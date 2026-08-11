@@ -1,0 +1,63 @@
+<app-top-bar />
+
+<div class="body">
+  <app-connections-sidebar
+    class="sidebar"
+    [style.width.px]="sidebarWidth()"
+    [connections]="connections()"
+    [explorerNodes]="explorerNodes()"
+    (toggleConnection)="toggleConnection($event)"
+    (toggleNode)="toggleNode($event)"
+  />
+
+  <app-resize-handle
+    axis="width"
+    [(size)]="sidebarWidth"
+    [min]="sidebarMin"
+    [max]="sidebarMax"
+    aria-label="Ancho del panel de conexiones"
+  />
+
+  <main class="main">
+    <app-editor-tabs
+      [tabs]="tabs()"
+      (select)="selectTab($event)"
+      (close)="closeTab($event)"
+      (create)="createTab()"
+    />
+
+    <app-editor-toolbar
+      [context]="editorContext()"
+      [running]="running()"
+      [hasSelection]="hasSelection()"
+      (execute)="onExecute()"
+      (executeSelection)="onExecute()"
+    />
+
+    <app-sql-editor
+      class="editor"
+      [value]="sql()"
+      (valueChange)="sql.set($event)"
+      (cursorChange)="onCursorChange($event)"
+      (selectionChange)="hasSelection.set($event)"
+      (execute)="onExecute()"
+    />
+
+    <app-resize-handle
+      axis="height"
+      [(size)]="resultsHeight"
+      [min]="resultsMin"
+      [max]="resultsMax"
+      [inverted]="true"
+      aria-label="Alto del panel de resultados"
+    />
+
+    <app-results-panel class="results" [style.height.px]="resultsHeight()" [resultSet]="resultSet()" />
+
+    <app-status-bar
+      [session]="session()"
+      [line]="cursor().line"
+      [column]="cursor().column"
+    />
+  </main>
+</div>

@@ -1,0 +1,48 @@
+<div class="brand">
+  <span class="brand__mark" aria-hidden="true"><span class="brand__core"></span></span>
+  <span class="brand__name">Druse</span>
+</div>
+
+<span class="divider" aria-hidden="true"></span>
+
+<div class="actions">
+  <button type="button" class="btn btn--primary" (click)="newConnection.emit()">
+    <app-icon name="plus" [size]="12" class="btn__icon" />
+    Nueva conexión
+  </button>
+  <button type="button" class="btn" (click)="newQuery.emit()">
+    <app-icon name="new-query" [size]="12" />
+    Nueva consulta
+  </button>
+</div>
+
+<div class="search-slot">
+  <div class="search">
+    <app-icon name="search" [size]="13" />
+    <span class="search__placeholder">Buscar tablas, consultas, conexiones…</span>
+    <kbd class="search__shortcut">⌘K</kbd>
+  </div>
+</div>
+
+<div class="trailing">
+  <div class="segmented" role="group" aria-label="Tema">
+    <button type="button" class="segmented__item" aria-label="Tema claro">
+      <app-icon name="sun" [size]="13" />
+    </button>
+    <button type="button" class="segmented__item is-active" aria-label="Tema oscuro" aria-pressed="true">
+      <app-icon name="moon" [size]="13" />
+    </button>
+  </div>
+
+  <button type="button" class="icon-button" aria-label="Preferencias">
+    <app-icon name="settings" [size]="15" />
+  </button>
+
+  <span class="divider divider--spaced" aria-hidden="true"></span>
+
+  <div class="window-controls" aria-hidden="true">
+    <span class="window-controls__dot window-controls__dot--minimize"></span>
+    <span class="window-controls__dot window-controls__dot--maximize"></span>
+    <span class="window-controls__dot window-controls__dot--close"></span>
+  </div>
+</div>

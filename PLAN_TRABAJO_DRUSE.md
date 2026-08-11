@@ -404,14 +404,14 @@ La solución compila, Angular inicia, la API responde en `/api/health` y existe 
 
 ### Tareas
 
-- [ ] Crear el layout general.
-- [ ] Implementar barra superior y barra de estado.
-- [ ] Crear panel redimensionable de conexiones.
-- [ ] Crear sistema de pestañas.
-- [ ] Integrar Monaco Editor con datos simulados.
-- [ ] Crear panel redimensionable de resultados.
-- [ ] Implementar tema oscuro y variables de diseño.
-- [ ] Crear la cuadrícula con datos simulados.
+- [x] Crear el layout general.
+- [x] Implementar barra superior y barra de estado.
+- [x] Crear panel redimensionable de conexiones.
+- [x] Crear sistema de pestañas.
+- [x] Integrar Monaco Editor con datos simulados.
+- [x] Crear panel redimensionable de resultados.
+- [x] Implementar tema oscuro y variables de diseño.
+- [x] Crear la cuadrícula con datos simulados.
 
 ### Criterio de salida
 

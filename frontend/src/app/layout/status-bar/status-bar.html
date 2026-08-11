@@ -1,0 +1,34 @@
+@if (session(); as s) {
+  <div class="item item--state">
+    <span class="dot" [class.dot--off]="!s.connected" aria-hidden="true"></span>
+    <span class="state-label">{{ s.connected ? 'Conectado' : 'Sin conexión' }}</span>
+  </div>
+
+  <span class="sep" aria-hidden="true"></span>
+
+  <div class="item">
+    <app-engine-badge [engine]="s.engine" [size]="13" class="engine" />
+    {{ s.engineVersion }}
+  </div>
+
+  <span class="sep" aria-hidden="true"></span>
+
+  <div class="item">Base de datos <span class="mono">{{ s.database }}</span></div>
+
+  <span class="sep" aria-hidden="true"></span>
+
+  <div class="item">Usuario <span class="mono">{{ s.user }}</span></div>
+
+  <span class="spacer"></span>
+
+  @if (s.lastDurationMs !== null) {
+    <div class="item">Última ejecución <span class="mono">{{ s.lastDurationMs }} ms</span></div>
+    <span class="sep" aria-hidden="true"></span>
+  }
+
+  <div class="item">Ln {{ line() }}, Col {{ column() }}</div>
+
+  <span class="sep" aria-hidden="true"></span>
+
+  <div class="item mono">{{ encoding() }}</div>
+}

@@ -1,0 +1,63 @@
+:host {
+  display: flex;
+  align-items: center;
+  height: var(--dr-statusbar-height);
+  flex: 0 0 var(--dr-statusbar-height);
+  padding: 0 12px;
+  background: var(--dr-surface-statusbar);
+  border-top: 1px solid #1b2130;
+  font-size: var(--dr-font-size-xs);
+  color: var(--dr-text-dim);
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 12px;
+
+  &--state {
+    padding: 0 12px 0 0;
+  }
+}
+
+.sep {
+  width: 1px;
+  height: 12px;
+  background: var(--dr-border);
+}
+
+.spacer {
+  flex: 1;
+}
+
+.dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--dr-success);
+  box-shadow: 0 0 6px rgb(61 220 151 / 80%);
+
+  &--off {
+    background: #3e4658;
+    box-shadow: none;
+  }
+}
+
+.state-label {
+  color: var(--dr-text-muted);
+}
+
+.mono {
+  font-family: var(--dr-font-mono);
+  color: var(--dr-text-muted);
+}
+
+// A este tamaño el distintivo necesita esquina y tipografía más pequeñas
+// que las que trae por defecto.
+.engine {
+  border-radius: 4px;
+  font-size: 7.5px;
+}

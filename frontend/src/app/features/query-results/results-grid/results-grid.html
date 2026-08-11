@@ -1,0 +1,44 @@
+<div class="head" role="row" [style.grid-template-columns]="gridTemplate()">
+  <div class="cell cell--check" role="columnheader">
+    <span class="checkbox" aria-hidden="true"></span>
+  </div>
+  @for (column of resultSet().columns; track column.name) {
+    <div class="cell cell--head" role="columnheader">
+      <span class="cell__name" [class.is-sorted]="!!column.sorted">{{ column.name }}</span>
+      @if (column.sorted) {
+        <app-icon name="sort-desc" [size]="9" class="cell__sort" />
+      }
+      <span class="cell__type">{{ column.dataType }}</span>
+    </div>
+  }
+</div>
+
+<div class="filters" role="row" [style.grid-template-columns]="gridTemplate()">
+  <div class="cell cell--check"></div>
+  @for (column of resultSet().columns; track column.name) {
+    <div class="cell cell--filter" [class.is-set]="!!column.filter">
+      {{ column.filter ?? 'filtrar…' }}
+    </div>
+  }
+</div>
+
+<div class="body">
+  @for (row of resultSet().rows; track row.number) {
+    <div class="row" role="row" [style.grid-template-columns]="gridTemplate()">
+      <div class="cell cell--number" role="cell">{{ row.number }}</div>
+      @for (column of resultSet().columns; track column.name; let i = $index) {
+        <div class="cell cell--value" role="cell" [attr.data-kind]="column.kind">
+          @if (row.values[i] === null) {
+            <span class="null">NULL</span>
+          } @else if (column.kind === 'boolean') {
+            <span class="pill">{{ row.values[i] }}</span>
+          } @else {
+            {{ row.values[i] }}
+          }
+        </div>
+      }
+    </div>
+  } @empty {
+    <p class="empty">La consulta no devolvió filas.</p>
+  }
+</div>
