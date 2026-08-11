@@ -1,0 +1,34 @@
+<main class="shell">
+  <section class="card">
+    <header class="card__header">
+      <span class="logo" aria-hidden="true"><span class="logo__core"></span></span>
+      <h1 class="wordmark">Druse</h1>
+    </header>
+
+    <p class="tagline">Fase 0 — verificación del flujo entre la interfaz y la API local.</p>
+
+    @if (checking()) {
+      <p class="state state--pending">Comprobando…</p>
+    } @else if (health(); as status) {
+      <p class="state state--ok">
+        <span class="dot" aria-hidden="true"></span>
+        API local activa
+      </p>
+      <dl class="detail">
+        <dt>Estado</dt>
+        <dd>{{ status.status }}</dd>
+        <dt>Versión</dt>
+        <dd>{{ status.version }}</dd>
+        <dt>Entorno</dt>
+        <dd>{{ status.environment }}</dd>
+      </dl>
+    } @else {
+      <p class="state state--error">{{ error() }}</p>
+      <p class="hint">Ejecuta <code>dotnet run</code> en <code>backend/src/Druse.Host.LocalApi</code>.</p>
+    }
+
+    <button type="button" class="button" (click)="check()" [disabled]="checking()">
+      Volver a comprobar
+    </button>
+  </section>
+</main>

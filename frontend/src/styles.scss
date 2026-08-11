@@ -1,0 +1,43 @@
+@use 'styles/tokens';
+
+// =============================================================================
+// Druse — estilos globales
+// El tema oscuro del mockup es el único tema del MVP (plan §3).
+// =============================================================================
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--dr-surface-outer);
+  color: var(--dr-text);
+  font-family: var(--dr-font-ui);
+  font-size: var(--dr-font-size);
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background: var(--dr-selection);
+}
+
+a {
+  color: var(--dr-accent);
+  text-decoration: none;
+
+  &:hover {
+    color: var(--dr-accent-bright);
+  }
+}
+
+code,
+pre {
+  font-family: var(--dr-font-mono);
+}

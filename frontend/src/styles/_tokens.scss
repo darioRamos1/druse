@@ -1,0 +1,99 @@
+// =============================================================================
+// Druse — design tokens
+//
+// Extraídos del mockup de referencia: docs/mockups/druse-main.html
+// Ver BITACORA.md §7 (Referencia extraída del mockup).
+//
+// Regla: ningún componente escribe un color literal. Todo pasa por estas variables.
+// =============================================================================
+
+:root {
+  // ---------------------------------------------------------------------------
+  // Superficies
+  // ---------------------------------------------------------------------------
+  --dr-surface-outer: #07080b; // fondo fuera de la ventana
+  --dr-surface-base: #0b0d11; // fondo principal: editor y área central
+  --dr-surface-panel: #0e1219; // sidebar, pestañas, toolbar, panel de resultados
+  --dr-surface-topbar: #101420;
+  --dr-surface-statusbar: #0c1018;
+  --dr-surface-grid-header: #121824;
+  --dr-surface-raised: #1b2233; // botones y elementos elevados
+  --dr-surface-raised-hover: #222b40;
+  --dr-surface-input: #0c1018;
+
+  // ---------------------------------------------------------------------------
+  // Bordes
+  // ---------------------------------------------------------------------------
+  --dr-border: #1e2534;
+  --dr-border-subtle: #232a38;
+  --dr-border-strong: #2a3348;
+
+  // ---------------------------------------------------------------------------
+  // Acentos
+  // ---------------------------------------------------------------------------
+  --dr-accent: #6c8bff;
+  --dr-accent-bright: #9fb0ff;
+  --dr-accent-alt: #9a7cff; // violeta del degradado del logo
+  --dr-accent-alt-soft: #a78bfa;
+  --dr-accent-gradient: linear-gradient(140deg, #6c8bff, #9a7cff);
+
+  // ---------------------------------------------------------------------------
+  // Estado
+  // ---------------------------------------------------------------------------
+  --dr-success: #3ddc97; // conectado
+  --dr-info: #7faee8;
+
+  // ---------------------------------------------------------------------------
+  // Texto
+  // ---------------------------------------------------------------------------
+  --dr-text: #e4e8f1;
+  --dr-text-bright: #dce3f0;
+  --dr-text-secondary: #c9d3e6;
+  --dr-text-muted: #b9c2d4;
+  --dr-text-tertiary: #8b96ab;
+  --dr-text-dim: #7c879c;
+  --dr-text-faint: #66728a;
+  --dr-text-faintest: #5e6a80;
+  --dr-text-disabled: #4c566b;
+
+  // ---------------------------------------------------------------------------
+  // Tipografía
+  //
+  // El mockup carga Inter y JetBrains Mono desde Google Fonts. La aplicación de
+  // escritorio debe funcionar sin conexión, así que en la Fase 1 hay que
+  // empaquetar las fuentes localmente en lugar de enlazarlas. Mientras tanto,
+  // la pila degrada a las fuentes del sistema.
+  // ---------------------------------------------------------------------------
+  --dr-font-ui: 'Inter', system-ui, -apple-system, 'Segoe UI', roboto, sans-serif;
+  --dr-font-mono: 'JetBrains Mono', 'Cascadia Code', consolas, 'Courier New', monospace;
+
+  --dr-font-size: 13px;
+  --dr-font-size-sm: 12.5px;
+  --dr-font-size-xs: 11.5px;
+  --dr-font-size-lg: 13.5px;
+
+  // ---------------------------------------------------------------------------
+  // Medidas del layout (mockup sobre lienzo 1440x900)
+  // ---------------------------------------------------------------------------
+  --dr-topbar-height: 46px;
+  --dr-sidebar-width: 274px;
+  --dr-sidebar-header-height: 38px;
+  --dr-tabs-height: 36px;
+  --dr-editor-toolbar-height: 42px;
+  --dr-editor-gutter-width: 44px;
+  --dr-results-height: 322px;
+  --dr-results-header-height: 36px;
+  --dr-grid-header-height: 31px;
+  --dr-statusbar-height: 26px;
+
+  // ---------------------------------------------------------------------------
+  // Formas y sombras
+  // ---------------------------------------------------------------------------
+  --dr-radius-window: 10px;
+  --dr-radius: 8px;
+  --dr-radius-sm: 7px;
+  --dr-radius-xs: 2px;
+  --dr-shadow-window: 0 24px 80px rgb(0 0 0 / 55%);
+  --dr-shadow-accent: 0 2px 10px rgb(108 139 255 / 45%);
+  --dr-selection: rgb(108 139 255 / 32%);
+}

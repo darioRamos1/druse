@@ -1,0 +1,104 @@
+root = true
+
+##
+## Druse — convenciones de código
+## Ver PLAN_TRABAJO_DRUSE.md §13 (Convenciones de trabajo)
+##
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 4
+
+[*.{md,markdown}]
+trim_trailing_whitespace = false
+indent_size = 2
+
+[*.{json,jsonc,json5,yml,yaml,xml,csproj,props,targets,sln}]
+indent_size = 2
+
+[*.{ts,js,mjs,cjs,html,scss,css}]
+indent_size = 2
+quote_type = single
+
+[*.{sh,bash}]
+end_of_line = lf
+
+[*.{cmd,bat,ps1}]
+end_of_line = crlf
+
+# ---------------------------------------------------------------------------
+# C#
+# ---------------------------------------------------------------------------
+[*.cs]
+indent_size = 4
+csharp_using_directive_placement = outside_namespace:warning
+csharp_style_namespace_declarations = file_scoped:warning
+csharp_prefer_braces = true:warning
+csharp_style_var_for_built_in_types = false:suggestion
+csharp_style_var_when_type_is_apparent = true:suggestion
+csharp_style_var_elsewhere = false:suggestion
+csharp_style_expression_bodied_methods = false:suggestion
+csharp_style_prefer_primary_constructors = true:suggestion
+csharp_new_line_before_open_brace = all
+csharp_new_line_before_else = true
+csharp_new_line_before_catch = true
+csharp_new_line_before_finally = true
+
+dotnet_sort_system_directives_first = true
+dotnet_separate_import_directive_groups = false
+dotnet_style_qualification_for_field = false:warning
+dotnet_style_qualification_for_property = false:warning
+dotnet_style_qualification_for_method = false:warning
+dotnet_style_require_accessibility_modifiers = for_non_interface_members:warning
+dotnet_style_readonly_field = true:warning
+dotnet_style_object_initializer = true:suggestion
+dotnet_style_collection_initializer = true:suggestion
+dotnet_style_coalesce_expression = true:suggestion
+dotnet_style_null_propagation = true:suggestion
+
+# Nomenclatura: interfaces con I
+dotnet_naming_rule.interfaces_should_be_prefixed_with_i.severity = warning
+dotnet_naming_rule.interfaces_should_be_prefixed_with_i.symbols = interface_symbols
+dotnet_naming_rule.interfaces_should_be_prefixed_with_i.style = prefix_i_pascal_case
+dotnet_naming_symbols.interface_symbols.applicable_kinds = interface
+dotnet_naming_style.prefix_i_pascal_case.required_prefix = I
+dotnet_naming_style.prefix_i_pascal_case.capitalization = pascal_case
+
+# Nomenclatura: campos privados con _
+dotnet_naming_rule.private_fields_should_be_camel_case_with_underscore.severity = warning
+dotnet_naming_rule.private_fields_should_be_camel_case_with_underscore.symbols = private_field_symbols
+dotnet_naming_rule.private_fields_should_be_camel_case_with_underscore.style = prefix_underscore_camel_case
+dotnet_naming_symbols.private_field_symbols.applicable_kinds = field
+dotnet_naming_symbols.private_field_symbols.applicable_accessibilities = private
+dotnet_naming_style.prefix_underscore_camel_case.required_prefix = _
+dotnet_naming_style.prefix_underscore_camel_case.capitalization = camel_case
+
+# Nomenclatura: tipos y miembros públicos en PascalCase
+dotnet_naming_rule.types_and_members_should_be_pascal_case.severity = warning
+dotnet_naming_rule.types_and_members_should_be_pascal_case.symbols = type_and_member_symbols
+dotnet_naming_rule.types_and_members_should_be_pascal_case.style = pascal_case_style
+dotnet_naming_symbols.type_and_member_symbols.applicable_kinds = class,struct,enum,property,method,event,delegate
+dotnet_naming_style.pascal_case_style.capitalization = pascal_case
+
+# Async: los métodos asíncronos terminan en Async (plan §5)
+dotnet_naming_rule.async_methods_end_in_async.severity = suggestion
+dotnet_naming_rule.async_methods_end_in_async.symbols = async_method_symbols
+dotnet_naming_rule.async_methods_end_in_async.style = suffix_async
+dotnet_naming_symbols.async_method_symbols.applicable_kinds = method
+dotnet_naming_symbols.async_method_symbols.required_modifiers = async
+dotnet_naming_style.suffix_async.required_suffix = Async
+dotnet_naming_style.suffix_async.capitalization = pascal_case
+
+# Reglas que protegen las decisiones del plan
+# CA2007: no exigir ConfigureAwait en un host sin SynchronizationContext
+dotnet_diagnostic.CA2007.severity = none
+# CA2100: SQL construido dinámicamente — es el propósito de la app, se revisa a mano
+dotnet_diagnostic.CA2100.severity = none
+# Pasar siempre CancellationToken (plan §5: cancelación de punta a punta)
+dotnet_diagnostic.CA2016.severity = warning
+# No exponer cadenas de conexión ni secretos en logs (plan §12)
+dotnet_diagnostic.CA1848.severity = suggestion

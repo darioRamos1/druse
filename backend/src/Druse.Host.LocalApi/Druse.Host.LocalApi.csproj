@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.10" />
+    <!--
+      Referencia directa para elevar la dependencia transitiva de Microsoft.AspNetCore.OpenApi,
+      que trae Microsoft.OpenApi 2.0.0 (CVE-2026-49451, GHSA-v5pm-xwqc-g5wc, CVSS 7.5).
+      Parcheado a partir de 2.7.5. Revisar si una versión futura del SDK ya la eleva.
+    -->
+    <PackageReference Include="Microsoft.OpenApi" Version="2.7.5" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Druse.Application\Druse.Application.csproj" />
+    <ProjectReference Include="..\Druse.Infrastructure\Druse.Infrastructure.csproj" />
+    <ProjectReference Include="..\Druse.Provider.PostgreSql\Druse.Provider.PostgreSql.csproj" />
+    <ProjectReference Include="..\Druse.Provider.SqlServer\Druse.Provider.SqlServer.csproj" />
+    <ProjectReference Include="..\Druse.Persistence.Sqlite\Druse.Persistence.Sqlite.csproj" />
+    <ProjectReference Include="..\Druse.Platform.Native\Druse.Platform.Native.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,19 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Druse.Application/Druse.Application.csproj" />
+    <Project Path="src/Druse.Database.Abstractions/Druse.Database.Abstractions.csproj" />
+    <Project Path="src/Druse.Domain/Druse.Domain.csproj" />
+    <Project Path="src/Druse.Host.LocalApi/Druse.Host.LocalApi.csproj" />
+    <Project Path="src/Druse.Infrastructure/Druse.Infrastructure.csproj" />
+    <Project Path="src/Druse.Persistence.Sqlite/Druse.Persistence.Sqlite.csproj" />
+    <Project Path="src/Druse.Platform.Abstractions/Druse.Platform.Abstractions.csproj" />
+    <Project Path="src/Druse.Platform.Native/Druse.Platform.Native.csproj" />
+    <Project Path="src/Druse.Provider.PostgreSql/Druse.Provider.PostgreSql.csproj" />
+    <Project Path="src/Druse.Provider.SqlServer/Druse.Provider.SqlServer.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Druse.IntegrationTests/Druse.IntegrationTests.csproj" />
+    <Project Path="tests/Druse.ProviderContractTests/Druse.ProviderContractTests.csproj" />
+    <Project Path="tests/Druse.UnitTests/Druse.UnitTests.csproj" />
+  </Folder>
+</Solution>

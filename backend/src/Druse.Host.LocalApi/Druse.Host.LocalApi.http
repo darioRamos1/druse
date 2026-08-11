@@ -1,0 +1,7 @@
+@Druse.Host.LocalApi_HostAddress = http://127.0.0.1:5177
+
+### Verificar que el proceso local está activo
+GET {{Druse.Host.LocalApi_HostAddress}}/api/health
+Accept: application/json
+
+###

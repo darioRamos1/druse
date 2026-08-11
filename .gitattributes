@@ -1,0 +1,56 @@
+# =============================================================================
+# Druse — normalización de finales de línea
+#
+# El repositorio se compila en Windows, Linux y macOS (ADR 0003). Sin esto,
+# core.autocrlf convierte todo a CRLF en Windows y los scripts de shell dejan
+# de funcionar en Linux: `#!/usr/bin/env bash\r` no es un intérprete válido.
+# =============================================================================
+
+# Por defecto: normalizar a LF en el repositorio, detectando binarios.
+* text=auto eol=lf
+
+# ---------------------------------------------------------------------------
+# Deben ser LF sí o sí
+# ---------------------------------------------------------------------------
+*.sh   text eol=lf
+*.bash text eol=lf
+
+# ---------------------------------------------------------------------------
+# Deben ser CRLF sí o sí (herramientas de Windows)
+# ---------------------------------------------------------------------------
+*.cmd text eol=crlf
+*.bat text eol=crlf
+*.ps1 text eol=crlf
+
+# ---------------------------------------------------------------------------
+# Binarios: nunca tocar
+# ---------------------------------------------------------------------------
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.gif  binary
+*.ico  binary
+*.icns binary
+*.pdf  binary
+*.zip  binary
+*.gz   binary
+*.woff binary
+*.woff2 binary
+*.ttf  binary
+*.otf  binary
+*.eot  binary
+*.dll  binary
+*.exe  binary
+*.pdb  binary
+*.snk  binary
+*.pfx  binary
+
+# ---------------------------------------------------------------------------
+# Diferencias más legibles
+# ---------------------------------------------------------------------------
+*.cs   text diff=csharp
+*.md   text diff=markdown
+*.html text diff=html
+
+# Generado: no ensuciar las revisiones de código
+package-lock.json linguist-generated=true -diff

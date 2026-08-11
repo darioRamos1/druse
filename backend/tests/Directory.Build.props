@@ -1,0 +1,15 @@
+<Project>
+
+  <!-- Hereda las propiedades comunes del backend. -->
+  <Import Project="$([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)../'))" />
+
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+    <!--
+      CA1707 prohíbe guiones bajos en los nombres de miembro. En las pruebas se usa
+      la convención Metodo_Escenario, que es deliberada y hace legible el informe.
+    -->
+    <NoWarn>$(NoWarn);CA1707</NoWarn>
+  </PropertyGroup>
+
+</Project>

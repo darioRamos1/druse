@@ -1,0 +1,134 @@
+// Pantalla provisional de la Fase 0. Usa exclusivamente los tokens del mockup.
+
+.shell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  background: var(--dr-surface-base);
+}
+
+.card {
+  width: 380px;
+  padding: 26px;
+  border: 1px solid var(--dr-border);
+  border-radius: var(--dr-radius-window);
+  background: var(--dr-surface-panel);
+  box-shadow: var(--dr-shadow-window);
+
+  &__header {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    margin-bottom: 14px;
+  }
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: var(--dr-radius-sm);
+  background: var(--dr-accent-gradient);
+  box-shadow: var(--dr-shadow-accent);
+
+  &__core {
+    width: 8px;
+    height: 8px;
+    border-radius: var(--dr-radius-xs);
+    background: var(--dr-surface-base);
+    transform: rotate(45deg);
+  }
+}
+
+.wordmark {
+  margin: 0;
+  font-size: var(--dr-font-size-lg);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.tagline {
+  margin: 0 0 18px;
+  color: var(--dr-text-dim);
+  font-size: var(--dr-font-size-sm);
+}
+
+.state {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 14px;
+  font-weight: 500;
+
+  &--ok {
+    color: var(--dr-success);
+  }
+
+  &--error {
+    color: var(--dr-accent-bright);
+  }
+
+  &--pending {
+    color: var(--dr-text-tertiary);
+  }
+}
+
+.dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--dr-success);
+}
+
+.detail {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 6px 16px;
+  margin: 0 0 20px;
+  font-size: var(--dr-font-size-sm);
+
+  dt {
+    color: var(--dr-text-faint);
+  }
+
+  dd {
+    margin: 0;
+    color: var(--dr-text-secondary);
+    font-family: var(--dr-font-mono);
+  }
+}
+
+.hint {
+  margin: 0 0 20px;
+  color: var(--dr-text-faint);
+  font-size: var(--dr-font-size-xs);
+
+  code {
+    color: var(--dr-text-muted);
+  }
+}
+
+.button {
+  height: 29px;
+  padding: 0 12px;
+  border: 1px solid var(--dr-border-strong);
+  border-radius: var(--dr-radius);
+  background: var(--dr-surface-raised);
+  color: var(--dr-text);
+  font-family: inherit;
+  font-size: var(--dr-font-size-sm);
+  font-weight: 500;
+  cursor: pointer;
+
+  &:hover:not(:disabled) {
+    background: var(--dr-surface-raised-hover);
+  }
+
+  &:disabled {
+    color: var(--dr-text-disabled);
+    cursor: default;
+  }
+}

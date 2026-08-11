@@ -1,0 +1,37 @@
+<Project>
+
+  <!--
+    Druse — propiedades comunes a todos los proyectos del backend.
+    Ver PLAN_TRABAJO_DRUSE.md §5 (Diseño del backend) y §12 (Seguridad).
+  -->
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <AnalysisLevel>latest-recommended</AnalysisLevel>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <InvariantGlobalization>true</InvariantGlobalization>
+  </PropertyGroup>
+
+  <!-- Metadatos del producto -->
+  <PropertyGroup>
+    <Product>Druse</Product>
+    <Company>Druse</Company>
+    <Authors>Druse</Authors>
+    <Version>0.1.0</Version>
+    <NeutralLanguage>es</NeutralLanguage>
+  </PropertyGroup>
+
+  <!--
+    Portabilidad (plan §2): la base de código debe compilar para Windows, Linux y macOS
+    en x64 y ARM64. Ningún proyecto puede fijar un RID aquí.
+  -->
+  <PropertyGroup>
+    <EnableWindowsTargeting>false</EnableWindowsTargeting>
+  </PropertyGroup>
+
+</Project>
