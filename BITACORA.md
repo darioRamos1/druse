@@ -10,30 +10,28 @@
 
 | Campo | Valor |
 | --- | --- |
-| Última sesión | **002** — 2026-08-11 |
-| Fase activa | **Fase 1 — Shell visual basado en el mockup** |
-| Fase 0 | ✅ **Cerrada.** 9/9 tareas y criterio de salida verificado. |
-| ¿Compila el backend? | Sí — `dotnet build backend/Druse.slnx`, 0 advertencias, 0 errores |
-| ¿Pasan las pruebas? | Sí — 7 en backend (4 arquitectura + 3 integración), 4 en frontend |
-| ¿Arranca el frontend? | Sí — `npm start` en 127.0.0.1:4200, con proxy hacia la API |
+| Última sesión | **003** — 2026-08-11 |
+| Fase activa | **Fase 2 — Flujo vertical PostgreSQL** |
+| Fase 0 | ✅ Cerrada. 9/9 tareas. |
+| Fase 1 | ✅ **Cerrada.** 8/8 tareas. |
+| ¿Compila el backend? | Sí — 0 advertencias, 0 errores |
+| ¿Compila el frontend? | Sí — 320 kB iniciales, 0 advertencias |
+| ¿Pasan las pruebas? | Sí — 7 en backend, 17 en frontend |
 | ¿Responde la API? | Sí — `GET /api/health` en 127.0.0.1:5177 |
 | Bloqueantes | Ninguno |
-| Git | Rama `main`, commit inicial `4ba1319` con 71 archivos. Árbol limpio. Sin remoto configurado. |
+| Git | Rama `feature/app-shell`, pendiente de fusionar en `main`. Sin remoto configurado. |
 
 ### Qué toca retomar en la próxima sesión
 
-1. Empezar la **Fase 1**: traducir `docs/mockups/druse-main.html` al shell de Angular, en este orden:
-   - layout general con las medidas ya extraídas (§7),
-   - barra superior y barra de estado,
-   - panel lateral de conexiones redimensionable,
-   - sistema de pestañas,
-   - Monaco Editor con datos simulados,
-   - panel de resultados redimensionable y cuadrícula simulada.
-2. Resolver **D-07** (fuentes Inter y JetBrains Mono empaquetadas localmente): la aplicación debe funcionar sin conexión, así que no puede enlazar Google Fonts como hace el mockup.
-3. Decidir la biblioteca de cuadrícula (**D-08**) antes de construir el panel de resultados.
-4. Opcional: crear el repositorio remoto y hacer `git push -u`. Todavía no hay remoto configurado.
-
-Según el plan §13, la Fase 1 va en una rama `feature/app-shell`, no directamente sobre `main`.
+1. **Fusionar `feature/app-shell` en `main`** y abrir `feature/postgresql-connection`.
+2. Empezar la **Fase 2** por el backend, en este orden:
+   - definir `IDatabaseProvider`, `IDatabaseSession`, `IDatabaseMetadataReader` e `IQueryExecutor` en `Druse.Database.Abstractions`;
+   - implementar `PostgreSqlDatabaseProvider` con Npgsql;
+   - endpoints de conexión, sesión y metadatos;
+   - ejecución de consulta con cancelación y límite de filas.
+3. **Antes de la Fase 2: verificar Docker** y levantar un PostgreSQL desechable para las pruebas de integración. Es el único prerrequisito externo.
+4. Sustituir los datos simulados: `frontend/src/app/shared/mock/mock-workspace.ts` debe desaparecer cuando el gateway devuelva datos reales.
+5. Pendiente de verificación visual: no se pudo comparar la pantalla con el mockup mediante captura porque la extensión de Chrome no estaba conectada. Queda comprobado por DOM y pruebas, pero conviene una revisión a ojo abriendo `npm start`.
 
 ---
 
@@ -99,6 +97,54 @@ Pendiente de verificar cuando toque: Docker (pruebas de integración con contene
 ---
 
 ## 5. Registro de sesiones
+
+### Sesión 003 — 2026-08-11 · Fase 1 completa
+
+**Objetivo:** reproducir el mockup como shell de Angular.
+
+**Hecho:**
+
+*Dependencias*
+- Fuentes **Inter** y **JetBrains Mono** empaquetadas con `@fontsource` y cargadas desde `angular.json`. **D-07 resuelto**: verificado que el CSS servido tiene **cero** referencias a Google Fonts y que los WOFF2 salen del propio servidor.
+- **Monaco Editor 0.56.0** copiado como recurso estático a `assets/monaco/vs`.
+
+*Componentes* (todos `OnPush`, todos con los tokens, ningún color literal suelto salvo los pocos matices que aún no eran token)
+- `layout/app-shell` — compone la ventana y sostiene el estado con Signals.
+- `layout/top-bar` — marca, acciones, búsqueda global, controles de ventana.
+- `layout/status-bar` — estado de sesión, motor, base, usuario, posición del cursor.
+- `features/connections/connections-sidebar` — conexiones y árbol del explorador con sangría por nivel.
+- `features/query-editor/editor-tabs` — pestañas con indicador de cambios sin guardar.
+- `features/query-editor/editor-toolbar` — ejecutar, ejecutar selección, cancelar, formatear, contexto y timeout.
+- `features/query-editor/sql-editor` — Monaco encapsulado; **ningún otro componente importa su API**.
+- `features/query-results/results-panel` y `results-grid` — separados a propósito (ver «Incidencias»).
+- `shared/ui/icon` — los 20 trazos del mockup en un solo sitio, con unión cerrada de nombres.
+- `shared/ui/engine-badge` — el color por motor vive aquí y solo aquí, para no ramificar por motor en las plantillas (plan §13).
+- `shared/ui/resize-handle` — arrastre con Pointer Events **y ajuste por teclado**, con `role="separator"` y valores ARIA.
+
+*Editor*
+- Tema `druse-dark` para Monaco derivado del mockup: violeta para reservadas, verde para literales, azul para identificadores.
+- Creado fuera de la zona de Angular para no disparar detección de cambios en cada pulsación.
+- `Ctrl/Cmd + Enter` ejecuta.
+- Autocompletado por palabras del documento **desactivado**: sin esquema real solo estorba. Se activa en la Fase 5 con metadatos.
+
+**Verificado:**
+- `ng build` — 320 kB iniciales, 0 advertencias.
+- `ng test` — 17 pruebas, todas pasan.
+- `dotnet test` — 7 pruebas, siguen pasando.
+- Servidor de desarrollo sirviendo `loader.js` de Monaco (39 kB) y los WOFF2 de ambas fuentes.
+
+**Incidencias resueltas:**
+1. **Monaco arrastraba una `dompurify` vulnerable** (3.4.8; avisos de XSS y de contaminación de configuración). `npm audit fix` proponía degradar Monaco a 0.53. En su lugar se añadió un `override` a `dompurify ^3.4.13`, que resuelve a la versión parcheada manteniendo Monaco 0.56.
+2. **El panel de resultados superaba el presupuesto de estilos de Angular** (5,45 kB sobre 4 kB). En vez de subir el límite se extrajo `results-grid`, que además aísla justo la pieza que habrá que sustituir al resolver D-08.
+
+**No hecho:**
+- **Sin captura visual comparada con el mockup:** la extensión de Chrome no estaba conectada. La estructura está verificada por DOM y pruebas, pero falta el vistazo a ojo.
+- El diálogo «Nueva conexión» del mockup **no se implementó**: pertenece a `connections`, no a la Fase 1.
+- Quedan 3 vulnerabilidades moderadas en `@angular/cli` (su servidor MCP interno, vía `@hono/node-server`). Son de desarrollo, no llegan al bundle, y la única «solución» sería degradar Angular a la 21. Se espera actualización.
+
+**Archivos:** 30 nuevos en `frontend/src/app`, más `angular.json` y `package.json`.
+
+---
 
 ### Sesión 002 — 2026-08-11 · Fase 0 completa
 
@@ -195,17 +241,21 @@ Pendiente de verificar cuando toque: Docker (pruebas de integración con contene
 | D-03 | **El mockup HTML es la fuente de verdad**, no un PNG. Los tokens ya se extrajeron a SCSS; la comparación visual se hará por captura. | 2026-08-11 |
 | D-04 | **Angular 22.1.0**, zoneless, con Signals y Vitest. Sin NgRx hasta que haya necesidad comprobada. | 2026-08-11 |
 | D-05 | **Nombre del producto: Druse**, sin sufijo. Ver §3. | 2026-08-11 |
+| D-07 | **Fuentes empaquetadas con `@fontsource`**, no enlazadas desde Google Fonts. La aplicación funciona sin conexión. Inter y JetBrains Mono son de licencia abierta (SIL OFL). | 2026-08-11 |
 | D-09 | **Formato de solución `.slnx`**, el nuevo de .NET 10. Requiere VS 2022 17.13+ o Rider recientes. | 2026-08-11 |
+| D-12 | **Monaco se carga con su cargador AMD desde `assets`**, no como ESM a través del bundler. Sus *web workers* se resuelven solos y queda fuera del bundle inicial. Encapsulado por completo en `SqlEditor`. | 2026-08-11 |
+| D-13 | **`dompurify` fijado con `override` a ^3.4.13** en lugar de degradar Monaco. Revisar cuando Monaco actualice su dependencia. | 2026-08-11 |
 | D-10 | **La integración continua no genera instaladores todavía.** Compila, prueba y verifica la publicación autocontenida. El empaquetado llega en la Fase 7 (ADR 0003). | 2026-08-11 |
 
 ### Abiertas
 
 | ID | Decisión | Opciones | Estado |
 | --- | --- | --- | --- |
-| D-06 | Wordmark del mockup | El HTML original decía «Quarzo Studio». Se aplicará «Druse» al construir el shell en la Fase 1; el HTML del mockup no se retoca. | Abierta — resolver en Fase 1 |
-| D-07 | Fuentes Inter y JetBrains Mono | El mockup las carga desde Google Fonts, lo que rompe el funcionamiento sin conexión. Propuesta: empaquetarlas localmente como WOFF2 y comprobar sus licencias (ambas son de fuente abierta). | **Abierta — bloquea la fidelidad de la Fase 1** |
-| D-08 | Biblioteca de cuadrícula | El plan sugiere AG Grid Community «o equivalente». Evaluar también una implementación propia con virtualización, dado que los requisitos son acotados. | Abierta — antes del panel de resultados |
+| D-08 | Biblioteca de cuadrícula | Aplazada a propósito. La cuadrícula de la Fase 1 es una rejilla CSS propia, ya aislada en `results-grid`. Con datos reales se decidirá entre AG Grid Community y una virtualización propia; los requisitos son bastante acotados. | Abierta — **Fase 6**, no antes |
 | D-11 | Optimización del ejecutable | La publicación autocontenida pesa 107 MB. Evaluar trimming y ReadyToRun. | Abierta — Fase 7 |
+| D-14 | Estado del shell | Hoy vive en Signals dentro de `AppShell`. Al llegar los datos reales hay que decidir si se reparte en servicios por funcionalidad. Sigue en pie no incorporar NgRx sin necesidad comprobada. | Abierta — Fase 2 |
+
+_D-06 (wordmark) quedó resuelta al construir el shell: la barra superior dice «Druse». El HTML del mockup no se retocó._
 
 ---
 
@@ -265,8 +315,8 @@ Fuente: `docs/mockups/druse-main.html`. **Ya implementado** en `frontend/src/sty
 | Fase | Descripción | Estado |
 | --- | --- | --- |
 | 0 | Preparación y decisiones | ✅ **Cerrada** — 9/9 |
-| 1 | Shell visual basado en el mockup | 🔄 **Activa** — 0/8 |
-| 2 | Flujo vertical PostgreSQL | ⬜ No iniciada |
+| 1 | Shell visual basado en el mockup | ✅ **Cerrada** — 8/8 |
+| 2 | Flujo vertical PostgreSQL | 🔄 **Activa** — 0/11 |
 | 3 | Persistencia local y seguridad | ⬜ No iniciada |
 | 4 | SQL Server | ⬜ No iniciada |
 | 5 | Productividad del editor | ⬜ No iniciada |
@@ -280,18 +330,29 @@ Fuente: `docs/mockups/druse-main.html`. **Ya implementado** en `frontend/src/sty
 
 Los cuatro puntos están verificados con ejecución real, no por inspección.
 
-### Fase 1 — detalle
+### Fase 1 — criterio de salida ✅
 
-- [ ] Crear el layout general.
-- [ ] Implementar barra superior y barra de estado.
-- [ ] Crear panel redimensionable de conexiones.
-- [ ] Crear sistema de pestañas.
-- [ ] Integrar Monaco Editor con datos simulados.
-- [ ] Crear panel redimensionable de resultados.
-- [ ] Implementar tema oscuro y variables de diseño. _(Tokens ya listos desde la Fase 0.)_
-- [ ] Crear la cuadrícula con datos simulados. _(Depende de D-08.)_
+> «La pantalla reproduce el mockup con proporciones, colores y comportamiento de paneles consistente, todavía sin conexión real.»
 
-**Criterio de salida:** la pantalla reproduce el mockup con proporciones, colores y comportamiento de paneles consistente, todavía sin conexión real.
+Proporciones y colores salen de los tokens extraídos del propio mockup, y los dos paneles se redimensionan con ratón y con teclado. **Pendiente el visto bueno a ojo**: la comparación por captura no se pudo hacer.
+
+### Fase 2 — detalle
+
+- [ ] Implementar `IDatabaseProvider`.
+- [ ] Crear `PostgreSqlDatabaseProvider` con Npgsql.
+- [ ] Crear y probar una conexión PostgreSQL.
+- [ ] Abrir y cerrar sesiones.
+- [ ] Obtener bases, esquemas, tablas, vistas y columnas.
+- [ ] Mostrar los metadatos con carga perezosa en el árbol.
+- [ ] Ejecutar una consulta desde Monaco.
+- [ ] Mostrar columnas, tipos, filas, duración y mensajes.
+- [ ] Ejecutar solamente el texto seleccionado.
+- [ ] Cancelar consultas.
+- [ ] Limitar filas y configurar timeout.
+
+**Criterio de salida:** un usuario puede conectarse a PostgreSQL, navegar hasta una tabla, ejecutar un `SELECT`, ver el resultado y cancelar una consulta larga.
+
+**Prerrequisito:** una instancia PostgreSQL de prueba. Verificar Docker antes de empezar.
 
 ---
 
@@ -299,12 +360,13 @@ Los cuatro puntos están verificados con ejecución real, no por inspección.
 
 | Riesgo | Impacto | Mitigación |
 | --- | --- | --- |
-| Fuentes enlazadas desde Google Fonts | Rompe el funcionamiento sin conexión, que es el punto de una app de escritorio | D-07: empaquetar WOFF2 localmente en la Fase 1 |
+| **Sin PostgreSQL de prueba** | **Bloquea la Fase 2, que es la activa** | Contenedor Docker desechable. Verificar Docker en la próxima sesión |
 | Rust no instalado | Bloquea la Fase 7 | Instalar antes de empezarla; no urge |
-| Sin PostgreSQL ni SQL Server de prueba | Bloquea Fases 2 y 4 | Contenedores Docker desechables; verificar Docker antes de la Fase 2 |
 | Ejecutable de 107 MB | Instalador pesado | D-11: trimming y ReadyToRun en la Fase 7 |
-| Dependencias con vulnerabilidades en plantillas | Ya ocurrió con `Microsoft.OpenApi` | `TreatWarningsAsErrors` lo detecta al compilar; revisar en cada actualización del SDK |
-| Monaco Editor pesa lo suyo | Presupuesto de bundle de Angular (1 MB de límite) | Cargarlo de forma diferida y ajustar el presupuesto al integrarlo |
+| Dependencias con vulnerabilidades en plantillas | Ya pasó dos veces: `Microsoft.OpenApi` y `dompurify` | En backend lo caza `TreatWarningsAsErrors`; en frontend, `npm audit` en cada instalación |
+| 3 vulnerabilidades moderadas en `@angular/cli` | Solo desarrollo; no llegan al bundle | Esperar actualización de Angular. Degradar a la 21 sería peor |
+| Fidelidad visual no comprobada a ojo | El shell podría desviarse del mockup en detalles | Revisar con `npm start` junto a `docs/mockups/druse-main.html` |
+| Los datos simulados podrían filtrarse a producción | `mock-workspace.ts` es solo de la Fase 1 | Debe borrarse en la Fase 2. Ningún componente lo importa: solo `AppShell` |
 | Identificador `druse` no reservado | Podría ocuparlo otro | Reservar dominio, org de GitHub y NuGet/npm cuando haya algo publicable |
 
 ---

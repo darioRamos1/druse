@@ -1,0 +1,235 @@
+:host {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+  background: var(--dr-surface-panel);
+  border-top: 1px solid #1b2130;
+  overflow: hidden;
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  height: var(--dr-results-header-height);
+  flex: 0 0 var(--dr-results-header-height);
+  padding: 0 10px;
+  border-bottom: 1px solid #171d2a;
+}
+
+.tabs {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+.tab {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  height: 26px;
+  flex: none;
+  padding: 0 11px;
+  border: 0;
+  border-radius: var(--dr-radius-sm);
+  background: transparent;
+  color: var(--dr-text-tertiary);
+  font-family: inherit;
+  font-size: var(--dr-font-size-sm);
+  white-space: nowrap;
+  cursor: pointer;
+
+  &:hover:not(.is-active) {
+    background: #151b27;
+    color: var(--dr-text-secondary);
+  }
+
+  &.is-active {
+    background: var(--dr-surface-raised);
+    color: var(--dr-text);
+    font-weight: 500;
+  }
+
+  &__count {
+    padding: 1px 5px;
+    border-radius: 4px;
+    background: rgb(108 139 255 / 15%);
+    color: var(--dr-accent-bright);
+    font-family: var(--dr-font-mono);
+    font-size: 10.5px;
+  }
+}
+
+.spacer {
+  flex: 1;
+}
+
+.tool-button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 26px;
+  flex: none;
+  margin-left: 6px;
+  padding: 0 9px;
+  border: 1px solid var(--dr-border-subtle);
+  border-radius: var(--dr-radius-sm);
+  background: transparent;
+  color: var(--dr-text-muted);
+  font-family: inherit;
+  font-size: 12px;
+  white-space: nowrap;
+  cursor: pointer;
+
+  &:hover {
+    background: #151b27;
+    color: var(--dr-text);
+  }
+
+  &.is-on {
+    border-color: rgb(108 139 255 / 35%);
+    color: var(--dr-accent-bright);
+  }
+
+  &__hint {
+    color: var(--dr-text-faintest);
+    font-size: 11px;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Pie
+// ---------------------------------------------------------------------------
+.foot {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 36px;
+  flex: 0 0 36px;
+  padding: 0 12px;
+  border-top: 1px solid #1b2130;
+  background: var(--dr-surface-topbar);
+  font-size: 12px;
+
+  &__item {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    color: var(--dr-text-muted);
+    white-space: nowrap;
+
+    &--muted {
+      color: var(--dr-text-tertiary);
+    }
+  }
+}
+
+.dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--dr-success);
+  box-shadow: 0 0 6px rgb(61 220 151 / 70%);
+}
+
+.sep {
+  width: 1px;
+  height: 16px;
+  background: var(--dr-border);
+}
+
+.mono {
+  font-family: var(--dr-font-mono);
+  color: var(--dr-text);
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 23px;
+  padding: 0 8px;
+  border: 1px solid #212939;
+  border-radius: 6px;
+  background: var(--dr-surface-input);
+  color: var(--dr-text-secondary);
+  font-family: var(--dr-font-mono);
+  font-size: 11.5px;
+}
+
+.pager {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+
+  &__arrow,
+  &__page {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 23px;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--dr-text-tertiary);
+    font-family: var(--dr-font-mono);
+    font-size: 11.5px;
+    cursor: pointer;
+  }
+
+  &__arrow {
+    width: 23px;
+    border-color: #212939;
+    color: var(--dr-text-muted);
+    font-family: inherit;
+    font-size: 11px;
+
+    &:disabled {
+      color: #3e4658;
+      cursor: default;
+    }
+
+    &:hover:not(:disabled) {
+      background: #151b27;
+    }
+  }
+
+  &__page {
+    min-width: 23px;
+    padding: 0 7px;
+
+    &:hover:not(.is-current) {
+      background: #151b27;
+    }
+
+    &.is-current {
+      border-color: var(--dr-border-strong);
+      background: var(--dr-surface-raised);
+      color: var(--dr-text);
+    }
+  }
+
+  &__range {
+    margin-left: 6px;
+    color: var(--dr-text-faintest);
+    font-size: 11.5px;
+    white-space: nowrap;
+  }
+}
+
+.empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  color: var(--dr-text-faint);
+  font-size: var(--dr-font-size-sm);
+}

@@ -1,0 +1,39 @@
+:host {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+  background: var(--dr-surface-base);
+  color: var(--dr-text);
+}
+
+.body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
+.sidebar {
+  flex: none;
+  // El ancho lo fija el shell mediante [style.width.px]; el mínimo evita que
+  // el contenido se rompa mientras se arrastra el tirador.
+  min-width: 0;
+}
+
+.main {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  background: var(--dr-surface-base);
+}
+
+.editor {
+  flex: 1;
+  min-height: 0;
+}
+
+.results {
+  flex: none;
+  min-height: 0;
+}

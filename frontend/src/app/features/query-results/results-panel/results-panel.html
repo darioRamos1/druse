@@ -1,0 +1,92 @@
+<header class="head">
+  <div class="tabs" role="tablist">
+    <button
+      type="button"
+      class="tab"
+      role="tab"
+      [class.is-active]="activeTab() === 'results'"
+      [attr.aria-selected]="activeTab() === 'results'"
+      (click)="select('results')"
+    >
+      Resultados
+      <span class="tab__count">{{ resultSet().rows.length }}</span>
+    </button>
+    <button
+      type="button"
+      class="tab"
+      role="tab"
+      [class.is-active]="activeTab() === 'messages'"
+      [attr.aria-selected]="activeTab() === 'messages'"
+      (click)="select('messages')"
+    >
+      Mensajes
+    </button>
+    <button
+      type="button"
+      class="tab"
+      role="tab"
+      [class.is-active]="activeTab() === 'plan'"
+      [attr.aria-selected]="activeTab() === 'plan'"
+      (click)="select('plan')"
+    >
+      Plan de ejecución
+    </button>
+    <button
+      type="button"
+      class="tab"
+      role="tab"
+      [class.is-active]="activeTab() === 'history'"
+      [attr.aria-selected]="activeTab() === 'history'"
+      (click)="select('history')"
+    >
+      Historial
+    </button>
+  </div>
+
+  <span class="spacer"></span>
+
+  <button type="button" class="tool-button" [class.is-on]="hasFilters()">
+    <app-icon name="filter" [size]="12" />
+    Filtros
+  </button>
+  <button type="button" class="tool-button">
+    <app-icon name="export" [size]="12" />
+    Exportar
+    <span class="tool-button__hint">CSV · Excel</span>
+  </button>
+</header>
+
+@if (activeTab() === 'results') {
+  <app-results-grid [resultSet]="resultSet()" />
+
+  <footer class="foot">
+    <div class="foot__item">
+      <span class="dot" aria-hidden="true"></span>
+      {{ resultSet().rows.length }} filas obtenidas en
+      <span class="mono">{{ resultSet().durationMs }} ms</span>
+    </div>
+
+    <span class="sep" aria-hidden="true"></span>
+
+    <div class="foot__item foot__item--muted">
+      Filas por página
+      <span class="chip">
+        {{ pageSize() }}
+        <app-icon name="chevron-down" [size]="9" />
+      </span>
+    </div>
+
+    <span class="spacer"></span>
+
+    <nav class="pager" aria-label="Paginación">
+      <button type="button" class="pager__arrow" disabled aria-label="Página anterior">‹</button>
+      <button type="button" class="pager__page is-current" aria-current="page">1</button>
+      <button type="button" class="pager__page">2</button>
+      <button type="button" class="pager__page">3</button>
+      <button type="button" class="pager__arrow" aria-label="Página siguiente">›</button>
+      <span class="pager__range">{{ rangeLabel() }}</span>
+    </nav>
+  </footer>
+} @else {
+  <div class="empty">Sin contenido todavía. Esta vista se implementa en una fase posterior.</div>
+}

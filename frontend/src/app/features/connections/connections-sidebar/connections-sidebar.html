@@ -1,0 +1,115 @@
+<header class="head">
+  <h2 class="head__title">Conexiones</h2>
+  <div class="head__actions">
+    <button type="button" class="mini-button" title="Actualizar" (click)="refresh.emit()">
+      <app-icon name="refresh" [size]="13" />
+    </button>
+    <button
+      type="button"
+      class="mini-button mini-button--accent"
+      title="Agregar conexión"
+      (click)="addConnection.emit()"
+    >
+      <app-icon name="plus" [size]="13" />
+    </button>
+  </div>
+</header>
+
+<div class="filter-row">
+  <div class="filter">
+    <app-icon name="search" [size]="12" />
+    <span class="filter__placeholder">Filtrar conexiones</span>
+  </div>
+</div>
+
+<div class="tree" role="tree">
+  @for (connection of connections(); track connection.id) {
+    <button
+      type="button"
+      class="node node--connection"
+      [class.is-active]="connection.expanded"
+      [class.is-offline]="connection.state !== 'connected'"
+      role="treeitem"
+      [attr.aria-expanded]="connection.expanded"
+      (click)="toggleConnection.emit(connection.id)"
+    >
+      <app-icon
+        name="chevron-down"
+        [size]="10"
+        class="node__chevron"
+        [class.is-collapsed]="!connection.expanded"
+      />
+      <app-engine-badge [engine]="connection.engine" />
+      <span class="node__label">{{ connection.name }}</span>
+
+      @if (connection.expanded) {
+        <span class="node__tools">
+          <span class="tool" title="Actualizar"><app-icon name="refresh" [size]="11" /></span>
+          <span class="tool" title="Abrir consola SQL"><app-icon name="console" [size]="11" /></span>
+          <span class="tool tool--danger" title="Desconectar"><app-icon name="disconnect" [size]="11" /></span>
+        </span>
+      }
+
+      <span
+        class="status-dot"
+        [class.status-dot--off]="connection.state !== 'connected'"
+        [attr.title]="connection.state === 'connected' ? 'Conectado' : 'Sin conexión'"
+      ></span>
+    </button>
+
+    @if (connection.expanded) {
+      @for (node of explorerNodes(); track node.id) {
+        <button
+          type="button"
+          class="node node--object"
+          [class.is-selected]="node.selected"
+          [style.padding-left.px]="indentFor(node)"
+          role="treeitem"
+          [attr.aria-expanded]="node.expandable ? !!node.expanded : null"
+          (click)="toggleNode.emit(node.id)"
+        >
+          @if (node.expandable) {
+            <app-icon
+              name="chevron-down"
+              [size]="10"
+              class="node__chevron"
+              [class.is-collapsed]="!node.expanded"
+              [class.is-open]="node.expanded"
+            />
+          } @else {
+            <span class="node__chevron-spacer" aria-hidden="true"></span>
+          }
+
+          @switch (node.kind) {
+            @case ('database') {
+              <span class="node__marker" aria-hidden="true"></span>
+            }
+            @default {
+              @if (iconFor(node); as icon) {
+                <app-icon [name]="icon" [size]="12" class="node__icon" />
+              } @else if (node.kind === 'folder' && node.label === 'Databases') {
+                <app-icon name="database" [size]="13" class="node__icon" />
+              }
+            }
+          }
+
+          <span class="node__label" [class.is-mono]="node.kind === 'table' || node.kind === 'view'">
+            {{ node.label }}
+            @if (node.hint) {
+              <span class="node__hint">{{ node.hint }}</span>
+            }
+          </span>
+
+          @if (node.badge) {
+            <span class="node__badge">{{ node.badge }}</span>
+          }
+        </button>
+      }
+    }
+  }
+</div>
+
+<footer class="foot">
+  <span>{{ connections().length }} conexiones · {{ activeCount() }} activas</span>
+  <span class="foot__version">v0.1.0</span>
+</footer>

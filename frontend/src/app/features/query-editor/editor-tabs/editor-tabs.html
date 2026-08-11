@@ -1,0 +1,31 @@
+<div class="tabs" role="tablist">
+  @for (tab of tabs(); track tab.id) {
+    <div
+      class="tab"
+      [class.is-active]="tab.active"
+      role="tab"
+      [attr.aria-selected]="tab.active"
+      tabindex="0"
+      (click)="select.emit(tab.id)"
+      (keydown.enter)="select.emit(tab.id)"
+      (keydown.space)="select.emit(tab.id)"
+    >
+      @if (tab.dirty) {
+        <span class="tab__dirty" title="Cambios sin guardar" aria-label="Cambios sin guardar"></span>
+      }
+      <span class="tab__title">{{ tab.title }}</span>
+      <button
+        type="button"
+        class="tab__close"
+        [attr.aria-label]="'Cerrar ' + tab.title"
+        (click)="onClose($event, tab.id)"
+      >
+        ×
+      </button>
+    </div>
+  }
+
+  <button type="button" class="tabs__add" aria-label="Nueva consulta" (click)="create.emit()">+</button>
+</div>
+
+<div class="meta">{{ encoding() }}</div>
