@@ -18,20 +18,22 @@
 | ¿Arranca el frontend? | Sí — `npm start` en 127.0.0.1:4200, con proxy hacia la API |
 | ¿Responde la API? | Sí — `GET /api/health` en 127.0.0.1:5177 |
 | Bloqueantes | Ninguno |
-| Sin commitear | Sí — 70 archivos en el árbol de trabajo, esperando el primer commit |
+| Git | Rama `main`, commit inicial `4ba1319` con 71 archivos. Árbol limpio. Sin remoto configurado. |
 
 ### Qué toca retomar en la próxima sesión
 
-1. **Hacer el primer commit.** El repositorio está inicializado (rama `main`) pero no hay ningún commit todavía.
-2. Empezar la **Fase 1**: traducir `docs/mockups/druse-main.html` al shell de Angular, en este orden:
+1. Empezar la **Fase 1**: traducir `docs/mockups/druse-main.html` al shell de Angular, en este orden:
    - layout general con las medidas ya extraídas (§7),
    - barra superior y barra de estado,
    - panel lateral de conexiones redimensionable,
    - sistema de pestañas,
    - Monaco Editor con datos simulados,
    - panel de resultados redimensionable y cuadrícula simulada.
-3. Resolver **D-07** (fuentes Inter y JetBrains Mono empaquetadas localmente): la aplicación debe funcionar sin conexión, así que no puede enlazar Google Fonts como hace el mockup.
-4. Decidir la biblioteca de cuadrícula (**D-08**) antes de construir el panel de resultados.
+2. Resolver **D-07** (fuentes Inter y JetBrains Mono empaquetadas localmente): la aplicación debe funcionar sin conexión, así que no puede enlazar Google Fonts como hace el mockup.
+3. Decidir la biblioteca de cuadrícula (**D-08**) antes de construir el panel de resultados.
+4. Opcional: crear el repositorio remoto y hacer `git push -u`. Todavía no hay remoto configurado.
+
+Según el plan §13, la Fase 1 va en una rama `feature/app-shell`, no directamente sobre `main`.
 
 ---
 
@@ -146,8 +148,11 @@ Pendiente de verificar cuando toque: Docker (pruebas de integración con contene
 2. **`.slnx` en vez de `.sln`.** .NET 10 genera el formato nuevo. Se mantiene; el plan quedó actualizado.
 3. **CA1707 contra los nombres de prueba.** Los analizadores prohibían los guiones bajos de `Metodo_Escenario`. Desactivada solo para `tests/` mediante un `Directory.Build.props` propio.
 
+*Cierre*
+- `.gitattributes` que normaliza a LF. Sin él, `core.autocrlf` de Windows convertía todo a CRLF y `dev.sh` habría dejado de funcionar en Linux: `#!/usr/bin/env bash\r` no es un intérprete válido. Los `.ps1` y `.cmd` quedan forzados a CRLF.
+- Commit inicial `4ba1319`: 71 archivos, 4861 inserciones. Sin remoto configurado.
+
 **No hecho:**
-- **Sin commit.** El repositorio está inicializado pero no hay ningún commit; se dejó a criterio del autor.
 - `Druse.ProviderContractTests` está vacío a propósito: se llena en las Fases 2 y 4.
 - Sin trimming ni ReadyToRun en la publicación (107 MB). Optimizar en la Fase 7.
 
