@@ -102,9 +102,26 @@ La dirección de las dependencias apunta siempre al núcleo. Está fijada por pr
 | [`docs/decisions/`](docs/decisions/) | ADR de las decisiones estructurales |
 | [`docs/mockups/druse-main.html`](docs/mockups/druse-main.html) | Mockup de referencia de la interfaz |
 
+## Dónde guarda Druse tus datos
+
+| Qué | Dónde |
+| --- | --- |
+| Perfiles de conexión, historial y preferencias | `druse.db` en el directorio de datos del usuario |
+| Contraseñas | Almacén del sistema: Administrador de credenciales, Llavero o Secret Service |
+| Token de la API | `api-token`, junto a la base; se regenera en cada arranque |
+
+Directorio de datos por plataforma:
+
+- **Windows:** `%APPDATA%\Druse`
+- **macOS:** `~/Library/Application Support/Druse`
+- **Linux:** `$XDG_DATA_HOME/druse` (por defecto `~/.local/share/druse`)
+
+Si el sistema no ofrece un almacén seguro, Druse **no guarda la contraseña** y la pide en cada conexión, indicándolo en la interfaz. Ver [ADR 0004](docs/decisions/0004-almacenamiento-de-secretos-y-token-local.md).
+
 ## Seguridad
 
-- Las contraseñas nunca se guardan en el repositorio, en `appsettings.json` ni en SQLite en texto plano.
-- Los secretos van al almacén seguro del sistema operativo.
+- Las contraseñas nunca se guardan en el repositorio, en `appsettings.json` ni en SQLite. La tabla de perfiles no tiene columna para ellas, y hay pruebas que lo comprueban.
 - Las respuestas de la API no devuelven credenciales ni cadenas de conexión.
-- La API local no se expone a la red.
+- La API local escucha solo en loopback **y exige un token**: sin él, cualquier proceso de la máquina podría abrir sesiones contra tus bases de datos.
+- Las instrucciones destructivas (`DROP`, `TRUNCATE`, `DELETE` sin filtro) exigen confirmación explícita.
+- Una conexión marcada como solo lectura rechaza cualquier instrucción que escriba, y confirmar un riesgo no permite saltarse esa marca.

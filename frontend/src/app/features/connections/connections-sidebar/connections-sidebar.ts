@@ -39,10 +39,38 @@ export class ConnectionsSidebar {
 
   readonly addConnection = output<void>();
   readonly toggleConnection = output<string>();
+  readonly connectSaved = output<string>();
   readonly toggleNode = output<string>();
   readonly refreshNode = output<string>();
   readonly disconnect = output<string>();
+  readonly forget = output<string>();
   readonly openNode = output<ExplorerNode>();
+
+  /**
+   * Un clic sobre una conexión guardada y desconectada la abre; sobre una ya
+   * conectada, solo pliega o despliega su árbol.
+   */
+  protected activate(connection: ConnectionSummary): void {
+    if (connection.state === 'disconnected' && connection.saved) {
+      this.connectSaved.emit(connection.id);
+      return;
+    }
+
+    this.toggleConnection.emit(connection.id);
+  }
+
+  protected statusLabel(connection: ConnectionSummary): string {
+    switch (connection.state) {
+      case 'connected':
+        return 'Conectado';
+      case 'connecting':
+        return 'Conectando…';
+      case 'error':
+        return 'Error de conexión';
+      default:
+        return 'Sin conexión. Haz clic para conectar.';
+    }
+  }
 
   protected readonly activeCount = computed(
     () => this.connections().filter((connection) => connection.state === 'connected').length,

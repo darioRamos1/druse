@@ -5,11 +5,15 @@ import { Observable, of, throwError } from 'rxjs';
 import {
   ApplicationGateway,
   ExecuteQueryRequest,
+  SaveConnectionRequest,
 } from '../application-gateway/application-gateway';
 import {
   ConnectionForm,
   DatabaseObject,
+  QueryHistoryEntry,
   QueryResult,
+  SavedConnection,
+  SecretStoreStatus,
   SessionInfo,
 } from '../../shared/models/workspace';
 import { WorkspaceStore } from './workspace-store';
@@ -23,6 +27,10 @@ const form: ConnectionForm = {
   username: 'postgres',
   password: 'secreta',
   readOnly: false,
+  environment: 'development',
+  // Sin guardar: las pruebas de conexión no deben tocar la persistencia.
+  save: false,
+  storePassword: false,
 };
 
 const session: SessionInfo = {
@@ -71,8 +79,59 @@ function successfulQuery(overrides: Partial<QueryResult> = {}): QueryResult {
 class FakeGateway implements Partial<ApplicationGateway> {
   executeCalls: ExecuteQueryRequest[] = [];
   closedSessions: string[] = [];
+  saveCalls: SaveConnectionRequest[] = [];
+  deletedConnections: string[] = [];
+  openSavedCalls: { id: string; password?: string }[] = [];
   openShouldFail = false;
+  savedConnectionMissingPassword = false;
   executeResult: Observable<QueryResult> = of(successfulQuery());
+  savedConnections: SavedConnection[] = [];
+
+  getSavedConnections(): Observable<readonly SavedConnection[]> {
+    return of(this.savedConnections);
+  }
+
+  getSecretStoreStatus(): Observable<SecretStoreStatus> {
+    return of({ available: true, description: 'Almacén de prueba' });
+  }
+
+  saveConnection(request: SaveConnectionRequest): Observable<SavedConnection> {
+    this.saveCalls.push(request);
+
+    return of({
+      id: request.profile.id ?? 'perfil-1',
+      name: request.profile.name,
+      engine: request.profile.engine,
+      host: request.profile.host,
+      port: request.profile.port,
+      database: request.profile.database,
+      username: request.profile.username,
+      environment: 'development',
+      readOnly: false,
+      hasStoredPassword: request.storePassword,
+    });
+  }
+
+  deleteConnection(id: string): Observable<void> {
+    this.deletedConnections.push(id);
+    return of(undefined);
+  }
+
+  openSavedSession(id: string, password?: string): Observable<SessionInfo> {
+    this.openSavedCalls.push({ id, password });
+
+    return this.savedConnectionMissingPassword && !password
+      ? throwError(() => new HttpErrorResponse({ status: 428, error: { requiresPassword: true } }))
+      : of(session);
+  }
+
+  getHistory(): Observable<readonly QueryHistoryEntry[]> {
+    return of([]);
+  }
+
+  clearHistory(): Observable<void> {
+    return of(undefined);
+  }
 
   getEngines(): Observable<never[]> {
     return of([]);
@@ -167,6 +226,130 @@ describe('WorkspaceStore', () => {
       expect(gateway.closedSessions).toEqual(['sesion-1']);
       expect(store.connections()).toEqual([]);
       expect(store.explorerNodes()).toEqual([]);
+    });
+  });
+
+  describe('conexiones guardadas', () => {
+    it('restaura los perfiles guardados como desconectados', async () => {
+      gateway.savedConnections = [
+        {
+          id: 'perfil-1',
+          name: 'Producción',
+          engine: 'postgresql',
+          host: 'db.interno',
+          port: 5432,
+          database: 'app',
+          username: 'lector',
+          environment: 'production',
+          readOnly: true,
+          hasStoredPassword: true,
+        },
+      ];
+
+      await store.loadSavedConnections();
+
+      const connection = store.connections()[0];
+
+      // Restaurar no debe abrir sesiones: despertaría servidores que el usuario
+      // no pensaba tocar.
+      expect(connection.state).toBe('disconnected');
+      expect(connection.saved).toBe(true);
+      expect(connection.environment).toBe('production');
+      expect(connection.readOnly).toBe(true);
+    });
+
+    it('guarda el perfil al conectar si se pide', async () => {
+      await store.connect({ ...form, save: true, storePassword: true });
+
+      expect(gateway.saveCalls.length).toBe(1);
+      expect(gateway.saveCalls[0].storePassword).toBe(true);
+      expect(gateway.saveCalls[0].password).toBe('secreta');
+    });
+
+    it('no guarda nada si el usuario no lo pide', async () => {
+      await store.connect(form);
+
+      expect(gateway.saveCalls).toEqual([]);
+    });
+
+    it('abre sesión con un perfil guardado sin reenviar la contraseña', async () => {
+      gateway.savedConnections = [
+        {
+          id: 'perfil-1',
+          name: 'Guardada',
+          engine: 'postgresql',
+          host: '127.0.0.1',
+          port: 5432,
+          database: 'druse_test',
+          username: 'postgres',
+          environment: 'development',
+          readOnly: false,
+          hasStoredPassword: true,
+        },
+      ];
+
+      await store.loadSavedConnections();
+      const connected = await store.connectSaved('perfil-1');
+
+      expect(connected).toBe(true);
+      expect(gateway.openSavedCalls[0].password).toBeUndefined();
+      expect(store.connections()[0].state).toBe('connected');
+    });
+
+    it('si no hay contraseña guardada, no conecta y deja el perfil intacto', async () => {
+      gateway.savedConnections = [
+        {
+          id: 'perfil-1',
+          name: 'Sin clave',
+          engine: 'postgresql',
+          host: '127.0.0.1',
+          port: 5432,
+          database: 'druse_test',
+          username: 'postgres',
+          environment: 'development',
+          readOnly: false,
+          hasStoredPassword: false,
+        },
+      ];
+      gateway.savedConnectionMissingPassword = true;
+
+      await store.loadSavedConnections();
+      const connected = await store.connectSaved('perfil-1');
+
+      expect(connected).toBe(false);
+      expect(store.connections()[0].state).toBe('disconnected');
+      // Falta la contraseña, no es un error que deba alarmar.
+      expect(store.connections()[0].error).toBeUndefined();
+    });
+
+    it('desconectar conserva el perfil guardado en la lista', async () => {
+      await store.connect({ ...form, save: true, storePassword: true });
+      const id = store.connections()[0].id;
+
+      await store.disconnect(id);
+
+      expect(store.connections().length).toBe(1);
+      expect(store.connections()[0].state).toBe('disconnected');
+      expect(gateway.deletedConnections).toEqual([]);
+    });
+
+    it('olvidar un perfil lo borra del servidor y de la lista', async () => {
+      await store.connect({ ...form, save: true, storePassword: true });
+      const id = store.connections()[0].id;
+
+      await store.forget(id);
+
+      expect(gateway.deletedConnections).toEqual([id]);
+      expect(store.connections()).toEqual([]);
+    });
+
+    it('una conexión sin guardar desaparece al desconectar', async () => {
+      await store.connect(form);
+      const id = store.connections()[0].id;
+
+      await store.disconnect(id);
+
+      expect(store.connections()).toEqual([]);
     });
   });
 

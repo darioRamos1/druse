@@ -143,3 +143,69 @@ public sealed record EngineDto
     public required string Name { get; init; }
     public required int DefaultPort { get; init; }
 }
+
+// ---------------------------------------------------------------------------
+// Fase 3: conexiones guardadas, historial y preferencias
+// ---------------------------------------------------------------------------
+
+/// <summary>
+/// Perfil guardado tal y como lo ve el cliente.
+///
+/// No lleva contraseña, solo si hay una guardada: con eso basta para decidir si
+/// pedirla al conectar.
+/// </summary>
+public sealed record SavedConnectionDto
+{
+    public required Guid Id { get; init; }
+    public required string Name { get; init; }
+    public required string Engine { get; init; }
+    public required string Host { get; init; }
+    public required int Port { get; init; }
+    public required string Database { get; init; }
+    public required string Username { get; init; }
+    public required string Environment { get; init; }
+    public required bool ReadOnly { get; init; }
+    public required bool HasStoredPassword { get; init; }
+}
+
+public sealed record SaveConnectionRequest
+{
+    public required ConnectionProfileDto Profile { get; init; }
+
+    /// <summary>Se usa para guardarla en el almacén del sistema; nunca se persiste aquí.</summary>
+    public string? Password { get; init; }
+
+    /// <summary>El usuario pidió recordar la contraseña.</summary>
+    public bool StorePassword { get; init; }
+}
+
+/// <summary>Contraseña para conexiones sin credencial guardada.</summary>
+public sealed record OpenSavedSessionRequest
+{
+    public string? Password { get; init; }
+}
+
+public sealed record SecretStoreStatusDto
+{
+    public required bool Available { get; init; }
+    public required string Description { get; init; }
+}
+
+public sealed record QueryHistoryEntryDto
+{
+    public required Guid Id { get; init; }
+    public Guid? ConnectionId { get; init; }
+    public required string ConnectionName { get; init; }
+    public required string Database { get; init; }
+    public required string Sql { get; init; }
+    public required DateTimeOffset ExecutedAtUtc { get; init; }
+    public required long DurationMs { get; init; }
+    public required bool Succeeded { get; init; }
+    public long? RowCount { get; init; }
+    public string? ErrorMessage { get; init; }
+}
+
+public sealed record PreferenceValueDto
+{
+    public required string Value { get; init; }
+}

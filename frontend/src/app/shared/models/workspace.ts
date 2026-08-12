@@ -18,6 +18,48 @@ export interface EngineInfo {
   readonly defaultPort: number;
 }
 
+/** Entorno al que apunta una conexión. Cambia su color y sus advertencias. */
+export type ConnectionEnvironment = 'development' | 'testing' | 'production';
+
+/**
+ * Perfil guardado en la base local.
+ *
+ * Nunca lleva contraseña: solo si hay una guardada, que es lo que hace falta
+ * para decidir si pedirla al conectar.
+ */
+export interface SavedConnection {
+  readonly id: string;
+  readonly name: string;
+  readonly engine: DatabaseEngine;
+  readonly host: string;
+  readonly port: number;
+  readonly database: string;
+  readonly username: string;
+  readonly environment: ConnectionEnvironment;
+  readonly readOnly: boolean;
+  readonly hasStoredPassword: boolean;
+}
+
+/** Dónde se guardan las contraseñas en esta máquina. */
+export interface SecretStoreStatus {
+  readonly available: boolean;
+  readonly description: string;
+}
+
+/** Entrada del historial local de ejecuciones. */
+export interface QueryHistoryEntry {
+  readonly id: string;
+  readonly connectionId?: string;
+  readonly connectionName: string;
+  readonly database: string;
+  readonly sql: string;
+  readonly executedAtUtc: string;
+  readonly durationMs: number;
+  readonly succeeded: boolean;
+  readonly rowCount?: number;
+  readonly errorMessage?: string;
+}
+
 /** Perfil de conexión tal y como se dibuja en la barra lateral. */
 export interface ConnectionSummary {
   readonly id: string;
@@ -29,10 +71,18 @@ export interface ConnectionSummary {
   readonly sessionId?: string;
   /** Motivo del último fallo, para mostrarlo junto a la conexión. */
   readonly error?: string;
+  readonly environment: ConnectionEnvironment;
+  readonly readOnly: boolean;
+  /** El perfil está guardado en la base local y sobrevive al reinicio. */
+  readonly saved: boolean;
+  readonly hasStoredPassword: boolean;
+  readonly database: string;
 }
 
-/** Datos con los que se abre una conexión. La contraseña no se guarda aquí. */
+/** Datos con los que se abre o se guarda una conexión. */
 export interface ConnectionForm {
+  /** Presente al editar un perfil ya guardado. */
+  readonly id?: string;
   readonly name: string;
   readonly engine: DatabaseEngine;
   readonly host: string;
@@ -41,6 +91,11 @@ export interface ConnectionForm {
   readonly username: string;
   readonly password: string;
   readonly readOnly: boolean;
+  readonly environment: ConnectionEnvironment;
+  /** Guardar el perfil en la base local. */
+  readonly save: boolean;
+  /** Recordar la contraseña en el almacén del sistema. */
+  readonly storePassword: boolean;
 }
 
 export interface SessionInfo {

@@ -26,9 +26,10 @@
       class="node node--connection"
       [class.is-active]="connection.expanded"
       [class.is-offline]="connection.state !== 'connected'"
+      [attr.data-environment]="connection.environment"
       role="treeitem"
       [attr.aria-expanded]="connection.expanded"
-      (click)="toggleConnection.emit(connection.id)"
+      (click)="activate(connection)"
     >
       <app-icon
         name="chevron-down"
@@ -37,23 +38,41 @@
         [class.is-collapsed]="!connection.expanded"
       />
       <app-engine-badge [engine]="connection.engine" />
-      <span class="node__label">{{ connection.name }}</span>
+
+      <span class="node__label">
+        {{ connection.name }}
+        @if (connection.readOnly) {
+          <span class="node__tag" title="Solo lectura">RO</span>
+        }
+      </span>
 
       <span class="node__tools">
-        <span
-          class="tool tool--danger"
-          title="Desconectar"
-          (click)="act($event, () => disconnect.emit(connection.id))"
-        >
-          <app-icon name="disconnect" [size]="11" />
-        </span>
+        @if (connection.state === 'connected') {
+          <span
+            class="tool tool--danger"
+            title="Desconectar"
+            (click)="act($event, () => disconnect.emit(connection.id))"
+          >
+            <app-icon name="disconnect" [size]="11" />
+          </span>
+        }
+        @if (connection.saved) {
+          <span
+            class="tool tool--danger"
+            title="Eliminar esta conexión guardada"
+            (click)="act($event, () => forget.emit(connection.id))"
+          >
+            <app-icon name="stop" [size]="11" />
+          </span>
+        }
       </span>
 
       <span
         class="status-dot"
         [class.status-dot--off]="connection.state !== 'connected'"
         [class.status-dot--error]="connection.state === 'error'"
-        [attr.title]="connection.error ?? (connection.state === 'connected' ? 'Conectado' : 'Sin conexión')"
+        [class.status-dot--busy]="connection.state === 'connecting'"
+        [attr.title]="connection.error ?? statusLabel(connection)"
       ></span>
     </button>
 

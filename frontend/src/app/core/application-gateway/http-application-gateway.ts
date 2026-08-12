@@ -6,9 +6,12 @@ import {
   DatabaseColumn,
   DatabaseObject,
   EngineInfo,
+  QueryHistoryEntry,
   QueryResult,
   ResultColumn,
   ResultSet,
+  SavedConnection,
+  SecretStoreStatus,
   SessionInfo,
   TestConnectionResult,
 } from '../../shared/models/workspace';
@@ -17,6 +20,7 @@ import {
   ConnectRequest,
   ExecuteQueryRequest,
   HealthStatus,
+  SaveConnectionRequest,
 } from './application-gateway';
 
 /** Forma en que la API devuelve un conjunto de resultados. */
@@ -105,6 +109,51 @@ export class HttpApplicationGateway extends ApplicationGateway {
 
   override cancelQuery(executionId: string): Observable<void> {
     return this._http.delete<void>(`/api/queries/${executionId}`);
+  }
+
+  override getSavedConnections(): Observable<readonly SavedConnection[]> {
+    return this._http.get<SavedConnection[]>('/api/connections');
+  }
+
+  override getSecretStoreStatus(): Observable<SecretStoreStatus> {
+    return this._http.get<SecretStoreStatus>('/api/connections/secret-store');
+  }
+
+  override saveConnection(request: SaveConnectionRequest): Observable<SavedConnection> {
+    return this._http.post<SavedConnection>('/api/connections', request);
+  }
+
+  override updateConnection(
+    id: string,
+    request: SaveConnectionRequest,
+  ): Observable<SavedConnection> {
+    return this._http.put<SavedConnection>(`/api/connections/${id}`, request);
+  }
+
+  override deleteConnection(id: string): Observable<void> {
+    return this._http.delete<void>(`/api/connections/${id}`);
+  }
+
+  override openSavedSession(id: string, password?: string): Observable<SessionInfo> {
+    return this._http.post<SessionInfo>(`/api/connections/${id}/sessions`, { password });
+  }
+
+  override getHistory(search?: string): Observable<readonly QueryHistoryEntry[]> {
+    const query = search ? `?search=${encodeURIComponent(search)}` : '';
+
+    return this._http.get<QueryHistoryEntry[]>(`/api/history${query}`);
+  }
+
+  override clearHistory(): Observable<void> {
+    return this._http.delete<void>('/api/history');
+  }
+
+  override getPreferences(): Observable<Readonly<Record<string, string>>> {
+    return this._http.get<Record<string, string>>('/api/preferences');
+  }
+
+  override setPreference(key: string, value: string): Observable<void> {
+    return this._http.put<void>(`/api/preferences/${encodeURIComponent(key)}`, { value });
   }
 
   /** Añade lo que la cuadrícula necesita y la API no tiene por qué saber. */

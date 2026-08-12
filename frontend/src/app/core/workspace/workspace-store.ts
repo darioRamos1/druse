@@ -12,9 +12,12 @@ import {
   ConnectionSummary,
   DatabaseObject,
   ExplorerNode,
+  QueryHistoryEntry,
   QueryResult,
   QueryTab,
   ResultSet,
+  SavedConnection,
+  SecretStoreStatus,
   SessionStatus,
 } from '../../shared/models/workspace';
 
@@ -77,7 +80,140 @@ export class WorkspaceStore {
   private readonly _session = signal<SessionStatus | null>(null);
   readonly session = this._session.asReadonly();
 
-  private readonly _serverVersions = new Map<string, string>();
+  // --- Persistencia ----------------------------------------------------------
+  private readonly _secretStore = signal<SecretStoreStatus | null>(null);
+  readonly secretStore = this._secretStore.asReadonly();
+
+  private readonly _history = signal<readonly QueryHistoryEntry[]>([]);
+  readonly history = this._history.asReadonly();
+
+  /**
+   * Carga los perfiles guardados.
+   *
+   * Se llama al arrancar: sin esto, las conexiones que el usuario guardó en una
+   * sesión anterior no aparecerían hasta volver a crearlas.
+   */
+  async loadSavedConnections(): Promise<void> {
+    try {
+      const [saved, secretStore] = await Promise.all([
+        firstValueFrom(this._gateway.getSavedConnections()),
+        firstValueFrom(this._gateway.getSecretStoreStatus()),
+      ]);
+
+      this._secretStore.set(secretStore);
+
+      // Los perfiles guardados aparecen desconectados: abrir todas las
+      // conexiones al arrancar sería lento y podría despertar servidores que el
+      // usuario no pensaba tocar.
+      this._connections.update((current) => {
+        const live = current.filter((connection) => connection.sessionId);
+        const liveIds = new Set(live.map((connection) => connection.id));
+
+        const restored = saved
+          .filter((profile) => !liveIds.has(profile.id))
+          .map<ConnectionSummary>((profile) => ({
+            id: profile.id,
+            name: profile.name,
+            engine: profile.engine,
+            state: 'disconnected',
+            expanded: false,
+            environment: profile.environment,
+            readOnly: profile.readOnly,
+            saved: true,
+            hasStoredPassword: profile.hasStoredPassword,
+            database: profile.database,
+          }));
+
+        return [...live, ...restored];
+      });
+    } catch (error) {
+      this._notice.set(describeError(error));
+    }
+  }
+
+  /** Abre una sesión con un perfil ya guardado. */
+  async connectSaved(connectionId: string, password?: string): Promise<boolean> {
+    const connection = this.findConnection(connectionId);
+
+    if (!connection) {
+      return false;
+    }
+
+    this.patchConnection(connectionId, { state: 'connecting', error: undefined });
+
+    try {
+      const session = await firstValueFrom(
+        this._gateway.openSavedSession(connectionId, password),
+      );
+
+      this.patchConnection(connectionId, {
+        state: 'connected',
+        expanded: true,
+        sessionId: session.sessionId,
+        error: undefined,
+      });
+
+      this._session.set({
+        connected: true,
+        engine: session.engine,
+        engineVersion: describeVersion(session.engine, session.serverVersion),
+        database: session.database,
+        user: connection.name,
+        lastDurationMs: null,
+      });
+
+      await this.loadDatabases(connectionId, session.sessionId);
+
+      return true;
+    } catch (error) {
+      // 428: la conexión no tiene contraseña guardada y hay que pedirla.
+      if (error instanceof HttpErrorResponse && error.status === 428) {
+        this.patchConnection(connectionId, { state: 'disconnected' });
+        return false;
+      }
+
+      this.patchConnection(connectionId, { state: 'error', error: describeError(error) });
+      this._notice.set(describeError(error));
+
+      return false;
+    }
+  }
+
+  /** Borra un perfil guardado y su contraseña. */
+  async forget(connectionId: string): Promise<void> {
+    // Cierra la sesión si estaba abierta. Para un perfil guardado, `disconnect`
+    // lo deja en la lista como desconectado, así que hay que retirarlo después.
+    await this.disconnect(connectionId);
+
+    try {
+      await firstValueFrom(this._gateway.deleteConnection(connectionId));
+    } catch (error) {
+      this._notice.set(describeError(error));
+      return;
+    }
+
+    this._connections.update((connections) =>
+      connections.filter((connection) => connection.id !== connectionId),
+    );
+    this._roots.update((roots) => roots.filter((root) => root.connectionId !== connectionId));
+  }
+
+  async loadHistory(search?: string): Promise<void> {
+    try {
+      this._history.set(await firstValueFrom(this._gateway.getHistory(search)));
+    } catch (error) {
+      this._notice.set(describeError(error));
+    }
+  }
+
+  async clearHistory(): Promise<void> {
+    try {
+      await firstValueFrom(this._gateway.clearHistory());
+      this._history.set([]);
+    } catch (error) {
+      this._notice.set(describeError(error));
+    }
+  }
 
   // --- Derivados -------------------------------------------------------------
 
@@ -121,23 +257,37 @@ export class WorkspaceStore {
    * Fase 3.
    */
   async connect(form: ConnectionForm): Promise<boolean> {
-    const id = crypto.randomUUID();
+    let id = form.id ?? crypto.randomUUID();
+
+    // Guardar el perfil antes de conectar hace que sobreviva aunque la conexión
+    // falle: casi siempre se falla por un dato del propio perfil, y perderlo
+    // obligaría a escribirlo todo otra vez.
+    if (form.save) {
+      const saved = await this.persist(form, id);
+
+      if (saved) {
+        id = saved.id;
+      }
+    }
 
     this._connections.update((connections) => [
-      ...connections,
+      ...connections.filter((connection) => connection.id !== id),
       {
         id,
         name: form.name || `${form.host}:${form.port}`,
         engine: form.engine,
         state: 'connecting',
         expanded: false,
+        environment: form.environment,
+        readOnly: form.readOnly,
+        saved: form.save,
+        hasStoredPassword: form.save && form.storePassword,
+        database: form.database,
       },
     ]);
 
     try {
       const session = await firstValueFrom(this._gateway.openSession(toRequest(form)));
-
-      this._serverVersions.set(id, session.serverVersion);
 
       this.patchConnection(id, {
         state: 'connected',
@@ -166,6 +316,12 @@ export class WorkspaceStore {
     }
   }
 
+  /**
+   * Cierra la sesión.
+   *
+   * Un perfil guardado no desaparece de la lista: se queda desconectado, listo
+   * para volver a abrirse. Para eliminarlo está {@link forget}.
+   */
   async disconnect(connectionId: string): Promise<void> {
     const connection = this.findConnection(connectionId);
 
@@ -177,13 +333,40 @@ export class WorkspaceStore {
       }
     }
 
-    this._connections.update((connections) =>
-      connections.filter((item) => item.id !== connectionId),
-    );
+    if (connection?.saved) {
+      this.patchConnection(connectionId, {
+        state: 'disconnected',
+        expanded: false,
+        sessionId: undefined,
+      });
+    } else {
+      this._connections.update((connections) =>
+        connections.filter((item) => item.id !== connectionId),
+      );
+    }
+
     this._roots.update((roots) => roots.filter((root) => root.connectionId !== connectionId));
 
-    if (this._connections().length === 0) {
+    if (!this._connections().some((item) => item.sessionId)) {
       this._session.set(null);
+    }
+  }
+
+  /** Guarda el perfil en la base local; la contraseña va al almacén del sistema. */
+  private async persist(form: ConnectionForm, id: string): Promise<SavedConnection | null> {
+    const request = {
+      profile: { ...toRequest(form).profile, id },
+      password: form.password,
+      storePassword: form.storePassword,
+    };
+
+    try {
+      return form.id
+        ? await firstValueFrom(this._gateway.updateConnection(form.id, request))
+        : await firstValueFrom(this._gateway.saveConnection(request));
+    } catch (error) {
+      this._notice.set(describeError(error));
+      return null;
     }
   }
 

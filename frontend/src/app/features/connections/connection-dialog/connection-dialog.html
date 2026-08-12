@@ -77,6 +77,23 @@
       </label>
     </div>
 
+    <h3 class="section">Entorno</h3>
+    <div class="environments" role="group" aria-label="Entorno">
+      @for (option of environments; track option.id) {
+        <button
+          type="button"
+          class="environment"
+          [attr.data-environment]="option.id"
+          [class.is-selected]="environment() === option.id"
+          [attr.aria-pressed]="environment() === option.id"
+          (click)="environment.set(option.id)"
+        >
+          <span class="environment__dot" aria-hidden="true"></span>
+          {{ option.label }}
+        </button>
+      }
+    </div>
+
     <label class="checkbox">
       <input type="checkbox" [(ngModel)]="readOnly" />
       <span>
@@ -84,6 +101,34 @@
         <span class="checkbox__hint">Bloquea cualquier instrucción que modifique datos.</span>
       </span>
     </label>
+
+    <label class="checkbox">
+      <input type="checkbox" [(ngModel)]="save" />
+      <span>
+        Guardar esta conexión
+        <span class="checkbox__hint">Queda disponible al volver a abrir Druse.</span>
+      </span>
+    </label>
+
+    @if (save()) {
+      <label class="checkbox" [class.is-disabled]="!secretStore()?.available">
+        <input type="checkbox" [(ngModel)]="storePassword" [disabled]="!secretStore()?.available" />
+        <span>
+          Recordar la contraseña
+          <span class="checkbox__hint">
+            @if (secretStore(); as store) {
+              @if (store.available) {
+                Se guarda en {{ store.description }}, nunca en la base local.
+              } @else {
+                {{ store.description }}
+              }
+            } @else {
+              Se guarda en el almacén seguro del sistema, nunca en la base local.
+            }
+          </span>
+        </span>
+      </label>
+    }
 
     @if (feedback(); as message) {
       <p class="feedback" role="status">{{ message }}</p>

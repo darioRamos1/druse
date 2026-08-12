@@ -2,6 +2,8 @@ using System.Reflection;
 using Druse.Application.Abstractions;
 using Druse.Host.LocalApi;
 using Druse.Host.LocalApi.Endpoints;
+using Druse.Host.LocalApi.Security;
+using Druse.Persistence.Sqlite;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -17,19 +19,27 @@ builder.Services.AddDruse();
 
 // Origen del servidor de desarrollo de Angular. En producción el frontend se sirve
 // desde el propio host y no hace falta CORS.
+//
+// La política es estricta a propósito: solo estos dos orígenes, y se exige que el
+// navegador pueda enviar la cabecera del token (plan §12).
 const string DevelopmentCorsPolicy = "druse-dev";
 builder.Services.AddCors(options => options.AddPolicy(DevelopmentCorsPolicy, policy =>
     policy.WithOrigins("http://localhost:4200", "http://127.0.0.1:4200")
-          .AllowAnyHeader()
-          .AllowAnyMethod()));
+          .WithHeaders("Content-Type", "X-Druse-Token")
+          .WithMethods("GET", "POST", "PUT", "DELETE")));
 
 var app = builder.Build();
+
+// La base local debe existir antes de atender la primera petición.
+await app.Services.GetRequiredService<DruseDatabase>().MigrateAsync(CancellationToken.None);
 
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
-    app.UseCors(DevelopmentCorsPolicy);
 }
+
+// CORS también en producción: la política solo admite el origen de la aplicación.
+app.UseCors(DevelopmentCorsPolicy);
 
 // Traduce las excepciones conocidas a respuestas HTTP.
 //
@@ -67,7 +77,12 @@ app.Use(async (context, next) =>
     }
 });
 
-// Verifica que el proceso local está activo.
+// Escuchar solo en loopback impide el acceso desde la red, pero no desde la propia
+// máquina: sin token, cualquier proceso del usuario podría abrir sesiones contra
+// sus bases de datos.
+app.UseMiddleware<TokenAuthenticationMiddleware>();
+
+// Verifica que el proceso local está activo. Es la única ruta sin token.
 app.MapGet("/api/health", () => new HealthResponse(
     Status: "ok",
     Product: "Druse",
@@ -77,12 +92,21 @@ app.MapGet("/api/health", () => new HealthResponse(
    .WithName("GetHealth");
 
 app.MapDatabaseEndpoints();
+app.MapStorageEndpoints();
 
-// Ninguna conexión ni transacción debe quedar viva al cerrar (plan §12).
+var token = app.Services.GetRequiredService<LocalApiToken>();
+
+if (app.Logger.IsEnabled(LogLevel.Information))
+{
+    app.Logger.LogInformation("Token de la API local escrito en {Path}", token.FilePath);
+}
+
+// Ninguna conexión ni transacción debe quedar viva al cerrar, y el token deja de
+// existir con el proceso (plan §12).
 app.Lifetime.ApplicationStopping.Register(() =>
 {
-    var sessions = app.Services.GetRequiredService<ISessionRegistry>();
-    sessions.CloseAllAsync().GetAwaiter().GetResult();
+    app.Services.GetRequiredService<ISessionRegistry>().CloseAllAsync().GetAwaiter().GetResult();
+    token.Dispose();
 });
 
 app.Run();

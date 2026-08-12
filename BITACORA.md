@@ -10,30 +10,28 @@
 
 | Campo | Valor |
 | --- | --- |
-| Última sesión | **004** — 2026-08-11 |
-| Fase activa | **Fase 3 — Persistencia local y seguridad** |
+| Última sesión | **005** — 2026-08-11 |
+| Fase activa | **Fase 4 — SQL Server** |
 | Fase 0 | ✅ Cerrada. 9/9 tareas. |
 | Fase 1 | ✅ Cerrada. 8/8 tareas. |
-| Fase 2 | ✅ **Cerrada.** 11/11 tareas. |
+| Fase 2 | ✅ Cerrada. 11/11 tareas. |
+| Fase 3 | ✅ **Cerrada.** 10/10 tareas. |
 | ¿Compila el backend? | Sí — 0 advertencias, 0 errores |
-| ¿Compila el frontend? | Sí — 386 kB iniciales, 0 advertencias |
-| ¿Pasan las pruebas? | Sí — **90 en backend** (54 unitarias + 21 contractuales + 15 integración) y **37 en frontend** |
-| ¿Funciona contra una base real? | Sí — verificado de punta a punta contra PostgreSQL 18.4 en Docker |
+| ¿Compila el frontend? | Sí — 398 kB iniciales, 0 advertencias |
+| ¿Pasan las pruebas? | Sí — **138 en backend** (85 unitarias + 21 contractuales + 32 integración) y **45 en frontend** |
+| ¿Persisten los datos? | Sí — verificado reiniciando la API: el perfil sobrevive y conecta sin reenviar la contraseña |
 | Bloqueantes | Ninguno |
-| Git | Rama `feature/postgresql-connection`, pendiente de fusionar en `main`. Sin remoto configurado. |
+| Git | Rama `feature/local-persistence`, pendiente de fusionar en `main`. Sin remoto configurado. |
 
 ### Qué toca retomar en la próxima sesión
 
-1. **Fusionar `feature/postgresql-connection` en `main`** y abrir `feature/local-persistence`.
-2. Empezar la **Fase 3**, cuyo primer objetivo es que las contraseñas dejen de pedirse en cada arranque:
-   - `Druse.Persistence.Sqlite` con la base local;
-   - `IAppPaths` e `ISecretStore` en `Platform.Abstractions`, con implementación por sistema en `Platform.Native`;
-   - guardar perfiles **sin contraseña** en SQLite y la contraseña en el almacén del sistema;
-   - historial de consultas y preferencias.
-3. Token temporal entre Angular y la API, que hoy no existe: cualquier proceso local puede llamarla.
-4. La base de pruebas se levanta con `./build/scripts/test-db.ps1`. El contenedor `druse-pg-test` puede seguir corriendo entre sesiones.
+1. **Fusionar `feature/local-persistence` en `main`** y abrir `feature/sqlserver-provider`.
+2. **Antes de empezar: levantar un SQL Server de prueba.** Es el prerrequisito de la Fase 4, igual que Docker lo fue de la Fase 2. Conviene ampliar `build/scripts/test-db.ps1` para que levante también `mcr.microsoft.com/mssql/server`.
+3. La Fase 4 es donde se comprueba de verdad si las abstracciones sirven: las **21 pruebas contractuales deben pasar contra SQL Server sin cambiar lo que comprueban**. Si alguna resulta ser específica de PostgreSQL, es que se coló una fuga de dialecto.
+4. Habilitar el motor en el diálogo de conexión (hoy aparece deshabilitado) y quitar el `available: false` de `connection-dialog.ts`.
+5. Resolver **D-15** (selector de base de datos) comparando el comportamiento de los dos motores: SQL Server sí permite cambiar de base en la misma conexión, PostgreSQL no.
 
-**Sigue pendiente el visto bueno visual.** La extensión de Chrome no estaba conectada en ninguna de las dos sesiones, así que la pantalla nunca se ha comparado a ojo con el mockup.
+**Sigue pendiente el visto bueno visual.** La extensión de Chrome no ha estado conectada en ninguna sesión, así que la pantalla nunca se ha comparado a ojo con el mockup.
 
 ---
 
@@ -99,6 +97,59 @@ Pendiente de verificar cuando toque: Docker (pruebas de integración con contene
 ---
 
 ## 5. Registro de sesiones
+
+### Sesión 005 — 2026-08-11 · Fase 3 completa
+
+**Objetivo:** que los datos sobrevivan al reinicio y que la API deje de ser abierta.
+
+**Hecho:**
+
+*Plataforma*
+- `IAppPaths`: directorios según la convención de cada sistema (`%APPDATA%`, `Application Support`, XDG). Todo con `Path.Combine`; una prueba comprueba que no aparece el separador de la otra plataforma.
+- `ISecretStore` con tres implementaciones: **Administrador de credenciales de Windows** por P/Invoke a `advapi32`, **Llavero de macOS** por `security` y **Secret Service** por `secret-tool`.
+- `NullSecretStore` cuando no hay ninguno: la aplicación pide la contraseña cada vez **y lo dice en la interfaz**. Cifrar un archivo con una clave que está en el mismo disco sería seguridad aparente, que es peor que ninguna.
+
+*Persistencia*
+- SQLite con perfiles, historial y preferencias. Esquema explícito, WAL y `user_version` para poder migrar más adelante.
+- `SavedConnectionService` reparte: el perfil a SQLite, la contraseña al almacén del sistema. **Nunca coinciden en el mismo sitio.**
+- El historial guarda cada ejecución, incluidas las fallidas con su error. Un fallo al escribirlo no tumba la consulta.
+
+*Seguridad*
+- **Token de la API local**: 32 bytes aleatorios por arranque, en `api-token` con permisos 0600 en Unix, exigido en `X-Druse-Token` en todas las rutas menos `/api/health`. Comparación en tiempo constante.
+- CORS restringido al origen de la aplicación y solo a la cabecera del token.
+- El proxy de desarrollo de Angular pasó de `.json` a `.js` para poder **leer el token del disco e inyectarlo**: el navegador no puede hacerlo.
+- ADR 0004 documenta el alcance real de la protección, incluido lo que **no** cubre.
+
+*Interfaz*
+- Perfiles guardados en la barra lateral, restaurados al arrancar y desconectados: abrir todas las sesiones al inicio despertaría servidores que el usuario no pensaba tocar.
+- Un clic sobre un perfil guardado lo conecta usando la contraseña del almacén.
+- **Color por entorno**: franja verde, ámbar o roja en desarrollo, pruebas y producción.
+- Historial navegable con filtro; al pulsar una consulta se abre en una pestaña nueva.
+- El diálogo ofrece guardar la conexión y recordar la contraseña, e informa de dónde queda.
+
+**Verificado ejecutando:**
+- 138 pruebas de backend y 45 de frontend, todas pasan.
+- **Sin token la API responde 401; con él, 200.**
+- **Al reiniciar la API, el token cambia y el anterior deja de valer.**
+- **El perfil guardado sobrevive al reinicio y abre sesión sin reenviar la contraseña**, que sale del Administrador de credenciales.
+- Se ejecutó una consulta real con esa sesión y quedó anotada en el historial.
+- **Ningún archivo local contiene la contraseña**: se leyeron `druse.db`, `-wal`, `-shm` y `api-token` byte a byte buscándola. La credencial sí estaba en el Administrador de credenciales.
+- Los datos de prueba y la credencial se borraron de la máquina al terminar.
+
+**Incidencias resueltas:**
+1. Una prueba destapó que **el término de búsqueda del historial no escapaba los comodines de LIKE**: buscar `%` devolvía todo y `_` casaba con cualquier carácter. No era inyección —iba como parámetro— pero sí una búsqueda que mentía. Ahora se escapa con `ESCAPE '\'`.
+2. Otra prueba destapó que **`forget` borraba el perfil en el servidor pero lo dejaba en la lista local**, porque `disconnect` ahora conserva los perfiles guardados. Corregido.
+3. La referencia nueva `Persistence.Sqlite → Platform.Abstractions` hizo fallar la prueba de arquitectura, que es justo su trabajo. Se amplió la regla con el motivo documentado.
+
+**Comportamiento conocido:**
+- Si el proceso muere de forma abrupta (kill, fallo), **el archivo del token queda en disco**. No es una brecha: ese valor ya no lo acepta nadie y el siguiente arranque lo sobrescribe. Verificado.
+- En macOS, `security` recibe la contraseña como argumento y es visible un instante en la lista de procesos. Anotado en el ADR 0004 como mejora pendiente.
+
+**No hecho:**
+- No se recuerdan las pestañas abiertas: va con el resto del estado del editor en la Fase 5.
+- Sin verificación visual: la extensión de Chrome sigue sin conectarse.
+
+---
 
 ### Sesión 004 — 2026-08-11 · Fase 2 completa
 
@@ -311,6 +362,9 @@ Pendiente de verificar cuando toque: Docker (pruebas de integración con contene
 | D-09 | **Formato de solución `.slnx`**, el nuevo de .NET 10. Requiere VS 2022 17.13+ o Rider recientes. | 2026-08-11 |
 | D-12 | **Monaco se carga con su cargador AMD desde `assets`**, no como ESM a través del bundler. Sus *web workers* se resuelven solos y queda fuera del bundle inicial. Encapsulado por completo en `SqlEditor`. | 2026-08-11 |
 | D-13 | **`dompurify` fijado con `override` a ^3.4.13** en lugar de degradar Monaco. Revisar cuando Monaco actualice su dependencia. | 2026-08-11 |
+| D-17 | **Sin almacén seguro no se guarda la contraseña.** Se pide en cada conexión y se dice en la interfaz. Cifrar un archivo con una clave del mismo disco sería seguridad aparente. Ver ADR 0004. | 2026-08-11 |
+| D-18 | **Token obligatorio en la API local**, salvo `/api/health`. El proxy de desarrollo lo lee del disco y lo inyecta, porque el navegador no puede. | 2026-08-11 |
+| D-19 | **`proxy.conf.json` → `proxy.conf.js`**: el proxy necesita lógica para leer el token en cada petición. No se cachea, para que reiniciar la API no obligue a reiniciar el servidor de desarrollo. | 2026-08-11 |
 | D-10 | **La integración continua no genera instaladores todavía.** Compila, prueba y verifica la publicación autocontenida. El empaquetado llega en la Fase 7 (ADR 0003). | 2026-08-11 |
 
 ### Abiertas
@@ -385,8 +439,8 @@ Fuente: `docs/mockups/druse-main.html`. **Ya implementado** en `frontend/src/sty
 | 0 | Preparación y decisiones | ✅ **Cerrada** — 9/9 |
 | 1 | Shell visual basado en el mockup | ✅ **Cerrada** — 8/8 |
 | 2 | Flujo vertical PostgreSQL | ✅ **Cerrada** — 11/11 |
-| 3 | Persistencia local y seguridad | 🔄 **Activa** — 0/10 |
-| 4 | SQL Server | ⬜ No iniciada |
+| 3 | Persistencia local y seguridad | ✅ **Cerrada** — 10/10 |
+| 4 | SQL Server | 🔄 **Activa** — 0/9 |
 | 5 | Productividad del editor | ⬜ No iniciada |
 | 6 | Resultados y exportaciones | ⬜ No iniciada |
 | 7 | Empaquetado de escritorio | ⬜ No iniciada |
@@ -410,20 +464,29 @@ Proporciones y colores salen de los tokens extraídos del propio mockup, y los d
 
 Los cinco pasos están verificados contra PostgreSQL 18.4 real, no simulado.
 
-### Fase 3 — detalle
+### Fase 3 — criterio de salida ✅
 
-- [ ] Crear la base SQLite local.
-- [ ] Guardar perfiles sin incluir la contraseña en texto plano.
-- [ ] Integrar el almacén seguro del sistema operativo para secretos.
-- [ ] Guardar historial de consultas.
-- [ ] Guardar pestañas recientes y preferencias.
-- [ ] Implementar perfiles de color para producción, pruebas y desarrollo.
-- [ ] Ocultar información sensible de logs y excepciones.
-- [ ] Agregar token temporal entre Angular y la API local.
-- [ ] Restringir CORS al origen de la aplicación. _(Hecho parcialmente: hay política para el origen de desarrollo.)_
-- [ ] Implementar `IAppPaths` e `ISecretStore` sin dependencias del sistema operativo en Application.
+> «Cerrar y abrir la aplicación conserva conexiones, historial y preferencias sin almacenar contraseñas legibles.»
 
-**Criterio de salida:** cerrar y abrir la aplicación conserva conexiones, historial y preferencias sin almacenar contraseñas legibles.
+Verificado reiniciando la API de verdad: el perfil sobrevivió, abrió sesión sin reenviar la contraseña, y **una búsqueda byte a byte en todos los archivos locales no encontró la contraseña por ninguna parte**.
+
+### Fase 4 — detalle
+
+- [ ] Crear `SqlServerDatabaseProvider`.
+- [ ] Implementar autenticación SQL Server.
+- [ ] Evaluar autenticación integrada de Windows como tarea separada.
+- [ ] Obtener bases, esquemas, tablas, vistas, procedimientos y columnas.
+- [ ] Ejecutar consultas T-SQL.
+- [ ] Normalizar mensajes y errores.
+- [ ] Probar múltiples conjuntos de resultados.
+- [ ] Verificar timeout y cancelación.
+- [ ] Ejecutar las pruebas contractuales compartidas por proveedores.
+
+**Criterio de salida:** las mismas funciones visibles del MVP trabajan con PostgreSQL y SQL Server sin condicionales del motor dentro de los componentes Angular.
+
+**Prerrequisito:** un SQL Server de prueba. Ampliar `build/scripts/test-db.ps1` con `mcr.microsoft.com/mssql/server`.
+
+**Lo que de verdad se pone a prueba:** las 21 pruebas contractuales deben pasar contra SQL Server **sin cambiar lo que comprueban**. Si alguna hay que retocar, es señal de que se coló una fuga de dialecto en las abstracciones.
 
 ---
 
@@ -431,8 +494,9 @@ Los cinco pasos están verificados contra PostgreSQL 18.4 real, no simulado.
 
 | Riesgo | Impacto | Mitigación |
 | --- | --- | --- |
-| **La contraseña se pide en cada conexión** | Molesto de usar; empuja a soluciones caseras del usuario | Es el objetivo de la Fase 3: `ISecretStore` sobre el almacén del sistema |
-| **La API local no pide token** | Cualquier proceso de la máquina puede llamarla | Token temporal en la Fase 3. Mitigado en parte: solo escucha en loopback |
+| **Sin SQL Server de prueba** | **Bloquea la Fase 4, que es la activa** | Contenedor `mcr.microsoft.com/mssql/server`; ampliar `test-db.ps1` |
+| Solo hay un proveedor implementado | Las abstracciones no están validadas de verdad | La Fase 4 es justo esa prueba: las contractuales deben pasar tal cual |
+| macOS pasa la contraseña por argumento a `security` | Visible un instante en la lista de procesos | Enlazar Security.framework. Anotado en ADR 0004 |
 | Contenedor `druse-pg-test` en el 55440 | El 55432 lo ocupa `prima-postgres`, ajeno al proyecto | Puerto configurable con `DRUSE_TEST_PG_PORT` |
 | Rust no instalado | Bloquea la Fase 7 | Instalar antes de empezarla; no urge |
 | Ejecutable de 107 MB | Instalador pesado | D-11: trimming y ReadyToRun en la Fase 7 |

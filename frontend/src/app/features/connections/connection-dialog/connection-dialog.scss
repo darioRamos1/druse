@@ -229,11 +229,63 @@
   }
 }
 
+.environments {
+  display: flex;
+  gap: 8px;
+}
+
+// El color del entorno es la señal que evita ejecutar en producción creyendo
+// que se está en desarrollo (plan §12).
+.environment {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  height: 30px;
+  padding: 0 12px;
+  border: 1px solid var(--dr-border-subtle);
+  border-radius: var(--dr-radius);
+  background: transparent;
+  color: var(--dr-text-tertiary);
+  font-family: inherit;
+  font-size: var(--dr-font-size-sm);
+  cursor: pointer;
+
+  &__dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: currentcolor;
+  }
+
+  &[data-environment='development'].is-selected {
+    border-color: rgb(61 220 151 / 45%);
+    background: rgb(61 220 151 / 10%);
+    color: var(--dr-success);
+  }
+
+  &[data-environment='testing'].is-selected {
+    border-color: rgb(245 191 79 / 45%);
+    background: rgb(245 191 79 / 10%);
+    color: #f5bf4f;
+  }
+
+  &[data-environment='production'].is-selected {
+    border-color: rgb(242 104 107 / 45%);
+    background: rgb(242 104 107 / 10%);
+    color: #f2686b;
+  }
+
+  &:hover:not(.is-selected) {
+    background: #151b27;
+    color: var(--dr-text-secondary);
+  }
+}
+
 .checkbox {
   display: flex;
   align-items: flex-start;
   gap: 9px;
-  margin-top: 16px;
+  margin-top: 14px;
   color: var(--dr-text-secondary);
   font-size: var(--dr-font-size-sm);
   cursor: pointer;
@@ -247,6 +299,11 @@
     display: block;
     color: var(--dr-text-faintest);
     font-size: 11.5px;
+  }
+
+  &.is-disabled {
+    cursor: not-allowed;
+    opacity: 0.6;
   }
 }
 

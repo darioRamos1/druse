@@ -1,9 +1,13 @@
 import { ChangeDetectionStrategy, Component, inject, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
-import { ConnectionForm, DatabaseEngine } from '../../../shared/models/workspace';
-import { EngineBadge } from '../../../shared/ui/engine-badge/engine-badge';
 import { WorkspaceStore } from '../../../core/workspace/workspace-store';
+import {
+  ConnectionEnvironment,
+  ConnectionForm,
+  DatabaseEngine,
+} from '../../../shared/models/workspace';
+import { EngineBadge } from '../../../shared/ui/engine-badge/engine-badge';
 
 interface EngineOption {
   readonly id: DatabaseEngine;
@@ -13,6 +17,11 @@ interface EngineOption {
   readonly available: boolean;
 }
 
+interface EnvironmentOption {
+  readonly id: ConnectionEnvironment;
+  readonly label: string;
+}
+
 /** Motores que se ofrecen. MySQL aparece pero deshabilitado hasta la Fase 8. */
 const ENGINES: readonly EngineOption[] = [
   { id: 'sqlserver', name: 'SQL Server', versions: '2016 – 2022', defaultPort: 1433, available: false },
@@ -20,12 +29,17 @@ const ENGINES: readonly EngineOption[] = [
   { id: 'mysql', name: 'MySQL', versions: '8.0+', defaultPort: 3306, available: false },
 ];
 
+const ENVIRONMENTS: readonly EnvironmentOption[] = [
+  { id: 'development', label: 'Desarrollo' },
+  { id: 'testing', label: 'Pruebas' },
+  { id: 'production', label: 'Producción' },
+];
+
 /**
- * Diálogo de nueva conexión, según el mockup.
+ * Diálogo de nueva conexión.
  *
- * La contraseña vive en el formulario y se entrega al store, que la pasa al
- * gateway y la olvida. No se guarda en ningún sitio hasta que exista el almacén
- * seguro del sistema (Fase 3).
+ * La contraseña se entrega al store, que la pasa al gateway. Si el usuario pide
+ * recordarla, acaba en el almacén del sistema operativo; nunca en la base local.
  */
 @Component({
   selector: 'app-connection-dialog',
@@ -40,6 +54,9 @@ export class ConnectionDialog {
   readonly closed = output<void>();
 
   protected readonly engines = ENGINES;
+  protected readonly environments = ENVIRONMENTS;
+
+  protected readonly secretStore = this._store.secretStore;
 
   protected readonly engine = signal<DatabaseEngine>('postgresql');
   protected readonly name = signal('');
@@ -49,6 +66,9 @@ export class ConnectionDialog {
   protected readonly username = signal('');
   protected readonly password = signal('');
   protected readonly readOnly = signal(false);
+  protected readonly environment = signal<ConnectionEnvironment>('development');
+  protected readonly save = signal(true);
+  protected readonly storePassword = signal(true);
 
   protected readonly testing = signal(false);
   protected readonly connecting = signal(false);
@@ -106,6 +126,11 @@ export class ConnectionDialog {
       username: this.username(),
       password: this.password(),
       readOnly: this.readOnly(),
+      environment: this.environment(),
+      save: this.save(),
+      // Sin almacén del sistema no se guarda la contraseña, aunque se pida:
+      // fingir que quedó a salvo sería peor que decir que no se guardó.
+      storePassword: this.save() && this.storePassword() && (this.secretStore()?.available ?? false),
     };
   }
 }

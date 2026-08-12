@@ -1,3 +1,4 @@
+using Druse.Application.Abstractions;
 using Druse.Application.Queries;
 using Druse.Database.Abstractions;
 using Druse.Domain;
@@ -161,6 +162,45 @@ internal static class ContractMapper
                 Kind = risk.Kind.ToString().ToLowerInvariant(),
                 Description = risk.Description,
             })],
+        };
+    }
+
+    /// <summary>Perfil guardado. Nunca incluye la contraseña, solo si existe una.</summary>
+    public static SavedConnectionDto ToSavedDto(this ConnectionProfile profile, bool hasStoredPassword)
+    {
+        ArgumentNullException.ThrowIfNull(profile);
+
+        return new SavedConnectionDto
+        {
+            Id = profile.Id,
+            Name = profile.Name,
+            Engine = EngineId(profile.Engine),
+            Host = profile.Host,
+            Port = profile.Port,
+            Database = profile.Database,
+            Username = profile.Username,
+            Environment = profile.Environment.ToString().ToLowerInvariant(),
+            ReadOnly = profile.ReadOnly,
+            HasStoredPassword = hasStoredPassword,
+        };
+    }
+
+    public static QueryHistoryEntryDto ToDto(this QueryHistoryEntry entry)
+    {
+        ArgumentNullException.ThrowIfNull(entry);
+
+        return new QueryHistoryEntryDto
+        {
+            Id = entry.Id,
+            ConnectionId = entry.ConnectionId,
+            ConnectionName = entry.ConnectionName,
+            Database = entry.Database,
+            Sql = entry.Sql,
+            ExecutedAtUtc = entry.ExecutedAtUtc,
+            DurationMs = entry.DurationMs,
+            Succeeded = entry.Succeeded,
+            RowCount = entry.RowCount,
+            ErrorMessage = entry.ErrorMessage,
         };
     }
 
