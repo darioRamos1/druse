@@ -22,9 +22,14 @@ interface EnvironmentOption {
   readonly label: string;
 }
 
-/** Motores que se ofrecen. MySQL aparece pero deshabilitado hasta la Fase 8. */
+/**
+ * Motores que se ofrecen.
+ *
+ * MySQL aparece deshabilitado a propósito: enseña hacia dónde va el producto sin
+ * dejar elegir algo que todavía no existe. Se habilita en la Fase 8.
+ */
 const ENGINES: readonly EngineOption[] = [
-  { id: 'sqlserver', name: 'SQL Server', versions: '2016 – 2022', defaultPort: 1433, available: false },
+  { id: 'sqlserver', name: 'SQL Server', versions: '2016 – 2022', defaultPort: 1433, available: true },
   { id: 'postgresql', name: 'PostgreSQL', versions: '12 – 18', defaultPort: 5432, available: true },
   { id: 'mysql', name: 'MySQL', versions: '8.0+', defaultPort: 3306, available: false },
 ];

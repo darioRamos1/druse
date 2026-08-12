@@ -1,76 +1,143 @@
 #!/usr/bin/env pwsh
 <#
 .SYNOPSIS
-    Levanta o retira el PostgreSQL desechable que usan las pruebas.
+    Levanta o retira los motores desechables que usan las pruebas.
 
 .DESCRIPTION
-    Las pruebas de proveedor e integración necesitan un servidor real. Este script
-    crea un contenedor aislado con datos que no importan.
+    Las pruebas de proveedor e integración necesitan servidores reales. Este
+    script crea contenedores aislados con datos que no importan.
 
-    La contraseña es de usar y tirar y solo escucha en loopback: no debe
-    reutilizarse para nada más ni parecerse a una credencial real (plan §11).
+    Las contraseñas son de usar y tirar y solo escuchan en loopback: no deben
+    reutilizarse para nada más ni parecerse a credenciales reales (plan §11).
 
-    Si el puerto por defecto está ocupado, pásale otro con -Port y exporta
-    DRUSE_TEST_PG_PORT con el mismo valor antes de ejecutar las pruebas.
+    Si un puerto está ocupado, pásale otro y exporta la variable correspondiente
+    antes de ejecutar las pruebas (DRUSE_TEST_PG_PORT, DRUSE_TEST_MSSQL_PORT).
+
+.PARAMETER Engine
+    Qué motor levantar: postgres, sqlserver o all (por defecto).
 
 .PARAMETER Down
-    Detiene y elimina el contenedor en lugar de crearlo.
+    Detiene y elimina los contenedores en lugar de crearlos.
 
 .EXAMPLE
     ./build/scripts/test-db.ps1
     dotnet test backend/Druse.slnx
 
 .EXAMPLE
+    ./build/scripts/test-db.ps1 -Engine sqlserver
+
+.EXAMPLE
     ./build/scripts/test-db.ps1 -Down
 #>
 [CmdletBinding()]
 param(
-    [int]$Port = 55440,
-    [string]$Name = 'druse-pg-test',
-    [string]$Image = 'postgres:18-alpine',
+    [ValidateSet('all', 'postgres', 'sqlserver')]
+    [string]$Engine = 'all',
+
+    [int]$PostgresPort = 55440,
+    [int]$SqlServerPort = 14433,
     [switch]$Down
 )
 
 $ErrorActionPreference = 'Stop'
 
-if ($Down) {
-    Write-Host "Eliminando el contenedor $Name..." -ForegroundColor Yellow
+$PostgresName = 'druse-pg-test'
+$SqlServerName = 'druse-mssql-test'
+
+function Remove-Container([string]$Name) {
+    Write-Host "Eliminando $Name..." -ForegroundColor Yellow
     docker rm -f $Name 2>$null | Out-Null
+}
+
+if ($Down) {
+    if ($Engine -in 'all', 'postgres') { Remove-Container $PostgresName }
+    if ($Engine -in 'all', 'sqlserver') { Remove-Container $SqlServerName }
+
     Write-Host 'Listo.' -ForegroundColor Green
     return
 }
 
-$existing = docker ps -a --filter "name=^/$Name$" --format '{{.Names}}'
-
-if ($existing -eq $Name) {
-    Write-Host "El contenedor $Name ya existe; se reinicia." -ForegroundColor Cyan
-    docker start $Name | Out-Null
-}
-else {
-    Write-Host "Creando $Name con $Image en el puerto $Port..." -ForegroundColor Cyan
-
-    docker run -d `
-        --name $Name `
-        -e POSTGRES_PASSWORD=druse_dev_only `
-        -e POSTGRES_DB=druse_test `
-        -p "${Port}:5432" `
-        $Image | Out-Null
+function Test-ContainerExists([string]$Name) {
+    return (docker ps -a --filter "name=^/$Name$" --format '{{.Names}}') -eq $Name
 }
 
-# Espera a que el servidor acepte conexiones: recién arrancado tarda un momento.
-foreach ($attempt in 1..30) {
-    Start-Sleep -Milliseconds 500
+# --- PostgreSQL -------------------------------------------------------------
+if ($Engine -in 'all', 'postgres') {
+    if (Test-ContainerExists $PostgresName) {
+        Write-Host "$PostgresName ya existe; se reinicia." -ForegroundColor Cyan
+        docker start $PostgresName | Out-Null
+    }
+    else {
+        Write-Host "Creando $PostgresName en el puerto $PostgresPort..." -ForegroundColor Cyan
 
-    docker exec $Name pg_isready -U postgres 2>$null | Out-Null
+        docker run -d `
+            --name $PostgresName `
+            -e POSTGRES_PASSWORD=druse_dev_only `
+            -e POSTGRES_DB=druse_test `
+            -p "${PostgresPort}:5432" `
+            postgres:18-alpine | Out-Null
+    }
 
-    if ($LASTEXITCODE -eq 0) {
-        Write-Host "PostgreSQL listo en 127.0.0.1:$Port" -ForegroundColor Green
-        Write-Host ''
-        Write-Host 'Las pruebas lo encuentran solas si usas el puerto por defecto.' -ForegroundColor DarkGray
-        Write-Host 'Con otro puerto, exporta: $env:DRUSE_TEST_PG_PORT = ' -NoNewline -ForegroundColor DarkGray
-        Write-Host $Port -ForegroundColor DarkGray
-        return
+    $ready = $false
+
+    foreach ($attempt in 1..40) {
+        Start-Sleep -Milliseconds 500
+        docker exec $PostgresName pg_isready -U postgres 2>$null | Out-Null
+
+        if ($LASTEXITCODE -eq 0) { $ready = $true; break }
+    }
+
+    if ($ready) {
+        Write-Host "  PostgreSQL listo en 127.0.0.1:$PostgresPort" -ForegroundColor Green
+    }
+    else {
+        throw "$PostgresName no respondió a tiempo."
     }
 }
 
-throw "El contenedor $Name no respondió a tiempo."
+# --- SQL Server -------------------------------------------------------------
+if ($Engine -in 'all', 'sqlserver') {
+    if (Test-ContainerExists $SqlServerName) {
+        Write-Host "$SqlServerName ya existe; se reinicia." -ForegroundColor Cyan
+        docker start $SqlServerName | Out-Null
+    }
+    else {
+        Write-Host "Creando $SqlServerName en el puerto $SqlServerPort..." -ForegroundColor Cyan
+        Write-Host '  (la imagen ocupa ~1,5 GB y el primer arranque tarda)' -ForegroundColor DarkGray
+
+        docker run -d `
+            --name $SqlServerName `
+            -e 'ACCEPT_EULA=Y' `
+            -e 'MSSQL_SA_PASSWORD=Druse_dev_only_1' `
+            -e 'MSSQL_PID=Developer' `
+            -p "${SqlServerPort}:1433" `
+            mcr.microsoft.com/mssql/server:2022-latest | Out-Null
+    }
+
+    # SQL Server tarda bastante más que PostgreSQL en aceptar conexiones.
+    $ready = $false
+
+    foreach ($attempt in 1..90) {
+        Start-Sleep -Seconds 1
+
+        docker exec $SqlServerName /opt/mssql-tools18/bin/sqlcmd `
+            -S localhost -U sa -P 'Druse_dev_only_1' -C -Q 'SELECT 1' 2>$null | Out-Null
+
+        if ($LASTEXITCODE -eq 0) { $ready = $true; break }
+    }
+
+    if (-not $ready) {
+        throw "$SqlServerName no respondió a tiempo."
+    }
+
+    # La base no se crea sola, a diferencia de POSTGRES_DB.
+    docker exec $SqlServerName /opt/mssql-tools18/bin/sqlcmd `
+        -S localhost -U sa -P 'Druse_dev_only_1' -C `
+        -Q "IF DB_ID('druse_test') IS NULL CREATE DATABASE druse_test;" 2>$null | Out-Null
+
+    Write-Host "  SQL Server listo en 127.0.0.1:$SqlServerPort" -ForegroundColor Green
+}
+
+Write-Host ''
+Write-Host 'Las pruebas encuentran los motores solas si usas los puertos por defecto.' -ForegroundColor DarkGray
+Write-Host 'Para exigir que todos estén disponibles: $env:DRUSE_REQUIRE_ENGINES = 1' -ForegroundColor DarkGray

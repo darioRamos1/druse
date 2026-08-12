@@ -460,15 +460,15 @@ Cerrar y abrir la aplicación conserva conexiones, historial y preferencias sin 
 
 ### Tareas
 
-- [ ] Crear `SqlServerDatabaseProvider`.
-- [ ] Implementar autenticación SQL Server.
-- [ ] Evaluar autenticación integrada de Windows como tarea separada.
-- [ ] Obtener bases, esquemas, tablas, vistas, procedimientos y columnas.
-- [ ] Ejecutar consultas T-SQL.
-- [ ] Normalizar mensajes y errores.
-- [ ] Probar múltiples conjuntos de resultados.
-- [ ] Verificar timeout y cancelación.
-- [ ] Ejecutar las pruebas contractuales compartidas por proveedores.
+- [x] Crear `SqlServerDatabaseProvider`.
+- [x] Implementar autenticación SQL Server.
+- [x] Evaluar autenticación integrada de Windows como tarea separada. _(Evaluada y descartada del MVP: ata la aplicación a Windows. Queda en el backlog de prioridad alta, como dice el plan §15.)_
+- [x] Obtener bases, esquemas, tablas, vistas, procedimientos y columnas.
+- [x] Ejecutar consultas T-SQL.
+- [x] Normalizar mensajes y errores.
+- [x] Probar múltiples conjuntos de resultados.
+- [x] Verificar timeout y cancelación.
+- [x] Ejecutar las pruebas contractuales compartidas por proveedores.
 
 ### Criterio de salida
 

@@ -10,28 +10,31 @@
 
 | Campo | Valor |
 | --- | --- |
-| Última sesión | **005** — 2026-08-11 |
-| Fase activa | **Fase 4 — SQL Server** |
-| Fase 0 | ✅ Cerrada. 9/9 tareas. |
-| Fase 1 | ✅ Cerrada. 8/8 tareas. |
-| Fase 2 | ✅ Cerrada. 11/11 tareas. |
-| Fase 3 | ✅ **Cerrada.** 10/10 tareas. |
+| Última sesión | **007** — 2026-08-11 |
+| Fase activa | **Fase 5 — Productividad del editor** |
+| Fases 0–3 | ✅ Cerradas. |
+| Fase 4 | ✅ **Cerrada.** 9/9 tareas. |
 | ¿Compila el backend? | Sí — 0 advertencias, 0 errores |
 | ¿Compila el frontend? | Sí — 398 kB iniciales, 0 advertencias |
-| ¿Pasan las pruebas? | Sí — **138 en backend** (85 unitarias + 21 contractuales + 32 integración) y **45 en frontend** |
-| ¿Persisten los datos? | Sí — verificado reiniciando la API: el perfil sobrevive y conecta sin reenviar la contraseña |
+| ¿Pasan las pruebas? | Sí — **167 en backend** (85 unitarias + **48 contractuales** + 34 integración) y **45 en frontend** |
+| ¿Funcionan los dos motores? | Sí — las **24 pruebas contractuales pasan idénticas** contra PostgreSQL 18.4 y SQL Server 2022 |
 | Bloqueantes | Ninguno |
-| Git | Rama `feature/local-persistence`, pendiente de fusionar en `main`. Sin remoto configurado. |
+| Git | Rama `feature/sqlserver-provider`, pendiente de fusionar en `main`. Sin remoto configurado. |
 
 ### Qué toca retomar en la próxima sesión
 
-1. **Fusionar `feature/local-persistence` en `main`** y abrir `feature/sqlserver-provider`.
-2. **Antes de empezar: levantar un SQL Server de prueba.** Es el prerrequisito de la Fase 4, igual que Docker lo fue de la Fase 2. Conviene ampliar `build/scripts/test-db.ps1` para que levante también `mcr.microsoft.com/mssql/server`.
-3. La Fase 4 es donde se comprueba de verdad si las abstracciones sirven: las **21 pruebas contractuales deben pasar contra SQL Server sin cambiar lo que comprueban**. Si alguna resulta ser específica de PostgreSQL, es que se coló una fuga de dialecto.
-4. Habilitar el motor en el diálogo de conexión (hoy aparece deshabilitado) y quitar el `available: false` de `connection-dialog.ts`.
-5. Resolver **D-15** (selector de base de datos) comparando el comportamiento de los dos motores: SQL Server sí permite cambiar de base en la misma conexión, PostgreSQL no.
+1. **Fusionar `feature/sqlserver-provider` en `main`** y abrir `feature/editor-productivity`.
+2. Empezar la **Fase 5**, que es sobre todo trabajo de interfaz. Los botones que hoy están en pantalla sin hacer nada y que le tocan a esta fase:
+   - **Formatear** (formateador SQL consciente del dialecto);
+   - **Timeout**, hoy fijo en 30 s y no editable;
+   - filtro de conexiones de la barra lateral;
+   - atajos de teclado más allá de Ctrl+Enter;
+   - búsqueda dentro del editor.
+3. Autocompletado con esquemas, tablas y columnas ya cargados. El de palabras del documento está apagado a propósito desde la Fase 1.
+4. Recordar las pestañas abiertas entre sesiones: quedó fuera de la Fase 3 y encaja aquí.
+5. Resolver **D-15** (selector de base de datos): ahora que hay dos motores se puede decidir con criterio. SQL Server permite cambiar de base en la misma conexión; PostgreSQL exige reconectar.
 
-**Sigue pendiente el visto bueno visual.** La extensión de Chrome no ha estado conectada en ninguna sesión, así que la pantalla nunca se ha comparado a ojo con el mockup.
+**Sigue pendiente el visto bueno visual.** La extensión de Chrome no ha estado conectada en ninguna sesión.
 
 ---
 
@@ -98,11 +101,49 @@ Pendiente de verificar cuando toque: Docker (pruebas de integración con contene
 
 ## 5. Registro de sesiones
 
+### Sesión 007 — 2026-08-11 · Fase 4 completa
+
+**Objetivo:** el segundo motor. Es la fase que dice si las abstracciones sirven o solo lo parecían.
+
+**Hecho:**
+- `SqlServerDatabaseProvider`, `SqlServerQueryExecutor`, `SqlServerMetadataReader` y `SqlServerErrorNormalizer` con Microsoft.Data.SqlClient 7.
+- Metadatos sobre las vistas `sys.*`, con recuento desde `sys.dm_db_partition_stats` —el equivalente de `reltuples`— para no hacer `COUNT(*)` por tabla.
+- Los tipos se recomponen con su longitud (`nvarchar(200)`, `datetimeoffset(7)`), porque `sys.columns` los guarda despiezados y mostrar solo «nvarchar» perdería información que PostgreSQL sí da.
+- Registrado en la composición: **tres líneas**, sin tocar Domain, Application ni un solo componente Angular.
+- SQL Server habilitado en el diálogo de conexión.
+- `test-db.ps1` y `.sh` levantan ahora los dos motores, por separado o juntos.
+
+**Las pruebas contractuales pasaron a ser de verdad compartidas**
+- `DatabaseProviderContractTests<TFixture>` define **24 comprobaciones idénticas**; cada motor solo aporta conexión y dialecto a través de `IProviderFixture`.
+- **48 pruebas en verde: las mismas 24 contra PostgreSQL 18.4 y contra SQL Server 2022.** Ninguna comprobación tuvo que cambiarse para que pasara en un motor concreto.
+- Lo que sí varía queda declarado y a la vista en el fixture: `pg_sleep` frente a `WAITFOR DELAY`, SQLSTATE `42601` frente al error `102`, `generate_series` frente a una CTE recursiva, `RAISE NOTICE` frente a `PRINT`, `public` frente a `dbo`.
+
+**Dos fallos encontrados, y cómo:**
+
+1. **`InvariantGlobalization=true`, puesto en la Fase 0 para reducir el tamaño del ejecutable, impide que SqlClient abra ninguna conexión**: falla con «Globalization Invariant Mode is not supported». Una decisión de tres fases atrás que solo se manifiesta al integrar el segundo motor. Desactivado, con el motivo escrito en `Directory.Build.props`. Tampoco encajaba con una aplicación que muestra datos de bases ajenas con sus intercalaciones.
+
+2. **Las 24 pruebas de SQL Server pasaban sin comprobar nada.** El patrón de omisión silenciosa —terminar sin hacer nada cuando falta el servidor— convertía un motor caído en una suite verde. Se añadió `ElMotorEstabaDisponible`, que con `DRUSE_REQUIRE_ENGINES=1` convierte ese silencio en un fallo, y `UnavailableReason`, que muestra **por qué** no conectó en lugar de obligar a depurar a ciegas. Fue justo ese test el que destapó el problema anterior. La integración continua ya exige los dos motores.
+
+**Verificado con la aplicación en marcha, contra SQL Server real:**
+- `/api/engines` devuelve los dos motores.
+- Conexión guardada y sesión abierta **sin reenviar la contraseña**.
+- Esquemas sin `sys` ni `INFORMATION_SCHEMA`; tablas con su recuento.
+- Columnas con tipos T-SQL correctos: `nvarchar(200)`, `datetimeoffset(7)`, `bit`, clave primaria e identidad.
+- Consulta T-SQL con acentos y nulos.
+- **El `bit` de SQL Server llega como `true`, igual que el `boolean` de PostgreSQL**: la normalización de tipos funciona.
+- `DELETE` sin filtro → 409 con el mismo aviso que en PostgreSQL.
+
+**Decisión registrada:** la autenticación integrada de Windows queda **fuera del MVP**. Ata la aplicación a un sistema operativo y el plan exige explícitamente que no sea la única forma de conectarse (ADR 0003). Sigue en el backlog de prioridad alta.
+
+**Sobre el nombre «R3Safety»:** venía del mockup y lo había copiado a los datos de prueba. Sustituido por nombres neutros. En el código no quedaba ninguna referencia: los datos simulados que lo tenían se borraron en la Fase 2.
+
+---
+
 ### Sesión 006 — 2026-08-11 · Ejecución completa y tres fallos corregidos
 
 **Objetivo:** arrancar la aplicación entera y ver cómo se comporta de verdad.
 
-**Qué se hizo:** se pobló la base de pruebas con los mismos datos del mockup (1 284 usuarios, 37 tenants, 412 empresas, 9 630 documentos), se arrancó con `dev.ps1` y se recorrió el flujo completo por el proxy.
+**Qué se hizo:** se pobló la base de pruebas con los mismos datos del mockup (1 284 usuarios, 37 tenants, 412 empresas, 9 630 documentos; el nombre «R3Safety» del mockup se sustituyó por datos neutros), se arrancó con `dev.ps1` y se recorrió el flujo completo por el proxy.
 
 **Tres fallos que solo aparecieron al ejecutar:**
 
@@ -115,7 +156,7 @@ Pendiente de verificar cuando toque: Docker (pruebas de integración con contene
 **Verificado con la aplicación en marcha:**
 - `dev.ps1` levanta API y frontend con un solo comando.
 - El proxy inyecta el token: `/api/connections` responde 200 por el 4200 y 401 por el 5177 directo.
-- Conexión guardada, sesión abierta **sin reenviar la contraseña**, con nombre en UTF-8 («PostgreSQL — R3Safety») intacto.
+- Conexión guardada, sesión abierta **sin reenviar la contraseña**, con nombre en UTF-8 («PostgreSQL — Local») intacto.
 - Explorador con carga perezosa: base → esquema → carpetas → tablas, con los recuentos reales (9 630, 412, 37, 1 284).
 - La consulta del mockup ejecutada de verdad: 17 ms.
 - `DELETE FROM users` sin filtro → **409** con el riesgo explicado.
@@ -474,8 +515,8 @@ Fuente: `docs/mockups/druse-main.html`. **Ya implementado** en `frontend/src/sty
 | 1 | Shell visual basado en el mockup | ✅ **Cerrada** — 8/8 |
 | 2 | Flujo vertical PostgreSQL | ✅ **Cerrada** — 11/11 |
 | 3 | Persistencia local y seguridad | ✅ **Cerrada** — 10/10 |
-| 4 | SQL Server | 🔄 **Activa** — 0/9 |
-| 5 | Productividad del editor | ⬜ No iniciada |
+| 4 | SQL Server | ✅ **Cerrada** — 9/9 |
+| 5 | Productividad del editor | 🔄 **Activa** — 0/10 |
 | 6 | Resultados y exportaciones | ⬜ No iniciada |
 | 7 | Empaquetado de escritorio | ⬜ No iniciada |
 | 8 | MySQL y estabilización | ⬜ No iniciada |

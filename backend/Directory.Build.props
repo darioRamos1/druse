@@ -14,7 +14,18 @@
     <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
     <AnalysisLevel>latest-recommended</AnalysisLevel>
     <GenerateDocumentationFile>false</GenerateDocumentationFile>
-    <InvariantGlobalization>true</InvariantGlobalization>
+
+    <!--
+      El modo de globalización invariante reduciría el tamaño del ejecutable,
+      pero Microsoft.Data.SqlClient no arranca con él: falla al abrir cualquier
+      conexión con «Globalization Invariant Mode is not supported».
+
+      Tampoco encaja con lo que hace la aplicación: muestra datos de bases
+      ajenas, con sus intercalaciones y alfabetos. Los valores se formatean con
+      cultura invariante en cada proveedor, que es donde importa; apagar la
+      globalización del proceso entero es otra cosa.
+    -->
+    <InvariantGlobalization>false</InvariantGlobalization>
   </PropertyGroup>
 
   <!-- Metadatos del producto -->

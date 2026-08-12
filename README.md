@@ -4,7 +4,7 @@ Aplicación de escritorio para administrar y consultar distintos motores de base
 
 Una *drusa* es la costra de cristales que tapiza el interior de una geoda: la estructura que aparece al abrir la piedra. Es lo que hace la aplicación con una base de datos.
 
-> **Estado: Fase 0 (preparación).** La solución compila, la API local responde y el frontend arranca. Todavía no hay conexión real a ningún motor.
+> **Estado: Fase 4 cerrada.** Funciona el flujo completo contra **PostgreSQL y SQL Server**: conectar, explorar el catálogo, escribir SQL, ejecutar, cancelar y consultar el historial. Todavía no está empaquetado como aplicación de escritorio (Fase 7) y faltan la exportación (Fase 6) y buena parte de la productividad del editor (Fase 5).
 
 ---
 
@@ -14,7 +14,16 @@ Una *drusa* es la costra de cristales que tapiza el interior de una geoda: la es
 | --- | --- | --- |
 | .NET SDK | 10.0 | API local y proveedores |
 | Node.js | 22 o superior | Frontend Angular |
+| Docker | — | Solo para las bases de datos de pruebas |
 | Rust (cargo) | estable | Solo para el empaquetado con Tauri (Fase 7) |
+
+## Motores soportados
+
+| Motor | Estado |
+| --- | --- |
+| PostgreSQL 12 – 18 | Funcionando |
+| SQL Server 2016 – 2022 | Funcionando (autenticación SQL; la integrada de Windows está en el backlog) |
+| MySQL | Fase 8 |
 
 ## Ejecutar en desarrollo
 
@@ -58,22 +67,36 @@ npm run build
 npm test
 ```
 
-### Base de datos de pruebas
+### Bases de datos de pruebas
 
-Las pruebas de proveedor y de integración necesitan un PostgreSQL real. Hay un contenedor desechable preparado:
+Las pruebas de proveedor y de integración necesitan servidores reales. Hay contenedores desechables preparados:
 
 ```powershell
-./build/scripts/test-db.ps1        # Windows
+./build/scripts/test-db.ps1                    # ambos motores
+./build/scripts/test-db.ps1 -Engine postgres   # solo uno
+./build/scripts/test-db.ps1 -Down              # retirarlos
 ```
 
 ```bash
-./build/scripts/test-db.sh         # Linux y macOS
-./build/scripts/test-db.sh down    # retirarlo
+./build/scripts/test-db.sh                     # ambos motores
+./build/scripts/test-db.sh sqlserver           # solo uno
+./build/scripts/test-db.sh down                # retirarlos
 ```
 
-Levanta `postgres:18-alpine` en `127.0.0.1:55440` con una contraseña de usar y tirar. Las pruebas lo encuentran solas; si necesitas otro puerto, ajusta `DRUSE_TEST_PG_PORT`.
+| Motor | Imagen | Puerto | Variable para cambiarlo |
+| --- | --- | --- | --- |
+| PostgreSQL | `postgres:18-alpine` | 55440 | `DRUSE_TEST_PG_PORT` |
+| SQL Server | `mssql/server:2022-latest` | 14433 | `DRUSE_TEST_MSSQL_PORT` |
 
 **Sin contenedor las pruebas no fallan: se omiten.** Una máquina sin Docker no debería dar por rota la suite entera.
+
+Eso tiene un riesgo, y por eso existe `DRUSE_REQUIRE_ENGINES=1`: con esa variable, un motor que no responda **rompe la compilación** en lugar de dejar una suite verde que no comprobó nada. La integración continua siempre la activa.
+
+### Pruebas contractuales
+
+`backend/tests/Druse.ProviderContractTests` define **un solo conjunto de comprobaciones que todos los motores deben superar**. Cada proveedor aporta únicamente su conexión y sus diferencias de dialecto, declaradas en `IProviderFixture`.
+
+Si alguna vez hay que cambiar *lo que comprueba* una de esas pruebas para que pase en un motor concreto, es señal de que se ha colado una fuga de dialecto en las abstracciones.
 
 ## Estructura
 
