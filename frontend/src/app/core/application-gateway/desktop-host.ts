@@ -1,0 +1,69 @@
+import { Injectable, signal } from '@angular/core';
+
+/** Cómo alcanzar la API local. */
+export interface ApiConnection {
+  /** Vacío en desarrollo: las rutas relativas las resuelve el proxy. */
+  readonly baseUrl: string;
+  readonly token: string | null;
+}
+
+/** Forma en que Tauri expone sus comandos en la ventana. */
+interface TauriBridge {
+  core?: { invoke<T>(command: string, args?: unknown): Promise<T> };
+  invoke?<T>(command: string, args?: unknown): Promise<T>;
+}
+
+declare global {
+  interface Window {
+    __TAURI__?: TauriBridge;
+  }
+}
+
+/**
+ * Detecta si la aplicación corre dentro del envoltorio de escritorio y, en ese
+ * caso, obtiene de él el puerto y el token de la API.
+ *
+ * El navegador no puede leer archivos del disco, así que alguien con acceso al
+ * sistema tiene que pasarle esos datos. En desarrollo lo hace el proxy del
+ * servidor de Angular, que inyecta la cabecera y redirige `/api`; empaquetado,
+ * lo hace Tauri. **El resto de la aplicación no distingue un caso del otro.**
+ */
+@Injectable({ providedIn: 'root' })
+export class DesktopHost {
+  private readonly _connection = signal<ApiConnection>({ baseUrl: '', token: null });
+
+  /** Punto de conexión vigente. En desarrollo, rutas relativas y sin token. */
+  readonly connection = this._connection.asReadonly();
+
+  get isDesktop(): boolean {
+    return typeof window !== 'undefined' && !!window.__TAURI__;
+  }
+
+  /**
+   * Pide al envoltorio los datos de conexión.
+   *
+   * Si no estamos dentro de Tauri no hace nada: las rutas relativas siguen
+   * funcionando a través del proxy.
+   */
+  async initialize(): Promise<void> {
+    if (!this.isDesktop) {
+      return;
+    }
+
+    try {
+      const bridge = window.__TAURI__!;
+      const invoke = bridge.core?.invoke ?? bridge.invoke;
+
+      if (!invoke) {
+        return;
+      }
+
+      const result = await invoke<{ base_url: string; token: string }>('api_connection');
+
+      this._connection.set({ baseUrl: result.base_url, token: result.token });
+    } catch {
+      // Si el envoltorio no responde, se sigue con rutas relativas: fallará más
+      // adelante con un error claro en lugar de impedir que la ventana abra.
+    }
+  }
+}

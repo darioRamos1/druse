@@ -28,7 +28,30 @@ El CSV sigue el RFC 4180: entrecomilla los valores con separador, comillas o sal
 | .NET SDK | 10.0 | API local y proveedores |
 | Node.js | 22 o superior | Frontend Angular |
 | Docker | — | Solo para las bases de datos de pruebas |
-| Rust (cargo) | estable | Solo para el empaquetado con Tauri (Fase 7) |
+| Rust (cargo) | estable | Solo para el envoltorio de escritorio |
+| MSVC Build Tools | 2022 | En Windows: el enlazador que necesita Rust |
+
+En Windows, Rust por sí solo no basta: necesita el enlazador de Microsoft. Se instala con
+
+```powershell
+winget install --id Microsoft.VisualStudio.2022.BuildTools
+# y en el instalador, marcar «Desarrollo para el escritorio con C++»
+```
+
+## Empaquetar como aplicación de escritorio
+
+```powershell
+./build/scripts/package.ps1                       # instalador para esta máquina
+./build/scripts/package.ps1 -SkipInstaller        # solo preparar el contenido
+./build/scripts/package.ps1 -Runtime linux-x64
+```
+
+Publica la API de forma **autocontenida** y la mete dentro del paquete, de modo que quien instale Druse **no necesita .NET ni Node.js**.
+
+Al empaquetar cambian dos cosas respecto al desarrollo:
+
+- **La API usa un puerto que le asigna el sistema**, no el 5177. Publica el puerto y su token en `endpoint.json`, dentro del directorio de datos.
+- **Tauri lee ese archivo** y se lo pasa al frontend. En desarrollo esa misma función la cumple el proxy del servidor de Angular. El resto de la aplicación no distingue un caso del otro.
 
 ## Atajos del editor
 

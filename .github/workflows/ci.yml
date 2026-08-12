@@ -139,6 +139,46 @@ jobs:
       - name: Probar
         run: npm test
 
+  # Compila el envoltorio de escritorio. No genera instaladores —eso se hace al
+  # publicar una versión— pero sí detecta que el código Rust dejó de compilar,
+  # que es lo que se escaparía sin este job.
+  escritorio:
+    name: Envoltorio de escritorio (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Instalar Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Dependencias de Tauri en Linux
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+
+      - name: Instalar Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Compilar el frontend
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run build
+
+      - name: Comprobar que el envoltorio compila
+        working-directory: shells/desktop-tauri
+        run: cargo check --locked
+
   # Comprueba que la API se puede publicar autocontenida para cada plataforma
   # objetivo, sin que el usuario final necesite el SDK de .NET (ADR 0003).
   publicacion-autocontenida:

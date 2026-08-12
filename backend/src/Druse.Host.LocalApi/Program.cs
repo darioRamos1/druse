@@ -9,10 +9,28 @@ var builder = WebApplication.CreateBuilder(args);
 
 // La API local escucha exclusivamente en la interfaz de loopback y nunca en 0.0.0.0.
 // Ver PLAN_TRABAJO_DRUSE.md §2 (Decisión de implementación) y §12 (Seguridad desde el inicio).
-// El puerto será dinámico cuando Tauri administre el proceso auxiliar (Fase 7).
+//
+// El puerto 0 pide uno libre al sistema, que es lo que usa la aplicación de
+// escritorio: un puerto fijo puede estar ocupado por otro programa, o por otra
+// instancia de Druse. En desarrollo se mantiene el 5177 para que el proxy de
+// Angular sepa a dónde ir sin leer nada.
 const int DefaultPort = 5177;
-int port = builder.Configuration.GetValue("LocalApi:Port", DefaultPort);
-builder.WebHost.ConfigureKestrel(options => options.ListenLocalhost(port));
+int configuredPort = builder.Configuration.GetValue("LocalApi:Port", DefaultPort);
+
+builder.WebHost.ConfigureKestrel(options =>
+{
+    if (configuredPort == 0)
+    {
+        // `ListenLocalhost` no admite puerto dinámico porque abriría dos
+        // sockets —IPv4 e IPv6— y cada uno recibiría un puerto distinto. Con la
+        // dirección explícita, el sistema asigna uno y sabemos cuál.
+        options.Listen(System.Net.IPAddress.Loopback, 0);
+    }
+    else
+    {
+        options.ListenLocalhost(configuredPort);
+    }
+});
 
 builder.Services.AddOpenApi();
 builder.Services.AddDruse();
@@ -95,19 +113,36 @@ app.MapDatabaseEndpoints();
 app.MapStorageEndpoints();
 app.MapExportEndpoints();
 
-var token = app.Services.GetRequiredService<LocalApiToken>();
+var endpoint = app.Services.GetRequiredService<LocalApiEndpoint>();
 
-if (app.Logger.IsEnabled(LogLevel.Information))
+// El punto de conexión se publica cuando el servidor ya escucha: con puerto
+// dinámico, el número real no existe hasta ese momento.
+app.Lifetime.ApplicationStarted.Register(() =>
 {
-    app.Logger.LogInformation("Token de la API local escrito en {Path}", token.FilePath);
-}
+    var addresses = app.Services
+        .GetRequiredService<Microsoft.AspNetCore.Hosting.Server.IServer>()
+        .Features.Get<Microsoft.AspNetCore.Hosting.Server.Features.IServerAddressesFeature>();
 
-// Ninguna conexión ni transacción debe quedar viva al cerrar, y el token deja de
-// existir con el proceso (plan §12).
+    var address = addresses?.Addresses.FirstOrDefault();
+    var listeningPort = address is null ? configuredPort : new Uri(address).Port;
+
+    endpoint.Publish(listeningPort);
+
+    if (app.Logger.IsEnabled(LogLevel.Information))
+    {
+        app.Logger.LogInformation(
+            "Druse escuchando en http://127.0.0.1:{Port}; punto de conexión en {Path}",
+            listeningPort,
+            endpoint.FilePath);
+    }
+});
+
+// Ninguna conexión ni transacción debe quedar viva al cerrar, y el punto de
+// conexión deja de existir con el proceso (plan §12).
 app.Lifetime.ApplicationStopping.Register(() =>
 {
     app.Services.GetRequiredService<ISessionRegistry>().CloseAllAsync().GetAwaiter().GetResult();
-    token.Dispose();
+    endpoint.Dispose();
 });
 
 app.Run();

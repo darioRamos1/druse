@@ -7,7 +7,7 @@ namespace Druse.Host.LocalApi.Security;
 /// aplicación pueda saber si la API ya responde, antes de tener nada más. No
 /// expone ningún dato del usuario.
 /// </summary>
-internal sealed class TokenAuthenticationMiddleware(RequestDelegate next, LocalApiToken token)
+internal sealed class TokenAuthenticationMiddleware(RequestDelegate next, LocalApiEndpoint token)
 {
     private const string HeaderName = "X-Druse-Token";
 
@@ -15,7 +15,7 @@ internal sealed class TokenAuthenticationMiddleware(RequestDelegate next, LocalA
     private static readonly string[] PublicPaths = ["/api/health"];
 
     private readonly RequestDelegate _next = next;
-    private readonly LocalApiToken _token = token;
+    private readonly LocalApiEndpoint _token = token;
 
     public async Task InvokeAsync(HttpContext context)
     {

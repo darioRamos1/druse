@@ -35,7 +35,7 @@ internal static class DependencyInjection
         // cada vez en lugar de fingir que la guarda bien.
         services.AddSingleton(_ => SecretStoreFactory.Create());
 
-        services.AddSingleton<LocalApiToken>();
+        services.AddSingleton<LocalApiEndpoint>();
 
         // --- Persistencia local ----------------------------------------------
         services.AddSingleton<DruseDatabase>();

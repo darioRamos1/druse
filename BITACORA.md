@@ -10,30 +10,30 @@
 
 | Campo | Valor |
 | --- | --- |
-| Última sesión | **009** — 2026-08-12 |
-| Fase activa | **Fase 7 — Empaquetado de escritorio** |
-| Fases 0–5 | ✅ Cerradas. |
-| Fase 6 | ✅ **Cerrada.** 9/9 tareas. |
+| Última sesión | **010** — 2026-08-12 |
+| Fase activa | **Fase 8 — MySQL y estabilización** |
+| Fases 0–6 | ✅ Cerradas. |
+| Fase 7 | 🟡 **10/12.** Hay instalador y funciona; faltan dos comprobaciones que exigen otro equipo. |
 | ¿Compila el backend? | Sí — 0 advertencias, 0 errores |
-| ¿Compila el frontend? | Sí — 422 kB iniciales, 0 advertencias |
-| ¿Pasan las pruebas? | Sí — **192 en backend** (102 unitarias + 48 contractuales + 42 integración) y **70 en frontend** |
-| ¿Se puede exportar? | Sí — 9 630 filas a CSV en 0,23 s, y XLSX que Windows reconoce |
-| Bloqueantes | **Rust no está instalado** y hace falta para Tauri |
-| Git | Rama `feature/results-export`, pendiente de fusionar en `main`. Sin remoto configurado. |
+| ¿Compila el envoltorio? | Sí — `cargo check` sin avisos |
+| ¿Pasan las pruebas? | Sí — **192 en backend** y **76 en frontend** |
+| ¿Hay aplicación de escritorio? | **Sí.** Instalador NSIS (44 MB), MSI (58 MB) y ZIP portable (62 MB), los tres probados |
+| Bloqueantes | Ninguno |
+| Git | Rama `feature/desktop-packaging`, pendiente de fusionar en `main`. Sin remoto configurado. |
 
 ### Qué toca retomar en la próxima sesión
 
-1. **Instalar Rust** (`rustup`). Es el prerrequisito de la Fase 7, como Docker lo fue de la 2 y SQL Server de la 4.
-2. **Fusionar `feature/results-export` en `main`** y abrir `feature/desktop-packaging`.
-3. La **Fase 7** es la que convierte esto en una aplicación de verdad:
-   - Tauri sobre el frontend existente;
-   - la API como proceso auxiliar, con **puerto dinámico** en lugar del 5177 fijo;
-   - **el token ya no lo leerá el proxy sino Tauri**, que es lo que se preparó en la Fase 3;
-   - cerrar la API al cerrar la ventana;
-   - instalador para Windows y ZIP portable;
-   - probar en un equipo limpio, sin .NET ni Node.
-4. Los tres círculos de la barra superior (minimizar, maximizar, cerrar) siguen siendo decorativos: con Tauri pasan a funcionar.
-5. Aplazado otra vez: recordar las pestañas abiertas entre sesiones. Encaja con el estado de ventana de esta fase.
+1. **Fusionar `feature/desktop-packaging` en `main`** y abrir `feature/mysql-provider`.
+2. La **Fase 8** cierra el ciclo. Es la más previsible de todas: el contrato compartido dirá en un minuto si el proveedor MySQL está bien.
+   - `MySqlDatabaseProvider` con MySqlConnector;
+   - metadatos MySQL/MariaDB;
+   - **las 24 pruebas contractuales deben pasar sin cambiar lo que comprueban**;
+   - habilitar el motor en el diálogo, donde ya aparece deshabilitado;
+   - añadir MySQL a `test-db.ps1` y al CI.
+3. Lo que quedó pendiente de la Fase 7 y **necesita otro equipo**:
+   - instalar y desinstalar de verdad, para validar el ciclo completo;
+   - probar en una máquina sin .NET ni Node.
+4. Artefactos de Linux y macOS: el script acepta cualquier RID, pero generarlos exige compilar en cada plataforma. Es trabajo de integración continua.
 
 **Sigue pendiente el visto bueno visual.** La extensión de Chrome no ha estado conectada en ninguna sesión.
 
@@ -94,13 +94,67 @@ Pendiente cuando haya presencia pública: reservar dominio, organización de Git
 | Angular | 22.1.0 (CLI 22.1.3) | OK |
 | TypeScript | 6.0.2 | OK |
 | Vitest | 4.1.10 | OK — es el runner por defecto de Angular 22 |
-| Rust / cargo | — | **Falta.** Necesario solo para Tauri (Fase 7). |
+| Rust / cargo | 1.97.1 | OK |
+| MSVC Build Tools | 14.44.35207 + SDK 10.0.26100 | OK — el enlazador que Rust necesita en Windows |
+| Tauri CLI | 2.11.4 | OK |
 
 Pendiente de verificar cuando toque: Docker (pruebas de integración con contenedores), instancias PostgreSQL y SQL Server de prueba (Fases 2 y 4).
 
 ---
 
 ## 5. Registro de sesiones
+
+### Sesión 010 — 2026-08-12 · Fase 7, aplicación de escritorio
+
+**Objetivo:** que Druse deje de ser una pestaña del navegador.
+
+**Instalación del entorno**
+- Rust 1.97.1 con rustup, añadido al PATH del usuario.
+- **El instalador oficial de Rust no viene firmado.** Es conocido y ha sido objeto de debate en el propio proyecto; se descargó de `win.rustup.rs` por HTTPS.
+- Faltaba el enlazador de C++. Hubo que instalar Build Tools 2022 con el componente de C++ y el SDK de Windows: **4 GB de descarga**.
+
+**Hecho:**
+
+*Puerto dinámico*
+- La API acepta `LocalApi:Port=0` y pide un puerto libre al sistema. Un puerto fijo puede estar ocupado por otro programa o por otra instancia.
+- `LocalApiEndpoint` sustituye a `LocalApiToken`: publica **puerto, token y PID** en `endpoint.json`, dentro del directorio de datos. Quien pueda leer ese archivo tiene todo lo necesario para hablar con la API; quien no, nada.
+- El archivo se escribe al arrancar el servidor, no en el constructor: con puerto dinámico el número real no existe antes.
+
+*Envoltorio Tauri*
+- Lanza la API como proceso auxiliar, espera a que publique su punto de conexión y **la mata al cerrar la ventana**.
+- Expone un único comando, `api_connection`, que da al frontend el puerto y el token. Es toda su razón de ser: el navegador no puede leer archivos del disco.
+- **No contiene lógica de base de datos** (ADR 0001).
+- Icono generado a partir del logo del mockup: rombo sobre degradado azul-violeta.
+
+*Frontend*
+- `DesktopHost` detecta si corre dentro del envoltorio y le pide los datos de conexión.
+- `apiInterceptor` antepone el host y añade el token **solo cuando hace falta**. En desarrollo no toca nada, porque de eso se encarga el proxy.
+- **Es el único sitio del frontend que distingue navegador de escritorio.** Ni el gateway ni los componentes lo saben.
+
+*Empaquetado*
+- `package.ps1` publica la API autocontenida, compila el frontend y construye el instalador. Con `-Portable`, además un ZIP.
+- `msvc-env.ps1` carga el entorno de MSVC antes de compilar.
+
+**Verificado ejecutando la aplicación de verdad:**
+- Se generaron **NSIS (44 MB), MSI (58 MB) y ZIP portable (62 MB)**.
+- La aplicación abre, **arranca su propia API en un puerto asignado por el sistema** (56201 en la prueba) y responde.
+- **La versión portable funciona extraída en un directorio limpio**, con la API en otro puerto (65088).
+- Al cerrar la ventana **no queda ningún proceso vivo** y el `endpoint.json` desaparece.
+- 192 pruebas de backend y 76 de frontend.
+
+**Incidencias resueltas:**
+1. **`ListenLocalhost(0)` no admite puerto dinámico**: abriría dos sockets, IPv4 e IPv6, y cada uno recibiría un puerto distinto. Se pasó a `Listen(IPAddress.Loopback, 0)`.
+2. **winget no pasó el `--override`**: instaló el bootstrapper de Build Tools sin el componente de C++, y en el registro no aparecía VCTools por ninguna parte. Se resolvió con el instalador oficial de Microsoft directamente.
+3. **Rust elegía el `link.exe` equivocado.** Conviven varias instalaciones de Visual Studio y la detección automática tomaba una que tiene el enlazador pero no las librerías, fallando con «no se puede abrir el archivo msvcrt.lib». Un `.cargo/config.toml` con otro enlazador **no resolvía nada** —el problema eran las rutas de librerías, no el enlazador— así que se hizo bien: cargar el entorno de MSVC.
+4. **El glob de recursos `api/*` fallaba** cuando la API no estaba publicada. Se versiona un `.gitkeep`.
+5. **`endpoint.json` sobrevivía al cierre**, porque Tauri mata la API sin darle tiempo a limpiar. Ahora lo borra el propio envoltorio.
+
+**No hecho, y por qué:**
+- **Instalar y desinstalar de verdad**: modificaría el sistema del usuario. Requiere su decisión.
+- **Probar en un equipo limpio**: hace falta otra máquina. Es el criterio que de verdad demuestra que no se necesita .NET ni Node.
+- **Artefactos de Linux y macOS**: exigen compilar en cada plataforma. Trabajo de integración continua, no de esta máquina.
+
+---
 
 ### Sesión 009 — 2026-08-12 · Fase 6 completa
 
@@ -606,8 +660,8 @@ Fuente: `docs/mockups/druse-main.html`. **Ya implementado** en `frontend/src/sty
 | 4 | SQL Server | ✅ **Cerrada** — 9/9 |
 | 5 | Productividad del editor | ✅ **Cerrada** — 10/10 |
 | 6 | Resultados y exportaciones | ✅ **Cerrada** — 9/9 |
-| 7 | Empaquetado de escritorio | 🔄 **Activa** — 0/12 |
-| 8 | MySQL y estabilización | ⬜ No iniciada |
+| 7 | Empaquetado de escritorio | 🟡 **10/12** — falta validar en otro equipo |
+| 8 | MySQL y estabilización | 🔄 **Activa** — 0/7 |
 
 ### Fase 0 — criterio de salida ✅
 
