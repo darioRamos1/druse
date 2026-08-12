@@ -2,6 +2,7 @@ using Druse.Application.Abstractions;
 using Druse.Application.Connections;
 using Druse.Application.Metadata;
 using Druse.Application.Queries;
+using Druse.Application.Rows;
 using Druse.Database.Abstractions;
 using Druse.Host.LocalApi.Security;
 using Druse.Infrastructure.Exports;
@@ -45,20 +46,23 @@ internal static class DependencyInjection
         services.AddScoped<IPreferencesStore, SqlitePreferencesStore>();
 
         // --- Proveedores de motor ---------------------------------------------
-        // Cada motor aporta tres piezas y nada más. MySQL entró en la Fase 8
-        // exactamente así: tres líneas aquí, sin tocar Domain, Application ni la
+        // Cada motor aporta sus piezas y nada más. MySQL entró en la Fase 8
+        // exactamente así: unas líneas aquí, sin tocar Domain, Application ni la
         // interfaz.
         services.AddSingleton<IDatabaseProvider, PostgreSqlDatabaseProvider>();
         services.AddSingleton<IDatabaseMetadataReader, PostgreSqlMetadataReader>();
         services.AddSingleton<IQueryExecutor, PostgreSqlQueryExecutor>();
+        services.AddSingleton<IRowEditor, PostgreSqlRowEditor>();
 
         services.AddSingleton<IDatabaseProvider, SqlServerDatabaseProvider>();
         services.AddSingleton<IDatabaseMetadataReader, SqlServerMetadataReader>();
         services.AddSingleton<IQueryExecutor, SqlServerQueryExecutor>();
+        services.AddSingleton<IRowEditor, SqlServerRowEditor>();
 
         services.AddSingleton<IDatabaseProvider, MySqlDatabaseProvider>();
         services.AddSingleton<IDatabaseMetadataReader, MySqlMetadataReader>();
         services.AddSingleton<IQueryExecutor, MySqlQueryExecutor>();
+        services.AddSingleton<IRowEditor, MySqlRowEditor>();
 
         services.AddSingleton<IProviderRegistry, ProviderRegistry>();
 
@@ -73,6 +77,7 @@ internal static class DependencyInjection
         services.AddScoped<SavedConnectionService>();
         services.AddScoped<MetadataService>();
         services.AddScoped<QueryService>();
+        services.AddScoped<RowEditService>();
         services.AddScoped<ExportService>();
 
         // --- Exportadores -------------------------------------------------------

@@ -2,6 +2,7 @@ using Druse.Application.Abstractions;
 using Druse.Application.Connections;
 using Druse.Application.Metadata;
 using Druse.Application.Queries;
+using Druse.Application.Rows;
 using Druse.Database.Abstractions;
 using Druse.Domain;
 using Druse.Host.LocalApi.Contracts;
@@ -23,6 +24,7 @@ internal static class DatabaseEndpoints
         MapSessions(app);
         MapMetadata(app);
         MapQueries(app);
+        MapRowEdits(app);
     }
 
     private static void MapEngines(IEndpointRouteBuilder app)
@@ -129,6 +131,76 @@ internal static class DatabaseEndpoints
         })
         .WithName("GetColumns");
     }
+
+    /// <summary>
+    /// Edición de filas desde la cuadrícula.
+    ///
+    /// Son dos rutas y no una con bandera a propósito: **ver el SQL y ejecutarlo
+    /// son cosas distintas**, y separarlas impide que un cliente mal escrito
+    /// acabe guardando cuando solo quería mirar.
+    /// </summary>
+    private static void MapRowEdits(IEndpointRouteBuilder app)
+    {
+        app.MapPost("/api/rows/preview", async (
+            RowEditRequest request,
+            RowEditService rows,
+            CancellationToken cancellationToken) =>
+        {
+            try
+            {
+                var statements = await rows.PreviewAsync(request.ToDomain(), cancellationToken);
+
+                return Results.Ok(new { statements });
+            }
+            catch (RowEditRejectedException exception)
+            {
+                return Rejected(exception);
+            }
+        })
+        .WithName("PreviewRowEdits");
+
+        app.MapPost("/api/rows", async (
+            RowEditRequest request,
+            RowEditService rows,
+            CancellationToken cancellationToken) =>
+        {
+            try
+            {
+                var result = await rows.ApplyAsync(request.ToDomain(), cancellationToken);
+
+                return Results.Ok(new RowEditResponse
+                {
+                    RowsAffected = result.RowsAffected,
+                    DurationMs = (long)result.Duration.TotalMilliseconds,
+                    Statements = result.Statements,
+                });
+            }
+            catch (RowEditRejectedException exception)
+            {
+                return Rejected(exception);
+            }
+            catch (RowEditFailedException exception)
+            {
+                // 409: la petición era válida, pero el estado de la tabla no era
+                // el que el usuario tenía delante. No se guardó nada.
+                return Results.Conflict(new RowEditRejectedResponse
+                {
+                    Reason = "unexpectedrowcount",
+                    Message = exception.Message,
+                });
+            }
+        })
+        .WithName("ApplyRowEdits");
+    }
+
+    private static IResult Rejected(RowEditRejectedException exception) =>
+        Results.Json(
+            new RowEditRejectedResponse
+            {
+                Reason = exception.Rejection.Reason.ToString().ToLowerInvariant(),
+                Message = exception.Rejection.Message,
+            },
+            statusCode: StatusCodes.Status409Conflict);
 
     private static void MapQueries(IEndpointRouteBuilder app)
     {

@@ -21,6 +21,8 @@ public sealed class SqlServerFixture : IProviderFixture
 
     public IDatabaseMetadataReader Metadata { get; } = new SqlServerMetadataReader();
 
+    public IRowEditor RowEditor { get; } = new SqlServerRowEditor();
+
     public string DatabaseName =>
         Environment.GetEnvironmentVariable("DRUSE_TEST_MSSQL_DB") ?? "druse_test";
 
@@ -91,6 +93,12 @@ public sealed class SqlServerFixture : IProviderFixture
     public string DropTable(string name) => $"DROP TABLE IF EXISTS {name}";
 
     public string InsertThreeRows(string name) => $"INSERT INTO {name} (id) VALUES (1), (2), (3)";
+
+    public string InsertNamedRows(string name) => $"""
+        SET IDENTITY_INSERT {name} ON;
+        INSERT INTO {name} (id, nombre) VALUES (1, 'Ana'), (2, 'Bea'), (3, 'Cris');
+        SET IDENTITY_INSERT {name} OFF;
+        """;
 
     public string CreateTableWithColumns(string name) => $"""
         CREATE TABLE {name} (

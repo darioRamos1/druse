@@ -237,6 +237,29 @@ internal static class ContractMapper
         };
     }
 
+    /// <summary>
+    /// Traduce los cambios de la cuadrícula.
+    ///
+    /// La tabla se convierte con el mismo mapeo que el resto del catálogo: el
+    /// servidor volverá a leer sus columnas antes de escribir nada.
+    /// </summary>
+    public static RowEditBatch ToDomain(this RowEditRequest request)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        return new RowEditBatch
+        {
+            SessionId = request.SessionId,
+            Table = request.Table.ToDomain(),
+            Confirmed = request.Confirmed,
+            Edits = [.. request.Edits.Select(edit => new RowEdit
+            {
+                Key = [.. edit.Key.Select(cell => new CellValue(cell.Column, cell.Value))],
+                Changes = [.. edit.Changes.Select(cell => new CellValue(cell.Column, cell.Value))],
+            })],
+        };
+    }
+
     public static string EngineId(DatabaseEngine engine) => engine switch
     {
         DatabaseEngine.PostgreSql => "postgresql",

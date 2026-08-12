@@ -221,6 +221,57 @@ public sealed record PreferenceValueDto
 }
 
 // ---------------------------------------------------------------------------
+// Edición de filas
+// ---------------------------------------------------------------------------
+
+/// <summary>Una celda: su columna y el valor, donde `null` es NULL.</summary>
+public sealed record CellValueDto
+{
+    public required string Column { get; init; }
+    public string? Value { get; init; }
+}
+
+public sealed record RowEditDto
+{
+    /// <summary>Columnas de la clave primaria con el valor con el que se leyó la fila.</summary>
+    public required IReadOnlyList<CellValueDto> Key { get; init; }
+
+    public required IReadOnlyList<CellValueDto> Changes { get; init; }
+}
+
+/// <summary>
+/// Cambios hechos sobre la cuadrícula.
+///
+/// La tabla viaja como objeto del catálogo y no como texto: así el servidor lee
+/// sus columnas reales y no se fía del nombre que le manden.
+/// </summary>
+public sealed record RowEditRequest
+{
+    public required Guid SessionId { get; init; }
+    public required DatabaseObjectDto Table { get; init; }
+    public required IReadOnlyList<RowEditDto> Edits { get; init; }
+
+    /// <summary>El usuario ya vio el SQL. Sin esto no se ejecuta nada.</summary>
+    public bool Confirmed { get; init; }
+}
+
+public sealed record RowEditResponse
+{
+    public required long RowsAffected { get; init; }
+    public required long DurationMs { get; init; }
+
+    /// <summary>Lo que se ejecutó, escrito para poder leerlo.</summary>
+    public required IReadOnlyList<string> Statements { get; init; }
+}
+
+/// <summary>Los cambios no se aplicaron, con el motivo.</summary>
+public sealed record RowEditRejectedResponse
+{
+    public required string Reason { get; init; }
+    public required string Message { get; init; }
+}
+
+// ---------------------------------------------------------------------------
 // Fase 6: exportaciones
 // ---------------------------------------------------------------------------
 

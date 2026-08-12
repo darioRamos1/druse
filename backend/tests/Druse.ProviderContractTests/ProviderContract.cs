@@ -30,6 +30,9 @@ public interface IProviderFixture
 
     IDatabaseMetadataReader Metadata { get; }
 
+    /// <summary>Quien escribe los cambios hechos sobre la cuadrícula.</summary>
+    IRowEditor RowEditor { get; }
+
     ConnectionProfile Profile(bool onlyRead = false);
 
     DatabaseCredentials Credentials { get; }
@@ -81,6 +84,16 @@ public interface IProviderFixture
 
     /// <summary>Crea una tabla con clave primaria, columna obligatoria, opcional y con valor por defecto.</summary>
     string CreateTableWithColumns(string name);
+
+    /// <summary>
+    /// Inserta tres filas con nombre en la tabla de <see cref="CreateTableWithColumns"/>,
+    /// con los identificadores 1, 2 y 3 y los nombres Ana, Bea y Cris.
+    ///
+    /// Los identificadores son explícitos porque la edición de filas apunta a una
+    /// fila **por su clave**, y una prueba que no sepa cuál es esa clave no
+    /// comprueba nada.
+    /// </summary>
+    string InsertNamedRows(string name);
 
     /// <summary>Tipo con el que el motor reporta una marca de tiempo con zona horaria.</summary>
     string TimestampTypeName { get; }

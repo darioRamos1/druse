@@ -16,19 +16,23 @@ public sealed class ProviderRegistry : IProviderRegistry
     private readonly Dictionary<DatabaseEngine, IDatabaseProvider> _providers;
     private readonly Dictionary<DatabaseEngine, IDatabaseMetadataReader> _readers;
     private readonly Dictionary<DatabaseEngine, IQueryExecutor> _executors;
+    private readonly Dictionary<DatabaseEngine, IRowEditor> _rowEditors;
 
     public ProviderRegistry(
         IEnumerable<IDatabaseProvider> providers,
         IEnumerable<IDatabaseMetadataReader> readers,
-        IEnumerable<IQueryExecutor> executors)
+        IEnumerable<IQueryExecutor> executors,
+        IEnumerable<IRowEditor> rowEditors)
     {
         ArgumentNullException.ThrowIfNull(providers);
         ArgumentNullException.ThrowIfNull(readers);
         ArgumentNullException.ThrowIfNull(executors);
+        ArgumentNullException.ThrowIfNull(rowEditors);
 
         _providers = providers.ToDictionary(provider => provider.Engine);
         _readers = readers.ToDictionary(reader => reader.Engine);
         _executors = executors.ToDictionary(executor => executor.Engine);
+        _rowEditors = rowEditors.ToDictionary(editor => editor.Engine);
     }
 
     public IReadOnlyCollection<DatabaseEngine> SupportedEngines => _providers.Keys;
@@ -46,5 +50,10 @@ public sealed class ProviderRegistry : IProviderRegistry
     public IQueryExecutor GetQueryExecutor(DatabaseEngine engine) =>
         _executors.TryGetValue(engine, out var executor)
             ? executor
+            : throw new UnsupportedEngineException(engine);
+
+    public IRowEditor GetRowEditor(DatabaseEngine engine) =>
+        _rowEditors.TryGetValue(engine, out var editor)
+            ? editor
             : throw new UnsupportedEngineException(engine);
 }

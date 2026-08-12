@@ -1,0 +1,59 @@
+using Druse.Domain;
+
+namespace Druse.Database.Abstractions;
+
+/// <summary>Una columna con su valor ya convertido, lista para ir como parámetro.</summary>
+/// <param name="Column">Nombre sin comillas: cada proveedor lo cita a su manera.</param>
+/// <param name="Value">Valor convertido, o <see cref="DBNull"/>.</param>
+/// <param name="Literal">El mismo valor escrito para leerlo, nunca para ejecutarlo.</param>
+public sealed record PreparedCell(string Column, object Value, string Literal);
+
+/// <summary>Un `UPDATE` de una fila, ya validado y con los valores convertidos.</summary>
+public sealed record PreparedRowEdit
+{
+    public required IReadOnlyList<PreparedCell> Key { get; init; }
+
+    public required IReadOnlyList<PreparedCell> Changes { get; init; }
+}
+
+/// <summary>Lo que hay que aplicar, sin nada por decidir.</summary>
+public sealed record PreparedRowEditBatch
+{
+    /// <summary>Esquema de la tabla. Puede faltar en motores que no lo usan.</summary>
+    public string? Schema { get; init; }
+
+    public required string Table { get; init; }
+
+    public required IReadOnlyList<PreparedRowEdit> Edits { get; init; }
+}
+
+/// <summary>
+/// Escribe cambios de filas en el motor.
+///
+/// Existe aparte de <see cref="IQueryExecutor"/> porque no ejecuta SQL del
+/// usuario, sino SQL que Druse escribe. Eso cambia las reglas: aquí los
+/// identificadores se citan según el dialecto, los valores viajan siempre como
+/// parámetros y **cada instrucción tiene que afectar exactamente a una fila**.
+///
+/// La comprobación del número de filas no es un detalle: es lo que impide que un
+/// `UPDATE` pensado para una fila modifique media tabla porque la clave no era
+/// única. Si alguna afecta a otra cantidad, se deshace todo.
+/// </summary>
+public interface IRowEditor
+{
+    DatabaseEngine Engine { get; }
+
+    /// <summary>
+    /// El SQL que se ejecutaría, con los valores escritos, para enseñarlo antes.
+    ///
+    /// Lo que se ejecuta usa parámetros; esto es la misma instrucción hecha
+    /// legible. Nunca debe mandarse al servidor.
+    /// </summary>
+    IReadOnlyList<string> Describe(PreparedRowEditBatch batch);
+
+    /// <summary>Aplica todos los cambios en una transacción.</summary>
+    Task<RowEditResult> ApplyAsync(
+        IDatabaseSession session,
+        PreparedRowEditBatch batch,
+        CancellationToken cancellationToken);
+}

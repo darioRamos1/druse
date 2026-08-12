@@ -21,6 +21,8 @@ public sealed class PostgreSqlFixture : IProviderFixture
 
     public IDatabaseMetadataReader Metadata { get; } = new PostgreSqlMetadataReader();
 
+    public IRowEditor RowEditor { get; } = new PostgreSqlRowEditor();
+
     public string DatabaseName =>
         Environment.GetEnvironmentVariable("DRUSE_TEST_PG_DB") ?? "druse_test";
 
@@ -76,6 +78,10 @@ public sealed class PostgreSqlFixture : IProviderFixture
     public string DropTable(string name) => $"DROP TABLE IF EXISTS {name}";
 
     public string InsertThreeRows(string name) => $"INSERT INTO {name} (id) VALUES (1), (2), (3)";
+
+    public string InsertNamedRows(string name) => $"""
+        INSERT INTO {name} (id, nombre) VALUES (1, 'Ana'), (2, 'Bea'), (3, 'Cris')
+        """;
 
     public string CreateTableWithColumns(string name) => $"""
         CREATE TABLE {name} (

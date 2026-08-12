@@ -21,6 +21,8 @@ public sealed class MySqlFixture : IProviderFixture
 
     public IDatabaseMetadataReader Metadata { get; } = new MySqlMetadataReader();
 
+    public IRowEditor RowEditor { get; } = new MySqlRowEditor();
+
     public string DatabaseName =>
         Environment.GetEnvironmentVariable("DRUSE_TEST_MYSQL_DB") ?? "druse_test";
 
@@ -110,6 +112,10 @@ public sealed class MySqlFixture : IProviderFixture
     public string DropTable(string name) => $"DROP TABLE IF EXISTS {name}";
 
     public string InsertThreeRows(string name) => $"INSERT INTO {name} (id) VALUES (1), (2), (3)";
+
+    public string InsertNamedRows(string name) => $"""
+        INSERT INTO {name} (id, nombre) VALUES (1, 'Ana'), (2, 'Bea'), (3, 'Cris')
+        """;
 
     public string CreateTableWithColumns(string name) => $"""
         CREATE TABLE {name} (

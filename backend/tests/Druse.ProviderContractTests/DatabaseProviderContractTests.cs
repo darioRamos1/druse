@@ -479,6 +479,136 @@ public abstract class DatabaseProviderContractTests<TFixture>
         }
     }
 
+    // -----------------------------------------------------------------------
+    // Edición de filas
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public async Task EditarUnaFila_CambiaEsaYSoloEsa()
+    {
+        if (Skip) { return; }
+
+        await using var session = await OpenAsync();
+
+        var table = $"druse_tmp_{Guid.NewGuid():N}";
+
+        try
+        {
+            await ExecuteAsync(session, Fixture.CreateTableWithColumns(table));
+            await ExecuteAsync(session, Fixture.InsertNamedRows(table));
+
+            var batch = new PreparedRowEditBatch
+            {
+                Schema = Fixture.DefaultSchema,
+                Table = table,
+                Edits =
+                [
+                    new PreparedRowEdit
+                    {
+                        Key = [new PreparedCell("id", 2L, "2")],
+                        Changes = [new PreparedCell("nombre", "Cambiado", "'Cambiado'")],
+                    },
+                ],
+            };
+
+            var result = await Fixture.RowEditor.ApplyAsync(session, batch, CancellationToken.None);
+
+            Assert.Equal(1, result.RowsAffected);
+
+            var después = await ExecuteAsync(
+                session,
+                $"SELECT nombre FROM {Fixture.DefaultSchema}.{table} ORDER BY id");
+
+            // La segunda cambió; las otras dos siguen como estaban. Un editor de
+            // filas que toque de más es peor que no tener editor.
+            Assert.Equal(["Ana", "Cambiado", "Cris"], después.ResultSets[0].Rows.Select(row => row[0]));
+        }
+        finally
+        {
+            await ExecuteAsync(session, Fixture.DropTable(table));
+        }
+    }
+
+    [Fact]
+    public async Task ElSqlQueSeEnsena_EsElQueSeEjecuta()
+    {
+        if (Skip) { return; }
+
+        var batch = new PreparedRowEditBatch
+        {
+            Schema = Fixture.DefaultSchema,
+            Table = "usuarios",
+            Edits =
+            [
+                new PreparedRowEdit
+                {
+                    Key = [new PreparedCell("id", 7L, "7")],
+                    Changes = [new PreparedCell("nombre", "Ana", "'Ana'")],
+                },
+            ],
+        };
+
+        var sql = Assert.Single(Fixture.RowEditor.Describe(batch));
+
+        // Se comprueba la forma, no el dialecto: cada motor cita a su manera.
+        Assert.StartsWith("UPDATE ", sql, StringComparison.Ordinal);
+        Assert.Contains("usuarios", sql, StringComparison.Ordinal);
+        Assert.Contains("SET ", sql, StringComparison.Ordinal);
+        Assert.Contains("'Ana'", sql, StringComparison.Ordinal);
+        Assert.Contains("WHERE ", sql, StringComparison.Ordinal);
+        Assert.Contains("7", sql, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task SiUnaFilaNoExiste_NoSeGuardaNadaDeLoDemas()
+    {
+        if (Skip) { return; }
+
+        await using var session = await OpenAsync();
+
+        var table = $"druse_tmp_{Guid.NewGuid():N}";
+
+        try
+        {
+            await ExecuteAsync(session, Fixture.CreateTableWithColumns(table));
+            await ExecuteAsync(session, Fixture.InsertNamedRows(table));
+
+            var batch = new PreparedRowEditBatch
+            {
+                Schema = Fixture.DefaultSchema,
+                Table = table,
+                Edits =
+                [
+                    // La primera es válida; la segunda apunta a una fila que no
+                    // existe. Si la transacción no funciona, la primera se queda.
+                    new PreparedRowEdit
+                    {
+                        Key = [new PreparedCell("id", 1L, "1")],
+                        Changes = [new PreparedCell("nombre", "No debería quedar", "'No debería quedar'")],
+                    },
+                    new PreparedRowEdit
+                    {
+                        Key = [new PreparedCell("id", 999L, "999")],
+                        Changes = [new PreparedCell("nombre", "Fantasma", "'Fantasma'")],
+                    },
+                ],
+            };
+
+            await Assert.ThrowsAsync<RowEditFailedException>(
+                () => Fixture.RowEditor.ApplyAsync(session, batch, CancellationToken.None));
+
+            var después = await ExecuteAsync(
+                session,
+                $"SELECT nombre FROM {Fixture.DefaultSchema}.{table} ORDER BY id");
+
+            Assert.Equal(["Ana", "Bea", "Cris"], después.ResultSets[0].Rows.Select(row => row[0]));
+        }
+        finally
+        {
+            await ExecuteAsync(session, Fixture.DropTable(table));
+        }
+    }
+
     [Fact]
     public async Task LaSesionExponeElMotorCorrecto()
     {
