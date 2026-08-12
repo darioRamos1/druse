@@ -24,4 +24,19 @@ public interface IQueryExecutor
         IDatabaseSession session,
         QueryRequest request,
         CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Abre el resultado para leerlo fila a fila, sin materializarlo.
+    ///
+    /// Es lo que hace posible exportar una tabla grande: `ExecuteAsync` limita
+    /// las filas porque van a una cuadrícula, pero una exportación debe poder
+    /// recorrer el resultado entero sin que crezca la memoria del proceso.
+    ///
+    /// Solo se expone el primer conjunto de resultados: exportar un lote con
+    /// varios a un único archivo no tendría un significado claro.
+    /// </summary>
+    Task<IQueryResultReader> OpenReaderAsync(
+        IDatabaseSession session,
+        QueryRequest request,
+        CancellationToken cancellationToken);
 }

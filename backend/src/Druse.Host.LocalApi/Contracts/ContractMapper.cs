@@ -205,6 +205,38 @@ internal static class ContractMapper
         };
     }
 
+    public static QueryRequest ToDomain(this ExportRequest request)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        return new QueryRequest
+        {
+            SessionId = request.SessionId,
+            Sql = request.Sql,
+            // Al exportar no se recorta: el límite lo aplica el exportador, que
+            // es quien sabe cuántas filas caben en cada formato.
+            MaxRows = int.MaxValue,
+            TimeoutSeconds = request.TimeoutSeconds,
+            DestructiveConfirmed = request.ConfirmDestructive,
+        };
+    }
+
+    public static ExportOptions ToOptions(this ExportRequest request, ExportFormat format)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        return new ExportOptions
+        {
+            Format = format,
+            Encoding = ParseEnum(request.Encoding.Replace("-", string.Empty, StringComparison.Ordinal), CsvEncoding.Utf8Bom),
+            // Un separador vacío o de varios caracteres no tiene sentido en CSV.
+            Delimiter = request.Delimiter.Length == 1 ? request.Delimiter[0] : ',',
+            IncludeHeaders = request.IncludeHeaders,
+            NullText = request.NullText,
+            MaxRows = Math.Clamp(request.MaxRows, 1, 1_000_000),
+        };
+    }
+
     public static string EngineId(DatabaseEngine engine) => engine switch
     {
         DatabaseEngine.PostgreSql => "postgresql",

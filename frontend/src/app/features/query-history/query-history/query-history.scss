@@ -1,0 +1,140 @@
+:host {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+.search {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex: none;
+  padding: 7px 12px;
+  border-bottom: 1px solid #171d2a;
+  color: var(--dr-text-faintest);
+
+  &__input {
+    flex: 1;
+    min-width: 0;
+    border: 0;
+    background: transparent;
+    color: var(--dr-text-secondary);
+    font-family: inherit;
+    font-size: var(--dr-font-size-sm);
+
+    &:focus {
+      outline: none;
+    }
+
+    &::placeholder {
+      color: var(--dr-text-disabled);
+    }
+  }
+}
+
+.list {
+  flex: 1;
+  min-height: 0;
+  margin: 0;
+  padding: 4px 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 12px;
+  border-bottom: 1px solid #151b26;
+
+  &:hover {
+    background: #141a26;
+  }
+
+  // Las ejecuciones fallidas se distinguen de un vistazo.
+  &.is-failed {
+    border-left: 2px solid rgb(242 104 107 / 55%);
+  }
+
+  &__sql {
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--dr-text-secondary);
+    font-family: var(--dr-font-mono);
+    font-size: 12px;
+    text-align: left;
+    cursor: pointer;
+
+    &:hover {
+      color: var(--dr-accent-bright);
+    }
+  }
+
+  &__meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    color: var(--dr-text-faintest);
+    font-size: 11px;
+  }
+
+  &__dot {
+    color: var(--dr-text-disabled);
+  }
+
+  &__error {
+    color: #f2686b;
+  }
+}
+
+.foot {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 36px;
+  flex: 0 0 36px;
+  padding: 0 12px;
+  border-top: 1px solid #1b2130;
+  background: var(--dr-surface-topbar);
+  font-size: 12px;
+
+  &__count {
+    color: var(--dr-text-tertiary);
+  }
+
+  &__spacer {
+    flex: 1;
+  }
+
+  &__action {
+    height: 26px;
+    padding: 0 9px;
+    border: 1px solid var(--dr-border-subtle);
+    border-radius: var(--dr-radius-sm);
+    background: transparent;
+    color: var(--dr-text-muted);
+    font-family: inherit;
+    font-size: 12px;
+    cursor: pointer;
+
+    &:hover {
+      background: #151b27;
+      color: var(--dr-text);
+    }
+  }
+}
+
+.empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  margin: 0;
+  padding: 0 18px;
+  color: var(--dr-text-faint);
+  font-size: var(--dr-font-size-sm);
+  text-align: center;
+}

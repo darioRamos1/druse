@@ -7,6 +7,7 @@ import {
   viewChild,
 } from '@angular/core';
 
+import { ExportFormat } from '../../core/application-gateway/application-gateway';
 import { WorkspaceStore } from '../../core/workspace/workspace-store';
 import { ConnectionDialog } from '../../features/connections/connection-dialog/connection-dialog';
 import { ConnectionsSidebar } from '../../features/connections/connections-sidebar/connections-sidebar';
@@ -84,6 +85,7 @@ export class AppShell {
   protected readonly rejection = this._store.rejection;
   protected readonly notice = this._store.notice;
   protected readonly history = this._store.history;
+  protected readonly exporting = this._store.exporting;
 
   protected readonly session = computed(() => this._store.session() ?? DISCONNECTED);
 
@@ -241,6 +243,11 @@ export class AppShell {
 
   protected dismissNotice(): void {
     this._store.dismissNotice();
+  }
+
+  // --- Exportación -----------------------------------------------------------
+  protected exportAs(format: ExportFormat): void {
+    void this._store.export(format);
   }
 
   // --- Copiar nombres --------------------------------------------------------

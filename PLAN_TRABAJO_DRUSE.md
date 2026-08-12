@@ -497,15 +497,15 @@ El flujo cotidiano de abrir conexión, localizar tabla, escribir, ejecutar y reu
 
 ### Tareas
 
-- [ ] Soportar varios conjuntos de resultados.
-- [ ] Copiar celdas, filas y encabezados.
-- [ ] Exportar CSV con codificación configurable.
-- [ ] Exportar XLSX.
-- [ ] Mostrar valores `NULL` de manera diferenciada.
-- [ ] Renderizar fechas, booleanos, números y binarios correctamente.
-- [ ] Manejar resultados grandes sin congelar la interfaz.
-- [ ] Mostrar filas afectadas para `INSERT`, `UPDATE` y `DELETE`.
-- [ ] Agregar advertencias para operaciones destructivas.
+- [x] Soportar varios conjuntos de resultados.
+- [x] Copiar celdas, filas y encabezados.
+- [x] Exportar CSV con codificación configurable.
+- [x] Exportar XLSX.
+- [x] Mostrar valores `NULL` de manera diferenciada.
+- [x] Renderizar fechas, booleanos, números y binarios correctamente.
+- [x] Manejar resultados grandes sin congelar la interfaz. _(el límite de 500 filas mantiene fluida la cuadrícula; exportar recorre el resultado completo sin materializarlo.)_
+- [x] Mostrar filas afectadas para `INSERT`, `UPDATE` y `DELETE`.
+- [x] Agregar advertencias para operaciones destructivas.
 
 ### Criterio de salida
 

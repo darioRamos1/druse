@@ -19,6 +19,7 @@ import {
   ApplicationGateway,
   ConnectRequest,
   ExecuteQueryRequest,
+  ExportRequest,
   HealthStatus,
   SaveConnectionRequest,
 } from './application-gateway';
@@ -154,6 +155,14 @@ export class HttpApplicationGateway extends ApplicationGateway {
 
   override setPreference(key: string, value: string): Observable<void> {
     return this._http.put<void>(`/api/preferences/${encodeURIComponent(key)}`, { value });
+  }
+
+  override exportQuery(request: ExportRequest): Observable<Blob> {
+    const { format, ...body } = request;
+
+    // La respuesta es un archivo, no JSON: sin `responseType` Angular intentaría
+    // interpretarlo y fallaría con el primer byte binario.
+    return this._http.post(`/api/exports/${format}`, body, { responseType: 'blob' });
   }
 
   /** Añade lo que la cuadrícula necesita y la API no tiene por qué saber. */

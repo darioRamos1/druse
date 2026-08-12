@@ -1,6 +1,13 @@
 <div class="head" role="row" [style.grid-template-columns]="gridTemplate()">
   <div class="cell cell--check" role="columnheader">
-    <span class="checkbox" aria-hidden="true"></span>
+    <button
+      type="button"
+      class="copy-all"
+      title="Copiar los nombres de las columnas"
+      (click)="copyHeaders()"
+    >
+      <app-icon name="new-query" [size]="11" />
+    </button>
   </div>
   @for (column of resultSet().columns; track column.name) {
     <div class="cell cell--head" role="columnheader">
@@ -13,21 +20,48 @@
   }
 </div>
 
-<div class="filters" role="row" [style.grid-template-columns]="gridTemplate()">
-  <div class="cell cell--check"></div>
-  @for (column of resultSet().columns; track column.name) {
-    <div class="cell cell--filter" [class.is-set]="!!column.filter">
-      {{ column.filter ?? 'filtrar…' }}
-    </div>
-  }
-</div>
+@if (showFilters()) {
+  <div class="filters" role="row" [style.grid-template-columns]="gridTemplate()">
+    <div class="cell cell--check"></div>
+    @for (column of resultSet().columns; track column.name; let i = $index) {
+      <div class="cell cell--filter">
+        <input
+          type="search"
+          class="filters__input"
+          placeholder="filtrar…"
+          [value]="filters()[i] ?? ''"
+          (input)="onFilter(i, $event)"
+          [attr.aria-label]="'Filtrar ' + column.name"
+        />
+      </div>
+    }
+  </div>
+}
 
 <div class="body">
-  @for (row of resultSet().rows; track row.number) {
+  @for (row of visibleRows(); track row.number) {
     <div class="row" role="row" [style.grid-template-columns]="gridTemplate()">
-      <div class="cell cell--number" role="cell">{{ row.number }}</div>
+      <div
+        class="cell cell--number"
+        role="cell"
+        title="Copiar la fila"
+        (dblclick)="copyRow(row)"
+      >
+        {{ row.number }}
+      </div>
       @for (column of resultSet().columns; track column.name; let i = $index) {
-        <div class="cell cell--value" role="cell" [attr.data-kind]="column.kind">
+        <div
+          class="cell cell--value"
+          role="cell"
+          tabindex="0"
+          [attr.data-kind]="column.kind"
+          [class.is-selected]="isSelected(row.number, i)"
+          [attr.title]="row.values[i]"
+          (click)="select(row.number, i)"
+          (dblclick)="copyCell(row, i)"
+          (keydown.control.c)="copyCell(row, i)"
+          (keydown.meta.c)="copyCell(row, i)"
+        >
           @if (row.values[i] === null) {
             <span class="null">NULL</span>
           } @else if (column.kind === 'boolean') {
@@ -39,6 +73,10 @@
       }
     </div>
   } @empty {
-    <p class="empty">La consulta no devolvió filas.</p>
+    @if (filtered()) {
+      <p class="empty">Ninguna fila coincide con los filtros.</p>
+    } @else {
+      <p class="empty">La consulta no devolvió filas.</p>
+    }
   }
 </div>

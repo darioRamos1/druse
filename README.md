@@ -4,7 +4,20 @@ Aplicación de escritorio para administrar y consultar distintos motores de base
 
 Una *drusa* es la costra de cristales que tapiza el interior de una geoda: la estructura que aparece al abrir la piedra. Es lo que hace la aplicación con una base de datos.
 
-> **Estado: Fase 4 cerrada.** Funciona el flujo completo contra **PostgreSQL y SQL Server**: conectar, explorar el catálogo, escribir SQL, ejecutar, cancelar y consultar el historial. Todavía no está empaquetado como aplicación de escritorio (Fase 7) y faltan la exportación (Fase 6) y buena parte de la productividad del editor (Fase 5).
+> **Estado: Fase 6 cerrada.** Funciona el flujo completo contra **PostgreSQL y SQL Server**: conectar, explorar el catálogo, escribir SQL con autocompletado del esquema, ejecutar, cancelar, consultar el historial y **exportar a CSV o Excel**. Lo que falta es empaquetarlo como aplicación de escritorio (Fase 7) y añadir MySQL (Fase 8).
+
+## Exportar
+
+El botón **Exportar** del panel de resultados manda la consulta al servidor y descarga el archivo completo, **no solo las 500 filas que muestra la cuadrícula**.
+
+| Formato | Límite | Notas |
+| --- | --- | --- |
+| CSV | 1 000 000 filas | UTF-8 con BOM, para que Excel no rompa los acentos |
+| Excel | 200 000 filas | El formato XLSX obliga a construir el libro en memoria |
+
+El CSV sigue el RFC 4180: entrecomilla los valores con separador, comillas o saltos de línea. Los valores se escriben tal y como los devuelve el motor, sin que Excel los reinterprete.
+
+**Exportar no salta las protecciones**: una instrucción destructiva sigue necesitando confirmación y una conexión de solo lectura sigue rechazando escrituras.
 
 ---
 

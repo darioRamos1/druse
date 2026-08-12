@@ -105,10 +105,14 @@
       [resultSet]="resultSet()"
       [result]="result()"
       [history]="history()"
+      [exporting]="exporting()"
       (refreshHistory)="refreshHistory()"
       (searchHistory)="searchHistory($event)"
       (clearHistory)="clearHistory()"
       (reuseQuery)="reuseQuery($event)"
+      (exportAs)="exportAs($event)"
+      (copied)="onCopied($event)"
+      (copyFailed)="onCopyFailed()"
     />
 
     <app-status-bar [session]="session()" [line]="cursor().line" [column]="cursor().column" />

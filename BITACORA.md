@@ -10,28 +10,30 @@
 
 | Campo | Valor |
 | --- | --- |
-| Última sesión | **008** — 2026-08-11 |
-| Fase activa | **Fase 6 — Resultados y exportaciones** |
-| Fases 0–4 | ✅ Cerradas. |
-| Fase 5 | ✅ **Cerrada.** 10/10 tareas. |
+| Última sesión | **009** — 2026-08-12 |
+| Fase activa | **Fase 7 — Empaquetado de escritorio** |
+| Fases 0–5 | ✅ Cerradas. |
+| Fase 6 | ✅ **Cerrada.** 9/9 tareas. |
 | ¿Compila el backend? | Sí — 0 advertencias, 0 errores |
-| ¿Compila el frontend? | Sí — 411 kB iniciales, 0 advertencias |
-| ¿Pasan las pruebas? | Sí — **167 en backend** y **61 en frontend** |
-| ¿Funcionan los dos motores? | Sí — las 24 pruebas contractuales pasan idénticas contra PostgreSQL 18.4 y SQL Server 2022 |
-| Bloqueantes | Ninguno |
-| Git | Rama `feature/editor-productivity`, pendiente de fusionar en `main`. Sin remoto configurado. |
+| ¿Compila el frontend? | Sí — 422 kB iniciales, 0 advertencias |
+| ¿Pasan las pruebas? | Sí — **192 en backend** (102 unitarias + 48 contractuales + 42 integración) y **70 en frontend** |
+| ¿Se puede exportar? | Sí — 9 630 filas a CSV en 0,23 s, y XLSX que Windows reconoce |
+| Bloqueantes | **Rust no está instalado** y hace falta para Tauri |
+| Git | Rama `feature/results-export`, pendiente de fusionar en `main`. Sin remoto configurado. |
 
 ### Qué toca retomar en la próxima sesión
 
-1. **Fusionar `feature/editor-productivity` en `main`** y abrir `feature/results-export`.
-2. Empezar la **Fase 6**. Lo que sigue en pantalla sin hacer nada y le toca a esta fase:
-   - **Exportar CSV · Excel** (endpoints `/api/exports/csv` y `/api/exports/xlsx` del plan §7);
-   - **Filtros** y la fila de filtros por columna de la cuadrícula;
-   - casillas de selección de filas y copiar celdas, filas y encabezados;
-   - la paginación, que hoy muestra el rango pero no navega (**D-16**).
-3. Resolver **D-08**: con 500 filas la rejilla CSS va bien; si se sube el límite hará falta virtualización. Es el momento de decidir entre AG Grid Community y una propia.
-4. Varios conjuntos de resultados: el backend ya los devuelve todos, pero la interfaz solo muestra el primero.
-5. Resolver **D-15** (selector de base de datos), pendiente desde la Fase 4.
+1. **Instalar Rust** (`rustup`). Es el prerrequisito de la Fase 7, como Docker lo fue de la 2 y SQL Server de la 4.
+2. **Fusionar `feature/results-export` en `main`** y abrir `feature/desktop-packaging`.
+3. La **Fase 7** es la que convierte esto en una aplicación de verdad:
+   - Tauri sobre el frontend existente;
+   - la API como proceso auxiliar, con **puerto dinámico** en lugar del 5177 fijo;
+   - **el token ya no lo leerá el proxy sino Tauri**, que es lo que se preparó en la Fase 3;
+   - cerrar la API al cerrar la ventana;
+   - instalador para Windows y ZIP portable;
+   - probar en un equipo limpio, sin .NET ni Node.
+4. Los tres círculos de la barra superior (minimizar, maximizar, cerrar) siguen siendo decorativos: con Tauri pasan a funcionar.
+5. Aplazado otra vez: recordar las pestañas abiertas entre sesiones. Encaja con el estado de ventana de esta fase.
 
 **Sigue pendiente el visto bueno visual.** La extensión de Chrome no ha estado conectada en ninguna sesión.
 
@@ -99,6 +101,51 @@ Pendiente de verificar cuando toque: Docker (pruebas de integración con contene
 ---
 
 ## 5. Registro de sesiones
+
+### Sesión 009 — 2026-08-12 · Fase 6 completa
+
+**Objetivo:** sacar los datos de la herramienta. Es lo último que faltaba del uso diario.
+
+**Hecho:**
+
+*Lectura progresiva*
+- `IQueryResultReader`: nuevo contrato que recorre un resultado **fila a fila, sin materializarlo**. Implementado en los dos proveedores.
+- Existe porque `ExecuteAsync` limita las filas —van a una cuadrícula— y exportar una tabla grande por ese camino agotaría la memoria del proceso.
+- El búfer de fila se reutiliza en cada iteración, para no reservar un array por registro durante una exportación larga.
+
+*Exportadores*
+- **CSV según RFC 4180**, escrito a mano: son cuatro reglas y una dependencia para esto habría que justificarla. Entrecomilla cuando hay separador, comillas o saltos de línea, y duplica las comillas internas.
+- Codificación elegible. Por defecto **UTF-8 con BOM**: sin él, Excel en Windows abre el archivo con la página de códigos del sistema y los acentos salen rotos.
+- Separador y texto de nulo configurables. Un nulo escrito como vacío es indistinguible de una cadena vacía, así que se puede cambiar.
+- **XLSX con ClosedXML**, con su propio tope de 200 000 filas: este formato sí necesita el libro entero en memoria, y se dice en el código por qué.
+- Los valores van como texto a propósito: dejar que Excel los interprete convertiría «007» en 7.
+
+*API*
+- `/api/exports/csv` y `/api/exports/xlsx`, escribiendo directamente sobre la respuesta.
+- **Exportar no es una vía para saltarse las protecciones**: pasa por las mismas reglas que una ejecución, incluidas solo lectura y confirmación de instrucciones destructivas.
+- El nombre de archivo se sanea antes de ir a la cabecera.
+
+*Interfaz*
+- Menú **Exportar** con CSV y Excel, que descarga el archivo.
+- **Filtros por columna**, locales sobre lo que se ve; para acotar de verdad está el `WHERE`.
+- **Copiar**: celda con doble clic o Ctrl+C, fila entera con doble clic en su número, encabezados desde la esquina. Todo separado por tabuladores para pegarlo en una hoja.
+- **Varios conjuntos de resultados**: un lote con tres `SELECT` muestra tres pestañas. El backend ya los devolvía; la interfaz ignoraba todos menos el primero.
+- El historial se extrajo a su propio componente.
+
+**Verificado con la aplicación en marcha:**
+- **9 630 filas exportadas a CSV en 0,23 s**, cuando la cuadrícula solo muestra 500.
+- XLSX que Windows identifica como «Microsoft Excel 2007+».
+- Los casos que rompen un CSV mal hecho, todos correctos: `"Madrid, España"`, `"Dijo ""hola"""`, salto de línea dentro del campo, nulo vacío, acentos y BOM `ef bb bf`.
+- `DELETE` sin filtro por la vía de exportación → 409.
+
+**Incidencias resueltas:**
+1. **Las cabeceras con el recuento de filas se añadían después de escribir el cuerpo**, cuando ya se habían enviado. Se pasó a **trailers HTTP**, que es el mecanismo para metadatos que solo se conocen al terminar. La validación se movió antes de tocar la respuesta, para poder devolver 409 con un cuerpo legible.
+2. **ClosedXML necesita un destino con posicionamiento** y el cuerpo de una respuesta HTTP no lo tiene. Se compone en memoria y se copia; no es una limitación nueva, porque este formato ya obligaba a tener el libro entero en memoria.
+3. El panel de resultados volvió a superar el presupuesto de estilos. Se extrajo el historial, que es una vista con entidad propia.
+
+**Decisiones tomadas:** D-08 y D-16 (ver §6).
+
+---
 
 ### Sesión 008 — 2026-08-11 · Fase 5 completa
 
@@ -480,6 +527,8 @@ Pendiente de verificar cuando toque: Docker (pruebas de integración con contene
 | D-13 | **`dompurify` fijado con `override` a ^3.4.13** en lugar de degradar Monaco. Revisar cuando Monaco actualice su dependencia. | 2026-08-11 |
 | D-17 | **Sin almacén seguro no se guarda la contraseña.** Se pide en cada conexión y se dice en la interfaz. Cifrar un archivo con una clave del mismo disco sería seguridad aparente. Ver ADR 0004. | 2026-08-11 |
 | D-18 | **Token obligatorio en la API local**, salvo `/api/health`. El proxy de desarrollo lo lee del disco y lo inyecta, porque el navegador no puede. | 2026-08-11 |
+| D-08 | **Cuadrícula propia, sin biblioteca externa.** Con el límite de 500 filas la rejilla CSS va sobrada, y exportar —que es donde aparecen los volúmenes grandes— no pasa por ella. Revisar solo si algún día se sube ese tope. | 2026-08-12 |
+| D-16 | **Sin paginación.** Exportar cubre el caso de «quiero todo», y para acotar está el `WHERE` de la consulta. Paginar obligaría a reescribir el SQL del usuario con `OFFSET` o a mantener un cursor abierto, y ninguna de las dos cosas compensa. | 2026-08-12 |
 | D-19 | **`proxy.conf.json` → `proxy.conf.js`**: el proxy necesita lógica para leer el token en cada petición. No se cachea, para que reiniciar la API no obligue a reiniciar el servidor de desarrollo. | 2026-08-11 |
 | D-10 | **La integración continua no genera instaladores todavía.** Compila, prueba y verifica la publicación autocontenida. El empaquetado llega en la Fase 7 (ADR 0003). | 2026-08-11 |
 
@@ -487,9 +536,7 @@ Pendiente de verificar cuando toque: Docker (pruebas de integración con contene
 
 | ID | Decisión | Opciones | Estado |
 | --- | --- | --- | --- |
-| D-08 | Biblioteca de cuadrícula | Aplazada a propósito. La cuadrícula es una rejilla CSS propia, aislada en `results-grid`. Con 500 filas se comporta bien; la decisión entre AG Grid Community y virtualización propia se toma cuando haya que subir ese límite. | Abierta — **Fase 6** |
 | D-15 | Selector de base de datos | PostgreSQL no permite cambiar de base sin reconectar, así que el explorador solo muestra los esquemas de la base de la sesión. Falta decidir si abrir una sesión nueva por base o pedirle al usuario que cree otra conexión. | Abierta — Fase 4, al comparar con SQL Server |
-| D-16 | Paginación de resultados | El pie muestra el rango pero no navega: hoy se trae un único bloque de 500 filas. Decidir entre paginación por `OFFSET` (cambia el SQL del usuario) o desplazamiento sobre un cursor. | Abierta — Fase 6 |
 | D-11 | Optimización del ejecutable | La publicación autocontenida pesa 107 MB. Evaluar trimming y ReadyToRun. | Abierta — Fase 7 |
 | D-14 | Estado del shell | Hoy vive en Signals dentro de `AppShell`. Al llegar los datos reales hay que decidir si se reparte en servicios por funcionalidad. Sigue en pie no incorporar NgRx sin necesidad comprobada. | Abierta — Fase 2 |
 
@@ -558,8 +605,8 @@ Fuente: `docs/mockups/druse-main.html`. **Ya implementado** en `frontend/src/sty
 | 3 | Persistencia local y seguridad | ✅ **Cerrada** — 10/10 |
 | 4 | SQL Server | ✅ **Cerrada** — 9/9 |
 | 5 | Productividad del editor | ✅ **Cerrada** — 10/10 |
-| 6 | Resultados y exportaciones | 🔄 **Activa** — 0/9 |
-| 7 | Empaquetado de escritorio | ⬜ No iniciada |
+| 6 | Resultados y exportaciones | ✅ **Cerrada** — 9/9 |
+| 7 | Empaquetado de escritorio | 🔄 **Activa** — 0/12 |
 | 8 | MySQL y estabilización | ⬜ No iniciada |
 
 ### Fase 0 — criterio de salida ✅

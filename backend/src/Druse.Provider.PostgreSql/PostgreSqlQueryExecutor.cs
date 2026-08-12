@@ -1,6 +1,5 @@
 using System.Data.Common;
 using System.Diagnostics;
-using System.Globalization;
 using Druse.Database.Abstractions;
 using Druse.Domain;
 using Npgsql;
@@ -176,7 +175,7 @@ public sealed class PostgreSqlQueryExecutor : IQueryExecutor
             {
                 values[ordinal] = await reader.IsDBNullAsync(ordinal, cancellationToken)
                     ? null
-                    : Format(reader.GetValue(ordinal));
+                    : PostgreSqlValueFormatter.Format(reader.GetValue(ordinal));
             }
 
             rows.Add(values);
@@ -190,27 +189,24 @@ public sealed class PostgreSqlQueryExecutor : IQueryExecutor
         };
     }
 
-    /// <summary>
-    /// Convierte un valor a texto de forma predecible.
-    ///
-    /// Se usa cultura invariante a propósito: lo que se muestra debe ser el dato
-    /// del servidor, no una interpretación local. Formatear un `numeric` con la
-    /// coma decimal de la máquina haría imposible copiar el valor de vuelta a una
-    /// consulta.
-    /// </summary>
-    private static string Format(object value) => value switch
+    /// <inheritdoc />
+    public Task<IQueryResultReader> OpenReaderAsync(
+        IDatabaseSession session,
+        QueryRequest request,
+        CancellationToken cancellationToken)
     {
-        string text => text,
-        bool flag => flag ? "true" : "false",
-        DateTime timestamp => timestamp.ToString("yyyy-MM-dd HH:mm:ss.FFFFFF", CultureInfo.InvariantCulture),
-        DateTimeOffset timestamp => timestamp.ToString("yyyy-MM-dd HH:mm:ss.FFFFFFzzz", CultureInfo.InvariantCulture),
-        DateOnly date => date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
-        TimeOnly time => time.ToString("HH:mm:ss.FFFFFF", CultureInfo.InvariantCulture),
-        TimeSpan interval => interval.ToString(),
-        byte[] binary => $"\\x{Convert.ToHexString(binary).ToLowerInvariant()}",
-        IFormattable formattable => formattable.ToString(null, CultureInfo.InvariantCulture),
-        _ => value.ToString() ?? string.Empty,
-    };
+        ArgumentNullException.ThrowIfNull(session);
+        ArgumentNullException.ThrowIfNull(request);
+
+        if (session is not PostgreSqlSession postgres)
+        {
+            throw new ArgumentException(
+                "La sesión no pertenece al proveedor PostgreSQL.",
+                nameof(session));
+        }
+
+        return PostgreSqlResultReader.OpenAsync(postgres, request, cancellationToken);
+    }
 
     private static QueryMessageSeverity MapSeverity(string severity) =>
         severity.ToUpperInvariant() switch
