@@ -10,32 +10,29 @@
 
 | Campo | Valor |
 | --- | --- |
-| Última sesión | **010** — 2026-08-12 |
-| Fase activa | **Fase 8 — MySQL y estabilización** |
+| Última sesión | **011** — 2026-08-12 |
+| Fase activa | **Ninguna: las ocho fases están cerradas.** Queda validar el MVP en otro equipo |
 | Fases 0–6 | ✅ Cerradas. |
 | Fase 7 | 🟡 **10/12.** Hay instalador y funciona; faltan dos comprobaciones que exigen otro equipo. |
+| Fase 8 | ✅ **7/7.** Tres motores sobre el mismo contrato y primera beta preparada. |
 | ¿Compila el backend? | Sí — 0 advertencias, 0 errores |
-| ¿Compila el envoltorio? | Sí — `cargo check` sin avisos |
-| ¿Pasan las pruebas? | Sí — **192 en backend** y **76 en frontend** |
-| ¿Hay aplicación de escritorio? | **Sí.** Instalador NSIS (44 MB), MSI (58 MB) y ZIP portable (62 MB), los tres probados |
+| ¿Compila el envoltorio? | Sí |
+| ¿Pasan las pruebas? | Sí — **219 en backend** y **80 en frontend** |
+| ¿Hay aplicación de escritorio? | **Sí.** Instalador NSIS, MSI y ZIP portable |
+| Motores | **PostgreSQL, SQL Server y MySQL/MariaDB**, con las **mismas 24 pruebas contractuales** cada uno |
 | Bloqueantes | Ninguno |
-| Git | Rama `feature/desktop-packaging`, pendiente de fusionar en `main`. Sin remoto configurado. |
+| Git | Rama `feature/mysql-provider`, pendiente de fusionar en `main`. Sin remoto configurado. |
 
 ### Qué toca retomar en la próxima sesión
 
-1. **Fusionar `feature/desktop-packaging` en `main`** y abrir `feature/mysql-provider`.
-2. La **Fase 8** cierra el ciclo. Es la más previsible de todas: el contrato compartido dirá en un minuto si el proveedor MySQL está bien.
-   - `MySqlDatabaseProvider` con MySqlConnector;
-   - metadatos MySQL/MariaDB;
-   - **las 24 pruebas contractuales deben pasar sin cambiar lo que comprueban**;
-   - habilitar el motor en el diálogo, donde ya aparece deshabilitado;
-   - añadir MySQL a `test-db.ps1` y al CI.
-3. Lo que quedó pendiente de la Fase 7 y **necesita otro equipo**:
-   - instalar y desinstalar de verdad, para validar el ciclo completo;
-   - probar en una máquina sin .NET ni Node.
-4. Artefactos de Linux y macOS: el script acepta cualquier RID, pero generarlos exige compilar en cada plataforma. Es trabajo de integración continua.
+1. **Fusionar `feature/mysql-provider` en `main`.**
+2. Lo único que impide dar el MVP por terminado **necesita otro equipo**:
+   - instalar, actualizar y desinstalar de verdad, para validar el ciclo completo;
+   - arrancar en una máquina sin .NET ni Node, que es el criterio que demuestra que el paquete se basta solo.
+3. Artefactos de Linux y macOS: el script acepta cualquier RID, pero generarlos exige compilar en cada plataforma. Es trabajo de integración continua.
+4. Con el MVP cerrado, lo siguiente sale del **backlog del plan §15**: autenticación integrada de Windows, túneles SSH, edición de filas y actualizador automático.
 
-**Sigue pendiente el visto bueno visual.** La extensión de Chrome no ha estado conectada en ninguna sesión.
+**El visto bueno visual ya está dado** (sesión 011, con la extensión de Chrome por fin conectada): la pantalla reproduce el mockup. Lo único ausente es la pestaña «Plan de ejecución», que está fuera del MVP.
 
 ---
 
@@ -103,6 +100,64 @@ Pendiente de verificar cuando toque: Docker (pruebas de integración con contene
 ---
 
 ## 5. Registro de sesiones
+
+### Sesión 011 — 2026-08-12 · Fase 8, MySQL y primera beta
+
+**Objetivo:** el tercer motor y cerrar el ciclo. Era la fase más previsible: el contrato compartido iba a decir en un minuto si el proveedor estaba bien.
+
+**Hecho:**
+
+*Proveedor MySQL*
+- `MySqlDatabaseProvider`, `MySqlQueryExecutor`, `MySqlMetadataReader`, `MySqlResultReader`, `MySqlErrorNormalizer`, `MySqlValueFormatter` y `MySqlConnectionStringFactory` con MySqlConnector 2.6.2.
+- Registrado en la composición: **tres líneas**, sin tocar Domain, Application ni un solo componente Angular. Es justo lo que el plan §14 pedía demostrar.
+- Metadatos sobre `information_schema`, al revés que los otros dos: MySQL no tiene un catálogo interno que aporte más, y ahí ya están el recuento aproximado (`TABLE_ROWS`) y el tipo completo de cada columna (`COLUMN_TYPE`, que da `varchar(200)` donde `DATA_TYPE` solo daría `varchar`).
+- Cuatro opciones del driver elegidas a conciencia, cada una con su motivo en el código: `ConvertZeroDateTime` (las fechas cero de MySQL no caben en .NET y reventarían a mitad de un resultado), `GuidFormat=None` (un `CHAR(36)` que no sea un GUID es legítimo y debe verse tal cual), `TreatTinyAsBoolean` (es lo que hace que un `BOOL` se lea `true` igual que en los otros motores) y `AllowUserVariables` (un cliente SQL tiene que poder ejecutar `SET @x = …`).
+
+*Las 24 pruebas contractuales, otra vez sin tocarlas*
+- **72 en verde: las mismas 24 contra PostgreSQL 18.4, SQL Server 2022 y MySQL 8.4.** Ninguna comprobación tuvo que cambiarse.
+- Lo que sí varía queda declarado en el fixture: `SLEEP` frente a `pg_sleep` y `WAITFOR`, `SIGNAL SQLSTATE '01000'` frente a `RAISE NOTICE` y `PRINT`, el error 1064 frente a `42601` y 102, y el esquema por omisión, que en MySQL es la propia base.
+- **MariaDB 11.4 supera las mismas 24 con el proveedor de MySQL**, así que la compatibilidad que declara el código está comprobada y no supuesta.
+
+*Estabilización*
+- Regresión: una prueba nueva comprueba que **todo motor anunciado tiene sus tres piezas registradas**. Sin ella, olvidar el lector de metadatos de un proveedor futuro no falla al arrancar: el motor aparece en la lista y revienta luego, al abrir el árbol.
+- Los tres motores y sus puertos, comprobados por HTTP; `test-db.ps1`, `test-db.sh` y la integración continua levantan ahora los tres.
+- Dos pruebas de frontend para el dialecto MySQL, incluida la que protege las comillas invertidas: son lo que permite que una columna se llame `order`.
+
+*Primera beta*
+- `docs/release-notes/0.1.0-beta.md`: qué trae, con qué números se comprobó y **qué no garantiza todavía**.
+- La versión se queda en `0.1.0` sin sufijo (ver D-23).
+
+**Un fallo encontrado, y lo que destapó:**
+
+De las 24, una falló: **el tiempo de espera daba la consulta por completada**. MySqlConnector agota `CommandTimeout` mandando `KILL QUERY` desde otra conexión, pero el servidor no siempre convierte esa interrupción en error: un `SELECT SLEEP(30)` cortado **termina bien y devuelve una fila**. La consulta que el usuario dio por caducada se anunciaba como correcta, con datos incompletos. Ahora el plazo lo controla el proveedor con su propio token y `CommandTimeout` queda a cero: así se distingue quién cortó, si el reloj o el usuario. Es exactamente el tipo de diferencia que el contrato compartido existe para encontrar.
+
+**Verificado con la aplicación en marcha, contra MySQL 8.4 real** (37 tenants, 412 empresas, 1 284 usuarios y 9 630 documentos):
+- Los **tres motores** en `/api/engines` con sus puertos.
+- Sesión abierta **sin reenviar la contraseña**, y la respuesta no la contiene.
+- Árbol completo: base → esquema → carpetas → tablas con recuento, más vistas, funciones y procedimientos.
+- Columnas con su tipo entero: `varchar(200)`, `decimal(12,2)`, `tinyint(1)`, `timestamp`, clave primaria y valores por defecto.
+- Tipos normalizados: el `BOOL` de MySQL llega como `true`/`false` **igual que el `boolean` de PostgreSQL y el `bit` de SQL Server**; decimales en cultura invariante; binarios como `0x…`; nulos distintos de la cadena vacía; acentos intactos («André Sáez», «Ömer Çelik»).
+- `SET @total = …; SELECT @total := …` funciona, y los parámetros con nombre de las consultas de catálogo siguen funcionando.
+- Avisos del servidor recogidos («aviso desde MySQL»), error de sintaxis con código 1064, `DELETE` sin filtro → **409**, 9 630 filas recortadas a 500 con `truncated`.
+- **Cancelación en vivo: `SLEEP(30)` cortado a los 2,8 s.**
+- **9 630 filas exportadas a CSV en 0,06 s**, con BOM y acentos correctos.
+- Tiempos (mediana de 10): metadatos **~5 ms**, `SELECT` de 500 filas **~26 ms**, abrir y cerrar sesión **~5 ms**.
+- **Memoria plana: 44 MB antes y 42 MB después de tres exportaciones completas seguidas.** La lectura progresiva hace lo que promete.
+
+**Verificación visual, por fin (la extensión de Chrome se conectó a mitad de sesión):**
+- Se compararon lado a lado el mockup y Druse a 1440×900, con la aplicación conectada a MySQL y una consulta ejecutada. **La pantalla reproduce el mockup**: proporciones de los paneles, barra superior, pestañas, barra de herramientas, cuadrícula con tipos por columna, panel de resultados y barra de estado.
+- Diferencias, todas conocidas: el wordmark dice «Druse» y no «Quarzo Studio» (D-05/D-06) y **falta la pestaña «Plan de ejecución»**, que el mockup enseña pero está fuera del MVP (backlog §15, prioridad media).
+- De paso quedó comprobado el flujo de MySQL **desde la interfaz**, no solo por HTTP: diálogo con MySQL ya seleccionable, «Conexión correcta con MySQL 8 en 160 ms», árbol con recuentos, doble clic en una tabla generando `SELECT * FROM druse_test.usuarios LIMIT 100;` —dialecto correcto, no `TOP`— y 100 filas en 13 ms con booleanos en verde y rojo, nulos marcados y acentos intactos.
+
+**Un fallo de interfaz encontrado mirando, que ninguna prueba veía:** la barra del editor escribía **`druse_test.public`**. El esquema estaba puesto a fuego desde la Fase 1, copiado del mockup: `public` es el esquema por omisión de PostgreSQL y de nadie más —en SQL Server es `dbo` y en MySQL no existe—, así que la aplicación mentía en dos motores de tres. Ahora el esquema solo se muestra cuando el árbol ha cargado uno y solo uno y no coincide con el nombre de la base. Dos pruebas nuevas lo fijan: una comprueba que MySQL no dice `public`, y otra que PostgreSQL **sí** sigue diciendo `druse_test.public`, para que arreglar un motor no rompa el otro.
+
+**Incidencia del entorno, no del producto:** los acentos aparecían dobles («AndrÃ©»). No era Druse: el guion de carga entró por el cliente `mysql` sin `--default-character-set=utf8mb4` y los grabó doblemente codificados. Se comprobó con `HEX(nombre)` —`C383C2A9` en vez de `C3A9`— y al recargar bien salieron correctos de punta a punta. Merece quedar escrito para que la próxima lectura no lo confunda con un fallo del proveedor.
+
+**No hecho, y por qué:** lo mismo que quedó de la Fase 7 —instalar de verdad y probar en un equipo limpio— sigue necesitando otra máquina.
+
+**Decisiones tomadas:** D-20 a D-23 (ver §6).
+
+---
 
 ### Sesión 010 — 2026-08-12 · Fase 7, aplicación de escritorio
 
@@ -585,6 +640,10 @@ Pendiente de verificar cuando toque: Docker (pruebas de integración con contene
 | D-16 | **Sin paginación.** Exportar cubre el caso de «quiero todo», y para acotar está el `WHERE` de la consulta. Paginar obligaría a reescribir el SQL del usuario con `OFFSET` o a mantener un cursor abierto, y ninguna de las dos cosas compensa. | 2026-08-12 |
 | D-19 | **`proxy.conf.json` → `proxy.conf.js`**: el proxy necesita lógica para leer el token en cada petición. No se cachea, para que reiniciar la API no obligue a reiniciar el servidor de desarrollo. | 2026-08-11 |
 | D-10 | **La integración continua no genera instaladores todavía.** Compila, prueba y verifica la publicación autocontenida. El empaquetado llega en la Fase 7 (ADR 0003). | 2026-08-11 |
+| D-20 | **En MySQL el árbol conserva el nivel de esquema**, con un nodo del mismo nombre que su base. `SCHEMA` es allí un sinónimo de `DATABASE`, así que el nivel es redundante; aun así se mantiene para que el explorador se comporte igual en los tres motores. La alternativa sería un árbol distinto solo para MySQL, y eso obligaría a ramificar por motor en la interfaz (plan §13). | 2026-08-12 |
+| D-21 | **El tiempo de espera de MySQL lo controla el proveedor, no `CommandTimeout`.** El driver corta con `KILL QUERY` y hay instrucciones que al ser interrumpidas terminan «bien»: la consulta caducada se anunciaba como completada. Con un token propio se distingue el reloj del usuario. | 2026-08-12 |
+| D-22 | **Cuatro opciones fijadas en la cadena de conexión de MySQL**: `ConvertZeroDateTime`, `GuidFormat=None`, `TreatTinyAsBoolean` y `AllowUserVariables`. Las tres primeras existen porque Druse muestra datos de bases ajenas y no puede reventar ante un `0000-00-00` o un `CHAR(36)` que no sea un GUID; la cuarta, porque un cliente SQL tiene que poder ejecutar `SET @x = …`. | 2026-08-12 |
+| D-23 | **La primera beta es la `0.1.0`, sin sufijo de prerrelease.** Un `0.x` ya dice que es una beta, y los instaladores MSI de Windows exigen una versión de tres partes numéricas: añadir `-beta.1` sería arriesgar el empaquetado para repetir algo que el número ya comunica. Lo que sí se declara por escrito son sus límites, en `docs/release-notes/0.1.0-beta.md`. | 2026-08-12 |
 
 ### Abiertas
 
@@ -661,7 +720,7 @@ Fuente: `docs/mockups/druse-main.html`. **Ya implementado** en `frontend/src/sty
 | 5 | Productividad del editor | ✅ **Cerrada** — 10/10 |
 | 6 | Resultados y exportaciones | ✅ **Cerrada** — 9/9 |
 | 7 | Empaquetado de escritorio | 🟡 **10/12** — falta validar en otro equipo |
-| 8 | MySQL y estabilización | 🔄 **Activa** — 0/7 |
+| 8 | MySQL y estabilización | ✅ **Cerrada** — 7/7 |
 
 ### Fase 0 — criterio de salida ✅
 
@@ -687,23 +746,21 @@ Los cinco pasos están verificados contra PostgreSQL 18.4 real, no simulado.
 
 Verificado reiniciando la API de verdad: el perfil sobrevivió, abrió sesión sin reenviar la contraseña, y **una búsqueda byte a byte en todos los archivos locales no encontró la contraseña por ninguna parte**.
 
-### Fase 4 — detalle
+### Fases 4 a 6 — criterios de salida ✅
 
-- [ ] Crear `SqlServerDatabaseProvider`.
-- [ ] Implementar autenticación SQL Server.
-- [ ] Evaluar autenticación integrada de Windows como tarea separada.
-- [ ] Obtener bases, esquemas, tablas, vistas, procedimientos y columnas.
-- [ ] Ejecutar consultas T-SQL.
-- [ ] Normalizar mensajes y errores.
-- [ ] Probar múltiples conjuntos de resultados.
-- [ ] Verificar timeout y cancelación.
-- [ ] Ejecutar las pruebas contractuales compartidas por proveedores.
+Cerradas en las sesiones 007, 008 y 009. El detalle está en cada entrada de §5.
 
-**Criterio de salida:** las mismas funciones visibles del MVP trabajan con PostgreSQL y SQL Server sin condicionales del motor dentro de los componentes Angular.
+### Fase 7 — criterio de salida 🟡
 
-**Prerrequisito:** un SQL Server de prueba. Ampliar `build/scripts/test-db.ps1` con `mcr.microsoft.com/mssql/server`.
+> «Druse se instala y ejecuta en Windows sin que el usuario tenga que instalar Node.js, Angular CLI o el SDK de .NET.»
 
-**Lo que de verdad se pone a prueba:** las 21 pruebas contractuales deben pasar contra SQL Server **sin cambiar lo que comprueban**. Si alguna hay que retocar, es señal de que se coló una fuga de dialecto en las abstracciones.
+Los instaladores se generan y la aplicación arranca desde el ZIP portable en un directorio limpio. **Falta la mitad que exige otro equipo**: instalar y desinstalar de verdad, y arrancar en una máquina sin herramientas de desarrollo.
+
+### Fase 8 — criterio de salida ✅
+
+> «Los tres motores superan el mismo contrato sin excepciones y existe una versión instalable con sus notas y sus límites declarados.»
+
+72 pruebas contractuales en verde —24 idénticas por motor—, MariaDB comprobado con el mismo proveedor, y `docs/release-notes/0.1.0-beta.md` escrito, incluidos los límites que la beta **no** garantiza.
 
 ---
 
@@ -711,17 +768,16 @@ Verificado reiniciando la API de verdad: el perfil sobrevivió, abrió sesión s
 
 | Riesgo | Impacto | Mitigación |
 | --- | --- | --- |
-| **Sin SQL Server de prueba** | **Bloquea la Fase 4, que es la activa** | Contenedor `mcr.microsoft.com/mssql/server`; ampliar `test-db.ps1` |
-| Solo hay un proveedor implementado | Las abstracciones no están validadas de verdad | La Fase 4 es justo esa prueba: las contractuales deben pasar tal cual |
+| **El MVP no se ha probado en un equipo limpio** | Es el criterio que demuestra que el paquete se basta solo | Instalar el NSIS en una máquina sin .NET ni Node. **Es lo único que queda del MVP** |
 | macOS pasa la contraseña por argumento a `security` | Visible un instante en la lista de procesos | Enlazar Security.framework. Anotado en ADR 0004 |
 | Contenedor `druse-pg-test` en el 55440 | El 55432 lo ocupa `prima-postgres`, ajeno al proyecto | Puerto configurable con `DRUSE_TEST_PG_PORT` |
-| Rust no instalado | Bloquea la Fase 7 | Instalar antes de empezarla; no urge |
-| Ejecutable de 107 MB | Instalador pesado | D-11: trimming y ReadyToRun en la Fase 7 |
+| Ejecutable de 107 MB | Instalador pesado | D-11: trimming y ReadyToRun. Sigue abierta |
 | Dependencias con vulnerabilidades en plantillas | Ya pasó dos veces: `Microsoft.OpenApi` y `dompurify` | En backend lo caza `TreatWarningsAsErrors`; en frontend, `npm audit` en cada instalación |
 | 3 vulnerabilidades moderadas en `@angular/cli` | Solo desarrollo; no llegan al bundle | Esperar actualización de Angular. Degradar a la 21 sería peor |
-| Fidelidad visual no comprobada a ojo | El shell podría desviarse del mockup en detalles | Revisar con `npm start` junto a `docs/mockups/druse-main.html` |
-| Los datos simulados podrían filtrarse a producción | `mock-workspace.ts` es solo de la Fase 1 | Debe borrarse en la Fase 2. Ningún componente lo importa: solo `AppShell` |
+| Detalles visuales fuera del shell principal | La comparación de la sesión 011 cubrió la pantalla principal, no todos los estados | Repetir la comparación al tocar diálogos, filtros o vistas menos transitadas |
 | Identificador `druse` no reservado | Podría ocuparlo otro | Reservar dominio, org de GitHub y NuGet/npm cuando haya algo publicable |
+
+_Retirados: «sin SQL Server de prueba» y «solo hay un proveedor» (Fase 4), «Rust no instalado» (Fase 7), «los datos simulados podrían filtrarse» (borrados en la Fase 2) y «fidelidad visual no comprobada» (comprobada en la sesión 011)._
 
 ---
 

@@ -25,13 +25,13 @@ interface EnvironmentOption {
 /**
  * Motores que se ofrecen.
  *
- * MySQL aparece deshabilitado a propósito: enseña hacia dónde va el producto sin
- * dejar elegir algo que todavía no existe. Se habilita en la Fase 8.
+ * `available` sigue existiendo aunque hoy los tres lo estén: es lo que permite
+ * enseñar un motor por venir sin dejar elegirlo.
  */
 const ENGINES: readonly EngineOption[] = [
   { id: 'sqlserver', name: 'SQL Server', versions: '2016 – 2022', defaultPort: 1433, available: true },
   { id: 'postgresql', name: 'PostgreSQL', versions: '12 – 18', defaultPort: 5432, available: true },
-  { id: 'mysql', name: 'MySQL', versions: '8.0+', defaultPort: 3306, available: false },
+  { id: 'mysql', name: 'MySQL', versions: '8.0+ · MariaDB', defaultPort: 3306, available: true },
 ];
 
 const ENVIRONMENTS: readonly EnvironmentOption[] = [

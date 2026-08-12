@@ -7,10 +7,11 @@
 # reutilizarse para nada más ni parecerse a credenciales reales (plan §11).
 #
 # Uso:
-#   ./build/scripts/test-db.sh                  # ambos motores
+#   ./build/scripts/test-db.sh                  # los tres motores
 #   ./build/scripts/test-db.sh postgres         # solo PostgreSQL
 #   ./build/scripts/test-db.sh sqlserver        # solo SQL Server
-#   ./build/scripts/test-db.sh down             # eliminar ambos
+#   ./build/scripts/test-db.sh mysql            # solo MySQL
+#   ./build/scripts/test-db.sh down             # eliminar los tres
 
 set -euo pipefail
 
@@ -23,10 +24,15 @@ MSSQL_PORT="${DRUSE_TEST_MSSQL_PORT:-14433}"
 MSSQL_IMAGE="${DRUSE_TEST_MSSQL_IMAGE:-mcr.microsoft.com/mssql/server:2022-latest}"
 MSSQL_PASSWORD='Druse_dev_only_1'
 
+MYSQL_NAME="${DRUSE_TEST_MYSQL_NAME:-druse-mysql-test}"
+MYSQL_PORT="${DRUSE_TEST_MYSQL_PORT:-33306}"
+MYSQL_IMAGE="${DRUSE_TEST_MYSQL_IMAGE:-mysql:8.4}"
+MYSQL_PASSWORD='druse_dev_only'
+
 TARGET="${1:-all}"
 
 if [[ "$TARGET" == "down" ]]; then
-    for name in "$PG_NAME" "$MSSQL_NAME"; do
+    for name in "$PG_NAME" "$MSSQL_NAME" "$MYSQL_NAME"; do
         echo "Eliminando $name..."
         docker rm -f "$name" >/dev/null 2>&1 || true
     done
@@ -102,6 +108,34 @@ if [[ "$TARGET" == "all" || "$TARGET" == "sqlserver" ]]; then
         -Q "IF DB_ID('druse_test') IS NULL CREATE DATABASE druse_test;" >/dev/null 2>&1
 
     echo "  SQL Server listo en 127.0.0.1:$MSSQL_PORT"
+fi
+
+# --- MySQL ------------------------------------------------------------------
+if [[ "$TARGET" == "all" || "$TARGET" == "mysql" ]]; then
+    if container_exists "$MYSQL_NAME"; then
+        echo "$MYSQL_NAME ya existe; se reinicia."
+        docker start "$MYSQL_NAME" >/dev/null
+    else
+        echo "Creando $MYSQL_NAME en el puerto $MYSQL_PORT..."
+        docker run -d \
+            --name "$MYSQL_NAME" \
+            -e "MYSQL_ROOT_PASSWORD=$MYSQL_PASSWORD" \
+            -e MYSQL_DATABASE=druse_test \
+            -p "${MYSQL_PORT}:3306" \
+            "$MYSQL_IMAGE" >/dev/null
+    fi
+
+    ready=0
+    for _ in $(seq 1 60); do
+        sleep 1
+        if docker exec "$MYSQL_NAME" mysqladmin ping -uroot -p"$MYSQL_PASSWORD" >/dev/null 2>&1; then
+            ready=1
+            break
+        fi
+    done
+
+    [[ "$ready" -eq 1 ]] || { echo "$MYSQL_NAME no respondió a tiempo." >&2; exit 1; }
+    echo "  MySQL listo en 127.0.0.1:$MYSQL_PORT"
 fi
 
 echo

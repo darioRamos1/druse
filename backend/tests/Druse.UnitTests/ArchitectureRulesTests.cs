@@ -42,6 +42,7 @@ public sealed class ArchitectureRulesTests
         ["Druse.Persistence.Sqlite"] = ["Druse.Application", "Druse.Platform.Abstractions"],
 
         // Proveedores: sus contratos y su propio driver. Nunca otro proveedor.
+        ["Druse.Provider.MySql"] = ["Druse.Database.Abstractions"],
         ["Druse.Provider.PostgreSql"] = ["Druse.Database.Abstractions"],
         ["Druse.Provider.SqlServer"] = ["Druse.Database.Abstractions"],
 
@@ -53,6 +54,7 @@ public sealed class ArchitectureRulesTests
         [
             "Druse.Application",
             "Druse.Infrastructure",
+            "Druse.Provider.MySql",
             "Druse.Provider.PostgreSql",
             "Druse.Provider.SqlServer",
             "Druse.Persistence.Sqlite",
