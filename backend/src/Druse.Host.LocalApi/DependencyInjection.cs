@@ -6,6 +6,7 @@ using Druse.Application.Rows;
 using Druse.Database.Abstractions;
 using Druse.Host.LocalApi.Security;
 using Druse.Infrastructure.Exports;
+using Druse.Infrastructure.Importing;
 using Druse.Infrastructure.Providers;
 using Druse.Infrastructure.Queries;
 using Druse.Infrastructure.Sessions;
@@ -78,11 +79,16 @@ internal static class DependencyInjection
         services.AddScoped<MetadataService>();
         services.AddScoped<QueryService>();
         services.AddScoped<RowEditService>();
+        services.AddScoped<ImportService>();
         services.AddScoped<ExportService>();
 
         // --- Exportadores -------------------------------------------------------
         services.AddSingleton<IResultExporter, CsvResultExporter>();
         services.AddSingleton<IResultExporter, XlsxResultExporter>();
+
+        // --- Lectores de archivo ------------------------------------------------
+        services.AddSingleton<ITableFileReader, CsvTableFileReader>();
+        services.AddSingleton<ITableFileReader, XlsxTableFileReader>();
 
         return services;
     }

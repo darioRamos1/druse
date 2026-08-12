@@ -101,6 +101,89 @@ public abstract class RowEditorBase : IRowEditor
         };
     }
 
+    public IReadOnlyList<string> DescribeInsert(PreparedInsertBatch batch)
+    {
+        ArgumentNullException.ThrowIfNull(batch);
+
+        return [.. batch.Rows.Select(row => InsertStatement(batch, row, literal: true))];
+    }
+
+    public async Task<RowEditResult> InsertAsync(
+        IDatabaseSession session,
+        PreparedInsertBatch batch,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(batch);
+
+        var connection = Connection(session);
+        var stopwatch = Stopwatch.StartNew();
+        var insertadas = 0L;
+
+        // Todo o nada, igual que al editar: media importación es peor que
+        // ninguna, porque nadie sabe por dónde se quedó.
+        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+
+        try
+        {
+            foreach (var row in batch.Rows)
+            {
+                await using var command = connection.CreateCommand();
+                command.Transaction = transaction;
+                command.CommandText = InsertStatement(batch, row, literal: false);
+
+                var index = 0;
+
+                foreach (var cell in row)
+                {
+                    var parameter = command.CreateParameter();
+                    parameter.ParameterName = Parameter(index++);
+                    parameter.Value = cell.Value;
+                    command.Parameters.Add(parameter);
+                }
+
+                insertadas += await command.ExecuteNonQueryAsync(cancellationToken);
+            }
+
+            await transaction.CommitAsync(cancellationToken);
+        }
+        catch
+        {
+            await transaction.RollbackAsync(CancellationToken.None);
+            throw;
+        }
+
+        stopwatch.Stop();
+
+        return new RowEditResult
+        {
+            RowsAffected = insertadas,
+            Duration = stopwatch.Elapsed,
+            // Solo las primeras: un archivo de diez mil filas produciría diez mil
+            // instrucciones y nadie las va a leer.
+            Statements = [.. DescribeInsert(batch).Take(PreviewedStatements)],
+        };
+    }
+
+    /// <summary>Cuántas instrucciones se devuelven como muestra al importar.</summary>
+    private const int PreviewedStatements = 5;
+
+    private string InsertStatement(
+        PreparedInsertBatch batch,
+        IReadOnlyList<PreparedCell> row,
+        bool literal)
+    {
+        var name = batch.Schema is null
+            ? Quote(batch.Table)
+            : $"{Quote(batch.Schema)}.{Quote(batch.Table)}";
+
+        var columns = string.Join(", ", batch.Columns.Select(Quote));
+        var values = string.Join(
+            ", ",
+            row.Select((cell, index) => literal ? cell.Literal : Parameter(index)));
+
+        return $"INSERT INTO {name} ({columns}) VALUES ({values})";
+    }
+
     /// <summary>
     /// El `UPDATE` de una fila.
     ///

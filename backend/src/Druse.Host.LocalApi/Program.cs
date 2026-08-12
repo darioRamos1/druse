@@ -140,6 +140,7 @@ app.MapGet("/api/health", () => new HealthResponse(
 app.MapDatabaseEndpoints();
 app.MapStorageEndpoints();
 app.MapExportEndpoints();
+app.MapImportEndpoints();
 
 var endpoint = app.Services.GetRequiredService<LocalApiEndpoint>();
 

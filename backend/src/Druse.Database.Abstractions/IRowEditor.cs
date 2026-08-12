@@ -56,4 +56,32 @@ public interface IRowEditor
         IDatabaseSession session,
         PreparedRowEditBatch batch,
         CancellationToken cancellationToken);
+
+    /// <summary>El `INSERT` que se ejecutaría, con los valores escritos.</summary>
+    IReadOnlyList<string> DescribeInsert(PreparedInsertBatch batch);
+
+    /// <summary>
+    /// Inserta filas en una tabla, todas en una transacción.
+    ///
+    /// Es el mismo camino que la edición y por los mismos motivos: parámetros,
+    /// identificadores citados por el dialecto y todo o nada. Importar medio
+    /// archivo es peor que no importarlo, porque nadie sabe por dónde se quedó.
+    /// </summary>
+    Task<RowEditResult> InsertAsync(
+        IDatabaseSession session,
+        PreparedInsertBatch batch,
+        CancellationToken cancellationToken);
+}
+
+/// <summary>Filas a insertar, ya validadas y con los valores convertidos.</summary>
+public sealed record PreparedInsertBatch
+{
+    public string? Schema { get; init; }
+
+    public required string Table { get; init; }
+
+    /// <summary>Columnas de destino, en el orden en que van los valores.</summary>
+    public required IReadOnlyList<string> Columns { get; init; }
+
+    public required IReadOnlyList<IReadOnlyList<PreparedCell>> Rows { get; init; }
 }
