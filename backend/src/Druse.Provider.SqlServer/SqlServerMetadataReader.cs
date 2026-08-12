@@ -1,6 +1,7 @@
 using System.Data.Common;
 using Druse.Database.Abstractions;
 using Druse.Domain;
+using Microsoft.Data.SqlClient;
 
 namespace Druse.Provider.SqlServer;
 
@@ -182,8 +183,14 @@ public sealed class SqlServerMetadataReader : IDatabaseMetadataReader
     /// <summary>
     /// Tablas del esquema con su recuento aproximado.
     ///
-    /// `sys.dm_db_partition_stats` da el recuento sin escanear la tabla, igual que
-    /// `reltuples` en PostgreSQL: un `COUNT(*)` por tabla haría inservible el
+    /// El recuento sale de `sys.partitions`, que es una vista de catálogo y solo
+    /// exige poder ver la tabla. La DMV `sys.dm_db_partition_stats` daría lo
+    /// mismo, pero **pide `VIEW DATABASE STATE`**, un permiso que un usuario de
+    /// aplicación no suele tener: en una base restringida el servidor respondía
+    /// con el error 262 y el explorador se quedaba sin poder listar nada.
+    ///
+    /// De un modo u otro el recuento es una estimación —lo mismo que `reltuples`
+    /// en PostgreSQL—, porque un `COUNT(*)` por tabla haría inservible el
     /// explorador en una base grande.
     /// </summary>
     private static async Task<IReadOnlyList<DatabaseObject>> GetTablesAsync(
@@ -191,32 +198,73 @@ public sealed class SqlServerMetadataReader : IDatabaseMetadataReader
         DatabaseObject folder,
         CancellationToken cancellationToken)
     {
-        const string Sql = """
-            SELECT t.name, SUM(CASE WHEN p.index_id IN (0, 1) THEN p.row_count ELSE 0 END) AS row_count
+        const string WithRowCount = """
+            SELECT t.name, SUM(CASE WHEN p.index_id IN (0, 1) THEN p.[rows] ELSE 0 END) AS row_count
             FROM sys.tables t
             JOIN sys.schemas s ON s.schema_id = t.schema_id
-            LEFT JOIN sys.dm_db_partition_stats p ON p.object_id = t.object_id
+            LEFT JOIN sys.partitions p ON p.object_id = t.object_id
             WHERE s.name = @schema
             GROUP BY t.name
             ORDER BY t.name
             """;
 
-        return await QueryAsync(
-            session,
-            Sql,
-            reader => new DatabaseObject
-            {
-                Id = $"{DatabaseObjectKind.Table}:{folder.Schema}.{reader.GetString(0)}",
-                Name = reader.GetString(0),
-                Kind = DatabaseObjectKind.Table,
-                Database = folder.Database,
-                Schema = folder.Schema,
-                HasChildren = true,
-                ApproximateRowCount = reader.IsDBNull(1) ? null : reader.GetInt64(1),
-            },
-            cancellationToken,
-            ("schema", folder.Schema ?? "dbo"));
+        // Sin recuento. Es la red de seguridad: mostrar las tablas sin el número
+        // es infinitamente mejor que no mostrarlas.
+        const string WithoutRowCount = """
+            SELECT t.name, CAST(NULL AS bigint) AS row_count
+            FROM sys.tables t
+            JOIN sys.schemas s ON s.schema_id = t.schema_id
+            WHERE s.name = @schema
+            ORDER BY t.name
+            """;
+
+        DatabaseObject Project(DbDataReader reader) => new()
+        {
+            Id = $"{DatabaseObjectKind.Table}:{folder.Schema}.{reader.GetString(0)}",
+            Name = reader.GetString(0),
+            Kind = DatabaseObjectKind.Table,
+            Database = folder.Database,
+            Schema = folder.Schema,
+            HasChildren = true,
+            ApproximateRowCount = reader.IsDBNull(1) ? null : reader.GetInt64(1),
+        };
+
+        try
+        {
+            return await QueryAsync(
+                session,
+                WithRowCount,
+                Project,
+                cancellationToken,
+                ("schema", folder.Schema ?? "dbo"));
+        }
+        catch (SqlException exception) when (IsPermissionDenied(exception))
+        {
+            // Un permiso que falta al leer un dato accesorio no puede dejar al
+            // usuario sin explorador.
+            return await QueryAsync(
+                session,
+                WithoutRowCount,
+                Project,
+                cancellationToken,
+                ("schema", folder.Schema ?? "dbo"));
+        }
     }
+
+    /// <summary>
+    /// El servidor rechazó la consulta por permisos, no por estar mal escrita.
+    ///
+    /// Los números están comprobados, no supuestos: 229 y 230 son «permiso
+    /// denegado» sobre un objeto o una columna; **262** es el que devolvió una
+    /// base de Azure SQL al faltar `VIEW DATABASE PERFORMANCE STATE`, y **297**
+    /// el que devuelve SQL Server 2022 ante un `DENY VIEW DATABASE STATE`; 300
+    /// cubre los permisos de ámbito de servidor.
+    ///
+    /// El mismo permiso que falta se anuncia con un número distinto según dónde
+    /// se ejecute, así que la lista tiene que cubrir las dos formas.
+    /// </summary>
+    private static bool IsPermissionDenied(SqlException exception) =>
+        exception.Number is 229 or 230 or 262 or 297 or 300;
 
     private static async Task<IReadOnlyList<DatabaseObject>> GetViewsAsync(
         IDatabaseSession session,
