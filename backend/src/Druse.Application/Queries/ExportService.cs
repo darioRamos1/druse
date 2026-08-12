@@ -44,6 +44,10 @@ public sealed class ExportService(
         ArgumentNullException.ThrowIfNull(request);
         ArgumentNullException.ThrowIfNull(options);
 
+        // El turno cubre toda la exportación, no solo la apertura: el lector va
+        // trayendo filas mientras se escribe, y la conexión sigue ocupada.
+        using var turn = await _connections.EnterAsync(request.SessionId, cancellationToken);
+
         var session = _connections.Require(request.SessionId);
         var rejection = QueryService.Validate(QueryContext.From(session), request);
 

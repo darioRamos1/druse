@@ -86,6 +86,10 @@ public sealed class QueryService(
     {
         ArgumentNullException.ThrowIfNull(request);
 
+        // La sesión es una sola conexión: mientras esta consulta corre, los
+        // metadatos que pida el explorador esperan su turno en lugar de romperla.
+        using var turn = await _connections.EnterAsync(request.SessionId, cancellationToken);
+
         var session = _connections.Require(request.SessionId);
         var executor = _providers.GetQueryExecutor(session.Engine);
 

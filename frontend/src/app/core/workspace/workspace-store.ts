@@ -845,11 +845,16 @@ export class WorkspaceStore {
       (entry) => entry.object.kind === 'folder' && /:(tables|views)$/.test(entry.object.id),
     );
 
-    await Promise.all(
-      folders
-        .filter((folder) => folder.children === null)
-        .map((folder) => this.loadChildren(folder, true)),
-    );
+    // Una detrás de otra, nunca en paralelo. Al otro lado hay **una sola
+    // conexión**, y dos peticiones a la vez la rompen: SQL Server responde que
+    // no es compatible con MultipleActiveResultSets. El servidor ahora las pone
+    // en cola, pero encolarlas desde aquí es lo honesto: no se gana nada
+    // lanzándolas juntas si van a ejecutarse en fila igualmente.
+    for (const folder of folders) {
+      if (folder.children === null) {
+        await this.loadChildren(folder, true);
+      }
+    }
   }
 
   toggleConnection(connectionId: string): void {

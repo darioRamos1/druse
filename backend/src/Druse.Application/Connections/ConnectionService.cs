@@ -58,4 +58,13 @@ public sealed class ConnectionService(
     /// <summary>Recupera una sesión abierta o falla con un error claro.</summary>
     public IDatabaseSession Require(Guid sessionId) =>
         _sessions.Find(sessionId) ?? throw new SessionNotFoundException(sessionId);
+
+    /// <summary>
+    /// Espera el turno para usar la sesión.
+    ///
+    /// Todo lo que hable con el motor por una sesión debe pedirlo antes: la
+    /// conexión es una sola y no admite dos comandos a la vez.
+    /// </summary>
+    public Task<IDisposable> EnterAsync(Guid sessionId, CancellationToken cancellationToken) =>
+        _sessions.EnterAsync(sessionId, cancellationToken);
 }

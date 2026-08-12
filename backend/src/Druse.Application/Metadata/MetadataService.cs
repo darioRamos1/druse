@@ -22,6 +22,8 @@ public sealed class MetadataService(
         Guid sessionId,
         CancellationToken cancellationToken)
     {
+        using var turn = await _connections.EnterAsync(sessionId, cancellationToken);
+
         var session = _connections.Require(sessionId);
         var reader = _providers.GetMetadataReader(session.Engine);
 
@@ -33,6 +35,10 @@ public sealed class MetadataService(
         DatabaseObject parent,
         CancellationToken cancellationToken)
     {
+        // El explorador y el editor piden metadatos a la vez sin coordinarse
+        // entre ellos: sin turno, la segunda petición reventaría la conexión.
+        using var turn = await _connections.EnterAsync(sessionId, cancellationToken);
+
         var session = _connections.Require(sessionId);
         var reader = _providers.GetMetadataReader(session.Engine);
 
@@ -44,6 +50,8 @@ public sealed class MetadataService(
         DatabaseObject table,
         CancellationToken cancellationToken)
     {
+        using var turn = await _connections.EnterAsync(sessionId, cancellationToken);
+
         var session = _connections.Require(sessionId);
         var reader = _providers.GetMetadataReader(session.Engine);
 

@@ -15,6 +15,14 @@ public sealed class SessionRegistry : ISessionRegistry
 {
     private readonly ConcurrentDictionary<Guid, IDatabaseSession> _sessions = new();
 
+    /// <summary>
+    /// Un turno por sesión.
+    ///
+    /// El diccionario concurrente protege la lista de sesiones, pero no la
+    /// conexión que hay dentro de cada una: eso es lo que hace este semáforo.
+    /// </summary>
+    private readonly ConcurrentDictionary<Guid, SemaphoreSlim> _turns = new();
+
     public IReadOnlyCollection<IDatabaseSession> All => _sessions.Values.ToList();
 
     public void Add(IDatabaseSession session)
@@ -27,11 +35,45 @@ public sealed class SessionRegistry : ISessionRegistry
     public IDatabaseSession? Find(Guid sessionId) =>
         _sessions.TryGetValue(sessionId, out var session) && session.IsOpen ? session : null;
 
+    /// <inheritdoc />
+    public async Task<IDisposable> EnterAsync(Guid sessionId, CancellationToken cancellationToken)
+    {
+        var turn = _turns.GetOrAdd(sessionId, _ => new SemaphoreSlim(1, 1));
+
+        await turn.WaitAsync(cancellationToken);
+
+        return new Turn(turn);
+    }
+
+    /// <summary>El turno de una sesión, que se devuelve al liberarlo.</summary>
+    private sealed class Turn(SemaphoreSlim semaphore) : IDisposable
+    {
+        private bool _released;
+
+        public void Dispose()
+        {
+            if (_released)
+            {
+                return;
+            }
+
+            _released = true;
+            semaphore.Release();
+        }
+    }
+
     public async Task<bool> CloseAsync(Guid sessionId)
     {
         if (!_sessions.TryRemove(sessionId, out var session))
         {
             return false;
+        }
+
+        // El turno se retira con la sesión: dejarlo sería acumular semáforos de
+        // conexiones que ya no existen.
+        if (_turns.TryRemove(sessionId, out var turn))
+        {
+            turn.Dispose();
         }
 
         await session.DisposeAsync();
