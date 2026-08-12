@@ -21,16 +21,15 @@
 | ¿Hay aplicación de escritorio? | **Sí.** Instalador NSIS, MSI y ZIP portable |
 | Motores | **PostgreSQL, SQL Server y MySQL/MariaDB**, con las **mismas 24 pruebas contractuales** cada uno |
 | Bloqueantes | Ninguno |
-| Git | Rama `feature/mysql-provider`, pendiente de fusionar en `main`. Sin remoto configurado. |
+| Git | `main`, con la Fase 8 ya fusionada (`dd9244b`). Sin remoto configurado. |
 
 ### Qué toca retomar en la próxima sesión
 
-1. **Fusionar `feature/mysql-provider` en `main`.**
-2. Lo único que impide dar el MVP por terminado **necesita otro equipo**:
+1. Lo único que impide dar el MVP por terminado **necesita otro equipo**:
    - instalar, actualizar y desinstalar de verdad, para validar el ciclo completo;
    - arrancar en una máquina sin .NET ni Node, que es el criterio que demuestra que el paquete se basta solo.
-3. Artefactos de Linux y macOS: el script acepta cualquier RID, pero generarlos exige compilar en cada plataforma. Es trabajo de integración continua.
-4. Con el MVP cerrado, lo siguiente sale del **backlog del plan §15**: autenticación integrada de Windows, túneles SSH, edición de filas y actualizador automático.
+2. Artefactos de Linux y macOS: el script acepta cualquier RID, pero generarlos exige compilar en cada plataforma. Es trabajo de integración continua.
+3. Con el MVP cerrado, lo siguiente sale del **backlog del plan §15**: autenticación integrada de Windows, túneles SSH, edición de filas y actualizador automático.
 
 **El visto bueno visual ya está dado** (sesión 011, con la extensión de Chrome por fin conectada): la pantalla reproduce el mockup. Lo único ausente es la pestaña «Plan de ejecución», que está fuera del MVP.
 
