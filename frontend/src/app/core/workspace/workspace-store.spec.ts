@@ -9,6 +9,7 @@ import {
 } from '../application-gateway/application-gateway';
 import {
   ConnectionForm,
+  DatabaseColumn,
   DatabaseObject,
   QueryHistoryEntry,
   QueryResult,
@@ -199,6 +200,18 @@ class FakeGateway implements Partial<ApplicationGateway> {
       default:
         return of([]);
     }
+  }
+
+  /**
+   * Las columnas se piden por aquí y no por `getChildren`: es la misma lista
+   * que se ve en el árbol, pero con el tipo de cada columna, que es de lo que
+   * viven el tooltip y los avisos del editor.
+   */
+  getColumns(): Observable<DatabaseColumn[]> {
+    return of([
+      { name: 'id', dataType: 'int8', isNullable: false, isPrimaryKey: true, ordinal: 1 },
+      { name: 'email', dataType: 'text', isNullable: true, isPrimaryKey: false, ordinal: 2 },
+    ]);
   }
 
   executeQuery(request: ExecuteQueryRequest): Observable<QueryResult> {
@@ -431,7 +444,12 @@ describe('WorkspaceStore', () => {
 
       const columnas = await store.ensureColumnsAsync('public', 'users');
 
-      expect(columnas).toEqual([]);
+      // Llegan con su tipo, que es lo que el editor necesita para el tooltip.
+      expect(columnas.map((columna) => columna.name)).toEqual(['id', 'email']);
+      expect(columnas[0].dataType).toBe('int8');
+      expect(columnas[0].isPrimaryKey).toBe(true);
+
+      // Traer las columnas no es lo mismo que desplegar el nodo.
       expect(store.explorerNodes().length).toBe(1);
     });
   });
@@ -468,7 +486,9 @@ describe('WorkspaceStore', () => {
       await abrir('tables');
 
       const tabla = store.explorerNodes().find((node) => node.label === 'users');
-      const spy = vi.spyOn(gateway, 'getChildren');
+      // Una tabla pide `getColumns`, que trae lo mismo que el árbol enseña y
+      // además el tipo de cada columna.
+      const spy = vi.spyOn(gateway, 'getColumns');
 
       await store.toggleNode(tabla!.id);
       expect(spy).toHaveBeenCalledTimes(1);

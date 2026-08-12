@@ -15,7 +15,12 @@ import { EditorTabs } from '../../features/query-editor/editor-tabs/editor-tabs'
 import { EditorToolbar } from '../../features/query-editor/editor-toolbar/editor-toolbar';
 import { CursorPosition, SqlEditor } from '../../features/query-editor/sql-editor/sql-editor';
 import { ResultsPanel } from '../../features/query-results/results-panel/results-panel';
-import { DatabaseEngine, ExplorerNode, SessionStatus } from '../../shared/models/workspace';
+import {
+  DatabaseEngine,
+  ExplorerNode,
+  KnownColumn,
+  SessionStatus,
+} from '../../shared/models/workspace';
 import { ResizeHandle } from '../../shared/ui/resize-handle/resize-handle';
 import { StatusBar } from '../status-bar/status-bar';
 import { TopBar } from '../top-bar/top-bar';
@@ -133,8 +138,10 @@ export class AppShell {
    * el explorador. Va como propiedad ligada, no como método suelto, para que
    * conserve el `this` del store.
    */
-  protected readonly loadColumns = (schema: string | null, name: string): Promise<readonly string[]> =>
-    this._store.ensureColumnsAsync(schema, name);
+  protected readonly loadColumns = (
+    schema: string | null,
+    name: string,
+  ): Promise<readonly KnownColumn[]> => this._store.ensureColumnsAsync(schema, name);
 
   /** Lo mismo para las tablas de un esquema que el precalentado no alcanzó. */
   protected readonly loadRelations = (schema: string): Promise<void> =>

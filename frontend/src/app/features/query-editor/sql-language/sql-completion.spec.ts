@@ -1,5 +1,16 @@
 import { SchemaIndex } from '../../../shared/models/workspace';
+
 import { registerSqlCompletion } from './sql-completion';
+
+/** Columna del índice, con lo justo para no repetir cuatro campos en cada línea. */
+function col(
+  name: string,
+  dataType: string,
+  { pk = false, nullable = false }: { pk?: boolean; nullable?: boolean } = {},
+) {
+  return { name, dataType, isPrimaryKey: pk, isNullable: nullable };
+}
+
 
 /**
  * Monaco mínimo para poder probar el proveedor sin cargar el editor entero.
@@ -46,21 +57,21 @@ const schema: SchemaIndex = {
       name: 'users',
       kind: 'table',
       qualified: 'public.users',
-      columns: ['id', 'name', 'email'],
+      columns: [col('id', 'int8', { pk: true }), col('name', 'text'), col('email', 'text')],
     },
     {
       schema: 'public',
       name: 'pedidos',
       kind: 'table',
       qualified: 'public.pedidos',
-      columns: ['id', 'total'],
+      columns: [col('id', 'int8', { pk: true }), col('total', 'numeric(10,2)')],
     },
     {
       schema: 'public',
       name: 'usuarios_activos',
       kind: 'view',
       qualified: 'public.usuarios_activos',
-      columns: ['id'],
+      columns: [col('id', 'int8')],
     },
   ],
 };
@@ -80,21 +91,21 @@ const multiSchema: SchemaIndex = {
       name: 'usuarios',
       kind: 'table',
       qualified: 'tpublico.usuarios',
-      columns: ['id', 'nombre', 'correo'],
+      columns: [col('id', 'int', { pk: true }), col('nombre', 'varchar(200)'), col('correo', 'varchar(200)', { nullable: true })],
     },
     {
       schema: 'tpublico',
       name: 'facturas',
       kind: 'table',
       qualified: 'tpublico.facturas',
-      columns: ['id', 'importe'],
+      columns: [col('id', 'int', { pk: true }), col('importe', 'decimal(12,2)')],
     },
     {
       schema: 'dbo',
       name: 'usuarios',
       kind: 'table',
       qualified: 'dbo.usuarios',
-      columns: ['user_id', 'login'],
+      columns: [col('user_id', 'int', { pk: true }), col('login', 'nvarchar(50)')],
     },
   ],
 };
@@ -164,6 +175,42 @@ describe('autocompletado SQL', () => {
 
   it('no sugiere nada tras un punto de algo desconocido', () => {
     expect(complete('SELECT desconocida.')).toEqual([]);
+  });
+
+  describe('ayudas del editor', () => {
+    it('ofrece la lista de columnas de lo que hay en el FROM', () => {
+      const item = complete('SELECT  FROM users u').find((i) => i.label.startsWith('columnas'));
+
+      expect(item?.insertText).toBe('u.id, u.name, u.email');
+      expect(item?.detail).toContain('3 columnas');
+    });
+
+    it('ofrece una sola entrada por tabla, no una por alias', () => {
+      const items = complete('SELECT  FROM users u').filter((i) => i.label.startsWith('columnas'));
+
+      // `users` se registra con su alias y con su nombre; son la misma tabla.
+      expect(items.length).toBe(1);
+    });
+
+    it('incluye plantillas y las adapta al motor', () => {
+      const postgres = complete('', 'postgresql').map((item) => item.label);
+      const sqlserver = complete('', 'sqlserver').map((item) => item.label);
+
+      expect(postgres).toContain('sel');
+      expect(postgres).toContain('join');
+
+      // Limitar filas se escribe distinto en cada motor.
+      expect(postgres).toContain('limit');
+      expect(sqlserver).toContain('top');
+      expect(sqlserver).not.toContain('limit');
+    });
+
+    it('el tipo de cada columna acompaña a la sugerencia', () => {
+      const columnas = complete('SELECT * FROM users u WHERE u.');
+      const id = columnas.find((item) => item.label === 'id');
+
+      expect(id?.detail).toBe('int8 · no nulo · clave primaria');
+    });
   });
 
   describe('con esquema propio', () => {
@@ -258,7 +305,7 @@ describe('autocompletado SQL', () => {
         schema: sinAbrir,
         loadColumns: (schema, name) => {
           pedidas.push({ schema, name });
-          return Promise.resolve(['id', 'importe']);
+          return Promise.resolve([col('id', 'int', { pk: true }), col('importe', 'decimal(12,2)')]);
         },
       }));
 

@@ -1,7 +1,34 @@
 import type * as MonacoApi from 'monaco-editor';
 
-import { DatabaseEngine, KnownRelation, SchemaIndex } from '../../../shared/models/workspace';
+import {
+  DatabaseEngine,
+  KnownColumn,
+  KnownRelation,
+  SchemaIndex,
+} from '../../../shared/models/workspace';
+import { SqlReference, aliasMap, findRelation } from './sql-context';
 import { functionsFor, keywordsFor } from './sql-keywords';
+import { snippetsFor } from './sql-snippets';
+
+/**
+ * Cómo se describe una columna en una línea.
+ *
+ * El tipo primero, que es lo que se busca; después lo que cambia cómo se
+ * escribe la consulta: si admite nulos y si es clave primaria.
+ */
+export function describeColumn(column: KnownColumn): string {
+  const partes = [column.dataType];
+
+  if (!column.isNullable) {
+    partes.push('no nulo');
+  }
+
+  if (column.isPrimaryKey) {
+    partes.push('clave primaria');
+  }
+
+  return partes.join(' · ');
+}
 
 /** Contexto que el editor consulta en cada pulsación para sugerir. */
 export interface CompletionContext {
@@ -14,7 +41,10 @@ export interface CompletionContext {
    * Es opcional a propósito: sin esto el autocompletado sigue funcionando con lo
    * que ya está cargado, que es como se comportaba antes.
    */
-  readonly loadColumns?: (schema: string | null, name: string) => Promise<readonly string[]>;
+  readonly loadColumns?: (
+    schema: string | null,
+    name: string,
+  ) => Promise<readonly KnownColumn[]>;
 
   /**
    * Carga las tablas de un esquema que el explorador aún no ha recorrido.
@@ -23,12 +53,6 @@ export interface CompletionContext {
    * precalienta entero: este es el camino para el resto.
    */
   readonly loadRelations?: (schema: string) => Promise<void>;
-}
-
-/** Una relación nombrada en el SQL, con su esquema si el usuario lo escribió. */
-interface Reference {
-  readonly schema: string | null;
-  readonly name: string;
 }
 
 /**
@@ -43,7 +67,7 @@ interface Reference {
  * También se admite `esquema.tabla.`, porque quien escribe el nombre completo
  * sigue esperando sus columnas.
  */
-function qualifierBefore(line: string): Reference | null {
+function qualifierBefore(line: string): SqlReference | null {
   const identifier = '[\\p{L}_][\\p{L}\\p{N}_$]*';
   const match = new RegExp(
     `(?:(${identifier})\\.)?(${identifier})\\.\\s*[\\p{L}\\p{N}_$]*$`,
@@ -51,62 +75,6 @@ function qualifierBefore(line: string): Reference | null {
   ).exec(line);
 
   return match ? { schema: match[1] ?? null, name: match[2] } : null;
-}
-
-/**
- * Busca los alias declarados en el texto.
- *
- * `FROM users u` y `JOIN pedidos AS p` son la forma normal de escribir SQL, y
- * sin resolverlos las columnas nunca se sugerirían: el usuario escribe `u.` y
- * el editor no sabría que `u` es `users`.
- *
- * Se conserva el esquema cuando la relación viene calificada: en una base con
- * dos esquemas que tengan una tabla del mismo nombre, es lo único que permite
- * sugerir las columnas correctas.
- */
-function aliasMap(sql: string): Map<string, Reference> {
-  const aliases = new Map<string, Reference>();
-  const pattern =
-    /\b(?:FROM|JOIN|UPDATE|INTO)\s+([\p{L}_][\p{L}\p{N}_$]*(?:\.[\p{L}_][\p{L}\p{N}_$]*)?)(?:\s+(?:AS\s+)?([\p{L}_][\p{L}\p{N}_$]*))?/giu;
-
-  let match: RegExpExecArray | null;
-
-  while ((match = pattern.exec(sql)) !== null) {
-    const [, relation, alias] = match;
-    const parts = relation.split('.');
-    const reference: Reference = {
-      schema: parts.length > 1 ? parts[0].toLowerCase() : null,
-      name: parts[parts.length - 1].toLowerCase(),
-    };
-
-    // Palabras que no son alias aunque ocupen su sitio.
-    if (alias && !['WHERE', 'ON', 'INNER', 'LEFT', 'RIGHT', 'FULL', 'CROSS', 'JOIN', 'GROUP', 'ORDER', 'SET', 'VALUES'].includes(alias.toUpperCase())) {
-      aliases.set(alias.toLowerCase(), reference);
-    }
-
-    aliases.set(reference.name, reference);
-  }
-
-  return aliases;
-}
-
-/**
- * Busca la relación a la que apunta una referencia.
- *
- * Cuando el esquema es conocido manda él; sin esquema se acepta la primera
- * coincidencia por nombre, que es lo único que se puede hacer sin analizar el
- * `search_path` del servidor.
- */
-function findRelation(index: SchemaIndex, reference: Reference): KnownRelation | undefined {
-  const byName = index.relations.filter(
-    (candidate) => candidate.name.toLowerCase() === reference.name,
-  );
-
-  if (!reference.schema) {
-    return byName[0];
-  }
-
-  return byName.find((candidate) => candidate.schema.toLowerCase() === reference.schema);
 }
 
 /**
@@ -208,12 +176,15 @@ export function registerSqlCompletion(
           return { suggestions: [] };
         }
 
-        const columnItems = (columns: readonly string[]) => ({
+        const columnItems = (columns: readonly KnownColumn[]) => ({
           suggestions: columns.map((column, index) => ({
-            label: column,
+            label: column.name,
             kind: monaco.languages.CompletionItemKind.Field,
-            insertText: column,
-            detail: relation.qualified,
+            insertText: column.name,
+            // El tipo a la derecha evita ir a mirar la tabla para saber si algo
+            // es un texto, una fecha o un número.
+            detail: describeColumn(column),
+            documentation: `${relation.qualified}.${column.name}`,
             // El orden del catálogo es el de la tabla, que es más útil que el
             // alfabético para quien conoce su esquema.
             sortText: index.toString().padStart(4, '0'),
@@ -268,12 +239,58 @@ export function registerSqlCompletion(
         });
       }
 
+      // Lista explícita de columnas de lo que ya está en el FROM.
+      //
+      // Es lo que más se teclea a mano en un cliente SQL: cambiar el `*` por los
+      // nombres para quitar dos columnas. Solo aparece si esa tabla tiene ya sus
+      // columnas cargadas; si no, no habría nada que insertar.
+      // Una tabla se registra con su alias y con su propio nombre, así que hay
+      // que quedarse con una sola entrada por tabla; si no, `FROM usuarios u`
+      // ofrecería «columnas de u» y «columnas de usuarios», que son lo mismo.
+      const yaOfrecidas = new Set<string>();
+
+      for (const [alias, reference] of aliasMap(model.getValue())) {
+        const relation = findRelation(schema, reference);
+
+        if (!relation || relation.columns.length === 0 || yaOfrecidas.has(relation.qualified)) {
+          continue;
+        }
+
+        yaOfrecidas.add(relation.qualified);
+
+        const prefijo = alias === reference.name ? '' : `${alias}.`;
+
+        suggestions.push({
+          label: `columnas de ${alias}`,
+          kind: monaco.languages.CompletionItemKind.Snippet,
+          insertText: relation.columns.map((column) => `${prefijo}${column.name}`).join(', '),
+          detail: `${relation.qualified} · ${relation.columns.length} columnas`,
+          sortText: `00_${alias}`,
+          range,
+        });
+      }
+
+      for (const snippet of snippetsFor(engine)) {
+        suggestions.push({
+          label: snippet.trigger,
+          kind: monaco.languages.CompletionItemKind.Snippet,
+          insertText: snippet.body,
+          insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+          detail: snippet.description,
+          documentation: { value: `\`\`\`sql\n${snippet.body.replace(/\$\{\d+:?([^}]*)\}/g, '$1')}\n\`\`\`` },
+          // Detrás de las tablas y por delante de las reservadas: se buscan a
+          // propósito, escribiendo su nombre.
+          sortText: `2_${snippet.trigger}`,
+          range,
+        });
+      }
+
       for (const keyword of keywordsFor(engine)) {
         suggestions.push({
           label: keyword,
           kind: monaco.languages.CompletionItemKind.Keyword,
           insertText: keyword,
-          sortText: `2_${keyword}`,
+          sortText: `3_${keyword}`,
           range,
         });
       }
@@ -284,7 +301,7 @@ export function registerSqlCompletion(
           kind: monaco.languages.CompletionItemKind.Function,
           insertText: `${fn}($0)`,
           insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
-          sortText: `3_${fn}`,
+          sortText: `4_${fn}`,
           range,
         });
       }

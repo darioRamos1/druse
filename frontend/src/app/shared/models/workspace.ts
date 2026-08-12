@@ -170,14 +170,28 @@ export interface ExplorerNode {
 }
 
 /** Tabla o vista conocida, para el autocompletado. */
+/**
+ * Columna conocida por el editor.
+ *
+ * Lleva el tipo y no solo el nombre porque de eso viven las tres ayudas del
+ * editor: el tipo a la derecha del desplegable, el tooltip al pasar el ratón y
+ * el aviso de una columna que no existe.
+ */
+export interface KnownColumn {
+  readonly name: string;
+  readonly dataType: string;
+  readonly isNullable: boolean;
+  readonly isPrimaryKey: boolean;
+}
+
 export interface KnownRelation {
   readonly schema: string;
   readonly name: string;
   readonly kind: 'table' | 'view';
   /** Nombre calificado tal y como se escribiría en la consulta. */
   readonly qualified: string;
-  /** Columnas, si el usuario llegó a expandirla. */
-  readonly columns: readonly string[];
+  /** Columnas, si alguien las pidió ya. Vacío no significa «no tiene». */
+  readonly columns: readonly KnownColumn[];
 }
 
 /**

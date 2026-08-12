@@ -15,6 +15,7 @@ import {
   ExplorerNode,
   QueryHistoryEntry,
   QueryResult,
+  KnownColumn,
   KnownRelation,
   QueryTab,
   ResultSet,
@@ -364,6 +365,15 @@ export class WorkspaceStore {
    * tabla, sus columnas no se sugieren. Consultar el catálogo en cada pulsación
    * para completar sería mucho peor que sugerir de menos.
    */
+  /**
+   * Columnas con su tipo, por tabla calificada.
+   *
+   * Vive aparte del árbol porque los nodos del explorador solo llevan nombres,
+   * y el editor necesita el tipo para el tooltip, para el desplegable y para
+   * avisar de una columna que no existe.
+   */
+  private readonly _columns = signal<ReadonlyMap<string, readonly KnownColumn[]>>(new Map());
+
   readonly schemaIndex = computed<SchemaIndex>(() => {
     const schemas = new Set<string>();
     const relations: KnownRelation[] = [];
@@ -377,16 +387,14 @@ export class WorkspaceStore {
         }
 
         if (object.kind === 'table' || object.kind === 'view') {
-          const columns = (entry.children ?? [])
-            .filter((child) => child.object.kind === 'column')
-            .map((child) => child.object.name);
-
           relations.push({
             schema: object.schema ?? '',
             name: object.name,
             kind: object.kind,
             qualified: object.schema ? `${object.schema}.${object.name}` : object.name,
-            columns,
+            // Los tipos no viajan en los nodos del árbol, que solo llevan
+            // nombres; salen del catálogo de columnas.
+            columns: this._columns().get(columnKey(object.schema, object.name)) ?? [],
           });
         }
 
@@ -579,7 +587,7 @@ export class WorkspaceStore {
    * Sigue sin consultarse el catálogo en cada pulsación: solo la primera vez que
    * se pregunta por una tabla concreta.
    */
-  async ensureColumnsAsync(schema: string | null, name: string): Promise<readonly string[]> {
+  async ensureColumnsAsync(schema: string | null, name: string): Promise<readonly KnownColumn[]> {
     const entry = this.findRelationEntry(schema, name);
 
     if (!entry) {
@@ -587,12 +595,10 @@ export class WorkspaceStore {
     }
 
     if (entry.children === null) {
-      await this.loadChildren(entry);
+      await this.loadChildren(entry, true);
     }
 
-    return (entry.children ?? [])
-      .filter((child) => child.object.kind === 'column')
-      .map((child) => child.object.name);
+    return this._columns().get(columnKey(entry.object.schema, entry.object.name)) ?? [];
   }
 
   /**
@@ -708,9 +714,7 @@ export class WorkspaceStore {
     this.refreshTree();
 
     try {
-      const children = await firstValueFrom(
-        this._gateway.getChildren(connection.sessionId, entry.object),
-      );
+      const children = await this.fetchChildren(connection.sessionId, entry.object);
 
       entry.children = children.map((child) => ({
         object: child,
@@ -733,6 +737,49 @@ export class WorkspaceStore {
       entry.loading = false;
       this.refreshTree();
     }
+  }
+
+  /**
+   * Pide los hijos de un nodo.
+   *
+   * Las tablas y las vistas se piden por `getColumns` en lugar de por el camino
+   * genérico: devuelve lo mismo que se ve en el árbol **y además** el tipo, la
+   * nulabilidad y la clave primaria de cada columna. Una sola petición sirve
+   * así para el explorador y para las ayudas del editor.
+   */
+  private async fetchChildren(
+    sessionId: string,
+    parent: DatabaseObject,
+  ): Promise<readonly DatabaseObject[]> {
+    if (parent.kind !== 'table' && parent.kind !== 'view') {
+      return await firstValueFrom(this._gateway.getChildren(sessionId, parent));
+    }
+
+    const columns = await firstValueFrom(this._gateway.getColumns(sessionId, parent));
+
+    this._columns.update((current) => {
+      const next = new Map(current);
+      next.set(
+        columnKey(parent.schema, parent.name),
+        columns.map((column) => ({
+          name: column.name,
+          dataType: column.dataType,
+          isNullable: column.isNullable,
+          isPrimaryKey: column.isPrimaryKey,
+        })),
+      );
+
+      return next;
+    });
+
+    return columns.map((column) => ({
+      id: `column:${parent.schema}.${parent.name}.${column.name}`,
+      name: column.name,
+      kind: 'column' as const,
+      database: parent.database,
+      schema: parent.schema,
+      hasChildren: false,
+    }));
   }
 
   /**
@@ -1003,6 +1050,11 @@ export class WorkspaceStore {
 }
 
 /** Identificador único dentro del árbol: el mismo objeto puede salir en dos conexiones. */
+/** Clave con la que se guardan las columnas de una tabla. */
+function columnKey(schema: string | undefined, name: string): string {
+  return `${(schema ?? '').toLowerCase()}.${name.toLowerCase()}`;
+}
+
 function nodeKey(entry: TreeEntry): string {
   return `${entry.connectionId}|${entry.object.id}`;
 }

@@ -14,8 +14,10 @@ import {
 } from '@angular/core';
 import type * as MonacoApi from 'monaco-editor';
 
-import { DatabaseEngine, SchemaIndex } from '../../../shared/models/workspace';
+import { DatabaseEngine, KnownColumn, SchemaIndex } from '../../../shared/models/workspace';
 import { registerSqlCompletion } from '../sql-language/sql-completion';
+import { findProblems } from '../sql-language/sql-diagnostics';
+import { registerSqlHover } from '../sql-language/sql-hover';
 import { formatSql } from '../sql-language/sql-formatting';
 import { DRUSE_THEME, DRUSE_THEME_NAME } from './druse-theme';
 import { MonacoLoader } from './monaco-loader';
@@ -103,7 +105,7 @@ export class SqlEditor implements OnInit {
    * conocer el gateway ni el store, igual que no conoce el motor ni el esquema.
    */
   readonly loadColumns = input<
-    ((schema: string | null, name: string) => Promise<readonly string[]>) | undefined
+    ((schema: string | null, name: string) => Promise<readonly KnownColumn[]>) | undefined
   >(undefined);
 
   /** Cómo pedir las tablas de un esquema que el precalentado no alcanzó. */
@@ -215,6 +217,10 @@ export class SqlEditor implements OnInit {
       loadRelations: this.loadRelations(),
     }));
 
+    // El tooltip lee del mismo catálogo, así que nunca dispara una consulta:
+    // aparecería tarde y con el ratón ya en otro sitio.
+    const disposeHover = registerSqlHover(monaco, () => ({ schema: this.schema() }));
+
     // Monaco instala muchísimos escuchadores de eventos. Crearlo fuera de la
     // zona evita ciclos de detección de cambios en cada pulsación.
     this._zone.runOutsideAngular(() => {
@@ -247,7 +253,10 @@ export class SqlEditor implements OnInit {
 
       editor.onDidChangeModelContent(() => {
         this._zone.run(() => this.valueChange.emit(editor.getValue()));
+        this.scheduleDiagnostics(monaco);
       });
+
+      this.scheduleDiagnostics(monaco);
 
       editor.onDidChangeCursorPosition((event) => {
         this._zone.run(() =>
@@ -276,9 +285,50 @@ export class SqlEditor implements OnInit {
 
     this._destroyRef.onDestroy(() => {
       disposeCompletion();
+      disposeHover();
+      clearTimeout(this._diagnosticsTimer);
       this._editor?.dispose();
       this._editor = null;
     });
+  }
+
+  private _diagnosticsTimer?: ReturnType<typeof setTimeout>;
+
+  /**
+   * Revisa el SQL contra el catálogo, poco después de dejar de escribir.
+   *
+   * Con retardo a propósito: subrayar mientras se teclea marcaría como
+   * inexistente cada tabla a medio escribir, y el editor se pasaría el rato
+   * contradiciendo a quien escribe.
+   */
+  private scheduleDiagnostics(monaco: typeof MonacoApi): void {
+    clearTimeout(this._diagnosticsTimer);
+
+    this._diagnosticsTimer = setTimeout(() => {
+      const model = this._editor?.getModel();
+
+      if (!model) {
+        return;
+      }
+
+      const markers = findProblems(model.getValue(), this.schema()).map((problem) => {
+        const start = model.getPositionAt(problem.start);
+        const end = model.getPositionAt(problem.end);
+
+        return {
+          // Aviso y no error: el catálogo puede estar incompleto, y quien tiene
+          // la última palabra sobre el SQL es el servidor.
+          severity: monaco.MarkerSeverity.Warning,
+          message: problem.message,
+          startLineNumber: start.lineNumber,
+          startColumn: start.column,
+          endLineNumber: end.lineNumber,
+          endColumn: end.column,
+        };
+      });
+
+      monaco.editor.setModelMarkers(model, 'druse', markers);
+    }, 600);
   }
 
   /**
