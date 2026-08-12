@@ -65,17 +65,55 @@ const schema: SchemaIndex = {
   ],
 };
 
-function complete(sql: string, engine: 'postgresql' | 'sqlserver' = 'postgresql') {
+/**
+ * Una base con esquema propio y nombres repetidos, como las de verdad.
+ *
+ * `tpublico` viene de un caso real: un SQL Server de preproducción donde nada
+ * cuelga de `dbo`. Ahí es donde el autocompletado tiene que acertar, no en la
+ * base de juguete con un solo esquema.
+ */
+const multiSchema: SchemaIndex = {
+  schemas: ['dbo', 'tpublico'],
+  relations: [
+    {
+      schema: 'tpublico',
+      name: 'usuarios',
+      kind: 'table',
+      qualified: 'tpublico.usuarios',
+      columns: ['id', 'nombre', 'correo'],
+    },
+    {
+      schema: 'tpublico',
+      name: 'facturas',
+      kind: 'table',
+      qualified: 'tpublico.facturas',
+      columns: ['id', 'importe'],
+    },
+    {
+      schema: 'dbo',
+      name: 'usuarios',
+      kind: 'table',
+      qualified: 'dbo.usuarios',
+      columns: ['user_id', 'login'],
+    },
+  ],
+};
+
+function complete(
+  sql: string,
+  engine: 'postgresql' | 'sqlserver' = 'postgresql',
+  index: SchemaIndex = schema,
+) {
   const { monaco, provider } = fakeMonaco();
 
-  registerSqlCompletion(monaco as never, () => ({ engine, schema }));
+  registerSqlCompletion(monaco as never, () => ({ engine, schema: index }));
 
   const lines = sql.split('\n');
   const position = { lineNumber: lines.length, column: lines[lines.length - 1].length + 1 };
 
   const result = provider().provideCompletionItems(fakeModel(sql) as never, position);
 
-  return result.suggestions as { label: string; detail?: string }[];
+  return result.suggestions as { label: string; detail?: string; insertText?: string }[];
 }
 
 describe('autocompletado SQL', () => {
@@ -126,6 +164,116 @@ describe('autocompletado SQL', () => {
 
   it('no sugiere nada tras un punto de algo desconocido', () => {
     expect(complete('SELECT desconocida.')).toEqual([]);
+  });
+
+  describe('con esquema propio', () => {
+    const conEsquemas = (sql: string) => complete(sql, 'sqlserver', multiSchema);
+
+    it('tras el punto de un esquema sugiere sus tablas', () => {
+      // El caso que lo destapó: en una base sin nada en `dbo`, escribir el
+      // esquema y el punto dejaba el desplegable vacío.
+      const labels = conEsquemas('SELECT * FROM tpublico.').map((item) => item.label);
+
+      expect(labels).toEqual(['usuarios', 'facturas']);
+    });
+
+    it('no mezcla las tablas de otro esquema', () => {
+      const detalles = conEsquemas('SELECT * FROM tpublico.').map((item) => item.detail);
+
+      expect(detalles.every((detalle) => detalle?.startsWith('tpublico.'))).toBe(true);
+    });
+
+    it('tras el esquema inserta solo el nombre de la tabla', () => {
+      const [primera] = conEsquemas('SELECT * FROM tpublico.');
+
+      // Insertar el calificado daría `tpublico.tpublico.usuarios`.
+      expect(primera.insertText).toBe('usuarios');
+    });
+
+    it('sin esquema escrito inserta el nombre calificado', () => {
+      const tabla = conEsquemas('SELECT * FROM ').find((item) => item.label === 'facturas');
+
+      // `facturas` a secas solo funciona si el esquema por omisión del usuario
+      // es `tpublico`, y eso el cliente no lo sabe.
+      expect(tabla?.insertText).toBe('tpublico.facturas');
+    });
+
+    it('el nombre completo lleva a las columnas de esa tabla', () => {
+      const labels = conEsquemas('SELECT * FROM tpublico.usuarios.').map((item) => item.label);
+
+      expect(labels).toEqual(['id', 'nombre', 'correo']);
+    });
+
+    it('pide las columnas que faltan en lugar de no sugerir nada', async () => {
+      // Una tabla que el explorador conoce pero no ha abierto: sin columnas.
+      const sinAbrir: SchemaIndex = {
+        schemas: ['tpublico'],
+        relations: [
+          {
+            schema: 'tpublico',
+            name: 'facturas',
+            kind: 'table',
+            qualified: 'tpublico.facturas',
+            columns: [],
+          },
+        ],
+      };
+
+      const pedidas: { schema: string | null; name: string }[] = [];
+      const { monaco, provider } = fakeMonaco();
+
+      registerSqlCompletion(monaco as never, () => ({
+        engine: 'sqlserver',
+        schema: sinAbrir,
+        loadColumns: (schema, name) => {
+          pedidas.push({ schema, name });
+          return Promise.resolve(['id', 'importe']);
+        },
+      }));
+
+      const sql = 'SELECT * FROM tpublico.facturas f\nWHERE f.';
+      const lines = sql.split('\n');
+      const result = await provider().provideCompletionItems(fakeModel(sql) as never, {
+        lineNumber: lines.length,
+        column: lines[lines.length - 1].length + 1,
+      });
+
+      expect(result.suggestions.map((item: { label: string }) => item.label)).toEqual(['id', 'importe']);
+      // Con su esquema, para no traer las de la tabla homónima de otro.
+      expect(pedidas).toEqual([{ schema: 'tpublico', name: 'facturas' }]);
+    });
+
+    it('no pide nada cuando las columnas ya están cargadas', () => {
+      const pedidas: string[] = [];
+      const { monaco, provider } = fakeMonaco();
+
+      registerSqlCompletion(monaco as never, () => ({
+        engine: 'sqlserver',
+        schema: multiSchema,
+        loadColumns: (_schema, name) => {
+          pedidas.push(name);
+          return Promise.resolve([]);
+        },
+      }));
+
+      const sql = 'SELECT * FROM tpublico.usuarios u\nWHERE u.';
+      const lines = sql.split('\n');
+      provider().provideCompletionItems(fakeModel(sql) as never, {
+        lineNumber: lines.length,
+        column: lines[lines.length - 1].length + 1,
+      });
+
+      // Consultar el catálogo en cada pulsación sería mucho peor que el problema.
+      expect(pedidas).toEqual([]);
+    });
+
+    it('el esquema decide entre dos tablas del mismo nombre', () => {
+      const enTpublico = conEsquemas('SELECT * FROM tpublico.usuarios u\nWHERE u.');
+      const enDbo = conEsquemas('SELECT * FROM dbo.usuarios u\nWHERE u.');
+
+      expect(enTpublico.map((item) => item.label)).toEqual(['id', 'nombre', 'correo']);
+      expect(enDbo.map((item) => item.label)).toEqual(['user_id', 'login']);
+    });
   });
 
   it('sugiere lo propio de cada motor', () => {

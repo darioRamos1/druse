@@ -1,25 +1,48 @@
 import type * as MonacoApi from 'monaco-editor';
 
-import { DatabaseEngine, SchemaIndex } from '../../../shared/models/workspace';
+import { DatabaseEngine, KnownRelation, SchemaIndex } from '../../../shared/models/workspace';
 import { functionsFor, keywordsFor } from './sql-keywords';
 
 /** Contexto que el editor consulta en cada pulsación para sugerir. */
 export interface CompletionContext {
   readonly engine: DatabaseEngine;
   readonly schema: SchemaIndex;
+
+  /**
+   * Carga las columnas de una tabla que el explorador aún no ha abierto.
+   *
+   * Es opcional a propósito: sin esto el autocompletado sigue funcionando con lo
+   * que ya está cargado, que es como se comportaba antes.
+   */
+  readonly loadColumns?: (schema: string | null, name: string) => Promise<readonly string[]>;
+}
+
+/** Una relación nombrada en el SQL, con su esquema si el usuario lo escribió. */
+interface Reference {
+  readonly schema: string | null;
+  readonly name: string;
 }
 
 /**
  * Detecta si se está escribiendo tras un punto, y sobre qué.
  *
- * `u.` o `users.` cambian por completo lo que tiene sentido sugerir: allí van
- * columnas, no palabras reservadas. Sin esto, el desplegable ofrecería `SELECT`
- * justo después de un punto, que es imposible.
+ * Un punto cambia por completo lo que tiene sentido sugerir, y hay dos casos
+ * distintos que antes se trataban como uno:
+ *
+ * - `u.` o `users.` piden **columnas**;
+ * - `tpublico.` pide **las tablas de ese esquema**.
+ *
+ * También se admite `esquema.tabla.`, porque quien escribe el nombre completo
+ * sigue esperando sus columnas.
  */
-function qualifierBefore(line: string): string | null {
-  const match = /([\p{L}_][\p{L}\p{N}_$]*)\.\s*[\p{L}\p{N}_$]*$/u.exec(line);
+function qualifierBefore(line: string): Reference | null {
+  const identifier = '[\\p{L}_][\\p{L}\\p{N}_$]*';
+  const match = new RegExp(
+    `(?:(${identifier})\\.)?(${identifier})\\.\\s*[\\p{L}\\p{N}_$]*$`,
+    'u',
+  ).exec(line);
 
-  return match ? match[1] : null;
+  return match ? { schema: match[1] ?? null, name: match[2] } : null;
 }
 
 /**
@@ -28,9 +51,13 @@ function qualifierBefore(line: string): string | null {
  * `FROM users u` y `JOIN pedidos AS p` son la forma normal de escribir SQL, y
  * sin resolverlos las columnas nunca se sugerirían: el usuario escribe `u.` y
  * el editor no sabría que `u` es `users`.
+ *
+ * Se conserva el esquema cuando la relación viene calificada: en una base con
+ * dos esquemas que tengan una tabla del mismo nombre, es lo único que permite
+ * sugerir las columnas correctas.
  */
-function aliasMap(sql: string): Map<string, string> {
-  const aliases = new Map<string, string>();
+function aliasMap(sql: string): Map<string, Reference> {
+  const aliases = new Map<string, Reference>();
   const pattern =
     /\b(?:FROM|JOIN|UPDATE|INTO)\s+([\p{L}_][\p{L}\p{N}_$]*(?:\.[\p{L}_][\p{L}\p{N}_$]*)?)(?:\s+(?:AS\s+)?([\p{L}_][\p{L}\p{N}_$]*))?/giu;
 
@@ -38,17 +65,40 @@ function aliasMap(sql: string): Map<string, string> {
 
   while ((match = pattern.exec(sql)) !== null) {
     const [, relation, alias] = match;
-    const bare = relation.includes('.') ? relation.split('.').pop()! : relation;
+    const parts = relation.split('.');
+    const reference: Reference = {
+      schema: parts.length > 1 ? parts[0].toLowerCase() : null,
+      name: parts[parts.length - 1].toLowerCase(),
+    };
 
     // Palabras que no son alias aunque ocupen su sitio.
     if (alias && !['WHERE', 'ON', 'INNER', 'LEFT', 'RIGHT', 'FULL', 'CROSS', 'JOIN', 'GROUP', 'ORDER', 'SET', 'VALUES'].includes(alias.toUpperCase())) {
-      aliases.set(alias.toLowerCase(), bare.toLowerCase());
+      aliases.set(alias.toLowerCase(), reference);
     }
 
-    aliases.set(bare.toLowerCase(), bare.toLowerCase());
+    aliases.set(reference.name, reference);
   }
 
   return aliases;
+}
+
+/**
+ * Busca la relación a la que apunta una referencia.
+ *
+ * Cuando el esquema es conocido manda él; sin esquema se acepta la primera
+ * coincidencia por nombre, que es lo único que se puede hacer sin analizar el
+ * `search_path` del servidor.
+ */
+function findRelation(index: SchemaIndex, reference: Reference): KnownRelation | undefined {
+  const byName = index.relations.filter(
+    (candidate) => candidate.name.toLowerCase() === reference.name,
+  );
+
+  if (!reference.schema) {
+    return byName[0];
+  }
+
+  return byName.find((candidate) => candidate.schema.toLowerCase() === reference.schema);
 }
 
 /**
@@ -65,7 +115,7 @@ export function registerSqlCompletion(
     triggerCharacters: ['.'],
 
     provideCompletionItems(model, position) {
-      const { engine, schema } = getContext();
+      const { engine, schema, loadColumns } = getContext();
 
       const word = model.getWordUntilPosition(position);
       const range: MonacoApi.IRange = {
@@ -84,21 +134,57 @@ export function registerSqlCompletion(
 
       const qualifier = qualifierBefore(lineUntilPosition);
 
+      // --- Tras el punto de un esquema: sus tablas y vistas ------------------
+      //
+      // Es el caso de `FROM tpublico.`. Antes se buscaba una tabla llamada
+      // `tpublico`, no se encontraba y el desplegable salía vacío justo donde
+      // más falta hace: en una base cuyo esquema no es el de por omisión.
+      if (qualifier && !qualifier.schema) {
+        const schemaName = schema.schemas.find(
+          (candidate) => candidate.toLowerCase() === qualifier.name.toLowerCase(),
+        );
+
+        if (schemaName) {
+          const relations = schema.relations.filter(
+            (candidate) => candidate.schema.toLowerCase() === schemaName.toLowerCase(),
+          );
+
+          return {
+            suggestions: relations.map((relation) => ({
+              label: relation.name,
+              kind: relation.kind === 'view'
+                ? monaco.languages.CompletionItemKind.Interface
+                : monaco.languages.CompletionItemKind.Struct,
+              // Sin el esquema: el usuario acaba de escribirlo.
+              insertText: relation.name,
+              detail: relation.columns.length > 0
+                ? `${relation.qualified} · ${relation.columns.length} columnas`
+                : relation.qualified,
+              sortText: `0_${relation.name}`,
+              range,
+            })),
+          };
+        }
+      }
+
       // --- Tras un punto: solo columnas de esa relación --------------------
       if (qualifier) {
         const aliases = aliasMap(model.getValue());
-        const target = aliases.get(qualifier.toLowerCase()) ?? qualifier.toLowerCase();
+        const target = qualifier.schema
+          ? qualifier
+          : aliases.get(qualifier.name.toLowerCase()) ?? {
+              schema: null,
+              name: qualifier.name.toLowerCase(),
+            };
 
-        const relation = schema.relations.find(
-          (candidate) => candidate.name.toLowerCase() === target,
-        );
+        const relation = findRelation(schema, target);
 
         if (!relation) {
           return { suggestions: [] };
         }
 
-        return {
-          suggestions: relation.columns.map((column, index) => ({
+        const columnItems = (columns: readonly string[]) => ({
+          suggestions: columns.map((column, index) => ({
             label: column,
             kind: monaco.languages.CompletionItemKind.Field,
             insertText: column,
@@ -108,7 +194,16 @@ export function registerSqlCompletion(
             sortText: index.toString().padStart(4, '0'),
             range,
           })),
-        };
+        });
+
+        // La tabla está en el árbol pero nadie la ha abierto: se piden sus
+        // columnas ahora, una sola vez. Antes el desplegable salía vacío y la
+        // única salida era ir a expandirla en el explorador.
+        if (relation.columns.length === 0 && loadColumns) {
+          return loadColumns(relation.schema || null, relation.name).then(columnItems);
+        }
+
+        return columnItems(relation.columns);
       }
 
       // --- En cualquier otro sitio -----------------------------------------
@@ -120,7 +215,14 @@ export function registerSqlCompletion(
           kind: relation.kind === 'view'
             ? monaco.languages.CompletionItemKind.Interface
             : monaco.languages.CompletionItemKind.Struct,
-          insertText: relation.name,
+          // Se inserta el nombre calificado, que es el que siempre funciona:
+          // `usuarios` a secas solo vale si la tabla está en el esquema por
+          // omisión del usuario, y eso el cliente no lo sabe. Es además lo que
+          // ya hace el explorador al abrir un `SELECT` desde una tabla.
+          //
+          // La etiqueta se queda con el nombre corto, que es por el que se
+          // busca en el desplegable.
+          insertText: relation.qualified,
           detail: relation.columns.length > 0
             ? `${relation.qualified} · ${relation.columns.length} columnas`
             : relation.qualified,

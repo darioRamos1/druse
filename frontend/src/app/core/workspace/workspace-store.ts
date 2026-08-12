@@ -559,6 +559,69 @@ export class WorkspaceStore {
     this.refreshTree();
   }
 
+  /**
+   * Carga las columnas de una tabla o vista si todavía no se conocen.
+   *
+   * El autocompletado se alimenta del árbol ya cargado, y eso deja fuera el caso
+   * más común en una base grande: nadie va a expandir cientos de tablas en el
+   * explorador para que el editor sepa sus columnas. Con esto, pedir sugerencias
+   * sobre una tabla la carga **una vez**, y a partir de ahí sale del árbol como
+   * cualquier otra.
+   *
+   * Sigue sin consultarse el catálogo en cada pulsación: solo la primera vez que
+   * se pregunta por una tabla concreta.
+   */
+  async ensureColumnsAsync(schema: string | null, name: string): Promise<readonly string[]> {
+    const entry = this.findRelationEntry(schema, name);
+
+    if (!entry) {
+      return [];
+    }
+
+    if (entry.children === null) {
+      await this.loadChildren(entry);
+    }
+
+    return (entry.children ?? [])
+      .filter((child) => child.object.kind === 'column')
+      .map((child) => child.object.name);
+  }
+
+  /** Busca en el árbol la tabla o vista a la que apunta una referencia del SQL. */
+  private findRelationEntry(schema: string | null, name: string): TreeEntry | null {
+    const wanted = name.toLowerCase();
+    const wantedSchema = schema?.toLowerCase() ?? null;
+    let fallback: TreeEntry | null = null;
+
+    const walk = (entries: readonly TreeEntry[]): TreeEntry | null => {
+      for (const entry of entries) {
+        const { object } = entry;
+
+        if (
+          (object.kind === 'table' || object.kind === 'view') &&
+          object.name.toLowerCase() === wanted
+        ) {
+          if (!wantedSchema || object.schema?.toLowerCase() === wantedSchema) {
+            return entry;
+          }
+
+          // Sin esquema que la distinga, vale la primera; con él manda el esquema.
+          fallback ??= entry;
+        }
+
+        const found = entry.children ? walk(entry.children) : null;
+
+        if (found) {
+          return found;
+        }
+      }
+
+      return null;
+    };
+
+    return walk(this._roots()) ?? fallback;
+  }
+
   /** Vuelve a pedir los hijos de un nodo, descartando lo que ya tenía. */
   async refreshNode(nodeId: string): Promise<void> {
     const entry = this.findEntry(nodeId);

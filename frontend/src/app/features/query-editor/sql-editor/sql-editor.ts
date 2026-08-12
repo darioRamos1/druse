@@ -96,6 +96,16 @@ export class SqlEditor implements OnInit {
   readonly engine = input<DatabaseEngine>('postgresql');
   readonly schema = input<SchemaIndex>({ schemas: [], relations: [] });
 
+  /**
+   * Cómo pedir las columnas de una tabla que el explorador no ha abierto.
+   *
+   * Se recibe como entrada en lugar de inyectar el estado: el editor sigue sin
+   * conocer el gateway ni el store, igual que no conoce el motor ni el esquema.
+   */
+  readonly loadColumns = input<
+    ((schema: string | null, name: string) => Promise<readonly string[]>) | undefined
+  >(undefined);
+
   readonly valueChange = output<string>();
   readonly cursorChange = output<CursorPosition>();
   readonly selectionChange = output<EditorSelection>();
@@ -198,6 +208,7 @@ export class SqlEditor implements OnInit {
     const disposeCompletion = registerSqlCompletion(monaco, () => ({
       engine: this.engine(),
       schema: this.schema(),
+      loadColumns: this.loadColumns(),
     }));
 
     // Monaco instala muchísimos escuchadores de eventos. Crearlo fuera de la

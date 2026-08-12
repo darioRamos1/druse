@@ -53,6 +53,7 @@
       [value]="sql()"
       [engine]="activeEngine()"
       [schema]="schemaIndex()"
+      [loadColumns]="loadColumns"
       (valueChange)="onSqlChange($event)"
       (cursorChange)="onCursorChange($event)"
       (selectionChange)="onSelectionChange($event)"

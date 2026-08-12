@@ -127,6 +127,14 @@ export class AppShell {
   );
 
   protected readonly schemaIndex = this._store.schemaIndex;
+
+  /**
+   * El editor pide por aquí las columnas de una tabla que aún no está abierta en
+   * el explorador. Va como propiedad ligada, no como método suelto, para que
+   * conserve el `this` del store.
+   */
+  protected readonly loadColumns = (schema: string | null, name: string): Promise<readonly string[]> =>
+    this._store.ensureColumnsAsync(schema, name);
   protected readonly timeoutSeconds = this._store.timeoutSeconds;
 
   private readonly _editor = viewChild<SqlEditor>('editor');
