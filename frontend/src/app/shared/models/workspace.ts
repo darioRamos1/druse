@@ -169,6 +169,28 @@ export interface ExplorerNode {
   readonly connectionId: string;
 }
 
+/** Tabla o vista conocida, para el autocompletado. */
+export interface KnownRelation {
+  readonly schema: string;
+  readonly name: string;
+  readonly kind: 'table' | 'view';
+  /** Nombre calificado tal y como se escribiría en la consulta. */
+  readonly qualified: string;
+  /** Columnas, si el usuario llegó a expandirla. */
+  readonly columns: readonly string[];
+}
+
+/**
+ * Lo que el editor sabe del esquema.
+ *
+ * Contiene solo lo que el explorador ya cargó: sugerir lo que no se ha pedido
+ * exigiría consultar el catálogo en cada pulsación.
+ */
+export interface SchemaIndex {
+  readonly schemas: readonly string[];
+  readonly relations: readonly KnownRelation[];
+}
+
 /** Pestaña de consulta abierta. */
 export interface QueryTab {
   readonly id: string;

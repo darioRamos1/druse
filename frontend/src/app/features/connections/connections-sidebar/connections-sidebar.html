@@ -15,12 +15,19 @@
 <div class="filter-row">
   <div class="filter">
     <app-icon name="search" [size]="12" />
-    <span class="filter__placeholder">Filtrar conexiones</span>
+    <input
+      type="search"
+      class="filter__input"
+      placeholder="Filtrar conexiones y objetos"
+      [value]="filter()"
+      (input)="onFilter($event)"
+      aria-label="Filtrar conexiones y objetos"
+    />
   </div>
 </div>
 
 <div class="tree" role="tree">
-  @for (connection of connections(); track connection.id) {
+  @for (connection of visibleConnections(); track connection.id) {
     <button
       type="button"
       class="node node--connection"
@@ -117,21 +124,40 @@
             <span class="node__badge">{{ node.badge }}</span>
           }
 
-          @if (node.expandable && node.expanded && !node.loading) {
-            <span
-              class="tool"
-              title="Actualizar"
-              (click)="act($event, () => refreshNode.emit(node.id))"
-            >
-              <app-icon name="refresh" [size]="11" />
-            </span>
-          }
+          <span class="node__actions">
+            @if (node.kind === 'table' || node.kind === 'view') {
+              <span
+                class="tool"
+                title="Abrir SELECT en una pestaña nueva"
+                (click)="act($event, () => openNode.emit(node))"
+              >
+                <app-icon name="console" [size]="11" />
+              </span>
+              <span
+                class="tool"
+                [attr.title]="'Copiar ' + qualifiedName(node)"
+                (click)="copyName($event, node)"
+              >
+                <app-icon name="new-query" [size]="11" />
+              </span>
+            }
+
+            @if (node.expandable && node.expanded && !node.loading) {
+              <span
+                class="tool"
+                title="Actualizar"
+                (click)="act($event, () => refreshNode.emit(node.id))"
+              >
+                <app-icon name="refresh" [size]="11" />
+              </span>
+            }
+          </span>
         </button>
       }
     }
   } @empty {
     <p class="empty">
-      No hay conexiones todavía.
+      @if (filter()) { Ninguna conexión coincide con el filtro. } @else { No hay conexiones todavía. }
       <button type="button" class="empty__action" (click)="addConnection.emit()">
         Crear una conexión
       </button>

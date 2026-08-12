@@ -1,4 +1,11 @@
-import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  input,
+  output,
+  signal,
+} from '@angular/core';
 
 import { ConnectionSummary, ExplorerNode } from '../../../shared/models/workspace';
 import { EngineBadge } from '../../../shared/ui/engine-badge/engine-badge';
@@ -45,6 +52,8 @@ export class ConnectionsSidebar {
   readonly disconnect = output<string>();
   readonly forget = output<string>();
   readonly openNode = output<ExplorerNode>();
+  readonly copied = output<string>();
+  readonly copyFailed = output<void>();
 
   /**
    * Un clic sobre una conexión guardada y desconectada la abre; sobre una ya
@@ -76,9 +85,81 @@ export class ConnectionsSidebar {
     () => this.connections().filter((connection) => connection.state === 'connected').length,
   );
 
+  /** Término por el que se filtran conexiones y objetos. */
+  protected readonly filter = signal('');
+
+  protected readonly visibleConnections = computed(() => {
+    const term = this.filter().trim().toLowerCase();
+
+    if (!term) {
+      return this.connections();
+    }
+
+    // Una conexión se queda si coincide ella o alguno de sus objetos: al buscar
+    // una tabla, esconder su conexión dejaría el resultado inalcanzable.
+    return this.connections().filter(
+      (connection) =>
+        connection.name.toLowerCase().includes(term) ||
+        connection.database.toLowerCase().includes(term) ||
+        this.explorerNodes().some(
+          (node) =>
+            node.connectionId === connection.id && node.label.toLowerCase().includes(term),
+        ),
+    );
+  });
+
+  protected onFilter(event: Event): void {
+    this.filter.set((event.target as HTMLInputElement).value);
+  }
+
   /** Nodos de cada conexión, para pintarlos bajo la suya. */
   protected nodesOf(connectionId: string): readonly ExplorerNode[] {
-    return this.explorerNodes().filter((node) => node.connectionId === connectionId);
+    const nodes = this.explorerNodes().filter((node) => node.connectionId === connectionId);
+    const term = this.filter().trim().toLowerCase();
+
+    if (!term) {
+      return nodes;
+    }
+
+    // Con filtro se muestran las coincidencias y sus ancestros: una tabla suelta
+    // sin su esquema encima no diría de dónde sale.
+    const keep = new Set<string>();
+
+    nodes.forEach((node, index) => {
+      if (!node.label.toLowerCase().includes(term)) {
+        return;
+      }
+
+      keep.add(node.id);
+
+      let depth = node.depth;
+
+      for (let i = index - 1; i >= 0 && depth > 0; i--) {
+        if (nodes[i].depth < depth) {
+          keep.add(nodes[i].id);
+          depth = nodes[i].depth;
+        }
+      }
+    });
+
+    return nodes.filter((node) => keep.has(node.id));
+  }
+
+  /** Nombre calificado del objeto, listo para pegar en una consulta. */
+  protected qualifiedName(node: ExplorerNode): string {
+    return node.source.schema ? `${node.source.schema}.${node.source.name}` : node.source.name;
+  }
+
+  protected async copyName(event: Event, node: ExplorerNode): Promise<void> {
+    event.stopPropagation();
+
+    try {
+      await navigator.clipboard.writeText(this.qualifiedName(node));
+      this.copied.emit(this.qualifiedName(node));
+    } catch {
+      // El portapapeles puede estar bloqueado por permisos del navegador.
+      this.copyFailed.emit();
+    }
   }
 
   protected indentFor(node: ExplorerNode): number {

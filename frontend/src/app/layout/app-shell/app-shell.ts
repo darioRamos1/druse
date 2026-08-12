@@ -1,4 +1,11 @@
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  inject,
+  signal,
+  viewChild,
+} from '@angular/core';
 
 import { WorkspaceStore } from '../../core/workspace/workspace-store';
 import { ConnectionDialog } from '../../features/connections/connection-dialog/connection-dialog';
@@ -7,7 +14,7 @@ import { EditorTabs } from '../../features/query-editor/editor-tabs/editor-tabs'
 import { EditorToolbar } from '../../features/query-editor/editor-toolbar/editor-toolbar';
 import { CursorPosition, SqlEditor } from '../../features/query-editor/sql-editor/sql-editor';
 import { ResultsPanel } from '../../features/query-results/results-panel/results-panel';
-import { ExplorerNode, SessionStatus } from '../../shared/models/workspace';
+import { DatabaseEngine, ExplorerNode, SessionStatus } from '../../shared/models/workspace';
 import { ResizeHandle } from '../../shared/ui/resize-handle/resize-handle';
 import { StatusBar } from '../status-bar/status-bar';
 import { TopBar } from '../top-bar/top-bar';
@@ -94,14 +101,50 @@ export class AppShell {
   protected readonly cursor = signal<CursorPosition>({ line: 1, column: 1 });
   protected readonly hasSelection = signal(false);
 
+  /** Motor de la conexión activa; decide el dialecto del editor. */
+  protected readonly activeEngine = computed<DatabaseEngine>(
+    () => this._store.session()?.engine ?? 'postgresql',
+  );
+
+  protected readonly schemaIndex = this._store.schemaIndex;
+  protected readonly timeoutSeconds = this._store.timeoutSeconds;
+
+  private readonly _editor = viewChild<SqlEditor>('editor');
+
   /** Última selección del editor, para poder ejecutarla sola. */
   private _selectedSql = '';
+
+  // --- Productividad del editor ----------------------------------------------
+
+  protected format(): void {
+    void this._editor()?.formatDocument();
+  }
+
+  protected onFormatFailed(message: string): void {
+    this._store.notify(`No se pudo formatear: ${message}`);
+  }
+
+  protected setTimeout(seconds: number): void {
+    this._store.setTimeout(seconds);
+  }
+
+  /**
+   * Marca la pestaña como guardada.
+   *
+   * Todavía no hay archivos: guardar en disco llega con el empaquetado de
+   * escritorio. Lo que hace hoy es quitar el indicador de cambios pendientes,
+   * que es lo que el usuario espera al pulsar Ctrl+S.
+   */
+  protected saveTab(): void {
+    this._store.markTabSaved();
+  }
 
   constructor() {
     // Los perfiles guardados deben estar antes de que el usuario mire la barra
     // lateral; si no, parecería que se han perdido.
     void this._store.loadSavedConnections();
     void this._store.loadHistory();
+    void this._store.loadPreferences();
   }
 
   // --- Conexiones ------------------------------------------------------------
@@ -200,9 +243,22 @@ export class AppShell {
     this._store.dismissNotice();
   }
 
+  // --- Copiar nombres --------------------------------------------------------
+  protected onCopied(name: string): void {
+    this._store.notify(`Copiado: ${name}`);
+  }
+
+  protected onCopyFailed(): void {
+    this._store.notify('No se pudo acceder al portapapeles.');
+  }
+
   // --- Historial -------------------------------------------------------------
   protected refreshHistory(): void {
     void this._store.loadHistory();
+  }
+
+  protected searchHistory(term: string): void {
+    void this._store.loadHistory(term);
   }
 
   protected clearHistory(): void {

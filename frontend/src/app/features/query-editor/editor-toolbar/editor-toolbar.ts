@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
+import { ChangeDetectionStrategy, Component, input, output, signal } from '@angular/core';
 
 import { Icon } from '../../../shared/ui/icon/icon';
 
@@ -27,4 +27,24 @@ export class EditorToolbar {
   readonly executeSelection = output<void>();
   readonly cancel = output<void>();
   readonly format = output<void>();
+  readonly timeoutChange = output<number>();
+
+  /** Valores habituales, para no obligar a teclear un número. */
+  protected readonly timeoutOptions = [5, 10, 30, 60, 300, 600];
+
+  protected readonly editingTimeout = signal(false);
+
+  protected toggleTimeout(): void {
+    this.editingTimeout.update((open) => !open);
+  }
+
+  protected chooseTimeout(seconds: number): void {
+    this.editingTimeout.set(false);
+    this.timeoutChange.emit(seconds);
+  }
+
+  /** Etiqueta compacta: 600 s se lee peor que 10 min. */
+  protected label(seconds: number): string {
+    return seconds >= 60 && seconds % 60 === 0 ? `${seconds / 60} min` : `${seconds}s`;
+  }
 }

@@ -77,8 +77,22 @@
   color: var(--dr-text-faintest);
   cursor: text;
 
-  &__placeholder {
+  &__input {
+    flex: 1;
+    min-width: 0;
+    border: 0;
+    background: transparent;
+    color: var(--dr-text-secondary);
+    font-family: inherit;
     font-size: 12px;
+
+    &:focus {
+      outline: none;
+    }
+
+    &::placeholder {
+      color: var(--dr-text-faintest);
+    }
   }
 }
 
@@ -222,6 +236,20 @@
     display: flex;
     align-items: center;
     gap: 1px;
+  }
+
+  // Las acciones por objeto solo aparecen al pasar por encima: mostrarlas
+  // siempre llenaría el árbol de iconos y taparía los nombres, que es lo que
+  // el usuario viene a leer.
+  &__actions {
+    display: none;
+    align-items: center;
+    gap: 1px;
+  }
+
+  &:hover &__actions,
+  &:focus-visible &__actions {
+    display: flex;
   }
 
   &.is-selected &__icon {

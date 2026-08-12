@@ -14,6 +14,9 @@ import {
 } from '@angular/core';
 import type * as MonacoApi from 'monaco-editor';
 
+import { DatabaseEngine, SchemaIndex } from '../../../shared/models/workspace';
+import { registerSqlCompletion } from '../sql-language/sql-completion';
+import { formatSql } from '../sql-language/sql-formatting';
 import { DRUSE_THEME, DRUSE_THEME_NAME } from './druse-theme';
 import { MonacoLoader } from './monaco-loader';
 
@@ -90,11 +93,19 @@ export class SqlEditor implements OnInit {
 
   readonly value = input('');
   readonly readOnly = input(false);
+  readonly engine = input<DatabaseEngine>('postgresql');
+  readonly schema = input<SchemaIndex>({ schemas: [], relations: [] });
 
   readonly valueChange = output<string>();
   readonly cursorChange = output<CursorPosition>();
   readonly selectionChange = output<EditorSelection>();
   readonly execute = output<void>();
+  readonly executeSelection = output<void>();
+  readonly cancel = output<void>();
+  readonly save = output<void>();
+  readonly newTab = output<void>();
+  /** El formateo falló; lo comunica quien lo pidió. */
+  readonly formatFailed = output<string>();
 
   protected readonly ready = signal(false);
   protected readonly failed = signal(false);
@@ -115,6 +126,60 @@ export class SqlEditor implements OnInit {
     });
   }
 
+  /**
+   * Formatea el contenido, o solo la selección si la hay.
+   *
+   * Se hace a través del editor y no cambiando el texto desde fuera para que la
+   * operación entre en la pila de deshacer: formatear debe poder revertirse con
+   * Ctrl+Z como cualquier otra edición.
+   */
+  async formatDocument(): Promise<void> {
+    const editor = this._editor;
+
+    if (!editor) {
+      return;
+    }
+
+    const model = editor.getModel();
+
+    if (!model) {
+      return;
+    }
+
+    const selection = editor.getSelection();
+    const formatSelectionOnly = selection !== null && !selection.isEmpty();
+
+    const source = formatSelectionOnly ? model.getValueInRange(selection) : model.getValue();
+    const result = await formatSql(source, this.engine());
+
+    if (result.error) {
+      this.formatFailed.emit(result.error);
+      return;
+    }
+
+    if (!result.changed) {
+      return;
+    }
+
+    editor.executeEdits('druse-format', [
+      {
+        range: formatSelectionOnly ? selection : model.getFullModelRange(),
+        text: result.sql,
+      },
+    ]);
+
+    editor.pushUndoStop();
+  }
+
+  /** Abre la búsqueda del editor. */
+  openSearch(): void {
+    this._editor?.getAction('actions.find')?.run();
+  }
+
+  focus(): void {
+    this._editor?.focus();
+  }
+
   async ngOnInit(): Promise<void> {
     let monaco: typeof MonacoApi;
 
@@ -126,6 +191,14 @@ export class SqlEditor implements OnInit {
     }
 
     monaco.editor.defineTheme(DRUSE_THEME_NAME, DRUSE_THEME);
+
+    // El autocompletado se registra una vez por editor y se retira al destruirlo:
+    // de lo contrario cada editor añadiría otro proveedor y las sugerencias
+    // saldrían repetidas.
+    const disposeCompletion = registerSqlCompletion(monaco, () => ({
+      engine: this.engine(),
+      schema: this.schema(),
+    }));
 
     // Monaco instala muchísimos escuchadores de eventos. Crearlo fuera de la
     // zona evita ciclos de detección de cambios en cada pulsación.
@@ -147,10 +220,11 @@ export class SqlEditor implements OnInit {
         smoothScrolling: true,
         cursorBlinking: 'smooth',
         tabSize: 2,
-        // El autocompletado de palabras reservadas llega en la Fase 5; de momento
-        // se apaga la sugerencia por palabras del documento, que confunde más que ayuda.
+        // Ahora que hay sugerencias de esquema reales, las de palabras sueltas
+        // del propio documento solo añadirían ruido.
         wordBasedSuggestions: 'off',
-        suggestOnTriggerCharacters: false,
+        suggestOnTriggerCharacters: true,
+        quickSuggestions: { other: true, comments: false, strings: false },
         scrollbar: { verticalScrollbarSize: 10, horizontalScrollbarSize: 10 },
       });
 
@@ -180,17 +254,54 @@ export class SqlEditor implements OnInit {
         this._zone.run(() => this.selectionChange.emit({ hasSelection: !empty, text }));
       });
 
-      // Ctrl/Cmd + Enter ejecuta, como indica el mockup.
-      editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, () => {
-        this._zone.run(() => this.execute.emit());
-      });
+      this.registerShortcuts(monaco, editor);
     });
 
     this.ready.set(true);
 
     this._destroyRef.onDestroy(() => {
+      disposeCompletion();
       this._editor?.dispose();
       this._editor = null;
     });
+  }
+
+  /**
+   * Atajos del editor.
+   *
+   * Se registran en Monaco y no en el documento porque solo deben actuar con el
+   * foco dentro del editor: un Ctrl+S global se comería el del navegador aunque
+   * el usuario estuviera escribiendo en otro sitio.
+   */
+  private registerShortcuts(
+    monaco: typeof MonacoApi,
+    editor: MonacoApi.editor.IStandaloneCodeEditor,
+  ): void {
+    const run = (action: () => void) => () => this._zone.run(action);
+
+    // Ejecutar: Ctrl/Cmd + Enter.
+    editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, run(() => this.execute.emit()));
+
+    // Ejecutar solo la selección: Ctrl/Cmd + Shift + Enter.
+    editor.addCommand(
+      monaco.KeyMod.CtrlCmd | monaco.KeyMod.Shift | monaco.KeyCode.Enter,
+      run(() => this.executeSelection.emit()),
+    );
+
+    // Cancelar: Escape. Solo tiene efecto si hay algo ejecutándose; quien lo
+    // decide es el shell.
+    editor.addCommand(monaco.KeyCode.Escape, run(() => this.cancel.emit()));
+
+    // Guardar: Ctrl/Cmd + S.
+    editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, run(() => this.save.emit()));
+
+    // Nueva consulta: Ctrl/Cmd + T.
+    editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyT, run(() => this.newTab.emit()));
+
+    // Formatear: Ctrl/Cmd + Shift + F, el mismo que usa el resto de editores.
+    editor.addCommand(
+      monaco.KeyMod.CtrlCmd | monaco.KeyMod.Shift | monaco.KeyCode.KeyF,
+      run(() => void this.formatDocument()),
+    );
   }
 }

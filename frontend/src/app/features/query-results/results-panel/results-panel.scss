@@ -271,6 +271,34 @@
   color: #f5bf4f;
 }
 
+.history__search {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex: none;
+  padding: 7px 12px;
+  border-bottom: 1px solid #171d2a;
+  color: var(--dr-text-faintest);
+}
+
+.history__input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  color: var(--dr-text-secondary);
+  font-family: inherit;
+  font-size: var(--dr-font-size-sm);
+
+  &:focus {
+    outline: none;
+  }
+
+  &::placeholder {
+    color: var(--dr-text-disabled);
+  }
+}
+
 .history {
   flex: 1;
   min-height: 0;
