@@ -3,6 +3,7 @@ using Druse.Application.Connections;
 using Druse.Application.Metadata;
 using Druse.Application.Queries;
 using Druse.Database.Abstractions;
+using Druse.Domain;
 using Druse.Host.LocalApi.Contracts;
 
 namespace Druse.Host.LocalApi.Endpoints;
@@ -135,6 +136,7 @@ internal static class DatabaseEndpoints
             ExecuteQueryRequest request,
             ConnectionService connections,
             QueryService queries,
+            IQueryHistoryStore history,
             CancellationToken cancellationToken) =>
         {
             var session = connections.Require(request.SessionId);
@@ -146,10 +148,13 @@ internal static class DatabaseEndpoints
             {
                 // 409: la petición es válida pero el estado actual impide ejecutarla.
                 // El cliente puede reintentar con confirmDestructive.
+                // No se registra en el historial: no llegó a ejecutarse.
                 return Results.Conflict(rejection.ToResponse());
             }
 
             var result = await queries.ExecuteAsync(domainRequest, cancellationToken);
+
+            await RecordHistoryAsync(history, session, domainRequest, result, cancellationToken);
 
             return Results.Ok(result.ToResponse());
         })
@@ -164,5 +169,43 @@ internal static class DatabaseEndpoints
             return canceled ? Results.Accepted() : Results.NotFound();
         })
         .WithName("CancelQuery");
+    }
+
+    /// <summary>
+    /// Anota la ejecución en el historial local.
+    ///
+    /// Un fallo al escribir el historial no puede tumbar la consulta: el usuario
+    /// ya tiene su resultado y perderlo por no poder anotarlo sería absurdo.
+    /// </summary>
+    private static async Task RecordHistoryAsync(
+        IQueryHistoryStore history,
+        IDatabaseSession session,
+        QueryRequest request,
+        QueryResult result,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await history.AddAsync(
+                new QueryHistoryEntry
+                {
+                    Id = result.ExecutionId,
+                    ConnectionId = session.Profile.Id,
+                    ConnectionName = session.Profile.Name,
+                    Database = session.Profile.Database,
+                    Sql = request.Sql,
+                    ExecutedAtUtc = DateTimeOffset.UtcNow,
+                    DurationMs = (long)result.Duration.TotalMilliseconds,
+                    Succeeded = result.State == QueryExecutionState.Succeeded,
+                    RowCount = result.ResultSets.Count > 0 ? result.ResultSets[0].Rows.Count : result.RowsAffected,
+                    ErrorMessage = result.Error?.Message,
+                },
+                cancellationToken);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            // Se ignora a propósito. Si el historial da problemas de forma
+            // sostenida, se verá en los logs del proceso.
+        }
     }
 }

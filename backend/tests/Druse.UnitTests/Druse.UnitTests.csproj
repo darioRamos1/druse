@@ -22,6 +22,8 @@
     <ProjectReference Include="..\..\src\Druse.Application\Druse.Application.csproj" />
     <ProjectReference Include="..\..\src\Druse.Domain\Druse.Domain.csproj" />
     <ProjectReference Include="..\..\src\Druse.Database.Abstractions\Druse.Database.Abstractions.csproj" />
+    <ProjectReference Include="..\..\src\Druse.Platform.Native\Druse.Platform.Native.csproj" />
+    <ProjectReference Include="..\..\src\Druse.Persistence.Sqlite\Druse.Persistence.Sqlite.csproj" />
   </ItemGroup>
 
 </Project>

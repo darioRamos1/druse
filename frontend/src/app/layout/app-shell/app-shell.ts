@@ -76,6 +76,7 @@ export class AppShell {
   protected readonly running = this._store.running;
   protected readonly rejection = this._store.rejection;
   protected readonly notice = this._store.notice;
+  protected readonly history = this._store.history;
 
   protected readonly session = computed(() => this._store.session() ?? DISCONNECTED);
 
@@ -96,9 +97,24 @@ export class AppShell {
   /** Última selección del editor, para poder ejecutarla sola. */
   private _selectedSql = '';
 
+  constructor() {
+    // Los perfiles guardados deben estar antes de que el usuario mire la barra
+    // lateral; si no, parecería que se han perdido.
+    void this._store.loadSavedConnections();
+    void this._store.loadHistory();
+  }
+
   // --- Conexiones ------------------------------------------------------------
   protected openDialog(): void {
     this.dialogOpen.set(true);
+  }
+
+  protected connectSaved(id: string): void {
+    void this._store.connectSaved(id);
+  }
+
+  protected forget(id: string): void {
+    void this._store.forget(id);
   }
 
   protected closeDialog(): void {
@@ -182,5 +198,19 @@ export class AppShell {
 
   protected dismissNotice(): void {
     this._store.dismissNotice();
+  }
+
+  // --- Historial -------------------------------------------------------------
+  protected refreshHistory(): void {
+    void this._store.loadHistory();
+  }
+
+  protected clearHistory(): void {
+    void this._store.clearHistory();
+  }
+
+  /** Recupera una consulta del historial en una pestaña nueva. */
+  protected reuseQuery(sql: string): void {
+    this._store.createTab(sql);
   }
 }

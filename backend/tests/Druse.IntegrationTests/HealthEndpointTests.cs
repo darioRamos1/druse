@@ -9,11 +9,11 @@ namespace Druse.IntegrationTests;
 /// Criterio de salida de la Fase 0: la API local responde en /api/health.
 /// Ver PLAN_TRABAJO_DRUSE.md §7 (API local propuesta).
 /// </summary>
-public sealed class HealthEndpointTests : IClassFixture<WebApplicationFactory<Program>>
+public sealed class HealthEndpointTests : IClassFixture<DruseApiFactory>
 {
-    private readonly WebApplicationFactory<Program> _factory;
+    private readonly DruseApiFactory _factory;
 
-    public HealthEndpointTests(WebApplicationFactory<Program> factory)
+    public HealthEndpointTests(DruseApiFactory factory)
     {
         _factory = factory;
     }
@@ -21,7 +21,7 @@ public sealed class HealthEndpointTests : IClassFixture<WebApplicationFactory<Pr
     [Fact]
     public async Task GetHealth_DevuelveOk()
     {
-        using var client = _factory.CreateClient();
+        using var client = _factory.CreateAuthenticatedClient();
 
         using var response = await client.GetAsync("/api/health");
 
@@ -31,7 +31,7 @@ public sealed class HealthEndpointTests : IClassFixture<WebApplicationFactory<Pr
     [Fact]
     public async Task GetHealth_IdentificaAlProducto()
     {
-        using var client = _factory.CreateClient();
+        using var client = _factory.CreateAuthenticatedClient();
 
         var payload = await client.GetFromJsonAsync<JsonElement>("/api/health");
 
@@ -43,7 +43,7 @@ public sealed class HealthEndpointTests : IClassFixture<WebApplicationFactory<Pr
     [Fact]
     public async Task GetHealth_NoFiltraSecretos()
     {
-        using var client = _factory.CreateClient();
+        using var client = _factory.CreateAuthenticatedClient();
 
         using var response = await client.GetAsync("/api/health");
         var body = await response.Content.ReadAsStringAsync();

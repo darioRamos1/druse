@@ -8,9 +8,11 @@
     [explorerNodes]="explorerNodes()"
     (addConnection)="openDialog()"
     (toggleConnection)="toggleConnection($event)"
+    (connectSaved)="connectSaved($event)"
     (toggleNode)="toggleNode($event)"
     (refreshNode)="refreshNode($event)"
     (disconnect)="disconnect($event)"
+    (forget)="forget($event)"
     (openNode)="openNode($event)"
   />
 
@@ -89,6 +91,10 @@
       [style.height.px]="resultsHeight()"
       [resultSet]="resultSet()"
       [result]="result()"
+      [history]="history()"
+      (refreshHistory)="refreshHistory()"
+      (clearHistory)="clearHistory()"
+      (reuseQuery)="reuseQuery($event)"
     />
 
     <app-status-bar [session]="session()" [line]="cursor().line" [column]="cursor().column" />

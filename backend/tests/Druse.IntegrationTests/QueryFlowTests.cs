@@ -9,18 +9,18 @@ namespace Druse.IntegrationTests;
 /// Recorre por HTTP el mismo camino que hará el usuario: conectar, explorar,
 /// ejecutar y cancelar. Es el criterio de salida de la Fase 2.
 /// </summary>
-public sealed class QueryFlowTests : IClassFixture<WebApplicationFactory<Program>>
+public sealed class QueryFlowTests : IClassFixture<DruseApiFactory>
 {
-    private readonly WebApplicationFactory<Program> _factory;
+    private readonly DruseApiFactory _factory;
 
-    public QueryFlowTests(WebApplicationFactory<Program> factory)
+    public QueryFlowTests(DruseApiFactory factory)
     {
         _factory = factory;
     }
 
     private async Task<(HttpClient Client, Guid SessionId)> ConnectAsync(bool readOnly = false)
     {
-        var client = _factory.CreateClient();
+        var client = _factory.CreateAuthenticatedClient();
 
         var response = await client.PostAsJsonAsync("/api/sessions", TestDatabase.ConnectRequest(readOnly));
         response.EnsureSuccessStatusCode();
@@ -33,7 +33,7 @@ public sealed class QueryFlowTests : IClassFixture<WebApplicationFactory<Program
     [Fact]
     public async Task ListaLosMotoresDisponibles()
     {
-        using var client = _factory.CreateClient();
+        using var client = _factory.CreateAuthenticatedClient();
 
         var engines = await client.GetFromJsonAsync<JsonElement>("/api/engines");
 
@@ -46,7 +46,7 @@ public sealed class QueryFlowTests : IClassFixture<WebApplicationFactory<Program
     [Fact]
     public async Task ElMotorPostgreSqlDeclaraSuPuertoHabitual()
     {
-        using var client = _factory.CreateClient();
+        using var client = _factory.CreateAuthenticatedClient();
 
         var engines = await client.GetFromJsonAsync<JsonElement>("/api/engines");
 
@@ -59,7 +59,7 @@ public sealed class QueryFlowTests : IClassFixture<WebApplicationFactory<Program
     [Fact]
     public async Task UnaSesionInexistente_DevuelveNoEncontrado()
     {
-        using var client = _factory.CreateClient();
+        using var client = _factory.CreateAuthenticatedClient();
 
         var response = await client.GetAsync($"/api/sessions/{Guid.NewGuid()}/metadata/databases");
 
@@ -69,7 +69,7 @@ public sealed class QueryFlowTests : IClassFixture<WebApplicationFactory<Program
     [Fact]
     public async Task UnPerfilInvalido_NoLlegaAIntentarConectarse()
     {
-        using var client = _factory.CreateClient();
+        using var client = _factory.CreateAuthenticatedClient();
 
         var response = await client.PostAsJsonAsync("/api/connections/test", new
         {
@@ -95,7 +95,7 @@ public sealed class QueryFlowTests : IClassFixture<WebApplicationFactory<Program
     [RequiresPostgreSqlFact]
     public async Task ProbarConexion_ConCredencialesCorrectas()
     {
-        using var client = _factory.CreateClient();
+        using var client = _factory.CreateAuthenticatedClient();
 
         var response = await client.PostAsJsonAsync("/api/connections/test", TestDatabase.ConnectRequest());
         response.EnsureSuccessStatusCode();
@@ -109,7 +109,7 @@ public sealed class QueryFlowTests : IClassFixture<WebApplicationFactory<Program
     [RequiresPostgreSqlFact]
     public async Task NingunaRespuestaDevuelveLaContrasena()
     {
-        using var client = _factory.CreateClient();
+        using var client = _factory.CreateAuthenticatedClient();
 
         var response = await client.PostAsJsonAsync("/api/sessions", TestDatabase.ConnectRequest());
         var raw = await response.Content.ReadAsStringAsync();
@@ -304,7 +304,7 @@ public sealed class QueryFlowTests : IClassFixture<WebApplicationFactory<Program
     [RequiresPostgreSqlFact]
     public async Task CancelarUnaEjecucionQueNoExiste_DevuelveNoEncontrado()
     {
-        using var client = _factory.CreateClient();
+        using var client = _factory.CreateAuthenticatedClient();
 
         var response = await client.DeleteAsync($"/api/queries/{Guid.NewGuid()}");
 

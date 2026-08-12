@@ -110,8 +110,9 @@
   }
 
   &--connection {
+    position: relative;
     height: 28px;
-    padding: 0 8px;
+    padding: 0 8px 0 11px;
     border-radius: var(--dr-radius-sm);
     color: var(--dr-text-secondary);
 
@@ -123,6 +124,28 @@
 
     &.is-offline:not(.is-active) {
       color: var(--dr-text-tertiary);
+    }
+
+    // Franja de color del entorno. Es lo que evita ejecutar en producción
+    // creyendo estar en desarrollo, y por eso se ve siempre, no solo al
+    // conectar (plan §12).
+    &::before {
+      content: '';
+      position: absolute;
+      left: 3px;
+      top: 6px;
+      bottom: 6px;
+      width: 2px;
+      border-radius: 1px;
+      background: transparent;
+    }
+
+    &[data-environment='testing']::before {
+      background: #f5bf4f;
+    }
+
+    &[data-environment='production']::before {
+      background: #f2686b;
     }
   }
 
@@ -244,6 +267,23 @@
     background: #f2686b;
     box-shadow: 0 0 6px rgb(242 104 107 / 70%);
   }
+
+  &--busy {
+    background: var(--dr-accent);
+    box-shadow: none;
+    animation: node-pulse 900ms ease-in-out infinite;
+  }
+}
+
+.node__tag {
+  margin-left: 6px;
+  padding: 1px 4px;
+  border: 1px solid var(--dr-border-subtle);
+  border-radius: 3px;
+  color: var(--dr-text-faint);
+  font-family: var(--dr-font-mono);
+  font-size: 9px;
+  letter-spacing: 0.04em;
 }
 
 @keyframes node-pulse {

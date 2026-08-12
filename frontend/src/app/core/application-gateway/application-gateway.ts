@@ -5,7 +5,10 @@ import {
   DatabaseEngine,
   DatabaseObject,
   EngineInfo,
+  QueryHistoryEntry,
   QueryResult,
+  SavedConnection,
+  SecretStoreStatus,
   SessionInfo,
   TestConnectionResult,
 } from '../../shared/models/workspace';
@@ -103,4 +106,46 @@ export abstract class ApplicationGateway {
   abstract executeQuery(request: ExecuteQueryRequest): Observable<QueryResult>;
 
   abstract cancelQuery(executionId: string): Observable<void>;
+
+  // --- Conexiones guardadas -------------------------------------------------
+
+  abstract getSavedConnections(): Observable<readonly SavedConnection[]>;
+
+  /** Dónde se guardan las contraseñas, o por qué no se pueden guardar. */
+  abstract getSecretStoreStatus(): Observable<SecretStoreStatus>;
+
+  abstract saveConnection(request: SaveConnectionRequest): Observable<SavedConnection>;
+
+  abstract updateConnection(
+    id: string,
+    request: SaveConnectionRequest,
+  ): Observable<SavedConnection>;
+
+  abstract deleteConnection(id: string): Observable<void>;
+
+  /**
+   * Abre sesión con un perfil guardado.
+   *
+   * Si no hay contraseña guardada, la API responde 428 y hay que pedírsela al
+   * usuario y reintentar con `password`.
+   */
+  abstract openSavedSession(id: string, password?: string): Observable<SessionInfo>;
+
+  // --- Historial y preferencias ---------------------------------------------
+
+  abstract getHistory(search?: string): Observable<readonly QueryHistoryEntry[]>;
+
+  abstract clearHistory(): Observable<void>;
+
+  abstract getPreferences(): Observable<Readonly<Record<string, string>>>;
+
+  abstract setPreference(key: string, value: string): Observable<void>;
+}
+
+/** Datos para guardar un perfil. La contraseña solo viaja de ida. */
+export interface SaveConnectionRequest {
+  readonly profile: ConnectRequest['profile'];
+  readonly password?: string;
+  /** El usuario pidió recordar la contraseña. */
+  readonly storePassword: boolean;
 }

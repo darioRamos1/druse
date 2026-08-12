@@ -114,6 +114,48 @@
   }
 
   @default {
-    <div class="empty">El historial se implementa en la Fase 3.</div>
+    @if (history().length > 0) {
+      <ul class="history">
+        @for (entry of history(); track entry.id) {
+          <li class="history__item" [class.is-failed]="!entry.succeeded">
+            <button
+              type="button"
+              class="history__sql"
+              title="Abrir en una pestaña nueva"
+              (click)="reuseQuery.emit(entry.sql)"
+            >
+              {{ summarize(entry.sql) }}
+            </button>
+            <span class="history__meta">
+              <span [attr.title]="entry.executedAtUtc">{{ formatDate(entry.executedAtUtc) }}</span>
+              <span class="history__dot" aria-hidden="true">·</span>
+              <span>{{ entry.connectionName }}</span>
+              <span class="history__dot" aria-hidden="true">·</span>
+              <span>{{ entry.durationMs }} ms</span>
+              @if (entry.succeeded && entry.rowCount !== undefined && entry.rowCount !== null) {
+                <span class="history__dot" aria-hidden="true">·</span>
+                <span>{{ entry.rowCount }} filas</span>
+              }
+              @if (!entry.succeeded) {
+                <span class="history__dot" aria-hidden="true">·</span>
+                <span class="history__error">{{ entry.errorMessage }}</span>
+              }
+            </span>
+          </li>
+        }
+      </ul>
+
+      <footer class="foot">
+        <div class="foot__item foot__item--muted">{{ history().length }} entradas</div>
+        <span class="spacer"></span>
+        <button type="button" class="tool-button" (click)="clearHistory.emit()">
+          Vaciar historial
+        </button>
+      </footer>
+    } @else {
+      <div class="empty">
+        Todavía no hay consultas en el historial. Se guarda automáticamente al ejecutar.
+      </div>
+    }
   }
 }

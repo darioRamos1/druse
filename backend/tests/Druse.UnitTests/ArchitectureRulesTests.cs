@@ -35,7 +35,11 @@ public sealed class ArchitectureRulesTests
 
         // Adaptadores generales y persistencia interna.
         ["Druse.Infrastructure"] = ["Druse.Application"],
-        ["Druse.Persistence.Sqlite"] = ["Druse.Application"],
+
+        // La persistencia conoce Platform.Abstractions porque necesita IAppPaths
+        // para situar el archivo. Sigue sin conocer Platform.Native: dónde está el
+        // directorio de datos lo resuelve el host al componer.
+        ["Druse.Persistence.Sqlite"] = ["Druse.Application", "Druse.Platform.Abstractions"],
 
         // Proveedores: sus contratos y su propio driver. Nunca otro proveedor.
         ["Druse.Provider.PostgreSql"] = ["Druse.Database.Abstractions"],

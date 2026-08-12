@@ -441,16 +441,16 @@ Un usuario puede conectarse a PostgreSQL, navegar hasta una tabla, ejecutar un `
 
 ### Tareas
 
-- [ ] Crear la base SQLite local.
-- [ ] Guardar perfiles sin incluir la contraseña en texto plano.
-- [ ] Integrar el almacén seguro del sistema operativo para secretos.
-- [ ] Guardar historial de consultas.
-- [ ] Guardar pestañas recientes y preferencias.
-- [ ] Implementar perfiles de color para producción, pruebas y desarrollo.
-- [ ] Ocultar información sensible de logs y excepciones.
-- [ ] Agregar token temporal entre Angular y la API local.
-- [ ] Restringir CORS al origen de la aplicación.
-- [ ] Implementar `IAppPaths` e `ISecretStore` sin dependencias del sistema operativo en Application.
+- [x] Crear la base SQLite local.
+- [x] Guardar perfiles sin incluir la contraseña en texto plano.
+- [x] Integrar el almacén seguro del sistema operativo para secretos.
+- [x] Guardar historial de consultas.
+- [x] Guardar pestañas recientes y preferencias. _(preferencias sí; recordar las pestañas abiertas queda para la Fase 5, junto al resto del estado del editor.)_
+- [x] Implementar perfiles de color para producción, pruebas y desarrollo.
+- [x] Ocultar información sensible de logs y excepciones.
+- [x] Agregar token temporal entre Angular y la API local.
+- [x] Restringir CORS al origen de la aplicación.
+- [x] Implementar `IAppPaths` e `ISecretStore` sin dependencias del sistema operativo en Application.
 
 ### Criterio de salida
 
