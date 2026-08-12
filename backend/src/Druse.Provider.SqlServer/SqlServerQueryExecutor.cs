@@ -1,6 +1,5 @@
 using System.Data.Common;
 using System.Diagnostics;
-using System.Globalization;
 using Druse.Database.Abstractions;
 using Druse.Domain;
 using Microsoft.Data.SqlClient;
@@ -186,7 +185,7 @@ public sealed class SqlServerQueryExecutor : IQueryExecutor
             {
                 values[ordinal] = await reader.IsDBNullAsync(ordinal, cancellationToken)
                     ? null
-                    : Format(reader.GetValue(ordinal));
+                    : SqlServerValueFormatter.Format(reader.GetValue(ordinal));
             }
 
             rows.Add(values);
@@ -200,28 +199,24 @@ public sealed class SqlServerQueryExecutor : IQueryExecutor
         };
     }
 
-    /// <summary>
-    /// Convierte un valor a texto.
-    ///
-    /// Mismo criterio que en PostgreSQL: cultura invariante, para que lo que se
-    /// muestra sea el dato del servidor y se pueda copiar de vuelta a una
-    /// consulta. Los formatos coinciden a propósito, de modo que la misma columna
-    /// se lea igual venga del motor que venga.
-    /// </summary>
-    private static string Format(object value) => value switch
+    /// <inheritdoc />
+    public Task<IQueryResultReader> OpenReaderAsync(
+        IDatabaseSession session,
+        QueryRequest request,
+        CancellationToken cancellationToken)
     {
-        string text => text,
-        bool flag => flag ? "true" : "false",
-        DateTime timestamp => timestamp.ToString("yyyy-MM-dd HH:mm:ss.FFFFFFF", CultureInfo.InvariantCulture),
-        DateTimeOffset timestamp => timestamp.ToString("yyyy-MM-dd HH:mm:ss.FFFFFFFzzz", CultureInfo.InvariantCulture),
-        DateOnly date => date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
-        TimeOnly time => time.ToString("HH:mm:ss.FFFFFFF", CultureInfo.InvariantCulture),
-        TimeSpan interval => interval.ToString(),
-        byte[] binary => $"0x{Convert.ToHexString(binary)}",
-        Guid uuid => uuid.ToString(),
-        IFormattable formattable => formattable.ToString(null, CultureInfo.InvariantCulture),
-        _ => value.ToString() ?? string.Empty,
-    };
+        ArgumentNullException.ThrowIfNull(session);
+        ArgumentNullException.ThrowIfNull(request);
+
+        if (session is not SqlServerSession sqlServer)
+        {
+            throw new ArgumentException(
+                "La sesión no pertenece al proveedor SQL Server.",
+                nameof(session));
+        }
+
+        return SqlServerResultReader.OpenAsync(sqlServer, request, cancellationToken);
+    }
 
     /// <summary>
     /// Traduce la severidad de SQL Server.

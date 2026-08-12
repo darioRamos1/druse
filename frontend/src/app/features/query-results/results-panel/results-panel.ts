@@ -1,7 +1,9 @@
 import { ChangeDetectionStrategy, Component, computed, input, output, signal } from '@angular/core';
 
+import { ExportFormat } from '../../../core/application-gateway/application-gateway';
 import { QueryHistoryEntry, QueryResult, ResultSet } from '../../../shared/models/workspace';
 import { Icon } from '../../../shared/ui/icon/icon';
+import { QueryHistory } from '../../query-history/query-history/query-history';
 import { ResultsGrid } from '../results-grid/results-grid';
 
 type ResultsTab = 'results' | 'messages' | 'history';
@@ -15,7 +17,7 @@ type ResultsTab = 'results' | 'messages' | 'history';
 @Component({
   selector: 'app-results-panel',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [Icon, ResultsGrid],
+  imports: [Icon, ResultsGrid, QueryHistory],
   templateUrl: './results-panel.html',
   styleUrl: './results-panel.scss',
 })
@@ -25,13 +27,55 @@ export class ResultsPanel {
   readonly history = input<readonly QueryHistoryEntry[]>([]);
   readonly pageSize = input(500);
 
+  readonly exporting = input(false);
+
   readonly refreshHistory = output<void>();
   readonly searchHistory = output<string>();
   readonly clearHistory = output<void>();
   readonly reuseQuery = output<string>();
+  readonly exportAs = output<ExportFormat>();
+  readonly copied = output<string>();
+  readonly copyFailed = output<void>();
 
   protected readonly activeTab = signal<ResultsTab>('results');
-  protected readonly historySearch = signal('');
+  protected readonly exportOpen = signal(false);
+  protected readonly showFilters = signal(false);
+
+  /** Índice del conjunto de resultados visible, si la consulta devolvió varios. */
+  protected readonly activeSetIndex = signal(0);
+
+  protected readonly resultSets = computed(() => this.result()?.resultSets ?? []);
+
+  /**
+   * Conjunto que se está mostrando.
+   *
+   * `resultSet` sigue existiendo para quien solo tenga uno; si hay varios manda
+   * el que el usuario haya elegido.
+   */
+  protected readonly currentSet = computed(() => {
+    const sets = this.resultSets();
+
+    return sets.length > 0
+      ? (sets[Math.min(this.activeSetIndex(), sets.length - 1)] ?? null)
+      : this.resultSet();
+  });
+
+  protected toggleExport(): void {
+    this.exportOpen.update((open) => !open);
+  }
+
+  protected chooseExport(format: ExportFormat): void {
+    this.exportOpen.set(false);
+    this.exportAs.emit(format);
+  }
+
+  protected toggleFilters(): void {
+    this.showFilters.update((visible) => !visible);
+  }
+
+  protected selectSet(index: number): void {
+    this.activeSetIndex.set(index);
+  }
 
   /** Abre la pestaña indicada y refresca el historial al entrar en él. */
   protected select(tab: ResultsTab): void {
@@ -42,37 +86,6 @@ export class ResultsPanel {
     }
   }
 
-  /**
-   * Filtra el historial.
-   *
-   * La búsqueda la resuelve el servidor, que es quien tiene todas las entradas:
-   * filtrar en el cliente solo alcanzaría a las que ya se hubieran traído.
-   */
-  protected onSearch(event: Event): void {
-    const term = (event.target as HTMLInputElement).value;
-
-    this.historySearch.set(term);
-    this.searchHistory.emit(term);
-  }
-
-  /** Fecha corta y legible; la absoluta va en el atributo `title`. */
-  protected formatDate(iso: string): string {
-    const date = new Date(iso);
-
-    return date.toLocaleString('es', {
-      day: '2-digit',
-      month: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  }
-
-  /** Una línea del SQL, para que la lista no se descuadre. */
-  protected summarize(sql: string): string {
-    const collapsed = sql.replace(/\s+/g, ' ').trim();
-
-    return collapsed.length > 120 ? `${collapsed.slice(0, 120)}…` : collapsed;
-  }
 
   protected readonly hasFilters = computed(() =>
     (this.resultSet()?.columns ?? []).some((column) => !!column.filter),

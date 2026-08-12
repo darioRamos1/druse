@@ -219,3 +219,39 @@ public sealed record PreferenceValueDto
 {
     public required string Value { get; init; }
 }
+
+// ---------------------------------------------------------------------------
+// Fase 6: exportaciones
+// ---------------------------------------------------------------------------
+
+/// <summary>
+/// Petición de exportación.
+///
+/// Lleva el SQL y no las filas ya obtenidas: así se exporta el resultado
+/// completo aunque la cuadrícula solo muestre las primeras.
+/// </summary>
+public sealed record ExportRequest
+{
+    public required Guid SessionId { get; init; }
+    public required string Sql { get; init; }
+
+    /// <summary>Nombre sugerido, sin extensión. Se sanea antes de usarlo.</summary>
+    public string? FileName { get; init; }
+
+    /// <summary>`utf8bom`, `utf8` o `latin1`. Solo aplica a CSV.</summary>
+    public string Encoding { get; init; } = "utf8bom";
+
+    /// <summary>Separador de campos del CSV.</summary>
+    public string Delimiter { get; init; } = ",";
+
+    public bool IncludeHeaders { get; init; } = true;
+
+    /// <summary>Texto con el que se escribe un nulo.</summary>
+    public string NullText { get; init; } = "";
+
+    public int MaxRows { get; init; } = 1_000_000;
+
+    public int TimeoutSeconds { get; init; } = 300;
+
+    public bool ConfirmDestructive { get; init; }
+}

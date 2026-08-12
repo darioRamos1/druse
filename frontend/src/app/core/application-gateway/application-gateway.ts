@@ -149,6 +149,29 @@ export abstract class ApplicationGateway {
   abstract getPreferences(): Observable<Readonly<Record<string, string>>>;
 
   abstract setPreference(key: string, value: string): Observable<void>;
+
+  /**
+   * Exporta el resultado de una consulta.
+   *
+   * Se envía el SQL y no las filas que hay en pantalla: así se exporta el
+   * resultado completo aunque la cuadrícula solo muestre las primeras.
+   */
+  abstract exportQuery(request: ExportRequest): Observable<Blob>;
+}
+
+export type ExportFormat = 'csv' | 'xlsx';
+
+export interface ExportRequest {
+  readonly sessionId: string;
+  readonly sql: string;
+  readonly format: ExportFormat;
+  readonly fileName?: string;
+  /** `utf8bom`, `utf8` o `latin1`. Solo aplica a CSV. */
+  readonly encoding?: string;
+  readonly delimiter?: string;
+  readonly includeHeaders?: boolean;
+  readonly nullText?: string;
+  readonly confirmDestructive?: boolean;
 }
 
 /** Datos para guardar un perfil. La contraseña solo viaja de ida. */

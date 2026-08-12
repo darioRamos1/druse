@@ -4,6 +4,7 @@ using Druse.Application.Metadata;
 using Druse.Application.Queries;
 using Druse.Database.Abstractions;
 using Druse.Host.LocalApi.Security;
+using Druse.Infrastructure.Exports;
 using Druse.Infrastructure.Providers;
 using Druse.Infrastructure.Queries;
 using Druse.Infrastructure.Sessions;
@@ -66,6 +67,11 @@ internal static class DependencyInjection
         services.AddScoped<SavedConnectionService>();
         services.AddScoped<MetadataService>();
         services.AddScoped<QueryService>();
+        services.AddScoped<ExportService>();
+
+        // --- Exportadores -------------------------------------------------------
+        services.AddSingleton<IResultExporter, CsvResultExporter>();
+        services.AddSingleton<IResultExporter, XlsxResultExporter>();
 
         return services;
     }

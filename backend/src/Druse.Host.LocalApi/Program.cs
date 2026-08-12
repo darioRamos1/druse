@@ -93,6 +93,7 @@ app.MapGet("/api/health", () => new HealthResponse(
 
 app.MapDatabaseEndpoints();
 app.MapStorageEndpoints();
+app.MapExportEndpoints();
 
 var token = app.Services.GetRequiredService<LocalApiToken>();
 

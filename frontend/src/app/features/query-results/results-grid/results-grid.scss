@@ -103,6 +103,17 @@
   &--value {
     border-right-color: #151b26;
     text-overflow: ellipsis;
+    cursor: default;
+
+    &:focus-visible {
+      outline: none;
+    }
+
+    // La celda seleccionada se marca para saber sobre cuál actúa Ctrl+C.
+    &.is-selected {
+      background: rgb(108 139 255 / 18%);
+      box-shadow: inset 0 0 0 1px rgb(108 139 255 / 55%);
+    }
 
     // El tipo de la columna decide el color, igual que en el mockup.
     &[data-kind='number'] {
@@ -119,11 +130,48 @@
   }
 }
 
-.checkbox {
-  width: 12px;
-  height: 12px;
-  border: 1.3px solid #3e4658;
-  border-radius: 3px;
+.copy-all {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--dr-text-disabled);
+  cursor: pointer;
+
+  &:hover {
+    background: #1e2637;
+    color: var(--dr-text-secondary);
+  }
+}
+
+.filters__input {
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  color: var(--dr-accent-bright);
+  font-family: var(--dr-font-mono);
+  font-size: 11px;
+
+  &:focus {
+    outline: none;
+  }
+
+  &::placeholder {
+    color: var(--dr-text-disabled);
+  }
+}
+
+.cell--number {
+  cursor: pointer;
+
+  &:hover {
+    color: var(--dr-text-secondary);
+  }
 }
 
 // Los nulos deben verse distintos de la cadena vacía (plan §6).

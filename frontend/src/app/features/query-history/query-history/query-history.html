@@ -1,0 +1,55 @@
+<div class="search">
+  <app-icon name="search" [size]="12" />
+  <input
+    type="search"
+    class="search__input"
+    placeholder="Filtrar por SQL o conexión…"
+    [value]="term()"
+    (input)="onSearch($event)"
+    aria-label="Filtrar el historial"
+  />
+</div>
+
+@if (entries().length > 0) {
+  <ul class="list">
+    @for (entry of entries(); track entry.id) {
+      <li class="item" [class.is-failed]="!entry.succeeded">
+        <button
+          type="button"
+          class="item__sql"
+          title="Abrir en una pestaña nueva"
+          (click)="reuse.emit(entry.sql)"
+        >
+          {{ summarize(entry.sql) }}
+        </button>
+        <span class="item__meta">
+          <span [attr.title]="entry.executedAtUtc">{{ formatDate(entry.executedAtUtc) }}</span>
+          <span class="item__dot" aria-hidden="true">·</span>
+          <span>{{ entry.connectionName }}</span>
+          <span class="item__dot" aria-hidden="true">·</span>
+          <span>{{ entry.durationMs }} ms</span>
+          @if (entry.succeeded && entry.rowCount !== undefined && entry.rowCount !== null) {
+            <span class="item__dot" aria-hidden="true">·</span>
+            <span>{{ entry.rowCount }} filas</span>
+          }
+          @if (!entry.succeeded) {
+            <span class="item__dot" aria-hidden="true">·</span>
+            <span class="item__error">{{ entry.errorMessage }}</span>
+          }
+        </span>
+      </li>
+    }
+  </ul>
+
+  <footer class="foot">
+    <span class="foot__count">{{ entries().length }} entradas</span>
+    <span class="foot__spacer"></span>
+    <button type="button" class="foot__action" (click)="clear.emit()">Vaciar historial</button>
+  </footer>
+} @else if (term()) {
+  <p class="empty">Ninguna consulta coincide con «{{ term() }}».</p>
+} @else {
+  <p class="empty">
+    Todavía no hay consultas en el historial. Se guarda automáticamente al ejecutar.
+  </p>
+}

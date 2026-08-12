@@ -5,6 +5,7 @@ import { firstValueFrom } from 'rxjs';
 import {
   ApplicationGateway,
   ConnectRequest,
+  ExportFormat,
   QueryRejected,
 } from '../application-gateway/application-gateway';
 import {
@@ -125,6 +126,60 @@ export class WorkspaceStore {
   /** Quita el indicador de cambios sin guardar de la pestaña activa. */
   markTabSaved(): void {
     this._tabs.update((tabs) => tabs.map((tab) => (tab.active ? { ...tab, dirty: false } : tab)));
+  }
+
+  private readonly _exporting = signal(false);
+  readonly exporting = this._exporting.asReadonly();
+
+  /**
+   * Exporta el resultado de la consulta activa.
+   *
+   * Se manda el SQL al servidor en lugar de las filas que hay en pantalla: la
+   * cuadrícula solo tiene las primeras 500 y quien exporta espera el resultado
+   * completo.
+   */
+  async export(format: ExportFormat, confirmDestructive = false): Promise<void> {
+    const connection = this.activeConnection();
+    const tab = this.activeTab();
+    const sql = (tab?.sql ?? '').trim();
+
+    if (!connection?.sessionId) {
+      this._notice.set('No hay ninguna conexión abierta.');
+      return;
+    }
+
+    if (!sql) {
+      this._notice.set('No hay ninguna consulta que exportar.');
+      return;
+    }
+
+    this._exporting.set(true);
+    this._rejection.set(null);
+
+    try {
+      const blob = await firstValueFrom(
+        this._gateway.exportQuery({
+          sessionId: connection.sessionId,
+          sql,
+          format,
+          fileName: tab?.title,
+          confirmDestructive,
+        }),
+      );
+
+      download(blob, `${sanitizeFileName(tab?.title ?? 'druse')}.${format}`);
+      this._notice.set(`Exportado a ${format.toUpperCase()}.`);
+    } catch (error) {
+      const rejection = await asRejectionFromBlob(error);
+
+      if (rejection) {
+        this._rejection.set(rejection);
+      } else {
+        this._notice.set(describeError(error));
+      }
+    } finally {
+      this._exporting.set(false);
+    }
   }
 
   // --- Sesión activa ---------------------------------------------------------
@@ -803,6 +858,53 @@ function toRequest(form: ConnectionForm): ConnectRequest {
     },
     password: form.password,
   };
+}
+
+/**
+ * Descarga un archivo desde el navegador.
+ *
+ * Se crea un enlace temporal y se revoca la URL después: sin revocarla, el
+ * navegador conserva el archivo en memoria hasta recargar la página, y exportar
+ * varias veces iría acumulando copias.
+ */
+function download(blob: Blob, fileName: string): void {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+
+  link.href = url;
+  link.download = fileName;
+  link.click();
+
+  URL.revokeObjectURL(url);
+}
+
+/** Quita del nombre lo que un sistema de archivos no admite. */
+function sanitizeFileName(name: string): string {
+  const safe = name.replace(/[\\/:*?"<>|]/g, '').trim();
+
+  return safe.length > 0 ? safe : 'druse';
+}
+
+/**
+ * Reconoce un rechazo cuando la respuesta se pidió como `blob`.
+ *
+ * Angular entrega el cuerpo del error también como Blob, así que el JSON con el
+ * motivo hay que leerlo del archivo en lugar de encontrarlo ya interpretado.
+ */
+async function asRejectionFromBlob(error: unknown): Promise<QueryRejected | null> {
+  if (!(error instanceof HttpErrorResponse) || error.status !== 409) {
+    return null;
+  }
+
+  if (error.error instanceof Blob) {
+    try {
+      return JSON.parse(await error.error.text()) as QueryRejected;
+    } catch {
+      return null;
+    }
+  }
+
+  return error.error?.reason ? (error.error as QueryRejected) : null;
 }
 
 /** Reconoce el 409 con el que la API pide confirmación. */

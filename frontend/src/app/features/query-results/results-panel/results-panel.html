@@ -40,21 +40,77 @@
 
   <span class="spacer"></span>
 
-  <button type="button" class="tool-button" [class.is-on]="hasFilters()" [disabled]="!resultSet()">
+  <button
+    type="button"
+    class="tool-button"
+    [class.is-on]="showFilters()"
+    [disabled]="!resultSet()"
+    title="Filtrar las filas mostradas"
+    (click)="toggleFilters()"
+  >
     <app-icon name="filter" [size]="12" />
     Filtros
   </button>
-  <button type="button" class="tool-button" [disabled]="!resultSet()">
-    <app-icon name="export" [size]="12" />
-    Exportar
-    <span class="tool-button__hint">CSV · Excel</span>
-  </button>
+
+  <div class="export">
+    <button
+      type="button"
+      class="tool-button"
+      [disabled]="!resultSet() || exporting()"
+      [attr.aria-expanded]="exportOpen()"
+      (click)="toggleExport()"
+    >
+      <app-icon name="export" [size]="12" />
+      {{ exporting() ? 'Exportando…' : 'Exportar' }}
+      <span class="tool-button__hint">CSV · Excel</span>
+    </button>
+
+    @if (exportOpen()) {
+      <ul class="export__menu" role="menu">
+        <li>
+          <button type="button" class="export__option" role="menuitem" (click)="chooseExport('csv')">
+            CSV
+            <span class="export__hint">Todas las filas del resultado</span>
+          </button>
+        </li>
+        <li>
+          <button type="button" class="export__option" role="menuitem" (click)="chooseExport('xlsx')">
+            Excel
+            <span class="export__hint">Hasta 200 000 filas</span>
+          </button>
+        </li>
+      </ul>
+    }
+  </div>
 </header>
 
 @switch (activeTab()) {
   @case ('results') {
-    @if (resultSet(); as set) {
-      <app-results-grid [resultSet]="set" />
+    @if (currentSet(); as set) {
+      @if (resultSets().length > 1) {
+        <div class="sets" role="tablist" aria-label="Conjuntos de resultados">
+          @for (item of resultSets(); track $index) {
+            <button
+              type="button"
+              class="sets__tab"
+              role="tab"
+              [class.is-active]="$index === activeSetIndex()"
+              [attr.aria-selected]="$index === activeSetIndex()"
+              (click)="selectSet($index)"
+            >
+              Resultado {{ $index + 1 }}
+              <span class="sets__count">{{ item.rows.length }}</span>
+            </button>
+          }
+        </div>
+      }
+
+      <app-results-grid
+        [resultSet]="set"
+        [showFilters]="showFilters()"
+        (copied)="copied.emit($event)"
+        (copyFailed)="copyFailed.emit()"
+      />
 
       <footer class="foot">
         <div class="foot__item">
@@ -114,62 +170,11 @@
   }
 
   @default {
-    <div class="history__search">
-      <app-icon name="search" [size]="12" />
-      <input
-        type="search"
-        class="history__input"
-        placeholder="Filtrar por SQL o conexión…"
-        [value]="historySearch()"
-        (input)="onSearch($event)"
-        aria-label="Filtrar el historial"
-      />
-    </div>
-
-    @if (history().length > 0) {
-      <ul class="history">
-        @for (entry of history(); track entry.id) {
-          <li class="history__item" [class.is-failed]="!entry.succeeded">
-            <button
-              type="button"
-              class="history__sql"
-              title="Abrir en una pestaña nueva"
-              (click)="reuseQuery.emit(entry.sql)"
-            >
-              {{ summarize(entry.sql) }}
-            </button>
-            <span class="history__meta">
-              <span [attr.title]="entry.executedAtUtc">{{ formatDate(entry.executedAtUtc) }}</span>
-              <span class="history__dot" aria-hidden="true">·</span>
-              <span>{{ entry.connectionName }}</span>
-              <span class="history__dot" aria-hidden="true">·</span>
-              <span>{{ entry.durationMs }} ms</span>
-              @if (entry.succeeded && entry.rowCount !== undefined && entry.rowCount !== null) {
-                <span class="history__dot" aria-hidden="true">·</span>
-                <span>{{ entry.rowCount }} filas</span>
-              }
-              @if (!entry.succeeded) {
-                <span class="history__dot" aria-hidden="true">·</span>
-                <span class="history__error">{{ entry.errorMessage }}</span>
-              }
-            </span>
-          </li>
-        }
-      </ul>
-
-      <footer class="foot">
-        <div class="foot__item foot__item--muted">{{ history().length }} entradas</div>
-        <span class="spacer"></span>
-        <button type="button" class="tool-button" (click)="clearHistory.emit()">
-          Vaciar historial
-        </button>
-      </footer>
-    } @else if (historySearch()) {
-      <div class="empty">Ninguna consulta coincide con «{{ historySearch() }}».</div>
-    } @else {
-      <div class="empty">
-        Todavía no hay consultas en el historial. Se guarda automáticamente al ejecutar.
-      </div>
-    }
+    <app-query-history
+      [entries]="history()"
+      (search)="searchHistory.emit($event)"
+      (clear)="clearHistory.emit()"
+      (reuse)="reuseQuery.emit($event)"
+    />
   }
 }
