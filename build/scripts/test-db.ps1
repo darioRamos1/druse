@@ -11,10 +11,11 @@
     reutilizarse para nada más ni parecerse a credenciales reales (plan §11).
 
     Si un puerto está ocupado, pásale otro y exporta la variable correspondiente
-    antes de ejecutar las pruebas (DRUSE_TEST_PG_PORT, DRUSE_TEST_MSSQL_PORT).
+    antes de ejecutar las pruebas (DRUSE_TEST_PG_PORT, DRUSE_TEST_MSSQL_PORT,
+    DRUSE_TEST_MYSQL_PORT).
 
 .PARAMETER Engine
-    Qué motor levantar: postgres, sqlserver o all (por defecto).
+    Qué motor levantar: postgres, sqlserver, mysql o all (por defecto).
 
 .PARAMETER Down
     Detiene y elimina los contenedores en lugar de crearlos.
@@ -31,11 +32,12 @@
 #>
 [CmdletBinding()]
 param(
-    [ValidateSet('all', 'postgres', 'sqlserver')]
+    [ValidateSet('all', 'postgres', 'sqlserver', 'mysql')]
     [string]$Engine = 'all',
 
     [int]$PostgresPort = 55440,
     [int]$SqlServerPort = 14433,
+    [int]$MySqlPort = 33306,
     [switch]$Down
 )
 
@@ -43,6 +45,7 @@ $ErrorActionPreference = 'Stop'
 
 $PostgresName = 'druse-pg-test'
 $SqlServerName = 'druse-mssql-test'
+$MySqlName = 'druse-mysql-test'
 
 function Remove-Container([string]$Name) {
     Write-Host "Eliminando $Name..." -ForegroundColor Yellow
@@ -52,6 +55,7 @@ function Remove-Container([string]$Name) {
 if ($Down) {
     if ($Engine -in 'all', 'postgres') { Remove-Container $PostgresName }
     if ($Engine -in 'all', 'sqlserver') { Remove-Container $SqlServerName }
+    if ($Engine -in 'all', 'mysql') { Remove-Container $MySqlName }
 
     Write-Host 'Listo.' -ForegroundColor Green
     return
@@ -136,6 +140,40 @@ if ($Engine -in 'all', 'sqlserver') {
         -Q "IF DB_ID('druse_test') IS NULL CREATE DATABASE druse_test;" 2>$null | Out-Null
 
     Write-Host "  SQL Server listo en 127.0.0.1:$SqlServerPort" -ForegroundColor Green
+}
+
+# --- MySQL ------------------------------------------------------------------
+if ($Engine -in 'all', 'mysql') {
+    if (Test-ContainerExists $MySqlName) {
+        Write-Host "$MySqlName ya existe; se reinicia." -ForegroundColor Cyan
+        docker start $MySqlName | Out-Null
+    }
+    else {
+        Write-Host "Creando $MySqlName en el puerto $MySqlPort..." -ForegroundColor Cyan
+
+        docker run -d `
+            --name $MySqlName `
+            -e MYSQL_ROOT_PASSWORD=druse_dev_only `
+            -e MYSQL_DATABASE=druse_test `
+            -p "${MySqlPort}:3306" `
+            mysql:8.4 | Out-Null
+    }
+
+    $ready = $false
+
+    foreach ($attempt in 1..60) {
+        Start-Sleep -Seconds 1
+        docker exec $MySqlName mysqladmin ping -uroot -pdruse_dev_only 2>$null | Out-Null
+
+        if ($LASTEXITCODE -eq 0) { $ready = $true; break }
+    }
+
+    if ($ready) {
+        Write-Host "  MySQL listo en 127.0.0.1:$MySqlPort" -ForegroundColor Green
+    }
+    else {
+        throw "$MySqlName no respondió a tiempo."
+    }
 }
 
 Write-Host ''

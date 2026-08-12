@@ -1,7 +1,9 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using Druse.Application.Abstractions;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Druse.IntegrationTests;
 
@@ -43,17 +45,41 @@ public sealed class QueryFlowTests : IClassFixture<DruseApiFactory>
             engine => engine.GetProperty("id").GetString() == "postgresql");
     }
 
-    [Fact]
-    public async Task ElMotorPostgreSqlDeclaraSuPuertoHabitual()
+    [Theory]
+    [InlineData("postgresql", 5432)]
+    [InlineData("sqlserver", 1433)]
+    [InlineData("mysql", 3306)]
+    public async Task CadaMotorDeclaraSuPuertoHabitual(string id, int defaultPort)
     {
         using var client = _factory.CreateAuthenticatedClient();
 
         var engines = await client.GetFromJsonAsync<JsonElement>("/api/engines");
 
-        var postgres = engines.EnumerateArray()
-            .Single(engine => engine.GetProperty("id").GetString() == "postgresql");
+        var engine = engines.EnumerateArray()
+            .Single(item => item.GetProperty("id").GetString() == id);
 
-        Assert.Equal(5432, postgres.GetProperty("defaultPort").GetInt32());
+        Assert.Equal(defaultPort, engine.GetProperty("defaultPort").GetInt32());
+    }
+
+    /// <summary>
+    /// Cada motor aporta tres piezas y el registro las busca por separado. Si
+    /// alguien añade un proveedor y olvida registrar su lector de metadatos o su
+    /// ejecutor, nada falla al arrancar: el motor aparece en la lista y revienta
+    /// más tarde, al abrir el árbol o al ejecutar. Esto lo detecta antes.
+    /// </summary>
+    [Fact]
+    public void TodoMotorAnunciadoTieneSusTresPiezas()
+    {
+        var registry = _factory.Services.GetRequiredService<IProviderRegistry>();
+
+        Assert.NotEmpty(registry.SupportedEngines);
+
+        foreach (var engine in registry.SupportedEngines)
+        {
+            Assert.Equal(engine, registry.GetProvider(engine).Engine);
+            Assert.Equal(engine, registry.GetMetadataReader(engine).Engine);
+            Assert.Equal(engine, registry.GetQueryExecutor(engine).Engine);
+        }
     }
 
     [Fact]

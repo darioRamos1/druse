@@ -12,6 +12,7 @@ using Druse.Persistence.Sqlite;
 using Druse.Platform.Abstractions;
 using Druse.Platform.Native;
 using Druse.Platform.Native.Secrets;
+using Druse.Provider.MySql;
 using Druse.Provider.PostgreSql;
 using Druse.Provider.SqlServer;
 
@@ -44,8 +45,9 @@ internal static class DependencyInjection
         services.AddScoped<IPreferencesStore, SqlitePreferencesStore>();
 
         // --- Proveedores de motor ---------------------------------------------
-        // Cada motor aporta tres piezas y nada más. Añadir MySQL en la Fase 8
-        // serán tres líneas aquí, sin tocar Domain, Application ni la interfaz.
+        // Cada motor aporta tres piezas y nada más. MySQL entró en la Fase 8
+        // exactamente así: tres líneas aquí, sin tocar Domain, Application ni la
+        // interfaz.
         services.AddSingleton<IDatabaseProvider, PostgreSqlDatabaseProvider>();
         services.AddSingleton<IDatabaseMetadataReader, PostgreSqlMetadataReader>();
         services.AddSingleton<IQueryExecutor, PostgreSqlQueryExecutor>();
@@ -53,6 +55,10 @@ internal static class DependencyInjection
         services.AddSingleton<IDatabaseProvider, SqlServerDatabaseProvider>();
         services.AddSingleton<IDatabaseMetadataReader, SqlServerMetadataReader>();
         services.AddSingleton<IQueryExecutor, SqlServerQueryExecutor>();
+
+        services.AddSingleton<IDatabaseProvider, MySqlDatabaseProvider>();
+        services.AddSingleton<IDatabaseMetadataReader, MySqlMetadataReader>();
+        services.AddSingleton<IQueryExecutor, MySqlQueryExecutor>();
 
         services.AddSingleton<IProviderRegistry, ProviderRegistry>();
 

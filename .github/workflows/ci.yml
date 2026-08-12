@@ -42,7 +42,7 @@ jobs:
   # Windows y macOS no traen Docker, y montarlo ahí multiplicaría el tiempo sin
   # aportar nada. Lo que se valida aquí son los proveedores, no el sistema.
   backend-con-motores-reales:
-    name: Backend con PostgreSQL y SQL Server
+    name: Backend con PostgreSQL, SQL Server y MySQL
     runs-on: ubuntu-latest
 
     services:
@@ -74,6 +74,19 @@ jobs:
           --health-retries 20
           --health-start-period 30s
 
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: druse_dev_only
+          MYSQL_DATABASE: druse_test
+        ports:
+          - 33306:3306
+        options: >-
+          --health-cmd "mysqladmin ping -uroot -pdruse_dev_only"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+
     env:
       DRUSE_TEST_PG_HOST: 127.0.0.1
       DRUSE_TEST_PG_PORT: 55440
@@ -86,6 +99,12 @@ jobs:
       DRUSE_TEST_MSSQL_DB: druse_test
       DRUSE_TEST_MSSQL_USER: sa
       DRUSE_TEST_MSSQL_PASSWORD: Druse_dev_only_1
+
+      DRUSE_TEST_MYSQL_HOST: 127.0.0.1
+      DRUSE_TEST_MYSQL_PORT: 33306
+      DRUSE_TEST_MYSQL_DB: druse_test
+      DRUSE_TEST_MYSQL_USER: root
+      DRUSE_TEST_MYSQL_PASSWORD: druse_dev_only
 
       # Sin esto, un motor caído se manifestaría como una suite en verde que no
       # comprobó nada. Aquí ese caso debe romper la compilación.
@@ -105,7 +124,7 @@ jobs:
             /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P 'Druse_dev_only_1' -C \
             -Q "IF DB_ID('druse_test') IS NULL CREATE DATABASE druse_test;"
 
-      - name: Probar contra los dos motores
+      - name: Probar contra los tres motores
         run: dotnet test backend/Druse.slnx --configuration Release --verbosity normal
 
   frontend:

@@ -190,6 +190,7 @@ druse/
 │   │   ├── Druse.Persistence.Sqlite/
 │   │   ├── Druse.Provider.PostgreSql/
 │   │   ├── Druse.Provider.SqlServer/
+│   │   ├── Druse.Provider.MySql/
 │   │   ├── Druse.Platform.Abstractions/
 │   │   ├── Druse.Platform.Native/
 │   │   └── Druse.Host.LocalApi/
@@ -204,7 +205,7 @@ druse/
     └── packaging/
 ```
 
-No crear el proyecto MySQL hasta que PostgreSQL y SQL Server compartan correctamente las abstracciones comunes.
+No crear el proyecto MySQL hasta que PostgreSQL y SQL Server compartan correctamente las abstracciones comunes. _(Cumplido: se creó en la Fase 8, cuando las 24 pruebas contractuales ya pasaban idénticas en los dos primeros motores.)_
 
 ---
 
@@ -536,13 +537,18 @@ Druse se instala y ejecuta en Windows sin que el usuario tenga que instalar Node
 
 ### Tareas
 
-- [ ] Crear `MySqlDatabaseProvider`.
-- [ ] Implementar metadatos MySQL/MariaDB.
-- [ ] Ejecutar las pruebas contractuales de proveedores.
-- [ ] Corregir diferencias de tipos y mensajes.
-- [ ] Crear pruebas de regresión para los tres motores.
-- [ ] Medir consumo de memoria y tiempos de respuesta.
-- [ ] Preparar la primera versión beta.
+- [x] Crear `MySqlDatabaseProvider`.
+- [x] Implementar metadatos MySQL/MariaDB. _(verificado también contra MariaDB 11.4, que supera las mismas 24 pruebas.)_
+- [x] Ejecutar las pruebas contractuales de proveedores. _(24 × 3 motores = 72, sin cambiar ninguna comprobación.)_
+- [x] Corregir diferencias de tipos y mensajes.
+- [x] Crear pruebas de regresión para los tres motores.
+- [x] Medir consumo de memoria y tiempos de respuesta.
+- [x] Preparar la primera versión beta. _(ver `docs/release-notes/0.1.0-beta.md`.)_
+
+### Criterio de salida
+
+Los tres motores superan el mismo contrato sin excepciones y existe una versión
+instalable con sus notas y sus límites declarados.
 
 ---
 
@@ -601,6 +607,7 @@ Host.LocalApi -> Application
 Host.LocalApi -> Infrastructure
 Host.LocalApi -> Provider.PostgreSql
 Host.LocalApi -> Provider.SqlServer
+Host.LocalApi -> Provider.MySql
 Host.LocalApi -> Persistence.Sqlite
 Host.LocalApi -> Platform.Native
 Application -> Domain
@@ -611,6 +618,7 @@ Persistence.Sqlite -> Application
 Platform.Native -> Platform.Abstractions
 Provider.PostgreSql -> Database.Abstractions
 Provider.SqlServer -> Database.Abstractions
+Provider.MySql -> Database.Abstractions
 ```
 
 `Domain`, `Database.Abstractions` y `Platform.Abstractions` no deben depender de infraestructura concreta. La composición de implementaciones ocurre únicamente en `Host.LocalApi`.
@@ -708,23 +716,23 @@ feature/desktop-packaging
 
 El MVP estará terminado cuando:
 
-- [ ] Existe un instalador funcional para Windows.
-- [ ] La solución compila y ejecuta pruebas automatizadas en Windows, Linux y macOS.
-- [ ] La API puede publicarse de forma autocontenida para diferentes Runtime Identifiers.
-- [ ] La interfaz conserva el diseño principal del mockup.
-- [ ] PostgreSQL y SQL Server funcionan mediante proveedores independientes.
-- [ ] Las conexiones se guardan de forma segura.
-- [ ] El explorador carga objetos bajo demanda.
-- [ ] El editor ejecuta todo el SQL o la selección activa.
-- [ ] Las consultas pueden cancelarse.
-- [ ] Los resultados no congelan la interfaz con el límite configurado.
-- [ ] Los mensajes y errores son comprensibles.
-- [ ] Los resultados se exportan a CSV y XLSX.
-- [ ] El historial persiste después de reiniciar.
-- [ ] Las pruebas unitarias y de integración principales pasan.
-- [ ] La aplicación funciona en un equipo limpio.
-- [ ] No existen dependencias del sistema operativo fuera de adaptadores de plataforma.
-- [ ] Agregar un nuevo proveedor no exige modificar Domain, Application ni los componentes Angular.
+- [x] Existe un instalador funcional para Windows. _(NSIS, MSI y ZIP portable; falta validar el ciclo de instalación en otro equipo.)_
+- [x] La solución compila y ejecuta pruebas automatizadas en Windows, Linux y macOS. _(matriz de integración continua.)_
+- [x] La API puede publicarse de forma autocontenida para diferentes Runtime Identifiers.
+- [x] La interfaz conserva el diseño principal del mockup. _(comparado a ojo con el mockup en la sesión 011; la única zona ausente es «Plan de ejecución», que está fuera del MVP.)_
+- [x] PostgreSQL y SQL Server funcionan mediante proveedores independientes. _(y MySQL/MariaDB desde la Fase 8.)_
+- [x] Las conexiones se guardan de forma segura.
+- [x] El explorador carga objetos bajo demanda.
+- [x] El editor ejecuta todo el SQL o la selección activa.
+- [x] Las consultas pueden cancelarse.
+- [x] Los resultados no congelan la interfaz con el límite configurado.
+- [x] Los mensajes y errores son comprensibles.
+- [x] Los resultados se exportan a CSV y XLSX.
+- [x] El historial persiste después de reiniciar.
+- [x] Las pruebas unitarias y de integración principales pasan.
+- [ ] La aplicación funciona en un equipo limpio. _(pendiente: hace falta otra máquina sin .NET ni Node.)_
+- [x] No existen dependencias del sistema operativo fuera de adaptadores de plataforma.
+- [x] Agregar un nuevo proveedor no exige modificar Domain, Application ni los componentes Angular. _(demostrado con MySQL: tres líneas en la composición y ni un componente Angular tocado.)_
 
 ---
 

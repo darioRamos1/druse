@@ -4,7 +4,7 @@ Aplicación de escritorio para administrar y consultar distintos motores de base
 
 Una *drusa* es la costra de cristales que tapiza el interior de una geoda: la estructura que aparece al abrir la piedra. Es lo que hace la aplicación con una base de datos.
 
-> **Estado: Fase 6 cerrada.** Funciona el flujo completo contra **PostgreSQL y SQL Server**: conectar, explorar el catálogo, escribir SQL con autocompletado del esquema, ejecutar, cancelar, consultar el historial y **exportar a CSV o Excel**. Lo que falta es empaquetarlo como aplicación de escritorio (Fase 7) y añadir MySQL (Fase 8).
+> **Estado: primera beta (0.1.0).** Funciona el flujo completo contra **PostgreSQL, SQL Server y MySQL/MariaDB**: conectar, explorar el catálogo, escribir SQL con autocompletado del esquema, ejecutar, cancelar, consultar el historial y **exportar a CSV o Excel**, todo dentro de una aplicación de escritorio que no necesita .NET ni Node.js instalados. Ver las [notas de la versión](docs/release-notes/0.1.0-beta.md).
 
 ## Exportar
 
@@ -74,7 +74,11 @@ El autocompletado ofrece las tablas, vistas y columnas **que el explorador ya ha
 | --- | --- |
 | PostgreSQL 12 – 18 | Funcionando |
 | SQL Server 2016 – 2022 | Funcionando (autenticación SQL; la integrada de Windows está en el backlog) |
-| MySQL | Fase 8 |
+| MySQL 8.0+ y MariaDB | Funcionando |
+
+Los tres superan **el mismo conjunto de 24 pruebas contractuales**, sin excepciones por motor.
+
+En MySQL, `SCHEMA` es un sinónimo de `DATABASE`, así que el explorador muestra un esquema del mismo nombre que su base. El árbol se comporta igual en los tres motores; la alternativa habría sido ramificar por motor en la interfaz, que es justo lo que el plan prohíbe.
 
 ## Ejecutar en desarrollo
 
@@ -123,13 +127,13 @@ npm test
 Las pruebas de proveedor y de integración necesitan servidores reales. Hay contenedores desechables preparados:
 
 ```powershell
-./build/scripts/test-db.ps1                    # ambos motores
+./build/scripts/test-db.ps1                    # los tres motores
 ./build/scripts/test-db.ps1 -Engine postgres   # solo uno
 ./build/scripts/test-db.ps1 -Down              # retirarlos
 ```
 
 ```bash
-./build/scripts/test-db.sh                     # ambos motores
+./build/scripts/test-db.sh                     # los tres motores
 ./build/scripts/test-db.sh sqlserver           # solo uno
 ./build/scripts/test-db.sh down                # retirarlos
 ```
@@ -138,6 +142,9 @@ Las pruebas de proveedor y de integración necesitan servidores reales. Hay cont
 | --- | --- | --- | --- |
 | PostgreSQL | `postgres:18-alpine` | 55440 | `DRUSE_TEST_PG_PORT` |
 | SQL Server | `mssql/server:2022-latest` | 14433 | `DRUSE_TEST_MSSQL_PORT` |
+| MySQL | `mysql:8.4` | 33306 | `DRUSE_TEST_MYSQL_PORT` |
+
+Para comprobar MariaDB basta apuntar las variables `DRUSE_TEST_MYSQL_*` a un contenedor `mariadb`: el contrato es el mismo y el proveedor no distingue entre ambos.
 
 **Sin contenedor las pruebas no fallan: se omiten.** Una máquina sin Docker no debería dar por rota la suite entera.
 
@@ -162,6 +169,7 @@ druse/
 └── docs/
     ├── architecture/
     ├── decisions/      ADR
+    ├── release-notes/  Notas de cada versión publicada
     └── mockups/        Mockup de referencia
 ```
 
@@ -174,6 +182,7 @@ La dirección de las dependencias apunta siempre al núcleo. Está fijada por pr
 | [`PLAN_TRABAJO_DRUSE.md`](PLAN_TRABAJO_DRUSE.md) | Plan maestro: alcance, arquitectura y las 8 fases |
 | [`BITACORA.md`](BITACORA.md) | Bitácora por sesión: estado actual, qué toca retomar y decisiones |
 | [`docs/decisions/`](docs/decisions/) | ADR de las decisiones estructurales |
+| [`docs/release-notes/0.1.0-beta.md`](docs/release-notes/0.1.0-beta.md) | Qué trae la primera beta, con qué números se comprobó y qué no garantiza |
 | [`docs/mockups/druse-main.html`](docs/mockups/druse-main.html) | Mockup de referencia de la interfaz |
 
 ## Dónde guarda Druse tus datos

@@ -33,6 +33,24 @@ describe('formatSql', () => {
     expect(result.error).toBeUndefined();
   });
 
+  it('respeta las comillas invertidas de MySQL', async () => {
+    const result = await formatSql('select `id` from `druse_test`.`usuarios`', 'mysql');
+
+    // En MySQL las comillas invertidas son lo que permite que una columna se
+    // llame `order` o `group`. Perderlas rompería la consulta.
+    expect(result.sql).toContain('`id`');
+    expect(result.sql).toContain('`usuarios`');
+    expect(result.error).toBeUndefined();
+  });
+
+  it('formatea el LIMIT de MySQL', async () => {
+    const result = await formatSql('select * from usuarios limit 10 offset 20', 'mysql');
+
+    expect(result.sql).toContain('LIMIT');
+    expect(result.sql).toContain('OFFSET');
+    expect(result.error).toBeUndefined();
+  });
+
   it('no toca un texto vacío', async () => {
     const result = await formatSql('   ', 'postgresql');
 

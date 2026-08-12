@@ -2,6 +2,8 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { of } from 'rxjs';
 
 import { ApplicationGateway } from '../../core/application-gateway/application-gateway';
+import { WorkspaceStore } from '../../core/workspace/workspace-store';
+import { ConnectionForm } from '../../shared/models/workspace';
 import { AppShell } from './app-shell';
 
 /** Gateway que no habla con nadie: el shell debe montarse sin API detrás. */
@@ -12,6 +14,56 @@ function silentGateway(): Partial<ApplicationGateway> {
     getChildren: () => of([]),
   };
 }
+
+/**
+ * Gateway mínimo que sí deja abrir una sesión, para probar el contexto.
+ *
+ * `schemaName` es lo único que cambia entre motores: en PostgreSQL el esquema se
+ * llama `public`, y en MySQL igual que la base.
+ */
+function connectedGateway(engine: 'mysql' | 'postgresql', schemaName: string): Partial<ApplicationGateway> {
+  return {
+    getEngines: () => of([]),
+    getSavedConnections: () => of([]),
+    getSecretStoreStatus: () => of({ available: true, description: 'Prueba' }),
+    getHistory: () => of([]),
+    openSession: () =>
+      of({
+        sessionId: 'sesion-1',
+        engine,
+        serverVersion: '18.0.0',
+        database: 'druse_test',
+        readOnly: false,
+      }),
+    getDatabases: () =>
+      of([{ id: 'db:druse_test', name: 'druse_test', kind: 'database' as const, hasChildren: true }]),
+    getChildren: () =>
+      of([
+        {
+          id: `schema:${schemaName}`,
+          name: schemaName,
+          kind: 'schema' as const,
+          database: 'druse_test',
+          schema: schemaName,
+          hasChildren: true,
+        },
+      ]),
+  };
+}
+
+const connectionForm: ConnectionForm = {
+  name: 'Pruebas',
+  engine: 'mysql',
+  host: '127.0.0.1',
+  port: 33306,
+  database: 'druse_test',
+  username: 'root',
+  password: 'da-igual',
+  readOnly: false,
+  environment: 'development',
+  save: false,
+  storePassword: false,
+};
 
 describe('AppShell', () => {
   let fixture: ComponentFixture<AppShell>;
@@ -87,6 +139,50 @@ describe('AppShell', () => {
     expect(tabs.length).toBe(tabsBefore + 1);
     expect(active.length).toBe(1);
     expect(tabs[tabs.length - 1].classList).toContain('is-active');
+  });
+
+  /** Conecta un shell nuevo y expande la base, para que el árbol cargue su esquema. */
+  async function toolbarTextAfterConnecting(
+    engine: 'mysql' | 'postgresql',
+    schemaName: string,
+  ): Promise<string> {
+    TestBed.resetTestingModule();
+    await TestBed.configureTestingModule({
+      imports: [AppShell],
+      providers: [
+        { provide: ApplicationGateway, useValue: connectedGateway(engine, schemaName) },
+      ],
+    }).compileComponents();
+
+    const shell = TestBed.createComponent(AppShell);
+    await shell.whenStable();
+
+    const store = TestBed.inject(WorkspaceStore);
+    await store.connect({ ...connectionForm, engine });
+    // Expandir la base es lo que hace que el árbol cargue su esquema, que es de
+    // donde sale el contexto.
+    await store.toggleNode(store.explorerNodes()[0].id);
+
+    shell.detectChanges();
+    await shell.whenStable();
+
+    return (shell.nativeElement as HTMLElement).querySelector('app-editor-toolbar')?.textContent ?? '';
+  }
+
+  it('no inventa un esquema en el contexto del editor', async () => {
+    // `public` es el esquema por omisión de PostgreSQL y de nadie más: en SQL
+    // Server es `dbo` y en MySQL el esquema es la propia base. Escribirlo fijo
+    // mentía en dos motores de tres.
+    const toolbar = await toolbarTextAfterConnecting('mysql', 'druse_test');
+
+    expect(toolbar).toContain('druse_test');
+    expect(toolbar).not.toContain('public');
+  });
+
+  it('muestra el esquema cuando el motor sí tiene uno propio', async () => {
+    const toolbar = await toolbarTextAfterConnecting('postgresql', 'public');
+
+    expect(toolbar).toContain('druse_test.public');
   });
 
   it('al cerrar la pestaña activa deja otra activa', async () => {

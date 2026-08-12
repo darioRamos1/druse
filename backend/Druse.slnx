@@ -8,6 +8,7 @@
     <Project Path="src/Druse.Persistence.Sqlite/Druse.Persistence.Sqlite.csproj" />
     <Project Path="src/Druse.Platform.Abstractions/Druse.Platform.Abstractions.csproj" />
     <Project Path="src/Druse.Platform.Native/Druse.Platform.Native.csproj" />
+    <Project Path="src/Druse.Provider.MySql/Druse.Provider.MySql.csproj" />
     <Project Path="src/Druse.Provider.PostgreSql/Druse.Provider.PostgreSql.csproj" />
     <Project Path="src/Druse.Provider.SqlServer/Druse.Provider.SqlServer.csproj" />
   </Folder>

@@ -93,10 +93,28 @@ export class AppShell {
 
   protected readonly hasConnection = computed(() => !!this._store.activeConnection()?.sessionId);
 
+  /**
+   * Contexto que muestra la barra del editor.
+   *
+   * El esquema solo se añade cuando el explorador ha cargado **uno y solo uno**,
+   * y no coincide ya con el nombre de la base. Antes se escribía `public` fijo,
+   * que es el esquema por omisión de PostgreSQL y de nadie más: en SQL Server es
+   * `dbo` y en MySQL no existe, porque allí el esquema *es* la base. Inventar un
+   * nombre de esquema es peor que no mostrar ninguno.
+   */
   protected readonly editorContext = computed(() => {
     const session = this._store.session();
 
-    return session ? `${session.database}.public` : 'sin conexión';
+    if (!session) {
+      return 'sin conexión';
+    }
+
+    const schemas = this._store.schemaIndex().schemas;
+    const only = schemas.length === 1 ? schemas[0] : null;
+
+    return only && only !== session.database
+      ? `${session.database}.${only}`
+      : session.database;
   });
 
   // --- Estado del editor -----------------------------------------------------
