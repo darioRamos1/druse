@@ -5,6 +5,7 @@ import {
   ElementRef,
   NgZone,
   OnInit,
+  effect,
   inject,
   input,
   output,
@@ -20,6 +21,13 @@ import { MonacoLoader } from './monaco-loader';
 export interface CursorPosition {
   readonly line: number;
   readonly column: number;
+}
+
+/** Selección activa del editor. */
+export interface EditorSelection {
+  readonly hasSelection: boolean;
+  /** Texto seleccionado, para poder ejecutarlo solo. */
+  readonly text: string;
 }
 
 /**
@@ -85,13 +93,27 @@ export class SqlEditor implements OnInit {
 
   readonly valueChange = output<string>();
   readonly cursorChange = output<CursorPosition>();
-  readonly selectionChange = output<boolean>();
+  readonly selectionChange = output<EditorSelection>();
   readonly execute = output<void>();
 
   protected readonly ready = signal(false);
   protected readonly failed = signal(false);
 
   private _editor: MonacoApi.editor.IStandaloneCodeEditor | null = null;
+
+  constructor() {
+    // El valor puede cambiar desde fuera al cambiar de pestaña. Se compara antes
+    // de escribir para no reponer el mismo texto en cada pulsación, lo que
+    // devolvería el cursor al principio.
+    effect(() => {
+      const value = this.value();
+      const editor = this._editor;
+
+      if (editor && editor.getValue() !== value) {
+        editor.setValue(value);
+      }
+    });
+  }
 
   async ngOnInit(): Promise<void> {
     let monaco: typeof MonacoApi;
@@ -149,7 +171,13 @@ export class SqlEditor implements OnInit {
 
       editor.onDidChangeCursorSelection((event) => {
         const empty = event.selection.isEmpty();
-        this._zone.run(() => this.selectionChange.emit(!empty));
+
+        // Se emite el texto y no solo si hay selección: «Ejecutar selección»
+        // necesita exactamente lo que el usuario marcó, sin volver a pedírselo
+        // al editor desde fuera.
+        const text = empty ? '' : (editor.getModel()?.getValueInRange(event.selection) ?? '');
+
+        this._zone.run(() => this.selectionChange.emit({ hasSelection: !empty, text }));
       });
 
       // Ctrl/Cmd + Enter ejecuta, como indica el mockup.

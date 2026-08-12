@@ -11,19 +11,20 @@ const INDENT_BASE = 8;
 /** Icono que corresponde a cada clase de objeto del explorador. */
 const KIND_ICONS: Readonly<Record<ExplorerNode['kind'], IconName | null>> = {
   folder: null,
-  database: null,
+  database: 'database',
   schema: null,
   table: 'table',
   view: 'table',
   function: null,
   procedure: null,
+  column: null,
 };
 
 /**
  * Barra lateral de conexiones con el explorador de objetos.
  *
- * En la Fase 1 recibe el árbol ya aplanado y no carga nada: la carga perezosa
- * por nodo llega en la Fase 2.
+ * Recibe el árbol ya aplanado y solo emite intenciones: quién carga los hijos y
+ * cuándo es asunto del store.
  */
 @Component({
   selector: 'app-connections-sidebar',
@@ -37,13 +38,20 @@ export class ConnectionsSidebar {
   readonly explorerNodes = input.required<readonly ExplorerNode[]>();
 
   readonly addConnection = output<void>();
-  readonly refresh = output<void>();
   readonly toggleConnection = output<string>();
   readonly toggleNode = output<string>();
+  readonly refreshNode = output<string>();
+  readonly disconnect = output<string>();
+  readonly openNode = output<ExplorerNode>();
 
   protected readonly activeCount = computed(
     () => this.connections().filter((connection) => connection.state === 'connected').length,
   );
+
+  /** Nodos de cada conexión, para pintarlos bajo la suya. */
+  protected nodesOf(connectionId: string): readonly ExplorerNode[] {
+    return this.explorerNodes().filter((node) => node.connectionId === connectionId);
+  }
 
   protected indentFor(node: ExplorerNode): number {
     return INDENT_BASE + node.depth * INDENT_STEP;
@@ -51,5 +59,11 @@ export class ConnectionsSidebar {
 
   protected iconFor(node: ExplorerNode): IconName | null {
     return KIND_ICONS[node.kind];
+  }
+
+  /** Evita que el botón de una acción propague el clic al nodo. */
+  protected act(event: Event, action: () => void): void {
+    event.stopPropagation();
+    action();
   }
 }

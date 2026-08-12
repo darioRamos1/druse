@@ -58,6 +58,23 @@ npm run build
 npm test
 ```
 
+### Base de datos de pruebas
+
+Las pruebas de proveedor y de integración necesitan un PostgreSQL real. Hay un contenedor desechable preparado:
+
+```powershell
+./build/scripts/test-db.ps1        # Windows
+```
+
+```bash
+./build/scripts/test-db.sh         # Linux y macOS
+./build/scripts/test-db.sh down    # retirarlo
+```
+
+Levanta `postgres:18-alpine` en `127.0.0.1:55440` con una contraseña de usar y tirar. Las pruebas lo encuentran solas; si necesitas otro puerto, ajusta `DRUSE_TEST_PG_PORT`.
+
+**Sin contenedor las pruebas no fallan: se omiten.** Una máquina sin Docker no debería dar por rota la suite entera.
+
 ## Estructura
 
 ```text

@@ -1,14 +1,60 @@
 import { Observable } from 'rxjs';
 
-/**
- * Estado del proceso local que atiende las peticiones de la aplicación.
- */
+import {
+  DatabaseColumn,
+  DatabaseEngine,
+  DatabaseObject,
+  EngineInfo,
+  QueryResult,
+  SessionInfo,
+  TestConnectionResult,
+} from '../../shared/models/workspace';
+
+/** Estado del proceso local que atiende las peticiones de la aplicación. */
 export interface HealthStatus {
   readonly status: string;
   readonly product: string;
   readonly version: string;
   readonly environment: string;
   readonly timestampUtc: string;
+}
+
+/** Datos de conexión. La contraseña solo viaja de ida. */
+export interface ConnectRequest {
+  readonly profile: {
+    readonly id?: string;
+    readonly name: string;
+    readonly engine: DatabaseEngine;
+    readonly host: string;
+    readonly port: number;
+    readonly database: string;
+    readonly username: string;
+    readonly readOnly?: boolean;
+    readonly sslMode?: string;
+    readonly connectTimeoutSeconds?: number;
+  };
+  readonly password?: string;
+}
+
+export interface ExecuteQueryRequest {
+  readonly sessionId: string;
+  readonly sql: string;
+  readonly maxRows?: number;
+  readonly timeoutSeconds?: number;
+  readonly confirmDestructive?: boolean;
+}
+
+/** Riesgo detectado antes de ejecutar. */
+export interface SqlRisk {
+  readonly kind: string;
+  readonly description: string;
+}
+
+/** La ejecución se rechazó y el usuario debe decidir. */
+export interface QueryRejected {
+  readonly reason: 'readonlyconnection' | 'unconfirmeddestructive' | 'emptystatement';
+  readonly message: string;
+  readonly risks: readonly SqlRisk[];
 }
 
 /**
@@ -23,4 +69,38 @@ export interface HealthStatus {
 export abstract class ApplicationGateway {
   /** Verifica que el proceso local está activo. */
   abstract getHealth(): Observable<HealthStatus>;
+
+  /** Motores con proveedor registrado. */
+  abstract getEngines(): Observable<readonly EngineInfo[]>;
+
+  /** Prueba unas credenciales sin abrir sesión ni guardarlas. */
+  abstract testConnection(request: ConnectRequest): Observable<TestConnectionResult>;
+
+  abstract openSession(request: ConnectRequest): Observable<SessionInfo>;
+
+  abstract closeSession(sessionId: string): Observable<void>;
+
+  abstract getDatabases(sessionId: string): Observable<readonly DatabaseObject[]>;
+
+  /** Hijos de un nodo. Es la base de la carga perezosa del explorador. */
+  abstract getChildren(
+    sessionId: string,
+    parent: DatabaseObject,
+  ): Observable<readonly DatabaseObject[]>;
+
+  abstract getColumns(
+    sessionId: string,
+    table: DatabaseObject,
+  ): Observable<readonly DatabaseColumn[]>;
+
+  /**
+   * Ejecuta SQL.
+   *
+   * Un rechazo por instrucción destructiva o por conexión de solo lectura llega
+   * como error HTTP 409 con cuerpo {@link QueryRejected}, no como excepción de
+   * transporte: es una respuesta legítima que la interfaz debe saber tratar.
+   */
+  abstract executeQuery(request: ExecuteQueryRequest): Observable<QueryResult>;
+
+  abstract cancelQuery(executionId: string): Observable<void>;
 }

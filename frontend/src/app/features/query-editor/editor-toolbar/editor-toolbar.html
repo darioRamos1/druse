@@ -1,4 +1,10 @@
-<button type="button" class="run" [disabled]="running()" (click)="execute.emit()">
+<button
+  type="button"
+  class="run"
+  [disabled]="running() || !canExecute()"
+  [attr.title]="canExecute() ? null : 'Abre una conexión para poder ejecutar'"
+  (click)="execute.emit()"
+>
   <app-icon name="play" [size]="11" />
   Ejecutar
   <kbd class="run__shortcut">⌘⏎</kbd>
@@ -7,7 +13,7 @@
 <button
   type="button"
   class="btn"
-  [disabled]="running() || !hasSelection()"
+  [disabled]="running() || !hasSelection() || !canExecute()"
   (click)="executeSelection.emit()"
 >
   <app-icon name="play-outline" [size]="11" />

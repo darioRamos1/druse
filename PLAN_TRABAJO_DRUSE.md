@@ -421,17 +421,17 @@ La pantalla reproduce el mockup con proporciones, colores y comportamiento de pa
 
 ### Tareas
 
-- [ ] Implementar `IDatabaseProvider`.
-- [ ] Crear `PostgreSqlDatabaseProvider` con Npgsql.
-- [ ] Crear y probar una conexión PostgreSQL.
-- [ ] Abrir y cerrar sesiones.
-- [ ] Obtener bases, esquemas, tablas, vistas y columnas.
-- [ ] Mostrar los metadatos con carga perezosa en el árbol.
-- [ ] Ejecutar una consulta desde Monaco.
-- [ ] Mostrar columnas, tipos, filas, duración y mensajes.
-- [ ] Ejecutar solamente el texto seleccionado.
-- [ ] Cancelar consultas.
-- [ ] Limitar filas y configurar timeout.
+- [x] Implementar `IDatabaseProvider`.
+- [x] Crear `PostgreSqlDatabaseProvider` con Npgsql.
+- [x] Crear y probar una conexión PostgreSQL.
+- [x] Abrir y cerrar sesiones.
+- [x] Obtener bases, esquemas, tablas, vistas y columnas.
+- [x] Mostrar los metadatos con carga perezosa en el árbol.
+- [x] Ejecutar una consulta desde Monaco.
+- [x] Mostrar columnas, tipos, filas, duración y mensajes.
+- [x] Ejecutar solamente el texto seleccionado.
+- [x] Cancelar consultas.
+- [x] Limitar filas y configurar timeout. _(timeout fijo en 30 s; hacerlo configurable en la interfaz queda para la Fase 5.)_
 
 ### Criterio de salida
 

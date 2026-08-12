@@ -6,6 +6,7 @@ import { ResultsGrid } from './results-grid';
 const resultSet: ResultSet = {
   durationMs: 12,
   totalRows: 2,
+  truncated: false,
   columns: [
     { name: 'id', dataType: 'int8', kind: 'number', width: 80 },
     { name: 'email', dataType: 'text', kind: 'text', width: 200 },

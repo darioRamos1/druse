@@ -2,15 +2,21 @@
  * Modelos de presentación del shell.
  *
  * Son deliberadamente independientes de los DTO de la API: describen lo que la
- * pantalla necesita mostrar, no lo que el backend devuelve. Cuando exista el
- * cliente generado por OpenAPI (Fase 2) se traducirá hacia estos tipos, para que
- * un cambio en el contrato no arrastre a los componentes.
+ * pantalla necesita mostrar. El gateway traduce entre ambos, de modo que un
+ * cambio en el contrato no arrastre a los componentes.
  */
 
 /** Motores soportados. Nunca se ramifica por motor dentro de los componentes. */
 export type DatabaseEngine = 'postgresql' | 'sqlserver' | 'mysql';
 
 export type ConnectionState = 'connected' | 'disconnected' | 'connecting' | 'error';
+
+/** Motor disponible, según lo que declara la API. */
+export interface EngineInfo {
+  readonly id: DatabaseEngine;
+  readonly name: string;
+  readonly defaultPort: number;
+}
 
 /** Perfil de conexión tal y como se dibuja en la barra lateral. */
 export interface ConnectionSummary {
@@ -19,6 +25,38 @@ export interface ConnectionSummary {
   readonly engine: DatabaseEngine;
   readonly state: ConnectionState;
   readonly expanded: boolean;
+  /** Presente mientras hay una sesión abierta. */
+  readonly sessionId?: string;
+  /** Motivo del último fallo, para mostrarlo junto a la conexión. */
+  readonly error?: string;
+}
+
+/** Datos con los que se abre una conexión. La contraseña no se guarda aquí. */
+export interface ConnectionForm {
+  readonly name: string;
+  readonly engine: DatabaseEngine;
+  readonly host: string;
+  readonly port: number;
+  readonly database: string;
+  readonly username: string;
+  readonly password: string;
+  readonly readOnly: boolean;
+}
+
+export interface SessionInfo {
+  readonly sessionId: string;
+  readonly engine: DatabaseEngine;
+  readonly serverVersion: string;
+  readonly database: string;
+  readonly readOnly: boolean;
+}
+
+export interface TestConnectionResult {
+  readonly succeeded: boolean;
+  readonly serverVersion?: string;
+  readonly errorMessage?: string;
+  readonly errorCode?: string;
+  readonly durationMs: number;
 }
 
 /** Clase de objeto dentro del explorador. Determina el icono y las acciones. */
@@ -29,26 +67,51 @@ export type DatabaseObjectKind =
   | 'table'
   | 'view'
   | 'function'
-  | 'procedure';
+  | 'procedure'
+  | 'column';
+
+/** Nodo tal y como lo devuelve la API. */
+export interface DatabaseObject {
+  readonly id: string;
+  readonly name: string;
+  readonly kind: DatabaseObjectKind;
+  readonly database?: string;
+  readonly schema?: string;
+  readonly hasChildren: boolean;
+  readonly approximateRowCount?: number;
+}
+
+export interface DatabaseColumn {
+  readonly name: string;
+  readonly dataType: string;
+  readonly isNullable: boolean;
+  readonly isPrimaryKey: boolean;
+  readonly defaultValue?: string;
+  readonly ordinal: number;
+}
 
 /**
- * Nodo del explorador ya aplanado.
+ * Nodo del explorador ya aplanado para pintarlo.
  *
- * El árbol se aplana a propósito: la lista virtualizada de la Fase 2 necesita
- * una secuencia, y el nivel de indentación se resuelve con `depth`.
+ * El árbol se aplana porque la lista necesita una secuencia; el nivel se resuelve
+ * con `depth`.
  */
 export interface ExplorerNode {
   readonly id: string;
   readonly label: string;
   readonly kind: DatabaseObjectKind;
   readonly depth: number;
-  readonly expanded?: boolean;
   readonly expandable: boolean;
-  /** Recuento de hijos o de filas, ya formateado para mostrar. */
+  readonly expanded: boolean;
+  /** Se están pidiendo sus hijos. */
+  readonly loading: boolean;
   readonly badge?: string;
   readonly selected?: boolean;
-  /** Texto atenuado tras la etiqueta, por ejemplo el esquema activo. */
   readonly hint?: string;
+  /** Objeto original, para volver a pedir sus hijos. */
+  readonly source: DatabaseObject;
+  /** Conexión a la que pertenece. */
+  readonly connectionId: string;
 }
 
 /** Pestaña de consulta abierta. */
@@ -56,8 +119,10 @@ export interface QueryTab {
   readonly id: string;
   readonly title: string;
   readonly active: boolean;
-  /** Hay cambios sin guardar. */
   readonly dirty: boolean;
+  readonly sql: string;
+  /** Conexión contra la que se ejecuta. */
+  readonly connectionId?: string;
 }
 
 export type ColumnType = 'number' | 'text' | 'boolean' | 'timestamp' | 'uuid' | 'binary';
@@ -65,22 +130,19 @@ export type ColumnType = 'number' | 'text' | 'boolean' | 'timestamp' | 'uuid' | 
 /** Columna de un conjunto de resultados. */
 export interface ResultColumn {
   readonly name: string;
-  /** Tipo tal y como lo reporta el motor: se muestra literal. */
   readonly dataType: string;
   readonly kind: ColumnType;
   /** Ancho en píxeles; `null` reparte el espacio sobrante. */
   readonly width: number | null;
   readonly sorted?: 'asc' | 'desc';
-  /** Filtro local escrito por el usuario. */
   readonly filter?: string;
 }
 
 /**
  * Fila de resultados.
  *
- * Los valores llegan ya convertidos a texto: la conversión de tipos ocurre en el
- * backend, que es quien conoce el dialecto. `null` se distingue de la cadena
- * vacía porque debe mostrarse de forma diferenciada (plan §6).
+ * `null` se distingue de la cadena vacía porque debe mostrarse de forma
+ * diferenciada (plan §6).
  */
 export interface ResultRow {
   readonly number: number;
@@ -92,6 +154,32 @@ export interface ResultSet {
   readonly rows: readonly ResultRow[];
   readonly totalRows: number;
   readonly durationMs: number;
+  /** Se alcanzó el límite de filas y quedaron más sin leer. */
+  readonly truncated: boolean;
+}
+
+export type QueryState = 'succeeded' | 'failed' | 'canceled' | 'running';
+
+export interface QueryMessage {
+  readonly text: string;
+  readonly severity: 'info' | 'warning' | 'error';
+}
+
+export interface QueryError {
+  readonly message: string;
+  readonly code?: string;
+  readonly position?: number;
+  readonly line?: number;
+}
+
+export interface QueryResult {
+  readonly executionId: string;
+  readonly state: QueryState;
+  readonly resultSets: readonly ResultSet[];
+  readonly messages: readonly QueryMessage[];
+  readonly rowsAffected?: number;
+  readonly durationMs: number;
+  readonly error?: QueryError;
 }
 
 /** Estado de la sesión que se refleja en la barra inferior. */

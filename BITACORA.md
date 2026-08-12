@@ -10,28 +10,30 @@
 
 | Campo | Valor |
 | --- | --- |
-| Última sesión | **003** — 2026-08-11 |
-| Fase activa | **Fase 2 — Flujo vertical PostgreSQL** |
+| Última sesión | **004** — 2026-08-11 |
+| Fase activa | **Fase 3 — Persistencia local y seguridad** |
 | Fase 0 | ✅ Cerrada. 9/9 tareas. |
-| Fase 1 | ✅ **Cerrada.** 8/8 tareas. |
+| Fase 1 | ✅ Cerrada. 8/8 tareas. |
+| Fase 2 | ✅ **Cerrada.** 11/11 tareas. |
 | ¿Compila el backend? | Sí — 0 advertencias, 0 errores |
-| ¿Compila el frontend? | Sí — 320 kB iniciales, 0 advertencias |
-| ¿Pasan las pruebas? | Sí — 7 en backend, 17 en frontend |
-| ¿Responde la API? | Sí — `GET /api/health` en 127.0.0.1:5177 |
+| ¿Compila el frontend? | Sí — 386 kB iniciales, 0 advertencias |
+| ¿Pasan las pruebas? | Sí — **90 en backend** (54 unitarias + 21 contractuales + 15 integración) y **37 en frontend** |
+| ¿Funciona contra una base real? | Sí — verificado de punta a punta contra PostgreSQL 18.4 en Docker |
 | Bloqueantes | Ninguno |
-| Git | Rama `feature/app-shell`, pendiente de fusionar en `main`. Sin remoto configurado. |
+| Git | Rama `feature/postgresql-connection`, pendiente de fusionar en `main`. Sin remoto configurado. |
 
 ### Qué toca retomar en la próxima sesión
 
-1. **Fusionar `feature/app-shell` en `main`** y abrir `feature/postgresql-connection`.
-2. Empezar la **Fase 2** por el backend, en este orden:
-   - definir `IDatabaseProvider`, `IDatabaseSession`, `IDatabaseMetadataReader` e `IQueryExecutor` en `Druse.Database.Abstractions`;
-   - implementar `PostgreSqlDatabaseProvider` con Npgsql;
-   - endpoints de conexión, sesión y metadatos;
-   - ejecución de consulta con cancelación y límite de filas.
-3. **Antes de la Fase 2: verificar Docker** y levantar un PostgreSQL desechable para las pruebas de integración. Es el único prerrequisito externo.
-4. Sustituir los datos simulados: `frontend/src/app/shared/mock/mock-workspace.ts` debe desaparecer cuando el gateway devuelva datos reales.
-5. Pendiente de verificación visual: no se pudo comparar la pantalla con el mockup mediante captura porque la extensión de Chrome no estaba conectada. Queda comprobado por DOM y pruebas, pero conviene una revisión a ojo abriendo `npm start`.
+1. **Fusionar `feature/postgresql-connection` en `main`** y abrir `feature/local-persistence`.
+2. Empezar la **Fase 3**, cuyo primer objetivo es que las contraseñas dejen de pedirse en cada arranque:
+   - `Druse.Persistence.Sqlite` con la base local;
+   - `IAppPaths` e `ISecretStore` en `Platform.Abstractions`, con implementación por sistema en `Platform.Native`;
+   - guardar perfiles **sin contraseña** en SQLite y la contraseña en el almacén del sistema;
+   - historial de consultas y preferencias.
+3. Token temporal entre Angular y la API, que hoy no existe: cualquier proceso local puede llamarla.
+4. La base de pruebas se levanta con `./build/scripts/test-db.ps1`. El contenedor `druse-pg-test` puede seguir corriendo entre sesiones.
+
+**Sigue pendiente el visto bueno visual.** La extensión de Chrome no estaba conectada en ninguna de las dos sesiones, así que la pantalla nunca se ha comparado a ojo con el mockup.
 
 ---
 
@@ -97,6 +99,70 @@ Pendiente de verificar cuando toque: Docker (pruebas de integración con contene
 ---
 
 ## 5. Registro de sesiones
+
+### Sesión 004 — 2026-08-11 · Fase 2 completa
+
+**Objetivo:** el flujo vertical contra PostgreSQL, de la interfaz al motor.
+
+**Hecho:**
+
+*Dominio y contratos*
+- `ConnectionProfile`, `DatabaseObject`, `DatabaseColumn`, `QueryRequest`, `QueryResult` y compañía en `Druse.Domain`.
+- `IDatabaseProvider`, `IDatabaseSession`, `IDatabaseMetadataReader` e `IQueryExecutor` en `Druse.Database.Abstractions`.
+- **`ConnectionProfile` no tiene campo de contraseña.** Las credenciales viajan aparte en `DatabaseCredentials`, se usan al abrir y se descartan. Hay una prueba que falla si alguien añade una propiedad que se llame «password», «secret» o «credential».
+- `SqlSafetyAnalyzer`: detecta DROP, TRUNCATE, DELETE/UPDATE sin WHERE, cambios de esquema y de permisos. Descarta cadenas, identificadores citados y comentarios antes de analizar, para no avisar sin motivo.
+
+*Proveedor PostgreSQL*
+- `PostgreSqlDatabaseProvider` con Npgsql 10.
+- `PostgreSqlQueryExecutor` sobre `DbCommand`/`DbDataReader`. **No reescribe el SQL**: el límite de filas se aplica al leer, no añadiendo `LIMIT`, porque modificar la consulta cambiaría su significado y su plan.
+- `PostgreSqlMetadataReader` sobre los catálogos `pg_*`, con carga perezosa por nivel y recuento estimado desde `reltuples`.
+- `PostgreSqlErrorNormalizer`: traduce excepciones a `QueryError` **saneado**, porque los mensajes del driver pueden traer la cadena de conexión.
+- Los valores se formatean en cultura invariante: un `numeric` con la coma decimal de la máquina no se podría copiar de vuelta a una consulta.
+
+*Aplicación e infraestructura*
+- `ConnectionService`, `MetadataService` y `QueryService`.
+- `QueryService.Validate` concentra las reglas comunes: solo lectura, confirmación de instrucciones destructivas y límites. **Confirmar un riesgo no permite saltarse el modo de solo lectura**, que tiene prioridad.
+- `ProviderRegistry`, `SessionRegistry` y `QueryExecutionTracker` (cancelación con tokens enlazados).
+
+*API local*
+- Endpoints de motores, prueba de conexión, sesiones, metadatos, ejecución y cancelación.
+- Middleware que traduce las excepciones conocidas: **ninguna traza llega al cliente**.
+- Las sesiones se cierran al apagar el proceso.
+
+*Frontend*
+- `ApplicationGateway` ampliado con todo el contrato; `HttpApplicationGateway` traduce los DTO y clasifica los tipos de columna por nombre, no por motor.
+- **`WorkspaceStore`**: conexiones, árbol perezoso, pestañas, ejecución y cancelación con Signals.
+- Diálogo de nueva conexión según el mockup, con «Probar conexión».
+- El árbol carga hijos al expandir y no vuelve a pedirlos; hay que actualizar el nodo explícitamente.
+- Doble clic en una tabla abre una pestaña con su `SELECT`.
+- Aviso de instrucción destructiva con «Ejecutar de todos modos».
+- **Los datos simulados se borraron**, como estaba previsto.
+
+*Pruebas*
+- 21 contractuales contra PostgreSQL real: conexión válida e inválida, tipos, nulos, varios conjuntos de resultados, errores con su SQLSTATE, timeout, cancelación y metadatos.
+- 15 de integración por HTTP, incluido el flujo completo y la comprobación de que **ninguna respuesta devuelve la contraseña**.
+- 20 unitarias nuevas del analizador de SQL y las reglas de ejecución.
+
+**Verificado ejecutando:**
+- `dotnet build` y `ng build` — 0 advertencias.
+- 90 pruebas de backend y 37 de frontend, todas pasan.
+- Flujo completo por HTTP contra PostgreSQL 18.4: salud → motores → sesión → bases → esquemas → `SELECT` con nulo → cierre.
+- `DELETE FROM pg_class` sin filtro devuelve **409** con el riesgo explicado, en lugar de ejecutarse.
+- Proxy de Angular alcanzando la API y ésta la base.
+
+**Incidencias resueltas:**
+1. El puerto 55440 se eligió porque **55432 ya lo ocupaba `prima-postgres`**, un contenedor ajeno al proyecto. No se tocó ningún contenedor existente.
+2. Una prueba destapó que `ALTER TABLE … DROP COLUMN` solo se marcaba como cambio de esquema, cuando **destruye datos**. Se amplió el patrón para tratarlo como DROP.
+3. El diálogo de conexión superaba el presupuesto de estilos por 281 bytes. Aquí sí se subió el límite a 6 kB: partir un modal en dos componentes por eso habría sido peor que el problema.
+
+**No hecho / decidido no hacer:**
+- **Sin verificación visual**: la extensión de Chrome sigue sin estar conectada.
+- El timeout está fijo en 30 s; exponerlo en la interfaz es de la Fase 5.
+- No hay historial ni persistencia: la contraseña se pide en cada conexión. Es justo el objetivo de la Fase 3.
+- No hay token entre Angular y la API. También Fase 3.
+- Sin exportación a CSV/XLSX (Fase 6) ni plan de ejecución.
+
+---
 
 ### Sesión 003 — 2026-08-11 · Fase 1 completa
 
@@ -251,7 +317,9 @@ Pendiente de verificar cuando toque: Docker (pruebas de integración con contene
 
 | ID | Decisión | Opciones | Estado |
 | --- | --- | --- | --- |
-| D-08 | Biblioteca de cuadrícula | Aplazada a propósito. La cuadrícula de la Fase 1 es una rejilla CSS propia, ya aislada en `results-grid`. Con datos reales se decidirá entre AG Grid Community y una virtualización propia; los requisitos son bastante acotados. | Abierta — **Fase 6**, no antes |
+| D-08 | Biblioteca de cuadrícula | Aplazada a propósito. La cuadrícula es una rejilla CSS propia, aislada en `results-grid`. Con 500 filas se comporta bien; la decisión entre AG Grid Community y virtualización propia se toma cuando haya que subir ese límite. | Abierta — **Fase 6** |
+| D-15 | Selector de base de datos | PostgreSQL no permite cambiar de base sin reconectar, así que el explorador solo muestra los esquemas de la base de la sesión. Falta decidir si abrir una sesión nueva por base o pedirle al usuario que cree otra conexión. | Abierta — Fase 4, al comparar con SQL Server |
+| D-16 | Paginación de resultados | El pie muestra el rango pero no navega: hoy se trae un único bloque de 500 filas. Decidir entre paginación por `OFFSET` (cambia el SQL del usuario) o desplazamiento sobre un cursor. | Abierta — Fase 6 |
 | D-11 | Optimización del ejecutable | La publicación autocontenida pesa 107 MB. Evaluar trimming y ReadyToRun. | Abierta — Fase 7 |
 | D-14 | Estado del shell | Hoy vive en Signals dentro de `AppShell`. Al llegar los datos reales hay que decidir si se reparte en servicios por funcionalidad. Sigue en pie no incorporar NgRx sin necesidad comprobada. | Abierta — Fase 2 |
 
@@ -316,8 +384,8 @@ Fuente: `docs/mockups/druse-main.html`. **Ya implementado** en `frontend/src/sty
 | --- | --- | --- |
 | 0 | Preparación y decisiones | ✅ **Cerrada** — 9/9 |
 | 1 | Shell visual basado en el mockup | ✅ **Cerrada** — 8/8 |
-| 2 | Flujo vertical PostgreSQL | 🔄 **Activa** — 0/11 |
-| 3 | Persistencia local y seguridad | ⬜ No iniciada |
+| 2 | Flujo vertical PostgreSQL | ✅ **Cerrada** — 11/11 |
+| 3 | Persistencia local y seguridad | 🔄 **Activa** — 0/10 |
 | 4 | SQL Server | ⬜ No iniciada |
 | 5 | Productividad del editor | ⬜ No iniciada |
 | 6 | Resultados y exportaciones | ⬜ No iniciada |
@@ -336,23 +404,26 @@ Los cuatro puntos están verificados con ejecución real, no por inspección.
 
 Proporciones y colores salen de los tokens extraídos del propio mockup, y los dos paneles se redimensionan con ratón y con teclado. **Pendiente el visto bueno a ojo**: la comparación por captura no se pudo hacer.
 
-### Fase 2 — detalle
+### Fase 2 — criterio de salida ✅
 
-- [ ] Implementar `IDatabaseProvider`.
-- [ ] Crear `PostgreSqlDatabaseProvider` con Npgsql.
-- [ ] Crear y probar una conexión PostgreSQL.
-- [ ] Abrir y cerrar sesiones.
-- [ ] Obtener bases, esquemas, tablas, vistas y columnas.
-- [ ] Mostrar los metadatos con carga perezosa en el árbol.
-- [ ] Ejecutar una consulta desde Monaco.
-- [ ] Mostrar columnas, tipos, filas, duración y mensajes.
-- [ ] Ejecutar solamente el texto seleccionado.
-- [ ] Cancelar consultas.
-- [ ] Limitar filas y configurar timeout.
+> «Un usuario puede conectarse a PostgreSQL, navegar hasta una tabla, ejecutar un `SELECT`, ver el resultado y cancelar una consulta larga.»
 
-**Criterio de salida:** un usuario puede conectarse a PostgreSQL, navegar hasta una tabla, ejecutar un `SELECT`, ver el resultado y cancelar una consulta larga.
+Los cinco pasos están verificados contra PostgreSQL 18.4 real, no simulado.
 
-**Prerrequisito:** una instancia PostgreSQL de prueba. Verificar Docker antes de empezar.
+### Fase 3 — detalle
+
+- [ ] Crear la base SQLite local.
+- [ ] Guardar perfiles sin incluir la contraseña en texto plano.
+- [ ] Integrar el almacén seguro del sistema operativo para secretos.
+- [ ] Guardar historial de consultas.
+- [ ] Guardar pestañas recientes y preferencias.
+- [ ] Implementar perfiles de color para producción, pruebas y desarrollo.
+- [ ] Ocultar información sensible de logs y excepciones.
+- [ ] Agregar token temporal entre Angular y la API local.
+- [ ] Restringir CORS al origen de la aplicación. _(Hecho parcialmente: hay política para el origen de desarrollo.)_
+- [ ] Implementar `IAppPaths` e `ISecretStore` sin dependencias del sistema operativo en Application.
+
+**Criterio de salida:** cerrar y abrir la aplicación conserva conexiones, historial y preferencias sin almacenar contraseñas legibles.
 
 ---
 
@@ -360,7 +431,9 @@ Proporciones y colores salen de los tokens extraídos del propio mockup, y los d
 
 | Riesgo | Impacto | Mitigación |
 | --- | --- | --- |
-| **Sin PostgreSQL de prueba** | **Bloquea la Fase 2, que es la activa** | Contenedor Docker desechable. Verificar Docker en la próxima sesión |
+| **La contraseña se pide en cada conexión** | Molesto de usar; empuja a soluciones caseras del usuario | Es el objetivo de la Fase 3: `ISecretStore` sobre el almacén del sistema |
+| **La API local no pide token** | Cualquier proceso de la máquina puede llamarla | Token temporal en la Fase 3. Mitigado en parte: solo escucha en loopback |
+| Contenedor `druse-pg-test` en el 55440 | El 55432 lo ocupa `prima-postgres`, ajeno al proyecto | Puerto configurable con `DRUSE_TEST_PG_PORT` |
 | Rust no instalado | Bloquea la Fase 7 | Instalar antes de empezarla; no urge |
 | Ejecutable de 107 MB | Instalador pesado | D-11: trimming y ReadyToRun en la Fase 7 |
 | Dependencias con vulnerabilidades en plantillas | Ya pasó dos veces: `Microsoft.OpenApi` y `dompurify` | En backend lo caza `TreatWarningsAsErrors`; en frontend, `npm audit` en cada instalación |

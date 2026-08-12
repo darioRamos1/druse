@@ -1,4 +1,4 @@
-<app-top-bar />
+<app-top-bar (newConnection)="openDialog()" (newQuery)="createTab()" />
 
 <div class="body">
   <app-connections-sidebar
@@ -6,8 +6,12 @@
     [style.width.px]="sidebarWidth()"
     [connections]="connections()"
     [explorerNodes]="explorerNodes()"
+    (addConnection)="openDialog()"
     (toggleConnection)="toggleConnection($event)"
     (toggleNode)="toggleNode($event)"
+    (refreshNode)="refreshNode($event)"
+    (disconnect)="disconnect($event)"
+    (openNode)="openNode($event)"
   />
 
   <app-resize-handle
@@ -30,18 +34,46 @@
       [context]="editorContext()"
       [running]="running()"
       [hasSelection]="hasSelection()"
-      (execute)="onExecute()"
-      (executeSelection)="onExecute()"
+      [canExecute]="hasConnection()"
+      (execute)="execute()"
+      (executeSelection)="executeSelection()"
+      (cancel)="cancel()"
     />
 
     <app-sql-editor
       class="editor"
       [value]="sql()"
-      (valueChange)="sql.set($event)"
+      (valueChange)="onSqlChange($event)"
       (cursorChange)="onCursorChange($event)"
-      (selectionChange)="hasSelection.set($event)"
-      (execute)="onExecute()"
+      (selectionChange)="onSelectionChange($event)"
+      (execute)="execute()"
     />
+
+    @if (rejection(); as pending) {
+      <div class="banner banner--warning" role="alertdialog" aria-live="assertive">
+        <div class="banner__text">
+          <strong class="banner__title">{{ pending.message }}</strong>
+          <ul class="banner__risks">
+            @for (risk of pending.risks; track risk.kind) {
+              <li>{{ risk.description }}</li>
+            }
+          </ul>
+        </div>
+        <div class="banner__actions">
+          @if (pending.reason === 'unconfirmeddestructive') {
+            <button type="button" class="banner__button banner__button--danger" (click)="confirmDestructive()">
+              Ejecutar de todos modos
+            </button>
+          }
+          <button type="button" class="banner__button" (click)="dismissRejection()">Cancelar</button>
+        </div>
+      </div>
+    } @else if (notice(); as message) {
+      <div class="banner" role="status" aria-live="polite">
+        <span class="banner__text">{{ message }}</span>
+        <button type="button" class="banner__button" (click)="dismissNotice()">Cerrar</button>
+      </div>
+    }
 
     <app-resize-handle
       axis="height"
@@ -52,12 +84,17 @@
       aria-label="Alto del panel de resultados"
     />
 
-    <app-results-panel class="results" [style.height.px]="resultsHeight()" [resultSet]="resultSet()" />
-
-    <app-status-bar
-      [session]="session()"
-      [line]="cursor().line"
-      [column]="cursor().column"
+    <app-results-panel
+      class="results"
+      [style.height.px]="resultsHeight()"
+      [resultSet]="resultSet()"
+      [result]="result()"
     />
+
+    <app-status-bar [session]="session()" [line]="cursor().line" [column]="cursor().column" />
   </main>
 </div>
+
+@if (dialogOpen()) {
+  <app-connection-dialog (closed)="closeDialog()" />
+}
