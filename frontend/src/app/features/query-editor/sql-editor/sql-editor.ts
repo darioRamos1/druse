@@ -106,6 +106,9 @@ export class SqlEditor implements OnInit {
     ((schema: string | null, name: string) => Promise<readonly string[]>) | undefined
   >(undefined);
 
+  /** Cómo pedir las tablas de un esquema que el precalentado no alcanzó. */
+  readonly loadRelations = input<((schema: string) => Promise<void>) | undefined>(undefined);
+
   readonly valueChange = output<string>();
   readonly cursorChange = output<CursorPosition>();
   readonly selectionChange = output<EditorSelection>();
@@ -209,6 +212,7 @@ export class SqlEditor implements OnInit {
       engine: this.engine(),
       schema: this.schema(),
       loadColumns: this.loadColumns(),
+      loadRelations: this.loadRelations(),
     }));
 
     // Monaco instala muchísimos escuchadores de eventos. Crearlo fuera de la

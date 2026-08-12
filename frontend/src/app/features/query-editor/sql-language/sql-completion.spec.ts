@@ -204,6 +204,37 @@ describe('autocompletado SQL', () => {
       expect(labels).toEqual(['id', 'nombre', 'correo']);
     });
 
+    it('pide las tablas de un esquema que aún no se ha recorrido', async () => {
+      // Un esquema conocido del que todavía no se sabe nada más. Pasa en las
+      // bases con muchos esquemas, donde el precalentado no llega a todos.
+      let index: SchemaIndex = { schemas: ['tpublico'], relations: [] };
+      const pedidos: string[] = [];
+      const { monaco, provider } = fakeMonaco();
+
+      registerSqlCompletion(monaco as never, () => ({
+        engine: 'sqlserver',
+        schema: index,
+        loadRelations: (schemaName) => {
+          pedidos.push(schemaName);
+          // Cargarlo es justo lo que hace el store: repone el índice.
+          index = multiSchema;
+          return Promise.resolve();
+        },
+      }));
+
+      const sql = 'SELECT * FROM tpublico.';
+      const result = await provider().provideCompletionItems(fakeModel(sql) as never, {
+        lineNumber: 1,
+        column: sql.length + 1,
+      });
+
+      expect(pedidos).toEqual(['tpublico']);
+      expect(result.suggestions.map((item: { label: string }) => item.label)).toEqual([
+        'usuarios',
+        'facturas',
+      ]);
+    });
+
     it('pide las columnas que faltan en lugar de no sugerir nada', async () => {
       // Una tabla que el explorador conoce pero no ha abierto: sin columnas.
       const sinAbrir: SchemaIndex = {

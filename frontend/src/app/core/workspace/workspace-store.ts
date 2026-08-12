@@ -270,6 +270,10 @@ export class WorkspaceStore {
 
       await this.loadDatabases(connectionId, session.sessionId);
 
+      // Sin `await`: el editor queda usable de inmediato y el catálogo va
+      // llegando por detrás.
+      void this.primeSchemaIndexAsync(connectionId, session.database);
+
       return true;
     } catch (error) {
       // 428: la conexión no tiene contraseña guardada y hay que pedirla.
@@ -457,6 +461,10 @@ export class WorkspaceStore {
 
       await this.loadDatabases(id, session.sessionId);
 
+      // Igual que al abrir un perfil guardado: el catálogo se precalienta por
+      // detrás para que el autocompletado no dependa de pasear por el árbol.
+      void this.primeSchemaIndexAsync(id, session.database);
+
       return true;
     } catch (error) {
       this.patchConnection(id, { state: 'error', error: describeError(error) });
@@ -587,6 +595,38 @@ export class WorkspaceStore {
       .map((child) => child.object.name);
   }
 
+  /**
+   * Carga las tablas y vistas de un esquema si todavía no se conocen.
+   *
+   * Es la salida para las bases que superan el tope del precalentado: escribir
+   * `esquema.` trae ese esquema y solo ese.
+   */
+  async ensureRelationsAsync(schemaName: string): Promise<void> {
+    const wanted = schemaName.toLowerCase();
+
+    const findSchema = (entries: readonly TreeEntry[]): TreeEntry | null => {
+      for (const entry of entries) {
+        if (entry.object.kind === 'schema' && entry.object.name.toLowerCase() === wanted) {
+          return entry;
+        }
+
+        const found = entry.children ? findSchema(entry.children) : null;
+
+        if (found) {
+          return found;
+        }
+      }
+
+      return null;
+    };
+
+    const schema = findSchema(this._roots());
+
+    if (schema) {
+      await this.loadSchemaRelationsAsync(schema);
+    }
+  }
+
   /** Busca en el árbol la tabla o vista a la que apunta una referencia del SQL. */
   private findRelationEntry(schema: string | null, name: string): TreeEntry | null {
     const wanted = name.toLowerCase();
@@ -657,7 +697,7 @@ export class WorkspaceStore {
     }
   }
 
-  private async loadChildren(entry: TreeEntry): Promise<void> {
+  private async loadChildren(entry: TreeEntry, quiet = false): Promise<void> {
     const connection = this.findConnection(entry.connectionId);
 
     if (!connection?.sessionId) {
@@ -682,11 +722,87 @@ export class WorkspaceStore {
       }));
     } catch (error) {
       entry.children = [];
-      this._notice.set(describeError(error));
+
+      // El precalentado no debe interrumpir a nadie: si una parte del catálogo
+      // no se puede leer, el autocompletado tendrá menos, y ya está. Cuando el
+      // usuario abra ese nodo a mano sí verá el motivo.
+      if (!quiet) {
+        this._notice.set(describeError(error));
+      }
     } finally {
       entry.loading = false;
       this.refreshTree();
     }
+  }
+
+  /**
+   * Máximo de esquemas que se precargan al conectar.
+   *
+   * Un catálogo con decenas de esquemas convertiría el precalentado en una
+   * ráfaga de peticiones al abrir la conexión. Pasado el tope, el
+   * autocompletado sigue funcionando: los esquemas se ofrecen igual y las
+   * tablas de uno concreto se cargan la primera vez que se escribe `esquema.`.
+   */
+  private static readonly PreloadedSchemaLimit = 20;
+
+  /** Sesiones cuyo catálogo ya se precalentó, para no repetirlo. */
+  private readonly _primed = new Set<string>();
+
+  /**
+   * Carga el catálogo de la base de la sesión sin esperar a que nadie abra el
+   * árbol.
+   *
+   * El autocompletado se alimenta de lo que el explorador tiene cargado, y eso
+   * obligaba a pasear por el árbol —base, esquema, carpeta— antes de que el
+   * editor supiera una sola tabla. Aquí se hace ese recorrido solo, al conectar
+   * y en segundo plano: nadie espera a que termine, y los nodos quedan
+   * plegados, solo con sus hijos ya traídos.
+   */
+  private async primeSchemaIndexAsync(connectionId: string, database: string): Promise<void> {
+    if (this._primed.has(connectionId)) {
+      return;
+    }
+
+    this._primed.add(connectionId);
+
+    const databaseEntry = this._roots().find(
+      (entry) => entry.connectionId === connectionId && entry.object.name === database,
+    );
+
+    if (!databaseEntry) {
+      return;
+    }
+
+    if (databaseEntry.children === null) {
+      await this.loadChildren(databaseEntry, true);
+    }
+
+    const schemas = (databaseEntry.children ?? []).filter(
+      (entry) => entry.object.kind === 'schema',
+    );
+
+    for (const schema of schemas.slice(0, WorkspaceStore.PreloadedSchemaLimit)) {
+      await this.loadSchemaRelationsAsync(schema);
+    }
+  }
+
+  /** Trae las tablas y vistas de un esquema, sin desplegarlo. */
+  private async loadSchemaRelationsAsync(schema: TreeEntry): Promise<void> {
+    if (schema.children === null) {
+      await this.loadChildren(schema, true);
+    }
+
+    // Solo tablas y vistas: funciones y procedimientos no aportan nada al
+    // autocompletado y duplicarían las peticiones.
+    const folders = (schema.children ?? []).filter(
+      (entry) => entry.object.kind === 'folder' && /:(tables|views)$/.test(entry.object.id),
+    );
+
+    await Promise.all(
+      folders
+        .filter((folder) => folder.children === null)
+        .map((folder) => this.loadChildren(folder, true)),
+    );
   }
 
   toggleConnection(connectionId: string): void {

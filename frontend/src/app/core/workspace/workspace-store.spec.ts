@@ -56,6 +56,26 @@ const schemas: DatabaseObject[] = [
   },
 ];
 
+const folders: DatabaseObject[] = ['tables', 'views', 'functions', 'procedures'].map((id) => ({
+  id: `folder:public:${id}`,
+  name: id,
+  kind: 'folder',
+  database: 'druse_test',
+  schema: 'public',
+  hasChildren: true,
+}));
+
+const tables: DatabaseObject[] = [
+  {
+    id: 'Table:public.users',
+    name: 'users',
+    kind: 'table',
+    database: 'druse_test',
+    schema: 'public',
+    hasChildren: true,
+  },
+];
+
 function successfulQuery(overrides: Partial<QueryResult> = {}): QueryResult {
   return {
     executionId: 'ejecucion-1',
@@ -158,8 +178,27 @@ class FakeGateway implements Partial<ApplicationGateway> {
     return of(databases);
   }
 
-  getChildren(): Observable<DatabaseObject[]> {
-    return of(schemas);
+  /**
+   * Responde según el tipo de nodo, como hace el servidor de verdad.
+   *
+   * Antes devolvía siempre los esquemas, y eso bastaba mientras el árbol solo
+   * se abría a mano. Al precalentar el catálogo hay que recorrer los tres
+   * niveles, así que el doble tiene que distinguirlos.
+   */
+  getChildren(_sessionId: string, parent: DatabaseObject): Observable<DatabaseObject[]> {
+    switch (parent.kind) {
+      case 'database':
+        return of(schemas);
+
+      case 'schema':
+        return of(folders);
+
+      case 'folder':
+        return of(parent.id.endsWith(':tables') ? tables : []);
+
+      default:
+        return of([]);
+    }
   }
 
   executeQuery(request: ExecuteQueryRequest): Observable<QueryResult> {
@@ -169,6 +208,17 @@ class FakeGateway implements Partial<ApplicationGateway> {
 
   cancelQuery(): Observable<void> {
     return of(undefined);
+  }
+}
+
+/**
+ * El precalentado del catálogo no se espera al conectar —el editor debe quedar
+ * usable de inmediato—, así que las pruebas que dependen de él tienen que
+ * dejarlo terminar.
+ */
+async function esperarA(condicion: () => boolean): Promise<void> {
+  for (let intento = 0; intento < 50 && !condicion(); intento++) {
+    await Promise.resolve();
   }
 }
 
@@ -353,21 +403,79 @@ describe('WorkspaceStore', () => {
     });
   });
 
-  describe('explorador', () => {
-    it('carga los hijos al expandir y no vuelve a pedirlos', async () => {
+  describe('catálogo para el autocompletado', () => {
+    it('conocer las tablas no exige abrir el árbol', async () => {
       await store.connect(form);
-      const spy = vi.spyOn(gateway, 'getChildren');
+      await esperarA(() => store.schemaIndex().relations.length > 0);
 
+      const index = store.schemaIndex();
+
+      // Nadie ha expandido nada: el editor ya puede sugerir.
+      expect(index.schemas).toContain('public');
+      expect(index.relations.map((relation) => relation.qualified)).toContain('public.users');
+      expect(store.explorerNodes().length).toBe(1);
+    });
+
+    it('el precalentado no despliega el árbol', async () => {
+      await store.connect(form);
+      await esperarA(() => store.schemaIndex().relations.length > 0);
+
+      // Traer los hijos y mostrarlos son cosas distintas: el usuario no ha
+      // pedido ver nada.
+      expect(store.explorerNodes().map((node) => node.label)).toEqual(['druse_test']);
+    });
+
+    it('cargar las columnas de una tabla no la despliega en el explorador', async () => {
+      await store.connect(form);
+      await esperarA(() => store.schemaIndex().relations.length > 0);
+
+      const columnas = await store.ensureColumnsAsync('public', 'users');
+
+      expect(columnas).toEqual([]);
+      expect(store.explorerNodes().length).toBe(1);
+    });
+  });
+
+  describe('explorador', () => {
+    it('expandir lo ya precalentado no pide nada al servidor', async () => {
+      await store.connect(form);
+      await esperarA(() => store.schemaIndex().relations.length > 0);
+
+      const spy = vi.spyOn(gateway, 'getChildren');
       const nodeId = store.explorerNodes()[0].id;
       await store.toggleNode(nodeId);
 
       expect(store.explorerNodes().length).toBe(2);
       expect(store.explorerNodes()[1].label).toBe('public');
+
+      // El catálogo ya estaba en memoria: abrir el árbol es instantáneo.
+      expect(spy).not.toHaveBeenCalled();
+    });
+
+    it('carga los hijos al expandir lo que no se precalentó, y no los vuelve a pedir', async () => {
+      await store.connect(form);
+      await esperarA(() => store.schemaIndex().relations.length > 0);
+
+      // Las columnas de una tabla no entran en el precalentado: son el caso que
+      // sigue cargándose al abrir el nodo. Hay que bajar hasta ella.
+      const abrir = async (etiqueta: string) => {
+        const nodo = store.explorerNodes().find((node) => node.label === etiqueta);
+        await store.toggleNode(nodo!.id);
+      };
+
+      await abrir('druse_test');
+      await abrir('public');
+      await abrir('tables');
+
+      const tabla = store.explorerNodes().find((node) => node.label === 'users');
+      const spy = vi.spyOn(gateway, 'getChildren');
+
+      await store.toggleNode(tabla!.id);
       expect(spy).toHaveBeenCalledTimes(1);
 
       // Plegar y volver a desplegar no debe repetir la petición.
-      await store.toggleNode(nodeId);
-      await store.toggleNode(nodeId);
+      await store.toggleNode(tabla!.id);
+      await store.toggleNode(tabla!.id);
 
       expect(spy).toHaveBeenCalledTimes(1);
     });
@@ -385,13 +493,15 @@ describe('WorkspaceStore', () => {
 
     it('actualizar un nodo vuelve a pedir sus hijos', async () => {
       await store.connect(form);
+      await esperarA(() => store.schemaIndex().relations.length > 0);
+
       const nodeId = store.explorerNodes()[0].id;
-
       await store.toggleNode(nodeId);
-      const spy = vi.spyOn(gateway, 'getChildren');
 
+      const spy = vi.spyOn(gateway, 'getChildren');
       await store.refreshNode(nodeId);
 
+      // Actualizar es la forma de decir «esto ha cambiado», así que sí se pide.
       expect(spy).toHaveBeenCalledTimes(1);
     });
   });

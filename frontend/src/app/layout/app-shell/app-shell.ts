@@ -135,6 +135,10 @@ export class AppShell {
    */
   protected readonly loadColumns = (schema: string | null, name: string): Promise<readonly string[]> =>
     this._store.ensureColumnsAsync(schema, name);
+
+  /** Lo mismo para las tablas de un esquema que el precalentado no alcanzó. */
+  protected readonly loadRelations = (schema: string): Promise<void> =>
+    this._store.ensureRelationsAsync(schema);
   protected readonly timeoutSeconds = this._store.timeoutSeconds;
 
   private readonly _editor = viewChild<SqlEditor>('editor');

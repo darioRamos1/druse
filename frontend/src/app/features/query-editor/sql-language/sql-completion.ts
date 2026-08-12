@@ -15,6 +15,14 @@ export interface CompletionContext {
    * que ya está cargado, que es como se comportaba antes.
    */
   readonly loadColumns?: (schema: string | null, name: string) => Promise<readonly string[]>;
+
+  /**
+   * Carga las tablas de un esquema que el explorador aún no ha recorrido.
+   *
+   * Al conectar se precalientan, pero un catálogo con muchos esquemas no se
+   * precalienta entero: este es el camino para el resto.
+   */
+  readonly loadRelations?: (schema: string) => Promise<void>;
 }
 
 /** Una relación nombrada en el SQL, con su esquema si el usuario lo escribió. */
@@ -115,7 +123,7 @@ export function registerSqlCompletion(
     triggerCharacters: ['.'],
 
     provideCompletionItems(model, position) {
-      const { engine, schema, loadColumns } = getContext();
+      const { engine, schema, loadColumns, loadRelations } = getContext();
 
       const word = model.getWordUntilPosition(position);
       const range: MonacoApi.IRange = {
@@ -145,26 +153,43 @@ export function registerSqlCompletion(
         );
 
         if (schemaName) {
-          const relations = schema.relations.filter(
-            (candidate) => candidate.schema.toLowerCase() === schemaName.toLowerCase(),
-          );
+          const relationsOf = (index: SchemaIndex) =>
+            index.relations.filter(
+              (candidate) => candidate.schema.toLowerCase() === schemaName.toLowerCase(),
+            );
 
-          return {
-            suggestions: relations.map((relation) => ({
-              label: relation.name,
-              kind: relation.kind === 'view'
-                ? monaco.languages.CompletionItemKind.Interface
-                : monaco.languages.CompletionItemKind.Struct,
-              // Sin el esquema: el usuario acaba de escribirlo.
-              insertText: relation.name,
-              detail: relation.columns.length > 0
-                ? `${relation.qualified} · ${relation.columns.length} columnas`
-                : relation.qualified,
-              sortText: `0_${relation.name}`,
-              range,
-            })),
-          };
+          const relations = relationsOf(schema);
+
+          // El esquema existe pero sus tablas no se han traído: se piden ahora.
+          // Después hay que releer el contexto, porque el índice lo produce una
+          // señal que acaba de cambiar.
+          if (relations.length === 0 && loadRelations) {
+            return loadRelations(schemaName).then(() =>
+              relationItems(relationsOf(getContext().schema)),
+            );
+          }
+
+          return relationItems(relations);
         }
+      }
+
+      /** Tablas y vistas de un esquema, ya sin su nombre delante. */
+      function relationItems(relations: readonly KnownRelation[]) {
+        return {
+          suggestions: relations.map((relation) => ({
+            label: relation.name,
+            kind: relation.kind === 'view'
+              ? monaco.languages.CompletionItemKind.Interface
+              : monaco.languages.CompletionItemKind.Struct,
+            // Sin el esquema: el usuario acaba de escribirlo.
+            insertText: relation.name,
+            detail: relation.columns.length > 0
+              ? `${relation.qualified} · ${relation.columns.length} columnas`
+              : relation.qualified,
+            sortText: `0_${relation.name}`,
+            range,
+          })),
+        };
       }
 
       // --- Tras un punto: solo columnas de esa relación --------------------
