@@ -361,3 +361,98 @@
   color: #f5bf4f;
 }
 
+
+/* --- Cambios pendientes en la cuadrícula -----------------------------------
+ *
+ * Se pega abajo, sobre la barra de estado del panel: es donde el usuario ya
+ * mira para ver cuántas filas salieron.
+ */
+.edits {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border-top: 1px solid var(--dr-border);
+  background: rgb(108 139 255 / 8%);
+  font-family: var(--dr-font-ui);
+  font-size: var(--dr-font-size-sm);
+}
+
+.edits__count {
+  margin: 0;
+  color: var(--dr-text-secondary);
+}
+
+.edits__sql {
+  display: flex;
+  flex: 1 1 340px;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.edits__title {
+  margin: 0;
+  color: var(--dr-text-tertiary);
+  font-size: 11px;
+}
+
+/* El SQL se muestra entero y se desborda con barra propia: recortarlo sería
+   esconder justo la parte que hay que revisar. */
+.edits__statement {
+  overflow-x: auto;
+  padding: 4px 6px;
+  border-radius: 4px;
+  background: var(--dr-surface-base);
+  color: var(--dr-text);
+  font-family: var(--dr-font-mono);
+  font-size: 11.5px;
+  white-space: pre;
+}
+
+.edits__actions {
+  display: flex;
+  gap: 8px;
+}
+
+/* Los botones de la barra, con el mismo lenguaje que los del editor. */
+.edits .btn {
+  display: flex;
+  align-items: center;
+  height: 26px;
+  padding: 0 10px;
+  border: 1px solid var(--dr-border-subtle);
+  border-radius: var(--dr-radius);
+  background: transparent;
+  color: var(--dr-text-muted);
+  font-family: inherit;
+  font-size: 12px;
+  cursor: pointer;
+
+  &:hover:not(:disabled) {
+    background: #151b27;
+    color: var(--dr-text);
+  }
+
+  &:disabled {
+    color: #6e7a90;
+    cursor: default;
+  }
+}
+
+.edits .btn--primary {
+  border-color: rgb(108 139 255 / 40%);
+  background: rgb(108 139 255 / 14%);
+  color: var(--dr-accent-bright);
+}
+
+/* Escribir en la base se pide con el mismo color que Rollback: es la acción
+   de la que uno se arrepiente, no una más. */
+.edits .btn--danger {
+  border-color: rgb(255 107 107 / 32%);
+  background: rgb(255 107 107 / 10%);
+  color: #ff8f8f;
+  font-weight: 500;
+}

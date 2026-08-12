@@ -108,9 +108,54 @@
       <app-results-grid
         [resultSet]="set"
         [showFilters]="showFilters()"
+        [editable]="editable()"
+        [pendingEdits]="edits()"
         (copied)="copied.emit($event)"
         (copyFailed)="copyFailed.emit()"
+        (cellEdited)="cellEdited.emit($event)"
       />
+
+      @if (edits().length > 0) {
+        <!--
+          La barra de cambios pendientes. Guardar es siempre en dos pasos: aquí
+          se ve cuántas celdas se han tocado, y el SQL exacto antes de escribir.
+        -->
+        <div class="edits" role="status">
+          @if (editPreview(); as statements) {
+            <div class="edits__sql">
+              <p class="edits__title">Se va a ejecutar:</p>
+              @for (statement of statements; track $index) {
+                <code class="edits__statement">{{ statement }}</code>
+              }
+            </div>
+
+            <div class="edits__actions">
+              <button type="button" class="btn" (click)="cancelSave.emit()">Volver</button>
+              <button
+                type="button"
+                class="btn btn--danger"
+                [disabled]="saving()"
+                (click)="saveEdits.emit()"
+              >
+                {{ saving() ? 'Guardando…' : 'Confirmar y guardar' }}
+              </button>
+            </div>
+          } @else {
+            <p class="edits__count">
+              <span class="mono">{{ edits().length }}</span>
+              {{ edits().length === 1 ? 'celda cambiada' : 'celdas cambiadas' }}
+              · sin guardar
+            </p>
+
+            <div class="edits__actions">
+              <button type="button" class="btn" (click)="discardEdits.emit()">Descartar</button>
+              <button type="button" class="btn btn--primary" (click)="prepareEdits.emit()">
+                Ver SQL y guardar
+              </button>
+            </div>
+          }
+        </div>
+      }
 
       <footer class="foot">
         <div class="foot__item">

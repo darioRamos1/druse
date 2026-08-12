@@ -39,6 +39,25 @@ export interface ConnectRequest {
   readonly password?: string;
 }
 
+/** Cambios de la cuadrícula tal y como viajan a la API. */
+export interface RowEditRequest {
+  readonly sessionId: string;
+  readonly table: DatabaseObject;
+  /** El usuario ya vio el SQL. Sin esto el servidor se niega. */
+  readonly confirmed: boolean;
+  readonly edits: readonly {
+    readonly key: readonly { column: string; value: string | null }[];
+    readonly changes: readonly { column: string; value: string | null }[];
+  }[];
+}
+
+export interface RowEditResult {
+  readonly rowsAffected: number;
+  readonly durationMs: number;
+  /** Lo que se ejecutó, escrito para poder leerlo. */
+  readonly statements: readonly string[];
+}
+
 export interface ExecuteQueryRequest {
   readonly sessionId: string;
   readonly sql: string;
@@ -115,6 +134,20 @@ export abstract class ApplicationGateway {
   abstract executeQuery(request: ExecuteQueryRequest): Observable<QueryResult>;
 
   abstract cancelQuery(executionId: string): Observable<void>;
+
+  // --- Edición de filas -----------------------------------------------------
+
+  /**
+   * El SQL que se ejecutaría, para enseñarlo antes de tocar nada.
+   *
+   * Va por su propia ruta y no como una bandera de {@link applyRowEdits}: ver y
+   * ejecutar son cosas distintas, y confundirlas aquí acabaría guardando algo
+   * que solo se quería mirar.
+   */
+  abstract previewRowEdits(request: RowEditRequest): Observable<readonly string[]>;
+
+  /** Guarda los cambios. El servidor los aplica todos o ninguno. */
+  abstract applyRowEdits(request: RowEditRequest): Observable<RowEditResult>;
 
   // --- Conexiones guardadas -------------------------------------------------
 

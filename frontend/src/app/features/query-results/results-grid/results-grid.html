@@ -56,18 +56,36 @@
           tabindex="0"
           [attr.data-kind]="column.kind"
           [class.is-selected]="isSelected(row.number, i)"
-          [attr.title]="row.values[i]"
+          [class.is-dirty]="isDirty(row.number, i)"
+          [class.is-editable]="editable()"
+          [attr.title]="shownValue(row, i)"
           (click)="select(row.number, i)"
-          (dblclick)="copyCell(row, i)"
+          (dblclick)="editable() ? startEditing(row.number, i) : copyCell(row, i)"
           (keydown.control.c)="copyCell(row, i)"
           (keydown.meta.c)="copyCell(row, i)"
+          (keydown.enter)="startEditing(row.number, i)"
         >
-          @if (row.values[i] === null) {
+          @if (isEditing(row.number, i)) {
+            <!--
+              El editor sale con el valor actual ya seleccionado: escribir encima
+              es lo que se espera al entrar en una celda.
+            -->
+            <input
+              class="cell__editor"
+              type="text"
+              [value]="shownValue(row, i) ?? 'NULL'"
+              autofocus
+              (blur)="commitEdit(row, i, $event)"
+              (keydown.enter)="commitEdit(row, i, $event)"
+              (keydown.escape)="cancelEdit()"
+              [attr.aria-label]="'Editar ' + column.name"
+            />
+          } @else if (shownValue(row, i) === null) {
             <span class="null">NULL</span>
           } @else if (column.kind === 'boolean') {
-            <span class="pill">{{ row.values[i] }}</span>
+            <span class="pill">{{ shownValue(row, i) }}</span>
           } @else {
-            {{ row.values[i] }}
+            {{ shownValue(row, i) }}
           }
         </div>
       }

@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, input, output, signal } from '@angular/core';
 
-import { ResultRow, ResultSet } from '../../../shared/models/workspace';
+import { CellEdit, ResultRow, ResultSet } from '../../../shared/models/workspace';
 import { Icon } from '../../../shared/ui/icon/icon';
 
 /** Ancho de la columna del número de fila. */
@@ -30,8 +30,24 @@ export class ResultsGrid {
   readonly resultSet = input.required<ResultSet>();
   readonly showFilters = input(false);
 
+  /**
+   * Se puede editar aquí.
+   *
+   * Lo decide quien conoce el origen del resultado, no la cuadrícula: hace falta
+   * que las filas vengan de una tabla concreta y que su clave primaria esté
+   * entre las columnas. Sobre el resultado de un JOIN no hay nada que editar.
+   */
+  readonly editable = input(false);
+
+  /** Cambios pendientes, para pintarlos aunque el componente se recree. */
+  readonly pendingEdits = input<readonly CellEdit[]>([]);
+
   readonly copied = output<string>();
   readonly copyFailed = output<void>();
+  readonly cellEdited = output<CellEdit>();
+
+  /** Celda que se está escribiendo ahora mismo. */
+  protected readonly editing = signal<CellPosition | null>(null);
 
   /** Filtro escrito por el usuario en cada columna, por índice. */
   protected readonly filters = signal<Readonly<Record<number, string>>>({});
@@ -83,6 +99,62 @@ export class ResultsGrid {
 
   protected select(row: number, column: number): void {
     this.selected.set({ row, column });
+  }
+
+  /** Empieza a editar una celda, si aquí se puede. */
+  protected startEditing(row: number, column: number): void {
+    if (this.editable()) {
+      this.editing.set({ row, column });
+    }
+  }
+
+  protected isEditing(row: number, column: number): boolean {
+    const editing = this.editing();
+
+    return editing?.row === row && editing.column === column;
+  }
+
+  /** Valor pendiente de una celda, si el usuario ya la tocó. */
+  protected pendingValue(row: number, columnIndex: number): string | null | undefined {
+    const column = this.resultSet().columns[columnIndex]?.name;
+
+    return this.pendingEdits().find((edit) => edit.row === row && edit.column === column)?.value;
+  }
+
+  protected isDirty(row: number, columnIndex: number): boolean {
+    return this.pendingValue(row, columnIndex) !== undefined;
+  }
+
+  /** Lo que hay que mostrar: el cambio pendiente si lo hay, o el valor original. */
+  protected shownValue(row: ResultRow, columnIndex: number): string | null {
+    const pending = this.pendingValue(row.number, columnIndex);
+
+    return pending === undefined ? row.values[columnIndex] : pending;
+  }
+
+  /**
+   * Termina la edición de una celda.
+   *
+   * Un campo vacío se guarda como cadena vacía, no como NULL: son cosas
+   * distintas y confundirlas al escribir sería la peor forma de descubrirlo.
+   * Para poner NULL se escribe la palabra, que es lo que la cuadrícula muestra.
+   */
+  protected commitEdit(row: ResultRow, columnIndex: number, event: Event): void {
+    this.editing.set(null);
+
+    const escrito = (event.target as HTMLInputElement).value;
+    const column = this.resultSet().columns[columnIndex];
+    const value = escrito === 'NULL' ? null : escrito;
+
+    if (value === row.values[columnIndex]) {
+      return;
+    }
+
+    this.cellEdited.emit({ row: row.number, column: column.name, value });
+  }
+
+  protected cancelEdit(): void {
+    this.editing.set(null);
   }
 
   protected isSelected(row: number, column: number): boolean {

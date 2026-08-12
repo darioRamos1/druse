@@ -7,6 +7,7 @@ import {
   ConnectRequest,
   ExportFormat,
   QueryRejected,
+  RowEditRequest,
 } from '../application-gateway/application-gateway';
 import {
   ConnectionForm,
@@ -14,6 +15,8 @@ import {
   DatabaseObject,
   ExplorerNode,
   QueryHistoryEntry,
+  CellEdit,
+  EditableTable,
   QueryResult,
   KnownColumn,
   KnownRelation,
@@ -408,6 +411,167 @@ export class WorkspaceStore {
 
     return { schemas: [...schemas], relations };
   });
+
+  // --- Edición de filas ------------------------------------------------------
+
+  private readonly _edits = signal<readonly CellEdit[]>([]);
+  readonly edits = this._edits.asReadonly();
+
+  /** SQL que se va a ejecutar, mientras el usuario decide. */
+  private readonly _editPreview = signal<readonly string[] | null>(null);
+  readonly editPreview = this._editPreview.asReadonly();
+
+  private readonly _savingEdits = signal(false);
+  readonly savingEdits = this._savingEdits.asReadonly();
+
+  /**
+   * Sobre qué tabla se puede editar lo que hay en pantalla.
+   *
+   * Hacen falta tres cosas, y si falta una no se edita: que la pestaña venga de
+   * una tabla, que esa tabla tenga clave primaria y que **la clave esté entre
+   * las columnas del resultado**. Sin lo tercero se podría ver la fila pero no
+   * señalarla, que es justo el caso en que un `UPDATE` alcanza de más.
+   */
+  readonly editableTable = computed<EditableTable | null>(() => {
+    const table = this.activeTab()?.sourceTable;
+
+    if (!table) {
+      return null;
+    }
+
+    const columns = this._columns().get(columnKey(table.schema, table.name)) ?? [];
+    const keyColumns = columns.filter((column) => column.isPrimaryKey).map((column) => column.name);
+
+    if (keyColumns.length === 0) {
+      return null;
+    }
+
+    const shown = new Set(
+      (this.resultSet()?.columns ?? []).map((column) => column.name.toLowerCase()),
+    );
+
+    return keyColumns.every((name) => shown.has(name.toLowerCase()))
+      ? { table, keyColumns }
+      : null;
+  });
+
+  /** Anota un cambio sobre una celda. */
+  editCell(edit: CellEdit): void {
+    this._edits.update((current) => [
+      ...current.filter((item) => !(item.row === edit.row && item.column === edit.column)),
+      edit,
+    ]);
+  }
+
+  /** Vuelve del SQL a la lista de cambios, conservándolos. */
+  cancelPreview(): void {
+    this._editPreview.set(null);
+  }
+
+  /** Tira los cambios pendientes sin tocar la base. */
+  discardEdits(): void {
+    this._edits.set([]);
+    this._editPreview.set(null);
+  }
+
+  /**
+   * Pide el SQL que se ejecutaría y lo deja listo para enseñarlo.
+   *
+   * Es el paso que no se puede saltar: guardar sin haber visto qué se va a
+   * ejecutar es lo que convierte una cuadrícula en una trampa.
+   */
+  async prepareEdits(): Promise<void> {
+    const request = this.buildEditRequest(false);
+
+    if (!request) {
+      return;
+    }
+
+    try {
+      this._editPreview.set(await firstValueFrom(this._gateway.previewRowEdits(request)));
+    } catch (error) {
+      this._notice.set(describeError(error));
+    }
+  }
+
+  /** Guarda los cambios y vuelve a ejecutar la consulta para ver el resultado. */
+  async saveEdits(): Promise<boolean> {
+    const request = this.buildEditRequest(true);
+
+    if (!request) {
+      return false;
+    }
+
+    this._savingEdits.set(true);
+
+    try {
+      const result = await firstValueFrom(this._gateway.applyRowEdits(request));
+
+      this._edits.set([]);
+      this._editPreview.set(null);
+      this._notice.set(
+        `${result.rowsAffected} ${result.rowsAffected === 1 ? 'fila guardada' : 'filas guardadas'}.`,
+      );
+
+      // Se relee para que en pantalla quede lo que hay en la base, no lo que se
+      // creía haber escrito: valores por defecto y disparadores pueden cambiarlo.
+      await this.execute();
+
+      return true;
+    } catch (error) {
+      this._notice.set(describeError(error));
+      return false;
+    } finally {
+      this._savingEdits.set(false);
+    }
+  }
+
+  /**
+   * Traduce los cambios a lo que espera la API.
+   *
+   * La clave de cada fila se toma **del resultado que el usuario tiene delante**,
+   * no de lo que escribió: es lo que hace que el `UPDATE` apunte a la fila que se
+   * editó y no a otra.
+   */
+  private buildEditRequest(confirmed: boolean): RowEditRequest | null {
+    const editable = this.editableTable();
+    const sessionId = this.activeConnection()?.sessionId;
+    const resultSet = this.resultSet();
+    const edits = this._edits();
+
+    if (!editable || !sessionId || !resultSet || edits.length === 0) {
+      return null;
+    }
+
+    const indexOf = (name: string) =>
+      resultSet.columns.findIndex((column) => column.name.toLowerCase() === name.toLowerCase());
+
+    const porFila = new Map<number, CellEdit[]>();
+
+    for (const edit of edits) {
+      porFila.set(edit.row, [...(porFila.get(edit.row) ?? []), edit]);
+    }
+
+    const filas = [...porFila.entries()].flatMap(([number, cambios]) => {
+      const row = resultSet.rows.find((item) => item.number === number);
+
+      if (!row) {
+        return [];
+      }
+
+      return [
+        {
+          key: editable.keyColumns.map((column) => ({
+            column,
+            value: row.values[indexOf(column)] ?? null,
+          })),
+          changes: cambios.map((cambio) => ({ column: cambio.column, value: cambio.value })),
+        },
+      ];
+    });
+
+    return { sessionId, table: editable.table, confirmed, edits: filas };
+  }
 
   // --- Conexiones ------------------------------------------------------------
 
@@ -869,6 +1033,7 @@ export class WorkspaceStore {
 
   selectTab(id: string): void {
     this._tabs.update((tabs) => tabs.map((tab) => ({ ...tab, active: tab.id === id })));
+    this.discardEdits();
   }
 
   closeTab(id: string): void {
@@ -883,13 +1048,24 @@ export class WorkspaceStore {
     });
   }
 
-  createTab(sql = ''): void {
+  createTab(sql = '', sourceTable?: DatabaseObject): void {
     tabCounter++;
 
     this._tabs.update((tabs) => [
       ...tabs.map((tab) => ({ ...tab, active: false })),
-      { id: `q${tabCounter}`, title: `Query ${tabCounter}`, active: true, dirty: false, sql },
+      {
+        id: `q${tabCounter}`,
+        title: `Query ${tabCounter}`,
+        active: true,
+        dirty: false,
+        sql,
+        sourceTable,
+      },
     ]);
+
+    // Cambiar de pestaña cambia lo que hay en la cuadrícula: los cambios
+    // pendientes de la anterior no pueden seguir vivos.
+    this.discardEdits();
   }
 
   updateSql(sql: string): void {
@@ -908,7 +1084,13 @@ export class WorkspaceStore {
       ? `${node.source.schema}.${node.source.name}`
       : node.source.name;
 
-    this.createTab(`SELECT *\nFROM ${qualified}\nLIMIT 100;\n`);
+    // La tabla viaja con la pestaña: es lo que permite editar su resultado, y
+    // solo lo tienen las pestañas abiertas desde el explorador.
+    this.createTab(`SELECT *\nFROM ${qualified}\nLIMIT 100;\n`, node.source);
+
+    // Sus columnas hacen falta para saber cuál es la clave primaria; se piden
+    // ahora para que al ejecutar la cuadrícula ya sepa si se puede editar.
+    void this.ensureColumnsAsync(node.source.schema ?? null, node.source.name);
   }
 
   // --- Ejecución -------------------------------------------------------------

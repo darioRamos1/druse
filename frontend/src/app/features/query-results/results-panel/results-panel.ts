@@ -1,7 +1,12 @@
 import { ChangeDetectionStrategy, Component, computed, input, output, signal } from '@angular/core';
 
 import { ExportFormat } from '../../../core/application-gateway/application-gateway';
-import { QueryHistoryEntry, QueryResult, ResultSet } from '../../../shared/models/workspace';
+import {
+  CellEdit,
+  QueryHistoryEntry,
+  QueryResult,
+  ResultSet,
+} from '../../../shared/models/workspace';
 import { Icon } from '../../../shared/ui/icon/icon';
 import { QueryHistory } from '../../query-history/query-history/query-history';
 import { ResultsGrid } from '../results-grid/results-grid';
@@ -29,6 +34,12 @@ export class ResultsPanel {
 
   readonly exporting = input(false);
 
+  /** El resultado se puede editar: viene de una tabla con clave primaria. */
+  readonly editable = input(false);
+  readonly edits = input<readonly CellEdit[]>([]);
+  readonly editPreview = input<readonly string[] | null>(null);
+  readonly saving = input(false);
+
   readonly refreshHistory = output<void>();
   readonly searchHistory = output<string>();
   readonly clearHistory = output<void>();
@@ -36,6 +47,11 @@ export class ResultsPanel {
   readonly exportAs = output<ExportFormat>();
   readonly copied = output<string>();
   readonly copyFailed = output<void>();
+  readonly cellEdited = output<CellEdit>();
+  readonly prepareEdits = output<void>();
+  readonly saveEdits = output<void>();
+  readonly discardEdits = output<void>();
+  readonly cancelSave = output<void>();
 
   protected readonly activeTab = signal<ResultsTab>('results');
   protected readonly exportOpen = signal(false);

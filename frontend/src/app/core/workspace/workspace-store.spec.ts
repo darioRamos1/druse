@@ -5,6 +5,8 @@ import { Observable, of, throwError } from 'rxjs';
 import {
   ApplicationGateway,
   ExecuteQueryRequest,
+  RowEditRequest,
+  RowEditResult,
   SaveConnectionRequest,
 } from '../application-gateway/application-gateway';
 import {
@@ -83,8 +85,11 @@ function successfulQuery(overrides: Partial<QueryResult> = {}): QueryResult {
     state: 'succeeded',
     resultSets: [
       {
-        columns: [{ name: 'n', dataType: 'int4', kind: 'number', width: null }],
-        rows: [{ number: 1, values: ['1'] }],
+        columns: [
+          { name: 'id', dataType: 'int8', kind: 'number', width: null },
+          { name: 'email', dataType: 'text', kind: 'text', width: null },
+        ],
+        rows: [{ number: 1, values: ['1', 'ana@ejemplo.test'] }],
         totalRows: 1,
         durationMs: 5,
         truncated: false,
@@ -202,10 +207,23 @@ class FakeGateway implements Partial<ApplicationGateway> {
     }
   }
 
+  /** Lo que se ha mandado a guardar, para comprobarlo. */
+  rowEditRequests: RowEditRequest[] = [];
+
+  previewRowEdits(request: RowEditRequest): Observable<readonly string[]> {
+    this.rowEditRequests.push(request);
+    return of([`UPDATE public.users SET email = 'nuevo@ejemplo.test' WHERE id = 1`]);
+  }
+
+  applyRowEdits(request: RowEditRequest): Observable<RowEditResult> {
+    this.rowEditRequests.push(request);
+    return of({ rowsAffected: 1, durationMs: 3, statements: [] });
+  }
+
   /**
    * Las columnas se piden por aquí y no por `getChildren`: es la misma lista
    * que se ve en el árbol, pero con el tipo de cada columna, que es de lo que
-   * viven el tooltip y los avisos del editor.
+   * viven el tooltip, los avisos del editor y la clave primaria de la edición.
    */
   getColumns(): Observable<DatabaseColumn[]> {
     return of([
@@ -451,6 +469,95 @@ describe('WorkspaceStore', () => {
 
       // Traer las columnas no es lo mismo que desplegar el nodo.
       expect(store.explorerNodes().length).toBe(1);
+    });
+  });
+
+  describe('edición de filas', () => {
+    /** Abre una pestaña desde la tabla `users`, que es lo que permite editar. */
+    async function abrirTabla(): Promise<void> {
+      await store.connect(form);
+      await esperarA(() => store.schemaIndex().relations.length > 0);
+
+      const abrir = async (etiqueta: string) => {
+        const nodo = store.explorerNodes().find((node) => node.label === etiqueta);
+        await store.toggleNode(nodo!.id);
+      };
+
+      await abrir('druse_test');
+      await abrir('public');
+      await abrir('tables');
+
+      const tabla = store.explorerNodes().find((node) => node.label === 'users');
+      store.openSelectFor(tabla!);
+
+      // Editable exige las dos cosas: saber la clave primaria de la tabla y
+      // tener un resultado en pantalla donde esa clave aparezca.
+      await store.execute();
+      await esperarA(() => !!store.editableTable());
+    }
+
+    it('una consulta escrita a mano no es editable', async () => {
+      await store.connect(form);
+      await store.execute();
+
+      // Sin saber de qué tabla vienen las filas no hay a dónde escribir.
+      expect(store.editableTable()).toBeNull();
+    });
+
+    it('una pestaña abierta desde una tabla sí lo es', async () => {
+      await abrirTabla();
+
+      expect(store.editableTable()?.table.name).toBe('users');
+      expect(store.editableTable()?.keyColumns).toEqual(['id']);
+    });
+
+    it('manda la clave que se leyó, no la que se escribió', async () => {
+      await abrirTabla();
+
+      store.editCell({ row: 1, column: 'email', value: 'nuevo@ejemplo.test' });
+      await store.prepareEdits();
+
+      const enviado = gateway.rowEditRequests[0];
+
+      // La clave sale de la fila que el usuario tiene delante: es lo que hace
+      // que el UPDATE apunte a esa fila y no a otra.
+      expect(enviado.edits[0].key).toEqual([{ column: 'id', value: '1' }]);
+      expect(enviado.edits[0].changes).toEqual([
+        { column: 'email', value: 'nuevo@ejemplo.test' },
+      ]);
+      // Previsualizar nunca confirma.
+      expect(enviado.confirmed).toBe(false);
+    });
+
+    it('guardar sí confirma, y limpia los cambios pendientes', async () => {
+      await abrirTabla();
+
+      store.editCell({ row: 1, column: 'email', value: 'nuevo@ejemplo.test' });
+      await store.saveEdits();
+
+      expect(gateway.rowEditRequests.at(-1)?.confirmed).toBe(true);
+      expect(store.edits()).toEqual([]);
+    });
+
+    it('descartar no manda nada', async () => {
+      await abrirTabla();
+
+      store.editCell({ row: 1, column: 'email', value: 'da igual' });
+      store.discardEdits();
+
+      expect(store.edits()).toEqual([]);
+      expect(gateway.rowEditRequests).toEqual([]);
+    });
+
+    it('cambiar de pestaña no arrastra los cambios pendientes', async () => {
+      await abrirTabla();
+
+      store.editCell({ row: 1, column: 'email', value: 'da igual' });
+      store.createTab('SELECT 1');
+
+      // Lo que hay en la cuadrícula ya es otra cosa; conservarlos sería
+      // guardarlos luego contra la tabla equivocada.
+      expect(store.edits()).toEqual([]);
     });
   });
 

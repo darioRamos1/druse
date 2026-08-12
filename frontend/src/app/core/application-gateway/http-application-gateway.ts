@@ -20,6 +20,8 @@ import {
   ConnectRequest,
   ExecuteQueryRequest,
   ExportRequest,
+  RowEditRequest,
+  RowEditResult,
   HealthStatus,
   SaveConnectionRequest,
 } from './application-gateway';
@@ -110,6 +112,16 @@ export class HttpApplicationGateway extends ApplicationGateway {
 
   override cancelQuery(executionId: string): Observable<void> {
     return this._http.delete<void>(`/api/queries/${executionId}`);
+  }
+
+  override previewRowEdits(request: RowEditRequest): Observable<readonly string[]> {
+    return this._http
+      .post<{ statements: string[] }>('/api/rows/preview', request)
+      .pipe(map((response) => response.statements));
+  }
+
+  override applyRowEdits(request: RowEditRequest): Observable<RowEditResult> {
+    return this._http.post<RowEditResult>('/api/rows', request);
   }
 
   override getSavedConnections(): Observable<readonly SavedConnection[]> {

@@ -169,7 +169,6 @@ export interface ExplorerNode {
   readonly connectionId: string;
 }
 
-/** Tabla o vista conocida, para el autocompletado. */
 /**
  * Columna conocida por el editor.
  *
@@ -184,6 +183,7 @@ export interface KnownColumn {
   readonly isPrimaryKey: boolean;
 }
 
+/** Tabla o vista conocida, para el autocompletado. */
 export interface KnownRelation {
   readonly schema: string;
   readonly name: string;
@@ -205,6 +205,25 @@ export interface SchemaIndex {
   readonly relations: readonly KnownRelation[];
 }
 
+/** Un cambio pendiente sobre una celda. `null` es NULL. */
+export interface CellEdit {
+  /** Número de fila dentro del resultado que se está viendo. */
+  readonly row: number;
+  readonly column: string;
+  readonly value: string | null;
+}
+
+/**
+ * Tabla sobre la que se puede editar el resultado que hay en pantalla.
+ *
+ * Solo existe cuando el resultado viene de una tabla concreta y su clave
+ * primaria está entre las columnas: sin eso no hay forma de señalar una fila.
+ */
+export interface EditableTable {
+  readonly table: DatabaseObject;
+  readonly keyColumns: readonly string[];
+}
+
 /** Pestaña de consulta abierta. */
 export interface QueryTab {
   readonly id: string;
@@ -214,6 +233,13 @@ export interface QueryTab {
   readonly sql: string;
   /** Conexión contra la que se ejecuta. */
   readonly connectionId?: string;
+  /**
+   * Tabla de la que salió la pestaña, cuando se abrió desde el explorador.
+   *
+   * Es lo que permite editar su resultado: sin saber de qué tabla vienen las
+   * filas no hay a dónde escribir. Una consulta escrita a mano no la tiene.
+   */
+  readonly sourceTable?: DatabaseObject;
 }
 
 export type ColumnType = 'number' | 'text' | 'boolean' | 'timestamp' | 'uuid' | 'binary';

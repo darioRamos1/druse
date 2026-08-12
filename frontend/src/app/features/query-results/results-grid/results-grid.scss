@@ -205,3 +205,28 @@
   font-size: var(--dr-font-size-sm);
   text-align: center;
 }
+
+/* --- Edición ---------------------------------------------------------------
+ *
+ * Una celda tocada se marca hasta que se guarda: quien edita varias filas
+ * necesita ver de un vistazo qué ha cambiado antes de confirmar.
+ */
+.cell--value.is-editable {
+  cursor: cell;
+}
+
+.cell--value.is-dirty {
+  background: rgb(108 139 255 / 12%);
+  box-shadow: inset 2px 0 0 var(--dr-accent);
+}
+
+.cell__editor {
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--dr-text);
+  font-family: inherit;
+  font-size: inherit;
+  outline: none;
+}

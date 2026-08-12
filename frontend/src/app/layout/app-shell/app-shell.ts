@@ -16,6 +16,7 @@ import { EditorToolbar } from '../../features/query-editor/editor-toolbar/editor
 import { CursorPosition, SqlEditor } from '../../features/query-editor/sql-editor/sql-editor';
 import { ResultsPanel } from '../../features/query-results/results-panel/results-panel';
 import {
+  CellEdit,
   DatabaseEngine,
   ExplorerNode,
   KnownColumn,
@@ -132,6 +133,33 @@ export class AppShell {
   );
 
   protected readonly schemaIndex = this._store.schemaIndex;
+
+  // --- Edición de filas --------------------------------------------------------
+  protected readonly editableTable = this._store.editableTable;
+  protected readonly edits = this._store.edits;
+  protected readonly editPreview = this._store.editPreview;
+  protected readonly savingEdits = this._store.savingEdits;
+
+  protected onCellEdited(edit: CellEdit): void {
+    this._store.editCell(edit);
+  }
+
+  protected async prepareEdits(): Promise<void> {
+    await this._store.prepareEdits();
+  }
+
+  protected async saveEdits(): Promise<void> {
+    await this._store.saveEdits();
+  }
+
+  protected discardEdits(): void {
+    this._store.discardEdits();
+  }
+
+  /** Vuelve del SQL a la lista de cambios, sin perderlos. */
+  protected cancelSave(): void {
+    this._store.cancelPreview();
+  }
 
   /**
    * El editor pide por aquí las columnas de una tabla que aún no está abierta en
