@@ -738,13 +738,28 @@ El MVP estará terminado cuando:
 
 ## 15. Backlog posterior al MVP
 
+### Lo siguiente, pedido por el usuario (sesión 011)
+
+Estas tres ya estaban en el backlog, pero sueltas y sin dueño. El usuario las
+pidió juntas después de usar la beta contra su base de preproducción, así que
+pasan al frente y se describen por lo que tienen que resolver, no por su
+etiqueta:
+
+| # | Petición | Qué significa |
+| --- | --- | --- |
+| 1 | **Exportar e importar, fácil** | Exportar ya existe (CSV y XLSX). Falta la vuelta: **cargar un CSV o un Excel dentro de una tabla**, viendo antes qué columna va a cuál, qué se va a insertar y qué va a fallar. Sin previsualización, importar es apostar. |
+| 2 | **Ajustar varios registros a la vez** | Editar los resultados en la propia cuadrícula, como el «Edit Top 200 Rows» de SQL Server: cambiar varias celdas, ver qué se ha tocado y guardar. Exige clave primaria para saber a qué fila apunta cada cambio, y debe **enseñar el `UPDATE` antes de ejecutarlo**. |
+| 3 | **Ayuda para crear las consultas** | Componer la consulta sin escribirla entera: elegir tabla y columnas, filtros y orden, y que Druse escriba el SQL. También lo inverso —generar `INSERT`, `UPDATE` o `CREATE TABLE` de un objeto del árbol—, que es la «generación de scripts» del backlog. |
+
+Las tres tocan la misma pieza que el MVP dejó a propósito de solo lectura, así
+que el orden entre ellas importa: **la 2 es la que obliga a que Druse escriba en
+los datos del usuario**, y de ahí salen las reglas que las otras dos reutilizan
+—clave primaria, previsualización del SQL, confirmación y transacción—.
+
 ### Prioridad alta
 
 - Autenticación integrada de Windows para SQL Server.
 - Túneles SSH.
-- Edición directa de filas con clave primaria.
-- Generación de scripts SQL.
-- Importación CSV/Excel.
 - Actualizador automático.
 
 ### Prioridad media

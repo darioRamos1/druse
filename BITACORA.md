@@ -29,7 +29,7 @@
    - instalar, actualizar y desinstalar de verdad, para validar el ciclo completo;
    - arrancar en una máquina sin .NET ni Node, que es el criterio que demuestra que el paquete se basta solo.
 2. Artefactos de Linux y macOS: el script acepta cualquier RID, pero generarlos exige compilar en cada plataforma. Es trabajo de integración continua.
-3. Con el MVP cerrado, lo siguiente sale del **backlog del plan §15**: autenticación integrada de Windows, túneles SSH, edición de filas y actualizador automático.
+3. **Lo siguiente lo pidió el usuario** después de usar la beta contra su base de preproducción, y está descrito en el plan §15: importar CSV/Excel, editar varias filas a la vez en la cuadrícula y ayuda para componer consultas. Las tres tocan la pieza que el MVP dejó de solo lectura, así que conviene empezar por la edición de filas: de ahí salen las reglas —clave primaria, previsualización del SQL, confirmación y transacción— que las otras dos reutilizan.
 
 **El visto bueno visual ya está dado** (sesión 011, con la extensión de Chrome por fin conectada): la pantalla reproduce el mockup. Lo único ausente es la pestaña «Plan de ejecución», que está fuera del MVP.
 
