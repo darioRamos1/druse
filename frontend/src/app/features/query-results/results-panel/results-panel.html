@@ -114,6 +114,18 @@
   }
 
   @default {
+    <div class="history__search">
+      <app-icon name="search" [size]="12" />
+      <input
+        type="search"
+        class="history__input"
+        placeholder="Filtrar por SQL o conexión…"
+        [value]="historySearch()"
+        (input)="onSearch($event)"
+        aria-label="Filtrar el historial"
+      />
+    </div>
+
     @if (history().length > 0) {
       <ul class="history">
         @for (entry of history(); track entry.id) {
@@ -152,6 +164,8 @@
           Vaciar historial
         </button>
       </footer>
+    } @else if (historySearch()) {
+      <div class="empty">Ninguna consulta coincide con «{{ historySearch() }}».</div>
     } @else {
       <div class="empty">
         Todavía no hay consultas en el historial. Se guarda automáticamente al ejecutar.

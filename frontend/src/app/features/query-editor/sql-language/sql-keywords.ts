@@ -1,0 +1,56 @@
+import { DatabaseEngine } from '../../../shared/models/workspace';
+
+/**
+ * Palabras reservadas comunes a los motores soportados.
+ *
+ * La lista es corta a propósito: sugerir cientos de palabras convierte el
+ * autocompletado en ruido y estorba más que ayuda. Están las que se escriben a
+ * diario.
+ */
+const COMMON_KEYWORDS: readonly string[] = [
+  'SELECT', 'FROM', 'WHERE', 'GROUP BY', 'HAVING', 'ORDER BY', 'LIMIT',
+  'INSERT INTO', 'VALUES', 'UPDATE', 'SET', 'DELETE FROM',
+  'INNER JOIN', 'LEFT JOIN', 'RIGHT JOIN', 'FULL JOIN', 'CROSS JOIN', 'ON',
+  'AND', 'OR', 'NOT', 'IN', 'EXISTS', 'BETWEEN', 'LIKE', 'IS NULL', 'IS NOT NULL',
+  'AS', 'DISTINCT', 'CASE', 'WHEN', 'THEN', 'ELSE', 'END',
+  'WITH', 'UNION', 'UNION ALL', 'INTERSECT', 'EXCEPT',
+  'CREATE TABLE', 'ALTER TABLE', 'DROP TABLE', 'TRUNCATE TABLE',
+  'CREATE INDEX', 'CREATE VIEW', 'PRIMARY KEY', 'FOREIGN KEY', 'REFERENCES',
+  'BEGIN', 'COMMIT', 'ROLLBACK',
+  'ASC', 'DESC', 'NULL', 'TRUE', 'FALSE',
+];
+
+/** Funciones de agregación y de uso frecuente, iguales en los tres motores. */
+const COMMON_FUNCTIONS: readonly string[] = [
+  'COUNT', 'SUM', 'AVG', 'MIN', 'MAX', 'COALESCE', 'NULLIF', 'CAST', 'LOWER',
+  'UPPER', 'TRIM', 'LENGTH', 'ABS', 'ROUND', 'FLOOR', 'CEIL',
+];
+
+/** Lo propio de cada motor. */
+const ENGINE_KEYWORDS: Readonly<Record<DatabaseEngine, readonly string[]>> = {
+  postgresql: [
+    'ILIKE', 'RETURNING', 'ON CONFLICT', 'DO UPDATE', 'DO NOTHING',
+    'OFFSET', 'LATERAL', 'ARRAY', 'JSONB', 'SERIAL', 'BIGSERIAL',
+    'NOW()', 'CURRENT_DATE', 'GENERATE_SERIES', 'STRING_AGG', 'ARRAY_AGG',
+  ],
+  sqlserver: [
+    'TOP', 'OFFSET', 'FETCH NEXT', 'ROWS ONLY', 'IDENTITY', 'NVARCHAR',
+    'DATETIMEOFFSET', 'MERGE', 'OUTPUT', 'APPLY', 'CROSS APPLY', 'OUTER APPLY',
+    'GETDATE()', 'SYSDATETIMEOFFSET()', 'ISNULL', 'STRING_AGG', 'IIF',
+  ],
+  mysql: [
+    'LIMIT', 'OFFSET', 'AUTO_INCREMENT', 'ENGINE', 'IFNULL', 'GROUP_CONCAT',
+    'NOW()', 'CURDATE()', 'ON DUPLICATE KEY UPDATE',
+  ],
+};
+
+/** Palabras que deben sugerirse para un motor concreto. */
+export function keywordsFor(engine: DatabaseEngine): readonly string[] {
+  return [...COMMON_KEYWORDS, ...ENGINE_KEYWORDS[engine]];
+}
+
+export function functionsFor(engine: DatabaseEngine): readonly string[] {
+  // Las funciones específicas ya vienen en la lista de palabras del motor; aquí
+  // solo están las comunes, que se marcan con otro icono en el desplegable.
+  return COMMON_FUNCTIONS;
+}

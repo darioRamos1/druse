@@ -14,6 +14,8 @@
     (disconnect)="disconnect($event)"
     (forget)="forget($event)"
     (openNode)="openNode($event)"
+    (copied)="onCopied($event)"
+    (copyFailed)="onCopyFailed()"
   />
 
   <app-resize-handle
@@ -37,18 +39,29 @@
       [running]="running()"
       [hasSelection]="hasSelection()"
       [canExecute]="hasConnection()"
+      [timeoutSeconds]="timeoutSeconds()"
       (execute)="execute()"
       (executeSelection)="executeSelection()"
       (cancel)="cancel()"
+      (format)="format()"
+      (timeoutChange)="setTimeout($event)"
     />
 
     <app-sql-editor
+      #editor
       class="editor"
       [value]="sql()"
+      [engine]="activeEngine()"
+      [schema]="schemaIndex()"
       (valueChange)="onSqlChange($event)"
       (cursorChange)="onCursorChange($event)"
       (selectionChange)="onSelectionChange($event)"
       (execute)="execute()"
+      (executeSelection)="executeSelection()"
+      (cancel)="cancel()"
+      (save)="saveTab()"
+      (newTab)="createTab()"
+      (formatFailed)="onFormatFailed($event)"
     />
 
     @if (rejection(); as pending) {
@@ -93,6 +106,7 @@
       [result]="result()"
       [history]="history()"
       (refreshHistory)="refreshHistory()"
+      (searchHistory)="searchHistory($event)"
       (clearHistory)="clearHistory()"
       (reuseQuery)="reuseQuery($event)"
     />

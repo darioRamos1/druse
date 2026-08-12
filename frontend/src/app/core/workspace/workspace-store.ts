@@ -14,9 +14,11 @@ import {
   ExplorerNode,
   QueryHistoryEntry,
   QueryResult,
+  KnownRelation,
   QueryTab,
   ResultSet,
   SavedConnection,
+  SchemaIndex,
   SecretStoreStatus,
   SessionStatus,
 } from '../../shared/models/workspace';
@@ -30,6 +32,9 @@ interface TreeEntry {
   loading: boolean;
   children: TreeEntry[] | null;
 }
+
+/** Clave con la que se guarda el tiempo máximo de ejecución. */
+const TIMEOUT_PREFERENCE = 'query.timeoutSeconds';
 
 let tabCounter = 1;
 
@@ -75,6 +80,52 @@ export class WorkspaceStore {
 
   private readonly _notice = signal<string | null>(null);
   readonly notice = this._notice.asReadonly();
+
+  /**
+   * Tiempo máximo de ejecución, en segundos.
+   *
+   * Se guarda en preferencias: es de las cosas que un usuario ajusta una vez y
+   * espera no volver a tocar.
+   */
+  private readonly _timeoutSeconds = signal(30);
+  readonly timeoutSeconds = this._timeoutSeconds.asReadonly();
+
+  /** Muestra un aviso al usuario. */
+  notify(message: string): void {
+    this._notice.set(message);
+  }
+
+  async setTimeout(seconds: number): Promise<void> {
+    const clamped = Math.min(3600, Math.max(1, Math.round(seconds)));
+
+    this._timeoutSeconds.set(clamped);
+
+    try {
+      await firstValueFrom(this._gateway.setPreference(TIMEOUT_PREFERENCE, String(clamped)));
+    } catch {
+      // La preferencia no se pudo guardar, pero el valor ya está aplicado en
+      // esta sesión: interrumpir al usuario por esto sería desproporcionado.
+    }
+  }
+
+  /** Carga las preferencias guardadas. */
+  async loadPreferences(): Promise<void> {
+    try {
+      const preferences = await firstValueFrom(this._gateway.getPreferences());
+      const stored = Number.parseInt(preferences[TIMEOUT_PREFERENCE] ?? '', 10);
+
+      if (Number.isFinite(stored) && stored > 0) {
+        this._timeoutSeconds.set(stored);
+      }
+    } catch {
+      // Se sigue con los valores por defecto.
+    }
+  }
+
+  /** Quita el indicador de cambios sin guardar de la pestaña activa. */
+  markTabSaved(): void {
+    this._tabs.update((tabs) => tabs.map((tab) => (tab.active ? { ...tab, dirty: false } : tab)));
+  }
 
   // --- Sesión activa ---------------------------------------------------------
   private readonly _session = signal<SessionStatus | null>(null);
@@ -246,6 +297,50 @@ export class WorkspaceStore {
   readonly resultSet = computed<ResultSet | null>(
     () => this._result()?.resultSets[0] ?? null,
   );
+
+  /**
+   * Lo que el editor sabe del esquema, para el autocompletado.
+   *
+   * Se construye desde el árbol ya cargado: si el usuario no ha expandido una
+   * tabla, sus columnas no se sugieren. Consultar el catálogo en cada pulsación
+   * para completar sería mucho peor que sugerir de menos.
+   */
+  readonly schemaIndex = computed<SchemaIndex>(() => {
+    const schemas = new Set<string>();
+    const relations: KnownRelation[] = [];
+
+    const walk = (entries: readonly TreeEntry[]): void => {
+      for (const entry of entries) {
+        const { object } = entry;
+
+        if (object.kind === 'schema') {
+          schemas.add(object.name);
+        }
+
+        if (object.kind === 'table' || object.kind === 'view') {
+          const columns = (entry.children ?? [])
+            .filter((child) => child.object.kind === 'column')
+            .map((child) => child.object.name);
+
+          relations.push({
+            schema: object.schema ?? '',
+            name: object.name,
+            kind: object.kind,
+            qualified: object.schema ? `${object.schema}.${object.name}` : object.name,
+            columns,
+          });
+        }
+
+        if (entry.children) {
+          walk(entry.children);
+        }
+      }
+    };
+
+    walk(this._roots());
+
+    return { schemas: [...schemas], relations };
+  });
 
   // --- Conexiones ------------------------------------------------------------
 
@@ -571,7 +666,7 @@ export class WorkspaceStore {
           executionId,
           sql,
           maxRows: 500,
-          timeoutSeconds: 30,
+          timeoutSeconds: this._timeoutSeconds(),
           confirmDestructive,
         }),
       );

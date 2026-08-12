@@ -26,10 +26,12 @@ export class ResultsPanel {
   readonly pageSize = input(500);
 
   readonly refreshHistory = output<void>();
+  readonly searchHistory = output<string>();
   readonly clearHistory = output<void>();
   readonly reuseQuery = output<string>();
 
   protected readonly activeTab = signal<ResultsTab>('results');
+  protected readonly historySearch = signal('');
 
   /** Abre la pestaña indicada y refresca el historial al entrar en él. */
   protected select(tab: ResultsTab): void {
@@ -38,6 +40,19 @@ export class ResultsPanel {
     if (tab === 'history') {
       this.refreshHistory.emit();
     }
+  }
+
+  /**
+   * Filtra el historial.
+   *
+   * La búsqueda la resuelve el servidor, que es quien tiene todas las entradas:
+   * filtrar en el cliente solo alcanzaría a las que ya se hubieran traído.
+   */
+  protected onSearch(event: Event): void {
+    const term = (event.target as HTMLInputElement).value;
+
+    this.historySearch.set(term);
+    this.searchHistory.emit(term);
   }
 
   /** Fecha corta y legible; la absoluta va en el atributo `title`. */

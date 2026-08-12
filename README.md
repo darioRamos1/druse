@@ -17,6 +17,21 @@ Una *drusa* es la costra de cristales que tapiza el interior de una geoda: la es
 | Docker | — | Solo para las bases de datos de pruebas |
 | Rust (cargo) | estable | Solo para el empaquetado con Tauri (Fase 7) |
 
+## Atajos del editor
+
+| Atajo | Acción |
+| --- | --- |
+| `Ctrl/Cmd + Enter` | Ejecutar |
+| `Ctrl/Cmd + Shift + Enter` | Ejecutar solo la selección |
+| `Esc` | Cancelar la consulta en curso |
+| `Ctrl/Cmd + S` | Marcar la pestaña como guardada |
+| `Ctrl/Cmd + T` | Nueva consulta |
+| `Ctrl/Cmd + Shift + F` | Formatear |
+| `Ctrl/Cmd + F` | Buscar en el editor |
+| `Ctrl/Cmd + Espacio` | Sugerencias |
+
+El autocompletado ofrece las tablas, vistas y columnas **que el explorador ya ha cargado**, resolviendo los alias del `FROM`: si escribes `FROM users u`, después `u.` sugiere las columnas de `users`.
+
 ## Motores soportados
 
 | Motor | Estado |

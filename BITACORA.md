@@ -10,29 +10,28 @@
 
 | Campo | Valor |
 | --- | --- |
-| Última sesión | **007** — 2026-08-11 |
-| Fase activa | **Fase 5 — Productividad del editor** |
-| Fases 0–3 | ✅ Cerradas. |
-| Fase 4 | ✅ **Cerrada.** 9/9 tareas. |
+| Última sesión | **008** — 2026-08-11 |
+| Fase activa | **Fase 6 — Resultados y exportaciones** |
+| Fases 0–4 | ✅ Cerradas. |
+| Fase 5 | ✅ **Cerrada.** 10/10 tareas. |
 | ¿Compila el backend? | Sí — 0 advertencias, 0 errores |
-| ¿Compila el frontend? | Sí — 398 kB iniciales, 0 advertencias |
-| ¿Pasan las pruebas? | Sí — **167 en backend** (85 unitarias + **48 contractuales** + 34 integración) y **45 en frontend** |
-| ¿Funcionan los dos motores? | Sí — las **24 pruebas contractuales pasan idénticas** contra PostgreSQL 18.4 y SQL Server 2022 |
+| ¿Compila el frontend? | Sí — 411 kB iniciales, 0 advertencias |
+| ¿Pasan las pruebas? | Sí — **167 en backend** y **61 en frontend** |
+| ¿Funcionan los dos motores? | Sí — las 24 pruebas contractuales pasan idénticas contra PostgreSQL 18.4 y SQL Server 2022 |
 | Bloqueantes | Ninguno |
-| Git | Rama `feature/sqlserver-provider`, pendiente de fusionar en `main`. Sin remoto configurado. |
+| Git | Rama `feature/editor-productivity`, pendiente de fusionar en `main`. Sin remoto configurado. |
 
 ### Qué toca retomar en la próxima sesión
 
-1. **Fusionar `feature/sqlserver-provider` en `main`** y abrir `feature/editor-productivity`.
-2. Empezar la **Fase 5**, que es sobre todo trabajo de interfaz. Los botones que hoy están en pantalla sin hacer nada y que le tocan a esta fase:
-   - **Formatear** (formateador SQL consciente del dialecto);
-   - **Timeout**, hoy fijo en 30 s y no editable;
-   - filtro de conexiones de la barra lateral;
-   - atajos de teclado más allá de Ctrl+Enter;
-   - búsqueda dentro del editor.
-3. Autocompletado con esquemas, tablas y columnas ya cargados. El de palabras del documento está apagado a propósito desde la Fase 1.
-4. Recordar las pestañas abiertas entre sesiones: quedó fuera de la Fase 3 y encaja aquí.
-5. Resolver **D-15** (selector de base de datos): ahora que hay dos motores se puede decidir con criterio. SQL Server permite cambiar de base en la misma conexión; PostgreSQL exige reconectar.
+1. **Fusionar `feature/editor-productivity` en `main`** y abrir `feature/results-export`.
+2. Empezar la **Fase 6**. Lo que sigue en pantalla sin hacer nada y le toca a esta fase:
+   - **Exportar CSV · Excel** (endpoints `/api/exports/csv` y `/api/exports/xlsx` del plan §7);
+   - **Filtros** y la fila de filtros por columna de la cuadrícula;
+   - casillas de selección de filas y copiar celdas, filas y encabezados;
+   - la paginación, que hoy muestra el rango pero no navega (**D-16**).
+3. Resolver **D-08**: con 500 filas la rejilla CSS va bien; si se sube el límite hará falta virtualización. Es el momento de decidir entre AG Grid Community y una propia.
+4. Varios conjuntos de resultados: el backend ya los devuelve todos, pero la interfaz solo muestra el primero.
+5. Resolver **D-15** (selector de base de datos), pendiente desde la Fase 4.
 
 **Sigue pendiente el visto bueno visual.** La extensión de Chrome no ha estado conectada en ninguna sesión.
 
@@ -100,6 +99,48 @@ Pendiente de verificar cuando toque: Docker (pruebas de integración con contene
 ---
 
 ## 5. Registro de sesiones
+
+### Sesión 008 — 2026-08-11 · Fase 5 completa
+
+**Objetivo:** que el trabajo diario se pueda hacer con el teclado, y apagar los botones de adorno.
+
+**Hecho:**
+
+*Formateador*
+- `sql-formatter` con el dialecto de cada motor: PostgreSQL, T-SQL o MySQL. Formatear con el genérico no es inofensivo —parte el `::` de PostgreSQL y los corchetes de SQL Server por sitios que cambian el significado del SQL.
+- Formatea la selección si la hay, o el documento entero.
+- **Si el SQL no se puede analizar, se devuelve intacto.** Reformatear a la fuerza algo a medio escribir sería la forma más rápida de que alguien pierda trabajo.
+- Va por `executeEdits`, así que **se deshace con Ctrl+Z** como cualquier otra edición.
+
+*Autocompletado*
+- Palabras reservadas y funciones por motor. La lista es corta a propósito: sugerir cientos convierte el desplegable en ruido.
+- Tablas, vistas, esquemas y columnas **de lo que el explorador ya cargó**. Consultar el catálogo en cada pulsación sería mucho peor que sugerir de menos.
+- Tras un punto se sugieren **solo columnas**, y se resuelven los alias: escribir `u.` funciona si antes hay `FROM users u`. Sin eso, la función más útil del autocompletado no existiría.
+- Las tablas se ordenan por delante de las palabras reservadas, que es lo que más se escribe.
+
+*Atajos*
+- `Ctrl+Enter` ejecutar · `Ctrl+Shift+Enter` ejecutar selección · `Esc` cancelar · `Ctrl+S` guardar · `Ctrl+T` nueva consulta · `Ctrl+Shift+F` formatear · `Ctrl+F` buscar.
+- Se registran en Monaco y no en el documento: un `Ctrl+S` global se comería el del navegador aunque el foco estuviera en otro sitio.
+
+*Lo que dejó de ser decorativo*
+- **Formatear**, que era un botón muerto.
+- **Timeout**, ahora un desplegable con valores habituales que **se guarda en preferencias**.
+- **Filtro de conexiones**, que además filtra objetos del árbol y conserva los ancestros de cada coincidencia: una tabla suelta sin su esquema no diría de dónde sale.
+- **Historial filtrable**, resuelto en el servidor, que es quien tiene todas las entradas.
+- **Copiar el nombre calificado** y **abrir el `SELECT`** desde el árbol, con acciones que solo aparecen al pasar por encima para no tapar los nombres.
+
+**Verificado:**
+- 61 pruebas de frontend (16 nuevas de formateo y autocompletado) y 167 de backend.
+- La preferencia de timeout persiste: se escribió 120 y se leyó 120.
+- El historial filtra por texto contra el servidor.
+
+**Incidencia resuelta:** `sql-formatter` añadía **300 kB al paquete inicial**, que se descargarían siempre, incluso para quien no formatee nunca. Pasó a carga diferida, igual que Monaco: el paquete inicial volvió de 705 kB a 411 kB y el formateador se trae la primera vez que se usa.
+
+**No hecho:**
+- Guardar en disco: `Ctrl+S` solo quita el indicador de cambios pendientes. Los archivos llegan con el empaquetado de escritorio (Fase 7).
+- Recordar las pestañas abiertas entre sesiones. Se aplaza otra vez; encaja mejor junto al estado de ventana de la Fase 7.
+
+---
 
 ### Sesión 007 — 2026-08-11 · Fase 4 completa
 
@@ -516,8 +557,8 @@ Fuente: `docs/mockups/druse-main.html`. **Ya implementado** en `frontend/src/sty
 | 2 | Flujo vertical PostgreSQL | ✅ **Cerrada** — 11/11 |
 | 3 | Persistencia local y seguridad | ✅ **Cerrada** — 10/10 |
 | 4 | SQL Server | ✅ **Cerrada** — 9/9 |
-| 5 | Productividad del editor | 🔄 **Activa** — 0/10 |
-| 6 | Resultados y exportaciones | ⬜ No iniciada |
+| 5 | Productividad del editor | ✅ **Cerrada** — 10/10 |
+| 6 | Resultados y exportaciones | 🔄 **Activa** — 0/9 |
 | 7 | Empaquetado de escritorio | ⬜ No iniciada |
 | 8 | MySQL y estabilización | ⬜ No iniciada |
 

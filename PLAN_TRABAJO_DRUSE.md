@@ -478,16 +478,16 @@ Las mismas funciones visibles del MVP trabajan con PostgreSQL y SQL Server sin c
 
 ### Tareas
 
-- [ ] Atajos para ejecutar, cancelar, guardar y crear consulta.
-- [ ] Formateador SQL consciente del dialecto.
-- [ ] Sugerencias de palabras reservadas.
-- [ ] Sugerencias de esquemas, tablas y columnas cargadas.
-- [ ] Generar `SELECT` desde una tabla.
-- [ ] Copiar nombre completo del objeto.
-- [ ] Abrir varias pestañas.
-- [ ] Indicador de cambios sin guardar.
-- [ ] Búsqueda en el editor.
-- [ ] Historial filtrable.
+- [x] Atajos para ejecutar, cancelar, guardar y crear consulta.
+- [x] Formateador SQL consciente del dialecto.
+- [x] Sugerencias de palabras reservadas.
+- [x] Sugerencias de esquemas, tablas y columnas cargadas.
+- [x] Generar `SELECT` desde una tabla.
+- [x] Copiar nombre completo del objeto.
+- [x] Abrir varias pestañas.
+- [x] Indicador de cambios sin guardar.
+- [x] Búsqueda en el editor. _(la de Monaco, con Ctrl+F.)_
+- [x] Historial filtrable.
 
 ### Criterio de salida
 

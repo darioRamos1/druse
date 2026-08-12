@@ -27,7 +27,7 @@
 
 <span class="divider" aria-hidden="true"></span>
 
-<button type="button" class="btn" (click)="format.emit()">
+<button type="button" class="btn" title="Formatear (Ctrl+Shift+F)" (click)="format.emit()">
   <app-icon name="format" [size]="11" />
   Formatear
 </button>
@@ -45,7 +45,35 @@
   <app-icon name="chevron-down" [size]="9" />
 </button>
 
-<div class="chip chip--static">
-  <app-icon name="clock" [size]="12" />
-  Timeout <span class="chip__value">{{ timeoutSeconds() }}s</span>
+<div class="timeout">
+  <button
+    type="button"
+    class="chip"
+    [attr.aria-expanded]="editingTimeout()"
+    title="Tiempo máximo de ejecución"
+    (click)="toggleTimeout()"
+  >
+    <app-icon name="clock" [size]="12" />
+    Timeout <span class="chip__value">{{ label(timeoutSeconds()) }}</span>
+    <app-icon name="chevron-down" [size]="9" />
+  </button>
+
+  @if (editingTimeout()) {
+    <ul class="timeout__menu" role="listbox">
+      @for (option of timeoutOptions; track option) {
+        <li>
+          <button
+            type="button"
+            class="timeout__option"
+            role="option"
+            [attr.aria-selected]="option === timeoutSeconds()"
+            [class.is-selected]="option === timeoutSeconds()"
+            (click)="chooseTimeout(option)"
+          >
+            {{ label(option) }}
+          </button>
+        </li>
+      }
+    </ul>
+  }
 </div>
