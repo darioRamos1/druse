@@ -58,7 +58,7 @@ public sealed class DruseApiFactory : WebApplicationFactory<Program>
     private readonly TemporaryPaths _paths = new();
 
     /// <summary>Token que genera el host al arrancar.</summary>
-    public string Token => Services.GetRequiredService<LocalApiToken>().Value;
+    public string Token => Services.GetRequiredService<LocalApiEndpoint>().Token;
 
     /// <summary>Cliente con la cabecera del token ya puesta.</summary>
     public HttpClient CreateAuthenticatedClient()

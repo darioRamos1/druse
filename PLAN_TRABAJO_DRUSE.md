@@ -515,18 +515,18 @@ Los resultados pueden inspeccionarse y exportarse de manera confiable sin bloque
 
 ### Tareas
 
-- [ ] Inicializar Tauri sobre el frontend existente.
-- [ ] Publicar la API .NET como ejecutable autocontenido.
-- [ ] Publicar ejecutables por Runtime Identifier y arquitectura.
-- [ ] Incluir la API como proceso auxiliar reemplazable de la aplicación.
-- [ ] Elegir un puerto local dinámico o comunicación IPC segura.
-- [ ] Finalizar correctamente la API al cerrar la aplicación.
-- [ ] Crear icono, nombre, versión y metadatos del instalador.
-- [ ] Generar instalador para Windows x64.
-- [ ] Generar artefactos de prueba para Linux x64 y macOS ARM64.
-- [ ] Crear distribución ZIP en modo portable para Windows.
-- [ ] Validar instalación, actualización y desinstalación.
-- [ ] Probar en un equipo sin SDK de .NET ni Node.js.
+- [x] Inicializar Tauri sobre el frontend existente.
+- [x] Publicar la API .NET como ejecutable autocontenido.
+- [x] Publicar ejecutables por Runtime Identifier y arquitectura. _(la publicación acepta cualquier RID con `-Runtime`; solo se ha ejecutado win-x64.)_
+- [x] Incluir la API como proceso auxiliar reemplazable de la aplicación.
+- [x] Elegir un puerto local dinámico o comunicación IPC segura.
+- [x] Finalizar correctamente la API al cerrar la aplicación.
+- [x] Crear icono, nombre, versión y metadatos del instalador.
+- [x] Generar instalador para Windows x64.
+- [ ] Generar artefactos de prueba para Linux x64 y macOS ARM64. _(el script acepta cualquier RID, pero generar esos artefactos exige compilar en cada plataforma: es trabajo de integración continua, no de esta máquina.)_
+- [x] Crear distribución ZIP en modo portable para Windows.
+- [ ] Validar instalación, actualización y desinstalación. _(pendiente: instalar y desinstalar de verdad en este equipo.)_
+- [ ] Probar en un equipo sin SDK de .NET ni Node.js. _(pendiente: hace falta un equipo limpio.)_
 
 ### Criterio de salida
 

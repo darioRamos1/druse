@@ -522,3 +522,10 @@ secrets.json
 
 # Cliente OpenAPI generado
 frontend/src/app/core/generated-api-client/
+
+# Tauri
+shells/desktop-tauri/target/
+shells/desktop-tauri/gen/
+# La API publicada se copia aquí al empaquetar; se regenera con package.ps1
+shells/desktop-tauri/api/*
+!shells/desktop-tauri/api/.gitkeep
