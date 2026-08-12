@@ -54,30 +54,38 @@ function readToken() {
 
 let warned = false;
 
+/** Añade la cabecera del token a una petición saliente. */
+function attachToken(proxyReq) {
+  const token = readToken();
+
+  if (token) {
+    proxyReq.setHeader('X-Druse-Token', token);
+    return;
+  }
+
+  // Un solo aviso: repetirlo en cada petición ahogaría la consola.
+  if (!warned) {
+    warned = true;
+    console.warn(
+      `\n[druse] No se encontró el token en ${tokenPath}.` +
+        '\n[druse] Arranca la API local; sin token responderá 401.\n',
+    );
+  }
+}
+
 module.exports = {
   '/api': {
     target: 'http://127.0.0.1:5177',
     secure: false,
     changeOrigin: false,
     logLevel: 'warn',
-    on: {
-      proxyReq: (proxyReq) => {
-        const token = readToken();
 
-        if (token) {
-          proxyReq.setHeader('X-Druse-Token', token);
-          return;
-        }
-
-        // Un solo aviso: repetirlo en cada petición ahogaría la consola.
-        if (!warned) {
-          warned = true;
-          console.warn(
-            `\n[druse] No se encontró el token en ${tokenPath}.` +
-              '\n[druse] Arranca la API local; sin token responderá 401.\n',
-          );
-        }
-      },
+    // El servidor de desarrollo de Angular usa Vite, que expone el proxy
+    // subyacente por `configure`. El estilo `on: { proxyReq }` pertenece a
+    // http-proxy-middleware v3 y aquí se ignora en silencio, que es justo lo
+    // que hacía que todas las peticiones llegaran sin token.
+    configure: (proxy) => {
+      proxy.on('proxyReq', attachToken);
     },
   },
 };

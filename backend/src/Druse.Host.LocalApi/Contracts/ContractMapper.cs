@@ -116,6 +116,7 @@ internal static class ContractMapper
         return new QueryRequest
         {
             SessionId = request.SessionId,
+            ExecutionId = request.ExecutionId,
             Sql = request.Sql,
             MaxRows = request.MaxRows,
             TimeoutSeconds = request.TimeoutSeconds,

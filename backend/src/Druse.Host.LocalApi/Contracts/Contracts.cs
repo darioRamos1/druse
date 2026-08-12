@@ -79,6 +79,16 @@ public sealed record ExecuteQueryRequest
 {
     public required Guid SessionId { get; init; }
     public required string Sql { get; init; }
+
+    /// <summary>
+    /// Identificador que el cliente elige para poder cancelar.
+    ///
+    /// Debe enviarse **antes** de ejecutar: si lo asignara el servidor, el cliente
+    /// solo lo conocería al recibir la respuesta, cuando ya no queda nada que
+    /// cancelar.
+    /// </summary>
+    public Guid ExecutionId { get; init; }
+
     public int MaxRows { get; init; } = 500;
     public int TimeoutSeconds { get; init; } = 30;
     public bool ConfirmDestructive { get; init; }

@@ -558,10 +558,17 @@ export class WorkspaceStore {
     this._rejection.set(null);
     this._notice.set(null);
 
+    // El identificador se genera aquí y se envía con la petición: cancelar exige
+    // conocerlo mientras la consulta corre, y si lo pusiera el servidor solo
+    // llegaría con la respuesta, cuando ya no hay nada que cancelar.
+    const executionId = crypto.randomUUID();
+    this._currentExecutionId.set(executionId);
+
     try {
       const result = await firstValueFrom(
         this._gateway.executeQuery({
           sessionId: connection.sessionId,
+          executionId,
           sql,
           maxRows: 500,
           timeoutSeconds: 30,
@@ -570,7 +577,6 @@ export class WorkspaceStore {
       );
 
       this._result.set(result);
-      this._currentExecutionId.set(result.executionId);
 
       this._session.update((session) =>
         session ? { ...session, lastDurationMs: result.durationMs } : session,

@@ -6,6 +6,17 @@ public sealed record QueryRequest
     /// <summary>Sesión abierta sobre la que ejecutar.</summary>
     public required Guid SessionId { get; init; }
 
+    /// <summary>
+    /// Identificador de la ejecución, elegido por quien la lanza.
+    ///
+    /// Lo aporta el cliente a propósito: cancelar exige conocer el identificador
+    /// **mientras la consulta corre**, y si lo generara el servidor solo llegaría
+    /// con la respuesta, es decir, cuando ya no hay nada que cancelar.
+    ///
+    /// Si viene vacío se genera uno, pero esa ejecución no podrá cancelarse.
+    /// </summary>
+    public Guid ExecutionId { get; init; }
+
     /// <summary>Texto a ejecutar. Si el usuario seleccionó algo, ya viene recortado.</summary>
     public required string Sql { get; init; }
 

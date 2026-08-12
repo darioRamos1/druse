@@ -37,8 +37,12 @@ try {
         Write-Host "Arrancando la API local en http://127.0.0.1:$ApiPort ..." -ForegroundColor Cyan
 
         $env:LocalApi__Port = $ApiPort
+
+        # La ruta va entre comillas: Start-Process une los argumentos con
+        # espacios sin entrecomillarlos, así que un directorio con espacios en el
+        # nombre llegaría partido a dotnet.
         $apiProcess = Start-Process -FilePath 'dotnet' `
-            -ArgumentList 'run', '--project', $apiProject `
+            -ArgumentList 'run', '--project', "`"$apiProject`"" `
             -PassThru -NoNewWindow
 
         # Espera a que el endpoint de salud responda antes de abrir el frontend.

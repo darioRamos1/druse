@@ -95,9 +95,10 @@ public sealed class QueryService(
             TimeoutSeconds = Math.Clamp(request.TimeoutSeconds, 1, 3600),
         };
 
-        // El identificador se genera aquí, antes de ejecutar, para que el cliente
-        // pueda cancelar una consulta que todavía no ha respondido.
-        var executionId = Guid.NewGuid();
+        // El identificador lo elige el cliente para poder cancelar mientras la
+        // consulta corre. Si no lo mandó, se genera aquí y esa ejecución
+        // simplemente no será cancelable.
+        var executionId = request.ExecutionId == Guid.Empty ? Guid.NewGuid() : request.ExecutionId;
         var token = _tracker.Register(executionId, cancellationToken);
 
         try
