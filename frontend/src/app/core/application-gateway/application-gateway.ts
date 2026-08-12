@@ -42,6 +42,15 @@ export interface ConnectRequest {
 export interface ExecuteQueryRequest {
   readonly sessionId: string;
   readonly sql: string;
+
+  /**
+   * Identificador elegido por el cliente para poder cancelar.
+   *
+   * Sin él, el identificador solo llegaría con la respuesta —cuando ya no queda
+   * nada que cancelar— y el botón «Cancelar» no tendría a qué agarrarse.
+   */
+  readonly executionId?: string;
+
   readonly maxRows?: number;
   readonly timeoutSeconds?: number;
   readonly confirmDestructive?: boolean;

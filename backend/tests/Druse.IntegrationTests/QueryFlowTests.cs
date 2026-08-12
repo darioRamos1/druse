@@ -310,4 +310,85 @@ public sealed class QueryFlowTests : IClassFixture<DruseApiFactory>
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
+
+    /// <summary>
+    /// Cancelar una consulta **en curso**, que es el caso que le importa al
+    /// usuario.
+    ///
+    /// El cliente manda el identificador con la petición: si lo generara el
+    /// servidor, solo lo conocería al recibir la respuesta —cuando ya no queda
+    /// nada que cancelar— y el botón «Cancelar» no serviría de nada.
+    /// </summary>
+    [RequiresPostgreSqlFact]
+    public async Task CancelarUnaConsultaEnCurso_LaDetiene()
+    {
+        var (client, sessionId) = await ConnectAsync();
+
+        using (client)
+        {
+            var executionId = Guid.NewGuid();
+
+            var running = client.PostAsJsonAsync("/api/queries", new
+            {
+                sessionId,
+                executionId,
+                sql = "SELECT pg_sleep(30)",
+                timeoutSeconds = 60,
+            });
+
+            // Espera a que la ejecución esté registrada antes de cancelarla.
+            HttpResponseMessage? cancel = null;
+
+            for (var attempt = 0; attempt < 40; attempt++)
+            {
+                await Task.Delay(100);
+
+                cancel = await client.DeleteAsync($"/api/queries/{executionId}");
+
+                if (cancel.StatusCode == HttpStatusCode.Accepted)
+                {
+                    break;
+                }
+            }
+
+            Assert.NotNull(cancel);
+            Assert.Equal(HttpStatusCode.Accepted, cancel.StatusCode);
+
+            var response = await running;
+            response.EnsureSuccessStatusCode();
+
+            var body = await response.ReadJsonAsync();
+
+            Assert.Equal("canceled", body.GetProperty("state").GetString());
+            // Cancelar debe cortar de verdad, no esperar los 30 segundos.
+            Assert.True(body.GetProperty("durationMs").GetInt64() < 15_000);
+
+            await client.DeleteAsync($"/api/sessions/{sessionId}");
+        }
+    }
+
+    [RequiresPostgreSqlFact]
+    public async Task ElIdentificadorDeEjecucionEsElQueMandaElCliente()
+    {
+        var (client, sessionId) = await ConnectAsync();
+
+        using (client)
+        {
+            var executionId = Guid.NewGuid();
+
+            var response = await client.PostAsJsonAsync("/api/queries", new
+            {
+                sessionId,
+                executionId,
+                sql = "SELECT 1",
+            });
+
+            response.EnsureSuccessStatusCode();
+            var body = await response.ReadJsonAsync();
+
+            Assert.Equal(executionId, body.GetProperty("executionId").GetGuid());
+
+            await client.DeleteAsync($"/api/sessions/{sessionId}");
+        }
+    }
 }

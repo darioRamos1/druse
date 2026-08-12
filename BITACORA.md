@@ -98,6 +98,40 @@ Pendiente de verificar cuando toque: Docker (pruebas de integración con contene
 
 ## 5. Registro de sesiones
 
+### Sesión 006 — 2026-08-11 · Ejecución completa y tres fallos corregidos
+
+**Objetivo:** arrancar la aplicación entera y ver cómo se comporta de verdad.
+
+**Qué se hizo:** se pobló la base de pruebas con los mismos datos del mockup (1 284 usuarios, 37 tenants, 412 empresas, 9 630 documentos), se arrancó con `dev.ps1` y se recorrió el flujo completo por el proxy.
+
+**Tres fallos que solo aparecieron al ejecutar:**
+
+1. **`dev.ps1` no funcionaba en esta máquina.** `Start-Process` une los argumentos con espacios sin entrecomillarlos, y la ruta contiene un espacio («DB STUDIO»), así que dotnet recibía `P:\Proyectos\Trabajo\DB`. El criterio de salida de la Fase 0 decía «existe un único comando documentado»… y ese comando nunca se había ejecutado entero. Corregido entrecomillando la ruta.
+
+2. **El proxy no inyectaba el token.** Se había escrito con la sintaxis `on: { proxyReq }` de http-proxy-middleware v3, pero el servidor de Angular usa Vite, que espera `configure`. La opción se ignoraba **en silencio** y todas las peticiones llegaban sin token: el frontend habría respondido 401 en todo. Corregido con `configure`.
+
+3. **El botón «Cancelar» no podía funcionar.** El `executionId` lo generaba el servidor y solo llegaba **con la respuesta**, es decir, cuando la consulta ya había terminado. Mientras corría, el cliente no tenía identificador que cancelar. Las pruebas no lo detectaron porque las contractuales cancelaban pasando un token directamente al ejecutor, y la de integración solo comprobaba que cancelar un id inexistente da 404. **Ahora el identificador lo elige el cliente y se envía con la petición.** Añadidas dos pruebas: cancelar una consulta *en curso* y comprobar que el id devuelto es el que se mandó.
+
+**Verificado con la aplicación en marcha:**
+- `dev.ps1` levanta API y frontend con un solo comando.
+- El proxy inyecta el token: `/api/connections` responde 200 por el 4200 y 401 por el 5177 directo.
+- Conexión guardada, sesión abierta **sin reenviar la contraseña**, con nombre en UTF-8 («PostgreSQL — R3Safety») intacto.
+- Explorador con carga perezosa: base → esquema → carpetas → tablas, con los recuentos reales (9 630, 412, 37, 1 284).
+- La consulta del mockup ejecutada de verdad: 17 ms.
+- `DELETE FROM users` sin filtro → **409** con el riesgo explicado.
+- Error de sintaxis → SQLSTATE 42601 y posición 14.
+- 9 630 filas recortadas a 500 con `truncated: true`.
+- Nulos como `null`, distintos de la cadena vacía, y acentos correctos («Lucía Gómez»).
+- **Cancelación en vivo: `pg_sleep(30)` cortado a los 2,8 segundos.**
+
+**Pruebas:** 140 en backend (85 + 21 + 34) y 45 en frontend.
+
+**Limpieza:** se borraron de la máquina los datos de prueba y la credencial del Administrador de credenciales.
+
+**Nota sobre el proceso:** los tres fallos estaban en las costuras —un script, una opción de configuración, un contrato entre cliente y servidor—, justo donde las pruebas de cada lado no miran. Conviene ejecutar la aplicación entera al cerrar cada fase, no solo al final.
+
+---
+
 ### Sesión 005 — 2026-08-11 · Fase 3 completa
 
 **Objetivo:** que los datos sobrevivan al reinicio y que la API deje de ser abierta.
