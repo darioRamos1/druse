@@ -1,5 +1,6 @@
 using System.Reflection;
 using Druse.Application.Abstractions;
+using Druse.Database.Abstractions;
 using Druse.Host.LocalApi;
 using Druse.Host.LocalApi.Endpoints;
 using Druse.Host.LocalApi.Security;
@@ -85,9 +86,36 @@ app.Use(async (context, next) =>
         context.Response.StatusCode = StatusCodes.Status400BadRequest;
         await context.Response.WriteAsJsonAsync(new { message = exception.Message });
     }
+    catch (DatabaseOperationException exception)
+    {
+        // El motor dijo que no, y dijo por qué.
+        //
+        // Que falte un permiso o que la contraseña no sea correcta no es un
+        // fallo del programa: es una respuesta normal de una base de datos, y el
+        // usuario puede hacer algo al respecto **si se la contamos**. El mensaje
+        // ya viene saneado por el proveedor, sin cadena de conexión.
+        //
+        // Se registra como aviso y no como error: no hay nada roto que arreglar
+        // aquí, y llenar el log de trazas escondería los fallos de verdad.
+        app.Logger.LogWarning(
+            "El motor rechazó {Path}: {Message}",
+            context.Request.Path,
+            exception.Error.Message);
+
+        context.Response.StatusCode = StatusCodes.Status409Conflict;
+
+        // Sin campo `reason`: ese lo usa el cliente para reconocer los avisos que
+        // se pueden confirmar, y esto no se confirma, se arregla.
+        await context.Response.WriteAsJsonAsync(new
+        {
+            message = exception.Error.Message,
+            code = exception.Error.Code,
+        });
+    }
     catch (Exception exception)
     {
         // El detalle va al log del servidor; al cliente solo un mensaje genérico.
+        // Aquí abajo solo debería quedar lo que de verdad no esperábamos.
         app.Logger.LogError(exception, "Error no controlado atendiendo {Path}", context.Request.Path);
 
         context.Response.StatusCode = StatusCodes.Status500InternalServerError;

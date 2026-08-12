@@ -325,15 +325,24 @@ public sealed class MySqlMetadataReader : IDatabaseMetadataReader
             command.Parameters.Add(parameter);
         }
 
-        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
-
-        var items = new List<T>();
-
-        while (await reader.ReadAsync(cancellationToken))
+        try
         {
-            items.Add(project(reader));
-        }
+            await using var reader = await command.ExecuteReaderAsync(cancellationToken);
 
-        return items;
+            var items = new List<T>();
+
+            while (await reader.ReadAsync(cancellationToken))
+            {
+                items.Add(project(reader));
+            }
+
+            return items;
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            // El motivo real —un permiso que falta, un objeto que no está— tiene
+            // que llegar a la pantalla. Ya viene saneado por el normalizador.
+            throw new DatabaseOperationException(MySqlErrorNormalizer.Normalize(exception));
+        }
     }
 }

@@ -238,7 +238,7 @@ public sealed class SqlServerMetadataReader : IDatabaseMetadataReader
                 cancellationToken,
                 ("schema", folder.Schema ?? "dbo"));
         }
-        catch (SqlException exception) when (IsPermissionDenied(exception))
+        catch (DatabaseOperationException exception) when (IsPermissionDenied(exception))
         {
             // Un permiso que falta al leer un dato accesorio no puede dejar al
             // usuario sin explorador.
@@ -262,9 +262,13 @@ public sealed class SqlServerMetadataReader : IDatabaseMetadataReader
     ///
     /// El mismo permiso que falta se anuncia con un número distinto según dónde
     /// se ejecute, así que la lista tiene que cubrir las dos formas.
+    ///
+    /// El número llega como texto porque es lo que el error normalizado
+    /// transporta: los motores no numeran igual, y el contrato no tiene por qué
+    /// saberlo.
     /// </summary>
-    private static bool IsPermissionDenied(SqlException exception) =>
-        exception.Number is 229 or 230 or 262 or 297 or 300;
+    private static bool IsPermissionDenied(DatabaseOperationException exception) =>
+        exception.Error.Code is "229" or "230" or "262" or "297" or "300";
 
     private static async Task<IReadOnlyList<DatabaseObject>> GetViewsAsync(
         IDatabaseSession session,
@@ -404,15 +408,24 @@ public sealed class SqlServerMetadataReader : IDatabaseMetadataReader
             command.Parameters.Add(parameter);
         }
 
-        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
-
-        var items = new List<T>();
-
-        while (await reader.ReadAsync(cancellationToken))
+        try
         {
-            items.Add(project(reader));
-        }
+            await using var reader = await command.ExecuteReaderAsync(cancellationToken);
 
-        return items;
+            var items = new List<T>();
+
+            while (await reader.ReadAsync(cancellationToken))
+            {
+                items.Add(project(reader));
+            }
+
+            return items;
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            // El motivo real —un permiso que falta, un objeto que no está— tiene
+            // que llegar a la pantalla. Ya viene saneado por el normalizador.
+            throw new DatabaseOperationException(SqlServerErrorNormalizer.Normalize(exception));
+        }
     }
 }

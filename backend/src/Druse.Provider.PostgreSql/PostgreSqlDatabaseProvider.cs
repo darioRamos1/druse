@@ -92,11 +92,14 @@ public sealed class PostgreSqlDatabaseProvider : IDatabaseProvider
         {
             await connection.OpenAsync(cancellationToken);
         }
-        catch
+        catch (Exception exception) when (exception is not OperationCanceledException)
         {
             // Si abrir falla, la conexión no debe quedar viva a medias.
             await connection.DisposeAsync();
-            throw;
+
+            // Y el motivo se cuenta: «la contraseña no es correcta» es algo que
+            // el usuario puede arreglar; «error inesperado», no.
+            throw new DatabaseOperationException(PostgreSqlErrorNormalizer.Normalize(exception));
         }
 
         // El identificador es aleatorio a propósito: es lo que viaja por HTTP y no

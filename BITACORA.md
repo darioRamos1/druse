@@ -17,7 +17,7 @@
 | Fase 8 | ✅ **7/7.** Tres motores sobre el mismo contrato y primera beta preparada. |
 | ¿Compila el backend? | Sí — 0 advertencias, 0 errores |
 | ¿Compila el envoltorio? | Sí |
-| ¿Pasan las pruebas? | Sí — **219 en backend** y **80 en frontend** |
+| ¿Pasan las pruebas? | Sí — **269 en backend** y **120 en frontend** |
 | ¿Hay aplicación de escritorio? | **Sí.** Instalador NSIS, MSI y ZIP portable |
 | Motores | **PostgreSQL, SQL Server y MySQL/MariaDB**, con las **mismas 24 pruebas contractuales** cada uno |
 | Bloqueantes | Ninguno |
@@ -29,7 +29,8 @@
    - instalar, actualizar y desinstalar de verdad, para validar el ciclo completo;
    - arrancar en una máquina sin .NET ni Node, que es el criterio que demuestra que el paquete se basta solo.
 2. Artefactos de Linux y macOS: el script acepta cualquier RID, pero generarlos exige compilar en cada plataforma. Es trabajo de integración continua.
-3. **Lo siguiente lo pidió el usuario** después de usar la beta contra su base de preproducción, y está descrito en el plan §15: importar CSV/Excel, editar varias filas a la vez en la cuadrícula y ayuda para componer consultas. Las tres tocan la pieza que el MVP dejó de solo lectura, así que conviene empezar por la edición de filas: de ahí salen las reglas —clave primaria, previsualización del SQL, confirmación y transacción— que las otras dos reutilizan.
+3. **Probar la edición de filas a mano**: editar una celda, ver el SQL y confirmar. Es lo único de lo entregado que no se ha recorrido en el navegador.
+4. **De las tres que pidió el usuario** (plan §15), la edición de filas ya está. Quedan **importar CSV/Excel** —que reutiliza sus mismas protecciones— y la **ayuda para componer consultas**, que es la única de las tres que no escribe en los datos.
 
 **El visto bueno visual ya está dado** (sesión 011, con la extensión de Chrome por fin conectada): la pantalla reproduce el mockup. Lo único ausente es la pestaña «Plan de ejecución», que está fuera del MVP.
 
@@ -153,6 +154,28 @@ De las 24, una falló: **el tiempo de espera daba la consulta por completada**. 
 **Incidencia del entorno, no del producto:** los acentos aparecían dobles («AndrÃ©»). No era Druse: el guion de carga entró por el cliente `mysql` sin `--default-character-set=utf8mb4` y los grabó doblemente codificados. Se comprobó con `HEX(nombre)` —`C383C2A9` en vez de `C3A9`— y al recargar bien salieron correctos de punta a punta. Merece quedar escrito para que la próxima lectura no lo confunda con un fallo del proveedor.
 
 **No hecho, y por qué:** lo mismo que quedó de la Fase 7 —instalar de verdad y probar en un equipo limpio— sigue necesitando otra máquina.
+
+---
+
+#### Después de cerrar la Fase 8, usando la beta contra una base real
+
+El usuario abrió su SQL Server de preproducción y lo que salió no estaba en ningún plan. Todo esto vino de usarla, no de leerla:
+
+1. **El explorador no podía listar tablas** en su base. El recuento de filas salía de una DMV que exige `VIEW DATABASE STATE`, un permiso que un usuario de aplicación no tiene: el servidor respondía 262 y el usuario se quedaba sin ver **ninguna** tabla por culpa de un número informativo. Ahora sale de `sys.partitions`, que solo exige poder ver la tabla, y detrás queda un respaldo que lista sin recuento si aun así lo rechazan. Los números de error están comprobados en los dos entornos: 262 en Azure SQL, 297 en SQL Server 2022.
+
+2. **El autocompletado se apagaba tras el punto de un esquema.** Se buscaba una tabla llamada `tpublico`; como no existía, la lista salía vacía justo donde más falta hace: en una base cuyo esquema no es el de por omisión. De paso, las columnas solo se conocían si la tabla se había expandido a mano, cosa que nadie hace con cientos de tablas. Ahora el catálogo **se precalienta al conectar** —hasta 20 esquemas, y el resto al escribir `esquema.`— y las columnas se piden la primera vez que se pregunta por una tabla.
+
+3. **Una conexión no ejecuta dos cosas a la vez**, y el precalentado pedía tablas y vistas en paralelo: SQL Server respondía que no admite MultipleActiveResultSets. El fallo lo destapó el precalentado pero no era suyo —bastaba con expandir dos nodos seguidos—, así que cada sesión tiene ahora su turno en el servidor.
+
+4. **IntelliSense**, a petición del usuario: tooltip con el tipo de cada columna, tipos en el desplegable, plantillas por motor y avisos que subrayan lo que el catálogo desmiente. La regla de los avisos es callar si no se está seguro: un aviso falso sobre SQL correcto enseña a ignorarlos.
+
+5. **Edición de filas en la cuadrícula**, la primera vez que Druse escribe en los datos del usuario. Las reglas viven en el caso de uso, no en la interfaz: clave primaria obligatoria, la clave se lee del catálogo, no se toca la clave primaria, transacción, parámetros, el SQL a la vista antes de confirmar y **una fila por instrucción** —si toca cero o más de una, se deshace todo—.
+
+6. **Los errores del motor llegan a la pantalla.** Un permiso que falta o una contraseña incorrecta salían como 500 con «se produjo un error inesperado» y el motivo se quedaba en el log. Ahora salen como 409 con el mensaje del motor y su código, ya saneado: se comprobó que la contraseña rechazada no aparece dentro.
+
+**Al día:** 269 pruebas de backend y 120 de frontend.
+
+**Sin verificar todavía:** el recorrido completo de la edición de filas en el navegador —editar, ver el SQL, confirmar—. La cadena que decide si una tabla es editable sí se comprobó en la aplicación real; el clic final lo hará el usuario.
 
 **Decisiones tomadas:** D-20 a D-23 (ver §6).
 
