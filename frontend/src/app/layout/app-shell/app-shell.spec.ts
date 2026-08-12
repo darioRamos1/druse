@@ -1,13 +1,27 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { of } from 'rxjs';
 
+import { ApplicationGateway } from '../../core/application-gateway/application-gateway';
 import { AppShell } from './app-shell';
+
+/** Gateway que no habla con nadie: el shell debe montarse sin API detrás. */
+function silentGateway(): Partial<ApplicationGateway> {
+  return {
+    getEngines: () => of([]),
+    getDatabases: () => of([]),
+    getChildren: () => of([]),
+  };
+}
 
 describe('AppShell', () => {
   let fixture: ComponentFixture<AppShell>;
   let element: HTMLElement;
 
   beforeEach(async () => {
-    await TestBed.configureTestingModule({ imports: [AppShell] }).compileComponents();
+    await TestBed.configureTestingModule({
+      imports: [AppShell],
+      providers: [{ provide: ApplicationGateway, useValue: silentGateway() }],
+    }).compileComponents();
 
     fixture = TestBed.createComponent(AppShell);
     element = fixture.nativeElement as HTMLElement;
@@ -38,6 +52,29 @@ describe('AppShell', () => {
     expect(handles[1].getAttribute('aria-orientation')).toBe('horizontal');
   });
 
+  it('sin conexiones, invita a crear una', () => {
+    expect(element.querySelector('.empty__action')?.textContent).toContain('Crear una conexión');
+  });
+
+  it('sin conexión, la barra de estado lo dice', () => {
+    expect(element.querySelector('app-status-bar')?.textContent).toContain('Sin conexión');
+  });
+
+  it('sin conexión, no se puede ejecutar', () => {
+    const run = element.querySelector<HTMLButtonElement>('app-editor-toolbar .run');
+
+    expect(run?.disabled).toBe(true);
+  });
+
+  it('abre el diálogo de conexión desde la barra superior', async () => {
+    expect(element.querySelector('app-connection-dialog')).toBeNull();
+
+    element.querySelector<HTMLButtonElement>('app-top-bar .btn--primary')?.click();
+    await fixture.whenStable();
+
+    expect(element.querySelector('app-connection-dialog')).toBeTruthy();
+  });
+
   it('abre una pestaña nueva y la deja activa', async () => {
     const tabsBefore = element.querySelectorAll('app-editor-tabs .tab').length;
 
@@ -53,27 +90,15 @@ describe('AppShell', () => {
   });
 
   it('al cerrar la pestaña activa deja otra activa', async () => {
-    const closeActive = element.querySelector<HTMLButtonElement>(
-      'app-editor-tabs .tab.is-active .tab__close',
-    );
-
-    closeActive?.click();
+    element.querySelector<HTMLButtonElement>('app-editor-tabs .tabs__add')?.click();
     await fixture.whenStable();
 
-    const active = element.querySelectorAll('app-editor-tabs .tab.is-active');
+    element
+      .querySelector<HTMLButtonElement>('app-editor-tabs .tab.is-active .tab__close')
+      ?.click();
+    await fixture.whenStable();
 
     // Nunca debe quedar el editor sin pestaña seleccionada.
-    expect(active.length).toBe(1);
-  });
-
-  it('pliega y despliega una conexión', async () => {
-    const connection = element.querySelector<HTMLButtonElement>('.node--connection.is-active');
-    expect(connection?.getAttribute('aria-expanded')).toBe('true');
-
-    connection?.click();
-    await fixture.whenStable();
-
-    const nodes = element.querySelectorAll('.node--object');
-    expect(nodes.length).toBe(0);
+    expect(element.querySelectorAll('app-editor-tabs .tab.is-active').length).toBe(1);
   });
 });

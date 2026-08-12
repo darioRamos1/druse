@@ -9,7 +9,9 @@
       (click)="select('results')"
     >
       Resultados
-      <span class="tab__count">{{ resultSet().rows.length }}</span>
+      @if (rowCount() > 0) {
+        <span class="tab__count">{{ rowCount() }}</span>
+      }
     </button>
     <button
       type="button"
@@ -20,16 +22,9 @@
       (click)="select('messages')"
     >
       Mensajes
-    </button>
-    <button
-      type="button"
-      class="tab"
-      role="tab"
-      [class.is-active]="activeTab() === 'plan'"
-      [attr.aria-selected]="activeTab() === 'plan'"
-      (click)="select('plan')"
-    >
-      Plan de ejecución
+      @if (messageCount() > 0) {
+        <span class="tab__count">{{ messageCount() }}</span>
+      }
     </button>
     <button
       type="button"
@@ -45,48 +40,80 @@
 
   <span class="spacer"></span>
 
-  <button type="button" class="tool-button" [class.is-on]="hasFilters()">
+  <button type="button" class="tool-button" [class.is-on]="hasFilters()" [disabled]="!resultSet()">
     <app-icon name="filter" [size]="12" />
     Filtros
   </button>
-  <button type="button" class="tool-button">
+  <button type="button" class="tool-button" [disabled]="!resultSet()">
     <app-icon name="export" [size]="12" />
     Exportar
     <span class="tool-button__hint">CSV · Excel</span>
   </button>
 </header>
 
-@if (activeTab() === 'results') {
-  <app-results-grid [resultSet]="resultSet()" />
+@switch (activeTab()) {
+  @case ('results') {
+    @if (resultSet(); as set) {
+      <app-results-grid [resultSet]="set" />
 
-  <footer class="foot">
-    <div class="foot__item">
-      <span class="dot" aria-hidden="true"></span>
-      {{ resultSet().rows.length }} filas obtenidas en
-      <span class="mono">{{ resultSet().durationMs }} ms</span>
-    </div>
+      <footer class="foot">
+        <div class="foot__item">
+          <span class="dot" aria-hidden="true"></span>
+          {{ set.rows.length }} filas obtenidas en
+          <span class="mono">{{ set.durationMs }} ms</span>
+        </div>
 
-    <span class="sep" aria-hidden="true"></span>
+        @if (set.truncated) {
+          <span class="sep" aria-hidden="true"></span>
+          <div class="foot__item foot__item--warning" title="Se alcanzó el límite de filas">
+            Resultado recortado
+          </div>
+        }
 
-    <div class="foot__item foot__item--muted">
-      Filas por página
-      <span class="chip">
-        {{ pageSize() }}
-        <app-icon name="chevron-down" [size]="9" />
-      </span>
-    </div>
+        @if (result()?.rowsAffected; as affected) {
+          <span class="sep" aria-hidden="true"></span>
+          <div class="foot__item">
+            <span class="mono">{{ affected }}</span> filas afectadas
+          </div>
+        }
 
-    <span class="spacer"></span>
+        <span class="spacer"></span>
 
-    <nav class="pager" aria-label="Paginación">
-      <button type="button" class="pager__arrow" disabled aria-label="Página anterior">‹</button>
-      <button type="button" class="pager__page is-current" aria-current="page">1</button>
-      <button type="button" class="pager__page">2</button>
-      <button type="button" class="pager__page">3</button>
-      <button type="button" class="pager__arrow" aria-label="Página siguiente">›</button>
-      <span class="pager__range">{{ rangeLabel() }}</span>
-    </nav>
-  </footer>
-} @else {
-  <div class="empty">Sin contenido todavía. Esta vista se implementa en una fase posterior.</div>
+        <nav class="pager" aria-label="Paginación">
+          <span class="pager__range">{{ rangeLabel() }}</span>
+        </nav>
+      </footer>
+    } @else if (result(); as executed) {
+      <div class="empty">
+        @if (executed.state === 'failed') {
+          <span class="empty__error">{{ executed.error?.message }}</span>
+        } @else if (executed.state === 'canceled') {
+          La ejecución se canceló.
+        } @else if (executed.rowsAffected !== undefined && executed.rowsAffected !== null) {
+          <span class="mono">{{ executed.rowsAffected }}</span>&nbsp;filas afectadas en
+          <span class="mono">&nbsp;{{ executed.durationMs }} ms</span>
+        } @else {
+          La instrucción se ejecutó correctamente y no devolvió filas.
+        }
+      </div>
+    } @else {
+      <div class="empty">Ejecuta una consulta para ver los resultados aquí.</div>
+    }
+  }
+
+  @case ('messages') {
+    @if (messages().length > 0) {
+      <ul class="messages">
+        @for (message of messages(); track $index) {
+          <li class="messages__item" [attr.data-severity]="message.severity">{{ message.text }}</li>
+        }
+      </ul>
+    } @else {
+      <div class="empty">Sin mensajes.</div>
+    }
+  }
+
+  @default {
+    <div class="empty">El historial se implementa en la Fase 3.</div>
+  }
 }

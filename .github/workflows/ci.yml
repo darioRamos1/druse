@@ -38,6 +38,45 @@ jobs:
       - name: Probar
         run: dotnet test backend/Druse.slnx --configuration Release --no-build --verbosity normal
 
+  # Las pruebas contra un motor real solo corren en Linux: los ejecutores de
+  # Windows y macOS no traen Docker, y montarlo ahí multiplicaría el tiempo sin
+  # aportar nada. Lo que se valida aquí es el proveedor, no el sistema operativo.
+  backend-con-postgresql:
+    name: Backend con PostgreSQL real
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_PASSWORD: druse_dev_only
+          POSTGRES_DB: druse_test
+        ports:
+          - 55440:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DRUSE_TEST_PG_HOST: 127.0.0.1
+      DRUSE_TEST_PG_PORT: 55440
+      DRUSE_TEST_PG_DB: druse_test
+      DRUSE_TEST_PG_USER: postgres
+      DRUSE_TEST_PG_PASSWORD: druse_dev_only
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Instalar .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Probar contra PostgreSQL
+        run: dotnet test backend/Druse.slnx --configuration Release --verbosity normal
+
   frontend:
     name: Frontend (${{ matrix.os }})
     runs-on: ${{ matrix.os }}

@@ -149,6 +149,12 @@
     &.is-open {
       color: var(--dr-accent-bright);
     }
+
+    // Mientras se piden los hijos, el propio chevron indica la espera: añadir un
+    // indicador aparte movería el resto de la fila.
+    &.is-loading {
+      animation: node-pulse 900ms ease-in-out infinite;
+    }
   }
 
   &__chevron-spacer {
@@ -232,6 +238,45 @@
   &--off {
     background: #3e4658;
     box-shadow: none;
+  }
+
+  &--error {
+    background: #f2686b;
+    box-shadow: 0 0 6px rgb(242 104 107 / 70%);
+  }
+}
+
+@keyframes node-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.35;
+  }
+}
+
+.empty {
+  margin: 12px 8px;
+  color: var(--dr-text-faint);
+  font-size: 12px;
+  line-height: 1.5;
+
+  &__action {
+    display: block;
+    margin-top: 6px;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--dr-accent);
+    font-family: inherit;
+    font-size: 12px;
+    cursor: pointer;
+
+    &:hover {
+      color: var(--dr-accent-bright);
+    }
   }
 }
 

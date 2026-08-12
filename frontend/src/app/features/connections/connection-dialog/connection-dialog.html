@@ -1,0 +1,103 @@
+<div class="backdrop" (click)="close()"></div>
+
+<div class="dialog" role="dialog" aria-modal="true" aria-labelledby="connection-dialog-title">
+  <header class="head">
+    <span class="head__icon" aria-hidden="true">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+        <ellipse cx="8" cy="4" rx="5.2" ry="2.2" stroke="#9FB0FF" stroke-width="1.3" />
+        <path d="M2.8 4v8c0 1.2 2.33 2.2 5.2 2.2s5.2-1 5.2-2.2V4" stroke="#9FB0FF" stroke-width="1.3" />
+        <path d="M2.8 8c0 1.2 2.33 2.2 5.2 2.2s5.2-1 5.2-2.2" stroke="#9FB0FF" stroke-width="1.3" />
+      </svg>
+    </span>
+    <div class="head__text">
+      <h2 class="head__title" id="connection-dialog-title">Nueva conexión</h2>
+      <p class="head__subtitle">
+        Configura el acceso a un motor de base de datos. La contraseña se usa para abrir la sesión y no
+        se guarda todavía.
+      </p>
+    </div>
+    <button type="button" class="head__close" aria-label="Cerrar" (click)="close()">×</button>
+  </header>
+
+  <div class="body">
+    <h3 class="section">Motor</h3>
+    <div class="engines">
+      @for (option of engines; track option.id) {
+        <button
+          type="button"
+          class="engine"
+          [class.is-selected]="engine() === option.id"
+          [class.is-disabled]="!option.available"
+          [attr.aria-pressed]="engine() === option.id"
+          [attr.title]="option.available ? null : 'Disponible en una fase posterior'"
+          (click)="selectEngine(option)"
+        >
+          <app-engine-badge [engine]="option.id" [size]="24" class="engine__badge" />
+          <span class="engine__text">
+            <span class="engine__name">{{ option.name }}</span>
+            <span class="engine__versions">{{ option.versions }}</span>
+          </span>
+          @if (engine() === option.id) {
+            <span class="engine__check" aria-hidden="true">✓</span>
+          }
+        </button>
+      }
+    </div>
+
+    <h3 class="section">Conexión</h3>
+    <div class="grid">
+      <label class="field field--wide">
+        <span class="field__label">Nombre</span>
+        <input class="field__input" type="text" [(ngModel)]="name" placeholder="PostgreSQL — Producción" />
+      </label>
+
+      <label class="field field--host">
+        <span class="field__label">Servidor</span>
+        <input class="field__input" type="text" [(ngModel)]="host" />
+      </label>
+
+      <label class="field field--port">
+        <span class="field__label">Puerto</span>
+        <input class="field__input" type="number" [(ngModel)]="port" />
+      </label>
+
+      <label class="field field--wide">
+        <span class="field__label">Base de datos</span>
+        <input class="field__input" type="text" [(ngModel)]="database" placeholder="postgres" />
+      </label>
+
+      <label class="field">
+        <span class="field__label">Usuario</span>
+        <input class="field__input" type="text" [(ngModel)]="username" autocomplete="off" />
+      </label>
+
+      <label class="field">
+        <span class="field__label">Contraseña</span>
+        <input class="field__input" type="password" [(ngModel)]="password" autocomplete="off" />
+      </label>
+    </div>
+
+    <label class="checkbox">
+      <input type="checkbox" [(ngModel)]="readOnly" />
+      <span>
+        Solo lectura
+        <span class="checkbox__hint">Bloquea cualquier instrucción que modifique datos.</span>
+      </span>
+    </label>
+
+    @if (feedback(); as message) {
+      <p class="feedback" role="status">{{ message }}</p>
+    }
+  </div>
+
+  <footer class="foot">
+    <button type="button" class="btn" [disabled]="testing() || connecting()" (click)="test()">
+      {{ testing() ? 'Probando…' : 'Probar conexión' }}
+    </button>
+    <span class="foot__spacer"></span>
+    <button type="button" class="btn" (click)="close()">Cancelar</button>
+    <button type="button" class="btn btn--primary" [disabled]="connecting()" (click)="connect()">
+      {{ connecting() ? 'Conectando…' : 'Conectar' }}
+    </button>
+  </footer>
+</div>
