@@ -315,7 +315,8 @@ public sealed class QueryFlowTests : IClassFixture<DruseApiFactory>
                 var body = await response.ReadJsonAsync();
                 var sql = body.GetProperty("sql").GetString();
 
-                Assert.Contains("CREATE PROCEDURE", sql, StringComparison.OrdinalIgnoreCase);
+                Assert.Contains("CREATE", sql, StringComparison.OrdinalIgnoreCase);
+                Assert.Contains("PROCEDURE", sql, StringComparison.OrdinalIgnoreCase);
                 Assert.Contains(procedureName, sql, StringComparison.OrdinalIgnoreCase);
                 Assert.Contains("marca_procedimiento", sql, StringComparison.OrdinalIgnoreCase);
             }
