@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Runtime.Versioning;
+using System.Text;
 using Druse.Platform.Abstractions;
 
 namespace Druse.Platform.Native.Secrets;
@@ -32,7 +33,7 @@ internal sealed class MacOsSecretStore : ISecretStore
         // `-U` actualiza si ya existe, en lugar de fallar.
         var result = await ProcessRunner.RunAsync(
             "/usr/bin/security",
-            ["add-generic-password", "-a", key, "-s", Service, "-w", secret, "-U"],
+            ["add-generic-password", "-a", key, "-s", Service, "-w", MacOsSecretCodec.Encode(secret), "-U"],
             cancellationToken);
 
         if (result.ExitCode != 0)
@@ -51,7 +52,9 @@ internal sealed class MacOsSecretStore : ISecretStore
             cancellationToken);
 
         // Código 44: no existe. No es un error.
-        return result.ExitCode == 0 ? result.StandardOutput.TrimEnd('\n') : null;
+        return result.ExitCode == 0
+            ? MacOsSecretCodec.Decode(result.StandardOutput.TrimEnd('\r', '\n'))
+            : null;
     }
 
     public async Task DeleteAsync(string key, CancellationToken cancellationToken)
@@ -63,6 +66,18 @@ internal sealed class MacOsSecretStore : ISecretStore
             ["delete-generic-password", "-a", key, "-s", Service],
             cancellationToken);
     }
+}
+
+internal static class MacOsSecretCodec
+{
+    private const string Prefix = "druse:v1:";
+
+    internal static string Encode(string secret) =>
+        Prefix + Convert.ToBase64String(Encoding.UTF8.GetBytes(secret));
+
+    internal static string Decode(string stored) => stored.StartsWith(Prefix, StringComparison.Ordinal)
+        ? Encoding.UTF8.GetString(Convert.FromBase64String(stored[Prefix.Length..]))
+        : stored;
 }
 
 /// <summary>

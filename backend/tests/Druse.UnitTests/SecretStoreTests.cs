@@ -97,6 +97,17 @@ public sealed class SecretStoreTests
     }
 
     [Fact]
+    public void MacOsCodificaLosSecretosUnicodeSinPerderInformacion()
+    {
+        const string secret = "contraseña con ñ €";
+
+        var encoded = MacOsSecretCodec.Encode(secret);
+
+        Assert.Equal(secret, MacOsSecretCodec.Decode(encoded));
+        Assert.Equal("credencial-anterior", MacOsSecretCodec.Decode("credencial-anterior"));
+    }
+
+    [Fact]
     public async Task ElAlmacenNuloNuncaDevuelveNada()
     {
         var store = new NullSecretStore();

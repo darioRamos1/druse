@@ -913,7 +913,7 @@ determinar si una vista admite escrituras.
   la posición correcta cuando se ejecuta solo una selección.
 - [x] Mostrar «Ver DDL» en procedimientos almacenados y resolver sobrecargas de
   PostgreSQL sin confundir procedimientos homónimos.
-- [x] Cubrir el incremento final con 294 pruebas backend y 176 frontend.
+- [x] Cubrir el incremento final con 295 pruebas backend y 176 frontend.
 
 ### Prioridad alta
 

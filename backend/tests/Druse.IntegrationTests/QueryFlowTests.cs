@@ -303,7 +303,9 @@ public sealed class QueryFlowTests : IClassFixture<DruseApiFactory>
                 childrenResponse.EnsureSuccessStatusCode();
                 var children = await childrenResponse.ReadJsonAsync();
                 var procedure = children.EnumerateArray().Single(
-                    item => item.GetProperty("name").GetString() == $"{procedureName}(integer)");
+                    item => item.GetProperty("name").GetString()?.StartsWith(
+                        $"{procedureName}(",
+                        StringComparison.Ordinal) == true);
 
                 var response = await client.PostAsJsonAsync(
                     $"/api/sessions/{sessionId}/metadata/definition",

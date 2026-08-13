@@ -17,7 +17,7 @@
 | Fase 8 | ✅ **7/7.** Tres motores sobre el mismo contrato y primera beta preparada. |
 | ¿Compila el backend? | Sí — 0 advertencias, 0 errores |
 | ¿Compila el envoltorio? | Sí |
-| ¿Pasan las pruebas? | Sí — **294 en backend** y **176 en frontend** |
+| ¿Pasan las pruebas? | Sí — **295 en backend** y **176 en frontend** |
 | ¿Hay aplicación de escritorio? | **Sí.** Instalador NSIS, MSI y ZIP portable |
 | Motores | **PostgreSQL, SQL Server y MySQL/MariaDB**, con las **mismas 26 pruebas contractuales** cada uno |
 | Bloqueantes | Ninguno |
@@ -220,7 +220,7 @@ con los flujos de paleta, menús, pestañas, exportación y conexiones simultán
 - La CI ya recibe los fuentes de iconos y persistencia SQLite que dos reglas
   demasiado amplias de `.gitignore` ocultaban en la primera subida.
 
-**Verificado:** 294 pruebas backend, 176 frontend y compilaciones de producción.
+**Verificado:** 295 pruebas backend, 176 frontend y compilaciones de producción.
 El editor se carga en un chunk inmediato de 18,78 kB y el bundle inicial queda en
 488,88 kB, dentro del presupuesto de 500 kB.
 
