@@ -47,7 +47,7 @@ export class ConnectionsSidebar {
   readonly openNode = output<ExplorerNode>();
   /** Componer una consulta sobre esta tabla o vista. */
   readonly composeQuery = output<ExplorerNode>();
-  readonly viewDefinition = output<ExplorerNode>();
+  readonly definition = output<ExplorerNode>();
 
   /** Importar un archivo dentro de esta tabla. */
   readonly importInto = output<ExplorerNode>();

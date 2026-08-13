@@ -113,7 +113,24 @@ public sealed class MySqlMetadataReader : IDatabaseMetadataReader
             ("table", table.Name));
     }
 
-    public async Task<string> GetViewDefinitionAsync(
+    public Task<string> GetDefinitionAsync(
+        IDatabaseSession session,
+        DatabaseObject databaseObject,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(databaseObject);
+
+        return databaseObject.Kind switch
+        {
+            DatabaseObjectKind.View => GetViewDefinitionAsync(session, databaseObject, cancellationToken),
+            DatabaseObjectKind.Procedure => GetProcedureDefinitionAsync(session, databaseObject, cancellationToken),
+            _ => throw new ArgumentException(
+                "Solo se puede obtener la definición de una vista o un procedimiento.",
+                nameof(databaseObject)),
+        };
+    }
+
+    private static async Task<string> GetViewDefinitionAsync(
         IDatabaseSession session,
         DatabaseObject view,
         CancellationToken cancellationToken)
@@ -136,6 +153,30 @@ public sealed class MySqlMetadataReader : IDatabaseMetadataReader
         throw new DatabaseOperationException(new QueryError
         {
             Message = $"No se pudo obtener la definición de la vista {schema}.{view.Name}.",
+        });
+    }
+
+    private static async Task<string> GetProcedureDefinitionAsync(
+        IDatabaseSession session,
+        DatabaseObject procedure,
+        CancellationToken cancellationToken)
+    {
+        var schema = Schema(session, procedure);
+        var sql = $"SHOW CREATE PROCEDURE {Quote(schema)}.{Quote(procedure.Name)}";
+        var definitions = await QueryAsync(
+            session,
+            sql,
+            reader => reader.GetString(2),
+            cancellationToken);
+
+        if (definitions.Count == 1 && !string.IsNullOrWhiteSpace(definitions[0]))
+        {
+            return definitions[0].TrimEnd().TrimEnd(';') + ";" + Environment.NewLine;
+        }
+
+        throw new DatabaseOperationException(new QueryError
+        {
+            Message = $"No se pudo obtener la definición del procedimiento {schema}.{procedure.Name}.",
         });
     }
 

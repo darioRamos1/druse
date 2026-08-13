@@ -106,9 +106,9 @@ export class HttpApplicationGateway extends ApplicationGateway {
     return this._http.post<DatabaseColumn[]>(`/api/sessions/${sessionId}/metadata/columns`, table);
   }
 
-  override getViewDefinition(sessionId: string, view: DatabaseObject): Observable<string> {
+  override getDefinition(sessionId: string, databaseObject: DatabaseObject): Observable<string> {
     return this._http
-      .post<{ sql: string }>(`/api/sessions/${sessionId}/metadata/definition`, view)
+      .post<{ sql: string }>(`/api/sessions/${sessionId}/metadata/definition`, databaseObject)
       .pipe(map((response) => response.sql));
   }
 

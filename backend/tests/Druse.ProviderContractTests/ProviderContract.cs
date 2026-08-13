@@ -91,6 +91,12 @@ public interface IProviderFixture
     /// <summary>Elimina la vista si existe.</summary>
     string DropView(string name);
 
+    /// <summary>Crea un procedimiento cuyo cuerpo contiene `marca_procedimiento`.</summary>
+    string CreateProcedure(string name);
+
+    /// <summary>Elimina el procedimiento si existe.</summary>
+    string DropProcedure(string name);
+
     /// <summary>
     /// Inserta tres filas con nombre en la tabla de <see cref="CreateTableWithColumns"/>,
     /// con los identificadores 1, 2 y 3 y los nombres Ana, Bea y Cris.

@@ -1047,22 +1047,22 @@ export class WorkspaceStore {
     this.refreshTree();
   }
 
-  /** Obtiene el DDL de una vista desde su motor y lo abre sin ejecutarlo. */
-  async openViewDefinition(node: ExplorerNode): Promise<void> {
-    if (node.kind !== 'view') {
+  /** Obtiene el DDL de una vista o procedimiento y lo abre sin ejecutarlo. */
+  async openDefinition(node: ExplorerNode): Promise<void> {
+    if (node.kind !== 'view' && node.kind !== 'procedure') {
       return;
     }
 
     const connection = this.findConnection(node.connectionId);
 
     if (!connection?.sessionId) {
-      this._notice.set('La conexión de esta vista no está abierta.');
+      this._notice.set('La conexión de este objeto no está abierta.');
       return;
     }
 
     try {
       const sql = await firstValueFrom(
-        this._gateway.getViewDefinition(connection.sessionId, node.source),
+        this._gateway.getDefinition(connection.sessionId, node.source),
       );
 
       this.createTab(sql, undefined, node.connectionId, `${node.label} · DDL`);
@@ -1359,7 +1359,7 @@ export class WorkspaceStore {
    * `sqlOverride` sirve para ejecutar solo la selección del editor sin tocar el
    * contenido de la pestaña.
    */
-  async execute(sqlOverride?: string, confirmDestructive = false): Promise<void> {
+  async execute(sqlOverride?: string, confirmDestructive = false): Promise<QueryResult | null> {
     const connection = this.activeConnection();
     const tab = this.activeTab();
     const tabId = tab?.id;
@@ -1367,14 +1367,14 @@ export class WorkspaceStore {
 
     if (!connection?.sessionId) {
       this._notice.set('No hay ninguna conexión abierta.');
-      return;
+      return null;
     }
 
-    const sql = (sqlOverride ?? tab?.sql ?? '').trim();
+    const sql = sqlOverride ?? tab?.sql ?? '';
 
-    if (!sql) {
+    if (!sql.trim()) {
       this._notice.set('No hay ninguna instrucción que ejecutar.');
-      return;
+      return null;
     }
 
     this._running.set(true);
@@ -1401,6 +1401,8 @@ export class WorkspaceStore {
 
       if (this.activeTab()?.id === tabId && this.activeTab()?.sql === tabSql) {
         this._result.set(result);
+      } else {
+        return null;
       }
 
       this._sessions.update((sessions) => {
@@ -1420,6 +1422,8 @@ export class WorkspaceStore {
           this._notice.set(result.error.message);
         }
       }
+
+      return result;
     } catch (error) {
       // Un 409 no es un fallo de transporte: es la API pidiendo confirmación.
       const rejection = asRejection(error);
@@ -1444,6 +1448,8 @@ export class WorkspaceStore {
           this._notice.set(describeError(error));
         }
       }
+
+      return null;
     } finally {
       this._running.set(false);
       this._currentExecutionId.set(null);
@@ -1451,21 +1457,22 @@ export class WorkspaceStore {
   }
 
   /** Confirma exactamente la operación que el servidor rechazó. */
-  async confirmAndExecute(): Promise<void> {
+  async confirmAndExecute(): Promise<QueryResult | null> {
     const pending = this._pendingRejection();
     const tab = this.activeTab();
 
     if (!pending || tab?.id !== pending.tabId || tab.connectionId !== pending.connectionId) {
       this._pendingRejection.set(null);
-      return;
+      return null;
     }
 
     this._pendingRejection.set(null);
 
     if (pending.operation === 'export' && pending.format) {
       await this.export(pending.format, true, pending.sql);
+      return null;
     } else {
-      await this.execute(pending.sql, true);
+      return await this.execute(pending.sql, true);
     }
   }
 

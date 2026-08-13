@@ -98,6 +98,7 @@ public sealed record QueryError
     /// <summary>Posición dentro del SQL, si el motor la reporta. Base 1.</summary>
     public int? Position { get; init; }
 
+    /// <summary>Línea dentro del SQL, si el motor la reporta. Base 1.</summary>
     public int? Line { get; init; }
 }
 

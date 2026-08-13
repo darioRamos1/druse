@@ -113,6 +113,15 @@ public sealed class SqlServerFixture : IProviderFixture
 
     public string DropView(string name) => $"DROP VIEW IF EXISTS {name}";
 
+    public string CreateProcedure(string name) => $"""
+        CREATE PROCEDURE {name}
+        AS BEGIN
+            PRINT 'marca_procedimiento';
+        END
+        """;
+
+    public string DropProcedure(string name) => $"DROP PROCEDURE IF EXISTS {name}";
+
     public string TimestampTypeName => "datetimeoffset(7)";
 
     private static (bool, string?) Probe()

@@ -58,16 +58,18 @@ public sealed class MetadataService(
         return await reader.GetColumnsAsync(session, table, cancellationToken);
     }
 
-    public async Task<string> GetViewDefinitionAsync(
+    public async Task<string> GetDefinitionAsync(
         Guid sessionId,
-        DatabaseObject view,
+        DatabaseObject databaseObject,
         CancellationToken cancellationToken)
     {
-        ArgumentNullException.ThrowIfNull(view);
+        ArgumentNullException.ThrowIfNull(databaseObject);
 
-        if (view.Kind != DatabaseObjectKind.View)
+        if (databaseObject.Kind is not (DatabaseObjectKind.View or DatabaseObjectKind.Procedure))
         {
-            throw new ArgumentException("Solo se puede obtener la definición de una vista.", nameof(view));
+            throw new ArgumentException(
+                "Solo se puede obtener la definición de una vista o un procedimiento.",
+                nameof(databaseObject));
         }
 
         using var turn = await _connections.EnterAsync(sessionId, cancellationToken);
@@ -75,6 +77,6 @@ public sealed class MetadataService(
         var session = _connections.Require(sessionId);
         var reader = _providers.GetMetadataReader(session.Engine);
 
-        return await reader.GetViewDefinitionAsync(session, view, cancellationToken);
+        return await reader.GetDefinitionAsync(session, databaseObject, cancellationToken);
     }
 }

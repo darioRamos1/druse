@@ -2,6 +2,7 @@ import {
   ChangeDetectionStrategy,
   Component,
   computed,
+  effect,
   HostListener,
   inject,
   signal,
@@ -14,7 +15,12 @@ import { ConnectionDialog } from '../../features/connections/connection-dialog/c
 import { ConnectionsSidebar } from '../../features/connections/connections-sidebar/connections-sidebar';
 import { EditorTabs } from '../../features/query-editor/editor-tabs/editor-tabs';
 import { EditorToolbar } from '../../features/query-editor/editor-toolbar/editor-toolbar';
-import { CursorPosition, SqlEditor } from '../../features/query-editor/sql-editor/sql-editor';
+import {
+  CursorPosition,
+  EditorSelection,
+  ExecutionErrorContext,
+} from '../../features/query-editor/sql-editor/sql-editor';
+import SqlEditor from '../../features/query-editor/sql-editor/sql-editor';
 import { ImportDialog } from '../../features/import/import-dialog/import-dialog';
 import { QueryBuilder } from '../../features/query-builder/query-builder/query-builder';
 import { buildSelect } from '../../features/query-editor/sql-language/sql-writer';
@@ -255,8 +261,10 @@ export class AppShell {
     this._resultsPanel()?.openHistory();
   }
 
-  /** Última selección del editor, para poder ejecutarla sola. */
-  private _selectedSql = '';
+  /** Última selección y su origen, para trasladar a Monaco los errores del motor. */
+  private _selection: EditorSelection = { hasSelection: false, text: '', startOffset: 0 };
+  private _executionContext: { sql: string; startOffset: number } | null = null;
+  protected readonly executionError = signal<ExecutionErrorContext | null>(null);
 
   // --- Productividad del editor ----------------------------------------------
 
@@ -289,6 +297,16 @@ export class AppShell {
     void this._store.loadSavedConnections();
     void this._store.loadHistory();
     void this._store.loadPreferences();
+
+    let tabId = this._store.activeTab()?.id;
+    effect(() => {
+      const nextTabId = this._store.activeTab()?.id;
+
+      if (nextTabId !== tabId) {
+        tabId = nextTabId;
+        this.executionError.set(null);
+      }
+    });
   }
 
   // --- Conexiones ------------------------------------------------------------
@@ -334,8 +352,8 @@ export class AppShell {
     void this._store.refreshNode(id);
   }
 
-  protected openViewDefinition(node: ExplorerNode): void {
-    void this._store.openViewDefinition(node);
+  protected openDefinition(node: ExplorerNode): void {
+    void this._store.openDefinition(node);
   }
 
   protected disconnect(id: string): void {
@@ -364,19 +382,23 @@ export class AppShell {
 
   // --- Pestañas --------------------------------------------------------------
   protected selectTab(id: string): void {
+    this.executionError.set(null);
     this._store.selectTab(id);
   }
 
   protected closeTab(id: string): void {
+    this.executionError.set(null);
     this._store.closeTab(id);
   }
 
   protected createTab(): void {
+    this.executionError.set(null);
     this._store.createTab();
   }
 
   // --- Editor ----------------------------------------------------------------
   protected onSqlChange(sql: string): void {
+    this.executionError.set(null);
     this._store.updateSql(sql);
   }
 
@@ -384,19 +406,19 @@ export class AppShell {
     this.cursor.set(position);
   }
 
-  protected onSelectionChange(selection: { hasSelection: boolean; text: string }): void {
+  protected onSelectionChange(selection: EditorSelection): void {
     this.hasSelection.set(selection.hasSelection);
-    this._selectedSql = selection.text;
+    this._selection = selection;
   }
 
   // --- Ejecución -------------------------------------------------------------
   protected execute(): void {
-    void this._store.execute();
+    void this.runQuery(this.sql(), 0);
   }
 
   /** Ejecuta solo lo seleccionado, sin alterar el contenido de la pestaña. */
   protected executeSelection(): void {
-    void this._store.execute(this._selectedSql);
+    void this.runQuery(this._selection.text, this._selection.startOffset);
   }
 
   protected cancel(): void {
@@ -408,7 +430,33 @@ export class AppShell {
 
     // Solo se puede confirmar un riesgo, nunca saltarse el modo de solo lectura.
     if (rejection?.reason === 'unconfirmeddestructive') {
-      void this._store.confirmAndExecute();
+      void this.confirmQuery();
+    }
+  }
+
+  private async runQuery(sql: string, startOffset: number): Promise<void> {
+    if (this.running()) {
+      return;
+    }
+
+    this._executionContext = { sql, startOffset };
+    this.executionError.set(null);
+    const result = await this._store.execute(
+      startOffset === 0 && sql === this.sql() ? undefined : sql,
+    );
+
+    if (result?.state === 'failed' && result.error) {
+      this.executionError.set({ error: result.error, sql, startOffset });
+    }
+  }
+
+  private async confirmQuery(): Promise<void> {
+    const context = this._executionContext;
+    this.executionError.set(null);
+    const result = await this._store.confirmAndExecute();
+
+    if (context && result?.state === 'failed' && result.error) {
+      this.executionError.set({ error: result.error, ...context });
     }
   }
 

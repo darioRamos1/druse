@@ -266,6 +266,72 @@ public sealed class QueryFlowTests : IClassFixture<DruseApiFactory>
     }
 
     [RequiresPostgreSqlFact]
+    public async Task DefinicionDeProcedimiento_DevuelveSqlEditable()
+    {
+        var (client, sessionId) = await ConnectAsync();
+        var procedureName = $"druse_procedure_{Guid.NewGuid():N}";
+
+        using (client)
+        {
+            try
+            {
+                var create = await client.PostAsJsonAsync("/api/queries", new
+                {
+                    sessionId,
+                    sql = $"""
+                        CREATE PROCEDURE {procedureName}(integer)
+                        LANGUAGE plpgsql
+                        AS $$ BEGIN RAISE NOTICE 'marca_procedimiento'; END $$
+                        """,
+                    maxRows = 100,
+                    timeoutSeconds = 30,
+                    confirmDestructive = true,
+                });
+                create.EnsureSuccessStatusCode();
+
+                var childrenResponse = await client.PostAsJsonAsync(
+                    $"/api/sessions/{sessionId}/metadata/children",
+                    new
+                    {
+                        id = "folder:public:procedures",
+                        name = "Procedures",
+                        kind = "folder",
+                        database = TestDatabase.Database,
+                        schema = "public",
+                        hasChildren = true,
+                    });
+                childrenResponse.EnsureSuccessStatusCode();
+                var children = await childrenResponse.ReadJsonAsync();
+                var procedure = children.EnumerateArray().Single(
+                    item => item.GetProperty("name").GetString() == $"{procedureName}(integer)");
+
+                var response = await client.PostAsJsonAsync(
+                    $"/api/sessions/{sessionId}/metadata/definition",
+                    procedure);
+
+                response.EnsureSuccessStatusCode();
+                var body = await response.ReadJsonAsync();
+                var sql = body.GetProperty("sql").GetString();
+
+                Assert.Contains("CREATE PROCEDURE", sql, StringComparison.OrdinalIgnoreCase);
+                Assert.Contains(procedureName, sql, StringComparison.OrdinalIgnoreCase);
+                Assert.Contains("marca_procedimiento", sql, StringComparison.OrdinalIgnoreCase);
+            }
+            finally
+            {
+                await client.PostAsJsonAsync("/api/queries", new
+                {
+                    sessionId,
+                    sql = $"DROP PROCEDURE IF EXISTS {procedureName}(integer)",
+                    maxRows = 100,
+                    timeoutSeconds = 30,
+                    confirmDestructive = true,
+                });
+            }
+        }
+    }
+
+    [RequiresPostgreSqlFact]
     public async Task InstruccionDestructiva_SeRechazaHastaQueElUsuarioConfirma()
     {
         var (client, sessionId) = await ConnectAsync();

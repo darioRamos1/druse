@@ -121,7 +121,24 @@ public sealed class PostgreSqlMetadataReader : IDatabaseMetadataReader
             ("table", table.Name));
     }
 
-    public async Task<string> GetViewDefinitionAsync(
+    public Task<string> GetDefinitionAsync(
+        IDatabaseSession session,
+        DatabaseObject databaseObject,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(databaseObject);
+
+        return databaseObject.Kind switch
+        {
+            DatabaseObjectKind.View => GetViewDefinitionAsync(session, databaseObject, cancellationToken),
+            DatabaseObjectKind.Procedure => GetProcedureDefinitionAsync(session, databaseObject, cancellationToken),
+            _ => throw new ArgumentException(
+                "Solo se puede obtener la definición de una vista o un procedimiento.",
+                nameof(databaseObject)),
+        };
+    }
+
+    private static async Task<string> GetViewDefinitionAsync(
         IDatabaseSession session,
         DatabaseObject view,
         CancellationToken cancellationToken)
@@ -168,6 +185,53 @@ public sealed class PostgreSqlMetadataReader : IDatabaseMetadataReader
             ("view", view.Name));
 
         return RequireDefinition(definitions, view);
+    }
+
+    private static async Task<string> GetProcedureDefinitionAsync(
+        IDatabaseSession session,
+        DatabaseObject procedure,
+        CancellationToken cancellationToken)
+    {
+        const string IdPrefix = "Procedure:oid:";
+
+        if (!string.IsNullOrWhiteSpace(procedure.Database)
+            && !string.Equals(procedure.Database, session.Profile.Database, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new ArgumentException(
+                "La definición solo está disponible para procedimientos de la base conectada.",
+                nameof(procedure));
+        }
+
+        if (!procedure.Id.StartsWith(IdPrefix, StringComparison.Ordinal)
+            || !long.TryParse(procedure.Id[IdPrefix.Length..], out var oid)
+            || oid <= 0
+            || oid > uint.MaxValue)
+        {
+            throw new ArgumentException(
+                "El identificador del procedimiento PostgreSQL no contiene un OID válido.",
+                nameof(procedure));
+        }
+
+        const string Sql = """
+            SELECT pg_get_functiondef(p.oid)
+            FROM pg_proc p
+            JOIN pg_namespace n ON n.oid = p.pronamespace
+            WHERE p.oid::bigint = @oid
+              AND p.prokind = 'p'
+              AND n.nspname = @schema
+              AND p.proname || '(' || pg_get_function_identity_arguments(p.oid) || ')' = @name
+            """;
+
+        var definitions = await QueryAsync(
+            session,
+            Sql,
+            reader => reader.GetString(0),
+            cancellationToken,
+            ("oid", oid),
+            ("schema", procedure.Schema ?? "public"),
+            ("name", procedure.Name));
+
+        return RequireDefinition(definitions, procedure);
     }
 
     private static async Task<IReadOnlyList<DatabaseObject>> GetSchemasAsync(
@@ -225,7 +289,7 @@ public sealed class PostgreSqlMetadataReader : IDatabaseMetadataReader
             "tables" => await GetRelationsAsync(session, folder, "'r', 'p'", DatabaseObjectKind.Table, cancellationToken),
             "views" => await GetRelationsAsync(session, folder, "'v', 'm'", DatabaseObjectKind.View, cancellationToken),
             "functions" => await GetRoutinesAsync(session, folder, "'f', 'a', 'w'", DatabaseObjectKind.Function, cancellationToken),
-            "procedures" => await GetRoutinesAsync(session, folder, "'p'", DatabaseObjectKind.Procedure, cancellationToken),
+            "procedures" => await GetProceduresAsync(session, folder, cancellationToken),
             _ => [],
         };
     }
@@ -294,6 +358,39 @@ public sealed class PostgreSqlMetadataReader : IDatabaseMetadataReader
                 Id = $"{kind}:{folder.Schema}.{reader.GetString(0)}",
                 Name = reader.GetString(0),
                 Kind = kind,
+                Database = folder.Database,
+                Schema = folder.Schema,
+                HasChildren = false,
+            },
+            cancellationToken,
+            ("schema", folder.Schema ?? "public"));
+    }
+
+    private static async Task<IReadOnlyList<DatabaseObject>> GetProceduresAsync(
+        IDatabaseSession session,
+        DatabaseObject folder,
+        CancellationToken cancellationToken)
+    {
+        const string Sql = """
+            SELECT
+                p.oid::bigint,
+                p.proname,
+                pg_get_function_identity_arguments(p.oid)
+            FROM pg_proc p
+            JOIN pg_namespace n ON n.oid = p.pronamespace
+            WHERE n.nspname = @schema
+              AND p.prokind = 'p'
+            ORDER BY p.proname, pg_get_function_identity_arguments(p.oid)
+            """;
+
+        return await QueryAsync(
+            session,
+            Sql,
+            reader => new DatabaseObject
+            {
+                Id = $"Procedure:oid:{reader.GetInt64(0)}",
+                Name = $"{reader.GetString(1)}({reader.GetString(2)})",
+                Kind = DatabaseObjectKind.Procedure,
                 Database = folder.Database,
                 Schema = folder.Schema,
                 HasChildren = false,
@@ -377,7 +474,7 @@ public sealed class PostgreSqlMetadataReader : IDatabaseMetadataReader
 
     private static string RequireDefinition(
         IReadOnlyList<string> definitions,
-        DatabaseObject view)
+        DatabaseObject databaseObject)
     {
         if (definitions.Count == 1 && !string.IsNullOrWhiteSpace(definitions[0]))
         {
@@ -386,7 +483,9 @@ public sealed class PostgreSqlMetadataReader : IDatabaseMetadataReader
 
         throw new DatabaseOperationException(new QueryError
         {
-            Message = $"No se pudo obtener la definición de la vista {view.Schema}.{view.Name}.",
+            Message = databaseObject.Kind == DatabaseObjectKind.View
+                ? $"No se pudo obtener la definición de la vista {databaseObject.Schema}.{databaseObject.Name}."
+                : $"No se pudo obtener la definición del procedimiento {databaseObject.Schema}.{databaseObject.Name}.",
         });
     }
 }

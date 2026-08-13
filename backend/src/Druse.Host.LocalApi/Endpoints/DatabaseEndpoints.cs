@@ -133,18 +133,18 @@ internal static class DatabaseEndpoints
 
         app.MapPost("/api/sessions/{sessionId:guid}/metadata/definition", async (
             Guid sessionId,
-            DatabaseObjectDto view,
+            DatabaseObjectDto databaseObject,
             MetadataService metadata,
             CancellationToken cancellationToken) =>
         {
-            var sql = await metadata.GetViewDefinitionAsync(
+            var sql = await metadata.GetDefinitionAsync(
                 sessionId,
-                view.ToDomain(),
+                databaseObject.ToDomain(),
                 cancellationToken);
 
             return Results.Ok(new { sql });
         })
-        .WithName("GetViewDefinition");
+        .WithName("GetDefinition");
     }
 
     /// <summary>

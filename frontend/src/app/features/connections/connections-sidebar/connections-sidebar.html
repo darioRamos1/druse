@@ -131,7 +131,12 @@
             <span class="node__badge">{{ node.badge }}</span>
           }
 
-          @if (node.kind === 'table' || node.kind === 'view' || node.expandable) {
+          @if (
+            node.kind === 'table' ||
+            node.kind === 'view' ||
+            node.kind === 'procedure' ||
+            node.expandable
+          ) {
             <div class="node__menu-wrap" (focusout)="closeMenu($event, node.id)">
               <button
                 type="button"
@@ -176,11 +181,11 @@
                     </button>
                   }
 
-                  @if (node.kind === 'view') {
+                  @if (node.kind === 'view' || node.kind === 'procedure') {
                     <button
                       type="button"
                       role="menuitem"
-                      (click)="act($event, () => viewDefinition.emit(node))"
+                      (click)="act($event, () => definition.emit(node))"
                     >
                       <app-icon name="new-query" [size]="12" />
                       Ver DDL

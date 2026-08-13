@@ -33,9 +33,9 @@ public interface IDatabaseMetadataReader
         DatabaseObject table,
         CancellationToken cancellationToken);
 
-    /// <summary>Instrucción con la que se crea una vista.</summary>
-    Task<string> GetViewDefinitionAsync(
+    /// <summary>Instrucción con la que se crea una vista o un procedimiento.</summary>
+    Task<string> GetDefinitionAsync(
         IDatabaseSession session,
-        DatabaseObject view,
+        DatabaseObject databaseObject,
         CancellationToken cancellationToken);
 }

@@ -96,6 +96,14 @@ public sealed class PostgreSqlFixture : IProviderFixture
 
     public string DropView(string name) => $"DROP VIEW IF EXISTS {name}";
 
+    public string CreateProcedure(string name) => $"""
+        CREATE PROCEDURE {name}()
+        LANGUAGE plpgsql
+        AS $$ BEGIN RAISE NOTICE 'marca_procedimiento'; END $$
+        """;
+
+    public string DropProcedure(string name) => $"DROP PROCEDURE IF EXISTS {name}()";
+
     public string TimestampTypeName => "timestamp with time zone";
 
     private static (bool, string?) Probe()
@@ -121,4 +129,95 @@ public sealed class PostgreSqlFixture : IProviderFixture
 }
 
 /// <summary>Ejecuta el contrato común contra PostgreSQL.</summary>
-public sealed class PostgreSqlContractTests : DatabaseProviderContractTests<PostgreSqlFixture>;
+public sealed class PostgreSqlContractTests : DatabaseProviderContractTests<PostgreSqlFixture>
+{
+    [Fact]
+    public async Task ProcedimientosSobrecargados_ConservanSuIdentidad()
+    {
+        if (!Fixture.IsAvailable) { return; }
+
+        await using var session = await Fixture.Provider.OpenSessionAsync(
+            Fixture.Profile(),
+            Fixture.Credentials,
+            CancellationToken.None);
+        var procedureName = $"druse_overload_{Guid.NewGuid():N}";
+
+        async Task<QueryResult> ExecuteAsync(string sql) =>
+            await Fixture.Executor.ExecuteAsync(
+                session,
+                new QueryRequest
+                {
+                    SessionId = session.Id,
+                    Sql = sql,
+                    MaxRows = 100,
+                    TimeoutSeconds = 30,
+                    DestructiveConfirmed = true,
+                },
+                CancellationToken.None);
+
+        try
+        {
+            var creation = await ExecuteAsync($"""
+                CREATE PROCEDURE {procedureName}(integer)
+                LANGUAGE plpgsql
+                AS $$ BEGIN RAISE NOTICE 'marca_entero'; END $$;
+
+                CREATE PROCEDURE {procedureName}(text)
+                LANGUAGE plpgsql
+                AS $$ BEGIN RAISE NOTICE 'marca_texto'; END $$;
+                """);
+            Assert.Equal(QueryExecutionState.Succeeded, creation.State);
+
+            var folder = new DatabaseObject
+            {
+                Id = $"folder:{Fixture.DefaultSchema}:procedures",
+                Name = "Procedures",
+                Kind = DatabaseObjectKind.Folder,
+                Database = Fixture.DatabaseName,
+                Schema = Fixture.DefaultSchema,
+            };
+            var procedures = await Fixture.Metadata.GetChildrenAsync(
+                session,
+                folder,
+                CancellationToken.None);
+            var overloads = procedures
+                .Where(item => item.Name.StartsWith($"{procedureName}(", StringComparison.Ordinal))
+                .ToArray();
+
+            Assert.Equal(2, overloads.Length);
+            Assert.Equal(2, overloads.Select(item => item.Id).Distinct().Count());
+            Assert.All(overloads, item => Assert.StartsWith("Procedure:oid:", item.Id, StringComparison.Ordinal));
+
+            var integerProcedure = Assert.Single(
+                overloads,
+                item => item.Name.Contains("integer", StringComparison.OrdinalIgnoreCase));
+            var textProcedure = Assert.Single(
+                overloads,
+                item => item.Name.Contains("text", StringComparison.OrdinalIgnoreCase));
+            var integerDefinition = await Fixture.Metadata.GetDefinitionAsync(
+                session,
+                integerProcedure,
+                CancellationToken.None);
+            var textDefinition = await Fixture.Metadata.GetDefinitionAsync(
+                session,
+                textProcedure,
+                CancellationToken.None);
+
+            Assert.Contains("marca_entero", integerDefinition, StringComparison.Ordinal);
+            Assert.DoesNotContain("marca_texto", integerDefinition, StringComparison.Ordinal);
+            Assert.Contains("marca_texto", textDefinition, StringComparison.Ordinal);
+            Assert.DoesNotContain("marca_entero", textDefinition, StringComparison.Ordinal);
+
+            var forgedProcedure = integerProcedure with { Name = textProcedure.Name };
+            await Assert.ThrowsAsync<DatabaseOperationException>(() =>
+                Fixture.Metadata.GetDefinitionAsync(session, forgedProcedure, CancellationToken.None));
+        }
+        finally
+        {
+            await ExecuteAsync($"""
+                DROP PROCEDURE IF EXISTS {procedureName}(integer);
+                DROP PROCEDURE IF EXISTS {procedureName}(text);
+                """);
+        }
+    }
+}

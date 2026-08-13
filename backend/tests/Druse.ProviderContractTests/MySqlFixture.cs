@@ -130,6 +130,15 @@ public sealed class MySqlFixture : IProviderFixture
 
     public string DropView(string name) => $"DROP VIEW IF EXISTS {name}";
 
+    public string CreateProcedure(string name) => $"""
+        CREATE PROCEDURE {name}()
+        BEGIN
+            SELECT 'marca_procedimiento';
+        END
+        """;
+
+    public string DropProcedure(string name) => $"DROP PROCEDURE IF EXISTS {name}";
+
     /// <summary>
     /// `TIMESTAMP` es el tipo de MySQL con semántica de zona horaria: se guarda en
     /// UTC y se convierte a la zona de la sesión al leerlo.

@@ -33,7 +33,7 @@
     (openNode)="openNode($event)"
     (importInto)="openImport($event)"
     (composeQuery)="openBuilder($event)"
-    (viewDefinition)="openViewDefinition($event)"
+    (definition)="openDefinition($event)"
     (copied)="onCopied($event)"
     (copyFailed)="onCopyFailed()"
   />
@@ -68,24 +68,29 @@
       (timeoutChange)="setTimeout($event)"
     />
 
-    <app-sql-editor
-      #editor
-      class="editor"
-      [value]="sql()"
-      [engine]="activeEngine()"
-      [schema]="schemaIndex()"
-      [loadColumns]="loadColumns"
-      [loadRelations]="loadRelations"
-      (valueChange)="onSqlChange($event)"
-      (cursorChange)="onCursorChange($event)"
-      (selectionChange)="onSelectionChange($event)"
-      (execute)="execute()"
-      (executeSelection)="executeSelection()"
-      (cancel)="cancel()"
-      (save)="saveTab()"
-      (newTab)="createTab()"
-      (formatFailed)="onFormatFailed($event)"
-    />
+    @defer (on immediate) {
+      <app-sql-editor
+        #editor
+        class="editor"
+        [value]="sql()"
+        [engine]="activeEngine()"
+        [schema]="schemaIndex()"
+        [executionError]="executionError()"
+        [loadColumns]="loadColumns"
+        [loadRelations]="loadRelations"
+        (valueChange)="onSqlChange($event)"
+        (cursorChange)="onCursorChange($event)"
+        (selectionChange)="onSelectionChange($event)"
+        (execute)="execute()"
+        (executeSelection)="executeSelection()"
+        (cancel)="cancel()"
+        (save)="saveTab()"
+        (newTab)="createTab()"
+        (formatFailed)="onFormatFailed($event)"
+      />
+    } @placeholder {
+      <div class="editor"></div>
+    }
 
     @if (rejection(); as pending) {
       <div class="banner banner--warning" role="alertdialog" aria-live="assertive">

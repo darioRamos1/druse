@@ -502,7 +502,7 @@ public abstract class DatabaseProviderContractTests<TFixture>
                 Schema = Fixture.DefaultSchema,
             };
 
-            var definition = await Fixture.Metadata.GetViewDefinitionAsync(
+            var definition = await Fixture.Metadata.GetDefinitionAsync(
                 session,
                 view,
                 CancellationToken.None);
@@ -515,6 +515,52 @@ public abstract class DatabaseProviderContractTests<TFixture>
         finally
         {
             await ExecuteAsync(session, Fixture.DropView(viewName));
+        }
+    }
+
+    [Fact]
+    public async Task ObtieneLaDefinicionDeUnProcedimiento()
+    {
+        if (Skip) { return; }
+
+        await using var session = await OpenAsync();
+
+        var procedureName = $"druse_procedure_{Guid.NewGuid():N}";
+
+        try
+        {
+            await ExecuteAsync(session, Fixture.CreateProcedure(procedureName));
+
+            var folder = new DatabaseObject
+            {
+                Id = $"folder:{Fixture.DefaultSchema}:procedures",
+                Name = "Procedures",
+                Kind = DatabaseObjectKind.Folder,
+                Database = Fixture.DatabaseName,
+                Schema = Fixture.DefaultSchema,
+            };
+            var procedures = await Fixture.Metadata.GetChildrenAsync(
+                session,
+                folder,
+                CancellationToken.None);
+            var procedure = Assert.Single(
+                procedures,
+                item => item.Name == procedureName
+                    || item.Name.StartsWith($"{procedureName}(", StringComparison.Ordinal));
+
+            var definition = await Fixture.Metadata.GetDefinitionAsync(
+                session,
+                procedure,
+                CancellationToken.None);
+
+            Assert.Contains("CREATE", definition, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("PROCEDURE", definition, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains(procedureName, definition, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("marca_procedimiento", definition, StringComparison.OrdinalIgnoreCase);
+        }
+        finally
+        {
+            await ExecuteAsync(session, Fixture.DropProcedure(procedureName));
         }
     }
 

@@ -128,21 +128,36 @@ public sealed class SqlServerMetadataReader : IDatabaseMetadataReader
             ("table", table.Name));
     }
 
-    public async Task<string> GetViewDefinitionAsync(
+    public Task<string> GetDefinitionAsync(
+        IDatabaseSession session,
+        DatabaseObject databaseObject,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(databaseObject);
+
+        if (!string.IsNullOrWhiteSpace(databaseObject.Database)
+            && !string.Equals(databaseObject.Database, session.Profile.Database, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new ArgumentException(
+                "La definición solo está disponible para objetos de la base conectada.",
+                nameof(databaseObject));
+        }
+
+        return databaseObject.Kind switch
+        {
+            DatabaseObjectKind.View => GetViewDefinitionAsync(session, databaseObject, cancellationToken),
+            DatabaseObjectKind.Procedure => GetProcedureDefinitionAsync(session, databaseObject, cancellationToken),
+            _ => throw new ArgumentException(
+                "Solo se puede obtener la definición de una vista o un procedimiento.",
+                nameof(databaseObject)),
+        };
+    }
+
+    private static async Task<string> GetViewDefinitionAsync(
         IDatabaseSession session,
         DatabaseObject view,
         CancellationToken cancellationToken)
     {
-        ArgumentNullException.ThrowIfNull(view);
-
-        if (!string.IsNullOrWhiteSpace(view.Database)
-            && !string.Equals(view.Database, session.Profile.Database, StringComparison.OrdinalIgnoreCase))
-        {
-            throw new ArgumentException(
-                "La definición solo está disponible para vistas de la base conectada.",
-                nameof(view));
-        }
-
         const string Sql = """
             SELECT sm.definition
             FROM sys.views v
@@ -170,6 +185,56 @@ public sealed class SqlServerMetadataReader : IDatabaseMetadataReader
             Message = $"No se puede leer la definición de la vista {view.Schema}.{view.Name}; puede estar cifrada o no ser visible para este usuario.",
         });
     }
+
+    private static async Task<string> GetProcedureDefinitionAsync(
+        IDatabaseSession session,
+        DatabaseObject procedure,
+        CancellationToken cancellationToken)
+    {
+        var schema = procedure.Schema ?? "dbo";
+
+        const string Sql = """
+            SELECT
+                sm.definition,
+                CASE WHEN p.type = 'PC' THEN 1 ELSE 0 END AS is_clr,
+                CONVERT(bit, OBJECTPROPERTYEX(p.object_id, 'IsEncrypted')) AS is_encrypted
+            FROM sys.procedures p
+            JOIN sys.schemas s ON s.schema_id = p.schema_id
+            LEFT JOIN sys.sql_modules sm ON sm.object_id = p.object_id
+            WHERE s.name = @schema
+              AND p.name = @procedure
+            """;
+
+        var definitions = await QueryAsync(
+            session,
+            Sql,
+            reader => new ProcedureDefinition(
+                reader.IsDBNull(0) ? null : reader.GetString(0),
+                reader.GetInt32(1) != 0,
+                !reader.IsDBNull(2) && reader.GetBoolean(2)),
+            cancellationToken,
+            ("schema", schema),
+            ("procedure", procedure.Name));
+
+        if (definitions.Count == 1 && definitions[0].Sql is { } definition
+            && !string.IsNullOrWhiteSpace(definition))
+        {
+            return definition.TrimEnd() + Environment.NewLine;
+        }
+
+        var qualifiedName = $"{schema}.{procedure.Name}";
+        var message = definitions.Count switch
+        {
+            0 => $"No se encontró el procedimiento {qualifiedName} o no es visible para este usuario.",
+            _ when definitions[0].IsClr => $"La definición del procedimiento {qualifiedName} no está disponible porque es un procedimiento CLR.",
+            _ when definitions[0].IsEncrypted => $"No se puede leer la definición del procedimiento {qualifiedName} porque está cifrado.",
+            _ => $"La definición del procedimiento {qualifiedName} no está disponible para este usuario.",
+        };
+
+        throw new DatabaseOperationException(new QueryError { Message = message });
+    }
+
+    private sealed record ProcedureDefinition(string? Sql, bool IsClr, bool IsEncrypted);
 
     private static async Task<IReadOnlyList<DatabaseObject>> GetSchemasAsync(
         IDatabaseSession session,

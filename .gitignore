@@ -432,6 +432,9 @@ test-results/
 
 # Icon must end with two \r
 Icon
+!frontend/src/app/shared/ui/icon/
+frontend/src/app/shared/ui/icon/*
+!frontend/src/app/shared/ui/icon/icon.ts
 
 
 # Thumbnails
@@ -511,6 +514,10 @@ build/artifacts/
 *.db-wal
 *.sqlite
 *.sqlite3
+!backend/src/Druse.Persistence.Sqlite/
+backend/src/Druse.Persistence.Sqlite/*
+!backend/src/Druse.Persistence.Sqlite/*.cs
+!backend/src/Druse.Persistence.Sqlite/Druse.Persistence.Sqlite.csproj
 appsettings.Local.json
 appsettings.*.Local.json
 secrets.json

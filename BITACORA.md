@@ -17,9 +17,9 @@
 | Fase 8 | ✅ **7/7.** Tres motores sobre el mismo contrato y primera beta preparada. |
 | ¿Compila el backend? | Sí — 0 advertencias, 0 errores |
 | ¿Compila el envoltorio? | Sí |
-| ¿Pasan las pruebas? | Sí — **289 en backend** y **168 en frontend** |
+| ¿Pasan las pruebas? | Sí — **294 en backend** y **176 en frontend** |
 | ¿Hay aplicación de escritorio? | **Sí.** Instalador NSIS, MSI y ZIP portable |
-| Motores | **PostgreSQL, SQL Server y MySQL/MariaDB**, con las **mismas 25 pruebas contractuales** cada uno |
+| Motores | **PostgreSQL, SQL Server y MySQL/MariaDB**, con las **mismas 26 pruebas contractuales** cada uno |
 | Bloqueantes | Ninguno |
 | Git | `fix/empaquetado-escritorio`, con el incremento del explorador y composición SQL completado. Sin remoto configurado. |
 
@@ -207,6 +207,22 @@ dentro del presupuesto existente de 500 kB.
 
 **Validación manual completada:** interfaz revisada en escritorio y móvil, junto
 con los flujos de paleta, menús, pestañas, exportación y conexiones simultáneas.
+
+#### Ubicación de errores y DDL de procedimientos
+
+**Hecho:**
+- PostgreSQL y SQL Server marcan en Monaco la línea que el motor reporta; al
+  ejecutar una selección se conserva su desplazamiento dentro del documento.
+  MySQL mantiene el mensaje sin inventar una línea cuando el driver no la aporta.
+- «Ver DDL» está disponible también para procedimientos almacenados. PostgreSQL
+  distingue sobrecargas por OID y firma; SQL Server y MySQL consultan sus
+  catálogos nativos.
+- La CI ya recibe los fuentes de iconos y persistencia SQLite que dos reglas
+  demasiado amplias de `.gitignore` ocultaban en la primera subida.
+
+**Verificado:** 294 pruebas backend, 176 frontend y compilaciones de producción.
+El editor se carga en un chunk inmediato de 18,78 kB y el bundle inicial queda en
+488,88 kB, dentro del presupuesto de 500 kB.
 
 ---
 

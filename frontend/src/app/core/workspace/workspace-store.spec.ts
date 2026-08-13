@@ -115,8 +115,8 @@ class FakeGateway implements Partial<ApplicationGateway> {
   savedConnections: SavedConnection[] = [];
   columnDataTypes: string[] = [];
   sessionIds: string[] = [];
-  viewDefinition = 'CREATE VIEW "public"."active_users" AS SELECT 1;\n';
-  viewDefinitionSessionId: string | null = null;
+  definition = 'CREATE VIEW "public"."active_users" AS SELECT 1;\n';
+  definitionRequest: { sessionId: string; databaseObject: DatabaseObject } | null = null;
 
   exportQuery(): Observable<Blob> {
     return of(new Blob());
@@ -269,9 +269,9 @@ class FakeGateway implements Partial<ApplicationGateway> {
     ]);
   }
 
-  getViewDefinition(sessionId: string): Observable<string> {
-    this.viewDefinitionSessionId = sessionId;
-    return of(this.viewDefinition);
+  getDefinition(sessionId: string, databaseObject: DatabaseObject): Observable<string> {
+    this.definitionRequest = { sessionId, databaseObject };
+    return of(this.definition);
   }
 
   executeQuery(request: ExecuteQueryRequest): Observable<QueryResult> {
@@ -835,6 +835,15 @@ describe('WorkspaceStore', () => {
       expect(store.activeTab()?.sql).toBe('SELECT 1;\nSELECT 2;');
     });
 
+    it('conserva los espacios del SQL enviado para ubicar errores', async () => {
+      await store.connect(form);
+      store.updateSql('\n  SELECT * FROM');
+
+      await store.execute();
+
+      expect(gateway.executeCalls[0].sql).toBe('\n  SELECT * FROM');
+    });
+
     it('guarda la duración de la última ejecución', async () => {
       await store.connect(form);
       store.updateSql('SELECT 1');
@@ -1108,7 +1117,7 @@ describe('WorkspaceStore', () => {
         .connections()
         .find((connection) => connection.engine === 'postgresql')!;
 
-      await store.openViewDefinition({
+      await store.openDefinition({
         id: 'active-users',
         label: 'active_users',
         kind: 'view',
@@ -1127,10 +1136,40 @@ describe('WorkspaceStore', () => {
         },
       });
 
-      expect(gateway.viewDefinitionSessionId).toBe('postgresql-session');
+      expect(gateway.definitionRequest?.sessionId).toBe('postgresql-session');
       expect(store.activeTab()?.sql).toContain('CREATE VIEW');
       expect(store.activeTab()?.connectionId).toBe(postgresql.id);
       expect(store.activeTab()?.sourceTable).toBeUndefined();
+    });
+
+    it('abre el DDL de un procedimiento desde su conexión', async () => {
+      await store.connect(form);
+      const connectionId = store.connections()[0].id;
+      gateway.definition = 'CREATE PROCEDURE public.recalcular() LANGUAGE SQL AS $$ SELECT 1 $$;\n';
+      const procedure: DatabaseObject = {
+        id: 'Procedure:oid:42',
+        name: 'recalcular()',
+        kind: 'procedure',
+        database: 'druse_test',
+        schema: 'public',
+        hasChildren: false,
+      };
+
+      await store.openDefinition({
+        id: `${connectionId}|${procedure.id}`,
+        label: procedure.name,
+        kind: 'procedure',
+        depth: 4,
+        expandable: false,
+        expanded: false,
+        loading: false,
+        source: procedure,
+        connectionId,
+      });
+
+      expect(gateway.definitionRequest?.databaseObject).toEqual(procedure);
+      expect(store.activeTab()?.sql).toContain('CREATE PROCEDURE');
+      expect(store.activeTab()?.title).toBe('recalcular() · DDL');
     });
 
     it('no abre nada desde una carpeta', () => {

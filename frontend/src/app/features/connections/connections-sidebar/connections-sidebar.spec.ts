@@ -56,6 +56,22 @@ const view: ExplorerNode = {
   },
 };
 
+const procedure: ExplorerNode = {
+  ...view,
+  id: 'connection-1|Procedure:oid:42',
+  label: 'recalcular(integer)',
+  kind: 'procedure',
+  expandable: false,
+  source: {
+    id: 'Procedure:oid:42',
+    name: 'recalcular(integer)',
+    kind: 'procedure',
+    database: 'druse_test',
+    schema: 'public',
+    hasChildren: false,
+  },
+};
+
 describe('ConnectionsSidebar', () => {
   let fixture: ComponentFixture<ConnectionsSidebar>;
 
@@ -90,6 +106,23 @@ describe('ConnectionsSidebar', () => {
     );
 
     expect(ddl).toBeTruthy();
+  });
+
+  it('ofrece únicamente Ver DDL como acción propia de un procedimiento', () => {
+    fixture.componentRef.setInput('explorerNodes', [procedure]);
+    fixture.detectChanges();
+
+    const trigger = fixture.nativeElement.querySelector('.node__menu-trigger') as HTMLButtonElement;
+    trigger.click();
+    fixture.detectChanges();
+    const labels = [...fixture.nativeElement.querySelectorAll('.node-menu button')].map(
+      (button: Element) => button.textContent?.trim(),
+    );
+
+    expect(labels).toContain('Ver DDL');
+    expect(labels).not.toContain('Abrir SELECT');
+    expect(labels).not.toContain('Componer consulta');
+    expect(labels).not.toContain('Importar archivo');
   });
 
   it('el menú usa acciones textuales y botones accesibles', () => {

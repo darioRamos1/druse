@@ -909,6 +909,11 @@ determinar si una vista admite escrituras.
 - [x] Mantener el bundle inicial dentro del presupuesto de 500 kB cargando la
   paleta de comandos de forma diferida.
 - [x] Completar una pasada visual manual en escritorio y móvil con el stack local.
+- [x] Marcar en Monaco la línea reportada por PostgreSQL o SQL Server, incluida
+  la posición correcta cuando se ejecuta solo una selección.
+- [x] Mostrar «Ver DDL» en procedimientos almacenados y resolver sobrecargas de
+  PostgreSQL sin confundir procedimientos homónimos.
+- [x] Cubrir el incremento final con 294 pruebas backend y 176 frontend.
 
 ### Prioridad alta
 
