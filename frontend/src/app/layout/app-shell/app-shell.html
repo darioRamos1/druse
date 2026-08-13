@@ -1,8 +1,25 @@
-<app-top-bar (newConnection)="openDialog()" (newQuery)="createTab()" />
+<app-top-bar
+  (newConnection)="openDialog()"
+  (newQuery)="createTab()"
+  (openPalette)="paletteOpen.set(true)"
+/>
 
 <div class="body">
+  <button
+    type="button"
+    class="mobile-explorer-toggle"
+    aria-label="Abrir explorador de bases de datos"
+    [attr.aria-expanded]="mobileExplorerOpen()"
+    (click)="mobileExplorerOpen.update((open) => !open)"
+  >
+    Bases
+  </button>
+  @if (mobileExplorerOpen()) {
+    <div class="mobile-sidebar-backdrop" (click)="closeMobileExplorer()"></div>
+  }
   <app-connections-sidebar
     class="sidebar"
+    [class.is-mobile-open]="mobileExplorerOpen()"
     [style.width.px]="sidebarWidth()"
     [connections]="connections()"
     [explorerNodes]="explorerNodes()"
@@ -16,6 +33,7 @@
     (openNode)="openNode($event)"
     (importInto)="openImport($event)"
     (composeQuery)="openBuilder($event)"
+    (viewDefinition)="openViewDefinition($event)"
     (copied)="onCopied($event)"
     (copyFailed)="onCopyFailed()"
   />
@@ -31,6 +49,7 @@
   <main class="main">
     <app-editor-tabs
       [tabs]="tabs()"
+      [connections]="connections()"
       (select)="selectTab($event)"
       (close)="closeTab($event)"
       (create)="createTab()"
@@ -80,15 +99,22 @@
         </div>
         <div class="banner__actions">
           @if (pending.reason === 'unconfirmeddestructive') {
-            <button type="button" class="banner__button banner__button--danger" (click)="confirmDestructive()">
+            <button
+              type="button"
+              class="banner__button banner__button--danger"
+              (click)="confirmDestructive()"
+            >
               Ejecutar de todos modos
             </button>
           }
-          <button type="button" class="banner__button" (click)="dismissRejection()">Cancelar</button>
+          <button type="button" class="banner__button" (click)="dismissRejection()">
+            Cancelar
+          </button>
         </div>
       </div>
     } @else if (notice(); as message) {
       <div class="banner" role="status" aria-live="polite">
+        <span class="banner__label">Aviso</span>
         <span class="banner__text">{{ message }}</span>
         <button type="button" class="banner__button" (click)="dismissNotice()">Cerrar</button>
       </div>
@@ -104,6 +130,7 @@
     />
 
     <app-results-panel
+      #resultsPanel
       class="results"
       [style.height.px]="resultsHeight()"
       [resultSet]="resultSet()"
@@ -136,15 +163,37 @@
   <app-connection-dialog (closed)="closeDialog()" />
 }
 
-@if (importTarget(); as tabla) {
-  <app-import-dialog [table]="tabla" (closed)="closeImport()" />
+@if (importTarget(); as destino) {
+  <app-import-dialog
+    [table]="destino.source"
+    [connectionId]="destino.connectionId"
+    (closed)="closeImport()"
+  />
 }
 
-@if (builderTarget(); as tabla) {
+@if (builderTarget(); as destino) {
   <app-query-builder
-    [table]="tabla"
-    [engine]="activeEngine()"
+    [table]="destino.source"
+    [engine]="engineFor(destino.connectionId)"
+    [connectionId]="destino.connectionId"
     (insert)="insertComposed($event)"
     (closed)="closeBuilder()"
   />
+}
+
+@defer (when paletteOpen()) {
+  @if (paletteOpen()) {
+    <app-command-palette
+      [connections]="connections()"
+      [nodes]="searchableRelations()"
+      (closed)="paletteOpen.set(false)"
+      (newConnection)="openDialog()"
+      (newQuery)="createTab()"
+      (executeQuery)="execute()"
+      (formatQuery)="format()"
+      (showHistory)="showHistory()"
+      (activateConnection)="activateFromPalette($event)"
+      (openNode)="openNode($event)"
+    />
+  }
 }

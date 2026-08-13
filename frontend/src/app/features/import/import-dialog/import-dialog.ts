@@ -1,4 +1,12 @@
-import { ChangeDetectionStrategy, Component, computed, inject, input, output, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  inject,
+  input,
+  output,
+  signal,
+} from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
 import { WorkspaceStore } from '../../../core/workspace/workspace-store';
@@ -24,6 +32,7 @@ export class ImportDialog {
 
   /** Tabla de destino, la que el usuario eligió en el explorador. */
   readonly table = input.required<DatabaseObject>();
+  readonly connectionId = input.required<string>();
 
   readonly closed = output<void>();
 
@@ -64,12 +73,17 @@ export class ImportDialog {
       return;
     }
 
-    await this._store.previewImport(this.table(), file, {
-      hasHeaders: this.hasHeaders(),
-      delimiter: this.delimiter(),
-      encoding: this.encoding(),
-      nullText: this.nullText(),
-    });
+    await this._store.previewImport(
+      this.table(),
+      file,
+      {
+        hasHeaders: this.hasHeaders(),
+        delimiter: this.delimiter(),
+        encoding: this.encoding(),
+        nullText: this.nullText(),
+      },
+      this.connectionId(),
+    );
   }
 
   protected async run(): Promise<void> {
@@ -79,12 +93,17 @@ export class ImportDialog {
       return;
     }
 
-    const ok = await this._store.runImport(this.table(), file, {
-      hasHeaders: this.hasHeaders(),
-      delimiter: this.delimiter(),
-      encoding: this.encoding(),
-      nullText: this.nullText(),
-    });
+    const ok = await this._store.runImport(
+      this.table(),
+      file,
+      {
+        hasHeaders: this.hasHeaders(),
+        delimiter: this.delimiter(),
+        encoding: this.encoding(),
+        nullText: this.nullText(),
+      },
+      this.connectionId(),
+    );
 
     if (ok) {
       this.close();

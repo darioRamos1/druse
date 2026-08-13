@@ -109,6 +109,10 @@ public sealed class SqlServerFixture : IProviderFixture
         )
         """;
 
+    public string CreateView(string name) => $"CREATE VIEW {name} AS SELECT 7 AS valor";
+
+    public string DropView(string name) => $"DROP VIEW IF EXISTS {name}";
+
     public string TimestampTypeName => "datetimeoffset(7)";
 
     private static (bool, string?) Probe()

@@ -126,6 +126,7 @@ export class SqlEditor implements OnInit {
   protected readonly failed = signal(false);
 
   private _editor: MonacoApi.editor.IStandaloneCodeEditor | null = null;
+  private _syncingExternalValue = false;
 
   constructor() {
     // El valor puede cambiar desde fuera al cambiar de pestaña. Se compara antes
@@ -136,7 +137,13 @@ export class SqlEditor implements OnInit {
       const editor = this._editor;
 
       if (editor && editor.getValue() !== value) {
-        editor.setValue(value);
+        this._syncingExternalValue = true;
+
+        try {
+          editor.setValue(value);
+        } finally {
+          this._syncingExternalValue = false;
+        }
       }
     });
   }
@@ -252,7 +259,10 @@ export class SqlEditor implements OnInit {
       const editor = this._editor;
 
       editor.onDidChangeModelContent(() => {
-        this._zone.run(() => this.valueChange.emit(editor.getValue()));
+        if (!this._syncingExternalValue) {
+          this._zone.run(() => this.valueChange.emit(editor.getValue()));
+        }
+
         this.scheduleDiagnostics(monaco);
       });
 
@@ -345,7 +355,10 @@ export class SqlEditor implements OnInit {
     const run = (action: () => void) => () => this._zone.run(action);
 
     // Ejecutar: Ctrl/Cmd + Enter.
-    editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, run(() => this.execute.emit()));
+    editor.addCommand(
+      monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter,
+      run(() => this.execute.emit()),
+    );
 
     // Ejecutar solo la selección: Ctrl/Cmd + Shift + Enter.
     editor.addCommand(
@@ -355,13 +368,22 @@ export class SqlEditor implements OnInit {
 
     // Cancelar: Escape. Solo tiene efecto si hay algo ejecutándose; quien lo
     // decide es el shell.
-    editor.addCommand(monaco.KeyCode.Escape, run(() => this.cancel.emit()));
+    editor.addCommand(
+      monaco.KeyCode.Escape,
+      run(() => this.cancel.emit()),
+    );
 
     // Guardar: Ctrl/Cmd + S.
-    editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, run(() => this.save.emit()));
+    editor.addCommand(
+      monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS,
+      run(() => this.save.emit()),
+    );
 
     // Nueva consulta: Ctrl/Cmd + T.
-    editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyT, run(() => this.newTab.emit()));
+    editor.addCommand(
+      monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyT,
+      run(() => this.newTab.emit()),
+    );
 
     // Formatear: Ctrl/Cmd + Shift + F, el mismo que usa el resto de editores.
     editor.addCommand(

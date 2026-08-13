@@ -57,4 +57,24 @@ public sealed class MetadataService(
 
         return await reader.GetColumnsAsync(session, table, cancellationToken);
     }
+
+    public async Task<string> GetViewDefinitionAsync(
+        Guid sessionId,
+        DatabaseObject view,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(view);
+
+        if (view.Kind != DatabaseObjectKind.View)
+        {
+            throw new ArgumentException("Solo se puede obtener la definición de una vista.", nameof(view));
+        }
+
+        using var turn = await _connections.EnterAsync(sessionId, cancellationToken);
+
+        var session = _connections.Require(sessionId);
+        var reader = _providers.GetMetadataReader(session.Engine);
+
+        return await reader.GetViewDefinitionAsync(session, view, cancellationToken);
+    }
 }

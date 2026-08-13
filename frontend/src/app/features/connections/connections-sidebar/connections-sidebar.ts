@@ -1,11 +1,4 @@
-import {
-  ChangeDetectionStrategy,
-  Component,
-  computed,
-  input,
-  output,
-  signal,
-} from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, input, output, signal } from '@angular/core';
 
 import { ConnectionSummary, ExplorerNode } from '../../../shared/models/workspace';
 import { EngineBadge } from '../../../shared/ui/engine-badge/engine-badge';
@@ -54,6 +47,7 @@ export class ConnectionsSidebar {
   readonly openNode = output<ExplorerNode>();
   /** Componer una consulta sobre esta tabla o vista. */
   readonly composeQuery = output<ExplorerNode>();
+  readonly viewDefinition = output<ExplorerNode>();
 
   /** Importar un archivo dentro de esta tabla. */
   readonly importInto = output<ExplorerNode>();
@@ -92,6 +86,8 @@ export class ConnectionsSidebar {
 
   /** Término por el que se filtran conexiones y objetos. */
   protected readonly filter = signal('');
+  protected readonly openMenuId = signal<string | null>(null);
+  protected readonly menuPosition = signal({ top: 0, left: 0 });
 
   protected readonly visibleConnections = computed(() => {
     const term = this.filter().trim().toLowerCase();
@@ -107,8 +103,7 @@ export class ConnectionsSidebar {
         connection.name.toLowerCase().includes(term) ||
         connection.database.toLowerCase().includes(term) ||
         this.explorerNodes().some(
-          (node) =>
-            node.connectionId === connection.id && node.label.toLowerCase().includes(term),
+          (node) => node.connectionId === connection.id && node.label.toLowerCase().includes(term),
         ),
     );
   });
@@ -157,6 +152,7 @@ export class ConnectionsSidebar {
 
   protected async copyName(event: Event, node: ExplorerNode): Promise<void> {
     event.stopPropagation();
+    this.openMenuId.set(null);
 
     try {
       await navigator.clipboard.writeText(this.qualifiedName(node));
@@ -175,9 +171,60 @@ export class ConnectionsSidebar {
     return KIND_ICONS[node.kind];
   }
 
+  protected toggleMenu(event: Event, nodeId: string): void {
+    event.stopPropagation();
+    const current = this.openMenuId();
+
+    if (current === nodeId) {
+      this.openMenuId.set(null);
+      return;
+    }
+
+    const trigger = event.currentTarget as HTMLElement;
+    const rect = trigger.getBoundingClientRect();
+    const menuHeight = 190;
+    const top =
+      rect.bottom + menuHeight <= window.innerHeight - 8
+        ? rect.bottom + 3
+        : Math.max(8, rect.top - menuHeight - 3);
+
+    this.menuPosition.set({ top, left: Math.max(8, rect.right - 190) });
+    this.openMenuId.set(nodeId);
+  }
+
+  protected onNodeKeydown(event: KeyboardEvent, nodeId: string): void {
+    if (event.target !== event.currentTarget) {
+      return;
+    }
+
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      this.toggleNode.emit(nodeId);
+    }
+  }
+
+  protected stopMenuKeydown(event: KeyboardEvent): void {
+    event.stopPropagation();
+
+    if (event.key === 'Escape') {
+      this.openMenuId.set(null);
+      ((event.currentTarget as HTMLElement).closest('.node') as HTMLElement | null)?.focus();
+    }
+  }
+
+  protected closeMenu(event: FocusEvent, nodeId: string): void {
+    const next = event.relatedTarget as Node | null;
+    const current = event.currentTarget as HTMLElement;
+
+    if (!next || !current.contains(next)) {
+      this.openMenuId.update((open) => (open === nodeId ? null : open));
+    }
+  }
+
   /** Evita que el botón de una acción propague el clic al nodo. */
   protected act(event: Event, action: () => void): void {
     event.stopPropagation();
+    this.openMenuId.set(null);
     action();
   }
 }

@@ -28,13 +28,14 @@ public sealed class SqlServerMetadataReader : IDatabaseMetadataReader
         IDatabaseSession session,
         CancellationToken cancellationToken)
     {
-        // A diferencia de PostgreSQL, SQL Server sí permite consultar otras bases
-        // desde la misma conexión. Aun así se listan igual, para que el explorador
-        // se comporte del mismo modo con los dos motores.
+        // El proveedor todavía consulta `sys.*` en el catálogo de la conexión.
+        // Mostrar otras bases aquí haría que el árbol etiquetara como ajenos
+        // objetos que en realidad leyó de la base conectada.
         const string Sql = """
             SELECT d.name
             FROM sys.databases d
-            WHERE d.state = 0
+            WHERE d.name = DB_NAME()
+              AND d.state = 0
               AND HAS_DBACCESS(d.name) = 1
             ORDER BY d.name
             """;
@@ -83,7 +84,12 @@ public sealed class SqlServerMetadataReader : IDatabaseMetadataReader
                 c.is_nullable,
                 CASE WHEN pk.column_id IS NOT NULL THEN 1 ELSE 0 END AS is_primary_key,
                 dc.definition AS default_value,
-                c.column_id
+                c.column_id,
+                CASE WHEN c.is_identity = 1
+                           OR c.is_computed = 1
+                           OR c.generated_always_type <> 0
+                           OR t.name IN ('timestamp', 'rowversion')
+                     THEN 1 ELSE 0 END AS is_generated
             FROM sys.columns c
             JOIN sys.objects o     ON o.object_id = c.object_id
             JOIN sys.schemas s     ON s.schema_id = o.schema_id
@@ -115,10 +121,54 @@ public sealed class SqlServerMetadataReader : IDatabaseMetadataReader
                 IsPrimaryKey = reader.GetInt32(6) != 0,
                 DefaultValue = reader.IsDBNull(7) ? null : reader.GetString(7),
                 Ordinal = reader.GetInt32(8),
+                IsGenerated = reader.GetInt32(9) != 0,
             },
             cancellationToken,
             ("schema", table.Schema ?? "dbo"),
             ("table", table.Name));
+    }
+
+    public async Task<string> GetViewDefinitionAsync(
+        IDatabaseSession session,
+        DatabaseObject view,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(view);
+
+        if (!string.IsNullOrWhiteSpace(view.Database)
+            && !string.Equals(view.Database, session.Profile.Database, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new ArgumentException(
+                "La definición solo está disponible para vistas de la base conectada.",
+                nameof(view));
+        }
+
+        const string Sql = """
+            SELECT sm.definition
+            FROM sys.views v
+            JOIN sys.schemas s ON s.schema_id = v.schema_id
+            LEFT JOIN sys.sql_modules sm ON sm.object_id = v.object_id
+            WHERE s.name = @schema
+              AND v.name = @view
+            """;
+
+        var definitions = await QueryAsync(
+            session,
+            Sql,
+            reader => reader.IsDBNull(0) ? string.Empty : reader.GetString(0),
+            cancellationToken,
+            ("schema", view.Schema ?? "dbo"),
+            ("view", view.Name));
+
+        if (definitions.Count == 1 && !string.IsNullOrWhiteSpace(definitions[0]))
+        {
+            return definitions[0].TrimEnd() + Environment.NewLine;
+        }
+
+        throw new DatabaseOperationException(new QueryError
+        {
+            Message = $"No se puede leer la definición de la vista {view.Schema}.{view.Name}; puede estar cifrada o no ser visible para este usuario.",
+        });
     }
 
     private static async Task<IReadOnlyList<DatabaseObject>> GetSchemasAsync(

@@ -2,6 +2,7 @@ import {
   ChangeDetectionStrategy,
   Component,
   computed,
+  HostListener,
   inject,
   signal,
   viewChild,
@@ -16,6 +17,7 @@ import { EditorToolbar } from '../../features/query-editor/editor-toolbar/editor
 import { CursorPosition, SqlEditor } from '../../features/query-editor/sql-editor/sql-editor';
 import { ImportDialog } from '../../features/import/import-dialog/import-dialog';
 import { QueryBuilder } from '../../features/query-builder/query-builder/query-builder';
+import { buildSelect } from '../../features/query-editor/sql-language/sql-writer';
 import { ResultsPanel } from '../../features/query-results/results-panel/results-panel';
 import {
   CellEdit,
@@ -28,6 +30,7 @@ import {
 import { ResizeHandle } from '../../shared/ui/resize-handle/resize-handle';
 import { StatusBar } from '../status-bar/status-bar';
 import { TopBar } from '../top-bar/top-bar';
+import CommandPalette from '../command-palette/command-palette';
 
 /** Límites de arrastre de los paneles, en píxeles. */
 const SIDEBAR_MIN = 200;
@@ -66,6 +69,7 @@ const DISCONNECTED: SessionStatus = {
     ResultsPanel,
     ImportDialog,
     QueryBuilder,
+    CommandPalette,
     ResizeHandle,
   ],
   templateUrl: './app-shell.html',
@@ -76,6 +80,7 @@ export class AppShell {
 
   // --- Tamaños de panel ------------------------------------------------------
   protected readonly sidebarWidth = signal(274);
+  protected readonly mobileExplorerOpen = signal(false);
   protected readonly resultsHeight = signal(322);
 
   protected readonly sidebarMin = SIDEBAR_MIN;
@@ -85,12 +90,29 @@ export class AppShell {
 
   // --- Diálogo ---------------------------------------------------------------
   protected readonly dialogOpen = signal(false);
+  protected readonly paletteOpen = signal(false);
+
+  @HostListener('document:keydown', ['$event'])
+  protected onGlobalKeydown(event: KeyboardEvent): void {
+    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
+      if (this.paletteOpen()) {
+        return;
+      }
+      if (this.dialogOpen() || this.importTarget() || this.builderTarget()) {
+        return;
+      }
+      event.preventDefault();
+      this.paletteOpen.set(true);
+    } else if (event.key === 'Escape' && this.paletteOpen()) {
+      this.paletteOpen.set(false);
+    }
+  }
 
   /** Tabla a la que se está importando, si el diálogo está abierto. */
-  protected readonly importTarget = signal<DatabaseObject | null>(null);
+  protected readonly importTarget = signal<ExplorerNode | null>(null);
 
   protected openImport(node: ExplorerNode): void {
-    this.importTarget.set(node.source);
+    this.importTarget.set(node);
   }
 
   protected closeImport(): void {
@@ -98,10 +120,10 @@ export class AppShell {
   }
 
   /** Tabla sobre la que se está componiendo una consulta. */
-  protected readonly builderTarget = signal<DatabaseObject | null>(null);
+  protected readonly builderTarget = signal<ExplorerNode | null>(null);
 
   protected openBuilder(node: ExplorerNode): void {
-    this.builderTarget.set(node.source);
+    this.builderTarget.set(node);
   }
 
   protected closeBuilder(): void {
@@ -115,12 +137,23 @@ export class AppShell {
    * estrenar una ayuda.
    */
   protected insertComposed(sql: string): void {
-    this._store.createTab(sql, this.builderTarget() ?? undefined);
+    const target = this.builderTarget();
+    const operation = sql
+      .trimStart()
+      .match(/^(SELECT|INSERT|UPDATE|CREATE TABLE|DROP TABLE)/i)?.[1];
+
+    this._store.createTab(
+      sql,
+      target?.kind === 'table' ? target.source : undefined,
+      target?.connectionId,
+      target ? `${target.label} · ${operation?.toUpperCase() ?? 'Consulta'}` : undefined,
+    );
   }
 
   // --- Estado del área de trabajo -------------------------------------------
   protected readonly connections = this._store.connections;
   protected readonly explorerNodes = this._store.explorerNodes;
+  protected readonly searchableRelations = this._store.searchableRelations;
   protected readonly tabs = this._store.tabs;
   protected readonly resultSet = this._store.resultSet;
   protected readonly result = this._store.result;
@@ -155,9 +188,7 @@ export class AppShell {
     const schemas = this._store.schemaIndex().schemas;
     const only = schemas.length === 1 ? schemas[0] : null;
 
-    return only && only !== session.database
-      ? `${session.database}.${only}`
-      : session.database;
+    return only && only !== session.database ? `${session.database}.${only}` : session.database;
   });
 
   // --- Estado del editor -----------------------------------------------------
@@ -166,8 +197,12 @@ export class AppShell {
 
   /** Motor de la conexión activa; decide el dialecto del editor. */
   protected readonly activeEngine = computed<DatabaseEngine>(
-    () => this._store.session()?.engine ?? 'postgresql',
+    () => this._store.activeConnection()?.engine ?? 'postgresql',
   );
+
+  protected engineFor(connectionId: string): DatabaseEngine {
+    return this._store.engineForConnection(connectionId) ?? 'postgresql';
+  }
 
   protected readonly schemaIndex = this._store.schemaIndex;
 
@@ -214,6 +249,11 @@ export class AppShell {
   protected readonly timeoutSeconds = this._store.timeoutSeconds;
 
   private readonly _editor = viewChild<SqlEditor>('editor');
+  private readonly _resultsPanel = viewChild<ResultsPanel>('resultsPanel');
+
+  protected showHistory(): void {
+    this._resultsPanel()?.openHistory();
+  }
 
   /** Última selección del editor, para poder ejecutarla sola. */
   private _selectedSql = '';
@@ -260,6 +300,16 @@ export class AppShell {
     void this._store.connectSaved(id);
   }
 
+  protected activateFromPalette(id: string): void {
+    const connection = this.connections().find((item) => item.id === id);
+
+    if (connection?.state === 'disconnected' && connection.saved) {
+      this.connectSaved(id);
+    } else {
+      this._store.selectConnection(id);
+    }
+  }
+
   protected forget(id: string): void {
     void this._store.forget(id);
   }
@@ -276,8 +326,16 @@ export class AppShell {
     void this._store.toggleNode(id);
   }
 
+  protected closeMobileExplorer(): void {
+    this.mobileExplorerOpen.set(false);
+  }
+
   protected refreshNode(id: string): void {
     void this._store.refreshNode(id);
+  }
+
+  protected openViewDefinition(node: ExplorerNode): void {
+    void this._store.openViewDefinition(node);
   }
 
   protected disconnect(id: string): void {
@@ -286,7 +344,22 @@ export class AppShell {
 
   /** Doble clic sobre una tabla: abre una consulta preparada. */
   protected openNode(node: ExplorerNode): void {
-    this._store.openSelectFor(node);
+    const engine = this._store.engineForConnection(node.connectionId);
+
+    if (!engine || (node.kind !== 'table' && node.kind !== 'view')) {
+      return;
+    }
+
+    this._store.openSelectFor(
+      node,
+      buildSelect(engine, {
+        schema: node.source.schema,
+        table: node.source.name,
+        columns: [],
+        filters: [],
+        limit: 100,
+      }),
+    );
   }
 
   // --- Pestañas --------------------------------------------------------------
@@ -335,7 +408,7 @@ export class AppShell {
 
     // Solo se puede confirmar un riesgo, nunca saltarse el modo de solo lectura.
     if (rejection?.reason === 'unconfirmeddestructive') {
-      void this._store.confirmAndExecute(this.hasSelection() ? this._selectedSql : undefined);
+      void this._store.confirmAndExecute();
     }
   }
 
@@ -376,6 +449,6 @@ export class AppShell {
 
   /** Recupera una consulta del historial en una pestaña nueva. */
   protected reuseQuery(sql: string): void {
-    this._store.createTab(sql);
+    this._store.createTab(sql, undefined, undefined, 'Historial · Consulta');
   }
 }

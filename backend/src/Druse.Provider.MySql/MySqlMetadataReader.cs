@@ -84,7 +84,9 @@ public sealed class MySqlMetadataReader : IDatabaseMetadataReader
                 c.IS_NULLABLE,
                 c.COLUMN_KEY,
                 c.COLUMN_DEFAULT,
-                CAST(c.ORDINAL_POSITION AS SIGNED) AS ordinal
+                CAST(c.ORDINAL_POSITION AS SIGNED) AS ordinal,
+                c.EXTRA LIKE '%auto_increment%'
+                    OR c.EXTRA LIKE '%GENERATED%' AS is_generated
             FROM information_schema.COLUMNS c
             WHERE c.TABLE_SCHEMA = @schema
               AND c.TABLE_NAME = @table
@@ -104,10 +106,37 @@ public sealed class MySqlMetadataReader : IDatabaseMetadataReader
                 IsPrimaryKey = reader.GetString(3) == "PRI",
                 DefaultValue = reader.IsDBNull(4) ? null : reader.GetString(4),
                 Ordinal = (int)reader.GetInt64(5),
+                IsGenerated = reader.GetBoolean(6),
             },
             cancellationToken,
             ("schema", Schema(session, table)),
             ("table", table.Name));
+    }
+
+    public async Task<string> GetViewDefinitionAsync(
+        IDatabaseSession session,
+        DatabaseObject view,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(view);
+
+        var schema = Schema(session, view);
+        var sql = $"SHOW CREATE VIEW {Quote(schema)}.{Quote(view.Name)}";
+        var definitions = await QueryAsync(
+            session,
+            sql,
+            reader => reader.GetString(1),
+            cancellationToken);
+
+        if (definitions.Count == 1 && !string.IsNullOrWhiteSpace(definitions[0]))
+        {
+            return definitions[0].TrimEnd().TrimEnd(';') + ";" + Environment.NewLine;
+        }
+
+        throw new DatabaseOperationException(new QueryError
+        {
+            Message = $"No se pudo obtener la definición de la vista {schema}.{view.Name}.",
+        });
     }
 
     /// <summary>
@@ -292,6 +321,9 @@ public sealed class MySqlMetadataReader : IDatabaseMetadataReader
     /// </summary>
     private static string Schema(IDatabaseSession session, DatabaseObject node) =>
         node.Schema ?? node.Database ?? session.Profile.Database;
+
+    private static string Quote(string identifier) =>
+        $"`{identifier.Replace("`", "``", StringComparison.Ordinal)}`";
 
     /// <summary>
     /// Ejecuta una consulta de catálogo y proyecta cada fila.

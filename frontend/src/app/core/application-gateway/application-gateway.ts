@@ -154,6 +154,8 @@ export abstract class ApplicationGateway {
     table: DatabaseObject,
   ): Observable<readonly DatabaseColumn[]>;
 
+  abstract getViewDefinition(sessionId: string, view: DatabaseObject): Observable<string>;
+
   /**
    * Ejecuta SQL.
    *

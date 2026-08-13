@@ -15,6 +15,9 @@
 }
 
 .head {
+  position: sticky;
+  z-index: 2;
+  top: 0;
   height: var(--dr-grid-header-height);
   flex: 0 0 var(--dr-grid-header-height);
   background: var(--dr-surface-grid-header);
@@ -26,6 +29,9 @@
 }
 
 .filters {
+  position: sticky;
+  z-index: 2;
+  top: var(--dr-grid-header-height);
   height: 28px;
   flex: 0 0 28px;
   background: #0f141e;
@@ -39,6 +45,15 @@
   flex: 1;
   min-height: 0;
   overflow: auto;
+}
+
+.body.is-compact .row {
+  height: 25px;
+  font-size: 11px;
+}
+
+.body.is-compact .cell {
+  padding-inline: 7px;
 }
 
 .row {

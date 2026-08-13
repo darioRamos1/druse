@@ -212,6 +212,60 @@ public sealed class QueryFlowTests : IClassFixture<DruseApiFactory>
     }
 
     [RequiresPostgreSqlFact]
+    public async Task DefinicionDeVista_DevuelveSqlEditable()
+    {
+        var (client, sessionId) = await ConnectAsync();
+        var viewName = $"druse_view_{Guid.NewGuid():N}";
+
+        using (client)
+        {
+            try
+            {
+                var create = await client.PostAsJsonAsync("/api/queries", new
+                {
+                    sessionId,
+                    sql = $"CREATE VIEW {viewName} AS SELECT 7 AS valor",
+                    maxRows = 100,
+                    timeoutSeconds = 30,
+                    confirmDestructive = true,
+                });
+                create.EnsureSuccessStatusCode();
+
+                var response = await client.PostAsJsonAsync(
+                    $"/api/sessions/{sessionId}/metadata/definition",
+                    new
+                    {
+                        id = $"View:public.{viewName}",
+                        name = viewName,
+                        kind = "view",
+                        database = TestDatabase.Database,
+                        schema = "public",
+                        hasChildren = true,
+                    });
+
+                response.EnsureSuccessStatusCode();
+                var body = await response.ReadJsonAsync();
+                var sql = body.GetProperty("sql").GetString();
+
+                Assert.Contains("CREATE VIEW", sql, StringComparison.OrdinalIgnoreCase);
+                Assert.Contains(viewName, sql, StringComparison.OrdinalIgnoreCase);
+                Assert.Contains("valor", sql, StringComparison.OrdinalIgnoreCase);
+            }
+            finally
+            {
+                await client.PostAsJsonAsync("/api/queries", new
+                {
+                    sessionId,
+                    sql = $"DROP VIEW IF EXISTS {viewName}",
+                    maxRows = 100,
+                    timeoutSeconds = 30,
+                    confirmDestructive = true,
+                });
+            }
+        }
+    }
+
+    [RequiresPostgreSqlFact]
     public async Task InstruccionDestructiva_SeRechazaHastaQueElUsuarioConfirma()
     {
         var (client, sessionId) = await ConnectAsync();

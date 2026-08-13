@@ -71,6 +71,7 @@ public sealed record DatabaseColumnDto
     public required string DataType { get; init; }
     public required bool IsNullable { get; init; }
     public bool IsPrimaryKey { get; init; }
+    public bool IsGenerated { get; init; }
     public string? DefaultValue { get; init; }
     public required int Ordinal { get; init; }
 }

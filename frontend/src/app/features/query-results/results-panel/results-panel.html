@@ -52,13 +52,25 @@
     Filtros
   </button>
 
+  <button
+    type="button"
+    class="tool-button"
+    [class.is-on]="compact()"
+    [disabled]="!resultSet()"
+    [attr.aria-pressed]="compact()"
+    title="Alternar densidad de filas"
+    (click)="toggleDensity()"
+  >
+    Densidad {{ compact() ? 'compacta' : 'cómoda' }}
+  </button>
+
   <div class="export">
     <button
       type="button"
       class="tool-button"
       [disabled]="!resultSet() || exporting()"
       [attr.aria-expanded]="exportOpen()"
-      (click)="toggleExport()"
+      (click)="toggleExport($event)"
     >
       <app-icon name="export" [size]="12" />
       {{ exporting() ? 'Exportando…' : 'Exportar' }}
@@ -66,15 +78,30 @@
     </button>
 
     @if (exportOpen()) {
-      <ul class="export__menu" role="menu">
+      <ul
+        class="export__menu"
+        role="menu"
+        [style.top.px]="exportPosition().top"
+        [style.left.px]="exportPosition().left"
+      >
         <li>
-          <button type="button" class="export__option" role="menuitem" (click)="chooseExport('csv')">
+          <button
+            type="button"
+            class="export__option"
+            role="menuitem"
+            (click)="chooseExport('csv')"
+          >
             CSV
             <span class="export__hint">Todas las filas del resultado</span>
           </button>
         </li>
         <li>
-          <button type="button" class="export__option" role="menuitem" (click)="chooseExport('xlsx')">
+          <button
+            type="button"
+            class="export__option"
+            role="menuitem"
+            (click)="chooseExport('xlsx')"
+          >
             Excel
             <span class="export__hint">Hasta 200 000 filas</span>
           </button>
@@ -94,8 +121,8 @@
               type="button"
               class="sets__tab"
               role="tab"
-              [class.is-active]="$index === activeSetIndex()"
-              [attr.aria-selected]="$index === activeSetIndex()"
+              [class.is-active]="$index === selectedSetIndex()"
+              [attr.aria-selected]="$index === selectedSetIndex()"
               (click)="selectSet($index)"
             >
               Resultado {{ $index + 1 }}
@@ -108,6 +135,7 @@
       <app-results-grid
         [resultSet]="set"
         [showFilters]="showFilters()"
+        [compact]="compact()"
         [editable]="editable()"
         [pendingEdits]="edits()"
         (copied)="copied.emit($event)"
@@ -167,7 +195,8 @@
         @if (set.truncated) {
           <span class="sep" aria-hidden="true"></span>
           <div class="foot__item foot__item--warning" title="Se alcanzó el límite de filas">
-            Resultado recortado
+            Resultado recortado: se muestran {{ set.rows.length }} de
+            {{ set.totalRows.toLocaleString('es') }}
           </div>
         }
 
@@ -188,17 +217,25 @@
       <div class="empty">
         @if (executed.state === 'failed') {
           <span class="empty__error">{{ executed.error?.message }}</span>
+          @if (executed.error?.code) {
+            <code class="empty__code">{{ executed.error?.code }}</code>
+          }
+          <button type="button" class="empty__action" (click)="copyError()">Copiar error</button>
         } @else if (executed.state === 'canceled') {
           La ejecución se canceló.
         } @else if (executed.rowsAffected !== undefined && executed.rowsAffected !== null) {
-          <span class="mono">{{ executed.rowsAffected }}</span>&nbsp;filas afectadas en
+          <span class="mono">{{ executed.rowsAffected }}</span
+          >&nbsp;filas afectadas en
           <span class="mono">&nbsp;{{ executed.durationMs }} ms</span>
         } @else {
           La instrucción se ejecutó correctamente y no devolvió filas.
         }
       </div>
     } @else {
-      <div class="empty">Ejecuta una consulta para ver los resultados aquí.</div>
+      <div class="empty">
+        <strong>Los resultados aparecerán aquí</strong>
+        <span>Ejecuta el documento con Ctrl+Enter o una selección con Ctrl+Shift+Enter.</span>
+      </div>
     }
   }
 
@@ -206,7 +243,16 @@
     @if (messages().length > 0) {
       <ul class="messages">
         @for (message of messages(); track $index) {
-          <li class="messages__item" [attr.data-severity]="message.severity">{{ message.text }}</li>
+          <li class="messages__item" [attr.data-severity]="message.severity">
+            <strong>{{
+              message.severity === 'error'
+                ? 'Error'
+                : message.severity === 'warning'
+                  ? 'Advertencia'
+                  : 'Información'
+            }}</strong>
+            <span>{{ message.text }}</span>
+          </li>
         }
       </ul>
     } @else {

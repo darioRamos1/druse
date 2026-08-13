@@ -462,6 +462,7 @@ public abstract class DatabaseProviderContractTests<TFixture>
             Assert.Equal("id", id.Name);
             Assert.True(id.IsPrimaryKey);
             Assert.False(id.IsNullable);
+            Assert.True(id.IsGenerated);
 
             Assert.False(columns[1].IsNullable);
 
@@ -476,6 +477,44 @@ public abstract class DatabaseProviderContractTests<TFixture>
         finally
         {
             await ExecuteAsync(session, Fixture.DropTable(table));
+        }
+    }
+
+    [Fact]
+    public async Task ObtieneLaDefinicionDeUnaVista()
+    {
+        if (Skip) { return; }
+
+        await using var session = await OpenAsync();
+
+        var viewName = $"druse_view_{Guid.NewGuid():N}";
+
+        try
+        {
+            await ExecuteAsync(session, Fixture.CreateView(viewName));
+
+            var view = new DatabaseObject
+            {
+                Id = $"View:{Fixture.DefaultSchema}.{viewName}",
+                Name = viewName,
+                Kind = DatabaseObjectKind.View,
+                Database = Fixture.DatabaseName,
+                Schema = Fixture.DefaultSchema,
+            };
+
+            var definition = await Fixture.Metadata.GetViewDefinitionAsync(
+                session,
+                view,
+                CancellationToken.None);
+
+            Assert.Contains("CREATE", definition, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("VIEW", definition, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains(viewName, definition, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("valor", definition, StringComparison.OrdinalIgnoreCase);
+        }
+        finally
+        {
+            await ExecuteAsync(session, Fixture.DropView(viewName));
         }
     }
 

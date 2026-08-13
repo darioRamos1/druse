@@ -104,6 +104,7 @@ internal static class ContractMapper
             DataType = value.DataType,
             IsNullable = value.IsNullable,
             IsPrimaryKey = value.IsPrimaryKey,
+            IsGenerated = value.IsGenerated,
             DefaultValue = value.DefaultValue,
             Ordinal = value.Ordinal,
         };

@@ -126,6 +126,10 @@ public sealed class MySqlFixture : IProviderFixture
         )
         """;
 
+    public string CreateView(string name) => $"CREATE VIEW {name} AS SELECT 7 AS valor";
+
+    public string DropView(string name) => $"DROP VIEW IF EXISTS {name}";
+
     /// <summary>
     /// `TIMESTAMP` es el tipo de MySQL con semántica de zona horaria: se guarda en
     /// UTC y se convierte a la zona de la sesión al leerlo.

@@ -32,4 +32,10 @@ public interface IDatabaseMetadataReader
         IDatabaseSession session,
         DatabaseObject table,
         CancellationToken cancellationToken);
+
+    /// <summary>Instrucción con la que se crea una vista.</summary>
+    Task<string> GetViewDefinitionAsync(
+        IDatabaseSession session,
+        DatabaseObject view,
+        CancellationToken cancellationToken);
 }

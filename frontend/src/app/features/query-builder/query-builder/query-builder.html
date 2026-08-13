@@ -28,7 +28,13 @@
             <span class="column__type">{{ column.dataType }}</span>
           </label>
         } @empty {
-          <p class="hint">Cargando las columnas…</p>
+          <p class="hint">
+            @if (loading()) {
+              Cargando las columnas…
+            } @else {
+              No se pudieron cargar columnas para este objeto.
+            }
+          </p>
         }
       </div>
     </section>
@@ -70,7 +76,12 @@
             <span class="filter__novalue">sin valor</span>
           }
 
-          <button type="button" class="icon" (click)="removeFilter($index)" aria-label="Quitar filtro">
+          <button
+            type="button"
+            class="icon"
+            (click)="removeFilter($index)"
+            aria-label="Quitar filtro"
+          >
             ×
           </button>
         </div>
@@ -116,12 +127,36 @@
 
   <footer class="foot">
     <div class="templates">
-      <span class="templates__label">Plantillas:</span>
-      <button type="button" class="btn btn--small" (click)="insertTemplate('insert')">INSERT</button>
-      <button type="button" class="btn btn--small" (click)="insertTemplate('update')">UPDATE</button>
-      <button type="button" class="btn btn--small" (click)="insertTemplate('create')">
-        CREATE TABLE
-      </button>
+      @if (table().kind === 'table') {
+        <span class="templates__label">Plantillas:</span>
+        <button
+          type="button"
+          class="btn btn--small"
+          [disabled]="!templatesReady()"
+          (click)="insertTemplate('insert')"
+        >
+          INSERT
+        </button>
+        <button
+          type="button"
+          class="btn btn--small"
+          [disabled]="!templatesReady()"
+          (click)="insertTemplate('update')"
+        >
+          UPDATE
+        </button>
+        <button
+          type="button"
+          class="btn btn--small"
+          [disabled]="!templatesReady()"
+          (click)="insertTemplate('create')"
+        >
+          CREATE TABLE
+        </button>
+        <button type="button" class="btn btn--small" (click)="insertTemplate('drop')">
+          DROP TABLE
+        </button>
+      }
     </div>
 
     <span class="spacer"></span>

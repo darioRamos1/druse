@@ -28,7 +28,8 @@ public sealed class PostgreSqlMetadataReader : IDatabaseMetadataReader
         const string Sql = """
             SELECT d.datname
             FROM pg_database d
-            WHERE d.datistemplate = false
+            WHERE d.datname = current_database()
+              AND d.datistemplate = false
               AND d.datallowconn = true
               AND has_database_privilege(d.datname, 'CONNECT')
             ORDER BY d.datname
@@ -78,7 +79,11 @@ public sealed class PostgreSqlMetadataReader : IDatabaseMetadataReader
                 NOT a.attnotnull                     AS is_nullable,
                 COALESCE(pk.is_primary, false)       AS is_primary_key,
                 pg_get_expr(ad.adbin, ad.adrelid)    AS default_value,
-                a.attnum
+                a.attnum,
+                a.attidentity <> ''
+                    OR a.attgenerated <> ''
+                    OR COALESCE(pg_get_expr(ad.adbin, ad.adrelid), '') LIKE 'nextval(%'
+                                                    AS is_generated
             FROM pg_attribute a
             JOIN pg_class c     ON c.oid = a.attrelid
             JOIN pg_namespace n ON n.oid = c.relnamespace
@@ -109,10 +114,60 @@ public sealed class PostgreSqlMetadataReader : IDatabaseMetadataReader
                 IsPrimaryKey = reader.GetBoolean(3),
                 DefaultValue = reader.IsDBNull(4) ? null : reader.GetString(4),
                 Ordinal = reader.GetInt16(5),
+                IsGenerated = reader.GetBoolean(6),
             },
             cancellationToken,
             ("schema", table.Schema ?? "public"),
             ("table", table.Name));
+    }
+
+    public async Task<string> GetViewDefinitionAsync(
+        IDatabaseSession session,
+        DatabaseObject view,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(view);
+
+        const string Sql = """
+            SELECT
+                CASE c.relkind
+                    WHEN 'm' THEN 'CREATE MATERIALIZED VIEW '
+                    ELSE 'CREATE VIEW '
+                END
+                || quote_ident(n.nspname) || '.' || quote_ident(c.relname)
+                || CASE
+                    WHEN c.reloptions IS NULL THEN ''
+                    ELSE E'\nWITH (' || array_to_string(c.reloptions, ', ') || ')'
+                END
+                || CASE
+                    WHEN c.relkind = 'm' AND c.reltablespace <> 0
+                    THEN E'\nTABLESPACE ' || quote_ident(t.spcname)
+                    ELSE ''
+                END
+                || E' AS\n' || pg_get_viewdef(c.oid, true)
+                || CASE
+                    WHEN c.relkind = 'm' AND NOT c.relispopulated
+                    THEN E'\nWITH NO DATA'
+                    ELSE ''
+                END
+                || E';\n'
+            FROM pg_class c
+            JOIN pg_namespace n ON n.oid = c.relnamespace
+            LEFT JOIN pg_tablespace t ON t.oid = c.reltablespace
+            WHERE n.nspname = @schema
+              AND c.relname = @view
+              AND c.relkind IN ('v', 'm')
+            """;
+
+        var definitions = await QueryAsync(
+            session,
+            Sql,
+            reader => reader.GetString(0),
+            cancellationToken,
+            ("schema", view.Schema ?? "public"),
+            ("view", view.Name));
+
+        return RequireDefinition(definitions, view);
     }
 
     private static async Task<IReadOnlyList<DatabaseObject>> GetSchemasAsync(
@@ -318,5 +373,20 @@ public sealed class PostgreSqlMetadataReader : IDatabaseMetadataReader
             // que llegar a la pantalla. Ya viene saneado por el normalizador.
             throw new DatabaseOperationException(PostgreSqlErrorNormalizer.Normalize(exception));
         }
+    }
+
+    private static string RequireDefinition(
+        IReadOnlyList<string> definitions,
+        DatabaseObject view)
+    {
+        if (definitions.Count == 1 && !string.IsNullOrWhiteSpace(definitions[0]))
+        {
+            return definitions[0];
+        }
+
+        throw new DatabaseOperationException(new QueryError
+        {
+            Message = $"No se pudo obtener la definición de la vista {view.Schema}.{view.Name}.",
+        });
     }
 }

@@ -1,12 +1,23 @@
 import { KnownColumn } from '../../../shared/models/workspace';
-import { buildCreateTable, buildInsert, buildSelect, buildUpdate, quote } from './sql-writer';
+import {
+  buildCreateTable,
+  buildDropTable,
+  buildInsert,
+  buildSelect,
+  buildUpdate,
+  quote,
+} from './sql-writer';
 
 function col(
   name: string,
   dataType: string,
-  { pk = false, nullable = true }: { pk?: boolean; nullable?: boolean } = {},
+  {
+    pk = false,
+    nullable = true,
+    generated = false,
+  }: { pk?: boolean; nullable?: boolean; generated?: boolean } = {},
 ): KnownColumn {
-  return { name, dataType, isPrimaryKey: pk, isNullable: nullable };
+  return { name, dataType, isPrimaryKey: pk, isNullable: nullable, isGenerated: generated };
 }
 
 const columnas: KnownColumn[] = [
@@ -62,7 +73,7 @@ describe('escribir SQL', () => {
         ],
       });
 
-      expect(sql).toContain("\"nombre\" LIKE '%ana%'");
+      expect(sql).toContain('"nombre" LIKE \'%ana%\'');
       expect(sql).toContain('AND "id" > 10');
     });
 
@@ -106,12 +117,26 @@ describe('escribir SQL', () => {
       const sql = buildInsert('postgresql', {
         schema: 'public',
         table: 'usuarios',
-        columns: [col('id', 'serial', { pk: true, nullable: false }), col('nombre', 'text')],
+        columns: [
+          col('id', 'bigint', { pk: true, nullable: false, generated: true }),
+          col('nombre', 'text'),
+        ],
       });
 
       // Escribir la columna de autoincremento obliga a quitarla a mano.
       expect(sql).not.toContain('"id"');
       expect(sql).toContain('"nombre"');
+    });
+
+    it('el INSERT usa la sintaxis de valores por defecto si todo es automático', () => {
+      const soloIdentidad = {
+        table: 'secuencia',
+        columns: [col('id', 'bigint', { generated: true })],
+      };
+
+      expect(buildInsert('postgresql', soloIdentidad)).toContain('DEFAULT VALUES');
+      expect(buildInsert('sqlserver', soloIdentidad)).toContain('DEFAULT VALUES');
+      expect(buildInsert('mysql', soloIdentidad)).toContain('()\nVALUES ()');
     });
 
     it('el UPDATE trae el WHERE por clave primaria', () => {
@@ -120,6 +145,24 @@ describe('escribir SQL', () => {
       expect(sql).toContain('WHERE [id] =');
       // Y no propone tocar la clave.
       expect(sql).not.toContain('  [id] =');
+    });
+
+    it('el UPDATE no propone escribir columnas calculadas', () => {
+      const sql = buildUpdate('sqlserver', {
+        ...tabla,
+        columns: [...columnas, col('total', 'decimal(12,2)', { generated: true })],
+      });
+
+      expect(sql).not.toContain('[total] =');
+    });
+
+    it('el UPDATE sin columnas modificables no produce SQL ejecutable', () => {
+      const sql = buildUpdate('postgresql', {
+        table: 'secuencia',
+        columns: [col('id', 'bigint', { pk: true, generated: true })],
+      });
+
+      expect(sql).toBe('-- Esta tabla no tiene columnas modificables.\n');
     });
 
     it('el UPDATE de una tabla sin clave lo dice en vez de dejar el WHERE vacío', () => {
@@ -139,6 +182,14 @@ describe('escribir SQL', () => {
       expect(sql).toContain('`nombre` varchar(200) NOT NULL');
       expect(sql).toContain('`correo` varchar(200)');
       expect(sql).toContain('PRIMARY KEY (`id`)');
+    });
+
+    it('el DROP TABLE cita el nombre según cada motor', () => {
+      const objeto = { schema: 'sales data', table: 'order' };
+
+      expect(buildDropTable('postgresql', objeto)).toBe('DROP TABLE "sales data"."order";\n');
+      expect(buildDropTable('sqlserver', objeto)).toBe('DROP TABLE [sales data].[order];\n');
+      expect(buildDropTable('mysql', objeto)).toBe('DROP TABLE `sales data`.`order`;\n');
     });
   });
 });

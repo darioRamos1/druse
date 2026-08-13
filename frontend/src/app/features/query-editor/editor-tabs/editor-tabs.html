@@ -1,31 +1,58 @@
 <div class="tabs" role="tablist">
-  @for (tab of tabs(); track tab.id) {
+  @for (tab of tabs(); track tab.id; let index = $index) {
     <div
       class="tab"
       [class.is-active]="tab.active"
+      [attr.data-environment]="connectionFor(tab)?.environment"
       role="tab"
       [attr.aria-selected]="tab.active"
-      tabindex="0"
+      [attr.tabindex]="tab.active ? 0 : -1"
       (click)="select.emit(tab.id)"
       (keydown.enter)="select.emit(tab.id)"
       (keydown.space)="select.emit(tab.id)"
+      (keydown)="onTabKeydown($event, index)"
     >
       @if (tab.dirty) {
-        <span class="tab__dirty" title="Cambios sin guardar" aria-label="Cambios sin guardar"></span>
+        <span
+          class="tab__dirty"
+          title="Cambios sin guardar"
+          aria-label="Cambios sin guardar"
+        ></span>
       }
-      <span class="tab__title">{{ tab.title }}</span>
+      @if (connectionFor(tab); as connection) {
+        <app-engine-badge [engine]="connection.engine" />
+      }
+      <span class="tab__identity">
+        <span class="tab__title">{{ tab.title }}</span>
+        <span class="tab__context">
+          @if (connectionFor(tab); as connection) {
+            {{ connection.name }} · {{ connection.database }}
+          } @else {
+            Sin conexión asignada
+          }
+        </span>
+      </span>
       <button
         type="button"
         class="tab__close"
         [attr.aria-label]="'Cerrar ' + tab.title"
         (click)="onClose($event, tab.id)"
+        (keydown)="stopCloseKeydown($event)"
       >
         ×
       </button>
     </div>
   }
 
-  <button type="button" class="tabs__add" aria-label="Nueva consulta" (click)="create.emit()">+</button>
+  <button
+    type="button"
+    class="tabs__add"
+    title="Nueva consulta (Ctrl+T)"
+    aria-label="Nueva consulta"
+    (click)="create.emit()"
+  >
+    +
+  </button>
 </div>
 
 <div class="meta">{{ encoding() }}</div>
