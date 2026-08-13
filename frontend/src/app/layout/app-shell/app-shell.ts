@@ -14,10 +14,12 @@ import { ConnectionsSidebar } from '../../features/connections/connections-sideb
 import { EditorTabs } from '../../features/query-editor/editor-tabs/editor-tabs';
 import { EditorToolbar } from '../../features/query-editor/editor-toolbar/editor-toolbar';
 import { CursorPosition, SqlEditor } from '../../features/query-editor/sql-editor/sql-editor';
+import { ImportDialog } from '../../features/import/import-dialog/import-dialog';
 import { ResultsPanel } from '../../features/query-results/results-panel/results-panel';
 import {
   CellEdit,
   DatabaseEngine,
+  DatabaseObject,
   ExplorerNode,
   KnownColumn,
   SessionStatus,
@@ -61,6 +63,7 @@ const DISCONNECTED: SessionStatus = {
     EditorToolbar,
     SqlEditor,
     ResultsPanel,
+    ImportDialog,
     ResizeHandle,
   ],
   templateUrl: './app-shell.html',
@@ -80,6 +83,17 @@ export class AppShell {
 
   // --- Diálogo ---------------------------------------------------------------
   protected readonly dialogOpen = signal(false);
+
+  /** Tabla a la que se está importando, si el diálogo está abierto. */
+  protected readonly importTarget = signal<DatabaseObject | null>(null);
+
+  protected openImport(node: ExplorerNode): void {
+    this.importTarget.set(node.source);
+  }
+
+  protected closeImport(): void {
+    this.importTarget.set(null);
+  }
 
   // --- Estado del área de trabajo -------------------------------------------
   protected readonly connections = this._store.connections;

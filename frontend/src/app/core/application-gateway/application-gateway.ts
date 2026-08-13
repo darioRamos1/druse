@@ -39,6 +39,36 @@ export interface ConnectRequest {
   readonly password?: string;
 }
 
+/** Cómo leer el archivo que se importa. */
+export interface ImportOptions {
+  readonly hasHeaders: boolean;
+  readonly delimiter: string;
+  readonly encoding: string;
+  readonly nullText: string;
+}
+
+/** Qué columna del archivo va a qué columna de la tabla. */
+export interface ColumnMapping {
+  readonly source: string;
+  readonly target: string | null;
+}
+
+/** Un valor del archivo que no cabe en su columna. */
+export interface ImportProblem {
+  readonly row: number;
+  readonly column: string;
+  readonly message: string;
+}
+
+/** Lo que se sabe antes de escribir nada. */
+export interface ImportPreview {
+  readonly mappings: readonly ColumnMapping[];
+  readonly missingRequired: readonly string[];
+  readonly problems: readonly ImportProblem[];
+  readonly rowCount: number;
+  readonly statements: readonly string[];
+}
+
 /** Cambios de la cuadrícula tal y como viajan a la API. */
 export interface RowEditRequest {
   readonly sessionId: string;
@@ -148,6 +178,29 @@ export abstract class ApplicationGateway {
 
   /** Guarda los cambios. El servidor los aplica todos o ninguno. */
   abstract applyRowEdits(request: RowEditRequest): Observable<RowEditResult>;
+
+  // --- Importación ----------------------------------------------------------
+
+  /**
+   * Qué se insertaría y qué no cabe, sin tocar la tabla.
+   *
+   * El archivo viaja tal cual, en un formulario: codificarlo en base64 dentro de
+   * un JSON lo haría un tercio más grande sin ganar nada.
+   */
+  abstract previewImport(
+    sessionId: string,
+    table: DatabaseObject,
+    file: File,
+    options: ImportOptions,
+  ): Observable<ImportPreview>;
+
+  /** Inserta las filas del archivo. Todas o ninguna. */
+  abstract runImport(
+    sessionId: string,
+    table: DatabaseObject,
+    file: File,
+    options: ImportOptions,
+  ): Observable<RowEditResult>;
 
   // --- Conexiones guardadas -------------------------------------------------
 

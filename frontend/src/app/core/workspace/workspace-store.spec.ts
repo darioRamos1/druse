@@ -5,6 +5,7 @@ import { Observable, of, throwError } from 'rxjs';
 import {
   ApplicationGateway,
   ExecuteQueryRequest,
+  ImportPreview,
   RowEditRequest,
   RowEditResult,
   SaveConnectionRequest,
@@ -209,6 +210,26 @@ class FakeGateway implements Partial<ApplicationGateway> {
 
   /** Lo que se ha mandado a guardar, para comprobarlo. */
   rowEditRequests: RowEditRequest[] = [];
+
+  /** Importaciones pedidas: `false` es previsualizar, `true` es escribir. */
+  importCalls: boolean[] = [];
+  importPreviewResult: ImportPreview = {
+    mappings: [{ source: 'id', target: 'id' }],
+    missingRequired: [],
+    problems: [],
+    rowCount: 2,
+    statements: ['INSERT INTO public.users (id) VALUES (1)'],
+  };
+
+  previewImport(): Observable<ImportPreview> {
+    this.importCalls.push(false);
+    return of(this.importPreviewResult);
+  }
+
+  runImport(): Observable<RowEditResult> {
+    this.importCalls.push(true);
+    return of({ rowsAffected: 2, durationMs: 4, statements: [] });
+  }
 
   previewRowEdits(request: RowEditRequest): Observable<readonly string[]> {
     this.rowEditRequests.push(request);
@@ -558,6 +579,47 @@ describe('WorkspaceStore', () => {
       // Lo que hay en la cuadrícula ya es otra cosa; conservarlos sería
       // guardarlos luego contra la tabla equivocada.
       expect(store.edits()).toEqual([]);
+    });
+  });
+
+  describe('importación', () => {
+    const archivo = new File(['id\n1\n'], 'datos.csv', { type: 'text/csv' });
+    const opciones = { hasHeaders: true, delimiter: ',', encoding: 'utf8bom', nullText: '' };
+    const tabla = tables[0];
+
+    it('previsualizar no escribe', async () => {
+      await store.connect(form);
+      await store.previewImport(tabla, archivo, opciones);
+
+      expect(gateway.importCalls).toEqual([false]);
+      expect(store.importPreview()?.rowCount).toBe(2);
+    });
+
+    it('importar avisa de cuántas filas entraron', async () => {
+      await store.connect(form);
+      await store.runImport(tabla, archivo, opciones);
+
+      expect(gateway.importCalls).toEqual([true]);
+      expect(store.notice()).toContain('2 filas importadas');
+    });
+
+    it('sin conexión no se importa nada', async () => {
+      await store.runImport(tabla, archivo, opciones);
+
+      // El archivo ni se llega a mandar: no hay a dónde.
+      expect(gateway.importCalls).toEqual([]);
+      expect(store.notice()).toBe('No hay ninguna conexión abierta.');
+    });
+
+    it('cerrar el diálogo olvida lo previsualizado', async () => {
+      await store.connect(form);
+      await store.previewImport(tabla, archivo, opciones);
+
+      store.clearImportPreview();
+
+      // Si quedara, al reabrir el diálogo con otro archivo se estaría mirando
+      // el resumen del anterior.
+      expect(store.importPreview()).toBeNull();
     });
   });
 

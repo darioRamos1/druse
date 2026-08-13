@@ -14,6 +14,7 @@
     (disconnect)="disconnect($event)"
     (forget)="forget($event)"
     (openNode)="openNode($event)"
+    (importInto)="openImport($event)"
     (copied)="onCopied($event)"
     (copyFailed)="onCopyFailed()"
   />
@@ -132,4 +133,8 @@
 
 @if (dialogOpen()) {
   <app-connection-dialog (closed)="closeDialog()" />
+}
+
+@if (importTarget(); as tabla) {
+  <app-import-dialog [table]="tabla" (closed)="closeImport()" />
 }

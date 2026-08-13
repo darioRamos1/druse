@@ -142,6 +142,17 @@
               </span>
             }
 
+            @if (node.kind === 'table') {
+              <!-- Solo en tablas: en una vista no se puede insertar. -->
+              <span
+                class="tool"
+                title="Importar un archivo a esta tabla"
+                (click)="act($event, () => importInto.emit(node))"
+              >
+                <app-icon name="export" [size]="11" />
+              </span>
+            }
+
             @if (node.expandable && node.expanded && !node.loading) {
               <span
                 class="tool"

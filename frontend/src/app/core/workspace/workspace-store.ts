@@ -6,6 +6,8 @@ import {
   ApplicationGateway,
   ConnectRequest,
   ExportFormat,
+  ImportOptions,
+  ImportPreview,
   QueryRejected,
   RowEditRequest,
 } from '../application-gateway/application-gateway';
@@ -571,6 +573,94 @@ export class WorkspaceStore {
     });
 
     return { sessionId, table: editable.table, confirmed, edits: filas };
+  }
+
+
+  // --- Importación -----------------------------------------------------------
+
+  private readonly _importPreview = signal<ImportPreview | null>(null);
+  readonly importPreview = this._importPreview.asReadonly();
+
+  private readonly _importing = signal(false);
+  readonly importing = this._importing.asReadonly();
+
+  clearImportPreview(): void {
+    this._importPreview.set(null);
+  }
+
+  /** Pide qué se insertaría, sin escribir nada. */
+  async previewImport(
+    table: DatabaseObject,
+    file: File,
+    options: ImportOptions,
+  ): Promise<void> {
+    const sessionId = this.activeConnection()?.sessionId;
+
+    if (!sessionId) {
+      this._notice.set('No hay ninguna conexión abierta.');
+      return;
+    }
+
+    this._importing.set(true);
+
+    try {
+      this._importPreview.set(
+        await firstValueFrom(this._gateway.previewImport(sessionId, table, file, options)),
+      );
+    } catch (error) {
+      this._importPreview.set(null);
+      this._notice.set(describeError(error));
+    } finally {
+      this._importing.set(false);
+    }
+  }
+
+  /** Importa de verdad. Devuelve si se pudo. */
+  async runImport(
+    table: DatabaseObject,
+    file: File,
+    options: ImportOptions,
+  ): Promise<boolean> {
+    const sessionId = this.activeConnection()?.sessionId;
+
+    if (!sessionId) {
+      this._notice.set('No hay ninguna conexión abierta.');
+      return false;
+    }
+
+    this._importing.set(true);
+
+    try {
+      const result = await firstValueFrom(
+        this._gateway.runImport(sessionId, table, file, options),
+      );
+
+      this._importPreview.set(null);
+      this._notice.set(
+        `${result.rowsAffected} ${result.rowsAffected === 1 ? 'fila importada' : 'filas importadas'} en ${table.name}.`,
+      );
+
+      // El recuento del árbol se queda viejo en cuanto se insertan filas.
+      void this.refreshRelationNode(table);
+
+      return true;
+    } catch (error) {
+      this._notice.set(describeError(error));
+      return false;
+    } finally {
+      this._importing.set(false);
+    }
+  }
+
+  /** Vuelve a pedir el nodo de una tabla, para que su recuento no mienta. */
+  private async refreshRelationNode(table: DatabaseObject): Promise<void> {
+    const entry = this.findRelationEntry(table.schema ?? null, table.name);
+
+    if (entry?.children !== null && entry !== null) {
+      entry.children = null;
+      await this.loadChildren(entry, true);
+      this.refreshTree();
+    }
   }
 
   // --- Conexiones ------------------------------------------------------------

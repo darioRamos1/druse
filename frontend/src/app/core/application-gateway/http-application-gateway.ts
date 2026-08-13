@@ -20,6 +20,8 @@ import {
   ConnectRequest,
   ExecuteQueryRequest,
   ExportRequest,
+  ImportOptions,
+  ImportPreview,
   RowEditRequest,
   RowEditResult,
   HealthStatus,
@@ -122,6 +124,24 @@ export class HttpApplicationGateway extends ApplicationGateway {
 
   override applyRowEdits(request: RowEditRequest): Observable<RowEditResult> {
     return this._http.post<RowEditResult>('/api/rows', request);
+  }
+
+  override previewImport(
+    sessionId: string,
+    table: DatabaseObject,
+    file: File,
+    options: ImportOptions,
+  ): Observable<ImportPreview> {
+    return this._http.post<ImportPreview>('/api/imports/preview', form(sessionId, table, file, options));
+  }
+
+  override runImport(
+    sessionId: string,
+    table: DatabaseObject,
+    file: File,
+    options: ImportOptions,
+  ): Observable<RowEditResult> {
+    return this._http.post<RowEditResult>('/api/imports', form(sessionId, table, file, options));
   }
 
   override getSavedConnections(): Observable<readonly SavedConnection[]> {
@@ -247,4 +267,29 @@ function classify(dataType: string): ResultColumn['kind'] {
   }
 
   return 'text';
+}
+
+/**
+ * Arma el formulario de una importación.
+ *
+ * `FormData` en lugar de JSON porque lleva un archivo dentro: el navegador pone
+ * el `Content-Type` con su frontera y Angular no toca el cuerpo.
+ */
+function form(
+  sessionId: string,
+  table: DatabaseObject,
+  file: File,
+  options: ImportOptions,
+): FormData {
+  const data = new FormData();
+
+  data.append('sessionId', sessionId);
+  data.append('table', JSON.stringify(table));
+  data.append('file', file, file.name);
+  data.append('hasHeaders', String(options.hasHeaders));
+  data.append('delimiter', options.delimiter);
+  data.append('encoding', options.encoding);
+  data.append('nullText', options.nullText);
+
+  return data;
 }
