@@ -85,6 +85,18 @@ public interface IProviderFixture
     /// <summary>Crea una tabla con clave primaria, columna obligatoria, opcional y con valor por defecto.</summary>
     string CreateTableWithColumns(string name);
 
+    /// <summary>Crea una vista que devuelve una columna llamada `valor`.</summary>
+    string CreateView(string name);
+
+    /// <summary>Elimina la vista si existe.</summary>
+    string DropView(string name);
+
+    /// <summary>Crea un procedimiento cuyo cuerpo contiene `marca_procedimiento`.</summary>
+    string CreateProcedure(string name);
+
+    /// <summary>Elimina el procedimiento si existe.</summary>
+    string DropProcedure(string name);
+
     /// <summary>
     /// Inserta tres filas con nombre en la tabla de <see cref="CreateTableWithColumns"/>,
     /// con los identificadores 1, 2 y 3 y los nombres Ana, Bea y Cris.

@@ -106,6 +106,12 @@ export class HttpApplicationGateway extends ApplicationGateway {
     return this._http.post<DatabaseColumn[]>(`/api/sessions/${sessionId}/metadata/columns`, table);
   }
 
+  override getDefinition(sessionId: string, databaseObject: DatabaseObject): Observable<string> {
+    return this._http
+      .post<{ sql: string }>(`/api/sessions/${sessionId}/metadata/definition`, databaseObject)
+      .pipe(map((response) => response.sql));
+  }
+
   override executeQuery(request: ExecuteQueryRequest): Observable<QueryResult> {
     return this._http
       .post<QueryResultDto>('/api/queries', request)
@@ -132,7 +138,10 @@ export class HttpApplicationGateway extends ApplicationGateway {
     file: File,
     options: ImportOptions,
   ): Observable<ImportPreview> {
-    return this._http.post<ImportPreview>('/api/imports/preview', form(sessionId, table, file, options));
+    return this._http.post<ImportPreview>(
+      '/api/imports/preview',
+      form(sessionId, table, file, options),
+    );
   }
 
   override runImport(

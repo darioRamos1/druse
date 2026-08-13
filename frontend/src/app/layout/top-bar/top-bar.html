@@ -17,11 +17,16 @@
 </div>
 
 <div class="search-slot">
-  <div class="search">
+  <button
+    type="button"
+    class="search"
+    aria-label="Abrir búsqueda global"
+    (click)="openPalette.emit()"
+  >
     <app-icon name="search" [size]="13" />
     <span class="search__placeholder">Buscar tablas, consultas, conexiones…</span>
-    <kbd class="search__shortcut">⌘K</kbd>
-  </div>
+    <kbd class="search__shortcut">Ctrl K</kbd>
+  </button>
 </div>
 
 <div class="trailing">
@@ -29,7 +34,12 @@
     <button type="button" class="segmented__item" aria-label="Tema claro">
       <app-icon name="sun" [size]="13" />
     </button>
-    <button type="button" class="segmented__item is-active" aria-label="Tema oscuro" aria-pressed="true">
+    <button
+      type="button"
+      class="segmented__item is-active"
+      aria-label="Tema oscuro"
+      aria-pressed="true"
+    >
       <app-icon name="moon" [size]="13" />
     </button>
   </div>

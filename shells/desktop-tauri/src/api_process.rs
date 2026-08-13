@@ -10,10 +10,21 @@ use std::process::{Child, Command};
 use std::thread;
 use std::time::{Duration, Instant};
 
+#[cfg(target_os = "windows")]
+use std::os::windows::process::CommandExt;
+
 use serde::Deserialize;
 
 /// Nombre del archivo que la API escribe con su puerto y su token.
 const ENDPOINT_FILE: &str = "endpoint.json";
+
+/// `CREATE_NO_WINDOW`.
+///
+/// La API es una aplicación de consola. Sin esta bandera, Windows le abre su
+/// propia ventana negra con los registros de ASP.NET **delante de Druse**: el
+/// usuario ve un terminal que no ha pedido y que tapa la aplicación.
+#[cfg(target_os = "windows")]
+const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 
 /// Cuánto se espera a que la API arranque antes de darse por vencido.
 const STARTUP_TIMEOUT: Duration = Duration::from_secs(30);
@@ -47,9 +58,15 @@ impl ApiProcess {
         // ejecución que terminó mal, leerlo daría un puerto y un token muertos.
         let _ = fs::remove_file(&endpoint_path);
 
-        let child = Command::new(executable)
+        let mut command = Command::new(executable);
+        command
             .env("LocalApi__Port", "0")
-            .env("ASPNETCORE_ENVIRONMENT", "Production")
+            .env("ASPNETCORE_ENVIRONMENT", "Production");
+
+        #[cfg(target_os = "windows")]
+        command.creation_flags(CREATE_NO_WINDOW);
+
+        let child = command
             .spawn()
             .map_err(|error| format!("No se pudo arrancar la API local: {error}"))?;
 

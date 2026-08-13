@@ -29,6 +29,7 @@ interface CellPosition {
 export class ResultsGrid {
   readonly resultSet = input.required<ResultSet>();
   readonly showFilters = input(false);
+  readonly compact = input(false);
 
   /**
    * Se puede editar aquí.
@@ -175,7 +176,11 @@ export class ResultsGrid {
 
   /** Copia los nombres de las columnas. */
   protected async copyHeaders(): Promise<void> {
-    await this.copy(this.resultSet().columns.map((column) => column.name).join('\t'));
+    await this.copy(
+      this.resultSet()
+        .columns.map((column) => column.name)
+        .join('\t'),
+    );
   }
 
   private async copy(text: string): Promise<void> {

@@ -1,4 +1,13 @@
-import { ChangeDetectionStrategy, Component, computed, inject, input, output, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  OnInit,
+  computed,
+  inject,
+  input,
+  output,
+  signal,
+} from '@angular/core';
 
 import { WorkspaceStore } from '../../../core/workspace/workspace-store';
 import { DatabaseEngine, DatabaseObject, KnownColumn } from '../../../shared/models/workspace';
@@ -6,6 +15,7 @@ import {
   FilterOperator,
   QueryFilter,
   buildCreateTable,
+  buildDropTable,
   buildInsert,
   buildSelect,
   buildUpdate,
@@ -44,11 +54,12 @@ const OPERATORS: readonly FilterOperator[] = [
   templateUrl: './query-builder.html',
   styleUrl: './query-builder.scss',
 })
-export class QueryBuilder {
+export class QueryBuilder implements OnInit {
   private readonly _store = inject(WorkspaceStore);
 
   readonly table = input.required<DatabaseObject>();
   readonly engine = input.required<DatabaseEngine>();
+  readonly connectionId = input.required<string>();
 
   readonly closed = output<void>();
   readonly insert = output<string>();
@@ -57,6 +68,8 @@ export class QueryBuilder {
 
   /** Columnas de la tabla, según lo que el catálogo ya sabe. */
   protected readonly columns = signal<readonly KnownColumn[]>([]);
+  protected readonly loading = signal(true);
+  protected readonly templatesReady = computed(() => !this.loading() && this.columns().length > 0);
 
   protected readonly chosen = signal<readonly string[]>([]);
   protected readonly filters = signal<readonly QueryFilter[]>([]);
@@ -64,7 +77,7 @@ export class QueryBuilder {
   protected readonly descending = signal(false);
   protected readonly limit = signal<number | null>(100);
 
-  constructor() {
+  ngOnInit(): void {
     // Las columnas hacen falta para todo lo de aquí; se piden una vez.
     void this.load();
   }
@@ -72,7 +85,18 @@ export class QueryBuilder {
   private async load(): Promise<void> {
     const table = this.table();
 
-    this.columns.set(await this._store.ensureColumnsAsync(table.schema ?? null, table.name));
+    try {
+      this.columns.set(
+        await this._store.ensureColumnsAsync(
+          table.schema ?? null,
+          table.name,
+          this.connectionId(),
+          table.database,
+        ),
+      );
+    } finally {
+      this.loading.set(false);
+    }
   }
 
   protected readonly sql = computed(() =>
@@ -131,19 +155,19 @@ export class QueryBuilder {
   }
 
   /** Las plantillas van directas al editor: no hay nada que componer en ellas. */
-  protected insertTemplate(kind: 'insert' | 'update' | 'create'): void {
+  protected insertTemplate(kind: 'insert' | 'update' | 'create' | 'drop'): void {
     const spec = {
       schema: this.table().schema,
       table: this.table().name,
       columns: this.columns(),
     };
 
-    const sql =
-      kind === 'insert'
-        ? buildInsert(this.engine(), spec)
-        : kind === 'update'
-          ? buildUpdate(this.engine(), spec)
-          : buildCreateTable(this.engine(), spec);
+    const sql = {
+      insert: () => buildInsert(this.engine(), spec),
+      update: () => buildUpdate(this.engine(), spec),
+      create: () => buildCreateTable(this.engine(), spec),
+      drop: () => buildDropTable(this.engine(), spec),
+    }[kind]();
 
     this.insert.emit(sql);
     this.closed.emit();

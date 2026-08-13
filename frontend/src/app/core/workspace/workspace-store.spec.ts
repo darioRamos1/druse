@@ -113,6 +113,14 @@ class FakeGateway implements Partial<ApplicationGateway> {
   savedConnectionMissingPassword = false;
   executeResult: Observable<QueryResult> = of(successfulQuery());
   savedConnections: SavedConnection[] = [];
+  columnDataTypes: string[] = [];
+  sessionIds: string[] = [];
+  definition = 'CREATE VIEW "public"."active_users" AS SELECT 1;\n';
+  definitionRequest: { sessionId: string; databaseObject: DatabaseObject } | null = null;
+
+  exportQuery(): Observable<Blob> {
+    return of(new Blob());
+  }
 
   getSavedConnections(): Observable<readonly SavedConnection[]> {
     return of(this.savedConnections);
@@ -173,7 +181,7 @@ class FakeGateway implements Partial<ApplicationGateway> {
               error: { message: 'La autenticación falló.' },
             }),
         )
-      : of(session);
+      : of({ ...session, sessionId: this.sessionIds.shift() ?? session.sessionId });
   }
 
   closeSession(sessionId: string): Observable<void> {
@@ -247,10 +255,23 @@ class FakeGateway implements Partial<ApplicationGateway> {
    * viven el tooltip, los avisos del editor y la clave primaria de la edición.
    */
   getColumns(): Observable<DatabaseColumn[]> {
+    const dataType = this.columnDataTypes.shift() ?? 'varchar(200)';
+
     return of([
       { name: 'id', dataType: 'int8', isNullable: false, isPrimaryKey: true, ordinal: 1 },
-      { name: 'email', dataType: 'text', isNullable: true, isPrimaryKey: false, ordinal: 2 },
+      {
+        name: 'email',
+        dataType,
+        isNullable: true,
+        isPrimaryKey: false,
+        ordinal: 2,
+      },
     ]);
+  }
+
+  getDefinition(sessionId: string, databaseObject: DatabaseObject): Observable<string> {
+    this.definitionRequest = { sessionId, databaseObject };
+    return of(this.definition);
   }
 
   executeQuery(request: ExecuteQueryRequest): Observable<QueryResult> {
@@ -307,6 +328,22 @@ describe('WorkspaceStore', () => {
       expect(status?.connected).toBe(true);
       expect(status?.engineVersion).toBe('PostgreSQL 18');
       expect(status?.database).toBe('druse_test');
+    });
+
+    it('liga la pestaña inicial a la primera conexión activada', async () => {
+      await store.connect(form);
+
+      expect(store.activeTab()?.connectionId).toBe(store.connections()[0].id);
+    });
+
+    it('seleccionar una conexión la activa sin plegar su árbol', async () => {
+      await store.connect(form);
+      const connection = store.connections()[0];
+
+      store.selectConnection(connection.id);
+
+      expect(store.activeConnection()?.id).toBe(connection.id);
+      expect(store.connections()[0].expanded).toBe(true);
     });
 
     it('marca la conexión con error y explica el motivo', async () => {
@@ -475,6 +512,7 @@ describe('WorkspaceStore', () => {
       // Traer los hijos y mostrarlos son cosas distintas: el usuario no ha
       // pedido ver nada.
       expect(store.explorerNodes().map((node) => node.label)).toEqual(['druse_test']);
+      expect(store.searchableRelations().map((node) => node.label)).toContain('users');
     });
 
     it('cargar las columnas de una tabla no la despliega en el explorador', async () => {
@@ -490,6 +528,58 @@ describe('WorkspaceStore', () => {
 
       // Traer las columnas no es lo mismo que desplegar el nodo.
       expect(store.explorerNodes().length).toBe(1);
+    });
+
+    it('conserva el tipo completo al convertir una columna en nodo del explorador', async () => {
+      await store.connect(form);
+      await esperarA(() => store.schemaIndex().relations.length > 0);
+
+      for (const label of ['druse_test', 'public', 'tables', 'users']) {
+        const node = store.explorerNodes().find((candidate) => candidate.label === label);
+        await store.toggleNode(node!.id);
+      }
+
+      const email = store.explorerNodes().find((node) => node.label === 'email');
+
+      expect(email?.kind).toBe('column');
+      expect(email?.hint).toBe('varchar(200)');
+      expect(email?.source.dataType).toBe('varchar(200)');
+    });
+
+    it('no comparte columnas entre conexiones con la misma tabla', async () => {
+      await store.connect(form);
+      const postgresqlId = store.connections()[0].id;
+
+      await store.connect({ ...form, name: 'MySQL', engine: 'mysql' });
+      const mysqlId = store.connections().find((connection) => connection.engine === 'mysql')!.id;
+
+      const abrir = async (connectionId: string, label: string) => {
+        const node = store
+          .explorerNodes()
+          .find(
+            (candidate) => candidate.connectionId === connectionId && candidate.label === label,
+          );
+        await store.toggleNode(node!.id);
+      };
+
+      for (const connectionId of [postgresqlId, mysqlId]) {
+        await abrir(connectionId, 'druse_test');
+        await abrir(connectionId, 'public');
+        await abrir(connectionId, 'tables');
+      }
+
+      gateway.columnDataTypes = ['varchar(200)', 'varchar(255)'];
+
+      const postgresql = await store.ensureColumnsAsync(
+        'public',
+        'users',
+        postgresqlId,
+        'druse_test',
+      );
+      const mysql = await store.ensureColumnsAsync('public', 'users', mysqlId, 'druse_test');
+
+      expect(postgresql.find((column) => column.name === 'email')?.dataType).toBe('varchar(200)');
+      expect(mysql.find((column) => column.name === 'email')?.dataType).toBe('varchar(255)');
     });
   });
 
@@ -509,7 +599,7 @@ describe('WorkspaceStore', () => {
       await abrir('tables');
 
       const tabla = store.explorerNodes().find((node) => node.label === 'users');
-      store.openSelectFor(tabla!);
+      store.openSelectFor(tabla!, 'SELECT * FROM public.users;');
 
       // Editable exige las dos cosas: saber la clave primaria de la tabla y
       // tener un resultado en pantalla donde esa clave aparezca.
@@ -543,9 +633,7 @@ describe('WorkspaceStore', () => {
       // La clave sale de la fila que el usuario tiene delante: es lo que hace
       // que el UPDATE apunte a esa fila y no a otra.
       expect(enviado.edits[0].key).toEqual([{ column: 'id', value: '1' }]);
-      expect(enviado.edits[0].changes).toEqual([
-        { column: 'email', value: 'nuevo@ejemplo.test' },
-      ]);
+      expect(enviado.edits[0].changes).toEqual([{ column: 'email', value: 'nuevo@ejemplo.test' }]);
       // Previsualizar nunca confirma.
       expect(enviado.confirmed).toBe(false);
     });
@@ -579,6 +667,18 @@ describe('WorkspaceStore', () => {
       // Lo que hay en la cuadrícula ya es otra cosa; conservarlos sería
       // guardarlos luego contra la tabla equivocada.
       expect(store.edits()).toEqual([]);
+      expect(store.result()).toBeNull();
+    });
+
+    it('modificar el SQL invalida el origen editable de la pestaña', async () => {
+      await abrirTabla();
+
+      expect(store.editableTable()).not.toBeNull();
+
+      store.updateSql('SELECT * FROM public.otra_tabla');
+
+      expect(store.activeTab()?.sourceTable).toBeUndefined();
+      expect(store.editableTable()).toBeNull();
     });
   });
 
@@ -735,6 +835,15 @@ describe('WorkspaceStore', () => {
       expect(store.activeTab()?.sql).toBe('SELECT 1;\nSELECT 2;');
     });
 
+    it('conserva los espacios del SQL enviado para ubicar errores', async () => {
+      await store.connect(form);
+      store.updateSql('\n  SELECT * FROM');
+
+      await store.execute();
+
+      expect(gateway.executeCalls[0].sql).toBe('\n  SELECT * FROM');
+    });
+
     it('guarda la duración de la última ejecución', async () => {
       await store.connect(form);
       store.updateSql('SELECT 1');
@@ -790,9 +899,121 @@ describe('WorkspaceStore', () => {
       await store.connect(form);
       store.updateSql('DROP TABLE users');
 
+      gateway.executeResult = throwError(
+        () =>
+          new HttpErrorResponse({
+            status: 409,
+            error: {
+              reason: 'unconfirmeddestructive',
+              message: 'La instrucción puede destruir datos.',
+              risks: [{ kind: 'drop', description: 'Elimina una tabla.' }],
+            },
+          }),
+      );
+      await store.execute();
+
+      gateway.executeResult = of(successfulQuery());
+
       await store.confirmAndExecute();
 
-      expect(gateway.executeCalls[0].confirmDestructive).toBe(true);
+      expect(gateway.executeCalls.at(-1)?.confirmDestructive).toBe(true);
+      expect(gateway.executeCalls.at(-1)?.sql).toBe('DROP TABLE users');
+      expect(store.rejection()).toBeNull();
+    });
+
+    it('un rechazo deja de poder confirmarse al cambiar de pestaña', async () => {
+      await store.connect(form);
+      gateway.executeResult = throwError(
+        () =>
+          new HttpErrorResponse({
+            status: 409,
+            error: {
+              reason: 'unconfirmeddestructive',
+              message: 'La instrucción puede destruir datos.',
+              risks: [{ kind: 'drop', description: 'Elimina una tabla.' }],
+            },
+          }),
+      );
+      store.updateSql('DROP TABLE users');
+      await store.execute();
+
+      store.createTab('DROP TABLE otra');
+      await store.confirmAndExecute();
+
+      expect(gateway.executeCalls).toHaveLength(1);
+      expect(store.rejection()).toBeNull();
+    });
+
+    it('un rechazo tardío se descarta si el SQL cambió durante la ejecución', async () => {
+      await store.connect(form);
+
+      let reject!: (error: unknown) => void;
+      gateway.executeResult = new Observable<QueryResult>((subscriber) => {
+        reject = (error) => subscriber.error(error);
+      });
+
+      store.updateSql('DROP TABLE users');
+      const execution = store.execute();
+      store.updateSql('SELECT 1');
+      reject(
+        new HttpErrorResponse({
+          status: 409,
+          error: {
+            reason: 'unconfirmeddestructive',
+            message: 'La instrucción puede destruir datos.',
+            risks: [{ kind: 'drop', description: 'Elimina una tabla.' }],
+          },
+        }),
+      );
+      await execution;
+
+      expect(store.rejection()).toBeNull();
+    });
+
+    it('un error tardío no aparece al cambiar de pestaña', async () => {
+      await store.connect(form);
+
+      let reject!: (error: unknown) => void;
+      gateway.executeResult = new Observable<QueryResult>((subscriber) => {
+        reject = (error) => subscriber.error(error);
+      });
+
+      store.updateSql('SELECT rota');
+      const execution = store.execute();
+      store.createTab('SELECT 1');
+      reject(new HttpErrorResponse({ status: 500, error: { message: 'error de la anterior' } }));
+      await execution;
+
+      expect(store.notice()).not.toBe('error de la anterior');
+    });
+
+    it('un rechazo tardío de exportación se descarta si el SQL cambió', async () => {
+      await store.connect(form);
+
+      let reject!: (error: unknown) => void;
+      vi.spyOn(gateway, 'exportQuery').mockReturnValue(
+        new Observable<Blob>((subscriber) => {
+          reject = (error) => subscriber.error(error);
+        }),
+      );
+
+      store.updateSql('DROP TABLE users');
+      const exporting = store.export('csv');
+      store.updateSql('SELECT 1');
+      reject(
+        new HttpErrorResponse({
+          status: 409,
+          error: new Blob([
+            JSON.stringify({
+              reason: 'unconfirmeddestructive',
+              message: 'La instrucción puede destruir datos.',
+              risks: [{ kind: 'drop', description: 'Elimina una tabla.' }],
+            }),
+          ]),
+        }),
+      );
+      await exporting;
+
       expect(store.rejection()).toBeNull();
     });
   });
@@ -802,41 +1023,172 @@ describe('WorkspaceStore', () => {
       await store.connect(form);
       await store.toggleNode(store.explorerNodes()[0].id);
 
-      store.openSelectFor({
-        id: 'x',
-        label: 'users',
-        kind: 'table',
+      store.openSelectFor(
+        {
+          id: 'x',
+          label: 'users',
+          kind: 'table',
+          depth: 5,
+          expandable: false,
+          expanded: false,
+          loading: false,
+          connectionId: store.connections()[0].id,
+          source: {
+            id: 'table:public.users',
+            name: 'users',
+            kind: 'table',
+            schema: 'public',
+            hasChildren: true,
+          },
+        },
+        'SELECT *\nFROM "public"."users"\nLIMIT 100;\n',
+      );
+
+      expect(store.activeTab()?.sql).toContain('FROM "public"."users"');
+      expect(store.activeTab()?.connectionId).toBe(store.connections()[0].id);
+    });
+
+    it('ejecuta una pestaña del explorador en la conexión que la originó', async () => {
+      gateway.sessionIds = ['postgresql-session', 'sqlserver-session'];
+      await store.connect(form);
+      await store.connect({ ...form, name: 'SQL Server', engine: 'sqlserver' });
+
+      const sqlServer = store
+        .connections()
+        .find((connection) => connection.engine === 'sqlserver')!;
+
+      store.openSelectFor(
+        {
+          id: 'sqlserver-users',
+          label: 'users',
+          kind: 'table',
+          depth: 5,
+          expandable: true,
+          expanded: false,
+          loading: false,
+          connectionId: sqlServer.id,
+          source: {
+            id: 'table:public.users',
+            name: 'users',
+            kind: 'table',
+            database: 'druse_test',
+            schema: 'public',
+            hasChildren: true,
+          },
+        },
+        'SELECT TOP 100 * FROM [public].[users];',
+      );
+
+      await store.execute();
+
+      expect(gateway.executeCalls.at(-1)?.sessionId).toBe('sqlserver-session');
+      expect(store.activeConnection()?.engine).toBe('sqlserver');
+    });
+
+    it('una pestaña nueva queda ligada a la conexión activa', async () => {
+      await store.connect(form);
+
+      store.createTab('SELECT 1');
+
+      expect(store.activeTab()?.connectionId).toBe(store.connections()[0].id);
+      expect(store.session()?.database).toBe('druse_test');
+    });
+
+    it('una pestaña nueva hereda la conexión de la pestaña visible', async () => {
+      gateway.sessionIds = ['postgresql-session', 'sqlserver-session'];
+      await store.connect(form);
+      const postgresqlId = store.connections()[0].id;
+      await store.connect({ ...form, name: 'SQL Server', engine: 'sqlserver' });
+
+      store.selectTab('q1');
+      expect(store.activeTab()?.connectionId).toBe(postgresqlId);
+
+      store.createTab();
+
+      expect(store.activeTab()?.connectionId).toBe(postgresqlId);
+    });
+
+    it('abre el DDL de una vista desde la sesión de su nodo', async () => {
+      gateway.sessionIds = ['postgresql-session', 'sqlserver-session'];
+      await store.connect(form);
+      await store.connect({ ...form, name: 'SQL Server', engine: 'sqlserver' });
+
+      const postgresql = store
+        .connections()
+        .find((connection) => connection.engine === 'postgresql')!;
+
+      await store.openDefinition({
+        id: 'active-users',
+        label: 'active_users',
+        kind: 'view',
         depth: 5,
-        expandable: false,
+        expandable: true,
         expanded: false,
         loading: false,
-        connectionId: store.connections()[0].id,
+        connectionId: postgresql.id,
         source: {
-          id: 'table:public.users',
-          name: 'users',
-          kind: 'table',
+          id: 'View:public.active_users',
+          name: 'active_users',
+          kind: 'view',
+          database: 'druse_test',
           schema: 'public',
           hasChildren: true,
         },
       });
 
-      expect(store.activeTab()?.sql).toContain('FROM public.users');
+      expect(gateway.definitionRequest?.sessionId).toBe('postgresql-session');
+      expect(store.activeTab()?.sql).toContain('CREATE VIEW');
+      expect(store.activeTab()?.connectionId).toBe(postgresql.id);
+      expect(store.activeTab()?.sourceTable).toBeUndefined();
+    });
+
+    it('abre el DDL de un procedimiento desde su conexión', async () => {
+      await store.connect(form);
+      const connectionId = store.connections()[0].id;
+      gateway.definition = 'CREATE PROCEDURE public.recalcular() LANGUAGE SQL AS $$ SELECT 1 $$;\n';
+      const procedure: DatabaseObject = {
+        id: 'Procedure:oid:42',
+        name: 'recalcular()',
+        kind: 'procedure',
+        database: 'druse_test',
+        schema: 'public',
+        hasChildren: false,
+      };
+
+      await store.openDefinition({
+        id: `${connectionId}|${procedure.id}`,
+        label: procedure.name,
+        kind: 'procedure',
+        depth: 4,
+        expandable: false,
+        expanded: false,
+        loading: false,
+        source: procedure,
+        connectionId,
+      });
+
+      expect(gateway.definitionRequest?.databaseObject).toEqual(procedure);
+      expect(store.activeTab()?.sql).toContain('CREATE PROCEDURE');
+      expect(store.activeTab()?.title).toBe('recalcular() · DDL');
     });
 
     it('no abre nada desde una carpeta', () => {
       const before = store.tabs().length;
 
-      store.openSelectFor({
-        id: 'f',
-        label: 'Tables',
-        kind: 'folder',
-        depth: 4,
-        expandable: true,
-        expanded: true,
-        loading: false,
-        connectionId: 'c',
-        source: { id: 'folder', name: 'Tables', kind: 'folder', hasChildren: true },
-      });
+      store.openSelectFor(
+        {
+          id: 'f',
+          label: 'Tables',
+          kind: 'folder',
+          depth: 4,
+          expandable: true,
+          expanded: true,
+          loading: false,
+          connectionId: 'c',
+          source: { id: 'folder', name: 'Tables', kind: 'folder', hasChildren: true },
+        },
+        'SELECT 1;',
+      );
 
       expect(store.tabs().length).toBe(before);
     });

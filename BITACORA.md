@@ -10,18 +10,18 @@
 
 | Campo | Valor |
 | --- | --- |
-| Última sesión | **011** — 2026-08-12 |
-| Fase activa | **Ninguna: las ocho fases están cerradas.** Queda validar el MVP en otro equipo |
+| Última sesión | **012** — 2026-08-13 |
+| Fase activa | **Mejora posterior al MVP completada:** implementación y validación cerradas |
 | Fases 0–6 | ✅ Cerradas. |
 | Fase 7 | 🟡 **10/12.** Hay instalador y funciona; faltan dos comprobaciones que exigen otro equipo. |
 | Fase 8 | ✅ **7/7.** Tres motores sobre el mismo contrato y primera beta preparada. |
 | ¿Compila el backend? | Sí — 0 advertencias, 0 errores |
 | ¿Compila el envoltorio? | Sí |
-| ¿Pasan las pruebas? | Sí — **285 en backend** y **137 en frontend** |
+| ¿Pasan las pruebas? | Sí — **295 en backend** y **176 en frontend** |
 | ¿Hay aplicación de escritorio? | **Sí.** Instalador NSIS, MSI y ZIP portable |
-| Motores | **PostgreSQL, SQL Server y MySQL/MariaDB**, con las **mismas 24 pruebas contractuales** cada uno |
+| Motores | **PostgreSQL, SQL Server y MySQL/MariaDB**, con las **mismas 26 pruebas contractuales** cada uno |
 | Bloqueantes | Ninguno |
-| Git | `main`, con la Fase 8 ya fusionada (`dd9244b`). Sin remoto configurado. |
+| Git | `fix/empaquetado-escritorio`, con el incremento del explorador y composición SQL completado. Sin remoto configurado. |
 
 ### Qué toca retomar en la próxima sesión
 
@@ -29,8 +29,8 @@
    - instalar, actualizar y desinstalar de verdad, para validar el ciclo completo;
    - arrancar en una máquina sin .NET ni Node, que es el criterio que demuestra que el paquete se basta solo.
 2. Artefactos de Linux y macOS: el script acepta cualquier RID, pero generarlos exige compilar en cada plataforma. Es trabajo de integración continua.
-3. **Probar la edición de filas a mano**: editar una celda, ver el SQL y confirmar. Es lo único de lo entregado que no se ha recorrido en el navegador.
-4. **Las tres que pidió el usuario están entregadas** (plan §15): edición de filas, importar CSV/Excel y ayuda para componer consultas. Lo que falta de ellas es **usarlas**: ni la edición ni la importación se han recorrido clic a clic en el navegador.
+3. **Probar la edición de filas y la importación a mano**, sobre una tabla de prueba.
+4. **Recoger los registros de la API en un archivo.** Al ocultar su consola (D-26) se perdió el único sitio donde se veían. Mientras no haya que diagnosticar en campo no corre prisa, pero es lo primero que hará falta el día que algo falle en el equipo de otro.
 
 **El visto bueno visual ya está dado** (sesión 011, con la extensión de Chrome por fin conectada): la pantalla reproduce el mockup. Lo único ausente es la pestaña «Plan de ejecución», que está fuera del MVP.
 
@@ -100,6 +100,131 @@ Pendiente de verificar cuando toque: Docker (pruebas de integración con contene
 ---
 
 ## 5. Registro de sesiones
+
+### Sesión 012 — 2026-08-13 · Tipos de datos en el explorador
+
+**Objetivo:** iniciar la mejora posterior al MVP del plan §15 y cerrar su primera
+entrega sin añadir consultas de metadatos.
+
+**Hecho:**
+- El tipo completo de `DatabaseColumn` se conserva al convertir una columna en
+  `DatabaseObject` y llega a `ExplorerNode.hint`.
+- La barra lateral muestra el tipo junto al nombre de la columna. Nombre y tipo
+  se truncan de forma independiente y el tipo completo queda en `title`.
+- Una prueba del store protege `varchar(200)` durante el aplanado del árbol y una
+  prueba del componente protege el renderizado de `numeric(12,2)`.
+
+**Verificado:** 139 pruebas de frontend y compilación de producción correctas. La
+compilación conserva dos avisos anteriores: `results-panel.scss` supera su
+presupuesto por 259 bytes y `nearley`, transitiva de `sql-formatter`, es CommonJS.
+
+**Siguiente:** Entrega 2, plantillas SQL desde tablas según el motor de la conexión
+que originó la acción.
+
+#### Entrega 2 — Plantillas SQL por conexión
+
+**Hecho:**
+- El SELECT rápido reutiliza `buildSelect`: cita identificadores y escribe
+  `TOP 100` en SQL Server o `LIMIT 100` en PostgreSQL y MySQL/MariaDB.
+- El compositor añade `DROP TABLE`. `INSERT`, `UPDATE`, `CREATE TABLE` y
+  `DROP TABLE` solo aparecen para tablas; las vistas conservan únicamente SELECT.
+- Cada plantilla se abre en una pestaña editable ligada al `connectionId` del
+  nodo. Ejecutar o exportar esa pestaña utiliza esa sesión, no la primera abierta.
+- La caché de columnas incluye conexión, base, esquema y relación. El índice del
+  editor y las importaciones también respetan el contexto del nodo.
+
+**Pruebas nuevas:** dialecto de `DROP TABLE` en los tres motores, plantillas
+visibles según tabla o vista, dos conexiones con `public.users` sin compartir
+columnas y ejecución de una pestaña SQL Server en su propia sesión.
+
+**Verificado:** 145 pruebas de frontend, compilación de producción y formato
+correctos. Continúan únicamente los dos avisos de compilación anteriores.
+
+**Siguiente:** Entrega 3, DDL de vistas desde el catálogo de cada motor.
+
+#### Entrega 3 — DDL de vistas
+
+**Hecho:**
+- `IDatabaseMetadataReader`, `MetadataService` y la API local exponen la
+  definición de una vista bajo el mismo turno exclusivo que el resto del catálogo.
+- PostgreSQL usa `pg_get_viewdef` y distingue vistas normales de materializadas;
+  SQL Server lee `sys.sql_modules` y explica definiciones cifradas o privadas;
+  MySQL/MariaDB conserva lo que entrega `SHOW CREATE VIEW`.
+- «Ver DDL» solo aparece en vistas, usa la sesión de `connectionId` y abre el SQL
+  en una pestaña editable. Un error se muestra sin cerrar la sesión ni tocar el
+  árbol.
+- SQL Server rechaza expresamente pedir el DDL de una base distinta de aquella
+  contra la que se abrió la sesión, hasta que el explorador soporte cambiar el
+  catálogo de forma real.
+
+**Verificado con motores reales desechables:** 25 comprobaciones compartidas por
+PostgreSQL, SQL Server y MySQL; 85 pruebas en el ensamblado contractual y 59 de
+integración, todas sin omisiones. Suite completa: 289 backend y 147 frontend.
+Compilación backend sin advertencias; compilación frontend correcta con los dos
+avisos anteriores. Los tres contenedores se retiraron al terminar.
+
+**Correcciones surgidas de la revisión final:**
+- Cambiar, crear o cerrar pestañas limpia el resultado visible y los cambios de
+  cuadrícula; una fila leída en una conexión nunca puede quedar editable bajo otra.
+- Toda pestaña queda ligada a una conexión. Motor, autocompletado, barra de estado,
+  ejecución y exportación derivan de la misma sesión.
+- SQL Server muestra únicamente la base conectada hasta que exista navegación
+  real entre catálogos; antes se podían etiquetar como ajenos objetos leídos de la
+  base actual.
+- Los tres proveedores identifican identidad, autoincremento y columnas calculadas;
+  las plantillas no intentan escribirlas.
+- El compositor pasa también la base al buscar columnas y bloquea plantillas que
+  dependen de ellas hasta terminar la carga.
+- Modificar el SQL invalida la procedencia editable de una tabla; las respuestas
+  o confirmaciones tardías se descartan si cambió la pestaña o su texto.
+- La sincronización de una pestaña hacia Monaco no se confunde con una edición
+  del usuario.
+
+Tras estas correcciones se repitieron las pruebas reales de los tres motores sin
+omisiones. En ese punto la suite frontend tenía 156 pruebas.
+
+#### Mejora visual y de navegación
+
+**Hecho:**
+- Las pestañas muestran operación, conexión, base, motor y color de entorno; las
+  nuevas consultas heredan la conexión de la pestaña visible.
+- El explorador sustituyó la hilera de iconos por un menú textual accesible con
+  `SELECT`, compositor, copiar nombre, DDL, importar y actualizar.
+- `Ctrl+K` abre una paleta global con comandos, conexiones, tablas y vistas ya
+  cargadas aunque su rama esté plegada. Admite flechas, Enter, Escape, foco
+  contenido y resultados homónimos diferenciados por conexión y base.
+- La cuadrícula ofrece densidad cómoda o compacta, encabezados fijos y una
+  advertencia explícita cuando el resultado está recortado. Los errores enseñan
+  código y se pueden copiar.
+- En pantallas estrechas el explorador pasa a drawer recuperable; la barra superior
+  reduce acciones secundarias sin perder búsqueda ni creación de conexiones.
+- Respuestas y avisos tardíos de ejecución o exportación se descartan si cambió la
+  pestaña o su SQL.
+
+**Verificado:** 168 pruebas frontend y compilación de producción. La paleta se
+publica en un chunk diferido de 9 kB y el bundle inicial queda en 499,60 kB,
+dentro del presupuesto existente de 500 kB.
+
+**Validación manual completada:** interfaz revisada en escritorio y móvil, junto
+con los flujos de paleta, menús, pestañas, exportación y conexiones simultáneas.
+
+#### Ubicación de errores y DDL de procedimientos
+
+**Hecho:**
+- PostgreSQL y SQL Server marcan en Monaco la línea que el motor reporta; al
+  ejecutar una selección se conserva su desplazamiento dentro del documento.
+  MySQL mantiene el mensaje sin inventar una línea cuando el driver no la aporta.
+- «Ver DDL» está disponible también para procedimientos almacenados. PostgreSQL
+  distingue sobrecargas por OID y firma; SQL Server y MySQL consultan sus
+  catálogos nativos.
+- La CI ya recibe los fuentes de iconos y persistencia SQLite que dos reglas
+  demasiado amplias de `.gitignore` ocultaban en la primera subida.
+
+**Verificado:** 295 pruebas backend, 176 frontend y compilaciones de producción.
+El editor se carga en un chunk inmediato de 18,78 kB y el bundle inicial queda en
+488,88 kB, dentro del presupuesto de 500 kB.
+
+---
 
 ### Sesión 011 — 2026-08-12 · Fase 8, MySQL y primera beta
 
@@ -182,6 +307,12 @@ El usuario abrió su SQL Server de preproducción y lo que salió no estaba en n
 9. **La aplicación empaquetada salía sin estilos**, y el usuario lo había visto. No era un fallo de los estilos: Angular difiere la hoja poniéndola como `media="print"` y activándola con un manejador en línea (`onload="this.media='all'"`), y la CSP de Tauri —`script-src 'self'`— bloquea los manejadores en línea. La hoja se quedaba en `print` para siempre, así que solo se aplicaba el CSS crítico incrustado. En el navegador no pasa porque ahí no hay CSP: **solo se ve empaquetando**. Se desactivó `inlineCritical` en la compilación de producción, y ahora el enlace es una hoja normal sin nada en línea.
 
    **Cómo se comprobó, que es lo reutilizable:** se sirvió el `dist` compilado con un servidor estático que devuelve **la CSP exacta del envoltorio**, y se abrió en el navegador. Es la única condición que distingue al ejecutable, y así se puede verificar sin empaquetar. Resultado: la hoja se aplica (`media` vacío, 16 hojas activas), el fondo es `#07080B` y la barra superior mide sus 46 px. En el binario ya no aparece `media="print"` por ninguna parte.
+
+10. **La aplicación empaquetada no encontraba su API.** Al abrirla salía `Unexpected token '<', "<!DOCTYPE "… is not valid JSON`: sin `withGlobalTauri`, `window.__TAURI__` no existe, el frontend no podía preguntar el puerto ni el token, y sus peticiones acababan en el servidor de recursos, que devuelve el `index.html`. Corregido eso apareció el siguiente, «no se pudo contactar con la API local»: la ventana empaquetada sirve la aplicación desde `http://tauri.localhost`, un origen que la política de CORS no admitía. Con los dos orígenes de Tauri añadidos, la aplicación instalada abre sus conexiones guardadas y ejecuta consultas contra la preproducción real. **Ninguno de los dos fallos existe en el navegador**: los dos nacen de que empaquetada la aplicación cambia de origen y de forma de descubrir su API.
+
+11. **La barra de estado se salía de la pantalla, y la consola de la API se veía.** El tamaño de `tauri.conf.json` está en puntos: 1440×900 son **1800×1125 píxeles** con el escalado al 125 % que Windows trae de fábrica en muchos portátiles, y en una pantalla de 1080 px el borde inferior quedaba fuera, detrás de la barra de tareas. Ahora la ventana se encoge hasta el área de trabajo del monitor —que ya descuenta la barra— y se centra dentro de ella. Aparte, la API es una aplicación de consola y Windows le abría su ventana negra con los registros de ASP.NET delante de Druse: se lanza con `CREATE_NO_WINDOW`.
+
+    **Un aviso para la próxima medición, que costó tiempo:** mover o medir la ventana desde un proceso **sin conciencia de DPI** —PowerShell lo es— falsea el resultado con una ventana PerMonitorV2. Un `ShowWindow`/`SetWindowPos` desde ahí descuadró la ventana y produjo un síntoma inventado: la interfaz aparecía recortada por la derecha y por abajo, y llegué a reproducirlo píxel a píxel escalando el `dist` un 25 %. La aplicación estaba bien. **Lanzada limpia y capturada desde un proceso PerMonitorV2, la maquetación es correcta**: se ven los controles del topbar, los chips «sin conexión» y «Timeout 30 s», y «UTF-8 · LF». El diagnóstico solo vale si el observador tiene la misma conciencia de DPI que lo observado.
 
 **Al día:** 285 pruebas de backend y 137 de frontend.
 
@@ -676,6 +807,9 @@ El usuario abrió su SQL Server de preproducción y lo que salió no estaba en n
 | D-21 | **El tiempo de espera de MySQL lo controla el proveedor, no `CommandTimeout`.** El driver corta con `KILL QUERY` y hay instrucciones que al ser interrumpidas terminan «bien»: la consulta caducada se anunciaba como completada. Con un token propio se distingue el reloj del usuario. | 2026-08-12 |
 | D-22 | **Cuatro opciones fijadas en la cadena de conexión de MySQL**: `ConvertZeroDateTime`, `GuidFormat=None`, `TreatTinyAsBoolean` y `AllowUserVariables`. Las tres primeras existen porque Druse muestra datos de bases ajenas y no puede reventar ante un `0000-00-00` o un `CHAR(36)` que no sea un GUID; la cuarta, porque un cliente SQL tiene que poder ejecutar `SET @x = …`. | 2026-08-12 |
 | D-24 | **Sin CSS crítico incrustado en producción** (`inlineCritical: false`). Angular lo activa con un manejador `onload` en línea, y la CSP de Tauri prohíbe los manejadores en línea: la hoja de estilos no llegaba a aplicarse dentro del ejecutable. Se pierde una micro-optimización del primer pintado; se gana que la aplicación se vea. Relajar la CSP para permitirlo habría sido cambiar una protección real por una décima de segundo. | 2026-08-12 |
+| D-27 | **El puente con Tauri se expone como `window.__TAURI__` (`withGlobalTauri`), y la política de CORS admite los orígenes de la ventana empaquetada.** El frontend descubre el puerto y el token de su API por ese puente; sin él las peticiones se iban al servidor de recursos y volvían con el `index.html`. La alternativa —importar `@tauri-apps/api` como paquete— obligaría a que el mismo bundle sirva para navegador y para escritorio con dos caminos distintos. Los orígenes admitidos siguen siendo una lista cerrada: los dos del desarrollo y los dos de Tauri. | 2026-08-12 |
+| D-25 | **La ventana se encoge al área de trabajo del monitor al arrancar.** El tamaño de `tauri.conf.json` está en puntos y se multiplica por el escalado del sistema: 1440×900 son 1800×1125 px al 125 %, y en una pantalla de 1080 no cabían. Se ajusta en tiempo de ejecución en vez de bajar el tamaño por omisión, para no castigar a las pantallas grandes por lo que le pasa a las pequeñas. | 2026-08-12 |
+| D-26 | **La API se lanza con `CREATE_NO_WINDOW`.** Es una aplicación de consola y Windows le abría su terminal con los registros de ASP.NET delante de Druse. El precio es que esos registros dejan de verse en el paquete; recogerlos en un archivo queda para cuando haga falta diagnosticar en campo. | 2026-08-12 |
 | D-23 | **La primera beta es la `0.1.0`, sin sufijo de prerrelease.** Un `0.x` ya dice que es una beta, y los instaladores MSI de Windows exigen una versión de tres partes numéricas: añadir `-beta.1` sería arriesgar el empaquetado para repetir algo que el número ya comunica. Lo que sí se declara por escrito son sus límites, en `docs/release-notes/0.1.0-beta.md`. | 2026-08-12 |
 
 ### Abiertas

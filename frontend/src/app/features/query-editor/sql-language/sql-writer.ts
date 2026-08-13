@@ -9,16 +9,7 @@ export interface QueryFilter {
 }
 
 export type FilterOperator =
-  | '='
-  | '<>'
-  | '>'
-  | '>='
-  | '<'
-  | '<='
-  | 'LIKE'
-  | 'IN'
-  | 'IS NULL'
-  | 'IS NOT NULL';
+  '=' | '<>' | '>' | '>=' | '<' | '<=' | 'LIKE' | 'IN' | 'IS NULL' | 'IS NOT NULL';
 
 /** Lo que hay que saber para escribir un SELECT. */
 export interface SelectSpec {
@@ -105,9 +96,8 @@ function condition(engine: DatabaseEngine, filter: QueryFilter): string {
  * SELECT en SQL Server.
  */
 export function buildSelect(engine: DatabaseEngine, spec: SelectSpec): string {
-  const columnas = spec.columns.length > 0
-    ? spec.columns.map((column) => quote(engine, column)).join(', ')
-    : '*';
+  const columnas =
+    spec.columns.length > 0 ? spec.columns.map((column) => quote(engine, column)).join(', ') : '*';
 
   const top = engine === 'sqlserver' && spec.limit ? `TOP ${spec.limit} ` : '';
 
@@ -145,6 +135,12 @@ export function buildInsert(
   const nombres = columnas.map((column) => quote(engine, column.name)).join(', ');
   const huecos = columnas.map((column) => `/* ${column.dataType} */`).join(', ');
 
+  if (columnas.length === 0) {
+    return engine === 'mysql'
+      ? `INSERT INTO ${qualify(engine, spec.schema, spec.table)} ()\nVALUES ();\n`
+      : `INSERT INTO ${qualify(engine, spec.schema, spec.table)}\nDEFAULT VALUES;\n`;
+  }
+
   return `INSERT INTO ${qualify(engine, spec.schema, spec.table)} (${nombres})\nVALUES (${huecos});\n`;
 }
 
@@ -159,17 +155,32 @@ export function buildUpdate(
   spec: { schema?: string; table: string; columns: readonly KnownColumn[] },
 ): string {
   const clave = spec.columns.filter((column) => column.isPrimaryKey);
-  const resto = spec.columns.filter((column) => !column.isPrimaryKey);
+  const resto = spec.columns.filter((column) => !column.isPrimaryKey && !isGenerated(column));
 
-  const asignaciones = (resto.length > 0 ? resto : spec.columns)
+  if (resto.length === 0) {
+    return '-- Esta tabla no tiene columnas modificables.\n';
+  }
+
+  const asignaciones = resto
     .map((column) => `  ${quote(engine, column.name)} = /* ${column.dataType} */`)
     .join(',\n');
 
-  const filtro = clave.length > 0
-    ? clave.map((column) => `${quote(engine, column.name)} = /* ${column.dataType} */`).join(' AND ')
-    : '/* condición: esta tabla no tiene clave primaria */';
+  const filtro =
+    clave.length > 0
+      ? clave
+          .map((column) => `${quote(engine, column.name)} = /* ${column.dataType} */`)
+          .join(' AND ')
+      : '/* condición: esta tabla no tiene clave primaria */';
 
   return `UPDATE ${qualify(engine, spec.schema, spec.table)}\nSET\n${asignaciones}\nWHERE ${filtro};\n`;
+}
+
+/** Plantilla destructiva que siempre se revisa en el editor antes de ejecutarse. */
+export function buildDropTable(
+  engine: DatabaseEngine,
+  spec: { schema?: string; table: string },
+): string {
+  return `DROP TABLE ${qualify(engine, spec.schema, spec.table)};\n`;
 }
 
 /**
@@ -205,7 +216,5 @@ export function buildCreateTable(
 
 /** Columnas que el motor rellena solo y que no se escriben en un INSERT. */
 function isGenerated(column: KnownColumn): boolean {
-  const defecto = (column.dataType ?? '').toLowerCase();
-
-  return defecto.includes('serial') || defecto.includes('identity');
+  return column.isGenerated === true;
 }

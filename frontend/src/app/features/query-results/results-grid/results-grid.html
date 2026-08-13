@@ -38,15 +38,10 @@
   </div>
 }
 
-<div class="body">
+<div class="body" [class.is-compact]="compact()">
   @for (row of visibleRows(); track row.number) {
     <div class="row" role="row" [style.grid-template-columns]="gridTemplate()">
-      <div
-        class="cell cell--number"
-        role="cell"
-        title="Copiar la fila"
-        (dblclick)="copyRow(row)"
-      >
+      <div class="cell cell--number" role="cell" title="Copiar la fila" (dblclick)="copyRow(row)">
         {{ row.number }}
       </div>
       @for (column of resultSet().columns; track column.name; let i = $index) {

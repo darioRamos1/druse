@@ -109,7 +109,17 @@
   border-radius: var(--dr-radius);
   background: var(--dr-surface-input);
   color: var(--dr-text-faintest);
+  font-family: inherit;
+  text-align: left;
   cursor: text;
+
+  &:hover,
+  &:focus-visible {
+    outline: none;
+    border-color: #34415a;
+    background: #101620;
+    color: var(--dr-text-muted);
+  }
 
   &__placeholder {
     flex: 1;
@@ -203,5 +213,42 @@
     &--close:hover {
       background: #f2686b;
     }
+  }
+}
+
+@media (max-width: 900px) {
+  :host {
+    gap: 8px;
+  }
+
+  .actions .btn:not(.btn--primary),
+  .segmented,
+  .window-controls,
+  .divider--spaced {
+    display: none;
+  }
+
+  .search {
+    width: min(360px, 100%);
+  }
+}
+
+@media (max-width: 620px) {
+  .actions .btn--primary {
+    width: 30px;
+    padding: 0;
+    justify-content: center;
+    font-size: 0;
+  }
+
+  .brand__name,
+  :host > .divider {
+    display: none;
+  }
+
+  .search__placeholder {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 }

@@ -130,6 +130,21 @@ internal static class DatabaseEndpoints
             return Results.Ok(columns.Select(column => column.ToDto()));
         })
         .WithName("GetColumns");
+
+        app.MapPost("/api/sessions/{sessionId:guid}/metadata/definition", async (
+            Guid sessionId,
+            DatabaseObjectDto databaseObject,
+            MetadataService metadata,
+            CancellationToken cancellationToken) =>
+        {
+            var sql = await metadata.GetDefinitionAsync(
+                sessionId,
+                databaseObject.ToDomain(),
+                cancellationToken);
+
+            return Results.Ok(new { sql });
+        })
+        .WithName("GetDefinition");
     }
 
     /// <summary>

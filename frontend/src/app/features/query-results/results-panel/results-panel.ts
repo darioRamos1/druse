@@ -1,4 +1,12 @@
-import { ChangeDetectionStrategy, Component, computed, input, output, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  effect,
+  input,
+  output,
+  signal,
+} from '@angular/core';
 
 import { ExportFormat } from '../../../core/application-gateway/application-gateway';
 import {
@@ -55,12 +63,30 @@ export class ResultsPanel {
 
   protected readonly activeTab = signal<ResultsTab>('results');
   protected readonly exportOpen = signal(false);
+  protected readonly exportPosition = signal({ top: 0, left: 0 });
   protected readonly showFilters = signal(false);
+  protected readonly compact = signal(false);
 
   /** Índice del conjunto de resultados visible, si la consulta devolvió varios. */
   protected readonly activeSetIndex = signal(0);
+  protected readonly selectedSetIndex = computed(() =>
+    Math.min(this.activeSetIndex(), Math.max(0, this.resultSets().length - 1)),
+  );
 
   protected readonly resultSets = computed(() => this.result()?.resultSets ?? []);
+
+  constructor() {
+    let previousExecutionId: string | undefined;
+
+    effect(() => {
+      const executionId = this.result()?.executionId;
+
+      if (executionId !== previousExecutionId) {
+        previousExecutionId = executionId;
+        this.activeSetIndex.set(0);
+      }
+    });
+  }
 
   /**
    * Conjunto que se está mostrando.
@@ -71,12 +97,13 @@ export class ResultsPanel {
   protected readonly currentSet = computed(() => {
     const sets = this.resultSets();
 
-    return sets.length > 0
-      ? (sets[Math.min(this.activeSetIndex(), sets.length - 1)] ?? null)
-      : this.resultSet();
+    return sets.length > 0 ? (sets[this.selectedSetIndex()] ?? null) : this.resultSet();
   });
 
-  protected toggleExport(): void {
+  protected toggleExport(event: Event): void {
+    const trigger = event.currentTarget as HTMLElement;
+    const rect = trigger.getBoundingClientRect();
+    this.exportPosition.set({ top: rect.bottom + 4, left: Math.max(8, rect.right - 190) });
     this.exportOpen.update((open) => !open);
   }
 
@@ -87,6 +114,27 @@ export class ResultsPanel {
 
   protected toggleFilters(): void {
     this.showFilters.update((visible) => !visible);
+  }
+
+  protected toggleDensity(): void {
+    this.compact.update((value) => !value);
+  }
+
+  protected async copyError(): Promise<void> {
+    const error = this.result()?.error;
+
+    if (!error) {
+      return;
+    }
+
+    const text = error.code ? `${error.message} (${error.code})` : error.message;
+
+    try {
+      await navigator.clipboard.writeText(text);
+      this.copied.emit(text);
+    } catch {
+      this.copyFailed.emit();
+    }
   }
 
   protected selectSet(index: number): void {
@@ -102,12 +150,15 @@ export class ResultsPanel {
     }
   }
 
+  openHistory(): void {
+    this.select('history');
+  }
 
   protected readonly hasFilters = computed(() =>
-    (this.resultSet()?.columns ?? []).some((column) => !!column.filter),
+    (this.currentSet()?.columns ?? []).some((column) => !!column.filter),
   );
 
-  protected readonly rowCount = computed(() => this.resultSet()?.rows.length ?? 0);
+  protected readonly rowCount = computed(() => this.currentSet()?.rows.length ?? 0);
 
   /** Mensajes del servidor más el error, si lo hubo. */
   protected readonly messages = computed(() => {
@@ -134,7 +185,7 @@ export class ResultsPanel {
   protected readonly messageCount = computed(() => this.messages().length);
 
   protected readonly rangeLabel = computed(() => {
-    const set = this.resultSet();
+    const set = this.currentSet();
 
     if (!set || set.rows.length === 0) {
       return 'Sin filas';

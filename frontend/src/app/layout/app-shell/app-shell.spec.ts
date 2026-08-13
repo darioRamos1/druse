@@ -21,7 +21,10 @@ function silentGateway(): Partial<ApplicationGateway> {
  * `schemaName` es lo único que cambia entre motores: en PostgreSQL el esquema se
  * llama `public`, y en MySQL igual que la base.
  */
-function connectedGateway(engine: 'mysql' | 'postgresql', schemaName: string): Partial<ApplicationGateway> {
+function connectedGateway(
+  engine: 'mysql' | 'postgresql',
+  schemaName: string,
+): Partial<ApplicationGateway> {
   return {
     getEngines: () => of([]),
     getSavedConnections: () => of([]),
@@ -36,7 +39,9 @@ function connectedGateway(engine: 'mysql' | 'postgresql', schemaName: string): P
         readOnly: false,
       }),
     getDatabases: () =>
-      of([{ id: 'db:druse_test', name: 'druse_test', kind: 'database' as const, hasChildren: true }]),
+      of([
+        { id: 'db:druse_test', name: 'druse_test', kind: 'database' as const, hasChildren: true },
+      ]),
     getChildren: () =>
       of([
         {
@@ -149,9 +154,7 @@ describe('AppShell', () => {
     TestBed.resetTestingModule();
     await TestBed.configureTestingModule({
       imports: [AppShell],
-      providers: [
-        { provide: ApplicationGateway, useValue: connectedGateway(engine, schemaName) },
-      ],
+      providers: [{ provide: ApplicationGateway, useValue: connectedGateway(engine, schemaName) }],
     }).compileComponents();
 
     const shell = TestBed.createComponent(AppShell);
@@ -166,7 +169,9 @@ describe('AppShell', () => {
     shell.detectChanges();
     await shell.whenStable();
 
-    return (shell.nativeElement as HTMLElement).querySelector('app-editor-toolbar')?.textContent ?? '';
+    return (
+      (shell.nativeElement as HTMLElement).querySelector('app-editor-toolbar')?.textContent ?? ''
+    );
   }
 
   it('no inventa un esquema en el contexto del editor', async () => {
@@ -189,12 +194,22 @@ describe('AppShell', () => {
     element.querySelector<HTMLButtonElement>('app-editor-tabs .tabs__add')?.click();
     await fixture.whenStable();
 
-    element
-      .querySelector<HTMLButtonElement>('app-editor-tabs .tab.is-active .tab__close')
-      ?.click();
+    element.querySelector<HTMLButtonElement>('app-editor-tabs .tab.is-active .tab__close')?.click();
     await fixture.whenStable();
 
     // Nunca debe quedar el editor sin pestaña seleccionada.
     expect(element.querySelectorAll('app-editor-tabs .tab.is-active').length).toBe(1);
+  });
+
+  it('abre la paleta global con Ctrl+K', async () => {
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true }));
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    expect(element.querySelector('app-command-palette')).toBeTruthy();
+  });
+
+  it('en móvil conserva un control para abrir el explorador', () => {
+    expect(element.querySelector('.mobile-explorer-toggle')).toBeTruthy();
   });
 });

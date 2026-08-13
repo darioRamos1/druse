@@ -24,7 +24,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 32px;
+    width: 38px;
     flex: none;
     border: 0;
     background: transparent;
@@ -39,11 +39,14 @@
 }
 
 .tab {
+  position: relative;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 7px;
   flex: none;
-  padding: 0 12px;
+  min-width: 176px;
+  max-width: 260px;
+  padding: 0 10px;
   border-right: 1px solid #1b2130;
   border-top: 2px solid transparent;
   margin-top: -1px;
@@ -63,6 +66,14 @@
     font-weight: 500;
   }
 
+  &[data-environment='production'] {
+    border-top-color: #f2686b;
+  }
+
+  &[data-environment='testing'] {
+    border-top-color: #f5bf4f;
+  }
+
   &__dirty {
     width: 5px;
     height: 5px;
@@ -72,10 +83,34 @@
   }
 
   &__title {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &__identity {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-width: 0;
+    line-height: 1.15;
+  }
+
+  &__context {
+    overflow: hidden;
+    margin-top: 2px;
+    color: var(--dr-text-faintest);
+    font-size: 9.5px;
+    font-weight: 400;
+    text-overflow: ellipsis;
     white-space: nowrap;
   }
 
   &__close {
+    width: 20px;
+    height: 20px;
+    flex: none;
+    border-radius: 4px;
     border: 0;
     padding: 0;
     background: transparent;
@@ -85,6 +120,7 @@
     cursor: pointer;
 
     &:hover {
+      background: #232c42;
       color: var(--dr-text);
     }
   }

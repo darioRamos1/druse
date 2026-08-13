@@ -14,12 +14,18 @@ import {
 } from '@angular/core';
 import type * as MonacoApi from 'monaco-editor';
 
-import { DatabaseEngine, KnownColumn, SchemaIndex } from '../../../shared/models/workspace';
+import {
+  DatabaseEngine,
+  KnownColumn,
+  QueryError,
+  SchemaIndex,
+} from '../../../shared/models/workspace';
 import { registerSqlCompletion } from '../sql-language/sql-completion';
 import { findProblems } from '../sql-language/sql-diagnostics';
 import { registerSqlHover } from '../sql-language/sql-hover';
 import { formatSql } from '../sql-language/sql-formatting';
 import { DRUSE_THEME, DRUSE_THEME_NAME } from './druse-theme';
+import { executionErrorLine } from './execution-error';
 import { MonacoLoader } from './monaco-loader';
 
 /** Posición del cursor, tal como se muestra en la barra de estado. */
@@ -33,6 +39,14 @@ export interface EditorSelection {
   readonly hasSelection: boolean;
   /** Texto seleccionado, para poder ejecutarlo solo. */
   readonly text: string;
+  /** Desplazamiento UTF-16 donde empieza la selección dentro del documento. */
+  readonly startOffset: number;
+}
+
+export interface ExecutionErrorContext {
+  readonly error: QueryError;
+  readonly sql: string;
+  readonly startOffset: number;
 }
 
 /**
@@ -86,7 +100,7 @@ export interface EditorSelection {
     }
   `,
 })
-export class SqlEditor implements OnInit {
+export default class SqlEditor implements OnInit {
   private readonly _loader = inject(MonacoLoader);
   private readonly _zone = inject(NgZone);
   private readonly _destroyRef = inject(DestroyRef);
@@ -97,6 +111,7 @@ export class SqlEditor implements OnInit {
   readonly readOnly = input(false);
   readonly engine = input<DatabaseEngine>('postgresql');
   readonly schema = input<SchemaIndex>({ schemas: [], relations: [] });
+  readonly executionError = input<ExecutionErrorContext | null>(null);
 
   /**
    * Cómo pedir las columnas de una tabla que el explorador no ha abierto.
@@ -126,6 +141,8 @@ export class SqlEditor implements OnInit {
   protected readonly failed = signal(false);
 
   private _editor: MonacoApi.editor.IStandaloneCodeEditor | null = null;
+  private _monaco: typeof MonacoApi | null = null;
+  private _syncingExternalValue = false;
 
   constructor() {
     // El valor puede cambiar desde fuera al cambiar de pestaña. Se compara antes
@@ -136,7 +153,27 @@ export class SqlEditor implements OnInit {
       const editor = this._editor;
 
       if (editor && editor.getValue() !== value) {
-        editor.setValue(value);
+        this._syncingExternalValue = true;
+
+        try {
+          editor.setValue(value);
+        } finally {
+          this._syncingExternalValue = false;
+        }
+      }
+    });
+
+    effect(() => {
+      const context = this.executionError();
+
+      if (!this.ready()) {
+        return;
+      }
+
+      if (context) {
+        this.showExecutionError(context.error, context.sql, context.startOffset);
+      } else {
+        this.clearExecutionError();
       }
     });
   }
@@ -195,6 +232,48 @@ export class SqlEditor implements OnInit {
     this._editor?.focus();
   }
 
+  /** Quita el error de la ejecución anterior sin tocar los avisos del catálogo. */
+  clearExecutionError(): void {
+    const model = this._editor?.getModel();
+
+    if (model && this._monaco) {
+      this._monaco.editor.setModelMarkers(model, 'druse-execution', []);
+    }
+  }
+
+  /** Marca la línea que el motor reportó dentro del SQL enviado. */
+  showExecutionError(error: QueryError, executedSql: string, startOffset = 0): void {
+    const editor = this._editor;
+    const monaco = this._monaco;
+    const model = editor?.getModel();
+
+    if (!editor || !monaco || !model) {
+      return;
+    }
+
+    const localLine = executionErrorLine(error, executedSql);
+    const lineNumber = localLine
+      ? model.getPositionAt(startOffset).lineNumber + localLine - 1
+      : null;
+
+    if (!lineNumber || lineNumber > model.getLineCount()) {
+      this.clearExecutionError();
+      return;
+    }
+
+    monaco.editor.setModelMarkers(model, 'druse-execution', [
+      {
+        severity: monaco.MarkerSeverity.Error,
+        message: error.message,
+        startLineNumber: lineNumber,
+        startColumn: 1,
+        endLineNumber: lineNumber,
+        endColumn: model.getLineMaxColumn(lineNumber),
+      },
+    ]);
+    editor.revealLineInCenterIfOutsideViewport(lineNumber);
+  }
+
   async ngOnInit(): Promise<void> {
     let monaco: typeof MonacoApi;
 
@@ -205,7 +284,12 @@ export class SqlEditor implements OnInit {
       return;
     }
 
+    if (this._destroyRef.destroyed) {
+      return;
+    }
+
     monaco.editor.defineTheme(DRUSE_THEME_NAME, DRUSE_THEME);
+    this._monaco = monaco;
 
     // El autocompletado se registra una vez por editor y se retira al destruirlo:
     // de lo contrario cada editor añadiría otro proveedor y las sugerencias
@@ -252,7 +336,12 @@ export class SqlEditor implements OnInit {
       const editor = this._editor;
 
       editor.onDidChangeModelContent(() => {
-        this._zone.run(() => this.valueChange.emit(editor.getValue()));
+        this.clearExecutionError();
+
+        if (!this._syncingExternalValue) {
+          this._zone.run(() => this.valueChange.emit(editor.getValue()));
+        }
+
         this.scheduleDiagnostics(monaco);
       });
 
@@ -273,9 +362,13 @@ export class SqlEditor implements OnInit {
         // Se emite el texto y no solo si hay selección: «Ejecutar selección»
         // necesita exactamente lo que el usuario marcó, sin volver a pedírselo
         // al editor desde fuera.
-        const text = empty ? '' : (editor.getModel()?.getValueInRange(event.selection) ?? '');
+        const model = editor.getModel();
+        const text = empty ? '' : (model?.getValueInRange(event.selection) ?? '');
+        const startOffset = model?.getOffsetAt(event.selection.getStartPosition()) ?? 0;
 
-        this._zone.run(() => this.selectionChange.emit({ hasSelection: !empty, text }));
+        this._zone.run(() =>
+          this.selectionChange.emit({ hasSelection: !empty, text, startOffset }),
+        );
       });
 
       this.registerShortcuts(monaco, editor);
@@ -289,6 +382,7 @@ export class SqlEditor implements OnInit {
       clearTimeout(this._diagnosticsTimer);
       this._editor?.dispose();
       this._editor = null;
+      this._monaco = null;
     });
   }
 
@@ -345,7 +439,10 @@ export class SqlEditor implements OnInit {
     const run = (action: () => void) => () => this._zone.run(action);
 
     // Ejecutar: Ctrl/Cmd + Enter.
-    editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, run(() => this.execute.emit()));
+    editor.addCommand(
+      monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter,
+      run(() => this.execute.emit()),
+    );
 
     // Ejecutar solo la selección: Ctrl/Cmd + Shift + Enter.
     editor.addCommand(
@@ -355,13 +452,22 @@ export class SqlEditor implements OnInit {
 
     // Cancelar: Escape. Solo tiene efecto si hay algo ejecutándose; quien lo
     // decide es el shell.
-    editor.addCommand(monaco.KeyCode.Escape, run(() => this.cancel.emit()));
+    editor.addCommand(
+      monaco.KeyCode.Escape,
+      run(() => this.cancel.emit()),
+    );
 
     // Guardar: Ctrl/Cmd + S.
-    editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, run(() => this.save.emit()));
+    editor.addCommand(
+      monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS,
+      run(() => this.save.emit()),
+    );
 
     // Nueva consulta: Ctrl/Cmd + T.
-    editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyT, run(() => this.newTab.emit()));
+    editor.addCommand(
+      monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyT,
+      run(() => this.newTab.emit()),
+    );
 
     // Formatear: Ctrl/Cmd + Shift + F, el mismo que usa el resto de editores.
     editor.addCommand(

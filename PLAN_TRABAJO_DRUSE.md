@@ -756,6 +756,165 @@ tablas sin permisos de administración, el autocompletado se apagaba con esquema
 propios, dos peticiones simultáneas rompían la conexión y los errores del motor
 llegaban como «error inesperado». Los cuatro corregidos.
 
+### Mejora solicitada para el explorador y la composición SQL — completada
+
+**Estado al 13 de agosto de 2026:** las tres entregas están implementadas y
+verificadas automática y manualmente.
+
+El siguiente incremento mejorará el trabajo desde el explorador sin ejecutar
+cambios automáticamente en la base de datos:
+
+- Mostrar el tipo de dato junto a cada columna de una tabla o vista.
+- Generar plantillas de `SELECT`, `INSERT`, `UPDATE` y `DROP TABLE` respetando el
+  dialecto de PostgreSQL, SQL Server y MySQL/MariaDB.
+- Obtener del motor y mostrar el DDL con el que se crea una vista.
+
+#### Entrega 1 — Tipos de datos en las columnas
+
+El backend y el modelo del frontend ya reciben `DatabaseColumn.DataType`. El
+trabajo pendiente es conservar ese valor al convertir las columnas en nodos del
+explorador y presentarlo como información secundaria, sin añadir otra consulta de
+metadatos.
+
+Tareas:
+
+- [x] Rellenar `ExplorerNode.hint` con `DatabaseColumn.dataType` al construir los
+  nodos de columna en `frontend/src/app/core/workspace/workspace-store.ts`.
+- [x] Renderizar el tipo al lado del nombre en
+  `frontend/src/app/features/connections/connections-sidebar/connections-sidebar.html`.
+- [x] Ajustar el truncado y la distribución en
+  `connections-sidebar.scss` para nombres y tipos largos.
+- [x] Probar que una columna cargada conserva y muestra su tipo completo, incluidos
+  longitud, precisión y escala cuando el proveedor los devuelve.
+
+Criterio de salida: al expandir una tabla o vista se ve, por ejemplo,
+`total numeric(12,2)` o `name varchar(200)`, sin afectar la carga perezosa del
+árbol.
+
+#### Entrega 2 — Plantillas SQL desde tablas
+
+El compositor ya genera `SELECT`, `INSERT` y `UPDATE` mediante el escritor SQL
+común. Se reutilizará ese flujo y se añadirá `DROP TABLE`; no se generará SQL
+concatenando identificadores desde los componentes visuales.
+
+Regla obligatoria: las plantillas dependen del motor de la conexión desde la que
+se abrió la tabla. No existirá una plantilla SQL genérica reutilizada sin adaptar.
+El generador debe recibir el `DatabaseEngine` resuelto mediante
+`ExplorerNode.connectionId` y aplicar el dialecto correspondiente:
+
+- PostgreSQL: identificadores con comillas dobles y límites mediante `LIMIT`.
+- SQL Server: identificadores entre corchetes y límites mediante `TOP`.
+- MySQL/MariaDB: identificadores entre acentos graves y límites mediante `LIMIT`.
+
+Las diferencias futuras de sintaxis para valores generados, retornos, conflictos,
+actualizaciones o borrados deben permanecer encapsuladas en el escritor SQL por
+motor, nunca repartidas como condiciones dentro de los componentes Angular.
+
+Tareas:
+
+- [x] Añadir `buildDropTable` en
+  `frontend/src/app/features/query-editor/sql-language/sql-writer.ts`.
+- [x] Añadir la acción `DROP TABLE` al compositor únicamente para nodos de tabla.
+- [x] Mantener `INSERT`, `UPDATE`, `CREATE TABLE` y `DROP TABLE` fuera de las
+  acciones de vistas, porque no se conoce si una vista es actualizable.
+- [x] Reutilizar `buildSelect` en el SELECT rápido del explorador para citar
+  identificadores y generar `TOP 100` en SQL Server en vez de `LIMIT 100`.
+- [x] Abrir cada plantilla en una pestaña del editor para que el usuario pueda
+  revisarla y modificarla antes de ejecutarla.
+- [x] Resolver el `DatabaseEngine` desde la conexión del nodo que originó la
+  acción, incluso cuando haya varias conexiones de motores distintos abiertas.
+- [x] Cubrir PostgreSQL (`"objeto"`), SQL Server (`[objeto]`) y MySQL/MariaDB
+  (`` `objeto` ``) con pruebas del escritor SQL.
+
+La acción solo compone texto. Si el usuario ejecuta un `DROP`, seguirá pasando por
+la detección y confirmación de instrucciones destructivas que ya existe.
+
+Criterio de salida: desde cualquier tabla pueden abrirse plantillas válidas para
+el motor de su propia conexión de `SELECT`, `INSERT`, `UPDATE` y `DROP TABLE`;
+las acciones de escritura no aparecen en vistas. Con conexiones simultáneas a
+motores distintos, cada tabla genera exclusivamente la sintaxis de su motor.
+
+#### Entrega 3 — DDL de vistas
+
+La definición debe obtenerse del catálogo de cada motor, no reconstruirse a partir
+de las columnas. Se añadirá una operación de lectura de metadatos que atraviese el
+contrato de proveedores, la aplicación, la API local y el `ApplicationGateway`.
+El resultado se abrirá en una pestaña del editor existente.
+
+Tareas de backend:
+
+- [x] Añadir una operación de definición de vista a
+  `IDatabaseMetadataReader` y a `MetadataService`, respetando el turno exclusivo
+  de la sesión.
+- [x] Implementarla en PostgreSQL con `pg_get_viewdef`, distinguiendo vistas
+  normales y materializadas.
+- [x] Implementarla en SQL Server con `sys.views` y `sys.sql_modules`, devolviendo
+  un error comprensible cuando la definición sea privada o esté cifrada.
+- [x] Implementarla en MySQL/MariaDB con `SHOW CREATE VIEW`, conservando las
+  cláusulas que entregue el motor.
+- [x] Exponer `POST /api/sessions/{sessionId}/metadata/definition` con una respuesta
+  pequeña de la forma `{ sql }`.
+- [x] Añadir pruebas contractuales para los tres proveedores y una prueba de
+  integración del endpoint.
+
+Tareas de frontend:
+
+- [x] Añadir la operación al `ApplicationGateway` y a su implementación HTTP.
+- [x] Mostrar la acción «Ver DDL» únicamente en nodos de vista.
+- [x] Resolver la sesión y el motor desde `ExplorerNode.connectionId`, no desde la
+  primera conexión activa.
+- [x] Solicitar la definición y abrirla en una pestaña SQL editable.
+- [x] Mostrar errores de permisos o definiciones no disponibles sin cerrar la
+  sesión ni alterar el árbol.
+
+Criterio de salida: una vista de cualquiera de los tres motores soportados puede
+abrirse como DDL en el editor y el texto contiene una instrucción de creación y la
+consulta que define la vista.
+
+#### Trabajo técnico asociado
+
+Antes de considerar completa la mejora con varias conexiones abiertas, se debe
+evitar que dos relaciones con el mismo nombre compartan metadatos accidentalmente:
+
+- [x] Cambiar la clave de la caché de columnas para incluir conexión, base,
+  esquema y relación.
+- [x] Hacer que las acciones iniciadas en el explorador resuelvan siempre su
+  contexto mediante `connectionId`.
+- [x] Verificar el alcance entre bases de una sesión, especialmente en SQL Server,
+  antes de ofrecer DDL para objetos de una base distinta a la conectada.
+
+No forma parte de este incremento reconstruir el DDL completo de tablas, detectar
+relaciones para generar `JOIN`, ejecutar `DROP` directamente desde el árbol ni
+determinar si una vista admite escrituras.
+
+#### Verificación final
+
+- [x] Ejecutar las pruebas unitarias y la compilación del frontend.
+- [x] Compilar y ejecutar las pruebas del backend.
+- [x] Ejecutar las pruebas contractuales reales contra PostgreSQL, SQL Server y
+  MySQL/MariaDB.
+- [x] Comprobar manualmente nombres con espacios, palabras reservadas, tipos largos
+  y dos conexiones abiertas con esquemas y tablas del mismo nombre.
+
+### Incremento de interfaz y navegación — implementado
+
+- [x] Mostrar conexión, base, motor y entorno en las pestañas del editor.
+- [x] Sustituir las acciones ambiguas del explorador por un menú textual accesible.
+- [x] Añadir una paleta global `Ctrl+K` para comandos, conexiones, tablas y vistas.
+- [x] Mejorar resultados con densidad configurable, encabezados fijos, estados
+  vacíos, errores copiables y aviso de resultados recortados.
+- [x] Añadir navegación de pestañas por teclado y explorador móvil en un drawer.
+- [x] Aislar resultados y avisos asíncronos por pestaña, conexión y texto SQL.
+- [x] Cubrir los flujos nuevos con 168 pruebas frontend y compilación de producción.
+- [x] Mantener el bundle inicial dentro del presupuesto de 500 kB cargando la
+  paleta de comandos de forma diferida.
+- [x] Completar una pasada visual manual en escritorio y móvil con el stack local.
+- [x] Marcar en Monaco la línea reportada por PostgreSQL o SQL Server, incluida
+  la posición correcta cuando se ejecuta solo una selección.
+- [x] Mostrar «Ver DDL» en procedimientos almacenados y resolver sobrecargas de
+  PostgreSQL sin confundir procedimientos homónimos.
+- [x] Cubrir el incremento final con 295 pruebas backend y 176 frontend.
+
 ### Prioridad alta
 
 - Autenticación integrada de Windows para SQL Server.

@@ -38,6 +38,59 @@
   min-height: 0;
 }
 
+.mobile-explorer-toggle,
+.mobile-sidebar-backdrop {
+  display: none;
+}
+
+@media (max-width: 720px) {
+  .sidebar + app-resize-handle {
+    display: none;
+  }
+
+  .sidebar {
+    position: fixed;
+    z-index: 60;
+    top: var(--dr-topbar-height);
+    bottom: 0;
+    left: 0;
+    display: flex;
+    width: min(82vw, 320px) !important;
+    transform: translateX(-105%);
+    transition: transform 150ms ease;
+
+    &.is-mobile-open {
+      transform: translateX(0);
+    }
+  }
+
+  .mobile-sidebar-backdrop {
+    position: fixed;
+    z-index: 55;
+    inset: var(--dr-topbar-height) 0 0;
+    display: block;
+    background: rgb(0 0 0 / 52%);
+  }
+
+  .mobile-explorer-toggle {
+    position: fixed;
+    z-index: 50;
+    left: 8px;
+    bottom: 30px;
+    display: block;
+    min-height: 34px;
+    padding: 0 10px;
+    border: 1px solid var(--dr-border-strong);
+    border-radius: 7px;
+    background: var(--dr-surface-raised);
+    color: var(--dr-text);
+  }
+
+  .main {
+    width: 100%;
+  }
+}
+
 // Avisos entre el editor y los resultados: es donde el usuario está mirando
 // cuando pulsa «Ejecutar».
 .banner {
@@ -59,6 +112,18 @@
   &__text {
     flex: 1;
     min-width: 0;
+  }
+
+  &__label {
+    flex: none;
+    padding: 2px 6px;
+    border-radius: 4px;
+    background: rgb(108 139 255 / 12%);
+    color: var(--dr-accent-bright);
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
   }
 
   &__title {

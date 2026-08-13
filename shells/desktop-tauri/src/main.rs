@@ -13,7 +13,7 @@ mod api_process;
 use std::sync::Mutex;
 
 use api_process::{ApiProcess, Endpoint};
-use tauri::{Manager, State};
+use tauri::{Manager, PhysicalPosition, PhysicalSize, State, WebviewWindow};
 
 /// Estado compartido: el proceso de la API mientras la aplicación vive.
 struct ApiState(Mutex<Option<ApiProcess>>);
@@ -51,10 +51,64 @@ fn from_endpoint(endpoint: &Endpoint) -> ApiConnection {
     }
 }
 
+/// Encoge la ventana hasta que quepa en el área de trabajo del monitor.
+///
+/// El tamaño de `tauri.conf.json` está en puntos, no en píxeles: 1440×900 son
+/// 1800×1125 píxeles con el escalado al 125 % que Windows trae de fábrica en
+/// muchos portátiles. En una pantalla de 1080 px el borde inferior —donde vive
+/// la barra de estado— quedaba fuera de la pantalla, tapado por la barra de
+/// tareas, y el usuario no tenía forma de recuperarlo salvo maximizando.
+///
+/// Se usa el área de trabajo y no la resolución porque aquella ya descuenta la
+/// barra de tareas. Si el monitor no se puede consultar se deja la ventana como
+/// está: es preferible una ventana grande a ninguna.
+fn fit_to_work_area(window: &WebviewWindow) -> tauri::Result<()> {
+    let Some(monitor) = window.current_monitor()? else {
+        return Ok(());
+    };
+
+    let area = *monitor.work_area();
+    let outer = window.outer_size()?;
+
+    if outer.width <= area.size.width && outer.height <= area.size.height {
+        return Ok(());
+    }
+
+    // `set_size` habla del área de cliente, así que hay que descontar el marco
+    // y el título, que es justo lo que sobresalía de la pantalla.
+    let inner = window.inner_size()?;
+    let frame_width = outer.width.saturating_sub(inner.width);
+    let frame_height = outer.height.saturating_sub(inner.height);
+
+    let width = outer.width.min(area.size.width);
+    let height = outer.height.min(area.size.height);
+
+    window.set_size(PhysicalSize::new(
+        width.saturating_sub(frame_width),
+        height.saturating_sub(frame_height),
+    ))?;
+
+    // Centrar con `center()` usaría la resolución completa y volvería a meter el
+    // borde inferior debajo de la barra de tareas; se centra dentro del área útil.
+    window.set_position(PhysicalPosition::new(
+        area.position.x + ((area.size.width - width) / 2) as i32,
+        area.position.y + ((area.size.height - height) / 2) as i32,
+    ))?;
+
+    Ok(())
+}
+
 fn main() {
     tauri::Builder::default()
         .manage(ApiState(Mutex::new(None)))
         .setup(|app| {
+            if let Some(window) = app.get_webview_window("main") {
+                // Que el ajuste falle no debe impedir que la aplicación arranque.
+                if let Err(error) = fit_to_work_area(&window) {
+                    eprintln!("Druse: no se pudo ajustar la ventana a la pantalla: {error}");
+                }
+            }
+
             let data_dir = api_process::data_directory()?;
             std::fs::create_dir_all(&data_dir)?;
 

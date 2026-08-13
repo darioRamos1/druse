@@ -462,6 +462,7 @@ public abstract class DatabaseProviderContractTests<TFixture>
             Assert.Equal("id", id.Name);
             Assert.True(id.IsPrimaryKey);
             Assert.False(id.IsNullable);
+            Assert.True(id.IsGenerated);
 
             Assert.False(columns[1].IsNullable);
 
@@ -476,6 +477,90 @@ public abstract class DatabaseProviderContractTests<TFixture>
         finally
         {
             await ExecuteAsync(session, Fixture.DropTable(table));
+        }
+    }
+
+    [Fact]
+    public async Task ObtieneLaDefinicionDeUnaVista()
+    {
+        if (Skip) { return; }
+
+        await using var session = await OpenAsync();
+
+        var viewName = $"druse_view_{Guid.NewGuid():N}";
+
+        try
+        {
+            await ExecuteAsync(session, Fixture.CreateView(viewName));
+
+            var view = new DatabaseObject
+            {
+                Id = $"View:{Fixture.DefaultSchema}.{viewName}",
+                Name = viewName,
+                Kind = DatabaseObjectKind.View,
+                Database = Fixture.DatabaseName,
+                Schema = Fixture.DefaultSchema,
+            };
+
+            var definition = await Fixture.Metadata.GetDefinitionAsync(
+                session,
+                view,
+                CancellationToken.None);
+
+            Assert.Contains("CREATE", definition, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("VIEW", definition, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains(viewName, definition, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("valor", definition, StringComparison.OrdinalIgnoreCase);
+        }
+        finally
+        {
+            await ExecuteAsync(session, Fixture.DropView(viewName));
+        }
+    }
+
+    [Fact]
+    public async Task ObtieneLaDefinicionDeUnProcedimiento()
+    {
+        if (Skip) { return; }
+
+        await using var session = await OpenAsync();
+
+        var procedureName = $"druse_procedure_{Guid.NewGuid():N}";
+
+        try
+        {
+            await ExecuteAsync(session, Fixture.CreateProcedure(procedureName));
+
+            var folder = new DatabaseObject
+            {
+                Id = $"folder:{Fixture.DefaultSchema}:procedures",
+                Name = "Procedures",
+                Kind = DatabaseObjectKind.Folder,
+                Database = Fixture.DatabaseName,
+                Schema = Fixture.DefaultSchema,
+            };
+            var procedures = await Fixture.Metadata.GetChildrenAsync(
+                session,
+                folder,
+                CancellationToken.None);
+            var procedure = Assert.Single(
+                procedures,
+                item => item.Name == procedureName
+                    || item.Name.StartsWith($"{procedureName}(", StringComparison.Ordinal));
+
+            var definition = await Fixture.Metadata.GetDefinitionAsync(
+                session,
+                procedure,
+                CancellationToken.None);
+
+            Assert.Contains("CREATE", definition, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("PROCEDURE", definition, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains(procedureName, definition, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("marca_procedimiento", definition, StringComparison.OrdinalIgnoreCase);
+        }
+        finally
+        {
+            await ExecuteAsync(session, Fixture.DropProcedure(procedureName));
         }
     }
 

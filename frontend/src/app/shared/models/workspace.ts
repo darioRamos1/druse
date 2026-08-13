@@ -116,14 +116,7 @@ export interface TestConnectionResult {
 
 /** Clase de objeto dentro del explorador. Determina el icono y las acciones. */
 export type DatabaseObjectKind =
-  | 'folder'
-  | 'database'
-  | 'schema'
-  | 'table'
-  | 'view'
-  | 'function'
-  | 'procedure'
-  | 'column';
+  'folder' | 'database' | 'schema' | 'table' | 'view' | 'function' | 'procedure' | 'column';
 
 /** Nodo tal y como lo devuelve la API. */
 export interface DatabaseObject {
@@ -132,6 +125,8 @@ export interface DatabaseObject {
   readonly kind: DatabaseObjectKind;
   readonly database?: string;
   readonly schema?: string;
+  /** Tipo completo cuando el objeto es una columna. */
+  readonly dataType?: string;
   readonly hasChildren: boolean;
   readonly approximateRowCount?: number;
 }
@@ -141,6 +136,7 @@ export interface DatabaseColumn {
   readonly dataType: string;
   readonly isNullable: boolean;
   readonly isPrimaryKey: boolean;
+  readonly isGenerated?: boolean;
   readonly defaultValue?: string;
   readonly ordinal: number;
 }
@@ -181,10 +177,14 @@ export interface KnownColumn {
   readonly dataType: string;
   readonly isNullable: boolean;
   readonly isPrimaryKey: boolean;
+  readonly isGenerated?: boolean;
 }
 
 /** Tabla o vista conocida, para el autocompletado. */
 export interface KnownRelation {
+  readonly connectionId?: string;
+  readonly connectionName?: string;
+  readonly database?: string;
   readonly schema: string;
   readonly name: string;
   readonly kind: 'table' | 'view';

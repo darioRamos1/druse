@@ -56,6 +56,9 @@ public sealed record DatabaseColumn
 
     public bool IsPrimaryKey { get; init; }
 
+    /// <summary>La rellena el motor: identidad, autoincremento o columna calculada.</summary>
+    public bool IsGenerated { get; init; }
+
     public string? DefaultValue { get; init; }
 
     /// <summary>Posición dentro de la tabla, empezando en 1.</summary>

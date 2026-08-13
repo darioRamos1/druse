@@ -40,6 +40,15 @@ interface TreeEntry {
   children: TreeEntry[] | null;
 }
 
+interface PendingRejection {
+  readonly value: QueryRejected;
+  readonly operation: 'execute' | 'export';
+  readonly tabId: string;
+  readonly connectionId: string;
+  readonly sql: string;
+  readonly format?: ExportFormat;
+}
+
 /** Clave con la que se guarda el tiempo máximo de ejecución. */
 const TIMEOUT_PREFERENCE = 'query.timeoutSeconds';
 
@@ -81,9 +90,9 @@ export class WorkspaceStore {
 
   private readonly _currentExecutionId = signal<string | null>(null);
 
-  /** Rechazo pendiente de confirmar por el usuario. */
-  private readonly _rejection = signal<QueryRejected | null>(null);
-  readonly rejection = this._rejection.asReadonly();
+  /** Rechazo ligado a la operación exacta que el servidor no ejecutó. */
+  private readonly _pendingRejection = signal<PendingRejection | null>(null);
+  readonly rejection = computed(() => this._pendingRejection()?.value ?? null);
 
   private readonly _notice = signal<string | null>(null);
   readonly notice = this._notice.asReadonly();
@@ -144,10 +153,16 @@ export class WorkspaceStore {
    * cuadrícula solo tiene las primeras 500 y quien exporta espera el resultado
    * completo.
    */
-  async export(format: ExportFormat, confirmDestructive = false): Promise<void> {
+  async export(
+    format: ExportFormat,
+    confirmDestructive = false,
+    sqlOverride?: string,
+  ): Promise<void> {
     const connection = this.activeConnection();
     const tab = this.activeTab();
-    const sql = (tab?.sql ?? '').trim();
+    const tabId = tab?.id;
+    const sql = (sqlOverride ?? tab?.sql ?? '').trim();
+    const tabSql = tab?.sql;
 
     if (!connection?.sessionId) {
       this._notice.set('No hay ninguna conexión abierta.');
@@ -160,7 +175,7 @@ export class WorkspaceStore {
     }
 
     this._exporting.set(true);
-    this._rejection.set(null);
+    this._pendingRejection.set(null);
 
     try {
       const blob = await firstValueFrom(
@@ -173,15 +188,33 @@ export class WorkspaceStore {
         }),
       );
 
-      download(blob, `${sanitizeFileName(tab?.title ?? 'druse')}.${format}`);
-      this._notice.set(`Exportado a ${format.toUpperCase()}.`);
+      if (this.activeTab()?.id === tabId && this.activeTab()?.sql === tabSql) {
+        download(blob, `${sanitizeFileName(tab?.title ?? 'druse')}.${format}`);
+        this._notice.set(`Exportado a ${format.toUpperCase()}.`);
+      }
     } catch (error) {
       const rejection = await asRejectionFromBlob(error);
 
       if (rejection) {
-        this._rejection.set(rejection);
+        if (
+          tab &&
+          connection &&
+          this.activeTab()?.id === tab.id &&
+          this.activeTab()?.sql === tabSql
+        ) {
+          this._pendingRejection.set({
+            value: rejection,
+            operation: 'export',
+            tabId: tab.id,
+            connectionId: connection.id,
+            sql,
+            format,
+          });
+        }
       } else {
-        this._notice.set(describeError(error));
+        if (this.activeTab()?.id === tabId && this.activeTab()?.sql === tabSql) {
+          this._notice.set(describeError(error));
+        }
       }
     } finally {
       this._exporting.set(false);
@@ -189,8 +222,14 @@ export class WorkspaceStore {
   }
 
   // --- Sesión activa ---------------------------------------------------------
-  private readonly _session = signal<SessionStatus | null>(null);
-  readonly session = this._session.asReadonly();
+  private readonly _activeConnectionId = signal<string | null>(null);
+  private readonly _sessions = signal<ReadonlyMap<string, SessionStatus>>(new Map());
+
+  readonly session = computed(() => {
+    const connectionId = this.activeConnection()?.id;
+
+    return connectionId ? (this._sessions().get(connectionId) ?? null) : null;
+  });
 
   // --- Persistencia ----------------------------------------------------------
   private readonly _secretStore = signal<SecretStoreStatus | null>(null);
@@ -254,9 +293,7 @@ export class WorkspaceStore {
     this.patchConnection(connectionId, { state: 'connecting', error: undefined });
 
     try {
-      const session = await firstValueFrom(
-        this._gateway.openSavedSession(connectionId, password),
-      );
+      const session = await firstValueFrom(this._gateway.openSavedSession(connectionId, password));
 
       this.patchConnection(connectionId, {
         state: 'connected',
@@ -265,7 +302,7 @@ export class WorkspaceStore {
         error: undefined,
       });
 
-      this._session.set({
+      this.setSession(connectionId, {
         connected: true,
         engine: session.engine,
         engineVersion: describeVersion(session.engine, session.serverVersion),
@@ -273,6 +310,7 @@ export class WorkspaceStore {
         user: connection.name,
         lastDurationMs: null,
       });
+      this.activateConnection(connectionId);
 
       await this.loadDatabases(connectionId, session.sessionId);
 
@@ -335,9 +373,19 @@ export class WorkspaceStore {
 
   readonly activeTab = computed(() => this._tabs().find((tab) => tab.active) ?? null);
 
-  readonly activeConnection = computed(
-    () => this._connections().find((connection) => connection.sessionId) ?? null,
-  );
+  readonly activeConnection = computed(() => {
+    const connectionId = this.activeTab()?.connectionId ?? this._activeConnectionId();
+
+    return connectionId
+      ? (this._connections().find(
+          (connection) => connection.id === connectionId && connection.sessionId,
+        ) ?? null)
+      : (this._connections().find((connection) => connection.sessionId) ?? null);
+  });
+
+  engineForConnection(connectionId: string): ConnectionSummary['engine'] | null {
+    return this.findConnection(connectionId)?.engine ?? null;
+  }
 
   /** Árbol aplanado, listo para pintar. */
   readonly explorerNodes = computed<readonly ExplorerNode[]>(() => {
@@ -359,32 +407,27 @@ export class WorkspaceStore {
   });
 
   /** Primer conjunto de resultados, que es el que muestra la cuadrícula. */
-  readonly resultSet = computed<ResultSet | null>(
-    () => this._result()?.resultSets[0] ?? null,
-  );
+  readonly resultSet = computed<ResultSet | null>(() => this._result()?.resultSets[0] ?? null);
 
-  /**
-   * Lo que el editor sabe del esquema, para el autocompletado.
-   *
-   * Se construye desde el árbol ya cargado: si el usuario no ha expandido una
-   * tabla, sus columnas no se sugieren. Consultar el catálogo en cada pulsación
-   * para completar sería mucho peor que sugerir de menos.
-   */
   /**
    * Columnas con su tipo, por tabla calificada.
    *
-   * Vive aparte del árbol porque los nodos del explorador solo llevan nombres,
-   * y el editor necesita el tipo para el tooltip, para el desplegable y para
-   * avisar de una columna que no existe.
+   * Vive aparte del árbol porque el editor necesita nulabilidad y clave primaria,
+   * además del tipo que también se muestra en el explorador.
    */
   private readonly _columns = signal<ReadonlyMap<string, readonly KnownColumn[]>>(new Map());
 
   readonly schemaIndex = computed<SchemaIndex>(() => {
     const schemas = new Set<string>();
     const relations: KnownRelation[] = [];
+    const connectionId = this.activeConnection()?.id;
 
     const walk = (entries: readonly TreeEntry[]): void => {
       for (const entry of entries) {
+        if (connectionId && entry.connectionId !== connectionId) {
+          continue;
+        }
+
         const { object } = entry;
 
         if (object.kind === 'schema') {
@@ -394,12 +437,16 @@ export class WorkspaceStore {
         if (object.kind === 'table' || object.kind === 'view') {
           relations.push({
             schema: object.schema ?? '',
+            connectionId: entry.connectionId,
+            connectionName: this.findConnection(entry.connectionId)?.name,
+            database: object.database,
             name: object.name,
             kind: object.kind,
             qualified: object.schema ? `${object.schema}.${object.name}` : object.name,
-            // Los tipos no viajan en los nodos del árbol, que solo llevan
-            // nombres; salen del catálogo de columnas.
-            columns: this._columns().get(columnKey(object.schema, object.name)) ?? [],
+            columns:
+              this._columns().get(
+                columnKey(entry.connectionId, object.database, object.schema, object.name),
+              ) ?? [],
           });
         }
 
@@ -412,6 +459,26 @@ export class WorkspaceStore {
     walk(this._roots());
 
     return { schemas: [...schemas], relations };
+  });
+
+  /** Relaciones cargadas, aunque su rama del árbol esté plegada. */
+  readonly searchableRelations = computed<readonly ExplorerNode[]>(() => {
+    const relations: ExplorerNode[] = [];
+
+    const walk = (entries: readonly TreeEntry[]): void => {
+      for (const entry of entries) {
+        if (entry.object.kind === 'table' || entry.object.kind === 'view') {
+          relations.push(toExplorerNode(entry));
+        }
+
+        if (entry.children) {
+          walk(entry.children);
+        }
+      }
+    };
+
+    walk(this._roots());
+    return relations;
   });
 
   // --- Edición de filas ------------------------------------------------------
@@ -441,7 +508,11 @@ export class WorkspaceStore {
       return null;
     }
 
-    const columns = this._columns().get(columnKey(table.schema, table.name)) ?? [];
+    const connectionId = this.activeTab()?.connectionId ?? this.activeConnection()?.id;
+    const columns = connectionId
+      ? (this._columns().get(columnKey(connectionId, table.database, table.schema, table.name)) ??
+        [])
+      : [];
     const keyColumns = columns.filter((column) => column.isPrimaryKey).map((column) => column.name);
 
     if (keyColumns.length === 0) {
@@ -452,9 +523,7 @@ export class WorkspaceStore {
       (this.resultSet()?.columns ?? []).map((column) => column.name.toLowerCase()),
     );
 
-    return keyColumns.every((name) => shown.has(name.toLowerCase()))
-      ? { table, keyColumns }
-      : null;
+    return keyColumns.every((name) => shown.has(name.toLowerCase())) ? { table, keyColumns } : null;
   });
 
   /** Anota un cambio sobre una celda. */
@@ -575,7 +644,6 @@ export class WorkspaceStore {
     return { sessionId, table: editable.table, confirmed, edits: filas };
   }
 
-
   // --- Importación -----------------------------------------------------------
 
   private readonly _importPreview = signal<ImportPreview | null>(null);
@@ -593,8 +661,10 @@ export class WorkspaceStore {
     table: DatabaseObject,
     file: File,
     options: ImportOptions,
+    connectionId?: string,
   ): Promise<void> {
-    const sessionId = this.activeConnection()?.sessionId;
+    const sessionId = (connectionId ? this.findConnection(connectionId) : this.activeConnection())
+      ?.sessionId;
 
     if (!sessionId) {
       this._notice.set('No hay ninguna conexión abierta.');
@@ -620,8 +690,10 @@ export class WorkspaceStore {
     table: DatabaseObject,
     file: File,
     options: ImportOptions,
+    connectionId?: string,
   ): Promise<boolean> {
-    const sessionId = this.activeConnection()?.sessionId;
+    const sessionId = (connectionId ? this.findConnection(connectionId) : this.activeConnection())
+      ?.sessionId;
 
     if (!sessionId) {
       this._notice.set('No hay ninguna conexión abierta.');
@@ -631,9 +703,7 @@ export class WorkspaceStore {
     this._importing.set(true);
 
     try {
-      const result = await firstValueFrom(
-        this._gateway.runImport(sessionId, table, file, options),
-      );
+      const result = await firstValueFrom(this._gateway.runImport(sessionId, table, file, options));
 
       this._importPreview.set(null);
       this._notice.set(
@@ -641,7 +711,7 @@ export class WorkspaceStore {
       );
 
       // El recuento del árbol se queda viejo en cuanto se insertan filas.
-      void this.refreshRelationNode(table);
+      void this.refreshRelationNode(table, connectionId);
 
       return true;
     } catch (error) {
@@ -653,8 +723,13 @@ export class WorkspaceStore {
   }
 
   /** Vuelve a pedir el nodo de una tabla, para que su recuento no mienta. */
-  private async refreshRelationNode(table: DatabaseObject): Promise<void> {
-    const entry = this.findRelationEntry(table.schema ?? null, table.name);
+  private async refreshRelationNode(table: DatabaseObject, connectionId?: string): Promise<void> {
+    const entry = this.findRelationEntry(
+      table.schema ?? null,
+      table.name,
+      connectionId,
+      table.database,
+    );
 
     if (entry?.children !== null && entry !== null) {
       entry.children = null;
@@ -712,7 +787,7 @@ export class WorkspaceStore {
         error: undefined,
       });
 
-      this._session.set({
+      this.setSession(id, {
         connected: true,
         engine: form.engine,
         engineVersion: describeVersion(form.engine, session.serverVersion),
@@ -720,6 +795,7 @@ export class WorkspaceStore {
         user: `${form.username}@${form.host}`,
         lastDurationMs: null,
       });
+      this.activateConnection(id);
 
       await this.loadDatabases(id, session.sessionId);
 
@@ -766,9 +842,14 @@ export class WorkspaceStore {
     }
 
     this._roots.update((roots) => roots.filter((root) => root.connectionId !== connectionId));
+    this._sessions.update((sessions) => {
+      const next = new Map(sessions);
+      next.delete(connectionId);
+      return next;
+    });
 
-    if (!this._connections().some((item) => item.sessionId)) {
-      this._session.set(null);
+    if (this._activeConnectionId() === connectionId) {
+      this._activeConnectionId.set(this._connections().find((item) => item.sessionId)?.id ?? null);
     }
   }
 
@@ -841,8 +922,13 @@ export class WorkspaceStore {
    * Sigue sin consultarse el catálogo en cada pulsación: solo la primera vez que
    * se pregunta por una tabla concreta.
    */
-  async ensureColumnsAsync(schema: string | null, name: string): Promise<readonly KnownColumn[]> {
-    const entry = this.findRelationEntry(schema, name);
+  async ensureColumnsAsync(
+    schema: string | null,
+    name: string,
+    connectionId = this.activeConnection()?.id,
+    database?: string,
+  ): Promise<readonly KnownColumn[]> {
+    const entry = this.findRelationEntry(schema, name, connectionId, database);
 
     if (!entry) {
       return [];
@@ -852,7 +938,16 @@ export class WorkspaceStore {
       await this.loadChildren(entry, true);
     }
 
-    return this._columns().get(columnKey(entry.object.schema, entry.object.name)) ?? [];
+    return (
+      this._columns().get(
+        columnKey(
+          entry.connectionId,
+          entry.object.database,
+          entry.object.schema,
+          entry.object.name,
+        ),
+      ) ?? []
+    );
   }
 
   /**
@@ -863,9 +958,14 @@ export class WorkspaceStore {
    */
   async ensureRelationsAsync(schemaName: string): Promise<void> {
     const wanted = schemaName.toLowerCase();
+    const connectionId = this.activeConnection()?.id;
 
     const findSchema = (entries: readonly TreeEntry[]): TreeEntry | null => {
       for (const entry of entries) {
+        if (connectionId && entry.connectionId !== connectionId) {
+          continue;
+        }
+
         if (entry.object.kind === 'schema' && entry.object.name.toLowerCase() === wanted) {
           return entry;
         }
@@ -888,7 +988,12 @@ export class WorkspaceStore {
   }
 
   /** Busca en el árbol la tabla o vista a la que apunta una referencia del SQL. */
-  private findRelationEntry(schema: string | null, name: string): TreeEntry | null {
+  private findRelationEntry(
+    schema: string | null,
+    name: string,
+    connectionId?: string,
+    database?: string,
+  ): TreeEntry | null {
     const wanted = name.toLowerCase();
     const wantedSchema = schema?.toLowerCase() ?? null;
     let fallback: TreeEntry | null = null;
@@ -897,9 +1002,14 @@ export class WorkspaceStore {
       for (const entry of entries) {
         const { object } = entry;
 
+        if (connectionId && entry.connectionId !== connectionId) {
+          continue;
+        }
+
         if (
           (object.kind === 'table' || object.kind === 'view') &&
-          object.name.toLowerCase() === wanted
+          object.name.toLowerCase() === wanted &&
+          (!database || object.database?.toLowerCase() === database.toLowerCase())
         ) {
           if (!wantedSchema || object.schema?.toLowerCase() === wantedSchema) {
             return entry;
@@ -937,6 +1047,30 @@ export class WorkspaceStore {
     this.refreshTree();
   }
 
+  /** Obtiene el DDL de una vista o procedimiento y lo abre sin ejecutarlo. */
+  async openDefinition(node: ExplorerNode): Promise<void> {
+    if (node.kind !== 'view' && node.kind !== 'procedure') {
+      return;
+    }
+
+    const connection = this.findConnection(node.connectionId);
+
+    if (!connection?.sessionId) {
+      this._notice.set('La conexión de este objeto no está abierta.');
+      return;
+    }
+
+    try {
+      const sql = await firstValueFrom(
+        this._gateway.getDefinition(connection.sessionId, node.source),
+      );
+
+      this.createTab(sql, undefined, node.connectionId, `${node.label} · DDL`);
+    } catch (error) {
+      this._notice.set(describeError(error));
+    }
+  }
+
   private async loadDatabases(connectionId: string, sessionId: string): Promise<void> {
     try {
       const databases = await firstValueFrom(this._gateway.getDatabases(sessionId));
@@ -968,7 +1102,11 @@ export class WorkspaceStore {
     this.refreshTree();
 
     try {
-      const children = await this.fetchChildren(connection.sessionId, entry.object);
+      const children = await this.fetchChildren(
+        connection.sessionId,
+        entry.connectionId,
+        entry.object,
+      );
 
       entry.children = children.map((child) => ({
         object: child,
@@ -1003,6 +1141,7 @@ export class WorkspaceStore {
    */
   private async fetchChildren(
     sessionId: string,
+    connectionId: string,
     parent: DatabaseObject,
   ): Promise<readonly DatabaseObject[]> {
     if (parent.kind !== 'table' && parent.kind !== 'view') {
@@ -1014,12 +1153,13 @@ export class WorkspaceStore {
     this._columns.update((current) => {
       const next = new Map(current);
       next.set(
-        columnKey(parent.schema, parent.name),
+        columnKey(connectionId, parent.database, parent.schema, parent.name),
         columns.map((column) => ({
           name: column.name,
           dataType: column.dataType,
           isNullable: column.isNullable,
           isPrimaryKey: column.isPrimaryKey,
+          isGenerated: column.isGenerated,
         })),
       );
 
@@ -1032,6 +1172,7 @@ export class WorkspaceStore {
       kind: 'column' as const,
       database: parent.database,
       schema: parent.schema,
+      dataType: column.dataType,
       hasChildren: false,
     }));
   }
@@ -1115,7 +1256,17 @@ export class WorkspaceStore {
     const connection = this.findConnection(connectionId);
 
     if (connection) {
+      this.activateConnection(connectionId);
       this.patchConnection(connectionId, { expanded: !connection.expanded });
+    }
+  }
+
+  selectConnection(connectionId: string): void {
+    const connection = this.findConnection(connectionId);
+
+    if (connection?.sessionId) {
+      this.activateConnection(connectionId);
+      this.patchConnection(connectionId, { expanded: true });
     }
   }
 
@@ -1123,7 +1274,7 @@ export class WorkspaceStore {
 
   selectTab(id: string): void {
     this._tabs.update((tabs) => tabs.map((tab) => ({ ...tab, active: tab.id === id })));
-    this.discardEdits();
+    this.clearDisplayedResult();
   }
 
   closeTab(id: string): void {
@@ -1136,51 +1287,68 @@ export class WorkspaceStore {
 
       return remaining;
     });
+    this.clearDisplayedResult();
   }
 
-  createTab(sql = '', sourceTable?: DatabaseObject): void {
+  createTab(
+    sql = '',
+    sourceTable?: DatabaseObject,
+    connectionId: string | undefined = this.activeTab()?.connectionId ??
+      this._activeConnectionId() ??
+      undefined,
+    title?: string,
+  ): void {
     tabCounter++;
 
     this._tabs.update((tabs) => [
       ...tabs.map((tab) => ({ ...tab, active: false })),
       {
         id: `q${tabCounter}`,
-        title: `Query ${tabCounter}`,
+        title: title ?? `Query ${tabCounter}`,
         active: true,
         dirty: false,
         sql,
+        connectionId,
         sourceTable,
       },
     ]);
 
     // Cambiar de pestaña cambia lo que hay en la cuadrícula: los cambios
     // pendientes de la anterior no pueden seguir vivos.
-    this.discardEdits();
+    this.clearDisplayedResult();
   }
 
   updateSql(sql: string): void {
     this._tabs.update((tabs) =>
-      tabs.map((tab) => (tab.active ? { ...tab, sql, dirty: true } : tab)),
+      tabs.map((tab) => (tab.active ? { ...tab, sql, dirty: true, sourceTable: undefined } : tab)),
     );
+    this._pendingRejection.set(null);
+    this.discardEdits();
   }
 
   /** Abre una pestaña con un SELECT sobre la tabla indicada. */
-  openSelectFor(node: ExplorerNode): void {
+  openSelectFor(node: ExplorerNode, sql: string): void {
     if (node.kind !== 'table' && node.kind !== 'view') {
       return;
     }
 
-    const qualified = node.source.schema
-      ? `${node.source.schema}.${node.source.name}`
-      : node.source.name;
-
     // La tabla viaja con la pestaña: es lo que permite editar su resultado, y
     // solo lo tienen las pestañas abiertas desde el explorador.
-    this.createTab(`SELECT *\nFROM ${qualified}\nLIMIT 100;\n`, node.source);
+    this.createTab(
+      sql,
+      node.kind === 'table' ? node.source : undefined,
+      node.connectionId,
+      `${node.label} · SELECT`,
+    );
 
     // Sus columnas hacen falta para saber cuál es la clave primaria; se piden
     // ahora para que al ejecutar la cuadrícula ya sepa si se puede editar.
-    void this.ensureColumnsAsync(node.source.schema ?? null, node.source.name);
+    void this.ensureColumnsAsync(
+      node.source.schema ?? null,
+      node.source.name,
+      node.connectionId,
+      node.source.database,
+    );
   }
 
   // --- Ejecución -------------------------------------------------------------
@@ -1191,24 +1359,26 @@ export class WorkspaceStore {
    * `sqlOverride` sirve para ejecutar solo la selección del editor sin tocar el
    * contenido de la pestaña.
    */
-  async execute(sqlOverride?: string, confirmDestructive = false): Promise<void> {
+  async execute(sqlOverride?: string, confirmDestructive = false): Promise<QueryResult | null> {
     const connection = this.activeConnection();
     const tab = this.activeTab();
+    const tabId = tab?.id;
+    const tabSql = tab?.sql;
 
     if (!connection?.sessionId) {
       this._notice.set('No hay ninguna conexión abierta.');
-      return;
+      return null;
     }
 
-    const sql = (sqlOverride ?? tab?.sql ?? '').trim();
+    const sql = sqlOverride ?? tab?.sql ?? '';
 
-    if (!sql) {
+    if (!sql.trim()) {
       this._notice.set('No hay ninguna instrucción que ejecutar.');
-      return;
+      return null;
     }
 
     this._running.set(true);
-    this._rejection.set(null);
+    this._pendingRejection.set(null);
     this._notice.set(null);
 
     // El identificador se genera aquí y se envía con la petición: cancelar exige
@@ -1229,38 +1399,85 @@ export class WorkspaceStore {
         }),
       );
 
-      this._result.set(result);
+      if (this.activeTab()?.id === tabId && this.activeTab()?.sql === tabSql) {
+        this._result.set(result);
+      } else {
+        return null;
+      }
 
-      this._session.update((session) =>
-        session ? { ...session, lastDurationMs: result.durationMs } : session,
-      );
+      this._sessions.update((sessions) => {
+        const current = sessions.get(connection.id);
+
+        if (!current) {
+          return sessions;
+        }
+
+        const next = new Map(sessions);
+        next.set(connection.id, { ...current, lastDurationMs: result.durationMs });
+        return next;
+      });
 
       if (result.state === 'failed' && result.error) {
-        this._notice.set(result.error.message);
+        if (this.activeTab()?.id === tabId && this.activeTab()?.sql === tabSql) {
+          this._notice.set(result.error.message);
+        }
       }
+
+      return result;
     } catch (error) {
       // Un 409 no es un fallo de transporte: es la API pidiendo confirmación.
       const rejection = asRejection(error);
 
       if (rejection) {
-        this._rejection.set(rejection);
+        if (
+          tab &&
+          connection &&
+          this.activeTab()?.id === tab.id &&
+          this.activeTab()?.sql === tabSql
+        ) {
+          this._pendingRejection.set({
+            value: rejection,
+            operation: 'execute',
+            tabId: tab.id,
+            connectionId: connection.id,
+            sql,
+          });
+        }
       } else {
-        this._notice.set(describeError(error));
+        if (this.activeTab()?.id === tabId && this.activeTab()?.sql === tabSql) {
+          this._notice.set(describeError(error));
+        }
       }
+
+      return null;
     } finally {
       this._running.set(false);
       this._currentExecutionId.set(null);
     }
   }
 
-  /** Repite la última ejecución asumiendo el riesgo que la bloqueó. */
-  async confirmAndExecute(sqlOverride?: string): Promise<void> {
-    this._rejection.set(null);
-    await this.execute(sqlOverride, true);
+  /** Confirma exactamente la operación que el servidor rechazó. */
+  async confirmAndExecute(): Promise<QueryResult | null> {
+    const pending = this._pendingRejection();
+    const tab = this.activeTab();
+
+    if (!pending || tab?.id !== pending.tabId || tab.connectionId !== pending.connectionId) {
+      this._pendingRejection.set(null);
+      return null;
+    }
+
+    this._pendingRejection.set(null);
+
+    if (pending.operation === 'export' && pending.format) {
+      await this.export(pending.format, true, pending.sql);
+      return null;
+    } else {
+      return await this.execute(pending.sql, true);
+    }
   }
 
   dismissRejection(): void {
-    this._rejection.set(null);
+    this._pendingRejection.set(null);
   }
 
   dismissNotice(): void {
@@ -1285,6 +1502,23 @@ export class WorkspaceStore {
 
   private findConnection(id: string): ConnectionSummary | undefined {
     return this._connections().find((connection) => connection.id === id);
+  }
+
+  private setSession(connectionId: string, session: SessionStatus): void {
+    this._sessions.update((sessions) => new Map(sessions).set(connectionId, session));
+  }
+
+  private activateConnection(connectionId: string): void {
+    this._activeConnectionId.set(connectionId);
+    this._tabs.update((tabs) =>
+      tabs.map((tab) => (tab.active && !tab.connectionId ? { ...tab, connectionId } : tab)),
+    );
+  }
+
+  private clearDisplayedResult(): void {
+    this._result.set(null);
+    this._pendingRejection.set(null);
+    this.discardEdits();
   }
 
   private patchConnection(id: string, patch: Partial<ConnectionSummary>): void {
@@ -1326,10 +1560,16 @@ export class WorkspaceStore {
   }
 }
 
-/** Identificador único dentro del árbol: el mismo objeto puede salir en dos conexiones. */
-/** Clave con la que se guardan las columnas de una tabla. */
-function columnKey(schema: string | undefined, name: string): string {
-  return `${(schema ?? '').toLowerCase()}.${name.toLowerCase()}`;
+/** Clave de columnas: el mismo nombre puede existir en varias conexiones y bases. */
+function columnKey(
+  connectionId: string,
+  database: string | undefined,
+  schema: string | undefined,
+  name: string,
+): string {
+  return [connectionId, database ?? '', schema ?? '', name]
+    .map((part) => part.toLowerCase())
+    .join('|');
 }
 
 function nodeKey(entry: TreeEntry): string {
@@ -1348,6 +1588,7 @@ function toExplorerNode(entry: TreeEntry): ExplorerNode {
     expanded: entry.expanded,
     loading: entry.loading,
     badge: object.approximateRowCount?.toLocaleString('es'),
+    hint: object.kind === 'column' ? object.dataType : undefined,
     source: object,
     connectionId: entry.connectionId,
   };

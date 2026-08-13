@@ -85,14 +85,15 @@
 
     @if (connection.expanded) {
       @for (node of nodesOf(connection.id); track node.id) {
-        <button
-          type="button"
+        <div
           class="node node--object"
           [class.is-selected]="node.selected"
           [style.padding-left.px]="indentFor(node)"
           role="treeitem"
+          tabindex="0"
           [attr.aria-expanded]="node.expandable ? node.expanded : null"
           (click)="toggleNode.emit(node.id)"
+          (keydown)="onNodeKeydown($event, node.id)"
           (dblclick)="openNode.emit(node)"
         >
           @if (node.expandable) {
@@ -118,64 +119,114 @@
             {{ node.label }}
           </span>
 
+          @if (node.hint) {
+            <span class="node__hint" [title]="node.hint">
+              {{ node.hint }}
+            </span>
+          }
+
           @if (node.loading) {
             <span class="node__badge">…</span>
           } @else if (node.badge) {
             <span class="node__badge">{{ node.badge }}</span>
           }
 
-          <span class="node__actions">
-            @if (node.kind === 'table' || node.kind === 'view') {
-              <span
-                class="tool"
-                title="Abrir SELECT en una pestaña nueva"
-                (click)="act($event, () => openNode.emit(node))"
+          @if (
+            node.kind === 'table' ||
+            node.kind === 'view' ||
+            node.kind === 'procedure' ||
+            node.expandable
+          ) {
+            <div class="node__menu-wrap" (focusout)="closeMenu($event, node.id)">
+              <button
+                type="button"
+                class="node__menu-trigger"
+                [attr.aria-label]="'Acciones para ' + node.label"
+                [attr.aria-expanded]="openMenuId() === node.id"
+                aria-haspopup="menu"
+                (click)="toggleMenu($event, node.id)"
               >
-                <app-icon name="console" [size]="11" />
-              </span>
-              <span
-                class="tool"
-                title="Componer una consulta sobre esta tabla"
-                (click)="act($event, () => composeQuery.emit(node))"
-              >
-                <app-icon name="filter" [size]="11" />
-              </span>
-              <span
-                class="tool"
-                [attr.title]="'Copiar ' + qualifiedName(node)"
-                (click)="copyName($event, node)"
-              >
-                <app-icon name="new-query" [size]="11" />
-              </span>
-            }
+                ⋯
+              </button>
 
-            @if (node.kind === 'table') {
-              <!-- Solo en tablas: en una vista no se puede insertar. -->
-              <span
-                class="tool"
-                title="Importar un archivo a esta tabla"
-                (click)="act($event, () => importInto.emit(node))"
-              >
-                <app-icon name="export" [size]="11" />
-              </span>
-            }
+              @if (openMenuId() === node.id) {
+                <div
+                  class="node-menu"
+                  role="menu"
+                  [style.top.px]="menuPosition().top"
+                  [style.left.px]="menuPosition().left"
+                  (click)="$event.stopPropagation()"
+                  (keydown)="stopMenuKeydown($event)"
+                >
+                  @if (node.kind === 'table' || node.kind === 'view') {
+                    <button
+                      type="button"
+                      role="menuitem"
+                      (click)="act($event, () => openNode.emit(node))"
+                    >
+                      <app-icon name="console" [size]="12" />
+                      Abrir SELECT
+                    </button>
+                    <button
+                      type="button"
+                      role="menuitem"
+                      (click)="act($event, () => composeQuery.emit(node))"
+                    >
+                      <app-icon name="filter" [size]="12" />
+                      Componer consulta
+                    </button>
+                    <button type="button" role="menuitem" (click)="copyName($event, node)">
+                      <app-icon name="new-query" [size]="12" />
+                      Copiar nombre calificado
+                    </button>
+                  }
 
-            @if (node.expandable && node.expanded && !node.loading) {
-              <span
-                class="tool"
-                title="Actualizar"
-                (click)="act($event, () => refreshNode.emit(node.id))"
-              >
-                <app-icon name="refresh" [size]="11" />
-              </span>
-            }
-          </span>
-        </button>
+                  @if (node.kind === 'view' || node.kind === 'procedure') {
+                    <button
+                      type="button"
+                      role="menuitem"
+                      (click)="act($event, () => definition.emit(node))"
+                    >
+                      <app-icon name="new-query" [size]="12" />
+                      Ver DDL
+                    </button>
+                  }
+
+                  @if (node.kind === 'table') {
+                    <button
+                      type="button"
+                      role="menuitem"
+                      (click)="act($event, () => importInto.emit(node))"
+                    >
+                      <app-icon name="export" [size]="12" />
+                      Importar archivo
+                    </button>
+                  }
+
+                  @if (node.expandable && node.expanded && !node.loading) {
+                    <button
+                      type="button"
+                      role="menuitem"
+                      (click)="act($event, () => refreshNode.emit(node.id))"
+                    >
+                      <app-icon name="refresh" [size]="12" />
+                      Actualizar objetos
+                    </button>
+                  }
+                </div>
+              }
+            </div>
+          }
+        </div>
       }
     }
   } @empty {
     <p class="empty">
-      @if (filter()) { Ninguna conexión coincide con el filtro. } @else { No hay conexiones todavía. }
+      @if (filter()) {
+        Ninguna conexión coincide con el filtro.
+      } @else {
+        No hay conexiones todavía.
+      }
       <button type="button" class="empty__action" (click)="addConnection.emit()">
         Crear una conexión
       </button>

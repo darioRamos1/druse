@@ -164,6 +164,7 @@
   }
 
   &--object {
+    position: relative;
     height: 26px;
     padding-right: 8px;
     border-radius: 6px;
@@ -223,6 +224,13 @@
   }
 
   &__hint {
+    flex: 0 1 45%;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-family: var(--dr-font-mono);
+    font-size: 10px;
     color: var(--dr-text-faintest);
   }
 
@@ -238,22 +246,69 @@
     gap: 1px;
   }
 
-  // Las acciones por objeto solo aparecen al pasar por encima: mostrarlas
-  // siempre llenaría el árbol de iconos y taparía los nombres, que es lo que
-  // el usuario viene a leer.
-  &__actions {
-    display: none;
-    align-items: center;
-    gap: 1px;
+  &__menu-wrap {
+    position: relative;
+    flex: none;
   }
 
-  &:hover &__actions,
-  &:focus-visible &__actions {
+  &__menu-trigger {
     display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 22px;
+    border: 0;
+    border-radius: 5px;
+    background: transparent;
+    color: var(--dr-text-faint);
+    font-size: 16px;
+    line-height: 1;
+    cursor: pointer;
+
+    &:hover,
+    &[aria-expanded='true'] {
+      background: #232c42;
+      color: var(--dr-text);
+    }
   }
 
   &.is-selected &__icon {
     color: var(--dr-accent-bright);
+  }
+}
+
+.node-menu {
+  position: fixed;
+  z-index: 30;
+  width: 190px;
+  padding: 5px;
+  border: 1px solid var(--dr-border-subtle);
+  border-radius: 8px;
+  background: #111722;
+  box-shadow: 0 12px 32px rgb(0 0 0 / 45%);
+
+  button {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    min-height: 30px;
+    padding: 0 8px;
+    border: 0;
+    border-radius: 5px;
+    background: transparent;
+    color: var(--dr-text-muted);
+    font-family: inherit;
+    font-size: 11.5px;
+    text-align: left;
+    cursor: pointer;
+
+    &:hover,
+    &:focus-visible {
+      outline: none;
+      background: #1d2637;
+      color: var(--dr-text);
+    }
   }
 }
 
