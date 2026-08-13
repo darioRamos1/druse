@@ -43,7 +43,17 @@ builder.Services.AddDruse();
 // navegador pueda enviar la cabecera del token (plan §12).
 const string DevelopmentCorsPolicy = "druse-dev";
 builder.Services.AddCors(options => options.AddPolicy(DevelopmentCorsPolicy, policy =>
-    policy.WithOrigins("http://localhost:4200", "http://127.0.0.1:4200")
+    policy.WithOrigins(
+              // Servidor de desarrollo de Angular.
+              "http://localhost:4200",
+              "http://127.0.0.1:4200",
+              // La ventana empaquetada. Tauri sirve la aplicación desde su
+              // propio protocolo —`http://tauri.localhost` en Windows y
+              // `tauri://localhost` en macOS y Linux—, así que sin estos dos
+              // orígenes el navegador incrustado descarta la respuesta y la
+              // aplicación instalada no puede hablar con su propia API.
+              "http://tauri.localhost",
+              "tauri://localhost")
           .WithHeaders("Content-Type", "X-Druse-Token")
           .WithMethods("GET", "POST", "PUT", "DELETE")));
 
