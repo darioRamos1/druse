@@ -181,6 +181,8 @@ El usuario abrió su SQL Server de preproducción y lo que salió no estaba en n
 
 9. **La aplicación empaquetada salía sin estilos**, y el usuario lo había visto. No era un fallo de los estilos: Angular difiere la hoja poniéndola como `media="print"` y activándola con un manejador en línea (`onload="this.media='all'"`), y la CSP de Tauri —`script-src 'self'`— bloquea los manejadores en línea. La hoja se quedaba en `print` para siempre, así que solo se aplicaba el CSS crítico incrustado. En el navegador no pasa porque ahí no hay CSP: **solo se ve empaquetando**. Se desactivó `inlineCritical` en la compilación de producción, y ahora el enlace es una hoja normal sin nada en línea.
 
+   **Cómo se comprobó, que es lo reutilizable:** se sirvió el `dist` compilado con un servidor estático que devuelve **la CSP exacta del envoltorio**, y se abrió en el navegador. Es la única condición que distingue al ejecutable, y así se puede verificar sin empaquetar. Resultado: la hoja se aplica (`media` vacío, 16 hojas activas), el fondo es `#07080B` y la barra superior mide sus 46 px. En el binario ya no aparece `media="print"` por ninguna parte.
+
 **Al día:** 285 pruebas de backend y 137 de frontend.
 
 **Sin verificar todavía:** el recorrido en el navegador de la edición de filas y de la importación. Lo que decide si una tabla es editable sí se comprobó en la aplicación real; los clics finales los hará el usuario, y conviene que sea sobre una tabla de prueba.
