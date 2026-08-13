@@ -17,7 +17,7 @@
 | Fase 8 | ✅ **7/7.** Tres motores sobre el mismo contrato y primera beta preparada. |
 | ¿Compila el backend? | Sí — 0 advertencias, 0 errores |
 | ¿Compila el envoltorio? | Sí |
-| ¿Pasan las pruebas? | Sí — **269 en backend** y **120 en frontend** |
+| ¿Pasan las pruebas? | Sí — **285 en backend** y **137 en frontend** |
 | ¿Hay aplicación de escritorio? | **Sí.** Instalador NSIS, MSI y ZIP portable |
 | Motores | **PostgreSQL, SQL Server y MySQL/MariaDB**, con las **mismas 24 pruebas contractuales** cada uno |
 | Bloqueantes | Ninguno |
@@ -30,7 +30,7 @@
    - arrancar en una máquina sin .NET ni Node, que es el criterio que demuestra que el paquete se basta solo.
 2. Artefactos de Linux y macOS: el script acepta cualquier RID, pero generarlos exige compilar en cada plataforma. Es trabajo de integración continua.
 3. **Probar la edición de filas a mano**: editar una celda, ver el SQL y confirmar. Es lo único de lo entregado que no se ha recorrido en el navegador.
-4. **De las tres que pidió el usuario** (plan §15), la edición de filas ya está. Quedan **importar CSV/Excel** —que reutiliza sus mismas protecciones— y la **ayuda para componer consultas**, que es la única de las tres que no escribe en los datos.
+4. **Las tres que pidió el usuario están entregadas** (plan §15): edición de filas, importar CSV/Excel y ayuda para componer consultas. Lo que falta de ellas es **usarlas**: ni la edición ni la importación se han recorrido clic a clic en el navegador.
 
 **El visto bueno visual ya está dado** (sesión 011, con la extensión de Chrome por fin conectada): la pantalla reproduce el mockup. Lo único ausente es la pestaña «Plan de ejecución», que está fuera del MVP.
 
@@ -175,7 +175,13 @@ El usuario abrió su SQL Server de preproducción y lo que salió no estaba en n
 
 **Al día:** 269 pruebas de backend y 120 de frontend.
 
-**Sin verificar todavía:** el recorrido completo de la edición de filas en el navegador —editar, ver el SQL, confirmar—. La cadena que decide si una tabla es editable sí se comprobó en la aplicación real; el clic final lo hará el usuario.
+7. **Importar CSV y Excel**, con la previsualización como pieza central: emparejar por nombre, revisar todas las filas y no escribir nada si algo no cabe.
+
+8. **Componer consultas** sin escribirlas, y plantillas de `INSERT`, `UPDATE` y `CREATE TABLE` desde el catálogo.
+
+**Al día:** 285 pruebas de backend y 137 de frontend.
+
+**Sin verificar todavía:** el recorrido en el navegador de la edición de filas y de la importación. Lo que decide si una tabla es editable sí se comprobó en la aplicación real; los clics finales los hará el usuario, y conviene que sea sobre una tabla de prueba.
 
 **Decisiones tomadas:** D-20 a D-23 (ver §6).
 

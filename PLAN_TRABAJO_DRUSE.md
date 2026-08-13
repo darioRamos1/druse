@@ -738,23 +738,23 @@ El MVP estará terminado cuando:
 
 ## 15. Backlog posterior al MVP
 
-### Lo siguiente, pedido por el usuario (sesión 011)
+### Pedido por el usuario tras probar la beta (sesión 011) — hecho
 
-Estas tres ya estaban en el backlog, pero sueltas y sin dueño. El usuario las
-pidió juntas después de usar la beta contra su base de preproducción, así que
-pasan al frente y se describen por lo que tienen que resolver, no por su
-etiqueta:
+Las tres estaban en el backlog, sueltas y descritas por su etiqueta. El usuario
+las pidió juntas después de usar la beta contra su base de preproducción, y se
+entregaron en ese mismo orden porque todas tocan la pieza que el MVP dejó de
+solo lectura:
 
-| # | Petición | Qué significa |
+| # | Petición | Cómo quedó |
 | --- | --- | --- |
-| 1 | **Exportar e importar, fácil** | Exportar ya existe (CSV y XLSX). Falta la vuelta: **cargar un CSV o un Excel dentro de una tabla**, viendo antes qué columna va a cuál, qué se va a insertar y qué va a fallar. Sin previsualización, importar es apostar. |
-| 2 | **Ajustar varios registros a la vez** | Editar los resultados en la propia cuadrícula, como el «Edit Top 200 Rows» de SQL Server: cambiar varias celdas, ver qué se ha tocado y guardar. Exige clave primaria para saber a qué fila apunta cada cambio, y debe **enseñar el `UPDATE` antes de ejecutarlo**. |
-| 3 | **Ayuda para crear las consultas** | Componer la consulta sin escribirla entera: elegir tabla y columnas, filtros y orden, y que Druse escriba el SQL. También lo inverso —generar `INSERT`, `UPDATE` o `CREATE TABLE` de un objeto del árbol—, que es la «generación de scripts» del backlog. |
+| 1 | **Ajustar varios registros a la vez** | Edición en la cuadrícula, solo donde se puede señalar una fila sin ambigüedad: tabla abierta desde el explorador, con clave primaria, y con esa clave entre las columnas. Guardar es en dos pasos, con el `UPDATE` a la vista. En el servidor: transacción, parámetros y **una fila por instrucción**. |
+| 2 | **Exportar e importar, fácil** | Importar CSV y XLSX desde la tabla. Las columnas se emparejan **por nombre, nunca por posición**; la previsualización revisa todas las filas y enumera lo que no cabe con su fila y su columna; si hay un solo valor imposible, no entra nada. |
+| 3 | **Ayuda para crear las consultas** | Panel que compone `SELECT` con columnas, filtros, orden y límite, enseñando el SQL mientras se hace; más plantillas de `INSERT`, `UPDATE` y `CREATE TABLE` desde el catálogo. Una sola tabla: el JOIN necesita saber por qué columnas se relacionan, y eso aún no se lee. |
 
-Las tres tocan la misma pieza que el MVP dejó a propósito de solo lectura, así
-que el orden entre ellas importa: **la 2 es la que obliga a que Druse escriba en
-los datos del usuario**, y de ahí salen las reglas que las otras dos reutilizan
-—clave primaria, previsualización del SQL, confirmación y transacción—.
+**Lo que salió de usarla y no estaba previsto:** el explorador no podía listar
+tablas sin permisos de administración, el autocompletado se apagaba con esquemas
+propios, dos peticiones simultáneas rompían la conexión y los errores del motor
+llegaban como «error inesperado». Los cuatro corregidos.
 
 ### Prioridad alta
 
