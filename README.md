@@ -4,7 +4,23 @@ Aplicación de escritorio para administrar y consultar distintos motores de base
 
 Una *drusa* es la costra de cristales que tapiza el interior de una geoda: la estructura que aparece al abrir la piedra. Es lo que hace la aplicación con una base de datos.
 
-> **Estado: primera beta (0.1.0).** Funciona el flujo completo contra **PostgreSQL, SQL Server y MySQL/MariaDB**: conectar, explorar el catálogo, escribir SQL con autocompletado del esquema, ejecutar, cancelar, consultar el historial y **exportar a CSV o Excel**, todo dentro de una aplicación de escritorio que no necesita .NET ni Node.js instalados. Ver las [notas de la versión](docs/release-notes/0.1.0-beta.md).
+> **Estado: primera beta (0.1.0).** Funciona el flujo completo contra **PostgreSQL, SQL Server y MySQL/MariaDB**: conectar, explorar el catálogo, escribir SQL con ayudas de esquema, ejecutar, cancelar, consultar el historial, **exportar e importar CSV o Excel** y **editar filas desde la cuadrícula**, todo dentro de una aplicación de escritorio que no necesita .NET ni Node.js instalados. Ver las [notas de la versión](docs/release-notes/0.1.0-beta.md).
+
+## Editar, importar y exportar
+
+Lo que escribe en tus datos comparte tres reglas: **va en una transacción**, usa
+parámetros y **te enseña el SQL antes de ejecutarlo**.
+
+| Acción | Dónde | Qué exige |
+| --- | --- | --- |
+| Editar filas | Doble clic en una celda del resultado | Que la pestaña venga de una tabla con clave primaria y que esa clave esté entre las columnas |
+| Importar | Icono en la tabla, dentro del explorador | Ver antes la correspondencia de columnas y que ningún valor sea imposible |
+| Componer consultas | Icono en la tabla, dentro del explorador | Nada: no escribe en la base, solo produce SQL |
+
+Al editar, **cada instrucción tiene que afectar exactamente a una fila**. Si toca
+cero —la fila ya no está— o más de una —la clave no era única—, se deshace todo.
+Al importar, las columnas se emparejan **por nombre y nunca por posición**, y si
+un solo valor no cabe en su columna no entra nada.
 
 ## Exportar
 

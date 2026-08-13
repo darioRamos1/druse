@@ -179,6 +179,8 @@ El usuario abrió su SQL Server de preproducción y lo que salió no estaba en n
 
 8. **Componer consultas** sin escribirlas, y plantillas de `INSERT`, `UPDATE` y `CREATE TABLE` desde el catálogo.
 
+9. **La aplicación empaquetada salía sin estilos**, y el usuario lo había visto. No era un fallo de los estilos: Angular difiere la hoja poniéndola como `media="print"` y activándola con un manejador en línea (`onload="this.media='all'"`), y la CSP de Tauri —`script-src 'self'`— bloquea los manejadores en línea. La hoja se quedaba en `print` para siempre, así que solo se aplicaba el CSS crítico incrustado. En el navegador no pasa porque ahí no hay CSP: **solo se ve empaquetando**. Se desactivó `inlineCritical` en la compilación de producción, y ahora el enlace es una hoja normal sin nada en línea.
+
 **Al día:** 285 pruebas de backend y 137 de frontend.
 
 **Sin verificar todavía:** el recorrido en el navegador de la edición de filas y de la importación. Lo que decide si una tabla es editable sí se comprobó en la aplicación real; los clics finales los hará el usuario, y conviene que sea sobre una tabla de prueba.
@@ -671,6 +673,7 @@ El usuario abrió su SQL Server de preproducción y lo que salió no estaba en n
 | D-20 | **En MySQL el árbol conserva el nivel de esquema**, con un nodo del mismo nombre que su base. `SCHEMA` es allí un sinónimo de `DATABASE`, así que el nivel es redundante; aun así se mantiene para que el explorador se comporte igual en los tres motores. La alternativa sería un árbol distinto solo para MySQL, y eso obligaría a ramificar por motor en la interfaz (plan §13). | 2026-08-12 |
 | D-21 | **El tiempo de espera de MySQL lo controla el proveedor, no `CommandTimeout`.** El driver corta con `KILL QUERY` y hay instrucciones que al ser interrumpidas terminan «bien»: la consulta caducada se anunciaba como completada. Con un token propio se distingue el reloj del usuario. | 2026-08-12 |
 | D-22 | **Cuatro opciones fijadas en la cadena de conexión de MySQL**: `ConvertZeroDateTime`, `GuidFormat=None`, `TreatTinyAsBoolean` y `AllowUserVariables`. Las tres primeras existen porque Druse muestra datos de bases ajenas y no puede reventar ante un `0000-00-00` o un `CHAR(36)` que no sea un GUID; la cuarta, porque un cliente SQL tiene que poder ejecutar `SET @x = …`. | 2026-08-12 |
+| D-24 | **Sin CSS crítico incrustado en producción** (`inlineCritical: false`). Angular lo activa con un manejador `onload` en línea, y la CSP de Tauri prohíbe los manejadores en línea: la hoja de estilos no llegaba a aplicarse dentro del ejecutable. Se pierde una micro-optimización del primer pintado; se gana que la aplicación se vea. Relajar la CSP para permitirlo habría sido cambiar una protección real por una décima de segundo. | 2026-08-12 |
 | D-23 | **La primera beta es la `0.1.0`, sin sufijo de prerrelease.** Un `0.x` ya dice que es una beta, y los instaladores MSI de Windows exigen una versión de tres partes numéricas: añadir `-beta.1` sería arriesgar el empaquetado para repetir algo que el número ya comunica. Lo que sí se declara por escrito son sus límites, en `docs/release-notes/0.1.0-beta.md`. | 2026-08-12 |
 
 ### Abiertas
