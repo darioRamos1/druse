@@ -1,0 +1,274 @@
+/* Mismo modal que los otros dos diálogos del shell. */
+:host {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--dr-font-ui);
+  font-size: var(--dr-font-size-sm);
+}
+
+.backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgb(5 7 11 / 66%);
+  backdrop-filter: blur(2px);
+}
+
+.dialog {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 760px;
+  max-width: calc(100vw - 32px);
+  max-height: calc(100vh - 32px);
+  overflow: hidden;
+  border: 1px solid #262f42;
+  border-radius: 12px;
+  background: #111621;
+  box-shadow: 0 40px 120px rgb(0 0 0 / 70%);
+}
+
+.head {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 18px 20px 16px;
+  border-bottom: 1px solid var(--dr-border);
+}
+
+.title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.subtitle {
+  margin: 4px 0 0;
+  color: var(--dr-text-tertiary);
+  font-size: 12px;
+}
+
+.close {
+  margin-left: auto;
+  border: 0;
+  background: transparent;
+  color: var(--dr-text-tertiary);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+
+  &:hover {
+    color: var(--dr-text);
+  }
+}
+
+.body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px 20px;
+}
+
+.block {
+  margin-bottom: 18px;
+
+  &__title {
+    margin: 0 0 8px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--dr-text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+
+  &--row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    align-items: flex-end;
+  }
+}
+
+.hint {
+  margin: 0 0 8px;
+  color: var(--dr-text-tertiary);
+  font-size: 11.5px;
+}
+
+/* Las columnas se marcan a golpe de vista: son lo que más se toca aquí. */
+.columns {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 4px;
+  max-height: 190px;
+  overflow-y: auto;
+  padding: 6px;
+  border: 1px solid var(--dr-border);
+  border-radius: 8px;
+  background: var(--dr-surface-base);
+}
+
+.column {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 6px;
+  border-radius: 5px;
+  cursor: pointer;
+
+  &:hover {
+    background: #151b27;
+  }
+
+  &.is-on {
+    background: rgb(108 139 255 / 12%);
+  }
+
+  &__name {
+    font-family: var(--dr-font-mono);
+    font-size: 12px;
+  }
+
+  &__type {
+    margin-left: auto;
+    color: var(--dr-text-faint);
+    font-size: 10.5px;
+  }
+}
+
+.filter {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  margin-bottom: 6px;
+
+  &__novalue {
+    flex: 1;
+    color: var(--dr-text-faint);
+    font-size: 11.5px;
+    font-style: italic;
+  }
+}
+
+select,
+input[type='text'],
+input[type='number'] {
+  padding: 5px 8px;
+  border: 1px solid var(--dr-border-subtle);
+  border-radius: 6px;
+  background: var(--dr-surface-base);
+  color: var(--dr-text);
+  font-family: var(--dr-font-mono);
+  font-size: 12px;
+}
+
+.filter input[type='text'] {
+  flex: 1;
+  min-width: 0;
+}
+
+.tiny {
+  width: 110px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+
+  &__label {
+    color: var(--dr-text-muted);
+    font-size: 11.5px;
+  }
+}
+
+.check {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--dr-text-secondary);
+}
+
+.icon {
+  width: 24px;
+  height: 24px;
+  border: 1px solid var(--dr-border-subtle);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--dr-text-tertiary);
+  cursor: pointer;
+
+  &:hover {
+    color: var(--dr-text);
+  }
+}
+
+/* El SQL se ve mientras se compone: esconderlo obligaría a aprender la
+   interfaz en lugar de aprender SQL, que es lo que sirve fuera de Druse. */
+.sql {
+  margin: 0;
+  padding: 10px 12px;
+  overflow-x: auto;
+  border: 1px solid var(--dr-border);
+  border-radius: 8px;
+  background: var(--dr-surface-base);
+  color: var(--dr-text);
+  font-family: var(--dr-font-mono);
+  font-size: 12px;
+  white-space: pre;
+}
+
+.foot {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  padding: 14px 20px;
+  border-top: 1px solid var(--dr-border);
+}
+
+.templates {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+
+  &__label {
+    color: var(--dr-text-tertiary);
+    font-size: 11.5px;
+  }
+}
+
+.spacer {
+  flex: 1;
+}
+
+.btn {
+  height: 30px;
+  padding: 0 14px;
+  border: 1px solid var(--dr-border-subtle);
+  border-radius: var(--dr-radius);
+  background: transparent;
+  color: var(--dr-text-muted);
+  font-family: inherit;
+  font-size: 12px;
+  cursor: pointer;
+
+  &:hover:not(:disabled) {
+    background: #151b27;
+    color: var(--dr-text);
+  }
+
+  &--small {
+    height: 26px;
+    padding: 0 10px;
+    font-size: 11.5px;
+  }
+
+  &--primary {
+    border-color: rgb(108 139 255 / 40%);
+    background: rgb(108 139 255 / 14%);
+    color: var(--dr-accent-bright);
+  }
+}

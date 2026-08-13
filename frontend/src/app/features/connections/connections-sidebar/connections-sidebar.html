@@ -135,6 +135,13 @@
               </span>
               <span
                 class="tool"
+                title="Componer una consulta sobre esta tabla"
+                (click)="act($event, () => composeQuery.emit(node))"
+              >
+                <app-icon name="filter" [size]="11" />
+              </span>
+              <span
+                class="tool"
                 [attr.title]="'Copiar ' + qualifiedName(node)"
                 (click)="copyName($event, node)"
               >

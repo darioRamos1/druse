@@ -15,6 +15,7 @@
     (forget)="forget($event)"
     (openNode)="openNode($event)"
     (importInto)="openImport($event)"
+    (composeQuery)="openBuilder($event)"
     (copied)="onCopied($event)"
     (copyFailed)="onCopyFailed()"
   />
@@ -137,4 +138,13 @@
 
 @if (importTarget(); as tabla) {
   <app-import-dialog [table]="tabla" (closed)="closeImport()" />
+}
+
+@if (builderTarget(); as tabla) {
+  <app-query-builder
+    [table]="tabla"
+    [engine]="activeEngine()"
+    (insert)="insertComposed($event)"
+    (closed)="closeBuilder()"
+  />
 }

@@ -15,6 +15,7 @@ import { EditorTabs } from '../../features/query-editor/editor-tabs/editor-tabs'
 import { EditorToolbar } from '../../features/query-editor/editor-toolbar/editor-toolbar';
 import { CursorPosition, SqlEditor } from '../../features/query-editor/sql-editor/sql-editor';
 import { ImportDialog } from '../../features/import/import-dialog/import-dialog';
+import { QueryBuilder } from '../../features/query-builder/query-builder/query-builder';
 import { ResultsPanel } from '../../features/query-results/results-panel/results-panel';
 import {
   CellEdit,
@@ -64,6 +65,7 @@ const DISCONNECTED: SessionStatus = {
     SqlEditor,
     ResultsPanel,
     ImportDialog,
+    QueryBuilder,
     ResizeHandle,
   ],
   templateUrl: './app-shell.html',
@@ -93,6 +95,27 @@ export class AppShell {
 
   protected closeImport(): void {
     this.importTarget.set(null);
+  }
+
+  /** Tabla sobre la que se está componiendo una consulta. */
+  protected readonly builderTarget = signal<DatabaseObject | null>(null);
+
+  protected openBuilder(node: ExplorerNode): void {
+    this.builderTarget.set(node.source);
+  }
+
+  protected closeBuilder(): void {
+    this.builderTarget.set(null);
+  }
+
+  /**
+   * Lo compuesto va a una pestaña nueva, no encima de la que hubiera.
+   *
+   * Pisar lo que el usuario tenía a medio escribir sería la peor forma de
+   * estrenar una ayuda.
+   */
+  protected insertComposed(sql: string): void {
+    this._store.createTab(sql, this.builderTarget() ?? undefined);
   }
 
   // --- Estado del área de trabajo -------------------------------------------

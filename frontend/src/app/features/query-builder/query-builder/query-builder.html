@@ -1,0 +1,134 @@
+<div class="backdrop" (click)="close()"></div>
+
+<div class="dialog" role="dialog" aria-modal="true" aria-labelledby="builder-title">
+  <header class="head">
+    <div>
+      <h2 class="title" id="builder-title">Componer consulta sobre {{ table().name }}</h2>
+      <p class="subtitle">
+        Lo que salga es un punto de partida: se inserta en el editor y se sigue a mano.
+      </p>
+    </div>
+    <button type="button" class="close" (click)="close()" aria-label="Cerrar">×</button>
+  </header>
+
+  <div class="body">
+    <section class="block">
+      <h3 class="block__title">Columnas</h3>
+      <p class="hint">Sin marcar ninguna se escribe <code>*</code>.</p>
+
+      <div class="columns">
+        @for (column of columns(); track column.name) {
+          <label class="column" [class.is-on]="isChosen(column.name)">
+            <input
+              type="checkbox"
+              [checked]="isChosen(column.name)"
+              (change)="toggleColumn(column.name)"
+            />
+            <span class="column__name">{{ column.name }}</span>
+            <span class="column__type">{{ column.dataType }}</span>
+          </label>
+        } @empty {
+          <p class="hint">Cargando las columnas…</p>
+        }
+      </div>
+    </section>
+
+    <section class="block">
+      <h3 class="block__title">Filtros</h3>
+
+      @for (filter of filters(); track $index) {
+        <div class="filter">
+          <select
+            [value]="filter.column"
+            (change)="patchFilter($index, { column: $any($event.target).value })"
+            aria-label="Columna"
+          >
+            @for (column of columns(); track column.name) {
+              <option [value]="column.name">{{ column.name }}</option>
+            }
+          </select>
+
+          <select
+            [value]="filter.operator"
+            (change)="patchFilter($index, { operator: $any($event.target).value })"
+            aria-label="Operador"
+          >
+            @for (operator of operators; track operator) {
+              <option [value]="operator">{{ operator }}</option>
+            }
+          </select>
+
+          @if (needsValue(filter.operator)) {
+            <input
+              type="text"
+              [value]="filter.value"
+              (input)="patchFilter($index, { value: $any($event.target).value })"
+              [attr.placeholder]="filter.operator === 'IN' ? '1, 2, 3' : 'valor'"
+              aria-label="Valor"
+            />
+          } @else {
+            <span class="filter__novalue">sin valor</span>
+          }
+
+          <button type="button" class="icon" (click)="removeFilter($index)" aria-label="Quitar filtro">
+            ×
+          </button>
+        </div>
+      }
+
+      <button type="button" class="btn btn--small" (click)="addFilter()">Añadir filtro</button>
+    </section>
+
+    <section class="block block--row">
+      <label class="field">
+        <span class="field__label">Ordenar por</span>
+        <select [value]="orderBy()" (change)="orderBy.set($any($event.target).value)">
+          <option value="">(sin orden)</option>
+          @for (column of columns(); track column.name) {
+            <option [value]="column.name">{{ column.name }}</option>
+          }
+        </select>
+      </label>
+
+      <label class="check">
+        <input type="checkbox" [checked]="descending()" (change)="descending.set(!descending())" />
+        Descendente
+      </label>
+
+      <label class="field">
+        <span class="field__label">Máximo de filas</span>
+        <input
+          type="number"
+          min="1"
+          class="tiny"
+          [value]="limit() ?? ''"
+          (input)="setLimit($any($event.target).value)"
+          placeholder="sin límite"
+        />
+      </label>
+    </section>
+
+    <section class="block">
+      <h3 class="block__title">Así queda</h3>
+      <pre class="sql">{{ sql() }}</pre>
+    </section>
+  </div>
+
+  <footer class="foot">
+    <div class="templates">
+      <span class="templates__label">Plantillas:</span>
+      <button type="button" class="btn btn--small" (click)="insertTemplate('insert')">INSERT</button>
+      <button type="button" class="btn btn--small" (click)="insertTemplate('update')">UPDATE</button>
+      <button type="button" class="btn btn--small" (click)="insertTemplate('create')">
+        CREATE TABLE
+      </button>
+    </div>
+
+    <span class="spacer"></span>
+
+    <button type="button" class="btn" (click)="close()">Cancelar</button>
+    <button type="button" class="btn btn--primary" (click)="insertSelect()">
+      Insertar en el editor
+    </button>
+  </footer>
+</div>
