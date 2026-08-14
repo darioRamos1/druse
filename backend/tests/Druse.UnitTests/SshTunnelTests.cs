@@ -294,5 +294,8 @@ public sealed class SshTunnelTests
 
         public IRowEditor GetRowEditor(DatabaseEngine engine) =>
             throw new NotSupportedException();
+
+        public ITableDesigner GetTableDesigner(DatabaseEngine engine) =>
+            throw new NotSupportedException();
     }
 }

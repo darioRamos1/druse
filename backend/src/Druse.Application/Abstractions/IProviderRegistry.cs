@@ -23,6 +23,9 @@ public interface IProviderRegistry
 
     /// <summary>Quien escribe los cambios hechos sobre la cuadrícula.</summary>
     IRowEditor GetRowEditor(DatabaseEngine engine);
+
+    /// <summary>Quien escribe el DDL de este motor: crear y modificar tablas.</summary>
+    ITableDesigner GetTableDesigner(DatabaseEngine engine);
 }
 
 /// <summary>Se pidió un motor que nadie implementa.</summary>

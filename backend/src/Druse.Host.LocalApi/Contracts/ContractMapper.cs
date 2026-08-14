@@ -1,5 +1,6 @@
 using Druse.Application.Abstractions;
 using Druse.Application.Queries;
+using Druse.Application.Tables;
 using Druse.Database.Abstractions;
 using Druse.Domain;
 
@@ -306,6 +307,64 @@ internal static class ContractMapper
             })],
         };
     }
+
+    public static TableColumnDefinition ToDomain(this TableColumnDesignDto dto)
+    {
+        ArgumentNullException.ThrowIfNull(dto);
+
+        return new TableColumnDefinition
+        {
+            Name = dto.Name,
+            DataType = dto.DataType,
+            IsNullable = dto.IsNullable,
+            IsPrimaryKey = dto.IsPrimaryKey,
+            IsIdentity = dto.IsIdentity,
+            DefaultValue = dto.DefaultValue,
+        };
+    }
+
+    public static TableDefinition ToDomain(this CreateTableRequest request)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        return new TableDefinition
+        {
+            Database = request.Database,
+            Schema = request.Schema,
+            Name = request.Name,
+            Columns = [.. request.Columns.Select(column => column.ToDomain())],
+        };
+    }
+
+    public static TableAlteration ToDomain(this AlterTableRequest request)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        return new TableAlteration
+        {
+            Table = request.Table.ToDomain(),
+            NewName = request.NewName,
+            AddedColumns = [.. request.AddedColumns.Select(column => column.ToDomain())],
+            AlteredColumns = [.. request.AlteredColumns.Select(change => new ColumnAlteration
+            {
+                CurrentName = change.CurrentName,
+                Column = change.Column.ToDomain(),
+            })],
+            DroppedColumns = request.DroppedColumns,
+        };
+    }
+
+    public static TableChangeResponse ToResponse(this TableChangeResult result) => new()
+    {
+        Statements = result.Statements,
+        DurationMs = (long)result.Duration.TotalMilliseconds,
+    };
+
+    public static TableChangeRejectedResponse ToResponse(this TableChangeRejection rejection) => new()
+    {
+        Reason = rejection.Reason.ToString().ToLowerInvariant(),
+        Message = rejection.Message,
+    };
 
     public static string EngineId(DatabaseEngine engine) => engine switch
     {

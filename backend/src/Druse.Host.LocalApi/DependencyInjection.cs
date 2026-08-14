@@ -3,6 +3,7 @@ using Druse.Application.Connections;
 using Druse.Application.Metadata;
 using Druse.Application.Queries;
 using Druse.Application.Rows;
+using Druse.Application.Tables;
 using Druse.Database.Abstractions;
 using Druse.Host.LocalApi.Security;
 using Druse.Infrastructure.Exports;
@@ -55,16 +56,19 @@ internal static class DependencyInjection
         services.AddSingleton<IDatabaseMetadataReader, PostgreSqlMetadataReader>();
         services.AddSingleton<IQueryExecutor, PostgreSqlQueryExecutor>();
         services.AddSingleton<IRowEditor, PostgreSqlRowEditor>();
+        services.AddSingleton<ITableDesigner, PostgreSqlTableDesigner>();
 
         services.AddSingleton<IDatabaseProvider, SqlServerDatabaseProvider>();
         services.AddSingleton<IDatabaseMetadataReader, SqlServerMetadataReader>();
         services.AddSingleton<IQueryExecutor, SqlServerQueryExecutor>();
         services.AddSingleton<IRowEditor, SqlServerRowEditor>();
+        services.AddSingleton<ITableDesigner, SqlServerTableDesigner>();
 
         services.AddSingleton<IDatabaseProvider, MySqlDatabaseProvider>();
         services.AddSingleton<IDatabaseMetadataReader, MySqlMetadataReader>();
         services.AddSingleton<IQueryExecutor, MySqlQueryExecutor>();
         services.AddSingleton<IRowEditor, MySqlRowEditor>();
+        services.AddSingleton<ITableDesigner, MySqlTableDesigner>();
 
         services.AddSingleton<IProviderRegistry, ProviderRegistry>();
 
@@ -84,6 +88,7 @@ internal static class DependencyInjection
         services.AddScoped<MetadataService>();
         services.AddScoped<QueryService>();
         services.AddScoped<RowEditService>();
+        services.AddScoped<TableDesignService>();
         services.AddScoped<ImportService>();
         services.AddScoped<ExportService>();
 

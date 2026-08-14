@@ -337,6 +337,77 @@ public sealed record RowEditRejectedResponse
 }
 
 // ---------------------------------------------------------------------------
+// Diseño de tablas
+// ---------------------------------------------------------------------------
+
+/// <summary>Columna tal y como la describe quien diseña la tabla.</summary>
+public sealed record TableColumnDesignDto
+{
+    public required string Name { get; init; }
+
+    /// <summary>Tipo en el dialecto del motor, tal y como se escribirá.</summary>
+    public required string DataType { get; init; }
+
+    public bool IsNullable { get; init; } = true;
+    public bool IsPrimaryKey { get; init; }
+
+    /// <summary>El motor genera el valor: identidad, serial o autoincremento.</summary>
+    public bool IsIdentity { get; init; }
+
+    /// <summary>Expresión por omisión, ya escrita en SQL.</summary>
+    public string? DefaultValue { get; init; }
+}
+
+public sealed record CreateTableRequest
+{
+    public required Guid SessionId { get; init; }
+    public string? Database { get; init; }
+    public string? Schema { get; init; }
+    public required string Name { get; init; }
+    public required IReadOnlyList<TableColumnDesignDto> Columns { get; init; }
+
+    /// <summary>El usuario ya vio el SQL. Sin esto no se ejecuta nada.</summary>
+    public bool Confirmed { get; init; }
+}
+
+/// <summary>Columna existente y cómo debe quedar.</summary>
+public sealed record ColumnAlterationDto
+{
+    /// <summary>Nombre que la columna tiene hoy; distinto del nuevo es un renombrado.</summary>
+    public required string CurrentName { get; init; }
+    public required TableColumnDesignDto Column { get; init; }
+}
+
+public sealed record AlterTableRequest
+{
+    public required Guid SessionId { get; init; }
+    public required DatabaseObjectDto Table { get; init; }
+    public string? NewName { get; init; }
+    public IReadOnlyList<TableColumnDesignDto> AddedColumns { get; init; } = [];
+    public IReadOnlyList<ColumnAlterationDto> AlteredColumns { get; init; } = [];
+    public IReadOnlyList<string> DroppedColumns { get; init; } = [];
+
+    public bool Confirmed { get; init; }
+
+    /// <summary>Aparte de la confirmación: borrar columnas se lleva sus datos.</summary>
+    public bool ConfirmedDestructive { get; init; }
+}
+
+public sealed record TableChangeResponse
+{
+    /// <summary>Lo que se ejecutó, escrito para poder leerlo.</summary>
+    public required IReadOnlyList<string> Statements { get; init; }
+    public required long DurationMs { get; init; }
+}
+
+/// <summary>Los cambios no se aplicaron, con el motivo.</summary>
+public sealed record TableChangeRejectedResponse
+{
+    public required string Reason { get; init; }
+    public required string Message { get; init; }
+}
+
+// ---------------------------------------------------------------------------
 // Fase 6: exportaciones
 // ---------------------------------------------------------------------------
 

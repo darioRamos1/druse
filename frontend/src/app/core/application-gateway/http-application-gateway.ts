@@ -13,6 +13,8 @@ import {
   SavedConnection,
   SecretStoreStatus,
   SessionInfo,
+  TableAlteration,
+  TableDesign,
   TestConnectionResult,
 } from '../../shared/models/workspace';
 import {
@@ -24,6 +26,7 @@ import {
   ImportPreview,
   RowEditRequest,
   RowEditResult,
+  TableChangeResult,
   HealthStatus,
   SaveConnectionRequest,
 } from './application-gateway';
@@ -130,6 +133,53 @@ export class HttpApplicationGateway extends ApplicationGateway {
 
   override applyRowEdits(request: RowEditRequest): Observable<RowEditResult> {
     return this._http.post<RowEditResult>('/api/rows', request);
+  }
+
+  // --- Diseño de tablas -----------------------------------------------------
+
+  override getTableDataTypes(sessionId: string): Observable<readonly string[]> {
+    return this._http.get<string[]>(`/api/sessions/${sessionId}/tables/data-types`);
+  }
+
+  override previewCreateTable(
+    sessionId: string,
+    table: TableDesign,
+  ): Observable<readonly string[]> {
+    return this._http
+      .post<{ statements: string[] }>('/api/tables/preview', { sessionId, ...table })
+      .pipe(map((response) => response.statements));
+  }
+
+  override createTable(sessionId: string, table: TableDesign): Observable<TableChangeResult> {
+    // La confirmación viaja siempre en `true` desde aquí porque este método solo
+    // se llama después de que el usuario haya visto el SQL y haya dicho que sí.
+    return this._http.post<TableChangeResult>('/api/tables', {
+      sessionId,
+      ...table,
+      confirmed: true,
+    });
+  }
+
+  override previewAlterTable(
+    sessionId: string,
+    alteration: TableAlteration,
+  ): Observable<readonly string[]> {
+    return this._http
+      .post<{ statements: string[] }>('/api/tables/alter/preview', { sessionId, ...alteration })
+      .pipe(map((response) => response.statements));
+  }
+
+  override alterTable(
+    sessionId: string,
+    alteration: TableAlteration,
+    confirmedDestructive: boolean,
+  ): Observable<TableChangeResult> {
+    return this._http.post<TableChangeResult>('/api/tables/alter', {
+      sessionId,
+      ...alteration,
+      confirmed: true,
+      confirmedDestructive,
+    });
   }
 
   override previewImport(

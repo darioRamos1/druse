@@ -1,0 +1,155 @@
+<div class="backdrop" (click)="close()"></div>
+
+<div class="dialog" role="dialog" aria-modal="true" aria-labelledby="table-designer-title">
+  <header class="head">
+    <div class="head__text">
+      <h2 class="head__title" id="table-designer-title">{{ title() }}</h2>
+      <p class="head__subtitle">
+        {{ qualifiedTarget() }} · Nada se ejecuta hasta que veas el SQL y lo confirmes.
+      </p>
+    </div>
+    <button type="button" class="head__close" aria-label="Cerrar" (click)="close()">×</button>
+  </header>
+
+  <div class="body">
+    @if (applied(); as statements) {
+      <!-- Ya se aplicó: lo único que queda por hacer es enseñar qué se ejecutó. -->
+      <p class="done">Cambios aplicados.</p>
+      <pre class="sql">{{ statements.join('\n') }}</pre>
+    } @else {
+      <label class="field">
+        <span class="field__label">Nombre de la tabla</span>
+        <input
+          class="field__input"
+          type="text"
+          [(ngModel)]="name"
+          (ngModelChange)="touched()"
+          placeholder="pedidos"
+        />
+      </label>
+
+      <div class="columns">
+        <div class="columns__head">
+          <span>Columna</span>
+          <span>Tipo</span>
+          <span title="Admite nulos">Nulo</span>
+          <span title="Clave primaria">PK</span>
+          <span title="El motor genera el valor">Auto</span>
+          <span>Por defecto</span>
+          <span></span>
+        </div>
+
+        @for (row of rows(); track $index) {
+          <div class="columns__row" [class.is-dropped]="row.dropped">
+            <input
+              class="field__input"
+              type="text"
+              [(ngModel)]="row.name"
+              (ngModelChange)="touched()"
+              [disabled]="row.dropped"
+              placeholder="nombre"
+            />
+
+            <input
+              class="field__input"
+              type="text"
+              list="table-designer-types"
+              [(ngModel)]="row.dataType"
+              (ngModelChange)="touched()"
+              [disabled]="row.dropped"
+              placeholder="tipo"
+            />
+
+            <input
+              type="checkbox"
+              [(ngModel)]="row.isNullable"
+              (ngModelChange)="touched()"
+              [disabled]="row.dropped || row.isPrimaryKey"
+              aria-label="Admite nulos"
+            />
+
+            <input
+              type="checkbox"
+              [(ngModel)]="row.isPrimaryKey"
+              (ngModelChange)="touched()"
+              [disabled]="row.dropped"
+              aria-label="Clave primaria"
+            />
+
+            <input
+              type="checkbox"
+              [(ngModel)]="row.isIdentity"
+              (ngModelChange)="touched()"
+              [disabled]="row.dropped || !!row.origin"
+              aria-label="El motor genera el valor"
+            />
+
+            <input
+              class="field__input"
+              type="text"
+              [(ngModel)]="row.defaultValue"
+              (ngModelChange)="touched()"
+              [disabled]="row.dropped"
+              placeholder="—"
+            />
+
+            <button
+              type="button"
+              class="columns__remove"
+              [title]="row.dropped ? 'Conservar esta columna' : 'Quitar esta columna'"
+              (click)="removeColumn($index)"
+            >
+              {{ row.dropped ? '↺' : '×' }}
+            </button>
+          </div>
+        }
+      </div>
+
+      <datalist id="table-designer-types">
+        @for (type of dataTypes(); track type) {
+          <option [value]="type"></option>
+        }
+      </datalist>
+
+      <button type="button" class="btn btn--ghost" (click)="addColumn()">Añadir columna</button>
+
+      @if (destructive()) {
+        <p class="warning" role="status">
+          Se van a borrar columnas y todo lo que contienen. Ningún ALTER lo devuelve.
+        </p>
+      }
+
+      @if (error(); as message) {
+        <p class="feedback" role="status">{{ message }}</p>
+      }
+
+      @if (statements().length > 0) {
+        <h3 class="section">Esto es lo que se va a ejecutar</h3>
+        <pre class="sql">{{ statements().join('\n') }}</pre>
+      }
+    }
+  </div>
+
+  <footer class="foot">
+    @if (applied()) {
+      <span class="foot__spacer"></span>
+      <button type="button" class="btn btn--primary" (click)="close()">Cerrar</button>
+    } @else {
+      <button type="button" class="btn" [disabled]="busy()" (click)="preview()">
+        {{ busy() ? 'Un momento…' : 'Ver SQL' }}
+      </button>
+      <span class="foot__spacer"></span>
+      <button type="button" class="btn" (click)="close()">Cancelar</button>
+      <!-- Aplicar solo se habilita después de ver el SQL: es la regla que impide
+           cambiar una estructura sin haber leído qué se cambia. -->
+      <button
+        type="button"
+        class="btn btn--primary"
+        [disabled]="busy() || statements().length === 0"
+        (click)="apply()"
+      >
+        {{ editing() ? 'Aplicar cambios' : 'Crear tabla' }}
+      </button>
+    }
+  </footer>
+</div>

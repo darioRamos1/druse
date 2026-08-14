@@ -23,6 +23,7 @@ import {
 } from '../../features/query-editor/sql-editor/sql-editor';
 import SqlEditor from '../../features/query-editor/sql-editor/sql-editor';
 import { ImportDialog } from '../../features/import/import-dialog/import-dialog';
+import { TableDesigner } from '../../features/tables/table-designer/table-designer';
 import { QueryBuilder } from '../../features/query-builder/query-builder/query-builder';
 import { buildSelect } from '../../features/query-editor/sql-language/sql-writer';
 import { ResultsPanel } from '../../features/query-results/results-panel/results-panel';
@@ -77,6 +78,7 @@ const DISCONNECTED: SessionStatus = {
     SqlEditor,
     ResultsPanel,
     ImportDialog,
+    TableDesigner,
     QueryBuilder,
     CommandPalette,
     ResizeHandle,
@@ -111,7 +113,12 @@ export class AppShell {
       if (this.paletteOpen()) {
         return;
       }
-      if (this.dialogOpen() || this.importTarget() || this.builderTarget()) {
+      if (
+        this.dialogOpen() ||
+        this.importTarget() ||
+        this.builderTarget() ||
+        this.designTarget()
+      ) {
         return;
       }
       event.preventDefault();
@@ -130,6 +137,22 @@ export class AppShell {
 
   protected closeImport(): void {
     this.importTarget.set(null);
+  }
+
+  /**
+   * Nodo sobre el que está abierto el diseñador de tablas.
+   *
+   * Un esquema significa crear; una tabla, modificarla. El propio diseñador
+   * distingue por la clase del nodo.
+   */
+  protected readonly designTarget = signal<ExplorerNode | null>(null);
+
+  protected openTableDesigner(node: ExplorerNode): void {
+    this.designTarget.set(node);
+  }
+
+  protected closeTableDesigner(): void {
+    this.designTarget.set(null);
   }
 
   /** Tabla sobre la que se está componiendo una consulta. */
