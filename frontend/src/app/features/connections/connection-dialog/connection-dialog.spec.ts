@@ -2,6 +2,7 @@ import { signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 
 import { WorkspaceStore } from '../../../core/workspace/workspace-store';
+import { SavedConnection } from '../../../shared/models/workspace';
 import { ConnectionDialog } from './connection-dialog';
 
 describe('ConnectionDialog', () => {
@@ -11,12 +12,14 @@ describe('ConnectionDialog', () => {
     notice: signal<string | null>(null),
     testConnection: vi.fn(),
     connect: vi.fn(),
+    saveConnection: vi.fn(),
   };
 
   beforeEach(async () => {
     vi.clearAllMocks();
     store.testConnection.mockResolvedValue('Conexión correcta con SQL Server 16 en 12 ms.');
     store.connect.mockResolvedValue(true);
+    store.saveConnection.mockResolvedValue(true);
     await TestBed.configureTestingModule({
       imports: [ConnectionDialog],
       providers: [{ provide: WorkspaceStore, useValue: store }],
@@ -196,6 +199,101 @@ describe('ConnectionDialog', () => {
       'Indica el usuario del servidor SSH.',
     ]);
   });
+
+  describe('editando un perfil guardado', () => {
+    const saved: SavedConnection = {
+      id: 'perfil-1',
+      name: 'FENIX PREPROD',
+      engine: 'sqlserver',
+      host: 'sql-fenix.database.windows.net',
+      port: 1433,
+      database: 'sqldb-fenix',
+      username: 'lector',
+      authentication: 'password',
+      sslMode: 'require',
+      environment: 'production',
+      readOnly: true,
+      hasStoredPassword: true,
+      sshTunnel: {
+        host: 'bastion.empresa.com',
+        port: 2222,
+        username: 'operador',
+        authentication: 'privatekey',
+        privateKeyPath: 'C:\\claves\\id_ed25519',
+      },
+      hasStoredSshSecret: true,
+    };
+
+    beforeEach(() => {
+      fixture.componentRef.setInput('connection', saved);
+      fixture.detectChanges();
+    });
+
+    it('precarga todos los campos del perfil, incluido el túnel', () => {
+      const values = [...fixture.nativeElement.querySelectorAll('.field__input')].map(
+        (input: HTMLInputElement) => input.value,
+      );
+
+      expect(fixture.nativeElement.querySelector('.head__title').textContent).toContain(
+        'Editar conexión',
+      );
+      expect(values).toContain('FENIX PREPROD');
+      expect(values).toContain('sql-fenix.database.windows.net');
+      expect(values).toContain('bastion.empresa.com');
+      expect(values).toContain('2222');
+      expect(values).toContain('C:\\claves\\id_ed25519');
+      expect(selected('Cifrado verificado')).toBe(true);
+      expect(selected('Clave privada')).toBe(true);
+    });
+
+    it('guarda sin escribir contraseñas y las conserva', async () => {
+      button('Guardar cambios').click();
+      await fixture.whenStable();
+
+      // `undefined` es lo que le dice al servidor que no toque los secretos
+      // guardados; una cadena vacía los borraría.
+      expect(store.saveConnection).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: 'perfil-1',
+          password: undefined,
+          sshSecret: undefined,
+          sslMode: 'require',
+          readOnly: true,
+          environment: 'production',
+        }),
+      );
+      expect(store.connect).not.toHaveBeenCalled();
+    });
+
+    it('envía la contraseña nueva cuando se escribe una', async () => {
+      const password = [...fixture.nativeElement.querySelectorAll('.field__input')].find(
+        (input: HTMLInputElement) => input.type === 'password',
+      ) as HTMLInputElement;
+
+      password.value = 'otra-secreta';
+      password.dispatchEvent(new Event('input'));
+      fixture.detectChanges();
+
+      button('Guardar cambios').click();
+      await fixture.whenStable();
+
+      expect(store.saveConnection).toHaveBeenCalledWith(
+        expect.objectContaining({ password: 'otra-secreta' }),
+      );
+    });
+
+    it('no ofrece dejar de guardar una conexión que ya está guardada', () => {
+      const labels = [...fixture.nativeElement.querySelectorAll('.checkbox')].map(
+        (element: Element) => element.textContent,
+      );
+
+      expect(labels.some((text: string) => text.includes('Guardar esta conexión'))).toBe(false);
+    });
+  });
+
+  function selected(label: string): boolean {
+    return button(label).classList.contains('is-selected');
+  }
 
   function checkbox(label: string): HTMLInputElement {
     const found = [...fixture.nativeElement.querySelectorAll('.checkbox')].find(

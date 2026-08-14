@@ -10,14 +10,14 @@
 
 | Campo | Valor |
 | --- | --- |
-| Última sesión | **015** — 2026-08-13 |
+| Última sesión | **016** — 2026-08-13 |
 | Fase activa | **Mejora posterior al MVP completada:** implementación y validación cerradas |
 | Fases 0–6 | ✅ Cerradas. |
 | Fase 7 | 🟡 **10/12.** Hay instalador y funciona; faltan dos comprobaciones que exigen otro equipo. |
 | Fase 8 | ✅ **7/7.** Tres motores sobre el mismo contrato y primera beta preparada. |
 | ¿Compila el backend? | Sí — 0 advertencias, 0 errores |
 | ¿Compila el envoltorio? | Sí |
-| ¿Pasan las pruebas? | Sí — **326 en backend**, **212 en frontend** y **2 en el envoltorio** |
+| ¿Pasan las pruebas? | Sí — **330 en backend**, **216 en frontend** y **2 en el envoltorio** |
 | ¿Hay aplicación de escritorio? | **Sí.** Instalador NSIS, MSI y ZIP portable |
 | Motores | **PostgreSQL, SQL Server y MySQL/MariaDB**, con navegación por todas las bases autorizadas y las **mismas 27 pruebas contractuales** cada uno |
 | Bloqueantes | Ninguno |
@@ -100,6 +100,30 @@ Pendiente de verificar cuando toque: Docker (pruebas de integración con contene
 ---
 
 ## 5. Registro de sesiones
+
+### Sesión 016 — 2026-08-13 · Editar conexiones guardadas
+
+**Hecho:**
+- Una conexión guardada se puede editar: el mismo formulario se abre con sus
+  datos —incluidos cifrado y túnel— desde un botón nuevo en la barra lateral, y
+  guarda con `PUT /api/connections/{id}` sin abrir sesión. Hasta ahora, cambiar
+  el puerto de un perfil obligaba a borrarlo y volver a crearlo.
+- `null` y cadena vacía dejan de significar lo mismo en las contraseñas. El
+  formulario no puede mostrar un secreto guardado, así que llega vacío aunque
+  exista: ausente significa «no lo toques» y solo la cadena vacía lo retira. Sin
+  esa distinción, cambiar el nombre de una conexión le borraba la contraseña.
+- El store conserva los perfiles completos que devuelve la API; el resumen que
+  pinta la barra lateral no basta para volver a llenar el formulario.
+
+**Verificado:** 178 pruebas unitarias y 25 de integración en backend, 216 en
+frontend. Comprobado además contra la API real con un perfil de prueba: editar
+sin escribir la contraseña la conserva, vaciarla la retira, y el perfil se borra
+al terminar.
+
+**Aviso para quien lea esto:** las primeras pruebas contra la API dieron un falso
+negativo porque `dotnet run` no pudo reemplazar los binarios —los tenía
+bloqueados un proceso anterior— y respondía la versión vieja. Si algo no cuadra
+al probar a mano, comprobar antes que no haya un `Druse.Host.LocalApi` viejo vivo.
 
 ### Sesión 015 — 2026-08-13 · Túnel SSH y selector de cifrado
 
