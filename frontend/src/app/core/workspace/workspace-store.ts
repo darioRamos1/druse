@@ -1737,20 +1737,75 @@ function asRejection(error: unknown): QueryRejected | null {
  * Nunca se muestra el objeto de error completo: puede traer cabeceras, cuerpos y
  * rutas internas que no aportan al usuario (plan §12).
  */
+/**
+ * Qué decirle al usuario cuando algo falla.
+ *
+ * El número de un código HTTP no significa nada para quien está consultando una
+ * base de datos: «502» no dice qué pasó ni qué hacer. Así que cada caso se
+ * cuenta con palabras y, cuando se puede, con el siguiente paso.
+ *
+ * El código se conserva al final entre paréntesis, pequeño y sin protagonismo:
+ * no le sirve al usuario para nada, pero es lo primero que hace falta el día que
+ * tenga que contar el problema a alguien.
+ */
 function describeError(error: unknown): string {
-  if (error instanceof HttpErrorResponse) {
-    if (error.status === 0) {
-      return 'No se pudo contactar con la API local.';
-    }
-
-    const message = error.error?.message;
-
-    return typeof message === 'string' && message.length > 0
-      ? message
-      : `La API respondió con el código ${error.status}.`;
+  if (!(error instanceof HttpErrorResponse)) {
+    return 'Druse encontró un problema inesperado. Si vuelve a ocurrir, reinicia la aplicación.';
   }
 
-  return 'Se produjo un error inesperado.';
+  // Cuando el servidor explica el motivo, se enseña tal cual: sus mensajes ya
+  // están escritos para leerse, y son más concretos que cualquier traducción
+  // que se pudiera hacer aquí a partir del código.
+  const message = error.error?.message;
+
+  if (typeof message === 'string' && message.trim().length > 0) {
+    return message;
+  }
+
+  return `${explainStatus(error.status)} (${error.status})`;
+}
+
+/** Lo que significa cada código, dicho como se lo contarías a alguien. */
+function explainStatus(status: number): string {
+  switch (status) {
+    // Angular usa el 0 cuando la petición ni siquiera llegó a salir.
+    case 0:
+      return 'Druse no obtuvo respuesta de su propio motor. Comprueba que la aplicación siga abierta y vuelve a intentarlo.';
+
+    case 401:
+    case 403:
+      return 'Esta ventana perdió el permiso para hablar con el motor de Druse. Cierra la aplicación y vuelve a abrirla.';
+
+    case 404:
+      return 'Eso ya no existe. Es probable que la conexión se haya cerrado; vuelve a abrirla y repite la operación.';
+
+    case 408:
+      return 'La operación tardó demasiado y se cortó. Prueba otra vez, o con menos datos.';
+
+    case 409:
+      return 'La operación no se aplicó porque algo había cambiado mientras tanto. Actualiza y vuelve a intentarlo.';
+
+    case 413:
+      return 'El archivo es demasiado grande para procesarlo de una vez.';
+
+    case 428:
+      return 'Falta una contraseña para abrir esta conexión.';
+
+    case 500:
+      return 'Algo falló dentro de Druse mientras atendía la petición. No se aplicó ningún cambio.';
+
+    // 502, 503 y 504 significan lo mismo desde aquí: el proceso que hace el
+    // trabajo no está atendiendo. Es lo que se ve si se cerró o si aún arranca.
+    case 502:
+    case 503:
+    case 504:
+      return 'El motor de Druse no está respondiendo: puede que se haya cerrado o que todavía esté arrancando. Espera unos segundos y, si sigue igual, reinicia la aplicación.';
+
+    default:
+      return status >= 500
+        ? 'El motor de Druse falló al atender la petición.'
+        : 'Druse no pudo completar la operación.';
+  }
 }
 
 function describeVersion(engine: string, serverVersion: string): string {

@@ -175,13 +175,19 @@ class FakeGateway implements Partial<ApplicationGateway> {
     return of([]);
   }
 
+  /** Código con el que falla `openSession` cuando `openShouldFail` está activo. */
+  openFailureStatus = 400;
+
+  /** Cuerpo del fallo. Vacío imita a un servidor que no explica nada. */
+  openFailureBody: unknown = { message: 'La autenticación falló.' };
+
   openSession(): Observable<SessionInfo> {
     return this.openShouldFail
       ? throwError(
           () =>
             new HttpErrorResponse({
-              status: 400,
-              error: { message: 'La autenticación falló.' },
+              status: this.openFailureStatus,
+              error: this.openFailureBody,
             }),
         )
       : of({ ...session, sessionId: this.sessionIds.shift() ?? session.sessionId });
@@ -357,6 +363,37 @@ describe('WorkspaceStore', () => {
 
       expect(connected).toBe(false);
       expect(store.connections()[0].state).toBe('error');
+      expect(store.notice()).toBe('La autenticación falló.');
+    });
+
+    it('traduce un fallo sin explicación a algo que se pueda leer', async () => {
+      gateway.openShouldFail = true;
+      // 502 es lo que devuelve el proxy cuando el proceso local no responde, y
+      // llega sin cuerpo: es el caso donde antes se enseñaba el número pelado.
+      gateway.openFailureStatus = 502;
+      gateway.openFailureBody = null;
+
+      await store.connect(form);
+
+      const notice = store.notice() ?? '';
+
+      expect(notice).toContain('no está respondiendo');
+      expect(notice).toContain('reinicia la aplicación');
+      // El código se conserva al final: no le sirve al usuario, pero sí a quien
+      // tenga que diagnosticar lo que le pasó.
+      expect(notice).toContain('(502)');
+      expect(notice).not.toContain('La API respondió');
+    });
+
+    it('cuando el servidor explica el motivo, se enseña su mensaje', async () => {
+      gateway.openShouldFail = true;
+      gateway.openFailureStatus = 400;
+      gateway.openFailureBody = { message: 'La autenticación falló.' };
+
+      await store.connect(form);
+
+      // El mensaje del servidor es más concreto que cualquier traducción por
+      // código, así que gana y viaja sin número detrás.
       expect(store.notice()).toBe('La autenticación falló.');
     });
 
