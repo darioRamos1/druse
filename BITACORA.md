@@ -17,7 +17,7 @@
 | Fase 8 | ✅ **7/7.** Tres motores sobre el mismo contrato y primera beta preparada. |
 | ¿Compila el backend? | Sí — 0 advertencias, 0 errores |
 | ¿Compila el envoltorio? | Sí |
-| ¿Pasan las pruebas? | Sí — **380 en backend** (222 unitarias, 126 contractuales y 32 de integración), **245 en frontend** y **6 en el envoltorio** |
+| ¿Pasan las pruebas? | Sí — **380 en backend** (222 unitarias, 126 contractuales y 32 de integración), **264 en frontend** y **6 en el envoltorio** |
 | ¿Hay aplicación de escritorio? | **Sí.** Instalador NSIS, MSI y ZIP portable, en dos variantes: con Informix y sin él |
 | Motores | **PostgreSQL, SQL Server, MySQL/MariaDB e Informix**, todos sobre el mismo contrato compartido |
 | Trabajo a medias | Ninguno. Las transacciones manuales quedaron terminadas en la sesión 020. |
@@ -285,6 +285,33 @@ enseñar.
 
 **Sin ejecutar contra un motor real**, como el resto: ver el punto 3.b de «Qué
 toca retomar», que enumera las tres cosas que solo se ven ahí.
+
+#### El formateo del editor se puede configurar
+
+Estaba fijo en el código: mayúsculas, 80 caracteres, dos espacios y estilo
+estándar. Ahora se elige desde un menú detrás de la flecha del botón «Formatear»,
+y se recuerda entre arranques en las preferencias.
+
+- **Cuatro ajustes y no los veinte de `sql-formatter`**: reparto de líneas
+  (estándar o tabular), ancho de expresión, palabras clave y sangría. Cada opción
+  suelta de más es una decisión que alguien tiene que tomar sin saber qué hace.
+- **Formatear y configurar el formateo son dos botones.** Quien pulsa
+  «Formatear» quiere formatear ya; esconder esa acción tras un menú encarecería
+  lo frecuente por lo que se toca una vez.
+- **El menú no se cierra al elegir**, al revés que el de tiempo máximo: el ancho
+  y la sangría se ajustan juntos, y cerrarlo obligaría a abrirlo cuatro veces.
+- **Los ajustes viven en `core`, no junto al formateador**, porque el store tiene
+  que leerlos y guardarlos y el estado no puede depender de la interfaz (plan §5).
+  Lo que sí depende es el formateador, que los traduce a su dialecto.
+- Tipos y funciones siguen a las palabras clave: con «como estén», quien pidió
+  que no se toque nada no esperaría que sus funciones cambiaran igualmente.
+- Lo que no se reconozca al leer las preferencias cae en el valor por omisión.
+  Viven en una base local que sobrevive a las versiones.
+
+**Una cosa que la prueba corrigió sobre la marcha:** el ancho **no** reparte las
+cláusulas —`FROM` siempre empieza línea—, sino las expresiones: los argumentos de
+una función, una lista. La etiqueta dice «Ancho de expresión» por eso, después de
+comprobar contra la librería qué hacía de verdad.
 
 #### «Falta el token de la API local» con la API viva
 

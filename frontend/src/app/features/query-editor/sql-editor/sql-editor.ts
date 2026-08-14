@@ -24,6 +24,10 @@ import { registerSqlCompletion } from '../sql-language/sql-completion';
 import { findProblems } from '../sql-language/sql-diagnostics';
 import { registerSqlHover } from '../sql-language/sql-hover';
 import { formatSql } from '../sql-language/sql-formatting';
+import {
+  DEFAULT_FORMAT_SETTINGS,
+  FormatSettings,
+} from '../../../core/workspace/format-settings';
 import { DRUSE_THEME, DRUSE_THEME_NAME } from './druse-theme';
 import { executionErrorLine } from './execution-error';
 import { MonacoLoader } from './monaco-loader';
@@ -110,6 +114,10 @@ export default class SqlEditor implements OnInit {
   readonly value = input('');
   readonly readOnly = input(false);
   readonly engine = input<DatabaseEngine>('postgresql');
+
+  /** Cómo formatear. Lo elige el usuario en la barra y se recuerda entre arranques. */
+  readonly formatSettings = input<FormatSettings>(DEFAULT_FORMAT_SETTINGS);
+
   readonly schema = input<SchemaIndex>({ schemas: [], relations: [] });
   readonly executionError = input<ExecutionErrorContext | null>(null);
 
@@ -204,7 +212,7 @@ export default class SqlEditor implements OnInit {
     const formatSelectionOnly = selection !== null && !selection.isEmpty();
 
     const source = formatSelectionOnly ? model.getValueInRange(selection) : model.getValue();
-    const result = await formatSql(source, this.engine());
+    const result = await formatSql(source, this.engine(), this.formatSettings());
 
     if (result.error) {
       this.formatFailed.emit(result.error);

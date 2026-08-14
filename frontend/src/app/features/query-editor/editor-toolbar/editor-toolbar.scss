@@ -176,6 +176,82 @@
   }
 }
 
+// Botón partido: la acción a la izquierda, sus opciones detrás de la flecha.
+.format {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex: none;
+
+  .btn--split {
+    border-top-right-radius: 0;
+    border-bottom-right-radius: 0;
+  }
+
+  .btn--caret {
+    padding-inline: 6px;
+    border-top-left-radius: 0;
+    border-bottom-left-radius: 0;
+    // Sin esto se ve una línea doble entre los dos botones.
+    border-left: 0;
+  }
+
+  &__menu {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    z-index: 20;
+    min-width: 208px;
+    padding: 8px;
+    border: 1px solid var(--dr-border-strong);
+    border-radius: var(--dr-radius);
+    background: #141a26;
+    box-shadow: 0 18px 44px rgb(0 0 0 / 60%);
+  }
+
+  &__label {
+    margin: 0 0 5px;
+    font-size: 10.5px;
+    font-weight: 600;
+    color: var(--dr-text-tertiary);
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+  }
+
+  &__options {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+
+    // El último grupo no necesita separación por debajo.
+    &:not(:last-child) {
+      margin-bottom: 10px;
+    }
+  }
+
+  &__option {
+    padding: 4px 8px;
+    border: 1px solid var(--dr-border-subtle);
+    border-radius: 5px;
+    background: transparent;
+    color: var(--dr-text-muted);
+    font-family: inherit;
+    font-size: 11.5px;
+    cursor: pointer;
+
+    &:hover {
+      background: #1e2637;
+      color: var(--dr-text);
+    }
+
+    &.is-selected {
+      border-color: rgb(108 139 255 / 45%);
+      background: rgb(108 139 255 / 16%);
+      color: var(--dr-accent-bright);
+    }
+  }
+}
+
 .divider {
   width: 1px;
   height: 18px;

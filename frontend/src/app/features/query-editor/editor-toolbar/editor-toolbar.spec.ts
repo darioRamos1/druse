@@ -87,6 +87,76 @@ describe('EditorToolbar', () => {
     expect(emitidos).toEqual(['begin', 'commit', 'rollback']);
   });
 
+  describe('opciones de formateo', () => {
+    function openMenu(): void {
+      element().querySelector<HTMLButtonElement>('.btn--caret')?.click();
+      fixture.detectChanges();
+    }
+
+    function options(): HTMLButtonElement[] {
+      return [...element().querySelectorAll<HTMLButtonElement>('.format__option')];
+    }
+
+    /**
+     * Formatear es la acción; elegir cómo, una configuración que se toca una
+     * vez. Esconder la primera detrás de la segunda encarecería lo frecuente.
+     */
+    it('el menú está detrás de la flecha, no en el botón de formatear', () => {
+      expect(element().querySelector('.format__menu')).toBeNull();
+
+      element().querySelector<HTMLButtonElement>('.btn--split')?.click();
+      fixture.detectChanges();
+
+      expect(element().querySelector('.format__menu')).toBeNull();
+
+      openMenu();
+
+      expect(element().querySelector('.format__menu')).not.toBeNull();
+    });
+
+    it('marca lo que está en uso', () => {
+      fixture.componentRef.setInput('formatSettings', {
+        style: 'tabular',
+        expressionWidth: 120,
+        keywordCase: 'lower',
+        indent: 'tabs',
+      });
+      openMenu();
+
+      const elegidas = options()
+        .filter((option) => option.classList.contains('is-selected'))
+        .map((option) => option.textContent?.trim());
+
+      expect(elegidas).toEqual(['Tabular', '120', 'minúsculas', 'Tabulaciones']);
+    });
+
+    it('emite solo el ajuste que se tocó', () => {
+      const cambios: Partial<Record<string, unknown>>[] = [];
+
+      fixture.componentRef.instance.formatSettingsChange.subscribe((change) =>
+        cambios.push(change),
+      );
+      openMenu();
+
+      options().find((option) => option.textContent?.trim() === 'Tabular')?.click();
+
+      expect(cambios).toEqual([{ style: 'tabular' }]);
+    });
+
+    /**
+     * El ancho y la sangría se ajustan juntos: cerrar el menú en cada clic
+     * obligaría a abrirlo una vez por opción.
+     */
+    it('el menú sigue abierto tras elegir, para poder ajustar varias cosas', () => {
+      openMenu();
+
+      options().find((option) => option.textContent?.trim() === '120')?.click();
+      fixture.detectChanges();
+
+      expect(element().querySelector('.format__menu')).not.toBeNull();
+    });
+  });
+
   function element(): HTMLElement {
     return fixture.nativeElement as HTMLElement;
   }

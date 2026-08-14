@@ -1,5 +1,10 @@
 import type { FormatOptionsWithLanguage, SqlLanguage } from 'sql-formatter';
 
+import {
+  DEFAULT_FORMAT_SETTINGS,
+  FormatSettings,
+  clampFormatWidth,
+} from '../../../core/workspace/format-settings';
 import { DatabaseEngine } from '../../../shared/models/workspace';
 
 /**
@@ -20,17 +25,31 @@ const DIALECTS: Readonly<Record<DatabaseEngine, SqlLanguage>> = {
   informix: 'db2',
 };
 
-const OPTIONS: Omit<FormatOptionsWithLanguage, 'language'> = {
-  keywordCase: 'upper',
-  dataTypeCase: 'lower',
-  functionCase: 'lower',
-  indentStyle: 'standard',
-  logicalOperatorNewline: 'before',
-  expressionWidth: 80,
-  linesBetweenQueries: 1,
-  tabWidth: 2,
-  useTabs: false,
-};
+/**
+ * Traduce los ajustes a lo que entiende `sql-formatter`.
+ *
+ * Tipos y funciones **siguen a las palabras clave** en lugar de tener su propio
+ * ajuste: con `preserve`, quien pidió que no se toque nada no esperaría que sus
+ * funciones cambiaran de caja igualmente.
+ */
+function toOptions(settings: FormatSettings): Omit<FormatOptionsWithLanguage, 'language'> {
+  const secondary = settings.keywordCase === 'preserve' ? 'preserve' : 'lower';
+
+  return {
+    keywordCase: settings.keywordCase,
+    dataTypeCase: secondary,
+    functionCase: secondary,
+    // El estilo tabular alinea a la izquierda: la palabra clave manda y los
+    // valores quedan en columna. Su sangría es fija, así que el ajuste de
+    // espacios o tabulaciones no le afecta.
+    indentStyle: settings.style === 'tabular' ? 'tabularLeft' : 'standard',
+    logicalOperatorNewline: 'before',
+    expressionWidth: clampFormatWidth(settings.expressionWidth),
+    linesBetweenQueries: 1,
+    tabWidth: settings.indent === 'spaces4' ? 4 : 2,
+    useTabs: settings.indent === 'tabs',
+  };
+}
 
 /** Resultado de formatear. */
 export interface FormatResult {
@@ -62,14 +81,18 @@ function loadFormatter(): Promise<typeof import('sql-formatter')> {
  * SQL que el formateador no entendió sería la manera más rápida de que alguien
  * pierda trabajo.
  */
-export async function formatSql(sql: string, engine: DatabaseEngine): Promise<FormatResult> {
+export async function formatSql(
+  sql: string,
+  engine: DatabaseEngine,
+  settings: FormatSettings = DEFAULT_FORMAT_SETTINGS,
+): Promise<FormatResult> {
   if (!sql.trim()) {
     return { sql, changed: false };
   }
 
   try {
     const { format } = await loadFormatter();
-    const formatted = format(sql, { language: DIALECTS[engine], ...OPTIONS });
+    const formatted = format(sql, { language: DIALECTS[engine], ...toOptions(settings) });
 
     return { sql: formatted, changed: formatted !== sql };
   } catch (error) {

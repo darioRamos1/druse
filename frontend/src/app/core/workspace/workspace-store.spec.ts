@@ -226,6 +226,18 @@ class FakeGateway implements Partial<ApplicationGateway> {
       : of(session);
   }
 
+  /** Preferencias guardadas, tal y como las devolvería la API. */
+  preferences: Record<string, string> = {};
+
+  getPreferences(): Observable<Readonly<Record<string, string>>> {
+    return of(this.preferences);
+  }
+
+  setPreference(key: string, value: string): Observable<void> {
+    this.preferences[key] = value;
+    return of(undefined);
+  }
+
   getHistory(): Observable<readonly QueryHistoryEntry[]> {
     return of([]);
   }
@@ -1510,6 +1522,41 @@ describe('WorkspaceStore', () => {
       expect(store.transaction()).toBeNull();
       expect(store.notice()).toContain('se deshizo sola');
       expect(store.notice()).toContain('15 min');
+    });
+  });
+  describe('ajustes de formateo', () => {
+    it('empieza con lo que se venía aplicando', () => {
+      expect(store.formatSettings()).toEqual({
+        style: 'standard',
+        expressionWidth: 80,
+        keywordCase: 'upper',
+        indent: 'spaces2',
+      });
+    });
+
+    it('recuerda lo que el usuario elige', async () => {
+      await store.setFormatSettings({ style: 'tabular', indent: 'tabs' });
+
+      expect(store.formatSettings().style).toBe('tabular');
+      expect(store.formatSettings().indent).toBe('tabs');
+      expect(gateway.preferences['editor.format.style']).toBe('tabular');
+      expect(gateway.preferences['editor.format.indent']).toBe('tabs');
+    });
+
+    /** Escribir las cuatro claves en cada clic llenaría la base de nada. */
+    it('solo guarda lo que cambió', async () => {
+      await store.setFormatSettings({ keywordCase: 'lower' });
+
+      expect(Object.keys(gateway.preferences)).toEqual(['editor.format.keywordCase']);
+    });
+
+    it('los recupera al arrancar', async () => {
+      gateway.preferences = { 'editor.format.style': 'tabular', 'editor.format.width': '120' };
+
+      await store.loadPreferences();
+
+      expect(store.formatSettings().style).toBe('tabular');
+      expect(store.formatSettings().expressionWidth).toBe(120);
     });
   });
 });

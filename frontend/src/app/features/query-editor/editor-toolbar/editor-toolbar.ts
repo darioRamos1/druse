@@ -1,6 +1,29 @@
 import { ChangeDetectionStrategy, Component, computed, input, output, signal } from '@angular/core';
 
+import {
+  DEFAULT_FORMAT_SETTINGS,
+  FORMAT_WIDTHS,
+  FormatSettings,
+} from '../../../core/workspace/format-settings';
 import { Icon } from '../../../shared/ui/icon/icon';
+
+/** Ajuste de formateo que el menú deja cambiar. */
+type FormatGroupKey = keyof FormatSettings;
+
+type FormatOptionValue = FormatSettings[FormatGroupKey];
+
+interface FormatOption {
+  readonly value: FormatOptionValue;
+  readonly label: string;
+  /** Qué hace, para quien no lo deduzca del nombre. */
+  readonly hint?: string;
+}
+
+interface FormatGroup {
+  readonly key: FormatGroupKey;
+  readonly label: string;
+  readonly options: readonly FormatOption[];
+}
 
 /**
  * Barra de acciones del editor.
@@ -35,11 +58,17 @@ export class EditorToolbar {
   /** Hay una operación de transacción en curso; los botones esperan. */
   readonly transactionBusy = input(false);
 
+  /** Cómo formatea hoy el editor, para marcar lo elegido en el menú. */
+  readonly formatSettings = input<FormatSettings>(DEFAULT_FORMAT_SETTINGS);
+
   readonly execute = output<void>();
   readonly executeSelection = output<void>();
   readonly cancel = output<void>();
   readonly format = output<void>();
   readonly timeoutChange = output<number>();
+
+  /** Solo lo que cambió: el store completa el resto. */
+  readonly formatSettingsChange = output<Partial<FormatSettings>>();
   readonly beginTransaction = output<void>();
   readonly commit = output<void>();
   readonly rollback = output<void>();
@@ -63,8 +92,77 @@ export class EditorToolbar {
 
   protected readonly editingTimeout = signal(false);
 
+  protected readonly editingFormat = signal(false);
+
+  /**
+   * Lo que se puede elegir del formateo, descrito por lo que hace.
+   *
+   * Los nombres son los del usuario y no los de `sql-formatter`: «Tabular» dice
+   * más que `tabularLeft`, y quien busca sangría no busca `tabWidth`. El menú se
+   * dibuja a partir de esta lista, así que añadir una opción es añadir una fila.
+   */
+  protected readonly formatGroups: readonly FormatGroup[] = [
+    {
+      key: 'style',
+      label: 'Reparto de líneas',
+      options: [
+        { value: 'standard', label: 'Estándar', hint: 'Cada elemento en su línea, sangrado' },
+        { value: 'tabular', label: 'Tabular', hint: 'Palabra clave a la izquierda y valores en columna' },
+      ],
+    },
+    {
+      // El ancho manda sobre las expresiones —los argumentos de una función,
+      // una lista—, no sobre las cláusulas: `FROM` siempre empieza línea. La
+      // etiqueta lo dice para no prometer lo que no hace.
+      key: 'expressionWidth',
+      label: 'Ancho de expresión',
+      options: FORMAT_WIDTHS.map((width) => ({
+        value: width,
+        label: String(width),
+        hint: `Parte funciones y listas al pasar de ${width} caracteres`,
+      })),
+    },
+    {
+      key: 'keywordCase',
+      label: 'Palabras clave',
+      options: [
+        { value: 'upper', label: 'MAYÚSCULAS' },
+        { value: 'lower', label: 'minúsculas' },
+        { value: 'preserve', label: 'Como estén', hint: 'No cambia la caja de nada' },
+      ],
+    },
+    {
+      key: 'indent',
+      label: 'Sangría',
+      options: [
+        { value: 'spaces2', label: '2 espacios' },
+        { value: 'spaces4', label: '4 espacios' },
+        { value: 'tabs', label: 'Tabulaciones' },
+      ],
+    },
+  ];
+
   protected toggleTimeout(): void {
     this.editingTimeout.update((open) => !open);
+  }
+
+  protected toggleFormat(): void {
+    this.editingFormat.update((open) => !open);
+  }
+
+  protected isChosen(key: FormatGroupKey, value: FormatOptionValue): boolean {
+    return this.formatSettings()[key] === value;
+  }
+
+  /**
+   * Aplica una opción sin cerrar el menú.
+   *
+   * Quien viene a ajustar el formateo suele tocar más de una cosa —el ancho y la
+   * sangría van juntos—, y cerrarlo en cada clic obligaría a abrirlo cuatro
+   * veces.
+   */
+  protected choose(key: FormatGroupKey, value: FormatOptionValue): void {
+    this.formatSettingsChange.emit({ [key]: value } as Partial<FormatSettings>);
   }
 
   protected chooseTimeout(seconds: number): void {

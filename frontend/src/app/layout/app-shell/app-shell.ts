@@ -10,6 +10,7 @@ import {
 } from '@angular/core';
 
 import { ExportFormat } from '../../core/application-gateway/application-gateway';
+import { FormatSettings } from '../../core/workspace/format-settings';
 import { WorkspaceStore } from '../../core/workspace/workspace-store';
 import { SqlFileService } from '../../core/sql-files/sql-file.service';
 import { ConnectionDialog } from '../../features/connections/connection-dialog/connection-dialog';
@@ -202,6 +203,7 @@ export class AppShell {
   protected readonly exporting = this._store.exporting;
   protected readonly transaction = this._store.transaction;
   protected readonly transactionBusy = this._store.transactionBusy;
+  protected readonly formatSettings = this._store.formatSettings;
 
   protected readonly session = computed(() => this._store.session() ?? DISCONNECTED);
 
@@ -453,6 +455,10 @@ export class AppShell {
     }
 
     void this._store.disconnect(id);
+  }
+
+  protected setFormatSettings(changes: Partial<FormatSettings>): void {
+    void this._store.setFormatSettings(changes);
   }
 
   protected beginTransaction(): void {

@@ -15,6 +15,12 @@ import {
 import { FileSaveService } from '../files/file-save.service';
 import { PendingWorkService } from '../files/pending-work.service';
 import {
+  DEFAULT_FORMAT_SETTINGS,
+  FormatSettings,
+  formatPreferences,
+  parseFormatSettings,
+} from './format-settings';
+import {
   ConnectionForm,
   ConnectionSummary,
   DatabaseColumn,
@@ -134,9 +140,46 @@ export class WorkspaceStore {
   private readonly _timeoutSeconds = signal(30);
   readonly timeoutSeconds = this._timeoutSeconds.asReadonly();
 
+  /**
+   * Cómo formatea el editor.
+   *
+   * Se guarda igual que el tiempo máximo, y por lo mismo: es una decisión que se
+   * toma una vez —o que viene impuesta por el estilo del equipo— y que sería
+   * molesto repetir en cada arranque.
+   */
+  private readonly _formatSettings = signal<FormatSettings>(DEFAULT_FORMAT_SETTINGS);
+  readonly formatSettings = this._formatSettings.asReadonly();
+
   /** Muestra un aviso al usuario. */
   notify(message: string): void {
     this._notice.set(message);
+  }
+
+  /**
+   * Cambia uno o varios ajustes de formateo.
+   *
+   * Se guarda solo lo que cambió: escribir las cuatro claves en cada clic
+   * llenaría de escrituras la base local para no decir nada nuevo.
+   */
+  async setFormatSettings(changes: Partial<FormatSettings>): Promise<void> {
+    const previous = this._formatSettings();
+    const next = { ...previous, ...changes };
+
+    this._formatSettings.set(next);
+
+    const before = formatPreferences(previous);
+    const after = formatPreferences(next);
+
+    try {
+      await Promise.all(
+        Object.entries(after)
+          .filter(([key, value]) => before[key] !== value)
+          .map(([key, value]) => firstValueFrom(this._gateway.setPreference(key, value))),
+      );
+    } catch {
+      // Igual que con el tiempo máximo: el ajuste ya está aplicado en esta
+      // sesión, y no poder recordarlo no justifica interrumpir a nadie.
+    }
   }
 
   async setTimeout(seconds: number): Promise<void> {
@@ -161,6 +204,8 @@ export class WorkspaceStore {
       if (Number.isFinite(stored) && stored > 0) {
         this._timeoutSeconds.set(stored);
       }
+
+      this._formatSettings.set(parseFormatSettings(preferences));
     } catch {
       // Se sigue con los valores por defecto.
     }

@@ -27,10 +27,60 @@
 
 <span class="divider" aria-hidden="true"></span>
 
-<button type="button" class="btn" title="Formatear (Ctrl+Shift+F)" (click)="format.emit()">
-  <app-icon name="format" [size]="11" />
-  Formatear
-</button>
+<!--
+  Formatear y elegir cómo formatear son dos botones y no uno: quien pulsa
+  «Formatear» quiere formatear ya, y esconder esa acción detrás de un menú la
+  encarecería por una configuración que se toca una vez.
+-->
+<div class="format">
+  <button
+    type="button"
+    class="btn btn--split"
+    title="Formatear (Ctrl+Shift+F)"
+    (click)="format.emit()"
+  >
+    <app-icon name="format" [size]="11" />
+    Formatear
+  </button>
+
+  <button
+    type="button"
+    class="btn btn--caret"
+    title="Cómo se formatea"
+    aria-label="Opciones de formateo"
+    [attr.aria-expanded]="editingFormat()"
+    (click)="toggleFormat()"
+  >
+    <app-icon name="chevron-down" [size]="9" />
+  </button>
+
+  @if (editingFormat()) {
+    <div
+      class="format__menu"
+      role="dialog"
+      aria-label="Opciones de formateo"
+      (keydown.escape)="editingFormat.set(false)"
+    >
+      @for (group of formatGroups; track group.key) {
+        <p class="format__label">{{ group.label }}</p>
+        <div class="format__options" role="group" [attr.aria-label]="group.label">
+          @for (option of group.options; track option.value) {
+            <button
+              type="button"
+              class="format__option"
+              [attr.aria-pressed]="isChosen(group.key, option.value)"
+              [class.is-selected]="isChosen(group.key, option.value)"
+              [attr.title]="option.hint ?? null"
+              (click)="choose(group.key, option.value)"
+            >
+              {{ option.label }}
+            </button>
+          }
+        </div>
+      }
+    </div>
+  }
+</div>
 
 <span class="divider" aria-hidden="true"></span>
 
