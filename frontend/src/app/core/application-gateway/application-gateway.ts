@@ -1,6 +1,7 @@
 import { Observable } from 'rxjs';
 
 import {
+  AuthenticationMode,
   DatabaseColumn,
   DatabaseEngine,
   DatabaseObject,
@@ -10,6 +11,7 @@ import {
   SavedConnection,
   SecretStoreStatus,
   SessionInfo,
+  SshTunnel,
   TableAlteration,
   TableDesign,
   TestConnectionResult,
@@ -34,11 +36,19 @@ export interface ConnectRequest {
     readonly port: number;
     readonly database: string;
     readonly username: string;
+    /** `password` o `windows`. Si falta, la API asume `password`. */
+    readonly authentication?: AuthenticationMode;
     readonly readOnly?: boolean;
     readonly sslMode?: string;
     readonly connectTimeoutSeconds?: number;
+    /** Servidor intermedio, o ausente para ir directo. */
+    readonly sshTunnel?: SshTunnel;
   };
   readonly password?: string;
+  /** Contraseña del usuario SSH, o passphrase de su clave. */
+  readonly sshSecret?: string;
+  /** Código de un solo uso del servidor SSH. */
+  readonly sshVerificationCode?: string;
 }
 
 /** Cómo leer el archivo que se importa. */
@@ -315,4 +325,8 @@ export interface SaveConnectionRequest {
   readonly password?: string;
   /** El usuario pidió recordar la contraseña. */
   readonly storePassword: boolean;
+  /** Secreto del túnel, para el almacén del sistema. */
+  readonly sshSecret?: string;
+  /** El usuario pidió recordar el secreto del túnel. */
+  readonly storeSshSecret?: boolean;
 }

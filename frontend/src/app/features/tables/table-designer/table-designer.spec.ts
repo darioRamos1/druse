@@ -111,7 +111,7 @@ describe('TableDesigner', () => {
   it('solo envía las columnas que de verdad cambiaron', async () => {
     await open(table);
 
-    // Cada fila tiene tres campos de texto —nombre, tipo y valor por omisión—,
+    // Cada fila tiene tres campos de texto —nombre, tipo y valor por defecto—,
     // así que el tipo de la segunda columna es el quinto de la lista.
     const inputs = [...fixture.nativeElement.querySelectorAll('.columns__row .field__input')];
     const tipoDeTotal = inputs[4] as HTMLInputElement;

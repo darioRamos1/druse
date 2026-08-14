@@ -160,8 +160,9 @@ internal static class DatabaseEndpoints
         {
             var profile = request.Profile.ToDomain();
             var credentials = new DatabaseCredentials(request.Password);
+            var ssh = new SshCredentials(request.SshSecret, request.SshVerificationCode);
 
-            var result = await connections.TestAsync(profile, credentials, cancellationToken);
+            var result = await connections.TestAsync(profile, credentials, ssh, cancellationToken);
 
             // Un fallo de credenciales no es un error de la API: la petición se
             // atendió correctamente y su respuesta es «no se pudo conectar».
@@ -179,8 +180,9 @@ internal static class DatabaseEndpoints
         {
             var profile = request.Profile.ToDomain();
             var credentials = new DatabaseCredentials(request.Password);
+            var ssh = new SshCredentials(request.SshSecret, request.SshVerificationCode);
 
-            var session = await connections.OpenAsync(profile, credentials, cancellationToken);
+            var session = await connections.OpenAsync(profile, credentials, ssh, cancellationToken);
 
             return Results.Created($"/api/sessions/{session.Id}", session.ToResponse());
         })

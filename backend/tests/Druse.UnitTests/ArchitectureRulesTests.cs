@@ -49,6 +49,10 @@ public sealed class ArchitectureRulesTests
         // Capacidades nativas: solo su abstracción.
         ["Druse.Platform.Native"] = ["Druse.Platform.Abstractions"],
 
+        // El túnel SSH encapsula su librería igual que un proveedor encapsula su
+        // driver: la aplicación solo ve la abstracción del túnel.
+        ["Druse.Ssh"] = ["Druse.Application"],
+
         // Composición: único lugar donde se conocen todas las implementaciones.
         ["Druse.Host.LocalApi"] =
         [
@@ -59,6 +63,7 @@ public sealed class ArchitectureRulesTests
             "Druse.Provider.SqlServer",
             "Druse.Persistence.Sqlite",
             "Druse.Platform.Native",
+            "Druse.Ssh",
         ],
     };
 
@@ -81,6 +86,11 @@ public sealed class ArchitectureRulesTests
         "Microsoft.EntityFrameworkCore",
         "Microsoft.AspNetCore",
         "Dapper",
+
+        // El túnel se abre detrás de una abstracción: quien decide cómo hablar
+        // SSH es Druse.Ssh, igual que cada proveedor decide su driver.
+        "SSH.NET",
+        "Renci",
     ];
 
     [Fact]

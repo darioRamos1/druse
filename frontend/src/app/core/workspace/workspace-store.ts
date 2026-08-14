@@ -52,6 +52,14 @@ interface PendingRejection {
   readonly format?: ExportFormat;
 }
 
+interface DisplayedResultSource {
+  readonly tabId: string | null;
+  readonly connectionId: string;
+  readonly database?: string;
+  readonly sql: string;
+  readonly title: string;
+}
+
 /** Clave con la que se guarda el tiempo máximo de ejecución. */
 const TIMEOUT_PREFERENCE = 'query.timeoutSeconds';
 
@@ -87,6 +95,7 @@ export class WorkspaceStore {
   // --- Ejecución -------------------------------------------------------------
   private readonly _result = signal<QueryResult | null>(null);
   readonly result = this._result.asReadonly();
+  private readonly _resultSource = signal<DisplayedResultSource | null>(null);
 
   private readonly _running = signal(false);
   readonly running = this._running.asReadonly();
@@ -173,11 +182,16 @@ export class WorkspaceStore {
     confirmDestructive = false,
     sqlOverride?: string,
   ): Promise<void> {
-    const connection = this.activeConnection();
+    const source = this._result() ? this._resultSource() : null;
+    const connection = source ? this.findConnection(source.connectionId) : this.activeConnection();
     const tab = this.activeTab();
-    const tabId = tab?.id;
-    const sql = (sqlOverride ?? tab?.sql ?? '').trim();
+    const tabId = source?.tabId ?? tab?.id;
+    const sql = (sqlOverride ?? source?.sql ?? tab?.sql ?? '').trim();
     const tabSql = tab?.sql;
+    const stillCurrent = (): boolean =>
+      source
+        ? this._resultSource() === source
+        : this.activeTab()?.id === tabId && this.activeTab()?.sql === tabSql;
 
     if (!connection?.sessionId) {
       this._notice.set('No hay ninguna conexión abierta.');
@@ -197,15 +211,15 @@ export class WorkspaceStore {
         this._gateway.exportQuery({
           sessionId: connection.sessionId,
           sql,
-          database: tab?.database,
+          database: source?.database ?? tab?.database,
           format,
-          fileName: tab?.title,
+          fileName: source?.title ?? tab?.title,
           confirmDestructive,
         }),
       );
 
-      if (this.activeTab()?.id === tabId && this.activeTab()?.sql === tabSql) {
-        download(blob, `${sanitizeFileName(tab?.title ?? 'druse')}.${format}`);
+      if (stillCurrent()) {
+        download(blob, `${sanitizeFileName(source?.title ?? tab?.title ?? 'druse')}.${format}`);
         this._notice.set(`Exportado a ${format.toUpperCase()}.`);
       }
     } catch (error) {
@@ -216,7 +230,7 @@ export class WorkspaceStore {
           tab &&
           connection &&
           this.activeTab()?.id === tab.id &&
-          this.activeTab()?.sql === tabSql
+          stillCurrent()
         ) {
           this._pendingRejection.set({
             value: rejection,
@@ -228,8 +242,10 @@ export class WorkspaceStore {
           });
         }
       } else {
-        if (this.activeTab()?.id === tabId && this.activeTab()?.sql === tabSql) {
-          this._notice.set(describeError(error));
+        const message = await describeBlobError(error);
+
+        if (stillCurrent()) {
+          this._notice.set(message);
         }
       }
     } finally {
@@ -289,6 +305,7 @@ export class WorkspaceStore {
             saved: true,
             hasStoredPassword: profile.hasStoredPassword,
             database: profile.database,
+            authentication: profile.authentication ?? 'password',
           }));
 
         return [...live, ...restored];
@@ -810,6 +827,7 @@ export class WorkspaceStore {
         saved: form.save,
         hasStoredPassword: form.save && form.storePassword,
         database: form.database,
+        authentication: form.authentication,
       },
     ]);
 
@@ -828,7 +846,7 @@ export class WorkspaceStore {
         engine: form.engine,
         engineVersion: describeVersion(form.engine, session.serverVersion),
         database: session.database,
-        user: `${form.username}@${form.host}`,
+        user: describeUser(form),
         lastDurationMs: null,
       });
       this.activateConnection(id);
@@ -895,6 +913,8 @@ export class WorkspaceStore {
       profile: { ...toRequest(form).profile, id },
       password: form.password,
       storePassword: form.storePassword,
+      sshSecret: form.sshSecret,
+      storeSshSecret: form.storeSshSecret ?? false,
     };
 
     try {
@@ -1606,6 +1626,13 @@ export class WorkspaceStore {
 
       if (this.activeTab()?.id === tabId && this.activeTab()?.sql === tabSql) {
         this._result.set(result);
+        this._resultSource.set({
+          tabId: tabId ?? null,
+          connectionId: connection.id,
+          database: tab?.database,
+          sql,
+          title: tab?.title ?? 'druse',
+        });
       } else {
         return null;
       }
@@ -1722,6 +1749,7 @@ export class WorkspaceStore {
 
   private clearDisplayedResult(): void {
     this._result.set(null);
+    this._resultSource.set(null);
     this._pendingRejection.set(null);
     this.discardEdits();
   }
@@ -1799,6 +1827,18 @@ function toExplorerNode(entry: TreeEntry): ExplorerNode {
   };
 }
 
+/**
+ * Quién aparece en la barra de estado.
+ *
+ * Con autenticación de Windows no hay usuario escrito, así que se nombra el
+ * método: dejar solo el servidor haría creer que la conexión es anónima.
+ */
+function describeUser(form: ConnectionForm): string {
+  return form.authentication === 'windows'
+    ? `Windows@${form.host}`
+    : `${form.username}@${form.host}`;
+}
+
 function toRequest(form: ConnectionForm): ConnectRequest {
   return {
     profile: {
@@ -1808,9 +1848,16 @@ function toRequest(form: ConnectionForm): ConnectRequest {
       port: form.port,
       database: form.database,
       username: form.username,
+      authentication: form.authentication,
       readOnly: form.readOnly,
+      sslMode: form.sslMode,
+      sshTunnel: form.sshTunnel,
     },
-    password: form.password,
+    // Con autenticación de Windows no hay contraseña que enviar: la identidad la
+    // pone la sesión del sistema.
+    password: form.authentication === 'windows' ? undefined : form.password,
+    sshSecret: form.sshTunnel ? form.sshSecret : undefined,
+    sshVerificationCode: form.sshTunnel ? form.sshVerificationCode : undefined,
   };
 }
 
@@ -1861,6 +1908,23 @@ async function asRejectionFromBlob(error: unknown): Promise<QueryRejected | null
   return error.error?.reason ? (error.error as QueryRejected) : null;
 }
 
+async function describeBlobError(error: unknown): Promise<string> {
+  if (error instanceof HttpErrorResponse && error.error instanceof Blob) {
+    try {
+      const text = await error.error.text();
+      const body = JSON.parse(text) as { message?: unknown };
+
+      if (typeof body.message === 'string' && body.message.length > 0) {
+        return body.message;
+      }
+    } catch {
+      // Si no es JSON válido, se conserva el mensaje HTTP normal.
+    }
+  }
+
+  return describeError(error);
+}
+
 /** Reconoce el 409 con el que la API pide confirmación. */
 function asRejection(error: unknown): QueryRejected | null {
   if (error instanceof HttpErrorResponse && error.status === 409 && error.error?.reason) {
@@ -1871,25 +1935,144 @@ function asRejection(error: unknown): QueryRejected | null {
 }
 
 /**
- * Traduce un error a algo que se pueda enseñar.
+ * Qué decirle al usuario cuando algo falla.
  *
  * Nunca se muestra el objeto de error completo: puede traer cabeceras, cuerpos y
  * rutas internas que no aportan al usuario (plan §12).
+ *
+ * Y el número de un código HTTP tampoco significa nada para quien está
+ * consultando una base de datos: «502» no dice qué pasó ni qué hacer. Cada caso
+ * se cuenta con palabras y, cuando se puede, con el siguiente paso. El código se
+ * conserva al final entre paréntesis, pequeño y sin protagonismo: no le sirve al
+ * usuario, pero es lo primero que hace falta el día que tenga que contarle el
+ * problema a alguien.
  */
 function describeError(error: unknown): string {
-  if (error instanceof HttpErrorResponse) {
-    if (error.status === 0) {
-      return 'No se pudo contactar con la API local.';
-    }
-
-    const message = error.error?.message;
-
-    return typeof message === 'string' && message.length > 0
-      ? message
-      : `La API respondió con el código ${error.status}.`;
+  if (!(error instanceof HttpErrorResponse)) {
+    return 'Druse encontró un problema inesperado. Si vuelve a ocurrir, reinicia la aplicación.';
   }
 
-  return 'Se produjo un error inesperado.';
+  const body = error.error;
+
+  // Un fallo de validación sabe exactamente qué campo está mal, así que se
+  // cuenta campo por campo en lugar de resumirlo en un código.
+  const validation = validationMessages(body?.errors);
+
+  if (validation.length > 0) {
+    return `Revisa los datos enviados: ${validation.join(' ')}`;
+  }
+
+  // Cuando el servidor explica el motivo, se enseña tal cual: sus mensajes ya
+  // están escritos para leerse, y son más concretos que cualquier traducción
+  // que se pudiera hacer aquí a partir del código.
+  const message = body?.message ?? body?.detail;
+
+  if (typeof message === 'string' && message.trim().length > 0) {
+    return message;
+  }
+
+  return `${explainStatus(error.status)} (${error.status})`;
+}
+
+/** Lo que significa cada código, dicho como se lo contarías a alguien. */
+function explainStatus(status: number): string {
+  switch (status) {
+    // Angular usa el 0 cuando la petición ni siquiera llegó a salir.
+    case 0:
+      return 'Druse no obtuvo respuesta de su propio motor. Comprueba que la aplicación siga abierta y vuelve a intentarlo.';
+
+    case 400:
+      return 'La solicitud contiene datos incompletos o con un formato incorrecto.';
+
+    case 401:
+    case 403:
+      return 'Esta ventana perdió el permiso para hablar con el motor de Druse. Cierra la aplicación y vuelve a abrirla.';
+
+    case 404:
+      return 'Eso ya no existe. Es probable que la conexión se haya cerrado; vuelve a abrirla y repite la operación.';
+
+    case 408:
+      return 'La operación tardó demasiado y se cortó. Prueba otra vez, o con menos datos.';
+
+    case 409:
+      return 'La operación no se aplicó porque algo había cambiado mientras tanto. Actualiza y vuelve a intentarlo.';
+
+    case 413:
+      return 'El archivo es demasiado grande para procesarlo de una vez.';
+
+    case 428:
+      return 'Falta una contraseña para abrir esta conexión.';
+
+    case 500:
+      return 'Algo falló dentro de Druse mientras atendía la petición. No se aplicó ningún cambio.';
+
+    // 502, 503 y 504 significan lo mismo desde aquí: el proceso que hace el
+    // trabajo no está atendiendo. Es lo que se ve si se cerró o si aún arranca.
+    case 502:
+    case 503:
+    case 504:
+      return 'El motor de Druse no está respondiendo: puede que se haya cerrado o que todavía esté arrancando. Espera unos segundos y, si sigue igual, reinicia la aplicación.';
+
+    default:
+      return status >= 500
+        ? 'El motor de Druse falló al atender la petición.'
+        : 'Druse no pudo completar la operación.';
+  }
+}
+
+function validationMessages(errors: unknown): string[] {
+  if (!errors || typeof errors !== 'object') {
+    return [];
+  }
+
+  const messages = Object.entries(errors as Record<string, unknown>).flatMap(([field, value]) => {
+    const known = validationFieldMessage(field);
+
+    if (known) {
+      return [known];
+    }
+
+    if (!Array.isArray(value)) {
+      return [];
+    }
+
+    return value
+      .filter((message): message is string => typeof message === 'string')
+      .map((message) => {
+        if (/required/i.test(message)) {
+          return 'Falta un dato obligatorio.';
+        }
+        if (/could not be converted|invalid/i.test(message)) {
+          return 'Uno de los valores tiene un formato incorrecto.';
+        }
+
+        return message;
+      });
+  });
+
+  return [...new Set(messages)];
+}
+
+function validationFieldMessage(field: string): string | null {
+  const normalized = field.toLowerCase();
+
+  if (normalized.endsWith('.name')) {
+    return 'El nombre de la conexión es obligatorio.';
+  }
+  if (normalized.endsWith('.host')) {
+    return 'El servidor es obligatorio.';
+  }
+  if (normalized.endsWith('.port')) {
+    return 'El puerto debe ser un número entre 1 y 65535.';
+  }
+  if (normalized.endsWith('.database')) {
+    return 'La base de datos es obligatoria.';
+  }
+  if (normalized.endsWith('.username')) {
+    return 'El usuario es obligatorio.';
+  }
+
+  return null;
 }
 
 function describeVersion(engine: string, serverVersion: string): string {

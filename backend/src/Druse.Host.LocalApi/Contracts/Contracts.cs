@@ -20,10 +20,40 @@ public sealed record ConnectionProfileDto
     public required string Host { get; init; }
     public required int Port { get; init; }
     public required string Database { get; init; }
-    public required string Username { get; init; }
+
+    /// <summary>Se ignora cuando <see cref="Authentication"/> es `windows`.</summary>
+    public string Username { get; init; } = string.Empty;
+
+    /// <summary>`password` o `windows`. Por omisión, usuario y contraseña.</summary>
+    public string Authentication { get; init; } = nameof(AuthenticationMode.Password);
+
     public string Environment { get; init; } = nameof(ConnectionEnvironment.Development);
     public bool ReadOnly { get; init; }
     public string SslMode { get; init; } = nameof(Domain.SslMode.Prefer);
+    public int ConnectTimeoutSeconds { get; init; } = 15;
+
+    /// <summary>Servidor intermedio, o ausente para conectar directamente.</summary>
+    public SshTunnelDto? SshTunnel { get; init; }
+}
+
+/// <summary>
+/// Servidor SSH por el que viaja la conexión.
+///
+/// **Sin contraseña ni passphrase**, igual que el perfil: esos secretos viajan
+/// solo en las peticiones que abren la conexión (plan §12).
+/// </summary>
+public sealed record SshTunnelDto
+{
+    public required string Host { get; init; }
+    public int Port { get; init; } = 22;
+    public required string Username { get; init; }
+
+    /// <summary>`password`, `privatekey` o `keyboardinteractive`.</summary>
+    public string Authentication { get; init; } = nameof(SshAuthenticationMode.Password);
+
+    /// <summary>Ruta del archivo de clave privada. Solo con `privatekey`.</summary>
+    public string PrivateKeyPath { get; init; } = string.Empty;
+
     public int ConnectTimeoutSeconds { get; init; } = 15;
 }
 
@@ -34,6 +64,17 @@ public sealed record ConnectRequest
 
     /// <summary>Se usa y se descarta. No se persiste con el perfil.</summary>
     public string? Password { get; init; }
+
+    /// <summary>Contraseña del usuario SSH, o passphrase de su clave privada.</summary>
+    public string? SshSecret { get; init; }
+
+    /// <summary>
+    /// Código de un solo uso del servidor SSH.
+    ///
+    /// Nunca se guarda: caduca en segundos, así que guardarlo solo serviría para
+    /// tener un secreto inútil en el llavero del usuario.
+    /// </summary>
+    public string? SshVerificationCode { get; init; }
 }
 
 public sealed record TestConnectionResponse
@@ -175,9 +216,20 @@ public sealed record SavedConnectionDto
     public required int Port { get; init; }
     public required string Database { get; init; }
     public required string Username { get; init; }
+    public required string Authentication { get; init; }
     public required string Environment { get; init; }
     public required bool ReadOnly { get; init; }
+
+    /// <summary>`disable`, `prefer` o `require`.</summary>
+    public required string SslMode { get; init; }
+
     public required bool HasStoredPassword { get; init; }
+
+    /// <summary>Servidor intermedio del perfil, si tiene.</summary>
+    public SshTunnelDto? SshTunnel { get; init; }
+
+    /// <summary>Hay un secreto de SSH guardado para este perfil.</summary>
+    public bool HasStoredSshSecret { get; init; }
 }
 
 public sealed record SaveConnectionRequest
@@ -189,12 +241,23 @@ public sealed record SaveConnectionRequest
 
     /// <summary>El usuario pidió recordar la contraseña.</summary>
     public bool StorePassword { get; init; }
+
+    /// <summary>Contraseña o passphrase del túnel, para el almacén del sistema.</summary>
+    public string? SshSecret { get; init; }
+
+    /// <summary>El usuario pidió recordar el secreto del túnel.</summary>
+    public bool StoreSshSecret { get; init; }
 }
 
-/// <summary>Contraseña para conexiones sin credencial guardada.</summary>
+/// <summary>Secretos para conexiones guardadas que no los tienen almacenados.</summary>
 public sealed record OpenSavedSessionRequest
 {
     public string? Password { get; init; }
+
+    public string? SshSecret { get; init; }
+
+    /// <summary>Código de un solo uso, que nunca se guarda.</summary>
+    public string? SshVerificationCode { get; init; }
 }
 
 public sealed record SecretStoreStatusDto

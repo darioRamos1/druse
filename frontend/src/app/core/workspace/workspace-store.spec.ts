@@ -31,6 +31,8 @@ const form: ConnectionForm = {
   database: 'druse_test',
   username: 'postgres',
   password: 'secreta',
+  authentication: 'password',
+  sslMode: 'prefer',
   readOnly: false,
   environment: 'development',
   // Sin guardar: las pruebas de conexión no deben tocar la persistencia.
@@ -112,6 +114,7 @@ class FakeGateway implements Partial<ApplicationGateway> {
   deletedConnections: string[] = [];
   openSavedCalls: { id: string; password?: string }[] = [];
   openShouldFail = false;
+  openValidationShouldFail = false;
   savedConnectionMissingPassword = false;
   executeResult: Observable<QueryResult> = of(successfulQuery());
   savedConnections: SavedConnection[] = [];
@@ -144,6 +147,8 @@ class FakeGateway implements Partial<ApplicationGateway> {
       port: request.profile.port,
       database: request.profile.database,
       username: request.profile.username,
+      authentication: request.profile.authentication ?? 'password',
+      sslMode: 'prefer',
       environment: 'development',
       readOnly: false,
       hasStoredPassword: request.storePassword,
@@ -175,13 +180,34 @@ class FakeGateway implements Partial<ApplicationGateway> {
     return of([]);
   }
 
+  /** Código con el que falla `openSession` cuando `openShouldFail` está activo. */
+  openFailureStatus = 400;
+
+  /** Cuerpo del fallo. Vacío imita a un servidor que no explica nada. */
+  openFailureBody: unknown = { message: 'La autenticación falló.' };
+
   openSession(): Observable<SessionInfo> {
+    if (this.openValidationShouldFail) {
+      return throwError(
+        () =>
+          new HttpErrorResponse({
+            status: 400,
+            error: {
+              errors: {
+                '$.profile.port': ['The JSON value could not be converted to System.Int32.'],
+                '$.profile.database': ['The Database field is required.'],
+              },
+            },
+          }),
+      );
+    }
+
     return this.openShouldFail
       ? throwError(
           () =>
             new HttpErrorResponse({
-              status: 400,
-              error: { message: 'La autenticación falló.' },
+              status: this.openFailureStatus,
+              error: this.openFailureBody,
             }),
         )
       : of({ ...session, sessionId: this.sessionIds.shift() ?? session.sessionId });
@@ -360,6 +386,47 @@ describe('WorkspaceStore', () => {
       expect(store.notice()).toBe('La autenticación falló.');
     });
 
+    it('traduce un fallo sin explicación a algo que se pueda leer', async () => {
+      gateway.openShouldFail = true;
+      // 502 es lo que devuelve el proxy cuando el proceso local no responde, y
+      // llega sin cuerpo: es el caso donde antes se enseñaba el número pelado.
+      gateway.openFailureStatus = 502;
+      gateway.openFailureBody = null;
+
+      await store.connect(form);
+
+      const notice = store.notice() ?? '';
+
+      expect(notice).toContain('no está respondiendo');
+      expect(notice).toContain('reinicia la aplicación');
+      // El código se conserva al final: no le sirve al usuario, pero sí a quien
+      // tenga que diagnosticar lo que le pasó.
+      expect(notice).toContain('(502)');
+      expect(notice).not.toContain('La API respondió');
+    });
+
+    it('cuando el servidor explica el motivo, se enseña su mensaje', async () => {
+      gateway.openShouldFail = true;
+      gateway.openFailureStatus = 400;
+      gateway.openFailureBody = { message: 'La autenticación falló.' };
+
+      await store.connect(form);
+
+      // El mensaje del servidor es más concreto que cualquier traducción por
+      // código, así que gana y viaja sin número detrás.
+      expect(store.notice()).toBe('La autenticación falló.');
+    });
+
+    it('traduce los errores de validación enviados por la API', async () => {
+      gateway.openValidationShouldFail = true;
+
+      await store.connect({ ...form, save: false });
+
+      expect(store.notice()).toBe(
+        'Revisa los datos enviados: El puerto debe ser un número entre 1 y 65535. La base de datos es obligatoria.',
+      );
+    });
+
     it('al desconectar cierra la sesión y limpia el árbol', async () => {
       await store.connect(form);
       const id = store.connections()[0].id;
@@ -383,6 +450,8 @@ describe('WorkspaceStore', () => {
           port: 5432,
           database: 'app',
           username: 'lector',
+          authentication: 'password',
+          sslMode: 'prefer',
           environment: 'production',
           readOnly: true,
           hasStoredPassword: true,
@@ -425,6 +494,8 @@ describe('WorkspaceStore', () => {
           port: 5432,
           database: 'druse_test',
           username: 'postgres',
+          authentication: 'password',
+          sslMode: 'prefer',
           environment: 'development',
           readOnly: false,
           hasStoredPassword: true,
@@ -449,6 +520,8 @@ describe('WorkspaceStore', () => {
           port: 5432,
           database: 'druse_test',
           username: 'postgres',
+          authentication: 'password',
+          sslMode: 'prefer',
           environment: 'development',
           readOnly: false,
           hasStoredPassword: false,
@@ -1021,6 +1094,40 @@ describe('WorkspaceStore', () => {
       await exporting;
 
       expect(store.rejection()).toBeNull();
+    });
+
+    it('exporta la consulta que produjo el resultado aunque el editor después quede vacío', async () => {
+      await store.connect(form);
+      store.updateSql('SELECT 1;\nSELECT 2;');
+      await store.execute('SELECT 2;');
+      store.updateSql('');
+
+      await store.export('xlsx');
+
+      expect(gateway.exportCalls.at(-1)).toMatchObject({
+        sessionId: 'sesion-1',
+        sql: 'SELECT 2;',
+        format: 'xlsx',
+      });
+      expect(store.notice()).toBe('Exportado a XLSX.');
+    });
+
+    it('muestra el mensaje JSON de un error de exportación recibido como blob', async () => {
+      await store.connect(form);
+      store.updateSql('SELECT 1');
+      vi.spyOn(gateway, 'exportQuery').mockReturnValue(
+        throwError(
+          () =>
+            new HttpErrorResponse({
+              status: 500,
+              error: new Blob([JSON.stringify({ message: 'Excel rechazó una celda.' })]),
+            }),
+        ),
+      );
+
+      await store.export('xlsx');
+
+      expect(store.notice()).toBe('Excel rechazó una celda.');
     });
   });
 

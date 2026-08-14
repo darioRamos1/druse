@@ -128,7 +128,11 @@ public sealed class StorageEndpointsTests : IClassFixture<DruseApiFactory>
 
         // La contraseña entra en la petición pero jamás vuelve en la respuesta.
         Assert.DoesNotContain("contraseña-de-prueba", raw, StringComparison.Ordinal);
-        Assert.DoesNotContain("\"password\"", raw, StringComparison.OrdinalIgnoreCase);
+
+        // Se busca el nombre de propiedad, con sus dos puntos, y no la palabra
+        // suelta: `"authentication":"password"` nombra el método de acceso y no
+        // lleva ningún secreto.
+        Assert.DoesNotContain("\"password\":", raw, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

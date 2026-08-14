@@ -277,4 +277,24 @@ public sealed class XlsxResultExporterTests
         Assert.Equal(5, result.RowCount);
         Assert.True(result.Truncated);
     }
+
+    [Fact]
+    public async Task RecortaUnaCeldaQueSuperaElLimiteDeExcel()
+    {
+        var exporter = new XlsxResultExporter();
+        using var destination = new MemoryStream();
+
+        await exporter.WriteAsync(
+            new FakeReader(["json"], [[new string('x', 40_000)]]),
+            destination,
+            new ExportOptions { Format = ExportFormat.Xlsx },
+            CancellationToken.None);
+
+        destination.Position = 0;
+        using var workbook = new ClosedXML.Excel.XLWorkbook(destination);
+        var value = workbook.Worksheet("Resultados").Cell(2, 1).GetString();
+
+        Assert.Equal(32_767, value.Length);
+        Assert.EndsWith("[recortado por el límite de Excel]", value, StringComparison.Ordinal);
+    }
 }

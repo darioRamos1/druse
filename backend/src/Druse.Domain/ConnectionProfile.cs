@@ -9,6 +9,22 @@ public enum ConnectionEnvironment
 }
 
 /// <summary>
+/// Cómo se identifica el usuario ante el motor.
+///
+/// <see cref="Windows"/> delega la identidad en la sesión de Windows en la que
+/// corre Druse: no hay usuario ni contraseña que escribir ni que guardar, y por
+/// eso ninguno de los dos se pide cuando está activa.
+/// </summary>
+public enum AuthenticationMode
+{
+    /// <summary>Usuario y contraseña del propio motor.</summary>
+    Password = 0,
+
+    /// <summary>Identidad de la sesión de Windows. Solo la admite SQL Server.</summary>
+    Windows = 1,
+}
+
+/// <summary>
 /// Datos de acceso a un motor, sin la contraseña.
 ///
 /// La contraseña nunca forma parte de esta entidad: vive en el almacén seguro
@@ -32,7 +48,14 @@ public sealed record ConnectionProfile
     /// <summary>Base a la que conectarse inicialmente.</summary>
     public required string Database { get; init; }
 
+    /// <summary>Vacío cuando la autenticación es <see cref="AuthenticationMode.Windows"/>.</summary>
     public required string Username { get; init; }
+
+    /// <summary>Cómo se identifica el usuario. Por omisión, usuario y contraseña.</summary>
+    public AuthenticationMode Authentication { get; init; } = AuthenticationMode.Password;
+
+    /// <summary>La identidad la pone el sistema: no hay contraseña que pedir ni guardar.</summary>
+    public bool UsesIntegratedSecurity => Authentication == AuthenticationMode.Windows;
 
     public ConnectionEnvironment Environment { get; init; } = ConnectionEnvironment.Development;
 
@@ -44,6 +67,18 @@ public sealed record ConnectionProfile
 
     /// <summary>Segundos de espera al abrir la conexión.</summary>
     public int ConnectTimeoutSeconds { get; init; } = 15;
+
+    /// <summary>
+    /// Servidor intermedio por el que llegar al motor, o `null` para ir directo.
+    ///
+    /// Cuando está presente, <see cref="Host"/> y <see cref="Port"/> siguen siendo
+    /// los del motor **vistos desde el servidor intermedio**: quien abre el túnel
+    /// es quien traduce esa dirección a la local que acaba usando el driver.
+    /// </summary>
+    public SshTunnelSettings? SshTunnel { get; init; }
+
+    /// <summary>La conexión no va directa: pasa por un servidor intermedio.</summary>
+    public bool UsesSshTunnel => SshTunnel is not null;
 
     /// <summary>
     /// Opciones específicas del motor que no encajan en los campos anteriores.
