@@ -25,6 +25,14 @@
     usuario, no junto al ejecutable, y **no puede recordar contraseñas** si el
     sistema no ofrece un almacén seguro (ADR 0004).
 
+.PARAMETER WithoutInformix
+    Deja el proveedor de Informix fuera del paquete.
+
+    Su driver son 111 MB —el clidriver nativo de IBM— y triplica el tamaño del
+    resultado. Con este modificador salen los tres motores restantes y el ZIP
+    portable se llama distinto, para que ambas versiones puedan convivir en la
+    misma carpeta sin pisarse.
+
 .PARAMETER CertificateThumbprint
     Huella del certificado de firma de código, ya instalado en el almacén de
     Windows. Si no se indica, se toma de `DRUSE_SIGN_THUMBPRINT`.
@@ -51,6 +59,7 @@ param(
     [string]$Runtime = '',
     [switch]$SkipInstaller,
     [switch]$Portable,
+    [switch]$WithoutInformix,
     [string]$CertificateThumbprint = $env:DRUSE_SIGN_THUMBPRINT,
     [string]$TimestampUrl = 'http://timestamp.digicert.com'
 )
@@ -69,6 +78,11 @@ if ($env:DRUSE_SIGN_TIMESTAMP_URL) {
 
 $signCommand = $env:DRUSE_SIGN_COMMAND
 $signing = [bool]$CertificateThumbprint -or [bool]$signCommand
+
+# Distingue las dos variantes en el nombre de cada artefacto. La completa lleva
+# `-completo` en lugar de nada: si una se quedara sin sufijo, la siguiente
+# ejecución sobrescribiría su instalador antes de renombrarlo.
+$VariantSuffix = if ($WithoutInformix) { '-sin-informix' } else { '-completo' }
 
 $repoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $apiProject = Join-Path $repoRoot 'backend/src/Druse.Host.LocalApi'
@@ -107,7 +121,8 @@ dotnet publish $apiProject `
     --self-contained true `
     --output $apiOutput `
     -p:PublishSingleFile=false `
-    -p:DebugType=none
+    -p:DebugType=none `
+    "-p:IncludeInformix=$(if ($WithoutInformix) { 'false' } else { 'true' })"
 
 if ($LASTEXITCODE -ne 0) {
     throw 'Falló la publicación de la API.'
@@ -235,6 +250,19 @@ Write-Host 'Artefactos generados:' -ForegroundColor Green
 
 $bundles = Get-ChildItem $bundleDir -Recurse -Include '*.exe', '*.msi', '*.deb', '*.AppImage', '*.dmg' -ErrorAction SilentlyContinue
 
+# Tauri nombra sus instaladores igual en las dos variantes, así que **ambas** se
+# renombran, no solo la ligera. Poner sufijo a una sola no basta: generar la
+# segunda sobrescribe el archivo de la primera antes de que se renombre, y la
+# primera desaparece sin previo aviso. Pasó exactamente eso al encadenar las dos
+# ejecuciones.
+$bundles = $bundles | ForEach-Object {
+    $target = Join-Path $_.DirectoryName `
+        "$([IO.Path]::GetFileNameWithoutExtension($_.Name))$VariantSuffix$($_.Extension)"
+
+    Move-Item $_.FullName $target -Force
+    Get-Item $target
+}
+
 $bundles | ForEach-Object { "  {0}  ({1:N1} MB)" -f $_.FullName, ($_.Length / 1MB) }
 
 # Se verifica lo que salió, no lo que se pidió: Tauri puede terminar con éxito y
@@ -301,7 +329,7 @@ instalada. Si el equipo no ofrece uno, Druse pedirá la contraseña en cada
 conexión y te lo indicará en la interfaz.
 '@ | Set-Content (Join-Path $staging 'LEEME.txt') -Encoding UTF8
 
-    $zip = Join-Path $tauriDir "target/portable/Druse-0.1.0-$Runtime-portable.zip"
+    $zip = Join-Path $tauriDir "target/portable/Druse-0.1.0-$Runtime-portable$VariantSuffix.zip"
     Remove-Item $zip -Force -ErrorAction SilentlyContinue
     Compress-Archive -Path "$staging\*" -DestinationPath $zip -CompressionLevel Optimal
 

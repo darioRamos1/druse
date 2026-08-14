@@ -2,7 +2,7 @@
 name = "druse"
 version = "0.1.0"
 description = "Cliente de bases de datos de escritorio"
-authors = ["Druse"]
+authors = ["Darío Ramos"]
 edition = "2021"
 rust-version = "1.77.2"
 
