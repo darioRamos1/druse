@@ -181,6 +181,10 @@ app.Lifetime.ApplicationStarted.Register(() =>
 app.Lifetime.ApplicationStopping.Register(() =>
 {
     app.Services.GetRequiredService<ISessionRegistry>().CloseAllAsync().GetAwaiter().GetResult();
+
+    // Los túneles se cierran después: mientras haya una conexión despidiéndose,
+    // su reenvío todavía hace falta.
+    app.Services.GetRequiredService<ISshTunnelRegistry>().CloseAllAsync().GetAwaiter().GetResult();
     endpoint.Dispose();
 });
 

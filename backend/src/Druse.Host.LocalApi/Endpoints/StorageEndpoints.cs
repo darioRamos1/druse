@@ -32,7 +32,8 @@ internal static class StorageEndpoints
             foreach (var profile in profiles)
             {
                 result.Add(profile.ToSavedDto(
-                    await connections.HasStoredPasswordAsync(profile.Id, cancellationToken)));
+                    await connections.HasStoredPasswordAsync(profile.Id, cancellationToken),
+                    await connections.HasStoredSshSecretAsync(profile.Id, cancellationToken)));
             }
 
             return Results.Ok(result);
@@ -58,11 +59,13 @@ internal static class StorageEndpoints
                 profile,
                 request.Password,
                 request.StorePassword,
-                cancellationToken);
+                cancellationToken,
+                request.SshSecret,
+                request.StoreSshSecret);
 
             return Results.Created(
                 $"/api/connections/{result.Profile.Id}",
-                result.Profile.ToSavedDto(result.PasswordStored));
+                result.Profile.ToSavedDto(result.PasswordStored, result.SshSecretStored));
         })
         .WithName("CreateConnection");
 
@@ -87,9 +90,12 @@ internal static class StorageEndpoints
                 profile,
                 request.Password,
                 request.StorePassword,
-                cancellationToken);
+                cancellationToken,
+                request.SshSecret,
+                request.StoreSshSecret);
 
-            return Results.Ok(result.Profile.ToSavedDto(result.PasswordStored));
+            return Results.Ok(
+                result.Profile.ToSavedDto(result.PasswordStored, result.SshSecretStored));
         })
         .WithName("UpdateConnection");
 
@@ -120,18 +126,44 @@ internal static class StorageEndpoints
                 return Results.NotFound();
             }
 
-            var credentials = string.IsNullOrEmpty(request?.Password)
-                ? await saved.GetCredentialsAsync(id, cancellationToken)
-                : new Database.Abstractions.DatabaseCredentials(request.Password);
+            // Con autenticación de Windows no hay contraseña: ni se busca en el
+            // almacén ni se pide, porque la identidad la pone la sesión del sistema.
+            var credentials = profile.UsesIntegratedSecurity
+                ? new Database.Abstractions.DatabaseCredentials(null)
+                : string.IsNullOrEmpty(request?.Password)
+                    ? await saved.GetCredentialsAsync(id, cancellationToken)
+                    : new Database.Abstractions.DatabaseCredentials(request.Password);
 
-            if (string.IsNullOrEmpty(credentials.Password))
+            if (!profile.UsesIntegratedSecurity && string.IsNullOrEmpty(credentials.Password))
             {
                 return Results.Json(
                     new { message = "Esta conexión no tiene contraseña guardada.", requiresPassword = true },
                     statusCode: StatusCodes.Status428PreconditionRequired);
             }
 
-            var session = await connections.OpenAsync(profile, credentials, cancellationToken);
+            // El secreto del túnel sigue el mismo camino que el de la base: lo que
+            // manda el cliente pesa más que lo guardado, porque es lo que el
+            // usuario acaba de escribir.
+            var ssh = string.IsNullOrEmpty(request?.SshSecret)
+                ? await saved.GetSshCredentialsAsync(id, cancellationToken)
+                : new SshCredentials(request.SshSecret, null);
+
+            ssh = ssh with { VerificationCode = request?.SshVerificationCode };
+
+            if (profile.UsesSshTunnel
+                && profile.SshTunnel!.Authentication == SshAuthenticationMode.Password
+                && string.IsNullOrEmpty(ssh.Secret))
+            {
+                return Results.Json(
+                    new
+                    {
+                        message = "Esta conexión no tiene guardada la contraseña de su túnel SSH.",
+                        requiresSshSecret = true,
+                    },
+                    statusCode: StatusCodes.Status428PreconditionRequired);
+            }
+
+            var session = await connections.OpenAsync(profile, credentials, ssh, cancellationToken);
 
             return Results.Created($"/api/sessions/{session.Id}", session.ToResponse());
         })

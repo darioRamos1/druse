@@ -11,6 +11,18 @@ namespace Druse.Persistence.Sqlite;
 /// </summary>
 public sealed class DruseDatabase
 {
+    /// <summary>Columnas del túnel SSH, en el orden en que se añadieron.</summary>
+    private static readonly (string Column, string Definition)[] SshColumns =
+    [
+        ("ssh_enabled", "INTEGER NOT NULL DEFAULT 0"),
+        ("ssh_host", "TEXT NOT NULL DEFAULT ''"),
+        ("ssh_port", "INTEGER NOT NULL DEFAULT 22"),
+        ("ssh_username", "TEXT NOT NULL DEFAULT ''"),
+        ("ssh_authentication", "INTEGER NOT NULL DEFAULT 0"),
+        ("ssh_private_key_path", "TEXT NOT NULL DEFAULT ''"),
+        ("ssh_timeout_seconds", "INTEGER NOT NULL DEFAULT 15"),
+    ];
+
     private readonly IAppPaths _paths;
     private readonly string _connectionString;
 
@@ -66,10 +78,18 @@ public sealed class DruseDatabase
                 port                     INTEGER NOT NULL,
                 database_name            TEXT    NOT NULL,
                 username                 TEXT    NOT NULL,
+                authentication           INTEGER NOT NULL DEFAULT 0,
                 environment              INTEGER NOT NULL DEFAULT 0,
                 read_only                INTEGER NOT NULL DEFAULT 0,
                 ssl_mode                 INTEGER NOT NULL DEFAULT 1,
                 connect_timeout_seconds  INTEGER NOT NULL DEFAULT 15,
+                ssh_enabled              INTEGER NOT NULL DEFAULT 0,
+                ssh_host                 TEXT    NOT NULL DEFAULT '',
+                ssh_port                 INTEGER NOT NULL DEFAULT 22,
+                ssh_username             TEXT    NOT NULL DEFAULT '',
+                ssh_authentication       INTEGER NOT NULL DEFAULT 0,
+                ssh_private_key_path     TEXT    NOT NULL DEFAULT '',
+                ssh_timeout_seconds      INTEGER NOT NULL DEFAULT 15,
                 created_at_utc           TEXT    NOT NULL,
                 updated_at_utc           TEXT    NOT NULL
             );
@@ -103,9 +123,57 @@ public sealed class DruseDatabase
             );
             """, cancellationToken);
 
+        // Los archivos creados por versiones anteriores ya tienen la tabla, así que
+        // `CREATE TABLE IF NOT EXISTS` no les añade la columna: hay que agregarla
+        // aparte. El valor por omisión deja los perfiles existentes con usuario y
+        // contraseña, que es como se crearon.
+        await AddColumnIfMissingAsync(
+            connection,
+            "connection_profiles",
+            "authentication",
+            "INTEGER NOT NULL DEFAULT 0",
+            cancellationToken);
+
+        // Túnel SSH. Los valores por omisión dejan a los perfiles existentes
+        // conectando directamente, que es como se crearon.
+        foreach (var (column, definition) in SshColumns)
+        {
+            await AddColumnIfMissingAsync(
+                connection,
+                "connection_profiles",
+                column,
+                definition,
+                cancellationToken);
+        }
+
         // Marca de versión del esquema, para poder migrar más adelante sin
         // adivinar en qué estado está el archivo de cada usuario.
-        await ExecuteAsync(connection, "PRAGMA user_version = 1;", cancellationToken);
+        await ExecuteAsync(connection, "PRAGMA user_version = 3;", cancellationToken);
+    }
+
+    /// <summary>Añade una columna solo si el archivo del usuario aún no la tiene.</summary>
+    private static async Task AddColumnIfMissingAsync(
+        SqliteConnection connection,
+        string table,
+        string column,
+        string definition,
+        CancellationToken cancellationToken)
+    {
+        await using var query = connection.CreateCommand();
+        // `PRAGMA table_info` no admite parámetros, de ahí la interpolación; el
+        // nombre de la tabla lo pone esta clase, nunca el usuario.
+        query.CommandText = $"SELECT 1 FROM pragma_table_info('{table}') WHERE name = $column";
+        query.Parameters.AddWithValue("$column", column);
+
+        if (await query.ExecuteScalarAsync(cancellationToken) is not null)
+        {
+            return;
+        }
+
+        await ExecuteAsync(
+            connection,
+            $"ALTER TABLE {table} ADD COLUMN {column} {definition};",
+            cancellationToken);
     }
 
     private static async Task ExecuteAsync(

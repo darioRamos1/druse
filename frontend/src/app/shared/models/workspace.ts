@@ -22,6 +22,48 @@ export interface EngineInfo {
 export type ConnectionEnvironment = 'development' | 'testing' | 'production';
 
 /**
+ * Cómo se identifica el usuario ante el motor.
+ *
+ * `windows` usa la identidad de la sesión de Windows: no hay usuario ni
+ * contraseña que escribir, ni que guardar. Solo la admite SQL Server.
+ */
+export type AuthenticationMode = 'password' | 'windows';
+
+/**
+ * Exigencia de cifrado del transporte hasta el motor.
+ *
+ * `prefer` cifra si el servidor lo ofrece y acepta su certificado sin
+ * verificarlo; `require` no se conforma con menos que un certificado válido.
+ * Es independiente del túnel SSH: uno protege el camino hasta el servidor
+ * intermedio y el otro, la conversación con la base.
+ */
+export type SslMode = 'disable' | 'prefer' | 'require';
+
+/**
+ * Cómo se identifica Druse ante el servidor SSH intermedio.
+ *
+ * Nada que ver con {@link AuthenticationMode}: el servidor de salto y la base de
+ * datos son dos sistemas distintos, con dos cuentas distintas.
+ */
+export type SshAuthenticationMode = 'password' | 'privatekey' | 'keyboardinteractive';
+
+/**
+ * Servidor intermedio por el que viaja la conexión.
+ *
+ * Nunca lleva contraseña ni passphrase: esos secretos van aparte, igual que los
+ * de la base.
+ */
+export interface SshTunnel {
+  readonly host: string;
+  readonly port: number;
+  readonly username: string;
+  readonly authentication: SshAuthenticationMode;
+  /** Ruta del archivo de clave privada. Solo con `privatekey`. */
+  readonly privateKeyPath: string;
+  readonly connectTimeoutSeconds?: number;
+}
+
+/**
  * Perfil guardado en la base local.
  *
  * Nunca lleva contraseña: solo si hay una guardada, que es lo que hace falta
@@ -35,9 +77,14 @@ export interface SavedConnection {
   readonly port: number;
   readonly database: string;
   readonly username: string;
+  readonly authentication: AuthenticationMode;
   readonly environment: ConnectionEnvironment;
   readonly readOnly: boolean;
   readonly hasStoredPassword: boolean;
+  readonly sslMode: SslMode;
+  /** Ausente cuando la conexión va directa al motor. */
+  readonly sshTunnel?: SshTunnel;
+  readonly hasStoredSshSecret?: boolean;
 }
 
 /** Dónde se guardan las contraseñas en esta máquina. */
@@ -77,6 +124,8 @@ export interface ConnectionSummary {
   readonly saved: boolean;
   readonly hasStoredPassword: boolean;
   readonly database: string;
+  /** Sin contraseña que pedir cuando es `windows`. */
+  readonly authentication: AuthenticationMode;
 }
 
 /** Datos con los que se abre o se guarda una conexión. */
@@ -88,14 +137,26 @@ export interface ConnectionForm {
   readonly host: string;
   readonly port: number;
   readonly database: string;
+  /** Vacío cuando {@link authentication} es `windows`. */
   readonly username: string;
+  /** Vacía cuando {@link authentication} es `windows`. */
   readonly password: string;
+  readonly authentication: AuthenticationMode;
+  readonly sslMode: SslMode;
   readonly readOnly: boolean;
   readonly environment: ConnectionEnvironment;
   /** Guardar el perfil en la base local. */
   readonly save: boolean;
   /** Recordar la contraseña en el almacén del sistema. */
   readonly storePassword: boolean;
+  /** Servidor intermedio, o ausente para ir directo al motor. */
+  readonly sshTunnel?: SshTunnel;
+  /** Contraseña del usuario SSH, o passphrase de su clave privada. */
+  readonly sshSecret?: string;
+  /** Código de un solo uso del servidor SSH. Nunca se guarda. */
+  readonly sshVerificationCode?: string;
+  /** Recordar el secreto del túnel en el almacén del sistema. */
+  readonly storeSshSecret?: boolean;
 }
 
 export interface SessionInfo {

@@ -3,9 +3,12 @@ import { FormsModule } from '@angular/forms';
 
 import { WorkspaceStore } from '../../../core/workspace/workspace-store';
 import {
+  AuthenticationMode,
   ConnectionEnvironment,
   ConnectionForm,
   DatabaseEngine,
+  SshAuthenticationMode,
+  SslMode,
 } from '../../../shared/models/workspace';
 import { EngineBadge } from '../../../shared/ui/engine-badge/engine-badge';
 
@@ -22,6 +25,34 @@ interface EnvironmentOption {
   readonly label: string;
 }
 
+interface AuthenticationOption {
+  readonly id: AuthenticationMode;
+  readonly label: string;
+  readonly hint: string;
+}
+
+interface SshAuthenticationOption {
+  readonly id: SshAuthenticationMode;
+  readonly label: string;
+}
+
+interface SslOption {
+  readonly id: SslMode;
+  readonly label: string;
+  readonly hint: string;
+}
+
+type ConnectionField =
+  | 'name'
+  | 'host'
+  | 'port'
+  | 'database'
+  | 'username'
+  | 'sshHost'
+  | 'sshPort'
+  | 'sshUsername'
+  | 'sshPrivateKeyPath';
+
 /**
  * Motores que se ofrecen.
  *
@@ -32,6 +63,63 @@ const ENGINES: readonly EngineOption[] = [
   { id: 'sqlserver', name: 'SQL Server', versions: '2016 – 2022', defaultPort: 1433, available: true },
   { id: 'postgresql', name: 'PostgreSQL', versions: '12 – 18', defaultPort: 5432, available: true },
   { id: 'mysql', name: 'MySQL', versions: '8.0+ · MariaDB', defaultPort: 3306, available: true },
+];
+
+/**
+ * Métodos de autenticación.
+ *
+ * Solo se ofrecen con SQL Server: el resto de motores no acepta la identidad de
+ * la sesión de Windows, y enseñar una opción que siempre falla sería peor que no
+ * enseñarla.
+ */
+const AUTHENTICATIONS: readonly AuthenticationOption[] = [
+  {
+    id: 'password',
+    label: 'Autenticación de SQL Server',
+    hint: 'Usuario y contraseña definidos en el propio motor.',
+  },
+  {
+    id: 'windows',
+    label: 'Autenticación de Windows',
+    hint: 'Usa la sesión de Windows con la que abriste el equipo. No hay contraseña que escribir.',
+  },
+];
+
+/**
+ * Métodos de acceso al servidor intermedio.
+ *
+ * El agente SSH no está: la librería que abre el túnel no habla con él, así que
+ * ofrecerlo sería prometer algo que fallaría al conectar.
+ */
+const SSH_AUTHENTICATIONS: readonly SshAuthenticationOption[] = [
+  { id: 'password', label: 'Contraseña' },
+  { id: 'privatekey', label: 'Clave privada' },
+  { id: 'keyboardinteractive', label: 'Interactivo (2FA)' },
+];
+
+/**
+ * Exigencia de cifrado hasta el motor.
+ *
+ * Se describe por lo que ocurre y no por el nombre del parámetro de cada driver:
+ * lo que el usuario necesita decidir es si acepta un certificado sin verificar,
+ * que es justo lo que separa a `prefer` de `require`.
+ */
+const SSL_MODES: readonly SslOption[] = [
+  {
+    id: 'disable',
+    label: 'Sin cifrar',
+    hint: 'La conversación viaja en claro. Solo para servidores en tu propia máquina.',
+  },
+  {
+    id: 'prefer',
+    label: 'Cifrado',
+    hint: 'Cifra si el servidor lo ofrece y acepta su certificado sin verificarlo.',
+  },
+  {
+    id: 'require',
+    label: 'Cifrado verificado',
+    hint: 'Exige un certificado válido. Es lo que piden los servicios en la nube.',
+  },
 ];
 
 const ENVIRONMENTS: readonly EnvironmentOption[] = [
@@ -60,24 +148,43 @@ export class ConnectionDialog {
 
   protected readonly engines = ENGINES;
   protected readonly environments = ENVIRONMENTS;
+  protected readonly authentications = AUTHENTICATIONS;
 
   protected readonly secretStore = this._store.secretStore;
 
   protected readonly engine = signal<DatabaseEngine>('postgresql');
   protected readonly name = signal('');
   protected readonly host = signal('127.0.0.1');
-  protected readonly port = signal(5432);
+  protected readonly port = signal<number | null>(5432);
   protected readonly database = signal('');
   protected readonly username = signal('');
   protected readonly password = signal('');
+  protected readonly authentication = signal<AuthenticationMode>('password');
   protected readonly readOnly = signal(false);
   protected readonly environment = signal<ConnectionEnvironment>('development');
   protected readonly save = signal(true);
   protected readonly storePassword = signal(true);
 
+  protected readonly sshAuthentications = SSH_AUTHENTICATIONS;
+  protected readonly sslModes = SSL_MODES;
+
+  protected readonly sslMode = signal<SslMode>('prefer');
+
+  protected readonly sshEnabled = signal(false);
+  protected readonly sshHost = signal('');
+  protected readonly sshPort = signal<number | null>(22);
+  protected readonly sshUsername = signal('');
+  protected readonly sshAuthentication = signal<SshAuthenticationMode>('password');
+  protected readonly sshPrivateKeyPath = signal('');
+  protected readonly sshSecret = signal('');
+  protected readonly sshVerificationCode = signal('');
+  protected readonly storeSshSecret = signal(true);
+
   protected readonly testing = signal(false);
   protected readonly connecting = signal(false);
   protected readonly feedback = signal<string | null>(null);
+  protected readonly feedbackKind = signal<'success' | 'error'>('error');
+  protected readonly validationVisible = signal(false);
 
   protected selectEngine(option: EngineOption): void {
     if (!option.available) {
@@ -87,30 +194,102 @@ export class ConnectionDialog {
     this.engine.set(option.id);
     this.port.set(option.defaultPort);
     this.feedback.set(null);
+
+    // Cambiar a un motor que no admite la identidad de Windows debe devolver el
+    // formulario a usuario y contraseña; si no, quedaría elegido un método que
+    // ya no se puede ver ni corregir.
+    if (option.id !== 'sqlserver') {
+      this.authentication.set('password');
+    }
+  }
+
+  /** Solo SQL Server admite elegir cómo se identifica el usuario. */
+  protected supportsWindowsAuth(): boolean {
+    return this.engine() === 'sqlserver';
+  }
+
+  protected usesWindowsAuth(): boolean {
+    return this.authentication() === 'windows';
+  }
+
+  protected selectAuthentication(mode: AuthenticationMode): void {
+    this.authentication.set(mode);
+    this.feedback.set(null);
+  }
+
+  protected selectSslMode(mode: SslMode): void {
+    this.sslMode.set(mode);
+    this.feedback.set(null);
+  }
+
+  /** Lo que hace el modo elegido, para enseñarlo debajo de los botones. */
+  protected sslHint(): string {
+    return this.sslModes.find((option) => option.id === this.sslMode())?.hint ?? '';
+  }
+
+  protected selectSshAuthentication(mode: SshAuthenticationMode): void {
+    this.sshAuthentication.set(mode);
+    this.feedback.set(null);
+  }
+
+  protected usesSshKey(): boolean {
+    return this.sshAuthentication() === 'privatekey';
+  }
+
+  /** El servidor pregunta y el usuario responde; ahí es donde entra el código. */
+  protected usesSshPrompts(): boolean {
+    return this.sshAuthentication() === 'keyboardinteractive';
+  }
+
+  /**
+   * El secreto del túnel se llama distinto según el método.
+   *
+   * Con clave privada no es una contraseña sino la passphrase que la protege, y
+   * llamarlas igual lleva a escribir una donde va la otra.
+   */
+  protected sshSecretLabel(): string {
+    return this.usesSshKey() ? 'Passphrase de la clave' : 'Contraseña SSH';
   }
 
   protected async test(): Promise<void> {
+    const form = this.validForm();
+
+    if (!form) {
+      return;
+    }
+
     this.testing.set(true);
     this.feedback.set(null);
 
     try {
-      this.feedback.set(await this._store.testConnection(this.toForm()));
+      const message = await this._store.testConnection(form);
+      this.feedbackKind.set(message.startsWith('Conexión correcta') ? 'success' : 'error');
+      this.feedback.set(message);
     } finally {
       this.testing.set(false);
     }
   }
 
   protected async connect(): Promise<void> {
+    const form = this.validForm();
+
+    if (!form) {
+      return;
+    }
+
     this.connecting.set(true);
     this.feedback.set(null);
 
     try {
-      const connected = await this._store.connect(this.toForm());
+      const connected = await this._store.connect(form);
 
       if (connected) {
         this.closed.emit();
       } else {
-        this.feedback.set('No se pudo abrir la conexión.');
+        this.feedbackKind.set('error');
+        this.feedback.set(
+          this._store.notice() ?? 'No se pudo abrir la conexión. Revisa los datos e inténtalo de nuevo.',
+        );
       }
     } finally {
       this.connecting.set(false);
@@ -121,21 +300,139 @@ export class ConnectionDialog {
     this.closed.emit();
   }
 
+  protected fieldError(field: ConnectionField): string | null {
+    return this.validationVisible() ? (this.validationErrors()[field] ?? null) : null;
+  }
+
+  protected portHint(): string | null {
+    return this.engine() === 'sqlserver' && this.host().includes('\\')
+      ? 'Opcional para una instancia con nombre, por ejemplo SERVIDOR\\SQLEXPRESS.'
+      : null;
+  }
+
+  protected namePlaceholder(): string {
+    return `${this.engines.find((option) => option.id === this.engine())?.name ?? 'Base de datos'} — Desarrollo`;
+  }
+
+  protected databasePlaceholder(): string {
+    return this.engine() === 'sqlserver' ? 'master' : this.engine() === 'mysql' ? 'mysql' : 'postgres';
+  }
+
+  private validForm(): ConnectionForm | null {
+    this.validationVisible.set(true);
+    const errors = this.validationErrors();
+
+    if (Object.keys(errors).length > 0) {
+      this.feedbackKind.set('error');
+      this.feedback.set('Revisa los campos marcados antes de continuar.');
+      return null;
+    }
+
+    return this.toForm();
+  }
+
+  private validationErrors(): Partial<Record<ConnectionField, string>> {
+    const errors: Partial<Record<ConnectionField, string>> = {};
+    const namedSqlServer = this.engine() === 'sqlserver' && this.host().includes('\\');
+    const port = this.port();
+
+    if (!this.name().trim()) {
+      errors.name = 'Escribe un nombre para identificar esta conexión.';
+    }
+    if (!this.host().trim()) {
+      errors.host = 'Indica el servidor o la dirección IP.';
+    }
+    if (!namedSqlServer && (!Number.isInteger(port) || port! < 1 || port! > 65_535)) {
+      errors.port = 'Indica un puerto entre 1 y 65535.';
+    } else if (port !== null && (!Number.isInteger(port) || port < 0 || port > 65_535)) {
+      errors.port = 'Indica un puerto entre 1 y 65535.';
+    }
+    if (!this.database().trim()) {
+      errors.database = 'Indica la base de datos inicial.';
+    }
+    // Con autenticación de Windows el usuario lo pone el sistema y el campo ni
+    // siquiera se muestra, así que no hay nada que exigir.
+    if (!this.usesWindowsAuth() && !this.username().trim()) {
+      errors.username = 'Indica el usuario de la base de datos.';
+    }
+
+    if (this.sshEnabled()) {
+      const sshPort = this.sshPort();
+
+      if (!this.sshHost().trim()) {
+        errors.sshHost = 'Indica el servidor SSH intermedio.';
+      }
+      if (!Number.isInteger(sshPort) || sshPort! < 1 || sshPort! > 65_535) {
+        errors.sshPort = 'Indica un puerto entre 1 y 65535.';
+      }
+      if (!this.sshUsername().trim()) {
+        errors.sshUsername = 'Indica el usuario del servidor SSH.';
+      }
+      if (this.sshAuthentication() === 'privatekey' && !this.sshPrivateKeyPath().trim()) {
+        errors.sshPrivateKeyPath = 'Indica la ruta del archivo de clave privada.';
+      }
+    }
+
+    return errors;
+  }
+
   private toForm(): ConnectionForm {
+    const windows = this.usesWindowsAuth();
+
     return {
       name: this.name(),
       engine: this.engine(),
       host: this.host(),
-      port: this.port(),
+      port: this.port() ?? 0,
       database: this.database(),
-      username: this.username(),
-      password: this.password(),
+      // Lo que quedara escrito antes de cambiar de método no debe viajar: la
+      // conexión se abre con la identidad de Windows, no con ese usuario.
+      username: windows ? '' : this.username(),
+      password: windows ? '' : this.password(),
+      authentication: this.authentication(),
+      sslMode: this.sslMode(),
       readOnly: this.readOnly(),
       environment: this.environment(),
       save: this.save(),
       // Sin almacén del sistema no se guarda la contraseña, aunque se pida:
       // fingir que quedó a salvo sería peor que decir que no se guardó.
-      storePassword: this.save() && this.storePassword() && (this.secretStore()?.available ?? false),
+      storePassword:
+        !windows &&
+        this.save() &&
+        this.storePassword() &&
+        (this.secretStore()?.available ?? false),
+      ...this.tunnelForm(),
+    };
+  }
+
+  /**
+   * Parte del formulario que describe el túnel.
+   *
+   * Devuelve un objeto vacío cuando está desactivado: enviar el túnel apagado
+   * con sus campos a medio rellenar haría que el servidor intentara abrirlo.
+   */
+  private tunnelForm(): Partial<ConnectionForm> {
+    if (!this.sshEnabled()) {
+      return {};
+    }
+
+    // La passphrase solo tiene sentido con clave, y el código de un solo uso solo
+    // con el método que los pide.
+    const key = this.sshAuthentication() === 'privatekey';
+    const interactive = this.sshAuthentication() === 'keyboardinteractive';
+
+    return {
+      sshTunnel: {
+        host: this.sshHost(),
+        port: this.sshPort() ?? 22,
+        username: this.sshUsername(),
+        authentication: this.sshAuthentication(),
+        privateKeyPath: key ? this.sshPrivateKeyPath() : '',
+      },
+      sshSecret: this.sshSecret(),
+      sshVerificationCode: interactive ? this.sshVerificationCode() : '',
+      storeSshSecret:
+        this.save() && this.storeSshSecret() && (this.secretStore()?.available ?? false),
     };
   }
 }

@@ -15,6 +15,7 @@ const connection: ConnectionSummary = {
   saved: true,
   hasStoredPassword: true,
   database: 'ventas',
+  authentication: 'password',
 };
 
 const tab: QueryTab = {
