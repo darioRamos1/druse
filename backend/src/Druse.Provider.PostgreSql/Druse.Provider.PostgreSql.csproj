@@ -8,6 +8,15 @@
     <PackageReference Include="Npgsql" Version="10.0.3" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!--
+      El normalizador de errores es interno —nadie fuera del proveedor debe
+      conocer los tipos de Npgsql—, pero es justo lo que hay que probar: lo que
+      lee el usuario cuando el servidor no le deja entrar.
+    -->
+    <InternalsVisibleTo Include="Druse.UnitTests" />
+  </ItemGroup>
+
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>

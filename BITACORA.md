@@ -17,7 +17,7 @@
 | Fase 8 | ✅ **7/7.** Tres motores sobre el mismo contrato y primera beta preparada. |
 | ¿Compila el backend? | Sí — 0 advertencias, 0 errores |
 | ¿Compila el envoltorio? | Sí |
-| ¿Pasan las pruebas? | Sí — **381 en backend** (223 unitarias, 126 contractuales y 32 de integración), **279 en frontend** y **6 en el envoltorio** |
+| ¿Pasan las pruebas? | Sí — **386 en backend** (228 unitarias, 126 contractuales y 32 de integración), **279 en frontend** y **6 en el envoltorio** |
 | ¿Hay aplicación de escritorio? | **Sí.** Instalador NSIS, MSI y ZIP portable, en dos variantes: con Informix y sin él |
 | Motores | **PostgreSQL, SQL Server, MySQL/MariaDB e Informix**, todos sobre el mismo contrato compartido |
 | Trabajo a medias | Ninguno. Las transacciones manuales quedaron terminadas en la sesión 020. |
@@ -285,6 +285,38 @@ enseñar.
 
 **Sin ejecutar contra un motor real**, como el resto: ver el punto 3.b de «Qué
 toca retomar», que enumera las tres cosas que solo se ven ahí.
+
+#### «no pg_hba.conf entry», dicho con palabras
+
+Salió al probar Druse desde otro equipo: PostgreSQL rechazaba la conexión con su
+mensaje en inglés y en sus propios términos —habla de `pg_hba.conf`, que es un
+archivo del servidor—, y quien lo lee no sabe qué hacer con eso.
+
+Ahora el proveedor explica los cuatro fallos que impiden entrar, conservando el
+texto del servidor al final entre paréntesis, que es lo que hay que enseñarle a
+quien administra la base:
+
+- **`28000` con «no encryption»:** la conexión llegó en claro y el servidor no
+  admite conexiones sin cifrar desde esa dirección. Se dice que pruebe el cifrado
+  en «Requerir», que es lo que lo arregla desde la propia aplicación. La pista
+  está en esa palabra: con «Preferir», el driver intenta TLS y **vuelve a
+  intentarlo en claro** si la negociación no sale, y es ese segundo intento el
+  que el servidor rechaza.
+- **`28000` con cifrado:** entonces no hay nada que el cliente pueda hacer; la
+  dirección, el usuario o la base no están autorizados y la regla hay que
+  añadirla en el servidor.
+- **`28P01`:** la contraseña no es correcta.
+- **`3D000`:** esa base no existe. Y **`57P03`:** el servidor aún no acepta
+  conexiones.
+
+**Los errores de SQL se dejan como están.** PostgreSQL dice qué columna, qué tipo
+y qué restricción; reescribirlos sería perder información. Lo que no explica bien
+es por qué no te deja entrar.
+
+Los dos caminos de conexión —«Probar» y abrir sesión— ya pasaban por el
+normalizador, así que el mensaje llega a los dos sitios. El normalizador es
+interno y se prueba con `InternalsVisibleTo`, como ya se hacía con
+`Druse.Platform.Native`.
 
 #### Pulido de lo anterior
 
