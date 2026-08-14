@@ -28,6 +28,7 @@ export type IconName =
   | 'filter'
   | 'export'
   | 'disconnect'
+  | 'edit'
   | 'trash'
   | 'console'
   | 'sort-desc';
@@ -155,6 +156,12 @@ const ICONS: Readonly<Record<IconName, IconDefinition>> = {
     body:
       '<path d="M7 1.8v5.4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>' +
       '<path d="M10.4 3.4a4.6 4.6 0 1 1-6.8 0" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>',
+  },
+  edit: {
+    viewBox: '0 0 14 14',
+    body:
+      '<path d="M9.4 2.4l2.2 2.2-6.3 6.3-2.7.5.5-2.7 6.3-6.3z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/>' +
+      '<path d="M8.4 3.4l2.2 2.2" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>',
   },
   trash: {
     viewBox: '0 0 14 14',

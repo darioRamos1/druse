@@ -268,6 +268,20 @@ export class WorkspaceStore {
   readonly history = this._history.asReadonly();
 
   /**
+   * Perfiles guardados, completos.
+   *
+   * El resumen que se pinta en la barra lateral no basta para volver a abrir el
+   * formulario: no lleva el servidor, el cifrado ni el túnel. Aquí se conserva
+   * lo que devolvió la API para poder editarlo sin pedirlo otra vez.
+   */
+  private readonly _savedProfiles = signal<readonly SavedConnection[]>([]);
+
+  /** Perfil guardado con ese identificador, si existe. */
+  savedProfile(connectionId: string): SavedConnection | undefined {
+    return this._savedProfiles().find((profile) => profile.id === connectionId);
+  }
+
+  /**
    * Carga los perfiles guardados.
    *
    * Se llama al arrancar: sin esto, las conexiones que el usuario guardó en una
@@ -281,6 +295,7 @@ export class WorkspaceStore {
       ]);
 
       this._secretStore.set(secretStore);
+      this._savedProfiles.set(saved);
 
       // Los perfiles guardados aparecen desconectados: abrir todas las
       // conexiones al arrancar sería lento y podría despertar servidores que el
@@ -904,6 +919,34 @@ export class WorkspaceStore {
     }
   }
 
+  /**
+   * Guarda los cambios de un perfil sin abrir sesión.
+   *
+   * Editar y conectar son cosas distintas: quien corrige el puerto de una
+   * conexión de producción no está pidiendo entrar en ella.
+   */
+  async saveConnection(form: ConnectionForm): Promise<boolean> {
+    const saved = await this.persist(form, form.id ?? crypto.randomUUID());
+
+    if (!saved) {
+      return false;
+    }
+
+    // La conexión ya visible se actualiza en el sitio: recargarlo todo la
+    // devolvería al final de la lista y cerraría lo que estuviera desplegado.
+    this.patchConnection(saved.id, {
+      name: saved.name,
+      engine: saved.engine,
+      environment: saved.environment,
+      readOnly: saved.readOnly,
+      database: saved.database,
+      authentication: saved.authentication ?? 'password',
+      hasStoredPassword: saved.hasStoredPassword,
+    });
+
+    return true;
+  }
+
   /** Guarda el perfil en la base local; la contraseña va al almacén del sistema. */
   private async persist(form: ConnectionForm, id: string): Promise<SavedConnection | null> {
     const request = {
@@ -915,9 +958,16 @@ export class WorkspaceStore {
     };
 
     try {
-      return form.id
+      const saved = form.id
         ? await firstValueFrom(this._gateway.updateConnection(form.id, request))
         : await firstValueFrom(this._gateway.saveConnection(request));
+
+      this._savedProfiles.update((profiles) => [
+        ...profiles.filter((profile) => profile.id !== saved.id),
+        saved,
+      ]);
+
+      return saved;
     } catch (error) {
       this._notice.set(describeError(error));
       return null;

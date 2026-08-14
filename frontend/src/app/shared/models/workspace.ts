@@ -139,8 +139,14 @@ export interface ConnectionForm {
   readonly database: string;
   /** Vacío cuando {@link authentication} es `windows`. */
   readonly username: string;
-  /** Vacía cuando {@link authentication} es `windows`. */
-  readonly password: string;
+  /**
+   * Vacía cuando {@link authentication} es `windows`.
+   *
+   * Ausente significa «no la toques»: es lo que se envía al editar un perfil sin
+   * escribir una contraseña nueva, porque el formulario nunca puede mostrar la
+   * que ya está guardada. La cadena vacía sí la retira.
+   */
+  readonly password?: string;
   readonly authentication: AuthenticationMode;
   readonly sslMode: SslMode;
   readonly readOnly: boolean;

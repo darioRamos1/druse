@@ -65,6 +65,13 @@
         }
         @if (connection.saved) {
           <span
+            class="tool"
+            title="Editar esta conexión"
+            (click)="act($event, () => edit.emit(connection.id))"
+          >
+            <app-icon name="edit" [size]="12" />
+          </span>
+          <span
             class="tool tool--danger"
             title="Eliminar esta conexión guardada"
             (click)="act($event, () => forget.emit(connection.id))"
