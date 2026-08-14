@@ -1,44 +1,53 @@
-<div class="head" role="row" [style.grid-template-columns]="gridTemplate()">
-  <div class="cell cell--check" role="columnheader">
-    <button
-      type="button"
-      class="copy-all"
-      title="Copiar los nombres de las columnas"
-      (click)="copyHeaders()"
-    >
-      <app-icon name="new-query" [size]="11" />
-    </button>
-  </div>
-  @for (column of resultSet().columns; track column.name) {
-    <div class="cell cell--head" role="columnheader">
-      <span class="cell__name" [class.is-sorted]="!!column.sorted">{{ column.name }}</span>
-      @if (column.sorted) {
-        <app-icon name="sort-desc" [size]="9" class="cell__sort" />
-      }
-      <span class="cell__type">{{ column.dataType }}</span>
-    </div>
-  }
-</div>
+<!--
+  Cabecera, filtros y filas viven en el mismo contenedor con scroll.
 
-@if (showFilters()) {
-  <div class="filters" role="row" [style.grid-template-columns]="gridTemplate()">
-    <div class="cell cell--check"></div>
-    @for (column of resultSet().columns; track column.name; let i = $index) {
-      <div class="cell cell--filter">
-        <input
-          type="search"
-          class="filters__input"
-          placeholder="filtrar…"
-          [value]="filters()[i] ?? ''"
-          (input)="onFilter(i, $event)"
-          [attr.aria-label]="'Filtrar ' + column.name"
-        />
+  No es una cuestión de orden en el archivo: si la cabecera queda fuera, el
+  desplazamiento horizontal mueve las filas y la deja quieta, y cada título pasa
+  a estar sobre la columna equivocada. Dentro, `position: sticky` hace las dos
+  cosas a la vez —fija al bajar, acompaña al ir a la derecha—, que es justo lo
+  que se espera de un encabezado.
+-->
+<div class="body" [class.is-compact]="compact()">
+  <div class="head" role="row" [style.grid-template-columns]="gridTemplate()">
+    <div class="cell cell--check" role="columnheader">
+      <button
+        type="button"
+        class="copy-all"
+        title="Copiar los nombres de las columnas"
+        (click)="copyHeaders()"
+      >
+        <app-icon name="new-query" [size]="11" />
+      </button>
+    </div>
+    @for (column of resultSet().columns; track column.name) {
+      <div class="cell cell--head" role="columnheader">
+        <span class="cell__name" [class.is-sorted]="!!column.sorted">{{ column.name }}</span>
+        @if (column.sorted) {
+          <app-icon name="sort-desc" [size]="9" class="cell__sort" />
+        }
+        <span class="cell__type">{{ column.dataType }}</span>
       </div>
     }
   </div>
-}
 
-<div class="body" [class.is-compact]="compact()">
+  @if (showFilters()) {
+    <div class="filters" role="row" [style.grid-template-columns]="gridTemplate()">
+      <div class="cell cell--check"></div>
+      @for (column of resultSet().columns; track column.name; let i = $index) {
+        <div class="cell cell--filter">
+          <input
+            type="search"
+            class="filters__input"
+            placeholder="filtrar…"
+            [value]="filters()[i] ?? ''"
+            (input)="onFilter(i, $event)"
+            [attr.aria-label]="'Filtrar ' + column.name"
+          />
+        </div>
+      }
+    </div>
+  }
+
   @for (row of visibleRows(); track row.number) {
     <div class="row" role="row" [style.grid-template-columns]="gridTemplate()">
       <div class="cell cell--number" role="cell" title="Copiar la fila" (dblclick)="copyRow(row)">

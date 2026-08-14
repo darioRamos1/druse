@@ -14,12 +14,15 @@
   min-width: max-content;
 }
 
+// Fija al bajar y en movimiento al ir a la derecha: `sticky` solo se pega en el
+// eje donde se le da un desplazamiento, y aquí solo se le da `top`. Por eso
+// tiene que estar dentro de `.body`, que es quien tiene el scroll; fuera de él
+// no se pegaba a nada y, sobre todo, no acompañaba a sus columnas.
 .head {
   position: sticky;
   z-index: 2;
   top: 0;
   height: var(--dr-grid-header-height);
-  flex: 0 0 var(--dr-grid-header-height);
   background: var(--dr-surface-grid-header);
   border-bottom: 1px solid #212939;
   font-size: 11.5px;
@@ -28,12 +31,14 @@
   letter-spacing: 0.02em;
 }
 
+// Justo debajo de la cabecera, y con su misma regla: se queda al bajar y se
+// mueve con las columnas al desplazarse a la derecha, para que cada caja de
+// filtro siga sobre la columna que filtra.
 .filters {
   position: sticky;
   z-index: 2;
   top: var(--dr-grid-header-height);
   height: 28px;
-  flex: 0 0 28px;
   background: #0f141e;
   border-bottom: 1px solid #1b2231;
   font-family: var(--dr-font-mono);
