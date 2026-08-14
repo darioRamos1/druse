@@ -200,6 +200,8 @@ export class AppShell {
   protected readonly notice = this._store.notice;
   protected readonly history = this._store.history;
   protected readonly exporting = this._store.exporting;
+  protected readonly transaction = this._store.transaction;
+  protected readonly transactionBusy = this._store.transactionBusy;
 
   protected readonly session = computed(() => this._store.session() ?? DISCONNECTED);
 
@@ -437,7 +439,32 @@ export class AppShell {
   }
 
   protected disconnect(id: string): void {
+    // Cerrar la conexión deshace lo que no esté confirmado, y eso puede ser el
+    // trabajo de un buen rato. Es el mismo aviso que al cerrar una pestaña con
+    // cambios sin guardar, por el mismo motivo.
+    if (
+      this._store.hasOpenTransaction(id) &&
+      !window.confirm(
+        'Esta conexión tiene una transacción abierta. Al cerrarla se perderán los ' +
+          'cambios sin confirmar. ¿Cerrar de todos modos?',
+      )
+    ) {
+      return;
+    }
+
     void this._store.disconnect(id);
+  }
+
+  protected beginTransaction(): void {
+    void this._store.beginTransaction();
+  }
+
+  protected commitTransaction(): void {
+    void this._store.commitTransaction();
+  }
+
+  protected rollbackTransaction(): void {
+    void this._store.rollbackTransaction();
   }
 
   /** Doble clic sobre una tabla: abre una consulta preparada. */

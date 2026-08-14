@@ -4,6 +4,7 @@ using Druse.Application.Metadata;
 using Druse.Application.Queries;
 using Druse.Application.Rows;
 using Druse.Application.Tables;
+using Druse.Application.Transactions;
 using Druse.Database.Abstractions;
 using Druse.Host.LocalApi.Security;
 using Druse.Infrastructure.Exports;
@@ -94,6 +95,28 @@ internal static class DependencyInjection
         // Un túnel dura lo que dura su sesión, así que se guarda igual que ella.
         services.AddSingleton<ISshTunnelRegistry, SshTunnelRegistry>();
         services.AddSingleton<ISshTunnelFactory, SshTunnelFactory>();
+
+        // Las transacciones manuales también sobreviven a la petición: se abren
+        // en una y se confirman en otra. Y el barrido que deshace las olvidadas
+        // tiene que seguir corriendo aunque nadie pida nada.
+        //
+        // El tiempo de espera se puede acortar con
+        // `Transactions:IdleTimeoutMinutes`, que es lo que hace comprobable
+        // contra un motor real que la transacción olvidada se deshace: nadie va a
+        // esperar quince minutos delante de la pantalla. Un número negativo lo
+        // desactiva del todo.
+        services.AddSingleton(provider =>
+        {
+            var configured = provider
+                .GetRequiredService<IConfiguration>()
+                .GetValue<double?>("Transactions:IdleTimeoutMinutes");
+
+            return new TransactionService(
+                provider.GetRequiredService<IProviderRegistry>(),
+                provider.GetRequiredService<ISessionRegistry>(),
+                configured is { } minutes ? TimeSpan.FromMinutes(minutes) : null);
+        });
+        services.AddHostedService<IdleTransactionSweeper>();
 
         // --- Casos de uso -------------------------------------------------------
         services.AddScoped<ConnectionService>();

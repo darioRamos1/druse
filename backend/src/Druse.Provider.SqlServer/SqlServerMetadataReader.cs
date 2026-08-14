@@ -782,6 +782,13 @@ public sealed class SqlServerMetadataReader : IDatabaseMetadataReader
         await using var command = sqlServer.Connection.CreateCommand();
         command.CommandText = sql;
 
+        // Leer el catálogo con una transacción manual abierta también va dentro
+        // de ella. No es una preferencia: SQL Server se niega a ejecutar sobre
+        // una conexión con transacción pendiente si el comando no la lleva, así
+        // que sin esta línea expandir un nodo del árbol fallaría solo por haber
+        // pulsado «Iniciar transacción».
+        ((DbCommand)command).Transaction = sqlServer.Transaction.Current;
+
         foreach (var (name, value) in parameters)
         {
             var parameter = command.CreateParameter();

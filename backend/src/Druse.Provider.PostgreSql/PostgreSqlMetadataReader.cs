@@ -693,6 +693,10 @@ public sealed class PostgreSqlMetadataReader : IDatabaseMetadataReader
         await using var command = postgres.Connection.CreateCommand();
         command.CommandText = sql;
 
+        // Con una transacción manual abierta, leer el catálogo va dentro de ella
+        // como todo lo demás que pase por esta conexión.
+        ((DbCommand)command).Transaction = postgres.Transaction.Current;
+
         foreach (var (name, value) in parameters)
         {
             var parameter = command.CreateParameter();

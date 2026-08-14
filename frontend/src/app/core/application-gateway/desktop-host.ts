@@ -110,6 +110,16 @@ export class DesktopHost {
     });
   }
 
+  /**
+   * Declara si hay trabajo sin confirmar que se perdería al cerrar.
+   *
+   * El aviso lo enseña el envoltorio y no la página: dentro del WebView,
+   * `beforeunload` no es de fiar, porque quien cierra la ventana es el sistema.
+   */
+  setTransactionPending(pending: boolean): Promise<void> {
+    return this.invoke('set_transaction_pending', { pending });
+  }
+
   private invoke<T>(command: string, args?: unknown): Promise<T> {
     const bridge = typeof window === 'undefined' ? undefined : window.__TAURI__;
     const invoke = bridge?.core?.invoke ?? bridge?.invoke;

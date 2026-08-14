@@ -935,10 +935,44 @@ determinar si una vista admite escrituras.
   PostgreSQL sin confundir procedimientos homónimos.
 - [x] Cubrir el incremento final con 295 pruebas backend y 176 frontend.
 
+### Transacciones manuales — implementadas
+
+Commit y Rollback eran botones muertos heredados del mockup. Ahora gobiernan una
+transacción de verdad, con tres decisiones que condicionan el resto:
+
+- [x] **La transacción se ata a la conexión, no a la pestaña.** No es una
+  preferencia: varias pestañas del mismo perfil comparten conexión, así que lo
+  que se ejecute en cualquiera de ellas entra en la misma transacción. El
+  indicador dice a qué conexión afecta justamente por eso.
+- [x] **Al modo manual se entra a propósito**, con «Iniciar transacción».
+  El autocommit sigue siendo lo normal, y Commit y Rollback solo aparecen cuando
+  hay una abierta.
+- [x] **Se deshace sola tras 15 minutos sin actividad.** Una transacción olvidada
+  mantiene filas bloqueadas para todos; el barrido corre en el proceso local y no
+  en el navegador, porque la ventana puede estar cerrada justo cuando hay que
+  soltar los bloqueos. Lo que se mide es la inactividad, no la duración.
+- [x] `SessionTransaction` sostiene la transacción entre peticiones con las reglas
+  en un solo sitio; `OperationScope` decide si el editor de filas y el diseñador
+  abren la suya o se unen a la del usuario, porque anidarlas revienta en estos
+  motores.
+- [x] Consultas, catálogo, exportación, edición de filas y DDL van dentro de la
+  transacción cuando hay una abierta. Sin esto, SQL Server rechaza hasta expandir
+  un nodo del árbol.
+- [x] Avisos donde el usuario los necesita: al cerrar una conexión con cambios sin
+  confirmar, al cerrar la ventana, y en el propio indicador cuando el motor no
+  deshace el DDL.
+- [x] Cubierto con 10 pruebas de backend sobre una base real en memoria —lo escrito
+  dentro desaparece al deshacer— y 13 de frontend.
+
+**Lo que no se hace, y es una decisión:** si una operación falla a medias dentro
+de una transacción del usuario, no se deshace sola. Exigiría un punto de guardado,
+y tirar de la transacción entera borraría trabajo que nadie pidió borrar; los
+mensajes lo dicen en lugar de afirmar que no se guardó nada.
+
 ### Prioridad alta
 
-- Autenticación integrada de Windows para SQL Server.
-- Túneles SSH.
+- ~~Autenticación integrada de Windows para SQL Server.~~ Hecho (sesión 014).
+- ~~Túneles SSH.~~ Hecho (sesión 015).
 - Actualizador automático.
 
 ### Prioridad media
@@ -946,7 +980,7 @@ determinar si una vista admite escrituras.
 - Diagramas entidad-relación.
 - Comparación de esquemas.
 - Planes de ejecución gráficos.
-- Gestión visual de índices.
+- ~~Gestión visual de índices.~~ Hecho en el diseñador de tablas (sesión 019).
 - Temas y atajos configurables.
 - Soporte SQLite.
 - Instaladores estables para Linux y macOS.

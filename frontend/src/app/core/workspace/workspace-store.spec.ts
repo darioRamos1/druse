@@ -10,6 +10,7 @@ import {
   RowEditRequest,
   RowEditResult,
   SaveConnectionRequest,
+  TransactionState,
 } from '../application-gateway/application-gateway';
 import {
   ConnectionForm,
@@ -106,6 +107,19 @@ function successfulQuery(overrides: Partial<QueryResult> = {}): QueryResult {
 }
 
 /** Doble del gateway con lo justo para las pruebas. */
+function closedTransaction(overrides: Partial<TransactionState> = {}): TransactionState {
+  return {
+    sessionId: 'sesion-1',
+    isOpen: false,
+    connectionName: 'Pruebas',
+    database: 'druse_test',
+    engine: 'postgresql',
+    ddlIsReversible: true,
+    idleTimeoutSeconds: 900,
+    ...overrides,
+  };
+}
+
 class FakeGateway implements Partial<ApplicationGateway> {
   executeCalls: ExecuteQueryRequest[] = [];
   exportCalls: ExportRequest[] = [];
@@ -126,6 +140,50 @@ class FakeGateway implements Partial<ApplicationGateway> {
   exportQuery(request: ExportRequest): Observable<Blob> {
     this.exportCalls.push(request);
     return of(new Blob());
+  }
+
+  /** Transacción que devuelve la API para la sesión, imitando su estado real. */
+  transaction: TransactionState = closedTransaction();
+  transactionCalls: string[] = [];
+
+  getTransaction(sessionId: string): Observable<TransactionState> {
+    this.transactionCalls.push(`get:${sessionId}`);
+    return of(this.transaction);
+  }
+
+  beginTransaction(sessionId: string): Observable<TransactionState> {
+    this.transactionCalls.push(`begin:${sessionId}`);
+    this.transaction = { ...this.transaction, isOpen: true, startedAt: '2026-08-14T10:00:00Z' };
+
+    return of(this.transaction);
+  }
+
+  /** Imita a una API que ya no tiene esa transacción abierta. */
+  commitShouldFail = false;
+
+  commitTransaction(sessionId: string): Observable<TransactionState> {
+    this.transactionCalls.push(`commit:${sessionId}`);
+
+    if (this.commitShouldFail) {
+      return throwError(
+        () =>
+          new HttpErrorResponse({
+            status: 409,
+            error: { reason: 'notopen', message: 'No hay ninguna transacción abierta que confirmar.' },
+          }),
+      );
+    }
+
+    this.transaction = closedTransaction();
+
+    return of(this.transaction);
+  }
+
+  rollbackTransaction(sessionId: string): Observable<TransactionState> {
+    this.transactionCalls.push(`rollback:${sessionId}`);
+    this.transaction = closedTransaction();
+
+    return of(this.transaction);
   }
 
   getSavedConnections(): Observable<readonly SavedConnection[]> {
@@ -1363,6 +1421,95 @@ describe('WorkspaceStore', () => {
       );
 
       expect(store.tabs().length).toBe(before);
+    });
+  });
+  describe('transacciones manuales', () => {
+    it('abre la transacción sobre la conexión activa y dice a cuál afecta', async () => {
+      await store.connect(form);
+
+      const abierta = await store.beginTransaction();
+
+      expect(abierta).toBe(true);
+      expect(gateway.transactionCalls).toContain('begin:sesion-1');
+      expect(store.transaction()?.connectionName).toBe('Pruebas');
+      expect(store.notice()).toContain('Transacción abierta en «Pruebas»');
+    });
+
+    it('avisa de que el DDL no se deshace en los motores que no lo permiten', async () => {
+      gateway.transaction = closedTransaction({ ddlIsReversible: false });
+      await store.connect(form);
+
+      await store.beginTransaction();
+
+      expect(store.notice()).toContain('no se deshace en este motor');
+    });
+
+    it('confirmar cierra la transacción y lo cuenta', async () => {
+      await store.connect(form);
+      await store.beginTransaction();
+
+      const confirmada = await store.commitTransaction();
+
+      expect(confirmada).toBe(true);
+      expect(store.transaction()).toBeNull();
+      expect(store.notice()).toBe('Cambios confirmados en «Pruebas».');
+    });
+
+    it('deshacer cierra la transacción', async () => {
+      await store.connect(form);
+      await store.beginTransaction();
+
+      await store.rollbackTransaction();
+
+      expect(store.transaction()).toBeNull();
+      expect(gateway.transactionCalls).toContain('rollback:sesion-1');
+    });
+
+    it('sin conexión no se puede abrir ninguna', async () => {
+      const abierta = await store.beginTransaction();
+
+      expect(abierta).toBe(false);
+      expect(gateway.transactionCalls).toEqual([]);
+      expect(store.notice()).toBe('Abre una conexión para poder usar transacciones.');
+    });
+
+    /**
+     * Cerrar la conexión deshace lo que no esté confirmado, así que la interfaz
+     * tiene que poder preguntar antes de llegar ahí.
+     */
+    it('sabe si una conexión tiene trabajo sin confirmar', async () => {
+      await store.connect(form);
+      const connectionId = store.connections()[0].id;
+
+      expect(store.hasOpenTransaction(connectionId)).toBe(false);
+
+      await store.beginTransaction();
+
+      expect(store.hasOpenTransaction(connectionId)).toBe(true);
+
+      await store.disconnect(connectionId);
+
+      expect(store.hasOpenTransaction(connectionId)).toBe(false);
+    });
+    /**
+     * La deshace el proceso local sin que nadie pulse nada, así que el usuario
+     * tiene que enterarse al volver: sus cambios ya no están.
+     */
+    it('cuenta que la transacción se deshizo sola al descubrirlo', async () => {
+      await store.connect(form);
+      await store.beginTransaction();
+
+      // El proceso local la deshizo por inactividad mientras nadie miraba, así
+      // que confirmar ya no tiene nada que confirmar.
+      gateway.transaction = closedTransaction({ autoRolledBackAt: '2026-08-14T10:20:00Z' });
+      gateway.commitShouldFail = true;
+
+      const confirmada = await store.commitTransaction();
+
+      expect(confirmada).toBe(false);
+      expect(store.transaction()).toBeNull();
+      expect(store.notice()).toContain('se deshizo sola');
+      expect(store.notice()).toContain('15 min');
     });
   });
 });

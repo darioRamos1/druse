@@ -64,12 +64,22 @@ public sealed class ExportService(
             request.Database,
             async selected =>
             {
-                await using var reader = await executor.OpenReaderAsync(
-                    selected,
-                    request,
-                    cancellationToken);
+                try
+                {
+                    await using var reader = await executor.OpenReaderAsync(
+                        selected,
+                        request,
+                        cancellationToken);
 
-                return await exporter.WriteAsync(reader, destination, options, cancellationToken);
+                    return await exporter.WriteAsync(reader, destination, options, cancellationToken);
+                }
+                finally
+                {
+                    // Exportar puede tardar minutos, y todo ese rato la
+                    // transacción no recibiría nada más. Sin esto, una
+                    // exportación larga acabaría deshaciéndola por «olvidada».
+                    selected.Transaction.Touch();
+                }
             },
             cancellationToken);
     }

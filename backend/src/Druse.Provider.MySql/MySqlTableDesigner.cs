@@ -50,7 +50,7 @@ public sealed class MySqlTableDesigner : TableDesignerBase
     /// tercera instrucción falla, las dos primeras ya están aplicadas y no hay
     /// vuelta atrás. Es mejor decirlo que fingir lo contrario.
     /// </summary>
-    protected override bool SupportsTransactionalDdl => false;
+    public override bool SupportsTransactionalDdl => false;
 
     protected override string IdentityClause(TableColumnDefinition column) => "AUTO_INCREMENT";
 

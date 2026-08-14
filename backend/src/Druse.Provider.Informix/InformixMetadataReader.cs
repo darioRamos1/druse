@@ -729,6 +729,10 @@ public sealed class InformixMetadataReader : IDatabaseMetadataReader
         await using var command = informix.Connection.CreateCommand();
         command.CommandText = sql;
 
+        // Con una transacción manual abierta, leer el catálogo va dentro de ella
+        // como todo lo demás que pase por esta conexión.
+        ((DbCommand)command).Transaction = informix.Transaction.Current;
+
         foreach (var value in parameters)
         {
             var parameter = command.CreateParameter();

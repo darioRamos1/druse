@@ -198,7 +198,7 @@ public abstract class TableDesignerBase : ITableDesigner
     /// MySQL hace un commit implícito antes de cada uno, así que allí prometer
     /// atomicidad sería mentir.
     /// </summary>
-    protected virtual bool SupportsTransactionalDdl => true;
+    public virtual bool SupportsTransactionalDdl => true;
 
     public IReadOnlyList<string> DescribeCreate(TableDefinition table)
     {

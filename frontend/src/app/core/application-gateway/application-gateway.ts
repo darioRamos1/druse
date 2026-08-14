@@ -141,6 +141,37 @@ export interface QueryRejected {
 }
 
 /**
+ * La transacción manual de una conexión.
+ *
+ * Es de la conexión y no de la pestaña: dos pestañas del mismo perfil comparten
+ * sesión, así que lo que se ejecute en cualquiera de ellas entra en la misma
+ * transacción. De ahí que lleve el nombre de la conexión y la base, que es lo
+ * que el indicador tiene que enseñar.
+ */
+export interface TransactionState {
+  readonly sessionId: string;
+  readonly isOpen: boolean;
+  /** Cuándo se abrió, en UTC. Ausente si no hay ninguna. */
+  readonly startedAt?: string;
+  readonly lastActivityAt?: string;
+  readonly connectionName: string;
+  readonly database: string;
+  readonly engine: DatabaseEngine;
+  /** El DDL entra en la transacción y se deshace con ella. Falso en MySQL. */
+  readonly ddlIsReversible: boolean;
+  /** Segundos sin actividad tras los cuales se deshace sola. */
+  readonly idleTimeoutSeconds: number;
+  /** Se deshizo sola por inactividad y hay que contárselo al usuario. */
+  readonly autoRolledBackAt?: string;
+}
+
+/** No se pudo iniciar, confirmar o deshacer. */
+export interface TransactionRejected {
+  readonly reason: 'alreadyopen' | 'notopen' | 'readonlyconnection';
+  readonly message: string;
+}
+
+/**
  * Único punto de contacto entre la interfaz y la aplicación local.
  *
  * Los componentes dependen siempre de esta abstracción, nunca de HttpClient.
@@ -188,6 +219,24 @@ export abstract class ApplicationGateway {
   abstract executeQuery(request: ExecuteQueryRequest): Observable<QueryResult>;
 
   abstract cancelQuery(executionId: string): Observable<void>;
+
+  // --- Transacciones manuales -----------------------------------------------
+
+  /**
+   * Estado de la transacción de una conexión.
+   *
+   * La interfaz lo consulta también cada poco mientras hay una abierta: es como
+   * se entera de que se deshizo sola por inactividad, que pasa sin que nadie
+   * haya pulsado nada.
+   */
+  abstract getTransaction(sessionId: string): Observable<TransactionState>;
+
+  /** Entra en modo manual. Hasta aquí cada instrucción se confirmaba sola. */
+  abstract beginTransaction(sessionId: string): Observable<TransactionState>;
+
+  abstract commitTransaction(sessionId: string): Observable<TransactionState>;
+
+  abstract rollbackTransaction(sessionId: string): Observable<TransactionState>;
 
   // --- Edición de filas -----------------------------------------------------
 

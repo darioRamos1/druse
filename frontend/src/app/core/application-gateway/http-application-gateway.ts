@@ -29,6 +29,7 @@ import {
   RowEditRequest,
   RowEditResult,
   TableChangeResult,
+  TransactionState,
   HealthStatus,
   SaveConnectionRequest,
 } from './application-gateway';
@@ -125,6 +126,25 @@ export class HttpApplicationGateway extends ApplicationGateway {
 
   override cancelQuery(executionId: string): Observable<void> {
     return this._http.delete<void>(`/api/queries/${executionId}`);
+  }
+
+  override getTransaction(sessionId: string): Observable<TransactionState> {
+    return this._http.get<TransactionState>(`/api/sessions/${sessionId}/transaction`);
+  }
+
+  override beginTransaction(sessionId: string): Observable<TransactionState> {
+    return this._http.post<TransactionState>(`/api/sessions/${sessionId}/transaction`, {});
+  }
+
+  // Confirmar y deshacer tienen ruta propia en lugar de compartir una con un
+  // parámetro: son las dos decisiones opuestas del usuario, y equivocarse de
+  // valor tiraría el trabajo en lugar de guardarlo.
+  override commitTransaction(sessionId: string): Observable<TransactionState> {
+    return this._http.post<TransactionState>(`/api/sessions/${sessionId}/transaction/commit`, {});
+  }
+
+  override rollbackTransaction(sessionId: string): Observable<TransactionState> {
+    return this._http.post<TransactionState>(`/api/sessions/${sessionId}/transaction/rollback`, {});
   }
 
   override previewRowEdits(request: RowEditRequest): Observable<readonly string[]> {

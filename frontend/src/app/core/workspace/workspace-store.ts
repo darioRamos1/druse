@@ -1,6 +1,6 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { HttpErrorResponse } from '@angular/common/http';
-import { firstValueFrom } from 'rxjs';
+import { Observable, firstValueFrom } from 'rxjs';
 
 import {
   ApplicationGateway,
@@ -10,8 +10,10 @@ import {
   ImportPreview,
   QueryRejected,
   RowEditRequest,
+  TransactionState,
 } from '../application-gateway/application-gateway';
 import { FileSaveService } from '../files/file-save.service';
+import { PendingWorkService } from '../files/pending-work.service';
 import {
   ConnectionForm,
   ConnectionSummary,
@@ -66,6 +68,15 @@ interface DisplayedResultSource {
 /** Clave con la que se guarda el tiempo máximo de ejecución. */
 const TIMEOUT_PREFERENCE = 'query.timeoutSeconds';
 
+/**
+ * Cada cuánto se vuelve a preguntar por una transacción abierta.
+ *
+ * Medio minuto: lo bastante seguido para que el indicador no mienta mucho rato
+ * después de que el proceso local la deshaga por inactividad, y lo bastante
+ * espaciado para que no sea una petición constante contra la API.
+ */
+const TRANSACTION_WATCH_MS = 30_000;
+
 let tabCounter = 1;
 
 /**
@@ -82,6 +93,7 @@ let tabCounter = 1;
 export class WorkspaceStore {
   private readonly _gateway = inject(ApplicationGateway);
   private readonly _files = inject(FileSaveService);
+  private readonly _pendingWork = inject(PendingWorkService);
 
   // --- Conexiones ------------------------------------------------------------
   private readonly _connections = signal<readonly ConnectionSummary[]>([]);
@@ -276,6 +288,195 @@ export class WorkspaceStore {
 
     return connectionId ? (this._sessions().get(connectionId) ?? null) : null;
   });
+
+  // --- Transacciones manuales ------------------------------------------------
+
+  /**
+   * La transacción de cada conexión, indexada por conexión y no por pestaña.
+   *
+   * No es un detalle de implementación: **la transacción pertenece a la
+   * conexión**. Dos pestañas del mismo perfil comparten sesión, así que lo que
+   * se ejecute en cualquiera de ellas entra en la misma transacción, y guardarla
+   * por pestaña haría creer lo contrario.
+   */
+  private readonly _transactions = signal<ReadonlyMap<string, TransactionState>>(new Map());
+
+  /** La transacción abierta en la conexión activa, o `null` si va en autocommit. */
+  readonly transaction = computed(() => {
+    const connectionId = this.activeConnection()?.id;
+    const state = connectionId ? this._transactions().get(connectionId) : undefined;
+
+    return state?.isOpen ? state : null;
+  });
+
+  private readonly _transactionBusy = signal(false);
+  readonly transactionBusy = this._transactionBusy.asReadonly();
+
+  /**
+   * Reloj que vuelve a preguntar por la transacción abierta.
+   *
+   * Existe por una sola razón: el proceso local la deshace solo si se queda
+   * inactiva, y eso ocurre sin que nadie pulse nada. Sin este reloj, el
+   * indicador seguiría diciendo que hay una transacción abierta mucho después de
+   * que dejara de haberla.
+   */
+  private _transactionWatch: ReturnType<typeof setInterval> | null = null;
+
+  /** Hay una transacción abierta en esa conexión. */
+  hasOpenTransaction(connectionId: string): boolean {
+    return this._transactions().get(connectionId)?.isOpen === true;
+  }
+
+  /** Entra en modo manual: a partir de aquí nada se confirma solo. */
+  async beginTransaction(): Promise<boolean> {
+    return this.runTransaction((sessionId) => this._gateway.beginTransaction(sessionId), (state) => {
+      const aviso = state.ddlIsReversible
+        ? ''
+        : ' Crear o modificar tablas no se deshace en este motor, aunque uses «Deshacer».';
+
+      return (
+        `Transacción abierta en «${state.connectionName}». ` +
+        'Todo lo que ejecutes en esta conexión entra en ella hasta que la confirmes o la deshagas.' +
+        aviso
+      );
+    });
+  }
+
+  async commitTransaction(): Promise<boolean> {
+    return this.runTransaction(
+      (sessionId) => this._gateway.commitTransaction(sessionId),
+      (state) => `Cambios confirmados en «${state.connectionName}».`,
+    );
+  }
+
+  async rollbackTransaction(): Promise<boolean> {
+    return this.runTransaction(
+      (sessionId) => this._gateway.rollbackTransaction(sessionId),
+      (state) => `Cambios deshechos en «${state.connectionName}».`,
+    );
+  }
+
+  private async runTransaction(
+    operation: (sessionId: string) => Observable<TransactionState>,
+    describe: (state: TransactionState) => string,
+  ): Promise<boolean> {
+    const connection = this.activeConnection();
+
+    if (!connection?.sessionId) {
+      this._notice.set('Abre una conexión para poder usar transacciones.');
+
+      return false;
+    }
+
+    this._transactionBusy.set(true);
+
+    try {
+      const state = await firstValueFrom(operation(connection.sessionId));
+
+      this.setTransaction(connection.id, state);
+      this._notice.set(describe(state));
+
+      return true;
+    } catch (error) {
+      this._notice.set(describeError(error));
+
+      // El estado local pudo quedarse atrás —otra pestaña la cerró, o se
+      // deshizo sola—, así que se vuelve a preguntar en lugar de dejar los
+      // botones mintiendo.
+      await this.refreshTransaction(connection.id);
+
+      return false;
+    } finally {
+      this._transactionBusy.set(false);
+    }
+  }
+
+  /** Vuelve a preguntar por la transacción de una conexión. */
+  private async refreshTransaction(connectionId: string): Promise<void> {
+    const connection = this.findConnection(connectionId);
+
+    if (!connection?.sessionId) {
+      return;
+    }
+
+    try {
+      const state = await firstValueFrom(this._gateway.getTransaction(connection.sessionId));
+      const previous = this._transactions().get(connectionId);
+
+      this.setTransaction(connectionId, state);
+
+      // Se cuenta una sola vez, comparando con lo último que se sabía: sin esa
+      // comparación el aviso volvería a salir en cada vuelta del reloj.
+      if (
+        state.autoRolledBackAt &&
+        state.autoRolledBackAt !== previous?.autoRolledBackAt &&
+        !state.isOpen
+      ) {
+        const minutos = Math.max(1, Math.round(state.idleTimeoutSeconds / 60));
+
+        this._notice.set(
+          `La transacción de «${state.connectionName}» se deshizo sola tras ${minutos} min sin ` +
+            'actividad, para no dejar filas bloqueadas. Los cambios sin confirmar se perdieron.',
+        );
+      }
+    } catch {
+      // Preguntar por el estado no puede molestar al usuario: si la API no
+      // responde, ya se lo dirá la siguiente cosa que intente hacer.
+    }
+  }
+
+  private setTransaction(connectionId: string, state: TransactionState): void {
+    this._transactions.update((current) => {
+      const next = new Map(current);
+      next.set(connectionId, state);
+
+      return next;
+    });
+
+    this.watchTransactions();
+  }
+
+  /** Mantiene el reloj vivo solo mientras haya alguna transacción abierta. */
+  private watchTransactions(): void {
+    const abiertas = [...this._transactions().values()].some((state) => state.isOpen);
+
+    // Quien avisa al cerrar la ventana necesita saberlo aquí y no al final: en
+    // el escritorio, el aviso lo da el envoltorio, y para entonces preguntarle a
+    // la página ya sería tarde.
+    this._pendingWork.set(abiertas);
+
+    if (!abiertas) {
+      if (this._transactionWatch !== null) {
+        clearInterval(this._transactionWatch);
+        this._transactionWatch = null;
+      }
+
+      return;
+    }
+
+    if (this._transactionWatch !== null) {
+      return;
+    }
+
+    this._transactionWatch = setInterval(() => {
+      for (const [connectionId, state] of this._transactions()) {
+        if (state.isOpen) {
+          void this.refreshTransaction(connectionId);
+        }
+      }
+    }, TRANSACTION_WATCH_MS);
+  }
+
+  private forgetTransaction(connectionId: string): void {
+    this._transactions.update((current) => {
+      const next = new Map(current);
+      next.delete(connectionId);
+
+      return next;
+    });
+
+    this.watchTransactions();
+  }
 
   // --- Persistencia ----------------------------------------------------------
   private readonly _secretStore = signal<SecretStoreStatus | null>(null);
@@ -930,6 +1131,11 @@ export class WorkspaceStore {
       next.delete(connectionId);
       return next;
     });
+
+    // Cerrar la conexión deshace lo que no estuviera confirmado —lo hace el
+    // proceso local al soltar la sesión—, así que aquí no queda transacción de
+    // la que hablar. Quien avisa antes de llegar hasta aquí es la interfaz.
+    this.forgetTransaction(connectionId);
 
     if (this._activeConnectionId() === connectionId) {
       this._activeConnectionId.set(this._connections().find((item) => item.sessionId)?.id ?? null);

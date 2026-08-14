@@ -55,7 +55,20 @@ public sealed class RowEditService(
         return await _connections.UseDatabaseAsync(
             session,
             batch.Table.Database,
-            selected => editor.ApplyAsync(selected, prepared, cancellationToken),
+            async selected =>
+            {
+                try
+                {
+                    return await editor.ApplyAsync(selected, prepared, cancellationToken);
+                }
+                finally
+                {
+                    // Guardar cuenta como actividad: si estos cambios entraron en
+                    // una transacción del usuario, el reloj que la deshace por
+                    // olvido vuelve a empezar.
+                    selected.Transaction.Touch();
+                }
+            },
             cancellationToken);
     }
 

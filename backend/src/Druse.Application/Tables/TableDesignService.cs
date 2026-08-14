@@ -97,7 +97,17 @@ public sealed class TableDesignService(
         return await _connections.UseDatabaseAsync(
             session,
             table.Database,
-            selected => designer.CreateAsync(selected, table, cancellationToken),
+            async selected =>
+            {
+                try
+                {
+                    return await designer.CreateAsync(selected, table, cancellationToken);
+                }
+                finally
+                {
+                    selected.Transaction.Touch();
+                }
+            },
             cancellationToken);
     }
 
@@ -136,7 +146,17 @@ public sealed class TableDesignService(
         return await _connections.UseDatabaseAsync(
             session,
             alteration.Table.Database,
-            selected => designer.AlterAsync(selected, alteration, cancellationToken),
+            async selected =>
+            {
+                try
+                {
+                    return await designer.AlterAsync(selected, alteration, cancellationToken);
+                }
+                finally
+                {
+                    selected.Transaction.Touch();
+                }
+            },
             cancellationToken);
     }
 

@@ -337,6 +337,55 @@ public sealed record RowEditRejectedResponse
 }
 
 // ---------------------------------------------------------------------------
+// Transacciones manuales
+// ---------------------------------------------------------------------------
+
+/// <summary>
+/// La transacción de una conexión, tal y como la enseña la interfaz.
+///
+/// Lleva el nombre de la conexión y la base porque el indicador tiene que decir
+/// **a qué afecta**: la transacción es de la conexión, no de la pestaña, y quien
+/// la abrió en una pestaña necesita saber que lo que ejecute en otra del mismo
+/// perfil también entra.
+/// </summary>
+public sealed record TransactionStateResponse
+{
+    public required Guid SessionId { get; init; }
+    public required bool IsOpen { get; init; }
+
+    /// <summary>Cuándo se abrió, en UTC. Ausente si no hay ninguna.</summary>
+    public DateTimeOffset? StartedAt { get; init; }
+
+    public DateTimeOffset? LastActivityAt { get; init; }
+
+    public required string ConnectionName { get; init; }
+    public required string Database { get; init; }
+    public required string Engine { get; init; }
+
+    /// <summary>
+    /// El DDL entra en la transacción y se puede deshacer.
+    ///
+    /// Falso en MySQL, donde un `ALTER` queda hecho aunque después se pulse
+    /// Rollback. La interfaz lo avisa; callarlo sería dejar que el usuario
+    /// descubriera solo que su tabla no volvió atrás.
+    /// </summary>
+    public required bool DdlIsReversible { get; init; }
+
+    /// <summary>Segundos sin actividad tras los cuales se deshace sola.</summary>
+    public required int IdleTimeoutSeconds { get; init; }
+
+    /// <summary>Se deshizo sola por inactividad, y hay que contárselo al usuario.</summary>
+    public DateTimeOffset? AutoRolledBackAt { get; init; }
+}
+
+/// <summary>No se pudo iniciar, confirmar o deshacer, con el motivo.</summary>
+public sealed record TransactionRejectedResponse
+{
+    public required string Reason { get; init; }
+    public required string Message { get; init; }
+}
+
+// ---------------------------------------------------------------------------
 // Diseño de tablas
 // ---------------------------------------------------------------------------
 

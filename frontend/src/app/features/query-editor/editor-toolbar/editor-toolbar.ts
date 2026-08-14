@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, input, output, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, input, output, signal } from '@angular/core';
 
 import { Icon } from '../../../shared/ui/icon/icon';
 
@@ -23,11 +23,40 @@ export class EditorToolbar {
   /** Hay una conexión abierta contra la que ejecutar. */
   readonly canExecute = input(false);
 
+  /** Hay una transacción manual abierta en la conexión de esta pestaña. */
+  readonly transactionOpen = input(false);
+
+  /** Conexión a la que afecta la transacción, que no tiene por qué ser la pestaña. */
+  readonly transactionScope = input('');
+
+  /** El motor no deshace el DDL aunque se deshaga la transacción. */
+  readonly transactionDdlIsReversible = input(true);
+
+  /** Hay una operación de transacción en curso; los botones esperan. */
+  readonly transactionBusy = input(false);
+
   readonly execute = output<void>();
   readonly executeSelection = output<void>();
   readonly cancel = output<void>();
   readonly format = output<void>();
   readonly timeoutChange = output<number>();
+  readonly beginTransaction = output<void>();
+  readonly commit = output<void>();
+  readonly rollback = output<void>();
+
+  /**
+   * Qué implica tener esta transacción abierta.
+   *
+   * En los motores que no deshacen el DDL se dice aquí, donde el usuario tiene
+   * el ratón, y no solo en el aviso del momento de abrirla: quien creó una tabla
+   * media hora después ya no se acuerda de aquel mensaje.
+   */
+  protected readonly transactionHint = computed(() =>
+    this.transactionDdlIsReversible()
+      ? 'Todo lo que ejecutes en esta conexión entra en la transacción hasta que la confirmes o la deshagas.'
+      : 'Todo lo que ejecutes en esta conexión entra en la transacción. ' +
+        'Crear o modificar tablas es la excepción: en este motor queda hecho aunque pulses Rollback.',
+  );
 
   /** Valores habituales, para no obligar a teclear un número. */
   protected readonly timeoutOptions = [5, 10, 30, 60, 300, 600];

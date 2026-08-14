@@ -110,7 +110,22 @@ public sealed class QueryService(
             var result = await _connections.UseDatabaseAsync(
                 session,
                 effective.Database,
-                selected => executor.ExecuteAsync(selected, effective, token),
+                async selected =>
+                {
+                    try
+                    {
+                        return await executor.ExecuteAsync(selected, effective, token);
+                    }
+                    finally
+                    {
+                        // Se anota también si la consulta falló: la transacción
+                        // sigue abierta y el usuario está delante. Se toca la
+                        // sesión elegida y no la de origen porque una consulta
+                        // contra otra base va por otra conexión, y esa no está
+                        // dentro de la transacción.
+                        selected.Transaction.Touch();
+                    }
+                },
                 token);
 
             // El proveedor genera su propio identificador; se sustituye por el que

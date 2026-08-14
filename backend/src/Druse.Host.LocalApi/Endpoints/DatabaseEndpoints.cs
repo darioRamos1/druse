@@ -4,6 +4,7 @@ using Druse.Application.Metadata;
 using Druse.Application.Queries;
 using Druse.Application.Rows;
 using Druse.Application.Tables;
+using Druse.Application.Transactions;
 using Druse.Database.Abstractions;
 using Druse.Domain;
 using Druse.Host.LocalApi.Contracts;
@@ -27,7 +28,90 @@ internal static class DatabaseEndpoints
         MapQueries(app);
         MapRowEdits(app);
         MapTableDesign(app);
+        MapTransactions(app);
     }
+
+    /// <summary>
+    /// Las transacciones que el usuario abre y cierra a mano.
+    ///
+    /// Cuelgan de la sesión y no de la pestaña porque es de la conexión de quien
+    /// son: dos pestañas del mismo perfil comparten sesión y, por tanto,
+    /// transacción.
+    /// </summary>
+    private static void MapTransactions(IEndpointRouteBuilder app)
+    {
+        app.MapGet("/api/sessions/{sessionId:guid}/transaction", (
+            Guid sessionId,
+            TransactionService transactions) =>
+            Results.Ok(transactions.Get(sessionId).ToResponse()))
+        .WithName("GetTransaction");
+
+        app.MapPost("/api/sessions/{sessionId:guid}/transaction", async (
+            Guid sessionId,
+            TransactionService transactions,
+            CancellationToken cancellationToken) =>
+        {
+            try
+            {
+                var state = await transactions.BeginAsync(sessionId, cancellationToken);
+
+                return Results.Ok(state.ToResponse());
+            }
+            catch (TransactionRejectedException exception)
+            {
+                return Rejected(exception);
+            }
+        })
+        .WithName("BeginTransaction");
+
+        // Confirmar y deshacer son dos rutas y no una con bandera: son las dos
+        // decisiones opuestas que puede tomar el usuario, y un cliente que se
+        // equivoque de valor no puede acabar tirando el trabajo de una hora.
+        app.MapPost("/api/sessions/{sessionId:guid}/transaction/commit", async (
+            Guid sessionId,
+            TransactionService transactions,
+            CancellationToken cancellationToken) =>
+        {
+            try
+            {
+                var state = await transactions.CommitAsync(sessionId, cancellationToken);
+
+                return Results.Ok(state.ToResponse());
+            }
+            catch (TransactionRejectedException exception)
+            {
+                return Rejected(exception);
+            }
+        })
+        .WithName("CommitTransaction");
+
+        app.MapPost("/api/sessions/{sessionId:guid}/transaction/rollback", async (
+            Guid sessionId,
+            TransactionService transactions,
+            CancellationToken cancellationToken) =>
+        {
+            try
+            {
+                var state = await transactions.RollbackAsync(sessionId, cancellationToken);
+
+                return Results.Ok(state.ToResponse());
+            }
+            catch (TransactionRejectedException exception)
+            {
+                return Rejected(exception);
+            }
+        })
+        .WithName("RollbackTransaction");
+    }
+
+    private static IResult Rejected(TransactionRejectedException exception) =>
+        Results.Json(
+            new TransactionRejectedResponse
+            {
+                Reason = exception.Rejection.Reason.ToString().ToLowerInvariant(),
+                Message = exception.Rejection.Message,
+            },
+            statusCode: StatusCodes.Status409Conflict);
 
     /// <summary>
     /// Crear y modificar tablas.

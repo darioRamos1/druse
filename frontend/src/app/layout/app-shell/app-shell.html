@@ -67,11 +67,18 @@
       [hasSelection]="hasSelection()"
       [canExecute]="hasConnection()"
       [timeoutSeconds]="timeoutSeconds()"
+      [transactionOpen]="transaction() !== null"
+      [transactionScope]="transaction()?.connectionName ?? ''"
+      [transactionDdlIsReversible]="transaction()?.ddlIsReversible ?? true"
+      [transactionBusy]="transactionBusy()"
       (execute)="execute()"
       (executeSelection)="executeSelection()"
       (cancel)="cancel()"
       (format)="format()"
       (timeoutChange)="setTimeout($event)"
+      (beginTransaction)="beginTransaction()"
+      (commit)="commitTransaction()"
+      (rollback)="rollbackTransaction()"
     />
 
     @defer (on immediate) {

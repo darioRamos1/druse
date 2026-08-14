@@ -11,12 +11,15 @@
 mod api_process;
 mod exports;
 mod sql_files;
+mod transactions;
 
 use std::sync::Mutex;
 
 use api_process::{ApiProcess, Endpoint};
 use sql_files::SqlFileState;
 use tauri::{Manager, PhysicalPosition, PhysicalSize, State, WebviewWindow};
+use tauri_plugin_dialog::{DialogExt, MessageDialogButtons, MessageDialogKind};
+use transactions::PendingTransactions;
 
 /// Estado compartido: el proceso de la API mientras la aplicación vive.
 struct ApiState(Mutex<Option<ApiProcess>>);
@@ -105,6 +108,7 @@ fn main() {
     tauri::Builder::default()
         .manage(ApiState(Mutex::new(None)))
         .manage(SqlFileState::default())
+        .manage(PendingTransactions::default())
         .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
             if let Some(window) = app.get_webview_window("main") {
@@ -145,9 +149,50 @@ fn main() {
             sql_files::open_sql_file,
             sql_files::save_sql_file,
             sql_files::save_sql_file_as,
-            exports::save_export
+            exports::save_export,
+            transactions::set_transaction_pending
         ])
         .on_window_event(|window, event| {
+            // Cerrar con una transacción abierta tira lo que no esté confirmado:
+            // al soltar la sesión, el proceso local la deshace. Puede ser el
+            // trabajo de un buen rato, así que se pregunta antes.
+            //
+            // El aviso vive aquí y no en la página porque `beforeunload` no es
+            // fiable dentro del WebView: la ventana la cierra el sistema, no el
+            // navegador.
+            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                let pending = window
+                    .try_state::<PendingTransactions>()
+                    .map(|state| transactions::has_pending(&state))
+                    .unwrap_or(false);
+
+                if pending {
+                    api.prevent_close();
+
+                    let window = window.clone();
+
+                    // Con respuesta diferida y no con un diálogo que bloquee:
+                    // esto corre en el bucle de eventos, y esperar aquí colgaría
+                    // la ventana que se intenta cerrar.
+                    window.dialog()
+                        .message(
+                            "Hay una transacción abierta con cambios sin confirmar. \
+                             Si cierras Druse ahora, se perderán.",
+                        )
+                        .title("Cambios sin confirmar")
+                        .kind(MessageDialogKind::Warning)
+                        .buttons(MessageDialogButtons::OkCancelCustom(
+                            "Cerrar y perderlos".to_string(),
+                            "Volver".to_string(),
+                        ))
+                        .show(move |confirmado| {
+                            if confirmado {
+                                let _ = window.destroy();
+                            }
+                        });
+                }
+            }
+
             // Al cerrar la ventana hay que parar la API: dejarla viva
             // mantendría abiertas las conexiones del usuario contra sus bases de
             // datos (plan §12).

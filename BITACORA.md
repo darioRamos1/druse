@@ -10,51 +10,71 @@
 
 | Campo | Valor |
 | --- | --- |
-| Última sesión | **019** — 2026-08-14 |
+| Última sesión | **020** — 2026-08-14 |
 | Fase activa | **Mejora posterior al MVP completada:** implementación y validación cerradas |
 | Fases 0–6 | ✅ Cerradas. |
 | Fase 7 | 🟡 **10/12.** Hay instalador y funciona; faltan dos comprobaciones que exigen otro equipo. |
 | Fase 8 | ✅ **7/7.** Tres motores sobre el mismo contrato y primera beta preparada. |
 | ¿Compila el backend? | Sí — 0 advertencias, 0 errores |
 | ¿Compila el envoltorio? | Sí |
-| ¿Pasan las pruebas? | Sí — **232 en backend** (207 unitarias y 25 de integración), **229 en frontend** y **2 en el envoltorio** |
-| ¿Hay aplicación de escritorio? | **Sí.** Instalador NSIS, MSI y ZIP portable |
-| Motores | **PostgreSQL, SQL Server y MySQL/MariaDB**, con navegación por todas las bases autorizadas y las **mismas 27 pruebas contractuales** cada uno |
-| Bloqueantes | Ninguno para seguir programando. Sí para dar por buenas dos funciones nuevas: ver «Qué toca retomar». |
-| Git | `main` al día hasta la sesión 018 (#2, #4, #5, #6 y #7 fusionados). **La sesión 019 está sin commitear**: ver «Qué toca retomar». |
+| ¿Pasan las pruebas? | Sí — **378 en backend** (222 unitarias, 126 contractuales y 30 de integración), **245 en frontend** y **6 en el envoltorio** |
+| ¿Hay aplicación de escritorio? | **Sí.** Instalador NSIS, MSI y ZIP portable, en dos variantes: con Informix y sin él |
+| Motores | **PostgreSQL, SQL Server, MySQL/MariaDB e Informix**, todos sobre el mismo contrato compartido |
+| Trabajo a medias | Ninguno. Las transacciones manuales quedaron terminadas en la sesión 020. |
+| Bloqueantes | Ninguno para seguir programando. Sí para dar por buenos cuatro motores y cuatro funciones: ver «Qué toca retomar». |
+| Git | `main` al día hasta la sesión 018. La rama `feat/indices-y-claves-foraneas` tiene el PR #8 abierto y ahora **siete commits**: los dos de índices, cuatro que ordenan lo que estaba sin commitear —exportación, transacciones, Informix y empaquetado— y el de las transacciones terminadas. |
 
 ### Qué toca retomar en la próxima sesión
 
-**Lo primero, y con diferencia: probar contra servidores de verdad lo que se
-escribió en las sesiones 015, 017 y 019.** Las tres funciones nuevas están
-completas, con pruebas y revisadas en pantalla, pero **ninguna ha hablado nunca
-con un servidor real**, porque este equipo no tiene ni servidor SSH ni Docker ni
-un motor local, y las únicas bases a mano son de la empresa.
+Ya no queda nada a medias: las transacciones manuales se cerraron en la sesión
+020 y los 44 archivos sueltos se repartieron en cuatro commits temáticos. Lo que
+falta es **comprobar contra servidores de verdad** lo que se escribió a ciegas.
 
-**La deuda de la sesión 019 es la más grande de las tres**, porque el DDL de
-índices y restricciones es donde más se separan los tres dialectos y donde el
-catálogo de cada motor se lee distinto. Basta con levantar los contenedores
-(`./build/scripts/test-db.ps1`) y ejecutar la suite con
-`DRUSE_REQUIRE_ENGINES=1`: la prueba contractual
-`CreaIndicesYRestriccionesYLosVuelveALeer` ya está escrita y hace el ciclo
-completo —crear un índice, releerlo del catálogo, borrarlo y comprobar que
-desaparece— en los tres motores.
+**Probar contra servidores de verdad lo de las sesiones 015, 017, 019 y 020.**
+Cinco funciones completas, con pruebas y revisadas en pantalla, y **ninguna ha
+hablado nunca con un servidor real**, porque este equipo no tiene ni servidor SSH
+ni Docker ni un motor local, y las únicas bases a mano son de la empresa.
+
+**La deuda más grande es Informix**, porque entró entero a ciegas: catálogo,
+tipos, DDL y edición. Después va el DDL de índices y restricciones, donde más se
+separan los dialectos. Las dos se resuelven con lo mismo —levantar los
+contenedores con `./build/scripts/test-db.ps1` y ejecutar la suite con
+`DRUSE_REQUIRE_ENGINES=1`—, y las pruebas contractuales que lo comprueban ya
+están escritas: `CreaIndicesYRestriccionesYLosVuelveALeer` hace el ciclo completo
+—crear un índice, releerlo del catálogo, borrarlo y comprobar que desaparece— en
+los cuatro motores.
+
+**Instalar Docker en este equipo es, con diferencia, lo que más deuda cancela de
+una vez.**
 
 1. **Túnel SSH contra un servidor SSH real.** Lo probado llega hasta el error de
    red: la librería intenta conectar y el mensaje vuelve bien escrito. Falta el
    camino feliz —abrir el túnel, conectar la base por dentro y cerrarlo al cerrar
    la sesión— con los tres métodos: contraseña, clave privada y segundo factor.
    Vale cualquier bastión: una EC2, una VM o un equipo con el puerto 22 abierto.
-2. **DDL contra los tres motores.** Crear una tabla, añadirle y renombrarle
-   columnas, cambiar tipos y borrar una, y ahora además **crear, modificar y
-   quitar índices, claves foráneas, restricciones y la clave primaria**, en SQL
-   Server, PostgreSQL y MySQL. El SQL generado está fijado por 25 pruebas, pero
-   nadie lo ha ejecutado todavía. Ojo a MySQL, que es el único donde un `ALTER` a
-   medias no se deshace: si el `CREATE INDEX` que sigue a un `DROP INDEX` falla,
-   la tabla se queda sin ese índice.
+2. **DDL contra los cuatro motores.** Crear una tabla, añadirle y renombrarle
+   columnas, cambiar tipos y borrar una, y además **crear, modificar y quitar
+   índices, claves foráneas, restricciones y la clave primaria**. El SQL generado
+   está fijado por 30 pruebas, pero nadie lo ha ejecutado todavía. Ojo a MySQL,
+   que es el único donde un `ALTER` a medias no se deshace: si el `CREATE INDEX`
+   que sigue a un `DROP INDEX` falla, la tabla se queda sin ese índice.
+2.b **Informix entero.** Es el que más riesgo acumula: catálogo (`systables`,
+   `syscolumns`, `sysindexes`, `sysconstraints`), descodificación de tipos, DDL y
+   edición de filas, todo escrito contra la documentación sin ejecutar nada. El
+   contenedor está listo en `test-db.ps1` con la imagen de desarrollo de IBM,
+   publicando el 9089 y creando las bases `WITH LOG` que DRDA exige.
 3. **La autenticación de Windows con una cuenta de dominio.** Lo comprobado es
    que la petición llega al driver de SQL Server; falta una conexión que abra de
    verdad contra un servidor que acepte logins de Windows.
+3.b **El ciclo de una transacción manual contra los cuatro motores.** Lo probado
+   es real pero sobre SQLite: abrir, escribir, deshacer y comprobar que no queda
+   nada. Contra los motores de verdad falta ver **tres cosas que solo se ven
+   ahí**: que expandir el árbol con la transacción abierta no falle en SQL Server
+   —de eso va que los lectores de catálogo lleven la transacción—, que dos
+   pestañas de la misma conexión compartan de verdad la transacción, y que el
+   temporizador la deshaga y suelte los bloqueos. Para lo último no hace falta
+   esperar quince minutos: `Transactions:IdleTimeoutMinutes` acorta la espera al
+   arrancar la API.
 
 Y lo que ya venía de antes, sin cambios:
 
@@ -86,6 +106,33 @@ Y lo que ya venía de antes, sin cambios:
   ciegas puede dejar filas huérfanas entre una instrucción y la siguiente.
 - **Índices sobre expresiones** (`LOWER(email)`) y `CONCURRENTLY` en PostgreSQL,
   que es lo que permite crear un índice sin bloquear la tabla en producción.
+- **Un chat que ayude a escribir SQL.** Se habló y no se empezó. Lo que decide el
+  diseño no es qué modelo se use, sino que **el asistente necesita el esquema
+  para servir de algo**, y mandar los nombres de tablas y columnas de las bases
+  de la empresa a un tercero es una decisión de cumplimiento, no técnica. La vía
+  que lo evita es un modelo local (Ollama) con el proveedor detrás de un
+  contrato, igual que los motores, para poder cambiarlo después. Y una regla que
+  no debería negociarse: **el SQL que genere la IA pasa por el mismo
+  `SqlSafetyAnalyzer` y las mismas confirmaciones** que el escrito a mano.
+- **Transacción por pestaña** en vez de por conexión. Se descartó para esta
+  entrega porque exige abrir una conexión física por pestaña, pero es lo más
+  intuitivo si algún día molesta que todas las pestañas compartan transacción.
+
+### Lo que el navegador no puede enseñar
+
+Tres fallos ya han venido de lo mismo: **funciona en `ng serve` y se rompe en el
+ejecutable**. La hoja de estilos que se quedaba en `media="print"`, la API que
+no se encontraba al cambiar de origen, y exportar sin guardar nada.
+
+La causa siempre es una de estas tres, y ninguna existe en desarrollo:
+
+- **La CSP.** El servidor de Angular no manda ninguna; la ventana empaquetada sí.
+- **El origen.** Empaquetada, la aplicación se sirve desde `http://tauri.localhost`.
+- **Las capacidades del WebView.** No hay gestor de descargas ni acceso a disco.
+
+Así que **cualquier función que toque una de las tres hay que probarla
+empaquetada**. Para la CSP hay un atajo que ya funcionó una vez: servir el `dist`
+compilado con un servidor estático que devuelva la CSP exacta del envoltorio.
 
 ### Dos trampas de este equipo, para no repetirlas
 
@@ -109,8 +156,11 @@ docs/mockups/druse-main.html.
 
 Antes de escribir código:
 1. Confirma la fase activa y las tareas pendientes según la bitácora.
-2. Verifica el estado real del repositorio (no confíes solo en la bitácora).
-3. Propón únicamente los cambios de la siguiente tarea pendiente.
+2. Verifica el estado real del repositorio (no confíes solo en la bitácora):
+   `git status` y `git log` antes de nada.
+3. Lee «Qué toca retomar»: no queda nada a medias, y lo que falta es comprobar
+   contra motores reales lo que se escribió a ciegas.
+4. Propón únicamente los cambios de la siguiente tarea pendiente.
 
 Al terminar: ejecuta compilación y pruebas, resume archivos modificados y
 actualiza el checklist del plan y esta bitácora.
@@ -166,7 +216,84 @@ Pendiente de verificar cuando toque: Docker (pruebas de integración con contene
 
 ## 5. Registro de sesiones
 
-### Sesión 019 — 2026-08-14 · Índices, claves foráneas y restricciones
+### Sesión 020 — 2026-08-14 · Transacciones manuales, y los 44 archivos ordenados
+
+Dos trabajos: repartir lo que estaba sin commitear y terminar lo único que
+quedaba a mitad.
+
+#### Los 44 archivos, en cuatro commits temáticos
+
+Se decidió no repartirlos en ramas. Sacar cada trabajo a la suya exigía separar
+archivos que se tocan entre sí —`workspace-store.ts`, las clases base de los
+proveedores— y volver a apilar PRs, que es exactamente lo que costó cuatro rondas
+de conflictos y un PR fusionado contra su base en la sesión 018. Cuatro commits
+sobre la rama que ya tiene el PR #8 conservan la misma separación en el historial
+sin ese riesgo:
+
+1. **La exportación en la aplicación empaquetada.**
+2. **La transacción sostenida en la sesión**, que era el cimiento a medias.
+3. **Informix como cuarto motor.**
+4. **Dos variantes del paquete y la autoría**, incluido el `api/**/*` del glob.
+
+Cada uno compila por su cuenta. Dos archivos llevan cambios de dos trabajos
+—`RowEditorBase` y `TableDesignerBase`, donde los ganchos de Informix conviven
+con `OperationScope`—; van en el commit de transacciones y su mensaje lo dice, en
+lugar de partir hunks a mano y arriesgarse a dejar un commit que no compila.
+
+#### Transacciones manuales terminadas
+
+**Hecho:** `TransactionService` con las reglas, los endpoints, los tres botones
+conectados, el indicador y los avisos.
+
+- **El temporizador vive en el proceso, no en el navegador.** `IdleTransactionSweeper`
+  mira cada minuto y deshace lo que lleve quince sin actividad. Tenía que ser así:
+  la ventana puede estar cerrada o dormida justo cuando hay que soltar los
+  bloqueos. Se mide la **inactividad**, no la duración: quien lleva media hora
+  trabajando dentro de una transacción no ha olvidado nada.
+- **Se anota la actividad en la capa de aplicación**, no en los proveedores:
+  consultas, edición de filas, DDL y exportación tocan la transacción de la sesión
+  *elegida*, que no es la de origen cuando se ejecuta contra otra base —esa va por
+  otra conexión y no está dentro de la transacción—.
+- **Un aviso que sobrevive a la transacción.** Cuando se deshace sola, el usuario
+  no está delante; el servicio guarda ese hecho aparte y la interfaz lo cuenta al
+  volver, porque preguntárselo a una transacción que ya no existe no devolvería
+  nada. Por eso el servicio es singleton y no vive lo que dura una petición.
+- **Los lectores de catálogo y de exportación también entran en la transacción.**
+  No es simetría: SQL Server se niega a ejecutar sobre una conexión con
+  transacción pendiente si el comando no la lleva asignada, así que sin esto
+  **expandir un nodo del árbol fallaría solo por haber pulsado «Iniciar
+  transacción»**. Es el fallo más difícil de relacionar con su causa de todo esto.
+- **El aviso al cerrar la ventana lo da el envoltorio**, con un diálogo nativo y
+  un estado que la interfaz mantiene al día. `beforeunload` no vale dentro del
+  WebView —quien cierra es el sistema, no el navegador— y queda solo para el
+  navegador. El diálogo se muestra con respuesta diferida: bloquear ahí colgaría
+  la ventana que se intenta cerrar.
+- Cerrar una conexión con cambios sin confirmar también pregunta, igual que cerrar
+  una pestaña sin guardar y por el mismo motivo.
+- En solo lectura no se abre ninguna: no habría nada que confirmar y la
+  transacción retendría recursos del servidor a cambio de nada.
+- El indicador dice **a qué conexión afecta**, y en MySQL avisa de que el DDL
+  queda hecho aunque se pulse Rollback.
+
+**Verificado:** 222 pruebas unitarias en backend (10 nuevas), 126 contractuales,
+30 de integración (5 nuevas de las rutas), 245 en frontend (13 nuevas) y 6 en el
+envoltorio (2 nuevas),
+más compilación de producción sin avisos nuevos. Las del backend corren contra
+una base SQLite **real** en memoria, no contra dobles: lo que había que demostrar
+es que lo escrito dentro desaparece al deshacer, y eso un doble no lo puede
+enseñar.
+
+**Sin ejecutar contra un motor real**, como el resto: ver el punto 3.b de «Qué
+toca retomar», que enumera las tres cosas que solo se ven ahí.
+
+### Sesión 019 — 2026-08-14 · Índices y claves, cuarto motor, empaquetado y transacciones
+
+Sesión larga y con cuatro trabajos distintos, en este orden: el diseñador de
+tablas completo, el empaquetado (firma, autoría y variantes), Informix como
+cuarto motor, y las transacciones manuales, que **quedaron a mitad** — ver el
+apartado de arriba, que es por donde hay que empezar.
+
+#### Diseñador de tablas: índices, claves foráneas y restricciones
 
 **Hecho:** el diseñador de tablas deja de ser solo columnas. Ver, agregar,
 modificar y quitar **índices, claves foráneas, restricciones de unicidad,
@@ -209,6 +336,125 @@ catálogo— **no se ha ejecutado contra ningún motor**, porque este equipo no 
 Docker. Cuenta como superada porque el contrato se omite cuando el motor no
 responde. Es la comprobación que de verdad valida esta entrega, y necesita
 `DRUSE_REQUIRE_ENGINES=1` con los tres contenedores en marcha.
+
+#### Empaquetado: firma, autoría y dos variantes
+
+- **Preparado para firmar sin certificado todavía.** `signing.ps1` localiza
+  `signtool`, firma con sellado de tiempo y **comprueba el resultado**: signtool
+  puede terminar bien y dejar una firma que Windows no acepta. Se firma también
+  `Druse.Host.LocalApi.exe`, que Tauri no toca — un instalador firmado que suelta
+  un binario sin firmar es lo que hace saltar a los antivirus corporativos. La
+  huella no se versiona: es de la máquina que compila, así que el script genera
+  la configuración al vuelo y la borra en el `finally`.
+- **El producto pasa a estar a nombre de Darío Ramos**, no de una empresa, en el
+  envoltorio y en la API. Conviene no confundir las dos autorías: los metadatos
+  del archivo los escribe cualquiera, mientras que el «Editor» que Windows enseña
+  sale del certificado y no se configura en ningún archivo.
+- **Dos variantes del paquete.** `-p:IncludeInformix=false` deja fuera el
+  proveedor y su driver de 111 MB; el proyecto se sigue compilando y probando
+  siempre, porque un motor que no se prueba acaba roto sin que nadie se entere.
+  Ambas llevan sufijo en el nombre (`-completo` y `-sin-informix`).
+
+**Un fallo silencioso encontrado por los tamaños, y merece recordarse:** el
+instalador declaraba sus recursos como `api/*`, con un solo asterisco, que **no
+baja a subdirectorios**. Los 81 MB del `clidriver` de IBM viven en una carpeta,
+así que el ZIP portable los llevaba —el script copia con `-Recurse`— y el
+instalador no. Quien instalara con el `.exe` habría visto Informix en la lista y
+fallado al conectar, sin ninguna pista. La señal fue que la API creció 83 MB y el
+instalador solo 0,4. **Es la segunda vez que ese glob da problemas**, después de
+la incidencia 4 de la sesión 010.
+
+Y un error propio que costó un empaquetado: al poner sufijo solo a la variante
+ligera, encadenar las dos ejecuciones hizo que la segunda sobrescribiera el
+instalador de la primera antes de renombrarlo, y el completo desapareció. Ahora
+ambas lo llevan.
+
+#### Cuarto motor: IBM Informix
+
+Informix entra con las mismas funciones que los otros tres: explorador,
+autocompletado con su catálogo, plantillas, formateo, compositor, edición de
+filas y diseñador de tablas con índices y restricciones.
+
+**La decisión que condiciona todo lo demás: se llega por DRDA.** No existe un
+proveedor ADO.NET moderno de Informix —el `IBM.Data.Informix` clásico se quedó
+en .NET Framework—, así que se usa `Net.IBM.Data.Db2` hablando DRDA. Comprobado
+que restaura y compila en .NET 10. Dos consecuencias que hay que tener presentes:
+
+- **El paquete pesa 111 MB**, así que el instalador pasa de ~46 MB a ~160 MB. Es
+  con diferencia la dependencia más cara de la solución.
+- **El servidor necesita DRDA habilitado**: un escuchador con `drsoctcp` en
+  `sqlhosts` y una base con registro de transacciones. Contra un Informix sin esa
+  configuración la conexión falla por cómo está montado el servidor, no por la
+  cadena de conexión. El normalizador de errores lo dice explícitamente en el
+  −951, porque si no el usuario buscaría el fallo en su contraseña.
+- La licencia del driver es de IBM, no libre. Redistribuirlo dentro del
+  instalador lo permite la sección de redistribuibles del IPLA, cuyos términos
+  hay que cumplir.
+
+**Lo que Informix hace distinto y obligó a tocar las clases base:**
+
+- **La identidad es el tipo, no una cláusula.** Una columna autoincremental se
+  declara `SERIAL`, no `INTEGER` seguido de algo. `TableDesignerBase` solo sabía
+  añadir palabras detrás del tipo, así que se añadió el gancho `DataTypeOf`, que
+  por omisión devuelve el tipo sin tocar. El ancho se conserva: un `BIGINT`
+  autoincremental es `BIGSERIAL`, porque degradarlo a 32 bits agotaría los
+  identificadores de una tabla grande sin que nadie lo pidiera.
+- **Los parámetros son posicionales.** En el SQL todos son `?` y el enlace es por
+  orden. `RowEditorBase` usaba el mismo método para el marcador y para el nombre
+  del parámetro; se separaron con `ParameterName`, que por omisión sigue
+  devolviendo lo mismo.
+- **`SELECT FIRST n` va delante**, como el `TOP` de SQL Server y no como el
+  `LIMIT` del final. La regla vive ahora en una sola función del escritor de SQL,
+  para que un motor que lo ponga delante no arrastre además un `LIMIT` al final.
+- **El esquema es el propietario de la tabla**, no un objeto que se cree aparte.
+- **El tipo de una columna viene codificado en un número**, no escrito: hay una
+  clase entera dedicada a descodificar `coltype` y `collength`.
+- Sin `FULL OUTER JOIN`, igual que MySQL: el compositor no lo ofrece, porque
+  generaría SQL que el servidor rechaza.
+- Sin `DEFAULT VALUES`: para una tabla cuyas columnas rellena todas el motor, se
+  nombra la serial y se le da un cero, que es su forma idiomática.
+
+**Verificado:** 212 pruebas unitarias (5 nuevas del dialecto de Informix), 126
+contractuales, 25 de integración, 232 en frontend, y compilación de producción
+sin avisos nuevos. La prueba de arquitectura hizo su trabajo: falló al no
+encontrar declarada la regla de referencias del proyecto nuevo.
+
+**Sin ejecutar contra un servidor real.** No hay ningún Informix a mano, así que
+todo el catálogo —`systables`, `syscolumns`, `sysindexes`, `sysconstraints`, la
+descodificación de tipos— está escrito a ciegas contra la documentación. El
+contenedor está preparado en `test-db.ps1` con la imagen de desarrollo de IBM,
+publicando el 9089 y creando las bases `WITH LOG` que DRDA exige.
+
+#### Exportar no guardaba nada en la aplicación empaquetada
+
+Lo encontró el usuario probando el portable: **exportar decía «Exportado a
+XLSX» y no aparecía ningún archivo.** Fallaba igual en CSV.
+
+La exportación descargaba como en el navegador —crear un `blob:` y pulsar un
+enlace `download`—, y eso **dentro de Tauri no hace nada**: la CSP solo admite
+`blob:` para imágenes y workers, y el WebView no trae gestor de descargas. Lo
+peor es que **tampoco falla**: `link.click()` no lanza ninguna excepción, así
+que el código seguía hasta el aviso de éxito.
+
+Es el tercer fallo de la misma familia, después de la hoja de estilos que se
+quedaba en `media="print"` y de la API que no se encontraba: **cosas que
+funcionan en el navegador y solo se rompen empaquetadas**. La regla que dejan
+las tres: cualquier función que toque el navegador —CSP, descargas, origen— hay
+que probarla en el ejecutable, porque el servidor de desarrollo no tiene CSP y
+no puede enseñar el fallo.
+
+Arreglado con el mismo patrón que los archivos `.sql` de la sesión 013: un
+comando del envoltorio abre el diálogo del sistema y escribe el archivo. El
+contenido viaja en bytes y no como texto, porque un XLSX es binario. La
+bifurcación vive en un servicio nuevo, `FileSaveService`, para que el store no
+tenga que saber dónde está corriendo.
+
+Y **el aviso de éxito ahora depende de que se haya guardado**: si el usuario
+cierra el diálogo, dice «Exportación cancelada» en lugar de mentir.
+
+**Verificado:** 232 pruebas de frontend (3 nuevas del servicio) y 4 en el
+envoltorio (2 nuevas). Falta la comprobación que de verdad cuenta: **exportar
+desde la aplicación empaquetada contra una base real**, que es donde apareció.
 
 ### Sesión 018 — 2026-08-14 · Mensajes de error y cierre de la integración
 

@@ -34,8 +34,48 @@
 
 <span class="divider" aria-hidden="true"></span>
 
-<button type="button" class="btn btn--commit">Commit</button>
-<button type="button" class="btn btn--rollback">Rollback</button>
+@if (transactionOpen()) {
+  <!--
+    El indicador dice a qué conexión afecta, no solo que hay una transacción: es
+    de la conexión, así que lo que se ejecute en otra pestaña del mismo perfil
+    también entra en ella.
+  -->
+  <span class="tx" [attr.title]="transactionHint()">
+    <span class="tx__dot" aria-hidden="true"></span>
+    Transacción abierta en <strong>{{ transactionScope() }}</strong>
+  </span>
+
+  <button
+    type="button"
+    class="btn btn--commit"
+    [disabled]="transactionBusy()"
+    (click)="commit.emit()"
+  >
+    Commit
+  </button>
+  <button
+    type="button"
+    class="btn btn--rollback"
+    [disabled]="transactionBusy()"
+    (click)="rollback.emit()"
+  >
+    Rollback
+  </button>
+} @else {
+  <!--
+    Al modo manual se entra a propósito. El autocommit sigue siendo lo normal, y
+    Commit y Rollback no aparecen mientras no haya nada que confirmar.
+  -->
+  <button
+    type="button"
+    class="btn"
+    [disabled]="transactionBusy() || !canExecute()"
+    [attr.title]="canExecute() ? 'Nada se confirmará hasta que pulses Commit' : 'Abre una conexión para poder usar transacciones'"
+    (click)="beginTransaction.emit()"
+  >
+    Iniciar transacción
+  </button>
+}
 
 <span class="spacer"></span>
 

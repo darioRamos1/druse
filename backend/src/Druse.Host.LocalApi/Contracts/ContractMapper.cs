@@ -1,6 +1,7 @@
 using Druse.Application.Abstractions;
 using Druse.Application.Queries;
 using Druse.Application.Tables;
+using Druse.Application.Transactions;
 using Druse.Database.Abstractions;
 using Druse.Domain;
 
@@ -83,6 +84,25 @@ internal static class ContractMapper
             ServerVersion = session.ServerVersion,
             Database = session.Profile.Database,
             ReadOnly = session.Profile.ReadOnly,
+        };
+    }
+
+    public static TransactionStateResponse ToResponse(this TransactionState state)
+    {
+        ArgumentNullException.ThrowIfNull(state);
+
+        return new TransactionStateResponse
+        {
+            SessionId = state.SessionId,
+            IsOpen = state.IsOpen,
+            StartedAt = state.StartedAt,
+            LastActivityAt = state.LastActivityAt,
+            ConnectionName = state.ConnectionName,
+            Database = state.Database,
+            Engine = EngineId(state.Engine),
+            DdlIsReversible = state.DdlIsReversible,
+            IdleTimeoutSeconds = state.IdleTimeoutSeconds,
+            AutoRolledBackAt = state.AutoRolledBackAt,
         };
     }
 

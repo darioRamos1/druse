@@ -49,6 +49,30 @@ public sealed class SessionTransaction
     /// </summary>
     public DateTimeOffset? StartedAt { get; private set; }
 
+    /// <summary>
+    /// La última vez que algo pasó por esta transacción.
+    ///
+    /// Lo que se deshace sola es la transacción **inactiva**, no la larga: quien
+    /// está trabajando dentro de una desde hace media hora no ha olvidado nada, y
+    /// tirársela sería peor que el bloqueo que se intenta evitar.
+    /// </summary>
+    public DateTimeOffset? LastActivityAt { get; private set; }
+
+    /// <summary>
+    /// Anota que se usó, para que el temporizador vuelva a contar desde cero.
+    ///
+    /// Lo llama la capa de aplicación después de cada operación que fue por esta
+    /// conexión. Si no hay transacción abierta no hace nada: sin ella no hay
+    /// nada que deshacer y nada que contar.
+    /// </summary>
+    public void Touch()
+    {
+        if (_transaction is not null)
+        {
+            LastActivityAt = DateTimeOffset.UtcNow;
+        }
+    }
+
     public async Task BeginAsync(CancellationToken cancellationToken)
     {
         if (_transaction is not null)
@@ -63,6 +87,7 @@ public sealed class SessionTransaction
 
         _transaction = await _connection.BeginTransactionAsync(cancellationToken);
         StartedAt = DateTimeOffset.UtcNow;
+        LastActivityAt = StartedAt;
     }
 
     public async Task CommitAsync(CancellationToken cancellationToken)
@@ -116,6 +141,7 @@ public sealed class SessionTransaction
     {
         _transaction = null;
         StartedAt = null;
+        LastActivityAt = null;
         await transaction.DisposeAsync();
     }
 }

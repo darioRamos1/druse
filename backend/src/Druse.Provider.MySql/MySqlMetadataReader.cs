@@ -635,6 +635,10 @@ public sealed class MySqlMetadataReader : IDatabaseMetadataReader
         await using var command = mysql.Connection.CreateCommand();
         command.CommandText = sql;
 
+        // Con una transacción manual abierta, leer el catálogo va dentro de ella
+        // como todo lo demás que pase por esta conexión.
+        ((DbCommand)command).Transaction = mysql.Transaction.Current;
+
         foreach (var (name, value) in parameters)
         {
             var parameter = command.CreateParameter();
