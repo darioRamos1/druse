@@ -11,6 +11,7 @@ import {
   QueryRejected,
   RowEditRequest,
 } from '../application-gateway/application-gateway';
+import { FileSaveService } from '../files/file-save.service';
 import {
   ConnectionForm,
   ConnectionSummary,
@@ -80,6 +81,7 @@ let tabCounter = 1;
 @Injectable({ providedIn: 'root' })
 export class WorkspaceStore {
   private readonly _gateway = inject(ApplicationGateway);
+  private readonly _files = inject(FileSaveService);
 
   // --- Conexiones ------------------------------------------------------------
   private readonly _connections = signal<readonly ConnectionSummary[]>([]);
@@ -221,8 +223,18 @@ export class WorkspaceStore {
       );
 
       if (stillCurrent()) {
-        download(blob, `${sanitizeFileName(source?.title ?? tab?.title ?? 'druse')}.${format}`);
-        this._notice.set(`Exportado a ${format.toUpperCase()}.`);
+        const fileName = `${sanitizeFileName(source?.title ?? tab?.title ?? 'druse')}.${format}`;
+
+        // Se anuncia después de guardar y solo si de verdad se guardó. Antes se
+        // daba por hecho, y en la aplicación empaquetada eso significaba decir
+        // «Exportado» sin haber escrito nada en ningún sitio.
+        const saved = await this._files.save(fileName, blob);
+
+        if (stillCurrent()) {
+          this._notice.set(
+            saved ? `Exportado a ${format.toUpperCase()}.` : 'Exportación cancelada.',
+          );
+        }
       }
     } catch (error) {
       const rejection = await asRejectionFromBlob(error);
@@ -1965,24 +1977,6 @@ function toRequest(form: ConnectionForm): ConnectRequest {
     sshSecret: form.sshTunnel ? form.sshSecret : undefined,
     sshVerificationCode: form.sshTunnel ? form.sshVerificationCode : undefined,
   };
-}
-
-/**
- * Descarga un archivo desde el navegador.
- *
- * Se crea un enlace temporal y se revoca la URL después: sin revocarla, el
- * navegador conserva el archivo en memoria hasta recargar la página, y exportar
- * varias veces iría acumulando copias.
- */
-function download(blob: Blob, fileName: string): void {
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-
-  link.href = url;
-  link.download = fileName;
-  link.click();
-
-  URL.revokeObjectURL(url);
 }
 
 /** Quita del nombre lo que un sistema de archivos no admite. */

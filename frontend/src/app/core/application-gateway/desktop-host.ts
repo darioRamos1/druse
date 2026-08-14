@@ -94,6 +94,22 @@ export class DesktopHost {
     return this.invoke('save_sql_file_as', { documentId, suggestedName, contents });
   }
 
+  /**
+   * Guarda un archivo exportado con el diálogo del sistema.
+   *
+   * Devuelve la ruta elegida, o `null` si el usuario cerró el diálogo. Los bytes
+   * van como array de números porque es lo que entiende el puente: un `Blob` no
+   * sobrevive a la serialización.
+   *
+   * @returns Ruta donde quedó el archivo, o `null` si se canceló.
+   */
+  saveExport(suggestedName: string, contents: Uint8Array): Promise<string | null> {
+    return this.invoke('save_export', {
+      suggestedName,
+      contents: Array.from(contents),
+    });
+  }
+
   private invoke<T>(command: string, args?: unknown): Promise<T> {
     const bridge = typeof window === 'undefined' ? undefined : window.__TAURI__;
     const invoke = bridge?.core?.invoke ?? bridge?.invoke;

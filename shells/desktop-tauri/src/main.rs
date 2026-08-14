@@ -9,6 +9,7 @@
 //! API, decirle al frontend dónde encontrarla y cerrarla al salir.
 
 mod api_process;
+mod exports;
 mod sql_files;
 
 use std::sync::Mutex;
@@ -143,7 +144,8 @@ fn main() {
             api_connection,
             sql_files::open_sql_file,
             sql_files::save_sql_file,
-            sql_files::save_sql_file_as
+            sql_files::save_sql_file_as,
+            exports::save_export
         ])
         .on_window_event(|window, event| {
             // Al cerrar la ventana hay que parar la API: dejarla viva
