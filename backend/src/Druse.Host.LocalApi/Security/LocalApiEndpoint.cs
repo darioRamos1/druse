@@ -82,19 +82,53 @@ public sealed class LocalApiEndpoint : IDisposable
             Encoding.UTF8.GetBytes(Token));
     }
 
+    /// <summary>
+    /// Retira el punto de conexión, **pero solo si sigue siendo el suyo**.
+    ///
+    /// Comprobar el `pid` no es una precaución teórica: dos instancias conviven
+    /// más a menudo de lo que parece —se arranca una nueva y se cierra la vieja,
+    /// que es la forma normal de reiniciar la API—, y borrar a ciegas dejaba a la
+    /// que acababa de publicar sin archivo. Desde fuera eso se ve como «Falta el
+    /// token de la API local», con una API perfectamente viva delante.
+    /// </summary>
     public void Dispose()
     {
         try
         {
-            if (File.Exists(FilePath))
+            if (!File.Exists(FilePath) || !IsMine())
             {
-                File.Delete(FilePath);
+                return;
             }
+
+            File.Delete(FilePath);
         }
         catch (IOException)
         {
             // Si no se puede borrar, el token deja de valer igualmente al cerrar
             // el proceso: el siguiente arranque genera otro.
+        }
+    }
+
+    /// <summary>
+    /// El archivo lo publicó este proceso.
+    ///
+    /// Ante un archivo ilegible o sin `pid` se responde que sí: es lo que había
+    /// antes de esta comprobación, y dejar tirado un punto de conexión muerto
+    /// confunde más que borrar uno ajeno que ya nadie escribe.
+    /// </summary>
+    private bool IsMine()
+    {
+        try
+        {
+            using var document = JsonDocument.Parse(File.ReadAllText(FilePath));
+
+            return !document.RootElement.TryGetProperty("pid", out var pid)
+                || !pid.TryGetInt32(out var owner)
+                || owner == Environment.ProcessId;
+        }
+        catch (Exception exception) when (exception is IOException or JsonException)
+        {
+            return true;
         }
     }
 

@@ -17,7 +17,7 @@
 | Fase 8 | ✅ **7/7.** Tres motores sobre el mismo contrato y primera beta preparada. |
 | ¿Compila el backend? | Sí — 0 advertencias, 0 errores |
 | ¿Compila el envoltorio? | Sí |
-| ¿Pasan las pruebas? | Sí — **378 en backend** (222 unitarias, 126 contractuales y 30 de integración), **245 en frontend** y **6 en el envoltorio** |
+| ¿Pasan las pruebas? | Sí — **380 en backend** (222 unitarias, 126 contractuales y 32 de integración), **245 en frontend** y **6 en el envoltorio** |
 | ¿Hay aplicación de escritorio? | **Sí.** Instalador NSIS, MSI y ZIP portable, en dos variantes: con Informix y sin él |
 | Motores | **PostgreSQL, SQL Server, MySQL/MariaDB e Informix**, todos sobre el mismo contrato compartido |
 | Trabajo a medias | Ninguno. Las transacciones manuales quedaron terminadas en la sesión 020. |
@@ -276,8 +276,8 @@ conectados, el indicador y los avisos.
   queda hecho aunque se pulse Rollback.
 
 **Verificado:** 222 pruebas unitarias en backend (10 nuevas), 126 contractuales,
-30 de integración (5 nuevas de las rutas), 245 en frontend (13 nuevas) y 6 en el
-envoltorio (2 nuevas),
+32 de integración (7 nuevas: 5 de las rutas y 2 del punto de conexión), 245 en
+frontend (13 nuevas) y 6 en el envoltorio (2 nuevas),
 más compilación de producción sin avisos nuevos. Las del backend corren contra
 una base SQLite **real** en memoria, no contra dobles: lo que había que demostrar
 es que lo escrito dentro desaparece al deshacer, y eso un doble no lo puede
@@ -285,6 +285,24 @@ enseñar.
 
 **Sin ejecutar contra un motor real**, como el resto: ver el punto 3.b de «Qué
 toca retomar», que enumera las tres cosas que solo se ven ahí.
+
+#### «Falta el token de la API local» con la API viva
+
+Salió al levantar el entorno para verlo en el navegador, y no tenía nada que ver
+con las transacciones: **al cerrarse, la API borraba `endpoint.json` sin
+comprobar que siguiera siendo suyo**. Reiniciarla es arrancar una instancia y
+cerrar la anterior, así que las dos conviven un instante; la que se iba se
+llevaba por delante el punto de conexión que la nueva acababa de publicar. Desde
+la pantalla se ve como «Falta el token de la API local o no es válido» con una
+API perfectamente sana escuchando.
+
+El archivo ya guardaba el `pid`, así que la comprobación era de tres líneas. Ante
+un archivo ilegible o sin `pid` se borra igual, que es lo que hacía antes.
+
+Dos cosas que conviene recordar de esto: el proxy del servidor de desarrollo lee
+el archivo **en cada petición** —así que no hace falta reiniciar `ng serve` al
+reiniciar la API—, y el aviso de la bitácora sobre compilar con la API en marcha
+volvió a cumplirse puntualmente.
 
 ### Sesión 019 — 2026-08-14 · Índices y claves, cuarto motor, empaquetado y transacciones
 
