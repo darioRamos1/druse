@@ -44,6 +44,8 @@ export class ConnectionsSidebar {
   readonly refreshNode = output<string>();
   readonly disconnect = output<string>();
   readonly forget = output<string>();
+  /** Abrir el formulario con los datos de esta conexión guardada. */
+  readonly edit = output<string>();
   readonly openNode = output<ExplorerNode>();
   /** Componer una consulta sobre esta tabla o vista. */
   readonly composeQuery = output<ExplorerNode>();

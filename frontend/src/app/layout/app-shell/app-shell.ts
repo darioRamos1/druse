@@ -34,6 +34,7 @@ import {
   ExplorerNode,
   KnownColumn,
   QueryHistoryEntry,
+  SavedConnection,
   SessionStatus,
 } from '../../shared/models/workspace';
 import { ResizeHandle } from '../../shared/ui/resize-handle/resize-handle';
@@ -101,6 +102,9 @@ export class AppShell {
 
   // --- Diálogo ---------------------------------------------------------------
   protected readonly dialogOpen = signal(false);
+
+  /** Perfil que se está editando; `null` cuando el diálogo crea uno nuevo. */
+  protected readonly editingConnection = signal<SavedConnection | null>(null);
   protected readonly paletteOpen = signal(false);
 
   @HostListener('document:keydown', ['$event'])
@@ -368,6 +372,24 @@ export class AppShell {
 
   // --- Conexiones ------------------------------------------------------------
   protected openDialog(): void {
+    this.editingConnection.set(null);
+    this.dialogOpen.set(true);
+  }
+
+  /**
+   * Abre el formulario con los datos de una conexión guardada.
+   *
+   * Si el perfil no está cargado no se abre nada: un formulario vacío que dice
+   * «Editar» acabaría creando una conexión nueva sin que el usuario lo pidiera.
+   */
+  protected editConnection(id: string): void {
+    const profile = this._store.savedProfile(id);
+
+    if (!profile) {
+      return;
+    }
+
+    this.editingConnection.set(profile);
     this.dialogOpen.set(true);
   }
 
@@ -391,6 +413,7 @@ export class AppShell {
 
   protected closeDialog(): void {
     this.dialogOpen.set(false);
+    this.editingConnection.set(null);
   }
 
   protected toggleConnection(id: string): void {

@@ -58,6 +58,14 @@ public sealed class SavedConnectionService(
     ///
     /// Guardar la contraseña es opcional: el usuario puede querer que se la pidan
     /// cada vez, y en máquinas sin almacén no hay alternativa.
+    ///
+    /// **`null` y cadena vacía no significan lo mismo** en las contraseñas. Al
+    /// editar un perfil, el formulario no puede mostrar la contraseña guardada
+    /// —nadie la lee del almacén, ni debe— así que llega vacío aunque exista una.
+    /// Por eso `null` con <paramref name="storePassword"/> activo quiere decir «no
+    /// la toques», y solo la cadena vacía o desactivar el guardado la retiran. Sin
+    /// esta distinción, cambiar el nombre de una conexión le borraría la
+    /// contraseña.
     /// </summary>
     public async Task<SaveConnectionResult> SaveAsync(
         ConnectionProfile profile,
@@ -84,13 +92,22 @@ public sealed class SavedConnectionService(
 
         // Una conexión integrada no tiene contraseña que recordar; guardar la que
         // llegase dejaría un secreto que nadie va a volver a usar.
-        if (profile.UsesIntegratedSecurity || !storePassword || string.IsNullOrEmpty(password))
+        if (profile.UsesIntegratedSecurity || !storePassword || password is "")
         {
             // Si antes había una guardada y ahora se pide no guardarla, hay que
             // retirarla: dejarla ahí contradiría lo que el usuario acaba de elegir.
             await _secrets.DeleteAsync(SecretKey(profile.Id), cancellationToken);
 
             return new SaveConnectionResult(profile, false, _secrets.Description, sshStored);
+        }
+
+        if (password is null)
+        {
+            // Se pidió seguir recordándola sin decir cuál: es una edición que no
+            // tocó la contraseña, así que la que hubiera se queda como estaba.
+            var kept = await HasStoredPasswordAsync(profile.Id, cancellationToken);
+
+            return new SaveConnectionResult(profile, kept, _secrets.Description, sshStored);
         }
 
         if (!_secrets.IsAvailable)
@@ -126,10 +143,16 @@ public sealed class SavedConnectionService(
         bool store,
         CancellationToken cancellationToken)
     {
-        if (!profile.UsesSshTunnel || !store || string.IsNullOrEmpty(secret))
+        if (!profile.UsesSshTunnel || !store || secret is "")
         {
             await _secrets.DeleteAsync(SshSecretKey(profile.Id), cancellationToken);
             return false;
+        }
+
+        // Mismo trato que la contraseña de la base: `null` es «no lo toques».
+        if (secret is null)
+        {
+            return await HasStoredSshSecretAsync(profile.Id, cancellationToken);
         }
 
         if (!_secrets.IsAvailable)
