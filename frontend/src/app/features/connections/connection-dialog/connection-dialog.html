@@ -10,10 +10,17 @@
       </svg>
     </span>
     <div class="head__text">
-      <h2 class="head__title" id="connection-dialog-title">Nueva conexión</h2>
+      <h2 class="head__title" id="connection-dialog-title">
+        {{ editing() ? 'Editar conexión' : 'Nueva conexión' }}
+      </h2>
       <p class="head__subtitle">
-        Configura el acceso a un motor de base de datos. La contraseña se usa para abrir la sesión y no
-        se guarda todavía.
+        @if (editing()) {
+          Cambia lo que necesites. Las contraseñas guardadas no se muestran: si dejas el campo
+          vacío, se conservan tal y como están.
+        } @else {
+          Configura el acceso a un motor de base de datos. La contraseña se usa para abrir la
+          sesión y no se guarda todavía.
+        }
       </p>
     </div>
     <button type="button" class="head__close" aria-label="Cerrar" (click)="close()">×</button>
@@ -325,13 +332,17 @@
       </span>
     </label>
 
-    <label class="checkbox">
-      <input type="checkbox" [(ngModel)]="save" />
-      <span>
-        Guardar esta conexión
-        <span class="checkbox__hint">Queda disponible al volver a abrir Druse.</span>
-      </span>
-    </label>
+    <!-- Un perfil que se edita ya está guardado; ofrecer no guardarlo solo
+         serviría para perderlo sin querer. -->
+    @if (!editing()) {
+      <label class="checkbox">
+        <input type="checkbox" [(ngModel)]="save" />
+        <span>
+          Guardar esta conexión
+          <span class="checkbox__hint">Queda disponible al volver a abrir Druse.</span>
+        </span>
+      </label>
+    }
 
     @if (save() && sshEnabled()) {
       <label class="checkbox" [class.is-disabled]="!secretStore()?.available">
@@ -376,13 +387,31 @@
   </div>
 
   <footer class="foot">
-    <button type="button" class="btn" [disabled]="testing() || connecting()" (click)="test()">
+    <button
+      type="button"
+      class="btn"
+      [disabled]="testing() || connecting() || saving()"
+      (click)="test()"
+    >
       {{ testing() ? 'Probando…' : 'Probar conexión' }}
     </button>
     <span class="foot__spacer"></span>
     <button type="button" class="btn" (click)="close()">Cancelar</button>
-    <button type="button" class="btn btn--primary" [disabled]="connecting()" (click)="connect()">
-      {{ connecting() ? 'Conectando…' : 'Conectar' }}
-    </button>
+    @if (editing()) {
+      <!-- Guardar y conectar son cosas distintas: quien corrige el puerto de una
+           conexión de producción no está pidiendo entrar en ella. -->
+      <button
+        type="button"
+        class="btn btn--primary"
+        [disabled]="saving()"
+        (click)="saveChanges()"
+      >
+        {{ saving() ? 'Guardando…' : 'Guardar cambios' }}
+      </button>
+    } @else {
+      <button type="button" class="btn btn--primary" [disabled]="connecting()" (click)="connect()">
+        {{ connecting() ? 'Conectando…' : 'Conectar' }}
+      </button>
+    }
   </footer>
 </div>

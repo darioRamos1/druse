@@ -33,6 +33,7 @@
     (refreshNode)="refreshNode($event)"
     (disconnect)="disconnect($event)"
     (forget)="forget($event)"
+    (edit)="editConnection($event)"
     (openNode)="openNode($event)"
     (importInto)="openImport($event)"
     (composeQuery)="openBuilder($event)"
@@ -170,7 +171,7 @@
 </div>
 
 @if (dialogOpen()) {
-  <app-connection-dialog (closed)="closeDialog()" />
+  <app-connection-dialog [connection]="editingConnection()" (closed)="closeDialog()" />
 }
 
 @if (importTarget(); as destino) {

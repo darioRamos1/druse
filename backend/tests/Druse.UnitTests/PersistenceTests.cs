@@ -470,6 +470,102 @@ public sealed class SavedConnectionServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task EditarSinEscribirLaContrasenaLaConserva()
+    {
+        var profile = Profile();
+        await _service.SaveAsync(profile, "secreta", storePassword: true, CancellationToken.None);
+
+        // Es lo que llega al cambiar el nombre desde el formulario: la contraseña
+        // guardada no se puede mostrar, así que el campo viaja ausente.
+        var result = await _service.SaveAsync(
+            profile with { Name = "Renombrada" },
+            null,
+            storePassword: true,
+            CancellationToken.None);
+
+        Assert.True(result.PasswordStored);
+        Assert.Equal(
+            "secreta",
+            (await _service.GetCredentialsAsync(profile.Id, CancellationToken.None)).Password);
+    }
+
+    [Fact]
+    public async Task UnaContrasenaVaciaSiLaRetira()
+    {
+        var profile = Profile();
+        await _service.SaveAsync(profile, "secreta", storePassword: true, CancellationToken.None);
+
+        // Vaciar el campo a propósito es una orden distinta de no tocarlo.
+        var result = await _service.SaveAsync(
+            profile,
+            string.Empty,
+            storePassword: true,
+            CancellationToken.None);
+
+        Assert.False(result.PasswordStored);
+        Assert.False(await _service.HasStoredPasswordAsync(profile.Id, CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task EditarSinEscribirElSecretoDelTunelLoConserva()
+    {
+        var profile = Profile() with
+        {
+            SshTunnel = new SshTunnelSettings { Host = "bastion", Username = "operador" },
+        };
+
+        await _service.SaveAsync(
+            profile,
+            "secreta",
+            storePassword: true,
+            CancellationToken.None,
+            "clave-ssh",
+            storeSshSecret: true);
+
+        var result = await _service.SaveAsync(
+            profile with { Name = "Renombrada" },
+            null,
+            storePassword: true,
+            CancellationToken.None,
+            null,
+            storeSshSecret: true);
+
+        Assert.True(result.SshSecretStored);
+        Assert.Equal(
+            "clave-ssh",
+            (await _service.GetSshCredentialsAsync(profile.Id, CancellationToken.None)).Secret);
+    }
+
+    [Fact]
+    public async Task QuitarElTunelRetiraSuSecreto()
+    {
+        var profile = Profile() with
+        {
+            SshTunnel = new SshTunnelSettings { Host = "bastion", Username = "operador" },
+        };
+
+        await _service.SaveAsync(
+            profile,
+            null,
+            storePassword: false,
+            CancellationToken.None,
+            "clave-ssh",
+            storeSshSecret: true);
+
+        await _service.SaveAsync(
+            profile with { SshTunnel = null },
+            null,
+            storePassword: false,
+            CancellationToken.None,
+            null,
+            storeSshSecret: true);
+
+        // Sin túnel, ese secreto ya no abre nada: dejarlo sería ensuciar el
+        // llavero del usuario.
+        Assert.False(await _service.HasStoredSshSecretAsync(profile.Id, CancellationToken.None));
+    }
+
+    [Fact]
     public async Task BorrarElPerfilBorraTambienLaContrasena()
     {
         var profile = Profile();
