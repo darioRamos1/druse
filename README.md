@@ -69,6 +69,34 @@ Al empaquetar cambian dos cosas respecto al desarrollo:
 - **La API usa un puerto que le asigna el sistema**, no el 5177. Publica el puerto y su token en `endpoint.json`, dentro del directorio de datos.
 - **Tauri lee ese archivo** y se lo pasa al frontend. En desarrollo esa misma función la cumple el proxy del servidor de Angular. El resto de la aplicación no distingue un caso del otro.
 
+### Firmar los artefactos
+
+Sin firmar, Windows enseña el aviso de SmartScreen en cada equipo donde se abre la aplicación. No es que sospeche del código: es que no sabe quién lo hizo.
+
+```powershell
+$env:DRUSE_SIGN_THUMBPRINT = 'huella del certificado'
+./build/scripts/package.ps1 -Portable
+```
+
+La huella es la de un certificado **ya instalado en el almacén de Windows**. No se admite un `.pfx` con su contraseña, y no es una omisión: desde 2023 ninguna CA pública emite certificados de firma de código en archivo, porque la clave privada tiene que vivir en hardware o en un HSM.
+
+| Variable | Para qué |
+| --- | --- |
+| `DRUSE_SIGN_THUMBPRINT` | Certificado del almacén de Windows |
+| `DRUSE_SIGN_COMMAND` | Herramienta propia del servicio de firma; `{path}` es el archivo. Sustituye a signtool |
+| `DRUSE_SIGN_TIMESTAMP_URL` | Servidor de sellado. Por defecto, el de DigiCert |
+
+**Sin ninguna de las tres el empaquetado funciona igual**, solo que los artefactos salen sin firmar y el script lo dice al empezar, no al terminar.
+
+Se firma el ejecutable, los dos instaladores y **también la API que viaja dentro**: Tauri no la toca, y un instalador firmado que suelta un binario sin firmar es lo que hace saltar a los antivirus corporativos. El runtime de .NET no se refirma, porque ya viene firmado por Microsoft.
+
+Dos advertencias que evitan un chasco caro:
+
+- **Firmar no apaga SmartScreen al instante.** Con un certificado OV el aviso puede seguir apareciendo hasta que el ejecutable acumule reputación. Los certificados EV eran la vía a la confianza inmediata, aunque ese comportamiento ha ido cambiando.
+- **El sellado de tiempo no es opcional.** Sin él, la firma deja de validar el día que caduca el certificado, y fallan las copias ya repartidas.
+
+La huella nunca se escribe en `tauri.conf.json`: es de la máquina que compila, no del proyecto. El script genera la configuración de firma al vuelo y la borra al terminar, incluso si la construcción falla.
+
 ## Atajos del editor
 
 | Atajo | Acción |
