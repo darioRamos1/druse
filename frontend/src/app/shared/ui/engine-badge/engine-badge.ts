@@ -6,12 +6,14 @@ const ENGINE_LABELS: Readonly<Record<DatabaseEngine, string>> = {
   postgresql: 'PG',
   sqlserver: 'MS',
   mysql: 'MY',
+  informix: 'IX',
 };
 
 const ENGINE_NAMES: Readonly<Record<DatabaseEngine, string>> = {
   postgresql: 'PostgreSQL',
   sqlserver: 'SQL Server',
   mysql: 'MySQL',
+  informix: 'Informix',
 };
 
 /**
@@ -60,6 +62,12 @@ const ENGINE_NAMES: Readonly<Record<DatabaseEngine, string>> = {
       background: rgb(214 164 86 / 13%);
       border: 1px solid rgb(214 164 86 / 30%);
       color: #d9ae6a;
+    }
+
+    :host([data-engine='informix']) {
+      background: rgb(122 186 158 / 13%);
+      border: 1px solid rgb(122 186 158 / 30%);
+      color: #7fbaa0;
     }
   `,
 })

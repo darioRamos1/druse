@@ -7,7 +7,7 @@
  */
 
 /** Motores soportados. Nunca se ramifica por motor dentro de los componentes. */
-export type DatabaseEngine = 'postgresql' | 'sqlserver' | 'mysql';
+export type DatabaseEngine = 'postgresql' | 'sqlserver' | 'mysql' | 'informix';
 
 export type ConnectionState = 'connected' | 'disconnected' | 'connecting' | 'error';
 

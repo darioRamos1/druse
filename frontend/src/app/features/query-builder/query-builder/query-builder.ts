@@ -104,8 +104,15 @@ export class QueryBuilder implements OnInit {
   readonly insert = output<string>();
 
   protected readonly operators = OPERATORS;
+  /**
+   * Tipos de unión que ofrece el compositor.
+   *
+   * Ni MySQL ni Informix tienen `FULL OUTER JOIN`, así que allí no se enseña:
+   * ofrecerlo produciría SQL que el servidor rechaza, y el usuario buscaría el
+   * error en su consulta en vez de en el motor.
+   */
   protected readonly joinTypes = computed<readonly JoinType[]>(() =>
-    this.engine() === 'mysql'
+    this.engine() === 'mysql' || this.engine() === 'informix'
       ? ['INNER', 'LEFT', 'RIGHT', 'CROSS']
       : ['INNER', 'LEFT', 'RIGHT', 'FULL OUTER', 'CROSS'],
   );

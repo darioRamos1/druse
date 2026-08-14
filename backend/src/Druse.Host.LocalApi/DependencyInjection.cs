@@ -15,6 +15,9 @@ using Druse.Persistence.Sqlite;
 using Druse.Platform.Abstractions;
 using Druse.Platform.Native;
 using Druse.Platform.Native.Secrets;
+#if DRUSE_INFORMIX
+using Druse.Provider.Informix;
+#endif
 using Druse.Provider.MySql;
 using Druse.Provider.PostgreSql;
 using Druse.Provider.SqlServer;
@@ -69,6 +72,16 @@ internal static class DependencyInjection
         services.AddSingleton<IQueryExecutor, MySqlQueryExecutor>();
         services.AddSingleton<IRowEditor, MySqlRowEditor>();
         services.AddSingleton<ITableDesigner, MySqlTableDesigner>();
+
+        // Informix solo si se compiló con él: su driver pesa 111 MB y la
+        // compilación ligera lo deja fuera. Ver `IncludeInformix` en el csproj.
+#if DRUSE_INFORMIX
+        services.AddSingleton<IDatabaseProvider, InformixDatabaseProvider>();
+        services.AddSingleton<IDatabaseMetadataReader, InformixMetadataReader>();
+        services.AddSingleton<IQueryExecutor, InformixQueryExecutor>();
+        services.AddSingleton<IRowEditor, InformixRowEditor>();
+        services.AddSingleton<ITableDesigner, InformixTableDesigner>();
+#endif
 
         services.AddSingleton<IProviderRegistry, ProviderRegistry>();
 

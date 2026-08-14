@@ -32,12 +32,13 @@
 #>
 [CmdletBinding()]
 param(
-    [ValidateSet('all', 'postgres', 'sqlserver', 'mysql')]
+    [ValidateSet('all', 'postgres', 'sqlserver', 'mysql', 'informix')]
     [string]$Engine = 'all',
 
     [int]$PostgresPort = 55440,
     [int]$SqlServerPort = 14433,
     [int]$MySqlPort = 33306,
+    [int]$InformixPort = 9089,
     [switch]$Down
 )
 
@@ -46,6 +47,7 @@ $ErrorActionPreference = 'Stop'
 $PostgresName = 'druse-pg-test'
 $SqlServerName = 'druse-mssql-test'
 $MySqlName = 'druse-mysql-test'
+$InformixName = 'druse-informix-test'
 
 function Remove-Container([string]$Name) {
     Write-Host "Eliminando $Name..." -ForegroundColor Yellow
@@ -56,6 +58,7 @@ if ($Down) {
     if ($Engine -in 'all', 'postgres') { Remove-Container $PostgresName }
     if ($Engine -in 'all', 'sqlserver') { Remove-Container $SqlServerName }
     if ($Engine -in 'all', 'mysql') { Remove-Container $MySqlName }
+    if ($Engine -in 'all', 'informix') { Remove-Container $InformixName }
 
     Write-Host 'Listo.' -ForegroundColor Green
     return
@@ -183,6 +186,54 @@ if ($Engine -in 'all', 'mysql') {
     }
     else {
         throw "$MySqlName no respondió a tiempo."
+    }
+}
+
+# --- Informix ---------------------------------------------------------------
+if ($Engine -in 'all', 'informix') {
+    if (Test-ContainerExists $InformixName) {
+        Write-Host "$InformixName ya existe; se reinicia." -ForegroundColor Cyan
+        docker start $InformixName | Out-Null
+    }
+    else {
+        Write-Host "Creando $InformixName en el puerto $InformixPort..." -ForegroundColor Cyan
+
+        # Druse habla DRDA, no el protocolo nativo de Informix, así que lo que se
+        # publica es el puerto 9089 del contenedor —el del escuchador DRDA— y no
+        # el 9088 que atiende SQLI. Publicar el equivocado da un error de
+        # conexión que parece de credenciales.
+        #
+        # `LICENSE=accept` es obligatorio: la imagen es de IBM y no arranca sin
+        # aceptar sus términos.
+        docker run -d `
+            --name $InformixName `
+            -e LICENSE=accept `
+            -e DB_INIT=1 `
+            -p "${InformixPort}:9089" `
+            icr.io/informix/informix-developer-database:latest | Out-Null
+    }
+
+    # Informix tarda bastante más que los otros en estar listo: la primera vez
+    # inicializa la instancia entera antes de aceptar conexiones.
+    $ready = $false
+
+    foreach ($attempt in 1..180) {
+        Start-Sleep -Seconds 1
+        docker exec $InformixName bash -lc 'onstat -' 2>$null | Out-Null
+
+        if ($LASTEXITCODE -eq 0) { $ready = $true; break }
+    }
+
+    if ($ready) {
+        # Las bases de prueba se crean con registro de transacciones: DRDA lo
+        # exige, y sin él la conexión falla aunque el servidor esté vivo.
+        docker exec $InformixName bash -lc `
+            'echo "CREATE DATABASE IF NOT EXISTS druse_test WITH LOG; CREATE DATABASE IF NOT EXISTS druse_test2 WITH LOG;" | dbaccess sysmaster -' 2>$null | Out-Null
+
+        Write-Host "  Informix listo en 127.0.0.1:$InformixPort (DRDA)" -ForegroundColor Green
+    }
+    else {
+        throw "$InformixName no respondió a tiempo."
     }
 }
 

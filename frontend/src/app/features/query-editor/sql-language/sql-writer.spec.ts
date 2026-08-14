@@ -36,6 +36,7 @@ describe('escribir SQL', () => {
       expect(quote('sqlserver', 'order')).toBe('[order]');
       expect(quote('mysql', 'order')).toBe('`order`');
       expect(quote('postgresql', 'order')).toBe('"order"');
+      expect(quote('informix', 'order')).toBe('"order"');
     });
 
     it('escapa la comilla de cierre', () => {
@@ -64,6 +65,12 @@ describe('escribir SQL', () => {
       const sqlserver = buildSelect('sqlserver', spec);
       expect(sqlserver).toContain('SELECT TOP 100');
       expect(sqlserver).not.toContain('LIMIT');
+
+      // Informix lo escribe delante como SQL Server, pero con su propia palabra.
+      // Poner `LIMIT` al final aquí produciría SQL que su servidor rechaza.
+      const informix = buildSelect('informix', spec);
+      expect(informix).toContain('SELECT FIRST 100');
+      expect(informix).not.toContain('LIMIT');
     });
 
     it('junta los filtros con AND', () => {

@@ -42,6 +42,13 @@ const ENGINE_KEYWORDS: Readonly<Record<DatabaseEngine, readonly string[]>> = {
     'LIMIT', 'OFFSET', 'AUTO_INCREMENT', 'ENGINE', 'IFNULL', 'GROUP_CONCAT',
     'NOW()', 'CURDATE()', 'ON DUPLICATE KEY UPDATE',
   ],
+  informix: [
+    // `FIRST` y `SKIP` son lo propio de Informix y lo que peor se recuerda:
+    // van después del SELECT, no al final como `LIMIT`.
+    'FIRST', 'SKIP', 'SERIAL', 'BIGSERIAL', 'LVARCHAR', 'NVL',
+    'CURRENT', 'TODAY', 'EXTEND', 'MATCHES', 'UNITS', 'DBINFO',
+    'MODIFY', 'RENAME COLUMN',
+  ],
 };
 
 /** Palabras que deben sugerirse para un motor concreto. */

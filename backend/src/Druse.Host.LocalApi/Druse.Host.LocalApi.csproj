@@ -27,4 +27,24 @@
     <ProjectReference Include="..\Druse.Ssh\Druse.Ssh.csproj" />
   </ItemGroup>
 
+  <!--
+    Informix se puede dejar fuera del ejecutable que se reparte.
+
+    Su driver son 111 MB —el clidriver nativo de IBM— y triplica el tamaño del
+    paquete. Quien no use Informix no tiene por qué cargar con eso, así que
+    `-p:IncludeInformix=false` produce una compilación sin ese proveedor.
+
+    El proyecto se sigue compilando y probando siempre: lo que cambia es solo si
+    el host lo referencia. Un motor que no se prueba acaba roto sin que nadie
+    se entere.
+  -->
+  <PropertyGroup>
+    <IncludeInformix Condition="'$(IncludeInformix)' == ''">true</IncludeInformix>
+    <DefineConstants Condition="'$(IncludeInformix)' == 'true'">$(DefineConstants);DRUSE_INFORMIX</DefineConstants>
+  </PropertyGroup>
+
+  <ItemGroup Condition="'$(IncludeInformix)' == 'true'">
+    <ProjectReference Include="..\Druse.Provider.Informix\Druse.Provider.Informix.csproj" />
+  </ItemGroup>
+
 </Project>

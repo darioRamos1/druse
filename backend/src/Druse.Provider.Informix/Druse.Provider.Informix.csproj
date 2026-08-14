@@ -1,0 +1,28 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\Druse.Database.Abstractions\Druse.Database.Abstractions.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!--
+      No existe un proveedor ADO.NET moderno específico de Informix: el
+      `IBM.Data.Informix` clásico se quedó en .NET Framework. Se llega a
+      Informix por DRDA con el proveedor de DB2, que es lo que IBM mantiene
+      para .NET.
+
+      Pesa ~111 MB con sus binarios nativos, así que **es el paquete más caro
+      de la solución**. Su licencia es de IBM, no libre: redistribuirlo dentro
+      del instalador está permitido por la sección de redistribuibles del IPLA,
+      cuyos términos hay que cumplir.
+    -->
+    <PackageReference Include="Net.IBM.Data.Db2" Version="10.0.0.200" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+</Project>

@@ -73,6 +73,10 @@ const ENGINES: readonly EngineOption[] = [
   { id: 'sqlserver', name: 'SQL Server', versions: '2016 – 2022', defaultPort: 1433, available: true },
   { id: 'postgresql', name: 'PostgreSQL', versions: '12 – 18', defaultPort: 5432, available: true },
   { id: 'mysql', name: 'MySQL', versions: '8.0+ · MariaDB', defaultPort: 3306, available: true },
+  // El puerto es el del escuchador DRDA, no el nativo de Informix: Druse se
+  // conecta por DRDA, así que 9089 —el de la edición de desarrollo de IBM— es
+  // mejor punto de partida que el 1526 que la gente recuerda.
+  { id: 'informix', name: 'Informix', versions: '12.10+ · vía DRDA', defaultPort: 9089, available: true },
 ];
 
 /**
@@ -412,7 +416,16 @@ export class ConnectionDialog {
   }
 
   protected databasePlaceholder(): string {
-    return this.engine() === 'sqlserver' ? 'master' : this.engine() === 'mysql' ? 'mysql' : 'postgres';
+    switch (this.engine()) {
+      case 'sqlserver':
+        return 'master';
+      case 'mysql':
+        return 'mysql';
+      case 'informix':
+        return 'sysmaster';
+      default:
+        return 'postgres';
+    }
   }
 
   private validForm(): ConnectionForm | null {

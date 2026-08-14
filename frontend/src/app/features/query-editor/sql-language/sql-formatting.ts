@@ -13,6 +13,11 @@ const DIALECTS: Readonly<Record<DatabaseEngine, SqlLanguage>> = {
   postgresql: 'postgresql',
   sqlserver: 'transactsql',
   mysql: 'mysql',
+  // `sql-formatter` no tiene dialecto de Informix. Se usa el de DB2, que es el
+  // más cercano: se llega a Informix por DRDA, el protocolo de DB2, y comparten
+  // buena parte de la sintaxis. El genérico partiría construcciones propias como
+  // `SELECT FIRST n` por donde no debe.
+  informix: 'db2',
 };
 
 const OPTIONS: Omit<FormatOptionsWithLanguage, 'language'> = {
