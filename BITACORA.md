@@ -10,14 +10,14 @@
 
 | Campo | Valor |
 | --- | --- |
-| Última sesión | **013** — 2026-08-13 |
+| Última sesión | **015** — 2026-08-13 |
 | Fase activa | **Mejora posterior al MVP completada:** implementación y validación cerradas |
 | Fases 0–6 | ✅ Cerradas. |
 | Fase 7 | 🟡 **10/12.** Hay instalador y funciona; faltan dos comprobaciones que exigen otro equipo. |
 | Fase 8 | ✅ **7/7.** Tres motores sobre el mismo contrato y primera beta preparada. |
 | ¿Compila el backend? | Sí — 0 advertencias, 0 errores |
 | ¿Compila el envoltorio? | Sí |
-| ¿Pasan las pruebas? | Sí — **304 en backend**, **201 en frontend** y **2 en el envoltorio** |
+| ¿Pasan las pruebas? | Sí — **326 en backend**, **212 en frontend** y **2 en el envoltorio** |
 | ¿Hay aplicación de escritorio? | **Sí.** Instalador NSIS, MSI y ZIP portable |
 | Motores | **PostgreSQL, SQL Server y MySQL/MariaDB**, con navegación por todas las bases autorizadas y las **mismas 27 pruebas contractuales** cada uno |
 | Bloqueantes | Ninguno |
@@ -101,6 +101,55 @@ Pendiente de verificar cuando toque: Docker (pruebas de integración con contene
 
 ## 5. Registro de sesiones
 
+### Sesión 015 — 2026-08-13 · Túnel SSH y selector de cifrado
+
+**Hecho:**
+- Cualquier conexión puede pasar por un servidor SSH intermedio. El proyecto
+  nuevo `Druse.Ssh` encapsula SSH.NET igual que un proveedor encapsula su driver;
+  `Druse.Application` solo ve `ISshTunnelFactory` y una dirección local.
+- Al abrir la sesión se reenvía un puerto local hacia el servidor real y el
+  driver recibe ese extremo. El túnel se registra junto a la sesión y se cierra
+  con ella, o con el proceso.
+- Tres métodos de acceso al servidor intermedio: contraseña, clave privada con
+  passphrase y teclado interactivo para segundo factor. **Agente SSH no**: la
+  librería no lo soporta y ofrecerlo sería prometer algo que falla al conectar.
+- El secreto del túnel va al almacén del sistema con clave propia
+  (`Druse:ssh:`), separada de la de la base. El código de un solo uso nunca se
+  guarda.
+- Columnas nuevas del túnel en la base local, con migración (`user_version = 3`).
+- El diálogo expone el túnel y, por fin, el cifrado del transporte: los tres
+  modos de `SslMode` descritos por lo que hacen, no por el nombre del parámetro
+  de cada driver.
+- Arreglado de paso: el botón elegido de un grupo no se distinguía salvo en el
+  entorno, porque solo los entornos tenían color de selección.
+
+**Verificado:** 174 pruebas unitarias y 25 de integración en backend (36 omitidas
+por falta de contenedores), 212 en frontend y build de producción sin avisos
+nuevos. El túnel se ejercitó contra un servidor SSH inexistente: el camino
+completo se recorre y el error del driver llega escrito al diálogo. **Falta
+probarlo contra un servidor SSH real**, que esta máquina no tiene.
+
+### Sesión 014 — 2026-08-13 · Autenticación de Windows en SQL Server
+
+**Hecho:**
+- El perfil de conexión lleva método de autenticación (`password` o `windows`).
+  `windows` solo se acepta en SQL Server y sobre Windows; el validador lo rechaza
+  en cualquier otro caso en lugar de dejar que falle el driver.
+- Con autenticación integrada, la cadena de SqlClient activa `Integrated
+  Security` y deja fuera usuario y contraseña, que en ese modo el propio driver
+  rechaza.
+- El diálogo de nueva conexión muestra los dos métodos solo con SQL Server,
+  oculta usuario, contraseña y «recordar la contraseña» al elegir Windows, y
+  vuelve a contraseña si se cambia a otro motor.
+- La base local guarda el método en una columna nueva, añadida por migración
+  (`user_version = 2`); los perfiles existentes quedan como estaban.
+- Una conexión guardada con autenticación de Windows ya no pide contraseña ni
+  guarda secretos en el almacén del sistema.
+
+**Verificado:** 159 pruebas unitarias y 25 de integración en backend (36 omitidas
+por falta de contenedores), 208 en frontend y build de producción sin avisos
+nuevos.
+
 ### Sesión 013 — 2026-08-13 · Archivos SQL
 
 **Hecho:**
@@ -114,7 +163,7 @@ Pendiente de verificar cuando toque: Docker (pruebas de integración con contene
 - En navegador, abrir usa el selector web y guardar descarga el archivo.
 - Cerrar una pestaña modificada solicita confirmación para evitar pérdida de datos.
 
-**Verificado:** 201 pruebas frontend, build de producción, `cargo check` y 2
+**Verificado:** 206 pruebas frontend, build de producción, `cargo check` y 2
 pruebas Rust del envoltorio. Permanece únicamente el aviso conocido de `nearley`.
 
 ### Sesión 012 — 2026-08-13 · Tipos de datos en el explorador

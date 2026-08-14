@@ -18,6 +18,8 @@ internal static class ContractMapper
     {
         ArgumentNullException.ThrowIfNull(dto);
 
+        var authentication = ParseEnum(dto.Authentication, AuthenticationMode.Password);
+
         return new ConnectionProfile
         {
             Id = dto.Id == Guid.Empty ? Guid.NewGuid() : dto.Id,
@@ -26,11 +28,46 @@ internal static class ContractMapper
             Host = dto.Host,
             Port = dto.Port,
             Database = dto.Database,
-            Username = dto.Username,
+            // Con autenticación de Windows no hay usuario que guardar: conservar el
+            // que el cliente tuviera escrito lo dejaría luego en la barra de estado
+            // como si fuera con el que se conectó.
+            Username = authentication == AuthenticationMode.Windows ? string.Empty : dto.Username,
+            Authentication = authentication,
             Environment = ParseEnum(dto.Environment, ConnectionEnvironment.Development),
             ReadOnly = dto.ReadOnly,
             SslMode = ParseEnum(dto.SslMode, SslMode.Prefer),
             ConnectTimeoutSeconds = dto.ConnectTimeoutSeconds,
+            SshTunnel = dto.SshTunnel?.ToDomain(),
+        };
+    }
+
+    public static SshTunnelSettings ToDomain(this SshTunnelDto dto)
+    {
+        ArgumentNullException.ThrowIfNull(dto);
+
+        return new SshTunnelSettings
+        {
+            Host = dto.Host,
+            Port = dto.Port,
+            Username = dto.Username,
+            Authentication = ParseEnum(dto.Authentication, SshAuthenticationMode.Password),
+            PrivateKeyPath = dto.PrivateKeyPath,
+            ConnectTimeoutSeconds = dto.ConnectTimeoutSeconds,
+        };
+    }
+
+    public static SshTunnelDto ToDto(this SshTunnelSettings settings)
+    {
+        ArgumentNullException.ThrowIfNull(settings);
+
+        return new SshTunnelDto
+        {
+            Host = settings.Host,
+            Port = settings.Port,
+            Username = settings.Username,
+            Authentication = settings.Authentication.ToString().ToLowerInvariant(),
+            PrivateKeyPath = settings.PrivateKeyPath,
+            ConnectTimeoutSeconds = settings.ConnectTimeoutSeconds,
         };
     }
 
@@ -169,7 +206,10 @@ internal static class ContractMapper
     }
 
     /// <summary>Perfil guardado. Nunca incluye la contraseña, solo si existe una.</summary>
-    public static SavedConnectionDto ToSavedDto(this ConnectionProfile profile, bool hasStoredPassword)
+    public static SavedConnectionDto ToSavedDto(
+        this ConnectionProfile profile,
+        bool hasStoredPassword,
+        bool hasStoredSshSecret = false)
     {
         ArgumentNullException.ThrowIfNull(profile);
 
@@ -182,9 +222,13 @@ internal static class ContractMapper
             Port = profile.Port,
             Database = profile.Database,
             Username = profile.Username,
+            Authentication = profile.Authentication.ToString().ToLowerInvariant(),
             Environment = profile.Environment.ToString().ToLowerInvariant(),
             ReadOnly = profile.ReadOnly,
+            SslMode = profile.SslMode.ToString().ToLowerInvariant(),
             HasStoredPassword = hasStoredPassword,
+            SshTunnel = profile.SshTunnel?.ToDto(),
+            HasStoredSshSecret = hasStoredSshSecret,
         };
     }
 

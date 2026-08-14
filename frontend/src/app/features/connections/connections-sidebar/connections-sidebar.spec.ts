@@ -17,6 +17,7 @@ const connection: ConnectionSummary = {
   saved: false,
   hasStoredPassword: false,
   database: 'druse_test',
+  authentication: 'password',
 };
 
 const column: ExplorerNode = {

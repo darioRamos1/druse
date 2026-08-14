@@ -9,10 +9,12 @@ namespace Druse.Application.Connections;
 /// <param name="Profile">Perfil ya persistido.</param>
 /// <param name="PasswordStored">La contraseña quedó en el almacén del sistema.</param>
 /// <param name="StoreDescription">Dónde quedó, o por qué no se pudo guardar.</param>
+/// <param name="SshSecretStored">El secreto del túnel quedó en el almacén del sistema.</param>
 public readonly record struct SaveConnectionResult(
     ConnectionProfile Profile,
     bool PasswordStored,
-    string StoreDescription);
+    string StoreDescription,
+    bool SshSecretStored = false);
 
 /// <summary>
 /// Perfiles guardados y sus contraseñas.
@@ -28,6 +30,14 @@ public sealed class SavedConnectionService(
 {
     /// <summary>Prefijo de la clave con la que se guarda cada secreto.</summary>
     private const string SecretPrefix = "Druse:connection:";
+
+    /// <summary>
+    /// Prefijo del secreto del túnel.
+    ///
+    /// Va por separado del de la base porque son dos secretos de dos máquinas
+    /// distintas: cambiar la contraseña de una no debe tocar la de la otra.
+    /// </summary>
+    private const string SshSecretPrefix = "Druse:ssh:";
 
     private readonly IConnectionProfileStore _profiles = profiles;
     private readonly ISecretStore _secrets = secrets;
@@ -53,7 +63,9 @@ public sealed class SavedConnectionService(
         ConnectionProfile profile,
         string? password,
         bool storePassword,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        string? sshSecret = null,
+        bool storeSshSecret = false)
     {
         var validation = ConnectionProfileValidator.Validate(profile);
 
@@ -64,34 +76,86 @@ public sealed class SavedConnectionService(
 
         await _profiles.SaveAsync(profile, cancellationToken);
 
-        if (!storePassword || string.IsNullOrEmpty(password))
+        var sshStored = await SaveSshSecretAsync(
+            profile,
+            sshSecret,
+            storeSshSecret,
+            cancellationToken);
+
+        // Una conexión integrada no tiene contraseña que recordar; guardar la que
+        // llegase dejaría un secreto que nadie va a volver a usar.
+        if (profile.UsesIntegratedSecurity || !storePassword || string.IsNullOrEmpty(password))
         {
             // Si antes había una guardada y ahora se pide no guardarla, hay que
             // retirarla: dejarla ahí contradiría lo que el usuario acaba de elegir.
             await _secrets.DeleteAsync(SecretKey(profile.Id), cancellationToken);
 
-            return new SaveConnectionResult(profile, false, _secrets.Description);
+            return new SaveConnectionResult(profile, false, _secrets.Description, sshStored);
         }
 
         if (!_secrets.IsAvailable)
         {
-            return new SaveConnectionResult(profile, false, _secrets.Description);
+            return new SaveConnectionResult(profile, false, _secrets.Description, sshStored);
         }
 
         await _secrets.SetAsync(SecretKey(profile.Id), password, cancellationToken);
 
-        return new SaveConnectionResult(profile, true, _secrets.Description);
+        return new SaveConnectionResult(profile, true, _secrets.Description, sshStored);
     }
 
-    /// <summary>Borra el perfil y su contraseña, si la tenía.</summary>
+    /// <summary>Borra el perfil y sus secretos, si los tenía.</summary>
     public async Task<bool> DeleteAsync(Guid id, CancellationToken cancellationToken)
     {
-        // El secreto se borra siempre, aunque el perfil ya no esté: dejarlo
-        // huérfano en el llavero del usuario sería ensuciar su sistema.
+        // Los secretos se borran siempre, aunque el perfil ya no esté: dejarlos
+        // huérfanos en el llavero del usuario sería ensuciar su sistema.
         await _secrets.DeleteAsync(SecretKey(id), cancellationToken);
+        await _secrets.DeleteAsync(SshSecretKey(id), cancellationToken);
 
         return await _profiles.DeleteAsync(id, cancellationToken);
     }
+
+    /// <summary>
+    /// Guarda el secreto del túnel, o lo retira.
+    ///
+    /// Un perfil que deja de usar túnel pierde también su secreto: conservarlo
+    /// dejaría en el llavero una contraseña de un servidor al que ya no se entra.
+    /// </summary>
+    private async Task<bool> SaveSshSecretAsync(
+        ConnectionProfile profile,
+        string? secret,
+        bool store,
+        CancellationToken cancellationToken)
+    {
+        if (!profile.UsesSshTunnel || !store || string.IsNullOrEmpty(secret))
+        {
+            await _secrets.DeleteAsync(SshSecretKey(profile.Id), cancellationToken);
+            return false;
+        }
+
+        if (!_secrets.IsAvailable)
+        {
+            return false;
+        }
+
+        await _secrets.SetAsync(SshSecretKey(profile.Id), secret, cancellationToken);
+
+        return true;
+    }
+
+    /// <summary>Secreto del túnel: contraseña del usuario SSH o passphrase de su clave.</summary>
+    public async Task<SshCredentials> GetSshCredentialsAsync(
+        Guid profileId,
+        CancellationToken cancellationToken)
+    {
+        var secret = await _secrets.GetAsync(SshSecretKey(profileId), cancellationToken);
+
+        // El código de un solo uso nunca se guarda; si hace falta, lo aporta quien
+        // está conectando en ese momento.
+        return new SshCredentials(secret, null);
+    }
+
+    public async Task<bool> HasStoredSshSecretAsync(Guid profileId, CancellationToken cancellationToken) =>
+        await _secrets.GetAsync(SshSecretKey(profileId), cancellationToken) is not null;
 
     /// <summary>
     /// Recupera las credenciales guardadas de un perfil.
@@ -112,4 +176,6 @@ public sealed class SavedConnectionService(
         await _secrets.GetAsync(SecretKey(profileId), cancellationToken) is not null;
 
     private static string SecretKey(Guid profileId) => $"{SecretPrefix}{profileId:D}";
+
+    private static string SshSecretKey(Guid profileId) => $"{SshSecretPrefix}{profileId:D}";
 }

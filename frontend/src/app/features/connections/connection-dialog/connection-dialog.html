@@ -48,34 +48,257 @@
     <div class="grid">
       <label class="field field--wide">
         <span class="field__label">Nombre</span>
-        <input class="field__input" type="text" [(ngModel)]="name" placeholder="PostgreSQL — Producción" />
+        <input
+          class="field__input"
+          type="text"
+          [(ngModel)]="name"
+          [placeholder]="namePlaceholder()"
+          [class.is-invalid]="fieldError('name')"
+          [attr.aria-invalid]="!!fieldError('name')"
+          aria-describedby="connection-name-error"
+        />
+        @if (fieldError('name'); as error) {
+          <span class="field__error" id="connection-name-error">{{ error }}</span>
+        }
       </label>
 
       <label class="field field--host">
         <span class="field__label">Servidor</span>
-        <input class="field__input" type="text" [(ngModel)]="host" />
+        <input
+          class="field__input"
+          type="text"
+          [(ngModel)]="host"
+          [class.is-invalid]="fieldError('host')"
+          [attr.aria-invalid]="!!fieldError('host')"
+          aria-describedby="connection-host-error"
+        />
+        @if (fieldError('host'); as error) {
+          <span class="field__error" id="connection-host-error">{{ error }}</span>
+        }
       </label>
 
       <label class="field field--port">
         <span class="field__label">Puerto</span>
-        <input class="field__input" type="number" [(ngModel)]="port" />
+        <input
+          class="field__input"
+          type="number"
+          min="1"
+          max="65535"
+          [(ngModel)]="port"
+          [class.is-invalid]="fieldError('port')"
+          [attr.aria-invalid]="!!fieldError('port')"
+          aria-describedby="connection-port-detail"
+        />
+        @if (fieldError('port'); as error) {
+          <span class="field__error" id="connection-port-detail">{{ error }}</span>
+        } @else if (portHint(); as hint) {
+          <span class="field__hint" id="connection-port-detail">{{ hint }}</span>
+        }
       </label>
 
       <label class="field field--wide">
         <span class="field__label">Base de datos</span>
-        <input class="field__input" type="text" [(ngModel)]="database" placeholder="postgres" />
+        <input
+          class="field__input"
+          type="text"
+          [(ngModel)]="database"
+          [placeholder]="databasePlaceholder()"
+          [class.is-invalid]="fieldError('database')"
+          [attr.aria-invalid]="!!fieldError('database')"
+          aria-describedby="connection-database-error"
+        />
+        @if (fieldError('database'); as error) {
+          <span class="field__error" id="connection-database-error">{{ error }}</span>
+        }
       </label>
 
-      <label class="field">
-        <span class="field__label">Usuario</span>
-        <input class="field__input" type="text" [(ngModel)]="username" autocomplete="off" />
-      </label>
+      @if (supportsWindowsAuth()) {
+        <div class="field field--wide">
+          <span class="field__label" id="connection-auth-label">Autenticación</span>
+          <div class="auths" role="group" aria-labelledby="connection-auth-label">
+            @for (option of authentications; track option.id) {
+              <button
+                type="button"
+                class="auth"
+                [class.is-selected]="authentication() === option.id"
+                [attr.aria-pressed]="authentication() === option.id"
+                (click)="selectAuthentication(option.id)"
+              >
+                <span>{{ option.label }}</span>
+                <span class="auth__hint">{{ option.hint }}</span>
+              </button>
+            }
+          </div>
+        </div>
+      }
 
-      <label class="field">
-        <span class="field__label">Contraseña</span>
-        <input class="field__input" type="password" [(ngModel)]="password" autocomplete="off" />
-      </label>
+      @if (!usesWindowsAuth()) {
+        <label class="field">
+          <span class="field__label">Usuario</span>
+          <input
+            class="field__input"
+            type="text"
+            [(ngModel)]="username"
+            autocomplete="off"
+            [class.is-invalid]="fieldError('username')"
+            [attr.aria-invalid]="!!fieldError('username')"
+            aria-describedby="connection-username-error"
+          />
+          @if (fieldError('username'); as error) {
+            <span class="field__error" id="connection-username-error">{{ error }}</span>
+          }
+        </label>
+
+        <label class="field">
+          <span class="field__label">Contraseña</span>
+          <input class="field__input" type="password" [(ngModel)]="password" autocomplete="off" />
+        </label>
+      } @else {
+        <!-- Sin este aviso, el hueco donde estaban usuario y contraseña haría
+             dudar de si falta algo por rellenar. -->
+        <div class="field field--wide">
+          <span class="field__label">Identidad</span>
+          <span class="field__hint">
+            La sesión se abre con la cuenta de Windows con la que estás usando este equipo.
+          </span>
+        </div>
+      }
     </div>
+
+    <h3 class="section">Cifrado</h3>
+    <div class="environments" role="group" aria-label="Cifrado de la conexión">
+      @for (option of sslModes; track option.id) {
+        <button
+          type="button"
+          class="environment"
+          [class.is-selected]="sslMode() === option.id"
+          [attr.aria-pressed]="sslMode() === option.id"
+          (click)="selectSslMode(option.id)"
+        >
+          {{ option.label }}
+        </button>
+      }
+    </div>
+    <p class="field__hint">{{ sslHint() }}</p>
+
+    <h3 class="section">Túnel SSH</h3>
+    <label class="checkbox">
+      <input type="checkbox" [(ngModel)]="sshEnabled" />
+      <span>
+        Conectar a través de un servidor SSH
+        <span class="checkbox__hint">
+          Para bases que solo son accesibles desde otra máquina. El tráfico viaja dentro de la
+          sesión SSH.
+        </span>
+      </span>
+    </label>
+
+    @if (sshEnabled()) {
+      <div class="grid grid--tunnel">
+        <label class="field field--host">
+          <span class="field__label">Servidor SSH</span>
+          <input
+            class="field__input"
+            type="text"
+            [(ngModel)]="sshHost"
+            placeholder="bastion.empresa.com"
+            [class.is-invalid]="fieldError('sshHost')"
+            [attr.aria-invalid]="!!fieldError('sshHost')"
+          />
+          @if (fieldError('sshHost'); as error) {
+            <span class="field__error">{{ error }}</span>
+          }
+        </label>
+
+        <label class="field field--port">
+          <span class="field__label">Puerto</span>
+          <input
+            class="field__input"
+            type="number"
+            min="1"
+            max="65535"
+            [(ngModel)]="sshPort"
+            [class.is-invalid]="fieldError('sshPort')"
+            [attr.aria-invalid]="!!fieldError('sshPort')"
+          />
+          @if (fieldError('sshPort'); as error) {
+            <span class="field__error">{{ error }}</span>
+          }
+        </label>
+
+        <label class="field">
+          <span class="field__label">Usuario SSH</span>
+          <input
+            class="field__input"
+            type="text"
+            [(ngModel)]="sshUsername"
+            autocomplete="off"
+            [class.is-invalid]="fieldError('sshUsername')"
+            [attr.aria-invalid]="!!fieldError('sshUsername')"
+          />
+          @if (fieldError('sshUsername'); as error) {
+            <span class="field__error">{{ error }}</span>
+          }
+        </label>
+
+        <div class="field">
+          <span class="field__label" id="ssh-auth-label">Acceso al servidor SSH</span>
+          <div class="environments" role="group" aria-labelledby="ssh-auth-label">
+            @for (option of sshAuthentications; track option.id) {
+              <button
+                type="button"
+                class="environment"
+                [class.is-selected]="sshAuthentication() === option.id"
+                [attr.aria-pressed]="sshAuthentication() === option.id"
+                (click)="selectSshAuthentication(option.id)"
+              >
+                {{ option.label }}
+              </button>
+            }
+          </div>
+        </div>
+
+        @if (usesSshKey()) {
+          <label class="field field--wide">
+            <span class="field__label">Archivo de clave privada</span>
+            <input
+              class="field__input"
+              type="text"
+              [(ngModel)]="sshPrivateKeyPath"
+              placeholder="C:\Users\tu-usuario\.ssh\id_ed25519"
+              [class.is-invalid]="fieldError('sshPrivateKeyPath')"
+              [attr.aria-invalid]="!!fieldError('sshPrivateKeyPath')"
+            />
+            @if (fieldError('sshPrivateKeyPath'); as error) {
+              <span class="field__error">{{ error }}</span>
+            } @else {
+              <span class="field__hint">
+                Se guarda la ruta, nunca el contenido de la clave.
+              </span>
+            }
+          </label>
+        }
+
+        <label class="field">
+          <span class="field__label">{{ sshSecretLabel() }}</span>
+          <input class="field__input" type="password" [(ngModel)]="sshSecret" autocomplete="off" />
+        </label>
+
+        @if (usesSshPrompts()) {
+          <label class="field">
+            <span class="field__label">Código de un solo uso</span>
+            <input
+              class="field__input"
+              type="text"
+              [(ngModel)]="sshVerificationCode"
+              autocomplete="off"
+              inputmode="numeric"
+            />
+            <span class="field__hint">Caduca en segundos, así que nunca se guarda.</span>
+          </label>
+        }
+      </div>
+    }
 
     <h3 class="section">Entorno</h3>
     <div class="environments" role="group" aria-label="Entorno">
@@ -110,7 +333,24 @@
       </span>
     </label>
 
-    @if (save()) {
+    @if (save() && sshEnabled()) {
+      <label class="checkbox" [class.is-disabled]="!secretStore()?.available">
+        <input
+          type="checkbox"
+          [(ngModel)]="storeSshSecret"
+          [disabled]="!secretStore()?.available"
+        />
+        <span>
+          Recordar el secreto del túnel
+          <span class="checkbox__hint">
+            La contraseña o passphrase del servidor SSH, en el almacén del sistema. El código de un
+            solo uso nunca se guarda.
+          </span>
+        </span>
+      </label>
+    }
+
+    @if (save() && !usesWindowsAuth()) {
       <label class="checkbox" [class.is-disabled]="!secretStore()?.available">
         <input type="checkbox" [(ngModel)]="storePassword" [disabled]="!secretStore()?.available" />
         <span>
@@ -131,7 +371,7 @@
     }
 
     @if (feedback(); as message) {
-      <p class="feedback" role="status">{{ message }}</p>
+      <p class="feedback" [attr.data-kind]="feedbackKind()" role="status">{{ message }}</p>
     }
   </div>
 
