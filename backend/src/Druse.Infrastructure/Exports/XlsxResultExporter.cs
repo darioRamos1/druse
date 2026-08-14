@@ -14,6 +14,9 @@ namespace Druse.Infrastructure.Exports;
 /// </summary>
 public sealed class XlsxResultExporter : IResultExporter
 {
+    private const int ExcelCellCharacterLimit = 32_767;
+    private const string TruncatedCellSuffix = "… [recortado por el límite de Excel]";
+
     /// <summary>
     /// Tope propio de este formato.
     ///
@@ -82,7 +85,7 @@ public sealed class XlsxResultExporter : IResultExporter
                 // los interprete convertiría «007» en 7 y algunas fechas en el
                 // formato del sistema: el archivo dejaría de representar lo que
                 // hay en la base de datos.
-                sheet.Cell(rowIndex, column + 1).SetValue(value ?? options.NullText);
+                sheet.Cell(rowIndex, column + 1).SetValue(CellText(value ?? options.NullText));
             }
 
             rowIndex++;
@@ -104,4 +107,11 @@ public sealed class XlsxResultExporter : IResultExporter
 
         return new ExportResult(rows, truncated);
     }
+
+    private static string CellText(string value) =>
+        value.Length <= ExcelCellCharacterLimit
+            ? value
+            : string.Concat(
+                value.AsSpan(0, ExcelCellCharacterLimit - TruncatedCellSuffix.Length),
+                TruncatedCellSuffix);
 }
