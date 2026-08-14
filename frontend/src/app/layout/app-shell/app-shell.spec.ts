@@ -64,6 +64,8 @@ const connectionForm: ConnectionForm = {
   database: 'druse_test',
   username: 'root',
   password: 'da-igual',
+  authentication: 'password',
+  sslMode: 'prefer',
   readOnly: false,
   environment: 'development',
   save: false,

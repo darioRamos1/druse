@@ -92,6 +92,92 @@ public sealed class ConnectionProfileStoreTests : IDisposable
     }
 
     [Fact]
+    public async Task ConservaLaAutenticacionDeWindows()
+    {
+        var profile = Profile("Integrada") with
+        {
+            Engine = DatabaseEngine.SqlServer,
+            Username = string.Empty,
+            Authentication = AuthenticationMode.Windows,
+        };
+
+        await _store.SaveAsync(profile, CancellationToken.None);
+
+        var recovered = await _store.FindAsync(profile.Id, CancellationToken.None);
+
+        Assert.NotNull(recovered);
+        Assert.Equal(AuthenticationMode.Windows, recovered.Authentication);
+        Assert.True(recovered.UsesIntegratedSecurity);
+    }
+
+    [Fact]
+    public async Task GuardaYRecuperaElTunelSsh()
+    {
+        var profile = Profile("Con túnel") with
+        {
+            SshTunnel = new SshTunnelSettings
+            {
+                Host = "bastion.empresa.com",
+                Port = 2222,
+                Username = "operador",
+                Authentication = SshAuthenticationMode.PrivateKey,
+                PrivateKeyPath = @"C:\claves\id_ed25519",
+                ConnectTimeoutSeconds = 25,
+            },
+        };
+
+        await _store.SaveAsync(profile, CancellationToken.None);
+
+        var recovered = await _store.FindAsync(profile.Id, CancellationToken.None);
+
+        Assert.NotNull(recovered?.SshTunnel);
+        Assert.Equal("bastion.empresa.com", recovered.SshTunnel.Host);
+        Assert.Equal(2222, recovered.SshTunnel.Port);
+        Assert.Equal("operador", recovered.SshTunnel.Username);
+        Assert.Equal(SshAuthenticationMode.PrivateKey, recovered.SshTunnel.Authentication);
+        Assert.Equal(@"C:\claves\id_ed25519", recovered.SshTunnel.PrivateKeyPath);
+        Assert.Equal(25, recovered.SshTunnel.ConnectTimeoutSeconds);
+    }
+
+    [Fact]
+    public async Task QuitarElTunelLoBorraDelPerfil()
+    {
+        var profile = Profile("Con túnel") with
+        {
+            SshTunnel = new SshTunnelSettings { Host = "bastion", Username = "operador" },
+        };
+
+        await _store.SaveAsync(profile, CancellationToken.None);
+        await _store.SaveAsync(profile with { SshTunnel = null }, CancellationToken.None);
+
+        var recovered = await _store.FindAsync(profile.Id, CancellationToken.None);
+
+        Assert.Null(recovered?.SshTunnel);
+    }
+
+    [Fact]
+    public async Task UnPerfilSinTunelGuardadoConectaDirecto()
+    {
+        var profile = Profile("Directa");
+
+        await _store.SaveAsync(profile, CancellationToken.None);
+
+        Assert.Null((await _store.FindAsync(profile.Id, CancellationToken.None))?.SshTunnel);
+    }
+
+    [Fact]
+    public async Task UnPerfilSinMetodoGuardadoUsaContrasena()
+    {
+        var profile = Profile("Heredada");
+
+        await _store.SaveAsync(profile, CancellationToken.None);
+
+        var recovered = await _store.FindAsync(profile.Id, CancellationToken.None);
+
+        Assert.Equal(AuthenticationMode.Password, recovered?.Authentication);
+    }
+
+    [Fact]
     public async Task LosDatosSobrevivenAReabrirLaBase()
     {
         var profile = Profile("Persistente");

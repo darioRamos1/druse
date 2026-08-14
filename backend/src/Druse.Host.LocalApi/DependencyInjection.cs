@@ -17,6 +17,7 @@ using Druse.Platform.Native.Secrets;
 using Druse.Provider.MySql;
 using Druse.Provider.PostgreSql;
 using Druse.Provider.SqlServer;
+using Druse.Ssh;
 
 namespace Druse.Host.LocalApi;
 
@@ -72,6 +73,10 @@ internal static class DependencyInjection
         // que sobreviven a la petición que los creó.
         services.AddSingleton<ISessionRegistry, SessionRegistry>();
         services.AddSingleton<IQueryExecutionTracker, QueryExecutionTracker>();
+
+        // Un túnel dura lo que dura su sesión, así que se guarda igual que ella.
+        services.AddSingleton<ISshTunnelRegistry, SshTunnelRegistry>();
+        services.AddSingleton<ISshTunnelFactory, SshTunnelFactory>();
 
         // --- Casos de uso -------------------------------------------------------
         services.AddScoped<ConnectionService>();

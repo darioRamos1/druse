@@ -24,6 +24,9 @@ internal static class SqlServerConnectionStringFactory
         "Password",
         "Encrypt",
         "Connect Timeout",
+        "Integrated Security",
+        "Trusted_Connection",
+        "Authentication",
     };
 
     public static string Build(ConnectionProfile profile, DatabaseCredentials credentials)
@@ -34,14 +37,25 @@ internal static class SqlServerConnectionStringFactory
         {
             // SQL Server admite instancias con nombre; el puerto se separa con coma,
             // no con dos puntos como en el resto de motores.
-            DataSource = $"{profile.Host},{profile.Port}",
+            DataSource = profile.Port == 0 ? profile.Host : $"{profile.Host},{profile.Port}",
             InitialCatalog = profile.Database,
-            UserID = profile.Username,
-            Password = credentials.Password,
             ConnectTimeout = profile.ConnectTimeoutSeconds,
             ApplicationName = "Druse",
             Pooling = true,
         };
+
+        if (profile.UsesIntegratedSecurity)
+        {
+            // La identidad la pone la sesión de Windows. Usuario y contraseña deben
+            // quedar fuera de la cadena: con `Integrated Security` activo, SqlClient
+            // rechaza la conexión si además encuentra credenciales propias.
+            builder.IntegratedSecurity = true;
+        }
+        else
+        {
+            builder.UserID = profile.Username;
+            builder.Password = credentials.Password;
+        }
 
         Apply(builder, profile.SslMode);
 

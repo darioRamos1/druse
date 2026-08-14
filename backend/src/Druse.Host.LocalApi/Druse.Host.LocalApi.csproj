@@ -24,6 +24,7 @@
     <ProjectReference Include="..\Druse.Provider.SqlServer\Druse.Provider.SqlServer.csproj" />
     <ProjectReference Include="..\Druse.Persistence.Sqlite\Druse.Persistence.Sqlite.csproj" />
     <ProjectReference Include="..\Druse.Platform.Native\Druse.Platform.Native.csproj" />
+    <ProjectReference Include="..\Druse.Ssh\Druse.Ssh.csproj" />
   </ItemGroup>
 
 </Project>
