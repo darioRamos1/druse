@@ -23,6 +23,8 @@ public sealed class PostgreSqlFixture : IProviderFixture
 
     public IRowEditor RowEditor { get; } = new PostgreSqlRowEditor();
 
+    public ITableDesigner Designer { get; } = new PostgreSqlTableDesigner();
+
     public string DatabaseName =>
         Environment.GetEnvironmentVariable("DRUSE_TEST_PG_DB") ?? "druse_test";
 

@@ -6,6 +6,7 @@ import {
   DatabaseColumn,
   DatabaseObject,
   EngineInfo,
+  IndexCapabilities,
   QueryHistoryEntry,
   QueryResult,
   ResultColumn,
@@ -15,6 +16,7 @@ import {
   SessionInfo,
   TableAlteration,
   TableDesign,
+  TableStructure,
   TestConnectionResult,
 } from '../../shared/models/workspace';
 import {
@@ -139,6 +141,20 @@ export class HttpApplicationGateway extends ApplicationGateway {
 
   override getTableDataTypes(sessionId: string): Observable<readonly string[]> {
     return this._http.get<string[]>(`/api/sessions/${sessionId}/tables/data-types`);
+  }
+
+  override getTableCapabilities(sessionId: string): Observable<IndexCapabilities> {
+    return this._http.get<IndexCapabilities>(`/api/sessions/${sessionId}/tables/capabilities`);
+  }
+
+  override getTableStructure(
+    sessionId: string,
+    table: DatabaseObject,
+  ): Observable<TableStructure> {
+    return this._http.post<TableStructure>(
+      `/api/sessions/${sessionId}/tables/structure`,
+      table,
+    );
   }
 
   override previewCreateTable(

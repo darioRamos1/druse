@@ -59,6 +59,19 @@ public sealed class TableDesignService(
         return _providers.GetTableDesigner(session.Engine).CommonDataTypes;
     }
 
+    /// <summary>
+    /// Lo que el motor de esta sesión admite al definir un índice.
+    ///
+    /// No pasa por el filtro de solo lectura: preguntar qué se puede diseñar no
+    /// escribe nada, y ocultarlo dejaría la pantalla sin saber qué dibujar.
+    /// </summary>
+    public IndexCapabilities IndexCapabilities(Guid sessionId)
+    {
+        var session = _connections.Require(sessionId);
+
+        return _providers.GetTableDesigner(session.Engine).IndexCapabilities;
+    }
+
     /// <summary>El `CREATE TABLE` que se ejecutaría, sin ejecutarlo.</summary>
     public IReadOnlyList<string> PreviewCreate(Guid sessionId, TableDefinition table)
     {
@@ -107,14 +120,13 @@ public sealed class TableDesignService(
 
         Confirm(confirmed);
 
-        // Borrar una columna no se puede deshacer, así que no basta con haber
-        // visto el SQL: hay que decir que sí a eso en concreto.
+        // Lo que no se deshace con otro `ALTER` no basta con haberlo visto en el
+        // SQL: hay que decir que sí a eso en concreto.
         if (alteration.IsDestructive && !confirmedDestructive)
         {
             throw new TableChangeRejectedException(new TableChangeRejection(
                 TableChangeRefusal.Destructive,
-                "Se van a borrar columnas y los datos que contienen. Confirma para continuar: " +
-                string.Join(", ", alteration.DroppedColumns) + "."));
+                Describe(alteration)));
         }
 
         using var turn = await _connections.EnterAsync(sessionId, cancellationToken);
@@ -131,14 +143,8 @@ public sealed class TableDesignService(
     private ITableDesigner Prepare(Guid sessionId, TableDefinition table)
     {
         var designer = Designer(sessionId);
-        var validation = TableDesignValidator.Validate(table);
 
-        if (!validation.IsValid)
-        {
-            throw new TableChangeRejectedException(new TableChangeRejection(
-                TableChangeRefusal.InvalidDesign,
-                string.Join(" ", validation.Errors)));
-        }
+        Check(TableDesignValidator.Validate(table, designer.IndexCapabilities));
 
         return designer;
     }
@@ -146,16 +152,71 @@ public sealed class TableDesignService(
     private ITableDesigner Prepare(Guid sessionId, TableAlteration alteration)
     {
         var designer = Designer(sessionId);
-        var validation = TableDesignValidator.Validate(alteration);
 
+        Check(TableDesignValidator.Validate(alteration, designer.IndexCapabilities));
+
+        return designer;
+    }
+
+    /// <summary>
+    /// Cuenta qué se pierde, separando lo que se lleva datos de lo que no.
+    ///
+    /// Borrar una columna y quitar un índice no son la misma gravedad: lo primero
+    /// no se recupera y lo segundo se vuelve a crear, aunque reconstruirlo sobre
+    /// una tabla grande pueda tardar y bloquearla. Meterlo todo en la misma frase
+    /// enseñaría a confirmar sin leer.
+    /// </summary>
+    private static string Describe(TableAlteration alteration)
+    {
+        var parts = new List<string>();
+
+        if (alteration.DroppedColumns.Count > 0)
+        {
+            parts.Add(
+                "Se van a borrar columnas y los datos que contienen: " +
+                string.Join(", ", alteration.DroppedColumns) + ".");
+        }
+
+        var rebuilt = alteration.AlteredIndexes
+            .Select(change => change.CurrentName)
+            .Concat(alteration.DroppedIndexes)
+            .ToList();
+
+        if (rebuilt.Count > 0)
+        {
+            parts.Add(
+                "Se quitan índices, y volver a crearlos sobre una tabla grande puede tardar: " +
+                string.Join(", ", rebuilt) + ".");
+        }
+
+        var constraints = alteration.DroppedForeignKeys
+            .Concat(alteration.DroppedUniqueConstraints)
+            .Concat(alteration.DroppedCheckConstraints)
+            .ToList();
+
+        if (constraints.Count > 0)
+        {
+            parts.Add(
+                "Se quitan restricciones que hoy protegen los datos: " +
+                string.Join(", ", constraints) + ".");
+        }
+
+        if (alteration.DroppedPrimaryKeyName is { } primaryKey)
+        {
+            parts.Add($"Se suelta la clave primaria '{primaryKey}'.");
+        }
+
+        return string.Join(" ", parts) + " Confirma para continuar.";
+    }
+
+    private static void Check(ValidationResult validation)
+    {
         if (!validation.IsValid)
         {
             throw new TableChangeRejectedException(new TableChangeRejection(
                 TableChangeRefusal.InvalidDesign,
                 string.Join(" ", validation.Errors)));
         }
-
-        return designer;
     }
 
     private ITableDesigner Designer(Guid sessionId)

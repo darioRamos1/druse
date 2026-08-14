@@ -209,4 +209,303 @@ public sealed class TableDesignerTests
         Assert.Contains("jsonb", new PostgreSqlTableDesigner().CommonDataTypes);
         Assert.Contains("LONGTEXT", new MySqlTableDesigner().CommonDataTypes);
     }
+
+    // -- Índices y restricciones ---------------------------------------------
+
+    private static DatabaseObject Tabla() => new()
+    {
+        Id = "t1",
+        Name = "pedidos",
+        Kind = DatabaseObjectKind.Table,
+        Schema = "ventas",
+    };
+
+    private static IndexDefinition PorCliente() => new()
+    {
+        Name = "ix_pedidos_cliente",
+        Columns =
+        [
+            new IndexColumn { Name = "cliente_id" },
+            new IndexColumn { Name = "fecha", Direction = IndexSortDirection.Descending },
+        ],
+    };
+
+    private static ForeignKeyDefinition HaciaClientes() => new()
+    {
+        Name = "fk_pedidos_cliente",
+        Columns = ["cliente_id"],
+        ReferencedSchema = "ventas",
+        ReferencedTable = "clientes",
+        ReferencedColumns = ["id"],
+        OnDelete = ForeignKeyAction.Cascade,
+    };
+
+    [Fact]
+    public void CadaMotorCitaElIndiceEnSuDialecto()
+    {
+        var alteration = new TableAlteration { Table = Tabla(), AddedIndexes = [PorCliente()] };
+
+        Assert.Contains(
+            "CREATE INDEX [ix_pedidos_cliente] ON [ventas].[pedidos] " +
+            "([cliente_id] ASC, [fecha] DESC);",
+            new SqlServerTableDesigner().DescribeAlter(alteration));
+
+        Assert.Contains(
+            "CREATE INDEX \"ix_pedidos_cliente\" ON \"ventas\".\"pedidos\" " +
+            "(\"cliente_id\" ASC, \"fecha\" DESC);",
+            new PostgreSqlTableDesigner().DescribeAlter(alteration));
+
+        Assert.Contains(
+            "CREATE INDEX `ix_pedidos_cliente` ON `ventas`.`pedidos` " +
+            "(`cliente_id` ASC, `fecha` DESC);",
+            new MySqlTableDesigner().DescribeAlter(alteration));
+    }
+
+    /// <summary>
+    /// PostgreSQL borra el índice como objeto del esquema y ni menciona la tabla;
+    /// los otros dos la exigen. Es la instrucción que más difiere de las tres.
+    /// </summary>
+    [Fact]
+    public void BorrarUnIndiceSeEscribeDistintoEnCadaMotor()
+    {
+        var alteration = new TableAlteration
+        {
+            Table = Tabla(),
+            DroppedIndexes = ["ix_pedidos_cliente"],
+        };
+
+        Assert.Contains(
+            "DROP INDEX \"ventas\".\"ix_pedidos_cliente\";",
+            new PostgreSqlTableDesigner().DescribeAlter(alteration));
+
+        Assert.Contains(
+            "DROP INDEX [ix_pedidos_cliente] ON [ventas].[pedidos];",
+            new SqlServerTableDesigner().DescribeAlter(alteration));
+
+        Assert.Contains(
+            "DROP INDEX `ix_pedidos_cliente` ON `ventas`.`pedidos`;",
+            new MySqlTableDesigner().DescribeAlter(alteration));
+    }
+
+    /// <summary>
+    /// Ningún motor cambia las columnas de un índice, así que modificarlo es
+    /// borrarlo y volver a crearlo, **en ese orden**: al revés chocaría con el
+    /// nombre que todavía existe.
+    /// </summary>
+    [Fact]
+    public void ModificarUnIndiceLoBorraYLoVuelveACrear()
+    {
+        var alteration = new TableAlteration
+        {
+            Table = Tabla(),
+            AlteredIndexes =
+            [
+                new IndexAlteration
+                {
+                    CurrentName = "ix_pedidos_cliente",
+                    Index = PorCliente() with { IsUnique = true },
+                },
+            ],
+        };
+
+        var statements = new PostgreSqlTableDesigner().DescribeAlter(alteration);
+
+        var borrado = statements.ToList().FindIndex(sql => sql.StartsWith("DROP INDEX", StringComparison.Ordinal));
+        var creado = statements.ToList().FindIndex(sql => sql.StartsWith("CREATE UNIQUE INDEX", StringComparison.Ordinal));
+
+        Assert.True(borrado >= 0 && creado >= 0);
+        Assert.True(borrado < creado);
+    }
+
+    [Fact]
+    public void LaClaveForaneaEscribeSuAccionSoloCuandoNoEsLaDeOmision()
+    {
+        var alteration = new TableAlteration { Table = Tabla(), AddedForeignKeys = [HaciaClientes()] };
+
+        var sql = new PostgreSqlTableDesigner().DescribeAlter(alteration).Single();
+
+        Assert.Contains("CONSTRAINT \"fk_pedidos_cliente\" FOREIGN KEY", sql, StringComparison.Ordinal);
+        Assert.Contains("REFERENCES \"ventas\".\"clientes\" (\"id\")", sql, StringComparison.Ordinal);
+        Assert.Contains("ON DELETE CASCADE", sql, StringComparison.Ordinal);
+
+        // `NO ACTION` es lo que hacen los tres si no se dice nada: escribirlo solo
+        // añadiría ruido a lo que el usuario tiene que leer antes de confirmar.
+        Assert.DoesNotContain("ON UPDATE", sql, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// MySQL exige decir qué clase de restricción se suelta; los otros dos usan
+    /// `DROP CONSTRAINT` para todas.
+    /// </summary>
+    [Fact]
+    public void MySqlNombraElTipoAlSoltarUnaRestriccion()
+    {
+        var alteration = new TableAlteration
+        {
+            Table = Tabla(),
+            DroppedForeignKeys = ["fk_pedidos_cliente"],
+            DroppedUniqueConstraints = ["uq_pedidos_codigo"],
+            DroppedCheckConstraints = ["ck_pedidos_total"],
+            DroppedPrimaryKeyName = "pk_pedidos",
+        };
+
+        var mySql = new MySqlTableDesigner().DescribeAlter(alteration);
+
+        Assert.Contains("ALTER TABLE `ventas`.`pedidos` DROP FOREIGN KEY `fk_pedidos_cliente`;", mySql);
+        Assert.Contains("ALTER TABLE `ventas`.`pedidos` DROP INDEX `uq_pedidos_codigo`;", mySql);
+        Assert.Contains("ALTER TABLE `ventas`.`pedidos` DROP CHECK `ck_pedidos_total`;", mySql);
+        Assert.Contains("ALTER TABLE `ventas`.`pedidos` DROP PRIMARY KEY;", mySql);
+
+        var postgres = new PostgreSqlTableDesigner().DescribeAlter(alteration);
+
+        Assert.Contains(
+            "ALTER TABLE \"ventas\".\"pedidos\" DROP CONSTRAINT \"fk_pedidos_cliente\";",
+            postgres);
+        Assert.Contains(
+            "ALTER TABLE \"ventas\".\"pedidos\" DROP CONSTRAINT \"pk_pedidos\";",
+            postgres);
+    }
+
+    /// <summary>
+    /// El orden no es el de la pantalla: lo que sostiene a otra cosa se suelta
+    /// antes y se pone después. Cambiar la clave primaria con una foránea encima
+    /// falla si se hace al revés.
+    /// </summary>
+    [Fact]
+    public void CambiarLaClavePrimariaSueltaLaAnteriorAntesDePonerLaNueva()
+    {
+        var alteration = new TableAlteration
+        {
+            Table = Tabla(),
+            DroppedForeignKeys = ["fk_pedidos_cliente"],
+            DroppedPrimaryKeyName = "pk_pedidos",
+            NewPrimaryKey = new PrimaryKeyDefinition { Columns = ["id", "cliente_id"] },
+            AddedForeignKeys = [HaciaClientes()],
+        };
+
+        var statements = new SqlServerTableDesigner().DescribeAlter(alteration).ToList();
+
+        var sueltaForanea = statements.FindIndex(sql => sql.Contains("DROP CONSTRAINT [fk_pedidos_cliente]", StringComparison.Ordinal));
+        var sueltaClave = statements.FindIndex(sql => sql.Contains("DROP CONSTRAINT [pk_pedidos]", StringComparison.Ordinal));
+        var poneClave = statements.FindIndex(sql => sql.Contains("ADD PRIMARY KEY", StringComparison.Ordinal));
+        var poneForanea = statements.FindIndex(sql => sql.Contains("ADD CONSTRAINT [fk_pedidos_cliente]", StringComparison.Ordinal));
+
+        Assert.True(sueltaForanea < sueltaClave, "La foránea se apoya en la clave: va antes.");
+        Assert.True(sueltaClave < poneClave, "No se pone la nueva sin soltar la anterior.");
+        Assert.True(poneClave < poneForanea, "La foránea nueva necesita la clave ya puesta.");
+
+        Assert.Contains("ADD PRIMARY KEY ([id], [cliente_id]);", statements[poneClave], StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void SoloSeEscribenLasOpcionesQueElMotorAdmite()
+    {
+        var index = PorCliente() with
+        {
+            IncludedColumns = ["total"],
+            Filter = "estado = 'activo'",
+            Method = "btree",
+        };
+
+        var alteration = new TableAlteration { Table = Tabla(), AddedIndexes = [index] };
+
+        var sqlServer = new SqlServerTableDesigner().DescribeAlter(alteration).Single();
+
+        Assert.Contains("INCLUDE ([total])", sqlServer, StringComparison.Ordinal);
+        Assert.Contains("WHERE estado = 'activo'", sqlServer, StringComparison.Ordinal);
+        // SQL Server no elige estructura: no hay `USING` que escribir.
+        Assert.DoesNotContain("USING", sqlServer, StringComparison.Ordinal);
+
+        var postgres = new PostgreSqlTableDesigner().DescribeAlter(alteration).Single();
+
+        Assert.Contains("USING btree", postgres, StringComparison.Ordinal);
+        Assert.Contains("INCLUDE (\"total\")", postgres, StringComparison.Ordinal);
+
+        // MySQL no tiene ninguna de las dos, y lo que no admite no se escribe:
+        // mandarlo produciría una instrucción que el motor rechaza.
+        var mySql = new MySqlTableDesigner().DescribeAlter(alteration).Single();
+
+        Assert.DoesNotContain("INCLUDE", mySql, StringComparison.Ordinal);
+        Assert.DoesNotContain("WHERE", mySql, StringComparison.Ordinal);
+        Assert.Contains("USING BTREE", mySql, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// En MySQL `FULLTEXT` es la clase del índice y va donde en otros motores
+    /// iría `UNIQUE`, no detrás como un `USING`.
+    /// </summary>
+    [Fact]
+    public void MySqlEscribeFulltextComoClaseDeIndice()
+    {
+        var alteration = new TableAlteration
+        {
+            Table = Tabla(),
+            AddedIndexes = [PorCliente() with { Method = "fulltext" }],
+        };
+
+        var sql = new MySqlTableDesigner().DescribeAlter(alteration).Single();
+
+        Assert.StartsWith("CREATE FULLTEXT INDEX", sql, StringComparison.Ordinal);
+        Assert.DoesNotContain("USING", sql, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void CrearLaTablaMeteLasRestriccionesDentroYLosIndicesFuera()
+    {
+        var table = Pedidos() with
+        {
+            Indexes = [PorCliente()],
+            UniqueConstraints =
+            [
+                new UniqueConstraintDefinition { Name = "uq_pedidos_codigo", Columns = ["codigo"] },
+            ],
+            CheckConstraints =
+            [
+                new CheckConstraintDefinition { Name = "ck_pedidos_total", Expression = "total > 0" },
+            ],
+            ForeignKeys = [HaciaClientes()],
+        };
+
+        var statements = new PostgreSqlTableDesigner().DescribeCreate(table);
+
+        // Las restricciones caben en el paréntesis del CREATE; los índices no,
+        // y por eso salen como instrucciones aparte.
+        Assert.Contains("CONSTRAINT \"uq_pedidos_codigo\" UNIQUE (\"codigo\")", statements[0], StringComparison.Ordinal);
+        Assert.Contains("CONSTRAINT \"ck_pedidos_total\" CHECK (total > 0)", statements[0], StringComparison.Ordinal);
+        Assert.Contains("CONSTRAINT \"fk_pedidos_cliente\" FOREIGN KEY", statements[0], StringComparison.Ordinal);
+
+        Assert.Equal(2, statements.Count);
+        Assert.StartsWith("CREATE INDEX", statements[1], StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void CadaMotorDeclaraLoQueDeVerdadAdmite()
+    {
+        Assert.True(new SqlServerTableDesigner().IndexCapabilities.SupportsIncludedColumns);
+        Assert.Empty(new SqlServerTableDesigner().IndexCapabilities.Methods);
+
+        Assert.True(new PostgreSqlTableDesigner().IndexCapabilities.SupportsFilter);
+        Assert.Contains("gin", new PostgreSqlTableDesigner().IndexCapabilities.Methods);
+
+        Assert.False(new MySqlTableDesigner().IndexCapabilities.SupportsIncludedColumns);
+        Assert.False(new MySqlTableDesigner().IndexCapabilities.SupportsFilter);
+    }
+
+    /// <summary>
+    /// Un nombre de índice también se cita: es la misma vía de escape que la de
+    /// una tabla, y aquí llega desde un formulario.
+    /// </summary>
+    [Fact]
+    public void ElNombreDeUnIndiceNoPuedeEscapar()
+    {
+        var alteration = new TableAlteration
+        {
+            Table = Tabla(),
+            DroppedIndexes = ["ix]; DROP TABLE clientes; --"],
+        };
+
+        var sql = new SqlServerTableDesigner().DescribeAlter(alteration).Single();
+
+        Assert.Contains("[ix]]; DROP TABLE clientes; --]", sql, StringComparison.Ordinal);
+    }
 }

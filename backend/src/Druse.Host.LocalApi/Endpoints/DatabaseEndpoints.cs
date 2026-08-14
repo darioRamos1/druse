@@ -44,6 +44,27 @@ internal static class DatabaseEndpoints
             Results.Ok(tables.DataTypes(sessionId)))
         .WithName("GetTableDataTypes");
 
+        app.MapGet("/api/sessions/{sessionId:guid}/tables/capabilities", (
+            Guid sessionId,
+            TableDesignService tables) =>
+            Results.Ok(tables.IndexCapabilities(sessionId).ToResponse()))
+        .WithName("GetTableCapabilities");
+
+        app.MapPost("/api/sessions/{sessionId:guid}/tables/structure", async (
+            Guid sessionId,
+            DatabaseObjectDto table,
+            MetadataService metadata,
+            CancellationToken cancellationToken) =>
+        {
+            var structure = await metadata.GetTableStructureAsync(
+                sessionId,
+                table.ToDomain(),
+                cancellationToken);
+
+            return Results.Ok(structure.ToResponse());
+        })
+        .WithName("GetTableStructure");
+
         app.MapPost("/api/tables/preview", (
             CreateTableRequest request,
             TableDesignService tables) =>

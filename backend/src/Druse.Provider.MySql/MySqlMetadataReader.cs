@@ -1,6 +1,7 @@
 using System.Data.Common;
 using Druse.Database.Abstractions;
 using Druse.Domain;
+using MySqlConnector;
 
 namespace Druse.Provider.MySql;
 
@@ -129,6 +130,250 @@ public sealed class MySqlMetadataReader : IDatabaseMetadataReader
                 nameof(databaseObject)),
         };
     }
+
+    public async Task<TableStructure> GetTableStructureAsync(
+        IDatabaseSession session,
+        DatabaseObject table,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(table);
+
+        var schema = Schema(session, table);
+
+        var indexes = await GetIndexesAsync(session, schema, table.Name, cancellationToken);
+        var foreignKeys = await GetForeignKeysAsync(session, schema, table.Name, cancellationToken);
+        var checks = await GetCheckConstraintsAsync(session, schema, table.Name, cancellationToken);
+        var uniques = UniqueConstraints(indexes);
+
+        var primary = indexes.FirstOrDefault(index => index.IsPrimaryKey);
+
+        return new TableStructure
+        {
+            PrimaryKey = primary is null
+                ? null
+                : new DatabasePrimaryKey
+                {
+                    Name = primary.Name,
+                    Columns = [.. primary.Columns.Select(column => column.Name)],
+                },
+            Indexes = indexes,
+            ForeignKeys = foreignKeys,
+            UniqueConstraints = uniques,
+            CheckConstraints = checks,
+        };
+    }
+
+    /// <summary>
+    /// Índices, agrupando en memoria las filas que devuelve el catálogo.
+    ///
+    /// `STATISTICS` da una fila por columna y la tentación es juntarlas con
+    /// `GROUP_CONCAT`, pero esa función corta en `group_concat_max_len` —1024
+    /// bytes de fábrica— **sin avisar**: un índice ancho aparecería con menos
+    /// columnas de las que tiene y nada lo delataría. Agrupar aquí no puede
+    /// truncar.
+    ///
+    /// La clave primaria se llama siempre `PRIMARY` en MySQL, que es como se
+    /// reconoce: no hay una columna que lo diga.
+    /// </summary>
+    private static async Task<IReadOnlyList<DatabaseIndex>> GetIndexesAsync(
+        IDatabaseSession session,
+        string schema,
+        string table,
+        CancellationToken cancellationToken)
+    {
+        const string Sql = """
+            SELECT
+                INDEX_NAME,
+                SEQ_IN_INDEX,
+                COLUMN_NAME,
+                NON_UNIQUE,
+                COLLATION,
+                INDEX_TYPE
+            FROM information_schema.STATISTICS
+            WHERE TABLE_SCHEMA = @schema
+              AND TABLE_NAME = @table
+            ORDER BY INDEX_NAME, SEQ_IN_INDEX
+            """;
+
+        var rows = await QueryAsync(
+            session,
+            Sql,
+            reader => (
+                Index: reader.GetString(0),
+                Column: reader.IsDBNull(2) ? null : reader.GetString(2),
+                NonUnique: reader.GetInt64(3) != 0,
+                Descending: !reader.IsDBNull(4) && reader.GetString(4) == "D",
+                Type: reader.IsDBNull(5) ? null : reader.GetString(5)),
+            cancellationToken,
+            ("schema", schema),
+            ("table", table));
+
+        return
+        [
+            .. rows
+                .GroupBy(row => row.Index, StringComparer.Ordinal)
+                .Select(group => new DatabaseIndex
+                {
+                    Name = group.Key,
+                    IsUnique = !group.First().NonUnique,
+                    IsPrimaryKey = group.Key == "PRIMARY",
+
+                    // En MySQL un índice único *es* la restricción de unicidad:
+                    // no son dos objetos como en los otros motores. Se marca para
+                    // que la interfaz no ofrezca borrarlo dos veces por caminos
+                    // distintos.
+                    IsConstraintIndex = group.Key == "PRIMARY" || !group.First().NonUnique,
+                    Method = group.First().Type?.ToLowerInvariant(),
+                    Columns =
+                    [
+                        .. group
+                            .Where(row => row.Column is not null)
+                            .Select(row => new IndexColumn
+                            {
+                                Name = row.Column!,
+                                Direction = row.Descending
+                                    ? IndexSortDirection.Descending
+                                    : IndexSortDirection.Ascending,
+                            }),
+                    ],
+                })
+                .OrderBy(index => index.Name, StringComparer.Ordinal),
+        ];
+    }
+
+    private static async Task<IReadOnlyList<DatabaseForeignKey>> GetForeignKeysAsync(
+        IDatabaseSession session,
+        string schema,
+        string table,
+        CancellationToken cancellationToken)
+    {
+        const string Sql = """
+            SELECT
+                k.CONSTRAINT_NAME,
+                k.ORDINAL_POSITION,
+                k.COLUMN_NAME,
+                k.REFERENCED_TABLE_SCHEMA,
+                k.REFERENCED_TABLE_NAME,
+                k.REFERENCED_COLUMN_NAME,
+                r.DELETE_RULE,
+                r.UPDATE_RULE
+            FROM information_schema.KEY_COLUMN_USAGE k
+            JOIN information_schema.REFERENTIAL_CONSTRAINTS r
+              ON r.CONSTRAINT_SCHEMA = k.CONSTRAINT_SCHEMA
+             AND r.CONSTRAINT_NAME = k.CONSTRAINT_NAME
+             AND r.TABLE_NAME = k.TABLE_NAME
+            WHERE k.TABLE_SCHEMA = @schema
+              AND k.TABLE_NAME = @table
+              AND k.REFERENCED_TABLE_NAME IS NOT NULL
+            ORDER BY k.CONSTRAINT_NAME, k.ORDINAL_POSITION
+            """;
+
+        var rows = await QueryAsync(
+            session,
+            Sql,
+            reader => (
+                Name: reader.GetString(0),
+                Column: reader.GetString(2),
+                ReferencedSchema: reader.IsDBNull(3) ? null : reader.GetString(3),
+                ReferencedTable: reader.GetString(4),
+                ReferencedColumn: reader.GetString(5),
+                OnDelete: reader.GetString(6),
+                OnUpdate: reader.GetString(7)),
+            cancellationToken,
+            ("schema", schema),
+            ("table", table));
+
+        return
+        [
+            .. rows
+                .GroupBy(row => row.Name, StringComparer.Ordinal)
+                .Select(group => new DatabaseForeignKey
+                {
+                    Name = group.Key,
+                    ReferencedSchema = group.First().ReferencedSchema,
+                    ReferencedTable = group.First().ReferencedTable,
+                    OnDelete = ParseAction(group.First().OnDelete),
+                    OnUpdate = ParseAction(group.First().OnUpdate),
+                    Columns = [.. group.Select(row => row.Column)],
+                    ReferencedColumns = [.. group.Select(row => row.ReferencedColumn)],
+                })
+                .OrderBy(key => key.Name, StringComparer.Ordinal),
+        ];
+    }
+
+    /// <summary>
+    /// Restricciones de unicidad, tomadas de los índices ya leídos.
+    ///
+    /// En MySQL una `UNIQUE` no existe aparte de su índice, así que consultarla
+    /// en `TABLE_CONSTRAINTS` devolvería exactamente los mismos objetos con otro
+    /// nombre de tabla del catálogo. Se derivan de lo que ya se leyó y así no se
+    /// paga otra consulta sobre una conexión que no admite dos a la vez.
+    /// </summary>
+    private static IReadOnlyList<DatabaseUniqueConstraint> UniqueConstraints(
+        IReadOnlyList<DatabaseIndex> indexes) =>
+    [
+        .. indexes
+            .Where(index => index.IsUnique && !index.IsPrimaryKey)
+            .Select(index => new DatabaseUniqueConstraint
+            {
+                Name = index.Name,
+                Columns = [.. index.Columns.Select(column => column.Name)],
+            }),
+    ];
+
+    /// <summary>
+    /// Condiciones de comprobación.
+    ///
+    /// `CHECK_CONSTRAINTS` no existe antes de MySQL 8.0.16 ni de MariaDB 10.2. Un
+    /// servidor viejo responde con un error de tabla desconocida, y quedarse sin
+    /// ver los índices por eso sería peor que no enseñar las condiciones: se
+    /// devuelve vacío.
+    /// </summary>
+    private static async Task<IReadOnlyList<DatabaseCheckConstraint>> GetCheckConstraintsAsync(
+        IDatabaseSession session,
+        string schema,
+        string table,
+        CancellationToken cancellationToken)
+    {
+        const string Sql = """
+            SELECT c.CONSTRAINT_NAME, c.CHECK_CLAUSE
+            FROM information_schema.CHECK_CONSTRAINTS c
+            JOIN information_schema.TABLE_CONSTRAINTS t
+              ON t.CONSTRAINT_SCHEMA = c.CONSTRAINT_SCHEMA
+             AND t.CONSTRAINT_NAME = c.CONSTRAINT_NAME
+            WHERE t.TABLE_SCHEMA = @schema
+              AND t.TABLE_NAME = @table
+            ORDER BY c.CONSTRAINT_NAME
+            """;
+
+        try
+        {
+            return await QueryAsync(
+                session,
+                Sql,
+                reader => new DatabaseCheckConstraint
+                {
+                    Name = reader.GetString(0),
+                    Expression = reader.GetString(1),
+                },
+                cancellationToken,
+                ("schema", schema),
+                ("table", table));
+        }
+        catch (MySqlException error) when (error.Number is 1109 or 1146)
+        {
+            return [];
+        }
+    }
+
+    /// <summary>Traduce la regla referencial que nombra el estándar.</summary>
+    private static ForeignKeyAction ParseAction(string rule) => rule switch
+    {
+        "CASCADE" => ForeignKeyAction.Cascade,
+        "SET NULL" => ForeignKeyAction.SetNull,
+        "SET DEFAULT" => ForeignKeyAction.SetDefault,
+        _ => ForeignKeyAction.NoAction,
+    };
 
     private static async Task<string> GetViewDefinitionAsync(
         IDatabaseSession session,

@@ -323,6 +323,59 @@ internal static class ContractMapper
         };
     }
 
+    public static IndexDefinition ToDomain(this IndexDesignDto dto)
+    {
+        ArgumentNullException.ThrowIfNull(dto);
+
+        return new IndexDefinition
+        {
+            Name = dto.Name,
+            Columns =
+            [
+                .. dto.Columns.Select(column => new IndexColumn
+                {
+                    Name = column.Name,
+                    Direction = ParseDirection(column.Direction),
+                }),
+            ],
+            IsUnique = dto.IsUnique,
+            IncludedColumns = dto.IncludedColumns,
+            Filter = dto.Filter,
+            Method = dto.Method,
+        };
+    }
+
+    public static ForeignKeyDefinition ToDomain(this ForeignKeyDesignDto dto)
+    {
+        ArgumentNullException.ThrowIfNull(dto);
+
+        return new ForeignKeyDefinition
+        {
+            Name = dto.Name,
+            Columns = dto.Columns,
+            ReferencedDatabase = dto.ReferencedDatabase,
+            ReferencedSchema = dto.ReferencedSchema,
+            ReferencedTable = dto.ReferencedTable,
+            ReferencedColumns = dto.ReferencedColumns,
+            OnDelete = ParseAction(dto.OnDelete),
+            OnUpdate = ParseAction(dto.OnUpdate),
+        };
+    }
+
+    public static UniqueConstraintDefinition ToDomain(this UniqueConstraintDesignDto dto)
+    {
+        ArgumentNullException.ThrowIfNull(dto);
+
+        return new UniqueConstraintDefinition { Name = dto.Name, Columns = dto.Columns };
+    }
+
+    public static CheckConstraintDefinition ToDomain(this CheckConstraintDesignDto dto)
+    {
+        ArgumentNullException.ThrowIfNull(dto);
+
+        return new CheckConstraintDefinition { Name = dto.Name, Expression = dto.Expression };
+    }
+
     public static TableDefinition ToDomain(this CreateTableRequest request)
     {
         ArgumentNullException.ThrowIfNull(request);
@@ -333,6 +386,10 @@ internal static class ContractMapper
             Schema = request.Schema,
             Name = request.Name,
             Columns = [.. request.Columns.Select(column => column.ToDomain())],
+            Indexes = [.. request.Indexes.Select(index => index.ToDomain())],
+            ForeignKeys = [.. request.ForeignKeys.Select(key => key.ToDomain())],
+            UniqueConstraints = [.. request.UniqueConstraints.Select(unique => unique.ToDomain())],
+            CheckConstraints = [.. request.CheckConstraints.Select(check => check.ToDomain())],
         };
     }
 
@@ -351,8 +408,144 @@ internal static class ContractMapper
                 Column = change.Column.ToDomain(),
             })],
             DroppedColumns = request.DroppedColumns,
+            AddedIndexes = [.. request.AddedIndexes.Select(index => index.ToDomain())],
+            AlteredIndexes = [.. request.AlteredIndexes.Select(change => new IndexAlteration
+            {
+                CurrentName = change.CurrentName,
+                Index = change.Index.ToDomain(),
+            })],
+            DroppedIndexes = request.DroppedIndexes,
+            AddedForeignKeys = [.. request.AddedForeignKeys.Select(key => key.ToDomain())],
+            DroppedForeignKeys = request.DroppedForeignKeys,
+            AddedUniqueConstraints =
+                [.. request.AddedUniqueConstraints.Select(unique => unique.ToDomain())],
+            DroppedUniqueConstraints = request.DroppedUniqueConstraints,
+            AddedCheckConstraints =
+                [.. request.AddedCheckConstraints.Select(check => check.ToDomain())],
+            DroppedCheckConstraints = request.DroppedCheckConstraints,
+            NewPrimaryKey = request.NewPrimaryKey is null
+                ? null
+                : new PrimaryKeyDefinition
+                {
+                    Name = request.NewPrimaryKey.Name,
+                    Columns = request.NewPrimaryKey.Columns,
+                },
+            DroppedPrimaryKeyName = request.DroppedPrimaryKeyName,
         };
     }
+
+    public static TableStructureResponse ToResponse(this TableStructure structure)
+    {
+        ArgumentNullException.ThrowIfNull(structure);
+
+        return new TableStructureResponse
+        {
+            PrimaryKey = structure.PrimaryKey is null
+                ? null
+                : new DatabaseConstraintDto
+                {
+                    Name = structure.PrimaryKey.Name,
+                    Columns = structure.PrimaryKey.Columns,
+                },
+            Indexes =
+            [
+                .. structure.Indexes.Select(index => new DatabaseIndexDto
+                {
+                    Name = index.Name,
+                    Columns = [.. index.Columns.Select(ToDto)],
+                    IsUnique = index.IsUnique,
+                    IsConstraintIndex = index.IsConstraintIndex,
+                    IsPrimaryKey = index.IsPrimaryKey,
+                    IncludedColumns = index.IncludedColumns,
+                    Filter = index.Filter,
+                    Method = index.Method,
+                }),
+            ],
+            ForeignKeys =
+            [
+                .. structure.ForeignKeys.Select(key => new DatabaseForeignKeyDto
+                {
+                    Name = key.Name,
+                    Columns = key.Columns,
+                    ReferencedSchema = key.ReferencedSchema,
+                    ReferencedTable = key.ReferencedTable,
+                    ReferencedColumns = key.ReferencedColumns,
+                    OnDelete = Name(key.OnDelete),
+                    OnUpdate = Name(key.OnUpdate),
+                }),
+            ],
+            UniqueConstraints =
+            [
+                .. structure.UniqueConstraints.Select(unique => new DatabaseConstraintDto
+                {
+                    Name = unique.Name,
+                    Columns = unique.Columns,
+                }),
+            ],
+            CheckConstraints =
+            [
+                .. structure.CheckConstraints.Select(check => new DatabaseConstraintDto
+                {
+                    Name = check.Name,
+                    Expression = check.Expression,
+                }),
+            ],
+        };
+    }
+
+    public static IndexCapabilitiesResponse ToResponse(this IndexCapabilities capabilities)
+    {
+        ArgumentNullException.ThrowIfNull(capabilities);
+
+        return new IndexCapabilitiesResponse
+        {
+            SupportsIncludedColumns = capabilities.SupportsIncludedColumns,
+            SupportsFilter = capabilities.SupportsFilter,
+            SupportsSortDirection = capabilities.SupportsSortDirection,
+            SupportsCheckConstraints = capabilities.SupportsCheckConstraints,
+            Methods = capabilities.Methods,
+            ForeignKeyActions = [.. capabilities.ForeignKeyActions.Select(Name)],
+        };
+    }
+
+    private static IndexColumnDto ToDto(IndexColumn column) => new()
+    {
+        Name = column.Name,
+        Direction = column.Direction == IndexSortDirection.Descending ? "desc" : "asc",
+    };
+
+    /// <summary>
+    /// El sentido llega como texto y lo que no se reconoce se lee ascendente.
+    ///
+    /// Es el orden por omisión de los tres motores, así que un valor raro produce
+    /// el índice que se habría creado sin decir nada, no un error.
+    /// </summary>
+    private static IndexSortDirection ParseDirection(string? direction) =>
+        string.Equals(direction, "desc", StringComparison.OrdinalIgnoreCase)
+            ? IndexSortDirection.Descending
+            : IndexSortDirection.Ascending;
+
+    /// <summary>
+    /// La acción referencial llega como texto y lo que no se reconoce no hace nada.
+    ///
+    /// Caer en `NoAction` ante un valor desconocido es lo seguro: rechaza el
+    /// borrado en vez de propagarlo a las filas hijas.
+    /// </summary>
+    private static ForeignKeyAction ParseAction(string? action) => action?.ToLowerInvariant() switch
+    {
+        "cascade" => ForeignKeyAction.Cascade,
+        "setnull" => ForeignKeyAction.SetNull,
+        "setdefault" => ForeignKeyAction.SetDefault,
+        _ => ForeignKeyAction.NoAction,
+    };
+
+    private static string Name(ForeignKeyAction action) => action switch
+    {
+        ForeignKeyAction.Cascade => "cascade",
+        ForeignKeyAction.SetNull => "setNull",
+        ForeignKeyAction.SetDefault => "setDefault",
+        _ => "noAction",
+    };
 
     public static TableChangeResponse ToResponse(this TableChangeResult result) => new()
     {

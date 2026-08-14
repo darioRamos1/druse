@@ -358,6 +358,63 @@ public sealed record TableColumnDesignDto
     public string? DefaultValue { get; init; }
 }
 
+/// <summary>Columna dentro de un índice, con el sentido en que se ordena.</summary>
+public sealed record IndexColumnDto
+{
+    public required string Name { get; init; }
+
+    /// <summary>`asc` o `desc`. Cualquier otra cosa se lee como ascendente.</summary>
+    public string Direction { get; init; } = "asc";
+}
+
+public sealed record IndexDesignDto
+{
+    public required string Name { get; init; }
+    public required IReadOnlyList<IndexColumnDto> Columns { get; init; }
+    public bool IsUnique { get; init; }
+
+    /// <summary>Columnas guardadas en la hoja sin formar parte de la clave.</summary>
+    public IReadOnlyList<string> IncludedColumns { get; init; } = [];
+
+    /// <summary>Condición que limita las filas indizadas, ya escrita en SQL.</summary>
+    public string? Filter { get; init; }
+
+    /// <summary>Estructura del índice cuando el motor ofrece varias.</summary>
+    public string? Method { get; init; }
+}
+
+public sealed record ForeignKeyDesignDto
+{
+    public required string Name { get; init; }
+    public required IReadOnlyList<string> Columns { get; init; }
+    public string? ReferencedDatabase { get; init; }
+    public string? ReferencedSchema { get; init; }
+    public required string ReferencedTable { get; init; }
+    public required IReadOnlyList<string> ReferencedColumns { get; init; }
+
+    /// <summary>`noAction`, `cascade`, `setNull` o `setDefault`.</summary>
+    public string OnDelete { get; init; } = "noAction";
+    public string OnUpdate { get; init; } = "noAction";
+}
+
+public sealed record UniqueConstraintDesignDto
+{
+    public required string Name { get; init; }
+    public required IReadOnlyList<string> Columns { get; init; }
+}
+
+public sealed record CheckConstraintDesignDto
+{
+    public required string Name { get; init; }
+    public required string Expression { get; init; }
+}
+
+public sealed record PrimaryKeyDesignDto
+{
+    public string? Name { get; init; }
+    public required IReadOnlyList<string> Columns { get; init; }
+}
+
 public sealed record CreateTableRequest
 {
     public required Guid SessionId { get; init; }
@@ -365,6 +422,10 @@ public sealed record CreateTableRequest
     public string? Schema { get; init; }
     public required string Name { get; init; }
     public required IReadOnlyList<TableColumnDesignDto> Columns { get; init; }
+    public IReadOnlyList<IndexDesignDto> Indexes { get; init; } = [];
+    public IReadOnlyList<ForeignKeyDesignDto> ForeignKeys { get; init; } = [];
+    public IReadOnlyList<UniqueConstraintDesignDto> UniqueConstraints { get; init; } = [];
+    public IReadOnlyList<CheckConstraintDesignDto> CheckConstraints { get; init; } = [];
 
     /// <summary>El usuario ya vio el SQL. Sin esto no se ejecuta nada.</summary>
     public bool Confirmed { get; init; }
@@ -378,6 +439,13 @@ public sealed record ColumnAlterationDto
     public required TableColumnDesignDto Column { get; init; }
 }
 
+/// <summary>Índice existente y cómo debe quedar.</summary>
+public sealed record IndexAlterationDto
+{
+    public required string CurrentName { get; init; }
+    public required IndexDesignDto Index { get; init; }
+}
+
 public sealed record AlterTableRequest
 {
     public required Guid SessionId { get; init; }
@@ -387,10 +455,89 @@ public sealed record AlterTableRequest
     public IReadOnlyList<ColumnAlterationDto> AlteredColumns { get; init; } = [];
     public IReadOnlyList<string> DroppedColumns { get; init; } = [];
 
+    public IReadOnlyList<IndexDesignDto> AddedIndexes { get; init; } = [];
+    public IReadOnlyList<IndexAlterationDto> AlteredIndexes { get; init; } = [];
+    public IReadOnlyList<string> DroppedIndexes { get; init; } = [];
+
+    public IReadOnlyList<ForeignKeyDesignDto> AddedForeignKeys { get; init; } = [];
+    public IReadOnlyList<string> DroppedForeignKeys { get; init; } = [];
+
+    public IReadOnlyList<UniqueConstraintDesignDto> AddedUniqueConstraints { get; init; } = [];
+    public IReadOnlyList<string> DroppedUniqueConstraints { get; init; } = [];
+
+    public IReadOnlyList<CheckConstraintDesignDto> AddedCheckConstraints { get; init; } = [];
+    public IReadOnlyList<string> DroppedCheckConstraints { get; init; } = [];
+
+    public PrimaryKeyDesignDto? NewPrimaryKey { get; init; }
+    public string? DroppedPrimaryKeyName { get; init; }
+
     public bool Confirmed { get; init; }
 
-    /// <summary>Aparte de la confirmación: borrar columnas se lleva sus datos.</summary>
+    /// <summary>Aparte de la confirmación: lo que no se deshace con otro `ALTER`.</summary>
     public bool ConfirmedDestructive { get; init; }
+}
+
+// ---------------------------------------------------------------------------
+// Estructura leída del catálogo
+// ---------------------------------------------------------------------------
+
+public sealed record DatabaseIndexDto
+{
+    public required string Name { get; init; }
+    public required IReadOnlyList<IndexColumnDto> Columns { get; init; }
+    public bool IsUnique { get; init; }
+
+    /// <summary>Lo sostiene una restricción, así que no se puede borrar suelto.</summary>
+    public bool IsConstraintIndex { get; init; }
+    public bool IsPrimaryKey { get; init; }
+    public IReadOnlyList<string> IncludedColumns { get; init; } = [];
+    public string? Filter { get; init; }
+    public string? Method { get; init; }
+}
+
+public sealed record DatabaseForeignKeyDto
+{
+    public required string Name { get; init; }
+    public required IReadOnlyList<string> Columns { get; init; }
+    public string? ReferencedSchema { get; init; }
+    public required string ReferencedTable { get; init; }
+    public required IReadOnlyList<string> ReferencedColumns { get; init; }
+    public required string OnDelete { get; init; }
+    public required string OnUpdate { get; init; }
+}
+
+public sealed record DatabaseConstraintDto
+{
+    public required string Name { get; init; }
+    public IReadOnlyList<string> Columns { get; init; } = [];
+
+    /// <summary>Solo en las de comprobación: la condición que devuelve el motor.</summary>
+    public string? Expression { get; init; }
+}
+
+public sealed record TableStructureResponse
+{
+    public DatabaseConstraintDto? PrimaryKey { get; init; }
+    public required IReadOnlyList<DatabaseIndexDto> Indexes { get; init; }
+    public required IReadOnlyList<DatabaseForeignKeyDto> ForeignKeys { get; init; }
+    public required IReadOnlyList<DatabaseConstraintDto> UniqueConstraints { get; init; }
+    public required IReadOnlyList<DatabaseConstraintDto> CheckConstraints { get; init; }
+}
+
+/// <summary>
+/// Lo que el motor admite al definir un índice.
+///
+/// El formulario se dibuja a partir de esto y no del identificador del motor:
+/// así el cliente ofrece lo que hay sin saber contra qué está conectado.
+/// </summary>
+public sealed record IndexCapabilitiesResponse
+{
+    public required bool SupportsIncludedColumns { get; init; }
+    public required bool SupportsFilter { get; init; }
+    public required bool SupportsSortDirection { get; init; }
+    public required bool SupportsCheckConstraints { get; init; }
+    public required IReadOnlyList<string> Methods { get; init; }
+    public required IReadOnlyList<string> ForeignKeyActions { get; init; }
 }
 
 public sealed record TableChangeResponse

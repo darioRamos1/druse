@@ -20,6 +20,8 @@ public abstract class TableDesignerBase : ITableDesigner
 
     public abstract IReadOnlyList<string> CommonDataTypes { get; }
 
+    public abstract IndexCapabilities IndexCapabilities { get; }
+
     /// <summary>Cita un identificador en el dialecto del motor.</summary>
     protected abstract string Quote(string identifier);
 
@@ -42,6 +44,138 @@ public abstract class TableDesignerBase : ITableDesigner
     protected abstract string RenameTable(string qualifiedTable, DatabaseObject table, string newName);
 
     /// <summary>
+    /// Cómo se borra un índice.
+    ///
+    /// Es la instrucción que más difiere de las tres: PostgreSQL borra el índice
+    /// como un objeto del esquema y ni menciona la tabla, mientras que SQL Server
+    /// y MySQL la exigen. No hay forma de escribir una sola que valga en los tres.
+    /// </summary>
+    protected abstract string DropIndex(
+        string qualifiedTable,
+        DatabaseObject table,
+        string indexName);
+
+    /// <summary>
+    /// Lo que se escribe entre `CREATE INDEX` y el nombre, para índices que no
+    /// son simplemente únicos: `FULLTEXT`, `SPATIAL` y demás.
+    /// </summary>
+    protected virtual string IndexKind(IndexDefinition index) =>
+        index.IsUnique ? "UNIQUE " : string.Empty;
+
+    /// <summary>
+    /// La estructura del índice, cuando el motor la escribe antes de las columnas.
+    /// MySQL la pone al final, así que allí esto queda vacío.
+    /// </summary>
+    protected virtual string IndexMethodClause(IndexDefinition index) =>
+        string.IsNullOrWhiteSpace(index.Method) ? string.Empty : $" USING {index.Method.Trim()}";
+
+    /// <summary>Lo que se añade después de las columnas: `INCLUDE`, `WHERE` y demás.</summary>
+    protected virtual string IndexSuffix(IndexDefinition index)
+    {
+        ArgumentNullException.ThrowIfNull(index);
+
+        var suffix = string.Empty;
+
+        if (index.IncludedColumns.Count > 0 && IndexCapabilities.SupportsIncludedColumns)
+        {
+            suffix += $" INCLUDE ({string.Join(", ", index.IncludedColumns.Select(Quote))})";
+        }
+
+        if (!string.IsNullOrWhiteSpace(index.Filter) && IndexCapabilities.SupportsFilter)
+        {
+            suffix += $" WHERE {index.Filter.Trim()}";
+        }
+
+        return suffix;
+    }
+
+    /// <summary>
+    /// El `CREATE INDEX` completo.
+    ///
+    /// El nombre del índice se cita con el esquema en PostgreSQL, donde vive en
+    /// el esquema, y suelto en los otros dos, donde pertenece a la tabla.
+    /// </summary>
+    protected virtual string CreateIndex(
+        string qualifiedTable,
+        DatabaseObject table,
+        IndexDefinition index)
+    {
+        ArgumentNullException.ThrowIfNull(index);
+
+        var columns = index.Columns.Select(column =>
+            IndexCapabilities.SupportsSortDirection
+                ? $"{Quote(column.Name)} {(column.Direction == IndexSortDirection.Descending ? "DESC" : "ASC")}"
+                : Quote(column.Name));
+
+        return
+            $"CREATE {IndexKind(index)}INDEX {Quote(index.Name)} ON {qualifiedTable}" +
+            $"{IndexMethodClause(index)} ({string.Join(", ", columns)})" +
+            $"{IndexSuffix(index)};";
+    }
+
+    /// <summary>Cómo se cita la tabla a la que apunta una clave foránea.</summary>
+    protected virtual string QualifyReference(ForeignKeyDefinition key)
+    {
+        ArgumentNullException.ThrowIfNull(key);
+
+        return Qualify(key.ReferencedDatabase, key.ReferencedSchema, key.ReferencedTable);
+    }
+
+    /// <summary>
+    /// Cómo se escribe una acción referencial.
+    ///
+    /// `NO ACTION` se omite en lugar de escribirse: es lo que hacen los tres
+    /// motores si no se dice nada, y escribirlo en MySQL con `SET DEFAULT` al
+    /// lado produce una tabla que el motor acepta y luego no respeta.
+    /// </summary>
+    protected static string ReferentialAction(ForeignKeyAction action) => action switch
+    {
+        ForeignKeyAction.Cascade => "CASCADE",
+        ForeignKeyAction.SetNull => "SET NULL",
+        ForeignKeyAction.SetDefault => "SET DEFAULT",
+        _ => string.Empty,
+    };
+
+    /// <summary>El cuerpo de una clave foránea, sin el `ALTER TABLE` de delante.</summary>
+    protected string ForeignKeyBody(ForeignKeyDefinition key)
+    {
+        ArgumentNullException.ThrowIfNull(key);
+
+        var body =
+            $"CONSTRAINT {Quote(key.Name)} FOREIGN KEY " +
+            $"({string.Join(", ", key.Columns.Select(Quote))}) " +
+            $"REFERENCES {QualifyReference(key)} " +
+            $"({string.Join(", ", key.ReferencedColumns.Select(Quote))})";
+
+        var onDelete = ReferentialAction(key.OnDelete);
+        var onUpdate = ReferentialAction(key.OnUpdate);
+
+        if (onDelete.Length > 0)
+        {
+            body += $" ON DELETE {onDelete}";
+        }
+
+        if (onUpdate.Length > 0)
+        {
+            body += $" ON UPDATE {onUpdate}";
+        }
+
+        return body;
+    }
+
+    /// <summary>
+    /// Cómo se suelta una restricción con nombre.
+    ///
+    /// MySQL necesita decir de qué tipo es —`DROP FOREIGN KEY`, `DROP INDEX`—
+    /// mientras que los otros dos borran cualquiera con `DROP CONSTRAINT`.
+    /// </summary>
+    protected virtual string DropConstraint(
+        string qualifiedTable,
+        string name,
+        ConstraintKind kind) =>
+        $"ALTER TABLE {qualifiedTable} DROP CONSTRAINT {Quote(name)};";
+
+    /// <summary>
     /// El DDL de este motor se deshace solo si algo falla a mitad.
     ///
     /// PostgreSQL y SQL Server admiten `ALTER TABLE` dentro de una transacción;
@@ -54,6 +188,7 @@ public abstract class TableDesignerBase : ITableDesigner
     {
         ArgumentNullException.ThrowIfNull(table);
 
+        var qualified = Qualify(table.Database, table.Schema, table.Name);
         var lines = table.Columns.Select(ColumnDefinition).ToList();
         var key = table.PrimaryKeyColumns;
 
@@ -62,14 +197,47 @@ public abstract class TableDesignerBase : ITableDesigner
             lines.Add($"  PRIMARY KEY ({string.Join(", ", key.Select(Quote))})");
         }
 
-        return
-        [
-            $"CREATE TABLE {Qualify(table.Database, table.Schema, table.Name)} (" +
+        // Las restricciones caben dentro del paréntesis y los índices no: es la
+        // única diferencia entre unas y otros a la hora de crear la tabla.
+        foreach (var unique in table.UniqueConstraints)
+        {
+            lines.Add(
+                $"  CONSTRAINT {Quote(unique.Name)} UNIQUE " +
+                $"({string.Join(", ", unique.Columns.Select(Quote))})");
+        }
+
+        foreach (var check in table.CheckConstraints.Where(_ => IndexCapabilities.SupportsCheckConstraints))
+        {
+            lines.Add($"  CONSTRAINT {Quote(check.Name)} CHECK ({check.Expression.Trim()})");
+        }
+
+        foreach (var foreignKey in table.ForeignKeys)
+        {
+            lines.Add($"  {ForeignKeyBody(foreignKey)}");
+        }
+
+        var statements = new List<string>
+        {
+            $"CREATE TABLE {qualified} (" +
             Environment.NewLine +
             string.Join("," + Environment.NewLine, lines) +
             Environment.NewLine +
             ");",
-        ];
+        };
+
+        var created = new DatabaseObject
+        {
+            Id = qualified,
+            Name = table.Name,
+            Kind = DatabaseObjectKind.Table,
+            Database = table.Database,
+            Schema = table.Schema,
+        };
+
+        statements.AddRange(
+            table.Indexes.Select(index => CreateIndex(qualified, created, index)));
+
+        return statements;
     }
 
     public IReadOnlyList<string> DescribeAlter(TableAlteration alteration)
@@ -83,9 +251,53 @@ public abstract class TableDesignerBase : ITableDesigner
 
         var statements = new List<string>();
 
-        // El orden importa: primero se añade y se cambia, y solo al final se borra
-        // y se renombra la tabla. Renombrarla antes dejaría al resto de
-        // instrucciones apuntando a un nombre que ya no existe.
+        // El orden importa y no es el de la pantalla. Lo que depende de otra cosa
+        // se suelta antes y se pone después:
+        //
+        // 1. Se sueltan claves foráneas e índices, que pueden estar apoyados en
+        //    columnas o en la clave primaria que viene detrás.
+        // 2. Se suelta la clave primaria, ya sin nadie apoyado en ella.
+        // 3. Se añaden y cambian columnas, porque lo nuevo puede necesitarlas.
+        // 4. Se pone la clave primaria nueva, que exige sus columnas ya creadas.
+        // 5. Se crean índices y restricciones sobre el resultado.
+        // 6. Se borran columnas y, al final de todo, se renombra la tabla:
+        //    renombrarla antes dejaría al resto apuntando a un nombre que ya no
+        //    existe.
+        foreach (var name in alteration.DroppedForeignKeys)
+        {
+            statements.Add(DropConstraint(table, name, ConstraintKind.ForeignKey));
+        }
+
+        foreach (var name in alteration.DroppedUniqueConstraints)
+        {
+            statements.Add(DropConstraint(table, name, ConstraintKind.Unique));
+        }
+
+        foreach (var name in alteration.DroppedCheckConstraints)
+        {
+            statements.Add(DropConstraint(table, name, ConstraintKind.Check));
+        }
+
+        foreach (var name in alteration.DroppedIndexes)
+        {
+            statements.Add(DropIndex(table, alteration.Table, name));
+        }
+
+        // Cambiar un índice es borrarlo y volver a crearlo: ningún motor sabe
+        // cambiarle las columnas a uno que ya existe.
+        foreach (var change in alteration.AlteredIndexes)
+        {
+            statements.Add(DropIndex(table, alteration.Table, change.CurrentName));
+        }
+
+        if (alteration.DroppedPrimaryKeyName is not null)
+        {
+            statements.Add(DropConstraint(
+                table,
+                alteration.DroppedPrimaryKeyName,
+                ConstraintKind.PrimaryKey));
+        }
+
         foreach (var column in alteration.AddedColumns)
         {
             statements.Add($"ALTER TABLE {table} ADD {ColumnDefinition(column).TrimStart()};");
@@ -94,6 +306,46 @@ public abstract class TableDesignerBase : ITableDesigner
         foreach (var change in alteration.AlteredColumns)
         {
             statements.AddRange(AlterColumn(table, change));
+        }
+
+        if (alteration.NewPrimaryKey is { Columns.Count: > 0 } primaryKey)
+        {
+            var named = primaryKey.Name is null
+                ? string.Empty
+                : $"CONSTRAINT {Quote(primaryKey.Name)} ";
+
+            statements.Add(
+                $"ALTER TABLE {table} ADD {named}PRIMARY KEY " +
+                $"({string.Join(", ", primaryKey.Columns.Select(Quote))});");
+        }
+
+        foreach (var unique in alteration.AddedUniqueConstraints)
+        {
+            statements.Add(
+                $"ALTER TABLE {table} ADD CONSTRAINT {Quote(unique.Name)} UNIQUE " +
+                $"({string.Join(", ", unique.Columns.Select(Quote))});");
+        }
+
+        foreach (var check in alteration.AddedCheckConstraints)
+        {
+            statements.Add(
+                $"ALTER TABLE {table} ADD CONSTRAINT {Quote(check.Name)} " +
+                $"CHECK ({check.Expression.Trim()});");
+        }
+
+        foreach (var foreignKey in alteration.AddedForeignKeys)
+        {
+            statements.Add($"ALTER TABLE {table} ADD {ForeignKeyBody(foreignKey)};");
+        }
+
+        foreach (var index in alteration.AddedIndexes)
+        {
+            statements.Add(CreateIndex(table, alteration.Table, index));
+        }
+
+        foreach (var change in alteration.AlteredIndexes)
+        {
+            statements.Add(CreateIndex(table, alteration.Table, change.Index));
         }
 
         foreach (var dropped in alteration.DroppedColumns)

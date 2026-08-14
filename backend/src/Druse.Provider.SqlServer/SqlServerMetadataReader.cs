@@ -141,6 +141,285 @@ public sealed class SqlServerMetadataReader : IDatabaseMetadataReader
         };
     }
 
+    public async Task<TableStructure> GetTableStructureAsync(
+        IDatabaseSession session,
+        DatabaseObject table,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(table);
+
+        var schema = table.Schema ?? "dbo";
+
+        var indexes = await GetIndexesAsync(session, schema, table.Name, cancellationToken);
+        var foreignKeys = await GetForeignKeysAsync(session, schema, table.Name, cancellationToken);
+        var uniques = await GetUniqueConstraintsAsync(session, schema, table.Name, cancellationToken);
+        var checks = await GetCheckConstraintsAsync(session, schema, table.Name, cancellationToken);
+
+        var primary = indexes.FirstOrDefault(index => index.IsPrimaryKey);
+
+        return new TableStructure
+        {
+            PrimaryKey = primary is null
+                ? null
+                : new DatabasePrimaryKey
+                {
+                    Name = primary.Name,
+                    Columns = [.. primary.Columns.Select(column => column.Name)],
+                },
+            Indexes = indexes,
+            ForeignKeys = foreignKeys,
+            UniqueConstraints = uniques,
+            CheckConstraints = checks,
+        };
+    }
+
+    /// <summary>
+    /// Índices con sus columnas de clave y las incluidas.
+    ///
+    /// Se descarta el montón (`index_id = 0`): no es un índice que alguien haya
+    /// creado, sino la ausencia de uno, y ofrecerlo para borrar no tendría
+    /// sentido. Las columnas se juntan con <c>STRING_AGG</c> ordenando por
+    /// <c>key_ordinal</c>, porque en un índice el orden es lo que decide su uso.
+    /// </summary>
+    private static async Task<IReadOnlyList<DatabaseIndex>> GetIndexesAsync(
+        IDatabaseSession session,
+        string schema,
+        string table,
+        CancellationToken cancellationToken)
+    {
+        const string Sql = """
+            SELECT
+                i.name,
+                i.is_unique,
+                i.is_primary_key,
+                CASE WHEN i.is_primary_key = 1 OR i.is_unique_constraint = 1 THEN 1 ELSE 0 END,
+                LOWER(i.type_desc),
+                i.filter_definition,
+                (
+                    SELECT STRING_AGG(
+                        c.name + CASE WHEN ic.is_descending_key = 1 THEN ' DESC' ELSE ' ASC' END,
+                        CHAR(31)) WITHIN GROUP (ORDER BY ic.key_ordinal)
+                    FROM sys.index_columns ic
+                    JOIN sys.columns c
+                      ON c.object_id = ic.object_id AND c.column_id = ic.column_id
+                    WHERE ic.object_id = i.object_id
+                      AND ic.index_id = i.index_id
+                      AND ic.is_included_column = 0
+                ),
+                (
+                    SELECT STRING_AGG(c.name, CHAR(31)) WITHIN GROUP (ORDER BY ic.index_column_id)
+                    FROM sys.index_columns ic
+                    JOIN sys.columns c
+                      ON c.object_id = ic.object_id AND c.column_id = ic.column_id
+                    WHERE ic.object_id = i.object_id
+                      AND ic.index_id = i.index_id
+                      AND ic.is_included_column = 1
+                )
+            FROM sys.indexes i
+            JOIN sys.tables t   ON t.object_id = i.object_id
+            JOIN sys.schemas s  ON s.schema_id = t.schema_id
+            WHERE s.name = @schema
+              AND t.name = @table
+              AND i.index_id > 0
+              AND i.name IS NOT NULL
+            ORDER BY i.name
+            """;
+
+        return await QueryAsync(
+            session,
+            Sql,
+            reader => new DatabaseIndex
+            {
+                Name = reader.GetString(0),
+                IsUnique = reader.GetBoolean(1),
+                IsPrimaryKey = reader.GetBoolean(2),
+                IsConstraintIndex = reader.GetInt32(3) != 0,
+                Method = reader.IsDBNull(4) ? null : reader.GetString(4),
+                Filter = reader.IsDBNull(5) ? null : reader.GetString(5),
+                Columns = reader.IsDBNull(6) ? [] : ParseIndexColumns(reader.GetString(6)),
+                IncludedColumns = reader.IsDBNull(7) ? [] : Split(reader.GetString(7)),
+            },
+            cancellationToken,
+            ("schema", schema),
+            ("table", table));
+    }
+
+    private static async Task<IReadOnlyList<DatabaseForeignKey>> GetForeignKeysAsync(
+        IDatabaseSession session,
+        string schema,
+        string table,
+        CancellationToken cancellationToken)
+    {
+        // Las dos listas de columnas se ordenan por `constraint_column_id`, que es
+        // lo que las empareja: son posicionales, no coincidentes por nombre.
+        const string Sql = """
+            SELECT
+                fk.name,
+                rs.name AS referenced_schema,
+                rt.name AS referenced_table,
+                fk.delete_referential_action,
+                fk.update_referential_action,
+                (
+                    SELECT STRING_AGG(c.name, CHAR(31)) WITHIN GROUP (ORDER BY fkc.constraint_column_id)
+                    FROM sys.foreign_key_columns fkc
+                    JOIN sys.columns c
+                      ON c.object_id = fkc.parent_object_id AND c.column_id = fkc.parent_column_id
+                    WHERE fkc.constraint_object_id = fk.object_id
+                ),
+                (
+                    SELECT STRING_AGG(c.name, CHAR(31)) WITHIN GROUP (ORDER BY fkc.constraint_column_id)
+                    FROM sys.foreign_key_columns fkc
+                    JOIN sys.columns c
+                      ON c.object_id = fkc.referenced_object_id AND c.column_id = fkc.referenced_column_id
+                    WHERE fkc.constraint_object_id = fk.object_id
+                )
+            FROM sys.foreign_keys fk
+            JOIN sys.tables t   ON t.object_id = fk.parent_object_id
+            JOIN sys.schemas s  ON s.schema_id = t.schema_id
+            JOIN sys.tables rt  ON rt.object_id = fk.referenced_object_id
+            JOIN sys.schemas rs ON rs.schema_id = rt.schema_id
+            WHERE s.name = @schema
+              AND t.name = @table
+            ORDER BY fk.name
+            """;
+
+        return await QueryAsync(
+            session,
+            Sql,
+            reader => new DatabaseForeignKey
+            {
+                Name = reader.GetString(0),
+                ReferencedSchema = reader.GetString(1),
+                ReferencedTable = reader.GetString(2),
+                OnDelete = ParseAction(reader.GetByte(3)),
+                OnUpdate = ParseAction(reader.GetByte(4)),
+                Columns = reader.IsDBNull(5) ? [] : Split(reader.GetString(5)),
+                ReferencedColumns = reader.IsDBNull(6) ? [] : Split(reader.GetString(6)),
+            },
+            cancellationToken,
+            ("schema", schema),
+            ("table", table));
+    }
+
+    private static async Task<IReadOnlyList<DatabaseUniqueConstraint>> GetUniqueConstraintsAsync(
+        IDatabaseSession session,
+        string schema,
+        string table,
+        CancellationToken cancellationToken)
+    {
+        const string Sql = """
+            SELECT
+                i.name,
+                (
+                    SELECT STRING_AGG(c.name, CHAR(31)) WITHIN GROUP (ORDER BY ic.key_ordinal)
+                    FROM sys.index_columns ic
+                    JOIN sys.columns c
+                      ON c.object_id = ic.object_id AND c.column_id = ic.column_id
+                    WHERE ic.object_id = i.object_id
+                      AND ic.index_id = i.index_id
+                      AND ic.is_included_column = 0
+                )
+            FROM sys.indexes i
+            JOIN sys.tables t   ON t.object_id = i.object_id
+            JOIN sys.schemas s  ON s.schema_id = t.schema_id
+            WHERE s.name = @schema
+              AND t.name = @table
+              AND i.is_unique_constraint = 1
+            ORDER BY i.name
+            """;
+
+        return await QueryAsync(
+            session,
+            Sql,
+            reader => new DatabaseUniqueConstraint
+            {
+                Name = reader.GetString(0),
+                Columns = reader.IsDBNull(1) ? [] : Split(reader.GetString(1)),
+            },
+            cancellationToken,
+            ("schema", schema),
+            ("table", table));
+    }
+
+    private static async Task<IReadOnlyList<DatabaseCheckConstraint>> GetCheckConstraintsAsync(
+        IDatabaseSession session,
+        string schema,
+        string table,
+        CancellationToken cancellationToken)
+    {
+        const string Sql = """
+            SELECT cc.name, cc.definition
+            FROM sys.check_constraints cc
+            JOIN sys.tables t   ON t.object_id = cc.parent_object_id
+            JOIN sys.schemas s  ON s.schema_id = t.schema_id
+            WHERE s.name = @schema
+              AND t.name = @table
+            ORDER BY cc.name
+            """;
+
+        return await QueryAsync(
+            session,
+            Sql,
+            reader => new DatabaseCheckConstraint
+            {
+                Name = reader.GetString(0),
+                Expression = Unwrap(reader.GetString(1)),
+            },
+            cancellationToken,
+            ("schema", schema),
+            ("table", table));
+    }
+
+    /// <summary>
+    /// Parte una lista agregada por el servidor.
+    ///
+    /// El separador es el carácter 31, «separador de unidad», y no una coma: un
+    /// nombre de columna puede llevar comas, y con ellas la lista se partiría
+    /// donde no debe.
+    /// </summary>
+    private static string[] Split(string aggregated) =>
+        aggregated.Split('\u001f', StringSplitOptions.RemoveEmptyEntries);
+
+    private static IReadOnlyList<IndexColumn> ParseIndexColumns(string aggregated) =>
+    [
+        .. Split(aggregated).Select(entry =>
+        {
+            var descending = entry.EndsWith(" DESC", StringComparison.Ordinal);
+            var separator = entry.LastIndexOf(' ');
+
+            return new IndexColumn
+            {
+                Name = separator < 0 ? entry : entry[..separator],
+                Direction = descending ? IndexSortDirection.Descending : IndexSortDirection.Ascending,
+            };
+        }),
+    ];
+
+    /// <summary>
+    /// Quita los paréntesis con los que SQL Server envuelve una condición.
+    ///
+    /// El motor guarda `([precio]&gt;(0))` donde se escribió `precio &gt; 0`. Se
+    /// retira solo el par exterior; normalizar el resto sería reescribir lo que
+    /// el motor dice que tiene.
+    /// </summary>
+    private static string Unwrap(string definition)
+    {
+        var trimmed = definition.Trim();
+
+        return trimmed.StartsWith('(') && trimmed.EndsWith(')')
+            ? trimmed[1..^1].Trim()
+            : trimmed;
+    }
+
+    /// <summary>Traduce el código de una acción referencial de SQL Server.</summary>
+    private static ForeignKeyAction ParseAction(byte code) => code switch
+    {
+        1 => ForeignKeyAction.Cascade,
+        2 => ForeignKeyAction.SetNull,
+        3 => ForeignKeyAction.SetDefault,
+        _ => ForeignKeyAction.NoAction,
+    };
+
     private static async Task<string> GetViewDefinitionAsync(
         IDatabaseSession session,
         DatabaseObject view,

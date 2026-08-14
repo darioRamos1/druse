@@ -18,6 +18,19 @@ public sealed class SqlServerTableDesigner : TableDesignerBase
         "UNIQUEIDENTIFIER", "VARBINARY(MAX)",
     ];
 
+    /// <summary>
+    /// SQL Server admite columnas incluidas y filtros, pero no elegir estructura:
+    /// un índice es un árbol B salvo que sea de otro tipo —columnar, espacial—,
+    /// y esos no se crean con esta forma de instrucción.
+    /// </summary>
+    public override IndexCapabilities IndexCapabilities => new()
+    {
+        SupportsIncludedColumns = true,
+        SupportsFilter = true,
+        SupportsSortDirection = true,
+        Methods = [],
+    };
+
     /// <summary>Corchetes, duplicando el de cierre para que no se pueda escapar.</summary>
     protected override string Quote(string identifier) =>
         $"[{identifier.Replace("]", "]]", StringComparison.Ordinal)}]";
@@ -75,6 +88,16 @@ public sealed class SqlServerTableDesigner : TableDesignerBase
         DatabaseObject table,
         string newName) =>
         $"EXEC sp_rename '{Escape(qualifiedTable)}', '{Escape(newName)}';";
+
+    /// <summary>Aquí el índice pertenece a la tabla y hay que nombrarla al borrarlo.</summary>
+    protected override string DropIndex(
+        string qualifiedTable,
+        DatabaseObject table,
+        string indexName) =>
+        $"DROP INDEX {Quote(indexName)} ON {qualifiedTable};";
+
+    /// <summary>SQL Server no admite `USING`: la estructura no se elige.</summary>
+    protected override string IndexMethodClause(IndexDefinition index) => string.Empty;
 
     /// <summary>Escapa una comilla simple para meter un nombre dentro de un literal.</summary>
     private static string Escape(string value) =>

@@ -18,6 +18,20 @@ public sealed class PostgreSqlTableDesigner : TableDesignerBase
         "uuid", "json", "jsonb", "bytea",
     ];
 
+    /// <summary>
+    /// PostgreSQL es el más completo de los tres en índices: admite columnas
+    /// incluidas desde la 11, índices parciales desde siempre y varias
+    /// estructuras. `hash` y `brin` se ofrecen porque tienen usos claros, no por
+    /// listar todo lo que existe.
+    /// </summary>
+    public override IndexCapabilities IndexCapabilities => new()
+    {
+        SupportsIncludedColumns = true,
+        SupportsFilter = true,
+        SupportsSortDirection = true,
+        Methods = ["btree", "hash", "gin", "gist", "brin"],
+    };
+
     /// <summary>Comillas dobles, duplicándolas para que no se pueda escapar.</summary>
     protected override string Quote(string identifier) =>
         $"\"{identifier.Replace("\"", "\"\"", StringComparison.Ordinal)}\"";
@@ -82,4 +96,20 @@ public sealed class PostgreSqlTableDesigner : TableDesignerBase
         DatabaseObject table,
         string newName) =>
         $"ALTER TABLE {qualifiedTable} RENAME TO {Quote(newName)};";
+
+    /// <summary>
+    /// Aquí un índice es un objeto del esquema, no algo colgado de la tabla.
+    ///
+    /// Por eso se borra por su nombre calificado y sin mencionar la tabla, que es
+    /// justo al revés que en SQL Server y MySQL.
+    /// </summary>
+    protected override string DropIndex(
+        string qualifiedTable,
+        DatabaseObject table,
+        string indexName)
+    {
+        ArgumentNullException.ThrowIfNull(table);
+
+        return $"DROP INDEX {Qualify(table.Database, table.Schema, indexName)};";
+    }
 }
