@@ -43,7 +43,7 @@ public static class SqlSafetyAnalyzer
         RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.Compiled);
 
     private static readonly Regex UpdatePattern = new(
-        @"\bUPDATE\s+\w",
+        @"\bUPDATE\b",
         RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.Compiled);
 
     private static readonly Regex WherePattern = new(

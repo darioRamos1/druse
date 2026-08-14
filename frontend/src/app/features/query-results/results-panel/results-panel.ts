@@ -51,7 +51,7 @@ export class ResultsPanel {
   readonly refreshHistory = output<void>();
   readonly searchHistory = output<string>();
   readonly clearHistory = output<void>();
-  readonly reuseQuery = output<string>();
+  readonly reuseQuery = output<QueryHistoryEntry>();
   readonly exportAs = output<ExportFormat>();
   readonly copied = output<string>();
   readonly copyFailed = output<void>();

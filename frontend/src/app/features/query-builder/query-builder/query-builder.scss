@@ -71,6 +71,33 @@
   padding: 16px 20px;
 }
 
+.operations {
+  display: flex;
+  gap: 2px;
+  padding: 8px 20px 0;
+  border-bottom: 1px solid var(--dr-border);
+
+  button {
+    padding: 8px 14px 9px;
+    border: 0;
+    border-bottom: 2px solid transparent;
+    background: transparent;
+    color: var(--dr-text-tertiary);
+    font-family: var(--dr-font-mono);
+    font-size: 11.5px;
+    cursor: pointer;
+
+    &:hover {
+      color: var(--dr-text);
+    }
+
+    &.is-active {
+      border-bottom-color: var(--dr-accent);
+      color: var(--dr-accent-bright);
+    }
+  }
+}
+
 .block {
   margin-bottom: 18px;
 
@@ -95,6 +122,10 @@
   margin: 0 0 8px;
   color: var(--dr-text-tertiary);
   font-size: 11.5px;
+}
+
+.hint--warning {
+  color: #d7b66f;
 }
 
 /* Las columnas se marcan a golpe de vista: son lo que más se toca aquí. */
@@ -138,6 +169,43 @@
   }
 }
 
+.join-card {
+  &__head {
+    display: grid;
+    grid-template-columns: auto minmax(115px, 0.5fr) minmax(190px, 1fr) auto;
+    gap: 7px;
+  }
+}
+
+.join-search {
+  position: relative;
+}
+
+.join-suggestions {
+  position: absolute;
+  z-index: 4;
+  top: 100%;
+  width: 100%;
+  max-height: 14rem;
+  overflow: auto;
+}
+
+.join-condition {
+  display: grid;
+  grid-template-columns: auto minmax(120px, 1fr) auto minmax(120px, 1fr);
+  gap: 7px;
+}
+
+.join-columns {
+  display: flex;
+  flex-wrap: wrap;
+
+  label {
+    display: flex;
+    cursor: pointer;
+  }
+}
+
 .filter {
   display: flex;
   gap: 6px;
@@ -154,6 +222,7 @@
 
 select,
 input[type='text'],
+input[type='search'],
 input[type='number'] {
   padding: 5px 8px;
   border: 1px solid var(--dr-border-subtle);
@@ -162,6 +231,68 @@ input[type='number'] {
   color: var(--dr-text);
   font-family: var(--dr-font-mono);
   font-size: 12px;
+}
+
+.value-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 6px;
+  border: 1px solid var(--dr-border);
+  border-radius: 8px;
+  background: var(--dr-surface-base);
+}
+
+.value-row {
+  display: grid;
+  grid-template-columns: minmax(150px, 0.8fr) minmax(170px, 0.8fr) minmax(180px, 1.4fr);
+  gap: 8px;
+  align-items: center;
+  min-height: 38px;
+  padding: 4px 7px;
+  border-radius: 6px;
+
+  &:hover {
+    background: #151b27;
+  }
+
+  &.is-disabled {
+    opacity: 0.58;
+  }
+
+  input,
+  select {
+    width: 100%;
+    min-width: 0;
+  }
+
+  &__column {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+
+    strong {
+      overflow: hidden;
+      font-family: var(--dr-font-mono);
+      font-size: 12px;
+      font-weight: 500;
+      text-overflow: ellipsis;
+    }
+
+    span {
+      overflow: hidden;
+      color: var(--dr-text-faint);
+      font-size: 10.5px;
+      text-overflow: ellipsis;
+    }
+  }
+
+  &__automatic,
+  &__detail {
+    grid-column: span 2;
+    color: var(--dr-text-faint);
+    font-size: 11px;
+  }
 }
 
 .filter input[type='text'] {
@@ -207,7 +338,26 @@ input[type='number'] {
 
 /* El SQL se ve mientras se compone: esconderlo obligaría a aprender la
    interfaz en lugar de aprender SQL, que es lo que sirve fuera de Druse. */
+.preview__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.reset {
+  border: 0;
+  background: transparent;
+  color: var(--dr-accent-bright);
+  font-size: 11px;
+  cursor: pointer;
+}
+
 .sql {
+  display: block;
+  width: 100%;
+  min-height: 145px;
+  resize: vertical;
+  box-sizing: border-box;
   margin: 0;
   padding: 10px 12px;
   overflow-x: auto;
@@ -270,5 +420,34 @@ input[type='number'] {
     border-color: rgb(108 139 255 / 40%);
     background: rgb(108 139 255 / 14%);
     color: var(--dr-accent-bright);
+  }
+}
+
+@media (max-width: 680px) {
+  .dialog {
+    max-width: calc(100vw - 16px);
+    max-height: calc(100vh - 16px);
+  }
+
+  .value-row {
+    grid-template-columns: 1fr;
+
+    &__automatic,
+    &__detail {
+      grid-column: auto;
+    }
+  }
+
+  .join-card__head,
+  .join-condition {
+    grid-template-columns: 1fr;
+  }
+
+  .filter {
+    flex-wrap: wrap;
+
+    input[type='text'] {
+      flex-basis: 100%;
+    }
   }
 }

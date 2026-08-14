@@ -279,7 +279,7 @@ internal static class DatabaseEndpoints
                     Id = result.ExecutionId,
                     ConnectionId = session.Profile.Id,
                     ConnectionName = session.Profile.Name,
-                    Database = session.Profile.Database,
+                    Database = request.Database ?? session.Profile.Database,
                     Sql = request.Sql,
                     ExecutedAtUtc = DateTimeOffset.UtcNow,
                     DurationMs = (long)result.Duration.TotalMilliseconds,

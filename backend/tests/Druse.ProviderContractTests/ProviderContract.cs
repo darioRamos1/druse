@@ -40,8 +40,15 @@ public interface IProviderFixture
     /// <summary>Nombre de la base de pruebas.</summary>
     string DatabaseName { get; }
 
+    /// <summary>Segunda base autorizada para comprobar la navegación multibase.</summary>
+    string SecondaryDatabaseName { get; }
+
     /// <summary>Esquema por omisión: `public` en PostgreSQL, `dbo` en SQL Server.</summary>
     string DefaultSchema { get; }
+
+    string DefaultSchemaFor(string database);
+
+    ConnectionProfile ProfileForDatabase(string database, bool onlyRead = false);
 
     // --- SQL que cambia entre motores ---------------------------------------
 

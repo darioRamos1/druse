@@ -54,6 +54,14 @@ public abstract class DatabaseProviderContractTests<TFixture>
             Fixture.Credentials,
             CancellationToken.None);
 
+    private async Task<IDatabaseSession> OpenDatabaseAsync(
+        string database,
+        bool onlyRead = false) =>
+        await Fixture.Provider.OpenSessionAsync(
+            Fixture.ProfileForDatabase(database, onlyRead),
+            Fixture.Credentials,
+            CancellationToken.None);
+
     private static QueryRequest Query(string sql, int maxRows = 500, int timeoutSeconds = 30) => new()
     {
         SessionId = Guid.NewGuid(),
@@ -561,6 +569,86 @@ public abstract class DatabaseProviderContractTests<TFixture>
         finally
         {
             await ExecuteAsync(session, Fixture.DropProcedure(procedureName));
+        }
+    }
+
+    [Fact]
+    public async Task UnaSegundaBaseAutorizada_SeListaYSePuedeRecorrer()
+    {
+        if (Skip) { return; }
+
+        var databaseName = Fixture.SecondaryDatabaseName;
+        var schemaName = Fixture.DefaultSchemaFor(databaseName);
+        var tableName = $"druse_multibase_{Guid.NewGuid():N}";
+        var viewName = $"druse_multibase_view_{Guid.NewGuid():N}";
+
+        await using var browser = await OpenAsync();
+        await using var selected = await Fixture.Provider.OpenDatabaseSessionAsync(
+            browser,
+            databaseName,
+            CancellationToken.None);
+
+        try
+        {
+            Assert.Equal(
+                QueryExecutionState.Succeeded,
+                (await ExecuteAsync(selected, Fixture.CreateTableWithColumns(tableName))).State);
+            Assert.Equal(
+                QueryExecutionState.Succeeded,
+                (await ExecuteAsync(selected, Fixture.CreateView(viewName))).State);
+
+            var databases = await Fixture.Metadata.GetDatabasesAsync(
+                browser,
+                CancellationToken.None);
+            var database = Assert.Single(databases, item => item.Name == databaseName);
+
+            var schemas = await Fixture.Metadata.GetChildrenAsync(
+                selected,
+                database,
+                CancellationToken.None);
+            var schema = Assert.Single(schemas, item => item.Name == schemaName);
+            Assert.Equal(databaseName, schema.Database);
+
+            var folders = await Fixture.Metadata.GetChildrenAsync(
+                selected,
+                schema,
+                CancellationToken.None);
+            var tablesFolder = Assert.Single(folders, item => item.Name == "Tables");
+            var viewsFolder = Assert.Single(folders, item => item.Name == "Views");
+
+            var tables = await Fixture.Metadata.GetChildrenAsync(
+                selected,
+                tablesFolder,
+                CancellationToken.None);
+            var table = Assert.Single(tables, item => item.Name == tableName);
+            Assert.Equal(databaseName, table.Database);
+
+            var columns = await Fixture.Metadata.GetColumnsAsync(
+                selected,
+                table,
+                CancellationToken.None);
+            Assert.Equal(4, columns.Count);
+            Assert.True(columns[0].IsPrimaryKey);
+
+            var views = await Fixture.Metadata.GetChildrenAsync(
+                selected,
+                viewsFolder,
+                CancellationToken.None);
+            var view = Assert.Single(views, item => item.Name == viewName);
+            var definition = await Fixture.Metadata.GetDefinitionAsync(
+                selected,
+                view,
+                CancellationToken.None);
+
+            Assert.Contains("VIEW", definition, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains(viewName, definition, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("valor", definition, StringComparison.OrdinalIgnoreCase);
+            Assert.True(browser.IsOpen);
+        }
+        finally
+        {
+            await ExecuteAsync(selected, Fixture.DropView(viewName));
+            await ExecuteAsync(selected, Fixture.DropTable(tableName));
         }
     }
 

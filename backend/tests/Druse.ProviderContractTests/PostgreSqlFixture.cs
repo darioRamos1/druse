@@ -26,7 +26,12 @@ public sealed class PostgreSqlFixture : IProviderFixture
     public string DatabaseName =>
         Environment.GetEnvironmentVariable("DRUSE_TEST_PG_DB") ?? "druse_test";
 
+    public string SecondaryDatabaseName =>
+        Environment.GetEnvironmentVariable("DRUSE_TEST_PG_SECOND_DB") ?? "druse_test_secondary";
+
     public string DefaultSchema => "public";
+
+    public string DefaultSchemaFor(string database) => "public";
 
     public ConnectionProfile Profile(bool onlyRead = false) => new()
     {
@@ -42,6 +47,9 @@ public sealed class PostgreSqlFixture : IProviderFixture
         ReadOnly = onlyRead,
         ConnectTimeoutSeconds = 5,
     };
+
+    public ConnectionProfile ProfileForDatabase(string database, bool onlyRead = false) =>
+        Profile(onlyRead) with { Id = Guid.NewGuid(), Database = database };
 
     public DatabaseCredentials Credentials =>
         new(Environment.GetEnvironmentVariable("DRUSE_TEST_PG_PASSWORD") ?? "druse_dev_only");

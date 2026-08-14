@@ -53,6 +53,17 @@ public sealed class SqlSafetyAnalyzerTests
         Assert.Contains(risks, risk => risk.Kind == SqlRiskKind.UpdateWithoutFilter);
     }
 
+    [Theory]
+    [InlineData("UPDATE \"public\".\"users\" SET \"name\" = 'Ana';")]
+    [InlineData("UPDATE [dbo].[users] SET [name] = 'Ana';")]
+    [InlineData("UPDATE `users` SET `name` = 'Ana';")]
+    public void DetectaUpdateSinWhereConIdentificadoresCitados(string sql)
+    {
+        var risks = SqlSafetyAnalyzer.Analyze(sql);
+
+        Assert.Contains(risks, risk => risk.Kind == SqlRiskKind.UpdateWithoutFilter);
+    }
+
     [Fact]
     public void NoMarcaUpdateConWhere()
     {

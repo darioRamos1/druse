@@ -5,123 +5,448 @@
     <div>
       <h2 class="title" id="builder-title">Componer consulta sobre {{ table().name }}</h2>
       <p class="subtitle">
-        Lo que salga es un punto de partida: se inserta en el editor y se sigue a mano.
+        {{ table().database }} · {{ table().schema }} · {{ engine() }}
       </p>
     </div>
     <button type="button" class="close" (click)="close()" aria-label="Cerrar">×</button>
   </header>
 
+  <nav class="operations" aria-label="Tipo de consulta">
+    <button
+      type="button"
+      [class.is-active]="operation() === 'select'"
+      (click)="setOperation('select')"
+    >
+      SELECT
+    </button>
+    @if (table().kind === 'table') {
+      <button
+        type="button"
+        [class.is-active]="operation() === 'insert'"
+        (click)="setOperation('insert')"
+      >
+        INSERT
+      </button>
+      <button
+        type="button"
+        [class.is-active]="operation() === 'update'"
+        (click)="setOperation('update')"
+      >
+        UPDATE
+      </button>
+    }
+  </nav>
+
   <div class="body">
-    <section class="block">
-      <h3 class="block__title">Columnas</h3>
-      <p class="hint">Sin marcar ninguna se escribe <code>*</code>.</p>
+    @if (operation() === 'select') {
+      <section class="block">
+        <h3 class="block__title">Columnas</h3>
+        <p class="hint">Sin marcar ninguna se escribe <code>*</code>.</p>
 
-      <div class="columns">
-        @for (column of columns(); track column.name) {
-          <label class="column" [class.is-on]="isChosen(column.name)">
-            <input
-              type="checkbox"
-              [checked]="isChosen(column.name)"
-              (change)="toggleColumn(column.name)"
-            />
-            <span class="column__name">{{ column.name }}</span>
-            <span class="column__type">{{ column.dataType }}</span>
-          </label>
-        } @empty {
-          <p class="hint">
-            @if (loading()) {
-              Cargando las columnas…
+        <div class="columns">
+          @for (column of columns(); track column.name) {
+            <label class="column" [class.is-on]="isChosen(column.name)">
+              <input
+                type="checkbox"
+                [checked]="isChosen(column.name)"
+                (change)="toggleColumn(column.name)"
+              />
+              <span class="column__name">{{ column.name }}</span>
+              <span class="column__type">{{ column.dataType }}</span>
+            </label>
+          } @empty {
+            <p class="hint">
+              @if (loading()) {
+                Cargando las columnas…
+              } @else {
+                No se pudieron cargar columnas para este objeto.
+              }
+            </p>
+          }
+        </div>
+      </section>
+
+      <section class="block joins-block">
+        <h3 class="block__title">Cruces con otras tablas</h3>
+        <p class="hint">
+          Añade tablas de {{ table().database }} y elige cómo se relacionan con {{ table().name }}.
+        </p>
+
+        @for (join of joins(); track join.id; let joinIndex = $index) {
+          <article class="join-card">
+            <header class="join-card__head">
+              <span class="join-card__alias">t{{ joinIndex + 1 }}</span>
+              <select
+                [value]="join.type"
+                (change)="patchJoin(join.id, { type: $any($event.target).value })"
+                aria-label="Tipo de JOIN"
+              >
+                @for (type of joinTypes(); track type) {
+                  <option [value]="type">{{ type }} JOIN</option>
+                }
+              </select>
+              <div class="join-search">
+                <input
+                  type="search"
+                  [value]="join.search"
+                  (input)="searchJoinTable(join.id, $any($event.target).value)"
+                  (focus)="openJoinSuggestions(join.id)"
+                  (keydown)="onJoinSearchKeydown($event, join)"
+                  (blur)="closeJoinSuggestions(join.id)"
+                  placeholder="Buscar esquema.tabla"
+                  aria-label="Buscar tabla para JOIN"
+                  role="combobox"
+                  aria-autocomplete="list"
+                  [attr.aria-expanded]="join.suggestionsOpen"
+                  [attr.aria-controls]="'join-suggestions-' + join.id"
+                  [attr.aria-activedescendant]="
+                    join.suggestionsOpen ? 'join-option-' + join.id + '-' + join.highlighted : null
+                  "
+                  autocomplete="off"
+                />
+                @if (join.suggestionsOpen) {
+                  <div
+                    class="join-suggestions"
+                    [id]="'join-suggestions-' + join.id"
+                    role="listbox"
+                  >
+                    @for (suggestion of joinSuggestions(join); track suggestion.id; let optionIndex = $index) {
+                      <button
+                        type="button"
+                        role="option"
+                        [id]="'join-option-' + join.id + '-' + optionIndex"
+                        [class.is-active]="optionIndex === join.highlighted"
+                        [attr.aria-selected]="optionIndex === join.highlighted"
+                        [attr.data-value]="suggestionLabel(suggestion)"
+                        (mouseenter)="patchJoin(join.id, { highlighted: optionIndex })"
+                        (mousedown)="selectJoinSuggestion($event, join.id, suggestion)"
+                      >
+                        <span class="join-suggestions__mark" [attr.data-kind]="suggestion.kind">
+                          {{ suggestion.kind === 'schema' ? 'S' : 'T' }}
+                        </span>
+                        <span class="join-suggestions__text">
+                          @if (suggestion.kind === 'schema') {
+                            <strong>{{ suggestion.schema }}</strong>
+                            <small>Cargar tablas de este esquema</small>
+                          } @else {
+                            <strong>{{ suggestion.table }}</strong>
+                            <small>{{ suggestion.schema }}</small>
+                          }
+                        </span>
+                        <span class="join-suggestions__kind">{{ suggestion.kind }}</span>
+                      </button>
+                    } @empty {
+                      <span class="join-suggestions__empty">Sin coincidencias</span>
+                    }
+                  </div>
+                }
+              </div>
+              <button
+                type="button"
+                class="icon"
+                (click)="removeJoin(join.id)"
+                aria-label="Quitar JOIN"
+              >
+                ×
+              </button>
+            </header>
+
+            @if (join.type !== 'CROSS') {
+              <div class="join-condition">
+                <span class="join-condition__label">ON t0.</span>
+                <select
+                  [value]="join.leftColumn"
+                  (change)="patchJoin(join.id, { leftColumn: $any($event.target).value })"
+                  aria-label="Columna de la tabla principal"
+                >
+                  @for (column of columns(); track column.name) {
+                    <option [value]="column.name">{{ column.name }}</option>
+                  }
+                </select>
+                <span>= t{{ joinIndex + 1 }}.</span>
+                <select
+                  [value]="join.rightColumn"
+                  (change)="patchJoin(join.id, { rightColumn: $any($event.target).value })"
+                  aria-label="Columna de la tabla cruzada"
+                >
+                  @for (column of join.columns; track column.name) {
+                    <option [value]="column.name">{{ column.name }}</option>
+                  }
+                </select>
+              </div>
             } @else {
-              No se pudieron cargar columnas para este objeto.
+              <p class="hint join-card__cross">CROSS JOIN combina cada fila con todas las filas de la otra tabla.</p>
             }
-          </p>
+
+            <div class="join-columns">
+              <span class="join-columns__label">Devolver columnas:</span>
+              @for (column of join.columns; track column.name) {
+                <label [class.is-on]="join.chosen.includes(column.name)">
+                  <input
+                    type="checkbox"
+                    [checked]="join.chosen.includes(column.name)"
+                    (change)="toggleJoinColumn(join.id, column.name)"
+                  />
+                  {{ column.name }}
+                </label>
+              } @empty {
+                <span class="hint">{{ join.loading ? 'Cargando columnas…' : 'Sin columnas visibles' }}</span>
+              }
+            </div>
+          </article>
         }
-      </div>
-    </section>
 
-    <section class="block">
-      <h3 class="block__title">Filtros</h3>
+        <button
+          type="button"
+          class="btn btn--small"
+          [disabled]="availableRelations().length === 0 && availableSchemas().length === 0"
+          (click)="addJoin()"
+        >
+          Añadir JOIN
+        </button>
+        @if (availableRelations().length === 0 && availableSchemas().length === 0) {
+          <span class="hint join-empty">No hay otros esquemas o tablas visibles en esta base.</span>
+        }
+      </section>
 
-      @for (filter of filters(); track $index) {
-        <div class="filter">
-          <select
-            [value]="filter.column"
-            (change)="patchFilter($index, { column: $any($event.target).value })"
-            aria-label="Columna"
-          >
+      <section class="block">
+        <h3 class="block__title">Filtros</h3>
+
+        @for (filter of filters(); track $index) {
+          <div class="filter">
+            <select
+              [value]="filter.column"
+              (change)="patchFilter($index, { column: $any($event.target).value })"
+              aria-label="Columna"
+            >
+              @for (column of columns(); track column.name) {
+                <option [value]="column.name">{{ column.name }}</option>
+              }
+            </select>
+
+            <select
+              [value]="filter.operator"
+              (change)="patchFilter($index, { operator: $any($event.target).value })"
+              aria-label="Operador"
+            >
+              @for (operator of operators; track operator) {
+                <option [value]="operator">{{ operator }}</option>
+              }
+            </select>
+
+            @if (needsValue(filter.operator)) {
+              <input
+                type="text"
+                [value]="filter.value ?? ''"
+                (input)="patchFilter($index, { value: $any($event.target).value })"
+                [attr.placeholder]="filter.operator === 'IN' ? '1, 2, 3' : 'valor'"
+                aria-label="Valor"
+              />
+            } @else {
+              <span class="filter__novalue">sin valor</span>
+            }
+
+            <button type="button" class="icon" (click)="removeFilter($index)" aria-label="Quitar filtro">
+              ×
+            </button>
+          </div>
+        }
+
+        <button type="button" class="btn btn--small" (click)="addFilter()">Añadir filtro</button>
+      </section>
+
+      <section class="block block--row">
+        <label class="field">
+          <span class="field__label">Ordenar por</span>
+          <select [value]="orderBy()" (change)="orderBy.set($any($event.target).value)">
+            <option value="">(sin orden)</option>
             @for (column of columns(); track column.name) {
               <option [value]="column.name">{{ column.name }}</option>
             }
           </select>
+        </label>
 
-          <select
-            [value]="filter.operator"
-            (change)="patchFilter($index, { operator: $any($event.target).value })"
-            aria-label="Operador"
-          >
-            @for (operator of operators; track operator) {
-              <option [value]="operator">{{ operator }}</option>
-            }
-          </select>
+        <label class="check">
+          <input type="checkbox" [checked]="descending()" (change)="descending.set(!descending())" />
+          Descendente
+        </label>
 
-          @if (needsValue(filter.operator)) {
-            <input
-              type="text"
-              [value]="filter.value"
-              (input)="patchFilter($index, { value: $any($event.target).value })"
-              [attr.placeholder]="filter.operator === 'IN' ? '1, 2, 3' : 'valor'"
-              aria-label="Valor"
-            />
-          } @else {
-            <span class="filter__novalue">sin valor</span>
-          }
+        <label class="field">
+          <span class="field__label">Máximo de filas</span>
+          <input
+            type="number"
+            min="1"
+            class="tiny"
+            [value]="limit() ?? ''"
+            (input)="setLimit($any($event.target).value)"
+            placeholder="sin límite"
+          />
+        </label>
+      </section>
+    } @else if (operation() === 'insert') {
+      <section class="block">
+        <h3 class="block__title">Fila nueva</h3>
+        <p class="hint">
+          Elige qué enviar. Omitir conserva el valor por defecto del servidor; vacío escribe una cadena vacía.
+        </p>
 
-          <button
-            type="button"
-            class="icon"
-            (click)="removeFilter($index)"
-            aria-label="Quitar filtro"
-          >
-            ×
-          </button>
-        </div>
-      }
-
-      <button type="button" class="btn btn--small" (click)="addFilter()">Añadir filtro</button>
-    </section>
-
-    <section class="block block--row">
-      <label class="field">
-        <span class="field__label">Ordenar por</span>
-        <select [value]="orderBy()" (change)="orderBy.set($any($event.target).value)">
-          <option value="">(sin orden)</option>
+        <div class="value-grid">
           @for (column of columns(); track column.name) {
-            <option [value]="column.name">{{ column.name }}</option>
+            <div class="value-row" [class.is-disabled]="column.isGenerated">
+              <div class="value-row__column">
+                <strong>{{ column.name }}</strong>
+                <span>{{ column.dataType }}</span>
+              </div>
+
+              @if (column.isGenerated) {
+                <span class="value-row__automatic">Automático</span>
+              } @else {
+                <select
+                  [value]="draftFor('insert', column.name)?.mode ?? 'omit'"
+                  (change)="patchDraft('insert', column.name, { mode: $any($event.target).value })"
+                  [attr.aria-label]="'Modo para ' + column.name"
+                >
+                  <option value="omit">Omitir / valor por defecto</option>
+                  <option value="value">Escribir valor</option>
+                  @if (column.isNullable) {
+                    <option value="null">NULL</option>
+                  }
+                </select>
+
+                @if (draftFor('insert', column.name)?.mode === 'value') {
+                  <input
+                    type="text"
+                    [value]="draftFor('insert', column.name)?.text ?? ''"
+                    (input)="patchDraft('insert', column.name, { text: $any($event.target).value })"
+                    [attr.placeholder]="column.dataType"
+                    [attr.aria-label]="'Valor para ' + column.name"
+                  />
+                } @else {
+                  <span class="value-row__detail">
+                    @if (column.defaultValue) {
+                      {{ column.defaultValue }}
+                    } @else if (column.isNullable) {
+                      columna opcional
+                    } @else {
+                      valor obligatorio
+                    }
+                  </span>
+                }
+              }
+            </div>
           }
-        </select>
-      </label>
+        </div>
+      </section>
+    } @else {
+      <section class="block">
+        <h3 class="block__title">Cambios</h3>
+        <p class="hint">Solo se incluyen las columnas que marques. La clave primaria no se modifica.</p>
 
-      <label class="check">
-        <input type="checkbox" [checked]="descending()" (change)="descending.set(!descending())" />
-        Descendente
-      </label>
+        <div class="value-grid">
+          @for (column of columns(); track column.name) {
+            @if (!column.isGenerated && !column.isPrimaryKey) {
+              <div class="value-row">
+                <div class="value-row__column">
+                  <strong>{{ column.name }}</strong>
+                  <span>{{ column.dataType }}</span>
+                </div>
 
-      <label class="field">
-        <span class="field__label">Máximo de filas</span>
-        <input
-          type="number"
-          min="1"
-          class="tiny"
-          [value]="limit() ?? ''"
-          (input)="setLimit($any($event.target).value)"
-          placeholder="sin límite"
-        />
-      </label>
-    </section>
+                <select
+                  [value]="draftFor('update', column.name)?.mode ?? 'omit'"
+                  (change)="patchDraft('update', column.name, { mode: $any($event.target).value })"
+                  [attr.aria-label]="'Modo para ' + column.name"
+                >
+                  <option value="omit">No cambiar</option>
+                  <option value="value">Escribir valor</option>
+                  @if (column.isNullable) {
+                    <option value="null">NULL</option>
+                  }
+                  @if (column.defaultValue) {
+                    <option value="default">DEFAULT</option>
+                  }
+                </select>
 
-    <section class="block">
-      <h3 class="block__title">Así queda</h3>
-      <pre class="sql">{{ sql() }}</pre>
+                @if (draftFor('update', column.name)?.mode === 'value') {
+                  <input
+                    type="text"
+                    [value]="draftFor('update', column.name)?.text ?? ''"
+                    (input)="patchDraft('update', column.name, { text: $any($event.target).value })"
+                    [attr.placeholder]="column.dataType"
+                    [attr.aria-label]="'Valor para ' + column.name"
+                  />
+                } @else {
+                  <span class="value-row__detail">sin cambio</span>
+                }
+              </div>
+            }
+          }
+        </div>
+      </section>
+
+      <section class="block block--where">
+        <h3 class="block__title">Dónde aplicar el cambio</h3>
+        <p class="hint hint--warning">El UPDATE siempre conserva una cláusula WHERE visible.</p>
+
+        @for (filter of updateFilters(); track $index) {
+          <div class="filter">
+            <select
+              [value]="filter.column"
+              (change)="patchUpdateFilter($index, { column: $any($event.target).value })"
+              aria-label="Columna del filtro"
+            >
+              @for (column of columns(); track column.name) {
+                <option [value]="column.name">{{ column.name }}</option>
+              }
+            </select>
+            <select
+              [value]="filter.operator"
+              (change)="patchUpdateFilter($index, { operator: $any($event.target).value })"
+              aria-label="Operador del filtro"
+            >
+              @for (operator of operators; track operator) {
+                <option [value]="operator">{{ operator }}</option>
+              }
+            </select>
+            @if (needsValue(filter.operator)) {
+              <input
+                type="text"
+                [value]="filter.value ?? ''"
+                (input)="patchUpdateFilter($index, { value: $any($event.target).value })"
+                placeholder="valor obligatorio"
+                aria-label="Valor del filtro"
+              />
+            } @else {
+              <span class="filter__novalue">sin valor</span>
+            }
+            <button
+              type="button"
+              class="icon"
+              (click)="removeUpdateFilter($index)"
+              aria-label="Quitar filtro"
+            >
+              ×
+            </button>
+          </div>
+        }
+
+        <button type="button" class="btn btn--small" (click)="addUpdateFilter()">Añadir condición</button>
+      </section>
+    }
+
+    <section class="block preview">
+      <div class="preview__head">
+        <h3 class="block__title">Así queda</h3>
+        @if (sqlOverride() !== null) {
+          <button type="button" class="reset" (click)="resetSql()">Restablecer desde el formulario</button>
+        }
+      </div>
+      <textarea
+        class="sql"
+        [value]="sql()"
+        (input)="patchSql($any($event.target).value)"
+        aria-label="SQL generado"
+        spellcheck="false"
+      ></textarea>
     </section>
   </div>
 
@@ -129,22 +454,6 @@
     <div class="templates">
       @if (table().kind === 'table') {
         <span class="templates__label">Plantillas:</span>
-        <button
-          type="button"
-          class="btn btn--small"
-          [disabled]="!templatesReady()"
-          (click)="insertTemplate('insert')"
-        >
-          INSERT
-        </button>
-        <button
-          type="button"
-          class="btn btn--small"
-          [disabled]="!templatesReady()"
-          (click)="insertTemplate('update')"
-        >
-          UPDATE
-        </button>
         <button
           type="button"
           class="btn btn--small"
@@ -162,8 +471,8 @@
     <span class="spacer"></span>
 
     <button type="button" class="btn" (click)="close()">Cancelar</button>
-    <button type="button" class="btn btn--primary" (click)="insertSelect()">
-      Insertar en el editor
+    <button type="button" class="btn btn--primary" (click)="insertSql()">
+      Insertar {{ operation().toUpperCase() }} en el editor
     </button>
   </footer>
 </div>

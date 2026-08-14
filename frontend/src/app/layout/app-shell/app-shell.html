@@ -1,6 +1,9 @@
 <app-top-bar
   (newConnection)="openDialog()"
   (newQuery)="createTab()"
+  (openSql)="openSqlFile()"
+  (saveSql)="saveTab()"
+  (saveSqlAs)="saveTab(true)"
   (openPalette)="paletteOpen.set(true)"
 />
 
@@ -85,6 +88,8 @@
         (executeSelection)="executeSelection()"
         (cancel)="cancel()"
         (save)="saveTab()"
+        (saveAs)="saveTab(true)"
+        (openFile)="openSqlFile()"
         (newTab)="createTab()"
         (formatFailed)="onFormatFailed($event)"
       />
@@ -176,14 +181,16 @@
   />
 }
 
-@if (builderTarget(); as destino) {
-  <app-query-builder
-    [table]="destino.source"
-    [engine]="engineFor(destino.connectionId)"
-    [connectionId]="destino.connectionId"
-    (insert)="insertComposed($event)"
-    (closed)="closeBuilder()"
-  />
+@defer (when builderTarget()) {
+  @if (builderTarget(); as destino) {
+    <app-query-builder
+      [table]="destino.source"
+      [engine]="engineFor(destino.connectionId)"
+      [connectionId]="destino.connectionId"
+      (insert)="insertComposed($event)"
+      (closed)="closeBuilder()"
+    />
+  }
 }
 
 @defer (when paletteOpen()) {

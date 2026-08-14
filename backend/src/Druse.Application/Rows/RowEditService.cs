@@ -52,7 +52,11 @@ public sealed class RowEditService(
 
         var session = _connections.Require(batch.SessionId);
 
-        return await editor.ApplyAsync(session, prepared, cancellationToken);
+        return await _connections.UseDatabaseAsync(
+            session,
+            batch.Table.Database,
+            selected => editor.ApplyAsync(selected, prepared, cancellationToken),
+            cancellationToken);
     }
 
     private async Task<(IRowEditor Editor, PreparedRowEditBatch Batch)> PrepareAsync(

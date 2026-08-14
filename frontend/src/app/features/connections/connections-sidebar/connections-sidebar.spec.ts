@@ -1,6 +1,8 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { By } from '@angular/platform-browser';
 
 import { ConnectionSummary, ExplorerNode } from '../../../shared/models/workspace';
+import { Icon } from '../../../shared/ui/icon/icon';
 import { ConnectionsSidebar } from './connections-sidebar';
 
 const connection: ConnectionSummary = {
@@ -56,6 +58,22 @@ const view: ExplorerNode = {
   },
 };
 
+const schema: ExplorerNode = {
+  ...view,
+  id: 'connection-1|schema:public',
+  label: 'public',
+  kind: 'schema',
+  depth: 2,
+  source: {
+    id: 'schema:public',
+    name: 'public',
+    kind: 'schema',
+    database: 'druse_test',
+    schema: 'public',
+    hasChildren: true,
+  },
+};
+
 const procedure: ExplorerNode = {
   ...view,
   id: 'connection-1|Procedure:oid:42',
@@ -89,6 +107,22 @@ describe('ConnectionsSidebar', () => {
 
     expect(hint?.textContent?.trim()).toBe('numeric(12,2)');
     expect(hint?.title).toBe('numeric(12,2)');
+  });
+
+  it('usa iconos semánticos para esquemas y eliminar conexiones guardadas', () => {
+    fixture.componentRef.setInput('connections', [{ ...connection, saved: true }]);
+    fixture.componentRef.setInput('explorerNodes', [schema]);
+    fixture.detectChanges();
+
+    const schemaIcon = fixture.debugElement
+      .query(By.css('.node--object app-icon.node__icon'))
+      .componentInstance as Icon;
+    const deleteIcon = fixture.debugElement
+      .query(By.css('[title="Eliminar esta conexión guardada"] app-icon'))
+      .componentInstance as Icon;
+
+    expect(schemaIcon.name()).toBe('schema');
+    expect(deleteIcon.name()).toBe('trash');
   });
 
   it('ofrece Ver DDL dentro del menú de una vista', () => {

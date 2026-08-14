@@ -4,7 +4,8 @@ namespace Druse.Database.Abstractions;
 
 /// <summary>Credenciales necesarias para abrir una conexión, separadas del perfil.</summary>
 /// <param name="Password">
-/// Vive lo mínimo imprescindible. Nunca se persiste con el perfil ni se registra.
+/// Nunca se persiste con el perfil ni se registra. El proveedor puede conservarla
+/// dentro de una sesión abierta para conectar a otra base del mismo servidor.
 /// </param>
 public readonly record struct DatabaseCredentials(string? Password);
 
@@ -69,5 +70,15 @@ public interface IDatabaseProvider
     Task<IDatabaseSession> OpenSessionAsync(
         ConnectionProfile profile,
         DatabaseCredentials credentials,
+        CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Abre una sesión auxiliar en otra base del mismo servidor y con la misma
+    /// identidad. Se usa para que el explorador navegue todas las bases permitidas
+    /// sin exponer las credenciales fuera del proveedor.
+    /// </summary>
+    Task<IDatabaseSession> OpenDatabaseSessionAsync(
+        IDatabaseSession source,
+        string database,
         CancellationToken cancellationToken);
 }

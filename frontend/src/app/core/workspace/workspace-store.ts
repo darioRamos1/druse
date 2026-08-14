@@ -138,9 +138,21 @@ export class WorkspaceStore {
     }
   }
 
-  /** Quita el indicador de cambios sin guardar de la pestaña activa. */
-  markTabSaved(): void {
-    this._tabs.update((tabs) => tabs.map((tab) => (tab.active ? { ...tab, dirty: false } : tab)));
+  /** Aplica el resultado de guardar únicamente si el contenido no cambió mientras se escribía. */
+  markTabSaved(id: string, sql: string, fileName: string, documentId?: string): void {
+    this._tabs.update((tabs) =>
+      tabs.map((tab) =>
+        tab.id === id
+          ? {
+              ...tab,
+              title: fileName,
+              fileName,
+              documentId: documentId || tab.documentId,
+              dirty: tab.sql === sql ? false : tab.dirty,
+            }
+          : tab,
+      ),
+    );
   }
 
   private readonly _exporting = signal(false);
@@ -182,6 +194,7 @@ export class WorkspaceStore {
         this._gateway.exportQuery({
           sessionId: connection.sessionId,
           sql,
+          database: tab?.database,
           format,
           fileName: tab?.title,
           confirmDestructive,
@@ -479,6 +492,26 @@ export class WorkspaceStore {
 
     walk(this._roots());
     return relations;
+  });
+
+  /** Esquemas conocidos, aunque sus tablas todavía no se hayan cargado. */
+  readonly searchableSchemas = computed<readonly ExplorerNode[]>(() => {
+    const schemas: ExplorerNode[] = [];
+
+    const walk = (entries: readonly TreeEntry[]): void => {
+      for (const entry of entries) {
+        if (entry.object.kind === 'schema') {
+          schemas.push(toExplorerNode(entry));
+        }
+
+        if (entry.children) {
+          walk(entry.children);
+        }
+      }
+    };
+
+    walk(this._roots());
+    return schemas;
   });
 
   // --- Edición de filas ------------------------------------------------------
@@ -956,13 +989,26 @@ export class WorkspaceStore {
    * Es la salida para las bases que superan el tope del precalentado: escribir
    * `esquema.` trae ese esquema y solo ese.
    */
-  async ensureRelationsAsync(schemaName: string): Promise<void> {
+  async ensureRelationsAsync(
+    schemaName: string,
+    connectionId = this.activeConnection()?.id,
+    database?: string,
+  ): Promise<void> {
     const wanted = schemaName.toLowerCase();
-    const connectionId = this.activeConnection()?.id;
 
     const findSchema = (entries: readonly TreeEntry[]): TreeEntry | null => {
       for (const entry of entries) {
         if (connectionId && entry.connectionId !== connectionId) {
+          continue;
+        }
+
+        if (database && entry.object.database?.toLowerCase() !== database.toLowerCase()) {
+          const found = entry.children ? findSchema(entry.children) : null;
+
+          if (found) {
+            return found;
+          }
+
           continue;
         }
 
@@ -1065,7 +1111,13 @@ export class WorkspaceStore {
         this._gateway.getDefinition(connection.sessionId, node.source),
       );
 
-      this.createTab(sql, undefined, node.connectionId, `${node.label} · DDL`);
+      this.createTab(
+        sql,
+        undefined,
+        node.connectionId,
+        `${node.label} · DDL`,
+        node.source.database,
+      );
     } catch (error) {
       this._notice.set(describeError(error));
     }
@@ -1160,6 +1212,7 @@ export class WorkspaceStore {
           isNullable: column.isNullable,
           isPrimaryKey: column.isPrimaryKey,
           isGenerated: column.isGenerated,
+          defaultValue: column.defaultValue,
         })),
       );
 
@@ -1297,6 +1350,7 @@ export class WorkspaceStore {
       this._activeConnectionId() ??
       undefined,
     title?: string,
+    database: string | undefined = this.activeTab()?.database,
   ): void {
     tabCounter++;
 
@@ -1309,6 +1363,7 @@ export class WorkspaceStore {
         dirty: false,
         sql,
         connectionId,
+        database,
         sourceTable,
       },
     ]);
@@ -1316,6 +1371,15 @@ export class WorkspaceStore {
     // Cambiar de pestaña cambia lo que hay en la cuadrícula: los cambios
     // pendientes de la anterior no pueden seguir vivos.
     this.clearDisplayedResult();
+  }
+
+  openSqlFile(fileName: string, sql: string, documentId?: string): void {
+    this.createTab(sql, undefined, undefined, fileName, undefined);
+    this._tabs.update((tabs) =>
+      tabs.map((tab) =>
+        tab.active ? { ...tab, fileName, documentId: documentId || undefined } : tab,
+      ),
+    );
   }
 
   updateSql(sql: string): void {
@@ -1339,6 +1403,7 @@ export class WorkspaceStore {
       node.kind === 'table' ? node.source : undefined,
       node.connectionId,
       `${node.label} · SELECT`,
+      node.source.database,
     );
 
     // Sus columnas hacen falta para saber cuál es la clave primaria; se piden
@@ -1393,6 +1458,7 @@ export class WorkspaceStore {
           sessionId: connection.sessionId,
           executionId,
           sql,
+          database: tab?.database,
           maxRows: 500,
           timeoutSeconds: this._timeoutSeconds(),
           confirmDestructive,
@@ -1573,7 +1639,7 @@ function columnKey(
 }
 
 function nodeKey(entry: TreeEntry): string {
-  return `${entry.connectionId}|${entry.object.id}`;
+  return `${entry.connectionId}|${entry.object.database ?? ''}|${entry.object.id}`;
 }
 
 function toExplorerNode(entry: TreeEntry): ExplorerNode {

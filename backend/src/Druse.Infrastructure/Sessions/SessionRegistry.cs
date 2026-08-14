@@ -38,9 +38,21 @@ public sealed class SessionRegistry : ISessionRegistry
     /// <inheritdoc />
     public async Task<IDisposable> EnterAsync(Guid sessionId, CancellationToken cancellationToken)
     {
+        if (Find(sessionId) is null)
+        {
+            throw new SessionNotFoundException(sessionId);
+        }
+
         var turn = _turns.GetOrAdd(sessionId, _ => new SemaphoreSlim(1, 1));
 
         await turn.WaitAsync(cancellationToken);
+
+        // La sesión puede haberse cerrado mientras esta petición esperaba.
+        if (Find(sessionId) is null)
+        {
+            turn.Release();
+            throw new SessionNotFoundException(sessionId);
+        }
 
         return new Turn(turn);
     }
@@ -64,20 +76,31 @@ public sealed class SessionRegistry : ISessionRegistry
 
     public async Task<bool> CloseAsync(Guid sessionId)
     {
-        if (!_sessions.TryRemove(sessionId, out var session))
+        if (!_sessions.ContainsKey(sessionId))
         {
             return false;
         }
 
-        // El turno se retira con la sesión: dejarlo sería acumular semáforos de
-        // conexiones que ya no existen.
-        if (_turns.TryRemove(sessionId, out var turn))
-        {
-            turn.Dispose();
-        }
+        var turn = _turns.GetOrAdd(sessionId, _ => new SemaphoreSlim(1, 1));
+        await turn.WaitAsync();
 
-        await session.DisposeAsync();
-        return true;
+        try
+        {
+            if (!_sessions.TryRemove(sessionId, out var session))
+            {
+                return false;
+            }
+
+            await session.DisposeAsync();
+            _turns.TryRemove(sessionId, out _);
+            return true;
+        }
+        finally
+        {
+            // No se dispone aquí: una petición que ya estaba esperando aún puede
+            // tener una referencia al semáforo y debe despertar para ver el 404.
+            turn.Release();
+        }
     }
 
     /// <summary>

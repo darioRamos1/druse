@@ -26,11 +26,16 @@ public sealed class MySqlFixture : IProviderFixture
     public string DatabaseName =>
         Environment.GetEnvironmentVariable("DRUSE_TEST_MYSQL_DB") ?? "druse_test";
 
+    public string SecondaryDatabaseName =>
+        Environment.GetEnvironmentVariable("DRUSE_TEST_MYSQL_SECOND_DB") ?? "druse_test_secondary";
+
     /// <summary>
     /// En MySQL, `SCHEMA` es un sinónimo de `DATABASE`: el esquema por omisión es
     /// la propia base, no un `public` ni un `dbo`.
     /// </summary>
     public string DefaultSchema => DatabaseName;
+
+    public string DefaultSchemaFor(string database) => database;
 
     public ConnectionProfile Profile(bool onlyRead = false) => new()
     {
@@ -46,6 +51,9 @@ public sealed class MySqlFixture : IProviderFixture
         ReadOnly = onlyRead,
         ConnectTimeoutSeconds = 5,
     };
+
+    public ConnectionProfile ProfileForDatabase(string database, bool onlyRead = false) =>
+        Profile(onlyRead) with { Id = Guid.NewGuid(), Database = database };
 
     public DatabaseCredentials Credentials =>
         new(Environment.GetEnvironmentVariable("DRUSE_TEST_MYSQL_PASSWORD") ?? "druse_dev_only");

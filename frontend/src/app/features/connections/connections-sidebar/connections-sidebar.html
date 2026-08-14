@@ -69,7 +69,7 @@
             title="Eliminar esta conexión guardada"
             (click)="act($event, () => forget.emit(connection.id))"
           >
-            <app-icon name="stop" [size]="11" />
+            <app-icon name="trash" [size]="12" />
           </span>
         }
       </span>
@@ -109,9 +109,7 @@
             <span class="node__chevron-spacer" aria-hidden="true"></span>
           }
 
-          @if (node.kind === 'schema') {
-            <span class="node__marker" aria-hidden="true"></span>
-          } @else if (iconFor(node); as icon) {
+          @if (iconFor(node); as icon) {
             <app-icon [name]="icon" [size]="12" class="node__icon" />
           }
 

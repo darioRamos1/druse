@@ -57,6 +57,39 @@ describe('DesktopHost', () => {
 
     expect(host.connection().baseUrl).toBe('');
   });
+
+  it('abre y guarda documentos SQL mediante comandos tipados', async () => {
+    const invocations: { command: string; args?: unknown }[] = [];
+    (window as { __TAURI__?: unknown }).__TAURI__ = {
+      core: {
+        invoke: (command: string, args?: unknown) => {
+          invocations.push({ command, args });
+          return Promise.resolve(
+            command === 'open_sql_file'
+              ? { documentId: 'sql-1', fileName: 'ventas.sql', contents: 'SELECT 1;' }
+              : { documentId: 'sql-1', fileName: 'ventas.sql' },
+          );
+        },
+      },
+    };
+    TestBed.configureTestingModule({});
+    const host = TestBed.inject(DesktopHost);
+
+    await expect(host.openSqlFile()).resolves.toEqual({
+      documentId: 'sql-1',
+      fileName: 'ventas.sql',
+      contents: 'SELECT 1;',
+    });
+    await host.saveSqlFile('sql-1', 'SELECT 2;');
+
+    expect(invocations).toEqual([
+      { command: 'open_sql_file', args: undefined },
+      {
+        command: 'save_sql_file',
+        args: { documentId: 'sql-1', contents: 'SELECT 2;' },
+      },
+    ]);
+  });
 });
 
 describe('apiInterceptor', () => {

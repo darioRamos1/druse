@@ -178,6 +178,8 @@ export interface KnownColumn {
   readonly isNullable: boolean;
   readonly isPrimaryKey: boolean;
   readonly isGenerated?: boolean;
+  /** Expresión que ejecuta el servidor; no es un valor literal para copiar. */
+  readonly defaultValue?: string | null;
 }
 
 /** Tabla o vista conocida, para el autocompletado. */
@@ -231,8 +233,13 @@ export interface QueryTab {
   readonly active: boolean;
   readonly dirty: boolean;
   readonly sql: string;
+  /** Identificador opaco del archivo conservado por el host de escritorio. */
+  readonly documentId?: string;
+  readonly fileName?: string;
   /** Conexión contra la que se ejecuta. */
   readonly connectionId?: string;
+  /** Base contra la que se ejecuta, si la pestaña nació del explorador. */
+  readonly database?: string;
   /**
    * Tabla de la que salió la pestaña, cuando se abrió desde el explorador.
    *

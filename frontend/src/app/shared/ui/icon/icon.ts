@@ -9,6 +9,8 @@ import { inject } from '@angular/core';
 export type IconName =
   | 'plus'
   | 'new-query'
+  | 'folder-open'
+  | 'save'
   | 'search'
   | 'sun'
   | 'moon'
@@ -16,6 +18,7 @@ export type IconName =
   | 'refresh'
   | 'chevron-down'
   | 'database'
+  | 'schema'
   | 'table'
   | 'play'
   | 'play-outline'
@@ -25,6 +28,7 @@ export type IconName =
   | 'filter'
   | 'export'
   | 'disconnect'
+  | 'trash'
   | 'console'
   | 'sort-desc';
 
@@ -48,6 +52,18 @@ const ICONS: Readonly<Record<IconName, IconDefinition>> = {
     body:
       '<rect x="1.2" y="1.8" width="9.6" height="8.4" rx="2" stroke="currentColor" stroke-width="1.2"/>' +
       '<path d="M4 6h4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>',
+  },
+  'folder-open': {
+    viewBox: '0 0 14 14',
+    body:
+      '<path d="M1.5 4.2V3.1c0-.7.5-1.2 1.2-1.2h3l1.2 1.4h4.4c.7 0 1.2.5 1.2 1.2v.7" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/>' +
+      '<path d="M2.6 5.2h9.2c.7 0 1.1.7.8 1.3l-2.1 4.6c-.2.5-.7.8-1.2.8H2.7c-.7 0-1.2-.5-1.2-1.2V6.3c0-.6.5-1.1 1.1-1.1z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/>',
+  },
+  save: {
+    viewBox: '0 0 14 14',
+    body:
+      '<path d="M2 1.7h7.7l2.3 2.4v8.2H2V1.7z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/>' +
+      '<path d="M4.2 1.7v3.2h5V1.7M4.2 12.3V8h5.6v4.3" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/>',
   },
   search: {
     viewBox: '0 0 14 14',
@@ -87,6 +103,14 @@ const ICONS: Readonly<Record<IconName, IconDefinition>> = {
       '<ellipse cx="7" cy="3.4" rx="4.6" ry="1.9" stroke="currentColor" stroke-width="1.2"/>' +
       '<path d="M2.4 3.4v7.2c0 1.05 2.06 1.9 4.6 1.9s4.6-.85 4.6-1.9V3.4" stroke="currentColor" stroke-width="1.2"/>' +
       '<path d="M2.4 7c0 1.05 2.06 1.9 4.6 1.9s4.6-.85 4.6-1.9" stroke="currentColor" stroke-width="1.2"/>',
+  },
+  schema: {
+    viewBox: '0 0 14 14',
+    body:
+      '<rect x="5.2" y="1.4" width="3.6" height="3" rx=".8" stroke="currentColor" stroke-width="1.2"/>' +
+      '<rect x="1.4" y="9.4" width="3.6" height="3" rx=".8" stroke="currentColor" stroke-width="1.2"/>' +
+      '<rect x="9" y="9.4" width="3.6" height="3" rx=".8" stroke="currentColor" stroke-width="1.2"/>' +
+      '<path d="M7 4.4v2.3M3.2 9.4V7.2h7.6v2.2" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>',
   },
   table: {
     viewBox: '0 0 14 14',
@@ -131,6 +155,12 @@ const ICONS: Readonly<Record<IconName, IconDefinition>> = {
     body:
       '<path d="M7 1.8v5.4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>' +
       '<path d="M10.4 3.4a4.6 4.6 0 1 1-6.8 0" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>',
+  },
+  trash: {
+    viewBox: '0 0 14 14',
+    body:
+      '<path d="M2.4 3.6h9.2M5.1 3.6V2.2h3.8v1.4M3.7 3.6l.6 8.1h5.4l.6-8.1" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>' +
+      '<path d="M5.8 6v3.5M8.2 6v3.5" stroke="currentColor" stroke-width="1.1" stroke-linecap="round"/>',
   },
   console: {
     viewBox: '0 0 14 14',

@@ -3,8 +3,10 @@ import {
   buildCreateTable,
   buildDropTable,
   buildInsert,
+  buildInsertValues,
   buildSelect,
   buildUpdate,
+  buildUpdateValues,
   quote,
 } from './sql-writer';
 
@@ -110,6 +112,83 @@ describe('escribir SQL', () => {
 
       expect(sql).toContain('ORDER BY `nombre` DESC');
     });
+
+    it('genera varios tipos de JOIN con alias y columnas calificadas', () => {
+      const sql = buildSelect('postgresql', {
+        ...base,
+        alias: 't0',
+        columns: [
+          { alias: 't0', column: 'id' },
+          { alias: 't1', column: 'nombre' },
+          { alias: 't2', column: 'codigo' },
+        ],
+        joins: [
+          {
+            type: 'INNER',
+            schema: 'public',
+            table: 'clientes',
+            alias: 't1',
+            leftAlias: 't0',
+            leftColumn: 'cliente_id',
+            rightColumn: 'id',
+          },
+          {
+            type: 'LEFT',
+            schema: 'public',
+            table: 'estados',
+            alias: 't2',
+            leftAlias: 't0',
+            leftColumn: 'estado_id',
+            rightColumn: 'id',
+          },
+        ],
+      });
+
+      expect(sql).toContain('SELECT "t0"."id", "t1"."nombre", "t2"."codigo"');
+      expect(sql).toContain('FROM "tpublico"."usuarios" AS "t0"');
+      expect(sql).toContain('INNER JOIN "public"."clientes" AS "t1"');
+      expect(sql).toContain('ON "t0"."cliente_id" = "t1"."id"');
+      expect(sql).toContain('LEFT JOIN "public"."estados" AS "t2"');
+    });
+
+    it('CROSS JOIN no genera condición ON', () => {
+      const sql = buildSelect('mysql', {
+        ...base,
+        alias: 't0',
+        joins: [
+          {
+            type: 'CROSS',
+            table: 'colores',
+            alias: 't1',
+            leftAlias: 't0',
+            leftColumn: '',
+            rightColumn: '',
+          },
+        ],
+      });
+
+      expect(sql).toContain('CROSS JOIN `colores` AS `t1`');
+      expect(sql).not.toContain('\n  ON ');
+    });
+
+    it('admite FULL OUTER JOIN en los motores que lo soportan', () => {
+      const sql = buildSelect('sqlserver', {
+        ...base,
+        joins: [
+          {
+            type: 'FULL OUTER',
+            table: 'archivo',
+            alias: 't1',
+            leftAlias: 't0',
+            leftColumn: 'id',
+            rightColumn: 'id',
+          },
+        ],
+      });
+
+      expect(sql).toContain('FULL OUTER JOIN [archivo] AS [t1]');
+      expect(sql).toContain('FROM [tpublico].[usuarios] AS [t0]');
+    });
   });
 
   describe('plantillas', () => {
@@ -190,6 +269,78 @@ describe('escribir SQL', () => {
       expect(buildDropTable('postgresql', objeto)).toBe('DROP TABLE "sales data"."order";\n');
       expect(buildDropTable('sqlserver', objeto)).toBe('DROP TABLE [sales data].[order];\n');
       expect(buildDropTable('mysql', objeto)).toBe('DROP TABLE `sales data`.`order`;\n');
+    });
+  });
+
+  describe('valores rellenados', () => {
+    it('distingue números, texto, vacío y NULL en INSERT', () => {
+      const sql = buildInsertValues('postgresql', {
+        schema: 'public',
+        table: 'usuarios',
+        values: [
+          { column: 'id', dataType: 'int', value: { kind: 'value', text: '12' } },
+          { column: 'nombre', dataType: 'text', value: { kind: 'value', text: "O'Brien" } },
+          { column: 'correo', dataType: 'text', value: { kind: 'value', text: '' } },
+          { column: 'borrado_en', dataType: 'timestamp', value: { kind: 'null' } },
+        ],
+      });
+
+      expect(sql).toContain('VALUES (12, \'O\'\'Brien\', \'\', NULL)');
+    });
+
+    it('un valor sin rellenar queda como marcador visible', () => {
+      const sql = buildInsertValues('sqlserver', {
+        table: 'usuarios',
+        values: [
+          { column: 'nombre', dataType: 'nvarchar(200)', value: { kind: 'value', text: null } },
+        ],
+      });
+
+      expect(sql).toContain('/* nvarchar(200): valor obligatorio */');
+    });
+
+    it('un INSERT sin columnas usa valores por defecto según el motor', () => {
+      expect(buildInsertValues('postgresql', { table: 't', values: [] })).toContain(
+        'DEFAULT VALUES',
+      );
+      expect(buildInsertValues('mysql', { table: 't', values: [] })).toContain('()\nVALUES ()');
+    });
+
+    it('UPDATE escribe NULL, DEFAULT y conserva todos los filtros', () => {
+      const sql = buildUpdateValues('sqlserver', {
+        schema: 'dbo',
+        table: 'usuarios',
+        assignments: [
+          { column: 'correo', dataType: 'nvarchar(200)', value: { kind: 'null' } },
+          { column: 'actualizado', dataType: 'datetime2', value: { kind: 'default' } },
+        ],
+        filters: [
+          { column: 'tenant_id', operator: '=', value: '4' },
+          { column: 'id', operator: '=', value: '7' },
+        ],
+      });
+
+      expect(sql).toContain('[correo] = NULL');
+      expect(sql).toContain('[actualizado] = DEFAULT');
+      expect(sql).toContain('WHERE [tenant_id] = 4\n  AND [id] = 7');
+    });
+
+    it('UPDATE sin filtro deja una condición obligatoria', () => {
+      const sql = buildUpdateValues('mysql', {
+        table: 'usuarios',
+        assignments: [
+          { column: 'nombre', dataType: 'text', value: { kind: 'value', text: 'Ana' } },
+        ],
+        filters: [],
+      });
+
+      expect(sql).toContain('WHERE /* condición obligatoria */');
+    });
+
+    it('UPDATE sin columnas elegidas no produce SQL ejecutable', () => {
+      expect(
+        buildUpdateValues('postgresql', { table: 'usuarios', assignments: [], filters: [] }),
+      ).toBe('-- Elige al menos una columna para modificar.\n');
     });
   });
 });

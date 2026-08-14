@@ -7,6 +7,17 @@ export interface ApiConnection {
   readonly token: string | null;
 }
 
+export interface OpenedSqlDocument {
+  readonly documentId: string;
+  readonly fileName: string;
+  readonly contents: string;
+}
+
+export interface SavedSqlDocument {
+  readonly documentId: string;
+  readonly fileName: string;
+}
+
 /** Forma en que Tauri expone sus comandos en la ventana. */
 interface TauriBridge {
   core?: { invoke<T>(command: string, args?: unknown): Promise<T> };
@@ -65,5 +76,32 @@ export class DesktopHost {
       // Si el envoltorio no responde, se sigue con rutas relativas: fallará más
       // adelante con un error claro en lugar de impedir que la ventana abra.
     }
+  }
+
+  openSqlFile(): Promise<OpenedSqlDocument | null> {
+    return this.invoke('open_sql_file');
+  }
+
+  saveSqlFile(documentId: string, contents: string): Promise<SavedSqlDocument> {
+    return this.invoke('save_sql_file', { documentId, contents });
+  }
+
+  saveSqlFileAs(
+    suggestedName: string,
+    contents: string,
+    documentId?: string,
+  ): Promise<SavedSqlDocument | null> {
+    return this.invoke('save_sql_file_as', { documentId, suggestedName, contents });
+  }
+
+  private invoke<T>(command: string, args?: unknown): Promise<T> {
+    const bridge = typeof window === 'undefined' ? undefined : window.__TAURI__;
+    const invoke = bridge?.core?.invoke ?? bridge?.invoke;
+
+    if (!invoke) {
+      return Promise.reject(new Error('La función requiere el envoltorio de escritorio.'));
+    }
+
+    return invoke<T>(command, args);
   }
 }

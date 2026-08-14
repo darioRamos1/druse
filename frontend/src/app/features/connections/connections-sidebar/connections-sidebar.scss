@@ -203,14 +203,6 @@
     color: var(--dr-text-faint);
   }
 
-  &__marker {
-    width: 5px;
-    height: 5px;
-    flex: none;
-    border-radius: 1px;
-    background: #7faee8;
-  }
-
   &__label {
     flex: 1;
     min-width: 0;
@@ -272,7 +264,8 @@
     }
   }
 
-  &.is-selected &__icon {
+  &.is-selected &__icon,
+  &[aria-expanded='true'] &__icon {
     color: var(--dr-accent-bright);
   }
 }

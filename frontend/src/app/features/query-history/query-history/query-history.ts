@@ -22,7 +22,7 @@ export class QueryHistory {
 
   readonly search = output<string>();
   readonly clear = output<void>();
-  readonly reuse = output<string>();
+  readonly reuse = output<QueryHistoryEntry>();
 
   protected readonly term = signal('');
 

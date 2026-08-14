@@ -23,6 +23,9 @@ internal static class TestDatabase
     public static string Database =>
         Environment.GetEnvironmentVariable("DRUSE_TEST_PG_DB") ?? "druse_test";
 
+    public static string SecondaryDatabase =>
+        Environment.GetEnvironmentVariable("DRUSE_TEST_PG_SECOND_DB") ?? "druse_test_secondary";
+
     public static string Username =>
         Environment.GetEnvironmentVariable("DRUSE_TEST_PG_USER") ?? "postgres";
 
@@ -30,7 +33,7 @@ internal static class TestDatabase
         Environment.GetEnvironmentVariable("DRUSE_TEST_PG_PASSWORD") ?? "druse_dev_only";
 
     /// <summary>Cuerpo de conexión listo para enviar a la API.</summary>
-    public static object ConnectRequest(bool readOnly = false) => new
+    public static object ConnectRequest(bool readOnly = false, string? database = null) => new
     {
         profile = new
         {
@@ -38,7 +41,7 @@ internal static class TestDatabase
             engine = "postgresql",
             host = Host,
             port = Port,
-            database = Database,
+            database = database ?? Database,
             username = Username,
             readOnly,
             connectTimeoutSeconds = 5,

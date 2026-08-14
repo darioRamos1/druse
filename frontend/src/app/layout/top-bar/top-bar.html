@@ -14,6 +14,17 @@
     <app-icon name="new-query" [size]="12" />
     Nueva consulta
   </button>
+  <button type="button" class="btn btn--file" title="Abrir archivo SQL" (click)="openSql.emit()">
+    <app-icon name="folder-open" [size]="13" />
+    Abrir SQL
+  </button>
+  <button type="button" class="btn btn--file" title="Guardar (Ctrl+S)" (click)="saveSql.emit()">
+    <app-icon name="save" [size]="13" />
+    Guardar
+  </button>
+  <button type="button" class="btn btn--file btn--save-as" title="Guardar como (Ctrl+Shift+S)" (click)="saveSqlAs.emit()">
+    Guardar como…
+  </button>
 </div>
 
 <div class="search-slot">

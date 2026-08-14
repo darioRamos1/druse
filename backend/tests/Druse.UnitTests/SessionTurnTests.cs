@@ -1,5 +1,6 @@
 using Druse.Database.Abstractions;
 using Druse.Domain;
+using Druse.Application.Abstractions;
 using Druse.Infrastructure.Sessions;
 
 namespace Druse.UnitTests;
@@ -86,9 +87,43 @@ public sealed class SessionTurnTests
         Assert.NotNull(otra);
     }
 
+    [Fact]
+    public async Task CerrarEsperaAQueTermineElUsoActivo()
+    {
+        var registry = new SessionRegistry();
+        var session = new FakeSession();
+        registry.Add(session);
+
+        var turn = await registry.EnterAsync(session.Id, CancellationToken.None);
+        var closing = registry.CloseAsync(session.Id);
+
+        await Task.Delay(50);
+        Assert.False(closing.IsCompleted);
+        Assert.False(session.Disposed);
+
+        turn.Dispose();
+
+        Assert.True(await closing);
+        Assert.True(session.Disposed);
+    }
+
+    [Fact]
+    public async Task UnaSesionCerrada_NoEntregaOtroTurno()
+    {
+        var registry = new SessionRegistry();
+        var session = new FakeSession();
+        registry.Add(session);
+
+        Assert.True(await registry.CloseAsync(session.Id));
+        await Assert.ThrowsAsync<SessionNotFoundException>(() =>
+            registry.EnterAsync(session.Id, CancellationToken.None));
+    }
+
     /// <summary>Sesión que no habla con ningún motor.</summary>
     private sealed class FakeSession : IDatabaseSession
     {
+        public bool Disposed { get; private set; }
+
         public Guid Id { get; } = Guid.NewGuid();
 
         public DatabaseEngine Engine => DatabaseEngine.PostgreSql;
@@ -106,8 +141,12 @@ public sealed class SessionTurnTests
 
         public string ServerVersion => "0";
 
-        public bool IsOpen => true;
+        public bool IsOpen => !Disposed;
 
-        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+        public ValueTask DisposeAsync()
+        {
+            Disposed = true;
+            return ValueTask.CompletedTask;
+        }
     }
 }

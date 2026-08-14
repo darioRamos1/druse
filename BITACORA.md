@@ -10,18 +10,18 @@
 
 | Campo | Valor |
 | --- | --- |
-| Última sesión | **012** — 2026-08-13 |
+| Última sesión | **013** — 2026-08-13 |
 | Fase activa | **Mejora posterior al MVP completada:** implementación y validación cerradas |
 | Fases 0–6 | ✅ Cerradas. |
 | Fase 7 | 🟡 **10/12.** Hay instalador y funciona; faltan dos comprobaciones que exigen otro equipo. |
 | Fase 8 | ✅ **7/7.** Tres motores sobre el mismo contrato y primera beta preparada. |
 | ¿Compila el backend? | Sí — 0 advertencias, 0 errores |
 | ¿Compila el envoltorio? | Sí |
-| ¿Pasan las pruebas? | Sí — **295 en backend** y **176 en frontend** |
+| ¿Pasan las pruebas? | Sí — **304 en backend**, **201 en frontend** y **2 en el envoltorio** |
 | ¿Hay aplicación de escritorio? | **Sí.** Instalador NSIS, MSI y ZIP portable |
-| Motores | **PostgreSQL, SQL Server y MySQL/MariaDB**, con las **mismas 26 pruebas contractuales** cada uno |
+| Motores | **PostgreSQL, SQL Server y MySQL/MariaDB**, con navegación por todas las bases autorizadas y las **mismas 27 pruebas contractuales** cada uno |
 | Bloqueantes | Ninguno |
-| Git | `fix/empaquetado-escritorio`, con el incremento del explorador y composición SQL completado. Sin remoto configurado. |
+| Git | `main`, con navegación multibase implementada y cambios locales aún sin commit. |
 
 ### Qué toca retomar en la próxima sesión
 
@@ -100,6 +100,22 @@ Pendiente de verificar cuando toque: Docker (pruebas de integración con contene
 ---
 
 ## 5. Registro de sesiones
+
+### Sesión 013 — 2026-08-13 · Archivos SQL
+
+**Hecho:**
+- La barra superior abre, guarda y guarda como archivos `.sql`; Monaco añade
+  `Ctrl+O`, `Ctrl+S` y `Ctrl+Shift+S`.
+- En escritorio, Tauri usa diálogos nativos y conserva las rutas detrás de un
+  identificador opaco: el WebView no puede pedir lectura o escritura arbitraria.
+- Solo admite `.sql` UTF-8 de hasta 10 MB. Abrir crea una pestaña limpia con el
+  nombre del archivo y guardar solo quita el indicador si el texto escrito sigue
+  siendo el contenido actual.
+- En navegador, abrir usa el selector web y guardar descarga el archivo.
+- Cerrar una pestaña modificada solicita confirmación para evitar pérdida de datos.
+
+**Verificado:** 201 pruebas frontend, build de producción, `cargo check` y 2
+pruebas Rust del envoltorio. Permanece únicamente el aviso conocido de `nearley`.
 
 ### Sesión 012 — 2026-08-13 · Tipos de datos en el explorador
 

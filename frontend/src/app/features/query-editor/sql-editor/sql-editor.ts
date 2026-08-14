@@ -133,6 +133,8 @@ export default class SqlEditor implements OnInit {
   readonly executeSelection = output<void>();
   readonly cancel = output<void>();
   readonly save = output<void>();
+  readonly saveAs = output<void>();
+  readonly openFile = output<void>();
   readonly newTab = output<void>();
   /** El formateo falló; lo comunica quien lo pidió. */
   readonly formatFailed = output<string>();
@@ -461,6 +463,18 @@ export default class SqlEditor implements OnInit {
     editor.addCommand(
       monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS,
       run(() => this.save.emit()),
+    );
+
+    // Guardar como: Ctrl/Cmd + Shift + S.
+    editor.addCommand(
+      monaco.KeyMod.CtrlCmd | monaco.KeyMod.Shift | monaco.KeyCode.KeyS,
+      run(() => this.saveAs.emit()),
+    );
+
+    // Abrir archivo SQL: Ctrl/Cmd + O.
+    editor.addCommand(
+      monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyO,
+      run(() => this.openFile.emit()),
     );
 
     // Nueva consulta: Ctrl/Cmd + T.

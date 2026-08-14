@@ -10,10 +10,15 @@ internal sealed class PostgreSqlSession : IDatabaseSession
 {
     private bool _disposed;
 
-    public PostgreSqlSession(Guid id, ConnectionProfile profile, NpgsqlConnection connection)
+    public PostgreSqlSession(
+        Guid id,
+        ConnectionProfile profile,
+        DatabaseCredentials credentials,
+        NpgsqlConnection connection)
     {
         Id = id;
         Profile = profile;
+        Credentials = credentials;
         Connection = connection;
         ServerVersion = connection.PostgreSqlVersion.ToString();
     }
@@ -31,6 +36,9 @@ internal sealed class PostgreSqlSession : IDatabaseSession
     /// <summary>Solo accesible dentro del proveedor.</summary>
     internal NpgsqlConnection Connection { get; }
 
+    /// <summary>Solo se usa para abrir otra base del mismo servidor.</summary>
+    internal DatabaseCredentials Credentials { get; private set; }
+
     public async ValueTask DisposeAsync()
     {
         if (_disposed)
@@ -39,6 +47,7 @@ internal sealed class PostgreSqlSession : IDatabaseSession
         }
 
         _disposed = true;
+        Credentials = default;
         await Connection.DisposeAsync();
     }
 }
@@ -92,6 +101,11 @@ public sealed class PostgreSqlDatabaseProvider : IDatabaseProvider
         {
             await connection.OpenAsync(cancellationToken);
         }
+        catch (OperationCanceledException)
+        {
+            await connection.DisposeAsync();
+            throw;
+        }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
             // Si abrir falla, la conexión no debe quedar viva a medias.
@@ -104,6 +118,26 @@ public sealed class PostgreSqlDatabaseProvider : IDatabaseProvider
 
         // El identificador es aleatorio a propósito: es lo que viaja por HTTP y no
         // debe poder adivinarse (plan §12).
-        return new PostgreSqlSession(Guid.NewGuid(), profile, connection);
+        return new PostgreSqlSession(Guid.NewGuid(), profile, credentials, connection);
+    }
+
+    public Task<IDatabaseSession> OpenDatabaseSessionAsync(
+        IDatabaseSession source,
+        string database,
+        CancellationToken cancellationToken)
+    {
+        if (source is not PostgreSqlSession postgres || !postgres.IsOpen)
+        {
+            throw new ArgumentException(
+                "La sesión no pertenece al proveedor PostgreSQL o ya está cerrada.",
+                nameof(source));
+        }
+
+        ArgumentException.ThrowIfNullOrWhiteSpace(database);
+
+        return OpenSessionAsync(
+            postgres.Profile with { Database = database },
+            postgres.Credentials,
+            cancellationToken);
     }
 }

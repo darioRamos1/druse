@@ -80,6 +80,7 @@ public sealed record ExecuteQueryRequest
 {
     public required Guid SessionId { get; init; }
     public required string Sql { get; init; }
+    public string? Database { get; init; }
 
     /// <summary>
     /// Identificador que el cliente elige para poder cancelar.
@@ -286,6 +287,7 @@ public sealed record ExportRequest
 {
     public required Guid SessionId { get; init; }
     public required string Sql { get; init; }
+    public string? Database { get; init; }
 
     /// <summary>Nombre sugerido, sin extensión. Se sanea antes de usarlo.</summary>
     public string? FileName { get; init; }

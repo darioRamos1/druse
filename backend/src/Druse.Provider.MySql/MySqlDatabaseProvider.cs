@@ -10,10 +10,15 @@ internal sealed class MySqlSession : IDatabaseSession
 {
     private bool _disposed;
 
-    public MySqlSession(Guid id, ConnectionProfile profile, MySqlConnection connection)
+    public MySqlSession(
+        Guid id,
+        ConnectionProfile profile,
+        DatabaseCredentials credentials,
+        MySqlConnection connection)
     {
         Id = id;
         Profile = profile;
+        Credentials = credentials;
         Connection = connection;
         ServerVersion = connection.ServerVersion;
     }
@@ -31,6 +36,9 @@ internal sealed class MySqlSession : IDatabaseSession
     /// <summary>Solo accesible dentro del proveedor.</summary>
     internal MySqlConnection Connection { get; }
 
+    /// <summary>Solo se usa para abrir otra base del mismo servidor.</summary>
+    internal DatabaseCredentials Credentials { get; private set; }
+
     public async ValueTask DisposeAsync()
     {
         if (_disposed)
@@ -39,6 +47,7 @@ internal sealed class MySqlSession : IDatabaseSession
         }
 
         _disposed = true;
+        Credentials = default;
         await Connection.DisposeAsync();
     }
 }
@@ -99,6 +108,11 @@ public sealed class MySqlDatabaseProvider : IDatabaseProvider
         {
             await connection.OpenAsync(cancellationToken);
         }
+        catch (OperationCanceledException)
+        {
+            await connection.DisposeAsync();
+            throw;
+        }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
             // Si abrir falla, la conexión no debe quedar viva a medias.
@@ -111,6 +125,26 @@ public sealed class MySqlDatabaseProvider : IDatabaseProvider
 
         // El identificador es aleatorio a propósito: es lo que viaja por HTTP y no
         // debe poder adivinarse (plan §12).
-        return new MySqlSession(Guid.NewGuid(), profile, connection);
+        return new MySqlSession(Guid.NewGuid(), profile, credentials, connection);
+    }
+
+    public Task<IDatabaseSession> OpenDatabaseSessionAsync(
+        IDatabaseSession source,
+        string database,
+        CancellationToken cancellationToken)
+    {
+        if (source is not MySqlSession mysql || !mysql.IsOpen)
+        {
+            throw new ArgumentException(
+                "La sesión no pertenece al proveedor MySQL o ya está cerrada.",
+                nameof(source));
+        }
+
+        ArgumentException.ThrowIfNullOrWhiteSpace(database);
+
+        return OpenSessionAsync(
+            mysql.Profile with { Database = database },
+            mysql.Credentials,
+            cancellationToken);
     }
 }

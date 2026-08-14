@@ -11,6 +11,7 @@ import {
 
 import { ExportFormat } from '../../core/application-gateway/application-gateway';
 import { WorkspaceStore } from '../../core/workspace/workspace-store';
+import { SqlFileService } from '../../core/sql-files/sql-file.service';
 import { ConnectionDialog } from '../../features/connections/connection-dialog/connection-dialog';
 import { ConnectionsSidebar } from '../../features/connections/connections-sidebar/connections-sidebar';
 import { EditorTabs } from '../../features/query-editor/editor-tabs/editor-tabs';
@@ -31,6 +32,7 @@ import {
   DatabaseObject,
   ExplorerNode,
   KnownColumn,
+  QueryHistoryEntry,
   SessionStatus,
 } from '../../shared/models/workspace';
 import { ResizeHandle } from '../../shared/ui/resize-handle/resize-handle';
@@ -83,6 +85,7 @@ const DISCONNECTED: SessionStatus = {
 })
 export class AppShell {
   private readonly _store = inject(WorkspaceStore);
+  private readonly _sqlFiles = inject(SqlFileService);
 
   // --- Tamaños de panel ------------------------------------------------------
   protected readonly sidebarWidth = signal(274);
@@ -146,13 +149,15 @@ export class AppShell {
     const target = this.builderTarget();
     const operation = sql
       .trimStart()
-      .match(/^(SELECT|INSERT|UPDATE|CREATE TABLE|DROP TABLE)/i)?.[1];
+      .match(/^(SELECT|INSERT|UPDATE|DELETE|CREATE TABLE|DROP TABLE)/i)?.[1];
+    const editableSource = operation?.toUpperCase() === 'SELECT' && !/\bJOIN\b/i.test(sql);
 
     this._store.createTab(
       sql,
-      target?.kind === 'table' ? target.source : undefined,
+      target?.kind === 'table' && editableSource ? target.source : undefined,
       target?.connectionId,
       target ? `${target.label} · ${operation?.toUpperCase() ?? 'Consulta'}` : undefined,
+      target?.source.database,
     );
   }
 
@@ -191,10 +196,11 @@ export class AppShell {
       return 'sin conexión';
     }
 
+    const database = this._store.activeTab()?.database ?? session.database;
     const schemas = this._store.schemaIndex().schemas;
     const only = schemas.length === 1 ? schemas[0] : null;
 
-    return only && only !== session.database ? `${session.database}.${only}` : session.database;
+    return only && only !== database ? `${database}.${only}` : database;
   });
 
   // --- Estado del editor -----------------------------------------------------
@@ -280,15 +286,43 @@ export class AppShell {
     this._store.setTimeout(seconds);
   }
 
-  /**
-   * Marca la pestaña como guardada.
-   *
-   * Todavía no hay archivos: guardar en disco llega con el empaquetado de
-   * escritorio. Lo que hace hoy es quitar el indicador de cambios pendientes,
-   * que es lo que el usuario espera al pulsar Ctrl+S.
-   */
-  protected saveTab(): void {
-    this._store.markTabSaved();
+  protected async openSqlFile(): Promise<void> {
+    try {
+      const document = await this._sqlFiles.open();
+
+      if (document) {
+        this._store.openSqlFile(document.fileName, document.contents, document.documentId);
+      }
+    } catch (error) {
+      this._store.notify(this.fileError('No se pudo abrir el archivo SQL', error));
+    }
+  }
+
+  protected async saveTab(saveAs = false): Promise<void> {
+    const tab = this._store.activeTab();
+
+    if (!tab) {
+      return;
+    }
+
+    try {
+      const saved = await this._sqlFiles.save(
+        {
+          documentId: tab.documentId,
+          fileName: tab.fileName,
+          title: tab.title,
+          contents: tab.sql,
+        },
+        saveAs,
+      );
+
+      if (saved) {
+        this._store.markTabSaved(tab.id, tab.sql, saved.fileName, saved.documentId);
+        this._store.notify(`Guardado: ${saved.fileName}`);
+      }
+    } catch (error) {
+      this._store.notify(this.fileError('No se pudo guardar el archivo SQL', error));
+    }
   }
 
   constructor() {
@@ -387,6 +421,12 @@ export class AppShell {
   }
 
   protected closeTab(id: string): void {
+    const tab = this.tabs().find((item) => item.id === id);
+
+    if (tab?.dirty && !window.confirm(`“${tab.title}” tiene cambios sin guardar. ¿Cerrar de todos modos?`)) {
+      return;
+    }
+
     this.executionError.set(null);
     this._store.closeTab(id);
   }
@@ -400,6 +440,10 @@ export class AppShell {
   protected onSqlChange(sql: string): void {
     this.executionError.set(null);
     this._store.updateSql(sql);
+  }
+
+  private fileError(prefix: string, error: unknown): string {
+    return `${prefix}: ${error instanceof Error ? error.message : String(error)}`;
   }
 
   protected onCursorChange(position: CursorPosition): void {
@@ -496,7 +540,13 @@ export class AppShell {
   }
 
   /** Recupera una consulta del historial en una pestaña nueva. */
-  protected reuseQuery(sql: string): void {
-    this._store.createTab(sql, undefined, undefined, 'Historial · Consulta');
+  protected reuseQuery(entry: QueryHistoryEntry): void {
+    this._store.createTab(
+      entry.sql,
+      undefined,
+      entry.connectionId,
+      'Historial · Consulta',
+      entry.database,
+    );
   }
 }

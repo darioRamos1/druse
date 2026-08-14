@@ -69,6 +69,12 @@ if [[ "$TARGET" == "all" || "$TARGET" == "postgres" ]]; then
     done
 
     [[ "$ready" -eq 1 ]] || { echo "$PG_NAME no respondió a tiempo." >&2; exit 1; }
+
+    if ! docker exec "$PG_NAME" psql -U postgres -d postgres -tAc \
+        "SELECT 1 FROM pg_database WHERE datname = 'druse_test_secondary'" | grep -q 1; then
+        docker exec "$PG_NAME" createdb -U postgres druse_test_secondary
+    fi
+
     echo "  PostgreSQL listo en 127.0.0.1:$PG_PORT"
 fi
 
@@ -105,7 +111,7 @@ if [[ "$TARGET" == "all" || "$TARGET" == "sqlserver" ]]; then
     # La base no se crea sola, a diferencia de POSTGRES_DB.
     docker exec "$MSSQL_NAME" /opt/mssql-tools18/bin/sqlcmd \
         -S localhost -U sa -P "$MSSQL_PASSWORD" -C \
-        -Q "IF DB_ID('druse_test') IS NULL CREATE DATABASE druse_test;" >/dev/null 2>&1
+        -Q "IF DB_ID('druse_test') IS NULL CREATE DATABASE druse_test; IF DB_ID('druse_test_secondary') IS NULL CREATE DATABASE druse_test_secondary;" >/dev/null 2>&1
 
     echo "  SQL Server listo en 127.0.0.1:$MSSQL_PORT"
 fi
@@ -135,6 +141,8 @@ if [[ "$TARGET" == "all" || "$TARGET" == "mysql" ]]; then
     done
 
     [[ "$ready" -eq 1 ]] || { echo "$MYSQL_NAME no respondió a tiempo." >&2; exit 1; }
+    docker exec "$MYSQL_NAME" mysql -uroot -p"$MYSQL_PASSWORD" \
+        -e 'CREATE DATABASE IF NOT EXISTS druse_test_secondary;' >/dev/null 2>&1
     echo "  MySQL listo en 127.0.0.1:$MYSQL_PORT"
 fi
 

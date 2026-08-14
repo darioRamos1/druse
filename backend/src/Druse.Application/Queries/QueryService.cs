@@ -107,7 +107,11 @@ public sealed class QueryService(
 
         try
         {
-            var result = await executor.ExecuteAsync(session, effective, token);
+            var result = await _connections.UseDatabaseAsync(
+                session,
+                effective.Database,
+                selected => executor.ExecuteAsync(selected, effective, token),
+                token);
 
             // El proveedor genera su propio identificador; se sustituye por el que
             // ya conoce el cliente, que es con el que podría haber cancelado.

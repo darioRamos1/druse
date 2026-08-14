@@ -10,10 +10,15 @@ internal sealed class SqlServerSession : IDatabaseSession
 {
     private bool _disposed;
 
-    public SqlServerSession(Guid id, ConnectionProfile profile, SqlConnection connection)
+    public SqlServerSession(
+        Guid id,
+        ConnectionProfile profile,
+        DatabaseCredentials credentials,
+        SqlConnection connection)
     {
         Id = id;
         Profile = profile;
+        Credentials = credentials;
         Connection = connection;
         ServerVersion = connection.ServerVersion;
     }
@@ -31,6 +36,9 @@ internal sealed class SqlServerSession : IDatabaseSession
     /// <summary>Solo accesible dentro del proveedor.</summary>
     internal SqlConnection Connection { get; }
 
+    /// <summary>Solo se usa para abrir otra base del mismo servidor.</summary>
+    internal DatabaseCredentials Credentials { get; private set; }
+
     public async ValueTask DisposeAsync()
     {
         if (_disposed)
@@ -39,6 +47,7 @@ internal sealed class SqlServerSession : IDatabaseSession
         }
 
         _disposed = true;
+        Credentials = default;
         await Connection.DisposeAsync();
     }
 }
@@ -98,6 +107,11 @@ public sealed class SqlServerDatabaseProvider : IDatabaseProvider
         {
             await connection.OpenAsync(cancellationToken);
         }
+        catch (OperationCanceledException)
+        {
+            await connection.DisposeAsync();
+            throw;
+        }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
             // Si abrir falla, la conexión no debe quedar viva a medias.
@@ -110,6 +124,26 @@ public sealed class SqlServerDatabaseProvider : IDatabaseProvider
 
         // El identificador es aleatorio a propósito: es lo que viaja por HTTP y no
         // debe poder adivinarse (plan §12).
-        return new SqlServerSession(Guid.NewGuid(), profile, connection);
+        return new SqlServerSession(Guid.NewGuid(), profile, credentials, connection);
+    }
+
+    public Task<IDatabaseSession> OpenDatabaseSessionAsync(
+        IDatabaseSession source,
+        string database,
+        CancellationToken cancellationToken)
+    {
+        if (source is not SqlServerSession sqlServer || !sqlServer.IsOpen)
+        {
+            throw new ArgumentException(
+                "La sesión no pertenece al proveedor SQL Server o ya está cerrada.",
+                nameof(source));
+        }
+
+        ArgumentException.ThrowIfNullOrWhiteSpace(database);
+
+        return OpenSessionAsync(
+            sqlServer.Profile with { Database = database },
+            sqlServer.Credentials,
+            cancellationToken);
     }
 }

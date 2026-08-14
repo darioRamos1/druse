@@ -75,6 +75,7 @@ describe('AppShell', () => {
   let element: HTMLElement;
 
   beforeEach(async () => {
+    vi.restoreAllMocks();
     await TestBed.configureTestingModule({
       imports: [AppShell],
       providers: [{ provide: ApplicationGateway, useValue: silentGateway() }],
@@ -199,6 +200,22 @@ describe('AppShell', () => {
 
     // Nunca debe quedar el editor sin pestaña seleccionada.
     expect(element.querySelectorAll('app-editor-tabs .tab.is-active').length).toBe(1);
+  });
+
+  it('no cierra una pestaña modificada sin confirmación', async () => {
+    element.querySelector<HTMLButtonElement>('app-editor-tabs .tabs__add')?.click();
+    await fixture.whenStable();
+    const store = TestBed.inject(WorkspaceStore);
+    store.updateSql('SELECT 1;');
+    fixture.detectChanges();
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    const count = store.tabs().length;
+
+    element.querySelector<HTMLButtonElement>('app-editor-tabs .tab.is-active .tab__close')?.click();
+    await fixture.whenStable();
+
+    expect(confirm).toHaveBeenCalled();
+    expect(store.tabs().length).toBe(count);
   });
 
   it('abre la paleta global con Ctrl+K', async () => {

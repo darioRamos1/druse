@@ -59,9 +59,19 @@ public sealed class ExportService(
         var executor = _providers.GetQueryExecutor(session.Engine);
         var exporter = GetExporter(options.Format);
 
-        await using var reader = await executor.OpenReaderAsync(session, request, cancellationToken);
+        return await _connections.UseDatabaseAsync(
+            session,
+            request.Database,
+            async selected =>
+            {
+                await using var reader = await executor.OpenReaderAsync(
+                    selected,
+                    request,
+                    cancellationToken);
 
-        return await exporter.WriteAsync(reader, destination, options, cancellationToken);
+                return await exporter.WriteAsync(reader, destination, options, cancellationToken);
+            },
+            cancellationToken);
     }
 }
 

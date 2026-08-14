@@ -9,10 +9,12 @@
 //! API, decirle al frontend dónde encontrarla y cerrarla al salir.
 
 mod api_process;
+mod sql_files;
 
 use std::sync::Mutex;
 
 use api_process::{ApiProcess, Endpoint};
+use sql_files::SqlFileState;
 use tauri::{Manager, PhysicalPosition, PhysicalSize, State, WebviewWindow};
 
 /// Estado compartido: el proceso de la API mientras la aplicación vive.
@@ -101,6 +103,8 @@ fn fit_to_work_area(window: &WebviewWindow) -> tauri::Result<()> {
 fn main() {
     tauri::Builder::default()
         .manage(ApiState(Mutex::new(None)))
+        .manage(SqlFileState::default())
+        .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
             if let Some(window) = app.get_webview_window("main") {
                 // Que el ajuste falle no debe impedir que la aplicación arranque.
@@ -135,7 +139,12 @@ fn main() {
 
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![api_connection])
+        .invoke_handler(tauri::generate_handler![
+            api_connection,
+            sql_files::open_sql_file,
+            sql_files::save_sql_file,
+            sql_files::save_sql_file_as
+        ])
         .on_window_event(|window, event| {
             // Al cerrar la ventana hay que parar la API: dejarla viva
             // mantendría abiertas las conexiones del usuario contra sus bases de

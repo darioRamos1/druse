@@ -92,6 +92,13 @@ if ($Engine -in 'all', 'postgres') {
     }
 
     if ($ready) {
+        $secondary = docker exec $PostgresName psql -U postgres -d postgres -tAc `
+            "SELECT 1 FROM pg_database WHERE datname = 'druse_test_secondary'" 2>$null
+
+        if ($secondary -notcontains '1') {
+            docker exec $PostgresName createdb -U postgres druse_test_secondary 2>$null
+        }
+
         Write-Host "  PostgreSQL listo en 127.0.0.1:$PostgresPort" -ForegroundColor Green
     }
     else {
@@ -137,7 +144,7 @@ if ($Engine -in 'all', 'sqlserver') {
     # La base no se crea sola, a diferencia de POSTGRES_DB.
     docker exec $SqlServerName /opt/mssql-tools18/bin/sqlcmd `
         -S localhost -U sa -P 'Druse_dev_only_1' -C `
-        -Q "IF DB_ID('druse_test') IS NULL CREATE DATABASE druse_test;" 2>$null | Out-Null
+        -Q "IF DB_ID('druse_test') IS NULL CREATE DATABASE druse_test; IF DB_ID('druse_test_secondary') IS NULL CREATE DATABASE druse_test_secondary;" 2>$null | Out-Null
 
     Write-Host "  SQL Server listo en 127.0.0.1:$SqlServerPort" -ForegroundColor Green
 }
@@ -169,6 +176,9 @@ if ($Engine -in 'all', 'mysql') {
     }
 
     if ($ready) {
+        docker exec $MySqlName mysql -uroot -pdruse_dev_only `
+            -e 'CREATE DATABASE IF NOT EXISTS druse_test_secondary;' 2>$null | Out-Null
+
         Write-Host "  MySQL listo en 127.0.0.1:$MySqlPort" -ForegroundColor Green
     }
     else {

@@ -5,6 +5,7 @@ import { Observable, of, throwError } from 'rxjs';
 import {
   ApplicationGateway,
   ExecuteQueryRequest,
+  ExportRequest,
   ImportPreview,
   RowEditRequest,
   RowEditResult,
@@ -105,6 +106,7 @@ function successfulQuery(overrides: Partial<QueryResult> = {}): QueryResult {
 /** Doble del gateway con lo justo para las pruebas. */
 class FakeGateway implements Partial<ApplicationGateway> {
   executeCalls: ExecuteQueryRequest[] = [];
+  exportCalls: ExportRequest[] = [];
   closedSessions: string[] = [];
   saveCalls: SaveConnectionRequest[] = [];
   deletedConnections: string[] = [];
@@ -118,7 +120,8 @@ class FakeGateway implements Partial<ApplicationGateway> {
   definition = 'CREATE VIEW "public"."active_users" AS SELECT 1;\n';
   definitionRequest: { sessionId: string; databaseObject: DatabaseObject } | null = null;
 
-  exportQuery(): Observable<Blob> {
+  exportQuery(request: ExportRequest): Observable<Blob> {
+    this.exportCalls.push(request);
     return of(new Blob());
   }
 
@@ -264,6 +267,7 @@ class FakeGateway implements Partial<ApplicationGateway> {
         dataType,
         isNullable: true,
         isPrimaryKey: false,
+        defaultValue: "'sin-correo'",
         ordinal: 2,
       },
     ]);
@@ -512,6 +516,7 @@ describe('WorkspaceStore', () => {
       // Traer los hijos y mostrarlos son cosas distintas: el usuario no ha
       // pedido ver nada.
       expect(store.explorerNodes().map((node) => node.label)).toEqual(['druse_test']);
+      expect(store.searchableSchemas().map((node) => node.label)).toContain('public');
       expect(store.searchableRelations().map((node) => node.label)).toContain('users');
     });
 
@@ -525,6 +530,7 @@ describe('WorkspaceStore', () => {
       expect(columnas.map((columna) => columna.name)).toEqual(['id', 'email']);
       expect(columnas[0].dataType).toBe('int8');
       expect(columnas[0].isPrimaryKey).toBe(true);
+      expect(columnas[1].defaultValue).toBe("'sin-correo'");
 
       // Traer las columnas no es lo mismo que desplegar el nodo.
       expect(store.explorerNodes().length).toBe(1);
@@ -1019,6 +1025,30 @@ describe('WorkspaceStore', () => {
   });
 
   describe('pestañas', () => {
+    it('abre un archivo SQL limpio y conserva su identidad opaca', () => {
+      store.openSqlFile('ventas.sql', 'SELECT * FROM ventas;', 'sql-7');
+
+      expect(store.activeTab()).toMatchObject({
+        title: 'ventas.sql',
+        fileName: 'ventas.sql',
+        documentId: 'sql-7',
+        sql: 'SELECT * FROM ventas;',
+        dirty: false,
+      });
+    });
+
+    it('solo limpia los cambios que coinciden con el contenido guardado', () => {
+      store.openSqlFile('ventas.sql', 'SELECT 1;', 'sql-7');
+      const tab = store.activeTab()!;
+      store.updateSql('SELECT 2;');
+
+      store.markTabSaved(tab.id, 'SELECT 1;', 'ventas.sql', 'sql-7');
+      expect(store.activeTab()?.dirty).toBe(true);
+
+      store.markTabSaved(tab.id, 'SELECT 2;', 'ventas.sql', 'sql-7');
+      expect(store.activeTab()?.dirty).toBe(false);
+    });
+
     it('abre una consulta preparada desde una tabla', async () => {
       await store.connect(form);
       await store.toggleNode(store.explorerNodes()[0].id);
@@ -1082,7 +1112,41 @@ describe('WorkspaceStore', () => {
       await store.execute();
 
       expect(gateway.executeCalls.at(-1)?.sessionId).toBe('sqlserver-session');
+      expect(gateway.executeCalls.at(-1)?.database).toBe('druse_test');
       expect(store.activeConnection()?.engine).toBe('sqlserver');
+    });
+
+    it('conserva la base elegida al ejecutar y exportar', async () => {
+      await store.connect(form);
+
+      store.openSelectFor(
+        {
+          id: 'secondary-users',
+          label: 'users',
+          kind: 'table',
+          depth: 5,
+          expandable: true,
+          expanded: false,
+          loading: false,
+          connectionId: store.connections()[0].id,
+          source: {
+            id: 'Table:public.users',
+            name: 'users',
+            kind: 'table',
+            database: 'otra_base',
+            schema: 'public',
+            hasChildren: true,
+          },
+        },
+        'SELECT * FROM public.users;',
+      );
+
+      await store.execute();
+      await store.export('csv');
+
+      expect(store.activeTab()?.database).toBe('otra_base');
+      expect(gateway.executeCalls.at(-1)?.database).toBe('otra_base');
+      expect(gateway.exportCalls.at(-1)?.database).toBe('otra_base');
     });
 
     it('una pestaña nueva queda ligada a la conexión activa', async () => {
@@ -1139,6 +1203,7 @@ describe('WorkspaceStore', () => {
       expect(gateway.definitionRequest?.sessionId).toBe('postgresql-session');
       expect(store.activeTab()?.sql).toContain('CREATE VIEW');
       expect(store.activeTab()?.connectionId).toBe(postgresql.id);
+      expect(store.activeTab()?.database).toBe('druse_test');
       expect(store.activeTab()?.sourceTable).toBeUndefined();
     });
 

@@ -4,8 +4,8 @@ import { DatabaseEngine, KnownColumn } from '../../../shared/models/workspace';
 export interface QueryFilter {
   readonly column: string;
   readonly operator: FilterOperator;
-  /** Sin valor en `IS NULL` y `IS NOT NULL`. */
-  readonly value: string;
+  /** `null` significa que todavía no se rellenó; `''` es texto vacío. */
+  readonly value: string | null;
 }
 
 export type FilterOperator =
@@ -16,12 +16,57 @@ export interface SelectSpec {
   readonly schema?: string;
   readonly table: string;
   /** Columnas elegidas. Vacío significa `*`. */
-  readonly columns: readonly string[];
+  readonly columns: readonly (string | SelectColumn)[];
   readonly filters: readonly QueryFilter[];
   readonly orderBy?: string;
   readonly descending?: boolean;
   /** `null` para no limitar. */
   readonly limit: number | null;
+  /** Alias de la tabla principal cuando existen cruces. */
+  readonly alias?: string;
+  readonly joins?: readonly QueryJoin[];
+}
+
+export interface SelectColumn {
+  readonly alias: string;
+  readonly column: string;
+}
+
+export type JoinType = 'INNER' | 'LEFT' | 'RIGHT' | 'FULL OUTER' | 'CROSS';
+
+export interface QueryJoin {
+  readonly type: JoinType;
+  readonly schema?: string;
+  readonly table: string;
+  readonly alias: string;
+  readonly leftAlias: string;
+  readonly leftColumn: string;
+  readonly rightColumn: string;
+}
+
+export type SqlInputValue =
+  | { readonly kind: 'value'; readonly text: string | null }
+  | { readonly kind: 'null' }
+  | { readonly kind: 'default' };
+
+export interface ColumnWrite {
+  readonly column: string;
+  readonly dataType: string;
+  readonly value: SqlInputValue;
+}
+
+export interface InsertValuesSpec {
+  readonly schema?: string;
+  readonly table: string;
+  /** Las columnas omitidas conservan el valor por defecto del servidor. */
+  readonly values: readonly ColumnWrite[];
+}
+
+export interface UpdateValuesSpec {
+  readonly schema?: string;
+  readonly table: string;
+  readonly assignments: readonly ColumnWrite[];
+  readonly filters: readonly QueryFilter[];
 }
 
 /**
@@ -68,8 +113,10 @@ function literal(value: string): string {
   return `'${value.replace(/'/g, "''")}'`;
 }
 
-function condition(engine: DatabaseEngine, filter: QueryFilter): string {
-  const column = quote(engine, filter.column);
+function condition(engine: DatabaseEngine, filter: QueryFilter, alias?: string): string {
+  const column = alias
+    ? `${quote(engine, alias)}.${quote(engine, filter.column)}`
+    : quote(engine, filter.column);
 
   switch (filter.operator) {
     case 'IS NULL':
@@ -78,13 +125,13 @@ function condition(engine: DatabaseEngine, filter: QueryFilter): string {
 
     case 'IN':
       // Se acepta la lista tal y como se escribe: `1, 2, 3` o `'a', 'b'`.
-      return `${column} IN (${filter.value})`;
+      return `${column} IN (${filter.value ?? '/* valores obligatorios */'})`;
 
     case 'LIKE':
-      return `${column} LIKE ${literal(filter.value)}`;
+      return `${column} LIKE ${filter.value === null ? '/* valor obligatorio */' : literal(filter.value)}`;
 
     default:
-      return `${column} ${filter.operator} ${literal(filter.value)}`;
+      return `${column} ${filter.operator} ${filter.value === null ? '/* valor obligatorio */' : literal(filter.value)}`;
   }
 }
 
@@ -96,21 +143,50 @@ function condition(engine: DatabaseEngine, filter: QueryFilter): string {
  * SELECT en SQL Server.
  */
 export function buildSelect(engine: DatabaseEngine, spec: SelectSpec): string {
+  const alias = spec.alias ?? ((spec.joins?.length ?? 0) > 0 ? 't0' : undefined);
+  const selectColumn = (column: string | SelectColumn) =>
+    typeof column === 'string'
+      ? alias
+        ? `${quote(engine, alias)}.${quote(engine, column)}`
+        : quote(engine, column)
+      : `${quote(engine, column.alias)}.${quote(engine, column.column)}`;
   const columnas =
-    spec.columns.length > 0 ? spec.columns.map((column) => quote(engine, column)).join(', ') : '*';
+    spec.columns.length > 0
+      ? spec.columns.map(selectColumn).join(', ')
+      : alias
+        ? `${quote(engine, alias)}.*`
+        : '*';
 
   const top = engine === 'sqlserver' && spec.limit ? `TOP ${spec.limit} ` : '';
 
-  const lineas = [`SELECT ${top}${columnas}`, `FROM ${qualify(engine, spec.schema, spec.table)}`];
+  const from = alias
+    ? `${qualify(engine, spec.schema, spec.table)} AS ${quote(engine, alias)}`
+    : qualify(engine, spec.schema, spec.table);
+  const lineas = [`SELECT ${top}${columnas}`, `FROM ${from}`];
+
+  for (const join of spec.joins ?? []) {
+    lineas.push(
+      `${join.type} JOIN ${qualify(engine, join.schema, join.table)} AS ${quote(engine, join.alias)}`,
+    );
+
+    if (join.type !== 'CROSS') {
+      lineas.push(
+        `  ON ${quote(engine, join.leftAlias)}.${quote(engine, join.leftColumn)} = ${quote(engine, join.alias)}.${quote(engine, join.rightColumn)}`,
+      );
+    }
+  }
 
   if (spec.filters.length > 0) {
-    const condiciones = spec.filters.map((filter) => condition(engine, filter));
+    const condiciones = spec.filters.map((filter) => condition(engine, filter, alias));
 
     lineas.push(`WHERE ${condiciones.join('\n  AND ')}`);
   }
 
   if (spec.orderBy) {
-    lineas.push(`ORDER BY ${quote(engine, spec.orderBy)}${spec.descending ? ' DESC' : ''}`);
+    const order = alias
+      ? `${quote(engine, alias)}.${quote(engine, spec.orderBy)}`
+      : quote(engine, spec.orderBy);
+    lineas.push(`ORDER BY ${order}${spec.descending ? ' DESC' : ''}`);
   }
 
   if (spec.limit && engine !== 'sqlserver') {
@@ -144,6 +220,20 @@ export function buildInsert(
   return `INSERT INTO ${qualify(engine, spec.schema, spec.table)} (${nombres})\nVALUES (${huecos});\n`;
 }
 
+/** INSERT rellenado desde el compositor, conservando NULL y DEFAULT como estados distintos. */
+export function buildInsertValues(engine: DatabaseEngine, spec: InsertValuesSpec): string {
+  if (spec.values.length === 0) {
+    return engine === 'mysql'
+      ? `INSERT INTO ${qualify(engine, spec.schema, spec.table)} ()\nVALUES ();\n`
+      : `INSERT INTO ${qualify(engine, spec.schema, spec.table)}\nDEFAULT VALUES;\n`;
+  }
+
+  const columns = spec.values.map((entry) => quote(engine, entry.column)).join(', ');
+  const values = spec.values.map((entry) => writeValue(entry)).join(', ');
+
+  return `INSERT INTO ${qualify(engine, spec.schema, spec.table)} (${columns})\nVALUES (${values});\n`;
+}
+
 /**
  * Plantilla de `UPDATE`, con el `WHERE` por clave primaria ya puesto.
  *
@@ -173,6 +263,24 @@ export function buildUpdate(
       : '/* condición: esta tabla no tiene clave primaria */';
 
   return `UPDATE ${qualify(engine, spec.schema, spec.table)}\nSET\n${asignaciones}\nWHERE ${filtro};\n`;
+}
+
+/** UPDATE rellenado; nunca produce una sentencia ejecutable sin cláusula WHERE. */
+export function buildUpdateValues(engine: DatabaseEngine, spec: UpdateValuesSpec): string {
+  if (spec.assignments.length === 0) {
+    return '-- Elige al menos una columna para modificar.\n';
+  }
+
+  const assignments = spec.assignments
+    .map((entry) => `  ${quote(engine, entry.column)} = ${writeValue(entry)}`)
+    .join(',\n');
+  const filters = spec.filters.filter((filter) => filter.column.length > 0);
+  const where =
+    filters.length > 0
+      ? filters.map((filter) => condition(engine, filter)).join('\n  AND ')
+      : '/* condición obligatoria */';
+
+  return `UPDATE ${qualify(engine, spec.schema, spec.table)}\nSET\n${assignments}\nWHERE ${where};\n`;
 }
 
 /** Plantilla destructiva que siempre se revisa en el editor antes de ejecutarse. */
@@ -217,4 +325,17 @@ export function buildCreateTable(
 /** Columnas que el motor rellena solo y que no se escriben en un INSERT. */
 function isGenerated(column: KnownColumn): boolean {
   return column.isGenerated === true;
+}
+
+function writeValue(entry: ColumnWrite): string {
+  switch (entry.value.kind) {
+    case 'null':
+      return 'NULL';
+    case 'default':
+      return 'DEFAULT';
+    case 'value':
+      return entry.value.text === null
+        ? `/* ${entry.dataType}: valor obligatorio */`
+        : literal(entry.value.text);
+  }
 }

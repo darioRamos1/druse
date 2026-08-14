@@ -12,7 +12,7 @@ const INDENT_BASE = 8;
 const KIND_ICONS: Readonly<Record<ExplorerNode['kind'], IconName | null>> = {
   folder: null,
   database: 'database',
-  schema: null,
+  schema: 'schema',
   table: 'table',
   view: 'table',
   function: null,

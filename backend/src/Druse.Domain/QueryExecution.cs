@@ -20,6 +20,11 @@ public sealed record QueryRequest
     /// <summary>Texto a ejecutar. Si el usuario seleccionó algo, ya viene recortado.</summary>
     public required string Sql { get; init; }
 
+    /// <summary>
+    /// Base elegida en el explorador. Si falta, se usa la base inicial de la sesión.
+    /// </summary>
+    public string? Database { get; init; }
+
     /// <summary>Filas máximas a leer. Protege la memoria y la interfaz.</summary>
     public int MaxRows { get; init; } = 500;
 

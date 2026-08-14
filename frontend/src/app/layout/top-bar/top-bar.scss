@@ -233,6 +233,12 @@
   }
 }
 
+@media (max-width: 1180px) {
+  .btn--save-as {
+    display: none;
+  }
+}
+
 @media (max-width: 620px) {
   .actions .btn--primary {
     width: 30px;

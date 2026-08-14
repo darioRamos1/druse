@@ -67,4 +67,33 @@ public sealed class ConnectionService(
     /// </summary>
     public Task<IDisposable> EnterAsync(Guid sessionId, CancellationToken cancellationToken) =>
         _sessions.EnterAsync(sessionId, cancellationToken);
+
+    /// <summary>
+    /// Ejecuta una operación en la base pedida. Si no es la base inicial, abre
+    /// una sesión auxiliar que conserva servidor, usuario, opciones y permisos.
+    /// Quien llama debe tener ya el turno de la sesión de origen.
+    /// </summary>
+    public async Task<T> UseDatabaseAsync<T>(
+        IDatabaseSession source,
+        string? database,
+        Func<IDatabaseSession, Task<T>> operation,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+        ArgumentNullException.ThrowIfNull(operation);
+
+        if (string.IsNullOrWhiteSpace(database)
+            || string.Equals(database, source.Profile.Database, StringComparison.Ordinal))
+        {
+            return await operation(source);
+        }
+
+        var provider = _providers.GetProvider(source.Engine);
+        await using var auxiliary = await provider.OpenDatabaseSessionAsync(
+            source,
+            database,
+            cancellationToken);
+
+        return await operation(auxiliary);
+    }
 }

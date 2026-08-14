@@ -26,7 +26,12 @@ public sealed class SqlServerFixture : IProviderFixture
     public string DatabaseName =>
         Environment.GetEnvironmentVariable("DRUSE_TEST_MSSQL_DB") ?? "druse_test";
 
+    public string SecondaryDatabaseName =>
+        Environment.GetEnvironmentVariable("DRUSE_TEST_MSSQL_SECOND_DB") ?? "druse_test_secondary";
+
     public string DefaultSchema => "dbo";
+
+    public string DefaultSchemaFor(string database) => "dbo";
 
     public ConnectionProfile Profile(bool onlyRead = false) => new()
     {
@@ -42,6 +47,9 @@ public sealed class SqlServerFixture : IProviderFixture
         ReadOnly = onlyRead,
         ConnectTimeoutSeconds = 5,
     };
+
+    public ConnectionProfile ProfileForDatabase(string database, bool onlyRead = false) =>
+        Profile(onlyRead) with { Id = Guid.NewGuid(), Database = database };
 
     public DatabaseCredentials Credentials =>
         new(Environment.GetEnvironmentVariable("DRUSE_TEST_MSSQL_PASSWORD") ?? "Druse_dev_only_1");

@@ -42,7 +42,15 @@ public sealed class MetadataService(
         var session = _connections.Require(sessionId);
         var reader = _providers.GetMetadataReader(session.Engine);
 
-        return await reader.GetChildrenAsync(session, parent, cancellationToken);
+        var database = parent.Kind == DatabaseObjectKind.Database
+            ? parent.Database ?? parent.Name
+            : parent.Database;
+
+        return await _connections.UseDatabaseAsync(
+            session,
+            database,
+            selected => reader.GetChildrenAsync(selected, parent, cancellationToken),
+            cancellationToken);
     }
 
     public async Task<IReadOnlyList<DatabaseColumn>> GetColumnsAsync(
@@ -55,7 +63,11 @@ public sealed class MetadataService(
         var session = _connections.Require(sessionId);
         var reader = _providers.GetMetadataReader(session.Engine);
 
-        return await reader.GetColumnsAsync(session, table, cancellationToken);
+        return await _connections.UseDatabaseAsync(
+            session,
+            table.Database,
+            selected => reader.GetColumnsAsync(selected, table, cancellationToken),
+            cancellationToken);
     }
 
     public async Task<string> GetDefinitionAsync(
@@ -77,6 +89,10 @@ public sealed class MetadataService(
         var session = _connections.Require(sessionId);
         var reader = _providers.GetMetadataReader(session.Engine);
 
-        return await reader.GetDefinitionAsync(session, databaseObject, cancellationToken);
+        return await _connections.UseDatabaseAsync(
+            session,
+            databaseObject.Database,
+            selected => reader.GetDefinitionAsync(selected, databaseObject, cancellationToken),
+            cancellationToken);
     }
 }

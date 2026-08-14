@@ -106,7 +106,11 @@ public sealed class ImportService(
 
         var session = _connections.Require(request.SessionId);
 
-        return await editor.InsertAsync(session, plan.Batch, cancellationToken);
+        return await _connections.UseDatabaseAsync(
+            session,
+            request.Table.Database,
+            selected => editor.InsertAsync(selected, plan.Batch, cancellationToken),
+            cancellationToken);
     }
 
     private sealed record Plan(IReadOnlyList<ColumnMapping> Mappings, PreparedInsertBatch Batch);

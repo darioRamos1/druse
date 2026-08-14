@@ -76,13 +76,19 @@ Al empaquetar cambian dos cosas respecto al desarrollo:
 | `Ctrl/Cmd + Enter` | Ejecutar |
 | `Ctrl/Cmd + Shift + Enter` | Ejecutar solo la selección |
 | `Esc` | Cancelar la consulta en curso |
-| `Ctrl/Cmd + S` | Marcar la pestaña como guardada |
+| `Ctrl/Cmd + O` | Abrir un archivo `.sql` |
+| `Ctrl/Cmd + S` | Guardar el archivo `.sql` activo |
+| `Ctrl/Cmd + Shift + S` | Guardar como otro archivo `.sql` |
 | `Ctrl/Cmd + T` | Nueva consulta |
 | `Ctrl/Cmd + Shift + F` | Formatear |
 | `Ctrl/Cmd + F` | Buscar en el editor |
 | `Ctrl/Cmd + Espacio` | Sugerencias |
 
 El autocompletado ofrece las tablas, vistas y columnas **que el explorador ya ha cargado**, resolviendo los alias del `FROM`: si escribes `FROM users u`, después `u.` sugiere las columnas de `users`.
+
+En la aplicación de escritorio, abrir y guardar utiliza los selectores nativos y
+`Ctrl/Cmd + S` vuelve a escribir el mismo archivo. En navegador, abrir usa el
+selector web y guardar descarga un `.sql` nuevo.
 
 ## Motores soportados
 

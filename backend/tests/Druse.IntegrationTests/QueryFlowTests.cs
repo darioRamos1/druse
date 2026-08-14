@@ -20,11 +20,15 @@ public sealed class QueryFlowTests : IClassFixture<DruseApiFactory>
         _factory = factory;
     }
 
-    private async Task<(HttpClient Client, Guid SessionId)> ConnectAsync(bool readOnly = false)
+    private async Task<(HttpClient Client, Guid SessionId)> ConnectAsync(
+        bool readOnly = false,
+        string? database = null)
     {
         var client = _factory.CreateAuthenticatedClient();
 
-        var response = await client.PostAsJsonAsync("/api/sessions", TestDatabase.ConnectRequest(readOnly));
+        var response = await client.PostAsJsonAsync(
+            "/api/sessions",
+            TestDatabase.ConnectRequest(readOnly, database));
         response.EnsureSuccessStatusCode();
 
         var body = await response.ReadJsonAsync();
@@ -208,6 +212,60 @@ public sealed class QueryFlowTests : IClassFixture<DruseApiFactory>
             // 5. Ya no existe.
             var afterClose = await client.GetAsync($"/api/sessions/{sessionId}/metadata/databases");
             Assert.Equal(HttpStatusCode.NotFound, afterClose.StatusCode);
+        }
+    }
+
+    [RequiresPostgreSqlFact]
+    public async Task UnaSesionPuedeExplorarYEjecutarEnOtraBaseAutorizada()
+    {
+        var (client, sessionId) = await ConnectAsync();
+
+        using (client)
+        {
+            try
+            {
+                var databases = await client.GetFromJsonAsync<JsonElement>(
+                    $"/api/sessions/{sessionId}/metadata/databases");
+
+                Assert.Contains(
+                    databases.EnumerateArray(),
+                    database => database.GetProperty("name").GetString() == TestDatabase.SecondaryDatabase);
+
+                var schemasResponse = await client.PostAsJsonAsync(
+                    $"/api/sessions/{sessionId}/metadata/children",
+                    new
+                    {
+                        id = $"db:{TestDatabase.SecondaryDatabase}",
+                        name = TestDatabase.SecondaryDatabase,
+                        kind = "database",
+                        database = TestDatabase.SecondaryDatabase,
+                        hasChildren = true,
+                    });
+                schemasResponse.EnsureSuccessStatusCode();
+                var schemas = await schemasResponse.ReadJsonAsync();
+                Assert.Contains(
+                    schemas.EnumerateArray(),
+                    schema => schema.GetProperty("name").GetString() == "public");
+
+                var queryResponse = await client.PostAsJsonAsync("/api/queries", new
+                {
+                    sessionId,
+                    database = TestDatabase.SecondaryDatabase,
+                    sql = "SELECT current_database() AS database",
+                    maxRows = 10,
+                    timeoutSeconds = 30,
+                });
+                queryResponse.EnsureSuccessStatusCode();
+                var result = await queryResponse.ReadJsonAsync();
+
+                Assert.Equal(
+                    TestDatabase.SecondaryDatabase,
+                    result.GetProperty("resultSets")[0].GetProperty("rows")[0][0].GetString());
+            }
+            finally
+            {
+                await client.DeleteAsync($"/api/sessions/{sessionId}");
+            }
         }
     }
 

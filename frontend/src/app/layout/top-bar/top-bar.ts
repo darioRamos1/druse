@@ -13,5 +13,8 @@ import { Icon } from '../../shared/ui/icon/icon';
 export class TopBar {
   readonly newConnection = output<void>();
   readonly newQuery = output<void>();
+  readonly openSql = output<void>();
+  readonly saveSql = output<void>();
+  readonly saveSqlAs = output<void>();
   readonly openPalette = output<void>();
 }

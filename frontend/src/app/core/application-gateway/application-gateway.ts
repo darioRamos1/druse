@@ -91,6 +91,8 @@ export interface RowEditResult {
 export interface ExecuteQueryRequest {
   readonly sessionId: string;
   readonly sql: string;
+  /** Base elegida en el explorador; si falta, se usa la inicial de la conexión. */
+  readonly database?: string;
 
   /**
    * Identificador elegido por el cliente para poder cancelar.
@@ -252,6 +254,7 @@ export type ExportFormat = 'csv' | 'xlsx';
 export interface ExportRequest {
   readonly sessionId: string;
   readonly sql: string;
+  readonly database?: string;
   readonly format: ExportFormat;
   readonly fileName?: string;
   /** `utf8bom`, `utf8` o `latin1`. Solo aplica a CSV. */

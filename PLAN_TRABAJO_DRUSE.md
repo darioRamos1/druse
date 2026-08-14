@@ -841,6 +841,26 @@ de las columnas. Se añadirá una operación de lectura de metadatos que atravie
 contrato de proveedores, la aplicación, la API local y el `ApplicationGateway`.
 El resultado se abrirá en una pestaña del editor existente.
 
+La conexión también enumera todas las bases a las que el usuario tiene acceso.
+Cada nodo, pestaña, consulta, exportación, edición e importación conserva la base
+seleccionada; PostgreSQL y SQL Server abren una conexión auxiliar temporal porque
+sus catálogos dependen de la base activa. MySQL/MariaDB mantiene su navegación
+calificada por esquema.
+
+El compositor permite rellenar `INSERT` y `UPDATE` por columna, distinguiendo
+valor, cadena vacía, `NULL`, omisión y `DEFAULT`. El `UPDATE` conserva una sección
+`WHERE` obligatoria y el SQL resultante siempre queda visible y editable antes de
+abrirse en el editor.
+
+Los `SELECT` pueden añadir varios cruces manuales con tablas de la misma base:
+`INNER`, `LEFT`, `RIGHT`, `FULL OUTER` y `CROSS JOIN`. MySQL/MariaDB no ofrece
+`FULL OUTER JOIN` porque el motor no lo soporta; los resultados con cruces no se
+marcan como editables para evitar atribuir a la tabla principal columnas ajenas.
+El selector de cada cruce busca por `esquema.tabla` y carga bajo demanda el
+esquema escrito, para no obligar a recorrer catálogos grandes. Las sugerencias
+admiten búsqueda parcial, flechas, `Enter` y `Escape`, con un máximo visible para
+mantener fluida la lista en catálogos grandes.
+
 Tareas de backend:
 
 - [x] Añadir una operación de definición de vista a

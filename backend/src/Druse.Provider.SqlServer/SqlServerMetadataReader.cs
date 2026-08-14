@@ -28,14 +28,10 @@ public sealed class SqlServerMetadataReader : IDatabaseMetadataReader
         IDatabaseSession session,
         CancellationToken cancellationToken)
     {
-        // El proveedor todavía consulta `sys.*` en el catálogo de la conexión.
-        // Mostrar otras bases aquí haría que el árbol etiquetara como ajenos
-        // objetos que en realidad leyó de la base conectada.
         const string Sql = """
             SELECT d.name
             FROM sys.databases d
-            WHERE d.name = DB_NAME()
-              AND d.state = 0
+            WHERE d.state = 0
               AND HAS_DBACCESS(d.name) = 1
             ORDER BY d.name
             """;
@@ -134,14 +130,6 @@ public sealed class SqlServerMetadataReader : IDatabaseMetadataReader
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(databaseObject);
-
-        if (!string.IsNullOrWhiteSpace(databaseObject.Database)
-            && !string.Equals(databaseObject.Database, session.Profile.Database, StringComparison.OrdinalIgnoreCase))
-        {
-            throw new ArgumentException(
-                "La definición solo está disponible para objetos de la base conectada.",
-                nameof(databaseObject));
-        }
 
         return databaseObject.Kind switch
         {

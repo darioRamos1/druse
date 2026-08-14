@@ -28,8 +28,7 @@ public sealed class PostgreSqlMetadataReader : IDatabaseMetadataReader
         const string Sql = """
             SELECT d.datname
             FROM pg_database d
-            WHERE d.datname = current_database()
-              AND d.datistemplate = false
+            WHERE d.datistemplate = false
               AND d.datallowconn = true
               AND has_database_privilege(d.datname, 'CONNECT')
             ORDER BY d.datname
@@ -54,9 +53,6 @@ public sealed class PostgreSqlMetadataReader : IDatabaseMetadataReader
 
         return parent.Kind switch
         {
-            // Npgsql abre la conexión contra una base concreta y PostgreSQL no
-            // permite saltar entre bases sin reconectar. Por eso solo se listan los
-            // esquemas de la base de la sesión.
             DatabaseObjectKind.Database => await GetSchemasAsync(session, parent, cancellationToken),
             DatabaseObjectKind.Schema => GetSchemaFolders(parent),
             DatabaseObjectKind.Folder => await GetFolderContentAsync(session, parent, cancellationToken),
@@ -193,14 +189,6 @@ public sealed class PostgreSqlMetadataReader : IDatabaseMetadataReader
         CancellationToken cancellationToken)
     {
         const string IdPrefix = "Procedure:oid:";
-
-        if (!string.IsNullOrWhiteSpace(procedure.Database)
-            && !string.Equals(procedure.Database, session.Profile.Database, StringComparison.OrdinalIgnoreCase))
-        {
-            throw new ArgumentException(
-                "La definición solo está disponible para procedimientos de la base conectada.",
-                nameof(procedure));
-        }
 
         if (!procedure.Id.StartsWith(IdPrefix, StringComparison.Ordinal)
             || !long.TryParse(procedure.Id[IdPrefix.Length..], out var oid)

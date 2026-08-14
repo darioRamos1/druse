@@ -119,6 +119,7 @@ internal static class ContractMapper
             SessionId = request.SessionId,
             ExecutionId = request.ExecutionId,
             Sql = request.Sql,
+            Database = request.Database,
             MaxRows = request.MaxRows,
             TimeoutSeconds = request.TimeoutSeconds,
             DestructiveConfirmed = request.ConfirmDestructive,
@@ -214,6 +215,7 @@ internal static class ContractMapper
         {
             SessionId = request.SessionId,
             Sql = request.Sql,
+            Database = request.Database,
             // Al exportar no se recorta: el límite lo aplica el exportador, que
             // es quien sabe cuántas filas caben en cada formato.
             MaxRows = int.MaxValue,

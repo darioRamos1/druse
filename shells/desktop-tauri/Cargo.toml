@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "Cliente de bases de datos de escritorio"
 authors = ["Druse"]
 edition = "2021"
-rust-version = "1.77"
+rust-version = "1.77.2"
 
 # El binario se llama igual que el producto: es lo que verá el usuario en el
 # administrador de tareas y en el acceso directo.
@@ -23,6 +23,7 @@ serde_json = "1"
 # Para localizar el directorio de datos del usuario con la misma convención que
 # usa IAppPaths en el backend.
 dirs = "5"
+tauri-plugin-dialog = "2"
 
 [features]
 # Lo activa `tauri build`; en desarrollo se deja fuera para que la consola
