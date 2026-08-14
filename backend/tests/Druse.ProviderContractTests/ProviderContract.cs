@@ -33,6 +33,9 @@ public interface IProviderFixture
     /// <summary>Quien escribe los cambios hechos sobre la cuadrícula.</summary>
     IRowEditor RowEditor { get; }
 
+    /// <summary>Quien escribe el DDL: crear tablas, índices y restricciones.</summary>
+    ITableDesigner Designer { get; }
+
     ConnectionProfile Profile(bool onlyRead = false);
 
     DatabaseCredentials Credentials { get; }

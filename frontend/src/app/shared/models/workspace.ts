@@ -292,12 +292,120 @@ export interface TableColumnDesign {
   readonly defaultValue?: string;
 }
 
+/** Sentido en el que se recorre una columna dentro de un índice. */
+export type IndexDirection = 'asc' | 'desc';
+
+/** Qué hace el motor con las filas hijas cuando la padre se borra o cambia. */
+export type ForeignKeyAction = 'noAction' | 'cascade' | 'setNull' | 'setDefault';
+
+export interface IndexColumnDesign {
+  readonly name: string;
+  readonly direction: IndexDirection;
+}
+
+/** Índice que se quiere tener. */
+export interface IndexDesign {
+  readonly name: string;
+  readonly columns: readonly IndexColumnDesign[];
+  readonly isUnique: boolean;
+  /** Columnas guardadas en la hoja sin formar parte de la clave. */
+  readonly includedColumns?: readonly string[];
+  /** Condición que limita las filas indizadas, ya escrita en SQL. */
+  readonly filter?: string;
+  /** Estructura del índice cuando el motor ofrece varias. */
+  readonly method?: string;
+}
+
+export interface ForeignKeyDesign {
+  readonly name: string;
+  readonly columns: readonly string[];
+  readonly referencedSchema?: string;
+  readonly referencedTable: string;
+  readonly referencedColumns: readonly string[];
+  readonly onDelete: ForeignKeyAction;
+  readonly onUpdate: ForeignKeyAction;
+}
+
+export interface UniqueConstraintDesign {
+  readonly name: string;
+  readonly columns: readonly string[];
+}
+
+export interface CheckConstraintDesign {
+  readonly name: string;
+  readonly expression: string;
+}
+
+export interface PrimaryKeyDesign {
+  readonly name?: string;
+  readonly columns: readonly string[];
+}
+
+/**
+ * Lo que el motor admite al definir un índice.
+ *
+ * El formulario se dibuja a partir de esto y nunca preguntando por el motor: es
+ * lo que permite ofrecer `INCLUDE` donde existe sin que la vista sepa contra qué
+ * está conectada.
+ */
+export interface IndexCapabilities {
+  readonly supportsIncludedColumns: boolean;
+  readonly supportsFilter: boolean;
+  readonly supportsSortDirection: boolean;
+  readonly supportsCheckConstraints: boolean;
+  readonly methods: readonly string[];
+  readonly foreignKeyActions: readonly ForeignKeyAction[];
+}
+
+/** Índice tal y como está hoy en el catálogo. */
+export interface DatabaseIndex {
+  readonly name: string;
+  readonly columns: readonly IndexColumnDesign[];
+  readonly isUnique: boolean;
+  /** Lo sostiene una restricción: no se puede borrar suelto. */
+  readonly isConstraintIndex: boolean;
+  readonly isPrimaryKey: boolean;
+  readonly includedColumns: readonly string[];
+  readonly filter?: string;
+  readonly method?: string;
+}
+
+export interface DatabaseForeignKey {
+  readonly name: string;
+  readonly columns: readonly string[];
+  readonly referencedSchema?: string;
+  readonly referencedTable: string;
+  readonly referencedColumns: readonly string[];
+  readonly onDelete: ForeignKeyAction;
+  readonly onUpdate: ForeignKeyAction;
+}
+
+/** Restricción leída del catálogo. `expression` solo la traen las de comprobación. */
+export interface DatabaseConstraint {
+  readonly name: string;
+  readonly columns: readonly string[];
+  readonly expression?: string;
+}
+
+/** Todo lo que sostiene una tabla además de sus columnas. */
+export interface TableStructure {
+  readonly primaryKey?: DatabaseConstraint;
+  readonly indexes: readonly DatabaseIndex[];
+  readonly foreignKeys: readonly DatabaseForeignKey[];
+  readonly uniqueConstraints: readonly DatabaseConstraint[];
+  readonly checkConstraints: readonly DatabaseConstraint[];
+}
+
 /** Tabla que se va a crear. */
 export interface TableDesign {
   readonly database?: string;
   readonly schema?: string;
   readonly name: string;
   readonly columns: readonly TableColumnDesign[];
+  readonly indexes?: readonly IndexDesign[];
+  readonly foreignKeys?: readonly ForeignKeyDesign[];
+  readonly uniqueConstraints?: readonly UniqueConstraintDesign[];
+  readonly checkConstraints?: readonly CheckConstraintDesign[];
 }
 
 /** Columna existente y cómo debe quedar; si el nombre cambia, es un renombrado. */
@@ -319,6 +427,29 @@ export interface TableAlteration {
   readonly addedColumns: readonly TableColumnDesign[];
   readonly alteredColumns: readonly ColumnAlteration[];
   readonly droppedColumns: readonly string[];
+
+  readonly addedIndexes?: readonly IndexDesign[];
+  /** Índices que se rehacen: se borra el actual y se crea el nuevo. */
+  readonly alteredIndexes?: readonly IndexAlteration[];
+  readonly droppedIndexes?: readonly string[];
+
+  readonly addedForeignKeys?: readonly ForeignKeyDesign[];
+  readonly droppedForeignKeys?: readonly string[];
+
+  readonly addedUniqueConstraints?: readonly UniqueConstraintDesign[];
+  readonly droppedUniqueConstraints?: readonly string[];
+
+  readonly addedCheckConstraints?: readonly CheckConstraintDesign[];
+  readonly droppedCheckConstraints?: readonly string[];
+
+  readonly newPrimaryKey?: PrimaryKeyDesign;
+  readonly droppedPrimaryKeyName?: string;
+}
+
+/** Índice existente y cómo debe quedar. */
+export interface IndexAlteration {
+  readonly currentName: string;
+  readonly index: IndexDesign;
 }
 
 /** Un cambio pendiente sobre una celda. `null` es NULL. */

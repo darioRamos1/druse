@@ -23,6 +23,8 @@ public sealed class SqlServerFixture : IProviderFixture
 
     public IRowEditor RowEditor { get; } = new SqlServerRowEditor();
 
+    public ITableDesigner Designer { get; } = new SqlServerTableDesigner();
+
     public string DatabaseName =>
         Environment.GetEnvironmentVariable("DRUSE_TEST_MSSQL_DB") ?? "druse_test";
 

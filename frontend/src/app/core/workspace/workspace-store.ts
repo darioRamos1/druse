@@ -20,6 +20,7 @@ import {
   QueryHistoryEntry,
   CellEdit,
   EditableTable,
+  IndexCapabilities,
   QueryResult,
   KnownColumn,
   KnownRelation,
@@ -31,6 +32,7 @@ import {
   SessionStatus,
   TableAlteration,
   TableDesign,
+  TableStructure,
 } from '../../shared/models/workspace';
 
 /** Nodo del árbol con su estado de expansión y sus hijos ya cargados. */
@@ -1005,6 +1007,60 @@ export class WorkspaceStore {
       // Sin tipos sugeridos el formulario sigue sirviendo: el campo admite
       // escribir cualquier tipo a mano.
       return [];
+    }
+  }
+
+  /**
+   * Lo que el motor admite al definir un índice.
+   *
+   * Si la consulta falla se devuelve lo más restrictivo, no lo más permisivo:
+   * un formulario que ofrece `INCLUDE` donde no existe produce un índice que el
+   * motor rechaza, y el usuario no tiene forma de saber por qué.
+   */
+  async tableCapabilities(connectionId: string): Promise<IndexCapabilities> {
+    const sessionId = this.findConnection(connectionId)?.sessionId;
+
+    const conservative: IndexCapabilities = {
+      supportsIncludedColumns: false,
+      supportsFilter: false,
+      supportsSortDirection: true,
+      supportsCheckConstraints: true,
+      methods: [],
+      foreignKeyActions: ['noAction', 'cascade', 'setNull', 'setDefault'],
+    };
+
+    if (!sessionId) {
+      return conservative;
+    }
+
+    try {
+      return await firstValueFrom(this._gateway.getTableCapabilities(sessionId));
+    } catch {
+      return conservative;
+    }
+  }
+
+  /**
+   * Índices y restricciones de una tabla, tal y como están hoy.
+   *
+   * Es el punto de partida para modificarlos: igual que con las columnas, se
+   * describe en qué se diferencia lo que hay de lo que se quiere.
+   */
+  async tableStructure(
+    connectionId: string,
+    table: DatabaseObject,
+  ): Promise<TableStructure | null> {
+    const sessionId = this.findConnection(connectionId)?.sessionId;
+
+    if (!sessionId) {
+      return null;
+    }
+
+    try {
+      return await firstValueFrom(this._gateway.getTableStructure(sessionId, table));
+    } catch (error) {
+      this._notice.set(describeError(error));
+      return null;
     }
   }
 

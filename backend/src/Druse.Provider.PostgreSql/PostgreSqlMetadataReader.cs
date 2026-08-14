@@ -134,6 +134,268 @@ public sealed class PostgreSqlMetadataReader : IDatabaseMetadataReader
         };
     }
 
+    public async Task<TableStructure> GetTableStructureAsync(
+        IDatabaseSession session,
+        DatabaseObject table,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(table);
+
+        var schema = table.Schema ?? "public";
+
+        var indexes = await GetIndexesAsync(session, schema, table.Name, cancellationToken);
+        var foreignKeys = await GetForeignKeysAsync(session, schema, table.Name, cancellationToken);
+        var (uniques, checks) = await GetConstraintsAsync(session, schema, table.Name, cancellationToken);
+
+        var primary = indexes.FirstOrDefault(index => index.IsPrimaryKey);
+
+        return new TableStructure
+        {
+            PrimaryKey = primary is null
+                ? null
+                : new DatabasePrimaryKey
+                {
+                    Name = primary.Name,
+                    Columns = [.. primary.Columns.Select(column => column.Name)],
+                },
+            Indexes = indexes,
+            ForeignKeys = foreignKeys,
+            UniqueConstraints = uniques,
+            CheckConstraints = checks,
+        };
+    }
+
+    /// <summary>
+    /// Índices con sus columnas en orden.
+    ///
+    /// Las columnas salen de <c>pg_index.indkey</c>, que es la lista ordenada de
+    /// posiciones: unirse a <c>pg_attribute</c> sin conservar ese orden daría las
+    /// columnas correctas en el orden equivocado, y en un índice el orden es
+    /// justamente lo que decide para qué sirve. Las primeras
+    /// <c>indnkeyatts</c> son la clave y el resto es el `INCLUDE`.
+    /// </summary>
+    private static async Task<IReadOnlyList<DatabaseIndex>> GetIndexesAsync(
+        IDatabaseSession session,
+        string schema,
+        string table,
+        CancellationToken cancellationToken)
+    {
+        const string Sql = """
+            SELECT
+                ic.relname AS index_name,
+                i.indisunique,
+                i.indisprimary,
+                i.indisexclusion OR con.contype IN ('p', 'u') AS from_constraint,
+                am.amname,
+                pg_get_expr(i.indpred, i.indrelid) AS filter,
+                (
+                    SELECT array_agg(a.attname ORDER BY k.ord)
+                    FROM unnest(i.indkey[0:i.indnkeyatts - 1]) WITH ORDINALITY AS k(attnum, ord)
+                    JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = k.attnum
+                ) AS key_columns,
+                (
+                    SELECT array_agg(
+                        CASE WHEN o.option & 1 = 1 THEN 'DESC' ELSE 'ASC' END
+                        ORDER BY o.ord)
+                    FROM unnest(i.indoption[0:i.indnkeyatts - 1]) WITH ORDINALITY AS o(option, ord)
+                ) AS directions,
+                (
+                    SELECT array_agg(a.attname ORDER BY k.ord)
+                    FROM unnest(i.indkey[i.indnkeyatts:array_length(i.indkey, 1) - 1]) WITH ORDINALITY AS k(attnum, ord)
+                    JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = k.attnum
+                ) AS included_columns
+            FROM pg_index i
+            JOIN pg_class c      ON c.oid = i.indrelid
+            JOIN pg_class ic     ON ic.oid = i.indexrelid
+            JOIN pg_namespace n  ON n.oid = c.relnamespace
+            JOIN pg_am am        ON am.oid = ic.relam
+            LEFT JOIN pg_constraint con ON con.conindid = i.indexrelid
+            WHERE n.nspname = @schema
+              AND c.relname = @table
+              AND i.indislive
+            ORDER BY ic.relname
+            """;
+
+        return await QueryAsync(
+            session,
+            Sql,
+            reader =>
+            {
+                var columns = reader.IsDBNull(6) ? [] : reader.GetFieldValue<string[]>(6);
+                var directions = reader.IsDBNull(7) ? [] : reader.GetFieldValue<string[]>(7);
+
+                return new DatabaseIndex
+                {
+                    Name = reader.GetString(0),
+                    IsUnique = reader.GetBoolean(1),
+                    IsPrimaryKey = reader.GetBoolean(2),
+                    IsConstraintIndex = reader.GetBoolean(3),
+                    Method = reader.GetString(4),
+                    Filter = reader.IsDBNull(5) ? null : reader.GetString(5),
+                    Columns =
+                    [
+                        .. columns.Select((name, position) => new IndexColumn
+                        {
+                            Name = name,
+                            Direction = position < directions.Length && directions[position] == "DESC"
+                                ? IndexSortDirection.Descending
+                                : IndexSortDirection.Ascending,
+                        }),
+                    ],
+                    IncludedColumns = reader.IsDBNull(8) ? [] : reader.GetFieldValue<string[]>(8),
+                };
+            },
+            cancellationToken,
+            ("schema", schema),
+            ("table", table));
+    }
+
+    /// <summary>
+    /// Claves foráneas con sus columnas emparejadas.
+    ///
+    /// <c>conkey</c> y <c>confkey</c> son dos listas que emparejan por posición,
+    /// así que se recorren con <c>WITH ORDINALITY</c>: emparejarlas por nombre
+    /// las descolocaría en cuanto una clave apunte a columnas de nombre distinto.
+    /// </summary>
+    private static async Task<IReadOnlyList<DatabaseForeignKey>> GetForeignKeysAsync(
+        IDatabaseSession session,
+        string schema,
+        string table,
+        CancellationToken cancellationToken)
+    {
+        const string Sql = """
+            SELECT
+                con.conname,
+                fn.nspname AS referenced_schema,
+                fc.relname AS referenced_table,
+                con.confdeltype,
+                con.confupdtype,
+                (
+                    SELECT array_agg(a.attname ORDER BY k.ord)
+                    FROM unnest(con.conkey) WITH ORDINALITY AS k(attnum, ord)
+                    JOIN pg_attribute a ON a.attrelid = con.conrelid AND a.attnum = k.attnum
+                ) AS columns,
+                (
+                    SELECT array_agg(a.attname ORDER BY k.ord)
+                    FROM unnest(con.confkey) WITH ORDINALITY AS k(attnum, ord)
+                    JOIN pg_attribute a ON a.attrelid = con.confrelid AND a.attnum = k.attnum
+                ) AS referenced_columns
+            FROM pg_constraint con
+            JOIN pg_class c       ON c.oid = con.conrelid
+            JOIN pg_namespace n   ON n.oid = c.relnamespace
+            JOIN pg_class fc      ON fc.oid = con.confrelid
+            JOIN pg_namespace fn  ON fn.oid = fc.relnamespace
+            WHERE n.nspname = @schema
+              AND c.relname = @table
+              AND con.contype = 'f'
+            ORDER BY con.conname
+            """;
+
+        return await QueryAsync(
+            session,
+            Sql,
+            reader => new DatabaseForeignKey
+            {
+                Name = reader.GetString(0),
+                ReferencedSchema = reader.GetString(1),
+                ReferencedTable = reader.GetString(2),
+                OnDelete = ParseAction(reader.GetString(3)),
+                OnUpdate = ParseAction(reader.GetString(4)),
+                Columns = reader.IsDBNull(5) ? [] : reader.GetFieldValue<string[]>(5),
+                ReferencedColumns = reader.IsDBNull(6) ? [] : reader.GetFieldValue<string[]>(6),
+            },
+            cancellationToken,
+            ("schema", schema),
+            ("table", table));
+    }
+
+    private static async Task<(IReadOnlyList<DatabaseUniqueConstraint> Unique, IReadOnlyList<DatabaseCheckConstraint> Check)>
+        GetConstraintsAsync(
+            IDatabaseSession session,
+            string schema,
+            string table,
+            CancellationToken cancellationToken)
+    {
+        // Las restricciones que respaldan una columna `NOT NULL` se descartan:
+        // PostgreSQL las materializa como CHECK y enseñarlas llenaría la lista de
+        // condiciones que el usuario no escribió y no puede quitar desde aquí.
+        const string Sql = """
+            SELECT
+                con.contype,
+                con.conname,
+                pg_get_constraintdef(con.oid) AS definition,
+                (
+                    SELECT array_agg(a.attname ORDER BY k.ord)
+                    FROM unnest(con.conkey) WITH ORDINALITY AS k(attnum, ord)
+                    JOIN pg_attribute a ON a.attrelid = con.conrelid AND a.attnum = k.attnum
+                ) AS columns
+            FROM pg_constraint con
+            JOIN pg_class c     ON c.oid = con.conrelid
+            JOIN pg_namespace n ON n.oid = c.relnamespace
+            WHERE n.nspname = @schema
+              AND c.relname = @table
+              AND con.contype IN ('u', 'c')
+              AND NOT con.conname LIKE '%_not_null'
+            ORDER BY con.conname
+            """;
+
+        var rows = await QueryAsync(
+            session,
+            Sql,
+            reader => (
+                Type: reader.GetString(0),
+                Name: reader.GetString(1),
+                Definition: reader.GetString(2),
+                Columns: reader.IsDBNull(3) ? [] : reader.GetFieldValue<string[]>(3)),
+            cancellationToken,
+            ("schema", schema),
+            ("table", table));
+
+        var unique = rows
+            .Where(row => row.Type == "u")
+            .Select(row => new DatabaseUniqueConstraint { Name = row.Name, Columns = row.Columns })
+            .ToList();
+
+        var check = rows
+            .Where(row => row.Type == "c")
+            .Select(row => new DatabaseCheckConstraint
+            {
+                Name = row.Name,
+                Expression = Unwrap(row.Definition),
+            })
+            .ToList();
+
+        return (unique, check);
+    }
+
+    /// <summary>
+    /// Deja la condición sin el `CHECK (…)` que la envuelve.
+    ///
+    /// <c>pg_get_constraintdef</c> devuelve la restricción entera y lo que se
+    /// enseña —y se vuelve a escribir— es solo la expresión de dentro.
+    /// </summary>
+    private static string Unwrap(string definition)
+    {
+        const string Prefix = "CHECK (";
+
+        if (!definition.StartsWith(Prefix, StringComparison.Ordinal) ||
+            !definition.EndsWith(')'))
+        {
+            return definition;
+        }
+
+        return definition[Prefix.Length..^1].Trim();
+    }
+
+    /// <summary>Traduce el código de una acción referencial de PostgreSQL.</summary>
+    private static ForeignKeyAction ParseAction(string code) => code switch
+    {
+        "c" => ForeignKeyAction.Cascade,
+        "n" => ForeignKeyAction.SetNull,
+        "d" => ForeignKeyAction.SetDefault,
+        _ => ForeignKeyAction.NoAction,
+    };
+
     private static async Task<string> GetViewDefinitionAsync(
         IDatabaseSession session,
         DatabaseObject view,

@@ -38,4 +38,15 @@ public interface IDatabaseMetadataReader
         IDatabaseSession session,
         DatabaseObject databaseObject,
         CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Índices, claves foráneas y demás restricciones de una tabla.
+    ///
+    /// Va en una sola llamada porque una conexión no ejecuta dos cosas a la vez:
+    /// pedirlo por partes serían cuatro turnos seguidos sobre la misma sesión.
+    /// </summary>
+    Task<TableStructure> GetTableStructureAsync(
+        IDatabaseSession session,
+        DatabaseObject table,
+        CancellationToken cancellationToken);
 }

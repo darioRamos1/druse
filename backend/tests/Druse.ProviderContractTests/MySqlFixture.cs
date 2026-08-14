@@ -23,6 +23,8 @@ public sealed class MySqlFixture : IProviderFixture
 
     public IRowEditor RowEditor { get; } = new MySqlRowEditor();
 
+    public ITableDesigner Designer { get; } = new MySqlTableDesigner();
+
     public string DatabaseName =>
         Environment.GetEnvironmentVariable("DRUSE_TEST_MYSQL_DB") ?? "druse_test";
 

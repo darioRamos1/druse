@@ -49,9 +49,40 @@ public sealed record TableDefinition
 
     public required IReadOnlyList<TableColumnDefinition> Columns { get; init; }
 
+    /// <summary>
+    /// Índices que se crean junto a la tabla.
+    ///
+    /// Van aparte del `CREATE TABLE` porque los tres motores los declaran con su
+    /// propia instrucción; solo las restricciones caben dentro del paréntesis.
+    /// </summary>
+    public IReadOnlyList<IndexDefinition> Indexes { get; init; } = [];
+
+    public IReadOnlyList<ForeignKeyDefinition> ForeignKeys { get; init; } = [];
+
+    public IReadOnlyList<UniqueConstraintDefinition> UniqueConstraints { get; init; } = [];
+
+    public IReadOnlyList<CheckConstraintDefinition> CheckConstraints { get; init; } = [];
+
     /// <summary>Columnas marcadas como clave primaria, en el orden en que se escribieron.</summary>
     public IReadOnlyList<string> PrimaryKeyColumns =>
         [.. Columns.Where(column => column.IsPrimaryKey).Select(column => column.Name)];
+}
+
+/// <summary>
+/// Cambio sobre un índice que ya existe.
+///
+/// Ningún motor sabe cambiarle las columnas a un índice, así que esto se
+/// convierte siempre en un borrado seguido de una creación. Se modela como una
+/// sola intención porque es una sola: quien lo pide quiere el índice de otra
+/// forma, no quedarse sin él a mitad.
+/// </summary>
+public sealed record IndexAlteration
+{
+    /// <summary>Nombre que el índice tiene hoy en la base.</summary>
+    public required string CurrentName { get; init; }
+
+    /// <summary>Cómo debe quedar. Su nombre puede ser otro.</summary>
+    public required IndexDefinition Index { get; init; }
 }
 
 /// <summary>
@@ -94,12 +125,73 @@ public sealed record TableAlteration
     /// <summary>Columnas que se borran, por su nombre actual.</summary>
     public IReadOnlyList<string> DroppedColumns { get; init; } = [];
 
-    /// <summary>Borrar una columna se lleva por delante lo que hubiera dentro.</summary>
-    public bool IsDestructive => DroppedColumns.Count > 0;
+    public IReadOnlyList<IndexDefinition> AddedIndexes { get; init; } = [];
+
+    /// <summary>Índices que se rehacen: se borra el actual y se crea el nuevo.</summary>
+    public IReadOnlyList<IndexAlteration> AlteredIndexes { get; init; } = [];
+
+    /// <summary>Índices que se quitan, por su nombre actual.</summary>
+    public IReadOnlyList<string> DroppedIndexes { get; init; } = [];
+
+    public IReadOnlyList<ForeignKeyDefinition> AddedForeignKeys { get; init; } = [];
+
+    public IReadOnlyList<string> DroppedForeignKeys { get; init; } = [];
+
+    public IReadOnlyList<UniqueConstraintDefinition> AddedUniqueConstraints { get; init; } = [];
+
+    public IReadOnlyList<string> DroppedUniqueConstraints { get; init; } = [];
+
+    public IReadOnlyList<CheckConstraintDefinition> AddedCheckConstraints { get; init; } = [];
+
+    public IReadOnlyList<string> DroppedCheckConstraints { get; init; } = [];
+
+    /// <summary>
+    /// Clave primaria nueva, o `null` para dejar la que haya.
+    ///
+    /// Poner una donde ya hay otra obliga a soltar la anterior, y para eso hace
+    /// falta su nombre: por eso viaja <see cref="DroppedPrimaryKeyName"/> aparte.
+    /// </summary>
+    public PrimaryKeyDefinition? NewPrimaryKey { get; init; }
+
+    /// <summary>
+    /// Nombre de la clave primaria que se suelta.
+    ///
+    /// Va explícito y no deducido del catálogo porque soltar la clave equivocada
+    /// no se deshace, y porque el catálogo pudo cambiar desde que se abrió el
+    /// diseñador.
+    /// </summary>
+    public string? DroppedPrimaryKeyName { get; init; }
+
+    /// <summary>
+    /// Lo que no se recupera con otro `ALTER`.
+    ///
+    /// Un índice se vuelve a crear, pero reconstruirlo sobre una tabla grande
+    /// puede tardar horas y bloquearla, así que quitarlo también se pregunta.
+    /// Cambiar la clave primaria entra aquí porque suelta la que había.
+    /// </summary>
+    public bool IsDestructive =>
+        DroppedColumns.Count > 0
+        || DroppedIndexes.Count > 0
+        || AlteredIndexes.Count > 0
+        || DroppedForeignKeys.Count > 0
+        || DroppedUniqueConstraints.Count > 0
+        || DroppedCheckConstraints.Count > 0
+        || DroppedPrimaryKeyName is not null;
 
     public bool IsEmpty =>
         NewName is null
         && AddedColumns.Count == 0
         && AlteredColumns.Count == 0
-        && DroppedColumns.Count == 0;
+        && DroppedColumns.Count == 0
+        && AddedIndexes.Count == 0
+        && AlteredIndexes.Count == 0
+        && DroppedIndexes.Count == 0
+        && AddedForeignKeys.Count == 0
+        && DroppedForeignKeys.Count == 0
+        && AddedUniqueConstraints.Count == 0
+        && DroppedUniqueConstraints.Count == 0
+        && AddedCheckConstraints.Count == 0
+        && DroppedCheckConstraints.Count == 0
+        && NewPrimaryKey is null
+        && DroppedPrimaryKeyName is null;
 }

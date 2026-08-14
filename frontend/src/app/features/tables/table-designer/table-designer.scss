@@ -214,6 +214,119 @@
   color: var(--dr-success);
 }
 
+.tabs {
+  display: flex;
+  gap: 2px;
+  margin: 14px 0 12px;
+  border-bottom: 1px solid var(--dr-border);
+
+  &__tab {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    height: 28px;
+    padding: 0 12px;
+    border: 0;
+    border-bottom: 2px solid transparent;
+    background: transparent;
+    color: var(--dr-text-tertiary);
+    font-family: inherit;
+    font-size: var(--dr-font-size-sm);
+    cursor: pointer;
+
+    &:hover {
+      color: var(--dr-text-secondary);
+    }
+
+    &.is-active {
+      border-bottom-color: rgb(108 139 255 / 75%);
+      color: var(--dr-text);
+    }
+  }
+
+  &__count {
+    padding: 0 5px;
+    border-radius: 8px;
+    background: #1a2130;
+    color: var(--dr-text-tertiary);
+    font-size: 10.5px;
+    line-height: 15px;
+  }
+}
+
+// Las filas de índices, claves y restricciones no caben en una cuadrícula de
+// anchos fijos como la de columnas: cada una lleva un número distinto de campos
+// según lo que el motor admita.
+.rows {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+
+  &__item {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 8px;
+    border: 1px solid var(--dr-border-subtle);
+    border-radius: var(--dr-radius);
+    background: #10141d;
+
+    &.is-dropped {
+      opacity: 0.55;
+      text-decoration: line-through;
+    }
+  }
+
+  &__line {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+
+    &--secondary {
+      padding-left: 2px;
+    }
+  }
+
+  &__grow {
+    flex: 1;
+    min-width: 0;
+  }
+
+  &__check,
+  &__labelled {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    color: var(--dr-text-tertiary);
+    font-size: 11.5px;
+    white-space: nowrap;
+  }
+
+  &__kind {
+    min-width: 62px;
+    color: var(--dr-text-tertiary);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  &__arrow {
+    color: var(--dr-text-tertiary);
+  }
+
+  &__note {
+    margin: 0;
+    color: var(--dr-text-tertiary);
+    font-size: 11px;
+  }
+
+  &__empty {
+    margin: 6px 0;
+    color: var(--dr-text-tertiary);
+    font-size: var(--dr-font-size-sm);
+  }
+}
+
 .foot {
   display: flex;
   align-items: center;

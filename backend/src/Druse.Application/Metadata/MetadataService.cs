@@ -70,6 +70,38 @@ public sealed class MetadataService(
             cancellationToken);
     }
 
+    /// <summary>
+    /// Índices, claves foráneas y demás restricciones de una tabla.
+    ///
+    /// Pasa por el mismo turno que el resto del catálogo: es una lectura más, y
+    /// la conexión sigue sin admitir dos cosas a la vez.
+    /// </summary>
+    public async Task<TableStructure> GetTableStructureAsync(
+        Guid sessionId,
+        DatabaseObject table,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(table);
+
+        if (table.Kind != DatabaseObjectKind.Table)
+        {
+            throw new ArgumentException(
+                "Solo las tablas tienen índices y restricciones.",
+                nameof(table));
+        }
+
+        using var turn = await _connections.EnterAsync(sessionId, cancellationToken);
+
+        var session = _connections.Require(sessionId);
+        var reader = _providers.GetMetadataReader(session.Engine);
+
+        return await _connections.UseDatabaseAsync(
+            session,
+            table.Database,
+            selected => reader.GetTableStructureAsync(selected, table, cancellationToken),
+            cancellationToken);
+    }
+
     public async Task<string> GetDefinitionAsync(
         Guid sessionId,
         DatabaseObject databaseObject,

@@ -536,3 +536,8 @@ shells/desktop-tauri/gen/
 # La API publicada se copia aquí al empaquetar; se regenera con package.ps1
 shells/desktop-tauri/api/*
 !shells/desktop-tauri/api/.gitkeep
+
+# Configuración de firma que genera package.ps1 al vuelo. La borra al terminar,
+# pero si la construcción se interrumpe a la fuerza puede quedar: lleva la huella
+# del certificado de quien compiló, que es de su máquina y no del proyecto.
+shells/desktop-tauri/tauri.signing.json

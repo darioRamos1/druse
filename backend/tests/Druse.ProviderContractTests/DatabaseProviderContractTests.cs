@@ -488,6 +488,104 @@ public abstract class DatabaseProviderContractTests<TFixture>
         }
     }
 
+    /// <summary>
+    /// Crea índices y restricciones con el diseñador y los vuelve a leer del
+    /// catálogo.
+    ///
+    /// Las dos mitades se comprueban juntas a propósito: un DDL correcto que el
+    /// lector no sabe interpretar deja la pantalla en blanco, y un lector
+    /// correcto sobre un DDL que el motor rechaza no llega a ejecutarse. Solo el
+    /// ciclo completo demuestra que encajan.
+    /// </summary>
+    [Fact]
+    public async Task CreaIndicesYRestriccionesYLosVuelveALeer()
+    {
+        if (Skip) { return; }
+
+        await using var session = await OpenAsync();
+
+        var table = $"druse_tmp_{Guid.NewGuid():N}";
+
+        try
+        {
+            await ExecuteAsync(session, Fixture.CreateTableWithColumns(table));
+
+            var target = new DatabaseObject
+            {
+                Id = table,
+                Name = table,
+                Kind = DatabaseObjectKind.Table,
+                Database = Fixture.DatabaseName,
+                Schema = Fixture.DefaultSchema,
+            };
+
+            var alteration = new TableAlteration
+            {
+                Table = target,
+                AddedIndexes =
+                [
+                    new IndexDefinition
+                    {
+                        Name = $"ix_{table}",
+                        Columns = [new IndexColumn { Name = "id", Direction = IndexSortDirection.Descending }],
+                    },
+                ],
+                AddedCheckConstraints = Fixture.Designer.IndexCapabilities.SupportsCheckConstraints
+                    ?
+                    [
+                        new CheckConstraintDefinition
+                        {
+                            Name = $"ck_{table}",
+                            Expression = "id > 0",
+                        },
+                    ]
+                    : [],
+            };
+
+            await Fixture.Designer.AlterAsync(session, alteration, CancellationToken.None);
+
+            var structure = await Fixture.Metadata.GetTableStructureAsync(
+                session,
+                target,
+                CancellationToken.None);
+
+            var index = Assert.Single(structure.Indexes, item => item.Name == $"ix_{table}");
+
+            Assert.Equal("id", Assert.Single(index.Columns).Name);
+            Assert.False(index.IsPrimaryKey);
+            Assert.False(index.IsConstraintIndex);
+
+            // La clave primaria de la tabla llega como tal, y su índice queda
+            // marcado para que la interfaz no ofrezca borrarlo suelto.
+            Assert.NotNull(structure.PrimaryKey);
+            Assert.Contains("id", structure.PrimaryKey!.Columns);
+            Assert.Contains(structure.Indexes, item => item.IsPrimaryKey && item.IsConstraintIndex);
+
+            if (Fixture.Designer.IndexCapabilities.SupportsCheckConstraints)
+            {
+                Assert.Contains(structure.CheckConstraints, item => item.Name == $"ck_{table}");
+            }
+
+            // Y al quitarlo, desaparece: leer después de borrar es lo que
+            // distingue un borrado real de una instrucción que no hizo nada.
+            await Fixture.Designer.AlterAsync(
+                session,
+                new TableAlteration { Table = target, DroppedIndexes = [$"ix_{table}"] },
+                CancellationToken.None);
+
+            var after = await Fixture.Metadata.GetTableStructureAsync(
+                session,
+                target,
+                CancellationToken.None);
+
+            Assert.DoesNotContain(after.Indexes, item => item.Name == $"ix_{table}");
+        }
+        finally
+        {
+            await ExecuteAsync(session, Fixture.DropTable(table));
+        }
+    }
+
     [Fact]
     public async Task ObtieneLaDefinicionDeUnaVista()
     {

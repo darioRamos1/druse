@@ -10,26 +10,35 @@
 
 | Campo | Valor |
 | --- | --- |
-| Última sesión | **018** — 2026-08-14 |
+| Última sesión | **019** — 2026-08-14 |
 | Fase activa | **Mejora posterior al MVP completada:** implementación y validación cerradas |
 | Fases 0–6 | ✅ Cerradas. |
 | Fase 7 | 🟡 **10/12.** Hay instalador y funciona; faltan dos comprobaciones que exigen otro equipo. |
 | Fase 8 | ✅ **7/7.** Tres motores sobre el mismo contrato y primera beta preparada. |
 | ¿Compila el backend? | Sí — 0 advertencias, 0 errores |
 | ¿Compila el envoltorio? | Sí |
-| ¿Pasan las pruebas? | Sí — **214 en backend** (189 unitarias y 25 de integración), **224 en frontend** y **2 en el envoltorio** |
+| ¿Pasan las pruebas? | Sí — **232 en backend** (207 unitarias y 25 de integración), **229 en frontend** y **2 en el envoltorio** |
 | ¿Hay aplicación de escritorio? | **Sí.** Instalador NSIS, MSI y ZIP portable |
 | Motores | **PostgreSQL, SQL Server y MySQL/MariaDB**, con navegación por todas las bases autorizadas y las **mismas 27 pruebas contractuales** cada uno |
 | Bloqueantes | Ninguno para seguir programando. Sí para dar por buenas dos funciones nuevas: ver «Qué toca retomar». |
-| Git | `main` limpio y al día: fusionados #2 (túnel SSH y Windows), #6 (editar conexiones), #4 (diseñador de tablas) y #5 (mensajes de error). Nada sin commitear. |
+| Git | `main` al día hasta la sesión 018 (#2, #4, #5, #6 y #7 fusionados). **La sesión 019 está sin commitear**: ver «Qué toca retomar». |
 
 ### Qué toca retomar en la próxima sesión
 
 **Lo primero, y con diferencia: probar contra servidores de verdad lo que se
-escribió en las sesiones 015 y 017.** Las dos funciones nuevas están completas, con
-pruebas y revisadas en pantalla, pero **ninguna ha hablado nunca con un servidor
-real**, porque este equipo no tiene ni servidor SSH ni Docker ni un motor local,
-y las únicas bases a mano son de la empresa.
+escribió en las sesiones 015, 017 y 019.** Las tres funciones nuevas están
+completas, con pruebas y revisadas en pantalla, pero **ninguna ha hablado nunca
+con un servidor real**, porque este equipo no tiene ni servidor SSH ni Docker ni
+un motor local, y las únicas bases a mano son de la empresa.
+
+**La deuda de la sesión 019 es la más grande de las tres**, porque el DDL de
+índices y restricciones es donde más se separan los tres dialectos y donde el
+catálogo de cada motor se lee distinto. Basta con levantar los contenedores
+(`./build/scripts/test-db.ps1`) y ejecutar la suite con
+`DRUSE_REQUIRE_ENGINES=1`: la prueba contractual
+`CreaIndicesYRestriccionesYLosVuelveALeer` ya está escrita y hace el ciclo
+completo —crear un índice, releerlo del catálogo, borrarlo y comprobar que
+desaparece— en los tres motores.
 
 1. **Túnel SSH contra un servidor SSH real.** Lo probado llega hasta el error de
    red: la librería intenta conectar y el mensaje vuelve bien escrito. Falta el
@@ -37,9 +46,12 @@ y las únicas bases a mano son de la empresa.
    la sesión— con los tres métodos: contraseña, clave privada y segundo factor.
    Vale cualquier bastión: una EC2, una VM o un equipo con el puerto 22 abierto.
 2. **DDL contra los tres motores.** Crear una tabla, añadirle y renombrarle
-   columnas, cambiar tipos y borrar una, en SQL Server, PostgreSQL y MySQL. El
-   SQL generado está fijado por 11 pruebas, pero nadie lo ha ejecutado todavía.
-   Ojo a MySQL, que es el único donde un `ALTER` a medias no se deshace.
+   columnas, cambiar tipos y borrar una, y ahora además **crear, modificar y
+   quitar índices, claves foráneas, restricciones y la clave primaria**, en SQL
+   Server, PostgreSQL y MySQL. El SQL generado está fijado por 25 pruebas, pero
+   nadie lo ha ejecutado todavía. Ojo a MySQL, que es el único donde un `ALTER` a
+   medias no se deshace: si el `CREATE INDEX` que sigue a un `DROP INDEX` falla,
+   la tabla se queda sin ese índice.
 3. **La autenticación de Windows con una cuenta de dominio.** Lo comprobado es
    que la petición llega al driver de SQL Server; falta una conexión que abra de
    verdad contra un servidor que acepte logins de Windows.
@@ -65,10 +77,15 @@ Y lo que ya venía de antes, sin cambios:
   ofrecerlo habría sido prometer algo que falla al conectar. Soportarlo exige
   hablar el protocolo del agente por named pipe e implementar una `Key` que
   delegue la firma, con su parte criptográfica.
-- **Diseñador de tablas:** índices, claves foráneas y cambiar la clave primaria
-  de una tabla que ya la tiene.
 - **Editar el resto de un perfil ya conectado** sin cerrar su sesión: hoy los
   cambios se guardan, pero la conexión abierta sigue con los datos anteriores.
+- **Modificar una clave foránea sin quitarla y volver a crearla.** Hoy el
+  diseñador solo deja crearlas y quitarlas: ningún motor las cambia en su sitio,
+  igual que con los índices, pero ahí sí se automatizó el par borrar-crear. Para
+  las claves no se hizo porque afectan a los datos de otra tabla y el par a
+  ciegas puede dejar filas huérfanas entre una instrucción y la siguiente.
+- **Índices sobre expresiones** (`LOWER(email)`) y `CONCURRENTLY` en PostgreSQL,
+  que es lo que permite crear un índice sin bloquear la tabla en producción.
 
 ### Dos trampas de este equipo, para no repetirlas
 
@@ -148,6 +165,50 @@ Pendiente de verificar cuando toque: Docker (pruebas de integración con contene
 ---
 
 ## 5. Registro de sesiones
+
+### Sesión 019 — 2026-08-14 · Índices, claves foráneas y restricciones
+
+**Hecho:** el diseñador de tablas deja de ser solo columnas. Ver, agregar,
+modificar y quitar **índices, claves foráneas, restricciones de unicidad,
+condiciones (CHECK) y la clave primaria de una tabla que ya la tiene.**
+
+- **Leer no existía.** `IDatabaseMetadataReader` sabía de bases, hijos, columnas
+  y definiciones de vistas; ningún proveedor consultaba índices ni claves. Se
+  añadió `GetTableStructureAsync` con los catálogos de cada motor: `pg_index` y
+  `pg_constraint` en PostgreSQL, `sys.indexes` y `sys.foreign_keys` en SQL
+  Server, `information_schema` en MySQL.
+- **Modificar un índice es borrarlo y volver a crearlo**, porque ningún motor
+  sabe cambiarle las columnas a uno que ya existe. Se enseñan las dos
+  instrucciones en el SQL previo, en ese orden.
+- **Las opciones propias de cada motor se ofrecen sin ramificar por motor en la
+  interfaz.** Cada proveedor declara sus `IndexCapabilities` —columnas incluidas,
+  índices parciales, estructuras disponibles— y el formulario se dibuja a partir
+  de esa declaración. Ningún componente Angular pregunta contra qué está
+  conectado, que es lo que el plan §14 prohíbe. Lo que un motor no admite se
+  **rechaza** en el validador en lugar de ignorarse al escribir el SQL: un índice
+  que se crea callando una opción que se pidió es peor que uno que no se crea.
+- **El orden del `ALTER` no es el de la pantalla.** Primero se sueltan claves
+  foráneas e índices, luego la clave primaria, después se añaden y cambian
+  columnas, y solo entonces se pone la clave nueva y se recrea lo demás. Cambiar
+  la clave primaria con una foránea encima falla si se hace al revés.
+- **Quitar un índice también se confirma aparte.** No borra datos, pero
+  reconstruirlo sobre una tabla grande puede tardar y bloquearla. El aviso
+  distingue lo que se lleva datos de lo que no, para no enseñar a confirmar sin
+  leer.
+- Un índice que sostiene una clave primaria o una restricción se enseña pero no
+  se puede borrar suelto: los tres motores lo rechazan.
+
+**Verificado:** 207 pruebas unitarias en backend (18 nuevas del DDL y del
+validador), 25 de integración, 229 en frontend (5 nuevas del diseñador) y
+compilación de producción sin avisos nuevos. Las pruebas fijan el texto generado
+por los tres dialectos, incluido que el nombre de un índice no permita escapar.
+
+**Sin ejecutar todavía, y es importante:** la prueba contractual nueva
+—`CreaIndicesYRestriccionesYLosVuelveALeer`, que crea un índice y lo relee del
+catálogo— **no se ha ejecutado contra ningún motor**, porque este equipo no tiene
+Docker. Cuenta como superada porque el contrato se omite cuando el motor no
+responde. Es la comprobación que de verdad valida esta entrega, y necesita
+`DRUSE_REQUIRE_ENGINES=1` con los tres contenedores en marcha.
 
 ### Sesión 018 — 2026-08-14 · Mensajes de error y cierre de la integración
 

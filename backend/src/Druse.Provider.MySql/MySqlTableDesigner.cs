@@ -18,6 +18,20 @@ public sealed class MySqlTableDesigner : TableDesignerBase
         "JSON", "BLOB", "BINARY(16)",
     ];
 
+    /// <summary>
+    /// MySQL es el más limitado de los tres: ni columnas incluidas ni índices
+    /// parciales. A cambio ofrece estructuras que los otros no tienen, y por eso
+    /// aparecen aquí `fulltext` y `spatial`, que en MySQL son una clase de índice
+    /// y no un `USING`.
+    /// </summary>
+    public override IndexCapabilities IndexCapabilities => new()
+    {
+        SupportsIncludedColumns = false,
+        SupportsFilter = false,
+        SupportsSortDirection = true,
+        Methods = ["btree", "hash", "fulltext", "spatial"],
+    };
+
     /// <summary>Acentos graves, duplicándolos para que no se pueda escapar.</summary>
     protected override string Quote(string identifier) =>
         $"`{identifier.Replace("`", "``", StringComparison.Ordinal)}`";
@@ -71,6 +85,64 @@ public sealed class MySqlTableDesigner : TableDesignerBase
         DatabaseObject table,
         string newName) =>
         $"RENAME TABLE {qualifiedTable} TO {Quote(newName)};";
+
+    /// <summary>Aquí el índice pertenece a la tabla y hay que nombrarla al borrarlo.</summary>
+    protected override string DropIndex(
+        string qualifiedTable,
+        DatabaseObject table,
+        string indexName) =>
+        $"DROP INDEX {Quote(indexName)} ON {qualifiedTable};";
+
+    /// <summary>
+    /// `FULLTEXT` y `SPATIAL` no son un `USING`: son la clase del índice y van
+    /// donde en otros motores iría `UNIQUE`.
+    /// </summary>
+    protected override string IndexKind(IndexDefinition index)
+    {
+        ArgumentNullException.ThrowIfNull(index);
+
+        return index.Method?.ToLowerInvariant() switch
+        {
+            "fulltext" => "FULLTEXT ",
+            "spatial" => "SPATIAL ",
+            _ => index.IsUnique ? "UNIQUE " : string.Empty,
+        };
+    }
+
+    /// <summary>
+    /// La estructura se escribe al final, después de las columnas, y solo cuando
+    /// de verdad es una estructura: `FULLTEXT` ya se escribió delante.
+    /// </summary>
+    protected override string IndexMethodClause(IndexDefinition index) => string.Empty;
+
+    protected override string IndexSuffix(IndexDefinition index)
+    {
+        ArgumentNullException.ThrowIfNull(index);
+
+        return index.Method?.ToLowerInvariant() switch
+        {
+            "btree" or "hash" => $" USING {index.Method.ToUpperInvariant()}",
+            _ => string.Empty,
+        };
+    }
+
+    /// <summary>
+    /// MySQL exige decir qué clase de restricción se suelta.
+    ///
+    /// `DROP CONSTRAINT` genérico solo existe desde MySQL 8.0.19 y no cubre las
+    /// claves foráneas ni los índices únicos, así que se nombra siempre el tipo:
+    /// funciona igual en 8.0 y en MariaDB.
+    /// </summary>
+    protected override string DropConstraint(
+        string qualifiedTable,
+        string name,
+        ConstraintKind kind) => kind switch
+        {
+            ConstraintKind.PrimaryKey => $"ALTER TABLE {qualifiedTable} DROP PRIMARY KEY;",
+            ConstraintKind.ForeignKey => $"ALTER TABLE {qualifiedTable} DROP FOREIGN KEY {Quote(name)};",
+            ConstraintKind.Unique => $"ALTER TABLE {qualifiedTable} DROP INDEX {Quote(name)};",
+            _ => $"ALTER TABLE {qualifiedTable} DROP CHECK {Quote(name)};",
+        };
 
     /// <summary>
     /// En MySQL el esquema **es** la base, así que no hay dos niveles que

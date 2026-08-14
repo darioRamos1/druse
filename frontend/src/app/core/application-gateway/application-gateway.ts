@@ -6,6 +6,7 @@ import {
   DatabaseEngine,
   DatabaseObject,
   EngineInfo,
+  IndexCapabilities,
   QueryHistoryEntry,
   QueryResult,
   SavedConnection,
@@ -14,6 +15,7 @@ import {
   SshTunnel,
   TableAlteration,
   TableDesign,
+  TableStructure,
   TestConnectionResult,
 } from '../../shared/models/workspace';
 
@@ -228,6 +230,20 @@ export abstract class ApplicationGateway {
 
   /** Tipos que ofrece el motor de esta sesión, para el desplegable. */
   abstract getTableDataTypes(sessionId: string): Observable<readonly string[]>;
+
+  /**
+   * Lo que el motor admite al definir un índice.
+   *
+   * El diseñador dibuja el formulario con esto en lugar de mirar el motor de la
+   * conexión: así ofrece lo que hay sin saber contra qué está conectado.
+   */
+  abstract getTableCapabilities(sessionId: string): Observable<IndexCapabilities>;
+
+  /** Índices, claves foráneas y demás restricciones de una tabla. */
+  abstract getTableStructure(
+    sessionId: string,
+    table: DatabaseObject,
+  ): Observable<TableStructure>;
 
   /**
    * El SQL que crearía la tabla, para enseñarlo antes de ejecutarlo.

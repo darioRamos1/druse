@@ -28,7 +28,62 @@
         />
       </label>
 
-      <div class="columns">
+      <!-- Las pestañas no son decoración: un diseñador con columnas, índices,
+           claves y restricciones en una sola lista obliga a desplazarse para ver
+           lo que se está cambiando. -->
+      <div class="tabs" role="tablist">
+        <button
+          type="button"
+          role="tab"
+          class="tabs__tab"
+          [class.is-active]="section() === 'columns'"
+          [attr.aria-selected]="section() === 'columns'"
+          (click)="select('columns')"
+        >
+          Columnas
+        </button>
+        <button
+          type="button"
+          role="tab"
+          class="tabs__tab"
+          [class.is-active]="section() === 'indexes'"
+          [attr.aria-selected]="section() === 'indexes'"
+          (click)="select('indexes')"
+        >
+          Índices
+          @if (indexes().length > 0) {
+            <span class="tabs__count">{{ indexes().length }}</span>
+          }
+        </button>
+        <button
+          type="button"
+          role="tab"
+          class="tabs__tab"
+          [class.is-active]="section() === 'keys'"
+          [attr.aria-selected]="section() === 'keys'"
+          (click)="select('keys')"
+        >
+          Claves foráneas
+          @if (foreignKeys().length > 0) {
+            <span class="tabs__count">{{ foreignKeys().length }}</span>
+          }
+        </button>
+        <button
+          type="button"
+          role="tab"
+          class="tabs__tab"
+          [class.is-active]="section() === 'constraints'"
+          [attr.aria-selected]="section() === 'constraints'"
+          (click)="select('constraints')"
+        >
+          Restricciones
+          @if (constraints().length > 0) {
+            <span class="tabs__count">{{ constraints().length }}</span>
+          }
+        </button>
+      </div>
+
+      <div class="columns" [hidden]="section() !== 'columns'">
         <div class="columns__head">
           <span>Columna</span>
           <span>Tipo</span>
@@ -111,11 +166,295 @@
         }
       </datalist>
 
-      <button type="button" class="btn btn--ghost" (click)="addColumn()">Añadir columna</button>
+      @if (section() === 'columns') {
+        <button type="button" class="btn btn--ghost" (click)="addColumn()">Añadir columna</button>
+      }
+
+      <!-- Índices -->
+      <div class="rows" [hidden]="section() !== 'indexes'">
+        @for (row of indexes(); track $index) {
+          <div class="rows__item" [class.is-dropped]="row.dropped">
+            <div class="rows__line">
+              <input
+                class="field__input"
+                type="text"
+                [(ngModel)]="row.name"
+                (ngModelChange)="touched()"
+                [disabled]="row.dropped || !!row.locked"
+                placeholder="nombre del índice"
+                aria-label="Nombre del índice"
+              />
+
+              <input
+                class="field__input rows__grow"
+                type="text"
+                [(ngModel)]="row.columns"
+                (ngModelChange)="touched()"
+                [disabled]="row.dropped || !!row.locked"
+                placeholder="columnas separadas por comas"
+                aria-label="Columnas del índice"
+              />
+
+              @if (capabilities().supportsSortDirection) {
+                <select
+                  class="field__input"
+                  [(ngModel)]="row.direction"
+                  (ngModelChange)="touched()"
+                  [disabled]="row.dropped || !!row.locked"
+                  aria-label="Orden"
+                >
+                  <option value="asc">Ascendente</option>
+                  <option value="desc">Descendente</option>
+                </select>
+              }
+
+              <label class="rows__check">
+                <input
+                  type="checkbox"
+                  [(ngModel)]="row.isUnique"
+                  (ngModelChange)="touched()"
+                  [disabled]="row.dropped || !!row.locked"
+                />
+                Único
+              </label>
+
+              <button
+                type="button"
+                class="columns__remove"
+                [disabled]="!!row.locked"
+                [title]="
+                  row.locked
+                    ? 'Lo sostiene una restricción: quítala desde la pestaña Restricciones'
+                    : row.dropped
+                      ? 'Conservar este índice'
+                      : 'Quitar este índice'
+                "
+                (click)="removeIndex($index)"
+              >
+                {{ row.dropped ? '↺' : '×' }}
+              </button>
+            </div>
+
+            <!-- Lo que solo tiene sentido en algunos motores se dibuja a partir
+                 de lo que el proveedor declara, nunca preguntando por el motor. -->
+            @if (!row.locked && (capabilities().supportsIncludedColumns || capabilities().supportsFilter || methods().length > 0)) {
+              <div class="rows__line rows__line--secondary">
+                @if (methods().length > 0) {
+                  <select
+                    class="field__input"
+                    [(ngModel)]="row.method"
+                    (ngModelChange)="touched()"
+                    [disabled]="row.dropped"
+                    aria-label="Estructura del índice"
+                  >
+                    <option value="">Estructura por defecto</option>
+                    @for (method of methods(); track method) {
+                      <option [value]="method">{{ method }}</option>
+                    }
+                  </select>
+                }
+
+                @if (capabilities().supportsIncludedColumns) {
+                  <input
+                    class="field__input rows__grow"
+                    type="text"
+                    [(ngModel)]="row.includedColumns"
+                    (ngModelChange)="touched()"
+                    [disabled]="row.dropped"
+                    placeholder="columnas incluidas (INCLUDE)"
+                    aria-label="Columnas incluidas"
+                  />
+                }
+
+                @if (capabilities().supportsFilter) {
+                  <input
+                    class="field__input rows__grow"
+                    type="text"
+                    [(ngModel)]="row.filter"
+                    (ngModelChange)="touched()"
+                    [disabled]="row.dropped"
+                    placeholder="condición (WHERE), por ejemplo estado = 'activo'"
+                    aria-label="Condición del índice"
+                  />
+                }
+              </div>
+            }
+
+            @if (row.locked) {
+              <p class="rows__note">
+                Lo sostiene una restricción, así que no se puede quitar por su cuenta.
+              </p>
+            }
+          </div>
+        } @empty {
+          <p class="rows__empty">Esta tabla no tiene índices.</p>
+        }
+
+        <button type="button" class="btn btn--ghost" (click)="addIndex()">Añadir índice</button>
+      </div>
+
+      <!-- Claves foráneas -->
+      <div class="rows" [hidden]="section() !== 'keys'">
+        @for (row of foreignKeys(); track $index) {
+          <div class="rows__item" [class.is-dropped]="row.dropped">
+            <div class="rows__line">
+              <input
+                class="field__input"
+                type="text"
+                [(ngModel)]="row.name"
+                (ngModelChange)="touched()"
+                [disabled]="row.dropped || !!row.origin"
+                placeholder="nombre"
+                aria-label="Nombre de la clave foránea"
+              />
+
+              <input
+                class="field__input rows__grow"
+                type="text"
+                [(ngModel)]="row.columns"
+                (ngModelChange)="touched()"
+                [disabled]="row.dropped || !!row.origin"
+                placeholder="columnas de esta tabla"
+                aria-label="Columnas"
+              />
+
+              <span class="rows__arrow" aria-hidden="true">→</span>
+
+              <input
+                class="field__input"
+                type="text"
+                [(ngModel)]="row.referencedTable"
+                (ngModelChange)="touched()"
+                [disabled]="row.dropped || !!row.origin"
+                placeholder="tabla referenciada"
+                aria-label="Tabla referenciada"
+              />
+
+              <input
+                class="field__input rows__grow"
+                type="text"
+                [(ngModel)]="row.referencedColumns"
+                (ngModelChange)="touched()"
+                [disabled]="row.dropped || !!row.origin"
+                placeholder="columnas referenciadas"
+                aria-label="Columnas referenciadas"
+              />
+
+              <button
+                type="button"
+                class="columns__remove"
+                [title]="row.dropped ? 'Conservar esta clave' : 'Quitar esta clave'"
+                (click)="removeForeignKey($index)"
+              >
+                {{ row.dropped ? '↺' : '×' }}
+              </button>
+            </div>
+
+            <div class="rows__line rows__line--secondary">
+              <label class="rows__labelled">
+                Al borrar
+                <select
+                  class="field__input"
+                  [(ngModel)]="row.onDelete"
+                  (ngModelChange)="touched()"
+                  [disabled]="row.dropped || !!row.origin"
+                >
+                  @for (action of capabilities().foreignKeyActions; track action) {
+                    <option [value]="action">{{ actionLabel(action) }}</option>
+                  }
+                </select>
+              </label>
+
+              <label class="rows__labelled">
+                Al cambiar
+                <select
+                  class="field__input"
+                  [(ngModel)]="row.onUpdate"
+                  (ngModelChange)="touched()"
+                  [disabled]="row.dropped || !!row.origin"
+                >
+                  @for (action of capabilities().foreignKeyActions; track action) {
+                    <option [value]="action">{{ actionLabel(action) }}</option>
+                  }
+                </select>
+              </label>
+
+              @if (row.origin) {
+                <span class="rows__note">
+                  Para cambiarla, quítala y crea otra: ningún motor la modifica en su sitio.
+                </span>
+              }
+            </div>
+          </div>
+        } @empty {
+          <p class="rows__empty">Esta tabla no tiene claves foráneas.</p>
+        }
+
+        <button type="button" class="btn btn--ghost" (click)="addForeignKey()">
+          Añadir clave foránea
+        </button>
+      </div>
+
+      <!-- Unicidad y comprobaciones -->
+      <div class="rows" [hidden]="section() !== 'constraints'">
+        @for (row of constraints(); track $index) {
+          <div class="rows__item" [class.is-dropped]="row.dropped">
+            <div class="rows__line">
+              <span class="rows__kind">{{ row.kind === 'unique' ? 'Única' : 'Condición' }}</span>
+
+              <input
+                class="field__input"
+                type="text"
+                [(ngModel)]="row.name"
+                (ngModelChange)="touched()"
+                [disabled]="row.dropped || !!row.origin"
+                placeholder="nombre"
+                aria-label="Nombre de la restricción"
+              />
+
+              <input
+                class="field__input rows__grow"
+                type="text"
+                [(ngModel)]="row.body"
+                (ngModelChange)="touched()"
+                [disabled]="row.dropped || !!row.origin"
+                [placeholder]="
+                  row.kind === 'unique'
+                    ? 'columnas separadas por comas'
+                    : 'condición, por ejemplo precio > 0'
+                "
+                aria-label="Contenido de la restricción"
+              />
+
+              <button
+                type="button"
+                class="columns__remove"
+                [title]="row.dropped ? 'Conservar esta restricción' : 'Quitar esta restricción'"
+                (click)="removeConstraint($index)"
+              >
+                {{ row.dropped ? '↺' : '×' }}
+              </button>
+            </div>
+          </div>
+        } @empty {
+          <p class="rows__empty">Esta tabla no tiene restricciones de unicidad ni condiciones.</p>
+        }
+
+        <button type="button" class="btn btn--ghost" (click)="addConstraint('unique')">
+          Añadir restricción de unicidad
+        </button>
+
+        @if (capabilities().supportsCheckConstraints) {
+          <button type="button" class="btn btn--ghost" (click)="addConstraint('check')">
+            Añadir condición
+          </button>
+        }
+      </div>
 
       @if (destructive()) {
         <p class="warning" role="status">
-          Se van a borrar columnas y todo lo que contienen. Ningún ALTER lo devuelve.
+          Hay cambios que no se deshacen con otro ALTER: borrar columnas se lleva sus datos, y
+          quitar índices o restricciones puede tardar en rehacerse.
         </p>
       }
 

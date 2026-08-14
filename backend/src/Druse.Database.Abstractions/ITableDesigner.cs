@@ -23,6 +23,15 @@ public interface ITableDesigner
     /// <summary>Tipos que se ofrecen en el formulario. No son todos los del motor.</summary>
     IReadOnlyList<string> CommonDataTypes { get; }
 
+    /// <summary>
+    /// Lo que este motor admite al definir un índice.
+    ///
+    /// La interfaz dibuja el formulario a partir de esto, en lugar de preguntar
+    /// por el motor: así `INCLUDE` aparece donde existe y desaparece donde no,
+    /// sin que ningún componente sepa contra qué está conectado (plan §14).
+    /// </summary>
+    IndexCapabilities IndexCapabilities { get; }
+
     /// <summary>El `CREATE TABLE` que se ejecutaría, para enseñarlo antes.</summary>
     IReadOnlyList<string> DescribeCreate(TableDefinition table);
 
