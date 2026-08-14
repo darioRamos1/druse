@@ -1,4 +1,4 @@
-using Druse.Database.Abstractions;
+﻿using Druse.Database.Abstractions;
 using Druse.Domain;
 
 namespace Druse.ProviderContractTests;
@@ -912,6 +912,9 @@ public abstract class DatabaseProviderContractTests<TFixture>
         public Guid Id => Guid.NewGuid();
 
         public DatabaseEngine Engine => DatabaseEngine.MySql;
+
+        /// <summary>No habla con ningún motor, así que no hay dónde abrir una.</summary>
+        public SessionTransaction Transaction => SessionTransaction.None;
 
         public ConnectionProfile Profile => new()
         {

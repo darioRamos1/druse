@@ -35,6 +35,22 @@ public abstract class TableDesignerBase : ITableDesigner
     /// </summary>
     protected abstract string IdentityClause(TableColumnDefinition column);
 
+    /// <summary>
+    /// El tipo tal y como se escribe para esta columna.
+    ///
+    /// Por omisión es el que eligió el usuario, sin tocar. Existe como gancho
+    /// porque hay motores donde **generar el valor es el tipo y no una cláusula
+    /// añadida**: en Informix una columna autoincremental se declara `SERIAL`, no
+    /// `INTEGER` seguido de algo. Ahí no hay nada que añadir detrás del tipo:
+    /// hay que sustituirlo.
+    /// </summary>
+    protected virtual string DataTypeOf(TableColumnDefinition column)
+    {
+        ArgumentNullException.ThrowIfNull(column);
+
+        return column.DataType.Trim();
+    }
+
     /// <summary>Las instrucciones que cambian una columna existente.</summary>
     protected abstract IReadOnlyList<string> AlterColumn(
         string qualifiedTable,
@@ -390,22 +406,31 @@ public abstract class TableDesignerBase : ITableDesigner
         var connection = Connection(session);
         var stopwatch = Stopwatch.StartNew();
 
-        await using var transaction = SupportsTransactionalDdl
-            ? await connection.BeginTransactionAsync(cancellationToken)
+        // Con una transacción manual abierta hay que unirse a ella aunque el
+        // motor no prometa DDL transaccional: los comandos van por esa conexión
+        // y dejarlos sueltos daría «hay una transacción en curso».
+        //
+        // **En MySQL eso no significa que el DDL se pueda deshacer**: hace un
+        // commit implícito antes de cada `ALTER`, así que un `CREATE TABLE`
+        // dentro de la transacción del usuario queda hecho aunque pulse Rollback.
+        // Se ejecuta igual porque la alternativa es no funcionar, pero quien
+        // llama debe avisarlo.
+        await using var scope = SupportsTransactionalDdl || session.Transaction.IsOpen
+            ? await OperationScope.BeginAsync(connection, session.Transaction, cancellationToken)
             : null;
 
         foreach (var sql in statements)
         {
             await using var command = connection.CreateCommand();
             command.CommandText = sql;
-            command.Transaction = transaction;
+            command.Transaction = scope?.Transaction;
 
             await command.ExecuteNonQueryAsync(cancellationToken);
         }
 
-        if (transaction is not null)
+        if (scope is not null)
         {
-            await transaction.CommitAsync(cancellationToken);
+            await scope.CommitAsync(cancellationToken);
         }
 
         stopwatch.Stop();
@@ -416,7 +441,7 @@ public abstract class TableDesignerBase : ITableDesigner
     /// <summary>Una línea de la definición, ya indentada para el `CREATE TABLE`.</summary>
     protected string ColumnDefinition(TableColumnDefinition column)
     {
-        var parts = new List<string> { $"  {Quote(column.Name)}", column.DataType.Trim() };
+        var parts = new List<string> { $"  {Quote(column.Name)}", DataTypeOf(column) };
 
         if (column.IsIdentity)
         {

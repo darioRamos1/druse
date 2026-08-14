@@ -1,4 +1,4 @@
-using Druse.Database.Abstractions;
+﻿using Druse.Database.Abstractions;
 using Druse.Domain;
 using Druse.Application.Abstractions;
 using Druse.Infrastructure.Sessions;
@@ -127,6 +127,9 @@ public sealed class SessionTurnTests
         public Guid Id { get; } = Guid.NewGuid();
 
         public DatabaseEngine Engine => DatabaseEngine.PostgreSql;
+
+        /// <summary>No habla con ningún motor, así que no hay dónde abrir una.</summary>
+        public SessionTransaction Transaction => SessionTransaction.None;
 
         public ConnectionProfile Profile => new()
         {

@@ -1,4 +1,4 @@
-using System.Data.Common;
+﻿using System.Data.Common;
 using System.Diagnostics;
 using Druse.Database.Abstractions;
 using Druse.Domain;
@@ -54,6 +54,13 @@ public sealed class PostgreSqlQueryExecutor : IQueryExecutor
             await using var command = postgres.Connection.CreateCommand();
             command.CommandText = request.Sql;
             command.CommandTimeout = request.TimeoutSeconds;
+
+            // Si el usuario abrió una transacción manual, esta consulta entra en
+            // ella. Sin esto, los botones de confirmar y deshacer no gobernarían
+            // nada: cada consulta iría por su cuenta en autocommit.
+            // El comando concreto tipa `Transaction` con la clase del driver; se
+            // asigna por el tipo base, que es lo mismo para los cuatro motores.
+            ((DbCommand)command).Transaction = postgres.Transaction.Current;
 
             await using var reader = await command.ExecuteReaderAsync(cancellationToken);
 

@@ -1,4 +1,4 @@
-using System.Data.Common;
+﻿using System.Data.Common;
 using System.Diagnostics;
 using Druse.Domain;
 
@@ -23,6 +23,16 @@ public abstract class RowEditorBase : IRowEditor
     /// <summary>Cómo se nombra el parámetro número <paramref name="index"/>.</summary>
     protected abstract string Parameter(int index);
 
+    /// <summary>
+    /// Nombre con el que se registra el parámetro en el comando.
+    ///
+    /// Suele coincidir con el marcador que va en el SQL, y por eso es lo que se
+    /// devuelve por omisión. Los motores de marcadores **posicionales** son la
+    /// excepción: allí el SQL lleva `?` y el enlace es por orden, así que todos
+    /// los marcadores son iguales y hace falta un nombre distinto para cada uno.
+    /// </summary>
+    protected virtual string ParameterName(int index) => Parameter(index);
+
     /// <summary>La conexión de la sesión, comprobando que es de este proveedor.</summary>
     protected abstract DbConnection Connection(IDatabaseSession session);
 
@@ -46,7 +56,11 @@ public abstract class RowEditorBase : IRowEditor
 
         // Todo junto o nada: si el tercero de cinco falla, la tabla no puede
         // quedar a medio ajustar.
-        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+        await using var scope = await OperationScope.BeginAsync(
+            connection,
+            session.Transaction,
+            cancellationToken);
+        var transaction = scope.Transaction;
 
         try
         {
@@ -61,7 +75,7 @@ public abstract class RowEditorBase : IRowEditor
                 foreach (var cell in edit.Changes.Concat(edit.Key))
                 {
                     var parameter = command.CreateParameter();
-                    parameter.ParameterName = Parameter(index++);
+                    parameter.ParameterName = ParameterName(index++);
                     parameter.Value = cell.Value;
                     command.Parameters.Add(parameter);
                 }
@@ -72,22 +86,31 @@ public abstract class RowEditorBase : IRowEditor
                 // era única, o la fila ya no está, se deshace todo.
                 if (filas != 1)
                 {
-                    await transaction.RollbackAsync(CancellationToken.None);
+                    await scope.RollbackAsync(CancellationToken.None);
 
+                    var causa = filas == 0
+                        ? "Una de las filas ya no existe o alguien la cambió mientras editabas."
+                        : $"Una instrucción habría cambiado {filas} filas en lugar de una.";
+
+                    // Qué pasó con lo ya escrito depende de quién es la
+                    // transacción. Decir «no se guardó nada» dentro de una
+                    // transacción del usuario sería falso: ahí sigue, y solo su
+                    // Rollback lo retira.
                     throw new RowEditFailedException(
-                        filas == 0
-                            ? "Una de las filas ya no existe o alguien la cambió mientras editabas. No se guardó nada."
-                            : $"Una instrucción habría cambiado {filas} filas en lugar de una. No se guardó nada.");
+                        scope.IsOwned
+                            ? $"{causa} No se guardó nada."
+                            : $"{causa} Los cambios anteriores siguen dentro de tu transacción: " +
+                              "deshazla para retirarlos.");
                 }
 
                 afectadas += filas;
             }
 
-            await transaction.CommitAsync(cancellationToken);
+            await scope.CommitAsync(cancellationToken);
         }
         catch (Exception exception) when (exception is not RowEditFailedException)
         {
-            await transaction.RollbackAsync(CancellationToken.None);
+            await scope.RollbackAsync(CancellationToken.None);
             throw;
         }
 
@@ -121,7 +144,11 @@ public abstract class RowEditorBase : IRowEditor
 
         // Todo o nada, igual que al editar: media importación es peor que
         // ninguna, porque nadie sabe por dónde se quedó.
-        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+        await using var scope = await OperationScope.BeginAsync(
+            connection,
+            session.Transaction,
+            cancellationToken);
+        var transaction = scope.Transaction;
 
         try
         {
@@ -136,7 +163,7 @@ public abstract class RowEditorBase : IRowEditor
                 foreach (var cell in row)
                 {
                     var parameter = command.CreateParameter();
-                    parameter.ParameterName = Parameter(index++);
+                    parameter.ParameterName = ParameterName(index++);
                     parameter.Value = cell.Value;
                     command.Parameters.Add(parameter);
                 }
@@ -144,11 +171,11 @@ public abstract class RowEditorBase : IRowEditor
                 insertadas += await command.ExecuteNonQueryAsync(cancellationToken);
             }
 
-            await transaction.CommitAsync(cancellationToken);
+            await scope.CommitAsync(cancellationToken);
         }
         catch
         {
-            await transaction.RollbackAsync(CancellationToken.None);
+            await scope.RollbackAsync(CancellationToken.None);
             throw;
         }
 
