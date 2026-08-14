@@ -49,6 +49,12 @@ export class ConnectionsSidebar {
   readonly composeQuery = output<ExplorerNode>();
   readonly definition = output<ExplorerNode>();
 
+  /** Crear una tabla dentro de este esquema. */
+  readonly createTable = output<ExplorerNode>();
+
+  /** Cambiar la estructura de esta tabla. */
+  readonly designTable = output<ExplorerNode>();
+
   /** Importar un archivo dentro de esta tabla. */
   readonly importInto = output<ExplorerNode>();
   readonly copied = output<string>();

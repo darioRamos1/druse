@@ -10,6 +10,8 @@ import {
   SavedConnection,
   SecretStoreStatus,
   SessionInfo,
+  TableAlteration,
+  TableDesign,
   TestConnectionResult,
 } from '../../shared/models/workspace';
 
@@ -79,6 +81,12 @@ export interface RowEditRequest {
     readonly key: readonly { column: string; value: string | null }[];
     readonly changes: readonly { column: string; value: string | null }[];
   }[];
+}
+
+/** Lo que se ejecutó al cambiar la estructura, y cuánto tardó. */
+export interface TableChangeResult {
+  readonly statements: readonly string[];
+  readonly durationMs: number;
 }
 
 export interface RowEditResult {
@@ -205,6 +213,42 @@ export abstract class ApplicationGateway {
     file: File,
     options: ImportOptions,
   ): Observable<RowEditResult>;
+
+  // --- Diseño de tablas -----------------------------------------------------
+
+  /** Tipos que ofrece el motor de esta sesión, para el desplegable. */
+  abstract getTableDataTypes(sessionId: string): Observable<readonly string[]>;
+
+  /**
+   * El SQL que crearía la tabla, para enseñarlo antes de ejecutarlo.
+   *
+   * Va por su propia ruta y no como una bandera de {@link createTable}: ver y
+   * ejecutar son cosas distintas, igual que en la edición de filas.
+   */
+  abstract previewCreateTable(
+    sessionId: string,
+    table: TableDesign,
+  ): Observable<readonly string[]>;
+
+  /** Crea la tabla. El servidor se niega si `confirmed` no llega. */
+  abstract createTable(sessionId: string, table: TableDesign): Observable<TableChangeResult>;
+
+  abstract previewAlterTable(
+    sessionId: string,
+    alteration: TableAlteration,
+  ): Observable<readonly string[]>;
+
+  /**
+   * Aplica los cambios de estructura.
+   *
+   * `confirmedDestructive` es aparte porque borrar una columna se lleva sus
+   * datos y ningún `ALTER` los devuelve.
+   */
+  abstract alterTable(
+    sessionId: string,
+    alteration: TableAlteration,
+    confirmedDestructive: boolean,
+  ): Observable<TableChangeResult>;
 
   // --- Conexiones guardadas -------------------------------------------------
 

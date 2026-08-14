@@ -3,6 +3,7 @@ using Druse.Application.Connections;
 using Druse.Application.Metadata;
 using Druse.Application.Queries;
 using Druse.Application.Rows;
+using Druse.Application.Tables;
 using Druse.Database.Abstractions;
 using Druse.Domain;
 using Druse.Host.LocalApi.Contracts;
@@ -25,7 +26,112 @@ internal static class DatabaseEndpoints
         MapMetadata(app);
         MapQueries(app);
         MapRowEdits(app);
+        MapTableDesign(app);
     }
+
+    /// <summary>
+    /// Crear y modificar tablas.
+    ///
+    /// Cada operación tiene su ruta de vista previa: el SQL se enseña antes de
+    /// ejecutarlo, igual que en la edición de filas, y el servidor se niega a
+    /// aplicar nada que el usuario no haya confirmado.
+    /// </summary>
+    private static void MapTableDesign(IEndpointRouteBuilder app)
+    {
+        app.MapGet("/api/sessions/{sessionId:guid}/tables/data-types", (
+            Guid sessionId,
+            TableDesignService tables) =>
+            Results.Ok(tables.DataTypes(sessionId)))
+        .WithName("GetTableDataTypes");
+
+        app.MapPost("/api/tables/preview", (
+            CreateTableRequest request,
+            TableDesignService tables) =>
+        {
+            try
+            {
+                return Results.Ok(new
+                {
+                    statements = tables.PreviewCreate(request.SessionId, request.ToDomain()),
+                });
+            }
+            catch (TableChangeRejectedException exception)
+            {
+                return Rejected(exception);
+            }
+        })
+        .WithName("PreviewCreateTable");
+
+        app.MapPost("/api/tables", async (
+            CreateTableRequest request,
+            TableDesignService tables,
+            CancellationToken cancellationToken) =>
+        {
+            try
+            {
+                var result = await tables.CreateAsync(
+                    request.SessionId,
+                    request.ToDomain(),
+                    request.Confirmed,
+                    cancellationToken);
+
+                return Results.Ok(result.ToResponse());
+            }
+            catch (TableChangeRejectedException exception)
+            {
+                return Rejected(exception);
+            }
+        })
+        .WithName("CreateTable");
+
+        app.MapPost("/api/tables/alter/preview", (
+            AlterTableRequest request,
+            TableDesignService tables) =>
+        {
+            try
+            {
+                return Results.Ok(new
+                {
+                    statements = tables.PreviewAlter(request.SessionId, request.ToDomain()),
+                });
+            }
+            catch (TableChangeRejectedException exception)
+            {
+                return Rejected(exception);
+            }
+        })
+        .WithName("PreviewAlterTable");
+
+        app.MapPost("/api/tables/alter", async (
+            AlterTableRequest request,
+            TableDesignService tables,
+            CancellationToken cancellationToken) =>
+        {
+            try
+            {
+                var result = await tables.AlterAsync(
+                    request.SessionId,
+                    request.ToDomain(),
+                    request.Confirmed,
+                    request.ConfirmedDestructive,
+                    cancellationToken);
+
+                return Results.Ok(result.ToResponse());
+            }
+            catch (TableChangeRejectedException exception)
+            {
+                return Rejected(exception);
+            }
+        })
+        .WithName("AlterTable");
+    }
+
+    /// <summary>
+    /// Un rechazo no es un error del servidor: la petición se entendió y la
+    /// respuesta es que no se aplica, con el motivo para que el cliente decida.
+    /// </summary>
+    private static IResult Rejected(TableChangeRejectedException exception) =>
+        Results.Json(exception.Rejection.ToResponse(), statusCode: StatusCodes.Status409Conflict);
 
     private static void MapEngines(IEndpointRouteBuilder app)
     {

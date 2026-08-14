@@ -14,6 +14,7 @@ import {
 import {
   ConnectionForm,
   ConnectionSummary,
+  DatabaseColumn,
   DatabaseObject,
   ExplorerNode,
   QueryHistoryEntry,
@@ -28,6 +29,8 @@ import {
   SchemaIndex,
   SecretStoreStatus,
   SessionStatus,
+  TableAlteration,
+  TableDesign,
 } from '../../shared/models/workspace';
 
 /** Nodo del árbol con su estado de expansión y sus hijos ya cargados. */
@@ -914,6 +917,142 @@ export class WorkspaceStore {
     } catch (error) {
       return describeError(error);
     }
+  }
+
+  // --- Diseño de tablas ------------------------------------------------------
+
+  /** Tipos que ofrece el motor de esta conexión, para el desplegable. */
+  async tableDataTypes(connectionId: string): Promise<readonly string[]> {
+    const sessionId = this.findConnection(connectionId)?.sessionId;
+
+    if (!sessionId) {
+      return [];
+    }
+
+    try {
+      return await firstValueFrom(this._gateway.getTableDataTypes(sessionId));
+    } catch {
+      // Sin tipos sugeridos el formulario sigue sirviendo: el campo admite
+      // escribir cualquier tipo a mano.
+      return [];
+    }
+  }
+
+  /**
+   * Columnas de una tabla, tal y como están hoy en la base.
+   *
+   * El diseñador parte de ellas: modificar una tabla es partir de lo que hay y
+   * describir en qué se diferencia de lo que se quiere.
+   */
+  async tableColumns(
+    connectionId: string,
+    table: DatabaseObject,
+  ): Promise<readonly DatabaseColumn[]> {
+    const sessionId = this.findConnection(connectionId)?.sessionId;
+
+    if (!sessionId) {
+      return [];
+    }
+
+    try {
+      return await firstValueFrom(this._gateway.getColumns(sessionId, table));
+    } catch (error) {
+      this._notice.set(describeError(error));
+      return [];
+    }
+  }
+
+  /** El SQL que se ejecutaría, para enseñarlo antes de tocar la base. */
+  async previewTable(
+    connectionId: string,
+    design: TableDesign | TableAlteration,
+  ): Promise<readonly string[]> {
+    const sessionId = this.findConnection(connectionId)?.sessionId;
+
+    if (!sessionId) {
+      return [];
+    }
+
+    try {
+      return await firstValueFrom(
+        'table' in design
+          ? this._gateway.previewAlterTable(sessionId, design)
+          : this._gateway.previewCreateTable(sessionId, design),
+      );
+    } catch (error) {
+      this._notice.set(describeError(error));
+      return [];
+    }
+  }
+
+  /**
+   * Crea la tabla y refresca el árbol para que aparezca.
+   *
+   * Devuelve las instrucciones ejecutadas, o `null` si no se aplicó nada: el
+   * diálogo las enseña como confirmación de lo que acaba de ocurrir.
+   */
+  async createTable(
+    connectionId: string,
+    design: TableDesign,
+  ): Promise<readonly string[] | null> {
+    const sessionId = this.findConnection(connectionId)?.sessionId;
+
+    if (!sessionId) {
+      return null;
+    }
+
+    try {
+      const result = await firstValueFrom(this._gateway.createTable(sessionId, design));
+
+      await this.refreshAfterDesign(connectionId, design.database);
+
+      return result.statements;
+    } catch (error) {
+      this._notice.set(describeError(error));
+      return null;
+    }
+  }
+
+  async alterTable(
+    connectionId: string,
+    alteration: TableAlteration,
+    confirmedDestructive: boolean,
+  ): Promise<readonly string[] | null> {
+    const sessionId = this.findConnection(connectionId)?.sessionId;
+
+    if (!sessionId) {
+      return null;
+    }
+
+    try {
+      const result = await firstValueFrom(
+        this._gateway.alterTable(sessionId, alteration, confirmedDestructive),
+      );
+
+      await this.refreshAfterDesign(connectionId, alteration.table.database);
+
+      return result.statements;
+    } catch (error) {
+      this._notice.set(describeError(error));
+      return null;
+    }
+  }
+
+  /**
+   * Vuelve a leer el catálogo de la conexión tras cambiar la estructura.
+   *
+   * Sin esto, el explorador seguiría enseñando las columnas de antes y el
+   * autocompletado sugeriría una columna que ya no existe.
+   */
+  private async refreshAfterDesign(connectionId: string, database?: string): Promise<void> {
+    const connection = this.findConnection(connectionId);
+
+    if (!connection?.sessionId) {
+      return;
+    }
+
+    await this.loadDatabases(connectionId, connection.sessionId);
+    void this.primeSchemaIndexAsync(connectionId, database ?? connection.database);
   }
 
   // --- Explorador ------------------------------------------------------------

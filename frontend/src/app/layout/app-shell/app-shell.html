@@ -35,6 +35,8 @@
     (forget)="forget($event)"
     (openNode)="openNode($event)"
     (importInto)="openImport($event)"
+    (createTable)="openTableDesigner($event)"
+    (designTable)="openTableDesigner($event)"
     (composeQuery)="openBuilder($event)"
     (definition)="openDefinition($event)"
     (copied)="onCopied($event)"
@@ -178,6 +180,14 @@
     [table]="destino.source"
     [connectionId]="destino.connectionId"
     (closed)="closeImport()"
+  />
+}
+
+@if (designTarget(); as destino) {
+  <app-table-designer
+    [target]="destino.source"
+    [connectionId]="destino.connectionId"
+    (closed)="closeTableDesigner()"
   />
 }
 

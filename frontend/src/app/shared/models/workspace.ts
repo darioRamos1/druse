@@ -207,6 +207,53 @@ export interface SchemaIndex {
   readonly relations: readonly KnownRelation[];
 }
 
+/**
+ * Columna tal y como la describe quien diseña la tabla.
+ *
+ * No es {@link DatabaseColumn}: aquella cuenta lo que el motor ya tiene, y esta
+ * lo que se quiere que tenga.
+ */
+export interface TableColumnDesign {
+  readonly name: string;
+  /** Tipo en el dialecto del motor, tal y como se escribirá. */
+  readonly dataType: string;
+  readonly isNullable: boolean;
+  readonly isPrimaryKey: boolean;
+  /** El motor genera el valor: identidad, serial o autoincremento. */
+  readonly isIdentity: boolean;
+  /** Expresión por omisión, ya escrita en SQL. */
+  readonly defaultValue?: string;
+}
+
+/** Tabla que se va a crear. */
+export interface TableDesign {
+  readonly database?: string;
+  readonly schema?: string;
+  readonly name: string;
+  readonly columns: readonly TableColumnDesign[];
+}
+
+/** Columna existente y cómo debe quedar; si el nombre cambia, es un renombrado. */
+export interface ColumnAlteration {
+  readonly currentName: string;
+  readonly column: TableColumnDesign;
+}
+
+/**
+ * Cambios pedidos sobre una tabla que ya existe.
+ *
+ * Son operaciones explícitas y no la tabla resultante: comparar el antes con el
+ * después obligaría a adivinar qué pasó con cada columna, y adivinar mal
+ * significa borrar una que solo se había renombrado.
+ */
+export interface TableAlteration {
+  readonly table: DatabaseObject;
+  readonly newName?: string;
+  readonly addedColumns: readonly TableColumnDesign[];
+  readonly alteredColumns: readonly ColumnAlteration[];
+  readonly droppedColumns: readonly string[];
+}
+
 /** Un cambio pendiente sobre una celda. `null` es NULL. */
 export interface CellEdit {
   /** Número de fila dentro del resultado que se está viendo. */

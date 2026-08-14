@@ -199,6 +199,28 @@
                       <app-icon name="export" [size]="12" />
                       Importar archivo
                     </button>
+                    <button
+                      type="button"
+                      role="menuitem"
+                      (click)="act($event, () => designTable.emit(node))"
+                    >
+                      <app-icon name="table" [size]="12" />
+                      Modificar tabla
+                    </button>
+                  }
+
+                  <!-- Crear se ofrece sobre el esquema y sobre la carpeta que
+                       agrupa sus tablas, que es donde el usuario mira cuando
+                       piensa «aquí falta una». -->
+                  @if (node.kind === 'schema' || node.kind === 'folder') {
+                    <button
+                      type="button"
+                      role="menuitem"
+                      (click)="act($event, () => createTable.emit(node))"
+                    >
+                      <app-icon name="plus" [size]="12" />
+                      Crear tabla
+                    </button>
                   }
 
                   @if (node.expandable && node.expanded && !node.loading) {

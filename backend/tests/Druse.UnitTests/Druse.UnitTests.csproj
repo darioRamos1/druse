@@ -25,6 +25,9 @@
     <ProjectReference Include="..\..\src\Druse.Platform.Native\Druse.Platform.Native.csproj" />
     <ProjectReference Include="..\..\src\Druse.Persistence.Sqlite\Druse.Persistence.Sqlite.csproj" />
     <ProjectReference Include="..\..\src\Druse.Infrastructure\Druse.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\Druse.Provider.SqlServer\Druse.Provider.SqlServer.csproj" />
+    <ProjectReference Include="..\..\src\Druse.Provider.PostgreSql\Druse.Provider.PostgreSql.csproj" />
+    <ProjectReference Include="..\..\src\Druse.Provider.MySql\Druse.Provider.MySql.csproj" />
   </ItemGroup>
 
 </Project>

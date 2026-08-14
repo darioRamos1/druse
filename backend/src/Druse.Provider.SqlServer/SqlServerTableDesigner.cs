@@ -1,0 +1,82 @@
+using System.Data.Common;
+using Druse.Database.Abstractions;
+using Druse.Domain;
+
+namespace Druse.Provider.SqlServer;
+
+/// <summary>DDL de SQL Server. Solo aporta su dialecto.</summary>
+public sealed class SqlServerTableDesigner : TableDesignerBase
+{
+    public override DatabaseEngine Engine => DatabaseEngine.SqlServer;
+
+    public override IReadOnlyList<string> CommonDataTypes =>
+    [
+        "INT", "BIGINT", "SMALLINT", "TINYINT", "BIT",
+        "DECIMAL(18,2)", "MONEY", "FLOAT",
+        "NVARCHAR(50)", "NVARCHAR(255)", "NVARCHAR(MAX)", "VARCHAR(255)", "CHAR(10)",
+        "DATE", "DATETIME2", "TIME", "DATETIMEOFFSET",
+        "UNIQUEIDENTIFIER", "VARBINARY(MAX)",
+    ];
+
+    /// <summary>Corchetes, duplicando el de cierre para que no se pueda escapar.</summary>
+    protected override string Quote(string identifier) =>
+        $"[{identifier.Replace("]", "]]", StringComparison.Ordinal)}]";
+
+    protected override DbConnection Connection(IDatabaseSession session) =>
+        session is SqlServerSession sqlServer
+            ? sqlServer.Connection
+            : throw new ArgumentException(
+                "La sesión no pertenece al proveedor SQL Server.",
+                nameof(session));
+
+    protected override string IdentityClause(TableColumnDefinition column) => "IDENTITY(1,1)";
+
+    /// <summary>
+    /// SQL Server separa las dos cosas: renombrar es un procedimiento del sistema
+    /// y cambiar el tipo es `ALTER COLUMN`, que reescribe la columna entera. Por
+    /// eso hay que repetir en ella todo lo que debe conservarse.
+    /// </summary>
+    protected override IReadOnlyList<string> AlterColumn(
+        string qualifiedTable,
+        ColumnAlteration change)
+    {
+        var statements = new List<string>();
+        var column = change.Column;
+
+        if (change.IsRename)
+        {
+            // El procedimiento recibe cadenas, no identificadores citados, así que
+            // se escapa la comilla simple; el nombre viaja como literal.
+            statements.Add(
+                $"EXEC sp_rename '{Escape(qualifiedTable)}.{Escape(Quote(change.CurrentName))}', " +
+                $"'{Escape(column.Name)}', 'COLUMN';");
+        }
+
+        var nullability = column.IsNullable ? "NULL" : "NOT NULL";
+
+        statements.Add(
+            $"ALTER TABLE {qualifiedTable} ALTER COLUMN {Quote(column.Name)} " +
+            $"{column.DataType.Trim()} {nullability};");
+
+        // El valor por omisión de SQL Server es una restricción con nombre propio,
+        // no una propiedad de la columna: no se puede cambiar con ALTER COLUMN.
+        if (!string.IsNullOrWhiteSpace(column.DefaultValue))
+        {
+            statements.Add(
+                $"ALTER TABLE {qualifiedTable} ADD DEFAULT {column.DefaultValue.Trim()} " +
+                $"FOR {Quote(column.Name)};");
+        }
+
+        return statements;
+    }
+
+    protected override string RenameTable(
+        string qualifiedTable,
+        DatabaseObject table,
+        string newName) =>
+        $"EXEC sp_rename '{Escape(qualifiedTable)}', '{Escape(newName)}';";
+
+    /// <summary>Escapa una comilla simple para meter un nombre dentro de un literal.</summary>
+    private static string Escape(string value) =>
+        value.Replace("'", "''", StringComparison.Ordinal);
+}
