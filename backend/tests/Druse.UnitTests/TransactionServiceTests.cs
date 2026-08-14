@@ -171,15 +171,49 @@ public sealed class TransactionServiceTests
         Assert.False(mysql.Transactions.Get(mysql.Session.Id).DdlIsReversible);
     }
 
+    /// <summary>
+    /// Una conexión ocupada no puede retrasar al resto.
+    ///
+    /// Mientras se espera su turno, las demás transacciones olvidadas seguirían
+    /// reteniendo filas, que es justo lo que este barrido existe para evitar.
+    /// </summary>
+    [Fact]
+    public async Task UnaSesionOcupadaNoDetieneElBarridoDeLasDemas()
+    {
+        await using var world = new World(
+            idleTimeout: TimeSpan.Zero,
+            turnTimeout: TimeSpan.FromMilliseconds(50));
+
+        var otra = world.AddSession();
+
+        await world.Transactions.BeginAsync(world.Session.Id, CancellationToken.None);
+        await world.Transactions.BeginAsync(otra.Id, CancellationToken.None);
+
+        // Alguien está usando la primera conexión y no suelta el turno.
+        using var ocupada = await world.Sessions.EnterAsync(world.Session.Id, CancellationToken.None);
+
+        var abandoned = await world.Transactions.RollbackIdleAsync(CancellationToken.None);
+
+        Assert.Single(abandoned);
+        Assert.Equal(otra.Id, abandoned[0].SessionId);
+        Assert.False(otra.Transaction.IsOpen);
+
+        // La ocupada se atenderá en el barrido siguiente, dentro de un minuto.
+        Assert.True(world.Session.Transaction.IsOpen);
+    }
+
     /// <summary>Una sesión abierta con una tabla vacía y su servicio ya montado.</summary>
     private sealed class World : IAsyncDisposable
     {
         private readonly SqliteConnection _connection;
 
+        private readonly List<SqliteConnection> _extra = [];
+
         public World(
             bool readOnly = false,
             TimeSpan? idleTimeout = null,
-            DatabaseEngine engine = DatabaseEngine.PostgreSql)
+            DatabaseEngine engine = DatabaseEngine.PostgreSql,
+            TimeSpan? turnTimeout = null)
         {
             // La base en memoria vive mientras viva su conexión, que es
             // exactamente lo que dura una sesión.
@@ -192,8 +226,8 @@ public sealed class TransactionServiceTests
 
             Session = new FakeSession(_connection, readOnly, engine);
 
-            var sessions = new SessionRegistry();
-            sessions.Add(Session);
+            Sessions = new SessionRegistry();
+            Sessions.Add(Session);
 
             var providers = new ProviderRegistry(
                 [],
@@ -202,10 +236,25 @@ public sealed class TransactionServiceTests
                 [],
                 [new PostgreSqlTableDesigner(), new MySqlTableDesigner()]);
 
-            Transactions = new TransactionService(providers, sessions, idleTimeout);
+            Transactions = new TransactionService(providers, Sessions, idleTimeout, turnTimeout);
         }
 
         public FakeSession Session { get; }
+
+        public SessionRegistry Sessions { get; }
+
+        /// <summary>Otra conexión del mismo proceso, con su propia transacción.</summary>
+        public FakeSession AddSession()
+        {
+            var connection = new SqliteConnection("Data Source=:memory:");
+            connection.Open();
+            _extra.Add(connection);
+
+            var session = new FakeSession(connection, readOnly: false, DatabaseEngine.PostgreSql);
+            Sessions.Add(session);
+
+            return session;
+        }
 
         public TransactionService Transactions { get; }
 
@@ -233,6 +282,11 @@ public sealed class TransactionServiceTests
         {
             await Session.DisposeAsync();
             await _connection.DisposeAsync();
+
+            foreach (var connection in _extra)
+            {
+                await connection.DisposeAsync();
+            }
         }
     }
 

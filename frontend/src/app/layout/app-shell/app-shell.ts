@@ -205,7 +205,19 @@ export class AppShell {
   protected readonly transactionBusy = this._store.transactionBusy;
   protected readonly formatSettings = this._store.formatSettings;
 
-  protected readonly session = computed(() => this._store.session() ?? DISCONNECTED);
+  /**
+   * Estado de la sesión para la barra inferior.
+   *
+   * La base es la de la pestaña, no la que se abrió al conectar: se puede
+   * cambiar desde la barra del editor, y una barra de estado que siguiera
+   * diciendo la original estaría señalando a otra base que la que se ejecuta.
+   */
+  protected readonly session = computed(() => {
+    const status = this._store.session() ?? DISCONNECTED;
+    const database = this._store.activeDatabase();
+
+    return database && database !== status.database ? { ...status, database } : status;
+  });
 
   protected readonly sql = computed(() => this._store.activeTab()?.sql ?? '');
 

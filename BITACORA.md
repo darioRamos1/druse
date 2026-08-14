@@ -17,7 +17,7 @@
 | Fase 8 | ✅ **7/7.** Tres motores sobre el mismo contrato y primera beta preparada. |
 | ¿Compila el backend? | Sí — 0 advertencias, 0 errores |
 | ¿Compila el envoltorio? | Sí |
-| ¿Pasan las pruebas? | Sí — **380 en backend** (222 unitarias, 126 contractuales y 32 de integración), **275 en frontend** y **6 en el envoltorio** |
+| ¿Pasan las pruebas? | Sí — **381 en backend** (223 unitarias, 126 contractuales y 32 de integración), **279 en frontend** y **6 en el envoltorio** |
 | ¿Hay aplicación de escritorio? | **Sí.** Instalador NSIS, MSI y ZIP portable, en dos variantes: con Informix y sin él |
 | Motores | **PostgreSQL, SQL Server, MySQL/MariaDB e Informix**, todos sobre el mismo contrato compartido |
 | Trabajo a medias | Ninguno. Las transacciones manuales quedaron terminadas en la sesión 020. |
@@ -285,6 +285,36 @@ enseñar.
 
 **Sin ejecutar contra un motor real**, como el resto: ver el punto 3.b de «Qué
 toca retomar», que enumera las tres cosas que solo se ven ahí.
+
+#### Pulido de lo anterior
+
+Repaso de lo hecho en la sesión, con cuatro arreglos:
+
+- **La base elegida mentía en dos sitios.** Al cambiar de base en la barra, la
+  pestaña y la barra de estado seguían enseñando la de la conexión. Lo introdujo
+  el selector unas horas antes: la pestaña leía `connection.database` y la barra
+  `session.database`, y ninguna de las dos es ya la que se ejecuta.
+- **Cambiar de base con una transacción abierta avisa.** Esa consulta va por otra
+  conexión y se confirma sola; creer lo contrario cuesta un Rollback que no
+  deshace lo que se esperaba.
+- **Los desplegables de la barra se cierran al pulsar fuera**, y abrir uno cierra
+  los otros. Antes se quedaban abiertos tapando el editor hasta volver a su
+  botón. Se escucha `pointerdown` y no `click` para cerrar al empezar la
+  pulsación.
+- **La caída de sesión se detecta en todo lo que habla con una sesión**:
+  exportar, columnas, estructura y diseñador, además de lo que ya estaba. En la
+  exportación hubo que leer el cuerpo del error antes de reconocerla, porque
+  viaja como blob y `error.message` no existe hasta abrirlo.
+- **El barrido de transacciones ya no se queda esperando.** Recorría las sesiones
+  pidiendo cada turno sin límite, así que una consulta larga bloqueaba el barrido
+  de las demás y otras transacciones olvidadas seguían reteniendo filas. Ahora
+  espera cinco segundos por sesión y sigue; la que se salte se atiende en el
+  barrido siguiente.
+
+**Queda observado y sin arreglar:** el botón «Reconectar» del aviso aparece
+mientras haya una conexión caída, aunque el aviso que se esté leyendo sea otro.
+Arreglarlo bien exige que cada aviso sepa a qué conexión pertenece, que es un
+cambio mayor que la molestia.
 
 #### Reconectar, y cambiar de base sin abrir otro script
 

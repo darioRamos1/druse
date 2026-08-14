@@ -204,6 +204,26 @@ describe('EditorToolbar', () => {
 
       expect(element().querySelector<HTMLButtonElement>('.context .chip')?.disabled).toBe(true);
     });
+
+    /** Un menú que se queda abierto tapando el editor no es un menú. */
+    it('se cierra al pulsar fuera de la barra', () => {
+      openChooser();
+      expect(element().querySelector('.context__menu')).not.toBeNull();
+
+      document.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
+      fixture.detectChanges();
+
+      expect(element().querySelector('.context__menu')).toBeNull();
+    });
+
+    it('abrir uno cierra el otro, para que no se tapen', () => {
+      openChooser();
+      element().querySelector<HTMLButtonElement>('.btn--caret')?.click();
+      fixture.detectChanges();
+
+      expect(element().querySelector('.context__menu')).toBeNull();
+      expect(element().querySelector('.format__menu')).not.toBeNull();
+    });
   });
 
   function element(): HTMLElement {

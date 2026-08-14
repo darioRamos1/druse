@@ -97,9 +97,20 @@ public sealed class TransactionService
     /// </summary>
     public static readonly TimeSpan DefaultIdleTimeout = TimeSpan.FromMinutes(15);
 
+    /// <summary>
+    /// Cuánto espera el barrido el turno de una sesión antes de pasar a la
+    /// siguiente.
+    ///
+    /// Deshacer una transacción olvidada no corre prisa —lleva quince minutos
+    /// abierta—, pero quedarse esperando a una conexión ocupada sí tiene precio:
+    /// las demás olvidadas siguen bloqueando filas mientras tanto.
+    /// </summary>
+    public static readonly TimeSpan DefaultTurnTimeout = TimeSpan.FromSeconds(5);
+
     private readonly IProviderRegistry _providers;
     private readonly ISessionRegistry _sessions;
     private readonly TimeSpan _idleTimeout;
+    private readonly TimeSpan _turnTimeout;
 
     /// <summary>
     /// Sesiones a las que se les deshizo la transacción por inactividad.
@@ -119,11 +130,13 @@ public sealed class TransactionService
     public TransactionService(
         IProviderRegistry providers,
         ISessionRegistry sessions,
-        TimeSpan? idleTimeout = null)
+        TimeSpan? idleTimeout = null,
+        TimeSpan? turnTimeout = null)
     {
         _providers = providers;
         _sessions = sessions;
         _idleTimeout = idleTimeout ?? DefaultIdleTimeout;
+        _turnTimeout = turnTimeout ?? DefaultTurnTimeout;
     }
 
     /// <summary>Abre una transacción manual en la conexión de la sesión.</summary>
@@ -195,20 +208,40 @@ public sealed class TransactionService
                 continue;
             }
 
-            using var turn = await _sessions.EnterAsync(session.Id, cancellationToken);
+            // Se espera el turno **con un límite**. Una sesión ocupada por una
+            // consulta larga no puede retrasar al resto: mientras se esperaba a
+            // esa, las demás transacciones olvidadas seguirían reteniendo filas.
+            // La que se salte se atenderá en el barrido siguiente, que llega en
+            // un minuto.
+            using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            deadline.CancelAfter(_turnTimeout);
 
-            // Se vuelve a mirar con el turno en la mano: mientras se esperaba, la
-            // consulta que lo tenía ocupado pudo terminar, y esa transacción
-            // acaba de tener actividad.
-            if (!IsIdle(session))
+            IDisposable turn;
+
+            try
+            {
+                turn = await _sessions.EnterAsync(session.Id, deadline.Token);
+            }
+            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
             {
                 continue;
             }
 
-            await session.Transaction.RollbackAsync(cancellationToken);
-            _autoRolledBack[session.Id] = DateTimeOffset.UtcNow;
+            using (turn)
+            {
+                // Se vuelve a mirar con el turno en la mano: mientras se
+                // esperaba, la consulta que lo tenía ocupado pudo terminar, y
+                // esa transacción acaba de tener actividad.
+                if (!IsIdle(session))
+                {
+                    continue;
+                }
 
-            abandoned.Add(Describe(session));
+                await session.Transaction.RollbackAsync(cancellationToken);
+                _autoRolledBack[session.Id] = DateTimeOffset.UtcNow;
+
+                abandoned.Add(Describe(session));
+            }
         }
 
         Forget();

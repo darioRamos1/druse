@@ -1680,5 +1680,27 @@ describe('WorkspaceStore', () => {
 
       expect(store.databasesFor(store.connections()[0].id)).toEqual(['druse_test']);
     });
+
+    /**
+     * Una consulta contra otra base va por otra conexión, así que se confirma
+     * sola. Callarlo dejaría creer que esos cambios se pueden deshacer.
+     */
+    it('avisa de que la base nueva queda fuera de la transacción abierta', async () => {
+      await store.connect(form);
+      await store.beginTransaction();
+
+      store.useDatabase('otra_base');
+
+      expect(store.notice()).toContain('no entra en la transacción abierta');
+    });
+
+    it('sin transacción abierta, cambiar de base no dice nada', async () => {
+      await store.connect(form);
+      store.notify('algo anterior');
+
+      store.useDatabase('otra_base');
+
+      expect(store.notice()).toBe('algo anterior');
+    });
   });
 });

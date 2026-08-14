@@ -1,4 +1,14 @@
-import { ChangeDetectionStrategy, Component, computed, input, output, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  ElementRef,
+  HostListener,
+  computed,
+  inject,
+  input,
+  output,
+  signal,
+} from '@angular/core';
 
 import {
   DEFAULT_FORMAT_SETTINGS,
@@ -39,6 +49,8 @@ interface FormatGroup {
   styleUrl: './editor-toolbar.scss',
 })
 export class EditorToolbar {
+  private readonly _host = inject(ElementRef<HTMLElement>);
+
   readonly context = input.required<string>();
   readonly timeoutSeconds = input(30);
   readonly running = input(false);
@@ -150,17 +162,46 @@ export class EditorToolbar {
     },
   ];
 
+  /**
+   * Cierra los desplegables al pulsar en cualquier otro sitio.
+   *
+   * Es lo que se espera de un menú: sin esto, el de formateo se quedaba abierto
+   * tapando el editor hasta volver a su flecha. Se escucha en `pointerdown` y no
+   * en `click` para que cierre al empezar la pulsación, antes de que el clic
+   * llegue a lo que hay debajo.
+   */
+  @HostListener('document:pointerdown', ['$event'])
+  protected onPointerDownOutside(event: Event): void {
+    const target = event.target;
+
+    if (target instanceof Node && this._host.nativeElement.contains(target)) {
+      return;
+    }
+
+    this.editingTimeout.set(false);
+    this.editingFormat.set(false);
+    this.choosingDatabase.set(false);
+  }
+
   protected toggleTimeout(): void {
+    this.editingFormat.set(false);
+    this.choosingDatabase.set(false);
     this.editingTimeout.update((open) => !open);
   }
 
   protected toggleFormat(): void {
+    // Dos menús abiertos a la vez en la misma barra no aportan nada y se tapan
+    // entre ellos.
+    this.editingTimeout.set(false);
+    this.choosingDatabase.set(false);
     this.editingFormat.update((open) => !open);
   }
 
   protected readonly choosingDatabase = signal(false);
 
   protected toggleDatabases(): void {
+    this.editingTimeout.set(false);
+    this.editingFormat.set(false);
     this.choosingDatabase.update((open) => !open);
   }
 

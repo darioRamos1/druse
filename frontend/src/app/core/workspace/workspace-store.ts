@@ -321,10 +321,16 @@ export class WorkspaceStore {
           });
         }
       } else {
-        const message = await describeBlobError(error);
+        // La exportación viaja como blob, así que el cuerpo del error hay que
+        // leerlo antes de poder reconocer una sesión perdida.
+        const failure = await asHttpErrorFromBlob(error);
 
-        if (stillCurrent()) {
-          this._notice.set(message);
+        if (!connection || !this.noteSessionLoss(connection.id, failure ?? error)) {
+          const message = await describeBlobError(error);
+
+          if (stillCurrent()) {
+            this._notice.set(message);
+          }
         }
       }
     } finally {
@@ -758,11 +764,24 @@ export class WorkspaceStore {
 
     const connectionId = this.activeConnection()?.id;
 
-    if (connectionId) {
-      // El autocompletado de la base nueva no está cargado todavía; se pide por
-      // detrás para que escribir no tenga que esperar al catálogo.
-      void this.primeSchemaIndexAsync(connectionId, database);
+    if (!connectionId) {
+      return;
     }
+
+    // Una consulta contra otra base va por otra conexión, así que **no entra en
+    // la transacción abierta**. Es cómo funciona una transacción y no algo que
+    // Druse pueda arreglar, pero callarlo dejaría creer que esos cambios se
+    // pueden deshacer con Rollback.
+    if (this.hasOpenTransaction(connectionId)) {
+      this._notice.set(
+        `Lo que ejecutes contra «${database}» no entra en la transacción abierta: ` +
+          'va por otra conexión y se confirma solo.',
+      );
+    }
+
+    // El autocompletado de la base nueva no está cargado todavía; se pide por
+    // detrás para que escribir no tenga que esperar al catálogo.
+    void this.primeSchemaIndexAsync(connectionId, database);
   }
 
   readonly activeConnection = computed(() => {
@@ -1273,6 +1292,19 @@ export class WorkspaceStore {
   }
 
   /**
+   * Cuenta un fallo de una operación sobre una conexión.
+   *
+   * Si fue la sesión lo que se perdió, el aviso lo da {@link noteSessionLoss}
+   * con su botón de reconectar; si no, se enseña el mensaje de siempre. Existe
+   * para no repetir ese `if` en cada camino que habla con una sesión.
+   */
+  private reportFailure(connectionId: string, error: unknown): void {
+    if (!this.noteSessionLoss(connectionId, error)) {
+      this._notice.set(describeError(error));
+    }
+  }
+
+  /**
    * Vuelve a abrir la sesión de una conexión.
    *
    * Sirve para dos casos que se parecen: la conexión se cayó, o lleva tanto
@@ -1512,7 +1544,7 @@ export class WorkspaceStore {
     try {
       return await firstValueFrom(this._gateway.getTableStructure(sessionId, table));
     } catch (error) {
-      this._notice.set(describeError(error));
+      this.reportFailure(connectionId, error);
       return null;
     }
   }
@@ -1536,7 +1568,7 @@ export class WorkspaceStore {
     try {
       return await firstValueFrom(this._gateway.getColumns(sessionId, table));
     } catch (error) {
-      this._notice.set(describeError(error));
+      this.reportFailure(connectionId, error);
       return [];
     }
   }
@@ -1587,7 +1619,7 @@ export class WorkspaceStore {
 
       return result.statements;
     } catch (error) {
-      this._notice.set(describeError(error));
+      this.reportFailure(connectionId, error);
       return null;
     }
   }
@@ -1612,7 +1644,7 @@ export class WorkspaceStore {
 
       return result.statements;
     } catch (error) {
-      this._notice.set(describeError(error));
+      this.reportFailure(connectionId, error);
       return null;
     }
   }
@@ -2454,6 +2486,30 @@ async function asRejectionFromBlob(error: unknown): Promise<QueryRejected | null
   }
 
   return error.error?.reason ? (error.error as QueryRejected) : null;
+}
+
+/**
+ * Rehace el error con su cuerpo ya leído, cuando vino como blob.
+ *
+ * La exportación pide `responseType: 'blob'`, así que el JSON del error llega
+ * como archivo y `error.error.message` no existe. Sin esto, una sesión perdida
+ * durante una exportación se vería como un error cualquiera.
+ */
+async function asHttpErrorFromBlob(error: unknown): Promise<HttpErrorResponse | null> {
+  if (!(error instanceof HttpErrorResponse) || !(error.error instanceof Blob)) {
+    return null;
+  }
+
+  try {
+    return new HttpErrorResponse({
+      status: error.status,
+      statusText: error.statusText,
+      url: error.url ?? undefined,
+      error: JSON.parse(await error.error.text()),
+    });
+  } catch {
+    return null;
+  }
 }
 
 async function describeBlobError(error: unknown): Promise<string> {
