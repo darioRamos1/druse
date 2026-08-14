@@ -54,6 +54,22 @@
       </span>
 
       <span class="node__tools">
+        <!--
+          Reconectar está en las guardadas y no solo en las caídas: sirve igual
+          para recuperar una sesión perdida que para empezar limpio con una que
+          lleva horas abierta. Cuando se detecta la caída se resalta, porque
+          entonces es lo único que hay que hacer.
+        -->
+        @if (connection.saved) {
+          <span
+            class="tool"
+            [class.tool--attention]="connection.lost"
+            [attr.title]="connection.lost ? 'La conexión se perdió: volver a conectar' : 'Volver a conectar'"
+            (click)="act($event, () => reconnect.emit(connection.id))"
+          >
+            <app-icon name="refresh" [size]="12" />
+          </span>
+        }
         @if (connection.state === 'connected') {
           <span
             class="tool tool--danger"

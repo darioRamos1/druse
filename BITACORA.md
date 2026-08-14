@@ -17,7 +17,7 @@
 | Fase 8 | ✅ **7/7.** Tres motores sobre el mismo contrato y primera beta preparada. |
 | ¿Compila el backend? | Sí — 0 advertencias, 0 errores |
 | ¿Compila el envoltorio? | Sí |
-| ¿Pasan las pruebas? | Sí — **380 en backend** (222 unitarias, 126 contractuales y 32 de integración), **264 en frontend** y **6 en el envoltorio** |
+| ¿Pasan las pruebas? | Sí — **380 en backend** (222 unitarias, 126 contractuales y 32 de integración), **275 en frontend** y **6 en el envoltorio** |
 | ¿Hay aplicación de escritorio? | **Sí.** Instalador NSIS, MSI y ZIP portable, en dos variantes: con Informix y sin él |
 | Motores | **PostgreSQL, SQL Server, MySQL/MariaDB e Informix**, todos sobre el mismo contrato compartido |
 | Trabajo a medias | Ninguno. Las transacciones manuales quedaron terminadas en la sesión 020. |
@@ -285,6 +285,43 @@ enseñar.
 
 **Sin ejecutar contra un motor real**, como el resto: ver el punto 3.b de «Qué
 toca retomar», que enumera las tres cosas que solo se ven ahí.
+
+#### Reconectar, y cambiar de base sin abrir otro script
+
+Dos peticiones del usuario que se resolvieron juntas porque tocan lo mismo: qué
+significa «la conexión» dentro de una pestaña.
+
+**La sesión perdida se detecta y tiene salida.** Cuando una petición falla con
+«la sesión no está abierta» —el servidor cerró por inactividad, se cayó la red, o
+la API se reinició—, la conexión se marca como caída: se retira su catálogo y su
+transacción, que eran de una sesión que ya no existe, y el aviso trae un botón
+«Reconectar». En la barra lateral, el mismo botón se resalta. Antes eso salía
+como un error suelto que no decía qué hacer.
+
+- **Reconectar conserva las pestañas y su SQL.** Lo que se pierde es lo que ya
+  estaba perdido: el resultado en pantalla y cualquier transacción sin confirmar.
+- **Solo se puede con perfiles guardados**, que son los únicos con credenciales
+  que reabrir; si no hay contraseña guardada se abre el diálogo del perfil, y si
+  la conexión no está guardada se dice claramente en lugar de fallar en silencio.
+- **La detección vive en los sitios donde el usuario lo nota** —ejecutar,
+  explorar, guardar, transacciones— y no en un interceptor: hace falta saber de
+  qué conexión era la sesión, y eso solo lo sabe quien hizo la petición.
+
+**La base se elige en la barra, no abriendo otro script.** El chip de contexto
+—que hasta ahora solo informaba— es un desplegable con las bases de la conexión.
+Cambiarla afecta a la pestaña activa: la misma consulta pasa a ejecutarse contra
+otra base de la misma conexión.
+
+- El backend ya sabía hacerlo: `UseDatabaseAsync` abre una sesión auxiliar
+  conservando servidor, usuario y permisos, y `QueryTab.database` ya viajaba en
+  cada ejecución. Lo que faltaba era poder elegirla.
+- Al cambiar se retira el resultado en pantalla y la procedencia editable: eran
+  de la base anterior, y dejarlos mientras la barra dice otra cosa es la clase de
+  detalle que lleva a leer mal unas filas.
+- El autocompletado de la base nueva se precalienta por detrás, como al conectar.
+- **Ojo con las transacciones:** una consulta contra otra base va por otra
+  conexión, así que **no entra en la transacción abierta**. Es cómo funciona una
+  transacción, no una limitación de Druse, pero conviene tenerlo presente.
 
 #### El formateo del editor se puede configurar
 

@@ -61,6 +61,12 @@ export class EditorToolbar {
   /** Cómo formatea hoy el editor, para marcar lo elegido en el menú. */
   readonly formatSettings = input<FormatSettings>(DEFAULT_FORMAT_SETTINGS);
 
+  /** Bases de la conexión de esta pestaña. */
+  readonly databases = input<readonly string[]>([]);
+
+  /** Base contra la que se ejecuta ahora. */
+  readonly database = input<string | null>(null);
+
   readonly execute = output<void>();
   readonly executeSelection = output<void>();
   readonly cancel = output<void>();
@@ -69,6 +75,8 @@ export class EditorToolbar {
 
   /** Solo lo que cambió: el store completa el resto. */
   readonly formatSettingsChange = output<Partial<FormatSettings>>();
+
+  readonly databaseChange = output<string>();
   readonly beginTransaction = output<void>();
   readonly commit = output<void>();
   readonly rollback = output<void>();
@@ -148,6 +156,21 @@ export class EditorToolbar {
 
   protected toggleFormat(): void {
     this.editingFormat.update((open) => !open);
+  }
+
+  protected readonly choosingDatabase = signal(false);
+
+  protected toggleDatabases(): void {
+    this.choosingDatabase.update((open) => !open);
+  }
+
+  /**
+   * Aquí sí se cierra al elegir, al revés que el menú de formateo: de base se
+   * cambia una y se sigue trabajando, no se ajustan varias cosas seguidas.
+   */
+  protected chooseDatabase(name: string): void {
+    this.choosingDatabase.set(false);
+    this.databaseChange.emit(name);
   }
 
   protected isChosen(key: FormatGroupKey, value: FormatOptionValue): boolean {

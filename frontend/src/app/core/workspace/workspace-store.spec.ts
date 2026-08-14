@@ -41,6 +41,21 @@ const form: ConnectionForm = {
   storePassword: false,
 };
 
+const savedProfile: SavedConnection = {
+  id: 'perfil-1',
+  name: 'Guardada',
+  engine: 'postgresql',
+  host: '127.0.0.1',
+  port: 5432,
+  database: 'druse_test',
+  username: 'postgres',
+  authentication: 'password',
+  sslMode: 'prefer',
+  environment: 'development',
+  readOnly: false,
+  hasStoredPassword: true,
+};
+
 const session: SessionInfo = {
   sessionId: 'sesion-1',
   engine: 'postgresql',
@@ -288,6 +303,19 @@ class FakeGateway implements Partial<ApplicationGateway> {
     return of(undefined);
   }
 
+  /** Imita al proceso local cuando la sesión ya no está abierta. */
+  sessionIsGone = false;
+
+  private lostSession(): Observable<never> {
+    return throwError(
+      () =>
+        new HttpErrorResponse({
+          status: 404,
+          error: { message: "La sesión 'sesion-1' no está abierta." },
+        }),
+    );
+  }
+
   getDatabases(): Observable<DatabaseObject[]> {
     return of(databases);
   }
@@ -375,6 +403,11 @@ class FakeGateway implements Partial<ApplicationGateway> {
   }
 
   executeQuery(request: ExecuteQueryRequest): Observable<QueryResult> {
+    if (this.sessionIsGone) {
+      this.executeCalls.push(request);
+      return this.lostSession();
+    }
+
     this.executeCalls.push(request);
     return this.executeResult;
   }
@@ -1557,6 +1590,95 @@ describe('WorkspaceStore', () => {
 
       expect(store.formatSettings().style).toBe('tabular');
       expect(store.formatSettings().expressionWidth).toBe(120);
+    });
+  });
+  describe('reconectar y navegar entre bases', () => {
+    it('detecta que la sesión se perdió y lo cuenta con una salida', async () => {
+      await store.connect(form);
+      gateway.sessionIsGone = true;
+
+      await store.execute('SELECT 1');
+
+      const connection = store.connections()[0];
+
+      expect(connection.lost).toBe(true);
+      expect(connection.sessionId).toBeUndefined();
+      expect(store.lostConnection()?.id).toBe(connection.id);
+      expect(store.notice()).toContain('Se perdió la conexión');
+    });
+
+    /** El árbol era de una sesión que ya no existe: enseñarlo sería mentir. */
+    it('al perderse la sesión retira su catálogo', async () => {
+      await store.connect(form);
+      expect(store.explorerNodes().length).toBeGreaterThan(0);
+
+      gateway.sessionIsGone = true;
+      await store.execute('SELECT 1');
+
+      expect(store.explorerNodes().length).toBe(0);
+    });
+
+    it('reconectar abre otra sesión y deja la conexión utilizable', async () => {
+      gateway.savedConnections = [savedProfile];
+      await store.loadSavedConnections();
+      await store.connectSaved(savedProfile.id);
+
+      gateway.sessionIsGone = true;
+      await store.execute('SELECT 1');
+      gateway.sessionIsGone = false;
+
+      const outcome = await store.reconnect(savedProfile.id);
+
+      expect(outcome).toBe('ok');
+      expect(store.connections()[0].lost).toBeFalsy();
+      expect(store.connections()[0].state).toBe('connected');
+      expect(store.notice()).toContain('restablecida');
+    });
+
+    /** Sin perfil guardado no hay con qué volver a abrirla. */
+    it('no promete reconectar una conexión que no está guardada', async () => {
+      await store.connect(form);
+
+      const outcome = await store.reconnect(store.connections()[0].id);
+
+      expect(outcome).toBe('failed');
+      expect(store.notice()).toContain('no está guardada');
+    });
+
+    it('cambiar de base afecta a la pestaña, no a otro script', async () => {
+      await store.connect(form);
+
+      store.useDatabase('otra_base');
+
+      expect(store.activeTab()?.database).toBe('otra_base');
+      expect(store.activeDatabase()).toBe('otra_base');
+      expect(store.tabs().length).toBe(1);
+    });
+
+    it('la consulta se ejecuta contra la base elegida', async () => {
+      await store.connect(form);
+      store.useDatabase('otra_base');
+
+      await store.execute('SELECT 1');
+
+      expect(gateway.executeCalls.at(-1)?.database).toBe('otra_base');
+    });
+
+    /** El resultado vino de la base anterior; dejarlo invita a leerlo mal. */
+    it('cambiar de base retira el resultado en pantalla', async () => {
+      await store.connect(form);
+      await store.execute('SELECT 1');
+      expect(store.result()).not.toBeNull();
+
+      store.useDatabase('otra_base');
+
+      expect(store.result()).toBeNull();
+    });
+
+    it('ofrece las bases que trajo el explorador', async () => {
+      await store.connect(form);
+
+      expect(store.databasesFor(store.connections()[0].id)).toEqual(['druse_test']);
     });
   });
 });

@@ -71,6 +71,14 @@ interface DisplayedResultSource {
   readonly title: string;
 }
 
+/**
+ * Cómo acabó un intento de volver a abrir una conexión.
+ *
+ * `needsPassword` no es un fallo: es que el perfil no guarda la contraseña y hay
+ * que pedírsela, que es una decisión de la interfaz y no del estado.
+ */
+export type ReconnectOutcome = 'ok' | 'needsPassword' | 'failed';
+
 /** Clave con la que se guarda el tiempo máximo de ejecución. */
 const TIMEOUT_PREFERENCE = 'query.timeoutSeconds';
 
@@ -423,6 +431,12 @@ export class WorkspaceStore {
 
       return true;
     } catch (error) {
+      // Sin sesión no hay transacción de la que hablar, y el aviso de la
+      // conexión perdida explica mejor lo que pasó.
+      if (this.noteSessionLoss(connection.id, error)) {
+        return false;
+      }
+
       this._notice.set(describeError(error));
 
       // El estado local pudo quedarse atrás —otra pestaña la cerró, o se
@@ -681,6 +695,76 @@ export class WorkspaceStore {
 
   readonly activeTab = computed(() => this._tabs().find((tab) => tab.active) ?? null);
 
+  /**
+   * La conexión que perdió su sesión, si hay alguna.
+   *
+   * Sirve para poner «Reconectar» en el aviso: quien acaba de leer que se cayó
+   * la conexión no debería tener que buscar dónde se arregla.
+   */
+  readonly lostConnection = computed(
+    () => this._connections().find((connection) => connection.lost) ?? null,
+  );
+
+  /**
+   * Bases de una conexión, tal y como las trajo el explorador al abrirla.
+   *
+   * Salen del árbol y no de otra consulta: ya se piden al conectar, y volver a
+   * preguntarlas para llenar un desplegable sería trabajo repetido.
+   */
+  databasesFor(connectionId: string): readonly string[] {
+    return this._roots()
+      .filter((root) => root.connectionId === connectionId && root.object.kind === 'database')
+      .map((root) => root.object.name);
+  }
+
+  /** Base contra la que ejecuta la pestaña activa. */
+  readonly activeDatabase = computed(() => {
+    const tab = this.activeTab();
+
+    return tab?.database ?? this.session()?.database ?? null;
+  });
+
+  /**
+   * Cambia la base de la pestaña activa.
+   *
+   * Es lo que evita abrir un script por base: la misma consulta se ejecuta
+   * contra otra base de **la misma conexión**, que es como se trabaja cuando un
+   * servidor tiene la de producción y la de pruebas una al lado de la otra.
+   *
+   * El resultado en pantalla se retira: salió de la base anterior, y dejarlo
+   * mientras la barra dice otra cosa es la clase de detalle que lleva a leer mal
+   * unas filas.
+   */
+  useDatabase(database: string): void {
+    const tab = this.activeTab();
+
+    if (!tab || tab.database === database) {
+      return;
+    }
+
+    this._tabs.update((tabs) =>
+      tabs.map((item) =>
+        item.id === tab.id
+          ? // La procedencia editable también era de la base anterior: esas filas
+            // no se pueden escribir desde aquí.
+            { ...item, database, sourceTable: undefined }
+          : item,
+      ),
+    );
+
+    if (this._resultSource()?.tabId === tab.id) {
+      this.clearDisplayedResult();
+    }
+
+    const connectionId = this.activeConnection()?.id;
+
+    if (connectionId) {
+      // El autocompletado de la base nueva no está cargado todavía; se pide por
+      // detrás para que escribir no tenga que esperar al catálogo.
+      void this.primeSchemaIndexAsync(connectionId, database);
+    }
+  }
+
   readonly activeConnection = computed(() => {
     const connectionId = this.activeTab()?.connectionId ?? this._activeConnectionId();
 
@@ -918,7 +1002,12 @@ export class WorkspaceStore {
 
       return true;
     } catch (error) {
-      this._notice.set(describeError(error));
+      const connectionId = this.activeConnection()?.id;
+
+      if (!connectionId || !this.noteSessionLoss(connectionId, error)) {
+        this._notice.set(describeError(error));
+      }
+
       return false;
     } finally {
       this._savingEdits.set(false);
@@ -1139,6 +1228,107 @@ export class WorkspaceStore {
 
       return false;
     }
+  }
+
+  /**
+   * Anota que una operación falló porque la sesión ya no existe.
+   *
+   * Se llama desde los sitios donde el usuario lo va a notar —ejecutar, explorar,
+   * guardar, exportar—, y no en un interceptor: hace falta saber **de qué
+   * conexión** era la sesión, y eso solo lo sabe quien hizo la petición.
+   *
+   * @returns `true` si el fallo era una sesión perdida y ya se contó.
+   */
+  private noteSessionLoss(connectionId: string, error: unknown): boolean {
+    if (!isSessionLost(error)) {
+      return false;
+    }
+
+    const connection = this.findConnection(connectionId);
+
+    this.patchConnection(connectionId, {
+      state: 'error',
+      lost: true,
+      sessionId: undefined,
+      error: 'La conexión se perdió.',
+    });
+
+    // El árbol y la transacción eran de una sesión que ya no existe. Dejarlos
+    // sería enseñar un catálogo que nadie puede consultar y una transacción que
+    // el servidor ya deshizo al soltar la conexión.
+    this._roots.update((roots) => roots.filter((root) => root.connectionId !== connectionId));
+    this._sessions.update((sessions) => {
+      const next = new Map(sessions);
+      next.delete(connectionId);
+
+      return next;
+    });
+    this.forgetTransaction(connectionId);
+
+    this._notice.set(
+      `Se perdió la conexión con «${connection?.name ?? 'la base'}». Vuelve a conectarla para seguir.`,
+    );
+
+    return true;
+  }
+
+  /**
+   * Vuelve a abrir la sesión de una conexión.
+   *
+   * Sirve para dos casos que se parecen: la conexión se cayó, o lleva tanto
+   * abierta que uno prefiere empezar limpio. En ambos se cierra lo que quede
+   * —puede haber una sesión zombi en el proceso local— y se abre otra.
+   *
+   * **Las pestañas y su SQL no se tocan.** Lo que se pierde es lo que ya estaba
+   * perdido: el resultado en pantalla, que vino de una sesión que ya no existe,
+   * y cualquier transacción sin confirmar.
+   */
+  async reconnect(connectionId: string): Promise<ReconnectOutcome> {
+    const connection = this.findConnection(connectionId);
+
+    if (!connection) {
+      return 'failed';
+    }
+
+    if (!connection.saved) {
+      this._notice.set(
+        `«${connection.name}» no está guardada, así que Druse no tiene con qué volver a abrirla. ` +
+          'Créala de nuevo desde «Nueva conexión».',
+      );
+
+      return 'failed';
+    }
+
+    if (connection.sessionId) {
+      try {
+        await firstValueFrom(this._gateway.closeSession(connection.sessionId));
+      } catch {
+        // Si ya no existía, el resultado es el que se buscaba.
+      }
+    }
+
+    this.forgetTransaction(connectionId);
+    this._roots.update((roots) => roots.filter((root) => root.connectionId !== connectionId));
+    this.patchConnection(connectionId, { sessionId: undefined, lost: false, error: undefined });
+
+    // El resultado en pantalla salió de la sesión anterior; conservarlo sería
+    // enseñar filas que ya no se pueden ni refrescar ni editar.
+    if (this._resultSource()?.connectionId === connectionId) {
+      this.clearDisplayedResult();
+    }
+
+    const connected = await this.connectSaved(connectionId);
+
+    if (connected) {
+      this.patchConnection(connectionId, { lost: false });
+      this._notice.set(`Conexión con «${connection.name}» restablecida.`);
+
+      return 'ok';
+    }
+
+    // `connectSaved` deja la conexión desconectada cuando la API pide la
+    // contraseña; quien llama decide si abrir el diálogo.
+    return this.findConnection(connectionId)?.state === 'disconnected' ? 'needsPassword' : 'failed';
   }
 
   /**
@@ -1699,6 +1889,13 @@ export class WorkspaceStore {
     } catch (error) {
       entry.children = [];
 
+      // Que el árbol falle por una sesión perdida se cuenta siempre, aunque el
+      // precalentado fuera silencioso: la conexión entera dejó de servir, y
+      // callarlo solo retrasa el momento de enterarse.
+      if (this.noteSessionLoss(entry.connectionId, error)) {
+        return;
+      }
+
       // El precalentado no debe interrumpir a nadie: si una parte del catálogo
       // no se puede leer, el autocompletado tendrá menos, y ya está. Cuando el
       // usuario abra ese nodo a mano sí verá el motivo.
@@ -2044,7 +2241,7 @@ export class WorkspaceStore {
             sql,
           });
         }
-      } else {
+      } else if (!this.noteSessionLoss(connection.id, error)) {
         if (this.activeTab()?.id === tabId && this.activeTab()?.sql === tabSql) {
           this._notice.set(describeError(error));
         }
@@ -2323,6 +2520,23 @@ function describeError(error: unknown): string {
   }
 
   return `${explainStatus(error.status)} (${error.status})`;
+}
+
+/**
+ * El fallo es que la sesión ya no existe en el proceso local.
+ *
+ * Pasa más de lo que parece: el servidor cierra por inactividad, se cae la red,
+ * el proceso de la API se reinicia. Distinguirlo de cualquier otro 404 es lo que
+ * permite ofrecer «Reconectar» en vez de soltar un mensaje que no dice qué hacer.
+ */
+function isSessionLost(error: unknown): boolean {
+  if (!(error instanceof HttpErrorResponse) || error.status !== 404) {
+    return false;
+  }
+
+  const message = error.error?.message;
+
+  return typeof message === 'string' && message.includes('no está abierta');
 }
 
 /** Lo que significa cada código, dicho como se lo contarías a alguien. */

@@ -461,6 +461,34 @@ export class AppShell {
     void this._store.setFormatSettings(changes);
   }
 
+  /** Bases de la conexión activa, para el desplegable de la barra. */
+  protected readonly databases = computed(() => {
+    const connectionId = this._store.activeConnection()?.id;
+
+    return connectionId ? this._store.databasesFor(connectionId) : [];
+  });
+
+  protected readonly activeDatabase = this._store.activeDatabase;
+  protected readonly lostConnection = this._store.lostConnection;
+
+  protected useDatabase(database: string): void {
+    this._store.useDatabase(database);
+  }
+
+  /**
+   * Vuelve a abrir una conexión.
+   *
+   * Si el perfil no guarda la contraseña, la API la pide y aquí se abre el mismo
+   * diálogo que al editarla: es donde el usuario ya sabe escribirla.
+   */
+  protected async reconnect(id: string): Promise<void> {
+    const outcome = await this._store.reconnect(id);
+
+    if (outcome === 'needsPassword') {
+      this.editConnection(id);
+    }
+  }
+
   protected beginTransaction(): void {
     void this._store.beginTransaction();
   }

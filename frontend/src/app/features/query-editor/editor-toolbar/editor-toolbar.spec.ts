@@ -157,6 +157,55 @@ describe('EditorToolbar', () => {
     });
   });
 
+  describe('base de la pestaña', () => {
+    beforeEach(() => {
+      fixture.componentRef.setInput('databases', ['ventas', 'ventas_pruebas', 'auditoria']);
+      fixture.componentRef.setInput('database', 'ventas');
+      fixture.detectChanges();
+    });
+
+    function openChooser(): void {
+      element().querySelector<HTMLButtonElement>('.context .chip')?.click();
+      fixture.detectChanges();
+    }
+
+    it('ofrece las bases de la conexión y marca la que está en uso', () => {
+      openChooser();
+
+      const opciones = [...element().querySelectorAll<HTMLButtonElement>('.context__option')];
+
+      expect(opciones.map((option) => option.textContent?.trim())).toEqual([
+        'ventas',
+        'ventas_pruebas',
+        'auditoria',
+      ]);
+      expect(opciones[0].classList).toContain('is-selected');
+    });
+
+    /** Es lo que evita abrir un script por base. */
+    it('elegir una base la emite y cierra el desplegable', () => {
+      const elegidas: string[] = [];
+
+      fixture.componentRef.instance.databaseChange.subscribe((name) => elegidas.push(name));
+      openChooser();
+
+      element()
+        .querySelectorAll<HTMLButtonElement>('.context__option')[1]
+        ?.click();
+      fixture.detectChanges();
+
+      expect(elegidas).toEqual(['ventas_pruebas']);
+      expect(element().querySelector('.context__menu')).toBeNull();
+    });
+
+    it('sin conexión no hay nada que elegir', () => {
+      fixture.componentRef.setInput('databases', []);
+      fixture.detectChanges();
+
+      expect(element().querySelector<HTMLButtonElement>('.context .chip')?.disabled).toBe(true);
+    });
+  });
+
   function element(): HTMLElement {
     return fixture.nativeElement as HTMLElement;
   }

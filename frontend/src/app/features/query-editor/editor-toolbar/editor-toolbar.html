@@ -129,11 +129,48 @@
 
 <span class="spacer"></span>
 
-<button type="button" class="chip">
-  <span class="chip__dot" aria-hidden="true"></span>
-  <span class="chip__mono">{{ context() }}</span>
-  <app-icon name="chevron-down" [size]="9" />
-</button>
+<!--
+  La base de la pestaña, y cómo se cambia.
+
+  Cambiarla aquí evita tener un script por base: la misma consulta se ejecuta
+  contra otra base de la misma conexión, que es como está montado un servidor con
+  producción y pruebas una al lado de la otra.
+-->
+<div class="context">
+  <button
+    type="button"
+    class="chip"
+    [disabled]="databases().length === 0"
+    [attr.aria-expanded]="choosingDatabase()"
+    [attr.title]="
+      databases().length > 0 ? 'Base contra la que se ejecuta' : 'Conecta para elegir una base'
+    "
+    (click)="toggleDatabases()"
+  >
+    <span class="chip__dot" aria-hidden="true"></span>
+    <span class="chip__mono">{{ context() }}</span>
+    <app-icon name="chevron-down" [size]="9" />
+  </button>
+
+  @if (choosingDatabase()) {
+    <ul class="context__menu" role="listbox" (keydown.escape)="choosingDatabase.set(false)">
+      @for (name of databases(); track name) {
+        <li>
+          <button
+            type="button"
+            class="context__option"
+            role="option"
+            [attr.aria-selected]="name === database()"
+            [class.is-selected]="name === database()"
+            (click)="chooseDatabase(name)"
+          >
+            {{ name }}
+          </button>
+        </li>
+      }
+    </ul>
+  }
+</div>
 
 <div class="timeout">
   <button

@@ -323,6 +323,20 @@
     background: rgb(242 104 107 / 16%);
     color: #f2686b;
   }
+
+  // Las herramientas de una conexión solo se ven al pasar por encima; esta no,
+  // cuando la conexión se ha caído: es lo único que hay que hacer y el usuario
+  // no tiene por qué ir a buscarla.
+  &--attention {
+    background: rgb(240 180 41 / 14%);
+    color: #f0b429;
+    opacity: 1;
+
+    &:hover {
+      background: rgb(240 180 41 / 22%);
+      color: #f0b429;
+    }
+  }
 }
 
 .status-dot {

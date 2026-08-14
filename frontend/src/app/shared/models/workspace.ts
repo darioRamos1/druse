@@ -118,6 +118,14 @@ export interface ConnectionSummary {
   readonly sessionId?: string;
   /** Motivo del último fallo, para mostrarlo junto a la conexión. */
   readonly error?: string;
+  /**
+   * La sesión se perdió sola: el servidor la cerró, se cayó la red o el proceso
+   * local se reinició.
+   *
+   * Se distingue de un error cualquiera porque tiene una salida concreta —volver
+   * a abrirla— y porque el usuario no hizo nada para provocarlo.
+   */
+  readonly lost?: boolean;
   readonly environment: ConnectionEnvironment;
   readonly readOnly: boolean;
   /** El perfil está guardado en la base local y sobrevive al reinicio. */
