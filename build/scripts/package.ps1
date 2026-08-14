@@ -191,6 +191,12 @@ if ($SkipInstaller) {
 
 Write-Host '[3/3] Construyendo el instalador con Tauri...' -ForegroundColor Cyan
 
+# Se anota antes de construir para poder distinguir después los artefactos de
+# esta ejecución de los que ya estaban en el directorio. Un segundo de margen
+# porque la marca de tiempo del sistema de archivos no tiene por qué ser más
+# fina que la del reloj.
+$buildStartedAt = (Get-Date).AddSeconds(-1)
+
 # La firma no se escribe en `tauri.conf.json`: una huella de certificado es de
 # la máquina que compila, no del proyecto, y versionarla obligaría a cada equipo
 # a editar el archivo para poder empaquetar. Se pasa como configuración
@@ -248,7 +254,14 @@ if (-not (Test-Path $bundleDir)) {
 Write-Host ''
 Write-Host 'Artefactos generados:' -ForegroundColor Green
 
-$bundles = Get-ChildItem $bundleDir -Recurse -Include '*.exe', '*.msi', '*.deb', '*.AppImage', '*.dmg' -ErrorAction SilentlyContinue
+# Solo lo que ha salido de **esta** construcción.
+#
+# El directorio de bundles conserva lo de ejecuciones anteriores, que ya lleva
+# su sufijo, y renombrarlo otra vez produce nombres como
+# `...-sin-informix-sin-informix.exe`. Peor que ser feo: deja dos archivos
+# parecidos y recientes sin forma de saber cuál es el nuevo.
+$bundles = Get-ChildItem $bundleDir -Recurse -Include '*.exe', '*.msi', '*.deb', '*.AppImage', '*.dmg' -ErrorAction SilentlyContinue |
+    Where-Object { $_.LastWriteTime -ge $buildStartedAt }
 
 # Tauri nombra sus instaladores igual en las dos variantes, así que **ambas** se
 # renombran, no solo la ligera. Poner sufijo a una sola no basta: generar la

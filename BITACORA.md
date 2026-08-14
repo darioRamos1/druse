@@ -286,6 +286,24 @@ enseñar.
 **Sin ejecutar contra un motor real**, como el resto: ver el punto 3.b de «Qué
 toca retomar», que enumera las tres cosas que solo se ven ahí.
 
+#### Portable regenerado, y un fallo del empaquetado
+
+Se generó el portable ligero con todo lo de esta sesión:
+`Druse-0.1.0-win-x64-portable-sin-informix.zip`, 65,3 MB comprimido y 142 MB
+dentro. Comprobado abriéndolo: lleva `druse.exe`, la API con Npgsql y
+MySqlConnector, y **no** el `clidriver` de IBM, que es lo que debía quedar fuera.
+
+**El fallo:** el script renombraba todos los artefactos del directorio de
+bundles, incluidos los de ejecuciones anteriores, que ya llevaban su sufijo. El
+resultado eran nombres como `...-sin-informix-sin-informix.exe` y, peor, dos
+archivos parecidos sin forma de saber cuál era el nuevo. Ahora se anota la hora
+antes de construir y solo se renombra lo que salió de esa construcción.
+
+Es la tercera vuelta sobre el mismo punto —primero el sufijo que faltaba, luego
+el que había que poner a las dos variantes, ahora el que se aplicaba dos veces—,
+y las tres han salido de mirar la lista de artefactos al terminar en lugar de
+fiarse de que el script hizo lo que decía.
+
 #### «no pg_hba.conf entry», dicho con palabras
 
 Salió al probar Druse desde otro equipo: PostgreSQL rechazaba la conexión con su
