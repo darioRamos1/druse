@@ -10,7 +10,7 @@
 
 | Campo | Valor |
 | --- | --- |
-| Última sesión | **017** — 2026-08-14 |
+| Última sesión | **018** — 2026-08-14 |
 | Fase activa | **Mejora posterior al MVP completada:** implementación y validación cerradas |
 | Fases 0–6 | ✅ Cerradas. |
 | Fase 7 | 🟡 **10/12.** Hay instalador y funciona; faltan dos comprobaciones que exigen otro equipo. |
@@ -20,17 +20,65 @@
 | ¿Pasan las pruebas? | Sí — **214 en backend** (189 unitarias y 25 de integración), **224 en frontend** y **2 en el envoltorio** |
 | ¿Hay aplicación de escritorio? | **Sí.** Instalador NSIS, MSI y ZIP portable |
 | Motores | **PostgreSQL, SQL Server y MySQL/MariaDB**, con navegación por todas las bases autorizadas y las **mismas 27 pruebas contractuales** cada uno |
-| Bloqueantes | Ninguno |
-| Git | `main`, con navegación multibase implementada y cambios locales aún sin commit. |
+| Bloqueantes | Ninguno para seguir programando. Sí para dar por buenas dos funciones nuevas: ver «Qué toca retomar». |
+| Git | `main` limpio y al día: fusionados #2 (túnel SSH y Windows), #6 (editar conexiones), #4 (diseñador de tablas) y #5 (mensajes de error). Nada sin commitear. |
 
 ### Qué toca retomar en la próxima sesión
 
-1. Lo único que impide dar el MVP por terminado **necesita otro equipo**:
+**Lo primero, y con diferencia: probar contra servidores de verdad lo que se
+escribió en las sesiones 015 y 017.** Las dos funciones nuevas están completas, con
+pruebas y revisadas en pantalla, pero **ninguna ha hablado nunca con un servidor
+real**, porque este equipo no tiene ni servidor SSH ni Docker ni un motor local,
+y las únicas bases a mano son de la empresa.
+
+1. **Túnel SSH contra un servidor SSH real.** Lo probado llega hasta el error de
+   red: la librería intenta conectar y el mensaje vuelve bien escrito. Falta el
+   camino feliz —abrir el túnel, conectar la base por dentro y cerrarlo al cerrar
+   la sesión— con los tres métodos: contraseña, clave privada y segundo factor.
+   Vale cualquier bastión: una EC2, una VM o un equipo con el puerto 22 abierto.
+2. **DDL contra los tres motores.** Crear una tabla, añadirle y renombrarle
+   columnas, cambiar tipos y borrar una, en SQL Server, PostgreSQL y MySQL. El
+   SQL generado está fijado por 11 pruebas, pero nadie lo ha ejecutado todavía.
+   Ojo a MySQL, que es el único donde un `ALTER` a medias no se deshace.
+3. **La autenticación de Windows con una cuenta de dominio.** Lo comprobado es
+   que la petición llega al driver de SQL Server; falta una conexión que abra de
+   verdad contra un servidor que acepte logins de Windows.
+
+Y lo que ya venía de antes, sin cambios:
+
+4. Lo único que impide dar el MVP por terminado **necesita otro equipo**:
    - instalar, actualizar y desinstalar de verdad, para validar el ciclo completo;
-   - arrancar en una máquina sin .NET ni Node, que es el criterio que demuestra que el paquete se basta solo.
-2. Artefactos de Linux y macOS: el script acepta cualquier RID, pero generarlos exige compilar en cada plataforma. Es trabajo de integración continua.
-3. **Probar la edición de filas y la importación a mano**, sobre una tabla de prueba.
-4. **Recoger los registros de la API en un archivo.** Al ocultar su consola (D-26) se perdió el único sitio donde se veían. Mientras no haya que diagnosticar en campo no corre prisa, pero es lo primero que hará falta el día que algo falle en el equipo de otro.
+   - arrancar en una máquina sin .NET ni Node, que es el criterio que demuestra
+     que el paquete se basta solo.
+5. Artefactos de Linux y macOS: el script acepta cualquier RID, pero generarlos
+   exige compilar en cada plataforma. Es trabajo de integración continua.
+6. **Probar la edición de filas y la importación a mano**, sobre una tabla de prueba.
+7. **Recoger los registros de la API en un archivo.** Al ocultar su consola (D-26)
+   se perdió el único sitio donde se veían. Mientras no haya que diagnosticar en
+   campo no corre prisa, pero es lo primero que hará falta el día que algo falle
+   en el equipo de otro.
+
+### Ideas que quedaron sobre la mesa
+
+- **Agente SSH / Pageant.** Se pidió y no está: SSH.NET no habla con el agente
+  —comprobado por reflexión sobre el ensamblado, ni público ni interno—, así que
+  ofrecerlo habría sido prometer algo que falla al conectar. Soportarlo exige
+  hablar el protocolo del agente por named pipe e implementar una `Key` que
+  delegue la firma, con su parte criptográfica.
+- **Diseñador de tablas:** índices, claves foráneas y cambiar la clave primaria
+  de una tabla que ya la tiene.
+- **Editar el resto de un perfil ya conectado** sin cerrar su sesión: hoy los
+  cambios se guardan, pero la conexión abierta sigue con los datos anteriores.
+
+### Dos trampas de este equipo, para no repetirlas
+
+- **Compilar con la API en marcha falla**, y el error habla de archivos
+  bloqueados. Hay que parar `Druse.Host.LocalApi` antes de `dotnet build`.
+- Peor todavía: si `dotnet run` no puede reemplazar los binarios, **sigue vivo el
+  proceso anterior** y las pruebas contra la API responden con el código viejo.
+  Pasó una vez y dio un falso negativo que costó rato entender. Ante cualquier
+  resultado que no cuadre al probar a mano, comprobar primero que no haya un
+  `Druse.Host.LocalApi` antiguo escuchando.
 
 **El visto bueno visual ya está dado** (sesión 011, con la extensión de Chrome por fin conectada): la pantalla reproduce el mockup. Lo único ausente es la pestaña «Plan de ejecución», que está fuera del MVP.
 
@@ -100,6 +148,38 @@ Pendiente de verificar cuando toque: Docker (pruebas de integración con contene
 ---
 
 ## 5. Registro de sesiones
+
+### Sesión 018 — 2026-08-14 · Mensajes de error y cierre de la integración
+
+**Hecho:**
+- Los fallos se cuentan con palabras en lugar de con códigos. «La API respondió
+  con el código 502» era lo que aparecía al cerrarse el proceso local —el fallo
+  más frecuente y el peor explicado— y ahora dice qué pasó y qué hacer. El número
+  se conserva al final entre paréntesis: no le sirve al usuario, pero es lo
+  primero que hace falta para diagnosticar.
+- Cuando el servidor sí explica el motivo, gana su mensaje: ya está escrito para
+  leerse. Los errores de validación siguen contándose campo por campo.
+- «Por omisión» pasa a llamarse «Por defecto» en el diseñador de tablas. Lo pidió
+  el usuario al no entender el término, que es exactamente la señal de que una
+  etiqueta está mal puesta.
+- Fusionadas a `main` las cuatro ramas de la sesión anterior.
+
+**Una integración que no salió lisa, y conviene saberlo:**
+- **El PR #3 se fusionó contra su rama base en lugar de contra `main`.** Estaba
+  apilado sobre el del túnel SSH y, al fusionar los dos seguidos, GitHub lo mandó
+  a su base: quedó marcado como fusionado y su contenido no estaba en ninguna
+  parte. Se detectó al echar en falta la sesión 016 en este archivo. Se reabrió
+  como #6 contra `main`. **Un PR apilado marcado como MERGED no garantiza que su
+  código esté en `main`; hay que comprobarlo.**
+- Cuatro rondas de conflictos, siempre en `workspace-store.ts`, el gateway y esta
+  bitácora. Se resolvieron combinando ambos lados, nunca descartando uno: en
+  `describeError`, `main` traía mensajes de validación que no estaban en la rama,
+  y se conservaron junto a las explicaciones nuevas.
+
+**Verificado:** 189 pruebas unitarias y 25 de integración en backend, 224 en
+frontend, todas sobre `main` ya fusionado. Comprobado en la aplicación
+reproduciendo el fallo original: se cerró el proceso local con la ventana abierta
+y salió el aviso nuevo.
 
 ### Sesión 017 — 2026-08-13 · Diseñador de tablas
 
