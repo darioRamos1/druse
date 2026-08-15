@@ -286,6 +286,38 @@ enseñar.
 **Sin ejecutar contra un motor real**, como el resto: ver el punto 3.b de «Qué
 toca retomar», que enumera las tres cosas que solo se ven ahí.
 
+#### Firma de código: hasta dónde se llega sin certificado
+
+Se intentó firmar los artefactos. Resultado, para no repetir el camino:
+
+- **No hay certificado de firma de código en el equipo**, ni `DRUSE_SIGN_THUMBPRINT`
+  ni `DRUSE_SIGN_COMMAND` configurados. `signtool` sí está, en el SDK 10.0.26100.
+- Se creó uno **autofirmado** (`CN=Darío Ramos`, RSA 3072, hasta 2029) y firma
+  correctamente **con sello de tiempo**. Pero Windows no da la firma por válida:
+  «la cadena termina en un certificado de raíz no compatible con el proveedor de
+  confianza».
+- Por eso `Test-DruseSignature` aborta el empaquetado, y hace bien: es justo la
+  comprobación que evita repartir un paquete cuya firma el usuario final rechaza.
+- Para que valide hay que meter el certificado en las raíces de confianza del
+  equipo. **Eso no lo hace el asistente**: es un cambio en la configuración de
+  seguridad y lo decide quien usa la máquina.
+
+**Y aunque se haga, no resuelve el problema de fondo:** en otro equipo el aviso
+sale igual, porque allí nadie confía en ese certificado. Un autofirmado sirve
+para validar que el flujo de firma funciona y para repartir en equipos que uno
+administra; para que SmartScreen desaparezca en cualquier PC hace falta un
+certificado de una CA pública con la clave en token o HSM.
+
+**Un detalle del portable que conviene recordar:** lo que dispara SmartScreen es
+la marca de la web del archivo descargado. Un ZIP que llega por USB o por carpeta
+de red normalmente no la lleva, y entonces el ejecutable arranca sin aviso aunque
+vaya sin firmar.
+
+**Una trampa al comprobarlo:** la primera prueba se hizo firmando una copia de
+`where.exe`, que ya venía firmado por Microsoft, y `Get-AuthenticodeSignature`
+devolvió «Valid» hablando de la firma de Microsoft. Para comprobar una firma
+propia hay que partir de un binario **sin firmar**.
+
 #### Se puede mirar la contraseña que se escribe
 
 Lo pidió el usuario después de pelearse con una contraseña en otro equipo, y es
