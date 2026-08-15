@@ -21,6 +21,7 @@ import {
   SslMode,
 } from '../../../shared/models/workspace';
 import { EngineBadge } from '../../../shared/ui/engine-badge/engine-badge';
+import { Icon } from '../../../shared/ui/icon/icon';
 
 interface EngineOption {
   readonly id: DatabaseEngine;
@@ -151,7 +152,7 @@ const ENVIRONMENTS: readonly EnvironmentOption[] = [
 @Component({
   selector: 'app-connection-dialog',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, EngineBadge],
+  imports: [FormsModule, EngineBadge, Icon],
   templateUrl: './connection-dialog.html',
   styleUrl: './connection-dialog.scss',
 })
@@ -184,6 +185,16 @@ export class ConnectionDialog {
   protected readonly database = signal('');
   protected readonly username = signal('');
   protected readonly password = signal('');
+
+  /**
+   * Se está mirando la contraseña.
+   *
+   * Empieza oculta y vuelve a ocultarse al cargar otro perfil: el diálogo puede
+   * quedar abierto delante de alguien, y lo que se enseña a propósito no debería
+   * quedarse enseñado por descuido.
+   */
+  protected readonly passwordVisible = signal(false);
+  protected readonly sshSecretVisible = signal(false);
   protected readonly authentication = signal<AuthenticationMode>('password');
   protected readonly readOnly = signal(false);
   protected readonly environment = signal<ConnectionEnvironment>('development');
@@ -371,6 +382,8 @@ export class ConnectionDialog {
 
   /** Vuelca un perfil guardado en el formulario. */
   private load(profile: SavedConnection): void {
+    this.passwordVisible.set(false);
+    this.sshSecretVisible.set(false);
     this.engine.set(profile.engine);
     this.name.set(profile.name);
     this.host.set(profile.host);

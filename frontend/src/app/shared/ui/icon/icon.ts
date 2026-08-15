@@ -31,7 +31,9 @@ export type IconName =
   | 'edit'
   | 'trash'
   | 'console'
-  | 'sort-desc';
+  | 'sort-desc'
+  | 'eye'
+  | 'eye-off';
 
 interface IconDefinition {
   readonly viewBox: string;
@@ -134,6 +136,23 @@ const ICONS: Readonly<Record<IconName, IconDefinition>> = {
   format: {
     viewBox: '0 0 12 12',
     body: '<path d="M2 3h8M2 6h5M2 9h7" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>',
+  },
+  eye: {
+    viewBox: '0 0 14 14',
+    body:
+      '<path d="M1 7s2.2-3.6 6-3.6S13 7 13 7s-2.2 3.6-6 3.6S1 7 1 7z" stroke="currentColor" ' +
+      'stroke-width="1.2" stroke-linejoin="round"/>' +
+      '<circle cx="7" cy="7" r="1.6" stroke="currentColor" stroke-width="1.2"/>',
+  },
+  // El ojo tachado: la barra cruza el mismo dibujo, que es como se reconoce
+  // «ocultar» sin leer nada.
+  'eye-off': {
+    viewBox: '0 0 14 14',
+    body:
+      '<path d="M1 7s2.2-3.6 6-3.6c1 0 1.9.2 2.6.6M12.4 5.2c.4.5.6 1 .6 1.8 0 0-2.2 3.6-6 3.6' +
+      '-.9 0-1.7-.2-2.4-.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" ' +
+      'stroke-linejoin="round"/>' +
+      '<path d="M2 2l10 10" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>',
   },
   clock: {
     viewBox: '0 0 14 14',

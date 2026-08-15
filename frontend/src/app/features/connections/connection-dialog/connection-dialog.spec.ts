@@ -291,6 +291,39 @@ describe('ConnectionDialog', () => {
     });
   });
 
+  describe('ver la contraseña', () => {
+    function passwordField(): HTMLInputElement {
+      return fixture.nativeElement.querySelector('.secret .field__input') as HTMLInputElement;
+    }
+
+    function toggle(): HTMLButtonElement {
+      return fixture.nativeElement.querySelector('.secret__toggle') as HTMLButtonElement;
+    }
+
+    it('empieza oculta', () => {
+      expect(passwordField().type).toBe('password');
+      expect(toggle().getAttribute('aria-label')).toBe('Ver la contraseña');
+    });
+
+    /**
+     * Una contraseña larga escrita a mano solo se comprueba fallando al
+     * conectar, y ahí no se distingue una letra de más de una credencial
+     * equivocada.
+     */
+    it('se puede mirar y volver a ocultar', () => {
+      toggle().click();
+      fixture.detectChanges();
+
+      expect(passwordField().type).toBe('text');
+      expect(toggle().getAttribute('aria-label')).toBe('Ocultar la contraseña');
+
+      toggle().click();
+      fixture.detectChanges();
+
+      expect(passwordField().type).toBe('password');
+    });
+  });
+
   function selected(label: string): boolean {
     return button(label).classList.contains('is-selected');
   }

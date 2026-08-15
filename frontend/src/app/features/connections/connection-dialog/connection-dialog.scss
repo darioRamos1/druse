@@ -195,6 +195,48 @@
   }
 }
 
+/**
+ * Campo de secreto con el botón de mirarlo.
+ *
+ * El botón vive dentro del recuadro y no al lado para que el campo siga
+ * ocupando lo mismo que los demás de la rejilla: uno más estrecho llamaría la
+ * atención sobre justo el dato que no conviene señalar.
+ */
+.secret {
+  position: relative;
+  display: flex;
+  align-items: center;
+
+  &__toggle {
+    position: absolute;
+    right: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border: 0;
+    border-radius: 5px;
+    background: transparent;
+    color: var(--dr-text-tertiary);
+    cursor: pointer;
+
+    &:hover {
+      background: #1e2637;
+      color: var(--dr-text);
+    }
+
+    &[aria-pressed='true'] {
+      color: var(--dr-accent-bright);
+    }
+
+    &:focus-visible {
+      outline: 1px solid rgb(108 139 255 / 55%);
+      outline-offset: 1px;
+    }
+  }
+}
+
 .field {
   display: flex;
   flex-direction: column;
@@ -243,6 +285,13 @@
   &__hint {
     font-size: 10.5px;
     line-height: 1.3;
+  }
+
+  // El botón de ver el secreto va dentro del campo, así que el texto se aparta
+  // para no quedar debajo de él.
+  .secret &__input {
+    width: 100%;
+    padding-right: 32px;
   }
 
   &__error {

@@ -17,7 +17,7 @@
 | Fase 8 | ✅ **7/7.** Tres motores sobre el mismo contrato y primera beta preparada. |
 | ¿Compila el backend? | Sí — 0 advertencias, 0 errores |
 | ¿Compila el envoltorio? | Sí |
-| ¿Pasan las pruebas? | Sí — **386 en backend** (228 unitarias, 126 contractuales y 32 de integración), **279 en frontend** y **6 en el envoltorio** |
+| ¿Pasan las pruebas? | Sí — **386 en backend** (228 unitarias, 126 contractuales y 32 de integración), **281 en frontend** y **6 en el envoltorio** |
 | ¿Hay aplicación de escritorio? | **Sí.** Instalador NSIS, MSI y ZIP portable, en dos variantes: con Informix y sin él |
 | Motores | **PostgreSQL, SQL Server, MySQL/MariaDB e Informix**, todos sobre el mismo contrato compartido |
 | Trabajo a medias | Ninguno. Las transacciones manuales quedaron terminadas en la sesión 020. |
@@ -285,6 +285,23 @@ enseñar.
 
 **Sin ejecutar contra un motor real**, como el resto: ver el punto 3.b de «Qué
 toca retomar», que enumera las tres cosas que solo se ven ahí.
+
+#### Se puede mirar la contraseña que se escribe
+
+Lo pidió el usuario después de pelearse con una contraseña en otro equipo, y es
+exactamente el caso donde hace falta: una contraseña larga escrita a mano solo se
+comprobaba fallando al conectar, y ahí no se distingue una letra de más de una
+credencial equivocada.
+
+- El botón va **dentro** del recuadro, para que el campo siga midiendo lo mismo
+  que los demás de la rejilla: uno más estrecho llamaría la atención justo sobre
+  el dato que no conviene señalar.
+- Vale también para el secreto del túnel SSH, que tenía el mismo problema.
+- Empieza oculta y vuelve a ocultarse al cargar otro perfil: el diálogo puede
+  quedarse abierto delante de alguien, y lo que se enseña a propósito no debería
+  quedarse enseñado por descuido.
+- Iconos nuevos `eye` y `eye-off`. El tipo `IconName` es una unión cerrada y
+  cumplió su cometido: falló al compilar por usar un icono antes de declararlo.
 
 #### Portable regenerado, y un fallo del empaquetado
 
