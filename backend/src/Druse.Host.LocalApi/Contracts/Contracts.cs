@@ -110,6 +110,17 @@ public sealed record DatabaseColumnDto
 {
     public required string Name { get; init; }
     public required string DataType { get; init; }
+
+    /// <summary>
+    /// Con qué se pide el valor: `date`, `datetime`, `boolean`, `integer`…
+    ///
+    /// No es el tipo del motor, que ya viaja en `dataType`: es **qué control
+    /// dibuja la interfaz**. Se calcula aquí porque la regla que traduce
+    /// `timestamptz`, `datetimeoffset` o `DATETIME YEAR TO SECOND` a una familia
+    /// común ya existe en el dominio, y reescribirla en el navegador sería
+    /// tenerla en dos sitios que se separarían al primer motor nuevo.
+    /// </summary>
+    public required string InputKind { get; init; }
     public required bool IsNullable { get; init; }
     public bool IsPrimaryKey { get; init; }
     public bool IsGenerated { get; init; }
@@ -141,6 +152,9 @@ public sealed record ResultColumnDto
 {
     public required string Name { get; init; }
     public required string DataType { get; init; }
+
+    /// <inheritdoc cref="DatabaseColumnDto.InputKind" />
+    public required string InputKind { get; init; }
     public required int Ordinal { get; init; }
 }
 
@@ -603,6 +617,9 @@ public sealed record RoutineParameterDto
 {
     public required string Name { get; init; }
     public required string DataType { get; init; }
+
+    /// <inheritdoc cref="DatabaseColumnDto.InputKind" />
+    public required string InputKind { get; init; }
     public required string Direction { get; init; }
     public int Ordinal { get; init; }
 

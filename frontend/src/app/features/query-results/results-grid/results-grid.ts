@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, input, output, signal } from '@angular/core';
 
-import { CellEdit, ResultRow, ResultSet } from '../../../shared/models/workspace';
+import { CellEdit, ResultColumn, ResultRow, ResultSet } from '../../../shared/models/workspace';
 import { Icon } from '../../../shared/ui/icon/icon';
 
 /** Ancho de la columna del número de fila. */
@@ -124,6 +124,39 @@ export class ResultsGrid {
 
   protected isDirty(row: number, columnIndex: number): boolean {
     return this.pendingValue(row, columnIndex) !== undefined;
+  }
+
+  /**
+   * Con qué control se edita una celda.
+   *
+   * El tipo lo dice la columna, pero solo se usa si el valor **actual** encaja
+   * en él: un control de fecha que recibe algo que no sabe leer lo vacía sin
+   * avisar, y aquí eso sería borrar un dato al entrar a mirarlo.
+   */
+  protected editorType(column: ResultColumn, value: string | null): string {
+    const nativo: Readonly<Record<string, string>> = {
+      date: 'date',
+      time: 'time',
+      datetime: 'datetime-local',
+      datetimeOffset: 'datetime-local',
+      integer: 'number',
+      decimal: 'number',
+    };
+
+    const tipo = nativo[column.inputKind ?? 'text'];
+
+    if (!tipo || value === null) {
+      return 'text';
+    }
+
+    const encaja: Readonly<Record<string, RegExp>> = {
+      date: /^\d{4}-\d{2}-\d{2}$/,
+      time: /^\d{2}:\d{2}(:\d{2})?$/,
+      'datetime-local': /^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}/,
+      number: /^-?\d*[.]?\d+([eE][-+]?\d+)?$/,
+    };
+
+    return encaja[tipo].test(value.trim()) ? tipo : 'text';
   }
 
   /** Lo que hay que mostrar: el cambio pendiente si lo hay, o el valor original. */

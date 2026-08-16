@@ -1013,6 +1013,28 @@ la deuda que la Fase 3 dejó anotada («recordar las pestañas abiertas»).
 No se guardan los resultados: se vuelven a pedir ejecutando, y conservarlos
 dejaría datos de producción en el disco del usuario sin que nadie lo haya pedido.
 
+### Campos que ayudan según el tipo — implementado
+
+Pedido por el usuario: rellenar un `DATETIME` a mano es donde salen los
+`2026-13-45` y los `si`, que el motor rechaza cuando ya se ejecutó media
+instrucción.
+
+- [x] La API dice **con qué se pide** cada valor (`date`, `datetime`, `boolean`,
+  `integer`…), calculado con la misma clasificación que ya usa para convertir lo
+  que se escribe. La regla no se reescribe en el navegador: viviría en dos sitios
+  y se separarían al primer motor nuevo.
+- [x] Un componente único de entrada, usado en los cuatro sitios que piden un
+  valor: INSERT, UPDATE, parámetros de procedimiento, filtros del `WHERE` y
+  edición de celdas.
+- [x] Calendario para fechas, fecha y hora para marcas de tiempo, casilla para
+  booleanos y teclado numérico para números.
+- [x] **Siempre se puede volver a texto libre**: un valor no siempre es un dato,
+  y un calendario no sabe escribir `CURRENT_TIMESTAMP`.
+- [x] Si el valor actual no encaja en el control —una expresión, un formato
+  raro—, se enseña como texto en lugar de vaciarlo en silencio.
+
+`IN` se queda en texto libre a propósito: espera una lista separada por comas.
+
 ### Prioridad alta
 
 - ~~Autenticación integrada de Windows para SQL Server.~~ Hecho (sesión 014).

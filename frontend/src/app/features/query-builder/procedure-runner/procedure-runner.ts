@@ -11,6 +11,7 @@ import {
 
 import { WorkspaceStore } from '../../../core/workspace/workspace-store';
 import { Icon } from '../../../shared/ui/icon/icon';
+import { ValueInput } from '../../../shared/ui/value-input/value-input';
 import {
   DatabaseEngine,
   DatabaseObject,
@@ -47,7 +48,7 @@ interface ParameterDraft {
 @Component({
   selector: 'app-procedure-runner',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [Icon],
+  imports: [Icon, ValueInput],
   templateUrl: './procedure-runner.html',
   styleUrl: './procedure-runner.scss',
 })

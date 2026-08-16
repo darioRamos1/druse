@@ -209,6 +209,7 @@ export interface DatabaseObject {
 export interface DatabaseColumn {
   readonly name: string;
   readonly dataType: string;
+  readonly inputKind?: InputKind;
   readonly isNullable: boolean;
   readonly isPrimaryKey: boolean;
   readonly isGenerated?: boolean;
@@ -247,9 +248,30 @@ export interface ExplorerNode {
  * editor: el tipo a la derecha del desplegable, el tooltip al pasar el ratón y
  * el aviso de una columna que no existe.
  */
+/**
+ * Con qué se pide un valor de este tipo.
+ *
+ * No es el tipo del motor —ese viaja aparte y se enseña tal cual—, sino qué
+ * control dibuja la interfaz. Lo calcula la API con la misma clasificación que
+ * usa para convertir lo que se escribe, así que se pide exactamente lo que el
+ * servidor sabrá interpretar.
+ */
+export type InputKind =
+  | 'text'
+  | 'integer'
+  | 'decimal'
+  | 'boolean'
+  | 'date'
+  | 'time'
+  | 'datetime'
+  | 'datetimeOffset'
+  | 'binary'
+  | 'uuid';
+
 export interface KnownColumn {
   readonly name: string;
   readonly dataType: string;
+  readonly inputKind?: InputKind;
   readonly isNullable: boolean;
   readonly isPrimaryKey: boolean;
   readonly isGenerated?: boolean;
@@ -402,6 +424,7 @@ export type RoutineParameterDirection = 'input' | 'output' | 'inputOutput' | 're
 export interface RoutineParameter {
   readonly name: string;
   readonly dataType: string;
+  readonly inputKind?: InputKind;
   readonly direction: RoutineParameterDirection;
   readonly ordinal: number;
 
@@ -530,6 +553,7 @@ export type ColumnType = 'number' | 'text' | 'boolean' | 'timestamp' | 'uuid' | 
 export interface ResultColumn {
   readonly name: string;
   readonly dataType: string;
+  readonly inputKind?: InputKind;
   readonly kind: ColumnType;
   /** Ancho en píxeles; `null` reparte el espacio sobrante. */
   readonly width: number | null;

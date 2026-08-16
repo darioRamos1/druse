@@ -76,7 +76,7 @@
             -->
             <input
               class="cell__editor"
-              type="text"
+              [type]="editorType(column, shownValue(row, i))"
               [value]="shownValue(row, i) ?? 'NULL'"
               autofocus
               (blur)="commitEdit(row, i, $event)"

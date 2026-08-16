@@ -235,12 +235,12 @@
             </select>
 
             @if (needsValue(filter.operator)) {
-              <input
-                type="text"
+              <app-value-input
                 [value]="filter.value ?? ''"
-                (input)="patchFilter($index, { value: $any($event.target).value })"
-                [attr.placeholder]="filter.operator === 'IN' ? '1, 2, 3' : 'valor'"
-                aria-label="Valor"
+                [kind]="filterKind(filter)"
+                [dataType]="filter.operator === 'IN' ? '1, 2, 3' : 'valor'"
+                label="Valor"
+                (valueChange)="patchFilter($index, { value: $event })"
               />
             } @else {
               <span class="filter__novalue">sin valor</span>
@@ -314,12 +314,12 @@
                 </select>
 
                 @if (draftFor('insert', column.name)?.mode === 'value') {
-                  <input
-                    type="text"
+                  <app-value-input
                     [value]="draftFor('insert', column.name)?.text ?? ''"
-                    (input)="patchDraft('insert', column.name, { text: $any($event.target).value })"
-                    [attr.placeholder]="column.dataType"
-                    [attr.aria-label]="'Valor para ' + column.name"
+                    [kind]="column.inputKind ?? 'text'"
+                    [dataType]="column.dataType"
+                    [label]="'Valor para ' + column.name"
+                    (valueChange)="patchDraft('insert', column.name, { text: $event })"
                   />
                 } @else {
                   <span class="value-row__detail">
@@ -367,12 +367,12 @@
                 </select>
 
                 @if (draftFor('update', column.name)?.mode === 'value') {
-                  <input
-                    type="text"
+                  <app-value-input
                     [value]="draftFor('update', column.name)?.text ?? ''"
-                    (input)="patchDraft('update', column.name, { text: $any($event.target).value })"
-                    [attr.placeholder]="column.dataType"
-                    [attr.aria-label]="'Valor para ' + column.name"
+                    [kind]="column.inputKind ?? 'text'"
+                    [dataType]="column.dataType"
+                    [label]="'Valor para ' + column.name"
+                    (valueChange)="patchDraft('update', column.name, { text: $event })"
                   />
                 } @else {
                   <span class="value-row__detail">sin cambio</span>

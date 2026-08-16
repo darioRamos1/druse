@@ -83,7 +83,7 @@ describe('ProcedureRunner', () => {
 
   it('compone la llamada con lo que se escribe', async () => {
     const fixture = await create();
-    const input = fixture.nativeElement.querySelector('.value') as HTMLInputElement;
+    const input = fixture.nativeElement.querySelector('.value .field') as HTMLInputElement;
 
     input.value = '7';
     input.dispatchEvent(new Event('input'));
@@ -133,7 +133,7 @@ describe('ProcedureRunner', () => {
 
     expect(sqlOf(fixture)).toBe('EXEC otra_cosa;');
 
-    const input = fixture.nativeElement.querySelector('.value') as HTMLInputElement;
+    const input = fixture.nativeElement.querySelector('.value .field') as HTMLInputElement;
     input.value = '3';
     input.dispatchEvent(new Event('input'));
     fixture.detectChanges();

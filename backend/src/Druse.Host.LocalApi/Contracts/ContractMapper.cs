@@ -165,8 +165,32 @@ internal static class ContractMapper
             IsGenerated = value.IsGenerated,
             DefaultValue = value.DefaultValue,
             Ordinal = value.Ordinal,
+            InputKind = InputKind(value.DataType),
         };
     }
+
+    /// <summary>
+    /// Con qué control se pide un valor de este tipo.
+    ///
+    /// Sale de la misma clasificación que usa el editor de filas para convertir
+    /// lo que se escribe, así que la interfaz pide exactamente lo que el
+    /// servidor sabrá interpretar. Tenerla en dos sitios sería tenerla mal en
+    /// uno de los dos.
+    /// </summary>
+    private static string InputKind(string dataType) =>
+        ColumnValueParser.Classify(dataType) switch
+        {
+            ColumnFamily.Integral => "integer",
+            ColumnFamily.Fractional => "decimal",
+            ColumnFamily.Boolean => "boolean",
+            ColumnFamily.Date => "date",
+            ColumnFamily.Time => "time",
+            ColumnFamily.Timestamp => "datetime",
+            ColumnFamily.TimestampWithZone => "datetimeOffset",
+            ColumnFamily.Binary => "binary",
+            ColumnFamily.Uuid => "uuid",
+            _ => "text",
+        };
 
     public static QueryRequest ToDomain(this ExecuteQueryRequest request)
     {
@@ -507,6 +531,7 @@ internal static class ContractMapper
                 {
                     Name = parameter.Name,
                     DataType = parameter.DataType,
+                    InputKind = InputKind(parameter.DataType),
                     Direction = parameter.Direction switch
                     {
                         RoutineParameterDirection.Output => "output",
@@ -668,6 +693,7 @@ internal static class ContractMapper
         {
             Name = column.Name,
             DataType = column.DataType,
+            InputKind = InputKind(column.DataType),
             Ordinal = column.Ordinal,
         })],
         Rows = resultSet.Rows,

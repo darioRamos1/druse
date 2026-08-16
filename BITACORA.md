@@ -391,6 +391,33 @@ el disco sin que nadie lo pida.
 **Verificado:** 435 en backend (5 nuevas del almacén, incluida una que reabre el
 archivo) y 302 en frontend (7 nuevas).
 
+#### Campos que ayudan según el tipo
+
+Lo pidió el usuario: si un campo espera una fecha, que ayude a ponerla. Se
+aplica en los cuatro sitios donde Druse pide un valor —INSERT, UPDATE,
+parámetros de procedimiento, filtros del `WHERE` y edición de celdas— con un
+solo componente.
+
+La clasificación **no se reescribió en el navegador**: `ColumnValueParser` ya
+traducía `timestamptz`, `datetimeoffset` o `DATETIME YEAR TO SECOND` a una
+familia común para convertir lo que se escribe, así que la API la calcula y la
+manda. Tenerla en dos sitios sería tenerla mal en uno de los dos, y se
+separarían al añadir el siguiente motor.
+
+Dos detalles que evitan que ayudar estorbe:
+
+- **Se puede volver a texto libre en cualquier campo con tipo.** Un valor no
+  siempre es un dato: a veces es `CURRENT_TIMESTAMP` o una función del motor, y
+  un calendario no sabe escribir eso.
+- **Un valor que el control no entiende se enseña como texto**, no se vacía. Un
+  `date` que recibe algo que no sabe leer lo borra sin avisar, y en una celda eso
+  sería perder el dato por entrar a mirarlo.
+
+`IN` se queda en texto libre porque espera una lista separada por comas, y
+`datetime-local` recibe la `T` que SQL escribe como espacio.
+
+**Verificado:** 312 pruebas de frontend (10 nuevas del componente).
+
 #### Fase 7: los paquetes de Linux y macOS
 
 Lo que faltaba de la fase, salvo lo que exige otro equipo. Un job por plataforma

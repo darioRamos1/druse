@@ -35,13 +35,14 @@
               </div>
 
               <div class="controls">
-                <input
-                  type="text"
+                <app-value-input
                   class="value"
                   [value]="draftFor(parameter).text"
+                  [kind]="parameter.inputKind ?? 'text'"
+                  [dataType]="parameter.dataType"
                   [disabled]="draftFor(parameter).mode !== 'value'"
-                  [attr.aria-label]="'Valor de ' + parameter.name"
-                  (input)="onText(parameter, $event)"
+                  [label]="'Valor de ' + parameter.name"
+                  (valueChange)="setText(parameter, $event)"
                 />
 
                 <div class="modes" role="group" [attr.aria-label]="'Cómo pasar ' + parameter.name">

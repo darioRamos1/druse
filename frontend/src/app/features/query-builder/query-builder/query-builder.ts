@@ -10,9 +10,11 @@ import {
 } from '@angular/core';
 
 import { WorkspaceStore } from '../../../core/workspace/workspace-store';
+import { ValueInput } from '../../../shared/ui/value-input/value-input';
 import {
   DatabaseEngine,
   DatabaseObject,
+  InputKind,
   KnownColumn,
 } from '../../../shared/models/workspace';
 import {
@@ -90,6 +92,7 @@ const OPERATORS: readonly FilterOperator[] = [
 @Component({
   selector: 'app-query-builder',
   changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [ValueInput],
   templateUrl: './query-builder.html',
   styleUrl: './query-builder.scss',
 })
@@ -516,6 +519,21 @@ export class QueryBuilder implements OnInit {
     this.updateFilters.update((current) =>
       current.map((filter, i) => (i === index ? { ...filter, ...patch } : filter)),
     );
+  }
+
+  /**
+   * Con qué control se pide el valor de un filtro.
+   *
+   * El filtro guarda el nombre de la columna, no su tipo, así que se busca en lo
+   * que ya se cargó. `IN` se queda en texto libre a propósito: espera una lista
+   * separada por comas, y un calendario no sabe escribir eso.
+   */
+  protected filterKind(filter: QueryFilter): InputKind {
+    if (filter.operator === 'IN') {
+      return 'text';
+    }
+
+    return this.columns().find((column) => column.name === filter.column)?.inputKind ?? 'text';
   }
 
   protected draftFor(operation: 'insert' | 'update', name: string): ColumnDraft | undefined {
