@@ -75,6 +75,15 @@ internal sealed class InformixSession : IDatabaseSession
 /// </summary>
 public sealed class InformixDatabaseProvider : IDatabaseProvider
 {
+    /// <summary>
+    /// Se resuelve la biblioteca nativa antes de que nadie llame al driver.
+    ///
+    /// El constructor estático corre una sola vez y siempre antes de la primera
+    /// conexión, que es justo la condición que impone el tiempo de ejecución
+    /// para poder registrar un resolvedor.
+    /// </summary>
+    static InformixDatabaseProvider() => InformixNativeLibrary.Ensure();
+
     public DatabaseEngine Engine => DatabaseEngine.Informix;
 
     /// <summary>

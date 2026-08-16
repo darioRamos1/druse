@@ -460,6 +460,29 @@ aviso al empezar y el mensaje se ponía antes. Ahora va después de releer.
 **Verificado:** 443 en backend —8 contractuales nuevas, borrado real en los
 cuatro motores— y 329 en frontend.
 
+#### Informix en Linux: dos problemas, no uno
+
+El fallo que dejaba la integración continua en rojo —`Unable to load shared
+library 'libdb2.so'`— se reprodujo aquí en un contenedor, con una sonda mínima
+publicada para `linux-x64`. Y enseñó dos cosas encadenadas:
+
+1. **La ruta.** El paquete despliega el `clidriver` en un subdirectorio, pero el
+   `DllImport` pide `libdb2.so` a secas. En Windows funciona porque el cargador
+   mira junto al ejecutable; en Linux solo consulta las rutas del sistema y
+   `LD_LIBRARY_PATH`, así que no la encuentra.
+2. **`libxml2`.** Al resolver la ruta apareció el segundo, que el primero tapaba:
+   el clidriver depende de esa biblioteca del sistema, y no viaja en el paquete.
+
+Se resuelve con un `DllImportResolver` registrado sobre el ensamblado de IBM, y
+no con una variable de entorno, porque tiene que valer en los tres sitios donde
+esto corre —la aplicación empaquetada, la integración continua y quien compile el
+repositorio— y una variable hay que acordarse de ponerla en los tres.
+`libxml2` sí hay que instalarla: queda en los requisitos del README y en el
+flujo de integración.
+
+**Comprobado de verdad**: la misma sonda, en un contenedor Linux sin
+`LD_LIBRARY_PATH`, responde `CONECTA: 12.10.0000`.
+
 #### Fase 7: los paquetes de Linux y macOS
 
 Lo que faltaba de la fase, salvo lo que exige otro equipo. Un job por plataforma

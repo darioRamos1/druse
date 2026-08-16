@@ -29,6 +29,13 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
+      # El clidriver de IBM —el que usa Informix— depende de libxml2, que es del
+      # sistema y no viaja en el paquete. Sin ella la carga falla y la excepción
+      # se lleva por delante el proceso de pruebas entero, no solo las suyas.
+      - name: Dependencia nativa de Informix
+        if: matrix.os == 'ubuntu-latest'
+        run: sudo apt-get update && sudo apt-get install -y libxml2
+
       - name: Restaurar
         run: dotnet restore backend/Druse.slnx
 
@@ -127,6 +134,12 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '10.0.x'
+
+      # El clidriver de IBM depende de libxml2, que es del sistema y no viaja en
+      # el paquete: sin ella la carga falla y la excepción se lleva por delante
+      # el proceso de pruebas entero, no solo las de Informix.
+      - name: Dependencia nativa de Informix
+        run: sudo apt-get update && sudo apt-get install -y libxml2
 
       # Informix va como paso y no como `service` a propósito. Su comprobación de
       # salud necesita un shell de login —`onstat` no está en el PATH sin cargar
