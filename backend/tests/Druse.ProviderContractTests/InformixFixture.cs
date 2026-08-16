@@ -206,6 +206,12 @@ public sealed class InformixFixture : IProviderFixture
         END PROCEDURE
         """;
 
+    public string CreateProcedureWithParameters(string name) => $"""
+        CREATE PROCEDURE {name}(entrada INT, OUT salida VARCHAR(30));
+            LET salida = 'hecho';
+        END PROCEDURE
+        """;
+
     public string DropProcedure(string name) => $"DROP PROCEDURE IF EXISTS {name}";
 
     /// <summary>

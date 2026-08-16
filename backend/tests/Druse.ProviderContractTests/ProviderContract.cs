@@ -116,6 +116,13 @@ public interface IProviderFixture
     /// <summary>Crea una tabla con clave primaria, columna obligatoria, opcional y con valor por defecto.</summary>
     string CreateTableWithColumns(string name);
 
+    /// <summary>
+    /// Crea un procedimiento con dos parámetros: `entrada`, que entra, y
+    /// `salida`, que sale. Los nombres importan poco —SQL Server los adorna con
+    /// `@`— pero el orden y la dirección sí.
+    /// </summary>
+    string CreateProcedureWithParameters(string name);
+
     /// <summary>Crea una vista que devuelve una columna llamada `valor`.</summary>
     string CreateView(string name);
 

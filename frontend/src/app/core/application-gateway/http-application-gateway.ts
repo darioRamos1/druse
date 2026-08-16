@@ -16,6 +16,7 @@ import {
   SessionInfo,
   TableAlteration,
   TableDesign,
+  RoutineSignature,
   TableStructure,
   TestConnectionResult,
 } from '../../shared/models/workspace';
@@ -161,6 +162,16 @@ export class HttpApplicationGateway extends ApplicationGateway {
 
   override getTableDataTypes(sessionId: string): Observable<readonly string[]> {
     return this._http.get<string[]>(`/api/sessions/${sessionId}/tables/data-types`);
+  }
+
+  override getRoutineSignature(
+    sessionId: string,
+    routine: DatabaseObject,
+  ): Observable<RoutineSignature> {
+    return this._http.post<RoutineSignature>(
+      `/api/sessions/${sessionId}/metadata/routine`,
+      routine,
+    );
   }
 
   override getTableCapabilities(sessionId: string): Observable<IndexCapabilities> {

@@ -325,6 +325,44 @@ publicación no queda ni un `db2*.dll`—.
 Cabe que el paquete de macOS traiga solo binarios Intel; si es así, en Apple
 Silicon habrá que declarar el motor no soportado. Lo dirá la integración continua.
 
+#### Ejecutar procedimientos sin escribir la llamada
+
+Lo pidió el usuario a media sesión. Un procedimiento solo ofrecía «Ver DDL»:
+para llamarlo había que leer la definición, entender la firma y escribir el
+`EXEC` a mano.
+
+Hacía falta lo que nadie leía: **los parámetros**. El contrato de metadatos tenía
+bases, hijos, columnas, definición y estructura de tabla, y nada de rutinas más
+allá del nombre. `RoutineSignature` recorre ahora el mismo camino que hizo «Ver
+DDL» —contrato, cuatro proveedores, aplicación, API local y gateway—.
+
+Lo que enseñó cada catálogo:
+
+- **SQL Server** marca `is_output` pero no distingue `OUT` de `INOUT`, y para un
+  procedimiento de T-SQL `has_default_value` es siempre 0: el valor por omisión
+  está en el texto del `CREATE`, no en el catálogo.
+- **PostgreSQL** no identifica una rutina por su nombre —hay sobrecargas— así que
+  la firma se resuelve por el OID que el nodo ya lleva, igual que el DDL. Y
+  descarta los modificadores de tipo: un `VARCHAR(30)` vuelve como
+  `character varying`.
+- **MySQL** no admite valores por omisión en rutinas: hay que pasarlos todos.
+- **Informix** guarda la dirección en `paramattr`, que la documentación no
+  enumera entero. Comprobado contra el servidor: 1 entra, 4 sale y 3 es el valor
+  de retorno. Y el retorno **no** se reconoce por posición: `paramid` empieza en
+  0, que en un procedimiento sin `RETURNING` es el primer parámetro.
+
+La llamada la escribe el escritor SQL, con la forma de cada motor en un solo
+sitio. Las salidas cambian la forma entera: no basta con nombrar el parámetro,
+hay que declarar una variable antes y leerla después, así que lo que sale no es
+una instrucción sino un guion pequeño.
+
+**Informix no puede recoger salidas fuera de un procedimiento** —el `INTO` solo
+existe dentro de SPL—, así que allí se ejecuta sin ellas y se dice por qué.
+
+**Verificado:** 430 en backend, con la lectura de parámetros pasando en los
+cuatro motores reales, y 295 en frontend (14 nuevas: 6 del escritor y 8 del
+formulario).
+
 #### Fase 7: los paquetes de Linux y macOS
 
 Lo que faltaba de la fase, salvo lo que exige otro equipo. Un job por plataforma

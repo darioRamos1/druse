@@ -202,6 +202,17 @@
                     </button>
                   }
 
+                  @if (node.kind === 'procedure') {
+                    <button
+                      type="button"
+                      role="menuitem"
+                      (click)="act($event, () => runProcedure.emit(node))"
+                    >
+                      <app-icon name="play-outline" [size]="12" />
+                      Ejecutar procedimiento
+                    </button>
+                  }
+
                   @if (node.kind === 'view' || node.kind === 'procedure') {
                     <button
                       type="button"

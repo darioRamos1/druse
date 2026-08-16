@@ -41,6 +41,7 @@ import {
   SessionStatus,
   TableAlteration,
   TableDesign,
+  RoutineSignature,
   TableStructure,
 } from '../../shared/models/workspace';
 
@@ -1543,6 +1544,31 @@ export class WorkspaceStore {
 
     try {
       return await firstValueFrom(this._gateway.getTableStructure(sessionId, table));
+    } catch (error) {
+      this.reportFailure(connectionId, error);
+      return null;
+    }
+  }
+
+  /**
+   * Parámetros de un procedimiento, para poder componer su llamada.
+   *
+   * Devuelve `null` cuando el motor no lo deja leer —una función de PostgreSQL
+   * llega sin OID, un procedimiento puede estar cifrado— y el aviso ya se le ha
+   * dado al usuario: quien llama solo tiene que dejar de ofrecer el formulario.
+   */
+  async routineSignature(
+    connectionId: string,
+    routine: DatabaseObject,
+  ): Promise<RoutineSignature | null> {
+    const sessionId = this.findConnection(connectionId)?.sessionId;
+
+    if (!sessionId) {
+      return null;
+    }
+
+    try {
+      return await firstValueFrom(this._gateway.getRoutineSignature(sessionId, routine));
     } catch (error) {
       this.reportFailure(connectionId, error);
       return null;

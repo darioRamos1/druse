@@ -396,6 +396,28 @@ export interface DatabaseConstraint {
 }
 
 /** Todo lo que sostiene una tabla además de sus columnas. */
+/** Por dónde entra o sale un valor de un procedimiento. */
+export type RoutineParameterDirection = 'input' | 'output' | 'inputOutput' | 'return';
+
+export interface RoutineParameter {
+  readonly name: string;
+  readonly dataType: string;
+  readonly direction: RoutineParameterDirection;
+  readonly ordinal: number;
+
+  /** Se puede omitir porque el motor pone un valor. */
+  readonly hasDefault: boolean;
+}
+
+/** Lo que hace falta para poder llamar a un procedimiento. */
+export interface RoutineSignature {
+  readonly name: string;
+  readonly schema?: string;
+  readonly isFunction: boolean;
+  readonly parameters: readonly RoutineParameter[];
+  readonly returnType?: string;
+}
+
 export interface TableStructure {
   readonly primaryKey?: DatabaseConstraint;
   readonly indexes: readonly DatabaseIndex[];

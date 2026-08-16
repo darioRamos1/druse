@@ -503,6 +503,106 @@ public sealed class SqlServerMetadataReader : IDatabaseMetadataReader
 
     private sealed record ProcedureDefinition(string? Sql, bool IsClr, bool IsEncrypted);
 
+    /// <summary>
+    /// Firma de un procedimiento o función desde `sys.parameters`.
+    ///
+    /// El valor de retorno de una función aparece ahí con `parameter_id = 0` y
+    /// sin nombre, así que se separa del resto en lugar de colarse como un
+    /// parámetro más que nadie podría rellenar.
+    ///
+    /// `has_default_value` solo es de fiar en procedimientos CLR: para los de
+    /// T-SQL, SQL Server no guarda en el catálogo si un parámetro tiene valor por
+    /// omisión —está en el texto del `CREATE`— y devuelve 0 siempre. Se prefiere
+    /// eso a interpretar el DDL: decir «no tiene» de más solo hace que la interfaz
+    /// pida un valor que se podría haber omitido.
+    /// </summary>
+    public async Task<RoutineSignature> GetRoutineSignatureAsync(
+        IDatabaseSession session,
+        DatabaseObject routine,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(routine);
+
+        var schema = routine.Schema ?? "dbo";
+
+        const string Sql = """
+            SELECT
+                p.name,
+                TYPE_NAME(p.user_type_id) AS type_name,
+                p.max_length,
+                p.precision,
+                p.scale,
+                p.is_output,
+                p.parameter_id,
+                p.has_default_value,
+                o.type
+            FROM sys.objects o
+            JOIN sys.schemas s ON s.schema_id = o.schema_id
+            LEFT JOIN sys.parameters p ON p.object_id = o.object_id
+            WHERE s.name = @schema
+              AND o.name = @routine
+              AND o.type IN ('P', 'PC', 'FN', 'IF', 'TF', 'AF')
+            ORDER BY p.parameter_id
+            """;
+
+        var rows = await QueryAsync(
+            session,
+            Sql,
+            reader => new
+            {
+                Name = reader.IsDBNull(0) ? string.Empty : reader.GetString(0),
+                TypeName = reader.IsDBNull(1) ? "sql_variant" : reader.GetString(1),
+                MaxLength = reader.IsDBNull(2) ? (short)0 : reader.GetInt16(2),
+                Precision = reader.IsDBNull(3) ? (byte)0 : reader.GetByte(3),
+                Scale = reader.IsDBNull(4) ? (byte)0 : reader.GetByte(4),
+                IsOutput = !reader.IsDBNull(5) && reader.GetBoolean(5),
+                ParameterId = reader.IsDBNull(6) ? -1 : reader.GetInt32(6),
+                HasDefault = !reader.IsDBNull(7) && reader.GetBoolean(7),
+                ObjectType = reader.GetString(8).Trim(),
+            },
+            cancellationToken,
+            ("schema", schema),
+            ("routine", routine.Name));
+
+        if (rows.Count == 0)
+        {
+            throw new DatabaseOperationException(new QueryError
+            {
+                Message = $"No se encontró {schema}.{routine.Name} o no es visible para este usuario.",
+            });
+        }
+
+        var isFunction = rows[0].ObjectType is "FN" or "IF" or "TF" or "AF";
+
+        var parameters = rows
+            .Where(row => row.ParameterId > 0)
+            .Select(row => new RoutineParameter
+            {
+                Name = row.Name,
+                DataType = FormatType(row.TypeName, row.MaxLength, row.Precision, row.Scale),
+                Direction = row.IsOutput
+                    ? RoutineParameterDirection.InputOutput
+                    : RoutineParameterDirection.Input,
+                Ordinal = row.ParameterId,
+                HasDefault = row.HasDefault,
+            })
+            .ToList();
+
+        var returnRow = rows.FirstOrDefault(row => row.ParameterId == 0);
+
+        return new RoutineSignature
+        {
+            Name = routine.Name,
+            Schema = schema,
+            IsFunction = isFunction,
+            Parameters = parameters,
+            ReturnType = returnRow is null
+                ? null
+                : FormatType(returnRow.TypeName, returnRow.MaxLength, returnRow.Precision, returnRow.Scale),
+        };
+    }
+
+
     private static async Task<IReadOnlyList<DatabaseObject>> GetSchemasAsync(
         IDatabaseSession session,
         DatabaseObject parent,

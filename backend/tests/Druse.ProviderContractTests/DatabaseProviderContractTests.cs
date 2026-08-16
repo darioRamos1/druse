@@ -599,6 +599,83 @@ public abstract class DatabaseProviderContractTests<TFixture>
         }
     }
 
+    /// <summary>
+    /// Lee los parámetros de un procedimiento para poder componer su llamada.
+    ///
+    /// Lo que se comprueba es el orden y la dirección, no los nombres: SQL Server
+    /// los adorna con `@` y ese adorno forma parte del nombre en la llamada, así
+    /// que exigir un nombre común obligaría a normalizar algo que después hace
+    /// falta tal cual.
+    /// </summary>
+    [Fact]
+    public async Task LeeLosParametrosDeUnProcedimiento()
+    {
+        if (Skip) { return; }
+
+        await using var session = await OpenAsync();
+
+        var procedureName = $"druse_params_{Guid.NewGuid():N}";
+
+        try
+        {
+            await ExecuteAsync(session, Fixture.CreateProcedureWithParameters(procedureName));
+
+            var folder = new DatabaseObject
+            {
+                Id = $"folder:{Fixture.DefaultSchema}:procedures",
+                Name = "Procedures",
+                Kind = DatabaseObjectKind.Folder,
+                Database = Fixture.DatabaseName,
+                Schema = Fixture.DefaultSchema,
+            };
+
+            var procedures = await Fixture.Metadata.GetChildrenAsync(
+                session,
+                folder,
+                CancellationToken.None);
+
+            var procedure = Assert.Single(
+                procedures,
+                item => item.Name == procedureName
+                    || item.Name.StartsWith($"{procedureName}(", StringComparison.Ordinal));
+
+            var signature = await Fixture.Metadata.GetRoutineSignatureAsync(
+                session,
+                procedure,
+                CancellationToken.None);
+
+            Assert.False(signature.IsFunction);
+            Assert.Equal(2, signature.Parameters.Count);
+
+            var entrada = signature.Parameters[0];
+            Assert.Equal(RoutineParameterDirection.Input, entrada.Direction);
+            Assert.False(string.IsNullOrWhiteSpace(entrada.DataType));
+
+            // La segunda sale. Si además admite entrada es cosa del motor —SQL
+            // Server no distingue `OUT` de `INOUT`— y da igual para la llamada:
+            // en los dos casos hace falta una variable donde recogerla.
+            var salida = signature.Parameters[1];
+            Assert.True(
+                salida.Direction is RoutineParameterDirection.Output
+                    or RoutineParameterDirection.InputOutput,
+                $"El segundo parámetro debía salir y llegó como {salida.Direction}.");
+
+            // El tipo llega tal como lo escribe el motor, que es lo que hace falta
+            // para declarar la variable donde se recoge la salida. **No se exige
+            // la longitud**: PostgreSQL descarta los modificadores de tipo en los
+            // parámetros de una rutina y devuelve `character varying` a secas
+            // aunque se haya declarado con 30.
+            Assert.False(string.IsNullOrWhiteSpace(salida.DataType));
+
+            Assert.Equal(1, entrada.Ordinal);
+            Assert.Equal(2, salida.Ordinal);
+        }
+        finally
+        {
+            await ExecuteAsync(session, Fixture.DropProcedure(procedureName));
+        }
+    }
+
     [Fact]
     public async Task ObtieneLaDefinicionDeUnaVista()
     {

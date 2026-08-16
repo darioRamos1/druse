@@ -25,6 +25,7 @@ import {
 import SqlEditor from '../../features/query-editor/sql-editor/sql-editor';
 import { ImportDialog } from '../../features/import/import-dialog/import-dialog';
 import { TableDesigner } from '../../features/tables/table-designer/table-designer';
+import { ProcedureRunner } from '../../features/query-builder/procedure-runner/procedure-runner';
 import { QueryBuilder } from '../../features/query-builder/query-builder/query-builder';
 import { buildSelect } from '../../features/query-editor/sql-language/sql-writer';
 import { ResultsPanel } from '../../features/query-results/results-panel/results-panel';
@@ -81,6 +82,7 @@ const DISCONNECTED: SessionStatus = {
     ImportDialog,
     TableDesigner,
     QueryBuilder,
+    ProcedureRunner,
     CommandPalette,
     ResizeHandle,
   ],
@@ -187,6 +189,44 @@ export class AppShell {
       target ? `${target.label} · ${operation?.toUpperCase() ?? 'Consulta'}` : undefined,
       target?.source.database,
     );
+  }
+
+  /** Procedimiento que se está preparando para ejecutar. */
+  protected readonly procedureTarget = signal<ExplorerNode | null>(null);
+
+  protected openProcedureRunner(node: ExplorerNode): void {
+    this.procedureTarget.set(node);
+  }
+
+  protected closeProcedureRunner(): void {
+    this.procedureTarget.set(null);
+  }
+
+  /** La llamada compuesta se abre en una pestaña, para poder revisarla. */
+  protected insertCall(sql: string): void {
+    const target = this.procedureTarget();
+
+    this._store.createTab(
+      sql,
+      undefined,
+      target?.connectionId,
+      target ? `${target.label} · EXEC` : undefined,
+      target?.source.database,
+    );
+
+    this.procedureTarget.set(null);
+  }
+
+  /**
+   * Ejecutar abre igualmente la pestaña antes de lanzar.
+   *
+   * Lo que se ejecuta tiene que quedar escrito en algún sitio: si la llamada
+   * falla o devuelve algo raro, el usuario necesita el SQL delante para
+   * entenderlo, y no un diálogo que ya se cerró.
+   */
+  protected async runCall(sql: string): Promise<void> {
+    this.insertCall(sql);
+    await this._store.execute();
   }
 
   // --- Estado del área de trabajo -------------------------------------------

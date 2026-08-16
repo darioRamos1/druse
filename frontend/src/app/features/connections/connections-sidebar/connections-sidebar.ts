@@ -52,6 +52,7 @@ export class ConnectionsSidebar {
   /** Componer una consulta sobre esta tabla o vista. */
   readonly composeQuery = output<ExplorerNode>();
   readonly definition = output<ExplorerNode>();
+  readonly runProcedure = output<ExplorerNode>();
 
   /** Crear una tabla dentro de este esquema. */
   readonly createTable = output<ExplorerNode>();

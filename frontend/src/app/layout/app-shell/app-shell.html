@@ -41,6 +41,7 @@
     (designTable)="openTableDesigner($event)"
     (composeQuery)="openBuilder($event)"
     (definition)="openDefinition($event)"
+    (runProcedure)="openProcedureRunner($event)"
     (copied)="onCopied($event)"
     (copyFailed)="onCopyFailed()"
   />
@@ -223,6 +224,19 @@
       [connectionId]="destino.connectionId"
       (insert)="insertComposed($event)"
       (closed)="closeBuilder()"
+    />
+  }
+}
+
+@defer (when procedureTarget()) {
+  @if (procedureTarget(); as destino) {
+    <app-procedure-runner
+      [procedure]="destino.source"
+      [engine]="engineFor(destino.connectionId)"
+      [connectionId]="destino.connectionId"
+      (insert)="insertCall($event)"
+      (run)="runCall($event)"
+      (closed)="closeProcedureRunner()"
     />
   }
 }

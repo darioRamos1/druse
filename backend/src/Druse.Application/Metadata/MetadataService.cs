@@ -127,4 +127,37 @@ public sealed class MetadataService(
             selected => reader.GetDefinitionAsync(selected, databaseObject, cancellationToken),
             cancellationToken);
     }
+
+    /// <summary>
+    /// Parámetros de un procedimiento, para poder componer su llamada.
+    ///
+    /// Solo procedimientos: una función se llama dentro de una consulta y no
+    /// tiene sentido «ejecutarla» desde un formulario, así que ofrecerlo sería
+    /// prometer algo que después no encaja en ningún sitio.
+    /// </summary>
+    public async Task<RoutineSignature> GetRoutineSignatureAsync(
+        Guid sessionId,
+        DatabaseObject routine,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(routine);
+
+        if (routine.Kind is not DatabaseObjectKind.Procedure)
+        {
+            throw new ArgumentException(
+                "Solo se pueden leer los parámetros de un procedimiento.",
+                nameof(routine));
+        }
+
+        using var turn = await _connections.EnterAsync(sessionId, cancellationToken);
+
+        var session = _connections.Require(sessionId);
+        var reader = _providers.GetMetadataReader(session.Engine);
+
+        return await _connections.UseDatabaseAsync(
+            session,
+            routine.Database,
+            selected => reader.GetRoutineSignatureAsync(selected, routine, cancellationToken),
+            cancellationToken);
+    }
 }

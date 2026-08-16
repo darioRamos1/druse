@@ -18,6 +18,7 @@ import {
   DatabaseObject,
   QueryHistoryEntry,
   QueryResult,
+  RoutineSignature,
   SavedConnection,
   SecretStoreStatus,
   SessionInfo,
@@ -400,6 +401,29 @@ class FakeGateway implements Partial<ApplicationGateway> {
   getDefinition(sessionId: string, databaseObject: DatabaseObject): Observable<string> {
     this.definitionRequest = { sessionId, databaseObject };
     return of(this.definition);
+  }
+
+  signature: RoutineSignature = {
+    name: 'registrar',
+    schema: 'dbo',
+    isFunction: false,
+    parameters: [
+      { name: '@entrada', dataType: 'int', direction: 'input', ordinal: 1, hasDefault: false },
+      {
+        name: '@salida',
+        dataType: 'varchar(30)',
+        direction: 'output',
+        ordinal: 2,
+        hasDefault: false,
+      },
+    ],
+  };
+
+  signatureRequest: { sessionId: string; routine: DatabaseObject } | null = null;
+
+  getRoutineSignature(sessionId: string, routine: DatabaseObject): Observable<RoutineSignature> {
+    this.signatureRequest = { sessionId, routine };
+    return of(this.signature);
   }
 
   executeQuery(request: ExecuteQueryRequest): Observable<QueryResult> {

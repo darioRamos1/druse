@@ -49,4 +49,16 @@ public interface IDatabaseMetadataReader
         IDatabaseSession session,
         DatabaseObject table,
         CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Parámetros de un procedimiento o función, para poder componer la llamada.
+    ///
+    /// Se lee del catálogo y no del DDL: el texto de creación lo puede haber
+    /// perdido el motor, viene en el dialecto de cada uno y habría que
+    /// interpretarlo para saber qué entra y qué sale.
+    /// </summary>
+    Task<RoutineSignature> GetRoutineSignatureAsync(
+        IDatabaseSession session,
+        DatabaseObject routine,
+        CancellationToken cancellationToken);
 }

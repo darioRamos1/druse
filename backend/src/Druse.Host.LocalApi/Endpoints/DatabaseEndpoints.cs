@@ -358,6 +358,21 @@ internal static class DatabaseEndpoints
             return Results.Ok(new { sql });
         })
         .WithName("GetDefinition");
+
+        app.MapPost("/api/sessions/{sessionId:guid}/metadata/routine", async (
+            Guid sessionId,
+            DatabaseObjectDto routine,
+            MetadataService metadata,
+            CancellationToken cancellationToken) =>
+        {
+            var signature = await metadata.GetRoutineSignatureAsync(
+                sessionId,
+                routine.ToDomain(),
+                cancellationToken);
+
+            return Results.Ok(signature.ToDto());
+        })
+        .WithName("GetRoutineSignature");
     }
 
     /// <summary>

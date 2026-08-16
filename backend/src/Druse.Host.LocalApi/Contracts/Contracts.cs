@@ -574,6 +574,33 @@ public sealed record TableStructureResponse
 }
 
 /// <summary>
+/// Un parámetro de un procedimiento, para dibujar su formulario.
+///
+/// `direction` viaja como texto —`input`, `output`, `inputOutput`— y no como
+/// número: un contrato local se lee en el navegador y en los registros, y un 2
+/// suelto no dice nada.
+/// </summary>
+public sealed record RoutineParameterDto
+{
+    public required string Name { get; init; }
+    public required string DataType { get; init; }
+    public required string Direction { get; init; }
+    public int Ordinal { get; init; }
+
+    /// <summary>Se puede omitir porque el motor pone un valor.</summary>
+    public bool HasDefault { get; init; }
+}
+
+public sealed record RoutineSignatureResponse
+{
+    public required string Name { get; init; }
+    public string? Schema { get; init; }
+    public bool IsFunction { get; init; }
+    public required IReadOnlyList<RoutineParameterDto> Parameters { get; init; }
+    public string? ReturnType { get; init; }
+}
+
+/// <summary>
 /// Lo que el motor admite al definir un índice.
 ///
 /// El formulario se dibuja a partir de esto y no del identificador del motor:

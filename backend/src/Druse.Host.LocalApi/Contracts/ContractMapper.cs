@@ -454,6 +454,36 @@ internal static class ContractMapper
         };
     }
 
+    public static RoutineSignatureResponse ToDto(this RoutineSignature signature)
+    {
+        ArgumentNullException.ThrowIfNull(signature);
+
+        return new RoutineSignatureResponse
+        {
+            Name = signature.Name,
+            Schema = signature.Schema,
+            IsFunction = signature.IsFunction,
+            ReturnType = signature.ReturnType,
+            Parameters =
+            [
+                .. signature.Parameters.Select(parameter => new RoutineParameterDto
+                {
+                    Name = parameter.Name,
+                    DataType = parameter.DataType,
+                    Direction = parameter.Direction switch
+                    {
+                        RoutineParameterDirection.Output => "output",
+                        RoutineParameterDirection.InputOutput => "inputOutput",
+                        RoutineParameterDirection.Return => "return",
+                        _ => "input",
+                    },
+                    Ordinal = parameter.Ordinal,
+                    HasDefault = parameter.HasDefault,
+                }),
+            ],
+        };
+    }
+
     public static TableStructureResponse ToResponse(this TableStructure structure)
     {
         ArgumentNullException.ThrowIfNull(structure);

@@ -969,6 +969,33 @@ de una transacción del usuario, no se deshace sola. Exigiría un punto de guard
 y tirar de la transacción entera borraría trabajo que nadie pidió borrar; los
 mensajes lo dicen en lugar de afirmar que no se guardó nada.
 
+### Ejecutar procedimientos sin escribir la llamada — implementado
+
+Pedido por el usuario: un procedimiento solo ofrecía «Ver DDL», así que llamarlo
+exigía leer su definición, entender la firma y escribir el `EXEC` a mano.
+
+- [x] Leer los parámetros del catálogo —nombre, tipo, dirección y si tienen valor
+  por omisión— en los cuatro motores, con `RoutineSignature` atravesando el
+  contrato de proveedores, la aplicación, la API local y el gateway.
+- [x] Formulario con un campo por parámetro que distingue **valor, `NULL` y
+  omitir**: omitir deja que el motor ponga el suyo y `NULL` es decirle que no hay
+  valor, y confundirlos es de los errores más caros al llamar a algo ajeno.
+- [x] Parámetros de salida y valor de retorno desde el principio: la llamada
+  declara la variable, la pasa y la lee después.
+- [x] El SQL queda a la vista y **editable** antes de ejecutar, como en el resto
+  de Druse; ejecutar abre además la pestaña para que quede escrito qué se lanzó.
+
+Cada motor escribe la llamada a su manera y eso vive en el escritor SQL, no
+repartido por los componentes: `EXEC … OUTPUT` en SQL Server, variables de sesión
+en MySQL, `CALL` con huecos `NULL` en PostgreSQL —que devuelve las salidas como
+resultado— y `EXECUTE PROCEDURE` en Informix.
+
+**Lo que no se hace, y es una decisión:** Informix no recoge parámetros de salida
+fuera de un procedimiento —el `INTO` solo existe dentro de SPL—, así que allí la
+llamada se ejecuta sin ellos y se avisa por escrito en lugar de generar algo que
+el motor rechazaría. Las funciones tampoco entran: se llaman dentro de una
+consulta y no encajan en un formulario de ejecución.
+
 ### Prioridad alta
 
 - ~~Autenticación integrada de Windows para SQL Server.~~ Hecho (sesión 014).

@@ -15,6 +15,7 @@ import {
   SshTunnel,
   TableAlteration,
   TableDesign,
+  RoutineSignature,
   TableStructure,
   TestConnectionResult,
 } from '../../shared/models/workspace';
@@ -208,6 +209,12 @@ export abstract class ApplicationGateway {
   ): Observable<readonly DatabaseColumn[]>;
 
   abstract getDefinition(sessionId: string, databaseObject: DatabaseObject): Observable<string>;
+
+  /** Parámetros de un procedimiento, para poder componer su llamada. */
+  abstract getRoutineSignature(
+    sessionId: string,
+    routine: DatabaseObject,
+  ): Observable<RoutineSignature>;
 
   /**
    * Ejecuta SQL.

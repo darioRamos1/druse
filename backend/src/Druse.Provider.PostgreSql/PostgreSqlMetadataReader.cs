@@ -459,17 +459,7 @@ public sealed class PostgreSqlMetadataReader : IDatabaseMetadataReader
         DatabaseObject procedure,
         CancellationToken cancellationToken)
     {
-        const string IdPrefix = "Procedure:oid:";
-
-        if (!procedure.Id.StartsWith(IdPrefix, StringComparison.Ordinal)
-            || !long.TryParse(procedure.Id[IdPrefix.Length..], out var oid)
-            || oid <= 0
-            || oid > uint.MaxValue)
-        {
-            throw new ArgumentException(
-                "El identificador del procedimiento PostgreSQL no contiene un OID válido.",
-                nameof(procedure));
-        }
+        var oid = RequireOid(procedure);
 
         const string Sql = """
             SELECT pg_get_functiondef(p.oid)
@@ -623,6 +613,133 @@ public sealed class PostgreSqlMetadataReader : IDatabaseMetadataReader
             },
             cancellationToken,
             ("schema", folder.Schema ?? "public"));
+    }
+
+    /// <summary>
+    /// El OID que el nodo lleva en su identificador.
+    ///
+    /// Solo los procedimientos se listan con OID, porque son los únicos donde una
+    /// sobrecarga cambia de qué objeto se habla. Una función llega sin él y por
+    /// eso no se le puede pedir ni el DDL ni la firma.
+    /// </summary>
+    private static long RequireOid(DatabaseObject routine)
+    {
+        const string IdPrefix = "Procedure:oid:";
+
+        if (!routine.Id.StartsWith(IdPrefix, StringComparison.Ordinal)
+            || !long.TryParse(routine.Id[IdPrefix.Length..], out var oid)
+            || oid <= 0
+            || oid > uint.MaxValue)
+        {
+            throw new ArgumentException(
+                "El identificador del procedimiento PostgreSQL no contiene un OID válido.",
+                nameof(routine));
+        }
+
+        return oid;
+    }
+
+    /// <summary>
+    /// Firma de una rutina, resuelta por OID.
+    ///
+    /// Aquí el nombre **no identifica** nada: PostgreSQL admite sobrecargas, así
+    /// que `procesar(integer)` y `procesar(text)` conviven y solo el OID que ya
+    /// lleva el nodo dice de cuál se habla. Es la misma razón por la que el DDL
+    /// se pide igual.
+    ///
+    /// Los tipos salen de `proallargtypes` cuando la rutina tiene salidas y de
+    /// `proargtypes` cuando no: PostgreSQL solo rellena el primero si hay algún
+    /// `OUT`, y el segundo deja fuera precisamente esos.
+    /// </summary>
+    public async Task<RoutineSignature> GetRoutineSignatureAsync(
+        IDatabaseSession session,
+        DatabaseObject routine,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(routine);
+
+        var oid = RequireOid(routine);
+
+        const string Sql = """
+            SELECT
+                COALESCE(names.name, '') AS parameter_name,
+                format_type(types.type, NULL) AS data_type,
+                -- `::text` por lo mismo que en los índices: `proargmodes` y
+                -- `prokind` son el `"char"` interno de un byte, y Npgsql no lo
+                -- entrega como cadena.
+                COALESCE(modes.mode::text, 'i') AS parameter_mode,
+                types.ord AS ordinal,
+                p.prokind::text,
+                pg_get_function_result(p.oid) AS result_type,
+                p.pronargs,
+                p.pronargdefaults
+            FROM pg_proc p
+            LEFT JOIN LATERAL unnest(COALESCE(p.proallargtypes, p.proargtypes::oid[]))
+                WITH ORDINALITY AS types(type, ord) ON true
+            LEFT JOIN LATERAL unnest(p.proargnames)
+                WITH ORDINALITY AS names(name, ord) ON names.ord = types.ord
+            LEFT JOIN LATERAL unnest(p.proargmodes)
+                WITH ORDINALITY AS modes(mode, ord) ON modes.ord = types.ord
+            WHERE p.oid::bigint = @oid
+            ORDER BY types.ord
+            """;
+
+        var rows = await QueryAsync(
+            session,
+            Sql,
+            reader => new
+            {
+                Name = reader.GetString(0),
+                DataType = reader.IsDBNull(1) ? string.Empty : reader.GetString(1),
+                Mode = reader.GetString(2),
+                Ordinal = reader.IsDBNull(3) ? 0 : (int)reader.GetInt64(3),
+                Kind = reader.GetString(4),
+                ResultType = reader.IsDBNull(5) ? null : reader.GetString(5),
+                ArgumentCount = reader.GetInt16(6),
+                DefaultCount = reader.GetInt16(7),
+            },
+            cancellationToken,
+            ("oid", oid));
+
+        if (rows.Count == 0)
+        {
+            throw new DatabaseOperationException(new QueryError
+            {
+                Message = $"No se encontró {routine.Name} o no es visible para este usuario.",
+            });
+        }
+
+        var withArguments = rows.Where(row => row.Ordinal > 0).ToList();
+
+        // Los valores por omisión se aplican a los últimos parámetros de entrada,
+        // y el catálogo solo dice cuántos son. De ahí el recuento en vez de una
+        // marca por parámetro.
+        var firstWithDefault = rows[0].ArgumentCount - rows[0].DefaultCount;
+
+        var parameters = withArguments
+            .Select(row => new RoutineParameter
+            {
+                Name = row.Name,
+                DataType = row.DataType,
+                Direction = row.Mode switch
+                {
+                    "o" or "t" => RoutineParameterDirection.Output,
+                    "b" => RoutineParameterDirection.InputOutput,
+                    _ => RoutineParameterDirection.Input,
+                },
+                Ordinal = row.Ordinal,
+                HasDefault = row.Mode is "i" or "b" && row.Ordinal > firstWithDefault,
+            })
+            .ToList();
+
+        return new RoutineSignature
+        {
+            Name = routine.Name,
+            Schema = routine.Schema ?? "public",
+            IsFunction = rows[0].Kind is "f" or "a" or "w",
+            Parameters = parameters,
+            ReturnType = rows[0].Kind == "p" ? null : rows[0].ResultType,
+        };
     }
 
     private static async Task<IReadOnlyList<DatabaseObject>> GetProceduresAsync(

@@ -426,6 +426,97 @@ public sealed class MySqlMetadataReader : IDatabaseMetadataReader
     }
 
     /// <summary>
+    /// Firma de una rutina desde `information_schema.parameters`.
+    ///
+    /// El valor que devuelve una función aparece ahí con `ORDINAL_POSITION = 0`
+    /// y sin nombre; se separa del resto para que no acabe como un parámetro que
+    /// nadie puede rellenar.
+    ///
+    /// `DTD_IDENTIFIER` trae el tipo completo —`decimal(12,2)`, `enum('a','b')`—,
+    /// que es justo lo que hay que enseñar y lo que evita reconstruirlo a partir
+    /// de la longitud y la precisión.
+    /// </summary>
+    public async Task<RoutineSignature> GetRoutineSignatureAsync(
+        IDatabaseSession session,
+        DatabaseObject routine,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(routine);
+
+        var schema = Schema(session, routine);
+
+        const string Sql = """
+            SELECT
+                COALESCE(p.PARAMETER_NAME, ''),
+                p.DTD_IDENTIFIER,
+                COALESCE(p.PARAMETER_MODE, ''),
+                p.ORDINAL_POSITION,
+                r.ROUTINE_TYPE
+            FROM information_schema.ROUTINES r
+            LEFT JOIN information_schema.PARAMETERS p
+                ON p.SPECIFIC_SCHEMA = r.ROUTINE_SCHEMA
+               AND p.SPECIFIC_NAME = r.ROUTINE_NAME
+               AND p.ROUTINE_TYPE = r.ROUTINE_TYPE
+            WHERE r.ROUTINE_SCHEMA = @schema
+              AND r.ROUTINE_NAME = @routine
+            ORDER BY p.ORDINAL_POSITION
+            """;
+
+        var rows = await QueryAsync(
+            session,
+            Sql,
+            reader => new
+            {
+                Name = reader.GetString(0),
+                DataType = reader.IsDBNull(1) ? string.Empty : reader.GetString(1),
+                Mode = reader.GetString(2),
+                Ordinal = reader.IsDBNull(3) ? 0 : reader.GetInt32(3),
+                RoutineType = reader.GetString(4),
+            },
+            cancellationToken,
+            ("schema", schema),
+            ("routine", routine.Name));
+
+        if (rows.Count == 0)
+        {
+            throw new DatabaseOperationException(new QueryError
+            {
+                Message = $"No se encontró {schema}.{routine.Name} o no es visible para este usuario.",
+            });
+        }
+
+        var isFunction = string.Equals(rows[0].RoutineType, "FUNCTION", StringComparison.OrdinalIgnoreCase);
+
+        var parameters = rows
+            .Where(row => row.Ordinal > 0)
+            .Select(row => new RoutineParameter
+            {
+                Name = row.Name,
+                DataType = row.DataType,
+                Direction = row.Mode.ToUpperInvariant() switch
+                {
+                    "OUT" => RoutineParameterDirection.Output,
+                    "INOUT" => RoutineParameterDirection.InputOutput,
+                    _ => RoutineParameterDirection.Input,
+                },
+                Ordinal = row.Ordinal,
+                // MySQL no admite valores por omisión en las rutinas: hay que
+                // pasarlos todos.
+                HasDefault = false,
+            })
+            .ToList();
+
+        return new RoutineSignature
+        {
+            Name = routine.Name,
+            Schema = schema,
+            IsFunction = isFunction,
+            Parameters = parameters,
+            ReturnType = rows.FirstOrDefault(row => row.Ordinal == 0)?.DataType,
+        };
+    }
+
+    /// <summary>
     /// El único esquema de una base de MySQL: ella misma.
     ///
     /// No se consulta el catálogo porque no hay nada que consultar. Ver la nota de

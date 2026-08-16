@@ -112,6 +112,12 @@ public sealed class PostgreSqlFixture : IProviderFixture
         AS $$ BEGIN RAISE NOTICE 'marca_procedimiento'; END $$
         """;
 
+    public string CreateProcedureWithParameters(string name) => $"""
+        CREATE PROCEDURE {name}(entrada INT, OUT salida VARCHAR)
+        LANGUAGE plpgsql
+        AS $$ BEGIN salida := 'hecho'; END $$
+        """;
+
     public string DropProcedure(string name) => $"DROP PROCEDURE IF EXISTS {name}()";
 
     public string TimestampTypeName => "timestamp with time zone";

@@ -686,6 +686,94 @@ public sealed class InformixMetadataReader : IDatabaseMetadataReader
     /// el texto que escribió el usuario. Las demás son formas compiladas que no
     /// sirven para leer.
     /// </summary>
+    /// <summary>
+    /// Firma de una rutina desde `sysproccolumns`.
+    ///
+    /// `paramattr` dice por dónde va cada valor. Comprobado contra el servidor,
+    /// porque la documentación no lo enumera entero: **1 es entrada, 4 es salida
+    /// y 3 es el valor de retorno** de un `RETURNING`, que llega sin nombre.
+    ///
+    /// El retorno no se reconoce por su posición: `paramid` empieza en 0, y en un
+    /// procedimiento sin `RETURNING` ese 0 es el primer parámetro de entrada.
+    /// </summary>
+    public async Task<RoutineSignature> GetRoutineSignatureAsync(
+        IDatabaseSession session,
+        DatabaseObject routine,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(routine);
+
+        const string Sql = """
+            SELECT
+                c.paramname,
+                c.paramtype,
+                c.paramlen,
+                c.paramattr,
+                c.paramid,
+                p.isproc
+            FROM sysproccolumns c
+            JOIN sysprocedures p ON p.procid = c.procid
+            WHERE p.procname = ? AND p.owner = ?
+            ORDER BY c.paramid
+            """;
+
+        var rows = await QueryAsync(
+            session,
+            Sql,
+            reader => new
+            {
+                Name = reader.IsDBNull(0) ? string.Empty : Text(reader, 0),
+                Type = Number(reader, 1),
+                Length = Number(reader, 2),
+                Attribute = Number(reader, 3),
+                Ordinal = Number(reader, 4),
+                IsProcedure = Text(reader, 5).StartsWith('t'),
+            },
+            cancellationToken,
+            routine.Name,
+            Owner(session, routine));
+
+        if (rows.Count == 0)
+        {
+            throw new DatabaseOperationException(new QueryError
+            {
+                Message = $"No se encontró {routine.Name} o no tiene parámetros que leer.",
+            });
+        }
+
+        var parameters = rows
+            .Where(row => row.Attribute != 3)
+            .Select(row => new RoutineParameter
+            {
+                Name = row.Name,
+                DataType = InformixTypeNames.Format(row.Type, row.Length),
+                Direction = row.Attribute switch
+                {
+                    4 => RoutineParameterDirection.Output,
+                    5 => RoutineParameterDirection.InputOutput,
+                    _ => RoutineParameterDirection.Input,
+                },
+                // `paramid` empieza en 0 y el dominio cuenta desde 1.
+                Ordinal = row.Ordinal + 1,
+                // Informix no da valores por omisión a los parámetros.
+                HasDefault = false,
+            })
+            .ToList();
+
+        var returned = rows.FirstOrDefault(row => row.Attribute == 3);
+
+        return new RoutineSignature
+        {
+            Name = routine.Name,
+            Schema = Owner(session, routine),
+            IsFunction = !rows[0].IsProcedure,
+            Parameters = parameters,
+            ReturnType = returned is null
+                ? null
+                : InformixTypeNames.Format(returned.Type, returned.Length),
+        };
+    }
+
     private static async Task<string> GetProcedureDefinitionAsync(
         IDatabaseSession session,
         DatabaseObject procedure,

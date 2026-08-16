@@ -1,0 +1,126 @@
+<div class="backdrop" (click)="closed.emit()"></div>
+
+<div class="dialog" role="dialog" aria-modal="true" aria-labelledby="runner-title">
+  <header class="head">
+    <div>
+      <h2 class="title" id="runner-title">Ejecutar {{ procedure().name }}</h2>
+      <p class="subtitle">
+        {{ procedure().database }} · {{ procedure().schema }} · {{ engine() }}
+      </p>
+    </div>
+    <button type="button" class="close" (click)="closed.emit()" aria-label="Cerrar">×</button>
+  </header>
+
+  <div class="body">
+    @if (loading()) {
+      <p class="state">Leyendo los parámetros…</p>
+    } @else if (!signature()) {
+      <p class="state">
+        No se pudieron leer los parámetros de este procedimiento. Puedes abrir su DDL desde el
+        explorador y escribir la llamada a mano.
+      </p>
+    } @else {
+      @if (inputs().length === 0) {
+        <p class="state">Este procedimiento no recibe parámetros.</p>
+      } @else {
+        <ul class="parameters">
+          @for (parameter of inputs(); track parameter.name) {
+            <li class="parameter">
+              <div class="identity">
+                <span class="name">{{ parameter.name }}</span>
+                <span class="type">{{ parameter.dataType }}</span>
+                @if (parameter.direction === 'inputOutput') {
+                  <span class="badge">entra y sale</span>
+                }
+              </div>
+
+              <div class="controls">
+                <input
+                  type="text"
+                  class="value"
+                  [value]="draftFor(parameter).text"
+                  [disabled]="draftFor(parameter).mode !== 'value'"
+                  [attr.aria-label]="'Valor de ' + parameter.name"
+                  (input)="onText(parameter, $event)"
+                />
+
+                <div class="modes" role="group" [attr.aria-label]="'Cómo pasar ' + parameter.name">
+                  <button
+                    type="button"
+                    [class.is-active]="draftFor(parameter).mode === 'value'"
+                    (click)="setMode(parameter, 'value')"
+                  >
+                    Valor
+                  </button>
+                  <button
+                    type="button"
+                    [class.is-active]="draftFor(parameter).mode === 'null'"
+                    (click)="setMode(parameter, 'null')"
+                  >
+                    NULL
+                  </button>
+                  @if (parameter.hasDefault) {
+                    <button
+                      type="button"
+                      [class.is-active]="draftFor(parameter).mode === 'omit'"
+                      (click)="setMode(parameter, 'omit')"
+                    >
+                      Omitir
+                    </button>
+                  }
+                </div>
+              </div>
+            </li>
+          }
+        </ul>
+      }
+
+      @if (outputs().length > 0) {
+        <p class="note">
+          <app-icon name="export" [size]="12" />
+          @if (outputsUnavailable()) {
+            Informix solo entrega los parámetros de salida dentro de otro procedimiento, así que
+            aquí la llamada se ejecuta sin recogerlos.
+          } @else {
+            La llamada declara y lee los parámetros de salida; su valor sale como un resultado
+            más.
+          }
+        </p>
+      }
+
+      @if (missing().length > 0) {
+        <p class="warning">
+          Falta el valor de {{ missing().length }}
+          {{ missing().length === 1 ? 'parámetro' : 'parámetros' }}. El SQL lo señala donde
+          corresponde.
+        </p>
+      }
+
+      <label class="sql-label" for="runner-sql">SQL que se va a ejecutar</label>
+      <textarea
+        id="runner-sql"
+        class="sql"
+        rows="8"
+        spellcheck="false"
+        [value]="sql()"
+        (input)="onSqlEdited($event)"
+      ></textarea>
+
+      @if (sqlOverride() !== null) {
+        <button type="button" class="reset" (click)="resetSql()">
+          Volver a componerlo desde el formulario
+        </button>
+      }
+    }
+  </div>
+
+  <footer class="foot">
+    <button type="button" class="secondary" (click)="closed.emit()">Cancelar</button>
+    <button type="button" class="secondary" [disabled]="!signature()" (click)="emitInsert()">
+      Abrir en el editor
+    </button>
+    <button type="button" class="primary" [disabled]="!signature()" (click)="emitRun()">
+      Ejecutar
+    </button>
+  </footer>
+</div>
