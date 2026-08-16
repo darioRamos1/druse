@@ -266,10 +266,101 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
-      - name: Publicar
+      - name: Publicar API
         run: >
           dotnet publish backend/src/Druse.Host.LocalApi
           --configuration Release
           --runtime ${{ matrix.rid }}
           --self-contained true
           --output artifacts/${{ matrix.rid }}
+
+  # Genera los instaladores de Linux y macOS, que es lo que no puede salir de la
+  # máquina de desarrollo: cada plataforma solo empaqueta lo suyo. El de Windows
+  # se construye con `build/scripts/package.ps1`.
+  #
+  # Los artefactos quedan descargables desde la ejecución. No están firmados ni
+  # notarizados —eso es otra tarea, del backlog—, así que sirven para probar la
+  # aplicación, no para repartirla.
+  paquete-de-escritorio:
+    name: Paquete de escritorio (${{ matrix.rid }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            rid: linux-x64
+            bundles: deb,appimage
+          - os: macos-latest
+            rid: osx-arm64
+            bundles: dmg,app
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Instalar .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Instalar Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Dependencias de Tauri en Linux
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+
+      - name: Instalar Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      # El CLI de Tauri no viene con el runner y compilarlo lleva varios minutos,
+      # así que se guarda el binario ya construido entre ejecuciones.
+      - name: Recuperar el CLI de Tauri
+        id: cli-de-tauri
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/bin/cargo-tauri
+          key: cargo-tauri-2-${{ runner.os }}
+
+      - name: Instalar el CLI de Tauri
+        if: steps.cli-de-tauri.outputs.cache-hit != 'true'
+        run: cargo install tauri-cli --version "^2" --locked
+
+      # La API viaja dentro del paquete, así que se publica en el directorio que
+      # `tauri.conf.json` declara como recurso. Es lo mismo que hace el paso 1 de
+      # `package.ps1`.
+      - name: Publicar la API dentro del envoltorio
+        run: >
+          dotnet publish backend/src/Druse.Host.LocalApi
+          --configuration Release
+          --runtime ${{ matrix.rid }}
+          --self-contained true
+          --output shells/desktop-tauri/api
+          -p:PublishSingleFile=false
+          -p:DebugType=none
+
+      - name: Compilar el frontend
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run build
+
+      # Los formatos se piden por línea de comandos porque `tauri.conf.json` fija
+      # los de Windows —NSIS y MSI—, que aquí no existen.
+      - name: Empaquetar
+        working-directory: shells/desktop-tauri
+        run: cargo tauri build --bundles ${{ matrix.bundles }}
+
+      - name: Recoger los artefactos
+        uses: actions/upload-artifact@v4
+        with:
+          name: druse-${{ matrix.rid }}
+          path: shells/desktop-tauri/target/release/bundle/**
+          if-no-files-found: error
+          retention-days: 14

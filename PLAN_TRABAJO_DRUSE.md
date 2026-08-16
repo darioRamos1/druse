@@ -524,7 +524,7 @@ Los resultados pueden inspeccionarse y exportarse de manera confiable sin bloque
 - [x] Finalizar correctamente la API al cerrar la aplicación.
 - [x] Crear icono, nombre, versión y metadatos del instalador.
 - [x] Generar instalador para Windows x64.
-- [ ] Generar artefactos de prueba para Linux x64 y macOS ARM64. _(el script acepta cualquier RID, pero generar esos artefactos exige compilar en cada plataforma: es trabajo de integración continua, no de esta máquina.)_
+- [ ] Generar artefactos de prueba para Linux x64 y macOS ARM64. _(el trabajo está hecho en integración continua —un job por plataforma que empaqueta y deja el `.deb`, el `.AppImage` y el `.dmg` descargables—; queda marcarlo cuando esa ejecución termine en verde.)_
 - [x] Crear distribución ZIP en modo portable para Windows.
 - [ ] Validar instalación, actualización y desinstalación. _(pendiente: instalar y desinstalar de verdad en este equipo.)_
 - [ ] Probar en un equipo sin SDK de .NET ni Node.js. _(pendiente: hace falta un equipo limpio.)_

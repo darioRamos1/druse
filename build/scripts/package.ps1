@@ -223,15 +223,21 @@ if ($signing) {
         Set-Content $tauriOverride -Encoding UTF8
 }
 
+# `tauri.conf.json` fija los formatos de Windows, que son los que se reparten.
+# Fuera de Windows hay que pedir los de cada plataforma o la construcción no
+# produce nada: el script acepta cualquier RID y esto es lo que hace que eso sea
+# verdad y no solo una promesa del parámetro.
+$bundles = if ($IsWindows) { $null } elseif ($IsMacOS) { 'dmg,app' } else { 'deb,appimage' }
+
 Push-Location $tauriDir
 try {
     # `--no-bundle` no: aquí queremos precisamente el instalador.
-    if ($tauriOverride) {
-        cargo tauri build --config $tauriOverride
-    }
-    else {
-        cargo tauri build
-    }
+    $tauriArgs = @('tauri', 'build')
+
+    if ($tauriOverride) { $tauriArgs += @('--config', $tauriOverride) }
+    if ($bundles) { $tauriArgs += @('--bundles', $bundles) }
+
+    cargo @tauriArgs
 
     if ($LASTEXITCODE -ne 0) { throw 'Falló la construcción del instalador.' }
 }

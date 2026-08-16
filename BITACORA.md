@@ -82,8 +82,10 @@ Y lo que ya venía de antes, sin cambios:
    - instalar, actualizar y desinstalar de verdad, para validar el ciclo completo;
    - arrancar en una máquina sin .NET ni Node, que es el criterio que demuestra
      que el paquete se basta solo.
-5. Artefactos de Linux y macOS: el script acepta cualquier RID, pero generarlos
-   exige compilar en cada plataforma. Es trabajo de integración continua.
+5. ~~Artefactos de Linux y macOS.~~ Montados en la sesión 021: un job por
+   plataforma publica la API, compila el frontend y empaqueta con Tauri, dejando
+   el `.deb`, el `.AppImage` y el `.dmg` descargables de cada ejecución. Sin
+   firmar ni notarizar: sirven para probar, no para repartir.
 6. **Probar la edición de filas y la importación a mano**, sobre una tabla de prueba.
 7. **Recoger los registros de la API en un archivo.** Al ocultar su consola (D-26)
    se perdió el único sitio donde se veían. Mientras no haya que diagnosticar en
@@ -322,6 +324,24 @@ publicación no queda ni un `db2*.dll`—.
 
 Cabe que el paquete de macOS traiga solo binarios Intel; si es así, en Apple
 Silicon habrá que declarar el motor no soportado. Lo dirá la integración continua.
+
+#### Fase 7: los paquetes de Linux y macOS
+
+Lo que faltaba de la fase, salvo lo que exige otro equipo. Un job por plataforma
+publica la API dentro del envoltorio, compila el frontend y empaqueta con Tauri,
+y los artefactos quedan descargables de cada ejecución durante catorce días.
+
+Dos cosas que no eran evidentes:
+
+- **Los formatos se piden por línea de comandos.** `tauri.conf.json` fija NSIS y
+  MSI, que fuera de Windows no existen, así que hay que pasar `--bundles` con los
+  de cada plataforma. `package.ps1` tenía el mismo agujero: aceptaba
+  `-Runtime linux-x64` y habría intentado construir un instalador de Windows.
+- **El CLI de Tauri no viene con el runner** y compilarlo cuesta varios minutos,
+  así que su binario se guarda en caché entre ejecuciones.
+
+Salen sin firmar ni notarizar, que es otra tarea del backlog: sirven para probar
+la aplicación, no para repartirla.
 
 ### Sesión 020 — 2026-08-14 · Transacciones manuales, y los 44 archivos ordenados
 
