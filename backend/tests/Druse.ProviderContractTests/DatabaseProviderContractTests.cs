@@ -530,13 +530,17 @@ public abstract class DatabaseProviderContractTests<TFixture>
                         Columns = [new IndexColumn { Name = "id", Direction = IndexSortDirection.Descending }],
                     },
                 ],
+                // La restricción va sobre `nombre` y no sobre `id`: MySQL
+                // rechaza cualquier CHECK que mencione una columna
+                // AUTO_INCREMENT, así que comprobarlo ahí mediría una
+                // limitación del motor en vez del ciclo que interesa.
                 AddedCheckConstraints = Fixture.Designer.IndexCapabilities.SupportsCheckConstraints
                     ?
                     [
                         new CheckConstraintDefinition
                         {
                             Name = $"ck_{table}",
-                            Expression = "id > 0",
+                            Expression = "nombre <> ''",
                         },
                     ]
                     : [],

@@ -10,54 +10,52 @@
 
 | Campo | Valor |
 | --- | --- |
-| Última sesión | **020** — 2026-08-14 |
+| Última sesión | **021** — 2026-08-16 |
 | Fase activa | **Mejora posterior al MVP completada:** implementación y validación cerradas |
 | Fases 0–6 | ✅ Cerradas. |
 | Fase 7 | 🟡 **10/12.** Hay instalador y funciona; faltan dos comprobaciones que exigen otro equipo. |
 | Fase 8 | ✅ **7/7.** Tres motores sobre el mismo contrato y primera beta preparada. |
 | ¿Compila el backend? | Sí — 0 advertencias, 0 errores |
 | ¿Compila el envoltorio? | Sí |
-| ¿Pasan las pruebas? | Sí — **386 en backend** (228 unitarias, 126 contractuales y 32 de integración), **281 en frontend** y **6 en el envoltorio** |
+| ¿Pasan las pruebas? | Sí — **422 en backend** (228 unitarias, 126 contractuales y 68 de integración), **281 en frontend** y **6 en el envoltorio**. Las 36 que antes se saltaban ya corren: este equipo **sí tiene Docker** |
 | ¿Hay aplicación de escritorio? | **Sí.** Instalador NSIS, MSI y ZIP portable, en dos variantes: con Informix y sin él |
 | Motores | **PostgreSQL, SQL Server, MySQL/MariaDB e Informix**, todos sobre el mismo contrato compartido |
 | Trabajo a medias | Ninguno. Las transacciones manuales quedaron terminadas en la sesión 020. |
 | Bloqueantes | Ninguno para seguir programando. Sí para dar por buenos cuatro motores y cuatro funciones: ver «Qué toca retomar». |
-| Git | `main` al día hasta la sesión 018. La rama `feat/indices-y-claves-foraneas` tiene el PR #8 abierto y ahora **siete commits**: los dos de índices, cuatro que ordenan lo que estaba sin commitear —exportación, transacciones, Informix y empaquetado— y el de las transacciones terminadas. |
+| Git | El PR #8 se fusionó, pero solo se llevó **los dos primeros commits**. La rama `feat/indices-y-claves-foraneas` acumula **quince más** —lo de las sesiones 019 y 020 y los arreglos de la 021— que salen en un PR nuevo. |
 
 ### Qué toca retomar en la próxima sesión
 
 Ya no queda nada a medias: las transacciones manuales se cerraron en la sesión
 020 y los 44 archivos sueltos se repartieron en cuatro commits temáticos. Lo que
-falta es **comprobar contra servidores de verdad** lo que se escribió a ciegas.
+falta es **comprobar contra servidores de verdad** lo que se escribió a ciegas,
+y en la sesión 021 esa lista se acortó bastante.
 
-**Probar contra servidores de verdad lo de las sesiones 015, 017, 019 y 020.**
-Cinco funciones completas, con pruebas y revisadas en pantalla, y **ninguna ha
-hablado nunca con un servidor real**, porque este equipo no tiene ni servidor SSH
-ni Docker ni un motor local, y las únicas bases a mano son de la empresa.
+**Docker sí está en este equipo.** Lo que decía esta bitácora era falso: Docker
+Desktop está instalado y los contenedores de PostgreSQL, SQL Server y MySQL ya
+existían. Basta arrancar el escritorio, levantarlos con
+`./build/scripts/test-db.ps1` y ejecutar `dotnet test`, y la suite entera corre
+contra motores reales: **126 contractuales y 68 de integración, ninguna
+saltada**. Es lo primero que hay que hacer al empezar cualquier sesión que toque
+un proveedor.
 
-**La deuda más grande es Informix**, porque entró entero a ciegas: catálogo,
-tipos, DDL y edición. Después va el DDL de índices y restricciones, donde más se
-separan los dialectos. Las dos se resuelven con lo mismo —levantar los
-contenedores con `./build/scripts/test-db.ps1` y ejecutar la suite con
-`DRUSE_REQUIRE_ENGINES=1`—, y las pruebas contractuales que lo comprueban ya
-están escritas: `CreaIndicesYRestriccionesYLosVuelveALeer` hace el ciclo completo
-—crear un índice, releerlo del catálogo, borrarlo y comprobar que desaparece— en
-los cuatro motores.
-
-**Instalar Docker en este equipo es, con diferencia, lo que más deuda cancela de
-una vez.**
+**Lo que queda a ciegas es Informix, y solo Informix**: catálogo, tipos, DDL y
+edición entraron enteros contra la documentación. Su contenedor es el único que
+no se ha levantado nunca —imagen de IBM, `test-db.ps1 -Engine informix`— y hasta
+que lo esté, `DRUSE_REQUIRE_ENGINES=1` no puede exigirse de verdad.
 
 1. **Túnel SSH contra un servidor SSH real.** Lo probado llega hasta el error de
    red: la librería intenta conectar y el mensaje vuelve bien escrito. Falta el
    camino feliz —abrir el túnel, conectar la base por dentro y cerrarlo al cerrar
    la sesión— con los tres métodos: contraseña, clave privada y segundo factor.
    Vale cualquier bastión: una EC2, una VM o un equipo con el puerto 22 abierto.
-2. **DDL contra los cuatro motores.** Crear una tabla, añadirle y renombrarle
-   columnas, cambiar tipos y borrar una, y además **crear, modificar y quitar
-   índices, claves foráneas, restricciones y la clave primaria**. El SQL generado
-   está fijado por 30 pruebas, pero nadie lo ha ejecutado todavía. Ojo a MySQL,
-   que es el único donde un `ALTER` a medias no se deshace: si el `CREATE INDEX`
-   que sigue a un `DROP INDEX` falla, la tabla se queda sin ese índice.
+2. **DDL contra los cuatro motores.** El ciclo de índices y restricciones —crear,
+   releer del catálogo, borrar y comprobar que desaparece— ya se ejecuta contra
+   PostgreSQL, SQL Server y MySQL, y en la sesión 021 destapó tres fallos reales.
+   Queda el resto del diseñador a mano: renombrar columnas, cambiar tipos,
+   claves foráneas y clave primaria. Ojo a MySQL, que es el único donde un
+   `ALTER` a medias no se deshace: si el `CREATE INDEX` que sigue a un
+   `DROP INDEX` falla, la tabla se queda sin ese índice.
 2.b **Informix entero.** Es el que más riesgo acumula: catálogo (`systables`,
    `syscolumns`, `sysindexes`, `sysconstraints`), descodificación de tipos, DDL y
    edición de filas, todo escrito contra la documentación sin ejecutar nada. El
@@ -215,6 +213,52 @@ Pendiente de verificar cuando toque: Docker (pruebas de integración con contene
 ---
 
 ## 5. Registro de sesiones
+
+### Sesión 021 — 2026-08-16 · Lo que el CI encontró, y el Docker que sí estaba
+
+Se empezó preguntando qué faltaba de la rama. La respuesta corta: catorce commits
+sin subir y **el CI en rojo desde la sesión 019**, con dos de las noventa y cinco
+pruebas contractuales cayendo. Las dos eran
+`CreaIndicesYRestriccionesYLosVuelveALeer`, justo lo que la rama entrega.
+
+Eso ya corrige una idea de esta bitácora: se decía que el DDL de índices «no ha
+hablado nunca con un servidor real», y no era cierto. El flujo de integración
+levanta los tres motores en contenedores y lo venía ejecutando; lo que faltaba
+era mirar el resultado.
+
+#### Tres fallos, no dos
+
+El de PostgreSQL tapaba a otro que solo apareció al arreglarlo.
+
+1. **`Column 'from_constraint' is null`.** En la consulta de índices,
+   `i.indisexclusion OR con.contype IN ('p','u')` vale `NULL` cuando el
+   `LEFT JOIN` con `pg_constraint` no encuentra nada, porque `false OR NULL` es
+   `NULL` y no `false`. Resuelto con `COALESCE(…, false)`. **No era cosa de la
+   prueba:** leer la estructura de cualquier tabla de PostgreSQL con un índice
+   normal reventaba, así que el diseñador estaba roto en ese motor para el caso
+   más común que existe.
+2. **`Reading as 'System.String' is not supported for DataTypeName 'char'`.**
+   `con.contype` es el `"char"` interno de un byte de PostgreSQL, que Npgsql no
+   entrega como cadena. Va con `::text`. `confdeltype` y `confupdtype` de las
+   claves foráneas tenían el mismo fallo esperando a que alguien leyera una tabla
+   con una clave foránea; se arreglaron a la vez.
+3. **MySQL rechazaba el CHECK.** Aquí el motor tiene razón: prohíbe cualquier
+   CHECK que mencione una columna `AUTO_INCREMENT`. Lo equivocado era la prueba,
+   que lo ponía sobre `id`. Ahora va sobre `nombre`, que es lo que se quería
+   medir —el ciclo completo— y no una limitación de MySQL.
+
+#### Docker estaba instalado
+
+Lo que decía esta bitácora era falso. Docker Desktop está en el equipo y los tres
+contenedores ya existían; solo hacía falta arrancar el escritorio. Con los
+motores en pie, la suite completa pasa **sin saltarse nada**: 228 unitarias, 126
+contractuales y 68 de integración —las 36 que antes se omitían por falta de motor
+incluidas—, más 281 de frontend y 6 del envoltorio.
+
+Queda un solo motor a ciegas, Informix, cuyo contenedor no se ha levantado nunca.
+
+**Verificado:** compilación en Release sin advertencias y las 422 del backend
+contra PostgreSQL 18, SQL Server 2022 y MySQL 8.4 reales.
 
 ### Sesión 020 — 2026-08-14 · Transacciones manuales, y los 44 archivos ordenados
 

@@ -173,6 +173,11 @@ public sealed class PostgreSqlMetadataReader : IDatabaseMetadataReader
     /// columnas correctas en el orden equivocado, y en un índice el orden es
     /// justamente lo que decide para qué sirve. Las primeras
     /// <c>indnkeyatts</c> son la clave y el resto es el `INCLUDE`.
+    ///
+    /// <c>from_constraint</c> lleva <c>COALESCE</c> porque el <c>LEFT JOIN</c>
+    /// con <c>pg_constraint</c> no encuentra nada para un índice suelto, y
+    /// <c>false OR NULL</c> vale <c>NULL</c>, no <c>false</c>: sin él, leer la
+    /// estructura de cualquier tabla con un índice normal fallaba.
     /// </summary>
     private static async Task<IReadOnlyList<DatabaseIndex>> GetIndexesAsync(
         IDatabaseSession session,
@@ -185,7 +190,7 @@ public sealed class PostgreSqlMetadataReader : IDatabaseMetadataReader
                 ic.relname AS index_name,
                 i.indisunique,
                 i.indisprimary,
-                i.indisexclusion OR con.contype IN ('p', 'u') AS from_constraint,
+                COALESCE(i.indisexclusion OR con.contype IN ('p', 'u'), false) AS from_constraint,
                 am.amname,
                 pg_get_expr(i.indpred, i.indrelid) AS filter,
                 (
@@ -268,8 +273,8 @@ public sealed class PostgreSqlMetadataReader : IDatabaseMetadataReader
                 con.conname,
                 fn.nspname AS referenced_schema,
                 fc.relname AS referenced_table,
-                con.confdeltype,
-                con.confupdtype,
+                con.confdeltype::text,
+                con.confupdtype::text,
                 (
                     SELECT array_agg(a.attname ORDER BY k.ord)
                     FROM unnest(con.conkey) WITH ORDINALITY AS k(attnum, ord)
@@ -319,9 +324,13 @@ public sealed class PostgreSqlMetadataReader : IDatabaseMetadataReader
         // Las restricciones que respaldan una columna `NOT NULL` se descartan:
         // PostgreSQL las materializa como CHECK y enseñarlas llenaría la lista de
         // condiciones que el usuario no escribió y no puede quitar desde aquí.
+        //
+        // `contype` va con `::text` porque su tipo es el `"char"` interno de un
+        // byte, y Npgsql se niega a entregarlo como cadena. Lo mismo vale para
+        // `confdeltype` y `confupdtype` en las claves foráneas.
         const string Sql = """
             SELECT
-                con.contype,
+                con.contype::text,
                 con.conname,
                 pg_get_constraintdef(con.oid) AS definition,
                 (
