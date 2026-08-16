@@ -96,6 +96,19 @@ export interface RowEditRequest {
   }[];
 }
 
+/**
+ * Filas que se van a borrar, señaladas por su clave primaria.
+ *
+ * Sin valores: para borrar basta con saber cuál es la fila.
+ */
+export interface RowDeleteRequest {
+  readonly sessionId: string;
+  readonly table: DatabaseObject;
+  /** El usuario ya vio el SQL. Sin esto el servidor se niega. */
+  readonly confirmed: boolean;
+  readonly keys: readonly (readonly { column: string; value: string | null }[])[];
+}
+
 /** Lo que se ejecutó al cambiar la estructura, y cuánto tardó. */
 export interface TableChangeResult {
   readonly statements: readonly string[];
@@ -276,6 +289,11 @@ export abstract class ApplicationGateway {
 
   /** Guarda los cambios. El servidor los aplica todos o ninguno. */
   abstract applyRowEdits(request: RowEditRequest): Observable<RowEditResult>;
+
+  /** El `DELETE` que se ejecutaría, para enseñarlo antes de borrar nada. */
+  abstract previewRowDeletes(request: RowDeleteRequest): Observable<readonly string[]>;
+
+  abstract deleteRows(request: RowDeleteRequest): Observable<RowEditResult>;
 
   // --- Importación ----------------------------------------------------------
 

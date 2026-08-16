@@ -432,6 +432,34 @@ Dos detalles que evitan que ayudar estorbe:
 
 **Verificado:** 319 pruebas de frontend (17 nuevas).
 
+#### Borrar filas, por las dos vías
+
+Lo preguntó el usuario: si convenía una interfaz para los `DELETE` como la que
+hay para `INSERT` y `UPDATE`. Sí, **pero no con las mismas reglas**: que sea la
+operación más peligrosa es argumento para guiarla, no para dejarla fuera. Hasta
+ahora la única forma de borrar era escribirlo a mano, que es justo donde se
+olvida el `WHERE`.
+
+- **En el compositor**: condición obligatoria y **recuento previo** con el mismo
+  filtro. El error caro no es olvidar el `WHERE`, es escribir uno que abarca más
+  de lo que uno cree, y contar es lo único que lo enseña antes.
+- **En la cuadrícula**: se señalan filas con una casilla y se borran por clave
+  primaria, solo donde ya se puede editar. Es la forma más segura de borrar,
+  porque se ve exactamente qué se va.
+
+En el servidor rige la misma regla que al editar —**una fila por instrucción, o
+se deshace todo**— y aquí pesa más: de un borrado no queda valor anterior que
+devolver. Hay dos pruebas contractuales nuevas por motor, y una comprueba
+justamente que una clave que ya no existe no se lleve por delante las demás
+filas del lote.
+
+**De paso, un fallo que llevaba ahí desde el editor de filas:** el aviso de «N
+filas guardadas» no se veía nunca, porque volver a ejecutar la consulta limpia el
+aviso al empezar y el mensaje se ponía antes. Ahora va después de releer.
+
+**Verificado:** 443 en backend —8 contractuales nuevas, borrado real en los
+cuatro motores— y 329 en frontend.
+
 #### Fase 7: los paquetes de Linux y macOS
 
 Lo que faltaba de la fase, salvo lo que exige otro equipo. Un job por plataforma

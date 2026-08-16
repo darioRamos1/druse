@@ -50,8 +50,29 @@
 
   @for (row of visibleRows(); track row.number) {
     <div class="row" role="row" [style.grid-template-columns]="gridTemplate()">
-      <div class="cell cell--number" role="cell" title="Copiar la fila" (dblclick)="copyRow(row)">
-        {{ row.number }}
+      <div
+        class="cell cell--number"
+        role="cell"
+        [class.is-marked]="isRowSelected(row.number)"
+        title="Copiar la fila"
+        (dblclick)="copyRow(row)"
+      >
+        <!--
+          La casilla solo aparece donde se puede señalar una fila sin ambigüedad,
+          que es lo mismo que exige la edición: tabla de origen y clave primaria
+          entre las columnas.
+        -->
+        @if (editable()) {
+          <input
+            type="checkbox"
+            class="cell--number__check"
+            [checked]="isRowSelected(row.number)"
+            [attr.aria-label]="'Señalar la fila ' + row.number + ' para borrar'"
+            (click)="$event.stopPropagation()"
+            (change)="rowToggled.emit(row.number)"
+          />
+        }
+        <span>{{ row.number }}</span>
       </div>
       @for (column of resultSet().columns; track column.name; let i = $index) {
         <div

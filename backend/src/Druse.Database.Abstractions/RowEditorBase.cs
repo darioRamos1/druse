@@ -218,6 +218,106 @@ public abstract class RowEditorBase : IRowEditor
     /// puedan decir cosas distintas: solo cambia si los valores van como
     /// parámetros o escritos.
     /// </summary>
+    public IReadOnlyList<string> DescribeDelete(PreparedRowDeleteBatch batch)
+    {
+        ArgumentNullException.ThrowIfNull(batch);
+
+        return [.. batch.Keys.Select(key => DeleteStatement(batch, key, literal: true))];
+    }
+
+    public async Task<RowEditResult> DeleteAsync(
+        IDatabaseSession session,
+        PreparedRowDeleteBatch batch,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(batch);
+
+        var connection = Connection(session);
+        var stopwatch = Stopwatch.StartNew();
+        var afectadas = 0L;
+
+        await using var scope = await OperationScope.BeginAsync(
+            connection,
+            session.Transaction,
+            cancellationToken);
+        var transaction = scope.Transaction;
+
+        try
+        {
+            foreach (var key in batch.Keys)
+            {
+                await using var command = connection.CreateCommand();
+                command.Transaction = transaction;
+                command.CommandText = DeleteStatement(batch, key, literal: false);
+
+                var index = 0;
+
+                foreach (var cell in key)
+                {
+                    var parameter = command.CreateParameter();
+                    parameter.ParameterName = ParameterName(index++);
+                    parameter.Value = cell.Value;
+                    command.Parameters.Add(parameter);
+                }
+
+                var filas = await command.ExecuteNonQueryAsync(cancellationToken);
+
+                // Aquí la comprobación pesa más que en la edición: un borrado que
+                // afecta a varias filas no se arregla volviendo a escribir el
+                // valor anterior, porque ya no hay valor anterior que leer.
+                if (filas != 1)
+                {
+                    await scope.RollbackAsync(CancellationToken.None);
+
+                    var causa = filas == 0
+                        ? "Una de las filas ya no existe o alguien la borró mientras mirabas."
+                        : $"Una instrucción habría borrado {filas} filas en lugar de una.";
+
+                    throw new RowEditFailedException(
+                        scope.IsOwned
+                            ? $"{causa} No se borró nada."
+                            : $"{causa} Lo borrado antes sigue dentro de tu transacción: " +
+                              "deshazla para recuperarlo.");
+                }
+
+                afectadas += filas;
+            }
+
+            await scope.CommitAsync(cancellationToken);
+        }
+        catch (Exception exception) when (exception is not RowEditFailedException)
+        {
+            await scope.RollbackAsync(CancellationToken.None);
+            throw;
+        }
+
+        stopwatch.Stop();
+
+        return new RowEditResult
+        {
+            RowsAffected = afectadas,
+            Duration = stopwatch.Elapsed,
+            Statements = DescribeDelete(batch),
+        };
+    }
+
+    private string DeleteStatement(
+        PreparedRowDeleteBatch batch,
+        IReadOnlyList<PreparedCell> key,
+        bool literal)
+    {
+        var name = batch.Schema is null
+            ? Quote(batch.Table)
+            : $"{Quote(batch.Schema)}.{Quote(batch.Table)}";
+
+        var index = 0;
+
+        var where = key.Select(cell =>
+            $"{Quote(cell.Column)} = {(literal ? cell.Literal : Parameter(index++))}");
+
+        return $"DELETE FROM {name} WHERE {string.Join(" AND ", where)}";
+    }
+
     private string Statement(PreparedRowEditBatch batch, PreparedRowEdit edit, bool literal)
     {
         var name = batch.Schema is null

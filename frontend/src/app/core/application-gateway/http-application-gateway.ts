@@ -28,6 +28,7 @@ import {
   ExportRequest,
   ImportOptions,
   ImportPreview,
+  RowDeleteRequest,
   RowEditRequest,
   RowEditResult,
   TableChangeResult,
@@ -163,6 +164,16 @@ export class HttpApplicationGateway extends ApplicationGateway {
 
   override applyRowEdits(request: RowEditRequest): Observable<RowEditResult> {
     return this._http.post<RowEditResult>('/api/rows', request);
+  }
+
+  override previewRowDeletes(request: RowDeleteRequest): Observable<readonly string[]> {
+    return this._http
+      .post<{ statements: string[] }>('/api/rows/delete/preview', request)
+      .pipe(map((response) => response.statements));
+  }
+
+  override deleteRows(request: RowDeleteRequest): Observable<RowEditResult> {
+    return this._http.post<RowEditResult>('/api/rows/delete', request);
   }
 
   // --- Diseño de tablas -----------------------------------------------------

@@ -34,6 +34,14 @@
       >
         UPDATE
       </button>
+      <button
+        type="button"
+        class="op--danger"
+        [class.is-active]="operation() === 'delete'"
+        (click)="setOperation('delete')"
+      >
+        DELETE
+      </button>
     }
   </nav>
 
@@ -384,8 +392,16 @@
       </section>
 
       <section class="block block--where">
-        <h3 class="block__title">Dónde aplicar el cambio</h3>
-        <p class="hint hint--warning">El UPDATE siempre conserva una cláusula WHERE visible.</p>
+        <h3 class="block__title">
+          {{ operation() === 'delete' ? 'Qué filas se borran' : 'Dónde aplicar el cambio' }}
+        </h3>
+        <p class="hint hint--warning">
+          @if (operation() === 'delete') {
+            Sin condición no se genera un DELETE ejecutable: borraría la tabla entera.
+          } @else {
+            El UPDATE siempre conserva una cláusula WHERE visible.
+          }
+        </p>
 
         @for (filter of updateFilters(); track $index) {
           <div class="filter">
@@ -430,6 +446,30 @@
         }
 
         <button type="button" class="btn btn--small" (click)="addUpdateFilter()">Añadir condición</button>
+
+        @if (operation() === 'delete') {
+          <!--
+            El recuento antes de borrar: el error caro no es olvidar el WHERE,
+            es escribir uno que abarca más de lo que uno cree.
+          -->
+          <div class="count">
+            <button
+              type="button"
+              class="btn btn--small"
+              [disabled]="counting()"
+              (click)="countAffected()"
+            >
+              {{ counting() ? 'Contando…' : 'Contar filas afectadas' }}
+            </button>
+
+            @if (affected() !== null) {
+              <span class="count__result" [class.count__result--many]="(affected() ?? 0) > 1">
+                Se borrarían <span class="mono">{{ affected() }}</span>
+                {{ affected() === 1 ? 'fila' : 'filas' }}
+              </span>
+            }
+          </div>
+        }
       </section>
     }
 

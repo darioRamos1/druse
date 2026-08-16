@@ -845,6 +845,93 @@ public abstract class DatabaseProviderContractTests<TFixture>
     // -----------------------------------------------------------------------
 
     [Fact]
+    public async Task BorrarUnaFila_QuitaEsaYSoloEsa()
+    {
+        if (Skip) { return; }
+
+        await using var session = await OpenAsync();
+
+        var table = $"druse_tmp_{Guid.NewGuid():N}";
+
+        try
+        {
+            await ExecuteAsync(session, Fixture.CreateTableWithColumns(table));
+            await ExecuteAsync(session, Fixture.InsertNamedRows(table));
+
+            var batch = new PreparedRowDeleteBatch
+            {
+                Schema = Fixture.DefaultSchema,
+                Table = table,
+                Keys = [[new PreparedCell("id", 2L, "2")]],
+            };
+
+            var result = await Fixture.RowEditor.DeleteAsync(session, batch, CancellationToken.None);
+
+            Assert.Equal(1, result.RowsAffected);
+
+            var después = await ExecuteAsync(
+                session,
+                $"SELECT nombre FROM {Fixture.DefaultSchema}.{table} ORDER BY id");
+
+            // Se fue la segunda y solo la segunda. Un borrado que se lleve de más
+            // no se arregla después: no queda valor anterior que devolver.
+            Assert.Equal(["Ana", "Cris"], después.ResultSets[0].Rows.Select(row => row[0]));
+        }
+        finally
+        {
+            await ExecuteAsync(session, Fixture.DropTable(table));
+        }
+    }
+
+    /// <summary>
+    /// Una fila que ya no está deja el resto intacto y lo dice.
+    ///
+    /// Es el caso que de verdad protege la regla de «exactamente una fila»: dos
+    /// personas mirando la misma cuadrícula, y una borra antes que la otra.
+    /// </summary>
+    [Fact]
+    public async Task BorrarUnaFilaQueYaNoExiste_NoSeLlevaNadaMas()
+    {
+        if (Skip) { return; }
+
+        await using var session = await OpenAsync();
+
+        var table = $"druse_tmp_{Guid.NewGuid():N}";
+
+        try
+        {
+            await ExecuteAsync(session, Fixture.CreateTableWithColumns(table));
+            await ExecuteAsync(session, Fixture.InsertNamedRows(table));
+
+            var batch = new PreparedRowDeleteBatch
+            {
+                Schema = Fixture.DefaultSchema,
+                Table = table,
+                Keys =
+                [
+                    [new PreparedCell("id", 1L, "1")],
+                    [new PreparedCell("id", 99L, "99")],
+                ],
+            };
+
+            await Assert.ThrowsAsync<RowEditFailedException>(
+                () => Fixture.RowEditor.DeleteAsync(session, batch, CancellationToken.None));
+
+            var después = await ExecuteAsync(
+                session,
+                $"SELECT nombre FROM {Fixture.DefaultSchema}.{table} ORDER BY id");
+
+            // Ni siquiera la primera, que sí existía: o se borra todo lo pedido o
+            // no se borra nada.
+            Assert.Equal(["Ana", "Bea", "Cris"], después.ResultSets[0].Rows.Select(row => row[0]));
+        }
+        finally
+        {
+            await ExecuteAsync(session, Fixture.DropTable(table));
+        }
+    }
+
+    [Fact]
     public async Task EditarUnaFila_CambiaEsaYSoloEsa()
     {
         if (Skip) { return; }

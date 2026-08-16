@@ -451,3 +451,26 @@ input[type='number'] {
     }
   }
 }
+
+/* DELETE se distingue del resto de operaciones: no es una más de la fila. */
+.op--danger.is-active {
+  border-color: #f2686b;
+  color: #f2686b;
+}
+
+.count {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-top: 10px;
+
+  &__result {
+    color: var(--dr-text-muted);
+    font-size: var(--dr-font-size-xs);
+
+    /* Más de una fila es justo el caso que conviene mirar dos veces. */
+    &--many {
+      color: #f2686b;
+    }
+  }
+}

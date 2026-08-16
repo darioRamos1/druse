@@ -434,6 +434,58 @@ internal static class DatabaseEndpoints
             }
         })
         .WithName("ApplyRowEdits");
+
+        // Borrar tiene rutas propias por lo mismo que ver y guardar están
+        // separados: enseñar el DELETE y ejecutarlo son cosas distintas, y
+        // mezclarlas dejaría que un cliente mal escrito borre por mirar.
+        app.MapPost("/api/rows/delete/preview", async (
+            RowDeleteRequest request,
+            RowEditService rows,
+            CancellationToken cancellationToken) =>
+        {
+            try
+            {
+                var statements = await rows.PreviewDeleteAsync(request.ToDomain(), cancellationToken);
+
+                return Results.Ok(new { statements });
+            }
+            catch (RowEditRejectedException exception)
+            {
+                return Rejected(exception);
+            }
+        })
+        .WithName("PreviewRowDeletes");
+
+        app.MapPost("/api/rows/delete", async (
+            RowDeleteRequest request,
+            RowEditService rows,
+            CancellationToken cancellationToken) =>
+        {
+            try
+            {
+                var result = await rows.DeleteAsync(request.ToDomain(), cancellationToken);
+
+                return Results.Ok(new RowEditResponse
+                {
+                    RowsAffected = result.RowsAffected,
+                    DurationMs = (long)result.Duration.TotalMilliseconds,
+                    Statements = result.Statements,
+                });
+            }
+            catch (RowEditRejectedException exception)
+            {
+                return Rejected(exception);
+            }
+            catch (RowEditFailedException exception)
+            {
+                return Results.Conflict(new RowEditRejectedResponse
+                {
+                    Reason = "unexpectedrowcount",
+                    Message = exception.Message,
+                });
+            }
+        })
+        .WithName("DeleteRows");
     }
 
     private static IResult Rejected(RowEditRejectedException exception) =>

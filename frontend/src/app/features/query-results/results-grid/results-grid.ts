@@ -43,9 +43,17 @@ export class ResultsGrid {
   /** Cambios pendientes, para pintarlos aunque el componente se recree. */
   readonly pendingEdits = input<readonly CellEdit[]>([]);
 
+  /** Filas señaladas para borrar, por su número. */
+  readonly selectedRows = input<readonly number[]>([]);
+
   readonly copied = output<string>();
+  readonly rowToggled = output<number>();
   readonly copyFailed = output<void>();
   readonly cellEdited = output<CellEdit>();
+
+  protected isRowSelected(row: number): boolean {
+    return this.selectedRows().includes(row);
+  }
 
   /** Celda que se está escribiendo ahora mismo. */
   protected readonly editing = signal<CellPosition | null>(null);

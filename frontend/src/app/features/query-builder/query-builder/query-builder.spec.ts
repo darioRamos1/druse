@@ -163,8 +163,26 @@ describe('QueryBuilder', () => {
       (button: Element) => button.textContent?.trim(),
     );
 
-    expect(operations).toEqual(['SELECT', 'INSERT', 'UPDATE']);
+    expect(operations).toEqual(['SELECT', 'INSERT', 'UPDATE', 'DELETE']);
     expect(labels).toEqual(['CREATE TABLE', 'DROP TABLE']);
+  });
+
+  it('el DELETE exige condición y cuenta antes de borrar', async () => {
+    const fixture = await create(table);
+
+    const [, , , borrar] = [...fixture.nativeElement.querySelectorAll('.operations button')];
+    (borrar as HTMLButtonElement).click();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const sql = (fixture.nativeElement.querySelector('.sql') as HTMLTextAreaElement).value;
+
+    // Los filtros arrancan con la clave primaria, así que ya hay condición; lo
+    // que se comprueba es que el DELETE nunca sale sin ella.
+    expect(sql).toContain('DELETE FROM');
+    expect(sql).toContain('WHERE');
+    expect(fixture.nativeElement.textContent).toContain('Contar filas afectadas');
   });
 
   it('una vista solo permite componer SELECT', async () => {

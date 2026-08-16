@@ -353,6 +353,21 @@ public sealed record RowEditRequest
     public bool Confirmed { get; init; }
 }
 
+/// <summary>
+/// Filas a borrar, cada una señalada por su clave primaria.
+///
+/// Sin valores: para borrar basta con saber cuál es la fila.
+/// </summary>
+public sealed record RowDeleteRequest
+{
+    public required Guid SessionId { get; init; }
+    public required DatabaseObjectDto Table { get; init; }
+    public required IReadOnlyList<IReadOnlyList<CellValueDto>> Keys { get; init; }
+
+    /// <summary>El usuario ya vio el SQL. Sin esto no se borra nada.</summary>
+    public bool Confirmed { get; init; }
+}
+
 public sealed record RowEditResponse
 {
     public required long RowsAffected { get; init; }

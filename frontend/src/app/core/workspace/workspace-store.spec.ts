@@ -7,6 +7,7 @@ import {
   ExecuteQueryRequest,
   ExportRequest,
   ImportPreview,
+  RowDeleteRequest,
   RowEditRequest,
   RowEditResult,
   StoredEditorTab,
@@ -253,6 +254,19 @@ class FakeGateway implements Partial<ApplicationGateway> {
   setPreference(key: string, value: string): Observable<void> {
     this.preferences[key] = value;
     return of(undefined);
+  }
+
+  deleteRequests: RowDeleteRequest[] = [];
+  deletePreviewRequests: RowDeleteRequest[] = [];
+
+  previewRowDeletes(request: RowDeleteRequest): Observable<readonly string[]> {
+    this.deletePreviewRequests.push(request);
+    return of(request.keys.map((key) => `DELETE FROM t WHERE ${key[0].column} = ${key[0].value}`));
+  }
+
+  deleteRows(request: RowDeleteRequest): Observable<RowEditResult> {
+    this.deleteRequests.push(request);
+    return of({ rowsAffected: request.keys.length, durationMs: 3, statements: [] });
   }
 
   /** Lo que la sesión anterior dejó escrito sin ejecutar. */
@@ -838,6 +852,67 @@ describe('WorkspaceStore', () => {
       await store.execute();
       await esperarA(() => !!store.editableTable());
     }
+
+    describe('borrado de filas', () => {
+      it('sin filas señaladas no se pide nada', async () => {
+        await abrirTabla();
+
+        await store.prepareDelete();
+
+        expect(gateway.deletePreviewRequests).toHaveLength(0);
+        expect(store.deletePreview()).toBeNull();
+      });
+
+      it('señala la fila y enseña el DELETE antes de borrar', async () => {
+        await abrirTabla();
+
+        store.toggleRowSelection(1);
+        await store.prepareDelete();
+
+        // La clave sale de la fila que el usuario tiene delante, igual que al
+        // editar: es lo que hace que se borre esa fila y no otra.
+        const enviado = gateway.deletePreviewRequests[0];
+
+        expect(enviado.keys).toEqual([[{ column: 'id', value: '1' }]]);
+        expect(enviado.confirmed).toBe(false);
+        expect(store.deletePreview()?.[0]).toContain('DELETE FROM');
+      });
+
+      /** Sin confirmación el servidor se niega; el store no debe pedirla por su cuenta. */
+      it('borrar manda la confirmación y limpia la selección', async () => {
+        await abrirTabla();
+
+        store.toggleRowSelection(1);
+        await store.prepareDelete();
+        await store.deleteSelectedRows();
+
+        expect(gateway.deleteRequests[0].confirmed).toBe(true);
+        expect(store.selectedRows()).toEqual([]);
+        expect(store.deletePreview()).toBeNull();
+        expect(store.notice()).toContain('1 fila borrada');
+      });
+
+      it('la marca se pone y se quita sobre la misma fila', async () => {
+        await abrirTabla();
+
+        store.toggleRowSelection(1);
+        expect(store.selectedRows()).toEqual([1]);
+
+        store.toggleRowSelection(1);
+        expect(store.selectedRows()).toEqual([]);
+      });
+
+      it('volver atrás conserva la selección y descarta el SQL', async () => {
+        await abrirTabla();
+
+        store.toggleRowSelection(1);
+        await store.prepareDelete();
+        store.cancelDeletePreview();
+
+        expect(store.deletePreview()).toBeNull();
+        expect(store.selectedRows()).toEqual([1]);
+      });
+    });
 
     it('una consulta escrita a mano no es editable', async () => {
       await store.connect(form);

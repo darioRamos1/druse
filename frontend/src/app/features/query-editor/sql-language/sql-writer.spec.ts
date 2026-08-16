@@ -2,6 +2,8 @@ import { KnownColumn } from '../../../shared/models/workspace';
 import {
   buildCall,
   buildCreateTable,
+  buildDeleteCount,
+  buildDeleteValues,
   buildDropTable,
   buildInsert,
   buildInsertValues,
@@ -427,6 +429,47 @@ describe('escribir SQL', () => {
       });
 
       expect(sql).toContain('/* int: valor obligatorio */');
+    });
+  });
+
+  describe('DELETE compuesto', () => {
+    it('escribe el DELETE con su filtro', () => {
+      const sql = buildDeleteValues('postgresql', {
+        schema: 'public',
+        table: 'usuarios',
+        filters: [{ column: 'id', operator: '=', value: '7' }],
+      });
+
+      expect(sql).toBe('DELETE FROM "public"."usuarios"\nWHERE "id" = 7;\n');
+    });
+
+    /** Lo que impide el accidente: sin condición, no hay DELETE que ejecutar. */
+    it('sin filtros deja la condición como hueco obligatorio', () => {
+      const sql = buildDeleteValues('sqlserver', { table: 'usuarios', filters: [] });
+
+      expect(sql).toContain('/* condición obligatoria */');
+      expect(sql).not.toMatch(/WHERE\s*;/);
+    });
+
+    it('el recuento usa exactamente el mismo filtro', () => {
+      const filters = [
+        { column: 'estado', operator: '=' as const, value: 'baja' },
+        { column: 'creado', operator: '<' as const, value: '2020-01-01' },
+      ];
+
+      const borrado = buildDeleteValues('mysql', { table: 'usuarios', filters });
+      const recuento = buildDeleteCount('mysql', { table: 'usuarios', filters });
+
+      const condiciones = (sql: string) => sql.slice(sql.indexOf('WHERE'));
+
+      expect(recuento).toContain('SELECT COUNT(*) AS filas FROM `usuarios`');
+      expect(condiciones(recuento).replace(';', '')).toBe(
+        condiciones(borrado).replace(';\n', ''),
+      );
+    });
+
+    it('sin filtros no hay nada que contar', () => {
+      expect(buildDeleteCount('postgresql', { table: 'usuarios', filters: [] })).toBe('');
     });
   });
 });

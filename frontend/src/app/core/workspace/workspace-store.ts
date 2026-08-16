@@ -9,6 +9,7 @@ import {
   ImportOptions,
   ImportPreview,
   QueryRejected,
+  RowDeleteRequest,
   RowEditRequest,
   TransactionState,
 } from '../application-gateway/application-gateway';
@@ -1142,13 +1143,16 @@ export class WorkspaceStore {
 
       this._edits.set([]);
       this._editPreview.set(null);
-      this._notice.set(
-        `${result.rowsAffected} ${result.rowsAffected === 1 ? 'fila guardada' : 'filas guardadas'}.`,
-      );
 
       // Se relee para que en pantalla quede lo que hay en la base, no lo que se
       // creía haber escrito: valores por defecto y disparadores pueden cambiarlo.
       await this.execute();
+
+      // El aviso va **después** de releer: `execute` limpia el aviso al empezar,
+      // así que ponerlo antes equivalía a no ponerlo.
+      this._notice.set(
+        `${result.rowsAffected} ${result.rowsAffected === 1 ? 'fila guardada' : 'filas guardadas'}.`,
+      );
 
       return true;
     } catch (error) {
@@ -1209,6 +1213,156 @@ export class WorkspaceStore {
     });
 
     return { sessionId, table: editable.table, confirmed, edits: filas };
+  }
+
+  /**
+   * Ejecuta un recuento y devuelve el número, sin tocar la pantalla.
+   *
+   * No pasa por `execute` a propósito: esto no es lo que el usuario pidió
+   * ejecutar, así que no debe cambiar la cuadrícula, ni el historial, ni la
+   * pestaña activa. Solo responde una pregunta.
+   */
+  async countRows(connectionId: string, sql: string): Promise<number | null> {
+    const sessionId = this.findConnection(connectionId)?.sessionId;
+
+    if (!sessionId) {
+      return null;
+    }
+
+    try {
+      const result = await firstValueFrom(
+        this._gateway.executeQuery({ sessionId, sql, maxRows: 1 }),
+      );
+
+      const value = result.resultSets[0]?.rows[0]?.values[0];
+
+      return value === null || value === undefined ? null : Number(value);
+    } catch (error) {
+      this.reportFailure(connectionId, error);
+      return null;
+    }
+  }
+
+  // --- Borrado de filas ------------------------------------------------------
+
+  /** Filas señaladas para borrar, por su número en el resultado. */
+  private readonly _selectedRows = signal<readonly number[]>([]);
+  readonly selectedRows = this._selectedRows.asReadonly();
+
+  /** El `DELETE` que se ejecutaría, ya escrito, mientras se decide. */
+  private readonly _deletePreview = signal<readonly string[] | null>(null);
+  readonly deletePreview = this._deletePreview.asReadonly();
+
+  private readonly _deleting = signal(false);
+  readonly deleting = this._deleting.asReadonly();
+
+  toggleRowSelection(row: number): void {
+    this._selectedRows.update((current) =>
+      current.includes(row) ? current.filter((item) => item !== row) : [...current, row],
+    );
+  }
+
+  clearRowSelection(): void {
+    this._selectedRows.set([]);
+    this._deletePreview.set(null);
+  }
+
+  cancelDeletePreview(): void {
+    this._deletePreview.set(null);
+  }
+
+  /**
+   * Pide el `DELETE` que se ejecutaría y lo deja listo para enseñarlo.
+   *
+   * Igual que al editar: el paso que no se puede saltar. Con una diferencia, y
+   * es que aquí no hay vuelta atrás mirando la pantalla.
+   */
+  async prepareDelete(): Promise<void> {
+    const request = this.buildDeleteRequest(false);
+
+    if (!request) {
+      return;
+    }
+
+    try {
+      this._deletePreview.set(await firstValueFrom(this._gateway.previewRowDeletes(request)));
+    } catch (error) {
+      this._notice.set(describeError(error));
+    }
+  }
+
+  /** Borra las filas señaladas y vuelve a ejecutar la consulta. */
+  async deleteSelectedRows(): Promise<boolean> {
+    const request = this.buildDeleteRequest(true);
+
+    if (!request) {
+      return false;
+    }
+
+    this._deleting.set(true);
+
+    try {
+      const result = await firstValueFrom(this._gateway.deleteRows(request));
+
+      this.clearRowSelection();
+
+      await this.execute();
+
+      // Después de releer, por lo mismo que al guardar: `execute` limpia el
+      // aviso al empezar.
+      this._notice.set(
+        `${result.rowsAffected} ${result.rowsAffected === 1 ? 'fila borrada' : 'filas borradas'}.`,
+      );
+
+      return true;
+    } catch (error) {
+      const connectionId = this.activeConnection()?.id;
+
+      if (!connectionId || !this.noteSessionLoss(connectionId, error)) {
+        this._notice.set(describeError(error));
+      }
+
+      return false;
+    } finally {
+      this._deleting.set(false);
+    }
+  }
+
+  /**
+   * Traduce la selección a lo que espera la API.
+   *
+   * La clave sale del resultado que el usuario tiene delante, como en la
+   * edición: es lo que garantiza que se borre la fila señalada y no otra.
+   */
+  private buildDeleteRequest(confirmed: boolean): RowDeleteRequest | null {
+    const editable = this.editableTable();
+    const sessionId = this.activeConnection()?.sessionId;
+    const resultSet = this.resultSet();
+    const selected = this._selectedRows();
+
+    if (!editable || !sessionId || !resultSet || selected.length === 0) {
+      return null;
+    }
+
+    const indexOf = (name: string) =>
+      resultSet.columns.findIndex((column) => column.name.toLowerCase() === name.toLowerCase());
+
+    const keys = selected.flatMap((number) => {
+      const row = resultSet.rows.find((item) => item.number === number);
+
+      if (!row) {
+        return [];
+      }
+
+      return [
+        editable.keyColumns.map((column) => ({
+          column,
+          value: row.values[indexOf(column)] ?? null,
+        })),
+      ];
+    });
+
+    return { sessionId, table: editable.table, confirmed, keys };
   }
 
   // --- Importación -----------------------------------------------------------

@@ -88,3 +88,23 @@ public enum RowEditRefusal
 
 /// <summary>Rechazo con su motivo y su explicación.</summary>
 public sealed record RowEditRejection(RowEditRefusal Reason, string Message);
+
+/// <summary>
+/// Filas que se quieren borrar, señaladas por su clave primaria.
+///
+/// No lleva valores: para borrar basta con saber cuál es la fila, y pedir el
+/// resto invitaría a pensar que algo más influye en lo que se va.
+/// </summary>
+public sealed record RowDeleteBatch
+{
+    public required Guid SessionId { get; init; }
+
+    /// <summary>Tabla de la que se borra, tal y como la nombra el catálogo.</summary>
+    public required DatabaseObject Table { get; init; }
+
+    /// <summary>Una lista de claves: cada una identifica una fila.</summary>
+    public required IReadOnlyList<IReadOnlyList<CellValue>> Keys { get; init; }
+
+    /// <summary>El usuario ya vio el SQL y lo confirmó.</summary>
+    public bool Confirmed { get; init; }
+}

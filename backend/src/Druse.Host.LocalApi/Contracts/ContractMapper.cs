@@ -478,6 +478,24 @@ internal static class ContractMapper
         };
     }
 
+    public static RowDeleteBatch ToDomain(this RowDeleteRequest request)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        return new RowDeleteBatch
+        {
+            SessionId = request.SessionId,
+            Table = request.Table.ToDomain(),
+            Keys =
+            [
+                .. request.Keys.Select(key =>
+                    (IReadOnlyList<CellValue>)
+                        [.. key.Select(cell => new CellValue(cell.Column, cell.Value))]),
+            ],
+            Confirmed = request.Confirmed,
+        };
+    }
+
     public static EditorTabDto ToDto(this EditorTabState tab)
     {
         ArgumentNullException.ThrowIfNull(tab);

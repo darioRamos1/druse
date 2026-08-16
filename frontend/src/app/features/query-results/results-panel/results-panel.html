@@ -138,10 +138,55 @@
         [compact]="compact()"
         [editable]="editable()"
         [pendingEdits]="edits()"
+        [selectedRows]="selectedRows()"
         (copied)="copied.emit($event)"
         (copyFailed)="copyFailed.emit()"
         (cellEdited)="cellEdited.emit($event)"
+        (rowToggled)="rowToggled.emit($event)"
       />
+
+      @if (selectedRows().length > 0) {
+        <!--
+          Borrar es en dos pasos como guardar, y por un motivo más fuerte: aquí
+          no queda valor anterior al que volver. Antes de confirmar se enseña el
+          DELETE exacto, una instrucción por fila.
+        -->
+        <div class="edits edits--danger" role="status">
+          @if (deletePreview(); as statements) {
+            <div class="edits__sql">
+              <p class="edits__title">Se va a ejecutar:</p>
+              @for (statement of statements; track $index) {
+                <code class="edits__statement">{{ statement }}</code>
+              }
+            </div>
+
+            <div class="edits__actions">
+              <button type="button" class="btn" (click)="cancelDelete.emit()">Volver</button>
+              <button
+                type="button"
+                class="btn btn--danger"
+                [disabled]="deleting()"
+                (click)="deleteRows.emit()"
+              >
+                {{ deleting() ? 'Borrando…' : 'Confirmar y borrar' }}
+              </button>
+            </div>
+          } @else {
+            <p class="edits__count">
+              <span class="mono">{{ selectedRows().length }}</span>
+              {{ selectedRows().length === 1 ? 'fila señalada' : 'filas señaladas' }}
+              · para borrar
+            </p>
+
+            <div class="edits__actions">
+              <button type="button" class="btn" (click)="clearSelection.emit()">Quitar marca</button>
+              <button type="button" class="btn btn--primary" (click)="prepareDelete.emit()">
+                Ver SQL y borrar
+              </button>
+            </div>
+          }
+        </div>
+      }
 
       @if (edits().length > 0) {
         <!--

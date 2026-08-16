@@ -1035,6 +1035,30 @@ instrucción.
 
 `IN` se queda en texto libre a propósito: espera una lista separada por comas.
 
+### Borrar filas — implementado
+
+El compositor cubría `SELECT`, `INSERT` y `UPDATE`, y dejaba sin asistir justo la
+operación que más cuidado exige: para borrar había que escribir el `DELETE` a
+mano, que es donde más fácil resulta olvidar el `WHERE`.
+
+Se hizo por las dos vías, porque son dos necesidades distintas:
+
+- [x] **DELETE en el compositor**, con condición obligatoria: sin filtros no se
+  genera SQL ejecutable, igual que el `UPDATE`.
+- [x] **Recuento antes de borrar**, con el mismo `WHERE`. El error caro no suele
+  ser olvidar la condición, sino escribir una que abarca más de lo que uno cree.
+- [x] **Borrar las filas señaladas en la cuadrícula**, por clave primaria y solo
+  donde ya se permite editar: tabla de origen y clave entre las columnas.
+- [x] El `DELETE` se enseña antes de ejecutarlo, una instrucción por fila, y el
+  servidor exige la confirmación.
+- [x] **Exactamente una fila por instrucción**, comprobado en el servidor: si una
+  clave resultara no ser única, se deshace todo. Aquí pesa más que al editar,
+  porque de un borrado no queda valor anterior al que volver.
+
+No se ofrece `DELETE` sobre vistas —no se sabe si son actualizables— ni un
+borrado sin filtros «con confirmación»: para vaciar una tabla está `TRUNCATE`
+escrito a mano, que ya pasa por la detección de instrucciones destructivas.
+
 ### Prioridad alta
 
 - ~~Autenticación integrada de Windows para SQL Server.~~ Hecho (sesión 014).

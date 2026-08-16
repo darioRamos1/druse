@@ -332,6 +332,48 @@ export function buildUpdateValues(engine: DatabaseEngine, spec: UpdateValuesSpec
   return `UPDATE ${qualify(engine, spec.schema, spec.table)}\nSET\n${assignments}\nWHERE ${where};\n`;
 }
 
+/**
+ * `DELETE` compuesto desde el formulario, con su filtro obligatorio.
+ *
+ * Sin filtros no devuelve un DELETE ejecutable: deja el hueco a la vista, igual
+ * que el `UPDATE`. Aquí la razón pesa más, porque un `DELETE` sin `WHERE` vacía
+ * la tabla y no hay valor anterior al que volver.
+ */
+export function buildDeleteValues(
+  engine: DatabaseEngine,
+  spec: { schema?: string; table: string; filters: readonly QueryFilter[] },
+): string {
+  const filters = spec.filters.filter((filter) => filter.column.length > 0);
+  const where =
+    filters.length > 0
+      ? filters.map((filter) => condition(engine, filter)).join('\n  AND ')
+      : '/* condición obligatoria */';
+
+  return `DELETE FROM ${qualify(engine, spec.schema, spec.table)}\nWHERE ${where};\n`;
+}
+
+/**
+ * El recuento de lo que ese mismo `DELETE` se llevaría.
+ *
+ * Se ejecuta antes de borrar y con **el mismo filtro**: el error caro no suele
+ * ser olvidar el `WHERE`, sino escribir uno que coincide con más filas de las
+ * que uno cree.
+ */
+export function buildDeleteCount(
+  engine: DatabaseEngine,
+  spec: { schema?: string; table: string; filters: readonly QueryFilter[] },
+): string {
+  const filters = spec.filters.filter((filter) => filter.column.length > 0);
+
+  if (filters.length === 0) {
+    return '';
+  }
+
+  const where = filters.map((filter) => condition(engine, filter)).join('\n  AND ');
+
+  return `SELECT COUNT(*) AS filas FROM ${qualify(engine, spec.schema, spec.table)}\nWHERE ${where};`;
+}
+
 /** Plantilla destructiva que siempre se revisa en el editor antes de ejecutarse. */
 export function buildDropTable(
   engine: DatabaseEngine,

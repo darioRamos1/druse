@@ -250,6 +250,31 @@ export class AppShell {
   protected readonly resultSet = this._store.resultSet;
   protected readonly result = this._store.result;
   protected readonly running = this._store.running;
+
+  // Borrado de filas: la selección y el SQL viven en el store, como la edición.
+  protected readonly selectedRows = this._store.selectedRows;
+  protected readonly deletePreview = this._store.deletePreview;
+  protected readonly deleting = this._store.deleting;
+
+  protected toggleRowSelection(row: number): void {
+    this._store.toggleRowSelection(row);
+  }
+
+  protected clearRowSelection(): void {
+    this._store.clearRowSelection();
+  }
+
+  protected async prepareDelete(): Promise<void> {
+    await this._store.prepareDelete();
+  }
+
+  protected cancelDeletePreview(): void {
+    this._store.cancelDeletePreview();
+  }
+
+  protected async deleteSelectedRows(): Promise<void> {
+    await this._store.deleteSelectedRows();
+  }
   protected readonly rejection = this._store.rejection;
   protected readonly notice = this._store.notice;
   protected readonly history = this._store.history;

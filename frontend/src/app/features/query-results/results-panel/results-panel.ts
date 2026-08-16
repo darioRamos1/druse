@@ -56,6 +56,17 @@ export class ResultsPanel {
   readonly copied = output<string>();
   readonly copyFailed = output<void>();
   readonly cellEdited = output<CellEdit>();
+
+  /** Filas señaladas para borrar y lo que hace falta para llevarlo a cabo. */
+  readonly selectedRows = input<readonly number[]>([]);
+  readonly deletePreview = input<readonly string[] | null>(null);
+  readonly deleting = input(false);
+
+  readonly rowToggled = output<number>();
+  readonly clearSelection = output<void>();
+  readonly prepareDelete = output<void>();
+  readonly cancelDelete = output<void>();
+  readonly deleteRows = output<void>();
   readonly prepareEdits = output<void>();
   readonly saveEdits = output<void>();
   readonly discardEdits = output<void>();

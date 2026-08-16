@@ -187,10 +187,26 @@
 }
 
 .cell--number {
+  display: flex;
+  gap: 6px;
+  align-items: center;
   cursor: pointer;
 
   &:hover {
     color: var(--dr-text-secondary);
+  }
+
+  // Una fila señalada para borrar se ve de un vistazo, sin tener que buscar la
+  // casilla marcada.
+  &.is-marked {
+    background: rgb(242 104 107 / 12%);
+    color: var(--dr-text);
+  }
+
+  &__check {
+    margin: 0;
+    accent-color: #f2686b;
+    cursor: pointer;
   }
 }
 
