@@ -2122,6 +2122,9 @@ export class WorkspaceStore {
         columns.map((column) => ({
           name: column.name,
           dataType: column.dataType,
+          // Sin esto el compositor pide todo con un campo de texto: la columna
+          // sabe que es una fecha, pero esa parte se quedaba por el camino.
+          inputKind: column.inputKind,
           isNullable: column.isNullable,
           isPrimaryKey: column.isPrimaryKey,
           isGenerated: column.isGenerated,

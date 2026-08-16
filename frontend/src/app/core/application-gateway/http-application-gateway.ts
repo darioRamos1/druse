@@ -16,6 +16,7 @@ import {
   SessionInfo,
   TableAlteration,
   TableDesign,
+  InputKind,
   RoutineSignature,
   TableStructure,
   TestConnectionResult,
@@ -38,7 +39,12 @@ import {
 
 /** Forma en que la API devuelve un conjunto de resultados. */
 interface ResultSetDto {
-  readonly columns: readonly { name: string; dataType: string; ordinal: number }[];
+  readonly columns: readonly {
+    name: string;
+    dataType: string;
+    inputKind?: InputKind;
+    ordinal: number;
+  }[];
   readonly rows: readonly (readonly (string | null)[])[];
   readonly truncated: boolean;
 }
@@ -328,6 +334,10 @@ export class HttpApplicationGateway extends ApplicationGateway {
         name: column.name,
         dataType: column.dataType,
         kind,
+        // La familia exacta la calcula la API: `kind` solo distingue lo justo
+        // para el ancho y la alineación, y no separa una fecha de una marca de
+        // tiempo, que es precisamente lo que decide el control de edición.
+        inputKind: column.inputKind,
         width: WIDTH_BY_KIND[kind],
       };
     });

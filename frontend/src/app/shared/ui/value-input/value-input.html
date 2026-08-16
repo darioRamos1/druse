@@ -15,7 +15,7 @@
     [type]="nativeType()"
     [value]="nativeValue()"
     [disabled]="disabled()"
-    [attr.step]="kind() === 'decimal' ? 'any' : null"
+    [attr.step]="step()"
     [attr.aria-label]="label()"
     (input)="onInput($event)"
   />

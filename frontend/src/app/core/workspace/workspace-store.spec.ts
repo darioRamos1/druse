@@ -409,6 +409,14 @@ class FakeGateway implements Partial<ApplicationGateway> {
         defaultValue: "'sin-correo'",
         ordinal: 2,
       },
+      {
+        name: 'creado_en',
+        dataType: 'timestamp with time zone',
+        inputKind: 'datetimeOffset',
+        isNullable: true,
+        isPrimaryKey: false,
+        ordinal: 3,
+      },
     ]);
   }
 
@@ -741,10 +749,14 @@ describe('WorkspaceStore', () => {
       const columnas = await store.ensureColumnsAsync('public', 'users');
 
       // Llegan con su tipo, que es lo que el editor necesita para el tooltip.
-      expect(columnas.map((columna) => columna.name)).toEqual(['id', 'email']);
+      expect(columnas.map((columna) => columna.name)).toEqual(['id', 'email', 'creado_en']);
       expect(columnas[0].dataType).toBe('int8');
       expect(columnas[0].isPrimaryKey).toBe(true);
       expect(columnas[1].defaultValue).toBe("'sin-correo'");
+
+      // Y con su clase de entrada: es lo que hace que el compositor pida la
+      // fecha con un calendario en vez de con un campo de texto.
+      expect(columnas[2].inputKind).toBe('datetimeOffset');
 
       // Traer las columnas no es lo mismo que desplegar el nodo.
       expect(store.explorerNodes().length).toBe(1);

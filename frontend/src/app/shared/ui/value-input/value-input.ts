@@ -46,6 +46,26 @@ export class ValueInput {
 
   protected readonly nativeType = computed(() => NATIVE_TYPE[this.kind()] ?? 'text');
 
+  /**
+   * Precisión que se le pide al control.
+   *
+   * Sin `step`, el selector de fecha y hora se queda en minutos y no deja elegir
+   * los segundos, que una marca de tiempo sí guarda. Un decimal admite cualquier
+   * cifra: sin esto, el navegador solo aceptaría enteros.
+   */
+  protected readonly step = computed(() => {
+    switch (this.kind()) {
+      case 'decimal':
+        return 'any';
+      case 'time':
+      case 'datetime':
+      case 'datetimeOffset':
+        return '1';
+      default:
+        return null;
+    }
+  });
+
   protected readonly isBoolean = computed(() => this.kind() === 'boolean' && !this.freeText());
 
   /**

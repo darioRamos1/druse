@@ -416,7 +416,21 @@ Dos detalles que evitan que ayudar estorbe:
 `IN` se queda en texto libre porque espera una lista separada por comas, y
 `datetime-local` recibe la `T` que SQL escribe como espacio.
 
-**Verificado:** 312 pruebas de frontend (10 nuevas del componente).
+**Tres arreglos al probarlo en la aplicación**, que es donde se vieron:
+
+- **El tipo se perdía por el camino.** La API lo mandaba, pero al construir las
+  columnas del compositor y las de la cuadrícula no se copiaba, así que todo
+  seguía pidiéndose con un campo de texto. Las pruebas no lo habrían visto: el
+  componente recibía el tipo directamente.
+- **La fecha con hora no dejaba elegir los segundos.** Sin `step`, el selector se
+  queda en minutos.
+- **El editor se quedaba «cargando» para siempre.** Los módulos de Monaco se
+  pedían sin callback de error, así que uno que no cargara dejaba la promesa
+  colgada: ni editor ni mensaje. Y como la promesa se cacheaba, no se recuperaba
+  en toda la sesión. Ahora rechaza con el motivo, se puede reintentar sin
+  recargar la aplicación, y hay un tope de espera por si el cargador ni contesta.
+
+**Verificado:** 319 pruebas de frontend (17 nuevas).
 
 #### Fase 7: los paquetes de Linux y macOS
 

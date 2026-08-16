@@ -67,7 +67,8 @@ export interface ExecutionErrorContext {
     @if (!ready()) {
       <div class="placeholder">
         @if (failed()) {
-          <span class="placeholder__error">No se pudo cargar el editor.</span>
+          <span class="placeholder__error">{{ failure() }}</span>
+          <button type="button" class="placeholder__retry" (click)="retry()">Reintentar</button>
         } @else {
           <span>Cargando editor…</span>
         }
@@ -92,14 +93,29 @@ export interface ExecutionErrorContext {
       position: absolute;
       inset: 0;
       display: flex;
+      flex-direction: column;
+      gap: 10px;
       align-items: center;
       justify-content: center;
+      padding: 16px;
       background: var(--dr-surface-base);
       color: var(--dr-text-faint);
       font-size: var(--dr-font-size-sm);
+      text-align: center;
 
       &__error {
+        max-width: 460px;
         color: #f2686b;
+      }
+
+      &__retry {
+        padding: 6px 12px;
+        border: 1px solid var(--dr-border);
+        border-radius: 8px;
+        background: transparent;
+        color: var(--dr-text);
+        font-size: var(--dr-font-size-xs);
+        cursor: pointer;
       }
     }
   `,
@@ -149,6 +165,9 @@ export default class SqlEditor implements OnInit {
 
   protected readonly ready = signal(false);
   protected readonly failed = signal(false);
+
+  /** Por qué no cargó, para no dejar al usuario con un «no se pudo» a secas. */
+  protected readonly failure = signal('No se pudo cargar el editor.');
 
   private _editor: MonacoApi.editor.IStandaloneCodeEditor | null = null;
   private _monaco: typeof MonacoApi | null = null;
@@ -285,11 +304,30 @@ export default class SqlEditor implements OnInit {
   }
 
   async ngOnInit(): Promise<void> {
+    await this.start();
+  }
+
+  /**
+   * Vuelve a intentar cargar el editor.
+   *
+   * Existe porque el fallo más común es pasajero —un recurso que aún no estaba
+   * servido al abrir— y sin esto habría que recargar la aplicación entera,
+   * perdiendo de paso lo que hubiera escrito en las demás pestañas.
+   */
+  protected async retry(): Promise<void> {
+    this.failed.set(false);
+    await this.start();
+  }
+
+  private async start(): Promise<void> {
     let monaco: typeof MonacoApi;
 
     try {
       monaco = await this._loader.load();
-    } catch {
+    } catch (error) {
+      this.failure.set(
+        error instanceof Error ? error.message : 'No se pudo cargar el editor.',
+      );
       this.failed.set(true);
       return;
     }

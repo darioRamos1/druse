@@ -99,6 +99,26 @@ describe('ValueInput', () => {
     expect(field(fixture).value).toMatch(/^2026-08-16T10:30/);
   });
 
+  /** Sin `step`, el selector se queda en minutos y la hora exacta no se puede elegir. */
+  it('la fecha y hora deja elegir también los segundos', async () => {
+    const fixture = await create('datetime');
+
+    expect(field(fixture).getAttribute('step')).toBe('1');
+  });
+
+  it('una hora suelta también llega al segundo', async () => {
+    const fixture = await create('time');
+
+    expect(field(fixture).type).toBe('time');
+    expect(field(fixture).getAttribute('step')).toBe('1');
+  });
+
+  it('un decimal admite cifras, no solo enteros', async () => {
+    const fixture = await create('decimal');
+
+    expect(field(fixture).getAttribute('step')).toBe('any');
+  });
+
   it('un entero se pide con teclado numérico', async () => {
     const fixture = await create('integer', '42');
 
