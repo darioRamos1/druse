@@ -346,6 +346,11 @@
         </div>
       </section>
     } @else {
+      <!--
+        Las columnas solo se piden en el UPDATE: un DELETE no modifica nada, y
+        enseñar ahí una lista de valores haría pensar que sí influyen en algo.
+      -->
+      @if (operation() === 'update') {
       <section class="block">
         <h3 class="block__title">Cambios</h3>
         <p class="hint">Solo se incluyen las columnas que marques. La clave primaria no se modifica.</p>
@@ -390,6 +395,7 @@
           }
         </div>
       </section>
+      }
 
       <section class="block block--where">
         <h3 class="block__title">

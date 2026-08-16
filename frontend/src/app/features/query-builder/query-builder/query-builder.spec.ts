@@ -183,6 +183,11 @@ describe('QueryBuilder', () => {
     expect(sql).toContain('DELETE FROM');
     expect(sql).toContain('WHERE');
     expect(fixture.nativeElement.textContent).toContain('Contar filas afectadas');
+
+    // Un borrado no modifica columnas: enseñar la lista de valores del UPDATE
+    // haría pensar que influyen en algo.
+    expect(fixture.nativeElement.textContent).not.toContain('Cambios');
+    expect(fixture.nativeElement.textContent).toContain('Qué filas se borran');
   });
 
   it('una vista solo permite componer SELECT', async () => {
