@@ -29,6 +29,10 @@ internal static class InformixConnectionStringFactory
         "Security",
         "Connect Timeout",
         "ConnectTimeout",
+
+        // Lo gobierna Druse: dejar que un perfil lo cambie rompería el SQL que
+        // genera, y pasarlo por el constructor de IBM ni siquiera llega a eso.
+        "DELIMIDENT",
     };
 
     public static string Build(ConnectionProfile profile, DatabaseCredentials credentials) =>
@@ -63,13 +67,6 @@ internal static class InformixConnectionStringFactory
             ServerType = "IDS",
         };
 
-        // Sin DELIMIDENT, Informix trata las comillas dobles como delimitador de
-        // cadena y no de identificador: `SELECT "nombre" FROM t` devolvería la
-        // palabra literal en vez de la columna. Todo el DDL y el SQL generado de
-        // Druse cita con comillas dobles, así que esto es lo que hace que una
-        // tabla llamada `order` o con acentos pueda consultarse siquiera.
-        builder["DELIMIDENT"] = "Y";
-
         Apply(builder, profile.SslMode);
 
         foreach (var (key, value) in profile.Options)
@@ -82,7 +79,19 @@ internal static class InformixConnectionStringFactory
             builder[key] = value;
         }
 
-        return builder.ConnectionString;
+        // Sin DELIMIDENT, Informix trata las comillas dobles como delimitador de
+        // cadena y no de identificador: `SELECT "nombre" FROM t` devolvería la
+        // palabra literal en vez de la columna. Todo el DDL y el SQL generado de
+        // Druse cita con comillas dobles, así que esto es lo que hace que una
+        // tabla llamada `order` o con acentos pueda consultarse siquiera.
+        //
+        // Se pega a mano, y con un `1`, porque el paquete de IBM se contradice a
+        // sí mismo: su constructor reconoce la clave, la convierte a booleano
+        // —rechazando la `Y` que usa la variable de entorno del motor— y la
+        // vuelve a escribir como `DelimIdent=True`, que es justo un valor que su
+        // propia conexión rechaza con «Invalid argument». Comprobado contra el
+        // servidor: `1` y `y` valen; `Y` y `True`, no.
+        return builder.ConnectionString + ";DELIMIDENT=1";
     }
 
     /// <summary>

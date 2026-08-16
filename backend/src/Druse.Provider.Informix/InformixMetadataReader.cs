@@ -1,4 +1,5 @@
 using System.Data.Common;
+using System.Globalization;
 using System.Text;
 using Druse.Database.Abstractions;
 using Druse.Domain;
@@ -51,10 +52,10 @@ public sealed class InformixMetadataReader : IDatabaseMetadataReader
         {
             return await QueryAsync(session, Sql, reader => new DatabaseObject
             {
-                Id = $"db:{reader.GetString(0)}",
-                Name = reader.GetString(0),
+                Id = $"db:{Text(reader, 0)}",
+                Name = Text(reader, 0),
                 Kind = DatabaseObjectKind.Database,
-                Database = reader.GetString(0),
+                Database = Text(reader, 0),
                 HasChildren = true,
             }, cancellationToken);
         }
@@ -124,19 +125,19 @@ public sealed class InformixMetadataReader : IDatabaseMetadataReader
             Sql,
             reader =>
             {
-                var coltype = reader.GetInt32(1);
-                var collength = reader.GetInt32(2);
+                var coltype = Number(reader, 1);
+                var collength = Number(reader, 2);
 
                 return new DatabaseColumn
                 {
-                    Name = reader.GetString(0),
+                    Name = Text(reader, 0),
                     DataType = InformixTypeNames.Format(coltype, collength),
                     IsNullable = InformixTypeNames.IsNullable(coltype),
                     // La clave primaria no está en syscolumns: se rellena después.
                     IsPrimaryKey = false,
                     IsGenerated = InformixTypeNames.IsSerial(coltype),
-                    DefaultValue = reader.IsDBNull(5) ? null : reader.GetString(5).Trim(),
-                    Ordinal = reader.GetInt16(3),
+                    DefaultValue = DefaultValue(reader, 4, 5, coltype),
+                    Ordinal = (short)Number(reader, 3),
                 };
             },
             cancellationToken,
@@ -238,7 +239,7 @@ public sealed class InformixMetadataReader : IDatabaseMetadataReader
 
                 for (var part = 0; part < 16; part++)
                 {
-                    var position = reader.GetInt16(2 + part);
+                    var position = Number(reader, 2 + part);
 
                     if (position == 0)
                     {
@@ -263,9 +264,9 @@ public sealed class InformixMetadataReader : IDatabaseMetadataReader
 
                 return new DatabaseIndex
                 {
-                    Name = reader.GetString(0),
+                    Name = Text(reader, 0),
                     // `idxtype` es 'U' para único y 'D' para admitir duplicados.
-                    IsUnique = reader.GetString(1).Trim().StartsWith('U'),
+                    IsUnique = Text(reader, 1).StartsWith('U'),
                     Columns = columns,
                 };
             },
@@ -312,13 +313,13 @@ public sealed class InformixMetadataReader : IDatabaseMetadataReader
             session,
             Sql,
             reader => (
-                Name: reader.GetString(0).Trim(),
-                Type: reader.GetString(1).Trim(),
-                IndexName: reader.IsDBNull(2) ? null : reader.GetString(2).Trim(),
-                ConstraintId: reader.GetInt32(3),
-                ReferencedTable: reader.IsDBNull(4) ? null : reader.GetString(4).Trim(),
-                ReferencedOwner: reader.IsDBNull(5) ? null : reader.GetString(5).Trim(),
-                DeleteRule: reader.IsDBNull(6) ? null : reader.GetString(6).Trim()),
+                Name: Text(reader, 0),
+                Type: Text(reader, 1),
+                IndexName: reader.IsDBNull(2) ? null : Text(reader, 2),
+                ConstraintId: Number(reader, 3),
+                ReferencedTable: reader.IsDBNull(4) ? null : Text(reader, 4),
+                ReferencedOwner: reader.IsDBNull(5) ? null : Text(reader, 5),
+                DeleteRule: reader.IsDBNull(6) ? null : Text(reader, 6)),
             cancellationToken,
             table.Name,
             Owner(session, table));
@@ -408,7 +409,7 @@ public sealed class InformixMetadataReader : IDatabaseMetadataReader
         var parts = await QueryAsync(
             session,
             Sql,
-            reader => reader.GetString(0),
+            reader => Text(reader, 0),
             cancellationToken,
             constraintId);
 
@@ -448,7 +449,7 @@ public sealed class InformixMetadataReader : IDatabaseMetadataReader
         var rows = await QueryAsync(
             session,
             Sql,
-            reader => (Number: (int)reader.GetInt16(0), Name: reader.GetString(1).Trim()),
+            reader => (Number: Number(reader, 0), Name: Text(reader, 1)),
             cancellationToken,
             table.Name,
             Owner(session, table));
@@ -470,15 +471,34 @@ public sealed class InformixMetadataReader : IDatabaseMetadataReader
             ORDER BY t.owner
             """;
 
-        return await QueryAsync(session, sql, reader => new DatabaseObject
+        var owners = await QueryAsync(session, sql, reader => Text(reader, 0), cancellationToken);
+
+        // El usuario conectado sale siempre, tenga tablas o no. En Informix el
+        // esquema es el propietario y no existe por sí mismo, así que una base
+        // recién creada no devolvería ninguno: el árbol se quedaría vacío y sin
+        // sitio donde crear la primera tabla. Los otros motores tampoco esconden
+        // `public` ni `dbo` por estar vacíos.
+        var self = session.Profile.Username;
+
+        if (!owners.Contains(self, StringComparer.OrdinalIgnoreCase))
         {
-            Id = $"schema:{reader.GetString(0).Trim()}",
-            Name = reader.GetString(0).Trim(),
-            Kind = DatabaseObjectKind.Schema,
-            Database = database.Database ?? database.Name,
-            Schema = reader.GetString(0).Trim(),
-            HasChildren = true,
-        }, cancellationToken);
+            owners = [.. owners, self];
+        }
+
+        return
+        [
+            .. owners
+                .OrderBy(owner => owner, StringComparer.OrdinalIgnoreCase)
+                .Select(owner => new DatabaseObject
+                {
+                    Id = $"schema:{owner}",
+                    Name = owner,
+                    Kind = DatabaseObjectKind.Schema,
+                    Database = database.Database ?? database.Name,
+                    Schema = owner,
+                    HasChildren = true,
+                }),
+        ];
     }
 
     /// <summary>Agrupadores fijos bajo un esquema. Los mismos que en los otros motores.</summary>
@@ -543,13 +563,18 @@ public sealed class InformixMetadataReader : IDatabaseMetadataReader
             sql,
             reader => new DatabaseObject
             {
-                Id = $"{kind}:{folder.Schema}.{reader.GetString(0).Trim()}",
-                Name = reader.GetString(0).Trim(),
+                Id = $"{kind}:{folder.Schema}.{Text(reader, 0)}",
+                Name = Text(reader, 0),
                 Kind = kind,
                 Database = folder.Database,
                 Schema = folder.Schema,
                 HasChildren = true,
-                ApproximateRowCount = reader.IsDBNull(1) ? null : (long)reader.GetFloat(1),
+                // `nrows` es un FLOAT de ocho bytes, que el driver entrega como
+                // `double`: pedirlo con `GetFloat` lanzaba un cast inválido y
+                // tumbaba el listado entero de tablas.
+                ApproximateRowCount = reader.IsDBNull(1)
+                    ? null
+                    : Convert.ToInt64(reader.GetValue(1), CultureInfo.InvariantCulture),
             },
             cancellationToken,
             folder.Schema ?? string.Empty,
@@ -582,8 +607,8 @@ public sealed class InformixMetadataReader : IDatabaseMetadataReader
             Sql,
             reader => new DatabaseObject
             {
-                Id = $"{kind}:{folder.Schema}.{reader.GetString(0).Trim()}",
-                Name = reader.GetString(0).Trim(),
+                Id = $"{kind}:{folder.Schema}.{Text(reader, 0)}",
+                Name = Text(reader, 0),
                 Kind = kind,
                 Database = folder.Database,
                 Schema = folder.Schema,
@@ -638,7 +663,7 @@ public sealed class InformixMetadataReader : IDatabaseMetadataReader
         var parts = await QueryAsync(
             session,
             Sql,
-            reader => reader.GetString(0),
+            reader => Text(reader, 0),
             cancellationToken,
             view.Name,
             Owner(session, view));
@@ -679,7 +704,7 @@ public sealed class InformixMetadataReader : IDatabaseMetadataReader
         var parts = await QueryAsync(
             session,
             Sql,
-            reader => reader.GetString(0),
+            reader => Text(reader, 0),
             cancellationToken,
             procedure.Name,
             Owner(session, procedure));
@@ -704,6 +729,88 @@ public sealed class InformixMetadataReader : IDatabaseMetadataReader
     /// </summary>
     private static string Owner(IDatabaseSession session, DatabaseObject node) =>
         node.Schema ?? session.Profile.Username;
+
+    /// <summary>
+    /// Lee un texto del catálogo quitando el relleno.
+    ///
+    /// Casi todo el catálogo de Informix es `CHAR(n)`, así que los nombres llegan
+    /// rellenos de espacios hasta la longitud declarada: `sysdatabases.name` mide
+    /// 128 y devuelve `"druse_test"` seguido de 118 espacios. Comparar, componer
+    /// un identificador o buscar por ese valor falla sin recortarlo, y el fallo
+    /// no se ve —el nombre se lee bien en pantalla—, así que **todo texto del
+    /// catálogo tiene que pasar por aquí** en vez de repartir `Trim()` sueltos.
+    /// </summary>
+    private static string Text(DbDataReader reader, int ordinal) =>
+        reader.GetString(ordinal).TrimEnd();
+
+    /// <summary>
+    /// Lee un entero del catálogo sin depender de su ancho exacto.
+    ///
+    /// El catálogo mezcla `SMALLINT`, `INTEGER` y `FLOAT` según la columna, y
+    /// pedir el ancho equivocado —`GetInt32` sobre un `SMALLINT`— no devuelve un
+    /// número mal: lanza «Specified cast is not valid» y tumba la consulta
+    /// entera. Los anchos además cambian entre versiones de Informix, así que se
+    /// convierte desde el valor en vez de fijarlos aquí.
+    /// </summary>
+    private static int Number(DbDataReader reader, int ordinal) =>
+        Convert.ToInt32(reader.GetValue(ordinal), CultureInfo.InvariantCulture);
+
+    /// <summary>
+    /// Reconstruye el valor por defecto de una columna.
+    ///
+    /// `sysdefaults` no guarda el texto que se escribió, sino una letra que dice
+    /// **de qué clase** es el valor y, solo para los literales, el valor mismo:
+    ///
+    /// - `C`, `T`, `U`, `S` y `N` son palabras del motor —`CURRENT`, `TODAY`,
+    ///   `USER`, `DBSERVERNAME` y `NULL`— y llegan con el valor **vacío**. Leer
+    ///   solo el valor, como se hacía antes, dejaba sin defecto justo a la
+    ///   columna que más lo usa: la marca de tiempo de creación.
+    /// - `L` es un literal, y en una columna numérica viene precedido de su
+    ///   codificación interna y un espacio (`AAAABw 7`).
+    /// </summary>
+    private static string? DefaultValue(
+        DbDataReader reader,
+        int kindOrdinal,
+        int valueOrdinal,
+        int coltype)
+    {
+        if (reader.IsDBNull(kindOrdinal))
+        {
+            return null;
+        }
+
+        var kind = Text(reader, kindOrdinal);
+
+        if (kind.Length == 0)
+        {
+            return null;
+        }
+
+        switch (kind[0])
+        {
+            case 'C': return "CURRENT";
+            case 'T': return "TODAY";
+            case 'U': return "USER";
+            case 'S': return "DBSERVERNAME";
+            case 'N': return "NULL";
+        }
+
+        if (reader.IsDBNull(valueOrdinal))
+        {
+            return null;
+        }
+
+        var literal = Text(reader, valueOrdinal);
+
+        if (!InformixTypeNames.IsNumeric(coltype))
+        {
+            return literal;
+        }
+
+        var separator = literal.IndexOf(' ', StringComparison.Ordinal);
+
+        return separator < 0 ? literal : literal[(separator + 1)..];
+    }
 
     /// <summary>
     /// Ejecuta una consulta de catálogo y proyecta cada fila.

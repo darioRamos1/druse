@@ -17,7 +17,7 @@
 | Fase 8 | ✅ **7/7.** Tres motores sobre el mismo contrato y primera beta preparada. |
 | ¿Compila el backend? | Sí — 0 advertencias, 0 errores |
 | ¿Compila el envoltorio? | Sí |
-| ¿Pasan las pruebas? | Sí — **422 en backend** (228 unitarias, 126 contractuales y 68 de integración), **281 en frontend** y **6 en el envoltorio**. Las 36 que antes se saltaban ya corren: este equipo **sí tiene Docker** |
+| ¿Pasan las pruebas? | Sí — **426 en backend** (232 unitarias, 126 contractuales y 68 de integración), **281 en frontend** y **6 en el envoltorio**. Con `DRUSE_REQUIRE_ENGINES=1` y **los cuatro motores**, sin saltarse ninguna |
 | ¿Hay aplicación de escritorio? | **Sí.** Instalador NSIS, MSI y ZIP portable, en dos variantes: con Informix y sin él |
 | Motores | **PostgreSQL, SQL Server, MySQL/MariaDB e Informix**, todos sobre el mismo contrato compartido |
 | Trabajo a medias | Ninguno. Las transacciones manuales quedaron terminadas en la sesión 020. |
@@ -39,10 +39,13 @@ contra motores reales: **126 contractuales y 68 de integración, ninguna
 saltada**. Es lo primero que hay que hacer al empezar cualquier sesión que toque
 un proveedor.
 
-**Lo que queda a ciegas es Informix, y solo Informix**: catálogo, tipos, DDL y
-edición entraron enteros contra la documentación. Su contenedor es el único que
-no se ha levantado nunca —imagen de IBM, `test-db.ps1 -Engine informix`— y hasta
-que lo esté, `DRUSE_REQUIRE_ENGINES=1` no puede exigirse de verdad.
+**Y ya no queda ningún motor a ciegas.** Informix se levantó en la sesión 021 y
+pasa el contrato entero: `DRUSE_REQUIRE_ENGINES=1` con los cuatro motores da
+**426 en verde**. Costó nueve arreglos, empezando por uno que hacía imposible
+cualquier conexión.
+
+Lo que sigue sin comprobarse de Informix es lo que ninguna prueba contractual
+toca: el diseñador a mano desde la interfaz y la importación de archivos.
 
 1. **Túnel SSH contra un servidor SSH real.** Lo probado llega hasta el error de
    red: la librería intenta conectar y el mensaje vuelve bien escrito. Falta el
@@ -56,11 +59,10 @@ que lo esté, `DRUSE_REQUIRE_ENGINES=1` no puede exigirse de verdad.
    claves foráneas y clave primaria. Ojo a MySQL, que es el único donde un
    `ALTER` a medias no se deshace: si el `CREATE INDEX` que sigue a un
    `DROP INDEX` falla, la tabla se queda sin ese índice.
-2.b **Informix entero.** Es el que más riesgo acumula: catálogo (`systables`,
-   `syscolumns`, `sysindexes`, `sysconstraints`), descodificación de tipos, DDL y
-   edición de filas, todo escrito contra la documentación sin ejecutar nada. El
-   contenedor está listo en `test-db.ps1` con la imagen de desarrollo de IBM,
-   publicando el 9089 y creando las bases `WITH LOG` que DRDA exige.
+2.b ~~**Informix entero.**~~ Hecho en la sesión 021: el contrato completo corre
+   contra el contenedor de IBM y ahora también en integración continua. Queda
+   solo lo que el contrato no cubre en ningún motor —usar el diseñador a mano e
+   importar archivos—.
 3. **La autenticación de Windows con una cuenta de dominio.** Lo comprobado es
    que la petición llega al driver de SQL Server; falta una conexión que abra de
    verdad contra un servidor que acepte logins de Windows.
@@ -255,10 +257,54 @@ motores en pie, la suite completa pasa **sin saltarse nada**: 228 unitarias, 126
 contractuales y 68 de integración —las 36 que antes se omitían por falta de motor
 incluidas—, más 281 de frontend y 6 del envoltorio.
 
-Queda un solo motor a ciegas, Informix, cuyo contenedor no se ha levantado nunca.
+#### Informix, por fin contra un servidor
 
-**Verificado:** compilación en Release sin advertencias y las 422 del backend
-contra PostgreSQL 18, SQL Server 2022 y MySQL 8.4 reales.
+Se levantó su contenedor —el único que no se había arrancado nunca— y el motor
+resultó estar roto de arriba abajo. **Ninguna conexión habría funcionado jamás**,
+por tres capas encadenadas:
+
+1. `DELIMIDENT` iba como `"Y"`, y el constructor de IBM convierte esa clave a
+   booleano: reventaba antes de tocar la red.
+2. Pasarlo como booleano tampoco vale. El paquete de IBM **se contradice**: su
+   constructor escribe `DelimIdent=True` y su propia conexión rechaza ese valor
+   con «Invalid argument». Comprobado contra el servidor: valen `1` y `y`;
+   no valen `Y` ni `True`. Se pega a mano como `DELIMIDENT=1`.
+3. `test-db.ps1` no creaba las bases. Informix no tiene
+   `CREATE DATABASE IF NOT EXISTS`; no daba error visible y no creaba nada.
+
+Con la conexión viva, 13 de 31 pruebas fallaron. Lo que enseñaron:
+
+- **El catálogo viene relleno de espacios.** Es `CHAR(n)`, así que una base se
+  llama `"druse_test"` y 118 espacios. Había `Trim()` en unos sitios y no en
+  otros; ahora todo texto pasa por un único `Text()`.
+- **Los enteros del catálogo no tienen el ancho que uno supone.** `GetInt32`
+  sobre un `SMALLINT` no redondea: lanza «Specified cast is not valid» y tumba la
+  consulta. Mismo remedio: un único `Number()`.
+- **Una base sin tablas no tiene esquemas**, porque el esquema es el propietario.
+  El árbol salía vacío y sin sitio donde crear la primera tabla; ahora el usuario
+  conectado aparece siempre, como `public` o `dbo` en los demás.
+- **`sysdefaults` no guarda el texto del `DEFAULT`**, sino una letra que dice de
+  qué clase es. `CURRENT` llegaba vacío, que es justo el defecto más usado.
+- **El nombre de una restricción va detrás**: `CHECK (…) CONSTRAINT "nombre"`, y
+  al añadirla `CONSTRAINT` aparece dos veces. La forma estándar se rechaza con un
+  escueto «A syntax error has occurred» que no dice dónde.
+
+Y tres cosas que el motor **no puede** hacer, declaradas en el contrato en vez de
+disimuladas: no emite avisos al cliente, y por DRDA un `BOOLEAN` llega como
+`SMALLINT` de valor 1 —normalizarlo exigiría convertir todos los `SMALLINT`, y
+una columna de cantidades pasaría a leerse como booleana—.
+
+**Cuatro fallos eran del fixture, no del proveedor:** `ROWNUMBER` no existe, una
+vista exige nombrar sus columnas, un `CREATE PROCEDURE` con `RETURNING` se
+registra como función, y una fecha ISO no se interpreta sin `DBDATE`. El quinto
+merece mención aparte: la consulta que hacía de espera se resolvía en 0,1 s, así
+que ni la cancelación ni el timeout comprobaban nada. Un `SYSTEM 'sleep'` dura lo
+pedido pero deja al motor fuera del SQL y **no atiende la cancelación**; la
+espera tiene que ser trabajo SQL de verdad.
+
+**Verificado:** las 426 del backend con `DRUSE_REQUIRE_ENGINES=1` contra
+PostgreSQL 18, SQL Server 2022, MySQL 8.4 e Informix Developer, y compilación en
+Release sin advertencias. Informix entra además en integración continua.
 
 ### Sesión 020 — 2026-08-14 · Transacciones manuales, y los 44 archivos ordenados
 

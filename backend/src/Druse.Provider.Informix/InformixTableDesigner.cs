@@ -132,6 +132,25 @@ public sealed class InformixTableDesigner : TableDesignerBase
     protected override string IndexMethodClause(IndexDefinition index) => string.Empty;
 
     /// <summary>
+    /// Aquí el nombre de una restricción va **detrás** de su definición.
+    ///
+    /// Los otros tres motores escriben `CONSTRAINT nombre CHECK (…)`; Informix
+    /// escribe `CHECK (…) CONSTRAINT nombre` y rechaza la forma estándar con un
+    /// escueto «A syntax error has occurred», sin señalar dónde. Vale igual
+    /// dentro de un `CREATE TABLE` que detrás de un `ADD`.
+    /// </summary>
+    protected override string NamedConstraint(string name, string body) =>
+        $"{body} CONSTRAINT {Quote(name)}";
+
+    /// <summary>
+    /// Y al añadirla, `CONSTRAINT` aparece **dos veces**: una para anunciar que
+    /// se añade una restricción y otra delante del nombre, al final. La forma
+    /// completa es `ADD CONSTRAINT CHECK (…) CONSTRAINT "nombre"`.
+    /// </summary>
+    protected override string AddConstraint(string qualifiedTable, string name, string body) =>
+        $"ALTER TABLE {qualifiedTable} ADD CONSTRAINT {NamedConstraint(name, body)};";
+
+    /// <summary>
     /// El propietario hace de esquema, así que se califica igual que en los otros
     /// motores: `propietario.objeto`.
     /// </summary>

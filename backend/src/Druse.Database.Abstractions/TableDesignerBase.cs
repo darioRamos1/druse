@@ -152,13 +152,34 @@ public abstract class TableDesignerBase : ITableDesigner
         _ => string.Empty,
     };
 
-    /// <summary>El cuerpo de una clave foránea, sin el `ALTER TABLE` de delante.</summary>
+    /// <summary>
+    /// Añade una restricción con nombre a una tabla.
+    ///
+    /// El cuerpo llega ya escrito —`PRIMARY KEY (…)`, `UNIQUE (…)`, `CHECK (…)`
+    /// o la clave foránea entera— y aquí solo se le pone el nombre delante, que
+    /// es como lo escriben PostgreSQL, SQL Server y MySQL. Informix lo pone
+    /// detrás y por eso esto es un punto de extensión y no texto fijo.
+    /// </summary>
+    protected virtual string AddConstraint(string qualifiedTable, string name, string body) =>
+        $"ALTER TABLE {qualifiedTable} ADD {NamedConstraint(name, body)};";
+
+    /// <summary>
+    /// Una restricción con su nombre, tal como se escribe dentro de un
+    /// `CREATE TABLE` o detrás de un `ADD`.
+    ///
+    /// Es el único sitio donde se decide de qué lado va el nombre, y por eso lo
+    /// comparten la creación y la alteración: en Informix va detrás del cuerpo.
+    /// </summary>
+    protected virtual string NamedConstraint(string name, string body) =>
+        $"CONSTRAINT {Quote(name)} {body}";
+
+    /// <summary>El cuerpo de una clave foránea, sin el `ALTER TABLE` ni el nombre.</summary>
     protected string ForeignKeyBody(ForeignKeyDefinition key)
     {
         ArgumentNullException.ThrowIfNull(key);
 
         var body =
-            $"CONSTRAINT {Quote(key.Name)} FOREIGN KEY " +
+            $"FOREIGN KEY " +
             $"({string.Join(", ", key.Columns.Select(Quote))}) " +
             $"REFERENCES {QualifyReference(key)} " +
             $"({string.Join(", ", key.ReferencedColumns.Select(Quote))})";
@@ -229,7 +250,7 @@ public abstract class TableDesignerBase : ITableDesigner
 
         foreach (var foreignKey in table.ForeignKeys)
         {
-            lines.Add($"  {ForeignKeyBody(foreignKey)}");
+            lines.Add($"  {NamedConstraint(foreignKey.Name, ForeignKeyBody(foreignKey))}");
         }
 
         var statements = new List<string>
@@ -326,32 +347,29 @@ public abstract class TableDesignerBase : ITableDesigner
 
         if (alteration.NewPrimaryKey is { Columns.Count: > 0 } primaryKey)
         {
-            var named = primaryKey.Name is null
-                ? string.Empty
-                : $"CONSTRAINT {Quote(primaryKey.Name)} ";
+            var body = $"PRIMARY KEY ({string.Join(", ", primaryKey.Columns.Select(Quote))})";
 
-            statements.Add(
-                $"ALTER TABLE {table} ADD {named}PRIMARY KEY " +
-                $"({string.Join(", ", primaryKey.Columns.Select(Quote))});");
+            statements.Add(primaryKey.Name is null
+                ? $"ALTER TABLE {table} ADD {body};"
+                : AddConstraint(table, primaryKey.Name, body));
         }
 
         foreach (var unique in alteration.AddedUniqueConstraints)
         {
-            statements.Add(
-                $"ALTER TABLE {table} ADD CONSTRAINT {Quote(unique.Name)} UNIQUE " +
-                $"({string.Join(", ", unique.Columns.Select(Quote))});");
+            statements.Add(AddConstraint(
+                table,
+                unique.Name,
+                $"UNIQUE ({string.Join(", ", unique.Columns.Select(Quote))})"));
         }
 
         foreach (var check in alteration.AddedCheckConstraints)
         {
-            statements.Add(
-                $"ALTER TABLE {table} ADD CONSTRAINT {Quote(check.Name)} " +
-                $"CHECK ({check.Expression.Trim()});");
+            statements.Add(AddConstraint(table, check.Name, $"CHECK ({check.Expression.Trim()})"));
         }
 
         foreach (var foreignKey in alteration.AddedForeignKeys)
         {
-            statements.Add($"ALTER TABLE {table} ADD {ForeignKeyBody(foreignKey)};");
+            statements.Add(AddConstraint(table, foreignKey.Name, ForeignKeyBody(foreignKey)));
         }
 
         foreach (var index in alteration.AddedIndexes)

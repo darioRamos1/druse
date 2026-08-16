@@ -66,28 +66,39 @@ public sealed class InformixFixture : IProviderFixture
     // --- Dialecto -----------------------------------------------------------
 
     /// <summary>
-    /// Informix no tiene función de espera.
+    /// Informix no tiene función de espera: ni `pg_sleep`, ni `WAITFOR`, ni
+    /// `SLEEP`. Lo que más se le parece es darle trabajo de verdad, y el tamaño
+    /// importa: el producto de tres `systables` que había aquí antes se resolvía
+    /// en 0,1 s, así que ni la cancelación ni el timeout llegaban a ver nada.
+    /// Con cinco y el filtro que escala por segundos, la consulta dura minutos.
     ///
-    /// Ni `pg_sleep`, ni `WAITFOR`, ni `SLEEP`. La única forma sin escribir un
-    /// procedimiento es hacer trabajar al servidor: un producto cartesiano sobre
-    /// `systables` tarda lo suficiente para poder cancelarlo. **No es una espera
-    /// exacta**: el tiempo depende de la máquina, así que las comprobaciones que
-    /// dependan de una duración concreta serán menos precisas aquí que en los
-    /// otros motores.
+    /// **Tiene que ser trabajo SQL.** Un procedimiento con `SYSTEM 'sleep'` dura
+    /// lo que se le pida, pero deja al motor bloqueado fuera del SQL y entonces
+    /// no atiende la cancelación: la prueba esperaría los treinta segundos
+    /// enteros. Un bucle SPL sobre `CURRENT` tampoco vale, porque dentro del
+    /// procedimiento no avanza y no termina nunca.
+    ///
+    /// **No es una espera exacta**: el tiempo depende de la máquina, así que
+    /// aquí solo puede comprobarse que se corta pronto, no cuánto habría durado.
     /// </summary>
     public string Sleep(int seconds) => $"""
         SELECT COUNT(*)
-        FROM systables a, systables b, systables c
-        WHERE a.tabid > 0 AND b.tabid > 0 AND c.tabid > {seconds - seconds}
+        FROM systables a, systables b, systables c, systables d, systables e
+        WHERE a.tabid <= {seconds}
         """;
 
     /// <summary>
     /// Informix no admite CTE recursivas como PostgreSQL o MySQL. La forma
     /// idiomática de generar filas es la tabla virtual `sysmaster:sysdual` o un
     /// recorrido sobre el catálogo, limitado con `FIRST`.
+    ///
+    /// No hay `ROWNUMBER`: esa pseudo-columna es de otros dialectos y aquí da
+    /// error de sintaxis, así que se toma una columna real del catálogo. El
+    /// producto de `systables` consigo misma da miles de filas incluso en una
+    /// base recién creada, que es lo que la prueba del límite necesita.
     /// </summary>
     public string GenerateRows(int count) => $"""
-        SELECT FIRST {count} ROWNUMBER AS n
+        SELECT FIRST {count} a.tabid AS n
         FROM systables a, systables b
         """;
 
@@ -100,17 +111,28 @@ public sealed class InformixFixture : IProviderFixture
     /// </summary>
     public string RaiseNotice(string text) => $"SELECT '{text}' AS aviso FROM sysmaster:sysdual";
 
+    /// <inheritdoc />
+    public bool EmitsServerNotices => false;
+
+    /// <inheritdoc />
+    public bool TransportsBooleans => false;
+
     /// <summary>
     /// Informix sí tiene `BOOLEAN`, pero fuera de una tabla no hay forma de
     /// producirlo con un literal, así que se declara una tabla temporal como en
     /// MySQL.
     /// </summary>
+    /// <remarks>
+    /// La fecha se escribe con `MDY` y no con un literal: Informix interpreta las
+    /// cadenas de fecha según `DBDATE`, que por omisión espera `mm/dd/yyyy`, y
+    /// `'2026-08-11'` no falla por el formato sino con «Invalid year in date».
+    /// </remarks>
     public string SelectBasicTypes => """
         SELECT
             42::BIGINT AS entero,
             3.5::DECIMAL(10,1) AS decimalito,
             't'::BOOLEAN AS booleano,
-            '2026-08-11'::DATE AS fecha
+            MDY(8, 11, 2026) AS fecha
         FROM sysmaster:sysdual
         """;
 
@@ -158,18 +180,29 @@ public sealed class InformixFixture : IProviderFixture
         )
         """;
 
+    /// <summary>
+    /// Informix exige nombrar las columnas de la vista cuando no salen de una
+    /// tabla: sin la lista entre paréntesis responde «Need to specify view
+    /// column names» y la vista no llega a crearse.
+    /// </summary>
     public string CreateView(string name) =>
-        $"CREATE VIEW {name} AS SELECT 7 AS valor FROM sysmaster:sysdual";
+        $"CREATE VIEW {name} (valor) AS SELECT 7 FROM sysmaster:sysdual";
 
     public string DropView(string name) => $"DROP VIEW IF EXISTS {name}";
 
     /// <summary>
-    /// Informix escribe procedimientos en SPL, con `DEFINE` y `RETURN` en lugar
-    /// del `BEGIN … END` de los otros motores.
+    /// Informix escribe procedimientos en SPL, con `DEFINE` y `LET` en lugar del
+    /// `BEGIN … END` de los otros motores.
+    ///
+    /// Y **sin `RETURNING`**: el catálogo marca `isproc = 'f'` —función— a todo
+    /// lo que devuelve algo, aunque se haya escrito `CREATE PROCEDURE`. Con
+    /// `RETURNING` esto se creaba bien pero aparecía en la carpeta de funciones,
+    /// que es justo donde la prueba no lo busca.
     /// </summary>
     public string CreateProcedure(string name) => $"""
-        CREATE PROCEDURE {name}() RETURNING VARCHAR(30);
-            RETURN 'marca_procedimiento';
+        CREATE PROCEDURE {name}();
+            DEFINE marca VARCHAR(30);
+            LET marca = 'marca_procedimiento';
         END PROCEDURE
         """;
 
@@ -201,6 +234,7 @@ public sealed class InformixFixture : IProviderFixture
             return (false, exception.Message);
         }
     }
+
 }
 
 /// <summary>Ejecuta el contrato común contra Informix.</summary>

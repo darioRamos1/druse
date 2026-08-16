@@ -42,7 +42,7 @@ jobs:
   # Windows y macOS no traen Docker, y montarlo ahí multiplicaría el tiempo sin
   # aportar nada. Lo que se valida aquí son los proveedores, no el sistema.
   backend-con-motores-reales:
-    name: Backend con PostgreSQL, SQL Server y MySQL
+    name: Backend con los cuatro motores
     runs-on: ubuntu-latest
 
     services:
@@ -87,6 +87,25 @@ jobs:
           --health-timeout 5s
           --health-retries 20
 
+      # La imagen de desarrollo de IBM inicializa la instancia entera antes de
+      # aceptar conexiones, así que tarda bastante más que las otras tres. Se
+      # publica el 9089 —el escuchador DRDA—, que es por donde habla Druse; el
+      # 9088 atiende el protocolo nativo y usarlo da un error que parece de
+      # credenciales.
+      informix:
+        image: icr.io/informix/informix-developer-database:latest
+        env:
+          LICENSE: accept
+          DB_INIT: '1'
+        ports:
+          - 9089:9089
+        options: >-
+          --health-cmd "onstat - > /dev/null 2>&1"
+          --health-interval 10s
+          --health-timeout 10s
+          --health-retries 30
+          --health-start-period 60s
+
     env:
       DRUSE_TEST_PG_HOST: 127.0.0.1
       DRUSE_TEST_PG_PORT: 55440
@@ -108,6 +127,13 @@ jobs:
       DRUSE_TEST_MYSQL_SECOND_DB: druse_test_secondary
       DRUSE_TEST_MYSQL_USER: root
       DRUSE_TEST_MYSQL_PASSWORD: druse_dev_only
+
+      DRUSE_TEST_IFX_HOST: 127.0.0.1
+      DRUSE_TEST_IFX_PORT: 9089
+      DRUSE_TEST_IFX_DB: druse_test
+      DRUSE_TEST_IFX_SECOND_DB: druse_test2
+      DRUSE_TEST_IFX_USER: informix
+      DRUSE_TEST_IFX_PASSWORD: in4mix
 
       # Sin esto, un motor caído se manifestaría como una suite en verde que no
       # comprobó nada. Aquí ese caso debe romper la compilación.
@@ -135,7 +161,14 @@ jobs:
             mysql -uroot -pdruse_dev_only \
             -e "CREATE DATABASE IF NOT EXISTS druse_test_secondary;"
 
-      - name: Probar contra los tres motores
+          # Informix no tiene `CREATE DATABASE IF NOT EXISTS`, y las bases deben
+          # llevar registro de transacciones porque DRDA lo exige: sin `WITH LOG`
+          # el servidor está vivo pero rechaza la conexión.
+          docker exec "${{ job.services.informix.id }}" bash -lc \
+            'echo "CREATE DATABASE druse_test WITH LOG;" | dbaccess - -
+             echo "CREATE DATABASE druse_test2 WITH LOG;" | dbaccess - -'
+
+      - name: Probar contra los cuatro motores
         run: dotnet test backend/Druse.slnx --configuration Release --verbosity normal
 
   frontend:

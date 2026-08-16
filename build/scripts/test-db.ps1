@@ -227,8 +227,20 @@ if ($Engine -in 'all', 'informix') {
     if ($ready) {
         # Las bases de prueba se crean con registro de transacciones: DRDA lo
         # exige, y sin él la conexión falla aunque el servidor esté vivo.
-        docker exec $InformixName bash -lc `
-            'echo "CREATE DATABASE IF NOT EXISTS druse_test WITH LOG; CREATE DATABASE IF NOT EXISTS druse_test2 WITH LOG;" | dbaccess sysmaster -' 2>$null | Out-Null
+        #
+        # Informix no tiene `CREATE DATABASE IF NOT EXISTS`: esa forma no da
+        # error visible aquí —la salida va a $null— pero **no crea nada**, y el
+        # fallo aparece mucho después como «database name not found» al conectar.
+        # Por eso se consulta antes el catálogo y se crea solo lo que falta.
+        $existing = docker exec $InformixName bash -lc `
+            'echo "SELECT name FROM sysdatabases;" | dbaccess sysmaster -' 2>$null
+
+        foreach ($database in 'druse_test', 'druse_test2') {
+            if ($existing -match "\b$database\b") { continue }
+
+            docker exec $InformixName bash -lc `
+                "echo `"CREATE DATABASE $database WITH LOG;`" | dbaccess - -" 2>$null | Out-Null
+        }
 
         Write-Host "  Informix listo en 127.0.0.1:$InformixPort (DRDA)" -ForegroundColor Green
     }

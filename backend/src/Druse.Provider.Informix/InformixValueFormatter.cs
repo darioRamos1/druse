@@ -17,9 +17,13 @@ internal static class InformixValueFormatter
     {
         string text => text,
 
-        // Informix no tiene tipo booleano propio en el sentido de los otros
-        // motores: BOOLEAN se transporta como 't'/'f'. Si el driver ya lo
-        // convirtió a bool, se muestra como en PostgreSQL, SQL Server y MySQL.
+        // Si el driver entrega un bool, se muestra como en los otros motores.
+        //
+        // Por DRDA no ocurre: comprobado contra el servidor, un `BOOLEAN` llega
+        // como `SMALLINT` de valor 1 o 0 y el tipo original se pierde por el
+        // camino. No se normaliza a `true` porque para hacerlo habría que
+        // convertir todos los `SMALLINT`, y una columna de cantidades pasaría a
+        // leerse como booleana. Se enseña el número que manda el motor.
         bool flag => flag ? "true" : "false",
 
         // DATETIME de Informix llega hasta cinco decimales de segundo

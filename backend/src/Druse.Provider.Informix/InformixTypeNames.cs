@@ -36,6 +36,17 @@ internal static class InformixTypeNames
     /// </summary>
     public static bool IsSerial(int coltype) => Base(coltype) is 6 or 18 or 53;
 
+    /// <summary>
+    /// Tipos con los que el motor guarda el valor por defecto en dos partes.
+    ///
+    /// Para una columna numérica, `sysdefaults.default` trae la codificación
+    /// interna, un espacio y el texto —`AAAABw 7` para un `DEFAULT 7`—, mientras
+    /// que para una de texto trae el literal a secas. Distinguirlo es lo que
+    /// evita enseñar `AAAABw 7` en el diseñador.
+    /// </summary>
+    public static bool IsNumeric(int coltype) =>
+        Base(coltype) is 1 or 2 or 3 or 4 or 5 or 6 or 8 or 17 or 18 or 52 or 53;
+
     public static string Format(int coltype, int collength)
     {
         var type = Base(coltype);
