@@ -517,6 +517,29 @@ dejaría un aviso de «se cerró mal» y ese aviso dejaría de significar nada.
 
 **Verificado:** 446 pruebas de backend, 3 nuevas del vigilante.
 
+#### Informix se anunciaba y se rechazaba
+
+Probando el ZIP portable contra un Informix real apareció lo que ninguna prueba
+había podido ver: `/api/engines` ofrecía el motor —esa lista sale del registro de
+proveedores— pero el traductor del contrato HTTP no reconocía su identificador y
+respondía «Motor desconocido». **Informix era inalcanzable desde la aplicación**,
+con su proveedor cargado, sus 127 archivos de driver dentro del paquete y las 138
+pruebas contractuales en verde.
+
+El agujero estaba en que las contractuales construyen el perfil **directamente en
+el dominio**, sin pasar por el contrato HTTP. Solo se ve entrando por donde entra
+la interfaz.
+
+Los tres motores originales necesitan alias porque su identificador no se escribe
+igual que el nombre interno; cuando coinciden —Informix, y cualquiera que venga—
+ahora se reconocen solos, así que el quinto motor no repetirá esto. Y una prueba
+nueva recorre `/api/engines` y exige que **todo motor anunciado se acepte al
+conectar**.
+
+**Comprobado con el portable ya arreglado**, contra el servidor de verdad: prueba
+de conexión correcta (12.10.0000), sesión abierta, `SELECT` sobre `systables`
+devolviendo tres filas en 50 ms, y sesión cerrada.
+
 #### Fase 7: los paquetes de Linux y macOS
 
 Lo que faltaba de la fase, salvo lo que exige otro equipo. Un job por plataforma

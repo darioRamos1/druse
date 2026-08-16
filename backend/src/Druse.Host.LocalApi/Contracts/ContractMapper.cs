@@ -718,12 +718,23 @@ internal static class ContractMapper
         Truncated = resultSet.Truncated,
     };
 
-    /// <summary>Acepta el identificador del contrato y también el nombre del enumerado.</summary>
+    /// <summary>
+    /// Acepta el identificador del contrato y también el nombre del enumerado.
+    ///
+    /// Los tres primeros son alias: su identificador no se escribe igual que el
+    /// nombre del enumerado. Cuando sí coinciden basta con reconocer el nombre,
+    /// y ese caso general es justo lo que faltaba: Informix se anunciaba en
+    /// `/api/engines` —que sale del registro de proveedores— y se rechazaba
+    /// aquí, así que **el motor entero era inalcanzable desde la aplicación**
+    /// aunque su proveedor estuviera cargado.
+    /// </summary>
     private static DatabaseEngine ParseEngine(string value) => value?.ToLowerInvariant() switch
     {
         "postgresql" or "postgres" => DatabaseEngine.PostgreSql,
         "sqlserver" or "mssql" => DatabaseEngine.SqlServer,
         "mysql" => DatabaseEngine.MySql,
+        { } other when Enum.TryParse<DatabaseEngine>(other, ignoreCase: true, out var parsed) =>
+            parsed,
         _ => throw new ArgumentException($"Motor desconocido: '{value}'.", nameof(value)),
     };
 
