@@ -13,7 +13,7 @@
 | Última sesión | **021** — 2026-08-16 |
 | Fase activa | **Mejora posterior al MVP completada:** implementación y validación cerradas |
 | Fases 0–6 | ✅ Cerradas. |
-| Fase 7 | 🟡 **10/12.** Hay instalador y funciona; faltan dos comprobaciones que exigen otro equipo. |
+| Fase 7 | 🟡 **11/12.** El ciclo de instalación está probado sobre este equipo; solo falta arrancar en una máquina sin herramientas de desarrollo. |
 | Fase 8 | ✅ **7/7.** Tres motores sobre el mismo contrato y primera beta preparada. |
 | ¿Compila el backend? | Sí — 0 advertencias, 0 errores |
 | ¿Compila el envoltorio? | Sí |
@@ -482,6 +482,40 @@ flujo de integración.
 
 **Comprobado de verdad**: la misma sonda, en un contenedor Linux sin
 `LD_LIBRARY_PATH`, responde `CONECTA: 12.10.0000`.
+
+#### El ciclo de instalación, de verdad
+
+Instalar, actualizar y desinstalar sobre este equipo. Los tres pasos pasan:
+instala sin pedir permisos de administrador; actualizar de 0.1.0 a 0.1.1 deja
+**una sola entrada** en el registro y conserva `druse.db`; y desinstalar no deja
+restos ni toca los datos del usuario, que viven en `%APPDATA%\Druse`.
+
+**Y destapó un fallo que ninguna prueba habría encontrado.** Al matar la ventana
+sin dejarla cerrarse bien, la API auxiliar seguía viva: con sus DLL cargados,
+el desinstalador no podía borrar `api\` y dejaba **70 MB** con la entrada del
+registro ya eliminada. Restos que nadie iba a encontrar, porque para Windows la
+aplicación ya no existía.
+
+Conviene decir cómo se llegó a la conclusión correcta, porque la primera fue
+equivocada: parecía un fallo del desinstalador. La prueba de control —instalar y
+desinstalar sin nada corriendo— lo descartó: limpia perfectamente. La causa era
+el proceso huérfano.
+
+Ahora **la API vigila a quien la arrancó** y se apaga cuando desaparece. Va en la
+API y no con un Job Object de Windows porque Druse también compila para Linux y
+macOS. Se distingue el cierre propio del padre muerto: si no, cada cierre normal
+dejaría un aviso de «se cerró mal» y ese aviso dejaría de significar nada.
+
+**Dos cosas más que dejó ver el ciclo:**
+
+- La carpeta `logs` está siempre vacía: la API no escribe registro a archivo.
+  Cuando la ventana se cerró sola en la primera prueba no había dónde mirar; se
+  resolvió repitiéndola, no leyendo una traza. La deuda ya estaba anotada y este
+  ciclo la confirma.
+- La versión instalada y la de desarrollo **comparten `druse.db`**, porque
+  `IAppPaths` no distingue. Probar la empaquetada toca los datos reales.
+
+**Verificado:** 446 pruebas de backend, 3 nuevas del vigilante.
 
 #### Fase 7: los paquetes de Linux y macOS
 
@@ -1891,7 +1925,7 @@ Fuente: `docs/mockups/druse-main.html`. **Ya implementado** en `frontend/src/sty
 | 4 | SQL Server | ✅ **Cerrada** — 9/9 |
 | 5 | Productividad del editor | ✅ **Cerrada** — 10/10 |
 | 6 | Resultados y exportaciones | ✅ **Cerrada** — 9/9 |
-| 7 | Empaquetado de escritorio | 🟡 **10/12** — falta validar en otro equipo |
+| 7 | Empaquetado de escritorio | 🟡 **11/12** — solo falta el equipo limpio |
 | 8 | MySQL y estabilización | ✅ **Cerrada** — 7/7 |
 
 ### Fase 0 — criterio de salida ✅
@@ -1926,7 +1960,11 @@ Cerradas en las sesiones 007, 008 y 009. El detalle está en cada entrada de §5
 
 > «Druse se instala y ejecuta en Windows sin que el usuario tenga que instalar Node.js, Angular CLI o el SDK de .NET.»
 
-Los instaladores se generan y la aplicación arranca desde el ZIP portable en un directorio limpio. **Falta la mitad que exige otro equipo**: instalar y desinstalar de verdad, y arrancar en una máquina sin herramientas de desarrollo.
+El ciclo completo —instalar, actualizar y desinstalar— está probado sobre este
+equipo en la sesión 021, y de paso descubrió que la API auxiliar sobrevivía a un
+cierre forzado. **Falta lo que exige otro equipo**: arrancar en una máquina sin
+herramientas de desarrollo, que es el criterio que demuestra que el paquete se
+basta solo.
 
 ### Fase 8 — criterio de salida ✅
 

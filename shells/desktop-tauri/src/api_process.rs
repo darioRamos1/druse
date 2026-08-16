@@ -61,7 +61,12 @@ impl ApiProcess {
         let mut command = Command::new(executable);
         command
             .env("LocalApi__Port", "0")
-            .env("ASPNETCORE_ENVIRONMENT", "Production");
+            .env("ASPNETCORE_ENVIRONMENT", "Production")
+            // Con esto la API sabe a quién acompaña y se apaga sola si esta
+            // ventana desaparece sin poder terminarla —un cuelgue, un cierre de
+            // sesión—. Sin ello quedaba viva, con el puerto tomado y sus
+            // archivos bloqueados, impidiendo hasta desinstalar Druse.
+            .env("LocalApi__ParentProcessId", std::process::id().to_string());
 
         #[cfg(target_os = "windows")]
         command.creation_flags(CREATE_NO_WINDOW);

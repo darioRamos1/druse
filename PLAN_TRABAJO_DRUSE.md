@@ -526,7 +526,7 @@ Los resultados pueden inspeccionarse y exportarse de manera confiable sin bloque
 - [x] Generar instalador para Windows x64.
 - [ ] Generar artefactos de prueba para Linux x64 y macOS ARM64. _(el trabajo está hecho en integración continua —un job por plataforma que empaqueta y deja el `.deb`, el `.AppImage` y el `.dmg` descargables—; queda marcarlo cuando esa ejecución termine en verde.)_
 - [x] Crear distribución ZIP en modo portable para Windows.
-- [ ] Validar instalación, actualización y desinstalación. _(pendiente: instalar y desinstalar de verdad en este equipo.)_
+- [x] Validar instalación, actualización y desinstalación. _(hecho en la sesión 021 sobre este equipo: instala sin permisos de administrador, actualizar deja una sola entrada en el registro y conserva `druse.db`, y desinstalar no deja restos ni toca los datos del usuario. Destapó que la API auxiliar sobrevivía a un cierre forzado; corregido.)_
 - [ ] Probar en un equipo sin SDK de .NET ni Node.js. _(pendiente: hace falta un equipo limpio.)_
 
 ### Criterio de salida

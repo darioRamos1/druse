@@ -38,6 +38,15 @@
     el host lo referencia. Un motor que no se prueba acaba roto sin que nadie
     se entere.
   -->
+  <ItemGroup>
+    <!--
+      El vigilante del proceso padre es interno —nadie fuera del host lo
+      necesita—, pero es justo lo que hay que probar: sin él, una ventana que
+      muere de golpe deja la API viva bloqueando sus propios archivos.
+    -->
+    <InternalsVisibleTo Include="Druse.IntegrationTests" />
+  </ItemGroup>
+
   <PropertyGroup>
     <IncludeInformix Condition="'$(IncludeInformix)' == ''">true</IncludeInformix>
     <DefineConstants Condition="'$(IncludeInformix)' == 'true'">$(DefineConstants);DRUSE_INFORMIX</DefineConstants>
