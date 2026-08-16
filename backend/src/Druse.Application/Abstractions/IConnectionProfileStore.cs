@@ -68,6 +68,22 @@ public interface IQueryHistoryStore
     Task<int> ClearAsync(CancellationToken cancellationToken);
 }
 
+/// <summary>
+/// Las pestañas abiertas del editor, para poder devolverlas tras cerrar.
+///
+/// Se guardan y se leen **todas de una vez**: son pocas, cambian juntas y
+/// reemplazar el conjunto entero evita tener que decidir qué hacer con las que
+/// ya no están.
+/// </summary>
+public interface IEditorTabStore
+{
+    /// <summary>En el orden en que estaban en la barra.</summary>
+    Task<IReadOnlyList<EditorTabState>> GetAllAsync(CancellationToken cancellationToken);
+
+    /// <summary>Sustituye lo guardado por lo que hay ahora.</summary>
+    Task ReplaceAllAsync(IReadOnlyList<EditorTabState> tabs, CancellationToken cancellationToken);
+}
+
 /// <summary>Preferencias sencillas del usuario, guardadas como pares clave-valor.</summary>
 public interface IPreferencesStore
 {

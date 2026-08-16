@@ -285,6 +285,25 @@ public sealed record PreferenceValueDto
     public required string Value { get; init; }
 }
 
+/// <summary>
+/// Una pestaña del editor tal como estaba al cerrar.
+///
+/// Viaja con su SQL entero: es el trabajo que el usuario no llegó a ejecutar, y
+/// recortarlo sería devolverle algo distinto de lo que escribió.
+/// </summary>
+public sealed record EditorTabDto
+{
+    public required string Id { get; init; }
+    public required string Title { get; init; }
+    public string Sql { get; init; } = string.Empty;
+    public bool IsActive { get; init; }
+    public bool IsDirty { get; init; }
+    public string? ConnectionId { get; init; }
+    public string? Database { get; init; }
+    public string? FileName { get; init; }
+    public string? DocumentId { get; init; }
+}
+
 // ---------------------------------------------------------------------------
 // Edición de filas
 // ---------------------------------------------------------------------------

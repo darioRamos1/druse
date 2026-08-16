@@ -30,6 +30,7 @@ import {
   RowEditRequest,
   RowEditResult,
   TableChangeResult,
+  StoredEditorTab,
   TransactionState,
   HealthStatus,
   SaveConnectionRequest,
@@ -293,6 +294,14 @@ export class HttpApplicationGateway extends ApplicationGateway {
 
   override setPreference(key: string, value: string): Observable<void> {
     return this._http.put<void>(`/api/preferences/${encodeURIComponent(key)}`, { value });
+  }
+
+  override getEditorTabs(): Observable<readonly StoredEditorTab[]> {
+    return this._http.get<StoredEditorTab[]>('/api/workspace/tabs');
+  }
+
+  override saveEditorTabs(tabs: readonly StoredEditorTab[]): Observable<void> {
+    return this._http.put<void>('/api/workspace/tabs', tabs);
   }
 
   override exportQuery(request: ExportRequest): Observable<Blob> {

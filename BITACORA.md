@@ -363,6 +363,34 @@ existe dentro de SPL—, así que allí se ejecuta sin ellas y se dice por qué.
 cuatro motores reales, y 295 en frontend (14 nuevas: 6 del escritor y 8 del
 formulario).
 
+#### Recuperar el trabajo que no se llegó a ejecutar
+
+Lo pidió el usuario: al cerrar, lo escrito y no ejecutado se perdía. El historial
+guarda lo que llegó a lanzarse, y **lo demás no lo guardaba nadie**; el plan lo
+tenía anotado desde la Fase 3 —«recordar las pestañas abiertas queda para la
+Fase 5»— y nunca se hizo.
+
+Se guarda solo, un segundo después de dejar de escribir, en el SQLite del usuario
+—junto a las preferencias y el historial— y vuelve tal cual al abrir, sin
+preguntar. Tres decisiones que lo sostienen:
+
+- **Guardar en cada tecla sería una escritura por pulsación**, así que se espera
+  a la pausa. Y esa espera deja una rendija —cerrar justo después de teclear—,
+  que se tapa guardando también al perder el foco y al cerrar.
+- **Antes de leer lo guardado no se guarda nada.** Es el fallo que más caro
+  saldría: la pestaña vacía del arranque pisaría el trabajo de la sesión
+  anterior antes de que a nadie le diera tiempo a verlo.
+- **Todo lo que toca las pestañas pasa por un solo método.** Eran ocho sitios; el
+  que se olvidara de guardar sería justo el que perdiera lo escrito.
+
+Se guardan todas de una vez y dentro de una transacción: pestaña a pestaña, un
+cierre a media escritura dejaría un conjunto que nunca existió. No se guardan los
+resultados —se vuelven a pedir ejecutando— para no dejar datos de producción en
+el disco sin que nadie lo pida.
+
+**Verificado:** 435 en backend (5 nuevas del almacén, incluida una que reabre el
+archivo) y 302 en frontend (7 nuevas).
+
 #### Fase 7: los paquetes de Linux y macOS
 
 Lo que faltaba de la fase, salvo lo que exige otro equipo. Un job por plataforma

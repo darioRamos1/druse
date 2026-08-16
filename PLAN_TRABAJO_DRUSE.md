@@ -996,6 +996,23 @@ llamada se ejecuta sin ellos y se avisa por escrito en lugar de generar algo que
 el motor rechazaría. Las funciones tampoco entran: se llaman dentro de una
 consulta y no encajan en un formulario de ejecución.
 
+### Recuperar el trabajo sin ejecutar — implementado
+
+Pedido por el usuario. Cerrar la aplicación o el navegador se llevaba lo escrito
+y no ejecutado: el historial solo guarda lo que llegó a lanzarse. Cierra además
+la deuda que la Fase 3 dejó anotada («recordar las pestañas abiertas»).
+
+- [x] Guardar las pestañas —SQL, título, orden, cuál está activa, su conexión y
+  su base— en el SQLite del usuario, junto a las preferencias y el historial.
+- [x] Guardado automático un segundo después de dejar de escribir, y **también al
+  perder el foco y al cerrar**, que es la rendija que deja esa espera.
+- [x] Restaurar al abrir sin preguntar, conservando el orden y la pestaña activa.
+- [x] No guardar nada antes de haber leído lo guardado: la pestaña vacía del
+  arranque pisaría el trabajo de la sesión anterior.
+
+No se guardan los resultados: se vuelven a pedir ejecutando, y conservarlos
+dejaría datos de producción en el disco del usuario sin que nadie lo haya pedido.
+
 ### Prioridad alta
 
 - ~~Autenticación integrada de Windows para SQL Server.~~ Hecho (sesión 014).

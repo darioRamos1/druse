@@ -166,6 +166,24 @@ export interface TransactionState {
   readonly autoRolledBackAt?: string;
 }
 
+/**
+ * Una pestaña del editor tal como se guarda entre sesiones.
+ *
+ * Es trabajo **sin ejecutar**: el historial ya guarda lo que llegó a lanzarse, y
+ * esto es lo demás, que hasta ahora se perdía al cerrar.
+ */
+export interface StoredEditorTab {
+  readonly id: string;
+  readonly title: string;
+  readonly sql: string;
+  readonly isActive: boolean;
+  readonly isDirty: boolean;
+  readonly connectionId?: string;
+  readonly database?: string;
+  readonly fileName?: string;
+  readonly documentId?: string;
+}
+
 /** No se pudo iniciar, confirmar o deshacer. */
 export interface TransactionRejected {
   readonly reason: 'alreadyopen' | 'notopen' | 'readonlyconnection';
@@ -363,6 +381,16 @@ export abstract class ApplicationGateway {
   abstract clearHistory(): Observable<void>;
 
   abstract getPreferences(): Observable<Readonly<Record<string, string>>>;
+
+  /**
+   * Pestañas abiertas la última vez, con lo que hubiera escrito sin ejecutar.
+   *
+   * Van y vienen todas juntas: son pocas y cambian a la vez, y reemplazar el
+   * conjunto entero evita guardar un estado que nunca existió.
+   */
+  abstract getEditorTabs(): Observable<readonly StoredEditorTab[]>;
+
+  abstract saveEditorTabs(tabs: readonly StoredEditorTab[]): Observable<void>;
 
   abstract setPreference(key: string, value: string): Observable<void>;
 

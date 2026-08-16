@@ -454,6 +454,43 @@ internal static class ContractMapper
         };
     }
 
+    public static EditorTabDto ToDto(this EditorTabState tab)
+    {
+        ArgumentNullException.ThrowIfNull(tab);
+
+        return new EditorTabDto
+        {
+            Id = tab.Id,
+            Title = tab.Title,
+            Sql = tab.Sql,
+            IsActive = tab.IsActive,
+            IsDirty = tab.IsDirty,
+            ConnectionId = tab.ConnectionId,
+            Database = tab.Database,
+            FileName = tab.FileName,
+            DocumentId = tab.DocumentId,
+        };
+    }
+
+    public static EditorTabState ToDomain(this EditorTabDto tab)
+    {
+        ArgumentNullException.ThrowIfNull(tab);
+
+        return new EditorTabState
+        {
+            Id = tab.Id,
+            Title = tab.Title,
+            Sql = tab.Sql,
+            IsActive = tab.IsActive,
+            IsDirty = tab.IsDirty,
+            ConnectionId = tab.ConnectionId,
+            Database = tab.Database,
+            FileName = tab.FileName,
+            DocumentId = tab.DocumentId,
+            SavedAtUtc = DateTimeOffset.UtcNow,
+        };
+    }
+
     public static RoutineSignatureResponse ToDto(this RoutineSignature signature)
     {
         ArgumentNullException.ThrowIfNull(signature);

@@ -215,13 +215,17 @@ if ($Engine -in 'all', 'informix') {
 
     # Informix tarda bastante más que los otros en estar listo: la primera vez
     # inicializa la instancia entera antes de aceptar conexiones.
+    #
+    # Se espera a «On-Line» y no a que `onstat` conteste: el servidor arranca en
+    # modo administrativo, donde ya responde pero rechaza cualquier conexión con
+    # «27002: No connections are allowed in quiescent mode».
     $ready = $false
 
     foreach ($attempt in 1..180) {
         Start-Sleep -Seconds 1
-        docker exec $InformixName bash -lc 'onstat -' 2>$null | Out-Null
+        $status = docker exec $InformixName bash -lc 'onstat -' 2>$null
 
-        if ($LASTEXITCODE -eq 0) { $ready = $true; break }
+        if ($status -match 'On-Line') { $ready = $true; break }
     }
 
     if ($ready) {

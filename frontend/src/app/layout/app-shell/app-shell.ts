@@ -110,6 +110,19 @@ export class AppShell {
   protected readonly editingConnection = signal<SavedConnection | null>(null);
   protected readonly paletteOpen = signal(false);
 
+  /**
+   * Al cerrar o al perder el foco se guarda ya lo que estuviera esperando.
+   *
+   * El guardado normal espera a que se deje de escribir, y esa espera deja una
+   * rendija: cerrar la ventana justo después de teclear se llevaría lo último.
+   * `blur` cubre además el caso de irse a otra aplicación y no volver.
+   */
+  @HostListener('window:beforeunload')
+  @HostListener('window:blur')
+  protected onLeaving(): void {
+    this._store.flushTabs();
+  }
+
   @HostListener('document:keydown', ['$event'])
   protected onGlobalKeydown(event: KeyboardEvent): void {
     if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
@@ -414,6 +427,11 @@ export class AppShell {
     void this._store.loadSavedConnections();
     void this._store.loadHistory();
     void this._store.loadPreferences();
+
+    // Lo que quedó escrito y sin ejecutar vuelve tal cual. Va aquí y no más
+    // tarde porque hasta que no se ha leído, el store no guarda nada: la pestaña
+    // vacía del arranque pisaría el trabajo de la sesión anterior.
+    void this._store.restoreTabs();
 
     let tabId = this._store.activeTab()?.id;
     effect(() => {

@@ -18,6 +18,7 @@ internal static class StorageEndpoints
         MapConnections(app);
         MapHistory(app);
         MapPreferences(app);
+        MapEditorTabs(app);
     }
 
     private static void MapConnections(IEndpointRouteBuilder app)
@@ -214,5 +215,31 @@ internal static class StorageEndpoints
             return Results.NoContent();
         })
         .WithName("SetPreference");
+    }
+
+    /// <summary>
+    /// El trabajo sin ejecutar del editor.
+    ///
+    /// Se guarda entero de una vez y no pestaña a pestaña: es lo que evita que un
+    /// cierre a media escritura deje guardado un conjunto que nunca existió.
+    /// </summary>
+    private static void MapEditorTabs(IEndpointRouteBuilder app)
+    {
+        app.MapGet("/api/workspace/tabs", async (
+            IEditorTabStore tabs,
+            CancellationToken cancellationToken) =>
+            Results.Ok((await tabs.GetAllAsync(cancellationToken)).Select(tab => tab.ToDto())))
+        .WithName("GetEditorTabs");
+
+        app.MapPut("/api/workspace/tabs", async (
+            EditorTabDto[] request,
+            IEditorTabStore tabs,
+            CancellationToken cancellationToken) =>
+        {
+            await tabs.ReplaceAllAsync([.. request.Select(tab => tab.ToDomain())], cancellationToken);
+
+            return Results.NoContent();
+        })
+        .WithName("SaveEditorTabs");
     }
 }

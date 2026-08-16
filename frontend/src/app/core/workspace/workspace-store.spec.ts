@@ -9,6 +9,7 @@ import {
   ImportPreview,
   RowEditRequest,
   RowEditResult,
+  StoredEditorTab,
   SaveConnectionRequest,
   TransactionState,
 } from '../application-gateway/application-gateway';
@@ -251,6 +252,19 @@ class FakeGateway implements Partial<ApplicationGateway> {
 
   setPreference(key: string, value: string): Observable<void> {
     this.preferences[key] = value;
+    return of(undefined);
+  }
+
+  /** Lo que la sesión anterior dejó escrito sin ejecutar. */
+  storedTabs: StoredEditorTab[] = [];
+  savedTabs: StoredEditorTab[][] = [];
+
+  getEditorTabs(): Observable<readonly StoredEditorTab[]> {
+    return of(this.storedTabs);
+  }
+
+  saveEditorTabs(tabs: readonly StoredEditorTab[]): Observable<void> {
+    this.savedTabs.push([...tabs]);
     return of(undefined);
   }
 
@@ -1725,6 +1739,118 @@ describe('WorkspaceStore', () => {
       store.useDatabase('otra_base');
 
       expect(store.notice()).toBe('algo anterior');
+    });
+  });
+
+  describe('trabajo sin ejecutar', () => {
+    // El guardado espera a que se deje de escribir, así que el reloj se controla
+    // aquí en vez de dormir de verdad en cada prueba.
+    beforeEach(() => vi.useFakeTimers());
+    afterEach(() => vi.useRealTimers());
+
+    it('devuelve las pestañas de la última sesión tal y como estaban', async () => {
+      gateway.storedTabs = [
+        {
+          id: 'q7',
+          title: 'informe.sql',
+          sql: '-- a medio escribir\nSELECT * FROM ventas',
+          isActive: false,
+          isDirty: true,
+          connectionId: 'c1',
+          database: 'druse_test',
+          fileName: 'informe.sql',
+        },
+        { id: 'q8', title: 'Query 8', sql: 'SELECT 2', isActive: true, isDirty: false },
+      ];
+
+      await store.restoreTabs();
+
+      expect(store.tabs().map((tab) => tab.sql)).toEqual([
+        '-- a medio escribir\nSELECT * FROM ventas',
+        'SELECT 2',
+      ]);
+      expect(store.activeTab()?.id).toBe('q8');
+      expect(store.tabs()[0].fileName).toBe('informe.sql');
+      expect(store.tabs()[0].dirty).toBe(true);
+    });
+
+    it('sin nada guardado deja la pestaña vacía de siempre', async () => {
+      gateway.storedTabs = [];
+
+      await store.restoreTabs();
+
+      expect(store.tabs()).toHaveLength(1);
+      expect(store.tabs()[0].sql).toBe('');
+    });
+
+    /**
+     * Lo que más duele: si el guardado corriera antes de leer, la pestaña vacía
+     * del arranque borraría el trabajo de la sesión anterior.
+     */
+    it('no guarda nada antes de haber restaurado', async () => {
+      store.updateSql('SELECT 1');
+      vi.advanceTimersByTime(5000);
+
+      expect(gateway.savedTabs).toHaveLength(0);
+    });
+
+    it('guarda solo cuando se deja de escribir', async () => {
+      await store.restoreTabs();
+
+      store.updateSql('SEL');
+      vi.advanceTimersByTime(400);
+      store.updateSql('SELECT');
+      vi.advanceTimersByTime(400);
+      store.updateSql('SELECT 1');
+
+      // Tres cambios seguidos, ninguna escritura todavía.
+      expect(gateway.savedTabs).toHaveLength(0);
+
+      vi.advanceTimersByTime(1000);
+
+      expect(gateway.savedTabs).toHaveLength(1);
+      expect(gateway.savedTabs[0][0].sql).toBe('SELECT 1');
+    });
+
+    it('cerrar una pestaña también se guarda', async () => {
+      await store.restoreTabs();
+
+      store.createTab('SELECT 2');
+      vi.advanceTimersByTime(1000);
+      const antes = gateway.savedTabs.length;
+
+      store.closeTab(store.tabs()[0].id);
+      vi.advanceTimersByTime(1000);
+
+      expect(gateway.savedTabs.length).toBeGreaterThan(antes);
+      expect(gateway.savedTabs.at(-1)).toHaveLength(1);
+    });
+
+    it('al cerrar se guarda lo que estuviera esperando', async () => {
+      await store.restoreTabs();
+
+      store.updateSql('SELECT 1');
+      // Sin llegar al segundo de espera: es la rendija que deja el retardo.
+      vi.advanceTimersByTime(300);
+      expect(gateway.savedTabs).toHaveLength(0);
+
+      store.flushTabs();
+
+      expect(gateway.savedTabs).toHaveLength(1);
+      expect(gateway.savedTabs[0][0].sql).toBe('SELECT 1');
+    });
+
+    it('una pestaña nueva no se llama igual que una recuperada', async () => {
+      gateway.storedTabs = [
+        { id: 'q9', title: 'Query 9', sql: 'SELECT 1', isActive: true, isDirty: false },
+      ];
+
+      await store.restoreTabs();
+      store.createTab('SELECT 2');
+
+      const ids = store.tabs().map((tab) => tab.id);
+
+      expect(new Set(ids).size).toBe(ids.length);
     });
   });
 });

@@ -84,6 +84,15 @@ export type ReconnectOutcome = 'ok' | 'needsPassword' | 'failed';
 const TIMEOUT_PREFERENCE = 'query.timeoutSeconds';
 
 /**
+ * Espera antes de guardar el trabajo sin ejecutar, en milisegundos.
+ *
+ * Corto porque lo que protege es un cierre inesperado, y largo porque escribir
+ * cambia el estado en cada tecla: sin esta pausa habría una escritura en disco
+ * por pulsación.
+ */
+const TABS_SAVE_DELAY_MS = 1000;
+
+/**
  * Cada cuánto se vuelve a preguntar por una transacción abierta.
  *
  * Medio minuto: lo bastante seguido para que el indicador no mienta mucho rato
@@ -122,6 +131,12 @@ export class WorkspaceStore {
     { id: 'q1', title: 'Query 1', active: true, dirty: false, sql: '' },
   ]);
   readonly tabs = this._tabs.asReadonly();
+
+  /** Guardado pendiente del trabajo sin ejecutar, o `null` si no hay ninguno. */
+  private _tabsSaveTimer: ReturnType<typeof setTimeout> | null = null;
+
+  /** Hasta que no se ha leído lo guardado, no se guarda nada encima. */
+  private _tabsRestored = false;
 
   // --- Ejecución -------------------------------------------------------------
   private readonly _result = signal<QueryResult | null>(null);
@@ -204,6 +219,121 @@ export class WorkspaceStore {
     }
   }
 
+  /**
+   * Cambia las pestañas y programa su guardado.
+   *
+   * Todo lo que las toca pasa por aquí para que recuperar el trabajo no dependa
+   * de acordarse de guardar en cada sitio: son ocho, y el que se olvide sería
+   * justo el que pierda lo escrito.
+   */
+  private updateTabs(change: (tabs: readonly QueryTab[]) => readonly QueryTab[]): void {
+    this._tabs.update(change);
+    this.scheduleTabsSave();
+  }
+
+  /**
+   * Guarda el trabajo sin ejecutar, poco después de dejar de escribir.
+   *
+   * El retardo existe porque escribir cambia el estado en cada tecla y guardar
+   * en cada una sería una escritura por pulsación. Un segundo es corto para lo
+   * que se protege —un cierre inesperado— y suficiente para no castigar el
+   * teclado.
+   */
+  private scheduleTabsSave(): void {
+    if (!this._tabsRestored) {
+      // Antes de restaurar no se guarda nada: la pestaña vacía del arranque
+      // pisaría lo que se dejó escrito en la sesión anterior.
+      return;
+    }
+
+    if (this._tabsSaveTimer !== null) {
+      clearTimeout(this._tabsSaveTimer);
+    }
+
+    this._tabsSaveTimer = setTimeout(() => {
+      this._tabsSaveTimer = null;
+      void this.saveTabsNow();
+    }, TABS_SAVE_DELAY_MS);
+  }
+
+  /**
+   * Guarda ya lo que estuviera esperando.
+   *
+   * El retardo deja una rendija: cerrar justo después de escribir se llevaría lo
+   * último. Se llama al perder el foco y al cerrar, que es cuando esa rendija
+   * importa.
+   */
+  flushTabs(): void {
+    if (this._tabsSaveTimer === null) {
+      return;
+    }
+
+    clearTimeout(this._tabsSaveTimer);
+    this._tabsSaveTimer = null;
+    void this.saveTabsNow();
+  }
+
+  private async saveTabsNow(): Promise<void> {
+    const tabs = this._tabs().map((tab) => ({
+      id: tab.id,
+      title: tab.title,
+      sql: tab.sql,
+      isActive: tab.active,
+      isDirty: tab.dirty,
+      connectionId: tab.connectionId,
+      database: tab.database,
+      fileName: tab.fileName,
+      documentId: tab.documentId,
+    }));
+
+    try {
+      await firstValueFrom(this._gateway.saveEditorTabs(tabs));
+    } catch {
+      // Guardar el borrador es una red de seguridad: si falla, el usuario sigue
+      // teniendo su trabajo delante y avisarle no le sirve de nada.
+    }
+  }
+
+  /**
+   * Devuelve las pestañas de la última sesión, con lo que no se llegó a ejecutar.
+   *
+   * Se llama una vez al arrancar. Si no hay nada guardado se deja la pestaña
+   * vacía de siempre, que es lo que ve quien abre Druse por primera vez.
+   */
+  async restoreTabs(): Promise<void> {
+    try {
+      const stored = await firstValueFrom(this._gateway.getEditorTabs());
+
+      if (stored.length > 0) {
+        this._tabs.set(
+          stored.map((tab, index) => ({
+            id: tab.id,
+            title: tab.title,
+            active: tab.isActive || (index === 0 && !stored.some((other) => other.isActive)),
+            dirty: tab.isDirty,
+            sql: tab.sql,
+            connectionId: tab.connectionId,
+            database: tab.database,
+            fileName: tab.fileName,
+            documentId: tab.documentId,
+          })),
+        );
+
+        // El contador se adelanta a lo restaurado: si volviera a empezar, la
+        // siguiente pestaña nueva se llamaría igual que una recuperada y las dos
+        // se pisarían.
+        tabCounter = Math.max(
+          tabCounter,
+          ...stored.map((tab) => Number.parseInt(tab.id.replace(/^q/, ''), 10) || 0),
+        );
+      }
+    } catch {
+      // Sin lo guardado se arranca como siempre.
+    } finally {
+      this._tabsRestored = true;
+    }
+  }
+
   /** Carga las preferencias guardadas. */
   async loadPreferences(): Promise<void> {
     try {
@@ -222,7 +352,7 @@ export class WorkspaceStore {
 
   /** Aplica el resultado de guardar únicamente si el contenido no cambió mientras se escribía. */
   markTabSaved(id: string, sql: string, fileName: string, documentId?: string): void {
-    this._tabs.update((tabs) =>
+    this.updateTabs((tabs) =>
       tabs.map((tab) =>
         tab.id === id
           ? {
@@ -749,7 +879,7 @@ export class WorkspaceStore {
       return;
     }
 
-    this._tabs.update((tabs) =>
+    this.updateTabs((tabs) =>
       tabs.map((item) =>
         item.id === tab.id
           ? // La procedencia editable también era de la base anterior: esas filas
@@ -2109,12 +2239,12 @@ export class WorkspaceStore {
   // --- Pestañas --------------------------------------------------------------
 
   selectTab(id: string): void {
-    this._tabs.update((tabs) => tabs.map((tab) => ({ ...tab, active: tab.id === id })));
+    this.updateTabs((tabs) => tabs.map((tab) => ({ ...tab, active: tab.id === id })));
     this.clearDisplayedResult();
   }
 
   closeTab(id: string): void {
-    this._tabs.update((tabs) => {
+    this.updateTabs((tabs) => {
       const remaining = tabs.filter((tab) => tab.id !== id);
 
       if (remaining.length > 0 && !remaining.some((tab) => tab.active)) {
@@ -2137,7 +2267,7 @@ export class WorkspaceStore {
   ): void {
     tabCounter++;
 
-    this._tabs.update((tabs) => [
+    this.updateTabs((tabs) => [
       ...tabs.map((tab) => ({ ...tab, active: false })),
       {
         id: `q${tabCounter}`,
@@ -2158,7 +2288,7 @@ export class WorkspaceStore {
 
   openSqlFile(fileName: string, sql: string, documentId?: string): void {
     this.createTab(sql, undefined, undefined, fileName, undefined);
-    this._tabs.update((tabs) =>
+    this.updateTabs((tabs) =>
       tabs.map((tab) =>
         tab.active ? { ...tab, fileName, documentId: documentId || undefined } : tab,
       ),
@@ -2166,7 +2296,7 @@ export class WorkspaceStore {
   }
 
   updateSql(sql: string): void {
-    this._tabs.update((tabs) =>
+    this.updateTabs((tabs) =>
       tabs.map((tab) => (tab.active ? { ...tab, sql, dirty: true, sourceTable: undefined } : tab)),
     );
     this._pendingRejection.set(null);
@@ -2366,7 +2496,7 @@ export class WorkspaceStore {
 
   private activateConnection(connectionId: string): void {
     this._activeConnectionId.set(connectionId);
-    this._tabs.update((tabs) =>
+    this.updateTabs((tabs) =>
       tabs.map((tab) => (tab.active && !tab.connectionId ? { ...tab, connectionId } : tab)),
     );
   }

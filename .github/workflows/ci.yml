@@ -146,9 +146,12 @@ jobs:
             -p 9089:9089 \
             icr.io/informix/informix-developer-database:latest
 
+          # Se espera a «On-Line», no a que `onstat` responda: el servidor pasa
+          # primero por modo administrativo, donde ya contesta pero rechaza toda
+          # conexión con «27002: No connections are allowed in quiescent mode».
           for _ in $(seq 1 60); do
-            if docker exec druse-informix bash -lc 'onstat -' > /dev/null 2>&1; then
-              echo "Informix listo."
+            if docker exec druse-informix bash -lc 'onstat -' 2>/dev/null | grep -q 'On-Line'; then
+              echo "Informix en línea."
               exit 0
             fi
             sleep 5
@@ -368,8 +371,15 @@ jobs:
 
       # Los formatos se piden por línea de comandos porque `tauri.conf.json` fija
       # los de Windows —NSIS y MSI—, que aquí no existen.
+      #
+      # `APPIMAGE_EXTRACT_AND_RUN` es para linuxdeploy, que se distribuye a sí
+      # mismo como AppImage y necesita FUSE para montarse. En un runner no lo
+      # tiene, y falla con «failed to run linuxdeploy» sin decir por qué; con
+      # esto se extrae en lugar de montarse. Instalar libfuse2 no basta.
       - name: Empaquetar
         working-directory: shells/desktop-tauri
+        env:
+          APPIMAGE_EXTRACT_AND_RUN: 1
         run: cargo tauri build --bundles ${{ matrix.bundles }}
 
       - name: Recoger los artefactos
