@@ -306,6 +306,23 @@ espera tiene que ser trabajo SQL de verdad.
 PostgreSQL 18, SQL Server 2022, MySQL 8.4 e Informix Developer, y compilación en
 Release sin advertencias. Informix entra además en integración continua.
 
+#### El arreglo destapó que Informix solo funcionaba en Windows
+
+Al conectar de verdad, la integración continua se puso roja en Linux y macOS con
+un `DllNotFoundException` sobre `db2app64.dll` que **se lleva por delante el
+proceso de pruebas entero**, no una prueba suelta. La causa: `Net.IBM.Data.Db2`
+es el paquete **de Windows**, e IBM publica uno por sistema operativo —`-lnx` y
+`-osx`— con el mismo espacio de nombres y la misma versión.
+
+Esto no se veía porque el fallo del `DELIMIDENT` lo tapaba: la conexión moría
+antes de llegar a cargar nada nativo. Ahora la referencia se elige por el destino
+de la publicación cuando lo hay, y por el sistema de la máquina cuando no, así
+que un `publish -r linux-x64` desde Windows ya sale correcto —comprobado: en esa
+publicación no queda ni un `db2*.dll`—.
+
+Cabe que el paquete de macOS traiga solo binarios Intel; si es así, en Apple
+Silicon habrá que declarar el motor no soportado. Lo dirá la integración continua.
+
 ### Sesión 020 — 2026-08-14 · Transacciones manuales, y los 44 archivos ordenados
 
 Dos trabajos: repartir lo que estaba sin commitear y terminar lo único que
