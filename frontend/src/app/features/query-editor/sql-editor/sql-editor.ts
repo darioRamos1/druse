@@ -29,7 +29,7 @@ import {
   FormatSettings,
 } from '../../../core/workspace/format-settings';
 import { ThemeName } from '../../../core/theme/theme.service';
-import { DRUSE_THEMES, DRUSE_THEME_NAMES } from './druse-theme';
+import { DRUSE_THEME_NAMES, druseTheme } from './druse-theme';
 import { executionErrorLine } from './execution-error';
 import { MonacoLoader } from './monaco-loader';
 
@@ -85,7 +85,30 @@ export interface ExecutionErrorContext {
       background: var(--dr-surface-base);
     }
 
+    /*
+     * La imagen de fondo va en una capa propia, debajo del editor.
+     *
+     * No se le puede poner opacidad al contenedor: la heredaría el código, que
+     * es lo único que no puede perder contraste. Así la imagen se atenúa sola y
+     * el texto se queda entero. Sin imagen, la capa es transparente y no pinta
+     * nada.
+     */
+    :host::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      z-index: 0;
+      background-image: var(--dr-editor-background, none);
+      background-size: var(--dr-editor-background-size, cover);
+      background-repeat: var(--dr-editor-background-repeat, no-repeat);
+      background-position: var(--dr-editor-background-position, center);
+      opacity: var(--dr-editor-background-opacity, 0);
+      pointer-events: none;
+    }
+
     .host {
+      position: relative;
+      z-index: 1;
       width: 100%;
       height: 100%;
     }
@@ -139,6 +162,12 @@ export default class SqlEditor implements OnInit {
    * conoce el store ni el gateway.
    */
   readonly theme = input<ThemeName>('dark');
+
+  /** Acento elegido por el usuario; `null` deja el de la paleta. */
+  readonly accent = input<string | null>(null);
+
+  /** Cuerpo de la letra, en píxeles. Se elige en preferencias. */
+  readonly fontSize = input(13);
 
   /** Cómo formatear. Lo elige el usuario en la barra y se recuerda entre arranques. */
   readonly formatSettings = input<FormatSettings>(DEFAULT_FORMAT_SETTINGS);
@@ -204,11 +233,27 @@ export default class SqlEditor implements OnInit {
     // El tema se cambia con el editor ya creado. `setTheme` es global de Monaco,
     // que es justo lo que hace falta: la aplicación no tiene medio editor claro
     // y medio oscuro.
+    //
+    // Se vuelve a registrar en lugar de solo aplicarlo porque el acento forma
+    // parte de la definición: el cursor y la selección salen de ahí, y Monaco no
+    // los lee de ningún sitio después.
+    // El cuerpo de la letra se cambia en caliente: Monaco recoloca las líneas él
+    // solo y no hace falta rehacer el editor.
     effect(() => {
-      const theme = DRUSE_THEME_NAMES[this.theme()];
+      const fontSize = this.fontSize();
 
       if (this.ready()) {
-        this._monaco?.editor.setTheme(theme);
+        this._editor?.updateOptions({ fontSize, lineHeight: Math.round(fontSize * 1.7) });
+      }
+    });
+
+    effect(() => {
+      const theme = this.theme();
+      const accent = this.accent();
+
+      if (this.ready()) {
+        this.registerThemes(accent);
+        this._monaco?.editor.setTheme(DRUSE_THEME_NAMES[theme]);
       }
     });
 
@@ -356,13 +401,8 @@ export default class SqlEditor implements OnInit {
       return;
     }
 
-    // Se registran los dos: cambiar de tema con el editor abierto solo puede ser
-    // instantáneo si el otro ya está definido.
-    for (const [name, data] of Object.entries(DRUSE_THEMES)) {
-      monaco.editor.defineTheme(DRUSE_THEME_NAMES[name as ThemeName], data);
-    }
-
     this._monaco = monaco;
+    this.registerThemes(this.accent());
 
     // El autocompletado se registra una vez por editor y se retira al destruirlo:
     // de lo contrario cada editor añadiría otro proveedor y las sugerencias
@@ -388,8 +428,8 @@ export default class SqlEditor implements OnInit {
         readOnly: this.readOnly(),
         automaticLayout: true,
         fontFamily: "'JetBrains Mono', 'Cascadia Code', Consolas, monospace",
-        fontSize: 13,
-        lineHeight: 22,
+        fontSize: this.fontSize(),
+        lineHeight: Math.round(this.fontSize() * 1.7),
         lineNumbersMinChars: 3,
         padding: { top: 12, bottom: 12 },
         minimap: { enabled: true, maxColumn: 70, renderCharacters: false },
@@ -457,6 +497,25 @@ export default class SqlEditor implements OnInit {
       this._editor = null;
       this._monaco = null;
     });
+  }
+
+  /**
+   * Registra los dos temas con el acento vigente.
+   *
+   * Los dos, aunque solo se vaya a usar uno: cambiar de tema con el editor
+   * abierto solo puede ser instantáneo si el otro ya está definido.
+   */
+  private registerThemes(accent: string | null): void {
+    const monaco = this._monaco;
+
+    if (!monaco) {
+      return;
+    }
+
+    for (const name of Object.keys(DRUSE_THEME_NAMES) as ThemeName[]) {
+      monaco.editor.defineTheme(DRUSE_THEME_NAMES[name], druseTheme(name, accent));
+    }
+
   }
 
   private _diagnosticsTimer?: ReturnType<typeof setTimeout>;
