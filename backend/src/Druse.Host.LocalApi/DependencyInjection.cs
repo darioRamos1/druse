@@ -1,4 +1,5 @@
 using Druse.Application.Abstractions;
+using Druse.Application.Backups;
 using Druse.Application.Connections;
 using Druse.Application.Metadata;
 using Druse.Application.Queries;
@@ -7,6 +8,7 @@ using Druse.Application.Tables;
 using Druse.Application.Transactions;
 using Druse.Database.Abstractions;
 using Druse.Host.LocalApi.Security;
+using Druse.Infrastructure.Backups;
 using Druse.Infrastructure.Exports;
 using Druse.Infrastructure.Importing;
 using Druse.Infrastructure.Providers;
@@ -103,6 +105,11 @@ internal static class DependencyInjection
         services.AddSingleton<ISessionRegistry, SessionRegistry>();
         services.AddSingleton<IQueryExecutionTracker, QueryExecutionTracker>();
 
+        // El estado de los respaldos es singleton porque sobrevive a la petición
+        // que los lanzó, y también a que se cierre la ventana: el trabajo sigue en
+        // este proceso y quien vuelva tiene que encontrarlo donde lo dejó.
+        services.AddSingleton<IBackupTracker, BackupTracker>();
+
         // Un túnel dura lo que dura su sesión, así que se guarda igual que ella.
         services.AddSingleton<ISshTunnelRegistry, SshTunnelRegistry>();
         services.AddSingleton<ISshTunnelFactory, SshTunnelFactory>();
@@ -138,6 +145,7 @@ internal static class DependencyInjection
         services.AddScoped<TableDesignService>();
         services.AddScoped<ImportService>();
         services.AddScoped<ExportService>();
+        services.AddScoped<BackupService>();
 
         // --- Exportadores -------------------------------------------------------
         services.AddSingleton<IResultExporter, CsvResultExporter>();
