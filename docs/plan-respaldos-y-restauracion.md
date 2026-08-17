@@ -424,17 +424,49 @@ pertenezca.
 
 ## 8. Fases
 
-### Fase A — El contrato y la estructura
+### Fase A — El contrato y la estructura ✅
 
-- [ ] `IDatabaseScripter`, `ScripterBase`, `ScripterCapabilities`.
-- [ ] Implementación en los cuatro proveedores: tablas, columnas, tipos, valores
+- [x] `IDatabaseScripter` y `ScripterCapabilities`.
+- [x] Implementación en los cuatro proveedores: tablas, columnas, tipos, valores
       por omisión, índices, claves y restricciones.
-- [ ] Pruebas contractuales idénticas para los cuatro.
+- [x] Pruebas contractuales idénticas para los cuatro.
 
 **Criterio de salida — ida y vuelta.** Una prueba crea objetos en una base real,
 los guioniza, ejecuta el guion en una base limpia, **vuelve a leer la estructura
 con el mismo lector de metadatos y compara**. Si lo releído no coincide, el
 respaldo no sirve, y esto lo dice sin que nadie mire un archivo a ojo.
+
+_Cumplido._ `RespaldaLaEstructuraDeUnaTablaYLaVuelveACrear` lee, guioniza, **borra
+la tabla** y la recrea desde el guion, que es lo que hace una restauración de
+verdad; después compara dos lecturas del catálogo, no literales escritos a mano,
+así que ningún motor necesita su propia expectativa.
+
+**No hizo falta un `ScripterBase`.** El guionizado vive en `TableDesignerBase`,
+que ya resolvía el dialecto de los cuatro motores: escribir un `CREATE TABLE`
+desde un diseño y escribirlo desde el catálogo son la misma tarea con distinta
+entrada, y dos copias de un dialecto se separan a la primera corrección que solo
+se aplica en una.
+
+**Lo que la ida y vuelta destapó**, y que ninguna prueba anterior veía:
+
+- **Crear una tabla con restricciones fallaba en Informix.** `DescribeCreate`
+  escribía `UNIQUE` y `CHECK` con el nombre delante en lugar de pasar por
+  `NamedConstraint`, que es el único sitio que sabe que allí va detrás. Es un
+  fallo del diseñador, no del respaldo.
+- **MySQL devuelve las condiciones escapadas a la manera de C:** `codigo <> ''`
+  vuelve como ``(`codigo` <> _latin1\'\')``, que el propio motor rechaza al
+  volver a ejecutarlo. Se ve mal además en el diseñador.
+- **Informix crea un índice interno por cada clave foránea**, llamado ` 105_13`
+  —con un espacio delante—, y no estaba marcado como índice de restricción: la
+  interfaz ofrecía borrar algo que no se puede borrar suelto, y el respaldo
+  intentaba recrearlo con un nombre que el motor rechaza.
+- **En Informix, el nombre de la clave primaria y el de la unicidad que Druse lee
+  son los de su índice interno**, no los de la restricción. Se declara en
+  `ScripterCapabilities` y esas restricciones se guionizan sin nombre: copiarlo
+  no reproduciría nada, inventaría un nombre generado.
+- **Informix no entrega las columnas referenciadas de una clave foránea**, así
+  que `REFERENCES` se escribe sin la lista y el motor resuelve por la clave
+  primaria. `REFERENCES padre ()` no lo acepta nadie.
 
 ### Fase B — Los datos
 

@@ -11,7 +11,7 @@
 | Campo | Valor |
 | --- | --- |
 | Última sesión | **022** — 2026-08-17 |
-| Fase activa | **Respaldos y restauración:** planificados, sin empezar a implementar |
+| Fase activa | **Respaldos y restauración:** Fase A cerrada —la estructura de una tabla se guioniza en los cuatro motores—; toca la Fase B, los datos |
 | Fases 0–6 | ✅ Cerradas. |
 | Fase 7 | 🟡 **11/12.** El ciclo de instalación está probado sobre este equipo; solo falta arrancar en una máquina sin herramientas de desarrollo. |
 | Fase 8 | ✅ **7/7.** Tres motores sobre el mismo contrato y primera beta preparada. |
@@ -27,11 +27,13 @@
 
 ### Qué toca retomar en la próxima sesión
 
-**Lo primero: la Fase A de los respaldos** —`IDatabaseScripter` y el guionizado
-de la estructura en los cuatro motores—, según
-`docs/plan-respaldos-y-restauracion.md`. Su criterio de salida es la prueba de
-ida y vuelta: guionizar, ejecutar en una base limpia, releer con el mismo lector
-de metadatos y comparar.
+**Lo primero: la Fase B de los respaldos** —los datos—, según
+`docs/plan-respaldos-y-restauracion.md`. La Fase A quedó cerrada en la sesión
+022b con la ida y vuelta en verde en los cuatro motores. Lo que entra ahora:
+lectura por streaming sin materializar la tabla, `INSERT` troceados, literales
+por motor —fechas, binarios, JSON, booleanos—, el interruptor de datos general y
+por tabla, los filtros, y la transacción con instantánea. Su criterio de salida
+es que una tabla con una columna de cada tipo común salga idéntica al restaurarla.
 
 Y aparte, lo que ya venía. Ya no queda nada a medias: las transacciones manuales se cerraron en la sesión
 020 y los 44 archivos sueltos se repartieron en cuatro commits temáticos. Lo que
@@ -282,6 +284,69 @@ Y tres límites declarados desde el principio: no hay respaldo binario ni
 recuperación a un punto en el tiempo —eso es del servidor, y la interfaz tendrá
 que decirlo—, no hay respaldos programados, y un límite de filas puede dejar
 filas huérfanas, cosa que se avisa y no se corrige sola.
+
+### Sesión 022b — 2026-08-17 · Fase A de los respaldos: guionizar la estructura
+
+Escrito el plan, se empezó a construir. La Fase A entrega **el DDL que reproduce
+una tabla que ya existe**, en los cuatro motores, y su criterio de salida es la
+ida y vuelta.
+
+#### El guionizador no es una clase nueva por motor
+
+`IDatabaseScripter` es un puerto nuevo, pero lo implementa `TableDesignerBase`,
+que ya resolvía el dialecto de los cuatro motores. Escribir un `CREATE TABLE`
+desde un diseño y escribirlo desde el catálogo son la misma tarea con distinta
+entrada; separarlo habría duplicado cuatro veces el modo de citar, la cláusula de
+identidad y el cuerpo de una clave foránea, y **dos copias de un dialecto se
+separan a la primera corrección que solo se aplica en una**.
+
+Lo que sí cambió de forma: `TableDefinition` acepta ahora la clave primaria con
+nombre y orden propios. El diseñador no lo necesitaba —quien dibuja una tabla
+marca casillas y deja que el motor la nombre— pero quien **reproduce** una tabla
+sí: en una clave compuesta `(pedido, linea)` no es la misma que `(linea, pedido)`,
+y ese orden no tiene por qué coincidir con el de las columnas de la tabla.
+
+#### Cinco fallos que ninguna prueba anterior veía
+
+La ida y vuelta —leer, guionizar, **borrar la tabla**, recrearla desde el guion y
+comparar dos lecturas del catálogo— destapó esto:
+
+1. **Crear una tabla con restricciones fallaba en Informix.** `DescribeCreate`
+   escribía `UNIQUE` y `CHECK` con el nombre delante en vez de pasar por
+   `NamedConstraint`, que es el único sitio que sabe que allí va detrás. Es un
+   fallo del **diseñador**, vivo desde la sesión 017, que solo se veía creando la
+   tabla con restricciones de una vez: la prueba que había las añadía después,
+   con un `ALTER`, y ese camino sí pasaba por el sitio correcto.
+2. **MySQL devuelve sus condiciones escapadas a la manera de C.** `codigo <> ''`
+   vuelve del catálogo como ``(`codigo` <> _latin1\'\')``, y MySQL **rechaza su
+   propia expresión** en cuanto se escribe dentro de un `CREATE TABLE`. Además se
+   veía así, con las barras, en el diseñador.
+3. **Informix crea un índice interno por cada clave foránea.** Se llama ` 105_13`,
+   con un espacio delante, y no estaba marcado como índice de restricción: la
+   interfaz ofrecía borrar algo que no se puede borrar suelto, y el respaldo
+   intentaba recrearlo con un nombre que el propio motor rechaza —«Illegal
+   leading byte 0x20 in Index name»—.
+4. **En Informix, los nombres de clave primaria y unicidad que Druse lee son los
+   de su índice interno**, distintos en cada creación. Reproducirlos no copiaría
+   nada: inventaría un nombre generado. Queda declarado en `ScripterCapabilities`
+   y esas dos restricciones se guionizan sin nombre.
+5. **Informix no entrega las columnas referenciadas de una clave foránea** —era
+   una decisión ya tomada, para no gastar una consulta por clave—, así que
+   `REFERENCES` se escribe sin la lista y el motor resuelve por la clave primaria.
+   `REFERENCES padre ()` no lo acepta nadie.
+
+Los dos primeros son correcciones de código que ya estaba en uso; los tres
+últimos, límites de Informix declarados en vez de disimulados.
+
+#### Verificación
+
+**465 pruebas en verde, ninguna saltada**, con `DRUSE_REQUIRE_ENGINES=1` y los
+cuatro motores en contenedores: 251 unitarias, 142 contractuales y 72 de
+integración. La ida y vuelta corre idéntica en PostgreSQL, SQL Server, MySQL e
+Informix.
+
+Lo que la Fase A **no** hace todavía: datos, vistas, rutinas, secuencias,
+disparadores y permisos. Solo la estructura de una tabla.
 
 ### Sesión 021 — 2026-08-16 · Lo que el CI encontró, y el Docker que sí estaba
 
