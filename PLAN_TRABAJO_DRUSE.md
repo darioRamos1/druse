@@ -413,6 +413,7 @@ La solución compila, Angular inicia, la API responde en `/api/health` y existe 
 - [x] Crear panel redimensionable de resultados.
 - [x] Implementar tema oscuro y variables de diseño.
 - [x] Añadir tema claro sobre las mismas variables, con conmutador en la barra superior.
+- [x] Panel de preferencias: acento, tono de la interfaz, tamaño y fondo del editor.
 - [x] Crear la cuadrícula con datos simulados.
 
 ### Criterio de salida
@@ -1073,6 +1074,7 @@ escrito a mano, que ya pasa por la detección de instrucciones destructivas.
 - Planes de ejecución gráficos.
 - ~~Gestión visual de índices.~~ Hecho en el diseñador de tablas (sesión 019).
 - Atajos configurables.
+- Llevar al panel de preferencias el formato del SQL y el tiempo máximo de ejecución.
 - Soporte SQLite.
 - Instaladores estables para Linux y macOS.
 
