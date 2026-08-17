@@ -10,8 +10,8 @@
 
 | Campo | Valor |
 | --- | --- |
-| Última sesión | **021** — 2026-08-16 |
-| Fase activa | **Mejora posterior al MVP completada:** implementación y validación cerradas |
+| Última sesión | **022** — 2026-08-17 |
+| Fase activa | **Respaldos y restauración:** planificados, sin empezar a implementar |
 | Fases 0–6 | ✅ Cerradas. |
 | Fase 7 | 🟡 **11/12.** El ciclo de instalación está probado sobre este equipo; solo falta arrancar en una máquina sin herramientas de desarrollo. |
 | Fase 8 | ✅ **7/7.** Tres motores sobre el mismo contrato y primera beta preparada. |
@@ -22,11 +22,18 @@
 | Motores | **PostgreSQL, SQL Server, MySQL/MariaDB e Informix**, todos sobre el mismo contrato compartido |
 | Trabajo a medias | Ninguno. Las transacciones manuales quedaron terminadas en la sesión 020. |
 | Bloqueantes | Ninguno para seguir programando. Sí para dar por buenos cuatro motores y cuatro funciones: ver «Qué toca retomar». |
-| Git | El PR #8 se fusionó, pero solo se llevó **los dos primeros commits**. La rama `feat/indices-y-claves-foraneas` acumula **quince más** —lo de las sesiones 019 y 020 y los arreglos de la 021— que salen en un PR nuevo. |
+| Git | El **PR #9 se fusionó** (sesión 022), con los quince commits que el #8 dejó fuera más lo de la personalización. Se trabaja en `feat/respaldos-y-restauracion`, salida de un `main` ya al día. |
+| Integración continua | 🔴 **Parada, y no por el código.** GitHub aborta los catorce jobs en dos segundos: «recent account payments have failed or your spending limit needs to be increased». Hasta resolver la facturación, ningún PR podrá pasar los checks. |
 
 ### Qué toca retomar en la próxima sesión
 
-Ya no queda nada a medias: las transacciones manuales se cerraron en la sesión
+**Lo primero: la Fase A de los respaldos** —`IDatabaseScripter` y el guionizado
+de la estructura en los cuatro motores—, según
+`docs/plan-respaldos-y-restauracion.md`. Su criterio de salida es la prueba de
+ida y vuelta: guionizar, ejecutar en una base limpia, releer con el mismo lector
+de metadatos y comparar.
+
+Y aparte, lo que ya venía. Ya no queda nada a medias: las transacciones manuales se cerraron en la sesión
 020 y los 44 archivos sueltos se repartieron en cuatro commits temáticos. Lo que
 falta es **comprobar contra servidores de verdad** lo que se escribió a ciegas,
 y en la sesión 021 esa lista se acortó bastante.
@@ -217,6 +224,56 @@ Pendiente de verificar cuando toque: Docker (pruebas de integración con contene
 ---
 
 ## 5. Registro de sesiones
+
+### Sesión 022 — 2026-08-17 · El PR fusionado y el plan de los respaldos
+
+Sesión de cierre y de planificación. No se escribió código de producto.
+
+#### El PR #9, fusionado con los checks en rojo
+
+Los catorce jobs del CI estaban en `FAILURE`, y no por una prueba caída: GitHub
+los aborta **antes de arrancarlos**, en dos segundos, con «The job was not
+started because recent account payments have failed or your spending limit needs
+to be increased». Es facturación de Actions.
+
+Con eso escrito, el PR se fusionó con `--admin`, porque esperar significaba
+esperar a un pago y no a una corrección. **Queda anotado como bloqueante del
+proyecto:** mientras la cuenta no se resuelva, ningún PR puede pasar los checks y
+lo verde deja de ser una garantía. La última señal buena del CI es la de la
+sesión 021.
+
+Después, `main` al día y rama nueva: `feat/respaldos-y-restauracion`.
+
+#### Lo que se planificó
+
+Una herramienta de respaldo **personalizable**, pedida así: poder construir el
+respaldo de lo que haga falta —esquemas, tablas, objetos— y elegir **con datos o
+sin ellos**. El plan entero está en `docs/plan-respaldos-y-restauracion.md`; lo
+estructural, en el ADR 0005.
+
+Seis decisiones se tomaron antes de escribir nada, porque cada una cambia el
+diseño completo:
+
+1. **Guioniza Druse, no `pg_dump`.** El catálogo ya se lee en los cuatro motores.
+   Guionizar no exige instalar nada y es lo único que sostiene una selección tan
+   fina como «todo sin datos, salvo estas tres tablas, y de `pedidos` solo el
+   último año». Las herramientas nativas caben después como adaptador.
+2. **Con datos o sin ellos, en dos niveles:** un interruptor general que fija el
+   valor por omisión, y el mismo interruptor por tabla, que gana cuando se toca.
+3. **Los cuatro motores desde la primera fase**, con las mismas contractuales.
+   Es lo que funcionó con el diseñador de tablas.
+4. **El criterio de salida es la ida y vuelta**, no comparar cadenas de SQL:
+   guionizar, ejecutar en una base limpia, releer la estructura con el mismo
+   lector de metadatos y comparar. Solo eso comprueba que el respaldo sirva.
+5. **Se restaura en el mismo motor**, comprobándolo contra el manifiesto. El
+   formato queda preparado para no cerrar la traducción, que es otra función.
+6. **Escribe el proceso local, por streaming.** Ni la tabla en memoria ni el
+   respaldo pasando por el navegador.
+
+Y tres límites declarados desde el principio: no hay respaldo binario ni
+recuperación a un punto en el tiempo —eso es del servidor, y la interfaz tendrá
+que decirlo—, no hay respaldos programados, y un límite de filas puede dejar
+filas huérfanas, cosa que se avisa y no se corrige sola.
 
 ### Sesión 021 — 2026-08-16 · Lo que el CI encontró, y el Docker que sí estaba
 
