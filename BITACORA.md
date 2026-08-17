@@ -11,7 +11,7 @@
 | Campo | Valor |
 | --- | --- |
 | Última sesión | **022** — 2026-08-17 |
-| Fase activa | **Respaldos y restauración:** Fases A y B cerradas —estructura y datos de una tabla, guionizados en los cuatro motores—; toca la Fase C, el artefacto |
+| Fase activa | **Respaldos y restauración:** Fases A, B y C cerradas —el respaldo se escribe entero, en cuatro formas, con progreso consultable—; toca la Fase D, la interfaz |
 | Fases 0–6 | ✅ Cerradas. |
 | Fase 7 | 🟡 **11/12.** El ciclo de instalación está probado sobre este equipo; solo falta arrancar en una máquina sin herramientas de desarrollo. |
 | Fase 8 | ✅ **7/7.** Tres motores sobre el mismo contrato y primera beta preparada. |
@@ -27,14 +27,18 @@
 
 ### Qué toca retomar en la próxima sesión
 
-**Lo primero: la Fase C de los respaldos** —el artefacto—, según
-`docs/plan-respaldos-y-restauracion.md`. Las fases A y B quedaron cerradas en las
-sesiones 022b y 022c, con estructura y datos guionizados en los cuatro motores.
-Lo que entra ahora: el manifiesto versionado, las cuatro formas de salida, la
-escritura en disco por el proceso local, el estado de la operación —paso, objeto,
-filas, avisos— y la cancelación. Y **la transacción con instantánea que envuelve
-el respaldo entero**, que viene de la Fase B porque no es de cada tabla sino de
-todas a la vez.
+**Lo primero: la Fase D de los respaldos** —la interfaz—, según
+`docs/plan-respaldos-y-restauracion.md`. Las fases A, B y C quedaron cerradas en
+las sesiones 022b, 022c y 022d: el backend ya escribe un respaldo entero en cuatro
+formas, con manifiesto, instantánea y progreso consultable por HTTP.
+
+Lo que entra ahora es todo lo que ve el usuario: el árbol de selección con
+casillas de tres estados, el asistente de cuatro pasos desde el menú contextual y
+como pestaña, la vista previa del guion, `operation-progress` en `shared/ui` con
+las dos barras, el indicador en la barra de estado que sobrevive a cerrar el
+diálogo, y el resumen final en los cuatro estados. **Y el selector nativo de
+carpeta**, que viene de la Fase C: lo pone el envoltorio y hasta ahora no había
+dónde abrirlo.
 
 Y aparte, lo que ya venía. Ya no queda nada a medias: las transacciones manuales se cerraron en la sesión
 020 y los 44 archivos sueltos se repartieron en cuatro commits temáticos. Lo que
@@ -285,6 +289,78 @@ Y tres límites declarados desde el principio: no hay respaldo binario ni
 recuperación a un punto en el tiempo —eso es del servidor, y la interfaz tendrá
 que decirlo—, no hay respaldos programados, y un límite de filas puede dejar
 filas huérfanas, cosa que se avisa y no se corrige sola.
+
+### Sesión 022d — 2026-08-17 · Fase C: el artefacto, el progreso y la instantánea
+
+Lo que convierte dos guionizadores en una herramienta: alguien que recorra la
+selección en orden, escriba el resultado donde el usuario diga y **cuente lo que
+está haciendo mientras lo hace**.
+
+#### El respaldo sobrevive a la petición que lo lanzó
+
+`POST /api/backup/run` devuelve un identificador y termina. El trabajo sigue en el
+proceso local con su propio token, y el progreso se pregunta aparte con
+`GET /api/backup/{id}/status`. Es lo que permite cerrar el asistente sin matar un
+respaldo de media hora, y es justo lo que no se vería probando el servicio en vez
+de la API.
+
+El estado se conserva **después** de terminar. Un resumen que desapareciera al
+acabar no serviría para algo que tardó veinte minutos y que quizá terminó sin
+nadie mirando.
+
+#### Cuatro formas de salida, y qué hace cada una al descartarse
+
+Un `.sql` suelto, un árbol de carpetas, un `.zip` y los datos en CSV. El
+manifiesto va donde puede: un `manifest.json` en la carpeta y en el zip, y un
+bloque de comentarios en el `.sql` —cabecera al empezar, recuentos y avisos al
+final, porque reescribir la cabecera obligaría a copiar un archivo de gigabytes—.
+
+Al cancelar, el archivo suelto y el zip **se borran**: un respaldo a medias con
+aspecto de completo es más peligroso que no tener ninguno. La carpeta conserva lo
+escrito, que ahí sí se ve qué hay y qué falta, con el manifiesto marcado como
+incompleto.
+
+#### La instantánea: lo que enseñó probarla
+
+Venía pendiente de la Fase B y aquí se descubrió por qué merecía su sitio.
+
+**SQL Server acepta abrir la transacción con `SNAPSHOT` y falla en la primera
+consulta:** «snapshot isolation is not allowed in this database». Como las bases
+vienen así de fábrica, envolver la apertura en un `try`/`catch` no habría servido
+de nada: el respaldo habría reventado al leer la primera tabla. Hay que
+preguntarle antes a `sys.databases`.
+
+Y cuando no la hay, se lee sin garantía y **el manifiesto lo dice**. No se cae a
+`REPEATABLE READ` a propósito: en SQL Server eso mantiene bloqueos hasta el final
+y un respaldo de media hora dejaría media base sin poder escribirse.
+
+Tampoco se usa la transacción manual del usuario para esto, aunque encajaría: la
+deshace el barrido por inactividad a los quince minutos, que es exactamente lo que
+dura un respaldo grande.
+
+#### Dos detalles que el contrato ya tenía resueltos y uno que no
+
+La estimación de filas para la barra **ya estaba**: los cuatro lectores de
+metadatos rellenan `ApproximateRowCount` desde el catálogo. Se usa tal cual y se
+marca como aproximada; con condición `WHERE` se deja en nulo, que es la señal de
+barra indeterminada.
+
+El recuento de filas escritas dejó de deducirse del texto del `INSERT`: ahora cada
+instrucción dice cuántas lleva. Contar comas en un SQL ya escrito es adivinar, y
+de ese número sale la barra que el usuario mira durante veinte minutos.
+
+Y uno que no: los enumerados del contrato HTTP **viajan como texto**, porque el
+host no serializa enumerados de C#. Se escribieron primero como enumerados y el
+respaldo devolvía un 500 genérico; el resto del contrato ya lo hacía bien.
+
+#### Verificación
+
+**528 pruebas en verde, ninguna saltada**, con `DRUSE_REQUIRE_ENGINES=1` y los
+cuatro motores: 295 unitarias, 154 contractuales y 79 de integración.
+
+Lo que queda fuera de la fase, y es una decisión: el **selector nativo** de
+carpeta lo pone el envoltorio y no hay dónde abrirlo hasta que exista el asistente,
+así que va con la interfaz en la Fase D. El backend ya recibe la ruta y escribe.
 
 ### Sesión 022c — 2026-08-17 · Fase B de los respaldos: los datos
 

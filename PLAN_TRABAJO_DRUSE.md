@@ -1090,9 +1090,11 @@ Lo estructural, en el [ADR 0005](docs/decisions/0005-respaldos-guionizados-por-d
   base limpia, se relee la estructura con el mismo lector de metadatos y se
   compara. Comparar el SQL generado no comprueba que el respaldo sirva.
   _(Destapó cinco fallos reales en Informix y MySQL; ver el plan de la función.)_
-- [ ] **Salida en cuatro formas** combinables: un `.sql`, carpeta por tipo de
+- [x] **Salida en cuatro formas** combinables: un `.sql`, carpeta por tipo de
   objeto, `.zip` con manifiesto y datos en CSV. El CSV reutiliza el exportador y
-  el camino de importación que ya existen.
+  el camino de importación que ya existen. _(Fase C, sesión 022d: el respaldo se
+  escribe entero, con manifiesto versionado y lectura bajo una instantánea que
+  cubre todas las tablas.)_
 - [ ] **Perfiles guardados** en SQLite, lanzados a mano, que se reconcilian con
   el catálogo al abrirlos en vez de fallar si un objeto ya no está.
 - [ ] **Restauración en el mismo motor**, con vista previa de lo que se ejecuta.

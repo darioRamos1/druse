@@ -522,27 +522,54 @@ y eso lo tiene que abrir quien recorre la selección entera, no cada tabla por s
 cuenta. Ahí vive, con la comprobación que en SQL Server hace falta antes de pedir
 `SNAPSHOT`: una base que no lo tenga habilitado rechaza la transacción.
 
-### Fase C — El artefacto
+### Fase C — El artefacto ✅
 
-- [ ] Manifiesto versionado.
-- [ ] Las cuatro formas de salida y sus combinaciones.
-- [ ] Escritura en disco por el proceso local, con el selector nativo.
-- [ ] **Estado de la operación en el proceso local:** paso en curso, objeto,
+- [x] Manifiesto versionado.
+- [x] Las cuatro formas de salida y sus combinaciones.
+- [x] Escritura en disco por el proceso local. _(El **selector nativo** es de la
+      Fase D: lo pone el envoltorio, y hasta que exista el asistente no hay dónde
+      abrirlo. El backend ya recibe la ruta y escribe en ella.)_
+- [x] **Estado de la operación en el proceso local:** paso en curso, objeto,
       filas escritas, estimación, avisos y estado terminal, servido por
       `GET /api/backup/{id}/status`.
-- [ ] Estimación de filas desde el catálogo de los cuatro motores, marcada como
+- [x] Estimación de filas desde el catálogo de los cuatro motores, marcada como
       aproximada.
-- [ ] Cancelación, y borrado del archivo parcial.
-- [ ] Recolección de avisos y errores por objeto, con la instrucción que falló.
-- [ ] **La transacción con instantánea que envuelve el respaldo entero**, y el
-      límite declarado en el manifiesto donde el motor no la dé. Viene de la
-      Fase B: no es de cada tabla, es de todas a la vez. En SQL Server hay que
-      comprobar antes que la base admita `SNAPSHOT`, porque si no rechaza la
-      transacción y el respaldo no llegaría a empezar.
+- [x] Cancelación, y borrado del archivo parcial.
+- [x] Recolección de avisos y errores por objeto, con la instrucción que falló.
+- [x] **La transacción con instantánea que envuelve el respaldo entero**, y el
+      límite declarado en el manifiesto donde el motor no la dé.
 
 **Criterio de salida:** una base entera con las cuatro formas de salida; el
 manifiesto describe sin faltas lo que hay dentro **y el estado consultado durante
 la operación dice en todo momento qué objeto se está escribiendo**.
+
+_Cumplido._ `RespaldaUnaBaseEnLasCuatroFormasDeSalida` entra **por HTTP**, que es
+por donde entrará la interfaz: lanza el respaldo, sondea el estado hasta que
+termina, y comprueba el artefacto y el manifiesto de las cuatro combinaciones.
+
+**El respaldo sobrevive a la petición que lo lanzó.** `run` devuelve un
+identificador y termina; el trabajo sigue en el proceso local con su propio token
+de cancelación. Es lo que permite cerrar el asistente sin matar un respaldo de
+media hora, y por eso el estado se pregunta aparte en vez de esperar la respuesta.
+
+**Lo que se aprendió de la instantánea, probándola.** SQL Server **acepta** abrir
+la transacción con `SNAPSHOT` y falla en la primera consulta: «snapshot isolation
+is not allowed in this database». Como las bases vienen así de fábrica, un
+`try`/`catch` alrededor de la apertura no habría servido de nada —el respaldo
+habría reventado al leer la primera tabla—. Se le pregunta antes a
+`sys.databases`, y sin instantánea se lee sin garantía y el manifiesto lo dice.
+No se cae a `REPEATABLE READ` a propósito: allí eso mantiene bloqueos hasta el
+final y un respaldo de media hora dejaría media base sin poder escribirse.
+
+**Qué hace cada forma de salida cuando se descarta.** El archivo suelto y el `.zip`
+se borran: un respaldo a medias con aspecto de completo es más peligroso que no
+tener ninguno. La carpeta conserva lo escrito —ahí sí se ve qué hay y qué falta—
+con el manifiesto marcado como incompleto.
+
+**El manifiesto va donde puede ir:** un `manifest.json` en la carpeta y en el zip,
+y un bloque de comentarios en el `.sql`, con la cabecera al empezar y los
+recuentos y avisos al final. Reescribir la cabecera obligaría a copiar un archivo
+que puede ocupar gigabytes.
 
 ### Fase D — La interfaz
 
