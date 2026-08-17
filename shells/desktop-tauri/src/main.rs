@@ -11,6 +11,7 @@
 mod api_process;
 mod exports;
 mod sql_files;
+mod theme;
 mod transactions;
 
 use std::sync::Mutex;
@@ -150,7 +151,8 @@ fn main() {
             sql_files::save_sql_file,
             sql_files::save_sql_file_as,
             exports::save_export,
-            transactions::set_transaction_pending
+            transactions::set_transaction_pending,
+            theme::set_window_theme
         ])
         .on_window_event(|window, event| {
             // Cerrar con una transacción abierta tira lo que no esté confirmado:

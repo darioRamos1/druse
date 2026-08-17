@@ -2,6 +2,7 @@ import { Injectable, inject, signal } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 
 import { ApplicationGateway } from '../application-gateway/application-gateway';
+import { DesktopHost } from '../application-gateway/desktop-host';
 
 /**
  * Qué paleta se está pintando.
@@ -77,6 +78,7 @@ function remember(theme: ThemeName): void {
 @Injectable({ providedIn: 'root' })
 export class ThemeService {
   private readonly _gateway = inject(ApplicationGateway);
+  private readonly _desktop = inject(DesktopHost);
 
   private readonly _theme = signal<ThemeName>(cachedTheme());
   readonly theme = this._theme.asReadonly();
@@ -84,8 +86,10 @@ export class ThemeService {
   constructor() {
     // Normalmente ya lo aplicó el arranque. Repetirlo aquí cubre el caso de que
     // el servicio se cree en otro contexto —una prueba, otro punto de entrada—
-    // sin que el atributo llegue a escribirse nunca.
+    // sin que el atributo llegue a escribirse nunca. El marco de la ventana, en
+    // cambio, no lo ha tocado nadie todavía: lo pone siempre este primer paso.
     applyTheme(this._theme());
+    void this._desktop.setWindowTheme(this._theme());
   }
 
   /**
@@ -122,5 +126,6 @@ export class ThemeService {
     this._theme.set(theme);
     applyTheme(theme);
     remember(theme);
+    void this._desktop.setWindowTheme(theme);
   }
 }

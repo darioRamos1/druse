@@ -2,6 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { Observable, of, throwError } from 'rxjs';
 
 import { ApplicationGateway } from '../application-gateway/application-gateway';
+import { DesktopHost } from '../application-gateway/desktop-host';
 import { THEME_PREFERENCE, ThemeService, parseTheme } from './theme.service';
 
 /** Gateway mínimo: de todo lo que ofrece, el tema solo usa las preferencias. */
@@ -20,17 +21,31 @@ class FakeGateway {
   }
 }
 
+/** Envoltorio de escritorio de mentira: solo interesa qué tema se le pide. */
+class FakeDesktopHost {
+  readonly asked: string[] = [];
+
+  async setWindowTheme(theme: string): Promise<void> {
+    this.asked.push(theme);
+  }
+}
+
 describe('ThemeService', () => {
   let gateway: FakeGateway;
+  let desktop: FakeDesktopHost;
   let service: ThemeService;
 
   beforeEach(() => {
     localStorage.clear();
     document.documentElement.removeAttribute('data-theme');
     gateway = new FakeGateway();
+    desktop = new FakeDesktopHost();
 
     TestBed.configureTestingModule({
-      providers: [{ provide: ApplicationGateway, useValue: gateway }],
+      providers: [
+        { provide: ApplicationGateway, useValue: gateway },
+        { provide: DesktopHost, useValue: desktop },
+      ],
     });
 
     service = TestBed.inject(ThemeService);
@@ -80,6 +95,13 @@ describe('ThemeService', () => {
     service.adopt({ [THEME_PREFERENCE]: 'solarizado' });
 
     expect(service.theme()).toBe('dark');
+  });
+
+  it('pide al envoltorio que tiña también el marco de la ventana', async () => {
+    await service.set('light');
+
+    // El primero es el del arranque; el segundo, el cambio.
+    expect(desktop.asked).toEqual(['dark', 'light']);
   });
 
   it('alterna entre los dos', async () => {

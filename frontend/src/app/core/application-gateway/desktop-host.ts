@@ -120,6 +120,27 @@ export class DesktopHost {
     return this.invoke('set_transaction_pending', { pending });
   }
 
+  /**
+   * Pide al envoltorio que ponga la ventana en el mismo tema que la interfaz.
+   *
+   * El marco y la barra de título los dibuja el sistema y no leen CSS, así que
+   * son la única parte de la ventana que no cambia sola. En el navegador no hay
+   * nada que pedir y la llamada se descarta sin ruido: no poder teñir un marco
+   * que no existe no es un error del que haya que enterar a nadie.
+   */
+  async setWindowTheme(theme: string): Promise<void> {
+    if (!this.isDesktop) {
+      return;
+    }
+
+    try {
+      await this.invoke('set_window_theme', { theme });
+    } catch {
+      // Una ventana con la cabecera del otro color es un defecto menor; no
+      // justifica interrumpir un cambio de tema que ya se ha aplicado.
+    }
+  }
+
   private invoke<T>(command: string, args?: unknown): Promise<T> {
     const bridge = typeof window === 'undefined' ? undefined : window.__TAURI__;
     const invoke = bridge?.core?.invoke ?? bridge?.invoke;
