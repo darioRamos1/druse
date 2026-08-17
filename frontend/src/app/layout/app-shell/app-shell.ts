@@ -1,6 +1,7 @@
 import {
   ChangeDetectionStrategy,
   Component,
+  ElementRef,
   computed,
   effect,
   HostListener,
@@ -106,6 +107,29 @@ export class AppShell {
   protected readonly editorFontSize = computed(() => this._themes.appearance().editorFontSize);
 
   protected readonly settingsOpen = signal(false);
+
+  /**
+   * Proporción del editor, para que la miniatura de preferencias enseñe el
+   * mismo recorte. Se mide al abrir el panel y no antes: depende de cómo tenga
+   * el usuario repartidos los paneles en ese momento.
+   */
+  protected readonly editorRatio = signal('16 / 9');
+
+  protected openSettings(): void {
+    const box = this._editorElement()?.nativeElement.getBoundingClientRect();
+
+    if (box?.height) {
+      // Acotada: con el panel de resultados abierto del todo, el editor puede
+      // quedar en una franja de diez a uno, y una miniatura con esa forma no se
+      // ve. Se pierde algo de fidelidad justo cuando el encuadre importa menos,
+      // porque apenas hay editor donde enseñar la imagen.
+      const ratio = Math.min(2.6, Math.max(1.2, box.width / box.height));
+
+      this.editorRatio.set(`${ratio.toFixed(2)} / 1`);
+    }
+
+    this.settingsOpen.set(true);
+  }
 
   protected selectTheme(theme: ThemeName): void {
     void this._themes.set(theme);
@@ -400,6 +424,7 @@ export class AppShell {
   protected readonly timeoutSeconds = this._store.timeoutSeconds;
 
   private readonly _editor = viewChild<SqlEditor>('editor');
+  private readonly _editorElement = viewChild('editor', { read: ElementRef });
   private readonly _resultsPanel = viewChild<ResultsPanel>('resultsPanel');
 
   protected showHistory(): void {

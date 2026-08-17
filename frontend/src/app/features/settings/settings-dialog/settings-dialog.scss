@@ -218,6 +218,87 @@
   }
 }
 
+/*
+ * Miniatura del editor.
+ *
+ * Lee las mismas variables que pinta el editor de verdad, así que enseña el
+ * recorte real y se actualiza sola mientras se arrastra un control.
+ */
+.preview {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--dr-border-input);
+  border-radius: var(--dr-radius-sm);
+  background: var(--dr-surface-base);
+
+  &__image {
+    position: absolute;
+    inset: 0;
+    background-image: var(--dr-editor-background, none);
+    background-size: var(--dr-editor-background-size, cover);
+    background-repeat: var(--dr-editor-background-repeat, no-repeat);
+    background-position: var(--dr-editor-background-position, center);
+    opacity: var(--dr-editor-background-opacity, 0);
+  }
+
+  &__code {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+    padding: 10px 12px;
+  }
+
+  &__line {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    height: 6px;
+  }
+
+  &__gutter {
+    width: 8px;
+    height: 100%;
+    border-radius: 2px;
+    background: var(--dr-text-disabled);
+    opacity: 0.6;
+  }
+
+  /* Los mismos papeles que en el editor: violeta las reservadas, verde los
+     literales de texto, naranja los números. */
+  &__token {
+    height: 100%;
+    border-radius: 2px;
+    background: var(--dr-text-secondary);
+
+    &.is-keyword {
+      background: var(--dr-accent-alt-soft);
+    }
+
+    &.is-string {
+      background: var(--dr-success);
+    }
+
+    &.is-number {
+      background: var(--dr-warning);
+    }
+
+    &.is-call {
+      background: var(--dr-accent);
+    }
+
+    &.is-comment {
+      background: var(--dr-text-disabled);
+    }
+  }
+
+  &__caption {
+    margin: -4px 0 0;
+    color: var(--dr-text-tertiary);
+    font-size: var(--dr-font-size-xs);
+  }
+}
+
 .file {
   display: flex;
   align-items: center;

@@ -7,7 +7,7 @@
   (saveSqlAs)="saveTab(true)"
   (openPalette)="paletteOpen.set(true)"
   (themeSelected)="selectTheme($event)"
-  (openSettings)="settingsOpen.set(true)"
+  (openSettings)="openSettings()"
 />
 
 <div class="body">
@@ -257,7 +257,7 @@
 
 @defer (when settingsOpen()) {
   @if (settingsOpen()) {
-    <app-settings-dialog (closed)="settingsOpen.set(false)" />
+    <app-settings-dialog [editorRatio]="editorRatio()" (closed)="settingsOpen.set(false)" />
   }
 }
 

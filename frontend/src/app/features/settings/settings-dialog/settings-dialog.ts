@@ -1,4 +1,12 @@
-import { ChangeDetectionStrategy, Component, computed, inject, output, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  inject,
+  input,
+  output,
+  signal,
+} from '@angular/core';
 
 import { ThemeService } from '../../../core/theme/theme.service';
 import {
@@ -48,6 +56,63 @@ const TINTS: readonly { readonly name: string; readonly value: string }[] = [
   { name: 'Ciruela', value: '#a3708f' },
 ];
 
+/**
+ * El SQL de mentira de la miniatura.
+ *
+ * Anchos y clases inventados a mano en vez de texto de verdad: lo que hay que
+ * juzgar es si el color se distingue del fondo, y para eso una barra dice lo
+ * mismo que una palabra sin obligar a traducir nada ni a elegir una consulta de
+ * ejemplo que después no se parezca a la del usuario.
+ */
+interface PreviewToken {
+  readonly kind: string;
+  /** Ancho en porcentaje de la línea, para que parezca código y no un pentagrama. */
+  readonly width: number;
+}
+
+const PREVIEW_LINES: readonly (readonly PreviewToken[])[] = [
+  [
+    { kind: 'keyword', width: 16 },
+    { kind: 'name', width: 12 },
+    { kind: 'name', width: 18 },
+    { kind: 'call', width: 14 },
+  ],
+  [
+    { kind: 'keyword', width: 11 },
+    { kind: 'name', width: 26 },
+  ],
+  [
+    { kind: 'keyword', width: 14 },
+    { kind: 'name', width: 15 },
+    { kind: 'string', width: 10 },
+    { kind: 'keyword', width: 8 },
+    { kind: 'number', width: 9 },
+  ],
+  [
+    { kind: 'comment', width: 34 },
+  ],
+];
+
+/** Traduce un encuadre a la esquina —o el centro— donde queda. */
+function corner(x: number, y: number): string {
+  const horizontal = x < 34 ? 'la izquierda' : x > 66 ? 'la derecha' : 'el centro';
+  const vertical = y < 34 ? 'arriba' : y > 66 ? 'abajo' : 'el medio';
+
+  if (horizontal === 'el centro' && vertical === 'el medio') {
+    return 'centrada';
+  }
+
+  if (horizontal === 'el centro') {
+    return `${vertical === 'arriba' ? 'arriba' : 'abajo'} del todo`;
+  }
+
+  if (vertical === 'el medio') {
+    return `pegada a ${horizontal}`;
+  }
+
+  return `${vertical} a ${horizontal}`;
+}
+
 const FITS: readonly {
   readonly value: BackgroundFit;
   readonly label: string;
@@ -75,6 +140,15 @@ const FITS: readonly {
 })
 export class SettingsDialog {
   private readonly _themes = inject(ThemeService);
+
+  /**
+   * Proporción del editor de verdad.
+   *
+   * La miniatura la copia porque el recorte de una imagen depende de la forma
+   * del hueco: una previsualización cuadrada de un editor apaisado enseñaría un
+   * encuadre que después no se ve.
+   */
+  readonly editorRatio = input('16 / 9');
 
   readonly closed = output<void>();
 
@@ -220,6 +294,36 @@ export class SettingsDialog {
     this.problem.set(null);
     void this._themes.reset();
   }
+
+  /** Líneas de código de mentira para la miniatura, con la pinta de una consulta. */
+  protected readonly previewLines = PREVIEW_LINES;
+
+  /**
+   * Dónde queda la imagen, dicho con palabras.
+   *
+   * Dos porcentajes no se leen de un vistazo, y el encuadre es justo el ajuste
+   * que uno hace mirando y no calculando.
+   */
+  protected readonly framing = computed(() => {
+    const background = this.background();
+
+    if (!background) {
+      return '';
+    }
+
+    if (background.fit === 'tile') {
+      return `Repetida al ${background.scale} %, desde ${corner(background.x, background.y)}`;
+    }
+
+    const size =
+      background.fit === 'scale'
+        ? `Al ${background.scale} %`
+        : background.fit === 'contain'
+          ? 'Entera'
+          : 'Llenando el editor';
+
+    return `${size}, ${corner(background.x, background.y)}`;
+  });
 
   /** Si hay algo que restablecer; sin esto el botón mentiría estando siempre activo. */
   protected readonly customized = computed(() => {

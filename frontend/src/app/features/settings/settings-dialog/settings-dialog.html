@@ -154,6 +154,27 @@
       </p>
 
       @if (background(); as image) {
+        <!--
+          La miniatura usa las mismas variables que pinta el editor, así que lo
+          que se ve aquí es el mismo recorte, no una aproximación. Las líneas de
+          código son de mentira y están para lo único que importa decidir: si
+          encima de esa imagen se seguirá leyendo el SQL.
+        -->
+        <div class="preview" [style.aspect-ratio]="editorRatio()">
+          <div class="preview__image"></div>
+          <div class="preview__code" aria-hidden="true">
+            @for (line of previewLines; track $index) {
+              <span class="preview__line">
+                <span class="preview__gutter"></span>
+                @for (token of line; track $index) {
+                  <span class="preview__token" [class]="'is-' + token.kind" [style.width.%]="token.width"></span>
+                }
+              </span>
+            }
+          </div>
+        </div>
+        <p class="preview__caption">{{ framing() }}</p>
+
         <p class="file">
           <app-icon name="folder-open" [size]="13" />
           <span class="file__name">{{ image.name }}</span>
