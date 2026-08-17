@@ -1061,6 +1061,40 @@ No se ofrece `DELETE` sobre vistas —no se sabe si son actualizables— ni un
 borrado sin filtros «con confirmación»: para vaciar una tabla está `TRUNCATE`
 escrito a mano, que ya pasa por la detección de instrucciones destructivas.
 
+### Respaldos personalizables — planificado
+
+Pedido por el usuario: una herramienta de respaldo **que se arma**, no un botón
+que vuelca la base entera. Se eligen esquemas, tablas, vistas, rutinas,
+secuencias y disparadores, y se decide **con datos o sin ellos** —en general y
+tabla por tabla—, con filtro por filas, límite y columnas excluidas.
+
+El plan completo, con sus seis fases y sus criterios de salida, está en
+[`docs/plan-respaldos-y-restauracion.md`](docs/plan-respaldos-y-restauracion.md).
+Lo estructural, en el [ADR 0005](docs/decisions/0005-respaldos-guionizados-por-druse.md).
+
+- [ ] **Druse guioniza el respaldo** desde el catálogo que ya lee, tras un puerto
+  `IDatabaseScripter` al lado de `ITableDesigner`. No depende de `pg_dump` ni de
+  `dbexport`, funciona igual en los cuatro motores y es lo único que sostiene la
+  selección fina. Las herramientas nativas quedan como adaptador posterior.
+- [ ] **Los cuatro motores desde la primera fase**, con las mismas pruebas
+  contractuales, como se hizo con el diseñador de tablas.
+- [ ] **Ida y vuelta como criterio de salida:** se guioniza, se ejecuta en una
+  base limpia, se relee la estructura con el mismo lector de metadatos y se
+  compara. Comparar el SQL generado no comprueba que el respaldo sirva.
+- [ ] **Salida en cuatro formas** combinables: un `.sql`, carpeta por tipo de
+  objeto, `.zip` con manifiesto y datos en CSV. El CSV reutiliza el exportador y
+  el camino de importación que ya existen.
+- [ ] **Perfiles guardados** en SQLite, lanzados a mano, que se reconcilian con
+  el catálogo al abrirlos en vez de fallar si un objeto ya no está.
+- [ ] **Restauración en el mismo motor**, con vista previa de lo que se ejecuta.
+  El manifiesto guarda origen y versión de formato, y se rechaza lo que no
+  encaja.
+
+**Lo que no se hace, y es una decisión:** no hay respaldo binario ni recuperación
+a un punto en el tiempo —eso pertenece al servidor y la interfaz lo dirá—, no se
+traduce entre motores, y no hay respaldos programados, que exigirían un servicio
+vivo con la ventana cerrada.
+
 ### Prioridad alta
 
 - ~~Autenticación integrada de Windows para SQL Server.~~ Hecho (sesión 014).
