@@ -878,6 +878,318 @@ public abstract class DatabaseProviderContractTests<TFixture>
     }
 
     /// <summary>
+    /// Respalda los datos de una tabla con una columna de cada tipo, los borra y
+    /// los vuelve a cargar desde el guion.
+    ///
+    /// **Es el criterio de salida de la Fase B**, y mide lo único que importa: que
+    /// cada valor vuelva **igual**. Un literal mal escrito no da un error bonito;
+    /// da un respaldo que se ejecuta entero y guarda otra cosa, y eso solo se ve
+    /// comparando lo leído antes con lo leído después.
+    ///
+    /// Los valores se insertan con el mismo formateador que después los escribe.
+    /// Eso no comprueba el formateador contra una verdad externa —para eso están
+    /// las unitarias, valor a valor— pero sí lo que aquí interesa: que lo escrito
+    /// se pueda ejecutar y que el ciclo leer, escribir y volver a leer no pierda
+    /// nada.
+    /// </summary>
+    [Fact]
+    public async Task RespaldaLosDatosDeUnaTablaYLosVuelveACargar()
+    {
+        if (Skip) { return; }
+
+        await using var session = await OpenAsync();
+
+        var name = $"druse_dat_{Guid.NewGuid().ToString("N")[..8]}";
+        var families = Fixture.TypesByFamily.Keys.Order().ToList();
+
+        var target = new DatabaseObject
+        {
+            Id = name,
+            Name = name,
+            Kind = DatabaseObjectKind.Table,
+            Database = Fixture.DatabaseName,
+            Schema = Fixture.DefaultSchema,
+        };
+
+        try
+        {
+            await Fixture.Designer.CreateAsync(
+                session,
+                new TableDefinition
+                {
+                    Database = Fixture.DatabaseName,
+                    Schema = Fixture.DefaultSchema,
+                    Name = name,
+                    Columns =
+                    [
+                        new TableColumnDefinition
+                        {
+                            Name = "id",
+                            DataType = "INTEGER",
+                            IsNullable = false,
+                            IsPrimaryKey = true,
+                            IsIdentity = true,
+                        },
+                        .. families.Select(family => new TableColumnDefinition
+                        {
+                            Name = ColumnOf(family),
+                            DataType = Fixture.TypesByFamily[family],
+                        }),
+                    ],
+                },
+                CancellationToken.None);
+
+            var table = await ReadAsync(session, target);
+            var columns = table.Columns
+                .Where(column => column.Name != "id")
+                .OrderBy(column => column.Ordinal)
+                .ToList();
+
+            // De cómo se clasifique el tipo depende cómo se escribe el literal:
+            // un booleano escrito como número lo rechaza el motor, y una fecha
+            // escrita sin comillas también. Si el catálogo devuelve un nombre que
+            // Druse no sabe clasificar, el respaldo saldría mal sin que nada más
+            // lo delatara.
+            foreach (var column in columns)
+            {
+                var expected = FamilyOf(column.Name);
+                var actual = ColumnValueParser.Classify(column.DataType);
+
+                Assert.True(
+                    expected == actual,
+                    $"{Fixture.EngineName} devuelve «{column.DataType}» para la columna " +
+                    $"{column.Name}, que Druse clasifica como {actual} y no como {expected}.");
+            }
+
+            // Dos filas: una con un valor de cada tipo y otra entera a nulo. El
+            // nulo es la mitad del trabajo de un respaldo y la que más se olvida.
+            var names = string.Join(", ", columns.Select(column => column.Name));
+
+            var values = string.Join(
+                ", ",
+                columns.Select(column =>
+                    Fixture.Scripter.FormatLiteral(ValueOf(FamilyOf(column.Name)), column)));
+
+            var nulls = string.Join(", ", columns.Select(_ => "NULL"));
+
+            await ExecuteAsync(session, $"INSERT INTO {name} ({names}) VALUES ({values})");
+            await ExecuteAsync(session, $"INSERT INTO {name} ({names}) VALUES ({nulls})");
+
+            var before = await RowsAsync(session, name, names);
+
+            Assert.Equal(2, before.Count);
+
+            // --- El respaldo --------------------------------------------------
+            var script = new List<string>(Fixture.Scripter.BeginDataLoad(table));
+
+            await foreach (var statement in Fixture.Scripter.ScriptDataAsync(
+                session,
+                table,
+                TableDataFilter.None,
+                CancellationToken.None))
+            {
+                script.Add(statement);
+            }
+
+            script.AddRange(Fixture.Scripter.EndDataLoad(table));
+
+            // El identificador entra en el respaldo, así que la carga tiene que
+            // poder escribir en una columna que genera el motor.
+            Assert.Contains(script, statement => statement.Contains("INSERT INTO", StringComparison.Ordinal));
+
+            await ExecuteAsync(session, $"DELETE FROM {name}");
+            Assert.Empty(await RowsAsync(session, name, names));
+
+            await RunAsync(session, script);
+
+            var after = await RowsAsync(session, name, names);
+
+            // --- Lo que tiene que salir igual ---------------------------------
+            Assert.Equal(before.Count, after.Count);
+
+            for (var row = 0; row < before.Count; row++)
+            {
+                Assert.Equal(before[row], after[row]);
+            }
+        }
+        finally
+        {
+            await ExecuteAsync(session, Fixture.DropTable(name));
+        }
+    }
+
+    /// <summary>
+    /// Los filtros: la condición, el tope de filas y las columnas que no se
+    /// copian.
+    ///
+    /// Se comprueban sobre filas de verdad porque cada motor escribe el límite en
+    /// un sitio distinto de la instrucción —`LIMIT` al final, `TOP` y `FIRST`
+    /// delante de las columnas— y un límite mal colocado no falla: devuelve otra
+    /// cosa.
+    /// </summary>
+    [Fact]
+    public async Task LosFiltrosRecortanLoQueSeLleva()
+    {
+        if (Skip) { return; }
+
+        await using var session = await OpenAsync();
+
+        var name = $"druse_fil_{Guid.NewGuid().ToString("N")[..8]}";
+
+        var target = new DatabaseObject
+        {
+            Id = name,
+            Name = name,
+            Kind = DatabaseObjectKind.Table,
+            Database = Fixture.DatabaseName,
+            Schema = Fixture.DefaultSchema,
+        };
+
+        try
+        {
+            await ExecuteAsync(session, Fixture.CreateTableWithColumns(name));
+            await ExecuteAsync(session, Fixture.InsertNamedRows(name));
+
+            var table = await ReadAsync(session, target);
+
+            // --- Tope de filas -------------------------------------------------
+            var limited = await ScriptAsync(session, table, new TableDataFilter { MaxRows = 2 });
+
+            Assert.Equal(2, CountRows(limited));
+
+            // --- Condición -----------------------------------------------------
+            var filtered = await ScriptAsync(
+                session,
+                table,
+                new TableDataFilter { Where = "id = 2" });
+
+            var only = Assert.Single(filtered);
+
+            Assert.Contains("Bea", only, StringComparison.Ordinal);
+            Assert.DoesNotContain("Ana", only, StringComparison.Ordinal);
+
+            // --- Columnas excluidas ---------------------------------------------
+            var withoutName = await ScriptAsync(
+                session,
+                table,
+                new TableDataFilter { ExcludedColumns = ["email"] });
+
+            Assert.NotEmpty(withoutName);
+            Assert.All(withoutName, statement =>
+                Assert.DoesNotContain("email", statement, StringComparison.OrdinalIgnoreCase));
+
+            // --- Y lo que no se admite ------------------------------------------
+            // La condición acaba dentro de un `SELECT` que arma Druse, así que una
+            // segunda instrucción se rechaza antes de llegar al motor.
+            await Assert.ThrowsAsync<ArgumentException>(async () =>
+                await ScriptAsync(
+                    session,
+                    table,
+                    new TableDataFilter { Where = $"1=1; DROP TABLE {name}" }));
+
+            // Y la tabla sigue ahí.
+            Assert.Equal(3, (await RowsAsync(session, name, "id")).Count);
+        }
+        finally
+        {
+            await ExecuteAsync(session, Fixture.DropTable(name));
+        }
+    }
+
+    /// <summary>La tabla leída del catálogo, tal y como la recibe el guionizador.</summary>
+    private async Task<ScriptedTable> ReadAsync(IDatabaseSession session, DatabaseObject table) => new()
+    {
+        Table = table,
+        Columns = await Fixture.Metadata.GetColumnsAsync(session, table, CancellationToken.None),
+        Structure = await Fixture.Metadata.GetTableStructureAsync(session, table, CancellationToken.None),
+    };
+
+    private async Task<List<string>> ScriptAsync(
+        IDatabaseSession session,
+        ScriptedTable table,
+        TableDataFilter filter)
+    {
+        var statements = new List<string>();
+
+        await foreach (var statement in Fixture.Scripter.ScriptDataAsync(
+            session,
+            table,
+            filter,
+            CancellationToken.None))
+        {
+            statements.Add(statement);
+        }
+
+        return statements;
+    }
+
+    /// <summary>
+    /// Cuántas filas hay en un guion, que no es lo mismo que cuántas
+    /// instrucciones: donde el motor lo admite, varias filas van en un solo
+    /// `INSERT`.
+    /// </summary>
+    private static int CountRows(IEnumerable<string> statements) =>
+        statements.Sum(statement => statement.Split("),").Length);
+
+    private async Task RunAsync(IDatabaseSession session, IEnumerable<string> statements)
+    {
+        foreach (var statement in statements)
+        {
+            QueryResult result;
+
+            try
+            {
+                result = await ExecuteAsync(session, statement);
+            }
+            catch (Exception error)
+            {
+                throw new InvalidOperationException(
+                    $"El guion no se pudo ejecutar en {Fixture.EngineName}." +
+                    $"{Environment.NewLine}{statement}",
+                    error);
+            }
+
+            Assert.True(
+                result.Error is null,
+                $"El guion no se pudo ejecutar en {Fixture.EngineName}: " +
+                $"{result.Error?.Message}{Environment.NewLine}{statement}");
+        }
+    }
+
+    /// <summary>Las filas de una tabla, como texto, para poder compararlas.</summary>
+    private async Task<List<string>> RowsAsync(
+        IDatabaseSession session,
+        string table,
+        string columns)
+    {
+        var result = await ExecuteAsync(session, $"SELECT {columns} FROM {table} ORDER BY id");
+        var rows = Assert.Single(result.ResultSets).Rows;
+
+        return [.. rows.Select(row => string.Join("|", row.Select(cell => cell ?? "<nulo>")))];
+    }
+
+    private static string ColumnOf(ColumnFamily family) =>
+        $"c_{family.ToString().ToLowerInvariant()}";
+
+    private static ColumnFamily FamilyOf(string column) =>
+        Enum.Parse<ColumnFamily>(column[2..], ignoreCase: true);
+
+    /// <summary>Un valor reconocible de cada familia, con lo que suele romperse.</summary>
+    private static object ValueOf(ColumnFamily family) => family switch
+    {
+        // Comilla y barra invertida: lo que convierte una fila en instrucción si
+        // el literal está mal escrito.
+        ColumnFamily.Text => @"Ana O'Brien \ y punto",
+        ColumnFamily.Integral => 42,
+        ColumnFamily.Fractional => 3.50m,
+        ColumnFamily.Boolean => true,
+        ColumnFamily.Date => new DateOnly(2026, 8, 17),
+        ColumnFamily.Timestamp => new DateTime(2026, 8, 17, 14, 3, 11, DateTimeKind.Unspecified),
+        ColumnFamily.Binary => new byte[] { 0x00, 0x1A, 0xFF },
+        _ => throw new NotSupportedException($"La prueba no sabe qué valor usar para {family}."),
+    };
+
+    /// <summary>
     /// Lee los parámetros de un procedimiento para poder componer su llamada.
     ///
     /// Lo que se comprueba es el orden y la dirección, no los nombres: SQL Server

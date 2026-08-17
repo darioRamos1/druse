@@ -29,6 +29,18 @@ public sealed class SqlServerFixture : IProviderFixture
 
     public IDatabaseScripter Scripter => _designer;
 
+    public IReadOnlyDictionary<ColumnFamily, string> TypesByFamily { get; } =
+        new Dictionary<ColumnFamily, string>
+        {
+            [ColumnFamily.Text] = "NVARCHAR(100)",
+            [ColumnFamily.Integral] = "INT",
+            [ColumnFamily.Fractional] = "DECIMAL(12,2)",
+            [ColumnFamily.Boolean] = "BIT",
+            [ColumnFamily.Date] = "DATE",
+            [ColumnFamily.Timestamp] = "DATETIME2",
+            [ColumnFamily.Binary] = "VARBINARY(50)",
+        };
+
     public string DatabaseName =>
         Environment.GetEnvironmentVariable("DRUSE_TEST_MSSQL_DB") ?? "druse_test";
 

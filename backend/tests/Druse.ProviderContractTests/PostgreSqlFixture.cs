@@ -29,6 +29,18 @@ public sealed class PostgreSqlFixture : IProviderFixture
 
     public IDatabaseScripter Scripter => _designer;
 
+    public IReadOnlyDictionary<ColumnFamily, string> TypesByFamily { get; } =
+        new Dictionary<ColumnFamily, string>
+        {
+            [ColumnFamily.Text] = "TEXT",
+            [ColumnFamily.Integral] = "INTEGER",
+            [ColumnFamily.Fractional] = "DECIMAL(12,2)",
+            [ColumnFamily.Boolean] = "BOOLEAN",
+            [ColumnFamily.Date] = "DATE",
+            [ColumnFamily.Timestamp] = "TIMESTAMP",
+            [ColumnFamily.Binary] = "BYTEA",
+        };
+
     public string DatabaseName =>
         Environment.GetEnvironmentVariable("DRUSE_TEST_PG_DB") ?? "druse_test";
 

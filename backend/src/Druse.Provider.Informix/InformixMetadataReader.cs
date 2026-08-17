@@ -105,6 +105,11 @@ public sealed class InformixMetadataReader : IDatabaseMetadataReader
         // `default` de una columna vive en `sysdefaults`, con el valor en `default`
         // y una letra en `type` que dice de qué clase es. Se toma solo el literal,
         // que es lo que el diseñador puede volver a escribir.
+        //
+        // `sysxtdtypes` hace falta para los tipos opacos: `BOOLEAN`, `BLOB`,
+        // `CLOB` y `LVARCHAR` comparten `coltype` y solo se distinguen por su
+        // nombre extendido. Sin este `JOIN`, un `BOOLEAN` se anuncia como `CLOB`
+        // —lo hacía— y entonces se le escriben literales de texto.
         const string Sql = """
             SELECT
                 c.colname,
@@ -112,10 +117,12 @@ public sealed class InformixMetadataReader : IDatabaseMetadataReader
                 c.collength,
                 c.colno,
                 d.type,
-                d.default
+                d.default,
+                x.name
             FROM syscolumns c
             JOIN systables t ON t.tabid = c.tabid
             LEFT JOIN sysdefaults d ON d.tabid = c.tabid AND d.colno = c.colno
+            LEFT JOIN sysxtdtypes x ON x.extended_id = c.extended_id
             WHERE t.tabname = ? AND t.owner = ?
             ORDER BY c.colno
             """;
@@ -127,11 +134,12 @@ public sealed class InformixMetadataReader : IDatabaseMetadataReader
             {
                 var coltype = Number(reader, 1);
                 var collength = Number(reader, 2);
+                var extended = reader.IsDBNull(6) ? null : Text(reader, 6);
 
                 return new DatabaseColumn
                 {
                     Name = Text(reader, 0),
-                    DataType = InformixTypeNames.Format(coltype, collength),
+                    DataType = InformixTypeNames.Format(coltype, collength, extended),
                     IsNullable = InformixTypeNames.IsNullable(coltype),
                     // La clave primaria no está en syscolumns: se rellena después.
                     IsPrimaryKey = false,

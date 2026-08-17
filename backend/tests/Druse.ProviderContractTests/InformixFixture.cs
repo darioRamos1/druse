@@ -29,6 +29,21 @@ public sealed class InformixFixture : IProviderFixture
 
     public IDatabaseScripter Scripter => _designer;
 
+    /// <summary>
+    /// Sin binarios: `BYTE` y `BLOB` no tienen forma literal, así que una columna
+    /// así no se puede respaldar como texto y el guionizador lo declara.
+    /// </summary>
+    public IReadOnlyDictionary<ColumnFamily, string> TypesByFamily { get; } =
+        new Dictionary<ColumnFamily, string>
+        {
+            [ColumnFamily.Text] = "VARCHAR(100)",
+            [ColumnFamily.Integral] = "INTEGER",
+            [ColumnFamily.Fractional] = "DECIMAL(12,2)",
+            [ColumnFamily.Boolean] = "BOOLEAN",
+            [ColumnFamily.Date] = "DATE",
+            [ColumnFamily.Timestamp] = "DATETIME YEAR TO SECOND",
+        };
+
     public string DatabaseName =>
         Environment.GetEnvironmentVariable("DRUSE_TEST_IFX_DB") ?? "druse_test";
 

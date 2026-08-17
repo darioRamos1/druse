@@ -45,6 +45,19 @@ public interface IProviderFixture
     /// </summary>
     IDatabaseScripter Scripter { get; }
 
+    /// <summary>
+    /// Cómo llama este motor al tipo de cada familia de datos.
+    ///
+    /// Es lo que permite que la prueba de respaldo recorra «una columna de cada
+    /// tipo» sin escribir cuatro tablas distintas: la prueba pide familias y el
+    /// motor pone sus nombres.
+    ///
+    /// **Una familia ausente es una declaración**, no un olvido: Informix no sabe
+    /// escribir un valor binario dentro de una instrucción, así que allí una
+    /// columna binaria no se puede respaldar como texto y no aparece.
+    /// </summary>
+    IReadOnlyDictionary<ColumnFamily, string> TypesByFamily { get; }
+
     ConnectionProfile Profile(bool onlyRead = false);
 
     DatabaseCredentials Credentials { get; }

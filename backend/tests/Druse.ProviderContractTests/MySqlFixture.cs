@@ -29,6 +29,18 @@ public sealed class MySqlFixture : IProviderFixture
 
     public IDatabaseScripter Scripter => _designer;
 
+    public IReadOnlyDictionary<ColumnFamily, string> TypesByFamily { get; } =
+        new Dictionary<ColumnFamily, string>
+        {
+            [ColumnFamily.Text] = "VARCHAR(100)",
+            [ColumnFamily.Integral] = "INT",
+            [ColumnFamily.Fractional] = "DECIMAL(12,2)",
+            [ColumnFamily.Boolean] = "TINYINT(1)",
+            [ColumnFamily.Date] = "DATE",
+            [ColumnFamily.Timestamp] = "DATETIME",
+            [ColumnFamily.Binary] = "VARBINARY(50)",
+        };
+
     public string DatabaseName =>
         Environment.GetEnvironmentVariable("DRUSE_TEST_MYSQL_DB") ?? "druse_test";
 

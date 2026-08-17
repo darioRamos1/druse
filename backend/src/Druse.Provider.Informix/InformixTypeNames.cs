@@ -47,9 +47,26 @@ internal static class InformixTypeNames
     public static bool IsNumeric(int coltype) =>
         Base(coltype) is 1 or 2 or 3 or 4 or 5 or 6 or 8 or 17 or 18 or 52 or 53;
 
-    public static string Format(int coltype, int collength)
+    /// <summary>
+    /// El nombre del tipo de una columna.
+    /// </summary>
+    /// <param name="extendedName">
+    /// Nombre en `sysxtdtypes` cuando el tipo es opaco, que es el único sitio
+    /// donde se distinguen entre sí.
+    ///
+    /// `BOOLEAN`, `BLOB`, `CLOB` y `LVARCHAR` comparten `coltype`: elegir uno de
+    /// ellos por el número es acertar por casualidad. Un `BOOLEAN` anunciado como
+    /// `CLOB` se muestra mal en el explorador y, al respaldarlo, recibe comillas
+    /// de texto que el motor rechaza.
+    /// </param>
+    public static string Format(int coltype, int collength, string? extendedName = null)
     {
         var type = Base(coltype);
+
+        if (type is 40 or 41 && !string.IsNullOrWhiteSpace(extendedName))
+        {
+            return extendedName.Trim().ToUpperInvariant();
+        }
 
         return type switch
         {
