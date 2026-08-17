@@ -53,7 +53,23 @@ public sealed class InformixTableDesigner : TableDesignerBase
     {
         NamesPrimaryKey = false,
         NamesUniqueConstraints = false,
+
+        // Aquí `VALUES (1), (2)` es un error de sintaxis y no una forma menos
+        // eficiente de escribirlo: Informix inserta una fila por instrucción.
+        MaxRowsPerInsert = 1,
+
+        // `BYTE` y `BLOB` se cargan por otros caminos y no tienen forma literal.
+        SupportsBinaryLiterals = false,
     };
+
+    /// <summary>El límite va delante de las columnas, como en SQL Server.</summary>
+    protected override string RowLimitPrefix(int maxRows) =>
+        $"FIRST {maxRows.ToString(System.Globalization.CultureInfo.InvariantCulture)}";
+
+    protected override string RowLimitSuffix(int maxRows) => string.Empty;
+
+    /// <summary>Su tipo `BOOLEAN` se escribe con las letras t y f.</summary>
+    protected override string BooleanLiteral(bool value) => value ? "'t'" : "'f'";
 
     /// <summary>
     /// Comillas dobles, duplicándolas para que no se pueda escapar.

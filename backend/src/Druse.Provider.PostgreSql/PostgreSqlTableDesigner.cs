@@ -32,6 +32,20 @@ public sealed class PostgreSqlTableDesigner : TableDesignerBase
         Methods = ["btree", "hash", "gin", "gist", "brin"],
     };
 
+    /// <summary>
+    /// `bytea` se escribe con su forma hexadecimal entre comillas, no con `0x`.
+    ///
+    /// Depende de que la conexión trate la barra invertida como un carácter más
+    /// —`standard_conforming_strings`, encendido desde PostgreSQL 9.1 y lo que
+    /// pone Npgsql—; con la opción apagada haría falta duplicarla.
+    /// </summary>
+    protected override string BinaryLiteral(byte[] value)
+    {
+        ArgumentNullException.ThrowIfNull(value);
+
+        return $"'\\x{Convert.ToHexString(value).ToLowerInvariant()}'";
+    }
+
     /// <summary>Comillas dobles, duplicándolas para que no se pueda escapar.</summary>
     protected override string Quote(string identifier) =>
         $"\"{identifier.Replace("\"", "\"\"", StringComparison.Ordinal)}\"";

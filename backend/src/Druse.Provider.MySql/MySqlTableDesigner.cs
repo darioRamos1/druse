@@ -44,6 +44,40 @@ public sealed class MySqlTableDesigner : TableDesignerBase
         SupportsSchemas = false,
     };
 
+    /// <summary>
+    /// Aquí la barra invertida **también** escapa dentro de un literal, al
+    /// contrario que en el estándar.
+    ///
+    /// Doblar solo las comillas dejaría que un texto acabado en barra se comiera
+    /// la comilla de cierre y el respaldo siguiera leyéndose como instrucción. Es
+    /// el mismo motivo por el que MySQL devuelve sus propias condiciones escapadas
+    /// así, y por el que hay que deshacerlo al leerlas.
+    /// </summary>
+    protected override string TextLiteral(string text)
+    {
+        ArgumentNullException.ThrowIfNull(text);
+
+        var escaped = text
+            .Replace("\\", "\\\\", StringComparison.Ordinal)
+            .Replace("'", "''", StringComparison.Ordinal);
+
+        return $"'{escaped}'";
+    }
+
+    /// <summary>
+    /// `X'…'` en lugar de `0x…`, que con una tira vacía sería un error de
+    /// sintaxis: `X''` sí es un binario vacío válido.
+    /// </summary>
+    protected override string BinaryLiteral(byte[] value)
+    {
+        ArgumentNullException.ThrowIfNull(value);
+
+        return $"X'{Convert.ToHexString(value)}'";
+    }
+
+    /// <summary>MySQL no tiene booleano: `BOOL` es `TINYINT(1)`, y se escribe así.</summary>
+    protected override string BooleanLiteral(bool value) => value ? "1" : "0";
+
     /// <summary>Acentos graves, duplicándolos para que no se pueda escapar.</summary>
     protected override string Quote(string identifier) =>
         $"`{identifier.Replace("`", "``", StringComparison.Ordinal)}`";

@@ -61,4 +61,23 @@ public sealed record ScripterCapabilities
     /// el motor no tiene.
     /// </summary>
     public bool SupportsSchemas { get; init; } = true;
+
+    /// <summary>
+    /// Cuántas filas caben en un solo `INSERT`.
+    ///
+    /// Agrupar filas es lo que separa un respaldo utilizable de uno con un millón
+    /// de instrucciones, pero **Informix no admite más de una**: allí
+    /// `VALUES (1), (2)` es un error de sintaxis, no una forma menos eficiente de
+    /// escribirlo.
+    /// </summary>
+    public int MaxRowsPerInsert { get; init; } = 100;
+
+    /// <summary>
+    /// El motor sabe escribir un valor binario dentro de una instrucción.
+    ///
+    /// En Informix no: los tipos `BYTE` y `BLOB` se cargan por otros caminos y no
+    /// tienen forma literal. Una columna así no se puede respaldar como texto, y
+    /// eso se dice en vez de escribir algo que no es el dato.
+    /// </summary>
+    public bool SupportsBinaryLiterals { get; init; } = true;
 }

@@ -31,6 +31,38 @@ public sealed class SqlServerTableDesigner : TableDesignerBase
         Methods = [],
     };
 
+    /// <summary>
+    /// Copiar los datos significa copiar también las claves que ya tienen, y SQL
+    /// Server no deja escribir en una columna de identidad sin abrirle paso.
+    ///
+    /// Solo se emite donde hay identidad: `SET IDENTITY_INSERT` sobre una tabla
+    /// que no la tiene es un error, no una instrucción que no hace nada.
+    /// </summary>
+    public override IReadOnlyList<string> BeginDataLoad(ScriptedTable table) =>
+        HasIdentity(table) ? [$"SET IDENTITY_INSERT {Name(table)} ON;"] : [];
+
+    public override IReadOnlyList<string> EndDataLoad(ScriptedTable table) =>
+        HasIdentity(table) ? [$"SET IDENTITY_INSERT {Name(table)} OFF;"] : [];
+
+    private static bool HasIdentity(ScriptedTable table)
+    {
+        ArgumentNullException.ThrowIfNull(table);
+
+        return table.Columns.Any(column => column.IsGenerated);
+    }
+
+    private string Name(ScriptedTable table) =>
+        Qualify(table.Table.Database, table.Table.Schema, table.Table.Name);
+
+    /// <summary>Aquí el límite va delante de las columnas, no al final.</summary>
+    protected override string RowLimitPrefix(int maxRows) =>
+        $"TOP ({maxRows.ToString(System.Globalization.CultureInfo.InvariantCulture)})";
+
+    protected override string RowLimitSuffix(int maxRows) => string.Empty;
+
+    /// <summary>`BIT` no entiende `true`: se escribe con uno y cero.</summary>
+    protected override string BooleanLiteral(bool value) => value ? "1" : "0";
+
     /// <summary>Corchetes, duplicando el de cierre para que no se pueda escapar.</summary>
     protected override string Quote(string identifier) =>
         $"[{identifier.Replace("]", "]]", StringComparison.Ordinal)}]";

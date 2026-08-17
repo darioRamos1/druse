@@ -1,6 +1,8 @@
 using System.Data.Common;
 using System.Diagnostics;
 using System.Globalization;
+using System.Runtime.CompilerServices;
+using System.Text;
 using Druse.Domain;
 
 namespace Druse.Database.Abstractions;
@@ -468,6 +470,249 @@ public abstract class TableDesignerBase : ITableDesigner, IDatabaseScripter
             .. table.Structure.ForeignKeys.Select(key =>
                 AddConstraint(qualified, key.Name, ForeignKeyBody(ToDefinition(key)))),
         ];
+    }
+
+    /// <summary>
+    /// Lo que hay que ejecutar antes de cargar filas. Por omisión, nada.
+    /// </summary>
+    public virtual IReadOnlyList<string> BeginDataLoad(ScriptedTable table) => [];
+
+    /// <summary>Lo que cierra lo que abrió <see cref="BeginDataLoad"/>.</summary>
+    public virtual IReadOnlyList<string> EndDataLoad(ScriptedTable table) => [];
+
+    public async IAsyncEnumerable<string> ScriptDataAsync(
+        IDatabaseSession session,
+        ScriptedTable table,
+        TableDataFilter filter,
+        [EnumeratorCancellation] CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(session);
+        ArgumentNullException.ThrowIfNull(table);
+        ArgumentNullException.ThrowIfNull(filter);
+
+        // El filtro se comprueba antes de armar el `SELECT`, no después de
+        // ejecutarlo: es texto que escribió una persona y va dentro de una
+        // instrucción que escribe Druse.
+        var problems = filter.Validate(table);
+
+        if (problems.Count > 0)
+        {
+            throw new ArgumentException(
+                $"El filtro de «{table.Table.Name}» no se puede aplicar: {string.Join(" ", problems)}",
+                nameof(filter));
+        }
+
+        var columns = Included(table, filter);
+
+        if (columns.Count == 0)
+        {
+            yield break;
+        }
+
+        var qualified = Qualify(table.Table.Database, table.Table.Schema, table.Table.Name);
+        var header =
+            $"INSERT INTO {qualified} " +
+            $"({string.Join(", ", columns.Select(column => Quote(column.Name)))}) VALUES";
+
+        var connection = Connection(session);
+
+        // Lee dentro de la transacción del usuario si la hay: lo que se respalda
+        // es lo que esa sesión ve, incluidos sus cambios sin confirmar. Sin
+        // transacción abierta, esta se descarta al terminar; es solo lectura.
+        await using var scope = await OperationScope.BeginAsync(
+            connection,
+            session.Transaction,
+            cancellationToken);
+
+        await using var command = connection.CreateCommand();
+        command.CommandText = SelectRows(qualified, columns, table, filter);
+        command.Transaction = scope.Transaction;
+
+        // SequentialAccess deja liberar cada fila según se lee, en lugar de
+        // mantener el registro entero en memoria.
+        await using var reader = await command.ExecuteReaderAsync(
+            System.Data.CommandBehavior.SequentialAccess,
+            cancellationToken);
+
+        var batch = new List<string>(Math.Max(1, Capabilities.MaxRowsPerInsert));
+        var values = new string[columns.Count];
+
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            for (var ordinal = 0; ordinal < columns.Count; ordinal++)
+            {
+                var value = await reader.IsDBNullAsync(ordinal, cancellationToken)
+                    ? null
+                    : reader.GetValue(ordinal);
+
+                values[ordinal] = FormatLiteral(value, columns[ordinal]);
+            }
+
+            batch.Add($"({string.Join(", ", values)})");
+
+            if (batch.Count >= Math.Max(1, Capabilities.MaxRowsPerInsert))
+            {
+                yield return Insert(header, batch);
+                batch.Clear();
+            }
+        }
+
+        if (batch.Count > 0)
+        {
+            yield return Insert(header, batch);
+        }
+    }
+
+    private static string Insert(string header, List<string> rows) =>
+        rows.Count == 1
+            ? $"{header} {rows[0]};"
+            : $"{header}{Environment.NewLine}" +
+              $"{string.Join("," + Environment.NewLine, rows.Select(row => $"  {row}"))};";
+
+    /// <summary>Las columnas que se copian, en el orden de la tabla.</summary>
+    private static IReadOnlyList<DatabaseColumn> Included(
+        ScriptedTable table,
+        TableDataFilter filter) =>
+        [
+            .. table.Columns
+                .Where(column => !filter.ExcludedColumns.Contains(column.Name, StringComparer.Ordinal))
+                .OrderBy(column => column.Ordinal),
+        ];
+
+    /// <summary>
+    /// La consulta que lee las filas que hay que copiar.
+    ///
+    /// Con límite se ordena por la clave primaria si la hay: sin un orden, «las
+    /// primeras mil filas» son mil filas cualesquiera, distintas en cada respaldo,
+    /// y una muestra que no se puede reproducir no sirve para comparar nada.
+    /// </summary>
+    protected virtual string SelectRows(
+        string qualifiedTable,
+        IReadOnlyList<DatabaseColumn> columns,
+        ScriptedTable table,
+        TableDataFilter filter)
+    {
+        ArgumentNullException.ThrowIfNull(columns);
+        ArgumentNullException.ThrowIfNull(table);
+        ArgumentNullException.ThrowIfNull(filter);
+
+        var limit = filter.MaxRows;
+        var sql = new StringBuilder("SELECT ");
+
+        if (limit is { } prefixRows && RowLimitPrefix(prefixRows) is { Length: > 0 } prefix)
+        {
+            sql.Append(prefix).Append(' ');
+        }
+
+        sql.Append(string.Join(", ", columns.Select(column => Quote(column.Name))));
+        sql.Append(" FROM ").Append(qualifiedTable);
+
+        if (!string.IsNullOrWhiteSpace(filter.Where))
+        {
+            sql.Append(" WHERE ").Append(filter.Where.Trim());
+        }
+
+        if (limit is not null && table.Structure.PrimaryKey is { Columns.Count: > 0 } key)
+        {
+            sql.Append(" ORDER BY ").Append(string.Join(", ", key.Columns.Select(Quote)));
+        }
+
+        if (limit is { } suffixRows && RowLimitSuffix(suffixRows) is { Length: > 0 } suffix)
+        {
+            sql.Append(' ').Append(suffix);
+        }
+
+        return sql.ToString();
+    }
+
+    /// <summary>Lo que va entre `SELECT` y las columnas para limitar filas: `TOP`, `FIRST`.</summary>
+    protected virtual string RowLimitPrefix(int maxRows) => string.Empty;
+
+    /// <summary>Lo que va al final para limitar filas. `LIMIT` en la mayoría.</summary>
+    protected virtual string RowLimitSuffix(int maxRows) =>
+        $"LIMIT {maxRows.ToString(CultureInfo.InvariantCulture)}";
+
+    public virtual string FormatLiteral(object? value, DatabaseColumn column)
+    {
+        ArgumentNullException.ThrowIfNull(column);
+
+        if (value is null or DBNull)
+        {
+            return "NULL";
+        }
+
+        var invariant = CultureInfo.InvariantCulture;
+
+        // Manda el tipo de la columna, no el que traiga el valor. Un booleano no
+        // siempre llega como booleano: **Informix lo entrega como `SMALLINT`**
+        // porque DRDA no lo distingue de un entero pequeño, y escribir un `1` en
+        // una columna `BOOLEAN` lo rechaza el propio motor. Lo que sabe la verdad
+        // es el catálogo.
+        if (ColumnValueParser.Classify(column.DataType) == ColumnFamily.Boolean &&
+            value is not string)
+        {
+            return BooleanLiteral(Convert.ToInt64(value, invariant) != 0);
+        }
+
+        return value switch
+        {
+            bool flag => BooleanLiteral(flag),
+            byte[] binary => BinaryLiteral(binary),
+            string text => TextLiteral(text),
+            char character => TextLiteral(character.ToString()),
+            Guid uuid => TextLiteral(uuid.ToString()),
+
+            // Los mismos formatos con los que se muestran los valores en la
+            // cuadrícula y se exportan a CSV: una fecha tiene que leerse igual
+            // venga del motor que venga.
+            DateTime timestamp => TextLiteral(
+                timestamp.ToString("yyyy-MM-dd HH:mm:ss.FFFFFFF", invariant)),
+            DateTimeOffset timestamp => TextLiteral(
+                timestamp.ToString("yyyy-MM-dd HH:mm:ss.FFFFFFFzzz", invariant)),
+            DateOnly date => TextLiteral(date.ToString("yyyy-MM-dd", invariant)),
+            TimeOnly time => TextLiteral(time.ToString("HH:mm:ss.FFFFFFF", invariant)),
+            TimeSpan interval => TextLiteral(interval.ToString()),
+
+            // Los números van sin comillas y con cultura invariante. Escribir
+            // `3,5` porque la máquina usa coma decimal produciría un respaldo que
+            // se restaura como 35 en otro equipo, o que ni siquiera se ejecuta.
+            byte or sbyte or short or ushort or int or uint or long or ulong
+                or decimal or float or double
+                => ((IFormattable)value).ToString(null, invariant),
+
+            _ => TextLiteral(Convert.ToString(value, invariant) ?? string.Empty),
+        };
+    }
+
+    /// <summary>
+    /// Un texto entre comillas, con las comillas de dentro duplicadas.
+    ///
+    /// Es lo que impide que el contenido de una fila se convierta en instrucción.
+    /// Los motores que además tratan la barra invertida como escape lo redefinen.
+    /// </summary>
+    protected virtual string TextLiteral(string text)
+    {
+        ArgumentNullException.ThrowIfNull(text);
+
+        return $"'{text.Replace("'", "''", StringComparison.Ordinal)}'";
+    }
+
+    /// <summary>Cómo escribe este motor un valor de verdad o falso.</summary>
+    protected virtual string BooleanLiteral(bool value) => value ? "true" : "false";
+
+    /// <summary>Cómo escribe este motor una tira de bytes.</summary>
+    protected virtual string BinaryLiteral(byte[] value)
+    {
+        ArgumentNullException.ThrowIfNull(value);
+
+        if (!Capabilities.SupportsBinaryLiterals)
+        {
+            throw new NotSupportedException(
+                $"{Engine} no sabe escribir un valor binario dentro de una instrucción, " +
+                "así que esa columna no se puede respaldar como texto.");
+        }
+
+        return $"0x{Convert.ToHexString(value)}";
     }
 
     /// <summary>

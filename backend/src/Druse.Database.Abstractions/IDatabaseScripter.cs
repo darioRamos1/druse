@@ -50,4 +50,44 @@ public interface IDatabaseScripter
 
     /// <summary>Las claves foráneas, como `ALTER TABLE` posteriores a los datos.</summary>
     IReadOnlyList<string> ScriptForeignKeys(ScriptedTable table);
+
+    /// <summary>
+    /// Los `INSERT` de una tabla, leyendo del motor **según se escriben**.
+    ///
+    /// Devuelve instrucciones una a una y no una lista porque una tabla de diez
+    /// millones de filas no cabe en memoria: quien las consume las va escribiendo
+    /// al archivo y no guarda ninguna. Un respaldo que materialice la tabla no
+    /// falla en las pruebas, falla en producción.
+    ///
+    /// El filtro se comprueba antes de armar nada
+    /// (<see cref="TableDataFilter.Validate"/>) y se rechaza si no sirve: es la
+    /// única entrada de texto libre del respaldo.
+    /// </summary>
+    IAsyncEnumerable<string> ScriptDataAsync(
+        IDatabaseSession session,
+        ScriptedTable table,
+        TableDataFilter filter,
+        CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Lo que hay que ejecutar antes de cargar filas en esta tabla, si algo hace
+    /// falta.
+    ///
+    /// Existe por las columnas que el motor genera: copiar los datos significa
+    /// copiar también sus claves, y SQL Server no deja escribir en una columna de
+    /// identidad sin abrirle paso antes.
+    /// </summary>
+    IReadOnlyList<string> BeginDataLoad(ScriptedTable table);
+
+    /// <summary>Lo que cierra lo que abrió <see cref="BeginDataLoad"/>.</summary>
+    IReadOnlyList<string> EndDataLoad(ScriptedTable table);
+
+    /// <summary>
+    /// Un valor leído del motor, escrito como literal de este dialecto.
+    ///
+    /// Aquí no valen parámetros: lo que se genera es un archivo de texto que se
+    /// ejecutará en otra parte, quizá sin Druse delante. Por eso el escapado es
+    /// responsabilidad del proveedor y no de quien llama.
+    /// </summary>
+    string FormatLiteral(object? value, DatabaseColumn column);
 }
