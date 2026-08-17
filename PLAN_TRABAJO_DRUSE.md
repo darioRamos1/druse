@@ -121,7 +121,7 @@ La palabra *portable* se utilizará en dos sentidos:
 ### Incluido
 
 - Aplicación de escritorio inicialmente validada en Windows y preparada para Linux y macOS.
-- Tema oscuro basado en el mockup.
+- Tema oscuro basado en el mockup, y tema claro derivado de él.
 - Múltiples conexiones guardadas.
 - PostgreSQL y SQL Server.
 - Explorador jerárquico de objetos.
@@ -412,6 +412,7 @@ La solución compila, Angular inicia, la API responde en `/api/health` y existe 
 - [x] Integrar Monaco Editor con datos simulados.
 - [x] Crear panel redimensionable de resultados.
 - [x] Implementar tema oscuro y variables de diseño.
+- [x] Añadir tema claro sobre las mismas variables, con conmutador en la barra superior.
 - [x] Crear la cuadrícula con datos simulados.
 
 ### Criterio de salida
@@ -1071,7 +1072,7 @@ escrito a mano, que ya pasa por la detección de instrucciones destructivas.
 - Comparación de esquemas.
 - Planes de ejecución gráficos.
 - ~~Gestión visual de índices.~~ Hecho en el diseñador de tablas (sesión 019).
-- Temas y atajos configurables.
+- Atajos configurables.
 - Soporte SQLite.
 - Instaladores estables para Linux y macOS.
 
