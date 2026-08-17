@@ -1,0 +1,64 @@
+namespace Druse.Domain;
+
+/// <summary>
+/// Una tabla leída del catálogo, con todo lo necesario para volver a crearla.
+///
+/// Es lo que entra al guionizado, y por eso son lecturas y no intenciones:
+/// <see cref="DatabaseColumn"/> y <see cref="TableStructure"/> cuentan lo que el
+/// motor tiene hoy. Un respaldo que partiera de un diseño reproduciría lo que
+/// alguien quiso, no lo que hay.
+///
+/// Las tres piezas viajan juntas porque no sirven por separado: sin las columnas
+/// no hay `CREATE TABLE`, y sin la estructura la tabla recreada se queda sin
+/// clave, sin índices y sin restricciones.
+/// </summary>
+public sealed record ScriptedTable
+{
+    /// <summary>La tabla, con su base y su esquema para poder calificarla.</summary>
+    public required DatabaseObject Table { get; init; }
+
+    public required IReadOnlyList<DatabaseColumn> Columns { get; init; }
+
+    public required TableStructure Structure { get; init; }
+}
+
+/// <summary>
+/// Lo que un motor conserva de aquello que se guioniza.
+///
+/// Sirve para lo mismo que <see cref="IndexCapabilities"/> en el diseñador: quien
+/// use el guion sabe qué esperar sin preguntar contra qué motor está. Aquí importa
+/// sobre todo porque **comparar lo guionizado con lo releído** es la forma de
+/// comprobar que un respaldo sirve, y esa comparación tiene que saber qué es una
+/// diferencia real y qué es una limitación declarada.
+/// </summary>
+public sealed record ScripterCapabilities
+{
+    /// <summary>
+    /// La clave primaria conserva el nombre con el que se creó.
+    ///
+    /// En MySQL no: toda clave primaria se llama `PRIMARY`, se escriba lo que se
+    /// escriba. Guionizar allí un `CONSTRAINT pk_pedidos PRIMARY KEY` produce una
+    /// tabla que el motor acepta y que después nombra de otra forma, así que no se
+    /// escribe el nombre en lugar de escribir uno que se va a perder.
+    /// </summary>
+    public bool NamesPrimaryKey { get; init; } = true;
+
+    /// <summary>
+    /// Las restricciones de unicidad conservan el nombre con el que se crearon.
+    ///
+    /// En Informix no, y por el mismo motivo que la clave primaria: lo que se lee
+    /// del catálogo es el nombre del **índice** que la sostiene —` 112_50`, con un
+    /// espacio delante y distinto en cada creación—, que es el que hace falta para
+    /// soltarla. Reproducirlo no copiaría nada: inventaría un nombre interno.
+    /// </summary>
+    public bool NamesUniqueConstraints { get; init; } = true;
+
+    /// <summary>
+    /// El motor tiene esquemas dentro de una base.
+    ///
+    /// En MySQL el esquema **es** la base: no hay dos niveles que calificar, y un
+    /// respaldo que agrupara por esquema allí estaría inventando una jerarquía que
+    /// el motor no tiene.
+    /// </summary>
+    public bool SupportsSchemas { get; init; } = true;
+}

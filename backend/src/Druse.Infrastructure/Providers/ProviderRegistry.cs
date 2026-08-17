@@ -18,25 +18,29 @@ public sealed class ProviderRegistry : IProviderRegistry
     private readonly Dictionary<DatabaseEngine, IQueryExecutor> _executors;
     private readonly Dictionary<DatabaseEngine, IRowEditor> _rowEditors;
     private readonly Dictionary<DatabaseEngine, ITableDesigner> _tableDesigners;
+    private readonly Dictionary<DatabaseEngine, IDatabaseScripter> _scripters;
 
     public ProviderRegistry(
         IEnumerable<IDatabaseProvider> providers,
         IEnumerable<IDatabaseMetadataReader> readers,
         IEnumerable<IQueryExecutor> executors,
         IEnumerable<IRowEditor> rowEditors,
-        IEnumerable<ITableDesigner> tableDesigners)
+        IEnumerable<ITableDesigner> tableDesigners,
+        IEnumerable<IDatabaseScripter> scripters)
     {
         ArgumentNullException.ThrowIfNull(providers);
         ArgumentNullException.ThrowIfNull(readers);
         ArgumentNullException.ThrowIfNull(executors);
         ArgumentNullException.ThrowIfNull(rowEditors);
         ArgumentNullException.ThrowIfNull(tableDesigners);
+        ArgumentNullException.ThrowIfNull(scripters);
 
         _providers = providers.ToDictionary(provider => provider.Engine);
         _readers = readers.ToDictionary(reader => reader.Engine);
         _executors = executors.ToDictionary(executor => executor.Engine);
         _rowEditors = rowEditors.ToDictionary(editor => editor.Engine);
         _tableDesigners = tableDesigners.ToDictionary(designer => designer.Engine);
+        _scripters = scripters.ToDictionary(scripter => scripter.Engine);
     }
 
     public IReadOnlyCollection<DatabaseEngine> SupportedEngines => _providers.Keys;
@@ -64,5 +68,10 @@ public sealed class ProviderRegistry : IProviderRegistry
     public ITableDesigner GetTableDesigner(DatabaseEngine engine) =>
         _tableDesigners.TryGetValue(engine, out var designer)
             ? designer
+            : throw new UnsupportedEngineException(engine);
+
+    public IDatabaseScripter GetScripter(DatabaseEngine engine) =>
+        _scripters.TryGetValue(engine, out var scripter)
+            ? scripter
             : throw new UnsupportedEngineException(engine);
 }

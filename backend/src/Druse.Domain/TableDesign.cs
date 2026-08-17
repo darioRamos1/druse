@@ -63,9 +63,28 @@ public sealed record TableDefinition
 
     public IReadOnlyList<CheckConstraintDefinition> CheckConstraints { get; init; } = [];
 
-    /// <summary>Columnas marcadas como clave primaria, en el orden en que se escribieron.</summary>
+    /// <summary>
+    /// Clave primaria con nombre y orden propios, cuando importan.
+    ///
+    /// El diseñador no la necesita: quien dibuja una tabla marca casillas y deja
+    /// que el motor nombre la restricción. La necesita quien **reproduce una tabla
+    /// que ya existe**, y por dos motivos que no se ven hasta que se restaura:
+    /// el nombre, porque otra base puede referirse a él, y el orden, porque en una
+    /// clave compuesta `(pedido, linea)` no es la misma que `(linea, pedido)` —el
+    /// índice que la sostiene se recorre en ese orden— y el orden de las columnas
+    /// dentro de la tabla no tiene por qué coincidir con el de la clave.
+    /// </summary>
+    public PrimaryKeyDefinition? PrimaryKey { get; init; }
+
+    /// <summary>
+    /// Columnas de la clave primaria, en el orden que le corresponde.
+    ///
+    /// Manda <see cref="PrimaryKey"/> si viene; si no, las casillas marcadas en el
+    /// orden en que se escribieron las columnas.
+    /// </summary>
     public IReadOnlyList<string> PrimaryKeyColumns =>
-        [.. Columns.Where(column => column.IsPrimaryKey).Select(column => column.Name)];
+        PrimaryKey?.Columns
+        ?? [.. Columns.Where(column => column.IsPrimaryKey).Select(column => column.Name)];
 }
 
 /// <summary>

@@ -32,6 +32,30 @@ public sealed class InformixTableDesigner : TableDesignerBase
     };
 
     /// <summary>
+    /// Lo que Informix pierde al reproducir una tabla, declarado en vez de
+    /// disimulado.
+    ///
+    /// El nombre de clave primaria que Druse lee **no es el de la restricción**:
+    /// es el del índice que la sostiene, porque es el que hay que nombrar para
+    /// soltarla. Y ese índice lo bautiza el motor con algo como ` 108_26`, con un
+    /// espacio delante, distinto cada vez que se crea la tabla.
+    ///
+    /// Copiarlo no serviría de nada y además puede ser ilegal: Informix rechaza
+    /// crear un índice cuyo nombre empiece por espacio. Así que aquí la clave
+    /// primaria se guioniza sin nombre y lo pone el motor, que es lo único
+    /// reproducible.
+    /// </summary>
+    /// <remarks>
+    /// Lo mismo vale para las restricciones de unicidad, que también se leen por
+    /// el nombre de su índice.
+    /// </remarks>
+    public override ScripterCapabilities Capabilities { get; } = new()
+    {
+        NamesPrimaryKey = false,
+        NamesUniqueConstraints = false,
+    };
+
+    /// <summary>
     /// Comillas dobles, duplicándolas para que no se pueda escapar.
     ///
     /// Solo delimitan identificadores si la conexión lleva `DELIMIDENT=Y`, que es

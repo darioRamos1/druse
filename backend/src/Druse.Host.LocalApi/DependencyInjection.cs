@@ -57,23 +57,32 @@ internal static class DependencyInjection
         // Cada motor aporta sus piezas y nada más. MySQL entró en la Fase 8
         // exactamente así: unas líneas aquí, sin tocar Domain, Application ni la
         // interfaz.
+        //
+        // El diseñador y el guionizador son la misma clase por motor: escribir un
+        // `CREATE TABLE` desde un diseño y escribirlo desde el catálogo son la
+        // misma tarea con distinta entrada, y el dialecto tiene que vivir en un
+        // solo sitio. Se registran por separado porque los casos de uso piden uno
+        // u otro, no los dos.
         services.AddSingleton<IDatabaseProvider, PostgreSqlDatabaseProvider>();
         services.AddSingleton<IDatabaseMetadataReader, PostgreSqlMetadataReader>();
         services.AddSingleton<IQueryExecutor, PostgreSqlQueryExecutor>();
         services.AddSingleton<IRowEditor, PostgreSqlRowEditor>();
         services.AddSingleton<ITableDesigner, PostgreSqlTableDesigner>();
+        services.AddSingleton<IDatabaseScripter, PostgreSqlTableDesigner>();
 
         services.AddSingleton<IDatabaseProvider, SqlServerDatabaseProvider>();
         services.AddSingleton<IDatabaseMetadataReader, SqlServerMetadataReader>();
         services.AddSingleton<IQueryExecutor, SqlServerQueryExecutor>();
         services.AddSingleton<IRowEditor, SqlServerRowEditor>();
         services.AddSingleton<ITableDesigner, SqlServerTableDesigner>();
+        services.AddSingleton<IDatabaseScripter, SqlServerTableDesigner>();
 
         services.AddSingleton<IDatabaseProvider, MySqlDatabaseProvider>();
         services.AddSingleton<IDatabaseMetadataReader, MySqlMetadataReader>();
         services.AddSingleton<IQueryExecutor, MySqlQueryExecutor>();
         services.AddSingleton<IRowEditor, MySqlRowEditor>();
         services.AddSingleton<ITableDesigner, MySqlTableDesigner>();
+        services.AddSingleton<IDatabaseScripter, MySqlTableDesigner>();
 
         // Informix solo si se compiló con él: su driver pesa 111 MB y la
         // compilación ligera lo deja fuera. Ver `IncludeInformix` en el csproj.
@@ -83,6 +92,7 @@ internal static class DependencyInjection
         services.AddSingleton<IQueryExecutor, InformixQueryExecutor>();
         services.AddSingleton<IRowEditor, InformixRowEditor>();
         services.AddSingleton<ITableDesigner, InformixTableDesigner>();
+        services.AddSingleton<IDatabaseScripter, InformixTableDesigner>();
 #endif
 
         services.AddSingleton<IProviderRegistry, ProviderRegistry>();

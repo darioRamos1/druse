@@ -300,5 +300,8 @@ public sealed class SshTunnelTests
 
         public ITableDesigner GetTableDesigner(DatabaseEngine engine) =>
             throw new NotSupportedException();
+
+        public IDatabaseScripter GetScripter(DatabaseEngine engine) =>
+            throw new NotSupportedException();
     }
 }

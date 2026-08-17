@@ -26,6 +26,9 @@ public interface IProviderRegistry
 
     /// <summary>Quien escribe el DDL de este motor: crear y modificar tablas.</summary>
     ITableDesigner GetTableDesigner(DatabaseEngine engine);
+
+    /// <summary>Quien escribe el DDL que reproduce lo que ya existe, para respaldar.</summary>
+    IDatabaseScripter GetScripter(DatabaseEngine engine);
 }
 
 /// <summary>Se pidió un motor que nadie implementa.</summary>

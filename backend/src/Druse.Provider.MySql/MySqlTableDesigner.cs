@@ -32,6 +32,18 @@ public sealed class MySqlTableDesigner : TableDesignerBase
         Methods = ["btree", "hash", "fulltext", "spatial"],
     };
 
+    /// <summary>
+    /// Lo que MySQL pierde al reproducir una tabla, declarado en vez de disimulado.
+    ///
+    /// Su clave primaria se llama siempre `PRIMARY`, escriba uno lo que escriba, y
+    /// aquí el esquema **es** la base: no hay dos niveles que calificar.
+    /// </summary>
+    public override ScripterCapabilities Capabilities { get; } = new()
+    {
+        NamesPrimaryKey = false,
+        SupportsSchemas = false,
+    };
+
     /// <summary>Acentos graves, duplicándolos para que no se pueda escapar.</summary>
     protected override string Quote(string identifier) =>
         $"`{identifier.Replace("`", "``", StringComparison.Ordinal)}`";

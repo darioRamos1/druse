@@ -13,8 +13,15 @@ namespace Druse.Database.Abstractions;
 /// cómo se citan los identificadores, cómo se declara una columna que genera su
 /// valor y cómo se escribe cada `ALTER`. Esas diferencias, y solo esas, quedan
 /// en manos de cada proveedor.
+///
+/// **También guioniza lo que ya existe** (<see cref="IDatabaseScripter"/>), y no
+/// por comodidad: escribir un `CREATE TABLE` desde un diseño y escribirlo desde el
+/// catálogo son la misma tarea con distinta entrada. Separarlo en otra clase por
+/// motor habría duplicado cuatro veces el modo de citar, la cláusula de identidad
+/// y el cuerpo de una clave foránea, y dos copias de un dialecto se separan a la
+/// primera corrección que solo se aplica en una.
 /// </summary>
-public abstract class TableDesignerBase : ITableDesigner
+public abstract class TableDesignerBase : ITableDesigner, IDatabaseScripter
 {
     public abstract DatabaseEngine Engine { get; }
 
@@ -178,11 +185,19 @@ public abstract class TableDesignerBase : ITableDesigner
     {
         ArgumentNullException.ThrowIfNull(key);
 
+        // Sin columnas referenciadas se escribe solo la tabla, y el motor usa su
+        // clave primaria. No es un atajo: el catálogo de Informix no las entrega
+        // —leerlas costaría una consulta por cada clave foránea sobre una conexión
+        // que no admite dos a la vez— y `REFERENCES padre ()` no lo acepta nadie.
+        var references = key.ReferencedColumns.Count > 0
+            ? $"REFERENCES {QualifyReference(key)} " +
+              $"({string.Join(", ", key.ReferencedColumns.Select(Quote))})"
+            : $"REFERENCES {QualifyReference(key)}";
+
         var body =
             $"FOREIGN KEY " +
             $"({string.Join(", ", key.Columns.Select(Quote))}) " +
-            $"REFERENCES {QualifyReference(key)} " +
-            $"({string.Join(", ", key.ReferencedColumns.Select(Quote))})";
+            references;
 
         var onDelete = ReferentialAction(key.OnDelete);
         var onUpdate = ReferentialAction(key.OnUpdate);
@@ -231,21 +246,36 @@ public abstract class TableDesignerBase : ITableDesigner
 
         if (key.Count > 0)
         {
-            lines.Add($"  PRIMARY KEY ({string.Join(", ", key.Select(Quote))})");
+            var body = $"PRIMARY KEY ({string.Join(", ", key.Select(Quote))})";
+
+            // El nombre solo se escribe si quien pide la tabla lo trae. El
+            // diseñador no lo trae —deja que lo ponga el motor— y quien reproduce
+            // una tabla existente sí, para no perderlo por el camino.
+            lines.Add(table.PrimaryKey?.Name is { Length: > 0 } name
+                ? $"  {NamedConstraint(name, body)}"
+                : $"  {body}");
         }
 
         // Las restricciones caben dentro del paréntesis y los índices no: es la
         // única diferencia entre unas y otros a la hora de crear la tabla.
+        //
+        // Todas pasan por `NamedConstraint`, que es el único sitio que sabe de qué
+        // lado va el nombre. Escribirlo aquí a mano funcionaba en tres motores y
+        // rompía en Informix, donde va detrás del cuerpo.
         foreach (var unique in table.UniqueConstraints)
         {
-            lines.Add(
-                $"  CONSTRAINT {Quote(unique.Name)} UNIQUE " +
-                $"({string.Join(", ", unique.Columns.Select(Quote))})");
+            var body = $"UNIQUE ({string.Join(", ", unique.Columns.Select(Quote))})";
+
+            // Sin nombre, lo pone el motor. Es lo que pide quien reproduce una
+            // tabla de un motor que no deja leer el nombre real de la restricción.
+            lines.Add(unique.Name.Length > 0
+                ? $"  {NamedConstraint(unique.Name, body)}"
+                : $"  {body}");
         }
 
         foreach (var check in table.CheckConstraints.Where(_ => IndexCapabilities.SupportsCheckConstraints))
         {
-            lines.Add($"  CONSTRAINT {Quote(check.Name)} CHECK ({check.Expression.Trim()})");
+            lines.Add($"  {NamedConstraint(check.Name, $"CHECK ({check.Expression.Trim()})")}");
         }
 
         foreach (var foreignKey in table.ForeignKeys)
@@ -394,6 +424,140 @@ public abstract class TableDesignerBase : ITableDesigner
 
         return statements;
     }
+
+    // -----------------------------------------------------------------------
+    // Guionizado de lo que ya existe (IDatabaseScripter)
+    // -----------------------------------------------------------------------
+
+    /// <summary>
+    /// Lo que este motor conserva de lo guionizado. Por omisión, todo.
+    ///
+    /// Solo lo redefine quien pierde algo por el camino, y entonces lo declara en
+    /// vez de escribir DDL que el motor acepta y luego no respeta.
+    /// </summary>
+    public virtual ScripterCapabilities Capabilities { get; } = new();
+
+    public IReadOnlyList<string> ScriptTable(ScriptedTable table) =>
+        DescribeCreate(ToDefinition(table));
+
+    public IReadOnlyList<string> ScriptIndexes(ScriptedTable table)
+    {
+        ArgumentNullException.ThrowIfNull(table);
+
+        var qualified = Qualify(table.Table.Database, table.Table.Schema, table.Table.Name);
+
+        // El índice que sostiene una clave primaria o una restricción de unicidad
+        // ya se creó con ella dentro del `CREATE TABLE`. Volver a escribirlo lo
+        // rechazan los cuatro motores: el nombre ya está ocupado.
+        return
+        [
+            .. table.Structure.Indexes
+                .Where(index => !index.IsConstraintIndex && !index.IsPrimaryKey)
+                .Select(index => CreateIndex(qualified, table.Table, ToDefinition(index))),
+        ];
+    }
+
+    public IReadOnlyList<string> ScriptForeignKeys(ScriptedTable table)
+    {
+        ArgumentNullException.ThrowIfNull(table);
+
+        var qualified = Qualify(table.Table.Database, table.Table.Schema, table.Table.Name);
+
+        return
+        [
+            .. table.Structure.ForeignKeys.Select(key =>
+                AddConstraint(qualified, key.Name, ForeignKeyBody(ToDefinition(key)))),
+        ];
+    }
+
+    /// <summary>
+    /// La tabla leída, escrita como diseño para poder reutilizar
+    /// <see cref="DescribeCreate"/>.
+    ///
+    /// Va sin índices ni claves foráneas a propósito: así `DescribeCreate` produce
+    /// una sola instrucción —el `CREATE TABLE`— y el resto se escribe cuando toca,
+    /// que es después de los datos.
+    /// </summary>
+    private TableDefinition ToDefinition(ScriptedTable table)
+    {
+        ArgumentNullException.ThrowIfNull(table);
+
+        var key = table.Structure.PrimaryKey;
+        var keyColumns = key?.Columns ?? [];
+
+        return new TableDefinition
+        {
+            Database = table.Table.Database,
+            Schema = table.Table.Schema,
+            Name = table.Table.Name,
+            PrimaryKey = key is null
+                ? null
+                : new PrimaryKeyDefinition
+                {
+                    Name = Capabilities.NamesPrimaryKey ? key.Name : null,
+                    Columns = key.Columns,
+                },
+            Columns =
+            [
+                .. table.Columns
+                    .OrderBy(column => column.Ordinal)
+                    .Select(column => new TableColumnDefinition
+                    {
+                        Name = column.Name,
+                        DataType = column.DataType,
+                        IsNullable = column.IsNullable,
+                        IsPrimaryKey = keyColumns.Contains(column.Name, StringComparer.Ordinal),
+                        IsIdentity = column.IsGenerated,
+
+                        // Una columna que genera su valor no lleva además un valor
+                        // por omisión: en PostgreSQL el catálogo devuelve ahí el
+                        // `nextval` de su secuencia, y escribirlo junto a la
+                        // cláusula de identidad produce una tabla que el motor
+                        // rechaza o que queda con dos generadores.
+                        DefaultValue = column.IsGenerated ? null : column.DefaultValue,
+                    }),
+            ],
+            UniqueConstraints =
+            [
+                .. table.Structure.UniqueConstraints.Select(unique =>
+                    new UniqueConstraintDefinition
+                    {
+                        Name = Capabilities.NamesUniqueConstraints ? unique.Name : string.Empty,
+                        Columns = unique.Columns,
+                    }),
+            ],
+            CheckConstraints =
+            [
+                .. table.Structure.CheckConstraints.Select(check =>
+                    new CheckConstraintDefinition
+                    {
+                        Name = check.Name,
+                        Expression = check.Expression,
+                    }),
+            ],
+        };
+    }
+
+    private static IndexDefinition ToDefinition(DatabaseIndex index) => new()
+    {
+        Name = index.Name,
+        Columns = index.Columns,
+        IsUnique = index.IsUnique,
+        IncludedColumns = index.IncludedColumns,
+        Filter = index.Filter,
+        Method = index.Method,
+    };
+
+    private static ForeignKeyDefinition ToDefinition(DatabaseForeignKey key) => new()
+    {
+        Name = key.Name,
+        Columns = key.Columns,
+        ReferencedSchema = key.ReferencedSchema,
+        ReferencedTable = key.ReferencedTable,
+        ReferencedColumns = key.ReferencedColumns,
+        OnDelete = key.OnDelete,
+        OnUpdate = key.OnUpdate,
+    };
 
     public Task<TableChangeResult> CreateAsync(
         IDatabaseSession session,
