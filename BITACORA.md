@@ -269,6 +269,14 @@ diseño completo:
    formato queda preparado para no cerrar la traducción, que es otra función.
 6. **Escribe el proceso local, por streaming.** Ni la tabla en memoria ni el
    respaldo pasando por el navegador.
+7. **Progreso siempre a la vista, pedido expresamente.** Dos barras —global y del
+   objeto en curso—, el paso y el objeto con nombre propio, cancelar siempre
+   disponible, y cuatro estados terminales que se quedan en pantalla: correcto,
+   correcto con avisos, fallido y cancelado. Nada de barras inventadas: donde el
+   catálogo no da una estimación fiable, indeterminada con contador absoluto.
+   Cerrar el asistente no interrumpe el trabajo. Sale como `operation-progress`
+   reutilizable, porque hoy Druse no tiene ni progreso ni sistema de avisos y la
+   exportación y la importación arrastran la misma carencia.
 
 Y tres límites declarados desde el principio: no hay respaldo binario ni
 recuperación a un punto en el tiempo —eso es del servidor, y la interfaz tendrá

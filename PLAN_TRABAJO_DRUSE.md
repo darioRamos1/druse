@@ -1089,6 +1089,14 @@ Lo estructural, en el [ADR 0005](docs/decisions/0005-respaldos-guionizados-por-d
 - [ ] **Restauración en el mismo motor**, con vista previa de lo que se ejecuta.
   El manifiesto guarda origen y versión de formato, y se rechaza lo que no
   encaja.
+- [ ] **Progreso siempre a la vista, y un final que se lee.** Dos barras —global
+  y del objeto en curso, porque una tabla de ocho millones de filas deja la
+  primera inmóvil veinte minutos—, el paso y el objeto con nombre propio,
+  cancelar siempre disponible, y cuatro estados terminales que no se desvanecen
+  solos: correcto, correcto con avisos, fallido y cancelado. Cerrar el asistente
+  no interrumpe el trabajo: el indicador sigue en la barra de estado. Se
+  construye como `operation-progress` reutilizable, porque la exportación y la
+  importación tienen hoy el mismo problema sin resolver.
 
 **Lo que no se hace, y es una decisión:** no hay respaldo binario ni recuperación
 a un punto en el tiempo —eso pertenece al servidor y la interfaz lo dirá—, no se

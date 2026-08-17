@@ -249,9 +249,10 @@ respaldo nace roto. Donde el motor no lo garantice, **se declara el límite en e
 manifiesto** en vez de callarlo. Reutiliza `OperationScope`, que ya decide si una
 operación abre su transacción o se une a la del usuario.
 
-**Es una operación larga.** Progreso por objeto y cancelable, por el mismo camino
-que ya cancela una consulta. Sin progreso, el usuario no distingue «trabajando»
-de «colgado» y mata la aplicación.
+**Es una operación larga.** El servicio publica su estado —paso, objeto, filas,
+avisos— mientras trabaja, y es cancelable por el mismo camino que ya cancela una
+consulta. Sin eso, el usuario no distingue «trabajando» de «colgado» y mata la
+aplicación. El detalle está en el §7, que es requisito y no adorno.
 
 ### 5.4 Quién escribe el archivo
 
@@ -305,7 +306,123 @@ ejecutar y qué se va a sobrescribir** antes de tocar nada.
 
 ---
 
-## 7. Fases
+## 7. Progreso, éxito y fallo
+
+Requisito de primer nivel, no un adorno de la última fase. Un respaldo serio tarda
+minutos u horas, y durante ese tiempo el usuario tiene que poder responder a tres
+preguntas sin adivinar: **qué está haciendo ahora**, **cuánto falta** y **cómo
+acabó**. Hoy Druse no tiene ni componente de progreso ni sistema de avisos, así
+que esto se construye aquí y se deja reutilizable.
+
+### 7.1 Dos barras, no una
+
+- **La global** — pasos y objetos completados sobre el total.
+- **La del objeto en curso** — filas escritas de esa tabla.
+
+Con una sola barra, una tabla de ocho millones de filas deja el indicador
+inmóvil durante veinte minutos y el usuario concluye que se colgó. La segunda
+barra existe justo para ese rato.
+
+Siempre acompañadas de texto con **nombre propio**, nunca un porcentaje suelto:
+
+```text
+Escribiendo datos · ventas.pedidos
+1 240 000 de ~3 100 000 filas · 4 de 41 tablas · 2 min 18 s
+```
+
+### 7.2 Los pasos son visibles
+
+El trabajo se anuncia por lo que es, no como una única barra opaca:
+
+1. Resolviendo la selección contra el catálogo
+2. Leyendo la estructura
+3. Escribiendo estructura
+4. Escribiendo datos *(tabla a tabla)*
+5. Escribiendo índices, claves y restricciones
+6. Escribiendo vistas, rutinas y disparadores
+7. Empaquetando
+
+El empaquetado es un paso propio porque comprimir varios gigabytes tarda, y
+durante ese rato la barra de datos ya está llena: sin nombrarlo, parece colgado
+justo al final.
+
+### 7.3 Nada de barras falsas
+
+El total de filas es una **estimación** del catálogo —`reltuples` en PostgreSQL,
+`sys.partitions` en SQL Server, `information_schema.TABLES` en MySQL, `nrows` de
+`systables` en Informix—, porque un `COUNT(*)` sobre cada tabla seleccionada
+antes de empezar puede costar más que el propio respaldo. Por eso el número va
+con `~` delante, y así se dice.
+
+Donde no hay estimación fiable —una tabla con condición `WHERE`, o una vista— la
+barra del objeto va **indeterminada con contador absoluto**: «487 300 filas
+escritas». Una barra que llega al 90 % y se queda ahí es peor que no tener barra,
+porque miente sobre lo que falta.
+
+### 7.4 La ventana no se bloquea
+
+La operación vive en el proceso local, no en el diálogo. Se puede **cerrar el
+asistente y seguir trabajando**: el progreso continúa visible en la barra de
+estado, y desde ahí se vuelve a abrir el detalle. Un respaldo de media hora que
+secuestre la aplicación entera es una función que nadie usará dos veces.
+
+**Cómo llega el dato:** sondeo a `GET /api/backup/{id}/status` cada 500 ms, con el
+estado en memoria del proceso local. Se elige frente a SSE o WebSocket porque
+sobrevive a que la ventana se cierre y se reabra, no exige mantener un flujo
+abierto ni tocar la seguridad de la API local, y medio segundo es resolución de
+sobra para algo que dura minutos.
+
+**Cancelar está siempre a la vista**, por el mismo camino que ya cancela una
+consulta. Al cancelar, **el archivo parcial se borra**: un respaldo a medias con
+aspecto de completo es más peligroso que no tener ninguno. En salida por
+carpetas, lo escrito se conserva pero el manifiesto queda marcado como incompleto.
+
+### 7.5 Cómo acaba: cuatro estados, ninguno efímero
+
+Terminado el trabajo hay un **resumen que se queda en pantalla** hasta que el
+usuario lo cierra. Un aviso que se desvanece a los tres segundos no sirve para
+algo que tardó veinte minutos y que quizá ocurrió mientras nadie miraba.
+
+| Estado | Qué dice |
+| --- | --- |
+| **Correcto** | Qué se llevó —«41 tablas, 3 con datos, 128 439 filas, 12 rutinas»—, dónde quedó, cuánto pesa, cuánto tardó. Con «abrir carpeta» y «abrir en el editor» |
+| **Correcto con avisos** | Lo mismo, y la lista de avisos: tablas limitadas, columnas excluidas, objetos omitidos, consistencia que el motor no garantizó. **No se pinta de verde limpio**: el usuario tiene que saber que lo que tiene no es todo |
+| **Fallido** | Qué objeto falló, el mensaje del motor pasado por su normalizador, **la instrucción exacta** que lo provocó, y qué se alcanzó a escribir antes |
+| **Cancelado** | Dónde se cortó y qué se hizo con lo escrito |
+
+Los avisos van también al manifiesto, no solo a la pantalla: quien abra el
+archivo medio año después no vio ese resumen.
+
+### 7.6 Qué se hace cuando algo falla a mitad
+
+No es lo mismo leer que escribir, así que la política por omisión tampoco:
+
+- **Respaldar → seguir y anotar.** Una vista rota o un objeto sin permisos no
+  puede tirar tres horas de trabajo. Se omite, se registra el motivo y el
+  resultado es «correcto con avisos».
+- **Restaurar → parar.** Ahí se está modificando una base: seguir tras un error
+  deja un destino a medias que nadie sabe describir. Se detiene, se dice en qué
+  instrucción, y se ofrece reanudar desde ahí.
+
+Ambas son el valor por omisión, y ambas se pueden cambiar antes de lanzar.
+
+### 7.7 Un registro que se pueda pegar en un correo
+
+La operación deja una lista de líneas con marca de tiempo —objeto, filas,
+duración, error si lo hubo— visible en el detalle y **copiable de una vez**. Es
+lo que un usuario manda cuando pide ayuda, y sin ello la respuesta siempre es
+«¿y qué decía exactamente?».
+
+### 7.8 Se construye reutilizable
+
+`operation-progress` en `shared/ui`, con el estado de operación larga en `core/`.
+La exportación de resultados y la importación de archivos tienen hoy el mismo
+problema y no lo resuelven; que esta función lo estrene no significa que le
+pertenezca.
+
+---
+
+## 8. Fases
 
 ### Fase A — El contrato y la estructura
 
@@ -335,20 +452,36 @@ respalda, se restaura y sale idéntica, byte a byte donde el tipo lo permita.
 - [ ] Manifiesto versionado.
 - [ ] Las cuatro formas de salida y sus combinaciones.
 - [ ] Escritura en disco por el proceso local, con el selector nativo.
-- [ ] Progreso, cancelación y avisos.
+- [ ] **Estado de la operación en el proceso local:** paso en curso, objeto,
+      filas escritas, estimación, avisos y estado terminal, servido por
+      `GET /api/backup/{id}/status`.
+- [ ] Estimación de filas desde el catálogo de los cuatro motores, marcada como
+      aproximada.
+- [ ] Cancelación, y borrado del archivo parcial.
+- [ ] Recolección de avisos y errores por objeto, con la instrucción que falló.
 
-**Criterio de salida:** una base entera con las cuatro formas de salida, y el
-manifiesto describe sin faltas lo que hay dentro.
+**Criterio de salida:** una base entera con las cuatro formas de salida; el
+manifiesto describe sin faltas lo que hay dentro **y el estado consultado durante
+la operación dice en todo momento qué objeto se está escribiendo**.
 
 ### Fase D — La interfaz
 
 - [ ] Árbol de selección con casillas de tres estados.
 - [ ] Asistente de cuatro pasos, desde el menú contextual y como pestaña.
 - [ ] Vista previa del guion antes de ejecutar.
-- [ ] Barra de progreso y cancelar.
+- [ ] **`operation-progress` en `shared/ui`**: las dos barras, el paso en curso
+      con nombre de objeto, el tiempo transcurrido y el botón de cancelar.
+- [ ] **Indicador en la barra de estado** que sobrevive a cerrar el asistente, y
+      que devuelve al detalle al pulsarlo.
+- [ ] **Resumen final en los cuatro estados** —correcto, correcto con avisos,
+      fallido y cancelado—, que no se desvanece solo, con «abrir carpeta» y
+      «abrir en el editor».
+- [ ] Registro con marca de tiempo, copiable de una vez.
 
 **Criterio de salida:** el caso del §1 —todo sin datos salvo tres tablas— se
-resuelve sin escribir SQL.
+resuelve sin escribir SQL, **y en ningún momento de la operación la pantalla deja
+de decir qué se está haciendo**. Cerrar el asistente a mitad no interrumpe el
+respaldo ni pierde el resultado.
 
 ### Fase E — Perfiles
 
@@ -366,13 +499,16 @@ objetos desaparecidos lo dice sin romperse.
 - [ ] Comprobación de motor y versión de formato.
 - [ ] Vista previa de lo que se ejecuta y de lo que se sobrescribe.
 - [ ] Restauración de los CSV por el camino de importación existente.
+- [ ] **El mismo progreso que al respaldar**, y la parada ante el primer error
+      diciendo en qué instrucción, con la opción de reanudar desde ahí.
 
 **Criterio de salida:** una base se respalda, se restaura en un servidor limpio y
-las dos estructuras releídas coinciden. Con los cuatro motores.
+las dos estructuras releídas coinciden. Con los cuatro motores. Y una
+restauración que falla a mitad **deja claro qué se aplicó y qué no**.
 
 ---
 
-## 8. Pruebas
+## 9. Pruebas
 
 Lo mismo que se hizo con el diseñador de tablas, que es lo que funcionó:
 
@@ -384,10 +520,16 @@ Lo mismo que se hizo con el diseñador de tablas, que es lo que funcionó:
 - **Unitarias sin servidor** para el orden de dependencias, los ciclos de claves
   foráneas, la resolución del plan y el formateo de literales.
 - **De interfaz** para las casillas de tres estados y las anulaciones por tabla.
+- **Del progreso**, que es lógica y no decoración: que el porcentaje nunca
+  retroceda ni pase del cien, que una tabla sin estimación caiga a barra
+  indeterminada en vez de inventarse un total, que cerrar el diálogo no mate la
+  operación, y que los cuatro estados terminales se distingan. Un fallo forzado
+  a mitad tiene que producir el estado «fallido» con su objeto y su instrucción,
+  no un silencio.
 
 ---
 
-## 9. Lo que no se hace, y es una decisión
+## 10. Lo que no se hace, y es una decisión
 
 - **No hay respaldo binario ni recuperación a un punto en el tiempo.** Eso es
   `BACKUP DATABASE` y el WAL, y pertenece al servidor. Druse genera guiones
@@ -401,7 +543,7 @@ Lo mismo que se hizo con el diseñador de tablas, que es lo que funcionó:
 - **Los permisos no llevan credenciales.** Se guionizan roles y `GRANT`, nunca
   contraseñas ni sus hashes.
 
-## 10. Riesgos
+## 11. Riesgos
 
 | Riesgo | Cómo se ataja |
 | --- | --- |
@@ -410,3 +552,5 @@ Lo mismo que se hizo con el diseñador de tablas, que es lo que funcionó:
 | El `WHERE` escrito a mano como vía de ejecución arbitraria | `SqlSafetyAnalyzer` sobre la consulta armada, igual que el resto |
 | Un respaldo inconsistente que nadie nota hasta restaurarlo | Transacción con instantánea, y el límite escrito en el manifiesto donde el motor no la dé |
 | Informix se comporta distinto en todo | Va en las contractuales desde la Fase A, no al final |
+| La estimación de filas del catálogo se aleja tanto de la realidad que la barra engaña | El número se muestra siempre con `~`, y con filtro `WHERE` se cae a barra indeterminada con contador absoluto (§7.3) |
+| El sondeo del estado cada 500 ms compite con el propio respaldo | El estado se lee de memoria, sin tocar la base ni el archivo; y el sondeo se espacia cuando la ventana no está visible |
