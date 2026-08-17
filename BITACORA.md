@@ -11,7 +11,7 @@
 | Campo | Valor |
 | --- | --- |
 | Última sesión | **022** — 2026-08-17 |
-| Fase activa | **Respaldos y restauración:** Fase A cerrada —la estructura de una tabla se guioniza en los cuatro motores—; toca la Fase B, los datos |
+| Fase activa | **Respaldos y restauración:** Fases A y B cerradas —estructura y datos de una tabla, guionizados en los cuatro motores—; toca la Fase C, el artefacto |
 | Fases 0–6 | ✅ Cerradas. |
 | Fase 7 | 🟡 **11/12.** El ciclo de instalación está probado sobre este equipo; solo falta arrancar en una máquina sin herramientas de desarrollo. |
 | Fase 8 | ✅ **7/7.** Tres motores sobre el mismo contrato y primera beta preparada. |
@@ -27,13 +27,14 @@
 
 ### Qué toca retomar en la próxima sesión
 
-**Lo primero: la Fase B de los respaldos** —los datos—, según
-`docs/plan-respaldos-y-restauracion.md`. La Fase A quedó cerrada en la sesión
-022b con la ida y vuelta en verde en los cuatro motores. Lo que entra ahora:
-lectura por streaming sin materializar la tabla, `INSERT` troceados, literales
-por motor —fechas, binarios, JSON, booleanos—, el interruptor de datos general y
-por tabla, los filtros, y la transacción con instantánea. Su criterio de salida
-es que una tabla con una columna de cada tipo común salga idéntica al restaurarla.
+**Lo primero: la Fase C de los respaldos** —el artefacto—, según
+`docs/plan-respaldos-y-restauracion.md`. Las fases A y B quedaron cerradas en las
+sesiones 022b y 022c, con estructura y datos guionizados en los cuatro motores.
+Lo que entra ahora: el manifiesto versionado, las cuatro formas de salida, la
+escritura en disco por el proceso local, el estado de la operación —paso, objeto,
+filas, avisos— y la cancelación. Y **la transacción con instantánea que envuelve
+el respaldo entero**, que viene de la Fase B porque no es de cada tabla sino de
+todas a la vez.
 
 Y aparte, lo que ya venía. Ya no queda nada a medias: las transacciones manuales se cerraron en la sesión
 020 y los 44 archivos sueltos se repartieron en cuatro commits temáticos. Lo que
@@ -284,6 +285,72 @@ Y tres límites declarados desde el principio: no hay respaldo binario ni
 recuperación a un punto en el tiempo —eso es del servidor, y la interfaz tendrá
 que decirlo—, no hay respaldos programados, y un límite de filas puede dejar
 filas huérfanas, cosa que se avisa y no se corrige sola.
+
+### Sesión 022c — 2026-08-17 · Fase B de los respaldos: los datos
+
+Los `INSERT`, con lo que decide si un respaldo sirve o guarda otra cosa: **cómo se
+escribe cada valor**.
+
+#### Manda el tipo de la columna, no el del valor
+
+Es la regla que resolvió el caso más difícil. Un booleano no siempre llega como
+booleano: Informix lo entrega como `SMALLINT` porque DRDA no lo distingue de un
+entero pequeño, y escribir `1` en una columna `BOOLEAN` lo rechaza el propio
+motor. Lo que sabe la verdad es el catálogo, así que el literal se elige por el
+tipo declarado de la columna y no por lo que devuelva el lector.
+
+El resto de diferencias, cada una por su motivo:
+
+- `true` en PostgreSQL, `1` en SQL Server y MySQL, `'t'` en Informix.
+- **En MySQL la barra invertida también escapa dentro de un literal.** Doblar solo
+  las comillas dejaría que un texto acabado en barra se comiera la comilla de
+  cierre y el resto del respaldo se leyera como instrucción.
+- Binarios: `'\x…'`, `0x…` y `X'…'` según el motor. En MySQL se usa `X'…'` porque
+  `0x` con una tira vacía es un error de sintaxis y `X''` no. Informix **no tiene
+  forma literal** para `BYTE` ni `BLOB`, y se declara.
+- **Informix inserta una fila por instrucción:** `VALUES (1), (2)` es allí un
+  error de sintaxis, no una forma menos eficiente de escribirlo.
+- SQL Server necesita `IDENTITY_INSERT` para recibir las claves copiadas, y solo
+  donde hay identidad: sobre una tabla que no la tiene, esa instrucción falla.
+- Los números van sin comillas y con cultura invariante. Un `3,5` escrito con la
+  coma de la máquina se restaura como 35 en otro equipo.
+
+#### Lo que se lee, y cómo
+
+Por streaming y con `SequentialAccess`: las filas se van escribiendo según se
+leen y no se guarda ninguna. Un respaldo que materialice una tabla de diez
+millones de filas no falla en las pruebas, falla en producción.
+
+Con tope de filas se ordena por la clave primaria. Sin orden, «las primeras mil
+filas» son mil filas cualesquiera y una muestra que no se puede reproducir no
+sirve para comparar nada.
+
+La condición `WHERE` se comprueba antes de pegarla al `SELECT`: sin punto y coma
+—sería una segunda instrucción— y sin nada que escriba. Y excluir una columna
+obligatoria sin valor por omisión se rechaza al marcarla, no tres horas después
+con un `INSERT` que el motor no acepta.
+
+#### Otro tipo mal leído en Informix
+
+`BOOLEAN`, `BLOB`, `CLOB` y `LVARCHAR` comparten `coltype` —son tipos opacos y
+solo `sysxtdtypes` los distingue—, así que Druse llamaba **CLOB a todos**. Un
+booleano se anunciaba como CLOB en el explorador y al respaldarlo recibía comillas
+de texto. Corregido en la lectura de columnas; los parámetros de rutinas todavía
+no resuelven su nombre extendido.
+
+#### La instantánea se mueve a la Fase C
+
+Estaba en la lista de esta fase y no se ha hecho aquí, a propósito. El guionizado
+de datos ya se une a la transacción del usuario cuando hay una abierta, que es lo
+que le toca; pero una instantánea existe para que **todas** las tablas se lean en
+el mismo instante —la de pedidos a las 10:00 y la de líneas a las 10:04 nacen
+rotas— y eso lo abre quien recorre la selección entera. En SQL Server hay además
+que comprobar que la base admita `SNAPSHOT` antes de pedirlo.
+
+#### Verificación
+
+**508 pruebas en verde, ninguna saltada**, con `DRUSE_REQUIRE_ENGINES=1` y los
+cuatro motores: 286 unitarias, 150 contractuales y 72 de integración.
 
 ### Sesión 022b — 2026-08-17 · Fase A de los respaldos: guionizar la estructura
 

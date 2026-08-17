@@ -1079,6 +1079,11 @@ Lo estructural, en el [ADR 0005](docs/decisions/0005-respaldos-guionizados-por-d
   _(Fase A, sesión 022: la estructura de una tabla —columnas, tipos, valores por
   omisión, clave primaria, unicidad, comprobaciones, índices y claves foráneas—
   ya se guioniza en los cuatro motores.)_
+- [x] **Con datos o sin ellos, en dos niveles:** un interruptor general que fija
+  el valor por omisión y el mismo interruptor por tabla, que gana cuando se toca.
+  Con filtro por filas, tope y columnas excluidas. _(Fase B, sesión 022c: los
+  datos se leen por streaming y se escriben como `INSERT` con los literales de
+  cada motor.)_
 - [x] **Los cuatro motores desde la primera fase**, con las mismas pruebas
   contractuales, como se hizo con el diseñador de tablas.
 - [x] **Ida y vuelta como criterio de salida:** se guioniza, se ejecuta en una

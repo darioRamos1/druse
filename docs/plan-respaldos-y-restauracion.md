@@ -468,16 +468,59 @@ se aplica en una.
   que `REFERENCES` se escribe sin la lista y el motor resuelve por la clave
   primaria. `REFERENCES padre ()` no lo acepta nadie.
 
-### Fase B — Los datos
+### Fase B — Los datos ✅
 
-- [ ] Lectura por streaming y `INSERT` troceados.
-- [ ] Literales por motor: fechas, binarios en hexadecimal, JSON, booleanos.
-- [ ] El interruptor general y las anulaciones por tabla.
-- [ ] Filtros: `WHERE` analizado, límite de filas, columnas excluidas.
-- [ ] Transacción con instantánea, y el límite declarado donde no la haya.
+- [x] Lectura por streaming y `INSERT` troceados.
+- [x] Literales por motor: fechas, binarios en hexadecimal, textos y booleanos.
+- [x] El interruptor general y las anulaciones por tabla.
+- [x] Filtros: `WHERE` analizado, límite de filas, columnas excluidas.
+- [ ] Transacción con instantánea. **Se mueve a la Fase C**, ver abajo.
 
 **Criterio de salida:** una tabla con una columna de cada tipo común del motor se
 respalda, se restaura y sale idéntica, byte a byte donde el tipo lo permita.
+
+_Cumplido._ `RespaldaLosDatosDeUnaTablaYLosVuelveACargar` crea una tabla con una
+columna por familia —texto, entero, decimal, booleano, fecha, marca de tiempo y
+binario, los que cada motor declare—, mete una fila con valores y otra entera a
+nulo, guioniza, **borra las filas**, ejecuta el guion y compara lo leído antes con
+lo leído después. `LosFiltrosRecortanLoQueSeLleva` hace lo propio con el tope de
+filas, la condición y las columnas excluidas.
+
+**Cómo se escriben los valores, y por qué así:**
+
+- **Manda el tipo de la columna, no el del valor recibido.** Un booleano no
+  siempre llega como booleano —Informix lo entrega como `SMALLINT` porque DRDA no
+  lo distingue de un entero— y escribir `1` en una columna `BOOLEAN` lo rechaza el
+  propio motor. Quien sabe la verdad es el catálogo.
+- **Cada motor escribe la verdad a su manera:** `true` en PostgreSQL, `1` en SQL
+  Server y MySQL, `'t'` en Informix.
+- **En MySQL la barra invertida también escapa** dentro de un literal. Doblar solo
+  las comillas dejaría que un texto acabado en barra se comiera la comilla de
+  cierre y el resto del respaldo se leyera como instrucción.
+- **Los binarios:** `'\x…'` en PostgreSQL, `0x…` en SQL Server, `X'…'` en MySQL
+  —donde `0x` con una tira vacía es un error de sintaxis y `X''` no—. Informix
+  **no tiene forma literal** para `BYTE` ni `BLOB`: se declara en las capacidades
+  y esa columna no se puede respaldar como texto.
+- **Informix inserta una fila por instrucción.** Allí `VALUES (1), (2)` es un
+  error de sintaxis, no una forma menos eficiente de escribirlo.
+- **SQL Server necesita que se le abra paso a la identidad** (`IDENTITY_INSERT`),
+  y solo donde la hay: sobre una tabla sin identidad esa misma instrucción falla.
+- **Con tope de filas se ordena por la clave primaria.** Sin orden, «las primeras
+  mil filas» son mil filas cualesquiera, distintas en cada respaldo.
+
+**Lo que la fase destapó:** Informix guarda `BOOLEAN`, `BLOB`, `CLOB` y `LVARCHAR`
+con el mismo `coltype` —son tipos opacos, y solo `sysxtdtypes` los distingue—, así
+que Druse llamaba `CLOB` a todos. Un booleano se anunciaba como CLOB en el
+explorador y recibía comillas de texto al respaldarlo. Corregido en la lectura de
+columnas; los parámetros de rutinas siguen sin resolver su nombre extendido.
+
+**Por qué la instantánea pasa a la Fase C.** El guionizado de datos ya se une a la
+transacción del usuario cuando hay una abierta, que es lo que le corresponde. Pero
+una instantánea sirve para que **todas** las tablas del respaldo se lean en el
+mismo instante —la de pedidos a las 10:00 y la de líneas a las 10:04 nacen rotas—,
+y eso lo tiene que abrir quien recorre la selección entera, no cada tabla por su
+cuenta. Ahí vive, con la comprobación que en SQL Server hace falta antes de pedir
+`SNAPSHOT`: una base que no lo tenga habilitado rechaza la transacción.
 
 ### Fase C — El artefacto
 
@@ -491,6 +534,11 @@ respalda, se restaura y sale idéntica, byte a byte donde el tipo lo permita.
       aproximada.
 - [ ] Cancelación, y borrado del archivo parcial.
 - [ ] Recolección de avisos y errores por objeto, con la instrucción que falló.
+- [ ] **La transacción con instantánea que envuelve el respaldo entero**, y el
+      límite declarado en el manifiesto donde el motor no la dé. Viene de la
+      Fase B: no es de cada tabla, es de todas a la vez. En SQL Server hay que
+      comprobar antes que la base admita `SNAPSHOT`, porque si no rechaza la
+      transacción y el respaldo no llegaría a empezar.
 
 **Criterio de salida:** una base entera con las cuatro formas de salida; el
 manifiesto describe sin faltas lo que hay dentro **y el estado consultado durante
