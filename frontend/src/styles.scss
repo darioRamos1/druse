@@ -19,6 +19,12 @@ body {
 }
 
 body {
+  /*
+   * El tamaño de la interfaz se aplica aquí y no repartido por los tamaños de
+   * letra: las barras tienen alturas fijas del mockup, y agrandar solo el texto
+   * acabaría recortándolo dentro de barras que no crecen.
+   */
+  zoom: var(--dr-scale, 1);
   background: var(--dr-surface-outer);
   color: var(--dr-text);
   font-family: var(--dr-font-ui);

@@ -3,7 +3,7 @@ import { Observable, of, throwError } from 'rxjs';
 
 import { ApplicationGateway } from '../application-gateway/application-gateway';
 import { DesktopHost } from '../application-gateway/desktop-host';
-import { THEME_PREFERENCE, ThemeService, parseTheme } from './theme.service';
+import { THEME_PREFERENCE, ThemeService, cachedAppearance } from './theme.service';
 
 /** Gateway mínimo: de todo lo que ofrece, el tema solo usa las preferencias. */
 class FakeGateway {
@@ -70,10 +70,10 @@ describe('ThemeService', () => {
     expect(gateway.saved).toEqual([]);
   });
 
-  it('recuerda el tema en esta máquina, para el arranque siguiente', async () => {
+  it('recuerda la apariencia en esta máquina, para el arranque siguiente', async () => {
     await service.set('light');
 
-    expect(parseTheme(localStorage.getItem('druse.theme'))).toBe('light');
+    expect(cachedAppearance().theme).toBe('light');
   });
 
   it('mantiene el tema aunque no se pueda guardar en el servidor', async () => {
