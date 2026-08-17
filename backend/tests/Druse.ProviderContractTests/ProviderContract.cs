@@ -36,6 +36,15 @@ public interface IProviderFixture
     /// <summary>Quien escribe el DDL: crear tablas, índices y restricciones.</summary>
     ITableDesigner Designer { get; }
 
+    /// <summary>
+    /// Quien escribe el DDL que reproduce una tabla ya existente.
+    ///
+    /// En los cuatro proveedores es **el mismo objeto** que <see cref="Designer"/>:
+    /// escribir un `CREATE TABLE` desde un diseño y escribirlo desde el catálogo
+    /// son la misma tarea con distinta entrada.
+    /// </summary>
+    IDatabaseScripter Scripter { get; }
+
     ConnectionProfile Profile(bool onlyRead = false);
 
     DatabaseCredentials Credentials { get; }

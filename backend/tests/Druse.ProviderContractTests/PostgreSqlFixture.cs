@@ -23,7 +23,11 @@ public sealed class PostgreSqlFixture : IProviderFixture
 
     public IRowEditor RowEditor { get; } = new PostgreSqlRowEditor();
 
-    public ITableDesigner Designer { get; } = new PostgreSqlTableDesigner();
+    private readonly PostgreSqlTableDesigner _designer = new();
+
+    public ITableDesigner Designer => _designer;
+
+    public IDatabaseScripter Scripter => _designer;
 
     public string DatabaseName =>
         Environment.GetEnvironmentVariable("DRUSE_TEST_PG_DB") ?? "druse_test";

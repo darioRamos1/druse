@@ -600,6 +600,284 @@ public abstract class DatabaseProviderContractTests<TFixture>
     }
 
     /// <summary>
+    /// Respalda la estructura de una tabla, la borra y la vuelve a crear desde el
+    /// guion.
+    ///
+    /// **Es el criterio de salida de la Fase A de los respaldos**, y comprueba lo
+    /// único que importa: que lo guionizado *sirva*. Comparar el SQL generado con
+    /// un texto esperado diría que el generador no ha cambiado, que es otra cosa;
+    /// un guion puede leerse perfecto y no ejecutarse, o ejecutarse y dejar una
+    /// tabla distinta de la que se copió.
+    ///
+    /// Por eso el ciclo es entero —leer, guionizar, borrar, recrear, releer— y la
+    /// comparación se hace **entre dos lecturas del catálogo**, no contra literales
+    /// escritos a mano: así ningún motor necesita su propia expectativa.
+    ///
+    /// La tabla original se borra a propósito antes de recrearla. Es lo que hace
+    /// una restauración de verdad, y además evita que los nombres de índices y
+    /// restricciones choquen: en PostgreSQL viven en el esquema, no en la tabla.
+    /// </summary>
+    [Fact]
+    public async Task RespaldaLaEstructuraDeUnaTablaYLaVuelveACrear()
+    {
+        if (Skip) { return; }
+
+        await using var session = await OpenAsync();
+
+        var suffix = Guid.NewGuid().ToString("N")[..8];
+        var parent = $"druse_pad_{suffix}";
+        var child = $"druse_hij_{suffix}";
+
+        var target = new DatabaseObject
+        {
+            Id = child,
+            Name = child,
+            Kind = DatabaseObjectKind.Table,
+            Database = Fixture.DatabaseName,
+            Schema = Fixture.DefaultSchema,
+        };
+
+        try
+        {
+            // La tabla de origen se crea con el diseñador y no con SQL del
+            // fixture: así la prueba no añade una dependencia de dialecto por cada
+            // cosa que quiere ver copiada.
+            await Fixture.Designer.CreateAsync(
+                session,
+                new TableDefinition
+                {
+                    Database = Fixture.DatabaseName,
+                    Schema = Fixture.DefaultSchema,
+                    Name = parent,
+                    Columns =
+                    [
+                        new TableColumnDefinition
+                        {
+                            Name = "id",
+                            DataType = "INTEGER",
+                            IsNullable = false,
+                            IsPrimaryKey = true,
+                        },
+                    ],
+                },
+                CancellationToken.None);
+
+            var design = new TableDefinition
+            {
+                Database = Fixture.DatabaseName,
+                Schema = Fixture.DefaultSchema,
+                Name = child,
+                Columns =
+                [
+                    new TableColumnDefinition
+                    {
+                        Name = "id",
+                        DataType = "INTEGER",
+                        IsNullable = false,
+                        IsPrimaryKey = true,
+                        IsIdentity = true,
+                    },
+                    new TableColumnDefinition
+                    {
+                        Name = "codigo",
+                        DataType = "VARCHAR(50)",
+                        IsNullable = false,
+                    },
+                    new TableColumnDefinition
+                    {
+                        Name = "total",
+                        DataType = "DECIMAL(12,2)",
+                        IsNullable = false,
+                        DefaultValue = "0",
+                    },
+                    new TableColumnDefinition { Name = "padre_id", DataType = "INTEGER" },
+                ],
+                UniqueConstraints =
+                [
+                    new UniqueConstraintDefinition
+                    {
+                        Name = $"uq_{child}",
+                        Columns = ["codigo"],
+                    },
+                ],
+                // Sobre `codigo` y no sobre `id`: MySQL rechaza cualquier CHECK
+                // que mencione una columna AUTO_INCREMENT.
+                CheckConstraints = Fixture.Designer.IndexCapabilities.SupportsCheckConstraints
+                    ?
+                    [
+                        new CheckConstraintDefinition
+                        {
+                            Name = $"ck_{child}",
+                            Expression = "codigo <> ''",
+                        },
+                    ]
+                    : [],
+                ForeignKeys =
+                [
+                    new ForeignKeyDefinition
+                    {
+                        Name = $"fk_{child}",
+                        Columns = ["padre_id"],
+                        ReferencedSchema = Fixture.DefaultSchema,
+                        ReferencedTable = parent,
+                        ReferencedColumns = ["id"],
+                    },
+                ],
+                Indexes =
+                [
+                    new IndexDefinition
+                    {
+                        Name = $"ix_{child}",
+                        Columns = [new IndexColumn { Name = "total" }],
+                    },
+                ],
+            };
+
+            await Fixture.Designer.CreateAsync(session, design, CancellationToken.None);
+
+            var before = new ScriptedTable
+            {
+                Table = target,
+                Columns = await Fixture.Metadata.GetColumnsAsync(
+                    session,
+                    target,
+                    CancellationToken.None),
+                Structure = await Fixture.Metadata.GetTableStructureAsync(
+                    session,
+                    target,
+                    CancellationToken.None),
+            };
+
+            // El guion se escribe **antes** de borrar: es el respaldo.
+            var script = new List<string>();
+            script.AddRange(Fixture.Scripter.ScriptTable(before));
+            script.AddRange(Fixture.Scripter.ScriptIndexes(before));
+            script.AddRange(Fixture.Scripter.ScriptForeignKeys(before));
+
+            await ExecuteAsync(session, Fixture.DropTable(child));
+
+            // Cuando el guion no se puede ejecutar, lo que hace falta saber es
+            // **qué instrucción** falló y con qué texto exacto. Un motor que solo
+            // dice «error de sintaxis» —Informix lo hace— deja el diagnóstico en
+            // manos de esto.
+            foreach (var statement in script)
+            {
+                QueryResult result;
+
+                try
+                {
+                    result = await ExecuteAsync(session, statement);
+                }
+                catch (Exception error)
+                {
+                    throw new InvalidOperationException(
+                        $"El guion no se pudo ejecutar en {Fixture.EngineName}." +
+                        $"{Environment.NewLine}{statement}",
+                        error);
+                }
+
+                Assert.True(
+                    result.Error is null,
+                    $"El guion no se pudo ejecutar en {Fixture.EngineName}: " +
+                    $"{result.Error?.Message}{Environment.NewLine}{statement}");
+            }
+
+            var after = new ScriptedTable
+            {
+                Table = target,
+                Columns = await Fixture.Metadata.GetColumnsAsync(
+                    session,
+                    target,
+                    CancellationToken.None),
+                Structure = await Fixture.Metadata.GetTableStructureAsync(
+                    session,
+                    target,
+                    CancellationToken.None),
+            };
+
+            // --- Las columnas, en orden, con su tipo y su nulabilidad ----------
+            Assert.Equal(
+                before.Columns.Select(column => column.Name),
+                after.Columns.Select(column => column.Name));
+
+            foreach (var original in before.Columns)
+            {
+                var copy = Assert.Single(after.Columns, item => item.Name == original.Name);
+
+                Assert.Equal(original.DataType, copy.DataType);
+                Assert.Equal(original.IsNullable, copy.IsNullable);
+
+                // Que la columna la rellene el motor es lo primero que se pierde al
+                // reproducir una tabla, y no se nota hasta el primer `INSERT`.
+                Assert.Equal(original.IsGenerated, copy.IsGenerated);
+            }
+
+            // --- La clave primaria --------------------------------------------
+            Assert.NotNull(after.Structure.PrimaryKey);
+            Assert.Equal(
+                before.Structure.PrimaryKey!.Columns,
+                after.Structure.PrimaryKey!.Columns);
+
+            if (Fixture.Scripter.Capabilities.NamesPrimaryKey)
+            {
+                Assert.Equal(
+                    before.Structure.PrimaryKey.Name,
+                    after.Structure.PrimaryKey.Name);
+            }
+
+            // --- Índices, restricciones y claves foráneas ----------------------
+            var index = Assert.Single(after.Structure.Indexes, item => item.Name == $"ix_{child}");
+
+            Assert.Equal("total", Assert.Single(index.Columns).Name);
+
+            // De la unicidad importan las columnas, que se comparan siempre; el
+            // nombre solo donde el motor deje leerlo. En Informix lo que se lee es
+            // el del índice interno que la sostiene, distinto en cada creación.
+            Assert.Equal(
+                before.Structure.UniqueConstraints
+                    .Select(item => string.Join(",", item.Columns))
+                    .Order(),
+                after.Structure.UniqueConstraints
+                    .Select(item => string.Join(",", item.Columns))
+                    .Order());
+
+            if (Fixture.Scripter.Capabilities.NamesUniqueConstraints)
+            {
+                Assert.Contains(after.Structure.UniqueConstraints, item => item.Name == $"uq_{child}");
+            }
+
+            if (Fixture.Designer.IndexCapabilities.SupportsCheckConstraints)
+            {
+                Assert.Contains(after.Structure.CheckConstraints, item => item.Name == $"ck_{child}");
+            }
+
+            var sourceKey = Assert.Single(
+                before.Structure.ForeignKeys,
+                item => item.Name == $"fk_{child}");
+
+            var foreignKey = Assert.Single(
+                after.Structure.ForeignKeys,
+                item => item.Name == $"fk_{child}");
+
+            Assert.Equal(parent, foreignKey.ReferencedTable);
+            Assert.Equal("padre_id", Assert.Single(foreignKey.Columns));
+
+            // Las columnas referenciadas se comparan **entre las dos lecturas** y
+            // no contra un literal: el catálogo de Informix no las entrega, y
+            // exigir «id» mediría esa carencia en vez de la copia. Lo que importa
+            // es que la clave recreada apunte a lo mismo que la original.
+            Assert.Equal(sourceKey.ReferencedColumns, foreignKey.ReferencedColumns);
+        }
+        finally
+        {
+            // El hijo primero: mientras exista su clave foránea, el padre no se
+            // puede borrar.
+            await ExecuteAsync(session, Fixture.DropTable(child));
+            await ExecuteAsync(session, Fixture.DropTable(parent));
+        }
+    }
+
+    /// <summary>
     /// Lee los parámetros de un procedimiento para poder componer su llamada.
     ///
     /// Lo que se comprueba es el orden y la dirección, no los nombres: SQL Server

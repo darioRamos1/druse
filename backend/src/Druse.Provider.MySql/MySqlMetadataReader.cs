@@ -354,7 +354,7 @@ public sealed class MySqlMetadataReader : IDatabaseMetadataReader
                 reader => new DatabaseCheckConstraint
                 {
                     Name = reader.GetString(0),
-                    Expression = reader.GetString(1),
+                    Expression = Unescape(reader.GetString(1)),
                 },
                 cancellationToken,
                 ("schema", schema),
@@ -365,6 +365,25 @@ public sealed class MySqlMetadataReader : IDatabaseMetadataReader
             return [];
         }
     }
+
+    /// <summary>
+    /// Deshace los escapes con los que MySQL guarda la condición.
+    ///
+    /// `CHECK_CLAUSE` no devuelve lo que se escribió: `codigo <> ''` vuelve como
+    /// ``(`codigo` <> _latin1\'\')``, con las comillas escapadas a la manera de C
+    /// y no a la del estándar. Se ve mal en el diseñador, y sobre todo **no se
+    /// puede volver a ejecutar**: MySQL rechaza su propia expresión con un error
+    /// de sintaxis en cuanto se escribe dentro de un `CREATE TABLE`, que es lo que
+    /// hace un respaldo.
+    ///
+    /// La comilla escapada pasa a la forma estándar —duplicada— y la barra
+    /// escapada, a una barra. El introductor de juego de caracteres (`_latin1`)
+    /// se deja: es sintaxis válida y quitarlo cambiaría el significado.
+    /// </summary>
+    private static string Unescape(string expression) =>
+        expression
+            .Replace("\\\\", "\\", StringComparison.Ordinal)
+            .Replace("\\'", "''", StringComparison.Ordinal);
 
     /// <summary>Traduce la regla referencial que nombra el estándar.</summary>
     private static ForeignKeyAction ParseAction(string rule) => rule switch

@@ -23,7 +23,11 @@ public sealed class InformixFixture : IProviderFixture
 
     public IRowEditor RowEditor { get; } = new InformixRowEditor();
 
-    public ITableDesigner Designer { get; } = new InformixTableDesigner();
+    private readonly InformixTableDesigner _designer = new();
+
+    public ITableDesigner Designer => _designer;
+
+    public IDatabaseScripter Scripter => _designer;
 
     public string DatabaseName =>
         Environment.GetEnvironmentVariable("DRUSE_TEST_IFX_DB") ?? "druse_test";

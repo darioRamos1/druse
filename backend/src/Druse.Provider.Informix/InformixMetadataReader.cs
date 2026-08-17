@@ -178,22 +178,21 @@ public sealed class InformixMetadataReader : IDatabaseMetadataReader
         ArgumentNullException.ThrowIfNull(table);
 
         var indexes = await GetIndexesAsync(session, table, cancellationToken);
-        var (primary, unique, foreignKeys, checks) =
+        var (primary, unique, foreignKeys, checks, constraintIndexes) =
             await GetConstraintsAsync(session, table, cancellationToken);
 
         return new TableStructure
         {
             PrimaryKey = primary,
             // Un índice queda marcado como sostenido por una restricción si su
-            // nombre aparece entre los índices que respaldan las restricciones.
+            // nombre aparece entre los índices que respaldan las restricciones,
+            // que aquí incluyen las claves foráneas.
             Indexes =
             [
                 .. indexes.Select(index => index with
                 {
                     IsPrimaryKey = primary is not null && index.Name == primary.Name,
-                    IsConstraintIndex =
-                        (primary is not null && index.Name == primary.Name)
-                        || unique.Any(constraint => constraint.Name == index.Name),
+                    IsConstraintIndex = constraintIndexes.Contains(index.Name),
                 }),
             ],
             ForeignKeys = foreignKeys,
@@ -286,7 +285,8 @@ public sealed class InformixMetadataReader : IDatabaseMetadataReader
         DatabasePrimaryKey? Primary,
         IReadOnlyList<DatabaseUniqueConstraint> Unique,
         IReadOnlyList<DatabaseForeignKey> ForeignKeys,
-        IReadOnlyList<DatabaseCheckConstraint> Checks)>
+        IReadOnlyList<DatabaseCheckConstraint> Checks,
+        IReadOnlySet<string> ConstraintIndexes)>
         GetConstraintsAsync(
             IDatabaseSession session,
             DatabaseObject table,
@@ -383,7 +383,20 @@ public sealed class InformixMetadataReader : IDatabaseMetadataReader
             });
         }
 
-        return (primary, unique, foreignKeys, checks);
+        // Todo índice que sostiene una restricción, sea del tipo que sea.
+        //
+        // **Incluidas las claves foráneas**, que aquí también crean el suyo: se
+        // llama ` 105_13` —con un espacio delante— y el motor rechaza ese nombre
+        // si alguien intenta crearlo. Sin marcarlo, la interfaz ofrecería borrar
+        // un índice que no se puede borrar suelto, y un respaldo intentaría
+        // reproducirlo y fallaría.
+        var constraintIndexes = rows
+            .Select(row => row.IndexName)
+            .OfType<string>()
+            .Where(name => name.Length > 0)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        return (primary, unique, foreignKeys, checks, constraintIndexes);
     }
 
     /// <summary>
@@ -428,7 +441,7 @@ public sealed class InformixMetadataReader : IDatabaseMetadataReader
         DatabaseObject table,
         CancellationToken cancellationToken)
     {
-        var (primary, _, _, _) = await GetConstraintsAsync(session, table, cancellationToken);
+        var (primary, _, _, _, _) = await GetConstraintsAsync(session, table, cancellationToken);
 
         return primary?.Columns ?? [];
     }
