@@ -9,6 +9,7 @@
 //! API, decirle al frontend dónde encontrarla y cerrarla al salir.
 
 mod api_process;
+mod editor_background;
 mod exports;
 mod sql_files;
 mod theme;
@@ -152,7 +153,10 @@ fn main() {
             sql_files::save_sql_file_as,
             exports::save_export,
             transactions::set_transaction_pending,
-            theme::set_window_theme
+            theme::set_window_theme,
+            editor_background::choose_editor_background,
+            editor_background::read_editor_background,
+            editor_background::clear_editor_background
         ])
         .on_window_event(|window, event| {
             // Cerrar con una transacción abierta tira lo que no esté confirmado:

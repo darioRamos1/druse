@@ -141,6 +141,28 @@ export class DesktopHost {
     }
   }
 
+  /**
+   * Abre el diálogo del sistema para elegir la imagen de fondo del editor.
+   *
+   * El envoltorio la copia a la carpeta de datos de la aplicación y la devuelve
+   * ya leída. Se traen los bytes en lugar de una ruta porque la CSP solo admite
+   * imágenes propias o `data:`: servirla desde el disco obligaría a abrir el
+   * protocolo de recursos, que es relajar una protección real para ahorrarse una
+   * lectura que ocurre una vez por arranque.
+   */
+  chooseEditorBackground(): Promise<{ name: string; source: string } | null> {
+    return this.invoke('choose_editor_background');
+  }
+
+  /** La imagen de fondo guardada, o `null` si no hay ninguna. */
+  readEditorBackground(): Promise<string | null> {
+    return this.invoke('read_editor_background');
+  }
+
+  clearEditorBackground(): Promise<void> {
+    return this.invoke('clear_editor_background');
+  }
+
   private invoke<T>(command: string, args?: unknown): Promise<T> {
     const bridge = typeof window === 'undefined' ? undefined : window.__TAURI__;
     const invoke = bridge?.core?.invoke ?? bridge?.invoke;
