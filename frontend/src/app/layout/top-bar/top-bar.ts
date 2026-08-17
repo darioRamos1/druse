@@ -22,4 +22,5 @@ export class TopBar {
   readonly saveSqlAs = output<void>();
   readonly openPalette = output<void>();
   readonly themeSelected = output<ThemeName>();
+  readonly openSettings = output<void>();
 }

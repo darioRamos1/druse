@@ -11,6 +11,7 @@ import {
 
 import { ExportFormat } from '../../core/application-gateway/application-gateway';
 import { ThemeName, ThemeService } from '../../core/theme/theme.service';
+import { SettingsDialog } from '../../features/settings/settings-dialog/settings-dialog';
 import { FormatSettings } from '../../core/workspace/format-settings';
 import { WorkspaceStore } from '../../core/workspace/workspace-store';
 import { SqlFileService } from '../../core/sql-files/sql-file.service';
@@ -85,6 +86,7 @@ const DISCONNECTED: SessionStatus = {
     QueryBuilder,
     ProcedureRunner,
     CommandPalette,
+    SettingsDialog,
     ResizeHandle,
   ],
   templateUrl: './app-shell.html',
@@ -95,8 +97,15 @@ export class AppShell {
   private readonly _sqlFiles = inject(SqlFileService);
   private readonly _themes = inject(ThemeService);
 
-  // --- Tema ------------------------------------------------------------------
+  // --- Apariencia ------------------------------------------------------------
   protected readonly theme = this._themes.theme;
+
+  /** El acento elegido, que el editor necesita para su cursor y su selección. */
+  protected readonly accent = computed(() => this._themes.appearance().accent);
+
+  protected readonly editorFontSize = computed(() => this._themes.appearance().editorFontSize);
+
+  protected readonly settingsOpen = signal(false);
 
   protected selectTheme(theme: ThemeName): void {
     void this._themes.set(theme);

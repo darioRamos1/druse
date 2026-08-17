@@ -1,0 +1,309 @@
+/* Mismo modal que el compositor, el diseñador y el ejecutor: se hereda su forma
+   a propósito para que no parezca otra aplicación. */
+:host {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--dr-font-ui);
+  font-size: var(--dr-font-size-sm);
+}
+
+.backdrop {
+  position: absolute;
+  inset: 0;
+  background: var(--dr-scrim);
+  backdrop-filter: blur(2px);
+}
+
+.dialog {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 520px;
+  max-width: calc(100vw - 32px);
+  max-height: calc(100vh - 32px);
+  overflow: hidden;
+  border: 1px solid var(--dr-border-dialog);
+  border-radius: 12px;
+  background: var(--dr-surface-dialog);
+  box-shadow: var(--dr-shadow-dialog);
+}
+
+.head {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 18px 20px 16px;
+  border-bottom: 1px solid var(--dr-border);
+}
+
+.title {
+  margin: 0;
+  font-size: var(--dr-font-size-lg);
+  font-weight: 600;
+  color: var(--dr-text);
+}
+
+.subtitle {
+  margin: 4px 0 0;
+  color: var(--dr-text-tertiary);
+  font-size: var(--dr-font-size-xs);
+}
+
+.close {
+  margin-left: auto;
+  width: 26px;
+  height: 26px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--dr-text-dim);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+
+  &:hover {
+    background: var(--dr-surface-hover);
+    color: var(--dr-text);
+  }
+}
+
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  padding: 18px 20px;
+  overflow-y: auto;
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+
+  &__title {
+    margin: 0;
+    color: var(--dr-text-tertiary);
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  &__hint {
+    margin: -4px 0 0;
+    color: var(--dr-text-faint);
+    font-size: var(--dr-font-size-xs);
+    line-height: 1.5;
+  }
+}
+
+.choice {
+  display: flex;
+  gap: 6px;
+
+  &--wrap {
+    flex-wrap: wrap;
+  }
+
+  &__item {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    height: 30px;
+    padding: 0 12px;
+    border: 1px solid var(--dr-border-input);
+    border-radius: var(--dr-radius-sm);
+    background: transparent;
+    color: var(--dr-text-muted);
+    font-family: inherit;
+    font-size: var(--dr-font-size-sm);
+    cursor: pointer;
+
+    &:hover {
+      background: var(--dr-surface-hover);
+      color: var(--dr-text);
+    }
+
+    &--compact {
+      padding: 0 10px;
+      font-family: var(--dr-font-mono);
+      font-size: var(--dr-font-size-xs);
+    }
+
+    &.is-active {
+      border-color: var(--dr-accent-line);
+      background: var(--dr-accent-tint);
+      color: var(--dr-text);
+    }
+  }
+}
+
+.swatches {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.swatch {
+  position: relative;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 1px solid var(--dr-border-input);
+  border-radius: 50%;
+  background: var(--swatch, var(--dr-surface-raised));
+  cursor: pointer;
+
+  &:hover {
+    transform: scale(1.08);
+  }
+
+  /* La marca de elegido va fuera del círculo: dentro taparía justo el color que
+     hay que juzgar. */
+  &.is-active {
+    box-shadow: 0 0 0 2px var(--dr-surface-dialog), 0 0 0 4px var(--dr-accent);
+  }
+
+  &--custom {
+    display: grid;
+    place-items: center;
+    overflow: hidden;
+    background: conic-gradient(
+      from 90deg,
+      #f2686b,
+      #f0b429,
+      #3ddc97,
+      #6c8bff,
+      #9a7cff,
+      #f2686b
+    );
+
+    input {
+      width: 200%;
+      height: 200%;
+      border: 0;
+      background: transparent;
+      opacity: 0;
+      cursor: pointer;
+    }
+  }
+}
+
+.field {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+
+  &__label {
+    min-width: 76px;
+    color: var(--dr-text-muted);
+  }
+
+  &__value {
+    min-width: 38px;
+    color: var(--dr-text-tertiary);
+    font-family: var(--dr-font-mono);
+    font-size: var(--dr-font-size-xs);
+    text-align: right;
+  }
+
+  input[type='range'] {
+    flex: 1;
+    accent-color: var(--dr-accent);
+  }
+}
+
+.file {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 7px 10px;
+  border: 1px solid var(--dr-border-input);
+  border-radius: var(--dr-radius-sm);
+  background: var(--dr-surface-sunken);
+  color: var(--dr-text-muted);
+
+  &__name {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+.problem {
+  margin: 0;
+  color: var(--dr-danger-text);
+  font-size: var(--dr-font-size-xs);
+}
+
+.foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 14px 20px;
+  border-top: 1px solid var(--dr-border);
+  background: var(--dr-surface-sunken);
+}
+
+.link {
+  padding: 0;
+  align-self: flex-start;
+  border: 0;
+  background: transparent;
+  color: var(--dr-accent);
+  font-family: inherit;
+  font-size: var(--dr-font-size-xs);
+  cursor: pointer;
+
+  &:hover:not(:disabled) {
+    color: var(--dr-accent-bright);
+  }
+
+  &:disabled {
+    color: var(--dr-text-disabled);
+    cursor: default;
+  }
+
+  &--inline {
+    margin-top: 2px;
+  }
+}
+
+.secondary {
+  align-self: flex-start;
+  height: 30px;
+  padding: 0 14px;
+  border: 1px solid var(--dr-border-input);
+  border-radius: var(--dr-radius-sm);
+  background: transparent;
+  color: var(--dr-text);
+  font-family: inherit;
+  font-size: var(--dr-font-size-sm);
+  cursor: pointer;
+
+  &:hover {
+    background: var(--dr-surface-hover);
+  }
+}
+
+.primary {
+  height: 30px;
+  padding: 0 16px;
+  border: 1px solid var(--dr-accent);
+  border-radius: var(--dr-radius-sm);
+  background: var(--dr-accent-button);
+  color: var(--dr-text-on-accent);
+  font-family: inherit;
+  font-size: var(--dr-font-size-sm);
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: var(--dr-shadow-accent-button);
+}

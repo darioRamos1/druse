@@ -1,0 +1,257 @@
+<div class="backdrop" (click)="closed.emit()"></div>
+
+<div class="dialog" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+  <header class="head">
+    <div>
+      <h2 class="title" id="settings-title">Preferencias</h2>
+      <p class="subtitle">Cómo se ve Druse. Se recuerda entre arranques.</p>
+    </div>
+    <button type="button" class="close" (click)="closed.emit()" aria-label="Cerrar">×</button>
+  </header>
+
+  <div class="body">
+    <section class="section">
+      <h3 class="section__title">Tema</h3>
+      <div class="choice" role="group" aria-label="Tema">
+        <button
+          type="button"
+          class="choice__item"
+          [class.is-active]="theme() === 'light'"
+          [attr.aria-pressed]="theme() === 'light'"
+          (click)="setTheme('light')"
+        >
+          <app-icon name="sun" [size]="13" />
+          Claro
+        </button>
+        <button
+          type="button"
+          class="choice__item"
+          [class.is-active]="theme() === 'dark'"
+          [attr.aria-pressed]="theme() === 'dark'"
+          (click)="setTheme('dark')"
+        >
+          <app-icon name="moon" [size]="13" />
+          Oscuro
+        </button>
+      </div>
+    </section>
+
+    <section class="section">
+      <h3 class="section__title">Tamaño</h3>
+      <p class="section__hint">
+        La interfaz se agranda entera —texto, barras e iconos a la vez—, así que nada se sale de
+        su sitio. El editor lleva su propio cuerpo de letra.
+      </p>
+
+      <label class="field">
+        <span class="field__label">Interfaz</span>
+        <input
+          type="range"
+          [min]="minScale"
+          [max]="maxScale"
+          step="5"
+          [value]="appearance().scale"
+          (input)="setScale($any($event.target).value)"
+        />
+        <span class="field__value">{{ appearance().scale }}%</span>
+      </label>
+
+      <div class="field">
+        <span class="field__label">Editor</span>
+        <div class="choice choice--wrap" role="group" aria-label="Cuerpo de letra del editor">
+          @for (size of fontSizes; track size) {
+            <button
+              type="button"
+              class="choice__item choice__item--compact"
+              [class.is-active]="appearance().editorFontSize === size"
+              [attr.aria-pressed]="appearance().editorFontSize === size"
+              (click)="setEditorFontSize(size)"
+            >
+              {{ size }}
+            </button>
+          }
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <h3 class="section__title">Color de acento</h3>
+      <p class="section__hint">
+        Botones, selección, foco y el cursor del editor. El texto que va encima se elige solo
+        según el contraste.
+      </p>
+
+      <div class="swatches">
+        @for (accent of accents; track accent.value) {
+          <button
+            type="button"
+            class="swatch"
+            [class.is-active]="appearance().accent === accent.value"
+            [style.--swatch]="accent.value"
+            [title]="accent.name"
+            [attr.aria-label]="'Acento ' + accent.name"
+            [attr.aria-pressed]="appearance().accent === accent.value"
+            (click)="setAccent(accent.value)"
+          ></button>
+        }
+
+        <label class="swatch swatch--custom" title="Elegir otro color">
+          <input
+            type="color"
+            [value]="accentValue()"
+            aria-label="Color de acento personalizado"
+            (change)="setAccent($any($event.target).value)"
+          />
+        </label>
+
+        @if (appearance().accent) {
+          <button type="button" class="link" (click)="clearAccent()">Usar el del tema</button>
+        }
+      </div>
+    </section>
+
+    <section class="section">
+      <h3 class="section__title">Tono de la interfaz</h3>
+      <p class="section__hint">
+        Tiñe paneles, bordes y texto sin tocar su luminosidad, así que la interfaz sigue
+        leyéndose igual. Los colores de estado no cambian: un error sigue siendo rojo.
+      </p>
+
+      <div class="swatches">
+        @for (tint of tints; track tint.value) {
+          <button
+            type="button"
+            class="swatch"
+            [class.is-active]="appearance().tint === tint.value"
+            [style.--swatch]="tint.value"
+            [title]="tint.name"
+            [attr.aria-label]="'Tono ' + tint.name"
+            [attr.aria-pressed]="appearance().tint === tint.value"
+            (click)="setTint(tint.value)"
+          ></button>
+        }
+
+        <label class="swatch swatch--custom" title="Elegir otro tono">
+          <input
+            type="color"
+            [value]="tintValue()"
+            aria-label="Tono personalizado"
+            (change)="setTint($any($event.target).value)"
+          />
+        </label>
+
+        @if (appearance().tint) {
+          <button type="button" class="link" (click)="clearTint()">Usar el del tema</button>
+        }
+      </div>
+    </section>
+
+    <section class="section">
+      <h3 class="section__title">Fondo del editor</h3>
+      <p class="section__hint">
+        Una imagen detrás del código, atenuada. La imagen se guarda con la aplicación, no en la
+        base de preferencias.
+      </p>
+
+      @if (background(); as image) {
+        <p class="file">
+          <app-icon name="folder-open" [size]="13" />
+          <span class="file__name">{{ image.name }}</span>
+          <button type="button" class="link" (click)="clearBackground()">Quitar</button>
+        </p>
+
+        <label class="field">
+          <span class="field__label">Intensidad</span>
+          <input
+            type="range"
+            min="0"
+            [max]="maxOpacity"
+            step="1"
+            [value]="image.opacity"
+            (input)="setOpacity($any($event.target).value)"
+          />
+          <span class="field__value">{{ image.opacity }}%</span>
+        </label>
+
+        <div class="choice choice--wrap" role="group" aria-label="Encaje de la imagen">
+          @for (fit of fits; track fit.value) {
+            <button
+              type="button"
+              class="choice__item"
+              [class.is-active]="image.fit === fit.value"
+              [attr.aria-pressed]="image.fit === fit.value"
+              [title]="fit.hint"
+              (click)="setFit(fit.value)"
+            >
+              {{ fit.label }}
+            </button>
+          }
+        </div>
+
+        <!--
+          El tamaño solo aparece cuando el encaje no lo decide él: en «llenar» y
+          «encajar» sería un control que no hace nada.
+        -->
+        @if (image.fit === 'tile' || image.fit === 'scale') {
+          <label class="field">
+            <span class="field__label">Tamaño</span>
+            <input
+              type="range"
+              [min]="minBackgroundScale"
+              [max]="maxBackgroundScale"
+              step="5"
+              [value]="image.scale"
+              (input)="setBackgroundScale($any($event.target).value)"
+            />
+            <span class="field__value">{{ image.scale }}%</span>
+          </label>
+        }
+
+        <label class="field">
+          <span class="field__label">Horizontal</span>
+          <input
+            type="range"
+            min="0"
+            max="100"
+            step="1"
+            [value]="image.x"
+            (input)="setPosition($any($event.target).value, null)"
+          />
+          <span class="field__value">{{ image.x }}%</span>
+        </label>
+
+        <label class="field">
+          <span class="field__label">Vertical</span>
+          <input
+            type="range"
+            min="0"
+            max="100"
+            step="1"
+            [value]="image.y"
+            (input)="setPosition(null, $any($event.target).value)"
+          />
+          <span class="field__value">{{ image.y }}%</span>
+        </label>
+
+        <button type="button" class="link link--inline" (click)="centerBackground()">
+          Centrar y volver al tamaño original
+        </button>
+      } @else {
+        <button type="button" class="secondary" (click)="chooseBackground()">
+          Elegir imagen…
+        </button>
+      }
+
+      @if (problem(); as message) {
+        <p class="problem">{{ message }}</p>
+      }
+    </section>
+  </div>
+
+  <footer class="foot">
+    <button type="button" class="link" [disabled]="!customized()" (click)="reset()">
+      Restablecer la apariencia
+    </button>
+    <button type="button" class="primary" (click)="closed.emit()">Listo</button>
+  </footer>
+</div>
