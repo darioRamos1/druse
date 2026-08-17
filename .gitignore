@@ -269,6 +269,13 @@ UpgradeLog*.htm
 ServiceFabricBackup/
 *.rptproj.bak
 
+# `Backup*/` es para las copias que deja Visual Studio al convertir proyectos, no
+# para el código. Se llevaba por delante, en silencio, las carpetas de la función
+# de respaldos: un `git add` normal las daba por ignoradas y el servicio se quedó
+# fuera de su commit.
+!backend/src/Druse.Application/Backups/
+!backend/src/Druse.Infrastructure/Backups/
+
 # SQL Server files
 *.mdf
 *.ldf

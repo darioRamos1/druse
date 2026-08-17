@@ -480,19 +480,27 @@ public abstract class TableDesignerBase : ITableDesigner, IDatabaseScripter
     /// <summary>Lo que cierra lo que abrió <see cref="BeginDataLoad"/>.</summary>
     public virtual IReadOnlyList<string> EndDataLoad(ScriptedTable table) => [];
 
-    public async IAsyncEnumerable<string> ScriptDataAsync(
-        IDatabaseSession session,
-        ScriptedTable table,
-        TableDataFilter filter,
-        [EnumeratorCancellation] CancellationToken cancellationToken)
+    public string SelectData(ScriptedTable table, TableDataFilter filter)
     {
-        ArgumentNullException.ThrowIfNull(session);
         ArgumentNullException.ThrowIfNull(table);
         ArgumentNullException.ThrowIfNull(filter);
 
-        // El filtro se comprueba antes de armar el `SELECT`, no después de
-        // ejecutarlo: es texto que escribió una persona y va dentro de una
-        // instrucción que escribe Druse.
+        Check(table, filter);
+
+        return SelectRows(
+            Qualify(table.Table.Database, table.Table.Schema, table.Table.Name),
+            Included(table, filter),
+            table,
+            filter);
+    }
+
+    /// <summary>
+    /// El filtro se comprueba antes de armar el `SELECT`, no después de
+    /// ejecutarlo: es texto que escribió una persona y va dentro de una
+    /// instrucción que escribe Druse.
+    /// </summary>
+    private static void Check(ScriptedTable table, TableDataFilter filter)
+    {
         var problems = filter.Validate(table);
 
         if (problems.Count > 0)
@@ -501,6 +509,106 @@ public abstract class TableDesignerBase : ITableDesigner, IDatabaseScripter
                 $"El filtro de «{table.Table.Name}» no se puede aplicar: {string.Join(" ", problems)}",
                 nameof(filter));
         }
+    }
+
+    public async Task<IBackupSnapshot> BeginSnapshotAsync(
+        IDatabaseSession session,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(session);
+
+        // Con una transacción del usuario abierta se lee dentro de ella: es lo que
+        // esa sesión ve, incluidos sus cambios sin confirmar, y abrir otra sobre la
+        // misma conexión no lo admite ningún motor.
+        if (session.Transaction.Current is { } manual)
+        {
+            return new BorrowedSnapshot(manual);
+        }
+
+        var connection = Connection(session);
+
+        // Se pregunta al motor en vez de suponerlo: el nivel declarado es el que
+        // este dialecto *querría*, no el que la base concreta va a conceder.
+        var isolation = await ResolveIsolationAsync(connection, cancellationToken);
+
+        if (isolation == BackupIsolation.None)
+        {
+            return new BorrowedSnapshot(null);
+        }
+
+        var level = isolation == BackupIsolation.Snapshot
+            ? System.Data.IsolationLevel.Snapshot
+            : System.Data.IsolationLevel.RepeatableRead;
+
+        try
+        {
+            return new OwnedSnapshot(
+                await connection.BeginTransactionAsync(level, cancellationToken));
+        }
+        catch (Exception error) when (error is DbException or InvalidOperationException or NotSupportedException)
+        {
+            // Pasa de verdad: una base de SQL Server sin `ALLOW_SNAPSHOT_ISOLATION`
+            // rechaza la transacción. El respaldo sigue sin garantía y **lo dice en
+            // su manifiesto**, que es mejor que no llegar a empezar.
+            return new BorrowedSnapshot(null);
+        }
+    }
+
+    /// <summary>
+    /// Qué aislamiento concede **esta base**, que no siempre es el que el motor
+    /// ofrece sobre el papel.
+    ///
+    /// Por omisión, el declarado. Lo redefine quien tenga que preguntárselo al
+    /// servidor antes de pedirlo, y hay que preguntar cuando pedirlo de más no
+    /// degrada sino que rompe.
+    /// </summary>
+    protected virtual Task<BackupIsolation> ResolveIsolationAsync(
+        DbConnection connection,
+        CancellationToken cancellationToken) =>
+        Task.FromResult(Capabilities.Isolation);
+
+    /// <summary>Instantánea propia: se abrió aquí y aquí se cierra.</summary>
+    private sealed class OwnedSnapshot(DbTransaction transaction) : IBackupSnapshot
+    {
+        public DbTransaction? Transaction => transaction;
+
+        public bool IsConsistent => true;
+
+        public async ValueTask DisposeAsync()
+        {
+            // Solo se ha leído: deshacerla es la forma de soltarla sin escribir.
+            await transaction.RollbackAsync();
+            await transaction.DisposeAsync();
+        }
+    }
+
+    /// <summary>
+    /// Instantánea prestada, o ninguna.
+    ///
+    /// No cierra nada: o la transacción es del usuario y solo él la termina, o no
+    /// hubo forma de abrir una y entonces no hay garantía que cerrar.
+    /// </summary>
+    private sealed class BorrowedSnapshot(DbTransaction? transaction) : IBackupSnapshot
+    {
+        public DbTransaction? Transaction => transaction;
+
+        public bool IsConsistent => false;
+
+        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+    }
+
+    public async IAsyncEnumerable<ScriptedRows> ScriptDataAsync(
+        IDatabaseSession session,
+        ScriptedTable table,
+        TableDataFilter filter,
+        IBackupSnapshot? snapshot,
+        [EnumeratorCancellation] CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(session);
+        ArgumentNullException.ThrowIfNull(table);
+        ArgumentNullException.ThrowIfNull(filter);
+
+        Check(table, filter);
 
         var columns = Included(table, filter);
 
@@ -516,17 +624,17 @@ public abstract class TableDesignerBase : ITableDesigner, IDatabaseScripter
 
         var connection = Connection(session);
 
-        // Lee dentro de la transacción del usuario si la hay: lo que se respalda
-        // es lo que esa sesión ve, incluidos sus cambios sin confirmar. Sin
-        // transacción abierta, esta se descarta al terminar; es solo lectura.
-        await using var scope = await OperationScope.BeginAsync(
-            connection,
-            session.Transaction,
-            cancellationToken);
+        // La lectura va bajo la instantánea del respaldo cuando la hay: todas las
+        // tablas tienen que verse en el mismo instante. Sin ella —una tabla
+        // suelta, una vista previa— se abre una transacción propia que se descarta
+        // al terminar, o se lee dentro de la del usuario si la tiene abierta.
+        await using var scope = snapshot is null
+            ? await OperationScope.BeginAsync(connection, session.Transaction, cancellationToken)
+            : null;
 
         await using var command = connection.CreateCommand();
         command.CommandText = SelectRows(qualified, columns, table, filter);
-        command.Transaction = scope.Transaction;
+        command.Transaction = snapshot?.Transaction ?? scope?.Transaction;
 
         // SequentialAccess deja liberar cada fila según se lee, en lugar de
         // mantener el registro entero en memoria.
@@ -552,14 +660,14 @@ public abstract class TableDesignerBase : ITableDesigner, IDatabaseScripter
 
             if (batch.Count >= Math.Max(1, Capabilities.MaxRowsPerInsert))
             {
-                yield return Insert(header, batch);
+                yield return new ScriptedRows(Insert(header, batch), batch.Count);
                 batch.Clear();
             }
         }
 
         if (batch.Count > 0)
         {
-            yield return Insert(header, batch);
+            yield return new ScriptedRows(Insert(header, batch), batch.Count);
         }
     }
 

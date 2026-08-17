@@ -986,9 +986,10 @@ public abstract class DatabaseProviderContractTests<TFixture>
                 session,
                 table,
                 TableDataFilter.None,
+                snapshot: null,
                 CancellationToken.None))
             {
-                script.Add(statement);
+                script.Add(statement.Sql);
             }
 
             script.AddRange(Fixture.Scripter.EndDataLoad(table));
@@ -1011,6 +1012,71 @@ public abstract class DatabaseProviderContractTests<TFixture>
             {
                 Assert.Equal(before[row], after[row]);
             }
+        }
+        finally
+        {
+            await ExecuteAsync(session, Fixture.DropTable(name));
+        }
+    }
+
+    /// <summary>
+    /// Lee un respaldo entero bajo una sola instantánea.
+    ///
+    /// Es lo que impide que la tabla de pedidos se lea a las 10:00 y la de líneas a
+    /// las 10:04, produciendo un archivo que no corresponde a ningún momento real
+    /// de la base. Se comprueba lo que se puede comprobar sin dos conexiones
+    /// escribiendo a la vez: que se abre, que se lee dentro de ella y que **el
+    /// motor dice si la concedió**, porque de eso depende lo que se escriba en el
+    /// manifiesto.
+    /// </summary>
+    [Fact]
+    public async Task ElRespaldoSeLeeBajoUnaInstantanea()
+    {
+        if (Skip) { return; }
+
+        await using var session = await OpenAsync();
+
+        var name = $"druse_ins_{Guid.NewGuid().ToString("N")[..8]}";
+
+        var target = new DatabaseObject
+        {
+            Id = name,
+            Name = name,
+            Kind = DatabaseObjectKind.Table,
+            Database = Fixture.DatabaseName,
+            Schema = Fixture.DefaultSchema,
+        };
+
+        try
+        {
+            await ExecuteAsync(session, Fixture.CreateTableWithColumns(name));
+            await ExecuteAsync(session, Fixture.InsertNamedRows(name));
+
+            var table = await ReadAsync(session, target);
+
+            await using var snapshot = await Fixture.Scripter.BeginSnapshotAsync(
+                session,
+                CancellationToken.None);
+
+            var rows = new List<ScriptedRows>();
+
+            await foreach (var statement in Fixture.Scripter.ScriptDataAsync(
+                session,
+                table,
+                TableDataFilter.None,
+                snapshot,
+                CancellationToken.None))
+            {
+                rows.Add(statement);
+            }
+
+            Assert.Equal(3, rows.Sum(row => row.Rows));
+
+            // Un motor que no la conceda no es un fallo: es un límite que el
+            // respaldo declara. Lo que no vale es prometerla sin tenerla.
+            Assert.True(
+                snapshot.IsConsistent || snapshot.Transaction is null,
+                $"{Fixture.EngineName} dice tener instantánea pero no abrió transacción.");
         }
         finally
         {
@@ -1063,7 +1129,7 @@ public abstract class DatabaseProviderContractTests<TFixture>
                 table,
                 new TableDataFilter { Where = "id = 2" });
 
-            var only = Assert.Single(filtered);
+            var only = Assert.Single(filtered).Sql;
 
             Assert.Contains("Bea", only, StringComparison.Ordinal);
             Assert.DoesNotContain("Ana", only, StringComparison.Ordinal);
@@ -1076,7 +1142,7 @@ public abstract class DatabaseProviderContractTests<TFixture>
 
             Assert.NotEmpty(withoutName);
             Assert.All(withoutName, statement =>
-                Assert.DoesNotContain("email", statement, StringComparison.OrdinalIgnoreCase));
+                Assert.DoesNotContain("email", statement.Sql, StringComparison.OrdinalIgnoreCase));
 
             // --- Y lo que no se admite ------------------------------------------
             // La condición acaba dentro de un `SELECT` que arma Druse, así que una
@@ -1104,17 +1170,18 @@ public abstract class DatabaseProviderContractTests<TFixture>
         Structure = await Fixture.Metadata.GetTableStructureAsync(session, table, CancellationToken.None),
     };
 
-    private async Task<List<string>> ScriptAsync(
+    private async Task<List<ScriptedRows>> ScriptAsync(
         IDatabaseSession session,
         ScriptedTable table,
         TableDataFilter filter)
     {
-        var statements = new List<string>();
+        var statements = new List<ScriptedRows>();
 
         await foreach (var statement in Fixture.Scripter.ScriptDataAsync(
             session,
             table,
             filter,
+            snapshot: null,
             CancellationToken.None))
         {
             statements.Add(statement);
@@ -1126,10 +1193,11 @@ public abstract class DatabaseProviderContractTests<TFixture>
     /// <summary>
     /// Cuántas filas hay en un guion, que no es lo mismo que cuántas
     /// instrucciones: donde el motor lo admite, varias filas van en un solo
-    /// `INSERT`.
+    /// `INSERT`. El recuento lo trae cada instrucción, en vez de deducirse de su
+    /// texto.
     /// </summary>
-    private static int CountRows(IEnumerable<string> statements) =>
-        statements.Sum(statement => statement.Split("),").Length);
+    private static int CountRows(IEnumerable<ScriptedRows> statements) =>
+        statements.Sum(statement => statement.Rows);
 
     private async Task RunAsync(IDatabaseSession session, IEnumerable<string> statements)
     {

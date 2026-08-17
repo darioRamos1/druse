@@ -32,6 +32,49 @@ public sealed class SqlServerTableDesigner : TableDesignerBase
     };
 
     /// <summary>
+    /// Aquí un respaldo se lee con `SNAPSHOT` y no con lecturas repetibles.
+    ///
+    /// En SQL Server, `REPEATABLE READ` mantiene bloqueos compartidos hasta el
+    /// final: un respaldo de media hora dejaría media base sin poder escribirse.
+    /// La instantánea no bloquea a nadie, pero exige que la base la tenga
+    /// habilitada, y si no la tiene el motor **rechaza la transacción** en vez de
+    /// degradarla. Por eso se intenta y se declara lo que salga.
+    /// </summary>
+    public override ScripterCapabilities Capabilities { get; } = new()
+    {
+        Isolation = BackupIsolation.Snapshot,
+    };
+
+    /// <summary>
+    /// Se le pregunta a la base si admite instantáneas **antes** de pedir una.
+    ///
+    /// No es precaución de más: SQL Server acepta abrir la transacción sin rechistar
+    /// y **falla en la primera consulta** con «snapshot isolation is not allowed in
+    /// this database». Un respaldo que reventara al leer la primera tabla no sería
+    /// un límite declarado, sería una función rota en cualquier base que no tenga
+    /// la opción encendida —que es como vienen de fábrica—.
+    ///
+    /// Sin instantánea se lee sin garantía y el manifiesto lo dice, en lugar de
+    /// caer a `REPEATABLE READ`: allí eso mantiene bloqueos hasta el final y un
+    /// respaldo de media hora dejaría media base sin poder escribirse.
+    /// </summary>
+    protected override async Task<BackupIsolation> ResolveIsolationAsync(
+        DbConnection connection,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(connection);
+
+        await using var command = connection.CreateCommand();
+        command.CommandText =
+            "SELECT snapshot_isolation_state FROM sys.databases WHERE database_id = DB_ID();";
+
+        var state = await command.ExecuteScalarAsync(cancellationToken);
+
+        // 1 es «encendido»; 2 y 3 son estados de transición mientras se activa.
+        return state is byte and 1 ? BackupIsolation.Snapshot : BackupIsolation.None;
+    }
+
+    /// <summary>
     /// Copiar los datos significa copiar también las claves que ya tienen, y SQL
     /// Server no deja escribir en una columna de identidad sin abrirle paso.
     ///

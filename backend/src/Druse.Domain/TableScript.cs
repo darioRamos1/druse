@@ -80,4 +80,38 @@ public sealed record ScripterCapabilities
     /// eso se dice en vez de escribir algo que no es el dato.
     /// </summary>
     public bool SupportsBinaryLiterals { get; init; } = true;
+
+    /// <summary>
+    /// Con qué aislamiento se lee un respaldo entero para que todas las tablas se
+    /// vean en el mismo instante.
+    ///
+    /// No es una preferencia: sin él, la tabla de pedidos leída a las 10:00 y la
+    /// de líneas leída a las 10:04 producen un respaldo que no corresponde a
+    /// ningún momento real de la base.
+    /// </summary>
+    public BackupIsolation Isolation { get; init; } = BackupIsolation.RepeatableRead;
+}
+
+/// <summary>
+/// Cómo consigue cada motor que un respaldo se lea de una pieza.
+///
+/// Se declara en vez de suponerse porque **pedir el nivel equivocado no degrada,
+/// falla**: SQL Server rechaza `SNAPSHOT` si la base no lo tiene habilitado, y
+/// entonces el respaldo ni empezaría.
+/// </summary>
+public enum BackupIsolation
+{
+    /// <summary>El motor no ofrece ninguno utilizable; se lee sin garantía y se dice.</summary>
+    None = 0,
+
+    /// <summary>Lecturas repetibles, que es lo que dan PostgreSQL, MySQL e Informix.</summary>
+    RepeatableRead = 1,
+
+    /// <summary>
+    /// Instantánea sin bloqueos, propia de SQL Server.
+    ///
+    /// Se prefiere a las lecturas repetibles porque allí estas bloquean a quien
+    /// escriba: un respaldo no debe parar la base que está copiando.
+    /// </summary>
+    Snapshot = 2,
 }

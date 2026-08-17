@@ -1,3 +1,4 @@
+using System.Data.Common;
 using Druse.Domain;
 
 namespace Druse.Database.Abstractions;
@@ -26,6 +27,44 @@ namespace Druse.Database.Abstractions;
 ///    puede haber un ciclo, y con un ciclo no existe ningún orden de creación que
 ///    las satisfaga a la vez.
 /// </summary>
+/// <summary>
+/// Una instrucción de datos, con cuántas filas lleva dentro.
+///
+/// El recuento viaja con la instrucción y no se deduce de ella: contar comas en
+/// un `INSERT` ya escrito es adivinar, y de ese número sale la barra de progreso
+/// que el usuario mira durante veinte minutos.
+/// </summary>
+/// <param name="Sql">La instrucción, lista para escribir al archivo.</param>
+/// <param name="Rows">Filas que inserta.</param>
+public readonly record struct ScriptedRows(string Sql, int Rows);
+
+/// <summary>
+/// La lectura del respaldo entero, sostenida en el tiempo.
+///
+/// Existe porque un respaldo no es una consulta: la tabla de pedidos leída a las
+/// 10:00 y la de líneas leída a las 10:04 **nacen rotas**, y eso no se ve mirando
+/// el archivo. Mientras vive, todas las lecturas ven la base tal como estaba al
+/// abrirla.
+///
+/// No es la transacción del usuario y no debe serlo: aquella la deshace el barrido
+/// por inactividad a los quince minutos, que es justo lo que dura un respaldo
+/// grande.
+/// </summary>
+public interface IBackupSnapshot : IAsyncDisposable
+{
+    /// <summary>La transacción a la que se unen las lecturas, si la hay.</summary>
+    DbTransaction? Transaction { get; }
+
+    /// <summary>
+    /// El motor concedió de verdad una lectura consistente.
+    ///
+    /// Falso cuando no se pudo —SQL Server rechaza `SNAPSHOT` si la base no lo
+    /// tiene habilitado— y entonces el respaldo **lo dice en su manifiesto** en
+    /// lugar de prometer algo que no dio.
+    /// </summary>
+    bool IsConsistent { get; }
+}
+
 public interface IDatabaseScripter
 {
     DatabaseEngine Engine { get; }
@@ -63,11 +102,34 @@ public interface IDatabaseScripter
     /// (<see cref="TableDataFilter.Validate"/>) y se rechaza si no sirve: es la
     /// única entrada de texto libre del respaldo.
     /// </summary>
-    IAsyncEnumerable<string> ScriptDataAsync(
+    IAsyncEnumerable<ScriptedRows> ScriptDataAsync(
         IDatabaseSession session,
         ScriptedTable table,
         TableDataFilter filter,
+        IBackupSnapshot? snapshot,
         CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Abre la lectura sostenida bajo la que se copia todo.
+    ///
+    /// Quien la abre la cierra, y hasta entonces pasa el resultado a cada llamada
+    /// de <see cref="ScriptDataAsync"/>. Si el motor no puede darla, devuelve una
+    /// que lo declara en vez de fallar: un respaldo sin instantánea sigue siendo
+    /// mejor que ninguno, siempre que se diga.
+    /// </summary>
+    Task<IBackupSnapshot> BeginSnapshotAsync(
+        IDatabaseSession session,
+        CancellationToken cancellationToken);
+
+    /// <summary>
+    /// La consulta con la que se leen las filas que se van a copiar.
+    ///
+    /// Se expone porque los datos no siempre se escriben como `INSERT`: en CSV los
+    /// escribe el exportador que ya existe, y necesita el mismo `SELECT` —con su
+    /// filtro, su tope y sus columnas excluidas— que usaría el guionizado.
+    /// Duplicarlo sería tener dos definiciones de «lo que se copia».
+    /// </summary>
+    string SelectData(ScriptedTable table, TableDataFilter filter);
 
     /// <summary>
     /// Lo que hay que ejecutar antes de cargar filas en esta tabla, si algo hace
