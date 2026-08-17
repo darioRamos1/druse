@@ -28,7 +28,8 @@ import {
   DEFAULT_FORMAT_SETTINGS,
   FormatSettings,
 } from '../../../core/workspace/format-settings';
-import { DRUSE_THEME, DRUSE_THEME_NAME } from './druse-theme';
+import { ThemeName } from '../../../core/theme/theme.service';
+import { DRUSE_THEMES, DRUSE_THEME_NAMES } from './druse-theme';
 import { executionErrorLine } from './execution-error';
 import { MonacoLoader } from './monaco-loader';
 
@@ -105,7 +106,7 @@ export interface ExecutionErrorContext {
 
       &__error {
         max-width: 460px;
-        color: #f2686b;
+        color: var(--dr-danger);
       }
 
       &__retry {
@@ -130,6 +131,14 @@ export default class SqlEditor implements OnInit {
   readonly value = input('');
   readonly readOnly = input(false);
   readonly engine = input<DatabaseEngine>('postgresql');
+
+  /**
+   * Paleta que debe pintar el editor.
+   *
+   * Entra como el resto: el editor no conoce el servicio de tema, igual que no
+   * conoce el store ni el gateway.
+   */
+  readonly theme = input<ThemeName>('dark');
 
   /** Cómo formatear. Lo elige el usuario en la barra y se recuerda entre arranques. */
   readonly formatSettings = input<FormatSettings>(DEFAULT_FORMAT_SETTINGS);
@@ -189,6 +198,17 @@ export default class SqlEditor implements OnInit {
         } finally {
           this._syncingExternalValue = false;
         }
+      }
+    });
+
+    // El tema se cambia con el editor ya creado. `setTheme` es global de Monaco,
+    // que es justo lo que hace falta: la aplicación no tiene medio editor claro
+    // y medio oscuro.
+    effect(() => {
+      const theme = DRUSE_THEME_NAMES[this.theme()];
+
+      if (this.ready()) {
+        this._monaco?.editor.setTheme(theme);
       }
     });
 
@@ -336,7 +356,12 @@ export default class SqlEditor implements OnInit {
       return;
     }
 
-    monaco.editor.defineTheme(DRUSE_THEME_NAME, DRUSE_THEME);
+    // Se registran los dos: cambiar de tema con el editor abierto solo puede ser
+    // instantáneo si el otro ya está definido.
+    for (const [name, data] of Object.entries(DRUSE_THEMES)) {
+      monaco.editor.defineTheme(DRUSE_THEME_NAMES[name as ThemeName], data);
+    }
+
     this._monaco = monaco;
 
     // El autocompletado se registra una vez por editor y se retira al destruirlo:
@@ -359,7 +384,7 @@ export default class SqlEditor implements OnInit {
       this._editor = monaco.editor.create(this._container().nativeElement, {
         value: this.value(),
         language: 'sql',
-        theme: DRUSE_THEME_NAME,
+        theme: DRUSE_THEME_NAMES[this.theme()],
         readOnly: this.readOnly(),
         automaticLayout: true,
         fontFamily: "'JetBrains Mono', 'Cascadia Code', Consolas, monospace",

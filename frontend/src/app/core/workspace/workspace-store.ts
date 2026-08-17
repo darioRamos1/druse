@@ -15,6 +15,7 @@ import {
 } from '../application-gateway/application-gateway';
 import { FileSaveService } from '../files/file-save.service';
 import { PendingWorkService } from '../files/pending-work.service';
+import { ThemeService } from '../theme/theme.service';
 import {
   DEFAULT_FORMAT_SETTINGS,
   FormatSettings,
@@ -119,6 +120,7 @@ export class WorkspaceStore {
   private readonly _gateway = inject(ApplicationGateway);
   private readonly _files = inject(FileSaveService);
   private readonly _pendingWork = inject(PendingWorkService);
+  private readonly _theme = inject(ThemeService);
 
   // --- Conexiones ------------------------------------------------------------
   private readonly _connections = signal<readonly ConnectionSummary[]>([]);
@@ -335,7 +337,13 @@ export class WorkspaceStore {
     }
   }
 
-  /** Carga las preferencias guardadas. */
+  /**
+   * Carga las preferencias guardadas.
+   *
+   * De aquí sale también el tema, aunque no sea estado del área de trabajo: la
+   * lectura es una sola llamada, y hacer otra igual desde el servicio de tema
+   * sería pedir dos veces lo mismo en el arranque.
+   */
   async loadPreferences(): Promise<void> {
     try {
       const preferences = await firstValueFrom(this._gateway.getPreferences());
@@ -346,6 +354,7 @@ export class WorkspaceStore {
       }
 
       this._formatSettings.set(parseFormatSettings(preferences));
+      this._theme.adopt(preferences);
     } catch {
       // Se sigue con los valores por defecto.
     }

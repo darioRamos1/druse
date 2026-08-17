@@ -10,6 +10,7 @@ import {
 } from '@angular/core';
 
 import { ExportFormat } from '../../core/application-gateway/application-gateway';
+import { ThemeName, ThemeService } from '../../core/theme/theme.service';
 import { FormatSettings } from '../../core/workspace/format-settings';
 import { WorkspaceStore } from '../../core/workspace/workspace-store';
 import { SqlFileService } from '../../core/sql-files/sql-file.service';
@@ -92,6 +93,14 @@ const DISCONNECTED: SessionStatus = {
 export class AppShell {
   private readonly _store = inject(WorkspaceStore);
   private readonly _sqlFiles = inject(SqlFileService);
+  private readonly _themes = inject(ThemeService);
+
+  // --- Tema ------------------------------------------------------------------
+  protected readonly theme = this._themes.theme;
+
+  protected selectTheme(theme: ThemeName): void {
+    void this._themes.set(theme);
+  }
 
   // --- Tamaños de panel ------------------------------------------------------
   protected readonly sidebarWidth = signal(274);

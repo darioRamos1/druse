@@ -42,14 +42,23 @@
 
 <div class="trailing">
   <div class="segmented" role="group" aria-label="Tema">
-    <button type="button" class="segmented__item" aria-label="Tema claro">
+    <button
+      type="button"
+      class="segmented__item"
+      [class.is-active]="theme() === 'light'"
+      [attr.aria-pressed]="theme() === 'light'"
+      aria-label="Tema claro"
+      (click)="themeSelected.emit('light')"
+    >
       <app-icon name="sun" [size]="13" />
     </button>
     <button
       type="button"
-      class="segmented__item is-active"
+      class="segmented__item"
+      [class.is-active]="theme() === 'dark'"
+      [attr.aria-pressed]="theme() === 'dark'"
       aria-label="Tema oscuro"
-      aria-pressed="true"
+      (click)="themeSelected.emit('dark')"
     >
       <app-icon name="moon" [size]="13" />
     </button>

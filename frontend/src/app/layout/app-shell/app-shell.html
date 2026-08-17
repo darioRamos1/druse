@@ -1,10 +1,12 @@
 <app-top-bar
+  [theme]="theme()"
   (newConnection)="openDialog()"
   (newQuery)="createTab()"
   (openSql)="openSqlFile()"
   (saveSql)="saveTab()"
   (saveSqlAs)="saveTab(true)"
   (openPalette)="paletteOpen.set(true)"
+  (themeSelected)="selectTheme($event)"
 />
 
 <div class="body">
@@ -94,6 +96,7 @@
         class="editor"
         [value]="sql()"
         [engine]="activeEngine()"
+        [theme]="theme()"
         [formatSettings]="formatSettings()"
         [schema]="schemaIndex()"
         [executionError]="executionError()"
