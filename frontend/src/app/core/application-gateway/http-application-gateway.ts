@@ -23,6 +23,9 @@ import {
 } from '../../shared/models/workspace';
 import {
   ApplicationGateway,
+  BackupPreview,
+  BackupProgress,
+  BackupRequest,
   ConnectRequest,
   ExecuteQueryRequest,
   ExportRequest,
@@ -327,6 +330,26 @@ export class HttpApplicationGateway extends ApplicationGateway {
     // La respuesta es un archivo, no JSON: sin `responseType` Angular intentaría
     // interpretarlo y fallaría con el primer byte binario.
     return this._http.post(`/api/exports/${format}`, body, { responseType: 'blob' });
+  }
+
+  override previewBackup(request: BackupRequest): Observable<BackupPreview> {
+    return this._http.post<BackupPreview>('/api/backup/preview', request);
+  }
+
+  override runBackup(request: BackupRequest): Observable<string> {
+    // La respuesta llega con 202 y solo trae el identificador: el respaldo no ha
+    // hecho más que empezar, y esperar aquí sería atar el trabajo a esta petición.
+    return this._http
+      .post<{ id: string }>('/api/backup/run', request)
+      .pipe(map((response) => response.id));
+  }
+
+  override getBackupStatus(backupId: string): Observable<BackupProgress> {
+    return this._http.get<BackupProgress>(`/api/backup/${backupId}/status`);
+  }
+
+  override cancelBackup(backupId: string): Observable<void> {
+    return this._http.post<void>(`/api/backup/${backupId}/cancel`, null);
   }
 
   /** Añade lo que la cuadrícula necesita y la API no tiene por qué saber. */

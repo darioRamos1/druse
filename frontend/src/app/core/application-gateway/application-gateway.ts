@@ -419,6 +419,136 @@ export abstract class ApplicationGateway {
    * resultado completo aunque la cuadrícula solo muestre las primeras.
    */
   abstract exportQuery(request: ExportRequest): Observable<Blob>;
+
+  // --- Respaldos ------------------------------------------------------------
+
+  /**
+   * El guion que se escribiría, para enseñarlo antes de tocar nada.
+   *
+   * Va por su propia ruta y no como una bandera de {@link runBackup}, igual que
+   * la vista previa de la edición de filas: ver y ejecutar son cosas distintas.
+   */
+  abstract previewBackup(request: BackupRequest): Observable<BackupPreview>;
+
+  /**
+   * Lanza el respaldo y devuelve su identificador.
+   *
+   * **No espera a que termine.** El trabajo sigue en el proceso local aunque se
+   * cierre el asistente, y el progreso se pregunta con {@link getBackupStatus}.
+   */
+  abstract runBackup(request: BackupRequest): Observable<string>;
+
+  abstract getBackupStatus(backupId: string): Observable<BackupProgress>;
+
+  abstract cancelBackup(backupId: string): Observable<void>;
+}
+
+/** Qué se lleva un respaldo de una tabla. */
+export type BackupDataMode = 'StructureOnly' | 'StructureAndData' | 'DataOnly';
+
+/** Cómo se reparte el respaldo en archivos. */
+export type BackupLayout = 'SingleFile' | 'FolderByKind';
+
+/** Cómo se escriben las filas. */
+export type BackupDataFormat = 'Inserts' | 'Csv';
+
+/** Qué filas y qué columnas de una tabla entran. */
+export interface BackupFilter {
+  /** Condición sin el `WHERE` delante. */
+  readonly where?: string;
+  readonly maxRows?: number;
+  readonly excludedColumns?: readonly string[];
+}
+
+export interface BackupTable {
+  readonly id: string;
+  readonly name: string;
+  readonly database?: string;
+  readonly schema?: string;
+  /** Filas estimadas por el catálogo. Sirve para la barra, y es aproximada. */
+  readonly approximateRowCount?: number;
+}
+
+export interface BackupRequest {
+  readonly sessionId: string;
+  readonly tables: readonly BackupTable[];
+  /** Lo que se aplica a las tablas que no digan otra cosa. */
+  readonly dataMode: BackupDataMode;
+  /** Tablas que se salen de la regla general, por su nombre calificado. */
+  readonly dataOverrides?: Readonly<Record<string, BackupDataMode>>;
+  readonly filters?: Readonly<Record<string, BackupFilter>>;
+  readonly layout: BackupLayout;
+  readonly dataFormat: BackupDataFormat;
+  readonly compress: boolean;
+  /** Ruta elegida con el selector del sistema. La escribe el proceso local. */
+  readonly destination: string;
+}
+
+export interface BackupPreview {
+  readonly statements: readonly string[];
+  /** Se alcanzó el tope: hay más instrucciones que no se enseñan. */
+  readonly truncated: boolean;
+  readonly warnings: readonly BackupWarning[];
+}
+
+export interface BackupWarning {
+  readonly subject: string;
+  readonly message: string;
+}
+
+export interface BackupFailure {
+  readonly subject: string;
+  readonly message: string;
+  /** La instrucción que lo provocó, cuando la hubo. */
+  readonly statement?: string;
+}
+
+/** En qué anda el respaldo. */
+export type BackupStep =
+  | 'Resolving'
+  | 'ReadingStructure'
+  | 'WritingStructure'
+  | 'WritingData'
+  | 'WritingConstraints'
+  | 'Packaging'
+  | 'Done';
+
+/**
+ * Cómo acabó.
+ *
+ * `CompletedWithWarnings` no es un verde limpio: el usuario tiene que saber que
+ * lo que tiene no es la copia completa que pidió.
+ */
+export type BackupOutcome =
+  | 'Running'
+  | 'Completed'
+  | 'CompletedWithWarnings'
+  | 'Failed'
+  | 'Cancelled';
+
+export interface BackupProgress {
+  readonly id: string;
+  readonly step: BackupStep;
+  readonly outcome: BackupOutcome;
+  /** Objeto que se está escribiendo, con su nombre propio. */
+  readonly currentObject?: string;
+  readonly objectsDone: number;
+  readonly objectsTotal: number;
+  readonly rowsDone: number;
+  /**
+   * Filas que se esperan de la tabla en curso, estimadas por el catálogo.
+   *
+   * Ausente significa **barra indeterminada con contador**, no cero: una barra
+   * que llega al 90 % y se queda ahí es peor que no tener barra.
+   */
+  readonly rowsEstimated?: number;
+  readonly totalRows: number;
+  readonly elapsedMilliseconds: number;
+  readonly warnings: readonly BackupWarning[];
+  readonly failure?: BackupFailure;
+  /** Dónde quedó, cuando terminó bien. */
+  readonly path?: string;
+  readonly bytes?: number;
 }
 
 export type ExportFormat = 'csv' | 'xlsx';

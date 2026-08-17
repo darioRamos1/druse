@@ -9,6 +9,7 @@
 //! API, decirle al frontend dónde encontrarla y cerrarla al salir.
 
 mod api_process;
+mod backups;
 mod editor_background;
 mod exports;
 mod sql_files;
@@ -152,6 +153,8 @@ fn main() {
             sql_files::save_sql_file,
             sql_files::save_sql_file_as,
             exports::save_export,
+            backups::choose_backup_file,
+            backups::choose_backup_folder,
             transactions::set_transaction_pending,
             theme::set_window_theme,
             editor_background::choose_editor_background,

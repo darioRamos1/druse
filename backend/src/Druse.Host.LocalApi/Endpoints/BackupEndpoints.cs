@@ -100,6 +100,26 @@ internal static class BackupEndpoints
         })
         .WithName("RunBackup");
 
+        app.MapPost("/api/backup/preview", async (
+            BackupRequestDto request,
+            BackupService backups,
+            CancellationToken cancellationToken) =>
+        {
+            var preview = await backups.PreviewAsync(request.ToDomain(), cancellationToken);
+
+            return Results.Ok(new
+            {
+                statements = preview.Statements,
+                truncated = preview.Truncated,
+                warnings = preview.Warnings.Select(warning => new BackupWarningDto
+                {
+                    Subject = warning.Subject,
+                    Message = warning.Message,
+                }),
+            });
+        })
+        .WithName("PreviewBackup");
+
         app.MapGet("/api/backup/{id:guid}/status", (Guid id, IBackupTracker tracker) =>
         {
             var progress = tracker.Find(id);

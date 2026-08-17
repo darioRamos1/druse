@@ -275,6 +275,8 @@ ServiceFabricBackup/
 # fuera de su commit.
 !backend/src/Druse.Application/Backups/
 !backend/src/Druse.Infrastructure/Backups/
+!frontend/src/app/core/backup/
+!frontend/src/app/features/backup/
 
 # SQL Server files
 *.mdf

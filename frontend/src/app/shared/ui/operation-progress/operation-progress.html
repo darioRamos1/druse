@@ -1,0 +1,52 @@
+<div class="progress" role="status" aria-live="polite">
+  <div class="head">
+    <div class="what">
+      <span class="step">{{ step() }}</span>
+      @if (subject()) {
+        <span class="subject" title="{{ subject() }}">{{ subject() }}</span>
+      }
+    </div>
+
+    @if (cancellable()) {
+      <button type="button" class="cancel" (click)="cancelRequested.emit()">
+        <app-icon name="stop" />
+        Cancelar
+      </button>
+    }
+  </div>
+
+  <!--
+    La global: objetos completados. Sin total conocido va indeterminada, que es
+    honesto, en lugar de un porcentaje inventado.
+  -->
+  <div
+    class="bar"
+    role="progressbar"
+    [class.is-indeterminate]="percent() === null"
+    [attr.aria-valuenow]="percent()"
+    aria-valuemin="0"
+    aria-valuemax="100"
+  >
+    <span class="fill" [style.width.%]="percent() ?? 100"></span>
+  </div>
+
+  <!--
+    La del objeto en curso. Existe para el rato en que la global no se mueve:
+    una tabla de ocho millones de filas la deja quieta veinte minutos.
+  -->
+  @if (rows()) {
+    <div class="bar is-current" [class.is-indeterminate]="indeterminate()">
+      <span class="fill" [style.width.%]="currentPercent() ?? 100"></span>
+    </div>
+  }
+
+  <div class="numbers">
+    @if (rows()) {
+      <span class="rows">{{ rows() }}</span>
+    }
+    @if (objects()) {
+      <span>{{ objects() }}</span>
+    }
+    <span class="elapsed">{{ elapsed() }}</span>
+  </div>
+</div>

@@ -57,6 +57,71 @@ public sealed class BackupService(
     /// <summary>Versión del artefacto que escribe esta implementación.</summary>
     public const int FormatVersion = 1;
 
+    /// <summary>
+    /// El guion que se escribiría, para enseñarlo antes de tocar nada.
+    ///
+    /// Va por su propio camino y no como una bandera de <see cref="RunAsync"/>:
+    /// ver y ejecutar son cosas distintas, y confundirlas aquí acabaría
+    /// escribiendo un archivo que solo se quería mirar. Es la misma regla que
+    /// separa `previewRowEdits` de `applyRowEdits`.
+    ///
+    /// **Se limita a propósito.** Una vista previa que leyera la tabla entera
+    /// tardaría lo que tarda el respaldo, y nadie va a leer diez mil `INSERT`: se
+    /// traen unas pocas filas por tabla y se corta al llegar al tope, diciéndolo.
+    /// </summary>
+    public async Task<BackupPreview> PreviewAsync(
+        BackupRequest request,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        var sink = new PreviewSink(MaxPreviewStatements);
+
+        var result = await RunAsync(
+            request with
+            {
+                Data = request.Data with
+                {
+                    // Sobre los filtros del usuario manda el de la vista previa:
+                    // enseñar la primera decena de filas es suficiente para ver
+                    // cómo quedan, y leer más solo haría esperar.
+                    Filters = Preview(request),
+                },
+                Output = request.Output with { Data = BackupDataFormat.Inserts },
+            },
+            sink,
+            progress: null,
+            cancellationToken);
+
+        return new BackupPreview
+        {
+            Statements = sink.Statements,
+            Truncated = sink.Truncated,
+            Warnings = result.Warnings,
+        };
+    }
+
+    /// <summary>Cuántas instrucciones se enseñan como mucho en una vista previa.</summary>
+    private const int MaxPreviewStatements = 200;
+
+    /// <summary>Cuántas filas se leen por tabla al previsualizar.</summary>
+    private const int PreviewRows = 10;
+
+    private static Dictionary<string, TableDataFilter> Preview(BackupRequest request)
+    {
+        var filters = new Dictionary<string, TableDataFilter>(StringComparer.Ordinal);
+
+        foreach (var table in request.Tables)
+        {
+            var key = DataSelection.KeyOf(table);
+            var filter = request.Data.FilterOf(table);
+
+            filters[key] = filter with { MaxRows = Math.Min(filter.MaxRows ?? PreviewRows, PreviewRows) };
+        }
+
+        return filters;
+    }
+
     public async Task<BackupProgress> RunAsync(
         BackupRequest request,
         IBackupSink sink,

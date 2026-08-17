@@ -1,0 +1,119 @@
+:host {
+  display: block;
+}
+
+.progress {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.head {
+  display: flex;
+  gap: 12px;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.what {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  min-width: 0;
+}
+
+.step {
+  color: var(--dr-text);
+  font-size: var(--dr-font-size-sm);
+  white-space: nowrap;
+}
+
+/* El objeto en curso, con su nombre propio: un porcentaje suelto no dice qué se
+   está haciendo. */
+.subject {
+  overflow: hidden;
+  color: var(--dr-text-muted);
+  font-family: var(--dr-font-mono);
+  font-size: var(--dr-font-size-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cancel {
+  display: inline-flex;
+  flex-shrink: 0;
+  gap: 6px;
+  align-items: center;
+  padding: 4px 10px;
+  border: 1px solid var(--dr-danger-line-soft);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--dr-danger-text);
+  font-size: var(--dr-font-size-xs);
+  cursor: pointer;
+
+  &:hover {
+    background: var(--dr-danger-tint);
+  }
+}
+
+.bar {
+  position: relative;
+  height: 6px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--dr-surface-raised);
+}
+
+.bar.is-current {
+  height: 4px;
+  opacity: 0.85;
+}
+
+.fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--dr-accent-gradient);
+  transition: width 200ms ease-out;
+}
+
+/* Sin total conocido, la barra recorre en vez de llenarse: enseñar un 90 % que
+   no avanza sería mentir sobre lo que falta. */
+.bar.is-indeterminate .fill {
+  width: 35% !important;
+  animation: sweep 1.4s ease-in-out infinite;
+}
+
+@keyframes sweep {
+  0% {
+    transform: translateX(-100%);
+  }
+
+  100% {
+    transform: translateX(320%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bar.is-indeterminate .fill {
+    animation: none;
+    opacity: 0.6;
+  }
+}
+
+.numbers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  color: var(--dr-text-muted);
+  font-size: var(--dr-font-size-xs);
+}
+
+.rows {
+  font-family: var(--dr-font-mono);
+}
+
+.elapsed {
+  margin-left: auto;
+}

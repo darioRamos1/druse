@@ -111,6 +111,24 @@ export class DesktopHost {
   }
 
   /**
+   * Elige dónde escribir un respaldo que sale como un solo archivo.
+   *
+   * Solo devuelve la ruta: **los bytes no pasan por aquí**. Un respaldo puede
+   * ocupar gigabytes y lo escribe el proceso local directamente, al contrario que
+   * una exportación, que cabe en memoria y viaja por el puente.
+   *
+   * @returns Ruta elegida, o `null` si el usuario cerró el diálogo.
+   */
+  chooseBackupFile(suggestedName: string): Promise<string | null> {
+    return this.invoke('choose_backup_file', { suggestedName });
+  }
+
+  /** Elige la carpeta donde escribir un respaldo repartido por tipo de objeto. */
+  chooseBackupFolder(): Promise<string | null> {
+    return this.invoke('choose_backup_folder');
+  }
+
+  /**
    * Declara si hay trabajo sin confirmar que se perdería al cerrar.
    *
    * El aviso lo enseña el envoltorio y no la página: dentro del WebView,
