@@ -2,7 +2,10 @@
 
 // =============================================================================
 // Druse — estilos globales
-// El tema oscuro del mockup es el único tema del MVP (plan §3).
+//
+// Hay dos temas: el oscuro del mockup, que es el de partida, y uno claro. Cuál
+// se pinta lo dice `data-theme` en `<html>`; qué colores tiene cada uno, el
+// archivo de tokens. Aquí no se escribe ningún color.
 // =============================================================================
 
 * {
@@ -48,7 +51,7 @@ app-query-builder .join-suggestions {
   border: 1px solid var(--dr-border-strong);
   border-radius: var(--dr-radius-sm);
   background: var(--dr-surface-panel);
-  box-shadow: 0 16px 36px rgb(0 0 0 / 52%);
+  box-shadow: var(--dr-shadow-popover);
 
   button {
     display: flex;
@@ -66,7 +69,7 @@ app-query-builder .join-suggestions {
 
     &:hover,
     &.is-active {
-      background: linear-gradient(90deg, rgb(108 139 255 / 19%), rgb(108 139 255 / 7%));
+      background: var(--dr-accent-highlight);
       color: var(--dr-text);
     }
   }
@@ -77,13 +80,13 @@ app-query-builder .join-suggestions {
     height: 22px;
     flex: 0 0 22px;
     place-items: center;
-    border: 1px solid rgb(108 139 255 / 28%);
+    border: 1px solid var(--dr-accent-line-soft);
     border-radius: 5px;
     color: var(--dr-accent-bright);
     font: 9px var(--dr-font-mono);
 
     &[data-kind='schema'] {
-      border-color: rgb(167 139 250 / 32%);
+      border-color: var(--dr-accent-alt-line);
       color: var(--dr-accent-alt-soft);
     }
   }

@@ -10,7 +10,7 @@
 .backdrop {
   position: absolute;
   inset: 0;
-  background: rgb(5 7 11 / 66%);
+  background: var(--dr-scrim);
   backdrop-filter: blur(2px);
 }
 
@@ -21,10 +21,10 @@
   max-height: calc(100vh - 32px);
   display: flex;
   flex-direction: column;
-  border: 1px solid #262f42;
+  border: 1px solid var(--dr-border-dialog);
   border-radius: 12px;
-  background: #111621;
-  box-shadow: 0 40px 120px rgb(0 0 0 / 70%);
+  background: var(--dr-surface-dialog);
+  box-shadow: var(--dr-shadow-dialog);
   overflow: hidden;
 }
 
@@ -42,9 +42,9 @@
     width: 32px;
     height: 32px;
     flex: none;
-    border: 1px solid rgb(108 139 255 / 26%);
+    border: 1px solid var(--dr-accent-line-soft);
     border-radius: 9px;
-    background: rgb(108 139 255 / 13%);
+    background: var(--dr-accent-tint);
   }
 
   &__text {
@@ -77,7 +77,7 @@
     cursor: pointer;
 
     &:hover {
-      background: #1a2130;
+      background: var(--dr-surface-active);
       color: var(--dr-text);
     }
   }
@@ -117,20 +117,20 @@
   padding: 10px 11px;
   border: 1px solid var(--dr-border-subtle);
   border-radius: 9px;
-  background: #0d121b;
+  background: var(--dr-surface-inset);
   color: inherit;
   font-family: inherit;
   text-align: left;
   cursor: pointer;
 
   &:hover:not(.is-disabled):not(.is-selected) {
-    border-color: #33405a;
-    background: #101623;
+    border-color: var(--dr-border-input-hover);
+    background: var(--dr-surface-hover);
   }
 
   &.is-selected {
-    border-color: rgb(108 139 255 / 45%);
-    background: linear-gradient(180deg, rgb(108 139 255 / 14%), rgb(108 139 255 / 5%));
+    border-color: var(--dr-accent-line);
+    background: var(--dr-accent-tint);
   }
 
   // Los motores que aún no existen se muestran para que se vea hacia dónde va
@@ -178,7 +178,7 @@
     height: 13px;
     border-radius: 50%;
     background: var(--dr-accent);
-    color: #fff;
+    color: var(--dr-text-on-accent);
     font-size: 8px;
   }
 }
@@ -222,7 +222,7 @@
     cursor: pointer;
 
     &:hover {
-      background: #1e2637;
+      background: var(--dr-surface-active);
       color: var(--dr-text);
     }
 
@@ -231,7 +231,7 @@
     }
 
     &:focus-visible {
-      outline: 1px solid rgb(108 139 255 / 55%);
+      outline: 1px solid var(--dr-accent-line-strong);
       outline-offset: 1px;
     }
   }
@@ -259,7 +259,7 @@
   &__input {
     height: 31px;
     padding: 0 10px;
-    border: 1px solid #212939;
+    border: 1px solid var(--dr-border-input);
     border-radius: var(--dr-radius-sm);
     background: var(--dr-surface-input);
     color: var(--dr-text);
@@ -267,7 +267,7 @@
     font-size: 12.5px;
 
     &:focus {
-      border-color: rgb(108 139 255 / 55%);
+      border-color: var(--dr-accent-line-strong);
       outline: none;
     }
 
@@ -276,8 +276,8 @@
     }
 
     &.is-invalid {
-      border-color: rgb(242 104 107 / 68%);
-      background: rgb(242 104 107 / 5%);
+      border-color: var(--dr-danger-line);
+      background: var(--dr-danger-tint-weak);
     }
   }
 
@@ -295,7 +295,7 @@
   }
 
   &__error {
-    color: #f08a8d;
+    color: var(--dr-danger-text);
   }
 
   &__hint {
@@ -329,13 +329,13 @@
   // El entorno pinta su propio color encima, con más especificidad; el resto de
   // grupos se quedan con este azul, que es lo que hace visible la elección.
   &.is-selected {
-    border-color: rgb(108 139 255 / 55%);
-    background: rgb(108 139 255 / 10%);
+    border-color: var(--dr-accent-line-strong);
+    background: var(--dr-accent-tint);
     color: var(--dr-text);
   }
 
   &:hover:not(.is-selected) {
-    background: #151b27;
+    background: var(--dr-surface-hover);
     color: var(--dr-text-secondary);
   }
 }
@@ -373,21 +373,21 @@
   }
 
   &[data-environment='development'].is-selected {
-    border-color: rgb(61 220 151 / 45%);
-    background: rgb(61 220 151 / 10%);
+    border-color: var(--dr-success-line);
+    background: var(--dr-success-tint);
     color: var(--dr-success);
   }
 
   &[data-environment='testing'].is-selected {
-    border-color: rgb(245 191 79 / 45%);
-    background: rgb(245 191 79 / 10%);
-    color: #f5bf4f;
+    border-color: var(--dr-warning-line);
+    background: var(--dr-warning-tint);
+    color: var(--dr-warning);
   }
 
   &[data-environment='production'].is-selected {
-    border-color: rgb(242 104 107 / 45%);
-    background: rgb(242 104 107 / 10%);
-    color: #f2686b;
+    border-color: var(--dr-danger-line);
+    background: var(--dr-danger-tint);
+    color: var(--dr-danger);
   }
 }
 
@@ -427,14 +427,14 @@
   font-size: var(--dr-font-size-sm);
 
   &[data-kind='error'] {
-    border-color: rgb(242 104 107 / 28%);
-    background: rgb(242 104 107 / 7%);
-    color: #f3a1a3;
+    border-color: var(--dr-danger-line-soft);
+    background: var(--dr-danger-tint-weak);
+    color: var(--dr-danger-text);
   }
 
   &[data-kind='success'] {
-    border-color: rgb(61 220 151 / 25%);
-    background: rgb(61 220 151 / 7%);
+    border-color: var(--dr-success-line-soft);
+    background: var(--dr-success-tint);
     color: var(--dr-success);
   }
 }
@@ -445,7 +445,7 @@
   gap: 8px;
   padding: 14px 20px;
   border-top: 1px solid var(--dr-border);
-  background: #0f141e;
+  background: var(--dr-surface-sunken);
 
   &__spacer {
     flex: 1;
@@ -465,7 +465,7 @@
   cursor: pointer;
 
   &:hover:not(:disabled) {
-    background: #151b27;
+    background: var(--dr-surface-hover);
     color: var(--dr-text);
   }
 
@@ -476,14 +476,14 @@
 
   &--primary {
     border-color: transparent;
-    background: linear-gradient(180deg, #6c8bff, #5570f0);
-    color: #fff;
-    box-shadow: 0 2px 12px rgb(108 139 255 / 40%);
+    background: var(--dr-accent-button);
+    color: var(--dr-text-on-accent);
+    box-shadow: var(--dr-shadow-accent-button);
 
     &:hover:not(:disabled) {
       filter: brightness(1.08);
-      background: linear-gradient(180deg, #6c8bff, #5570f0);
-      color: #fff;
+      background: var(--dr-accent-button);
+      color: var(--dr-text-on-accent);
     }
   }
 }

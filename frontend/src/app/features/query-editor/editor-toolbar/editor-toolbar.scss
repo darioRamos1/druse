@@ -6,7 +6,7 @@
   flex: 0 0 var(--dr-editor-toolbar-height);
   padding: 0 12px;
   background: var(--dr-surface-panel);
-  border-bottom: 1px solid #1b2130;
+  border-bottom: 1px solid var(--dr-border-faint);
 
   // El desplegable del timeout se sale de la barra; recortarlo lo haría
   // invisible.
@@ -28,8 +28,8 @@
     list-style: none;
     border: 1px solid var(--dr-border-strong);
     border-radius: var(--dr-radius);
-    background: #141a26;
-    box-shadow: 0 18px 44px rgb(0 0 0 / 60%);
+    background: var(--dr-surface-overlay);
+    box-shadow: var(--dr-shadow-menu);
   }
 
   &__option {
@@ -45,12 +45,12 @@
     cursor: pointer;
 
     &:hover {
-      background: #1e2637;
+      background: var(--dr-surface-active);
       color: var(--dr-text);
     }
 
     &.is-selected {
-      background: rgb(108 139 255 / 16%);
+      background: var(--dr-accent-tint-strong);
       color: var(--dr-accent-bright);
     }
   }
@@ -65,12 +65,12 @@
   padding: 0 13px;
   border: 0;
   border-radius: var(--dr-radius);
-  background: linear-gradient(180deg, #6c8bff, #5570f0);
-  color: #fff;
+  background: var(--dr-accent-button);
+  color: var(--dr-text-on-accent);
   font-family: inherit;
   font-size: var(--dr-font-size-sm);
   font-weight: 600;
-  box-shadow: 0 2px 12px rgb(108 139 255 / 40%);
+  box-shadow: var(--dr-shadow-accent-button);
   cursor: pointer;
 
   &:hover:not(:disabled) {
@@ -106,36 +106,36 @@
   cursor: pointer;
 
   &:hover:not(:disabled) {
-    background: #151b27;
+    background: var(--dr-surface-hover);
     color: var(--dr-text);
   }
 
   &:disabled {
-    color: #6e7a90;
+    color: var(--dr-text-dim);
     cursor: default;
   }
 
   &--commit {
-    border-color: rgb(61 220 151 / 28%);
-    background: rgb(61 220 151 / 8%);
+    border-color: var(--dr-success-line-soft);
+    background: var(--dr-success-tint);
     color: var(--dr-success);
     font-weight: 500;
 
     &:hover:not(:disabled) {
-      background: rgb(61 220 151 / 15%);
+      background: var(--dr-success-tint-strong);
       color: var(--dr-success);
     }
   }
 
   &--rollback {
-    border-color: rgb(242 104 107 / 26%);
-    background: rgb(242 104 107 / 7%);
-    color: #f2686b;
+    border-color: var(--dr-danger-line-soft);
+    background: var(--dr-danger-tint-weak);
+    color: var(--dr-danger);
     font-weight: 500;
 
     &:hover:not(:disabled) {
-      background: rgb(242 104 107 / 14%);
-      color: #f2686b;
+      background: var(--dr-danger-tint);
+      color: var(--dr-danger);
     }
   }
 }
@@ -154,10 +154,10 @@
   height: 28px;
   flex: none;
   padding: 0 10px;
-  border: 1px solid rgb(240 180 41 / 38%);
+  border: 1px solid var(--dr-warning-line);
   border-radius: var(--dr-radius);
-  background: rgb(240 180 41 / 10%);
-  color: #f0b429;
+  background: var(--dr-warning-tint);
+  color: var(--dr-warning-strong);
   font-size: 12px;
   white-space: nowrap;
 
@@ -171,8 +171,8 @@
     width: 6px;
     height: 6px;
     border-radius: 50%;
-    background: #f0b429;
-    box-shadow: 0 0 0 3px rgb(240 180 41 / 18%);
+    background: var(--dr-warning-strong);
+    box-shadow: 0 0 0 3px var(--dr-warning-tint-strong);
   }
 }
 
@@ -205,8 +205,8 @@
     padding: 8px;
     border: 1px solid var(--dr-border-strong);
     border-radius: var(--dr-radius);
-    background: #141a26;
-    box-shadow: 0 18px 44px rgb(0 0 0 / 60%);
+    background: var(--dr-surface-overlay);
+    box-shadow: var(--dr-shadow-menu);
   }
 
   &__label {
@@ -240,13 +240,13 @@
     cursor: pointer;
 
     &:hover {
-      background: #1e2637;
+      background: var(--dr-surface-active);
       color: var(--dr-text);
     }
 
     &.is-selected {
-      border-color: rgb(108 139 255 / 45%);
-      background: rgb(108 139 255 / 16%);
+      border-color: var(--dr-accent-line);
+      background: var(--dr-accent-tint-strong);
       color: var(--dr-accent-bright);
     }
   }
@@ -282,8 +282,8 @@
     list-style: none;
     border: 1px solid var(--dr-border-strong);
     border-radius: var(--dr-radius);
-    background: #141a26;
-    box-shadow: 0 18px 44px rgb(0 0 0 / 60%);
+    background: var(--dr-surface-overlay);
+    box-shadow: var(--dr-shadow-menu);
   }
 
   &__option {
@@ -299,12 +299,12 @@
     cursor: pointer;
 
     &:hover {
-      background: #1e2637;
+      background: var(--dr-surface-active);
       color: var(--dr-text);
     }
 
     &.is-selected {
-      background: rgb(108 139 255 / 16%);
+      background: var(--dr-accent-tint-strong);
       color: var(--dr-accent-bright);
     }
   }
@@ -317,7 +317,7 @@
   height: 28px;
   flex: none;
   padding: 0 10px;
-  border: 1px solid #212939;
+  border: 1px solid var(--dr-border-input);
   border-radius: var(--dr-radius);
   background: var(--dr-surface-input);
   color: var(--dr-text-secondary);
@@ -335,7 +335,7 @@
     width: 5px;
     height: 5px;
     border-radius: 50%;
-    background: #7faee8;
+    background: var(--dr-info);
   }
 
   &__mono {

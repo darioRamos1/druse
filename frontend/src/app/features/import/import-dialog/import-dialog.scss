@@ -13,7 +13,7 @@
 .backdrop {
   position: absolute;
   inset: 0;
-  background: rgb(5 7 11 / 66%);
+  background: var(--dr-scrim);
   backdrop-filter: blur(2px);
 }
 
@@ -25,10 +25,10 @@
   max-width: calc(100vw - 32px);
   max-height: calc(100vh - 32px);
   overflow: hidden;
-  border: 1px solid #262f42;
+  border: 1px solid var(--dr-border-dialog);
   border-radius: 12px;
-  background: #111621;
-  box-shadow: 0 40px 120px rgb(0 0 0 / 70%);
+  background: var(--dr-surface-dialog);
+  box-shadow: var(--dr-shadow-dialog);
 }
 
 .head {
@@ -164,23 +164,23 @@ select {
 .warn {
   margin: 12px 0 0;
   padding: 8px 10px;
-  border: 1px solid rgb(240 173 78 / 30%);
+  border: 1px solid var(--dr-warning-line);
   border-radius: 6px;
-  background: rgb(240 173 78 / 10%);
-  color: #f0ad4e;
+  background: var(--dr-warning-tint);
+  color: var(--dr-warning-strong);
   font-size: 12px;
 }
 
 .problems {
   margin-top: 12px;
   padding: 10px;
-  border: 1px solid rgb(255 107 107 / 30%);
+  border: 1px solid var(--dr-danger-line-soft);
   border-radius: 6px;
-  background: rgb(255 107 107 / 8%);
+  background: var(--dr-danger-tint-weak);
 
   &__title {
     margin: 0 0 6px;
-    color: #ff8f8f;
+    color: var(--dr-danger-text);
     font-size: 12px;
   }
 
@@ -244,20 +244,20 @@ select {
   cursor: pointer;
 
   &:hover:not(:disabled) {
-    background: #151b27;
+    background: var(--dr-surface-hover);
     color: var(--dr-text);
   }
 
   &:disabled {
-    color: #6e7a90;
+    color: var(--dr-text-dim);
     cursor: default;
   }
 
   /* Escribir en la tabla se pide con el color del que uno se arrepiente. */
   &--danger:not(:disabled) {
-    border-color: rgb(255 107 107 / 32%);
-    background: rgb(255 107 107 / 10%);
-    color: #ff8f8f;
+    border-color: var(--dr-danger-line-soft);
+    background: var(--dr-danger-tint);
+    color: var(--dr-danger-text);
     font-weight: 500;
   }
 }

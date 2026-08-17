@@ -11,7 +11,7 @@
   gap: 7px;
   flex: none;
   padding: 7px 12px;
-  border-bottom: 1px solid #171d2a;
+  border-bottom: 1px solid var(--dr-border-hairline);
   color: var(--dr-text-faintest);
 
   &__input {
@@ -47,15 +47,15 @@
   flex-direction: column;
   gap: 2px;
   padding: 6px 12px;
-  border-bottom: 1px solid #151b26;
+  border-bottom: 1px solid var(--dr-border-hairline);
 
   &:hover {
-    background: #141a26;
+    background: var(--dr-surface-hover);
   }
 
   // Las ejecuciones fallidas se distinguen de un vistazo.
   &.is-failed {
-    border-left: 2px solid rgb(242 104 107 / 55%);
+    border-left: 2px solid var(--dr-danger-line);
   }
 
   &__sql {
@@ -86,7 +86,7 @@
   }
 
   &__error {
-    color: #f2686b;
+    color: var(--dr-danger);
   }
 }
 
@@ -97,7 +97,7 @@
   height: 36px;
   flex: 0 0 36px;
   padding: 0 12px;
-  border-top: 1px solid #1b2130;
+  border-top: 1px solid var(--dr-border-faint);
   background: var(--dr-surface-topbar);
   font-size: 12px;
 
@@ -121,7 +121,7 @@
     cursor: pointer;
 
     &:hover {
-      background: #151b27;
+      background: var(--dr-surface-hover);
       color: var(--dr-text);
     }
   }

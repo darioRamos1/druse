@@ -73,7 +73,7 @@
   cursor: pointer;
 
   &:hover {
-    background: #161b26;
+    background: var(--dr-surface-hover);
     color: var(--dr-text);
   }
 
@@ -105,7 +105,7 @@
   width: 420px;
   height: 29px;
   padding: 0 10px;
-  border: 1px solid #212939;
+  border: 1px solid var(--dr-border-input);
   border-radius: var(--dr-radius);
   background: var(--dr-surface-input);
   color: var(--dr-text-faintest);
@@ -116,8 +116,8 @@
   &:hover,
   &:focus-visible {
     outline: none;
-    border-color: #34415a;
-    background: #101620;
+    border-color: var(--dr-border-input-hover);
+    background: var(--dr-surface-hover);
     color: var(--dr-text-muted);
   }
 
@@ -145,7 +145,7 @@
   display: flex;
   gap: 2px;
   padding: 2px;
-  border: 1px solid #212939;
+  border: 1px solid var(--dr-border-input);
   border-radius: var(--dr-radius);
   background: var(--dr-surface-input);
 
@@ -158,7 +158,7 @@
     border: 0;
     border-radius: 6px;
     background: transparent;
-    color: #6e7a90;
+    color: var(--dr-text-dim);
     cursor: pointer;
 
     &:hover {
@@ -166,7 +166,7 @@
     }
 
     &.is-active {
-      background: #1e2637;
+      background: var(--dr-surface-active);
       color: var(--dr-text-secondary);
     }
   }
@@ -181,11 +181,11 @@
   border: 0;
   border-radius: var(--dr-radius);
   background: transparent;
-  color: #6e7a90;
+  color: var(--dr-text-dim);
   cursor: pointer;
 
   &:hover {
-    background: #161b26;
+    background: var(--dr-surface-hover);
     color: var(--dr-text-secondary);
   }
 }
@@ -199,19 +199,19 @@
     width: 12px;
     height: 12px;
     border-radius: 50%;
-    background: #3e4658;
+    background: var(--dr-indicator-off);
     transition: background 120ms ease;
 
     &--minimize:hover {
-      background: #f5bf4f;
+      background: var(--dr-warning);
     }
 
     &--maximize:hover {
-      background: #4cc38a;
+      background: var(--dr-success);
     }
 
     &--close:hover {
-      background: #f2686b;
+      background: var(--dr-danger);
     }
   }
 }

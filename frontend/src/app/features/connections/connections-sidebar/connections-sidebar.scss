@@ -4,7 +4,7 @@
   min-height: 0;
   height: 100%;
   background: var(--dr-surface-panel);
-  border-right: 1px solid #1b2130;
+  border-right: 1px solid var(--dr-border-faint);
   overflow: hidden;
 }
 
@@ -15,7 +15,7 @@
   height: var(--dr-sidebar-header-height);
   flex: 0 0 var(--dr-sidebar-header-height);
   padding: 0 10px 0 14px;
-  border-bottom: 1px solid #171d2a;
+  border-bottom: 1px solid var(--dr-border-hairline);
 
   &__title {
     margin: 0;
@@ -41,11 +41,11 @@
   border: 0;
   border-radius: 6px;
   background: transparent;
-  color: #6e7a90;
+  color: var(--dr-text-dim);
   cursor: pointer;
 
   &:hover {
-    background: #181f2c;
+    background: var(--dr-surface-hover);
     color: var(--dr-text-secondary);
   }
 
@@ -54,7 +54,7 @@
     color: var(--dr-accent-bright);
 
     &:hover {
-      background: #232c42;
+      background: var(--dr-surface-active-strong);
       color: var(--dr-accent-bright);
     }
   }
@@ -62,7 +62,7 @@
 
 .filter-row {
   padding: 9px 10px;
-  border-bottom: 1px solid #171d2a;
+  border-bottom: 1px solid var(--dr-border-hairline);
 }
 
 .filter {
@@ -71,9 +71,9 @@
   gap: 7px;
   height: 27px;
   padding: 0 9px;
-  border: 1px solid #1f2636;
+  border: 1px solid var(--dr-border-input);
   border-radius: var(--dr-radius-sm);
-  background: #0a0e15;
+  background: var(--dr-surface-inset);
   color: var(--dr-text-faintest);
   cursor: text;
 
@@ -120,7 +120,7 @@
   cursor: pointer;
 
   &:hover {
-    background: #151b27;
+    background: var(--dr-surface-hover);
   }
 
   &--connection {
@@ -131,8 +131,8 @@
     color: var(--dr-text-secondary);
 
     &.is-active {
-      background: linear-gradient(90deg, rgb(108 139 255 / 16%), rgb(108 139 255 / 5%));
-      border-color: rgb(108 139 255 / 22%);
+      background: var(--dr-accent-highlight);
+      border-color: var(--dr-accent-line-soft);
       color: var(--dr-text);
     }
 
@@ -155,11 +155,11 @@
     }
 
     &[data-environment='testing']::before {
-      background: #f5bf4f;
+      background: var(--dr-warning);
     }
 
     &[data-environment='production']::before {
-      background: #f2686b;
+      background: var(--dr-danger);
     }
   }
 
@@ -170,7 +170,7 @@
     border-radius: 6px;
 
     &.is-selected {
-      background: rgb(108 139 255 / 13%);
+      background: var(--dr-accent-tint);
       color: var(--dr-text);
     }
   }
@@ -259,7 +259,7 @@
 
     &:hover,
     &[aria-expanded='true'] {
-      background: #232c42;
+      background: var(--dr-surface-active-strong);
       color: var(--dr-text);
     }
   }
@@ -277,8 +277,8 @@
   padding: 5px;
   border: 1px solid var(--dr-border-subtle);
   border-radius: 8px;
-  background: #111722;
-  box-shadow: 0 12px 32px rgb(0 0 0 / 45%);
+  background: var(--dr-surface-overlay);
+  box-shadow: var(--dr-shadow-popover);
 
   button {
     display: flex;
@@ -299,7 +299,7 @@
     &:hover,
     &:focus-visible {
       outline: none;
-      background: #1d2637;
+      background: var(--dr-surface-active);
       color: var(--dr-text);
     }
   }
@@ -315,26 +315,26 @@
   color: var(--dr-text-tertiary);
 
   &:hover {
-    background: #232c42;
+    background: var(--dr-surface-active-strong);
     color: var(--dr-text);
   }
 
   &--danger:hover {
-    background: rgb(242 104 107 / 16%);
-    color: #f2686b;
+    background: var(--dr-danger-tint);
+    color: var(--dr-danger);
   }
 
   // Las herramientas de una conexión solo se ven al pasar por encima; esta no,
   // cuando la conexión se ha caído: es lo único que hay que hacer y el usuario
   // no tiene por qué ir a buscarla.
   &--attention {
-    background: rgb(240 180 41 / 14%);
-    color: #f0b429;
+    background: var(--dr-warning-tint);
+    color: var(--dr-warning-strong);
     opacity: 1;
 
     &:hover {
-      background: rgb(240 180 41 / 22%);
-      color: #f0b429;
+      background: var(--dr-warning-tint-strong);
+      color: var(--dr-warning-strong);
     }
   }
 }
@@ -346,16 +346,16 @@
   margin-left: 3px;
   border-radius: 50%;
   background: var(--dr-success);
-  box-shadow: 0 0 6px rgb(61 220 151 / 70%);
+  box-shadow: 0 0 6px var(--dr-success-glow);
 
   &--off {
-    background: #3e4658;
+    background: var(--dr-indicator-off);
     box-shadow: none;
   }
 
   &--error {
-    background: #f2686b;
-    box-shadow: 0 0 6px rgb(242 104 107 / 70%);
+    background: var(--dr-danger);
+    box-shadow: 0 0 6px var(--dr-danger-glow);
   }
 
   &--busy {
@@ -417,7 +417,7 @@
   height: 30px;
   flex: 0 0 30px;
   padding: 0 12px;
-  border-top: 1px solid #171d2a;
+  border-top: 1px solid var(--dr-border-hairline);
   color: var(--dr-text-faintest);
   font-size: 11px;
 

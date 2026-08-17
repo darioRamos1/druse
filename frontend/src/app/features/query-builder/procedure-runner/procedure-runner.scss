@@ -14,7 +14,7 @@
 .backdrop {
   position: absolute;
   inset: 0;
-  background: rgb(5 7 11 / 66%);
+  background: var(--dr-scrim);
   backdrop-filter: blur(2px);
 }
 
@@ -26,10 +26,10 @@
   max-width: calc(100vw - 32px);
   max-height: calc(100vh - 32px);
   overflow: hidden;
-  border: 1px solid #262f42;
+  border: 1px solid var(--dr-border-dialog);
   border-radius: 12px;
-  background: #111621;
-  box-shadow: 0 40px 120px rgb(0 0 0 / 70%);
+  background: var(--dr-surface-dialog);
+  box-shadow: var(--dr-shadow-dialog);
 }
 
 .head {
@@ -42,7 +42,7 @@
 
 .title {
   margin: 0;
-  font-size: var(--dr-font-size-md);
+  font-size: var(--dr-font-size-lg);
   font-weight: 600;
   color: var(--dr-text);
 }
@@ -180,7 +180,7 @@
 }
 
 .warning {
-  border-color: var(--dr-warning, #8a6d2b);
+  border-color: var(--dr-warning);
   color: var(--dr-text);
 }
 
@@ -246,6 +246,6 @@
 .primary {
   border: 1px solid var(--dr-accent);
   background: var(--dr-accent);
-  color: #0b0d11;
+  color: var(--dr-text-on-accent);
   font-weight: 600;
 }

@@ -4,7 +4,7 @@
   min-height: 0;
   height: 100%;
   background: var(--dr-surface-panel);
-  border-top: 1px solid #1b2130;
+  border-top: 1px solid var(--dr-border-faint);
   overflow: hidden;
 }
 
@@ -15,7 +15,7 @@
   height: var(--dr-results-header-height);
   flex: 0 0 var(--dr-results-header-height);
   padding: 0 10px;
-  border-bottom: 1px solid #171d2a;
+  border-bottom: 1px solid var(--dr-border-hairline);
 }
 
 .tabs {
@@ -48,7 +48,7 @@
   cursor: pointer;
 
   &:hover:not(.is-active) {
-    background: #151b27;
+    background: var(--dr-surface-hover);
     color: var(--dr-text-secondary);
   }
 
@@ -61,7 +61,7 @@
   &__count {
     padding: 1px 5px;
     border-radius: 4px;
-    background: rgb(108 139 255 / 15%);
+    background: var(--dr-accent-tint);
     color: var(--dr-accent-bright);
     font-family: var(--dr-font-mono);
     font-size: 10.5px;
@@ -85,8 +85,8 @@
     list-style: none;
     border: 1px solid var(--dr-border-strong);
     border-radius: var(--dr-radius);
-    background: #141a26;
-    box-shadow: 0 18px 44px rgb(0 0 0 / 60%);
+    background: var(--dr-surface-overlay);
+    box-shadow: var(--dr-shadow-menu);
   }
 
   &__option {
@@ -105,7 +105,7 @@
     cursor: pointer;
 
     &:hover {
-      background: #1e2637;
+      background: var(--dr-surface-active);
       color: var(--dr-text);
     }
   }
@@ -122,7 +122,7 @@
   gap: 2px;
   flex: none;
   padding: 5px 10px;
-  border-bottom: 1px solid #171d2a;
+  border-bottom: 1px solid var(--dr-border-hairline);
   overflow-x: auto;
 
   &__tab {
@@ -142,7 +142,7 @@
     cursor: pointer;
 
     &:hover:not(.is-active) {
-      background: #151b27;
+      background: var(--dr-surface-hover);
       color: var(--dr-text-secondary);
     }
 
@@ -178,12 +178,12 @@
   cursor: pointer;
 
   &:hover {
-    background: #151b27;
+    background: var(--dr-surface-hover);
     color: var(--dr-text);
   }
 
   &.is-on {
-    border-color: rgb(108 139 255 / 35%);
+    border-color: var(--dr-accent-line);
     color: var(--dr-accent-bright);
   }
 
@@ -203,7 +203,7 @@
   height: 36px;
   flex: 0 0 36px;
   padding: 0 12px;
-  border-top: 1px solid #1b2130;
+  border-top: 1px solid var(--dr-border-faint);
   background: var(--dr-surface-topbar);
   font-size: 12px;
 
@@ -225,7 +225,7 @@
   height: 6px;
   border-radius: 50%;
   background: var(--dr-success);
-  box-shadow: 0 0 6px rgb(61 220 151 / 70%);
+  box-shadow: 0 0 6px var(--dr-success-glow);
 }
 
 .sep {
@@ -263,7 +263,7 @@
   text-align: center;
 
   &__error {
-    color: #f2686b;
+    color: var(--dr-danger);
     font-family: var(--dr-font-mono);
     font-size: 12px;
   }
@@ -277,8 +277,8 @@
 .empty__code {
   padding: 2px 6px;
   border-radius: 4px;
-  background: rgb(242 104 107 / 10%);
-  color: #f28b8e;
+  background: var(--dr-danger-tint);
+  color: var(--dr-danger-text);
 }
 
 .empty__action {
@@ -303,11 +303,11 @@
   }
 
   &[data-severity='error'] strong {
-    color: #f2686b;
+    color: var(--dr-danger);
   }
 
   &[data-severity='warning'] strong {
-    color: #f5bf4f;
+    color: var(--dr-warning);
   }
 }
 
@@ -327,17 +327,17 @@
     white-space: pre-wrap;
 
     &[data-severity='warning'] {
-      color: #f5bf4f;
+      color: var(--dr-warning);
     }
 
     &[data-severity='error'] {
-      color: #f2686b;
+      color: var(--dr-danger);
     }
   }
 }
 
 .foot__item--warning {
-  color: #f5bf4f;
+  color: var(--dr-warning);
 }
 
 /* --- Cambios pendientes en la cuadrícula -----------------------------------
@@ -353,7 +353,7 @@
   justify-content: space-between;
   padding: 8px 12px;
   border-top: 1px solid var(--dr-border);
-  background: rgb(108 139 255 / 8%);
+  background: var(--dr-accent-tint-weak);
   font-family: var(--dr-font-ui);
   font-size: var(--dr-font-size-sm);
 }
@@ -410,27 +410,27 @@
   cursor: pointer;
 
   &:hover:not(:disabled) {
-    background: #151b27;
+    background: var(--dr-surface-hover);
     color: var(--dr-text);
   }
 
   &:disabled {
-    color: #6e7a90;
+    color: var(--dr-text-dim);
     cursor: default;
   }
 }
 
 .edits .btn--primary {
-  border-color: rgb(108 139 255 / 40%);
-  background: rgb(108 139 255 / 14%);
+  border-color: var(--dr-accent-line);
+  background: var(--dr-accent-tint);
   color: var(--dr-accent-bright);
 }
 
 /* Escribir en la base se pide con el mismo color que Rollback: es la acción
    de la que uno se arrepiente, no una más. */
 .edits .btn--danger {
-  border-color: rgb(255 107 107 / 32%);
-  background: rgb(255 107 107 / 10%);
-  color: #ff8f8f;
+  border-color: var(--dr-danger-line-soft);
+  background: var(--dr-danger-tint);
+  color: var(--dr-danger-text);
   font-weight: 500;
 }
