@@ -571,19 +571,45 @@ y un bloque de comentarios en el `.sql`, con la cabecera al empezar y los
 recuentos y avisos al final. Reescribir la cabecera obligaría a copiar un archivo
 que puede ocupar gigabytes.
 
-### Fase D — La interfaz
+### Fase D — La interfaz 🟡 a medias
 
-- [ ] Árbol de selección con casillas de tres estados.
-- [ ] Asistente de cuatro pasos, desde el menú contextual y como pestaña.
-- [ ] Vista previa del guion antes de ejecutar.
-- [ ] **`operation-progress` en `shared/ui`**: las dos barras, el paso en curso
+**Estado: las piezas están escritas y compilan, pero el asistente no está
+enganchado.** Desde la aplicación todavía no se llega a él. Lo que falta son tres
+archivos, detallados al final de la fase.
+
+- [x] Árbol de selección con casillas de tres estados.
+- [x] Asistente de cuatro pasos, desde el menú contextual. _(La pestaña propia no
+      entra todavía: el diálogo cubre el criterio de salida y la pestaña es para
+      selecciones grandes.)_
+- [x] Vista previa del guion antes de ejecutar, por su propia ruta
+      (`/api/backup/preview`), limitada a unas pocas filas por tabla.
+- [x] **`operation-progress` en `shared/ui`**: las dos barras, el paso en curso
       con nombre de objeto, el tiempo transcurrido y el botón de cancelar.
 - [ ] **Indicador en la barra de estado** que sobrevive a cerrar el asistente, y
-      que devuelve al detalle al pulsarlo.
-- [ ] **Resumen final en los cuatro estados** —correcto, correcto con avisos,
-      fallido y cancelado—, que no se desvanece solo, con «abrir carpeta» y
-      «abrir en el editor».
-- [ ] Registro con marca de tiempo, copiable de una vez.
+      que devuelve al detalle al pulsarlo. **Falta.**
+- [x] **Resumen final en los cuatro estados** —correcto, correcto con avisos,
+      fallido y cancelado—, que no se desvanece solo. _(«Abrir carpeta» y «abrir
+      en el editor» quedan pendientes: hacen falta comandos del envoltorio.)_
+- [x] Registro copiable de una vez.
+- [x] **Selector nativo de carpeta**, que venía de la Fase C. Devuelve solo la
+      ruta: los bytes no pasan por el puente. **El Rust no se ha compilado nunca
+      en este equipo** —cargo falla por el SDK de Windows—, así que está escrito
+      pero sin ver funcionar.
+
+#### Lo que falta para cerrarla, con nombre y sitio
+
+1. **`connections-sidebar`** — añadir `readonly backup = output<ExplorerNode>()`
+   y su botón en el menú del nodo, junto a «Importar archivo» (HTML, ~línea 231),
+   ofrecido para `database`, `schema` y `table`.
+2. **`app-shell`** — un `backupTarget = signal<ExplorerNode | null>(null)` con su
+   `@defer`, copiando el patrón de `app-table-designer` (HTML, ~línea 226), y
+   pasarle `[sessionId]` y `[target]`.
+3. **`status-bar`** — inyectar `BackupStore` y enseñar paso, objeto y porcentaje
+   mientras `store.running()`. Es lo que hace que cerrar el asistente no deje al
+   usuario a ciegas, y sin ello el criterio de salida no se cumple.
+4. **Pruebas de frontend** del `BackupStore` y de `operation-progress`: que el
+   porcentaje nunca retroceda ni pase de cien, que sin estimación caiga a barra
+   indeterminada, y que cerrar el diálogo no mate el sondeo.
 
 **Criterio de salida:** el caso del §1 —todo sin datos salvo tres tablas— se
 resuelve sin escribir SQL, **y en ningún momento de la operación la pantalla deja

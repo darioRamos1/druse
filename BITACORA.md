@@ -11,7 +11,7 @@
 | Campo | Valor |
 | --- | --- |
 | Última sesión | **022** — 2026-08-17 |
-| Fase activa | **Respaldos y restauración:** Fases A, B y C cerradas —el respaldo se escribe entero, en cuatro formas, con progreso consultable—; toca la Fase D, la interfaz |
+| Fase activa | **Respaldos y restauración:** Fases A, B y C cerradas; la **D va a medias** —las piezas de la interfaz compilan pero el asistente no está enganchado, así que desde la aplicación aún no se llega a él— |
 | Fases 0–6 | ✅ Cerradas. |
 | Fase 7 | 🟡 **11/12.** El ciclo de instalación está probado sobre este equipo; solo falta arrancar en una máquina sin herramientas de desarrollo. |
 | Fase 8 | ✅ **7/7.** Tres motores sobre el mismo contrato y primera beta preparada. |
@@ -27,18 +27,25 @@
 
 ### Qué toca retomar en la próxima sesión
 
-**Lo primero: la Fase D de los respaldos** —la interfaz—, según
-`docs/plan-respaldos-y-restauracion.md`. Las fases A, B y C quedaron cerradas en
-las sesiones 022b, 022c y 022d: el backend ya escribe un respaldo entero en cuatro
-formas, con manifiesto, instantánea y progreso consultable por HTTP.
+**Lo primero: terminar de enganchar el asistente de respaldos.** La Fase D quedó
+a medias en la sesión 022e: el diálogo, el estado en `core`, `operation-progress`
+y el selector nativo están escritos y **compilan**, pero nada los invoca. Son
+tres archivos y unas pocas líneas, y son la diferencia entre tener la función y
+no tenerla:
 
-Lo que entra ahora es todo lo que ve el usuario: el árbol de selección con
-casillas de tres estados, el asistente de cuatro pasos desde el menú contextual y
-como pestaña, la vista previa del guion, `operation-progress` en `shared/ui` con
-las dos barras, el indicador en la barra de estado que sobrevive a cerrar el
-diálogo, y el resumen final en los cuatro estados. **Y el selector nativo de
-carpeta**, que viene de la Fase C: lo pone el envoltorio y hasta ahora no había
-dónde abrirlo.
+1. `connections-sidebar` — `readonly backup = output<ExplorerNode>()` y su botón
+   en el menú del nodo, junto a «Importar archivo» (HTML, ~línea 231), para
+   `database`, `schema` y `table`.
+2. `app-shell` — `backupTarget = signal<ExplorerNode | null>(null)` con su
+   `@defer`, igual que `app-table-designer` (HTML, ~línea 226), pasándole
+   `[target]` y `[sessionId]`.
+3. `status-bar` — inyectar `BackupStore` y enseñar paso, objeto y porcentaje
+   mientras `store.running()`. **Sin esto no se cumple el criterio de salida**,
+   que exige que cerrar el asistente no deje al usuario a ciegas.
+
+Después: pruebas de frontend del `BackupStore` y de `operation-progress`, y
+comprobar el caso del §1 —todo sin datos salvo tres tablas— levantando la
+aplicación contra los contenedores.
 
 Y aparte, lo que ya venía. Ya no queda nada a medias: las transacciones manuales se cerraron en la sesión
 020 y los 44 archivos sueltos se repartieron en cuatro commits temáticos. Lo que
@@ -289,6 +296,38 @@ Y tres límites declarados desde el principio: no hay respaldo binario ni
 recuperación a un punto en el tiempo —eso es del servidor, y la interfaz tendrá
 que decirlo—, no hay respaldos programados, y un límite de filas puede dejar
 filas huérfanas, cosa que se avisa y no se corrige sola.
+
+### Sesión 022e — 2026-08-17 · Fase D a medias: la interfaz, sin enganchar
+
+Sesión corta, cortada por el límite de uso. Queda escrito y compilando —backend y
+frontend— pero **no alcanzable desde la aplicación**, y eso es lo primero que hay
+que arreglar al volver.
+
+Lo que entró:
+
+- **La vista previa por su propia ruta** (`/api/backup/preview`), no como una
+  bandera de lanzar: ver y ejecutar son cosas distintas, igual que en la edición
+  de filas. Se limita a unas pocas filas por tabla y corta al llegar al tope,
+  porque una vista previa que leyera la tabla entera tardaría lo mismo que el
+  respaldo y nadie va a leer diez mil instrucciones.
+- **`BackupStore` en `core`, no dentro del diálogo.** El trabajo sigue en el
+  proceso local aunque se cierre el asistente, así que el estado tiene que
+  sobrevivir al componente que lo lanzó. Sondea cada medio segundo, que aguanta
+  que la ventana se cierre y se reabra.
+- **`operation-progress` en `shared/ui`** con las dos barras. Sin la del objeto en
+  curso, una tabla de ocho millones de filas deja el indicador inmóvil veinte
+  minutos; y sin estimación fiable la barra va indeterminada con contador
+  absoluto, en vez de un porcentaje inventado.
+- **El asistente de cuatro pasos**, con casillas de tres estados, el interruptor
+  general, las anulaciones señaladas como excepciones y el resumen final que no se
+  desvanece solo.
+- **El selector nativo**, que devuelve solo la ruta: los bytes no pasan por el
+  puente porque un respaldo puede ocupar gigabytes y lo escribe el proceso local.
+  **El Rust no se ha compilado nunca aquí** —cargo falla por el SDK de Windows—.
+
+Y la regla `Backup*/` del `.gitignore` heredado de Visual Studio volvió a morder,
+ahora en el frontend: `core/backup/` y `features/backup/` se daban por ignoradas
+en silencio. Ya están las cuatro excepciones escritas con su motivo.
 
 ### Sesión 022d — 2026-08-17 · Fase C: el artefacto, el progreso y la instantánea
 
