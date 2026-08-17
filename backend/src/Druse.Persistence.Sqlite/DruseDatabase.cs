@@ -123,6 +123,25 @@ public sealed class DruseDatabase
             );
             """, cancellationToken);
 
+        // Lo que el usuario llevaba escrito y no había ejecutado. El historial
+        // guarda lo ejecutado; esto guarda lo demás, que es justo lo que se perdía
+        // al cerrar.
+        await ExecuteAsync(connection, """
+            CREATE TABLE IF NOT EXISTS editor_tabs (
+                id             TEXT    NOT NULL PRIMARY KEY,
+                position       INTEGER NOT NULL,
+                title          TEXT    NOT NULL,
+                sql_text       TEXT    NOT NULL,
+                is_active      INTEGER NOT NULL DEFAULT 0,
+                is_dirty       INTEGER NOT NULL DEFAULT 0,
+                connection_id  TEXT        NULL,
+                database_name  TEXT        NULL,
+                file_name      TEXT        NULL,
+                document_id    TEXT        NULL,
+                saved_at_utc   TEXT    NOT NULL
+            );
+            """, cancellationToken);
+
         // Los archivos creados por versiones anteriores ya tienen la tabla, así que
         // `CREATE TABLE IF NOT EXISTS` no les añade la columna: hay que agregarla
         // aparte. El valor por omisión deja los perfiles existentes con usuario y

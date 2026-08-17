@@ -64,6 +64,27 @@ public interface IProviderFixture
     /// <summary>Emite un mensaje informativo desde el servidor.</summary>
     string RaiseNotice(string text);
 
+    /// <summary>
+    /// Si el motor sabe devolver mensajes informativos al cliente.
+    ///
+    /// Informix no tiene nada equivalente a `RAISE NOTICE`, `PRINT` o `SIGNAL`
+    /// fuera de un procedimiento: no es que Druse no los recoja, es que el motor
+    /// no los produce. Declararlo aquí deja el hueco a la vista en vez de fingir
+    /// que la función existe con una consulta que no avisa de nada.
+    /// </summary>
+    bool EmitsServerNotices => true;
+
+    /// <summary>
+    /// Si un booleano llega al cliente **como** booleano.
+    ///
+    /// Informix tiene tipo `BOOLEAN`, pero Druse habla con él por DRDA y ese
+    /// transporte lo entrega como `SMALLINT` de valor 1 o 0, sin nada que lo
+    /// distinga de un entero pequeño cualquiera. Normalizarlo a `true` exigiría
+    /// convertir **todos** los `SMALLINT`, y entonces una columna de cantidades
+    /// se leería como booleana. Se prefiere enseñar el 1 que el motor manda.
+    /// </summary>
+    bool TransportsBooleans => true;
+
     /// <summary>Consulta con un valor de cada tipo básico, en este orden:
     /// entero, decimal 3.5, booleano verdadero, fecha 2026-08-11.</summary>
     string SelectBasicTypes { get; }
@@ -94,6 +115,13 @@ public interface IProviderFixture
 
     /// <summary>Crea una tabla con clave primaria, columna obligatoria, opcional y con valor por defecto.</summary>
     string CreateTableWithColumns(string name);
+
+    /// <summary>
+    /// Crea un procedimiento con dos parámetros: `entrada`, que entra, y
+    /// `salida`, que sale. Los nombres importan poco —SQL Server los adorna con
+    /// `@`— pero el orden y la dirección sí.
+    /// </summary>
+    string CreateProcedureWithParameters(string name);
 
     /// <summary>Crea una vista que devuelve una columna llamada `valor`.</summary>
     string CreateView(string name);

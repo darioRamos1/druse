@@ -1,6 +1,9 @@
 import { KnownColumn } from '../../../shared/models/workspace';
 import {
+  buildCall,
   buildCreateTable,
+  buildDeleteCount,
+  buildDeleteValues,
   buildDropTable,
   buildInsert,
   buildInsertValues,
@@ -36,6 +39,7 @@ describe('escribir SQL', () => {
       expect(quote('sqlserver', 'order')).toBe('[order]');
       expect(quote('mysql', 'order')).toBe('`order`');
       expect(quote('postgresql', 'order')).toBe('"order"');
+      expect(quote('informix', 'order')).toBe('"order"');
     });
 
     it('escapa la comilla de cierre', () => {
@@ -64,6 +68,12 @@ describe('escribir SQL', () => {
       const sqlserver = buildSelect('sqlserver', spec);
       expect(sqlserver).toContain('SELECT TOP 100');
       expect(sqlserver).not.toContain('LIMIT');
+
+      // Informix lo escribe delante como SQL Server, pero con su propia palabra.
+      // Poner `LIMIT` al final aquí produciría SQL que su servidor rechaza.
+      const informix = buildSelect('informix', spec);
+      expect(informix).toContain('SELECT FIRST 100');
+      expect(informix).not.toContain('LIMIT');
     });
 
     it('junta los filtros con AND', () => {
@@ -341,6 +351,125 @@ describe('escribir SQL', () => {
       expect(
         buildUpdateValues('postgresql', { table: 'usuarios', assignments: [], filters: [] }),
       ).toBe('-- Elige al menos una columna para modificar.\n');
+    });
+  });
+
+  describe('llamada a un procedimiento', () => {
+    const entrada = {
+      name: 'entrada',
+      dataType: 'int',
+      direction: 'input',
+      value: { kind: 'value', text: '7' },
+    } as const;
+
+    const salida = {
+      name: 'salida',
+      dataType: 'varchar(30)',
+      direction: 'output',
+      value: { kind: 'null' },
+    } as const;
+
+    it('SQL Server declara la salida, la pasa como OUTPUT y la lee después', () => {
+      const sql = buildCall('sqlserver', {
+        schema: 'dbo',
+        routine: 'registrar',
+        parameters: [{ ...entrada, name: '@entrada' }, { ...salida, name: '@salida' }],
+      });
+
+      expect(sql).toContain('DECLARE @out_salida varchar(30);');
+      expect(sql).toContain('@entrada = 7');
+      expect(sql).toContain('@salida = @out_salida OUTPUT');
+      expect(sql).toContain('SELECT @out_salida AS [salida];');
+      expect(sql).toContain('EXEC [dbo].[registrar]');
+    });
+
+    it('MySQL usa variables de sesión para las salidas', () => {
+      const sql = buildCall('mysql', {
+        schema: 'tienda',
+        routine: 'registrar',
+        parameters: [entrada, salida],
+      });
+
+      expect(sql).toContain('SET @salida_salida = NULL;');
+      expect(sql).toContain('CALL `tienda`.`registrar`(7, @salida_salida);');
+      expect(sql).toContain('SELECT @salida_salida AS `salida`;');
+    });
+
+    it('PostgreSQL pasa un hueco NULL y recoge la salida del propio CALL', () => {
+      const sql = buildCall('postgresql', {
+        schema: 'public',
+        routine: 'registrar',
+        parameters: [entrada, salida],
+      });
+
+      expect(sql).toBe('CALL "public"."registrar"(7, NULL);\n');
+    });
+
+    it('Informix ejecuta sin las salidas y explica por qué', () => {
+      const sql = buildCall('informix', {
+        schema: 'informix',
+        routine: 'registrar',
+        parameters: [entrada, salida],
+      });
+
+      expect(sql).toContain('EXECUTE PROCEDURE "informix"."registrar"(7);');
+      expect(sql).toContain('-- Informix solo recoge los parámetros de salida (salida)');
+    });
+
+    it('un procedimiento sin parámetros no escribe paréntesis vacíos en SQL Server', () => {
+      expect(buildCall('sqlserver', { schema: 'dbo', routine: 'limpiar', parameters: [] })).toBe(
+        'EXEC [dbo].[limpiar];\n',
+      );
+    });
+
+    it('un valor sin escribir queda señalado en lugar de colarse vacío', () => {
+      const sql = buildCall('mysql', {
+        routine: 'registrar',
+        parameters: [{ ...entrada, value: { kind: 'value', text: null } }],
+      });
+
+      expect(sql).toContain('/* int: valor obligatorio */');
+    });
+  });
+
+  describe('DELETE compuesto', () => {
+    it('escribe el DELETE con su filtro', () => {
+      const sql = buildDeleteValues('postgresql', {
+        schema: 'public',
+        table: 'usuarios',
+        filters: [{ column: 'id', operator: '=', value: '7' }],
+      });
+
+      expect(sql).toBe('DELETE FROM "public"."usuarios"\nWHERE "id" = 7;\n');
+    });
+
+    /** Lo que impide el accidente: sin condición, no hay DELETE que ejecutar. */
+    it('sin filtros deja la condición como hueco obligatorio', () => {
+      const sql = buildDeleteValues('sqlserver', { table: 'usuarios', filters: [] });
+
+      expect(sql).toContain('/* condición obligatoria */');
+      expect(sql).not.toMatch(/WHERE\s*;/);
+    });
+
+    it('el recuento usa exactamente el mismo filtro', () => {
+      const filters = [
+        { column: 'estado', operator: '=' as const, value: 'baja' },
+        { column: 'creado', operator: '<' as const, value: '2020-01-01' },
+      ];
+
+      const borrado = buildDeleteValues('mysql', { table: 'usuarios', filters });
+      const recuento = buildDeleteCount('mysql', { table: 'usuarios', filters });
+
+      const condiciones = (sql: string) => sql.slice(sql.indexOf('WHERE'));
+
+      expect(recuento).toContain('SELECT COUNT(*) AS filas FROM `usuarios`');
+      expect(condiciones(recuento).replace(';', '')).toBe(
+        condiciones(borrado).replace(';\n', ''),
+      );
+    });
+
+    it('sin filtros no hay nada que contar', () => {
+      expect(buildDeleteCount('postgresql', { table: 'usuarios', filters: [] })).toBe('');
     });
   });
 });

@@ -16,6 +16,8 @@ import {
   SessionInfo,
   TableAlteration,
   TableDesign,
+  InputKind,
+  RoutineSignature,
   TableStructure,
   TestConnectionResult,
 } from '../../shared/models/workspace';
@@ -26,16 +28,24 @@ import {
   ExportRequest,
   ImportOptions,
   ImportPreview,
+  RowDeleteRequest,
   RowEditRequest,
   RowEditResult,
   TableChangeResult,
+  StoredEditorTab,
+  TransactionState,
   HealthStatus,
   SaveConnectionRequest,
 } from './application-gateway';
 
 /** Forma en que la API devuelve un conjunto de resultados. */
 interface ResultSetDto {
-  readonly columns: readonly { name: string; dataType: string; ordinal: number }[];
+  readonly columns: readonly {
+    name: string;
+    dataType: string;
+    inputKind?: InputKind;
+    ordinal: number;
+  }[];
   readonly rows: readonly (readonly (string | null)[])[];
   readonly truncated: boolean;
 }
@@ -127,6 +137,25 @@ export class HttpApplicationGateway extends ApplicationGateway {
     return this._http.delete<void>(`/api/queries/${executionId}`);
   }
 
+  override getTransaction(sessionId: string): Observable<TransactionState> {
+    return this._http.get<TransactionState>(`/api/sessions/${sessionId}/transaction`);
+  }
+
+  override beginTransaction(sessionId: string): Observable<TransactionState> {
+    return this._http.post<TransactionState>(`/api/sessions/${sessionId}/transaction`, {});
+  }
+
+  // Confirmar y deshacer tienen ruta propia en lugar de compartir una con un
+  // parámetro: son las dos decisiones opuestas del usuario, y equivocarse de
+  // valor tiraría el trabajo en lugar de guardarlo.
+  override commitTransaction(sessionId: string): Observable<TransactionState> {
+    return this._http.post<TransactionState>(`/api/sessions/${sessionId}/transaction/commit`, {});
+  }
+
+  override rollbackTransaction(sessionId: string): Observable<TransactionState> {
+    return this._http.post<TransactionState>(`/api/sessions/${sessionId}/transaction/rollback`, {});
+  }
+
   override previewRowEdits(request: RowEditRequest): Observable<readonly string[]> {
     return this._http
       .post<{ statements: string[] }>('/api/rows/preview', request)
@@ -137,10 +166,30 @@ export class HttpApplicationGateway extends ApplicationGateway {
     return this._http.post<RowEditResult>('/api/rows', request);
   }
 
+  override previewRowDeletes(request: RowDeleteRequest): Observable<readonly string[]> {
+    return this._http
+      .post<{ statements: string[] }>('/api/rows/delete/preview', request)
+      .pipe(map((response) => response.statements));
+  }
+
+  override deleteRows(request: RowDeleteRequest): Observable<RowEditResult> {
+    return this._http.post<RowEditResult>('/api/rows/delete', request);
+  }
+
   // --- Diseño de tablas -----------------------------------------------------
 
   override getTableDataTypes(sessionId: string): Observable<readonly string[]> {
     return this._http.get<string[]>(`/api/sessions/${sessionId}/tables/data-types`);
+  }
+
+  override getRoutineSignature(
+    sessionId: string,
+    routine: DatabaseObject,
+  ): Observable<RoutineSignature> {
+    return this._http.post<RoutineSignature>(
+      `/api/sessions/${sessionId}/metadata/routine`,
+      routine,
+    );
   }
 
   override getTableCapabilities(sessionId: string): Observable<IndexCapabilities> {
@@ -264,6 +313,14 @@ export class HttpApplicationGateway extends ApplicationGateway {
     return this._http.put<void>(`/api/preferences/${encodeURIComponent(key)}`, { value });
   }
 
+  override getEditorTabs(): Observable<readonly StoredEditorTab[]> {
+    return this._http.get<StoredEditorTab[]>('/api/workspace/tabs');
+  }
+
+  override saveEditorTabs(tabs: readonly StoredEditorTab[]): Observable<void> {
+    return this._http.put<void>('/api/workspace/tabs', tabs);
+  }
+
   override exportQuery(request: ExportRequest): Observable<Blob> {
     const { format, ...body } = request;
 
@@ -288,6 +345,10 @@ export class HttpApplicationGateway extends ApplicationGateway {
         name: column.name,
         dataType: column.dataType,
         kind,
+        // La familia exacta la calcula la API: `kind` solo distingue lo justo
+        // para el ancho y la alineación, y no separa una fecha de una marca de
+        // tiempo, que es precisamente lo que decide el control de edición.
+        inputKind: column.inputKind,
         width: WIDTH_BY_KIND[kind],
       };
     });

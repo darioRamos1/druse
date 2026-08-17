@@ -1,4 +1,4 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using Druse.Database.Abstractions;
 using Druse.Domain;
 using MySqlConnector;
@@ -20,6 +20,7 @@ internal sealed class MySqlSession : IDatabaseSession
         Profile = profile;
         Credentials = credentials;
         Connection = connection;
+        Transaction = new SessionTransaction(connection);
         ServerVersion = connection.ServerVersion;
     }
 
@@ -32,6 +33,12 @@ internal sealed class MySqlSession : IDatabaseSession
     public string ServerVersion { get; }
 
     public bool IsOpen => !_disposed && Connection.State == System.Data.ConnectionState.Open;
+
+    /// <summary>
+    /// La transacción manual de esta conexión. Las reglas viven en la clase
+    /// compartida; aquí solo se le da la conexión sobre la que trabajar.
+    /// </summary>
+    public SessionTransaction Transaction { get; }
 
     /// <summary>Solo accesible dentro del proveedor.</summary>
     internal MySqlConnection Connection { get; }
@@ -47,6 +54,10 @@ internal sealed class MySqlSession : IDatabaseSession
         }
 
         _disposed = true;
+
+        // Lo que no se confirmó, se pierde: deshacerlo aquí lo deja explícito
+        // en vez de depender de lo que haga el driver al cerrar.
+        await Transaction.DisposeAsync();
         Credentials = default;
         await Connection.DisposeAsync();
     }

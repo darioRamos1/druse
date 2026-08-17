@@ -4,6 +4,7 @@ using Druse.Application.Metadata;
 using Druse.Application.Queries;
 using Druse.Application.Rows;
 using Druse.Application.Tables;
+using Druse.Application.Transactions;
 using Druse.Database.Abstractions;
 using Druse.Domain;
 using Druse.Host.LocalApi.Contracts;
@@ -27,7 +28,90 @@ internal static class DatabaseEndpoints
         MapQueries(app);
         MapRowEdits(app);
         MapTableDesign(app);
+        MapTransactions(app);
     }
+
+    /// <summary>
+    /// Las transacciones que el usuario abre y cierra a mano.
+    ///
+    /// Cuelgan de la sesión y no de la pestaña porque es de la conexión de quien
+    /// son: dos pestañas del mismo perfil comparten sesión y, por tanto,
+    /// transacción.
+    /// </summary>
+    private static void MapTransactions(IEndpointRouteBuilder app)
+    {
+        app.MapGet("/api/sessions/{sessionId:guid}/transaction", (
+            Guid sessionId,
+            TransactionService transactions) =>
+            Results.Ok(transactions.Get(sessionId).ToResponse()))
+        .WithName("GetTransaction");
+
+        app.MapPost("/api/sessions/{sessionId:guid}/transaction", async (
+            Guid sessionId,
+            TransactionService transactions,
+            CancellationToken cancellationToken) =>
+        {
+            try
+            {
+                var state = await transactions.BeginAsync(sessionId, cancellationToken);
+
+                return Results.Ok(state.ToResponse());
+            }
+            catch (TransactionRejectedException exception)
+            {
+                return Rejected(exception);
+            }
+        })
+        .WithName("BeginTransaction");
+
+        // Confirmar y deshacer son dos rutas y no una con bandera: son las dos
+        // decisiones opuestas que puede tomar el usuario, y un cliente que se
+        // equivoque de valor no puede acabar tirando el trabajo de una hora.
+        app.MapPost("/api/sessions/{sessionId:guid}/transaction/commit", async (
+            Guid sessionId,
+            TransactionService transactions,
+            CancellationToken cancellationToken) =>
+        {
+            try
+            {
+                var state = await transactions.CommitAsync(sessionId, cancellationToken);
+
+                return Results.Ok(state.ToResponse());
+            }
+            catch (TransactionRejectedException exception)
+            {
+                return Rejected(exception);
+            }
+        })
+        .WithName("CommitTransaction");
+
+        app.MapPost("/api/sessions/{sessionId:guid}/transaction/rollback", async (
+            Guid sessionId,
+            TransactionService transactions,
+            CancellationToken cancellationToken) =>
+        {
+            try
+            {
+                var state = await transactions.RollbackAsync(sessionId, cancellationToken);
+
+                return Results.Ok(state.ToResponse());
+            }
+            catch (TransactionRejectedException exception)
+            {
+                return Rejected(exception);
+            }
+        })
+        .WithName("RollbackTransaction");
+    }
+
+    private static IResult Rejected(TransactionRejectedException exception) =>
+        Results.Json(
+            new TransactionRejectedResponse
+            {
+                Reason = exception.Rejection.Reason.ToString().ToLowerInvariant(),
+                Message = exception.Rejection.Message,
+            },
+            statusCode: StatusCodes.Status409Conflict);
 
     /// <summary>
     /// Crear y modificar tablas.
@@ -274,6 +358,21 @@ internal static class DatabaseEndpoints
             return Results.Ok(new { sql });
         })
         .WithName("GetDefinition");
+
+        app.MapPost("/api/sessions/{sessionId:guid}/metadata/routine", async (
+            Guid sessionId,
+            DatabaseObjectDto routine,
+            MetadataService metadata,
+            CancellationToken cancellationToken) =>
+        {
+            var signature = await metadata.GetRoutineSignatureAsync(
+                sessionId,
+                routine.ToDomain(),
+                cancellationToken);
+
+            return Results.Ok(signature.ToDto());
+        })
+        .WithName("GetRoutineSignature");
     }
 
     /// <summary>
@@ -335,6 +434,58 @@ internal static class DatabaseEndpoints
             }
         })
         .WithName("ApplyRowEdits");
+
+        // Borrar tiene rutas propias por lo mismo que ver y guardar están
+        // separados: enseñar el DELETE y ejecutarlo son cosas distintas, y
+        // mezclarlas dejaría que un cliente mal escrito borre por mirar.
+        app.MapPost("/api/rows/delete/preview", async (
+            RowDeleteRequest request,
+            RowEditService rows,
+            CancellationToken cancellationToken) =>
+        {
+            try
+            {
+                var statements = await rows.PreviewDeleteAsync(request.ToDomain(), cancellationToken);
+
+                return Results.Ok(new { statements });
+            }
+            catch (RowEditRejectedException exception)
+            {
+                return Rejected(exception);
+            }
+        })
+        .WithName("PreviewRowDeletes");
+
+        app.MapPost("/api/rows/delete", async (
+            RowDeleteRequest request,
+            RowEditService rows,
+            CancellationToken cancellationToken) =>
+        {
+            try
+            {
+                var result = await rows.DeleteAsync(request.ToDomain(), cancellationToken);
+
+                return Results.Ok(new RowEditResponse
+                {
+                    RowsAffected = result.RowsAffected,
+                    DurationMs = (long)result.Duration.TotalMilliseconds,
+                    Statements = result.Statements,
+                });
+            }
+            catch (RowEditRejectedException exception)
+            {
+                return Rejected(exception);
+            }
+            catch (RowEditFailedException exception)
+            {
+                return Results.Conflict(new RowEditRejectedResponse
+                {
+                    Reason = "unexpectedrowcount",
+                    Message = exception.Message,
+                });
+            }
+        })
+        .WithName("DeleteRows");
     }
 
     private static IResult Rejected(RowEditRejectedException exception) =>

@@ -46,6 +46,15 @@ El CSV sigue el RFC 4180: entrecomilla los valores con separador, comillas o sal
 | Docker | — | Solo para las bases de datos de pruebas |
 | Rust (cargo) | estable | Solo para el envoltorio de escritorio |
 | MSVC Build Tools | 2022 | En Windows: el enlazador que necesita Rust |
+| libxml2 | — | **Solo en Linux**: dependencia nativa del driver de Informix |
+
+En Linux, el driver de Informix es una biblioteca nativa de IBM que depende de `libxml2`. No viaja en el paquete de NuGet, así que hay que instalarla aparte:
+
+```bash
+sudo apt-get install libxml2   # Debian y Ubuntu
+```
+
+Sin ella, la primera conexión a Informix falla con un mensaje sobre `libxml2.so.2`. Los otros tres motores no la necesitan.
 
 En Windows, Rust por sí solo no basta: necesita el enlazador de Microsoft. Se instala con
 
@@ -125,6 +134,7 @@ selector web y guardar descarga un `.sql` nuevo.
 | PostgreSQL 12 – 18 | Funcionando |
 | SQL Server 2016 – 2022 | Funcionando (autenticación SQL; la integrada de Windows está en el backlog) |
 | MySQL 8.0+ y MariaDB | Funcionando |
+| Informix 12.10+ | Funcionando (por DRDA; en Linux necesita `libxml2`) |
 
 Los tres superan **el mismo conjunto de 24 pruebas contractuales**, sin excepciones por motor.
 

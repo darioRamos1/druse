@@ -1,6 +1,7 @@
 import {
   ChangeDetectionStrategy,
   Component,
+  ElementRef,
   computed,
   effect,
   HostListener,
@@ -10,6 +11,9 @@ import {
 } from '@angular/core';
 
 import { ExportFormat } from '../../core/application-gateway/application-gateway';
+import { ThemeName, ThemeService } from '../../core/theme/theme.service';
+import { SettingsDialog } from '../../features/settings/settings-dialog/settings-dialog';
+import { FormatSettings } from '../../core/workspace/format-settings';
 import { WorkspaceStore } from '../../core/workspace/workspace-store';
 import { SqlFileService } from '../../core/sql-files/sql-file.service';
 import { ConnectionDialog } from '../../features/connections/connection-dialog/connection-dialog';
@@ -24,6 +28,7 @@ import {
 import SqlEditor from '../../features/query-editor/sql-editor/sql-editor';
 import { ImportDialog } from '../../features/import/import-dialog/import-dialog';
 import { TableDesigner } from '../../features/tables/table-designer/table-designer';
+import { ProcedureRunner } from '../../features/query-builder/procedure-runner/procedure-runner';
 import { QueryBuilder } from '../../features/query-builder/query-builder/query-builder';
 import { buildSelect } from '../../features/query-editor/sql-language/sql-writer';
 import { ResultsPanel } from '../../features/query-results/results-panel/results-panel';
@@ -80,7 +85,9 @@ const DISCONNECTED: SessionStatus = {
     ImportDialog,
     TableDesigner,
     QueryBuilder,
+    ProcedureRunner,
     CommandPalette,
+    SettingsDialog,
     ResizeHandle,
   ],
   templateUrl: './app-shell.html',
@@ -89,6 +96,44 @@ const DISCONNECTED: SessionStatus = {
 export class AppShell {
   private readonly _store = inject(WorkspaceStore);
   private readonly _sqlFiles = inject(SqlFileService);
+  private readonly _themes = inject(ThemeService);
+
+  // --- Apariencia ------------------------------------------------------------
+  protected readonly theme = this._themes.theme;
+
+  /** El acento elegido, que el editor necesita para su cursor y su selección. */
+  protected readonly accent = computed(() => this._themes.appearance().accent);
+
+  protected readonly editorFontSize = computed(() => this._themes.appearance().editorFontSize);
+
+  protected readonly settingsOpen = signal(false);
+
+  /**
+   * Proporción del editor, para que la miniatura de preferencias enseñe el
+   * mismo recorte. Se mide al abrir el panel y no antes: depende de cómo tenga
+   * el usuario repartidos los paneles en ese momento.
+   */
+  protected readonly editorRatio = signal('16 / 9');
+
+  protected openSettings(): void {
+    const box = this._editorElement()?.nativeElement.getBoundingClientRect();
+
+    if (box?.height) {
+      // Acotada: con el panel de resultados abierto del todo, el editor puede
+      // quedar en una franja de diez a uno, y una miniatura con esa forma no se
+      // ve. Se pierde algo de fidelidad justo cuando el encuadre importa menos,
+      // porque apenas hay editor donde enseñar la imagen.
+      const ratio = Math.min(2.6, Math.max(1.2, box.width / box.height));
+
+      this.editorRatio.set(`${ratio.toFixed(2)} / 1`);
+    }
+
+    this.settingsOpen.set(true);
+  }
+
+  protected selectTheme(theme: ThemeName): void {
+    void this._themes.set(theme);
+  }
 
   // --- Tamaños de panel ------------------------------------------------------
   protected readonly sidebarWidth = signal(274);
@@ -106,6 +151,19 @@ export class AppShell {
   /** Perfil que se está editando; `null` cuando el diálogo crea uno nuevo. */
   protected readonly editingConnection = signal<SavedConnection | null>(null);
   protected readonly paletteOpen = signal(false);
+
+  /**
+   * Al cerrar o al perder el foco se guarda ya lo que estuviera esperando.
+   *
+   * El guardado normal espera a que se deje de escribir, y esa espera deja una
+   * rendija: cerrar la ventana justo después de teclear se llevaría lo último.
+   * `blur` cubre además el caso de irse a otra aplicación y no volver.
+   */
+  @HostListener('window:beforeunload')
+  @HostListener('window:blur')
+  protected onLeaving(): void {
+    this._store.flushTabs();
+  }
 
   @HostListener('document:keydown', ['$event'])
   protected onGlobalKeydown(event: KeyboardEvent): void {
@@ -188,6 +246,44 @@ export class AppShell {
     );
   }
 
+  /** Procedimiento que se está preparando para ejecutar. */
+  protected readonly procedureTarget = signal<ExplorerNode | null>(null);
+
+  protected openProcedureRunner(node: ExplorerNode): void {
+    this.procedureTarget.set(node);
+  }
+
+  protected closeProcedureRunner(): void {
+    this.procedureTarget.set(null);
+  }
+
+  /** La llamada compuesta se abre en una pestaña, para poder revisarla. */
+  protected insertCall(sql: string): void {
+    const target = this.procedureTarget();
+
+    this._store.createTab(
+      sql,
+      undefined,
+      target?.connectionId,
+      target ? `${target.label} · EXEC` : undefined,
+      target?.source.database,
+    );
+
+    this.procedureTarget.set(null);
+  }
+
+  /**
+   * Ejecutar abre igualmente la pestaña antes de lanzar.
+   *
+   * Lo que se ejecuta tiene que quedar escrito en algún sitio: si la llamada
+   * falla o devuelve algo raro, el usuario necesita el SQL delante para
+   * entenderlo, y no un diálogo que ya se cerró.
+   */
+  protected async runCall(sql: string): Promise<void> {
+    this.insertCall(sql);
+    await this._store.execute();
+  }
+
   // --- Estado del área de trabajo -------------------------------------------
   protected readonly connections = this._store.connections;
   protected readonly explorerNodes = this._store.explorerNodes;
@@ -196,12 +292,52 @@ export class AppShell {
   protected readonly resultSet = this._store.resultSet;
   protected readonly result = this._store.result;
   protected readonly running = this._store.running;
+
+  // Borrado de filas: la selección y el SQL viven en el store, como la edición.
+  protected readonly selectedRows = this._store.selectedRows;
+  protected readonly deletePreview = this._store.deletePreview;
+  protected readonly deleting = this._store.deleting;
+
+  protected toggleRowSelection(row: number): void {
+    this._store.toggleRowSelection(row);
+  }
+
+  protected clearRowSelection(): void {
+    this._store.clearRowSelection();
+  }
+
+  protected async prepareDelete(): Promise<void> {
+    await this._store.prepareDelete();
+  }
+
+  protected cancelDeletePreview(): void {
+    this._store.cancelDeletePreview();
+  }
+
+  protected async deleteSelectedRows(): Promise<void> {
+    await this._store.deleteSelectedRows();
+  }
   protected readonly rejection = this._store.rejection;
   protected readonly notice = this._store.notice;
   protected readonly history = this._store.history;
   protected readonly exporting = this._store.exporting;
+  protected readonly transaction = this._store.transaction;
+  protected readonly transactionBusy = this._store.transactionBusy;
+  protected readonly formatSettings = this._store.formatSettings;
 
-  protected readonly session = computed(() => this._store.session() ?? DISCONNECTED);
+  /**
+   * Estado de la sesión para la barra inferior.
+   *
+   * La base es la de la pestaña, no la que se abrió al conectar: se puede
+   * cambiar desde la barra del editor, y una barra de estado que siguiera
+   * diciendo la original estaría señalando a otra base que la que se ejecuta.
+   */
+  protected readonly session = computed(() => {
+    const status = this._store.session() ?? DISCONNECTED;
+    const database = this._store.activeDatabase();
+
+    return database && database !== status.database ? { ...status, database } : status;
+  });
 
   protected readonly sql = computed(() => this._store.activeTab()?.sql ?? '');
 
@@ -288,6 +424,7 @@ export class AppShell {
   protected readonly timeoutSeconds = this._store.timeoutSeconds;
 
   private readonly _editor = viewChild<SqlEditor>('editor');
+  private readonly _editorElement = viewChild('editor', { read: ElementRef });
   private readonly _resultsPanel = viewChild<ResultsPanel>('resultsPanel');
 
   protected showHistory(): void {
@@ -358,6 +495,11 @@ export class AppShell {
     void this._store.loadSavedConnections();
     void this._store.loadHistory();
     void this._store.loadPreferences();
+
+    // Lo que quedó escrito y sin ejecutar vuelve tal cual. Va aquí y no más
+    // tarde porque hasta que no se ha leído, el store no guarda nada: la pestaña
+    // vacía del arranque pisaría el trabajo de la sesión anterior.
+    void this._store.restoreTabs();
 
     let tabId = this._store.activeTab()?.id;
     effect(() => {
@@ -437,7 +579,64 @@ export class AppShell {
   }
 
   protected disconnect(id: string): void {
+    // Cerrar la conexión deshace lo que no esté confirmado, y eso puede ser el
+    // trabajo de un buen rato. Es el mismo aviso que al cerrar una pestaña con
+    // cambios sin guardar, por el mismo motivo.
+    if (
+      this._store.hasOpenTransaction(id) &&
+      !window.confirm(
+        'Esta conexión tiene una transacción abierta. Al cerrarla se perderán los ' +
+          'cambios sin confirmar. ¿Cerrar de todos modos?',
+      )
+    ) {
+      return;
+    }
+
     void this._store.disconnect(id);
+  }
+
+  protected setFormatSettings(changes: Partial<FormatSettings>): void {
+    void this._store.setFormatSettings(changes);
+  }
+
+  /** Bases de la conexión activa, para el desplegable de la barra. */
+  protected readonly databases = computed(() => {
+    const connectionId = this._store.activeConnection()?.id;
+
+    return connectionId ? this._store.databasesFor(connectionId) : [];
+  });
+
+  protected readonly activeDatabase = this._store.activeDatabase;
+  protected readonly lostConnection = this._store.lostConnection;
+
+  protected useDatabase(database: string): void {
+    this._store.useDatabase(database);
+  }
+
+  /**
+   * Vuelve a abrir una conexión.
+   *
+   * Si el perfil no guarda la contraseña, la API la pide y aquí se abre el mismo
+   * diálogo que al editarla: es donde el usuario ya sabe escribirla.
+   */
+  protected async reconnect(id: string): Promise<void> {
+    const outcome = await this._store.reconnect(id);
+
+    if (outcome === 'needsPassword') {
+      this.editConnection(id);
+    }
+  }
+
+  protected beginTransaction(): void {
+    void this._store.beginTransaction();
+  }
+
+  protected commitTransaction(): void {
+    void this._store.commitTransaction();
+  }
+
+  protected rollbackTransaction(): void {
+    void this._store.rollbackTransaction();
   }
 
   /** Doble clic sobre una tabla: abre una consulta preparada. */

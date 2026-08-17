@@ -7,9 +7,12 @@ import {
   ExecuteQueryRequest,
   ExportRequest,
   ImportPreview,
+  RowDeleteRequest,
   RowEditRequest,
   RowEditResult,
+  StoredEditorTab,
   SaveConnectionRequest,
+  TransactionState,
 } from '../application-gateway/application-gateway';
 import {
   ConnectionForm,
@@ -17,6 +20,7 @@ import {
   DatabaseObject,
   QueryHistoryEntry,
   QueryResult,
+  RoutineSignature,
   SavedConnection,
   SecretStoreStatus,
   SessionInfo,
@@ -38,6 +42,21 @@ const form: ConnectionForm = {
   // Sin guardar: las pruebas de conexión no deben tocar la persistencia.
   save: false,
   storePassword: false,
+};
+
+const savedProfile: SavedConnection = {
+  id: 'perfil-1',
+  name: 'Guardada',
+  engine: 'postgresql',
+  host: '127.0.0.1',
+  port: 5432,
+  database: 'druse_test',
+  username: 'postgres',
+  authentication: 'password',
+  sslMode: 'prefer',
+  environment: 'development',
+  readOnly: false,
+  hasStoredPassword: true,
 };
 
 const session: SessionInfo = {
@@ -106,6 +125,19 @@ function successfulQuery(overrides: Partial<QueryResult> = {}): QueryResult {
 }
 
 /** Doble del gateway con lo justo para las pruebas. */
+function closedTransaction(overrides: Partial<TransactionState> = {}): TransactionState {
+  return {
+    sessionId: 'sesion-1',
+    isOpen: false,
+    connectionName: 'Pruebas',
+    database: 'druse_test',
+    engine: 'postgresql',
+    ddlIsReversible: true,
+    idleTimeoutSeconds: 900,
+    ...overrides,
+  };
+}
+
 class FakeGateway implements Partial<ApplicationGateway> {
   executeCalls: ExecuteQueryRequest[] = [];
   exportCalls: ExportRequest[] = [];
@@ -126,6 +158,50 @@ class FakeGateway implements Partial<ApplicationGateway> {
   exportQuery(request: ExportRequest): Observable<Blob> {
     this.exportCalls.push(request);
     return of(new Blob());
+  }
+
+  /** Transacción que devuelve la API para la sesión, imitando su estado real. */
+  transaction: TransactionState = closedTransaction();
+  transactionCalls: string[] = [];
+
+  getTransaction(sessionId: string): Observable<TransactionState> {
+    this.transactionCalls.push(`get:${sessionId}`);
+    return of(this.transaction);
+  }
+
+  beginTransaction(sessionId: string): Observable<TransactionState> {
+    this.transactionCalls.push(`begin:${sessionId}`);
+    this.transaction = { ...this.transaction, isOpen: true, startedAt: '2026-08-14T10:00:00Z' };
+
+    return of(this.transaction);
+  }
+
+  /** Imita a una API que ya no tiene esa transacción abierta. */
+  commitShouldFail = false;
+
+  commitTransaction(sessionId: string): Observable<TransactionState> {
+    this.transactionCalls.push(`commit:${sessionId}`);
+
+    if (this.commitShouldFail) {
+      return throwError(
+        () =>
+          new HttpErrorResponse({
+            status: 409,
+            error: { reason: 'notopen', message: 'No hay ninguna transacción abierta que confirmar.' },
+          }),
+      );
+    }
+
+    this.transaction = closedTransaction();
+
+    return of(this.transaction);
+  }
+
+  rollbackTransaction(sessionId: string): Observable<TransactionState> {
+    this.transactionCalls.push(`rollback:${sessionId}`);
+    this.transaction = closedTransaction();
+
+    return of(this.transaction);
   }
 
   getSavedConnections(): Observable<readonly SavedConnection[]> {
@@ -166,6 +242,44 @@ class FakeGateway implements Partial<ApplicationGateway> {
     return this.savedConnectionMissingPassword && !password
       ? throwError(() => new HttpErrorResponse({ status: 428, error: { requiresPassword: true } }))
       : of(session);
+  }
+
+  /** Preferencias guardadas, tal y como las devolvería la API. */
+  preferences: Record<string, string> = {};
+
+  getPreferences(): Observable<Readonly<Record<string, string>>> {
+    return of(this.preferences);
+  }
+
+  setPreference(key: string, value: string): Observable<void> {
+    this.preferences[key] = value;
+    return of(undefined);
+  }
+
+  deleteRequests: RowDeleteRequest[] = [];
+  deletePreviewRequests: RowDeleteRequest[] = [];
+
+  previewRowDeletes(request: RowDeleteRequest): Observable<readonly string[]> {
+    this.deletePreviewRequests.push(request);
+    return of(request.keys.map((key) => `DELETE FROM t WHERE ${key[0].column} = ${key[0].value}`));
+  }
+
+  deleteRows(request: RowDeleteRequest): Observable<RowEditResult> {
+    this.deleteRequests.push(request);
+    return of({ rowsAffected: request.keys.length, durationMs: 3, statements: [] });
+  }
+
+  /** Lo que la sesión anterior dejó escrito sin ejecutar. */
+  storedTabs: StoredEditorTab[] = [];
+  savedTabs: StoredEditorTab[][] = [];
+
+  getEditorTabs(): Observable<readonly StoredEditorTab[]> {
+    return of(this.storedTabs);
+  }
+
+  saveEditorTabs(tabs: readonly StoredEditorTab[]): Observable<void> {
+    this.savedTabs.push([...tabs]);
+    return of(undefined);
   }
 
   getHistory(): Observable<readonly QueryHistoryEntry[]> {
@@ -216,6 +330,19 @@ class FakeGateway implements Partial<ApplicationGateway> {
   closeSession(sessionId: string): Observable<void> {
     this.closedSessions.push(sessionId);
     return of(undefined);
+  }
+
+  /** Imita al proceso local cuando la sesión ya no está abierta. */
+  sessionIsGone = false;
+
+  private lostSession(): Observable<never> {
+    return throwError(
+      () =>
+        new HttpErrorResponse({
+          status: 404,
+          error: { message: "La sesión 'sesion-1' no está abierta." },
+        }),
+    );
   }
 
   getDatabases(): Observable<DatabaseObject[]> {
@@ -296,6 +423,14 @@ class FakeGateway implements Partial<ApplicationGateway> {
         defaultValue: "'sin-correo'",
         ordinal: 2,
       },
+      {
+        name: 'creado_en',
+        dataType: 'timestamp with time zone',
+        inputKind: 'datetimeOffset',
+        isNullable: true,
+        isPrimaryKey: false,
+        ordinal: 3,
+      },
     ]);
   }
 
@@ -304,7 +439,35 @@ class FakeGateway implements Partial<ApplicationGateway> {
     return of(this.definition);
   }
 
+  signature: RoutineSignature = {
+    name: 'registrar',
+    schema: 'dbo',
+    isFunction: false,
+    parameters: [
+      { name: '@entrada', dataType: 'int', direction: 'input', ordinal: 1, hasDefault: false },
+      {
+        name: '@salida',
+        dataType: 'varchar(30)',
+        direction: 'output',
+        ordinal: 2,
+        hasDefault: false,
+      },
+    ],
+  };
+
+  signatureRequest: { sessionId: string; routine: DatabaseObject } | null = null;
+
+  getRoutineSignature(sessionId: string, routine: DatabaseObject): Observable<RoutineSignature> {
+    this.signatureRequest = { sessionId, routine };
+    return of(this.signature);
+  }
+
   executeQuery(request: ExecuteQueryRequest): Observable<QueryResult> {
+    if (this.sessionIsGone) {
+      this.executeCalls.push(request);
+      return this.lostSession();
+    }
+
     this.executeCalls.push(request);
     return this.executeResult;
   }
@@ -600,10 +763,14 @@ describe('WorkspaceStore', () => {
       const columnas = await store.ensureColumnsAsync('public', 'users');
 
       // Llegan con su tipo, que es lo que el editor necesita para el tooltip.
-      expect(columnas.map((columna) => columna.name)).toEqual(['id', 'email']);
+      expect(columnas.map((columna) => columna.name)).toEqual(['id', 'email', 'creado_en']);
       expect(columnas[0].dataType).toBe('int8');
       expect(columnas[0].isPrimaryKey).toBe(true);
       expect(columnas[1].defaultValue).toBe("'sin-correo'");
+
+      // Y con su clase de entrada: es lo que hace que el compositor pida la
+      // fecha con un calendario en vez de con un campo de texto.
+      expect(columnas[2].inputKind).toBe('datetimeOffset');
 
       // Traer las columnas no es lo mismo que desplegar el nodo.
       expect(store.explorerNodes().length).toBe(1);
@@ -685,6 +852,67 @@ describe('WorkspaceStore', () => {
       await store.execute();
       await esperarA(() => !!store.editableTable());
     }
+
+    describe('borrado de filas', () => {
+      it('sin filas señaladas no se pide nada', async () => {
+        await abrirTabla();
+
+        await store.prepareDelete();
+
+        expect(gateway.deletePreviewRequests).toHaveLength(0);
+        expect(store.deletePreview()).toBeNull();
+      });
+
+      it('señala la fila y enseña el DELETE antes de borrar', async () => {
+        await abrirTabla();
+
+        store.toggleRowSelection(1);
+        await store.prepareDelete();
+
+        // La clave sale de la fila que el usuario tiene delante, igual que al
+        // editar: es lo que hace que se borre esa fila y no otra.
+        const enviado = gateway.deletePreviewRequests[0];
+
+        expect(enviado.keys).toEqual([[{ column: 'id', value: '1' }]]);
+        expect(enviado.confirmed).toBe(false);
+        expect(store.deletePreview()?.[0]).toContain('DELETE FROM');
+      });
+
+      /** Sin confirmación el servidor se niega; el store no debe pedirla por su cuenta. */
+      it('borrar manda la confirmación y limpia la selección', async () => {
+        await abrirTabla();
+
+        store.toggleRowSelection(1);
+        await store.prepareDelete();
+        await store.deleteSelectedRows();
+
+        expect(gateway.deleteRequests[0].confirmed).toBe(true);
+        expect(store.selectedRows()).toEqual([]);
+        expect(store.deletePreview()).toBeNull();
+        expect(store.notice()).toContain('1 fila borrada');
+      });
+
+      it('la marca se pone y se quita sobre la misma fila', async () => {
+        await abrirTabla();
+
+        store.toggleRowSelection(1);
+        expect(store.selectedRows()).toEqual([1]);
+
+        store.toggleRowSelection(1);
+        expect(store.selectedRows()).toEqual([]);
+      });
+
+      it('volver atrás conserva la selección y descarta el SQL', async () => {
+        await abrirTabla();
+
+        store.toggleRowSelection(1);
+        await store.prepareDelete();
+        store.cancelDeletePreview();
+
+        expect(store.deletePreview()).toBeNull();
+        expect(store.selectedRows()).toEqual([1]);
+      });
+    });
 
     it('una consulta escrita a mano no es editable', async () => {
       await store.connect(form);
@@ -1363,6 +1591,353 @@ describe('WorkspaceStore', () => {
       );
 
       expect(store.tabs().length).toBe(before);
+    });
+  });
+  describe('transacciones manuales', () => {
+    it('abre la transacción sobre la conexión activa y dice a cuál afecta', async () => {
+      await store.connect(form);
+
+      const abierta = await store.beginTransaction();
+
+      expect(abierta).toBe(true);
+      expect(gateway.transactionCalls).toContain('begin:sesion-1');
+      expect(store.transaction()?.connectionName).toBe('Pruebas');
+      expect(store.notice()).toContain('Transacción abierta en «Pruebas»');
+    });
+
+    it('avisa de que el DDL no se deshace en los motores que no lo permiten', async () => {
+      gateway.transaction = closedTransaction({ ddlIsReversible: false });
+      await store.connect(form);
+
+      await store.beginTransaction();
+
+      expect(store.notice()).toContain('no se deshace en este motor');
+    });
+
+    it('confirmar cierra la transacción y lo cuenta', async () => {
+      await store.connect(form);
+      await store.beginTransaction();
+
+      const confirmada = await store.commitTransaction();
+
+      expect(confirmada).toBe(true);
+      expect(store.transaction()).toBeNull();
+      expect(store.notice()).toBe('Cambios confirmados en «Pruebas».');
+    });
+
+    it('deshacer cierra la transacción', async () => {
+      await store.connect(form);
+      await store.beginTransaction();
+
+      await store.rollbackTransaction();
+
+      expect(store.transaction()).toBeNull();
+      expect(gateway.transactionCalls).toContain('rollback:sesion-1');
+    });
+
+    it('sin conexión no se puede abrir ninguna', async () => {
+      const abierta = await store.beginTransaction();
+
+      expect(abierta).toBe(false);
+      expect(gateway.transactionCalls).toEqual([]);
+      expect(store.notice()).toBe('Abre una conexión para poder usar transacciones.');
+    });
+
+    /**
+     * Cerrar la conexión deshace lo que no esté confirmado, así que la interfaz
+     * tiene que poder preguntar antes de llegar ahí.
+     */
+    it('sabe si una conexión tiene trabajo sin confirmar', async () => {
+      await store.connect(form);
+      const connectionId = store.connections()[0].id;
+
+      expect(store.hasOpenTransaction(connectionId)).toBe(false);
+
+      await store.beginTransaction();
+
+      expect(store.hasOpenTransaction(connectionId)).toBe(true);
+
+      await store.disconnect(connectionId);
+
+      expect(store.hasOpenTransaction(connectionId)).toBe(false);
+    });
+    /**
+     * La deshace el proceso local sin que nadie pulse nada, así que el usuario
+     * tiene que enterarse al volver: sus cambios ya no están.
+     */
+    it('cuenta que la transacción se deshizo sola al descubrirlo', async () => {
+      await store.connect(form);
+      await store.beginTransaction();
+
+      // El proceso local la deshizo por inactividad mientras nadie miraba, así
+      // que confirmar ya no tiene nada que confirmar.
+      gateway.transaction = closedTransaction({ autoRolledBackAt: '2026-08-14T10:20:00Z' });
+      gateway.commitShouldFail = true;
+
+      const confirmada = await store.commitTransaction();
+
+      expect(confirmada).toBe(false);
+      expect(store.transaction()).toBeNull();
+      expect(store.notice()).toContain('se deshizo sola');
+      expect(store.notice()).toContain('15 min');
+    });
+  });
+  describe('ajustes de formateo', () => {
+    it('empieza con lo que se venía aplicando', () => {
+      expect(store.formatSettings()).toEqual({
+        style: 'standard',
+        expressionWidth: 80,
+        keywordCase: 'upper',
+        indent: 'spaces2',
+      });
+    });
+
+    it('recuerda lo que el usuario elige', async () => {
+      await store.setFormatSettings({ style: 'tabular', indent: 'tabs' });
+
+      expect(store.formatSettings().style).toBe('tabular');
+      expect(store.formatSettings().indent).toBe('tabs');
+      expect(gateway.preferences['editor.format.style']).toBe('tabular');
+      expect(gateway.preferences['editor.format.indent']).toBe('tabs');
+    });
+
+    /** Escribir las cuatro claves en cada clic llenaría la base de nada. */
+    it('solo guarda lo que cambió', async () => {
+      await store.setFormatSettings({ keywordCase: 'lower' });
+
+      expect(Object.keys(gateway.preferences)).toEqual(['editor.format.keywordCase']);
+    });
+
+    it('los recupera al arrancar', async () => {
+      gateway.preferences = { 'editor.format.style': 'tabular', 'editor.format.width': '120' };
+
+      await store.loadPreferences();
+
+      expect(store.formatSettings().style).toBe('tabular');
+      expect(store.formatSettings().expressionWidth).toBe(120);
+    });
+  });
+  describe('reconectar y navegar entre bases', () => {
+    it('detecta que la sesión se perdió y lo cuenta con una salida', async () => {
+      await store.connect(form);
+      gateway.sessionIsGone = true;
+
+      await store.execute('SELECT 1');
+
+      const connection = store.connections()[0];
+
+      expect(connection.lost).toBe(true);
+      expect(connection.sessionId).toBeUndefined();
+      expect(store.lostConnection()?.id).toBe(connection.id);
+      expect(store.notice()).toContain('Se perdió la conexión');
+    });
+
+    /** El árbol era de una sesión que ya no existe: enseñarlo sería mentir. */
+    it('al perderse la sesión retira su catálogo', async () => {
+      await store.connect(form);
+      expect(store.explorerNodes().length).toBeGreaterThan(0);
+
+      gateway.sessionIsGone = true;
+      await store.execute('SELECT 1');
+
+      expect(store.explorerNodes().length).toBe(0);
+    });
+
+    it('reconectar abre otra sesión y deja la conexión utilizable', async () => {
+      gateway.savedConnections = [savedProfile];
+      await store.loadSavedConnections();
+      await store.connectSaved(savedProfile.id);
+
+      gateway.sessionIsGone = true;
+      await store.execute('SELECT 1');
+      gateway.sessionIsGone = false;
+
+      const outcome = await store.reconnect(savedProfile.id);
+
+      expect(outcome).toBe('ok');
+      expect(store.connections()[0].lost).toBeFalsy();
+      expect(store.connections()[0].state).toBe('connected');
+      expect(store.notice()).toContain('restablecida');
+    });
+
+    /** Sin perfil guardado no hay con qué volver a abrirla. */
+    it('no promete reconectar una conexión que no está guardada', async () => {
+      await store.connect(form);
+
+      const outcome = await store.reconnect(store.connections()[0].id);
+
+      expect(outcome).toBe('failed');
+      expect(store.notice()).toContain('no está guardada');
+    });
+
+    it('cambiar de base afecta a la pestaña, no a otro script', async () => {
+      await store.connect(form);
+
+      store.useDatabase('otra_base');
+
+      expect(store.activeTab()?.database).toBe('otra_base');
+      expect(store.activeDatabase()).toBe('otra_base');
+      expect(store.tabs().length).toBe(1);
+    });
+
+    it('la consulta se ejecuta contra la base elegida', async () => {
+      await store.connect(form);
+      store.useDatabase('otra_base');
+
+      await store.execute('SELECT 1');
+
+      expect(gateway.executeCalls.at(-1)?.database).toBe('otra_base');
+    });
+
+    /** El resultado vino de la base anterior; dejarlo invita a leerlo mal. */
+    it('cambiar de base retira el resultado en pantalla', async () => {
+      await store.connect(form);
+      await store.execute('SELECT 1');
+      expect(store.result()).not.toBeNull();
+
+      store.useDatabase('otra_base');
+
+      expect(store.result()).toBeNull();
+    });
+
+    it('ofrece las bases que trajo el explorador', async () => {
+      await store.connect(form);
+
+      expect(store.databasesFor(store.connections()[0].id)).toEqual(['druse_test']);
+    });
+
+    /**
+     * Una consulta contra otra base va por otra conexión, así que se confirma
+     * sola. Callarlo dejaría creer que esos cambios se pueden deshacer.
+     */
+    it('avisa de que la base nueva queda fuera de la transacción abierta', async () => {
+      await store.connect(form);
+      await store.beginTransaction();
+
+      store.useDatabase('otra_base');
+
+      expect(store.notice()).toContain('no entra en la transacción abierta');
+    });
+
+    it('sin transacción abierta, cambiar de base no dice nada', async () => {
+      await store.connect(form);
+      store.notify('algo anterior');
+
+      store.useDatabase('otra_base');
+
+      expect(store.notice()).toBe('algo anterior');
+    });
+  });
+
+  describe('trabajo sin ejecutar', () => {
+    // El guardado espera a que se deje de escribir, así que el reloj se controla
+    // aquí en vez de dormir de verdad en cada prueba.
+    beforeEach(() => vi.useFakeTimers());
+    afterEach(() => vi.useRealTimers());
+
+    it('devuelve las pestañas de la última sesión tal y como estaban', async () => {
+      gateway.storedTabs = [
+        {
+          id: 'q7',
+          title: 'informe.sql',
+          sql: '-- a medio escribir\nSELECT * FROM ventas',
+          isActive: false,
+          isDirty: true,
+          connectionId: 'c1',
+          database: 'druse_test',
+          fileName: 'informe.sql',
+        },
+        { id: 'q8', title: 'Query 8', sql: 'SELECT 2', isActive: true, isDirty: false },
+      ];
+
+      await store.restoreTabs();
+
+      expect(store.tabs().map((tab) => tab.sql)).toEqual([
+        '-- a medio escribir\nSELECT * FROM ventas',
+        'SELECT 2',
+      ]);
+      expect(store.activeTab()?.id).toBe('q8');
+      expect(store.tabs()[0].fileName).toBe('informe.sql');
+      expect(store.tabs()[0].dirty).toBe(true);
+    });
+
+    it('sin nada guardado deja la pestaña vacía de siempre', async () => {
+      gateway.storedTabs = [];
+
+      await store.restoreTabs();
+
+      expect(store.tabs()).toHaveLength(1);
+      expect(store.tabs()[0].sql).toBe('');
+    });
+
+    /**
+     * Lo que más duele: si el guardado corriera antes de leer, la pestaña vacía
+     * del arranque borraría el trabajo de la sesión anterior.
+     */
+    it('no guarda nada antes de haber restaurado', async () => {
+      store.updateSql('SELECT 1');
+      vi.advanceTimersByTime(5000);
+
+      expect(gateway.savedTabs).toHaveLength(0);
+    });
+
+    it('guarda solo cuando se deja de escribir', async () => {
+      await store.restoreTabs();
+
+      store.updateSql('SEL');
+      vi.advanceTimersByTime(400);
+      store.updateSql('SELECT');
+      vi.advanceTimersByTime(400);
+      store.updateSql('SELECT 1');
+
+      // Tres cambios seguidos, ninguna escritura todavía.
+      expect(gateway.savedTabs).toHaveLength(0);
+
+      vi.advanceTimersByTime(1000);
+
+      expect(gateway.savedTabs).toHaveLength(1);
+      expect(gateway.savedTabs[0][0].sql).toBe('SELECT 1');
+    });
+
+    it('cerrar una pestaña también se guarda', async () => {
+      await store.restoreTabs();
+
+      store.createTab('SELECT 2');
+      vi.advanceTimersByTime(1000);
+      const antes = gateway.savedTabs.length;
+
+      store.closeTab(store.tabs()[0].id);
+      vi.advanceTimersByTime(1000);
+
+      expect(gateway.savedTabs.length).toBeGreaterThan(antes);
+      expect(gateway.savedTabs.at(-1)).toHaveLength(1);
+    });
+
+    it('al cerrar se guarda lo que estuviera esperando', async () => {
+      await store.restoreTabs();
+
+      store.updateSql('SELECT 1');
+      // Sin llegar al segundo de espera: es la rendija que deja el retardo.
+      vi.advanceTimersByTime(300);
+      expect(gateway.savedTabs).toHaveLength(0);
+
+      store.flushTabs();
+
+      expect(gateway.savedTabs).toHaveLength(1);
+      expect(gateway.savedTabs[0][0].sql).toBe('SELECT 1');
+    });
+
+    it('una pestaña nueva no se llama igual que una recuperada', async () => {
+      gateway.storedTabs = [
+        { id: 'q9', title: 'Query 9', sql: 'SELECT 1', isActive: true, isDirty: false },
+      ];
+
+      await store.restoreTabs();
+      store.createTab('SELECT 2');
+
+      const ids = store.tabs().map((tab) => tab.id);
+
+      expect(new Set(ids).size).toBe(ids.length);
     });
   });
 });

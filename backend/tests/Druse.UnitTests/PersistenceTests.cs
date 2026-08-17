@@ -363,6 +363,100 @@ public sealed class QueryHistoryStoreTests : IDisposable
     }
 }
 
+/// <summary>
+/// Las pestañas del editor, que es trabajo **sin ejecutar**: lo que se perdía al
+/// cerrar porque el historial solo guarda lo que llegó a lanzarse.
+/// </summary>
+public sealed class EditorTabStoreTests : IDisposable
+{
+    private readonly TemporaryPaths _paths = new();
+    private readonly SqliteEditorTabStore _store;
+
+    public EditorTabStoreTests()
+    {
+        var database = new DruseDatabase(_paths);
+        database.MigrateAsync(CancellationToken.None).GetAwaiter().GetResult();
+        _store = new SqliteEditorTabStore(database);
+    }
+
+    public void Dispose() => _paths.Dispose();
+
+    private static EditorTabState Tab(string id, string sql, bool active = false) => new()
+    {
+        Id = id,
+        Title = id,
+        Sql = sql,
+        IsActive = active,
+        IsDirty = true,
+        ConnectionId = "conexion-1",
+        Database = "druse_test",
+    };
+
+    [Fact]
+    public async Task GuardaYDevuelveLoQueNoSeEjecuto()
+    {
+        await _store.ReplaceAllAsync(
+            [Tab("uno", "SELECT 1"), Tab("dos", "-- a medio escribir\nSELECT", active: true)],
+            CancellationToken.None);
+
+        var tabs = await _store.GetAllAsync(CancellationToken.None);
+
+        Assert.Equal(2, tabs.Count);
+        Assert.Equal("SELECT 1", tabs[0].Sql);
+        Assert.Equal("-- a medio escribir\nSELECT", tabs[1].Sql);
+        Assert.True(tabs[1].IsActive);
+        Assert.Equal("conexion-1", tabs[0].ConnectionId);
+    }
+
+    /// <summary>El orden de la barra es parte de lo que se recupera.</summary>
+    [Fact]
+    public async Task ConservaElOrden()
+    {
+        await _store.ReplaceAllAsync(
+            [Tab("c", "3"), Tab("a", "1"), Tab("b", "2")],
+            CancellationToken.None);
+
+        var tabs = await _store.GetAllAsync(CancellationToken.None);
+
+        Assert.Equal(["c", "a", "b"], tabs.Select(tab => tab.Id));
+        Assert.Equal([0, 1, 2], tabs.Select(tab => tab.Position));
+    }
+
+    /// <summary>
+    /// Guardar sustituye: una pestaña cerrada no puede volver sola la próxima vez
+    /// que se abra la aplicación.
+    /// </summary>
+    [Fact]
+    public async Task GuardarSustituyeLoAnterior()
+    {
+        await _store.ReplaceAllAsync(
+            [Tab("uno", "SELECT 1"), Tab("dos", "SELECT 2")],
+            CancellationToken.None);
+        await _store.ReplaceAllAsync([Tab("uno", "SELECT 1")], CancellationToken.None);
+
+        var tabs = await _store.GetAllAsync(CancellationToken.None);
+
+        Assert.Equal("uno", Assert.Single(tabs).Id);
+    }
+
+    [Fact]
+    public async Task SinNadaGuardadoNoDevuelveNada()
+    {
+        Assert.Empty(await _store.GetAllAsync(CancellationToken.None));
+    }
+
+    /// <summary>Sobrevive a cerrar la aplicación: el archivo es el mismo.</summary>
+    [Fact]
+    public async Task LoGuardadoSobreviveAReabrir()
+    {
+        await _store.ReplaceAllAsync([Tab("uno", "SELECT 1")], CancellationToken.None);
+
+        var reopened = new SqliteEditorTabStore(new DruseDatabase(_paths));
+
+        Assert.Equal("SELECT 1", Assert.Single(await reopened.GetAllAsync(CancellationToken.None)).Sql);
+    }
+}
+
 public sealed class PreferencesStoreTests : IDisposable
 {
     private readonly TemporaryPaths _paths = new();

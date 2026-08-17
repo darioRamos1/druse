@@ -47,6 +47,17 @@ public interface IDatabaseSession : IAsyncDisposable
     string ServerVersion { get; }
 
     bool IsOpen { get; }
+
+    /// <summary>
+    /// La transacción manual de esta conexión.
+    ///
+    /// Una transacción pertenece a la conexión, no a la pestaña: si el usuario
+    /// abre una y ejecuta algo desde otra pestaña del mismo perfil, ese trabajo
+    /// **también entra en ella**. No es una decisión de diseño, es cómo funciona
+    /// una conexión, y por eso la interfaz lo dice aquí en lugar de dejar que
+    /// cada capa lo suponga.
+    /// </summary>
+    SessionTransaction Transaction { get; }
 }
 
 /// <summary>

@@ -6,12 +6,14 @@ const ENGINE_LABELS: Readonly<Record<DatabaseEngine, string>> = {
   postgresql: 'PG',
   sqlserver: 'MS',
   mysql: 'MY',
+  informix: 'IX',
 };
 
 const ENGINE_NAMES: Readonly<Record<DatabaseEngine, string>> = {
   postgresql: 'PostgreSQL',
   sqlserver: 'SQL Server',
   mysql: 'MySQL',
+  informix: 'Informix',
 };
 
 /**
@@ -19,7 +21,9 @@ const ENGINE_NAMES: Readonly<Record<DatabaseEngine, string>> = {
  *
  * Centraliza el color por motor: es lo único del sistema que puede depender del
  * motor en la interfaz, y por eso vive en un solo componente en lugar de
- * repartirse en condicionales por las plantillas (plan §13).
+ * repartirse en condicionales por las plantillas (plan §13). El color concreto
+ * lo pone el tema —`--dr-engine-*`—, porque los tonos que funcionan sobre negro
+ * no son los mismos que funcionan sobre blanco.
  */
 @Component({
   selector: 'app-engine-badge',
@@ -45,21 +49,27 @@ const ENGINE_NAMES: Readonly<Record<DatabaseEngine, string>> = {
     }
 
     :host([data-engine='postgresql']) {
-      background: rgb(86 140 214 / 16%);
-      border: 1px solid rgb(86 140 214 / 34%);
-      color: #7faee8;
+      background: var(--dr-engine-postgresql-tint);
+      border: 1px solid var(--dr-engine-postgresql-line);
+      color: var(--dr-engine-postgresql);
     }
 
     :host([data-engine='sqlserver']) {
-      background: rgb(217 90 90 / 14%);
-      border: 1px solid rgb(217 90 90 / 30%);
-      color: #e07a7a;
+      background: var(--dr-engine-sqlserver-tint);
+      border: 1px solid var(--dr-engine-sqlserver-line);
+      color: var(--dr-engine-sqlserver);
     }
 
     :host([data-engine='mysql']) {
-      background: rgb(214 164 86 / 13%);
-      border: 1px solid rgb(214 164 86 / 30%);
-      color: #d9ae6a;
+      background: var(--dr-engine-mysql-tint);
+      border: 1px solid var(--dr-engine-mysql-line);
+      color: var(--dr-engine-mysql);
+    }
+
+    :host([data-engine='informix']) {
+      background: var(--dr-engine-informix-tint);
+      border: 1px solid var(--dr-engine-informix-line);
+      color: var(--dr-engine-informix);
     }
   `,
 })

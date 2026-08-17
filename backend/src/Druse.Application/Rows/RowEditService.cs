@@ -55,8 +55,133 @@ public sealed class RowEditService(
         return await _connections.UseDatabaseAsync(
             session,
             batch.Table.Database,
-            selected => editor.ApplyAsync(selected, prepared, cancellationToken),
+            async selected =>
+            {
+                try
+                {
+                    return await editor.ApplyAsync(selected, prepared, cancellationToken);
+                }
+                finally
+                {
+                    // Guardar cuenta como actividad: si estos cambios entraron en
+                    // una transacción del usuario, el reloj que la deshace por
+                    // olvido vuelve a empezar.
+                    selected.Transaction.Touch();
+                }
+            },
             cancellationToken);
+    }
+
+    /// <summary>El `DELETE` que se ejecutaría, para enseñarlo antes de borrar nada.</summary>
+    public async Task<IReadOnlyList<string>> PreviewDeleteAsync(
+        RowDeleteBatch batch,
+        CancellationToken cancellationToken)
+    {
+        var (editor, prepared) = await PrepareDeleteAsync(batch, requireConfirmation: false, cancellationToken);
+
+        return editor.DescribeDelete(prepared);
+    }
+
+    /// <summary>Borra las filas, si todas las reglas lo permiten.</summary>
+    public async Task<RowEditResult> DeleteAsync(
+        RowDeleteBatch batch,
+        CancellationToken cancellationToken)
+    {
+        var (editor, prepared) = await PrepareDeleteAsync(batch, requireConfirmation: true, cancellationToken);
+
+        using var turn = await _connections.EnterAsync(batch.SessionId, cancellationToken);
+
+        var session = _connections.Require(batch.SessionId);
+
+        return await _connections.UseDatabaseAsync(
+            session,
+            batch.Table.Database,
+            async selected =>
+            {
+                try
+                {
+                    return await editor.DeleteAsync(selected, prepared, cancellationToken);
+                }
+                finally
+                {
+                    selected.Transaction.Touch();
+                }
+            },
+            cancellationToken);
+    }
+
+    /// <summary>
+    /// Comprueba las mismas reglas que la edición, con una diferencia: aquí no
+    /// hay columnas que cambiar, así que solo se valida la clave.
+    /// </summary>
+    private async Task<(IRowEditor Editor, PreparedRowDeleteBatch Batch)> PrepareDeleteAsync(
+        RowDeleteBatch batch,
+        bool requireConfirmation,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(batch);
+
+        var session = _connections.Require(batch.SessionId);
+
+        if (session.Profile.ReadOnly)
+        {
+            throw new RowEditRejectedException(new RowEditRejection(
+                RowEditRefusal.ReadOnlyConnection,
+                "La conexión está marcada como solo lectura."));
+        }
+
+        if (batch.Keys.Count == 0)
+        {
+            throw new RowEditRejectedException(new RowEditRejection(
+                RowEditRefusal.NothingToDo,
+                "No hay ninguna fila señalada para borrar."));
+        }
+
+        if (requireConfirmation && !batch.Confirmed)
+        {
+            throw new RowEditRejectedException(new RowEditRejection(
+                RowEditRefusal.Unconfirmed,
+                "Hay que confirmar el borrado antes de ejecutarlo."));
+        }
+
+        var columns = await _metadata.GetColumnsAsync(batch.SessionId, batch.Table, cancellationToken);
+        var byName = columns.ToDictionary(column => column.Name, StringComparer.OrdinalIgnoreCase);
+        var primaryKey = columns.Where(column => column.IsPrimaryKey).ToList();
+
+        if (primaryKey.Count == 0)
+        {
+            throw new RowEditRejectedException(new RowEditRejection(
+                RowEditRefusal.NoPrimaryKey,
+                $"«{batch.Table.Name}» no tiene clave primaria, así que no hay forma de señalar una fila concreta. " +
+                "Bórrala con un DELETE escrito a mano, con su WHERE a la vista."));
+        }
+
+        var real = primaryKey.Select(column => column.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var keys = new List<IReadOnlyList<PreparedCell>>(batch.Keys.Count);
+
+        foreach (var key in batch.Keys)
+        {
+            var enviada = key.Select(cell => cell.Column).ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+            if (!enviada.SetEquals(real))
+            {
+                throw new RowEditRejectedException(new RowEditRejection(
+                    RowEditRefusal.KeyMismatch,
+                    $"Para borrar hay que identificar la fila por su clave primaria ({string.Join(", ", real)}). " +
+                    "Incluye esas columnas en la consulta."));
+            }
+
+            keys.Add([.. key.Select(cell => PrepareCell(cell, byName))]);
+        }
+
+        return (
+            _providers.GetRowEditor(session.Engine),
+            new PreparedRowDeleteBatch
+            {
+                Schema = batch.Table.Schema,
+                Table = batch.Table.Name,
+                Keys = keys,
+            });
     }
 
     private async Task<(IRowEditor Editor, PreparedRowEditBatch Batch)> PrepareAsync(

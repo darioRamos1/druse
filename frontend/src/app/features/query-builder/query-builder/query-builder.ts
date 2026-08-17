@@ -10,9 +10,11 @@ import {
 } from '@angular/core';
 
 import { WorkspaceStore } from '../../../core/workspace/workspace-store';
+import { ValueInput } from '../../../shared/ui/value-input/value-input';
 import {
   DatabaseEngine,
   DatabaseObject,
+  InputKind,
   KnownColumn,
 } from '../../../shared/models/workspace';
 import {
@@ -24,12 +26,14 @@ import {
   SelectColumn,
   buildCreateTable,
   buildDropTable,
+  buildDeleteCount,
+  buildDeleteValues,
   buildInsertValues,
   buildSelect,
   buildUpdateValues,
 } from '../../query-editor/sql-language/sql-writer';
 
-type Operation = 'select' | 'insert' | 'update';
+type Operation = 'select' | 'insert' | 'update' | 'delete';
 type InputMode = 'omit' | 'value' | 'null' | 'default';
 
 interface ColumnDraft {
@@ -90,6 +94,7 @@ const OPERATORS: readonly FilterOperator[] = [
 @Component({
   selector: 'app-query-builder',
   changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [ValueInput],
   templateUrl: './query-builder.html',
   styleUrl: './query-builder.scss',
 })
@@ -104,8 +109,15 @@ export class QueryBuilder implements OnInit {
   readonly insert = output<string>();
 
   protected readonly operators = OPERATORS;
+  /**
+   * Tipos de unión que ofrece el compositor.
+   *
+   * Ni MySQL ni Informix tienen `FULL OUTER JOIN`, así que allí no se enseña:
+   * ofrecerlo produciría SQL que el servidor rechaza, y el usuario buscaría el
+   * error en su consulta en vez de en el motor.
+   */
   protected readonly joinTypes = computed<readonly JoinType[]>(() =>
-    this.engine() === 'mysql'
+    this.engine() === 'mysql' || this.engine() === 'informix'
       ? ['INNER', 'LEFT', 'RIGHT', 'CROSS']
       : ['INNER', 'LEFT', 'RIGHT', 'FULL OUTER', 'CROSS'],
   );
@@ -184,6 +196,10 @@ export class QueryBuilder implements OnInit {
           assignments: this.toWrites(this.updateDrafts(), true),
           filters: this.updateFilters(),
         });
+      case 'delete':
+        // Comparte los filtros del UPDATE a propósito: es el mismo «qué filas»,
+        // y tener dos listas invitaría a componer el DELETE mirando la del otro.
+        return buildDeleteValues(this.engine(), { ...base, filters: this.updateFilters() });
       default:
         const joins = this.joins();
         const queryJoins = this.toQueryJoins(joins);
@@ -202,7 +218,38 @@ export class QueryBuilder implements OnInit {
 
   protected readonly sql = computed(() => this.sqlOverride() ?? this.generatedSql());
 
+  /** Cuántas filas se llevaría el DELETE compuesto, o `null` si no se ha contado. */
+  protected readonly affected = signal<number | null>(null);
+  protected readonly counting = signal(false);
+
+  /**
+   * Cuenta las filas que caerían con el mismo filtro.
+   *
+   * El error caro no suele ser olvidar el `WHERE`, sino escribir uno que abarca
+   * más de lo que uno cree; el recuento es lo único que lo enseña **antes**.
+   */
+  protected async countAffected(): Promise<void> {
+    const sql = buildDeleteCount(this.engine(), {
+      schema: this.table().schema,
+      table: this.table().name,
+      filters: this.updateFilters(),
+    });
+
+    if (!sql) {
+      return;
+    }
+
+    this.counting.set(true);
+
+    try {
+      this.affected.set(await this._store.countRows(this.connectionId(), sql));
+    } finally {
+      this.counting.set(false);
+    }
+  }
+
   protected setOperation(operation: Operation): void {
+    this.affected.set(null);
     this.operation.set(operation);
     this.sqlOverride.set(null);
   }
@@ -509,6 +556,21 @@ export class QueryBuilder implements OnInit {
     this.updateFilters.update((current) =>
       current.map((filter, i) => (i === index ? { ...filter, ...patch } : filter)),
     );
+  }
+
+  /**
+   * Con qué control se pide el valor de un filtro.
+   *
+   * El filtro guarda el nombre de la columna, no su tipo, así que se busca en lo
+   * que ya se cargó. `IN` se queda en texto libre a propósito: espera una lista
+   * separada por comas, y un calendario no sabe escribir eso.
+   */
+  protected filterKind(filter: QueryFilter): InputKind {
+    if (filter.operator === 'IN') {
+      return 'text';
+    }
+
+    return this.columns().find((column) => column.name === filter.column)?.inputKind ?? 'text';
   }
 
   protected draftFor(operation: 'insert' | 'update', name: string): ColumnDraft | undefined {

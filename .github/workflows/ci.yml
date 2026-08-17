@@ -29,6 +29,13 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
+      # El clidriver de IBM —el que usa Informix— depende de libxml2, que es del
+      # sistema y no viaja en el paquete. Sin ella la carga falla y la excepción
+      # se lleva por delante el proceso de pruebas entero, no solo las suyas.
+      - name: Dependencia nativa de Informix
+        if: matrix.os == 'ubuntu-latest'
+        run: sudo apt-get update && sudo apt-get install -y libxml2
+
       - name: Restaurar
         run: dotnet restore backend/Druse.slnx
 
@@ -42,7 +49,7 @@ jobs:
   # Windows y macOS no traen Docker, y montarlo ahí multiplicaría el tiempo sin
   # aportar nada. Lo que se valida aquí son los proveedores, no el sistema.
   backend-con-motores-reales:
-    name: Backend con PostgreSQL, SQL Server y MySQL
+    name: Backend con los cuatro motores
     runs-on: ubuntu-latest
 
     services:
@@ -109,6 +116,13 @@ jobs:
       DRUSE_TEST_MYSQL_USER: root
       DRUSE_TEST_MYSQL_PASSWORD: druse_dev_only
 
+      DRUSE_TEST_IFX_HOST: 127.0.0.1
+      DRUSE_TEST_IFX_PORT: 9089
+      DRUSE_TEST_IFX_DB: druse_test
+      DRUSE_TEST_IFX_SECOND_DB: druse_test2
+      DRUSE_TEST_IFX_USER: informix
+      DRUSE_TEST_IFX_PASSWORD: in4mix
+
       # Sin esto, un motor caído se manifestaría como una suite en verde que no
       # comprobó nada. Aquí ese caso debe romper la compilación.
       DRUSE_REQUIRE_ENGINES: '1'
@@ -120,6 +134,45 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '10.0.x'
+
+      # El clidriver de IBM depende de libxml2, que es del sistema y no viaja en
+      # el paquete: sin ella la carga falla y la excepción se lleva por delante
+      # el proceso de pruebas entero, no solo las de Informix.
+      - name: Dependencia nativa de Informix
+        run: sudo apt-get update && sudo apt-get install -y libxml2
+
+      # Informix va como paso y no como `service` a propósito. Su comprobación de
+      # salud necesita un shell de login —`onstat` no está en el PATH sin cargar
+      # el perfil— y el arranque pasa de largo cualquier margen razonable de los
+      # servicios, así que como servicio el job muere con «One or more containers
+      # failed to start» sin más explicación. Aquí se espera con el mismo bucle
+      # que usa `build/scripts/test-db.ps1`, que es el que ya funciona en local.
+      #
+      # Se publica el 9089, que es el escuchador DRDA por donde habla Druse; el
+      # 9088 atiende el protocolo nativo y usarlo da un error que parece de
+      # credenciales.
+      - name: Levantar Informix
+        run: |
+          docker run -d --name druse-informix \
+            -e LICENSE=accept \
+            -e DB_INIT=1 \
+            -p 9089:9089 \
+            icr.io/informix/informix-developer-database:latest
+
+          # Se espera a «On-Line», no a que `onstat` responda: el servidor pasa
+          # primero por modo administrativo, donde ya contesta pero rechaza toda
+          # conexión con «27002: No connections are allowed in quiescent mode».
+          for _ in $(seq 1 60); do
+            if docker exec druse-informix bash -lc 'onstat -' 2>/dev/null | grep -q 'On-Line'; then
+              echo "Informix en línea."
+              exit 0
+            fi
+            sleep 5
+          done
+
+          echo "Informix no respondió a tiempo."
+          docker logs --tail 40 druse-informix
+          exit 1
 
       - name: Crear las bases adicionales
         run: |
@@ -135,7 +188,14 @@ jobs:
             mysql -uroot -pdruse_dev_only \
             -e "CREATE DATABASE IF NOT EXISTS druse_test_secondary;"
 
-      - name: Probar contra los tres motores
+          # Informix no tiene `CREATE DATABASE IF NOT EXISTS`, y las bases deben
+          # llevar registro de transacciones porque DRDA lo exige: sin `WITH LOG`
+          # el servidor está vivo pero rechaza la conexión.
+          docker exec druse-informix bash -lc \
+            'echo "CREATE DATABASE druse_test WITH LOG;" | dbaccess - -
+             echo "CREATE DATABASE druse_test2 WITH LOG;" | dbaccess - -'
+
+      - name: Probar contra los cuatro motores
         run: dotnet test backend/Druse.slnx --configuration Release --verbosity normal
 
   frontend:
@@ -233,10 +293,112 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
-      - name: Publicar
+      - name: Publicar API
         run: >
           dotnet publish backend/src/Druse.Host.LocalApi
           --configuration Release
           --runtime ${{ matrix.rid }}
           --self-contained true
           --output artifacts/${{ matrix.rid }}
+
+  # Genera los instaladores de Linux y macOS, que es lo que no puede salir de la
+  # máquina de desarrollo: cada plataforma solo empaqueta lo suyo. El de Windows
+  # se construye con `build/scripts/package.ps1`.
+  #
+  # Los artefactos quedan descargables desde la ejecución. No están firmados ni
+  # notarizados —eso es otra tarea, del backlog—, así que sirven para probar la
+  # aplicación, no para repartirla.
+  paquete-de-escritorio:
+    name: Paquete de escritorio (${{ matrix.rid }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            rid: linux-x64
+            bundles: deb,appimage
+          - os: macos-latest
+            rid: osx-arm64
+            bundles: dmg,app
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Instalar .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Instalar Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      # `libfuse2` es para el AppImage y no para Tauri: linuxdeploy se empaqueta
+      # a sí mismo como AppImage y necesita FUSE 2 para arrancar. Sin él la
+      # construcción llega hasta el final y muere con «failed to run linuxdeploy»,
+      # que no menciona la causa.
+      - name: Dependencias de Tauri en Linux
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libfuse2
+
+      - name: Instalar Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      # El CLI de Tauri no viene con el runner y compilarlo lleva varios minutos,
+      # así que se guarda el binario ya construido entre ejecuciones.
+      - name: Recuperar el CLI de Tauri
+        id: cli-de-tauri
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/bin/cargo-tauri
+          key: cargo-tauri-2-${{ runner.os }}
+
+      - name: Instalar el CLI de Tauri
+        if: steps.cli-de-tauri.outputs.cache-hit != 'true'
+        run: cargo install tauri-cli --version "^2" --locked
+
+      # La API viaja dentro del paquete, así que se publica en el directorio que
+      # `tauri.conf.json` declara como recurso. Es lo mismo que hace el paso 1 de
+      # `package.ps1`.
+      - name: Publicar la API dentro del envoltorio
+        run: >
+          dotnet publish backend/src/Druse.Host.LocalApi
+          --configuration Release
+          --runtime ${{ matrix.rid }}
+          --self-contained true
+          --output shells/desktop-tauri/api
+          -p:PublishSingleFile=false
+          -p:DebugType=none
+
+      - name: Compilar el frontend
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run build
+
+      # Los formatos se piden por línea de comandos porque `tauri.conf.json` fija
+      # los de Windows —NSIS y MSI—, que aquí no existen.
+      #
+      # `APPIMAGE_EXTRACT_AND_RUN` es para linuxdeploy, que se distribuye a sí
+      # mismo como AppImage y necesita FUSE para montarse. En un runner no lo
+      # tiene, y falla con «failed to run linuxdeploy» sin decir por qué; con
+      # esto se extrae en lugar de montarse. Instalar libfuse2 no basta.
+      - name: Empaquetar
+        working-directory: shells/desktop-tauri
+        env:
+          APPIMAGE_EXTRACT_AND_RUN: 1
+        run: cargo tauri build --bundles ${{ matrix.bundles }}
+
+      - name: Recoger los artefactos
+        uses: actions/upload-artifact@v4
+        with:
+          name: druse-${{ matrix.rid }}
+          path: shells/desktop-tauri/target/release/bundle/**
+          if-no-files-found: error
+          retention-days: 14

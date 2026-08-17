@@ -1,10 +1,13 @@
 <app-top-bar
+  [theme]="theme()"
   (newConnection)="openDialog()"
   (newQuery)="createTab()"
   (openSql)="openSqlFile()"
   (saveSql)="saveTab()"
   (saveSqlAs)="saveTab(true)"
   (openPalette)="paletteOpen.set(true)"
+  (themeSelected)="selectTheme($event)"
+  (openSettings)="openSettings()"
 />
 
 <div class="body">
@@ -32,6 +35,7 @@
     (toggleNode)="toggleNode($event)"
     (refreshNode)="refreshNode($event)"
     (disconnect)="disconnect($event)"
+    (reconnect)="reconnect($event)"
     (forget)="forget($event)"
     (edit)="editConnection($event)"
     (openNode)="openNode($event)"
@@ -40,6 +44,7 @@
     (designTable)="openTableDesigner($event)"
     (composeQuery)="openBuilder($event)"
     (definition)="openDefinition($event)"
+    (runProcedure)="openProcedureRunner($event)"
     (copied)="onCopied($event)"
     (copyFailed)="onCopyFailed()"
   />
@@ -67,11 +72,23 @@
       [hasSelection]="hasSelection()"
       [canExecute]="hasConnection()"
       [timeoutSeconds]="timeoutSeconds()"
+      [transactionOpen]="transaction() !== null"
+      [transactionScope]="transaction()?.connectionName ?? ''"
+      [transactionDdlIsReversible]="transaction()?.ddlIsReversible ?? true"
+      [transactionBusy]="transactionBusy()"
+      [formatSettings]="formatSettings()"
+      [databases]="databases()"
+      [database]="activeDatabase()"
+      (formatSettingsChange)="setFormatSettings($event)"
+      (databaseChange)="useDatabase($event)"
       (execute)="execute()"
       (executeSelection)="executeSelection()"
       (cancel)="cancel()"
       (format)="format()"
       (timeoutChange)="setTimeout($event)"
+      (beginTransaction)="beginTransaction()"
+      (commit)="commitTransaction()"
+      (rollback)="rollbackTransaction()"
     />
 
     @defer (on immediate) {
@@ -80,6 +97,10 @@
         class="editor"
         [value]="sql()"
         [engine]="activeEngine()"
+        [theme]="theme()"
+        [accent]="accent()"
+        [fontSize]="editorFontSize()"
+        [formatSettings]="formatSettings()"
         [schema]="schemaIndex()"
         [executionError]="executionError()"
         [loadColumns]="loadColumns"
@@ -129,6 +150,15 @@
       <div class="banner" role="status" aria-live="polite">
         <span class="banner__label">Aviso</span>
         <span class="banner__text">{{ message }}</span>
+        <!--
+          Cuando lo que falló fue la conexión, la salida va en el propio aviso:
+          leer que se cayó y tener que buscar dónde se arregla es media ayuda.
+        -->
+        @if (lostConnection(); as lost) {
+          <button type="button" class="banner__button" (click)="reconnect(lost.id)">
+            Reconectar
+          </button>
+        }
         <button type="button" class="banner__button" (click)="dismissNotice()">Cerrar</button>
       </div>
     }
@@ -154,6 +184,14 @@
       [edits]="edits()"
       [editPreview]="editPreview()"
       [saving]="savingEdits()"
+      [selectedRows]="selectedRows()"
+      [deletePreview]="deletePreview()"
+      [deleting]="deleting()"
+      (rowToggled)="toggleRowSelection($event)"
+      (clearSelection)="clearRowSelection()"
+      (prepareDelete)="prepareDelete()"
+      (cancelDelete)="cancelDeletePreview()"
+      (deleteRows)="deleteSelectedRows()"
       (cellEdited)="onCellEdited($event)"
       (prepareEdits)="prepareEdits()"
       (saveEdits)="saveEdits()"
@@ -201,6 +239,25 @@
       (insert)="insertComposed($event)"
       (closed)="closeBuilder()"
     />
+  }
+}
+
+@defer (when procedureTarget()) {
+  @if (procedureTarget(); as destino) {
+    <app-procedure-runner
+      [procedure]="destino.source"
+      [engine]="engineFor(destino.connectionId)"
+      [connectionId]="destino.connectionId"
+      (insert)="insertCall($event)"
+      (run)="runCall($event)"
+      (closed)="closeProcedureRunner()"
+    />
+  }
+}
+
+@defer (when settingsOpen()) {
+  @if (settingsOpen()) {
+    <app-settings-dialog [editorRatio]="editorRatio()" (closed)="settingsOpen.set(false)" />
   }
 }
 

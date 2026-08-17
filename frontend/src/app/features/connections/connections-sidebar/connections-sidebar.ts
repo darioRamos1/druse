@@ -43,6 +43,8 @@ export class ConnectionsSidebar {
   readonly toggleNode = output<string>();
   readonly refreshNode = output<string>();
   readonly disconnect = output<string>();
+  /** Cerrar la sesión y volver a abrirla, conservando las pestañas. */
+  readonly reconnect = output<string>();
   readonly forget = output<string>();
   /** Abrir el formulario con los datos de esta conexión guardada. */
   readonly edit = output<string>();
@@ -50,6 +52,7 @@ export class ConnectionsSidebar {
   /** Componer una consulta sobre esta tabla o vista. */
   readonly composeQuery = output<ExplorerNode>();
   readonly definition = output<ExplorerNode>();
+  readonly runProcedure = output<ExplorerNode>();
 
   /** Crear una tabla dentro de este esquema. */
   readonly createTable = output<ExplorerNode>();

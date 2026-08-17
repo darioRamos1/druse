@@ -27,23 +27,150 @@
 
 <span class="divider" aria-hidden="true"></span>
 
-<button type="button" class="btn" title="Formatear (Ctrl+Shift+F)" (click)="format.emit()">
-  <app-icon name="format" [size]="11" />
-  Formatear
-</button>
+<!--
+  Formatear y elegir cómo formatear son dos botones y no uno: quien pulsa
+  «Formatear» quiere formatear ya, y esconder esa acción detrás de un menú la
+  encarecería por una configuración que se toca una vez.
+-->
+<div class="format">
+  <button
+    type="button"
+    class="btn btn--split"
+    title="Formatear (Ctrl+Shift+F)"
+    (click)="format.emit()"
+  >
+    <app-icon name="format" [size]="11" />
+    Formatear
+  </button>
+
+  <button
+    type="button"
+    class="btn btn--caret"
+    title="Cómo se formatea"
+    aria-label="Opciones de formateo"
+    [attr.aria-expanded]="editingFormat()"
+    (click)="toggleFormat()"
+  >
+    <app-icon name="chevron-down" [size]="9" />
+  </button>
+
+  @if (editingFormat()) {
+    <div
+      class="format__menu"
+      role="dialog"
+      aria-label="Opciones de formateo"
+      (keydown.escape)="editingFormat.set(false)"
+    >
+      @for (group of formatGroups; track group.key) {
+        <p class="format__label">{{ group.label }}</p>
+        <div class="format__options" role="group" [attr.aria-label]="group.label">
+          @for (option of group.options; track option.value) {
+            <button
+              type="button"
+              class="format__option"
+              [attr.aria-pressed]="isChosen(group.key, option.value)"
+              [class.is-selected]="isChosen(group.key, option.value)"
+              [attr.title]="option.hint ?? null"
+              (click)="choose(group.key, option.value)"
+            >
+              {{ option.label }}
+            </button>
+          }
+        </div>
+      }
+    </div>
+  }
+</div>
 
 <span class="divider" aria-hidden="true"></span>
 
-<button type="button" class="btn btn--commit">Commit</button>
-<button type="button" class="btn btn--rollback">Rollback</button>
+@if (transactionOpen()) {
+  <!--
+    El indicador dice a qué conexión afecta, no solo que hay una transacción: es
+    de la conexión, así que lo que se ejecute en otra pestaña del mismo perfil
+    también entra en ella.
+  -->
+  <span class="tx" [attr.title]="transactionHint()">
+    <span class="tx__dot" aria-hidden="true"></span>
+    Transacción abierta en <strong>{{ transactionScope() }}</strong>
+  </span>
+
+  <button
+    type="button"
+    class="btn btn--commit"
+    [disabled]="transactionBusy()"
+    (click)="commit.emit()"
+  >
+    Commit
+  </button>
+  <button
+    type="button"
+    class="btn btn--rollback"
+    [disabled]="transactionBusy()"
+    (click)="rollback.emit()"
+  >
+    Rollback
+  </button>
+} @else {
+  <!--
+    Al modo manual se entra a propósito. El autocommit sigue siendo lo normal, y
+    Commit y Rollback no aparecen mientras no haya nada que confirmar.
+  -->
+  <button
+    type="button"
+    class="btn"
+    [disabled]="transactionBusy() || !canExecute()"
+    [attr.title]="canExecute() ? 'Nada se confirmará hasta que pulses Commit' : 'Abre una conexión para poder usar transacciones'"
+    (click)="beginTransaction.emit()"
+  >
+    Iniciar transacción
+  </button>
+}
 
 <span class="spacer"></span>
 
-<button type="button" class="chip">
-  <span class="chip__dot" aria-hidden="true"></span>
-  <span class="chip__mono">{{ context() }}</span>
-  <app-icon name="chevron-down" [size]="9" />
-</button>
+<!--
+  La base de la pestaña, y cómo se cambia.
+
+  Cambiarla aquí evita tener un script por base: la misma consulta se ejecuta
+  contra otra base de la misma conexión, que es como está montado un servidor con
+  producción y pruebas una al lado de la otra.
+-->
+<div class="context">
+  <button
+    type="button"
+    class="chip"
+    [disabled]="databases().length === 0"
+    [attr.aria-expanded]="choosingDatabase()"
+    [attr.title]="
+      databases().length > 0 ? 'Base contra la que se ejecuta' : 'Conecta para elegir una base'
+    "
+    (click)="toggleDatabases()"
+  >
+    <span class="chip__dot" aria-hidden="true"></span>
+    <span class="chip__mono">{{ context() }}</span>
+    <app-icon name="chevron-down" [size]="9" />
+  </button>
+
+  @if (choosingDatabase()) {
+    <ul class="context__menu" role="listbox" (keydown.escape)="choosingDatabase.set(false)">
+      @for (name of databases(); track name) {
+        <li>
+          <button
+            type="button"
+            class="context__option"
+            role="option"
+            [attr.aria-selected]="name === database()"
+            [class.is-selected]="name === database()"
+            (click)="chooseDatabase(name)"
+          >
+            {{ name }}
+          </button>
+        </li>
+      }
+    </ul>
+  }
+</div>
 
 <div class="timeout">
   <button

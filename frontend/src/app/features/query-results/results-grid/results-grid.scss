@@ -14,28 +14,33 @@
   min-width: max-content;
 }
 
+// Fija al bajar y en movimiento al ir a la derecha: `sticky` solo se pega en el
+// eje donde se le da un desplazamiento, y aquí solo se le da `top`. Por eso
+// tiene que estar dentro de `.body`, que es quien tiene el scroll; fuera de él
+// no se pegaba a nada y, sobre todo, no acompañaba a sus columnas.
 .head {
   position: sticky;
   z-index: 2;
   top: 0;
   height: var(--dr-grid-header-height);
-  flex: 0 0 var(--dr-grid-header-height);
   background: var(--dr-surface-grid-header);
-  border-bottom: 1px solid #212939;
+  border-bottom: 1px solid var(--dr-border-input);
   font-size: 11.5px;
   font-weight: 600;
   color: var(--dr-text-tertiary);
   letter-spacing: 0.02em;
 }
 
+// Justo debajo de la cabecera, y con su misma regla: se queda al bajar y se
+// mueve con las columnas al desplazarse a la derecha, para que cada caja de
+// filtro siga sobre la columna que filtra.
 .filters {
   position: sticky;
   z-index: 2;
   top: var(--dr-grid-header-height);
   height: 28px;
-  flex: 0 0 28px;
-  background: #0f141e;
-  border-bottom: 1px solid #1b2231;
+  background: var(--dr-surface-sunken);
+  border-bottom: 1px solid var(--dr-border-faint);
   font-family: var(--dr-font-mono);
   font-size: 11px;
   color: var(--dr-text-disabled);
@@ -58,13 +63,13 @@
 
 .row {
   height: 32px;
-  border-bottom: 1px solid #151b26;
+  border-bottom: 1px solid var(--dr-border-hairline);
   font-family: var(--dr-font-mono);
   font-size: 12px;
   color: var(--dr-text-secondary);
 
   &:hover {
-    background: #141a26;
+    background: var(--dr-surface-hover);
   }
 }
 
@@ -73,7 +78,7 @@
   align-items: center;
   gap: 5px;
   padding: 0 10px;
-  border-right: 1px solid #1b2231;
+  border-right: 1px solid var(--dr-border-faint);
   overflow: hidden;
   white-space: nowrap;
 
@@ -110,13 +115,13 @@
   &--number {
     justify-content: center;
     padding: 0;
-    border-right-color: #151b26;
+    border-right-color: var(--dr-border-hairline);
     color: var(--dr-text-disabled);
     font-size: 10.5px;
   }
 
   &--value {
-    border-right-color: #151b26;
+    border-right-color: var(--dr-border-hairline);
     text-overflow: ellipsis;
     cursor: default;
 
@@ -126,13 +131,13 @@
 
     // La celda seleccionada se marca para saber sobre cuál actúa Ctrl+C.
     &.is-selected {
-      background: rgb(108 139 255 / 18%);
-      box-shadow: inset 0 0 0 1px rgb(108 139 255 / 55%);
+      background: var(--dr-accent-tint-strong);
+      box-shadow: inset 0 0 0 1px var(--dr-accent-line-strong);
     }
 
     // El tipo de la columna decide el color, igual que en el mockup.
     &[data-kind='number'] {
-      color: #7faee8;
+      color: var(--dr-info);
     }
 
     &[data-kind='text'] {
@@ -158,7 +163,7 @@
   cursor: pointer;
 
   &:hover {
-    background: #1e2637;
+    background: var(--dr-surface-active);
     color: var(--dr-text-secondary);
   }
 }
@@ -182,10 +187,26 @@
 }
 
 .cell--number {
+  display: flex;
+  gap: 6px;
+  align-items: center;
   cursor: pointer;
 
   &:hover {
     color: var(--dr-text-secondary);
+  }
+
+  // Una fila señalada para borrar se ve de un vistazo, sin tener que buscar la
+  // casilla marcada.
+  &.is-marked {
+    background: var(--dr-danger-tint);
+    color: var(--dr-text);
+  }
+
+  &__check {
+    margin: 0;
+    accent-color: var(--dr-danger);
+    cursor: pointer;
   }
 }
 
@@ -193,7 +214,7 @@
 .null {
   padding: 1px 5px;
   border-radius: 4px;
-  background: rgb(124 135 156 / 10%);
+  background: var(--dr-surface-stripe);
   color: var(--dr-text-disabled);
   font-size: 10.5px;
   font-style: italic;
@@ -205,9 +226,9 @@
   align-items: center;
   gap: 5px;
   padding: 2px 7px;
-  border: 1px solid rgb(61 220 151 / 22%);
+  border: 1px solid var(--dr-success-line-soft);
   border-radius: 5px;
-  background: rgb(61 220 151 / 10%);
+  background: var(--dr-success-tint);
   color: var(--dr-success);
   font-size: 11px;
 }
@@ -231,7 +252,7 @@
 }
 
 .cell--value.is-dirty {
-  background: rgb(108 139 255 / 12%);
+  background: var(--dr-accent-tint);
   box-shadow: inset 2px 0 0 var(--dr-accent);
 }
 

@@ -1,0 +1,68 @@
+:host {
+  display: flex;
+  flex: 1;
+  gap: 4px;
+  align-items: center;
+  min-width: 0;
+}
+
+.field {
+  flex: 1;
+  min-width: 0;
+  box-sizing: border-box;
+  padding: 7px 10px;
+  border: 1px solid var(--dr-border);
+  border-radius: 8px;
+  background: var(--dr-surface-base);
+  color: var(--dr-text);
+  font-family: var(--dr-font-mono);
+  font-size: var(--dr-font-size-xs);
+
+  &:disabled {
+    opacity: 0.45;
+  }
+}
+
+/* El calendario y el reloj del navegador son claros por omisión y desaparecen
+   sobre el fondo oscuro. */
+.field[type='date'],
+.field[type='time'],
+.field[type='datetime-local'] {
+  color-scheme: dark;
+}
+
+.check {
+  display: flex;
+  flex: 1;
+  gap: 8px;
+  align-items: center;
+  color: var(--dr-text);
+  font-family: var(--dr-font-mono);
+  font-size: var(--dr-font-size-xs);
+  cursor: pointer;
+}
+
+.toggle {
+  display: flex;
+  align-items: center;
+  padding: 6px;
+  border: 1px solid var(--dr-border);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--dr-text-muted);
+  cursor: pointer;
+
+  &:hover:not(:disabled) {
+    color: var(--dr-text);
+  }
+
+  &.is-active {
+    border-color: var(--dr-accent);
+    color: var(--dr-text);
+  }
+
+  &:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+}

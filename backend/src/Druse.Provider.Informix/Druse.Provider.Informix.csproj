@@ -1,0 +1,60 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\Druse.Database.Abstractions\Druse.Database.Abstractions.csproj" />
+  </ItemGroup>
+
+  <!--
+    No existe un proveedor ADO.NET moderno específico de Informix: el
+    `IBM.Data.Informix` clásico se quedó en .NET Framework. Se llega a Informix
+    por DRDA con el proveedor de DB2, que es lo que IBM mantiene para .NET.
+
+    Pesa ~111 MB con sus binarios nativos, así que **es el paquete más caro de
+    la solución**. Su licencia es de IBM, no libre: redistribuirlo dentro del
+    instalador está permitido por la sección de redistribuibles del IPLA, cuyos
+    términos hay que cumplir.
+
+    **IBM publica un paquete por sistema operativo**, con el mismo espacio de
+    nombres y la misma versión, y cada uno trae solo sus binarios nativos. Usar
+    el de Windows en Linux no da un error al compilar: compila, publica, y
+    revienta al abrir la primera conexión con un `DllNotFoundException` sobre
+    `db2app64.dll` que se lleva por delante el proceso entero.
+
+    Se elige por el destino de la publicación cuando lo hay —para que un
+    `dotnet publish -r linux-x64` desde Windows salga correcto— y por el sistema
+    de la máquina cuando no.
+  -->
+  <PropertyGroup>
+    <DruseDb2Platform Condition="'$(DruseDb2Platform)' == '' and $(RuntimeIdentifier.StartsWith('win'))">win</DruseDb2Platform>
+    <DruseDb2Platform Condition="'$(DruseDb2Platform)' == '' and $(RuntimeIdentifier.StartsWith('linux'))">lnx</DruseDb2Platform>
+    <DruseDb2Platform Condition="'$(DruseDb2Platform)' == '' and $(RuntimeIdentifier.StartsWith('osx'))">osx</DruseDb2Platform>
+    <DruseDb2Platform Condition="'$(DruseDb2Platform)' == '' and $([MSBuild]::IsOSPlatform('Windows'))">win</DruseDb2Platform>
+    <DruseDb2Platform Condition="'$(DruseDb2Platform)' == '' and $([MSBuild]::IsOSPlatform('Linux'))">lnx</DruseDb2Platform>
+    <DruseDb2Platform Condition="'$(DruseDb2Platform)' == '' and $([MSBuild]::IsOSPlatform('OSX'))">osx</DruseDb2Platform>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Net.IBM.Data.Db2" Version="10.0.0.200"
+                      Condition="'$(DruseDb2Platform)' == 'win'" />
+    <PackageReference Include="Net.IBM.Data.Db2-lnx" Version="10.0.0.200"
+                      Condition="'$(DruseDb2Platform)' == 'lnx'" />
+    <PackageReference Include="Net.IBM.Data.Db2-osx" Version="10.0.0.200"
+                      Condition="'$(DruseDb2Platform)' == 'osx'" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!--
+      La fábrica de la cadena de conexión es interna —nadie fuera del proveedor
+      debe conocer los tipos de IBM—, pero es lo primero que se ejecuta al
+      conectar: un error ahí deja el motor inservible sin llegar a la red.
+    -->
+    <InternalsVisibleTo Include="Druse.UnitTests" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+</Project>

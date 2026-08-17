@@ -40,6 +40,11 @@ internal sealed class MySqlResultReader : IQueryResultReader
         command.CommandText = request.Sql;
         command.CommandTimeout = request.TimeoutSeconds;
 
+        // Exportar lee por la misma conexión, así que con una transacción manual
+        // abierta va dentro de ella: lo que se exporta es lo que el usuario ve,
+        // incluidos sus cambios sin confirmar.
+        ((DbCommand)command).Transaction = session.Transaction.Current;
+
         DbDataReader? reader = null;
 
         try

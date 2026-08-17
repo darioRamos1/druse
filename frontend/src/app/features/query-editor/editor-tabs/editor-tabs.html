@@ -26,7 +26,11 @@
         <span class="tab__title">{{ tab.title }}</span>
         <span class="tab__context">
           @if (connectionFor(tab); as connection) {
-            {{ connection.name }} · {{ connection.database }}
+            <!--
+              La base de la pestaña manda sobre la de la conexión: se puede
+              cambiar desde la barra, y entonces esta es la que se ejecuta.
+            -->
+            {{ connection.name }} · {{ tab.database ?? connection.database }}
           } @else {
             Sin conexión asignada
           }

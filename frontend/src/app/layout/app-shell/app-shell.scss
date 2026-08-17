@@ -69,7 +69,7 @@
     z-index: 55;
     inset: var(--dr-topbar-height) 0 0;
     display: block;
-    background: rgb(0 0 0 / 52%);
+    background: var(--dr-scrim);
   }
 
   .mobile-explorer-toggle {
@@ -105,8 +105,8 @@
   font-size: var(--dr-font-size-sm);
 
   &--warning {
-    border-top-color: rgb(242 104 107 / 30%);
-    background: rgb(242 104 107 / 8%);
+    border-top-color: var(--dr-danger-line-soft);
+    background: var(--dr-danger-tint-weak);
   }
 
   &__text {
@@ -118,7 +118,7 @@
     flex: none;
     padding: 2px 6px;
     border-radius: 4px;
-    background: rgb(108 139 255 / 12%);
+    background: var(--dr-accent-tint);
     color: var(--dr-accent-bright);
     font-size: 9px;
     font-weight: 700;
@@ -157,17 +157,17 @@
     cursor: pointer;
 
     &:hover {
-      background: #151b27;
+      background: var(--dr-surface-hover);
       color: var(--dr-text);
     }
 
     &--danger {
-      border-color: rgb(242 104 107 / 40%);
-      color: #f2686b;
+      border-color: var(--dr-danger-line);
+      color: var(--dr-danger);
 
       &:hover {
-        background: rgb(242 104 107 / 14%);
-        color: #f2686b;
+        background: var(--dr-danger-tint);
+        color: var(--dr-danger);
       }
     }
   }

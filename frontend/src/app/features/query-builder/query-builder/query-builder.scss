@@ -13,7 +13,7 @@
 .backdrop {
   position: absolute;
   inset: 0;
-  background: rgb(5 7 11 / 66%);
+  background: var(--dr-scrim);
   backdrop-filter: blur(2px);
 }
 
@@ -25,10 +25,10 @@
   max-width: calc(100vw - 32px);
   max-height: calc(100vh - 32px);
   overflow: hidden;
-  border: 1px solid #262f42;
+  border: 1px solid var(--dr-border-dialog);
   border-radius: 12px;
-  background: #111621;
-  box-shadow: 0 40px 120px rgb(0 0 0 / 70%);
+  background: var(--dr-surface-dialog);
+  box-shadow: var(--dr-shadow-dialog);
 }
 
 .head {
@@ -125,7 +125,7 @@
 }
 
 .hint--warning {
-  color: #d7b66f;
+  color: var(--dr-warning-text);
 }
 
 /* Las columnas se marcan a golpe de vista: son lo que más se toca aquí. */
@@ -150,11 +150,11 @@
   cursor: pointer;
 
   &:hover {
-    background: #151b27;
+    background: var(--dr-surface-hover);
   }
 
   &.is-on {
-    background: rgb(108 139 255 / 12%);
+    background: var(--dr-accent-tint);
   }
 
   &__name {
@@ -253,7 +253,7 @@ input[type='number'] {
   border-radius: 6px;
 
   &:hover {
-    background: #151b27;
+    background: var(--dr-surface-hover);
   }
 
   &.is-disabled {
@@ -406,7 +406,7 @@ input[type='number'] {
   cursor: pointer;
 
   &:hover:not(:disabled) {
-    background: #151b27;
+    background: var(--dr-surface-hover);
     color: var(--dr-text);
   }
 
@@ -417,8 +417,8 @@ input[type='number'] {
   }
 
   &--primary {
-    border-color: rgb(108 139 255 / 40%);
-    background: rgb(108 139 255 / 14%);
+    border-color: var(--dr-accent-line);
+    background: var(--dr-accent-tint);
     color: var(--dr-accent-bright);
   }
 }
@@ -448,6 +448,29 @@ input[type='number'] {
 
     input[type='text'] {
       flex-basis: 100%;
+    }
+  }
+}
+
+/* DELETE se distingue del resto de operaciones: no es una más de la fila. */
+.op--danger.is-active {
+  border-color: var(--dr-danger);
+  color: var(--dr-danger);
+}
+
+.count {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-top: 10px;
+
+  &__result {
+    color: var(--dr-text-muted);
+    font-size: var(--dr-font-size-xs);
+
+    /* Más de una fila es justo el caso que conviene mirar dos veces. */
+    &--many {
+      color: var(--dr-danger);
     }
   }
 }

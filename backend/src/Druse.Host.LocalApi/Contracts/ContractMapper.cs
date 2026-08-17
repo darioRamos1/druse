@@ -1,6 +1,7 @@
 using Druse.Application.Abstractions;
 using Druse.Application.Queries;
 using Druse.Application.Tables;
+using Druse.Application.Transactions;
 using Druse.Database.Abstractions;
 using Druse.Domain;
 
@@ -86,6 +87,25 @@ internal static class ContractMapper
         };
     }
 
+    public static TransactionStateResponse ToResponse(this TransactionState state)
+    {
+        ArgumentNullException.ThrowIfNull(state);
+
+        return new TransactionStateResponse
+        {
+            SessionId = state.SessionId,
+            IsOpen = state.IsOpen,
+            StartedAt = state.StartedAt,
+            LastActivityAt = state.LastActivityAt,
+            ConnectionName = state.ConnectionName,
+            Database = state.Database,
+            Engine = EngineId(state.Engine),
+            DdlIsReversible = state.DdlIsReversible,
+            IdleTimeoutSeconds = state.IdleTimeoutSeconds,
+            AutoRolledBackAt = state.AutoRolledBackAt,
+        };
+    }
+
     public static TestConnectionResponse ToResponse(this TestConnectionResult result)
     {
         ArgumentNullException.ThrowIfNull(result);
@@ -145,8 +165,32 @@ internal static class ContractMapper
             IsGenerated = value.IsGenerated,
             DefaultValue = value.DefaultValue,
             Ordinal = value.Ordinal,
+            InputKind = InputKind(value.DataType),
         };
     }
+
+    /// <summary>
+    /// Con qué control se pide un valor de este tipo.
+    ///
+    /// Sale de la misma clasificación que usa el editor de filas para convertir
+    /// lo que se escribe, así que la interfaz pide exactamente lo que el
+    /// servidor sabrá interpretar. Tenerla en dos sitios sería tenerla mal en
+    /// uno de los dos.
+    /// </summary>
+    private static string InputKind(string dataType) =>
+        ColumnValueParser.Classify(dataType) switch
+        {
+            ColumnFamily.Integral => "integer",
+            ColumnFamily.Fractional => "decimal",
+            ColumnFamily.Boolean => "boolean",
+            ColumnFamily.Date => "date",
+            ColumnFamily.Time => "time",
+            ColumnFamily.Timestamp => "datetime",
+            ColumnFamily.TimestampWithZone => "datetimeOffset",
+            ColumnFamily.Binary => "binary",
+            ColumnFamily.Uuid => "uuid",
+            _ => "text",
+        };
 
     public static QueryRequest ToDomain(this ExecuteQueryRequest request)
     {
@@ -434,6 +478,92 @@ internal static class ContractMapper
         };
     }
 
+    public static RowDeleteBatch ToDomain(this RowDeleteRequest request)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        return new RowDeleteBatch
+        {
+            SessionId = request.SessionId,
+            Table = request.Table.ToDomain(),
+            Keys =
+            [
+                .. request.Keys.Select(key =>
+                    (IReadOnlyList<CellValue>)
+                        [.. key.Select(cell => new CellValue(cell.Column, cell.Value))]),
+            ],
+            Confirmed = request.Confirmed,
+        };
+    }
+
+    public static EditorTabDto ToDto(this EditorTabState tab)
+    {
+        ArgumentNullException.ThrowIfNull(tab);
+
+        return new EditorTabDto
+        {
+            Id = tab.Id,
+            Title = tab.Title,
+            Sql = tab.Sql,
+            IsActive = tab.IsActive,
+            IsDirty = tab.IsDirty,
+            ConnectionId = tab.ConnectionId,
+            Database = tab.Database,
+            FileName = tab.FileName,
+            DocumentId = tab.DocumentId,
+        };
+    }
+
+    public static EditorTabState ToDomain(this EditorTabDto tab)
+    {
+        ArgumentNullException.ThrowIfNull(tab);
+
+        return new EditorTabState
+        {
+            Id = tab.Id,
+            Title = tab.Title,
+            Sql = tab.Sql,
+            IsActive = tab.IsActive,
+            IsDirty = tab.IsDirty,
+            ConnectionId = tab.ConnectionId,
+            Database = tab.Database,
+            FileName = tab.FileName,
+            DocumentId = tab.DocumentId,
+            SavedAtUtc = DateTimeOffset.UtcNow,
+        };
+    }
+
+    public static RoutineSignatureResponse ToDto(this RoutineSignature signature)
+    {
+        ArgumentNullException.ThrowIfNull(signature);
+
+        return new RoutineSignatureResponse
+        {
+            Name = signature.Name,
+            Schema = signature.Schema,
+            IsFunction = signature.IsFunction,
+            ReturnType = signature.ReturnType,
+            Parameters =
+            [
+                .. signature.Parameters.Select(parameter => new RoutineParameterDto
+                {
+                    Name = parameter.Name,
+                    DataType = parameter.DataType,
+                    InputKind = InputKind(parameter.DataType),
+                    Direction = parameter.Direction switch
+                    {
+                        RoutineParameterDirection.Output => "output",
+                        RoutineParameterDirection.InputOutput => "inputOutput",
+                        RoutineParameterDirection.Return => "return",
+                        _ => "input",
+                    },
+                    Ordinal = parameter.Ordinal,
+                    HasDefault = parameter.HasDefault,
+                }),
+            ],
+        };
+    }
+
     public static TableStructureResponse ToResponse(this TableStructure structure)
     {
         ArgumentNullException.ThrowIfNull(structure);
@@ -581,18 +711,30 @@ internal static class ContractMapper
         {
             Name = column.Name,
             DataType = column.DataType,
+            InputKind = InputKind(column.DataType),
             Ordinal = column.Ordinal,
         })],
         Rows = resultSet.Rows,
         Truncated = resultSet.Truncated,
     };
 
-    /// <summary>Acepta el identificador del contrato y también el nombre del enumerado.</summary>
+    /// <summary>
+    /// Acepta el identificador del contrato y también el nombre del enumerado.
+    ///
+    /// Los tres primeros son alias: su identificador no se escribe igual que el
+    /// nombre del enumerado. Cuando sí coinciden basta con reconocer el nombre,
+    /// y ese caso general es justo lo que faltaba: Informix se anunciaba en
+    /// `/api/engines` —que sale del registro de proveedores— y se rechazaba
+    /// aquí, así que **el motor entero era inalcanzable desde la aplicación**
+    /// aunque su proveedor estuviera cargado.
+    /// </summary>
     private static DatabaseEngine ParseEngine(string value) => value?.ToLowerInvariant() switch
     {
         "postgresql" or "postgres" => DatabaseEngine.PostgreSql,
         "sqlserver" or "mssql" => DatabaseEngine.SqlServer,
         "mysql" => DatabaseEngine.MySql,
+        { } other when Enum.TryParse<DatabaseEngine>(other, ignoreCase: true, out var parsed) =>
+            parsed,
         _ => throw new ArgumentException($"Motor desconocido: '{value}'.", nameof(value)),
     };
 

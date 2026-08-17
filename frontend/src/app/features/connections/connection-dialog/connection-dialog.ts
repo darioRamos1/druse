@@ -21,6 +21,7 @@ import {
   SslMode,
 } from '../../../shared/models/workspace';
 import { EngineBadge } from '../../../shared/ui/engine-badge/engine-badge';
+import { Icon } from '../../../shared/ui/icon/icon';
 
 interface EngineOption {
   readonly id: DatabaseEngine;
@@ -73,6 +74,10 @@ const ENGINES: readonly EngineOption[] = [
   { id: 'sqlserver', name: 'SQL Server', versions: '2016 – 2022', defaultPort: 1433, available: true },
   { id: 'postgresql', name: 'PostgreSQL', versions: '12 – 18', defaultPort: 5432, available: true },
   { id: 'mysql', name: 'MySQL', versions: '8.0+ · MariaDB', defaultPort: 3306, available: true },
+  // El puerto es el del escuchador DRDA, no el nativo de Informix: Druse se
+  // conecta por DRDA, así que 9089 —el de la edición de desarrollo de IBM— es
+  // mejor punto de partida que el 1526 que la gente recuerda.
+  { id: 'informix', name: 'Informix', versions: '12.10+ · vía DRDA', defaultPort: 9089, available: true },
 ];
 
 /**
@@ -147,7 +152,7 @@ const ENVIRONMENTS: readonly EnvironmentOption[] = [
 @Component({
   selector: 'app-connection-dialog',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, EngineBadge],
+  imports: [FormsModule, EngineBadge, Icon],
   templateUrl: './connection-dialog.html',
   styleUrl: './connection-dialog.scss',
 })
@@ -180,6 +185,16 @@ export class ConnectionDialog {
   protected readonly database = signal('');
   protected readonly username = signal('');
   protected readonly password = signal('');
+
+  /**
+   * Se está mirando la contraseña.
+   *
+   * Empieza oculta y vuelve a ocultarse al cargar otro perfil: el diálogo puede
+   * quedar abierto delante de alguien, y lo que se enseña a propósito no debería
+   * quedarse enseñado por descuido.
+   */
+  protected readonly passwordVisible = signal(false);
+  protected readonly sshSecretVisible = signal(false);
   protected readonly authentication = signal<AuthenticationMode>('password');
   protected readonly readOnly = signal(false);
   protected readonly environment = signal<ConnectionEnvironment>('development');
@@ -367,6 +382,8 @@ export class ConnectionDialog {
 
   /** Vuelca un perfil guardado en el formulario. */
   private load(profile: SavedConnection): void {
+    this.passwordVisible.set(false);
+    this.sshSecretVisible.set(false);
     this.engine.set(profile.engine);
     this.name.set(profile.name);
     this.host.set(profile.host);
@@ -412,7 +429,16 @@ export class ConnectionDialog {
   }
 
   protected databasePlaceholder(): string {
-    return this.engine() === 'sqlserver' ? 'master' : this.engine() === 'mysql' ? 'mysql' : 'postgres';
+    switch (this.engine()) {
+      case 'sqlserver':
+        return 'master';
+      case 'mysql':
+        return 'mysql';
+      case 'informix':
+        return 'sysmaster';
+      default:
+        return 'postgres';
+    }
   }
 
   private validForm(): ConnectionForm | null {

@@ -1,5 +1,6 @@
 using Druse.Database.Abstractions;
 using Druse.Domain;
+using Druse.Provider.Informix;
 using Druse.Provider.MySql;
 using Druse.Provider.PostgreSql;
 using Druse.Provider.SqlServer;
@@ -489,6 +490,106 @@ public sealed class TableDesignerTests
 
         Assert.False(new MySqlTableDesigner().IndexCapabilities.SupportsIncludedColumns);
         Assert.False(new MySqlTableDesigner().IndexCapabilities.SupportsFilter);
+    }
+
+    // -- Informix -------------------------------------------------------------
+
+    /// <summary>
+    /// En Informix la identidad **es el tipo de la columna**, no una cláusula que
+    /// se añade detrás. Es la diferencia más marcada de este motor: los otros tres
+    /// escriben `INTEGER` seguido de algo, y aquí hay que sustituir el tipo.
+    /// </summary>
+    [Fact]
+    public void InformixConvierteLaIdentidadEnUnTipoSerial()
+    {
+        var sql = string.Join("\n", new InformixTableDesigner().DescribeCreate(Pedidos()));
+
+        Assert.Contains("\"id\" SERIAL NOT NULL", sql, StringComparison.Ordinal);
+        // Y no queda rastro de la forma de los otros motores.
+        Assert.DoesNotContain("IDENTITY", sql, StringComparison.Ordinal);
+        Assert.DoesNotContain("AUTO_INCREMENT", sql, StringComparison.Ordinal);
+        Assert.DoesNotContain("GENERATED", sql, StringComparison.Ordinal);
+        Assert.DoesNotContain("INT SERIAL", sql, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// El ancho se conserva al convertir a serial: degradar un `BIGINT` a `SERIAL`
+    /// de 32 bits agotaría los identificadores de una tabla grande sin que nadie
+    /// lo hubiera pedido.
+    /// </summary>
+    [Fact]
+    public void InformixConservaElAnchoAlConvertirASerial()
+    {
+        var table = new TableDefinition
+        {
+            Name = "eventos",
+            Columns =
+            [
+                new TableColumnDefinition
+                {
+                    Name = "id",
+                    DataType = "BIGINT",
+                    IsNullable = false,
+                    IsPrimaryKey = true,
+                    IsIdentity = true,
+                },
+            ],
+        };
+
+        var sql = string.Join("\n", new InformixTableDesigner().DescribeCreate(table));
+
+        Assert.Contains("BIGSERIAL", sql, StringComparison.Ordinal);
+        Assert.DoesNotContain("BIGINT", sql, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void InformixCitaConComillasDoblesYBorraElIndiceComoObjeto()
+    {
+        var alteration = new TableAlteration
+        {
+            Table = Tabla(),
+            AddedIndexes = [PorCliente()],
+            DroppedIndexes = ["ix_viejo"],
+        };
+
+        var statements = new InformixTableDesigner().DescribeAlter(alteration);
+
+        // El índice es un objeto de la base, como en PostgreSQL: se borra por su
+        // nombre calificado y sin mencionar la tabla.
+        Assert.Contains("DROP INDEX \"ventas\".\"ix_viejo\";", statements);
+
+        Assert.Contains(
+            "CREATE INDEX \"ix_pedidos_cliente\" ON \"ventas\".\"pedidos\" " +
+            "(\"cliente_id\" ASC, \"fecha\" DESC);",
+            statements);
+    }
+
+    /// <summary>
+    /// Informix reescribe la columna entera con `MODIFY`, y renombrar es una
+    /// instrucción aparte que va **primero**, para que el `MODIFY` hable ya del
+    /// nombre nuevo.
+    /// </summary>
+    [Fact]
+    public void InformixRenombraAntesDeModificar()
+    {
+        var statements = new InformixTableDesigner().DescribeAlter(Cambios()).ToList();
+
+        var renombrado = statements.FindIndex(sql => sql.StartsWith("RENAME COLUMN", StringComparison.Ordinal));
+        var modificado = statements.FindIndex(sql => sql.Contains("MODIFY", StringComparison.Ordinal));
+
+        Assert.True(renombrado >= 0, "Debe renombrar la columna que cambia de nombre.");
+        Assert.True(renombrado < modificado, "El renombrado va antes que el MODIFY.");
+        Assert.Contains("MODIFY (\"importe\"", statements[modificado], StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void InformixNoOfreceLoQueNoTiene()
+    {
+        var capabilities = new InformixTableDesigner().IndexCapabilities;
+
+        Assert.False(capabilities.SupportsIncludedColumns);
+        Assert.False(capabilities.SupportsFilter);
+        Assert.Empty(capabilities.Methods);
     }
 
     /// <summary>

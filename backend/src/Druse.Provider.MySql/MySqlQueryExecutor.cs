@@ -1,4 +1,4 @@
-using System.Data.Common;
+﻿using System.Data.Common;
 using System.Diagnostics;
 using Druse.Database.Abstractions;
 using Druse.Domain;
@@ -76,6 +76,13 @@ public sealed class MySqlQueryExecutor : IQueryExecutor
             command.CommandText = request.Sql;
             // 0 es «sin límite»: el límite lo pone `deadline`.
             command.CommandTimeout = 0;
+
+            // Si el usuario abrió una transacción manual, esta consulta entra en
+            // ella. Sin esto, los botones de confirmar y deshacer no gobernarían
+            // nada: cada consulta iría por su cuenta en autocommit.
+            // El comando concreto tipa `Transaction` con la clase del driver; se
+            // asigna por el tipo base, que es lo mismo para los cuatro motores.
+            ((DbCommand)command).Transaction = mysql.Transaction.Current;
 
             await using var reader = await command.ExecuteReaderAsync(linked.Token);
 

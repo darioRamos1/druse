@@ -30,9 +30,15 @@
 
   <!-- Metadatos del producto -->
   <PropertyGroup>
+    <!--
+      `Product` es el nombre del programa; `Company` y `Authors`, de quien lo
+      hizo. Son cosas distintas aunque hasta ahora dijeran lo mismo, y aparecen
+      en las propiedades del ejecutable que Windows enseña al usuario.
+    -->
     <Product>Druse</Product>
-    <Company>Druse</Company>
-    <Authors>Druse</Authors>
+    <Company>Darío Ramos</Company>
+    <Authors>Darío Ramos</Authors>
+    <Copyright>© 2026 Darío Ramos</Copyright>
     <Version>0.1.0</Version>
     <NeutralLanguage>es</NeutralLanguage>
   </PropertyGroup>

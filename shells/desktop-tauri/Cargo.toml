@@ -2,7 +2,7 @@
 name = "druse"
 version = "0.1.0"
 description = "Cliente de bases de datos de escritorio"
-authors = ["Druse"]
+authors = ["Darío Ramos"]
 edition = "2021"
 rust-version = "1.77.2"
 
@@ -17,6 +17,7 @@ tauri-build = { version = "2", features = [] }
 
 [dependencies]
 tauri = { version = "2", features = [] }
+base64 = "0.22"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 

@@ -1,3 +1,4 @@
+import { DEFAULT_FORMAT_SETTINGS } from '../../../core/workspace/format-settings';
 import { formatSql } from './sql-formatting';
 
 describe('formatSql', () => {
@@ -76,5 +77,71 @@ describe('formatSql', () => {
     const twice = await formatSql(once.sql, 'postgresql');
 
     expect(twice.changed).toBe(false);
+  });
+
+  describe('ajustes elegidos por el usuario', () => {
+    const sql = 'select id, name from users where active = true and age > 18';
+
+    it('el estilo tabular alinea los valores tras la palabra clave', async () => {
+      const estandar = await formatSql(sql, 'postgresql', DEFAULT_FORMAT_SETTINGS);
+      const tabular = await formatSql(sql, 'postgresql', {
+        ...DEFAULT_FORMAT_SETTINGS,
+        style: 'tabular',
+      });
+
+      // En estándar la palabra clave se queda sola en su línea; en tabular
+      // arrastra el primer valor a su derecha.
+      expect(estandar.sql).toMatch(/^SELECT\n/);
+      expect(tabular.sql).toMatch(/^SELECT\s+id/);
+    });
+
+    it('deja las palabras clave como están cuando se pide', async () => {
+      const result = await formatSql(sql, 'postgresql', {
+        ...DEFAULT_FORMAT_SETTINGS,
+        keywordCase: 'preserve',
+      });
+
+      expect(result.sql).toContain('select');
+      expect(result.sql).not.toContain('SELECT');
+    });
+
+    /**
+     * El ancho manda sobre las expresiones —los argumentos de una función, una
+     * lista—, no sobre las cláusulas: `FROM` siempre empieza línea.
+     */
+    it('un ancho mayor deja la expresión larga en una sola línea', async () => {
+      const largo = "select concat(nombre, ' ', apellido, ' ', ciudad) as etiqueta from usuarios";
+
+      const estrecho = await formatSql(largo, 'postgresql', {
+        ...DEFAULT_FORMAT_SETTINGS,
+        expressionWidth: 20,
+      });
+      const ancho = await formatSql(largo, 'postgresql', {
+        ...DEFAULT_FORMAT_SETTINGS,
+        expressionWidth: 120,
+      });
+
+      expect(estrecho.sql).toMatch(/concat\(\n/);
+      expect(ancho.sql).toContain("concat(nombre, ' ', apellido, ' ', ciudad)");
+      expect(ancho.sql.split('\n').length).toBeLessThan(estrecho.sql.split('\n').length);
+    });
+
+    it('sangra con tabulaciones cuando se pide', async () => {
+      const result = await formatSql(sql, 'postgresql', {
+        ...DEFAULT_FORMAT_SETTINGS,
+        indent: 'tabs',
+      });
+
+      expect(result.sql).toContain('\t');
+    });
+
+    it('sangra con cuatro espacios cuando se pide', async () => {
+      const result = await formatSql(sql, 'postgresql', {
+        ...DEFAULT_FORMAT_SETTINGS,
+        indent: 'spaces4',
+      });
+
+      expect(result.sql).toContain('\n    id');
+    });
   });
 });

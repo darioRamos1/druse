@@ -36,6 +36,23 @@ builder.WebHost.ConfigureKestrel(options =>
 builder.Services.AddOpenApi();
 builder.Services.AddDruse();
 
+// La API es un proceso auxiliar de la ventana: si quien la arrancó desaparece,
+// no tiene a quién servir. Sin esto, una ventana que muere de golpe deja la API
+// viva reteniendo su puerto y bloqueando sus propios archivos, hasta el punto de
+// impedir que Druse se desinstale.
+//
+// Solo se vigila si el envoltorio dice a quién: arrancada a mano —en desarrollo,
+// o para depurar— no hay padre del que depender.
+int parentProcessId = builder.Configuration.GetValue("LocalApi:ParentProcessId", 0);
+
+if (parentProcessId > 0)
+{
+    builder.Services.AddSingleton<IHostedService>(services => new ParentProcessWatcher(
+        services.GetRequiredService<IHostApplicationLifetime>(),
+        services.GetRequiredService<ILogger<ParentProcessWatcher>>(),
+        parentProcessId));
+}
+
 // Origen del servidor de desarrollo de Angular. En producción el frontend se sirve
 // desde el propio host y no hace falta CORS.
 //

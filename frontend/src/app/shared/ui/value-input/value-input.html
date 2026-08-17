@@ -1,0 +1,50 @@
+@if (isBoolean()) {
+  <label class="check">
+    <input
+      type="checkbox"
+      [checked]="checked()"
+      [disabled]="disabled()"
+      [attr.aria-label]="label()"
+      (change)="onCheck($event)"
+    />
+    <span>{{ checked() ? 'true' : 'false' }}</span>
+  </label>
+} @else if (usesNative()) {
+  <input
+    class="field"
+    [type]="nativeType()"
+    [value]="nativeValue()"
+    [disabled]="disabled()"
+    [attr.step]="step()"
+    [attr.aria-label]="label()"
+    (input)="onInput($event)"
+  />
+} @else {
+  <input
+    class="field"
+    type="text"
+    [value]="value()"
+    [disabled]="disabled()"
+    [attr.aria-label]="label()"
+    [attr.placeholder]="dataType()"
+    (input)="onInput($event)"
+  />
+}
+
+@if (canToggle()) {
+  <button
+    type="button"
+    class="toggle"
+    [class.is-active]="freeText()"
+    [disabled]="disabled()"
+    [attr.aria-pressed]="freeText()"
+    [title]="
+      freeText()
+        ? 'Volver al selector del tipo'
+        : 'Escribir a mano, para expresiones como CURRENT_TIMESTAMP'
+    "
+    (click)="toggleFreeText()"
+  >
+    <app-icon name="edit" [size]="12" />
+  </button>
+}

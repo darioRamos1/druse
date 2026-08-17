@@ -4,9 +4,9 @@
   <header class="head">
     <span class="head__icon" aria-hidden="true">
       <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-        <ellipse cx="8" cy="4" rx="5.2" ry="2.2" stroke="#9FB0FF" stroke-width="1.3" />
-        <path d="M2.8 4v8c0 1.2 2.33 2.2 5.2 2.2s5.2-1 5.2-2.2V4" stroke="#9FB0FF" stroke-width="1.3" />
-        <path d="M2.8 8c0 1.2 2.33 2.2 5.2 2.2s5.2-1 5.2-2.2" stroke="#9FB0FF" stroke-width="1.3" />
+        <ellipse cx="8" cy="4" rx="5.2" ry="2.2" stroke="var(--dr-accent-bright)" stroke-width="1.3" />
+        <path d="M2.8 4v8c0 1.2 2.33 2.2 5.2 2.2s5.2-1 5.2-2.2V4" stroke="var(--dr-accent-bright)" stroke-width="1.3" />
+        <path d="M2.8 8c0 1.2 2.33 2.2 5.2 2.2s5.2-1 5.2-2.2" stroke="var(--dr-accent-bright)" stroke-width="1.3" />
       </svg>
     </span>
     <div class="head__text">
@@ -158,7 +158,29 @@
 
         <label class="field">
           <span class="field__label">Contraseña</span>
-          <input class="field__input" type="password" [(ngModel)]="password" autocomplete="off" />
+          <!--
+            Se puede mirar lo que se escribe. Sin esto, una contraseña larga
+            copiada a mano solo se comprueba fallando al conectar, y ahí no se
+            distingue una letra de más de una credencial equivocada.
+          -->
+          <span class="secret">
+            <input
+              class="field__input"
+              [type]="passwordVisible() ? 'text' : 'password'"
+              [(ngModel)]="password"
+              autocomplete="off"
+            />
+            <button
+              type="button"
+              class="secret__toggle"
+              [attr.aria-label]="passwordVisible() ? 'Ocultar la contraseña' : 'Ver la contraseña'"
+              [attr.aria-pressed]="passwordVisible()"
+              [attr.title]="passwordVisible() ? 'Ocultar' : 'Ver'"
+              (click)="passwordVisible.set(!passwordVisible())"
+            >
+              <app-icon [name]="passwordVisible() ? 'eye-off' : 'eye'" [size]="13" />
+            </button>
+          </span>
         </label>
       } @else {
         <!-- Sin este aviso, el hueco donde estaban usuario y contraseña haría
@@ -288,7 +310,24 @@
 
         <label class="field">
           <span class="field__label">{{ sshSecretLabel() }}</span>
-          <input class="field__input" type="password" [(ngModel)]="sshSecret" autocomplete="off" />
+          <span class="secret">
+            <input
+              class="field__input"
+              [type]="sshSecretVisible() ? 'text' : 'password'"
+              [(ngModel)]="sshSecret"
+              autocomplete="off"
+            />
+            <button
+              type="button"
+              class="secret__toggle"
+              [attr.aria-label]="sshSecretVisible() ? 'Ocultar el secreto' : 'Ver el secreto'"
+              [attr.aria-pressed]="sshSecretVisible()"
+              [attr.title]="sshSecretVisible() ? 'Ocultar' : 'Ver'"
+              (click)="sshSecretVisible.set(!sshSecretVisible())"
+            >
+              <app-icon [name]="sshSecretVisible() ? 'eye-off' : 'eye'" [size]="13" />
+            </button>
+          </span>
         </label>
 
         @if (usesSshPrompts()) {

@@ -46,11 +46,13 @@
       "icons/icon.png"
     ],
     "category": "DeveloperTool",
-    "copyright": "Druse",
+    "publisher": "Darío Ramos",
+    "copyright": "© 2026 Darío Ramos",
     "shortDescription": "Cliente de bases de datos",
     "longDescription": "Administra y consulta PostgreSQL y SQL Server desde una interfaz moderna.",
     "resources": [
-      "api/*"
+      "api/*",
+      "api/**/*"
     ],
     "windows": {
       "nsis": {

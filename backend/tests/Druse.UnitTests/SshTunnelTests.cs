@@ -1,4 +1,4 @@
-using Druse.Application.Abstractions;
+﻿using Druse.Application.Abstractions;
 using Druse.Application.Connections;
 using Druse.Database.Abstractions;
 using Druse.Domain;
@@ -260,6 +260,9 @@ public sealed class SshTunnelTests
         public Guid Id { get; } = Guid.NewGuid();
 
         public DatabaseEngine Engine => DatabaseEngine.PostgreSql;
+
+        /// <summary>No habla con ningún motor, así que no hay dónde abrir una.</summary>
+        public SessionTransaction Transaction => SessionTransaction.None;
 
         public ConnectionProfile Profile => profile;
 

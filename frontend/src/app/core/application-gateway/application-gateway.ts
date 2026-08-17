@@ -15,6 +15,7 @@ import {
   SshTunnel,
   TableAlteration,
   TableDesign,
+  RoutineSignature,
   TableStructure,
   TestConnectionResult,
 } from '../../shared/models/workspace';
@@ -95,6 +96,19 @@ export interface RowEditRequest {
   }[];
 }
 
+/**
+ * Filas que se van a borrar, señaladas por su clave primaria.
+ *
+ * Sin valores: para borrar basta con saber cuál es la fila.
+ */
+export interface RowDeleteRequest {
+  readonly sessionId: string;
+  readonly table: DatabaseObject;
+  /** El usuario ya vio el SQL. Sin esto el servidor se niega. */
+  readonly confirmed: boolean;
+  readonly keys: readonly (readonly { column: string; value: string | null }[])[];
+}
+
 /** Lo que se ejecutó al cambiar la estructura, y cuánto tardó. */
 export interface TableChangeResult {
   readonly statements: readonly string[];
@@ -141,6 +155,55 @@ export interface QueryRejected {
 }
 
 /**
+ * La transacción manual de una conexión.
+ *
+ * Es de la conexión y no de la pestaña: dos pestañas del mismo perfil comparten
+ * sesión, así que lo que se ejecute en cualquiera de ellas entra en la misma
+ * transacción. De ahí que lleve el nombre de la conexión y la base, que es lo
+ * que el indicador tiene que enseñar.
+ */
+export interface TransactionState {
+  readonly sessionId: string;
+  readonly isOpen: boolean;
+  /** Cuándo se abrió, en UTC. Ausente si no hay ninguna. */
+  readonly startedAt?: string;
+  readonly lastActivityAt?: string;
+  readonly connectionName: string;
+  readonly database: string;
+  readonly engine: DatabaseEngine;
+  /** El DDL entra en la transacción y se deshace con ella. Falso en MySQL. */
+  readonly ddlIsReversible: boolean;
+  /** Segundos sin actividad tras los cuales se deshace sola. */
+  readonly idleTimeoutSeconds: number;
+  /** Se deshizo sola por inactividad y hay que contárselo al usuario. */
+  readonly autoRolledBackAt?: string;
+}
+
+/**
+ * Una pestaña del editor tal como se guarda entre sesiones.
+ *
+ * Es trabajo **sin ejecutar**: el historial ya guarda lo que llegó a lanzarse, y
+ * esto es lo demás, que hasta ahora se perdía al cerrar.
+ */
+export interface StoredEditorTab {
+  readonly id: string;
+  readonly title: string;
+  readonly sql: string;
+  readonly isActive: boolean;
+  readonly isDirty: boolean;
+  readonly connectionId?: string;
+  readonly database?: string;
+  readonly fileName?: string;
+  readonly documentId?: string;
+}
+
+/** No se pudo iniciar, confirmar o deshacer. */
+export interface TransactionRejected {
+  readonly reason: 'alreadyopen' | 'notopen' | 'readonlyconnection';
+  readonly message: string;
+}
+
+/**
  * Único punto de contacto entre la interfaz y la aplicación local.
  *
  * Los componentes dependen siempre de esta abstracción, nunca de HttpClient.
@@ -178,6 +241,12 @@ export abstract class ApplicationGateway {
 
   abstract getDefinition(sessionId: string, databaseObject: DatabaseObject): Observable<string>;
 
+  /** Parámetros de un procedimiento, para poder componer su llamada. */
+  abstract getRoutineSignature(
+    sessionId: string,
+    routine: DatabaseObject,
+  ): Observable<RoutineSignature>;
+
   /**
    * Ejecuta SQL.
    *
@@ -188,6 +257,24 @@ export abstract class ApplicationGateway {
   abstract executeQuery(request: ExecuteQueryRequest): Observable<QueryResult>;
 
   abstract cancelQuery(executionId: string): Observable<void>;
+
+  // --- Transacciones manuales -----------------------------------------------
+
+  /**
+   * Estado de la transacción de una conexión.
+   *
+   * La interfaz lo consulta también cada poco mientras hay una abierta: es como
+   * se entera de que se deshizo sola por inactividad, que pasa sin que nadie
+   * haya pulsado nada.
+   */
+  abstract getTransaction(sessionId: string): Observable<TransactionState>;
+
+  /** Entra en modo manual. Hasta aquí cada instrucción se confirmaba sola. */
+  abstract beginTransaction(sessionId: string): Observable<TransactionState>;
+
+  abstract commitTransaction(sessionId: string): Observable<TransactionState>;
+
+  abstract rollbackTransaction(sessionId: string): Observable<TransactionState>;
 
   // --- Edición de filas -----------------------------------------------------
 
@@ -202,6 +289,11 @@ export abstract class ApplicationGateway {
 
   /** Guarda los cambios. El servidor los aplica todos o ninguno. */
   abstract applyRowEdits(request: RowEditRequest): Observable<RowEditResult>;
+
+  /** El `DELETE` que se ejecutaría, para enseñarlo antes de borrar nada. */
+  abstract previewRowDeletes(request: RowDeleteRequest): Observable<readonly string[]>;
+
+  abstract deleteRows(request: RowDeleteRequest): Observable<RowEditResult>;
 
   // --- Importación ----------------------------------------------------------
 
@@ -307,6 +399,16 @@ export abstract class ApplicationGateway {
   abstract clearHistory(): Observable<void>;
 
   abstract getPreferences(): Observable<Readonly<Record<string, string>>>;
+
+  /**
+   * Pestañas abiertas la última vez, con lo que hubiera escrito sin ejecutar.
+   *
+   * Van y vienen todas juntas: son pocas y cambian a la vez, y reemplazar el
+   * conjunto entero evita guardar un estado que nunca existió.
+   */
+  abstract getEditorTabs(): Observable<readonly StoredEditorTab[]>;
+
+  abstract saveEditorTabs(tabs: readonly StoredEditorTab[]): Observable<void>;
 
   abstract setPreference(key: string, value: string): Observable<void>;
 

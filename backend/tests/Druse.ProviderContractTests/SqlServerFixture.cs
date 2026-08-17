@@ -130,6 +130,15 @@ public sealed class SqlServerFixture : IProviderFixture
         END
         """;
 
+    public string CreateProcedureWithParameters(string name) => $"""
+        CREATE PROCEDURE {name}
+            @entrada INT,
+            @salida VARCHAR(30) OUTPUT
+        AS BEGIN
+            SET @salida = 'hecho';
+        END
+        """;
+
     public string DropProcedure(string name) => $"DROP PROCEDURE IF EXISTS {name}";
 
     public string TimestampTypeName => "datetimeoffset(7)";

@@ -32,6 +32,16 @@ public interface ITableDesigner
     /// </summary>
     IndexCapabilities IndexCapabilities { get; }
 
+    /// <summary>
+    /// El DDL de este motor se deshace si algo falla a mitad, o si el usuario
+    /// deshace su transacción.
+    ///
+    /// Lo sabe el proveedor, pero tiene que llegar hasta la interfaz: en MySQL un
+    /// `ALTER` queda hecho aunque después se pulse Rollback, y quien no lo sepa
+    /// creerá que su tabla volvió a estar como estaba.
+    /// </summary>
+    bool SupportsTransactionalDdl { get; }
+
     /// <summary>El `CREATE TABLE` que se ejecutaría, para enseñarlo antes.</summary>
     IReadOnlyList<string> DescribeCreate(TableDefinition table);
 

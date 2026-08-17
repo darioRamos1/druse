@@ -5,7 +5,7 @@
   flex: 0 0 var(--dr-statusbar-height);
   padding: 0 12px;
   background: var(--dr-surface-statusbar);
-  border-top: 1px solid #1b2130;
+  border-top: 1px solid var(--dr-border-faint);
   font-size: var(--dr-font-size-xs);
   color: var(--dr-text-dim);
   white-space: nowrap;
@@ -38,10 +38,10 @@
   height: 6px;
   border-radius: 50%;
   background: var(--dr-success);
-  box-shadow: 0 0 6px rgb(61 220 151 / 80%);
+  box-shadow: 0 0 6px var(--dr-success-glow);
 
   &--off {
-    background: #3e4658;
+    background: var(--dr-indicator-off);
     box-shadow: none;
   }
 }

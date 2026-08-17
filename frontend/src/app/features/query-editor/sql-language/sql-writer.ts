@@ -139,9 +139,61 @@ function condition(engine: DatabaseEngine, filter: QueryFilter, alias?: string):
  * Escribe el SELECT.
  *
  * Limitar filas es lo que más cambia entre motores y lo que peor se recuerda:
- * `LIMIT` va al final en PostgreSQL y MySQL, y `TOP` va justo después del
- * SELECT en SQL Server.
+ * `LIMIT` va al final en PostgreSQL y MySQL, mientras que `TOP` en SQL Server y
+ * `FIRST` en Informix van justo después del SELECT.
  */
+/**
+ * El INSERT de una tabla cuyas columnas las rellena todas el motor.
+ *
+ * Cada motor lo dice a su manera y **Informix no tiene ninguna**: no admite
+ * `DEFAULT VALUES` ni la lista vacía de MySQL. Su forma idiomática es nombrar la
+ * columna serial y darle un cero, que es la señal para que asigne el siguiente
+ * valor. Sin este caso aparte se generaría SQL que su servidor rechaza.
+ */
+function allGeneratedInsert(
+  engine: DatabaseEngine,
+  schema: string | undefined,
+  table: string,
+  columns: readonly KnownColumn[],
+): string {
+  const name = qualify(engine, schema, table);
+
+  if (engine === 'mysql') {
+    return `INSERT INTO ${name} ()\nVALUES ();\n`;
+  }
+
+  if (engine === 'informix') {
+    const serial = columns[0];
+
+    return serial
+      ? `INSERT INTO ${name} (${quote(engine, serial.name)})\nVALUES (0);\n`
+      : `INSERT INTO ${name}\nVALUES ();\n`;
+  }
+
+  return `INSERT INTO ${name}\nDEFAULT VALUES;\n`;
+}
+
+/**
+ * Lo que va entre `SELECT` y las columnas para limitar filas.
+ *
+ * Devuelve cadena vacía en los motores que lo escriben al final con `LIMIT`, y
+ * esa misma cadena vacía es la que decide después si hay que añadirlo allí. Así
+ * la regla vive en un solo sitio y no puede quedar a medias: un motor nuevo que
+ * la ponga delante no arrastra además un `LIMIT` al final.
+ */
+function leadingLimit(engine: DatabaseEngine, limit: number): string {
+  switch (engine) {
+    case 'sqlserver':
+      return `TOP ${limit} `;
+
+    case 'informix':
+      return `FIRST ${limit} `;
+
+    default:
+      return '';
+  }
+}
+
 export function buildSelect(engine: DatabaseEngine, spec: SelectSpec): string {
   const alias = spec.alias ?? ((spec.joins?.length ?? 0) > 0 ? 't0' : undefined);
   const selectColumn = (column: string | SelectColumn) =>
@@ -157,7 +209,7 @@ export function buildSelect(engine: DatabaseEngine, spec: SelectSpec): string {
         ? `${quote(engine, alias)}.*`
         : '*';
 
-  const top = engine === 'sqlserver' && spec.limit ? `TOP ${spec.limit} ` : '';
+  const top = spec.limit ? leadingLimit(engine, spec.limit) : '';
 
   const from = alias
     ? `${qualify(engine, spec.schema, spec.table)} AS ${quote(engine, alias)}`
@@ -189,7 +241,8 @@ export function buildSelect(engine: DatabaseEngine, spec: SelectSpec): string {
     lineas.push(`ORDER BY ${order}${spec.descending ? ' DESC' : ''}`);
   }
 
-  if (spec.limit && engine !== 'sqlserver') {
+  // Solo los motores que no lo pusieron ya delante llevan `LIMIT` al final.
+  if (spec.limit && leadingLimit(engine, spec.limit) === '') {
     lineas.push(`LIMIT ${spec.limit}`);
   }
 
@@ -212,9 +265,7 @@ export function buildInsert(
   const huecos = columnas.map((column) => `/* ${column.dataType} */`).join(', ');
 
   if (columnas.length === 0) {
-    return engine === 'mysql'
-      ? `INSERT INTO ${qualify(engine, spec.schema, spec.table)} ()\nVALUES ();\n`
-      : `INSERT INTO ${qualify(engine, spec.schema, spec.table)}\nDEFAULT VALUES;\n`;
+    return allGeneratedInsert(engine, spec.schema, spec.table, spec.columns);
   }
 
   return `INSERT INTO ${qualify(engine, spec.schema, spec.table)} (${nombres})\nVALUES (${huecos});\n`;
@@ -223,9 +274,7 @@ export function buildInsert(
 /** INSERT rellenado desde el compositor, conservando NULL y DEFAULT como estados distintos. */
 export function buildInsertValues(engine: DatabaseEngine, spec: InsertValuesSpec): string {
   if (spec.values.length === 0) {
-    return engine === 'mysql'
-      ? `INSERT INTO ${qualify(engine, spec.schema, spec.table)} ()\nVALUES ();\n`
-      : `INSERT INTO ${qualify(engine, spec.schema, spec.table)}\nDEFAULT VALUES;\n`;
+    return allGeneratedInsert(engine, spec.schema, spec.table, []);
   }
 
   const columns = spec.values.map((entry) => quote(engine, entry.column)).join(', ');
@@ -283,6 +332,48 @@ export function buildUpdateValues(engine: DatabaseEngine, spec: UpdateValuesSpec
   return `UPDATE ${qualify(engine, spec.schema, spec.table)}\nSET\n${assignments}\nWHERE ${where};\n`;
 }
 
+/**
+ * `DELETE` compuesto desde el formulario, con su filtro obligatorio.
+ *
+ * Sin filtros no devuelve un DELETE ejecutable: deja el hueco a la vista, igual
+ * que el `UPDATE`. Aquí la razón pesa más, porque un `DELETE` sin `WHERE` vacía
+ * la tabla y no hay valor anterior al que volver.
+ */
+export function buildDeleteValues(
+  engine: DatabaseEngine,
+  spec: { schema?: string; table: string; filters: readonly QueryFilter[] },
+): string {
+  const filters = spec.filters.filter((filter) => filter.column.length > 0);
+  const where =
+    filters.length > 0
+      ? filters.map((filter) => condition(engine, filter)).join('\n  AND ')
+      : '/* condición obligatoria */';
+
+  return `DELETE FROM ${qualify(engine, spec.schema, spec.table)}\nWHERE ${where};\n`;
+}
+
+/**
+ * El recuento de lo que ese mismo `DELETE` se llevaría.
+ *
+ * Se ejecuta antes de borrar y con **el mismo filtro**: el error caro no suele
+ * ser olvidar el `WHERE`, sino escribir uno que coincide con más filas de las
+ * que uno cree.
+ */
+export function buildDeleteCount(
+  engine: DatabaseEngine,
+  spec: { schema?: string; table: string; filters: readonly QueryFilter[] },
+): string {
+  const filters = spec.filters.filter((filter) => filter.column.length > 0);
+
+  if (filters.length === 0) {
+    return '';
+  }
+
+  const where = filters.map((filter) => condition(engine, filter)).join('\n  AND ');
+
+  return `SELECT COUNT(*) AS filas FROM ${qualify(engine, spec.schema, spec.table)}\nWHERE ${where};`;
+}
+
 /** Plantilla destructiva que siempre se revisa en el editor antes de ejecutarse. */
 export function buildDropTable(
   engine: DatabaseEngine,
@@ -325,6 +416,184 @@ export function buildCreateTable(
 /** Columnas que el motor rellena solo y que no se escriben en un INSERT. */
 function isGenerated(column: KnownColumn): boolean {
   return column.isGenerated === true;
+}
+
+/** Un parámetro con el valor que se le ha dado en el formulario. */
+export interface RoutineArgument {
+  readonly name: string;
+  readonly dataType: string;
+  readonly direction: 'input' | 'output' | 'inputOutput';
+  readonly value: SqlInputValue;
+}
+
+export interface CallSpec {
+  readonly schema?: string;
+  readonly routine: string;
+  readonly parameters: readonly RoutineArgument[];
+}
+
+/**
+ * Escribe la llamada a un procedimiento.
+ *
+ * Los cuatro motores la escriben distinta, y las salidas cambian la forma
+ * entera: no basta con nombrar el parámetro, hay que **declarar una variable
+ * antes y leerla después**, así que lo que sale no es una instrucción sino un
+ * pequeño guion.
+ *
+ * Informix es la excepción declarada: fuera de SPL no hay dónde recoger un
+ * `OUT`, así que la llamada sale igual pero avisando por escrito en lugar de
+ * generar algo que el motor rechazaría.
+ */
+export function buildCall(engine: DatabaseEngine, spec: CallSpec): string {
+  const target = qualify(engine, spec.schema, spec.routine);
+  const salidas = spec.parameters.filter((parameter) => parameter.direction !== 'input');
+
+  switch (engine) {
+    case 'sqlserver':
+      return buildSqlServerCall(target, spec.parameters, salidas);
+    case 'mysql':
+      return buildMySqlCall(engine, target, spec.parameters, salidas);
+    case 'postgresql':
+      return buildPostgreSqlCall(spec.parameters, target);
+    default:
+      return buildInformixCall(target, spec.parameters, salidas);
+  }
+}
+
+/**
+ * SQL Server nombra los parámetros con `@` y marca las salidas con `OUTPUT`.
+ *
+ * La variable que las recoge se llama distinto del parámetro —`@out_algo`— a
+ * propósito: `@salida = @salida OUTPUT` es válido pero se lee fatal, y en un
+ * guion que el usuario va a revisar antes de ejecutar eso importa.
+ */
+function buildSqlServerCall(
+  target: string,
+  parameters: readonly RoutineArgument[],
+  salidas: readonly RoutineArgument[],
+): string {
+  const lineas: string[] = [];
+
+  for (const salida of salidas) {
+    lineas.push(`DECLARE ${outputVariable(salida)} ${salida.dataType};`);
+  }
+
+  const argumentos = parameters.map((parameter) =>
+    parameter.direction === 'input'
+      ? `${withAt(parameter.name)} = ${writeArgument(parameter)}`
+      : `${withAt(parameter.name)} = ${outputVariable(parameter)} OUTPUT`,
+  );
+
+  const llamada =
+    argumentos.length === 0
+      ? `EXEC ${target};`
+      : `EXEC ${target}\n    ${argumentos.join(',\n    ')};`;
+
+  lineas.push(llamada);
+
+  if (salidas.length > 0) {
+    const columnas = salidas
+      .map((salida) => `${outputVariable(salida)} AS [${bare(salida.name)}]`)
+      .join(', ');
+
+    lineas.push(`SELECT ${columnas};`);
+  }
+
+  return lineas.join('\n') + '\n';
+}
+
+/** En MySQL las salidas van en variables de sesión, que se leen después. */
+function buildMySqlCall(
+  engine: DatabaseEngine,
+  target: string,
+  parameters: readonly RoutineArgument[],
+  salidas: readonly RoutineArgument[],
+): string {
+  const lineas = salidas.map((salida) => `SET ${sessionVariable(salida)} = NULL;`);
+
+  const argumentos = parameters.map((parameter) =>
+    parameter.direction === 'input' ? writeArgument(parameter) : sessionVariable(parameter),
+  );
+
+  lineas.push(`CALL ${target}(${argumentos.join(', ')});`);
+
+  if (salidas.length > 0) {
+    const columnas = salidas
+      .map((salida) => `${sessionVariable(salida)} AS ${quote(engine, bare(salida.name))}`)
+      .join(', ');
+
+    lineas.push(`SELECT ${columnas};`);
+  }
+
+  return lineas.join('\n') + '\n';
+}
+
+/**
+ * PostgreSQL devuelve las salidas como el resultado del propio `CALL`, así que
+ * no hay nada que declarar ni que leer después: el hueco de una salida se pasa
+ * como `NULL` y el motor lo rellena en la fila que devuelve.
+ */
+function buildPostgreSqlCall(parameters: readonly RoutineArgument[], target: string): string {
+  const argumentos = parameters.map((parameter) =>
+    parameter.direction === 'input' ? writeArgument(parameter) : 'NULL',
+  );
+
+  return `CALL ${target}(${argumentos.join(', ')});\n`;
+}
+
+/**
+ * Informix ejecuta con `EXECUTE PROCEDURE`, y **no tiene dónde recoger un `OUT`
+ * fuera de un procedimiento**: el `INTO` que haría falta solo existe dentro de
+ * SPL. Se escribe la llamada y se dice por qué faltan las salidas, en lugar de
+ * generar un `INTO` que el motor rechazaría.
+ */
+function buildInformixCall(
+  target: string,
+  parameters: readonly RoutineArgument[],
+  salidas: readonly RoutineArgument[],
+): string {
+  const argumentos = parameters
+    .filter((parameter) => parameter.direction === 'input')
+    .map((parameter) => writeArgument(parameter));
+
+  const llamada = `EXECUTE PROCEDURE ${target}(${argumentos.join(', ')});\n`;
+
+  if (salidas.length === 0) {
+    return llamada;
+  }
+
+  const nombres = salidas.map((salida) => salida.name).join(', ');
+
+  return (
+    `-- Informix solo recoge los parámetros de salida (${nombres}) dentro de\n` +
+    `-- otro procedimiento, con INTO. Aquí se ejecuta sin ellos.\n` +
+    llamada
+  );
+}
+
+function writeArgument(parameter: RoutineArgument): string {
+  return writeValue({
+    column: parameter.name,
+    dataType: parameter.dataType,
+    value: parameter.value,
+  });
+}
+
+/** SQL Server nombra sus parámetros con `@`, y el catálogo ya lo devuelve así. */
+function withAt(name: string): string {
+  return name.startsWith('@') ? name : `@${name}`;
+}
+
+function bare(name: string): string {
+  return name.startsWith('@') ? name.slice(1) : name;
+}
+
+function outputVariable(parameter: RoutineArgument): string {
+  return `@out_${bare(parameter.name)}`;
+}
+
+function sessionVariable(parameter: RoutineArgument): string {
+  return `@${bare(parameter.name)}_salida`;
 }
 
 function writeValue(entry: ColumnWrite): string {

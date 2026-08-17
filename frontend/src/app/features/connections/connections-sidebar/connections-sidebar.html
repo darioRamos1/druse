@@ -54,6 +54,22 @@
       </span>
 
       <span class="node__tools">
+        <!--
+          Reconectar está en las guardadas y no solo en las caídas: sirve igual
+          para recuperar una sesión perdida que para empezar limpio con una que
+          lleva horas abierta. Cuando se detecta la caída se resalta, porque
+          entonces es lo único que hay que hacer.
+        -->
+        @if (connection.saved) {
+          <span
+            class="tool"
+            [class.tool--attention]="connection.lost"
+            [attr.title]="connection.lost ? 'La conexión se perdió: volver a conectar' : 'Volver a conectar'"
+            (click)="act($event, () => reconnect.emit(connection.id))"
+          >
+            <app-icon name="refresh" [size]="12" />
+          </span>
+        }
         @if (connection.state === 'connected') {
           <span
             class="tool tool--danger"
@@ -183,6 +199,17 @@
                     <button type="button" role="menuitem" (click)="copyName($event, node)">
                       <app-icon name="new-query" [size]="12" />
                       Copiar nombre calificado
+                    </button>
+                  }
+
+                  @if (node.kind === 'procedure') {
+                    <button
+                      type="button"
+                      role="menuitem"
+                      (click)="act($event, () => runProcedure.emit(node))"
+                    >
+                      <app-icon name="play-outline" [size]="12" />
+                      Ejecutar procedimiento
                     </button>
                   }
 

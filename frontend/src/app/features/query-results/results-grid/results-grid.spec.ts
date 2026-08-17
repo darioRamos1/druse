@@ -55,6 +55,24 @@ describe('ResultsGrid', () => {
     expect(header?.style.gridTemplateColumns).toBe('44px 80px 200px 1fr');
   });
 
+  /**
+   * La cabecera tiene que desplazarse con sus columnas.
+   *
+   * Fuera del contenedor con scroll, moverse a la derecha desplazaba las filas y
+   * dejaba los títulos quietos, así que cada uno acababa sobre la columna
+   * equivocada. Dentro, `sticky` con solo `top` se queda al bajar y acompaña al
+   * ir a los lados.
+   */
+  it('mantiene cabecera y filtros dentro del área que se desplaza', async () => {
+    fixture.componentRef.setInput('showFilters', true);
+    await fixture.whenStable();
+
+    const scrollable = element.querySelector<HTMLElement>('.body');
+
+    expect(scrollable?.querySelector('.head')).not.toBeNull();
+    expect(scrollable?.querySelector('.filters')).not.toBeNull();
+  });
+
   it('pinta una fila por resultado y las numera', () => {
     const numbers = [...element.querySelectorAll('.cell--number')].map((cell) =>
       cell.textContent?.trim(),

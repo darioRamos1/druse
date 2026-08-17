@@ -4,68 +4,37 @@
 // Extraídos del mockup de referencia: docs/mockups/druse-main.html
 // Ver BITACORA.md §7 (Referencia extraída del mockup).
 //
-// Regla: ningún componente escribe un color literal. Todo pasa por estas variables.
+// Regla: ningún componente escribe un color literal. Todo pasa por estas
+// variables, y por una razón que ahora es visible: **hay dos temas**. Un color
+// escrito a mano en un componente es una zona que se queda oscura al pasar a
+// claro, y no hay forma de descubrirlo salvo mirando la pantalla.
+//
+// El archivo tiene tres bloques:
+//
+//   1. Lo que no depende del tema: tipografía, medidas, formas.
+//   2. La paleta oscura, que es la del mockup y la que se aplica si nadie
+//      elige nada.
+//   3. La paleta clara.
+//
+// Los dos bloques de color declaran **exactamente los mismos nombres**. Si uno
+// gana un token, el otro lo gana en la misma línea: un token que solo existe en
+// oscuro se resuelve a nada en claro, que es peor que un color feo.
 // =============================================================================
 
 :root {
   // ---------------------------------------------------------------------------
-  // Superficies
-  // ---------------------------------------------------------------------------
-  --dr-surface-outer: #07080b; // fondo fuera de la ventana
-  --dr-surface-base: #0b0d11; // fondo principal: editor y área central
-  --dr-surface-panel: #0e1219; // sidebar, pestañas, toolbar, panel de resultados
-  --dr-surface-topbar: #101420;
-  --dr-surface-statusbar: #0c1018;
-  --dr-surface-grid-header: #121824;
-  --dr-surface-raised: #1b2233; // botones y elementos elevados
-  --dr-surface-raised-hover: #222b40;
-  --dr-surface-input: #0c1018;
-
-  // ---------------------------------------------------------------------------
-  // Bordes
-  // ---------------------------------------------------------------------------
-  --dr-border: #1e2534;
-  --dr-border-subtle: #232a38;
-  --dr-border-strong: #2a3348;
-
-  // ---------------------------------------------------------------------------
-  // Acentos
-  // ---------------------------------------------------------------------------
-  --dr-accent: #6c8bff;
-  --dr-accent-bright: #9fb0ff;
-  --dr-accent-alt: #9a7cff; // violeta del degradado del logo
-  --dr-accent-alt-soft: #a78bfa;
-  --dr-accent-gradient: linear-gradient(140deg, #6c8bff, #9a7cff);
-
-  // ---------------------------------------------------------------------------
-  // Estado
-  // ---------------------------------------------------------------------------
-  --dr-success: #3ddc97; // conectado
-  --dr-info: #7faee8;
-
-  // ---------------------------------------------------------------------------
-  // Texto
-  // ---------------------------------------------------------------------------
-  --dr-text: #e4e8f1;
-  --dr-text-bright: #dce3f0;
-  --dr-text-secondary: #c9d3e6;
-  --dr-text-muted: #b9c2d4;
-  --dr-text-tertiary: #8b96ab;
-  --dr-text-dim: #7c879c;
-  --dr-text-faint: #66728a;
-  --dr-text-faintest: #5e6a80;
-  --dr-text-disabled: #4c566b;
-
-  // ---------------------------------------------------------------------------
   // Tipografía
   //
   // El mockup carga Inter y JetBrains Mono desde Google Fonts. La aplicación de
-  // escritorio debe funcionar sin conexión, así que en la Fase 1 hay que
-  // empaquetar las fuentes localmente en lugar de enlazarlas. Mientras tanto,
-  // la pila degrada a las fuentes del sistema.
+  // escritorio debe funcionar sin conexión, así que las fuentes se empaquetan
+  // localmente en lugar de enlazarlas.
   // ---------------------------------------------------------------------------
   --dr-font-ui: 'Inter', system-ui, -apple-system, 'Segoe UI', roboto, sans-serif;
   --dr-font-mono: 'JetBrains Mono', 'Cascadia Code', consolas, 'Courier New', monospace;
+
+  // Cuánto se agranda o se encoge la ventana entera. Lo mueve el usuario desde
+  // preferencias; 1 es el tamaño del mockup.
+  --dr-scale: 1;
 
   --dr-font-size: 13px;
   --dr-font-size-sm: 12.5px;
@@ -87,13 +56,365 @@
   --dr-statusbar-height: 26px;
 
   // ---------------------------------------------------------------------------
-  // Formas y sombras
+  // Formas
   // ---------------------------------------------------------------------------
   --dr-radius-window: 10px;
   --dr-radius: 8px;
   --dr-radius-sm: 7px;
   --dr-radius-xs: 2px;
+}
+
+// =============================================================================
+// Tema oscuro — el del mockup, y el que se aplica mientras no se elija otro
+//
+// El selector sin atributo va primero para que valga también antes de que el
+// código haya podido escribir `data-theme`: el arranque nunca se ve sin colores.
+// =============================================================================
+:root,
+:root[data-theme='dark'] {
+  // Los controles nativos —barras de desplazamiento, casillas, desplegables del
+  // sistema— no leen estas variables. Esta propiedad es la única forma de que
+  // acompañen al tema en lugar de quedarse blancos en mitad de la ventana.
+  color-scheme: dark;
+
+  // ---------------------------------------------------------------------------
+  // Las dos manivelas del decorado
+  //
+  // Todo lo que es decorado —superficies, bordes, texto— se escribe en `hsl()`
+  // colgando de este matiz, conservando cada uno su distancia respecto a él. Con
+  // eso, teñir la aplicación entera de otro color es cambiar un número, y la
+  // jerarquía de luminosidad que hace legible la interfaz se mantiene intacta.
+  //
+  // Los estados y los motores se quedan fuera a propósito: un rojo de error
+  // tiene que seguir siendo rojo aunque el resto sea verde.
+  // ---------------------------------------------------------------------------
+  --dr-hue: 218;
+  --dr-sat-scale: 1;
+
+  // ---------------------------------------------------------------------------
+  // Superficies
+  // ---------------------------------------------------------------------------
+  --dr-surface-outer: hsl(calc(var(--dr-hue) + 7) calc(22.2% * var(--dr-sat-scale)) 3.5%); // fondo fuera de la ventana
+  --dr-surface-base: hsl(calc(var(--dr-hue) + 2) calc(21.4% * var(--dr-sat-scale)) 5.5%); // fondo principal: editor y área central
+  --dr-surface-panel: hsl(var(--dr-hue) calc(28.2% * var(--dr-sat-scale)) 7.6%); // sidebar, pestañas, toolbar, panel de resultados
+  --dr-surface-topbar: hsl(calc(var(--dr-hue) + 7) calc(33.3% * var(--dr-sat-scale)) 9.4%);
+  --dr-surface-statusbar: hsl(calc(var(--dr-hue) + 2) calc(33.3% * var(--dr-sat-scale)) 7.1%);
+  --dr-surface-grid-header: hsl(calc(var(--dr-hue) + 2) calc(33.3% * var(--dr-sat-scale)) 10.6%);
+  --dr-surface-raised: hsl(calc(var(--dr-hue) + 5) calc(30.8% * var(--dr-sat-scale)) 15.3%); // botones y elementos elevados
+  --dr-surface-raised-hover: hsl(calc(var(--dr-hue) + 4) calc(30.6% * var(--dr-sat-scale)) 19.2%);
+  --dr-surface-input: hsl(calc(var(--dr-hue) + 2) calc(33.3% * var(--dr-sat-scale)) 7.1%);
+
+  --dr-surface-hover: hsl(calc(var(--dr-hue) + 2) calc(30% * var(--dr-sat-scale)) 11.8%); // paso del ratón sobre algo que no está activo
+  --dr-surface-active: hsl(calc(var(--dr-hue) + 3) calc(29.4% * var(--dr-sat-scale)) 16.7%); // seleccionado, abierto, pulsado
+  --dr-surface-active-strong: hsl(calc(var(--dr-hue) + 5) calc(30.7% * var(--dr-sat-scale)) 19.8%); // ratón sobre algo ya activo
+  --dr-surface-overlay: hsl(calc(var(--dr-hue) + 2) calc(31% * var(--dr-sat-scale)) 11.4%); // menús y desplegables, que flotan sobre todo
+  --dr-surface-dialog: hsl(calc(var(--dr-hue) + 3) calc(32% * var(--dr-sat-scale)) 9.8%); // cuerpo de los diálogos modales
+  --dr-surface-sunken: hsl(calc(var(--dr-hue) + 2) calc(33.3% * var(--dr-sat-scale)) 8.8%); // zonas hundidas: pies de diálogo, cabeceras
+  --dr-surface-inset: hsl(calc(var(--dr-hue) + 1) calc(35% * var(--dr-sat-scale)) 7.8%); // lo más hundido: campos de búsqueda
+  --dr-surface-stripe: rgb(124 135 156 / 10%); // franjas de la cuadrícula
+
+  // ---------------------------------------------------------------------------
+  // Bordes
+  //
+  // Cuatro pesos, del más tenue al más marcado, más dos que solo usan los campos
+  // y uno para el contorno de los diálogos.
+  // ---------------------------------------------------------------------------
+  --dr-border-hairline: hsl(calc(var(--dr-hue) + 3) calc(29.2% * var(--dr-sat-scale)) 12.7%); // líneas entre filas
+  --dr-border-faint: hsl(calc(var(--dr-hue) + 5) calc(28% * var(--dr-sat-scale)) 14.7%); // separadores de zona
+  --dr-border: hsl(calc(var(--dr-hue) + 3) calc(26.8% * var(--dr-sat-scale)) 16.1%);
+  --dr-border-subtle: hsl(calc(var(--dr-hue) + 2) calc(23.1% * var(--dr-sat-scale)) 17.8%);
+  --dr-border-strong: hsl(calc(var(--dr-hue) + 4) calc(26.3% * var(--dr-sat-scale)) 22.4%);
+
+  --dr-border-input: hsl(calc(var(--dr-hue) + 2) calc(26.7% * var(--dr-sat-scale)) 17.6%);
+  --dr-border-input-hover: hsl(calc(var(--dr-hue) + 1) calc(26.8% * var(--dr-sat-scale)) 27.8%);
+  --dr-border-dialog: hsl(calc(var(--dr-hue) + 3) calc(26.9% * var(--dr-sat-scale)) 20.4%);
+
+  // ---------------------------------------------------------------------------
+  // Acentos
+  // ---------------------------------------------------------------------------
+  // Cuatro componentes sueltos —sin `rgb()` alrededor— de los que cuelga todo
+  // el acento. Elegir otro color de acento es reescribir estos cuatro; los
+  // veinte tokens que se derivan de ellos no se tocan.
+  --dr-accent-rgb: 108 139 255;
+  --dr-accent-bright-rgb: 159 176 255; // el acento con más luz, para iconos y texto
+  --dr-accent-deep-rgb: 85 112 240; // el acento apagado, para el fondo de los botones
+  --dr-accent-alt-rgb: 154 124 255; // violeta del degradado del logo
+
+  --dr-accent: rgb(var(--dr-accent-rgb));
+  --dr-accent-bright: rgb(var(--dr-accent-bright-rgb));
+  --dr-accent-alt: rgb(var(--dr-accent-alt-rgb));
+  --dr-accent-alt-soft: rgb(var(--dr-accent-alt-rgb));
+  --dr-accent-alt-line: rgb(var(--dr-accent-alt-rgb) / 32%);
+  --dr-accent-gradient: linear-gradient(140deg, var(--dr-accent), var(--dr-accent-alt));
+  --dr-accent-button: linear-gradient(180deg, var(--dr-accent), rgb(var(--dr-accent-deep-rgb)));
+
+  // Relleno de acento, de más tenue a más presente. Se usan para señalar lo
+  // seleccionado sin cambiar la superficie de debajo.
+  --dr-accent-tint-weak: rgb(var(--dr-accent-rgb) / 7%);
+  --dr-accent-tint: rgb(var(--dr-accent-rgb) / 13%);
+  --dr-accent-tint-strong: rgb(var(--dr-accent-rgb) / 17%);
+  --dr-accent-highlight: linear-gradient(
+    90deg,
+    rgb(var(--dr-accent-rgb) / 19%),
+    rgb(var(--dr-accent-rgb) / 7%)
+  );
+
+  // Contorno de acento, en los mismos tres pesos.
+  --dr-accent-line-soft: rgb(var(--dr-accent-rgb) / 26%);
+  --dr-accent-line: rgb(var(--dr-accent-rgb) / 45%);
+  --dr-accent-line-strong: rgb(var(--dr-accent-rgb) / 55%);
+
+  // Texto que va **encima** del acento, no al lado.
+  --dr-text-on-accent: hsl(var(--dr-hue) calc(0% * var(--dr-sat-scale)) 100%);
+
+  // ---------------------------------------------------------------------------
+  // Estado
+  //
+  // Cada estado tiene el mismo juego: color pleno para puntos e iconos, color de
+  // texto legible sobre el fondo del tema, relleno y contorno.
+  // ---------------------------------------------------------------------------
+  --dr-success: #3ddc97;
+  --dr-success-tint: rgb(61 220 151 / 9%);
+  --dr-success-tint-strong: rgb(61 220 151 / 16%);
+  --dr-success-line-soft: rgb(61 220 151 / 25%);
+  --dr-success-line: rgb(61 220 151 / 42%);
+  --dr-success-glow: rgb(61 220 151 / 75%); // halo del punto de «conectado»
+
+  --dr-danger: #f2686b;
+  --dr-danger-text: #f08a8d;
+  --dr-danger-tint-weak: rgb(242 104 107 / 7%);
+  --dr-danger-tint: rgb(242 104 107 / 12%);
+  --dr-danger-line-soft: rgb(242 104 107 / 29%);
+  --dr-danger-line: rgb(242 104 107 / 45%);
+  --dr-danger-glow: rgb(242 104 107 / 70%);
+
+  --dr-warning: #f5bf4f;
+  --dr-warning-strong: #f0b429;
+  --dr-warning-text: #d7b66f;
+  --dr-warning-tint: rgb(240 180 41 / 10%);
+  --dr-warning-tint-strong: rgb(240 180 41 / 20%);
+  --dr-warning-line: rgb(240 180 41 / 40%);
+
+  --dr-info: #7faee8;
+
+  // ---------------------------------------------------------------------------
+  // Texto
+  // ---------------------------------------------------------------------------
+  --dr-text: hsl(calc(var(--dr-hue) + 4) calc(31.7% * var(--dr-sat-scale)) 92%);
+  --dr-text-bright: hsl(calc(var(--dr-hue) + 1) calc(40% * var(--dr-sat-scale)) 90.2%);
+  --dr-text-secondary: hsl(calc(var(--dr-hue) + 1) calc(36.7% * var(--dr-sat-scale)) 84.5%);
+  --dr-text-muted: hsl(calc(var(--dr-hue) + 2) calc(23.9% * var(--dr-sat-scale)) 77.8%);
+  --dr-text-tertiary: hsl(calc(var(--dr-hue) + 1) calc(16% * var(--dr-sat-scale)) 60.8%);
+  --dr-text-dim: hsl(calc(var(--dr-hue) + 1) calc(13.9% * var(--dr-sat-scale)) 54.9%);
+  --dr-text-faint: hsl(calc(var(--dr-hue) + 2) calc(15% * var(--dr-sat-scale)) 47.1%);
+  --dr-text-faintest: hsl(calc(var(--dr-hue) + 1) calc(15.3% * var(--dr-sat-scale)) 43.5%);
+  --dr-text-disabled: hsl(calc(var(--dr-hue) + 3) calc(16.9% * var(--dr-sat-scale)) 35.9%);
+
+  // Indicador apagado: el punto que aún no dice nada.
+  --dr-indicator-off: hsl(calc(var(--dr-hue) + 4) calc(17.3% * var(--dr-sat-scale)) 29.4%);
+
+  // ---------------------------------------------------------------------------
+  // Color por motor
+  //
+  // Lo único de la interfaz que puede depender del motor. Tres tokens por
+  // motor —texto, relleno y contorno— porque el distintivo es un chip.
+  // ---------------------------------------------------------------------------
+  --dr-engine-postgresql: #7faee8;
+  --dr-engine-postgresql-tint: rgb(86 140 214 / 16%);
+  --dr-engine-postgresql-line: rgb(86 140 214 / 34%);
+
+  --dr-engine-sqlserver: #e07a7a;
+  --dr-engine-sqlserver-tint: rgb(217 90 90 / 14%);
+  --dr-engine-sqlserver-line: rgb(217 90 90 / 30%);
+
+  --dr-engine-mysql: #d9ae6a;
+  --dr-engine-mysql-tint: rgb(214 164 86 / 13%);
+  --dr-engine-mysql-line: rgb(214 164 86 / 30%);
+
+  --dr-engine-informix: #7fbaa0;
+  --dr-engine-informix-tint: rgb(122 186 158 / 13%);
+  --dr-engine-informix-line: rgb(122 186 158 / 30%);
+
+  // ---------------------------------------------------------------------------
+  // Sombras y velos
+  //
+  // Cuanto más alto flota algo, más larga y más opaca es su sombra: el diálogo
+  // está por encima del menú, y el menú por encima del panel.
+  // ---------------------------------------------------------------------------
   --dr-shadow-window: 0 24px 80px rgb(0 0 0 / 55%);
-  --dr-shadow-accent: 0 2px 10px rgb(108 139 255 / 45%);
-  --dr-selection: rgb(108 139 255 / 32%);
+  --dr-shadow-dialog: 0 40px 120px rgb(0 0 0 / 70%);
+  --dr-shadow-palette: 0 28px 80px rgb(0 0 0 / 65%);
+  --dr-shadow-menu: 0 18px 44px rgb(0 0 0 / 60%);
+  --dr-shadow-popover: 0 12px 32px rgb(0 0 0 / 45%);
+  --dr-shadow-accent: 0 2px 10px rgb(var(--dr-accent-rgb) / 45%);
+  --dr-shadow-accent-button: 0 2px 12px rgb(var(--dr-accent-rgb) / 40%);
+
+  --dr-scrim: rgb(5 7 11 / 66%); // lo que tapa el fondo cuando hay un modal
+  --dr-selection: rgb(var(--dr-accent-rgb) / 32%);
+}
+
+// =============================================================================
+// Tema claro
+//
+// No es el tema oscuro invertido: sobre blanco, un azul al 8 % desaparece y un
+// amarillo pleno es ilegible. Los rellenos suben de opacidad y los colores de
+// estado bajan de luminosidad hasta que el texto encima se lee.
+//
+// El acento cambia de tono a propósito. El #6c8bff del mockup luce sobre negro
+// y se queda corto sobre blanco —no llega al contraste mínimo para texto—, así
+// que en claro el mismo papel lo hace un azul más profundo. El degradado de la
+// marca sí se mantiene: ahí el color es un bloque con el logo encima, no texto.
+// =============================================================================
+:root[data-theme='light'] {
+  color-scheme: light;
+
+  // Mismas dos manivelas que en oscuro, con el matiz de partida de esta paleta.
+  --dr-hue: 220;
+  --dr-sat-scale: 1;
+
+  // ---------------------------------------------------------------------------
+  // Superficies
+  // ---------------------------------------------------------------------------
+  --dr-surface-outer: hsl(calc(var(--dr-hue) + 2) calc(25.5% * var(--dr-sat-scale)) 90%);
+  --dr-surface-base: hsl(var(--dr-hue) calc(0% * var(--dr-sat-scale)) 100%);
+  --dr-surface-panel: hsl(var(--dr-hue) calc(37.5% * var(--dr-sat-scale)) 96.9%);
+  --dr-surface-topbar: hsl(var(--dr-hue) calc(36% * var(--dr-sat-scale)) 95.1%);
+  --dr-surface-statusbar: hsl(var(--dr-hue) calc(36% * var(--dr-sat-scale)) 95.1%);
+  --dr-surface-grid-header: hsl(calc(var(--dr-hue) + -2) calc(35.5% * var(--dr-sat-scale)) 93.9%);
+  --dr-surface-raised: hsl(calc(var(--dr-hue) + 2) calc(35.1% * var(--dr-sat-scale)) 92.7%);
+  --dr-surface-raised-hover: hsl(calc(var(--dr-hue) + 1) calc(35.8% * var(--dr-sat-scale)) 89.6%);
+  --dr-surface-input: hsl(var(--dr-hue) calc(0% * var(--dr-sat-scale)) 100%);
+
+  --dr-surface-hover: hsl(var(--dr-hue) calc(36% * var(--dr-sat-scale)) 95.1%);
+  --dr-surface-active: hsl(var(--dr-hue) calc(45% * var(--dr-sat-scale)) 92.2%);
+  --dr-surface-active-strong: hsl(var(--dr-hue) calc(44.3% * var(--dr-sat-scale)) 88%);
+  --dr-surface-overlay: hsl(var(--dr-hue) calc(0% * var(--dr-sat-scale)) 100%);
+  --dr-surface-dialog: hsl(var(--dr-hue) calc(0% * var(--dr-sat-scale)) 100%);
+  --dr-surface-sunken: hsl(calc(var(--dr-hue) + 8) calc(45.5% * var(--dr-sat-scale)) 97.8%);
+  --dr-surface-inset: hsl(var(--dr-hue) calc(0% * var(--dr-sat-scale)) 100%);
+  --dr-surface-stripe: rgb(100 116 139 / 7%);
+
+  // ---------------------------------------------------------------------------
+  // Bordes
+  // ---------------------------------------------------------------------------
+  --dr-border-hairline: hsl(calc(var(--dr-hue) + 2) calc(31.3% * var(--dr-sat-scale)) 93.7%);
+  --dr-border-faint: hsl(calc(var(--dr-hue) + 2) calc(28.9% * var(--dr-sat-scale)) 91.2%);
+  --dr-border: hsl(var(--dr-hue) calc(25% * var(--dr-sat-scale)) 85.9%);
+  --dr-border-subtle: hsl(var(--dr-hue) calc(28.3% * var(--dr-sat-scale)) 89.6%);
+  --dr-border-strong: hsl(var(--dr-hue) calc(23.9% * var(--dr-sat-scale)) 77.8%);
+
+  --dr-border-input: hsl(var(--dr-hue) calc(26.6% * var(--dr-sat-scale)) 84.5%);
+  --dr-border-input-hover: hsl(calc(var(--dr-hue) + 2) calc(29.3% * var(--dr-sat-scale)) 67.3%);
+  --dr-border-dialog: hsl(var(--dr-hue) calc(25% * var(--dr-sat-scale)) 85.9%);
+
+  // ---------------------------------------------------------------------------
+  // Acentos
+  // ---------------------------------------------------------------------------
+  // En claro, «bright» es más oscuro que el acento: lo que hace falta sobre
+  // blanco para que un icono o un texto se lean no es más luz, sino menos.
+  --dr-accent-rgb: 74 103 232;
+  --dr-accent-bright-rgb: 47 73 201;
+  --dr-accent-deep-rgb: 64 88 216;
+  --dr-accent-alt-rgb: 123 92 240;
+
+  --dr-accent: rgb(var(--dr-accent-rgb));
+  --dr-accent-bright: rgb(var(--dr-accent-bright-rgb));
+  --dr-accent-alt: rgb(var(--dr-accent-alt-rgb));
+  --dr-accent-alt-soft: rgb(109 71 224);
+  --dr-accent-alt-line: rgb(var(--dr-accent-alt-rgb) / 34%);
+  --dr-accent-gradient: linear-gradient(140deg, #6c8bff, #9a7cff);
+  --dr-accent-button: linear-gradient(180deg, var(--dr-accent), rgb(var(--dr-accent-deep-rgb)));
+
+  --dr-accent-tint-weak: rgb(var(--dr-accent-rgb) / 6%);
+  --dr-accent-tint: rgb(var(--dr-accent-rgb) / 11%);
+  --dr-accent-tint-strong: rgb(var(--dr-accent-rgb) / 17%);
+  --dr-accent-highlight: linear-gradient(
+    90deg,
+    rgb(var(--dr-accent-rgb) / 16%),
+    rgb(var(--dr-accent-rgb) / 5%)
+  );
+
+  --dr-accent-line-soft: rgb(var(--dr-accent-rgb) / 28%);
+  --dr-accent-line: rgb(var(--dr-accent-rgb) / 48%);
+  --dr-accent-line-strong: rgb(var(--dr-accent-rgb) / 62%);
+
+  --dr-text-on-accent: hsl(var(--dr-hue) calc(0% * var(--dr-sat-scale)) 100%);
+
+  // ---------------------------------------------------------------------------
+  // Estado
+  // ---------------------------------------------------------------------------
+  --dr-success: #0f9d6a;
+  --dr-success-tint: rgb(15 157 106 / 11%);
+  --dr-success-tint-strong: rgb(15 157 106 / 18%);
+  --dr-success-line-soft: rgb(15 157 106 / 30%);
+  --dr-success-line: rgb(15 157 106 / 48%);
+  --dr-success-glow: rgb(15 157 106 / 55%);
+
+  --dr-danger: #d33a3f;
+  --dr-danger-text: #b3282d;
+  --dr-danger-tint-weak: rgb(211 58 63 / 7%);
+  --dr-danger-tint: rgb(211 58 63 / 12%);
+  --dr-danger-line-soft: rgb(211 58 63 / 30%);
+  --dr-danger-line: rgb(211 58 63 / 48%);
+  --dr-danger-glow: rgb(211 58 63 / 55%);
+
+  --dr-warning: #c2820b;
+  --dr-warning-strong: #a86f06;
+  --dr-warning-text: #8a5d06;
+  --dr-warning-tint: rgb(194 130 11 / 12%);
+  --dr-warning-tint-strong: rgb(194 130 11 / 22%);
+  --dr-warning-line: rgb(194 130 11 / 42%);
+
+  --dr-info: #2f6fbd;
+
+  // ---------------------------------------------------------------------------
+  // Texto
+  // ---------------------------------------------------------------------------
+  --dr-text: hsl(calc(var(--dr-hue) + -2) calc(28.2% * var(--dr-sat-scale)) 15.3%);
+  --dr-text-bright: hsl(calc(var(--dr-hue) + -2) calc(42.2% * var(--dr-sat-scale)) 8.8%);
+  --dr-text-secondary: hsl(calc(var(--dr-hue) + -1) calc(24.6% * var(--dr-sat-scale)) 22.4%);
+  --dr-text-muted: hsl(calc(var(--dr-hue) + -1) calc(19.7% * var(--dr-sat-scale)) 30.8%);
+  --dr-text-tertiary: hsl(calc(var(--dr-hue) + -2) calc(14.2% * var(--dr-sat-scale)) 41.6%);
+  --dr-text-dim: hsl(var(--dr-hue) calc(12.4% * var(--dr-sat-scale)) 47.5%);
+  --dr-text-faint: hsl(var(--dr-hue) calc(11.4% * var(--dr-sat-scale)) 53.5%);
+  --dr-text-faintest: hsl(calc(var(--dr-hue) + 1) calc(12.1% * var(--dr-sat-scale)) 59.4%);
+  --dr-text-disabled: hsl(var(--dr-hue) calc(13% * var(--dr-sat-scale)) 68.4%);
+
+  --dr-indicator-off: hsl(var(--dr-hue) calc(19.7% * var(--dr-sat-scale)) 76.1%);
+
+  // ---------------------------------------------------------------------------
+  // Color por motor
+  // ---------------------------------------------------------------------------
+  --dr-engine-postgresql: #2b6cb0;
+  --dr-engine-postgresql-tint: rgb(43 108 176 / 12%);
+  --dr-engine-postgresql-line: rgb(43 108 176 / 32%);
+
+  --dr-engine-sqlserver: #b03a3a;
+  --dr-engine-sqlserver-tint: rgb(176 58 58 / 11%);
+  --dr-engine-sqlserver-line: rgb(176 58 58 / 30%);
+
+  --dr-engine-mysql: #8a6212;
+  --dr-engine-mysql-tint: rgb(138 98 18 / 11%);
+  --dr-engine-mysql-line: rgb(138 98 18 / 30%);
+
+  --dr-engine-informix: #2c7a5c;
+  --dr-engine-informix-tint: rgb(44 122 92 / 11%);
+  --dr-engine-informix-line: rgb(44 122 92 / 30%);
+
+  // ---------------------------------------------------------------------------
+  // Sombras y velos
+  //
+  // En claro una sombra negra ensucia: el gris azulado del texto mancha menos y
+  // deja la sensación de altura sin apagar el fondo.
+  // ---------------------------------------------------------------------------
+  --dr-shadow-window: 0 24px 80px rgb(15 23 42 / 18%);
+  --dr-shadow-dialog: 0 40px 120px rgb(15 23 42 / 24%);
+  --dr-shadow-palette: 0 28px 80px rgb(15 23 42 / 22%);
+  --dr-shadow-menu: 0 18px 44px rgb(15 23 42 / 16%);
+  --dr-shadow-popover: 0 12px 32px rgb(15 23 42 / 14%);
+  --dr-shadow-accent: 0 2px 10px rgb(var(--dr-accent-rgb) / 35%);
+  --dr-shadow-accent-button: 0 2px 12px rgb(var(--dr-accent-rgb) / 30%);
+
+  --dr-scrim: rgb(30 41 59 / 38%);
+  --dr-selection: rgb(var(--dr-accent-rgb) / 22%);
 }

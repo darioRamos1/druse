@@ -7,7 +7,7 @@
  */
 
 /** Motores soportados. Nunca se ramifica por motor dentro de los componentes. */
-export type DatabaseEngine = 'postgresql' | 'sqlserver' | 'mysql';
+export type DatabaseEngine = 'postgresql' | 'sqlserver' | 'mysql' | 'informix';
 
 export type ConnectionState = 'connected' | 'disconnected' | 'connecting' | 'error';
 
@@ -118,6 +118,14 @@ export interface ConnectionSummary {
   readonly sessionId?: string;
   /** Motivo del último fallo, para mostrarlo junto a la conexión. */
   readonly error?: string;
+  /**
+   * La sesión se perdió sola: el servidor la cerró, se cayó la red o el proceso
+   * local se reinició.
+   *
+   * Se distingue de un error cualquiera porque tiene una salida concreta —volver
+   * a abrirla— y porque el usuario no hizo nada para provocarlo.
+   */
+  readonly lost?: boolean;
   readonly environment: ConnectionEnvironment;
   readonly readOnly: boolean;
   /** El perfil está guardado en la base local y sobrevive al reinicio. */
@@ -201,6 +209,7 @@ export interface DatabaseObject {
 export interface DatabaseColumn {
   readonly name: string;
   readonly dataType: string;
+  readonly inputKind?: InputKind;
   readonly isNullable: boolean;
   readonly isPrimaryKey: boolean;
   readonly isGenerated?: boolean;
@@ -239,9 +248,30 @@ export interface ExplorerNode {
  * editor: el tipo a la derecha del desplegable, el tooltip al pasar el ratón y
  * el aviso de una columna que no existe.
  */
+/**
+ * Con qué se pide un valor de este tipo.
+ *
+ * No es el tipo del motor —ese viaja aparte y se enseña tal cual—, sino qué
+ * control dibuja la interfaz. Lo calcula la API con la misma clasificación que
+ * usa para convertir lo que se escribe, así que se pide exactamente lo que el
+ * servidor sabrá interpretar.
+ */
+export type InputKind =
+  | 'text'
+  | 'integer'
+  | 'decimal'
+  | 'boolean'
+  | 'date'
+  | 'time'
+  | 'datetime'
+  | 'datetimeOffset'
+  | 'binary'
+  | 'uuid';
+
 export interface KnownColumn {
   readonly name: string;
   readonly dataType: string;
+  readonly inputKind?: InputKind;
   readonly isNullable: boolean;
   readonly isPrimaryKey: boolean;
   readonly isGenerated?: boolean;
@@ -388,6 +418,29 @@ export interface DatabaseConstraint {
 }
 
 /** Todo lo que sostiene una tabla además de sus columnas. */
+/** Por dónde entra o sale un valor de un procedimiento. */
+export type RoutineParameterDirection = 'input' | 'output' | 'inputOutput' | 'return';
+
+export interface RoutineParameter {
+  readonly name: string;
+  readonly dataType: string;
+  readonly inputKind?: InputKind;
+  readonly direction: RoutineParameterDirection;
+  readonly ordinal: number;
+
+  /** Se puede omitir porque el motor pone un valor. */
+  readonly hasDefault: boolean;
+}
+
+/** Lo que hace falta para poder llamar a un procedimiento. */
+export interface RoutineSignature {
+  readonly name: string;
+  readonly schema?: string;
+  readonly isFunction: boolean;
+  readonly parameters: readonly RoutineParameter[];
+  readonly returnType?: string;
+}
+
 export interface TableStructure {
   readonly primaryKey?: DatabaseConstraint;
   readonly indexes: readonly DatabaseIndex[];
@@ -500,6 +553,7 @@ export type ColumnType = 'number' | 'text' | 'boolean' | 'timestamp' | 'uuid' | 
 export interface ResultColumn {
   readonly name: string;
   readonly dataType: string;
+  readonly inputKind?: InputKind;
   readonly kind: ColumnType;
   /** Ancho en píxeles; `null` reparte el espacio sobrante. */
   readonly width: number | null;

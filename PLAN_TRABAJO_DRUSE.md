@@ -121,7 +121,7 @@ La palabra *portable* se utilizará en dos sentidos:
 ### Incluido
 
 - Aplicación de escritorio inicialmente validada en Windows y preparada para Linux y macOS.
-- Tema oscuro basado en el mockup.
+- Tema oscuro basado en el mockup, y tema claro derivado de él.
 - Múltiples conexiones guardadas.
 - PostgreSQL y SQL Server.
 - Explorador jerárquico de objetos.
@@ -412,6 +412,8 @@ La solución compila, Angular inicia, la API responde en `/api/health` y existe 
 - [x] Integrar Monaco Editor con datos simulados.
 - [x] Crear panel redimensionable de resultados.
 - [x] Implementar tema oscuro y variables de diseño.
+- [x] Añadir tema claro sobre las mismas variables, con conmutador en la barra superior.
+- [x] Panel de preferencias: acento, tono de la interfaz, tamaño y fondo del editor.
 - [x] Crear la cuadrícula con datos simulados.
 
 ### Criterio de salida
@@ -524,9 +526,9 @@ Los resultados pueden inspeccionarse y exportarse de manera confiable sin bloque
 - [x] Finalizar correctamente la API al cerrar la aplicación.
 - [x] Crear icono, nombre, versión y metadatos del instalador.
 - [x] Generar instalador para Windows x64.
-- [ ] Generar artefactos de prueba para Linux x64 y macOS ARM64. _(el script acepta cualquier RID, pero generar esos artefactos exige compilar en cada plataforma: es trabajo de integración continua, no de esta máquina.)_
+- [ ] Generar artefactos de prueba para Linux x64 y macOS ARM64. _(el trabajo está hecho en integración continua —un job por plataforma que empaqueta y deja el `.deb`, el `.AppImage` y el `.dmg` descargables—; queda marcarlo cuando esa ejecución termine en verde.)_
 - [x] Crear distribución ZIP en modo portable para Windows.
-- [ ] Validar instalación, actualización y desinstalación. _(pendiente: instalar y desinstalar de verdad en este equipo.)_
+- [x] Validar instalación, actualización y desinstalación. _(hecho en la sesión 021 sobre este equipo: instala sin permisos de administrador, actualizar deja una sola entrada en el registro y conserva `druse.db`, y desinstalar no deja restos ni toca los datos del usuario. Destapó que la API auxiliar sobrevivía a un cierre forzado; corregido.)_
 - [ ] Probar en un equipo sin SDK de .NET ni Node.js. _(pendiente: hace falta un equipo limpio.)_
 
 ### Criterio de salida
@@ -935,10 +937,134 @@ determinar si una vista admite escrituras.
   PostgreSQL sin confundir procedimientos homónimos.
 - [x] Cubrir el incremento final con 295 pruebas backend y 176 frontend.
 
+### Transacciones manuales — implementadas
+
+Commit y Rollback eran botones muertos heredados del mockup. Ahora gobiernan una
+transacción de verdad, con tres decisiones que condicionan el resto:
+
+- [x] **La transacción se ata a la conexión, no a la pestaña.** No es una
+  preferencia: varias pestañas del mismo perfil comparten conexión, así que lo
+  que se ejecute en cualquiera de ellas entra en la misma transacción. El
+  indicador dice a qué conexión afecta justamente por eso.
+- [x] **Al modo manual se entra a propósito**, con «Iniciar transacción».
+  El autocommit sigue siendo lo normal, y Commit y Rollback solo aparecen cuando
+  hay una abierta.
+- [x] **Se deshace sola tras 15 minutos sin actividad.** Una transacción olvidada
+  mantiene filas bloqueadas para todos; el barrido corre en el proceso local y no
+  en el navegador, porque la ventana puede estar cerrada justo cuando hay que
+  soltar los bloqueos. Lo que se mide es la inactividad, no la duración.
+- [x] `SessionTransaction` sostiene la transacción entre peticiones con las reglas
+  en un solo sitio; `OperationScope` decide si el editor de filas y el diseñador
+  abren la suya o se unen a la del usuario, porque anidarlas revienta en estos
+  motores.
+- [x] Consultas, catálogo, exportación, edición de filas y DDL van dentro de la
+  transacción cuando hay una abierta. Sin esto, SQL Server rechaza hasta expandir
+  un nodo del árbol.
+- [x] Avisos donde el usuario los necesita: al cerrar una conexión con cambios sin
+  confirmar, al cerrar la ventana, y en el propio indicador cuando el motor no
+  deshace el DDL.
+- [x] Cubierto con 10 pruebas de backend sobre una base real en memoria —lo escrito
+  dentro desaparece al deshacer— y 13 de frontend.
+
+**Lo que no se hace, y es una decisión:** si una operación falla a medias dentro
+de una transacción del usuario, no se deshace sola. Exigiría un punto de guardado,
+y tirar de la transacción entera borraría trabajo que nadie pidió borrar; los
+mensajes lo dicen en lugar de afirmar que no se guardó nada.
+
+### Ejecutar procedimientos sin escribir la llamada — implementado
+
+Pedido por el usuario: un procedimiento solo ofrecía «Ver DDL», así que llamarlo
+exigía leer su definición, entender la firma y escribir el `EXEC` a mano.
+
+- [x] Leer los parámetros del catálogo —nombre, tipo, dirección y si tienen valor
+  por omisión— en los cuatro motores, con `RoutineSignature` atravesando el
+  contrato de proveedores, la aplicación, la API local y el gateway.
+- [x] Formulario con un campo por parámetro que distingue **valor, `NULL` y
+  omitir**: omitir deja que el motor ponga el suyo y `NULL` es decirle que no hay
+  valor, y confundirlos es de los errores más caros al llamar a algo ajeno.
+- [x] Parámetros de salida y valor de retorno desde el principio: la llamada
+  declara la variable, la pasa y la lee después.
+- [x] El SQL queda a la vista y **editable** antes de ejecutar, como en el resto
+  de Druse; ejecutar abre además la pestaña para que quede escrito qué se lanzó.
+
+Cada motor escribe la llamada a su manera y eso vive en el escritor SQL, no
+repartido por los componentes: `EXEC … OUTPUT` en SQL Server, variables de sesión
+en MySQL, `CALL` con huecos `NULL` en PostgreSQL —que devuelve las salidas como
+resultado— y `EXECUTE PROCEDURE` en Informix.
+
+**Lo que no se hace, y es una decisión:** Informix no recoge parámetros de salida
+fuera de un procedimiento —el `INTO` solo existe dentro de SPL—, así que allí la
+llamada se ejecuta sin ellos y se avisa por escrito en lugar de generar algo que
+el motor rechazaría. Las funciones tampoco entran: se llaman dentro de una
+consulta y no encajan en un formulario de ejecución.
+
+### Recuperar el trabajo sin ejecutar — implementado
+
+Pedido por el usuario. Cerrar la aplicación o el navegador se llevaba lo escrito
+y no ejecutado: el historial solo guarda lo que llegó a lanzarse. Cierra además
+la deuda que la Fase 3 dejó anotada («recordar las pestañas abiertas»).
+
+- [x] Guardar las pestañas —SQL, título, orden, cuál está activa, su conexión y
+  su base— en el SQLite del usuario, junto a las preferencias y el historial.
+- [x] Guardado automático un segundo después de dejar de escribir, y **también al
+  perder el foco y al cerrar**, que es la rendija que deja esa espera.
+- [x] Restaurar al abrir sin preguntar, conservando el orden y la pestaña activa.
+- [x] No guardar nada antes de haber leído lo guardado: la pestaña vacía del
+  arranque pisaría el trabajo de la sesión anterior.
+
+No se guardan los resultados: se vuelven a pedir ejecutando, y conservarlos
+dejaría datos de producción en el disco del usuario sin que nadie lo haya pedido.
+
+### Campos que ayudan según el tipo — implementado
+
+Pedido por el usuario: rellenar un `DATETIME` a mano es donde salen los
+`2026-13-45` y los `si`, que el motor rechaza cuando ya se ejecutó media
+instrucción.
+
+- [x] La API dice **con qué se pide** cada valor (`date`, `datetime`, `boolean`,
+  `integer`…), calculado con la misma clasificación que ya usa para convertir lo
+  que se escribe. La regla no se reescribe en el navegador: viviría en dos sitios
+  y se separarían al primer motor nuevo.
+- [x] Un componente único de entrada, usado en los cuatro sitios que piden un
+  valor: INSERT, UPDATE, parámetros de procedimiento, filtros del `WHERE` y
+  edición de celdas.
+- [x] Calendario para fechas, fecha y hora para marcas de tiempo, casilla para
+  booleanos y teclado numérico para números.
+- [x] **Siempre se puede volver a texto libre**: un valor no siempre es un dato,
+  y un calendario no sabe escribir `CURRENT_TIMESTAMP`.
+- [x] Si el valor actual no encaja en el control —una expresión, un formato
+  raro—, se enseña como texto en lugar de vaciarlo en silencio.
+
+`IN` se queda en texto libre a propósito: espera una lista separada por comas.
+
+### Borrar filas — implementado
+
+El compositor cubría `SELECT`, `INSERT` y `UPDATE`, y dejaba sin asistir justo la
+operación que más cuidado exige: para borrar había que escribir el `DELETE` a
+mano, que es donde más fácil resulta olvidar el `WHERE`.
+
+Se hizo por las dos vías, porque son dos necesidades distintas:
+
+- [x] **DELETE en el compositor**, con condición obligatoria: sin filtros no se
+  genera SQL ejecutable, igual que el `UPDATE`.
+- [x] **Recuento antes de borrar**, con el mismo `WHERE`. El error caro no suele
+  ser olvidar la condición, sino escribir una que abarca más de lo que uno cree.
+- [x] **Borrar las filas señaladas en la cuadrícula**, por clave primaria y solo
+  donde ya se permite editar: tabla de origen y clave entre las columnas.
+- [x] El `DELETE` se enseña antes de ejecutarlo, una instrucción por fila, y el
+  servidor exige la confirmación.
+- [x] **Exactamente una fila por instrucción**, comprobado en el servidor: si una
+  clave resultara no ser única, se deshace todo. Aquí pesa más que al editar,
+  porque de un borrado no queda valor anterior al que volver.
+
+No se ofrece `DELETE` sobre vistas —no se sabe si son actualizables— ni un
+borrado sin filtros «con confirmación»: para vaciar una tabla está `TRUNCATE`
+escrito a mano, que ya pasa por la detección de instrucciones destructivas.
+
 ### Prioridad alta
 
-- Autenticación integrada de Windows para SQL Server.
-- Túneles SSH.
+- ~~Autenticación integrada de Windows para SQL Server.~~ Hecho (sesión 014).
+- ~~Túneles SSH.~~ Hecho (sesión 015).
 - Actualizador automático.
 
 ### Prioridad media
@@ -946,8 +1072,9 @@ determinar si una vista admite escrituras.
 - Diagramas entidad-relación.
 - Comparación de esquemas.
 - Planes de ejecución gráficos.
-- Gestión visual de índices.
-- Temas y atajos configurables.
+- ~~Gestión visual de índices.~~ Hecho en el diseñador de tablas (sesión 019).
+- Atajos configurables.
+- Llevar al panel de preferencias el formato del SQL y el tiempo máximo de ejecución.
 - Soporte SQLite.
 - Instaladores estables para Linux y macOS.
 

@@ -20,6 +20,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Druse.Database.Abstractions\Druse.Database.Abstractions.csproj" />
+    <ProjectReference Include="..\..\src\Druse.Provider.Informix\Druse.Provider.Informix.csproj" />
     <ProjectReference Include="..\..\src\Druse.Provider.MySql\Druse.Provider.MySql.csproj" />
     <ProjectReference Include="..\..\src\Druse.Provider.PostgreSql\Druse.Provider.PostgreSql.csproj" />
     <ProjectReference Include="..\..\src\Druse.Provider.SqlServer\Druse.Provider.SqlServer.csproj" />

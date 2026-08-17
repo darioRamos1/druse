@@ -147,6 +147,13 @@ public sealed class MySqlFixture : IProviderFixture
         END
         """;
 
+    public string CreateProcedureWithParameters(string name) => $"""
+        CREATE PROCEDURE {name}(IN entrada INT, OUT salida VARCHAR(30))
+        BEGIN
+            SET salida = 'hecho';
+        END
+        """;
+
     public string DropProcedure(string name) => $"DROP PROCEDURE IF EXISTS {name}";
 
     /// <summary>

@@ -80,6 +80,20 @@ const BY_ENGINE: Readonly<Record<DatabaseEngine, readonly SqlSnippet[]>> = {
       body: 'SELECT TOP ${1:100} ${2:*}\nFROM ${3:tabla}\nORDER BY ${4:columna}',
     },
   ],
+  informix: [
+    {
+      trigger: 'first',
+      description: 'Primeras filas (Informix)',
+      body: 'SELECT FIRST ${1:100} ${2:*}\nFROM ${3:tabla}\nORDER BY ${4:columna}',
+    },
+    {
+      // El equivalente de OFFSET: en Informix `SKIP` va delante y siempre
+      // acompañado de `FIRST`, que es lo que casi nadie recuerda.
+      trigger: 'skip',
+      description: 'Saltar y tomar filas (Informix)',
+      body: 'SELECT SKIP ${1:0} FIRST ${2:100} ${3:*}\nFROM ${4:tabla}\nORDER BY ${5:columna}',
+    },
+  ],
 };
 
 export function snippetsFor(engine: DatabaseEngine): readonly SqlSnippet[] {

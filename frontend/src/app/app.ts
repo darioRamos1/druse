@@ -10,7 +10,7 @@ import { AppShell } from './layout/app-shell/app-shell';
   styles: `
     :host {
       display: block;
-      height: 100vh;
+      height: 100%;
     }
   `,
 })

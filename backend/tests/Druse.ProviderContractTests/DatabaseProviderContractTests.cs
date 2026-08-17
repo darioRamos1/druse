@@ -1,4 +1,4 @@
-using Druse.Database.Abstractions;
+﻿using Druse.Database.Abstractions;
 using Druse.Domain;
 
 namespace Druse.ProviderContractTests;
@@ -215,7 +215,7 @@ public abstract class DatabaseProviderContractTests<TFixture>
         // Cultura invariante: punto decimal, no la coma de la máquina.
         Assert.Equal("3.5", row[1]);
         // El booleano se normaliza aunque SQL Server no tenga tipo booleano.
-        Assert.Equal("true", row[2]);
+        Assert.Equal(Fixture.TransportsBooleans ? "true" : "1", row[2]);
         // La fecha se lee igual venga del motor que venga.
         Assert.StartsWith("2026-08-11", row[3], StringComparison.Ordinal);
     }
@@ -365,6 +365,15 @@ public abstract class DatabaseProviderContractTests<TFixture>
         var result = await ExecuteAsync(session, Fixture.RaiseNotice("hola desde el servidor"));
 
         Assert.Equal(QueryExecutionState.Succeeded, result.State);
+
+        // Un motor sin avisos —Informix— llega hasta aquí: la consulta se ejecuta
+        // y termina bien. Lo que no puede comprobarse es lo que ese motor no
+        // produce.
+        if (!Fixture.EmitsServerNotices)
+        {
+            return;
+        }
+
         Assert.Contains(
             result.Messages,
             message => message.Text.Contains("hola desde el servidor", StringComparison.Ordinal));
@@ -530,13 +539,17 @@ public abstract class DatabaseProviderContractTests<TFixture>
                         Columns = [new IndexColumn { Name = "id", Direction = IndexSortDirection.Descending }],
                     },
                 ],
+                // La restricción va sobre `nombre` y no sobre `id`: MySQL
+                // rechaza cualquier CHECK que mencione una columna
+                // AUTO_INCREMENT, así que comprobarlo ahí mediría una
+                // limitación del motor en vez del ciclo que interesa.
                 AddedCheckConstraints = Fixture.Designer.IndexCapabilities.SupportsCheckConstraints
                     ?
                     [
                         new CheckConstraintDefinition
                         {
                             Name = $"ck_{table}",
-                            Expression = "id > 0",
+                            Expression = "nombre <> ''",
                         },
                     ]
                     : [],
@@ -583,6 +596,83 @@ public abstract class DatabaseProviderContractTests<TFixture>
         finally
         {
             await ExecuteAsync(session, Fixture.DropTable(table));
+        }
+    }
+
+    /// <summary>
+    /// Lee los parámetros de un procedimiento para poder componer su llamada.
+    ///
+    /// Lo que se comprueba es el orden y la dirección, no los nombres: SQL Server
+    /// los adorna con `@` y ese adorno forma parte del nombre en la llamada, así
+    /// que exigir un nombre común obligaría a normalizar algo que después hace
+    /// falta tal cual.
+    /// </summary>
+    [Fact]
+    public async Task LeeLosParametrosDeUnProcedimiento()
+    {
+        if (Skip) { return; }
+
+        await using var session = await OpenAsync();
+
+        var procedureName = $"druse_params_{Guid.NewGuid():N}";
+
+        try
+        {
+            await ExecuteAsync(session, Fixture.CreateProcedureWithParameters(procedureName));
+
+            var folder = new DatabaseObject
+            {
+                Id = $"folder:{Fixture.DefaultSchema}:procedures",
+                Name = "Procedures",
+                Kind = DatabaseObjectKind.Folder,
+                Database = Fixture.DatabaseName,
+                Schema = Fixture.DefaultSchema,
+            };
+
+            var procedures = await Fixture.Metadata.GetChildrenAsync(
+                session,
+                folder,
+                CancellationToken.None);
+
+            var procedure = Assert.Single(
+                procedures,
+                item => item.Name == procedureName
+                    || item.Name.StartsWith($"{procedureName}(", StringComparison.Ordinal));
+
+            var signature = await Fixture.Metadata.GetRoutineSignatureAsync(
+                session,
+                procedure,
+                CancellationToken.None);
+
+            Assert.False(signature.IsFunction);
+            Assert.Equal(2, signature.Parameters.Count);
+
+            var entrada = signature.Parameters[0];
+            Assert.Equal(RoutineParameterDirection.Input, entrada.Direction);
+            Assert.False(string.IsNullOrWhiteSpace(entrada.DataType));
+
+            // La segunda sale. Si además admite entrada es cosa del motor —SQL
+            // Server no distingue `OUT` de `INOUT`— y da igual para la llamada:
+            // en los dos casos hace falta una variable donde recogerla.
+            var salida = signature.Parameters[1];
+            Assert.True(
+                salida.Direction is RoutineParameterDirection.Output
+                    or RoutineParameterDirection.InputOutput,
+                $"El segundo parámetro debía salir y llegó como {salida.Direction}.");
+
+            // El tipo llega tal como lo escribe el motor, que es lo que hace falta
+            // para declarar la variable donde se recoge la salida. **No se exige
+            // la longitud**: PostgreSQL descarta los modificadores de tipo en los
+            // parámetros de una rutina y devuelve `character varying` a secas
+            // aunque se haya declarado con 30.
+            Assert.False(string.IsNullOrWhiteSpace(salida.DataType));
+
+            Assert.Equal(1, entrada.Ordinal);
+            Assert.Equal(2, salida.Ordinal);
+        }
+        finally
+        {
+            await ExecuteAsync(session, Fixture.DropProcedure(procedureName));
         }
     }
 
@@ -755,6 +845,93 @@ public abstract class DatabaseProviderContractTests<TFixture>
     // -----------------------------------------------------------------------
 
     [Fact]
+    public async Task BorrarUnaFila_QuitaEsaYSoloEsa()
+    {
+        if (Skip) { return; }
+
+        await using var session = await OpenAsync();
+
+        var table = $"druse_tmp_{Guid.NewGuid():N}";
+
+        try
+        {
+            await ExecuteAsync(session, Fixture.CreateTableWithColumns(table));
+            await ExecuteAsync(session, Fixture.InsertNamedRows(table));
+
+            var batch = new PreparedRowDeleteBatch
+            {
+                Schema = Fixture.DefaultSchema,
+                Table = table,
+                Keys = [[new PreparedCell("id", 2L, "2")]],
+            };
+
+            var result = await Fixture.RowEditor.DeleteAsync(session, batch, CancellationToken.None);
+
+            Assert.Equal(1, result.RowsAffected);
+
+            var después = await ExecuteAsync(
+                session,
+                $"SELECT nombre FROM {Fixture.DefaultSchema}.{table} ORDER BY id");
+
+            // Se fue la segunda y solo la segunda. Un borrado que se lleve de más
+            // no se arregla después: no queda valor anterior que devolver.
+            Assert.Equal(["Ana", "Cris"], después.ResultSets[0].Rows.Select(row => row[0]));
+        }
+        finally
+        {
+            await ExecuteAsync(session, Fixture.DropTable(table));
+        }
+    }
+
+    /// <summary>
+    /// Una fila que ya no está deja el resto intacto y lo dice.
+    ///
+    /// Es el caso que de verdad protege la regla de «exactamente una fila»: dos
+    /// personas mirando la misma cuadrícula, y una borra antes que la otra.
+    /// </summary>
+    [Fact]
+    public async Task BorrarUnaFilaQueYaNoExiste_NoSeLlevaNadaMas()
+    {
+        if (Skip) { return; }
+
+        await using var session = await OpenAsync();
+
+        var table = $"druse_tmp_{Guid.NewGuid():N}";
+
+        try
+        {
+            await ExecuteAsync(session, Fixture.CreateTableWithColumns(table));
+            await ExecuteAsync(session, Fixture.InsertNamedRows(table));
+
+            var batch = new PreparedRowDeleteBatch
+            {
+                Schema = Fixture.DefaultSchema,
+                Table = table,
+                Keys =
+                [
+                    [new PreparedCell("id", 1L, "1")],
+                    [new PreparedCell("id", 99L, "99")],
+                ],
+            };
+
+            await Assert.ThrowsAsync<RowEditFailedException>(
+                () => Fixture.RowEditor.DeleteAsync(session, batch, CancellationToken.None));
+
+            var después = await ExecuteAsync(
+                session,
+                $"SELECT nombre FROM {Fixture.DefaultSchema}.{table} ORDER BY id");
+
+            // Ni siquiera la primera, que sí existía: o se borra todo lo pedido o
+            // no se borra nada.
+            Assert.Equal(["Ana", "Bea", "Cris"], después.ResultSets[0].Rows.Select(row => row[0]));
+        }
+        finally
+        {
+            await ExecuteAsync(session, Fixture.DropTable(table));
+        }
+    }
+
+    [Fact]
     public async Task EditarUnaFila_CambiaEsaYSoloEsa()
     {
         if (Skip) { return; }
@@ -912,6 +1089,9 @@ public abstract class DatabaseProviderContractTests<TFixture>
         public Guid Id => Guid.NewGuid();
 
         public DatabaseEngine Engine => DatabaseEngine.MySql;
+
+        /// <summary>No habla con ningún motor, así que no hay dónde abrir una.</summary>
+        public SessionTransaction Transaction => SessionTransaction.None;
 
         public ConnectionProfile Profile => new()
         {

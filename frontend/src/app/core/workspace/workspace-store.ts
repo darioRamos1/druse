@@ -1,6 +1,6 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { HttpErrorResponse } from '@angular/common/http';
-import { firstValueFrom } from 'rxjs';
+import { Observable, firstValueFrom } from 'rxjs';
 
 import {
   ApplicationGateway,
@@ -9,8 +9,19 @@ import {
   ImportOptions,
   ImportPreview,
   QueryRejected,
+  RowDeleteRequest,
   RowEditRequest,
+  TransactionState,
 } from '../application-gateway/application-gateway';
+import { FileSaveService } from '../files/file-save.service';
+import { PendingWorkService } from '../files/pending-work.service';
+import { ThemeService } from '../theme/theme.service';
+import {
+  DEFAULT_FORMAT_SETTINGS,
+  FormatSettings,
+  formatPreferences,
+  parseFormatSettings,
+} from './format-settings';
 import {
   ConnectionForm,
   ConnectionSummary,
@@ -32,6 +43,7 @@ import {
   SessionStatus,
   TableAlteration,
   TableDesign,
+  RoutineSignature,
   TableStructure,
 } from '../../shared/models/workspace';
 
@@ -62,8 +74,34 @@ interface DisplayedResultSource {
   readonly title: string;
 }
 
+/**
+ * Cómo acabó un intento de volver a abrir una conexión.
+ *
+ * `needsPassword` no es un fallo: es que el perfil no guarda la contraseña y hay
+ * que pedírsela, que es una decisión de la interfaz y no del estado.
+ */
+export type ReconnectOutcome = 'ok' | 'needsPassword' | 'failed';
+
 /** Clave con la que se guarda el tiempo máximo de ejecución. */
 const TIMEOUT_PREFERENCE = 'query.timeoutSeconds';
+
+/**
+ * Espera antes de guardar el trabajo sin ejecutar, en milisegundos.
+ *
+ * Corto porque lo que protege es un cierre inesperado, y largo porque escribir
+ * cambia el estado en cada tecla: sin esta pausa habría una escritura en disco
+ * por pulsación.
+ */
+const TABS_SAVE_DELAY_MS = 1000;
+
+/**
+ * Cada cuánto se vuelve a preguntar por una transacción abierta.
+ *
+ * Medio minuto: lo bastante seguido para que el indicador no mienta mucho rato
+ * después de que el proceso local la deshaga por inactividad, y lo bastante
+ * espaciado para que no sea una petición constante contra la API.
+ */
+const TRANSACTION_WATCH_MS = 30_000;
 
 let tabCounter = 1;
 
@@ -80,6 +118,9 @@ let tabCounter = 1;
 @Injectable({ providedIn: 'root' })
 export class WorkspaceStore {
   private readonly _gateway = inject(ApplicationGateway);
+  private readonly _files = inject(FileSaveService);
+  private readonly _pendingWork = inject(PendingWorkService);
+  private readonly _theme = inject(ThemeService);
 
   // --- Conexiones ------------------------------------------------------------
   private readonly _connections = signal<readonly ConnectionSummary[]>([]);
@@ -93,6 +134,12 @@ export class WorkspaceStore {
     { id: 'q1', title: 'Query 1', active: true, dirty: false, sql: '' },
   ]);
   readonly tabs = this._tabs.asReadonly();
+
+  /** Guardado pendiente del trabajo sin ejecutar, o `null` si no hay ninguno. */
+  private _tabsSaveTimer: ReturnType<typeof setTimeout> | null = null;
+
+  /** Hasta que no se ha leído lo guardado, no se guarda nada encima. */
+  private _tabsRestored = false;
 
   // --- Ejecución -------------------------------------------------------------
   private readonly _result = signal<QueryResult | null>(null);
@@ -120,9 +167,46 @@ export class WorkspaceStore {
   private readonly _timeoutSeconds = signal(30);
   readonly timeoutSeconds = this._timeoutSeconds.asReadonly();
 
+  /**
+   * Cómo formatea el editor.
+   *
+   * Se guarda igual que el tiempo máximo, y por lo mismo: es una decisión que se
+   * toma una vez —o que viene impuesta por el estilo del equipo— y que sería
+   * molesto repetir en cada arranque.
+   */
+  private readonly _formatSettings = signal<FormatSettings>(DEFAULT_FORMAT_SETTINGS);
+  readonly formatSettings = this._formatSettings.asReadonly();
+
   /** Muestra un aviso al usuario. */
   notify(message: string): void {
     this._notice.set(message);
+  }
+
+  /**
+   * Cambia uno o varios ajustes de formateo.
+   *
+   * Se guarda solo lo que cambió: escribir las cuatro claves en cada clic
+   * llenaría de escrituras la base local para no decir nada nuevo.
+   */
+  async setFormatSettings(changes: Partial<FormatSettings>): Promise<void> {
+    const previous = this._formatSettings();
+    const next = { ...previous, ...changes };
+
+    this._formatSettings.set(next);
+
+    const before = formatPreferences(previous);
+    const after = formatPreferences(next);
+
+    try {
+      await Promise.all(
+        Object.entries(after)
+          .filter(([key, value]) => before[key] !== value)
+          .map(([key, value]) => firstValueFrom(this._gateway.setPreference(key, value))),
+      );
+    } catch {
+      // Igual que con el tiempo máximo: el ajuste ya está aplicado en esta
+      // sesión, y no poder recordarlo no justifica interrumpir a nadie.
+    }
   }
 
   async setTimeout(seconds: number): Promise<void> {
@@ -138,7 +222,128 @@ export class WorkspaceStore {
     }
   }
 
-  /** Carga las preferencias guardadas. */
+  /**
+   * Cambia las pestañas y programa su guardado.
+   *
+   * Todo lo que las toca pasa por aquí para que recuperar el trabajo no dependa
+   * de acordarse de guardar en cada sitio: son ocho, y el que se olvide sería
+   * justo el que pierda lo escrito.
+   */
+  private updateTabs(change: (tabs: readonly QueryTab[]) => readonly QueryTab[]): void {
+    this._tabs.update(change);
+    this.scheduleTabsSave();
+  }
+
+  /**
+   * Guarda el trabajo sin ejecutar, poco después de dejar de escribir.
+   *
+   * El retardo existe porque escribir cambia el estado en cada tecla y guardar
+   * en cada una sería una escritura por pulsación. Un segundo es corto para lo
+   * que se protege —un cierre inesperado— y suficiente para no castigar el
+   * teclado.
+   */
+  private scheduleTabsSave(): void {
+    if (!this._tabsRestored) {
+      // Antes de restaurar no se guarda nada: la pestaña vacía del arranque
+      // pisaría lo que se dejó escrito en la sesión anterior.
+      return;
+    }
+
+    if (this._tabsSaveTimer !== null) {
+      clearTimeout(this._tabsSaveTimer);
+    }
+
+    this._tabsSaveTimer = setTimeout(() => {
+      this._tabsSaveTimer = null;
+      void this.saveTabsNow();
+    }, TABS_SAVE_DELAY_MS);
+  }
+
+  /**
+   * Guarda ya lo que estuviera esperando.
+   *
+   * El retardo deja una rendija: cerrar justo después de escribir se llevaría lo
+   * último. Se llama al perder el foco y al cerrar, que es cuando esa rendija
+   * importa.
+   */
+  flushTabs(): void {
+    if (this._tabsSaveTimer === null) {
+      return;
+    }
+
+    clearTimeout(this._tabsSaveTimer);
+    this._tabsSaveTimer = null;
+    void this.saveTabsNow();
+  }
+
+  private async saveTabsNow(): Promise<void> {
+    const tabs = this._tabs().map((tab) => ({
+      id: tab.id,
+      title: tab.title,
+      sql: tab.sql,
+      isActive: tab.active,
+      isDirty: tab.dirty,
+      connectionId: tab.connectionId,
+      database: tab.database,
+      fileName: tab.fileName,
+      documentId: tab.documentId,
+    }));
+
+    try {
+      await firstValueFrom(this._gateway.saveEditorTabs(tabs));
+    } catch {
+      // Guardar el borrador es una red de seguridad: si falla, el usuario sigue
+      // teniendo su trabajo delante y avisarle no le sirve de nada.
+    }
+  }
+
+  /**
+   * Devuelve las pestañas de la última sesión, con lo que no se llegó a ejecutar.
+   *
+   * Se llama una vez al arrancar. Si no hay nada guardado se deja la pestaña
+   * vacía de siempre, que es lo que ve quien abre Druse por primera vez.
+   */
+  async restoreTabs(): Promise<void> {
+    try {
+      const stored = await firstValueFrom(this._gateway.getEditorTabs());
+
+      if (stored.length > 0) {
+        this._tabs.set(
+          stored.map((tab, index) => ({
+            id: tab.id,
+            title: tab.title,
+            active: tab.isActive || (index === 0 && !stored.some((other) => other.isActive)),
+            dirty: tab.isDirty,
+            sql: tab.sql,
+            connectionId: tab.connectionId,
+            database: tab.database,
+            fileName: tab.fileName,
+            documentId: tab.documentId,
+          })),
+        );
+
+        // El contador se adelanta a lo restaurado: si volviera a empezar, la
+        // siguiente pestaña nueva se llamaría igual que una recuperada y las dos
+        // se pisarían.
+        tabCounter = Math.max(
+          tabCounter,
+          ...stored.map((tab) => Number.parseInt(tab.id.replace(/^q/, ''), 10) || 0),
+        );
+      }
+    } catch {
+      // Sin lo guardado se arranca como siempre.
+    } finally {
+      this._tabsRestored = true;
+    }
+  }
+
+  /**
+   * Carga las preferencias guardadas.
+   *
+   * De aquí sale también el tema, aunque no sea estado del área de trabajo: la
+   * lectura es una sola llamada, y hacer otra igual desde el servicio de tema
+   * sería pedir dos veces lo mismo en el arranque.
+   */
   async loadPreferences(): Promise<void> {
     try {
       const preferences = await firstValueFrom(this._gateway.getPreferences());
@@ -147,6 +352,9 @@ export class WorkspaceStore {
       if (Number.isFinite(stored) && stored > 0) {
         this._timeoutSeconds.set(stored);
       }
+
+      this._formatSettings.set(parseFormatSettings(preferences));
+      this._theme.adopt(preferences);
     } catch {
       // Se sigue con los valores por defecto.
     }
@@ -154,7 +362,7 @@ export class WorkspaceStore {
 
   /** Aplica el resultado de guardar únicamente si el contenido no cambió mientras se escribía. */
   markTabSaved(id: string, sql: string, fileName: string, documentId?: string): void {
-    this._tabs.update((tabs) =>
+    this.updateTabs((tabs) =>
       tabs.map((tab) =>
         tab.id === id
           ? {
@@ -221,8 +429,18 @@ export class WorkspaceStore {
       );
 
       if (stillCurrent()) {
-        download(blob, `${sanitizeFileName(source?.title ?? tab?.title ?? 'druse')}.${format}`);
-        this._notice.set(`Exportado a ${format.toUpperCase()}.`);
+        const fileName = `${sanitizeFileName(source?.title ?? tab?.title ?? 'druse')}.${format}`;
+
+        // Se anuncia después de guardar y solo si de verdad se guardó. Antes se
+        // daba por hecho, y en la aplicación empaquetada eso significaba decir
+        // «Exportado» sin haber escrito nada en ningún sitio.
+        const saved = await this._files.save(fileName, blob);
+
+        if (stillCurrent()) {
+          this._notice.set(
+            saved ? `Exportado a ${format.toUpperCase()}.` : 'Exportación cancelada.',
+          );
+        }
       }
     } catch (error) {
       const rejection = await asRejectionFromBlob(error);
@@ -244,10 +462,16 @@ export class WorkspaceStore {
           });
         }
       } else {
-        const message = await describeBlobError(error);
+        // La exportación viaja como blob, así que el cuerpo del error hay que
+        // leerlo antes de poder reconocer una sesión perdida.
+        const failure = await asHttpErrorFromBlob(error);
 
-        if (stillCurrent()) {
-          this._notice.set(message);
+        if (!connection || !this.noteSessionLoss(connection.id, failure ?? error)) {
+          const message = await describeBlobError(error);
+
+          if (stillCurrent()) {
+            this._notice.set(message);
+          }
         }
       }
     } finally {
@@ -264,6 +488,201 @@ export class WorkspaceStore {
 
     return connectionId ? (this._sessions().get(connectionId) ?? null) : null;
   });
+
+  // --- Transacciones manuales ------------------------------------------------
+
+  /**
+   * La transacción de cada conexión, indexada por conexión y no por pestaña.
+   *
+   * No es un detalle de implementación: **la transacción pertenece a la
+   * conexión**. Dos pestañas del mismo perfil comparten sesión, así que lo que
+   * se ejecute en cualquiera de ellas entra en la misma transacción, y guardarla
+   * por pestaña haría creer lo contrario.
+   */
+  private readonly _transactions = signal<ReadonlyMap<string, TransactionState>>(new Map());
+
+  /** La transacción abierta en la conexión activa, o `null` si va en autocommit. */
+  readonly transaction = computed(() => {
+    const connectionId = this.activeConnection()?.id;
+    const state = connectionId ? this._transactions().get(connectionId) : undefined;
+
+    return state?.isOpen ? state : null;
+  });
+
+  private readonly _transactionBusy = signal(false);
+  readonly transactionBusy = this._transactionBusy.asReadonly();
+
+  /**
+   * Reloj que vuelve a preguntar por la transacción abierta.
+   *
+   * Existe por una sola razón: el proceso local la deshace solo si se queda
+   * inactiva, y eso ocurre sin que nadie pulse nada. Sin este reloj, el
+   * indicador seguiría diciendo que hay una transacción abierta mucho después de
+   * que dejara de haberla.
+   */
+  private _transactionWatch: ReturnType<typeof setInterval> | null = null;
+
+  /** Hay una transacción abierta en esa conexión. */
+  hasOpenTransaction(connectionId: string): boolean {
+    return this._transactions().get(connectionId)?.isOpen === true;
+  }
+
+  /** Entra en modo manual: a partir de aquí nada se confirma solo. */
+  async beginTransaction(): Promise<boolean> {
+    return this.runTransaction((sessionId) => this._gateway.beginTransaction(sessionId), (state) => {
+      const aviso = state.ddlIsReversible
+        ? ''
+        : ' Crear o modificar tablas no se deshace en este motor, aunque uses «Deshacer».';
+
+      return (
+        `Transacción abierta en «${state.connectionName}». ` +
+        'Todo lo que ejecutes en esta conexión entra en ella hasta que la confirmes o la deshagas.' +
+        aviso
+      );
+    });
+  }
+
+  async commitTransaction(): Promise<boolean> {
+    return this.runTransaction(
+      (sessionId) => this._gateway.commitTransaction(sessionId),
+      (state) => `Cambios confirmados en «${state.connectionName}».`,
+    );
+  }
+
+  async rollbackTransaction(): Promise<boolean> {
+    return this.runTransaction(
+      (sessionId) => this._gateway.rollbackTransaction(sessionId),
+      (state) => `Cambios deshechos en «${state.connectionName}».`,
+    );
+  }
+
+  private async runTransaction(
+    operation: (sessionId: string) => Observable<TransactionState>,
+    describe: (state: TransactionState) => string,
+  ): Promise<boolean> {
+    const connection = this.activeConnection();
+
+    if (!connection?.sessionId) {
+      this._notice.set('Abre una conexión para poder usar transacciones.');
+
+      return false;
+    }
+
+    this._transactionBusy.set(true);
+
+    try {
+      const state = await firstValueFrom(operation(connection.sessionId));
+
+      this.setTransaction(connection.id, state);
+      this._notice.set(describe(state));
+
+      return true;
+    } catch (error) {
+      // Sin sesión no hay transacción de la que hablar, y el aviso de la
+      // conexión perdida explica mejor lo que pasó.
+      if (this.noteSessionLoss(connection.id, error)) {
+        return false;
+      }
+
+      this._notice.set(describeError(error));
+
+      // El estado local pudo quedarse atrás —otra pestaña la cerró, o se
+      // deshizo sola—, así que se vuelve a preguntar en lugar de dejar los
+      // botones mintiendo.
+      await this.refreshTransaction(connection.id);
+
+      return false;
+    } finally {
+      this._transactionBusy.set(false);
+    }
+  }
+
+  /** Vuelve a preguntar por la transacción de una conexión. */
+  private async refreshTransaction(connectionId: string): Promise<void> {
+    const connection = this.findConnection(connectionId);
+
+    if (!connection?.sessionId) {
+      return;
+    }
+
+    try {
+      const state = await firstValueFrom(this._gateway.getTransaction(connection.sessionId));
+      const previous = this._transactions().get(connectionId);
+
+      this.setTransaction(connectionId, state);
+
+      // Se cuenta una sola vez, comparando con lo último que se sabía: sin esa
+      // comparación el aviso volvería a salir en cada vuelta del reloj.
+      if (
+        state.autoRolledBackAt &&
+        state.autoRolledBackAt !== previous?.autoRolledBackAt &&
+        !state.isOpen
+      ) {
+        const minutos = Math.max(1, Math.round(state.idleTimeoutSeconds / 60));
+
+        this._notice.set(
+          `La transacción de «${state.connectionName}» se deshizo sola tras ${minutos} min sin ` +
+            'actividad, para no dejar filas bloqueadas. Los cambios sin confirmar se perdieron.',
+        );
+      }
+    } catch {
+      // Preguntar por el estado no puede molestar al usuario: si la API no
+      // responde, ya se lo dirá la siguiente cosa que intente hacer.
+    }
+  }
+
+  private setTransaction(connectionId: string, state: TransactionState): void {
+    this._transactions.update((current) => {
+      const next = new Map(current);
+      next.set(connectionId, state);
+
+      return next;
+    });
+
+    this.watchTransactions();
+  }
+
+  /** Mantiene el reloj vivo solo mientras haya alguna transacción abierta. */
+  private watchTransactions(): void {
+    const abiertas = [...this._transactions().values()].some((state) => state.isOpen);
+
+    // Quien avisa al cerrar la ventana necesita saberlo aquí y no al final: en
+    // el escritorio, el aviso lo da el envoltorio, y para entonces preguntarle a
+    // la página ya sería tarde.
+    this._pendingWork.set(abiertas);
+
+    if (!abiertas) {
+      if (this._transactionWatch !== null) {
+        clearInterval(this._transactionWatch);
+        this._transactionWatch = null;
+      }
+
+      return;
+    }
+
+    if (this._transactionWatch !== null) {
+      return;
+    }
+
+    this._transactionWatch = setInterval(() => {
+      for (const [connectionId, state] of this._transactions()) {
+        if (state.isOpen) {
+          void this.refreshTransaction(connectionId);
+        }
+      }
+    }, TRANSACTION_WATCH_MS);
+  }
+
+  private forgetTransaction(connectionId: string): void {
+    this._transactions.update((current) => {
+      const next = new Map(current);
+      next.delete(connectionId);
+
+      return next;
+    });
+
+    this.watchTransactions();
+  }
 
   // --- Persistencia ----------------------------------------------------------
   private readonly _secretStore = signal<SecretStoreStatus | null>(null);
@@ -422,6 +841,89 @@ export class WorkspaceStore {
   // --- Derivados -------------------------------------------------------------
 
   readonly activeTab = computed(() => this._tabs().find((tab) => tab.active) ?? null);
+
+  /**
+   * La conexión que perdió su sesión, si hay alguna.
+   *
+   * Sirve para poner «Reconectar» en el aviso: quien acaba de leer que se cayó
+   * la conexión no debería tener que buscar dónde se arregla.
+   */
+  readonly lostConnection = computed(
+    () => this._connections().find((connection) => connection.lost) ?? null,
+  );
+
+  /**
+   * Bases de una conexión, tal y como las trajo el explorador al abrirla.
+   *
+   * Salen del árbol y no de otra consulta: ya se piden al conectar, y volver a
+   * preguntarlas para llenar un desplegable sería trabajo repetido.
+   */
+  databasesFor(connectionId: string): readonly string[] {
+    return this._roots()
+      .filter((root) => root.connectionId === connectionId && root.object.kind === 'database')
+      .map((root) => root.object.name);
+  }
+
+  /** Base contra la que ejecuta la pestaña activa. */
+  readonly activeDatabase = computed(() => {
+    const tab = this.activeTab();
+
+    return tab?.database ?? this.session()?.database ?? null;
+  });
+
+  /**
+   * Cambia la base de la pestaña activa.
+   *
+   * Es lo que evita abrir un script por base: la misma consulta se ejecuta
+   * contra otra base de **la misma conexión**, que es como se trabaja cuando un
+   * servidor tiene la de producción y la de pruebas una al lado de la otra.
+   *
+   * El resultado en pantalla se retira: salió de la base anterior, y dejarlo
+   * mientras la barra dice otra cosa es la clase de detalle que lleva a leer mal
+   * unas filas.
+   */
+  useDatabase(database: string): void {
+    const tab = this.activeTab();
+
+    if (!tab || tab.database === database) {
+      return;
+    }
+
+    this.updateTabs((tabs) =>
+      tabs.map((item) =>
+        item.id === tab.id
+          ? // La procedencia editable también era de la base anterior: esas filas
+            // no se pueden escribir desde aquí.
+            { ...item, database, sourceTable: undefined }
+          : item,
+      ),
+    );
+
+    if (this._resultSource()?.tabId === tab.id) {
+      this.clearDisplayedResult();
+    }
+
+    const connectionId = this.activeConnection()?.id;
+
+    if (!connectionId) {
+      return;
+    }
+
+    // Una consulta contra otra base va por otra conexión, así que **no entra en
+    // la transacción abierta**. Es cómo funciona una transacción y no algo que
+    // Druse pueda arreglar, pero callarlo dejaría creer que esos cambios se
+    // pueden deshacer con Rollback.
+    if (this.hasOpenTransaction(connectionId)) {
+      this._notice.set(
+        `Lo que ejecutes contra «${database}» no entra en la transacción abierta: ` +
+          'va por otra conexión y se confirma solo.',
+      );
+    }
+
+    // El autocompletado de la base nueva no está cargado todavía; se pide por
+    // detrás para que escribir no tenga que esperar al catálogo.
+    void this.primeSchemaIndexAsync(connectionId, database);
+  }
 
   readonly activeConnection = computed(() => {
     const connectionId = this.activeTab()?.connectionId ?? this._activeConnectionId();
@@ -650,17 +1152,25 @@ export class WorkspaceStore {
 
       this._edits.set([]);
       this._editPreview.set(null);
-      this._notice.set(
-        `${result.rowsAffected} ${result.rowsAffected === 1 ? 'fila guardada' : 'filas guardadas'}.`,
-      );
 
       // Se relee para que en pantalla quede lo que hay en la base, no lo que se
       // creía haber escrito: valores por defecto y disparadores pueden cambiarlo.
       await this.execute();
 
+      // El aviso va **después** de releer: `execute` limpia el aviso al empezar,
+      // así que ponerlo antes equivalía a no ponerlo.
+      this._notice.set(
+        `${result.rowsAffected} ${result.rowsAffected === 1 ? 'fila guardada' : 'filas guardadas'}.`,
+      );
+
       return true;
     } catch (error) {
-      this._notice.set(describeError(error));
+      const connectionId = this.activeConnection()?.id;
+
+      if (!connectionId || !this.noteSessionLoss(connectionId, error)) {
+        this._notice.set(describeError(error));
+      }
+
       return false;
     } finally {
       this._savingEdits.set(false);
@@ -712,6 +1222,156 @@ export class WorkspaceStore {
     });
 
     return { sessionId, table: editable.table, confirmed, edits: filas };
+  }
+
+  /**
+   * Ejecuta un recuento y devuelve el número, sin tocar la pantalla.
+   *
+   * No pasa por `execute` a propósito: esto no es lo que el usuario pidió
+   * ejecutar, así que no debe cambiar la cuadrícula, ni el historial, ni la
+   * pestaña activa. Solo responde una pregunta.
+   */
+  async countRows(connectionId: string, sql: string): Promise<number | null> {
+    const sessionId = this.findConnection(connectionId)?.sessionId;
+
+    if (!sessionId) {
+      return null;
+    }
+
+    try {
+      const result = await firstValueFrom(
+        this._gateway.executeQuery({ sessionId, sql, maxRows: 1 }),
+      );
+
+      const value = result.resultSets[0]?.rows[0]?.values[0];
+
+      return value === null || value === undefined ? null : Number(value);
+    } catch (error) {
+      this.reportFailure(connectionId, error);
+      return null;
+    }
+  }
+
+  // --- Borrado de filas ------------------------------------------------------
+
+  /** Filas señaladas para borrar, por su número en el resultado. */
+  private readonly _selectedRows = signal<readonly number[]>([]);
+  readonly selectedRows = this._selectedRows.asReadonly();
+
+  /** El `DELETE` que se ejecutaría, ya escrito, mientras se decide. */
+  private readonly _deletePreview = signal<readonly string[] | null>(null);
+  readonly deletePreview = this._deletePreview.asReadonly();
+
+  private readonly _deleting = signal(false);
+  readonly deleting = this._deleting.asReadonly();
+
+  toggleRowSelection(row: number): void {
+    this._selectedRows.update((current) =>
+      current.includes(row) ? current.filter((item) => item !== row) : [...current, row],
+    );
+  }
+
+  clearRowSelection(): void {
+    this._selectedRows.set([]);
+    this._deletePreview.set(null);
+  }
+
+  cancelDeletePreview(): void {
+    this._deletePreview.set(null);
+  }
+
+  /**
+   * Pide el `DELETE` que se ejecutaría y lo deja listo para enseñarlo.
+   *
+   * Igual que al editar: el paso que no se puede saltar. Con una diferencia, y
+   * es que aquí no hay vuelta atrás mirando la pantalla.
+   */
+  async prepareDelete(): Promise<void> {
+    const request = this.buildDeleteRequest(false);
+
+    if (!request) {
+      return;
+    }
+
+    try {
+      this._deletePreview.set(await firstValueFrom(this._gateway.previewRowDeletes(request)));
+    } catch (error) {
+      this._notice.set(describeError(error));
+    }
+  }
+
+  /** Borra las filas señaladas y vuelve a ejecutar la consulta. */
+  async deleteSelectedRows(): Promise<boolean> {
+    const request = this.buildDeleteRequest(true);
+
+    if (!request) {
+      return false;
+    }
+
+    this._deleting.set(true);
+
+    try {
+      const result = await firstValueFrom(this._gateway.deleteRows(request));
+
+      this.clearRowSelection();
+
+      await this.execute();
+
+      // Después de releer, por lo mismo que al guardar: `execute` limpia el
+      // aviso al empezar.
+      this._notice.set(
+        `${result.rowsAffected} ${result.rowsAffected === 1 ? 'fila borrada' : 'filas borradas'}.`,
+      );
+
+      return true;
+    } catch (error) {
+      const connectionId = this.activeConnection()?.id;
+
+      if (!connectionId || !this.noteSessionLoss(connectionId, error)) {
+        this._notice.set(describeError(error));
+      }
+
+      return false;
+    } finally {
+      this._deleting.set(false);
+    }
+  }
+
+  /**
+   * Traduce la selección a lo que espera la API.
+   *
+   * La clave sale del resultado que el usuario tiene delante, como en la
+   * edición: es lo que garantiza que se borre la fila señalada y no otra.
+   */
+  private buildDeleteRequest(confirmed: boolean): RowDeleteRequest | null {
+    const editable = this.editableTable();
+    const sessionId = this.activeConnection()?.sessionId;
+    const resultSet = this.resultSet();
+    const selected = this._selectedRows();
+
+    if (!editable || !sessionId || !resultSet || selected.length === 0) {
+      return null;
+    }
+
+    const indexOf = (name: string) =>
+      resultSet.columns.findIndex((column) => column.name.toLowerCase() === name.toLowerCase());
+
+    const keys = selected.flatMap((number) => {
+      const row = resultSet.rows.find((item) => item.number === number);
+
+      if (!row) {
+        return [];
+      }
+
+      return [
+        editable.keyColumns.map((column) => ({
+          column,
+          value: row.values[indexOf(column)] ?? null,
+        })),
+      ];
+    });
+
+    return { sessionId, table: editable.table, confirmed, keys };
   }
 
   // --- Importación -----------------------------------------------------------
@@ -884,6 +1544,120 @@ export class WorkspaceStore {
   }
 
   /**
+   * Anota que una operación falló porque la sesión ya no existe.
+   *
+   * Se llama desde los sitios donde el usuario lo va a notar —ejecutar, explorar,
+   * guardar, exportar—, y no en un interceptor: hace falta saber **de qué
+   * conexión** era la sesión, y eso solo lo sabe quien hizo la petición.
+   *
+   * @returns `true` si el fallo era una sesión perdida y ya se contó.
+   */
+  private noteSessionLoss(connectionId: string, error: unknown): boolean {
+    if (!isSessionLost(error)) {
+      return false;
+    }
+
+    const connection = this.findConnection(connectionId);
+
+    this.patchConnection(connectionId, {
+      state: 'error',
+      lost: true,
+      sessionId: undefined,
+      error: 'La conexión se perdió.',
+    });
+
+    // El árbol y la transacción eran de una sesión que ya no existe. Dejarlos
+    // sería enseñar un catálogo que nadie puede consultar y una transacción que
+    // el servidor ya deshizo al soltar la conexión.
+    this._roots.update((roots) => roots.filter((root) => root.connectionId !== connectionId));
+    this._sessions.update((sessions) => {
+      const next = new Map(sessions);
+      next.delete(connectionId);
+
+      return next;
+    });
+    this.forgetTransaction(connectionId);
+
+    this._notice.set(
+      `Se perdió la conexión con «${connection?.name ?? 'la base'}». Vuelve a conectarla para seguir.`,
+    );
+
+    return true;
+  }
+
+  /**
+   * Cuenta un fallo de una operación sobre una conexión.
+   *
+   * Si fue la sesión lo que se perdió, el aviso lo da {@link noteSessionLoss}
+   * con su botón de reconectar; si no, se enseña el mensaje de siempre. Existe
+   * para no repetir ese `if` en cada camino que habla con una sesión.
+   */
+  private reportFailure(connectionId: string, error: unknown): void {
+    if (!this.noteSessionLoss(connectionId, error)) {
+      this._notice.set(describeError(error));
+    }
+  }
+
+  /**
+   * Vuelve a abrir la sesión de una conexión.
+   *
+   * Sirve para dos casos que se parecen: la conexión se cayó, o lleva tanto
+   * abierta que uno prefiere empezar limpio. En ambos se cierra lo que quede
+   * —puede haber una sesión zombi en el proceso local— y se abre otra.
+   *
+   * **Las pestañas y su SQL no se tocan.** Lo que se pierde es lo que ya estaba
+   * perdido: el resultado en pantalla, que vino de una sesión que ya no existe,
+   * y cualquier transacción sin confirmar.
+   */
+  async reconnect(connectionId: string): Promise<ReconnectOutcome> {
+    const connection = this.findConnection(connectionId);
+
+    if (!connection) {
+      return 'failed';
+    }
+
+    if (!connection.saved) {
+      this._notice.set(
+        `«${connection.name}» no está guardada, así que Druse no tiene con qué volver a abrirla. ` +
+          'Créala de nuevo desde «Nueva conexión».',
+      );
+
+      return 'failed';
+    }
+
+    if (connection.sessionId) {
+      try {
+        await firstValueFrom(this._gateway.closeSession(connection.sessionId));
+      } catch {
+        // Si ya no existía, el resultado es el que se buscaba.
+      }
+    }
+
+    this.forgetTransaction(connectionId);
+    this._roots.update((roots) => roots.filter((root) => root.connectionId !== connectionId));
+    this.patchConnection(connectionId, { sessionId: undefined, lost: false, error: undefined });
+
+    // El resultado en pantalla salió de la sesión anterior; conservarlo sería
+    // enseñar filas que ya no se pueden ni refrescar ni editar.
+    if (this._resultSource()?.connectionId === connectionId) {
+      this.clearDisplayedResult();
+    }
+
+    const connected = await this.connectSaved(connectionId);
+
+    if (connected) {
+      this.patchConnection(connectionId, { lost: false });
+      this._notice.set(`Conexión con «${connection.name}» restablecida.`);
+
+      return 'ok';
+    }
+
+    // `connectSaved` deja la conexión desconectada cuando la API pide la
+    // contraseña; quien llama decide si abrir el diálogo.
+    return this.findConnection(connectionId)?.state === 'disconnected' ? 'needsPassword' : 'failed';
+  }
+
+  /**
    * Cierra la sesión.
    *
    * Un perfil guardado no desaparece de la lista: se queda desconectado, listo
@@ -918,6 +1692,11 @@ export class WorkspaceStore {
       next.delete(connectionId);
       return next;
     });
+
+    // Cerrar la conexión deshace lo que no estuviera confirmado —lo hace el
+    // proceso local al soltar la sesión—, así que aquí no queda transacción de
+    // la que hablar. Quien avisa antes de llegar hasta aquí es la interfaz.
+    this.forgetTransaction(connectionId);
 
     if (this._activeConnectionId() === connectionId) {
       this._activeConnectionId.set(this._connections().find((item) => item.sessionId)?.id ?? null);
@@ -1059,7 +1838,32 @@ export class WorkspaceStore {
     try {
       return await firstValueFrom(this._gateway.getTableStructure(sessionId, table));
     } catch (error) {
-      this._notice.set(describeError(error));
+      this.reportFailure(connectionId, error);
+      return null;
+    }
+  }
+
+  /**
+   * Parámetros de un procedimiento, para poder componer su llamada.
+   *
+   * Devuelve `null` cuando el motor no lo deja leer —una función de PostgreSQL
+   * llega sin OID, un procedimiento puede estar cifrado— y el aviso ya se le ha
+   * dado al usuario: quien llama solo tiene que dejar de ofrecer el formulario.
+   */
+  async routineSignature(
+    connectionId: string,
+    routine: DatabaseObject,
+  ): Promise<RoutineSignature | null> {
+    const sessionId = this.findConnection(connectionId)?.sessionId;
+
+    if (!sessionId) {
+      return null;
+    }
+
+    try {
+      return await firstValueFrom(this._gateway.getRoutineSignature(sessionId, routine));
+    } catch (error) {
+      this.reportFailure(connectionId, error);
       return null;
     }
   }
@@ -1083,7 +1887,7 @@ export class WorkspaceStore {
     try {
       return await firstValueFrom(this._gateway.getColumns(sessionId, table));
     } catch (error) {
-      this._notice.set(describeError(error));
+      this.reportFailure(connectionId, error);
       return [];
     }
   }
@@ -1134,7 +1938,7 @@ export class WorkspaceStore {
 
       return result.statements;
     } catch (error) {
-      this._notice.set(describeError(error));
+      this.reportFailure(connectionId, error);
       return null;
     }
   }
@@ -1159,7 +1963,7 @@ export class WorkspaceStore {
 
       return result.statements;
     } catch (error) {
-      this._notice.set(describeError(error));
+      this.reportFailure(connectionId, error);
       return null;
     }
   }
@@ -1436,6 +2240,13 @@ export class WorkspaceStore {
     } catch (error) {
       entry.children = [];
 
+      // Que el árbol falle por una sesión perdida se cuenta siempre, aunque el
+      // precalentado fuera silencioso: la conexión entera dejó de servir, y
+      // callarlo solo retrasa el momento de enterarse.
+      if (this.noteSessionLoss(entry.connectionId, error)) {
+        return;
+      }
+
       // El precalentado no debe interrumpir a nadie: si una parte del catálogo
       // no se puede leer, el autocompletado tendrá menos, y ya está. Cuando el
       // usuario abra ese nodo a mano sí verá el motivo.
@@ -1474,6 +2285,9 @@ export class WorkspaceStore {
         columns.map((column) => ({
           name: column.name,
           dataType: column.dataType,
+          // Sin esto el compositor pide todo con un campo de texto: la columna
+          // sabe que es una fecha, pero esa parte se quedaba por el camino.
+          inputKind: column.inputKind,
           isNullable: column.isNullable,
           isPrimaryKey: column.isPrimaryKey,
           isGenerated: column.isGenerated,
@@ -1591,12 +2405,12 @@ export class WorkspaceStore {
   // --- Pestañas --------------------------------------------------------------
 
   selectTab(id: string): void {
-    this._tabs.update((tabs) => tabs.map((tab) => ({ ...tab, active: tab.id === id })));
+    this.updateTabs((tabs) => tabs.map((tab) => ({ ...tab, active: tab.id === id })));
     this.clearDisplayedResult();
   }
 
   closeTab(id: string): void {
-    this._tabs.update((tabs) => {
+    this.updateTabs((tabs) => {
       const remaining = tabs.filter((tab) => tab.id !== id);
 
       if (remaining.length > 0 && !remaining.some((tab) => tab.active)) {
@@ -1619,7 +2433,7 @@ export class WorkspaceStore {
   ): void {
     tabCounter++;
 
-    this._tabs.update((tabs) => [
+    this.updateTabs((tabs) => [
       ...tabs.map((tab) => ({ ...tab, active: false })),
       {
         id: `q${tabCounter}`,
@@ -1640,7 +2454,7 @@ export class WorkspaceStore {
 
   openSqlFile(fileName: string, sql: string, documentId?: string): void {
     this.createTab(sql, undefined, undefined, fileName, undefined);
-    this._tabs.update((tabs) =>
+    this.updateTabs((tabs) =>
       tabs.map((tab) =>
         tab.active ? { ...tab, fileName, documentId: documentId || undefined } : tab,
       ),
@@ -1648,7 +2462,7 @@ export class WorkspaceStore {
   }
 
   updateSql(sql: string): void {
-    this._tabs.update((tabs) =>
+    this.updateTabs((tabs) =>
       tabs.map((tab) => (tab.active ? { ...tab, sql, dirty: true, sourceTable: undefined } : tab)),
     );
     this._pendingRejection.set(null);
@@ -1781,7 +2595,7 @@ export class WorkspaceStore {
             sql,
           });
         }
-      } else {
+      } else if (!this.noteSessionLoss(connection.id, error)) {
         if (this.activeTab()?.id === tabId && this.activeTab()?.sql === tabSql) {
           this._notice.set(describeError(error));
         }
@@ -1848,7 +2662,7 @@ export class WorkspaceStore {
 
   private activateConnection(connectionId: string): void {
     this._activeConnectionId.set(connectionId);
-    this._tabs.update((tabs) =>
+    this.updateTabs((tabs) =>
       tabs.map((tab) => (tab.active && !tab.connectionId ? { ...tab, connectionId } : tab)),
     );
   }
@@ -1967,24 +2781,6 @@ function toRequest(form: ConnectionForm): ConnectRequest {
   };
 }
 
-/**
- * Descarga un archivo desde el navegador.
- *
- * Se crea un enlace temporal y se revoca la URL después: sin revocarla, el
- * navegador conserva el archivo en memoria hasta recargar la página, y exportar
- * varias veces iría acumulando copias.
- */
-function download(blob: Blob, fileName: string): void {
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-
-  link.href = url;
-  link.download = fileName;
-  link.click();
-
-  URL.revokeObjectURL(url);
-}
-
 /** Quita del nombre lo que un sistema de archivos no admite. */
 function sanitizeFileName(name: string): string {
   const safe = name.replace(/[\\/:*?"<>|]/g, '').trim();
@@ -2012,6 +2808,30 @@ async function asRejectionFromBlob(error: unknown): Promise<QueryRejected | null
   }
 
   return error.error?.reason ? (error.error as QueryRejected) : null;
+}
+
+/**
+ * Rehace el error con su cuerpo ya leído, cuando vino como blob.
+ *
+ * La exportación pide `responseType: 'blob'`, así que el JSON del error llega
+ * como archivo y `error.error.message` no existe. Sin esto, una sesión perdida
+ * durante una exportación se vería como un error cualquiera.
+ */
+async function asHttpErrorFromBlob(error: unknown): Promise<HttpErrorResponse | null> {
+  if (!(error instanceof HttpErrorResponse) || !(error.error instanceof Blob)) {
+    return null;
+  }
+
+  try {
+    return new HttpErrorResponse({
+      status: error.status,
+      statusText: error.statusText,
+      url: error.url ?? undefined,
+      error: JSON.parse(await error.error.text()),
+    });
+  } catch {
+    return null;
+  }
 }
 
 async function describeBlobError(error: unknown): Promise<string> {
@@ -2078,6 +2898,23 @@ function describeError(error: unknown): string {
   }
 
   return `${explainStatus(error.status)} (${error.status})`;
+}
+
+/**
+ * El fallo es que la sesión ya no existe en el proceso local.
+ *
+ * Pasa más de lo que parece: el servidor cierra por inactividad, se cae la red,
+ * el proceso de la API se reinicia. Distinguirlo de cualquier otro 404 es lo que
+ * permite ofrecer «Reconectar» en vez de soltar un mensaje que no dice qué hacer.
+ */
+function isSessionLost(error: unknown): boolean {
+  if (!(error instanceof HttpErrorResponse) || error.status !== 404) {
+    return false;
+  }
+
+  const message = error.error?.message;
+
+  return typeof message === 'string' && message.includes('no está abierta');
 }
 
 /** Lo que significa cada código, dicho como se lo contarías a alguien. */

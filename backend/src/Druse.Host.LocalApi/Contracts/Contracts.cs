@@ -110,6 +110,17 @@ public sealed record DatabaseColumnDto
 {
     public required string Name { get; init; }
     public required string DataType { get; init; }
+
+    /// <summary>
+    /// Con qué se pide el valor: `date`, `datetime`, `boolean`, `integer`…
+    ///
+    /// No es el tipo del motor, que ya viaja en `dataType`: es **qué control
+    /// dibuja la interfaz**. Se calcula aquí porque la regla que traduce
+    /// `timestamptz`, `datetimeoffset` o `DATETIME YEAR TO SECOND` a una familia
+    /// común ya existe en el dominio, y reescribirla en el navegador sería
+    /// tenerla en dos sitios que se separarían al primer motor nuevo.
+    /// </summary>
+    public required string InputKind { get; init; }
     public required bool IsNullable { get; init; }
     public bool IsPrimaryKey { get; init; }
     public bool IsGenerated { get; init; }
@@ -141,6 +152,9 @@ public sealed record ResultColumnDto
 {
     public required string Name { get; init; }
     public required string DataType { get; init; }
+
+    /// <inheritdoc cref="DatabaseColumnDto.InputKind" />
+    public required string InputKind { get; init; }
     public required int Ordinal { get; init; }
 }
 
@@ -285,6 +299,25 @@ public sealed record PreferenceValueDto
     public required string Value { get; init; }
 }
 
+/// <summary>
+/// Una pestaña del editor tal como estaba al cerrar.
+///
+/// Viaja con su SQL entero: es el trabajo que el usuario no llegó a ejecutar, y
+/// recortarlo sería devolverle algo distinto de lo que escribió.
+/// </summary>
+public sealed record EditorTabDto
+{
+    public required string Id { get; init; }
+    public required string Title { get; init; }
+    public string Sql { get; init; } = string.Empty;
+    public bool IsActive { get; init; }
+    public bool IsDirty { get; init; }
+    public string? ConnectionId { get; init; }
+    public string? Database { get; init; }
+    public string? FileName { get; init; }
+    public string? DocumentId { get; init; }
+}
+
 // ---------------------------------------------------------------------------
 // Edición de filas
 // ---------------------------------------------------------------------------
@@ -320,6 +353,21 @@ public sealed record RowEditRequest
     public bool Confirmed { get; init; }
 }
 
+/// <summary>
+/// Filas a borrar, cada una señalada por su clave primaria.
+///
+/// Sin valores: para borrar basta con saber cuál es la fila.
+/// </summary>
+public sealed record RowDeleteRequest
+{
+    public required Guid SessionId { get; init; }
+    public required DatabaseObjectDto Table { get; init; }
+    public required IReadOnlyList<IReadOnlyList<CellValueDto>> Keys { get; init; }
+
+    /// <summary>El usuario ya vio el SQL. Sin esto no se borra nada.</summary>
+    public bool Confirmed { get; init; }
+}
+
 public sealed record RowEditResponse
 {
     public required long RowsAffected { get; init; }
@@ -331,6 +379,55 @@ public sealed record RowEditResponse
 
 /// <summary>Los cambios no se aplicaron, con el motivo.</summary>
 public sealed record RowEditRejectedResponse
+{
+    public required string Reason { get; init; }
+    public required string Message { get; init; }
+}
+
+// ---------------------------------------------------------------------------
+// Transacciones manuales
+// ---------------------------------------------------------------------------
+
+/// <summary>
+/// La transacción de una conexión, tal y como la enseña la interfaz.
+///
+/// Lleva el nombre de la conexión y la base porque el indicador tiene que decir
+/// **a qué afecta**: la transacción es de la conexión, no de la pestaña, y quien
+/// la abrió en una pestaña necesita saber que lo que ejecute en otra del mismo
+/// perfil también entra.
+/// </summary>
+public sealed record TransactionStateResponse
+{
+    public required Guid SessionId { get; init; }
+    public required bool IsOpen { get; init; }
+
+    /// <summary>Cuándo se abrió, en UTC. Ausente si no hay ninguna.</summary>
+    public DateTimeOffset? StartedAt { get; init; }
+
+    public DateTimeOffset? LastActivityAt { get; init; }
+
+    public required string ConnectionName { get; init; }
+    public required string Database { get; init; }
+    public required string Engine { get; init; }
+
+    /// <summary>
+    /// El DDL entra en la transacción y se puede deshacer.
+    ///
+    /// Falso en MySQL, donde un `ALTER` queda hecho aunque después se pulse
+    /// Rollback. La interfaz lo avisa; callarlo sería dejar que el usuario
+    /// descubriera solo que su tabla no volvió atrás.
+    /// </summary>
+    public required bool DdlIsReversible { get; init; }
+
+    /// <summary>Segundos sin actividad tras los cuales se deshace sola.</summary>
+    public required int IdleTimeoutSeconds { get; init; }
+
+    /// <summary>Se deshizo sola por inactividad, y hay que contárselo al usuario.</summary>
+    public DateTimeOffset? AutoRolledBackAt { get; init; }
+}
+
+/// <summary>No se pudo iniciar, confirmar o deshacer, con el motivo.</summary>
+public sealed record TransactionRejectedResponse
 {
     public required string Reason { get; init; }
     public required string Message { get; init; }
@@ -522,6 +619,36 @@ public sealed record TableStructureResponse
     public required IReadOnlyList<DatabaseForeignKeyDto> ForeignKeys { get; init; }
     public required IReadOnlyList<DatabaseConstraintDto> UniqueConstraints { get; init; }
     public required IReadOnlyList<DatabaseConstraintDto> CheckConstraints { get; init; }
+}
+
+/// <summary>
+/// Un parámetro de un procedimiento, para dibujar su formulario.
+///
+/// `direction` viaja como texto —`input`, `output`, `inputOutput`— y no como
+/// número: un contrato local se lee en el navegador y en los registros, y un 2
+/// suelto no dice nada.
+/// </summary>
+public sealed record RoutineParameterDto
+{
+    public required string Name { get; init; }
+    public required string DataType { get; init; }
+
+    /// <inheritdoc cref="DatabaseColumnDto.InputKind" />
+    public required string InputKind { get; init; }
+    public required string Direction { get; init; }
+    public int Ordinal { get; init; }
+
+    /// <summary>Se puede omitir porque el motor pone un valor.</summary>
+    public bool HasDefault { get; init; }
+}
+
+public sealed record RoutineSignatureResponse
+{
+    public required string Name { get; init; }
+    public string? Schema { get; init; }
+    public bool IsFunction { get; init; }
+    public required IReadOnlyList<RoutineParameterDto> Parameters { get; init; }
+    public string? ReturnType { get; init; }
 }
 
 /// <summary>
