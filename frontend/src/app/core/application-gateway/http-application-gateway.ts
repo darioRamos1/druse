@@ -29,6 +29,8 @@ import {
   BackupProfileResolution,
   BackupProgress,
   BackupRequest,
+  FolderListing,
+  FolderTarget,
   RestoreInspection,
   RestoreProgress,
   RestoreRequest,
@@ -401,6 +403,24 @@ export class HttpApplicationGateway extends ApplicationGateway {
 
   override cancelRestore(restoreId: string): Observable<void> {
     return this._http.post<void>(`/api/restore/${restoreId}/cancel`, null);
+  }
+
+  override browseFolders(path?: string): Observable<FolderListing> {
+    // Sin ruta, el proceso local devuelve por dónde se empieza: los sitios
+    // conocidos del usuario y las unidades.
+    return this._http.get<FolderListing>('/api/folders', {
+      params: path ? { path } : {},
+    });
+  }
+
+  override resolveFolderTarget(folder: string, name: string): Observable<FolderTarget> {
+    return this._http.get<FolderTarget>('/api/folders/target', {
+      params: { folder, name },
+    });
+  }
+
+  override createFolder(parent: string, name: string): Observable<FolderTarget> {
+    return this._http.post<FolderTarget>('/api/folders', { parent, name });
   }
 
   /** Añade lo que la cuadrícula necesita y la API no tiene por qué saber. */

@@ -18,6 +18,7 @@ import { DesktopHost } from '../../../core/application-gateway/desktop-host';
 import { BackupStore, outcomeLabel } from '../../../core/backup/backup.store';
 import { DatabaseObject, ExplorerNode } from '../../../shared/models/workspace';
 import { Icon } from '../../../shared/ui/icon/icon';
+import { FolderPicker } from '../../../shared/ui/folder-picker/folder-picker';
 import { OperationProgress } from '../../../shared/ui/operation-progress/operation-progress';
 
 /** Hasta dónde se baja buscando tablas. Con margen sobre el árbol más hondo. */
@@ -49,7 +50,7 @@ interface Candidate {
 @Component({
   selector: 'app-backup-dialog',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [DatePipe, Icon, OperationProgress],
+  imports: [DatePipe, FolderPicker, Icon, OperationProgress],
   templateUrl: './backup-dialog.html',
   styleUrl: './backup-dialog.scss',
 })
@@ -249,16 +250,20 @@ export class BackupDialog {
     }
   }
 
-  protected readonly canChoosePath = computed(() => this._desktop.isDesktop);
+  /** Si está abierto el selector de carpetas propio, el del navegador. */
+  protected readonly picking = signal(false);
 
   /**
-   * Elige el destino con el diálogo del sistema.
+   * Elige el destino sin escribirlo.
    *
-   * Fuera del envoltorio no hay selector nativo, así que la ruta se escribe a
-   * mano: es lo que ya pasa con el resto de rutas en desarrollo.
+   * En el envoltorio se usa el diálogo del sistema, que es el que el usuario ya
+   * conoce. En el navegador no hay ninguno —una página no ve el sistema de
+   * archivos—, así que se abre el selector propio, que pregunta las carpetas al
+   * proceso local: el mismo que después escribe el archivo.
    */
   protected async choose(): Promise<void> {
     if (!this._desktop.isDesktop) {
+      this.picking.set(true);
       return;
     }
 
@@ -270,6 +275,44 @@ export class BackupDialog {
     if (chosen) {
       this.destination.set(chosen);
     }
+  }
+
+  /** Dónde abrir el selector: la carpeta de lo que ya hubiera escrito. */
+  protected readonly pickerStart = computed(() => {
+    const separator = Math.max(
+      this.destination().lastIndexOf('/'),
+      this.destination().lastIndexOf('\\'),
+    );
+
+    return separator > 0 ? this.destination().slice(0, separator) : null;
+  });
+
+  /** Y con qué nombre: el que ya hubiera, o el propuesto. */
+  protected readonly pickerName = computed(() => {
+    const separator = Math.max(
+      this.destination().lastIndexOf('/'),
+      this.destination().lastIndexOf('\\'),
+    );
+
+    const tail = separator >= 0 ? this.destination().slice(separator + 1) : this.destination();
+
+    return tail.trim().length > 0 ? tail : this.suggestedName();
+  });
+
+  /**
+   * Un respaldo por carpetas sin comprimir **crea una carpeta**, no un archivo.
+   * El nombre es el mismo campo, pero llamarlo igual en los dos casos haría
+   * esperar un `.sql` donde va a aparecer un directorio.
+   */
+  protected readonly pickerLabel = computed(() =>
+    this.layout() === 'FolderByKind' && !this.compress()
+      ? 'Nombre de la carpeta'
+      : 'Nombre del archivo',
+  );
+
+  protected picked(path: string): void {
+    this.destination.set(path);
+    this.picking.set(false);
   }
 
   protected readonly suggestedName = computed(() => {

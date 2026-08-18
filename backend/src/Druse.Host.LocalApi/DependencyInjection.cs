@@ -1,4 +1,4 @@
-using Druse.Application.Abstractions;
+﻿using Druse.Application.Abstractions;
 using Druse.Application.Backups;
 using Druse.Application.Connections;
 using Druse.Application.Metadata;
@@ -40,6 +40,11 @@ internal static class DependencyInjection
     {
         // --- Plataforma -------------------------------------------------------
         services.AddSingleton<IAppPaths, AppPaths>();
+
+        // Enseña las carpetas del equipo para elegir dónde va un respaldo sin
+        // teclear la ruta. En el navegador es la única forma; el escritorio usa
+        // su diálogo nativo.
+        services.AddSingleton<IFolderBrowser, FolderBrowser>();
 
         // El almacén se elige según el sistema; si no hay ninguno utilizable,
         // la fábrica devuelve NullSecretStore y la aplicación pide la contraseña

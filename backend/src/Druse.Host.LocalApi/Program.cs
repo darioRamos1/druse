@@ -1,4 +1,4 @@
-using System.Reflection;
+﻿using System.Reflection;
 using Druse.Application.Abstractions;
 using Druse.Database.Abstractions;
 using Druse.Host.LocalApi;
@@ -166,6 +166,7 @@ app.MapGet("/api/health", () => new HealthResponse(
 
 app.MapDatabaseEndpoints();
 app.MapStorageEndpoints();
+app.MapFolderEndpoints();
 app.MapExportEndpoints();
 app.MapImportEndpoints();
 app.MapBackupEndpoints();

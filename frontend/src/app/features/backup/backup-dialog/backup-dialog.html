@@ -343,12 +343,10 @@
                   [attr.placeholder]="suggestedName()"
                   (input)="destination.set($any($event.target).value)"
                 />
-                @if (canChoosePath()) {
-                  <button type="button" class="ghost" (click)="choose()">
-                    <app-icon name="folder-open" />
-                    Elegir…
-                  </button>
-                }
+                <button type="button" class="ghost" (click)="choose()">
+                  <app-icon name="folder-open" />
+                  Elegir…
+                </button>
               </div>
             </label>
 
@@ -496,3 +494,18 @@
     </footer>
   }
 </div>
+
+<!--
+  El selector de carpetas del navegador. En el envoltorio no aparece: allí
+  «Elegir…» abre el diálogo del sistema, que es el que el usuario ya conoce.
+-->
+@if (picking()) {
+  <app-folder-picker
+    title="Dónde se guarda el respaldo"
+    [startPath]="pickerStart()"
+    [suggestedName]="pickerName()"
+    [nameLabel]="pickerLabel()"
+    (chosen)="picked($event)"
+    (cancelled)="picking.set(false)"
+  />
+}

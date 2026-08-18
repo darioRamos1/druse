@@ -1,0 +1,254 @@
+/* Mismo lenguaje que los demás diálogos: un modal centrado sobre el shell. */
+:host {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--dr-font-ui);
+  font-size: var(--dr-font-size-sm);
+}
+
+.backdrop {
+  position: absolute;
+  inset: 0;
+  background: var(--dr-scrim);
+  backdrop-filter: blur(2px);
+}
+
+.picker {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 560px;
+  max-width: calc(100vw - 32px);
+  max-height: calc(100vh - 64px);
+  overflow: hidden;
+  border: 1px solid var(--dr-border-dialog);
+  border-radius: 12px;
+  background: var(--dr-surface-dialog);
+  box-shadow: var(--dr-shadow-dialog);
+}
+
+.head {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--dr-border);
+}
+
+.title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--dr-text-primary);
+}
+
+.close {
+  border: none;
+  background: transparent;
+  color: var(--dr-text-secondary);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+
+  &:hover {
+    color: var(--dr-text-primary);
+  }
+}
+
+.bar {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 10px 18px;
+  border-bottom: 1px solid var(--dr-border);
+}
+
+/* La ruta puede ser larguísima; se recorta por el principio, que es la parte
+   que menos ayuda a reconocer dónde estás. */
+.here {
+  flex: 1;
+  overflow: hidden;
+  direction: rtl;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--dr-text-secondary);
+  font-family: var(--dr-font-mono);
+  font-size: 11.5px;
+}
+
+.list {
+  flex: 1;
+  min-height: 220px;
+  overflow-y: auto;
+  padding: 6px;
+}
+
+.row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  width: 100%;
+  padding: 7px 10px;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--dr-text-primary);
+  font-family: inherit;
+  font-size: 12.5px;
+  text-align: left;
+  cursor: pointer;
+
+  &:hover {
+    background: var(--dr-surface-raised);
+  }
+
+  app-icon {
+    color: var(--dr-text-secondary);
+    flex-shrink: 0;
+  }
+}
+
+.row--new {
+  cursor: default;
+
+  &:hover {
+    background: transparent;
+  }
+}
+
+.row__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.row__tag {
+  margin-left: auto;
+  color: var(--dr-text-tertiary, var(--dr-text-secondary));
+  font-size: 10.5px;
+}
+
+.new-name {
+  flex: 1;
+  padding: 5px 8px;
+  border: 1px solid var(--dr-border);
+  border-radius: 6px;
+  background: var(--dr-surface);
+  color: var(--dr-text-primary);
+  font-family: inherit;
+  font-size: 12.5px;
+}
+
+.empty,
+.problem {
+  margin: 14px 10px;
+  color: var(--dr-text-secondary);
+  font-size: 12px;
+}
+
+.problem {
+  color: var(--dr-danger, #d9534f);
+}
+
+.foot {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 18px 16px;
+  border-top: 1px solid var(--dr-border);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+
+  input {
+    padding: 7px 10px;
+    border: 1px solid var(--dr-border);
+    border-radius: 7px;
+    background: var(--dr-surface);
+    color: var(--dr-text-primary);
+    font-family: inherit;
+    font-size: 12.5px;
+  }
+}
+
+.field__label {
+  color: var(--dr-text-secondary);
+  font-size: 11.5px;
+}
+
+.result {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  color: var(--dr-text-secondary);
+  font-size: 11.5px;
+}
+
+.result__path {
+  overflow-wrap: anywhere;
+  color: var(--dr-text-primary);
+  font-family: var(--dr-font-mono);
+  font-size: 11.5px;
+}
+
+.result__note {
+  color: var(--dr-warning, #c77700);
+}
+
+.result--bad .result__note {
+  color: var(--dr-danger, #d9534f);
+}
+
+.actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.primary,
+.ghost {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  padding: 6px 14px;
+  border-radius: 7px;
+  font-family: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.primary {
+  border: 1px solid transparent;
+  background: var(--dr-accent-deep, var(--dr-accent));
+  color: #fff;
+
+  &:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+}
+
+.ghost {
+  border: 1px solid var(--dr-border);
+  background: transparent;
+  color: var(--dr-text-secondary);
+
+  &:hover {
+    background: var(--dr-surface-raised);
+  }
+
+  &:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+}

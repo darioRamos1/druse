@@ -1,0 +1,111 @@
+<div class="backdrop" (click)="cancel()"></div>
+
+<div class="picker" role="dialog" aria-modal="true" aria-labelledby="picker-title">
+  <header class="head">
+    <h2 class="title" id="picker-title">{{ title() }}</h2>
+    <button type="button" class="close" (click)="cancel()" aria-label="Cerrar">×</button>
+  </header>
+
+  <!--
+    La ruta actual se enseña entera y no solo la última carpeta: es lo que
+    permite darse cuenta de que se está en la unidad equivocada.
+  -->
+  <div class="bar">
+    <button
+      type="button"
+      class="ghost"
+      [disabled]="!listing() || (folder() === '' )"
+      (click)="up()"
+    >
+      Subir
+    </button>
+
+    <span class="here" [title]="folder()">
+      {{ folder() || 'Este equipo' }}
+    </span>
+
+    <button type="button" class="ghost" [disabled]="folder() === ''" (click)="startCreating()">
+      <app-icon name="plus" />
+      Nueva carpeta
+    </button>
+  </div>
+
+  <div class="list" role="listbox">
+    @if (loading()) {
+      <p class="empty">Leyendo…</p>
+    } @else if (listing(); as current) {
+      @if (current.error) {
+        <p class="problem">{{ current.error }}</p>
+      }
+
+      @if (creating() !== null) {
+        <div class="row row--new">
+          <app-icon name="folder-open" />
+          <input
+            type="text"
+            class="new-name"
+            placeholder="Nombre de la carpeta"
+            autofocus
+            #nueva
+            (keydown.enter)="create(nueva.value)"
+            (keydown.escape)="creating.set(null)"
+          />
+          <button type="button" class="ghost" (click)="create(nueva.value)">Crear</button>
+          <button type="button" class="ghost" (click)="creating.set(null)">Cancelar</button>
+        </div>
+      }
+
+      @for (folder of current.folders; track folder.path) {
+        <button type="button" class="row" (click)="enter(folder)">
+          <app-icon [name]="folder.kind === 'Drive' ? 'database' : 'folder-open'" />
+          <span class="row__name">{{ folder.name }}</span>
+          @if (folder.kind === 'Known') {
+            <span class="row__tag">acceso rápido</span>
+          }
+        </button>
+      } @empty {
+        @if (!current.error) {
+          <p class="empty">Aquí no hay carpetas. Puedes guardar en esta misma.</p>
+        }
+      }
+    }
+  </div>
+
+  <div class="foot">
+    <label class="field">
+      <span class="field__label">{{ nameLabel() }}</span>
+      <input
+        type="text"
+        [value]="name()"
+        [attr.placeholder]="suggestedName()"
+        (input)="rename($any($event.target).value)"
+        (blur)="resolve()"
+      />
+    </label>
+
+    <!--
+      La ruta final se enseña montada, con la misma barra que usa el sistema. Es
+      la única forma de que el usuario confirme que va donde cree que va.
+    -->
+    @if (target(); as destination) {
+      <p class="result" [class.result--bad]="destination.problem">
+        <span class="result__path">{{ destination.path }}</span>
+
+        @if (destination.problem) {
+          <span class="result__note">{{ destination.problem }}</span>
+        } @else if (destination.exists) {
+          <span class="result__note">Ya existe: se sobrescribiría.</span>
+        }
+      </p>
+    } @else if (folder() === '') {
+      <p class="result">Entra en una carpeta para poder guardar aquí.</p>
+    }
+
+    <div class="actions">
+      <button type="button" class="ghost" (click)="cancel()">Cancelar</button>
+      <button type="button" class="primary" [disabled]="!canAccept()" (click)="accept()">
+        Usar esta ruta
+      </button>
+    </div>
+  </div>
+</div>

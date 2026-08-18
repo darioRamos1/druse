@@ -492,6 +492,55 @@ export abstract class ApplicationGateway {
   abstract getRestoreStatus(restoreId: string): Observable<RestoreProgress>;
 
   abstract cancelRestore(restoreId: string): Observable<void>;
+
+  // --- Carpetas del equipo --------------------------------------------------
+
+  /**
+   * Las carpetas que hay en una ruta, para poder elegir dónde se guarda algo.
+   *
+   * Sin ruta devuelve por dónde se empieza: los sitios conocidos del usuario y
+   * las unidades. Existe porque **el navegador no ve el sistema de archivos**:
+   * quien corre dentro del envoltorio tiene el diálogo nativo y no pasa por
+   * aquí.
+   */
+  abstract browseFolders(path?: string): Observable<FolderListing>;
+
+  /** Une carpeta y nombre, y dice si eso se puede escribir o ya existe. */
+  abstract resolveFolderTarget(folder: string, name: string): Observable<FolderTarget>;
+
+  /** Crea una carpeta dentro de otra, sin salir del selector. */
+  abstract createFolder(parent: string, name: string): Observable<FolderTarget>;
+}
+
+/** Qué clase de sitio es una entrada del selector, para pintarle su icono. */
+export type FolderKind = 'Folder' | 'Drive' | 'Known';
+
+/** Una carpeta que se puede elegir. */
+export interface FolderEntry {
+  readonly name: string;
+  readonly path: string;
+  readonly kind: FolderKind;
+}
+
+/** Lo que hay dentro de una carpeta y por dónde se sale de ella. */
+export interface FolderListing {
+  readonly path: string;
+  readonly parent?: string | null;
+  /** Separador de este sistema: `\` en Windows y `/` en el resto. */
+  readonly separator: string;
+  readonly folders: readonly FolderEntry[];
+  readonly canWrite: boolean;
+  /** Por qué no se pudo leer, cuando no se pudo. */
+  readonly error?: string | null;
+}
+
+/** Un destino ya compuesto, con lo que pasaría al usarlo. */
+export interface FolderTarget {
+  readonly path: string;
+  readonly canWrite: boolean;
+  /** Ya hay algo con ese nombre: se sobrescribiría. */
+  readonly exists: boolean;
+  readonly problem?: string | null;
 }
 
 /** Cómo está repartido el artefacto que se restaura. */

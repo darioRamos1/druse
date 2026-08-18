@@ -10,14 +10,14 @@
 
 | Campo | Valor |
 | --- | --- |
-| Última sesión | **022j** — 2026-08-18 |
+| Última sesión | **022k** — 2026-08-18 |
 | Fase activa | **Respaldos y restauración:** Fases A–E cerradas y probadas contra PostgreSQL real. La **F** tiene backend, interfaz y **los CSV**; le falta el ciclo entero por HTTP en los otros tres motores y una prueba a mano |
 | Fases 0–6 | ✅ Cerradas. |
 | Fase 7 | 🟡 **11/12.** El ciclo de instalación está probado sobre este equipo; solo falta arrancar en una máquina sin herramientas de desarrollo. |
 | Fase 8 | ✅ **7/7.** Tres motores sobre el mismo contrato y primera beta preparada. |
 | ¿Compila el backend? | Sí — 0 advertencias, 0 errores |
 | ¿Compila el envoltorio? | Sí |
-| ¿Pasan las pruebas? | Sí — **580 en backend** (322 unitarias, 166 contractuales y 92 de integración), **418 en frontend** y **6 en el envoltorio**. Con `DRUSE_REQUIRE_ENGINES=1` y **los cuatro motores**, sin saltarse ninguna |
+| ¿Pasan las pruebas? | Sí — **596 en backend** (333 unitarias, 166 contractuales y 97 de integración), **425 en frontend** y **6 en el envoltorio**. Con `DRUSE_REQUIRE_ENGINES=1` y **los cuatro motores**, sin saltarse ninguna |
 | ¿Hay aplicación de escritorio? | **Sí.** Instalador NSIS, MSI y ZIP portable, en dos variantes: con Informix y sin él |
 | Motores | **PostgreSQL, SQL Server, MySQL/MariaDB e Informix**, todos sobre el mismo contrato compartido |
 | Trabajo a medias | Ninguno. El frontend de la restauración quedó commiteado en la sesión 022i. |
@@ -313,6 +313,50 @@ Y tres límites declarados desde el principio: no hay respaldo binario ni
 recuperación a un punto en el tiempo —eso es del servidor, y la interfaz tendrá
 que decirlo—, no hay respaldos programados, y un límite de filas puede dejar
 filas huérfanas, cosa que se avisa y no se corrige sola.
+
+### Sesión 022k — 2026-08-18 · Elegir dónde va el respaldo, sin teclear la ruta
+
+El asistente ya tenía un botón «Elegir…», pero **solo aparecía dentro del
+envoltorio**: usaba el diálogo nativo de Tauri. En el navegador —que es como se
+prueba en este equipo, donde Rust no compila— la única forma de decir dónde iba
+el respaldo era teclear la ruta entera y acertar a la primera.
+
+Ahora hay un selector propio: **el proceso local enumera las carpetas** y la
+pantalla las enseña. Es el mismo proceso que después escribe el archivo, así que
+lo que se ve es exactamente lo que él puede hacer: si una carpeta no aparece,
+tampoco podría escribir en ella. El botón está siempre; dentro del envoltorio
+sigue abriendo el diálogo del sistema, que es el que el usuario ya conoce.
+
+**La carpeta y el nombre son dos campos y no uno.** Son dos decisiones distintas
+—dónde y cómo se llama— y juntarlas en una caja de texto es justo lo que obliga a
+escribir la ruta a mano. El nombre viene propuesto (`respaldo-base-fecha.sql`) y
+se puede cambiar entero; la etiqueta cambia a «Nombre de la carpeta» cuando el
+respaldo va por carpetas, porque entonces lo que se crea es un directorio.
+
+Tres cosas que el selector hace y un campo de texto no podía:
+
+- **Dice si ya existe** algo con ese nombre, antes de aceptar. No lo impide
+  —repetir el respaldo de ayer encima es legítimo— pero se ve.
+- **Comprueba que se puede escribir**, y lo comprueba escribiendo: en Windows los
+  permisos no se deducen de los atributos, así que se crea un archivo temporal y
+  se borra en el acto.
+- **Crea carpetas** sin salir a buscar el explorador de Windows.
+
+El nombre se valida como nombre: un `..\` dentro escribiría en un sitio distinto
+del que la pantalla enseña, y eso no es una comodidad sino una sorpresa. Solo se
+enumeran **carpetas**, nunca archivos: para elegir dónde guardar no hacen falta.
+
+**Hecho.** `IFolderBrowser` en `Druse.Platform.Abstractions` y su implementación
+en `Druse.Platform.Native`, los endpoints `/api/folders`, el componente
+compartido `folder-picker` y su enganche en el asistente de respaldo.
+
+**Verificado.** **435 pruebas de backend** (333 unitarias y 97 de integración,
+más las 166 contractuales) y **425 en frontend**, todas en verde. Las nuevas son
+once del explorador, cinco de sus endpoints y siete del selector.
+
+**No hecho.** El asistente de **restaurar** sigue pidiendo la ruta escrita en el
+navegador: elegir un artefacto es elegir un archivo que ya existe, y este
+selector compone una ruta nueva. Es el mismo componente con un modo más.
 
 ### Sesión 022j — 2026-08-18 · Los CSV se restauran, y por el camino aparecen dos errores
 
