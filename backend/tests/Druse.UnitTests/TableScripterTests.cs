@@ -124,6 +124,80 @@ public sealed class TableScripterTests
     private static string Script(IReadOnlyList<string> statements) =>
         string.Join("\n", statements);
 
+    /// <summary>La misma tabla, con un índice más de los que se le pasen.</summary>
+    private static ScriptedTable PedidosCon(DatabaseIndex index)
+    {
+        var pedidos = Pedidos();
+
+        return pedidos with
+        {
+            Structure = pedidos.Structure with
+            {
+                Indexes = [.. pedidos.Structure.Indexes, index],
+            },
+        };
+    }
+
+    /// <summary>
+    /// Un índice sobre una expresión no tiene columnas que enumerar, y hasta
+    /// ahora se escribía igual: `USING btree ()`, que el motor rechaza. Rompía la
+    /// restauración entera a las 2.722 instrucciones, con todo lo anterior ya
+    /// aplicado.
+    /// </summary>
+    [Fact]
+    public void UnIndiceSinColumnasNoSeEscribe()
+    {
+        var table = PedidosCon(new DatabaseIndex
+        {
+            Name = "ix_pedidos_codigo_normalizado",
+            Columns = [],
+        });
+
+        var indexes = new PostgreSqlTableDesigner().ScriptIndexes(table);
+
+        Assert.DoesNotContain(indexes, sql => sql.Contains("()", StringComparison.Ordinal));
+        Assert.Single(indexes);
+    }
+
+    /// <summary>
+    /// Donde el motor sabe devolver su propia definición, se usa tal cual: es lo
+    /// único que reproduce una expresión, un operador o una intercalación.
+    /// </summary>
+    [Fact]
+    public void UnIndiceConDefinicionSeEscribeTalComoLoDaElMotor()
+    {
+        var table = PedidosCon(new DatabaseIndex
+        {
+            Name = "ix_pedidos_codigo_normalizado",
+            Columns = [],
+            Definition =
+                "CREATE INDEX ix_pedidos_codigo_normalizado ON ventas.pedidos USING btree (lower(codigo))",
+        });
+
+        var indexes = new PostgreSqlTableDesigner().ScriptIndexes(table);
+
+        Assert.Contains(indexes, sql => sql ==
+            "CREATE INDEX ix_pedidos_codigo_normalizado ON ventas.pedidos USING btree (lower(codigo));");
+    }
+
+    /// <summary>Y el punto y coma no se dobla si el motor ya lo puso.</summary>
+    [Fact]
+    public void LaDefinicionDelMotorNoAcabaConDosPuntosYComa()
+    {
+        var table = PedidosCon(new DatabaseIndex
+        {
+            Name = "ix_expresion",
+            Columns = [],
+            Definition = "CREATE INDEX ix_expresion ON ventas.pedidos (lower(codigo));",
+        });
+
+        var sql = new PostgreSqlTableDesigner()
+            .ScriptIndexes(table)
+            .Single(statement => statement.Contains("ix_expresion", StringComparison.Ordinal));
+
+        Assert.EndsWith("(lower(codigo));", sql, StringComparison.Ordinal);
+    }
+
     [Fact]
     public void LaTablaSeEscribeSinIndicesYSinClavesForaneas()
     {

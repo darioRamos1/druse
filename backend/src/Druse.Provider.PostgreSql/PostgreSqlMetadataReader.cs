@@ -208,7 +208,12 @@ public sealed class PostgreSqlMetadataReader : IDatabaseMetadataReader
                     SELECT array_agg(a.attname ORDER BY k.ord)
                     FROM unnest(i.indkey[i.indnkeyatts:array_length(i.indkey, 1) - 1]) WITH ORDINALITY AS k(attnum, ord)
                     JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = k.attnum
-                ) AS included_columns
+                ) AS included_columns,
+                -- Solo para los índices con expresión: los demás se reproducen
+                -- desde sus columnas, que es lo que la interfaz sabe editar.
+                CASE WHEN i.indexprs IS NOT NULL
+                     THEN pg_get_indexdef(i.indexrelid)
+                END AS definition
             FROM pg_index i
             JOIN pg_class c      ON c.oid = i.indrelid
             JOIN pg_class ic     ON ic.oid = i.indexrelid
@@ -248,6 +253,7 @@ public sealed class PostgreSqlMetadataReader : IDatabaseMetadataReader
                         }),
                     ],
                     IncludedColumns = reader.IsDBNull(8) ? [] : reader.GetFieldValue<string[]>(8),
+                    Definition = reader.IsDBNull(9) ? null : reader.GetString(9),
                 };
             },
             cancellationToken,

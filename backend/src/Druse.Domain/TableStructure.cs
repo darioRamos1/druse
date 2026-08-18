@@ -30,6 +30,18 @@ public sealed record DatabaseIndex
     public string? Filter { get; init; }
 
     public string? Method { get; init; }
+
+    /// <summary>
+    /// El `CREATE INDEX` tal y como lo escribe el motor, cuando la lista de
+    /// columnas no basta para reproducirlo.
+    ///
+    /// Un índice **sobre una expresión** —`lower(nit)`, `(a || b)`— no tiene
+    /// columnas que enumerar: el catálogo devuelve la lista vacía, y guionizarlo
+    /// desde ahí produce un `USING btree ()` que el motor rechaza al restaurar.
+    /// Donde el motor sabe devolver su propia definición, se guarda aquí y se usa
+    /// literalmente.
+    /// </summary>
+    public string? Definition { get; init; }
 }
 
 /// <summary>Clave foránea tal y como está hoy en el catálogo.</summary>

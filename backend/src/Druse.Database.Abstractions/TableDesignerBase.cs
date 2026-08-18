@@ -445,6 +445,19 @@ public abstract class TableDesignerBase : ITableDesigner, IDatabaseScripter
     /// </summary>
     public virtual IReadOnlyList<string> ScriptSchema(string schema) => [];
 
+    /// <summary>
+    /// El `CREATE DATABASE` de una base nueva donde volcar un respaldo.
+    ///
+    /// Es igual en tres de los cuatro motores; Informix lo amplía porque allí una
+    /// base sin registro de transacciones no admite conexiones DRDA.
+    /// </summary>
+    public virtual IReadOnlyList<string> ScriptCreateDatabase(string name)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+
+        return [$"CREATE DATABASE {Quote(name)}"];
+    }
+
     public IReadOnlyList<string> ScriptTable(ScriptedTable table) =>
         DescribeCreate(ToDefinition(table));
 
@@ -489,8 +502,31 @@ public abstract class TableDesignerBase : ITableDesigner, IDatabaseScripter
         [
             .. table.Structure.Indexes
                 .Where(index => !index.IsConstraintIndex && !index.IsPrimaryKey)
-                .Select(index => CreateIndex(qualified, table.Table, ToDefinition(index))),
+                .Select(index => Script(qualified, table.Table, index))
+                .OfType<string>(),
         ];
+    }
+
+    /// <summary>
+    /// Un índice, escrito para poder recrearlo.
+    ///
+    /// Devuelve `null` cuando **no se puede reproducir**: un índice sobre una
+    /// expresión no tiene columnas que enumerar, y escribirlo igual produce un
+    /// `USING btree ()` que el motor rechaza. Ahí es mejor un respaldo con un
+    /// índice de menos —y su aviso— que uno entero que no se puede aplicar.
+    /// </summary>
+    private string? Script(string qualified, DatabaseObject table, DatabaseIndex index)
+    {
+        // La definición del propio motor gana: reproduce expresiones, operadores
+        // y todo lo que la lista de columnas no sabe decir.
+        if (!string.IsNullOrWhiteSpace(index.Definition))
+        {
+            return index.Definition.TrimEnd().TrimEnd(';') + ";";
+        }
+
+        return index.Columns.Count > 0
+            ? CreateIndex(qualified, table, ToDefinition(index))
+            : null;
     }
 
     public IReadOnlyList<string> ScriptForeignKeys(ScriptedTable table)

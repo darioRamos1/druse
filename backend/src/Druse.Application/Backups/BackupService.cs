@@ -259,7 +259,24 @@ public sealed class BackupService(
                 cancellationToken.ThrowIfCancellationRequested();
                 state.Working(table.Table.Name);
 
-                var statements = scripter.ScriptIndexes(table)
+                var indexes = scripter.ScriptIndexes(table);
+
+                // Un índice que no se puede guionizar se queda fuera —mejor eso
+                // que un respaldo entero que no se aplica— pero no en silencio: el
+                // destino tendrá una tabla igual con un índice menos, y eso solo
+                // se nota cuando una consulta va lenta seis meses después.
+                var missing = table.Structure.Indexes
+                    .Count(index => !index.IsConstraintIndex && !index.IsPrimaryKey) - indexes.Count;
+
+                if (missing > 0)
+                {
+                    state.Warn(
+                        table.Table.Name,
+                        $"{missing} índice(s) no se pudieron escribir: este motor no sabe " +
+                        "reproducir los que van sobre una expresión.");
+                }
+
+                var statements = indexes
                     .Concat(scripter.ScriptForeignKeys(table))
                     .ToList();
 
