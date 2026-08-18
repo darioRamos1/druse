@@ -1,4 +1,5 @@
-﻿using System.Data.Common;
+﻿using System.Data;
+using System.Data.Common;
 using System.Diagnostics;
 using Druse.Domain;
 
@@ -35,6 +36,55 @@ public abstract class RowEditorBase : IRowEditor
 
     /// <summary>La conexión de la sesión, comprobando que es de este proveedor.</summary>
     protected abstract DbConnection Connection(IDatabaseSession session);
+
+    /// <summary>
+    /// Añade una celda al comando como parámetro.
+    ///
+    /// Con valor, el driver deduce el tipo de lo que hay dentro y no hay nada que
+    /// decidir. **Con un nulo no hay nada de donde deducirlo**: el driver lo manda
+    /// como texto, y SQL Server rechaza el `INSERT` entero antes de mirar la fila
+    /// porque no convierte texto a `varbinary`. Por eso la celda lleva el tipo de
+    /// su columna: para poder decírselo justo en ese caso.
+    /// </summary>
+    protected virtual void Bind(DbCommand command, string name, PreparedCell cell)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+        ArgumentNullException.ThrowIfNull(cell);
+
+        var parameter = command.CreateParameter();
+
+        parameter.ParameterName = name;
+        parameter.Value = cell.Value;
+
+        if (cell.Value is DBNull && cell.DataType is { } dataType && DbTypeOf(dataType) is { } type)
+        {
+            parameter.DbType = type;
+        }
+
+        command.Parameters.Add(parameter);
+    }
+
+    /// <summary>
+    /// Qué tipo declarar para un nulo, según la familia de la columna.
+    ///
+    /// Se clasifica por el nombre del tipo, igual que en todo lo demás: no hace
+    /// falta acertar con la longitud ni con la precisión, solo con la familia, que
+    /// es lo que decide si el motor acepta el parámetro.
+    /// </summary>
+    private static DbType? DbTypeOf(string dataType) => ColumnValueParser.Classify(dataType) switch
+    {
+        ColumnFamily.Text => DbType.String,
+        ColumnFamily.Integral => DbType.Int64,
+        ColumnFamily.Fractional => DbType.Decimal,
+        ColumnFamily.Boolean => DbType.Boolean,
+        ColumnFamily.Date => DbType.Date,
+        ColumnFamily.Time => DbType.Time,
+        ColumnFamily.Timestamp => DbType.DateTime,
+        ColumnFamily.TimestampWithZone => DbType.DateTimeOffset,
+        ColumnFamily.Binary => DbType.Binary,
+        ColumnFamily.Uuid => DbType.Guid,
+        _ => null,
+    };
 
     public IReadOnlyList<string> Describe(PreparedRowEditBatch batch)
     {
@@ -74,10 +124,7 @@ public abstract class RowEditorBase : IRowEditor
 
                 foreach (var cell in edit.Changes.Concat(edit.Key))
                 {
-                    var parameter = command.CreateParameter();
-                    parameter.ParameterName = ParameterName(index++);
-                    parameter.Value = cell.Value;
-                    command.Parameters.Add(parameter);
+                    Bind(command, ParameterName(index++), cell);
                 }
 
                 var filas = await command.ExecuteNonQueryAsync(cancellationToken);
@@ -162,10 +209,7 @@ public abstract class RowEditorBase : IRowEditor
 
                 foreach (var cell in row)
                 {
-                    var parameter = command.CreateParameter();
-                    parameter.ParameterName = ParameterName(index++);
-                    parameter.Value = cell.Value;
-                    command.Parameters.Add(parameter);
+                    Bind(command, ParameterName(index++), cell);
                 }
 
                 insertadas += await command.ExecuteNonQueryAsync(cancellationToken);
@@ -254,10 +298,7 @@ public abstract class RowEditorBase : IRowEditor
 
                 foreach (var cell in key)
                 {
-                    var parameter = command.CreateParameter();
-                    parameter.ParameterName = ParameterName(index++);
-                    parameter.Value = cell.Value;
-                    command.Parameters.Add(parameter);
+                    Bind(command, ParameterName(index++), cell);
                 }
 
                 var filas = await command.ExecuteNonQueryAsync(cancellationToken);

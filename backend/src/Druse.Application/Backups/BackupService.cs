@@ -362,6 +362,17 @@ public sealed class BackupService(
     /// devuelve el recuento al final— así que lo que se ve avanzar durante la
     /// escritura es el objeto en curso, no las filas.
     /// </summary>
+    /// <summary>
+    /// Con qué opciones se escriben los CSV de un respaldo.
+    ///
+    /// Son las del exportador salvo el tope de filas, que **se quita**: allí
+    /// protege de volcar sin querer una tabla entera desde la cuadrícula, y aquí
+    /// volcar la tabla entera es justo lo que se ha pedido. Con el tope puesto,
+    /// una tabla de tres millones de filas se respaldaría con un millón y el
+    /// artefacto no lo diría en ningún sitio.
+    /// </summary>
+    private static readonly ExportOptions CsvOptions = new() { MaxRows = int.MaxValue };
+
     private async Task WriteCsvAsync(
         IDatabaseSession session,
         IDatabaseScripter scripter,
@@ -400,16 +411,28 @@ public sealed class BackupService(
                 cancellationToken);
 
             var rows = 0L;
+            var truncated = false;
 
             await sink.WriteDataStreamAsync(
                 table.Table.Name,
                 exporter.FileExtension,
                 async (stream, token) =>
                 {
-                    var result = await exporter.WriteAsync(reader, stream, new ExportOptions(), token);
+                    var result = await exporter.WriteAsync(reader, stream, CsvOptions, token);
                     rows = result.RowCount;
+                    truncated = result.Truncated;
                 },
                 cancellationToken);
+
+            // No debería pasar nunca —el tope está quitado—, pero si pasara sería
+            // un respaldo incompleto con aspecto de completo, que es lo peor que
+            // puede devolver esta función.
+            if (truncated)
+            {
+                state.Warn(
+                    table.Table.Name,
+                    "El exportador cortó las filas: el respaldo de esta tabla está incompleto.");
+            }
 
             state.Rows(rows);
             state.TableDone();

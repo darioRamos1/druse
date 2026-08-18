@@ -156,6 +156,18 @@ public static class ColumnValueParser
                 value = fecha;
                 return true;
 
+            // MySQL, SQL Server e Informix devuelven una fecha con la hora a cero
+            // —«2026-08-17 00:00:00»—, y ese texto es el que acaba dentro de un
+            // CSV exportado. Volver a leerlo tiene que funcionar; con una hora
+            // distinta de medianoche no, porque entonces el valor dice algo que la
+            // columna no puede guardar y quedarse solo con la fecha sería
+            // tirarlo sin avisar.
+            case ColumnFamily.Date
+                when DateTime.TryParse(text, invariant, DateTimeStyles.None, out var conHora) &&
+                     conHora.TimeOfDay == TimeSpan.Zero:
+                value = DateOnly.FromDateTime(conHora);
+                return true;
+
             case ColumnFamily.Time when TimeSpan.TryParse(text, invariant, out var hora):
                 value = hora;
                 return true;

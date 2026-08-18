@@ -10,14 +10,14 @@
 
 | Campo | Valor |
 | --- | --- |
-| Última sesión | **022i** — 2026-08-17 |
-| Fase activa | **Respaldos y restauración:** Fases A–E cerradas y probadas contra PostgreSQL real. La **F** tiene backend e interfaz completos; le faltan **los CSV**, la ida y vuelta con los cuatro motores y una prueba a mano |
+| Última sesión | **022j** — 2026-08-18 |
+| Fase activa | **Respaldos y restauración:** Fases A–E cerradas y probadas contra PostgreSQL real. La **F** tiene backend, interfaz y **los CSV**; le falta el ciclo entero por HTTP en los otros tres motores y una prueba a mano |
 | Fases 0–6 | ✅ Cerradas. |
 | Fase 7 | 🟡 **11/12.** El ciclo de instalación está probado sobre este equipo; solo falta arrancar en una máquina sin herramientas de desarrollo. |
 | Fase 8 | ✅ **7/7.** Tres motores sobre el mismo contrato y primera beta preparada. |
 | ¿Compila el backend? | Sí — 0 advertencias, 0 errores |
 | ¿Compila el envoltorio? | Sí |
-| ¿Pasan las pruebas? | Sí — **545 en backend** (302 unitarias, 158 contractuales y 85 de integración), **418 en frontend** y **6 en el envoltorio**. Con `DRUSE_REQUIRE_ENGINES=1` y **los cuatro motores**, sin saltarse ninguna |
+| ¿Pasan las pruebas? | Sí — **580 en backend** (322 unitarias, 166 contractuales y 92 de integración), **418 en frontend** y **6 en el envoltorio**. Con `DRUSE_REQUIRE_ENGINES=1` y **los cuatro motores**, sin saltarse ninguna |
 | ¿Hay aplicación de escritorio? | **Sí.** Instalador NSIS, MSI y ZIP portable, en dos variantes: con Informix y sin él |
 | Motores | **PostgreSQL, SQL Server, MySQL/MariaDB e Informix**, todos sobre el mismo contrato compartido |
 | Trabajo a medias | Ninguno. El frontend de la restauración quedó commiteado en la sesión 022i. |
@@ -29,19 +29,17 @@
 
 **Lo que le falta a la Fase F**, por orden:
 
-1. **Restaurar los CSV** por el camino de importación que ya existe. Es el único
-   punto del checklist sin escribir: hoy un respaldo en carpeta con los datos en
-   CSV se inspecciona bien, pero no se aplica.
-2. **La ida y vuelta con los cuatro motores.** El criterio de salida pide
-   respaldar, restaurar en un servidor limpio y comparar las dos estructuras
-   releídas. Hoy solo lo cubre una prueba de integración contra PostgreSQL.
-3. **Usar el asistente a mano** contra `druse-pg-test`, que es lo que encontró
-   los errores de verdad en el respaldo (sesión 022g).
+1. **Usar el asistente a mano** contra `druse-pg-test`, que es lo que encontró
+   los errores de verdad en el respaldo (sesión 022g). Nadie ha restaurado
+   todavía desde la pantalla.
+2. **El ciclo entero por HTTP en los otros tres motores.** `RestoreEndpointTests`
+   solo abre sesiones de PostgreSQL; las contractuales sí cubren los cuatro, pero
+   por debajo de la API.
 
 Lo demás de la Fase F está hecho: `RestoreService`, la inspección del artefacto,
 el rechazo por motor y versión de formato, la vista previa de lo que se ejecuta y
-lo que se sobrescribe, el progreso y la parada con reanudación desde la
-instrucción que falló.
+lo que se sobrescribe, el progreso, la parada con reanudación desde la
+instrucción que falló, y **los datos en CSV**.
 
 **El escenario de pruebas ya está sembrado, no hay que rehacerlo.** En
 `druse-pg-test` quedó el esquema `tienda` de la sesión 022g: `cat_paises`,
@@ -315,6 +313,64 @@ Y tres límites declarados desde el principio: no hay respaldo binario ni
 recuperación a un punto en el tiempo —eso es del servidor, y la interfaz tendrá
 que decirlo—, no hay respaldos programados, y un límite de filas puede dejar
 filas huérfanas, cosa que se avisa y no se corrige sola.
+
+### Sesión 022j — 2026-08-18 · Los CSV se restauran, y por el camino aparecen dos errores
+
+Un respaldo con los datos en CSV se inspeccionaba bien y no se aplicaba: el
+lector del artefacto solo miraba los `.sql`. Ahora el artefacto no entrega
+cadenas sino **entradas** —una instrucción o un lote de filas—, y quien restaura
+distingue: la instrucción se ejecuta y las filas se meten por el camino de la
+importación, con sus columnas emparejadas por nombre y sus valores convertidos al
+tipo de cada columna.
+
+Las filas van **en lotes de 500**, y eso resuelve dos cosas a la vez: una tabla de
+tres millones de filas no se carga en memoria, y cada lote es una entrada del
+flujo, así que reanudar cae en el grano correcto. Reanudar desde el archivo
+entero habría duplicado todo lo ya insertado.
+
+El CSV se parte con la **misma máquina de estados** que usa la importación
+(`CsvSplitter`), ahora compartida: dos formas de leer un CSV serían dos formas de
+equivocarse con las comillas. Y la conversión de filas de texto a un lote de
+`INSERT` se extrajo a `RowBatchPlanner`, que usan la importación y la
+restauración: dos criterios distintos sobre qué es un nulo solo se verían en los
+datos, nunca en un error.
+
+**Lo que el formato no conserva, se dice antes.** Un CSV escribe igual un nulo y
+una cadena vacía. En las columnas que no son texto la diferencia se recupera —una
+celda vacía en una fecha solo puede ser un nulo—, pero en una columna de texto el
+nulo vuelve como cadena vacía, y la inspección lo avisa antes de aplicar nada.
+
+**Dos errores que solo aparecieron al probarlo en los cuatro motores.** La prueba
+contractual nueva —leer las filas como texto y volver a meterlas, que es lo que
+hace un CSV— falló en tres motores:
+
+1. **Las fechas.** MySQL, SQL Server e Informix devuelven una columna `DATE` como
+   «2026-08-17 00:00:00», y `ColumnValueParser` la rechazaba por no ser una fecha.
+   Rompía la restauración **y la importación** de cualquier CSV exportado por
+   Druse desde esos tres motores.
+2. **Los nulos sin tipo.** Un `DBNull` sin `DbType` lo manda el driver como texto,
+   y SQL Server tumbaba el `INSERT` entero al llegar a una columna binaria. Ahora
+   la celda lleva el tipo de su columna y el editor lo declara **solo cuando el
+   valor es nulo**, que es cuando no hay nada de donde deducirlo.
+
+De propina, el driver de Informix no conoce `DateOnly` ni `TimeOnly`: se traducen
+en su proveedor, que es donde vive lo que es del driver y no del dominio.
+
+**Y un tercero encontrado leyendo.** El respaldo en CSV exportaba con las opciones
+por omisión, y ahí el tope es de **un millón de filas**: una tabla de tres
+millones se habría respaldado con un tercio y el artefacto no lo diría en ningún
+sitio. El tope se quita al respaldar, y si el exportador cortara igual, se anota
+como aviso.
+
+**Verificado.** **580 pruebas de backend** en verde con `DRUSE_REQUIRE_ENGINES=1`
+y los cuatro motores: 322 unitarias, 166 contractuales y 92 de integración. Las
+nuevas son seis del lector de artefactos, dos de las fechas, una contractual
+—que corre en los cuatro— y una de integración que respalda en CSV y lo restaura
+comprobando que la coma, las comillas y el salto de línea dentro de un campo
+llegan siendo dato.
+
+**No hecho.** Nadie ha restaurado a mano desde el asistente, y el ciclo entero por
+HTTP sigue probándose solo contra PostgreSQL.
 
 ### Sesión 022i — 2026-08-17 · Fase F: la restauración, vista desde la pantalla
 

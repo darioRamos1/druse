@@ -68,6 +68,30 @@ public sealed class ColumnValueParserTests
         Assert.Equal(DBNull.Value, value);
     }
 
+    /// <summary>
+    /// MySQL, SQL Server e Informix devuelven una columna `DATE` como
+    /// «2026-08-17 00:00:00», y ese es el texto que acaba dentro de un CSV. Si no
+    /// se pudiera volver a leer, ni la importación ni la restauración de un
+    /// respaldo con los datos en CSV funcionarían en tres de los cuatro motores.
+    /// </summary>
+    [Fact]
+    public void UnaFechaConLaHoraACero_SeLeeComoFecha()
+    {
+        Assert.True(ColumnValueParser.TryParse("date", "2026-08-17 00:00:00", out var value, out _));
+        Assert.Equal(new DateOnly(2026, 8, 17), value);
+    }
+
+    /// <summary>
+    /// Con una hora de verdad no: el valor dice algo que la columna no puede
+    /// guardar, y quedarse solo con la fecha sería tirar la hora sin avisar.
+    /// </summary>
+    [Fact]
+    public void UnaFechaConHoraDeVerdad_SeRechaza()
+    {
+        Assert.False(ColumnValueParser.TryParse("date", "2026-08-17 14:03:11", out _, out var error));
+        Assert.False(string.IsNullOrWhiteSpace(error));
+    }
+
     [Theory]
     [InlineData("true", true)]
     [InlineData("1", true)]

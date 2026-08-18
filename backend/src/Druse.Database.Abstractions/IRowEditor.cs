@@ -6,7 +6,14 @@ namespace Druse.Database.Abstractions;
 /// <param name="Column">Nombre sin comillas: cada proveedor lo cita a su manera.</param>
 /// <param name="Value">Valor convertido, o <see cref="DBNull"/>.</param>
 /// <param name="Literal">El mismo valor escrito para leerlo, nunca para ejecutarlo.</param>
-public sealed record PreparedCell(string Column, object Value, string Literal);
+/// <param name="DataType">
+/// Tipo de la columna tal y como lo nombra el motor.
+///
+/// Hace falta **para los nulos**: un `DBNull` sin tipo lo manda el driver como
+/// texto, y SQL Server rechaza el `INSERT` entero porque no convierte texto a
+/// `varbinary`. Con valor no nulo el tipo se infiere solo y esto no se mira.
+/// </param>
+public sealed record PreparedCell(string Column, object Value, string Literal, string? DataType = null);
 
 /// <summary>Un `UPDATE` de una fila, ya validado y con los valores convertidos.</summary>
 public sealed record PreparedRowEdit

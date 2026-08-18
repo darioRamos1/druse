@@ -8,7 +8,9 @@ namespace Druse.Infrastructure.Importing;
 ///
 /// Está escrito a mano por la misma razón que el exportador: son cuatro reglas
 /// —comillas, comillas dobladas, separador dentro de comillas y salto de línea
-/// dentro de comillas— y una dependencia para esto habría que justificarla.
+/// dentro de comillas— y una dependencia para esto habría que justificarla. Las
+/// cuatro viven en <see cref="CsvSplitter"/>, que es también quien parte los CSV
+/// de un respaldo al restaurarlo.
 ///
 /// Lo que **no** hace es adivinar. No detecta el separador, ni la codificación,
 /// ni qué es un nulo: todo eso lo dice el usuario en las opciones, porque
@@ -72,8 +74,8 @@ public sealed class CsvTableFileReader : ITableFileReader
     /// con una fila desalineada no debería impedir importar las demás, y el
     /// usuario lo verá en la previsualización.
     /// </summary>
-    private static string?[] Ajustar(
-        List<string> fila,
+    internal static string?[] Ajustar(
+        IReadOnlyList<string> fila,
         int columnas,
         string nullText)
     {
@@ -100,76 +102,26 @@ public sealed class CsvTableFileReader : ITableFileReader
     ///
     /// Se recorre carácter a carácter porque partir por comas y saltos de línea
     /// rompe en cuanto un campo contiene cualquiera de los dos, que es
-    /// exactamente lo que las comillas del RFC existen para permitir.
+    /// exactamente lo que las comillas del RFC existen para permitir. Aquí se
+    /// entrega el texto ya leído; quien no puede permitírselo lo recorre con
+    /// <see cref="CsvRowReader"/>, que usa la misma máquina.
     /// </summary>
-    private static List<List<string>> Parse(string texto, char delimiter)
+    private static List<IReadOnlyList<string>> Parse(string texto, char delimiter)
     {
-        var filas = new List<List<string>>();
-        var fila = new List<string>();
-        var campo = new StringBuilder();
-        var entreComillas = false;
+        var splitter = new CsvSplitter(delimiter);
+        var filas = new List<IReadOnlyList<string>>();
 
-        for (var i = 0; i < texto.Length; i++)
+        foreach (var caracter in texto)
         {
-            var c = texto[i];
-
-            if (entreComillas)
+            if (splitter.Push(caracter) is { } fila)
             {
-                if (c != '"')
-                {
-                    campo.Append(c);
-                    continue;
-                }
-
-                // Dos comillas seguidas son una comilla dentro del campo.
-                if (i + 1 < texto.Length && texto[i + 1] == '"')
-                {
-                    campo.Append('"');
-                    i++;
-                    continue;
-                }
-
-                entreComillas = false;
-                continue;
-            }
-
-            switch (c)
-            {
-                case '"' when campo.Length == 0:
-                    entreComillas = true;
-                    break;
-
-                case '\r':
-                    // Se ignora: el salto lo marca el \n que viene detrás.
-                    break;
-
-                case '\n':
-                    fila.Add(campo.ToString());
-                    campo.Clear();
-                    filas.Add(fila);
-                    fila = [];
-                    break;
-
-                default:
-                    if (c == delimiter)
-                    {
-                        fila.Add(campo.ToString());
-                        campo.Clear();
-                    }
-                    else
-                    {
-                        campo.Append(c);
-                    }
-
-                    break;
+                filas.Add(fila);
             }
         }
 
-        // Lo que quede sin salto de línea final también es una fila.
-        if (campo.Length > 0 || fila.Count > 0)
+        if (splitter.Flush() is { } ultima)
         {
-            fila.Add(campo.ToString());
-            filas.Add(fila);
+            filas.Add(ultima);
         }
 
         return filas;

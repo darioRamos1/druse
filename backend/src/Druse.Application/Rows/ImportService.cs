@@ -177,59 +177,29 @@ public sealed class ImportService(
             .Select(column => column.Name)
             .ToList();
 
-        var problems = new List<ImportProblem>();
-        var filas = new List<IReadOnlyList<PreparedCell>>(request.File.Rows.Count);
+        // La conversión es la misma que usa la restauración de un respaldo en CSV:
+        // las dos tienen delante celdas de texto y una tabla con sus tipos, y dos
+        // criterios distintos sobre qué es un nulo solo se verían en los datos.
+        var plan = RowBatchPlanner.Prepare(
+            request.Table.Schema,
+            request.Table.Name,
+            [.. mappings.Select(mapping => mapping.Target is null ? null : byName[mapping.Target])],
+            request.File.Rows);
 
-        for (var indice = 0; indice < request.File.Rows.Count; indice++)
-        {
-            var fila = request.File.Rows[indice];
-            var celdas = new List<PreparedCell>(usadas.Count);
-
-            for (var columna = 0; columna < mappings.Count; columna++)
-            {
-                var destino = mappings[columna].Target;
-
-                if (destino is null)
-                {
-                    continue;
-                }
-
-                var column = byName[destino];
-                var texto = columna < fila.Count ? fila[columna] : null;
-
-                if (!ColumnValueParser.TryParse(column.DataType, texto, out var value, out var error))
-                {
-                    // Se anota y se sigue: quien importa quiere la lista completa
-                    // de lo que está mal, no el primer fallo y a empezar de nuevo.
-                    problems.Add(new ImportProblem(indice + 1, column.Name, error!));
-                    continue;
-                }
-
-                celdas.Add(new PreparedCell(
-                    column.Name,
-                    value,
-                    ColumnValueParser.ToLiteral(column.DataType, texto)));
-            }
-
-            filas.Add(celdas);
-        }
-
-        var batch = new PreparedInsertBatch
-        {
-            Schema = request.Table.Schema,
-            Table = request.Table.Name,
-            Columns = usadas,
-            Rows = filas,
-        };
+        // Se anotan todos y se sigue: quien importa quiere la lista completa de lo
+        // que está mal, no el primer fallo y a empezar de nuevo.
+        var problems = plan.Problems
+            .Select(problem => new ImportProblem((int)problem.Row, problem.Column, problem.Message))
+            .ToList();
 
         var editor = _providers.GetRowEditor(session.Engine);
 
         return (
             editor,
-            new Plan(mappings, batch),
+            new Plan(mappings, plan.Batch),
             problems,
             missing,
-            problems.Count == 0 ? [.. editor.DescribeInsert(batch).Take(5)] : []);
+            problems.Count == 0 ? [.. editor.DescribeInsert(plan.Batch).Take(5)] : []);
     }
 
     /// <summary>

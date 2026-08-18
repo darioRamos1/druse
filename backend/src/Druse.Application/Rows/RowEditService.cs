@@ -297,7 +297,11 @@ public sealed class RowEditService(
                 $"{column.Name}: {error}"));
         }
 
-        return new PreparedCell(column.Name, value, ColumnValueParser.ToLiteral(column.DataType, cell.Value));
+        return new PreparedCell(
+            column.Name,
+            value,
+            ColumnValueParser.ToLiteral(column.DataType, cell.Value),
+            column.DataType);
     }
 }
 

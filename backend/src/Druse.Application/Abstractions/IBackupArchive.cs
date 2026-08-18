@@ -3,6 +3,47 @@ using Druse.Domain;
 namespace Druse.Application.Abstractions;
 
 /// <summary>
+/// Algo que hay que aplicar del artefacto, en el orden en que va.
+///
+/// No todo lo que trae un respaldo es una instrucción. Con los datos en CSV, las
+/// filas viajan en un archivo aparte y hay que meterlas por el camino de la
+/// importación, no ejecutando SQL. Quien restaura tiene que distinguirlo, y por
+/// eso el artefacto entrega entradas y no cadenas.
+/// </summary>
+public abstract record BackupEntry;
+
+/// <summary>Una instrucción SQL, lista para ejecutarse tal cual.</summary>
+public sealed record BackupStatement(string Sql) : BackupEntry;
+
+/// <summary>
+/// Un puñado de filas de una tabla, leídas de un archivo de datos.
+///
+/// Van por lotes y no de una vez porque una tabla puede traer millones de filas:
+/// el lote es lo que acota la memoria y, de paso, lo que permite reanudar una
+/// restauración sin repetir lo que ya entró.
+/// </summary>
+public sealed record BackupRows : BackupEntry
+{
+    /// <summary>Nombre de la tabla tal y como lo nombró el respaldo.</summary>
+    public required string Table { get; init; }
+
+    /// <summary>De qué archivo salieron, para poder decirlo si algo falla.</summary>
+    public required string Source { get; init; }
+
+    /// <summary>Columnas del archivo, en su orden.</summary>
+    public required IReadOnlyList<string> Columns { get; init; }
+
+    /// <summary>Las filas del lote, sin interpretar: cada celda es texto o nulo.</summary>
+    public required IReadOnlyList<IReadOnlyList<string?>> Rows { get; init; }
+
+    /// <summary>
+    /// Número de la primera fila del lote dentro del archivo, contando desde uno
+    /// y sin la cabecera. Es lo que hace útil un error: «falló en la fila 12.480».
+    /// </summary>
+    public required long FirstRow { get; init; }
+}
+
+/// <summary>
 /// Un respaldo ya escrito, abierto para leerlo.
 ///
 /// Es la otra mitad de <see cref="IBackupSink"/>: aquel reparte el respaldo en un
@@ -26,13 +67,14 @@ public interface IBackupArchive : IDisposable
     Task<BackupManifest?> ReadManifestAsync(CancellationToken cancellationToken);
 
     /// <summary>
-    /// Las instrucciones, en el orden en que hay que ejecutarlas.
+    /// Todo lo que hay que aplicar, en el orden en que hay que aplicarlo.
     ///
     /// El orden es el del §4.2 del plan y lo pone quien lee: los esquemas antes
     /// que sus tablas, los datos antes que los índices, y las claves foráneas al
-    /// final porque entre dos tablas puede haber un ciclo.
+    /// final porque entre dos tablas puede haber un ciclo. Los datos en CSV
+    /// ocupan el mismo lugar que los `INSERT` a los que sustituyen.
     /// </summary>
-    IAsyncEnumerable<string> ReadStatementsAsync(CancellationToken cancellationToken);
+    IAsyncEnumerable<BackupEntry> ReadEntriesAsync(CancellationToken cancellationToken);
 }
 
 /// <summary>

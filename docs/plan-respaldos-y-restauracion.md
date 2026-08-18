@@ -722,9 +722,11 @@ llevarse por delante los perfiles hechos con ella.
 - [x] Vista previa de lo que se ejecuta y de lo que se sobrescribe. Enseña las
       tablas que ya existen **con las filas que tienen hoy**, que es el número
       que hace pensar antes de aceptar.
-- [ ] Restauración de los CSV por el camino de importación existente. **Es lo
-      único que falta de la fase:** un respaldo en carpeta con los datos en CSV
-      se inspecciona bien, pero no se aplica.
+- [x] Restauración de los CSV por el camino de importación existente: mismo
+      lector de CSV, mismo conversor de valores y los mismos `INSERT` con
+      parámetros. Las filas van **por lotes de 500**, que es lo que acota la
+      memoria de una tabla de tres millones y, de paso, el grano con el que se
+      puede reanudar.
 - [x] **El mismo progreso que al respaldar** —asistente y barra de estado, que
       el trabajo sobrevive a cerrar la ventana—, y la parada ante el primer
       error diciendo en qué instrucción, enseñándola entera, con la opción de
@@ -734,9 +736,31 @@ llevarse por delante los perfiles hechos con ella.
 las dos estructuras releídas coinciden. Con los cuatro motores. Y una
 restauración que falla a mitad **deja claro qué se aplicó y qué no**.
 
-**Sin cumplir todavía.** La ida y vuelta solo la cubre una prueba de integración
-contra PostgreSQL; falta llevarla a los cuatro motores y usar el asistente a mano
-contra el escenario ya sembrado en `druse-pg-test`.
+**Dónde está el criterio de salida.** La ida y vuelta de la **estructura** y la de
+los **datos** están cubiertas en los cuatro motores por las contractuales, y la
+del **artefacto entero** —respaldar, mirar, aplicar en una base limpia y comparar—
+por dos pruebas de integración contra PostgreSQL, una con `INSERT` y otra con CSV.
+Falta llevar el ciclo entero por HTTP a los otros tres motores y **usar el
+asistente a mano** contra el escenario ya sembrado en `druse-pg-test`.
+
+La prueba contractual de la carga por texto —lo que hace un CSV— encontró dos
+errores que ninguna otra veía, y los dos afectaban también a **importar** un CSV
+exportado por Druse: MySQL, SQL Server e Informix devuelven una fecha como
+«2026-08-17 00:00:00» y el conversor la rechazaba; y un nulo sin tipo lo manda el
+driver como texto, con lo que SQL Server tumbaba el `INSERT` entero al llegar a
+una columna binaria. Informix, además, no conoce `DateOnly` ni `TimeOnly`.
+
+**Lo que el CSV no conserva, y se avisa antes de aplicarlo.** Un nulo y una
+cadena vacía se escriben igual en un CSV. En las columnas que no son texto la
+diferencia se recupera —una celda vacía en una fecha o en un número solo puede
+ser un nulo—, pero **en una columna de texto un nulo vuelve como cadena vacía**.
+La inspección lo dice cuando el respaldo trae datos en CSV, para que quien
+necesite conservarlos elija los `INSERT`, donde no se pierde nada.
+
+**El archivo de datos no lleva el esquema en el nombre** —`datos/pedidos.csv`, no
+`datos/tienda.pedidos.csv`—, así que la tabla de destino se resuelve por el
+catálogo. Si el mismo nombre existe en dos esquemas, se para y se dice: insertar
+en la equivocada es peor que no restaurar.
 
 ---
 

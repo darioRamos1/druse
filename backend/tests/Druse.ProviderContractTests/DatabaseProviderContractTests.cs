@@ -1137,6 +1137,123 @@ public abstract class DatabaseProviderContractTests<TFixture>
     }
 
     /// <summary>
+    /// Las filas leídas como texto vuelven a entrar en su tabla y salen iguales.
+    ///
+    /// Es el camino de los datos en CSV, que no pasa por ningún `INSERT` escrito:
+    /// el respaldo guarda lo que el motor devuelve como texto y la restauración lo
+    /// vuelve a meter emparejando por nombre, convirtiendo cada celda al tipo de su
+    /// columna y escribiendo con parámetros.
+    ///
+    /// Por eso se prueba con una columna de cada familia y con una fila entera a
+    /// nulo: lo que se puede perder en ese viaje es justo lo que solo tiene texto
+    /// —un `0x1AFF` que vuelve como la cadena «0x1AFF», una fecha que vuelve como
+    /// otra fecha, un nulo que vuelve como cadena vacía— y ninguna de esas tres
+    /// cosas da un error; dan una tabla con otro contenido.
+    /// </summary>
+    [Fact]
+    public async Task CargaComoTextoLasFilasQueLeyoComoTexto()
+    {
+        if (Skip) { return; }
+
+        await using var session = await OpenAsync();
+
+        var name = $"druse_csv_{Guid.NewGuid().ToString("N")[..8]}";
+        var families = Fixture.TypesByFamily.Keys.Order().ToList();
+
+        var target = new DatabaseObject
+        {
+            Id = name,
+            Name = name,
+            Kind = DatabaseObjectKind.Table,
+            Database = Fixture.DatabaseName,
+            Schema = Fixture.DefaultSchema,
+        };
+
+        try
+        {
+            await Fixture.Designer.CreateAsync(
+                session,
+                new TableDefinition
+                {
+                    Database = Fixture.DatabaseName,
+                    Schema = Fixture.DefaultSchema,
+                    Name = name,
+                    Columns =
+                    [
+                        new TableColumnDefinition
+                        {
+                            Name = "id",
+                            DataType = "INTEGER",
+                            IsNullable = false,
+                            IsPrimaryKey = true,
+                            IsIdentity = true,
+                        },
+                        .. families.Select(family => new TableColumnDefinition
+                        {
+                            Name = ColumnOf(family),
+                            DataType = Fixture.TypesByFamily[family],
+                        }),
+                    ],
+                },
+                CancellationToken.None);
+
+            var table = await ReadAsync(session, target);
+            var columns = table.Columns
+                .Where(column => column.Name != "id")
+                .OrderBy(column => column.Ordinal)
+                .ToList();
+
+            var names = string.Join(", ", columns.Select(column => column.Name));
+
+            var values = string.Join(
+                ", ",
+                columns.Select(column =>
+                    Fixture.Scripter.FormatLiteral(ValueOf(FamilyOf(column.Name)), column)));
+
+            var nulls = string.Join(", ", columns.Select(_ => "NULL"));
+
+            await ExecuteAsync(session, $"INSERT INTO {name} ({names}) VALUES ({values})");
+            await ExecuteAsync(session, $"INSERT INTO {name} ({names}) VALUES ({nulls})");
+
+            // Esto es lo que acabaría dentro del CSV: lo que el motor devuelve.
+            var before = await CellsAsync(session, name, names);
+
+            Assert.Equal(2, before.Count);
+
+            await ExecuteAsync(session, $"DELETE FROM {name}");
+
+            // --- Y esto es la restauración de ese CSV -------------------------
+            var plan = RowBatchPlanner.Prepare(
+                Fixture.DefaultSchema,
+                name,
+                [.. columns.Select(column => (DatabaseColumn?)column)],
+                before);
+
+            Assert.True(
+                plan.Problems.Count == 0,
+                $"{Fixture.EngineName} devolvió valores que no se pueden volver a leer: " +
+                string.Join(
+                    "; ",
+                    plan.Problems.Select(problem => $"{problem.Column}: {problem.Message}")));
+
+            await Fixture.RowEditor.InsertAsync(session, plan.Batch, CancellationToken.None);
+
+            var after = await CellsAsync(session, name, names);
+
+            Assert.Equal(before.Count, after.Count);
+
+            for (var row = 0; row < before.Count; row++)
+            {
+                Assert.Equal(before[row], after[row]);
+            }
+        }
+        finally
+        {
+            await ExecuteAsync(session, Fixture.DropTable(name));
+        }
+    }
+
+    /// <summary>
     /// Lee un respaldo entero bajo una sola instantánea.
     ///
     /// Es lo que impide que la tabla de pedidos se lea a las 10:00 y la de líneas a
@@ -1339,6 +1456,26 @@ public abstract class DatabaseProviderContractTests<TFixture>
                 $"El guion no se pudo ejecutar en {Fixture.EngineName}: " +
                 $"{result.Error?.Message}{Environment.NewLine}{statement}");
         }
+    }
+
+    /// <summary>
+    /// Las filas de una tabla celda a celda, que es como acabarían en un CSV.
+    ///
+    /// Aparte de <see cref="RowsAsync"/> porque aquí no se comparan: se vuelven a
+    /// meter, y para eso hacen falta las celdas sueltas y no una línea.
+    /// </summary>
+    private async Task<List<IReadOnlyList<string?>>> CellsAsync(
+        IDatabaseSession session,
+        string table,
+        string columns)
+    {
+        var result = await ExecuteAsync(session, $"SELECT {columns} FROM {table} ORDER BY id");
+
+        return
+        [
+            .. Assert.Single(result.ResultSets).Rows
+                .Select(row => (IReadOnlyList<string?>)[.. row]),
+        ];
     }
 
     /// <summary>Las filas de una tabla, como texto, para poder compararlas.</summary>

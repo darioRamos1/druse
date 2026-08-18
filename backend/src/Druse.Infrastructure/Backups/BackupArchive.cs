@@ -1,10 +1,13 @@
 using System.Globalization;
 using System.IO.Compression;
+using System.Runtime.CompilerServices;
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
 using Druse.Application.Abstractions;
 using Druse.Domain;
+using Druse.Infrastructure.Importing;
 
 namespace Druse.Infrastructure.Backups;
 
@@ -46,6 +49,23 @@ public abstract class BackupArchive : IBackupArchive
     /// </summary>
     protected static readonly string[] FolderOrder = ["esquemas", "tablas", "datos", "restricciones"];
 
+    /// <summary>
+    /// Cuántas filas de un CSV van en cada lote.
+    ///
+    /// Es lo que acota la memoria de una tabla de tres millones de filas y, de
+    /// paso, el grano con el que se puede reanudar: al fallar el lote se sabe que
+    /// los anteriores entraron enteros, porque cada uno va en su transacción.
+    /// </summary>
+    internal const int RowBatchSize = 500;
+
+    /// <summary>
+    /// Cómo se escribieron los CSV del respaldo.
+    ///
+    /// No se adivina ni se pregunta: los escribió el exportador de Druse con sus
+    /// opciones por omisión, y este es el único lector que los va a abrir.
+    /// </summary>
+    private const char CsvDelimiter = ',';
+
     public required string Path { get; init; }
 
     public abstract BackupLayout Layout { get; }
@@ -55,8 +75,108 @@ public abstract class BackupArchive : IBackupArchive
     /// <summary>El manifiesto, o `null` si el artefacto no lo trae.</summary>
     public abstract Task<BackupManifest?> ReadManifestAsync(CancellationToken cancellationToken);
 
-    /// <summary>Las instrucciones, en el orden en que hay que ejecutarlas.</summary>
-    public abstract IAsyncEnumerable<string> ReadStatementsAsync(CancellationToken cancellationToken);
+    /// <summary>Todo lo que hay que aplicar, en el orden en que hay que aplicarlo.</summary>
+    public abstract IAsyncEnumerable<BackupEntry> ReadEntriesAsync(CancellationToken cancellationToken);
+
+    /// <summary>Las instrucciones de un archivo `.sql` del artefacto.</summary>
+    protected static async IAsyncEnumerable<BackupEntry> SqlOf(
+        TextReader reader,
+        [EnumeratorCancellation] CancellationToken cancellationToken)
+    {
+        using (reader)
+        {
+            await foreach (var statement in SqlStatementReader.ReadAsync(reader, cancellationToken))
+            {
+                yield return new BackupStatement(statement);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Las filas de un CSV del artefacto, por lotes.
+    ///
+    /// La primera fila son los nombres de las columnas: los escribió el
+    /// exportador y son los que se emparejan con los de la tabla de destino. Un
+    /// archivo que solo trae la cabecera no produce ninguna entrada, que es lo
+    /// que corresponde a una tabla vacía.
+    /// </summary>
+    protected static async IAsyncEnumerable<BackupEntry> RowsOf(
+        string table,
+        string source,
+        Stream stream,
+        [EnumeratorCancellation] CancellationToken cancellationToken)
+    {
+        // El BOM manda si lo hay, que es lo que escribe el exportador; sin él se
+        // lee como UTF-8, que es lo que escriben las otras dos codificaciones que
+        // ofrece.
+        using var reader = new StreamReader(
+            stream,
+            new UTF8Encoding(false),
+            detectEncodingFromByteOrderMarks: true);
+
+        IReadOnlyList<string>? columns = null;
+        var batch = new List<IReadOnlyList<string?>>(RowBatchSize);
+        var first = 1L;
+        var read = 0L;
+
+        await foreach (var row in CsvRowReader.ReadAsync(reader, CsvDelimiter, cancellationToken))
+        {
+            if (columns is null)
+            {
+                columns = [.. row];
+                continue;
+            }
+
+            read++;
+            batch.Add(CsvTableFileReader.Ajustar(row, columns.Count, nullText: string.Empty));
+
+            if (batch.Count < RowBatchSize)
+            {
+                continue;
+            }
+
+            yield return new BackupRows
+            {
+                Table = table,
+                Source = source,
+                Columns = columns,
+                Rows = batch,
+                FirstRow = first,
+            };
+
+            first = read + 1;
+            batch = new List<IReadOnlyList<string?>>(RowBatchSize);
+        }
+
+        if (columns is null || batch.Count == 0)
+        {
+            yield break;
+        }
+
+        yield return new BackupRows
+        {
+            Table = table,
+            Source = source,
+            Columns = columns,
+            Rows = batch,
+            FirstRow = first,
+        };
+    }
+
+    /// <summary>
+    /// La tabla a la que pertenece un archivo de datos.
+    ///
+    /// Es el nombre del archivo sin extensión, que es como lo escribió el
+    /// respaldo. Puede no traer el esquema —dos tablas iguales en esquemas
+    /// distintos comparten nombre de archivo—, y de resolverlo se encarga quien
+    /// restaura, que sí tiene delante el catálogo del destino.
+    /// </summary>
+    protected static string TableOf(string file) =>
+        System.IO.Path.GetFileNameWithoutExtension(file);
+
+    /// <summary>Si el archivo lleva datos en CSV en vez de instrucciones.</summary>
+    protected static bool IsCsv(string file) =>
+        file.EndsWith(".csv", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>
     /// Abre lo que haya en esa ruta, mirando qué es.
@@ -147,26 +267,13 @@ public sealed class SingleFileArchive : BackupArchive
         return ParseComments(tail);
     }
 
-    public override IAsyncEnumerable<string> ReadStatementsAsync(CancellationToken cancellationToken)
-    {
-        var reader = new StreamReader(Path);
-
-        return Read(reader, cancellationToken);
-
-        static async IAsyncEnumerable<string> Read(
-            StreamReader reader,
-            [System.Runtime.CompilerServices.EnumeratorCancellation]
-            CancellationToken cancellationToken)
-        {
-            using (reader)
-            {
-                await foreach (var statement in SqlStatementReader.ReadAsync(reader, cancellationToken))
-                {
-                    yield return statement;
-                }
-            }
-        }
-    }
+    /// <summary>
+    /// Todo va en el mismo `.sql`, así que aquí no hay más que instrucciones: un
+    /// archivo suelto no puede llevar dentro los CSV de cada tabla, y por eso el
+    /// respaldo en CSV exige la salida por carpetas.
+    /// </summary>
+    public override IAsyncEnumerable<BackupEntry> ReadEntriesAsync(CancellationToken cancellationToken) =>
+        SqlOf(new StreamReader(Path), cancellationToken);
 
     /// <summary>
     /// Rehace el manifiesto desde el bloque de comentarios que lo escribió.
@@ -257,8 +364,8 @@ public sealed class FolderArchive : BackupArchive
             : null;
     }
 
-    public override async IAsyncEnumerable<string> ReadStatementsAsync(
-        [System.Runtime.CompilerServices.EnumeratorCancellation]
+    public override async IAsyncEnumerable<BackupEntry> ReadEntriesAsync(
+        [EnumeratorCancellation]
         CancellationToken cancellationToken)
     {
         foreach (var folder in FolderOrder)
@@ -272,12 +379,32 @@ public sealed class FolderArchive : BackupArchive
 
             // Dentro de una carpeta el orden es el del nombre: entre dos tablas
             // sin dependencias da igual cuál va primero, y ordenarlo hace que dos
-            // restauraciones del mismo respaldo se ejecuten igual.
-            foreach (var file in Directory.EnumerateFiles(directory, "*.sql").Order(StringComparer.Ordinal))
-            {
-                using var reader = new StreamReader(file);
+            // restauraciones del mismo respaldo se ejecuten igual. Los `.csv` van
+            // mezclados con los `.sql` de su carpeta porque ocupan su mismo
+            // lugar: son los datos de una tabla, escritos de otra manera.
+            var files = Directory.EnumerateFiles(directory, "*.sql")
+                .Concat(Directory.EnumerateFiles(directory, "*.csv"))
+                .Order(StringComparer.Ordinal);
 
-                await foreach (var statement in SqlStatementReader.ReadAsync(reader, cancellationToken))
+            foreach (var file in files)
+            {
+                if (IsCsv(file))
+                {
+                    var rows = RowsOf(
+                        TableOf(file),
+                        System.IO.Path.Combine(folder, System.IO.Path.GetFileName(file)),
+                        File.OpenRead(file),
+                        cancellationToken);
+
+                    await foreach (var batch in rows)
+                    {
+                        yield return batch;
+                    }
+
+                    continue;
+                }
+
+                await foreach (var statement in SqlOf(new StreamReader(file), cancellationToken))
                 {
                     yield return statement;
                 }
@@ -312,8 +439,8 @@ public sealed class ZippedArchive : BackupArchive
         return Deserialize(await reader.ReadToEndAsync(cancellationToken));
     }
 
-    public override async IAsyncEnumerable<string> ReadStatementsAsync(
-        [System.Runtime.CompilerServices.EnumeratorCancellation]
+    public override async IAsyncEnumerable<BackupEntry> ReadEntriesAsync(
+        [EnumeratorCancellation]
         CancellationToken cancellationToken)
     {
         foreach (var folder in FolderOrder)
@@ -323,15 +450,29 @@ public sealed class ZippedArchive : BackupArchive
             var entries = Archive.Entries
                 .Where(entry =>
                     entry.FullName.StartsWith(prefix, StringComparison.Ordinal) &&
-                    entry.FullName.EndsWith(".sql", StringComparison.OrdinalIgnoreCase))
+                    (entry.FullName.EndsWith(".sql", StringComparison.OrdinalIgnoreCase) ||
+                     IsCsv(entry.FullName)))
                 .OrderBy(entry => entry.FullName, StringComparer.Ordinal);
 
             foreach (var entry in entries)
             {
-                await using var stream = entry.Open();
-                using var reader = new StreamReader(stream);
+                if (IsCsv(entry.FullName))
+                {
+                    var rows = RowsOf(
+                        TableOf(entry.Name),
+                        entry.FullName,
+                        entry.Open(),
+                        cancellationToken);
 
-                await foreach (var statement in SqlStatementReader.ReadAsync(reader, cancellationToken))
+                    await foreach (var batch in rows)
+                    {
+                        yield return batch;
+                    }
+
+                    continue;
+                }
+
+                await foreach (var statement in SqlOf(new StreamReader(entry.Open()), cancellationToken))
                 {
                     yield return statement;
                 }

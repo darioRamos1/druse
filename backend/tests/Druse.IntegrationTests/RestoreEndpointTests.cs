@@ -303,6 +303,157 @@ public sealed class RestoreEndpointTests(DruseApiFactory factory) : IClassFixtur
         }
     }
 
+    /// <summary>Respalda a una carpeta con los datos en CSV y devuelve su ruta.</summary>
+    private static async Task<string> BackupToCsvAsync(
+        HttpClient client,
+        Guid session,
+        string root,
+        params string[] tables)
+    {
+        var destination = Path.Combine(root, "carpeta");
+
+        using var started = await client.PostAsJsonAsync(
+            "/api/backup/run",
+            new
+            {
+                sessionId = session,
+                tables = tables.Select(table => new { id = table, name = table, schema = "public" }),
+                dataMode = "StructureAndData",
+                layout = "FolderByKind",
+                dataFormat = "Csv",
+                compress = false,
+                destination,
+            });
+
+        started.EnsureSuccessStatusCode();
+
+        var id = (await started.Content.ReadFromJsonAsync<JsonElement>())
+            .GetProperty("id")
+            .GetGuid();
+
+        for (var attempt = 0; attempt < 200; attempt++)
+        {
+            using var status = await client.GetAsync($"/api/backup/{id}/status");
+
+            var progress = await status.Content.ReadFromJsonAsync<JsonElement>();
+
+            if (progress.GetProperty("outcome").GetString() != "Running")
+            {
+                Assert.Equal("Completed", progress.GetProperty("outcome").GetString());
+
+                return destination;
+            }
+
+            await Task.Delay(50);
+        }
+
+        Assert.Fail("El respaldo no terminó a tiempo.");
+
+        return destination;
+    }
+
+    /// <summary>
+    /// El mismo ciclo, pero con las filas en CSV en vez de en `INSERT`.
+    ///
+    /// Es la otra forma de guardar los datos y hasta ahora se podía escribir pero
+    /// no aplicar. Lo que se comprueba es lo que el formato pone en juego: la
+    /// coma, las comillas y el salto de línea dentro de un campo tienen que
+    /// llegar al destino siendo dato y no separadores.
+    /// </summary>
+    [Fact]
+    public async Task RespaldaLosDatosEnCsvYLosVuelveAMeter()
+    {
+        using var client = _factory.CreateAuthenticatedClient();
+
+        var origin = await OpenAsync(client, "druse_test");
+
+        if (origin is null) { return; }
+
+        var target = await OpenAsync(client, "druse_test_secondary");
+
+        Assert.NotNull(target);
+
+        var suffix = Guid.NewGuid().ToString("N")[..8];
+        var tabla = $"druse_csv_{suffix}";
+        var root = Path.Combine(Path.GetTempPath(), $"druse-restore-csv-{suffix}");
+
+        Directory.CreateDirectory(root);
+
+        try
+        {
+            await RunSqlAsync(client, origin.Value, $"""
+                CREATE TABLE {tabla} (
+                    id     integer PRIMARY KEY,
+                    nombre text NOT NULL,
+                    total  numeric(10,2),
+                    alta   date
+                );
+                """);
+
+            await RunSqlAsync(client, origin.Value, $"""
+                INSERT INTO {tabla} (id, nombre, total, alta) VALUES
+                    (1, 'con, coma',        10.50, DATE '2026-01-31'),
+                    (2, 'con "comillas"',   NULL,  NULL),
+                    (3, E'con\nsalto',      0.00,  DATE '2026-08-18');
+                """);
+
+            var path = await BackupToCsvAsync(client, origin.Value, root, tabla);
+
+            // Los datos están en su archivo, no dentro del guion.
+            Assert.True(File.Exists(Path.Combine(path, "datos", $"{tabla}.csv")));
+
+            var inspection = await InspectAsync(client, target.Value, path);
+
+            Assert.True(inspection.GetProperty("canRestore").GetBoolean());
+
+            // Se avisa de lo que el formato no sabe conservar antes de aplicarlo.
+            var warnings = inspection.GetProperty("warnings")
+                .EnumerateArray()
+                .Select(warning => warning.GetProperty("message").GetString() ?? string.Empty)
+                .ToList();
+
+            Assert.Contains(warnings, message => message.Contains("CSV", StringComparison.Ordinal));
+
+            var result = await RestoreAsync(client, new { sessionId = target.Value, path });
+
+            Assert.Equal("Completed", result.GetProperty("outcome").GetString());
+            Assert.Equal(3, result.GetProperty("rowsWritten").GetInt64());
+
+            var rows = await RunSqlAsync(client, target.Value, $"""
+                SELECT nombre, coalesce(total::text, '·'), coalesce(alta::text, '·')
+                FROM {tabla}
+                ORDER BY id;
+                """);
+
+            var restored = rows.GetProperty("resultSets")[0]
+                .GetProperty("rows")
+                .EnumerateArray()
+                .Select(row => row.EnumerateArray().Select(cell => cell.GetString()).ToList())
+                .ToList();
+
+            Assert.Equal(["con, coma", "10.50", "2026-01-31"], restored[0]);
+
+            // El nulo de una columna que no es texto sí se conserva: una celda
+            // vacía en una fecha o en un número solo puede querer decir nulo.
+            Assert.Equal(["con \"comillas\"", "·", "·"], restored[1]);
+            Assert.Equal(["con\nsalto", "0.00", "2026-08-18"], restored[2]);
+        }
+        finally
+        {
+            await CleanAsync(client, origin.Value, $"DROP TABLE IF EXISTS {tabla}");
+
+            if (target is not null)
+            {
+                await CleanAsync(client, target.Value, $"DROP TABLE IF EXISTS {tabla}");
+            }
+
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+    }
+
     /// <summary>
     /// Un respaldo de otro motor no se intenta siquiera.
     ///
