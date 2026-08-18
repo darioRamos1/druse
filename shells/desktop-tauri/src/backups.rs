@@ -73,6 +73,43 @@ pub async fn choose_backup_folder(app: AppHandle) -> Result<Option<String>, Stri
     Ok(Some(path.to_string_lossy().to_string()))
 }
 
+/// Elige el respaldo que se va a restaurar.
+///
+/// Un respaldo puede ser **un archivo o una carpeta**, así que se pregunta cuál
+/// de los dos se busca en vez de adivinarlo: un diálogo de archivos no deja
+/// elegir una carpeta y uno de carpetas no deja elegir un archivo, y equivocarse
+/// deja al usuario sin poder seleccionar lo que tiene delante.
+///
+/// Tampoco aquí viajan los bytes: se devuelve la ruta y el proceso local lo lee.
+#[tauri::command]
+pub async fn choose_restore_source(
+    app: AppHandle,
+    folder: bool,
+) -> Result<Option<String>, String> {
+    let selected = if folder {
+        app.dialog()
+            .file()
+            .set_title("Carpeta del respaldo a restaurar")
+            .blocking_pick_folder()
+    } else {
+        app.dialog()
+            .file()
+            .set_title("Respaldo a restaurar")
+            .add_filter("Respaldo", &["sql", "zip"])
+            .blocking_pick_file()
+    };
+
+    let Some(selected) = selected else {
+        return Ok(None);
+    };
+
+    let path = selected
+        .into_path()
+        .map_err(|_| "La selección no es una ruta local.".to_string())?;
+
+    Ok(Some(path.to_string_lossy().to_string()))
+}
+
 /// Se queda con el nombre del archivo y descarta cualquier ruta que traiga.
 ///
 /// Lo propone la página, así que podría venir con `..` o con separadores. El

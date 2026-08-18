@@ -258,6 +258,20 @@
                     </button>
                   }
 
+                  <!-- Restaurar solo sobre la base: el artefacto trae dentro sus
+                       propios esquemas, y ofrecerlo sobre uno haría creer que se
+                       aplica ahí. -->
+                  @if (node.kind === 'database') {
+                    <button
+                      type="button"
+                      role="menuitem"
+                      (click)="act($event, () => restore.emit(node))"
+                    >
+                      <app-icon name="folder-open" [size]="12" />
+                      Restaurar…
+                    </button>
+                  }
+
                   <!-- Crear se ofrece sobre el esquema y sobre la carpeta que
                        agrupa sus tablas, que es donde el usuario mira cuando
                        piensa «aquí falta una». -->

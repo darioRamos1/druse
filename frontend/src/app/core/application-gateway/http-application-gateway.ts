@@ -29,6 +29,9 @@ import {
   BackupProfileResolution,
   BackupProgress,
   BackupRequest,
+  RestoreInspection,
+  RestoreProgress,
+  RestoreRequest,
   ConnectRequest,
   ExecuteQueryRequest,
   ExportRequest,
@@ -379,6 +382,25 @@ export class HttpApplicationGateway extends ApplicationGateway {
 
   override markBackupProfileRun(profileId: string): Observable<void> {
     return this._http.post<void>(`/api/backup/profiles/${profileId}/ran`, null);
+  }
+
+  override inspectRestore(sessionId: string, path: string): Observable<RestoreInspection> {
+    return this._http.post<RestoreInspection>('/api/restore/inspect', { sessionId, path });
+  }
+
+  override runRestore(request: RestoreRequest): Observable<string> {
+    // Igual que el respaldo: 202 con el identificador, y el trabajo sigue solo.
+    return this._http
+      .post<{ id: string }>('/api/restore/run', request)
+      .pipe(map((response) => response.id));
+  }
+
+  override getRestoreStatus(restoreId: string): Observable<RestoreProgress> {
+    return this._http.get<RestoreProgress>(`/api/restore/${restoreId}/status`);
+  }
+
+  override cancelRestore(restoreId: string): Observable<void> {
+    return this._http.post<void>(`/api/restore/${restoreId}/cancel`, null);
   }
 
   /** Añade lo que la cuadrícula necesita y la API no tiene por qué saber. */

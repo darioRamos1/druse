@@ -71,6 +71,15 @@ export class ConnectionsSidebar {
    * tablas hay debajo.
    */
   readonly backup = output<ExplorerNode>();
+
+  /**
+   * Aplicar un respaldo sobre esta base.
+   *
+   * Solo se ofrece sobre la base y no sobre un esquema o una tabla: un artefacto
+   * trae sus propios esquemas dentro, y abrirlo desde un nodo más hondo sugeriría
+   * que se restaura «ahí», que es justo lo que no pasa.
+   */
+  readonly restore = output<ExplorerNode>();
   readonly copied = output<string>();
   readonly copyFailed = output<void>();
 

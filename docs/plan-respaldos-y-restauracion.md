@@ -717,16 +717,26 @@ llevarse por delante los perfiles hechos con ella.
 
 ### Fase F — Restauración
 
-- [ ] `RestoreService` y la inspección del artefacto.
-- [ ] Comprobación de motor y versión de formato.
-- [ ] Vista previa de lo que se ejecuta y de lo que se sobrescribe.
-- [ ] Restauración de los CSV por el camino de importación existente.
-- [ ] **El mismo progreso que al respaldar**, y la parada ante el primer error
-      diciendo en qué instrucción, con la opción de reanudar desde ahí.
+- [x] `RestoreService` y la inspección del artefacto.
+- [x] Comprobación de motor y versión de formato.
+- [x] Vista previa de lo que se ejecuta y de lo que se sobrescribe. Enseña las
+      tablas que ya existen **con las filas que tienen hoy**, que es el número
+      que hace pensar antes de aceptar.
+- [ ] Restauración de los CSV por el camino de importación existente. **Es lo
+      único que falta de la fase:** un respaldo en carpeta con los datos en CSV
+      se inspecciona bien, pero no se aplica.
+- [x] **El mismo progreso que al respaldar** —asistente y barra de estado, que
+      el trabajo sobrevive a cerrar la ventana—, y la parada ante el primer
+      error diciendo en qué instrucción, enseñándola entera, con la opción de
+      reanudar desde ahí sin repetir lo aplicado.
 
 **Criterio de salida:** una base se respalda, se restaura en un servidor limpio y
 las dos estructuras releídas coinciden. Con los cuatro motores. Y una
 restauración que falla a mitad **deja claro qué se aplicó y qué no**.
+
+**Sin cumplir todavía.** La ida y vuelta solo la cubre una prueba de integración
+contra PostgreSQL; falta llevarla a los cuatro motores y usar el asistente a mano
+contra el escenario ya sembrado en `druse-pg-test`.
 
 ---
 

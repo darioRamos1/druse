@@ -155,6 +155,7 @@ fn main() {
             exports::save_export,
             backups::choose_backup_file,
             backups::choose_backup_folder,
+            backups::choose_restore_source,
             transactions::set_transaction_pending,
             theme::set_window_theme,
             editor_background::choose_editor_background,

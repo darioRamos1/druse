@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input, output } from '@angular/core';
 
 import { BackupStore } from '../../core/backup/backup.store';
+import { RestoreStore } from '../../core/backup/restore.store';
 import { SessionStatus } from '../../shared/models/workspace';
 import { EngineBadge } from '../../shared/ui/engine-badge/engine-badge';
 
@@ -21,6 +22,9 @@ export class StatusBar {
   /** Volver al detalle del respaldo en marcha. */
   readonly showBackup = output<void>();
 
+  /** Volver al detalle de la restauración en marcha. */
+  readonly showRestore = output<void>();
+
   /**
    * El respaldo se mira desde aquí porque **sobrevive al asistente**.
    *
@@ -38,9 +42,27 @@ export class StatusBar {
   });
 
   /** El objeto en curso, recortado: la barra no puede crecer a lo ancho. */
-  protected readonly subject = computed(() => {
-    const name = this.backup.progress()?.currentObject ?? '';
+  protected readonly subject = computed(() => shorten(this.backup.progress()?.currentObject));
 
-    return name.length > 32 ? `${name.slice(0, 31)}…` : name;
+  /**
+   * La restauración se mira desde aquí por lo mismo, y con más motivo: mientras
+   * corre **se está escribiendo en la base**, así que perderla de vista es peor
+   * que perder de vista un respaldo.
+   */
+  protected readonly restore = inject(RestoreStore);
+
+  protected readonly restorePercent = computed(() => {
+    const overall = this.restore.overall();
+
+    return overall === null ? null : Math.round(overall * 100);
   });
+
+  protected readonly restoreSubject = computed(() => shorten(this.restore.progress()?.currentObject));
+}
+
+/** Recorta un nombre largo para que no empuje al resto de la barra. */
+function shorten(name: string | undefined): string {
+  const text = name ?? '';
+
+  return text.length > 32 ? `${text.slice(0, 31)}…` : text;
 }

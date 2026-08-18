@@ -41,19 +41,55 @@
 @if (backup.running()) {
   <span class="sep" aria-hidden="true"></span>
 
-  <button type="button" class="backup" (click)="showBackup.emit()" title="Ver el respaldo en curso">
-    <span class="backup-bar" [class.backup-bar--waiting]="percent() === null">
-      <span class="backup-fill" [style.width.%]="percent() ?? 100"></span>
+  <button
+    type="button"
+    class="op op--backup"
+    (click)="showBackup.emit()"
+    title="Ver el respaldo en curso"
+  >
+    <span class="op-bar" [class.op-bar--waiting]="percent() === null">
+      <span class="op-fill" [style.width.%]="percent() ?? 100"></span>
     </span>
 
-    <span class="backup-step">{{ backup.stepLabel() }}</span>
+    <span class="op-step">{{ backup.stepLabel() }}</span>
 
     @if (subject()) {
-      <span class="mono backup-subject">{{ subject() }}</span>
+      <span class="mono op-subject">{{ subject() }}</span>
     }
 
     @if (percent() !== null) {
       <span class="mono">{{ percent() }}&nbsp;%</span>
+    }
+  </button>
+}
+
+<!--
+  La restauración se enseña igual, y por una razón más fuerte: mientras se
+  escribe en la base, saber que sigue en marcha es lo que evita que alguien
+  cierre la aplicación a mitad. Dice «Restaurando» porque las dos operaciones se
+  parecen demasiado como para distinguirlas solo por el paso.
+-->
+@if (restore.running()) {
+  <span class="sep" aria-hidden="true"></span>
+
+  <button
+    type="button"
+    class="op op--restore"
+    (click)="showRestore.emit()"
+    title="Ver la restauración en curso"
+  >
+    <span class="op-bar" [class.op-bar--waiting]="restorePercent() === null">
+      <span class="op-fill" [style.width.%]="restorePercent() ?? 100"></span>
+    </span>
+
+    <span class="op-step">Restaurando · {{ restore.stepLabel() }}</span>
+
+    @if (restoreSubject()) {
+      <span class="mono op-subject">{{ restoreSubject() }}</span>
+    }
+
+    @if (restorePercent() !== null) {
+      <span class="mono">{{ restorePercent() }}&nbsp;%</span>
     }
   </button>
 }

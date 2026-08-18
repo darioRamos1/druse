@@ -41,6 +41,7 @@
     (openNode)="openNode($event)"
     (importInto)="openImport($event)"
     (backup)="openBackup($event)"
+    (restore)="openRestore($event)"
     (createTable)="openTableDesigner($event)"
     (designTable)="openTableDesigner($event)"
     (composeQuery)="openBuilder($event)"
@@ -212,6 +213,7 @@
       [line]="cursor().line"
       [column]="cursor().column"
       (showBackup)="reopenBackup()"
+      (showRestore)="reopenRestore()"
     />
   </main>
 </div>
@@ -247,6 +249,19 @@
         [target]="destino"
         [sessionId]="backupSessionId()"
         (closed)="closeBackup()"
+      />
+    }
+  }
+}
+
+<!-- La otra mitad: aplicar un respaldo sobre esta base. -->
+@defer (when restoreOpen()) {
+  @if (restoreOpen()) {
+    @if (restoreTarget(); as destino) {
+      <app-restore-dialog
+        [target]="destino"
+        [sessionId]="restoreSessionId()"
+        (closed)="closeRestore()"
       />
     }
   }

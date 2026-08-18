@@ -62,9 +62,11 @@
   font-size: 7.5px;
 }
 
-/* El respaldo en curso. Es lo único pulsable de la barra, así que se comporta
-   como un botón —cursor y realce— y no como una etiqueta más. */
-.backup {
+/* La operación larga en curso —respaldo o restauración—. Es lo único pulsable
+   de la barra, así que se comporta como un botón —cursor y realce— y no como
+   una etiqueta más. Las dos comparten forma a propósito: son el mismo tipo de
+   trabajo y se leen igual, y solo cambia lo que dicen. */
+.op {
   display: flex;
   gap: 8px;
   align-items: center;
@@ -83,7 +85,7 @@
   }
 }
 
-.backup-bar {
+.op-bar {
   position: relative;
   flex: 0 0 56px;
   height: 4px;
@@ -92,7 +94,7 @@
   background: var(--dr-surface-raised);
 }
 
-.backup-fill {
+.op-fill {
   display: block;
   height: 100%;
   border-radius: inherit;
@@ -102,12 +104,12 @@
 
 /* Sin total conocido recorre en vez de llenarse, igual que en el asistente: una
    barra parada en un porcentaje inventado miente sobre lo que falta. */
-.backup-bar--waiting .backup-fill {
+.op-bar--waiting .op-fill {
   width: 40%;
-  animation: backup-sweep 1.4s ease-in-out infinite;
+  animation: op-sweep 1.4s ease-in-out infinite;
 }
 
-@keyframes backup-sweep {
+@keyframes op-sweep {
   0% {
     transform: translateX(-100%);
   }
@@ -118,13 +120,13 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .backup-bar--waiting .backup-fill {
+  .op-bar--waiting .op-fill {
     animation: none;
     opacity: 0.6;
   }
 }
 
-.backup-subject {
+.op-subject {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

@@ -27,6 +27,7 @@ import {
 } from '../../features/query-editor/sql-editor/sql-editor';
 import SqlEditor from '../../features/query-editor/sql-editor/sql-editor';
 import { BackupDialog } from '../../features/backup/backup-dialog/backup-dialog';
+import { RestoreDialog } from '../../features/backup/restore-dialog/restore-dialog';
 import { ImportDialog } from '../../features/import/import-dialog/import-dialog';
 import { TableDesigner } from '../../features/tables/table-designer/table-designer';
 import { ProcedureRunner } from '../../features/query-builder/procedure-runner/procedure-runner';
@@ -85,6 +86,7 @@ const DISCONNECTED: SessionStatus = {
     ResultsPanel,
     ImportDialog,
     BackupDialog,
+    RestoreDialog,
     TableDesigner,
     QueryBuilder,
     ProcedureRunner,
@@ -178,7 +180,8 @@ export class AppShell {
         this.importTarget() ||
         this.builderTarget() ||
         this.designTarget() ||
-        this.backupOpen()
+        this.backupOpen() ||
+        this.restoreOpen()
       ) {
         return;
       }
@@ -217,6 +220,38 @@ export class AppShell {
 
     return target ? (this._store.sessionForConnection(target.connectionId) ?? '') : '';
   });
+
+  /**
+   * Base sobre la que está abierto el asistente de restauración.
+   *
+   * Se guarda igual que el del respaldo y por lo mismo: el trabajo sigue en el
+   * proceso local aunque se cierre la ventana.
+   */
+  protected readonly restoreTarget = signal<ExplorerNode | null>(null);
+
+  protected readonly restoreOpen = signal(false);
+
+  protected readonly restoreSessionId = computed(() => {
+    const target = this.restoreTarget();
+
+    return target ? (this._store.sessionForConnection(target.connectionId) ?? '') : '';
+  });
+
+  protected openRestore(node: ExplorerNode): void {
+    this.restoreTarget.set(node);
+    this.restoreOpen.set(true);
+  }
+
+  protected closeRestore(): void {
+    this.restoreOpen.set(false);
+  }
+
+  /** Vuelve al detalle desde el indicador de la barra, igual que el respaldo. */
+  protected reopenRestore(): void {
+    if (this.restoreTarget()) {
+      this.restoreOpen.set(true);
+    }
+  }
 
   protected openBackup(node: ExplorerNode): void {
     this.backupTarget.set(node);

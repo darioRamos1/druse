@@ -469,6 +469,111 @@ export abstract class ApplicationGateway {
 
   /** Anota que se acaba de lanzar, sin tocar nada más del perfil. */
   abstract markBackupProfileRun(profileId: string): Observable<void>;
+
+  // --- Restauración ---------------------------------------------------------
+
+  /**
+   * Qué trae un artefacto y qué pasaría al aplicarlo aquí, **sin tocar nada**.
+   *
+   * Va por su propia ruta y no como un paso de restaurar, igual que la vista
+   * previa del respaldo: entre mirar y aplicar está la única oportunidad de ver
+   * qué se sobrescribe.
+   */
+  abstract inspectRestore(sessionId: string, path: string): Observable<RestoreInspection>;
+
+  /**
+   * Aplica el artefacto y devuelve el identificador de la operación.
+   *
+   * No espera a que termine: el trabajo sigue en el proceso local y el progreso
+   * se pregunta con {@link getRestoreStatus}.
+   */
+  abstract runRestore(request: RestoreRequest): Observable<string>;
+
+  abstract getRestoreStatus(restoreId: string): Observable<RestoreProgress>;
+
+  abstract cancelRestore(restoreId: string): Observable<void>;
+}
+
+/** Cómo está repartido el artefacto que se restaura. */
+export interface RestoreRequest {
+  readonly sessionId: string;
+  readonly path: string;
+  /** Instrucción desde la que se sigue. Cero es empezar de nuevo. */
+  readonly resumeFrom?: number;
+}
+
+/** Una tabla del artefacto que ya existe en el destino. */
+export interface RestoreCollision {
+  readonly table: string;
+  /** Filas que tiene hoy, estimadas por el catálogo. */
+  readonly rows?: number;
+}
+
+/** Por qué no se puede restaurar. */
+export type RestoreRefusal =
+  | 'DifferentEngine'
+  | 'UnknownFormat'
+  | 'ReadOnlyConnection'
+  | 'Unreadable';
+
+export interface RestoreRejection {
+  readonly reason: RestoreRefusal;
+  /** Ya viene escrito para enseñarlo tal cual. */
+  readonly message: string;
+}
+
+/** El manifiesto del artefacto, tal y como se enseña antes de aplicarlo. */
+export interface RestoreManifest {
+  readonly formatVersion: number;
+  readonly engine: string;
+  readonly serverVersion: string;
+  readonly database?: string;
+  readonly createdAt: string;
+  readonly tables: number;
+  readonly tablesWithData: number;
+  readonly rows: number;
+  readonly outcome: BackupOutcome;
+  readonly consistentSnapshot: boolean;
+}
+
+export interface RestoreInspection {
+  readonly path: string;
+  readonly layout: BackupLayout;
+  readonly compressed: boolean;
+  readonly manifest?: RestoreManifest;
+  readonly statements: number;
+  readonly tables: readonly string[];
+  readonly collisions: readonly RestoreCollision[];
+  readonly rejections: readonly RestoreRejection[];
+  readonly warnings: readonly BackupWarning[];
+  readonly canRestore: boolean;
+}
+
+export type RestoreStep = 'Reading' | 'Checking' | 'Applying' | 'Done';
+
+export type RestoreOutcome = 'Running' | 'Completed' | 'Failed' | 'Cancelled';
+
+/** Dónde se paró una restauración. */
+export interface RestoreFailure {
+  /** Instrucción que falló, contando desde uno. Es desde donde se reanuda. */
+  readonly index: number;
+  readonly statement: string;
+  readonly message: string;
+}
+
+export interface RestoreProgress {
+  readonly id: string;
+  readonly step: RestoreStep;
+  readonly outcome: RestoreOutcome;
+  readonly currentObject?: string;
+  readonly statementsDone: number;
+  readonly statementsTotal: number;
+  readonly rowsWritten: number;
+  readonly elapsedMilliseconds: number;
+  /** Hasta dónde se aplicó. */
+  readonly applied: number;
+  readonly failure?: RestoreFailure;
+  readonly warnings: readonly BackupWarning[];
 }
 
 /** Qué nombra una parte de la selección guardada. */

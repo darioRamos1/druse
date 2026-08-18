@@ -10,28 +10,38 @@
 
 | Campo | Valor |
 | --- | --- |
-| Última sesión | **022h** — 2026-08-17 |
-| Fase activa | **Respaldos y restauración:** Fases A–E cerradas y probadas contra PostgreSQL real. Queda la **F: restaurar**, que es la mitad que cierra el ciclo |
+| Última sesión | **022i** — 2026-08-17 |
+| Fase activa | **Respaldos y restauración:** Fases A–E cerradas y probadas contra PostgreSQL real. La **F** tiene backend e interfaz completos; le faltan **los CSV**, la ida y vuelta con los cuatro motores y una prueba a mano |
 | Fases 0–6 | ✅ Cerradas. |
 | Fase 7 | 🟡 **11/12.** El ciclo de instalación está probado sobre este equipo; solo falta arrancar en una máquina sin herramientas de desarrollo. |
 | Fase 8 | ✅ **7/7.** Tres motores sobre el mismo contrato y primera beta preparada. |
 | ¿Compila el backend? | Sí — 0 advertencias, 0 errores |
 | ¿Compila el envoltorio? | Sí |
-| ¿Pasan las pruebas? | Sí — **545 en backend** (302 unitarias, 158 contractuales y 85 de integración), **407 en frontend** y **6 en el envoltorio**. Con `DRUSE_REQUIRE_ENGINES=1` y **los cuatro motores**, sin saltarse ninguna |
+| ¿Pasan las pruebas? | Sí — **545 en backend** (302 unitarias, 158 contractuales y 85 de integración), **418 en frontend** y **6 en el envoltorio**. Con `DRUSE_REQUIRE_ENGINES=1` y **los cuatro motores**, sin saltarse ninguna |
 | ¿Hay aplicación de escritorio? | **Sí.** Instalador NSIS, MSI y ZIP portable, en dos variantes: con Informix y sin él |
 | Motores | **PostgreSQL, SQL Server, MySQL/MariaDB e Informix**, todos sobre el mismo contrato compartido |
-| Trabajo a medias | Ninguno. Las transacciones manuales quedaron terminadas en la sesión 020. |
+| Trabajo a medias | Ninguno. El frontend de la restauración quedó commiteado en la sesión 022i. |
 | Bloqueantes | Ninguno para seguir programando. Sí para dar por buenos cuatro motores y cuatro funciones: ver «Qué toca retomar». |
 | Git | El **PR #9 se fusionó** (sesión 022), con los quince commits que el #8 dejó fuera más lo de la personalización. Se trabaja en `feat/respaldos-y-restauracion`, salida de un `main` ya al día. |
 | Integración continua | 🔴 **Parada, y no por el código.** GitHub aborta los catorce jobs en dos segundos: «recent account payments have failed or your spending limit needs to be increased». Hasta resolver la facturación, ningún PR podrá pasar los checks. |
 
 ### Qué toca retomar en la próxima sesión
 
-**Lo primero: la Fase F, restaurar.** Es la mitad que cierra el ciclo y la única
-que falta de la función: leer un artefacto, comprobar su motor y su versión de
-formato, **enseñar qué se va a ejecutar y qué se va a sobrescribir** antes de
-tocar nada, y aplicar los CSV por el camino de importación que ya existe. Las
-fases A–E están cerradas y probadas contra PostgreSQL de verdad.
+**Lo que le falta a la Fase F**, por orden:
+
+1. **Restaurar los CSV** por el camino de importación que ya existe. Es el único
+   punto del checklist sin escribir: hoy un respaldo en carpeta con los datos en
+   CSV se inspecciona bien, pero no se aplica.
+2. **La ida y vuelta con los cuatro motores.** El criterio de salida pide
+   respaldar, restaurar en un servidor limpio y comparar las dos estructuras
+   releídas. Hoy solo lo cubre una prueba de integración contra PostgreSQL.
+3. **Usar el asistente a mano** contra `druse-pg-test`, que es lo que encontró
+   los errores de verdad en el respaldo (sesión 022g).
+
+Lo demás de la Fase F está hecho: `RestoreService`, la inspección del artefacto,
+el rechazo por motor y versión de formato, la vista previa de lo que se ejecuta y
+lo que se sobrescribe, el progreso y la parada con reanudación desde la
+instrucción que falló.
 
 **El escenario de pruebas ya está sembrado, no hay que rehacerlo.** En
 `druse-pg-test` quedó el esquema `tienda` de la sesión 022g: `cat_paises`,
@@ -305,6 +315,72 @@ Y tres límites declarados desde el principio: no hay respaldo binario ni
 recuperación a un punto en el tiempo —eso es del servidor, y la interfaz tendrá
 que decirlo—, no hay respaldos programados, y un límite de filas puede dejar
 filas huérfanas, cosa que se avisa y no se corrige sola.
+
+### Sesión 022i — 2026-08-17 · Fase F: la restauración, vista desde la pantalla
+
+El backend de restaurar ya estaba (sesión anterior, commit `70dd3db`). Esta
+sesión pone **la mitad que se ve**: elegir el artefacto, mirarlo sin tocar nada,
+y solo entonces aplicarlo.
+
+El orden no es decorativo. Restaurar **escribe**, así que el asistente son dos
+pasos y no cuatro, y el segundo enseña antes que nada qué tablas del destino ya
+existen y **cuántas filas tienen hoy**: «tres tablas» no asusta y «tres tablas
+con 40.000 filas» sí, y esa es la diferencia entre avisar y avisar de verdad.
+El botón de restaurar queda deshabilitado mientras la inspección diga que no se
+puede, y los motivos —otro motor, formato desconocido, conexión de solo
+lectura— se enseñan todos juntos y no de uno en uno.
+
+Cuando falla a mitad, la pantalla no se limita a decir que falló: dice **en qué
+instrucción**, la enseña entera, avisa de que lo aplicado hasta ahí sigue en la
+base, y ofrece reanudar desde esa instrucción. Reanudar no es repetir —un
+`CREATE TABLE` repetido falla y un `INSERT` repetido duplica filas—, así que se
+sigue desde donde se quedó, no desde el principio.
+
+«Restaurar…» se ofrece **solo sobre la base** y no sobre un esquema: el
+artefacto trae sus propios esquemas dentro, y ofrecerlo más abajo sugeriría que
+se aplica ahí, que es justo lo que no pasa.
+
+La restauración también se ve en la barra de estado, igual que el respaldo y por
+un motivo más fuerte: mientras corre **se está escribiendo en la base**, y
+perderla de vista es lo que hace que alguien cierre la aplicación a mitad. Las
+clases del indicador pasan de `.backup*` a `.op*` con `--backup` y `--restore`,
+porque son el mismo tipo de trabajo y se leen igual; solo cambia lo que dicen.
+Los dos pueden verse a la vez, que son trabajos independientes.
+
+En el envoltorio entra `choose_restore_source`, que **pregunta si se busca un
+archivo o una carpeta** en vez de adivinarlo: un diálogo de archivos no deja
+elegir una carpeta y uno de carpetas no deja elegir un archivo, y equivocarse
+deja al usuario sin poder seleccionar lo que tiene delante. Va **sin comprobar
+con el compilador**, por lo de siempre en este equipo.
+
+**Hecho.** `RestoreStore`, el asistente `restore-dialog`, las cuatro llamadas de
+restauración en el gateway, la entrada del menú en la base, el enganche en el
+shell, el indicador de la barra de estado y el comando del envoltorio.
+
+**Verificado.** **418 pruebas en frontend**, todas en verde. Las cuatro nuevas
+son las del indicador: que diga el paso y el objeto, que reabra su detalle al
+pulsarlo, que respaldo y restauración se enseñen por separado cuando coinciden,
+y que desaparezca al terminar.
+
+**No hecho, y es lo que queda de la fase.**
+
+1. **Los CSV no se restauran.** No hay una sola mención a CSV en
+   `RestoreService.cs`: un respaldo escrito en carpeta con los datos en CSV se
+   inspecciona pero no se aplica por el camino de importación que ya existe. Es
+   el único punto del checklist de la Fase F sin escribir.
+2. **La ida y vuelta con los cuatro motores.** Solo la cubre
+   `RestoreEndpointTests.RespaldaUnaBaseYLaRestauraEnOtra`, contra PostgreSQL.
+   El criterio de salida pide respaldar, restaurar en un servidor limpio y
+   comparar las dos estructuras releídas, con los cuatro.
+3. **Nadie ha restaurado a mano.** El escenario de `druse-pg-test` sigue
+   sembrado y sirve tal cual; el asistente no se ha usado contra él.
+
+**Archivos.** `frontend/src/app/core/backup/restore.store.ts`,
+`frontend/src/app/features/backup/restore-dialog/*`,
+`frontend/src/app/core/application-gateway/*`,
+`frontend/src/app/features/connections/connections-sidebar/*`,
+`frontend/src/app/layout/app-shell/*`, `frontend/src/app/layout/status-bar/*`,
+`shells/desktop-tauri/src/backups.rs`, `shells/desktop-tauri/src/main.rs`.
 
 ### Sesión 022h — 2026-08-17 · Fase E: un perfil guarda una intención, no una foto
 

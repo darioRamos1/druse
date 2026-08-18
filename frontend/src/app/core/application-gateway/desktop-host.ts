@@ -129,6 +129,18 @@ export class DesktopHost {
   }
 
   /**
+   * Elige el respaldo que se va a restaurar.
+   *
+   * Se pregunta si se busca una carpeta en vez de adivinarlo: un diálogo de
+   * archivos no deja elegir una carpeta y uno de carpetas no deja elegir un
+   * archivo, y equivocarse deja al usuario sin poder seleccionar lo que tiene
+   * delante.
+   */
+  chooseRestoreSource(folder: boolean): Promise<string | null> {
+    return this.invoke('choose_restore_source', { folder });
+  }
+
+  /**
    * Declara si hay trabajo sin confirmar que se perdería al cerrar.
    *
    * El aviso lo enseña el envoltorio y no la página: dentro del WebView,
