@@ -3,6 +3,7 @@ import { Observable, of } from 'rxjs';
 
 import {
   ApplicationGateway,
+  FolderListing,
   RestoreInspection,
   RestoreProgress,
   RestoreRequest,
@@ -83,6 +84,24 @@ class FakeGateway implements Partial<ApplicationGateway> {
 
   cancelRestore(): Observable<void> {
     return of(undefined);
+  }
+
+  browseFolders(path?: string): Observable<FolderListing> {
+    return of({
+      path: path ?? 'C:/respaldos',
+      parent: null,
+      separator: '/',
+      canWrite: true,
+      folders: [],
+      files: [
+        {
+          name: 'tienda.sql',
+          path: 'C:/respaldos/tienda.sql',
+          size: 1024,
+          modifiedUtc: '2026-08-18T00:00:00Z',
+        },
+      ],
+    });
   }
 }
 
@@ -252,5 +271,32 @@ describe('RestoreDialog', () => {
     // Se reanuda **antes** de la que falló: la 5 se vuelve a intentar y las
     // cuatro anteriores no se repiten.
     expect(gateway.started.at(-1)?.resumeFrom).toBe(4);
+  });
+
+  /**
+   * Fuera del envoltorio no hay diálogo del sistema, así que el respaldo se
+   * busca con el selector propio. Lo que importa es que al elegirlo **se mira
+   * solo**: eso es lo que se iba a hacer a continuación de todos modos.
+   */
+  it('en el navegador se busca el respaldo con el selector y se inspecciona al elegirlo', async () => {
+    const buscar = [...element.querySelectorAll<HTMLButtonElement>('.picker button')]
+      .find((button) => button.textContent?.includes('Buscar'));
+
+    expect(buscar).toBeDefined();
+
+    buscar!.click();
+    await settle(fixture);
+
+    element.querySelector<HTMLButtonElement>('app-folder-picker .row--file')!.click();
+    fixture.detectChanges();
+
+    element.querySelector<HTMLButtonElement>('app-folder-picker .actions .primary')!.click();
+    await settle(fixture);
+
+    expect(element.querySelector<HTMLInputElement>('.picker__path')?.value).toBe(
+      'C:/respaldos/tienda.sql',
+    );
+    expect(element.textContent).toContain('Restaurar');
+    expect(element.querySelector('app-folder-picker')).toBeNull();
   });
 });

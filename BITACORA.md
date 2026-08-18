@@ -17,7 +17,7 @@
 | Fase 8 | ✅ **7/7.** Tres motores sobre el mismo contrato y primera beta preparada. |
 | ¿Compila el backend? | Sí — 0 advertencias, 0 errores |
 | ¿Compila el envoltorio? | Sí |
-| ¿Pasan las pruebas? | Sí — **596 en backend** (333 unitarias, 166 contractuales y 97 de integración), **425 en frontend** y **6 en el envoltorio**. Con `DRUSE_REQUIRE_ENGINES=1` y **los cuatro motores**, sin saltarse ninguna |
+| ¿Pasan las pruebas? | Sí — **600 en backend** (336 unitarias, 166 contractuales y 98 de integración), **432 en frontend** y **6 en el envoltorio**. Con `DRUSE_REQUIRE_ENGINES=1` y **los cuatro motores**, sin saltarse ninguna |
 | ¿Hay aplicación de escritorio? | **Sí.** Instalador NSIS, MSI y ZIP portable, en dos variantes: con Informix y sin él |
 | Motores | **PostgreSQL, SQL Server, MySQL/MariaDB e Informix**, todos sobre el mismo contrato compartido |
 | Trabajo a medias | Ninguno. El frontend de la restauración quedó commiteado en la sesión 022i. |
@@ -350,13 +350,30 @@ enumeran **carpetas**, nunca archivos: para elegir dónde guardar no hacen falta
 en `Druse.Platform.Native`, los endpoints `/api/folders`, el componente
 compartido `folder-picker` y su enganche en el asistente de respaldo.
 
-**Verificado.** **435 pruebas de backend** (333 unitarias y 97 de integración,
-más las 166 contractuales) y **425 en frontend**, todas en verde. Las nuevas son
-once del explorador, cinco de sus endpoints y siete del selector.
+**Verificado.** **336 unitarias, 166 contractuales y 98 de integración** en el
+backend y **432 en frontend**, todas en verde. Las nuevas son catorce del
+explorador, seis de sus endpoints, trece del selector —ocho al guardar y cinco al
+abrir— y una del asistente de restaurar.
 
-**No hecho.** El asistente de **restaurar** sigue pidiendo la ruta escrita en el
-navegador: elegir un artefacto es elegir un archivo que ya existe, y este
-selector compone una ruta nueva. Es el mismo componente con un modo más.
+**Y después, el mismo selector para restaurar.** Elegir un artefacto no es
+componer una ruta nueva sino señalar algo que ya existe, así que el componente
+gana un modo: al **abrir** enseña los archivos —solo los `.sql` y `.zip`, con su
+tamaño y su fecha, del más reciente al más viejo— y **marca las carpetas que
+llevan un `manifest.json` dentro**, que son las que se pueden restaurar enteras.
+Sin esa marca habría que entrar en cada carpeta a comprobarlo.
+
+Elegir el respaldo **lo mira en el acto**: era lo que se iba a hacer a
+continuación de todos modos, y dejar la ruta puesta sin inspeccionarla obligaba a
+pulsar «Mirar» para descubrir si servía.
+
+Al **guardar** también se enseñan los `.sql` y `.zip` que ya están en la carpeta,
+y pinchar uno copia su nombre: es como se sobrescribe el respaldo de la semana
+pasada sin teclearlo entero. Que ya exista lo sigue diciendo el aviso de debajo.
+
+Una lección de la prueba a mano: la lista **no puede dar por hecho** que la
+respuesta traiga archivos. Con una API anterior —la que el usuario tenía
+levantada— el campo no venía y el `@for` tumbaba el render entero del selector,
+con lo que el síntoma no era «no hay archivos» sino «no me deja elegir nada».
 
 ### Sesión 022j — 2026-08-18 · Los CSV se restauran, y por el camino aparecen dos errores
 

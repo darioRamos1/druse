@@ -496,14 +496,19 @@ export abstract class ApplicationGateway {
   // --- Carpetas del equipo --------------------------------------------------
 
   /**
-   * Las carpetas que hay en una ruta, para poder elegir dónde se guarda algo.
+   * Lo que hay en una ruta, para poder elegir sin escribirla.
    *
    * Sin ruta devuelve por dónde se empieza: los sitios conocidos del usuario y
    * las unidades. Existe porque **el navegador no ve el sistema de archivos**:
    * quien corre dentro del envoltorio tiene el diálogo nativo y no pasa por
    * aquí.
+   *
+   * Por omisión solo trae carpetas, que es lo que hace falta para guardar. Con
+   * `files` trae además los archivos de esas extensiones —para elegir cuál
+   * abrir— y con `marker` señala las carpetas que llevan ese archivo dentro, que
+   * es lo que distingue un respaldo por carpetas de una carpeta cualquiera.
    */
-  abstract browseFolders(path?: string): Observable<FolderListing>;
+  abstract browseFolders(path?: string, options?: BrowseOptions): Observable<FolderListing>;
 
   /** Une carpeta y nombre, y dice si eso se puede escribir o ya existe. */
   abstract resolveFolderTarget(folder: string, name: string): Observable<FolderTarget>;
@@ -515,11 +520,29 @@ export abstract class ApplicationGateway {
 /** Qué clase de sitio es una entrada del selector, para pintarle su icono. */
 export type FolderKind = 'Folder' | 'Drive' | 'Known';
 
+/** Qué se quiere ver al listar una carpeta. */
+export interface BrowseOptions {
+  /** Extensiones de archivo que se enumeran, sin el punto. */
+  readonly files?: readonly string[];
+  /** Archivo cuya presencia marca una subcarpeta. */
+  readonly marker?: string;
+}
+
 /** Una carpeta que se puede elegir. */
 export interface FolderEntry {
   readonly name: string;
   readonly path: string;
   readonly kind: FolderKind;
+  /** Lleva dentro el archivo señalado: es un respaldo, no una carpeta cualquiera. */
+  readonly marked?: boolean;
+}
+
+/** Un archivo que se puede elegir para abrirlo. */
+export interface FileEntry {
+  readonly name: string;
+  readonly path: string;
+  readonly size: number;
+  readonly modifiedUtc: string;
 }
 
 /** Lo que hay dentro de una carpeta y por dónde se sale de ella. */
@@ -529,6 +552,8 @@ export interface FolderListing {
   /** Separador de este sistema: `\` en Windows y `/` en el resto. */
   readonly separator: string;
   readonly folders: readonly FolderEntry[];
+  /** Los archivos pedidos, del más reciente al más antiguo. */
+  readonly files: readonly FileEntry[];
   readonly canWrite: boolean;
   /** Por qué no se pudo leer, cuando no se pudo. */
   readonly error?: string | null;

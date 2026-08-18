@@ -66,6 +66,53 @@ public sealed class FolderEndpointTests(DruseApiFactory factory) : IClassFixture
         }
     }
 
+    /// <summary>
+    /// Lo que hace falta para elegir un respaldo que restaurar: sus archivos y,
+    /// marcadas, las carpetas que son un respaldo entero.
+    /// </summary>
+    [Fact]
+    public async Task ConExtensionesYMarcadorEnseñaLosRespaldos()
+    {
+        var root = Path.Combine(Path.GetTempPath(), $"druse-api-abrir-{Guid.NewGuid():N}");
+
+        Directory.CreateDirectory(Path.Combine(root, "tienda"));
+        File.WriteAllText(Path.Combine(root, "tienda", "manifest.json"), "{}");
+        Directory.CreateDirectory(Path.Combine(root, "fotos"));
+        File.WriteAllText(Path.Combine(root, "ventas.sql"), "-- respaldo");
+        File.WriteAllText(Path.Combine(root, "notas.txt"), "nada que ver");
+
+        try
+        {
+            using var client = _factory.CreateAuthenticatedClient();
+
+            using var response = await client.GetAsync(
+                $"/api/folders?path={Uri.EscapeDataString(root)}&files=sql,zip&marker=manifest.json");
+
+            response.EnsureSuccessStatusCode();
+
+            var listing = await response.Content.ReadFromJsonAsync<JsonElement>();
+
+            var files = listing.GetProperty("files")
+                .EnumerateArray()
+                .Select(file => file.GetProperty("name").GetString())
+                .ToList();
+
+            Assert.Equal(["ventas.sql"], files);
+
+            var marked = listing.GetProperty("folders")
+                .EnumerateArray()
+                .Where(folder => folder.GetProperty("marked").GetBoolean())
+                .Select(folder => folder.GetProperty("name").GetString())
+                .ToList();
+
+            Assert.Equal(["tienda"], marked);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
     [Fact]
     public async Task ComponeElDestinoYAvisaDeLoQueSeSobrescribiria()
     {

@@ -29,6 +29,7 @@ import {
   BackupProfileResolution,
   BackupProgress,
   BackupRequest,
+  BrowseOptions,
   FolderListing,
   FolderTarget,
   RestoreInspection,
@@ -405,12 +406,20 @@ export class HttpApplicationGateway extends ApplicationGateway {
     return this._http.post<void>(`/api/restore/${restoreId}/cancel`, null);
   }
 
-  override browseFolders(path?: string): Observable<FolderListing> {
+  override browseFolders(path?: string, options?: BrowseOptions): Observable<FolderListing> {
     // Sin ruta, el proceso local devuelve por dónde se empieza: los sitios
     // conocidos del usuario y las unidades.
-    return this._http.get<FolderListing>('/api/folders', {
-      params: path ? { path } : {},
-    });
+    const params: Record<string, string> = path ? { path } : {};
+
+    if (options?.files?.length) {
+      params['files'] = options.files.join(',');
+    }
+
+    if (options?.marker) {
+      params['marker'] = options.marker;
+    }
+
+    return this._http.get<FolderListing>('/api/folders', { params });
   }
 
   override resolveFolderTarget(folder: string, name: string): Observable<FolderTarget> {

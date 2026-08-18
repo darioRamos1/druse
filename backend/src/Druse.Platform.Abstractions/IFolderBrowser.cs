@@ -23,6 +23,43 @@ public sealed record FolderEntry
     public required string Path { get; init; }
 
     public FolderKind Kind { get; init; }
+
+    /// <summary>
+    /// La carpeta lleva dentro el archivo que se pidió como señal.
+    ///
+    /// Es lo que distingue «una carpeta cualquiera» de «un respaldo»: un respaldo
+    /// por carpetas se elige entero, y sin marcarlo habría que entrar en cada una
+    /// a ver si dentro está el manifiesto.
+    /// </summary>
+    public bool Marked { get; init; }
+}
+
+/// <summary>Un archivo que se puede elegir para abrirlo.</summary>
+public sealed record FileEntry
+{
+    public required string Name { get; init; }
+
+    public required string Path { get; init; }
+
+    /// <summary>Tamaño en bytes. Es lo que distingue un respaldo de su borrador.</summary>
+    public long Size { get; init; }
+
+    public DateTimeOffset ModifiedUtc { get; init; }
+}
+
+/// <summary>Qué se quiere ver al listar una carpeta.</summary>
+public sealed record FolderQuery
+{
+    /// <summary>
+    /// Extensiones de archivo que se enumeran, sin el punto.
+    ///
+    /// Vacío es lo normal —para guardar no hacen falta los archivos— y con algo
+    /// dentro se está eligiendo qué abrir.
+    /// </summary>
+    public IReadOnlyList<string> Extensions { get; init; } = [];
+
+    /// <summary>Archivo cuya presencia marca una subcarpeta, si se quiere marcar.</summary>
+    public string? Marker { get; init; }
 }
 
 /// <summary>
@@ -41,6 +78,9 @@ public sealed record FolderListing
     public string? Parent { get; init; }
 
     public IReadOnlyList<FolderEntry> Folders { get; init; } = [];
+
+    /// <summary>Los archivos que se pidieron, si es que se pidió alguno.</summary>
+    public IReadOnlyList<FileEntry> Files { get; init; } = [];
 
     /// <summary>Si se puede escribir aquí. Es lo que decide si se puede elegir.</summary>
     public bool CanWrite { get; init; }
@@ -73,10 +113,11 @@ public sealed record FolderTarget
 /// en el navegador la única forma de decir dónde va un respaldo es teclear la
 /// ruta entera y acertar.
 ///
-/// Solo enumera **carpetas**, nunca archivos: para elegir dónde guardar no hacen
-/// falta, y no enseñar lo que no se necesita es la forma barata de no enseñar de
-/// más. La API que lo publica escucha en loopback y exige token, igual que todo
-/// lo demás.
+/// Por omisión enumera **solo carpetas**: para elegir dónde guardar los archivos
+/// no hacen falta, y no enseñar lo que no se necesita es la forma barata de no
+/// enseñar de más. Los archivos se piden aparte y **por extensión**, que es el
+/// otro caso: elegir el respaldo que se va a restaurar. La API que lo publica
+/// escucha en loopback y exige token, igual que todo lo demás.
 /// </summary>
 public interface IFolderBrowser
 {
@@ -91,8 +132,15 @@ public interface IFolderBrowser
     /// </summary>
     FolderListing Roots();
 
-    /// <summary>Las subcarpetas de una ruta.</summary>
-    FolderListing List(string path);
+    /// <summary>
+    /// Lo que hay en una ruta.
+    ///
+    /// Por omisión solo las carpetas, que es lo que hace falta para guardar. Con
+    /// una consulta se piden además los archivos de ciertas extensiones —para
+    /// elegir cuál abrir— y que se marquen las carpetas que llevan dentro un
+    /// archivo concreto.
+    /// </summary>
+    FolderListing List(string path, FolderQuery? query = null);
 
     /// <summary>Crea una carpeta dentro de otra y devuelve dónde quedó.</summary>
     FolderTarget Create(string parent, string name);

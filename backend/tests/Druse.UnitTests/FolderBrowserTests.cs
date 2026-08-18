@@ -77,6 +77,65 @@ public sealed class FolderBrowserTests : IDisposable
         Assert.Equal(["carpeta"], listing.Folders.Select(folder => folder.Name));
     }
 
+    /// <summary>
+    /// El otro caso: elegir el respaldo que se va a restaurar. Ahí sí hacen falta
+    /// los archivos, pero solo los que pueden serlo.
+    /// </summary>
+    [Fact]
+    public void ConExtensionesSeEnumeranSoloEsosArchivos()
+    {
+        File.WriteAllText(Path.Combine(_root, "tienda.sql"), "-- respaldo");
+        File.WriteAllText(Path.Combine(_root, "tienda.zip"), "PK");
+        File.WriteAllText(Path.Combine(_root, "notas.txt"), "nada que ver");
+
+        var listing = _browser.List(_root, new FolderQuery { Extensions = ["sql", "zip"] });
+
+        Assert.Equal(
+            ["tienda.sql", "tienda.zip"],
+            listing.Files.Select(file => file.Name).Order());
+    }
+
+    /// <summary>
+    /// El respaldo que se busca casi siempre es el último; por nombre quedaría
+    /// escondido entre los de hace seis meses.
+    /// </summary>
+    [Fact]
+    public void LosArchivosSalenDelMasRecienteAlMasViejo()
+    {
+        var viejo = Path.Combine(_root, "a-enero.sql");
+        var nuevo = Path.Combine(_root, "z-agosto.sql");
+
+        File.WriteAllText(viejo, "-- de enero");
+        File.WriteAllText(nuevo, "-- de agosto");
+
+        File.SetLastWriteTimeUtc(viejo, new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc));
+        File.SetLastWriteTimeUtc(nuevo, new DateTime(2026, 8, 1, 0, 0, 0, DateTimeKind.Utc));
+
+        var listing = _browser.List(_root, new FolderQuery { Extensions = ["sql"] });
+
+        Assert.Equal(["z-agosto.sql", "a-enero.sql"], listing.Files.Select(file => file.Name));
+    }
+
+    /// <summary>
+    /// Un respaldo por carpetas se elige entero. Sin marcarlo habría que entrar en
+    /// cada carpeta a comprobar si dentro está el manifiesto.
+    /// </summary>
+    [Fact]
+    public void SeMarcaLaCarpetaQueLlevaDentroElArchivoSeñalado()
+    {
+        var respaldo = Path.Combine(_root, "tienda");
+        var cualquiera = Path.Combine(_root, "fotos");
+
+        Directory.CreateDirectory(respaldo);
+        Directory.CreateDirectory(cualquiera);
+        File.WriteAllText(Path.Combine(respaldo, "manifest.json"), "{}");
+
+        var listing = _browser.List(_root, new FolderQuery { Marker = "manifest.json" });
+
+        Assert.True(listing.Folders.Single(folder => folder.Name == "tienda").Marked);
+        Assert.False(listing.Folders.Single(folder => folder.Name == "fotos").Marked);
+    }
+
     [Fact]
     public void UnaCarpetaQueNoExisteSeDice()
     {

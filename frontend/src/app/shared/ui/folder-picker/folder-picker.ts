@@ -11,15 +11,20 @@ import {
   signal,
   untracked,
 } from '@angular/core';
+import { DatePipe } from '@angular/common';
 import { firstValueFrom } from 'rxjs';
 
 import {
   ApplicationGateway,
+  FileEntry,
   FolderEntry,
   FolderListing,
   FolderTarget,
 } from '../../../core/application-gateway/application-gateway';
 import { Icon } from '../icon/icon';
+
+/** Para qué se abre el selector: para guardar algo o para abrir algo que ya está. */
+export type FolderPickerMode = 'save' | 'open';
 
 /** Cuánto se espera desde la última tecla antes de preguntar por el nombre. */
 const TYPING_PAUSE = 250;
@@ -40,12 +45,32 @@ const TYPING_PAUSE = 250;
 @Component({
   selector: 'app-folder-picker',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [Icon],
+  imports: [DatePipe, Icon],
   templateUrl: './folder-picker.html',
   styleUrl: './folder-picker.scss',
 })
 export class FolderPicker implements OnDestroy {
   private readonly _gateway = inject(ApplicationGateway);
+
+  /**
+   * Qué se está haciendo.
+   *
+   * Al **guardar** se compone una ruta nueva: carpeta más nombre. Al **abrir** se
+   * elige algo que ya existe, y entonces no hay nombre que escribir sino
+   * archivos que enseñar.
+   */
+  readonly mode = input<FolderPickerMode>('save');
+
+  /** Extensiones que se enumeran al abrir, sin el punto. */
+  readonly extensions = input<readonly string[]>([]);
+
+  /**
+   * Archivo que, dentro de una carpeta, la señala como elegible.
+   *
+   * Un respaldo por carpetas se elige entero, y sin esto habría que entrar en
+   * cada carpeta a comprobar si dentro está su manifiesto.
+   */
+  readonly marker = input('');
 
   /** Dónde se abre. Sin ella empieza por los sitios conocidos y las unidades. */
   readonly startPath = input<string | null>(null);
@@ -77,6 +102,9 @@ export class FolderPicker implements OnDestroy {
 
   protected readonly target = signal<FolderTarget | null>(null);
 
+  /** El archivo señalado en la lista, mientras no se acepte. */
+  protected readonly selected = signal<FileEntry | null>(null);
+
   /** Nombre de la carpeta que se está creando, o `null` si no se está creando. */
   protected readonly creating = signal<string | null>(null);
 
@@ -107,8 +135,18 @@ export class FolderPicker implements OnDestroy {
   /** La carpeta donde se guardaría, o vacío mientras se está en las raíces. */
   protected readonly folder = computed(() => this.listing()?.path ?? '');
 
-  /** En las raíces no se puede guardar: hay que entrar en algún sitio. */
+  /**
+   * Si se puede aceptar lo que hay elegido.
+   *
+   * Al abrir, hace falta un archivo señalado. Al guardar, una carpeta donde se
+   * pueda escribir y un nombre: en las raíces no se puede guardar, hay que
+   * entrar en algún sitio.
+   */
   protected readonly canAccept = computed(() => {
+    if (this.mode() === 'open') {
+      return this.selected() !== null;
+    }
+
     const target = this.target();
 
     return (
@@ -119,12 +157,23 @@ export class FolderPicker implements OnDestroy {
     );
   });
 
+  /** Al abrir, la carpeta actual también puede ser la respuesta. */
+  protected readonly canUseFolder = computed(
+    () => this.mode() === 'open' && this.folder().length > 0,
+  );
+
   protected async open(path: string | null): Promise<void> {
     this.loading.set(true);
     this.creating.set(null);
+    this.selected.set(null);
 
     try {
-      const listing = await firstValueFrom(this._gateway.browseFolders(path ?? undefined));
+      const listing = await firstValueFrom(
+        this._gateway.browseFolders(path ?? undefined, {
+          files: this.extensions(),
+          marker: this.marker() || undefined,
+        }),
+      );
 
       this.listing.set(listing);
     } catch {
@@ -135,6 +184,7 @@ export class FolderPicker implements OnDestroy {
         parent: null,
         separator: '/',
         folders: [],
+        files: [],
         canWrite: false,
         error: 'No se pudo leer esa carpeta.',
       });
@@ -169,8 +219,45 @@ export class FolderPicker implements OnDestroy {
     this._pending = setTimeout(() => void this.resolve(), TYPING_PAUSE);
   }
 
+  protected select(file: FileEntry): void {
+    // Al guardar, pinchar un archivo que ya está **copia su nombre**: es como se
+    // sobrescribe el respaldo de la semana pasada sin volver a teclearlo. Que
+    // exista ya lo dice el aviso de debajo, así que no hace falta impedirlo.
+    if (this.mode() === 'save') {
+      this.name.set(file.name);
+      void this.resolve();
+
+      return;
+    }
+
+    this.selected.set(file);
+  }
+
+  /** Un tamaño en bytes, dicho como lo diría una persona. */
+  protected sizeLabel(bytes: number): string {
+    if (bytes < 1024) {
+      return `${bytes} B`;
+    }
+
+    const units = ['KB', 'MB', 'GB', 'TB'];
+    let size = bytes / 1024;
+    let unit = 0;
+
+    while (size >= 1024 && unit < units.length - 1) {
+      size /= 1024;
+      unit++;
+    }
+
+    return `${size.toFixed(size >= 10 ? 0 : 1)} ${units[unit]}`;
+  }
+
   /** Qué saldría de unir la carpeta actual con el nombre escrito. */
   protected async resolve(): Promise<void> {
+    // Al abrir no hay nada que componer: lo que se elige ya existe.
+    if (this.mode() === 'open') {
+      return;
+    }
+
     const folder = this.folder();
     const name = this.name().trim();
 
@@ -225,13 +312,32 @@ export class FolderPicker implements OnDestroy {
   }
 
   protected accept(): void {
-    const target = this.target();
-
-    if (!this.canAccept() || !target) {
+    if (!this.canAccept()) {
       return;
     }
 
-    this.chosen.emit(target.path);
+    if (this.mode() === 'open') {
+      const file = this.selected();
+
+      if (file) {
+        this.chosen.emit(file.path);
+      }
+
+      return;
+    }
+
+    const target = this.target();
+
+    if (target) {
+      this.chosen.emit(target.path);
+    }
+  }
+
+  /** Elige la carpeta en la que se está, que es como se abre un respaldo por carpetas. */
+  protected useFolder(): void {
+    if (this.canUseFolder()) {
+      this.chosen.emit(this.folder());
+    }
   }
 
   protected cancel(): void {

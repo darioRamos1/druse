@@ -43,7 +43,7 @@ public sealed class FolderBrowser(IAppPaths paths) : IFolderBrowser
         };
     }
 
-    public FolderListing List(string path)
+    public FolderListing List(string path, FolderQuery? query = null)
     {
         if (string.IsNullOrWhiteSpace(path))
         {
@@ -80,6 +80,7 @@ public sealed class FolderBrowser(IAppPaths paths) : IFolderBrowser
                     Name = Path.GetFileName(child),
                     Path = child,
                     Kind = FolderKind.Folder,
+                    Marked = Marked(child, query?.Marker),
                 });
             }
 
@@ -94,6 +95,7 @@ public sealed class FolderBrowser(IAppPaths paths) : IFolderBrowser
                 Path = full,
                 Parent = ParentOf(full),
                 Folders = folders,
+                Files = Files(full, query),
                 CanWrite = Writable(full),
             };
         }
@@ -179,6 +181,80 @@ public sealed class FolderBrowser(IAppPaths paths) : IFolderBrowser
                 ? null
                 : $"No se puede escribir en «{directory}».",
         };
+    }
+
+    /// <summary>
+    /// Los archivos de las extensiones que se hayan pedido.
+    ///
+    /// Sin extensiones no se enumera ninguno: quien está eligiendo dónde guardar
+    /// no necesita verlos, y una carpeta de descargas con mil archivos dentro
+    /// convertiría la lista en un pajar.
+    ///
+    /// Van **de más reciente a más antiguo**: el respaldo que se busca casi
+    /// siempre es el último, y ordenarlos por nombre lo escondería entre los de
+    /// hace seis meses.
+    /// </summary>
+    private static List<FileEntry> Files(string directory, FolderQuery? query)
+    {
+        if (query is null || query.Extensions.Count == 0)
+        {
+            return [];
+        }
+
+        var wanted = new HashSet<string>(
+            query.Extensions.Select(extension => $".{extension.TrimStart('.')}"),
+            StringComparer.OrdinalIgnoreCase);
+
+        var files = new List<FileEntry>();
+
+        try
+        {
+            foreach (var file in Directory.EnumerateFiles(directory))
+            {
+                if (!wanted.Contains(Path.GetExtension(file)) || Hidden(file))
+                {
+                    continue;
+                }
+
+                var info = new FileInfo(file);
+
+                files.Add(new FileEntry
+                {
+                    Name = info.Name,
+                    Path = info.FullName,
+                    Size = info.Length,
+                    ModifiedUtc = info.LastWriteTimeUtc,
+                });
+            }
+        }
+        catch (Exception error) when (error is UnauthorizedAccessException or IOException)
+        {
+            // Las carpetas ya se han leído: quedarse sin los archivos no vacía la
+            // lista, solo deja de ofrecer lo que no se puede mirar.
+            return files;
+        }
+
+        files.Sort((left, right) => right.ModifiedUtc.CompareTo(left.ModifiedUtc));
+
+        return files;
+    }
+
+    /// <summary>Si la carpeta lleva dentro el archivo que la señala.</summary>
+    private static bool Marked(string directory, string? marker)
+    {
+        if (string.IsNullOrWhiteSpace(marker))
+        {
+            return false;
+        }
+
+        try
+        {
+            return File.Exists(Path.Combine(directory, marker));
+        }
+        catch (Exception error) when (error is UnauthorizedAccessException or IOException or ArgumentException)
+        {
+            return false;
+        }
     }
 
     private static FolderTarget Invalid(string folder, string problem) => new()

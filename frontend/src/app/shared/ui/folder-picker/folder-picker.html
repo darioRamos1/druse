@@ -24,10 +24,12 @@
       {{ folder() || 'Este equipo' }}
     </span>
 
-    <button type="button" class="ghost" [disabled]="folder() === ''" (click)="startCreating()">
-      <app-icon name="plus" />
-      Nueva carpeta
-    </button>
+    @if (mode() === 'save') {
+      <button type="button" class="ghost" [disabled]="folder() === ''" (click)="startCreating()">
+        <app-icon name="plus" />
+        Nueva carpeta
+      </button>
+    }
   </div>
 
   <div class="list" role="listbox">
@@ -59,12 +61,40 @@
         <button type="button" class="row" (click)="enter(folder)">
           <app-icon [name]="folder.kind === 'Drive' ? 'database' : 'folder-open'" />
           <span class="row__name">{{ folder.name }}</span>
-          @if (folder.kind === 'Known') {
+
+          <!--
+            Un respaldo por carpetas se elige entero, así que la carpeta que lo
+            contiene se marca: si no, habría que entrar en cada una a mirar.
+          -->
+          @if (folder.marked) {
+            <span class="row__tag row__tag--marked">respaldo</span>
+          } @else if (folder.kind === 'Known') {
             <span class="row__tag">acceso rápido</span>
           }
         </button>
-      } @empty {
-        @if (!current.error) {
+      }
+
+      @for (file of current.files ?? []; track file.path) {
+        <button
+          type="button"
+          class="row row--file"
+          [class.is-selected]="selected()?.path === file.path"
+          (click)="select(file)"
+          (dblclick)="select(file); accept()"
+          [title]="mode() === 'save' ? 'Usar este nombre' : 'Abrir este respaldo'"
+        >
+          <app-icon name="save" />
+          <span class="row__name">{{ file.name }}</span>
+          <span class="row__meta">
+            {{ sizeLabel(file.size) }} · {{ file.modifiedUtc | date: 'short' }}
+          </span>
+        </button>
+      }
+
+      @if (current.folders.length === 0 && (current.files ?? []).length === 0 && !current.error) {
+        @if (mode() === 'open') {
+          <p class="empty">Aquí no hay respaldos ni carpetas.</p>
+        } @else {
           <p class="empty">Aquí no hay carpetas. Puedes guardar en esta misma.</p>
         }
       }
@@ -72,39 +102,56 @@
   </div>
 
   <div class="foot">
-    <label class="field">
-      <span class="field__label">{{ nameLabel() }}</span>
-      <input
-        type="text"
-        [value]="name()"
-        [attr.placeholder]="suggestedName()"
-        (input)="rename($any($event.target).value)"
-        (blur)="resolve()"
-      />
-    </label>
+    @if (mode() === 'save') {
+      <label class="field">
+        <span class="field__label">{{ nameLabel() }}</span>
+        <input
+          type="text"
+          [value]="name()"
+          [attr.placeholder]="suggestedName()"
+          (input)="rename($any($event.target).value)"
+          (blur)="resolve()"
+        />
+      </label>
 
-    <!--
-      La ruta final se enseña montada, con la misma barra que usa el sistema. Es
-      la única forma de que el usuario confirme que va donde cree que va.
-    -->
-    @if (target(); as destination) {
-      <p class="result" [class.result--bad]="destination.problem">
-        <span class="result__path">{{ destination.path }}</span>
+      <!--
+        La ruta final se enseña montada, con la misma barra que usa el sistema. Es
+        la única forma de que el usuario confirme que va donde cree que va.
+      -->
+      @if (target(); as destination) {
+        <p class="result" [class.result--bad]="destination.problem">
+          <span class="result__path">{{ destination.path }}</span>
 
-        @if (destination.problem) {
-          <span class="result__note">{{ destination.problem }}</span>
-        } @else if (destination.exists) {
-          <span class="result__note">Ya existe: se sobrescribiría.</span>
-        }
-      </p>
-    } @else if (folder() === '') {
-      <p class="result">Entra en una carpeta para poder guardar aquí.</p>
+          @if (destination.problem) {
+            <span class="result__note">{{ destination.problem }}</span>
+          } @else if (destination.exists) {
+            <span class="result__note">Ya existe: se sobrescribiría.</span>
+          }
+        </p>
+      } @else if (folder() === '') {
+        <p class="result">Entra en una carpeta para poder guardar aquí.</p>
+      }
+    } @else {
+      @if (selected(); as file) {
+        <p class="result">
+          <span class="result__path">{{ file.path }}</span>
+        </p>
+      } @else {
+        <p class="result">
+          Elige un archivo, o entra en la carpeta del respaldo y úsala tal cual.
+        </p>
+      }
     }
 
     <div class="actions">
       <button type="button" class="ghost" (click)="cancel()">Cancelar</button>
+
+      @if (canUseFolder()) {
+        <button type="button" class="ghost" (click)="useFolder()">Usar esta carpeta</button>
+      }
+
       <button type="button" class="primary" [disabled]="!canAccept()" (click)="accept()">
-        Usar esta ruta
+        {{ mode() === 'open' ? 'Abrir' : 'Usar esta ruta' }}
       </button>
     </div>
   </div>

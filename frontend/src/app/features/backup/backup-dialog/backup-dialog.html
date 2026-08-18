@@ -502,6 +502,7 @@
 @if (picking()) {
   <app-folder-picker
     title="Dónde se guarda el respaldo"
+    [extensions]="['sql', 'zip']"
     [startPath]="pickerStart()"
     [suggestedName]="pickerName()"
     [nameLabel]="pickerLabel()"

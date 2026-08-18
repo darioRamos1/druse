@@ -98,6 +98,11 @@
           (input)="path.set($any($event.target).value)"
         />
 
+        <!--
+          En el envoltorio se pregunta si se busca un archivo o una carpeta: un
+          diálogo de archivos no deja elegir una carpeta y al revés tampoco. En el
+          navegador el selector propio enseña las dos cosas a la vez.
+        -->
         @if (canChoose()) {
           <button type="button" class="ghost" (click)="choose(false)">
             <app-icon name="folder-open" />
@@ -106,6 +111,11 @@
           <button type="button" class="ghost" (click)="choose(true)">
             <app-icon name="folder-open" />
             Carpeta
+          </button>
+        } @else {
+          <button type="button" class="ghost" (click)="picking.set(true)">
+            <app-icon name="folder-open" />
+            Buscar…
           </button>
         }
 
@@ -222,3 +232,20 @@
     </footer>
   }
 </div>
+
+<!--
+  El selector del navegador, en modo abrir: enseña los `.sql` y `.zip` y marca
+  las carpetas que llevan dentro un manifiesto, que son las que se pueden
+  restaurar enteras.
+-->
+@if (picking()) {
+  <app-folder-picker
+    mode="open"
+    title="Elegir el respaldo que se aplica"
+    [extensions]="['sql', 'zip']"
+    marker="manifest.json"
+    [startPath]="pickerStart()"
+    (chosen)="use($event)"
+    (cancelled)="picking.set(false)"
+  />
+}

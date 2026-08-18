@@ -3,6 +3,7 @@ import { ChangeDetectionStrategy, Component, computed, inject, input, output, si
 import { DesktopHost } from '../../../core/application-gateway/desktop-host';
 import { RestoreStore, outcomeLabel } from '../../../core/backup/restore.store';
 import { ExplorerNode } from '../../../shared/models/workspace';
+import { FolderPicker } from '../../../shared/ui/folder-picker/folder-picker';
 import { Icon } from '../../../shared/ui/icon/icon';
 import { OperationProgress } from '../../../shared/ui/operation-progress/operation-progress';
 
@@ -21,7 +22,7 @@ import { OperationProgress } from '../../../shared/ui/operation-progress/operati
 @Component({
   selector: 'app-restore-dialog',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [Icon, OperationProgress],
+  imports: [FolderPicker, Icon, OperationProgress],
   templateUrl: './restore-dialog.html',
   styleUrl: './restore-dialog.scss',
 })
@@ -41,7 +42,11 @@ export class RestoreDialog {
 
   protected readonly outcomeLabel = outcomeLabel;
 
+  /** Dentro del envoltorio hay diálogos del sistema; fuera, el selector propio. */
   protected readonly canChoose = computed(() => this._desktop.isDesktop);
+
+  /** Si está abierto el selector propio, el del navegador. */
+  protected readonly picking = signal(false);
 
   /** Lo que el artefacto dice de sí mismo, cuando ya se ha mirado. */
   protected readonly inspection = this.store.inspection;
@@ -68,9 +73,28 @@ export class RestoreDialog {
     const chosen = await this._desktop.chooseRestoreSource(folder);
 
     if (chosen) {
-      this.path.set(chosen);
-      await this.inspect();
+      await this.use(chosen);
     }
+  }
+
+  /**
+   * Dónde abrir el selector: la carpeta de lo último que se escribió.
+   *
+   * Quien vuelve a restaurar suele hacerlo desde el mismo sitio, y empezar otra
+   * vez en «Este equipo» obligaría a rehacer el camino entero.
+   */
+  protected readonly pickerStart = computed(() => {
+    const separator = Math.max(this.path().lastIndexOf('/'), this.path().lastIndexOf('\\'));
+
+    return separator > 0 ? this.path().slice(0, separator) : null;
+  });
+
+  /** Toma la ruta elegida y la mira en el acto: es lo que se iba a hacer. */
+  protected async use(path: string): Promise<void> {
+    this.picking.set(false);
+    this.path.set(path);
+
+    await this.inspect();
   }
 
   protected inspect(): Promise<void> {

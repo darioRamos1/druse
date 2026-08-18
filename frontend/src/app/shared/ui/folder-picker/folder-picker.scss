@@ -134,6 +134,26 @@
   font-size: 10.5px;
 }
 
+/* Lo que distingue un respaldo de una carpeta cualquiera, de un vistazo. */
+.row__tag--marked {
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--dr-surface-raised);
+  color: var(--dr-accent);
+}
+
+.row__meta {
+  margin-left: auto;
+  color: var(--dr-text-secondary);
+  font-size: 10.5px;
+  white-space: nowrap;
+}
+
+.row--file.is-selected {
+  background: var(--dr-surface-raised);
+  outline: 1px solid var(--dr-accent);
+}
+
 .new-name {
   flex: 1;
   padding: 5px 8px;
