@@ -13,11 +13,17 @@
 <button
   type="button"
   class="btn"
-  [disabled]="running() || !hasSelection() || !canExecute()"
+  [disabled]="running() || !canExecute()"
+  [attr.title]="
+    hasSelection()
+      ? 'Ejecuta solo lo seleccionado'
+      : 'Ejecuta la instrucción donde está el cursor'
+  "
   (click)="executeSelection.emit()"
 >
   <app-icon name="play-outline" [size]="11" />
-  Ejecutar selección
+  Ejecutar actual
+  <kbd class="btn__shortcut">⇧⌘⏎</kbd>
 </button>
 
 <button type="button" class="btn" [disabled]="!running()" (click)="cancel.emit()">

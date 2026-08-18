@@ -146,6 +146,15 @@
     cursor: default;
   }
 
+  // El mismo atajo a la vista que en «Ejecutar»: es la única forma de que se
+  // descubra que existe sin ir a buscarlo.
+  &__shortcut {
+    margin-left: 2px;
+    font-family: var(--dr-font-mono);
+    font-size: 10px;
+    opacity: 0.7;
+  }
+
   &--commit {
     border-color: var(--dr-success-line-soft);
     background: var(--dr-success-tint);

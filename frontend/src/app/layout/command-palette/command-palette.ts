@@ -47,6 +47,9 @@ export default class CommandPalette implements AfterViewInit {
   readonly newConnection = output<void>();
   readonly newQuery = output<void>();
   readonly executeQuery = output<void>();
+
+  /** Ejecutar solo la instrucción del cursor, o la selección si la hay. */
+  readonly executeCurrent = output<void>();
   readonly formatQuery = output<void>();
   readonly showHistory = output<void>();
   readonly activateConnection = output<string>();
@@ -63,6 +66,12 @@ export default class CommandPalette implements AfterViewInit {
       { id: 'new-query', kind: 'command', label: 'Nueva consulta', hint: 'Ctrl+T' },
       { id: 'new-connection', kind: 'command', label: 'Nueva conexión', hint: 'Crear perfil' },
       { id: 'execute', kind: 'command', label: 'Ejecutar consulta activa', hint: 'Ctrl+Enter' },
+      {
+        id: 'execute-current',
+        kind: 'command',
+        label: 'Ejecutar instrucción actual',
+        hint: 'Ctrl+Shift+Enter',
+      },
       { id: 'format', kind: 'command', label: 'Formatear SQL', hint: 'Ctrl+Shift+F' },
       { id: 'history', kind: 'command', label: 'Abrir historial', hint: 'Consultas anteriores' },
     ];
@@ -150,6 +159,9 @@ export default class CommandPalette implements AfterViewInit {
           return;
         case 'execute':
           this.executeQuery.emit();
+          break;
+        case 'execute-current':
+          this.executeCurrent.emit();
           break;
         case 'format':
           this.formatQuery.emit();

@@ -819,9 +819,20 @@ export class AppShell {
     void this.runQuery(this.sql(), 0);
   }
 
-  /** Ejecuta solo lo seleccionado, sin alterar el contenido de la pestaña. */
+  /**
+   * Ejecuta un trozo de la pestaña, sin alterar su contenido.
+   *
+   * Con selección, lo seleccionado. Sin ella, **la instrucción donde está el
+   * cursor**: es lo que se espera de un editor con varias consultas dentro, y
+   * antes obligaba a resaltarla a mano cada vez.
+   *
+   * Se le pregunta al editor porque el cursor es suyo. El shell solo guarda la
+   * última selección, que no basta: el cursor se mueve sin seleccionar nada.
+   */
   protected executeSelection(): void {
-    void this.runQuery(this._selection.text, this._selection.startOffset);
+    const fragment = this._editor()?.activeFragment() ?? this._selection;
+
+    void this.runQuery(fragment.text, fragment.startOffset);
   }
 
   protected cancel(): void {

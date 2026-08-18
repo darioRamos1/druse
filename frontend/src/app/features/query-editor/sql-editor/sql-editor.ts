@@ -24,6 +24,7 @@ import { registerSqlCompletion } from '../sql-language/sql-completion';
 import { findProblems } from '../sql-language/sql-diagnostics';
 import { registerSqlHover } from '../sql-language/sql-hover';
 import { formatSql } from '../sql-language/sql-formatting';
+import { statementAt } from '../sql-language/sql-statements';
 import {
   DEFAULT_FORMAT_SETTINGS,
   FormatSettings,
@@ -282,6 +283,44 @@ export default class SqlEditor implements OnInit {
   }
 
   /**
+   * Lo que ejecuta «Ejecutar actual»: la selección, o la instrucción del cursor.
+   *
+   * Se calcula aquí y no en el shell porque hace falta el cursor, y el cursor es
+   * de Monaco. Y se calcula al pedirlo y no en cada tecla: recorrer el texto en
+   * cada pulsación sería pagar por algo que se usa al ejecutar.
+   *
+   * Devuelve una selección vacía cuando no hay nada que ejecutar; quien llama ya
+   * sabe qué decir en ese caso.
+   */
+  activeFragment(): EditorSelection {
+    const editor = this._editor;
+    const model = editor?.getModel();
+
+    if (!editor || !model) {
+      return { hasSelection: false, text: '', startOffset: 0 };
+    }
+
+    const selection = editor.getSelection();
+
+    if (selection && !selection.isEmpty()) {
+      return {
+        hasSelection: true,
+        text: model.getValueInRange(selection),
+        startOffset: model.getOffsetAt(selection.getStartPosition()),
+      };
+    }
+
+    const position = editor.getPosition();
+    const statement = position
+      ? statementAt(model.getValue(), model.getOffsetAt(position))
+      : null;
+
+    return statement
+      ? { hasSelection: false, text: statement.text, startOffset: statement.startOffset }
+      : { hasSelection: false, text: '', startOffset: 0 };
+  }
+
+  /**
    * Formatea el contenido, o solo la selección si la hay.
    *
    * Se hace a través del editor y no cambiando el texto desde fuera para que la
@@ -481,9 +520,10 @@ export default class SqlEditor implements OnInit {
       editor.onDidChangeCursorSelection((event) => {
         const empty = event.selection.isEmpty();
 
-        // Se emite el texto y no solo si hay selección: «Ejecutar selección»
-        // necesita exactamente lo que el usuario marcó, sin volver a pedírselo
-        // al editor desde fuera.
+        // Se emite el texto y no solo si hay selección: quien la ejecute
+        // necesita exactamente lo que el usuario marcó. Lo que hace falta al
+        // pulsar «Ejecutar actual» sale de `activeFragment()`, que además sabe
+        // dónde está el cursor cuando no hay nada marcado.
         const model = editor.getModel();
         const text = empty ? '' : (model?.getValueInRange(event.selection) ?? '');
         const startOffset = model?.getOffsetAt(event.selection.getStartPosition()) ?? 0;
