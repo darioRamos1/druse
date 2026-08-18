@@ -273,10 +273,19 @@ ServiceFabricBackup/
 # para el código. Se llevaba por delante, en silencio, las carpetas de la función
 # de respaldos: un `git add` normal las daba por ignoradas y el servicio se quedó
 # fuera de su commit.
+#
+# Y no basta con desexcluir la carpeta: `Backup*/` vuelve a atrapar cualquier
+# subcarpeta que empiece por «backup», que es justo como se llama la del
+# asistente. Por eso las excepciones bajan con `/**` en lugar de quedarse en el
+# primer nivel.
 !backend/src/Druse.Application/Backups/
+!backend/src/Druse.Application/Backups/**
 !backend/src/Druse.Infrastructure/Backups/
+!backend/src/Druse.Infrastructure/Backups/**
 !frontend/src/app/core/backup/
+!frontend/src/app/core/backup/**
 !frontend/src/app/features/backup/
+!frontend/src/app/features/backup/**
 
 # SQL Server files
 *.mdf

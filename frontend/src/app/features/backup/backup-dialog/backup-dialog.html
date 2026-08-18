@@ -1,0 +1,372 @@
+<div class="backdrop" (click)="close()"></div>
+
+<div class="dialog" role="dialog" aria-modal="true" aria-labelledby="backup-title">
+  <header class="head">
+    <div>
+      <h2 class="title" id="backup-title">Respaldar {{ target().label }}</h2>
+      <p class="subtitle">
+        Eliges qué se lleva y qué no. Antes de escribir nada puedes ver el guion exacto.
+      </p>
+    </div>
+    <button type="button" class="close" (click)="close()" aria-label="Cerrar">×</button>
+  </header>
+
+  <!--
+    Mientras hay un respaldo en marcha, el asistente enseña cómo va. Cerrarlo no
+    lo para: el trabajo vive en el proceso local.
+  -->
+  @if (store.progress(); as progress) {
+    <div class="body body--progress">
+      @if (store.running()) {
+        <app-operation-progress
+          [step]="store.stepLabel()"
+          [subject]="progress.currentObject ?? ''"
+          [overall]="store.overall()"
+          [current]="store.current()"
+          [done]="progress.objectsDone"
+          [total]="progress.objectsTotal"
+          [rowsDone]="progress.rowsDone"
+          [rowsEstimated]="progress.rowsEstimated ?? null"
+          [elapsedMs]="progress.elapsedMilliseconds"
+          (cancelRequested)="cancel()"
+        />
+
+        <p class="hint">
+          Puedes cerrar esta ventana: el respaldo sigue y lo verás en la barra de estado.
+        </p>
+      } @else {
+        <!--
+          El resumen se queda hasta que el usuario lo cierre. Un aviso de tres
+          segundos no sirve para algo que tardó veinte minutos y que quizá acabó
+          sin nadie mirando.
+        -->
+        <div class="result" [class]="'result--' + progress.outcome.toLowerCase()">
+          <h3 class="result__title">{{ outcomeLabel(progress.outcome) }}</h3>
+
+          <dl class="result__facts">
+            <div>
+              <dt>Objetos</dt>
+              <dd>{{ progress.objectsDone }} de {{ progress.objectsTotal }}</dd>
+            </div>
+            <div>
+              <dt>Filas</dt>
+              <dd>{{ progress.totalRows }}</dd>
+            </div>
+            <div>
+              <dt>Duración</dt>
+              <dd>{{ (progress.elapsedMilliseconds / 1000).toFixed(1) }} s</dd>
+            </div>
+            @if (progress.path) {
+              <div class="wide">
+                <dt>Dónde quedó</dt>
+                <dd class="path">{{ progress.path }}</dd>
+              </div>
+            }
+          </dl>
+
+          @if (progress.failure; as failure) {
+            <div class="failure">
+              <p class="failure__what">{{ failure.subject }}: {{ failure.message }}</p>
+              @if (failure.statement) {
+                <pre class="failure__sql">{{ failure.statement }}</pre>
+              }
+            </div>
+          }
+
+          @if (progress.warnings.length > 0) {
+            <ul class="warnings">
+              @for (warning of progress.warnings; track warning.subject + warning.message) {
+                <li><strong>{{ warning.subject }}</strong>: {{ warning.message }}</li>
+              }
+            </ul>
+          }
+        </div>
+      }
+    </div>
+
+    <footer class="foot">
+      @if (!store.running()) {
+        <button type="button" class="ghost" (click)="copyReport()">Copiar informe</button>
+        <span class="spacer"></span>
+        <button type="button" class="primary" (click)="dismiss()">Cerrar</button>
+      } @else {
+        <span class="spacer"></span>
+        <button type="button" class="ghost" (click)="close()">Seguir en segundo plano</button>
+      }
+    </footer>
+  } @else {
+    <nav class="steps" aria-label="Pasos">
+      <button type="button" [class.is-active]="step() === 'what'" (click)="go('what')">
+        1. Qué
+      </button>
+      <button type="button" [class.is-active]="step() === 'data'" (click)="go('data')">
+        2. Datos
+      </button>
+      <button type="button" [class.is-active]="step() === 'how'" (click)="go('how')">
+        3. Cómo
+      </button>
+      <button type="button" [class.is-active]="step() === 'review'" (click)="go('review')">
+        4. Revisar
+      </button>
+    </nav>
+
+    <div class="body">
+      @if (loading()) {
+        <p class="hint">Leyendo el catálogo…</p>
+      } @else if (loadError(); as error) {
+        <p class="error">{{ error }}</p>
+      } @else {
+        @switch (step()) {
+          @case ('what') {
+            <p class="hint">
+              {{ selectedCount() }} de {{ candidates().length }} tablas marcadas.
+            </p>
+
+            <div class="tree">
+              @for (schema of schemas(); track schema) {
+                <div class="tree__schema">
+                  <label class="check">
+                    <input
+                      type="checkbox"
+                      [checked]="schemaState(schema) === 'all'"
+                      [indeterminate]="schemaState(schema) === 'some'"
+                      (change)="toggleSchema(schema)"
+                    />
+                    <app-icon name="schema" />
+                    <span class="name">{{ schema }}</span>
+                  </label>
+
+                  @for (table of tablesOf(schema); track table.key) {
+                    <label class="check check--table">
+                      <input
+                        type="checkbox"
+                        [checked]="isSelected(table.key)"
+                        (change)="toggle(table.key)"
+                      />
+                      <app-icon name="table" />
+                      <span class="name">{{ table.source.name }}</span>
+                      @if (table.rows !== undefined) {
+                        <span class="rows">~{{ table.rows }} filas</span>
+                      }
+                    </label>
+                  }
+                </div>
+              }
+            </div>
+          }
+
+          @case ('data') {
+            <fieldset class="modes">
+              <legend>De todas las tablas</legend>
+
+              @for (mode of ['StructureOnly', 'StructureAndData', 'DataOnly']; track mode) {
+                <label class="radio">
+                  <input
+                    type="radio"
+                    name="dataMode"
+                    [checked]="dataMode() === mode"
+                    (change)="dataMode.set($any(mode))"
+                  />
+                  <span>
+                    @switch (mode) {
+                      @case ('StructureOnly') { Solo estructura }
+                      @case ('StructureAndData') { Estructura y datos }
+                      @default { Solo datos }
+                    }
+                  </span>
+                </label>
+              }
+            </fieldset>
+
+            <p class="hint">
+              Y aquí lo que se sale de esa regla. Es el caso de siempre: todo sin datos,
+              salvo las tablas de catálogo.
+            </p>
+
+            <div class="tree">
+              @for (table of chosen(); track table.key) {
+                <div class="row">
+                  <span class="name">{{ table.key }}</span>
+
+                  <select
+                    class="mode"
+                    [value]="modeOf(table.key)"
+                    (change)="setMode(table.key, $any($event.target).value)"
+                  >
+                    <option value="StructureOnly">Solo estructura</option>
+                    <option value="StructureAndData">Estructura y datos</option>
+                    <option value="DataOnly">Solo datos</option>
+                  </select>
+
+                  @if (modeOf(table.key) !== dataMode()) {
+                    <span class="badge">excepción</span>
+                  }
+                </div>
+              }
+            </div>
+          }
+
+          @case ('how') {
+            <fieldset class="modes">
+              <legend>Cómo se reparte</legend>
+
+              <label class="radio">
+                <input
+                  type="radio"
+                  name="layout"
+                  [checked]="layout() === 'SingleFile'"
+                  [disabled]="dataFormat() === 'Csv'"
+                  (change)="layout.set('SingleFile')"
+                />
+                <span>Un solo archivo .sql</span>
+              </label>
+
+              <label class="radio">
+                <input
+                  type="radio"
+                  name="layout"
+                  [checked]="layout() === 'FolderByKind'"
+                  (change)="layout.set('FolderByKind')"
+                />
+                <span>Carpeta por tipo de objeto</span>
+              </label>
+            </fieldset>
+
+            <fieldset class="modes">
+              <legend>Cómo se escriben las filas</legend>
+
+              <label class="radio">
+                <input
+                  type="radio"
+                  name="dataFormat"
+                  [checked]="dataFormat() === 'Inserts'"
+                  (change)="setDataFormat('Inserts')"
+                />
+                <span>INSERT, listos para ejecutar</span>
+              </label>
+
+              <label class="radio">
+                <input
+                  type="radio"
+                  name="dataFormat"
+                  [checked]="dataFormat() === 'Csv'"
+                  (change)="setDataFormat('Csv')"
+                />
+                <span>CSV por tabla — más rápido y pequeño; exige carpetas</span>
+              </label>
+            </fieldset>
+
+            <label class="check">
+              <input type="checkbox" [checked]="compress()" (change)="compress.set(!compress())" />
+              Empaquetar en un .zip con su manifiesto
+            </label>
+
+            <label class="field">
+              <span class="field__label">Dónde se guarda</span>
+              <div class="path-row">
+                <input
+                  type="text"
+                  [value]="destination()"
+                  [attr.placeholder]="suggestedName()"
+                  (input)="destination.set($any($event.target).value)"
+                />
+                @if (canChoosePath()) {
+                  <button type="button" class="ghost" (click)="choose()">
+                    <app-icon name="folder-open" />
+                    Elegir…
+                  </button>
+                }
+              </div>
+            </label>
+
+            <p class="hint">
+              Lo escribe el proceso local, no el navegador: un respaldo de varios gigabytes
+              no cabe dos veces en memoria.
+            </p>
+          }
+
+          @default {
+            <dl class="result__facts">
+              <div>
+                <dt>Tablas</dt>
+                <dd>{{ selectedCount() }}</dd>
+              </div>
+              <div>
+                <dt>Con datos</dt>
+                <dd>{{ withData() }}</dd>
+              </div>
+              <div>
+                <dt>Forma</dt>
+                <dd>
+                  {{ layout() === 'SingleFile' ? 'Un archivo' : 'Carpeta' }}
+                  @if (compress()) { · comprimida }
+                  @if (dataFormat() === 'Csv') { · datos en CSV }
+                </dd>
+              </div>
+              <div class="wide">
+                <dt>Destino</dt>
+                <dd class="path">{{ destination() || 'sin elegir' }}</dd>
+              </div>
+            </dl>
+
+            @if (exceptions().length > 0) {
+              <p class="hint">
+                {{ exceptions().length }} tabla(s) se salen de la regla general:
+              </p>
+              <ul class="warnings">
+                @for (exception of exceptions(); track exception.key) {
+                  <li><strong>{{ exception.key }}</strong>: {{ exception.mode }}</li>
+                }
+              </ul>
+            }
+
+            @if (!outputValid()) {
+              <p class="error">
+                Los datos en CSV necesitan la salida por carpetas.
+              </p>
+            }
+
+            <div class="preview">
+              <button type="button" class="ghost" [disabled]="!canRun()" (click)="preview()">
+                <app-icon name="eye" />
+                Ver el guion
+              </button>
+
+              @if (store.previewing()) {
+                <p class="hint">Componiendo…</p>
+              } @else if (store.preview(); as preview) {
+                <pre class="sql">{{ preview.statements.join('\n') }}</pre>
+                @if (preview.truncated) {
+                  <p class="hint">Se enseñan las primeras instrucciones; el respaldo llevará más.</p>
+                }
+              }
+            </div>
+
+            @if (store.error(); as error) {
+              <p class="error">{{ error }}</p>
+            }
+          }
+        }
+      }
+    </div>
+
+    <footer class="foot">
+      <button type="button" class="ghost" (click)="close()">Cancelar</button>
+      <span class="spacer"></span>
+
+      @if (step() !== 'review') {
+        <button
+          type="button"
+          class="primary"
+          (click)="go(step() === 'what' ? 'data' : step() === 'data' ? 'how' : 'review')"
+        >
+          Siguiente
+        </button>
+      } @else {
+        <button type="button" class="primary" [disabled]="!canRun()" (click)="run()">
+          Respaldar
+        </button>
+      }
+    </footer>
+  }
+</div>

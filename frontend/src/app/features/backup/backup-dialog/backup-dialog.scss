@@ -1,0 +1,419 @@
+/* Mismo lenguaje que los demás diálogos: un modal centrado sobre el shell. */
+:host {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--dr-font-ui);
+  font-size: var(--dr-font-size-sm);
+}
+
+.backdrop {
+  position: absolute;
+  inset: 0;
+  background: var(--dr-scrim);
+  backdrop-filter: blur(2px);
+}
+
+.dialog {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 760px;
+  max-width: calc(100vw - 32px);
+  max-height: calc(100vh - 32px);
+  overflow: hidden;
+  border: 1px solid var(--dr-border-dialog);
+  border-radius: 12px;
+  background: var(--dr-surface-dialog);
+  box-shadow: var(--dr-shadow-dialog);
+}
+
+.head {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 18px 20px 16px;
+  border-bottom: 1px solid var(--dr-border);
+}
+
+.title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.subtitle {
+  margin: 4px 0 0;
+  color: var(--dr-text-tertiary);
+  font-size: 12px;
+}
+
+.close {
+  margin-left: auto;
+  border: 0;
+  background: transparent;
+  color: var(--dr-text-tertiary);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+
+  &:hover {
+    color: var(--dr-text);
+  }
+}
+
+.steps {
+  display: flex;
+  gap: 4px;
+  padding: 10px 20px 0;
+
+  button {
+    padding: 6px 12px;
+    border: 1px solid transparent;
+    border-radius: 6px 6px 0 0;
+    background: transparent;
+    color: var(--dr-text-muted);
+    font-size: 12px;
+    cursor: pointer;
+
+    &.is-active {
+      border-color: var(--dr-border);
+      border-bottom-color: transparent;
+      background: var(--dr-surface-base);
+      color: var(--dr-text);
+    }
+  }
+}
+
+.body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 12px;
+  overflow-y: auto;
+  padding: 16px 20px;
+
+  &--progress {
+    gap: 16px;
+  }
+}
+
+.hint {
+  margin: 0;
+  color: var(--dr-text-tertiary);
+  font-size: 12px;
+}
+
+.error {
+  margin: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--dr-danger-line-soft);
+  border-radius: 6px;
+  background: var(--dr-danger-tint-weak);
+  color: var(--dr-danger-text);
+  font-size: 12px;
+}
+
+.tree {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 320px;
+  overflow-y: auto;
+  padding: 8px;
+  border: 1px solid var(--dr-border);
+  border-radius: 8px;
+  background: var(--dr-surface-base);
+}
+
+.tree__schema {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 8px;
+}
+
+.check {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 3px 4px;
+  border-radius: 4px;
+  color: var(--dr-text-secondary);
+  cursor: pointer;
+
+  &:hover {
+    background: var(--dr-surface-raised);
+  }
+
+  &--table {
+    padding-left: 22px;
+  }
+}
+
+.name {
+  overflow: hidden;
+  font-family: var(--dr-font-mono);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rows {
+  margin-left: auto;
+  color: var(--dr-text-tertiary);
+  font-size: 11px;
+}
+
+.row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 3px 4px;
+}
+
+.badge {
+  padding: 1px 6px;
+  border: 1px solid var(--dr-warning-line);
+  border-radius: 999px;
+  background: var(--dr-warning-tint);
+  color: var(--dr-warning-text);
+  font-size: 10px;
+}
+
+.modes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--dr-border);
+  border-radius: 8px;
+
+  legend {
+    padding: 0 6px;
+    color: var(--dr-text-muted);
+    font-size: 11px;
+  }
+}
+
+.radio {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  color: var(--dr-text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+
+  &__label {
+    color: var(--dr-text-muted);
+    font-size: 12px;
+  }
+}
+
+.path-row {
+  display: flex;
+  gap: 8px;
+
+  input {
+    flex: 1;
+    min-width: 0;
+  }
+}
+
+input[type='text'],
+select {
+  padding: 5px 8px;
+  border: 1px solid var(--dr-border-subtle);
+  border-radius: 6px;
+  background: var(--dr-surface-base);
+  color: var(--dr-text);
+  font-family: var(--dr-font-mono);
+  font-size: 12px;
+}
+
+.preview {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sql {
+  max-height: 240px;
+  margin: 0;
+  overflow: auto;
+  padding: 10px;
+  border: 1px solid var(--dr-border);
+  border-radius: 8px;
+  background: var(--dr-surface-base);
+  color: var(--dr-text-secondary);
+  font-family: var(--dr-font-mono);
+  font-size: 11px;
+  white-space: pre;
+}
+
+.result {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--dr-border);
+  border-radius: 8px;
+  background: var(--dr-surface-base);
+}
+
+.result__title {
+  margin: 0;
+  font-size: 14px;
+}
+
+/* Correcto con avisos **no** se pinta de verde limpio: lo que hay no es la copia
+   completa que se pidió. */
+.result--completed {
+  border-color: var(--dr-success-line-soft);
+
+  .result__title {
+    color: var(--dr-success);
+  }
+}
+
+.result--completedwithwarnings {
+  border-color: var(--dr-warning-line);
+
+  .result__title {
+    color: var(--dr-warning-text);
+  }
+}
+
+.result--failed {
+  border-color: var(--dr-danger-line-soft);
+
+  .result__title {
+    color: var(--dr-danger-text);
+  }
+}
+
+.result--cancelled .result__title {
+  color: var(--dr-text-muted);
+}
+
+.result__facts {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin: 0;
+
+  div {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .wide {
+    grid-column: 1 / -1;
+  }
+
+  dt {
+    color: var(--dr-text-tertiary);
+    font-size: 11px;
+  }
+
+  dd {
+    margin: 0;
+    color: var(--dr-text);
+    font-size: 12px;
+  }
+}
+
+.path {
+  overflow-wrap: anywhere;
+  font-family: var(--dr-font-mono);
+}
+
+.failure {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.failure__what {
+  margin: 0;
+  color: var(--dr-danger-text);
+  font-size: 12px;
+}
+
+/* La instrucción exacta: sin ella, un «error de sintaxis» no se diagnostica. */
+.failure__sql {
+  margin: 0;
+  overflow-x: auto;
+  padding: 8px;
+  border-radius: 6px;
+  background: var(--dr-surface-raised);
+  font-family: var(--dr-font-mono);
+  font-size: 11px;
+}
+
+.warnings {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--dr-warning-text);
+  font-size: 12px;
+}
+
+.foot {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 12px 20px;
+  border-top: 1px solid var(--dr-border);
+}
+
+.spacer {
+  flex: 1;
+}
+
+.primary,
+.ghost {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  padding: 6px 14px;
+  border-radius: 7px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.primary {
+  border: 1px solid transparent;
+  background: var(--dr-accent-deep, var(--dr-accent));
+  color: #fff;
+
+  &:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+}
+
+.ghost {
+  border: 1px solid var(--dr-border);
+  background: transparent;
+  color: var(--dr-text-secondary);
+
+  &:hover {
+    background: var(--dr-surface-raised);
+  }
+
+  &:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+}
