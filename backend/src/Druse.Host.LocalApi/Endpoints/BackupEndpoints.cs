@@ -133,6 +133,111 @@ internal static class BackupEndpoints
         app.MapPost("/api/backup/{id:guid}/cancel", (Guid id, IBackupTracker tracker) =>
             tracker.Cancel(id) ? Results.Accepted() : Results.NotFound())
         .WithName("CancelBackup");
+
+        MapProfiles(app);
+    }
+
+    /// <summary>
+    /// Los respaldos guardados para repetirlos.
+    ///
+    /// Van bajo `/api/backup/profiles` y no en su propia familia porque son el
+    /// mismo asunto: lo que se guarda es exactamente lo que `run` recibe, con la
+    /// selección todavía sin resolver.
+    /// </summary>
+    private static void MapProfiles(IEndpointRouteBuilder app)
+    {
+        app.MapGet("/api/backup/profiles", async (
+            BackupProfileService profiles,
+            CancellationToken cancellationToken) =>
+        {
+            var all = await profiles.GetAllAsync(cancellationToken);
+
+            return Results.Ok(all.Select(profile => profile.ToDto()));
+        })
+        .WithName("GetBackupProfiles");
+
+        app.MapGet("/api/backup/profiles/{id:guid}", async (
+            Guid id,
+            BackupProfileService profiles,
+            CancellationToken cancellationToken) =>
+        {
+            var profile = await profiles.FindAsync(id, cancellationToken);
+
+            return profile is null ? Results.NotFound() : Results.Ok(profile.ToDto());
+        })
+        .WithName("GetBackupProfile");
+
+        // Guardar y renombrar son la misma operación, y duplicar es guardar sin
+        // identificador: tres botones distintos en la pantalla, un solo camino
+        // aquí, porque lo que cambia entre ellos es qué manda el cliente.
+        app.MapPost("/api/backup/profiles", async (
+            BackupProfileDto request,
+            BackupProfileService profiles,
+            CancellationToken cancellationToken) =>
+        {
+            if (string.IsNullOrWhiteSpace(request.Name))
+            {
+                return Results.Json(
+                    new { message = "El perfil necesita un nombre." },
+                    statusCode: StatusCodes.Status400BadRequest);
+            }
+
+            var existing = request.Id is { } id
+                ? await profiles.FindAsync(id, cancellationToken)
+                : null;
+
+            var profile = request.ToDomain(existing);
+
+            await profiles.SaveAsync(profile, cancellationToken);
+
+            return Results.Ok(profile.ToDto());
+        })
+        .WithName("SaveBackupProfile");
+
+        app.MapDelete("/api/backup/profiles/{id:guid}", async (
+            Guid id,
+            BackupProfileService profiles,
+            CancellationToken cancellationToken) =>
+            await profiles.DeleteAsync(id, cancellationToken)
+                ? Results.NoContent()
+                : Results.NotFound())
+        .WithName("DeleteBackupProfile");
+
+        // Abrir un perfil es resolverlo: qué de lo que pedía existe hoy, qué se
+        // borró y qué ha aparecido dentro de los esquemas que eligió enteros.
+        app.MapPost("/api/backup/profiles/{id:guid}/resolve", async (
+            Guid id,
+            ResolveBackupProfileDto request,
+            BackupProfileService profiles,
+            CancellationToken cancellationToken) =>
+        {
+            var profile = await profiles.FindAsync(id, cancellationToken);
+
+            if (profile is null)
+            {
+                return Results.NotFound();
+            }
+
+            var resolution = await profiles.ResolveAsync(
+                profile,
+                request.SessionId,
+                cancellationToken);
+
+            return Results.Ok(resolution.ToDto());
+        })
+        .WithName("ResolveBackupProfile");
+
+        // Que un perfil se haya lanzado no lo modifica, así que se anota aparte:
+        // guardar el perfil entero al ejecutarlo daría por buenos los cambios que
+        // el usuario tuviera a medias en la pantalla.
+        app.MapPost("/api/backup/profiles/{id:guid}/ran", async (
+            Guid id,
+            BackupProfileService profiles,
+            CancellationToken cancellationToken) =>
+            await profiles.MarkRunAsync(id, cancellationToken)
+                ? Results.NoContent()
+                : Results.NotFound())
+        .WithName("MarkBackupProfileRun");
     }
 
     /// <summary>

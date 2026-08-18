@@ -6,8 +6,8 @@ namespace Druse.Persistence.Sqlite;
 /// <summary>
 /// Base local: apertura de conexiones y esquema.
 ///
-/// SQLite guarda perfiles, historial y preferencias. **Nunca contraseñas**: esas
-/// van al almacén del sistema operativo (plan §12).
+/// SQLite guarda perfiles —de conexión y de respaldo—, historial y preferencias.
+/// **Nunca contraseñas**: esas van al almacén del sistema operativo (plan §12).
 /// </summary>
 public sealed class DruseDatabase
 {
@@ -142,6 +142,37 @@ public sealed class DruseDatabase
             );
             """, cancellationToken);
 
+        // Respaldos guardados para repetirlos. La selección, las anulaciones y el
+        // formato van como JSON porque son listas y diccionarios de tamaño libre
+        // que solo se usan enteros; lo que se lista y se ordena —el nombre, la
+        // conexión, las fechas— sí tiene columna propia.
+        //
+        // `connection_id` no es clave foránea a propósito: borrar una conexión no
+        // puede llevarse por delante los perfiles hechos con ella, porque
+        // describen la base y no el acceso.
+        await ExecuteAsync(connection, """
+            CREATE TABLE IF NOT EXISTS backup_profiles (
+                id                 TEXT NOT NULL PRIMARY KEY,
+                name               TEXT NOT NULL,
+                connection_id      TEXT     NULL,
+                database_name      TEXT     NULL,
+                selection_json     TEXT NOT NULL DEFAULT '[]',
+                data_json          TEXT NOT NULL DEFAULT '{}',
+                output_json        TEXT NOT NULL DEFAULT '{}',
+                destination        TEXT NOT NULL DEFAULT '',
+                known_tables_json  TEXT NOT NULL DEFAULT '[]',
+                created_at_utc     TEXT NOT NULL,
+                updated_at_utc     TEXT NOT NULL,
+                last_run_at_utc    TEXT     NULL
+            );
+            """, cancellationToken);
+
+        // La lista se abre ordenada por lo último que se usó.
+        await ExecuteAsync(connection, """
+            CREATE INDEX IF NOT EXISTS ix_backup_profiles_last_run
+                ON backup_profiles (last_run_at_utc DESC);
+            """, cancellationToken);
+
         // Los archivos creados por versiones anteriores ya tienen la tabla, así que
         // `CREATE TABLE IF NOT EXISTS` no les añade la columna: hay que agregarla
         // aparte. El valor por omisión deja los perfiles existentes con usuario y
@@ -167,7 +198,7 @@ public sealed class DruseDatabase
 
         // Marca de versión del esquema, para poder migrar más adelante sin
         // adivinar en qué estado está el archivo de cada usuario.
-        await ExecuteAsync(connection, "PRAGMA user_version = 3;", cancellationToken);
+        await ExecuteAsync(connection, "PRAGMA user_version = 4;", cancellationToken);
     }
 
     /// <summary>Añade una columna solo si el archivo del usuario aún no la tiene.</summary>

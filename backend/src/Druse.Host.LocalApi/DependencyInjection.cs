@@ -54,6 +54,7 @@ internal static class DependencyInjection
         services.AddScoped<IQueryHistoryStore, SqliteQueryHistoryStore>();
         services.AddScoped<IPreferencesStore, SqlitePreferencesStore>();
         services.AddScoped<IEditorTabStore, SqliteEditorTabStore>();
+        services.AddScoped<IBackupProfileStore, SqliteBackupProfileStore>();
 
         // --- Proveedores de motor ---------------------------------------------
         // Cada motor aporta sus piezas y nada más. MySQL entró en la Fase 8
@@ -146,6 +147,7 @@ internal static class DependencyInjection
         services.AddScoped<ImportService>();
         services.AddScoped<ExportService>();
         services.AddScoped<BackupService>();
+        services.AddScoped<BackupProfileService>();
 
         // --- Exportadores -------------------------------------------------------
         services.AddSingleton<IResultExporter, CsvResultExporter>();
