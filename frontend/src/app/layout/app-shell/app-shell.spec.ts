@@ -3,7 +3,7 @@ import { of } from 'rxjs';
 
 import { ApplicationGateway } from '../../core/application-gateway/application-gateway';
 import { WorkspaceStore } from '../../core/workspace/workspace-store';
-import { ConnectionForm } from '../../shared/models/workspace';
+import { ConnectionForm, DatabaseObject } from '../../shared/models/workspace';
 import { AppShell } from './app-shell';
 
 /** Gateway que no habla con nadie: el shell debe montarse sin API detrás. */
@@ -53,6 +53,45 @@ function connectedGateway(
           hasChildren: true,
         },
       ]),
+  };
+}
+
+/**
+ * Catálogo con fondo, para el asistente de respaldos.
+ *
+ * El del resto de pruebas devuelve siempre el mismo esquema, y el asistente
+ * recorre hacia abajo hasta dar con las tablas: sin un final, la recursión no
+ * pararía nunca.
+ */
+function backupGateway(): Partial<ApplicationGateway> {
+  const schema: DatabaseObject = {
+    id: 'schema:public',
+    name: 'public',
+    kind: 'schema',
+    database: 'druse_test',
+    schema: 'public',
+    hasChildren: true,
+  };
+  const tables: DatabaseObject[] = [
+    {
+      id: 'Table:public.orders',
+      name: 'orders',
+      kind: 'table',
+      database: 'druse_test',
+      schema: 'public',
+      hasChildren: true,
+    },
+  ];
+
+  return {
+    ...connectedGateway('postgresql', 'public'),
+    getChildren: (_sessionId: string, parent: DatabaseObject) => {
+      if (parent.kind === 'database') {
+        return of([schema]);
+      }
+
+      return of(parent.kind === 'schema' ? tables : []);
+    },
   };
 }
 
@@ -226,6 +265,45 @@ describe('AppShell', () => {
     await fixture.whenStable();
 
     expect(element.querySelector('app-command-palette')).toBeTruthy();
+  });
+
+  /**
+   * El enganche completo de la función: sin esto, el asistente existe en el
+   * paquete pero no hay forma de llegar a él desde la aplicación.
+   */
+  it('abre el asistente de respaldos desde el menú del árbol', async () => {
+    TestBed.resetTestingModule();
+    await TestBed.configureTestingModule({
+      imports: [AppShell],
+      providers: [
+        { provide: ApplicationGateway, useValue: backupGateway() },
+      ],
+    }).compileComponents();
+
+    const shell = TestBed.createComponent(AppShell);
+    const dom = shell.nativeElement as HTMLElement;
+    await shell.whenStable();
+    await TestBed.inject(WorkspaceStore).connect({ ...connectionForm, engine: 'postgresql' });
+    shell.detectChanges();
+
+    const fila = [...dom.querySelectorAll('.node--object')].find((nodo) =>
+      nodo.textContent?.includes('druse_test'),
+    ) as HTMLElement;
+    fila.querySelector<HTMLButtonElement>('.node__menu-trigger')?.click();
+    shell.detectChanges();
+
+    const respaldar = [...fila.querySelectorAll('.node-menu button')].find((boton) =>
+      boton.textContent?.includes('Respaldar'),
+    ) as HTMLButtonElement;
+
+    expect(respaldar).toBeTruthy();
+
+    respaldar.click();
+    shell.detectChanges();
+    await shell.whenStable();
+    shell.detectChanges();
+
+    expect(dom.querySelector('app-backup-dialog')).toBeTruthy();
   });
 
   it('en móvil conserva un control para abrir el explorador', () => {

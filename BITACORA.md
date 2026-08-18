@@ -10,14 +10,14 @@
 
 | Campo | Valor |
 | --- | --- |
-| Última sesión | **022** — 2026-08-17 |
-| Fase activa | **Respaldos y restauración:** Fases A, B y C cerradas; la **D va a medias** —las piezas de la interfaz compilan pero el asistente no está enganchado, así que desde la aplicación aún no se llega a él— |
+| Última sesión | **022f** — 2026-08-17 |
+| Fase activa | **Respaldos y restauración:** Fases A, B, C y **D cerradas** —el asistente se abre desde el menú del explorador y el respaldo se sigue viendo en la barra de estado al cerrarlo—. Falta verlo contra los contenedores; la siguiente es la **E, perfiles** |
 | Fases 0–6 | ✅ Cerradas. |
 | Fase 7 | 🟡 **11/12.** El ciclo de instalación está probado sobre este equipo; solo falta arrancar en una máquina sin herramientas de desarrollo. |
 | Fase 8 | ✅ **7/7.** Tres motores sobre el mismo contrato y primera beta preparada. |
 | ¿Compila el backend? | Sí — 0 advertencias, 0 errores |
 | ¿Compila el envoltorio? | Sí |
-| ¿Pasan las pruebas? | Sí — **426 en backend** (232 unitarias, 126 contractuales y 68 de integración), **281 en frontend** y **6 en el envoltorio**. Con `DRUSE_REQUIRE_ENGINES=1` y **los cuatro motores**, sin saltarse ninguna |
+| ¿Pasan las pruebas? | Sí — **426 en backend** (232 unitarias, 126 contractuales y 68 de integración), **398 en frontend** y **6 en el envoltorio**. Con `DRUSE_REQUIRE_ENGINES=1` y **los cuatro motores**, sin saltarse ninguna |
 | ¿Hay aplicación de escritorio? | **Sí.** Instalador NSIS, MSI y ZIP portable, en dos variantes: con Informix y sin él |
 | Motores | **PostgreSQL, SQL Server, MySQL/MariaDB e Informix**, todos sobre el mismo contrato compartido |
 | Trabajo a medias | Ninguno. Las transacciones manuales quedaron terminadas en la sesión 020. |
@@ -27,25 +27,21 @@
 
 ### Qué toca retomar en la próxima sesión
 
-**Lo primero: terminar de enganchar el asistente de respaldos.** La Fase D quedó
-a medias en la sesión 022e: el diálogo, el estado en `core`, `operation-progress`
-y el selector nativo están escritos y **compilan**, pero nada los invoca. Son
-tres archivos y unas pocas líneas, y son la diferencia entre tener la función y
-no tenerla:
+**Lo primero: ver el respaldo funcionar contra los contenedores.** La Fase D se
+cerró en la sesión 022f y la función ya se alcanza desde la aplicación, pero
+**nadie ha hecho todavía un respaldo de verdad desde la interfaz**. El caso que
+justifica la función —una base entera sin datos, salvo tres tablas de catálogo—
+es lo que hay que reproducir: levantar los contenedores con
+`./build/scripts/test-db.ps1`, arrancar la aplicación, respaldar desde el menú
+del árbol y aplicar lo generado en una base vacía.
 
-1. `connections-sidebar` — `readonly backup = output<ExplorerNode>()` y su botón
-   en el menú del nodo, junto a «Importar archivo» (HTML, ~línea 231), para
-   `database`, `schema` y `table`.
-2. `app-shell` — `backupTarget = signal<ExplorerNode | null>(null)` con su
-   `@defer`, igual que `app-table-designer` (HTML, ~línea 226), pasándole
-   `[target]` y `[sessionId]`.
-3. `status-bar` — inyectar `BackupStore` y enseñar paso, objeto y porcentaje
-   mientras `store.running()`. **Sin esto no se cumple el criterio de salida**,
-   que exige que cerrar el asistente no deje al usuario a ciegas.
+Al hacerlo se comprueban de paso dos cosas que solo se ven ahí: que el respaldo
+sigue vivo al cerrar el asistente —la barra de estado tiene que seguir contando—
+y que el selector nativo de carpeta abre el diálogo del sistema, que **es Rust
+que nunca se ha compilado en este equipo**.
 
-Después: pruebas de frontend del `BackupStore` y de `operation-progress`, y
-comprobar el caso del §1 —todo sin datos salvo tres tablas— levantando la
-aplicación contra los contenedores.
+Después, la **Fase E: perfiles guardados** (`backup_profiles` en SQLite, con la
+reconciliación de un perfil cuyas tablas ya no existen).
 
 Y aparte, lo que ya venía. Ya no queda nada a medias: las transacciones manuales se cerraron en la sesión
 020 y los 44 archivos sueltos se repartieron en cuatro commits temáticos. Lo que
@@ -296,6 +292,45 @@ Y tres límites declarados desde el principio: no hay respaldo binario ni
 recuperación a un punto en el tiempo —eso es del servidor, y la interfaz tendrá
 que decirlo—, no hay respaldos programados, y un límite de filas puede dejar
 filas huérfanas, cosa que se avisa y no se corrige sola.
+
+### Sesión 022f — 2026-08-17 · La Fase D enganchada, y el diálogo que nunca estuvo en git
+
+Tres archivos y unas pocas líneas, que eran la diferencia entre tener la función
+y no tenerla. Ahora se llega al asistente desde el menú del explorador —sobre una
+base, un esquema o una tabla—, el shell lo carga tarde con su `@defer` y la barra
+de estado enseña paso, objeto y porcentaje mientras el respaldo corre.
+
+**Cerrar el asistente no puede parar el respaldo, y ahora tampoco perder el
+camino de vuelta.** El shell guarda por separado el nodo (`backupTarget`) y si el
+diálogo se ve (`backupOpen`): cerrar apaga solo lo segundo, así que el indicador
+de la barra puede devolver al detalle. El trabajo en sí nunca estuvo en el
+componente —vive en `BackupStore`—, y hay una prueba que lo fija: tras cerrar, el
+sondeo sigue y nadie llamó a `cancel`.
+
+**Lo que encontró una prueba, gastando ocho gigabytes.** El doble del catálogo
+que usa el resto de pruebas del shell devuelve siempre el mismo esquema, y
+resolver las tablas de un nodo baja por esquemas y carpetas: la recursión no
+paraba y el worker de Vitest moría por falta de memoria. El doble se arregló, y
+el recorrido lleva ahora un tope de seis niveles —el árbol más hondo es
+base → esquema → carpeta → tabla—, porque un catálogo que devolviera un hijo
+igual a su padre colgaría la ventana igual que colgó la prueba.
+
+**Y la regla `Backup*/` mordió por tercera vez.** La sesión anterior desexcluyó
+`frontend/src/app/features/backup/` y dio el asunto por cerrado, pero el patrón
+vuelve a atrapar cualquier **subcarpeta** que empiece por «backup», y la del
+asistente se llama `backup-dialog`. Resultado: los tres archivos del diálogo,
+escritos y compilando desde la sesión 022e, **nunca habían entrado en el
+repositorio** —un clon limpio no compilaba—. Las excepciones bajan ahora con
+`/**`, que es lo que hacía falta desde el principio.
+
+Pruebas del frontend: **398**, con 35 nuevas repartidas entre el `BackupStore`
+—que el porcentaje no retroceda ni pase de cien, que sin estimación caiga a barra
+indeterminada, que un sondeo perdido no dé el respaldo por muerto—,
+`operation-progress`, la barra de estado y el camino entero desde el menú del
+árbol hasta el asistente abierto.
+
+Lo que sigue sin verse funcionar es lo de siempre: **un respaldo de verdad contra
+los contenedores**, y el Rust del selector nativo.
 
 ### Sesión 022e — 2026-08-17 · Fase D a medias: la interfaz, sin enganchar
 

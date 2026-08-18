@@ -26,6 +26,7 @@ import {
   ExecutionErrorContext,
 } from '../../features/query-editor/sql-editor/sql-editor';
 import SqlEditor from '../../features/query-editor/sql-editor/sql-editor';
+import { BackupDialog } from '../../features/backup/backup-dialog/backup-dialog';
 import { ImportDialog } from '../../features/import/import-dialog/import-dialog';
 import { TableDesigner } from '../../features/tables/table-designer/table-designer';
 import { ProcedureRunner } from '../../features/query-builder/procedure-runner/procedure-runner';
@@ -83,6 +84,7 @@ const DISCONNECTED: SessionStatus = {
     SqlEditor,
     ResultsPanel,
     ImportDialog,
+    BackupDialog,
     TableDesigner,
     QueryBuilder,
     ProcedureRunner,
@@ -175,7 +177,8 @@ export class AppShell {
         this.dialogOpen() ||
         this.importTarget() ||
         this.builderTarget() ||
-        this.designTarget()
+        this.designTarget() ||
+        this.backupOpen()
       ) {
         return;
       }
@@ -195,6 +198,45 @@ export class AppShell {
 
   protected closeImport(): void {
     this.importTarget.set(null);
+  }
+
+  /**
+   * Nodo desde el que se abrió el asistente de respaldos.
+   *
+   * No se borra al cerrar el asistente **a propósito**: el respaldo sigue
+   * corriendo en el proceso local y el indicador de la barra de estado tiene que
+   * poder devolver aquí. Lo que se cierra es la visibilidad, no el destino.
+   */
+  protected readonly backupTarget = signal<ExplorerNode | null>(null);
+
+  protected readonly backupOpen = signal(false);
+
+  /** Sesión de la conexión del nodo respaldado; vacía si se perdió. */
+  protected readonly backupSessionId = computed(() => {
+    const target = this.backupTarget();
+
+    return target ? (this._store.sessionForConnection(target.connectionId) ?? '') : '';
+  });
+
+  protected openBackup(node: ExplorerNode): void {
+    this.backupTarget.set(node);
+    this.backupOpen.set(true);
+  }
+
+  protected closeBackup(): void {
+    this.backupOpen.set(false);
+  }
+
+  /**
+   * Vuelve al detalle desde el indicador de la barra de estado.
+   *
+   * Sin destino no hay nada que reabrir: pasa si la aplicación se recargó con un
+   * respaldo en marcha, y entonces el indicador solo informa.
+   */
+  protected reopenBackup(): void {
+    if (this.backupTarget()) {
+      this.backupOpen.set(true);
+    }
   }
 
   /**

@@ -91,6 +91,36 @@ const procedure: ExplorerNode = {
   },
 };
 
+const table: ExplorerNode = {
+  ...view,
+  id: 'connection-1|Table:public.orders',
+  label: 'orders',
+  kind: 'table',
+  source: {
+    id: 'Table:public.orders',
+    name: 'orders',
+    kind: 'table',
+    database: 'druse_test',
+    schema: 'public',
+    hasChildren: true,
+  },
+};
+
+const database: ExplorerNode = {
+  ...view,
+  id: 'connection-1|db:druse_test',
+  label: 'druse_test',
+  kind: 'database',
+  depth: 1,
+  source: {
+    id: 'db:druse_test',
+    name: 'druse_test',
+    kind: 'database',
+    database: 'druse_test',
+    hasChildren: true,
+  },
+};
+
 describe('ConnectionsSidebar', () => {
   let fixture: ComponentFixture<ConnectionsSidebar>;
 
@@ -176,6 +206,63 @@ describe('ConnectionsSidebar', () => {
     expect(labels).toContain('Abrir SELECT');
     expect(labels).toContain('Componer consulta');
     expect(labels).toContain('Copiar nombre calificado');
+  });
+
+  /**
+   * Los tres sitios desde los que se piensa «me llevo esto». Sobre una vista no
+   * se ofrece: el respaldo todavía solo sabe guionizar tablas.
+   */
+  it.each([
+    ['una base', database],
+    ['un esquema', schema],
+    ['una tabla', table],
+  ])('ofrece respaldar sobre %s', (_caso, node) => {
+    fixture.componentRef.setInput('explorerNodes', [node]);
+    fixture.detectChanges();
+
+    const trigger = fixture.nativeElement.querySelector('.node__menu-trigger') as HTMLButtonElement;
+    trigger.click();
+    fixture.detectChanges();
+
+    const labels = [...fixture.nativeElement.querySelectorAll('.node-menu button')].map(
+      (button: Element) => button.textContent?.trim(),
+    );
+
+    expect(labels).toContain('Respaldar…');
+  });
+
+  it('sobre una vista no se ofrece respaldar', () => {
+    fixture.componentRef.setInput('explorerNodes', [view]);
+    fixture.detectChanges();
+
+    const trigger = fixture.nativeElement.querySelector('.node__menu-trigger') as HTMLButtonElement;
+    trigger.click();
+    fixture.detectChanges();
+
+    const labels = [...fixture.nativeElement.querySelectorAll('.node-menu button')].map(
+      (button: Element) => button.textContent?.trim(),
+    );
+
+    expect(labels).not.toContain('Respaldar…');
+  });
+
+  it('respaldar entrega el nodo entero, que es lo que el asistente necesita', () => {
+    fixture.componentRef.setInput('explorerNodes', [table]);
+    fixture.detectChanges();
+    const pedidos: ExplorerNode[] = [];
+    fixture.componentInstance.backup.subscribe((node) => pedidos.push(node));
+
+    const trigger = fixture.nativeElement.querySelector('.node__menu-trigger') as HTMLButtonElement;
+    trigger.click();
+    fixture.detectChanges();
+    const accion = [...fixture.nativeElement.querySelectorAll('.node-menu button')].find(
+      (button: Element) => button.textContent?.includes('Respaldar'),
+    ) as HTMLButtonElement;
+    accion.click();
+
+    expect(pedidos).toHaveLength(1);
+    expect(pedidos[0].connectionId).toBe('connection-1');
+    expect(pedidos[0].source.name).toBe('orders');
   });
 
   it('Enter en una acción no pliega el nodo del árbol', () => {

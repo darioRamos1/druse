@@ -571,11 +571,10 @@ y un bloque de comentarios en el `.sql`, con la cabecera al empezar y los
 recuentos y avisos al final. Reescribir la cabecera obligaría a copiar un archivo
 que puede ocupar gigabytes.
 
-### Fase D — La interfaz 🟡 a medias
+### Fase D — La interfaz ✅
 
-**Estado: las piezas están escritas y compilan, pero el asistente no está
-enganchado.** Desde la aplicación todavía no se llega a él. Lo que falta son tres
-archivos, detallados al final de la fase.
+**Estado: enganchada.** Se llega al asistente desde el menú del explorador, y el
+respaldo se sigue viendo en la barra de estado aunque se cierre el diálogo.
 
 - [x] Árbol de selección con casillas de tres estados.
 - [x] Asistente de cuatro pasos, desde el menú contextual. _(La pestaña propia no
@@ -585,8 +584,8 @@ archivos, detallados al final de la fase.
       (`/api/backup/preview`), limitada a unas pocas filas por tabla.
 - [x] **`operation-progress` en `shared/ui`**: las dos barras, el paso en curso
       con nombre de objeto, el tiempo transcurrido y el botón de cancelar.
-- [ ] **Indicador en la barra de estado** que sobrevive a cerrar el asistente, y
-      que devuelve al detalle al pulsarlo. **Falta.**
+- [x] **Indicador en la barra de estado** que sobrevive a cerrar el asistente, y
+      que devuelve al detalle al pulsarlo.
 - [x] **Resumen final en los cuatro estados** —correcto, correcto con avisos,
       fallido y cancelado—, que no se desvanece solo. _(«Abrir carpeta» y «abrir
       en el editor» quedan pendientes: hacen falta comandos del envoltorio.)_
@@ -595,26 +594,44 @@ archivos, detallados al final de la fase.
       ruta: los bytes no pasan por el puente. **El Rust no se ha compilado nunca
       en este equipo** —cargo falla por el SDK de Windows—, así que está escrito
       pero sin ver funcionar.
-
-#### Lo que falta para cerrarla, con nombre y sitio
-
-1. **`connections-sidebar`** — añadir `readonly backup = output<ExplorerNode>()`
-   y su botón en el menú del nodo, junto a «Importar archivo» (HTML, ~línea 231),
-   ofrecido para `database`, `schema` y `table`.
-2. **`app-shell`** — un `backupTarget = signal<ExplorerNode | null>(null)` con su
-   `@defer`, copiando el patrón de `app-table-designer` (HTML, ~línea 226), y
-   pasarle `[sessionId]` y `[target]`.
-3. **`status-bar`** — inyectar `BackupStore` y enseñar paso, objeto y porcentaje
-   mientras `store.running()`. Es lo que hace que cerrar el asistente no deje al
-   usuario a ciegas, y sin ello el criterio de salida no se cumple.
-4. **Pruebas de frontend** del `BackupStore` y de `operation-progress`: que el
-   porcentaje nunca retroceda ni pase de cien, que sin estimación caiga a barra
-   indeterminada, y que cerrar el diálogo no mate el sondeo.
+- [x] **Enganche**: `backup` como salida del explorador para `database`, `schema`
+      y `table`; el `@defer` del asistente en el shell; y el indicador de la
+      barra de estado.
+- [x] **Pruebas de frontend**: el `BackupStore`, `operation-progress`, la barra
+      de estado y el camino entero desde el menú del árbol hasta el asistente.
 
 **Criterio de salida:** el caso del §1 —todo sin datos salvo tres tablas— se
 resuelve sin escribir SQL, **y en ningún momento de la operación la pantalla deja
 de decir qué se está haciendo**. Cerrar el asistente a mitad no interrumpe el
 respaldo ni pierde el resultado.
+
+_Cumplido en la interfaz y con pruebas; **falta verlo contra los contenedores**,
+que es lo único que comprueba el caso del §1 de punta a punta._
+
+**Dónde vive el destino, y por qué no se borra al cerrar.** El shell guarda el
+nodo (`backupTarget`) y, aparte, si el diálogo se ve (`backupOpen`). Cerrar el
+asistente solo apaga lo segundo: el indicador de la barra tiene que poder
+devolver al detalle, y sin conservar el nodo no habría adónde volver. El respaldo
+en sí nunca estuvo ahí —vive en `BackupStore`—, así que descartar el componente
+no para nada.
+
+**El explorador entrega el nodo entero, no un identificador.** El asistente
+necesita la conexión para resolver la sesión y el objeto para saber qué cuelga de
+él; partirlo en dos entradas obligaría a buscar el nodo otra vez.
+
+**Un tope al bajar por el catálogo.** Resolver las tablas de un nodo desciende por
+esquemas y carpetas, y un catálogo que devolviera un hijo igual a su padre dejaría
+la ventana bajando para siempre —se descubrió en una prueba, con un doble que
+respondía siempre lo mismo, y se llevó los ocho gigabytes del proceso—. Se para a
+seis niveles, con margen de sobra sobre el árbol más hondo, que es
+base → esquema → carpeta → tabla.
+
+**La regla `Backup*/` del .gitignore mordió por tercera vez.** Desexcluir
+`frontend/src/app/features/backup/` no bastaba: el patrón vuelve a atrapar
+cualquier **subcarpeta** que empiece por «backup», y la del asistente se llama
+`backup-dialog`. El diálogo entero —tres archivos escritos y compilando desde la
+sesión anterior— nunca había llegado al repositorio. Las excepciones bajan ahora
+con `/**`.
 
 ### Fase E — Perfiles
 

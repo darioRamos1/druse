@@ -32,3 +32,28 @@
 
   <div class="item mono">{{ encoding() }}</div>
 }
+
+<!--
+  El respaldo en marcha va fuera del bloque de la sesión y al final de la barra:
+  sigue corriendo aunque el asistente se cierre, y es lo único de aquí sobre lo
+  que se puede pulsar. Sin él, cerrar el diálogo deja al usuario a ciegas.
+-->
+@if (backup.running()) {
+  <span class="sep" aria-hidden="true"></span>
+
+  <button type="button" class="backup" (click)="showBackup.emit()" title="Ver el respaldo en curso">
+    <span class="backup-bar" [class.backup-bar--waiting]="percent() === null">
+      <span class="backup-fill" [style.width.%]="percent() ?? 100"></span>
+    </span>
+
+    <span class="backup-step">{{ backup.stepLabel() }}</span>
+
+    @if (subject()) {
+      <span class="mono backup-subject">{{ subject() }}</span>
+    }
+
+    @if (percent() !== null) {
+      <span class="mono">{{ percent() }}&nbsp;%</span>
+    }
+  </button>
+}

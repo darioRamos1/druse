@@ -62,6 +62,15 @@ export class ConnectionsSidebar {
 
   /** Importar un archivo dentro de esta tabla. */
   readonly importInto = output<ExplorerNode>();
+
+  /**
+   * Respaldar lo que cuelga de este nodo.
+   *
+   * Se ofrece sobre la base, el esquema y la tabla porque son los tres sitios
+   * desde los que se piensa «me llevo esto»: el asistente resuelve solo qué
+   * tablas hay debajo.
+   */
+  readonly backup = output<ExplorerNode>();
   readonly copied = output<string>();
   readonly copyFailed = output<void>();
 

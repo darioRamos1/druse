@@ -40,6 +40,7 @@
     (edit)="editConnection($event)"
     (openNode)="openNode($event)"
     (importInto)="openImport($event)"
+    (backup)="openBackup($event)"
     (createTable)="openTableDesigner($event)"
     (designTable)="openTableDesigner($event)"
     (composeQuery)="openBuilder($event)"
@@ -206,7 +207,12 @@
       (copyFailed)="onCopyFailed()"
     />
 
-    <app-status-bar [session]="session()" [line]="cursor().line" [column]="cursor().column" />
+    <app-status-bar
+      [session]="session()"
+      [line]="cursor().line"
+      [column]="cursor().column"
+      (showBackup)="reopenBackup()"
+    />
   </main>
 </div>
 
@@ -228,6 +234,22 @@
     [connectionId]="destino.connectionId"
     (closed)="closeTableDesigner()"
   />
+}
+
+<!--
+  El asistente se carga tarde y se descarta al cerrarlo, pero el respaldo no vive
+  aquí: está en `BackupStore`, así que cerrar esto no para nada.
+-->
+@defer (when backupOpen()) {
+  @if (backupOpen()) {
+    @if (backupTarget(); as destino) {
+      <app-backup-dialog
+        [target]="destino"
+        [sessionId]="backupSessionId()"
+        (closed)="closeBackup()"
+      />
+    }
+  }
 }
 
 @defer (when builderTarget()) {

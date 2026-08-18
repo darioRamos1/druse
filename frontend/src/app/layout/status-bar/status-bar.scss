@@ -61,3 +61,71 @@
   border-radius: 4px;
   font-size: 7.5px;
 }
+
+/* El respaldo en curso. Es lo único pulsable de la barra, así que se comporta
+   como un botón —cursor y realce— y no como una etiqueta más. */
+.backup {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  max-width: 340px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--dr-text-dim);
+  font: inherit;
+  cursor: pointer;
+
+  &:hover {
+    background: var(--dr-surface-raised);
+    color: var(--dr-text-muted);
+  }
+}
+
+.backup-bar {
+  position: relative;
+  flex: 0 0 56px;
+  height: 4px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--dr-surface-raised);
+}
+
+.backup-fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--dr-accent-gradient);
+  transition: width 200ms ease-out;
+}
+
+/* Sin total conocido recorre en vez de llenarse, igual que en el asistente: una
+   barra parada en un porcentaje inventado miente sobre lo que falta. */
+.backup-bar--waiting .backup-fill {
+  width: 40%;
+  animation: backup-sweep 1.4s ease-in-out infinite;
+}
+
+@keyframes backup-sweep {
+  0% {
+    transform: translateX(-100%);
+  }
+
+  100% {
+    transform: translateX(250%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .backup-bar--waiting .backup-fill {
+    animation: none;
+    opacity: 0.6;
+  }
+}
+
+.backup-subject {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

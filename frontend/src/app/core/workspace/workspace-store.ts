@@ -939,6 +939,16 @@ export class WorkspaceStore {
     return this.findConnection(connectionId)?.engine ?? null;
   }
 
+  /**
+   * Sesión viva de una conexión, o `null` si está desconectada.
+   *
+   * Lo piden los diálogos que hablan con el catálogo por su cuenta —el asistente
+   * de respaldos— y que reciben el nodo del árbol, donde solo viaja la conexión.
+   */
+  sessionForConnection(connectionId: string): string | null {
+    return this.findConnection(connectionId)?.sessionId ?? null;
+  }
+
   /** Árbol aplanado, listo para pintar. */
   readonly explorerNodes = computed<readonly ExplorerNode[]>(() => {
     const nodes: ExplorerNode[] = [];
