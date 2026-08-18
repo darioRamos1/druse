@@ -745,11 +745,30 @@ restauración que falla a mitad **deja claro qué se aplicó y qué no**.
 
 **Dónde está el criterio de salida.** La ida y vuelta de la **estructura** y la de
 los **datos** están cubiertas en los cuatro motores por las contractuales, y la
-del **artefacto entero** —respaldar, mirar, aplicar en una base limpia y comparar—
-por dos pruebas de integración contra PostgreSQL, una con `INSERT` y otra con CSV.
-El asistente **ya se ha usado a mano** contra una base real, y es lo que encontró
-el error de abajo. Falta repetir ese mismo respaldo ahora que está arreglado, y
-llevar el ciclo entero por HTTP a los otros tres motores.
+del **artefacto entero** —respaldar, mirar, aplicar en otra base y comparar— por
+`RestoreEndpointTests`, que ahora recorre **los cuatro motores por HTTP**: el
+ciclo completo, la base nueva creada en el momento y la negativa a crear una que
+ya existe. Falta repetir a mano el respaldo real que encontró el error de abajo.
+
+**Y lo que encontró llevar el ciclo a los otros tres motores.** Dos fallos, y
+ninguno se veía desde PostgreSQL:
+
+- **En MySQL e Informix el respaldo perdía la estructura de todas las tablas.**
+  La instantánea abre una transacción sobre la conexión de la sesión, pero no la
+  anunciaba a nadie: los comandos que leen el catálogo salían sin ella y esos dos
+  motores los rechazan cuando la conexión tiene una transacción pendiente. Cada
+  tabla se saldaba con «no se pudo leer su estructura» y el respaldo terminaba
+  «con avisos» llevándose solo los datos. En PostgreSQL no se nota porque Npgsql
+  no exige asignarla, y en SQL Server tampoco porque la base de prueba no admite
+  instantáneas y se acaba trabajando sin transacción. Ahora la instantánea se
+  **presta** a la sesión mientras dura.
+- **En MySQL, restaurar «en otra base» escribía en la de origen.** Allí el
+  esquema **es** la base, y el guion salía con `origen.tabla` dentro: el artefacto
+  quedaba atado a la base de la que salió. Se veía como un `CREATE TABLE` que
+  fallaba porque la tabla ya existía —en el origen—, y si no hubiera existido se
+  habría creado en la base equivocada sin que nada lo dijera. Ahora el guion de
+  MySQL nombra la tabla a secas, igual que `mysqldump`, y la inspección empareja
+  las colisiones aunque el artefacto no traiga esquema.
 
 **Y lo que solo encontró usarlo.** Un respaldo real de 2.747 instrucciones se
 paró en la 2.722: un índice sobre una expresión —`lower(nit)`— no tiene columnas

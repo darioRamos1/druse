@@ -10,14 +10,14 @@
 
 | Campo | Valor |
 | --- | --- |
-| Última sesión | **022l** — 2026-08-18 |
-| Fase activa | **Respaldos y restauración:** Fases A–E cerradas. La **F** tiene backend, interfaz, CSV, selector de archivos y **restaurar en una base nueva**; le falta el ciclo entero por HTTP en los otros tres motores |
+| Última sesión | **022m** — 2026-08-18 |
+| Fase activa | **Respaldos y restauración:** Fases A–E cerradas. La **F** tiene backend, interfaz, CSV, selector de archivos, restaurar en una base nueva y **el ciclo entero por HTTP en los cuatro motores**; le falta repetir a mano el respaldo real que encontró el error de los índices de expresión |
 | Fases 0–6 | ✅ Cerradas. |
 | Fase 7 | 🟡 **11/12.** El ciclo de instalación está probado sobre este equipo; solo falta arrancar en una máquina sin herramientas de desarrollo. |
 | Fase 8 | ✅ **7/7.** Tres motores sobre el mismo contrato y primera beta preparada. |
 | ¿Compila el backend? | Sí — 0 advertencias, 0 errores |
 | ¿Compila el envoltorio? | Sí |
-| ¿Pasan las pruebas? | Sí — **606 en backend** (339 unitarias, 166 contractuales y 101 de integración), **449 en frontend** y **6 en el envoltorio**. Con `DRUSE_REQUIRE_ENGINES=1` y **los cuatro motores**, sin saltarse ninguna |
+| ¿Pasan las pruebas? | Sí — **615 en backend** (339 unitarias, 166 contractuales y 110 de integración), **449 en frontend** y **6 en el envoltorio**. Con `DRUSE_REQUIRE_ENGINES=1` y **los cuatro motores**, sin saltarse ninguna |
 | ¿Hay aplicación de escritorio? | **Sí.** Instalador NSIS, MSI y ZIP portable, en dos variantes: con Informix y sin él |
 | Motores | **PostgreSQL, SQL Server, MySQL/MariaDB e Informix**, todos sobre el mismo contrato compartido |
 | Trabajo a medias | Ninguno. El frontend de la restauración quedó commiteado en la sesión 022i. |
@@ -27,18 +27,20 @@
 
 ### Qué toca retomar en la próxima sesión
 
-**Lo que le falta a la Fase F**, por orden:
+**Lo que le falta a la Fase F**, ya solo una cosa:
 
 1. **Repetir a mano el respaldo grande que falló** (sesión 022l): el de
    `empresa_estado_financiero`, ahora que los índices sobre expresiones se
    guionizan. Es el único caso real que ha pasado por la pantalla de punta a
-   punta, y encontró un error que ninguna prueba veía.
-2. **El ciclo entero por HTTP en los otros tres motores.** `RestoreEndpointTests`
-   solo abre sesiones de PostgreSQL; las contractuales sí cubren los cuatro, pero
-   por debajo de la API.
-3. **Probar la base nueva contra los otros motores.** `ScriptCreateDatabase` está
-   escrito para los cuatro —Informix con su `WITH LOG`— pero solo se ha ejecutado
-   contra PostgreSQL.
+   punta, y encontró un error que ninguna prueba veía. **No se puede hacer desde
+   aquí**: esa base no está en los contenedores, es de un servidor propio.
+
+Los otros dos puntos se cerraron en la sesión 022m. El ciclo entero
+—respaldar, inspeccionar, aplicar y comprobar— corre por HTTP en los cuatro
+motores, y con él la base nueva y el rechazo de la que ya existe. De paso destapó
+que en MySQL e Informix el respaldo **perdía la estructura de todas las tablas**,
+y que en MySQL restaurar «en otra base» escribía en la de origen: los dos
+arreglados y con prueba.
 
 Lo demás de la Fase F está hecho: `RestoreService`, la inspección del artefacto,
 el rechazo por motor y versión de formato, la vista previa de lo que se ejecuta y
@@ -317,6 +319,67 @@ Y tres límites declarados desde el principio: no hay respaldo binario ni
 recuperación a un punto en el tiempo —eso es del servidor, y la interfaz tendrá
 que decirlo—, no hay respaldos programados, y un límite de filas puede dejar
 filas huérfanas, cosa que se avisa y no se corrige sola.
+
+### Sesión 022m — 2026-08-18 · El ciclo en los otros tres motores, y lo que escondían
+
+Llevar el ciclo de respaldo y restauración a los cuatro motores **por HTTP** era
+la tarea que quedaba de la Fase F. No fue escribir pruebas de una función que ya
+estaba: fue destapar que en dos motores no funcionaba.
+
+**1. En MySQL e Informix el respaldo perdía la estructura de todas las tablas.**
+La instantánea abre una transacción sobre la conexión de la sesión —para que
+todas las tablas se lean en el mismo instante— pero no se la anunciaba a nadie.
+Los comandos que leen el catálogo salían sin ella, y esos dos motores rechazan un
+comando cuando la conexión tiene una transacción pendiente: «the transaction
+associated with this command is not the connection's active transaction». Cada
+tabla se saldaba con un aviso y el respaldo terminaba «con avisos» llevándose
+**solo los datos**. En PostgreSQL no se ve porque Npgsql no exige asignarla; en
+SQL Server tampoco, porque la base de prueba no admite instantáneas y se acaba
+trabajando sin transacción, o sea que **pasaba por accidente**. Ahora la
+instantánea se presta a la sesión mientras dura, y todo comando que salga la
+lleva puesta.
+
+**2. En MySQL, restaurar «en otra base» escribía en la de origen.** Allí el
+esquema es la base, así que el guion salía con `druse_test.tabla` dentro y el
+artefacto quedaba atado a la base de la que salió. Se veía como un `CREATE TABLE`
+que fallaba porque la tabla ya existía —en el origen—; **si no hubiera existido,
+se habría creado en la base equivocada sin que nada lo dijera**. Ahora el guion de
+MySQL nombra la tabla a secas, como hace `mysqldump`, y eso alcanza también a lo
+que apuntan las claves foráneas. Lo que se lee del origen sí conserva el nombre
+completo: la tabla puede estar en otra base del mismo servidor. Y la inspección
+empareja las colisiones aunque el artefacto no traiga esquema, que si no diría
+«no hay nada que sobrescribir» justo antes de sobrescribirlo.
+
+**3. Las pruebas dejaban bases huérfanas.** `DROP DATABASE` no llega a ejecutarse
+mientras el pool del proveedor conserve una conexión, y la limpieza se traga los
+errores: en el contenedor de PostgreSQL había **diez** `druse_nueva_*` y nueve en
+el de SQL Server. Ahora cada motor dice cómo se borra del todo una base suya
+—`WITH (FORCE)` en PostgreSQL, `SINGLE_USER WITH ROLLBACK IMMEDIATE` en SQL
+Server— y las que ya estaban se borraron.
+
+**4. El autocompletado quedaba por debajo de la rejilla.** Las cabeceras de las
+columnas son `sticky` con z-index 2 y el editor no creaba capa propia, así que
+cuando la lista de sugerencias caía sobre el panel de resultados se veían los
+nombres de las columnas por encima. El editor pasa a una capa por encima de la
+rejilla y del tirador, y por debajo de los menús y de todo lo modal.
+
+**Verificado.** **615 pruebas de backend** —339 unitarias, 166 contractuales y
+110 de integración, con `DRUSE_REQUIRE_ENGINES=1` y los cuatro motores— y **449
+en frontend**. Las nueve nuevas son el ciclo completo, la base nueva y el rechazo
+de la base repetida, en SQL Server, MySQL e Informix.
+
+**De paso, las pruebas dicen ahora por qué fallan.** Un respaldo con avisos hacía
+caer el ciclo con un «se esperaba Completed» y ni una palabra del motivo; ahora
+el mensaje trae los avisos, el fallo y la instrucción donde se paró. Es lo que
+convirtió el primer fallo en un diagnóstico en un minuto.
+
+**Archivos.** `SessionTransaction.cs`, `TableDesignerBase.cs`,
+`MySqlTableDesigner.cs`, `IDatabaseScripter.cs`, `RestoreService.cs`,
+`RestoreEngines.cs` (nuevo), `RestoreEndpointTests.cs`, `TableScripterTests.cs`,
+`sql-editor.ts`, `docs/plan-respaldos-y-restauracion.md`.
+
+**No hecho.** Repetir a mano el respaldo de `empresa_estado_financiero`: esa base
+no está en los contenedores, es de un servidor del usuario.
 
 ### Sesión 022l — 2026-08-18 · Lo que encontró usarlo de verdad
 
