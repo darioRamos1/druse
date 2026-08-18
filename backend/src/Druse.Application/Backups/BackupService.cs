@@ -187,6 +187,33 @@ public sealed class BackupService(
             // --- La estructura ------------------------------------------------
             state.Enter(BackupStep.WritingStructure);
 
+            // Los esquemas van antes que sus tablas, y por eso se escriben aquí y
+            // no junto a cada `CREATE TABLE`: sin ellos, aplicar el artefacto
+            // sobre una base recién creada falla en la primera instrucción, que
+            // es exactamente el caso que la función existe para resolver.
+            //
+            // Se ordenan por su primera aparición y no alfabéticamente: así el
+            // guion se lee en el mismo orden en que se eligieron las tablas.
+            foreach (var schema in tables
+                .Where(item => request.Data.IncludesStructure(item.Table))
+                .Select(item => item.Table.Schema)
+                .Where(name => !string.IsNullOrWhiteSpace(name))
+                .Distinct(StringComparer.Ordinal))
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+
+                var creation = scripter.ScriptSchema(schema!);
+
+                if (creation.Count > 0)
+                {
+                    await sink.WriteAsync(
+                        BackupEntryKind.Schema,
+                        schema!,
+                        Join(creation),
+                        cancellationToken);
+                }
+            }
+
             foreach (var table in tables.Where(item => request.Data.IncludesStructure(item.Table)))
             {
                 cancellationToken.ThrowIfCancellationRequested();

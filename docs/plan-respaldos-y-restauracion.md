@@ -605,8 +605,26 @@ resuelve sin escribir SQL, **y en ningún momento de la operación la pantalla d
 de decir qué se está haciendo**. Cerrar el asistente a mitad no interrumpe el
 respaldo ni pierde el resultado.
 
-_Cumplido en la interfaz y con pruebas; **falta verlo contra los contenedores**,
-que es lo único que comprueba el caso del §1 de punta a punta._
+_Cumplido, **y visto funcionar contra PostgreSQL 18.4 real** (sesión 022g): el
+caso del §1 —una base entera sin datos salvo tres catálogos— se resuelve desde el
+menú del árbol, se escribe el artefacto y se aplica en una base vacía dejando los
+catálogos con sus filas y las tablas de producción vacías. También un respaldo de
+**3.010.013 filas y 417 MB en 20,9 s**, cerrando el asistente a mitad: la barra de
+estado siguió contando y el resumen seguía ahí al volver._
+
+**Lo que la prueba a mano encontró y ninguna prueba automática veía: faltaba el
+`CREATE SCHEMA`.** El artefacto empezaba por `CREATE TABLE "tienda"."…"` y morir
+en la primera línea contra una base recién creada —«schema "tienda" does not
+exist"»— es justo lo contrario de para lo que existe la función. Ahora el guion lo
+emite antes que nada, con `ScriptSchema` en el contrato del guionizador:
+PostgreSQL escribe `CREATE SCHEMA IF NOT EXISTS`, SQL Server lo condiciona con
+`IF SCHEMA_ID(...) IS NULL EXEC(...)` —no admite `IF NOT EXISTS` y exige ser la
+primera instrucción de su lote—, y MySQL e Informix **no escriben nada**: allí el
+esquema es la base, y crear una decidiría por quien restaura adónde va todo.
+
+Va condicionado a propósito: restaurar encima de lo de ayer es el caso más común,
+y un `CREATE SCHEMA` a secas dejaría el respaldo inservible justo ahí. Lo fija una
+prueba contractual que lo aplica **dos veces** contra los cuatro motores.
 
 **Dónde vive el destino, y por qué no se borra al cerrar.** El shell guarda el
 nodo (`backupTarget`) y, aparte, si el diálogo se ve (`backupOpen`). Cerrar el
@@ -632,6 +650,19 @@ cualquier **subcarpeta** que empiece por «backup», y la del asistente se llama
 `backup-dialog`. El diálogo entero —tres archivos escritos y compilando desde la
 sesión anterior— nunca había llegado al repositorio. Las excepciones bajan ahora
 con `/**`.
+
+#### Lo que queda anotado de la prueba a mano
+
+- **La cabecera del manifiesto no se escribe al principio del `.sql`**, solo al
+  final. `SingleFileBackupSink` dice en su documentación que va «como cabecera al
+  empezar y también al final», y la de empezar no existe: el sink solo recibe el
+  manifiesto al completar. Para ponerla haría falta pasarle el origen al
+  construirlo.
+- «Abrir carpeta» y «abrir en el editor» siguen pendientes de comandos del
+  envoltorio.
+- El indicador de la barra de estado **desaparece al terminar**, y con el
+  asistente cerrado nada dice que el respaldo acabó: hay que volver a abrirlo para
+  ver el resumen. Con veinte segundos no molesta; con media hora, sí.
 
 ### Fase E — Perfiles
 

@@ -73,6 +73,19 @@ public interface IDatabaseScripter
     ScripterCapabilities Capabilities { get; }
 
     /// <summary>
+    /// El `CREATE SCHEMA` del contenedor donde viven las tablas, si el motor lo
+    /// tiene como objeto propio.
+    ///
+    /// Devuelve vacío donde no lo es: en MySQL el esquema **es** la base, y quien
+    /// restaura ya está conectado a una. Escribir un `CREATE DATABASE` allí
+    /// decidiría por el usuario a qué base va el respaldo.
+    ///
+    /// Existe porque sin él el artefacto no se puede aplicar en una base recién
+    /// creada, que es el caso que justifica la función.
+    /// </summary>
+    IReadOnlyList<string> ScriptSchema(string schema);
+
+    /// <summary>
     /// El `CREATE TABLE`: columnas, clave primaria, restricciones de unicidad y de
     /// comprobación. **Sin índices y sin claves foráneas**, que llegan después.
     /// </summary>

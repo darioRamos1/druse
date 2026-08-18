@@ -45,6 +45,7 @@ public abstract class BackupSinkBase : IBackupSink
     /// </summary>
     protected static string FolderOf(BackupEntryKind kind) => kind switch
     {
+        BackupEntryKind.Schema => "esquemas",
         BackupEntryKind.Structure => "tablas",
         BackupEntryKind.Data => "datos",
         _ => "restricciones",
@@ -218,6 +219,7 @@ public sealed class SingleFileBackupSink : BackupSinkBase
 
     private static string Titled(BackupEntryKind kind) => kind switch
     {
+        BackupEntryKind.Schema => "Esquema",
         BackupEntryKind.Structure => "Tabla",
         BackupEntryKind.Data => "Datos",
         _ => "Restricciones",

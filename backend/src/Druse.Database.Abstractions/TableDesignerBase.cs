@@ -439,6 +439,12 @@ public abstract class TableDesignerBase : ITableDesigner, IDatabaseScripter
     /// </summary>
     public virtual ScripterCapabilities Capabilities { get; } = new();
 
+    /// <summary>
+    /// Por omisión no se crea nada: solo lo redefine el motor donde el esquema es
+    /// un objeto aparte de la base.
+    /// </summary>
+    public virtual IReadOnlyList<string> ScriptSchema(string schema) => [];
+
     public IReadOnlyList<string> ScriptTable(ScriptedTable table) =>
         DescribeCreate(ToDefinition(table));
 

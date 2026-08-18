@@ -50,6 +50,15 @@ public sealed class PostgreSqlTableDesigner : TableDesignerBase
     protected override string Quote(string identifier) =>
         $"\"{identifier.Replace("\"", "\"\"", StringComparison.Ordinal)}\"";
 
+    /// <summary>
+    /// `IF NOT EXISTS` y no un `CREATE SCHEMA` a secas: el respaldo tiene que
+    /// poder aplicarse tanto sobre una base recién creada como sobre una donde el
+    /// esquema ya está, y fallar en la primera línea del segundo caso sería peor
+    /// que no escribirlo.
+    /// </summary>
+    public override IReadOnlyList<string> ScriptSchema(string schema) =>
+        string.IsNullOrWhiteSpace(schema) ? [] : [$"CREATE SCHEMA IF NOT EXISTS {Quote(schema)};"];
+
     protected override DbConnection Connection(IDatabaseSession session) =>
         session is PostgreSqlSession postgres
             ? postgres.Connection

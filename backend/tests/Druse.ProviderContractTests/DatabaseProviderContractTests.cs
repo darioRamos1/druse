@@ -600,6 +600,77 @@ public abstract class DatabaseProviderContractTests<TFixture>
     }
 
     /// <summary>
+    /// El guion crea el esquema donde viven las tablas, y aplicarlo dos veces no
+    /// falla.
+    ///
+    /// Es lo que separa un respaldo que se puede aplicar de uno que no: el caso
+    /// que justifica la función es llevarse la estructura a una base **recién
+    /// creada**, donde el esquema todavía no existe, y sin esto el artefacto
+    /// muere en su primer `CREATE TABLE`. Se descubrió probándolo a mano contra
+    /// PostgreSQL, no en una prueba.
+    ///
+    /// Se aplica dos veces a propósito: sobre una base que ya tiene el esquema,
+    /// un `CREATE SCHEMA` sin condición dejaría el respaldo inservible justo en
+    /// el caso más común, que es restaurar encima de lo de ayer.
+    /// </summary>
+    [Fact]
+    public async Task ElGuionCreaElEsquemaYSePuedeAplicarDosVeces()
+    {
+        if (Skip) { return; }
+
+        var schema = $"druse_esq_{Guid.NewGuid().ToString("N")[..8]}";
+        var script = Fixture.Scripter.ScriptSchema(schema);
+
+        if (script.Count == 0)
+        {
+            // MySQL e Informix no crean nada: allí el esquema no es un objeto
+            // aparte de la base, y quien restaura ya está conectado a una.
+            // Escribir un `CREATE DATABASE` decidiría por él adónde va todo.
+            Assert.Empty(Fixture.Scripter.ScriptSchema(Fixture.DefaultSchema));
+            return;
+        }
+
+        await using var session = await OpenAsync();
+
+        var table = $"{schema}.druse_t";
+
+        try
+        {
+            foreach (var statement in script)
+            {
+                await ExecuteAsync(session, statement);
+            }
+
+            // Otra vez, ahora con el esquema ya creado.
+            foreach (var statement in script)
+            {
+                await ExecuteAsync(session, statement);
+            }
+
+            // Y existe de verdad, no solo «no falló»: dentro cabe una tabla.
+            await ExecuteAsync(session, Fixture.CreateTable(table));
+        }
+        finally
+        {
+            await CleanAsync(session, Fixture.DropTable(table));
+            await CleanAsync(session, $"DROP SCHEMA {schema}");
+        }
+    }
+
+    /// <summary>Limpieza que no tapa el fallo de la prueba con uno suyo.</summary>
+    private async Task CleanAsync(IDatabaseSession session, string sql)
+    {
+        try
+        {
+            await ExecuteAsync(session, sql);
+        }
+        catch (Exception error) when (error is not OperationCanceledException)
+        {
+            // Si la prueba ya falló, lo que importa es su fallo y no este.
+        }
+    }
+
+    /// <summary>
     /// Respalda la estructura de una tabla, la borra y la vuelve a crear desde el
     /// guion.
     ///

@@ -10,14 +10,14 @@
 
 | Campo | Valor |
 | --- | --- |
-| Última sesión | **022f** — 2026-08-17 |
-| Fase activa | **Respaldos y restauración:** Fases A, B, C y **D cerradas** —el asistente se abre desde el menú del explorador y el respaldo se sigue viendo en la barra de estado al cerrarlo—. Falta verlo contra los contenedores; la siguiente es la **E, perfiles** |
+| Última sesión | **022g** — 2026-08-17 |
+| Fase activa | **Respaldos y restauración:** Fases A, B, C y **D cerradas y probadas contra PostgreSQL real**: el caso del §1 se resuelve desde la interfaz y el artefacto se aplica en una base vacía. La siguiente es la **E, perfiles** |
 | Fases 0–6 | ✅ Cerradas. |
 | Fase 7 | 🟡 **11/12.** El ciclo de instalación está probado sobre este equipo; solo falta arrancar en una máquina sin herramientas de desarrollo. |
 | Fase 8 | ✅ **7/7.** Tres motores sobre el mismo contrato y primera beta preparada. |
 | ¿Compila el backend? | Sí — 0 advertencias, 0 errores |
 | ¿Compila el envoltorio? | Sí |
-| ¿Pasan las pruebas? | Sí — **426 en backend** (232 unitarias, 126 contractuales y 68 de integración), **398 en frontend** y **6 en el envoltorio**. Con `DRUSE_REQUIRE_ENGINES=1` y **los cuatro motores**, sin saltarse ninguna |
+| ¿Pasan las pruebas? | Sí — **532 en backend** (295 unitarias, 158 contractuales y 79 de integración), **398 en frontend** y **6 en el envoltorio**. Con `DRUSE_REQUIRE_ENGINES=1` y **los cuatro motores**, sin saltarse ninguna |
 | ¿Hay aplicación de escritorio? | **Sí.** Instalador NSIS, MSI y ZIP portable, en dos variantes: con Informix y sin él |
 | Motores | **PostgreSQL, SQL Server, MySQL/MariaDB e Informix**, todos sobre el mismo contrato compartido |
 | Trabajo a medias | Ninguno. Las transacciones manuales quedaron terminadas en la sesión 020. |
@@ -27,21 +27,19 @@
 
 ### Qué toca retomar en la próxima sesión
 
-**Lo primero: ver el respaldo funcionar contra los contenedores.** La Fase D se
-cerró en la sesión 022f y la función ya se alcanza desde la aplicación, pero
-**nadie ha hecho todavía un respaldo de verdad desde la interfaz**. El caso que
-justifica la función —una base entera sin datos, salvo tres tablas de catálogo—
-es lo que hay que reproducir: levantar los contenedores con
-`./build/scripts/test-db.ps1`, arrancar la aplicación, respaldar desde el menú
-del árbol y aplicar lo generado en una base vacía.
+**Lo primero: la Fase E, perfiles guardados** (`backup_profiles` en SQLite, con
+la reconciliación de un perfil cuyas tablas ya no existen). La D quedó cerrada y
+**probada contra PostgreSQL de verdad** en la sesión 022g.
 
-Al hacerlo se comprueban de paso dos cosas que solo se ven ahí: que el respaldo
-sigue vivo al cerrar el asistente —la barra de estado tiene que seguir contando—
-y que el selector nativo de carpeta abre el diálogo del sistema, que **es Rust
-que nunca se ha compilado en este equipo**.
+Lo que sigue sin verse funcionar de los respaldos es **el selector nativo de
+carpeta**: es Rust y en este equipo cargo no compila. Fuera del envoltorio la
+ruta se escribe a mano y el respaldo funciona igual, así que no bloquea nada,
+pero nadie ha visto abrirse ese diálogo.
 
-Después, la **Fase E: perfiles guardados** (`backup_profiles` en SQLite, con la
-reconciliación de un perfil cuyas tablas ya no existen).
+Y dos detalles anotados en el plan de la función, ninguno urgente: la cabecera
+del manifiesto no se escribe al principio del `.sql` —solo al final—, y cuando el
+respaldo termina con el asistente cerrado, nada avisa: el indicador desaparece y
+hay que reabrirlo para ver el resumen.
 
 Y aparte, lo que ya venía. Ya no queda nada a medias: las transacciones manuales se cerraron en la sesión
 020 y los 44 archivos sueltos se repartieron en cuatro commits temáticos. Lo que
@@ -292,6 +290,50 @@ Y tres límites declarados desde el principio: no hay respaldo binario ni
 recuperación a un punto en el tiempo —eso es del servidor, y la interfaz tendrá
 que decirlo—, no hay respaldos programados, y un límite de filas puede dejar
 filas huérfanas, cosa que se avisa y no se corrige sola.
+
+### Sesión 022g — 2026-08-17 · El respaldo, probado de verdad: faltaba el esquema
+
+Se levantaron los cuatro contenedores y se hizo lo que ninguna prueba automática
+había hecho: **usar la función**. Una base con el caso del §1 —tres catálogos de
+4, 4 y 5 filas y cuatro tablas con 10.000 filas de «producción»—, y el respaldo
+armado desde el menú del árbol.
+
+Casi todo funcionó a la primera: las casillas de tres estados —desmarcar `public`
+dejó 7 de 23 tablas—, las estimaciones del catálogo, la regla general con sus tres
+excepciones señaladas, la vista previa con el DDL real, y el artefacto escrito con
+sus `INSERT` solo de los catálogos y los acentos intactos. Después, uno de
+**3.010.013 filas y 417 MB en 20,9 s** para ver el progreso con calma: se cerró el
+asistente a mitad, la barra de estado siguió contando —«Escribiendo datos ·
+pedido_lineas · 8 %»— y al volver a abrirlo el resumen seguía ahí.
+
+**Y entonces el artefacto no se pudo aplicar.** Contra una base vacía murió en la
+primera línea: «schema "tienda" does not exist». El respaldo escribía
+`CREATE TABLE "tienda"."…"` sin crear nunca el esquema, así que lo único que la
+función existe para hacer —llevarse la estructura a una base de desarrollo donde
+todavía no hay nada— era justo lo que no se podía. Ninguna prueba lo veía porque
+todas restauran sobre el esquema por omisión, que siempre está.
+
+Arreglado con `ScriptSchema` en el contrato del guionizador. PostgreSQL escribe
+`CREATE SCHEMA IF NOT EXISTS`; SQL Server lo condiciona con
+`IF SCHEMA_ID(...) IS NULL EXEC(...)`, porque no admite `IF NOT EXISTS` y exige
+ser la primera instrucción de su lote; MySQL e Informix no escriben nada, que
+allí el esquema es la base y crear una decidiría por quien restaura adónde va
+todo. Va condicionado a propósito: restaurar encima de lo de ayer es el caso más
+común y un `CREATE SCHEMA` a secas lo rompería. Lo fija una prueba contractual
+que aplica el guion **dos veces** contra los cuatro motores, y la de integración
+comprueba además que el esquema se escribe **antes** que sus tablas en las cuatro
+formas de salida.
+
+Con eso, el ciclo cierra sin tocar nada a mano: base vacía → respaldo → aplicado
+→ ocho tablas, catálogos con sus filas y producción vacía.
+
+Pruebas del backend: **532** (295 unitarias, 158 contractuales, 79 de
+integración), con `DRUSE_REQUIRE_ENGINES=1` y los cuatro motores, ninguna
+omitida.
+
+De paso, en el resumen del asistente los modos salían con el nombre del
+contrato —`StructureAndData`—, lo único de esa pantalla escrito para el servidor
+y no para quien lo lee.
 
 ### Sesión 022f — 2026-08-17 · La Fase D enganchada, y el diálogo que nunca estuvo en git
 

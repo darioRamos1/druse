@@ -13,6 +13,15 @@ public enum BackupEntryKind
 
     /// <summary>Índices, claves y restricciones, que van después de los datos.</summary>
     Constraints = 2,
+
+    /// <summary>
+    /// El `CREATE SCHEMA` de los esquemas que el respaldo va a necesitar.
+    ///
+    /// Va primero que todo: sin él, aplicar el artefacto en una base recién
+    /// creada falla en la primera instrucción, que es justo el caso que la
+    /// función existe para resolver —llevarse la estructura a desarrollo—.
+    /// </summary>
+    Schema = 3,
 }
 
 /// <summary>Dónde quedó el respaldo y cuánto ocupa.</summary>

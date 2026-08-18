@@ -315,7 +315,7 @@
               </p>
               <ul class="warnings">
                 @for (exception of exceptions(); track exception.key) {
-                  <li><strong>{{ exception.key }}</strong>: {{ exception.mode }}</li>
+                  <li><strong>{{ exception.key }}</strong>: {{ modeLabel(exception.mode) }}</li>
                 }
               </ul>
             }

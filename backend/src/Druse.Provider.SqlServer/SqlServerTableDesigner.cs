@@ -110,6 +110,24 @@ public sealed class SqlServerTableDesigner : TableDesignerBase
     protected override string Quote(string identifier) =>
         $"[{identifier.Replace("]", "]]", StringComparison.Ordinal)}]";
 
+    /// <summary>
+    /// SQL Server no admite `IF NOT EXISTS` en `CREATE SCHEMA`, y además exige
+    /// que sea la primera instrucción de su lote: por eso va dentro de un
+    /// `EXEC`, que es la forma de condicionarlo sin partir el guion en lotes.
+    /// </summary>
+    public override IReadOnlyList<string> ScriptSchema(string schema)
+    {
+        if (string.IsNullOrWhiteSpace(schema))
+        {
+            return [];
+        }
+
+        return
+        [
+            $"IF SCHEMA_ID({TextLiteral(schema)}) IS NULL EXEC({TextLiteral($"CREATE SCHEMA {Quote(schema)}")});",
+        ];
+    }
+
     protected override DbConnection Connection(IDatabaseSession session) =>
         session is SqlServerSession sqlServer
             ? sqlServer.Connection

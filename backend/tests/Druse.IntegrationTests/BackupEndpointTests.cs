@@ -227,6 +227,11 @@ public sealed class BackupEndpointTests(DruseApiFactory factory) : IClassFixture
 
             Assert.Contains(objects, name => name == parent || name == child);
 
+            // --- Y el esquema se crea antes que sus tablas --------------------
+            // Sin esto el artefacto no se puede aplicar sobre una base recién
+            // creada, que es justo para lo que se hace un respaldo de estructura.
+            AssertCreatesSchema(path!, layout, compress);
+
             // --- Y el manifiesto describe lo que hay dentro -------------------
             var manifest = ReadManifest(path!, layout, compress);
 
@@ -250,6 +255,43 @@ public sealed class BackupEndpointTests(DruseApiFactory factory) : IClassFixture
                 Directory.Delete(root, recursive: true);
             }
         }
+    }
+
+    /// <summary>
+    /// El `CREATE SCHEMA` está, y **antes** del primer `CREATE TABLE`.
+    ///
+    /// En la carpeta y en el zip el orden lo da el reparto por carpetas, así que
+    /// allí basta con que la entrada exista; en el archivo suelto el orden es el
+    /// archivo, y ahí sí se comprueba cuál va primero.
+    /// </summary>
+    private static void AssertCreatesSchema(string path, string layout, bool compress)
+    {
+        if (compress)
+        {
+            using var archive = ZipFile.OpenRead(path);
+
+            Assert.Contains(
+                archive.Entries,
+                entry => entry.FullName.Contains("esquemas/", StringComparison.Ordinal));
+
+            return;
+        }
+
+        if (layout == "FolderByKind")
+        {
+            Assert.True(
+                Directory.Exists(Path.Combine(path, "esquemas")),
+                "El respaldo por carpetas no escribió el esquema.");
+
+            return;
+        }
+
+        var text = File.ReadAllText(path);
+        var schema = text.IndexOf("CREATE SCHEMA", StringComparison.Ordinal);
+        var table = text.IndexOf("CREATE TABLE", StringComparison.Ordinal);
+
+        Assert.True(schema >= 0, "El guion no crea el esquema.");
+        Assert.True(schema < table, "El esquema se crea después de sus tablas.");
     }
 
     /// <summary>

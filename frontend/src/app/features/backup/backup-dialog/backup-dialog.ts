@@ -82,6 +82,23 @@ export class BackupDialog {
 
   protected readonly outcomeLabel = outcomeLabel;
 
+  /**
+   * El modo, dicho como en el desplegable que lo eligió.
+   *
+   * En el resumen salía el nombre del contrato —`StructureAndData`—, que es lo
+   * único de la pantalla escrito para el servidor y no para quien lo lee.
+   */
+  protected modeLabel(mode: BackupDataMode): string {
+    switch (mode) {
+      case 'StructureOnly':
+        return 'Solo estructura';
+      case 'DataOnly':
+        return 'Solo datos';
+      default:
+        return 'Estructura y datos';
+    }
+  }
+
   constructor() {
     effect(() => {
       const node = this.target();
