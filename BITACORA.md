@@ -31,6 +31,19 @@
 la reconciliación de un perfil cuyas tablas ya no existen). La D quedó cerrada y
 **probada contra PostgreSQL de verdad** en la sesión 022g.
 
+**El escenario de pruebas ya está sembrado, no hay que rehacerlo.** En
+`druse-pg-test` quedó el esquema `tienda` de la sesión 022g: `cat_paises`,
+`cat_monedas` y `cat_estados_pedido` con 4, 4 y 5 filas —los catálogos que sin
+datos no sirven—, `clientes`, `pedidos`, `pedido_lineas` y `facturas` con 10.000
+filas de «producción», y `movimientos` con tres millones para ver el progreso con
+calma. Está en `druse_test` y su copia restaurada en `druse_test_secondary`, y en
+la aplicación hay una conexión guardada, **«Contenedor de pruebas»**, apuntando al
+puerto 55440. Es exactamente el caso del §1 y sirve tal cual para probar los
+perfiles: guardar uno, reabrirlo y comprobar que reproduce el mismo respaldo.
+
+Ojo a una cosa al reconciliar: si se quiere probar un perfil que nombra tablas
+desaparecidas, `movimientos` es la que se puede borrar sin tocar el caso del §1.
+
 Lo que sigue sin verse funcionar de los respaldos es **el selector nativo de
 carpeta**: es Rust y en este equipo cargo no compila. Fuera del envoltorio la
 ruta se escribe a mano y el respaldo funciona igual, así que no bloquea nada,
