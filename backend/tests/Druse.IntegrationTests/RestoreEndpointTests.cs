@@ -21,42 +21,71 @@ public sealed class RestoreEndpointTests(DruseApiFactory factory) : IClassFixtur
 {
     private readonly DruseApiFactory _factory = factory;
 
-    private static string Port =>
-        Environment.GetEnvironmentVariable("DRUSE_TEST_PG_PORT") ?? "55440";
-
     private static bool Required =>
         Environment.GetEnvironmentVariable("DRUSE_REQUIRE_ENGINES") == "1";
+
+    /// <summary>PostgreSQL, para lo que no depende del motor y no hay por qué repetir.</summary>
+    private static RestoreEngine Postgres => RestoreEngines.Of(RestoreEngines.PostgreSql);
+
+    /// <summary>
+    /// Si un nombre del artefacto habla de esta tabla.
+    ///
+    /// El artefacto la nombra como toque en su motor: con esquema donde el
+    /// esquema es un objeto de la base, y **a secas en MySQL**, donde el esquema
+    /// es la base y por eso no viaja con el respaldo. Exigir aquí el nombre
+    /// completo sería exigir que el respaldo se atara a la base de origen, que es
+    /// justo lo que no debe hacer.
+    /// </summary>
+    private static bool Names(string announced, string table) =>
+        string.Equals(announced, table, StringComparison.OrdinalIgnoreCase) ||
+        announced.EndsWith($".{table}", StringComparison.OrdinalIgnoreCase);
 
     private sealed record SessionDto(Guid SessionId);
 
     /// <summary>Abre una sesión contra la base pedida, o nulo si no hay motor.</summary>
-    private static async Task<Guid?> OpenAsync(HttpClient client, string database)
+    private static async Task<Guid?> OpenAsync(
+        HttpClient client,
+        RestoreEngine engine,
+        string database)
     {
         var request = new
         {
             profile = new
             {
                 name = "Restauración",
-                engine = "PostgreSql",
-                host = "127.0.0.1",
-                port = int.Parse(Port, CultureInfo.InvariantCulture),
+                engine = engine.Id,
+                host = engine.Host,
+                port = engine.Port,
                 database,
-                username = "postgres",
+                username = engine.Username,
                 connectTimeoutSeconds = 5,
             },
-            password = "druse_dev_only",
+            password = engine.Password,
         };
 
         using var response = await client.PostAsJsonAsync("/api/sessions", request);
 
         if (!response.IsSuccessStatusCode)
         {
-            Assert.False(Required, "Se exigían los motores y PostgreSQL no respondió.");
+            Assert.False(Required, $"Se exigían los motores y {engine.Name} no respondió.");
 
             return null;
         }
 
         return (await response.Content.ReadFromJsonAsync<SessionDto>())?.SessionId;
+    }
+
+    /// <summary>
+    /// Cierra una sesión.
+    ///
+    /// No es cortesía: mientras quede una conexión abierta contra una base,
+    /// `DROP DATABASE` falla en PostgreSQL, en SQL Server y en Informix. Sin esto
+    /// la limpieza se traga el error y cada ejecución deja una base más en el
+    /// servidor —así aparecieron las `druse_nueva_*` del contenedor de pruebas—.
+    /// </summary>
+    private static async Task CloseAsync(HttpClient client, Guid session)
+    {
+        using var response = await client.DeleteAsync($"/api/sessions/{session}");
     }
 
     private static async Task<JsonElement> RunSqlAsync(HttpClient client, Guid session, string sql)
@@ -132,9 +161,49 @@ public sealed class RestoreEndpointTests(DruseApiFactory factory) : IClassFixtur
         return await response.Content.ReadFromJsonAsync<JsonElement>();
     }
 
+    /// <summary>
+    /// Por qué un respaldo o una restauración no terminaron limpios.
+    ///
+    /// Sin esto, un artefacto con avisos o una instrucción que revienta hacen
+    /// caer el ciclo entero con un «se esperaba Completed» y ni una palabra del
+    /// motivo, que es justo lo que hay que leer para saber si el problema es del
+    /// motor, del guion o de la prueba. Con cuatro motores en juego, esa
+    /// diferencia son horas.
+    /// </summary>
+    private static string Describe(JsonElement progress)
+    {
+        var warnings = progress.TryGetProperty("warnings", out var list)
+            ? list.EnumerateArray()
+                .Select(warning =>
+                    $"  · {warning.GetProperty("subject").GetString()}: " +
+                    warning.GetProperty("message").GetString())
+                .ToList()
+            : [];
+
+        var failure = string.Empty;
+
+        if (progress.TryGetProperty("failure", out var error)
+            && error.ValueKind is not JsonValueKind.Null)
+        {
+            failure = $"\nFallo: {error.GetProperty("message").GetString()}";
+
+            // La restauración además dice en qué instrucción se paró, que es lo
+            // primero que se mira cuando el guion no se puede aplicar.
+            if (error.TryGetProperty("statement", out var statement)
+                && statement.ValueKind is not JsonValueKind.Null)
+            {
+                failure += $"\nInstrucción: {statement.GetString()}";
+            }
+        }
+
+        return $"Terminó como «{progress.GetProperty("outcome").GetString()}».{failure}" +
+            (warnings.Count > 0 ? $"\nAvisos:\n{string.Join("\n", warnings)}" : string.Empty);
+    }
+
     /// <summary>Respalda las tablas indicadas a un `.sql` y devuelve su ruta.</summary>
     private static async Task<string> BackupAsync(
         HttpClient client,
+        RestoreEngine engine,
         Guid session,
         string root,
         params string[] tables)
@@ -146,7 +215,12 @@ public sealed class RestoreEndpointTests(DruseApiFactory factory) : IClassFixtur
             new
             {
                 sessionId = session,
-                tables = tables.Select(table => new { id = table, name = table, schema = "public" }),
+                tables = tables.Select(table => new
+                {
+                    id = table,
+                    name = table,
+                    schema = engine.Schema,
+                }),
                 dataMode = "StructureAndData",
                 layout = "SingleFile",
                 dataFormat = "Inserts",
@@ -168,7 +242,7 @@ public sealed class RestoreEndpointTests(DruseApiFactory factory) : IClassFixtur
 
             if (progress.GetProperty("outcome").GetString() != "Running")
             {
-                Assert.Equal("Completed", progress.GetProperty("outcome").GetString());
+                Assert.True(progress.GetProperty("outcome").GetString() == "Completed", Describe(progress));
 
                 return destination;
             }
@@ -184,56 +258,77 @@ public sealed class RestoreEndpointTests(DruseApiFactory factory) : IClassFixtur
     /// <summary>
     /// El criterio de salida: respaldar, restaurar en otra base y comprobar que
     /// lo restaurado es lo que había.
+    ///
+    /// Se recorren **los cuatro motores**. Las contractuales ya cubrían a los
+    /// cuatro por debajo, pero el ciclo entero solo se había ejercitado en
+    /// PostgreSQL: entre el dominio y la pantalla hay un contrato HTTP donde el
+    /// motor es un identificador y el esquema significa cosas distintas.
     /// </summary>
-    [Fact]
-    public async Task RespaldaUnaBaseYLaRestauraEnOtra()
+    [Theory]
+    [InlineData(RestoreEngines.PostgreSql)]
+    [InlineData(RestoreEngines.SqlServer)]
+    [InlineData(RestoreEngines.MySql)]
+    [InlineData(RestoreEngines.Informix)]
+    public async Task RespaldaUnaBaseYLaRestauraEnOtra(string id)
     {
+        var engine = RestoreEngines.Of(id);
+
         using var client = _factory.CreateAuthenticatedClient();
 
-        var origin = await OpenAsync(client, "druse_test");
+        var origin = await OpenAsync(client, engine, engine.Database);
 
         if (origin is null) { return; }
 
-        var target = await OpenAsync(client, "druse_test_secondary");
+        var target = await OpenAsync(client, engine, engine.SecondaryDatabase);
 
         Assert.NotNull(target);
 
         var suffix = Guid.NewGuid().ToString("N")[..8];
         var padre = $"druse_res_pad_{suffix}";
         var hijo = $"druse_res_hij_{suffix}";
-        var root = Path.Combine(Path.GetTempPath(), $"druse-restore-{suffix}");
+        var root = Path.Combine(Path.GetTempPath(), $"druse-restore-{id}-{suffix}");
 
         Directory.CreateDirectory(root);
 
         try
         {
             await RunSqlAsync(client, origin.Value, $"""
-                CREATE TABLE {padre} (id integer PRIMARY KEY, nombre text NOT NULL);
+                CREATE TABLE {padre} (id {engine.NumberType} PRIMARY KEY, nombre {engine.TextType} NOT NULL)
                 """);
 
             await RunSqlAsync(client, origin.Value, $"""
                 CREATE TABLE {hijo} (
-                    id       integer PRIMARY KEY,
-                    padre_id integer REFERENCES {padre} (id),
-                    nota     text
-                );
+                    id       {engine.NumberType} PRIMARY KEY,
+                    padre_id {engine.NumberType} REFERENCES {padre} (id),
+                    nota     {engine.TextType}
+                )
+                """);
+
+            // Una fila por instrucción: Informix no admite varias tuplas en un
+            // mismo `VALUES`, y lo que se prueba aquí no es el `INSERT`.
+            await RunSqlAsync(client, origin.Value, $"""
+                INSERT INTO {padre} (id, nombre) VALUES (1, 'Ana')
                 """);
 
             await RunSqlAsync(client, origin.Value, $"""
-                INSERT INTO {padre} (id, nombre) VALUES (1, 'Ana'), (2, 'O''Donnell; 12');
+                INSERT INTO {padre} (id, nombre) VALUES (2, 'O''Donnell; 12')
                 """);
 
             await RunSqlAsync(client, origin.Value, $"""
-                INSERT INTO {hijo} (id, padre_id, nota) VALUES (1, 1, 'una'), (2, 2, 'otra');
+                INSERT INTO {hijo} (id, padre_id, nota) VALUES (1, 1, 'una')
                 """);
 
-            var path = await BackupAsync(client, origin.Value, root, padre, hijo);
+            await RunSqlAsync(client, origin.Value, $"""
+                INSERT INTO {hijo} (id, padre_id, nota) VALUES (2, 2, 'otra')
+                """);
+
+            var path = await BackupAsync(client, engine, origin.Value, root, padre, hijo);
 
             // --- Mirar antes de tocar -----------------------------------------
             var inspection = await InspectAsync(client, target.Value, path);
 
             Assert.True(inspection.GetProperty("canRestore").GetBoolean());
-            Assert.Equal("PostgreSql", inspection.GetProperty("manifest").GetProperty("engine").GetString());
+            Assert.Equal(engine.Id, inspection.GetProperty("manifest").GetProperty("engine").GetString());
             Assert.True(inspection.GetProperty("statements").GetInt32() > 0);
 
             var announced = inspection.GetProperty("tables")
@@ -241,7 +336,7 @@ public sealed class RestoreEndpointTests(DruseApiFactory factory) : IClassFixtur
                 .Select(table => table.GetString())
                 .ToList();
 
-            Assert.Contains($"public.{padre}", announced);
+            Assert.Contains(announced, name => Names(name!, padre));
 
             // La base destino está limpia: no hay nada que sobrescribir todavía.
             Assert.Empty(inspection.GetProperty("collisions").EnumerateArray());
@@ -253,12 +348,12 @@ public sealed class RestoreEndpointTests(DruseApiFactory factory) : IClassFixtur
                 path,
             });
 
-            Assert.Equal("Completed", result.GetProperty("outcome").GetString());
+            Assert.True(result.GetProperty("outcome").GetString() == "Completed", Describe(result));
             Assert.True(result.GetProperty("applied").GetInt32() > 0);
 
             // --- Y lo restaurado es lo que había -------------------------------
             var rows = await RunSqlAsync(client, target.Value, $"""
-                SELECT nombre FROM {padre} ORDER BY id;
+                SELECT nombre FROM {padre} ORDER BY id
                 """);
 
             var values = rows.GetProperty("resultSets")[0]
@@ -271,7 +366,7 @@ public sealed class RestoreEndpointTests(DruseApiFactory factory) : IClassFixtur
             // el guion a lo bruto: si llega entero, el lector hizo su trabajo.
             Assert.Equal(["Ana", "O'Donnell; 12"], values);
 
-            var hijos = await RunSqlAsync(client, target.Value, $"SELECT count(*) FROM {hijo};");
+            var hijos = await RunSqlAsync(client, target.Value, $"SELECT count(*) FROM {hijo}");
 
             Assert.Equal("2", hijos.GetProperty("resultSets")[0].GetProperty("rows")[0][0].GetString());
 
@@ -282,8 +377,8 @@ public sealed class RestoreEndpointTests(DruseApiFactory factory) : IClassFixtur
                 .Select(collision => collision.GetProperty("table").GetString())
                 .ToList();
 
-            Assert.Contains($"public.{padre}", collisions);
-            Assert.Contains($"public.{hijo}", collisions);
+            Assert.Contains(collisions, name => Names(name!, padre));
+            Assert.Contains(collisions, name => Names(name!, hijo));
         }
         finally
         {
@@ -310,41 +405,53 @@ public sealed class RestoreEndpointTests(DruseApiFactory factory) : IClassFixtur
     /// crea y aplica dentro el artefacto. Lo que se comprueba es que la base
     /// aparece, que lo restaurado está en ella y que **la de origen no se toca**.
     /// </summary>
-    [Fact]
-    public async Task CreaLaBaseNuevaYRestauraDentro()
+    [Theory]
+    [InlineData(RestoreEngines.PostgreSql)]
+    [InlineData(RestoreEngines.SqlServer)]
+    [InlineData(RestoreEngines.MySql)]
+    [InlineData(RestoreEngines.Informix)]
+    public async Task CreaLaBaseNuevaYRestauraDentro(string id)
     {
+        var engine = RestoreEngines.Of(id);
+
         using var client = _factory.CreateAuthenticatedClient();
 
-        var origin = await OpenAsync(client, "druse_test");
+        var origin = await OpenAsync(client, engine, engine.Database);
 
         if (origin is null) { return; }
 
         var suffix = Guid.NewGuid().ToString("N")[..8];
         var tabla = $"druse_copia_{suffix}";
         var nueva = $"druse_nueva_{suffix}";
-        var root = Path.Combine(Path.GetTempPath(), $"druse-restore-nueva-{suffix}");
+        var root = Path.Combine(Path.GetTempPath(), $"druse-restore-nueva-{id}-{suffix}");
 
         Directory.CreateDirectory(root);
+
+        Guid? target = null;
 
         try
         {
             await RunSqlAsync(client, origin.Value, $"""
-                CREATE TABLE {tabla} (id integer PRIMARY KEY, nombre text NOT NULL);
+                CREATE TABLE {tabla} (id {engine.NumberType} PRIMARY KEY, nombre {engine.TextType} NOT NULL)
                 """);
 
             await RunSqlAsync(client, origin.Value, $"""
-                INSERT INTO {tabla} (id, nombre) VALUES (1, 'Ana'), (2, 'Luis');
+                INSERT INTO {tabla} (id, nombre) VALUES (1, 'Ana')
                 """);
 
-            var path = await BackupAsync(client, origin.Value, root, tabla);
+            await RunSqlAsync(client, origin.Value, $"""
+                INSERT INTO {tabla} (id, nombre) VALUES (2, 'Luis')
+                """);
+
+            var path = await BackupAsync(client, engine, origin.Value, root, tabla);
 
             // La inspección propone el nombre de la base de la que salió y dice
             // cuáles hay ya, que es con lo que la pantalla avisa antes de lanzar.
             var inspection = await InspectAsync(client, origin.Value, path);
 
-            Assert.Equal("druse_test", inspection.GetProperty("sourceDatabase").GetString());
+            Assert.Equal(engine.Database, inspection.GetProperty("sourceDatabase").GetString());
             Assert.Contains(
-                "druse_test",
+                engine.Database,
                 inspection.GetProperty("databases").EnumerateArray().Select(name => name.GetString()));
 
             var result = await RestoreAsync(client, new
@@ -354,21 +461,29 @@ public sealed class RestoreEndpointTests(DruseApiFactory factory) : IClassFixtur
                 newDatabase = nueva,
             });
 
-            Assert.Equal("Completed", result.GetProperty("outcome").GetString());
+            Assert.True(result.GetProperty("outcome").GetString() == "Completed", Describe(result));
 
             // Y lo restaurado está en la base nueva, no en la de origen.
-            var target = await OpenAsync(client, nueva);
+            target = await OpenAsync(client, engine, nueva);
 
             Assert.NotNull(target);
 
-            var rows = await RunSqlAsync(client, target.Value, $"SELECT count(*) FROM {tabla};");
+            var rows = await RunSqlAsync(client, target.Value, $"SELECT count(*) FROM {tabla}");
 
             Assert.Equal("2", rows.GetProperty("resultSets")[0].GetProperty("rows")[0][0].GetString());
         }
         finally
         {
             await CleanAsync(client, origin.Value, $"DROP TABLE IF EXISTS {tabla}");
-            await CleanAsync(client, origin.Value, $"DROP DATABASE IF EXISTS {nueva}");
+
+            // Primero se suelta la conexión a la base nueva: con ella abierta,
+            // el `DROP DATABASE` no llega a ejecutarse en tres de los cuatro.
+            if (target is not null)
+            {
+                await CloseAsync(client, target.Value);
+            }
+
+            await CleanAsync(client, origin.Value, engine.DropDatabase(nueva));
 
             if (Directory.Exists(root))
             {
@@ -382,32 +497,38 @@ public sealed class RestoreEndpointTests(DruseApiFactory factory) : IClassFixtur
     /// una base nueva» está copiando, y escribir encima de otra cosa no es un
     /// matiz. Se para **antes** de tocar nada.
     /// </summary>
-    [Fact]
-    public async Task SeNiegaACrearUnaBaseQueYaExiste()
+    [Theory]
+    [InlineData(RestoreEngines.PostgreSql)]
+    [InlineData(RestoreEngines.SqlServer)]
+    [InlineData(RestoreEngines.MySql)]
+    [InlineData(RestoreEngines.Informix)]
+    public async Task SeNiegaACrearUnaBaseQueYaExiste(string id)
     {
+        var engine = RestoreEngines.Of(id);
+
         using var client = _factory.CreateAuthenticatedClient();
 
-        var origin = await OpenAsync(client, "druse_test");
+        var origin = await OpenAsync(client, engine, engine.Database);
 
         if (origin is null) { return; }
 
         var suffix = Guid.NewGuid().ToString("N")[..8];
         var tabla = $"druse_choque_{suffix}";
-        var root = Path.Combine(Path.GetTempPath(), $"druse-restore-choque-{suffix}");
+        var root = Path.Combine(Path.GetTempPath(), $"druse-restore-choque-{id}-{suffix}");
 
         Directory.CreateDirectory(root);
 
         try
         {
-            await RunSqlAsync(client, origin.Value, $"CREATE TABLE {tabla} (id integer PRIMARY KEY);");
+            await RunSqlAsync(client, origin.Value, $"CREATE TABLE {tabla} (id {engine.NumberType} PRIMARY KEY)");
 
-            var path = await BackupAsync(client, origin.Value, root, tabla);
+            var path = await BackupAsync(client, engine, origin.Value, root, tabla);
 
             var result = await RestoreAsync(client, new
             {
                 sessionId = origin.Value,
                 path,
-                newDatabase = "druse_test_secondary",
+                newDatabase = engine.SecondaryDatabase,
             });
 
             Assert.Equal("Failed", result.GetProperty("outcome").GetString());
@@ -415,7 +536,7 @@ public sealed class RestoreEndpointTests(DruseApiFactory factory) : IClassFixtur
             var failure = result.GetProperty("failure");
 
             Assert.Contains(
-                "druse_test_secondary",
+                engine.SecondaryDatabase,
                 failure.GetProperty("message").GetString(),
                 StringComparison.Ordinal);
 
@@ -447,11 +568,11 @@ public sealed class RestoreEndpointTests(DruseApiFactory factory) : IClassFixtur
     {
         using var client = _factory.CreateAuthenticatedClient();
 
-        var origin = await OpenAsync(client, "druse_test");
+        var origin = await OpenAsync(client, Postgres, Postgres.Database);
 
         if (origin is null) { return; }
 
-        var target = await OpenAsync(client, "druse_test_secondary");
+        var target = await OpenAsync(client, Postgres, Postgres.SecondaryDatabase);
 
         Assert.NotNull(target);
 
@@ -476,11 +597,11 @@ public sealed class RestoreEndpointTests(DruseApiFactory factory) : IClassFixtur
                 INSERT INTO {tabla} (id, nit) VALUES (1, '900.123-4');
                 """);
 
-            var path = await BackupAsync(client, origin.Value, root, tabla);
+            var path = await BackupAsync(client, Postgres, origin.Value, root, tabla);
 
             var result = await RestoreAsync(client, new { sessionId = target.Value, path });
 
-            Assert.Equal("Completed", result.GetProperty("outcome").GetString());
+            Assert.True(result.GetProperty("outcome").GetString() == "Completed", Describe(result));
 
             var indices = await RunSqlAsync(client, target.Value, $"""
                 SELECT indexdef FROM pg_indexes WHERE indexname = '{indice}';
@@ -514,6 +635,7 @@ public sealed class RestoreEndpointTests(DruseApiFactory factory) : IClassFixtur
     /// <summary>Respalda a una carpeta con los datos en CSV y devuelve su ruta.</summary>
     private static async Task<string> BackupToCsvAsync(
         HttpClient client,
+        RestoreEngine engine,
         Guid session,
         string root,
         params string[] tables)
@@ -525,7 +647,12 @@ public sealed class RestoreEndpointTests(DruseApiFactory factory) : IClassFixtur
             new
             {
                 sessionId = session,
-                tables = tables.Select(table => new { id = table, name = table, schema = "public" }),
+                tables = tables.Select(table => new
+                {
+                    id = table,
+                    name = table,
+                    schema = engine.Schema,
+                }),
                 dataMode = "StructureAndData",
                 layout = "FolderByKind",
                 dataFormat = "Csv",
@@ -547,7 +674,7 @@ public sealed class RestoreEndpointTests(DruseApiFactory factory) : IClassFixtur
 
             if (progress.GetProperty("outcome").GetString() != "Running")
             {
-                Assert.Equal("Completed", progress.GetProperty("outcome").GetString());
+                Assert.True(progress.GetProperty("outcome").GetString() == "Completed", Describe(progress));
 
                 return destination;
             }
@@ -573,11 +700,11 @@ public sealed class RestoreEndpointTests(DruseApiFactory factory) : IClassFixtur
     {
         using var client = _factory.CreateAuthenticatedClient();
 
-        var origin = await OpenAsync(client, "druse_test");
+        var origin = await OpenAsync(client, Postgres, Postgres.Database);
 
         if (origin is null) { return; }
 
-        var target = await OpenAsync(client, "druse_test_secondary");
+        var target = await OpenAsync(client, Postgres, Postgres.SecondaryDatabase);
 
         Assert.NotNull(target);
 
@@ -605,7 +732,7 @@ public sealed class RestoreEndpointTests(DruseApiFactory factory) : IClassFixtur
                     (3, E'con\nsalto',      0.00,  DATE '2026-08-18');
                 """);
 
-            var path = await BackupToCsvAsync(client, origin.Value, root, tabla);
+            var path = await BackupToCsvAsync(client, Postgres, origin.Value, root, tabla);
 
             // Los datos están en su archivo, no dentro del guion.
             Assert.True(File.Exists(Path.Combine(path, "datos", $"{tabla}.csv")));
@@ -624,7 +751,7 @@ public sealed class RestoreEndpointTests(DruseApiFactory factory) : IClassFixtur
 
             var result = await RestoreAsync(client, new { sessionId = target.Value, path });
 
-            Assert.Equal("Completed", result.GetProperty("outcome").GetString());
+            Assert.True(result.GetProperty("outcome").GetString() == "Completed", Describe(result));
             Assert.Equal(3, result.GetProperty("rowsWritten").GetInt64());
 
             var rows = await RunSqlAsync(client, target.Value, $"""
@@ -674,7 +801,7 @@ public sealed class RestoreEndpointTests(DruseApiFactory factory) : IClassFixtur
     {
         using var client = _factory.CreateAuthenticatedClient();
 
-        var session = await OpenAsync(client, "druse_test");
+        var session = await OpenAsync(client, Postgres, Postgres.Database);
 
         if (session is null) { return; }
 
@@ -721,7 +848,7 @@ public sealed class RestoreEndpointTests(DruseApiFactory factory) : IClassFixtur
     {
         using var client = _factory.CreateAuthenticatedClient();
 
-        var session = await OpenAsync(client, "druse_test");
+        var session = await OpenAsync(client, Postgres, Postgres.Database);
 
         if (session is null) { return; }
 
@@ -765,7 +892,7 @@ public sealed class RestoreEndpointTests(DruseApiFactory factory) : IClassFixtur
     {
         using var client = _factory.CreateAuthenticatedClient();
 
-        var session = await OpenAsync(client, "druse_test");
+        var session = await OpenAsync(client, Postgres, Postgres.Database);
 
         if (session is null) { return; }
 
@@ -815,7 +942,7 @@ public sealed class RestoreEndpointTests(DruseApiFactory factory) : IClassFixtur
                 resumeFrom = 2,
             });
 
-            Assert.Equal("Completed", resumed.GetProperty("outcome").GetString());
+            Assert.True(resumed.GetProperty("outcome").GetString() == "Completed", Describe(resumed));
 
             // La tercera se aplicó, y la primera no se repitió: si se hubiera
             // repetido, el `CREATE TABLE` habría fallado y no habría «Completed».
@@ -835,7 +962,7 @@ public sealed class RestoreEndpointTests(DruseApiFactory factory) : IClassFixtur
     {
         using var client = _factory.CreateAuthenticatedClient();
 
-        var session = await OpenAsync(client, "druse_test");
+        var session = await OpenAsync(client, Postgres, Postgres.Database);
 
         if (session is null) { return; }
 
