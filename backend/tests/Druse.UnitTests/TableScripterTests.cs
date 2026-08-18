@@ -336,20 +336,35 @@ public sealed class TableScripterTests
     }
 
     /// <summary>
-    /// En MySQL el esquema **es** la base: calificar con dos niveles daría un
-    /// nombre inválido, y por eso el motor lo declara en vez de que lo suponga
-    /// quien arma el respaldo.
+    /// En MySQL el guion de un respaldo nombra la tabla **a secas**.
+    ///
+    /// Aquí el esquema es la base, así que calificar no distingue una tabla
+    /// dentro de la base: la ata a una base concreta. Un artefacto con
+    /// `ventas.pedidos` dentro se aplica en `ventas` se restaure donde se
+    /// restaure, y «restaurar en otra base» acaba escribiendo en el origen. Se
+    /// descubrió restaurando de verdad, con un `CREATE TABLE` que falló porque la
+    /// tabla ya existía... en la base de la que venía el respaldo.
+    ///
+    /// Es también lo que hace `mysqldump`. Fuera del respaldo —un `ALTER TABLE`
+    /// del diseñador— sí se califica, y con un solo nivel: `base.esquema.tabla`
+    /// sería un nombre inválido.
     /// </summary>
     [Fact]
-    public void MySqlCalificaConUnSoloNivel()
+    public void MySqlNoAtaElRespaldoASuBase()
     {
         var designer = new MySqlTableDesigner();
 
         var sql = Script(designer.ScriptTable(Pedidos()));
+        var fk = Assert.Single(designer.ScriptForeignKeys(Pedidos()));
 
         Assert.False(designer.Capabilities.SupportsSchemas);
-        Assert.Contains("CREATE TABLE `ventas`.`pedidos`", sql, StringComparison.Ordinal);
-        Assert.DoesNotContain("`tienda`.`ventas`", sql, StringComparison.Ordinal);
+        Assert.Contains("CREATE TABLE `pedidos`", sql, StringComparison.Ordinal);
+        Assert.DoesNotContain("`ventas`", sql, StringComparison.Ordinal);
+
+        // Y lo que apuntan las claves foráneas, igual: bastaría una para
+        // devolver la mitad del artefacto a la base de origen.
+        Assert.DoesNotContain("`ventas`", fk, StringComparison.Ordinal);
+        Assert.Contains("REFERENCES `clientes` (`id`)", fk, StringComparison.Ordinal);
     }
 
     /// <summary>

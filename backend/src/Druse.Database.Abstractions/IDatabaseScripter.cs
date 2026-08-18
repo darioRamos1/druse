@@ -99,6 +99,11 @@ public interface IDatabaseScripter
     /// <summary>
     /// El `CREATE TABLE`: columnas, clave primaria, restricciones de unicidad y de
     /// comprobación. **Sin índices y sin claves foráneas**, que llegan después.
+    ///
+    /// Lo que sale de aquí va a un artefacto, y **un artefacto no pertenece a la
+    /// base de la que salió**: se aplica donde el usuario diga. Por eso el nombre
+    /// que se escribe puede no ser el completo —en MySQL, donde el esquema es la
+    /// base, no lo es— y cada motor decide cuánto de él sobrevive.
     /// </summary>
     IReadOnlyList<string> ScriptTable(ScriptedTable table);
 

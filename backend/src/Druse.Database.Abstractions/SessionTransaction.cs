@@ -21,6 +21,7 @@ public sealed class SessionTransaction
 {
     private readonly DbConnection? _connection;
     private DbTransaction? _transaction;
+    private DbTransaction? _borrowed;
 
     public SessionTransaction(DbConnection connection) => _connection = connection;
 
@@ -35,10 +36,48 @@ public sealed class SessionTransaction
     /// </summary>
     public static SessionTransaction None { get; } = new();
 
-    /// <summary>La transacción abierta, o `null` si se trabaja en autocommit.</summary>
-    public DbTransaction? Current => _transaction;
+    /// <summary>
+    /// La transacción que hay **en la conexión**, o `null` si se trabaja en
+    /// autocommit. Es la que todo comando tiene que llevar puesta.
+    ///
+    /// Puede ser la del usuario o una interna que dure lo que dure una operación,
+    /// como la instantánea de un respaldo. Para el comando es lo mismo: MySQL e
+    /// Informix rechazan un comando sin transacción cuando la conexión tiene una
+    /// pendiente, venga de donde venga. Quien necesite distinguirlas mira
+    /// <see cref="IsOpen"/>, que solo habla de la del usuario.
+    /// </summary>
+    public DbTransaction? Current => _transaction ?? _borrowed;
 
+    /// <summary>Si el **usuario** tiene una transacción abierta.</summary>
     public bool IsOpen => _transaction is not null;
+
+    /// <summary>
+    /// Presta una transacción interna a la sesión mientras dure una operación.
+    ///
+    /// No es la del usuario y no se confirma ni se deshace desde aquí: quien la
+    /// abrió la cierra. Se anuncia para que los comandos que salgan mientras
+    /// tanto —leer un catálogo, leer filas— la lleven puesta.
+    ///
+    /// Se descubrió respaldando en MySQL e Informix: la instantánea abría una
+    /// transacción que nadie más veía, y **la estructura de todas las tablas se
+    /// perdía** con un aviso por tabla mientras el respaldo terminaba «con
+    /// avisos». En PostgreSQL no se notaba porque Npgsql no exige asignarla.
+    /// </summary>
+    public void Borrow(DbTransaction transaction)
+    {
+        ArgumentNullException.ThrowIfNull(transaction);
+
+        if (_borrowed is not null)
+        {
+            throw new InvalidOperationException(
+                "Ya hay una transacción interna prestada a esta sesión.");
+        }
+
+        _borrowed = transaction;
+    }
+
+    /// <summary>Devuelve la transacción prestada. Sin ella, no hace nada.</summary>
+    public void Return() => _borrowed = null;
 
     /// <summary>
     /// Cuándo se abrió.
@@ -75,7 +114,7 @@ public sealed class SessionTransaction
 
     public async Task BeginAsync(CancellationToken cancellationToken)
     {
-        if (_transaction is not null)
+        if (Current is not null)
         {
             throw new InvalidOperationException("Ya hay una transacción abierta en esta conexión.");
         }

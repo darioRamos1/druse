@@ -501,11 +501,20 @@ public sealed partial class RestoreService(
             return [];
         }
 
+        // Se empareja con la misma tolerancia que al meter datos: el artefacto
+        // puede nombrar la tabla sin esquema —lo hace MySQL, donde el esquema es
+        // la base y no viaja con el respaldo— y aun así estar hablando de una que
+        // ya existe aquí. Compararlo por clave exacta diría «no hay nada que
+        // sobrescribir» justo antes de sobrescribirlo.
         return
         [
             .. tables
-                .Where(existing.ContainsKey)
-                .Select(table => new RestoreCollision(table, existing[table].ApproximateRowCount)),
+                .Select(table => (Name: table, Match: existing.Values.FirstOrDefault(
+                    candidate => Matches(DataSelection.KeyOf(candidate), table))))
+                .Where(pair => pair.Match is not null)
+                .Select(pair => new RestoreCollision(
+                    pair.Name,
+                    pair.Match!.ApproximateRowCount)),
         ];
     }
 

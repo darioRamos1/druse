@@ -191,6 +191,36 @@ public sealed class MySqlTableDesigner : TableDesignerBase
         };
 
     /// <summary>
+    /// En un respaldo, la tabla va a secas.
+    ///
+    /// Como aquí el esquema es la base, calificar el guion lo ataría a la base de
+    /// la que salió: restaurar «en otra base» acabaría escribiendo en el origen.
+    /// Sin nombre delante, cada instrucción va a donde apunte la conexión, que es
+    /// lo que el usuario eligió. Es también lo que hace `mysqldump`.
+    /// </summary>
+    protected override ScriptedTable Portable(ScriptedTable table)
+    {
+        ArgumentNullException.ThrowIfNull(table);
+
+        return table with
+        {
+            Table = table.Table with { Database = null, Schema = null },
+
+            // Y lo mismo con lo que apuntan las claves foráneas: un `REFERENCES
+            // ventas.clientes` en el `ALTER TABLE` ataría la mitad del artefacto
+            // a la base de origen aunque las tablas se hubieran creado bien.
+            Structure = table.Structure with
+            {
+                ForeignKeys =
+                [
+                    .. table.Structure.ForeignKeys
+                        .Select(key => key with { ReferencedSchema = null }),
+                ],
+            },
+        };
+    }
+
+    /// <summary>
     /// En MySQL el esquema **es** la base, así que no hay dos niveles que
     /// calificar: escribir `base.esquema.tabla` sería un nombre inválido.
     /// </summary>

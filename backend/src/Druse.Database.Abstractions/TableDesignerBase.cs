@@ -458,8 +458,23 @@ public abstract class TableDesignerBase : ITableDesigner, IDatabaseScripter
         return [$"CREATE DATABASE {Quote(name)}"];
     }
 
+    /// <summary>
+    /// La misma tabla, nombrada como hay que nombrarla **dentro de un artefacto**.
+    ///
+    /// Un respaldo no pertenece a la base de la que salió: se aplica donde el
+    /// usuario diga. Por omisión no hay nada que quitar —`public` y `dbo` son
+    /// esquemas dentro de cualquier base, y el propietario de Informix tampoco es
+    /// una base—, así que solo lo redefine el motor donde el esquema **es** la
+    /// base.
+    ///
+    /// Lo aplican los tres métodos de guionizado y los `INSERT`, que es todo lo
+    /// que acaba escrito en el artefacto. Lo que se lee del origen conserva el
+    /// nombre completo: la tabla puede estar en otra base del mismo servidor.
+    /// </summary>
+    protected virtual ScriptedTable Portable(ScriptedTable table) => table;
+
     public IReadOnlyList<string> ScriptTable(ScriptedTable table) =>
-        DescribeCreate(ToDefinition(table));
+        DescribeCreate(ToDefinition(Portable(table)));
 
     /// <summary>
     /// Manda una instrucción del artefacto por la conexión de la sesión.
@@ -492,6 +507,8 @@ public abstract class TableDesignerBase : ITableDesigner, IDatabaseScripter
     public IReadOnlyList<string> ScriptIndexes(ScriptedTable table)
     {
         ArgumentNullException.ThrowIfNull(table);
+
+        table = Portable(table);
 
         var qualified = Qualify(table.Table.Database, table.Table.Schema, table.Table.Name);
 
@@ -532,6 +549,8 @@ public abstract class TableDesignerBase : ITableDesigner, IDatabaseScripter
     public IReadOnlyList<string> ScriptForeignKeys(ScriptedTable table)
     {
         ArgumentNullException.ThrowIfNull(table);
+
+        table = Portable(table);
 
         var qualified = Qualify(table.Table.Database, table.Table.Schema, table.Table.Name);
 
@@ -590,7 +609,7 @@ public abstract class TableDesignerBase : ITableDesigner, IDatabaseScripter
         // Con una transacción del usuario abierta se lee dentro de ella: es lo que
         // esa sesión ve, incluidos sus cambios sin confirmar, y abrir otra sobre la
         // misma conexión no lo admite ningún motor.
-        if (session.Transaction.Current is { } manual)
+        if (session.Transaction is { IsOpen: true, Current: { } manual })
         {
             return new BorrowedSnapshot(manual);
         }
@@ -612,7 +631,11 @@ public abstract class TableDesignerBase : ITableDesigner, IDatabaseScripter
 
         try
         {
+            // Se le presta a la sesión: los comandos que salgan mientras dure
+            // —el catálogo de cada tabla, las filas— tienen que llevarla puesta,
+            // o MySQL e Informix los rechazan por tener la conexión ocupada.
             return new OwnedSnapshot(
+                session.Transaction,
                 await connection.BeginTransactionAsync(level, cancellationToken));
         }
         catch (Exception error) when (error is DbException or InvalidOperationException or NotSupportedException)
@@ -638,17 +661,32 @@ public abstract class TableDesignerBase : ITableDesigner, IDatabaseScripter
         Task.FromResult(Capabilities.Isolation);
 
     /// <summary>Instantánea propia: se abrió aquí y aquí se cierra.</summary>
-    private sealed class OwnedSnapshot(DbTransaction transaction) : IBackupSnapshot
+    private sealed class OwnedSnapshot : IBackupSnapshot
     {
-        public DbTransaction? Transaction => transaction;
+        private readonly SessionTransaction _session;
+        private readonly DbTransaction _transaction;
+
+        public OwnedSnapshot(SessionTransaction session, DbTransaction transaction)
+        {
+            _session = session;
+            _transaction = transaction;
+
+            _session.Borrow(transaction);
+        }
+
+        public DbTransaction? Transaction => _transaction;
 
         public bool IsConsistent => true;
 
         public async ValueTask DisposeAsync()
         {
+            // Se devuelve antes de deshacerla: dejarla anunciada un instante más
+            // sería ofrecer a los comandos una transacción ya muerta.
+            _session.Return();
+
             // Solo se ha leído: deshacerla es la forma de soltarla sin escribir.
-            await transaction.RollbackAsync();
-            await transaction.DisposeAsync();
+            await _transaction.RollbackAsync();
+            await _transaction.DisposeAsync();
         }
     }
 
@@ -687,7 +725,14 @@ public abstract class TableDesignerBase : ITableDesigner, IDatabaseScripter
             yield break;
         }
 
-        var qualified = Qualify(table.Table.Database, table.Table.Schema, table.Table.Name);
+        // Se lee de donde está y se escribe adonde se restaure: no son el mismo
+        // nombre. La tabla puede estar en otra base del mismo servidor, así que
+        // el `SELECT` la nombra entera; el `INSERT` va al artefacto y ahí el
+        // nombre de la base de origen sobraría.
+        var source = Qualify(table.Table.Database, table.Table.Schema, table.Table.Name);
+        var written = Portable(table).Table;
+        var qualified = Qualify(written.Database, written.Schema, written.Name);
+
         var header =
             $"INSERT INTO {qualified} " +
             $"({string.Join(", ", columns.Select(column => Quote(column.Name)))}) VALUES";
@@ -703,7 +748,7 @@ public abstract class TableDesignerBase : ITableDesigner, IDatabaseScripter
             : null;
 
         await using var command = connection.CreateCommand();
-        command.CommandText = SelectRows(qualified, columns, table, filter);
+        command.CommandText = SelectRows(source, columns, table, filter);
         command.Transaction = snapshot?.Transaction ?? scope?.Transaction;
 
         // SequentialAccess deja liberar cada fila según se lee, en lugar de
