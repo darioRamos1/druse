@@ -24,6 +24,9 @@ import {
 import {
   ApplicationGateway,
   BackupPreview,
+  BackupProfile,
+  BackupProfileInput,
+  BackupProfileResolution,
   BackupProgress,
   BackupRequest,
   ConnectRequest,
@@ -350,6 +353,32 @@ export class HttpApplicationGateway extends ApplicationGateway {
 
   override cancelBackup(backupId: string): Observable<void> {
     return this._http.post<void>(`/api/backup/${backupId}/cancel`, null);
+  }
+
+  override getBackupProfiles(): Observable<readonly BackupProfile[]> {
+    return this._http.get<BackupProfile[]>('/api/backup/profiles');
+  }
+
+  override saveBackupProfile(profile: BackupProfileInput): Observable<BackupProfile> {
+    return this._http.post<BackupProfile>('/api/backup/profiles', profile);
+  }
+
+  override deleteBackupProfile(profileId: string): Observable<void> {
+    return this._http.delete<void>(`/api/backup/profiles/${profileId}`);
+  }
+
+  override resolveBackupProfile(
+    profileId: string,
+    sessionId: string,
+  ): Observable<BackupProfileResolution> {
+    return this._http.post<BackupProfileResolution>(
+      `/api/backup/profiles/${profileId}/resolve`,
+      { sessionId },
+    );
+  }
+
+  override markBackupProfileRun(profileId: string): Observable<void> {
+    return this._http.post<void>(`/api/backup/profiles/${profileId}/ran`, null);
   }
 
   /** Añade lo que la cuadrícula necesita y la API no tiene por qué saber. */

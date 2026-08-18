@@ -118,6 +118,79 @@
       } @else {
         @switch (step()) {
           @case ('what') {
+            <!--
+              Los perfiles guardados van arriba del todo: quien vuelve a hacer el
+              respaldo de todas las semanas no debería tener que rehacer la
+              selección para encontrarlo.
+            -->
+            @if (profiles().length > 0) {
+              <div class="profiles">
+                <p class="profiles__title">Respaldos guardados</p>
+
+                @for (profile of profiles(); track profile.id) {
+                  <div class="profiles__row" [class.is-active]="activeProfile()?.id === profile.id">
+                    <button
+                      type="button"
+                      class="profiles__open"
+                      (click)="openProfile(profile)"
+                      [title]="'Abrir ' + profile.name"
+                    >
+                      <app-icon name="save" />
+                      <span class="name">{{ profile.name }}</span>
+                      @if (profile.lastRunAtUtc) {
+                        <span class="when">último uso {{ profile.lastRunAtUtc | date: 'short' }}</span>
+                      } @else {
+                        <span class="when">sin lanzar todavía</span>
+                      }
+                    </button>
+
+                    <button
+                      type="button"
+                      class="profiles__delete"
+                      (click)="deleteProfile(profile)"
+                      [title]="'Borrar ' + profile.name"
+                    >
+                      <app-icon name="trash" />
+                    </button>
+                  </div>
+                }
+              </div>
+            }
+
+            <!--
+              Lo que el perfil pedía y hoy no está. Se dice al abrirlo y no al
+              lanzarlo: para entonces ya sería tarde para decidir otra cosa.
+            -->
+            @if (gaps().length > 0) {
+              <div class="reconcile reconcile--gaps">
+                <p class="reconcile__title">
+                  {{ gaps().length }} objeto(s) del perfil ya no existen:
+                </p>
+                <ul class="warnings">
+                  @for (gap of gaps(); track gap.reason) {
+                    <li>{{ gap.reason }}</li>
+                  }
+                </ul>
+              </div>
+            }
+
+            @if (added().length > 0) {
+              <div class="reconcile">
+                <p class="reconcile__title">
+                  {{ added().length }} tabla(s) nuevas dentro de lo que el perfil elegía entero:
+                </p>
+                <ul class="warnings">
+                  @for (table of added(); track table) {
+                    <li>{{ table }}</li>
+                  }
+                </ul>
+              </div>
+            }
+
+            @if (profileError(); as error) {
+              <p class="error">{{ error }}</p>
+            }
+
             <p class="hint">
               {{ selectedCount() }} de {{ candidates().length }} tablas marcadas.
             </p>
@@ -339,6 +412,59 @@
                 @if (preview.truncated) {
                   <p class="hint">Se enseñan las primeras instrucciones; el respaldo llevará más.</p>
                 }
+              }
+            </div>
+
+            <!--
+              Guardar como perfil va aquí y no al principio: solo al final se sabe
+              qué se estaría guardando.
+            -->
+            <div class="save-profile">
+              <label class="save-profile__label" for="backup-profile-name">
+                Guardar esta selección como perfil
+              </label>
+
+              <div class="save-profile__row">
+                <input
+                  id="backup-profile-name"
+                  type="text"
+                  class="save-profile__name"
+                  placeholder="Estructura a desarrollo"
+                  [value]="profileName()"
+                  (input)="profileName.set($any($event.target).value)"
+                />
+
+                <button
+                  type="button"
+                  class="ghost"
+                  [disabled]="!canSaveProfile() || savingProfile()"
+                  (click)="saveProfile()"
+                >
+                  <app-icon name="save" />
+                  {{ activeProfile() ? 'Guardar cambios' : 'Guardar perfil' }}
+                </button>
+
+                @if (activeProfile()) {
+                  <button
+                    type="button"
+                    class="ghost"
+                    [disabled]="savingProfile()"
+                    (click)="duplicateProfile()"
+                  >
+                    <app-icon name="plus" />
+                    Duplicar
+                  </button>
+                }
+              </div>
+
+              @if (activeProfile()) {
+                <p class="hint">
+                  Cambiar el nombre y guardar renombra «{{ activeProfile()!.name }}».
+                </p>
+              }
+
+              @if (profileError(); as error) {
+                <p class="error">{{ error }}</p>
               }
             </div>
 

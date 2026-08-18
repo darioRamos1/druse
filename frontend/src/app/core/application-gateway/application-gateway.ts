@@ -441,6 +441,93 @@ export abstract class ApplicationGateway {
   abstract getBackupStatus(backupId: string): Observable<BackupProgress>;
 
   abstract cancelBackup(backupId: string): Observable<void>;
+
+  // --- Perfiles de respaldo -------------------------------------------------
+
+  abstract getBackupProfiles(): Observable<readonly BackupProfile[]>;
+
+  /**
+   * Guarda uno nuevo o reemplaza el que traiga identificador.
+   *
+   * Renombrar es guardar con otro nombre y duplicar es guardar sin
+   * identificador: tres botones en la pantalla, un solo camino aquí.
+   */
+  abstract saveBackupProfile(profile: BackupProfileInput): Observable<BackupProfile>;
+
+  abstract deleteBackupProfile(profileId: string): Observable<void>;
+
+  /**
+   * Abre un perfil contra una sesión: qué de lo que pedía existe hoy y qué no.
+   *
+   * La sesión se pasa aparte de lo que el perfil recuerda porque llevarse la
+   * estructura de producción a desarrollo es justo abrirlo contra otra.
+   */
+  abstract resolveBackupProfile(
+    profileId: string,
+    sessionId: string,
+  ): Observable<BackupProfileResolution>;
+
+  /** Anota que se acaba de lanzar, sin tocar nada más del perfil. */
+  abstract markBackupProfileRun(profileId: string): Observable<void>;
+}
+
+/** Qué nombra una parte de la selección guardada. */
+export type BackupSelectorKind = 'Schema' | 'Table';
+
+/**
+ * Una parte de lo que un perfil se lleva.
+ *
+ * Un esquema se guarda **como esquema**: lo que se cree dentro después también
+ * entra. Marcar tablas sueltas guarda sus nombres, y esas son las que pueden
+ * faltar al abrirlo meses más tarde.
+ */
+export interface BackupSelector {
+  readonly kind: BackupSelectorKind;
+  readonly schema: string;
+  readonly name?: string;
+}
+
+/** Lo que se manda al guardar un perfil. */
+export interface BackupProfileInput {
+  /** Ausente al crear uno nuevo; presente al actualizar o renombrar. */
+  readonly id?: string;
+  readonly name: string;
+  readonly connectionId?: string;
+  readonly database?: string;
+  readonly selection: readonly BackupSelector[];
+  readonly dataMode: BackupDataMode;
+  readonly dataOverrides?: Readonly<Record<string, BackupDataMode>>;
+  readonly filters?: Readonly<Record<string, BackupFilter>>;
+  readonly layout: BackupLayout;
+  readonly dataFormat: BackupDataFormat;
+  readonly compress: boolean;
+  readonly destination: string;
+  /** Las tablas que resolvía al guardarlo, para saber después qué ha crecido. */
+  readonly knownTables?: readonly string[];
+}
+
+export interface BackupProfile extends BackupProfileInput {
+  readonly id: string;
+  readonly createdAtUtc: string;
+  readonly updatedAtUtc: string;
+  /** Nulo mientras no se haya lanzado nunca. */
+  readonly lastRunAtUtc?: string | null;
+}
+
+/** Algo que el perfil pedía y hoy no está. */
+export interface BackupProfileGap {
+  readonly selector: BackupSelector;
+  /** Ya viene escrito para enseñarlo tal cual. */
+  readonly reason: string;
+}
+
+/** Un perfil traído al presente. */
+export interface BackupProfileResolution {
+  readonly profile: BackupProfile;
+  readonly tables: readonly BackupTable[];
+  readonly gaps: readonly BackupProfileGap[];
+  /** Tablas nuevas dentro de un esquema que se eligió entero. */
+  readonly added: readonly string[];
 }
 
 /** Qué se lleva un respaldo de una tabla. */

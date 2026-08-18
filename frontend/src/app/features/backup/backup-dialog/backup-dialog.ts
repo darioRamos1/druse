@@ -1,11 +1,17 @@
 import { ChangeDetectionStrategy, Component, computed, effect, inject, input, output, signal } from '@angular/core';
+import { DatePipe } from '@angular/common';
+import { firstValueFrom } from 'rxjs';
 
 import {
   ApplicationGateway,
   BackupDataFormat,
   BackupDataMode,
   BackupLayout,
+  BackupProfile,
+  BackupProfileGap,
+  BackupProfileInput,
   BackupRequest,
+  BackupSelector,
   BackupTable,
 } from '../../../core/application-gateway/application-gateway';
 import { DesktopHost } from '../../../core/application-gateway/desktop-host';
@@ -43,7 +49,7 @@ interface Candidate {
 @Component({
   selector: 'app-backup-dialog',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [Icon, OperationProgress],
+  imports: [DatePipe, Icon, OperationProgress],
   templateUrl: './backup-dialog.html',
   styleUrl: './backup-dialog.scss',
 })
@@ -82,6 +88,26 @@ export class BackupDialog {
 
   protected readonly outcomeLabel = outcomeLabel;
 
+  // --- Perfiles -------------------------------------------------------------
+
+  /** Los guardados, del usado más recientemente al más antiguo. */
+  protected readonly profiles = signal<readonly BackupProfile[]>([]);
+
+  /** El que se abrió, para poder guardar encima en vez de duplicarlo. */
+  protected readonly activeProfile = signal<BackupProfile | null>(null);
+
+  protected readonly profileName = signal('');
+
+  protected readonly savingProfile = signal(false);
+
+  protected readonly profileError = signal<string | null>(null);
+
+  /** Lo que el perfil pedía y hoy no está. Se enseña hasta que se toca algo. */
+  protected readonly gaps = signal<readonly BackupProfileGap[]>([]);
+
+  /** Lo que ha aparecido dentro de un esquema elegido entero. */
+  protected readonly added = signal<readonly string[]>([]);
+
   /**
    * El modo, dicho como en el desplegable que lo eligió.
    *
@@ -106,6 +132,9 @@ export class BackupDialog {
 
       void this.load(session, node);
     });
+
+    // Los perfiles no dependen del nodo: se piden una vez al abrir el asistente.
+    void this.loadProfiles();
   }
 
   // --- Paso 1: qué entra ----------------------------------------------------
@@ -283,8 +312,20 @@ export class BackupDialog {
     return this.store.previewBackup(this.request());
   }
 
-  protected run(): Promise<void> {
-    return this.store.start(this.request());
+  protected async run(): Promise<void> {
+    await this.store.start(this.request());
+
+    const profile = this.activeProfile();
+
+    if (profile) {
+      // Que se haya lanzado se anota aparte de guardarlo: el perfil no cambia
+      // por ejecutarlo, y de esta fecha vive el orden de la lista.
+      try {
+        await firstValueFrom(this._gateway.markBackupProfileRun(profile.id));
+      } catch {
+        // Perder la marca no estropea el respaldo, que es lo que importaba.
+      }
+    }
   }
 
   protected cancel(): Promise<void> {
@@ -317,6 +358,187 @@ export class BackupDialog {
 
   protected go(step: BackupStepId): void {
     this.step.set(step);
+  }
+
+  // --- Perfiles: abrir, guardar y borrar ------------------------------------
+
+  /**
+   * La selección, escrita como el usuario la eligió.
+   *
+   * Un esquema con **todas** sus tablas marcadas se guarda como el esquema
+   * entero, y entonces lo que se cree dentro después también entrará. Es la
+   * decisión que separa un perfil de una lista de nombres congelada, y la que
+   * hace que «el esquema de ventas» siga queriendo decir lo mismo medio año
+   * más tarde.
+   */
+  protected readonly selectors = computed<readonly BackupSelector[]>(() => {
+    const selectors: BackupSelector[] = [];
+
+    for (const schema of this.schemas()) {
+      if (this.schemaState(schema) === 'all') {
+        selectors.push({ kind: 'Schema', schema });
+        continue;
+      }
+
+      for (const table of this.tablesOf(schema)) {
+        if (this.isSelected(table.key)) {
+          selectors.push({ kind: 'Table', schema, name: table.source.name });
+        }
+      }
+    }
+
+    return selectors;
+  });
+
+  protected readonly profileInput = computed<BackupProfileInput>(() => ({
+    id: this.activeProfile()?.id,
+    name: this.profileName().trim(),
+    database: this.target().source.database,
+    selection: this.selectors(),
+    dataMode: this.dataMode(),
+    dataOverrides: Object.fromEntries(
+      [...this.overrides().entries()].filter(([key]) => this.selected().has(key)),
+    ),
+    layout: this.layout(),
+    dataFormat: this.dataFormat(),
+    compress: this.compress(),
+    destination: this.destination(),
+    // Lo que resuelve hoy, para poder decir mañana qué ha crecido.
+    knownTables: this.chosen().map((candidate) => candidate.key),
+  }));
+
+  protected readonly canSaveProfile = computed(
+    () => this.profileName().trim().length > 0 && this.selectedCount() > 0,
+  );
+
+  protected async saveProfile(): Promise<void> {
+    if (!this.canSaveProfile()) {
+      return;
+    }
+
+    this.savingProfile.set(true);
+    this.profileError.set(null);
+
+    try {
+      const saved = await firstValueFrom(
+        this._gateway.saveBackupProfile(this.profileInput()),
+      );
+
+      this.activeProfile.set(saved);
+      await this.loadProfiles();
+    } catch (error) {
+      this.profileError.set(reason(error, 'No se pudo guardar el perfil.'));
+    } finally {
+      this.savingProfile.set(false);
+    }
+  }
+
+  /**
+   * Guarda una copia con otro nombre, sin tocar el original.
+   *
+   * Es duplicar: se manda sin identificador, y el proceso local crea uno nuevo.
+   */
+  protected async duplicateProfile(): Promise<void> {
+    const current = this.activeProfile();
+
+    if (!current) {
+      return;
+    }
+
+    this.activeProfile.set(null);
+    this.profileName.set(`${current.name} (copia)`);
+
+    await this.saveProfile();
+  }
+
+  protected async deleteProfile(profile: BackupProfile): Promise<void> {
+    this.profileError.set(null);
+
+    try {
+      await firstValueFrom(this._gateway.deleteBackupProfile(profile.id));
+
+      if (this.activeProfile()?.id === profile.id) {
+        this.activeProfile.set(null);
+      }
+
+      await this.loadProfiles();
+    } catch (error) {
+      this.profileError.set(reason(error, 'No se pudo borrar el perfil.'));
+    }
+  }
+
+  /**
+   * Abre un perfil: lo resuelve contra la base de ahora y lo aplica.
+   *
+   * Los candidatos se **reemplazan** por lo que el perfil resuelve, y no se
+   * cruzan con los del nodo desde el que se abrió el asistente: un perfil puede
+   * nombrar tablas de otro esquema, y filtrarlas por dónde se hizo clic daría un
+   * respaldo distinto del que se guardó sin decirlo.
+   */
+  protected async openProfile(profile: BackupProfile): Promise<void> {
+    this.loading.set(true);
+    this.profileError.set(null);
+    this.gaps.set([]);
+    this.added.set([]);
+
+    try {
+      const resolution = await firstValueFrom(
+        this._gateway.resolveBackupProfile(profile.id, this.sessionId()),
+      );
+
+      const candidates = resolution.tables.map<Candidate>((table) => {
+        const source: DatabaseObject = {
+          id: table.id,
+          name: table.name,
+          kind: 'table',
+          database: table.database,
+          schema: table.schema,
+          hasChildren: false,
+          approximateRowCount: table.approximateRowCount,
+        };
+
+        return {
+          key: keyOf(source),
+          source,
+          schema: table.schema ?? table.database ?? '',
+          rows: table.approximateRowCount,
+        };
+      });
+
+      this.candidates.set(candidates);
+      this.selected.set(new Set(candidates.map((candidate) => candidate.key)));
+
+      const saved = resolution.profile;
+
+      this.dataMode.set(saved.dataMode);
+      this.overrides.set(
+        new Map(Object.entries(saved.dataOverrides ?? {}) as [string, BackupDataMode][]),
+      );
+      this.layout.set(saved.layout);
+      this.dataFormat.set(saved.dataFormat);
+      this.compress.set(saved.compress);
+      this.destination.set(saved.destination);
+
+      this.activeProfile.set(saved);
+      this.profileName.set(saved.name);
+      this.gaps.set(resolution.gaps);
+      this.added.set(resolution.added);
+      this.step.set('what');
+    } catch (error) {
+      this.profileError.set(reason(error, 'No se pudo abrir el perfil.'));
+    } finally {
+      this.loading.set(false);
+    }
+  }
+
+  private async loadProfiles(): Promise<void> {
+    try {
+      this.profiles.set(await firstValueFrom(this._gateway.getBackupProfiles()));
+    } catch {
+      // Sin perfiles la pantalla sigue sirviendo entera: se puede armar un
+      // respaldo igual, que es lo que hacía antes de que existieran.
+      this.profiles.set([]);
+    }
   }
 
   // --- Carga de candidatos --------------------------------------------------
@@ -396,6 +618,19 @@ export class BackupDialog {
       });
     });
   }
+}
+
+/** El mensaje del servidor cuando lo hay, y si no uno que se pueda leer. */
+function reason(error: unknown, fallback: string): string {
+  if (typeof error === 'object' && error !== null && 'error' in error) {
+    const body = (error as { error?: { message?: string } }).error;
+
+    if (body?.message) {
+      return body.message;
+    }
+  }
+
+  return error instanceof Error ? error.message : fallback;
 }
 
 /**

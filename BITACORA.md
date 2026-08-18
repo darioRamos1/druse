@@ -10,14 +10,14 @@
 
 | Campo | Valor |
 | --- | --- |
-| Última sesión | **022g** — 2026-08-17 |
-| Fase activa | **Respaldos y restauración:** Fases A, B, C y **D cerradas y probadas contra PostgreSQL real**: el caso del §1 se resuelve desde la interfaz y el artefacto se aplica en una base vacía. La siguiente es la **E, perfiles** |
+| Última sesión | **022h** — 2026-08-17 |
+| Fase activa | **Respaldos y restauración:** Fases A–E cerradas y probadas contra PostgreSQL real. Queda la **F: restaurar**, que es la mitad que cierra el ciclo |
 | Fases 0–6 | ✅ Cerradas. |
 | Fase 7 | 🟡 **11/12.** El ciclo de instalación está probado sobre este equipo; solo falta arrancar en una máquina sin herramientas de desarrollo. |
 | Fase 8 | ✅ **7/7.** Tres motores sobre el mismo contrato y primera beta preparada. |
 | ¿Compila el backend? | Sí — 0 advertencias, 0 errores |
 | ¿Compila el envoltorio? | Sí |
-| ¿Pasan las pruebas? | Sí — **532 en backend** (295 unitarias, 158 contractuales y 79 de integración), **398 en frontend** y **6 en el envoltorio**. Con `DRUSE_REQUIRE_ENGINES=1` y **los cuatro motores**, sin saltarse ninguna |
+| ¿Pasan las pruebas? | Sí — **545 en backend** (302 unitarias, 158 contractuales y 85 de integración), **407 en frontend** y **6 en el envoltorio**. Con `DRUSE_REQUIRE_ENGINES=1` y **los cuatro motores**, sin saltarse ninguna |
 | ¿Hay aplicación de escritorio? | **Sí.** Instalador NSIS, MSI y ZIP portable, en dos variantes: con Informix y sin él |
 | Motores | **PostgreSQL, SQL Server, MySQL/MariaDB e Informix**, todos sobre el mismo contrato compartido |
 | Trabajo a medias | Ninguno. Las transacciones manuales quedaron terminadas en la sesión 020. |
@@ -27,9 +27,11 @@
 
 ### Qué toca retomar en la próxima sesión
 
-**Lo primero: la Fase E, perfiles guardados** (`backup_profiles` en SQLite, con
-la reconciliación de un perfil cuyas tablas ya no existen). La D quedó cerrada y
-**probada contra PostgreSQL de verdad** en la sesión 022g.
+**Lo primero: la Fase F, restaurar.** Es la mitad que cierra el ciclo y la única
+que falta de la función: leer un artefacto, comprobar su motor y su versión de
+formato, **enseñar qué se va a ejecutar y qué se va a sobrescribir** antes de
+tocar nada, y aplicar los CSV por el camino de importación que ya existe. Las
+fases A–E están cerradas y probadas contra PostgreSQL de verdad.
 
 **El escenario de pruebas ya está sembrado, no hay que rehacerlo.** En
 `druse-pg-test` quedó el esquema `tienda` de la sesión 022g: `cat_paises`,
@@ -303,6 +305,39 @@ Y tres límites declarados desde el principio: no hay respaldo binario ni
 recuperación a un punto en el tiempo —eso es del servidor, y la interfaz tendrá
 que decirlo—, no hay respaldos programados, y un límite de filas puede dejar
 filas huérfanas, cosa que se avisa y no se corrige sola.
+
+### Sesión 022h — 2026-08-17 · Fase E: un perfil guarda una intención, no una foto
+
+Los respaldos ya se pueden guardar y repetir. Lo que decide el diseño entero es
+qué se guarda: **la selección tal y como el usuario la eligió**, no la lista de
+tablas que había ese día. Un esquema con todas sus tablas marcadas se guarda como
+el esquema, y entonces lo que se cree dentro después también entra; en cuanto se
+desmarca una, se guardan nombres. Es la regla del §3.1 llevada a la pantalla, y
+se explica sola al usarla: se guardó «Tienda a desarrollo» con el esquema entero,
+se creó una tabla dentro, y al reabrirlo el asistente la trajo marcada avisando
+de que era nueva.
+
+Abrir un perfil es resolverlo contra el catálogo de hoy, y se devuelven las dos
+mitades juntas: lo que existe —listo para lanzar— y lo que ya no. Negarse a abrir
+un perfil porque alguien borró una tabla obligaría a rehacerlo entero; abrirlo
+callando la ausencia haría creer que el respaldo se llevó algo que no está. Y se
+dice también lo que ha crecido, porque un esquema al que le añaden veinte tablas
+de trabajo convierte un respaldo de estructura en uno de veinte gigabytes: para
+eso el perfil recuerda qué resolvía la última vez.
+
+Guardar nombres y nunca identificadores no es un detalle: los del catálogo
+cambian al recrear un objeto y los de sesión no sobreviven a cerrar la ventana.
+
+Lanzar un perfil no lo modifica —la marca de «último uso» va por su propia ruta—
+porque si ejecutar guardara el perfil entero, un respaldo lanzado desde una
+pantalla con cambios a medias los daría por buenos.
+
+En SQLite entra `backup_profiles` con la migración a `user_version` 4: la
+selección y las anulaciones como JSON, y lo que se lista y se ordena en columnas.
+
+Pruebas: **545 en backend** —la de integración mueve la base debajo del perfil
+contra PostgreSQL de verdad, borrando la tabla que nombraba y creando otra dentro
+del esquema elegido— y **407 en frontend**.
 
 ### Sesión 022g — 2026-08-17 · El respaldo, probado de verdad: faltaba el esquema
 

@@ -417,3 +417,139 @@ select {
     cursor: not-allowed;
   }
 }
+
+/* --- Perfiles guardados -------------------------------------------------- */
+
+.profiles {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px;
+  border: 1px solid var(--dr-border);
+  border-radius: 8px;
+  background: var(--dr-surface-sunken);
+}
+
+.profiles__title {
+  margin: 0 0 2px;
+  color: var(--dr-text-tertiary);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.profiles__row {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+
+  /* El abierto se marca: al aplicar un perfil la selección cambia entera, y sin
+     esto nadie sabría cuál de ellos está mirando. */
+  &.is-active .profiles__open {
+    border-color: var(--dr-accent-line);
+    background: var(--dr-accent-tint);
+  }
+}
+
+.profiles__open {
+  display: flex;
+  flex: 1;
+  gap: 8px;
+  align-items: baseline;
+  min-width: 0;
+  padding: 6px 10px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--dr-text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+
+  &:hover {
+    background: var(--dr-surface-raised);
+  }
+
+  .name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .when {
+    margin-left: auto;
+    flex-shrink: 0;
+    color: var(--dr-text-tertiary);
+    font-size: 11px;
+  }
+}
+
+.profiles__delete {
+  display: flex;
+  flex-shrink: 0;
+  padding: 6px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--dr-text-tertiary);
+  cursor: pointer;
+
+  &:hover {
+    background: var(--dr-danger-tint);
+    color: var(--dr-danger-text);
+  }
+}
+
+/* --- Lo que cambió desde que se guardó ----------------------------------- */
+
+.reconcile {
+  padding: 8px 10px;
+  border: 1px solid var(--dr-border);
+  border-radius: 8px;
+  background: var(--dr-surface-sunken);
+}
+
+/* Lo que falta se distingue de lo que sobra: uno es una pérdida y el otro no. */
+.reconcile--gaps {
+  border-color: var(--dr-warning-line);
+  background: var(--dr-warning-tint);
+}
+
+.reconcile__title {
+  margin: 0 0 4px;
+  font-size: 12px;
+}
+
+/* --- Guardar como perfil ------------------------------------------------- */
+
+.save-profile {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 12px;
+  border-top: 1px solid var(--dr-border-faint);
+}
+
+.save-profile__label {
+  color: var(--dr-text-tertiary);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.save-profile__row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.save-profile__name {
+  flex: 1;
+  min-width: 0;
+  padding: 6px 10px;
+  border: 1px solid var(--dr-border);
+  border-radius: 6px;
+  background: var(--dr-surface-input);
+  color: var(--dr-text);
+  font: inherit;
+}

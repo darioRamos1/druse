@@ -664,15 +664,56 @@ con `/**`.
   asistente cerrado nada dice que el respaldo acabó: hay que volver a abrirlo para
   ver el resumen. Con veinte segundos no molesta; con media hora, sí.
 
-### Fase E — Perfiles
+### Fase E — Perfiles ✅
 
-- [ ] `backup_profiles` en SQLite, con su migración.
-- [ ] Guardar, renombrar, duplicar y borrar.
-- [ ] **Reconciliar al abrir:** un perfil de hace medio año nombra tablas que ya
+- [x] `backup_profiles` en SQLite, con su migración (`user_version` 4).
+- [x] Guardar, renombrar, duplicar y borrar.
+- [x] **Reconciliar al abrir:** un perfil de hace medio año nombra tablas que ya
       no existen. Se abre igual, marcando lo que falta, en vez de fallar.
+- [x] Y al revés: dice también **qué ha aparecido** dentro de un esquema elegido
+      entero.
 
 **Criterio de salida:** un perfil guardado reproduce el mismo respaldo, y uno con
 objetos desaparecidos lo dice sin romperse.
+
+_Cumplido, y visto funcionar contra PostgreSQL real: se guardó «Tienda a
+desarrollo» con el esquema entero, se creó una tabla dentro y al reabrirlo el
+asistente la trajo marcada avisando de que era nueva._
+
+**Un perfil guarda una intención, no una foto.** La selección se escribe como el
+usuario la eligió —«este esquema entero y estas tres tablas»— y se resuelve
+contra el catálogo cada vez que se abre. De ahí `BackupSelector`, con sus dos
+formas. Un esquema con **todas** sus tablas marcadas se guarda como el esquema, y
+entonces lo que se cree dentro después también entra; en cuanto se desmarca una,
+se guardan nombres. Es la regla del §3.1 llevada a la pantalla, y se explica sola
+al usarla.
+
+**Nombres, nunca identificadores.** Los del catálogo cambian al recrear un objeto
+y los de sesión no sobreviven a cerrar la ventana. Medio año después lo único que
+sigue significando lo mismo es cómo se llaman las cosas.
+
+**Se dice lo que falta y lo que sobra.** Negarse a abrir un perfil porque alguien
+borró una tabla obligaría a rehacerlo entero; abrirlo callando la ausencia haría
+creer que el respaldo se llevó algo que ya no está. Y crecer en silencio
+sorprende tanto como desaparecer: un esquema al que le añaden veinte tablas de
+trabajo convierte un respaldo de estructura en uno de veinte gigabytes. Para
+poder decirlo, el perfil recuerda qué resolvía la última vez que se guardó.
+
+**Abrir un perfil reemplaza la selección entera**, sin cruzarla con el nodo desde
+el que se abrió el asistente: un perfil puede nombrar tablas de otro esquema, y
+filtrarlas por dónde se hizo clic daría un respaldo distinto del guardado sin
+decirlo.
+
+**Lanzarlo no lo modifica.** La marca de «último uso» se anota por su propia ruta:
+si ejecutar guardara el perfil entero, un respaldo lanzado desde una pantalla con
+cambios a medias los daría por buenos. De esa fecha vive el orden de la lista.
+
+**En SQLite**, la selección, las anulaciones y los filtros van como JSON en
+columnas —listas y diccionarios de tamaño libre que solo se usan enteros— y lo
+que se lista y se ordena tiene columna propia. Los enumerados se escriben con su
+nombre: el archivo lo abre quien quiere entender por qué su respaldo hace lo que
+hace. `connection_id` no es clave foránea, que borrar una conexión no puede
+llevarse por delante los perfiles hechos con ella.
 
 ### Fase F — Restauración
 
