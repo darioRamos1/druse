@@ -1770,6 +1770,65 @@ describe('WorkspaceStore', () => {
       expect(store.notice()).toContain('no está guardada');
     });
 
+    /**
+     * El caso de todos los días: la misma consulta, primero en desarrollo y
+     * después en preproducción, sin pegar el SQL en otra pestaña.
+     *
+     * Se conecta primero la de trabajo y **después** se carga la guardada, que
+     * es el orden real: la otra está en la lista pero sin abrir.
+     */
+    it('cambiar de conexión repunta la pestaña y abre la que hacía falta', async () => {
+      await store.connect(form);
+      gateway.savedConnections = [savedProfile];
+      await store.loadSavedConnections();
+
+      const outcome = await store.useConnection(savedProfile.id);
+
+      expect(outcome).toBe('ok');
+      expect(gateway.openSavedCalls.at(-1)?.id).toBe(savedProfile.id);
+      expect(store.activeTab()?.connectionId).toBe(savedProfile.id);
+      expect(store.activeConnection()?.id).toBe(savedProfile.id);
+    });
+
+    /** El resultado salió del otro servidor; dejarlo invita a leerlo mal. */
+    it('cambiar de conexión retira el resultado en pantalla', async () => {
+      await store.connect(form);
+      gateway.savedConnections = [savedProfile];
+      await store.loadSavedConnections();
+      await store.execute('SELECT 1');
+
+      expect(store.result()).not.toBeNull();
+
+      await store.useConnection(savedProfile.id);
+
+      expect(store.result()).toBeNull();
+    });
+
+    /** Volver a elegir la que ya está no reabre nada ni tira lo que hay. */
+    it('elegir la conexión en la que ya se está no hace nada', async () => {
+      await store.connect(form);
+      await store.execute('SELECT 1');
+
+      const outcome = await store.useConnection(store.activeConnection()!.id);
+
+      expect(outcome).toBe('ok');
+      expect(store.result()).not.toBeNull();
+    });
+
+    /** Si le falta la contraseña se dice, para que la pida quien tiene el diálogo. */
+    it('una conexión sin contraseña guardada pide que se escriba', async () => {
+      await store.connect(form);
+      gateway.savedConnections = [savedProfile];
+      gateway.savedConnectionMissingPassword = true;
+      await store.loadSavedConnections();
+
+      const antes = store.activeTab()?.connectionId;
+      const outcome = await store.useConnection(savedProfile.id);
+
+      expect(outcome).toBe('needsPassword');
+      expect(store.activeTab()?.connectionId).toBe(antes);
+    });
+
     it('cambiar de base afecta a la pestaña, no a otro script', async () => {
       await store.connect(form);
 

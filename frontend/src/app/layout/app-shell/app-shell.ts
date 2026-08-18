@@ -19,7 +19,10 @@ import { SqlFileService } from '../../core/sql-files/sql-file.service';
 import { ConnectionDialog } from '../../features/connections/connection-dialog/connection-dialog';
 import { ConnectionsSidebar } from '../../features/connections/connections-sidebar/connections-sidebar';
 import { EditorTabs } from '../../features/query-editor/editor-tabs/editor-tabs';
-import { EditorToolbar } from '../../features/query-editor/editor-toolbar/editor-toolbar';
+import {
+  ConnectionChoice,
+  EditorToolbar,
+} from '../../features/query-editor/editor-toolbar/editor-toolbar';
 import {
   CursorPosition,
   EditorSelection,
@@ -688,6 +691,40 @@ export class AppShell {
 
   protected useDatabase(database: string): void {
     this._store.useDatabase(database);
+  }
+
+  /**
+   * Las conexiones entre las que puede moverse la pestaña.
+   *
+   * Van todas: las abiertas y las guardadas que no lo están. Pasar de desarrollo
+   * a preproducción es el caso de todos los días, y obligar a ir al panel de
+   * conexiones y volver es lo que lleva a tener la misma consulta en dos
+   * pestañas y ejecutarla en la equivocada.
+   */
+  protected readonly connectionChoices = computed<readonly ConnectionChoice[]>(() =>
+    this._store.connections().map((connection) => ({
+      id: connection.id,
+      name: connection.name,
+      environment: connection.environment,
+      open: connection.sessionId !== undefined,
+      readOnly: connection.readOnly,
+    })),
+  );
+
+  protected readonly activeConnectionId = computed(
+    () => this._store.activeConnection()?.id ?? null,
+  );
+
+  /**
+   * Cambia la conexión de la pestaña.
+   *
+   * Si la elegida no está abierta y su contraseña no está guardada, se abre el
+   * mismo diálogo que al editarla: es donde el usuario ya sabe escribirla.
+   */
+  protected async useConnection(connectionId: string): Promise<void> {
+    if ((await this._store.useConnection(connectionId)) === 'needsPassword') {
+      this.editConnection(connectionId);
+    }
   }
 
   /**

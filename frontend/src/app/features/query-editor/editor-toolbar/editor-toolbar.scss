@@ -32,7 +32,38 @@
     box-shadow: var(--dr-shadow-menu);
   }
 
+  /* El menú ahora tiene dos listas —conexión y base— y necesita separarlas. */
+  &__title {
+    margin: 6px 9px 3px;
+    color: var(--dr-text-tertiary);
+    font-family: var(--dr-font-ui);
+    font-size: 10px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  &__menu ul {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  &__label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &__tags {
+    display: inline-flex;
+    gap: 5px;
+    margin-left: auto;
+  }
+
   &__option {
+    display: flex;
+    align-items: center;
+    gap: 8px;
     width: 100%;
     padding: 5px 9px;
     border: 0;
@@ -286,7 +317,38 @@
     box-shadow: var(--dr-shadow-menu);
   }
 
+  /* El menú ahora tiene dos listas —conexión y base— y necesita separarlas. */
+  &__title {
+    margin: 6px 9px 3px;
+    color: var(--dr-text-tertiary);
+    font-family: var(--dr-font-ui);
+    font-size: 10px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  &__menu ul {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  &__label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &__tags {
+    display: inline-flex;
+    gap: 5px;
+    margin-left: auto;
+  }
+
   &__option {
+    display: flex;
+    align-items: center;
+    gap: 8px;
     width: 100%;
     padding: 5px 9px;
     border: 0;
@@ -347,4 +409,40 @@
     font-family: var(--dr-font-mono);
     color: var(--dr-text-secondary);
   }
+}
+
+/* Las etiquetas del menú de conexiones: entorno, solo lectura, sin abrir. */
+.tag {
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--dr-surface-active);
+  color: var(--dr-text-tertiary);
+  font-family: var(--dr-font-ui);
+  font-size: 9.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.tag--production {
+  background: var(--dr-danger-tint, var(--dr-surface-active));
+  color: var(--dr-danger, #d9534f);
+}
+
+.tag--staging {
+  background: var(--dr-warning-tint, var(--dr-surface-active));
+  color: var(--dr-warning, #c77700);
+}
+
+/* Producción se ve desde el chip, sin abrir el menú: es lo que evita ejecutar
+   en el sitio equivocado por costumbre. */
+.chip--warn .chip__dot {
+  background: var(--dr-danger, #d9534f);
+}
+
+.chip__name {
+  color: var(--dr-text);
+}
+
+.chip__sep {
+  color: var(--dr-text-tertiary);
 }

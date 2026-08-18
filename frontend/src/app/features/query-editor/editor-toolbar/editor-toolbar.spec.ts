@@ -229,4 +229,82 @@ describe('EditorToolbar', () => {
   function element(): HTMLElement {
     return fixture.nativeElement as HTMLElement;
   }
+
+  /**
+   * Cambiar de conexión sin salir de la pestaña: el caso de mirar algo en
+   * desarrollo y repetirlo en preproducción sin pegar el SQL en otro sitio.
+   */
+  describe('conexión de la pestaña', () => {
+    beforeEach(() => {
+      fixture.componentRef.setInput('databases', ['ventas']);
+      fixture.componentRef.setInput('database', 'ventas');
+      fixture.componentRef.setInput('connectionId', 'dev');
+      fixture.componentRef.setInput('connections', [
+        { id: 'dev', name: 'Desarrollo', environment: 'development', open: true, readOnly: false },
+        { id: 'pre', name: 'Preproducción', environment: 'staging', open: false, readOnly: false },
+        { id: 'prod', name: 'Producción', environment: 'production', open: true, readOnly: true },
+      ]);
+      fixture.detectChanges();
+    });
+
+    function openChooser(): void {
+      element().querySelector<HTMLButtonElement>('.context .chip')?.click();
+      fixture.detectChanges();
+    }
+
+    function connectionOptions(): HTMLButtonElement[] {
+      return [...element().querySelectorAll<HTMLButtonElement>('.context__option')].slice(0, 3);
+    }
+
+    it('el chip dice en qué conexión está, no solo la base', () => {
+      expect(element().querySelector('.chip')?.textContent).toContain('Desarrollo');
+    });
+
+    /** Entre dos bases llamadas igual, el entorno es lo único que las distingue. */
+    it('lista las conexiones con su entorno y marca la de la pestaña', () => {
+      openChooser();
+
+      const opciones = connectionOptions();
+
+      expect(opciones[0].textContent).toContain('Desarrollo');
+      expect(opciones[0].classList).toContain('is-selected');
+      expect(opciones[1].textContent).toContain('staging');
+      expect(opciones[1].textContent).toContain('sin abrir');
+      expect(opciones[2].textContent).toContain('solo lectura');
+    });
+
+    it('elegir otra conexión la emite y cierra el menú', () => {
+      const elegidas: string[] = [];
+
+      fixture.componentRef.instance.connectionChange.subscribe((id) => elegidas.push(id));
+
+      openChooser();
+      connectionOptions()[1].click();
+      fixture.detectChanges();
+
+      expect(elegidas).toEqual(['pre']);
+      expect(element().querySelector('.context__menu')).toBeNull();
+    });
+
+    /** Volver a elegir la que ya está no debe reabrir sesión ni tirar el resultado. */
+    it('elegir la que ya está no emite nada', () => {
+      const elegidas: string[] = [];
+
+      fixture.componentRef.instance.connectionChange.subscribe((id) => elegidas.push(id));
+
+      openChooser();
+      connectionOptions()[0].click();
+      fixture.detectChanges();
+
+      expect(elegidas).toEqual([]);
+    });
+
+    /** Producción se ve sin abrir el menú: es lo que frena el clic por costumbre. */
+    it('avisa en el propio chip cuando la conexión es de producción', () => {
+      fixture.componentRef.setInput('connectionId', 'prod');
+      fixture.detectChanges();
+
+      expect(element().querySelector('.chip')?.classList).toContain('chip--warn');
+    });
+  });
 });

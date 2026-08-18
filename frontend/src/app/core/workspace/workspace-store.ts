@@ -753,10 +753,21 @@ export class WorkspaceStore {
 
   /** Abre una sesión con un perfil ya guardado. */
   async connectSaved(connectionId: string, password?: string): Promise<boolean> {
+    return (await this.openSaved(connectionId, password)) === 'ok';
+  }
+
+  /**
+   * Abre una conexión guardada **diciendo por qué no pudo**, si no pudo.
+   *
+   * Es lo mismo que `connectSaved`, salvo que distingue «hace falta la
+   * contraseña» de «falló»: quien cambia de conexión desde el editor necesita
+   * saberlo para abrir el diálogo en vez de enseñar un error.
+   */
+  async openSaved(connectionId: string, password?: string): Promise<ReconnectOutcome> {
     const connection = this.findConnection(connectionId);
 
     if (!connection) {
-      return false;
+      return 'failed';
     }
 
     this.patchConnection(connectionId, { state: 'connecting', error: undefined });
@@ -787,18 +798,18 @@ export class WorkspaceStore {
       // llegando por detrás.
       void this.primeSchemaIndexAsync(connectionId, session.database);
 
-      return true;
+      return 'ok';
     } catch (error) {
       // 428: la conexión no tiene contraseña guardada y hay que pedirla.
       if (error instanceof HttpErrorResponse && error.status === 428) {
         this.patchConnection(connectionId, { state: 'disconnected' });
-        return false;
+        return 'needsPassword';
       }
 
       this.patchConnection(connectionId, { state: 'error', error: describeError(error) });
       this._notice.set(describeError(error));
 
-      return false;
+      return 'failed';
     }
   }
 
@@ -923,6 +934,85 @@ export class WorkspaceStore {
     // El autocompletado de la base nueva no está cargado todavía; se pide por
     // detrás para que escribir no tenga que esperar al catálogo.
     void this.primeSchemaIndexAsync(connectionId, database);
+  }
+
+  /**
+   * Cambia la conexión contra la que ejecuta la pestaña activa.
+   *
+   * Es el caso de todos los días: la misma consulta, primero en desarrollo y
+   * después en preproducción. Antes había que abrir otra pestaña en la otra
+   * conexión y pegar el SQL, con lo que eso tiene de acabar ejecutando en el
+   * sitio equivocado.
+   *
+   * Si la conexión elegida no está abierta **se abre aquí**, y si necesita
+   * contraseña se dice para que la pida quien tiene el diálogo.
+   */
+  async useConnection(connectionId: string): Promise<ReconnectOutcome> {
+    const connection = this.findConnection(connectionId);
+
+    if (!connection) {
+      return 'failed';
+    }
+
+    const previous = this.activeConnection()?.id;
+
+    if (previous === connectionId) {
+      return 'ok';
+    }
+
+    if (!connection.sessionId) {
+      const outcome = await this.openSaved(connectionId);
+
+      if (outcome !== 'ok') {
+        return outcome;
+      }
+    }
+
+    const tab = this.activeTab();
+    const database = this._sessions().get(connectionId)?.database;
+
+    this._activeConnectionId.set(connectionId);
+
+    if (tab) {
+      // La base y la procedencia editable eran de la conexión anterior: aquí no
+      // significan nada, y arrastrarlas es cómo se acaba escribiendo en la tabla
+      // de otro servidor.
+      this.updateTabs((tabs) =>
+        tabs.map((item) =>
+          item.id === tab.id
+            ? { ...item, connectionId, database, sourceTable: undefined }
+            : item,
+        ),
+      );
+
+    }
+
+    // El resultado en pantalla salió del servidor anterior. Se retira mire lo que
+    // mire: unas filas de desarrollo bajo una barra que ya dice «preproducción»
+    // son la clase de detalle que lleva a tomar una decisión al revés.
+    const source = this._resultSource();
+
+    if (source && (source.connectionId === previous || source.tabId === tab?.id)) {
+      this.clearDisplayedResult();
+    }
+
+    // Una transacción es de su conexión, así que sigue abierta donde estaba. Se
+    // dice porque desde aquí ya no se ve, y una transacción olvidada retiene
+    // bloqueos hasta que alguien se acuerda.
+    if (previous && this.hasOpenTransaction(previous)) {
+      const before = this.findConnection(previous)?.name ?? 'la conexión anterior';
+
+      this._notice.set(
+        `La transacción abierta en «${before}» sigue ahí: es de esa conexión y no ` +
+          'se cierra al cambiar de pestaña.',
+      );
+    }
+
+    if (database) {
+      void this.primeSchemaIndexAsync(connectionId, database);
+    }
+
+    return 'ok';
   }
 
   readonly activeConnection = computed(() => {

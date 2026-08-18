@@ -17,6 +17,21 @@ import {
 } from '../../../core/workspace/format-settings';
 import { Icon } from '../../../shared/ui/icon/icon';
 
+/**
+ * Una conexión a la que la pestaña puede cambiarse.
+ *
+ * Lleva el entorno porque es lo que evita el accidente: entre «ventas» y
+ * «ventas» lo único que distingue desarrollo de producción es esa etiqueta.
+ */
+export interface ConnectionChoice {
+  readonly id: string;
+  readonly name: string;
+  readonly environment: string;
+  /** Tiene sesión abierta; las demás se abren al elegirlas. */
+  readonly open: boolean;
+  readonly readOnly: boolean;
+}
+
 /** Ajuste de formateo que el menú deja cambiar. */
 type FormatGroupKey = keyof FormatSettings;
 
@@ -79,6 +94,18 @@ export class EditorToolbar {
   /** Base contra la que se ejecuta ahora. */
   readonly database = input<string | null>(null);
 
+  /**
+   * Conexiones entre las que puede moverse esta pestaña.
+   *
+   * Van las abiertas y también las guardadas que no lo están: pasar de
+   * desarrollo a preproducción no debería obligar a ir al panel de conexiones y
+   * volver.
+   */
+  readonly connections = input<readonly ConnectionChoice[]>([]);
+
+  /** La conexión de esta pestaña, para marcarla en el menú. */
+  readonly connectionId = input<string | null>(null);
+
   readonly execute = output<void>();
   readonly executeSelection = output<void>();
   readonly cancel = output<void>();
@@ -89,6 +116,7 @@ export class EditorToolbar {
   readonly formatSettingsChange = output<Partial<FormatSettings>>();
 
   readonly databaseChange = output<string>();
+  readonly connectionChange = output<string>();
   readonly beginTransaction = output<void>();
   readonly commit = output<void>();
   readonly rollback = output<void>();
@@ -213,6 +241,19 @@ export class EditorToolbar {
     this.choosingDatabase.set(false);
     this.databaseChange.emit(name);
   }
+
+  protected chooseConnection(id: string): void {
+    this.choosingDatabase.set(false);
+
+    if (id !== this.connectionId()) {
+      this.connectionChange.emit(id);
+    }
+  }
+
+  /** La conexión de la pestaña, para escribirla en el chip. */
+  protected readonly connection = computed(
+    () => this.connections().find((option) => option.id === this.connectionId()) ?? null,
+  );
 
   protected isChosen(key: FormatGroupKey, value: FormatOptionValue): boolean {
     return this.formatSettings()[key] === value;
