@@ -10,14 +10,14 @@
 
 | Campo | Valor |
 | --- | --- |
-| Última sesión | **022m** — 2026-08-18 |
+| Última sesión | **022n** — 2026-08-18 |
 | Fase activa | **Respaldos y restauración:** Fases A–E cerradas. La **F** tiene backend, interfaz, CSV, selector de archivos, restaurar en una base nueva y **el ciclo entero por HTTP en los cuatro motores**; le falta repetir a mano el respaldo real que encontró el error de los índices de expresión |
 | Fases 0–6 | ✅ Cerradas. |
 | Fase 7 | 🟡 **11/12.** El ciclo de instalación está probado sobre este equipo; solo falta arrancar en una máquina sin herramientas de desarrollo. |
 | Fase 8 | ✅ **7/7.** Tres motores sobre el mismo contrato y primera beta preparada. |
 | ¿Compila el backend? | Sí — 0 advertencias, 0 errores |
 | ¿Compila el envoltorio? | Sí |
-| ¿Pasan las pruebas? | Sí — **615 en backend** (339 unitarias, 166 contractuales y 110 de integración), **449 en frontend** y **6 en el envoltorio**. Con `DRUSE_REQUIRE_ENGINES=1` y **los cuatro motores**, sin saltarse ninguna |
+| ¿Pasan las pruebas? | Sí — **615 en backend** (339 unitarias, 166 contractuales y 110 de integración), **466 en frontend** y **6 en el envoltorio**. Con `DRUSE_REQUIRE_ENGINES=1` y **los cuatro motores**, sin saltarse ninguna |
 | ¿Hay aplicación de escritorio? | **Sí.** Instalador NSIS, MSI y ZIP portable, en dos variantes: con Informix y sin él |
 | Motores | **PostgreSQL, SQL Server, MySQL/MariaDB e Informix**, todos sobre el mismo contrato compartido |
 | Trabajo a medias | Ninguno. El frontend de la restauración quedó commiteado en la sesión 022i. |
@@ -320,6 +320,50 @@ recuperación a un punto en el tiempo —eso es del servidor, y la interfaz tend
 que decirlo—, no hay respaldos programados, y un límite de filas puede dejar
 filas huérfanas, cosa que se avisa y no se corrige sola.
 
+### Sesión 022n — 2026-08-18 · Ejecutar solo la instrucción del cursor
+
+Con varias consultas en la misma pestaña, ejecutar una obligaba a resaltarla a
+mano: «Ejecutar» manda la pestaña entera y «Ejecutar selección» estaba
+deshabilitado si no había nada marcado.
+
+**El botón pasa a ser «Ejecutar actual».** Con selección, ejecuta lo
+seleccionado; sin ella, la instrucción donde está el cursor. Ya no se deshabilita
+y su atajo, `Ctrl+Shift+Enter`, se ve en el propio botón. `Ctrl+Enter` sigue
+siendo la pestaña entera: no se cambia un atajo que ya está en los dedos.
+
+**Partir por `;` no vale.** Un punto y coma dentro de un literal
+—`'O''Donnell; 12'`—, de un identificador citado o de un comentario es un
+carácter más, y cortar ahí manda media instrucción al servidor. `sql-statements`
+recorre el texto con los mismos criterios que `SqlStatementReader` usa para leer
+un respaldo: los cuatro estilos de comilla, comentarios de línea y de bloque. Y
+con el mismo límite declarado: **el `$cuerpo$` de PostgreSQL no se reconoce**.
+
+Lo que sí es distinto de leer un respaldo: aquí hacen falta las **posiciones**,
+no las instrucciones. El texto se parte en tramos que lo cubren entero, incluidos
+los huecos, para que cualquier cursor caiga en alguno. El sitio pegado al `;`
+cuenta como parte de la instrucción que cierra —es el caso de escribirla,
+cerrarla y pulsar el atajo sin mover el cursor—; en un hueco de en medio manda lo
+que viene debajo; y un tramo con solo comentarios se salta.
+
+El desplazamiento donde empieza el fragmento viaja con él, así que **el error del
+servidor sigue señalando la línea de verdad** y no la primera del trozo.
+
+El cálculo lo hace el editor, que es quien tiene el cursor, y solo al pedirlo:
+recorrer el texto en cada pulsación sería pagar por algo que se usa al ejecutar.
+La paleta de comandos gana «Ejecutar instrucción actual», que si no la acción
+nueva solo se descubre pulsando el botón.
+
+**Verificado.** **466 pruebas en frontend** (17 nuevas, todas del separador: los
+puntos y coma que no separan, dónde cae cada cursor y qué pasa cuando no hay nada
+que ejecutar). Backend sin tocar.
+
+**Archivos.** `sql-statements.ts` y su prueba (nuevos), `sql-editor.ts`,
+`app-shell.ts`, `app-shell.html`, `editor-toolbar.html`, `editor-toolbar.scss`,
+`command-palette.ts`.
+
+**No hecho.** No se ha visto funcionar en la aplicación levantada: lo que hay son
+las pruebas del separador.
+
 ### Sesión 022m — 2026-08-18 · El ciclo en los otros tres motores, y lo que escondían
 
 Llevar el ciclo de respaldo y restauración a los cuatro motores **por HTTP** era
@@ -364,7 +408,7 @@ nombres de las columnas por encima. El editor pasa a una capa por encima de la
 rejilla y del tirador, y por debajo de los menús y de todo lo modal.
 
 **Verificado.** **615 pruebas de backend** —339 unitarias, 166 contractuales y
-110 de integración, con `DRUSE_REQUIRE_ENGINES=1` y los cuatro motores— y **449
+110 de integración, con `DRUSE_REQUIRE_ENGINES=1` y los cuatro motores— y **466
 en frontend**. Las nueve nuevas son el ciclo completo, la base nueva y el rechazo
 de la base repetida, en SQL Server, MySQL e Informix.
 
@@ -423,7 +467,7 @@ otro servidor— y se avisa de la transacción que quede abierta en la conexión
 se deja. Producción se ve desde el chip, sin abrir el menú.
 
 **Verificado.** **606 pruebas de backend** —339 unitarias, 166 contractuales y
-101 de integración, con `DRUSE_REQUIRE_ENGINES=1` y los cuatro motores— y **449
+101 de integración, con `DRUSE_REQUIRE_ENGINES=1` y los cuatro motores— y **466
 en frontend**. Las nuevas cubren el índice de expresión de punta a punta, la base
 nueva (creada y rechazada por nombre repetido), el camino del navegador al abrir
 un `.sql` y el cambio de conexión.
