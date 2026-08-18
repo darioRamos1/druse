@@ -6,6 +6,15 @@ import {
   SavedSqlDocument,
 } from '../application-gateway/desktop-host';
 
+/** Tope de tamaño de un `.sql`: por encima, el editor no lo aguanta. */
+const MAX_SQL_BYTES = 10 * 1024 * 1024;
+
+/** Lo poco que se usa de `showOpenFilePicker`, que TypeScript aún no declara. */
+type FilePicker = (options: {
+  multiple: boolean;
+  types: { description: string; accept: Record<string, string[]> }[];
+}) => Promise<{ getFile(): Promise<File> }[]>;
+
 export interface SqlFileSaveRequest {
   readonly documentId?: string;
   readonly fileName?: string;
@@ -43,9 +52,61 @@ export class SqlFileService {
     return { documentId: '', fileName };
   }
 
-  private openInBrowser(): Promise<OpenedSqlDocument | null> {
+  /**
+   * Abre un `.sql` desde el navegador.
+   *
+   * Se prefiere el selector del sistema —`showOpenFilePicker`— porque **entrega
+   * el archivo y ya está**: sin eventos, sin carreras y con una forma inequívoca
+   * de saber que el usuario cerró el diálogo sin elegir. Donde no existe se
+   * recurre al `<input>` de toda la vida.
+   */
+  private async openInBrowser(): Promise<OpenedSqlDocument | null> {
+    const picker = (window as Window & { showOpenFilePicker?: FilePicker }).showOpenFilePicker;
+
+    if (typeof picker !== 'function') {
+      return this.openWithInput();
+    }
+
+    let file: File;
+
+    try {
+      const [handle] = await picker.call(window, {
+        multiple: false,
+        types: [{ description: 'Consultas SQL', accept: { 'text/sql': ['.sql'] } }],
+      });
+
+      file = await handle.getFile();
+    } catch (error) {
+      // Cerrar el diálogo sin elegir nada no es un error que enseñar.
+      if (error instanceof DOMException && error.name === 'AbortError') {
+        return null;
+      }
+
+      // Un navegador que lo anuncia pero lo tiene capado —dentro de un iframe,
+      // por ejemplo— no debe dejar sin abrir archivos: se prueba por el otro
+      // camino antes de darse por vencido.
+      return this.openWithInput();
+    }
+
+    return this.read(file);
+  }
+
+  /**
+   * El camino de siempre: un `<input type="file">` invisible.
+   *
+   * **Ya no se mira el foco de la ventana para adivinar si se canceló.** Eso era
+   * lo que rompía el caso normal: al elegir un archivo, el navegador devuelve el
+   * foco *antes* de despachar el `change`, así que se quitaba el input del DOM
+   * —matando el evento que estaba por llegar— y se resolvía como si no se
+   * hubiera elegido nada. El archivo se seleccionaba y no se abría nunca.
+   *
+   * Lo que sí dice si se canceló es el evento `cancel` del propio input, que es
+   * exactamente para lo que existe.
+   */
+  private openWithInput(): Promise<OpenedSqlDocument | null> {
     return new Promise((resolve, reject) => {
       const input = document.createElement('input');
+
       input.type = 'file';
       input.accept = '.sql,text/plain';
       input.hidden = true;
@@ -61,42 +122,50 @@ export class SqlFileService {
             resolve(null);
             return;
           }
-          if (!file.name.toLowerCase().endsWith('.sql')) {
-            reject(new Error('Solo se pueden abrir archivos con extensión .sql.'));
-            return;
-          }
-          if (file.size > 10 * 1024 * 1024) {
-            reject(new Error('El archivo SQL supera el límite de 10 MB.'));
-            return;
-          }
 
-          file
-            .text()
-            .then((contents) =>
-              resolve({
-                documentId: '',
-                fileName: file.name,
-                contents: contents.replace(/^\uFEFF/, ''),
-              }),
-            )
-            .catch(() => reject(new Error('No se pudo leer el archivo SQL.')));
+          this.read(file).then(resolve, reject);
         },
         { once: true },
       );
-      window.addEventListener(
-        'focus',
+
+      input.addEventListener(
+        'cancel',
         () => {
-          window.setTimeout(() => {
-            if (input.isConnected && !input.files?.length) {
-              input.remove();
-              resolve(null);
-            }
-          });
+          input.remove();
+          resolve(null);
         },
         { once: true },
       );
+
       input.click();
     });
+  }
+
+  /** Comprueba el archivo elegido y devuelve su contenido. */
+  private async read(file: File): Promise<OpenedSqlDocument> {
+    if (!file.name.toLowerCase().endsWith('.sql')) {
+      throw new Error('Solo se pueden abrir archivos con extensión .sql.');
+    }
+
+    if (file.size > MAX_SQL_BYTES) {
+      throw new Error('El archivo SQL supera el límite de 10 MB.');
+    }
+
+    let contents: string;
+
+    try {
+      contents = await file.text();
+    } catch {
+      throw new Error('No se pudo leer el archivo SQL.');
+    }
+
+    return {
+      documentId: '',
+      fileName: file.name,
+      // El BOM es del archivo, no del SQL: dejarlo delante del primer `SELECT`
+      // haría que el motor no reconociera la instrucción.
+      contents: contents.replace(/^\uFEFF/, ''),
+    };
   }
 
   private download(fileName: string, contents: string): void {
