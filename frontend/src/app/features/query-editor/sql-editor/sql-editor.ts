@@ -77,8 +77,17 @@ export interface ExecutionErrorContext {
     }
   `,
   styles: `
+    /*
+     * Monaco saca el autocompletado, el hover y la ayuda de parámetros fuera de
+     * su marco, así que caen sobre el panel de resultados. Ahí compiten con la
+     * cabecera de la rejilla, que está fija con z-index 2, y con el tirador que
+     * reparte el alto: sin este nivel propio, el nombre de las columnas se
+     * dibujaba encima de la lista de sugerencias. Queda por debajo de los menús
+     * de la barra (20) y de todo lo modal.
+     */
     :host {
       position: relative;
+      z-index: 6;
       display: block;
       min-width: 0;
       min-height: 0;
