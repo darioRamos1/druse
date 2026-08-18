@@ -727,6 +727,13 @@ llevarse por delante los perfiles hechos con ella.
       parámetros. Las filas van **por lotes de 500**, que es lo que acota la
       memoria de una tabla de tres millones y, de paso, el grano con el que se
       puede reanudar.
+- [x] **Elegir el artefacto sin escribir su ruta**: un selector propio —el
+      navegador no ve el sistema de archivos— que enseña los `.sql` y `.zip` con
+      su fecha y marca las carpetas que llevan un `manifest.json` dentro.
+- [x] **Restaurar en una base nueva**, creada en el momento con el nombre del que
+      venía el respaldo. Nunca dentro de una que ya exista: quien copia una base
+      no espera escribir encima de otra. Añade `ScriptCreateDatabase` al contrato
+      del scripter, con el `WITH LOG` que Informix exige para admitir DRDA.
 - [x] **El mismo progreso que al respaldar** —asistente y barra de estado, que
       el trabajo sobrevive a cerrar la ventana—, y la parada ante el primer
       error diciendo en qué instrucción, enseñándola entera, con la opción de
@@ -740,8 +747,18 @@ restauración que falla a mitad **deja claro qué se aplicó y qué no**.
 los **datos** están cubiertas en los cuatro motores por las contractuales, y la
 del **artefacto entero** —respaldar, mirar, aplicar en una base limpia y comparar—
 por dos pruebas de integración contra PostgreSQL, una con `INSERT` y otra con CSV.
-Falta llevar el ciclo entero por HTTP a los otros tres motores y **usar el
-asistente a mano** contra el escenario ya sembrado en `druse-pg-test`.
+El asistente **ya se ha usado a mano** contra una base real, y es lo que encontró
+el error de abajo. Falta repetir ese mismo respaldo ahora que está arreglado, y
+llevar el ciclo entero por HTTP a los otros tres motores.
+
+**Y lo que solo encontró usarlo.** Un respaldo real de 2.747 instrucciones se
+paró en la 2.722: un índice sobre una expresión —`lower(nit)`— no tiene columnas
+que enumerar, el catálogo las devuelve vacías y el guion salía con
+`USING btree ()`. Ahora PostgreSQL entrega su propia definición para esos índices
+y, en cualquier motor, uno que no se pueda reproducir **no se escribe** y se
+avisa: un artefacto con un índice de menos se aplica; uno con un `CREATE INDEX`
+inválido no se aplica entero. Ninguna prueba de laboratorio lo habría visto,
+porque ninguna tabla de prueba tenía un índice de expresión.
 
 La prueba contractual de la carga por texto —lo que hace un CSV— encontró dos
 errores que ninguna otra veía, y los dos afectaban también a **importar** un CSV

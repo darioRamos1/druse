@@ -10,14 +10,14 @@
 
 | Campo | Valor |
 | --- | --- |
-| Última sesión | **022k** — 2026-08-18 |
-| Fase activa | **Respaldos y restauración:** Fases A–E cerradas y probadas contra PostgreSQL real. La **F** tiene backend, interfaz y **los CSV**; le falta el ciclo entero por HTTP en los otros tres motores y una prueba a mano |
+| Última sesión | **022l** — 2026-08-18 |
+| Fase activa | **Respaldos y restauración:** Fases A–E cerradas. La **F** tiene backend, interfaz, CSV, selector de archivos y **restaurar en una base nueva**; le falta el ciclo entero por HTTP en los otros tres motores |
 | Fases 0–6 | ✅ Cerradas. |
 | Fase 7 | 🟡 **11/12.** El ciclo de instalación está probado sobre este equipo; solo falta arrancar en una máquina sin herramientas de desarrollo. |
 | Fase 8 | ✅ **7/7.** Tres motores sobre el mismo contrato y primera beta preparada. |
 | ¿Compila el backend? | Sí — 0 advertencias, 0 errores |
 | ¿Compila el envoltorio? | Sí |
-| ¿Pasan las pruebas? | Sí — **600 en backend** (336 unitarias, 166 contractuales y 98 de integración), **432 en frontend** y **6 en el envoltorio**. Con `DRUSE_REQUIRE_ENGINES=1` y **los cuatro motores**, sin saltarse ninguna |
+| ¿Pasan las pruebas? | Sí — **606 en backend** (339 unitarias, 166 contractuales y 101 de integración), **449 en frontend** y **6 en el envoltorio**. Con `DRUSE_REQUIRE_ENGINES=1` y **los cuatro motores**, sin saltarse ninguna |
 | ¿Hay aplicación de escritorio? | **Sí.** Instalador NSIS, MSI y ZIP portable, en dos variantes: con Informix y sin él |
 | Motores | **PostgreSQL, SQL Server, MySQL/MariaDB e Informix**, todos sobre el mismo contrato compartido |
 | Trabajo a medias | Ninguno. El frontend de la restauración quedó commiteado en la sesión 022i. |
@@ -29,12 +29,16 @@
 
 **Lo que le falta a la Fase F**, por orden:
 
-1. **Usar el asistente a mano** contra `druse-pg-test`, que es lo que encontró
-   los errores de verdad en el respaldo (sesión 022g). Nadie ha restaurado
-   todavía desde la pantalla.
+1. **Repetir a mano el respaldo grande que falló** (sesión 022l): el de
+   `empresa_estado_financiero`, ahora que los índices sobre expresiones se
+   guionizan. Es el único caso real que ha pasado por la pantalla de punta a
+   punta, y encontró un error que ninguna prueba veía.
 2. **El ciclo entero por HTTP en los otros tres motores.** `RestoreEndpointTests`
    solo abre sesiones de PostgreSQL; las contractuales sí cubren los cuatro, pero
    por debajo de la API.
+3. **Probar la base nueva contra los otros motores.** `ScriptCreateDatabase` está
+   escrito para los cuatro —Informix con su `WITH LOG`— pero solo se ha ejecutado
+   contra PostgreSQL.
 
 Lo demás de la Fase F está hecho: `RestoreService`, la inspección del artefacto,
 el rechazo por motor y versión de formato, la vista previa de lo que se ejecuta y
@@ -313,6 +317,61 @@ Y tres límites declarados desde el principio: no hay respaldo binario ni
 recuperación a un punto en el tiempo —eso es del servidor, y la interfaz tendrá
 que decirlo—, no hay respaldos programados, y un límite de filas puede dejar
 filas huérfanas, cosa que se avisa y no se corrige sola.
+
+### Sesión 022l — 2026-08-18 · Lo que encontró usarlo de verdad
+
+Cuatro cosas, y **tres salieron de una sola tarde de uso real**, no de leer el
+código. Conviene anotarlo: el respaldo llevaba dos sesiones «terminado».
+
+**1. Los índices sobre expresiones rompían la restauración entera.** Un índice
+como `lower(nit)` no tiene columnas que enumerar; el catálogo devuelve la lista
+vacía y el guion salía con `CREATE INDEX … USING btree ()`. La restauración se
+paraba ahí con «syntax error at or near ")"» **en la instrucción 2.722 de
+2.747**, con todo lo anterior ya aplicado. Ahora PostgreSQL entrega su propia
+definición —`pg_get_indexdef`, solo para los que tienen `indexprs`— y se guioniza
+tal cual; y en cualquier motor, un índice sin columnas y sin definición ya no se
+escribe, con su aviso por tabla. Mejor un índice de menos que un artefacto que no
+se puede aplicar.
+
+**2. Restaurar en una base nueva.** El asistente pregunta dónde: la base abierta,
+o una que se crea en ese momento con el nombre del que venía el respaldo. No se
+restaura dentro de una que ya exista —quien copia no espera escribir encima— y se
+comprueba dos veces: en la pantalla mientras se escribe el nombre, y en el
+proceso local antes de tocar nada. La base se crea **antes** de abrir el
+artefacto: si el nombre está cogido, mejor saberlo antes que a mitad de tres
+millones de filas. `CREATE DATABASE` entra en el contrato del scripter, con el
+`WITH LOG` de Informix, donde una base sin registro se crea y luego no admite
+conexiones DRDA.
+
+**3. Abrir un `.sql` en el navegador no abría nada.** Se elegía el archivo y no
+pasaba nada. El código adivinaba la cancelación mirando el foco de la ventana, y
+el navegador devuelve el foco **antes** de despachar el `change`: se quitaba el
+input del DOM —matando el evento que estaba por llegar— y se resolvía como si no
+se hubiera elegido nada. Ahora se usa `showOpenFilePicker` donde existe y, si no,
+el evento `cancel` del propio input. Ese camino **no tenía ninguna prueba**, que
+es exactamente cómo un fallo así llega al usuario; ahora tiene cuatro.
+
+**4. Cambiar de conexión sin salir de la pestaña.** El chip de la barra dice
+ahora «conexión · base» y su menú lista las dos cosas: las conexiones abiertas y
+también las guardadas, que se abren al elegirlas. Es el caso de mirar algo en
+desarrollo y repetirlo en preproducción sin pegar el SQL en otra pestaña. Al
+cambiar se retira el resultado en pantalla y la procedencia editable —eran de
+otro servidor— y se avisa de la transacción que quede abierta en la conexión que
+se deja. Producción se ve desde el chip, sin abrir el menú.
+
+**Verificado.** **606 pruebas de backend** —339 unitarias, 166 contractuales y
+101 de integración, con `DRUSE_REQUIRE_ENGINES=1` y los cuatro motores— y **449
+en frontend**. Las nuevas cubren el índice de expresión de punta a punta, la base
+nueva (creada y rechazada por nombre repetido), el camino del navegador al abrir
+un `.sql` y el cambio de conexión.
+
+**De propina.** `docs/Guia-Druse-Levantar-y-Empaquetar.docx`: cómo levantar los
+servicios a mano y generar instaladores y portable, con las rutas exactas de cada
+artefacto. **Sin versionar**, a la espera de decidir si el `.docx` entra al
+repositorio.
+
+**Sigue sin poder compilarse Rust en este equipo**, así que todo lo probado va
+por el navegador; el envoltorio no se ha ejercitado.
 
 ### Sesión 022k — 2026-08-18 · Elegir dónde va el respaldo, sin teclear la ruta
 
