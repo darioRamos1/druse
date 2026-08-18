@@ -303,6 +303,214 @@ public sealed class RestoreEndpointTests(DruseApiFactory factory) : IClassFixtur
         }
     }
 
+    /// <summary>
+    /// Traerse el respaldo a una base **que no existe todavía**.
+    ///
+    /// Es cómo se copia una base entera sin tocar la que hay abierta: Druse la
+    /// crea y aplica dentro el artefacto. Lo que se comprueba es que la base
+    /// aparece, que lo restaurado está en ella y que **la de origen no se toca**.
+    /// </summary>
+    [Fact]
+    public async Task CreaLaBaseNuevaYRestauraDentro()
+    {
+        using var client = _factory.CreateAuthenticatedClient();
+
+        var origin = await OpenAsync(client, "druse_test");
+
+        if (origin is null) { return; }
+
+        var suffix = Guid.NewGuid().ToString("N")[..8];
+        var tabla = $"druse_copia_{suffix}";
+        var nueva = $"druse_nueva_{suffix}";
+        var root = Path.Combine(Path.GetTempPath(), $"druse-restore-nueva-{suffix}");
+
+        Directory.CreateDirectory(root);
+
+        try
+        {
+            await RunSqlAsync(client, origin.Value, $"""
+                CREATE TABLE {tabla} (id integer PRIMARY KEY, nombre text NOT NULL);
+                """);
+
+            await RunSqlAsync(client, origin.Value, $"""
+                INSERT INTO {tabla} (id, nombre) VALUES (1, 'Ana'), (2, 'Luis');
+                """);
+
+            var path = await BackupAsync(client, origin.Value, root, tabla);
+
+            // La inspección propone el nombre de la base de la que salió y dice
+            // cuáles hay ya, que es con lo que la pantalla avisa antes de lanzar.
+            var inspection = await InspectAsync(client, origin.Value, path);
+
+            Assert.Equal("druse_test", inspection.GetProperty("sourceDatabase").GetString());
+            Assert.Contains(
+                "druse_test",
+                inspection.GetProperty("databases").EnumerateArray().Select(name => name.GetString()));
+
+            var result = await RestoreAsync(client, new
+            {
+                sessionId = origin.Value,
+                path,
+                newDatabase = nueva,
+            });
+
+            Assert.Equal("Completed", result.GetProperty("outcome").GetString());
+
+            // Y lo restaurado está en la base nueva, no en la de origen.
+            var target = await OpenAsync(client, nueva);
+
+            Assert.NotNull(target);
+
+            var rows = await RunSqlAsync(client, target.Value, $"SELECT count(*) FROM {tabla};");
+
+            Assert.Equal("2", rows.GetProperty("resultSets")[0].GetProperty("rows")[0][0].GetString());
+        }
+        finally
+        {
+            await CleanAsync(client, origin.Value, $"DROP TABLE IF EXISTS {tabla}");
+            await CleanAsync(client, origin.Value, $"DROP DATABASE IF EXISTS {nueva}");
+
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Y no se restaura dentro de una base que ya existe: quien pide «tráemela a
+    /// una base nueva» está copiando, y escribir encima de otra cosa no es un
+    /// matiz. Se para **antes** de tocar nada.
+    /// </summary>
+    [Fact]
+    public async Task SeNiegaACrearUnaBaseQueYaExiste()
+    {
+        using var client = _factory.CreateAuthenticatedClient();
+
+        var origin = await OpenAsync(client, "druse_test");
+
+        if (origin is null) { return; }
+
+        var suffix = Guid.NewGuid().ToString("N")[..8];
+        var tabla = $"druse_choque_{suffix}";
+        var root = Path.Combine(Path.GetTempPath(), $"druse-restore-choque-{suffix}");
+
+        Directory.CreateDirectory(root);
+
+        try
+        {
+            await RunSqlAsync(client, origin.Value, $"CREATE TABLE {tabla} (id integer PRIMARY KEY);");
+
+            var path = await BackupAsync(client, origin.Value, root, tabla);
+
+            var result = await RestoreAsync(client, new
+            {
+                sessionId = origin.Value,
+                path,
+                newDatabase = "druse_test_secondary",
+            });
+
+            Assert.Equal("Failed", result.GetProperty("outcome").GetString());
+
+            var failure = result.GetProperty("failure");
+
+            Assert.Contains(
+                "druse_test_secondary",
+                failure.GetProperty("message").GetString(),
+                StringComparison.Ordinal);
+
+            // Nada aplicado: se para antes de abrir el artefacto siquiera.
+            Assert.Equal(0, result.GetProperty("statementsDone").GetInt32());
+        }
+        finally
+        {
+            await CleanAsync(client, origin.Value, $"DROP TABLE IF EXISTS {tabla}");
+
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Una tabla con un índice **sobre una expresión** se respalda y se restaura.
+    ///
+    /// El catálogo no da columnas para esos índices, y el guion salía con
+    /// `USING btree ()`: la restauración se paraba en él con «syntax error at or
+    /// near ")"», después de haber aplicado todo lo anterior. Aquí se comprueba lo
+    /// que importa —que la vuelta entera funcione— y de paso que el índice llegue
+    /// al destino, en vez de perderse en silencio.
+    /// </summary>
+    [Fact]
+    public async Task UnIndiceSobreUnaExpresionSobreviveALaVuelta()
+    {
+        using var client = _factory.CreateAuthenticatedClient();
+
+        var origin = await OpenAsync(client, "druse_test");
+
+        if (origin is null) { return; }
+
+        var target = await OpenAsync(client, "druse_test_secondary");
+
+        Assert.NotNull(target);
+
+        var suffix = Guid.NewGuid().ToString("N")[..8];
+        var tabla = $"druse_expr_{suffix}";
+        var indice = $"ix_{tabla}_nit";
+        var root = Path.Combine(Path.GetTempPath(), $"druse-restore-expr-{suffix}");
+
+        Directory.CreateDirectory(root);
+
+        try
+        {
+            await RunSqlAsync(client, origin.Value, $"""
+                CREATE TABLE {tabla} (id integer PRIMARY KEY, nit text NOT NULL);
+                """);
+
+            await RunSqlAsync(client, origin.Value, $"""
+                CREATE INDEX {indice} ON {tabla} (lower(nit));
+                """);
+
+            await RunSqlAsync(client, origin.Value, $"""
+                INSERT INTO {tabla} (id, nit) VALUES (1, '900.123-4');
+                """);
+
+            var path = await BackupAsync(client, origin.Value, root, tabla);
+
+            var result = await RestoreAsync(client, new { sessionId = target.Value, path });
+
+            Assert.Equal("Completed", result.GetProperty("outcome").GetString());
+
+            var indices = await RunSqlAsync(client, target.Value, $"""
+                SELECT indexdef FROM pg_indexes WHERE indexname = '{indice}';
+                """);
+
+            var definicion = indices.GetProperty("resultSets")[0]
+                .GetProperty("rows")
+                .EnumerateArray()
+                .Select(row => row[0].GetString())
+                .SingleOrDefault();
+
+            Assert.NotNull(definicion);
+            Assert.Contains("lower(nit)", definicion, StringComparison.Ordinal);
+        }
+        finally
+        {
+            await CleanAsync(client, origin.Value, $"DROP TABLE IF EXISTS {tabla}");
+
+            if (target is not null)
+            {
+                await CleanAsync(client, target.Value, $"DROP TABLE IF EXISTS {tabla}");
+            }
+
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+    }
+
     /// <summary>Respalda a una carpeta con los datos en CSV y devuelve su ruta.</summary>
     private static async Task<string> BackupToCsvAsync(
         HttpClient client,

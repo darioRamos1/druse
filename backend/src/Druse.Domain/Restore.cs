@@ -106,6 +106,23 @@ public sealed record RestoreInspection
     /// <summary>Cosas que conviene saber pero no impiden restaurar.</summary>
     public IReadOnlyList<BackupWarning> Warnings { get; init; } = [];
 
+    /// <summary>
+    /// De qué base venía el respaldo, si el manifiesto lo dice.
+    ///
+    /// Es el nombre que se propone al traérselo a una base nueva: quien copia una
+    /// base a otro servidor casi siempre la quiere llamar igual.
+    /// </summary>
+    public string? SourceDatabase { get; init; }
+
+    /// <summary>
+    /// Las bases que ya hay en este servidor.
+    ///
+    /// Viajan para que la pantalla pueda decir «ese nombre ya está cogido»
+    /// **mientras se escribe**, en vez de al fallar el `CREATE DATABASE` a mitad
+    /// de la restauración.
+    /// </summary>
+    public IReadOnlyList<string> Databases { get; init; } = [];
+
     public bool CanRestore => Rejections.Count == 0;
 }
 

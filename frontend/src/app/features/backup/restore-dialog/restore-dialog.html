@@ -188,11 +188,59 @@
         </p>
 
         <!--
+          Dónde se aplica. Encima de lo que se sobrescribiría, porque cambiar el
+          destino a una base nueva hace que ese aviso deje de aplicar.
+        -->
+        <fieldset class="where">
+          <legend class="where__title">Dónde se restaura</legend>
+
+          <label class="radio">
+            <input
+              type="radio"
+              name="destination"
+              [checked]="destination() === 'here'"
+              (change)="destination.set('here')"
+            />
+            <span>En <strong>{{ target().label }}</strong>, la base abierta</span>
+          </label>
+
+          <label class="radio">
+            <input
+              type="radio"
+              name="destination"
+              [checked]="destination() === 'new'"
+              (change)="destination.set('new')"
+            />
+            <span>En una base nueva, que se crea ahora</span>
+          </label>
+
+          @if (destination() === 'new') {
+            <div class="where__name">
+              <input
+                type="text"
+                [value]="newDatabase()"
+                [attr.placeholder]="found.sourceDatabase ?? 'nombre de la base'"
+                (input)="newDatabase.set($any($event.target).value)"
+              />
+            </div>
+
+            @if (destinationProblem(); as problem) {
+              <p class="error">{{ problem }}</p>
+            } @else {
+              <p class="hint">
+                Se crea vacía y el respaldo entra dentro. Nada de lo que hay en
+                {{ target().label }} se toca.
+              </p>
+            }
+          }
+        </fieldset>
+
+        <!--
           Lo que de verdad hay que ver antes de aceptar. Va destacado y con las
           filas que hay hoy: «tres tablas» no dice nada y «tres tablas con 40.000
-          filas» sí.
+          filas» sí. Con una base nueva no aplica: allí no hay nada todavía.
         -->
-        @if (found.collisions.length > 0) {
+        @if (found.collisions.length > 0 && destination() === 'here') {
           <div class="collisions">
             <p class="collisions__title">
               {{ found.collisions.length }} tabla(s) ya existen en {{ target().label }}
@@ -226,8 +274,8 @@
     <footer class="foot">
       <button type="button" class="ghost" (click)="close()">Cancelar</button>
       <span class="spacer"></span>
-      <button type="button" class="primary" [disabled]="!canRestore()" (click)="run()">
-        Restaurar
+      <button type="button" class="primary" [disabled]="!canLaunch()" (click)="run()">
+        {{ destination() === 'new' ? 'Crear y restaurar' : 'Restaurar' }}
       </button>
     </footer>
   }

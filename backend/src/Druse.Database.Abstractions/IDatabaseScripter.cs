@@ -86,6 +86,17 @@ public interface IDatabaseScripter
     IReadOnlyList<string> ScriptSchema(string schema);
 
     /// <summary>
+    /// El `CREATE DATABASE` de una base nueva.
+    ///
+    /// Existe desde que restaurar ofrece **traerse el respaldo a una base que
+    /// todavía no está**, que es como se copia una base entera sin tocar la que
+    /// hay abierta. Se emite solo cuando el usuario lo pide con un nombre
+    /// delante: crear una base por iniciativa propia sería decidir por él dónde
+    /// va el respaldo.
+    /// </summary>
+    IReadOnlyList<string> ScriptCreateDatabase(string name);
+
+    /// <summary>
     /// El `CREATE TABLE`: columnas, clave primaria, restricciones de unicidad y de
     /// comprobación. **Sin índices y sin claves foráneas**, que llegan después.
     /// </summary>

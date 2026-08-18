@@ -19,6 +19,19 @@ public sealed class InformixTableDesigner : TableDesignerBase
     ];
 
     /// <summary>
+    /// Una base sin registro de transacciones **no admite conexiones DRDA**, que
+    /// es por donde habla Druse. Crearla sin `WITH LOG` daría una base que existe
+    /// y a la que después no se puede entrar, con un error que no menciona el
+    /// registro por ninguna parte.
+    /// </summary>
+    public override IReadOnlyList<string> ScriptCreateDatabase(string name)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+
+        return [$"CREATE DATABASE {Quote(name)} WITH LOG"];
+    }
+
+    /// <summary>
     /// Informix es el más limitado de los cuatro en índices: ni columnas
     /// incluidas ni índices parciales, y tampoco se elige la estructura desde
     /// esta forma de instrucción.

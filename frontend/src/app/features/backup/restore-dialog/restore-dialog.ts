@@ -1,5 +1,16 @@
-import { ChangeDetectionStrategy, Component, computed, inject, input, output, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  effect,
+  inject,
+  input,
+  output,
+  signal,
+  untracked,
+} from '@angular/core';
 
+import { RestoreRequest } from '../../../core/application-gateway/application-gateway';
 import { DesktopHost } from '../../../core/application-gateway/desktop-host';
 import { RestoreStore, outcomeLabel } from '../../../core/backup/restore.store';
 import { ExplorerNode } from '../../../shared/models/workspace';
@@ -101,13 +112,79 @@ export class RestoreDialog {
     return this.store.inspect(this.sessionId(), this.path().trim());
   }
 
+  // --- Dónde se restaura ----------------------------------------------------
+
+  /** `here` es la base abierta; `new` es traerse el respaldo a una que no está. */
+  protected readonly destination = signal<'here' | 'new'>('here');
+
+  /** Nombre de la base nueva, propuesto con el que traiga el respaldo. */
+  protected readonly newDatabase = signal('');
+
+  constructor() {
+    // Al mirar un artefacto se propone el nombre de la base de la que salió:
+    // quien copia una base a otro servidor casi siempre la quiere llamar igual.
+    effect(() => {
+      const source = this.inspection()?.sourceDatabase;
+
+      untracked(() => {
+        if (source && this.newDatabase().trim().length === 0) {
+          this.newDatabase.set(source);
+        }
+      });
+    });
+  }
+
+  /** Si el nombre escrito ya está cogido en este servidor. */
+  protected readonly nameTaken = computed(() => {
+    const name = this.newDatabase().trim().toLowerCase();
+
+    return (
+      name.length > 0 &&
+      (this.inspection()?.databases ?? []).some((database) => database.toLowerCase() === name)
+    );
+  });
+
+  /**
+   * Lo que impide lanzar, cuando se ha pedido una base nueva.
+   *
+   * No se restaura dentro de una base que ya existe: quien pide «tráemela a una
+   * base nueva» está copiando, y encontrarse con que ha escrito encima de otra
+   * cosa no es un matiz.
+   */
+  protected readonly destinationProblem = computed(() => {
+    if (this.destination() === 'here') {
+      return null;
+    }
+
+    if (this.newDatabase().trim().length === 0) {
+      return 'Escribe el nombre de la base que se va a crear.';
+    }
+
+    return this.nameTaken()
+      ? `Ya hay una base llamada «${this.newDatabase().trim()}» en este servidor.`
+      : null;
+  });
+
+  protected readonly canLaunch = computed(
+    () => this.canRestore() && this.destinationProblem() === null,
+  );
+
+  /** Lo que se manda al proceso local: la base nueva solo si se pidió una. */
+  private request(): RestoreRequest {
+    return {
+      sessionId: this.sessionId(),
+      path: this.path().trim(),
+      newDatabase: this.destination() === 'new' ? this.newDatabase().trim() : undefined,
+    };
+  }
+
   protected run(): Promise<void> {
-    return this.store.start({ sessionId: this.sessionId(), path: this.path().trim() });
+    return this.store.start(this.request());
   }
 
   /** Sigue desde donde se paró, sin repetir lo aplicado. */
   protected resume(): Promise<void> {
-    return this.store.resume({ sessionId: this.sessionId(), path: this.path().trim() });
+    return this.store.resume(this.request());
   }
 
   protected cancel(): Promise<void> {

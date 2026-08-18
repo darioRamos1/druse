@@ -90,6 +90,7 @@ internal static class RestoreEndpoints
                                 SessionId = request.SessionId,
                                 Path = request.Path,
                                 ResumeFrom = request.ResumeFrom,
+                                NewDatabase = request.NewDatabase,
                             },
                             progress,
                             token);

@@ -50,6 +50,8 @@ const limpio: RestoreInspection = {
   collisions: [],
   rejections: [],
   warnings: [],
+  sourceDatabase: 'druse_test',
+  databases: ['druse_test', 'druse_test_secondary'],
   canRestore: true,
 };
 
@@ -298,5 +300,67 @@ describe('RestoreDialog', () => {
     );
     expect(element.textContent).toContain('Restaurar');
     expect(element.querySelector('app-folder-picker')).toBeNull();
+  });
+
+  /**
+   * Traerse el respaldo a una base nueva es como se copia una base entera sin
+   * tocar la que hay abierta. El nombre se propone con el del origen: quien
+   * copia a otro servidor casi siempre la quiere llamar igual.
+   */
+  describe('en una base nueva', () => {
+    function elegirNueva(): void {
+      [...element.querySelectorAll<HTMLInputElement>('.where input[type="radio"]')]
+        .at(-1)!
+        .dispatchEvent(new Event('change'));
+
+      fixture.detectChanges();
+    }
+
+    function nombre(): HTMLInputElement {
+      return element.querySelector<HTMLInputElement>('.where__name input')!;
+    }
+
+    function lanzar(): HTMLButtonElement {
+      return [...element.querySelectorAll<HTMLButtonElement>('.foot button')].at(-1)!;
+    }
+
+    it('propone el nombre de la base de la que salió el respaldo', async () => {
+      gateway.inspection = { ...limpio, sourceDatabase: 'ventas', databases: ['druse_test'] };
+
+      await inspect();
+      elegirNueva();
+
+      expect(nombre().value).toBe('ventas');
+      expect(lanzar().textContent).toContain('Crear y restaurar');
+    });
+
+    it('manda el nombre para que el proceso local la cree', async () => {
+      gateway.inspection = { ...limpio, sourceDatabase: 'ventas', databases: ['druse_test'] };
+
+      await inspect();
+      elegirNueva();
+      lanzar().click();
+      await settle(fixture);
+
+      expect(gateway.started.at(-1)?.newDatabase).toBe('ventas');
+    });
+
+    /** No se restaura dentro de una base que ya está: eso sería sobrescribirla. */
+    it('no deja usar un nombre que ya existe en el servidor', async () => {
+      await inspect();
+      elegirNueva();
+
+      expect(nombre().value).toBe('druse_test');
+      expect(element.querySelector('.where .error')?.textContent).toContain('Ya hay una base');
+      expect(lanzar().disabled).toBe(true);
+    });
+
+    it('sobre la base abierta sigue sin mandar nombre de base nueva', async () => {
+      await inspect();
+      lanzar().click();
+      await settle(fixture);
+
+      expect(gateway.started.at(-1)?.newDatabase).toBeUndefined();
+    });
   });
 });

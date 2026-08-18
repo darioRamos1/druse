@@ -20,6 +20,13 @@ public sealed record RestoreRequestDto
 
     /// <summary>Instrucción desde la que se sigue. Cero es empezar de nuevo.</summary>
     public int ResumeFrom { get; init; }
+
+    /// <summary>
+    /// Nombre de una base **nueva** donde volcar el respaldo.
+    ///
+    /// Vacío es lo de siempre: aplicarlo sobre la base abierta.
+    /// </summary>
+    public string? NewDatabase { get; init; }
 }
 
 /// <summary>Una tabla del artefacto que ya existe en el destino.</summary>
@@ -84,6 +91,12 @@ public sealed record RestoreInspectionDto
     public IReadOnlyList<RestoreRejectionDto> Rejections { get; init; } = [];
 
     public IReadOnlyList<BackupWarningDto> Warnings { get; init; } = [];
+
+    /// <summary>De qué base venía el respaldo, si el manifiesto lo dice.</summary>
+    public string? SourceDatabase { get; init; }
+
+    /// <summary>Las bases que ya hay en este servidor.</summary>
+    public IReadOnlyList<string> Databases { get; init; } = [];
 
     public bool CanRestore { get; init; }
 }
@@ -179,6 +192,8 @@ internal static class RestoreMapper
                     Message = warning.Message,
                 }),
             ],
+            SourceDatabase = inspection.SourceDatabase,
+            Databases = inspection.Databases,
             CanRestore = inspection.CanRestore,
         };
     }

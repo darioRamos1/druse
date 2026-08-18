@@ -572,6 +572,13 @@ export interface FolderTarget {
 export interface RestoreRequest {
   readonly sessionId: string;
   readonly path: string;
+  /**
+   * Base **nueva** donde volcarlo, si se pidió una.
+   *
+   * Ausente es lo de siempre: aplicarlo sobre la base abierta. Con un nombre, el
+   * proceso local la crea y restaura dentro; si ya existiera, se niega.
+   */
+  readonly newDatabase?: string;
   /** Instrucción desde la que se sigue. Cero es empezar de nuevo. */
   readonly resumeFrom?: number;
 }
@@ -620,6 +627,10 @@ export interface RestoreInspection {
   readonly collisions: readonly RestoreCollision[];
   readonly rejections: readonly RestoreRejection[];
   readonly warnings: readonly BackupWarning[];
+  /** De qué base venía el respaldo, si el manifiesto lo dice. */
+  readonly sourceDatabase?: string;
+  /** Las bases que ya hay en este servidor, para no proponer un nombre cogido. */
+  readonly databases: readonly string[];
   readonly canRestore: boolean;
 }
 

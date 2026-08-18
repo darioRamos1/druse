@@ -24,6 +24,16 @@ public sealed record RestoreRequest
     /// `CREATE TABLE` fallaría y en un `INSERT` duplicaría filas.
     /// </summary>
     public int ResumeFrom { get; init; }
+
+    /// <summary>
+    /// Base **nueva** que se crea para meter dentro el respaldo.
+    ///
+    /// Vacío es lo de siempre: aplicarlo sobre la base abierta. Con un nombre se
+    /// crea esa base y se restaura ahí, que es como se trae una copia entera sin
+    /// tocar nada de lo que ya hay. **Nunca se usa una base que ya exista**: eso
+    /// sería sobrescribirla creyendo que se está copiando.
+    /// </summary>
+    public string? NewDatabase { get; init; }
 }
 
 /// <summary>
@@ -159,7 +169,38 @@ public sealed partial class RestoreService(
                 : await CollisionsAsync(sessionId, summary.Tables, cancellationToken),
             Rejections = rejections,
             Warnings = warnings,
+            SourceDatabase = summary.Manifest?.Database,
+            Databases = await DatabasesAsync(sessionId, cancellationToken),
         };
+    }
+
+    /// <summary>
+    /// Los nombres de las bases que ya hay en el servidor.
+    ///
+    /// Se mandan con la inspección para que la pantalla pueda decir «ese nombre
+    /// ya está cogido» mientras se escribe, en lugar de dejar que lo descubra el
+    /// `CREATE DATABASE`.
+    /// </summary>
+    private async Task<IReadOnlyList<string>> DatabasesAsync(
+        Guid sessionId,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            using var turn = await _connections.EnterAsync(sessionId, cancellationToken);
+
+            var session = _connections.Require(sessionId);
+            var reader = _providers.GetMetadataReader(session.Engine);
+
+            return [.. (await reader.GetDatabasesAsync(session, cancellationToken))
+                .Select(database => database.Name)];
+        }
+        catch (Exception error) when (error is not OperationCanceledException)
+        {
+            // Sin la lista se restaura igual: lo único que se pierde es el aviso
+            // temprano, y el servidor sigue teniendo la última palabra.
+            return [];
+        }
     }
 
     /// <summary>
@@ -198,6 +239,76 @@ public sealed partial class RestoreService(
         // hora. Se paga una lectura entera del archivo, que es barata al lado de
         // ejecutarlo.
         state.Total(await CountAsync(archive, cancellationToken));
+
+        // La base nueva, si se pidió una. Se crea **antes** de tocar el artefacto:
+        // si el nombre estaba cogido o faltan permisos, mejor enterarse ahora que
+        // a mitad de un respaldo de tres millones de filas.
+        if (!string.IsNullOrWhiteSpace(request.NewDatabase))
+        {
+            try
+            {
+                await CreateAsync(session, scripter, request.NewDatabase, cancellationToken);
+            }
+            catch (Exception error) when (error is not OperationCanceledException)
+            {
+                return state.Failed(0, $"CREATE DATABASE {request.NewDatabase}", error);
+            }
+        }
+
+        // Y a partir de aquí se escribe donde toque: en la base nueva si la hay,
+        // y si no en la de la sesión. La sesión auxiliar conserva servidor,
+        // usuario y permisos; lo único que cambia es a qué base apunta.
+        return await _connections.UseDatabaseAsync(
+            session,
+            string.IsNullOrWhiteSpace(request.NewDatabase) ? null : request.NewDatabase,
+            target => ApplyAsync(target, session, scripter, archive, request, state, cancellationToken),
+            cancellationToken);
+    }
+
+    /// <summary>
+    /// Crea la base donde se va a volcar el respaldo.
+    ///
+    /// Se comprueba antes que no exista, y no se restaura dentro de una que ya
+    /// esté: quien pide «tráemela a una base nueva» está copiando, y encontrarse
+    /// con que ha escrito encima de otra cosa no es un matiz.
+    /// </summary>
+    private async Task CreateAsync(
+        IDatabaseSession session,
+        IDatabaseScripter scripter,
+        string name,
+        CancellationToken cancellationToken)
+    {
+        var reader = _providers.GetMetadataReader(session.Engine);
+        var existing = await reader.GetDatabasesAsync(session, cancellationToken);
+
+        if (existing.Any(database =>
+                string.Equals(database.Name, name, StringComparison.OrdinalIgnoreCase)))
+        {
+            throw new InvalidOperationException(
+                $"Ya hay una base llamada «{name}» en este servidor. " +
+                "Elige otro nombre o restaura sobre ella a propósito.");
+        }
+
+        foreach (var statement in scripter.ScriptCreateDatabase(name))
+        {
+            await scripter.ApplyAsync(session, statement, cancellationToken);
+        }
+    }
+
+    /// <summary>
+    /// Recorre el artefacto y lo va aplicando sobre la base de destino.
+    /// </summary>
+    /// <param name="target">Dónde se escribe: la base nueva, o la de la sesión.</param>
+    /// <param name="session">La sesión del usuario, que es de quien es el turno.</param>
+    private async Task<RestoreProgress> ApplyAsync(
+        IDatabaseSession target,
+        IDatabaseSession session,
+        IDatabaseScripter scripter,
+        IBackupArchive archive,
+        RestoreRequest request,
+        RestoreState state,
+        CancellationToken cancellationToken)
+    {
         state.Enter(RestoreStep.Applying);
 
         var targets = new RestoreTargets();
@@ -230,15 +341,15 @@ public sealed partial class RestoreService(
                             // Lo que abrió el cargador de una tabla se cierra antes
                             // de volver al SQL: `IDENTITY_INSERT` es de la sesión y
                             // solo admite una tabla a la vez.
-                            await CloseLoadAsync(session, scripter, targets, cancellationToken);
+                            await CloseLoadAsync(target, scripter, targets, cancellationToken);
 
                             state.Working(SubjectOf(statement.Sql));
-                            state.Wrote(await scripter.ApplyAsync(session, statement.Sql, cancellationToken));
+                            state.Wrote(await scripter.ApplyAsync(target, statement.Sql, cancellationToken));
                             break;
 
                         case BackupRows rows:
                             state.Working(rows.Table);
-                            state.Wrote(await LoadAsync(session, scripter, targets, rows, state, cancellationToken));
+                            state.Wrote(await LoadAsync(target, scripter, targets, rows, state, cancellationToken));
                             break;
                     }
                 }
@@ -248,7 +359,7 @@ public sealed partial class RestoreService(
                 }
             }
 
-            await CloseLoadAsync(session, scripter, targets, cancellationToken);
+            await CloseLoadAsync(target, scripter, targets, cancellationToken);
         }
         catch (OperationCanceledException)
         {
