@@ -169,6 +169,7 @@ app.MapStorageEndpoints();
 app.MapExportEndpoints();
 app.MapImportEndpoints();
 app.MapBackupEndpoints();
+app.MapRestoreEndpoints();
 
 var endpoint = app.Services.GetRequiredService<LocalApiEndpoint>();
 

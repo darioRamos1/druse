@@ -104,6 +104,24 @@ public interface IDatabaseScripter
     IReadOnlyList<string> ScriptForeignKeys(ScriptedTable table);
 
     /// <summary>
+    /// Aplica una instrucción de un respaldo, y devuelve las filas que tocó.
+    ///
+    /// Es lo que usa la restauración, y va aquí porque el guion lo escribió este
+    /// mismo dialecto: quien sabe redactarlo sabe mandarlo.
+    ///
+    /// **Una instrucción por llamada, y sin transacción propia.** Envolver la
+    /// restauración entera en una transacción sonaría más seguro y sería peor:
+    /// no todos los motores deshacen DDL —MySQL confirma antes de cada `ALTER`—,
+    /// un respaldo de tres millones de filas reventaría el registro, y sobre todo
+    /// dejaría de existir la respuesta a «¿hasta dónde llegó?», que es lo que
+    /// permite reanudar desde donde falló en lugar de empezar de cero.
+    /// </summary>
+    Task<long> ApplyAsync(
+        IDatabaseSession session,
+        string statement,
+        CancellationToken cancellationToken);
+
+    /// <summary>
     /// Los `INSERT` de una tabla, leyendo del motor **según se escriben**.
     ///
     /// Devuelve instrucciones una a una y no una lista porque una tabla de diez

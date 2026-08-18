@@ -448,6 +448,34 @@ public abstract class TableDesignerBase : ITableDesigner, IDatabaseScripter
     public IReadOnlyList<string> ScriptTable(ScriptedTable table) =>
         DescribeCreate(ToDefinition(table));
 
+    /// <summary>
+    /// Manda una instrucción del artefacto por la conexión de la sesión.
+    ///
+    /// Se une a la transacción manual si el usuario tiene una abierta —los
+    /// comandos van por esa misma conexión y dejarlos fuera daría «hay una
+    /// transacción en curso»— pero no abre ninguna por su cuenta: quién decide
+    /// eso es la restauración, y decidió que no (ver el contrato).
+    /// </summary>
+    public async Task<long> ApplyAsync(
+        IDatabaseSession session,
+        string statement,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(session);
+        ArgumentException.ThrowIfNullOrWhiteSpace(statement);
+
+        await using var command = Connection(session).CreateCommand();
+
+        command.CommandText = statement;
+        command.Transaction = session.Transaction.Current;
+
+        var affected = await command.ExecuteNonQueryAsync(cancellationToken);
+
+        // Un `CREATE TABLE` devuelve -1 en casi todos los proveedores: no son
+        // filas escritas, son «esto no contaba filas».
+        return affected < 0 ? 0 : affected;
+    }
+
     public IReadOnlyList<string> ScriptIndexes(ScriptedTable table)
     {
         ArgumentNullException.ThrowIfNull(table);

@@ -600,6 +600,52 @@ public abstract class DatabaseProviderContractTests<TFixture>
     }
 
     /// <summary>
+    /// Aplicar una instrucción del artefacto, que es lo que hace restaurar.
+    ///
+    /// El camino de la restauración no es el del editor de consultas: no analiza
+    /// riesgo, no trae filas y no arma un resultado, porque lo que ejecuta son
+    /// treinta mil instrucciones seguidas escritas por Druse. Aquí se comprueba
+    /// lo único que promete —que se aplica y que dice cuántas filas tocó— en los
+    /// cuatro motores, porque de ese recuento vive el progreso.
+    /// </summary>
+    [Fact]
+    public async Task AplicaUnaInstrucciónDelArtefactoYCuentaSusFilas()
+    {
+        if (Skip) { return; }
+
+        await using var session = await OpenAsync();
+
+        var table = $"druse_apl_{Guid.NewGuid().ToString("N")[..8]}";
+
+        try
+        {
+            // Un `CREATE TABLE` no escribe filas: cero, y no el -1 que devuelven
+            // casi todos los proveedores por dentro.
+            var created = await Fixture.Scripter.ApplyAsync(
+                session,
+                Fixture.CreateTable(table),
+                CancellationToken.None);
+
+            Assert.Equal(0, created);
+
+            var inserted = await Fixture.Scripter.ApplyAsync(
+                session,
+                Fixture.InsertThreeRows(table),
+                CancellationToken.None);
+
+            Assert.Equal(3, inserted);
+
+            var result = await ExecuteAsync(session, $"SELECT COUNT(*) FROM {table}");
+
+            Assert.Equal("3", result.ResultSets[0].Rows[0][0]);
+        }
+        finally
+        {
+            await CleanAsync(session, Fixture.DropTable(table));
+        }
+    }
+
+    /// <summary>
     /// El guion crea el esquema donde viven las tablas, y aplicarlo dos veces no
     /// falla.
     ///

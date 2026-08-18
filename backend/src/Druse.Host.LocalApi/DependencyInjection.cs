@@ -50,6 +50,7 @@ internal static class DependencyInjection
 
         // --- Persistencia local ----------------------------------------------
         services.AddSingleton<DruseDatabase>();
+        services.AddSingleton<IBackupArchiveFactory, BackupArchiveFactory>();
         services.AddScoped<IConnectionProfileStore, SqliteConnectionProfileStore>();
         services.AddScoped<IQueryHistoryStore, SqliteQueryHistoryStore>();
         services.AddScoped<IPreferencesStore, SqlitePreferencesStore>();
@@ -110,6 +111,7 @@ internal static class DependencyInjection
         // que los lanzó, y también a que se cierre la ventana: el trabajo sigue en
         // este proceso y quien vuelva tiene que encontrarlo donde lo dejó.
         services.AddSingleton<IBackupTracker, BackupTracker>();
+        services.AddSingleton<IRestoreTracker, RestoreTracker>();
 
         // Un túnel dura lo que dura su sesión, así que se guarda igual que ella.
         services.AddSingleton<ISshTunnelRegistry, SshTunnelRegistry>();
@@ -148,6 +150,7 @@ internal static class DependencyInjection
         services.AddScoped<ExportService>();
         services.AddScoped<BackupService>();
         services.AddScoped<BackupProfileService>();
+        services.AddScoped<RestoreService>();
 
         // --- Exportadores -------------------------------------------------------
         services.AddSingleton<IResultExporter, CsvResultExporter>();

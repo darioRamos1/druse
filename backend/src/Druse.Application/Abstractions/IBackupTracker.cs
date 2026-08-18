@@ -39,3 +39,28 @@ public interface IBackupTracker
     /// </summary>
     void Finish(Guid backupId);
 }
+
+/// <summary>
+/// Lo mismo para las restauraciones.
+///
+/// Va aparte del de respaldos y no se comparte por un tipo genérico porque lo que
+/// guardan no es intercambiable: quien pregunta por una restauración quiere saber
+/// en qué instrucción va, y quien pregunta por un respaldo, qué tabla escribe.
+/// Las dos operaciones sí comparten la razón de existir: **la ventana se puede
+/// cerrar y el trabajo sigue**.
+/// </summary>
+public interface IRestoreTracker
+{
+    /// <summary>Anota una restauración que empieza y devuelve su token.</summary>
+    CancellationToken Start(Guid restoreId, CancellationToken linkedToken);
+
+    void Report(RestoreProgress progress);
+
+    RestoreProgress? Find(Guid restoreId);
+
+    /// <summary>Pide que pare. Devuelve `false` si ya había terminado.</summary>
+    bool Cancel(Guid restoreId);
+
+    /// <summary>Da por cerrada la restauración, conservando su estado final.</summary>
+    void Finish(Guid restoreId);
+}
