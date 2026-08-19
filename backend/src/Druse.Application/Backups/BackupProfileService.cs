@@ -1,5 +1,6 @@
 using Druse.Application.Abstractions;
 using Druse.Application.Connections;
+using Druse.Application.Metadata;
 using Druse.Database.Abstractions;
 using Druse.Domain;
 
@@ -57,7 +58,7 @@ public sealed class BackupProfileService(
         var session = _connections.Require(sessionId);
         var metadata = _providers.GetMetadataReader(session.Engine);
 
-        var schemas = await SchemasAsync(session, metadata, cancellationToken);
+        var schemas = await CatalogLookup.SchemasAsync(session, metadata, cancellationToken);
         var tablesBySchema = new Dictionary<string, IReadOnlyList<DatabaseObject>>(
             StringComparer.OrdinalIgnoreCase);
 
@@ -78,7 +79,11 @@ public sealed class BackupProfileService(
 
             if (!tablesBySchema.TryGetValue(selector.Schema, out var tables))
             {
-                tables = await TablesUnderAsync(session, metadata, schema, 0, cancellationToken);
+                tables = await CatalogLookup.TablesUnderAsync(
+                    session,
+                    metadata,
+                    schema,
+                    cancellationToken);
                 tablesBySchema[selector.Schema] = tables;
             }
 
@@ -145,87 +150,5 @@ public sealed class BackupProfileService(
         var known = new HashSet<string>(profile.KnownTables, StringComparer.OrdinalIgnoreCase);
 
         return [.. resolved.Select(DataSelection.KeyOf).Where(key => !known.Contains(key))];
-    }
-
-    /// <summary>Los esquemas de la base en curso, por nombre.</summary>
-    private static async Task<Dictionary<string, DatabaseObject>> SchemasAsync(
-        IDatabaseSession session,
-        IDatabaseMetadataReader metadata,
-        CancellationToken cancellationToken)
-    {
-        var schemas = new Dictionary<string, DatabaseObject>(StringComparer.OrdinalIgnoreCase);
-
-        // Se parte de la base abierta y no de la lista entera del servidor: un
-        // perfil se resuelve contra la conexión que se le dé, y buscar sus
-        // esquemas en otra base sería resolverlo contra algo que nadie pidió.
-        var databases = await metadata.GetDatabasesAsync(session, cancellationToken);
-
-        if (databases.Count == 0)
-        {
-            return schemas;
-        }
-
-        var current = databases.FirstOrDefault(database =>
-            string.Equals(database.Name, session.Profile.Database, StringComparison.OrdinalIgnoreCase))
-            ?? databases[0];
-
-        foreach (var child in await metadata.GetChildrenAsync(session, current, cancellationToken))
-        {
-            if (child.Kind == DatabaseObjectKind.Schema)
-            {
-                schemas[child.Name] = child;
-            }
-        }
-
-        return schemas;
-    }
-
-    /// <summary>Hasta dónde se baja buscando tablas, con margen sobre el árbol real.</summary>
-    private const int MaxDepth = 6;
-
-    /// <summary>
-    /// Las tablas que cuelgan de un nodo, bajando por sus carpetas.
-    ///
-    /// Se recorren las carpetas en vez de buscar la que se llame «Tables»: el
-    /// nombre lo pone cada proveedor y traducirlo aquí sería inventar un contrato
-    /// que no existe. El tope de profundidad está por si un catálogo devolviera
-    /// un hijo igual a su padre.
-    /// </summary>
-    private static async Task<IReadOnlyList<DatabaseObject>> TablesUnderAsync(
-        IDatabaseSession session,
-        IDatabaseMetadataReader metadata,
-        DatabaseObject parent,
-        int depth,
-        CancellationToken cancellationToken)
-    {
-        if (parent.Kind == DatabaseObjectKind.Table)
-        {
-            return [parent];
-        }
-
-        if (depth >= MaxDepth)
-        {
-            return [];
-        }
-
-        var found = new List<DatabaseObject>();
-
-        foreach (var child in await metadata.GetChildrenAsync(session, parent, cancellationToken))
-        {
-            if (child.Kind == DatabaseObjectKind.Table)
-            {
-                found.Add(child);
-                continue;
-            }
-
-            // Vistas y rutinas no entran todavía: solo se sabe guionizar tablas.
-            if (child.Kind is DatabaseObjectKind.Folder or DatabaseObjectKind.Schema)
-            {
-                found.AddRange(
-                    await TablesUnderAsync(session, metadata, child, depth + 1, cancellationToken));
-            }
-        }
-
-        return found;
     }
 }

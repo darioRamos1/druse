@@ -393,3 +393,95 @@
   color: var(--dr-text-muted);
   font-size: 11.5px;
 }
+
+// Lo guardado, arriba del todo: quien repite una migración viene a eso.
+.saved {
+  margin-bottom: 12px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--dr-border);
+
+  &__title {
+    margin: 0 0 6px;
+    color: var(--dr-text-muted);
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  &__list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  &__row {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  &__open {
+    flex: 1;
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    padding: 4px 6px;
+    border: 0;
+    border-radius: var(--dr-radius-sm, 4px);
+    background: none;
+    color: var(--dr-text);
+    text-align: left;
+    cursor: pointer;
+
+    &:hover {
+      background: var(--dr-surface-hover, rgb(255 255 255 / 4%));
+    }
+  }
+
+  &__name {
+    font-size: 12px;
+  }
+
+  &__detail {
+    color: var(--dr-text-faintest);
+    font-size: 10.5px;
+  }
+
+  &__forget {
+    flex: none;
+    padding: 2px 6px;
+    border: 0;
+    background: none;
+    color: var(--dr-text-faintest);
+    font-size: 14px;
+    line-height: 1;
+    cursor: pointer;
+
+    &:hover {
+      color: var(--dr-danger-text);
+    }
+  }
+}
+
+.save {
+  margin-top: 10px;
+  gap: 6px;
+
+  input {
+    flex: 1;
+  }
+}
+
+.gaps {
+  margin-top: 10px;
+
+  &__title {
+    margin: 0 0 4px;
+    color: var(--dr-text-muted);
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+}

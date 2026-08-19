@@ -21,6 +21,35 @@
     <!-- 1. Qué tablas se llevan                                           -->
     <!-- ---------------------------------------------------------------- -->
     @if (step() === 'tables') {
+      <!-- Lo guardado va antes de elegir: quien repite una migración viene a eso
+           y no a volver a marcar seis tablas. -->
+      @if (profiles().length > 0) {
+        <section class="saved">
+          <h3 class="saved__title">Migraciones guardadas</h3>
+          <ul class="saved__list">
+            @for (profile of profiles(); track profile.id) {
+              <li class="saved__row">
+                <button type="button" class="saved__open" (click)="openProfile(profile)">
+                  <span class="saved__name">{{ profile.name }}</span>
+                  <span class="saved__detail">
+                    {{ profile.tables.length }} tablas → {{ profile.targetSchema ?? '—' }}
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  class="saved__forget"
+                  [attr.aria-label]="'Borrar el perfil ' + profile.name"
+                  title="Borrar"
+                  (click)="deleteProfile(profile)"
+                >
+                  ×
+                </button>
+              </li>
+            }
+          </ul>
+        </section>
+      }
+
       @if (loadingSource()) {
         <p class="empty">Leyendo las tablas…</p>
       } @else if (sourceTables().length === 0) {
@@ -128,9 +157,12 @@
       <div class="options">
         <label class="field">
           <span class="field__label">Qué hacer con lo que ya está</span>
-          <select [value]="mode()" (change)="onMode($any($event.target).value)">
+          <!-- La opción marcada va en el <option> y no en el <select>: al abrir un
+               perfil, el valor se pone antes de que existan las opciones y se
+               perdería. -->
+          <select (change)="onMode($any($event.target).value)">
             @for (option of modes; track option.id) {
-              <option [value]="option.id">{{ option.label }}</option>
+              <option [value]="option.id" [selected]="option.id === mode()">{{ option.label }}</option>
             }
           </select>
         </label>
@@ -160,6 +192,35 @@
       <p class="note">
         Para vaciar y cargar, hazlo tabla a tabla: borrar exige escribir el nombre de cada una.
       </p>
+
+      @if (profileGaps().length > 0) {
+        <section class="gaps">
+          <h3 class="gaps__title">Lo que el perfil pedía y hoy no se puede migrar</h3>
+          @for (gap of profileGaps(); track gap.table) {
+            <p class="warn"><strong>{{ gap.table }}:</strong> {{ gap.reason }}</p>
+          }
+        </section>
+      }
+
+      <!-- Guardar es opcional y va aquí, con la pasada ya armada: es justo lo que
+           se guarda. -->
+      <label class="field field--inline save">
+        <span class="field__label">Guardar esta migración</span>
+        <input
+          type="text"
+          [value]="profileName()"
+          (input)="profileName.set($any($event.target).value)"
+          placeholder="nombre del perfil"
+        />
+        <button
+          type="button"
+          class="btn"
+          [disabled]="!profileName().trim() || savingProfile() || ready().length === 0"
+          (click)="saveProfile()"
+        >
+          {{ profileId() ? 'Actualizar' : 'Guardar' }}
+        </button>
+      </label>
 
       <section class="plan">
         <h3 class="plan__title">

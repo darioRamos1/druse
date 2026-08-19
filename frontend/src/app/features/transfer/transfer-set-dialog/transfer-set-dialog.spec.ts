@@ -3,6 +3,8 @@ import { Observable, of } from 'rxjs';
 
 import {
   ApplicationGateway,
+  TransferProfile,
+  TransferProfileResolution,
   TransferSetOrder,
   TransferSetRequest,
 } from '../../../core/application-gateway/application-gateway';
@@ -85,6 +87,63 @@ class FakeGateway implements Partial<ApplicationGateway> {
   getTransferStatus(): Observable<never> {
     return new Observable<never>();
   }
+
+  // --- Migraciones guardadas ------------------------------------------------
+
+  savedProfiles: TransferProfile[] = [];
+  lastSavedProfile: TransferProfile | null = null;
+  ranProfiles: string[] = [];
+
+  resolution: TransferProfileResolution = {
+    profile: profile(),
+    tables: [
+      {
+        source: { id: 'Table:public.clientes', name: 'clientes', schema: 'public' },
+        target: { id: 'Table:ventas.clientes', name: 'clientes', schema: 'ventas' },
+      },
+    ],
+    gaps: [{ table: 'facturas', reason: '«facturas» no existe en el destino.' }],
+    hasChanges: true,
+  };
+
+  getTransferProfiles(): Observable<readonly TransferProfile[]> {
+    return of(this.savedProfiles);
+  }
+
+  saveTransferProfile(profile: TransferProfile): Observable<TransferProfile> {
+    this.lastSavedProfile = profile;
+
+    return of({ ...profile, id: profile.id ?? 'perfil-1' });
+  }
+
+  resolveTransferProfile(): Observable<TransferProfileResolution> {
+    return of(this.resolution);
+  }
+
+  markTransferProfileRun(profileId: string): Observable<void> {
+    this.ranProfiles.push(profileId);
+
+    return of(undefined);
+  }
+}
+
+/** Un perfil guardado, como lo devolvería el proceso local. */
+function profile(overrides: Partial<TransferProfile> = {}): TransferProfile {
+  return {
+    id: 'perfil-1',
+    name: 'Ventas a producción',
+    sourceConnectionId: 'dev',
+    sourceSchema: 'public',
+    targetConnectionId: 'prod',
+    targetSchema: 'ventas',
+    tables: ['clientes', 'facturas'],
+    mode: 'Upsert',
+    ordered: true,
+    atomic: false,
+    keepIdentity: true,
+    batchSize: 1000,
+    ...overrides,
+  };
 }
 
 const workspace = {
@@ -213,6 +272,85 @@ describe('TransferSetDialog', () => {
     expect(gateway.lastSet?.tables.every((table) => table.targetSessionId === 'sesion-prod')).toBe(
       true,
     );
+  });
+
+  /**
+   * Guardar la pasada guarda **nombres**, no sesiones.
+   *
+   * Es la regla del perfil de respaldo y aquí vale igual: esto se reabre meses
+   * después, cuando la sesión de hoy hace mucho que se cerró.
+   */
+  it('guarda la pasada con nombres y no con sesiones', async () => {
+    await elegirDestino();
+
+    const nombre = element.querySelector<HTMLInputElement>('.save input')!;
+
+    nombre.value = 'Ventas a producción';
+    nombre.dispatchEvent(new Event('input'));
+    await settle(fixture);
+
+    boton('Guardar').click();
+    await settle(fixture);
+
+    expect(gateway.lastSavedProfile).toMatchObject({
+      name: 'Ventas a producción',
+      sourceConnectionId: 'dev',
+      targetConnectionId: 'prod',
+      tables: ['pedidos', 'clientes'],
+      mode: 'Insert',
+      ordered: true,
+    });
+
+    // Y ni rastro de sesiones en lo guardado.
+    expect(JSON.stringify(gateway.lastSavedProfile)).not.toContain('sesion-');
+  });
+
+  /**
+   * Abrir un perfil salta al plan, y dice qué de lo que pedía ya no está.
+   *
+   * Negarse a abrirlo obligaría a rehacerlo entero; abrirlo callando las
+   * ausencias haría creer que la pasada se lleva algo que no se lleva.
+   */
+  it('abre un perfil guardado y cuenta lo que falta', async () => {
+    gateway.savedProfiles = [profile()];
+
+    // La lista se lee al abrir el diálogo, así que se rehace con ella dentro.
+    fixture = TestBed.createComponent(TransferSetDialog);
+    element = fixture.nativeElement as HTMLElement;
+    fixture.componentRef.setInput('node', folder('Tables'));
+    fixture.componentRef.setInput('connectionId', 'dev');
+    fixture.detectChanges();
+    await settle(fixture);
+
+    boton('Ventas a producción').click();
+    await settle(fixture);
+
+    expect(element.querySelector('.plan')).toBeTruthy();
+    expect(element.querySelector('.gaps')?.textContent).toContain('no existe en el destino');
+
+    // Y las opciones son las del perfil, no las de por omisión.
+    expect(element.querySelector<HTMLSelectElement>('.options select')?.value).toBe('Upsert');
+    expect(boton('Copiar 1 tablas')).toBeTruthy();
+  });
+
+  /** Lanzar un perfil se anota, y no lo modifica. */
+  it('anota que el perfil se lanzó', async () => {
+    gateway.savedProfiles = [profile()];
+
+    fixture = TestBed.createComponent(TransferSetDialog);
+    element = fixture.nativeElement as HTMLElement;
+    fixture.componentRef.setInput('node', folder('Tables'));
+    fixture.componentRef.setInput('connectionId', 'dev');
+    fixture.detectChanges();
+    await settle(fixture);
+
+    boton('Ventas a producción').click();
+    await settle(fixture);
+
+    boton('Copiar 1 tablas').click();
+    await settle(fixture);
+
+    expect(gateway.ranProfiles).toEqual(['perfil-1']);
   });
 
   /**

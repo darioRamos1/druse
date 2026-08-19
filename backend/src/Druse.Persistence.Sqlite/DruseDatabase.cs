@@ -173,6 +173,36 @@ public sealed class DruseDatabase
                 ON backup_profiles (last_run_at_utc DESC);
             """, cancellationToken);
 
+        // Migraciones guardadas para repetirlas. Misma forma que los respaldos y
+        // por lo mismo: la lista de tablas va como JSON porque solo se usa entera,
+        // y lo que se lista y se ordena tiene columna propia.
+        //
+        // Los dos extremos se guardan **por su nombre** —conexión, base y
+        // esquema—, nunca por identificador de sesión: un perfil se reabre meses
+        // después, cuando aquella sesión hace mucho que se cerró.
+        await ExecuteAsync(connection, """
+            CREATE TABLE IF NOT EXISTS transfer_profiles (
+                id                    TEXT NOT NULL PRIMARY KEY,
+                name                  TEXT NOT NULL,
+                source_connection_id  TEXT     NULL,
+                source_database       TEXT     NULL,
+                source_schema         TEXT     NULL,
+                target_connection_id  TEXT     NULL,
+                target_database       TEXT     NULL,
+                target_schema         TEXT     NULL,
+                tables_json           TEXT NOT NULL DEFAULT '[]',
+                options_json          TEXT NOT NULL DEFAULT '{}',
+                created_at_utc        TEXT NOT NULL,
+                updated_at_utc        TEXT NOT NULL,
+                last_run_at_utc       TEXT     NULL
+            );
+            """, cancellationToken);
+
+        await ExecuteAsync(connection, """
+            CREATE INDEX IF NOT EXISTS ix_transfer_profiles_last_run
+                ON transfer_profiles (last_run_at_utc DESC);
+            """, cancellationToken);
+
         // Los archivos creados por versiones anteriores ya tienen la tabla, así que
         // `CREATE TABLE IF NOT EXISTS` no les añade la columna: hay que agregarla
         // aparte. El valor por omisión deja los perfiles existentes con usuario y

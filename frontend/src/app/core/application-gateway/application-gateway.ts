@@ -550,6 +550,31 @@ export abstract class ApplicationGateway {
   /** Lanza la pasada entera y devuelve su identificador. Ver {@link runTransfer}. */
   abstract runTransferSet(request: TransferSetRequest): Observable<string>;
 
+  // --- Migraciones guardadas ------------------------------------------------
+
+  abstract getTransferProfiles(): Observable<readonly TransferProfile[]>;
+
+  /** Guardar, renombrar y duplicar son lo mismo: cambia lo que se manda. */
+  abstract saveTransferProfile(profile: TransferProfile): Observable<TransferProfile>;
+
+  abstract deleteTransferProfile(profileId: string): Observable<void>;
+
+  /**
+   * Abre un perfil contra dos conexiones vivas.
+   *
+   * Devuelve lo que hoy se puede migrar **y lo que no**: un perfil de hace medio
+   * año nombra tablas que alguien borró, y negarse a abrirlo obligaría a rehacerlo
+   * entero.
+   */
+  abstract resolveTransferProfile(
+    profileId: string,
+    sourceSessionId: string,
+    targetSessionId: string,
+  ): Observable<TransferProfileResolution>;
+
+  /** Anota que se acaba de lanzar. No modifica el resto del perfil. */
+  abstract markTransferProfileRun(profileId: string): Observable<void>;
+
   abstract getTransferStatus(transferId: string): Observable<TransferProgress>;
 
   abstract cancelTransfer(transferId: string): Observable<void>;
@@ -948,6 +973,53 @@ export interface TransferSetRequest {
    * padre es el rechazo más previsible de todos.
    */
   readonly ordered?: boolean;
+}
+
+/**
+ * Una migración guardada para repetirla.
+ *
+ * Guarda **nombres** —conexión, base, esquema y tablas—, nunca identificadores de
+ * sesión: se reabre meses después, cuando aquella sesión hace mucho que se cerró.
+ */
+export interface TransferProfile {
+  /** Ausente al crear: lo pone el proceso local. */
+  readonly id?: string;
+  readonly name: string;
+  readonly sourceConnectionId?: string;
+  readonly sourceDatabase?: string;
+  readonly sourceSchema?: string;
+  readonly targetConnectionId?: string;
+  readonly targetDatabase?: string;
+  readonly targetSchema?: string;
+  readonly tables: readonly string[];
+  readonly mode: TransferMode;
+  readonly ordered: boolean;
+  readonly atomic: boolean;
+  readonly keepIdentity: boolean;
+  readonly batchSize: number;
+  readonly createdAtUtc?: string;
+  readonly updatedAtUtc?: string;
+  readonly lastRunAtUtc?: string | null;
+}
+
+/** Una tabla del perfil que hoy existe a los dos lados. */
+export interface TransferProfilePair {
+  readonly source: TransferTable;
+  readonly target: TransferTable;
+}
+
+/** Lo que el perfil pedía y hoy no se puede migrar. */
+export interface TransferProfileGap {
+  readonly table: string;
+  readonly reason: string;
+}
+
+/** El perfil traído al presente: lo que se puede migrar hoy, y lo que no. */
+export interface TransferProfileResolution {
+  readonly profile: TransferProfile;
+  readonly tables: readonly TransferProfilePair[];
+  readonly gaps: readonly TransferProfileGap[];
+  readonly hasChanges: boolean;
 }
 
 /** En qué orden se copiarían las tablas, y cuáles se apuntan entre sí. */

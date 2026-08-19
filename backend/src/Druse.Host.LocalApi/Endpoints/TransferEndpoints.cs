@@ -140,6 +140,116 @@ internal static class TransferEndpoints
         app.MapPost("/api/transfers/{id:guid}/cancel", (Guid id, ITransferTracker tracker) =>
             tracker.Cancel(id) ? Results.Accepted() : Results.NotFound())
         .WithName("CancelTransfer");
+
+        MapProfiles(app);
+    }
+
+    /// <summary>
+    /// Las migraciones guardadas para repetirlas.
+    ///
+    /// Van bajo `/api/transfers/profiles` porque son el mismo asunto: lo que se
+    /// guarda es lo que la pasada recibe, con los dos extremos todavía sin
+    /// resolver.
+    /// </summary>
+    private static void MapProfiles(IEndpointRouteBuilder app)
+    {
+        app.MapGet("/api/transfers/profiles", async (
+            TransferProfileService profiles,
+            CancellationToken cancellationToken) =>
+        {
+            var all = await profiles.GetAllAsync(cancellationToken);
+
+            return Results.Ok(all.Select(profile => profile.ToDto()));
+        })
+        .WithName("GetTransferProfiles");
+
+        app.MapGet("/api/transfers/profiles/{id:guid}", async (
+            Guid id,
+            TransferProfileService profiles,
+            CancellationToken cancellationToken) =>
+        {
+            var profile = await profiles.FindAsync(id, cancellationToken);
+
+            return profile is null ? Results.NotFound() : Results.Ok(profile.ToDto());
+        })
+        .WithName("GetTransferProfile");
+
+        // Guardar, renombrar y duplicar son el mismo camino: lo que cambia entre
+        // ellos es qué manda el cliente.
+        app.MapPost("/api/transfers/profiles", async (
+            TransferProfileDto request,
+            TransferProfileService profiles,
+            CancellationToken cancellationToken) =>
+        {
+            if (string.IsNullOrWhiteSpace(request.Name))
+            {
+                return Results.Json(
+                    new { message = "El perfil necesita un nombre." },
+                    statusCode: StatusCodes.Status400BadRequest);
+            }
+
+            if (request.Tables.Count == 0)
+            {
+                return Results.Json(
+                    new { message = "Un perfil sin tablas no repetiría nada." },
+                    statusCode: StatusCodes.Status400BadRequest);
+            }
+
+            var existing = request.Id is { } id
+                ? await profiles.FindAsync(id, cancellationToken)
+                : null;
+
+            var profile = request.ToDomain(existing);
+
+            await profiles.SaveAsync(profile, cancellationToken);
+
+            return Results.Ok(profile.ToDto());
+        })
+        .WithName("SaveTransferProfile");
+
+        app.MapDelete("/api/transfers/profiles/{id:guid}", async (
+            Guid id,
+            TransferProfileService profiles,
+            CancellationToken cancellationToken) =>
+            await profiles.DeleteAsync(id, cancellationToken)
+                ? Results.NoContent()
+                : Results.NotFound())
+        .WithName("DeleteTransferProfile");
+
+        // Abrir un perfil es resolverlo contra dos conexiones vivas: qué de lo que
+        // pedía existe hoy a los dos lados y qué no.
+        app.MapPost("/api/transfers/profiles/{id:guid}/resolve", async (
+            Guid id,
+            ResolveTransferProfileDto request,
+            TransferProfileService profiles,
+            CancellationToken cancellationToken) =>
+        {
+            var profile = await profiles.FindAsync(id, cancellationToken);
+
+            if (profile is null)
+            {
+                return Results.NotFound();
+            }
+
+            var resolution = await profiles.ResolveAsync(
+                profile,
+                request.SourceSessionId,
+                request.TargetSessionId,
+                cancellationToken);
+
+            return Results.Ok(resolution.ToDto());
+        })
+        .WithName("ResolveTransferProfile");
+
+        // Que un perfil se haya lanzado no lo modifica, así que se anota aparte.
+        app.MapPost("/api/transfers/profiles/{id:guid}/ran", async (
+            Guid id,
+            TransferProfileService profiles,
+            CancellationToken cancellationToken) =>
+            await profiles.MarkRunAsync(id, cancellationToken)
+                ? Results.NoContent()
+                : Results.NotFound())
+        .WithName("MarkTransferProfileRun");
     }
 
     /// <summary>

@@ -48,6 +48,8 @@ import {
   TransactionState,
   TransferPreview,
   TransferProgress,
+  TransferProfile,
+  TransferProfileResolution,
   TransferRequest,
   TransferSetOrder,
   TransferSetRequest,
@@ -452,6 +454,33 @@ export class HttpApplicationGateway extends ApplicationGateway {
     return this._http
       .post<{ id: string }>('/api/transfers/set', request)
       .pipe(map((response) => response.id));
+  }
+
+  override getTransferProfiles(): Observable<readonly TransferProfile[]> {
+    return this._http.get<TransferProfile[]>('/api/transfers/profiles');
+  }
+
+  override saveTransferProfile(profile: TransferProfile): Observable<TransferProfile> {
+    return this._http.post<TransferProfile>('/api/transfers/profiles', profile);
+  }
+
+  override deleteTransferProfile(profileId: string): Observable<void> {
+    return this._http.delete<void>(`/api/transfers/profiles/${profileId}`);
+  }
+
+  override resolveTransferProfile(
+    profileId: string,
+    sourceSessionId: string,
+    targetSessionId: string,
+  ): Observable<TransferProfileResolution> {
+    return this._http.post<TransferProfileResolution>(
+      `/api/transfers/profiles/${profileId}/resolve`,
+      { sourceSessionId, targetSessionId },
+    );
+  }
+
+  override markTransferProfileRun(profileId: string): Observable<void> {
+    return this._http.post<void>(`/api/transfers/profiles/${profileId}/ran`, null);
   }
 
   override getTransferStatus(transferId: string): Observable<TransferProgress> {

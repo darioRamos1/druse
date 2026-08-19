@@ -5,6 +5,8 @@ import { firstValueFrom } from 'rxjs';
 import {
   ApplicationGateway,
   TransferMode,
+  TransferProfile,
+  TransferProfileGap,
   TransferRequest,
   TransferSetOrder,
   TransferSetRequest,
@@ -99,6 +101,20 @@ export class TransferSetDialog {
 
   protected readonly localError = signal<string | null>(null);
 
+  // --- Migraciones guardadas ------------------------------------------------
+
+  protected readonly profiles = signal<readonly TransferProfile[]>([]);
+
+  /** Perfil abierto o guardado, para poder actualizarlo en vez de duplicarlo. */
+  protected readonly profileId = signal<string | null>(null);
+
+  protected readonly profileName = signal('');
+
+  /** Lo que el perfil pedía y hoy no se puede migrar. */
+  protected readonly profileGaps = signal<readonly TransferProfileGap[]>([]);
+
+  protected readonly savingProfile = signal(false);
+
   // --- Lo que viene del proceso local ---------------------------------------
 
   protected readonly progress = this._transfers.progress;
@@ -181,6 +197,7 @@ export class TransferSetDialog {
       }
 
       void this.loadSource();
+      void this.loadProfiles();
     });
   }
 
@@ -366,6 +383,131 @@ export class TransferSetDialog {
     this.mode.set(mode as TransferMode);
   }
 
+  // --- Migraciones guardadas ------------------------------------------------
+
+  private async loadProfiles(): Promise<void> {
+    try {
+      this.profiles.set(await firstValueFrom(this._gateway.getTransferProfiles()));
+    } catch {
+      // Sin la lista se sigue trabajando: los perfiles son una comodidad, no un
+      // requisito para migrar.
+    }
+  }
+
+  /**
+   * Abre un perfil: lo resuelve contra las conexiones vivas y salta al plan.
+   *
+   * No hay que volver a elegir nada porque el perfil ya lo dice; lo único que
+   * puede haber cambiado son las bases, y de eso habla la lista de huecos.
+   */
+  protected async openProfile(profile: TransferProfile): Promise<void> {
+    const sourceSession = this._workspace.sessionForConnection(this.connectionId());
+    const target = profile.targetConnectionId ?? this.targetConnectionId() ?? this.connectionId();
+    const targetSession = this._workspace.sessionForConnection(target);
+
+    if (!profile.id || !sourceSession || !targetSession) {
+      this.localError.set(
+        'Para abrir un perfil hacen falta abiertas las dos conexiones que nombra.',
+      );
+
+      return;
+    }
+
+    this.localError.set(null);
+
+    try {
+      const resolution = await firstValueFrom(
+        this._gateway.resolveTransferProfile(profile.id, sourceSession, targetSession),
+      );
+
+      this.targetConnectionId.set(target);
+      this.sourceTables.set(resolution.tables.map((pair) => asObject(pair.source)));
+      this.targetTables.set(resolution.tables.map((pair) => asObject(pair.target)));
+      this.selected.set(new Set(resolution.tables.map((pair) => pair.source.id)));
+      this.targetFolder.set(place(profile.targetSchema, profile.targetDatabase));
+      this.profileGaps.set(resolution.gaps);
+
+      this.mode.set(profile.mode);
+      this.ordered.set(profile.ordered);
+      this.atomic.set(profile.atomic);
+      this.keepIdentity.set(profile.keepIdentity);
+      this.batchSize.set(profile.batchSize);
+
+      this.profileId.set(profile.id);
+      this.profileName.set(profile.name);
+      this.step.set('plan');
+
+      await this.plan();
+    } catch (error) {
+      this.localError.set(describe(error));
+    }
+  }
+
+  /**
+   * Guarda lo que hay en pantalla como perfil.
+   *
+   * Con un perfil abierto lo actualiza; si no, crea uno. Se guardan **nombres**
+   * —conexión, base, esquema y tablas—, nunca las sesiones: esto se reabre meses
+   * después, cuando aquellas ya no existen.
+   */
+  protected async saveProfile(): Promise<void> {
+    const name = this.profileName().trim();
+    const folder = this.targetFolder();
+
+    if (!name || this.ready().length === 0) {
+      return;
+    }
+
+    this.savingProfile.set(true);
+    this.localError.set(null);
+
+    try {
+      const saved = await firstValueFrom(
+        this._gateway.saveTransferProfile({
+          id: this.profileId() ?? undefined,
+          name,
+          sourceConnectionId: this.connectionId(),
+          sourceDatabase: this.node().database,
+          sourceSchema: this.node().schema,
+          targetConnectionId: this.targetConnectionId(),
+          targetDatabase: folder?.database,
+          targetSchema: folder?.schema ?? folder?.name,
+          tables: this.ready().map((pair) => pair.source.name),
+          mode: this.mode(),
+          ordered: this.ordered(),
+          atomic: this.atomic(),
+          keepIdentity: this.keepIdentity(),
+          batchSize: this.batchSize(),
+        }),
+      );
+
+      this.profileId.set(saved.id ?? null);
+      await this.loadProfiles();
+    } catch (error) {
+      this.localError.set(describe(error));
+    } finally {
+      this.savingProfile.set(false);
+    }
+  }
+
+  protected async deleteProfile(profile: TransferProfile): Promise<void> {
+    if (!profile.id) {
+      return;
+    }
+
+    try {
+      await firstValueFrom(this._gateway.deleteTransferProfile(profile.id));
+
+      if (this.profileId() === profile.id) {
+        this.profileId.set(null);
+      }
+
+      await this.loadProfiles();
+    } catch (error) {
+      this.localError.set(describe(error));
+    }
+  }
+
   // --- Ejecutar -------------------------------------------------------------
 
   protected async run(): Promise<void> {
@@ -377,6 +519,17 @@ export class TransferSetDialog {
 
     this.step.set('running');
     await this._transfers.startSet(request);
+
+    const profile = this.profileId();
+
+    if (profile) {
+      try {
+        // Se anota aparte de guardar, porque lanzarlo no lo modifica.
+        await firstValueFrom(this._gateway.markTransferProfileRun(profile));
+      } catch {
+        // Que no se pueda anotar no estropea la pasada, que ya está corriendo.
+      }
+    }
   }
 
   protected async cancel(): Promise<void> {
@@ -444,6 +597,31 @@ function toTable(object: DatabaseObject): TransferTable {
     database: object.database,
     schema: object.schema,
     approximateRowCount: object.approximateRowCount,
+  };
+}
+
+/** La tabla que devuelve el perfil, en la forma que usa el explorador. */
+function asObject(table: TransferTable): DatabaseObject {
+  return {
+    id: table.id,
+    name: table.name,
+    kind: 'table',
+    database: table.database,
+    schema: table.schema,
+    hasChildren: false,
+    approximateRowCount: table.approximateRowCount,
+  };
+}
+
+/** El sitio que nombra un perfil, solo para poder enseñarlo en pantalla. */
+function place(schema: string | undefined, database: string | undefined): DatabaseObject {
+  return {
+    id: `Folder:${database ?? ''}.${schema ?? ''}`,
+    name: schema ?? database ?? '',
+    kind: 'folder',
+    database,
+    schema,
+    hasChildren: true,
   };
 }
 
