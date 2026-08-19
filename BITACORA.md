@@ -10,14 +10,14 @@
 
 | Campo | Valor |
 | --- | --- |
-| Última sesión | **022o** — 2026-08-18 |
+| Última sesión | **022p** — 2026-08-18 |
 | Fase activa | **Respaldos y restauración:** Fases A–E cerradas. La **F** tiene backend, interfaz, CSV, selector de archivos, restaurar en una base nueva y **el ciclo entero por HTTP en los cuatro motores**; le falta repetir a mano el respaldo real que encontró el error de los índices de expresión |
 | Fases 0–6 | ✅ Cerradas. |
 | Fase 7 | 🟡 **11/12.** El ciclo de instalación está probado sobre este equipo; solo falta arrancar en una máquina sin herramientas de desarrollo. |
 | Fase 8 | ✅ **7/7.** Tres motores sobre el mismo contrato y primera beta preparada. |
 | ¿Compila el backend? | Sí — 0 advertencias, 0 errores |
 | ¿Compila el envoltorio? | Sí |
-| ¿Pasan las pruebas? | Sí — **623 en backend** (343 unitarias, 170 contractuales y 110 de integración), **468 en frontend** y **6 en el envoltorio**. Con `DRUSE_REQUIRE_ENGINES=1` y **los cuatro motores**, sin saltarse ninguna |
+| ¿Pasan las pruebas? | Sí — **625 en backend** (345 unitarias, 170 contractuales y 110 de integración), **468 en frontend**, **11 de punta a punta** y **6 en el envoltorio**. Con `DRUSE_REQUIRE_ENGINES=1` y **los cuatro motores**, sin saltarse ninguna |
 | ¿Hay aplicación de escritorio? | **Sí.** Instalador NSIS, MSI y ZIP portable, en dos variantes: con Informix y sin él |
 | Motores | **PostgreSQL, SQL Server, MySQL/MariaDB e Informix**, todos sobre el mismo contrato compartido |
 | Trabajo a medias | Ninguno. El frontend de la restauración quedó commiteado en la sesión 022i. |
@@ -319,6 +319,59 @@ Y tres límites declarados desde el principio: no hay respaldo binario ni
 recuperación a un punto en el tiempo —eso es del servidor, y la interfaz tendrá
 que decirlo—, no hay respaldos programados, y un límite de filas puede dejar
 filas huérfanas, cosa que se avisa y no se corrige sola.
+
+### Sesión 022p — 2026-08-18 · Playwright, y los dos fallos que destapó montarlo
+
+Pruebas de punta a punta con Playwright: la aplicación entera —Angular, la API
+local y un PostgreSQL real— por donde la usa una persona. **11 pruebas del
+camino crítico**, en `e2e/`, levantando los servidores por su cuenta en puertos
+propios (5188 y 4300) para no pisar los de `dev.ps1`.
+
+Lo interesante no fueron las pruebas, sino lo que hizo falta para que
+funcionaran.
+
+**1. En Windows no se podían aislar los datos.** La API guarda conexiones,
+historial y pestañas en la carpeta del usuario, así que unas pruebas que crean
+conexiones escribirían dentro del Druse de quien las lanza. Lo obvio —arrancarla
+con otro `APPDATA`— **no funciona**: `GetFolderPath` pregunta a la API del
+sistema y esa variable le da igual. Se vio en vivo: el backend de las pruebas
+escribió su `endpoint.json` en el perfil de verdad mientras el proxy, que es de
+Node y sí respeta la variable, buscaba el token en la carpeta vacía. Ahora
+`AppPaths` mira `DRUSE_DATA_DIR`, que además sirve para una instalación portable
+o para dos perfiles en la misma máquina.
+
+**2. El proxy del servidor de desarrollo tenía código muerto que engañaba.**
+`proxy.conf.js` resolvía el puerto de la API en cada petición con `router`, y
+**Vite no mira `router`**: solo usa `target`, que estaba fijo al 5177. No se
+notaba porque la API arranca justo en ese puerto, así que acertaba por
+casualidad; con la API en el 5188, todas las peticiones se iban al 5177 y volvían
+502. Ahora el destino se decide al arrancar, y `DRUSE_API_PORT` manda sobre el
+archivo —cuando el servidor de desarrollo y la API arrancan a la vez, el punto de
+conexión todavía no existe—. `dev.ps1` y `dev.sh` lo pasan, con lo que su
+parámetro `-ApiPort` funciona de verdad por primera vez.
+
+**Y tres cosas más que solo se ven al conducir la interfaz:** el diálogo de
+conexión propone «Cifrado» y el contenedor de PostgreSQL no tiene TLS, así que
+hay que elegir «Sin cifrar»; un clic sobre una conexión ya desplegada la pliega,
+de modo que solo se pulsa cuando sus bases no están a la vista; y la primera
+celda de cada fila es el número de fila, no un dato —una prueba que la leyera
+compararía contra «1», «2», «3» y pasaría dijera lo que dijera la consulta—.
+
+**Qué cubren.** Arrancar, conectarse a un PostgreSQL real por el diálogo, ver
+sus bases, ejecutar y leer las filas, varios conjuntos de resultados, un error
+que no rompe la sesión; y del editor: «Ejecutar actual» con el cursor en cada
+instrucción, el cursor pegado al `;`, `Ctrl+Enter` con la pestaña entera, el
+subrayado exacto del error, el error de un fragmento en su sitio y la marca que
+se borra al acertar.
+
+**Verificado.** **11 de 11 en 1,9 minutos desde cero** —sin servidores previos y
+con la carpeta de datos vacía, que es como correrá en CI— y **345 unitarias** de
+backend tras el cambio de `AppPaths`. Comprobado además que el perfil real
+siguió intacto: las cinco conexiones y las tres pestañas de siempre.
+
+**Archivos.** `e2e/` entero (configuración, dos ficheros de pruebas, helpers y
+README), `AppPaths.cs`, `SecretStoreTests.cs`, `proxy.conf.js`, `dev.ps1`,
+`dev.sh`, `.github/workflows/ci.yml`, `.gitignore` y `README.md`.
 
 ### Sesión 022o — 2026-08-18 · Señalar dónde falló, no la línea entera
 
