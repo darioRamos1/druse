@@ -10,55 +10,65 @@
 
 | Campo | Valor |
 | --- | --- |
-| Última sesión | **023b** — 2026-08-19 |
-| Fase activa | **Migración de datos entre tablas:** fases 1 y 2 de 4 cerradas y funcionando (ver «Qué toca retomar»). **Respaldos y restauración:** Fases A–E cerradas. La **F** tiene backend, interfaz, CSV, selector de archivos, restaurar en una base nueva y **el ciclo entero por HTTP en los cuatro motores**; le falta repetir a mano el respaldo real que encontró el error de los índices de expresión |
+| Última sesión | **023c** — 2026-08-19 |
+| Fase activa | **Migración de datos entre tablas:** fases 1, 2 y 3 de 4 cerradas y funcionando (ver «Qué toca retomar»). **Respaldos y restauración:** Fases A–E cerradas. La **F** tiene backend, interfaz, CSV, selector de archivos, restaurar en una base nueva y **el ciclo entero por HTTP en los cuatro motores**; le falta repetir a mano el respaldo real que encontró el error de los índices de expresión |
 | Fases 0–6 | ✅ Cerradas. |
 | Fase 7 | 🟡 **11/12.** El ciclo de instalación está probado sobre este equipo; solo falta arrancar en una máquina sin herramientas de desarrollo. |
 | Fase 8 | ✅ **7/7.** Tres motores sobre el mismo contrato y primera beta preparada. |
 | ¿Compila el backend? | Sí — 0 advertencias, 0 errores |
 | ¿Compila el envoltorio? | Sí |
-| ¿Pasan las pruebas? | Sí — **690 en backend** (371 unitarias, 190 contractuales y 129 de integración), **485 en frontend**, **14 de punta a punta** y **6 en el envoltorio**. Con `DRUSE_REQUIRE_ENGINES=1` y **los cuatro motores**, sin saltarse ninguna |
+| ¿Pasan las pruebas? | Sí — **723 en backend** (401 unitarias, 190 contractuales y 132 de integración), **485 en frontend** y **15 de punta a punta**, todas vueltas a ejecutar al cerrar la fase 3, con `DRUSE_REQUIRE_ENGINES=1` y **los cuatro motores**, sin saltarse ninguna. Las **6 del envoltorio** no se ejecutaron: cargo no compila en este equipo |
 | ¿Hay aplicación de escritorio? | **Sí.** Instalador NSIS, MSI y ZIP portable, en dos variantes: con Informix y sin él |
 | Motores | **PostgreSQL, SQL Server, MySQL/MariaDB e Informix**, todos sobre el mismo contrato compartido |
-| Trabajo a medias | Ninguno. El frontend de la restauración quedó commiteado en la sesión 022i. |
+| Trabajo a medias | Ninguno. La fase 3 de la migración quedó commiteada en la sesión 023c. |
 | Bloqueantes | Ninguno para seguir programando. Sí para dar por buenos cuatro motores y cuatro funciones: ver «Qué toca retomar». |
 | Git | El **PR #9 se fusionó** (sesión 022), con los quince commits que el #8 dejó fuera más lo de la personalización. Se trabaja en `feat/respaldos-y-restauracion`, salida de un `main` ya al día. |
 | Integración continua | 🔴 **Parada, y no por el código.** GitHub aborta los catorce jobs en dos segundos: «recent account payments have failed or your spending limit needs to be increased». Hasta resolver la facturación, ningún PR podrá pasar los checks. |
 
 ### Qué toca retomar en la próxima sesión
 
-#### Migración de datos: la fase 3
+#### Migración de datos: la fase 4
 
-Las fases 1 y 2 están cerradas y se usan. Lo siguiente es **trasladar entre
-motores distintos**, que hoy se rechaza diciéndolo en
-`TransferService.PrepareAsync`.
+Las fases 1, 2 y 3 están cerradas y verificadas. Lo que queda es **llevar varias
+tablas de una vez y poder repetir la migración mañana sin volver a armarla**, y
+se puede hacer en ese orden porque lo segundo no necesita lo primero.
 
-Lo que hay que construir:
+1. **Un conjunto de tablas, no un par.** Hoy `DataTransferRequest` lleva un
+   `Source` y un `Target`; la fase 4 los convierte en una lista de pares y
+   `TransferService` en un bucle sobre ella. El orden sale de
+   `TableStructure.ForeignKeys`, que `MetadataService` ya lee: las padres antes
+   que las hijas. **Los ciclos no se resuelven, se avisan**, y ese grupo se migra
+   sin ordenar; es la misma salida que tomó el respaldo al dejar las foráneas
+   para el final.
 
-1. **`TypeTranslator` en `Application/Transfers`**, con una tabla de equivalencias
-   por par de motores. Vive ahí y trabaja sobre `DatabaseEngine` como dato porque
-   `ArchitectureRulesTests.LosProveedoresNoSeConocenEntreSi` prohíbe que un
-   proveedor conozca a otro. `ITableDesigner.CommonDataTypes` da el punto de
-   partida de cada dialecto.
-2. **Cada traducción con su nivel**: exacta, aproximada —con qué se pierde— o sin
-   equivalente. La vista previa ya tiene dónde enseñarlas: `TransferColumnIssue`
-   es exactamente eso, y hoy solo lo usan las columnas que genera el motor.
-3. **Editar el tipo antes de crear la tabla**, que es lo que se decidió al
-   planificar: proponer, avisar y dejar cambiar.
-4. **Crear la tabla destino** con un `TableDefinition` construido desde las
-   columnas del origen y `ITableDesigner.CreateAsync`. Solo columnas, tipos,
-   nulabilidad y clave primaria; índices y foráneas no, por lo mismo que el
-   respaldo los deja para el final.
+2. **La primera decisión, antes de escribir código: qué significa «todo o nada»
+   con varias tablas.** Hoy `IWriteScope` abarca los lotes de una tabla. Si pasa
+   a abarcar la pasada entera —que es lo coherente en cuanto hay foráneas de por
+   medio— vuelve la transacción larga que la fase 1 evitó a propósito. Conviene
+   decidirlo y dejarlo escrito en el plan, no descubrirlo a mitad.
 
-**Los avisos son el producto.** Una migración que traduce en silencio es la que
-estropea datos: el valor de la fase está en que la vista previa diga qué se pierde
-antes de escribir nada.
+3. **El progreso, en dos niveles**, como el del respaldo: la tabla en curso y el
+   conjunto. `TransferProgress` e `ITransferTracker` cuentan hoy las filas de una
+   sola tabla, y `transfer.store.ts` dibuja exactamente eso.
 
-Después queda la fase 4: varias tablas ordenadas por sus claves foráneas y
-migraciones guardadas, espejo de `SqliteBackupProfileStore`.
+4. **Perfiles de migración**, espejo de `SqliteBackupProfileStore`: una tabla
+   nueva en `DruseDatabase`, al lado de `backup_profiles`, con la selección en
+   JSON por lo mismo que allí. La regla que no se puede saltar es la suya: el
+   perfil guarda **nombres calificados, no identificadores de sesión**, porque se
+   reabre meses después contra otra conexión. Al abrirlo se pregunta contra qué
+   conexión viva se resuelve cada extremo, y lo que ya no existe se reconcilia
+   como hace el respaldo con `known_tables_json`.
 
-El plan completo, con el porqué de cada decisión y lo que se aprendió en las dos
-primeras fases, está en `docs/plan-migracion-de-datos.md`.
+**Antes de eso, la media hora que le falta a la fase 3:** nadie ha migrado entre
+dos motores **desde la pantalla**. Lo cruzado está comprobado por HTTP
+—`CrossEngineTransferTests`, PostgreSQL a SQL Server— y la prueba de punta a
+punta del camino nuevo crea la tabla dentro del mismo motor. Falta abrir las dos
+conexiones en la aplicación levantada, cruzar, y mirar que la pantalla de tipos
+cumpla lo que promete: decir qué se pierde, y no dejar crear la tabla mientras
+haya una columna sin equivalente.
+
+El plan completo, con el porqué de cada decisión y lo aprendido en las tres fases
+cerradas, está en `docs/plan-migracion-de-datos.md`.
 
 #### Respaldos: lo que le falta a la Fase F
 
@@ -354,6 +364,79 @@ Y tres límites declarados desde el principio: no hay respaldo binario ni
 recuperación a un punto en el tiempo —eso es del servidor, y la interfaz tendrá
 que decirlo—, no hay respaldos programados, y un límite de filas puede dejar
 filas huérfanas, cosa que se avisa y no se corrige sola.
+
+### Sesión 023c — 2026-08-19 · Cruzar de motor sin traducir en silencio
+
+Fase 3 de la migración: **trasladar entre motores distintos**, que hasta ahora se
+rechazaba a propósito, y **crear la tabla de destino** desde la estructura del
+origen. De las cuatro fases quedan solo las varias tablas y los perfiles.
+
+#### Dos preguntas, y no una tabla de todos contra todos
+
+Lo difícil no era saber que un `uuid` se llama `uniqueidentifier` al otro lado.
+Era poder decir, **antes de copiar nada**, qué deja de ser cierto en el destino.
+
+La traducción no lleva equivalencias por par de motores: con cuatro serían doce
+direcciones y crecerían al cuadrado. Se apoya en dos preguntas —qué familia es el
+tipo, que el dominio ya sabía clasificar, y cómo llama este motor al tipo que
+guarda eso, que es `ITableDesigner.TypeFor`—, y lo demás sale del propio texto del
+tipo con `TypeFacets.Parse`: longitud, precisión, escala y si tenía límite. Cada
+dialecto aporta una sola respuesta, no once.
+
+#### Los avisos son el producto
+
+Un JSON que llega a un motor sin JSON viaja entero, pero deja de validarse y de
+consultarse por sus campos. Un identificador único sin tipo propio se guarda
+escrito, con sus 36 caracteres. Una marca de tiempo con zona pierde el huso donde
+no se guarda. Un texto sin límite que llega con tope cabe hoy y quizá no mañana.
+Y una columna que guarda varios valores **no se traduce a la fuerza**: fuera de
+PostgreSQL no hay dónde ponerla, y meterla como texto dejaría dentro la
+representación del conjunto en vez de sus elementos, así que impide crear la
+tabla hasta que se le escriba un tipo o se la deje fuera. El tipo escrito a mano,
+en cambio, gana sin discusión: quien lo escribe sabe algo que el traductor no.
+
+#### Lo que enseñó una prueba
+
+La traducción **va por su propia ruta** y no dentro de la vista previa, porque se
+pregunta antes de que la tabla exista, que es justo cuando sirve para decidir si
+crearla. La vista previa compara dos tablas que ya están.
+
+Y crear la tabla deja fuera tres cosas a propósito: índices y foráneas —por lo
+mismo que en un respaldo—, **la identidad**, porque la tabla nueva existe para
+recibir los valores del origen y una columna que los genera sola pelearía con
+ellos, y **los valores por omisión**, que son expresiones del dialecto de origen
+—`now()`, `GETDATE()`, `CURRENT`— y crearían una tabla que no compila.
+
+**Verificado.** Todo vuelto a ejecutar al cerrar la fase: **723 en backend** (401
+unitarias, 190 contractuales y 132 de integración) con `DRUSE_REQUIRE_ENGINES=1` y
+los cuatro motores levantados, sin saltarse ninguna; **485 en frontend**; y **las
+15 de punta a punta**, incluida la que crea la tabla desde el asistente y cuenta
+las filas de la tabla nueva al final. Lo cruzado se comprueba contra motores de
+verdad en `CrossEngineTransferTests` —PostgreSQL a SQL Server, con un tipo de cada
+familia que da problemas al cruzar—, con el tipo escrito a mano ganando al
+propuesto y la columna sin equivalente impidiendo crear la tabla.
+
+**El fallo anotado en el commit anterior no se reprodujo.** «Repetir la copia
+actualizando» se había quedado sin resumen en pantalla y falló por tiempo; aquí
+pasa dos veces seguidas, sola y con la suite entera. Encaja con el nerviosismo ya
+conocido de Playwright cuando hay un servidor de desarrollo levantado en
+paralelo, y queda como sospecha, no como diagnóstico.
+
+**No hecho.** Nadie ha migrado entre dos motores **desde la pantalla**: lo cruzado
+está comprobado por HTTP, y la prueba de punta a punta del camino nuevo crea la
+tabla dentro del mismo motor. `CrossEngineTransferTests` cubre una de las doce
+direcciones posibles; las otras once solo están en unitarias. Y el paso de tipos
+del asistente no tiene pruebas de componente en el frontend.
+
+**Archivos.** `Druse.Domain/TypeFacets.cs` y `DataTransfer.cs` (`TypeOverrides`),
+`Application/Transfers/TypeTranslator.cs` y `TransferService.cs`,
+`ITableDesigner.TypeFor` con `TableDesignerBase` y los cuatro diseñadores,
+`TransferContracts.cs` y `TransferEndpoints.cs` —las rutas
+`/api/transfers/translation` y `/api/transfers/target`—; en la interfaz, el
+gateway y el paso `types` del asistente. Pruebas: `TypeTranslationTests`,
+`TransferPlanTests`, `CrossEngineTransferTests`, `TestServerFixture` y
+`e2e/tests/migracion.spec.ts`. Documentación: la fase 3 cerrada y la 4 detallada
+en `docs/plan-migracion-de-datos.md`.
 
 ### Sesión 023b — 2026-08-19 · Qué hacer con lo que ya está en el destino
 

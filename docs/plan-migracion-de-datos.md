@@ -162,30 +162,95 @@ La prueba que importa es **contractual**: los cuatro motores ante el mismo lote
 repetido —insertar falla, actualizar cambia sin duplicar, omitir cuenta lo que
 dejó estar, y repetir dos veces deja lo mismo que una—.
 
-### Fase 3 — Entre motores distintos
+### Fase 3 — Entre motores distintos ✅ (sesión 023c)
 
-`TypeTranslator` en `Application/Transfers`, con una tabla de equivalencias por
-par de motores. Vive ahí y trabaja sobre `DatabaseEngine` como dato porque
-`ArchitectureRulesTests.LosProveedoresNoSeConocenEntreSi` prohíbe que un proveedor
-conozca a otro.
+Trasladar de un motor a otro ya no se rechaza, y con ello llega crear la tabla de
+destino desde la estructura del origen.
 
-Cada traducción lleva su nivel —exacta, aproximada con lo que se pierde, o sin
-equivalente— y la vista previa las enseña. **Los avisos son el producto**: una
-migración que traduce en silencio es la que estropea datos.
+`TypeTranslator` vive en `Application/Transfers` y trabaja sobre `DatabaseEngine`
+como dato, porque `ArchitectureRulesTests.LosProveedoresNoSeConocenEntreSi`
+prohíbe que un proveedor conozca a otro —y aquí hay que mirarlos de dos en dos—.
 
-Con esto llega crear la tabla destino: un `TableDefinition` construido desde las
-columnas del origen y `ITableDesigner.CreateAsync`. Solo columnas, tipos,
-nulabilidad y clave primaria; índices y foráneas no, por lo mismo que el respaldo
-los deja para el final.
+**No hay tabla de equivalencias por par de motores.** Con cuatro serían doce
+direcciones y crecería al cuadrado. En su lugar, dos preguntas: qué familia es el
+tipo —`ColumnValueParser.Classify`, que el dominio ya sabía responder— y cómo
+llama este motor al tipo que guarda eso, que es `ITableDesigner.TypeFor` y es lo
+único nuevo que aporta cada dialecto. Las medidas que sí viajan —longitud,
+precisión, escala, si tenía límite— salen del propio texto del tipo, con
+`TypeFacets.Parse`.
+
+Sobre eso, los avisos, que son el producto:
+
+| Lo que deja de ser cierto en el destino | Nivel |
+| --- | --- |
+| Un JSON en un motor sin JSON: viaja entero, pero deja de validarse y de consultarse por sus campos | Aproximada |
+| Un identificador único sin tipo propio: se guarda escrito, con sus 36 caracteres | Aproximada |
+| Una marca de tiempo con zona donde no se guarda el huso: el instante se conserva, de dónde venía no | Aproximada |
+| Un booleano donde no lo hay: los valores llegan como 1 y 0 | Aproximada |
+| Un texto sin límite que llega con tope: lo que hay cabe, lo que se escriba después quizá no | Aproximada |
+| Una columna que guarda varios valores, fuera de PostgreSQL | **Sin equivalente** |
+
+Lo que no tiene equivalente **no se traduce a la fuerza**: se dice, e impide crear
+la tabla hasta que se excluya la columna o se le escriba un tipo. Y el tipo
+escrito a mano gana siempre, sin discutirlo con un aviso: quien lo escribe sabe
+algo que el traductor no —que ese texto sin límite son en realidad cuatro
+letras—.
+
+Crear la tabla es un `TableDefinition` armado desde las columnas del origen y
+`ITableDesigner.CreateAsync`: columnas, tipos, nulabilidad y clave primaria.
+Índices y foráneas no, por lo mismo que el respaldo los deja para el final. **La
+identidad tampoco**, porque la tabla nueva existe para recibir los valores del
+origen y una columna que los genera sola pelearía con ellos; ni los valores por
+omisión, que son expresiones del dialecto de origen —`now()`, `GETDATE()`,
+`CURRENT`— y crearían una tabla que no compila.
+
+Tres cosas que salieron al construirlo:
+
+1. **La traducción va por su propia ruta** —`POST /api/transfers/translation`— y
+   no dentro de la vista previa. Lo enseñó una prueba: se pregunta *antes de que
+   la tabla exista*, que es justo cuando sirve para decidir si crearla. La vista
+   previa, en cambio, compara dos tablas que ya están.
+2. **Dentro del mismo motor no se traduce nada.** Proponer un equivalente sería
+   cambiar una columna sin motivo: un `smallint` no tiene por qué convertirse en
+   `bigint` porque los dos guarden enteros. La traducción devuelve vacío y el
+   asistente lo dice, en lugar de enseñar una tabla de tipos vacía.
+3. **`TypeFor` devuelve siempre algo.** Un motor sin tipo para una familia
+   contesta con el más cercano que tenga; negarse ahí dejaría a la vista previa
+   sin nada que enseñar, y decir qué se pierde es trabajo de quien llama, no del
+   dialecto.
+
+Piezas: `Druse.Domain/TypeFacets.cs`, `Application/Transfers/TypeTranslator.cs`,
+`ITableDesigner.TypeFor` con sus cuatro implementaciones,
+`TransferService.TranslateAsync` y `CreateTargetAsync`, las rutas
+`/api/transfers/translation` y `/api/transfers/target`, y en la interfaz el paso
+`types` del asistente, que enseña el tipo de cada columna, deja cambiarlo y pone
+debajo lo que se pierde.
+
+**Lo que queda sin comprobar**, que no bloquea la fase pero conviene tener
+escrito: `CrossEngineTransferTests` cruza **PostgreSQL → SQL Server** contra
+motores de verdad, y las otras once direcciones solo están cubiertas por
+unitarias; la prueba de punta a punta del camino nuevo crea la tabla **dentro del
+mismo motor**, así que el asistente cruzado no lo ha recorrido nadie desde la
+pantalla; y el paso de tipos no tiene pruebas de componente en el frontend.
 
 ### Fase 4 — Varias tablas y migraciones guardadas
 
-Varias tablas en una pasada, ordenadas por sus claves foráneas con lo que ya lee
-`IDatabaseMetadataReader`; los ciclos se avisan y se migran sin ordenar.
+Dos cosas que caben en una fase porque se usan juntas: llevar un conjunto de
+tablas de una vez, y poder repetirlo mañana sin volver a armarlo.
+
+**Varias tablas en una pasada**, ordenadas por sus claves foráneas —las padres
+antes que las hijas— con lo que ya lee `IDatabaseMetadataReader` en
+`TableStructure.ForeignKeys`. Los ciclos existen, y con un ciclo no hay orden que
+satisfaga a las dos tablas a la vez: **se avisa y se migran sin ordenar**, que es
+la misma decisión que tomó el respaldo al dejar las foráneas para el final.
+
+El progreso pasa a tener dos niveles, como el del respaldo: la tabla en curso y
+el conjunto. Hoy `ITransferTracker` cuenta las filas de una sola tabla.
 
 Y perfiles, espejo de `SqliteBackupProfileStore`, con su misma regla: el perfil
 guarda **nombres calificados, no identificadores de sesión**, porque se reabre
-meses después contra otra conexión.
+meses después contra otra conexión y la sesión de hoy ya no existirá. Al abrirlo
+se pregunta contra qué conexión viva se resuelve cada extremo.
 
 ---
 
