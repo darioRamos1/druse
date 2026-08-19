@@ -361,8 +361,24 @@ que ejecutar). Backend sin tocar.
 `app-shell.ts`, `app-shell.html`, `editor-toolbar.html`, `editor-toolbar.scss`,
 `command-palette.ts`.
 
-**No hecho.** No se ha visto funcionar en la aplicación levantada: lo que hay son
-las pruebas del separador.
+**Y se vio funcionando.** Levantando Druse de verdad contra el contenedor de
+PostgreSQL, con tres `SELECT` en una pestaña: el cursor en la segunda ejecuta la
+segunda, en la tercera —que no lleva `;` final— la tercera, pegado al `;` de la
+primera la primera, con selección lo seleccionado, y `Ctrl+Enter` sigue
+devolviendo los tres resultados.
+
+Eso encontró algo que el código no decía: **el texto del panel vacío se había
+quedado atrás**. Anunciaba «una selección con Ctrl+Shift+Enter» cuando ese atajo
+ya hace más que eso. Corregido.
+
+**Cómo se condujo el navegador, por si hace falta repetirlo.** La extensión de
+Chrome no estaba conectada y el proyecto no trae Playwright, así que se habló CDP
+directamente desde Node —`WebSocket` es global desde Node 21— contra el Chrome ya
+instalado. Dos cosas que costaron: el servidor de Angular escucha en `localhost`
+resolviendo a IPv6, y `127.0.0.1:4200` **no responde**; y cerrar una pestaña con
+cambios abre un `confirm()` del navegador que **congela el renderer**, así que
+hay que atender `Page.javascriptDialogOpening` o la siguiente evaluación no
+vuelve nunca.
 
 ### Sesión 022m — 2026-08-18 · El ciclo en los otros tres motores, y lo que escondían
 
@@ -2814,6 +2830,7 @@ basta solo.
 | Dependencias con vulnerabilidades en plantillas | Ya pasó dos veces: `Microsoft.OpenApi` y `dompurify` | En backend lo caza `TreatWarningsAsErrors`; en frontend, `npm audit` en cada instalación |
 | 3 vulnerabilidades moderadas en `@angular/cli` | Solo desarrollo; no llegan al bundle | Esperar actualización de Angular. Degradar a la 21 sería peor |
 | Detalles visuales fuera del shell principal | La comparación de la sesión 011 cubrió la pantalla principal, no todos los estados | Repetir la comparación al tocar diálogos, filtros o vistas menos transitadas |
+| `formatSql` falla a veces en las pruebas del frontend | Un rojo que no es del código: pasa al repetir | Solo aparece con `ng serve` corriendo en paralelo —el arranque del entorno pasa de 274 s a 1220 s— y se lleva por delante una prueba por tiempo. No ejecutar la suite con el servidor de desarrollo levantado |
 | Identificador `druse` no reservado | Podría ocuparlo otro | Reservar dominio, org de GitHub y NuGet/npm cuando haya algo publicable |
 
 _Retirados: «sin SQL Server de prueba» y «solo hay un proveedor» (Fase 4), «Rust no instalado» (Fase 7), «los datos simulados podrían filtrarse» (borrados en la Fase 2) y «fidelidad visual no comprobada» (comprobada en la sesión 011)._
