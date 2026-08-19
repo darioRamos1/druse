@@ -10,14 +10,14 @@
 
 | Campo | Valor |
 | --- | --- |
-| Última sesión | **022n** — 2026-08-18 |
+| Última sesión | **022o** — 2026-08-18 |
 | Fase activa | **Respaldos y restauración:** Fases A–E cerradas. La **F** tiene backend, interfaz, CSV, selector de archivos, restaurar en una base nueva y **el ciclo entero por HTTP en los cuatro motores**; le falta repetir a mano el respaldo real que encontró el error de los índices de expresión |
 | Fases 0–6 | ✅ Cerradas. |
 | Fase 7 | 🟡 **11/12.** El ciclo de instalación está probado sobre este equipo; solo falta arrancar en una máquina sin herramientas de desarrollo. |
 | Fase 8 | ✅ **7/7.** Tres motores sobre el mismo contrato y primera beta preparada. |
 | ¿Compila el backend? | Sí — 0 advertencias, 0 errores |
 | ¿Compila el envoltorio? | Sí |
-| ¿Pasan las pruebas? | Sí — **615 en backend** (339 unitarias, 166 contractuales y 110 de integración), **466 en frontend** y **6 en el envoltorio**. Con `DRUSE_REQUIRE_ENGINES=1` y **los cuatro motores**, sin saltarse ninguna |
+| ¿Pasan las pruebas? | Sí — **623 en backend** (343 unitarias, 170 contractuales y 110 de integración), **468 en frontend** y **6 en el envoltorio**. Con `DRUSE_REQUIRE_ENGINES=1` y **los cuatro motores**, sin saltarse ninguna |
 | ¿Hay aplicación de escritorio? | **Sí.** Instalador NSIS, MSI y ZIP portable, en dos variantes: con Informix y sin él |
 | Motores | **PostgreSQL, SQL Server, MySQL/MariaDB e Informix**, todos sobre el mismo contrato compartido |
 | Trabajo a medias | Ninguno. El frontend de la restauración quedó commiteado en la sesión 022i. |
@@ -319,6 +319,55 @@ Y tres límites declarados desde el principio: no hay respaldo binario ni
 recuperación a un punto en el tiempo —eso es del servidor, y la interfaz tendrá
 que decirlo—, no hay respaldos programados, y un límite de filas puede dejar
 filas huérfanas, cosa que se avisa y no se corrige sola.
+
+### Sesión 022o — 2026-08-18 · Señalar dónde falló, no la línea entera
+
+El editor ya marcaba el error de una ejecución, pero marcaba **la línea entera**
+aunque el motor supiera la palabra exacta, y en dos de los cuatro motores no
+marcaba nada.
+
+**Lo primero fue preguntarle a cada motor qué sabe decir.** Una sonda con el
+mismo `SELECT` roto en la tercera línea, contra los cuatro:
+
+| Motor | Qué entrega |
+| --- | --- |
+| PostgreSQL | `position` = 17, el carácter exacto |
+| SQL Server | `line` = 3, sin columna |
+| MySQL | nada en campos; la línea va **dentro del mensaje**: «…at line 3» |
+| Informix | nada: «A syntax error has occurred.» y punto |
+
+**Con posición se subraya la palabra.** `executionErrorPlace` devuelve línea y
+columna, y el editor marca la palabra que empieza ahí —`getWordAtPosition`— o el
+carácter suelto si el error cae sobre un símbolo. Con solo línea se sigue
+subrayando la línea entera: inventarse una columna sería señalar un sitio falso.
+
+Hay un detalle que solo aparece con «Ejecutar actual»: lo que dice el motor es
+relativo **al fragmento enviado**, no a la pestaña. La línea ya se desplazaba; la
+columna también hace falta desplazarla, pero **solo en la primera línea del
+fragmento**, que es la única que puede empezar a media línea.
+
+**MySQL escribe la línea en el texto y de ahí se saca.** Es un heurístico y se
+comporta como tal: la expresión se ancla al final del mensaje —el SQL del usuario
+viaja dentro y podría llevar un «at line 99» en un literal— y si el servidor
+responde en otro idioma no se devuelve ninguna línea. Antes de esto, en MySQL el
+error se leía sin saber dónde miraba.
+
+**Informix no se puede arreglar desde aquí.** No da posición, ni línea, ni el
+fragmento culpable. Queda declarado en el contrato: `SyntaxErrorPlace.Nothing`, y
+la prueba lo comprueba contra el motor real. Si algún día IBM lo añade, esa
+prueba se pondrá roja y nos enteraremos.
+
+**Verificado.** **623 pruebas de backend** —343 unitarias, 170 contractuales y
+110 de integración, con los cuatro motores— y **468 en frontend**. Y visto en la
+aplicación contra PostgreSQL: un `FROM` mal puesto subraya `FROM` y solo `FROM`;
+la misma consulta como tercera instrucción de la pestaña lo subraya en su sitio
+real; y una columna inexistente subraya el nombre de la columna. En MySQL se
+comprobó por la API, que ahora devuelve `line: 3` donde antes devolvía nulo.
+
+**Archivos.** `execution-error.ts`, `sql-editor.ts`, `sql-editor.spec.ts`,
+`MySqlErrorNormalizer.cs`, `Druse.Provider.MySql.csproj`,
+`MySqlErrorNormalizerTests.cs` (nuevo), `ProviderContract.cs`, las cuatro
+fixtures y `DatabaseProviderContractTests.cs`.
 
 ### Sesión 022n — 2026-08-18 · Ejecutar solo la instrucción del cursor
 
