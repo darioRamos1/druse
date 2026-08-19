@@ -90,75 +90,42 @@ internal static class TransferEndpoints
         })
         .WithName("CreateTransferTarget");
 
+        app.MapPost("/api/transfers/set/order", async (
+            TransferSetRequestDto request,
+            TransferService transfers,
+            CancellationToken cancellationToken) =>
+        {
+            try
+            {
+                var order = await transfers.OrderAsync(request.ToDomain(), cancellationToken);
+
+                return Results.Ok(order.ToDto());
+            }
+            catch (RowEditRejectedException exception)
+            {
+                return Rejected(exception);
+            }
+        })
+        .WithName("OrderTransferSet");
+
+        // Una tabla es una pasada de una: el camino de las tres primeras fases no
+        // se mantiene aparte, porque serían dos formas de hacer lo mismo y solo
+        // una se probaría a fondo.
         app.MapPost("/api/transfers", (
             TransferRequestDto request,
             TransferService transfers,
             ITransferTracker tracker,
             ILoggerFactory logs) =>
-        {
-            DataTransferRequest domain;
-
-            try
-            {
-                domain = request.ToDomain();
-            }
-            catch (ArgumentException error)
-            {
-                return Results.Json(
-                    new { message = error.Message },
-                    statusCode: StatusCodes.Status400BadRequest);
-            }
-
-            var id = Guid.NewGuid();
-
-            // El token es el del registro y no el de la petición: la petición
-            // termina en cuanto se devuelve el identificador, y el traslado tiene
-            // que seguir. Cancelar es lo único que lo para.
-            var token = tracker.Start(id, CancellationToken.None);
-
-            tracker.Report(Starting(id, domain));
-
-            _ = Task.Run(
-                async () =>
-                {
-                    var log = logs.CreateLogger("Druse.Transfer");
-
-                    try
-                    {
-                        var progress = new Progress<TransferProgress>(state =>
-                            tracker.Report(state with { Id = id }));
-
-                        var result = await transfers.RunAsync(domain, progress, token);
-
-                        tracker.Report(result with { Id = id });
-                    }
-                    catch (RowEditRejectedException rejected)
-                    {
-                        // Un rechazo llega hasta aquí cuando se comprueba ya
-                        // lanzado el trabajo —la sesión se cerró entre medias, el
-                        // destino resultó ser de solo lectura—. Va al estado y no
-                        // a la respuesta, que hace rato que se envió.
-                        tracker.Report(Failed(id, domain, rejected.Rejection.Message, tracker.Find(id)));
-                    }
-                    catch (Exception error)
-                    {
-                        // Lo que llega aquí es lo que el servicio no supo contar:
-                        // sin este registro, el traslado se quedaría «en marcha»
-                        // para siempre en la pantalla de quien lo lanzó.
-                        log.LogError(error, "El traslado {Id} terminó con un error no previsto.", id);
-
-                        tracker.Report(Failed(id, domain, error.Message, tracker.Find(id)));
-                    }
-                    finally
-                    {
-                        tracker.Finish(id);
-                    }
-                },
-                CancellationToken.None);
-
-            return Results.Accepted($"/api/transfers/{id}/status", new { id });
-        })
+            Launch(new TransferSetRequestDto { Tables = [request] }, transfers, tracker, logs))
         .WithName("RunTransfer");
+
+        app.MapPost("/api/transfers/set", (
+            TransferSetRequestDto request,
+            TransferService transfers,
+            ITransferTracker tracker,
+            ILoggerFactory logs) =>
+            Launch(request, transfers, tracker, logs))
+        .WithName("RunTransferSet");
 
         app.MapGet("/api/transfers/{id:guid}/status", (Guid id, ITransferTracker tracker) =>
         {
@@ -176,19 +143,103 @@ internal static class TransferEndpoints
     }
 
     /// <summary>
+    /// Lanza la pasada y devuelve su identificador.
+    ///
+    /// El trabajo se va a un hilo suelto y la petición termina: lo que sigue se
+    /// pregunta por `status`. Es lo mismo que hace un respaldo, y aquí importa más,
+    /// porque lo que queda a medias son filas en una base ajena.
+    /// </summary>
+    private static IResult Launch(
+        TransferSetRequestDto request,
+        TransferService transfers,
+        ITransferTracker tracker,
+        ILoggerFactory logs)
+    {
+        DataTransferSetRequest domain;
+
+        try
+        {
+            domain = request.ToDomain();
+        }
+        catch (ArgumentException error)
+        {
+            return Results.Json(
+                new { message = error.Message },
+                statusCode: StatusCodes.Status400BadRequest);
+        }
+
+        if (domain.Tables.Count == 0)
+        {
+            return Results.Json(
+                new { message = "No hay ninguna tabla que trasladar." },
+                statusCode: StatusCodes.Status400BadRequest);
+        }
+
+        var id = Guid.NewGuid();
+
+        // El token es el del registro y no el de la petición: la petición termina
+        // en cuanto se devuelve el identificador, y el traslado tiene que seguir.
+        // Cancelar es lo único que lo para.
+        var token = tracker.Start(id, CancellationToken.None);
+
+        tracker.Report(Starting(id, domain));
+
+        _ = Task.Run(
+            async () =>
+            {
+                var log = logs.CreateLogger("Druse.Transfer");
+
+                try
+                {
+                    var progress = new Progress<TransferProgress>(state =>
+                        tracker.Report(state with { Id = id }));
+
+                    var result = await transfers.RunSetAsync(domain, progress, token);
+
+                    tracker.Report(result with { Id = id });
+                }
+                catch (RowEditRejectedException rejected)
+                {
+                    // Un rechazo llega hasta aquí cuando se comprueba ya lanzado el
+                    // trabajo —la sesión se cerró entre medias, el destino resultó
+                    // ser de solo lectura—. Va al estado y no a la respuesta, que
+                    // hace rato que se envió.
+                    tracker.Report(Failed(id, domain, rejected.Rejection.Message, tracker.Find(id)));
+                }
+                catch (Exception error)
+                {
+                    // Lo que llega aquí es lo que el servicio no supo contar: sin
+                    // este registro, el traslado se quedaría «en marcha» para
+                    // siempre en la pantalla de quien lo lanzó.
+                    log.LogError(error, "El traslado {Id} terminó con un error no previsto.", id);
+
+                    tracker.Report(Failed(id, domain, error.Message, tracker.Find(id)));
+                }
+                finally
+                {
+                    tracker.Finish(id);
+                }
+            },
+            CancellationToken.None);
+
+        return Results.Accepted($"/api/transfers/{id}/status", new { id });
+    }
+
+    /// <summary>
     /// El primer estado, publicado antes de que el trabajo empiece a correr.
     ///
     /// Sin él, quien pregunta por el progreso justo después de lanzar el traslado
     /// se llevaría un 404 y creería que se perdió.
     /// </summary>
-    private static TransferProgress Starting(Guid id, DataTransferRequest request) =>
+    private static TransferProgress Starting(Guid id, DataTransferSetRequest request) =>
         new()
         {
             Id = id,
             Step = TransferStep.ReadingStructure,
             Outcome = TransferOutcome.Running,
-            CurrentObject = request.Target.Name,
-            RowsEstimated = request.Source.ApproximateRowCount,
+            CurrentObject = request.Tables[0].Target.Name,
+            RowsEstimated = request.Tables[0].Source.ApproximateRowCount,
+            TablesTotal = request.Tables.Count,
         };
 
     /// <summary>
@@ -200,10 +251,10 @@ internal static class TransferEndpoints
     /// </summary>
     private static TransferProgress Failed(
         Guid id,
-        DataTransferRequest request,
+        DataTransferSetRequest request,
         string message,
         TransferProgress? last) =>
-        (last ?? new TransferProgress { Id = id, CurrentObject = request.Target.Name }) with
+        (last ?? new TransferProgress { Id = id, CurrentObject = request.Tables[0].Target.Name }) with
         {
             Id = id,
             Step = TransferStep.Done,

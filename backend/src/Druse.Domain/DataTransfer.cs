@@ -140,6 +140,33 @@ public sealed record DataTransferRequest
         BatchSize <= 0 ? DefaultBatchSize : Math.Min(BatchSize, MaxBatchSize);
 }
 
+/// <summary>
+/// Varias tablas trasladadas en una pasada, con un progreso y una cancelación
+/// para todas.
+///
+/// Los dos extremos son **una conexión de origen y una de destino para el
+/// conjunto entero**. Los turnos se piden por sesión, y una pasada que tocara
+/// cuatro conexiones tendría que sostener cuatro turnos a la vez, que es la
+/// forma más corta de llegar a un bloqueo mutuo. Llevar tablas de tres bases a
+/// una son tres pasadas, y se ven como tres.
+/// </summary>
+public sealed record DataTransferSetRequest
+{
+    /// <summary>Las tablas, cada una con su modo, su filtro y su emparejamiento.</summary>
+    public required IReadOnlyList<DataTransferRequest> Tables { get; init; }
+
+    /// <summary>
+    /// Ordenar por las claves foráneas del destino antes de copiar: las padres
+    /// antes que las hijas.
+    ///
+    /// Encendido por omisión, porque copiar una hija antes que su padre es el
+    /// rechazo más previsible de todos. Se apaga para respetar el orden escrito,
+    /// que es lo que hace falta cuando quien migra sabe algo que el catálogo no
+    /// dice.
+    /// </summary>
+    public bool Ordered { get; init; } = true;
+}
+
 /// <summary>En qué anda un traslado.</summary>
 public enum TransferStep
 {
@@ -211,7 +238,8 @@ public sealed record TransferProgress
     public long RowsCopied { get; init; }
 
     /// <summary>
-    /// Filas que se esperan, **estimadas** por el catálogo del origen.
+    /// Filas que se esperan **de la tabla en curso**, estimadas por el catálogo
+    /// del origen.
     ///
     /// Nula cuando no hay estimación fiable —una condición `WHERE`, una vista— y
     /// entonces se enseña el contador absoluto sin barra. Una barra que llega al
@@ -221,6 +249,27 @@ public sealed record TransferProgress
 
     /// <summary>Filas que el destino rechazó y se saltaron, en los modos que lo permiten.</summary>
     public long RowsSkipped { get; init; }
+
+    /// <summary>
+    /// Filas copiadas **de la tabla en curso**.
+    ///
+    /// Es el segundo nivel del progreso: <see cref="RowsCopied"/> cuenta la pasada
+    /// entera y esto la tabla que se está copiando ahora, que es la única que se
+    /// puede comparar con <see cref="RowsEstimated"/>. Con una sola tabla los dos
+    /// números son el mismo.
+    /// </summary>
+    public long TableRowsCopied { get; init; }
+
+    /// <summary>Tablas del conjunto ya terminadas.</summary>
+    public int TablesDone { get; init; }
+
+    /// <summary>
+    /// Tablas del conjunto.
+    ///
+    /// Uno cuando se traslada una sola tabla, que es el caso de las tres primeras
+    /// fases y sigue siendo el corriente.
+    /// </summary>
+    public int TablesTotal { get; init; } = 1;
 
     /// <summary>Lotes ya confirmados. Con «todo o nada» se queda en cero hasta el final.</summary>
     public int BatchesDone { get; init; }

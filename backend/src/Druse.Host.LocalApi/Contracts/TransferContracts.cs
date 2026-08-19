@@ -107,6 +107,29 @@ public sealed record TransferPreviewDto
     public IReadOnlyList<TypeTranslationDto> Translations { get; init; } = [];
 }
 
+/// <summary>Varias tablas trasladadas en una pasada.</summary>
+public sealed record TransferSetRequestDto
+{
+    /// <summary>Las tablas, cada una con su modo, su filtro y su emparejamiento.</summary>
+    public IReadOnlyList<TransferRequestDto> Tables { get; init; } = [];
+
+    /// <summary>
+    /// Ordenar por las claves foráneas del destino: las padres antes que las
+    /// hijas. Encendido salvo que se diga lo contrario.
+    /// </summary>
+    public bool Ordered { get; init; } = true;
+}
+
+/// <summary>En qué orden se copiarían las tablas de una pasada.</summary>
+public sealed record TransferSetOrderDto
+{
+    /// <summary>Nombres calificados, en el orden en que se copiarían.</summary>
+    public IReadOnlyList<string> Tables { get; init; } = [];
+
+    /// <summary>Las que se apuntan entre sí y van sin ordenar. Vacío es lo normal.</summary>
+    public IReadOnlyList<string> Cycles { get; init; } = [];
+}
+
 /// <summary>Cómo queda una columna al cambiar de motor.</summary>
 public sealed record TypeTranslationDto
 {
@@ -155,6 +178,14 @@ public sealed record TransferProgressDto
     public long? RowsEstimated { get; init; }
 
     public long RowsSkipped { get; init; }
+
+    /// <summary>Filas copiadas de la tabla en curso; `RowsCopied` es el total de la pasada.</summary>
+    public long TableRowsCopied { get; init; }
+
+    /// <summary>Tablas terminadas y tablas del conjunto. Uno de uno con una sola tabla.</summary>
+    public int TablesDone { get; init; }
+
+    public int TablesTotal { get; init; } = 1;
 
     public int BatchesDone { get; init; }
 
@@ -208,6 +239,28 @@ internal static class TransferMapper
             KeepIdentity = dto.KeepIdentity,
             Confirmed = dto.Confirmed,
             ReplaceConfirmation = dto.ReplaceConfirmation,
+        };
+    }
+
+    public static DataTransferSetRequest ToDomain(this TransferSetRequestDto dto)
+    {
+        ArgumentNullException.ThrowIfNull(dto);
+
+        return new DataTransferSetRequest
+        {
+            Tables = [.. dto.Tables.Select(table => table.ToDomain())],
+            Ordered = dto.Ordered,
+        };
+    }
+
+    public static TransferSetOrderDto ToDto(this TransferSetOrder order)
+    {
+        ArgumentNullException.ThrowIfNull(order);
+
+        return new TransferSetOrderDto
+        {
+            Tables = order.Tables,
+            Cycles = order.Cycles,
         };
     }
 
@@ -281,6 +334,9 @@ internal static class TransferMapper
             RowsCopied = progress.RowsCopied,
             RowsEstimated = progress.RowsEstimated,
             RowsSkipped = progress.RowsSkipped,
+            TableRowsCopied = progress.TableRowsCopied,
+            TablesDone = progress.TablesDone,
+            TablesTotal = progress.TablesTotal,
             BatchesDone = progress.BatchesDone,
             ElapsedMilliseconds = (long)progress.Elapsed.TotalMilliseconds,
             Warnings =

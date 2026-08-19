@@ -54,6 +54,15 @@ public sealed record TransferPreview
     public IReadOnlyList<TypeTranslation> Translations { get; init; } = [];
 }
 
+/// <summary>En qué orden se copiarían las tablas de una pasada.</summary>
+/// <param name="Tables">Nombres calificados, en el orden en que se copiarían.</param>
+/// <param name="Cycles">
+/// Las que se apuntan entre sí y por eso van sin ordenar. Vacío es lo normal.
+/// </param>
+public sealed record TransferSetOrder(
+    IReadOnlyList<string> Tables,
+    IReadOnlyList<string> Cycles);
+
 /// <summary>
 /// Copia las filas de una tabla a otra, que puede estar en otro esquema, en otra
 /// base o al otro lado de otra conexión.
@@ -295,23 +304,121 @@ public sealed class TransferService(
         return result.Statements;
     }
 
-    /// <summary>Copia las filas. Devuelve cuántas llegaron, incluso si falló a mitad.</summary>
-    public async Task<TransferProgress> RunAsync(
+    /// <summary>
+    /// En qué orden se copiarían las tablas, y cuáles se apuntan entre sí.
+    ///
+    /// Se pregunta **antes de confirmar nada**: quien va a mover doce tablas
+    /// quiere ver el orden y los ciclos en la vista previa, no enterarse por el
+    /// aviso de un traslado que ya empezó.
+    /// </summary>
+    public async Task<TransferSetOrder> OrderAsync(
+        DataTransferSetRequest set,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(set);
+
+        var nodes = new List<TransferNode>(set.Tables.Count);
+
+        foreach (var table in set.Tables)
+        {
+            var structure = await _metadata.GetTableStructureAsync(
+                table.TargetSessionId,
+                table.Target,
+                cancellationToken);
+
+            nodes.Add(new TransferNode(table.Target, structure.ForeignKeys));
+        }
+
+        var ordering = set.Ordered
+            ? TransferOrder.Sort(nodes)
+            : new TransferOrdering([.. Enumerable.Range(0, nodes.Count)], []);
+
+        return new TransferSetOrder(
+            [.. ordering.Order.Select(index => Qualified(set.Tables[index].Target))],
+            ordering.Cycles);
+    }
+
+    /// <summary>
+    /// Copia las filas de una tabla. Devuelve cuántas llegaron, incluso si falló
+    /// a mitad.
+    /// </summary>
+    public Task<TransferProgress> RunAsync(
         DataTransferRequest request,
+        IProgress<TransferProgress>? progress,
+        CancellationToken cancellationToken) =>
+        RunSetAsync(
+            new DataTransferSetRequest { Tables = [request] },
+            progress,
+            cancellationToken);
+
+    /// <summary>
+    /// Copia un conjunto de tablas en una pasada, ordenadas por sus foráneas.
+    ///
+    /// **«Todo o nada» sigue siendo por tabla**, y la pasada se para en la primera
+    /// que falle. Una transacción que abarcara el conjunto entero sería coherente
+    /// con las foráneas, pero traería de vuelta justo lo que la fase 1 evitó a
+    /// propósito: el registro del servidor creciendo hasta el final y las tablas
+    /// bloqueadas mientras dura. Lo que entró completo se queda, y el resumen dice
+    /// cuántas tablas pasaron y en cuál se paró.
+    ///
+    /// Todo se prepara **antes de escribir la primera fila**: una tabla mal
+    /// emparejada o una confirmación que falta se descubren aquí, y no con media
+    /// pasada ya dentro del destino.
+    /// </summary>
+    public async Task<TransferProgress> RunSetAsync(
+        DataTransferSetRequest set,
         IProgress<TransferProgress>? progress,
         CancellationToken cancellationToken)
     {
-        var plan = await PrepareAsync(request, requireConfirmation: true, cancellationToken);
-        var state = new TransferState(Guid.NewGuid(), Qualified(plan.Target.Table), progress);
+        ArgumentNullException.ThrowIfNull(set);
 
-        state.Estimate(plan.RowsEstimated);
+        if (set.Tables.Count == 0)
+        {
+            throw new RowEditRejectedException(new RowEditRejection(
+                RowEditRefusal.NothingToDo,
+                "No hay ninguna tabla que trasladar."));
+        }
+
+        var sourceSessionId = set.Tables[0].SourceSessionId;
+        var targetSessionId = set.Tables[0].TargetSessionId;
+
+        if (set.Tables.Any(table =>
+                table.SourceSessionId != sourceSessionId ||
+                table.TargetSessionId != targetSessionId))
+        {
+            throw new RowEditRejectedException(new RowEditRejection(
+                RowEditRefusal.NothingToDo,
+                "Todas las tablas de una pasada van de la misma conexión a la misma " +
+                "conexión. Los turnos se piden por sesión, y sostener varios a la vez " +
+                "es la forma más corta de que dos traslados se esperen para siempre."));
+        }
+
+        var plans = new List<Plan>(set.Tables.Count);
+
+        foreach (var table in set.Tables)
+        {
+            plans.Add(await PrepareAsync(table, requireConfirmation: true, cancellationToken));
+        }
+
+        var ordering = Ordered(set, plans);
+        var state = new TransferState(Guid.NewGuid(), progress, plans.Count);
+
+        if (ordering.Cycles.Count > 0)
+        {
+            state.Warn(
+                string.Join(", ", ordering.Cycles),
+                "Estas tablas se apuntan entre sí con sus claves foráneas, y con un " +
+                "ciclo no hay ningún orden que las satisfaga a la vez. Se copian en el " +
+                "orden en que se pidieron, así que el destino puede rechazar filas que " +
+                "apunten a otras que todavía no han llegado.");
+        }
 
         // Los turnos se piden **en orden de identificador**, siempre el mismo.
         // Dos traslados cruzados entre las mismas dos conexiones —uno de dev a
         // prod y otro de prod a dev— se quedarían esperando el uno al otro para
         // siempre si cada uno tomase primero el suyo.
-        var first = request.SourceSessionId;
-        var second = request.TargetSessionId;
+        var first = sourceSessionId;
+        var second = targetSessionId;
 
         if (first.CompareTo(second) > 0)
         {
@@ -323,9 +430,37 @@ public sealed class TransferService(
             ? null
             : await _connections.EnterAsync(second, cancellationToken);
 
+        // Vaciar va antes de copiar nada y **en el orden contrario**: una tabla no
+        // se deja vaciar mientras sus hijas guarden filas que la apuntan. Con una
+        // sola tabla no hay orden contrario que valga, y el vaciado se queda donde
+        // estaba —dentro de su propia transacción—, que es lo que hace cierto el
+        // «vaciar y cargar, o nada» de la fase 1.
+        var apart = plans.Count > 1;
+
         try
         {
-            return await CopyAsync(request, plan, state, cancellationToken);
+            if (apart)
+            {
+                await ClearAsync(set, plans, ordering, state, cancellationToken);
+            }
+
+            foreach (var index in ordering.Order)
+            {
+                var plan = plans[index];
+
+                state.Begin(Qualified(plan.Target.Table), plan.RowsEstimated);
+
+                await CopyAsync(
+                    set.Tables[index],
+                    plan,
+                    state,
+                    clearTarget: !apart,
+                    cancellationToken);
+
+                state.TableDone();
+            }
+
+            return state.Complete();
         }
         catch (OperationCanceledException)
         {
@@ -343,10 +478,87 @@ public sealed class TransferService(
         }
     }
 
-    private async Task<TransferProgress> CopyAsync(
+    /// <summary>
+    /// En qué orden se copian las tablas de la pasada.
+    ///
+    /// Con una sola tabla, o cuando se pidió respetar el orden escrito, no se
+    /// ordena nada: el orden es el que llegó.
+    /// </summary>
+    private static TransferOrdering Ordered(DataTransferSetRequest set, IReadOnlyList<Plan> plans) =>
+        set.Ordered && plans.Count > 1
+            ? TransferOrder.Sort(
+                [
+                    .. plans.Select(plan =>
+                        new TransferNode(plan.Target.Table, plan.Target.Structure.ForeignKeys)),
+                ])
+            : new TransferOrdering([.. Enumerable.Range(0, plans.Count)], []);
+
+    /// <summary>
+    /// Vacía las tablas que pidieron «vaciar y cargar», de las hijas hacia las
+    /// padres.
+    ///
+    /// Es lo único de la pasada que va al revés que la copia, y por la misma razón
+    /// por la que la copia va como va: una tabla no se puede vaciar mientras otra
+    /// guarde filas que la apuntan.
+    ///
+    /// **El precio queda declarado**: en una pasada de varias tablas el vaciado ya
+    /// no cae dentro de la transacción de su tabla, así que «todo o nada» cubre lo
+    /// que se carga y no lo que se borró antes.
+    /// </summary>
+    private async Task ClearAsync(
+        DataTransferSetRequest set,
+        IReadOnlyList<Plan> plans,
+        TransferOrdering ordering,
+        TransferState state,
+        CancellationToken cancellationToken)
+    {
+        var pending = ordering.Order
+            .Where(index => set.Tables[index].Mode == TransferMode.Replace)
+            .Reverse()
+            .ToList();
+
+        if (pending.Count == 0)
+        {
+            return;
+        }
+
+        var targetSession = _connections.Require(set.Tables[0].TargetSessionId);
+
+        state.Enter(TransferStep.ClearingTarget);
+
+        foreach (var index in pending)
+        {
+            var plan = plans[index];
+
+            state.Begin(Qualified(plan.Target.Table), plan.RowsEstimated);
+
+            await using var writing = await SideAsync(
+                targetSession,
+                plan.Target.Table.Database,
+                separate: false,
+                cancellationToken);
+
+            var scripter = _providers.GetScripter(writing.Session.Engine);
+
+            foreach (var statement in scripter.ScriptClearTable(plan.Target))
+            {
+                await Apply(scripter, writing.Session, statement, cancellationToken);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Copia una tabla, con su vaciado y su transacción si los pidió.
+    ///
+    /// El vaciado se hace aquí cuando la tabla va sola. En una pasada de varias,
+    /// ya se hizo antes y en el orden contrario, y entonces llega
+    /// <paramref name="clearTarget"/> apagado.
+    /// </summary>
+    private async Task CopyAsync(
         DataTransferRequest request,
         Plan plan,
         TransferState state,
+        bool clearTarget,
         CancellationToken cancellationToken)
     {
         var sourceSession = _connections.Require(request.SourceSessionId);
@@ -382,7 +594,7 @@ public sealed class TransferService(
             ? await editor.BeginWriteAsync(target, cancellationToken)
             : null;
 
-        if (request.Mode == TransferMode.Replace)
+        if (clearTarget && request.Mode == TransferMode.Replace)
         {
             state.Enter(TransferStep.ClearingTarget);
 
@@ -437,8 +649,6 @@ public sealed class TransferService(
             await scope.CommitAsync(cancellationToken);
             state.Committed();
         }
-
-        return state.Complete();
     }
 
     private static async Task ReadAndWriteAsync(
@@ -1022,20 +1232,39 @@ public sealed class TransferService(
 ///
 /// Es mutable a propósito y vive en el proceso local: el cliente lo consulta cada
 /// medio segundo y necesita leerlo sin interrumpir nada.
+///
+/// Cuenta **en dos niveles** desde la fase 4: la pasada entera y la tabla en
+/// curso. Con una sola tabla los dos números coinciden, que es como tiene que ser
+/// —lo contrario obligaría a la pantalla a saber en cuál de los dos casos está—.
 /// </summary>
-internal sealed class TransferState(Guid id, string table, IProgress<TransferProgress>? progress)
+internal sealed class TransferState(Guid id, IProgress<TransferProgress>? progress, int tables)
 {
     private readonly Stopwatch _clock = Stopwatch.StartNew();
     private readonly List<TransferWarning> _warnings = [];
 
     private TransferStep _step = TransferStep.ReadingStructure;
+    private string? _table;
     private long? _estimated;
+    private long _tableRows;
+    private int _done;
     private int _batches;
     private long _skipped;
 
     public long RowsCopied { get; private set; }
 
-    public void Estimate(long? rows) => _estimated = rows;
+    /// <summary>
+    /// Empieza con otra tabla: la nombra y pone su contador a cero.
+    ///
+    /// El de la pasada no se toca, porque lo que ya entró en el destino sigue
+    /// estando allí.
+    /// </summary>
+    public void Begin(string table, long? estimated)
+    {
+        _table = table;
+        _estimated = estimated;
+        _tableRows = 0;
+        Report();
+    }
 
     public void Enter(TransferStep step)
     {
@@ -1046,8 +1275,16 @@ internal sealed class TransferState(Guid id, string table, IProgress<TransferPro
     public void Rows(long written, long skipped = 0)
     {
         RowsCopied += written;
+        _tableRows += written;
         _skipped += skipped;
         _batches++;
+        Report();
+    }
+
+    /// <summary>Una tabla menos. Es el primer nivel del progreso.</summary>
+    public void TableDone()
+    {
+        _done++;
         Report();
     }
 
@@ -1083,10 +1320,13 @@ internal sealed class TransferState(Guid id, string table, IProgress<TransferPro
             Id = id,
             Step = _step,
             Outcome = outcome,
-            CurrentObject = table,
+            CurrentObject = _table,
             RowsCopied = RowsCopied,
             RowsEstimated = _estimated,
             RowsSkipped = _skipped,
+            TableRowsCopied = _tableRows,
+            TablesDone = _done,
+            TablesTotal = tables,
             BatchesDone = _batches,
             Elapsed = _clock.Elapsed,
             Warnings = [.. _warnings],
