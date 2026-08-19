@@ -105,18 +105,34 @@
 
       <label class="field field--wide">
         <span class="field__label">Base de datos</span>
-        <input
-          class="field__input"
-          type="text"
-          [(ngModel)]="database"
-          [placeholder]="databasePlaceholder()"
-          [class.is-invalid]="fieldError('database')"
-          [attr.aria-invalid]="!!fieldError('database')"
-          aria-describedby="connection-database-error"
-        />
-        @if (fieldError('database'); as error) {
-          <span class="field__error" id="connection-database-error">{{ error }}</span>
-        }
+        <span class="picker">
+          <input
+            class="field__input"
+            type="text"
+            list="connection-databases"
+            [(ngModel)]="database"
+            [placeholder]="databasePlaceholder()"
+            aria-describedby="connection-database-detail"
+          />
+          <!-- Preguntar exige conectar, así que es un botón y no algo que pase
+               solo mientras se escribe el servidor. -->
+          <button
+            type="button"
+            class="picker__load"
+            [disabled]="loadingDatabases()"
+            (click)="loadDatabases()"
+          >
+            {{ loadingDatabases() ? 'Buscando…' : 'Ver las mías' }}
+          </button>
+        </span>
+        <datalist id="connection-databases">
+          @for (option of databases(); track option) {
+            <option [value]="option"></option>
+          }
+        </datalist>
+        <span class="field__hint" id="connection-database-detail">
+          {{ databaseHint() }}
+        </span>
       </label>
 
       @if (supportsWindowsAuth()) {

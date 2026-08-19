@@ -221,6 +221,10 @@ public sealed class SshTunnelTests
 
         public int DefaultPort => 5432;
 
+        public string DefaultDatabase => "postgres";
+
+        public IReadOnlyList<string> SystemDatabases => ["postgres"];
+
         public Task<TestConnectionResult> TestConnectionAsync(
             ConnectionProfile profile,
             DatabaseCredentials credentials,

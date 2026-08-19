@@ -108,6 +108,12 @@ export class HttpApplicationGateway extends ApplicationGateway {
     return this._http.post<TestConnectionResult>('/api/connections/test', request);
   }
 
+  override listConnectionDatabases(request: ConnectRequest): Observable<readonly string[]> {
+    return this._http
+      .post<{ databases: string[] }>('/api/connections/databases', request)
+      .pipe(map((response) => response.databases));
+  }
+
   override openSession(request: ConnectRequest): Observable<SessionInfo> {
     return this._http.post<SessionInfo>('/api/sessions', request);
   }

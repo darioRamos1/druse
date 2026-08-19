@@ -95,6 +95,12 @@ public sealed class InformixDatabaseProvider : IDatabaseProvider
     /// </summary>
     public int DefaultPort => 9089;
 
+    /// <summary>`sysmaster` es la base del servidor, y es donde vive el catálogo.</summary>
+    public string DefaultDatabase => "sysmaster";
+
+    public IReadOnlyList<string> SystemDatabases =>
+        ["sysmaster", "sysadmin", "sysutils", "sysuser", "syscdr"];
+
     public async Task<TestConnectionResult> TestConnectionAsync(
         ConnectionProfile profile,
         DatabaseCredentials credentials,

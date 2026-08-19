@@ -274,6 +274,28 @@ internal static class DatabaseEndpoints
             return Results.Ok(result.ToResponse());
         })
         .WithName("TestConnection");
+
+        app.MapPost("/api/connections/databases", async (
+            ConnectRequest request,
+            ConnectionService connections,
+            CancellationToken cancellationToken) =>
+        {
+            var profile = request.Profile.ToDomain();
+            var credentials = new DatabaseCredentials(request.Password);
+            var ssh = new SshCredentials(request.SshSecret, request.SshVerificationCode);
+
+            var databases = await connections.ListDatabasesAsync(
+                profile,
+                credentials,
+                ssh,
+                cancellationToken);
+
+            // Al contrario que probar, aquí un fallo **sí** es un no de la API: el
+            // formulario pidió una lista y no la hay. El motor dirá por qué, y el
+            // middleware lo traduce a un 409 con su mensaje.
+            return Results.Ok(new { databases });
+        })
+        .WithName("ListConnectionDatabases");
     }
 
     private static void MapSessions(IEndpointRouteBuilder app)

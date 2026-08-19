@@ -70,6 +70,12 @@ public sealed class PostgreSqlDatabaseProvider : IDatabaseProvider
 
     public int DefaultPort => 5432;
 
+    /// <summary>`postgres` existe en toda instalación y es donde se pregunta.</summary>
+    public string DefaultDatabase => "postgres";
+
+    /// <summary>Las plantillas y la base de mantenimiento no son de nadie.</summary>
+    public IReadOnlyList<string> SystemDatabases => ["postgres", "template0", "template1"];
+
     public async Task<TestConnectionResult> TestConnectionAsync(
         ConnectionProfile profile,
         DatabaseCredentials credentials,

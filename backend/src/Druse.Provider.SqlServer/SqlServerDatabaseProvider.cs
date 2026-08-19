@@ -76,6 +76,11 @@ public sealed class SqlServerDatabaseProvider : IDatabaseProvider
 
     public int DefaultPort => 1433;
 
+    /// <summary>`master` la ve cualquier inicio de sesión, por poco permiso que tenga.</summary>
+    public string DefaultDatabase => "master";
+
+    public IReadOnlyList<string> SystemDatabases => ["master", "model", "msdb", "tempdb"];
+
     public async Task<TestConnectionResult> TestConnectionAsync(
         ConnectionProfile profile,
         DatabaseCredentials credentials,

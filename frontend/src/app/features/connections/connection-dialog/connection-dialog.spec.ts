@@ -11,6 +11,7 @@ describe('ConnectionDialog', () => {
     secretStore: signal({ available: true, description: 'Administrador de credenciales' }),
     notice: signal<string | null>(null),
     testConnection: vi.fn(),
+    connectionDatabases: vi.fn(),
     connect: vi.fn(),
     saveConnection: vi.fn(),
   };
@@ -18,6 +19,7 @@ describe('ConnectionDialog', () => {
   beforeEach(async () => {
     vi.clearAllMocks();
     store.testConnection.mockResolvedValue('Conexión correcta con SQL Server 16 en 12 ms.');
+    store.connectionDatabases.mockResolvedValue({ databases: [], error: null });
     store.connect.mockResolvedValue(true);
     store.saveConnection.mockResolvedValue(true);
     await TestBed.configureTestingModule({
@@ -41,7 +43,6 @@ describe('ConnectionDialog', () => {
     expect(store.testConnection).not.toHaveBeenCalled();
     expect(messages).toEqual([
       'Escribe un nombre para identificar esta conexión.',
-      'Indica la base de datos inicial.',
       'Indica el usuario de la base de datos.',
     ]);
     expect(fixture.nativeElement.querySelector('.feedback')?.textContent).toContain(
@@ -71,6 +72,84 @@ describe('ConnectionDialog', () => {
       }),
     );
     expect(fixture.nativeElement.querySelector('.feedback')?.dataset['kind']).toBe('success');
+  });
+
+  it('deja conectar sin base: vacía significa la primera a la que se tenga acceso', async () => {
+    setInput(0, 'PostgreSQL local');
+    setInput(1, 'localhost');
+    setInput(4, 'postgres');
+
+    button('Probar conexión').click();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(store.testConnection).toHaveBeenCalledWith(
+      expect.objectContaining({ host: 'localhost', database: '' }),
+    );
+    expect(fixture.nativeElement.querySelector('.field__error')).toBeNull();
+  });
+
+  it('ofrece las bases a las que se tiene acceso', async () => {
+    store.connectionDatabases.mockResolvedValue({
+      databases: ['compras', 'ventas'],
+      error: null,
+    });
+
+    setInput(0, 'PostgreSQL local');
+    setInput(1, 'localhost');
+    setInput(4, 'postgres');
+
+    button('Ver las mías').click();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const opciones = [...fixture.nativeElement.querySelectorAll('#connection-databases option')].map(
+      (option: HTMLOptionElement) => option.value,
+    );
+
+    expect(opciones).toEqual(['compras', 'ventas']);
+    expect(fixture.nativeElement.querySelector('#connection-database-detail')?.textContent).toContain(
+      '2 bases disponibles',
+    );
+  });
+
+  it('con una sola base la deja puesta, que no hay nada que elegir', async () => {
+    store.connectionDatabases.mockResolvedValue({ databases: ['ventas'], error: null });
+
+    setInput(0, 'PostgreSQL local');
+    setInput(1, 'localhost');
+    setInput(4, 'postgres');
+
+    button('Ver las mías').click();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    button('Probar conexión').click();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(store.testConnection).toHaveBeenCalledWith(
+      expect.objectContaining({ database: 'ventas' }),
+    );
+  });
+
+  it('si no se puede preguntar, lo dice en lugar de callarse', async () => {
+    store.connectionDatabases.mockResolvedValue({
+      databases: [],
+      error: 'La contraseña no es correcta.',
+    });
+
+    setInput(0, 'PostgreSQL local');
+    setInput(1, 'localhost');
+    setInput(4, 'postgres');
+
+    button('Ver las mías').click();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('#connection-database-detail')?.textContent).toContain(
+      'La contraseña no es correcta.',
+    );
   });
 
   it('con autenticación de Windows no pide usuario ni contraseña', async () => {

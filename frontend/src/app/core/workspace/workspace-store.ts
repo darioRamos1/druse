@@ -1858,6 +1858,28 @@ export class WorkspaceStore {
     }
   }
 
+  /**
+   * Qué bases puede abrir esta conexión.
+   *
+   * Devuelve la lista **y el motivo cuando no la hay**: el formulario necesita
+   * distinguir «el servidor no tiene ninguna» de «no se pudo preguntar», y una
+   * lista vacía diría las dos cosas a la vez. La redacción del fallo se queda
+   * aquí, que es donde vive la del resto de la aplicación.
+   */
+  async connectionDatabases(
+    form: ConnectionForm,
+  ): Promise<{ databases: readonly string[]; error: string | null }> {
+    try {
+      const databases = await firstValueFrom(
+        this._gateway.listConnectionDatabases(toRequest(form)),
+      );
+
+      return { databases, error: null };
+    } catch (error) {
+      return { databases: [], error: describeError(error) };
+    }
+  }
+
   async testConnection(form: ConnectionForm): Promise<string> {
     try {
       const result = await firstValueFrom(this._gateway.testConnection(toRequest(form)));

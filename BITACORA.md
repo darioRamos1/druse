@@ -10,14 +10,14 @@
 
 | Campo | Valor |
 | --- | --- |
-| Última sesión | **023d** — 2026-08-19 |
+| Última sesión | **023e** — 2026-08-19 |
 | Fase activa | **Migración de datos entre tablas:** fases 1, 2 y 3 cerradas; la **4** tiene la pasada de varias tablas con su orden por foráneas, y le faltan la pantalla y los perfiles (ver «Qué toca retomar»). **Respaldos y restauración:** Fases A–E cerradas. La **F** tiene backend, interfaz, CSV, selector de archivos, restaurar en una base nueva y **el ciclo entero por HTTP en los cuatro motores**; le falta repetir a mano el respaldo real que encontró el error de los índices de expresión |
 | Fases 0–6 | ✅ Cerradas. |
 | Fase 7 | 🟡 **11/12.** El ciclo de instalación está probado sobre este equipo; solo falta arrancar en una máquina sin herramientas de desarrollo. |
 | Fase 8 | ✅ **7/7.** Tres motores sobre el mismo contrato y primera beta preparada. |
 | ¿Compila el backend? | Sí — 0 advertencias, 0 errores |
 | ¿Compila el envoltorio? | Sí |
-| ¿Pasan las pruebas? | Sí — **738 en backend** (410 unitarias, 190 contractuales y 138 de integración) con `DRUSE_REQUIRE_ENGINES=1` y **los cuatro motores**, sin saltarse ninguna, y **485 en frontend**. Con una salvedad: una de integración **falla por tiempo de vez en cuando**, y no es del cambio de hoy —se reprodujo igual en `HEAD`—; está acotada en la sesión 023d. Las **6 del envoltorio** no se ejecutaron: cargo no compila en este equipo |
+| ¿Pasan las pruebas? | Sí — **748 en backend** (417 unitarias, 190 contractuales y 141 de integración) con `DRUSE_REQUIRE_ENGINES=1` y **los cuatro motores**, **489 en frontend** y **16 de punta a punta**. Con la salvedad conocida: una de integración **falla por tiempo de vez en cuando**, siempre una del traslado, y no es de estos cambios —se reprodujo igual en `HEAD`—; está acotada en la sesión 023d. Las **6 del envoltorio** no se ejecutaron: cargo no compila en este equipo |
 | ¿Hay aplicación de escritorio? | **Sí.** Instalador NSIS, MSI y ZIP portable, en dos variantes: con Informix y sin él |
 | Motores | **PostgreSQL, SQL Server, MySQL/MariaDB e Informix**, todos sobre el mismo contrato compartido |
 | Trabajo a medias | La fase 4 de la migración, a propósito: el backend de la pasada está commiteado y probado; la pantalla es lo siguiente. |
@@ -356,6 +356,64 @@ Y tres límites declarados desde el principio: no hay respaldo binario ni
 recuperación a un punto en el tiempo —eso es del servidor, y la interfaz tendrá
 que decirlo—, no hay respaldos programados, y un límite de filas puede dejar
 filas huérfanas, cosa que se avisa y no se corrige sola.
+
+### Sesión 023e — 2026-08-19 · Conectar sin saberse el nombre de la base
+
+Paréntesis en mitad de la fase 4, pedido al usarlo: al abrir una conexión, poder
+**elegir entre las bases a las que se tiene acceso**, o dejar que Druse entre por
+la primera.
+
+Lo que había era una validación —«Indica la base de datos inicial.»— que no dejaba
+conectar sin escribirla. Contra un servidor ajeno eso es pedir justo el dato que
+se venía a buscar: la dirección y la clave se tienen; el nombre de la base, no.
+
+#### Para preguntar hay que estar conectado a algo
+
+Y ese algo es distinto en cada motor, así que lo dice cada proveedor:
+`postgres` en PostgreSQL, `master` en SQL Server, `sysmaster` en Informix, y
+**ninguna** en MySQL, que conecta sin base. Es el mismo sitio donde ya vivía el
+puerto por omisión, y por la misma razón: es dato del dialecto, no del formulario.
+
+Preguntar no cuesta permisos nuevos: el catálogo ya devolvía **solo las que el
+usuario puede abrir** —`has_database_privilege` en PostgreSQL, `HAS_DBACCESS` en
+SQL Server—, así que aquí no se comprueba nada, se elige.
+
+#### Elegir, y qué hacer cuando no hay dónde
+
+`DatabaseChoice` toma la primera que no sea del propio motor. Las del motor se
+dejan para el final porque quien abre una conexión quiere ver sus datos, no el
+catálogo del servidor; pero **si solo hay de esas, se usa una**: conectar a
+`master` y dejar ver el explorador es mejor que negarse a abrir la conexión.
+
+Y si preguntar falla, la sesión se queda como está. Un usuario con permiso para
+entrar pero no para listar sigue teniendo una conexión que sirve, y perderla por
+un listado informativo sería cambiar algo que funciona por nada.
+
+#### En la pantalla
+
+El campo sigue estando —quien sepa el nombre lo escribe— y ahora lleva al lado
+«Ver las mías», que pregunta y llena la lista. Con una sola base la deja puesta,
+que no hay nada que elegir. Debajo, la frase que hacía falta: **si se deja vacía,
+se abre la primera a la que se tenga acceso**, para que vacío no parezca un
+olvido. Cuando no se puede preguntar, ahí mismo se dice por qué en lugar de dejar
+el botón mudo.
+
+**Verificado.** Seis unitarias para la elección —solo bases del motor, ninguna,
+mayúsculas, nombres vacíos— y tres de integración contra PostgreSQL, que además
+de mirar la respuesta preguntan al motor con `SELECT current_database()`:
+quedarse en la base de arranque y decir otra cosa se vería igual desde fuera. En
+el frontend, cuatro casos nuevos del diálogo. Y **en la aplicación levantada**,
+una de punta a punta que abre el formulario, pide las bases, deja el campo vacío y
+comprueba que la conexión abre y el árbol enseña la base.
+
+**Archivos.** `IDatabaseProvider` (`DefaultDatabase`, `SystemDatabases`) con los
+cuatro proveedores, `ConnectionProfileValidator` —la base deja de ser
+obligatoria—, `Connections/DatabaseChoice.cs`, `ConnectionService`
+(`ListDatabasesAsync` y la elección al abrir), `DatabaseEndpoints`
+(`POST /api/connections/databases`); en la interfaz, el gateway, el store y el
+diálogo de conexión. Pruebas: `DatabaseChoiceTests`,
+`ConnectionProfileValidatorTests`, `ConnectionDatabasesTests`,
+`connection-dialog.spec.ts` y `e2e/tests/camino-critico.spec.ts`.
 
 ### Sesión 023d — 2026-08-19 · Varias tablas en una pasada, y en qué orden
 

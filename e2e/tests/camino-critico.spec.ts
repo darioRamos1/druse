@@ -31,6 +31,64 @@ test.describe('el camino crítico', () => {
     await expect(page.locator('app-editor-toolbar .chip').first()).toContainText('sin conexión');
   });
 
+  /**
+   * Conectar sin saberse el nombre de la base.
+   *
+   * Es lo que pasa con un servidor ajeno: se tienen la dirección y la clave, y el
+   * nombre de la base es justo lo que se venía a buscar. Aquí se comprueba lo que
+   * ve el usuario: que el formulario le enseña las suyas, y que dejándolo vacío
+   * la conexión abre igual.
+   */
+  test('se conecta sin decir la base y entra por la primera a la que tiene acceso', async ({
+    page,
+  }) => {
+    await abrir(page);
+
+    await page.getByRole('button', { name: 'Nueva conexión' }).click();
+
+    const dialogo = page.locator('app-connection-dialog');
+
+    await expect(dialogo).toBeVisible();
+    await dialogo.locator('.engine', { hasText: 'PostgreSQL' }).first().click();
+
+    const campo = (etiqueta: string) =>
+      dialogo.locator(`.field:has(.field__label:text-is("${etiqueta}")) input`).first();
+
+    // Nombre distinto en cada ejecución: los perfiles se guardan, y repetir uno
+    // haría fallar la segunda vuelta por nombre duplicado.
+    const nombre = `E2E sin base ${Date.now()}`;
+
+    await campo('Nombre').fill(nombre);
+    await campo('Servidor').fill(CONTENEDOR.host);
+    await campo('Puerto').fill(String(CONTENEDOR.puerto));
+    await campo('Usuario').fill(CONTENEDOR.usuario);
+    await campo('Contraseña').fill(CONTENEDOR.contrasena);
+    await dialogo.getByRole('button', { name: 'Sin cifrar' }).click();
+
+    // Lo primero: que el formulario sepa decir cuáles hay.
+    await dialogo.getByRole('button', { name: 'Ver las mías' }).click();
+    await expect(dialogo.locator('#connection-database-detail')).toContainText('disponibles', {
+      timeout: 30_000,
+    });
+    await expect(dialogo.locator(`#connection-databases option[value="${CONTENEDOR.base}"]`)).toHaveCount(
+      1,
+    );
+
+    // Y que dejándola vacía se conecte igual.
+    await campo('Base de datos').fill('');
+    await dialogo.getByRole('button', { name: 'Conectar' }).click();
+    await expect(dialogo).toBeHidden({ timeout: 60_000 });
+
+    const sidebar = page.locator('app-connections-sidebar');
+
+    await expect(sidebar.getByText(nombre).first()).toBeVisible();
+
+    // La sesión quedó abierta contra una base de verdad, y el árbol la enseña.
+    await expect(sidebar.getByText(CONTENEDOR.base, { exact: true }).first()).toBeVisible({
+      timeout: 60_000,
+    });
+  });
+
   test('se conecta a un PostgreSQL real y enseña sus bases', async ({ page }) => {
     await abrir(page);
     await conectar(page);

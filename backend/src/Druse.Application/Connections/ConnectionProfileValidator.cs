@@ -58,10 +58,10 @@ public static class ConnectionProfileValidator
                 "El puerto debe estar entre 1 y 65535, salvo en una instancia con nombre de SQL Server.");
         }
 
-        if (string.IsNullOrWhiteSpace(profile.Database))
-        {
-            errors.Add("La base de datos es obligatoria.");
-        }
+        // La base **no** es obligatoria. Vacía significa «la primera a la que
+        // tenga acceso»: quien abre una conexión a un servidor ajeno rara vez se
+        // sabe de memoria el nombre de su base, y exigírselo antes de dejarle
+        // conectar es pedirle el dato que venía a buscar.
 
         // Con autenticación de Windows la identidad la pone la sesión del sistema,
         // así que exigir un usuario obligaría a inventarse uno que nadie usa.

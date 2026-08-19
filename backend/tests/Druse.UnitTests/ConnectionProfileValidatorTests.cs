@@ -79,14 +79,30 @@ public sealed class ConnectionProfileValidatorTests
     }
 
     [Fact]
-    public void ExigeServidorBaseYUsuario()
+    public void ExigeServidorYUsuario()
     {
-        var profile = Valid() with { Host = "", Database = "", Username = "" };
+        var profile = Valid() with { Host = "", Username = "" };
 
         var result = ConnectionProfileValidator.Validate(profile);
 
         Assert.False(result.IsValid);
-        Assert.Equal(3, result.Errors.Count);
+        Assert.Equal(2, result.Errors.Count);
+    }
+
+    /// <summary>
+    /// La base **no** es obligatoria: vacía significa «la primera a la que tenga
+    /// acceso».
+    ///
+    /// Quien abre una conexión a un servidor ajeno rara vez se sabe de memoria el
+    /// nombre de su base, y exigírselo antes de dejarle conectar es pedirle justo
+    /// el dato que venía a buscar.
+    /// </summary>
+    [Fact]
+    public void SinBaseElPerfilSigueSiendoValido()
+    {
+        var profile = Valid() with { Database = "" };
+
+        Assert.True(ConnectionProfileValidator.Validate(profile).IsValid);
     }
 
     /// <summary>Perfil de SQL Server con la identidad de la sesión de Windows.</summary>

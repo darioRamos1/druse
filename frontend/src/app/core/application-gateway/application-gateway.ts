@@ -222,6 +222,14 @@ export abstract class ApplicationGateway {
   /** Prueba unas credenciales sin abrir sesión ni guardarlas. */
   abstract testConnection(request: ConnectRequest): Observable<TestConnectionResult>;
 
+  /**
+   * Bases que esas credenciales pueden abrir, antes de abrir ninguna sesión.
+   *
+   * Es lo que deja elegir en el formulario en vez de tener que saberse el nombre
+   * de memoria.
+   */
+  abstract listConnectionDatabases(request: ConnectRequest): Observable<readonly string[]>;
+
   abstract openSession(request: ConnectRequest): Observable<SessionInfo>;
 
   abstract closeSession(sessionId: string): Observable<void>;

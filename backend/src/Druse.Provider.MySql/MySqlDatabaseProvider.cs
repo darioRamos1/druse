@@ -77,6 +77,15 @@ public sealed class MySqlDatabaseProvider : IDatabaseProvider
 
     public int DefaultPort => 3306;
 
+    /// <summary>
+    /// Vacía a propósito: MySQL conecta sin base, y entonces preguntar cuáles hay
+    /// no depende de acertar con ninguna.
+    /// </summary>
+    public string DefaultDatabase => string.Empty;
+
+    public IReadOnlyList<string> SystemDatabases =>
+        ["information_schema", "mysql", "performance_schema", "sys"];
+
     public async Task<TestConnectionResult> TestConnectionAsync(
         ConnectionProfile profile,
         DatabaseCredentials credentials,

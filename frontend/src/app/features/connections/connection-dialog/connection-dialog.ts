@@ -217,6 +217,14 @@ export class ConnectionDialog {
   protected readonly storeSshSecret = signal(true);
 
   protected readonly testing = signal(false);
+
+  /** Bases que estas credenciales pueden abrir. Vacío hasta que se pregunta. */
+  protected readonly databases = signal<readonly string[]>([]);
+
+  protected readonly loadingDatabases = signal(false);
+
+  /** Lo que pasó al preguntar, para no dejar el botón mudo. */
+  protected readonly databasesNotice = signal<string | null>(null);
   protected readonly connecting = signal(false);
   protected readonly feedback = signal<string | null>(null);
   protected readonly feedbackKind = signal<'success' | 'error'>('error');
@@ -306,6 +314,64 @@ export class ConnectionDialog {
    */
   protected sshSecretLabel(): string {
     return this.usesSshKey() ? 'Passphrase de la clave' : 'Contraseña SSH';
+  }
+
+  /**
+   * Pregunta al servidor qué bases puede abrir esta identidad.
+   *
+   * Necesita conectar, así que se pide a botón: escribiendo el servidor no se
+   * puede ir probando credenciales a cada tecla.
+   */
+  protected async loadDatabases(): Promise<void> {
+    const form = this.validForm();
+
+    if (!form) {
+      return;
+    }
+
+    this.loadingDatabases.set(true);
+    this.databasesNotice.set(null);
+
+    try {
+      const { databases, error } = await this._store.connectionDatabases(form);
+
+      this.databases.set(databases);
+      this.databasesNotice.set(
+        error ?? (databases.length === 0 ? 'El servidor no devolvió ninguna base.' : null),
+      );
+
+      // Con una sola no hay nada que elegir, y dejar el campo vacío obligaría a
+      // escribir el único nombre posible.
+      if (databases.length === 1) {
+        this.database.set(databases[0]);
+      }
+    } finally {
+      this.loadingDatabases.set(false);
+    }
+  }
+
+  /**
+   * Qué se dice debajo del campo.
+   *
+   * Lo que hay que dejar claro es que **vacío no es un olvido**: es pedirle a
+   * Druse que entre por la primera base a la que se tenga acceso.
+   */
+  protected databaseHint(): string {
+    const notice = this.databasesNotice();
+
+    if (notice) {
+      return notice;
+    }
+
+    const found = this.databases();
+
+    if (found.length > 0) {
+      return found.length === 1
+        ? 'Solo hay una base disponible y ya está puesta.'
+        : `${found.length} bases disponibles: escribe o elige de la lista.`;
+    }
+
+    return 'Si la dejas vacía, se abre la primera a la que tengas acceso.';
   }
 
   protected async test(): Promise<void> {
@@ -469,9 +535,6 @@ export class ConnectionDialog {
       errors.port = 'Indica un puerto entre 1 y 65535.';
     } else if (port !== null && (!Number.isInteger(port) || port < 0 || port > 65_535)) {
       errors.port = 'Indica un puerto entre 1 y 65535.';
-    }
-    if (!this.database().trim()) {
-      errors.database = 'Indica la base de datos inicial.';
     }
     // Con autenticación de Windows el usuario lo pone el sistema y el campo ni
     // siquiera se muestra, así que no hay nada que exigir.

@@ -73,6 +73,27 @@ public interface IDatabaseProvider
     /// <summary>Puerto habitual del motor, para rellenar el formulario de conexión.</summary>
     int DefaultPort { get; }
 
+    /// <summary>
+    /// Base desde la que se pregunta **qué bases hay**, cuando el perfil no dice
+    /// ninguna.
+    ///
+    /// Para preguntar hay que estar conectado a algo, y ese algo es distinto en
+    /// cada motor: `postgres` en PostgreSQL, `master` en SQL Server, `sysmaster`
+    /// en Informix. Vacío significa que el motor admite conectarse **sin nombrar
+    /// base**, que es el caso de MySQL.
+    /// </summary>
+    string DefaultDatabase { get; }
+
+    /// <summary>
+    /// Bases que son del propio motor y no se eligen solas.
+    ///
+    /// Cuando el perfil no dice a cuál conectarse, Druse toma la primera a la que
+    /// el usuario tenga acceso, y estas se dejan para el final: quien abre una
+    /// conexión quiere ver sus datos, no el catálogo del servidor. Si no hay
+    /// ninguna otra sí se usa una de estas, que es mejor que no conectar.
+    /// </summary>
+    IReadOnlyList<string> SystemDatabases { get; }
+
     Task<TestConnectionResult> TestConnectionAsync(
         ConnectionProfile profile,
         DatabaseCredentials credentials,
