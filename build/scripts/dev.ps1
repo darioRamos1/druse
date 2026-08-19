@@ -66,6 +66,12 @@ try {
         Write-Host 'API local lista.' -ForegroundColor Green
     }
 
+    # A qué puerto tiene que hablar el proxy del servidor de desarrollo. Lo fija
+    # al arrancar —Vite no admite un destino por petición— así que decírselo
+    # aquí es lo que hace que `-ApiPort` funcione de verdad: sin esto se iba al
+    # puerto por omisión y todas las peticiones volvían con un 502.
+    $env:DRUSE_API_PORT = $ApiPort
+
     Write-Host 'Arrancando el frontend en http://127.0.0.1:4200 ...' -ForegroundColor Cyan
     Push-Location $frontend
     try {

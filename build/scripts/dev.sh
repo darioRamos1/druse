@@ -44,5 +44,10 @@ fi
 echo "API local lista."
 echo "Arrancando el frontend en http://127.0.0.1:4200 ..."
 
+# A qué puerto habla el proxy del servidor de desarrollo. Lo fija al arrancar
+# —Vite no admite un destino por petición—, así que hay que decírselo o un
+# puerto distinto del de siempre acaba en 502.
+export DRUSE_API_PORT="$API_PORT"
+
 cd "$FRONTEND"
 npm start

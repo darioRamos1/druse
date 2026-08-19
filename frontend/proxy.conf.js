@@ -18,8 +18,21 @@ const ENDPOINT_FILE = 'endpoint.json';
 /** Puerto al que ir si no hay archivo de punto de conexión. */
 const FALLBACK_PORT = 5177;
 
-/** Directorio de datos de Druse, según la convención de cada sistema. */
+/**
+ * Directorio de datos de Druse, según la convención de cada sistema.
+ *
+ * `DRUSE_DATA_DIR` manda sobre todo lo demás, igual que en el backend: es lo que
+ * permite levantar la aplicación contra otro perfil —las pruebas de punta a
+ * punta lo hacen— sin tocar el del usuario. Los dos procesos tienen que mirar la
+ * misma variable, porque uno escribe el token aquí y el otro viene a leerlo.
+ */
 function dataDirectory() {
+  const custom = process.env.DRUSE_DATA_DIR;
+
+  if (custom && path.isAbsolute(custom)) {
+    return custom;
+  }
+
   const home = os.homedir();
 
   if (process.platform === 'win32') {
@@ -61,17 +74,31 @@ function readEndpoint() {
 
 let warned = false;
 
+/**
+ * A qué puerto se manda todo, decidido **al arrancar** el servidor.
+ *
+ * Aquí había un `router` que resolvía el puerto en cada petición, y era código
+ * muerto: **Vite no lo mira**, solo usa `target`. No se notaba porque el valor
+ * de reserva coincide con el puerto en que arranca la API, así que en
+ * desarrollo siempre acertaba por casualidad. Salió al montar las pruebas de
+ * punta a punta, que levantan la API en otro puerto: todas las peticiones se
+ * iban al 5177 y volvían con un 502.
+ *
+ * `DRUSE_API_PORT` manda sobre el archivo, porque cuando el servidor de
+ * desarrollo y la API arrancan a la vez el archivo puede no existir todavía.
+ * Sin ella, el puerto sale del punto de conexión, y si tampoco está, del valor
+ * de reserva. **Cambiar de puerto exige reiniciar el servidor de desarrollo**,
+ * que es la contrapartida de que Vite no admita un destino por petición.
+ */
+const apiPort =
+  Number(process.env.DRUSE_API_PORT) || readEndpoint().port || FALLBACK_PORT;
+
 module.exports = {
   '/api': {
-    // El destino real lo decide `router` en cada petición; este valor solo se
-    // usa si el archivo no existe.
-    target: `http://127.0.0.1:${FALLBACK_PORT}`,
+    target: `http://127.0.0.1:${apiPort}`,
     secure: false,
     changeOrigin: false,
     logLevel: 'warn',
-
-    /** Sigue a la API si arrancó en otro puerto. */
-    router: () => `http://127.0.0.1:${readEndpoint().port}`,
 
     // El servidor de desarrollo de Angular usa Vite, que expone el proxy
     // subyacente por `configure`. El estilo `on: { proxyReq }` pertenece a
