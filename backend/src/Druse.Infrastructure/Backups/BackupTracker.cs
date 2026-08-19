@@ -36,11 +36,42 @@ public sealed class BackupTracker : IBackupTracker, IDisposable
         return source.Token;
     }
 
+    /// <summary>
+    /// Guarda lo último que se sabe, **sin dejar que un aviso viejo pise al final**.
+    ///
+    /// Los avisos de progreso viajan por `Progress&lt;T&gt;`, que los entrega en el
+    /// grupo de hilos y **no garantiza el orden**: el «terminado» puede llegar
+    /// antes que el último «en marcha» que lo precedía. Guardando a ciegas el que
+    /// llegue, el estado se queda en marcha para siempre; quien mira la pantalla
+    /// ve una barra que no acaba nunca y el resumen no aparece jamás, aunque el
+    /// trabajo esté hecho.
+    /// </summary>
     public void Report(BackupProgress progress)
     {
         ArgumentNullException.ThrowIfNull(progress);
 
-        _progress[progress.Id] = progress;
+        _progress.AddOrUpdate(progress.Id, progress, (_, previous) => Newer(previous, progress));
+    }
+
+    /// <summary>
+    /// Cuál de los dos estados vale: el nuevo, salvo que llegue tarde.
+    ///
+    /// Terminar es definitivo —lo que acabó no vuelve a estar en marcha— y entre
+    /// dos avisos en marcha manda el que lleva más tiempo corrido, para que el
+    /// recuento no vaya hacia atrás delante de quien lo está mirando.
+    /// </summary>
+    private static BackupProgress Newer(BackupProgress previous, BackupProgress candidate)
+    {
+        var terminado = previous.Outcome != BackupOutcome.Running;
+
+        if (terminado)
+        {
+            return candidate.Outcome == BackupOutcome.Running ? previous : candidate;
+        }
+
+        return candidate.Outcome == BackupOutcome.Running && candidate.Elapsed < previous.Elapsed
+            ? previous
+            : candidate;
     }
 
     public BackupProgress? Find(Guid backupId) =>

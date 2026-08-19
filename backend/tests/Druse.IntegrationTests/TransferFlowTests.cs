@@ -759,6 +759,13 @@ public sealed class TransferFlowTests(DruseApiFactory factory) : IClassFixture<D
     ///
     /// Con un tope: si algo se queda colgado, la prueba tiene que fallar diciendo
     /// que se colgó, no quedarse esperando para siempre.
+    ///
+    /// **El mensaje lleva el último estado**, y no es adorno: así se encontró el
+    /// fallo que ponía roja esta suite de vez en cuando. Decía «copiando» con
+    /// todas las filas ya copiadas y el reloj parado, que es lo que delató que el
+    /// aviso de «terminado» se había perdido en el registro del progreso en lugar
+    /// de que el traslado fuera lento. Sin el estado, «no terminó en diez
+    /// segundos» no dice si se quedó leyendo, copiando o cerrando.
     /// </summary>
     private static async Task<JsonElement> WaitAsync(HttpClient client, Guid id)
     {
@@ -778,7 +785,9 @@ public sealed class TransferFlowTests(DruseApiFactory factory) : IClassFixture<D
             await Task.Delay(50);
         }
 
-        throw new TimeoutException($"El traslado {id} no terminó en diez segundos.");
+        var ultimo = await (await client.GetAsync($"/api/transfers/{id}/status")).Content.ReadAsStringAsync();
+
+        throw new TimeoutException($"El traslado {id} no terminó en diez segundos. Último estado: {ultimo}");
     }
 
     private static async Task CrearAsync(HttpClient client, Guid sessionId, string tabla, int filas)

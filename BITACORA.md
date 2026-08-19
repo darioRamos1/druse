@@ -10,14 +10,14 @@
 
 | Campo | Valor |
 | --- | --- |
-| Última sesión | **023f** — 2026-08-19 |
+| Última sesión | **023g** — 2026-08-19 |
 | Fase activa | **Migración de datos entre tablas:** fases 1, 2 y 3 cerradas; la **4** tiene la pasada de varias tablas entera —motor, API y pantalla— y le faltan los perfiles (ver «Qué toca retomar»). **Respaldos y restauración:** Fases A–E cerradas. La **F** tiene backend, interfaz, CSV, selector de archivos, restaurar en una base nueva y **el ciclo entero por HTTP en los cuatro motores**; le falta repetir a mano el respaldo real que encontró el error de los índices de expresión |
 | Fases 0–6 | ✅ Cerradas. |
 | Fase 7 | 🟡 **11/12.** El ciclo de instalación está probado sobre este equipo; solo falta arrancar en una máquina sin herramientas de desarrollo. |
 | Fase 8 | ✅ **7/7.** Tres motores sobre el mismo contrato y primera beta preparada. |
 | ¿Compila el backend? | Sí — 0 advertencias, 0 errores |
 | ¿Compila el envoltorio? | Sí |
-| ¿Pasan las pruebas? | Sí — **748 en backend** (417 unitarias, 190 contractuales y 141 de integración) con `DRUSE_REQUIRE_ENGINES=1` y **los cuatro motores**, **495 en frontend** y **17 de punta a punta**. Con la salvedad conocida: una de integración **falla por tiempo de vez en cuando**, siempre una del traslado, y no es de estos cambios —se reprodujo igual en `HEAD`—; está acotada en la sesión 023d. Las **6 del envoltorio** no se ejecutaron: cargo no compila en este equipo |
+| ¿Pasan las pruebas? | Sí — **753 en backend** (422 unitarias, 190 contractuales y 141 de integración) con `DRUSE_REQUIRE_ENGINES=1` y **los cuatro motores**, sin saltarse ninguna y **en verde dos veces seguidas**; **495 en frontend** y **17 de punta a punta**. El rojo intermitente que arrastraba la suite era un fallo de verdad y se arregló en la sesión 023g. Las **6 del envoltorio** no se ejecutaron: cargo no compila en este equipo |
 | ¿Hay aplicación de escritorio? | **Sí.** Instalador NSIS, MSI y ZIP portable, en dos variantes: con Informix y sin él |
 | Motores | **PostgreSQL, SQL Server, MySQL/MariaDB e Informix**, todos sobre el mismo contrato compartido |
 | Trabajo a medias | La fase 4 de la migración, a propósito: el backend de la pasada está commiteado y probado; la pantalla es lo siguiente. |
@@ -348,6 +348,51 @@ recuperación a un punto en el tiempo —eso es del servidor, y la interfaz tend
 que decirlo—, no hay respaldos programados, y un límite de filas puede dejar
 filas huérfanas, cosa que se avisa y no se corrige sola.
 
+### Sesión 023g — 2026-08-19 · El aviso que llegaba tarde y dejaba el trabajo «en marcha» para siempre
+
+El cuelgue intermitente que la sesión 023d dejó acotado **era un fallo de verdad**,
+y no lentitud de la máquina: un traslado terminado se quedaba diciendo «en marcha»
+hasta que alguien se cansaba de esperar. Es el mismo síntoma que dejó sin resumen
+a una prueba de punta a punta en la sesión 023c.
+
+#### Cómo se encontró
+
+Poniéndole al tiempo de espera de la prueba **el último estado conocido**. Decía
+«copiando», con todas las filas ya copiadas, la tabla dada por terminada y el
+reloj parado en veintisiete milisegundos. Un trabajo lento sigue moviendo el
+reloj; este no se movía. Lo que faltaba no era tiempo, era el aviso final.
+
+#### Qué pasaba
+
+Los avisos de progreso viajan por `Progress<T>`, que los entrega en el grupo de
+hilos y **no garantiza el orden**. Los tres registros —traslado, respaldo y
+restauración— guardaban a ciegas el último que llegara, así que un «en marcha»
+rezagado podía pisar al «terminado» que ya se había guardado. A partir de ahí el
+estado no se arreglaba solo: la barra no acababa nunca y el resumen no aparecía,
+aunque el trabajo estuviera hecho y las filas en su sitio.
+
+Por eso solo se veía con la máquina cargada —hace falta que dos avisos se crucen—
+y por eso aparecía en pruebas distintas cada vez.
+
+#### El arreglo
+
+Terminar es definitivo: un estado terminal no se sustituye por uno en marcha. Y
+entre dos avisos en marcha manda el que lleva más tiempo corrido, para que el
+recuento no vaya hacia atrás delante de quien lo está mirando. La regla es la
+misma en los tres registros, porque el fallo era el mismo en los tres.
+
+**Verificado.** Cinco unitarias que reproducen el cruce —el aviso viejo llegando
+después del final, el recuento que retrocede y el fallo que sí puede sustituir a
+otro estado terminal— en el traslado, el respaldo y la restauración. Y la suite
+entera, **753 en backend** (422 unitarias, 190 contractuales y 141 de
+integración), en verde dos veces seguidas. La señal más clara es el reloj: las de
+integración pasaron de 44 s a 16 s, porque ya nadie espera diez segundos a un
+trabajo que había terminado.
+
+**Archivos.** `TransferTracker`, `BackupTracker` y `RestoreTracker`;
+`ProgressTrackerTests`; y en `TransferFlowTests`, el mensaje de espera agotada que
+lleva el último estado, que es lo que destapó todo.
+
 ### Sesión 023f — 2026-08-19 · La pasada, ahora desde la pantalla
 
 Lo que la sesión 023d dejó corriendo solo por HTTP ya se puede pedir desde Druse:
@@ -515,6 +560,9 @@ espera a cien segundos, la clase entera pasa dos veces seguidas y ninguna prueba
 llega a diez—; no es agotamiento de conexiones —PostgreSQL admite cien y el pico
 medido fue de treinta y cuatro—; y aparece más cuando hay varias clases corriendo
 a la vez. Queda como lo primero que hay que mirar, con reproducción escrita.
+
+**Resuelto en la sesión 023g**: no era lentitud, era el aviso de «terminado» que
+un «en marcha» rezagado pisaba en el registro del progreso.
 
 **Verificado.** **738 en backend** (410 unitarias, 190 contractuales y 138 de
 integración) con `DRUSE_REQUIRE_ENGINES=1` y los cuatro motores. Nueve unitarias
@@ -3370,11 +3418,10 @@ basta solo.
 | Dependencias con vulnerabilidades en plantillas | Ya pasó dos veces: `Microsoft.OpenApi` y `dompurify` | En backend lo caza `TreatWarningsAsErrors`; en frontend, `npm audit` en cada instalación |
 | 3 vulnerabilidades moderadas en `@angular/cli` | Solo desarrollo; no llegan al bundle | Esperar actualización de Angular. Degradar a la 21 sería peor |
 | Detalles visuales fuera del shell principal | La comparación de la sesión 011 cubrió la pantalla principal, no todos los estados | Repetir la comparación al tocar diálogos, filtros o vistas menos transitadas |
-| **Un traslado se queda «en marcha» de vez en cuando** | Es la promesa central de la función: si el resumen no llega, quien copió no sabe qué entró | Reproducido en `HEAD` sin los cambios de la fase 4 (dos de diecinueve en una clase). No es bloqueo permanente —con cien segundos de tope pasa todo— ni agotamiento de conexiones —pico de 34 sobre 100—. Lo primero que hay que mirar; el mismo síntoma que la prueba de punta a punta de la sesión 023c |
 | `formatSql` falla a veces en las pruebas del frontend | Un rojo que no es del código: pasa al repetir | Solo aparece con `ng serve` corriendo en paralelo —el arranque del entorno pasa de 274 s a 1220 s— y se lleva por delante una prueba por tiempo. No ejecutar la suite con el servidor de desarrollo levantado |
 | Identificador `druse` no reservado | Podría ocuparlo otro | Reservar dominio, org de GitHub y NuGet/npm cuando haya algo publicable |
 
-_Retirados: «sin SQL Server de prueba» y «solo hay un proveedor» (Fase 4), «Rust no instalado» (Fase 7), «los datos simulados podrían filtrarse» (borrados en la Fase 2) y «fidelidad visual no comprobada» (comprobada en la sesión 011)._
+_Retirados: «un traslado se queda en marcha de vez en cuando» (era el aviso final que se perdía en el registro del progreso; arreglado en la sesión 023g), «sin SQL Server de prueba» y «solo hay un proveedor» (Fase 4), «Rust no instalado» (Fase 7), «los datos simulados podrían filtrarse» (borrados en la Fase 2) y «fidelidad visual no comprobada» (comprobada en la sesión 011)._
 
 ---
 
