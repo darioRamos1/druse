@@ -590,10 +590,11 @@ en frontend**. Las nuevas cubren el índice de expresión de punta a punta, la b
 nueva (creada y rechazada por nombre repetido), el camino del navegador al abrir
 un `.sql` y el cambio de conexión.
 
-**De propina.** `docs/Guia-Druse-Levantar-y-Empaquetar.docx`: cómo levantar los
+**De propina.** `docs/Guia-Druse-Levantar-y-Empaquetar.md`: cómo levantar los
 servicios a mano y generar instaladores y portable, con las rutas exactas de cada
-artefacto. **Sin versionar**, a la espera de decidir si el `.docx` entra al
-repositorio.
+artefacto. Se redactó en Word, pero **al repositorio entra en Markdown**: un
+`.docx` es un binario y ningún diff lo enseña. El original se queda fuera, en
+`docs/`, ignorado.
 
 **Sigue sin poder compilarse Rust en este equipo**, así que todo lo probado va
 por el navegador; el envoltorio no se ha ejercitado.
