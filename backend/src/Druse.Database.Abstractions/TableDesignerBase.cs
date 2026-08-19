@@ -562,6 +562,22 @@ public abstract class TableDesignerBase : ITableDesigner, IDatabaseScripter
     }
 
     /// <summary>
+    /// El `DELETE` que deja la tabla vacía, sin condición.
+    ///
+    /// Igual en los cuatro motores, y a propósito: lo que cambia entre ellos es
+    /// cómo se cita el nombre, que ya resuelve <see cref="Qualify"/>.
+    /// </summary>
+    public virtual IReadOnlyList<string> ScriptClearTable(ScriptedTable table)
+    {
+        ArgumentNullException.ThrowIfNull(table);
+
+        return
+        [
+            $"DELETE FROM {Qualify(table.Table.Database, table.Table.Schema, table.Table.Name)};",
+        ];
+    }
+
+    /// <summary>
     /// Lo que hay que ejecutar antes de cargar filas. Por omisión, nada.
     /// </summary>
     public virtual IReadOnlyList<string> BeginDataLoad(ScriptedTable table) => [];

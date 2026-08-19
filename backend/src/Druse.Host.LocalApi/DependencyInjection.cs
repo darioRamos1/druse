@@ -6,6 +6,7 @@ using Druse.Application.Queries;
 using Druse.Application.Rows;
 using Druse.Application.Tables;
 using Druse.Application.Transactions;
+using Druse.Application.Transfers;
 using Druse.Database.Abstractions;
 using Druse.Host.LocalApi.Security;
 using Druse.Infrastructure.Backups;
@@ -14,6 +15,7 @@ using Druse.Infrastructure.Importing;
 using Druse.Infrastructure.Providers;
 using Druse.Infrastructure.Queries;
 using Druse.Infrastructure.Sessions;
+using Druse.Infrastructure.Transfers;
 using Druse.Persistence.Sqlite;
 using Druse.Platform.Abstractions;
 using Druse.Platform.Native;
@@ -117,6 +119,7 @@ internal static class DependencyInjection
         // este proceso y quien vuelva tiene que encontrarlo donde lo dejó.
         services.AddSingleton<IBackupTracker, BackupTracker>();
         services.AddSingleton<IRestoreTracker, RestoreTracker>();
+        services.AddSingleton<ITransferTracker, TransferTracker>();
 
         // Un túnel dura lo que dura su sesión, así que se guarda igual que ella.
         services.AddSingleton<ISshTunnelRegistry, SshTunnelRegistry>();
@@ -156,6 +159,7 @@ internal static class DependencyInjection
         services.AddScoped<BackupService>();
         services.AddScoped<BackupProfileService>();
         services.AddScoped<RestoreService>();
+        services.AddScoped<TransferService>();
 
         // --- Exportadores -------------------------------------------------------
         services.AddSingleton<IResultExporter, CsvResultExporter>();

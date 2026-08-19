@@ -179,6 +179,21 @@ public interface IDatabaseScripter
     string SelectData(ScriptedTable table, TableDataFilter filter);
 
     /// <summary>
+    /// Vacía la tabla antes de volver a cargarla.
+    ///
+    /// **Es un `DELETE` y no un `TRUNCATE`**, aunque el segundo sea mucho más
+    /// rápido. Por dos razones que se pagan caras: MySQL confirma la transacción
+    /// en curso al truncar —así que «o entra todo o no entra nada» dejaría de ser
+    /// cierto justo en el modo que borra— y truncar falla en cuanto otra tabla
+    /// apunte a esta, que es lo normal en la tabla que uno quiere reemplazar.
+    ///
+    /// Va aquí y no lo escribe quien llama por lo mismo que el resto del
+    /// guionizado: el nombre se cita según el dialecto, y aceptar SQL de fuera
+    /// convertiría esto en una vía para ejecutar cualquier cosa.
+    /// </summary>
+    IReadOnlyList<string> ScriptClearTable(ScriptedTable table);
+
+    /// <summary>
     /// Lo que hay que ejecutar antes de cargar filas en esta tabla, si algo hace
     /// falta.
     ///

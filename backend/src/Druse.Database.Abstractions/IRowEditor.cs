@@ -95,6 +95,24 @@ public interface IRowEditor
         PreparedInsertBatch batch,
         CancellationToken cancellationToken);
 
+    /// <summary>
+    /// Mete varias escrituras seguidas en una sola transacción.
+    ///
+    /// Existe por el traslado de datos entre tablas, que escribe el destino por
+    /// lotes: sin esto, cada lote confirma por su cuenta —que es lo que se quiere
+    /// con una tabla de millones de filas, porque una transacción de ese tamaño
+    /// revienta el registro del servidor— y con esto se puede pedir lo contrario
+    /// para una tabla pequeña, donde dejar la mitad copiada sería peor.
+    ///
+    /// **Si el usuario ya tiene una transacción manual abierta, no abre ninguna**:
+    /// se une a la suya y confirmarla sigue siendo cosa suya. Es la misma regla de
+    /// <see cref="OperationScope"/>, y por el mismo motivo: estos motores no
+    /// anidan transacciones.
+    /// </summary>
+    Task<IWriteScope> BeginWriteAsync(
+        IDatabaseSession session,
+        CancellationToken cancellationToken);
+
     /// <summary>El `DELETE` que se ejecutaría, con los valores escritos.</summary>
     IReadOnlyList<string> DescribeDelete(PreparedRowDeleteBatch batch);
 
@@ -110,6 +128,26 @@ public interface IRowEditor
         IDatabaseSession session,
         PreparedRowDeleteBatch batch,
         CancellationToken cancellationToken);
+}
+
+/// <summary>
+/// Varias escrituras que van juntas o no van.
+///
+/// Mientras vive, todo lo que escriba esa sesión entra en la misma transacción,
+/// incluidas las operaciones que normalmente abrirían la suya. Quien lo abre lo
+/// cierra: sin <see cref="CommitAsync"/>, liberarlo deshace lo escrito.
+/// </summary>
+public interface IWriteScope : IAsyncDisposable
+{
+    /// <summary>
+    /// La transacción es de este alcance y hay algo que confirmar.
+    ///
+    /// Falso cuando se está dentro de una transacción del usuario: entonces
+    /// <see cref="CommitAsync"/> no hace nada, porque confirmarla la decide él.
+    /// </summary>
+    bool IsOwned { get; }
+
+    Task CommitAsync(CancellationToken cancellationToken);
 }
 
 /// <summary>Filas a insertar, ya validadas y con los valores convertidos.</summary>

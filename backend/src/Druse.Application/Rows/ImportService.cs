@@ -6,11 +6,6 @@ using Druse.Domain;
 
 namespace Druse.Application.Rows;
 
-/// <summary>Qué columna del archivo va a qué columna de la tabla.</summary>
-/// <param name="Source">Nombre de la columna en el archivo.</param>
-/// <param name="Target">Columna de la tabla, o `null` para no importarla.</param>
-public sealed record ColumnMapping(string Source, string? Target);
-
 /// <summary>Petición de importación, ya con el archivo leído.</summary>
 public sealed record ImportRequest
 {

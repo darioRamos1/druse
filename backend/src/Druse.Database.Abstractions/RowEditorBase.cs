@@ -238,6 +238,84 @@ public abstract class RowEditorBase : IRowEditor
     /// <summary>Cuántas instrucciones se devuelven como muestra al importar.</summary>
     private const int PreviewedStatements = 5;
 
+    public async Task<IWriteScope> BeginWriteAsync(
+        IDatabaseSession session,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(session);
+
+        // Dentro de una transacción del usuario no se abre nada: estos motores no
+        // anidan, y la suya ya envuelve todo lo que venga. Confirmarla es cosa
+        // suya, así que el alcance se limita a no estorbar.
+        if (session.Transaction.Current is not null)
+        {
+            return WriteScope.Joined;
+        }
+
+        var connection = Connection(session);
+        var transaction = await connection.BeginTransactionAsync(cancellationToken);
+
+        // Se presta a la sesión para que las escrituras que salgan mientras tanto
+        // la lleven puesta. Sin esto, `OperationScope` abriría una transacción por
+        // lote y MySQL e Informix rechazarían los comandos que fueran sin ella:
+        // es la misma lección que dejó la instantánea de los respaldos.
+        session.Transaction.Borrow(transaction);
+
+        return new WriteScope(session.Transaction, transaction);
+    }
+
+    /// <summary>
+    /// La transacción que abarca varios lotes, devuelta a la sesión al soltarla.
+    ///
+    /// Deshacer al liberar sin confirmar no es una precaución de más: es lo que
+    /// hace que una excepción a mitad del traslado deje el destino como estaba en
+    /// lugar de con media tabla dentro de una transacción que nadie va a cerrar.
+    /// </summary>
+    private sealed class WriteScope(SessionTransaction session, DbTransaction? owned) : IWriteScope
+    {
+        /// <summary>El alcance que no abrió nada porque ya había transacción.</summary>
+        public static WriteScope Joined { get; } = new(SessionTransaction.None, owned: null);
+
+        private bool _committed;
+
+        public bool IsOwned => owned is not null;
+
+        public async Task CommitAsync(CancellationToken cancellationToken)
+        {
+            if (owned is null || _committed)
+            {
+                return;
+            }
+
+            await owned.CommitAsync(cancellationToken);
+            _committed = true;
+        }
+
+        public async ValueTask DisposeAsync()
+        {
+            if (owned is null)
+            {
+                return;
+            }
+
+            if (!_committed)
+            {
+                try
+                {
+                    await owned.RollbackAsync(CancellationToken.None);
+                }
+                catch
+                {
+                    // La conexión ya no está: no hay nada que deshacer, y el
+                    // motor la deshizo por su cuenta al caerse.
+                }
+            }
+
+            session.Return();
+            await owned.DisposeAsync();
+        }
+    }
+
     private string InsertStatement(
         PreparedInsertBatch batch,
         IReadOnlyList<PreparedCell> row,
