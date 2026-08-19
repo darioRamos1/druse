@@ -1445,6 +1445,319 @@ public abstract class DatabaseProviderContractTests<TFixture>
         }
     }
 
+    // -----------------------------------------------------------------------
+    // Escribir sobre lo que ya está
+    // -----------------------------------------------------------------------
+
+    /// <summary>
+    /// Insertar dos veces la misma fila falla, y no deja nada a medias.
+    ///
+    /// Es el comportamiento de siempre y sigue siendo el que se usa al importar:
+    /// lo peor que puede hacer es negarse. Se comprueba junto a los otros dos
+    /// modos porque lo que importa es que **los tres signifiquen lo mismo en los
+    /// cuatro motores**, y eso solo se ve comparándolos.
+    /// </summary>
+    [Fact]
+    public async Task InsertarLoQueYaEstaFallaYNoEscribeNada()
+    {
+        if (Skip) { return; }
+
+        await using var session = await OpenAsync();
+        var name = $"druse_up_{Guid.NewGuid().ToString("N")[..8]}";
+        ScriptedTable? table = null;
+
+        try
+        {
+            table = await PrepareUpsertTableAsync(session, name);
+
+            var batch = await BatchAsync(session, name, [(2, "Beatriz"), (4, "Dora")]);
+
+            await Assert.ThrowsAnyAsync<Exception>(
+                () => Fixture.RowEditor.WriteAsync(
+                    session,
+                    batch,
+                    ExistingRowAction.Fail,
+                    [],
+                    CancellationToken.None));
+
+            // Ni siquiera la fila que no chocaba: es un lote, y un lote va entero.
+            Assert.Equal(["1|Ana", "2|Bea", "3|Cris"], await RowsAsync(session, name, "id, nombre"));
+        }
+        finally
+        {
+            if (table is not null)
+            {
+                await CloseUpsertTableAsync(session, table);
+            }
+
+            await ExecuteAsync(session, Fixture.DropTable(name));
+        }
+    }
+
+    /// <summary>
+    /// Omitir lo que ya está: entra lo que falta, lo demás se queda como estaba y
+    /// **se cuenta aparte**.
+    ///
+    /// El recuento es la mitad del valor del modo. Sin él, «entraron 900 de 5.000»
+    /// parece que se perdieron cuatro mil filas por el camino.
+    /// </summary>
+    [Fact]
+    public async Task OmitirLoQueYaEstaDejaLaFilaIntactaYLaCuenta()
+    {
+        if (Skip) { return; }
+
+        await using var session = await OpenAsync();
+        var name = $"druse_up_{Guid.NewGuid().ToString("N")[..8]}";
+        ScriptedTable? table = null;
+
+        try
+        {
+            table = await PrepareUpsertTableAsync(session, name);
+
+            var result = await Fixture.RowEditor.WriteAsync(
+                session,
+                await BatchAsync(session, name, [(2, "Beatriz"), (4, "Dora")]),
+                ExistingRowAction.Skip,
+                ["id"],
+                CancellationToken.None);
+
+            Assert.Equal(1, result.RowsAffected);
+            Assert.Equal(1, result.RowsSkipped);
+
+            Assert.Equal(
+                ["1|Ana", "2|Bea", "3|Cris", "4|Dora"],
+                await RowsAsync(session, name, "id, nombre"));
+        }
+        finally
+        {
+            if (table is not null)
+            {
+                await CloseUpsertTableAsync(session, table);
+            }
+
+            await ExecuteAsync(session, Fixture.DropTable(name));
+        }
+    }
+
+    /// <summary>
+    /// Actualizar lo que ya está: la fila cambia y **no se duplica**.
+    ///
+    /// El recuento se normaliza aquí: MySQL devuelve dos filas afectadas cuando
+    /// actualiza una, así que sin normalizar el mismo trabajo daría un número
+    /// distinto según el motor.
+    /// </summary>
+    [Fact]
+    public async Task ActualizarLoQueYaEstaCambiaLaFilaSinDuplicarla()
+    {
+        if (Skip) { return; }
+
+        await using var session = await OpenAsync();
+        var name = $"druse_up_{Guid.NewGuid().ToString("N")[..8]}";
+        ScriptedTable? table = null;
+
+        try
+        {
+            table = await PrepareUpsertTableAsync(session, name);
+
+            var result = await Fixture.RowEditor.WriteAsync(
+                session,
+                await BatchAsync(session, name, [(2, "Beatriz"), (4, "Dora")]),
+                ExistingRowAction.Update,
+                ["id"],
+                CancellationToken.None);
+
+            Assert.Equal(2, result.RowsAffected);
+            Assert.Equal(0, result.RowsSkipped);
+
+            Assert.Equal(
+                ["1|Ana", "2|Beatriz", "3|Cris", "4|Dora"],
+                await RowsAsync(session, name, "id, nombre"));
+        }
+        finally
+        {
+            if (table is not null)
+            {
+                await CloseUpsertTableAsync(session, table);
+            }
+
+            await ExecuteAsync(session, Fixture.DropTable(name));
+        }
+    }
+
+    /// <summary>
+    /// Repetir el mismo traslado dos veces deja la tabla igual que una.
+    ///
+    /// Es la propiedad que hace útil el modo —se puede reanudar una copia que se
+    /// cortó sin mirar por dónde iba— y la que se rompería si algún motor
+    /// insertara en lugar de actualizar.
+    /// </summary>
+    [Fact]
+    public async Task ActualizarDosVecesDejaLoMismoQueUna()
+    {
+        if (Skip) { return; }
+
+        await using var session = await OpenAsync();
+        var name = $"druse_up_{Guid.NewGuid().ToString("N")[..8]}";
+        ScriptedTable? table = null;
+
+        try
+        {
+            table = await PrepareUpsertTableAsync(session, name);
+
+            for (var vuelta = 0; vuelta < 2; vuelta++)
+            {
+                await Fixture.RowEditor.WriteAsync(
+                    session,
+                    await BatchAsync(session, name, [(2, "Beatriz"), (4, "Dora")]),
+                    ExistingRowAction.Update,
+                    ["id"],
+                    CancellationToken.None);
+            }
+
+            Assert.Equal(
+                ["1|Ana", "2|Beatriz", "3|Cris", "4|Dora"],
+                await RowsAsync(session, name, "id, nombre"));
+        }
+        finally
+        {
+            if (table is not null)
+            {
+                await CloseUpsertTableAsync(session, table);
+            }
+
+            await ExecuteAsync(session, Fixture.DropTable(name));
+        }
+    }
+
+    /// <summary>
+    /// Sin columnas que identifiquen la fila no se escribe nada.
+    ///
+    /// Se rechaza al armar la instrucción y no al ejecutarla: para entonces el
+    /// mensaje sería del servidor y no diría qué se pretendía.
+    /// </summary>
+    [Fact]
+    public async Task SinClaveNoSePuedeDecidirQueHacerConLoQueYaEsta()
+    {
+        if (Skip) { return; }
+
+        await using var session = await OpenAsync();
+        var name = $"druse_up_{Guid.NewGuid().ToString("N")[..8]}";
+        ScriptedTable? table = null;
+
+        try
+        {
+            table = await PrepareUpsertTableAsync(session, name);
+
+            var batch = await BatchAsync(session, name, [(4, "Dora")]);
+
+            await Assert.ThrowsAsync<ArgumentException>(
+                () => Fixture.RowEditor.WriteAsync(
+                    session,
+                    batch,
+                    ExistingRowAction.Update,
+                    [],
+                    CancellationToken.None));
+        }
+        finally
+        {
+            if (table is not null)
+            {
+                await CloseUpsertTableAsync(session, table);
+            }
+
+            await ExecuteAsync(session, Fixture.DropTable(name));
+        }
+    }
+
+    /// <summary>Las dos columnas con las que se prueba escribir sobre lo que ya está.</summary>
+    private static readonly string[] UpsertColumns = ["id", "nombre"];
+
+    /// <summary>
+    /// Deja la tabla con tres filas —1 Ana, 2 Bea y 3 Cris— y la identidad abierta.
+    ///
+    /// Lo segundo hace falta porque el `id` lo genera el motor y aquí se escriben
+    /// valores propios, que es exactamente lo que hace un traslado al conservar los
+    /// identificadores del origen. SQL Server lo rechaza sin abrirla antes, y de
+    /// paso queda comprobado que lo que abre el guionizado sirve para lo que
+    /// escribe el editor de filas.
+    /// </summary>
+    private async Task<ScriptedTable> PrepareUpsertTableAsync(IDatabaseSession session, string name)
+    {
+        await ExecuteAsync(session, Fixture.CreateTableWithColumns(name));
+        await ExecuteAsync(session, Fixture.InsertNamedRows(name));
+
+        var table = await ReadAsync(session, new DatabaseObject
+        {
+            Id = name,
+            Name = name,
+            Kind = DatabaseObjectKind.Table,
+            Database = Fixture.DatabaseName,
+            Schema = Fixture.DefaultSchema,
+        });
+
+        foreach (var statement in Fixture.Scripter.BeginDataLoad(table))
+        {
+            await ExecuteAsync(session, statement);
+        }
+
+        return table;
+    }
+
+    /// <summary>Cierra lo que abrió <see cref="PrepareUpsertTableAsync"/>.</summary>
+    private async Task CloseUpsertTableAsync(IDatabaseSession session, ScriptedTable table)
+    {
+        foreach (var statement in Fixture.Scripter.EndDataLoad(table))
+        {
+            await ExecuteAsync(session, statement);
+        }
+    }
+
+    /// <summary>
+    /// Un lote con las columnas `id` y `nombre`, convertido como lo haría el
+    /// traslado.
+    ///
+    /// Pasa por <see cref="RowBatchPlanner"/> a propósito: es el mismo camino que
+    /// recorren los datos de verdad, y con él van los tipos que cada motor
+    /// necesita para los nulos.
+    /// </summary>
+    private async Task<PreparedInsertBatch> BatchAsync(
+        IDatabaseSession session,
+        string name,
+        IReadOnlyList<(int Id, string Nombre)> rows)
+    {
+        var target = new DatabaseObject
+        {
+            Id = name,
+            Name = name,
+            Kind = DatabaseObjectKind.Table,
+            Database = Fixture.DatabaseName,
+            Schema = Fixture.DefaultSchema,
+        };
+
+        var columns = await Fixture.Metadata.GetColumnsAsync(session, target, CancellationToken.None);
+
+        var wanted = UpsertColumns
+            .Select(wantedName => columns.First(column =>
+                string.Equals(column.Name, wantedName, StringComparison.OrdinalIgnoreCase)))
+            .ToList();
+
+        var plan = RowBatchPlanner.Prepare(
+            Fixture.DefaultSchema,
+            name,
+            [.. wanted.Select(column => (DatabaseColumn?)column)],
+            [
+                .. rows.Select(row => (IReadOnlyList<string?>)
+                [
+                    row.Id.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                    row.Nombre,
+                ]),
+            ]);
+
+        Assert.Empty(plan.Problems);
+
+        return plan.Batch;
+    }
+
     /// <summary>La tabla leída del catálogo, tal y como la recibe el guionizador.</summary>
     private async Task<ScriptedTable> ReadAsync(IDatabaseSession session, DatabaseObject table) => new()
     {

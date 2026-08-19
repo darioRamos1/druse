@@ -49,6 +49,16 @@ public sealed record RowEditResult
     /// <summary>Filas realmente modificadas por el servidor.</summary>
     public required long RowsAffected { get; init; }
 
+    /// <summary>
+    /// Filas que ya estaban y se dejaron como estaban.
+    ///
+    /// Solo lo llena el traslado cuando se le pide omitir lo existente. Va aparte
+    /// de <see cref="RowsAffected"/> porque son cosas distintas: «entraron 900» y
+    /// «ya estaban 4.100» juntas explican el resultado, y solo la primera lo
+    /// dejaría pareciendo que se perdieron filas por el camino.
+    /// </summary>
+    public long RowsSkipped { get; init; }
+
     public required TimeSpan Duration { get; init; }
 
     /// <summary>SQL que se ejecutó, con los valores puestos, para poder leerlo.</summary>

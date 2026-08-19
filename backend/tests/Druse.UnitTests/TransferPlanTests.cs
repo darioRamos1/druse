@@ -125,16 +125,20 @@ public sealed class TransferPlanTests
         Assert.Equal(RowEditRefusal.Unconfirmed, rejection.Rejection.Reason);
     }
 
+    // -----------------------------------------------------------------------
+    // Reconocer la fila que ya está
+    // -----------------------------------------------------------------------
+
     /// <summary>
-    /// Lo que todavía no sabe hacer lo dice, en lugar de hacer otra cosa.
+    /// Sin clave primaria no hay forma de saber qué fila del destino es cuál.
     ///
-    /// Un modo desconocido que cayera en «insertar» duplicaría las filas del
-    /// destino sin que nadie lo pidiera.
+    /// Se dice antes de empezar y no cuando el motor se queje: para entonces el
+    /// mensaje sería suyo y no diría qué se pretendía.
     /// </summary>
     [Theory]
     [InlineData(TransferMode.Upsert)]
     [InlineData(TransferMode.SkipExisting)]
-    public async Task LosModosQueTodaviaNoEstanSeRechazan(TransferMode mode)
+    public async Task SinClavePrimariaNoSePuedeReconocerLoQueYaEsta(TransferMode mode)
     {
         var world = new World();
 
@@ -143,7 +147,89 @@ public sealed class TransferPlanTests
                 world.Request() with { Mode = mode },
                 CancellationToken.None));
 
-        Assert.Contains("Todavía no", rejection.Rejection.Message, StringComparison.Ordinal);
+        Assert.Equal(RowEditRefusal.NoPrimaryKey, rejection.Rejection.Reason);
+    }
+
+    /// <summary>Con clave primaria, esas son las columnas que se usan sin decir nada.</summary>
+    [Fact]
+    public async Task LaClavePrimariaDelDestinoEsLaQueSeUsaPorOmision()
+    {
+        var world = new World(source: ["id", "nombre"], target: ["id", "nombre"], primaryKey: ["id"]);
+
+        var preview = await world.Service.PreviewAsync(
+            world.Request() with { Mode = TransferMode.Upsert },
+            CancellationToken.None);
+
+        Assert.Equal(["id"], preview.KeyColumns);
+    }
+
+    /// <summary>
+    /// Reconocer la fila por columnas que se pueden repetir se rechaza.
+    ///
+    /// Sin unicidad, «actualiza la que ya está» toca todas las que coinciden: no
+    /// falla, no avisa, y deja el destino con filas que nadie pidió cambiar. Es
+    /// el mismo accidente que el resto del editor de filas existe para impedir.
+    /// </summary>
+    [Fact]
+    public async Task UnaClaveQueSePuedeRepetirSeRechaza()
+    {
+        var world = new World(source: ["id", "nombre"], target: ["id", "nombre"], primaryKey: ["id"]);
+
+        var rejection = await Assert.ThrowsAsync<RowEditRejectedException>(
+            () => world.Service.PreviewAsync(
+                world.Request() with { Mode = TransferMode.Upsert, KeyColumns = ["nombre"] },
+                CancellationToken.None));
+
+        Assert.Equal(RowEditRefusal.KeyMismatch, rejection.Rejection.Reason);
+        Assert.Contains("no hay nada que garantice", rejection.Rejection.Message, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// Una clave que no se copia no sirve para reconocer nada.
+    ///
+    /// Si la columna no viaja, todas las filas se parecerían en la clave y la
+    /// primera actualizaría a la siguiente.
+    /// </summary>
+    [Fact]
+    public async Task UnaClaveQueNoSeCopiaSeRechaza()
+    {
+        var world = new World(source: ["nombre"], target: ["id", "nombre"], primaryKey: ["id"]);
+
+        var rejection = await Assert.ThrowsAsync<RowEditRejectedException>(
+            () => world.Service.PreviewAsync(
+                world.Request() with { Mode = TransferMode.Upsert },
+                CancellationToken.None));
+
+        Assert.Equal(RowEditRefusal.KeyMismatch, rejection.Rejection.Reason);
+        Assert.Contains("id", rejection.Rejection.Message, StringComparison.Ordinal);
+    }
+
+    /// <summary>Una restricción de unicidad vale igual que la clave primaria.</summary>
+    [Fact]
+    public async Task UnaRestriccionDeUnicidadTambienSirveParaReconocerLaFila()
+    {
+        var world = new World(
+            source: ["id", "codigo"],
+            target: ["id", "codigo"],
+            primaryKey: ["id"],
+            unique: ["codigo"]);
+
+        var preview = await world.Service.PreviewAsync(
+            world.Request() with { Mode = TransferMode.Upsert, KeyColumns = ["codigo"] },
+            CancellationToken.None);
+
+        Assert.Equal(["codigo"], preview.KeyColumns);
+    }
+
+    /// <summary>Los modos que solo añaden no preguntan por ninguna clave.</summary>
+    [Fact]
+    public async Task InsertarNoNecesitaSaberQueIdentificaLaFila()
+    {
+        var world = new World();
+
+        var preview = await world.Service.PreviewAsync(world.Request(), CancellationToken.None);
+
+        Assert.Empty(preview.KeyColumns);
     }
 
     /// <summary>Entre motores distintos hay que traducir tipos, y eso llega después.</summary>
@@ -364,7 +450,9 @@ public sealed class TransferPlanTests
             IReadOnlyList<string>? target = null,
             bool targetReadOnly = false,
             DatabaseEngine targetEngine = DatabaseEngine.PostgreSql,
-            string? targetRequired = null)
+            string? targetRequired = null,
+            IReadOnlyList<string>? primaryKey = null,
+            IReadOnlyList<string>? unique = null)
         {
             SourceSession = new FakeSession(DatabaseEngine.PostgreSql, readOnly: false);
             TargetSession = new FakeSession(targetEngine, targetReadOnly);
@@ -384,7 +472,17 @@ public sealed class TransferPlanTests
                 ],
             };
 
-            var providers = new FakeRegistry(catalog, SourceSession, TargetSession);
+            var structure = new TableStructure
+            {
+                PrimaryKey = primaryKey is null
+                    ? null
+                    : new DatabasePrimaryKey { Name = "pk", Columns = primaryKey },
+                UniqueConstraints = unique is null
+                    ? []
+                    : [new DatabaseUniqueConstraint { Name = "uq", Columns = unique }],
+            };
+
+            var providers = new FakeRegistry(catalog, structure, SourceSession, TargetSession);
             var connections = new ConnectionService(
                 providers,
                 sessions,
@@ -470,6 +568,7 @@ public sealed class TransferPlanTests
     /// </summary>
     private sealed class FakeRegistry(
         IReadOnlyDictionary<Guid, IReadOnlyList<DatabaseColumn>> catalog,
+        TableStructure structure,
         IDatabaseSession source,
         IDatabaseSession target) : IProviderRegistry
     {
@@ -480,7 +579,7 @@ public sealed class TransferPlanTests
             throw new NotSupportedException();
 
         public IDatabaseMetadataReader GetMetadataReader(DatabaseEngine engine) =>
-            new FakeMetadataReader(catalog);
+            new FakeMetadataReader(catalog, structure);
 
         public IQueryExecutor GetQueryExecutor(DatabaseEngine engine) =>
             throw new NotSupportedException();
@@ -495,7 +594,8 @@ public sealed class TransferPlanTests
     }
 
     private sealed class FakeMetadataReader(
-        IReadOnlyDictionary<Guid, IReadOnlyList<DatabaseColumn>> catalog) : IDatabaseMetadataReader
+        IReadOnlyDictionary<Guid, IReadOnlyList<DatabaseColumn>> catalog,
+        TableStructure structure) : IDatabaseMetadataReader
     {
         public DatabaseEngine Engine => DatabaseEngine.PostgreSql;
 
@@ -509,7 +609,7 @@ public sealed class TransferPlanTests
             IDatabaseSession session,
             DatabaseObject table,
             CancellationToken cancellationToken) =>
-            Task.FromResult(new TableStructure());
+            Task.FromResult(structure);
 
         public Task<IReadOnlyList<DatabaseObject>> GetDatabasesAsync(
             IDatabaseSession session,

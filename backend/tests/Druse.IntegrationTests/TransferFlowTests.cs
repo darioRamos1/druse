@@ -282,6 +282,241 @@ public sealed class TransferFlowTests(DruseApiFactory factory) : IClassFixture<D
     }
 
     // -----------------------------------------------------------------------
+    // Lo que ya está en el destino
+    // -----------------------------------------------------------------------
+
+    /// <summary>
+    /// Actualizar lo que ya está: la fila cambia y la nueva entra.
+    ///
+    /// Es el modo que hace repetible un traslado, y lo que se comprueba es que no
+    /// duplica: cuatro filas antes, cuatro después.
+    /// </summary>
+    [RequiresPostgreSqlFact]
+    public async Task ActualizarLoQueYaEstaCambiaSinDuplicar()
+    {
+        var (client, sessionId) = await ConnectAsync();
+        var origen = Nombre();
+        var destino = Nombre();
+
+        try
+        {
+            await CrearConClaveAsync(client, sessionId, origen, filas: 4);
+            await CrearConClaveAsync(client, sessionId, destino, filas: 2);
+
+            // Las dos primeras filas del origen ya están en el destino, pero con
+            // otro nombre: es lo que tiene que quedar reescrito.
+            await RunAsync(client, sessionId, $"UPDATE {destino} SET nombre = 'viejo'");
+
+            var progress = await TransferAsync(
+                client,
+                Request(sessionId, origen, destino) with { Mode = "Upsert" });
+
+            Assert.Equal("Completed", progress.GetProperty("outcome").GetString());
+            Assert.Equal(4, progress.GetProperty("rowsCopied").GetInt64());
+            Assert.Equal(4, await ContarAsync(client, sessionId, destino));
+
+            var nombres = await LeerAsync(client, sessionId, $"SELECT nombre FROM {destino} ORDER BY id");
+
+            Assert.Equal(["fila 1", "fila 2", "fila 3", "fila 4"], nombres);
+        }
+        finally
+        {
+            await LimpiarAsync(client, sessionId, origen, destino);
+        }
+    }
+
+    /// <summary>
+    /// Omitir lo que ya está: entra lo que falta y lo demás se cuenta aparte.
+    ///
+    /// El recuento de saltadas es la mitad del valor del modo: sin él, «entraron
+    /// 2 de 4» parece que se perdieron dos filas por el camino.
+    /// </summary>
+    [RequiresPostgreSqlFact]
+    public async Task OmitirLoQueYaEstaCuentaLasQueSeSaltan()
+    {
+        var (client, sessionId) = await ConnectAsync();
+        var origen = Nombre();
+        var destino = Nombre();
+
+        try
+        {
+            await CrearConClaveAsync(client, sessionId, origen, filas: 4);
+            await CrearConClaveAsync(client, sessionId, destino, filas: 2);
+            await RunAsync(client, sessionId, $"UPDATE {destino} SET nombre = 'viejo'");
+
+            var progress = await TransferAsync(
+                client,
+                Request(sessionId, origen, destino) with { Mode = "SkipExisting" });
+
+            Assert.Equal(2, progress.GetProperty("rowsCopied").GetInt64());
+            Assert.Equal(2, progress.GetProperty("rowsSkipped").GetInt64());
+            Assert.Equal(4, await ContarAsync(client, sessionId, destino));
+
+            // Y lo que ya estaba **no se tocó**, que es lo que distingue este modo.
+            var nombres = await LeerAsync(client, sessionId, $"SELECT nombre FROM {destino} ORDER BY id");
+
+            Assert.Equal(["viejo", "viejo", "fila 3", "fila 4"], nombres);
+        }
+        finally
+        {
+            await LimpiarAsync(client, sessionId, origen, destino);
+        }
+    }
+
+    /// <summary>
+    /// Repetir el mismo traslado no cambia nada la segunda vez.
+    ///
+    /// Es la propiedad que permite reanudar una copia que se cortó sin mirar por
+    /// dónde iba.
+    /// </summary>
+    [RequiresPostgreSqlFact]
+    public async Task RepetirUnTrasladoQueActualizaEsInofensivo()
+    {
+        var (client, sessionId) = await ConnectAsync();
+        var origen = Nombre();
+        var destino = Nombre();
+
+        try
+        {
+            await CrearConClaveAsync(client, sessionId, origen, filas: 3);
+            await CrearConClaveAsync(client, sessionId, destino, filas: 0);
+
+            var request = Request(sessionId, origen, destino) with { Mode = "Upsert" };
+
+            await TransferAsync(client, request);
+            await TransferAsync(client, request);
+
+            Assert.Equal(3, await ContarAsync(client, sessionId, destino));
+        }
+        finally
+        {
+            await LimpiarAsync(client, sessionId, origen, destino);
+        }
+    }
+
+    /// <summary>
+    /// Se puede reconocer la fila por otras columnas, no solo por la clave
+    /// primaria.
+    ///
+    /// Es lo que se quiere al sincronizar dos entornos por una clave de negocio:
+    /// los identificadores los generó cada base por su cuenta y no coinciden.
+    /// </summary>
+    [RequiresPostgreSqlFact]
+    public async Task SePuedeReconocerLaFilaPorUnaClaveDeNegocio()
+    {
+        var (client, sessionId) = await ConnectAsync();
+        var origen = Nombre();
+        var destino = Nombre();
+
+        try
+        {
+            foreach (var tabla in new[] { origen, destino })
+            {
+                await RunAsync(
+                    client,
+                    sessionId,
+                    $"CREATE TABLE {tabla} (id serial PRIMARY KEY, codigo text UNIQUE, nombre text)");
+            }
+
+            await RunAsync(client, sessionId, $"INSERT INTO {origen} (codigo, nombre) VALUES ('A', 'Ana'), ('B', 'Bea')");
+            await RunAsync(client, sessionId, $"INSERT INTO {destino} (codigo, nombre) VALUES ('A', 'vieja')");
+
+            var request = Request(sessionId, origen, destino) with
+            {
+                Mode = "Upsert",
+                KeyColumns = ["codigo"],
+                // El identificador no viaja: lo genera cada base por su cuenta.
+                Mappings =
+                [
+                    new MappingBody { Source = "id", Target = null },
+                    new MappingBody { Source = "codigo", Target = "codigo" },
+                    new MappingBody { Source = "nombre", Target = "nombre" },
+                ],
+            };
+
+            var progress = await TransferAsync(client, request);
+
+            Assert.Equal("Completed", progress.GetProperty("outcome").GetString());
+            Assert.Equal(2, await ContarAsync(client, sessionId, destino));
+
+            var nombres = await LeerAsync(client, sessionId, $"SELECT nombre FROM {destino} ORDER BY codigo");
+
+            Assert.Equal(["Ana", "Bea"], nombres);
+        }
+        finally
+        {
+            await LimpiarAsync(client, sessionId, origen, destino);
+        }
+    }
+
+    /// <summary>
+    /// Reconocer la fila por columnas que se pueden repetir se rechaza.
+    ///
+    /// Sin unicidad, «actualiza la que ya está» toca todas las que coinciden: no
+    /// falla, no avisa, y deja el destino con filas que nadie pidió cambiar.
+    /// </summary>
+    [RequiresPostgreSqlFact]
+    public async Task UnaClaveQueSePuedeRepetirSeRechaza()
+    {
+        var (client, sessionId) = await ConnectAsync();
+        var origen = Nombre();
+
+        try
+        {
+            await CrearConClaveAsync(client, sessionId, origen, filas: 1);
+
+            var request = Request(sessionId, origen, origen) with
+            {
+                Mode = "Upsert",
+                KeyColumns = ["nombre"],
+            };
+
+            var response = await client.PostAsJsonAsync("/api/transfers/preview", request);
+
+            Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+
+            var body = await response.ReadJsonAsync();
+
+            Assert.Contains(
+                "no hay nada que garantice",
+                body.GetProperty("message").GetString()!,
+                StringComparison.Ordinal);
+        }
+        finally
+        {
+            await LimpiarAsync(client, sessionId, origen);
+        }
+    }
+
+    /// <summary>Sin clave primaria y sin columnas elegidas, no hay nada que reconocer.</summary>
+    [RequiresPostgreSqlFact]
+    public async Task SinClavePrimariaNoSePuedeActualizarLoQueYaEsta()
+    {
+        var (client, sessionId) = await ConnectAsync();
+        var origen = Nombre();
+
+        try
+        {
+            // Sin clave: es la tabla que crea `CrearAsync`.
+            await CrearAsync(client, sessionId, origen, filas: 1);
+
+            var response = await client.PostAsJsonAsync(
+                "/api/transfers/preview",
+                Request(sessionId, origen, origen) with { Mode = "Upsert" });
+
+            Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+
+            var body = await response.ReadJsonAsync();
+
+            Assert.Equal("noprimarykey", body.GetProperty("reason").GetString());
+        }
+        finally
+        {
+            await LimpiarAsync(client, sessionId, origen);
+        }
+    }
+
+    // -----------------------------------------------------------------------
     // Lo que no hace
     // -----------------------------------------------------------------------
 
@@ -463,6 +698,8 @@ public sealed class TransferFlowTests(DruseApiFactory factory) : IClassFixture<D
 
         public string Mode { get; init; } = "Insert";
 
+        public IReadOnlyList<string> KeyColumns { get; init; } = [];
+
         public bool Atomic { get; init; }
 
         public int BatchSize { get; init; } = 1000;
@@ -547,6 +784,32 @@ public sealed class TransferFlowTests(DruseApiFactory factory) : IClassFixture<D
     private static async Task CrearAsync(HttpClient client, Guid sessionId, string tabla, int filas)
     {
         await RunAsync(client, sessionId, $"CREATE TABLE {tabla} (id int, nombre text, saldo numeric(10,2))");
+
+        for (var fila = 1; fila <= filas; fila++)
+        {
+            await RunAsync(
+                client,
+                sessionId,
+                $"INSERT INTO {tabla} VALUES ({fila}, 'fila {fila}', {fila}.50)");
+        }
+    }
+
+    /// <summary>
+    /// Como <see cref="CrearAsync"/> pero con clave primaria.
+    ///
+    /// Va aparte para que las pruebas de los modos que reconocen filas digan en su
+    /// primera línea que la tabla tiene con qué reconocerlas.
+    /// </summary>
+    private static async Task CrearConClaveAsync(
+        HttpClient client,
+        Guid sessionId,
+        string tabla,
+        int filas)
+    {
+        await RunAsync(
+            client,
+            sessionId,
+            $"CREATE TABLE {tabla} (id int PRIMARY KEY, nombre text, saldo numeric(10,2))");
 
         for (var fila = 1; fila <= filas; fila++)
         {

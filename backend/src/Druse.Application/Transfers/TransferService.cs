@@ -34,6 +34,15 @@ public sealed record TransferPreview
 
     /// <summary>Las primeras instrucciones que recibiría el destino.</summary>
     public required IReadOnlyList<string> Statements { get; init; }
+
+    /// <summary>
+    /// Con qué columnas se reconoce una fila que ya está.
+    ///
+    /// Vacío en los modos que no reconocen nada. Se devuelve resuelto —si no se
+    /// pidieron, es la clave primaria del destino— para que la pantalla enseñe lo
+    /// que de verdad se va a usar y no lo que se escribió.
+    /// </summary>
+    public IReadOnlyList<string> KeyColumns { get; init; } = [];
 }
 
 /// <summary>
@@ -96,9 +105,33 @@ public sealed class TransferService(
             Issues = plan.Issues,
             RowsEstimated = plan.RowsEstimated,
             Select = plan.Select,
-            Statements = [.. editor.DescribeInsert(sample).Take(PreviewedStatements)],
+            KeyColumns = plan.KeyColumns,
+            Statements =
+            [
+                .. editor.DescribeInsert(sample)
+                    .Select(statement => Described(editor, plan, sample, statement))
+                    .Take(PreviewedStatements),
+            ],
         };
     }
+
+    /// <summary>
+    /// La instrucción de muestra, con lo que el modo elegido le añade.
+    ///
+    /// Enseñar un `INSERT` pelado cuando lo que se va a ejecutar es un `MERGE`
+    /// sería enseñar otra cosa, y la vista previa existe justo para que lo que se
+    /// lee sea lo que pasa.
+    /// </summary>
+    private static string Described(
+        IRowEditor editor,
+        Plan plan,
+        PreparedInsertBatch sample,
+        string fallback) =>
+        plan.OnExisting == ExistingRowAction.Fail
+            ? fallback
+            : editor.DescribeWrite(sample, plan.OnExisting, plan.KeyColumns) is [var written, ..]
+                ? written
+                : fallback;
 
     /// <summary>Copia las filas. Devuelve cuántas llegaron, incluso si falló a mitad.</summary>
     public async Task<TransferProgress> RunAsync(
@@ -328,9 +361,14 @@ public sealed class TransferService(
                 "no se corresponden con el origen.");
         }
 
-        var result = await editor.InsertAsync(target, prepared.Batch, cancellationToken);
+        var result = await editor.WriteAsync(
+            target,
+            prepared.Batch,
+            plan.OnExisting,
+            plan.KeyColumns,
+            cancellationToken);
 
-        state.Rows(result.RowsAffected);
+        state.Rows(result.RowsAffected, result.RowsSkipped);
 
         var next = firstRow + batch.Count;
 
@@ -445,6 +483,11 @@ public sealed class TransferService(
         /// <summary>Columnas del destino que se escriben, en orden.</summary>
         public required IReadOnlyList<string> TargetColumns { get; init; }
 
+        /// <summary>
+        /// Las que identifican una fila. Vacío en los modos que no reconocen nada.
+        /// </summary>
+        public IReadOnlyList<string> KeyColumns { get; init; } = [];
+
         public required IReadOnlyList<string> MissingRequired { get; init; }
 
         public required IReadOnlyList<string> UnmatchedSource { get; init; }
@@ -454,6 +497,21 @@ public sealed class TransferService(
         public required string Select { get; init; }
 
         public long? RowsEstimated { get; init; }
+
+        /// <summary>
+        /// Qué hacer con la fila que ya está, dicho como lo entiende el editor.
+        ///
+        /// `Replace` no aparece: allí no queda nada con lo que chocar, porque la
+        /// tabla se vacía antes de empezar.
+        /// </summary>
+        public ExistingRowAction OnExisting => Mode switch
+        {
+            TransferMode.Upsert => ExistingRowAction.Update,
+            TransferMode.SkipExisting => ExistingRowAction.Skip,
+            _ => ExistingRowAction.Fail,
+        };
+
+        public required TransferMode Mode { get; init; }
     }
 
     private async Task<Plan> PrepareAsync(
@@ -471,14 +529,6 @@ public sealed class TransferService(
             throw new RowEditRejectedException(new RowEditRejection(
                 RowEditRefusal.ReadOnlyConnection,
                 "La conexión de destino está marcada como solo lectura."));
-        }
-
-        if (request.Mode is TransferMode.Upsert or TransferMode.SkipExisting)
-        {
-            throw new RowEditRejectedException(new RowEditRejection(
-                RowEditRefusal.NothingToDo,
-                "Todavía no se puede actualizar ni omitir lo que ya existe: por ahora " +
-                "el traslado sabe insertar y vaciar-y-cargar."));
         }
 
         if (sourceSession.Engine != targetSession.Engine)
@@ -547,6 +597,7 @@ public sealed class TransferService(
         var select = scripter.SelectData(source, filter);
 
         var targetColumns = used.Select(mapping => mapping.Target!).ToList();
+        var keyColumns = KeysFor(request, target, targetColumns);
 
         return new Plan
         {
@@ -555,14 +606,119 @@ public sealed class TransferService(
             TargetEngine = targetSession.Engine,
             Mappings = mappings,
             TargetColumns = targetColumns,
+            KeyColumns = keyColumns,
             MissingRequired = Missing(target.Columns, targetColumns),
             UnmatchedSource = ignored,
             Issues = Issues(request, target.Columns, targetColumns),
             Select = select,
+            Mode = request.Mode,
             RowsEstimated = string.IsNullOrWhiteSpace(filter.Where)
                 ? request.Source.ApproximateRowCount
                 : null,
         };
+    }
+
+    /// <summary>
+    /// Qué columnas del destino identifican una fila, comprobando que sirvan.
+    ///
+    /// Solo importa en los modos que tienen que reconocer lo que ya está; en los
+    /// demás devuelve vacío y no se pregunta nada, porque no hay nada que
+    /// reconocer.
+    ///
+    /// **La comprobación de unicidad no es una formalidad.** Con una clave que se
+    /// repite, «actualiza la que ya está» toca todas las que coinciden: no falla,
+    /// no avisa, y deja el destino con filas que nadie pidió cambiar. Se
+    /// comprueba contra el catálogo —clave primaria, restricciones de unicidad e
+    /// índices únicos— antes de escribir la primera fila.
+    /// </summary>
+    private static IReadOnlyList<string> KeysFor(
+        DataTransferRequest request,
+        ScriptedTable target,
+        IReadOnlyList<string> written)
+    {
+        if (request.Mode is not (TransferMode.Upsert or TransferMode.SkipExisting))
+        {
+            return [];
+        }
+
+        var keys = request.KeyColumns.Count > 0
+            ? request.KeyColumns
+            : target.Structure.PrimaryKey?.Columns ?? [];
+
+        if (keys.Count == 0)
+        {
+            throw new RowEditRejectedException(new RowEditRejection(
+                RowEditRefusal.NoPrimaryKey,
+                $"«{target.Table.Name}» no tiene clave primaria, así que no hay forma de " +
+                "saber qué fila del destino es cuál. Elige las columnas que identifican " +
+                "la fila, o usa el modo que solo añade."));
+        }
+
+        var known = target.Columns.Select(column => column.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var key in keys)
+        {
+            if (!known.Contains(key))
+            {
+                throw new RowEditRejectedException(new RowEditRejection(
+                    RowEditRefusal.UnknownColumn,
+                    $"La tabla de destino no tiene ninguna columna «{key}»."));
+            }
+        }
+
+        // Las columnas que identifican la fila tienen que llegar con valor: si no
+        // se copian, todas las filas se parecerían en la clave y la primera
+        // actualizaría a la siguiente.
+        var missing = keys
+            .Where(key => !written.Contains(key, StringComparer.OrdinalIgnoreCase))
+            .ToList();
+
+        if (missing.Count > 0)
+        {
+            throw new RowEditRejectedException(new RowEditRejection(
+                RowEditRefusal.KeyMismatch,
+                $"No se copian las columnas que identifican la fila: {string.Join(", ", missing)}. " +
+                "Sin ellas no se puede saber qué fila del destino corresponde a cada una " +
+                "del origen."));
+        }
+
+        if (!IsUnique(target, keys))
+        {
+            throw new RowEditRejectedException(new RowEditRejection(
+                RowEditRefusal.KeyMismatch,
+                $"En «{target.Table.Name}» no hay nada que garantice que {string.Join(", ", keys)} " +
+                "no se repita, así que actualizar por esas columnas podría cambiar varias " +
+                "filas a la vez. Hace falta una clave primaria, una restricción de unicidad " +
+                "o un índice único sobre ellas."));
+        }
+
+        return keys;
+    }
+
+    /// <summary>El catálogo garantiza que esas columnas juntas no se repiten.</summary>
+    private static bool IsUnique(ScriptedTable target, IReadOnlyList<string> keys)
+    {
+        bool Same(IReadOnlyList<string> columns) =>
+            columns.Count == keys.Count &&
+            columns.All(column => keys.Contains(column, StringComparer.OrdinalIgnoreCase));
+
+        if (target.Structure.PrimaryKey is { } primary && Same(primary.Columns))
+        {
+            return true;
+        }
+
+        if (target.Structure.UniqueConstraints.Any(unique => Same(unique.Columns)))
+        {
+            return true;
+        }
+
+        // Un índice único sin restricción detrás vale igual: lo que importa es la
+        // garantía, no cómo se declaró. Los que van sobre una expresión llegan sin
+        // columnas y no dicen nada de estas.
+        return target.Structure.Indexes.Any(index =>
+            index.IsUnique &&
+            index.Filter is null &&
+            Same([.. index.Columns.Select(column => column.Name)]));
     }
 
     private static bool ConfirmedReplace(DataTransferRequest request) =>
@@ -705,6 +861,7 @@ internal sealed class TransferState(Guid id, string table, IProgress<TransferPro
     private TransferStep _step = TransferStep.ReadingStructure;
     private long? _estimated;
     private int _batches;
+    private long _skipped;
 
     public long RowsCopied { get; private set; }
 
@@ -716,9 +873,10 @@ internal sealed class TransferState(Guid id, string table, IProgress<TransferPro
         Report();
     }
 
-    public void Rows(long written)
+    public void Rows(long written, long skipped = 0)
     {
         RowsCopied += written;
+        _skipped += skipped;
         _batches++;
         Report();
     }
@@ -758,6 +916,7 @@ internal sealed class TransferState(Guid id, string table, IProgress<TransferPro
             CurrentObject = table,
             RowsCopied = RowsCopied,
             RowsEstimated = _estimated,
+            RowsSkipped = _skipped,
             BatchesDone = _batches,
             Elapsed = _clock.Elapsed,
             Warnings = [.. _warnings],

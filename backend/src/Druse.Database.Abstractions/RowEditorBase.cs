@@ -171,23 +171,51 @@ public abstract class RowEditorBase : IRowEditor
         };
     }
 
-    public IReadOnlyList<string> DescribeInsert(PreparedInsertBatch batch)
+    public IReadOnlyList<string> DescribeInsert(PreparedInsertBatch batch) =>
+        DescribeWrite(batch, ExistingRowAction.Fail, []);
+
+    public IReadOnlyList<string> DescribeWrite(
+        PreparedInsertBatch batch,
+        ExistingRowAction onExisting,
+        IReadOnlyList<string> keyColumns)
     {
         ArgumentNullException.ThrowIfNull(batch);
 
-        return [.. batch.Rows.Select(row => InsertStatement(batch, row, literal: true))];
+        return
+        [
+            .. batch.Rows.Select(row =>
+                WriteStatement(batch, row, onExisting, keyColumns, literal: true)),
+        ];
     }
 
-    public async Task<RowEditResult> InsertAsync(
+    public Task<RowEditResult> InsertAsync(
         IDatabaseSession session,
         PreparedInsertBatch batch,
+        CancellationToken cancellationToken) =>
+        WriteAsync(session, batch, ExistingRowAction.Fail, [], cancellationToken);
+
+    public async Task<RowEditResult> WriteAsync(
+        IDatabaseSession session,
+        PreparedInsertBatch batch,
+        ExistingRowAction onExisting,
+        IReadOnlyList<string> keyColumns,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(batch);
+        ArgumentNullException.ThrowIfNull(keyColumns);
+
+        if (onExisting != ExistingRowAction.Fail && keyColumns.Count == 0)
+        {
+            throw new ArgumentException(
+                "Para decidir qué hacer con lo que ya está hace falta saber qué " +
+                "columnas identifican la fila.",
+                nameof(keyColumns));
+        }
 
         var connection = Connection(session);
         var stopwatch = Stopwatch.StartNew();
-        var insertadas = 0L;
+        var escritas = 0L;
+        var saltadas = 0L;
 
         // Todo o nada, igual que al editar: media importación es peor que
         // ninguna, porque nadie sabe por dónde se quedó.
@@ -203,16 +231,23 @@ public abstract class RowEditorBase : IRowEditor
             {
                 await using var command = connection.CreateCommand();
                 command.Transaction = transaction;
-                command.CommandText = InsertStatement(batch, row, literal: false);
+                command.CommandText = WriteStatement(batch, row, onExisting, keyColumns, literal: false);
 
-                var index = 0;
+                Bind(command, row, onExisting);
 
-                foreach (var cell in row)
+                // El recuento se normaliza aquí y no en cada proveedor: MySQL
+                // devuelve dos filas afectadas cuando actualiza una, así que sumar
+                // lo que diga el motor daría un número distinto por motor para el
+                // mismo trabajo. Lo que se cuenta es **si la fila se escribió**,
+                // que significa lo mismo en los cuatro.
+                if (await command.ExecuteNonQueryAsync(cancellationToken) > 0)
                 {
-                    Bind(command, ParameterName(index++), cell);
+                    escritas++;
                 }
-
-                insertadas += await command.ExecuteNonQueryAsync(cancellationToken);
+                else
+                {
+                    saltadas++;
+                }
             }
 
             await scope.CommitAsync(cancellationToken);
@@ -227,13 +262,93 @@ public abstract class RowEditorBase : IRowEditor
 
         return new RowEditResult
         {
-            RowsAffected = insertadas,
+            RowsAffected = escritas,
+            RowsSkipped = saltadas,
             Duration = stopwatch.Elapsed,
             // Solo las primeras: un archivo de diez mil filas produciría diez mil
             // instrucciones y nadie las va a leer.
             Statements = [.. DescribeInsert(batch).Take(PreviewedStatements)],
         };
     }
+
+    /// <summary>
+    /// Enlaza los valores de una fila como parámetros.
+    ///
+    /// Los motores que resuelven el conflicto con un `MERGE` los necesitan dos
+    /// veces —una para buscar la fila y otra para escribirla— y con marcadores
+    /// posicionales eso significa mandarlos repetidos.
+    /// </summary>
+    private void Bind(DbCommand command, IReadOnlyList<PreparedCell> row, ExistingRowAction onExisting)
+    {
+        var index = 0;
+
+        foreach (var cell in row)
+        {
+            Bind(command, ParameterName(index++), cell);
+        }
+
+        if (onExisting == ExistingRowAction.Fail || !RepeatsParameters)
+        {
+            return;
+        }
+
+        foreach (var cell in row)
+        {
+            Bind(command, ParameterName(index++), cell);
+        }
+    }
+
+    /// <summary>
+    /// Este dialecto necesita los valores otra vez para resolver el conflicto.
+    ///
+    /// Falso en los que lo dicen con una cláusula al final del `INSERT`, que
+    /// reutiliza los valores que ya van dentro.
+    /// </summary>
+    protected virtual bool RepeatsParameters => false;
+
+    /// <summary>
+    /// La instrucción que escribe una fila teniendo en cuenta lo que ya está.
+    ///
+    /// Por omisión es el `INSERT` de siempre con lo que cada motor añade al final
+    /// (<see cref="ConflictClause"/>). Los que no saben decirlo así —los que
+    /// necesitan un `MERGE`— reescriben este método entero.
+    /// </summary>
+    protected virtual string WriteStatement(
+        PreparedInsertBatch batch,
+        IReadOnlyList<PreparedCell> row,
+        ExistingRowAction onExisting,
+        IReadOnlyList<string> keyColumns,
+        bool literal)
+    {
+        var insert = InsertStatement(batch, row, literal);
+
+        return onExisting == ExistingRowAction.Fail
+            ? insert
+            : $"{insert} {ConflictClause(batch, onExisting, keyColumns)}";
+    }
+
+    /// <summary>
+    /// Lo que este motor añade al `INSERT` para no chocar con lo que ya está.
+    ///
+    /// Sin implementar por omisión a propósito: un motor que no sepa decirlo debe
+    /// fallar al escribir la instrucción y no al ejecutarla, cuando el mensaje ya
+    /// sería del servidor y no diría qué se pretendía.
+    /// </summary>
+    protected virtual string ConflictClause(
+        PreparedInsertBatch batch,
+        ExistingRowAction onExisting,
+        IReadOnlyList<string> keyColumns) =>
+        throw new NotSupportedException(
+            $"El proveedor {Engine} todavía no sabe insertar teniendo en cuenta lo que ya está.");
+
+    /// <summary>Las columnas que se escriben y no identifican la fila.</summary>
+    protected static IReadOnlyList<string> Updatable(
+        PreparedInsertBatch batch,
+        IReadOnlyList<string> keyColumns) =>
+        [
+            .. batch.Columns.Where(column =>
+                !keyColumns.Contains(column, StringComparer.OrdinalIgnoreCase)),
+        ];
 
     /// <summary>Cuántas instrucciones se devuelven como muestra al importar.</summary>
     private const int PreviewedStatements = 5;

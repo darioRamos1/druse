@@ -63,6 +63,20 @@ public sealed record DataTransferRequest
     public TransferMode Mode { get; init; } = TransferMode.Insert;
 
     /// <summary>
+    /// Qué columnas del destino identifican una fila, para los modos que tienen
+    /// que reconocer lo que ya está.
+    ///
+    /// Vacío significa **la clave primaria del destino**, que es lo que se quiere
+    /// casi siempre. Se puede cambiar porque sincronizar dos entornos a menudo se
+    /// hace por una clave de negocio —el código del artículo, el NIT— y no por el
+    /// identificador que generó cada base por su cuenta.
+    ///
+    /// Tienen que estar respaldadas por la clave primaria o por una restricción de
+    /// unicidad: sin eso, «actualiza la que ya está» puede tocar muchas filas.
+    /// </summary>
+    public IReadOnlyList<string> KeyColumns { get; init; } = [];
+
+    /// <summary>
     /// Todos los lotes en una sola transacción: o entra la tabla entera o nada.
     ///
     /// **No es el valor por omisión**, y esa es la decisión importante de aquí. Una

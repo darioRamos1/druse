@@ -52,6 +52,9 @@ public sealed record TransferRequestDto
     /// </summary>
     public string Mode { get; init; } = nameof(TransferMode.Insert);
 
+    /// <summary>Vacío significa la clave primaria del destino.</summary>
+    public IReadOnlyList<string> KeyColumns { get; init; } = [];
+
     public bool Atomic { get; init; }
 
     public int BatchSize { get; init; } = DataTransferRequest.DefaultBatchSize;
@@ -88,6 +91,9 @@ public sealed record TransferPreviewDto
     public required string Select { get; init; }
 
     public IReadOnlyList<string> Statements { get; init; } = [];
+
+    /// <summary>Con qué columnas se reconoce una fila que ya está, ya resueltas.</summary>
+    public IReadOnlyList<string> KeyColumns { get; init; } = [];
 }
 
 /// <summary>Por qué se paró un traslado, con lo que ya había entrado.</summary>
@@ -168,6 +174,7 @@ internal static class TransferMapper
                     string.IsNullOrWhiteSpace(mapping.Target) ? null : mapping.Target)),
             ],
             Mode = Parse(dto.Mode),
+            KeyColumns = dto.KeyColumns,
             Atomic = dto.Atomic,
             BatchSize = dto.BatchSize,
             KeepIdentity = dto.KeepIdentity,
@@ -218,6 +225,7 @@ internal static class TransferMapper
             RowsEstimated = preview.RowsEstimated,
             Select = preview.Select,
             Statements = preview.Statements,
+            KeyColumns = preview.KeyColumns,
         };
     }
 

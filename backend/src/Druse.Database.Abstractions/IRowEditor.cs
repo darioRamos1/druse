@@ -96,6 +96,44 @@ public interface IRowEditor
         CancellationToken cancellationToken);
 
     /// <summary>
+    /// La instrucción que se ejecutaría con este modo, con los valores escritos.
+    ///
+    /// Existe porque enseñar un `INSERT` pelado cuando lo que se va a ejecutar es
+    /// un `MERGE` sería enseñar otra cosa, y la vista previa del traslado está
+    /// justo para que lo que se lee sea lo que pasa.
+    /// </summary>
+    IReadOnlyList<string> DescribeWrite(
+        PreparedInsertBatch batch,
+        ExistingRowAction onExisting,
+        IReadOnlyList<string> keyColumns);
+
+    /// <summary>
+    /// Inserta filas decidiendo qué pasa con las que ya están en la tabla.
+    ///
+    /// Es <see cref="InsertAsync"/> con una pregunta más, y existe por el
+    /// traslado de datos entre tablas: repetir una copia es lo normal —se cortó,
+    /// se añadieron filas al origen, se sincroniza a diario— y sin esto la única
+    /// salida es fallar en la primera clave repetida.
+    ///
+    /// **Las columnas que identifican la fila tienen que estar respaldadas por la
+    /// clave primaria o por una restricción de unicidad.** No es una formalidad
+    /// del dialecto: sin unicidad, «actualiza la que ya está» puede tocar muchas
+    /// filas a la vez, que es exactamente el accidente que el resto de este puerto
+    /// existe para impedir. Quien llama lo comprueba antes contra el catálogo.
+    ///
+    /// El recuento se normaliza: los motores no cuentan igual —MySQL devuelve dos
+    /// filas afectadas cuando actualiza una— así que lo que se devuelve es
+    /// **cuántas filas se escribieron y cuántas se saltaron**, que significa lo
+    /// mismo en los cuatro.
+    /// </summary>
+    Task<RowEditResult> WriteAsync(
+        IDatabaseSession session,
+        PreparedInsertBatch batch,
+        ExistingRowAction onExisting,
+        IReadOnlyList<string> keyColumns,
+        CancellationToken cancellationToken);
+
+    /// <summary>
     /// Mete varias escrituras seguidas en una sola transacción.
     ///
     /// Existe por el traslado de datos entre tablas, que escribe el destino por
@@ -128,6 +166,30 @@ public interface IRowEditor
         IDatabaseSession session,
         PreparedRowDeleteBatch batch,
         CancellationToken cancellationToken);
+}
+
+/// <summary>
+/// Qué hacer con una fila que ya está en la tabla de destino.
+///
+/// Los tres casos son escrituras distintas, no matices de una: fallar deja la
+/// tabla como estaba, actualizar la cambia y saltar no la toca. Por eso se
+/// eligen y no se deducen.
+/// </summary>
+public enum ExistingRowAction
+{
+    /// <summary>
+    /// Chocar y deshacer el lote. Es lo que hace <see cref="IRowEditor.InsertAsync"/>.
+    ///
+    /// Sigue siendo lo más seguro y por eso es el primero: lo peor que puede
+    /// hacer es negarse.
+    /// </summary>
+    Fail = 0,
+
+    /// <summary>Actualizar la fila que ya estaba con los valores del origen.</summary>
+    Update = 1,
+
+    /// <summary>Dejarla como está y seguir, contándola aparte.</summary>
+    Skip = 2,
 }
 
 /// <summary>
