@@ -11,7 +11,7 @@
 | Campo | Valor |
 | --- | --- |
 | Última sesión | **023** — 2026-08-19 |
-| Fase activa | **Respaldos y restauración:** Fases A–E cerradas. La **F** tiene backend, interfaz, CSV, selector de archivos, restaurar en una base nueva y **el ciclo entero por HTTP en los cuatro motores**; le falta repetir a mano el respaldo real que encontró el error de los índices de expresión |
+| Fase activa | **Migración de datos entre tablas:** fase 1 de 4 cerrada y funcionando (ver «Qué toca retomar»). **Respaldos y restauración:** Fases A–E cerradas. La **F** tiene backend, interfaz, CSV, selector de archivos, restaurar en una base nueva y **el ciclo entero por HTTP en los cuatro motores**; le falta repetir a mano el respaldo real que encontró el error de los índices de expresión |
 | Fases 0–6 | ✅ Cerradas. |
 | Fase 7 | 🟡 **11/12.** El ciclo de instalación está probado sobre este equipo; solo falta arrancar en una máquina sin herramientas de desarrollo. |
 | Fase 8 | ✅ **7/7.** Tres motores sobre el mismo contrato y primera beta preparada. |
@@ -27,7 +27,63 @@
 
 ### Qué toca retomar en la próxima sesión
 
-**Lo que le falta a la Fase F**, ya solo una cosa:
+#### Migración de datos: la fase 2
+
+La fase 1 está cerrada y se usa (sesión 023). Lo siguiente es **qué hacer con las
+filas que ya están en el destino**: `Upsert` —actualizar si está, insertar si
+no— y `SkipExisting` —insertar solo lo que falta y decir cuántas se saltaron—.
+
+Los dos valores **ya existen** en `TransferMode` y viajan en el contrato; lo que
+hace hoy `TransferService.PrepareAsync` es rechazarlos con un mensaje que lo dice.
+Así que la fase 2 es sustituir ese rechazo por el camino de escritura, no
+inventar el contrato.
+
+Dónde toca:
+
+1. **`IRowEditor` gana un método de escritura con modo**, junto a `InsertAsync`,
+   que recibe el lote, el modo y las columnas que identifican la fila.
+   `RowEditorBase` lo implementa una vez —la transacción, los parámetros y el
+   recuento son iguales— y deja un gancho abstracto para la cláusula de
+   conflicto, que sí es dialecto:
+
+   | Motor | Actualizar si está | Omitir si está |
+   | --- | --- | --- |
+   | PostgreSQL | `ON CONFLICT (...) DO UPDATE SET` | `ON CONFLICT DO NOTHING` |
+   | MySQL | `ON DUPLICATE KEY UPDATE` | `INSERT IGNORE` |
+   | SQL Server | `MERGE ... WHEN MATCHED` | `MERGE ... WHEN NOT MATCHED` |
+   | Informix | `MERGE` | `MERGE` |
+
+   `InsertAsync` se queda como está: es el camino que ya usan importar y
+   restaurar, y no hay razón para moverlo.
+
+2. **Las columnas que identifican la fila** salen de `DatabaseColumn.IsPrimaryKey`,
+   que el catálogo ya trae. El asistente tiene que dejar cambiarlas: emparejar por
+   una clave de negocio en vez de por la primaria es justo lo que se quiere al
+   sincronizar dos entornos. **Sin clave no hay upsert posible**, y eso se dice
+   antes de empezar, no cuando el motor se queje.
+
+3. **`RowsSkipped` ya está en `TransferProgress` y en el contrato**, sin llenar.
+   Es lo que tiene que contar `SkipExisting`, y es el número que hace útil el
+   modo: «entraron 900, ya estaban 4.100».
+
+4. **Contractuales, no de integración.** En
+   `DatabaseProviderContractTests` hay que exigir que los cuatro motores se
+   comporten **igual ante el mismo lote repetido**: insertar dos veces falla,
+   con upsert actualiza y no duplica, con omitir no toca lo que ya estaba. Cuatro
+   dialectos distintos para una promesa que tiene que ser una.
+
+Después vienen la fase 3 —traducir tipos entre motores y ofrecer crear la tabla
+destino, con `TypeTranslator` en `Application/Transfers` para no romper la regla
+de que los proveedores no se conocen— y la fase 4 —varias tablas ordenadas por
+sus claves foráneas, y migraciones guardadas con el espejo de
+`SqliteBackupProfileStore`—.
+
+El plan completo, con el porqué de cada decisión, está en
+`docs/plan-migracion-de-datos.md`.
+
+#### Respaldos: lo que le falta a la Fase F
+
+Ya solo una cosa:
 
 1. **Repetir a mano el respaldo grande que falló** (sesión 022l): el de
    `empresa_estado_financiero`, ahora que los índices sobre expresiones se
