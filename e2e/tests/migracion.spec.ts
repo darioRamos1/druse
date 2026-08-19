@@ -217,6 +217,67 @@ test.describe('migrar datos entre tablas', () => {
   });
 
   /**
+   * La tabla de destino se puede crear desde el propio asistente.
+   *
+   * Es el camino que evita salir a escribir un `CREATE TABLE` a mano y volver.
+   * Dentro del mismo motor no hay tipos que traducir, así que lo que se comprueba
+   * aquí es el recorrido entero: elegir dónde, ponerle nombre, ver con qué se va a
+   * crear, crearla y copiar dentro **sin tocar nada más**.
+   */
+  test('crea la tabla de destino y copia dentro', async ({ page }) => {
+    await abrir(page);
+    await conectar(page);
+
+    const nueva = `e2e_migracion_nueva_${Date.now()}`;
+
+    await prepararTablas(page);
+
+    await menuDeLaTabla(page, ORIGEN);
+    await page.getByRole('menuitem', { name: 'Migrar datos a…' }).click();
+
+    const dialogo = page.locator('app-transfer-dialog');
+
+    // Se baja hasta la carpeta donde vivirá, porque de ahí salen su base y su
+    // esquema: crear en la base que no era es de los errores que no se ven hasta
+    // que alguien busca la tabla donde debería estar.
+    for (const paso of ['druse_test', 'public', 'Tables']) {
+      const nodo = dialogo.locator('.browser__item', { hasText: paso }).first();
+
+      await expect(nodo).toBeVisible({ timeout: 30_000 });
+      await nodo.click();
+    }
+
+    await dialogo.locator('.new-table input').fill(nueva);
+    await dialogo.getByRole('button', { name: 'Crear tabla…' }).click();
+
+    // Mismo motor: no hay nada que traducir, y el asistente lo dice en lugar de
+    // enseñar una tabla de tipos vacía.
+    await expect(dialogo.locator('.route')).toContainText(nueva, { timeout: 30_000 });
+    await expect(dialogo.locator('.body')).toContainText('mismo motor');
+
+    await dialogo.getByRole('button', { name: 'Crear la tabla' }).click();
+
+    await expect(dialogo.locator('.mapping')).toBeVisible({ timeout: 30_000 });
+    await expect(dialogo.locator('.hint')).toContainText('2 de 2 columnas');
+
+    await dialogo.getByRole('button', { name: 'Copiar las filas' }).click();
+
+    await expect(dialogo.locator('.summary__title')).toContainText('Copiadas 3 filas', {
+      timeout: 60_000,
+    });
+
+    await dialogo.locator('.foot').getByRole('button', { name: 'Cerrar' }).click();
+    await expect(dialogo).toBeHidden();
+
+    // La tabla existe y tiene dentro lo que se copió.
+    expect(await contar(page, nueva)).toBe('3');
+
+    await escribirSql(page, `DROP TABLE IF EXISTS ${nueva}`);
+    await page.keyboard.press('Control+Enter');
+    await page.getByRole('alertdialog').getByRole('button', { name: 'Ejecutar de todos modos' }).click();
+  });
+
+  /**
    * Vaciar el destino no se puede pedir sin escribir su nombre.
    *
    * Es la única acción del asistente que borra, y una casilla marcada sin querer
