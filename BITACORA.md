@@ -10,14 +10,14 @@
 
 | Campo | Valor |
 | --- | --- |
-| Última sesión | **023e** — 2026-08-19 |
-| Fase activa | **Migración de datos entre tablas:** fases 1, 2 y 3 cerradas; la **4** tiene la pasada de varias tablas con su orden por foráneas, y le faltan la pantalla y los perfiles (ver «Qué toca retomar»). **Respaldos y restauración:** Fases A–E cerradas. La **F** tiene backend, interfaz, CSV, selector de archivos, restaurar en una base nueva y **el ciclo entero por HTTP en los cuatro motores**; le falta repetir a mano el respaldo real que encontró el error de los índices de expresión |
+| Última sesión | **023f** — 2026-08-19 |
+| Fase activa | **Migración de datos entre tablas:** fases 1, 2 y 3 cerradas; la **4** tiene la pasada de varias tablas entera —motor, API y pantalla— y le faltan los perfiles (ver «Qué toca retomar»). **Respaldos y restauración:** Fases A–E cerradas. La **F** tiene backend, interfaz, CSV, selector de archivos, restaurar en una base nueva y **el ciclo entero por HTTP en los cuatro motores**; le falta repetir a mano el respaldo real que encontró el error de los índices de expresión |
 | Fases 0–6 | ✅ Cerradas. |
 | Fase 7 | 🟡 **11/12.** El ciclo de instalación está probado sobre este equipo; solo falta arrancar en una máquina sin herramientas de desarrollo. |
 | Fase 8 | ✅ **7/7.** Tres motores sobre el mismo contrato y primera beta preparada. |
 | ¿Compila el backend? | Sí — 0 advertencias, 0 errores |
 | ¿Compila el envoltorio? | Sí |
-| ¿Pasan las pruebas? | Sí — **748 en backend** (417 unitarias, 190 contractuales y 141 de integración) con `DRUSE_REQUIRE_ENGINES=1` y **los cuatro motores**, **489 en frontend** y **16 de punta a punta**. Con la salvedad conocida: una de integración **falla por tiempo de vez en cuando**, siempre una del traslado, y no es de estos cambios —se reprodujo igual en `HEAD`—; está acotada en la sesión 023d. Las **6 del envoltorio** no se ejecutaron: cargo no compila en este equipo |
+| ¿Pasan las pruebas? | Sí — **748 en backend** (417 unitarias, 190 contractuales y 141 de integración) con `DRUSE_REQUIRE_ENGINES=1` y **los cuatro motores**, **495 en frontend** y **17 de punta a punta**. Con la salvedad conocida: una de integración **falla por tiempo de vez en cuando**, siempre una del traslado, y no es de estos cambios —se reprodujo igual en `HEAD`—; está acotada en la sesión 023d. Las **6 del envoltorio** no se ejecutaron: cargo no compila en este equipo |
 | ¿Hay aplicación de escritorio? | **Sí.** Instalador NSIS, MSI y ZIP portable, en dos variantes: con Informix y sin él |
 | Motores | **PostgreSQL, SQL Server, MySQL/MariaDB e Informix**, todos sobre el mismo contrato compartido |
 | Trabajo a medias | La fase 4 de la migración, a propósito: el backend de la pasada está commiteado y probado; la pantalla es lo siguiente. |
@@ -27,40 +27,31 @@
 
 ### Qué toca retomar en la próxima sesión
 
-#### Migración de datos: lo que le falta a la fase 4
+#### Migración de datos: los perfiles, y lo que la pantalla aún no ofrece
 
-La pasada de varias tablas **ya corre**: ordena por las foráneas del destino,
-vacía en el orden contrario, se para en la tabla que falla y dice cuántas
-pasaron. Lo que no existe es la pantalla, así que hoy eso solo se puede pedir por
-HTTP.
+De la fase 4 queda **la segunda mitad**: guardar una migración para repetirla.
+Espejo de `SqliteBackupProfileStore` —tabla nueva en `DruseDatabase` junto a
+`backup_profiles`, selección en JSON— con su regla, que es la que no se puede
+saltar: el perfil guarda **nombres calificados, no identificadores de sesión**,
+porque se reabre meses después contra otra conexión. Al abrirlo se pregunta contra
+qué conexión viva se resuelve cada extremo, y lo que ya no existe se reconcilia
+como hace el respaldo con `known_tables_json`.
 
-1. **Elegir varias tablas.** Hoy el asistente sale del menú de una tabla y copia
-   esa. Hay que decidir de dónde se lanza la pasada —lo natural es el menú de la
-   carpeta de tablas o del esquema, «Migrar tablas de aquí…»— y dentro del
-   asistente una lista con casillas donde cada tabla lleve su modo y su filtro,
-   porque migrar seis tablas no significa tratarlas igual.
+Y dos cosas que el plan pide de la pasada y la pantalla todavía no da:
 
-2. **El orden, a la vista antes de confirmar.** `POST /api/transfers/set/order`
-   ya devuelve la lista ordenada y los ciclos; falta enseñarla. Es lo que
-   convierte «marqué seis tablas» en «van en este orden, y estas dos se apuntan
-   entre sí».
+1. **Modo y filtro por tabla.** Hoy el modo es uno para toda la pasada, y el
+   contrato ya admite uno por tabla: de una se lleva el año en curso y de otra
+   todo, y una se reemplaza mientras las demás se añaden.
+2. **La clave de emparejamiento al actualizar**, que se queda en la primaria de
+   cada destino. En el asistente de una tabla sí se puede cambiar, y sincronizar
+   entornos suele hacerse por una clave de negocio.
 
-3. **Las dos barras.** El progreso ya trae los dos niveles —`tablesDone` y
-   `tablesTotal` para la pasada, `tableRowsCopied` contra `rowsEstimated` para la
-   tabla en curso—, y `transfer.store.ts` sigue dibujando solo uno.
+**Y sigue pendiente lo de la fase 3:** nadie ha migrado entre dos motores desde la
+pantalla. Lo cruzado está comprobado por HTTP y la prueba de punta a punta crea la
+tabla dentro del mismo motor.
 
-4. **Perfiles**, que es la otra mitad de la fase y no se ha empezado. Espejo de
-   `SqliteBackupProfileStore`: tabla nueva en `DruseDatabase` junto a
-   `backup_profiles`, selección en JSON, y su regla —**nombres calificados, no
-   identificadores de sesión**— porque un perfil se reabre meses después contra
-   otra conexión.
-
-**Y sigue pendiente lo de la fase 3:** nadie ha migrado entre dos motores desde
-la pantalla. Lo cruzado está comprobado por HTTP y la prueba de punta a punta
-crea la tabla dentro del mismo motor.
-
-El plan completo, con el porqué de cada decisión y lo aprendido en cada fase,
-está en `docs/plan-migracion-de-datos.md`.
+El plan completo, con el porqué de cada decisión y lo aprendido en cada fase, está
+en `docs/plan-migracion-de-datos.md`.
 
 #### Respaldos: lo que le falta a la Fase F
 
@@ -356,6 +347,59 @@ Y tres límites declarados desde el principio: no hay respaldo binario ni
 recuperación a un punto en el tiempo —eso es del servidor, y la interfaz tendrá
 que decirlo—, no hay respaldos programados, y un límite de filas puede dejar
 filas huérfanas, cosa que se avisa y no se corrige sola.
+
+### Sesión 023f — 2026-08-19 · La pasada, ahora desde la pantalla
+
+Lo que la sesión 023d dejó corriendo solo por HTTP ya se puede pedir desde Druse:
+marcar varias tablas, elegir a dónde van y verlas copiarse en el orden que exigen
+sus foráneas.
+
+#### Un asistente aparte, no un modo del que había
+
+`TransferSetDialog` vive al lado del de una tabla en vez de dentro. La razón es
+que aquí **el destino no es una tabla sino el sitio donde viven las tablas**:
+compartir pantalla obligaría a preguntar en cada paso cuál de los dos flujos se
+está haciendo, y a llenar de condicionales una plantilla que ya es larga.
+
+Sale del menú del esquema o de la carpeta —«Migrar tablas a…»—, que es donde se
+mira cuando uno piensa «me llevo esto». Cuatro pasos: marcar, elegir sitio, ver el
+plan, copiar.
+
+#### Tres decisiones de la pantalla
+
+1. **Empareja por nombre**, igual que las columnas: cada tabla del origen busca la
+   que se llama igual al otro lado.
+2. **Las que no están en el destino se dicen y se quedan fuera.** No se crean:
+   crear una tabla es una decisión con tipos y clave primaria, y se toma de una en
+   una en el otro asistente. Una pasada que crea a medias parece completa y no lo
+   es.
+3. **«Vaciar y cargar» no se ofrece aquí.** Vaciar exige escribir el nombre de la
+   tabla, y con seis marcadas serían seis confirmaciones que no caben en una
+   casilla. Se hace tabla a tabla, que es donde esa confirmación significa algo, y
+   la pantalla lo dice en lugar de esconder el modo.
+
+El orden se pide antes de confirmar y se enseña numerado, con los ciclos avisados
+debajo. El progreso usa ya los dos niveles: «tabla 2 de 6» encima, y la barra de
+la tabla en curso contra su estimación.
+
+**Verificado.** **495 en frontend**, seis de ellas nuevas para este asistente: que
+empieza con todas marcadas, que se puede quitar una, que empareja y enseña el
+orden, que nombra las que faltan, que avisa del ciclo y que manda la pasada con lo
+que se marcó. Y **en la aplicación levantada**, una de punta a punta que crea dos
+tablas relacionadas en otro esquema, las migra desde el menú de la carpeta,
+comprueba que el plan pone la padre primero y cuenta las filas de las dos tablas
+del destino: **17 de punta a punta**, todas en verde.
+
+**No hecho.** Los perfiles de migración, que son la otra mitad de la fase 4. Y en
+esta pantalla, dos cosas que el plan pide y no están: **modo y filtro por tabla**
+—hoy el modo es uno para toda la pasada— y elegir la clave de emparejamiento
+cuando se actualiza, que se queda en la primaria de cada destino.
+
+**Archivos.** `features/transfer/transfer-set-dialog/` (componente, plantilla,
+estilos y pruebas), `transfer.store.ts` (`orderSet`, `startSet`, el avance por
+tabla y el contador de tablas), el gateway (`orderTransferSet`, `runTransferSet` y
+el progreso en dos niveles), `connections-sidebar` y `app-shell` para engancharlo,
+y `e2e/tests/migracion.spec.ts`.
 
 ### Sesión 023e — 2026-08-19 · Conectar sin saberse el nombre de la base
 

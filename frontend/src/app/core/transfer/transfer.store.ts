@@ -6,6 +6,8 @@ import {
   TransferPreview,
   TransferProgress,
   TransferRequest,
+  TransferSetOrder,
+  TransferSetRequest,
 } from '../application-gateway/application-gateway';
 import { outcomeLabel } from '../backup/backup.store';
 
@@ -101,7 +103,26 @@ export class TransferStore {
       return null;
     }
 
-    return Math.min(1, progress.rowsCopied / progress.rowsEstimated);
+    // Se compara con las filas **de la tabla en curso**: la estimación es suya, y
+    // con varias tablas el total de la pasada la pasaría de largo enseguida. Con
+    // una sola tabla los dos números son el mismo.
+    return Math.min(1, progress.tableRowsCopied / progress.rowsEstimated);
+  });
+
+  /**
+   * Tablas terminadas sobre el total, o nulo cuando solo hay una.
+   *
+   * Es el primer nivel del progreso, el que contesta «¿por dónde va la pasada?».
+   * Con una tabla no se enseña: sería una barra de dos posiciones.
+   */
+  readonly tables = computed(() => {
+    const progress = this._progress();
+
+    if (!progress || progress.tablesTotal <= 1) {
+      return null;
+    }
+
+    return { done: progress.tablesDone, total: progress.tablesTotal };
   });
 
   /** Qué se copiaría y qué habría que mirar antes, sin tocar el destino. */
@@ -140,6 +161,64 @@ export class TransferStore {
         rowsCopied: 0,
         rowsEstimated: request.source.approximateRowCount,
         rowsSkipped: 0,
+        tableRowsCopied: 0,
+        tablesDone: 0,
+        tablesTotal: 1,
+        batchesDone: 0,
+        elapsedMilliseconds: 0,
+        warnings: [],
+      });
+
+      this.poll(id);
+    } catch (error) {
+      this._error.set(message(error));
+    }
+  }
+
+  /**
+   * En qué orden se copiarían las tablas, y cuáles se apuntan entre sí.
+   *
+   * Se pregunta antes de confirmar: el orden es lo que hace que una pasada de
+   * seis tablas relacionadas funcione, y hay que poder verlo antes de escribir
+   * nada.
+   */
+  async orderSet(request: TransferSetRequest): Promise<TransferSetOrder | null> {
+    this._error.set(null);
+
+    try {
+      return await firstValueFrom(this._gateway.orderTransferSet(request));
+    } catch (error) {
+      this._error.set(message(error));
+
+      return null;
+    }
+  }
+
+  /** Lanza la pasada entera. Como {@link start}, no espera a que termine. */
+  async startSet(request: TransferSetRequest): Promise<void> {
+    this._error.set(null);
+    this._preview.set(null);
+
+    const first = request.tables[0];
+
+    if (!first) {
+      return;
+    }
+
+    try {
+      const id = await firstValueFrom(this._gateway.runTransferSet(request));
+
+      this._progress.set({
+        id,
+        step: 'ReadingStructure',
+        outcome: 'Running',
+        currentObject: first.target.name,
+        rowsCopied: 0,
+        rowsEstimated: first.source.approximateRowCount,
+        rowsSkipped: 0,
+        tableRowsCopied: 0,
+        tablesDone: 0,
+        tablesTotal: request.tables.length,
         batchesDone: 0,
         elapsedMilliseconds: 0,
         warnings: [],
@@ -204,6 +283,9 @@ export class TransferStore {
       `Traslado ${progress.id}`,
       `Destino: ${progress.currentObject ?? '—'}`,
       `Estado: ${outcomeLabel(progress.outcome)}`,
+      ...(progress.tablesTotal > 1
+        ? [`Tablas: ${progress.tablesDone} de ${progress.tablesTotal}`]
+        : []),
       `Filas copiadas: ${progress.rowsCopied}`,
       `Lotes: ${progress.batchesDone}`,
       `Duración: ${Math.round(progress.elapsedMilliseconds / 1000)} s`,

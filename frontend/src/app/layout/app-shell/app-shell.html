@@ -41,6 +41,7 @@
     (openNode)="openNode($event)"
     (importInto)="openImport($event)"
     (transferFrom)="openTransfer($event)"
+    (transferTablesFrom)="openTransferSet($event)"
     (backup)="openBackup($event)"
     (restore)="openRestore($event)"
     (createTable)="openTableDesigner($event)"
@@ -239,6 +240,14 @@
     [table]="origen.source"
     [connectionId]="origen.connectionId"
     (closed)="closeTransfer()"
+  />
+}
+
+@if (transferSetTarget(); as origen) {
+  <app-transfer-set-dialog
+    [node]="origen.source"
+    [connectionId]="origen.connectionId"
+    (closed)="closeTransferSet()"
   />
 }
 

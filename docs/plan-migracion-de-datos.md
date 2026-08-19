@@ -234,12 +234,11 @@ unitarias; la prueba de punta a punta del camino nuevo crea la tabla **dentro de
 mismo motor**, así que el asistente cruzado no lo ha recorrido nadie desde la
 pantalla; y el paso de tipos no tiene pruebas de componente en el frontend.
 
-### Fase 4 — Varias tablas y migraciones guardadas 🟡 (en curso, sesión 023d)
+### Fase 4 — Varias tablas y migraciones guardadas 🟡 (en curso, sesiones 023d y 023f)
 
 Dos cosas que caben en una fase porque se usan juntas: llevar un conjunto de
 tablas de una vez, y poder repetirlo mañana sin volver a armarlo. La primera
-tiene ya el motor y la puerta HTTP; le falta la pantalla. La segunda no se ha
-empezado.
+está terminada —motor, puerta HTTP y pantalla—. La segunda no se ha empezado.
 
 #### La decisión que había que tomar antes de escribir código
 
@@ -296,11 +295,35 @@ para la pasada, `TableRowsCopied` contra `RowsEstimated` para la tabla en curso,
 tiene que ser: lo contrario obligaría a la pantalla a saber en cuál de los dos
 casos está.
 
-#### Lo que falta
+#### La pantalla ✅
 
-**La pantalla.** Hoy el asistente elige una tabla y una sola: elegir varias, verlas
-en el orden en que van a copiarse, y las dos barras. Sin eso, la pasada existe
-pero no se puede pedir desde Druse.
+`TransferSetDialog`, aparte del asistente de una tabla y no dentro de él: aquí el
+destino **no es una tabla sino el sitio donde viven las tablas**, y meter los dos
+flujos en la misma pantalla obligaría a preguntar en cada paso cuál de los dos se
+está haciendo.
+
+Sale del menú del esquema o de la carpeta de tablas —«Migrar tablas a…»—, que es
+donde se mira cuando se piensa «me llevo esto». Cuatro pasos: marcar las tablas,
+elegir el sitio de destino, ver el plan y copiar.
+
+Tres decisiones de esta pantalla:
+
+1. **Se empareja por nombre**, igual que las columnas. Cada tabla del origen busca
+   la que se llama igual al otro lado.
+2. **Las que no están en el destino se dicen y se quedan fuera.** No se crean:
+   crear una tabla es una decisión con tipos y clave primaria, y se toma de una en
+   una en el otro asistente. Una pasada que crea a medias parece completa y no lo
+   es.
+3. **«Vaciar y cargar» no se ofrece en una pasada.** Vaciar exige escribir el
+   nombre de la tabla, y con seis marcadas serían seis confirmaciones que no caben
+   en una casilla; se hace tabla a tabla, que es donde esa confirmación significa
+   algo.
+
+El orden se pide antes de confirmar y se enseña como lista numerada, con el aviso
+de los ciclos debajo. Y el progreso ya usa los dos niveles: la tabla en curso
+contra su estimación, y «tabla 2 de 6» encima.
+
+#### Lo que falta
 
 **Los perfiles**, espejo de `SqliteBackupProfileStore`: una tabla nueva en
 `DruseDatabase`, al lado de `backup_profiles`, con la selección en JSON por lo

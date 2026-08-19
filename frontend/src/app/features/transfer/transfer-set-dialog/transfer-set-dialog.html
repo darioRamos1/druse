@@ -1,0 +1,294 @@
+<div class="backdrop" (click)="close()"></div>
+
+<div class="dialog" role="dialog" aria-modal="true" aria-labelledby="transfer-set-title">
+  <header class="head">
+    <div>
+      <h2 class="title" id="transfer-set-title">Migrar tablas de {{ sourceName() }}</h2>
+      <p class="subtitle">
+        Marca las que se llevan y elige dónde van. Se copian en el orden que exijan sus claves
+        foráneas, y antes de escribir nada verás cuál va primero.
+      </p>
+    </div>
+    <button type="button" class="close" (click)="close()" aria-label="Cerrar">×</button>
+  </header>
+
+  <div class="body">
+    @if (error()) {
+      <p class="problem">{{ error() }}</p>
+    }
+
+    <!-- ---------------------------------------------------------------- -->
+    <!-- 1. Qué tablas se llevan                                           -->
+    <!-- ---------------------------------------------------------------- -->
+    @if (step() === 'tables') {
+      @if (loadingSource()) {
+        <p class="empty">Leyendo las tablas…</p>
+      } @else if (sourceTables().length === 0) {
+        <p class="empty">Aquí no hay tablas que migrar.</p>
+      } @else {
+        <div class="bulk">
+          <span class="bulk__count">{{ selected().size }} de {{ sourceTables().length }} marcadas</span>
+          <button type="button" class="link" (click)="all()">Todas</button>
+          <button type="button" class="link" (click)="none()">Ninguna</button>
+        </div>
+
+        <ul class="tables">
+          @for (table of sourceTables(); track table.id) {
+            <li>
+              <label class="tables__row">
+                <input
+                  type="checkbox"
+                  [checked]="isSelected(table)"
+                  (change)="toggle(table)"
+                />
+                <span class="tables__name">{{ table.name }}</span>
+                @if (table.approximateRowCount !== undefined) {
+                  <span class="tables__rows">~{{ table.approximateRowCount }} filas</span>
+                }
+              </label>
+            </li>
+          }
+        </ul>
+      }
+    }
+
+    <!-- ---------------------------------------------------------------- -->
+    <!-- 2. A dónde van                                                    -->
+    <!-- ---------------------------------------------------------------- -->
+    @if (step() === 'target') {
+      <label class="field">
+        <span class="field__label">Conexión de destino</span>
+        <select
+          [value]="targetConnectionId()"
+          (change)="onTargetConnection($any($event.target).value)"
+        >
+          @for (connection of connections(); track connection.id) {
+            <option [value]="connection.id">
+              {{ connection.name }}@if (connection.id === connectionId()) { (esta misma) }
+            </option>
+          }
+        </select>
+      </label>
+
+      <nav class="trail" aria-label="Dónde estás">
+        <button type="button" class="trail__step" (click)="back()">Bases</button>
+        @for (node of trail(); track node.id; let i = $index) {
+          <span class="trail__sep">›</span>
+          <button type="button" class="trail__step" (click)="back(i)">{{ node.name }}</button>
+        }
+      </nav>
+
+      <!-- El destino es el sitio, no una tabla: cada tabla del origen se
+           empareja con la que se llama igual al otro lado. -->
+      <div class="choose">
+        <button type="button" class="btn" [disabled]="!here() || browsing()" (click)="chooseHere()">
+          @if (here(); as folder) {
+            Migrar a «{{ folder.name }}»
+          } @else {
+            Entra en una base para elegir dónde
+          }
+        </button>
+      </div>
+
+      <div class="browser">
+        @if (browsing()) {
+          <p class="browser__empty">Leyendo el catálogo…</p>
+        } @else if (nodes().length === 0) {
+          <p class="browser__empty">Aquí no hay nada que enseñar.</p>
+        } @else {
+          <ul class="browser__list">
+            @for (node of nodes(); track node.id) {
+              <li>
+                <button
+                  type="button"
+                  class="browser__item"
+                  [class.is-table]="node.kind === 'table'"
+                  [disabled]="node.kind === 'table'"
+                  (click)="open(node)"
+                >
+                  <span class="browser__name">{{ node.name }}</span>
+                  <span class="browser__kind">{{ node.kind }}</span>
+                </button>
+              </li>
+            }
+          </ul>
+        }
+      </div>
+    }
+
+    <!-- ---------------------------------------------------------------- -->
+    <!-- 3. Qué va a pasar                                                 -->
+    <!-- ---------------------------------------------------------------- -->
+    @if (step() === 'plan') {
+      <p class="route">
+        {{ sourceName() }} <span class="route__arrow">→</span> {{ targetName() }}
+        <button type="button" class="link" (click)="step.set('target')">Cambiar destino</button>
+      </p>
+
+      <div class="options">
+        <label class="field">
+          <span class="field__label">Qué hacer con lo que ya está</span>
+          <select [value]="mode()" (change)="onMode($any($event.target).value)">
+            @for (option of modes; track option.id) {
+              <option [value]="option.id">{{ option.label }}</option>
+            }
+          </select>
+        </label>
+
+        <label class="field field--inline">
+          <input
+            type="checkbox"
+            [checked]="ordered()"
+            (change)="onOrdered($any($event.target).checked)"
+          />
+          <span>Ordenar por las claves foráneas del destino</span>
+        </label>
+
+        <label class="field field--inline">
+          <input type="checkbox" [(ngModel)]="keepIdentity" />
+          <span>Conservar los identificadores del origen</span>
+        </label>
+
+        <label class="field field--inline">
+          <input type="checkbox" [(ngModel)]="atomic" />
+          <span>Cada tabla entera o nada</span>
+        </label>
+      </div>
+
+      <!-- Vaciar y cargar no se ofrece aquí: el proceso local exige escribir el
+           nombre de cada tabla que se vacía, y eso se hace de una en una. -->
+      <p class="note">
+        Para vaciar y cargar, hazlo tabla a tabla: borrar exige escribir el nombre de cada una.
+      </p>
+
+      <section class="plan">
+        <h3 class="plan__title">
+          @if (planning()) {
+            Preguntando en qué orden van…
+          } @else if (order(); as order) {
+            Se copian en este orden
+          } @else {
+            Se copian en el orden de la lista
+          }
+        </h3>
+
+        <ol class="plan__list">
+          @if (order(); as order) {
+            @for (name of order.tables; track name) {
+              <li>{{ name }}</li>
+            }
+          } @else {
+            @for (pair of ready(); track pair.source.id) {
+              <li>{{ pair.source.name }}</li>
+            }
+          }
+        </ol>
+
+        @if (order(); as order) {
+          @if (order.cycles.length > 0) {
+            <p class="warn">
+              <strong>{{ order.cycles.join(', ') }}</strong> se apuntan entre sí, y con un ciclo no
+              hay orden que las satisfaga a la vez. Se copian en el orden en que están, así que el
+              destino puede rechazar filas que apunten a otras que todavía no han llegado.
+            </p>
+          }
+        }
+
+        @if (missing().length > 0) {
+          <p class="warn">
+            No están en el destino y se quedan fuera:
+            <strong>{{ missing().length }}</strong> —
+            {{ missingNames() }}. Créalas antes, o migra esas de una en una.
+          </p>
+        }
+      </section>
+    }
+
+    <!-- ---------------------------------------------------------------- -->
+    <!-- 4. Copiando                                                       -->
+    <!-- ---------------------------------------------------------------- -->
+    @if (step() === 'running' && progress(); as progress) {
+      @if (tables(); as tables) {
+        <p class="tables-progress">
+          Tabla {{ tables.done + 1 > tables.total ? tables.total : tables.done + 1 }} de
+          {{ tables.total }} — {{ tables.done }} terminadas
+        </p>
+      }
+
+      <app-operation-progress
+        [step]="stepLabel()"
+        [subject]="progress.currentObject ?? targetName()"
+        [overall]="overall()"
+        [current]="overall()"
+        [rowsDone]="progress.tableRowsCopied"
+        [rowsEstimated]="progress.rowsEstimated ?? null"
+        [elapsedMs]="progress.elapsedMilliseconds"
+        [cancellable]="running()"
+        (cancelRequested)="cancel()"
+      />
+
+      @if (finished()) {
+        <section class="summary">
+          <h3 class="summary__title">
+            @switch (progress.outcome) {
+              @case ('Completed') {
+                Copiadas {{ progress.rowsCopied }} filas de {{ progress.tablesDone }} tablas
+              }
+              @case ('CompletedWithWarnings') {
+                Copiadas {{ progress.rowsCopied }} filas de {{ progress.tablesDone }} tablas, con
+                avisos
+              }
+              @case ('Cancelled') { Cancelado con {{ progress.rowsCopied }} filas ya copiadas }
+              @default { No se pudo terminar }
+            }
+          </h3>
+
+          @if (progress.failure) {
+            <p class="problem">{{ progress.failure.message }}</p>
+            <p class="summary__line">
+              Se pararon en «{{ progress.currentObject }}», con
+              {{ progress.tablesDone }} de {{ progress.tablesTotal }} tablas ya copiadas enteras. Lo
+              que entró se queda: repite desde ahí, no desde el principio.
+            </p>
+          }
+
+          @for (warning of progress.warnings; track $index) {
+            <p class="warn"><strong>{{ warning.subject }}:</strong> {{ warning.message }}</p>
+          }
+
+          <details class="summary__report">
+            <summary>Ver el registro</summary>
+            <pre>{{ report() }}</pre>
+          </details>
+        </section>
+      }
+    }
+  </div>
+
+  <footer class="foot">
+    @if (step() === 'running' && finished()) {
+      <button type="button" class="btn" (click)="dismiss()">Cerrar</button>
+    } @else if (step() === 'running') {
+      <button type="button" class="btn" (click)="close()">Dejarlo en segundo plano</button>
+    } @else {
+      <button type="button" class="btn" (click)="close()">Cancelar</button>
+
+      @if (step() === 'tables') {
+        <button
+          type="button"
+          class="btn btn--primary"
+          [disabled]="selected().size === 0"
+          (click)="toTarget()"
+        >
+          Elegir destino ({{ selected().size }})
+        </button>
+      }
+
+      @if (step() === 'plan') {
+        <button type="button" class="btn btn--primary" [disabled]="!canRun()" (click)="run()">
+          Copiar {{ ready().length }} tablas
+        </button>
+      }
+    }
+  </footer>
+</div>

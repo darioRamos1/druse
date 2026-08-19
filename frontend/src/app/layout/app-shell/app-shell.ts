@@ -33,6 +33,7 @@ import { BackupDialog } from '../../features/backup/backup-dialog/backup-dialog'
 import { RestoreDialog } from '../../features/backup/restore-dialog/restore-dialog';
 import { ImportDialog } from '../../features/import/import-dialog/import-dialog';
 import { TransferDialog } from '../../features/transfer/transfer-dialog/transfer-dialog';
+import { TransferSetDialog } from '../../features/transfer/transfer-set-dialog/transfer-set-dialog';
 import { TableDesigner } from '../../features/tables/table-designer/table-designer';
 import { ProcedureRunner } from '../../features/query-builder/procedure-runner/procedure-runner';
 import { QueryBuilder } from '../../features/query-builder/query-builder/query-builder';
@@ -90,6 +91,7 @@ const DISCONNECTED: SessionStatus = {
     ResultsPanel,
     ImportDialog,
     TransferDialog,
+    TransferSetDialog,
     BackupDialog,
     RestoreDialog,
     TableDesigner,
@@ -184,6 +186,7 @@ export class AppShell {
         this.dialogOpen() ||
         this.importTarget() ||
         this.transferTarget() ||
+        this.transferSetTarget() ||
         this.builderTarget() ||
         this.designTarget() ||
         this.backupOpen() ||
@@ -219,6 +222,22 @@ export class AppShell {
 
   protected openTransfer(node: ExplorerNode): void {
     this.transferTarget.set(node);
+  }
+
+  /**
+   * Sitio del que se están migrando varias tablas.
+   *
+   * Va aparte del de una tabla porque son dos asistentes: aquí lo que se elige es
+   * el conjunto, y el destino es dónde viven las tablas y no una de ellas.
+   */
+  protected readonly transferSetTarget = signal<ExplorerNode | null>(null);
+
+  protected openTransferSet(node: ExplorerNode): void {
+    this.transferSetTarget.set(node);
+  }
+
+  protected closeTransferSet(): void {
+    this.transferSetTarget.set(null);
   }
 
   protected closeTransfer(): void {

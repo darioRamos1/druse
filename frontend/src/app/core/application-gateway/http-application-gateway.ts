@@ -49,6 +49,8 @@ import {
   TransferPreview,
   TransferProgress,
   TransferRequest,
+  TransferSetOrder,
+  TransferSetRequest,
   TypeTranslation,
   HealthStatus,
   SaveConnectionRequest,
@@ -440,6 +442,16 @@ export class HttpApplicationGateway extends ApplicationGateway {
     return this._http
       .post<{ statements: readonly string[] }>('/api/transfers/target', request)
       .pipe(map((response) => response.statements));
+  }
+
+  override orderTransferSet(request: TransferSetRequest): Observable<TransferSetOrder> {
+    return this._http.post<TransferSetOrder>('/api/transfers/set/order', request);
+  }
+
+  override runTransferSet(request: TransferSetRequest): Observable<string> {
+    return this._http
+      .post<{ id: string }>('/api/transfers/set', request)
+      .pipe(map((response) => response.id));
   }
 
   override getTransferStatus(transferId: string): Observable<TransferProgress> {

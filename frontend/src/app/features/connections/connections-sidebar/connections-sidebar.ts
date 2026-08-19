@@ -71,6 +71,9 @@ export class ConnectionsSidebar {
    */
   readonly transferFrom = output<ExplorerNode>();
 
+  /** Varias tablas de un esquema o carpeta, en una pasada. */
+  readonly transferTablesFrom = output<ExplorerNode>();
+
   /**
    * Respaldar lo que cuelga de este nodo.
    *

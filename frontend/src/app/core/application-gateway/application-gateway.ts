@@ -538,6 +538,18 @@ export abstract class ApplicationGateway {
    */
   abstract createTransferTarget(request: TransferRequest): Observable<readonly string[]>;
 
+  /**
+   * En qué orden se copiarían las tablas de una pasada, y cuáles se apuntan
+   * entre sí.
+   *
+   * Se pregunta antes de confirmar nada: quien va a mover doce tablas quiere
+   * verlo en la vista previa y no en el aviso de un traslado que ya empezó.
+   */
+  abstract orderTransferSet(request: TransferSetRequest): Observable<TransferSetOrder>;
+
+  /** Lanza la pasada entera y devuelve su identificador. Ver {@link runTransfer}. */
+  abstract runTransferSet(request: TransferSetRequest): Observable<string>;
+
   abstract getTransferStatus(transferId: string): Observable<TransferProgress>;
 
   abstract cancelTransfer(transferId: string): Observable<void>;
@@ -926,6 +938,26 @@ export interface TransferRequest {
   readonly replaceConfirmation?: string;
 }
 
+/** Varias tablas trasladadas en una pasada. */
+export interface TransferSetRequest {
+  readonly tables: readonly TransferRequest[];
+  /**
+   * Ordenar por las claves foráneas del destino: las padres antes que las hijas.
+   *
+   * Encendido salvo que se diga lo contrario, porque copiar una hija antes que su
+   * padre es el rechazo más previsible de todos.
+   */
+  readonly ordered?: boolean;
+}
+
+/** En qué orden se copiarían las tablas, y cuáles se apuntan entre sí. */
+export interface TransferSetOrder {
+  /** Nombres calificados, en el orden en que se copiarían. */
+  readonly tables: readonly string[];
+  /** Las que están en un ciclo y van sin ordenar. Vacío es lo normal. */
+  readonly cycles: readonly string[];
+}
+
 /**
  * Cuánto se conserva de un tipo al llevarlo a otro motor.
  *
@@ -995,6 +1027,11 @@ export interface TransferProgress {
    */
   readonly rowsEstimated?: number;
   readonly rowsSkipped: number;
+  /** Filas de la tabla en curso; `rowsCopied` es el total de la pasada. */
+  readonly tableRowsCopied: number;
+  readonly tablesDone: number;
+  /** Uno cuando se traslada una sola tabla, que sigue siendo lo corriente. */
+  readonly tablesTotal: number;
   readonly batchesDone: number;
   readonly elapsedMilliseconds: number;
   readonly warnings: readonly BackupWarning[];

@@ -1,0 +1,395 @@
+// Migrar varias tablas en una pasada.
+//
+// Comparte la forma del asistente de una tabla —es el mismo diálogo, con los
+// mismos pasos— y añade lo suyo: la lista con casillas, el orden y el aviso de
+// las que no están al otro lado.
+
+.backdrop {
+  position: absolute;
+  inset: 0;
+  background: var(--dr-scrim);
+  backdrop-filter: blur(2px);
+}
+
+.dialog {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 760px;
+  max-width: calc(100vw - 32px);
+  max-height: calc(100vh - 32px);
+  overflow: hidden;
+  border: 1px solid var(--dr-border-dialog);
+  border-radius: 12px;
+  background: var(--dr-surface-dialog);
+  box-shadow: var(--dr-shadow-dialog);
+}
+
+.head {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 18px 20px 16px;
+  border-bottom: 1px solid var(--dr-border);
+}
+
+.title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.subtitle {
+  margin: 4px 0 0;
+  color: var(--dr-text-tertiary);
+  font-size: 12px;
+}
+
+.close {
+  margin-left: auto;
+  border: 0;
+  background: transparent;
+  color: var(--dr-text-tertiary);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+
+  &:hover {
+    color: var(--dr-text);
+  }
+}
+
+.body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px 20px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 14px;
+
+  &--inline {
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+    margin: 0;
+  }
+
+  &__label {
+    color: var(--dr-text-muted);
+    font-size: 12px;
+  }
+}
+
+.trail {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 8px;
+
+  &__step {
+    border: 0;
+    background: transparent;
+    color: var(--dr-text-secondary);
+    font-family: inherit;
+    font-size: 12px;
+    cursor: pointer;
+
+    &:hover {
+      color: var(--dr-text);
+      text-decoration: underline;
+    }
+  }
+
+  &__sep {
+    color: var(--dr-text-faint);
+  }
+}
+
+.browser {
+  height: 260px;
+  overflow-y: auto;
+  border: 1px solid var(--dr-border);
+  border-radius: 8px;
+  background: var(--dr-surface-base);
+
+  &__empty {
+    margin: 0;
+    padding: 16px;
+    color: var(--dr-text-tertiary);
+    font-size: 12px;
+  }
+
+  &__list {
+    margin: 0;
+    padding: 4px;
+    list-style: none;
+  }
+
+  &__item {
+    display: flex;
+    gap: 8px;
+    align-items: baseline;
+    width: 100%;
+    padding: 5px 8px;
+    border: 0;
+    border-radius: 5px;
+    background: transparent;
+    color: var(--dr-text-secondary);
+    font-family: inherit;
+    font-size: 12px;
+    text-align: left;
+    cursor: pointer;
+
+    &:hover {
+      background: var(--dr-surface-hover);
+      color: var(--dr-text);
+    }
+  }
+
+  /* La tabla es lo que se está buscando, así que se distingue del resto. */
+  &__item.is-table &__name,
+  &__item.is-table .browser__name {
+    color: var(--dr-text);
+    font-weight: 500;
+  }
+
+  &__name {
+    font-family: var(--dr-font-mono);
+  }
+
+  &__kind {
+    margin-left: auto;
+    color: var(--dr-text-faint);
+    font-size: 11px;
+  }
+}
+
+.route {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 14px;
+  color: var(--dr-text-secondary);
+  font-size: 12px;
+
+  code {
+    font-family: var(--dr-font-mono);
+  }
+}
+
+.link {
+  border: 0;
+  background: transparent;
+  color: var(--dr-accent-text, var(--dr-text-secondary));
+  font-family: inherit;
+  font-size: 12px;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.note {
+  color: var(--dr-warning-strong);
+  font-family: var(--dr-font-ui);
+  font-size: 11.5px;
+
+  &--lost {
+    color: var(--dr-danger-text);
+  }
+}
+
+.options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: center;
+  margin: 16px 0 14px;
+  padding: 12px;
+  border: 1px solid var(--dr-border);
+  border-radius: 8px;
+  background: var(--dr-surface-base);
+}
+
+.warn {
+  margin: 12px 0 0;
+  padding: 8px 10px;
+  border: 1px solid var(--dr-warning-line);
+  border-radius: 6px;
+  background: var(--dr-warning-tint);
+  color: var(--dr-warning-strong);
+  font-size: 12px;
+}
+
+.problem {
+  margin: 0 0 12px;
+  padding: 8px 10px;
+  border: 1px solid var(--dr-danger-line-soft);
+  border-radius: 6px;
+  background: var(--dr-danger-tint-weak);
+  color: var(--dr-danger-text);
+  font-size: 12px;
+}
+
+.summary {
+  margin-top: 16px;
+
+  &__title {
+    margin: 0 0 8px;
+    font-size: 13px;
+    font-weight: 600;
+  }
+
+  &__line {
+    margin: 0 0 8px;
+    color: var(--dr-text-secondary);
+    font-size: 12px;
+  }
+
+  &__report {
+    margin-top: 12px;
+    color: var(--dr-text-tertiary);
+    font-size: 12px;
+
+    pre {
+      overflow-x: auto;
+      margin: 8px 0 0;
+      padding: 8px;
+      border-radius: 6px;
+      background: var(--dr-surface-base);
+      font-family: var(--dr-font-mono);
+      font-size: 11.5px;
+    }
+  }
+}
+
+.foot {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 14px 20px;
+  border-top: 1px solid var(--dr-border);
+}
+
+.btn {
+  height: 30px;
+  padding: 0 14px;
+  border: 1px solid var(--dr-border-subtle);
+  border-radius: var(--dr-radius);
+  background: transparent;
+  color: var(--dr-text-muted);
+  font-family: inherit;
+  font-size: 12px;
+  cursor: pointer;
+
+  &:hover:not(:disabled) {
+    background: var(--dr-surface-hover);
+    color: var(--dr-text);
+  }
+
+  &:disabled {
+    color: var(--dr-text-dim);
+    cursor: default;
+  }
+
+  /* Escribir en otra base se pide con el color del que uno se arrepiente. */
+  &--danger:not(:disabled) {
+    border-color: var(--dr-danger-line-soft);
+    background: var(--dr-danger-tint);
+    color: var(--dr-danger-text);
+    font-weight: 500;
+  }
+}
+
+.empty {
+  padding: 24px 0;
+  color: var(--dr-text-faintest);
+  font-size: 12px;
+  text-align: center;
+}
+
+.bulk {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+
+  &__count {
+    color: var(--dr-text-muted);
+    font-size: 11px;
+  }
+}
+
+.tables {
+  max-height: 320px;
+  overflow-y: auto;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--dr-border);
+  border-radius: var(--dr-radius-sm, 4px);
+  list-style: none;
+
+  &__row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 5px 10px;
+    cursor: pointer;
+
+    &:hover {
+      background: var(--dr-surface-hover, rgb(255 255 255 / 4%));
+    }
+  }
+
+  &__name {
+    flex: 1;
+    font-family: var(--dr-font-mono, monospace);
+    font-size: 12px;
+  }
+
+  &__rows {
+    color: var(--dr-text-faintest);
+    font-size: 10.5px;
+  }
+}
+
+// Elegir el sitio es un botón y no un clic en la fila: en el destino se navega
+// entre carpetas, y hay que poder decir «esta» sin haber entrado en una tabla.
+.choose {
+  margin: 8px 0;
+}
+
+.plan {
+  margin-top: 12px;
+
+  &__title {
+    margin: 0 0 6px;
+    color: var(--dr-text-muted);
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  &__list {
+    margin: 0;
+    padding-left: 20px;
+    color: var(--dr-text);
+    font-family: var(--dr-font-mono, monospace);
+    font-size: 12px;
+
+    li {
+      padding: 1px 0;
+    }
+  }
+}
+
+.tables-progress {
+  margin: 0 0 8px;
+  color: var(--dr-text-muted);
+  font-size: 11.5px;
+}

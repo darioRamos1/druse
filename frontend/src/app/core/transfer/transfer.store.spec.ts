@@ -29,10 +29,15 @@ function running(partial: Partial<TransferProgress> = {}): TransferProgress {
     rowsCopied: 0,
     rowsEstimated: 1000,
     rowsSkipped: 0,
+    tablesDone: 0,
+    tablesTotal: 1,
     batchesDone: 0,
     elapsedMilliseconds: 1000,
     warnings: [],
     ...partial,
+    // Con una sola tabla, lo copiado de la tabla en curso y el total de la pasada
+    // son el mismo número, y así es como llega del proceso local.
+    tableRowsCopied: partial.tableRowsCopied ?? partial.rowsCopied ?? 0,
   };
 }
 

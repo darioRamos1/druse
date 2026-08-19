@@ -30,7 +30,7 @@ test.describe('migrar datos entre tablas', () => {
     // los demás se deja fuera para no dar por hecho que la tabla la tiene.
     const clave = options.conClave ? ' PRIMARY KEY' : '';
 
-    await escribirSql(
+    await ejecutarConAviso(
       page,
       `DROP TABLE IF EXISTS ${ORIGEN};
        DROP TABLE IF EXISTS ${DESTINO};
@@ -38,6 +38,17 @@ test.describe('migrar datos entre tablas', () => {
        INSERT INTO ${ORIGEN} VALUES (1, 'Ana'), (2, 'Bea'), (3, 'Carla');
        CREATE TABLE ${DESTINO} (id int${clave}, nombre text);`,
     );
+  }
+
+  /**
+   * Ejecuta SQL que Druse considera peligroso, confirmando como lo haría alguien.
+   *
+   * Lleva `DROP`, así que la aplicación pide confirmación —es su análisis de
+   * riesgo, y saltárselo aquí sería probar una aplicación que no es la que se
+   * reparte—.
+   */
+  async function ejecutarConAviso(page: Page, sql: string): Promise<void> {
+    await escribirSql(page, sql);
 
     await page.keyboard.press('Control+Enter');
 
@@ -309,5 +320,105 @@ test.describe('migrar datos entre tablas', () => {
     // Y se cierra sin copiar: lo que se comprobaba era la puerta, no el paso.
     await dialogo.locator('.foot').getByRole('button', { name: 'Cancelar' }).click();
     await expect(dialogo).toBeHidden();
+  });
+  /**
+   * Varias tablas en una pasada, con el orden que exigen sus foráneas.
+   *
+   * Es la fase 4 vista desde la pantalla: se marcan las tablas del sitio, se
+   * elige a dónde van —un sitio, no una tabla— y el asistente enseña en qué orden
+   * irán antes de escribir nada. Lo que se comprueba al final son las filas de
+   * las dos tablas del destino.
+   */
+  test('migra varias tablas a la vez, las padres antes que las hijas', async ({ page }) => {
+    await abrir(page);
+    await conectar(page);
+
+    const esquema = 'e2e_pasada';
+
+    // El destino es otro esquema con **las mismas tablas**, porque la pasada
+    // empareja por nombre. Y la hija de allí lleva la foránea, que es lo que
+    // obliga a ordenar.
+    await ejecutarConAviso(
+      page,
+      `DROP SCHEMA IF EXISTS ${esquema} CASCADE;
+       DROP TABLE IF EXISTS e2e_pedidos;
+       DROP TABLE IF EXISTS e2e_clientes;
+       CREATE TABLE e2e_clientes (id int PRIMARY KEY, nombre text);
+       CREATE TABLE e2e_pedidos (id int PRIMARY KEY, cliente_id int);
+       INSERT INTO e2e_clientes VALUES (1, 'Ana'), (2, 'Bea');
+       INSERT INTO e2e_pedidos VALUES (10, 1), (11, 1), (12, 2);
+       CREATE SCHEMA ${esquema};
+       CREATE TABLE ${esquema}.e2e_clientes (id int PRIMARY KEY, nombre text);
+       CREATE TABLE ${esquema}.e2e_pedidos (
+         id int PRIMARY KEY,
+         cliente_id int REFERENCES ${esquema}.e2e_clientes (id));`,
+    );
+
+    // La pasada sale del sitio donde viven las tablas, no del menú de una.
+    await desplegar(page, 'druse_test', 'public');
+    await desplegar(page, 'public', 'Tables');
+
+    const sidebar = page.locator('app-connections-sidebar');
+    const carpeta = sidebar.locator('.node', { hasText: 'Tables' }).first();
+
+    await carpeta.getByRole('button', { name: 'Acciones para Tables' }).click();
+    await page.getByRole('menuitem', { name: 'Migrar tablas a…' }).click();
+
+    const dialogo = page.locator('app-transfer-set-dialog');
+
+    await expect(dialogo).toBeVisible();
+
+    // En `public` hay más tablas de otras pruebas: se empieza por ninguna y se
+    // marcan las dos que interesan.
+    await dialogo.getByRole('button', { name: 'Ninguna' }).click();
+
+    for (const tabla of ['e2e_clientes', 'e2e_pedidos']) {
+      await dialogo.locator('.tables__row', { hasText: tabla }).first().locator('input').check();
+    }
+
+    await dialogo.getByRole('button', { name: 'Elegir destino' }).click();
+
+    for (const paso of ['druse_test', esquema, 'Tables']) {
+      const nodo = dialogo.locator('.browser__item', { hasText: paso }).first();
+
+      await expect(nodo).toBeVisible({ timeout: 30_000 });
+      await nodo.click();
+    }
+
+    await dialogo.getByRole('button', { name: 'Migrar a' }).click();
+
+    // El orden es el producto de la fase: la padre primero, aunque se marcaran
+    // por orden alfabético.
+    await expect(dialogo.locator('.plan__title')).toContainText('Se copian en este orden', {
+      timeout: 30_000,
+    });
+
+    const orden = await dialogo.locator('.plan__list li').allTextContents();
+
+    expect(orden.map((linea) => linea.trim())).toEqual([
+      `${esquema}.e2e_clientes`,
+      `${esquema}.e2e_pedidos`,
+    ]);
+
+    await dialogo.getByRole('button', { name: 'Copiar 2 tablas' }).click();
+
+    await expect(dialogo.locator('.summary__title')).toContainText('Copiadas 5 filas de 2 tablas', {
+      timeout: 60_000,
+    });
+
+    await dialogo.locator('.foot').getByRole('button', { name: 'Cerrar' }).click();
+    await expect(dialogo).toBeHidden();
+
+    // Lo que demuestra que la pasada sirvió: las filas están al otro lado, y la
+    // hija entró sin que la foránea la rechazara.
+    expect(await contar(page, `${esquema}.e2e_clientes`)).toBe('2');
+    expect(await contar(page, `${esquema}.e2e_pedidos`)).toBe('3');
+
+    await ejecutarConAviso(
+      page,
+      `DROP SCHEMA IF EXISTS ${esquema} CASCADE;
+       DROP TABLE IF EXISTS e2e_pedidos;
+       DROP TABLE IF EXISTS e2e_clientes;`,
+    );
   });
 });
