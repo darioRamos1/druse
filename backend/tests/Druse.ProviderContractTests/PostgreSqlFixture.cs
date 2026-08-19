@@ -95,6 +95,9 @@ public sealed class PostgreSqlFixture : IProviderFixture
 
     public string SyntaxErrorCode => "42601";
 
+    /// <summary>Da la posición del carácter, y por eso aquí se subraya la palabra.</summary>
+    public SyntaxErrorPlace SyntaxErrorPlace => SyntaxErrorPlace.Position;
+
     public string MissingTableCode => "42P01";
 
     public string ThreeResultSets => "SELECT 1 AS a; SELECT 2 AS b; SELECT 3 AS c;";

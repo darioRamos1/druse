@@ -164,6 +164,13 @@ public sealed class InformixFixture : IProviderFixture
     /// <summary>-201: error de sintaxis. Informix numera sus errores en negativo.</summary>
     public string SyntaxErrorCode => "-201";
 
+    /// <summary>
+    /// No dice dónde. Ante un error de sintaxis responde «A syntax error has
+    /// occurred.» y nada más: ni línea, ni posición, ni el fragmento culpable.
+    /// El editor no tiene qué señalar y no señala nada.
+    /// </summary>
+    public SyntaxErrorPlace SyntaxErrorPlace => SyntaxErrorPlace.Nothing;
+
     /// <summary>-206: la tabla no está en la base de datos.</summary>
     public string MissingTableCode => "-206";
 

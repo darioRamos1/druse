@@ -128,6 +128,12 @@ public sealed class MySqlFixture : IProviderFixture
     /// <summary>1064: error de sintaxis.</summary>
     public string SyntaxErrorCode => "1064";
 
+    /// <summary>
+    /// Da la línea, pero **solo dentro del texto** del mensaje: «…at line 3». El
+    /// normalizador la extrae de ahí; no hay campo donde leerla.
+    /// </summary>
+    public SyntaxErrorPlace SyntaxErrorPlace => SyntaxErrorPlace.Line;
+
     /// <summary>1146: la tabla no existe.</summary>
     public string MissingTableCode => "1146";
 

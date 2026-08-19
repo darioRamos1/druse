@@ -108,6 +108,9 @@ public sealed class SqlServerFixture : IProviderFixture
     /// <summary>102: sintaxis incorrecta cerca de…</summary>
     public string SyntaxErrorCode => "102";
 
+    /// <summary>Da la línea en un campo propio del error, sin la columna.</summary>
+    public SyntaxErrorPlace SyntaxErrorPlace => SyntaxErrorPlace.Line;
+
     /// <summary>208: nombre de objeto no válido.</summary>
     public string MissingTableCode => "208";
 

@@ -8,6 +8,15 @@
     <PackageReference Include="MySqlConnector" Version="2.6.2" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!--
+      El normalizador es interno —nadie fuera del proveedor debe conocer los
+      tipos de MySqlConnector— pero la línea del error se saca del texto del
+      mensaje, y eso hay que poder probarlo sin un servidor delante.
+    -->
+    <InternalsVisibleTo Include="Druse.UnitTests" />
+  </ItemGroup>
+
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>

@@ -3,6 +3,19 @@ using Druse.Domain;
 
 namespace Druse.ProviderContractTests;
 
+/// <summary>Hasta dónde llega un motor al decir dónde está el error.</summary>
+public enum SyntaxErrorPlace
+{
+    /// <summary>Ni línea ni posición: es el caso de Informix.</summary>
+    Nothing,
+
+    /// <summary>La línea dentro del SQL enviado. SQL Server la da en un campo; MySQL, dentro del mensaje.</summary>
+    Line,
+
+    /// <summary>El carácter exacto. Solo PostgreSQL.</summary>
+    Position,
+}
+
 /// <summary>
 /// Lo que cada proveedor debe aportar para poder ejecutar el contrato común.
 ///
@@ -119,6 +132,16 @@ public interface IProviderFixture
 
     /// <summary>Código que el motor devuelve ante un error de sintaxis.</summary>
     string SyntaxErrorCode { get; }
+
+    /// <summary>
+    /// Cuánto sabe decir este motor sobre **dónde** falló.
+    ///
+    /// Está declarado porque es lo que el editor puede señalar: con la posición
+    /// se subraya la palabra culpable, con la línea la línea entera, y sin nada
+    /// no se marca nada. Los tres casos existen entre los cuatro motores, y
+    /// confundirlos acabaría señalando un sitio inventado.
+    /// </summary>
+    SyntaxErrorPlace SyntaxErrorPlace { get; }
 
     /// <summary>Código que el motor devuelve al referenciar una tabla inexistente.</summary>
     string MissingTableCode { get; }

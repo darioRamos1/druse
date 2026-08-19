@@ -235,6 +235,55 @@ public abstract class DatabaseProviderContractTests<TFixture>
         Assert.False(string.IsNullOrWhiteSpace(result.Error.Message));
     }
 
+    /// <summary>
+    /// Un error de sintaxis dice **dónde**, hasta donde el motor sepa decirlo.
+    ///
+    /// Es lo que el editor subraya: con la posición se marca la palabra culpable,
+    /// con la línea la línea entera, y sin nada no se marca. Lo que se comprueba
+    /// aquí es que lo declarado en la fixture y lo que el motor entrega de verdad
+    /// no se separen —si un día IBM empieza a dar la línea, esta prueba se pone
+    /// roja y nos enteramos— y, sobre todo, que **lo que llegue apunte a la línea
+    /// correcta**: un error mal situado es peor que uno sin situar.
+    /// </summary>
+    [Fact]
+    public async Task ErrorDeSintaxis_DiceDondeHastaDondeElMotorSabe()
+    {
+        if (Skip) { return; }
+
+        await using var session = await OpenAsync();
+
+        // El error está en la tercera línea a propósito: con todo en una sola,
+        // cualquier número valdría y la prueba no distinguiría nada.
+        const string Sql = "SELECT\n  uno,\n  FROM tabla_x";
+
+        var result = await ExecuteAsync(session, Sql);
+
+        Assert.Equal(QueryExecutionState.Failed, result.State);
+        Assert.NotNull(result.Error);
+
+        switch (Fixture.SyntaxErrorPlace)
+        {
+            case SyntaxErrorPlace.Position:
+                Assert.NotNull(result.Error.Position);
+
+                // La posición se cuenta desde uno sobre el SQL enviado, así que
+                // lo que hay antes tiene que ser justo las dos primeras líneas.
+                var antes = Sql[..(result.Error.Position!.Value - 1)];
+
+                Assert.Equal(2, antes.Count(character => character == '\n'));
+                break;
+
+            case SyntaxErrorPlace.Line:
+                Assert.Equal(3, result.Error.Line);
+                break;
+
+            default:
+                Assert.Null(result.Error.Position);
+                Assert.Null(result.Error.Line);
+                break;
+        }
+    }
+
     [Fact]
     public async Task TablaInexistente_DevuelveErrorNormalizado()
     {
