@@ -1151,6 +1151,45 @@ describe('WorkspaceStore', () => {
       expect(gateway.executeCalls[0].sql).toBe('\n  SELECT * FROM');
     });
 
+    /**
+     * Cuántas filas se traen es un ajuste, no un número escondido en el código.
+     *
+     * Quinientas caben en pantalla y llegan rápido, pero quien mira una tabla
+     * grande necesita subirlo sin salir a buscar dónde se cambia.
+     */
+    it('trae quinientas filas mientras nadie diga otra cosa', async () => {
+      await store.connect(form);
+      store.updateSql('SELECT 1');
+
+      await store.execute();
+
+      expect(gateway.executeCalls[0].maxRows).toBe(500);
+    });
+
+    it('usa el límite de filas elegido, y lo recuerda', async () => {
+      await store.connect(form);
+      await store.setMaxRows(10_000);
+      store.updateSql('SELECT 1');
+
+      await store.execute();
+
+      expect(store.maxRows()).toBe(10_000);
+      expect(gateway.executeCalls[0].maxRows).toBe(10_000);
+      expect(gateway.preferences['query.maxRows']).toBe('10000');
+    });
+
+    /**
+     * Pedir más de lo que el proceso local admite se ajusta aquí.
+     *
+     * Prometer doscientas mil en la barra y que el servidor devuelva cien mil
+     * sería mentir sobre lo que se está viendo.
+     */
+    it('no deja pedir más filas de las que el proceso local admite', async () => {
+      await store.setMaxRows(500_000);
+
+      expect(store.maxRows()).toBe(100_000);
+    });
+
     it('guarda la duración de la última ejecución', async () => {
       await store.connect(form);
       store.updateSql('SELECT 1');

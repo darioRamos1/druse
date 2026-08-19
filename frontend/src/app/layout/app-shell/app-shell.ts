@@ -541,6 +541,8 @@ export class AppShell {
     this._store.ensureRelationsAsync(schema);
   protected readonly timeoutSeconds = this._store.timeoutSeconds;
 
+  protected readonly maxRows = this._store.maxRows;
+
   private readonly _editor = viewChild<SqlEditor>('editor');
   private readonly _editorElement = viewChild('editor', { read: ElementRef });
   private readonly _resultsPanel = viewChild<ResultsPanel>('resultsPanel');
@@ -562,6 +564,10 @@ export class AppShell {
 
   protected onFormatFailed(message: string): void {
     this._store.notify(`No se pudo formatear: ${message}`);
+  }
+
+  protected setMaxRows(rows: number): void {
+    this._store.setMaxRows(rows);
   }
 
   protected setTimeout(seconds: number): void {

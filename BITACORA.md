@@ -10,14 +10,14 @@
 
 | Campo | Valor |
 | --- | --- |
-| Última sesión | **023g** — 2026-08-19 |
+| Última sesión | **023h** — 2026-08-19 |
 | Fase activa | **Migración de datos entre tablas:** fases 1, 2 y 3 cerradas; la **4** tiene la pasada de varias tablas entera —motor, API y pantalla— y le faltan los perfiles (ver «Qué toca retomar»). **Respaldos y restauración:** Fases A–E cerradas. La **F** tiene backend, interfaz, CSV, selector de archivos, restaurar en una base nueva y **el ciclo entero por HTTP en los cuatro motores**; le falta repetir a mano el respaldo real que encontró el error de los índices de expresión |
 | Fases 0–6 | ✅ Cerradas. |
 | Fase 7 | 🟡 **11/12.** El ciclo de instalación está probado sobre este equipo; solo falta arrancar en una máquina sin herramientas de desarrollo. |
 | Fase 8 | ✅ **7/7.** Tres motores sobre el mismo contrato y primera beta preparada. |
 | ¿Compila el backend? | Sí — 0 advertencias, 0 errores |
 | ¿Compila el envoltorio? | Sí |
-| ¿Pasan las pruebas? | Sí — **753 en backend** (422 unitarias, 190 contractuales y 141 de integración) con `DRUSE_REQUIRE_ENGINES=1` y **los cuatro motores**, sin saltarse ninguna y **en verde dos veces seguidas**; **495 en frontend** y **17 de punta a punta**. El rojo intermitente que arrastraba la suite era un fallo de verdad y se arregló en la sesión 023g. Las **6 del envoltorio** no se ejecutaron: cargo no compila en este equipo |
+| ¿Pasan las pruebas? | Sí — **753 en backend** (422 unitarias, 190 contractuales y 141 de integración) con `DRUSE_REQUIRE_ENGINES=1` y **los cuatro motores**, sin saltarse ninguna y **en verde dos veces seguidas**; **498 en frontend** y **18 de punta a punta**. El rojo intermitente que arrastraba la suite era un fallo de verdad y se arregló en la sesión 023g. Las **6 del envoltorio** no se ejecutaron: cargo no compila en este equipo |
 | ¿Hay aplicación de escritorio? | **Sí.** Instalador NSIS, MSI y ZIP portable, en dos variantes: con Informix y sin él |
 | Motores | **PostgreSQL, SQL Server, MySQL/MariaDB e Informix**, todos sobre el mismo contrato compartido |
 | Trabajo a medias | La fase 4 de la migración, a propósito: el backend de la pasada está commiteado y probado; la pantalla es lo siguiente. |
@@ -347,6 +347,47 @@ Y tres límites declarados desde el principio: no hay respaldo binario ni
 recuperación a un punto en el tiempo —eso es del servidor, y la interfaz tendrá
 que decirlo—, no hay respaldos programados, y un límite de filas puede dejar
 filas huérfanas, cosa que se avisa y no se corrige sola.
+
+### Sesión 023h — 2026-08-19 · Cuántas filas trae una consulta, elegido por quien mira
+
+Las consultas traían **quinientas filas y punto**: el número estaba escrito en el
+código del store, sin nada que tocar. El panel avisaba de que el resultado venía
+recortado, que es la mitad de lo que hace falta; la otra mitad es poder subirlo.
+
+#### Donde ya se ajusta el tiempo máximo
+
+El límite es ahora un ajuste más de la barra del editor, al lado del tiempo de
+ejecución y con la misma mecánica: se elige de una lista —100, 500, 1.000, 5.000,
+10.000 y 100.000— y **se guarda en preferencias**, porque quien trabaja con tablas
+grandes lo sube una vez y no quiere repetirlo en cada arranque.
+
+Cien mil es el tope del proceso local, y se ofrece entero. Pedir más se ajusta en
+el propio store: prometer doscientas mil en la barra y que el servidor devuelva
+cien mil sería mentir sobre lo que se está viendo.
+
+#### Y una casilla que se desmarcaba sola
+
+Comprobándolo en la aplicación levantada apareció un fallo del asistente de la
+pasada, recién estrenado: con la lista larga —el esquema de pruebas tiene noventa
+y dos tablas—, una de las dos marcadas llegaba al plan sin marcar, y la pasada se
+lanzaba con una tabla menos sin que nadie lo dijera.
+
+La casilla **alternaba** el estado en cada evento, y alternar da por hecho que a
+cada clic le corresponde un cambio. No siempre es así: un mismo clic puede llegar
+dos veces —la casilla y su etiqueta— y entonces la marca se pone y se quita sin
+que se vea. Ahora se toma el estado del evento, así que repetirlo no cambia nada.
+
+**Verificado.** **498 en frontend**, tres nuevas del límite —el valor por omisión,
+el elegido que se recuerda y el tope que no se puede pasar—, y **18 de punta a
+punta**: la nueva ejecuta `generate_series(1, 900)` con quinientas, comprueba que
+el panel dice «recortado», sube el límite a mil y vuelve a ejecutar para ver
+900 de 900. La suite entera pasó dos veces seguidas después del arreglo de la
+casilla, que antes fallaba una de cada dos.
+
+**Archivos.** `workspace-store.ts` (la preferencia `query.maxRows`, el tope y su
+uso al ejecutar), `editor-toolbar` (el chip y su menú), `app-shell` para
+enlazarlos, `transfer-set-dialog` (la casilla), y las pruebas de las tres cosas
+más `e2e/tests/editor.spec.ts`.
 
 ### Sesión 023g — 2026-08-19 · El aviso que llegaba tarde y dejaba el trabajo «en marcha» para siempre
 

@@ -68,6 +68,9 @@ export class EditorToolbar {
 
   readonly context = input.required<string>();
   readonly timeoutSeconds = input(30);
+
+  /** Filas que se traen de cada consulta. */
+  readonly maxRows = input(500);
   readonly running = input(false);
   readonly hasSelection = input(false);
   /** Hay una conexión abierta contra la que ejecutar. */
@@ -112,6 +115,8 @@ export class EditorToolbar {
   readonly format = output<void>();
   readonly timeoutChange = output<number>();
 
+  readonly maxRowsChange = output<number>();
+
   /** Solo lo que cambió: el store completa el resto. */
   readonly formatSettingsChange = output<Partial<FormatSettings>>();
 
@@ -138,7 +143,18 @@ export class EditorToolbar {
   /** Valores habituales, para no obligar a teclear un número. */
   protected readonly timeoutOptions = [5, 10, 30, 60, 300, 600];
 
+  /**
+   * Cuántas filas se ofrecen.
+   *
+   * Cien mil es el tope del proceso local, y se ofrece entero en lugar de dejarlo
+   * escrito en el código: quien exporta un resultado lo necesita, y sabe lo que
+   * pide porque el panel dice cuándo se recortó.
+   */
+  protected readonly rowOptions = [100, 500, 1_000, 5_000, 10_000, 100_000];
+
   protected readonly editingTimeout = signal(false);
+
+  protected readonly editingRows = signal(false);
 
   protected readonly editingFormat = signal(false);
 
@@ -207,20 +223,30 @@ export class EditorToolbar {
     }
 
     this.editingTimeout.set(false);
+    this.editingRows.set(false);
     this.editingFormat.set(false);
     this.choosingDatabase.set(false);
   }
 
   protected toggleTimeout(): void {
     this.editingFormat.set(false);
+    this.editingRows.set(false);
     this.choosingDatabase.set(false);
     this.editingTimeout.update((open) => !open);
+  }
+
+  protected toggleRows(): void {
+    this.editingFormat.set(false);
+    this.editingTimeout.set(false);
+    this.choosingDatabase.set(false);
+    this.editingRows.update((open) => !open);
   }
 
   protected toggleFormat(): void {
     // Dos menús abiertos a la vez en la misma barra no aportan nada y se tapan
     // entre ellos.
     this.editingTimeout.set(false);
+    this.editingRows.set(false);
     this.choosingDatabase.set(false);
     this.editingFormat.update((open) => !open);
   }
@@ -229,6 +255,7 @@ export class EditorToolbar {
 
   protected toggleDatabases(): void {
     this.editingTimeout.set(false);
+    this.editingRows.set(false);
     this.editingFormat.set(false);
     this.choosingDatabase.update((open) => !open);
   }
@@ -273,6 +300,22 @@ export class EditorToolbar {
   protected chooseTimeout(seconds: number): void {
     this.editingTimeout.set(false);
     this.timeoutChange.emit(seconds);
+  }
+
+  protected chooseRows(rows: number): void {
+    this.editingRows.set(false);
+    this.maxRowsChange.emit(rows);
+  }
+
+  /**
+   * Miles separados siempre: `100000` se lee mal.
+   *
+   * Con la agrupación por omisión, el español deja `1000` sin punto y la lista
+   * quedaría con unos números agrupados y otros no, que es peor que cualquiera de
+   * las dos formas.
+   */
+  protected rowsLabel(rows: number): string {
+    return new Intl.NumberFormat('es', { useGrouping: true }).format(rows);
   }
 
   /** Etiqueta compacta: 600 s se lee peor que 10 min. */

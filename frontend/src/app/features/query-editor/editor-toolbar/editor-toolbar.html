@@ -224,6 +224,39 @@
   <button
     type="button"
     class="chip"
+    [attr.aria-expanded]="editingRows()"
+    title="Filas que se traen de cada consulta"
+    (click)="toggleRows()"
+  >
+    <app-icon name="table" [size]="12" />
+    Filas <span class="chip__value">{{ rowsLabel(maxRows()) }}</span>
+    <app-icon name="chevron-down" [size]="9" />
+  </button>
+
+  @if (editingRows()) {
+    <ul class="timeout__menu" role="listbox">
+      @for (option of rowOptions; track option) {
+        <li>
+          <button
+            type="button"
+            class="timeout__option"
+            role="option"
+            [attr.aria-selected]="option === maxRows()"
+            [class.is-selected]="option === maxRows()"
+            (click)="chooseRows(option)"
+          >
+            {{ rowsLabel(option) }}
+          </button>
+        </li>
+      }
+    </ul>
+  }
+</div>
+
+<div class="timeout">
+  <button
+    type="button"
+    class="chip"
     [attr.aria-expanded]="editingTimeout()"
     title="Tiempo máximo de ejecución"
     (click)="toggleTimeout()"

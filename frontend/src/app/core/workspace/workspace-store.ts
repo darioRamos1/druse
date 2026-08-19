@@ -85,6 +85,20 @@ export type ReconnectOutcome = 'ok' | 'needsPassword' | 'failed';
 /** Clave con la que se guarda el tiempo máximo de ejecución. */
 const TIMEOUT_PREFERENCE = 'query.timeoutSeconds';
 
+/** Clave con la que se guarda cuántas filas se traen de cada consulta. */
+const ROW_LIMIT_PREFERENCE = 'query.maxRows';
+
+/**
+ * Filas que se traen si nadie dice otra cosa.
+ *
+ * Quinientas caben en pantalla y llegan rápido; quien necesite más lo sube desde
+ * la barra, y el proceso local admite hasta cien mil.
+ */
+const DEFAULT_ROW_LIMIT = 500;
+
+/** Tope del proceso local, que aquí se respeta para no prometer lo que rechazará. */
+const MAX_ROW_LIMIT = 100_000;
+
 /**
  * Espera antes de guardar el trabajo sin ejecutar, en milisegundos.
  *
@@ -168,6 +182,17 @@ export class WorkspaceStore {
   readonly timeoutSeconds = this._timeoutSeconds.asReadonly();
 
   /**
+   * Filas que se traen de cada consulta.
+   *
+   * Se guarda en preferencias igual que el tiempo máximo, y por lo mismo: quien
+   * trabaja con tablas grandes lo sube una vez y no quiere volver a hacerlo en
+   * cada arranque. El resultado dice **cuándo se recortó**, así que subirlo es una
+   * decisión informada y no a ciegas.
+   */
+  private readonly _maxRows = signal(DEFAULT_ROW_LIMIT);
+  readonly maxRows = this._maxRows.asReadonly();
+
+  /**
    * Cómo formatea el editor.
    *
    * Se guarda igual que el tiempo máximo, y por lo mismo: es una decisión que se
@@ -206,6 +231,24 @@ export class WorkspaceStore {
     } catch {
       // Igual que con el tiempo máximo: el ajuste ya está aplicado en esta
       // sesión, y no poder recordarlo no justifica interrumpir a nadie.
+    }
+  }
+
+  /**
+   * Cambia cuántas filas se traen.
+   *
+   * Se ajusta al tope del proceso local en lugar de dejar pedir más: prometer
+   * doscientas mil y que el servidor devuelva cien mil sería mentir en la barra.
+   */
+  async setMaxRows(rows: number): Promise<void> {
+    const clamped = Math.min(MAX_ROW_LIMIT, Math.max(1, Math.round(rows)));
+
+    this._maxRows.set(clamped);
+
+    try {
+      await firstValueFrom(this._gateway.setPreference(ROW_LIMIT_PREFERENCE, String(clamped)));
+    } catch {
+      // Como con el tiempo máximo: el ajuste ya está aplicado en esta sesión.
     }
   }
 
@@ -351,6 +394,12 @@ export class WorkspaceStore {
 
       if (Number.isFinite(stored) && stored > 0) {
         this._timeoutSeconds.set(stored);
+      }
+
+      const rows = Number.parseInt(preferences[ROW_LIMIT_PREFERENCE] ?? '', 10);
+
+      if (Number.isFinite(rows) && rows > 0) {
+        this._maxRows.set(Math.min(MAX_ROW_LIMIT, rows));
       }
 
       this._formatSettings.set(parseFormatSettings(preferences));
@@ -2660,7 +2709,7 @@ export class WorkspaceStore {
           executionId,
           sql,
           database: tab?.database,
-          maxRows: 500,
+          maxRows: this._maxRows(),
           timeoutSeconds: this._timeoutSeconds(),
           confirmDestructive,
         }),

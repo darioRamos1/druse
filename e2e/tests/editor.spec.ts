@@ -117,4 +117,51 @@ test.describe('el editor', () => {
     // ya no existe.
     expect(await marcaDeError(page)).toBeNull();
   });
+  /**
+   * Cuántas filas se traen se elige desde la barra.
+   *
+   * Quinientas es lo que viene puesto —caben en pantalla y llegan rápido—, y el
+   * panel dice cuándo se recortó. Lo que se comprueba aquí es que subirlo sirve:
+   * la misma consulta devuelve las novecientas y deja de estar recortada.
+   *
+   * El límite se fija a mano al empezar en lugar de darlo por hecho: es una
+   * preferencia y **se guarda**, así que lo que dejara puesto otra ejecución
+   * seguiría ahí.
+   */
+  test('el límite de filas se cambia desde la barra y se nota', async ({ page }) => {
+    const barra = page.locator('app-editor-toolbar');
+
+    /** Elige un límite en la barra. Devuelve el foco a quien lo pida después. */
+    async function elegirFilas(etiqueta: string): Promise<void> {
+      await barra.getByRole('button', { name: 'Filas' }).click();
+      await barra.getByRole('option', { name: etiqueta, exact: true }).click();
+      await expect(barra.getByRole('button', { name: 'Filas' })).toContainText(etiqueta);
+    }
+
+    await abrir(page);
+    await conectar(page);
+
+    await elegirFilas('500');
+
+    // Se escribe cada vez porque el atajo de ejecutar sale del editor, y tocar la
+    // barra deja el foco en el botón.
+    await escribirSql(page, 'SELECT * FROM generate_series(1, 900)');
+    await ejecutar(page, 'todo');
+
+    const rango = page.locator('.pager__range');
+
+    await expect(rango).toContainText('1–500', { timeout: 30_000 });
+    await expect(rango).toContainText('recortado');
+
+    await elegirFilas('1.000');
+
+    await escribirSql(page, 'SELECT * FROM generate_series(1, 900)');
+    await ejecutar(page, 'todo');
+
+    await expect(rango).toContainText('1–900', { timeout: 30_000 });
+    await expect(rango).not.toContainText('recortado');
+
+    // Se deja como estaba: las pruebas comparten aplicación y preferencias.
+    await elegirFilas('500');
+  });
 });
