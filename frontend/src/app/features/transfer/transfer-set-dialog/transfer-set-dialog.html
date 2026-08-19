@@ -39,7 +39,7 @@
                 <input
                   type="checkbox"
                   [checked]="isSelected(table)"
-                  (change)="toggle(table)"
+                  (change)="setSelected(table, $any($event.target).checked)"
                 />
                 <span class="tables__name">{{ table.name }}</span>
                 @if (table.approximateRowCount !== undefined) {

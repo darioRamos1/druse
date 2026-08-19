@@ -210,11 +210,21 @@ export class TransferSetDialog {
     }
   }
 
-  protected toggle(table: DatabaseObject): void {
+  /**
+   * Marca o desmarca una tabla **según cómo quedó la casilla**, no alternando.
+   *
+   * Alternar da por hecho que a cada clic le corresponde un cambio, y no siempre
+   * es así: un mismo clic puede llegar dos veces —la casilla y su etiqueta— y
+   * entonces la marca se pone y se quita sin que nadie lo vea. Tomando el estado
+   * del evento, repetirlo no cambia nada.
+   */
+  protected setSelected(table: DatabaseObject, selected: boolean): void {
     const chosen = new Set(this.selected());
 
-    if (!chosen.delete(table.id)) {
+    if (selected) {
       chosen.add(table.id);
+    } else {
+      chosen.delete(table.id);
     }
 
     this.selected.set(chosen);

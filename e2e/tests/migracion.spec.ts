@@ -376,6 +376,11 @@ test.describe('migrar datos entre tablas', () => {
       await dialogo.locator('.tables__row', { hasText: tabla }).first().locator('input').check();
     }
 
+    // Se comprueba la cuenta antes de seguir: si una casilla no prendió, el fallo
+    // tiene que señalar aquí y no tres pasos más allá, en un plan con una tabla
+    // menos de las que se pidieron.
+    await expect(dialogo.locator('.bulk__count')).toContainText('2 de');
+
     await dialogo.getByRole('button', { name: 'Elegir destino' }).click();
 
     for (const paso of ['druse_test', esquema, 'Tables']) {
