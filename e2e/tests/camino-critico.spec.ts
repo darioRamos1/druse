@@ -87,6 +87,21 @@ test.describe('el camino crítico', () => {
     await expect(sidebar.getByText(CONTENEDOR.base, { exact: true }).first()).toBeVisible({
       timeout: 60_000,
     });
+
+    /**
+     * Y se recoge lo que se ensució.
+     *
+     * Las pruebas comparten aplicación, y las demás bajan por el árbol buscando
+     * nodos por su nombre: dejar una segunda conexión abierta con las mismas bases
+     * dentro haría que alguna acabara pulsando en el árbol que no era.
+     */
+    const fila = sidebar.locator('.node--connection', { hasText: nombre }).first();
+
+    await fila.hover();
+    await fila.locator('[title="Desconectar"]').click();
+    await fila.hover();
+    await fila.locator('[title="Eliminar esta conexión guardada"]').click();
+    await expect(sidebar.getByText(nombre)).toHaveCount(0, { timeout: 30_000 });
   });
 
   test('se conecta a un PostgreSQL real y enseña sus bases', async ({ page }) => {
