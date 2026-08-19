@@ -10,65 +10,57 @@
 
 | Campo | Valor |
 | --- | --- |
-| Última sesión | **023c** — 2026-08-19 |
-| Fase activa | **Migración de datos entre tablas:** fases 1, 2 y 3 de 4 cerradas y funcionando (ver «Qué toca retomar»). **Respaldos y restauración:** Fases A–E cerradas. La **F** tiene backend, interfaz, CSV, selector de archivos, restaurar en una base nueva y **el ciclo entero por HTTP en los cuatro motores**; le falta repetir a mano el respaldo real que encontró el error de los índices de expresión |
+| Última sesión | **023d** — 2026-08-19 |
+| Fase activa | **Migración de datos entre tablas:** fases 1, 2 y 3 cerradas; la **4** tiene la pasada de varias tablas con su orden por foráneas, y le faltan la pantalla y los perfiles (ver «Qué toca retomar»). **Respaldos y restauración:** Fases A–E cerradas. La **F** tiene backend, interfaz, CSV, selector de archivos, restaurar en una base nueva y **el ciclo entero por HTTP en los cuatro motores**; le falta repetir a mano el respaldo real que encontró el error de los índices de expresión |
 | Fases 0–6 | ✅ Cerradas. |
 | Fase 7 | 🟡 **11/12.** El ciclo de instalación está probado sobre este equipo; solo falta arrancar en una máquina sin herramientas de desarrollo. |
 | Fase 8 | ✅ **7/7.** Tres motores sobre el mismo contrato y primera beta preparada. |
 | ¿Compila el backend? | Sí — 0 advertencias, 0 errores |
 | ¿Compila el envoltorio? | Sí |
-| ¿Pasan las pruebas? | Sí — **723 en backend** (401 unitarias, 190 contractuales y 132 de integración), **485 en frontend** y **15 de punta a punta**, todas vueltas a ejecutar al cerrar la fase 3, con `DRUSE_REQUIRE_ENGINES=1` y **los cuatro motores**, sin saltarse ninguna. Las **6 del envoltorio** no se ejecutaron: cargo no compila en este equipo |
+| ¿Pasan las pruebas? | Sí — **738 en backend** (410 unitarias, 190 contractuales y 138 de integración) con `DRUSE_REQUIRE_ENGINES=1` y **los cuatro motores**, sin saltarse ninguna, y **485 en frontend**. Con una salvedad: una de integración **falla por tiempo de vez en cuando**, y no es del cambio de hoy —se reprodujo igual en `HEAD`—; está acotada en la sesión 023d. Las **6 del envoltorio** no se ejecutaron: cargo no compila en este equipo |
 | ¿Hay aplicación de escritorio? | **Sí.** Instalador NSIS, MSI y ZIP portable, en dos variantes: con Informix y sin él |
 | Motores | **PostgreSQL, SQL Server, MySQL/MariaDB e Informix**, todos sobre el mismo contrato compartido |
-| Trabajo a medias | Ninguno. La fase 3 de la migración quedó commiteada en la sesión 023c. |
+| Trabajo a medias | La fase 4 de la migración, a propósito: el backend de la pasada está commiteado y probado; la pantalla es lo siguiente. |
 | Bloqueantes | Ninguno para seguir programando. Sí para dar por buenos cuatro motores y cuatro funciones: ver «Qué toca retomar». |
 | Git | El **PR #9 se fusionó** (sesión 022), con los quince commits que el #8 dejó fuera más lo de la personalización. Se trabaja en `feat/respaldos-y-restauracion`, salida de un `main` ya al día. |
 | Integración continua | 🔴 **Parada, y no por el código.** GitHub aborta los catorce jobs en dos segundos: «recent account payments have failed or your spending limit needs to be increased». Hasta resolver la facturación, ningún PR podrá pasar los checks. |
 
 ### Qué toca retomar en la próxima sesión
 
-#### Migración de datos: la fase 4
+#### Migración de datos: lo que le falta a la fase 4
 
-Las fases 1, 2 y 3 están cerradas y verificadas. Lo que queda es **llevar varias
-tablas de una vez y poder repetir la migración mañana sin volver a armarla**, y
-se puede hacer en ese orden porque lo segundo no necesita lo primero.
+La pasada de varias tablas **ya corre**: ordena por las foráneas del destino,
+vacía en el orden contrario, se para en la tabla que falla y dice cuántas
+pasaron. Lo que no existe es la pantalla, así que hoy eso solo se puede pedir por
+HTTP.
 
-1. **Un conjunto de tablas, no un par.** Hoy `DataTransferRequest` lleva un
-   `Source` y un `Target`; la fase 4 los convierte en una lista de pares y
-   `TransferService` en un bucle sobre ella. El orden sale de
-   `TableStructure.ForeignKeys`, que `MetadataService` ya lee: las padres antes
-   que las hijas. **Los ciclos no se resuelven, se avisan**, y ese grupo se migra
-   sin ordenar; es la misma salida que tomó el respaldo al dejar las foráneas
-   para el final.
+1. **Elegir varias tablas.** Hoy el asistente sale del menú de una tabla y copia
+   esa. Hay que decidir de dónde se lanza la pasada —lo natural es el menú de la
+   carpeta de tablas o del esquema, «Migrar tablas de aquí…»— y dentro del
+   asistente una lista con casillas donde cada tabla lleve su modo y su filtro,
+   porque migrar seis tablas no significa tratarlas igual.
 
-2. **La primera decisión, antes de escribir código: qué significa «todo o nada»
-   con varias tablas.** Hoy `IWriteScope` abarca los lotes de una tabla. Si pasa
-   a abarcar la pasada entera —que es lo coherente en cuanto hay foráneas de por
-   medio— vuelve la transacción larga que la fase 1 evitó a propósito. Conviene
-   decidirlo y dejarlo escrito en el plan, no descubrirlo a mitad.
+2. **El orden, a la vista antes de confirmar.** `POST /api/transfers/set/order`
+   ya devuelve la lista ordenada y los ciclos; falta enseñarla. Es lo que
+   convierte «marqué seis tablas» en «van en este orden, y estas dos se apuntan
+   entre sí».
 
-3. **El progreso, en dos niveles**, como el del respaldo: la tabla en curso y el
-   conjunto. `TransferProgress` e `ITransferTracker` cuentan hoy las filas de una
-   sola tabla, y `transfer.store.ts` dibuja exactamente eso.
+3. **Las dos barras.** El progreso ya trae los dos niveles —`tablesDone` y
+   `tablesTotal` para la pasada, `tableRowsCopied` contra `rowsEstimated` para la
+   tabla en curso—, y `transfer.store.ts` sigue dibujando solo uno.
 
-4. **Perfiles de migración**, espejo de `SqliteBackupProfileStore`: una tabla
-   nueva en `DruseDatabase`, al lado de `backup_profiles`, con la selección en
-   JSON por lo mismo que allí. La regla que no se puede saltar es la suya: el
-   perfil guarda **nombres calificados, no identificadores de sesión**, porque se
-   reabre meses después contra otra conexión. Al abrirlo se pregunta contra qué
-   conexión viva se resuelve cada extremo, y lo que ya no existe se reconcilia
-   como hace el respaldo con `known_tables_json`.
+4. **Perfiles**, que es la otra mitad de la fase y no se ha empezado. Espejo de
+   `SqliteBackupProfileStore`: tabla nueva en `DruseDatabase` junto a
+   `backup_profiles`, selección en JSON, y su regla —**nombres calificados, no
+   identificadores de sesión**— porque un perfil se reabre meses después contra
+   otra conexión.
 
-**Antes de eso, la media hora que le falta a la fase 3:** nadie ha migrado entre
-dos motores **desde la pantalla**. Lo cruzado está comprobado por HTTP
-—`CrossEngineTransferTests`, PostgreSQL a SQL Server— y la prueba de punta a
-punta del camino nuevo crea la tabla dentro del mismo motor. Falta abrir las dos
-conexiones en la aplicación levantada, cruzar, y mirar que la pantalla de tipos
-cumpla lo que promete: decir qué se pierde, y no dejar crear la tabla mientras
-haya una columna sin equivalente.
+**Y sigue pendiente lo de la fase 3:** nadie ha migrado entre dos motores desde
+la pantalla. Lo cruzado está comprobado por HTTP y la prueba de punta a punta
+crea la tabla dentro del mismo motor.
 
-El plan completo, con el porqué de cada decisión y lo aprendido en las tres fases
-cerradas, está en `docs/plan-migracion-de-datos.md`.
+El plan completo, con el porqué de cada decisión y lo aprendido en cada fase,
+está en `docs/plan-migracion-de-datos.md`.
 
 #### Respaldos: lo que le falta a la Fase F
 
@@ -364,6 +356,85 @@ Y tres límites declarados desde el principio: no hay respaldo binario ni
 recuperación a un punto en el tiempo —eso es del servidor, y la interfaz tendrá
 que decirlo—, no hay respaldos programados, y un límite de filas puede dejar
 filas huérfanas, cosa que se avisa y no se corrige sola.
+
+### Sesión 023d — 2026-08-19 · Varias tablas en una pasada, y en qué orden
+
+Arranca la fase 4. Lo que entra es **el conjunto**: varias tablas trasladadas de
+una vez, ordenadas por sus claves foráneas, con un progreso y una cancelación para
+todas. Backend y puerta HTTP; la pantalla es lo siguiente.
+
+#### La decisión, antes de escribir código
+
+**«Todo o nada» sigue siendo por tabla, y la pasada se para en la primera que
+falle.** Abarcar el conjunto entero con una transacción sería lo coherente cuando
+hay foráneas de por medio, pero devuelve exactamente lo que la fase 1 evitó a
+propósito —el registro del servidor creciendo hasta el final y las tablas
+bloqueadas mientras dura—, ahora multiplicado por el número de tablas. Lo que
+entró completo se queda, y el resumen dice cuántas pasaron y en cuál se paró, que
+es de donde sale por dónde se retoma.
+
+#### El orden se mira en el destino, no en el origen
+
+Es el único lado que puede rechazar una escritura: si allí `pedidos` apunta a
+`clientes`, copiar los pedidos primero falla por más ordenadas que estén en el
+origen. `TransferOrder` es determinista —entre dos tablas que nadie obliga a
+separar gana la que se pidió antes, porque un orden que cambia convierte cualquier
+fallo a mitad en algo que no se puede reproducir—, ignora lo que apunta fuera del
+conjunto y no trata como ciclo a la tabla que se apunta a sí misma, que es la
+jerarquía de toda la vida. **Los ciclos se avisan y se copian sin ordenar.**
+
+#### Lo que salió al construirlo
+
+**Vaciar va antes de todo y en el orden contrario.** «Vaciar y cargar» sobre dos
+tablas relacionadas falla siempre si se vacía la padre mientras la hija guarda
+filas que la apuntan, así que el vaciado de la pasada se hace entero —de las hijas
+hacia las padres— y después empieza la copia. El precio queda declarado: en una
+pasada de varias tablas el vaciado ya no cae dentro de la transacción de su tabla.
+Con una sola tabla nada de esto cambia.
+
+**Una tabla es una pasada de una.** `RunAsync` construye un conjunto de un
+elemento y sigue por donde siguen todos: dos caminos para lo mismo acaban siempre
+con uno de los dos sin probar.
+
+**El orden se pregunta antes de confirmar**, en `/api/transfers/set/order`. Quien
+va a mover doce tablas quiere verlo en la vista previa, no enterarse por el aviso
+de un traslado que ya empezó.
+
+#### El cuelgue intermitente, acotado
+
+Al ejecutar la suite apareció un traslado que se quedaba en «en marcha» y agotaba
+los diez segundos que espera la prueba. **No es de la fase 4**: se reprodujo
+guardando los cambios y ejecutando la misma clase en `HEAD`, donde también falla
+—dos de diecinueve—. Es el mismo síntoma que quedó anotado en la sesión 023c,
+cuando una prueba de punta a punta se quedó sin resumen en pantalla.
+
+Lo que se sabe hasta ahora: no es un bloqueo permanente —subiendo el tope de
+espera a cien segundos, la clase entera pasa dos veces seguidas y ninguna prueba
+llega a diez—; no es agotamiento de conexiones —PostgreSQL admite cien y el pico
+medido fue de treinta y cuatro—; y aparece más cuando hay varias clases corriendo
+a la vez. Queda como lo primero que hay que mirar, con reproducción escrita.
+
+**Verificado.** **738 en backend** (410 unitarias, 190 contractuales y 138 de
+integración) con `DRUSE_REQUIRE_ENGINES=1` y los cuatro motores. Nueve unitarias
+nuevas para el orden —la cadena entera, el empate, lo que apunta fuera, la
+autorreferencia y el ciclo— y seis de integración contra PostgreSQL: la padre
+antes que la hija aunque se pidan al revés, **la misma pasada sin ordenar
+rechazada por el motor** —que es lo que demuestra que ordenar sirve—, vaciar de la
+hija hacia la padre, la pasada que se para diciendo cuántas tablas entraron, el
+orden preguntado sin escribir nada y el ciclo dicho en lugar de inventado. El
+frontend no se tocó, así que sus 485 siguen como estaban.
+
+**No hecho.** La pantalla: hoy el asistente elige una tabla y una sola, así que la
+pasada solo se puede pedir por HTTP. Y los perfiles, que son la otra mitad de la
+fase.
+
+**Archivos.** `Druse.Domain/DataTransfer.cs` (`DataTransferSetRequest`,
+`TableRowsCopied`, `TablesDone`, `TablesTotal`),
+`Application/Transfers/TransferOrder.cs`, `TransferService.cs` (`RunSetAsync`,
+`OrderAsync`, `ClearAsync` y el estado en dos niveles), `TransferContracts.cs` y
+`TransferEndpoints.cs` —`/api/transfers/set` y `/api/transfers/set/order`—.
+Pruebas: `TransferOrderTests` y `TransferSetFlowTests`. La fase 4 en curso, con la
+decisión y su porqué, en `docs/plan-migracion-de-datos.md`.
 
 ### Sesión 023c — 2026-08-19 · Cruzar de motor sin traducir en silencio
 
@@ -3197,6 +3268,7 @@ basta solo.
 | Dependencias con vulnerabilidades en plantillas | Ya pasó dos veces: `Microsoft.OpenApi` y `dompurify` | En backend lo caza `TreatWarningsAsErrors`; en frontend, `npm audit` en cada instalación |
 | 3 vulnerabilidades moderadas en `@angular/cli` | Solo desarrollo; no llegan al bundle | Esperar actualización de Angular. Degradar a la 21 sería peor |
 | Detalles visuales fuera del shell principal | La comparación de la sesión 011 cubrió la pantalla principal, no todos los estados | Repetir la comparación al tocar diálogos, filtros o vistas menos transitadas |
+| **Un traslado se queda «en marcha» de vez en cuando** | Es la promesa central de la función: si el resumen no llega, quien copió no sabe qué entró | Reproducido en `HEAD` sin los cambios de la fase 4 (dos de diecinueve en una clase). No es bloqueo permanente —con cien segundos de tope pasa todo— ni agotamiento de conexiones —pico de 34 sobre 100—. Lo primero que hay que mirar; el mismo síntoma que la prueba de punta a punta de la sesión 023c |
 | `formatSql` falla a veces en las pruebas del frontend | Un rojo que no es del código: pasa al repetir | Solo aparece con `ng serve` corriendo en paralelo —el arranque del entorno pasa de 274 s a 1220 s— y se lleva por delante una prueba por tiempo. No ejecutar la suite con el servidor de desarrollo levantado |
 | Identificador `druse` no reservado | Podría ocuparlo otro | Reservar dominio, org de GitHub y NuGet/npm cuando haya algo publicable |
 

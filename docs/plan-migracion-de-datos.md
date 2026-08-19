@@ -32,6 +32,7 @@ Tomadas antes de escribir código, porque cada una cambia el diseño entero.
 | --- | --- | --- |
 | Cómo se escribe | **Por lotes, cada uno confirmado**, con «todo o nada» opcional | Una transacción que abarque millones de filas revienta el registro del servidor y bloquea la tabla mientras dura. Troceando, lo copiado se queda y se sabe hasta dónde llegó |
 | Qué hacer con lo que ya está | **Los cuatro modos**: añadir, vaciar-y-cargar, actualizar-o-insertar y omitir-existentes | Los dos primeros cubren el caso corriente; los otros dos son los que convierten esto en algo que se puede repetir sin duplicar |
+| «Todo o nada» con varias tablas | **Por tabla**, y la pasada se para en la primera que falle | Abarcar el conjunto entero devolvería la transacción larga que la primera decisión evitó, multiplicada por el número de tablas. Lo que entró completo se queda, y el resumen dice en cuál se paró |
 | Motores | **El mismo a los dos lados primero**, entre motores distintos en la fase 3 | Traducir tipos entre dialectos es una función por sí sola, con pérdidas que hay que declarar |
 | Identidad y autoincremento | **Se conservan los valores del origen** | Si el id 42 llega con otro número, todo lo que apuntaba a esa fila deja de apuntar a nada |
 | Tabla destino ausente | **Se ofrece crearla** desde la estructura del origen (fase 3) | El guionizado ya sabe hacerlo; el paso manual sobra |
@@ -233,24 +234,81 @@ unitarias; la prueba de punta a punta del camino nuevo crea la tabla **dentro de
 mismo motor**, así que el asistente cruzado no lo ha recorrido nadie desde la
 pantalla; y el paso de tipos no tiene pruebas de componente en el frontend.
 
-### Fase 4 — Varias tablas y migraciones guardadas
+### Fase 4 — Varias tablas y migraciones guardadas 🟡 (en curso, sesión 023d)
 
 Dos cosas que caben en una fase porque se usan juntas: llevar un conjunto de
-tablas de una vez, y poder repetirlo mañana sin volver a armarlo.
+tablas de una vez, y poder repetirlo mañana sin volver a armarlo. La primera
+tiene ya el motor y la puerta HTTP; le falta la pantalla. La segunda no se ha
+empezado.
 
-**Varias tablas en una pasada**, ordenadas por sus claves foráneas —las padres
-antes que las hijas— con lo que ya lee `IDatabaseMetadataReader` en
-`TableStructure.ForeignKeys`. Los ciclos existen, y con un ciclo no hay orden que
-satisfaga a las dos tablas a la vez: **se avisa y se migran sin ordenar**, que es
-la misma decisión que tomó el respaldo al dejar las foráneas para el final.
+#### La decisión que había que tomar antes de escribir código
 
-El progreso pasa a tener dos niveles, como el del respaldo: la tabla en curso y
-el conjunto. Hoy `ITransferTracker` cuenta las filas de una sola tabla.
+**«Todo o nada» sigue siendo por tabla, y la pasada se para en la primera que
+falle.** Una transacción que abarcara el conjunto entero sería lo coherente
+cuando hay foráneas de por medio —o entran todas las tablas o ninguna—, pero es
+exactamente lo que la fase 1 evitó a propósito: el registro del servidor
+creciendo hasta el final y las tablas bloqueadas mientras dura, ahora
+multiplicado por el número de tablas. Lo que entró completo se queda, y el
+resumen dice cuántas tablas pasaron y en cuál se paró, que es de donde sale por
+dónde se retoma.
 
-Y perfiles, espejo de `SqliteBackupProfileStore`, con su misma regla: el perfil
-guarda **nombres calificados, no identificadores de sesión**, porque se reabre
-meses después contra otra conexión y la sesión de hoy ya no existirá. Al abrirlo
-se pregunta contra qué conexión viva se resuelve cada extremo.
+#### Varias tablas en una pasada ✅
+
+`DataTransferSetRequest` es la lista de traslados más un interruptor para ordenar.
+Cada tabla lleva **su modo, su filtro y su emparejamiento**, porque migrar seis
+tablas no significa tratarlas igual: de una se lleva el año en curso y de otra
+todo, y una se reemplaza mientras las demás se añaden.
+
+Los dos extremos son **una conexión de origen y una de destino para el conjunto
+entero**. Los turnos se piden por sesión, y una pasada que tocara cuatro
+conexiones tendría que sostener cuatro turnos a la vez, que es la forma más corta
+de llegar a un bloqueo mutuo.
+
+`TransferOrder` ordena mirando el grafo **del destino**, que es el único lado que
+puede rechazar una escritura: si allí `pedidos` apunta a `clientes`, copiar los
+pedidos primero falla por más ordenadas que estén en el origen. Es determinista
+—entre dos tablas que nadie obliga a separar gana la que se pidió antes—, ignora
+lo que apunta fuera del conjunto y no trata como ciclo a la tabla que se apunta a
+sí misma, que es la jerarquía de toda la vida. **Los ciclos se avisan y se copian
+sin ordenar.**
+
+Tres cosas que salieron al construirlo:
+
+1. **Vaciar va antes de todo y en el orden contrario.** «Vaciar y cargar» sobre
+   dos tablas relacionadas falla siempre si se vacía la padre mientras la hija
+   guarda filas que la apuntan, así que el vaciado de la pasada se hace entero
+   —de las hijas hacia las padres— y después empieza la copia. El precio queda
+   declarado: en una pasada de varias tablas el vaciado ya no cae dentro de la
+   transacción de su tabla, de modo que «todo o nada» cubre lo que se carga y no
+   lo que se borró antes. Con una sola tabla nada de esto pasa y el vaciado sigue
+   donde estaba.
+2. **Una tabla es una pasada de una.** El camino de las tres primeras fases no se
+   mantiene aparte: `RunAsync` construye un conjunto de un elemento y sigue por
+   donde siguen todos. Dos caminos para lo mismo acaban siempre con uno de los dos
+   sin probar.
+3. **El orden se pregunta antes de confirmar nada**, en `/api/transfers/set/order`.
+   Quien va a mover doce tablas quiere verlo en la vista previa, no enterarse por
+   el aviso de un traslado que ya empezó.
+
+El progreso tiene ya los dos niveles del respaldo: `TablesDone` y `TablesTotal`
+para la pasada, `TableRowsCopied` contra `RowsEstimated` para la tabla en curso, y
+`RowsCopied` como total. Con una sola tabla los dos números coinciden, que es como
+tiene que ser: lo contrario obligaría a la pantalla a saber en cuál de los dos
+casos está.
+
+#### Lo que falta
+
+**La pantalla.** Hoy el asistente elige una tabla y una sola: elegir varias, verlas
+en el orden en que van a copiarse, y las dos barras. Sin eso, la pasada existe
+pero no se puede pedir desde Druse.
+
+**Los perfiles**, espejo de `SqliteBackupProfileStore`: una tabla nueva en
+`DruseDatabase`, al lado de `backup_profiles`, con la selección en JSON por lo
+mismo que allí. La regla que no se puede saltar es la suya: el perfil guarda
+**nombres calificados, no identificadores de sesión**, porque se reabre meses
+después contra otra conexión y la sesión de hoy ya no existirá. Al abrirlo se
+pregunta contra qué conexión viva se resuelve cada extremo, y lo que ya no existe
+se reconcilia como hace el respaldo con `known_tables_json`.
 
 ---
 
