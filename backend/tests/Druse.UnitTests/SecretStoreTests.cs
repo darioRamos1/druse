@@ -160,4 +160,65 @@ public sealed class AppPathsTests
 
         Assert.DoesNotContain(wrongSeparator, paths.DataDirectory);
     }
+
+    /// <summary>
+    /// `DRUSE_DATA_DIR` manda sobre la convención del sistema.
+    ///
+    /// Se añadió al montar las pruebas de punta a punta. Se intentó aislarlas
+    /// cambiando `APPDATA` —lo que sí funciona con un proceso de Node— y en
+    /// Windows no sirve: `GetFolderPath` pregunta a la API del sistema y esa
+    /// variable le da igual, así que el backend siguió escribiendo en el perfil
+    /// de verdad mientras las pruebas creían correr aparte.
+    /// </summary>
+    [Fact]
+    public void ConLaVariableDeDatos_TodoCuelgaDeEsaCarpeta()
+    {
+        var carpeta = Path.Combine(Path.GetTempPath(), $"druse-rutas-{Guid.NewGuid():N}");
+        var anterior = Environment.GetEnvironmentVariable(AppPaths.DataDirectoryVariable);
+
+        try
+        {
+            Environment.SetEnvironmentVariable(AppPaths.DataDirectoryVariable, carpeta);
+
+            var paths = new AppPaths();
+
+            Assert.Equal(carpeta, paths.DataDirectory);
+            Assert.Equal(carpeta, paths.ConfigDirectory);
+            Assert.Equal(Path.Combine(carpeta, "druse.db"), paths.DatabaseFile);
+
+            // La caché y los registros también: dejarlos en el perfil del usuario
+            // sería aislar a medias, y a medias no aísla.
+            Assert.StartsWith(carpeta, paths.CacheDirectory, StringComparison.Ordinal);
+            Assert.StartsWith(carpeta, paths.LogDirectory, StringComparison.Ordinal);
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable(AppPaths.DataDirectoryVariable, anterior);
+        }
+    }
+
+    /// <summary>
+    /// Una ruta relativa se resolvería contra el directorio de trabajo, que en un
+    /// servicio no es el que nadie tiene en la cabeza. Se ignora y se escribe
+    /// donde siempre, en vez de escribir en un sitio sorpresa.
+    /// </summary>
+    [Fact]
+    public void UnaRutaDeDatosRelativaSeIgnora()
+    {
+        var anterior = Environment.GetEnvironmentVariable(AppPaths.DataDirectoryVariable);
+
+        try
+        {
+            Environment.SetEnvironmentVariable(AppPaths.DataDirectoryVariable, "datos");
+
+            var paths = new AppPaths();
+
+            Assert.True(Path.IsPathRooted(paths.DataDirectory));
+            Assert.NotEqual("datos", paths.DataDirectory);
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable(AppPaths.DataDirectoryVariable, anterior);
+        }
+    }
 }

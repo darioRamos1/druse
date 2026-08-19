@@ -16,9 +16,36 @@ public sealed class AppPaths : IAppPaths
 {
     private const string ApplicationName = "Druse";
 
+    /// <summary>
+    /// Variable que manda sobre la convención del sistema.
+    ///
+    /// Existe porque **en Windows no hay otra forma de mover estos datos**:
+    /// `GetFolderPath` pregunta a la API del sistema y no mira la variable
+    /// `APPDATA`, así que arrancar Druse con otro `APPDATA` —lo que sí funciona
+    /// para un proceso de Node— lo deja escribiendo igualmente en el perfil del
+    /// usuario. Se descubrió montando las pruebas de punta a punta: creían correr
+    /// aisladas y estaban usando la base de verdad.
+    ///
+    /// Sirve además para lo que se le pida encima: una instalación portable en
+    /// una llave USB, o dos perfiles en la misma máquina.
+    /// </summary>
+    public const string DataDirectoryVariable = "DRUSE_DATA_DIR";
+
     public AppPaths()
     {
-        if (OperatingSystem.IsWindows())
+        // Una ruta relativa se resolvería contra el directorio de trabajo, que
+        // en un servicio no es el que nadie espera: se exige absoluta o se
+        // ignora, en lugar de escribir en un sitio sorpresa.
+        var custom = Environment.GetEnvironmentVariable(DataDirectoryVariable);
+
+        if (!string.IsNullOrWhiteSpace(custom) && Path.IsPathRooted(custom))
+        {
+            DataDirectory = custom;
+            ConfigDirectory = custom;
+            CacheDirectory = Path.Combine(custom, "cache");
+            LogDirectory = Path.Combine(custom, "logs");
+        }
+        else if (OperatingSystem.IsWindows())
         {
             var roaming = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
             var local = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
