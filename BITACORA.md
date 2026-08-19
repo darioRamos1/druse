@@ -10,14 +10,14 @@
 
 | Campo | Valor |
 | --- | --- |
-| Última sesión | **023** — 2026-08-19 |
-| Fase activa | **Migración de datos entre tablas:** fase 1 de 4 cerrada y funcionando (ver «Qué toca retomar»). **Respaldos y restauración:** Fases A–E cerradas. La **F** tiene backend, interfaz, CSV, selector de archivos, restaurar en una base nueva y **el ciclo entero por HTTP en los cuatro motores**; le falta repetir a mano el respaldo real que encontró el error de los índices de expresión |
+| Última sesión | **023b** — 2026-08-19 |
+| Fase activa | **Migración de datos entre tablas:** fases 1 y 2 de 4 cerradas y funcionando (ver «Qué toca retomar»). **Respaldos y restauración:** Fases A–E cerradas. La **F** tiene backend, interfaz, CSV, selector de archivos, restaurar en una base nueva y **el ciclo entero por HTTP en los cuatro motores**; le falta repetir a mano el respaldo real que encontró el error de los índices de expresión |
 | Fases 0–6 | ✅ Cerradas. |
 | Fase 7 | 🟡 **11/12.** El ciclo de instalación está probado sobre este equipo; solo falta arrancar en una máquina sin herramientas de desarrollo. |
 | Fase 8 | ✅ **7/7.** Tres motores sobre el mismo contrato y primera beta preparada. |
 | ¿Compila el backend? | Sí — 0 advertencias, 0 errores |
 | ¿Compila el envoltorio? | Sí |
-| ¿Pasan las pruebas? | Sí — **659 en backend** (366 unitarias, 170 contractuales y 123 de integración), **483 en frontend**, **13 de punta a punta** y **6 en el envoltorio**. Con `DRUSE_REQUIRE_ENGINES=1` y **los cuatro motores**, sin saltarse ninguna |
+| ¿Pasan las pruebas? | Sí — **690 en backend** (371 unitarias, 190 contractuales y 129 de integración), **485 en frontend**, **14 de punta a punta** y **6 en el envoltorio**. Con `DRUSE_REQUIRE_ENGINES=1` y **los cuatro motores**, sin saltarse ninguna |
 | ¿Hay aplicación de escritorio? | **Sí.** Instalador NSIS, MSI y ZIP portable, en dos variantes: con Informix y sin él |
 | Motores | **PostgreSQL, SQL Server, MySQL/MariaDB e Informix**, todos sobre el mismo contrato compartido |
 | Trabajo a medias | Ninguno. El frontend de la restauración quedó commiteado en la sesión 022i. |
@@ -27,59 +27,38 @@
 
 ### Qué toca retomar en la próxima sesión
 
-#### Migración de datos: la fase 2
+#### Migración de datos: la fase 3
 
-La fase 1 está cerrada y se usa (sesión 023). Lo siguiente es **qué hacer con las
-filas que ya están en el destino**: `Upsert` —actualizar si está, insertar si
-no— y `SkipExisting` —insertar solo lo que falta y decir cuántas se saltaron—.
+Las fases 1 y 2 están cerradas y se usan. Lo siguiente es **trasladar entre
+motores distintos**, que hoy se rechaza diciéndolo en
+`TransferService.PrepareAsync`.
 
-Los dos valores **ya existen** en `TransferMode` y viajan en el contrato; lo que
-hace hoy `TransferService.PrepareAsync` es rechazarlos con un mensaje que lo dice.
-Así que la fase 2 es sustituir ese rechazo por el camino de escritura, no
-inventar el contrato.
+Lo que hay que construir:
 
-Dónde toca:
+1. **`TypeTranslator` en `Application/Transfers`**, con una tabla de equivalencias
+   por par de motores. Vive ahí y trabaja sobre `DatabaseEngine` como dato porque
+   `ArchitectureRulesTests.LosProveedoresNoSeConocenEntreSi` prohíbe que un
+   proveedor conozca a otro. `ITableDesigner.CommonDataTypes` da el punto de
+   partida de cada dialecto.
+2. **Cada traducción con su nivel**: exacta, aproximada —con qué se pierde— o sin
+   equivalente. La vista previa ya tiene dónde enseñarlas: `TransferColumnIssue`
+   es exactamente eso, y hoy solo lo usan las columnas que genera el motor.
+3. **Editar el tipo antes de crear la tabla**, que es lo que se decidió al
+   planificar: proponer, avisar y dejar cambiar.
+4. **Crear la tabla destino** con un `TableDefinition` construido desde las
+   columnas del origen y `ITableDesigner.CreateAsync`. Solo columnas, tipos,
+   nulabilidad y clave primaria; índices y foráneas no, por lo mismo que el
+   respaldo los deja para el final.
 
-1. **`IRowEditor` gana un método de escritura con modo**, junto a `InsertAsync`,
-   que recibe el lote, el modo y las columnas que identifican la fila.
-   `RowEditorBase` lo implementa una vez —la transacción, los parámetros y el
-   recuento son iguales— y deja un gancho abstracto para la cláusula de
-   conflicto, que sí es dialecto:
+**Los avisos son el producto.** Una migración que traduce en silencio es la que
+estropea datos: el valor de la fase está en que la vista previa diga qué se pierde
+antes de escribir nada.
 
-   | Motor | Actualizar si está | Omitir si está |
-   | --- | --- | --- |
-   | PostgreSQL | `ON CONFLICT (...) DO UPDATE SET` | `ON CONFLICT DO NOTHING` |
-   | MySQL | `ON DUPLICATE KEY UPDATE` | `INSERT IGNORE` |
-   | SQL Server | `MERGE ... WHEN MATCHED` | `MERGE ... WHEN NOT MATCHED` |
-   | Informix | `MERGE` | `MERGE` |
+Después queda la fase 4: varias tablas ordenadas por sus claves foráneas y
+migraciones guardadas, espejo de `SqliteBackupProfileStore`.
 
-   `InsertAsync` se queda como está: es el camino que ya usan importar y
-   restaurar, y no hay razón para moverlo.
-
-2. **Las columnas que identifican la fila** salen de `DatabaseColumn.IsPrimaryKey`,
-   que el catálogo ya trae. El asistente tiene que dejar cambiarlas: emparejar por
-   una clave de negocio en vez de por la primaria es justo lo que se quiere al
-   sincronizar dos entornos. **Sin clave no hay upsert posible**, y eso se dice
-   antes de empezar, no cuando el motor se queje.
-
-3. **`RowsSkipped` ya está en `TransferProgress` y en el contrato**, sin llenar.
-   Es lo que tiene que contar `SkipExisting`, y es el número que hace útil el
-   modo: «entraron 900, ya estaban 4.100».
-
-4. **Contractuales, no de integración.** En
-   `DatabaseProviderContractTests` hay que exigir que los cuatro motores se
-   comporten **igual ante el mismo lote repetido**: insertar dos veces falla,
-   con upsert actualiza y no duplica, con omitir no toca lo que ya estaba. Cuatro
-   dialectos distintos para una promesa que tiene que ser una.
-
-Después vienen la fase 3 —traducir tipos entre motores y ofrecer crear la tabla
-destino, con `TypeTranslator` en `Application/Transfers` para no romper la regla
-de que los proveedores no se conocen— y la fase 4 —varias tablas ordenadas por
-sus claves foráneas, y migraciones guardadas con el espejo de
-`SqliteBackupProfileStore`—.
-
-El plan completo, con el porqué de cada decisión, está en
-`docs/plan-migracion-de-datos.md`.
+El plan completo, con el porqué de cada decisión y lo que se aprendió en las dos
+primeras fases, está en `docs/plan-migracion-de-datos.md`.
 
 #### Respaldos: lo que le falta a la Fase F
 
@@ -375,6 +354,69 @@ Y tres límites declarados desde el principio: no hay respaldo binario ni
 recuperación a un punto en el tiempo —eso es del servidor, y la interfaz tendrá
 que decirlo—, no hay respaldos programados, y un límite de filas puede dejar
 filas huérfanas, cosa que se avisa y no se corrige sola.
+
+### Sesión 023b — 2026-08-19 · Qué hacer con lo que ya está en el destino
+
+Fase 2 de la migración: **actualizar la fila que ya está** (`Upsert`) y **añadir
+solo lo que falta** (`SkipExisting`). Los dos modos ya viajaban en el contrato
+desde la sesión anterior, rechazados a propósito; ahora funcionan en los cuatro
+motores.
+
+#### Un método más en el editor de filas, no un servicio aparte
+
+`IRowEditor.WriteAsync` recibe el lote, qué hacer con lo que ya está y las
+columnas que identifican la fila. `RowEditorBase` lo implementa una vez
+—transacción, parámetros y recuento son iguales— y `InsertAsync` pasa a ser ese
+mismo camino con «fallar si ya está», que es lo que siempre fue.
+
+Cada motor pone su dialecto, y no son cuatro variantes de lo mismo: PostgreSQL y
+MySQL lo dicen con una cláusula al final del `INSERT`; SQL Server e Informix
+necesitan un `MERGE` entero. Informix además exige un `CAST` por valor, porque un
+`?` suelto dentro del `SELECT` de origen no tiene de dónde deducir su tipo, y su
+fila de origen sale de `sysmaster:sysdual`.
+
+#### Las dos cosas que costaron
+
+**El recuento no significa lo mismo en cada motor.** MySQL devuelve dos filas
+afectadas cuando actualiza una. Se normaliza en la base: lo que se cuenta es *si
+la fila se escribió*, y de ahí salen «entraron 900» y «ya estaban 4.100» como dos
+números distintos.
+
+**En MySQL, omitir tiene que ser `INSERT IGNORE`.** La forma elegante —`ON
+DUPLICATE KEY UPDATE col = col`— parecía mejor y no sirve: MySqlConnector cuenta
+por omisión filas *encontradas* y no *afectadas*, así que una fila que ya estaba
+devolvía uno y se contaba como escrita. Lo destapó la contractual, no una
+revisión. El precio es que `IGNORE` también degrada a aviso algún error de datos;
+se asume porque los valores llegan convertidos contra los tipos del destino.
+
+Y una diferencia que no se puede tapar: **MySQL no deja decir con qué clave se
+choca**, reacciona ante cualquier restricción de unicidad de la tabla. Queda
+escrito en el proveedor y en el plan.
+
+#### La regla que evita el accidente
+
+Las columnas que identifican la fila salen de la clave primaria del destino y se
+pueden cambiar —sincronizar dos entornos suele hacerse por una clave de negocio—,
+pero **tienen que estar respaldadas por la clave primaria, una restricción de
+unicidad o un índice único**. Se comprueba contra el catálogo antes de escribir
+nada, porque con una clave que se repite «actualiza la que ya está» toca todas las
+que coinciden: no falla, no avisa, y deja el destino con filas que nadie pidió
+cambiar. También se exige que la clave se copie: si no viaja, todas las filas se
+parecerían en ella.
+
+**Verificado.** **690 en backend** (371 unitarias, 190 contractuales y 129 de
+integración) con `DRUSE_REQUIRE_ENGINES=1` y los cuatro motores levantados; las
+20 contractuales nuevas comprueban en los cuatro que insertar dos veces falla, que
+actualizar cambia sin duplicar, que omitir cuenta lo que dejó estar y que repetir
+el traslado deja lo mismo que hacerlo una vez. **485 en frontend** y **14 de punta
+a punta**, una de ellas repitiendo la copia dos veces contra la aplicación
+levantada para ver que al final hay tres filas y no seis.
+
+**Archivos.** `IRowEditor`, `RowEditorBase` y los cuatro editores de proveedor;
+`RowEdit.cs` (`RowsSkipped`), `DataTransfer.cs` (`KeyColumns`),
+`TransferService.cs`, `TransferContracts.cs`; en la interfaz, el gateway y el
+asistente. Pruebas: `DatabaseProviderContractTests`, `TransferPlanTests`,
+`TransferFlowTests`, `transfer-dialog.spec.ts` y `e2e/tests/migracion.spec.ts`.
 
 ### Sesión 023 — 2026-08-19 · Migrar los datos de una tabla a otra
 

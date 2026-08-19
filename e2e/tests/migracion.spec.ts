@@ -22,14 +22,21 @@ test.describe('migrar datos entre tablas', () => {
    * análisis de riesgo, y saltárselo aquí sería probar una aplicación que no es
    * la que se reparte—. La prueba confirma igual que lo haría una persona.
    */
-  async function prepararTablas(page: Page): Promise<void> {
+  async function prepararTablas(
+    page: Page,
+    options: { conClave?: boolean } = {},
+  ): Promise<void> {
+    // La clave primaria solo hace falta para los modos que reconocen filas; en
+    // los demás se deja fuera para no dar por hecho que la tabla la tiene.
+    const clave = options.conClave ? ' PRIMARY KEY' : '';
+
     await escribirSql(
       page,
       `DROP TABLE IF EXISTS ${ORIGEN};
        DROP TABLE IF EXISTS ${DESTINO};
-       CREATE TABLE ${ORIGEN} (id int, nombre text);
+       CREATE TABLE ${ORIGEN} (id int${clave}, nombre text);
        INSERT INTO ${ORIGEN} VALUES (1, 'Ana'), (2, 'Bea'), (3, 'Carla');
-       CREATE TABLE ${DESTINO} (id int, nombre text);`,
+       CREATE TABLE ${DESTINO} (id int${clave}, nombre text);`,
     );
 
     await page.keyboard.press('Control+Enter');
@@ -37,9 +44,22 @@ test.describe('migrar datos entre tablas', () => {
     const aviso = page.getByRole('alertdialog');
 
     await expect(aviso).toBeVisible({ timeout: 30_000 });
+
+    // La respuesta se espera desde antes de confirmar: el aviso desaparece en
+    // cuanto se pulsa, mucho antes de que el servidor conteste, y sin esperar a
+    // que termine la consulta siguiente llegaría pisando a esta.
+    const respuesta = page.waitForResponse(
+      (r) => r.url().includes('/api/queries') && r.request().method() === 'POST',
+      { timeout: 60_000 },
+    );
+
     await aviso.getByRole('button', { name: 'Ejecutar de todos modos' }).click();
 
     await expect(aviso).toBeHidden({ timeout: 60_000 });
+    await respuesta;
+    await expect(page.getByRole('button', { name: 'Cancelar' }).first()).toBeDisabled({
+      timeout: 30_000,
+    });
   }
 
   /**
@@ -155,6 +175,45 @@ test.describe('migrar datos entre tablas', () => {
 
     // Y lo que importa: las filas están allí de verdad.
     expect(await contar(page, DESTINO)).toBe('3');
+  });
+
+  /**
+   * Repetir la copia con «actualizar lo que ya esté» no duplica nada.
+   *
+   * Es el caso que hace repetible un traslado, y el que peor se comprueba sin la
+   * aplicación delante: lo que importa no es el mensaje del asistente, sino que
+   * al final haya tres filas y no seis.
+   */
+  test('repetir la copia actualizando no duplica las filas', async ({ page }) => {
+    await abrir(page);
+    await conectar(page);
+    await prepararTablas(page, { conClave: true });
+
+    // Dos vueltas iguales: la segunda es la que tiene que no cambiar nada.
+    for (let vuelta = 0; vuelta < 2; vuelta++) {
+      await menuDeLaTabla(page, ORIGEN);
+      await page.getByRole('menuitem', { name: 'Migrar datos a…' }).click();
+
+      const dialogo = page.locator('app-transfer-dialog');
+
+      await elegirDestino(page, DESTINO);
+
+      await dialogo.locator('.options select').first().selectOption('Upsert');
+
+      // La clave primaria viene propuesta: no hay que elegir nada.
+      await expect(dialogo.locator('.keys')).toContainText('clave primaria');
+
+      await dialogo.getByRole('button', { name: 'Copiar las filas' }).click();
+
+      await expect(dialogo.locator('.summary__title')).toContainText('Copiadas 3 filas', {
+        timeout: 60_000,
+      });
+
+      await dialogo.locator('.foot').getByRole('button', { name: 'Cerrar' }).click();
+      await expect(dialogo).toBeHidden();
+
+      expect(await contar(page, DESTINO)).toBe('3');
+    }
   });
 
   /**

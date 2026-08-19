@@ -116,37 +116,51 @@ De las abstracciones salieron dos añadidos: `IWriteScope` —una transacción q
 abarca varios lotes, prestada a la sesión con `Borrow` para que los lotes se unan
 a ella— y `ScriptClearTable`, el `DELETE` que vacía la tabla destino.
 
-### Fase 2 — Actualizar lo que ya está
+### Fase 2 — Actualizar lo que ya está ✅ (sesión 023b)
 
-`Upsert` y `SkipExisting`. Los dos valores **ya existen** en `TransferMode` y
-viajan en el contrato; hoy `TransferService.PrepareAsync` los rechaza con un
-mensaje que lo dice. La fase es sustituir ese rechazo por el camino de escritura.
+`Upsert` y `SkipExisting`, con `IRowEditor.WriteAsync`: el lote, qué hacer con lo
+que ya está y las columnas que identifican la fila. `RowEditorBase` lo implementa
+una vez —transacción, parámetros y recuento son iguales— y `InsertAsync` pasa a
+ser ese mismo camino con «fallar si ya está», que es lo que era.
 
-`IRowEditor` gana un método de escritura con modo, junto a `InsertAsync`, que
-recibe el lote, el modo y las columnas que identifican la fila. `RowEditorBase`
-lo implementa una vez —transacción, parámetros y recuento son iguales— y deja un
-gancho abstracto para la cláusula de conflicto, que sí es dialecto:
+Cada motor pone su dialecto:
 
 | Motor | Actualizar si está | Omitir si está |
 | --- | --- | --- |
-| PostgreSQL | `ON CONFLICT (...) DO UPDATE SET` | `ON CONFLICT DO NOTHING` |
+| PostgreSQL | `ON CONFLICT (...) DO UPDATE SET` | `ON CONFLICT (...) DO NOTHING` |
 | MySQL | `ON DUPLICATE KEY UPDATE` | `INSERT IGNORE` |
 | SQL Server | `MERGE ... WHEN MATCHED` | `MERGE ... WHEN NOT MATCHED` |
-| Informix | `MERGE` | `MERGE` |
+| Informix | `MERGE` con `sysmaster:sysdual` | igual, sin la rama de actualizar |
 
-`InsertAsync` se queda como está: es el camino que ya usan importar y restaurar.
+Cuatro cosas que salieron al construirlo y conviene no volver a descubrir:
 
-Las columnas que identifican la fila salen de `DatabaseColumn.IsPrimaryKey`, y el
-asistente debe dejar cambiarlas —emparejar por una clave de negocio es justo lo
-que se quiere al sincronizar dos entornos—. **Sin clave no hay upsert posible**, y
-eso se dice antes de empezar, no cuando el motor se queje.
+1. **El recuento se normaliza en la base, no en cada proveedor.** MySQL devuelve
+   dos filas afectadas cuando actualiza una. Lo que se cuenta es *si la fila se
+   escribió*, que significa lo mismo en los cuatro.
+2. **En MySQL, omitir tiene que ser `INSERT IGNORE`.** La forma elegante —`ON
+   DUPLICATE KEY UPDATE col = col`— no sirve porque MySqlConnector cuenta filas
+   *encontradas* y no *afectadas*, así que una fila que ya estaba devolvería uno y
+   se contaría como escrita. El precio es que `IGNORE` también degrada a aviso
+   algún error de datos; se asume porque los valores llegan ya convertidos contra
+   los tipos del destino.
+3. **MySQL no deja decir con qué clave se choca**: reacciona ante cualquier
+   restricción de unicidad de la tabla, no solo ante las columnas elegidas. No hay
+   sintaxis para arreglarlo, así que queda dicho aquí.
+4. **SQL Server e Informix necesitan un `MERGE` entero**, no una cláusula al
+   final; Informix además exige un `CAST` por valor, porque un `?` suelto dentro
+   del `SELECT` de origen no tiene de dónde deducir su tipo.
 
-`RowsSkipped` ya está en `TransferProgress` sin llenar: es el número que hace útil
-el modo, «entraron 900, ya estaban 4.100».
+Las columnas que identifican la fila salen de `DatabaseColumn.IsPrimaryKey`, y se
+pueden cambiar —sincronizar dos entornos suele hacerse por una clave de negocio—.
+**Tienen que estar respaldadas por la clave primaria, una restricción de unicidad
+o un índice único**, y se comprueba contra el catálogo antes de escribir: con una
+clave que se repite, «actualiza la que ya está» toca todas las que coinciden, no
+falla y no avisa. También se exige que la clave **se copie**: si no viaja, todas
+las filas se parecerían en ella.
 
-La prueba que importa es **contractual, no de integración**: los cuatro motores
-tienen que comportarse igual ante el mismo lote repetido. Cuatro dialectos para
-una promesa que tiene que ser una.
+La prueba que importa es **contractual**: los cuatro motores ante el mismo lote
+repetido —insertar falla, actualizar cambia sin duplicar, omitir cuenta lo que
+dejó estar, y repetir dos veces deja lo mismo que una—.
 
 ### Fase 3 — Entre motores distintos
 
