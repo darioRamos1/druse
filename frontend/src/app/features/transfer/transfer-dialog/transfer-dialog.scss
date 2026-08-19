@@ -272,6 +272,34 @@ select {
   color: var(--dr-text-secondary);
 }
 
+/* Con qué columnas se reconoce una fila que ya está: solo aparece en los modos
+   que tienen algo que reconocer. */
+.keys {
+  margin-bottom: 14px;
+  padding: 12px;
+  border: 1px solid var(--dr-border);
+  border-radius: 8px;
+  background: var(--dr-surface-base);
+
+  &__title {
+    margin: 0 0 8px;
+    color: var(--dr-text-muted);
+    font-size: 12px;
+  }
+
+  &__list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+
+  &__hint {
+    margin-left: 4px;
+    color: var(--dr-text-faint);
+    font-size: 11px;
+  }
+}
+
 .warn {
   margin: 12px 0 0;
   padding: 8px 10px;

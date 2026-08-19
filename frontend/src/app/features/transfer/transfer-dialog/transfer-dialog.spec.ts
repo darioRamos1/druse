@@ -21,10 +21,14 @@ function column(name: string, ordinal: number, dataType = 'text'): DatabaseColum
   return { name, dataType, isNullable: true, isPrimaryKey: false, ordinal };
 }
 
+function key(name: string, ordinal: number): DatabaseColumn {
+  return { ...column(name, ordinal), isPrimaryKey: true };
+}
+
 /** Un catálogo con una base, un esquema y una tabla, y columnas a los dos lados. */
 class FakeGateway implements Partial<ApplicationGateway> {
   sourceColumns: DatabaseColumn[] = [column('id', 1), column('nombre', 2), column('telefono', 3)];
-  targetColumns: DatabaseColumn[] = [column('ID', 1), column('nombre', 2), column('cp', 3)];
+  targetColumns: DatabaseColumn[] = [key('ID', 1), column('nombre', 2), column('cp', 3)];
 
   getDatabases(): Observable<readonly DatabaseObject[]> {
     return of([
@@ -192,6 +196,61 @@ describe('TransferDialog', () => {
     const confirmacion = element.querySelector<HTMLInputElement>('.danger input')!;
     confirmacion.value = 'pedidos_destino';
     confirmacion.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+
+    expect(copiar()?.disabled).toBe(false);
+  });
+
+  /**
+   * Al elegir un modo que reconoce filas aparece con qué columnas se reconocen, y
+   * la clave primaria viene marcada: es lo que se quiere casi siempre.
+   */
+  it('actualizar lo que ya está propone la clave primaria del destino', async () => {
+    await elegirDestino();
+
+    const modo = element.querySelector<HTMLSelectElement>('.options select')!;
+    modo.value = 'Upsert';
+    modo.dispatchEvent(new Event('change'));
+    fixture.detectChanges();
+
+    const claves = element.querySelector('.keys')!;
+
+    expect(claves.textContent).toContain('clave primaria');
+
+    const marcada = [...claves.querySelectorAll<HTMLInputElement>('input')].filter(
+      (casilla) => casilla.checked,
+    );
+
+    expect(marcada.length).toBe(1);
+  });
+
+  /**
+   * Sin clave primaria hay que decir qué columnas identifican la fila, y hasta
+   * entonces no se puede copiar.
+   *
+   * Es la puerta que impide el accidente: con una clave que se repite, «actualiza
+   * la que ya está» tocaría varias filas a la vez.
+   */
+  it('sin clave primaria no deja copiar hasta que se eligen columnas', async () => {
+    gateway.targetColumns = [column('ID', 1), column('nombre', 2), column('cp', 3)];
+
+    await elegirDestino();
+
+    const modo = element.querySelector<HTMLSelectElement>('.options select')!;
+    modo.value = 'SkipExisting';
+    modo.dispatchEvent(new Event('change'));
+    fixture.detectChanges();
+
+    function copiar(): HTMLButtonElement | undefined {
+      return [...element.querySelectorAll<HTMLButtonElement>('.btn')].find((boton) =>
+        boton.textContent?.includes('Copiar las filas'),
+      );
+    }
+
+    expect(element.querySelector('.keys .warn')?.textContent).toContain('no tiene clave primaria');
+    expect(copiar()?.disabled).toBe(true);
+
+    element.querySelector<HTMLInputElement>('.keys input')!.click();
     fixture.detectChanges();
 
     expect(copiar()?.disabled).toBe(false);

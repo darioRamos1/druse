@@ -120,9 +120,17 @@
       <div class="options">
         <label class="field field--inline">
           <span class="field__label">Qué hacer con lo que ya hay</span>
-          <select [value]="mode()" (change)="onModeChange($any($event.target).value)">
-            <option value="Insert">Añadir las filas</option>
-            <option value="Replace">Vaciar el destino y cargar</option>
+          <select (change)="onModeChange($any($event.target).value)">
+            <option value="Insert" [selected]="mode() === 'Insert'">Añadir las filas</option>
+            <option value="Upsert" [selected]="mode() === 'Upsert'">
+              Actualizar la que ya esté, y añadir el resto
+            </option>
+            <option value="SkipExisting" [selected]="mode() === 'SkipExisting'">
+              Añadir solo lo que falte
+            </option>
+            <option value="Replace" [selected]="mode() === 'Replace'">
+              Vaciar el destino y cargar
+            </option>
           </select>
         </label>
 
@@ -151,6 +159,36 @@
           Conservar los identificadores del origen
         </label>
       </div>
+
+      @if (needsKey()) {
+        <div class="keys">
+          <p class="keys__title">Con qué columnas se reconoce una fila que ya está</p>
+
+          @if (effectiveKey().length === 0) {
+            <p class="warn">
+              {{ targetName() }} no tiene clave primaria, así que hay que decir qué columnas
+              identifican la fila. Tienen que ser columnas que no se repitan.
+            </p>
+          }
+
+          <div class="keys__list">
+            @for (column of targetColumns(); track column.name) {
+              <label class="check">
+                <input
+                  type="checkbox"
+                  [checked]="isKey(column.name)"
+                  [disabled]="keyColumns().length === 0 && column.isPrimaryKey"
+                  (change)="toggleKey(column.name)"
+                />
+                {{ column.name }}
+                @if (column.isPrimaryKey) {
+                  <span class="keys__hint">clave primaria</span>
+                }
+              </label>
+            }
+          </div>
+        </div>
+      }
 
       <label class="field">
         <span class="field__label">Solo las filas que cumplan (opcional, sin escribir WHERE)</span>
@@ -205,6 +243,13 @@
             }
           </p>
 
+          @if (preview.keyColumns.length > 0) {
+            <p class="preview__line">
+              Una fila del destino se reconoce por
+              <strong>{{ preview.keyColumns.join(', ') }}</strong>.
+            </p>
+          }
+
           @for (issue of preview.issues; track issue.column) {
             <p class="warn"><strong>{{ issue.column }}:</strong> {{ issue.message }}</p>
           }
@@ -250,7 +295,11 @@
         <section class="summary">
           <h3 class="summary__title">
             @switch (progress.outcome) {
-              @case ('Completed') { Copiadas {{ progress.rowsCopied }} filas }
+              @case ('Completed') {
+                Copiadas {{ progress.rowsCopied }} filas@if (progress.rowsSkipped > 0) {
+                  , y {{ progress.rowsSkipped }} que ya estaban se quedaron como estaban
+                }
+              }
               @case ('CompletedWithWarnings') { Copiadas {{ progress.rowsCopied }} filas, con avisos }
               @case ('Cancelled') { Cancelado con {{ progress.rowsCopied }} filas ya copiadas }
               @default { No se pudo terminar }

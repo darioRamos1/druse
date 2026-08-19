@@ -82,6 +82,16 @@ export class TransferDialog {
   protected readonly mappings = signal<readonly ColumnMapping[]>([]);
 
   protected readonly mode = signal<TransferMode>('Insert');
+
+  /**
+   * Columnas del destino que identifican una fila.
+   *
+   * Vacío significa «la clave primaria del destino», que es lo que se quiere casi
+   * siempre. Se puede cambiar porque sincronizar dos entornos suele hacerse por
+   * una clave de negocio —el código del artículo, el NIT— y no por el
+   * identificador que generó cada base por su cuenta.
+   */
+  protected readonly keyColumns = signal<readonly string[]>([]);
   protected readonly where = signal('');
   protected readonly batchSize = signal(1000);
   protected readonly atomic = signal(false);
@@ -142,8 +152,33 @@ export class TransferDialog {
     );
   });
 
+  /** Los modos que tienen que reconocer la fila que ya está. */
+  protected readonly needsKey = computed(
+    () => this.mode() === 'Upsert' || this.mode() === 'SkipExisting',
+  );
+
+  /**
+   * La clave que se va a usar: la elegida, o la primaria del destino.
+   *
+   * Se enseña resuelta para que en la pantalla se lea lo que de verdad va a
+   * pasar, y no un hueco vacío que en realidad significa algo.
+   */
+  protected readonly effectiveKey = computed(() => {
+    const chosen = this.keyColumns();
+
+    return chosen.length > 0
+      ? chosen
+      : this.targetColumns()
+          .filter((column) => column.isPrimaryKey)
+          .map((column) => column.name);
+  });
+
   protected readonly canRun = computed(
-    () => this.mapped() > 0 && this.replaceReady() && !this.previewing(),
+    () =>
+      this.mapped() > 0 &&
+      this.replaceReady() &&
+      !this.previewing() &&
+      (!this.needsKey() || this.effectiveKey().length > 0),
   );
 
   constructor() {
@@ -298,7 +333,24 @@ export class TransferDialog {
   protected onModeChange(mode: string): void {
     this.mode.set(mode as TransferMode);
     this.replaceConfirmation.set('');
+    this.keyColumns.set([]);
     this._transfers.clearPreview();
+  }
+
+  protected toggleKey(column: string): void {
+    const chosen = this.keyColumns();
+
+    this.keyColumns.set(
+      chosen.includes(column)
+        ? chosen.filter((name) => name !== column)
+        : [...chosen, column],
+    );
+
+    this._transfers.clearPreview();
+  }
+
+  protected isKey(column: string): boolean {
+    return this.effectiveKey().includes(column);
   }
 
   // --- Ejecutar -------------------------------------------------------------
@@ -358,6 +410,7 @@ export class TransferDialog {
       filter: where ? { where } : undefined,
       mappings: this.mappings(),
       mode: this.mode(),
+      keyColumns: this.needsKey() ? this.keyColumns() : [],
       atomic: this.atomic(),
       batchSize: this.batchSize(),
       keepIdentity: this.keepIdentity(),

@@ -871,12 +871,7 @@ export interface ColumnMapping {
   readonly target: string | null;
 }
 
-/**
- * Qué hace el traslado con lo que ya está en el destino.
- *
- * `Upsert` y `SkipExisting` todavía no están: el proceso local los rechaza
- * diciéndolo, en lugar de hacer otra cosa.
- */
+/** Qué hace el traslado con lo que ya está en el destino. */
 export type TransferMode = 'Insert' | 'Replace' | 'Upsert' | 'SkipExisting';
 
 export interface TransferRequest {
@@ -888,6 +883,13 @@ export interface TransferRequest {
   /** Vacío significa emparejar por nombre. */
   readonly mappings?: readonly ColumnMapping[];
   readonly mode: TransferMode;
+  /**
+   * Qué columnas del destino identifican una fila.
+   *
+   * Vacío significa la clave primaria del destino. Solo se mira en los modos que
+   * tienen que reconocer lo que ya está.
+   */
+  readonly keyColumns?: readonly string[];
   /** Todos los lotes en una transacción. No es lo normal: ver el servicio. */
   readonly atomic: boolean;
   readonly batchSize: number;
@@ -914,6 +916,8 @@ export interface TransferPreview {
   /** La consulta con la que se leerá el origen. */
   readonly select: string;
   readonly statements: readonly string[];
+  /** Con qué columnas se reconoce una fila que ya está, ya resueltas. */
+  readonly keyColumns: readonly string[];
 }
 
 export type TransferStep = 'ReadingStructure' | 'ClearingTarget' | 'CopyingRows' | 'Done';
