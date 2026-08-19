@@ -10,14 +10,14 @@
 
 | Campo | Valor |
 | --- | --- |
-| Última sesión | **022p** — 2026-08-18 |
+| Última sesión | **023** — 2026-08-19 |
 | Fase activa | **Respaldos y restauración:** Fases A–E cerradas. La **F** tiene backend, interfaz, CSV, selector de archivos, restaurar en una base nueva y **el ciclo entero por HTTP en los cuatro motores**; le falta repetir a mano el respaldo real que encontró el error de los índices de expresión |
 | Fases 0–6 | ✅ Cerradas. |
 | Fase 7 | 🟡 **11/12.** El ciclo de instalación está probado sobre este equipo; solo falta arrancar en una máquina sin herramientas de desarrollo. |
 | Fase 8 | ✅ **7/7.** Tres motores sobre el mismo contrato y primera beta preparada. |
 | ¿Compila el backend? | Sí — 0 advertencias, 0 errores |
 | ¿Compila el envoltorio? | Sí |
-| ¿Pasan las pruebas? | Sí — **625 en backend** (345 unitarias, 170 contractuales y 110 de integración), **468 en frontend**, **11 de punta a punta** y **6 en el envoltorio**. Con `DRUSE_REQUIRE_ENGINES=1` y **los cuatro motores**, sin saltarse ninguna |
+| ¿Pasan las pruebas? | Sí — **659 en backend** (366 unitarias, 170 contractuales y 123 de integración), **483 en frontend**, **13 de punta a punta** y **6 en el envoltorio**. Con `DRUSE_REQUIRE_ENGINES=1` y **los cuatro motores**, sin saltarse ninguna |
 | ¿Hay aplicación de escritorio? | **Sí.** Instalador NSIS, MSI y ZIP portable, en dos variantes: con Informix y sin él |
 | Motores | **PostgreSQL, SQL Server, MySQL/MariaDB e Informix**, todos sobre el mismo contrato compartido |
 | Trabajo a medias | Ninguno. El frontend de la restauración quedó commiteado en la sesión 022i. |
@@ -319,6 +319,89 @@ Y tres límites declarados desde el principio: no hay respaldo binario ni
 recuperación a un punto en el tiempo —eso es del servidor, y la interfaz tendrá
 que decirlo—, no hay respaldos programados, y un límite de filas puede dejar
 filas huérfanas, cosa que se avisa y no se corrige sola.
+
+### Sesión 023 — 2026-08-19 · Migrar los datos de una tabla a otra
+
+Druse sabía llevar un archivo a una tabla (importar) y una tabla a un archivo
+(respaldar). Faltaba lo de en medio, que es lo que se pide a diario: **pasar las
+filas de una tabla a otra**, aunque estén en otro esquema, en otra base o al otro
+lado de otra conexión —de desarrollo a producción, por ejemplo—, eligiendo qué
+columnas viajan.
+
+Es la fase 1 de cuatro. Cubre una tabla a otra, dentro del mismo motor, con
+filtro de filas, añadir o vaciar-y-cargar, y progreso cancelable. Quedan el
+upsert y omitir-existentes (2), la traducción de tipos entre motores y crear la
+tabla destino (3), y varias tablas de una vez con migraciones guardadas (4).
+
+#### Casi todo estaba ya escrito
+
+El servicio nuevo se apoya en piezas que ya funcionaban: `SelectData` +
+`OpenReaderAsync` para leer sin materializar, `RowBatchPlanner` para convertir,
+`IRowEditor.InsertAsync` para escribir, `TableDataFilter` para el `WHERE`, el
+patrón de `IBackupTracker` para el progreso que sobrevive a cerrar la ventana, y
+`BeginDataLoad`/`EndDataLoad` para poder copiar los identificadores que genera el
+motor. Lo genuinamente nuevo es el bucle que lee de una sesión y escribe en otra.
+
+#### Las tres decisiones que cambian el resultado
+
+**1. Se escribe por lotes, y cada lote se confirma.** Una transacción que abarque
+millones de filas revienta el registro del servidor y bloquea la tabla mientras
+dura. Troceando, lo copiado se queda y el resumen dice cuántas filas entraron —que
+es la única pregunta que importa cuando algo falla a mitad—. Para una tabla
+pequeña, donde dejarla a medias sería peor, está «todo o nada», que necesitó un
+`IWriteScope` nuevo en `IRowEditor`: abre una transacción y **se la presta a la
+sesión** con `Borrow`, de modo que los lotes se unan a ella en lugar de abrir la
+suya. Es el mismo mecanismo que la instantánea de los respaldos.
+
+**2. El lado que lee necesita su propia conexión.** Copiar entre dos esquemas de
+la misma conexión es de lo más corriente, y ningún motor de estos admite un lector
+abierto y un `INSERT` a la vez por el mismo cable. Cuando origen y destino
+comparten sesión, se abre una auxiliar con la misma identidad —lo que ya hacía el
+explorador para navegar otras bases—. Sin esto, el caso más común se quedaría
+colgado. Y los turnos de las dos sesiones se piden **en orden de identificador**:
+dos traslados cruzados entre las mismas conexiones se esperarían para siempre.
+
+**3. Vaciar es un `DELETE`, no un `TRUNCATE`.** Aunque sea mucho más lento. MySQL
+confirma la transacción en curso al truncar —con lo que «todo o nada» dejaría de
+ser cierto justo en el modo que borra— y truncar falla en cuanto otra tabla
+apunte a esta, que es lo normal en la tabla que uno quiere reemplazar.
+
+**Y una que es de seguridad:** un valor que no cabe para el traslado entero,
+diciendo la fila y la columna. Es lo contrario de importar, que enumera todos los
+problemas para que se corrija el archivo: aquí no hay archivo que corregir, y
+seguir metiendo filas dejaría en el destino una tabla que nadie sabe describir.
+Vaciar el destino, además, exige escribir el nombre de la tabla.
+
+#### Lo que solo se vio conduciendo la interfaz
+
+Con las pruebas en verde, tres cosas que el código no decía:
+
+- Los desplegables del emparejado salían **vacíos** aunque la columna sí tuviera
+  pareja: en Angular, `[value]` sobre un `<select>` se aplica antes de que el
+  `@for` haya creado sus `<option>`. Va en cada opción con `[selected]`.
+- La vista previa decía «con condición, el catálogo no lo estima» **sin que
+  hubiera condición**: lo que faltaba era el recuento del catálogo. Ahora
+  distingue los dos casos.
+- «No se copian 1 columnas». Concordancia.
+
+**Verificado.** **659 en backend** (366 unitarias, 170 contractuales y 123 de
+integración; 13 nuevas del traslado contra PostgreSQL real, incluidas dos
+sesiones distintas, dos esquemas de la misma conexión, el troceado en lotes y
+«todo o nada»), **483 en frontend** y **13 de punta a punta**, dos de ellas del
+asistente: una copia tres filas y lo demuestra con un `COUNT(*)`, la otra
+comprueba que vaciar no se puede pedir sin escribir el nombre.
+
+**No hecho.** Las fases 2 a 4. `Upsert` y `SkipExisting` existen en el contrato y
+el proceso local **los rechaza diciéndolo**, en lugar de caer en «insertar» y
+duplicar filas sin que nadie lo pida. Lo mismo entre motores distintos.
+
+**Archivos.** Backend: `DataTransfer.cs`, `Transfers/TransferService.cs`,
+`ITransferTracker.cs`, `Transfers/TransferTracker.cs`, `TransferEndpoints.cs`,
+`TransferContracts.cs`, y en las abstracciones `IRowEditor`, `RowEditorBase`,
+`IDatabaseScripter` y `TableDesignerBase`. Frontend: `transfer.store.ts`,
+`features/transfer/transfer-dialog/`, el gateway, el shell y la barra lateral.
+Pruebas: `TransferPlanTests.cs`, `TransferFlowTests.cs`, `transfer.store.spec.ts`,
+`transfer-dialog.spec.ts` y `e2e/tests/migracion.spec.ts`.
 
 ### Sesión 022p — 2026-08-18 · Playwright, y los dos fallos que destapó montarlo
 
