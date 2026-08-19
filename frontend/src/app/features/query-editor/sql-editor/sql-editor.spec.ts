@@ -1,25 +1,59 @@
-import { executionErrorLine } from './execution-error';
+import { executionErrorPlace } from './execution-error';
 
-describe('executionErrorLine', () => {
-  it('convierte una posición PostgreSQL en la línea enviada', () => {
-    const sql = 'SELECT 1;\nSELECT * FROM';
+describe('executionErrorPlace', () => {
+  it('convierte la posición del motor en línea y columna', () => {
+    const sql = 'SELECT 1\nFROM tabla_x';
 
-    expect(executionErrorLine({ message: 'error', position: 20 }, sql)).toBe(2);
+    // El carácter 20 cae en la segunda línea, sexta columna.
+    expect(executionErrorPlace({ message: 'error', position: 20 }, sql)).toEqual({
+      line: 2,
+      column: 11,
+    });
   });
 
-  it('usa la línea que reporta SQL Server', () => {
-    expect(executionErrorLine({ message: 'error', line: 3 }, 'SELECT 1')).toBe(3);
+  it('señala la palabra culpable, no la línea entera', () => {
+    // Es el caso real de PostgreSQL: «syntax error at or near "FROM"» con la
+    // posición del propio FROM.
+    const sql = 'SELECT\n  uno,\n  FROM tabla_x\n';
+
+    expect(executionErrorPlace({ message: 'syntax error', position: 17 }, sql)).toEqual({
+      line: 3,
+      column: 3,
+    });
   });
 
-  it('prefiere la posición cuando el motor informa ambas ubicaciones', () => {
-    expect(executionErrorLine({ message: 'error', position: 2, line: 4 }, 'X\nY')).toBe(1);
+  it('la primera posición es la primera columna', () => {
+    expect(executionErrorPlace({ message: 'error', position: 1 }, 'SELECT')).toEqual({
+      line: 1,
+      column: 1,
+    });
   });
 
-  it('cuenta caracteres Unicode como el servidor PostgreSQL', () => {
-    expect(executionErrorLine({ message: 'error', position: 3 }, '😀\nX')).toBe(2);
+  it('usa la línea cuando el motor solo da la línea', () => {
+    // SQL Server y MySQL: sin columna, y por eso se subraya la línea entera en
+    // lugar de inventarse un sitio.
+    expect(executionErrorPlace({ message: 'error', line: 3 }, 'SELECT 1')).toEqual({
+      line: 3,
+      column: null,
+    });
   });
 
-  it('no inventa una línea cuando el motor no informa ubicación', () => {
-    expect(executionErrorLine({ message: 'error' }, 'SELECT * FROM')).toBeNull();
+  it('la posición manda sobre la línea', () => {
+    expect(executionErrorPlace({ message: 'error', position: 2, line: 4 }, 'X\nY')).toEqual({
+      line: 1,
+      column: 2,
+    });
+  });
+
+  it('cuenta por caracteres y no por unidades UTF-16', () => {
+    // Un emoji ocupa dos unidades: contándolas, el error caería una línea antes.
+    expect(executionErrorPlace({ message: 'error', position: 3 }, '😀\nX')).toEqual({
+      line: 2,
+      column: 1,
+    });
+  });
+
+  it('sin ubicación, no se señala nada', () => {
+    expect(executionErrorPlace({ message: 'error' }, 'SELECT * FROM')).toBeNull();
   });
 });

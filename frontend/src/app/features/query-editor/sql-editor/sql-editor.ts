@@ -31,7 +31,7 @@ import {
 } from '../../../core/workspace/format-settings';
 import { ThemeName } from '../../../core/theme/theme.service';
 import { DRUSE_THEME_NAMES, druseTheme } from './druse-theme';
-import { executionErrorLine } from './execution-error';
+import { executionErrorPlace } from './execution-error';
 import { MonacoLoader } from './monaco-loader';
 
 /** Posición del cursor, tal como se muestra en la barra de estado. */
@@ -383,7 +383,15 @@ export default class SqlEditor implements OnInit {
     }
   }
 
-  /** Marca la línea que el motor reportó dentro del SQL enviado. */
+  /**
+   * Marca dónde falló, dentro del SQL enviado.
+   *
+   * Se subraya lo más pequeño que el motor permita saber: con PostgreSQL, que da
+   * la posición exacta, **la palabra culpable**; con SQL Server y MySQL, que solo
+   * dan la línea, la línea entera. Señalar un párrafo cuando se sabe la palabra
+   * es tirar información, y señalar una palabra cuando solo se sabe la línea es
+   * inventársela.
+   */
   showExecutionError(error: QueryError, executedSql: string, startOffset = 0): void {
     const editor = this._editor;
     const monaco = this._monaco;
@@ -393,27 +401,79 @@ export default class SqlEditor implements OnInit {
       return;
     }
 
-    const localLine = executionErrorLine(error, executedSql);
-    const lineNumber = localLine
-      ? model.getPositionAt(startOffset).lineNumber + localLine - 1
-      : null;
+    const place = executionErrorPlace(error, executedSql);
 
-    if (!lineNumber || lineNumber > model.getLineCount()) {
+    if (!place) {
       this.clearExecutionError();
       return;
     }
+
+    // El fragmento ejecutado puede empezar en mitad del documento —«Ejecutar
+    // actual» manda una sola instrucción— así que lo que dice el motor es
+    // relativo a él y hay que devolverlo a coordenadas de la pestaña.
+    const start = model.getPositionAt(startOffset);
+    const lineNumber = start.lineNumber + place.line - 1;
+
+    if (lineNumber > model.getLineCount()) {
+      this.clearExecutionError();
+      return;
+    }
+
+    // La columna solo se desplaza en la primera línea del fragmento: es la única
+    // que puede empezar a media línea. Las siguientes empiezan donde la pestaña.
+    const column =
+      place.column === null
+        ? null
+        : place.line === 1
+          ? start.column + place.column - 1
+          : place.column;
 
     monaco.editor.setModelMarkers(model, 'druse-execution', [
       {
         severity: monaco.MarkerSeverity.Error,
         message: error.message,
-        startLineNumber: lineNumber,
-        startColumn: 1,
-        endLineNumber: lineNumber,
-        endColumn: model.getLineMaxColumn(lineNumber),
+        ...this.range(model, lineNumber, column),
       },
     ]);
     editor.revealLineInCenterIfOutsideViewport(lineNumber);
+  }
+
+  /**
+   * Qué se subraya: la palabra que empieza en esa columna, o la línea entera.
+   *
+   * Cuando la columna cae sobre un símbolo y no sobre una palabra —una coma de
+   * más, un paréntesis sin cerrar— no hay palabra que marcar y se subraya ese
+   * carácter: es exactamente lo que el motor está señalando.
+   */
+  private range(
+    model: MonacoApi.editor.ITextModel,
+    lineNumber: number,
+    column: number | null,
+  ): {
+    startLineNumber: number;
+    startColumn: number;
+    endLineNumber: number;
+    endColumn: number;
+  } {
+    const last = model.getLineMaxColumn(lineNumber);
+
+    if (column === null || column >= last) {
+      return {
+        startLineNumber: lineNumber,
+        startColumn: 1,
+        endLineNumber: lineNumber,
+        endColumn: last,
+      };
+    }
+
+    const word = model.getWordAtPosition({ lineNumber, column });
+
+    return {
+      startLineNumber: lineNumber,
+      startColumn: word?.startColumn ?? column,
+      endLineNumber: lineNumber,
+      endColumn: word?.endColumn ?? Math.min(column + 1, last),
+    };
   }
 
   async ngOnInit(): Promise<void> {
