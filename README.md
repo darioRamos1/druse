@@ -182,6 +182,22 @@ npm run build
 npm test
 ```
 
+### De punta a punta
+
+La aplicación entera por donde la usa una persona —Angular, la API local y un
+PostgreSQL de verdad— con Playwright. Levanta los servidores por su cuenta, en
+puertos propios, y escribe en una carpeta aparte para no tocar el Druse de quien
+las lanza:
+
+```bash
+cd e2e
+npm install
+npx playwright install chromium   # solo la primera vez
+npm test
+```
+
+Los detalles, en [`e2e/README.md`](e2e/README.md).
+
 ### Bases de datos de pruebas
 
 Las pruebas de proveedor y de integración necesitan servidores reales. Hay contenedores desechables preparados:

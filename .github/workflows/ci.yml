@@ -198,6 +198,77 @@ jobs:
       - name: Probar contra los cuatro motores
         run: dotnet test backend/Druse.slnx --configuration Release --verbosity normal
 
+  # La aplicación entera por donde la usa una persona: Angular, la API local y un
+  # PostgreSQL de verdad. Es el único job que prueba las tres capas juntas, y por
+  # eso vale la pena aunque tarde: lo que se le escapa a las otras es justamente
+  # que encajen entre sí.
+  #
+  # Solo en Linux. Un E2E por sistema operativo triplicaría el tiempo para
+  # comprobar tres veces lo mismo: lo que aquí se ejercita es la aplicación, no
+  # el sistema debajo.
+  e2e:
+    name: Punta a punta
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_PASSWORD: druse_dev_only
+          POSTGRES_DB: druse_test
+        ports:
+          - 55440:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Instalar .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Instalar Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: |
+            frontend/package-lock.json
+            e2e/package-lock.json
+
+      - name: Instalar dependencias del frontend
+        working-directory: frontend
+        run: npm ci
+
+      - name: Instalar dependencias de las pruebas
+        working-directory: e2e
+        run: npm ci
+
+      # Solo Chromium: los navegadores pesan y aquí no se está probando la
+      # compatibilidad entre ellos, sino que la aplicación funcione.
+      - name: Instalar el navegador
+        working-directory: e2e
+        run: npx playwright install --with-deps chromium
+
+      - name: Probar
+        working-directory: e2e
+        run: npm test
+
+      # El informe solo sirve cuando algo falló, y entonces es lo primero que se
+      # mira: trae la traza, la captura y el vídeo del momento exacto.
+      - name: Recoger el informe
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-informe
+          path: e2e/playwright-report/**
+          retention-days: 14
+
   frontend:
     name: Frontend (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
