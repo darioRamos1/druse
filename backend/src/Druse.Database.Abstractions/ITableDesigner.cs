@@ -24,6 +24,22 @@ public interface ITableDesigner
     IReadOnlyList<string> CommonDataTypes { get; }
 
     /// <summary>
+    /// Cómo llama este motor al tipo que guarda esto.
+    ///
+    /// Es la mitad que le toca a cada dialecto de traducir tipos entre motores: la
+    /// otra —clasificar lo que se lee— ya la hace el dominio. Con esto no hace
+    /// falta una tabla de todos los motores contra todos, que con cuatro serían
+    /// doce direcciones y crecería al cuadrado; hacen falta cuatro respuestas a la
+    /// misma pregunta.
+    ///
+    /// **Devuelve siempre algo.** Un motor sin tipo para una familia contesta con
+    /// el más cercano que tenga —un identificador único donde no existe es texto
+    /// de 36 caracteres— y quien llama se encarga de decir qué se pierde. Negarse
+    /// aquí dejaría a la vista previa sin nada que enseñar.
+    /// </summary>
+    string TypeFor(TypeFacets facets);
+
+    /// <summary>
     /// Lo que este motor admite al definir un índice.
     ///
     /// La interfaz dibuja el formulario a partir de esto, en lugar de preguntar

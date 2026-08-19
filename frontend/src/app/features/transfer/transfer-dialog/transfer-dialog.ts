@@ -16,6 +16,7 @@ import {
   TransferMode,
   TransferRequest,
   TransferTable,
+  TypeTranslation,
 } from '../../../core/application-gateway/application-gateway';
 import { TransferStore } from '../../../core/transfer/transfer.store';
 import { WorkspaceStore } from '../../../core/workspace/workspace-store';
@@ -23,7 +24,7 @@ import { DatabaseColumn, DatabaseObject } from '../../../shared/models/workspace
 import { OperationProgress } from '../../../shared/ui/operation-progress/operation-progress';
 
 /** En qué pantalla del asistente estamos. */
-type Step = 'target' | 'columns' | 'running';
+type Step = 'target' | 'types' | 'columns' | 'running';
 
 /**
  * Copiar las filas de una tabla a otra.
@@ -73,6 +74,19 @@ export class TransferDialog {
 
   protected readonly target = signal<DatabaseObject | null>(null);
 
+  // --- Crear la tabla de destino --------------------------------------------
+
+  /** Nombre que se le va a poner a la tabla nueva. */
+  protected readonly newTableName = signal('');
+
+  /** Qué tipo tendría cada columna al otro lado. Vacío dentro del mismo motor. */
+  protected readonly translations = signal<readonly TypeTranslation[]>([]);
+
+  /** Tipos que el usuario cambió a mano, por columna del origen. */
+  protected readonly typeOverrides = signal<Readonly<Record<string, string>>>({});
+
+  protected readonly creating = signal(false);
+
   // --- Columnas y opciones --------------------------------------------------
 
   protected readonly sourceColumns = signal<readonly DatabaseColumn[]>([]);
@@ -97,6 +111,16 @@ export class TransferDialog {
   protected readonly atomic = signal(false);
   protected readonly keepIdentity = signal(true);
   protected readonly replaceConfirmation = signal('');
+
+  /** Columnas que no tienen dónde ir en el motor de destino. */
+  protected readonly untranslatable = computed(() =>
+    this.translations().filter((translation) => translation.fidelity === 'None'),
+  );
+
+  /** Lo que se pierde al cruzar de motor: es lo que hay que leer antes de crear. */
+  protected readonly losses = computed(() =>
+    this.translations().filter((translation) => translation.fidelity !== 'Exact'),
+  );
 
   protected readonly loadingColumns = signal(false);
   protected readonly localError = signal<string | null>(null);
@@ -273,6 +297,94 @@ export class TransferDialog {
   }
 
   /**
+   * Prepara la creación de una tabla nueva en el sitio donde se está mirando.
+   *
+   * Antes de crear nada se pide la traducción de los tipos: entre motores
+   * distintos es lo único que dice qué deja de ser cierto al otro lado, y esa
+   * pregunta se hace **antes** de que la tabla exista.
+   */
+  protected async prepareNewTable(): Promise<void> {
+    const name = this.newTableName().trim();
+    const sourceSession = this._workspace.sessionForConnection(this.connectionId());
+    const targetSession = this.targetSessionId();
+
+    if (!name || !sourceSession || !targetSession) {
+      return;
+    }
+
+    this.target.set(this.plannedTarget(name));
+    this.loadingColumns.set(true);
+    this.localError.set(null);
+
+    try {
+      const request = this.request(false);
+
+      if (request) {
+        this.translations.set(await firstValueFrom(this._gateway.translateTransferTypes(request)));
+      }
+
+      this.step.set('types');
+    } catch (error) {
+      this.target.set(null);
+      this.localError.set(describe(error));
+    } finally {
+      this.loadingColumns.set(false);
+    }
+  }
+
+  protected setType(column: string, dataType: string): void {
+    this.typeOverrides.set({ ...this.typeOverrides(), [column]: dataType });
+  }
+
+  protected typeOf(translation: TypeTranslation): string {
+    return this.typeOverrides()[translation.column] ?? translation.targetType;
+  }
+
+  /** Crea la tabla y sigue por donde seguiría cualquier otro destino. */
+  protected async createTarget(): Promise<void> {
+    const request = this.request(false);
+    const target = this.target();
+
+    if (!request || !target) {
+      return;
+    }
+
+    this.creating.set(true);
+    this.localError.set(null);
+
+    try {
+      await firstValueFrom(this._gateway.createTransferTarget(request));
+      await this.loadColumns(target);
+    } catch (error) {
+      this.localError.set(describe(error));
+    } finally {
+      this.creating.set(false);
+    }
+  }
+
+  /**
+   * La tabla que se va a crear, colocada donde se esté mirando.
+   *
+   * La base y el esquema salen del camino recorrido y no de la conexión: dentro
+   * de una conexión hay varias bases, y crear en la que no era es de los errores
+   * que no se ven hasta que alguien busca la tabla donde debería estar.
+   */
+  private plannedTarget(name: string): DatabaseObject {
+    const trail = this.trail();
+    const database = trail.find((node) => node.kind === 'database');
+    const schema = trail.find((node) => node.kind === 'schema');
+
+    return {
+      id: `Table:${schema?.name ?? ''}.${name}`,
+      name,
+      kind: 'table',
+      database: database?.name ?? schema?.database,
+      schema: schema?.name,
+      hasChildren: false,
+    };
+  }
+
+  /**
    * Trae las columnas de los dos lados y las empareja por nombre.
    *
    * Se emparejan aquí igual que las emparejaría el proceso local si no se dijera
@@ -411,6 +523,7 @@ export class TransferDialog {
       mappings: this.mappings(),
       mode: this.mode(),
       keyColumns: this.needsKey() ? this.keyColumns() : [],
+      typeOverrides: this.typeOverrides(),
       atomic: this.atomic(),
       batchSize: this.batchSize(),
       keepIdentity: this.keepIdentity(),

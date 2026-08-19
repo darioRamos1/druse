@@ -49,6 +49,7 @@ import {
   TransferPreview,
   TransferProgress,
   TransferRequest,
+  TypeTranslation,
   HealthStatus,
   SaveConnectionRequest,
 } from './application-gateway';
@@ -419,6 +420,20 @@ export class HttpApplicationGateway extends ApplicationGateway {
     return this._http
       .post<{ id: string }>('/api/transfers', request)
       .pipe(map((response) => response.id));
+  }
+
+  override translateTransferTypes(
+    request: TransferRequest,
+  ): Observable<readonly TypeTranslation[]> {
+    return this._http
+      .post<{ translations: readonly TypeTranslation[] }>('/api/transfers/translation', request)
+      .pipe(map((response) => response.translations));
+  }
+
+  override createTransferTarget(request: TransferRequest): Observable<readonly string[]> {
+    return this._http
+      .post<{ statements: readonly string[] }>('/api/transfers/target', request)
+      .pipe(map((response) => response.statements));
   }
 
   override getTransferStatus(transferId: string): Observable<TransferProgress> {

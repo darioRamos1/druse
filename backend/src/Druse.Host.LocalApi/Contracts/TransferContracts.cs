@@ -55,6 +55,14 @@ public sealed record TransferRequestDto
     /// <summary>Vacío significa la clave primaria del destino.</summary>
     public IReadOnlyList<string> KeyColumns { get; init; } = [];
 
+    /// <summary>
+    /// Tipos escritos a mano al crear la tabla de destino, por columna del origen.
+    ///
+    /// Solo se miran entre motores distintos, que es cuando hay algo que traducir.
+    /// </summary>
+    public IReadOnlyDictionary<string, string> TypeOverrides { get; init; } =
+        new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
     public bool Atomic { get; init; }
 
     public int BatchSize { get; init; } = DataTransferRequest.DefaultBatchSize;
@@ -94,6 +102,25 @@ public sealed record TransferPreviewDto
 
     /// <summary>Con qué columnas se reconoce una fila que ya está, ya resueltas.</summary>
     public IReadOnlyList<string> KeyColumns { get; init; } = [];
+
+    /// <summary>Qué tipo tendría cada columna al otro lado. Vacío dentro del mismo motor.</summary>
+    public IReadOnlyList<TypeTranslationDto> Translations { get; init; } = [];
+}
+
+/// <summary>Cómo queda una columna al cambiar de motor.</summary>
+public sealed record TypeTranslationDto
+{
+    public required string Column { get; init; }
+
+    public required string SourceType { get; init; }
+
+    public required string TargetType { get; init; }
+
+    /// <summary>`Exact`, `Approximate` o `None`.</summary>
+    public required string Fidelity { get; init; }
+
+    /// <summary>Qué se pierde. Ausente cuando no se pierde nada.</summary>
+    public string? Note { get; init; }
 }
 
 /// <summary>Por qué se paró un traslado, con lo que ya había entrado.</summary>
@@ -175,6 +202,7 @@ internal static class TransferMapper
             ],
             Mode = Parse(dto.Mode),
             KeyColumns = dto.KeyColumns,
+            TypeOverrides = dto.TypeOverrides,
             Atomic = dto.Atomic,
             BatchSize = dto.BatchSize,
             KeepIdentity = dto.KeepIdentity,
@@ -226,6 +254,17 @@ internal static class TransferMapper
             Select = preview.Select,
             Statements = preview.Statements,
             KeyColumns = preview.KeyColumns,
+            Translations =
+            [
+                .. preview.Translations.Select(translation => new TypeTranslationDto
+                {
+                    Column = translation.Column,
+                    SourceType = translation.SourceType,
+                    TargetType = translation.TargetType,
+                    Fidelity = translation.Fidelity.ToString(),
+                    Note = translation.Note,
+                }),
+            ],
         };
     }
 

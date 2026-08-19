@@ -514,6 +514,22 @@ export abstract class ApplicationGateway {
    */
   abstract runTransfer(request: TransferRequest): Observable<string>;
 
+  /**
+   * Qué tipo tendría cada columna del origen en el motor de destino.
+   *
+   * Va por su propia ruta y no dentro de la vista previa porque **se pregunta
+   * antes de que la tabla exista**: es justo lo que hay que leer para decidir si
+   * crearla. Dentro del mismo motor devuelve vacío.
+   */
+  abstract translateTransferTypes(request: TransferRequest): Observable<readonly TypeTranslation[]>;
+
+  /**
+   * Crea en el destino una tabla con la forma de la de origen.
+   *
+   * Devuelve las instrucciones que se ejecutaron, para poder leerlas.
+   */
+  abstract createTransferTarget(request: TransferRequest): Observable<readonly string[]>;
+
   abstract getTransferStatus(transferId: string): Observable<TransferProgress>;
 
   abstract cancelTransfer(transferId: string): Observable<void>;
@@ -890,6 +906,8 @@ export interface TransferRequest {
    * tienen que reconocer lo que ya está.
    */
   readonly keyColumns?: readonly string[];
+  /** Tipos escritos a mano al crear la tabla, por columna del origen. */
+  readonly typeOverrides?: Readonly<Record<string, string>>;
   /** Todos los lotes en una transacción. No es lo normal: ver el servicio. */
   readonly atomic: boolean;
   readonly batchSize: number;
@@ -898,6 +916,24 @@ export interface TransferRequest {
   readonly confirmed: boolean;
   /** El nombre de la tabla escrito a mano, solo para `Replace`. */
   readonly replaceConfirmation?: string;
+}
+
+/**
+ * Cuánto se conserva de un tipo al llevarlo a otro motor.
+ *
+ * `Approximate` es el caso que hay que leer: los datos caben, pero algo del tipo
+ * no viaja. `None` es el que impide crear la tabla.
+ */
+export type TranslationFidelity = 'Exact' | 'Approximate' | 'None';
+
+/** Cómo queda una columna al cambiar de motor. */
+export interface TypeTranslation {
+  readonly column: string;
+  readonly sourceType: string;
+  readonly targetType: string;
+  readonly fidelity: TranslationFidelity;
+  /** Qué se pierde. Ausente cuando no se pierde nada. */
+  readonly note?: string;
 }
 
 export interface TransferIssue {
@@ -918,6 +954,8 @@ export interface TransferPreview {
   readonly statements: readonly string[];
   /** Con qué columnas se reconoce una fila que ya está, ya resueltas. */
   readonly keyColumns: readonly string[];
+  /** Qué tipo tendría cada columna al otro lado. Vacío dentro del mismo motor. */
+  readonly translations: readonly TypeTranslation[];
 }
 
 export type TransferStep = 'ReadingStructure' | 'ClearingTarget' | 'CopyingRows' | 'Done';

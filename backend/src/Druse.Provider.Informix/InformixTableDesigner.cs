@@ -19,6 +19,33 @@ public sealed class InformixTableDesigner : TableDesignerBase
     ];
 
     /// <summary>
+    /// Informix es el que menos tipos propios tiene de los cuatro, así que es
+    /// donde más cosas llegan como texto.
+    ///
+    /// **`lvarchar` en lugar de `text`** para lo que no declara tamaño: el tipo
+    /// `text` de Informix es un objeto grande que no se puede comparar ni indexar,
+    /// y una columna que venía siendo texto corriente dejaría de servir para lo
+    /// que servía. `lvarchar` llega a 32 739 bytes y se comporta como lo que era.
+    /// </summary>
+    public override string TypeFor(TypeFacets facets) => facets.Family switch
+    {
+        ColumnFamily.Uuid => "CHAR(36)",
+        // No hay booleano por DRDA: viaja como entero pequeño de valor 1 o 0.
+        ColumnFamily.Boolean => "SMALLINT",
+        ColumnFamily.Integral => "BIGINT",
+        ColumnFamily.Fractional => facets.Precision is { } precision
+            ? $"DECIMAL({precision},{facets.Scale ?? 0})"
+            : "FLOAT",
+        ColumnFamily.Date => "DATE",
+        ColumnFamily.Time => "DATETIME HOUR TO SECOND",
+        ColumnFamily.Timestamp or ColumnFamily.TimestampWithZone => "DATETIME YEAR TO SECOND",
+        ColumnFamily.Binary => "BYTE",
+        _ when facets.IsUnbounded || facets.Length is null => "LVARCHAR(32739)",
+        _ when facets.Length > 32739 => "LVARCHAR(32739)",
+        _ => $"VARCHAR({facets.Length})",
+    };
+
+    /// <summary>
     /// Una base sin registro de transacciones **no admite conexiones DRDA**, que
     /// es por donde habla Druse. Crearla sin `WITH LOG` daría una base que existe
     /// y a la que después no se puede entrar, con un error que no menciona el

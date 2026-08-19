@@ -253,6 +253,39 @@ select {
   }
 }
 
+.new-table {
+  margin-bottom: 10px;
+
+  input {
+    flex: 1;
+  }
+}
+
+/* Lo que se pierde al cruzar de motor va pegado a su columna: leerlo en una
+   lista aparte obligaría a emparejar a mano. */
+.note-row td {
+  padding-top: 0;
+  border-bottom: 1px solid var(--dr-border);
+}
+
+.note {
+  color: var(--dr-warning-strong);
+  font-family: var(--dr-font-ui);
+  font-size: 11.5px;
+
+  &--lost {
+    color: var(--dr-danger-text);
+  }
+}
+
+.type-cell {
+  color: var(--dr-text-tertiary);
+}
+
+.is-lost td:first-child {
+  color: var(--dr-danger-text);
+}
+
 .options {
   display: flex;
   flex-wrap: wrap;

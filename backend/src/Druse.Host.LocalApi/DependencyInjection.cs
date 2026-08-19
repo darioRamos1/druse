@@ -159,6 +159,7 @@ internal static class DependencyInjection
         services.AddScoped<BackupService>();
         services.AddScoped<BackupProfileService>();
         services.AddScoped<RestoreService>();
+        services.AddScoped<TypeTranslator>();
         services.AddScoped<TransferService>();
 
         // --- Exportadores -------------------------------------------------------

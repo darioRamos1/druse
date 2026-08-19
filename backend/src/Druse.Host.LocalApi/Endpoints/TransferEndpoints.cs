@@ -40,6 +40,56 @@ internal static class TransferEndpoints
         })
         .WithName("PreviewTransfer");
 
+        app.MapPost("/api/transfers/translation", async (
+            TransferRequestDto request,
+            TransferService transfers,
+            CancellationToken cancellationToken) =>
+        {
+            try
+            {
+                var translations = await transfers.TranslateAsync(
+                    request.ToDomain(),
+                    cancellationToken);
+
+                return Results.Ok(new
+                {
+                    translations = translations.Select(translation => new TypeTranslationDto
+                    {
+                        Column = translation.Column,
+                        SourceType = translation.SourceType,
+                        TargetType = translation.TargetType,
+                        Fidelity = translation.Fidelity.ToString(),
+                        Note = translation.Note,
+                    }),
+                });
+            }
+            catch (RowEditRejectedException exception)
+            {
+                return Rejected(exception);
+            }
+        })
+        .WithName("TranslateTransferTypes");
+
+        app.MapPost("/api/transfers/target", async (
+            TransferRequestDto request,
+            TransferService transfers,
+            CancellationToken cancellationToken) =>
+        {
+            try
+            {
+                var statements = await transfers.CreateTargetAsync(
+                    request.ToDomain(),
+                    cancellationToken);
+
+                return Results.Ok(new { statements });
+            }
+            catch (RowEditRejectedException exception)
+            {
+                return Rejected(exception);
+            }
+        })
+        .WithName("CreateTransferTarget");
+
         app.MapPost("/api/transfers", (
             TransferRequestDto request,
             TransferService transfers,

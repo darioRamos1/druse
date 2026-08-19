@@ -43,6 +43,15 @@ public sealed record TransferPreview
     /// que de verdad se va a usar y no lo que se escribió.
     /// </summary>
     public IReadOnlyList<string> KeyColumns { get; init; } = [];
+
+    /// <summary>
+    /// Qué tipo tendría cada columna del origen en el motor de destino.
+    ///
+    /// Vacío cuando los dos lados son el mismo motor: allí no hay nada que
+    /// traducir. Cuando no lo son, **esto es lo que hay que leer antes de
+    /// copiar**: dice qué deja de ser cierto al otro lado.
+    /// </summary>
+    public IReadOnlyList<TypeTranslation> Translations { get; init; } = [];
 }
 
 /// <summary>
@@ -68,11 +77,13 @@ public sealed record TransferPreview
 public sealed class TransferService(
     IProviderRegistry providers,
     ConnectionService connections,
-    MetadataService metadata)
+    MetadataService metadata,
+    TypeTranslator types)
 {
     private readonly IProviderRegistry _providers = providers;
     private readonly ConnectionService _connections = connections;
     private readonly MetadataService _metadata = metadata;
+    private readonly TypeTranslator _types = types;
 
     /// <summary>Cuántas instrucciones se enseñan como muestra en la vista previa.</summary>
     private const int PreviewedStatements = 5;
@@ -106,6 +117,7 @@ public sealed class TransferService(
             RowsEstimated = plan.RowsEstimated,
             Select = plan.Select,
             KeyColumns = plan.KeyColumns,
+            Translations = plan.Translations,
             Statements =
             [
                 .. editor.DescribeInsert(sample)
@@ -132,6 +144,156 @@ public sealed class TransferService(
             : editor.DescribeWrite(sample, plan.OnExisting, plan.KeyColumns) is [var written, ..]
                 ? written
                 : fallback;
+
+    /// <summary>
+    /// Qué tipo tendría cada columna del origen en el motor de destino.
+    ///
+    /// Va por su propia ruta y no dentro de la vista previa porque **se pregunta
+    /// antes de que exista la tabla**: es lo que hay que leer justo para decidir
+    /// si crearla. La vista previa, en cambio, compara dos tablas que ya están.
+    ///
+    /// Dentro del mismo motor devuelve vacío: no hay nada que traducir.
+    /// </summary>
+    public async Task<IReadOnlyList<TypeTranslation>> TranslateAsync(
+        DataTransferRequest request,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        var sourceSession = _connections.Require(request.SourceSessionId);
+        var targetSession = _connections.Require(request.TargetSessionId);
+
+        if (sourceSession.Engine == targetSession.Engine)
+        {
+            return [];
+        }
+
+        var columns = await _metadata.GetColumnsAsync(
+            request.SourceSessionId,
+            request.Source,
+            cancellationToken);
+
+        return _types.Translate(
+            sourceSession.Engine,
+            targetSession.Engine,
+            columns,
+            request.TypeOverrides);
+    }
+
+    /// <summary>
+    /// Crea en el destino una tabla con la forma de la de origen.
+    ///
+    /// Existe porque el paso manual sobra: la estructura ya se sabe leer, y
+    /// traducirla es lo que acaba de hacer la vista previa. Lo que se crea son
+    /// **columnas, tipos, nulabilidad y clave primaria**, nada más: los índices y
+    /// las claves foráneas se dejan para después por lo mismo que en un respaldo
+    /// —crear un índice antes de cargar hace que cada fila pague su
+    /// mantenimiento, y entre dos tablas puede haber un ciclo que ningún orden
+    /// satisface—.
+    ///
+    /// **Se niega si algo no tiene dónde ir.** Una columna que guarda varios
+    /// valores no cabe en un motor sin arrays, y crear la tabla sin ella dejaría
+    /// un traslado que parece completo y no lo es. Quien quiera seguir la excluye
+    /// o le pone un tipo a mano.
+    /// </summary>
+    public async Task<IReadOnlyList<string>> CreateTargetAsync(
+        DataTransferRequest request,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        var sourceSession = _connections.Require(request.SourceSessionId);
+        var targetSession = _connections.Require(request.TargetSessionId);
+
+        if (targetSession.Profile.ReadOnly)
+        {
+            throw new RowEditRejectedException(new RowEditRejection(
+                RowEditRefusal.ReadOnlyConnection,
+                "La conexión de destino está marcada como solo lectura."));
+        }
+
+        if (string.IsNullOrWhiteSpace(request.Target.Name))
+        {
+            throw new RowEditRejectedException(new RowEditRejection(
+                RowEditRefusal.NothingToDo,
+                "Hay que decir cómo se va a llamar la tabla nueva."));
+        }
+
+        var columns = await _metadata.GetColumnsAsync(
+            request.SourceSessionId,
+            request.Source,
+            cancellationToken);
+
+        var structure = await _metadata.GetTableStructureAsync(
+            request.SourceSessionId,
+            request.Source,
+            cancellationToken);
+
+        var translations = _types.Translate(
+            sourceSession.Engine,
+            targetSession.Engine,
+            columns,
+            request.TypeOverrides);
+
+        var lost = translations
+            .Where(translation => translation.Fidelity == TranslationFidelity.None)
+            .ToList();
+
+        if (lost.Count > 0)
+        {
+            throw new RowEditRejectedException(new RowEditRejection(
+                RowEditRefusal.UnknownColumn,
+                $"{targetSession.Engine} no tiene dónde guardar " +
+                $"{string.Join(", ", lost.Select(translation => translation.Column))}. " +
+                "Escribe un tipo a mano para esas columnas o déjalas fuera del traslado."));
+        }
+
+        var byColumn = translations.ToDictionary(
+            translation => translation.Column,
+            StringComparer.OrdinalIgnoreCase);
+
+        var keys = structure.PrimaryKey?.Columns ?? [];
+
+        var definition = new TableDefinition
+        {
+            Database = request.Target.Database,
+            Schema = request.Target.Schema,
+            Name = request.Target.Name,
+            Columns =
+            [
+                .. columns.Select(column => new TableColumnDefinition
+                {
+                    Name = column.Name,
+                    DataType = byColumn[column.Name].TargetType,
+                    IsNullable = column.IsNullable,
+                    IsPrimaryKey = keys.Contains(column.Name, StringComparer.OrdinalIgnoreCase),
+
+                    // La identidad **no se copia**: la tabla nueva existe para
+                    // recibir los valores del origen, y una columna que los genera
+                    // sola pelearía con ellos. Lo que hace falta para escribirlos
+                    // lo abre el traslado con `BeginDataLoad`.
+                    IsIdentity = false,
+
+                    // Los valores por omisión tampoco: son expresiones del
+                    // dialecto de origen —`now()`, `GETDATE()`, `CURRENT`— y
+                    // copiarlas literalmente crearía una tabla que no compila.
+                    DefaultValue = null,
+                }),
+            ],
+        };
+
+        using var turn = await _connections.EnterAsync(request.TargetSessionId, cancellationToken);
+
+        var designer = _providers.GetTableDesigner(targetSession.Engine);
+
+        var result = await _connections.UseDatabaseAsync(
+            targetSession,
+            request.Target.Database,
+            selected => designer.CreateAsync(selected, definition, cancellationToken),
+            cancellationToken);
+
+        return result.Statements;
+    }
 
     /// <summary>Copia las filas. Devuelve cuántas llegaron, incluso si falló a mitad.</summary>
     public async Task<TransferProgress> RunAsync(
@@ -488,6 +650,9 @@ public sealed class TransferService(
         /// </summary>
         public IReadOnlyList<string> KeyColumns { get; init; } = [];
 
+        /// <summary>Qué tipo tendría cada columna al otro lado. Vacío dentro del mismo motor.</summary>
+        public IReadOnlyList<TypeTranslation> Translations { get; init; } = [];
+
         public required IReadOnlyList<string> MissingRequired { get; init; }
 
         public required IReadOnlyList<string> UnmatchedSource { get; init; }
@@ -529,14 +694,6 @@ public sealed class TransferService(
             throw new RowEditRejectedException(new RowEditRejection(
                 RowEditRefusal.ReadOnlyConnection,
                 "La conexión de destino está marcada como solo lectura."));
-        }
-
-        if (sourceSession.Engine != targetSession.Engine)
-        {
-            throw new RowEditRejectedException(new RowEditRejection(
-                RowEditRefusal.NothingToDo,
-                "Todavía no se puede trasladar entre motores distintos: los tipos de " +
-                "los dos lados no se corresponden y hay que traducirlos."));
         }
 
         if (requireConfirmation && !request.Confirmed)
@@ -599,6 +756,18 @@ public sealed class TransferService(
         var targetColumns = used.Select(mapping => mapping.Target!).ToList();
         var keyColumns = KeysFor(request, target, targetColumns);
 
+        // Solo entre motores distintos: dentro del mismo, los tipos de las dos
+        // tablas ya son del mismo dialecto y no hay nada que decir de ellos.
+        var translations = sourceSession.Engine == targetSession.Engine
+            ? []
+            : _types.Translate(
+                sourceSession.Engine,
+                targetSession.Engine,
+                [.. source.Columns.Where(column => mappings.Any(mapping =>
+                    mapping.Target is not null &&
+                    string.Equals(mapping.Source, column.Name, StringComparison.OrdinalIgnoreCase)))],
+                request.TypeOverrides);
+
         return new Plan
         {
             Source = source,
@@ -607,6 +776,7 @@ public sealed class TransferService(
             Mappings = mappings,
             TargetColumns = targetColumns,
             KeyColumns = keyColumns,
+            Translations = translations,
             MissingRequired = Missing(target.Columns, targetColumns),
             UnmatchedSource = ignored,
             Issues = Issues(request, target.Columns, targetColumns),

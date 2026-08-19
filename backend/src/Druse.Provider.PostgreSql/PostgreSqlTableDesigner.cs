@@ -19,6 +19,29 @@ public sealed class PostgreSqlTableDesigner : TableDesignerBase
     ];
 
     /// <summary>
+    /// PostgreSQL tiene un tipo para casi todo, así que casi nada se pierde al
+    /// llegar aquí: identificadores únicos, JSON y textos sin límite son tipos
+    /// propios y no apaños sobre texto.
+    /// </summary>
+    public override string TypeFor(TypeFacets facets) => facets.Family switch
+    {
+        ColumnFamily.Uuid => "uuid",
+        ColumnFamily.Boolean => "boolean",
+        ColumnFamily.Integral => "bigint",
+        ColumnFamily.Fractional => facets.Precision is { } precision
+            ? $"numeric({precision},{facets.Scale ?? 0})"
+            : "double precision",
+        ColumnFamily.Date => "date",
+        ColumnFamily.Time => "time",
+        ColumnFamily.Timestamp => "timestamp",
+        ColumnFamily.TimestampWithZone => "timestamptz",
+        ColumnFamily.Binary => "bytea",
+        _ when facets.IsJson => "jsonb",
+        _ when facets.IsUnbounded || facets.Length is null => "text",
+        _ => $"varchar({facets.Length})",
+    };
+
+    /// <summary>
     /// PostgreSQL es el más completo de los tres en índices: admite columnas
     /// incluidas desde la 11, índices parciales desde siempre y varias
     /// estructuras. `hash` y `brin` se ofrecen porque tienen usos claros, no por

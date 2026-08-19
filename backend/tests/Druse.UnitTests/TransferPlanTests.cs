@@ -232,16 +232,34 @@ public sealed class TransferPlanTests
         Assert.Empty(preview.KeyColumns);
     }
 
-    /// <summary>Entre motores distintos hay que traducir tipos, y eso llega después.</summary>
+    /// <summary>
+    /// Entre motores distintos, la vista previa dice qué tipo tendría cada
+    /// columna al otro lado.
+    ///
+    /// Y dentro del mismo motor no dice nada, porque no hay nada que traducir:
+    /// los tipos de las dos tablas ya son del mismo dialecto.
+    /// </summary>
     [Fact]
-    public async Task EntreMotoresDistintosSeRechazaPorAhora()
+    public async Task EntreMotoresDistintosLaVistaPreviaTraduceLosTipos()
     {
         var world = new World(targetEngine: DatabaseEngine.SqlServer);
 
-        var rejection = await Assert.ThrowsAsync<RowEditRejectedException>(
-            () => world.Service.PreviewAsync(world.Request(), CancellationToken.None));
+        var preview = await world.Service.PreviewAsync(world.Request(), CancellationToken.None);
 
-        Assert.Contains("motores distintos", rejection.Rejection.Message, StringComparison.Ordinal);
+        var translation = Assert.Single(preview.Translations);
+
+        Assert.Equal("id", translation.Column);
+        Assert.Equal("nvarchar(max)", translation.TargetType);
+    }
+
+    [Fact]
+    public async Task DentroDelMismoMotorNoHayNadaQueTraducir()
+    {
+        var world = new World();
+
+        var preview = await world.Service.PreviewAsync(world.Request(), CancellationToken.None);
+
+        Assert.Empty(preview.Translations);
     }
 
     // -----------------------------------------------------------------------
@@ -489,7 +507,11 @@ public sealed class TransferPlanTests
                 new FakeTunnelFactory(),
                 new FakeTunnelRegistry());
 
-            Service = new TransferService(providers, connections, new MetadataService(providers, connections));
+            Service = new TransferService(
+                providers,
+                connections,
+                new MetadataService(providers, connections),
+                new TypeTranslator(providers));
         }
 
         public FakeSession SourceSession { get; }
@@ -586,8 +608,20 @@ public sealed class TransferPlanTests
 
         public IRowEditor GetRowEditor(DatabaseEngine engine) => new PostgreSqlRowEditor();
 
-        public ITableDesigner GetTableDesigner(DatabaseEngine engine) =>
-            new PostgreSqlTableDesigner();
+        /// <summary>
+        /// El diseñador **del motor que se pide**, no el de siempre.
+        ///
+        /// Importa desde que se traducen tipos: devolver el de PostgreSQL para
+        /// todos haría que una traducción a SQL Server contestara con tipos de
+        /// PostgreSQL y la prueba pasara diciendo lo contrario de lo que mira.
+        /// </summary>
+        public ITableDesigner GetTableDesigner(DatabaseEngine engine) => engine switch
+        {
+            DatabaseEngine.SqlServer => new SqlServerTableDesigner(),
+            DatabaseEngine.MySql => new MySqlTableDesigner(),
+            DatabaseEngine.Informix => new InformixTableDesigner(),
+            _ => new PostgreSqlTableDesigner(),
+        };
 
         public IDatabaseScripter GetScripter(DatabaseEngine engine) =>
             new PostgreSqlTableDesigner();

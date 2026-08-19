@@ -31,6 +31,14 @@ public abstract class TableDesignerBase : ITableDesigner, IDatabaseScripter
 
     public abstract IndexCapabilities IndexCapabilities { get; }
 
+    /// <summary>
+    /// Cómo llama este motor al tipo que guarda esto.
+    ///
+    /// Sin implementación común: es dialecto puro, y una respuesta por omisión
+    /// sería la de un motor concreto disfrazada de regla general.
+    /// </summary>
+    public abstract string TypeFor(TypeFacets facets);
+
     /// <summary>Cita un identificador en el dialecto del motor.</summary>
     protected abstract string Quote(string identifier);
 

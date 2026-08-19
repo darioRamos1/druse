@@ -77,6 +77,17 @@ public sealed record DataTransferRequest
     public IReadOnlyList<string> KeyColumns { get; init; } = [];
 
     /// <summary>
+    /// Tipos que el usuario escribió a mano al crear la tabla de destino en otro
+    /// motor, por nombre de columna del origen.
+    ///
+    /// Se respetan tal cual: quien los escribe sabe algo que la traducción
+    /// automática no —que ese texto siempre son tres letras, que ese decimal no
+    /// necesita tanta precisión— y discutírselo sería ruido.
+    /// </summary>
+    public IReadOnlyDictionary<string, string> TypeOverrides { get; init; } =
+        new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
     /// Todos los lotes en una sola transacción: o entra la tabla entera o nada.
     ///
     /// **No es el valor por omisión**, y esa es la decisión importante de aquí. Una

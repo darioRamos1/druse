@@ -19,6 +19,38 @@ public sealed class MySqlTableDesigner : TableDesignerBase
     ];
 
     /// <summary>
+    /// MySQL tiene JSON propio, pero no identificadores únicos ni textos con
+    /// zona horaria.
+    ///
+    /// **El límite de `varchar` no es el que dice el número.** Una fila entera
+    /// cabe en 65 535 bytes, así que un `varchar(20000)` en UTF-8 ya no cabe con
+    /// otra columna al lado; por eso lo que pasa de 8 000 se manda a `text`, que
+    /// no cuenta contra ese límite.
+    /// </summary>
+    public override string TypeFor(TypeFacets facets) => facets.Family switch
+    {
+        // No hay tipo para un identificador único: 36 caracteres es su forma
+        // escrita, y así se sigue leyendo igual que en el origen.
+        ColumnFamily.Uuid => "char(36)",
+        ColumnFamily.Boolean => "tinyint(1)",
+        ColumnFamily.Integral => "bigint",
+        ColumnFamily.Fractional => facets.Precision is { } precision
+            ? $"decimal({precision},{facets.Scale ?? 0})"
+            : "double",
+        ColumnFamily.Date => "date",
+        ColumnFamily.Time => "time",
+        // MySQL no guarda la zona con la marca de tiempo: la convierte a UTC al
+        // escribir y la devuelve en la zona de la sesión.
+        ColumnFamily.Timestamp or ColumnFamily.TimestampWithZone => "datetime",
+        ColumnFamily.Binary => facets.IsUnbounded || facets.Length is null
+            ? "longblob"
+            : $"varbinary({facets.Length})",
+        _ when facets.IsJson => "json",
+        _ when facets.IsUnbounded || facets.Length is null || facets.Length > 8000 => "longtext",
+        _ => $"varchar({facets.Length})",
+    };
+
+    /// <summary>
     /// MySQL es el más limitado de los tres: ni columnas incluidas ni índices
     /// parciales. A cambio ofrece estructuras que los otros no tienen, y por eso
     /// aparecen aquí `fulltext` y `spatial`, que en MySQL son una clase de índice

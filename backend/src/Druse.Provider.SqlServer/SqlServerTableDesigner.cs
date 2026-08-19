@@ -19,6 +19,35 @@ public sealed class SqlServerTableDesigner : TableDesignerBase
     ];
 
     /// <summary>
+    /// SQL Server pide dos decisiones que los demás no.
+    ///
+    /// **El texto va en `nvarchar` y no en `varchar`**: es lo único que garantiza
+    /// que lo que venía de un `text` de PostgreSQL —que es UTF-8— llegue entero,
+    /// porque `varchar` depende de la intercalación de la base de destino.
+    ///
+    /// **Y no hay JSON.** Desde 2016 hay funciones para consultarlo, pero el tipo
+    /// es texto: lo que se pierde al traerlo aquí es la validación, no los datos.
+    /// </summary>
+    public override string TypeFor(TypeFacets facets) => facets.Family switch
+    {
+        ColumnFamily.Uuid => "uniqueidentifier",
+        ColumnFamily.Boolean => "bit",
+        ColumnFamily.Integral => "bigint",
+        ColumnFamily.Fractional => facets.Precision is { } precision
+            ? $"decimal({precision},{facets.Scale ?? 0})"
+            : "float",
+        ColumnFamily.Date => "date",
+        ColumnFamily.Time => "time",
+        ColumnFamily.Timestamp => "datetime2",
+        ColumnFamily.TimestampWithZone => "datetimeoffset",
+        ColumnFamily.Binary => facets.IsUnbounded || facets.Length is null
+            ? "varbinary(max)"
+            : $"varbinary({facets.Length})",
+        _ when facets.IsUnbounded || facets.Length is null => "nvarchar(max)",
+        _ => $"nvarchar({facets.Length})",
+    };
+
+    /// <summary>
     /// SQL Server admite columnas incluidas y filtros, pero no elegir estructura:
     /// un índice es un árbol B salvo que sea de otro tipo —columnar, espacial—,
     /// y esos no se crean con esta forma de instrucción.
