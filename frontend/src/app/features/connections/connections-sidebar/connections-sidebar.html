@@ -236,6 +236,14 @@
                     <button
                       type="button"
                       role="menuitem"
+                      (click)="act($event, () => transferFrom.emit(node))"
+                    >
+                      <app-icon name="export" [size]="12" />
+                      Migrar datos a…
+                    </button>
+                    <button
+                      type="button"
+                      role="menuitem"
                       (click)="act($event, () => designTable.emit(node))"
                     >
                       <app-icon name="table" [size]="12" />

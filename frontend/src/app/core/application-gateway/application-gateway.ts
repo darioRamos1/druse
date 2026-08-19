@@ -493,6 +493,31 @@ export abstract class ApplicationGateway {
 
   abstract cancelRestore(restoreId: string): Observable<void>;
 
+  // --- Traslado de datos entre tablas ---------------------------------------
+
+  /**
+   * Qué se copiaría y qué habría que mirar antes, **sin tocar el destino**.
+   *
+   * Va por su propia ruta y no como una bandera de {@link runTransfer}, igual
+   * que la vista previa del respaldo: entre mirar y copiar está la única
+   * oportunidad de ver a qué columna va cada columna.
+   */
+  abstract previewTransfer(request: TransferRequest): Observable<TransferPreview>;
+
+  /**
+   * Lanza el traslado y devuelve su identificador.
+   *
+   * **No espera a que termine.** El trabajo sigue en el proceso local aunque se
+   * cierre el asistente, y el progreso se pregunta con
+   * {@link getTransferStatus}. Aquí eso importa más que en un respaldo: lo que
+   * queda a medias no es un archivo que se pueda tirar, sino filas en otra base.
+   */
+  abstract runTransfer(request: TransferRequest): Observable<string>;
+
+  abstract getTransferStatus(transferId: string): Observable<TransferProgress>;
+
+  abstract cancelTransfer(transferId: string): Observable<void>;
+
   // --- Carpetas del equipo --------------------------------------------------
 
   /**
@@ -826,6 +851,104 @@ export interface BackupProgress {
   /** Dónde quedó, cuando terminó bien. */
   readonly path?: string;
   readonly bytes?: number;
+}
+
+// --- Traslado de datos entre tablas -----------------------------------------
+
+/** Una tabla de un lado del traslado. */
+export interface TransferTable {
+  readonly id: string;
+  readonly name: string;
+  readonly database?: string;
+  readonly schema?: string;
+  /** Filas estimadas por el catálogo. Sirve para la barra, y es aproximada. */
+  readonly approximateRowCount?: number;
+}
+
+/** Qué columna del origen va a cuál del destino. `target` vacío es «no se copia». */
+export interface ColumnMapping {
+  readonly source: string;
+  readonly target: string | null;
+}
+
+/**
+ * Qué hace el traslado con lo que ya está en el destino.
+ *
+ * `Upsert` y `SkipExisting` todavía no están: el proceso local los rechaza
+ * diciéndolo, en lugar de hacer otra cosa.
+ */
+export type TransferMode = 'Insert' | 'Replace' | 'Upsert' | 'SkipExisting';
+
+export interface TransferRequest {
+  readonly sourceSessionId: string;
+  readonly source: TransferTable;
+  readonly targetSessionId: string;
+  readonly target: TransferTable;
+  readonly filter?: BackupFilter;
+  /** Vacío significa emparejar por nombre. */
+  readonly mappings?: readonly ColumnMapping[];
+  readonly mode: TransferMode;
+  /** Todos los lotes en una transacción. No es lo normal: ver el servicio. */
+  readonly atomic: boolean;
+  readonly batchSize: number;
+  /** Copiar también los valores que genera el motor. */
+  readonly keepIdentity: boolean;
+  readonly confirmed: boolean;
+  /** El nombre de la tabla escrito a mano, solo para `Replace`. */
+  readonly replaceConfirmation?: string;
+}
+
+export interface TransferIssue {
+  readonly column: string;
+  readonly message: string;
+}
+
+export interface TransferPreview {
+  readonly mappings: readonly ColumnMapping[];
+  /** Columnas obligatorias del destino que no llena nadie. */
+  readonly missingRequired: readonly string[];
+  /** Columnas del origen que no van a ninguna parte. */
+  readonly unmatchedSource: readonly string[];
+  readonly issues: readonly TransferIssue[];
+  readonly rowsEstimated?: number;
+  /** La consulta con la que se leerá el origen. */
+  readonly select: string;
+  readonly statements: readonly string[];
+}
+
+export type TransferStep = 'ReadingStructure' | 'ClearingTarget' | 'CopyingRows' | 'Done';
+
+export type TransferOutcome =
+  | 'Running'
+  | 'Completed'
+  | 'CompletedWithWarnings'
+  | 'Failed'
+  | 'Cancelled';
+
+export interface TransferFailure {
+  readonly message: string;
+  /** Filas confirmadas en el destino antes del fallo. */
+  readonly rowsCommitted: number;
+  readonly statement?: string;
+}
+
+export interface TransferProgress {
+  readonly id: string;
+  readonly step: TransferStep;
+  readonly outcome: TransferOutcome;
+  readonly currentObject?: string;
+  readonly rowsCopied: number;
+  /**
+   * Estimación del catálogo, ausente cuando no la hay.
+   *
+   * Ausente significa **barra indeterminada con contador**, no cero.
+   */
+  readonly rowsEstimated?: number;
+  readonly rowsSkipped: number;
+  readonly batchesDone: number;
+  readonly elapsedMilliseconds: number;
+  readonly warnings: readonly BackupWarning[];
+  readonly failure?: TransferFailure;
 }
 
 export type ExportFormat = 'csv' | 'xlsx';

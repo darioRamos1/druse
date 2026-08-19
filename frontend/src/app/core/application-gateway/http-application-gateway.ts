@@ -46,6 +46,9 @@ import {
   TableChangeResult,
   StoredEditorTab,
   TransactionState,
+  TransferPreview,
+  TransferProgress,
+  TransferRequest,
   HealthStatus,
   SaveConnectionRequest,
 } from './application-gateway';
@@ -404,6 +407,26 @@ export class HttpApplicationGateway extends ApplicationGateway {
 
   override cancelRestore(restoreId: string): Observable<void> {
     return this._http.post<void>(`/api/restore/${restoreId}/cancel`, null);
+  }
+
+  override previewTransfer(request: TransferRequest): Observable<TransferPreview> {
+    return this._http.post<TransferPreview>('/api/transfers/preview', request);
+  }
+
+  override runTransfer(request: TransferRequest): Observable<string> {
+    // Llega un 202 con solo el identificador: la copia no ha hecho más que
+    // empezar, y esperar aquí la ataría a esta petición.
+    return this._http
+      .post<{ id: string }>('/api/transfers', request)
+      .pipe(map((response) => response.id));
+  }
+
+  override getTransferStatus(transferId: string): Observable<TransferProgress> {
+    return this._http.get<TransferProgress>(`/api/transfers/${transferId}/status`);
+  }
+
+  override cancelTransfer(transferId: string): Observable<void> {
+    return this._http.post<void>(`/api/transfers/${transferId}/cancel`, null);
   }
 
   override browseFolders(path?: string, options?: BrowseOptions): Observable<FolderListing> {

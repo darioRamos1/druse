@@ -64,6 +64,14 @@ export class ConnectionsSidebar {
   readonly importInto = output<ExplorerNode>();
 
   /**
+   * Copiar las filas de esta tabla a otra.
+   *
+   * Solo sobre una tabla: el traslado va de una tabla a otra, y ofrecerlo sobre
+   * una base haría creer que se copia entera.
+   */
+  readonly transferFrom = output<ExplorerNode>();
+
+  /**
    * Respaldar lo que cuelga de este nodo.
    *
    * Se ofrece sobre la base, el esquema y la tabla porque son los tres sitios

@@ -1,0 +1,321 @@
+<div class="backdrop" (click)="close()"></div>
+
+<div class="dialog" role="dialog" aria-modal="true" aria-labelledby="transfer-title">
+  <header class="head">
+    <div>
+      <h2 class="title" id="transfer-title">Migrar datos de {{ sourceName() }}</h2>
+      <p class="subtitle">
+        Elige la tabla de destino y qué columnas viajan. Antes de escribir nada verás qué se va a
+        copiar.
+      </p>
+    </div>
+    <button type="button" class="close" (click)="close()" aria-label="Cerrar">×</button>
+  </header>
+
+  <div class="body">
+    @if (error()) {
+      <p class="problem">{{ error() }}</p>
+    }
+
+    <!-- ---------------------------------------------------------------- -->
+    <!-- 1. A dónde van                                                    -->
+    <!-- ---------------------------------------------------------------- -->
+    @if (step() === 'target') {
+      <label class="field">
+        <span class="field__label">Conexión de destino</span>
+        <select
+          [value]="targetConnectionId()"
+          (change)="onTargetConnection($any($event.target).value)"
+        >
+          @for (connection of connections(); track connection.id) {
+            <option [value]="connection.id">
+              {{ connection.name }}@if (connection.id === connectionId()) { (esta misma) }
+            </option>
+          }
+        </select>
+      </label>
+
+      <nav class="trail" aria-label="Dónde estás">
+        <button type="button" class="trail__step" (click)="back()">Bases</button>
+        @for (node of trail(); track node.id; let i = $index) {
+          <span class="trail__sep">›</span>
+          <button type="button" class="trail__step" (click)="back(i)">{{ node.name }}</button>
+        }
+      </nav>
+
+      <div class="browser">
+        @if (browsing() || loadingColumns()) {
+          <p class="browser__empty">Leyendo el catálogo…</p>
+        } @else if (nodes().length === 0) {
+          <p class="browser__empty">Aquí no hay nada que enseñar.</p>
+        } @else {
+          <ul class="browser__list">
+            @for (node of nodes(); track node.id) {
+              <li>
+                <button
+                  type="button"
+                  class="browser__item"
+                  [class.is-table]="node.kind === 'table'"
+                  (click)="open(node)"
+                >
+                  <span class="browser__name">{{ node.name }}</span>
+                  <span class="browser__kind">{{ node.kind }}</span>
+                </button>
+              </li>
+            }
+          </ul>
+        }
+      </div>
+    }
+
+    <!-- ---------------------------------------------------------------- -->
+    <!-- 2. Qué columna va a cuál, y cómo                                  -->
+    <!-- ---------------------------------------------------------------- -->
+    @if (step() === 'columns') {
+      <p class="route">
+        <code>{{ sourceName() }}</code> → <code>{{ targetName() }}</code>
+        <button type="button" class="link" (click)="step.set('target')">Cambiar destino</button>
+      </p>
+
+      <table class="mapping">
+        <caption class="sr-only">
+          Correspondencia entre las columnas del origen y las del destino
+        </caption>
+        <thead>
+          <tr>
+            <th scope="col">Columna del origen</th>
+            <th scope="col">Va a</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (column of sourceColumns(); track column.name) {
+            <tr [class.is-ignored]="!targetOf(column.name)">
+              <td>
+                {{ column.name }}
+                <span class="type">{{ column.dataType }}</span>
+              </td>
+              <td>
+                <!-- El valor va en cada opción y no en el `select`: las opciones las
+                     crea el `@for` después de aplicarse el enlace del padre, y con
+                     `[value]` arriba el desplegable aparecería vacío aunque la
+                     columna sí tenga pareja. -->
+                <select (change)="setTarget(column.name, $any($event.target).value)">
+                  <option value="" [selected]="!targetOf(column.name)">— no se copia —</option>
+                  @for (candidate of targetColumns(); track candidate.name) {
+                    <option
+                      [value]="candidate.name"
+                      [selected]="candidate.name === targetOf(column.name)"
+                      [disabled]="taken(column.name, candidate.name)"
+                    >
+                      {{ candidate.name }} ({{ candidate.dataType }})
+                    </option>
+                  }
+                </select>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+
+      <div class="options">
+        <label class="field field--inline">
+          <span class="field__label">Qué hacer con lo que ya hay</span>
+          <select [value]="mode()" (change)="onModeChange($any($event.target).value)">
+            <option value="Insert">Añadir las filas</option>
+            <option value="Replace">Vaciar el destino y cargar</option>
+          </select>
+        </label>
+
+        <label class="field field--inline">
+          <span class="field__label">Filas por lote</span>
+          <input
+            type="number"
+            min="1"
+            class="tiny"
+            [value]="batchSize()"
+            (input)="batchSize.set(+$any($event.target).value || 1000)"
+          />
+        </label>
+
+        <label class="check">
+          <input type="checkbox" [checked]="atomic()" (change)="atomic.set(!atomic())" />
+          Todo o nada
+        </label>
+
+        <label class="check">
+          <input
+            type="checkbox"
+            [checked]="keepIdentity()"
+            (change)="keepIdentity.set(!keepIdentity())"
+          />
+          Conservar los identificadores del origen
+        </label>
+      </div>
+
+      <label class="field">
+        <span class="field__label">Solo las filas que cumplan (opcional, sin escribir WHERE)</span>
+        <input
+          type="text"
+          [value]="where()"
+          (input)="where.set($any($event.target).value)"
+          placeholder="creado_en >= '2026-01-01'"
+        />
+      </label>
+
+      @if (mode() === 'Replace') {
+        <div class="danger">
+          <p class="danger__text">
+            Esto borra todas las filas de <strong>{{ targetName() }}</strong> antes de copiar, y no
+            se deshace. Escribe el nombre de la tabla para confirmarlo.
+          </p>
+          <input
+            type="text"
+            [value]="replaceConfirmation()"
+            (input)="replaceConfirmation.set($any($event.target).value)"
+            [placeholder]="target()?.name ?? ''"
+          />
+        </div>
+      }
+
+      @if (ignored().length > 0) {
+        <p class="warn">
+          @if (ignored().length === 1) {
+            No se copia la columna {{ ignored()[0] }} del origen.
+          } @else {
+            No se copian {{ ignored().length }} columnas del origen: {{ ignored().join(', ') }}.
+          }
+        </p>
+      }
+
+      <!-- La vista previa: lo único que separa mirar de escribir. -->
+      @if (preview(); as preview) {
+        <section class="preview">
+          <h3 class="preview__title">Esto es lo que va a pasar</h3>
+
+          <p class="preview__line">
+            Se copian <strong>{{ mapped() }}</strong> columnas
+            @if (preview.rowsEstimated) {
+              de unas <strong>{{ preview.rowsEstimated }}</strong> filas.
+            } @else if (where().trim()) {
+              y no se sabe cuántas filas: con una condición delante, el catálogo no
+              las estima.
+            } @else {
+              y no se sabe cuántas filas: el catálogo no tiene un recuento de esta
+              tabla. La barra irá contando lo que lleve copiado.
+            }
+          </p>
+
+          @for (issue of preview.issues; track issue.column) {
+            <p class="warn"><strong>{{ issue.column }}:</strong> {{ issue.message }}</p>
+          }
+
+          @if (preview.missingRequired.length > 0) {
+            <p class="warn">
+              Estas columnas del destino son obligatorias y no las llena nadie:
+              {{ preview.missingRequired.join(', ') }}. Si no tienen valor por omisión, el motor
+              rechazará el primer lote.
+            </p>
+          }
+
+          <div class="sql">
+            <p class="sql__title">Se leerá del origen</p>
+            <code class="sql__statement">{{ preview.select }}</code>
+
+            <p class="sql__title">Y se escribirá en el destino</p>
+            @for (statement of preview.statements; track $index) {
+              <code class="sql__statement">{{ statement }}</code>
+            }
+          </div>
+        </section>
+      }
+    }
+
+    <!-- ---------------------------------------------------------------- -->
+    <!-- 3. Cómo va                                                        -->
+    <!-- ---------------------------------------------------------------- -->
+    @if (step() === 'running' && progress(); as progress) {
+      <app-operation-progress
+        [step]="stepLabel()"
+        [subject]="progress.currentObject ?? targetName()"
+        [overall]="overall()"
+        [current]="overall()"
+        [rowsDone]="progress.rowsCopied"
+        [rowsEstimated]="progress.rowsEstimated ?? null"
+        [elapsedMs]="progress.elapsedMilliseconds"
+        [cancellable]="running()"
+        (cancelRequested)="cancel()"
+      />
+
+      @if (finished()) {
+        <section class="summary">
+          <h3 class="summary__title">
+            @switch (progress.outcome) {
+              @case ('Completed') { Copiadas {{ progress.rowsCopied }} filas }
+              @case ('CompletedWithWarnings') { Copiadas {{ progress.rowsCopied }} filas, con avisos }
+              @case ('Cancelled') { Cancelado con {{ progress.rowsCopied }} filas ya copiadas }
+              @default { No se pudo terminar }
+            }
+          </h3>
+
+          @if (progress.failure) {
+            <p class="problem">{{ progress.failure.message }}</p>
+            <p class="summary__line">
+              En el destino quedaron {{ progress.failure.rowsCommitted }} filas.
+              @if (progress.failure.rowsCommitted > 0) {
+                Tenlo en cuenta antes de repetir la copia: volver a lanzarla las duplicaría.
+              }
+            </p>
+          }
+
+          @if (progress.outcome === 'Cancelled' && progress.rowsCopied > 0) {
+            <p class="summary__line">
+              Lo ya copiado se queda: cancelar no deshace los lotes que el destino dio por buenos.
+            </p>
+          }
+
+          @for (warning of progress.warnings; track $index) {
+            <p class="warn"><strong>{{ warning.subject }}:</strong> {{ warning.message }}</p>
+          }
+
+          <details class="summary__report">
+            <summary>Ver el registro</summary>
+            <pre>{{ report() }}</pre>
+          </details>
+        </section>
+      }
+    }
+  </div>
+
+  <footer class="foot">
+    @if (step() === 'columns') {
+      <span class="hint">
+        {{ mapped() }} de {{ sourceColumns().length }} columnas se copian
+      </span>
+    }
+
+    <span class="spacer"></span>
+
+    @if (step() === 'running' && finished()) {
+      <button type="button" class="btn" (click)="dismiss()">Cerrar</button>
+    } @else if (step() === 'running') {
+      <button type="button" class="btn" (click)="close()">Dejarlo en segundo plano</button>
+    } @else {
+      <button type="button" class="btn" (click)="close()">Cancelar</button>
+
+      @if (step() === 'columns') {
+        <button type="button" class="btn" [disabled]="previewing()" (click)="analyze()">
+          {{ previewing() ? 'Mirando…' : 'Ver qué va a pasar' }}
+        </button>
+
+        <button
+          type="button"
+          class="btn btn--danger"
+          [disabled]="!canRun()"
+          (click)="run()"
+        >
+          Copiar las filas
+        </button>
+      }
+    }
+  </footer>
+</div>

@@ -32,6 +32,7 @@ import SqlEditor from '../../features/query-editor/sql-editor/sql-editor';
 import { BackupDialog } from '../../features/backup/backup-dialog/backup-dialog';
 import { RestoreDialog } from '../../features/backup/restore-dialog/restore-dialog';
 import { ImportDialog } from '../../features/import/import-dialog/import-dialog';
+import { TransferDialog } from '../../features/transfer/transfer-dialog/transfer-dialog';
 import { TableDesigner } from '../../features/tables/table-designer/table-designer';
 import { ProcedureRunner } from '../../features/query-builder/procedure-runner/procedure-runner';
 import { QueryBuilder } from '../../features/query-builder/query-builder/query-builder';
@@ -88,6 +89,7 @@ const DISCONNECTED: SessionStatus = {
     SqlEditor,
     ResultsPanel,
     ImportDialog,
+    TransferDialog,
     BackupDialog,
     RestoreDialog,
     TableDesigner,
@@ -181,6 +183,7 @@ export class AppShell {
       if (
         this.dialogOpen() ||
         this.importTarget() ||
+        this.transferTarget() ||
         this.builderTarget() ||
         this.designTarget() ||
         this.backupOpen() ||
@@ -204,6 +207,22 @@ export class AppShell {
 
   protected closeImport(): void {
     this.importTarget.set(null);
+  }
+
+  /**
+   * Tabla desde la que se está trasladando, si el asistente está abierto.
+   *
+   * Se borra al cerrar y el traslado sigue: el estado que sobrevive vive en el
+   * `TransferStore`, no aquí, igual que en los respaldos.
+   */
+  protected readonly transferTarget = signal<ExplorerNode | null>(null);
+
+  protected openTransfer(node: ExplorerNode): void {
+    this.transferTarget.set(node);
+  }
+
+  protected closeTransfer(): void {
+    this.transferTarget.set(null);
   }
 
   /**
