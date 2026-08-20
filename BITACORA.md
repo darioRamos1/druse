@@ -10,7 +10,7 @@
 
 | Campo | Valor |
 | --- | --- |
-| Última sesión | **023o** — 2026-08-19 |
+| Última sesión | **023p** — 2026-08-19 |
 | Fase activa | **Migración de datos entre tablas:** fases 1, 2 y 3 cerradas; la **4** cerrada: la pasada de varias tablas, lo que cada tabla hace distinto y las migraciones guardadas (ver «Qué toca retomar»). **Respaldos y restauración:** Fases A–E cerradas. La **F** tiene backend, interfaz, CSV, selector de archivos, restaurar en una base nueva y **el ciclo entero por HTTP en los cuatro motores**; le falta repetir a mano el respaldo real que encontró el error de los índices de expresión |
 | Fases 0–6 | ✅ Cerradas. |
 | Fase 7 | 🟡 **11/12.** El ciclo de instalación está probado sobre este equipo; solo falta arrancar en una máquina sin herramientas de desarrollo. |
@@ -338,6 +338,44 @@ Y tres límites declarados desde el principio: no hay respaldo binario ni
 recuperación a un punto en el tiempo —eso es del servidor, y la interfaz tendrá
 que decirlo—, no hay respaldos programados, y un límite de filas puede dejar
 filas huérfanas, cosa que se avisa y no se corrige sola.
+
+### Sesión 023p — 2026-08-19 · Mirar la aplicación entera, y anotar lo que se ve
+
+Segundo barrido, esta vez completo: dieciocho capturas —resultados, mensajes,
+historial, el error de una consulta, el menú del árbol, la paleta, seis diálogos,
+el asistente de migrar, los dos temas y tres anchos— con las medidas de desborde
+y la consola. El resultado está en `docs/plan-mejoras-visuales.md`, ordenado por
+lo que más molesta.
+
+Nueve hallazgos, ninguno grave. Los dos primeros son de los que se arreglan en un
+rato y se notan: **la barra del panel de resultados se pisa con sus pestañas** a
+900 px —el mismo mal de las otras dos barras, en la única fila que quedó sin
+revisar— y **«~ filas» sin número** en la lista del respaldo, que se lee como un
+error de la aplicación cuando lo que pasa es que el catálogo no da estimación.
+
+Después, tres de forma: las pestañas del diseñador no filtran nada —debajo se
+apilan todas las secciones a la vez—, el error de una consulta se cuenta dos veces
+—en una banda y en el panel, este con su código y su botón de copiar— y las celdas
+cortadas no lo dicen, que sin puntos suspensivos no se distinguen de un valor que
+acaba ahí.
+
+Y cuatro menores: la paleta etiqueta en inglés (`COMMAND`, `CONNECTION`), la
+rejilla de motores queda 3 + 1, tres listas con desplazamiento cortan la última
+fila por la mitad, y a 900 px la barra del editor ocupa tres filas.
+
+**Lo que se miró y está bien** también quedó escrito, que es la mitad del valor de
+un barrido: la consola limpia en todo el recorrido, ningún botón sin nombre
+accesible, y el tema claro aplicándose de verdad —comprobado midiendo los tokens
+antes de tocar nada, porque la primera impresión sobre una captura decía lo
+contrario—.
+
+**La herramienta queda en el repositorio**, en `e2e/tests/barrido.spec.ts`, pero
+**no corre con la suite**: no afirma nada y tarda casi un minuto. Se pide con
+`DRUSE_BARRIDO=1` y las capturas salen donde diga `DRUSE_BARRIDO_DIR`.
+
+**Verificado.** Las 23 de punta a punta siguen en verde, con el barrido saltado.
+
+**Archivos.** `docs/plan-mejoras-visuales.md` y `e2e/tests/barrido.spec.ts`.
 
 ### Sesión 023o — 2026-08-19 · Barrido visual: cuatro cosas que se veían mal
 
