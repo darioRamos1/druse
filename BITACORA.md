@@ -10,22 +10,37 @@
 
 | Campo | Valor |
 | --- | --- |
-| Última sesión | **023r** — 2026-08-19 |
+| Última sesión | **023s** — 2026-08-19 |
 | Fase activa | **Migración de datos entre tablas:** fases 1, 2 y 3 cerradas; la **4** cerrada: la pasada de varias tablas, lo que cada tabla hace distinto y las migraciones guardadas (ver «Qué toca retomar»). **Respaldos y restauración:** Fases A–E cerradas. La **F** tiene backend, interfaz, CSV, selector de archivos, restaurar en una base nueva y **el ciclo entero por HTTP en los cuatro motores**; le falta repetir a mano el respaldo real que encontró el error de los índices de expresión |
 | Fases 0–6 | ✅ Cerradas. |
 | Fase 7 | 🟡 **11/12.** El ciclo de instalación está probado sobre este equipo; solo falta arrancar en una máquina sin herramientas de desarrollo. |
 | Fase 8 | ✅ **7/7.** Tres motores sobre el mismo contrato y primera beta preparada. |
 | ¿Compila el backend? | Sí — 0 advertencias, 0 errores |
 | ¿Compila el envoltorio? | Sí |
-| ¿Pasan las pruebas? | Sí — **780 en backend** (422 unitarias, 206 contractuales y 152 de integración) con `DRUSE_REQUIRE_ENGINES=1` y **los cuatro motores**, sin saltarse ninguna; **508 en frontend** y **24 de punta a punta**, estas dos veces seguidas y con los dos motores. Las **6 del envoltorio** no se ejecutaron: cargo no compila en este equipo |
+| ¿Pasan las pruebas? | Sí — **780 en backend** (422 unitarias, 206 contractuales y 152 de integración) con `DRUSE_REQUIRE_ENGINES=1` y **los cuatro motores**, sin saltarse ninguna; **510 en frontend** y **25 de punta a punta**, estas dos veces seguidas y con los dos motores. Las **6 del envoltorio** no se ejecutaron: cargo no compila en este equipo |
 | ¿Hay aplicación de escritorio? | **Sí.** Instalador NSIS, MSI y ZIP portable, en dos variantes: con Informix y sin él |
 | Motores | **PostgreSQL, SQL Server, MySQL/MariaDB e Informix**, todos sobre el mismo contrato compartido |
-| Trabajo a medias | Ninguno. La migración quedó cerrada de punta a punta en las sesiones 023i y 023j. |
+| Trabajo a medias | **Siete archivos sin commitear** de la sesión 023s: el arreglo del precalentado por base, buscar y reemplazar en la paleta y sus pruebas. Compilan y pasan; falta el commit y corregir el §4.3 del plan visual. |
 | Bloqueantes | Ninguno para seguir programando. Sí para dar por buenos cuatro motores y cuatro funciones: ver «Qué toca retomar». |
 | Git | El **PR #9 se fusionó** (sesión 022), con los quince commits que el #8 dejó fuera más lo de la personalización. Se trabaja en `feat/respaldos-y-restauracion`, salida de un `main` ya al día. |
 | Integración continua | 🔴 **Parada, y no por el código.** GitHub aborta los catorce jobs en dos segundos: «recent account payments have failed or your spending limit needs to be increased». Hasta resolver la facturación, ningún PR podrá pasar los checks. |
 
 ### Qué toca retomar en la próxima sesión
+
+#### Lo primero, que está a medias (sesión 023s)
+
+1. **Commitear los siete archivos** del árbol de trabajo: el precalentado por
+   base, buscar y reemplazar en la paleta y las pruebas de ambos. Compilan y
+   pasan; solo falta el commit temático.
+2. **Corregir el §4.3 de `docs/plan-mejoras-visuales.md`.** Dice que el
+   autocompletado no distingue alias, y **es falso**: funciona. La lista vacía
+   que lo hizo parecer roto venía de `public.clientes` en la base de pruebas, que
+   se quedó **sin columnas** de una prueba anterior. Con `ciudad c` salen sus
+   tres columnas. Marcar también el §4.2 como hecho.
+3. **Lo que queda del plan visual:** §3.8 (la última fila de las listas con
+   desplazamiento sale cortada), §3.9 (a 900 px la barra del editor ocupa tres
+   filas), el ancho inicial de las columnas de la cuadrícula y el §4.4
+   (fragmentos guardados).
 
 #### Migración de datos: la fase 4 está cerrada
 
@@ -338,6 +353,54 @@ Y tres límites declarados desde el principio: no hay respaldo binario ni
 recuperación a un punto en el tiempo —eso es del servidor, y la interfaz tendrá
 que decirlo—, no hay respaldos programados, y un límite de filas puede dejar
 filas huérfanas, cosa que se avisa y no se corrige sola.
+
+### Sesión 023s — 2026-08-19 · El catálogo que no volvía a cargarse
+
+Iba a ser la tercera tanda del plan visual y acabó en un fallo de los que se
+notan todos los días.
+
+**Lo que contó el usuario:** «hay momentos que el autocompletado no sirve, como
+que se cambia el servidor, los esquemas o las tablas no cargaba». Es real, y la
+causa está en una línea: lo precalentado se recordaba **por conexión**, no por
+conexión y base. `primeSchemaIndexAsync` miraba `_primed.has(connectionId)` y se
+iba. Con eso:
+
+- cambiar de base en la misma conexión daba por hecho un catálogo que era el de
+  la base anterior, y el de la nueva no se pedía **nunca**;
+- tras un cambio de estructura, `loadDatabases` rehace el árbol entero con los
+  hijos vacíos y el reprecalentado tampoco corría: explorador y autocompletado en
+  blanco;
+- al reconectar tras perder la sesión, lo mismo.
+
+La única salida era cerrar y volver a abrir la conexión, que es justo lo que
+describía el usuario.
+
+**Arreglado.** La clave lleva la base (`conexión::base`); `forgetPrimed` borra lo
+de una conexión en los cinco sitios donde su árbol se vacía o se rehace; y la
+clave se retira si no había nodo que recorrer, porque si no un intento fallido
+bloqueaba todos los siguientes.
+
+**Comprobado en los dos sentidos.** La prueba nueva —«cambiar de base precalienta
+el catálogo de la nueva»— falla si se vuelve a poner la clave vieja. Es la única
+forma de saber que una prueba de regresión sirve para algo.
+
+**Buscar y reemplazar** (§4.2 del plan visual): Monaco lo traía desde siempre con
+`Ctrl+F` y `Ctrl+H` y nada en la interfaz lo decía. Ahora el editor expone
+`openFind(replace)` y la paleta ofrece las dos entradas con su atajo.
+
+**Y una prueba que no se quedó.** Intenté reproducir el cambio de base en la app
+levantada: el cambio ocurre —el chip dice `druse_test_secondary`—, pero leer el
+desplegable tecleando y borrando `tienda.` no daba resultado estable. Antes que
+dejar una prueba dudosa en la suite, fuera; la cobertura del fallo se queda en la
+unitaria, que sí está probada en ambos sentidos.
+
+**Verificado.** **510 en frontend** (dos nuevas) y las **5 de `interfaz.spec.ts`**
+en verde, con la del buscador incluida.
+
+**Archivos.** `workspace-store.ts` y su prueba, `sql-editor.ts`,
+`command-palette.ts`, `app-shell.{ts,html}`, `e2e/tests/interfaz.spec.ts`.
+
+**Sin commitear.** Los siete archivos siguen en el árbol de trabajo.
 
 ### Sesión 023r — 2026-08-19 · Segunda tanda: las pestañas que no separaban nada
 
