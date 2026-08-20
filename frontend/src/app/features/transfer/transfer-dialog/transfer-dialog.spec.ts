@@ -1,7 +1,11 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { Observable, of } from 'rxjs';
 
-import { ApplicationGateway } from '../../../core/application-gateway/application-gateway';
+import {
+  ApplicationGateway,
+  TransferRequest,
+  TypeTranslation,
+} from '../../../core/application-gateway/application-gateway';
 import { WorkspaceStore } from '../../../core/workspace/workspace-store';
 import { DatabaseColumn, DatabaseObject } from '../../../shared/models/workspace';
 import { TransferDialog } from './transfer-dialog';
@@ -48,6 +52,39 @@ class FakeGateway implements Partial<ApplicationGateway> {
 
   getColumns(sessionId: string): Observable<readonly DatabaseColumn[]> {
     return of(sessionId === 'sesion-dev' ? this.sourceColumns : this.targetColumns);
+  }
+
+  // --- Cruzar de motor ------------------------------------------------------
+
+  /** Lo que el proceso local diría de estas columnas al otro lado. */
+  translations: TypeTranslation[] = [
+    { column: 'id', sourceType: 'uuid', targetType: 'uniqueidentifier', fidelity: 'Exact' },
+    {
+      column: 'nombre',
+      sourceType: 'jsonb',
+      targetType: 'nvarchar(max)',
+      fidelity: 'Approximate',
+      note: 'El JSON viaja entero, pero el destino lo guarda como texto.',
+    },
+    {
+      column: 'telefono',
+      sourceType: 'text[]',
+      targetType: 'nvarchar(max)',
+      fidelity: 'None',
+      note: 'SqlServer no tiene columnas que guarden varios valores.',
+    },
+  ];
+
+  lastCreate: TransferRequest | null = null;
+
+  translateTransferTypes(): Observable<readonly TypeTranslation[]> {
+    return of(this.translations);
+  }
+
+  createTransferTarget(request: TransferRequest): Observable<readonly string[]> {
+    this.lastCreate = request;
+
+    return of(['CREATE TABLE ...']);
   }
 }
 
@@ -268,5 +305,84 @@ describe('TransferDialog', () => {
 
     expect(aviso).toContain('public.pedidos_destino');
     expect(aviso).toContain('no se deshace');
+  });
+
+  // -----------------------------------------------------------------------
+  // Crear la tabla al otro lado
+  // -----------------------------------------------------------------------
+
+  /** Baja hasta la carpeta del destino y pide crear una tabla nueva. */
+  async function pedirTablaNueva(nombre = 'pedidos_nueva'): Promise<void> {
+    const conexion = element.querySelector<HTMLSelectElement>('.field select')!;
+    conexion.value = 'prod';
+    conexion.dispatchEvent(new Event('change'));
+    await settle(fixture);
+
+    const nueva = element.querySelector<HTMLInputElement>('.new-table input')!;
+    nueva.value = nombre;
+    nueva.dispatchEvent(new Event('input'));
+    await settle(fixture);
+
+    boton('Crear tabla…').click();
+    await settle(fixture);
+  }
+
+  function boton(texto: string): HTMLButtonElement {
+    return [...element.querySelectorAll('button')].find((candidato) =>
+      candidato.textContent?.includes(texto),
+    ) as HTMLButtonElement;
+  }
+
+  /**
+   * Lo que se lee antes de crear: a qué se traduce cada columna.
+   *
+   * Es el producto de la fase de cruzar motores. El tipo propuesto va en un campo
+   * porque se puede cambiar; la nota, debajo, porque es lo que hay que leer.
+   */
+  it('enseña a qué se traduce cada columna y qué se pierde', async () => {
+    await pedirTablaNueva();
+
+    // Por los campos y no por las filas: cada nota ocupa una fila propia debajo
+    // de la suya, así que las filas y las columnas no van una a una.
+    const propuestos = [...element.querySelectorAll<HTMLInputElement>('.mapping tbody input')];
+
+    expect(propuestos[0].value).toBe('uniqueidentifier');
+    expect(element.textContent).toContain('El JSON viaja entero');
+  });
+
+  /**
+   * Una columna sin equivalente impide crear la tabla.
+   *
+   * Crearla sin ella dejaría un traslado que parece completo y no lo es: es justo
+   * el silencio que esta función existe para evitar.
+   */
+  it('no deja crear la tabla mientras una columna no tenga dónde ir', async () => {
+    await pedirTablaNueva();
+
+    expect(element.querySelector('.problem')?.textContent).toContain('no tienen dónde ir');
+    expect(boton('Crear la tabla').disabled).toBe(true);
+  });
+
+  /**
+   * Y el tipo escrito a mano manda: quien lo escribe sabe algo que el traductor
+   * no.
+   */
+  it('el tipo escrito a mano viaja con la petición', async () => {
+    await pedirTablaNueva();
+
+    const suyo = [...element.querySelectorAll<HTMLInputElement>('.mapping tbody input')][2];
+
+    suyo.value = 'nvarchar(400)';
+    suyo.dispatchEvent(new Event('input'));
+    await settle(fixture);
+
+    // Con todas las columnas resueltas, ya se puede crear.
+    expect(boton('Crear la tabla').disabled).toBe(false);
+
+    boton('Crear la tabla').click();
+    await settle(fixture);
+
+    expect(gateway.lastCreate?.typeOverrides).toEqual({ telefono: 'nvarchar(400)' });
+    expect(gateway.lastCreate?.target.name).toBe('pedidos_nueva');
   });
 });

@@ -10,14 +10,14 @@
 
 | Campo | Valor |
 | --- | --- |
-| Última sesión | **023k** — 2026-08-19 |
+| Última sesión | **023l** — 2026-08-19 |
 | Fase activa | **Migración de datos entre tablas:** fases 1, 2 y 3 cerradas; la **4** cerrada: la pasada de varias tablas, lo que cada tabla hace distinto y las migraciones guardadas (ver «Qué toca retomar»). **Respaldos y restauración:** Fases A–E cerradas. La **F** tiene backend, interfaz, CSV, selector de archivos, restaurar en una base nueva y **el ciclo entero por HTTP en los cuatro motores**; le falta repetir a mano el respaldo real que encontró el error de los índices de expresión |
 | Fases 0–6 | ✅ Cerradas. |
 | Fase 7 | 🟡 **11/12.** El ciclo de instalación está probado sobre este equipo; solo falta arrancar en una máquina sin herramientas de desarrollo. |
 | Fase 8 | ✅ **7/7.** Tres motores sobre el mismo contrato y primera beta preparada. |
 | ¿Compila el backend? | Sí — 0 advertencias, 0 errores |
 | ¿Compila el envoltorio? | Sí |
-| ¿Pasan las pruebas? | Sí — **760 en backend** (422 unitarias, 190 contractuales y 148 de integración) con `DRUSE_REQUIRE_ENGINES=1` y **los cuatro motores**, sin saltarse ninguna; **505 en frontend** y **21 de punta a punta**, estas dos veces seguidas y con los dos motores. Las **6 del envoltorio** no se ejecutaron: cargo no compila en este equipo |
+| ¿Pasan las pruebas? | Sí — **764 en backend** (422 unitarias, 190 contractuales y 152 de integración) con `DRUSE_REQUIRE_ENGINES=1` y **los cuatro motores**, sin saltarse ninguna; **508 en frontend** y **21 de punta a punta**, estas dos veces seguidas y con los dos motores. Las **6 del envoltorio** no se ejecutaron: cargo no compila en este equipo |
 | ¿Hay aplicación de escritorio? | **Sí.** Instalador NSIS, MSI y ZIP portable, en dos variantes: con Informix y sin él |
 | Motores | **PostgreSQL, SQL Server, MySQL/MariaDB e Informix**, todos sobre el mismo contrato compartido |
 | Trabajo a medias | Ninguno. La migración quedó cerrada de punta a punta en las sesiones 023i y 023j. |
@@ -31,12 +31,15 @@
 
 Quedan tres cosas menores, ninguna bloqueante:
 
-1. **`CrossEngineTransferTests` cubre una de las doce direcciones** contra motores
-   de verdad —PostgreSQL a SQL Server—; las otras once solo están en unitarias.
-   MySQL e Informix están levantados, así que añadir un par de direcciones es
-   cuestión de escribirlas.
-2. **El paso de tipos no tiene pruebas de componente** en el frontend, aunque sí
-   de punta a punta desde la sesión 023j.
+De la migración **no queda nada pendiente**: las cuatro fases están cerradas y
+comprobadas de punta a punta, incluidas cinco direcciones entre motores contra
+servidores de verdad.
+
+Lo único que se dejó fuera a propósito está escrito en el plan: **vaciar y cargar
+en pasada** —vaciar exige escribir el nombre de cada tabla, y con seis marcadas
+serían seis confirmaciones— y **crear en el destino las tablas que faltan** desde
+la pasada, que se hace de una en una porque es una decisión con tipos y clave
+primaria.
 
 El plan completo, con el porqué de cada decisión y lo aprendido en las cuatro
 fases, está en `docs/plan-migracion-de-datos.md`.
@@ -335,6 +338,46 @@ Y tres límites declarados desde el principio: no hay respaldo binario ni
 recuperación a un punto en el tiempo —eso es del servidor, y la interfaz tendrá
 que decirlo—, no hay respaldos programados, y un límite de filas puede dejar
 filas huérfanas, cosa que se avisa y no se corrige sola.
+
+### Sesión 023l — 2026-08-19 · Las otras direcciones, y un aviso que no servía de nada
+
+Lo que le quedaba a la migración eran pruebas, y de paso salió un fallo de la
+pantalla.
+
+#### A lo ancho, no solo a fondo
+
+Lo cruzado se comprobaba a fondo en **una** dirección —PostgreSQL a SQL Server, con
+los tipos que peor viajan— y las otras once solo con unitarias.
+`CrossEngineDirectionsTests` añade cuatro más: PostgreSQL → MySQL, MySQL → SQL
+Server, SQL Server → PostgreSQL y PostgreSQL → Informix.
+
+Las tablas son sosas a propósito —un entero, un texto y un decimal—: lo que se
+mira ahí no es la traducción de tipos raros, es que **el camino entero existe en
+las cuatro esquinas**, porque cada par tiene su dialecto y el que no se prueba es
+el que se rompe. Se apoya en el catálogo de motores que ya usaban los respaldos,
+así que no hubo que inventar ninguna fixture.
+
+Las cuatro pasaron a la primera, Informix incluido.
+
+#### El aviso que mandaba hacer algo que no funcionaba
+
+Al escribir las pruebas de componente del paso de tipos apareció: cuando una
+columna no tiene equivalente, la pantalla dice «escríbeles un tipo a mano o
+déjalas fuera; la tabla no se puede crear mientras estén así»… y escribir el tipo
+**no desbloqueaba nada**. El botón miraba la traducción original y no lo que el
+usuario acababa de escribir, aunque el proceso local sí acepta el tipo escrito y
+lo prefiere al propuesto.
+
+Ahora una columna con tipo a mano deja de contar como perdida, que es lo que su
+propio aviso pedía.
+
+**Verificado.** **764 en backend** (422 unitarias, 190 contractuales y 152 de
+integración) con los cuatro motores levantados; **508 en frontend**, tres nuevas
+del paso de tipos —lo que se traduce, lo que se pierde, y que el tipo escrito a
+mano viaja con la petición—; y **21 de punta a punta**.
+
+**Archivos.** `CrossEngineDirectionsTests`, `transfer-dialog.spec.ts` y
+`transfer-dialog.ts` (el cómputo de las columnas sin equivalente).
 
 ### Sesión 023k — 2026-08-19 · Reconocer la fila por lo que la identifica de verdad
 

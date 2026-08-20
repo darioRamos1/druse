@@ -233,10 +233,13 @@ tipos que peor viajan, lee en la pantalla de tipos que el `uuid` se creará como
 `uniqueidentifier` y que el JSON «deja de comprobar que lo sea», crea la tabla,
 copia y cuenta las filas **en SQL Server**.
 
-**Lo que queda sin comprobar**, que no bloquea la fase: `CrossEngineTransferTests`
-cruza PostgreSQL → SQL Server contra motores de verdad, y las otras once
-direcciones solo están cubiertas por unitarias; y el paso de tipos no tiene
-pruebas de componente en el frontend.
+**Cómo se comprueba lo cruzado**, en tres alturas: `TypeTranslationTests` sin
+motor —qué nombre tiene cada tipo al otro lado—; `CrossEngineTransferTests` a
+fondo en una dirección, PostgreSQL → SQL Server, con los tipos que peor viajan; y
+`CrossEngineDirectionsTests` a lo ancho, en cuatro direcciones más
+—PostgreSQL → MySQL, MySQL → SQL Server, SQL Server → PostgreSQL y
+PostgreSQL → Informix—, con tablas sosas a propósito: lo que se mira ahí no es la
+traducción, es que el camino entero existe en las cuatro esquinas.
 
 ### Fase 4 — Varias tablas y migraciones guardadas ✅ (sesiones 023d, 023f e 023i)
 

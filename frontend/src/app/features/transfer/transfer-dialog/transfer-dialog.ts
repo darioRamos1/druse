@@ -112,9 +112,20 @@ export class TransferDialog {
   protected readonly keepIdentity = signal(true);
   protected readonly replaceConfirmation = signal('');
 
-  /** Columnas que no tienen dónde ir en el motor de destino. */
+  /**
+   * Columnas que no tienen dónde ir en el motor de destino **y siguen así**.
+   *
+   * Una a la que se le escribe un tipo a mano deja de contar: es lo que el aviso
+   * pide hacer, y el proceso local ya la acepta —el tipo escrito gana al
+   * propuesto—. Sin esto, la pantalla mandaba escribir un tipo y luego no dejaba
+   * crear la tabla igualmente.
+   */
   protected readonly untranslatable = computed(() =>
-    this.translations().filter((translation) => translation.fidelity === 'None'),
+    this.translations().filter(
+      (translation) =>
+        translation.fidelity === 'None' &&
+        (this.typeOverrides()[translation.column] ?? '').trim() === '',
+    ),
   );
 
   /** Lo que se pierde al cruzar de motor: es lo que hay que leer antes de crear. */
