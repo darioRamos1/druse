@@ -51,6 +51,9 @@ export default class CommandPalette implements AfterViewInit {
   /** Ejecutar solo la instrucción del cursor, o la selección si la hay. */
   readonly executeCurrent = output<void>();
   readonly formatQuery = output<void>();
+
+  /** Abrir el buscador del editor; con `true`, el de reemplazar. */
+  readonly findInEditor = output<boolean>();
   readonly showHistory = output<void>();
   readonly activateConnection = output<string>();
   readonly openNode = output<ExplorerNode>();
@@ -73,6 +76,9 @@ export default class CommandPalette implements AfterViewInit {
         hint: 'Ctrl+Shift+Enter',
       },
       { id: 'format', kind: 'command', label: 'Formatear SQL', hint: 'Ctrl+Shift+F' },
+      // El buscador del editor existía y no lo decía nadie.
+      { id: 'find', kind: 'command', label: 'Buscar en el editor', hint: 'Ctrl+F' },
+      { id: 'replace', kind: 'command', label: 'Buscar y reemplazar', hint: 'Ctrl+H' },
       { id: 'history', kind: 'command', label: 'Abrir historial', hint: 'Consultas anteriores' },
     ];
     const connections: PaletteItem[] = this.connections().map((connection) => ({
@@ -200,6 +206,15 @@ export default class CommandPalette implements AfterViewInit {
           break;
         case 'format':
           this.formatQuery.emit();
+          break;
+        case 'find':
+          // Se cierra sin devolver el foco: lo quiere el buscador del editor.
+          this.closeWithoutRestoringFocus();
+          this.findInEditor.emit(false);
+          break;
+        case 'replace':
+          this.closeWithoutRestoringFocus();
+          this.findInEditor.emit(true);
           break;
         case 'history':
           this.showHistory.emit();

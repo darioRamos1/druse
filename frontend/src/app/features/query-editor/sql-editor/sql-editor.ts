@@ -337,6 +337,24 @@ export default class SqlEditor implements OnInit {
    * operación entre en la pila de deshacer: formatear debe poder revertirse con
    * Ctrl+Z como cualquier otra edición.
    */
+  /**
+   * Abre el buscador del editor, con o sin reemplazo.
+   *
+   * Monaco lo trae desde siempre y funciona con `Ctrl+F` y `Ctrl+H`, pero nada
+   * en la interfaz lo decía: quien no venga de VS Code no tiene forma de saber
+   * que está. Por eso lo ofrece también la paleta.
+   */
+  openFind(replace = false): void {
+    const editor = this._editor;
+
+    if (!editor) {
+      return;
+    }
+
+    editor.focus();
+    editor.getAction(replace ? 'editor.action.startFindReplaceAction' : 'actions.find')?.run();
+  }
+
   async formatDocument(): Promise<void> {
     const editor = this._editor;
 

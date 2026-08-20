@@ -50,6 +50,71 @@ test.describe('la interfaz por dentro', () => {
   });
 
   /**
+   * El buscador del editor se puede encontrar sin saberse el atajo.
+   *
+   * Monaco lo trae desde siempre —`Ctrl+F` y `Ctrl+H`— y nada en la interfaz lo
+   * decía: quien no venga de VS Code no tenía forma de saber que está.
+   */
+  test('la paleta ofrece buscar y reemplazar en el editor', async ({ page }) => {
+    await abrir(page);
+    await escribirSql(page, 'SELECT 1 AS uno');
+
+    await page.getByRole('button', { name: 'Abrir búsqueda global' }).click();
+    await page.locator('app-command-palette input').fill('reemplaz');
+    await page.getByText('Buscar y reemplazar').first().click();
+
+    // El buscador de Monaco, con su parte de reemplazo desplegada.
+    const buscador = page.locator('.monaco-editor .find-widget');
+
+    await expect(buscador).toBeVisible({ timeout: 10_000 });
+
+    // `replaceToggled` es lo que distingue «buscar» de «buscar y reemplazar»:
+    // el buscador es el mismo widget con su segunda fila desplegada.
+    await expect(buscador).toHaveClass(/replaceToggled/);
+    await expect(buscador.locator('.replace-part')).toBeVisible();
+  });
+
+  /**
+   * Tras un alias, el desplegable trae **las columnas de su tabla**.
+   *
+   * Es lo que más se usa al escribir consultas de verdad, y lo que peor se
+   * comprueba sin motor: hace falta el catálogo real, la resolución del alias y
+   * que las columnas se pidan al vuelo aunque nadie haya abierto esa tabla en el
+   * árbol.
+   */
+  test('tras un alias se sugieren las columnas de su tabla', async ({ page }) => {
+    await abrir(page);
+    await conectar(page);
+    await apuntarPestana(page);
+
+    // Dos tablas con alias: si no distinguiera, saldrían las de la otra.
+    await escribirSql(page, 'SELECT  FROM ciudad c JOIN accionista a ON a.id = c.id_ciudad');
+
+    // El cursor, justo detrás de «SELECT ».
+    await page.evaluate(() => {
+      const editor = (window as unknown as { monaco: { editor: { getEditors(): any[] } } }).monaco
+        .editor.getEditors()[0];
+
+      editor.setPosition({ lineNumber: 1, column: 8 });
+      editor.focus();
+    });
+
+    await page.keyboard.type('c.');
+    await page.waitForTimeout(1500);
+
+    const sugerencias = await page.evaluate(() =>
+      Array.from(
+        document.querySelectorAll('.monaco-editor .suggest-widget .monaco-list-row'),
+      ).map((fila) => fila.textContent?.trim() ?? ''),
+    );
+
+    // Las de `ciudad`, con su tipo al lado; ninguna de `accionista`.
+    expect(sugerencias.some((fila) => fila.startsWith('id_ciudad'))).toBe(true);
+    expect(sugerencias.some((fila) => fila.startsWith('ciudad'))).toBe(true);
+    expect(sugerencias.length).toBeLessThan(6);
+  });
+
+  /**
    * Bajando por un guion largo, Monaco deja pegada arriba la línea que abre el
    * bloque. Sin fondo propio se quedaba **escrita encima** del texto que pasaba
    * por debajo: el fondo del editor es transparente a propósito y esa franja lo

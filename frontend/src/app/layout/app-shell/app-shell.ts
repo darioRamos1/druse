@@ -562,6 +562,10 @@ export class AppShell {
     void this._editor()?.formatDocument();
   }
 
+  protected findInEditor(replace: boolean): void {
+    this._editor()?.openFind(replace);
+  }
+
   protected onFormatFailed(message: string): void {
     this._store.notify(`No se pudo formatear: ${message}`);
   }
