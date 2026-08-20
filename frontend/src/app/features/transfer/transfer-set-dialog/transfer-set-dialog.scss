@@ -538,4 +538,12 @@
   &__where {
     min-width: 160px;
   }
+
+  &__key {
+    min-width: 120px;
+  }
+
+  &__na {
+    color: var(--dr-text-faintest);
+  }
 }

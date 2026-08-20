@@ -10,14 +10,14 @@
 
 | Campo | Valor |
 | --- | --- |
-| Última sesión | **023j** — 2026-08-19 |
+| Última sesión | **023k** — 2026-08-19 |
 | Fase activa | **Migración de datos entre tablas:** fases 1, 2 y 3 cerradas; la **4** cerrada: la pasada de varias tablas, lo que cada tabla hace distinto y las migraciones guardadas (ver «Qué toca retomar»). **Respaldos y restauración:** Fases A–E cerradas. La **F** tiene backend, interfaz, CSV, selector de archivos, restaurar en una base nueva y **el ciclo entero por HTTP en los cuatro motores**; le falta repetir a mano el respaldo real que encontró el error de los índices de expresión |
 | Fases 0–6 | ✅ Cerradas. |
 | Fase 7 | 🟡 **11/12.** El ciclo de instalación está probado sobre este equipo; solo falta arrancar en una máquina sin herramientas de desarrollo. |
 | Fase 8 | ✅ **7/7.** Tres motores sobre el mismo contrato y primera beta preparada. |
 | ¿Compila el backend? | Sí — 0 advertencias, 0 errores |
 | ¿Compila el envoltorio? | Sí |
-| ¿Pasan las pruebas? | Sí — **760 en backend** (422 unitarias, 190 contractuales y 148 de integración) con `DRUSE_REQUIRE_ENGINES=1` y **los cuatro motores**, sin saltarse ninguna; **503 en frontend** y **20 de punta a punta**, estas dos veces seguidas y con los dos motores. Las **6 del envoltorio** no se ejecutaron: cargo no compila en este equipo |
+| ¿Pasan las pruebas? | Sí — **760 en backend** (422 unitarias, 190 contractuales y 148 de integración) con `DRUSE_REQUIRE_ENGINES=1` y **los cuatro motores**, sin saltarse ninguna; **505 en frontend** y **21 de punta a punta**, estas dos veces seguidas y con los dos motores. Las **6 del envoltorio** no se ejecutaron: cargo no compila en este equipo |
 | ¿Hay aplicación de escritorio? | **Sí.** Instalador NSIS, MSI y ZIP portable, en dos variantes: con Informix y sin él |
 | Motores | **PostgreSQL, SQL Server, MySQL/MariaDB e Informix**, todos sobre el mismo contrato compartido |
 | Trabajo a medias | Ninguno. La migración quedó cerrada de punta a punta en las sesiones 023i y 023j. |
@@ -31,12 +31,11 @@
 
 Quedan tres cosas menores, ninguna bloqueante:
 
-1. **La clave de emparejamiento por tabla** al actualizar. La pasada usa la
-   primaria de cada destino; en el asistente de una tabla sí se puede cambiar, y
-   sincronizar entornos suele hacerse por una clave de negocio.
-2. **`CrossEngineTransferTests` cubre una de las doce direcciones** contra motores
-   de verdad; las otras once solo están en unitarias.
-3. **El paso de tipos no tiene pruebas de componente** en el frontend, aunque sí
+1. **`CrossEngineTransferTests` cubre una de las doce direcciones** contra motores
+   de verdad —PostgreSQL a SQL Server—; las otras once solo están en unitarias.
+   MySQL e Informix están levantados, así que añadir un par de direcciones es
+   cuestión de escribirlas.
+2. **El paso de tipos no tiene pruebas de componente** en el frontend, aunque sí
    de punta a punta desde la sesión 023j.
 
 El plan completo, con el porqué de cada decisión y lo aprendido en las cuatro
@@ -336,6 +335,41 @@ Y tres límites declarados desde el principio: no hay respaldo binario ni
 recuperación a un punto en el tiempo —eso es del servidor, y la interfaz tendrá
 que decirlo—, no hay respaldos programados, y un límite de filas puede dejar
 filas huérfanas, cosa que se avisa y no se corrige sola.
+
+### Sesión 023k — 2026-08-19 · Reconocer la fila por lo que la identifica de verdad
+
+Lo que le quedaba a la pasada: **con qué se reconoce una fila que ya está**. Hasta
+hoy usaba la clave primaria de cada destino y no había forma de cambiarla, aunque
+el asistente de una tabla sí la dejaba elegir desde la fase 2.
+
+Es de cada tabla y no de la pasada, porque cada una tiene la suya. Vacío sigue
+significando la primaria del destino —lo que se quiere casi siempre—, y se escribe
+otra cuando hay que sincronizar por una **clave de negocio**: el código del
+artículo, el NIT, lo que identifica la fila en los dos entornos. El identificador
+lo generó cada base por su cuenta, así que emparejar por él es lo que duplica
+filas al sincronizar.
+
+El campo aparece **solo en los modos que reconocen la fila**. En «añadir» sería
+una pregunta sin respuesta posible, y un campo que no significa nada se rellena
+igual. Lo que se escriba lo comprueba el proceso local contra el catálogo, como ya
+hacía: sin unicidad detrás, «actualiza la que ya está» tocaría todas las que
+coincidan.
+
+Se guarda con el perfil, junto al modo y al filtro, por lo mismo que ellos: un
+perfil que olvidara la clave volvería a emparejar por el identificador la próxima
+vez, y eso duplica.
+
+**Verificado.** **760 en backend** (148 de integración, una de ellas comprobando
+que la clave sobrevive al ida y vuelta del perfil), **505 en frontend** —la clave
+solo se ofrece donde significa algo, y viaja con su tabla— y **21 de punta a
+punta**, dos vueltas seguidas. La nueva es la que importa: en el destino hay una
+fila con el mismo código y **otro id**, se migra actualizando por el código, y al
+final hay dos filas en vez de tres y el nombre viejo ya no está.
+
+**Archivos.** `TransferProfile.cs` (`TransferTableOptions.KeyColumns`),
+`TransferProfileContracts`, el gateway y el asistente de la pasada; pruebas en
+`TransferProfileTests`, `transfer-set-dialog.spec.ts` y
+`e2e/tests/migracion.spec.ts`.
 
 ### Sesión 023j — 2026-08-19 · Cruzar de motor, ahora por la pantalla
 

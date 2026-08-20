@@ -338,6 +338,15 @@ Elegir en una tabla el mismo modo de la pasada **no la separa del resto**: si
 contara como algo distinto, cambiar después el modo general la dejaría atrás sin
 que nadie lo hubiera pedido.
 
+Y con qué se reconoce la fila que ya está también es de cada tabla, porque cada
+una tiene la suya. Vacío significa la clave primaria del destino; se escribe otra
+cuando hay que sincronizar por una **clave de negocio** —el código del artículo, el
+NIT— y no por el identificador que generó cada base por su cuenta. El campo solo
+aparece en los modos que tienen que reconocer la fila: en «añadir» sería una
+pregunta sin respuesta posible. Lo que se escriba lo comprueba el proceso local
+contra el catálogo, como en el asistente de una tabla: sin unicidad detrás,
+actualizar tocaría todas las filas que coincidan.
+
 #### Migraciones guardadas ✅
 
 Espejo de `SqliteBackupProfileStore`: tabla `transfer_profiles` en `DruseDatabase`,
@@ -364,10 +373,6 @@ Buscar en el catálogo por nombre —que es como guardan los perfiles— lo hace
 dos servicios, así que vive en `CatalogLookup`.
 
 #### Lo que queda fuera de la fase
-
-**La clave de emparejamiento por tabla.** Al actualizar, la pasada usa la clave
-primaria de cada destino; en el asistente de una tabla sí se puede cambiar, y
-sincronizar entornos suele hacerse por una clave de negocio.
 
 **Vaciar y cargar en pasada**, que se deja a propósito: vaciar exige escribir el
 nombre de la tabla, y con seis marcadas serían seis confirmaciones.

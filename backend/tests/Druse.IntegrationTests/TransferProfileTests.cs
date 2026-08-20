@@ -21,6 +21,9 @@ public sealed class TransferProfileTests(DruseApiFactory factory) : IClassFixtur
 
     private static readonly string[] UnaTabla = ["clientes"];
 
+    /// <summary>La clave de negocio del perfil de ejemplo.</summary>
+    private static readonly string[] PorCodigo = ["codigo"];
+
     /// <summary>Guardar, releer de la lista y borrar.</summary>
     [RequiresPostgreSqlFact]
     public async Task ElPerfilSeGuardaSeListaYSeBorra()
@@ -216,7 +219,12 @@ public sealed class TransferProfileTests(DruseApiFactory factory) : IClassFixtur
             mode = "Insert",
             tableOptions = new Dictionary<string, object>
             {
-                ["pedidos"] = new { mode = "Upsert", where = "anio = 2026" },
+                ["pedidos"] = new
+                {
+                    mode = "Upsert",
+                    where = "anio = 2026",
+                    keyColumns = PorCodigo,
+                },
             },
         });
 
@@ -234,6 +242,14 @@ public sealed class TransferProfileTests(DruseApiFactory factory) : IClassFixtur
 
             Assert.Equal("Upsert", opciones.GetProperty("mode").GetString());
             Assert.Equal("anio = 2026", opciones.GetProperty("where").GetString());
+
+            // Y con qué se reconoce la fila, que es de cada tabla y no de la pasada.
+            Assert.Equal(
+                ["codigo"],
+                opciones.GetProperty("keyColumns")
+                    .EnumerateArray()
+                    .Select(column => column.GetString())
+                    .ToList());
         }
         finally
         {

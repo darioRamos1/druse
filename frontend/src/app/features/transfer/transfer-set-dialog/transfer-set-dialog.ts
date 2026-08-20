@@ -397,7 +397,10 @@ export class TransferSetDialog {
   protected readonly tweaked = computed(
     () =>
       Object.values(this.tableOptions()).filter(
-        (options) => options.mode !== undefined || (options.where ?? '') !== '',
+        (options) =>
+          options.mode !== undefined ||
+          (options.where ?? '') !== '' ||
+          (options.keyColumns ?? []).length > 0,
       ).length,
   );
 
@@ -409,6 +412,27 @@ export class TransferSetDialog {
     });
   }
 
+  /** La clave escrita para esta tabla, tal y como se lee en la pantalla. */
+  protected keyOf(table: string): string {
+    return (this.tableOptions()[table]?.keyColumns ?? []).join(', ');
+  }
+
+  /** Los modos que tienen que reconocer la fila que ya está. */
+  protected needsKey(table: string): boolean {
+    const mode = this.modeOf(table);
+
+    return mode === 'Upsert' || mode === 'SkipExisting';
+  }
+
+  protected setTableKey(table: string, columns: string): void {
+    const names = columns
+      .split(',')
+      .map((name) => name.trim())
+      .filter((name) => name !== '');
+
+    this.setTableOptions(table, { keyColumns: names.length === 0 ? undefined : names });
+  }
+
   protected setTableWhere(table: string, where: string): void {
     this.setTableOptions(table, { where: where.trim() === '' ? undefined : where });
   }
@@ -418,7 +442,11 @@ export class TransferSetDialog {
     const merged: TransferTableOptions = { ...current[table], ...patch };
     const next = { ...current };
 
-    if (merged.mode === undefined && (merged.where ?? '') === '') {
+    if (
+      merged.mode === undefined &&
+      (merged.where ?? '') === '' &&
+      (merged.keyColumns ?? []).length === 0
+    ) {
       delete next[table];
     } else {
       next[table] = merged;
@@ -621,6 +649,7 @@ export class TransferSetDialog {
         target: toTable(pair.target!),
         filter: where ? { where } : undefined,
         mode: this.modeOf(pair.source.name),
+        keyColumns: this.tableOptions()[pair.source.name]?.keyColumns ?? [],
         atomic: this.atomic(),
         batchSize: this.batchSize(),
         keepIdentity: this.keepIdentity(),

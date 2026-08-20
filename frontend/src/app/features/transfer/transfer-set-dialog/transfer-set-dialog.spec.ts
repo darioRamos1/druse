@@ -327,6 +327,59 @@ describe('TransferSetDialog', () => {
   });
 
   /**
+   * La clave solo se pide donde significa algo.
+   *
+   * Reconocer la fila que ya está es cosa de actualizar y de omitir; en «añadir»
+   * el campo sería una pregunta sin respuesta posible.
+   */
+  it('pide la clave solo en los modos que reconocen la fila', async () => {
+    await elegirDestino();
+
+    expect(element.querySelectorAll('.each__key').length).toBe(0);
+
+    const modo = element.querySelector<HTMLSelectElement>('.each__table select')!;
+
+    modo.value = 'Upsert';
+    modo.dispatchEvent(new Event('change'));
+    await settle(fixture);
+
+    expect(element.querySelectorAll('.each__key').length).toBe(1);
+  });
+
+  /**
+   * Y la clave escrita viaja con su tabla.
+   *
+   * Sincronizar dos entornos se hace por una clave de negocio —el código del
+   * artículo, el NIT— y no por el identificador que generó cada base por su
+   * cuenta.
+   */
+  it('manda la clave de negocio de cada tabla', async () => {
+    await elegirDestino();
+
+    const modo = element.querySelector<HTMLSelectElement>('.each__table select')!;
+
+    modo.value = 'Upsert';
+    modo.dispatchEvent(new Event('change'));
+    await settle(fixture);
+
+    const clave = element.querySelector<HTMLInputElement>('.each__key')!;
+
+    clave.value = 'codigo, sucursal';
+    clave.dispatchEvent(new Event('change'));
+    await settle(fixture);
+
+    boton('Copiar 2 tablas').click();
+    await settle(fixture);
+
+    const [primera, segunda] = gateway.lastSet!.tables;
+
+    expect(primera.keyColumns).toEqual(['codigo', 'sucursal']);
+
+    // Y la que no la lleva se queda con la primaria de su destino.
+    expect(segunda.keyColumns).toEqual([]);
+  });
+
+  /**
    * Guardar la pasada guarda **nombres**, no sesiones.
    *
    * Es la regla del perfil de respaldo y aquí vale igual: esto se reabre meses

@@ -67,6 +67,13 @@ public sealed record TransferTableOptionsDto
 
     /// <summary>Su condición, sin `WHERE` delante. Vacía significa la tabla entera.</summary>
     public string? Where { get; init; }
+
+    /// <summary>
+    /// Con qué columnas se reconoce una fila que ya está.
+    ///
+    /// Vacío significa la clave primaria del destino.
+    /// </summary>
+    public IReadOnlyList<string> KeyColumns { get; init; } = [];
 }
 
 /// <summary>Contra qué conexiones vivas se abre un perfil.</summary>
@@ -131,6 +138,7 @@ internal static class TransferProfileMapper
                 {
                     Mode = entry.Value.Mode?.ToString(),
                     Where = entry.Value.Where,
+                    KeyColumns = entry.Value.KeyColumns ?? [],
                 },
                 StringComparer.OrdinalIgnoreCase),
             Ordered = profile.Ordered,
@@ -174,7 +182,8 @@ internal static class TransferProfileMapper
                 entry => entry.Key,
                 entry => new TransferTableOptions(
                     string.IsNullOrWhiteSpace(entry.Value.Mode) ? null : Parse(entry.Value.Mode),
-                    entry.Value.Where),
+                    entry.Value.Where,
+                    entry.Value.KeyColumns.Count == 0 ? null : entry.Value.KeyColumns),
                 StringComparer.OrdinalIgnoreCase),
             Ordered = dto.Ordered,
             Atomic = dto.Atomic,

@@ -1010,6 +1010,13 @@ export interface TransferTableOptions {
   readonly mode?: TransferMode;
   /** Su condición, sin `WHERE` delante. */
   readonly where?: string;
+  /**
+   * Con qué columnas se reconoce una fila que ya está.
+   *
+   * Vacío significa la clave primaria del destino. Es por tabla porque cada una
+   * tiene la suya.
+   */
+  readonly keyColumns?: readonly string[];
 }
 
 /** Una tabla del perfil que hoy existe a los dos lados. */

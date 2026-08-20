@@ -678,4 +678,95 @@ test.describe('migrar datos entre tablas', () => {
     await sqlserver.locator('[title="Desconectar"]').click();
     await expect(sqlserver).toHaveClass(/is-offline/, { timeout: 30_000 });
   });
+  /**
+   * Dentro de la pasada, una tabla se actualiza **por una clave de negocio**.
+   *
+   * Es lo que se hace al sincronizar dos entornos: el identificador lo generó cada
+   * base por su cuenta, así que la fila que ya está se reconoce por el código, no
+   * por el id. Lo que se cuenta al final son las filas: dos y no tres.
+   */
+  test('actualiza por una clave de negocio dentro de la pasada', async ({ page }) => {
+    await abrir(page);
+    await conectar(page);
+
+    const esquema = 'e2e_clave';
+
+    await ejecutarConAviso(
+      page,
+      `DROP SCHEMA IF EXISTS ${esquema} CASCADE;
+       DROP TABLE IF EXISTS e2e_clave_clientes;
+       CREATE TABLE e2e_clave_clientes (id int PRIMARY KEY, codigo text, nombre text);
+       INSERT INTO e2e_clave_clientes VALUES (1, 'A', 'Ana'), (2, 'B', 'Bea');
+       CREATE SCHEMA ${esquema};
+       CREATE TABLE ${esquema}.e2e_clave_clientes (
+         id int PRIMARY KEY,
+         codigo text UNIQUE,
+         nombre text);
+       INSERT INTO ${esquema}.e2e_clave_clientes VALUES (99, 'A', 'la de antes');`,
+    );
+
+    await desplegar(page, 'druse_test', 'public');
+    await desplegar(page, 'public', 'Tables');
+
+    const sidebar = page.locator('app-connections-sidebar');
+    const dialogo = page.locator('app-transfer-set-dialog');
+
+    await sidebar
+      .locator('.node', { hasText: 'Tables' })
+      .first()
+      .getByRole('button', { name: 'Acciones para Tables' })
+      .click();
+    await page.getByRole('menuitem', { name: 'Migrar tablas a…' }).click();
+    await expect(dialogo).toBeVisible();
+
+    await dialogo.getByRole('button', { name: 'Ninguna' }).click();
+    await dialogo.locator('.tables__row', { hasText: 'e2e_clave_clientes' }).first().click();
+    await expect(dialogo.locator('.bulk__count')).toContainText('1 de');
+
+    await dialogo.getByRole('button', { name: 'Elegir destino' }).click();
+
+    for (const paso of ['druse_test', esquema, 'Tables']) {
+      const nodo = dialogo.locator('.browser__item', { hasText: paso }).first();
+
+      await expect(nodo).toBeVisible({ timeout: 30_000 });
+      await nodo.click();
+    }
+
+    await dialogo.getByRole('button', { name: 'Migrar a' }).click();
+    await expect(dialogo.locator('.plan__list li')).toHaveCount(1, { timeout: 30_000 });
+
+    // Esta tabla se actualiza, y se reconoce por el código y no por el id.
+    await dialogo.locator('.each__summary').click();
+
+    const fila = dialogo.locator('.each__table tbody tr').first();
+
+    await fila.locator('select').selectOption('Upsert');
+    await fila.locator('.each__key').fill('codigo');
+
+    await dialogo.getByRole('button', { name: 'Copiar 1 tablas' }).click();
+    await expect(dialogo.locator('.summary__title')).toContainText('Copiadas 2 filas', {
+      timeout: 60_000,
+    });
+
+    await dialogo.locator('.foot').getByRole('button', { name: 'Cerrar' }).click();
+    await expect(dialogo).toBeHidden();
+
+    // Dos y no tres: la de código «A» era la misma fila, aunque su id fuera otro.
+    expect(await contar(page, `${esquema}.e2e_clave_clientes`)).toBe('2');
+
+    // Y se actualizó de verdad: el nombre viejo ya no está.
+    await escribirSql(
+      page,
+      `SELECT nombre FROM ${esquema}.e2e_clave_clientes WHERE codigo = 'A'`,
+    );
+    await ejecutar(page, 'todo');
+
+    expect((await primeraColumna(page))[0]).toBe('Ana');
+
+    await ejecutarConAviso(
+      page,
+      `DROP SCHEMA IF EXISTS ${esquema} CASCADE;
+       DROP TABLE IF EXISTS e2e_clave_clientes;`,
+    );
+  });
 });

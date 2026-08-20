@@ -88,7 +88,20 @@ public sealed record TransferProfile
 /// <param name="Where">
 /// Su condición, sin `WHERE` delante. Vacío significa la tabla entera.
 /// </param>
-public sealed record TransferTableOptions(TransferMode? Mode = null, string? Where = null);
+/// <param name="KeyColumns">
+/// Con qué columnas se reconoce una fila que ya está, para los modos que tienen
+/// que hacerlo.
+///
+/// Vacío significa **la clave primaria del destino**, que es lo que se quiere casi
+/// siempre. Se puede cambiar porque sincronizar dos entornos suele hacerse por una
+/// clave de negocio —el código del artículo, el NIT— y no por el identificador que
+/// generó cada base por su cuenta. Es por tabla y no de la pasada porque cada una
+/// tiene la suya.
+/// </param>
+public sealed record TransferTableOptions(
+    TransferMode? Mode = null,
+    string? Where = null,
+    IReadOnlyList<string>? KeyColumns = null);
 
 /// <summary>Una tabla del perfil que hoy existe a los dos lados.</summary>
 /// <param name="Source">La del origen, tal y como está hoy en el catálogo.</param>

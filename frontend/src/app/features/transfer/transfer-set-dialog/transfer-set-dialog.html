@@ -238,6 +238,7 @@
               <th scope="col">Tabla</th>
               <th scope="col">Qué hacer con lo que ya está</th>
               <th scope="col">Qué filas se llevan</th>
+              <th scope="col">Con qué se reconoce la fila</th>
             </tr>
           </thead>
           <tbody>
@@ -264,6 +265,21 @@
                     (change)="setTableWhere(pair.source.name, $any($event.target).value)"
                     placeholder="todas — o una condición, sin WHERE"
                   />
+                </td>
+                <td>
+                  <!-- Solo donde significa algo: los modos que tienen que
+                       reconocer la fila que ya está. -->
+                  @if (needsKey(pair.source.name)) {
+                    <input
+                      type="text"
+                      class="each__key"
+                      [value]="keyOf(pair.source.name)"
+                      (change)="setTableKey(pair.source.name, $any($event.target).value)"
+                      placeholder="la clave primaria"
+                    />
+                  } @else {
+                    <span class="each__na">—</span>
+                  }
                 </td>
               </tr>
             }
