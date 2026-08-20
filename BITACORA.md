@@ -10,14 +10,14 @@
 
 | Campo | Valor |
 | --- | --- |
-| Última sesión | **023i** — 2026-08-19 |
+| Última sesión | **023j** — 2026-08-19 |
 | Fase activa | **Migración de datos entre tablas:** fases 1, 2 y 3 cerradas; la **4** cerrada: la pasada de varias tablas, lo que cada tabla hace distinto y las migraciones guardadas (ver «Qué toca retomar»). **Respaldos y restauración:** Fases A–E cerradas. La **F** tiene backend, interfaz, CSV, selector de archivos, restaurar en una base nueva y **el ciclo entero por HTTP en los cuatro motores**; le falta repetir a mano el respaldo real que encontró el error de los índices de expresión |
 | Fases 0–6 | ✅ Cerradas. |
 | Fase 7 | 🟡 **11/12.** El ciclo de instalación está probado sobre este equipo; solo falta arrancar en una máquina sin herramientas de desarrollo. |
 | Fase 8 | ✅ **7/7.** Tres motores sobre el mismo contrato y primera beta preparada. |
 | ¿Compila el backend? | Sí — 0 advertencias, 0 errores |
 | ¿Compila el envoltorio? | Sí |
-| ¿Pasan las pruebas? | Sí — **760 en backend** (422 unitarias, 190 contractuales y 148 de integración) con `DRUSE_REQUIRE_ENGINES=1` y **los cuatro motores**, sin saltarse ninguna; **503 en frontend** y **19 de punta a punta**, estas dos veces seguidas. Las **6 del envoltorio** no se ejecutaron: cargo no compila en este equipo |
+| ¿Pasan las pruebas? | Sí — **760 en backend** (422 unitarias, 190 contractuales y 148 de integración) con `DRUSE_REQUIRE_ENGINES=1` y **los cuatro motores**, sin saltarse ninguna; **503 en frontend** y **20 de punta a punta**, estas dos veces seguidas y con los dos motores. Las **6 del envoltorio** no se ejecutaron: cargo no compila en este equipo |
 | ¿Hay aplicación de escritorio? | **Sí.** Instalador NSIS, MSI y ZIP portable, en dos variantes: con Informix y sin él |
 | Motores | **PostgreSQL, SQL Server, MySQL/MariaDB e Informix**, todos sobre el mismo contrato compartido |
 | Trabajo a medias | La fase 4 de la migración, a propósito: el backend de la pasada está commiteado y probado; la pantalla es lo siguiente. |
@@ -31,16 +31,13 @@
 
 Quedan tres cosas menores, ninguna bloqueante:
 
-1. **Cruzar de motor desde la pantalla**, que es lo único que la fase 3 no tiene.
-   Lo cruzado está comprobado por HTTP —`CrossEngineTransferTests`, PostgreSQL a
-   SQL Server— y la prueba de punta a punta crea la tabla dentro del mismo motor.
-   Media hora: abrir las dos conexiones, cruzar y mirar que la pantalla de tipos
-   diga lo que promete.
-2. **La clave de emparejamiento por tabla** al actualizar. La pasada usa la
+1. **La clave de emparejamiento por tabla** al actualizar. La pasada usa la
    primaria de cada destino; en el asistente de una tabla sí se puede cambiar, y
    sincronizar entornos suele hacerse por una clave de negocio.
-3. **`CrossEngineTransferTests` cubre una de las doce direcciones** contra motores
+2. **`CrossEngineTransferTests` cubre una de las doce direcciones** contra motores
    de verdad; las otras once solo están en unitarias.
+3. **El paso de tipos no tiene pruebas de componente** en el frontend, aunque sí
+   de punta a punta desde la sesión 023j.
 
 El plan completo, con el porqué de cada decisión y lo aprendido en las cuatro
 fases, está en `docs/plan-migracion-de-datos.md`.
@@ -339,6 +336,41 @@ Y tres límites declarados desde el principio: no hay respaldo binario ni
 recuperación a un punto en el tiempo —eso es del servidor, y la interfaz tendrá
 que decirlo—, no hay respaldos programados, y un límite de filas puede dejar
 filas huérfanas, cosa que se avisa y no se corrige sola.
+
+### Sesión 023j — 2026-08-19 · Cruzar de motor, ahora por la pantalla
+
+Lo último que le faltaba a la fase 3: migrar de PostgreSQL a SQL Server **desde la
+aplicación**, y no solo por HTTP. Una prueba de punta a punta abre las dos
+conexiones, migra una tabla con los tipos que peor viajan —identificador único,
+JSON, marca de tiempo con zona, booleano y texto sin límite—, lee lo que la
+pantalla promete, crea la tabla al otro lado, copia y cuenta las filas allí.
+
+Y lo que promete se lee: el `uuid` se creará como `uniqueidentifier`, y del JSON
+dice que el destino «deja de comprobar que lo sea y de poder consultarlo por sus
+campos». Ese aviso es el producto de la fase, y hasta hoy nadie lo había visto en
+pantalla.
+
+#### Cuatro cosas que costaron, todas de la prueba
+
+1. **El desplegable de conexiones se elige por el valor de la opción**, no por su
+   etiqueta: la de la conexión de partida lleva pegado un «(esta misma)».
+2. **El tipo propuesto vive en un campo editable**, así que no está en el texto de
+   la tabla: se comprueba el valor del campo, que además es lo que se puede
+   cambiar antes de crear.
+3. **Las dos bases de prueba se llaman igual.** Dar por conectado el SQL Server
+   porque aparece un `druse_test` en el árbol es dar por bueno el de PostgreSQL:
+   se mira el estado de **su fila**. Y al terminar se desconecta, porque las demás
+   pruebas bajan por el árbol buscando nombres.
+4. **El explorador guarda lo que ya leyó.** Una tabla con nombre nuevo no aparece
+   sin refrescar, así que la prueba reutiliza el nombre que las otras ya dejaron
+   en el árbol y le cambia la forma.
+
+**Verificado.** **20 de punta a punta**, dos vueltas seguidas en verde, con los dos
+motores levantados. El backend y el frontend no se tocaron.
+
+**Archivos.** `e2e/support/druse.ts` —los datos del SQL Server de pruebas,
+`conectarSqlServer` y apuntar la pestaña a cualquier conexión— y
+`e2e/tests/migracion.spec.ts`.
 
 ### Sesión 023i — 2026-08-19 · Migraciones guardadas, y cada tabla a lo suyo
 

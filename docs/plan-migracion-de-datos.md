@@ -227,12 +227,16 @@ Piezas: `Druse.Domain/TypeFacets.cs`, `Application/Transfers/TypeTranslator.cs`,
 `types` del asistente, que enseña el tipo de cada columna, deja cambiarlo y pone
 debajo lo que se pierde.
 
-**Lo que queda sin comprobar**, que no bloquea la fase pero conviene tener
-escrito: `CrossEngineTransferTests` cruza **PostgreSQL → SQL Server** contra
-motores de verdad, y las otras once direcciones solo están cubiertas por
-unitarias; la prueba de punta a punta del camino nuevo crea la tabla **dentro del
-mismo motor**, así que el asistente cruzado no lo ha recorrido nadie desde la
-pantalla; y el paso de tipos no tiene pruebas de componente en el frontend.
+**Comprobado también desde la pantalla** (sesión 023j): una prueba de punta a
+punta abre las dos conexiones —PostgreSQL y SQL Server—, migra una tabla con los
+tipos que peor viajan, lee en la pantalla de tipos que el `uuid` se creará como
+`uniqueidentifier` y que el JSON «deja de comprobar que lo sea», crea la tabla,
+copia y cuenta las filas **en SQL Server**.
+
+**Lo que queda sin comprobar**, que no bloquea la fase: `CrossEngineTransferTests`
+cruza PostgreSQL → SQL Server contra motores de verdad, y las otras once
+direcciones solo están cubiertas por unitarias; y el paso de tipos no tiene
+pruebas de componente en el frontend.
 
 ### Fase 4 — Varias tablas y migraciones guardadas ✅ (sesiones 023d, 023f e 023i)
 

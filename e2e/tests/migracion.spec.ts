@@ -1,6 +1,16 @@
 import { expect, test, type Page } from '@playwright/test';
 
-import { abrir, conectar, ejecutar, escribirSql, primeraColumna } from '../support/druse';
+import {
+  SQLSERVER,
+  abrir,
+  apuntarPestana,
+  apuntarPestanaA,
+  conectar,
+  conectarSqlServer,
+  ejecutar,
+  escribirSql,
+  primeraColumna,
+} from '../support/druse';
 
 /**
  * Migrar los datos de una tabla a otra, por donde lo hace una persona.
@@ -546,5 +556,126 @@ test.describe('migrar datos entre tablas', () => {
       `DROP SCHEMA IF EXISTS ${esquema} CASCADE;
        DROP TABLE IF EXISTS e2e_perfil_clientes;`,
     );
+  });
+  /**
+   * Cruzar de motor **desde la pantalla**: de PostgreSQL a SQL Server.
+   *
+   * Es lo único que la fase 3 tenía comprobado solo por HTTP. Lo que se mira aquí
+   * es lo que ve quien migra: que la pantalla de tipos dice **qué se pierde** al
+   * otro lado antes de crear nada, y que después las filas están allí de verdad.
+   */
+  test('migra de PostgreSQL a SQL Server y avisa de lo que se pierde', async ({ page }) => {
+    await abrir(page);
+    await conectar(page);
+    await conectarSqlServer(page);
+    await apuntarPestana(page);
+
+    // Se reutiliza el nombre que las otras pruebas ya dejaron en el árbol y se le
+    // cambia la forma: el explorador guarda lo que leyó, y una tabla con nombre
+    // nuevo obligaría a refrescarlo antes de poder abrir su menú.
+    const origen = ORIGEN;
+    const destino = `e2e_cruce_${Date.now()}`;
+
+    // Tipos que peor viajan: un identificador único, un JSON y una marca de
+    // tiempo con zona. Son los que la pantalla tiene que saber contar.
+    await ejecutarConAviso(
+      page,
+      `DROP TABLE IF EXISTS ${origen};
+       CREATE TABLE ${origen} (
+         id uuid PRIMARY KEY,
+         datos jsonb,
+         cuando timestamptz,
+         activo boolean,
+         nota text);
+       INSERT INTO ${origen} VALUES
+         ('11111111-1111-1111-1111-111111111111', '{"a": 1}', now(), true, 'primera'),
+         ('22222222-2222-2222-2222-222222222222', '{"a": 2}', now(), false, 'segunda');`,
+    );
+
+    await menuDeLaTabla(page, origen);
+    await page.getByRole('menuitem', { name: 'Migrar datos a…' }).click();
+
+    const dialogo = page.locator('app-transfer-dialog');
+
+    // El destino es la otra conexión, que es de otro motor.
+    // Por el valor de su opción y no por la etiqueta: la del desplegable lleva
+    // pegado el «(esta misma)» de la conexión de partida.
+    const conexiones = dialogo.locator('.field select').first();
+    const valor = await conexiones
+      .locator('option', { hasText: SQLSERVER.nombre })
+      .first()
+      .getAttribute('value');
+
+    await conexiones.selectOption(valor!);
+
+    for (const paso of [SQLSERVER.base, 'dbo', 'Tables']) {
+      const nodo = dialogo.locator('.browser__item', { hasText: paso }).first();
+
+      await expect(nodo).toBeVisible({ timeout: 60_000 });
+      await nodo.click();
+    }
+
+    await dialogo.locator('.new-table input').fill(destino);
+    await dialogo.getByRole('button', { name: 'Crear tabla…' }).click();
+
+    // Lo que justifica la fase: la pantalla dice a qué se traduce cada columna y
+    // qué deja de ser cierto al otro lado.
+    const tipos = dialogo.locator('.mapping');
+
+    await expect(tipos).toBeVisible({ timeout: 60_000 });
+
+    // El tipo propuesto va en un campo, porque se puede cambiar antes de crear.
+    await expect(tipos.locator('tbody tr', { hasText: 'uuid' }).first().locator('input')).toHaveValue(
+      'uniqueidentifier',
+    );
+
+    // Y lo que hay que leer: qué deja de ser cierto al otro lado.
+    await expect(dialogo.locator('.body')).toContainText('deja de comprobar que lo sea');
+
+    await dialogo.getByRole('button', { name: 'Crear la tabla' }).click();
+
+    await expect(dialogo.locator('.hint')).toContainText('5 de 5 columnas', { timeout: 60_000 });
+
+    await dialogo.getByRole('button', { name: 'Copiar las filas' }).click();
+    await expect(dialogo.locator('.summary__title')).toContainText('Copiadas 2 filas', {
+      timeout: 60_000,
+    });
+
+    await dialogo.locator('.foot').getByRole('button', { name: 'Cerrar' }).click();
+    await expect(dialogo).toBeHidden();
+
+    // Y las filas están en SQL Server, contadas desde una pestaña que mira allí.
+    await apuntarPestanaA(page, SQLSERVER.nombre, SQLSERVER.base);
+    await escribirSql(page, `SELECT COUNT(*) FROM dbo.${destino}`);
+    await ejecutar(page, 'todo');
+
+    expect((await primeraColumna(page))[0]).toBe('2');
+
+    await escribirSql(page, `DROP TABLE dbo.${destino}`);
+    await page.keyboard.press('Control+Enter');
+    await page
+      .getByRole('alertdialog')
+      .getByRole('button', { name: 'Ejecutar de todos modos' })
+      .click();
+
+    await apuntarPestana(page);
+
+    // La de origen se deja como la dejan las demás, que comparten su nombre.
+    await prepararTablas(page);
+
+    /**
+     * Y se cierra la segunda conexión.
+     *
+     * Las pruebas comparten aplicación y bajan por el árbol buscando nodos por su
+     * nombre; las dos bases de prueba se llaman igual, así que dejar dos abiertas
+     * haría que alguna acabara pulsando en el árbol que no era.
+     */
+    const sqlserver = page
+      .locator('app-connections-sidebar .node--connection', { hasText: SQLSERVER.nombre })
+      .first();
+
+    await sqlserver.hover();
+    await sqlserver.locator('[title="Desconectar"]').click();
+    await expect(sqlserver).toHaveClass(/is-offline/, { timeout: 30_000 });
   });
 });

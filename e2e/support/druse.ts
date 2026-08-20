@@ -21,6 +21,23 @@ export const CONTENEDOR = {
 };
 
 /**
+ * El SQL Server de pruebas, el mismo que usan las contractuales.
+ *
+ * Existe aquí para lo único que no se puede probar con un motor: **cruzar de uno
+ * a otro** desde la pantalla.
+ */
+export const SQLSERVER = {
+  nombre: 'E2E SQL Server',
+  host: '127.0.0.1',
+  puerto: Number(process.env.DRUSE_TEST_MSSQL_PORT ?? 14433),
+  base: process.env.DRUSE_TEST_MSSQL_DB ?? 'druse_test',
+  usuario: process.env.DRUSE_TEST_MSSQL_USER ?? 'sa',
+  // No es un secreto: es la del contenedor de pruebas, la misma que está escrita
+  // en `build/scripts/test-db.ps1`.
+  contrasena: process.env.DRUSE_TEST_MSSQL_PASSWORD ?? 'Druse_dev_only_1',
+};
+
+/**
  * Espera a que la aplicación esté usable, no solo servida.
  *
  * Son dos esperas distintas y las dos hacen falta. La lista de conexiones llega
@@ -74,15 +91,49 @@ export async function conectar(page: Page): Promise<void> {
   await apuntarPestana(page);
 }
 
+/**
+ * Deja abierta la conexión al SQL Server de pruebas.
+ *
+ * Idempotente como `conectar`: las pruebas comparten aplicación, y crearla dos
+ * veces fallaría por nombre repetido.
+ */
+export async function conectarSqlServer(page: Page): Promise<void> {
+  const sidebar = page.locator('app-connections-sidebar');
+  const fila = sidebar.locator('.node--connection', { hasText: SQLSERVER.nombre }).first();
+
+  if ((await fila.count()) === 0) {
+    await crearConexion(page, SQLSERVER, 'SQL Server');
+  }
+
+  /**
+   * Se mira el estado de **su fila**, no si aparece su base.
+   *
+   * Las dos conexiones de prueba tienen una base que se llama igual, así que
+   * buscarla por nombre se conforma con la del otro motor y da por conectado lo
+   * que no lo está.
+   */
+  await expect(fila).toBeVisible({ timeout: 60_000 });
+
+  if ((await fila.getAttribute('class'))?.includes('is-offline')) {
+    await fila.click();
+  }
+
+  await expect(fila).not.toHaveClass(/is-offline/, { timeout: 60_000 });
+}
+
 /** Rellena el diálogo de conexión nueva y conecta. */
-async function crearConexion(page: Page): Promise<void> {
+async function crearConexion(
+  page: Page,
+  servidor: typeof CONTENEDOR = CONTENEDOR,
+  motor = 'PostgreSQL',
+): Promise<void> {
   await page.getByRole('button', { name: 'Nueva conexión' }).click();
 
   const dialogo = page.locator('app-connection-dialog');
 
   await expect(dialogo).toBeVisible();
 
-  await dialogo.locator('.engine', { hasText: 'PostgreSQL' }).first().click();
+  await dialogo.locator('.engine', { hasText: motor }).first().click();
 
   /**
    * Los campos se localizan por su etiqueta y no por su posición.
@@ -94,12 +145,12 @@ async function crearConexion(page: Page): Promise<void> {
   const campo = (etiqueta: string) =>
     dialogo.locator(`.field:has(.field__label:text-is("${etiqueta}")) input`).first();
 
-  await campo('Nombre').fill(CONTENEDOR.nombre);
-  await campo('Servidor').fill(CONTENEDOR.host);
-  await campo('Puerto').fill(String(CONTENEDOR.puerto));
-  await campo('Base de datos').fill(CONTENEDOR.base);
-  await campo('Usuario').fill(CONTENEDOR.usuario);
-  await campo('Contraseña').fill(CONTENEDOR.contrasena);
+  await campo('Nombre').fill(servidor.nombre);
+  await campo('Servidor').fill(servidor.host);
+  await campo('Puerto').fill(String(servidor.puerto));
+  await campo('Base de datos').fill(servidor.base);
+  await campo('Usuario').fill(servidor.usuario);
+  await campo('Contraseña').fill(servidor.contrasena);
 
   /**
    * Sin cifrar, que es lo que ofrece el contenedor.
@@ -109,7 +160,12 @@ async function crearConexion(page: Page): Promise<void> {
    * se queda a medias: la conexión se guarda, pero no abre. Es la misma
    * elección que haría cualquiera contra una base local.
    */
-  await dialogo.getByRole('button', { name: 'Sin cifrar' }).click();
+  //
+  // SQL Server se queda con el cifrado por omisión, que acepta su certificado
+  // autofirmado: sin cifrar, su driver ni siquiera lo intenta.
+  if (motor === 'PostgreSQL') {
+    await dialogo.getByRole('button', { name: 'Sin cifrar' }).click();
+  }
 
   /**
    * Lo que responda el servidor mientras se conecta.
@@ -150,21 +206,34 @@ async function crearConexion(page: Page): Promise<void> {
 
 /** Apunta la pestaña activa a la conexión y la base del contenedor. */
 export async function apuntarPestana(page: Page): Promise<void> {
-  const chip = page.locator('app-editor-toolbar .chip').first();
+  await apuntarPestanaA(page, CONTENEDOR.nombre, CONTENEDOR.base);
+}
 
-  if ((await chip.textContent())?.includes(CONTENEDOR.base)) {
+/**
+ * Apunta la pestaña activa a una conexión y una base cualesquiera.
+ *
+ * Hace falta para cruzar de motor: lo que se copió a SQL Server se cuenta desde
+ * una pestaña que mire a SQL Server, no desde la de PostgreSQL.
+ */
+export async function apuntarPestanaA(
+  page: Page,
+  conexion: string,
+  base: string,
+): Promise<void> {
+  const chip = page.locator('app-editor-toolbar .chip').first();
+  const texto = (await chip.textContent()) ?? '';
+
+  if (texto.includes(conexion) && texto.includes(base)) {
     return;
   }
 
   await chip.click();
-  await page.locator('.context__option', { hasText: CONTENEDOR.nombre }).first().click();
-  await expect(page.locator('app-editor-toolbar .chip').first()).toContainText(CONTENEDOR.nombre, {
-    timeout: 30_000,
-  });
+  await page.locator('.context__option', { hasText: conexion }).first().click();
+  await expect(chip).toContainText(conexion, { timeout: 30_000 });
 
   await chip.click();
-  await page.locator('.context__option', { hasText: CONTENEDOR.base }).first().click();
-  await expect(chip).toContainText(CONTENEDOR.base);
+  await page.locator('.context__option', { hasText: base }).first().click();
+  await expect(chip).toContainText(base);
 }
 
 /**
