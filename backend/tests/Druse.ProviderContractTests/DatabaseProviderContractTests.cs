@@ -547,6 +547,333 @@ public abstract class DatabaseProviderContractTests<TFixture>
     }
 
     /// <summary>
+    /// Renombra una columna y le cambia el tipo, y vuelve a leerla.
+    ///
+    /// Es lo que más se usa del diseñador después de crear, y lo que peor se
+    /// parece entre motores: PostgreSQL tiene `RENAME COLUMN` y `ALTER COLUMN
+    /// TYPE`, SQL Server necesita un procedimiento del sistema para renombrar,
+    /// MySQL rehace la columna entera con `CHANGE` —y hay que repetirle todo lo
+    /// que ya tenía— e Informix las trata con `MODIFY`.
+    ///
+    /// Las dos cosas van en la **misma** alteración a propósito: por separado
+    /// cada motor acierta; juntas es donde se ve si el orden es el correcto y si
+    /// el segundo paso usa el nombre nuevo o el viejo.
+    /// </summary>
+    [Fact]
+    public async Task RenombraUnaColumnaYLeCambiaElTipo()
+    {
+        if (Skip) { return; }
+
+        await using var session = await OpenAsync();
+
+        var table = $"druse_col_{Guid.NewGuid().ToString("N")[..8]}";
+
+        var target = new DatabaseObject
+        {
+            Id = table,
+            Name = table,
+            Kind = DatabaseObjectKind.Table,
+            Database = Fixture.DatabaseName,
+            Schema = Fixture.DefaultSchema,
+        };
+
+        try
+        {
+            await Fixture.Designer.CreateAsync(
+                session,
+                new TableDefinition
+                {
+                    Database = Fixture.DatabaseName,
+                    Schema = Fixture.DefaultSchema,
+                    Name = table,
+                    Columns =
+                    [
+                        new TableColumnDefinition
+                        {
+                            Name = "id",
+                            DataType = "INTEGER",
+                            IsNullable = false,
+                            IsPrimaryKey = true,
+                        },
+                        new TableColumnDefinition
+                        {
+                            Name = "correo",
+                            DataType = "VARCHAR(50)",
+                        },
+                    ],
+                },
+                CancellationToken.None);
+
+            await Fixture.Designer.AlterAsync(
+                session,
+                new TableAlteration
+                {
+                    Table = target,
+                    AlteredColumns =
+                    [
+                        new ColumnAlteration
+                        {
+                            CurrentName = "correo",
+                            Column = new TableColumnDefinition
+                            {
+                                Name = "email",
+                                DataType = "VARCHAR(120)",
+                            },
+                        },
+                    ],
+                },
+                CancellationToken.None);
+
+            var columns = await Fixture.Metadata.GetColumnsAsync(
+                session,
+                target,
+                CancellationToken.None);
+
+            Assert.DoesNotContain(
+                columns,
+                column => string.Equals(column.Name, "correo", StringComparison.OrdinalIgnoreCase));
+
+            var email = Assert.Single(
+                columns,
+                column => string.Equals(column.Name, "email", StringComparison.OrdinalIgnoreCase));
+
+            // El nombre del tipo lo escribe cada motor a su manera; lo que tiene
+            // que estar es el tamaño nuevo, que es lo que se pidió cambiar.
+            Assert.Contains("120", email.DataType, StringComparison.Ordinal);
+        }
+        finally
+        {
+            await ExecuteAsync(session, Fixture.DropTable(table));
+        }
+    }
+
+    /// <summary>
+    /// Cambia la clave primaria de una tabla: suelta la que había y pone otra.
+    ///
+    /// Es la operación que menos se deshace del diseñador, y la que más depende
+    /// del nombre: para soltarla hay que nombrarla, y el nombre lo pone el motor
+    /// cuando la clave nació sin él. Por eso se lee del catálogo antes de soltar,
+    /// que es exactamente lo que hace la pantalla.
+    /// </summary>
+    [Fact]
+    public async Task CambiaLaClavePrimariaDeUnaTabla()
+    {
+        if (Skip) { return; }
+
+        await using var session = await OpenAsync();
+
+        var table = $"druse_pk_{Guid.NewGuid().ToString("N")[..8]}";
+
+        var target = new DatabaseObject
+        {
+            Id = table,
+            Name = table,
+            Kind = DatabaseObjectKind.Table,
+            Database = Fixture.DatabaseName,
+            Schema = Fixture.DefaultSchema,
+        };
+
+        try
+        {
+            // Sin identidad a propósito: MySQL no deja soltar la clave de una
+            // columna autoincremental, y lo que se prueba aquí es la clave, no esa
+            // limitación.
+            await Fixture.Designer.CreateAsync(
+                session,
+                new TableDefinition
+                {
+                    Database = Fixture.DatabaseName,
+                    Schema = Fixture.DefaultSchema,
+                    Name = table,
+                    Columns =
+                    [
+                        new TableColumnDefinition
+                        {
+                            Name = "id",
+                            DataType = "INTEGER",
+                            IsNullable = false,
+                            IsPrimaryKey = true,
+                        },
+                        new TableColumnDefinition
+                        {
+                            Name = "codigo",
+                            DataType = "VARCHAR(20)",
+                            IsNullable = false,
+                        },
+                    ],
+                },
+                CancellationToken.None);
+
+            var before = await Fixture.Metadata.GetTableStructureAsync(
+                session,
+                target,
+                CancellationToken.None);
+
+            Assert.NotNull(before.PrimaryKey);
+            Assert.Equal(["id"], before.PrimaryKey!.Columns);
+
+            await Fixture.Designer.AlterAsync(
+                session,
+                new TableAlteration
+                {
+                    Table = target,
+                    DroppedPrimaryKeyName = before.PrimaryKey.Name,
+                    NewPrimaryKey = new PrimaryKeyDefinition
+                    {
+                        Name = $"pk_{table}",
+                        Columns = ["id", "codigo"],
+                    },
+                },
+                CancellationToken.None);
+
+            var after = await Fixture.Metadata.GetTableStructureAsync(
+                session,
+                target,
+                CancellationToken.None);
+
+            Assert.NotNull(after.PrimaryKey);
+            Assert.Equal(["id", "codigo"], after.PrimaryKey!.Columns);
+        }
+        finally
+        {
+            await ExecuteAsync(session, Fixture.DropTable(table));
+        }
+    }
+
+    /// <summary>
+    /// Añade una clave foránea a una tabla que ya existe, y la quita.
+    ///
+    /// Crear la tabla con su foránea ya se prueba; añadirla después es otro
+    /// camino —un `ALTER` en lugar de un `CREATE`— y es el que usa quien relaciona
+    /// dos tablas que ya tenían datos.
+    /// </summary>
+    [Fact]
+    public async Task AnadeYQuitaUnaClaveForanea()
+    {
+        if (Skip) { return; }
+
+        await using var session = await OpenAsync();
+
+        var suffix = Guid.NewGuid().ToString("N")[..8];
+        var parent = $"druse_fkp_{suffix}";
+        var child = $"druse_fkh_{suffix}";
+
+        var target = new DatabaseObject
+        {
+            Id = child,
+            Name = child,
+            Kind = DatabaseObjectKind.Table,
+            Database = Fixture.DatabaseName,
+            Schema = Fixture.DefaultSchema,
+        };
+
+        try
+        {
+            await Fixture.Designer.CreateAsync(
+                session,
+                new TableDefinition
+                {
+                    Database = Fixture.DatabaseName,
+                    Schema = Fixture.DefaultSchema,
+                    Name = parent,
+                    Columns =
+                    [
+                        new TableColumnDefinition
+                        {
+                            Name = "id",
+                            DataType = "INTEGER",
+                            IsNullable = false,
+                            IsPrimaryKey = true,
+                        },
+                    ],
+                },
+                CancellationToken.None);
+
+            await Fixture.Designer.CreateAsync(
+                session,
+                new TableDefinition
+                {
+                    Database = Fixture.DatabaseName,
+                    Schema = Fixture.DefaultSchema,
+                    Name = child,
+                    Columns =
+                    [
+                        new TableColumnDefinition
+                        {
+                            Name = "id",
+                            DataType = "INTEGER",
+                            IsNullable = false,
+                            IsPrimaryKey = true,
+                        },
+                        new TableColumnDefinition { Name = "padre_id", DataType = "INTEGER" },
+                    ],
+                },
+                CancellationToken.None);
+
+            await Fixture.Designer.AlterAsync(
+                session,
+                new TableAlteration
+                {
+                    Table = target,
+                    AddedForeignKeys =
+                    [
+                        new ForeignKeyDefinition
+                        {
+                            Name = $"fk_{child}",
+                            Columns = ["padre_id"],
+                            ReferencedSchema = Fixture.DefaultSchema,
+                            ReferencedTable = parent,
+                            ReferencedColumns = ["id"],
+                        },
+                    ],
+                },
+                CancellationToken.None);
+
+            var structure = await Fixture.Metadata.GetTableStructureAsync(
+                session,
+                target,
+                CancellationToken.None);
+
+            var foreign = Assert.Single(structure.ForeignKeys);
+
+            Assert.Equal("padre_id", Assert.Single(foreign.Columns), ignoreCase: true);
+            Assert.Equal(parent, foreign.ReferencedTable, ignoreCase: true);
+
+            // Las columnas referenciadas se comprueban **si el motor las
+            // entrega**: el catálogo de Informix no las da junto a la clave, y
+            // sacarlas costaría una consulta por cada foránea sobre una conexión
+            // que no admite dos a la vez. Está decidido y escrito en su lector.
+            if (foreign.ReferencedColumns.Count > 0)
+            {
+                Assert.Equal("id", Assert.Single(foreign.ReferencedColumns), ignoreCase: true);
+            }
+
+            // Y al quitarla desaparece: leer después de borrar es lo que distingue
+            // un borrado real de una instrucción que no hizo nada.
+            await Fixture.Designer.AlterAsync(
+                session,
+                new TableAlteration
+                {
+                    Table = target,
+                    DroppedForeignKeys = [foreign.Name],
+                },
+                CancellationToken.None);
+
+            var after = await Fixture.Metadata.GetTableStructureAsync(
+                session,
+                target,
+                CancellationToken.None);
+
+            Assert.Empty(after.ForeignKeys);
+        }
+        finally
+        {
+            await ExecuteAsync(session, Fixture.DropTable(child));
+            await ExecuteAsync(session, Fixture.DropTable(parent));
+        }
+    }
+
+    /// <summary>
     /// Crea índices y restricciones con el diseñador y los vuelve a leer del
     /// catálogo.
     ///

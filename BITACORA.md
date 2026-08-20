@@ -10,14 +10,14 @@
 
 | Campo | Valor |
 | --- | --- |
-| Última sesión | **023l** — 2026-08-19 |
+| Última sesión | **023m** — 2026-08-19 |
 | Fase activa | **Migración de datos entre tablas:** fases 1, 2 y 3 cerradas; la **4** cerrada: la pasada de varias tablas, lo que cada tabla hace distinto y las migraciones guardadas (ver «Qué toca retomar»). **Respaldos y restauración:** Fases A–E cerradas. La **F** tiene backend, interfaz, CSV, selector de archivos, restaurar en una base nueva y **el ciclo entero por HTTP en los cuatro motores**; le falta repetir a mano el respaldo real que encontró el error de los índices de expresión |
 | Fases 0–6 | ✅ Cerradas. |
 | Fase 7 | 🟡 **11/12.** El ciclo de instalación está probado sobre este equipo; solo falta arrancar en una máquina sin herramientas de desarrollo. |
 | Fase 8 | ✅ **7/7.** Tres motores sobre el mismo contrato y primera beta preparada. |
 | ¿Compila el backend? | Sí — 0 advertencias, 0 errores |
 | ¿Compila el envoltorio? | Sí |
-| ¿Pasan las pruebas? | Sí — **764 en backend** (422 unitarias, 190 contractuales y 152 de integración) con `DRUSE_REQUIRE_ENGINES=1` y **los cuatro motores**, sin saltarse ninguna; **508 en frontend** y **21 de punta a punta**, estas dos veces seguidas y con los dos motores. Las **6 del envoltorio** no se ejecutaron: cargo no compila en este equipo |
+| ¿Pasan las pruebas? | Sí — **776 en backend** (422 unitarias, 202 contractuales y 152 de integración) con `DRUSE_REQUIRE_ENGINES=1` y **los cuatro motores**, sin saltarse ninguna; **508 en frontend** y **21 de punta a punta**, estas dos veces seguidas y con los dos motores. Las **6 del envoltorio** no se ejecutaron: cargo no compila en este equipo |
 | ¿Hay aplicación de escritorio? | **Sí.** Instalador NSIS, MSI y ZIP portable, en dos variantes: con Informix y sin él |
 | Motores | **PostgreSQL, SQL Server, MySQL/MariaDB e Informix**, todos sobre el mismo contrato compartido |
 | Trabajo a medias | Ninguno. La migración quedó cerrada de punta a punta en las sesiones 023i y 023j. |
@@ -115,13 +115,13 @@ toca: el diseñador a mano desde la interfaz y la importación de archivos.
    camino feliz —abrir el túnel, conectar la base por dentro y cerrarlo al cerrar
    la sesión— con los tres métodos: contraseña, clave privada y segundo factor.
    Vale cualquier bastión: una EC2, una VM o un equipo con el puerto 22 abierto.
-2. **DDL contra los cuatro motores.** El ciclo de índices y restricciones —crear,
-   releer del catálogo, borrar y comprobar que desaparece— ya se ejecuta contra
-   PostgreSQL, SQL Server y MySQL, y en la sesión 021 destapó tres fallos reales.
-   Queda el resto del diseñador a mano: renombrar columnas, cambiar tipos,
-   claves foráneas y clave primaria. Ojo a MySQL, que es el único donde un
-   `ALTER` a medias no se deshace: si el `CREATE INDEX` que sigue a un
-   `DROP INDEX` falla, la tabla se queda sin ese índice.
+2. ~~**DDL contra los cuatro motores.**~~ Cerrado en la sesión 023m: renombrar
+   columnas, cambiar tipos, cambiar la clave primaria y añadir o quitar una
+   foránea se ejecutan ya contra los cuatro, y destaparon que en Informix no se
+   podía cambiar la clave primaria. Lo único que sigue sin cubrir de esa familia
+   es **deshacer un `ALTER` a medias en MySQL**, que es el único motor donde no se
+   deshace: si el `CREATE INDEX` que sigue a un `DROP INDEX` falla, la tabla se
+   queda sin ese índice.
 2.b ~~**Informix entero.**~~ Hecho en la sesión 021: el contrato completo corre
    contra el contenedor de IBM y ahora también en integración continua. Queda
    solo lo que el contrato no cubre en ningún motor —usar el diseñador a mano e
@@ -338,6 +338,47 @@ Y tres límites declarados desde el principio: no hay respaldo binario ni
 recuperación a un punto en el tiempo —eso es del servidor, y la interfaz tendrá
 que decirlo—, no hay respaldos programados, y un límite de filas puede dejar
 filas huérfanas, cosa que se avisa y no se corrige sola.
+
+### Sesión 023m — 2026-08-19 · El resto del diseñador, contra los cuatro motores
+
+Lo que quedaba del diseñador sin probar contra servidores de verdad: **renombrar
+una columna y cambiarle el tipo**, **cambiar la clave primaria** y **añadir y
+quitar una clave foránea** sobre una tabla que ya existe. Tres pruebas
+contractuales nuevas, doce ejecuciones —cuatro motores cada una—, y salió lo que
+se venía a buscar.
+
+#### El fallo: en Informix no se podía cambiar la clave primaria
+
+Diez de las doce pasaron a la primera. Las dos de Informix no, y una era un fallo
+de verdad: soltar la clave primaria respondía «Unable to find CONSTRAINT
+( 876_2116)».
+
+El lector devolvía como nombre de la clave **el de su índice**, y en Informix la
+restricción y su índice se llaman distinto: `u876_2116` la una y ` 876_2116` el
+otro, **con un espacio delante** que el motor no acepta al soltarla. Como el
+nombre que se lee es el que la pantalla usa para el `DROP CONSTRAINT`, cambiar la
+clave primaria desde el diseñador era imposible en ese motor. Lo mismo pasaba con
+las restricciones de unicidad, que se sueltan igual.
+
+Ahora se lee el nombre de la restricción, y el del índice se conserva aparte solo
+para marcar cuál lo sostiene. De paso arregla algo que nadie había visto: un
+respaldo de esa tabla escribía la clave con el nombre del índice —espacio incluido
+— y ese `CREATE TABLE` no se podía volver a ejecutar.
+
+#### Y una diferencia que no es fallo
+
+La otra de Informix era la prueba, no el motor: comprobaba las **columnas
+referenciadas** de la foránea, y ese catálogo no las entrega junto a la clave.
+Sacarlas costaría una consulta por cada foránea sobre una conexión que no admite
+dos a la vez, y está decidido y escrito en su lector desde que se hizo. La prueba
+ahora las comprueba cuando el motor las da, y lo dice.
+
+**Verificado.** **776 en backend** (422 unitarias, **202** contractuales y 152 de
+integración) con los cuatro motores levantados y sin saltarse ninguna. Las doce
+ejecuciones nuevas —tres pruebas por cuatro motores— en verde.
+
+**Archivos.** `DatabaseProviderContractTests` (las tres pruebas) e
+`InformixMetadataReader` (el nombre de la clave primaria y el de la unicidad).
 
 ### Sesión 023l — 2026-08-19 · Las otras direcciones, y un aviso que no servía de nada
 

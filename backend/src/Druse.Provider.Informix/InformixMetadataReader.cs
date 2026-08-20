@@ -186,7 +186,7 @@ public sealed class InformixMetadataReader : IDatabaseMetadataReader
         ArgumentNullException.ThrowIfNull(table);
 
         var indexes = await GetIndexesAsync(session, table, cancellationToken);
-        var (primary, unique, foreignKeys, checks, constraintIndexes) =
+        var (primary, primaryIndex, unique, foreignKeys, checks, constraintIndexes) =
             await GetConstraintsAsync(session, table, cancellationToken);
 
         return new TableStructure
@@ -195,11 +195,14 @@ public sealed class InformixMetadataReader : IDatabaseMetadataReader
             // Un índice queda marcado como sostenido por una restricción si su
             // nombre aparece entre los índices que respaldan las restricciones,
             // que aquí incluyen las claves foráneas.
+            //
+            // El de la primaria se compara con **el nombre de su índice** y no con
+            // el de la restricción: aquí son dos nombres distintos.
             Indexes =
             [
                 .. indexes.Select(index => index with
                 {
-                    IsPrimaryKey = primary is not null && index.Name == primary.Name,
+                    IsPrimaryKey = primaryIndex is not null && index.Name == primaryIndex,
                     IsConstraintIndex = constraintIndexes.Contains(index.Name),
                 }),
             ],
@@ -291,6 +294,7 @@ public sealed class InformixMetadataReader : IDatabaseMetadataReader
     /// </summary>
     private static async Task<(
         DatabasePrimaryKey? Primary,
+        string? PrimaryIndex,
         IReadOnlyList<DatabaseUniqueConstraint> Unique,
         IReadOnlyList<DatabaseForeignKey> ForeignKeys,
         IReadOnlyList<DatabaseCheckConstraint> Checks,
@@ -346,17 +350,23 @@ public sealed class InformixMetadataReader : IDatabaseMetadataReader
             ? null
             : new DatabasePrimaryKey
             {
-                // El nombre que se enseña es el del índice que la sostiene, que es
-                // el que hay que nombrar para soltarla.
-                Name = primaryRow.IndexName ?? primaryRow.Name,
+                // **El nombre de la restricción, no el de su índice.** Aquí son
+                // distintos —la restricción se llama `u876_2116` y su índice
+                // ` 876_2116`, con un espacio delante— y el que pide
+                // `DROP CONSTRAINT` es el primero: con el del índice, Informix
+                // responde «Unable to find CONSTRAINT» y cambiar la clave primaria
+                // desde el diseñador es imposible.
+                Name = primaryRow.Name,
                 Columns = ColumnsOf(primaryRow.IndexName),
             };
 
+        // Y por lo mismo, la unicidad se nombra por su restricción: soltarla pasa
+        // por el mismo `DROP CONSTRAINT`.
         var unique = rows
             .Where(row => row.Type == "U")
             .Select(row => new DatabaseUniqueConstraint
             {
-                Name = row.IndexName ?? row.Name,
+                Name = row.Name,
                 Columns = ColumnsOf(row.IndexName),
             })
             .ToList();
@@ -404,7 +414,7 @@ public sealed class InformixMetadataReader : IDatabaseMetadataReader
             .Where(name => name.Length > 0)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
-        return (primary, unique, foreignKeys, checks, constraintIndexes);
+        return (primary, primaryRow.IndexName, unique, foreignKeys, checks, constraintIndexes);
     }
 
     /// <summary>
@@ -449,7 +459,7 @@ public sealed class InformixMetadataReader : IDatabaseMetadataReader
         DatabaseObject table,
         CancellationToken cancellationToken)
     {
-        var (primary, _, _, _, _) = await GetConstraintsAsync(session, table, cancellationToken);
+        var (primary, _, _, _, _, _) = await GetConstraintsAsync(session, table, cancellationToken);
 
         return primary?.Columns ?? [];
     }
