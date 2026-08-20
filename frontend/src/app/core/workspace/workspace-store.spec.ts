@@ -1199,7 +1199,16 @@ describe('WorkspaceStore', () => {
       expect(store.session()?.lastDurationMs).toBe(5);
     });
 
-    it('expone el error cuando la consulta falla', async () => {
+    /**
+     * El error de una consulta se cuenta **donde tiene contexto**, no en el aviso
+     * de arriba.
+     *
+     * El panel lo enseña con el código del motor y su botón de copiar, y el
+     * editor subraya la palabra culpable en su sitio. La banda superior se queda
+     * para lo que no cabe ahí: la sesión perdida, la transacción abierta, la
+     * confirmación de algo destructivo.
+     */
+    it('el error de la consulta va al resultado y no al aviso de arriba', async () => {
       await store.connect(form);
       gateway.executeResult = of(
         successfulQuery({
@@ -1212,7 +1221,8 @@ describe('WorkspaceStore', () => {
       store.updateSql('SELECT * FROM');
       await store.execute();
 
-      expect(store.notice()).toBe('error de sintaxis');
+      expect(store.result()?.error?.message).toBe('error de sintaxis');
+      expect(store.notice()).toBeNull();
     });
 
     it('un rechazo por instrucción destructiva se muestra para confirmar', async () => {

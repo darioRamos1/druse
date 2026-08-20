@@ -2740,11 +2740,12 @@ export class WorkspaceStore {
         return next;
       });
 
-      if (result.state === 'failed' && result.error) {
-        if (this.activeTab()?.id === tabId && this.activeTab()?.sql === tabSql) {
-          this._notice.set(result.error.message);
-        }
-      }
+      // El error de una consulta **no va al aviso de arriba**: el panel ya lo
+      // enseña con su código y su botón de copiar, y el editor subraya la
+      // palabra culpable en su sitio. Decirlo tres veces solo robaba alto.
+      //
+      // La banda se queda para lo que no cabe ahí: la sesión perdida, la
+      // transacción abierta, la confirmación de algo destructivo.
 
       return result;
     } catch (error) {

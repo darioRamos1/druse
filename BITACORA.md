@@ -10,7 +10,7 @@
 
 | Campo | Valor |
 | --- | --- |
-| Última sesión | **023q** — 2026-08-19 |
+| Última sesión | **023r** — 2026-08-19 |
 | Fase activa | **Migración de datos entre tablas:** fases 1, 2 y 3 cerradas; la **4** cerrada: la pasada de varias tablas, lo que cada tabla hace distinto y las migraciones guardadas (ver «Qué toca retomar»). **Respaldos y restauración:** Fases A–E cerradas. La **F** tiene backend, interfaz, CSV, selector de archivos, restaurar en una base nueva y **el ciclo entero por HTTP en los cuatro motores**; le falta repetir a mano el respaldo real que encontró el error de los índices de expresión |
 | Fases 0–6 | ✅ Cerradas. |
 | Fase 7 | 🟡 **11/12.** El ciclo de instalación está probado sobre este equipo; solo falta arrancar en una máquina sin herramientas de desarrollo. |
@@ -338,6 +338,34 @@ Y tres límites declarados desde el principio: no hay respaldo binario ni
 recuperación a un punto en el tiempo —eso es del servidor, y la interfaz tendrá
 que decirlo—, no hay respaldos programados, y un límite de filas puede dejar
 filas huérfanas, cosa que se avisa y no se corrige sola.
+
+### Sesión 023r — 2026-08-19 · Segunda tanda: las pestañas que no separaban nada
+
+Tres más del plan visual, y la primera resultó ser un fallo con una causa que no
+se ve mirando el código de Angular.
+
+**Las pestañas del diseñador** —Columnas, Índices, Claves foráneas,
+Restricciones— no filtraban: debajo se apilaban las cuatro secciones a la vez. La
+lógica estaba bien; lo que fallaba es que `[hidden]` **solo vale `display: none`
+en la hoja del navegador**, y `.rows { display: flex }` le ganaba. Una regla de
+una línea, y el diálogo pasó de 660 a 360 píxeles de alto.
+
+**El error de una consulta** se contaba dos veces: una banda arriba y el panel
+abajo. Ahora se queda donde tiene contexto —el panel, con el código del motor y el
+botón de copiar—, y la banda se reserva para lo que no cabe ahí: la sesión
+perdida, la transacción abierta, la confirmación de algo destructivo. Con la
+insignia de «Mensajes» y la palabra subrayada en el editor, nadie se pierde el
+fallo por quitarlo de arriba.
+
+Y **la rejilla de motores**, dos por dos: cuatro en tres columnas dejaban el
+último solo con un hueco al lado.
+
+**Verificado.** **508 en frontend** —una prueba cambió de bando: ahora afirma que
+el error va al resultado y **no** al aviso— y **24 de punta a punta**. El barrido
+relanzado confirma las tres en las capturas.
+
+**Archivos.** `table-designer.scss`, `workspace-store.ts` y su prueba,
+`connection-dialog.scss`, y el plan al día en `docs/plan-mejoras-visuales.md`.
 
 ### Sesión 023q — 2026-08-19 · Ejecutar el plan visual: cinco arreglos
 

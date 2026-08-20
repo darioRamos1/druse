@@ -262,6 +262,14 @@
   flex-direction: column;
   gap: 8px;
 
+  // **Sin esto, las pestañas no separaban nada.** `[hidden]` solo vale
+  // `display: none` en la hoja del navegador, y cualquier `display` propio le
+  // gana: las cuatro secciones se pintaban a la vez, una debajo de otra, y las
+  // pestañas parecían de adorno.
+  &[hidden] {
+    display: none;
+  }
+
   &__item {
     display: flex;
     flex-direction: column;

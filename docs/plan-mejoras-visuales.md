@@ -61,7 +61,7 @@ iría el número. Se lee como un error de la aplicación, no como «no lo sé».
 **Hecho.** El catálogo devuelve **nulo**, no ausente, y la comprobación solo
 miraba `undefined`. Ahora no se escribe nada cuando no hay número.
 
-### 3.3 Media — Las pestañas del diseñador no filtran nada
+### 3.3 Media — Las pestañas del diseñador no filtran nada ✅
 
 **Dónde:** diseñador de tablas.
 
@@ -70,10 +70,12 @@ apilan **todas** las secciones a la vez, cada una con su mensaje de vacío y su
 botón a ancho completo. Las pestañas parecen decorativas y la pantalla se alarga
 sin necesidad.
 
-**Qué hacer:** que cada pestaña enseñe lo suyo. Y con ello, un solo botón
-«Añadir…» por pestaña en lugar de cuatro apilados.
+**Hecho.** No era que faltara la lógica: las secciones ya se ocultaban con
+`[hidden]`, y **un `display` propio le ganaba** —el atributo solo vale
+`display: none` en la hoja del navegador—. Con eso, cada pestaña enseña lo suyo y
+el diálogo pasó de 660 a 360 píxeles de alto.
 
-### 3.4 Media — El error de una consulta se cuenta dos veces
+### 3.4 Media — El error de una consulta se cuenta dos veces ✅
 
 **Dónde:** al fallar una consulta.
 
@@ -81,8 +83,9 @@ El mismo texto aparece en una banda de aviso sobre el panel y otra vez en el
 centro del panel, esta con el código del motor y el botón de copiar. La banda
 roba alto y no añade nada.
 
-**Qué hacer:** dejar el error donde tiene contexto —el panel— y reservar la banda
-para lo que no cabe ahí: sesión perdida, transacción abierta, permiso denegado.
+**Hecho.** El error se queda donde tiene contexto: el panel, con el código del
+motor y el botón de copiar, más la insignia en «Mensajes» y la palabra subrayada
+en el editor. La banda se reserva para lo que no cabe ahí.
 
 ### 3.5 Media — Las celdas cortadas no lo dicen ✅
 
@@ -106,14 +109,14 @@ español de arriba abajo.
 **Hecho.** Traducidas las once: comando, conexión, base, esquema, carpeta, tabla,
 vista, función, procedimiento y columna.
 
-### 3.7 Baja — La rejilla de motores queda 3 + 1
+### 3.7 Baja — La rejilla de motores queda 3 + 1 ✅
 
 **Dónde:** diálogo de conexión.
 
 Cuatro motores en una rejilla de tres columnas: tres arriba y uno solo abajo, con
 el hueco a la derecha.
 
-**Qué hacer:** dos por dos, o cuatro en una fila si el diálogo da el ancho.
+**Hecho.** Dos por dos.
 
 ### 3.8 Baja — Las listas con desplazamiento cortan la fila por la mitad
 

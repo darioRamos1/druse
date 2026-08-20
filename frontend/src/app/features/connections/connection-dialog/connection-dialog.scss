@@ -105,7 +105,10 @@
 
 .engines {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+
+  // Dos por dos y no tres más uno: con cuatro motores, la rejilla de tres
+  // columnas dejaba el último solo en su fila y un hueco a la derecha.
+  grid-template-columns: repeat(2, 1fr);
   gap: 9px;
 }
 
