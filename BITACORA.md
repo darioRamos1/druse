@@ -17,7 +17,7 @@
 | Fase 8 | ✅ **7/7.** Tres motores sobre el mismo contrato y primera beta preparada. |
 | ¿Compila el backend? | Sí — 0 advertencias, 0 errores |
 | ¿Compila el envoltorio? | Sí |
-| ¿Pasan las pruebas? | Sí — **776 en backend** (422 unitarias, 202 contractuales y 152 de integración) con `DRUSE_REQUIRE_ENGINES=1` y **los cuatro motores**, sin saltarse ninguna; **508 en frontend** y **21 de punta a punta**, estas dos veces seguidas y con los dos motores. Las **6 del envoltorio** no se ejecutaron: cargo no compila en este equipo |
+| ¿Pasan las pruebas? | Sí — **780 en backend** (422 unitarias, 206 contractuales y 152 de integración) con `DRUSE_REQUIRE_ENGINES=1` y **los cuatro motores**, sin saltarse ninguna; **508 en frontend** y **21 de punta a punta**, estas dos veces seguidas y con los dos motores. Las **6 del envoltorio** no se ejecutaron: cargo no compila en este equipo |
 | ¿Hay aplicación de escritorio? | **Sí.** Instalador NSIS, MSI y ZIP portable, en dos variantes: con Informix y sin él |
 | Motores | **PostgreSQL, SQL Server, MySQL/MariaDB e Informix**, todos sobre el mismo contrato compartido |
 | Trabajo a medias | Ninguno. La migración quedó cerrada de punta a punta en las sesiones 023i y 023j. |
@@ -118,10 +118,10 @@ toca: el diseñador a mano desde la interfaz y la importación de archivos.
 2. ~~**DDL contra los cuatro motores.**~~ Cerrado en la sesión 023m: renombrar
    columnas, cambiar tipos, cambiar la clave primaria y añadir o quitar una
    foránea se ejecutan ya contra los cuatro, y destaparon que en Informix no se
-   podía cambiar la clave primaria. Lo único que sigue sin cubrir de esa familia
-   es **deshacer un `ALTER` a medias en MySQL**, que es el único motor donde no se
-   deshace: si el `CREATE INDEX` que sigue a un `DROP INDEX` falla, la tabla se
-   queda sin ese índice.
+   podía cambiar la clave primaria. Y el `ALTER` a medias quedó cubierto en la
+   023n: un cambio que falla dice **cuál** instrucción falló y si lo anterior
+   quedó aplicado, que es lo que separa «no se pudo» de «tu tabla ya no es la que
+   era».
 2.b ~~**Informix entero.**~~ Hecho en la sesión 021: el contrato completo corre
    contra el contenedor de IBM y ahora también en integración continua. Queda
    solo lo que el contrato no cubre en ningún motor —usar el diseñador a mano e
@@ -338,6 +338,36 @@ Y tres límites declarados desde el principio: no hay respaldo binario ni
 recuperación a un punto en el tiempo —eso es del servidor, y la interfaz tendrá
 que decirlo—, no hay respaldos programados, y un límite de filas puede dejar
 filas huérfanas, cosa que se avisa y no se corrige sola.
+
+### Sesión 023n — 2026-08-19 · Un cambio que falla a mitad tiene que decirlo
+
+Lo que quedaba del diseñador: qué pasa cuando el motor rechaza una de las
+instrucciones de un cambio de tabla.
+
+Hasta hoy, nada bueno. El error del driver salía sin pasar por el normalizador del
+proveedor, así que llegaba a la pantalla como «se produjo un error inesperado» —un
+500 genérico— y del resto no se decía nada. En tres motores da igual, porque
+deshacen el DDL y no queda rastro. En MySQL no: confirma cada `ALTER` por su
+cuenta, así que lo anterior **se queda**, y quien volvía al diseñador estaba
+partiendo de una tabla que ya no era la que tenía delante.
+
+Ahora el fallo lleva tres cosas: el motivo ya en limpio —el mismo normalizador que
+usan las consultas, así que un error del diseñador se lee igual que uno del
+editor—, **cuál** instrucción falló, y si lo aplicado se deshizo. Cuando no se
+deshace, el mensaje lo dice con el número delante: es lo que cambia la siguiente
+decisión, repetir el cambio entero o retomarlo desde ahí.
+
+La prueba no nombra a ningún motor: compara con lo que cada proveedor promete en
+`SupportsTransactionalDdl` y comprueba que **la tabla cuenta lo mismo que el
+aviso** —donde se deshace no quedó la columna, donde no, está—.
+
+**Verificado.** **780 en backend** (422 unitarias, **206** contractuales y 152 de
+integración) con los cuatro motores. Las cuatro ejecuciones nuevas en verde, y las
+de MySQL son las que enseñan la diferencia.
+
+**Archivos.** `TableChangeFailedException`, `TableDesignerBase` (envuelve el fallo
+y pregunta al proveedor cómo se lee), los cuatro diseñadores, el middleware del
+host —un 409 con la instrucción y lo aplicado— y `DatabaseProviderContractTests`.
 
 ### Sesión 023m — 2026-08-19 · El resto del diseñador, contra los cuatro motores
 
