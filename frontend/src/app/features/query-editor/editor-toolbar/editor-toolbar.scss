@@ -2,9 +2,16 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  height: var(--dr-editor-toolbar-height);
-  flex: 0 0 var(--dr-editor-toolbar-height);
-  padding: 0 12px;
+
+  // **Envuelve en lugar de recortar.** Con una sola línea fija, en una ventana
+  // estrecha se perdían por la derecha el selector de conexión, el límite de
+  // filas y el tiempo máximo: sin desplazamiento ni forma de llegar a ellos. Al
+  // envolver, la barra crece unos píxeles y no se pierde nada.
+  flex-wrap: wrap;
+  row-gap: 6px;
+  min-height: var(--dr-editor-toolbar-height);
+  flex: 0 0 auto;
+  padding: 5px 12px;
   background: var(--dr-surface-panel);
   border-bottom: 1px solid var(--dr-border-faint);
 

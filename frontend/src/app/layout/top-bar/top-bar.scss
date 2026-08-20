@@ -55,6 +55,10 @@
   display: flex;
   align-items: center;
   gap: 8px;
+
+  // Los botones no se encogen: perder «Guardar como…» por falta de sitio es peor
+  // que dejar la búsqueda estrecha, que sigue sirviendo con dos palabras.
+  flex: none;
 }
 
 .btn {
@@ -97,7 +101,11 @@
 }
 
 .search-slot {
-  flex: 1;
+  // Encoge la búsqueda antes que empujar fuera de la ventana el tema y las
+  // preferencias: es el único elemento de la barra que sigue sirviendo a
+  // cualquier tamaño.
+  flex: 1 1 auto;
+  min-width: 0;
   display: flex;
   justify-content: center;
 }
@@ -107,6 +115,8 @@
   align-items: center;
   gap: 8px;
   width: 420px;
+  max-width: 100%;
+  min-width: 0;
   height: 29px;
   padding: 0 10px;
   border: 1px solid var(--dr-border-input);
@@ -126,7 +136,14 @@
   }
 
   &__placeholder {
+    // Una línea siempre. Al encoger la búsqueda, el texto se partía en tres y se
+    // salía del propio campo por arriba y por abajo; recortado con puntos
+    // suspensivos sigue diciendo para qué sirve.
     flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
     font-size: var(--dr-font-size-sm);
   }
 
@@ -143,6 +160,10 @@
   display: flex;
   align-items: center;
   gap: 6px;
+
+  // Lo último que se debe encoger: cambiar de tema y abrir preferencias tienen
+  // que estar donde siempre por estrecha que quede la ventana.
+  flex: none;
 }
 
 .segmented {
@@ -256,9 +277,4 @@
     display: none;
   }
 
-  .search__placeholder {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
 }

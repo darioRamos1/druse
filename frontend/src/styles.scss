@@ -134,3 +134,24 @@ app-query-builder .join-suggestions {
     text-align: center;
   }
 }
+
+// =============================================================================
+// La franja que Monaco pega arriba al desplazar
+//
+// El fondo del editor es transparente a propósito —así se ve el panel de la
+// aplicación detrás— y esa franja lo heredaba: bajando por un guion largo, la
+// primera línea se quedaba escrita **encima** del texto que pasaba por debajo.
+//
+// Va aquí y no en el tema de Monaco porque su widget no lee
+// `editorStickyScroll.background`: lo pinta con su propio CSS. Y va en los
+// estilos globales porque el DOM del editor no lo genera Angular, así que los
+// estilos del componente no lo alcanzan.
+// =============================================================================
+.monaco-editor .sticky-widget {
+  background: var(--dr-surface-base);
+  border-bottom: 1px solid var(--dr-border-faint);
+}
+
+.monaco-editor .sticky-widget .sticky-line-content:hover {
+  background: var(--dr-surface-hover);
+}

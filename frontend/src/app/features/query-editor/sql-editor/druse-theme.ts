@@ -96,6 +96,13 @@ const DARK: MonacoApi.editor.IStandaloneThemeData = {
     'editorSuggestWidget.border': '#2A3348',
     'editorHoverWidget.background': '#141A26',
     'editorHoverWidget.border': '#2A3348',
+    // La línea que Monaco pega arriba al desplazar **necesita fondo propio**.
+    // El del editor es transparente a propósito —para que se vea el panel—, y
+    // esa franja lo heredaba: al bajar por un guion largo, la primera línea se
+    // quedaba escrita encima del texto que pasaba por debajo.
+    'editorStickyScroll.background': '#101623',
+    'editorStickyScrollHover.background': '#171E2B',
+    'editorStickyScroll.border': '#2A3348',
     'scrollbarSlider.background': '#1E253480',
     'scrollbarSlider.hoverBackground': '#2A3348B3',
     'scrollbarSlider.activeBackground': '#2A3348',
@@ -135,6 +142,10 @@ const LIGHT: MonacoApi.editor.IStandaloneThemeData = {
     'editorSuggestWidget.border': '#D2D8E4',
     'editorHoverWidget.background': '#FFFFFF',
     'editorHoverWidget.border': '#D2D8E4',
+    // Lo mismo en claro: sin fondo, la franja pegada deja pasar el texto.
+    'editorStickyScroll.background': '#FFFFFF',
+    'editorStickyScrollHover.background': '#F1F4FA',
+    'editorStickyScroll.border': '#D2D8E4',
     'scrollbarSlider.background': '#93A2C455',
     'scrollbarSlider.hoverBackground': '#93A2C488',
     'scrollbarSlider.activeBackground': '#93A2C4',

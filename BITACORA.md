@@ -10,14 +10,14 @@
 
 | Campo | Valor |
 | --- | --- |
-| Última sesión | **023m** — 2026-08-19 |
+| Última sesión | **023o** — 2026-08-19 |
 | Fase activa | **Migración de datos entre tablas:** fases 1, 2 y 3 cerradas; la **4** cerrada: la pasada de varias tablas, lo que cada tabla hace distinto y las migraciones guardadas (ver «Qué toca retomar»). **Respaldos y restauración:** Fases A–E cerradas. La **F** tiene backend, interfaz, CSV, selector de archivos, restaurar en una base nueva y **el ciclo entero por HTTP en los cuatro motores**; le falta repetir a mano el respaldo real que encontró el error de los índices de expresión |
 | Fases 0–6 | ✅ Cerradas. |
 | Fase 7 | 🟡 **11/12.** El ciclo de instalación está probado sobre este equipo; solo falta arrancar en una máquina sin herramientas de desarrollo. |
 | Fase 8 | ✅ **7/7.** Tres motores sobre el mismo contrato y primera beta preparada. |
 | ¿Compila el backend? | Sí — 0 advertencias, 0 errores |
 | ¿Compila el envoltorio? | Sí |
-| ¿Pasan las pruebas? | Sí — **780 en backend** (422 unitarias, 206 contractuales y 152 de integración) con `DRUSE_REQUIRE_ENGINES=1` y **los cuatro motores**, sin saltarse ninguna; **508 en frontend** y **21 de punta a punta**, estas dos veces seguidas y con los dos motores. Las **6 del envoltorio** no se ejecutaron: cargo no compila en este equipo |
+| ¿Pasan las pruebas? | Sí — **780 en backend** (422 unitarias, 206 contractuales y 152 de integración) con `DRUSE_REQUIRE_ENGINES=1` y **los cuatro motores**, sin saltarse ninguna; **508 en frontend** y **23 de punta a punta**, estas dos veces seguidas y con los dos motores. Las **6 del envoltorio** no se ejecutaron: cargo no compila en este equipo |
 | ¿Hay aplicación de escritorio? | **Sí.** Instalador NSIS, MSI y ZIP portable, en dos variantes: con Informix y sin él |
 | Motores | **PostgreSQL, SQL Server, MySQL/MariaDB e Informix**, todos sobre el mismo contrato compartido |
 | Trabajo a medias | Ninguno. La migración quedó cerrada de punta a punta en las sesiones 023i y 023j. |
@@ -338,6 +338,60 @@ Y tres límites declarados desde el principio: no hay respaldo binario ni
 recuperación a un punto en el tiempo —eso es del servidor, y la interfaz tendrá
 que decirlo—, no hay respaldos programados, y un límite de filas puede dejar
 filas huérfanas, cosa que se avisa y no se corrige sola.
+
+### Sesión 023o — 2026-08-19 · Barrido visual: cuatro cosas que se veían mal
+
+Un recorrido con Playwright por las pantallas —capturas, medidas de desborde y
+consola— y después mirarlas de verdad. Salieron cuatro, y una la había traído yo.
+
+#### La franja pegada del editor dejaba pasar el texto
+
+Es la que más molestaba, y la contó el usuario: bajando por un guion largo, la
+primera línea se quedaba **escrita encima** del texto que pasaba por debajo.
+
+Monaco pega arriba la línea que abre el bloque —un `WITH … AS (`, un `IN` largo—
+y esa franja hereda el fondo del editor, que aquí es **transparente a propósito**
+para que se vea el panel de la aplicación. Sin fondo propio, se leían las dos
+cosas a la vez.
+
+Se arregla en los estilos globales y no en el tema de Monaco: su widget no lee
+`editorStickyScroll.background`, lo pinta con su propio CSS. Y global porque ese
+DOM no lo genera Angular, así que los estilos del componente no lo alcanzan.
+
+#### La barra del editor perdía controles al estrechar
+
+Medido: a 1280 sobraban 179 píxeles y a 1024, **435**, con `overflow: visible` y
+sin desplazamiento. Es decir, el selector de conexión, el límite de filas y el
+tiempo máximo quedaban fuera de la ventana **sin forma de llegar a ellos**. Y una
+parte era mía: el chip de filas de la sesión 023h fue el que colmó la barra.
+
+Ahora envuelve: crece unos píxeles en lugar de esconder lo que no cabe.
+
+#### La barra superior empujaba fuera el tema y las preferencias
+
+Mismo mal, otra barra: la búsqueda ocupaba 420 píxeles fijos y lo demás se salía.
+Ahora la búsqueda es lo que encoge —sigue sirviendo con dos palabras— y los
+botones no se mueven. Su texto va en una línea con puntos suspensivos; antes se
+partía en tres y se salía del propio campo.
+
+#### Y ningún diálogo se cerraba con Escape
+
+Nueve modales, todos con su fondo que cierra al pulsar fuera, y ninguno respondía
+a Escape. Ahora los nueve hacen con Escape lo mismo que con el clic fuera.
+
+#### Lo que se miró y no era
+
+El tema claro parecía no aplicarse en las capturas. No era verdad: los tokens
+resuelven a claro y el panel se pinta en `rgb(244, 246, 250)`. Se comprobó
+midiendo antes de tocar nada, que es lo que evitó «arreglar» algo que funcionaba.
+
+**Verificado.** **508 en frontend** y **23 de punta a punta**, con dos guardarraíles
+nuevos: que Escape cierra, y que la franja pegada del editor tiene fondo opaco
+—cualquier color con alfa deja pasar el texto de debajo—.
+
+**Archivos.** `styles.scss` (la franja), `editor-toolbar.scss` (envolver),
+`top-bar.scss` (qué encoge y qué no), los nueve diálogos y
+`e2e/tests/interfaz.spec.ts`.
 
 ### Sesión 023n — 2026-08-19 · Un cambio que falla a mitad tiene que decirlo
 
