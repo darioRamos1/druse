@@ -345,8 +345,11 @@ class FakeGateway implements Partial<ApplicationGateway> {
     );
   }
 
+  /** Bases además de la de siempre, para lo que cambia de base. */
+  extraDatabases: DatabaseObject[] = [];
+
   getDatabases(): Observable<DatabaseObject[]> {
-    return of(databases);
+    return of([...databases, ...this.extraDatabases]);
   }
 
   /**
@@ -359,7 +362,21 @@ class FakeGateway implements Partial<ApplicationGateway> {
   getChildren(_sessionId: string, parent: DatabaseObject): Observable<DatabaseObject[]> {
     switch (parent.kind) {
       case 'database':
-        return of(schemas);
+        // Cada base con su esquema: así se ve de cuál salió lo que se cargó.
+        return of(
+          parent.name === 'druse_test'
+            ? schemas
+            : [
+                {
+                  id: `schema:${parent.name}`,
+                  name: `esquema_de_${parent.name}`,
+                  kind: 'schema' as const,
+                  database: parent.name,
+                  schema: `esquema_de_${parent.name}`,
+                  hasChildren: true,
+                },
+              ],
+        );
 
       case 'schema':
         return of(folders);
@@ -743,6 +760,45 @@ describe('WorkspaceStore', () => {
       expect(index.schemas).toContain('public');
       expect(index.relations.map((relation) => relation.qualified)).toContain('public.users');
       expect(store.explorerNodes().length).toBe(1);
+    });
+
+    /**
+     * Cambiar de base tiene que traer el catálogo de la base nueva.
+     *
+     * Lo precalentado se recordaba **por conexión**, así que la segunda base de
+     * la misma conexión se daba por hecha y nunca se pedía: el editor se
+     * quedaba sin esquemas ni tablas y no había forma de recuperarlo salvo
+     * reconectar.
+     */
+    it('cambiar de base precalienta el catálogo de la nueva', async () => {
+      gateway.extraDatabases = [
+        { id: 'db:otra', name: 'otra', kind: 'database', hasChildren: true },
+      ];
+
+      await store.connect(form);
+      await esperarA(() => store.schemaIndex().relations.length > 0);
+
+      store.useDatabase('otra');
+      await esperarA(() => store.schemaIndex().schemas.includes('esquema_de_otra'));
+
+      // El de la base anterior sigue estando: no se pierde por cambiar.
+      expect(store.schemaIndex().schemas).toContain('public');
+      expect(store.schemaIndex().schemas).toContain('esquema_de_otra');
+    });
+
+    it('vuelve a precalentar al reconectar la misma conexión', async () => {
+      await store.connect(form);
+      await esperarA(() => store.schemaIndex().relations.length > 0);
+
+      await store.disconnect(store.connections()[0].id);
+      expect(store.schemaIndex().relations.length).toBe(0);
+
+      await store.connect(form);
+      await esperarA(() => store.schemaIndex().relations.length > 0);
+
+      expect(store.schemaIndex().relations.map((relation) => relation.qualified)).toContain(
+        'public.users',
+      );
     });
 
     it('el precalentado no despliega el árbol', async () => {

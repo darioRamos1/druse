@@ -878,6 +878,7 @@ export class WorkspaceStore {
     this._connections.update((connections) =>
       connections.filter((connection) => connection.id !== connectionId),
     );
+    this.forgetPrimed(connectionId);
     this._roots.update((roots) => roots.filter((root) => root.connectionId !== connectionId));
   }
 
@@ -1718,6 +1719,7 @@ export class WorkspaceStore {
     // El árbol y la transacción eran de una sesión que ya no existe. Dejarlos
     // sería enseñar un catálogo que nadie puede consultar y una transacción que
     // el servidor ya deshizo al soltar la conexión.
+    this.forgetPrimed(connectionId);
     this._roots.update((roots) => roots.filter((root) => root.connectionId !== connectionId));
     this._sessions.update((sessions) => {
       const next = new Map(sessions);
@@ -1783,6 +1785,7 @@ export class WorkspaceStore {
     }
 
     this.forgetTransaction(connectionId);
+    this.forgetPrimed(connectionId);
     this._roots.update((roots) => roots.filter((root) => root.connectionId !== connectionId));
     this.patchConnection(connectionId, { sessionId: undefined, lost: false, error: undefined });
 
@@ -1835,6 +1838,7 @@ export class WorkspaceStore {
       );
     }
 
+    this.forgetPrimed(connectionId);
     this._roots.update((roots) => roots.filter((root) => root.connectionId !== connectionId));
     this._sessions.update((sessions) => {
       const next = new Map(sessions);
@@ -2367,6 +2371,9 @@ export class WorkspaceStore {
     try {
       const databases = await firstValueFrom(this._gateway.getDatabases(sessionId));
 
+      // Los nodos de antes se van con sus hijos: lo precalentado deja de estar.
+      this.forgetPrimed(connectionId);
+
       this._roots.update((roots) => [
         ...roots.filter((root) => root.connectionId !== connectionId),
         ...databases.map((database) => ({
@@ -2490,8 +2497,37 @@ export class WorkspaceStore {
    */
   private static readonly PreloadedSchemaLimit = 20;
 
-  /** Sesiones cuyo catálogo ya se precalentó, para no repetirlo. */
+  /**
+   * Bases cuyo catálogo ya se precalentó, para no repetirlo.
+   *
+   * La clave lleva **la base**, no solo la conexión. Cuando llevaba solo la
+   * conexión, cambiar de base en la misma conexión daba por precalentado un
+   * catálogo que era el de la base anterior: el editor se quedaba sin esquemas
+   * ni tablas y no había forma de recuperarlo salvo reconectar. Le pasaba lo
+   * mismo a la relectura tras un cambio de estructura, que rehace el árbol
+   * entero.
+   */
   private readonly _primed = new Set<string>();
+
+  /** El identificador de conexión es un GUID, así que `::` no se confunde. */
+  private static primedKey(connectionId: string, database: string): string {
+    return `${connectionId}::${database}`;
+  }
+
+  /**
+   * Olvida lo precalentado de una conexión.
+   *
+   * Se llama allí donde el árbol de la conexión se vacía o se rehace: lo que
+   * había cargado ya no está, así que darlo por hecho dejaría el autocompletado
+   * en blanco hasta reconectar.
+   */
+  private forgetPrimed(connectionId: string): void {
+    for (const key of [...this._primed]) {
+      if (key.startsWith(`${connectionId}::`)) {
+        this._primed.delete(key);
+      }
+    }
+  }
 
   /**
    * Carga el catálogo de la base de la sesión sin esperar a que nadie abra el
@@ -2504,17 +2540,22 @@ export class WorkspaceStore {
    * plegados, solo con sus hijos ya traídos.
    */
   private async primeSchemaIndexAsync(connectionId: string, database: string): Promise<void> {
-    if (this._primed.has(connectionId)) {
+    const key = WorkspaceStore.primedKey(connectionId, database);
+
+    if (this._primed.has(key)) {
       return;
     }
 
-    this._primed.add(connectionId);
+    this._primed.add(key);
 
     const databaseEntry = this._roots().find(
       (entry) => entry.connectionId === connectionId && entry.object.name === database,
     );
 
+    // Sin nodo no hay nada que recorrer, y darlo por precalentado impediría
+    // volver a intentarlo cuando el árbol sí lo tenga.
     if (!databaseEntry) {
+      this._primed.delete(key);
       return;
     }
 
