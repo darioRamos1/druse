@@ -10,14 +10,14 @@
 
 | Campo | Valor |
 | --- | --- |
-| Última sesión | **023p** — 2026-08-19 |
+| Última sesión | **023q** — 2026-08-19 |
 | Fase activa | **Migración de datos entre tablas:** fases 1, 2 y 3 cerradas; la **4** cerrada: la pasada de varias tablas, lo que cada tabla hace distinto y las migraciones guardadas (ver «Qué toca retomar»). **Respaldos y restauración:** Fases A–E cerradas. La **F** tiene backend, interfaz, CSV, selector de archivos, restaurar en una base nueva y **el ciclo entero por HTTP en los cuatro motores**; le falta repetir a mano el respaldo real que encontró el error de los índices de expresión |
 | Fases 0–6 | ✅ Cerradas. |
 | Fase 7 | 🟡 **11/12.** El ciclo de instalación está probado sobre este equipo; solo falta arrancar en una máquina sin herramientas de desarrollo. |
 | Fase 8 | ✅ **7/7.** Tres motores sobre el mismo contrato y primera beta preparada. |
 | ¿Compila el backend? | Sí — 0 advertencias, 0 errores |
 | ¿Compila el envoltorio? | Sí |
-| ¿Pasan las pruebas? | Sí — **780 en backend** (422 unitarias, 206 contractuales y 152 de integración) con `DRUSE_REQUIRE_ENGINES=1` y **los cuatro motores**, sin saltarse ninguna; **508 en frontend** y **23 de punta a punta**, estas dos veces seguidas y con los dos motores. Las **6 del envoltorio** no se ejecutaron: cargo no compila en este equipo |
+| ¿Pasan las pruebas? | Sí — **780 en backend** (422 unitarias, 206 contractuales y 152 de integración) con `DRUSE_REQUIRE_ENGINES=1` y **los cuatro motores**, sin saltarse ninguna; **508 en frontend** y **24 de punta a punta**, estas dos veces seguidas y con los dos motores. Las **6 del envoltorio** no se ejecutaron: cargo no compila en este equipo |
 | ¿Hay aplicación de escritorio? | **Sí.** Instalador NSIS, MSI y ZIP portable, en dos variantes: con Informix y sin él |
 | Motores | **PostgreSQL, SQL Server, MySQL/MariaDB e Informix**, todos sobre el mismo contrato compartido |
 | Trabajo a medias | Ninguno. La migración quedó cerrada de punta a punta en las sesiones 023i y 023j. |
@@ -338,6 +338,47 @@ Y tres límites declarados desde el principio: no hay respaldo binario ni
 recuperación a un punto en el tiempo —eso es del servidor, y la interfaz tendrá
 que decirlo—, no hay respaldos programados, y un límite de filas puede dejar
 filas huérfanas, cosa que se avisa y no se corrige sola.
+
+### Sesión 023q — 2026-08-19 · Ejecutar el plan visual: cinco arreglos
+
+Del plan de la sesión anterior salieron cinco a la calle: los dos de prioridad
+alta, dos de forma y el del editor.
+
+**La barra del panel de resultados** envuelve, como ya hacían las otras dos: las
+pestañas no encogen y los controles bajan a la fila siguiente. A 900 px se lee
+«Resultados · Mensajes · Historial» entero, que antes quedaba medio tapado por el
+botón de filtros.
+
+**«~ filas» sin número** era un `null` disfrazado: el catálogo devuelve nulo —no
+ausente— para las tablas que no sabe estimar, y la comprobación solo miraba
+`undefined`. Ahora, sin número no se escribe nada.
+
+**Las celdas cortadas** llevan puntos suspensivos. Hizo falta envolver el valor en
+su propio elemento: sueltos dentro de un contenedor flexible, los puntos no se
+aplican. Queda pendiente lo otro que anota el plan —repartir el ancho inicial de
+las columnas mirando los valores—.
+
+**La paleta habla español**: `COMMAND` y `CONNECTION` eran los nombres internos
+asomando en una interfaz que está en español entera. Traducidas las once.
+
+Y del editor, **Ctrl+K ya llega desde dentro**. Monaco se queda con esa
+combinación —la usa como principio de sus propios acordes—, así que el atajo que
+anuncia la barra de arriba solo funcionaba con el foco fuera del editor, que es
+donde menos tiempo se pasa. Lo destapó el propio barrido: la prueba tuvo que abrir
+la paleta por su botón porque el atajo no llegaba.
+
+El plan queda actualizado con lo hecho y con **una sección nueva del editor**: lo
+que falta ahí es anunciar buscar y reemplazar —Monaco lo trae y nada lo dice—, que
+el autocompletado distinga alias en consultas con varios JOIN, y fragmentos
+guardados.
+
+**Verificado.** **508 en frontend** y **24 de punta a punta**, con una nueva: que
+Ctrl+K abre la búsqueda con el foco dentro del editor.
+
+**Archivos.** `results-panel.scss`, `backup-dialog.html`, `results-grid` (plantilla
+y estilos), `command-palette` (plantilla y componente), `sql-editor.ts` y
+`app-shell.html`; el plan en `docs/plan-mejoras-visuales.md` y la prueba en
+`e2e/tests/interfaz.spec.ts`.
 
 ### Sesión 023p — 2026-08-19 · Mirar la aplicación entera, y anotar lo que se ve
 

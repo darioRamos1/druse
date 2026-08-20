@@ -116,6 +116,41 @@ export default class CommandPalette implements AfterViewInit {
     }
   }
 
+  /**
+   * Qué es cada resultado, dicho en el idioma de la aplicación.
+   *
+   * Salían los nombres internos —`command`, `connection`, `table`— en una
+   * interfaz que está en español de arriba abajo.
+   */
+  protected kindLabel(item: PaletteItem): string {
+    const nombre = item.kind === 'object' ? item.node.kind : item.kind;
+
+    switch (nombre) {
+      case 'command':
+        return 'comando';
+      case 'connection':
+        return 'conexión';
+      case 'database':
+        return 'base';
+      case 'schema':
+        return 'esquema';
+      case 'folder':
+        return 'carpeta';
+      case 'table':
+        return 'tabla';
+      case 'view':
+        return 'vista';
+      case 'function':
+        return 'función';
+      case 'procedure':
+        return 'procedimiento';
+      case 'column':
+        return 'columna';
+      default:
+        return nombre;
+    }
+  }
+
   protected close(): void {
     this.closed.emit();
     queueMicrotask(() => this._returnFocus?.focus());

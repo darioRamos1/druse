@@ -208,6 +208,16 @@ export default class SqlEditor implements OnInit {
   readonly saveAs = output<void>();
   readonly openFile = output<void>();
   readonly newTab = output<void>();
+
+  /**
+   * Abrir la búsqueda global desde dentro del editor.
+   *
+   * Hace falta porque Monaco se queda con `Ctrl+K`: lo usa como principio de sus
+   * propios acordes, así que la pulsación nunca llegaba a la aplicación y el
+   * atajo solo funcionaba con el foco fuera del editor —justo donde menos
+   * tiempo se pasa—.
+   */
+  readonly openPalette = output<void>();
   /** El formateo falló; lo comunica quien lo pidió. */
   readonly formatFailed = output<string>();
 
@@ -720,6 +730,12 @@ export default class SqlEditor implements OnInit {
     editor.addCommand(
       monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyT,
       run(() => this.newTab.emit()),
+    );
+
+    // Búsqueda global: Ctrl/Cmd + K, el mismo que anuncia la barra de arriba.
+    editor.addCommand(
+      monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyK,
+      run(() => this.openPalette.emit()),
     );
 
     // Formatear: Ctrl/Cmd + Shift + F, el mismo que usa el resto de editores.

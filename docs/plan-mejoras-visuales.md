@@ -38,7 +38,7 @@ preferencias; y ningún diálogo se cerraba con Escape.
 
 ## 3. Hallazgos
 
-### 3.1 Alta — La barra de resultados se pisa con sus pestañas
+### 3.1 Alta — La barra de resultados se pisa con sus pestañas ✅
 
 **Dónde:** panel de resultados, a 900 px de ancho.
 
@@ -47,18 +47,19 @@ Las pestañas «Resultados · Mensajes · Historial» y los controles de la dere
 queda cortado a media palabra debajo del botón de Filtros. Es el mismo mal que
 tenían las dos barras de arriba, en la única fila que quedó sin revisar.
 
-**Qué hacer:** envolver igual que la barra del editor, o esconder el texto de los
-controles y dejar sus iconos por debajo de cierto ancho.
+**Hecho.** Envuelve igual que la barra del editor: las pestañas no encogen y los
+controles bajan a la fila siguiente cuando no caben. El desplazamiento interno se
+queda para el caso extremo de muchos conjuntos de resultados.
 
-### 3.2 Alta — «~ filas» sin número
+### 3.2 Alta — «~ filas» sin número ✅
 
 **Dónde:** asistente de respaldo, lista de tablas.
 
 Las tablas cuyo catálogo no da estimación muestran «~ filas», con el hueco donde
 iría el número. Se lee como un error de la aplicación, no como «no lo sé».
 
-**Qué hacer:** cuando no hay estimación, no escribir nada —o «sin estimar»—, que
-es lo que ya hace el progreso de los respaldos con las barras indeterminadas.
+**Hecho.** El catálogo devuelve **nulo**, no ausente, y la comprobación solo
+miraba `undefined`. Ahora no se escribe nada cuando no hay número.
 
 ### 3.3 Media — Las pestañas del diseñador no filtran nada
 
@@ -83,25 +84,27 @@ roba alto y no añade nada.
 **Qué hacer:** dejar el error donde tiene contexto —el panel— y reservar la banda
 para lo que no cabe ahí: sesión perdida, transacción abierta, permiso denegado.
 
-### 3.5 Media — Las celdas cortadas no lo dicen
+### 3.5 Media — Las celdas cortadas no lo dicen ✅
 
 **Dónde:** cuadrícula de resultados.
 
 Un texto que no cabe se corta a mitad de palabra sin puntos suspensivos, así que
 no se distingue de un valor que acaba ahí.
 
-**Qué hacer:** `text-overflow: ellipsis` en la celda. Y, ya puestos, repartir el
-ancho inicial de las columnas mirando una muestra de los valores: hoy una columna
-de enteros se lleva el mismo ancho que un texto largo.
+**Hecho a medias.** El valor va ahora en su propio elemento con puntos
+suspensivos —sueltos en un contenedor flexible no se aplican—. Queda pendiente lo
+otro: repartir el ancho inicial de las columnas mirando una muestra de los
+valores, que hoy una columna de enteros se lleva tanto como un texto largo.
 
-### 3.6 Baja — La paleta habla en inglés
+### 3.6 Baja — La paleta habla en inglés ✅
 
 **Dónde:** paleta de comandos.
 
 Las etiquetas de tipo son `COMMAND` y `CONNECTION` en una interfaz que está en
 español de arriba abajo.
 
-**Qué hacer:** traducirlas —«comando», «conexión», «tabla»—.
+**Hecho.** Traducidas las once: comando, conexión, base, esquema, carpeta, tabla,
+vista, función, procedimiento y columna.
 
 ### 3.7 Baja — La rejilla de motores queda 3 + 1
 
@@ -132,7 +135,50 @@ tooltip, como ya hace la barra superior con sus medias consultas.
 
 ---
 
-## 4. Lo que se miró y está bien
+## 4. El editor
+
+Lo que se ve al usarlo a diario, más allá de lo visual.
+
+### 4.1 Ctrl+K no llegaba desde dentro del editor ✅
+
+**Hecho.** Monaco se queda con esa combinación —la usa como principio de sus
+propios acordes—, así que el atajo que anuncia la barra de arriba solo funcionaba
+con el foco fuera del editor, que es donde menos tiempo se pasa. Ahora el editor
+lo registra y avisa al shell.
+
+Merece revisarse la misma pregunta con el resto de atajos globales que no estén ya
+registrados en el editor.
+
+### 4.2 Buscar y reemplazar no se anuncia
+
+Monaco lo trae —`Ctrl+F`, `Ctrl+H`— y funciona, pero nada en la interfaz lo dice:
+ni un botón en la barra, ni una entrada en la paleta. Quien no venga de VS Code no
+sabe que está.
+
+**Qué hacer:** una entrada en la paleta y, si cabe, un botón en la barra del
+editor.
+
+### 4.3 El autocompletado no distingue alias en consultas con varios JOIN
+
+Sugiere las columnas del catálogo, pero al escribir `p.` en una consulta con
+`pedidos p JOIN clientes c` no acota a las de `pedidos`. Es lo que más se nota al
+escribir consultas de verdad.
+
+**Qué hacer:** resolver el alias contra el `FROM`/`JOIN` de la instrucción en
+curso —el analizador de fragmentos ya sabe dónde empieza y acaba cada una—.
+
+### 4.4 Fragmentos guardados
+
+No hay forma de guardar un trozo de SQL con nombre y reutilizarlo. Es lo que más
+piden los editores de este tipo después del autocompletado.
+
+### 4.5 Fuera de alcance, dicho a propósito
+
+El **plan de ejecución** está declarado fuera del MVP en la bitácora, y así sigue.
+
+---
+
+## 5. Lo que se miró y está bien
 
 - **El tema claro se aplica de verdad**: se comprobó midiendo los tokens
   —`--dr-surface-panel` resuelve a un gris casi blanco y el panel se pinta con

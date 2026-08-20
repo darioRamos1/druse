@@ -220,7 +220,12 @@
                       />
                       <app-icon name="table" />
                       <span class="name">{{ table.source.name }}</span>
-                      @if (table.rows !== undefined) {
+                      <!--
+                        Solo cuando hay número. El catálogo devuelve nulo para las
+                        tablas que no sabe estimar, y «~ filas» con el hueco vacío
+                        se leía como un fallo de la aplicación.
+                      -->
+                      @if (table.rows !== undefined && table.rows !== null) {
                         <span class="rows">~{{ table.rows }} filas</span>
                       }
                     </label>

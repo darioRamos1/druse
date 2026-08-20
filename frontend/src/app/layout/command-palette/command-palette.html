@@ -51,7 +51,7 @@
           <strong>{{ item.label }}</strong>
           <small>{{ item.hint }}</small>
         </span>
-        <span class="result__kind">{{ item.kind === 'object' ? item.node.kind : item.kind }}</span>
+        <span class="result__kind">{{ kindLabel(item) }}</span>
       </button>
     } @empty {
       <p class="empty">No hay coincidencias. Prueba con otro nombre.</p>

@@ -110,7 +110,12 @@
           } @else if (column.kind === 'boolean') {
             <span class="pill">{{ shownValue(row, i) }}</span>
           } @else {
-            {{ shownValue(row, i) }}
+            <!--
+              En un `span` y no suelto: los puntos suspensivos necesitan un
+              elemento propio, y sin ellos un texto cortado no se distingue de
+              uno que acaba ahí.
+            -->
+            <span class="cell__text">{{ shownValue(row, i) }}</span>
           }
         </div>
       }

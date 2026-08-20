@@ -12,9 +12,16 @@
   display: flex;
   align-items: center;
   gap: 2px;
-  height: var(--dr-results-header-height);
-  flex: 0 0 var(--dr-results-header-height);
-  padding: 0 10px;
+
+  // Envuelve, como la barra del editor. En una ventana estrecha, las pestañas y
+  // los controles compartían fila y «Historial» acababa medio tapado por el
+  // botón de filtros: se podía llegar a él desplazando, pero sin nada que lo
+  // insinuara.
+  flex-wrap: wrap;
+  row-gap: 4px;
+  min-height: var(--dr-results-header-height);
+  flex: 0 0 auto;
+  padding: 4px 10px;
   border-bottom: 1px solid var(--dr-border-hairline);
 }
 
@@ -22,7 +29,12 @@
   display: flex;
   align-items: center;
   gap: 2px;
-  min-width: 0;
+
+  // No encoge: antes se comía a sí misma para dejar sitio a los controles, y lo
+  // que hay que hacer cuando no cabe es bajarlos a la fila siguiente. El
+  // desplazamiento se queda para el caso extremo de muchos conjuntos.
+  flex: none;
+  max-width: 100%;
   overflow-x: auto;
   scrollbar-width: none;
 

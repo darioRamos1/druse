@@ -30,6 +30,26 @@ test.describe('la interfaz por dentro', () => {
   });
 
   /**
+   * Ctrl+K abre la búsqueda global **con el foco dentro del editor**.
+   *
+   * Monaco se queda con esa combinación —la usa como principio de sus propios
+   * acordes—, así que el atajo que anuncia la barra de arriba solo funcionaba
+   * fuera del editor, que es donde menos tiempo se pasa.
+   */
+  test('ctrl+k abre la búsqueda desde dentro del editor', async ({ page }) => {
+    await abrir(page);
+
+    await escribirSql(page, 'SELECT 1');
+    await page.locator('app-sql-editor .monaco-editor textarea').first().focus();
+    await page.keyboard.press('Control+k');
+
+    await expect(page.locator('app-command-palette')).toBeVisible({ timeout: 10_000 });
+
+    await page.keyboard.press('Escape');
+    await expect(page.locator('app-command-palette')).toBeHidden();
+  });
+
+  /**
    * Bajando por un guion largo, Monaco deja pegada arriba la línea que abre el
    * bloque. Sin fondo propio se quedaba **escrita encima** del texto que pasaba
    * por debajo: el fondo del editor es transparente a propósito y esa franja lo
