@@ -82,6 +82,10 @@ public sealed class PostgreSqlTableDesigner : TableDesignerBase
     public override IReadOnlyList<string> ScriptSchema(string schema) =>
         string.IsNullOrWhiteSpace(schema) ? [] : [$"CREATE SCHEMA IF NOT EXISTS {Quote(schema)};"];
 
+    /// <summary>El mismo normalizador que usan las consultas de este motor.</summary>
+    protected override QueryError Normalize(Exception exception) =>
+        PostgreSqlErrorNormalizer.Normalize(exception);
+
     protected override DbConnection Connection(IDatabaseSession session) =>
         session is PostgreSqlSession postgres
             ? postgres.Connection

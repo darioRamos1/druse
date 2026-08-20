@@ -113,6 +113,28 @@ app.Use(async (context, next) =>
         context.Response.StatusCode = StatusCodes.Status400BadRequest;
         await context.Response.WriteAsJsonAsync(new { message = exception.Message });
     }
+    catch (TableChangeFailedException exception)
+    {
+        // Un cambio de tabla que falla a mitad no es un error del programa, y lo
+        // que hay que contar no es solo el motivo: **cuál** instrucción falló y si
+        // lo anterior quedó aplicado. Sin eso, en un motor que no deshace el DDL
+        // el usuario vuelve al diseñador creyendo que su tabla sigue igual.
+        app.Logger.LogWarning(
+            "El motor rechazó un cambio de tabla en {Path}: {Message}",
+            context.Request.Path,
+            exception.Error.Message);
+
+        context.Response.StatusCode = StatusCodes.Status409Conflict;
+
+        await context.Response.WriteAsJsonAsync(new
+        {
+            message = exception.Message,
+            code = exception.Error.Code,
+            statement = exception.Statement,
+            applied = exception.Applied,
+            reverted = exception.Reverted,
+        });
+    }
     catch (DatabaseOperationException exception)
     {
         // El motor dijo que no, y dijo por qué.

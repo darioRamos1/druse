@@ -121,6 +121,10 @@ public sealed class InformixTableDesigner : TableDesignerBase
     protected override string Quote(string identifier) =>
         $"\"{identifier.Replace("\"", "\"\"", StringComparison.Ordinal)}\"";
 
+    /// <summary>El mismo normalizador que usan las consultas de este motor.</summary>
+    protected override QueryError Normalize(Exception exception) =>
+        InformixErrorNormalizer.Normalize(exception);
+
     protected override DbConnection Connection(IDatabaseSession session) =>
         session is InformixSession informix
             ? informix.Connection

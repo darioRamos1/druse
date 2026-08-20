@@ -42,6 +42,15 @@ public abstract class TableDesignerBase : ITableDesigner, IDatabaseScripter
     /// <summary>Cita un identificador en el dialecto del motor.</summary>
     protected abstract string Quote(string identifier);
 
+    /// <summary>
+    /// Qué dice el motor cuando rechaza una instrucción, ya en limpio.
+    ///
+    /// Lo traduce cada proveedor con el mismo normalizador que usan las
+    /// consultas: así un error del diseñador se lee igual que uno del editor, y
+    /// **no arrastra la cadena de conexión** hasta la pantalla.
+    /// </summary>
+    protected abstract QueryError Normalize(Exception exception);
+
     protected abstract DbConnection Connection(IDatabaseSession session);
 
     /// <summary>
@@ -1093,13 +1102,32 @@ public abstract class TableDesignerBase : ITableDesigner, IDatabaseScripter
             ? await OperationScope.BeginAsync(connection, session.Transaction, cancellationToken)
             : null;
 
+        var applied = new List<string>();
+
         foreach (var sql in statements)
         {
             await using var command = connection.CreateCommand();
             command.CommandText = sql;
             command.Transaction = scope?.Transaction;
 
-            await command.ExecuteNonQueryAsync(cancellationToken);
+            try
+            {
+                await command.ExecuteNonQueryAsync(cancellationToken);
+            }
+            catch (Exception error) when (error is not OperationCanceledException)
+            {
+                // Lo que hace falta saber al fallar un cambio de tabla no es solo
+                // el motivo: es **cuál** de las instrucciones falló y qué pasa con
+                // las anteriores. Donde el motor no deshace el DDL, esas se
+                // quedan, y la tabla ya no es la que el diseñador tenía delante.
+                throw new TableChangeFailedException(
+                    Normalize(error),
+                    sql,
+                    applied,
+                    reverted: scope is not null);
+            }
+
+            applied.Add(sql);
         }
 
         if (scope is not null)

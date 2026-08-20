@@ -547,6 +547,112 @@ public abstract class DatabaseProviderContractTests<TFixture>
     }
 
     /// <summary>
+    /// Un cambio de tabla que falla a mitad dice **cuál** instrucción falló y qué
+    /// quedó aplicado.
+    ///
+    /// Es la diferencia entre «no se pudo» y «tu tabla ya no es la que era». Tres
+    /// de los cuatro motores deshacen el DDL y no queda nada; MySQL confirma cada
+    /// `ALTER` por su cuenta, así que lo anterior se queda —y hay que decirlo, o
+    /// quien vuelva al diseñador estará partiendo de otra cosa—.
+    ///
+    /// El motor no se nombra en ningún sitio: lo que manda es lo que cada
+    /// proveedor promete en `SupportsTransactionalDdl`.
+    /// </summary>
+    [Fact]
+    public async Task UnCambioQueFallaAMitadDiceQueQuedoAplicado()
+    {
+        if (Skip) { return; }
+
+        await using var session = await OpenAsync();
+
+        var table = $"druse_mid_{Guid.NewGuid().ToString("N")[..8]}";
+
+        var target = new DatabaseObject
+        {
+            Id = table,
+            Name = table,
+            Kind = DatabaseObjectKind.Table,
+            Database = Fixture.DatabaseName,
+            Schema = Fixture.DefaultSchema,
+        };
+
+        try
+        {
+            await Fixture.Designer.CreateAsync(
+                session,
+                new TableDefinition
+                {
+                    Database = Fixture.DatabaseName,
+                    Schema = Fixture.DefaultSchema,
+                    Name = table,
+                    Columns =
+                    [
+                        new TableColumnDefinition
+                        {
+                            Name = "id",
+                            DataType = "INTEGER",
+                            IsNullable = false,
+                            IsPrimaryKey = true,
+                        },
+                    ],
+                },
+                CancellationToken.None);
+
+            // Primero algo que sí se puede hacer, y después algo imposible: un
+            // índice sobre una columna que no existe. Ese orden es el que deja la
+            // tabla a medias donde el motor no sabe deshacerlo.
+            var alteration = new TableAlteration
+            {
+                Table = target,
+                AddedColumns =
+                [
+                    new TableColumnDefinition { Name = "apodo", DataType = "VARCHAR(30)" },
+                ],
+                AddedIndexes =
+                [
+                    new IndexDefinition
+                    {
+                        Name = $"ix_{table}",
+                        Columns = [new IndexColumn { Name = "no_existe" }],
+                    },
+                ],
+            };
+
+            var failure = await Assert.ThrowsAsync<TableChangeFailedException>(
+                () => Fixture.Designer.AlterAsync(session, alteration, CancellationToken.None));
+
+            // Qué falló, con su texto: un «error de sintaxis» suelto no se
+            // diagnostica sin la instrucción delante.
+            Assert.Contains("no_existe", failure.Statement, StringComparison.OrdinalIgnoreCase);
+            Assert.False(string.IsNullOrWhiteSpace(failure.Error.Message));
+
+            // Y qué pasó con lo anterior, que es lo que decide el siguiente paso.
+            Assert.Equal(Fixture.Designer.SupportsTransactionalDdl, failure.Reverted);
+
+            var columns = await Fixture.Metadata.GetColumnsAsync(
+                session,
+                target,
+                CancellationToken.None);
+
+            var quedo = columns.Any(column =>
+                string.Equals(column.Name, "apodo", StringComparison.OrdinalIgnoreCase));
+
+            // La tabla cuenta lo mismo que el aviso: donde se deshace no quedó
+            // nada, y donde no, la columna está.
+            Assert.Equal(!failure.Reverted, quedo);
+
+            if (!failure.Reverted)
+            {
+                Assert.Contains("ya están aplicadas", failure.Message, StringComparison.Ordinal);
+            }
+        }
+        finally
+        {
+            await ExecuteAsync(session, Fixture.DropTable(table));
+        }
+    }
+
+    /// <summary>
     /// Renombra una columna y le cambia el tipo, y vuelve a leerla.
     ///
     /// Es lo que más se usa del diseñador después de crear, y lo que peor se

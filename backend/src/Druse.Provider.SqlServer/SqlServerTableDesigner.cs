@@ -157,6 +157,10 @@ public sealed class SqlServerTableDesigner : TableDesignerBase
         ];
     }
 
+    /// <summary>El mismo normalizador que usan las consultas de este motor.</summary>
+    protected override QueryError Normalize(Exception exception) =>
+        SqlServerErrorNormalizer.Normalize(exception);
+
     protected override DbConnection Connection(IDatabaseSession session) =>
         session is SqlServerSession sqlServer
             ? sqlServer.Connection

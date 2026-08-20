@@ -114,6 +114,10 @@ public sealed class MySqlTableDesigner : TableDesignerBase
     protected override string Quote(string identifier) =>
         $"`{identifier.Replace("`", "``", StringComparison.Ordinal)}`";
 
+    /// <summary>El mismo normalizador que usan las consultas de este motor.</summary>
+    protected override QueryError Normalize(Exception exception) =>
+        MySqlErrorNormalizer.Normalize(exception);
+
     protected override DbConnection Connection(IDatabaseSession session) =>
         session is MySqlSession mySql
             ? mySql.Connection
