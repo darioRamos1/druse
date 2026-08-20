@@ -533,6 +533,42 @@ internal static class ContractMapper
         };
     }
 
+    public static SqlSnippetDto ToDto(this SqlSnippet snippet)
+    {
+        ArgumentNullException.ThrowIfNull(snippet);
+
+        return new SqlSnippetDto
+        {
+            Id = snippet.Id.ToString(),
+            Name = snippet.Name,
+            Sql = snippet.Sql,
+            CreatedAtUtc = snippet.CreatedAtUtc,
+            UpdatedAtUtc = snippet.UpdatedAtUtc,
+        };
+    }
+
+    /// <summary>
+    /// El identificador viene de la ruta, no del cuerpo.
+    ///
+    /// Es la misma regla que en los perfiles de conexión: si no coincidieran, se
+    /// estaría guardando un fragmento distinto del que se cree.
+    /// </summary>
+    public static SqlSnippet ToDomain(this SqlSnippetDto snippet, Guid id)
+    {
+        ArgumentNullException.ThrowIfNull(snippet);
+
+        var now = DateTimeOffset.UtcNow;
+
+        return new SqlSnippet
+        {
+            Id = id,
+            Name = snippet.Name,
+            Sql = snippet.Sql,
+            CreatedAtUtc = snippet.CreatedAtUtc ?? now,
+            UpdatedAtUtc = now,
+        };
+    }
+
     public static RoutineSignatureResponse ToDto(this RoutineSignature signature)
     {
         ArgumentNullException.ThrowIfNull(signature);

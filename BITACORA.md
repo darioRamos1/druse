@@ -10,37 +10,63 @@
 
 | Campo | Valor |
 | --- | --- |
-| Última sesión | **023s** — 2026-08-19 |
+| Última sesión | **027** — 2026-08-20 |
 | Fase activa | **Migración de datos entre tablas:** fases 1, 2 y 3 cerradas; la **4** cerrada: la pasada de varias tablas, lo que cada tabla hace distinto y las migraciones guardadas (ver «Qué toca retomar»). **Respaldos y restauración:** Fases A–E cerradas. La **F** tiene backend, interfaz, CSV, selector de archivos, restaurar en una base nueva y **el ciclo entero por HTTP en los cuatro motores**; le falta repetir a mano el respaldo real que encontró el error de los índices de expresión |
 | Fases 0–6 | ✅ Cerradas. |
 | Fase 7 | 🟡 **11/12.** El ciclo de instalación está probado sobre este equipo; solo falta arrancar en una máquina sin herramientas de desarrollo. |
 | Fase 8 | ✅ **7/7.** Tres motores sobre el mismo contrato y primera beta preparada. |
 | ¿Compila el backend? | Sí — 0 advertencias, 0 errores |
 | ¿Compila el envoltorio? | Sí |
-| ¿Pasan las pruebas? | Sí — **780 en backend** (422 unitarias, 206 contractuales y 152 de integración) con `DRUSE_REQUIRE_ENGINES=1` y **los cuatro motores**, sin saltarse ninguna; **510 en frontend** y **25 de punta a punta**, estas dos veces seguidas y con los dos motores. Las **6 del envoltorio** no se ejecutaron: cargo no compila en este equipo |
+| ¿Pasan las pruebas? | Sí — **781 en backend** (422 unitarias, 206 contractuales y 153 de integración) en la sesión 024. En la 027 pasaron las **538 del frontend** y la E2E del selector de tipos; en la 026 habían pasado además 15 de integración del almacenamiento y 3 E2E dirigidas. La última pasada con `DRUSE_REQUIRE_ENGINES=1` y los cuatro motores fue la de la sesión 023; ahora solo estaba levantado PostgreSQL. La suite E2E completa, ahora de 29 casos, no se repitió. Las **6 del envoltorio** tampoco se ejecutaron. |
 | ¿Hay aplicación de escritorio? | **Sí.** Instalador NSIS, MSI y ZIP portable, en dos variantes: con Informix y sin él |
 | Motores | **PostgreSQL, SQL Server, MySQL/MariaDB e Informix**, todos sobre el mismo contrato compartido |
-| Trabajo a medias | **Siete archivos sin commitear** de la sesión 023s: el arreglo del precalentado por base, buscar y reemplazar en la paleta y sus pruebas. Compilan y pasan; falta el commit y corregir el §4.3 del plan visual. |
+| Trabajo a medias | Los cambios de las sesiones **024–027 siguen en el árbol sin commit**: cierre del plan visual, fragmentos guardados, alias editables, correcciones de la reauditoría y el selector de tipos con estilo propio. La suite frontend ya se repitió completa; falta integrar el conjunto, incluyendo los archivos nuevos todavía no rastreados. |
 | Bloqueantes | Ninguno para seguir programando. Sí para dar por buenos cuatro motores y cuatro funciones: ver «Qué toca retomar». |
 | Git | El **PR #9 se fusionó** (sesión 022), con los quince commits que el #8 dejó fuera más lo de la personalización. Se trabaja en `feat/respaldos-y-restauracion`, salida de un `main` ya al día. |
 | Integración continua | 🔴 **Parada, y no por el código.** GitHub aborta los catorce jobs en dos segundos: «recent account payments have failed or your spending limit needs to be increased». Hasta resolver la facturación, ningún PR podrá pasar los checks. |
 
 ### Qué toca retomar en la próxima sesión
 
-#### Lo primero, que está a medias (sesión 023s)
+#### Lo primero, integrar las sesiones 024–027
 
-1. **Commitear los siete archivos** del árbol de trabajo: el precalentado por
-   base, buscar y reemplazar en la paleta y las pruebas de ambos. Compilan y
-   pasan; solo falta el commit temático.
-2. **Corregir el §4.3 de `docs/plan-mejoras-visuales.md`.** Dice que el
-   autocompletado no distingue alias, y **es falso**: funciona. La lista vacía
-   que lo hizo parecer roto venía de `public.clientes` en la base de pruebas, que
-   se quedó **sin columnas** de una prueba anterior. Con `ciudad c` salen sus
-   tres columnas. Marcar también el §4.2 como hecho.
-3. **Lo que queda del plan visual:** §3.8 (la última fila de las listas con
-   desplazamiento sale cortada), §3.9 (a 900 px la barra del editor ocupa tres
-   filas), el ancho inicial de las columnas de la cuadrícula y el §4.4
-   (fragmentos guardados).
+El estado real del repositorio manda sobre la entrada anterior: el cierre visual,
+los fragmentos guardados, el autocompletado con alias, la revalidación visual y
+el selector de tipos siguen **sin commit** en el mismo árbol. Hay archivos
+rastreados que ya usan `SqlSnippet.cs`,
+`SqliteSqlSnippetStore.cs`, `column-widths.ts` y `snippet.store.ts`, que todavía
+figuran como nuevos; no se puede integrar solo una parte sin romper el conjunto.
+
+Antes de cerrarlo:
+
+1. Revisar que todos los archivos nuevos de fragmentos y anchos de columna entren
+   con sus consumidores y sus pruebas.
+2. Separar los commits por función si sigue siendo posible sin dejar una revisión
+   intermedia que no compile; si no, integrar el cierre de la 024 como una unidad
+   y el alias de la 025 junto con la revalidación de la 026–027 aparte.
+3. Cuando estén disponibles los cuatro contenedores, repetir la validación general
+   de motores; no hace falta para integrar CSS y pruebas de navegador, pero sí
+   antes de atribuir esta sesión al producto entero.
+
+#### El plan visual queda cerrado (sesión 024, revalidado en la 026–027)
+
+No queda nada de él: los diez hallazgos de §3 y los cuatro puntos del editor
+están hechos y ahora tienen regresiones donde faltaban, incluidos los cuatro que
+quedaban —el degradado de las listas, la barra del editor en una fila a 900 px,
+el ancho inicial de las columnas sacado de los valores y los **fragmentos
+guardados**—. El detalle está en
+`docs/plan-mejoras-visuales.md` y en la entrada de §5.
+
+Dos cosas quedan dichas, ninguna bloqueante:
+
+1. **Con una transacción abierta, la barra del editor vuelve a envolver a 900 px.**
+   Es a propósito: Commit y Rollback son las dos palabras que no puede sustituir
+   ningún icono.
+2. **Los contenedores de prueba habían desaparecido.** `docker ps -a` salió vacío
+   y con ellos se fue el escenario sembrado en la 022g. PostgreSQL se volvió a
+   levantar, pero **`druse_test` viene limpia**: hay que resembrarla antes de
+   retomar la comprobación de perfiles de respaldo, y volver a levantar SQL
+   Server, MySQL e Informix antes de dar por buena una pasada con
+   `DRUSE_REQUIRE_ENGINES=1`.
 
 #### Migración de datos: la fase 4 está cerrada
 
@@ -81,7 +107,10 @@ el rechazo por motor y versión de formato, la vista previa de lo que se ejecuta
 lo que se sobrescribe, el progreso, la parada con reanudación desde la
 instrucción que falló, y **los datos en CSV**.
 
-**El escenario de pruebas ya está sembrado, no hay que rehacerlo.** En
+**Ojo: el escenario de pruebas ya no está.** En la sesión 024 `docker ps -a`
+salió vacío y el contenedor se volvió a crear desde cero, así que **todo lo que
+sigue hay que resembrarlo**. Se deja escrito porque describe el caso que hace
+falta reconstruir. En
 `druse-pg-test` quedó el esquema `tienda` de la sesión 022g: `cat_paises`,
 `cat_monedas` y `cat_estados_pedido` con 4, 4 y 5 filas —los catálogos que sin
 datos no sirven—, `clientes`, `pedidos`, `pedido_lineas` y `facturas` con 10.000
@@ -238,8 +267,8 @@ Antes de escribir código:
 1. Confirma la fase activa y las tareas pendientes según la bitácora.
 2. Verifica el estado real del repositorio (no confíes solo en la bitácora):
    `git status` y `git log` antes de nada.
-3. Lee «Qué toca retomar»: no queda nada a medias, y lo que falta es comprobar
-   contra motores reales lo que se escribió a ciegas.
+3. Lee «Qué toca retomar»: las sesiones 024–027 siguen en el árbol sin commit;
+   hay que verificar e integrar el conjunto antes de volver a los motores reales.
 4. Propón únicamente los cambios de la siguiente tarea pendiente.
 
 Al terminar: ejecuta compilación y pruebas, resume archivos modificados y
@@ -353,6 +382,243 @@ Y tres límites declarados desde el principio: no hay respaldo binario ni
 recuperación a un punto en el tiempo —eso es del servidor, y la interfaz tendrá
 que decirlo—, no hay respaldos programados, y un límite de filas puede dejar
 filas huérfanas, cosa que se avisa y no se corrige sola.
+
+### Sesión 027 — 2026-08-20 · Los tipos de columna ya usan el lenguaje de Druse
+
+Al crear o modificar una columna, el desplegable del tipo de dato era el único
+control del diseñador que parecía venir de otra aplicación. La causa no estaba
+en los tokens: era un `datalist`, cuyo menú lo dibuja Windows/Chromium fuera del
+DOM y no admite estilos propios.
+
+Se sustituyó por un **combobox editable de Druse**:
+
+- usa las superficies, borde, sombra, tipografía monoespaciada, hover y selección
+  del tema activo;
+- filtra el catálogo de tipos que devuelve cada motor;
+- se recorre con flechas, acepta con Enter y cierra con Escape;
+- expone los roles y relaciones ARIA de `combobox`, `listbox` y `option`;
+- sigue aceptando tipos libres como `DECIMAL(14,2)`, dominios y tipos definidos
+  por el usuario; las sugerencias no se convirtieron en una lista cerrada;
+- una lista vacía no bloquea el campo: explica que se puede escribir un tipo
+  personalizado.
+
+No se extrajo un componente compartido: por ahora el único caso que combina el
+catálogo de tipos, filas editables y el estado `dropped` es el diseñador. El
+autocompletado de JOIN se usó como referencia de interacción, no como dependencia.
+
+#### Verificado
+
+- **538 pruebas frontend**, 40 archivos, todas en verde.
+- La prueba de componente cubre filtrado, flechas, Enter y tipo personalizado.
+- Playwright abre el diseñador real contra PostgreSQL y comprueba superficie,
+  borde, sombra, filtrado y escritura libre: **1 E2E en verde**.
+- Build de producción correcto; siguen los avisos conocidos del bundle
+  (564,62 kB frente a 500 kB) y de `nearley` no ESM.
+- `git diff --check` sin errores, con el aviso informativo ya conocido de CRLF a
+  LF en `backup-dialog.spec.ts`.
+
+**Archivos.** `table-designer.{ts,html,scss,spec.ts}`, `interfaz.spec.ts`, el
+plan visual y esta bitácora.
+
+**Estado al cerrar.** Sin commit; comparte el árbol con las sesiones 024–026.
+
+### Sesión 026 — 2026-08-20 · El plan visual se cierra con regresiones reales
+
+Se pidió terminar `docs/plan-mejoras-visuales.md`, que la sesión 024 marcaba como
+cerrado. Al contrastar cada afirmación con el CSS, las pruebas y el navegador
+aparecieron dos huecos funcionales:
+
+1. El diseñador había corregido `[hidden]` solo en `.rows`; `.columns` también
+   declara `display: flex` y podía seguir visible al elegir otra pestaña. Ahora
+   las cuatro secciones respetan el atributo y una prueba compara el `display`
+   calculado antes y después de cambiar a Índices.
+2. La cuadrícula ponía `text-overflow: ellipsis`, pero el `span` seguía con el
+   `min-width` automático de flex. El padre podía cortarlo antes de que apareciera
+   la elipsis. Con `min-width: 0` el texto sí encoge en su propia caja.
+
+#### Lo que dejó de depender de mirar a ojo
+
+- El respaldo prueba expresamente el `approximateRowCount` nulo: no vuelve a
+  aparecer «~ filas» sin número.
+- La paleta prueba sus tipos en español y que un nombre vacío llega al shell para
+  que lo proponga desde el SQL.
+- El autocompletado prueba que un fragmento guardado queda por delante de una
+  plantilla de fábrica.
+- Playwright mide la barra a 900 px, comprueba que Historial y Filtros no se
+  solapan, abre el menú de filas por encima de Monaco y verifica que las etiquetas
+  vuelven a verse a 1440 px.
+- Playwright baja la paleta hasta el final y confirma que la máscara cambia, que
+  es el comportamiento real del degradado y no solo la presencia de una clase.
+- El ciclo del fragmento espera los `PUT` y `DELETE`, guarda solo la instrucción
+  del cursor entre dos consultas, comprueba Ctrl+Z y vuelve a leer después de
+  recargar. Las carreras anteriores podían dar un verde falso.
+- El barrido manual vuelve a usar `Ctrl+K` desde Monaco y ya no confunde las
+  etiquetas accesibles de un píxel con textos recortados.
+
+#### Verificado
+
+- **536 pruebas frontend**, 40 archivos, todas en verde.
+- **15 pruebas de integración** de almacenamiento y fragmentos, todas en verde.
+- **3 pruebas Playwright dirigidas**, juntas y en verde.
+- Build de producción correcto; quedan los avisos conocidos del bundle
+  (560,32 kB frente a 500 kB) y de `nearley` no ESM.
+- `git diff --check` limpio, salvo el aviso informativo de que Git normalizará
+  CRLF a LF en `backup-dialog.spec.ts` cuando vuelva a tocarlo.
+
+Solo estaba levantado `druse-pg-test`. No se repitieron la suite E2E completa ni
+las pruebas de los cuatro motores, así que esta sesión cierra el **plan visual**,
+no sustituye la validación general de proveedores.
+
+**Archivos de producto.** `table-designer.scss` y `results-grid.scss`.
+
+**Pruebas y herramientas.** `table-designer.spec.ts`, `results-grid.spec.ts`,
+`backup-dialog.spec.ts`, `command-palette.spec.ts`, `sql-completion.spec.ts`,
+`e2e/tests/interfaz.spec.ts` y `e2e/tests/barrido.spec.ts`.
+
+**Estado al cerrar.** Sin commit; comparte el árbol con las sesiones 024 y 025.
+
+### Sesión 025 — 2026-08-20 · Las tablas sugieren un alias editable
+
+Se pidió que el autocompletado no se limitara a insertar el nombre de la tabla,
+sino que ayudara también con un alias. Se conserva la entrada anterior sin alias
+y se añade una segunda opción: `users AS u`, `order_items AS oi`. Al elegirla se
+inserta el nombre calificado —`public.order_items AS oi`— y Monaco deja `oi`
+seleccionado para cambiarlo escribiendo, no obliga a aceptar la propuesta.
+
+Las iniciales salen de las palabras del nombre, también en `snake_case` y
+`camelCase`. La alternativa aparece en las sugerencias generales y después de
+escribir un esquema; en ese segundo caso no duplica lo ya escrito:
+`tpublico.` más la sugerencia produce `tpublico.usuarios AS u`.
+
+No se tocó la resolución que ya existía. Después de insertar la opción nueva,
+`u.` sigue llevando a las columnas de `users`, y quien no quiera alias conserva
+la sugerencia original.
+
+#### Verificado
+
+- `npm test -- --watch=false --include="src/app/features/query-editor/sql-language/sql-completion.spec.ts"`:
+  **24 pruebas en verde**, incluidas las dos nuevas para alias simple y compuesto.
+- `npm run build`: correcto. Conserva los avisos anteriores del presupuesto del
+  bundle y de `nearley` como dependencia no ESM.
+- `git diff --check`: sin errores de espacios.
+
+**Archivos.** `sql-completion.ts`, `sql-completion.spec.ts` y esta bitácora.
+
+**Estado al cerrar.** No hay commit. Este cambio comparte el árbol con todo lo de
+la sesión 024, que tampoco está integrado. Falta repetir la suite completa del
+frontend antes de cerrar ambos trabajos.
+
+### Sesión 024 — 2026-08-20 · Se cierra el plan visual, y el editor guarda fragmentos
+
+Se retomó lo que quedaba a medias del plan de mejoras visuales. **Queda cerrado
+entero**: los nueve hallazgos de §3 y los cuatro puntos de §4.
+
+#### Lo que estaba a medias de la 023s
+
+El primer punto ya no estaba: los siete archivos se habían commiteado en
+`c01e025` y `100d2b3`. Los otros dos, hechos.
+
+**El §4.3 decía una falsedad y ahora lo dice al revés:** el autocompletado **sí**
+distingue alias. La lista vacía que lo hizo dudar venía de `public.clientes`,
+que se había quedado sin columnas por una prueba anterior. El §4.2 queda marcado
+como hecho.
+
+#### §3.9 — la barra del editor, en una sola fila
+
+Por debajo de **780 px de barra** los botones se quedan en icono. Lo que decide
+no es el ancho de la ventana sino el de la propia barra
+—`container: editor-toolbar / inline-size`—, porque el editor vive a la derecha
+de un sidebar que se arrastra: a igual ventana la barra puede tener 900 px o 500.
+
+Las etiquetas se retiran de la vista pero **siguen siendo el nombre accesible del
+botón**, y el `title` dice lo mismo a la vista. «Iniciar transacción» estrenó
+icono propio para poder quedarse mudo.
+
+Un detalle que casi cuesta caro: contener el eje en línea **crea contexto de
+apilamiento**, y sin `position: relative` y `z-index` los desplegables de
+formato, base y timeout se habrían desplegado por detrás del editor.
+
+**Medido en la aplicación levantada**, no deducido: a 900 px de ventana la barra
+pasó de **73 px a 42** —una fila— y a 1440 px sigue con todas sus etiquetas.
+
+#### §3.8 — las listas ya no cortan la fila
+
+Un degradado corto al pie de la paleta, el historial y el árbol de tablas del
+respaldo, con una clase global, `dr-scroll-fade`. **Solo pinta mientras queda
+algo por debajo**: la máscara se anima con el propio desplazamiento
+(`animation-timeline: scroll(self block)`), así que al llegar al final la última
+fila se ve entera. Donde no haya soporte, no se aplica nada y la lista queda como
+estaba.
+
+No se hizo con desplazamiento por filas enteras porque las filas **no miden lo
+mismo** en los tres sitios.
+
+#### El ancho inicial de las columnas sale de los valores
+
+Era lo que faltaba del §3.5. Antes lo decía el tipo y punto: 110 px para `id` y
+220 para `descripcion`, cupiera lo que cupiera. Ahora se miran **las primeras 60
+filas** y se cuenta el valor más largo. Medir el texto pintado exigiría pintarlo
+antes —y el ancho se elige antes de existir la cuadrícula—, así que se cuenta en
+caracteres por el avance del glifo, con suelo de 84 px y tope de 320. El reparto
+por tipo se queda solo para el `SELECT` que no devuelve ninguna fila.
+
+Comprobado en la aplicación: `id` salió con 84 px y `descripcion` con 320.
+
+#### §4.4 — fragmentos guardados, de punta a punta
+
+Lo que más se pide en un editor de SQL después del autocompletado. Se guardan en
+la base local —tabla `sql_snippets`, `user_version` a 5— detrás de
+`/api/workspace/snippets`, **de uno en uno**: son independientes entre sí, al
+revés que las pestañas, y guardar uno no puede tocar los demás.
+
+Todo pasa por la paleta, **sin diálogo nuevo**:
+
+- **Guardar**: el nombre se pide en el propio campo de búsqueda —el usuario ya
+  está escribiendo ahí— y, si lo deja vacío, lo pone la primera línea del SQL. Se
+  guarda **lo mismo que ejecutaría «Ejecutar actual»**: la selección, o la
+  instrucción del cursor.
+- **Insertar**: entra donde esté el cursor y **por la pila de deshacer**, así que
+  se quita con Ctrl+Z.
+- **Borrar**: Shift+Supr, y **a la segunda**. No hay deshacer, y una lista que se
+  recorre con las flechas no puede borrar a la primera. El atajo solo se anuncia
+  cuando hay un fragmento marcado.
+
+Y salen en el **autocompletado del editor**, por delante de las plantillas de
+fábrica: estos los guardó el usuario y se escriben por el nombre que él les puso.
+
+No se atan a ninguna conexión: el mismo `SELECT` sirve en pruebas y en
+producción, y atarlo a un perfil obligaría a decidir qué hacer con él cuando ese
+perfil se borra.
+
+#### Verificado
+
+**781 en backend** —422 unitarias, 206 contractuales y 153 de integración, cuatro
+de ellas nuevas para el ciclo del fragmento: guardar, listar, reemplazar,
+rechazar el que no tiene nombre o SQL y borrar—. **530 en frontend** (veinte
+nuevas). Y **la prueba de punta a punta del ciclo entero** —guardar, insertar en
+otra pestaña, borrar a la segunda y comprobar que no vuelve tras recargar— en
+verde.
+
+Lo visual, además, **mirado en la aplicación levantada**: barra a 900 y a 1440,
+cuadrícula con un entero y un texto largo, y el degradado de la paleta.
+
+#### Los contenedores de prueba ya no estaban
+
+`docker ps -a` salió **vacío**: el `druse-pg-test` de las sesiones anteriores no
+existe, y con él se fue el escenario sembrado en la 022g —el esquema `tienda`
+con sus 10.000 filas y los tres millones de `movimientos`—. Se volvió a levantar
+PostgreSQL con `test-db.ps1`, pero **la base viene limpia**: quien retome la
+comprobación de perfiles de respaldo tendrá que volver a sembrarla.
+
+**Archivos.** Backend: `SqlSnippet.cs`, `SqliteSqlSnippetStore.cs`,
+`DruseDatabase.cs`, `IConnectionProfileStore.cs`, `Contracts.cs`,
+`ContractMapper.cs`, `StorageEndpoints.cs`, `DependencyInjection.cs` y
+`SecurityAndStorageTests.cs`. Frontend: `column-widths.ts` y su prueba,
+`snippet.store.ts` y la suya, `application-gateway.ts`,
+`http-application-gateway.ts`, `command-palette.{ts,html,scss,spec.ts}`,
+`app-shell.{ts,html}`, `sql-editor.ts`, `sql-completion.ts`, `icon.ts`,
+`editor-toolbar.{html,scss}`, `query-history.html`, `backup-dialog.html` y
+`styles.scss`. Y `e2e/tests/interfaz.spec.ts`, `docs/plan-mejoras-visuales.md`.
 
 ### Sesión 023s — 2026-08-19 · El catálogo que no volvía a cargarse
 
@@ -3913,6 +4179,7 @@ basta solo.
 | **El MVP no se ha probado en un equipo limpio** | Es el criterio que demuestra que el paquete se basta solo | Instalar el NSIS en una máquina sin .NET ni Node. **Es lo único que queda del MVP** |
 | macOS pasa la contraseña por argumento a `security` | Visible un instante en la lista de procesos | Enlazar Security.framework. Anotado en ADR 0004 |
 | Contenedor `druse-pg-test` en el 55440 | El 55432 lo ocupa `prima-postgres`, ajeno al proyecto | Puerto configurable con `DRUSE_TEST_PG_PORT` |
+| **Los contenedores de prueba desaparecen** | Con ellos se va lo sembrado, y las pruebas que lo necesitan pasan a comprobar otra cosa | Pasó entre la 023 y la 024: `docker ps -a` vacío. Antes de fiarse de una pasada, comprobar que están **y que tienen datos** |
 | Ejecutable de 107 MB | Instalador pesado | D-11: trimming y ReadyToRun. Sigue abierta |
 | Dependencias con vulnerabilidades en plantillas | Ya pasó dos veces: `Microsoft.OpenApi` y `dompurify` | En backend lo caza `TreatWarningsAsErrors`; en frontend, `npm audit` en cada instalación |
 | 3 vulnerabilidades moderadas en `@angular/cli` | Solo desarrollo; no llegan al bundle | Esperar actualización de Angular. Degradar a la 21 sería peor |

@@ -81,6 +81,15 @@ describe('ResultsGrid', () => {
     expect(numbers).toEqual(['1', '2', '3']);
   });
 
+  it('pone la elipsis en un elemento que puede encogerse dentro de la celda', () => {
+    const text = element.querySelector<HTMLElement>('.cell__text');
+    const style = getComputedStyle(text!);
+
+    expect(style.minWidth).toBe('0px');
+    expect(style.overflow).toBe('hidden');
+    expect(style.textOverflow).toBe('ellipsis');
+  });
+
   it('avisa cuando la consulta no devuelve filas', async () => {
     fixture.componentRef.setInput('resultSet', { ...resultSet, rows: [], totalRows: 0 });
     await fixture.whenStable();

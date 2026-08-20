@@ -163,6 +163,27 @@ describe('BackupDialog', () => {
     expect(element.textContent).toContain('2 de 2 tablas marcadas');
   });
 
+  it('no escribe «filas» cuando el catálogo devuelve nulo', () => {
+    const component = fixture.componentInstance as unknown as {
+      candidates: {
+        set(value: readonly {
+          key: string;
+          source: DatabaseObject;
+          schema: string;
+          rows: number | null;
+        }[]): void;
+      };
+    };
+
+    component.candidates.set([
+      { key: 'tienda.sin_estimacion', source: table('sin_estimacion'), schema: 'tienda', rows: null },
+    ]);
+    fixture.detectChanges();
+
+    expect(element.querySelector('.check--table')?.textContent).toContain('sin_estimacion');
+    expect(element.querySelector('.check--table')?.textContent).not.toContain('filas');
+  });
+
   /**
    * La decisión del §3.1: un esquema entero se guarda **como esquema**, para que
    * lo que se cree dentro después también entre. Es lo que separa un perfil de

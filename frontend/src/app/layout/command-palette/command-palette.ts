@@ -11,6 +11,7 @@ import {
   HostListener,
 } from '@angular/core';
 
+import { SavedSnippet } from '../../core/application-gateway/application-gateway';
 import { ConnectionSummary, ExplorerNode } from '../../shared/models/workspace';
 import { EngineBadge } from '../../shared/ui/engine-badge/engine-badge';
 import { Icon } from '../../shared/ui/icon/icon';
@@ -30,6 +31,13 @@ type PaletteItem =
       readonly label: string;
       readonly hint: string;
       readonly node: ExplorerNode;
+    }
+  | {
+      readonly id: string;
+      readonly kind: 'snippet';
+      readonly label: string;
+      readonly hint: string;
+      readonly snippet: SavedSnippet;
     };
 
 @Component({
@@ -42,6 +50,7 @@ type PaletteItem =
 export default class CommandPalette implements AfterViewInit {
   readonly connections = input.required<readonly ConnectionSummary[]>();
   readonly nodes = input.required<readonly ExplorerNode[]>();
+  readonly snippets = input<readonly SavedSnippet[]>([]);
 
   readonly closed = output<void>();
   readonly newConnection = output<void>();
@@ -55,11 +64,28 @@ export default class CommandPalette implements AfterViewInit {
   /** Abrir el buscador del editor; con `true`, el de reemplazar. */
   readonly findInEditor = output<boolean>();
   readonly showHistory = output<void>();
+
+  /** Guardar lo que hay en el editor con este nombre. Vacío, lo pone el shell. */
+  readonly saveSnippet = output<string>();
+  readonly insertSnippet = output<SavedSnippet>();
+  readonly deleteSnippet = output<SavedSnippet>();
   readonly activateConnection = output<string>();
   readonly openNode = output<ExplorerNode>();
 
   protected readonly query = signal('');
   protected readonly selected = signal(0);
+
+  /**
+   * La paleta pidiendo el nombre del fragmento.
+   *
+   * Se hace aquí y no en un diálogo aparte porque el usuario ya está escribiendo
+   * en este campo: abrirle una ventana encima para una línea de texto sería
+   * sacarlo del teclado para devolverlo al mismo sitio.
+   */
+  protected readonly naming = signal(false);
+
+  /** Fragmento que se ha pedido borrar una vez y espera la confirmación. */
+  protected readonly confirmingDelete = signal<string | null>(null);
   private readonly _input = viewChild<ElementRef<HTMLInputElement>>('search');
   private _returnFocus: HTMLElement | null = null;
 
@@ -80,6 +106,12 @@ export default class CommandPalette implements AfterViewInit {
       { id: 'find', kind: 'command', label: 'Buscar en el editor', hint: 'Ctrl+F' },
       { id: 'replace', kind: 'command', label: 'Buscar y reemplazar', hint: 'Ctrl+H' },
       { id: 'history', kind: 'command', label: 'Abrir historial', hint: 'Consultas anteriores' },
+      {
+        id: 'save-snippet',
+        kind: 'command',
+        label: 'Guardar como fragmento',
+        hint: 'Lo seleccionado, o la instrucción del cursor',
+      },
     ];
     const connections: PaletteItem[] = this.connections().map((connection) => ({
       id: `connection:${connection.id}`,
@@ -98,7 +130,17 @@ export default class CommandPalette implements AfterViewInit {
         node,
       }));
 
-    const all = [...commands, ...connections, ...objects];
+    // Delante de las conexiones y las tablas: se guardan para usarlos, y quien
+    // los busca sabe cómo se llaman.
+    const snippets: PaletteItem[] = this.snippets().map((snippet) => ({
+      id: `snippet:${snippet.id}`,
+      kind: 'snippet',
+      label: snippet.name,
+      hint: firstLine(snippet.sql),
+      snippet,
+    }));
+
+    const all = [...commands, ...snippets, ...connections, ...objects];
 
     return term
       ? all.filter((item) => `${item.label} ${item.hint}`.toLowerCase().includes(term))
@@ -118,6 +160,15 @@ export default class CommandPalette implements AfterViewInit {
     ) {
       event.preventDefault();
       event.stopImmediatePropagation();
+
+      // Escapar de «ponle nombre» devuelve a la lista, no cierra la paleta: se
+      // vino aquí desde ella y el usuario aún no ha hecho nada.
+      if (this.naming() && event.key === 'Escape') {
+        this.cancelNaming();
+
+        return;
+      }
+
       this.close();
     }
   }
@@ -130,6 +181,11 @@ export default class CommandPalette implements AfterViewInit {
    */
   protected kindLabel(item: PaletteItem): string {
     const nombre = item.kind === 'object' ? item.node.kind : item.kind;
+
+    if (nombre === 'snippet') {
+      return 'fragmento';
+    }
+
 
     switch (nombre) {
       case 'command':
@@ -169,6 +225,7 @@ export default class CommandPalette implements AfterViewInit {
   protected onInput(event: Event): void {
     this.query.set((event.target as HTMLInputElement).value);
     this.selected.set(0);
+    this.confirmingDelete.set(null);
   }
 
   protected move(delta: number): void {
@@ -219,15 +276,82 @@ export default class CommandPalette implements AfterViewInit {
         case 'history':
           this.showHistory.emit();
           break;
+        case 'save-snippet':
+          // No se cierra: hace falta el nombre, y se pide en este mismo campo.
+          this.startNaming();
+          return;
       }
     } else if (item.kind === 'connection') {
       this.activateConnection.emit(item.connection.id);
+    } else if (item.kind === 'snippet') {
+      // Sin devolver el foco a donde estaba: lo quiere el editor, que es donde
+      // acaba de aparecer el texto.
+      this.closeWithoutRestoringFocus();
+      this.insertSnippet.emit(item.snippet);
+      return;
     } else {
       this.openNode.emit(item.node);
     }
 
     this.close();
   }
+
+  /** Pasa a pedir el nombre, con el campo limpio para escribirlo. */
+  private startNaming(): void {
+    this.naming.set(true);
+    this.query.set('');
+    queueMicrotask(() => this._input()?.nativeElement.focus());
+  }
+
+  /**
+   * Confirma el nombre y guarda.
+   *
+   * Un nombre vacío también vale: el shell propone uno a partir del propio SQL,
+   * porque lo que no puede pasar es que guardar cueste más que volver a escribir
+   * la consulta.
+   */
+  protected confirmName(): void {
+    this.saveSnippet.emit(this.query().trim());
+    this.naming.set(false);
+    this.close();
+  }
+
+  protected cancelNaming(): void {
+    this.naming.set(false);
+    this.query.set('');
+    this.selected.set(0);
+  }
+
+  /**
+   * Borra el fragmento marcado, a la segunda.
+   *
+   * La primera pulsación pregunta y la segunda borra: no hay deshacer, y un
+   * atajo que borra a la primera desde una lista que se recorre con las flechas
+   * es un accidente esperando su turno.
+   */
+  protected requestDelete(): void {
+    const item = this.items()[this.selected()];
+
+    if (item?.kind !== 'snippet') {
+      return;
+    }
+
+    if (this.confirmingDelete() === item.snippet.id) {
+      this.confirmingDelete.set(null);
+      this.deleteSnippet.emit(item.snippet);
+
+      return;
+    }
+
+    this.confirmingDelete.set(item.snippet.id);
+  }
+
+  /** El fragmento sobre el que está la selección, si lo es. */
+  protected readonly selectedSnippet = computed(() => {
+    const item = this.items()[this.selected()];
+
+    return item?.kind === 'snippet' ? item.snippet : null;
+  });
 
   protected trapFocus(event: KeyboardEvent): void {
     if (event.key !== 'Tab') {
@@ -247,4 +371,23 @@ export default class CommandPalette implements AfterViewInit {
       first?.focus();
     }
   }
+}
+
+/**
+ * La primera línea con algo escrito, para reconocer el fragmento en la lista.
+ *
+ * Los comentarios de cabecera se saltan: «-- pedidos del día» explica, pero no
+ * distingue un fragmento de otro tan bien como el `SELECT` que viene detrás.
+ */
+function firstLine(sql: string): string {
+  const line = sql
+    .split('\n')
+    .map((text) => text.trim())
+    .find((text) => text.length > 0 && !text.startsWith('--'));
+
+  if (!line) {
+    return 'Fragmento vacío';
+  }
+
+  return line.length > 72 ? `${line.slice(0, 72).trimEnd()}…` : line;
 }

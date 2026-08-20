@@ -6,7 +6,8 @@ namespace Druse.Persistence.Sqlite;
 /// <summary>
 /// Base local: apertura de conexiones y esquema.
 ///
-/// SQLite guarda perfiles —de conexión y de respaldo—, historial y preferencias.
+/// SQLite guarda perfiles —de conexión y de respaldo—, historial, preferencias y
+/// los fragmentos de SQL guardados.
 /// **Nunca contraseñas**: esas van al almacén del sistema operativo (plan §12).
 /// </summary>
 public sealed class DruseDatabase
@@ -60,8 +61,8 @@ public sealed class DruseDatabase
     /// <summary>
     /// Crea el esquema si falta.
     ///
-    /// Se usa SQL explícito en lugar de migraciones de un ORM: son cuatro tablas
-    /// y el control sobre el archivo del usuario debe ser total.
+    /// Se usa SQL explícito en lugar de migraciones de un ORM: son un puñado de
+    /// tablas y el control sobre el archivo del usuario debe ser total.
     /// </summary>
     public async Task MigrateAsync(CancellationToken cancellationToken)
     {
@@ -203,6 +204,25 @@ public sealed class DruseDatabase
                 ON transfer_profiles (last_run_at_utc DESC);
             """, cancellationToken);
 
+        // Fragmentos de SQL guardados con nombre. Sin columna de conexión a
+        // propósito: un fragmento vale para cualquiera, y atarlo a un perfil
+        // obligaría a decidir qué hacer con él cuando ese perfil se borra.
+        await ExecuteAsync(connection, """
+            CREATE TABLE IF NOT EXISTS sql_snippets (
+                id              TEXT NOT NULL PRIMARY KEY,
+                name            TEXT NOT NULL,
+                sql_text        TEXT NOT NULL,
+                created_at_utc  TEXT NOT NULL,
+                updated_at_utc  TEXT NOT NULL
+            );
+            """, cancellationToken);
+
+        // La lista se abre por lo último que se tocó, que es lo que se busca.
+        await ExecuteAsync(connection, """
+            CREATE INDEX IF NOT EXISTS ix_sql_snippets_updated_at
+                ON sql_snippets (updated_at_utc DESC);
+            """, cancellationToken);
+
         // Los archivos creados por versiones anteriores ya tienen la tabla, así que
         // `CREATE TABLE IF NOT EXISTS` no les añade la columna: hay que agregarla
         // aparte. El valor por omisión deja los perfiles existentes con usuario y
@@ -228,7 +248,7 @@ public sealed class DruseDatabase
 
         // Marca de versión del esquema, para poder migrar más adelante sin
         // adivinar en qué estado está el archivo de cada usuario.
-        await ExecuteAsync(connection, "PRAGMA user_version = 4;", cancellationToken);
+        await ExecuteAsync(connection, "PRAGMA user_version = 5;", cancellationToken);
     }
 
     /// <summary>Añade una columna solo si el archivo del usuario aún no la tiene.</summary>

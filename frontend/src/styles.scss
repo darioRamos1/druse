@@ -51,6 +51,36 @@ pre {
   font-family: var(--dr-font-mono);
 }
 
+/**
+ * Listas que siguen hacia abajo: `dr-scroll-fade`.
+ *
+ * La última fila visible de la paleta, del historial y del árbol de tablas del
+ * respaldo quedaba partida por la mitad, sin que nada distinguiera «se acabó»
+ * de «hay más». Este degradado corto al pie lo dice, y **solo mientras es
+ * verdad**: la máscara se anima con el propio desplazamiento, así que al llegar
+ * al final se retira y la última fila se ve entera.
+ *
+ * Es global porque son tres componentes distintos con el mismo problema, y
+ * porque `animation-timeline` no debe repetirse tres veces. Donde el navegador
+ * no soporte líneas de tiempo de desplazamiento no se aplica nada y la lista
+ * queda como estaba: no rompe, solo no ayuda.
+ */
+.dr-scroll-fade {
+  animation: dr-scroll-fade linear both;
+  animation-timeline: scroll(self block);
+}
+
+@keyframes dr-scroll-fade {
+  from,
+  88% {
+    mask-image: linear-gradient(to bottom, #000 calc(100% - 26px), transparent);
+  }
+
+  to {
+    mask-image: linear-gradient(to bottom, #000 100%, transparent);
+  }
+}
+
 // El autocompletado del compositor se pinta como la paleta de comandos. Vive
 // aquí para que el bloque diferido no rebase el presupuesto por componente.
 app-query-builder .join-suggestions {

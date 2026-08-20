@@ -2,11 +2,13 @@
   type="button"
   class="run"
   [disabled]="running() || !canExecute()"
-  [attr.title]="canExecute() ? null : 'Abre una conexión para poder ejecutar'"
+  [attr.title]="
+    canExecute() ? 'Ejecuta toda la consulta (Ctrl+Enter)' : 'Abre una conexión para poder ejecutar'
+  "
   (click)="execute.emit()"
 >
   <app-icon name="play" [size]="11" />
-  Ejecutar
+  <span class="label">Ejecutar</span>
   <kbd class="run__shortcut">⌘⏎</kbd>
 </button>
 
@@ -15,20 +17,24 @@
   class="btn"
   [disabled]="running() || !canExecute()"
   [attr.title]="
-    hasSelection()
-      ? 'Ejecuta solo lo seleccionado'
-      : 'Ejecuta la instrucción donde está el cursor'
+    hasSelection() ? 'Ejecuta solo lo seleccionado' : 'Ejecuta la instrucción donde está el cursor'
   "
   (click)="executeSelection.emit()"
 >
   <app-icon name="play-outline" [size]="11" />
-  Ejecutar actual
+  <span class="label">Ejecutar actual</span>
   <kbd class="btn__shortcut">⇧⌘⏎</kbd>
 </button>
 
-<button type="button" class="btn" [disabled]="!running()" (click)="cancel.emit()">
+<button
+  type="button"
+  class="btn"
+  title="Cancela la consulta en curso"
+  [disabled]="!running()"
+  (click)="cancel.emit()"
+>
   <app-icon name="stop" [size]="11" />
-  Cancelar
+  <span class="label">Cancelar</span>
 </button>
 
 <span class="divider" aria-hidden="true"></span>
@@ -46,7 +52,7 @@
     (click)="format.emit()"
   >
     <app-icon name="format" [size]="11" />
-    Formatear
+    <span class="label">Formatear</span>
   </button>
 
   <button
@@ -98,7 +104,8 @@
   -->
   <span class="tx" [attr.title]="transactionHint()">
     <span class="tx__dot" aria-hidden="true"></span>
-    Transacción abierta en <strong>{{ transactionScope() }}</strong>
+    <span class="label">Transacción abierta en</span>
+    <strong>{{ transactionScope() }}</strong>
   </span>
 
   <button
@@ -126,10 +133,15 @@
     type="button"
     class="btn"
     [disabled]="transactionBusy() || !canExecute()"
-    [attr.title]="canExecute() ? 'Nada se confirmará hasta que pulses Commit' : 'Abre una conexión para poder usar transacciones'"
+    [attr.title]="
+      canExecute()
+        ? 'Nada se confirmará hasta que pulses Commit'
+        : 'Abre una conexión para poder usar transacciones'
+    "
     (click)="beginTransaction.emit()"
   >
-    Iniciar transacción
+    <app-icon name="transaction" [size]="11" />
+    <span class="label">Iniciar transacción</span>
   </button>
 }
 
@@ -187,9 +199,13 @@
                       {{ option.environment }}
                     </span>
                   }
-                  @if (option.readOnly) { <span class="tag">solo lectura</span> }
+                  @if (option.readOnly) {
+                    <span class="tag">solo lectura</span>
+                  }
                   <!-- Se dice antes de pulsar: elegirla abre la sesión. -->
-                  @if (!option.open) { <span class="tag">sin abrir</span> }
+                  @if (!option.open) {
+                    <span class="tag">sin abrir</span>
+                  }
                 </span>
               </button>
             </li>
@@ -229,7 +245,8 @@
     (click)="toggleRows()"
   >
     <app-icon name="table" [size]="12" />
-    Filas <span class="chip__value">{{ rowsLabel(maxRows()) }}</span>
+    <span class="label">Filas</span>
+    <span class="chip__value">{{ rowsLabel(maxRows()) }}</span>
     <app-icon name="chevron-down" [size]="9" />
   </button>
 
@@ -262,7 +279,8 @@
     (click)="toggleTimeout()"
   >
     <app-icon name="clock" [size]="12" />
-    Timeout <span class="chip__value">{{ label(timeoutSeconds()) }}</span>
+    <span class="label">Timeout</span>
+    <span class="chip__value">{{ label(timeoutSeconds()) }}</span>
     <app-icon name="chevron-down" [size]="9" />
   </button>
 

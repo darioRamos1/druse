@@ -128,6 +128,12 @@
   flex-direction: column;
   gap: 6px;
 
+  // Igual que las otras tres secciones: el `display` propio no puede ganarle
+  // al atributo que cambia de pestaña.
+  &[hidden] {
+    display: none;
+  }
+
   &__head,
   &__row {
     display: grid;
@@ -168,6 +174,75 @@
       border-color: var(--dr-danger-line);
       color: var(--dr-danger);
     }
+  }
+}
+
+/**
+ * Selector editable de tipos.
+ *
+ * Antes era un `datalist`: su menú lo dibuja el navegador y no admite los
+ * tokens de la aplicación. Este conserva la escritura libre, pero el desplegable
+ * sí pertenece a Druse y se ve igual en tema claro y oscuro.
+ */
+.type-picker {
+  position: relative;
+  min-width: 0;
+
+  &__input {
+    width: 100%;
+    padding-right: 25px;
+  }
+
+  &__chevron {
+    position: absolute;
+    top: 5px;
+    right: 9px;
+    color: var(--dr-text-faint);
+    font-size: 13px;
+    line-height: 18px;
+    pointer-events: none;
+  }
+
+  &__menu {
+    position: absolute;
+    z-index: 12;
+    top: calc(100% + 4px);
+    right: 0;
+    left: 0;
+    max-height: 210px;
+    overflow-y: auto;
+    padding: 4px;
+    border: 1px solid var(--dr-border-strong);
+    border-radius: var(--dr-radius-sm);
+    background: var(--dr-surface-overlay);
+    box-shadow: var(--dr-shadow-menu);
+
+    button {
+      display: block;
+      width: 100%;
+      min-height: 30px;
+      padding: 5px 8px;
+      border: 0;
+      border-radius: 5px;
+      background: transparent;
+      color: var(--dr-text-muted);
+      font: 11.5px var(--dr-font-mono);
+      text-align: left;
+      cursor: pointer;
+
+      &:hover,
+      &.is-active {
+        background: var(--dr-accent-highlight);
+        color: var(--dr-text);
+      }
+    }
+  }
+
+  &__empty {
+    margin: 0;
+    padding: 8px;
+    color: var(--dr-text-faint);
+    font-size: 11px;
   }
 }
 

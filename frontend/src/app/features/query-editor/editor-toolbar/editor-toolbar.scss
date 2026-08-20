@@ -18,6 +18,77 @@
   // El desplegable del timeout se sale de la barra; recortarlo lo haría
   // invisible.
   overflow: visible;
+
+  // **Quién decide si los botones caben es la barra, no la ventana.** El editor
+  // vive a la derecha de un sidebar que se arrastra, así que a igual ventana la
+  // barra puede tener 900 px o 500. Por eso se consulta su propio ancho.
+  container: editor-toolbar / inline-size;
+
+  // Contener el eje en línea crea contexto de apilamiento propio: sin esta
+  // posición y este z-index, los desplegables de formato, base y timeout se
+  // desplegarían por detrás del editor.
+  position: relative;
+  z-index: 3;
+}
+
+/**
+ * Barra estrecha: los botones se quedan en icono.
+ *
+ * Envolver evitó perder controles, pero a 900 px de ventana la barra ocupaba
+ * tres filas y se comía un cuarto del editor. Las etiquetas se retiran de la
+ * vista **sin salir del árbol de accesibilidad** —siguen siendo el nombre del
+ * botón— y el `title` dice a la vista lo mismo que ellas decían.
+ */
+@container editor-toolbar (max-width: 780px) {
+  :host {
+    gap: 6px;
+  }
+
+  .label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  // Un hijo absoluto deja de ser ítem flex, así que el hueco que ocupaba la
+  // etiqueta desaparece con ella; solo sobra el aire de los costados.
+  .run,
+  .btn,
+  .chip {
+    padding-inline: 9px;
+  }
+
+  .btn--caret {
+    padding-inline: 5px;
+  }
+
+  // El atajo solo se enseña cuando hay sitio: con el botón en icono compite
+  // con lo único que queda por leer.
+  .run__shortcut,
+  .btn__shortcut {
+    display: none;
+  }
+
+  // Del contexto sobrevive la base, que es contra lo que se ejecuta; el nombre
+  // de la conexión lo sigue diciendo el tooltip y el color del punto.
+  .chip__name,
+  .chip__sep {
+    display: none;
+  }
+
+  // Y la base, si es larga, se corta: prefiero verla a medias con las demás
+  // cosas en su sitio que perder una fila entera por el nombre completo.
+  .chip__mono {
+    max-width: 92px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
 }
 
 .timeout {

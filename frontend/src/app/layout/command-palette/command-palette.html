@@ -8,60 +8,95 @@
   (keydown)="trapFocus($event)"
 >
   <header class="search">
-    <app-icon name="search" [size]="15" />
-    <input
-      #search
-      type="search"
-      placeholder="Buscar conexiones, tablas, vistas o comandos"
-      aria-label="Buscar comandos"
-      aria-controls="palette-results"
-      [attr.aria-activedescendant]="items().length ? 'palette-option-' + selected() : null"
-      [value]="query()"
-      (input)="onInput($event)"
-      (keydown.arrowdown)="move(1); $event.preventDefault()"
-      (keydown.arrowup)="move(-1); $event.preventDefault()"
-      (keydown.enter)="run(); $event.preventDefault()"
-      (keydown.escape)="close()"
-    />
-    <kbd>Esc</kbd>
+    <app-icon [name]="naming() ? 'save' : 'search'" [size]="15" />
+    @if (naming()) {
+      <!--
+        Mismo campo, otra pregunta. Se pide el nombre aquí en vez de abrir un
+        diálogo encima: el usuario ya está escribiendo en él.
+      -->
+      <input
+        #search
+        type="text"
+        placeholder="Nombre del fragmento — vacío, lo pone la primera línea"
+        aria-label="Nombre del fragmento"
+        [value]="query()"
+        (input)="onInput($event)"
+        (keydown.enter)="confirmName(); $event.preventDefault()"
+        (keydown.escape)="cancelNaming()"
+      />
+      <kbd>Enter</kbd>
+    } @else {
+      <input
+        #search
+        type="search"
+        placeholder="Buscar conexiones, tablas, vistas o comandos"
+        aria-label="Buscar comandos"
+        aria-controls="palette-results"
+        [attr.aria-activedescendant]="items().length ? 'palette-option-' + selected() : null"
+        [value]="query()"
+        (input)="onInput($event)"
+        (keydown.arrowdown)="move(1); $event.preventDefault()"
+        (keydown.arrowup)="move(-1); $event.preventDefault()"
+        (keydown.enter)="run(); $event.preventDefault()"
+        (keydown.shift.delete)="requestDelete(); $event.preventDefault()"
+        (keydown.escape)="close()"
+      />
+      <kbd>Esc</kbd>
+    }
   </header>
 
-  <div id="palette-results" class="results" role="listbox" aria-label="Resultados">
-    @for (item of items(); track item.id; let index = $index) {
-      <button
-        type="button"
-        class="result"
-        [id]="'palette-option-' + index"
-        role="option"
-        [class.is-selected]="index === selected()"
-        [attr.aria-selected]="index === selected()"
-        (mouseenter)="selected.set(index)"
-        (click)="run(item)"
-      >
-        <span class="result__icon">
-          @if (item.kind === 'connection') {
-            <app-engine-badge [engine]="item.connection.engine" />
-          } @else if (item.kind === 'object') {
-            <app-icon name="table" [size]="13" />
-          } @else {
-            <app-icon name="console" [size]="13" />
+  @if (naming()) {
+    <p class="naming">
+      Se guarda lo seleccionado en el editor; si no hay selección, la instrucción donde esté el
+      cursor.
+    </p>
+  } @else {
+    <div id="palette-results" class="results dr-scroll-fade" role="listbox" aria-label="Resultados">
+      @for (item of items(); track item.id; let index = $index) {
+        <button
+          type="button"
+          class="result"
+          [id]="'palette-option-' + index"
+          role="option"
+          [class.is-selected]="index === selected()"
+          [attr.aria-selected]="index === selected()"
+          (mouseenter)="selected.set(index)"
+          (click)="run(item)"
+        >
+          <span class="result__icon">
+            @if (item.kind === 'connection') {
+              <app-engine-badge [engine]="item.connection.engine" />
+            } @else if (item.kind === 'object') {
+              <app-icon name="table" [size]="13" />
+            } @else if (item.kind === 'snippet') {
+              <app-icon name="save" [size]="13" />
+            } @else {
+              <app-icon name="console" [size]="13" />
+            }
+          </span>
+          <span class="result__text">
+            <strong>{{ item.label }}</strong>
+            <small>{{ item.hint }}</small>
+          </span>
+          @if (item.kind === 'snippet' && confirmingDelete() === item.snippet.id) {
+            <span class="result__warn">Shift+Supr otra vez para borrarlo</span>
           }
-        </span>
-        <span class="result__text">
-          <strong>{{ item.label }}</strong>
-          <small>{{ item.hint }}</small>
-        </span>
-        <span class="result__kind">{{ kindLabel(item) }}</span>
-      </button>
-    } @empty {
-      <p class="empty">No hay coincidencias. Prueba con otro nombre.</p>
-    }
-  </div>
+          <span class="result__kind">{{ kindLabel(item) }}</span>
+        </button>
+      } @empty {
+        <p class="empty">No hay coincidencias. Prueba con otro nombre.</p>
+      }
+    </div>
 
-  <footer class="foot">
-    <span><kbd>↑</kbd><kbd>↓</kbd> navegar</span>
-    <span><kbd>Enter</kbd> abrir</span>
-    <span class="spacer"></span>
-    <span>{{ items().length }} resultados</span>
-  </footer>
+    <footer class="foot">
+      <span><kbd>↑</kbd><kbd>↓</kbd> navegar</span>
+      <span><kbd>Enter</kbd> abrir</span>
+      <!-- El atajo se anuncia solo cuando hay algo que borrar con él. -->
+      @if (selectedSnippet()) {
+        <span><kbd>Shift</kbd><kbd>Supr</kbd> borrar</span>
+      }
+      <span class="spacer"></span>
+      <span>{{ items().length }} resultados</span>
+    </footer>
+  }
 </section>

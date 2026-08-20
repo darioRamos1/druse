@@ -114,17 +114,24 @@ function complete(
   sql: string,
   engine: 'postgresql' | 'sqlserver' = 'postgresql',
   index: SchemaIndex = schema,
+  snippets: readonly { id: string; name: string; sql: string }[] = [],
 ) {
   const { monaco, provider } = fakeMonaco();
 
-  registerSqlCompletion(monaco as never, () => ({ engine, schema: index }));
+  registerSqlCompletion(monaco as never, () => ({ engine, schema: index, snippets }));
 
   const lines = sql.split('\n');
   const position = { lineNumber: lines.length, column: lines[lines.length - 1].length + 1 };
 
   const result = provider().provideCompletionItems(fakeModel(sql) as never, position);
 
-  return result.suggestions as { label: string; detail?: string; insertText?: string }[];
+  return result.suggestions as {
+    label: string;
+    detail?: string;
+    insertText?: string;
+    insertTextRules?: number;
+    sortText?: string;
+  }[];
 }
 
 describe('autocompletado SQL', () => {
@@ -144,6 +151,32 @@ describe('autocompletado SQL', () => {
 
     // Es lo que más se escribe; enterrarlo bajo las reservadas sería inútil.
     expect(table).toBeLessThan(keyword);
+  });
+
+  it('ofrece cada tabla con un alias inicial editable', () => {
+    const table = complete('SELECT * FROM ').find((item) => item.label === 'users AS u');
+
+    expect(table?.insertText).toBe('public.users AS ${1:u}');
+    expect(table?.insertTextRules).toBe(4);
+    expect(table?.detail).toContain('con alias');
+  });
+
+  it('forma el alias con las iniciales de un nombre compuesto', () => {
+    const index: SchemaIndex = {
+      schemas: ['public'],
+      relations: [{
+        schema: 'public',
+        name: 'order_items',
+        kind: 'table',
+        qualified: 'public.order_items',
+        columns: [],
+      }],
+    };
+
+    const table = complete('SELECT * FROM ', 'postgresql', index)
+      .find((item) => item.label === 'order_items AS oi');
+
+    expect(table?.insertText).toBe('public.order_items AS ${1:oi}');
   });
 
   it('tras un punto sugiere solo las columnas de esa tabla', () => {
@@ -205,6 +238,18 @@ describe('autocompletado SQL', () => {
       expect(sqlserver).not.toContain('limit');
     });
 
+    it('pone los fragmentos guardados antes que las plantillas de fábrica', () => {
+      const suggestions = complete('', 'postgresql', schema, [
+        { id: 'uno', name: 'Mis pedidos', sql: 'SELECT * FROM pedidos' },
+      ]);
+      const saved = suggestions.find((item) => item.label === 'Mis pedidos');
+      const factory = suggestions.find((item) => item.label === 'sel');
+
+      expect(saved?.insertText).toBe('SELECT * FROM pedidos');
+      expect(saved?.detail).toBe('fragmento guardado');
+      expect(saved?.sortText! < factory?.sortText!).toBe(true);
+    });
+
     it('el tipo de cada columna acompaña a la sugerencia', () => {
       const columnas = complete('SELECT * FROM users u WHERE u.');
       const id = columnas.find((item) => item.label === 'id');
@@ -221,7 +266,7 @@ describe('autocompletado SQL', () => {
       // esquema y el punto dejaba el desplegable vacío.
       const labels = conEsquemas('SELECT * FROM tpublico.').map((item) => item.label);
 
-      expect(labels).toEqual(['usuarios', 'facturas']);
+      expect(labels).toEqual(['usuarios', 'usuarios AS u', 'facturas', 'facturas AS f']);
     });
 
     it('no mezcla las tablas de otro esquema', () => {
@@ -278,7 +323,9 @@ describe('autocompletado SQL', () => {
       expect(pedidos).toEqual(['tpublico']);
       expect(result.suggestions.map((item: { label: string }) => item.label)).toEqual([
         'usuarios',
+        'usuarios AS u',
         'facturas',
+        'facturas AS f',
       ]);
     });
 

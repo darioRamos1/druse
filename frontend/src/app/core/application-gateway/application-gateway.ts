@@ -197,6 +197,21 @@ export interface StoredEditorTab {
   readonly documentId?: string;
 }
 
+/**
+ * Un trozo de SQL guardado con nombre.
+ *
+ * Lo que se escribe una vez y se repite muchas. No se ata a ninguna conexión:
+ * el mismo `SELECT` sirve en pruebas y en producción, y atarlo a un perfil
+ * obligaría a decidir qué hacer con él cuando ese perfil se borra.
+ */
+export interface SavedSnippet {
+  readonly id: string;
+  readonly name: string;
+  readonly sql: string;
+  readonly createdAtUtc?: string;
+  readonly updatedAtUtc?: string;
+}
+
 /** No se pudo iniciar, confirmar o deshacer. */
 export interface TransactionRejected {
   readonly reason: 'alreadyopen' | 'notopen' | 'readonlyconnection';
@@ -340,10 +355,7 @@ export abstract class ApplicationGateway {
   abstract getTableCapabilities(sessionId: string): Observable<IndexCapabilities>;
 
   /** Índices, claves foráneas y demás restricciones de una tabla. */
-  abstract getTableStructure(
-    sessionId: string,
-    table: DatabaseObject,
-  ): Observable<TableStructure>;
+  abstract getTableStructure(sessionId: string, table: DatabaseObject): Observable<TableStructure>;
 
   /**
    * El SQL que crearía la tabla, para enseñarlo antes de ejecutarlo.
@@ -351,10 +363,7 @@ export abstract class ApplicationGateway {
    * Va por su propia ruta y no como una bandera de {@link createTable}: ver y
    * ejecutar son cosas distintas, igual que en la edición de filas.
    */
-  abstract previewCreateTable(
-    sessionId: string,
-    table: TableDesign,
-  ): Observable<readonly string[]>;
+  abstract previewCreateTable(sessionId: string, table: TableDesign): Observable<readonly string[]>;
 
   /** Crea la tabla. El servidor se niega si `confirmed` no llega. */
   abstract createTable(sessionId: string, table: TableDesign): Observable<TableChangeResult>;
@@ -419,6 +428,19 @@ export abstract class ApplicationGateway {
   abstract saveEditorTabs(tabs: readonly StoredEditorTab[]): Observable<void>;
 
   abstract setPreference(key: string, value: string): Observable<void>;
+
+  /**
+   * Fragmentos de SQL guardados, del último tocado al más antiguo.
+   *
+   * Van de uno en uno, al revés que las pestañas: son independientes entre sí y
+   * guardar uno no puede tocar los demás.
+   */
+  abstract getSnippets(): Observable<readonly SavedSnippet[]>;
+
+  /** Inserta o reemplaza según el identificador, que lo pone quien guarda. */
+  abstract saveSnippet(snippet: SavedSnippet): Observable<void>;
+
+  abstract deleteSnippet(id: string): Observable<void>;
 
   /**
    * Exporta el resultado de una consulta.
@@ -678,10 +700,7 @@ export interface RestoreCollision {
 
 /** Por qué no se puede restaurar. */
 export type RestoreRefusal =
-  | 'DifferentEngine'
-  | 'UnknownFormat'
-  | 'ReadOnlyConnection'
-  | 'Unreadable';
+  'DifferentEngine' | 'UnknownFormat' | 'ReadOnlyConnection' | 'Unreadable';
 
 export interface RestoreRejection {
   readonly reason: RestoreRefusal;
@@ -883,11 +902,7 @@ export type BackupStep =
  * lo que tiene no es la copia completa que pidió.
  */
 export type BackupOutcome =
-  | 'Running'
-  | 'Completed'
-  | 'CompletedWithWarnings'
-  | 'Failed'
-  | 'Cancelled';
+  'Running' | 'Completed' | 'CompletedWithWarnings' | 'Failed' | 'Cancelled';
 
 export interface BackupProgress {
   readonly id: string;
@@ -1090,11 +1105,7 @@ export interface TransferPreview {
 export type TransferStep = 'ReadingStructure' | 'ClearingTarget' | 'CopyingRows' | 'Done';
 
 export type TransferOutcome =
-  | 'Running'
-  | 'Completed'
-  | 'CompletedWithWarnings'
-  | 'Failed'
-  | 'Cancelled';
+  'Running' | 'Completed' | 'CompletedWithWarnings' | 'Failed' | 'Cancelled';
 
 export interface TransferFailure {
   readonly message: string;

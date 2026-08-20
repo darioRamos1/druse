@@ -11,7 +11,7 @@
 </div>
 
 @if (entries().length > 0) {
-  <ul class="list">
+  <ul class="list dr-scroll-fade">
     @for (entry of entries(); track entry.id) {
       <li class="item" [class.is-failed]="!entry.succeeded">
         <button

@@ -197,7 +197,7 @@
               {{ selectedCount() }} de {{ candidates().length }} tablas marcadas.
             </p>
 
-            <div class="tree">
+            <div class="tree dr-scroll-fade">
               @for (schema of schemas(); track schema) {
                 <div class="tree__schema">
                   <label class="check">
@@ -263,7 +263,7 @@
               salvo las tablas de catálogo.
             </p>
 
-            <div class="tree">
+            <div class="tree dr-scroll-fade">
               @for (table of chosen(); track table.key) {
                 <div class="row">
                   <span class="name">{{ table.key }}</span>

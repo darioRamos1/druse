@@ -10,7 +10,8 @@ import {
   viewChild,
 } from '@angular/core';
 
-import { ExportFormat } from '../../core/application-gateway/application-gateway';
+import { ExportFormat, SavedSnippet } from '../../core/application-gateway/application-gateway';
+import { SnippetStore } from '../../core/snippets/snippet.store';
 import { ThemeName, ThemeService } from '../../core/theme/theme.service';
 import { SettingsDialog } from '../../features/settings/settings-dialog/settings-dialog';
 import { FormatSettings } from '../../core/workspace/format-settings';
@@ -107,6 +108,7 @@ const DISCONNECTED: SessionStatus = {
 export class AppShell {
   private readonly _store = inject(WorkspaceStore);
   private readonly _sqlFiles = inject(SqlFileService);
+  private readonly _snippets = inject(SnippetStore);
   private readonly _themes = inject(ThemeService);
 
   // --- Apariencia ------------------------------------------------------------
@@ -566,6 +568,50 @@ export class AppShell {
     this._editor()?.openFind(replace);
   }
 
+  // --- Fragmentos guardados ---------------------------------------------------
+
+  protected readonly snippets = this._snippets.snippets;
+
+  /**
+   * Guarda lo que hay en el editor con el nombre que dio la paleta.
+   *
+   * Se guarda **lo mismo que ejecutaría «Ejecutar actual»**: la selección, o la
+   * instrucción donde esté el cursor. Guardar la pestaña entera cuando lo que se
+   * quería era una consulta obligaría a recortarla después a mano.
+   */
+  protected async saveSnippet(name: string): Promise<void> {
+    const sql = this._editor()?.activeFragment().text.trim() ?? '';
+
+    if (sql.length === 0) {
+      this._store.notify('No hay nada que guardar: el editor está vacío.');
+
+      return;
+    }
+
+    const saved = await this._snippets.save(name || SnippetStore.suggestName(sql), sql);
+
+    this._store.notify(
+      saved
+        ? `Fragmento guardado: «${saved.name}».`
+        : (this._snippets.error() ?? 'No se pudo guardar el fragmento.'),
+    );
+  }
+
+  /** Lo pone donde esté el cursor, que es de donde vino el usuario. */
+  protected insertSnippet(snippet: SavedSnippet): void {
+    this._editor()?.insertText(snippet.sql);
+  }
+
+  protected async deleteSnippet(snippet: SavedSnippet): Promise<void> {
+    const removed = await this._snippets.remove(snippet.id);
+
+    this._store.notify(
+      removed
+        ? `Fragmento borrado: «${snippet.name}».`
+        : (this._snippets.error() ?? 'No se pudo borrar el fragmento.'),
+    );
+  }
+
   protected onFormatFailed(message: string): void {
     this._store.notify(`No se pudo formatear: ${message}`);
   }
@@ -623,6 +669,10 @@ export class AppShell {
     void this._store.loadSavedConnections();
     void this._store.loadHistory();
     void this._store.loadPreferences();
+
+    // Los fragmentos, con lo demás: los ofrece el autocompletado desde la primera
+    // tecla, así que no pueden llegar cuando al usuario ya le hizo falta uno.
+    void this._snippets.load();
 
     // Lo que quedó escrito y sin ejecutar vuelve tal cual. Va aquí y no más
     // tarde porque hasta que no se ha leído, el store no guarda nada: la pestaña
@@ -830,7 +880,10 @@ export class AppShell {
   protected closeTab(id: string): void {
     const tab = this.tabs().find((item) => item.id === id);
 
-    if (tab?.dirty && !window.confirm(`“${tab.title}” tiene cambios sin guardar. ¿Cerrar de todos modos?`)) {
+    if (
+      tab?.dirty &&
+      !window.confirm(`“${tab.title}” tiene cambios sin guardar. ¿Cerrar de todos modos?`)
+    ) {
       return;
     }
 

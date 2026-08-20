@@ -84,6 +84,24 @@ public interface IEditorTabStore
     Task ReplaceAllAsync(IReadOnlyList<EditorTabState> tabs, CancellationToken cancellationToken);
 }
 
+/// <summary>
+/// Fragmentos de SQL guardados con nombre.
+///
+/// Se guardan uno a uno, al revés que las pestañas: no cambian a la vez ni
+/// forman un conjunto, y guardar uno no puede poner en riesgo los demás.
+/// </summary>
+public interface ISqlSnippetStore
+{
+    /// <summary>Todos, del más reciente al más antiguo.</summary>
+    Task<IReadOnlyList<SqlSnippet>> GetAllAsync(CancellationToken cancellationToken);
+
+    /// <summary>Inserta o reemplaza según el identificador.</summary>
+    Task SaveAsync(SqlSnippet snippet, CancellationToken cancellationToken);
+
+    /// <summary>Devuelve `false` si no existía.</summary>
+    Task<bool> DeleteAsync(Guid id, CancellationToken cancellationToken);
+}
+
 /// <summary>Preferencias sencillas del usuario, guardadas como pares clave-valor.</summary>
 public interface IPreferencesStore
 {

@@ -33,7 +33,8 @@ export type IconName =
   | 'console'
   | 'sort-desc'
   | 'eye'
-  | 'eye-off';
+  | 'eye-off'
+  | 'transaction';
 
 interface IconDefinition {
   readonly viewBox: string;
@@ -197,6 +198,13 @@ const ICONS: Readonly<Record<IconName, IconDefinition>> = {
   'sort-desc': {
     viewBox: '0 0 10 10',
     body: '<path d="M5 2v6M2.6 5.6L5 8l2.4-2.4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>',
+  },
+  // Un nodo en una línea: el trabajo que aún no se ha confirmado.
+  transaction: {
+    viewBox: '0 0 12 12',
+    body:
+      '<path d="M6 1v2.4M6 8.6V11" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>' +
+      '<circle cx="6" cy="6" r="2.4" stroke="currentColor" stroke-width="1.3"/>',
   },
 };
 

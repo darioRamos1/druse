@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-import { abrir, apuntarPestana, conectar, escribirSql } from '../support/druse';
+import { abrir, apuntarPestana, conectar, escribirSql, situarCursor } from '../support/druse';
 
 /**
  * Lo que salió de mirar la aplicación con calma, convertido en guardarraíl.
@@ -72,6 +72,230 @@ test.describe('la interfaz por dentro', () => {
     // el buscador es el mismo widget con su segunda fila desplegada.
     await expect(buscador).toHaveClass(/replaceToggled/);
     await expect(buscador.locator('.replace-part')).toBeVisible();
+  });
+
+  /**
+   * El ciclo entero de un fragmento guardado: guardarlo, insertarlo y borrarlo.
+   *
+   * Es lo que más se pide en un editor de SQL después del autocompletado, y lo
+   * que no se ve en una prueba de componente: el nombre se escribe en la propia
+   * paleta, el texto sale del cursor de Monaco y lo guardado sobrevive en el
+   * proceso local.
+   */
+  test('la paleta guarda un fragmento, lo inserta y lo borra', async ({ page }) => {
+    await abrir(page);
+
+    const nombre = `Fragmento ${Date.now()}`;
+
+    await escribirSql(
+      page,
+      'SELECT 1 AS no_guardar;\nSELECT * FROM ciudad WHERE id_ciudad > 10;',
+    );
+    await situarCursor(page, 2, 10);
+
+    // Guardar: la paleta pide el nombre en su propio campo.
+    await page.getByRole('button', { name: 'Abrir búsqueda global' }).click();
+    await page.locator('app-command-palette input').fill('fragmento');
+    await page.getByText('Guardar como fragmento').first().click();
+
+    const campo = page.locator('app-command-palette input');
+
+    await expect(campo).toHaveAttribute('aria-label', 'Nombre del fragmento');
+    await campo.fill(nombre);
+    const guardado = page.waitForResponse(
+      (response) =>
+        response.url().includes('/api/workspace/snippets') &&
+        response.request().method() === 'PUT' &&
+        response.ok(),
+    );
+    await campo.press('Enter');
+    await guardado;
+
+    await expect(page.locator('app-command-palette')).toBeHidden();
+
+    // Insertar: en una pestaña nueva y vacía, para que el texto solo pueda venir
+    // del fragmento.
+    await page.getByRole('button', { name: 'Nueva consulta' }).first().click();
+    await escribirSql(page, '');
+
+    await page.keyboard.press('Control+k');
+    await page.locator('app-command-palette input').fill(nombre);
+
+    // Con Enter y no con un clic sobre el nombre: el aviso de «guardado» lleva
+    // el mismo texto y vive debajo del velo de la paleta.
+    await expect(page.locator('app-command-palette')).toContainText(nombre);
+    await page.keyboard.press('Enter');
+
+    await expect(page.locator('app-sql-editor .monaco-editor')).toContainText(
+      'FROM ciudad',
+      { timeout: 10_000 },
+    );
+    await expect(page.locator('app-sql-editor .monaco-editor')).not.toContainText('no_guardar');
+
+    // Insertar usa la pila de Monaco, no reemplaza el modelo desde fuera.
+    const canUndo = await page.evaluate(() => {
+      const editor = (window as unknown as { monaco: { editor: { getEditors(): any[] } } }).monaco
+        .editor.getEditors()[0];
+
+      editor.focus();
+
+      return editor.getModel().canUndo();
+    });
+
+    expect(canUndo).toBe(true);
+    await page.keyboard.press('Control+z');
+    const afterUndo = await page.evaluate(() => {
+      const editor = (window as unknown as { monaco: { editor: { getEditors(): any[] } } }).monaco
+        .editor.getEditors()[0];
+
+      return editor.getValue();
+    });
+    expect(afterUndo).toBe('');
+    await expect(page.locator('app-sql-editor .monaco-editor')).not.toContainText('FROM ciudad');
+
+    // Se vuelve a insertar para completar el ciclo con el mismo fragmento.
+    await page.keyboard.press('Control+k');
+    await page.locator('app-command-palette input').fill(nombre);
+    await page.keyboard.press('Enter');
+    await expect(page.locator('app-sql-editor .monaco-editor')).toContainText('FROM ciudad');
+
+    // Borrar: la primera pulsación pregunta y la segunda borra.
+    await page.keyboard.press('Control+k');
+    await page.locator('app-command-palette input').fill(nombre);
+    await page.keyboard.press('Shift+Delete');
+
+    await expect(page.locator('app-command-palette')).toContainText('otra vez');
+
+    const borrado = page.waitForResponse(
+      (response) =>
+        response.url().includes('/api/workspace/snippets/') &&
+        response.request().method() === 'DELETE' &&
+        response.ok(),
+    );
+    await page.keyboard.press('Shift+Delete');
+    await borrado;
+    await page.keyboard.press('Escape');
+
+    // Y ya no está, ni siquiera tras volver a preguntarle al proceso local.
+    await page.reload();
+    await expect(page.locator('app-sql-editor .monaco-editor')).toBeVisible({ timeout: 90_000 });
+    await page.keyboard.press('Control+k');
+    await page.locator('app-command-palette input').fill(nombre);
+
+    await expect(page.locator('app-command-palette')).toContainText('No hay coincidencias');
+  });
+
+  test('la interfaz estrecha no solapa controles y conserva sus menús', async ({ page }) => {
+    await page.setViewportSize({ width: 900, height: 760 });
+    await abrir(page);
+
+    const toolbar = page.locator('app-editor-toolbar');
+    const compactLabel = toolbar.locator('.run .label');
+    const compactBox = await compactLabel.boundingBox();
+    const toolbarBox = await toolbar.boundingBox();
+
+    expect(compactBox?.width).toBeLessThanOrEqual(1);
+    expect(toolbarBox?.height).toBeLessThanOrEqual(44);
+
+    // Aunque el texto esté visualmente recogido, sigue nombrando el botón y el
+    // desplegable queda por encima de Monaco y recibe el clic.
+    await toolbar.getByRole('button', { name: /Filas/ }).click();
+    await expect(toolbar.getByRole('listbox')).toBeVisible();
+
+    const historyBox = await page.getByRole('tab', { name: 'Historial' }).boundingBox();
+    const filtersBox = await page.getByRole('button', { name: 'Filtros' }).boundingBox();
+
+    expect(historyBox && filtersBox).not.toBeNull();
+    expect(
+      historyBox!.x + historyBox!.width > filtersBox!.x &&
+      filtersBox!.x + filtersBox!.width > historyBox!.x &&
+      historyBox!.y + historyBox!.height > filtersBox!.y &&
+      filtersBox!.y + filtersBox!.height > historyBox!.y,
+    ).toBe(false);
+
+    await page.setViewportSize({ width: 1440, height: 760 });
+    await expect.poll(async () => (await compactLabel.boundingBox())?.width ?? 0).toBeGreaterThan(1);
+  });
+
+  test('el degradado de las listas desaparece al llegar al final', async ({ page }) => {
+    await abrir(page);
+    await page.getByRole('button', { name: 'Abrir búsqueda global' }).click();
+
+    const results = page.locator('app-command-palette .results');
+    await expect(results).toBeVisible();
+
+    const masks = await results.evaluate(async (element) => {
+      const start = getComputedStyle(element).maskImage;
+      element.scrollTop = element.scrollHeight;
+
+      await new Promise<void>((resolve) =>
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+      );
+
+      return { start, end: getComputedStyle(element).maskImage };
+    });
+
+    expect(masks.start).not.toBe('none');
+    expect(masks.end).not.toBe(masks.start);
+  });
+
+  test('el selector de tipos del diseñador usa los estilos de la aplicación', async ({ page }) => {
+    await abrir(page);
+    await conectar(page);
+    await apuntarPestana(page);
+
+    const sidebar = page.locator('app-connections-sidebar');
+    const reveal = async (parent: string, child: string) => {
+      const target = sidebar.getByText(child, { exact: true }).first();
+
+      if (!(await target.isVisible().catch(() => false))) {
+        await sidebar.getByText(parent, { exact: true }).first().click();
+      }
+
+      await expect(target).toBeVisible({ timeout: 30_000 });
+    };
+
+    await reveal('druse_test', 'public');
+    await reveal('public', 'Tables');
+
+    await sidebar
+      .locator('.node', { hasText: 'Tables' })
+      .first()
+      .getByRole('button', { name: 'Acciones para Tables' })
+      .click();
+    await page.getByRole('menuitem', { name: 'Crear tabla' }).click();
+
+    const designer = page.locator('app-table-designer');
+    const input = designer.getByRole('combobox', { name: 'Tipo de dato' }).first();
+
+    await expect(designer).toBeVisible();
+    await input.click();
+
+    const menu = designer.getByRole('listbox', { name: 'Tipos de dato sugeridos' });
+    await expect(menu).toBeVisible();
+
+    const style = await menu.evaluate((element) => {
+      const computed = getComputedStyle(element);
+
+      return {
+        background: computed.backgroundColor,
+        border: computed.borderStyle,
+        shadow: computed.boxShadow,
+      };
+    });
+
+    expect(style.background).not.toBe('rgba(0, 0, 0, 0)');
+    expect(style.border).toBe('solid');
+    expect(style.shadow).not.toBe('none');
+
+    await input.fill('var');
+    const options = menu.getByRole('option');
+    await expect(options.first()).toBeVisible();
+    await expect(options.first()).toContainText(/var/i);
+
+    await input.fill('TIPO_PERSONALIZADO');
+    await expect(menu).toContainText('Escribe un tipo personalizado');
+    await expect(input).toHaveValue('TIPO_PERSONALIZADO');
   });
 
   /**

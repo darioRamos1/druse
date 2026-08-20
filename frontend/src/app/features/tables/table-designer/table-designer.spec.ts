@@ -164,6 +164,58 @@ describe('TableDesigner', () => {
     expect(fixture.nativeElement.querySelectorAll('.columns__row').length).toBe(3);
   });
 
+  it('muestra y filtra los tipos en un desplegable propio', async () => {
+    await open(table);
+
+    const type = fixture.nativeElement.querySelector('.type-picker__input') as HTMLInputElement;
+
+    type.focus();
+    fixture.detectChanges();
+
+    expect(type.getAttribute('role')).toBe('combobox');
+    expect(fixture.nativeElement.querySelector('.type-picker__menu')).not.toBeNull();
+    expect(typeOptions()).toEqual(['INT', 'NVARCHAR(255)']);
+
+    escribir(type, 'nvar');
+    fixture.detectChanges();
+
+    expect(typeOptions()).toEqual(['NVARCHAR(255)']);
+
+    (fixture.nativeElement as HTMLElement)
+      .querySelector<HTMLButtonElement>('.type-picker__menu button')
+      ?.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
+    fixture.detectChanges();
+
+    expect(type.value).toBe('NVARCHAR(255)');
+    expect(fixture.nativeElement.querySelector('.type-picker__menu')).toBeNull();
+  });
+
+  it('permite elegir el tipo con teclado sin impedir tipos personalizados', async () => {
+    await open(table);
+
+    const type = fixture.nativeElement.querySelector('.type-picker__input') as HTMLInputElement;
+
+    type.focus();
+    fixture.detectChanges();
+    type.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('.type-picker__menu .is-active')?.textContent)
+      .toContain('NVARCHAR(255)');
+    type.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    fixture.detectChanges();
+
+    expect(
+      (fixture.nativeElement.querySelector('.type-picker__input') as HTMLInputElement).value,
+    ).toBe('NVARCHAR(255)');
+    expect(fixture.nativeElement.querySelector('.type-picker__menu')).toBeNull();
+
+    escribir(type, 'MI_DOMINIO');
+    fixture.detectChanges();
+
+    expect(type.value).toBe('MI_DOMINIO');
+    expect(fixture.nativeElement.querySelector('.type-picker__empty')).not.toBeNull();
+  });
+
   it('solo envía las columnas que de verdad cambiaron', async () => {
     await open(table);
 
@@ -325,9 +377,42 @@ describe('TableDesigner', () => {
     expect(campos.some((texto) => texto?.includes('WHERE'))).toBe(false);
   });
 
+  it('cada pestaña oculta también las secciones que tienen display propio', async () => {
+    await open(table);
+
+    const element = fixture.nativeElement as HTMLElement;
+    const sections = () => [
+      element.querySelector<HTMLElement>('.columns')!,
+      ...element.querySelectorAll<HTMLElement>('.rows'),
+    ];
+
+    expect(sections().map((section) => getComputedStyle(section).display)).toEqual([
+      'flex',
+      'none',
+      'none',
+      'none',
+    ]);
+
+    tab('Índices');
+
+    expect(sections().map((section) => getComputedStyle(section).display)).toEqual([
+      'none',
+      'flex',
+      'none',
+      'none',
+    ]);
+  });
+
   function escribir(input: HTMLInputElement, value: string): void {
     input.value = value;
     input.dispatchEvent(new Event('input'));
+  }
+
+  function typeOptions(): string[] {
+    const element = fixture.nativeElement as HTMLElement;
+
+    return [...element.querySelectorAll<HTMLButtonElement>('.type-picker__menu button')]
+      .map((option) => option.textContent?.trim() ?? '');
   }
 
   /**

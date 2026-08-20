@@ -25,10 +25,8 @@ import { findProblems } from '../sql-language/sql-diagnostics';
 import { registerSqlHover } from '../sql-language/sql-hover';
 import { formatSql } from '../sql-language/sql-formatting';
 import { statementAt } from '../sql-language/sql-statements';
-import {
-  DEFAULT_FORMAT_SETTINGS,
-  FormatSettings,
-} from '../../../core/workspace/format-settings';
+import { DEFAULT_FORMAT_SETTINGS, FormatSettings } from '../../../core/workspace/format-settings';
+import { SnippetStore } from '../../../core/snippets/snippet.store';
 import { ThemeName } from '../../../core/theme/theme.service';
 import { DRUSE_THEME_NAMES, druseTheme } from './druse-theme';
 import { executionErrorPlace } from './execution-error';
@@ -158,6 +156,7 @@ export default class SqlEditor implements OnInit {
   private readonly _loader = inject(MonacoLoader);
   private readonly _zone = inject(NgZone);
   private readonly _destroyRef = inject(DestroyRef);
+  private readonly _snippets = inject(SnippetStore);
 
   private readonly _container = viewChild.required<ElementRef<HTMLElement>>('container');
 
@@ -321,22 +320,13 @@ export default class SqlEditor implements OnInit {
     }
 
     const position = editor.getPosition();
-    const statement = position
-      ? statementAt(model.getValue(), model.getOffsetAt(position))
-      : null;
+    const statement = position ? statementAt(model.getValue(), model.getOffsetAt(position)) : null;
 
     return statement
       ? { hasSelection: false, text: statement.text, startOffset: statement.startOffset }
       : { hasSelection: false, text: '', startOffset: 0 };
   }
 
-  /**
-   * Formatea el contenido, o solo la selección si la hay.
-   *
-   * Se hace a través del editor y no cambiando el texto desde fuera para que la
-   * operación entre en la pila de deshacer: formatear debe poder revertirse con
-   * Ctrl+Z como cualquier otra edición.
-   */
   /**
    * Abre el buscador del editor, con o sin reemplazo.
    *
@@ -355,6 +345,49 @@ export default class SqlEditor implements OnInit {
     editor.getAction(replace ? 'editor.action.startFindReplaceAction' : 'actions.find')?.run();
   }
 
+  /**
+   * Escribe texto donde esté el cursor, reemplazando lo que hubiera seleccionado.
+   *
+   * Es por donde entran los fragmentos guardados. Va por `executeEdits` y no
+   * cambiando el valor del modelo para que la inserción **entre en la pila de
+   * deshacer**: un fragmento largo pegado por error se quita con Ctrl+Z, como
+   * cualquier otra edición.
+   */
+  insertText(text: string): void {
+    const editor = this._editor;
+    const monaco = this._monaco;
+    const model = editor?.getModel();
+
+    if (!editor || !monaco || !model) {
+      return;
+    }
+
+    const selection = editor.getSelection();
+    const position = editor.getPosition();
+    const range =
+      selection ??
+      (position
+        ? new monaco.Range(
+            position.lineNumber,
+            position.column,
+            position.lineNumber,
+            position.column,
+          )
+        : model.getFullModelRange().collapseToStart());
+
+    editor.pushUndoStop();
+    editor.executeEdits('druse-snippet', [{ range, text, forceMoveMarkers: true }]);
+    editor.pushUndoStop();
+    editor.focus();
+  }
+
+  /**
+   * Formatea el contenido, o solo la selección si la hay.
+   *
+   * Se hace a través del editor y no cambiando el texto desde fuera para que la
+   * operación entre en la pila de deshacer: formatear debe poder revertirse con
+   * Ctrl+Z como cualquier otra edición.
+   */
   async formatDocument(): Promise<void> {
     const editor = this._editor;
 
@@ -526,9 +559,7 @@ export default class SqlEditor implements OnInit {
     try {
       monaco = await this._loader.load();
     } catch (error) {
-      this.failure.set(
-        error instanceof Error ? error.message : 'No se pudo cargar el editor.',
-      );
+      this.failure.set(error instanceof Error ? error.message : 'No se pudo cargar el editor.');
       this.failed.set(true);
       return;
     }
@@ -548,6 +579,9 @@ export default class SqlEditor implements OnInit {
       schema: this.schema(),
       loadColumns: this.loadColumns(),
       loadRelations: this.loadRelations(),
+      // Lo guardado por el usuario pesa más que las plantillas de fábrica: se
+      // guardó a propósito y se escribe por su nombre.
+      snippets: this._snippets.snippets(),
     }));
 
     // El tooltip lee del mismo catálogo, así que nunca dispara una consulta:
@@ -652,7 +686,6 @@ export default class SqlEditor implements OnInit {
     for (const name of Object.keys(DRUSE_THEME_NAMES) as ThemeName[]) {
       monaco.editor.defineTheme(DRUSE_THEME_NAMES[name], druseTheme(name, accent));
     }
-
   }
 
   private _diagnosticsTimer?: ReturnType<typeof setTimeout>;

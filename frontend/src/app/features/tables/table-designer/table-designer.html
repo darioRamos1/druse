@@ -96,7 +96,7 @@
           <span></span>
         </div>
 
-        @for (row of rows(); track $index) {
+        @for (row of rows(); track $index; let rowIndex = $index) {
           <div class="columns__row" [class.is-dropped]="row.dropped">
             <input
               class="field__input"
@@ -107,15 +107,56 @@
               placeholder="nombre"
             />
 
-            <input
-              class="field__input"
-              type="text"
-              list="table-designer-types"
-              [(ngModel)]="row.dataType"
-              (ngModelChange)="touched()"
-              [disabled]="row.dropped"
-              placeholder="tipo"
-            />
+            <div class="type-picker">
+              <input
+                class="field__input type-picker__input"
+                type="text"
+                [value]="row.dataType"
+                (input)="onDataTypeInput($event, rowIndex)"
+                (focus)="openTypeSuggestions(rowIndex, row)"
+                (blur)="closeTypeSuggestions(rowIndex)"
+                (keydown)="onDataTypeKeydown($event, rowIndex, row)"
+                [disabled]="row.dropped"
+                placeholder="tipo"
+                role="combobox"
+                aria-label="Tipo de dato"
+                aria-autocomplete="list"
+                autocomplete="off"
+                [attr.aria-expanded]="openTypeIndex() === rowIndex"
+                [attr.aria-controls]="'data-type-options-' + rowIndex"
+                [attr.aria-activedescendant]="
+                  openTypeIndex() === rowIndex && typeSuggestions(row).length > 0
+                    ? 'data-type-option-' + rowIndex + '-' + highlightedType()
+                    : null
+                "
+              />
+              <span class="type-picker__chevron" aria-hidden="true">⌄</span>
+
+              @if (openTypeIndex() === rowIndex) {
+                <div
+                  class="type-picker__menu"
+                  [id]="'data-type-options-' + rowIndex"
+                  role="listbox"
+                  aria-label="Tipos de dato sugeridos"
+                >
+                  @for (type of typeSuggestions(row); track type; let optionIndex = $index) {
+                    <button
+                      type="button"
+                      role="option"
+                      [id]="'data-type-option-' + rowIndex + '-' + optionIndex"
+                      [class.is-active]="optionIndex === highlightedType()"
+                      [attr.aria-selected]="optionIndex === highlightedType()"
+                      (mouseenter)="highlightedType.set(optionIndex)"
+                      (mousedown)="chooseDataType($event, rowIndex, type)"
+                    >
+                      {{ type }}
+                    </button>
+                  } @empty {
+                    <p class="type-picker__empty">Escribe un tipo personalizado</p>
+                  }
+                </div>
+              }
+            </div>
 
             <input
               type="checkbox"
@@ -161,12 +202,6 @@
           </div>
         }
       </div>
-
-      <datalist id="table-designer-types">
-        @for (type of dataTypes(); track type) {
-          <option [value]="type"></option>
-        }
-      </datalist>
 
       @if (section() === 'columns') {
         <button type="button" class="btn btn--ghost" (click)="addColumn()">Añadir columna</button>

@@ -122,6 +122,26 @@ kbd {
   }
 }
 
+/* Lo que se guardará, dicho antes de pedir el nombre. */
+.naming {
+  margin: 0;
+  padding: 14px 16px 16px;
+  color: var(--dr-text-faint);
+  font-size: 11.5px;
+  line-height: 1.5;
+}
+
+/* La primera pulsación de Shift+Supr pregunta; esto es la pregunta. */
+.result__warn {
+  flex: none;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: var(--dr-danger-tint-weak);
+  color: var(--dr-danger);
+  font-size: 10px;
+  white-space: nowrap;
+}
+
 .empty {
   margin: 0;
   padding: 32px 16px;

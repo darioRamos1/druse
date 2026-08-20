@@ -214,6 +214,94 @@ public sealed class StorageEndpointsTests : IClassFixture<DruseApiFactory>
     }
 
     [Fact]
+    public async Task GuardaUnFragmentoLoListaYLoBorra()
+    {
+        using var client = _factory.CreateAuthenticatedClient();
+
+        var id = Guid.NewGuid();
+        var name = $"Pedidos del día {id:N}";
+
+        var saved = await client.PutAsJsonAsync(
+            $"/api/workspace/snippets/{id}",
+            new { id = id.ToString(), name, sql = "SELECT * FROM pedidos WHERE creado >= CURRENT_DATE" });
+
+        Assert.Equal(HttpStatusCode.NoContent, saved.StatusCode);
+
+        var list = await client.GetFromJsonAsync<JsonElement>("/api/workspace/snippets");
+        var mine = list.EnumerateArray().Single(item => item.GetProperty("id").GetGuid() == id);
+
+        Assert.Equal(name, mine.GetProperty("name").GetString());
+        Assert.Contains("FROM pedidos", mine.GetProperty("sql").GetString(), StringComparison.Ordinal);
+
+        var deleted = await client.DeleteAsync($"/api/workspace/snippets/{id}");
+        Assert.Equal(HttpStatusCode.NoContent, deleted.StatusCode);
+
+        var afterwards = await client.GetFromJsonAsync<JsonElement>("/api/workspace/snippets");
+
+        Assert.DoesNotContain(
+            afterwards.EnumerateArray(),
+            item => item.GetProperty("id").GetGuid() == id);
+    }
+
+    /// <summary>
+    /// Guardar dos veces con el mismo identificador es corregir el fragmento, no
+    /// crear otro: es lo que hace que renombrarlo funcione.
+    /// </summary>
+    [Fact]
+    public async Task GuardarDosVecesElMismoFragmentoLoReemplaza()
+    {
+        using var client = _factory.CreateAuthenticatedClient();
+
+        var id = Guid.NewGuid();
+
+        await client.PutAsJsonAsync(
+            $"/api/workspace/snippets/{id}",
+            new { id = id.ToString(), name = $"Antes {id:N}", sql = "SELECT 1" });
+
+        await client.PutAsJsonAsync(
+            $"/api/workspace/snippets/{id}",
+            new { id = id.ToString(), name = $"Después {id:N}", sql = "SELECT 2" });
+
+        var list = await client.GetFromJsonAsync<JsonElement>("/api/workspace/snippets");
+        var mine = list.EnumerateArray().Where(item => item.GetProperty("id").GetGuid() == id).ToList();
+
+        Assert.Single(mine);
+        Assert.Equal($"Después {id:N}", mine[0].GetProperty("name").GetString());
+        Assert.Equal("SELECT 2", mine[0].GetProperty("sql").GetString());
+    }
+
+    /// <summary>
+    /// Un fragmento sin nombre no se puede volver a encontrar, y uno sin SQL no
+    /// tiene nada que insertar.
+    /// </summary>
+    [Fact]
+    public async Task RechazaUnFragmentoSinNombreOSinSql()
+    {
+        using var client = _factory.CreateAuthenticatedClient();
+
+        var sinNombre = await client.PutAsJsonAsync(
+            $"/api/workspace/snippets/{Guid.NewGuid()}",
+            new { id = Guid.NewGuid().ToString(), name = "   ", sql = "SELECT 1" });
+
+        var sinSql = await client.PutAsJsonAsync(
+            $"/api/workspace/snippets/{Guid.NewGuid()}",
+            new { id = Guid.NewGuid().ToString(), name = "Vacío", sql = "" });
+
+        Assert.Equal(HttpStatusCode.BadRequest, sinNombre.StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, sinSql.StatusCode);
+    }
+
+    [Fact]
+    public async Task BorrarUnFragmentoQueNoExisteNoEncuentraNada()
+    {
+        using var client = _factory.CreateAuthenticatedClient();
+
+        var response = await client.DeleteAsync($"/api/workspace/snippets/{Guid.NewGuid()}");
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
     public async Task ElHistorialEmpiezaVacioYSePuedeVaciar()
     {
         using var client = _factory.CreateAuthenticatedClient();

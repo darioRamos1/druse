@@ -327,6 +327,7 @@
     <app-command-palette
       [connections]="connections()"
       [nodes]="searchableRelations()"
+      [snippets]="snippets()"
       (closed)="paletteOpen.set(false)"
       (newConnection)="openDialog()"
       (newQuery)="createTab()"
@@ -335,6 +336,9 @@
       (formatQuery)="format()"
       (findInEditor)="findInEditor($event)"
       (showHistory)="showHistory()"
+      (saveSnippet)="saveSnippet($event)"
+      (insertSnippet)="insertSnippet($event)"
+      (deleteSnippet)="deleteSnippet($event)"
       (activateConnection)="activateFromPalette($event)"
       (openNode)="openNode($event)"
     />

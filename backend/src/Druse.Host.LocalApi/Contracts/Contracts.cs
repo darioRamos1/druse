@@ -318,6 +318,21 @@ public sealed record EditorTabDto
     public string? DocumentId { get; init; }
 }
 
+/// <summary>
+/// Un fragmento de SQL guardado con nombre.
+///
+/// El identificador lo pone el cliente: guardar de nuevo el mismo fragmento con
+/// otro nombre es reemplazarlo, y crear otro es mandar otro identificador.
+/// </summary>
+public sealed record SqlSnippetDto
+{
+    public required string Id { get; init; }
+    public required string Name { get; init; }
+    public required string Sql { get; init; }
+    public DateTimeOffset? CreatedAtUtc { get; init; }
+    public DateTimeOffset? UpdatedAtUtc { get; init; }
+}
+
 // ---------------------------------------------------------------------------
 // Edición de filas
 // ---------------------------------------------------------------------------

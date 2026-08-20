@@ -21,6 +21,7 @@ import {
   TableStructure,
   TestConnectionResult,
 } from '../../shared/models/workspace';
+import { initialColumnWidths } from './column-widths';
 import {
   ApplicationGateway,
   BackupPreview,
@@ -43,6 +44,7 @@ import {
   RowDeleteRequest,
   RowEditRequest,
   RowEditResult,
+  SavedSnippet,
   TableChangeResult,
   StoredEditorTab,
   TransactionState,
@@ -73,21 +75,6 @@ interface ResultSetDto {
 interface QueryResultDto extends Omit<QueryResult, 'resultSets'> {
   readonly resultSets: readonly ResultSetDto[];
 }
-
-/**
- * Anchos por defecto de columna según el tipo, en píxeles.
- *
- * Ajustar el ancho al contenido exigiría medir el texto renderizado; partir de
- * una estimación por tipo acierta lo suficiente y no cuesta nada.
- */
-const WIDTH_BY_KIND: Readonly<Record<ResultColumn['kind'], number>> = {
-  number: 110,
-  boolean: 110,
-  timestamp: 200,
-  uuid: 290,
-  binary: 200,
-  text: 220,
-};
 
 /**
  * Implementación del gateway sobre HTTP contra la API local.
@@ -222,14 +209,8 @@ export class HttpApplicationGateway extends ApplicationGateway {
     return this._http.get<IndexCapabilities>(`/api/sessions/${sessionId}/tables/capabilities`);
   }
 
-  override getTableStructure(
-    sessionId: string,
-    table: DatabaseObject,
-  ): Observable<TableStructure> {
-    return this._http.post<TableStructure>(
-      `/api/sessions/${sessionId}/tables/structure`,
-      table,
-    );
+  override getTableStructure(sessionId: string, table: DatabaseObject): Observable<TableStructure> {
+    return this._http.post<TableStructure>(`/api/sessions/${sessionId}/tables/structure`, table);
   }
 
   override previewCreateTable(
@@ -347,6 +328,18 @@ export class HttpApplicationGateway extends ApplicationGateway {
     return this._http.put<void>('/api/workspace/tabs', tabs);
   }
 
+  override getSnippets(): Observable<readonly SavedSnippet[]> {
+    return this._http.get<SavedSnippet[]>('/api/workspace/snippets');
+  }
+
+  override saveSnippet(snippet: SavedSnippet): Observable<void> {
+    return this._http.put<void>(`/api/workspace/snippets/${snippet.id}`, snippet);
+  }
+
+  override deleteSnippet(id: string): Observable<void> {
+    return this._http.delete<void>(`/api/workspace/snippets/${id}`);
+  }
+
   override exportQuery(request: ExportRequest): Observable<Blob> {
     const { format, ...body } = request;
 
@@ -391,10 +384,9 @@ export class HttpApplicationGateway extends ApplicationGateway {
     profileId: string,
     sessionId: string,
   ): Observable<BackupProfileResolution> {
-    return this._http.post<BackupProfileResolution>(
-      `/api/backup/profiles/${profileId}/resolve`,
-      { sessionId },
-    );
+    return this._http.post<BackupProfileResolution>(`/api/backup/profiles/${profileId}/resolve`, {
+      sessionId,
+    });
   }
 
   override markBackupProfileRun(profileId: string): Observable<void> {
@@ -526,20 +518,25 @@ export class HttpApplicationGateway extends ApplicationGateway {
   }
 
   private toResultSet(dto: ResultSetDto, durationMs: number): ResultSet {
-    const columns = dto.columns.map<ResultColumn>((column) => {
-      const kind = classify(column.dataType);
+    const kinds = dto.columns.map((column) => ({
+      name: column.name,
+      // La familia exacta la calcula la API: `kind` solo distingue lo justo para
+      // el ancho y la alineación, y no separa una fecha de una marca de tiempo,
+      // que es precisamente lo que decide el control de edición.
+      kind: classify(column.dataType),
+    }));
 
-      return {
-        name: column.name,
-        dataType: column.dataType,
-        kind,
-        // La familia exacta la calcula la API: `kind` solo distingue lo justo
-        // para el ancho y la alineación, y no separa una fecha de una marca de
-        // tiempo, que es precisamente lo que decide el control de edición.
-        inputKind: column.inputKind,
-        width: WIDTH_BY_KIND[kind],
-      };
-    });
+    // El ancho sale de los valores, no del tipo: es aquí, con las filas todavía
+    // a mano, donde se puede mirar la muestra.
+    const widths = initialColumnWidths(kinds, dto.rows);
+
+    const columns = dto.columns.map<ResultColumn>((column, index) => ({
+      name: column.name,
+      dataType: column.dataType,
+      kind: kinds[index].kind,
+      inputKind: column.inputKind,
+      width: widths[index],
+    }));
 
     // La última columna se estira para ocupar el espacio sobrante, como en el
     // mockup.

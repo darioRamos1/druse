@@ -32,7 +32,12 @@ async function medir(page: Page, donde: string): Promise<void> {
 
       const caja = element.getBoundingClientRect();
 
-      if (caja.width === 0 || caja.height === 0 || element.closest('.monaco-editor')) {
+      if (
+        caja.width === 0 ||
+        caja.height === 0 ||
+        element.closest('.monaco-editor') ||
+        (element.matches('.label') && caja.width <= 1 && caja.height <= 1)
+      ) {
         continue;
       }
 
@@ -159,9 +164,10 @@ test.describe('barrido visual', () => {
     await page.locator('app-sql-editor').click();
 
     // --- Paleta de comandos ------------------------------------------------
-    // Por su botón y no por Ctrl+K: con el foco dentro de Monaco, el atajo es
-    // suyo y no llega a la aplicación.
-    await page.getByRole('button', { name: 'Abrir búsqueda global' }).click();
+    // También sirve desde Monaco: Druse registra el acorde antes de que el
+    // editor se quede esperando la segunda tecla de sus propios atajos.
+    await page.locator('app-sql-editor .monaco-editor textarea').first().focus();
+    await page.keyboard.press('Control+k');
     await expect(page.locator('app-command-palette')).toBeVisible();
     await medir(page, 'paleta');
     await foto(page, '06-paleta');

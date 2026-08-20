@@ -7,6 +7,7 @@ import {
   SchemaIndex,
 } from '../../../shared/models/workspace';
 import { SqlReference, aliasMap, findRelation } from './sql-context';
+import { SavedSnippet } from '../../../core/application-gateway/application-gateway';
 import { functionsFor, keywordsFor } from './sql-keywords';
 import { snippetsFor } from './sql-snippets';
 
@@ -30,6 +31,19 @@ export function describeColumn(column: KnownColumn): string {
   return partes.join(' · ');
 }
 
+/** Propone `oi` para `order_items` y `u` para `users`. */
+function suggestedAlias(name: string): string {
+  const words = name
+    .replace(/([\p{Ll}\p{N}])(\p{Lu})/gu, '$1 $2')
+    .split(/[^\p{L}\p{N}]+/u)
+    .filter(Boolean);
+
+  return words
+    .map((word) => word[0])
+    .join('')
+    .toLowerCase();
+}
+
 /** Contexto que el editor consulta en cada pulsación para sugerir. */
 export interface CompletionContext {
   readonly engine: DatabaseEngine;
@@ -41,10 +55,7 @@ export interface CompletionContext {
    * Es opcional a propósito: sin esto el autocompletado sigue funcionando con lo
    * que ya está cargado, que es como se comportaba antes.
    */
-  readonly loadColumns?: (
-    schema: string | null,
-    name: string,
-  ) => Promise<readonly KnownColumn[]>;
+  readonly loadColumns?: (schema: string | null, name: string) => Promise<readonly KnownColumn[]>;
 
   /**
    * Carga las tablas de un esquema que el explorador aún no ha recorrido.
@@ -53,6 +64,14 @@ export interface CompletionContext {
    * precalienta entero: este es el camino para el resto.
    */
   readonly loadRelations?: (schema: string) => Promise<void>;
+
+  /**
+   * Fragmentos que el usuario guardó con nombre.
+   *
+   * Opcional para que el autocompletado siga funcionando sin ellos, que es como
+   * se comportaba antes de que existieran.
+   */
+  readonly snippets?: readonly SavedSnippet[];
 }
 
 /**
@@ -91,7 +110,7 @@ export function registerSqlCompletion(
     triggerCharacters: ['.'],
 
     provideCompletionItems(model, position) {
-      const { engine, schema, loadColumns, loadRelations } = getContext();
+      const { engine, schema, loadColumns, loadRelations, snippets } = getContext();
 
       const word = model.getWordUntilPosition(position);
       const range: MonacoApi.IRange = {
@@ -144,20 +163,45 @@ export function registerSqlCompletion(
       /** Tablas y vistas de un esquema, ya sin su nombre delante. */
       function relationItems(relations: readonly KnownRelation[]) {
         return {
-          suggestions: relations.map((relation) => ({
-            label: relation.name,
-            kind: relation.kind === 'view'
-              ? monaco.languages.CompletionItemKind.Interface
-              : monaco.languages.CompletionItemKind.Struct,
-            // Sin el esquema: el usuario acaba de escribirlo.
-            insertText: relation.name,
-            detail: relation.columns.length > 0
-              ? `${relation.qualified} · ${relation.columns.length} columnas`
-              : relation.qualified,
-            sortText: `0_${relation.name}`,
-            range,
-          })),
+          suggestions: relations.flatMap((relation) => relationItemsFor(relation, false)),
         };
+      }
+
+      /** Ofrece cada relación tal cual y con un alias breve que se puede editar. */
+      function relationItemsFor(
+        relation: KnownRelation,
+        includeSchema: boolean,
+      ): MonacoApi.languages.CompletionItem[] {
+        const kind =
+          relation.kind === 'view'
+            ? monaco.languages.CompletionItemKind.Interface
+            : monaco.languages.CompletionItemKind.Struct;
+        const insertName = includeSchema ? relation.qualified : relation.name;
+        const detail =
+          relation.columns.length > 0
+            ? `${relation.qualified} · ${relation.columns.length} columnas`
+            : relation.qualified;
+        const alias = suggestedAlias(relation.name);
+
+        return [
+          {
+            label: relation.name,
+            kind,
+            insertText: insertName,
+            detail,
+            sortText: `0_${relation.name}_0`,
+            range,
+          },
+          {
+            label: `${relation.name} AS ${alias}`,
+            kind,
+            insertText: `${insertName} AS \${1:${alias}}`,
+            insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+            detail: `${detail} · con alias`,
+            sortText: `0_${relation.name}_1`,
+            range,
+          },
+        ];
       }
 
       // --- Tras un punto: solo columnas de esa relación --------------------
@@ -165,10 +209,10 @@ export function registerSqlCompletion(
         const aliases = aliasMap(model.getValue());
         const target = qualifier.schema
           ? qualifier
-          : aliases.get(qualifier.name.toLowerCase()) ?? {
+          : (aliases.get(qualifier.name.toLowerCase()) ?? {
               schema: null,
               name: qualifier.name.toLowerCase(),
-            };
+            });
 
         const relation = findRelation(schema, target);
 
@@ -206,26 +250,9 @@ export function registerSqlCompletion(
       const suggestions: MonacoApi.languages.CompletionItem[] = [];
 
       for (const relation of schema.relations) {
-        suggestions.push({
-          label: relation.name,
-          kind: relation.kind === 'view'
-            ? monaco.languages.CompletionItemKind.Interface
-            : monaco.languages.CompletionItemKind.Struct,
-          // Se inserta el nombre calificado, que es el que siempre funciona:
-          // `usuarios` a secas solo vale si la tabla está en el esquema por
-          // omisión del usuario, y eso el cliente no lo sabe. Es además lo que
-          // ya hace el explorador al abrir un `SELECT` desde una tabla.
-          //
-          // La etiqueta se queda con el nombre corto, que es por el que se
-          // busca en el desplegable.
-          insertText: relation.qualified,
-          detail: relation.columns.length > 0
-            ? `${relation.qualified} · ${relation.columns.length} columnas`
-            : relation.qualified,
-          // Las tablas van primero: es lo que más se escribe.
-          sortText: `0_${relation.name}`,
-          range,
-        });
+        // El nombre calificado siempre funciona aunque la relación no esté en
+        // el esquema por omisión del usuario.
+        suggestions.push(...relationItemsFor(relation, true));
       }
 
       for (const schemaName of schema.schemas) {
@@ -270,6 +297,20 @@ export function registerSqlCompletion(
         });
       }
 
+      // Por delante de las plantillas de fábrica: estos los guardó el usuario, y
+      // se escriben buscando el nombre que él mismo les puso.
+      for (const saved of snippets ?? []) {
+        suggestions.push({
+          label: saved.name,
+          kind: monaco.languages.CompletionItemKind.Snippet,
+          insertText: saved.sql,
+          detail: 'fragmento guardado',
+          documentation: { value: ['```sql', saved.sql, '```'].join('\n') },
+          sortText: `1_${saved.name}`,
+          range,
+        });
+      }
+
       for (const snippet of snippetsFor(engine)) {
         suggestions.push({
           label: snippet.trigger,
@@ -277,7 +318,9 @@ export function registerSqlCompletion(
           insertText: snippet.body,
           insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
           detail: snippet.description,
-          documentation: { value: `\`\`\`sql\n${snippet.body.replace(/\$\{\d+:?([^}]*)\}/g, '$1')}\n\`\`\`` },
+          documentation: {
+            value: `\`\`\`sql\n${snippet.body.replace(/\$\{\d+:?([^}]*)\}/g, '$1')}\n\`\`\``,
+          },
           // Detrás de las tablas y por delante de las reservadas: se buscan a
           // propósito, escribiendo su nombre.
           sortText: `2_${snippet.trigger}`,

@@ -133,6 +133,8 @@ export class TableDesigner {
   protected readonly name = signal('');
   protected readonly rows = signal<DesignRow[]>([]);
   protected readonly dataTypes = signal<readonly string[]>([]);
+  protected readonly openTypeIndex = signal<number | null>(null);
+  protected readonly highlightedType = signal(0);
 
   protected readonly section = signal<DesignerSection>('columns');
   protected readonly indexes = signal<IndexRow[]>([]);
@@ -201,7 +203,107 @@ export class TableDesigner {
   protected readonly methods = computed(() => this.capabilities().methods);
 
   protected select(section: DesignerSection): void {
+    this.openTypeIndex.set(null);
     this.section.set(section);
+  }
+
+  /** Sugerencias del motor, filtradas sin convertirlas en una lista cerrada. */
+  protected typeSuggestions(row: DesignRow): readonly string[] {
+    const types = this.dataTypes();
+    const term = row.dataType.trim().toLowerCase();
+
+    if (!term || types.some((type) => type.toLowerCase() === term)) {
+      return types.slice(0, 30);
+    }
+
+    return types
+      .filter((type) => type.toLowerCase().includes(term))
+      .sort((left, right) => {
+        const leftStarts = left.toLowerCase().startsWith(term);
+        const rightStarts = right.toLowerCase().startsWith(term);
+
+        return leftStarts === rightStarts ? 0 : leftStarts ? -1 : 1;
+      })
+      .slice(0, 30);
+  }
+
+  protected openTypeSuggestions(index: number, row: DesignRow): void {
+    const current = row.dataType.trim().toLowerCase();
+    const exact = this.typeSuggestions(row).findIndex((type) => type.toLowerCase() === current);
+
+    this.openTypeIndex.set(index);
+    this.highlightedType.set(Math.max(0, exact));
+  }
+
+  protected onDataTypeInput(event: Event, index: number): void {
+    const value = (event.target as HTMLInputElement).value;
+
+    this.rows.update((rows) =>
+      rows.map((row, position) => (position === index ? { ...row, dataType: value } : row)),
+    );
+    this.openTypeIndex.set(index);
+    this.highlightedType.set(0);
+    this.touched();
+  }
+
+  protected closeTypeSuggestions(index: number): void {
+    if (this.openTypeIndex() === index) {
+      this.openTypeIndex.set(null);
+    }
+  }
+
+  protected chooseDataType(event: Event, index: number, type: string): void {
+    event.preventDefault();
+    this.rows.update((rows) =>
+      rows.map((row, position) => (position === index ? { ...row, dataType: type } : row)),
+    );
+    this.openTypeIndex.set(null);
+    this.touched();
+  }
+
+  protected onDataTypeKeydown(event: KeyboardEvent, index: number, row: DesignRow): void {
+    const suggestions = this.typeSuggestions(row);
+    const open = this.openTypeIndex() === index;
+
+    switch (event.key) {
+      case 'ArrowDown':
+        event.preventDefault();
+
+        if (!open) {
+          this.openTypeSuggestions(index, row);
+        } else {
+          this.highlightedType.update((current) =>
+            Math.min(current + 1, Math.max(0, suggestions.length - 1)),
+          );
+        }
+        break;
+      case 'ArrowUp':
+        event.preventDefault();
+
+        if (!open) {
+          this.openTypeSuggestions(index, row);
+          this.highlightedType.set(Math.max(0, suggestions.length - 1));
+        } else {
+          this.highlightedType.update((current) => Math.max(0, current - 1));
+        }
+        break;
+      case 'Enter': {
+        const selected = suggestions[this.highlightedType()];
+
+        if (open && selected) {
+          event.preventDefault();
+          this.chooseDataType(event, index, selected);
+        }
+        break;
+      }
+      case 'Escape':
+        if (open) {
+          event.preventDefault();
+          event.stopPropagation();
+          this.openTypeIndex.set(null);
+        }
+        break;
+    }
   }
 
   /**
@@ -343,6 +445,7 @@ export class TableDesigner {
    * la marca, porque eso es una instrucción que hay que confirmar aparte.
    */
   protected removeColumn(index: number): void {
+    this.openTypeIndex.set(null);
     this.rows.update((rows) => {
       const row = rows[index];
 

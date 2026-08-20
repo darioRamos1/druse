@@ -1,5 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 
+import { SavedSnippet } from '../../core/application-gateway/application-gateway';
 import { ConnectionSummary, ExplorerNode } from '../../shared/models/workspace';
 import CommandPalette from './command-palette';
 
@@ -37,6 +38,12 @@ const table: ExplorerNode = {
   },
 };
 
+const snippet: SavedSnippet = {
+  id: 'snippet-1',
+  name: 'Pedidos del día',
+  sql: ['-- los de hoy', 'SELECT * FROM pedidos WHERE creado >= CURRENT_DATE'].join('\n'),
+};
+
 describe('CommandPalette', () => {
   let fixture: ComponentFixture<CommandPalette>;
 
@@ -46,6 +53,7 @@ describe('CommandPalette', () => {
     fixture = TestBed.createComponent(CommandPalette);
     fixture.componentRef.setInput('connections', [connection]);
     fixture.componentRef.setInput('nodes', [table]);
+    fixture.componentRef.setInput('snippets', [snippet]);
     fixture.detectChanges();
     await fixture.whenStable();
   });
@@ -75,5 +83,112 @@ describe('CommandPalette', () => {
     const text = (fixture.nativeElement as HTMLElement).textContent;
 
     expect(text).toContain('Pruebas · druse_test · public.users');
+  });
+
+  it('presenta los tipos de resultado en español', () => {
+    const element = fixture.nativeElement as HTMLElement;
+    const kinds = [...element.querySelectorAll<HTMLElement>('.result__kind')]
+      .map((item) => item.textContent?.trim());
+
+    expect(kinds).toContain('comando');
+    expect(kinds).toContain('conexión');
+    expect(kinds).toContain('tabla');
+    expect(kinds).toContain('fragmento');
+    expect(kinds).not.toContain('command');
+    expect(kinds).not.toContain('connection');
+  });
+
+  /** El comentario de cabecera explica, pero no distingue un fragmento de otro. */
+  it('lista los fragmentos por su nombre y su primera línea de SQL', () => {
+    const text = (fixture.nativeElement as HTMLElement).textContent;
+
+    expect(text).toContain('Pedidos del día');
+    expect(text).toContain('SELECT * FROM pedidos');
+    expect(text).not.toContain('-- los de hoy');
+  });
+
+  it('inserta el fragmento elegido', () => {
+    const inserted: SavedSnippet[] = [];
+    fixture.componentInstance.insertSnippet.subscribe((item) => inserted.push(item));
+
+    const input = fixture.nativeElement.querySelector('input') as HTMLInputElement;
+    input.value = 'Pedidos del día';
+    input.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
+
+    expect(inserted[0]?.id).toBe(snippet.id);
+  });
+
+  /**
+   * El nombre se pide en el mismo campo: abrir un diálogo encima para una línea
+   * de texto sería sacar al usuario del teclado para devolverlo al mismo sitio.
+   */
+  it('pide el nombre en el propio buscador y guarda con él', async () => {
+    const names: string[] = [];
+    fixture.componentInstance.saveSnippet.subscribe((name) => names.push(name));
+
+    const input = () => fixture.nativeElement.querySelector('input') as HTMLInputElement;
+
+    input().value = 'Guardar como fragmento';
+    input().dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+    input().dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    expect(input().getAttribute('aria-label')).toBe('Nombre del fragmento');
+
+    input().value = '  Ventas del mes  ';
+    input().dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+    input().dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
+
+    expect(names).toEqual(['Ventas del mes']);
+  });
+
+  it('permite dejar el nombre vacío para que lo proponga el SQL', async () => {
+    const names: string[] = [];
+    fixture.componentInstance.saveSnippet.subscribe((name) => names.push(name));
+
+    const input = () => fixture.nativeElement.querySelector('input') as HTMLInputElement;
+
+    input().value = 'Guardar como fragmento';
+    input().dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+    input().dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    input().dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
+
+    expect(names).toEqual(['']);
+  });
+
+  /**
+   * Borrar no se deshace, así que la primera pulsación pregunta. Una lista que
+   * se recorre con las flechas no puede borrar a la primera.
+   */
+  it('borra un fragmento a la segunda pulsación', () => {
+    const deleted: SavedSnippet[] = [];
+    fixture.componentInstance.deleteSnippet.subscribe((item) => deleted.push(item));
+
+    const input = fixture.nativeElement.querySelector('input') as HTMLInputElement;
+    input.value = 'Pedidos del día';
+    input.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+
+    const borrar = () =>
+      input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Delete', shiftKey: true }));
+
+    borrar();
+    fixture.detectChanges();
+
+    expect(deleted).toEqual([]);
+    expect((fixture.nativeElement as HTMLElement).textContent).toContain('otra vez');
+
+    borrar();
+
+    expect(deleted[0]?.id).toBe(snippet.id);
   });
 });

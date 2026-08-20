@@ -19,6 +19,7 @@ internal static class StorageEndpoints
         MapHistory(app);
         MapPreferences(app);
         MapEditorTabs(app);
+        MapSnippets(app);
     }
 
     private static void MapConnections(IEndpointRouteBuilder app)
@@ -241,5 +242,52 @@ internal static class StorageEndpoints
             return Results.NoContent();
         })
         .WithName("SaveEditorTabs");
+    }
+
+    /// <summary>
+    /// Fragmentos de SQL guardados con nombre.
+    ///
+    /// Se guardan de uno en uno —no como las pestañas, que van juntas—: son
+    /// independientes entre sí y guardar uno no puede tocar los demás.
+    /// </summary>
+    private static void MapSnippets(IEndpointRouteBuilder app)
+    {
+        app.MapGet("/api/workspace/snippets", async (
+            ISqlSnippetStore snippets,
+            CancellationToken cancellationToken) =>
+            Results.Ok((await snippets.GetAllAsync(cancellationToken)).Select(snippet => snippet.ToDto())))
+        .WithName("GetSqlSnippets");
+
+        app.MapPut("/api/workspace/snippets/{id:guid}", async (
+            Guid id,
+            SqlSnippetDto request,
+            ISqlSnippetStore snippets,
+            CancellationToken cancellationToken) =>
+        {
+            var name = request.Name?.Trim() ?? string.Empty;
+
+            // Un fragmento sin nombre no se puede volver a encontrar, y uno sin
+            // SQL no tiene nada que insertar: las dos cosas son el fragmento.
+            if (name.Length == 0 || string.IsNullOrWhiteSpace(request.Sql))
+            {
+                return Results.BadRequest(new { message = "Un fragmento necesita nombre y SQL." });
+            }
+
+            await snippets.SaveAsync((request with { Name = name }).ToDomain(id), cancellationToken);
+
+            return Results.NoContent();
+        })
+        .WithName("SaveSqlSnippet");
+
+        app.MapDelete("/api/workspace/snippets/{id:guid}", async (
+            Guid id,
+            ISqlSnippetStore snippets,
+            CancellationToken cancellationToken) =>
+        {
+            var deleted = await snippets.DeleteAsync(id, cancellationToken);
+
+            return deleted ? Results.NoContent() : Results.NotFound();
+        })
+        .WithName("DeleteSqlSnippet");
     }
 }
