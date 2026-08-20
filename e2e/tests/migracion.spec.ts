@@ -372,8 +372,10 @@ test.describe('migrar datos entre tablas', () => {
     // marcan las dos que interesan.
     await dialogo.getByRole('button', { name: 'Ninguna' }).click();
 
+    // Se pulsa la fila entera, que es el gesto de una persona: la etiqueta
+    // envuelve a la casilla, y pulsar la casilla por dentro puede llegar dos veces.
     for (const tabla of ['e2e_clientes', 'e2e_pedidos']) {
-      await dialogo.locator('.tables__row', { hasText: tabla }).first().locator('input').check();
+      await dialogo.locator('.tables__row', { hasText: tabla }).first().click();
     }
 
     // Se comprueba la cuenta antes de seguir: si una casilla no prendió, el fallo
@@ -424,6 +426,111 @@ test.describe('migrar datos entre tablas', () => {
       `DROP SCHEMA IF EXISTS ${esquema} CASCADE;
        DROP TABLE IF EXISTS e2e_pedidos;
        DROP TABLE IF EXISTS e2e_clientes;`,
+    );
+  });
+  /**
+   * Guardar una migración y volver a lanzarla desde la lista.
+   *
+   * Es la otra mitad de la fase: un perfil guarda **nombres**, así que la prueba
+   * cierra el asistente, lo vuelve a abrir —sesión nueva del diálogo— y lanza el
+   * perfil sin volver a elegir nada. Lo que se cuenta al final son las filas.
+   */
+  test('guarda la migración y la repite desde el perfil', async ({ page }) => {
+    await abrir(page);
+    await conectar(page);
+
+    const esquema = 'e2e_perfil';
+    const perfil = `Perfil e2e ${Date.now()}`;
+
+    await ejecutarConAviso(
+      page,
+      `DROP SCHEMA IF EXISTS ${esquema} CASCADE;
+       DROP TABLE IF EXISTS e2e_perfil_clientes;
+       CREATE TABLE e2e_perfil_clientes (id int PRIMARY KEY, nombre text);
+       INSERT INTO e2e_perfil_clientes VALUES (1, 'Ana'), (2, 'Bea');
+       CREATE SCHEMA ${esquema};
+       CREATE TABLE ${esquema}.e2e_perfil_clientes (id int PRIMARY KEY, nombre text);`,
+    );
+
+    await desplegar(page, 'druse_test', 'public');
+    await desplegar(page, 'public', 'Tables');
+
+    const sidebar = page.locator('app-connections-sidebar');
+    const dialogo = page.locator('app-transfer-set-dialog');
+
+    /** Abre el asistente de la pasada desde la carpeta de tablas. */
+    async function abrirAsistente(): Promise<void> {
+      await sidebar
+        .locator('.node', { hasText: 'Tables' })
+        .first()
+        .getByRole('button', { name: 'Acciones para Tables' })
+        .click();
+      await page.getByRole('menuitem', { name: 'Migrar tablas a…' }).click();
+      await expect(dialogo).toBeVisible();
+    }
+
+    // --- Primera vez: se arma a mano y se guarda ---------------------------
+    await abrirAsistente();
+
+    await dialogo.getByRole('button', { name: 'Ninguna' }).click();
+    // Se pulsa la fila, que es lo que hace una persona: la etiqueta envuelve a la
+    // casilla.
+    await dialogo.locator('.tables__row', { hasText: 'e2e_perfil_clientes' }).first().click();
+    await expect(dialogo.locator('.bulk__count')).toContainText('1 de');
+
+    await dialogo.getByRole('button', { name: 'Elegir destino' }).click();
+
+    for (const paso of ['druse_test', esquema, 'Tables']) {
+      const nodo = dialogo.locator('.browser__item', { hasText: paso }).first();
+
+      await expect(nodo).toBeVisible({ timeout: 30_000 });
+      await nodo.click();
+    }
+
+    await dialogo.getByRole('button', { name: 'Migrar a' }).click();
+    await expect(dialogo.locator('.plan__list li')).toHaveCount(1, { timeout: 30_000 });
+
+    await dialogo.locator('.save input').fill(perfil);
+    await dialogo.getByRole('button', { name: 'Guardar' }).click();
+
+    // Se cierra sin copiar: lo que se comprobaba era que quedara guardado.
+    await dialogo.locator('.foot').getByRole('button', { name: 'Cancelar' }).click();
+    await expect(dialogo).toBeHidden();
+
+    // --- Segunda vez: se abre el perfil y se lanza -------------------------
+    await abrirAsistente();
+
+    // Por su fila y no por el nombre: el botón de borrar lo lleva en su etiqueta.
+    await dialogo.locator('.saved__open', { hasText: perfil }).first().click();
+
+    // Salta directo al plan, con su tabla y su destino ya resueltos.
+    await expect(dialogo.locator('.plan__list li')).toHaveCount(1, { timeout: 30_000 });
+    await expect(dialogo.locator('.route')).toContainText(esquema);
+
+    await dialogo.getByRole('button', { name: 'Copiar 1 tablas' }).click();
+    await expect(dialogo.locator('.summary__title')).toContainText('Copiadas 2 filas', {
+      timeout: 60_000,
+    });
+
+    await dialogo.locator('.foot').getByRole('button', { name: 'Cerrar' }).click();
+    await expect(dialogo).toBeHidden();
+
+    expect(await contar(page, `${esquema}.e2e_perfil_clientes`)).toBe('2');
+
+    // Y se recoge: el perfil vive en la base local y se vería en la vuelta siguiente.
+    await abrirAsistente();
+    await dialogo
+      .locator('.saved__row', { hasText: perfil })
+      .first()
+      .getByRole('button', { name: `Borrar el perfil ${perfil}` })
+      .click();
+    await expect(dialogo.locator('.saved__row', { hasText: perfil })).toHaveCount(0);
+    await dialogo.locator('.foot').getByRole('button', { name: 'Cancelar' }).click();
+
+    await ejecutarConAviso(
+      page,
+      `DROP SCHEMA IF EXISTS ${esquema} CASCADE;
+       DROP TABLE IF EXISTS e2e_perfil_clientes;`,
     );
   });
 });
