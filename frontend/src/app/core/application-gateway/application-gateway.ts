@@ -993,6 +993,8 @@ export interface TransferProfile {
   readonly targetSchema?: string;
   readonly tables: readonly string[];
   readonly mode: TransferMode;
+  /** Lo que cada tabla hace distinto, por su nombre. Lo demás sigue a la pasada. */
+  readonly tableOptions?: Readonly<Record<string, TransferTableOptions>>;
   readonly ordered: boolean;
   readonly atomic: boolean;
   readonly keepIdentity: boolean;
@@ -1000,6 +1002,14 @@ export interface TransferProfile {
   readonly createdAtUtc?: string;
   readonly updatedAtUtc?: string;
   readonly lastRunAtUtc?: string | null;
+}
+
+/** Lo que una tabla concreta hace distinto del resto de la pasada. */
+export interface TransferTableOptions {
+  /** Su modo, o ausente para seguir el de la pasada. */
+  readonly mode?: TransferMode;
+  /** Su condición, sin `WHERE` delante. */
+  readonly where?: string;
 }
 
 /** Una tabla del perfil que hoy existe a los dos lados. */

@@ -52,6 +52,20 @@ public sealed record TransferProfile
 
     public TransferMode Mode { get; init; } = TransferMode.Insert;
 
+    /// <summary>
+    /// Lo que cada tabla hace distinto del resto, por su nombre.
+    ///
+    /// Migrar seis tablas no significa tratarlas igual: de una se lleva el año en
+    /// curso y de otra todo, y una se actualiza mientras las demás se añaden. Lo
+    /// que no aparezca aquí sigue el modo de la pasada.
+    ///
+    /// **Se guarda con el perfil** porque olvidarlo sería peligroso: un perfil que
+    /// perdiera el filtro se llevaría la tabla entera la próxima vez, sin que
+    /// nadie lo pidiera.
+    /// </summary>
+    public IReadOnlyDictionary<string, TransferTableOptions> TableOptions { get; init; } =
+        new Dictionary<string, TransferTableOptions>(StringComparer.OrdinalIgnoreCase);
+
     /// <summary>Ordenar por las claves foráneas del destino antes de copiar.</summary>
     public bool Ordered { get; init; } = true;
 
@@ -68,6 +82,13 @@ public sealed record TransferProfile
     /// <summary>Cuándo se lanzó por última vez. Nulo si nunca se ha ejecutado.</summary>
     public DateTimeOffset? LastRunAtUtc { get; init; }
 }
+
+/// <summary>Lo que una tabla concreta hace distinto del resto de la pasada.</summary>
+/// <param name="Mode">Su modo, o `null` para seguir el de la pasada.</param>
+/// <param name="Where">
+/// Su condición, sin `WHERE` delante. Vacío significa la tabla entera.
+/// </param>
+public sealed record TransferTableOptions(TransferMode? Mode = null, string? Where = null);
 
 /// <summary>Una tabla del perfil que hoy existe a los dos lados.</summary>
 /// <param name="Source">La del origen, tal y como está hoy en el catálogo.</param>

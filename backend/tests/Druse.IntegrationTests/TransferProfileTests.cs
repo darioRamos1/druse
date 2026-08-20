@@ -196,6 +196,51 @@ public sealed class TransferProfileTests(DruseApiFactory factory) : IClassFixtur
         }
     }
 
+    /// <summary>
+    /// Lo que cada tabla hace distinto se guarda con el perfil.
+    ///
+    /// Olvidarlo sería peligroso: un perfil que perdiera el filtro se llevaría la
+    /// tabla entera la próxima vez, sin que nadie lo pidiera.
+    /// </summary>
+    [RequiresPostgreSqlFact]
+    public async Task GuardaLoQueCadaTablaHaceDistinto()
+    {
+        using var client = _factory.CreateAuthenticatedClient();
+
+        var creado = await GuardarAsync(client, new
+        {
+            name = $"Perfil {Guid.NewGuid():N}",
+            sourceSchema = "public",
+            targetSchema = "public",
+            tables = DosTablas,
+            mode = "Insert",
+            tableOptions = new Dictionary<string, object>
+            {
+                ["pedidos"] = new { mode = "Upsert", where = "anio = 2026" },
+            },
+        });
+
+        var id = creado.GetProperty("id").GetGuid();
+
+        try
+        {
+            var releido = await client.GetAsync($"/api/transfers/profiles/{id}");
+
+            releido.EnsureSuccessStatusCode();
+
+            var opciones = (await releido.ReadJsonAsync())
+                .GetProperty("tableOptions")
+                .GetProperty("pedidos");
+
+            Assert.Equal("Upsert", opciones.GetProperty("mode").GetString());
+            Assert.Equal("anio = 2026", opciones.GetProperty("where").GetString());
+        }
+        finally
+        {
+            await client.DeleteAsync($"/api/transfers/profiles/{id}");
+        }
+    }
+
     /// <summary>Un perfil sin tablas no se guarda: no repetiría nada.</summary>
     [RequiresPostgreSqlFact]
     public async Task UnPerfilSinTablasSeRechaza()

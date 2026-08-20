@@ -156,7 +156,7 @@
 
       <div class="options">
         <label class="field">
-          <span class="field__label">Qué hacer con lo que ya está</span>
+          <span class="field__label">Qué hacer con lo que ya está, por omisión</span>
           <!-- La opción marcada va en el <option> y no en el <select>: al abrir un
                perfil, el valor se pone antes de que existan las opciones y se
                perdería. -->
@@ -221,6 +221,55 @@
           {{ profileId() ? 'Actualizar' : 'Guardar' }}
         </button>
       </label>
+
+      <!-- Cada tabla puede ir a lo suyo: de una se lleva el año en curso y de otra
+           todo, y una se actualiza mientras las demás se añaden. -->
+      <details class="each" [open]="tweaked() > 0">
+        <summary class="each__summary">
+          Ajustar tabla por tabla
+          @if (tweaked(); as cuantas) {
+            <span class="each__badge">{{ cuantas }} con algo distinto</span>
+          }
+        </summary>
+
+        <table class="each__table">
+          <thead>
+            <tr>
+              <th scope="col">Tabla</th>
+              <th scope="col">Qué hacer con lo que ya está</th>
+              <th scope="col">Qué filas se llevan</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (pair of ready(); track pair.source.id) {
+              <tr>
+                <td class="each__name">{{ pair.source.name }}</td>
+                <td>
+                  <select (change)="setTableMode(pair.source.name, $any($event.target).value)">
+                    @for (option of modes; track option.id) {
+                      <option
+                        [value]="option.id"
+                        [selected]="option.id === modeOf(pair.source.name)"
+                      >
+                        {{ option.label }}
+                      </option>
+                    }
+                  </select>
+                </td>
+                <td>
+                  <input
+                    type="text"
+                    class="each__where"
+                    [value]="whereOf(pair.source.name)"
+                    (change)="setTableWhere(pair.source.name, $any($event.target).value)"
+                    placeholder="todas — o una condición, sin WHERE"
+                  />
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </details>
 
       <section class="plan">
         <h3 class="plan__title">

@@ -234,11 +234,11 @@ unitarias; la prueba de punta a punta del camino nuevo crea la tabla **dentro de
 mismo motor**, así que el asistente cruzado no lo ha recorrido nadie desde la
 pantalla; y el paso de tipos no tiene pruebas de componente en el frontend.
 
-### Fase 4 — Varias tablas y migraciones guardadas 🟡 (en curso, sesiones 023d y 023f)
+### Fase 4 — Varias tablas y migraciones guardadas ✅ (sesiones 023d, 023f e 023i)
 
 Dos cosas que caben en una fase porque se usan juntas: llevar un conjunto de
-tablas de una vez, y poder repetirlo mañana sin volver a armarlo. La primera
-está terminada —motor, puerta HTTP y pantalla—. La segunda no se ha empezado.
+tablas de una vez, y poder repetirlo mañana sin volver a armarlo. Las dos están
+terminadas, de motor a pantalla.
 
 #### La decisión que había que tomar antes de escribir código
 
@@ -323,15 +323,50 @@ El orden se pide antes de confirmar y se enseña como lista numerada, con el avi
 de los ciclos debajo. Y el progreso ya usa los dos niveles: la tabla en curso
 contra su estimación, y «tabla 2 de 6» encima.
 
-#### Lo que falta
+#### Cada tabla a lo suyo ✅
 
-**Los perfiles**, espejo de `SqliteBackupProfileStore`: una tabla nueva en
-`DruseDatabase`, al lado de `backup_profiles`, con la selección en JSON por lo
-mismo que allí. La regla que no se puede saltar es la suya: el perfil guarda
-**nombres calificados, no identificadores de sesión**, porque se reabre meses
-después contra otra conexión y la sesión de hoy ya no existirá. Al abrirlo se
-pregunta contra qué conexión viva se resuelve cada extremo, y lo que ya no existe
-se reconcilia como hace el respaldo con `known_tables_json`.
+Migrar seis tablas no significa tratarlas igual: de una se lleva el año en curso y
+de otra todo, y una se actualiza mientras las demás se añaden. El modo de la
+pantalla es **el de partida**, y debajo, plegado, cada tabla puede llevar el suyo y
+su condición.
+
+Elegir en una tabla el mismo modo de la pasada **no la separa del resto**: si
+contara como algo distinto, cambiar después el modo general la dejaría atrás sin
+que nadie lo hubiera pedido.
+
+#### Migraciones guardadas ✅
+
+Espejo de `SqliteBackupProfileStore`: tabla `transfer_profiles` en `DruseDatabase`,
+con las tablas y las opciones en JSON por lo mismo que allí —solo se usan
+enteras— y lo que se lista y se ordena en columnas propias.
+
+La regla que no se puede saltar es la suya: el perfil guarda **nombres —conexión,
+base, esquema y tablas—, no identificadores de sesión**, porque se reabre meses
+después y para entonces aquella sesión hace mucho que se cerró. Al abrirlo se
+resuelve contra dos conexiones vivas, que no tienen por qué ser las de aquel día:
+repetir en otro entorno la misma migración es justo para lo que se guarda.
+
+Y se abre **diciendo las dos cosas**: lo que hoy se puede migrar y lo que no.
+Negarse por una tabla que alguien borró obligaría a rehacer el perfil entero;
+abrirlo callando las ausencias haría creer que la pasada se llevó algo que no se
+llevó. Las que faltan en el destino no se crean desde aquí, por lo mismo que en la
+pantalla: crear una tabla es una decisión con tipos y clave primaria.
+
+Lo que cada tabla hace distinto **se guarda con el perfil**. Olvidarlo sería
+peligroso: uno que perdiera el filtro se llevaría la tabla entera la próxima vez,
+sin que nadie lo pidiera.
+
+Buscar en el catálogo por nombre —que es como guardan los perfiles— lo hacen ya
+dos servicios, así que vive en `CatalogLookup`.
+
+#### Lo que queda fuera de la fase
+
+**La clave de emparejamiento por tabla.** Al actualizar, la pasada usa la clave
+primaria de cada destino; en el asistente de una tabla sí se puede cambiar, y
+sincronizar entornos suele hacerse por una clave de negocio.
+
+**Vaciar y cargar en pasada**, que se deja a propósito: vaciar exige escribir el
+nombre de la tabla, y con seis marcadas serían seis confirmaciones.
 
 ---
 

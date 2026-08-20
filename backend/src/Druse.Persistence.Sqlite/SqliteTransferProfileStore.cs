@@ -53,6 +53,15 @@ public sealed class SqliteTransferProfileStore(DruseDatabase database) : ITransf
         public bool KeepIdentity { get; init; } = true;
 
         public int BatchSize { get; init; } = DataTransferRequest.DefaultBatchSize;
+
+        /// <summary>
+        /// Lo que cada tabla hace distinto, por su nombre.
+        ///
+        /// Va aquí dentro y no en columnas propias por lo mismo que la lista de
+        /// tablas: es un diccionario de tamaño libre que solo se usa entero.
+        /// </summary>
+        public Dictionary<string, TransferTableOptions> TableOptions { get; init; } =
+            new(StringComparer.OrdinalIgnoreCase);
     }
 
     public async Task<IReadOnlyList<TransferProfile>> GetAllAsync(CancellationToken cancellationToken)
@@ -152,6 +161,9 @@ public sealed class SqliteTransferProfileStore(DruseDatabase database) : ITransf
                 Atomic = profile.Atomic,
                 KeepIdentity = profile.KeepIdentity,
                 BatchSize = profile.BatchSize,
+                TableOptions = new Dictionary<string, TransferTableOptions>(
+                    profile.TableOptions,
+                    StringComparer.OrdinalIgnoreCase),
             },
             Json));
         command.Parameters.AddWithValue("$created", Text(profile.CreatedAtUtc));
@@ -214,6 +226,7 @@ public sealed class SqliteTransferProfileStore(DruseDatabase database) : ITransf
             Atomic = options.Atomic,
             KeepIdentity = options.KeepIdentity,
             BatchSize = options.BatchSize,
+            TableOptions = options.TableOptions,
             CreatedAtUtc = Moment(reader.GetString(10)),
             UpdatedAtUtc = Moment(reader.GetString(11)),
             LastRunAtUtc = reader.IsDBNull(12) ? null : Moment(reader.GetString(12)),

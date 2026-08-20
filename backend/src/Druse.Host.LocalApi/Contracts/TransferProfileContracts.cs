@@ -34,6 +34,14 @@ public sealed record TransferProfileDto
     /// <summary>`Insert`, `Replace`, `Upsert` o `SkipExisting`.</summary>
     public string Mode { get; init; } = nameof(TransferMode.Insert);
 
+    /// <summary>
+    /// Lo que cada tabla hace distinto del resto, por su nombre.
+    ///
+    /// Lo que no aparezca aquí sigue el modo de la pasada.
+    /// </summary>
+    public IReadOnlyDictionary<string, TransferTableOptionsDto> TableOptions { get; init; } =
+        new Dictionary<string, TransferTableOptionsDto>(StringComparer.OrdinalIgnoreCase);
+
     public bool Ordered { get; init; } = true;
 
     public bool Atomic { get; init; }
@@ -49,6 +57,16 @@ public sealed record TransferProfileDto
     public DateTimeOffset? UpdatedAtUtc { get; init; }
 
     public DateTimeOffset? LastRunAtUtc { get; init; }
+}
+
+/// <summary>Lo que una tabla concreta hace distinto del resto de la pasada.</summary>
+public sealed record TransferTableOptionsDto
+{
+    /// <summary>Su modo, o ausente para seguir el de la pasada.</summary>
+    public string? Mode { get; init; }
+
+    /// <summary>Su condición, sin `WHERE` delante. Vacía significa la tabla entera.</summary>
+    public string? Where { get; init; }
 }
 
 /// <summary>Contra qué conexiones vivas se abre un perfil.</summary>
@@ -107,6 +125,14 @@ internal static class TransferProfileMapper
             TargetSchema = profile.TargetSchema,
             Tables = profile.Tables,
             Mode = profile.Mode.ToString(),
+            TableOptions = profile.TableOptions.ToDictionary(
+                entry => entry.Key,
+                entry => new TransferTableOptionsDto
+                {
+                    Mode = entry.Value.Mode?.ToString(),
+                    Where = entry.Value.Where,
+                },
+                StringComparer.OrdinalIgnoreCase),
             Ordered = profile.Ordered,
             Atomic = profile.Atomic,
             KeepIdentity = profile.KeepIdentity,
@@ -144,6 +170,12 @@ internal static class TransferProfileMapper
             TargetSchema = dto.TargetSchema,
             Tables = [.. dto.Tables.Where(table => !string.IsNullOrWhiteSpace(table))],
             Mode = Parse(dto.Mode),
+            TableOptions = dto.TableOptions.ToDictionary(
+                entry => entry.Key,
+                entry => new TransferTableOptions(
+                    string.IsNullOrWhiteSpace(entry.Value.Mode) ? null : Parse(entry.Value.Mode),
+                    entry.Value.Where),
+                StringComparer.OrdinalIgnoreCase),
             Ordered = dto.Ordered,
             Atomic = dto.Atomic,
             KeepIdentity = dto.KeepIdentity,

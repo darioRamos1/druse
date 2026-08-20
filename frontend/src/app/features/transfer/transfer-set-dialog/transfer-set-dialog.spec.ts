@@ -275,6 +275,58 @@ describe('TransferSetDialog', () => {
   });
 
   /**
+   * Cada tabla puede ir a lo suyo.
+   *
+   * Migrar seis tablas no significa tratarlas igual: de una se lleva el año en
+   * curso y de otra todo, y una se actualiza mientras las demás se añaden.
+   */
+  it('manda el modo y el filtro de cada tabla', async () => {
+    await elegirDestino();
+
+    const filas = [...element.querySelectorAll('.each__table tbody tr')];
+    const modo = filas[0].querySelector<HTMLSelectElement>('select')!;
+    const filtro = filas[1].querySelector<HTMLInputElement>('input')!;
+
+    modo.value = 'Upsert';
+    modo.dispatchEvent(new Event('change'));
+    filtro.value = 'anio = 2026';
+    filtro.dispatchEvent(new Event('change'));
+    await settle(fixture);
+
+    boton('Copiar 2 tablas').click();
+    await settle(fixture);
+
+    const [primera, segunda] = gateway.lastSet!.tables;
+
+    expect(primera.mode).toBe('Upsert');
+    expect(primera.filter).toBeUndefined();
+    expect(segunda.mode).toBe('Insert');
+    expect(segunda.filter).toEqual({ where: 'anio = 2026' });
+  });
+
+  /**
+   * Poner en una tabla el mismo modo de la pasada no cuenta como algo distinto.
+   *
+   * Si contara, cambiar después el modo general dejaría atrás a esa tabla sin que
+   * nadie lo hubiera pedido.
+   */
+  it('elegir el modo de la pasada en una tabla no la separa del resto', async () => {
+    await elegirDestino();
+
+    const modo = element.querySelector<HTMLSelectElement>('.each__table select')!;
+
+    modo.value = 'Upsert';
+    modo.dispatchEvent(new Event('change'));
+    await settle(fixture);
+    expect(element.querySelector('.each__badge')?.textContent).toContain('1');
+
+    modo.value = 'Insert';
+    modo.dispatchEvent(new Event('change'));
+    await settle(fixture);
+    expect(element.querySelector('.each__badge')).toBeNull();
+  });
+
+  /**
    * Guardar la pasada guarda **nombres**, no sesiones.
    *
    * Es la regla del perfil de respaldo y aquí vale igual: esto se reabre meses
@@ -282,6 +334,12 @@ describe('TransferSetDialog', () => {
    */
   it('guarda la pasada con nombres y no con sesiones', async () => {
     await elegirDestino();
+
+    const filtro = element.querySelector<HTMLInputElement>('.each__where')!;
+
+    filtro.value = 'anio = 2026';
+    filtro.dispatchEvent(new Event('change'));
+    await settle(fixture);
 
     const nombre = element.querySelector<HTMLInputElement>('.save input')!;
 
@@ -299,6 +357,12 @@ describe('TransferSetDialog', () => {
       tables: ['pedidos', 'clientes'],
       mode: 'Insert',
       ordered: true,
+    });
+
+    // Y lo que cada tabla hacía distinto, que olvidarlo sería peligroso: un perfil
+    // sin el filtro se llevaría la tabla entera la próxima vez.
+    expect(gateway.lastSavedProfile?.tableOptions).toEqual({
+      pedidos: { where: 'anio = 2026' },
     });
 
     // Y ni rastro de sesiones en lo guardado.

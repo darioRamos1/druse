@@ -11,6 +11,7 @@ import {
   TransferSetOrder,
   TransferSetRequest,
   TransferTable,
+  TransferTableOptions,
 } from '../../../core/application-gateway/application-gateway';
 import { TransferStore } from '../../../core/transfer/transfer.store';
 import { WorkspaceStore } from '../../../core/workspace/workspace-store';
@@ -94,6 +95,15 @@ export class TransferSetDialog {
   protected readonly keepIdentity = signal(true);
 
   protected readonly ordered = signal(true);
+
+  /**
+   * Lo que cada tabla hace distinto, por su nombre.
+   *
+   * Migrar seis tablas no significa tratarlas igual: de una se lleva el año en
+   * curso y de otra todo, y una se actualiza mientras las demás se añaden. Lo que
+   * no esté aquí sigue el modo de la pasada.
+   */
+  protected readonly tableOptions = signal<Readonly<Record<string, TransferTableOptions>>>({});
 
   protected readonly order = signal<TransferSetOrder | null>(null);
 
@@ -374,6 +384,49 @@ export class TransferSetDialog {
     }
   }
 
+  /** El modo con el que va esta tabla: el suyo, o el de la pasada. */
+  protected modeOf(table: string): TransferMode {
+    return this.tableOptions()[table]?.mode ?? this.mode();
+  }
+
+  protected whereOf(table: string): string {
+    return this.tableOptions()[table]?.where ?? '';
+  }
+
+  /** Cuántas tablas llevan algo distinto, para poder decirlo sin abrir la lista. */
+  protected readonly tweaked = computed(
+    () =>
+      Object.values(this.tableOptions()).filter(
+        (options) => options.mode !== undefined || (options.where ?? '') !== '',
+      ).length,
+  );
+
+  protected setTableMode(table: string, mode: string): void {
+    // El propio modo de la pasada se guarda como «sin nada distinto»: así, cambiar
+    // el general después sigue arrastrando a las tablas que nadie tocó.
+    this.setTableOptions(table, {
+      mode: mode === this.mode() ? undefined : (mode as TransferMode),
+    });
+  }
+
+  protected setTableWhere(table: string, where: string): void {
+    this.setTableOptions(table, { where: where.trim() === '' ? undefined : where });
+  }
+
+  private setTableOptions(table: string, patch: Partial<TransferTableOptions>): void {
+    const current = this.tableOptions();
+    const merged: TransferTableOptions = { ...current[table], ...patch };
+    const next = { ...current };
+
+    if (merged.mode === undefined && (merged.where ?? '') === '') {
+      delete next[table];
+    } else {
+      next[table] = merged;
+    }
+
+    this.tableOptions.set(next);
+  }
+
   protected async onOrdered(ordered: boolean): Promise<void> {
     this.ordered.set(ordered);
     await this.plan();
@@ -428,6 +481,7 @@ export class TransferSetDialog {
       this.profileGaps.set(resolution.gaps);
 
       this.mode.set(profile.mode);
+      this.tableOptions.set(profile.tableOptions ?? {});
       this.ordered.set(profile.ordered);
       this.atomic.set(profile.atomic);
       this.keepIdentity.set(profile.keepIdentity);
@@ -474,6 +528,7 @@ export class TransferSetDialog {
           targetSchema: folder?.schema ?? folder?.name,
           tables: this.ready().map((pair) => pair.source.name),
           mode: this.mode(),
+          tableOptions: this.tableOptions(),
           ordered: this.ordered(),
           atomic: this.atomic(),
           keepIdentity: this.keepIdentity(),
@@ -556,17 +611,22 @@ export class TransferSetDialog {
       return null;
     }
 
-    const tables: TransferRequest[] = pairs.map((pair) => ({
-      sourceSessionId: sourceSession,
-      source: toTable(pair.source),
-      targetSessionId: targetSession,
-      target: toTable(pair.target!),
-      mode: this.mode(),
-      atomic: this.atomic(),
-      batchSize: this.batchSize(),
-      keepIdentity: this.keepIdentity(),
-      confirmed,
-    }));
+    const tables: TransferRequest[] = pairs.map((pair) => {
+      const where = this.whereOf(pair.source.name);
+
+      return {
+        sourceSessionId: sourceSession,
+        source: toTable(pair.source),
+        targetSessionId: targetSession,
+        target: toTable(pair.target!),
+        filter: where ? { where } : undefined,
+        mode: this.modeOf(pair.source.name),
+        atomic: this.atomic(),
+        batchSize: this.batchSize(),
+        keepIdentity: this.keepIdentity(),
+        confirmed,
+      };
+    });
 
     return { tables, ordered: this.ordered() };
   }

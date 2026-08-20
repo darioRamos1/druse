@@ -10,14 +10,14 @@
 
 | Campo | Valor |
 | --- | --- |
-| Última sesión | **023h** — 2026-08-19 |
-| Fase activa | **Migración de datos entre tablas:** fases 1, 2 y 3 cerradas; la **4** tiene la pasada de varias tablas entera —motor, API y pantalla— y le faltan los perfiles (ver «Qué toca retomar»). **Respaldos y restauración:** Fases A–E cerradas. La **F** tiene backend, interfaz, CSV, selector de archivos, restaurar en una base nueva y **el ciclo entero por HTTP en los cuatro motores**; le falta repetir a mano el respaldo real que encontró el error de los índices de expresión |
+| Última sesión | **023i** — 2026-08-19 |
+| Fase activa | **Migración de datos entre tablas:** fases 1, 2 y 3 cerradas; la **4** cerrada: la pasada de varias tablas, lo que cada tabla hace distinto y las migraciones guardadas (ver «Qué toca retomar»). **Respaldos y restauración:** Fases A–E cerradas. La **F** tiene backend, interfaz, CSV, selector de archivos, restaurar en una base nueva y **el ciclo entero por HTTP en los cuatro motores**; le falta repetir a mano el respaldo real que encontró el error de los índices de expresión |
 | Fases 0–6 | ✅ Cerradas. |
 | Fase 7 | 🟡 **11/12.** El ciclo de instalación está probado sobre este equipo; solo falta arrancar en una máquina sin herramientas de desarrollo. |
 | Fase 8 | ✅ **7/7.** Tres motores sobre el mismo contrato y primera beta preparada. |
 | ¿Compila el backend? | Sí — 0 advertencias, 0 errores |
 | ¿Compila el envoltorio? | Sí |
-| ¿Pasan las pruebas? | Sí — **753 en backend** (422 unitarias, 190 contractuales y 141 de integración) con `DRUSE_REQUIRE_ENGINES=1` y **los cuatro motores**, sin saltarse ninguna y **en verde dos veces seguidas**; **498 en frontend** y **18 de punta a punta**. El rojo intermitente que arrastraba la suite era un fallo de verdad y se arregló en la sesión 023g. Las **6 del envoltorio** no se ejecutaron: cargo no compila en este equipo |
+| ¿Pasan las pruebas? | Sí — **760 en backend** (422 unitarias, 190 contractuales y 148 de integración) con `DRUSE_REQUIRE_ENGINES=1` y **los cuatro motores**, sin saltarse ninguna; **503 en frontend** y **19 de punta a punta**, estas dos veces seguidas. Las **6 del envoltorio** no se ejecutaron: cargo no compila en este equipo |
 | ¿Hay aplicación de escritorio? | **Sí.** Instalador NSIS, MSI y ZIP portable, en dos variantes: con Informix y sin él |
 | Motores | **PostgreSQL, SQL Server, MySQL/MariaDB e Informix**, todos sobre el mismo contrato compartido |
 | Trabajo a medias | La fase 4 de la migración, a propósito: el backend de la pasada está commiteado y probado; la pantalla es lo siguiente. |
@@ -27,31 +27,23 @@
 
 ### Qué toca retomar en la próxima sesión
 
-#### Migración de datos: los perfiles, y lo que la pantalla aún no ofrece
+#### Migración de datos: la fase 4 está cerrada
 
-De la fase 4 queda **la segunda mitad**: guardar una migración para repetirla.
-Espejo de `SqliteBackupProfileStore` —tabla nueva en `DruseDatabase` junto a
-`backup_profiles`, selección en JSON— con su regla, que es la que no se puede
-saltar: el perfil guarda **nombres calificados, no identificadores de sesión**,
-porque se reabre meses después contra otra conexión. Al abrirlo se pregunta contra
-qué conexión viva se resuelve cada extremo, y lo que ya no existe se reconcilia
-como hace el respaldo con `known_tables_json`.
+Quedan tres cosas menores, ninguna bloqueante:
 
-Y dos cosas que el plan pide de la pasada y la pantalla todavía no da:
+1. **Cruzar de motor desde la pantalla**, que es lo único que la fase 3 no tiene.
+   Lo cruzado está comprobado por HTTP —`CrossEngineTransferTests`, PostgreSQL a
+   SQL Server— y la prueba de punta a punta crea la tabla dentro del mismo motor.
+   Media hora: abrir las dos conexiones, cruzar y mirar que la pantalla de tipos
+   diga lo que promete.
+2. **La clave de emparejamiento por tabla** al actualizar. La pasada usa la
+   primaria de cada destino; en el asistente de una tabla sí se puede cambiar, y
+   sincronizar entornos suele hacerse por una clave de negocio.
+3. **`CrossEngineTransferTests` cubre una de las doce direcciones** contra motores
+   de verdad; las otras once solo están en unitarias.
 
-1. **Modo y filtro por tabla.** Hoy el modo es uno para toda la pasada, y el
-   contrato ya admite uno por tabla: de una se lleva el año en curso y de otra
-   todo, y una se reemplaza mientras las demás se añaden.
-2. **La clave de emparejamiento al actualizar**, que se queda en la primaria de
-   cada destino. En el asistente de una tabla sí se puede cambiar, y sincronizar
-   entornos suele hacerse por una clave de negocio.
-
-**Y sigue pendiente lo de la fase 3:** nadie ha migrado entre dos motores desde la
-pantalla. Lo cruzado está comprobado por HTTP y la prueba de punta a punta crea la
-tabla dentro del mismo motor.
-
-El plan completo, con el porqué de cada decisión y lo aprendido en cada fase, está
-en `docs/plan-migracion-de-datos.md`.
+El plan completo, con el porqué de cada decisión y lo aprendido en las cuatro
+fases, está en `docs/plan-migracion-de-datos.md`.
 
 #### Respaldos: lo que le falta a la Fase F
 
@@ -347,6 +339,68 @@ Y tres límites declarados desde el principio: no hay respaldo binario ni
 recuperación a un punto en el tiempo —eso es del servidor, y la interfaz tendrá
 que decirlo—, no hay respaldos programados, y un límite de filas puede dejar
 filas huérfanas, cosa que se avisa y no se corrige sola.
+
+### Sesión 023i — 2026-08-19 · Migraciones guardadas, y cada tabla a lo suyo
+
+Cierra la fase 4 de la migración: lo que quedaba era poder **repetir** una pasada y
+poder **afinarla tabla por tabla**.
+
+#### Un perfil guarda nombres, no sesiones
+
+Es la regla del perfil de respaldo y aquí manda igual: lo que se guarda son la
+conexión, la base, el esquema y las tablas, porque un perfil se reabre meses
+después y para entonces la sesión con la que se creó hace mucho que se cerró. Al
+abrirlo se resuelve contra **dos conexiones vivas**, que no tienen por qué ser las
+de aquel día: repetir en otro entorno la misma migración es justo para lo que se
+guarda.
+
+La tabla local es espejo de `backup_profiles` —lo que se lista y se ordena en
+columnas, lo que solo se usa entero en JSON— y buscar en el catálogo por nombre,
+que ya hacían dos servicios, se movió a `CatalogLookup` tal cual estaba.
+
+Abrirlo dice **las dos cosas a la vez**: lo que hoy se puede migrar y lo que no.
+Negarse por una tabla que alguien borró obligaría a rehacer el perfil entero, y
+abrirlo callando las ausencias haría creer que la pasada se llevó algo que no se
+llevó.
+
+#### Cada tabla a lo suyo
+
+El modo de la pantalla pasa a ser **el de partida**, y debajo, plegado, cada tabla
+puede llevar el suyo y su condición: de una se lleva el año en curso y de otra
+todo. Con un detalle que evita un accidente: elegir en una tabla el mismo modo de
+la pasada **no la separa del resto**, porque si contara como algo distinto,
+cambiar después el modo general la dejaría atrás sin que nadie lo pidiera.
+
+Y todo eso **se guarda con el perfil**. Olvidarlo sería peligroso: uno que
+perdiera el filtro se llevaría la tabla entera la próxima vez.
+
+#### Lo que costó fue la prueba, no el código
+
+Dos veces por lo mismo. Playwright pulsaba la casilla *por dentro* de su etiqueta,
+y ese clic puede llegar dos veces —uno del control y otro reenviado por la
+etiqueta—, así que la marca se ponía y se quitaba y la pasada salía con una tabla
+menos. Se pulsa la fila, que además es lo que hace una persona. Y el bloque de
+tabla por tabla va plegado, así que la prueba lo abre antes de escribir en él.
+
+**Verificado.** **760 en backend** (422 unitarias, 190 contractuales y 148 de
+integración) con los cuatro motores; siete de perfiles, incluida la que comprueba
+que el modo y el filtro de cada tabla sobreviven al ida y vuelta. **503 en
+frontend**, con lo de cada tabla y lo que guarda el perfil. Y **19 de punta a
+punta**: una guarda la migración, cierra el asistente, lo reabre y la lanza desde
+la lista contando las filas; otra filtra una tabla dentro de la pasada y comprueba
+que al destino llegan **dos y no tres**, que es lo que demuestra que la condición
+por tabla llega hasta el motor.
+
+**No hecho.** La clave de emparejamiento por tabla al actualizar —se queda en la
+primaria de cada destino— y vaciar-y-cargar en pasada, que se deja fuera a
+propósito. Y sigue pendiente lo de la fase 3: cruzar de motor desde la pantalla.
+
+**Archivos.** `Druse.Domain/TransferProfile.cs`, `ITransferProfileStore`,
+`SqliteTransferProfileStore` con su tabla en `DruseDatabase`,
+`TransferProfileService`, `Application/Metadata/CatalogLookup.cs`,
+`TransferProfileContracts` y las rutas `/api/transfers/profiles`; en la interfaz,
+el gateway y el asistente de la pasada. Pruebas: `TransferProfileTests`,
+`transfer-set-dialog.spec.ts` y `e2e/tests/migracion.spec.ts`.
 
 ### Sesión 023h — 2026-08-19 · Cuántas filas trae una consulta, elegido por quien mira
 

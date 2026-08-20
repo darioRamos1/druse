@@ -407,9 +407,20 @@ test.describe('migrar datos entre tablas', () => {
       `${esquema}.e2e_pedidos`,
     ]);
 
+    // Y una de las dos va a lo suyo: solo los pedidos de un cliente. El bloque va
+    // plegado porque lo normal es que todas vayan igual, así que se abre.
+    await dialogo.locator('.each__summary').click();
+
+    const filaHija = dialogo.locator('.each__table tbody tr', { hasText: 'e2e_pedidos' }).first();
+
+    await filaHija.locator('.each__where').fill('cliente_id = 1');
+    await filaHija.locator('.each__where').blur();
+
+    await expect(dialogo.locator('.each__badge')).toContainText('1');
+
     await dialogo.getByRole('button', { name: 'Copiar 2 tablas' }).click();
 
-    await expect(dialogo.locator('.summary__title')).toContainText('Copiadas 5 filas de 2 tablas', {
+    await expect(dialogo.locator('.summary__title')).toContainText('Copiadas 4 filas de 2 tablas', {
       timeout: 60_000,
     });
 
@@ -419,7 +430,10 @@ test.describe('migrar datos entre tablas', () => {
     // Lo que demuestra que la pasada sirvió: las filas están al otro lado, y la
     // hija entró sin que la foránea la rechazara.
     expect(await contar(page, `${esquema}.e2e_clientes`)).toBe('2');
-    expect(await contar(page, `${esquema}.e2e_pedidos`)).toBe('3');
+
+    // Dos y no tres: la condición de esa tabla dejó fuera el pedido del otro
+    // cliente, y es lo que demuestra que el filtro por tabla llega hasta el motor.
+    expect(await contar(page, `${esquema}.e2e_pedidos`)).toBe('2');
 
     await ejecutarConAviso(
       page,
