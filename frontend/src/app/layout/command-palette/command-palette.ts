@@ -60,6 +60,7 @@ export default class CommandPalette implements AfterViewInit {
   /** Ejecutar solo la instrucción del cursor, o la selección si la hay. */
   readonly executeCurrent = output<void>();
   readonly formatQuery = output<void>();
+  readonly toggleLineComment = output<void>();
 
   /** Abrir el buscador del editor; con `true`, el de reemplazar. */
   readonly findInEditor = output<boolean>();
@@ -102,6 +103,12 @@ export default class CommandPalette implements AfterViewInit {
         hint: 'Ctrl+Shift+Enter',
       },
       { id: 'format', kind: 'command', label: 'Formatear SQL', hint: 'Ctrl+Shift+F' },
+      {
+        id: 'toggle-line-comment',
+        kind: 'command',
+        label: 'Comentar/descomentar líneas',
+        hint: 'Ctrl+/',
+      },
       // El buscador del editor existía y no lo decía nadie.
       { id: 'find', kind: 'command', label: 'Buscar en el editor', hint: 'Ctrl+F' },
       { id: 'replace', kind: 'command', label: 'Buscar y reemplazar', hint: 'Ctrl+H' },
@@ -263,6 +270,9 @@ export default class CommandPalette implements AfterViewInit {
           break;
         case 'format':
           this.formatQuery.emit();
+          break;
+        case 'toggle-line-comment':
+          this.toggleLineComment.emit();
           break;
         case 'find':
           // Se cierra sin devolver el foco: lo quiere el buscador del editor.

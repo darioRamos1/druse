@@ -214,13 +214,7 @@ export function registerSqlCompletion(
               name: qualifier.name.toLowerCase(),
             });
 
-        const relation = findRelation(schema, target);
-
-        if (!relation) {
-          return { suggestions: [] };
-        }
-
-        const columnItems = (columns: readonly KnownColumn[]) => ({
+        const columnItems = (relation: KnownRelation, columns: readonly KnownColumn[]) => ({
           suggestions: columns.map((column, index) => ({
             label: column.name,
             kind: monaco.languages.CompletionItemKind.Field,
@@ -236,14 +230,37 @@ export function registerSqlCompletion(
           })),
         });
 
-        // La tabla está en el árbol pero nadie la ha abierto: se piden sus
-        // columnas ahora, una sola vez. Antes el desplegable salía vacío y la
-        // única salida era ir a expandirla en el explorador.
-        if (relation.columns.length === 0 && loadColumns) {
-          return loadColumns(relation.schema || null, relation.name).then(columnItems);
+        const columnsFor = (relation: KnownRelation) => {
+          // La tabla está en el árbol pero nadie la ha abierto: se piden sus
+          // columnas ahora, una sola vez. Antes el desplegable salía vacío y la
+          // única salida era ir a expandirla en el explorador.
+          if (relation.columns.length === 0 && loadColumns) {
+            return loadColumns(relation.schema || null, relation.name).then((columns) =>
+              columnItems(relation, columns),
+            );
+          }
+
+          return columnItems(relation, relation.columns);
+        };
+
+        const relation = findRelation(schema, target);
+
+        if (relation) {
+          return columnsFor(relation);
         }
 
-        return columnItems(relation.columns);
+        // Al retomar un SQL, su esquema puede quedar fuera de los primeros que
+        // se precargan. El alias ya dice `esquema.tabla`, así que se puede traer
+        // esa rama sin obligar a abrirla antes en el explorador.
+        if (target.schema && loadRelations) {
+          return loadRelations(target.schema).then(() => {
+            const loaded = findRelation(getContext().schema, target);
+
+            return loaded ? columnsFor(loaded) : { suggestions: [] };
+          });
+        }
+
+        return { suggestions: [] };
       }
 
       // --- En cualquier otro sitio -----------------------------------------

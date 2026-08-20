@@ -24,11 +24,11 @@
   // barra puede tener 900 px o 500. Por eso se consulta su propio ancho.
   container: editor-toolbar / inline-size;
 
-  // Contener el eje en línea crea contexto de apilamiento propio: sin esta
-  // posición y este z-index, los desplegables de formato, base y timeout se
-  // desplegarían por detrás del editor.
+  // Contener el eje en línea crea contexto de apilamiento propio. Monaco vive
+  // en el nivel 6, así que la barra completa tiene que quedar por encima: el
+  // z-index 20 de un menú hijo no puede escapar de un padre que esté en el 3.
   position: relative;
-  z-index: 3;
+  z-index: 10;
 }
 
 /**
@@ -41,7 +41,7 @@
  */
 @container editor-toolbar (max-width: 780px) {
   :host {
-    gap: 6px;
+    gap: 4px;
   }
 
   .label {
@@ -57,14 +57,18 @@
 
   // Un hijo absoluto deja de ser ítem flex, así que el hueco que ocupaba la
   // etiqueta desaparece con ella; solo sobra el aire de los costados.
-  .run,
-  .btn,
-  .chip {
-    padding-inline: 9px;
+  // Se incluye :host para ganar a las reglas base declaradas más abajo.
+  :host .run,
+  :host .btn {
+    padding-inline: 6px;
   }
 
-  .btn--caret {
-    padding-inline: 5px;
+  :host .chip {
+    padding-inline: 7px;
+  }
+
+  :host .btn--caret {
+    padding-inline: 4px;
   }
 
   // El atajo solo se enseña cuando hay sitio: con el botón en icono compite

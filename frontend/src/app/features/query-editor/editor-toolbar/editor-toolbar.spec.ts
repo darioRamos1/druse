@@ -87,6 +87,17 @@ describe('EditorToolbar', () => {
     expect(emitidos).toEqual(['begin', 'commit', 'rollback']);
   });
 
+  it('ofrece comentar y descomentar las líneas seleccionadas', () => {
+    let emitted = 0;
+    fixture.componentRef.instance.toggleLineComment.subscribe(() => emitted++);
+
+    [...element().querySelectorAll<HTMLButtonElement>('button')]
+      .find((item) => item.textContent?.includes('Comentar'))
+      ?.click();
+
+    expect(emitted).toBe(1);
+  });
+
   describe('opciones de formateo', () => {
     function openMenu(): void {
       element().querySelector<HTMLButtonElement>('.btn--caret')?.click();

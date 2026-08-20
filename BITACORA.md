@@ -10,42 +10,34 @@
 
 | Campo | Valor |
 | --- | --- |
-| Última sesión | **027** — 2026-08-20 |
+| Última sesión | **030** — 2026-08-20 |
 | Fase activa | **Migración de datos entre tablas:** fases 1, 2 y 3 cerradas; la **4** cerrada: la pasada de varias tablas, lo que cada tabla hace distinto y las migraciones guardadas (ver «Qué toca retomar»). **Respaldos y restauración:** Fases A–E cerradas. La **F** tiene backend, interfaz, CSV, selector de archivos, restaurar en una base nueva y **el ciclo entero por HTTP en los cuatro motores**; le falta repetir a mano el respaldo real que encontró el error de los índices de expresión |
 | Fases 0–6 | ✅ Cerradas. |
 | Fase 7 | 🟡 **11/12.** El ciclo de instalación está probado sobre este equipo; solo falta arrancar en una máquina sin herramientas de desarrollo. |
 | Fase 8 | ✅ **7/7.** Tres motores sobre el mismo contrato y primera beta preparada. |
 | ¿Compila el backend? | Sí — 0 advertencias, 0 errores |
 | ¿Compila el envoltorio? | Sí |
-| ¿Pasan las pruebas? | Sí — **781 en backend** (422 unitarias, 206 contractuales y 153 de integración) en la sesión 024. En la 027 pasaron las **538 del frontend** y la E2E del selector de tipos; en la 026 habían pasado además 15 de integración del almacenamiento y 3 E2E dirigidas. La última pasada con `DRUSE_REQUIRE_ENGINES=1` y los cuatro motores fue la de la sesión 023; ahora solo estaba levantado PostgreSQL. La suite E2E completa, ahora de 29 casos, no se repitió. Las **6 del envoltorio** tampoco se ejecutaron. |
+| ¿Pasan las pruebas? | Sí — **781 en backend** (422 unitarias, 206 contractuales y 153 de integración) en la sesión 024. En la 030 pasaron las **539 del frontend** y 130 específicas de catálogo/autocompletado; en la 028 pasó además la E2E del menú de conexiones. La última pasada con `DRUSE_REQUIRE_ENGINES=1` y los cuatro motores fue la de la sesión 023; ahora solo estaba levantado PostgreSQL. La suite E2E completa, ahora de 30 casos, no se repitió. Las **6 del envoltorio** tampoco se ejecutaron. |
 | ¿Hay aplicación de escritorio? | **Sí.** Instalador NSIS, MSI y ZIP portable, en dos variantes: con Informix y sin él |
 | Motores | **PostgreSQL, SQL Server, MySQL/MariaDB e Informix**, todos sobre el mismo contrato compartido |
-| Trabajo a medias | Los cambios de las sesiones **024–027 siguen en el árbol sin commit**: cierre del plan visual, fragmentos guardados, alias editables, correcciones de la reauditoría y el selector de tipos con estilo propio. La suite frontend ya se repitió completa; falta integrar el conjunto, incluyendo los archivos nuevos todavía no rastreados. |
+| Trabajo a medias | Las correcciones de las sesiones **028–030** están verificadas pero sin commit: menú por encima de Monaco, catálogo correcto tras el switch y carga automática del esquema de un alias restaurado. Las sesiones 024–027 ya están integradas en `1452a6c` y subidas al remoto. |
 | Bloqueantes | Ninguno para seguir programando. Sí para dar por buenos cuatro motores y cuatro funciones: ver «Qué toca retomar». |
-| Git | El **PR #9 se fusionó** (sesión 022), con los quince commits que el #8 dejó fuera más lo de la personalización. Se trabaja en `feat/respaldos-y-restauracion`, salida de un `main` ya al día. |
+| Git | El **PR #9 se fusionó** (sesión 022). Se trabaja en `feat/respaldos-y-restauracion`; las sesiones 024–027 se subieron en `1452a6c`. Quedan sin commit las correcciones 028–030. |
 | Integración continua | 🔴 **Parada, y no por el código.** GitHub aborta los catorce jobs en dos segundos: «recent account payments have failed or your spending limit needs to be increased». Hasta resolver la facturación, ningún PR podrá pasar los checks. |
 
 ### Qué toca retomar en la próxima sesión
 
-#### Lo primero, integrar las sesiones 024–027
+#### Lo primero, integrar las correcciones 028–030
 
-El estado real del repositorio manda sobre la entrada anterior: el cierre visual,
-los fragmentos guardados, el autocompletado con alias, la revalidación visual y
-el selector de tipos siguen **sin commit** en el mismo árbol. Hay archivos
-rastreados que ya usan `SqlSnippet.cs`,
-`SqliteSqlSnippetStore.cs`, `column-widths.ts` y `snippet.store.ts`, que todavía
-figuran como nuevos; no se puede integrar solo una parte sin romper el conjunto.
+Son tres partes del mismo fallo: el menú quedaba detrás de Monaco; después de
+elegir, el autocompletado podía consultar otra base o terminar antes de cargar el
+catálogo; y un SQL restaurado no cargaba el esquema de su alias si estaba fuera
+del precalentado. Ya pasaron frontend completo, Playwright y build; falta el
+commit y el push.
 
-Antes de cerrarlo:
-
-1. Revisar que todos los archivos nuevos de fragmentos y anchos de columna entren
-   con sus consumidores y sus pruebas.
-2. Separar los commits por función si sigue siendo posible sin dejar una revisión
-   intermedia que no compile; si no, integrar el cierre de la 024 como una unidad
-   y el alias de la 025 junto con la revalidación de la 026–027 aparte.
-3. Cuando estén disponibles los cuatro contenedores, repetir la validación general
-   de motores; no hace falta para integrar CSS y pruebas de navegador, pero sí
-   antes de atribuir esta sesión al producto entero.
+Después, cuando estén disponibles los cuatro contenedores, repetir la validación
+general de motores. No hace falta para esta corrección de apilamiento, pero sí
+antes de atribuir la sesión al producto entero.
 
 #### El plan visual queda cerrado (sesión 024, revalidado en la 026–027)
 
@@ -267,8 +259,8 @@ Antes de escribir código:
 1. Confirma la fase activa y las tareas pendientes según la bitácora.
 2. Verifica el estado real del repositorio (no confíes solo en la bitácora):
    `git status` y `git log` antes de nada.
-3. Lee «Qué toca retomar»: las sesiones 024–027 siguen en el árbol sin commit;
-   hay que verificar e integrar el conjunto antes de volver a los motores reales.
+3. Lee «Qué toca retomar»: las correcciones 028–030 están verificadas y solo
+   falta integrarlas antes de volver a los motores reales.
 4. Propón únicamente los cambios de la siguiente tarea pendiente.
 
 Al terminar: ejecuta compilación y pruebas, resume archivos modificados y
@@ -382,6 +374,145 @@ Y tres límites declarados desde el principio: no hay respaldo binario ni
 recuperación a un punto en el tiempo —eso es del servidor, y la interfaz tendrá
 que decirlo—, no hay respaldos programados, y un límite de filas puede dejar
 filas huérfanas, cosa que se avisa y no se corrige sola.
+
+### Sesión 031 — 2026-08-20 · Comentar fragmentos SQL seleccionados
+
+El editor permite ahora comentar o descomentar la línea del cursor y todas las
+líneas de una selección. La acción está a la vista en la barra, se encuentra
+también como «Comentar/descomentar líneas» en la paleta y conserva el atajo
+nativo de Monaco, `Ctrl+/`.
+
+No se reescribe el texto a mano: se delega en `editor.action.commentLine`. Así
+Monaco conserva la selección, los cursores múltiples y una sola operación de
+deshacer. El resultado usa `-- `, que funciona igual en **PostgreSQL, SQL Server,
+MySQL/MariaDB e Informix**, por lo que no hace falta una rama por motor.
+
+#### Verificado
+
+- Pruebas de componente de la barra y la paleta: ofrecen y emiten la acción.
+- E2E real sobre Monaco: comenta dos líneas seleccionadas, las descomenta y
+  vuelve a comentarlas con `Ctrl+/`.
+- **541 pruebas frontend** en verde y typecheck E2E correcto.
+- Build de producción correcto; siguen solo los avisos conocidos del bundle y
+  `nearley`.
+- `git diff --check` limpio.
+
+**Archivos.** `sql-editor.ts`, `editor-toolbar.{ts,html,spec.ts}`, `icon.ts`,
+`command-palette.{ts,spec.ts}`, `app-shell.{ts,html}`, `e2e/tests/interfaz.spec.ts`.
+
+**Estado al cerrar.** Verificado, sin commit; comparte el árbol con 028–030.
+
+### Sesión 030 — 2026-08-20 · Un SQL restaurado carga el esquema de su alias
+
+El detalle que faltaba era «retomar algo de la vez pasada». La conexión y la base
+ya quedaban bien después del switch, pero el SQL restaurado podía nombrar una
+tabla de un esquema que no estuviera entre los 20 precargados.
+
+Con `FROM archivo.expedientes e`, `aliasMap` sabía que `e` era
+`archivo.expedientes`. Al escribir `e.`, el proveedor buscaba la tabla en el
+índice, no la encontraba y devolvía una lista vacía. Nunca llamaba a
+`loadRelations`, así que la única forma de desbloquearlo era exactamente la que
+describió el usuario: ir al explorador y abrir `archivo` a mano.
+
+Ahora, si el alias lleva esquema y la relación todavía no está cargada, el
+autocompletado:
+
+1. carga las tablas de ese esquema;
+2. relee el índice producido por el store;
+3. encuentra la tabla del alias;
+4. carga sus columnas si todavía faltan;
+5. devuelve las sugerencias en la misma pulsación.
+
+No se precargan todos los esquemas a ciegas: una base corporativa puede tener
+cientos. Se carga solo el que el propio SQL ya nombró.
+
+#### Verificado
+
+- Regresión exacta con índice sin relaciones, SQL restaurado y alias de
+  `archivo.expedientes`: carga esquema y columnas.
+- **130 pruebas específicas** de store y autocompletado en verde.
+- **539 pruebas frontend** en verde.
+- Build de producción correcto; siguen solo los avisos conocidos del bundle y
+  `nearley`.
+- `git diff --check` limpio.
+
+**Archivos.** `sql-completion.{ts,spec.ts}`, además de las correcciones 028–029
+que siguen en el mismo árbol.
+
+**Estado al cerrar.** Verificado, sin commit.
+
+### Sesión 029 — 2026-08-20 · El switch lleva también su catálogo
+
+Después de destapar el menú apareció el segundo fallo: elegir una conexión desde
+la barra cambiaba correctamente el destino de ejecución, pero el autocompletado
+podía quedarse sin tablas y columnas. Abrir la misma conexión desde el panel sí
+funcionaba.
+
+El contexto se perdía en tres puntos:
+
+1. `schemaIndex` filtraba por conexión, pero mezclaba todas las bases cargadas de
+   esa conexión.
+2. Los callbacks de columnas y relaciones llegaban al store sin `connectionId`
+   ni base, así que ante dos esquemas o tablas homónimos mandaba la primera rama
+   del árbol.
+3. `openSaved` y `useConnection` lanzaban el mismo precalentado, pero `_primed`
+   solo decía «ya se inició»: el switch podía terminar antes de que hubiera una
+   sola tabla disponible.
+
+Ahora el índice entregado a Monaco contiene únicamente la conexión y base de la
+pestaña activa. Las cargas diferidas pasan ese mismo par y la caché de
+precalentado conserva la promesa en curso; `useConnection` la espera en vez de
+dar el catálogo por listo. De paso, la pestaña que pidió el cambio se captura
+antes de abrir una conexión lenta, para no reasignar otra si el usuario cambia de
+pestaña durante la espera.
+
+#### Verificado
+
+- El spec del store exige relaciones de la conexión destino al terminar el
+  switch y ausencia de esquemas de la base anterior en el índice activo.
+- **104 pruebas del store** en verde.
+- **538 pruebas frontend** en verde.
+- Build de producción correcto; siguen solo los avisos conocidos del bundle y
+  `nearley`.
+- `git diff --check` limpio.
+
+**Archivos.** `workspace-store.{ts,spec.ts}`, `app-shell.ts`, el plan visual y
+esta bitácora. Comparte el árbol con la corrección de apilamiento de la sesión
+028.
+
+**Estado al cerrar.** Verificado, sin commit.
+
+### Sesión 028 — 2026-08-20 · Monaco tapaba el cambio de conexión
+
+La captura lo mostraba: pulsar el chip `conexión · base` no enseñaba ninguna
+lista. El menú sí se creaba y por eso las pruebas del componente pasaban, pero no
+se podía ver ni pulsar.
+
+La causa eran dos contextos de apilamiento:
+
+- Monaco vive en `z-index: 6` para que sus sugerencias queden sobre resultados.
+- La barra había quedado en `z-index: 3` al convertirla en contenedor CSS.
+
+Aunque `.context__menu` usaba `z-index: 20`, un hijo no puede escapar del nivel 3
+de su padre. Monaco quedaba delante e interceptaba todos los eventos. La barra
+sube al nivel 10, por encima del editor y por debajo de modales y paleta.
+
+La primera reproducción de Playwright confirmó el fallo con precisión: la opción
+era visible para el motor de pruebas, pero el log decía
+`monaco-editor subtree intercepts pointer events`. La regresión ya no se conforma
+con `toBeVisible`: pulsa una opción y exige que el menú se cierre.
+
+#### Verificado
+
+- La E2E falla antes del cambio por intercepción de Monaco y pasa después.
+- **538 pruebas frontend** en verde.
+- Build de producción correcto; solo los avisos conocidos del bundle y `nearley`.
+- `git diff --check` limpio.
+
+**Archivos.** `editor-toolbar.scss`, `e2e/tests/interfaz.spec.ts`, el plan visual
+y esta bitácora.
+
+**Estado al cerrar.** Verificado, sin commit.
 
 ### Sesión 027 — 2026-08-20 · Los tipos de columna ya usan el lenguaje de Druse
 

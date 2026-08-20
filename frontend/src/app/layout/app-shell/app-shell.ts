@@ -536,11 +536,18 @@ export class AppShell {
   protected readonly loadColumns = (
     schema: string | null,
     name: string,
-  ): Promise<readonly KnownColumn[]> => this._store.ensureColumnsAsync(schema, name);
+  ): Promise<readonly KnownColumn[]> => {
+    const tab = this._store.activeTab();
+
+    return this._store.ensureColumnsAsync(schema, name, tab?.connectionId, tab?.database);
+  };
 
   /** Lo mismo para las tablas de un esquema que el precalentado no alcanzó. */
-  protected readonly loadRelations = (schema: string): Promise<void> =>
-    this._store.ensureRelationsAsync(schema);
+  protected readonly loadRelations = (schema: string): Promise<void> => {
+    const tab = this._store.activeTab();
+
+    return this._store.ensureRelationsAsync(schema, tab?.connectionId, tab?.database);
+  };
   protected readonly timeoutSeconds = this._store.timeoutSeconds;
 
   protected readonly maxRows = this._store.maxRows;
@@ -562,6 +569,10 @@ export class AppShell {
 
   protected format(): void {
     void this._editor()?.formatDocument();
+  }
+
+  protected toggleLineComment(): void {
+    this._editor()?.toggleLineComment();
   }
 
   protected findInEditor(replace: boolean): void {

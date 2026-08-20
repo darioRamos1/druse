@@ -1004,6 +1004,9 @@ export class WorkspaceStore {
       return 'failed';
     }
 
+    // La pestaña que pidió el cambio se captura antes de abrir una conexión: esa
+    // apertura puede tardar y el usuario podría cambiar de pestaña mientras.
+    const tab = this.activeTab();
     const previous = this.activeConnection()?.id;
 
     if (previous === connectionId) {
@@ -1018,7 +1021,6 @@ export class WorkspaceStore {
       }
     }
 
-    const tab = this.activeTab();
     const database = this._sessions().get(connectionId)?.database;
 
     this._activeConnectionId.set(connectionId);
@@ -1059,7 +1061,9 @@ export class WorkspaceStore {
     }
 
     if (database) {
-      void this.primeSchemaIndexAsync(connectionId, database);
+      // `openSaved` puede haber iniciado ya el recorrido. Se espera esa misma
+      // promesa: devolver antes dejaba el switch hecho pero el editor sin tablas.
+      await this.primeSchemaIndexAsync(connectionId, database);
     }
 
     return 'ok';
@@ -1123,6 +1127,7 @@ export class WorkspaceStore {
     const schemas = new Set<string>();
     const relations: KnownRelation[] = [];
     const connectionId = this.activeConnection()?.id;
+    const database = this.activeDatabase()?.toLowerCase();
 
     const walk = (entries: readonly TreeEntry[]): void => {
       for (const entry of entries) {
@@ -1131,6 +1136,14 @@ export class WorkspaceStore {
         }
 
         const { object } = entry;
+
+        if (database) {
+          const entryDatabase = object.kind === 'database' ? object.name : object.database;
+
+          if (entryDatabase?.toLowerCase() !== database) {
+            continue;
+          }
+        }
 
         if (object.kind === 'schema') {
           schemas.add(object.name);
@@ -2203,7 +2216,7 @@ export class WorkspaceStore {
     schema: string | null,
     name: string,
     connectionId = this.activeConnection()?.id,
-    database?: string,
+    database = this.activeDatabase() ?? undefined,
   ): Promise<readonly KnownColumn[]> {
     const entry = this.findRelationEntry(schema, name, connectionId, database);
 
@@ -2236,7 +2249,7 @@ export class WorkspaceStore {
   async ensureRelationsAsync(
     schemaName: string,
     connectionId = this.activeConnection()?.id,
-    database?: string,
+    database = this.activeDatabase() ?? undefined,
   ): Promise<void> {
     const wanted = schemaName.toLowerCase();
 
@@ -2507,7 +2520,7 @@ export class WorkspaceStore {
    * mismo a la relectura tras un cambio de estructura, que rehace el árbol
    * entero.
    */
-  private readonly _primed = new Set<string>();
+  private readonly _primed = new Map<string, Promise<void>>();
 
   /** El identificador de conexión es un GUID, así que `::` no se confunde. */
   private static primedKey(connectionId: string, database: string): string {
@@ -2522,7 +2535,7 @@ export class WorkspaceStore {
    * en blanco hasta reconectar.
    */
   private forgetPrimed(connectionId: string): void {
-    for (const key of [...this._primed]) {
+    for (const key of this._primed.keys()) {
       if (key.startsWith(`${connectionId}::`)) {
         this._primed.delete(key);
       }
@@ -2541,12 +2554,11 @@ export class WorkspaceStore {
    */
   private async primeSchemaIndexAsync(connectionId: string, database: string): Promise<void> {
     const key = WorkspaceStore.primedKey(connectionId, database);
+    const existing = this._primed.get(key);
 
-    if (this._primed.has(key)) {
-      return;
+    if (existing) {
+      return existing;
     }
-
-    this._primed.add(key);
 
     const databaseEntry = this._roots().find(
       (entry) => entry.connectionId === connectionId && entry.object.name === database,
@@ -2555,20 +2567,31 @@ export class WorkspaceStore {
     // Sin nodo no hay nada que recorrer, y darlo por precalentado impediría
     // volver a intentarlo cuando el árbol sí lo tenga.
     if (!databaseEntry) {
-      this._primed.delete(key);
       return;
     }
 
-    if (databaseEntry.children === null) {
-      await this.loadChildren(databaseEntry, true);
-    }
+    const priming = (async () => {
+      if (databaseEntry.children === null) {
+        await this.loadChildren(databaseEntry, true);
+      }
 
-    const schemas = (databaseEntry.children ?? []).filter(
-      (entry) => entry.object.kind === 'schema',
-    );
+      const schemas = (databaseEntry.children ?? []).filter(
+        (entry) => entry.object.kind === 'schema',
+      );
 
-    for (const schema of schemas.slice(0, WorkspaceStore.PreloadedSchemaLimit)) {
-      await this.loadSchemaRelationsAsync(schema);
+      for (const schema of schemas.slice(0, WorkspaceStore.PreloadedSchemaLimit)) {
+        await this.loadSchemaRelationsAsync(schema);
+      }
+    })();
+
+    this._primed.set(key, priming);
+
+    try {
+      await priming;
+    } catch {
+      // Un fallo transitorio se puede volver a intentar. Los detalles ya los
+      // registra la carga del nodo cuando corresponde.
+      this._primed.delete(key);
     }
   }
 

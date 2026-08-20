@@ -781,9 +781,10 @@ describe('WorkspaceStore', () => {
       store.useDatabase('otra');
       await esperarA(() => store.schemaIndex().schemas.includes('esquema_de_otra'));
 
-      // El de la base anterior sigue estando: no se pierde por cambiar.
-      expect(store.schemaIndex().schemas).toContain('public');
-      expect(store.schemaIndex().schemas).toContain('esquema_de_otra');
+      // El árbol conserva las dos bases, pero Monaco solo recibe la activa.
+      expect(store.searchableSchemas().map((node) => node.label)).toContain('public');
+      expect(store.schemaIndex().schemas).not.toContain('public');
+      expect(store.schemaIndex().schemas).toEqual(['esquema_de_otra']);
     });
 
     it('vuelve a precalentar al reconectar la misma conexión', async () => {
@@ -1893,6 +1894,10 @@ describe('WorkspaceStore', () => {
       expect(gateway.openSavedCalls.at(-1)?.id).toBe(savedProfile.id);
       expect(store.activeTab()?.connectionId).toBe(savedProfile.id);
       expect(store.activeConnection()?.id).toBe(savedProfile.id);
+      expect(store.schemaIndex().relations.length).toBeGreaterThan(0);
+      expect(
+        store.schemaIndex().relations.every((relation) => relation.connectionId === savedProfile.id),
+      ).toBe(true);
     });
 
     /** El resultado salió del otro servidor; dejarlo invita a leerlo mal. */

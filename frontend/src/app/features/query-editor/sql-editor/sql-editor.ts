@@ -346,6 +346,23 @@ export default class SqlEditor implements OnInit {
   }
 
   /**
+   * Alterna `-- ` en las líneas seleccionadas, o en la del cursor.
+   *
+   * Se delega a Monaco para conservar cursores múltiples, selección y deshacer.
+   * El comentario por línea es el denominador común de los cuatro motores.
+   */
+  toggleLineComment(): void {
+    const editor = this._editor;
+
+    if (!editor) {
+      return;
+    }
+
+    editor.focus();
+    void editor.getAction('editor.action.commentLine')?.run();
+  }
+
+  /**
    * Escribe texto donde esté el cursor, reemplazando lo que hubiera seleccionado.
    *
    * Es por donde entran los fragmentos guardados. Va por `executeEdits` y no

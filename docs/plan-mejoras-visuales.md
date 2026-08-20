@@ -185,6 +185,13 @@ La regresión de Playwright mide que a 900 px la etiqueta queda recogida, la bar
 no supera 44 px, Historial y Filtros no se solapan y el menú de filas recibe el
 clic por encima de Monaco; al volver a 1440, la etiqueta recupera su ancho.
 
+**Corrección de la sesión 028.** La primera prueba solo preguntaba si el menú era
+visible. Playwright considera visible una caja aunque otro elemento la tape:
+Monaco estaba en el nivel 6 y la barra en el 3, así que el menú existía pero el
+editor interceptaba el clic. La barra quedó en el nivel 10 y la regresión ahora
+pulsa una opción de conexión y afirma que el menú se cierra; eso prueba que está
+realmente por encima.
+
 ### 3.10 Media — El selector de tipos no parecía parte de Druse ✅
 
 **Dónde:** diseñador de tablas, al crear o modificar una columna.
@@ -237,6 +244,21 @@ La lista vacía que lo hizo parecer roto no venía del editor, sino de los datos
 la tabla `public.clientes` de la base de pruebas se había quedado **sin columnas**
 por una prueba anterior, así que el catálogo no tenía nada que sugerir. Queda una
 prueba de punta a punta que afirma el caso, para que no vuelva a dudarse.
+
+**Corrección de la sesión 029.** Resolver alias funcionaba, pero cambiar la
+conexión desde la barra dejaba otro problema: el índice filtraba por conexión y
+no por la base activa, y las cargas diferidas omitían ambos datos. Además, el
+switch podía terminar mientras el precalentado seguía en curso. El editor recibe
+ahora solo `conexión + base` de la pestaña, las columnas y relaciones conservan
+ese contexto y el switch espera la misma promesa de catálogo que inició al abrir
+la conexión.
+
+**Corrección definitiva de la sesión 030.** Al retomar un SQL, la tabla del alias
+puede pertenecer a un esquema fuera de los 20 que se precargan. `e.` resolvía el
+alias a `archivo.expedientes`, no encontraba esa relación en el índice y devolvía
+vacío antes de pedir nada. Ahora usa el esquema que ya está escrito en el SQL:
+carga sus tablas, relee el índice y después trae las columnas. Es el mismo camino
+que antes solo se conseguía abriendo el esquema a mano.
 
 ### 4.4 Fragmentos guardados ✅
 
@@ -317,3 +339,30 @@ implementar, pero sí impide usar esta sesión como validación general de motor
   bundle (564,62 kB frente a 500 kB) y de `nearley` como dependencia no ESM.
 - `git diff --check`: sin errores; permanece el aviso informativo de CRLF a LF en
   `backup-dialog.spec.ts`.
+
+---
+
+## 8. Corrección — sesión 028
+
+- Frontend completo: **538 pruebas**, todas en verde.
+- Playwright reproduce primero la intercepción de Monaco y después completa el
+  clic sobre una opción del menú de conexiones: **1 E2E en verde**.
+- Build de producción correcto, con los dos avisos conocidos sin cambios.
+
+---
+
+## 9. Corrección — sesión 029
+
+- El spec del store exige que `useConnection` termine con relaciones de la
+  conexión destino y que el índice de Monaco contenga solo la base activa.
+- Frontend completo: **538 pruebas**, todas en verde.
+- Build de producción correcto, con los dos avisos conocidos sin cambios.
+
+---
+
+## 10. Corrección — sesión 030
+
+- Una prueba reproduce un SQL restaurado con `FROM archivo.expedientes e`, sin
+  relaciones precargadas, y exige que `e.` cargue esquema y columnas.
+- Frontend completo: **539 pruebas**, todas en verde.
+- Build de producción correcto, con los dos avisos conocidos sin cambios.

@@ -113,6 +113,7 @@ export class EditorToolbar {
   readonly executeSelection = output<void>();
   readonly cancel = output<void>();
   readonly format = output<void>();
+  readonly toggleLineComment = output<void>();
   readonly timeoutChange = output<number>();
 
   readonly maxRowsChange = output<number>();

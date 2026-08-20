@@ -76,7 +76,21 @@ describe('CommandPalette', () => {
 
     expect(text).toContain('Ejecutar consulta activa');
     expect(text).toContain('Formatear SQL');
+    expect(text).toContain('Comentar/descomentar líneas');
     expect(text).toContain('Abrir historial');
+  });
+
+  it('ejecuta comentar líneas desde la paleta', () => {
+    let emitted = 0;
+    fixture.componentInstance.toggleLineComment.subscribe(() => emitted++);
+
+    const input = fixture.nativeElement.querySelector('input') as HTMLInputElement;
+    input.value = 'comentar';
+    input.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
+
+    expect(emitted).toBe(1);
   });
 
   it('distingue los objetos por conexión y base', () => {

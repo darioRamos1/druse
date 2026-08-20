@@ -94,6 +94,17 @@
   }
 </div>
 
+<button
+  type="button"
+  class="btn"
+  title="Comentar/descomentar líneas (Ctrl+/)"
+  (click)="toggleLineComment.emit()"
+>
+  <app-icon name="comment" [size]="12" />
+  <span class="label">Comentar</span>
+  <kbd class="btn__shortcut">⌘/</kbd>
+</button>
+
 <span class="divider" aria-hidden="true"></span>
 
 @if (transactionOpen()) {

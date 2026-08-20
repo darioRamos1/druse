@@ -24,6 +24,7 @@ export type IconName =
   | 'play-outline'
   | 'stop'
   | 'format'
+  | 'comment'
   | 'clock'
   | 'filter'
   | 'export'
@@ -137,6 +138,12 @@ const ICONS: Readonly<Record<IconName, IconDefinition>> = {
   format: {
     viewBox: '0 0 12 12',
     body: '<path d="M2 3h8M2 6h5M2 9h7" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>',
+  },
+  comment: {
+    viewBox: '0 0 14 14',
+    body:
+      '<path d="M2 2.2h10v7H6.1L3 11.8V9.2H2v-7z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/>' +
+      '<path d="M4.2 4.7h5.6M4.2 6.9h3.9" stroke="currentColor" stroke-width="1.1" stroke-linecap="round"/>',
   },
   eye: {
     viewBox: '0 0 14 14',

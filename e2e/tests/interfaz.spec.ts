@@ -74,6 +74,50 @@ test.describe('la interfaz por dentro', () => {
     await expect(buscador.locator('.replace-part')).toBeVisible();
   });
 
+  test('comenta y descomenta las líneas seleccionadas', async ({ page }) => {
+    await abrir(page);
+
+    const original = 'SELECT 1 AS uno;\nSELECT 2 AS dos;';
+    await escribirSql(page, original);
+
+    await page.evaluate(() => {
+      const editor = (window as unknown as { monaco: { editor: { getEditors(): any[] } } }).monaco
+        .editor.getEditors()[0];
+      const model = editor.getModel();
+
+      editor.setSelection({
+        startLineNumber: 1,
+        startColumn: 1,
+        endLineNumber: 2,
+        endColumn: model.getLineMaxColumn(2),
+      });
+      editor.focus();
+    });
+
+    const value = () =>
+      page.evaluate(() =>
+        (window as unknown as { monaco: { editor: { getEditors(): any[] } } }).monaco
+          .editor.getEditors()[0]
+          .getValue(),
+      );
+
+    await page.getByRole('button', { name: /Comentar/ }).click();
+    await expect.poll(value).toBe('-- SELECT 1 AS uno;\n-- SELECT 2 AS dos;');
+
+    await page.getByRole('button', { name: /Comentar/ }).click();
+    await expect.poll(value).toBe(original);
+
+    // Monaco conserva además el atajo estándar con el foco dentro del editor.
+    await page.evaluate(() => {
+      const editor = (window as unknown as { monaco: { editor: { getEditors(): any[] } } }).monaco
+        .editor.getEditors()[0];
+
+      editor.focus();
+    });
+    await page.keyboard.press('Control+/');
+    await expect.poll(value).toBe('-- SELECT 1 AS uno;\n-- SELECT 2 AS dos;');
+  });
+
   /**
    * El ciclo entero de un fragmento guardado: guardarlo, insertarlo y borrarlo.
    *
@@ -215,6 +259,44 @@ test.describe('la interfaz por dentro', () => {
 
     await page.setViewportSize({ width: 1440, height: 760 });
     await expect.poll(async () => (await compactLabel.boundingBox())?.width ?? 0).toBeGreaterThan(1);
+  });
+
+  test('el chip de conexión abre su menú por encima del editor', async ({ page }) => {
+    await abrir(page);
+    await conectar(page);
+    await apuntarPestana(page);
+
+    const toolbar = page.locator('app-editor-toolbar');
+    const chip = toolbar.locator('.context .chip');
+
+    await expect(chip).toBeEnabled();
+    await chip.click();
+
+    const menu = toolbar.locator('.context__menu');
+
+    await expect(chip).toHaveAttribute('aria-expanded', 'true');
+    await expect(menu).toBeVisible();
+
+    const geometry = await menu.evaluate((element) => {
+      const rect = element.getBoundingClientRect();
+      const style = getComputedStyle(element);
+
+      return {
+        top: rect.top,
+        bottom: rect.bottom,
+        zIndex: Number(style.zIndex),
+        viewportHeight: window.innerHeight,
+      };
+    });
+
+    expect(geometry.top).toBeGreaterThanOrEqual(0);
+    expect(geometry.bottom).toBeLessThanOrEqual(geometry.viewportHeight);
+    expect(geometry.zIndex).toBeGreaterThan(0);
+
+    // Visible no basta: una caja detrás de Monaco también cuenta como visible
+    // para Playwright. La opción tiene que recibir el clic y cerrar el menú.
+    await menu.locator('.context__option').first().click();
+    await expect(menu).toBeHidden();
   });
 
   test('el degradado de las listas desaparece al llegar al final', async ({ page }) => {

@@ -329,6 +329,50 @@ describe('autocompletado SQL', () => {
       ]);
     });
 
+    it('al retomar un SQL carga el esquema de la tabla antes de resolver su alias', async () => {
+      let index: SchemaIndex = { schemas: ['archivo'], relations: [] };
+      const esquemas: string[] = [];
+      const columnas: { schema: string | null; name: string }[] = [];
+      const { monaco, provider } = fakeMonaco();
+
+      registerSqlCompletion(monaco as never, () => ({
+        engine: 'sqlserver',
+        schema: index,
+        loadRelations: (schemaName) => {
+          esquemas.push(schemaName);
+          index = {
+            schemas: ['archivo'],
+            relations: [{
+              schema: 'archivo',
+              name: 'expedientes',
+              kind: 'table',
+              qualified: 'archivo.expedientes',
+              columns: [],
+            }],
+          };
+          return Promise.resolve();
+        },
+        loadColumns: (schemaName, name) => {
+          columnas.push({ schema: schemaName, name });
+          return Promise.resolve([col('id_expediente', 'int'), col('radicado', 'varchar(50)')]);
+        },
+      }));
+
+      const sql = 'SELECT * FROM archivo.expedientes e\nWHERE e.';
+      const lines = sql.split('\n');
+      const result = await provider().provideCompletionItems(fakeModel(sql) as never, {
+        lineNumber: lines.length,
+        column: lines.at(-1)!.length + 1,
+      });
+
+      expect(esquemas).toEqual(['archivo']);
+      expect(columnas).toEqual([{ schema: 'archivo', name: 'expedientes' }]);
+      expect(result.suggestions.map((item: { label: string }) => item.label)).toEqual([
+        'id_expediente',
+        'radicado',
+      ]);
+    });
+
     it('pide las columnas que faltan en lugar de no sugerir nada', async () => {
       // Una tabla que el explorador conoce pero no ha abierto: sin columnas.
       const sinAbrir: SchemaIndex = {
