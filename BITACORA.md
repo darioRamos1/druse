@@ -20,7 +20,7 @@
 | ¿Pasan las pruebas? | Sí — **760 en backend** (422 unitarias, 190 contractuales y 148 de integración) con `DRUSE_REQUIRE_ENGINES=1` y **los cuatro motores**, sin saltarse ninguna; **503 en frontend** y **20 de punta a punta**, estas dos veces seguidas y con los dos motores. Las **6 del envoltorio** no se ejecutaron: cargo no compila en este equipo |
 | ¿Hay aplicación de escritorio? | **Sí.** Instalador NSIS, MSI y ZIP portable, en dos variantes: con Informix y sin él |
 | Motores | **PostgreSQL, SQL Server, MySQL/MariaDB e Informix**, todos sobre el mismo contrato compartido |
-| Trabajo a medias | La fase 4 de la migración, a propósito: el backend de la pasada está commiteado y probado; la pantalla es lo siguiente. |
+| Trabajo a medias | Ninguno. La migración quedó cerrada de punta a punta en las sesiones 023i y 023j. |
 | Bloqueantes | Ninguno para seguir programando. Sí para dar por buenos cuatro motores y cuatro funciones: ver «Qué toca retomar». |
 | Git | El **PR #9 se fusionó** (sesión 022), con los quince commits que el #8 dejó fuera más lo de la personalización. Se trabaja en `feat/respaldos-y-restauracion`, salida de un `main` ya al día. |
 | Integración continua | 🔴 **Parada, y no por el código.** GitHub aborta los catorce jobs en dos segundos: «recent account payments have failed or your spending limit needs to be increased». Hasta resolver la facturación, ningún PR podrá pasar los checks. |
