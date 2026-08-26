@@ -219,3 +219,62 @@ fn main() {
         .run(tauri::generate_context!())
         .expect("No se pudo iniciar Druse");
 }
+
+/// Comprobaciones sobre la configuración con la que se construye la ventana.
+///
+/// No prueban código: leen `tauri.conf.json` y sujetan dos decisiones que **solo
+/// se notan en el ejecutable**, donde nadie mira hasta que algo se ve mal.
+#[cfg(test)]
+mod configuracion {
+    const CONFIGURACION: &str = include_str!("../tauri.conf.json");
+
+    fn seguridad() -> serde_json::Value {
+        let raiz: serde_json::Value =
+            serde_json::from_str(CONFIGURACION).expect("tauri.conf.json no es JSON válido");
+
+        raiz["app"]["security"].clone()
+    }
+
+    /// Angular pinta los estilos de cada componente en una etiqueta `<style>`.
+    ///
+    /// Tauri añade un nonce a `style-src` al procesar la CSP, y la especificación
+    /// dice que con un nonce presente **`'unsafe-inline'` se ignora**. Resultado:
+    /// el navegador bloquea las quince etiquetas que inyecta Angular y la
+    /// aplicación aparece sin una sola regla de disposición, con todo apilado en
+    /// una columna. La hoja externa sigue cargando, así que desde fuera parece
+    /// que el CSS «está», y por eso costó tanto verlo.
+    ///
+    /// Pedirle a Tauri que no toque esa directiva es lo que devuelve el efecto de
+    /// `'unsafe-inline'`.
+    #[test]
+    fn tauri_no_toca_style_src() {
+        let seguridad = seguridad();
+        let excluidas = seguridad["dangerousDisableAssetCspModification"]
+            .as_array()
+            .expect("hace falta la lista de directivas que Tauri no debe modificar");
+
+        assert!(
+            excluidas.iter().any(|d| d == "style-src"),
+            "sin `style-src` aquí, el nonce de Tauri anula 'unsafe-inline' y la \
+             ventana se abre sin estilos"
+        );
+    }
+
+    /// El puente con el proceso Rust viaja por `ipc.localhost`.
+    ///
+    /// Sin él en `connect-src`, la CSP bloquea cada `invoke` y se cae en silencio
+    /// todo lo que depende del envoltorio: elegir dónde guardar una exportación,
+    /// el selector de carpeta de los respaldos, abrir un `.sql`.
+    #[test]
+    fn el_puente_con_el_proceso_no_esta_bloqueado() {
+        let seguridad = seguridad();
+        let connect = seguridad["csp"]["connect-src"]
+            .as_str()
+            .expect("falta connect-src en la CSP");
+
+        assert!(
+            connect.contains("ipc:") && connect.contains("ipc.localhost"),
+            "connect-src debe dejar pasar el IPC de Tauri; ahora es: {connect}"
+        );
+    }
+}

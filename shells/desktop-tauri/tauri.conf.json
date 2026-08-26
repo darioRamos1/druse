@@ -26,13 +26,14 @@
     "security": {
       "csp": {
         "default-src": "'self'",
-        "connect-src": "'self' http://127.0.0.1:* http://localhost:*",
+        "connect-src": "'self' ipc: http://ipc.localhost http://127.0.0.1:* http://localhost:*",
         "img-src": "'self' data: blob:",
         "style-src": "'self' 'unsafe-inline'",
         "font-src": "'self' data:",
         "script-src": "'self'",
         "worker-src": "'self' blob:"
-      }
+      },
+      "dangerousDisableAssetCspModification": ["style-src"]
     }
   },
   "bundle": {
