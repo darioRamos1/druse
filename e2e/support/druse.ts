@@ -56,6 +56,11 @@ export async function abrir(page: Page): Promise<void> {
 
   await conexiones;
   await expect(page.locator('app-sql-editor .monaco-editor')).toBeVisible({ timeout: 90_000 });
+
+  // La pantalla de carga se va sola cuando termina el arranque, pero hasta
+  // entonces tapa la ventana entera: sin esperarla, el primer clic de cada
+  // prueba se quedaría esperando a que dejara de interceptarlo.
+  await expect(page.locator('#druse-splash')).toHaveCount(0, { timeout: 30_000 });
 }
 
 /**
@@ -221,9 +226,21 @@ export async function apuntarPestanaA(
   base: string,
 ): Promise<void> {
   const chip = page.locator('app-editor-toolbar .chip').first();
-  const texto = (await chip.textContent()) ?? '';
+  const conexionActual = (
+    await chip
+      .locator('.chip__name')
+      .textContent()
+      .catch(() => '')
+  )?.trim();
+  const baseActual = (
+    await chip
+      .locator('.chip__mono')
+      .textContent()
+      .catch(() => '')
+  )?.trim();
+  const apuntaALaBase = baseActual === base || baseActual?.startsWith(`${base}.`);
 
-  if (texto.includes(conexion) && texto.includes(base)) {
+  if (conexionActual === conexion && apuntaALaBase) {
     return;
   }
 
@@ -232,8 +249,9 @@ export async function apuntarPestanaA(
   await expect(chip).toContainText(conexion, { timeout: 30_000 });
 
   await chip.click();
-  await page.locator('.context__option', { hasText: base }).first().click();
-  await expect(chip).toContainText(base);
+  await page.getByRole('option', { name: base, exact: true }).click();
+  const baseEscapada = base.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  await expect(chip.locator('.chip__mono')).toHaveText(new RegExp(`^${baseEscapada}(?:\\.|$)`));
 }
 
 /**
@@ -337,6 +355,19 @@ export async function ejecutar(page: Page, que: 'todo' | 'la del cursor'): Promi
 
   // La respuesta ya está; falta que Angular la pinte.
   await expect(page.getByRole('button', { name: 'Cancelar' })).toBeDisabled({ timeout: 30_000 });
+}
+
+/**
+ * Lo que hay en el portapapeles, con los saltos de línea normalizados.
+ *
+ * En Windows el portapapeles guarda CRLF, y Chromium convierte al escribir: sin
+ * esto, comprobar un texto de varias líneas falla por un carácter que no puso
+ * la aplicación y que Excel ni siquiera nota al pegar.
+ */
+export async function portapapeles(page: Page): Promise<string> {
+  const texto = await page.evaluate(() => navigator.clipboard.readText());
+
+  return texto.replace(/\r\n/g, '\n');
 }
 
 /** Los conjuntos de resultados que se ofrecen, cuando la consulta trajo varios. */
