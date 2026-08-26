@@ -149,7 +149,12 @@ export interface SqlRisk {
 
 /** La ejecución se rechazó y el usuario debe decidir. */
 export interface QueryRejected {
-  readonly reason: 'readonlyconnection' | 'unconfirmeddestructive' | 'emptystatement';
+  readonly reason:
+    | 'readonlyconnection'
+    | 'unconfirmeddestructive'
+    | 'emptystatement'
+    /** Se pidió exportar algo que escribe en la base en vez de devolver filas. */
+    | 'notexportable';
   readonly message: string;
   readonly risks: readonly SqlRisk[];
 }

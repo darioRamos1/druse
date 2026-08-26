@@ -68,7 +68,7 @@ internal sealed class InformixResultReader : IQueryResultReader
 
             return new InformixResultReader(command, reader, columns);
         }
-        catch
+        catch (OperationCanceledException)
         {
             if (reader is not null)
             {
@@ -77,6 +77,21 @@ internal sealed class InformixResultReader : IQueryResultReader
 
             await command.DisposeAsync();
             throw;
+        }
+        catch (Exception exception)
+        {
+            if (reader is not null)
+            {
+                await reader.DisposeAsync();
+            }
+
+            await command.DisposeAsync();
+
+            // Se cuenta lo que dijo el motor, igual que al abrir la conexión.
+            // Por aquí pasa la exportación, y sin esto su error salía como «se
+            // produjo un error inesperado»: el usuario veía fallar el archivo
+            // sin saber que el problema estaba en su SQL.
+            throw new DatabaseOperationException(InformixErrorNormalizer.Normalize(exception));
         }
     }
 

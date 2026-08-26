@@ -3085,7 +3085,14 @@ async function asRejectionFromBlob(error: unknown): Promise<QueryRejected | null
 
   if (error.error instanceof Blob) {
     try {
-      return JSON.parse(await error.error.text()) as QueryRejected;
+      const body = JSON.parse(await error.error.text()) as Partial<QueryRejected>;
+
+      // Se exige `reason`, igual que en la rama de abajo. Por este mismo 409
+      // llegan ahora los errores del motor durante una exportación —traen
+      // `message` y `code`, no `reason`—, y tomarlos por un rechazo dejaría el
+      // aviso sin la lista de riesgos que la plantilla recorre. Sin `reason` es
+      // un error normal y se cuenta como tal.
+      return body.reason ? (body as QueryRejected) : null;
     } catch {
       return null;
     }

@@ -1497,6 +1497,62 @@ describe('WorkspaceStore', () => {
       expect(store.notice()).toBe('Exportado a XLSX.');
     });
 
+    /**
+     * El motor rechaza la consulta durante una exportación.
+     *
+     * Llega como 409 con el mensaje del motor y **sin `reason`**: no es algo que
+     * se pueda confirmar, es algo que se arregla en el SQL. Antes salía como un
+     * 500 con «se produjo un error inesperado»; ahora se cuenta lo que dijo el
+     * servidor, y como aviso, no como banner de confirmación.
+     */
+    it('un error del motor al exportar se cuenta con su mensaje, sin pedir confirmación', async () => {
+      await store.connect(form);
+      store.updateSql('SELECT * FROM no_existe');
+      vi.spyOn(gateway, 'exportQuery').mockReturnValue(
+        throwError(
+          () =>
+            new HttpErrorResponse({
+              status: 409,
+              error: new Blob([
+                JSON.stringify({ message: "Invalid object name 'no_existe'.", code: '208' }),
+              ]),
+            }),
+        ),
+      );
+
+      await store.export('csv');
+
+      expect(store.rejection()).toBeNull();
+      expect(store.notice()).toBe("Invalid object name 'no_existe'.");
+    });
+
+    it('exportar una definición se rechaza y el aviso explica qué hacer', async () => {
+      await store.connect(form);
+      store.updateSql('CREATE VIEW dbo.v AS SELECT 1 AS uno');
+      vi.spyOn(gateway, 'exportQuery').mockReturnValue(
+        throwError(
+          () =>
+            new HttpErrorResponse({
+              status: 409,
+              error: new Blob([
+                JSON.stringify({
+                  reason: 'notexportable',
+                  message: 'Esto no devuelve filas: modifica la base de datos.',
+                  risks: [],
+                }),
+              ]),
+            }),
+        ),
+      );
+
+      await store.export('csv');
+
+      expect(store.rejection()).toMatchObject({
+        reason: 'notexportable',
+        message: 'Esto no devuelve filas: modifica la base de datos.',
+      });
+    });
+
     it('muestra el mensaje JSON de un error de exportación recibido como blob', async () => {
       await store.connect(form);
       store.updateSql('SELECT 1');
