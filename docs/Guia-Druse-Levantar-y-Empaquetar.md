@@ -186,7 +186,30 @@ Eso produce, para esta máquina, el instalador NSIS (.exe) y el MSI.
 ./build/scripts/package.ps1 -Portable -WithoutInformix   # lo mismo, versión ligera
 ```
 
-### 4.3 Receta completa: las dos variantes, con portable
+### 4.3 El icono no hay que pedirlo, pero sí rehacerlo si cambia la marca
+
+El icono del ejecutable y el de los instaladores salen los dos de
+`shells/desktop-tauri/icons/icon.ico`, que está versionado: `package.ps1` no
+hace nada especial con él y no hay que pasarle ninguna opción.
+
+Lo que sí hay que saber es que ese `.ico` **no es una imagen**: es un contenedor
+con una copia para cada tamaño que pide el sistema —16, 32 y 48 px para el
+Explorador; hasta 256 para el cuadro de propiedades—. Si se sustituye por una
+sola imagen grande, o por una de pocos colores, Windows deja de dibujarlo en los
+tamaños pequeños y el ejecutable aparece **sin icono**. Es lo que le pasaba a
+Druse hasta la sesión 033.
+
+Por eso, cuando cambie la marca, se cambia `icons/icon.png` —cuadrado y de 512 px
+o más— y se regenera el resto:
+
+```powershell
+./build/scripts/iconos.ps1
+```
+
+El resultado se versiona con el resto de los iconos. No hace falta ejecutarlo en
+cada empaquetado.
+
+### 4.4 Receta completa: las dos variantes, con portable
 
 Esto es lo que se lanza para tener **todo lo que se reparte**. Tarda varios minutos: cada variante compila Rust entero.
 
@@ -200,7 +223,7 @@ Esto es lo que se lanza para tener **todo lo que se reparte**. Tarda varios minu
 
 El script pone un sufijo a cada artefacto —**-completo** o **-sin-informix**— para que las dos variantes puedan convivir en la misma carpeta sin pisarse. Por eso el orden no importa y ninguna sobrescribe a la otra.
 
-### 4.4 Dónde quedan los archivos
+### 4.5 Dónde quedan los archivos
 
 | Artefacto | Ruta (desde el repositorio) |
 | --- | --- |
@@ -218,7 +241,7 @@ explorer shells\desktop-tauri\target\win-x64\release\bundle
 explorer shells\desktop-tauri\target\portable
 ```
 
-### 4.5 Firmar los artefactos (opcional)
+### 4.6 Firmar los artefactos (opcional)
 
 Sin firma, Windows enseña el aviso de SmartScreen en cada equipo donde se abra la aplicación. **Sin certificado el empaquetado funciona igual**; solo salen sin firmar, y el script lo dice al empezar, no al terminar.
 
@@ -244,7 +267,7 @@ $env:DRUSE_SIGN_THUMBPRINT = 'huella del certificado'
 | «La API local no respondió en /api/health» | El puerto 5177 está ocupado. Arranca con otro: ./build/scripts/dev.ps1 -ApiPort 5180 |
 | Las pruebas de motores no comprueban nada | Docker Desktop no está arrancado o faltan los contenedores: ./build/scripts/test-db.ps1 |
 | npm start falla nada más empezar | Faltan las dependencias: cd frontend && npm install |
-| Windows avisa de SmartScreen al abrir el instalador | El artefacto no está firmado. Es esperable en las compilaciones locales; ver el punto 4.5. |
+| Windows avisa de SmartScreen al abrir el instalador | El artefacto no está firmado. Es esperable en las compilaciones locales; ver el punto 4.6. |
 | En Linux, la primera conexión a Informix falla por libxml2 | sudo apt-get install libxml2 — el driver de IBM la necesita y no viaja en el paquete. |
 
 ## 6. Chuleta de una sola página
@@ -261,5 +284,6 @@ $env:DRUSE_SIGN_THUMBPRINT = 'huella del certificado'
 | Generar instalador + portable | `./build/scripts/package.ps1 -Portable` |
 | Lo mismo, versión ligera | `./build/scripts/package.ps1 -Portable -WithoutInformix` |
 | Preparar sin construir instalador | `./build/scripts/package.ps1 -SkipInstaller` |
+| Rehacer el icono tras cambiar la marca | `./build/scripts/iconos.ps1` |
 
-*Referencias del repositorio: README.md (visión general), build/scripts/dev.ps1, build/scripts/package.ps1 y build/scripts/test-db.ps1 (cada uno documenta sus parámetros con Get-Help).*
+*Referencias del repositorio: README.md (visión general), build/scripts/dev.ps1, build/scripts/package.ps1, build/scripts/test-db.ps1 y build/scripts/iconos.ps1 (cada uno documenta sus parámetros con Get-Help).*
