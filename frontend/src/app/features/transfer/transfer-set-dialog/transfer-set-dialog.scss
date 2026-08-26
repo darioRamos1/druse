@@ -4,6 +4,17 @@
 // mismos pasos— y añade lo suyo: la lista con casillas, el orden y el aviso de
 // las que no están al otro lado.
 
+:host {
+  position: fixed;
+  inset: 0;
+  z-index: var(--dr-z-modal);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--dr-font-ui);
+  font-size: var(--dr-font-size-sm);
+}
+
 .backdrop {
   position: absolute;
   inset: 0;
@@ -186,7 +197,7 @@
 .link {
   border: 0;
   background: transparent;
-  color: var(--dr-accent-text, var(--dr-text-secondary));
+  color: var(--dr-accent-bright);
   font-family: inherit;
   font-size: 12px;
   text-decoration: underline;

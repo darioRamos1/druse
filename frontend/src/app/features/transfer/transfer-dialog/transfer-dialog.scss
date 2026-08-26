@@ -2,7 +2,7 @@
 :host {
   position: fixed;
   inset: 0;
-  z-index: 50;
+  z-index: var(--dr-z-modal);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -211,7 +211,7 @@ select {
 .link {
   border: 0;
   background: transparent;
-  color: var(--dr-accent-text, var(--dr-text-secondary));
+  color: var(--dr-accent-bright);
   font-family: inherit;
   font-size: 12px;
   text-decoration: underline;

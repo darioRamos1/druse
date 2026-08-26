@@ -62,6 +62,14 @@
   --dr-radius: 8px;
   --dr-radius-sm: 7px;
   --dr-radius-xs: 2px;
+
+  // Capas compartidas: los drawers nunca deben quedar encima de un diálogo.
+  --dr-z-drawer-toggle: 50;
+  --dr-z-drawer-backdrop: 55;
+  --dr-z-drawer: 60;
+  --dr-z-modal: 100;
+  --dr-z-modal-nested: 110;
+  --dr-z-command-palette: 120;
 }
 
 // =============================================================================
@@ -165,7 +173,8 @@
   --dr-accent-line-strong: rgb(var(--dr-accent-rgb) / 55%);
 
   // Texto que va **encima** del acento, no al lado.
-  --dr-text-on-accent: hsl(var(--dr-hue) calc(0% * var(--dr-sat-scale)) 100%);
+  // El acento oscuro predeterminado es suficientemente claro para requerir tinta.
+  --dr-text-on-accent: rgb(12 16 24);
 
   // ---------------------------------------------------------------------------
   // Estado

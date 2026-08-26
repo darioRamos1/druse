@@ -50,7 +50,7 @@
 
   .sidebar {
     position: fixed;
-    z-index: 60;
+    z-index: var(--dr-z-drawer);
     top: var(--dr-topbar-height);
     bottom: 0;
     left: 0;
@@ -66,7 +66,7 @@
 
   .mobile-sidebar-backdrop {
     position: fixed;
-    z-index: 55;
+    z-index: var(--dr-z-drawer-backdrop);
     inset: var(--dr-topbar-height) 0 0;
     display: block;
     background: var(--dr-scrim);
@@ -74,7 +74,7 @@
 
   .mobile-explorer-toggle {
     position: fixed;
-    z-index: 50;
+    z-index: var(--dr-z-drawer-toggle);
     left: 8px;
     bottom: 30px;
     display: block;

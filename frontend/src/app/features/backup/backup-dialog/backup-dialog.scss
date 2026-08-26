@@ -2,7 +2,7 @@
 :host {
   position: fixed;
   inset: 0;
-  z-index: 50;
+  z-index: var(--dr-z-modal);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -394,8 +394,8 @@ select {
 
 .primary {
   border: 1px solid transparent;
-  background: var(--dr-accent-deep, var(--dr-accent));
-  color: #fff;
+  background: var(--dr-accent-button);
+  color: var(--dr-text-on-accent);
 
   &:disabled {
     opacity: 0.45;

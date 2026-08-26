@@ -23,14 +23,6 @@
   }
 }
 
-/* El calendario y el reloj del navegador son claros por omisión y desaparecen
-   sobre el fondo oscuro. */
-.field[type='date'],
-.field[type='time'],
-.field[type='datetime-local'] {
-  color-scheme: dark;
-}
-
 .check {
   display: flex;
   flex: 1;
