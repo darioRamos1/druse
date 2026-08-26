@@ -182,6 +182,85 @@ public sealed class ExportFlowTests : IClassFixture<DruseApiFactory>
         }
     }
 
+    /// <summary>
+    /// El nombre del archivo puede no ser ASCII, y una cabecera HTTP sí lo exige.
+    ///
+    /// El nombre sale del título de la pestaña: en español lleva acentos, y una
+    /// pestaña abierta con «Ver DDL» se titula <c>vista · DDL</c>. Puesto tal
+    /// cual en `Content-Disposition`, Kestrel rechazaba la respuesta entera y la
+    /// exportación moría con un 500 que no explicaba nada.
+    /// </summary>
+    [RequiresPostgreSqlFact]
+    public async Task ElNombreDelArchivoAdmiteAcentosYPuntoMedio()
+    {
+        var (client, sessionId) = await ConnectAsync();
+
+        using (client)
+        {
+            var nombre = "análisis de año · DDL";
+
+            var response = await client.PostAsJsonAsync("/api/exports/csv", new
+            {
+                sessionId,
+                sql = "SELECT 1 AS id",
+                fileName = nombre,
+            });
+
+            response.EnsureSuccessStatusCode();
+
+            var disposition = response.Content.Headers.ContentDisposition?.ToString() ?? "";
+
+            // El nombre de verdad viaja en `filename*`, en UTF-8 con porcentajes.
+            Assert.Contains("filename*=utf-8''", disposition, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains(Uri.EscapeDataString(nombre + ".csv"), disposition, StringComparison.OrdinalIgnoreCase);
+
+            await client.DeleteAsync($"/api/sessions/{sessionId}");
+        }
+    }
+
+    /// <summary>
+    /// Exportar una definición no la ejecuta.
+    ///
+    /// Abrir una vista desde el explorador deja su CREATE VIEW en la pestaña.
+    /// Exportarlo llegaba al motor: si la vista existía respondía con un error
+    /// ilegible, y si no, **la creaba** dando la exportación por buena.
+    /// </summary>
+    [RequiresPostgreSqlFact]
+    public async Task ExportarUnaDefinicionSeRechazaYNoLaEjecuta()
+    {
+        var (client, sessionId) = await ConnectAsync();
+
+        using (client)
+        {
+            var response = await client.PostAsJsonAsync("/api/exports/csv", new
+            {
+                sessionId,
+                sql = "CREATE VIEW v_no_deberia_crearse AS SELECT 1 AS uno",
+            });
+
+            Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+
+            var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+            Assert.Equal("notexportable", body.GetProperty("reason").GetString());
+
+            // Y lo que importa: no quedó creada.
+            var check = await client.PostAsJsonAsync("/api/queries", new
+            {
+                sessionId,
+                sql = "SELECT COUNT(*) FROM pg_views WHERE viewname = 'v_no_deberia_crearse'",
+            });
+
+            check.EnsureSuccessStatusCode();
+
+            var counted = await check.Content.ReadFromJsonAsync<JsonElement>();
+            var value = counted.GetProperty("resultSets")[0].GetProperty("rows")[0][0].GetString();
+
+            Assert.Equal("0", value);
+
+            await client.DeleteAsync($"/api/sessions/{sessionId}");
+        }
+    }
+
     [RequiresPostgreSqlFact]
     public async Task AdmiteOtroSeparadorYTextoDeNulo()
     {

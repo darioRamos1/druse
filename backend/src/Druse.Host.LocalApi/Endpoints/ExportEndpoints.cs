@@ -52,7 +52,7 @@ internal static class ExportEndpoints
         // Se comprueba **antes** de tocar la respuesta: una vez empieza a salir
         // el cuerpo ya no se puede cambiar el código de estado ni las cabeceras.
         var session = connections.Require(domainRequest.SessionId);
-        var rejection = QueryService.Validate(QueryContext.From(session), domainRequest);
+        var rejection = ExportService.Validate(QueryContext.From(session), domainRequest);
 
         if (rejection is not null)
         {
@@ -63,7 +63,7 @@ internal static class ExportEndpoints
         var fileName = BuildFileName(request.FileName, exporter.FileExtension);
 
         context.Response.ContentType = exporter.ContentType;
-        context.Response.Headers.ContentDisposition = $"attachment; filename=\"{fileName}\"";
+        context.Response.Headers.ContentDisposition = ContentDisposition(fileName);
 
         // El recuento de filas solo se conoce al terminar de escribir, y para
         // entonces las cabeceras ya se enviaron. Los trailers existen justo para
@@ -92,6 +92,37 @@ internal static class ExportEndpoints
         }
 
         return Results.Empty;
+    }
+
+    /// <summary>
+    /// Compone la cabecera con el nombre del archivo.
+    ///
+    /// **Una cabecera HTTP solo admite ASCII**, y el nombre sale del título de la
+    /// pestaña, que casi nunca lo es: en español lleva acentos, y una pestaña
+    /// abierta con «Ver DDL» se titula <c>vista · DDL</c>, con un punto medio.
+    /// Metido tal cual, Kestrel se niega —«Invalid non-ASCII or control character
+    /// in header»— y la exportación entera muere con un error del servidor que no
+    /// dice nada de esto. Era lo que rompía exportar tras mirar una vista.
+    ///
+    /// Se escriben los dos parámetros que define el RFC 6266: <c>filename</c> con
+    /// lo que sobrevive en ASCII, para cualquier cliente antiguo, y
+    /// <c>filename*</c> con el nombre de verdad en UTF-8. Los navegadores
+    /// prefieren el segundo, así que el usuario conserva sus acentos.
+    /// </summary>
+    private static string ContentDisposition(string fileName)
+    {
+        var ascii = new string([.. fileName
+            .Where(character => character is >= ' ' and < (char)127)
+            .Where(character => character is not ('"' or '\\'))]);
+
+        if (ascii.Length == 0)
+        {
+            ascii = "druse";
+        }
+
+        // `EscapeDataString` deja el nombre en porcentajes, que es justo lo que
+        // pide `filename*`; el prefijo declara en qué juego de caracteres viene.
+        return $"attachment; filename=\"{ascii}\"; filename*=UTF-8''{Uri.EscapeDataString(fileName)}";
     }
 
     /// <summary>
