@@ -1,4 +1,4 @@
-import { initialColumnWidths } from './column-widths';
+import { fitColumnWidth, initialColumnWidths, MIN_COLUMN_WIDTH } from './column-widths';
 
 describe('ancho inicial de las columnas', () => {
   /**
@@ -79,5 +79,52 @@ describe('ancho inicial de las columnas', () => {
     const [ancho] = initialColumnWidths([{ name: 'a', kind: 'text' }], filas);
 
     expect(ancho).toBe(84);
+  });
+});
+
+describe('fitColumnWidth', () => {
+  it('coge el título cuando es más largo que los valores', () => {
+    const ancho = fitColumnWidth({ name: 'fecha_de_alta_efectiva', kind: 'text' }, ['1', '2']);
+
+    // 22 caracteres de cabecera: nadie lee «fecha_de_alt…» y sabe qué columna es.
+    expect(ancho).toBeGreaterThan(140);
+  });
+
+  it('coge el valor más largo cuando es él quien manda', () => {
+    const corto = fitColumnWidth({ name: 'nota', kind: 'text' }, ['sí']);
+    const largo = fitColumnWidth({ name: 'nota', kind: 'text' }, [
+      'una nota bastante más larga que el título',
+    ]);
+
+    expect(largo).toBeGreaterThan(corto);
+  });
+
+  it('cuenta los nulos como la palabra que se pinta', () => {
+    // La celda no está vacía: dice NULL, y eso ocupa.
+    expect(fitColumnWidth({ name: 'a', kind: 'text' }, [null])).toBe(
+      fitColumnWidth({ name: 'a', kind: 'text' }, ['NULL']),
+    );
+  });
+
+  it('admite columnas más anchas que el reparto inicial', () => {
+    const valor = 'x'.repeat(120);
+
+    const inicial = initialColumnWidths([{ name: 'json', kind: 'text' }], [[valor]])[0];
+    const ajustado = fitColumnWidth({ name: 'json', kind: 'text' }, [valor]);
+
+    // El reparto inicial se corta en 320 px para no comerse la pantalla; el
+    // ajuste a mano lo ha pedido alguien, así que puede pasar de ahí.
+    expect(inicial).toBe(320);
+    expect(ajustado).toBeGreaterThan(320);
+  });
+
+  it('no se dispara con un valor desmesurado', () => {
+    const ancho = fitColumnWidth({ name: 'payload', kind: 'text' }, ['x'.repeat(10_000)]);
+
+    expect(ancho).toBe(900);
+  });
+
+  it('nunca baja del mínimo', () => {
+    expect(fitColumnWidth({ name: 'a', kind: 'text' }, ['1'])).toBe(MIN_COLUMN_WIDTH);
   });
 });

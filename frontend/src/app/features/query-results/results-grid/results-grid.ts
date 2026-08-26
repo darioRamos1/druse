@@ -1,23 +1,56 @@
-import { ChangeDetectionStrategy, Component, computed, input, output, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  effect,
+  ElementRef,
+  HostListener,
+  inject,
+  input,
+  output,
+  signal,
+} from '@angular/core';
 
 import { CellEdit, ResultColumn, ResultRow, ResultSet } from '../../../shared/models/workspace';
 import { Icon } from '../../../shared/ui/icon/icon';
+import { fitColumnWidth, MIN_COLUMN_WIDTH } from '../../../core/application-gateway/column-widths';
+import { CopyFormat, CopySelection, formatSelection } from './copy-formats';
 
 /** Ancho de la columna del número de fila. */
 const ROW_NUMBER_WIDTH = 44;
 
-/** Celda seleccionada, por fila y columna. */
+/** Filas añadidas al DOM en cada bloque. */
+const ROW_PAGE_SIZE = 500;
+
+/** Celda que se está editando, por número de fila y columna. */
 interface CellPosition {
   readonly row: number;
   readonly column: number;
 }
 
 /**
+ * Extremo de una selección de celdas.
+ *
+ * La fila va por **posición entre las filas visibles**, no por su número: con un
+ * filtro puesto los números dejan de ser consecutivos, y un rango apoyado en
+ * ellos se llevaría filas que el filtro esconde.
+ */
+interface CellAnchor {
+  readonly row: number;
+  readonly column: number;
+}
+
+/** Dónde se abrió el menú contextual, en coordenadas de la ventana. */
+interface MenuPosition {
+  readonly top: number;
+  readonly left: number;
+}
+
+/**
  * Cuadrícula de resultados.
  *
- * Rejilla CSS sin virtualizar. Con el límite de 500 filas del ejecutor se
- * comporta bien; si algún día se sube ese tope habrá que virtualizar, y por eso
- * está aislada del panel que la contiene (bitácora D-08).
+ * Rejilla CSS con renderizado progresivo: el resultado completo sigue disponible
+ * para exportar, pero el DOM solo recibe bloques manejables de filas.
  */
 @Component({
   selector: 'app-results-grid',
@@ -61,16 +94,104 @@ export class ResultsGrid {
   /** Filtro escrito por el usuario en cada columna, por índice. */
   protected readonly filters = signal<Readonly<Record<number, string>>>({});
 
-  protected readonly selected = signal<CellPosition | null>(null);
+  /**
+   * La selección de celdas: dónde empezó y hasta dónde llega.
+   *
+   * Dos extremos y no una lista de celdas: lo que se puede seleccionar aquí es
+   * siempre un rectángulo, y guardar las esquinas evita recorrer —y recordar—
+   * un resultado que puede tener cientos de miles de filas.
+   */
+  protected readonly anchor = signal<CellAnchor | null>(null);
+  protected readonly focus = signal<CellAnchor | null>(null);
+
+  /**
+   * Columnas enteras seleccionadas, por índice.
+   *
+   * Es el otro modo de selección, y los dos se excluyen: al pulsar una cabecera
+   * se olvida el rango de celdas y al pulsar una celda se olvidan las columnas.
+   * Mezclarlos dejaría una selección que no se puede dibujar ni explicar.
+   */
+  protected readonly selectedColumns = signal<readonly number[]>([]);
+
+  protected readonly menu = signal<MenuPosition | null>(null);
+
+  protected readonly visibleLimit = signal(ROW_PAGE_SIZE);
+
+  /** La última cabecera pulsada, para que Mayúsculas sepa desde dónde extender. */
+  private lastColumn: number | null = null;
+
+  /** Hay un botón pulsado y el ratón está barriendo celdas. */
+  private dragging = false;
+
+  /**
+   * Anchos que el usuario ha ajustado, por nombre de columna.
+   *
+   * Por nombre y no por posición: al reejecutar la consulta llega un resultado
+   * nuevo, y lo que el usuario quiere recuperar es el ancho de *esa* columna.
+   */
+  protected readonly customWidths = signal<Readonly<Record<string, number>>>({});
+
+  /** Se está arrastrando el borde de una cabecera. */
+  private resizing: { column: number; startX: number; startWidth: number } | null = null;
+
+  protected readonly isResizing = signal(false);
+
+  private readonly host = inject(ElementRef<HTMLElement>);
+
+  /**
+   * Qué columnas trae el resultado, en orden.
+   *
+   * Es lo que distingue «la misma consulta otra vez» de «otra consulta»: mientras
+   * las columnas sean las mismas, los anchos ajustados a mano siguen valiendo.
+   */
+  private readonly columnSignature = computed(() =>
+    this.resultSet()
+      .columns.map((column) => column.name)
+      .join('\u0000'),
+  );
+
+  private lastSignature: string | null = null;
+
+  private readonly resetLocalState = effect(() => {
+    // Se lee el resultado entero y no solo su firma: la firma no cambia cuando
+    // se reejecuta la misma consulta, y entonces esto no volvería a correr y el
+    // filtro y la selección de la ejecución anterior seguirían puestos sobre
+    // filas que ya no son las mismas.
+    this.resultSet();
+
+    const signature = this.columnSignature();
+
+    this.filters.set({});
+    this.clearSelection();
+    this.editing.set(null);
+    this.menu.set(null);
+    this.visibleLimit.set(ROW_PAGE_SIZE);
+
+    // Los anchos son lo único que sobrevive a una ejecución: volver a lanzar la
+    // consulta que acabas de ensanchar y encontrarla otra vez estrecha sería
+    // pedir el mismo trabajo dos veces. Cambian las columnas, se olvidan.
+    if (signature !== this.lastSignature) {
+      this.lastSignature = signature;
+      this.customWidths.set({});
+    }
+  });
 
   /**
    * Plantilla de columnas de la rejilla. La última lleva `1fr` para absorber el
    * espacio sobrante, igual que en el mockup.
    */
   protected readonly gridTemplate = computed(() => {
-    const columns = this.resultSet().columns.map((column) =>
-      column.width === null ? '1fr' : `${column.width}px`,
-    );
+    const custom = this.customWidths();
+
+    const columns = this.resultSet().columns.map((column) => {
+      const ajustado = custom[column.name];
+
+      if (ajustado !== undefined) {
+        return `${ajustado}px`;
+      }
+
+      return column.width === null ? '1fr' : `${column.width}px`;
+    });
 
     return [`${ROW_NUMBER_WIDTH}px`, ...columns].join(' ');
   });
@@ -100,14 +221,196 @@ export class ResultsGrid {
     () => this.visibleRows().length !== this.resultSet().rows.length,
   );
 
+  protected readonly renderedRows = computed(() =>
+    this.visibleRows().slice(0, this.visibleLimit()),
+  );
+
+  protected readonly remainingRows = computed(() =>
+    Math.max(0, this.visibleRows().length - this.renderedRows().length),
+  );
+
   protected onFilter(columnIndex: number, event: Event): void {
     const term = (event.target as HTMLInputElement).value;
 
     this.filters.update((current) => ({ ...current, [columnIndex]: term }));
+    this.visibleLimit.set(ROW_PAGE_SIZE);
   }
 
-  protected select(row: number, column: number): void {
-    this.selected.set({ row, column });
+  protected showMore(): void {
+    this.visibleLimit.update((current) => current + ROW_PAGE_SIZE);
+  }
+
+  /**
+   * Empieza una selección de celdas donde se pulsó.
+   *
+   * Con Mayúsculas no se empieza: se estira la que ya había hasta aquí, que es
+   * como se coge un bloque largo sin arrastrar por media pantalla.
+   */
+  protected beginCellSelection(row: number, column: number, event: MouseEvent): void {
+    // El botón derecho no selecciona: abre el menú sobre lo que ya estuviera
+    // marcado, igual que en una hoja de cálculo.
+    if (event.button === 2) {
+      return;
+    }
+
+    this.selectedColumns.set([]);
+    this.lastColumn = null;
+
+    if (event.shiftKey && this.anchor()) {
+      this.focus.set({ row, column });
+    } else {
+      this.anchor.set({ row, column });
+      this.focus.set({ row, column });
+    }
+
+    this.dragging = true;
+  }
+
+  /** Estira la selección mientras el ratón barre celdas con el botón pulsado. */
+  protected extendCellSelection(row: number, column: number, event: MouseEvent): void {
+    // `buttons` y no `button`: en un `mouseenter` este último no dice nada, y sin
+    // comprobarlo la selección seguiría al puntero después de soltar.
+    if (!this.dragging || event.buttons !== 1) {
+      return;
+    }
+
+    this.focus.set({ row, column });
+  }
+
+  /**
+   * Selecciona una columna entera desde su cabecera.
+   *
+   * Control añade o quita una suelta y Mayúsculas coge el tramo entre la última
+   * y esta, que es lo que hace cualquier lista con selección múltiple.
+   */
+  protected selectColumn(column: number, event: MouseEvent): void {
+    this.anchor.set(null);
+    this.focus.set(null);
+
+    if (event.shiftKey && this.lastColumn !== null) {
+      const from = Math.min(this.lastColumn, column);
+      const to = Math.max(this.lastColumn, column);
+
+      this.selectedColumns.set(Array.from({ length: to - from + 1 }, (_, i) => from + i));
+
+      return;
+    }
+
+    if (event.ctrlKey || event.metaKey) {
+      this.selectedColumns.update((current) =>
+        current.includes(column)
+          ? current.filter((index) => index !== column)
+          : [...current, column].sort((a, b) => a - b),
+      );
+      this.lastColumn = column;
+
+      return;
+    }
+
+    this.selectedColumns.set([column]);
+    this.lastColumn = column;
+  }
+
+  /**
+   * Empieza a arrastrar el borde derecho de una cabecera.
+   *
+   * Se para el evento antes de que suba: el mismo botón sobre la cabecera
+   * selecciona la columna, y quien viene a ensancharla no está pidiendo eso.
+   */
+  protected beginResize(column: number, event: MouseEvent): void {
+    event.preventDefault();
+    event.stopPropagation();
+
+    this.resizing = { column, startX: event.clientX, startWidth: this.renderedWidth(column) };
+    this.isResizing.set(true);
+  }
+
+  @HostListener('document:mousemove', ['$event'])
+  protected onResizeMove(event: MouseEvent): void {
+    if (!this.resizing) {
+      return;
+    }
+
+    this.setWidth(this.resizing.column, this.resizing.startWidth + (event.clientX - this.resizing.startX));
+  }
+
+  /**
+   * Ajusta la columna a lo más largo que haya en ella.
+   *
+   * Mira las filas que están pintadas y el título, y se queda con el mayor. No
+   * lee las que aún no han entrado al DOM: lo que se pide con este gesto es ver
+   * lo que hay delante, y recorrer cien mil filas para eso costaría más que el
+   * problema que resuelve.
+   */
+  protected autoFit(column: number, event: MouseEvent): void {
+    event.preventDefault();
+    event.stopPropagation();
+
+    const definition = this.resultSet().columns[column];
+
+    if (!definition) {
+      return;
+    }
+
+    const values = this.renderedRows().map((row) => this.shownValue(row, column));
+
+    this.setWidth(column, fitColumnWidth(definition, values));
+  }
+
+  /** Se suelta el botón en cualquier parte: el barrido termina donde quedó. */
+  @HostListener('document:mouseup')
+  protected endDrag(): void {
+    this.dragging = false;
+    this.resizing = null;
+    this.isResizing.set(false);
+  }
+
+  private setWidth(column: number, width: number): void {
+    const name = this.resultSet().columns[column]?.name;
+
+    if (name === undefined) {
+      return;
+    }
+
+    this.customWidths.update((current) => ({
+      ...current,
+      [name]: Math.max(MIN_COLUMN_WIDTH, Math.round(width)),
+    }));
+  }
+
+  /**
+   * Lo que mide ahora mismo la cabecera en pantalla.
+   *
+   * Se pregunta al DOM en vez de mirar el ancho declarado porque la última
+   * columna no tiene ninguno: se estira para absorber el espacio sobrante, y
+   * empezar a arrastrarla desde un número inventado la haría saltar.
+   */
+  private renderedWidth(column: number): number {
+    const heads = (this.host.nativeElement as HTMLElement).querySelectorAll('.cell--head');
+    const head = heads[column] as HTMLElement | undefined;
+    const medido = head?.getBoundingClientRect().width ?? 0;
+
+    if (medido > 0) {
+      return medido;
+    }
+
+    // Sin nada que medir —la cabecera todavía no está pintada— vale lo último
+    // que se ajustó, y en su defecto lo que el reparto inicial le dio.
+    const definition = this.resultSet().columns[column];
+
+    return (
+      (definition && this.customWidths()[definition.name]) ??
+      definition?.width ??
+      MIN_COLUMN_WIDTH
+    );
+  }
+
+  private clearSelection(): void {
+    this.anchor.set(null);
+    this.focus.set(null);
+    this.selectedColumns.set([]);
+    this.lastColumn = null;
+    this.dragging = false;
   }
 
   /** Empieza a editar una celda, si aquí se puede. */
@@ -199,20 +502,205 @@ export class ResultsGrid {
     this.editing.set(null);
   }
 
-  protected isSelected(row: number, column: number): boolean {
-    const selected = this.selected();
+  /** Rectángulo seleccionado, ya con las esquinas ordenadas. */
+  private readonly bounds = computed(() => {
+    const anchor = this.anchor();
+    const focus = this.focus() ?? anchor;
 
-    return selected?.row === row && selected.column === column;
+    if (!anchor || !focus) {
+      return null;
+    }
+
+    return {
+      top: Math.min(anchor.row, focus.row),
+      bottom: Math.max(anchor.row, focus.row),
+      left: Math.min(anchor.column, focus.column),
+      right: Math.max(anchor.column, focus.column),
+    };
+  });
+
+  /** Hay algo que copiar. Lo consulta también la barra del panel. */
+  readonly hasSelection = computed(
+    () => this.selectedColumns().length > 0 || this.bounds() !== null,
+  );
+
+  /**
+   * Cuánto hay cogido, para decirlo en el menú.
+   *
+   * Importa porque seleccionar una columna se lleva **todas** las filas que pasan
+   * el filtro, no solo las que están pintadas: sin verlo escrito, quien copia una
+   * columna de un resultado de cien mil filas no sabe qué acaba de coger.
+   */
+  readonly selectionLabel = computed(() => {
+    const selection = this.selectionShape();
+
+    if (!selection) {
+      return '';
+    }
+
+    const columnas = selection.columns === 1 ? '1 columna' : `${selection.columns} columnas`;
+    const filas = selection.rows === 1 ? '1 fila' : `${selection.rows.toLocaleString('es')} filas`;
+
+    return `${columnas} × ${filas}`;
+  });
+
+  private readonly selectionShape = computed(() => {
+    const chosen = this.selectedColumns();
+
+    if (chosen.length > 0) {
+      return { columns: chosen.length, rows: this.visibleRows().length };
+    }
+
+    const bounds = this.bounds();
+
+    return bounds
+      ? { columns: bounds.right - bounds.left + 1, rows: bounds.bottom - bounds.top + 1 }
+      : null;
+  });
+
+  protected isColumnSelected(column: number): boolean {
+    return this.selectedColumns().includes(column);
+  }
+
+  protected isSelected(row: number, column: number): boolean {
+    if (this.selectedColumns().length > 0) {
+      return this.selectedColumns().includes(column);
+    }
+
+    const bounds = this.bounds();
+
+    return (
+      !!bounds &&
+      row >= bounds.top &&
+      row <= bounds.bottom &&
+      column >= bounds.left &&
+      column <= bounds.right
+    );
+  }
+
+  /**
+   * Abre el menú de copia donde se pulsó.
+   *
+   * Si el clic cae fuera de lo seleccionado, primero se selecciona eso: pedir
+   * «copiar» sobre una celda que no está marcada tiene que copiar esa celda, no
+   * lo que quedó marcado hace un rato en otra parte de la cuadrícula.
+   */
+  protected openMenu(event: MouseEvent, row: number | null, column: number): void {
+    event.preventDefault();
+
+    if (row === null) {
+      if (!this.isColumnSelected(column)) {
+        this.selectColumn(column, event);
+      }
+    } else if (!this.isSelected(row, column)) {
+      this.selectedColumns.set([]);
+      this.anchor.set({ row, column });
+      this.focus.set({ row, column });
+    }
+
+    this.menu.set({ top: event.clientY, left: event.clientX });
+  }
+
+  /**
+   * Cualquier clic o Escape cierra el menú.
+   *
+   * El de una opción del menú también, y no hay carrera: el botón atiende su
+   * propio clic antes de que el evento llegue al documento.
+   */
+  @HostListener('document:click')
+  @HostListener('document:keydown.escape')
+  protected closeMenu(): void {
+    this.menu.set(null);
+  }
+
+  /**
+   * Copia lo seleccionado con el formato pedido.
+   *
+   * Público porque el mismo trabajo se pide desde dos sitios: el menú de aquí y
+   * el botón de la barra del panel, que no tiene forma de saber qué hay cogido.
+   */
+  async copyAs(format: CopyFormat): Promise<void> {
+    const selection = this.currentSelection();
+
+    if (!selection) {
+      return;
+    }
+
+    await this.copy(formatSelection(selection, format));
+  }
+
+  /**
+   * Lo seleccionado, tal como se ve.
+   *
+   * Sale de `visibleRows` y no de las filas pintadas: una columna seleccionada se
+   * lleva todo lo que pasa el filtro, aunque el DOM solo tenga las primeras
+   * quinientas. Y de `shownValue`, para que un cambio sin guardar se copie como
+   * se está viendo y no como estaba en la base.
+   */
+  private currentSelection(): CopySelection | null {
+    const columns = this.resultSet().columns;
+    const rows = this.visibleRows();
+    const chosen = this.selectedColumns();
+
+    if (chosen.length > 0) {
+      const indices = [...chosen].sort((a, b) => a - b);
+
+      return {
+        columns: indices.map((index) => columns[index]),
+        rows: rows.map((row) => indices.map((index) => this.shownValue(row, index))),
+      };
+    }
+
+    const bounds = this.bounds();
+
+    if (!bounds) {
+      return null;
+    }
+
+    const indices = Array.from(
+      { length: bounds.right - bounds.left + 1 },
+      (_, offset) => bounds.left + offset,
+    );
+
+    return {
+      columns: indices.map((index) => columns[index]),
+      rows: rows
+        .slice(bounds.top, bounds.bottom + 1)
+        .map((row) => indices.map((index) => this.shownValue(row, index))),
+    };
+  }
+
+  /**
+   * Lo que hace Ctrl+C.
+   *
+   * Una sola celda se copia tal cual, sin encabezado, que es la costumbre de
+   * siempre y lo que espera quien va a pegarla en un mensaje. En cuanto hay más
+   * de una, sale con tabuladores y con los nombres arriba, listo para una hoja.
+   */
+  protected async copyShortcut(row: ResultRow, columnIndex: number): Promise<void> {
+    const selection = this.currentSelection();
+
+    if (!selection || (selection.columns.length === 1 && selection.rows.length === 1)) {
+      await this.copyCell(row, columnIndex);
+
+      return;
+    }
+
+    await this.copyAs('excel');
   }
 
   /** Copia el valor de una celda. */
   protected async copyCell(row: ResultRow, columnIndex: number): Promise<void> {
-    await this.copy(row.values[columnIndex] ?? '');
+    await this.copy(this.shownValue(row, columnIndex) ?? '');
   }
 
   /** Copia una fila entera, separada por tabuladores para pegarla en una hoja. */
   protected async copyRow(row: ResultRow): Promise<void> {
-    await this.copy(row.values.map((value) => value ?? '').join('\t'));
+    await this.copy(
+      this.resultSet()
+        .columns.map((_, index) => this.shownValue(row, index) ?? '')
+        .join('\t'),
+    );
   }
 
   /** Copia los nombres de las columnas. */

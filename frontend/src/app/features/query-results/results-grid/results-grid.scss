@@ -29,6 +29,20 @@
   font-weight: 600;
   color: var(--dr-text-tertiary);
   letter-spacing: 0.02em;
+
+  // Cada título selecciona su columna, así que se comporta como algo que se
+  // pulsa. La línea de acento va arriba y no de fondo: la cabecera ya tiene su
+  // propia superficie, y teñirla entera competía con las celdas marcadas.
+  .cell--head {
+    position: relative;
+    cursor: pointer;
+
+    &.is-selected {
+      box-shadow: inset 0 2px 0 0 var(--dr-accent);
+      background: var(--dr-accent-tint);
+      color: var(--dr-text);
+    }
+  }
 }
 
 // Justo debajo de la cabecera, y con su misma regla: se queda al bajar y se
@@ -50,6 +64,15 @@
   flex: 1;
   min-height: 0;
   overflow: auto;
+
+  // Arrastrar por las celdas selecciona celdas, no texto. Sin esto, el barrido
+  // dejaba media cuadrícula pintada de azul por debajo de la selección propia.
+  user-select: none;
+
+  &.is-resizing,
+  &.is-resizing * {
+    cursor: col-resize;
+  }
 }
 
 .body.is-compact .row {
@@ -94,6 +117,8 @@
   }
 
   &__name {
+    flex: 0 1 auto;
+    min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
 
@@ -106,12 +131,55 @@
     color: var(--dr-accent-bright);
   }
 
+  /*
+   * El tipo se encoge primero y desaparece del todo si hace falta.
+   *
+   * Antes ocurría lo contrario: el tipo se quedaba entero pegado a la derecha y
+   * quien acababa cortado era el nombre, que es lo que hay que leer para saber
+   * qué columna es. El factor de encogimiento desproporcionado hace que ceda
+   * todo su ancho antes de que el nombre ceda el primer píxel.
+   */
   &__type {
+    flex: 0 1000000 auto;
+    min-width: 0;
     margin-left: auto;
+    overflow: hidden;
     font-family: var(--dr-font-mono);
     font-size: 9.5px;
     font-weight: 400;
     color: var(--dr-text-disabled);
+  }
+
+  /*
+   * El asa para ajustar el ancho.
+   *
+   * Sobresale un poco por fuera del borde —está centrada sobre él— porque el
+   * borde es una línea de un píxel y nadie acierta a darle. Se ilumina al
+   * acercarse, que es lo que dice que se puede arrastrar.
+   */
+  &__resize {
+    position: absolute;
+    z-index: 1;
+    top: 0;
+    right: -3px;
+    width: 7px;
+    height: 100%;
+    cursor: col-resize;
+
+    &::after {
+      content: '';
+      position: absolute;
+      top: 20%;
+      left: 3px;
+      width: 1px;
+      height: 60%;
+      background: transparent;
+      transition: background 120ms ease;
+    }
+
+    &:hover::after {
+      background: var(--dr-accent);
+    }
   }
 
   &--filter.is-set {
@@ -135,7 +203,11 @@
       outline: none;
     }
 
-    // La celda seleccionada se marca para saber sobre cuál actúa Ctrl+C.
+    // Lo seleccionado se marca para saber sobre qué actúa Ctrl+C y el menú.
+    //
+    // El borde de dentro se queda: sobre una celda suelta dice cuál es, y sobre
+    // un bloque dibuja la cuadrícula de lo cogido, que es como se lee en una
+    // hoja de cálculo.
     &.is-selected {
       background: var(--dr-accent-tint-strong);
       box-shadow: inset 0 0 0 1px var(--dr-accent-line-strong);
@@ -248,6 +320,38 @@
   text-align: center;
 }
 
+.more {
+  position: sticky;
+  left: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 40px;
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--dr-border-faint);
+  background: var(--dr-surface-sunken);
+  color: var(--dr-text-tertiary);
+  font-size: var(--dr-font-size-sm);
+
+  button {
+    min-height: 28px;
+    padding: 0 10px;
+    border: 1px solid var(--dr-border-strong);
+    border-radius: var(--dr-radius-sm);
+    background: var(--dr-surface-raised);
+    color: var(--dr-text-secondary);
+    font: inherit;
+    cursor: pointer;
+
+    &:hover {
+      border-color: var(--dr-accent-line-soft);
+      color: var(--dr-text);
+    }
+  }
+}
+
 /* --- Edición ---------------------------------------------------------------
  *
  * Una celda tocada se marca hasta que se guarda: quien edita varias filas
@@ -271,4 +375,58 @@
   font-family: inherit;
   font-size: inherit;
   outline: none;
+}
+
+
+// Menú de copia, el que sale con el botón derecho sobre la selección.
+//
+// Repite la forma del de exportar del panel a propósito: son la misma clase de
+// menú y verlos distintos haría dudar de si hacen lo mismo.
+.copy-menu {
+  position: fixed;
+  z-index: 20;
+  min-width: 232px;
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+  border: 1px solid var(--dr-border-strong);
+  border-radius: var(--dr-radius);
+  background: var(--dr-surface-overlay);
+  box-shadow: var(--dr-shadow-menu);
+
+  &__title {
+    padding: 5px 9px 6px;
+    border-bottom: 1px solid var(--dr-border-hairline);
+    margin-bottom: 4px;
+    color: var(--dr-text-tertiary);
+    font-size: 11px;
+    font-weight: 600;
+  }
+
+  &__option {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    width: 100%;
+    padding: 6px 9px;
+    border: 0;
+    border-radius: 5px;
+    background: transparent;
+    color: var(--dr-text-secondary);
+    font-family: inherit;
+    font-size: var(--dr-font-size-sm);
+    text-align: left;
+    cursor: pointer;
+
+    &:hover {
+      background: var(--dr-surface-active);
+      color: var(--dr-text);
+    }
+  }
+
+  &__hint {
+    color: var(--dr-text-faintest);
+    font-family: var(--dr-font-mono);
+    font-size: 11px;
+  }
 }

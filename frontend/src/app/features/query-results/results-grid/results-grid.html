@@ -7,7 +7,7 @@
   cosas a la vez —fija al bajar, acompaña al ir a la derecha—, que es justo lo
   que se espera de un encabezado.
 -->
-<div class="body" [class.is-compact]="compact()">
+<div class="body" [class.is-compact]="compact()" [class.is-resizing]="isResizing()">
   <div class="head" role="row" [style.grid-template-columns]="gridTemplate()">
     <div class="cell cell--check" role="columnheader">
       <button
@@ -19,13 +19,41 @@
         <app-icon name="new-query" [size]="11" />
       </button>
     </div>
-    @for (column of resultSet().columns; track column.name) {
-      <div class="cell cell--head" role="columnheader">
+    @for (column of resultSet().columns; track column.name; let i = $index) {
+      <!--
+        La cabecera selecciona su columna entera. Con Control se añade otra y con
+        Mayúsculas, el tramo entre las dos.
+      -->
+      <div
+        class="cell cell--head"
+        role="columnheader"
+        [class.is-selected]="isColumnSelected(i)"
+        [attr.aria-selected]="isColumnSelected(i)"
+        title="Seleccionar la columna (Control para añadir, Mayúsculas para un tramo)"
+        (click)="selectColumn(i, $event)"
+        (contextmenu)="openMenu($event, null, i)"
+      >
         <span class="cell__name" [class.is-sorted]="!!column.sorted">{{ column.name }}</span>
         @if (column.sorted) {
           <app-icon name="sort-desc" [size]="9" class="cell__sort" />
         }
         <span class="cell__type">{{ column.dataType }}</span>
+
+        <!--
+          El asa de ajuste. Vive dentro de la cabecera y no entre dos, para que
+          arrastrarla mueva siempre el borde de *esta* columna: un asa compartida
+          obliga a adivinar a cuál de las dos pertenece.
+        -->
+        <span
+          class="cell__resize"
+          role="separator"
+          aria-orientation="vertical"
+          [attr.aria-label]="'Ajustar el ancho de ' + column.name"
+          title="Arrastra para ajustar el ancho. Doble clic para ajustarlo al contenido."
+          (mousedown)="beginResize(i, $event)"
+          (dblclick)="autoFit(i, $event)"
+          (click)="$event.stopPropagation()"
+        ></span>
       </div>
     }
   </div>
@@ -48,7 +76,7 @@
     </div>
   }
 
-  @for (row of visibleRows(); track row.number) {
+  @for (row of renderedRows(); track row.number; let r = $index) {
     <div class="row" role="row" [style.grid-template-columns]="gridTemplate()">
       <div
         class="cell cell--number"
@@ -80,14 +108,16 @@
           role="cell"
           tabindex="0"
           [attr.data-kind]="column.kind"
-          [class.is-selected]="isSelected(row.number, i)"
+          [class.is-selected]="isSelected(r, i)"
           [class.is-dirty]="isDirty(row.number, i)"
           [class.is-editable]="editable()"
           [attr.title]="shownValue(row, i)"
-          (click)="select(row.number, i)"
+          (mousedown)="beginCellSelection(r, i, $event)"
+          (mouseenter)="extendCellSelection(r, i, $event)"
+          (contextmenu)="openMenu($event, r, i)"
           (dblclick)="editable() ? startEditing(row.number, i) : copyCell(row, i)"
-          (keydown.control.c)="copyCell(row, i)"
-          (keydown.meta.c)="copyCell(row, i)"
+          (keydown.control.c)="copyShortcut(row, i)"
+          (keydown.meta.c)="copyShortcut(row, i)"
           (keydown.enter)="startEditing(row.number, i)"
         >
           @if (isEditing(row.number, i)) {
@@ -127,4 +157,48 @@
       <p class="empty">La consulta no devolvió filas.</p>
     }
   }
+
+  @if (remainingRows() > 0) {
+    <div class="more" role="status">
+      <span>Mostrando {{ renderedRows().length }} de {{ visibleRows().length }} filas.</span>
+      <button type="button" (click)="showMore()">
+        Mostrar {{ remainingRows() > 500 ? 500 : remainingRows() }} más
+      </button>
+    </div>
+  }
 </div>
+
+<!--
+  El menú de copia vive fuera del contenedor con desplazamiento y en coordenadas
+  de la ventana: dentro, la primera rueda de ratón lo dejaría flotando lejos del
+  sitio donde se pulsó.
+-->
+@if (menu(); as position) {
+  <ul
+    class="copy-menu"
+    role="menu"
+    aria-label="Copiar la selección"
+    [style.top.px]="position.top"
+    [style.left.px]="position.left"
+  >
+    <li class="copy-menu__title">Copiar {{ selectionLabel() }}</li>
+    <li>
+      <button type="button" class="copy-menu__option" role="menuitem" (click)="copyAs('excel')">
+        Para Excel
+        <span class="copy-menu__hint">Tabuladores, con los nombres arriba</span>
+      </button>
+    </li>
+    <li>
+      <button type="button" class="copy-menu__option" role="menuitem" (click)="copyAs('where-in')">
+        Como condición IN
+        <span class="copy-menu__hint">columna IN ('a', 'b'), sin repetidos</span>
+      </button>
+    </li>
+    <li>
+      <button type="button" class="copy-menu__option" role="menuitem" (click)="copyAs('list')">
+        Como lista de valores
+        <span class="copy-menu__hint">'a', 'b', 'c'</span>
+      </button>
+    </li>
+  </ul>
+}

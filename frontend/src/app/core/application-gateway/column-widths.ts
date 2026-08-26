@@ -33,16 +33,31 @@ const CHROME = 26;
  */
 const SAMPLE = 60;
 
-/** Nadie quiere una columna de una letra: por debajo de esto no cabe el título. */
-const MIN_WIDTH = 84;
+/**
+ * Nadie quiere una columna de una letra: por debajo de esto no cabe el título.
+ *
+ * Lo exporta para la cuadrícula, que es donde se arrastra el borde: el suelo del
+ * ajuste a mano tiene que ser el mismo que el del reparto inicial, o arrastrar
+ * dejaría columnas que el cálculo automático nunca habría producido.
+ */
+export const MIN_COLUMN_WIDTH = 84;
 
 /**
- * Tope.
+ * Tope del reparto inicial.
  *
  * Un texto largo puede llevarse la pantalla entera y esconder las columnas de
  * después. Se corta con puntos suspensivos y se ensancha a mano si hace falta.
  */
 const MAX_WIDTH = 320;
+
+/**
+ * Tope del ajuste a mano, mucho más alto.
+ *
+ * Cuando alguien pide expresamente ver una columna entera, esconder las de al
+ * lado es justo lo que quiere; el tope solo está para que una fila con un JSON
+ * de diez mil caracteres no produzca una columna imposible de manejar.
+ */
+const MAX_FIT_WIDTH = 900;
 
 /**
  * Anchos de reserva por tipo, para cuando no hay ni una fila que mirar.
@@ -74,23 +89,49 @@ export function initialColumnWidths(
 ): number[] {
   const sample = rows.slice(0, SAMPLE);
 
-  return columns.map((column, index) => {
-    const header = column.name.length * HEAD_CHAR + CHROME;
-
-    if (sample.length === 0) {
-      return clamp(Math.max(header, WIDTH_BY_KIND[column.kind]));
-    }
-
-    const longest = sample.reduce((largest, row) => {
-      const value = row[index] ?? NULL_TEXT;
-
-      return Math.max(largest, value.length);
-    }, 0);
-
-    return clamp(Math.max(header, longest * CELL_CHAR + CHROME));
-  });
+  return columns.map((column, index) =>
+    columnWidth(
+      column,
+      sample.map((row) => row[index] ?? null),
+      MAX_WIDTH,
+    ),
+  );
 }
 
-function clamp(width: number): number {
-  return Math.round(Math.min(Math.max(width, MIN_WIDTH), MAX_WIDTH));
+/**
+ * Lo que necesita una columna para enseñar su título y sus valores.
+ *
+ * Es lo que hay detrás del doble clic sobre el borde de la cabecera. Recibe los
+ * valores ya recortados a lo que se está mirando —quien llama decide si es la
+ * muestra del arranque o las filas pintadas— y admite un ancho mayor que el del
+ * reparto inicial: aquí el ancho lo ha pedido alguien, no lo ha repartido nadie.
+ */
+export function fitColumnWidth(
+  column: Pick<ResultColumn, 'name' | 'kind'>,
+  values: readonly (string | null)[],
+): number {
+  return columnWidth(column, values, MAX_FIT_WIDTH);
+}
+
+function columnWidth(
+  column: Pick<ResultColumn, 'name' | 'kind'>,
+  values: readonly (string | null)[],
+  max: number,
+): number {
+  const header = column.name.length * HEAD_CHAR + CHROME;
+
+  if (values.length === 0) {
+    return clamp(Math.max(header, WIDTH_BY_KIND[column.kind]), max);
+  }
+
+  const longest = values.reduce<number>(
+    (largest, value) => Math.max(largest, (value ?? NULL_TEXT).length),
+    0,
+  );
+
+  return clamp(Math.max(header, longest * CELL_CHAR + CHROME), max);
+}
+
+function clamp(width: number, max: number): number {
+  return Math.round(Math.min(Math.max(width, MIN_COLUMN_WIDTH), max));
 }
