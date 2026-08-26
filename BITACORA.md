@@ -10,46 +10,41 @@
 
 | Campo | Valor |
 | --- | --- |
-| Última sesión | **036** — 2026-08-25 |
+| Última sesión | **037** — 2026-08-26 |
 | Fase activa | **Migración de datos entre tablas:** fases 1, 2 y 3 cerradas; la **4** cerrada: la pasada de varias tablas, lo que cada tabla hace distinto y las migraciones guardadas (ver «Qué toca retomar»). **Respaldos y restauración:** Fases A–E cerradas. La **F** tiene backend, interfaz, CSV, selector de archivos, restaurar en una base nueva y **el ciclo entero por HTTP en los cuatro motores**; le falta repetir a mano el respaldo real que encontró el error de los índices de expresión |
 | Fases 0–6 | ✅ Cerradas. |
 | Fase 7 | 🟡 **11/12.** El ciclo de instalación está probado sobre este equipo; solo falta arrancar en una máquina sin herramientas de desarrollo. |
 | Fase 8 | ✅ **7/7.** Tres motores sobre el mismo contrato y primera beta preparada. |
 | ¿Compila el backend? | Sí — 0 advertencias, 0 errores |
-| ¿Compila el envoltorio? | Sí — recompilado en la sesión 033 con `build/scripts/msvc-env.ps1` cargado antes; sin él, `cargo` falla en `vswhom-sys` por elegir el MSVC equivocado |
-| ¿Pasan las pruebas? | Sí — **781 en backend** (422 unitarias, 206 contractuales y 153 de integración) en la sesión 024. En la 036 pasaron las **615 del frontend** y las **21 E2E de `interfaz.spec.ts`** con PostgreSQL y SQL Server levantados a la vez; en la 035, las 613 de entonces y las E2E del ancho de columna; en la 034, las 599 de entonces y las E2E de copiar la selección, todas contra PostgreSQL; en la 033, las 567 de entonces y la E2E de la pantalla de carga; en la 032, las 543 de entonces, el typecheck E2E y la E2E del constructor a dos anchos; en la 031 pasaron además las E2E del comentario de líneas y la barra estrecha. La última pasada con `DRUSE_REQUIRE_ENGINES=1` y los cuatro motores fue la de la sesión 023; ahora solo estaba levantado PostgreSQL. La suite E2E completa no se repitió. Las **6 del envoltorio** tampoco se ejecutaron. |
+| ¿Compila el envoltorio? | Sí — recompilado en la 037 con `build/scripts/msvc-env.ps1` cargado antes; sin él, `cargo` falla en `vswhom-sys` por elegir el MSVC equivocado. **Sus pruebas ya son 10**, con las dos que vigilan la CSP |
+| ¿Pasan las pruebas? | Sí. En la **037**: **433 unitarias** y **158 de integración** del backend, **627 del frontend** y las **10 del envoltorio**, todas en verde; la suite E2E completa dio 42 de 44 —una saltada y `migracion.spec.ts:154`, que **pasa al repetirla sola**—. Las 206 contractuales no se repitieron: la última pasada con `DRUSE_REQUIRE_ENGINES=1` y los cuatro motores sigue siendo la de la sesión 023. En la 037 solo estaban levantados PostgreSQL y SQL Server. **Dos rojos intermitentes** en el frontend, ambos por tiempo y ambos verdes al repetir: `formatSql` (ya anotado en §9) y uno más de la misma clase |
 | ¿Hay aplicación de escritorio? | **Sí.** Instalador NSIS, MSI y ZIP portable, en dos variantes: con Informix y sin él |
 | Motores | **PostgreSQL, SQL Server, MySQL/MariaDB e Informix**, todos sobre el mismo contrato compartido |
-| Trabajo a medias | **Nada sin commitear.** Las sesiones **032 a 036** se repartieron en seis commits temáticos y se subieron junto con `640151c` (sesiones 028–031). Lo que queda es de contenido, no de código: la bitácora describe las cinco sesiones, pero el árbol traía además tres temas sin anotar —agrupar y resumir en el constructor, el progreso con cancelación del panel, y el saneamiento de capas y tokens de color—, que quedaron descritos en los mensajes de sus commits y **falta llevar a §5**. |
+| Trabajo a medias | **Nada.** Todo lo de la 037 está commiteado y subido. Lo que queda sin comprobar es de otra clase: **el selector nativo de carpeta y `save_export` no se han visto abrirse todavía**, aunque en la 037 se descubrió por qué nunca podían funcionar y se arregló (ver §5) |
 | Bloqueantes | Ninguno para seguir programando. Sí para dar por buenos cuatro motores y cuatro funciones: ver «Qué toca retomar». |
-| Git | El **PR #9 se fusionó** (sesión 022). Se trabaja en `feat/respaldos-y-restauracion`, con todo subido: las 024–027 en `1452a6c`, las 028–031 en `640151c`, y las 032–036 en los seis commits que van de `d3ac0d5` a `35d192e`. |
+| Git | El **PR #9 se fusionó** (sesión 022). Se trabaja en `feat/respaldos-y-restauracion`, con todo subido: las 024–027 en `1452a6c`, las 028–031 en `640151c`, las 032–036 en los seis commits de `d3ac0d5` a `35d192e`, y la **037** en los cinco que van de `4ba8cce` a `1c2e258` |
 | Integración continua | 🔴 **Parada, y no por el código.** GitHub aborta los catorce jobs en dos segundos: «recent account payments have failed or your spending limit needs to be increased». Hasta resolver la facturación, ningún PR podrá pasar los checks. |
 
 ### Qué toca retomar en la próxima sesión
 
-#### Lo primero, anotar los tres temas que el árbol traía de más
+#### Lo primero, ver abrirse el diálogo del envoltorio
 
-Ya no queda nada por integrar: las sesiones 032–036 se repartieron en seis
-commits temáticos y están subidas junto con `640151c`. Al agruparlas apareció
-que el árbol traía **tres temas que ninguna entrada de §5 describe**:
+La 037 descubrió que **el puente con el proceso Rust estaba cortado**: `connect-src`
+no dejaba pasar `ipc.localhost`, así que cada `invoke` moría en silencio. Está
+arreglado y la consola del ejecutable ya no da un solo error, pero **el diálogo en
+sí sigue sin verse abrir**. Es lo primero: empaquetar, exportar un resultado y
+comprobar que el selector del sistema aparece y escribe el archivo. Lo mismo con
+el de carpeta de los respaldos, que arrastraba el mismo problema.
 
-1. **Agrupar y resumir en el constructor** — GROUP BY, las cinco funciones de
-   agregado, HAVING sobre esas expresiones, agrupación por día/mes/trimestre/año
-   y varios órdenes, más la vista previa de diez filas (`previewQuery`).
-2. **El progreso de la consulta y la cancelación** — el tiempo transcurrido en
-   el panel, el texto que cambia a los diez segundos, y el botón que dice
-   «Cancelando…» mientras el motor no confirma.
-3. **Capas y tokens** — los z-index sueltos pasaron a seis tokens ordenados, y
-   se corrigieron cuatro tokens de color que no existían en ninguna parte.
+Hasta que eso se vea, lo que hay es un error menos, no una función comprobada.
 
-El porqué de cada uno quedó escrito en el mensaje de su commit; falta llevarlo a
-§5 como sesiones y decidir si alguno merece entrada propia. **Ninguno se ha
-verificado a mano en la aplicación levantada**: lo que se comprobó en la 036 son
-las pruebas.
+#### Los tres temas del árbol ya están anotados
 
-Después, cuando estén disponibles los cuatro contenedores, repetir la validación
-general de motores. No hace falta para esta corrección de apilamiento, pero sí
-antes de atribuir la sesión al producto entero.
+Quedaron descritos en la entrada «036b» de §5. **Ninguno se ha verificado a mano
+en la aplicación levantada**: lo que los cubre son sus pruebas.
+
+Y cuando estén disponibles los cuatro contenedores, repetir la validación general
+de motores: la última pasada con `DRUSE_REQUIRE_ENGINES=1` es de la sesión 023.
 
 #### El plan visual queda cerrado (sesión 024, revalidado en la 026–027)
 
@@ -128,9 +123,13 @@ Ojo a una cosa al reconciliar: si se quiere probar un perfil que nombra tablas
 desaparecidas, `movimientos` es la que se puede borrar sin tocar el caso del §1.
 
 Lo que sigue sin verse funcionar de los respaldos es **el selector nativo de
-carpeta**: es Rust y en este equipo cargo no compila. Fuera del envoltorio la
-ruta se escribe a mano y el respaldo funciona igual, así que no bloquea nada,
-pero nadie ha visto abrirse ese diálogo.
+carpeta**. Dos cosas que esta bitácora daba por ciertas eran falsas: que aquí no
+se puede compilar Rust —sí se puede, cargando antes `build/scripts/msvc-env.ps1`—
+y que el diálogo estaba «sin probar». En la 037 se vio el motivo de verdad: la
+CSP del envoltorio no dejaba pasar `ipc.localhost`, así que **cada `invoke` moría
+en silencio** y ese diálogo no podía abrirse de ninguna manera. Está arreglado y
+la consola ya no da errores, pero **abrirse, todavía no se le ha visto**. Fuera
+del envoltorio la ruta se escribe a mano y el respaldo funciona igual.
 
 Y dos detalles anotados en el plan de la función, ninguno urgente: la cabecera
 del manifiesto no se escribe al principio del `.sql` —solo al final—, y cuando el
@@ -386,6 +385,136 @@ Y tres límites declarados desde el principio: no hay respaldo binario ni
 recuperación a un punto en el tiempo —eso es del servidor, y la interfaz tendrá
 que decirlo—, no hay respaldos programados, y un límite de filas puede dejar
 filas huérfanas, cosa que se avisa y no se corrige sola.
+
+### Sesión 037 — 2026-08-26 · El ejecutable no tenía estilos, y exportar moría por un punto
+
+Cinco commits, tres cosas distintas: coger filas en la cuadrícula, arreglar la
+exportación y descubrir por qué la ventana empaquetada se veía como se veía.
+
+#### Coger registros enteros arrastrando
+
+La cuadrícula sabía coger un rectángulo de celdas y columnas desde la cabecera,
+pero no filas. Ahora el número de fila hace con su fila lo que la cabecera hace
+con su columna: pulsar, arrastrar, Control para sueltas y Mayúsculas para el
+tramo. Copiar se lleva la fila con **todas** sus columnas.
+
+La señal se llama `chosenRows` y no `selectedRows` porque ese nombre ya estaba
+cogido —las filas señaladas para borrar, que van por número—. Estas van por
+**posición entre las filas visibles**, igual que el rango de celdas: con un
+filtro puesto los números dejan de ser consecutivos. Aquello marca, esto copia.
+
+#### Exportar: tres fallos, uno de ellos el que se reportó
+
+El reporte era «exportar una vista da error desde el portable». Reproduciendo se
+encontró **un fallo real que no era ese**: exportar mandaba al motor el contenido
+de la pestaña sin comprobar que devolviera filas, y una vista abierta con «Ver
+DDL» lleva su `CREATE VIEW`. Si la vista existía, error; **y si no existía, la
+creaba** y el archivo salía vacío con un «Exportado» encima. Se cerró: exportar
+exige ahora algo que devuelva filas, y confirmar lo destructivo no lo convierte
+en exportable.
+
+Pero el error del usuario era otro, y solo se supo cuando llegó su traza:
+
+    Invalid non-ASCII or control character in header: 0x00B7
+
+`0x00B7` es «·», el separador de `nombre · DDL`. Ese título se propone como
+nombre de archivo y acaba en `Content-Disposition`, que **solo admite ASCII**.
+No era cosa de las vistas ni de un motor: **cualquier título con acentos lo
+provocaba**, y en español eso es la mitad de los títulos. Se escriben ahora los
+dos parámetros del RFC 6266, y el nombre de verdad viaja en `filename*`.
+
+El tercero: los cuatro lectores de resultado dejaban pasar la excepción del
+proveedor sin normalizar, así que cualquier fallo del motor al exportar salía
+como «Se produjo un error inesperado». Ahora dice lo que dijo el motor.
+
+**Lección, y va escrita porque costó:** se dio por confirmada una hipótesis sin
+tener el mensaje de error, y era la causa equivocada. Reproducir *un* fallo por
+la misma superficie no es reproducir *el* fallo.
+
+#### La ventana empaquetada abría sin una sola regla de estilo
+
+Lo enseñó una captura: todo apilado en una columna, sin barra lateral ni
+pestañas. En el navegador se veía perfecta. Se conectó al WebView del ejecutable
+por depuración remota —`WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=--remote-debugging-port`—
+y lo dijo él mismo:
+
+    Applying inline style violates 'style-src 'self' 'unsafe-inline'
+    'nonce-…''. Note that 'unsafe-inline' is ignored if either a hash
+    or nonce value is present in the source list.
+
+Tauri añade un nonce a `style-src`, y con un nonce presente **`'unsafe-inline'`
+deja de valer**. Angular pinta los estilos de cada componente en un `<style>` que
+inyecta en tiempo de ejecución, sin nonce: las quince bloqueadas, una sola
+llegaba a ser hoja. Lo que despistaba es que la hoja externa **sí cargaba**, así
+que desde fuera parecía que el CSS estaba puesto.
+
+Y por el mismo camino apareció el segundo, que llevaba sesiones sin explicación:
+
+    Connecting to 'http://ipc.localhost/api_connection' violates
+    connect-src 'self' http://127.0.0.1:* http://localhost:*
+
+`connect-src` no dejaba pasar el IPC de Tauri: **cada `invoke` moría en
+silencio**. Eso es todo lo que depende del envoltorio —el selector de carpeta que
+esta bitácora lleva sesiones anotando como «nunca se ha visto funcionar», el
+diálogo de guardar una exportación, abrir un `.sql`—. No estaba sin probar: no
+podía funcionar.
+
+#### Verificado
+
+- **433 unitarias** y **158 de integración** del backend, **627 del frontend** y
+  las **10 del envoltorio**. Suite E2E: 42 de 44, con una saltada y
+  `migracion.spec.ts:154`, que pasa al repetirla sola.
+- Los cuatro casos de exportación, **a mano por HTTP contra SQL Server real**:
+  el DDL de una vista que existe, el de una que no —comprobando que no queda
+  creada—, un SELECT que el motor rechaza y un SELECT correcto.
+- El nombre con «·» y el nombre con acentos, contra el motor: los dos dan 200.
+- La CSP, **sobre el binario de verdad**: de 1 hoja de estilos activa a 15 de 15,
+  de 3 hojas a 17, la barra lateral vuelve a medir 288 px en 1536, y no queda un
+  solo error en consola.
+
+#### No hecho
+
+- **El diálogo del sistema sigue sin verse abrir.** Se arregló lo que lo hacía
+  imposible, no se comprobó que ya ocurra.
+- Las 206 contractuales y la pasada con los cuatro motores: solo había PostgreSQL
+  y SQL Server levantados.
+- Se intentó una prueba E2E del rechazo al exportar un DDL y **se retiró**:
+  exigía ejecutar el `CREATE VIEW` para habilitar el botón, cosa que falla si la
+  vista ya existe, así que no habría demostrado lo que prometía.
+- El empaquetado falló una vez con `os error 32` al parchear `druse.exe` para
+  NSIS —el binario estaba tomado, con un `Blocking waiting for file lock` justo
+  antes—. Se relanzó sin tocar nada.
+
+**Archivos.** `results-grid/{results-grid.ts,html,scss,spec.ts}`,
+`e2e/tests/interfaz.spec.ts`, `Queries/{ExportService,QueryService}.cs`,
+`Endpoints/ExportEndpoints.cs`, los cuatro `*ResultReader.cs`,
+`workspace-store.ts`, `application-gateway.ts`, `tauri.conf.json`,
+`desktop-tauri/src/main.rs`.
+
+**Estado al cerrar.** Todo commiteado y subido: `4ba8cce`, `d35d8f3`, `b0cba00`,
+`9f59a2e`, `1c2e258`.
+
+### Sesión 036b — sin fecha · Los tres temas que el árbol traía de más
+
+No son una sesión: es el trabajo que apareció al repartir las 032–036 en commits
+y que **ninguna entrada describía**. Se anota aquí para que el código no quede
+sin explicación. Ninguno se ha visto funcionar en la aplicación levantada; lo que
+los cubre son sus pruebas.
+
+1. **Agrupar y resumir en el constructor.** GROUP BY, las cinco funciones de
+   agregado con su `DISTINCT` y su alias, HAVING sobre esas mismas expresiones
+   —repetidas y no por alias, porque no todos los motores admiten el alias ahí—,
+   agrupación por día, mes, trimestre o año, y una lista ordenada de órdenes en
+   lugar de una sola columna. Más `previewQuery`, que ejecuta diez filas sin
+   tocar el resultado del editor.
+2. **El progreso de la consulta y la cancelación.** El panel enseña el tiempo
+   transcurrido y cambia el texto a los diez segundos —«la base sigue
+   procesando» dice algo distinto de «esperando respuesta»—, y cancelar deshabilita
+   el botón y pone «Cancelando…» hasta que el motor confirma.
+3. **Capas y tokens.** Los z-index sueltos de cada componente pasaron a seis
+   tokens ordenados en `_tokens.scss`, y se corrigieron cuatro tokens de color
+   que no existían en ninguna parte: donde había respaldo se veía el respaldo, y
+   donde no, el color heredado.
 
 ### Sesión 036 — 2026-08-25 · Las dos mejoras de la cuadrícula, contra SQL Server
 
@@ -4596,6 +4725,9 @@ basta solo.
 
 | Riesgo | Impacto | Mitigación |
 | --- | --- | --- |
+| **Lo que solo falla empaquetado no lo ve nadie** | La ventana abrió sin un solo estilo durante quién sabe cuántas sesiones, y el puente con el proceso Rust llevaba igual de tiempo cortado. Ninguna prueba lo veía: en el navegador todo funciona | Al tocar la CSP, el `index.html` o cualquier `invoke`, **abrir el ejecutable y mirar la consola**: `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=--remote-debugging-port=9222` y conectarse por CDP. Las dos pruebas de `tauri.conf.json` sujetan lo ya conocido, no lo próximo |
+| **El `.exe` se queda tomado y el empaquetado falla** | `os error 32` al parchear el binario para NSIS, con la compilación entera ya hecha | Cerrar todo `druse.exe` antes de empaquetar y no dejar un `cargo build` reciente sujetando el directorio. Relanzar basta; no hay nada que arreglar |
+| **El frontend tiene más de un rojo por tiempo** | Se confunden con fallos del producto y se pierde media tarde | Antes de creerse un rojo del frontend, repetir la suite. En la 037 hubo dos, distintos, y los dos verdes a la segunda |
 | **El MVP no se ha probado en un equipo limpio** | Es el criterio que demuestra que el paquete se basta solo | Instalar el NSIS en una máquina sin .NET ni Node. **Es lo único que queda del MVP** |
 | macOS pasa la contraseña por argumento a `security` | Visible un instante en la lista de procesos | Enlazar Security.framework. Anotado en ADR 0004 |
 | Contenedor `druse-pg-test` en el 55440 | El 55432 lo ocupa `prima-postgres`, ajeno al proyecto | Puerto configurable con `DRUSE_TEST_PG_PORT` |
@@ -4604,10 +4736,12 @@ basta solo.
 | Dependencias con vulnerabilidades en plantillas | Ya pasó dos veces: `Microsoft.OpenApi` y `dompurify` | En backend lo caza `TreatWarningsAsErrors`; en frontend, `npm audit` en cada instalación |
 | 3 vulnerabilidades moderadas en `@angular/cli` | Solo desarrollo; no llegan al bundle | Esperar actualización de Angular. Degradar a la 21 sería peor |
 | Detalles visuales fuera del shell principal | La comparación de la sesión 011 cubrió la pantalla principal, no todos los estados | Repetir la comparación al tocar diálogos, filtros o vistas menos transitadas |
-| `formatSql` falla a veces en las pruebas del frontend | Un rojo que no es del código: pasa al repetir | Solo aparece con `ng serve` corriendo en paralelo —el arranque del entorno pasa de 274 s a 1220 s— y se lleva por delante una prueba por tiempo. No ejecutar la suite con el servidor de desarrollo levantado |
+| `formatSql` falla a veces en las pruebas del frontend | Un rojo que no es del código: pasa al repetir | Se creía que solo pasaba con `ng serve` en paralelo. **En la 037 saltó sin el servidor levantado**, así que la explicación no era completa: es una prueba que se va por tiempo cuando la máquina está cargada. Repetir antes de investigarla |
 | Identificador `druse` no reservado | Podría ocuparlo otro | Reservar dominio, org de GitHub y NuGet/npm cuando haya algo publicable |
 
-_Retirados: «un traslado se queda en marcha de vez en cuando» (era el aviso final que se perdía en el registro del progreso; arreglado en la sesión 023g), «sin SQL Server de prueba» y «solo hay un proveedor» (Fase 4), «Rust no instalado» (Fase 7), «los datos simulados podrían filtrarse» (borrados en la Fase 2) y «fidelidad visual no comprobada» (comprobada en la sesión 011)._
+_Retirado en la 037: «el selector nativo de carpeta no se ha podido probar porque aquí no compila Rust» —las dos mitades eran falsas: Rust compila con `msvc-env.ps1`, y el diálogo no funcionaba porque la CSP bloqueaba el IPC. Lo que queda no es un riesgo, es una comprobación pendiente._
+
+_Retirados antes: «un traslado se queda en marcha de vez en cuando» (era el aviso final que se perdía en el registro del progreso; arreglado en la sesión 023g), «sin SQL Server de prueba» y «solo hay un proveedor» (Fase 4), «Rust no instalado» (Fase 7), «los datos simulados podrían filtrarse» (borrados en la Fase 2) y «fidelidad visual no comprobada» (comprobada en la sesión 011)._
 
 ---
 
