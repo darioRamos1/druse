@@ -17,7 +17,7 @@
 | Fase 8 | ✅ **7/7.** Tres motores sobre el mismo contrato y primera beta preparada. |
 | ¿Compila el backend? | Sí — 0 advertencias, 0 errores |
 | ¿Compila el envoltorio? | Sí — recompilado en la 037 con `build/scripts/msvc-env.ps1` cargado antes; sin él, `cargo` falla en `vswhom-sys` por elegir el MSVC equivocado. **Sus pruebas ya son 10**, con las dos que vigilan la CSP |
-| ¿Pasan las pruebas? | Sí. En la **037**: **433 unitarias** y **158 de integración** del backend, **627 del frontend** y las **10 del envoltorio**, todas en verde; la suite E2E completa dio 42 de 44 —una saltada y `migracion.spec.ts:154`, que **pasa al repetirla sola**—. Las 206 contractuales no se repitieron: la última pasada con `DRUSE_REQUIRE_ENGINES=1` y los cuatro motores sigue siendo la de la sesión 023. En la 037 solo estaban levantados PostgreSQL y SQL Server. **Dos rojos intermitentes** en el frontend, ambos por tiempo y ambos verdes al repetir: `formatSql` (ya anotado en §9) y uno más de la misma clase |
+| ¿Pasan las pruebas? | Sí, y por fin **con los cuatro motores a la vez**. En la 037, con `DRUSE_REQUIRE_ENGINES=1` y PostgreSQL, SQL Server, MySQL e Informix levantados: **206 contractuales, 158 de integración y 438 unitarias — 802 en verde, ninguna saltada**. Es la primera pasada así desde la sesión 023. Además **633 del frontend**, las **10 del envoltorio** y la suite E2E, que dio 42 de 44 —una saltada y `migracion.spec.ts:154`, verde al repetirla sola—. Ojo: la **primera** pasada dio tres rojos, los tres de MySQL, por lanzarla trece segundos después de crear su contenedor; repetidos, verdes (ver §9) |
 | ¿Hay aplicación de escritorio? | **Sí.** Instalador NSIS, MSI y ZIP portable, en dos variantes: con Informix y sin él |
 | Motores | **PostgreSQL, SQL Server, MySQL/MariaDB e Informix**, todos sobre el mismo contrato compartido |
 | Trabajo a medias | **Nada.** Todo lo de la 037 está commiteado y subido. Lo que queda sin comprobar es de otra clase: **el selector nativo de carpeta y `save_export` no se han visto abrirse todavía**, aunque en la 037 se descubrió por qué nunca podían funcionar y se arregló (ver §5) |
@@ -43,8 +43,8 @@ Hasta que eso se vea, lo que hay es un error menos, no una función comprobada.
 Quedaron descritos en la entrada «036b» de §5. **Ninguno se ha verificado a mano
 en la aplicación levantada**: lo que los cubre son sus pruebas.
 
-Y cuando estén disponibles los cuatro contenedores, repetir la validación general
-de motores: la última pasada con `DRUSE_REQUIRE_ENGINES=1` es de la sesión 023.
+La validación general de motores **ya está hecha** (037): los cuatro levantados y
+802 pruebas en verde sin ninguna omitida.
 
 #### El plan visual queda cerrado (sesión 024, revalidado en la 026–027)
 
@@ -471,6 +471,44 @@ podía funcionar.
 - La CSP, **sobre el binario de verdad**: de 1 hoja de estilos activa a 15 de 15,
   de 3 hojas a 17, la barra lateral vuelve a medir 288 px en 1536, y no queda un
   solo error en consola.
+
+#### La pasada con los cuatro motores, por fin
+
+Levantados PostgreSQL, SQL Server, Informix y MySQL a la vez —los dos últimos
+hubo que crearlos desde cero, no existían—, con `DRUSE_REQUIRE_ENGINES=1` para
+que ninguna prueba pudiera saltarse por no encontrar su motor:
+
+| Suite | Resultado |
+| --- | --- |
+| Contractuales | **206 / 206** |
+| Integración | **158 / 158** |
+| Unitarias | **438 / 438** |
+
+**802 en verde y ninguna omitida.** Es la primera pasada así desde la sesión 023,
+y cierra lo que §1 arrastraba como pendiente.
+
+Con un matiz que conviene no perder: **la primera pasada dio tres rojos**, y los
+tres eran de MySQL —la segunda base del contrato y las dos de restaurar—. Se
+lanzó trece segundos después de crear su contenedor. Repetidas a solas, verdes;
+y la pasada entera, repetida con el motor ya asentado, verde también. No era el
+código: era pedirle trabajo a un servidor que todavía estaba levantándose.
+
+#### De paso, lo que enseñó el `sqlhosts` de Informix
+
+El contenedor de IBM trae las dos entradas, y explica de un vistazo por qué
+Druse y DBeaver no piden los mismos datos:
+
+    informix        onsoctcp    *488e28edd714    9088    ← SQLI
+    informix_dr     drsoctcp    *488e28edd714    9089    ← DRDA
+
+Dos protocolos, dos puertos y **dos nombres lógicos distintos**. Se aprovechó
+para comprobar contra ese servidor si el driver .NET de IBM admite de alguna
+forma el `INFORMIXSERVER` que DBeaver pide: **no**. Sin servidor lógico y contra
+el 9089 abre —`version=12.10.0000`—; `base@servidor` responde «database name
+SYSMASTER@INFORMIX_DR was not found»; `host:puerto/servidor` responde «The
+service "9089/informix_" was not found»; y como clave suelta, el constructor la
+rechaza con `Invalid argument`. No hay dónde ponerlo, y por DRDA no hace falta.
+Apuntar al 9088 da `SQL30081N`, que es la familia del error que se reportó.
 
 #### No hecho
 
@@ -4731,7 +4769,8 @@ basta solo.
 | **El MVP no se ha probado en un equipo limpio** | Es el criterio que demuestra que el paquete se basta solo | Instalar el NSIS en una máquina sin .NET ni Node. **Es lo único que queda del MVP** |
 | macOS pasa la contraseña por argumento a `security` | Visible un instante en la lista de procesos | Enlazar Security.framework. Anotado en ADR 0004 |
 | Contenedor `druse-pg-test` en el 55440 | El 55432 lo ocupa `prima-postgres`, ajeno al proyecto | Puerto configurable con `DRUSE_TEST_PG_PORT` |
-| **Los contenedores de prueba desaparecen** | Con ellos se va lo sembrado, y las pruebas que lo necesitan pasan a comprobar otra cosa | Pasó entre la 023 y la 024: `docker ps -a` vacío. Antes de fiarse de una pasada, comprobar que están **y que tienen datos** |
+| **Un motor recién creado da rojos que no son del código** | Se confunden con fallos del producto, y encima aparecen justo cuando se está validando algo | Pasó en la 037: la pasada lanzada trece segundos después de crear el contenedor de MySQL dio tres rojos —la segunda base y las dos de restaurar—, todos verdes al repetir. **Dar unos minutos al motor recién creado antes de fiarse de una pasada**, y repetir antes de investigar |
+| **Los contenedores de prueba desaparecen** | Con ellos se va lo sembrado, y las pruebas que lo necesitan pasan a comprobar otra cosa | Pasó entre la 023 y la 024, y otra vez antes de la 037: Informix y MySQL **ya no existían** y hubo que crearlos de cero. Antes de fiarse de una pasada, comprobar que están **y que tienen datos**. Los cuatro quedaron levantados al cerrar la 037 |
 | Ejecutable de 107 MB | Instalador pesado | D-11: trimming y ReadyToRun. Sigue abierta |
 | Dependencias con vulnerabilidades en plantillas | Ya pasó dos veces: `Microsoft.OpenApi` y `dompurify` | En backend lo caza `TreatWarningsAsErrors`; en frontend, `npm audit` en cada instalación |
 | 3 vulnerabilidades moderadas en `@angular/cli` | Solo desarrollo; no llegan al bundle | Esperar actualización de Angular. Degradar a la 21 sería peor |
