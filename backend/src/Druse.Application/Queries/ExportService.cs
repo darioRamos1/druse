@@ -23,6 +23,48 @@ public sealed class ExportService(
     private readonly Dictionary<ExportFormat, IResultExporter> _exporters =
         exporters.ToDictionary(exporter => exporter.Format);
 
+    /// <summary>
+    /// Comprueba si la petición puede exportarse.
+    ///
+    /// Son las reglas de una ejecución normal **y una más**: lo que se exporta
+    /// tiene que devolver filas. Exportar no es una forma de ejecutar: el archivo
+    /// es el objetivo, así que mandar al motor algo que escribe sería un efecto
+    /// que nadie pidió al pulsar «Exportar».
+    ///
+    /// El caso que lo destapó es una vista abierta desde el explorador. Esa
+    /// pestaña no lleva un SELECT sino el <c>CREATE VIEW</c> que la define, y
+    /// exportarla llegaba al motor: si la vista ya existía, el servidor
+    /// respondía con un error que nadie sabía leer, y **si no existía la creaba**
+    /// y el archivo salía vacío con un «Exportado» encima.
+    ///
+    /// Se decide por lo que escribe y no por una lista de lo que se acepta:
+    /// cada motor tiene sus formas de devolver filas —<c>SHOW</c>, <c>EXPLAIN</c>,
+    /// procedimientos— y una lista blanca las iría dejando fuera de una en una.
+    /// </summary>
+    public static QueryRejection? Validate(QueryContext context, QueryRequest request)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        var rejection = QueryService.Validate(context, request);
+
+        if (rejection is not null)
+        {
+            return rejection;
+        }
+
+        if (SqlSafetyAnalyzer.IsMutating(request.Sql))
+        {
+            return new QueryRejection(
+                QueryRejectionReason.NotExportable,
+                "Esto no devuelve filas: modifica la base de datos. Para exportar hace falta "
+                    + "una consulta. Si has abierto una vista desde el explorador, lo que tienes "
+                    + "delante es su definición; escribe un SELECT sobre ella.",
+                SqlSafetyAnalyzer.Analyze(request.Sql));
+        }
+
+        return null;
+    }
+
     public IResultExporter GetExporter(ExportFormat format) =>
         _exporters.TryGetValue(format, out var exporter)
             ? exporter
@@ -49,7 +91,7 @@ public sealed class ExportService(
         using var turn = await _connections.EnterAsync(request.SessionId, cancellationToken);
 
         var session = _connections.Require(request.SessionId);
-        var rejection = QueryService.Validate(QueryContext.From(session), request);
+        var rejection = Validate(QueryContext.From(session), request);
 
         if (rejection is not null)
         {

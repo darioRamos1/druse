@@ -15,6 +15,8 @@ public enum QueryRejectionReason
     UnconfirmedDestructive = 2,
     /// <summary>El SQL está vacío.</summary>
     EmptyStatement = 3,
+    /// <summary>Se pidió exportar algo que escribe en la base en vez de devolver filas.</summary>
+    NotExportable = 4,
 }
 
 /// <summary>Ejecución rechazada, con los riesgos que la motivaron.</summary>
