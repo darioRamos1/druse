@@ -39,6 +39,7 @@ param(
     [int]$SqlServerPort = 14433,
     [int]$MySqlPort = 33306,
     [int]$InformixPort = 9089,
+    [int]$InformixSqliPort = 9088,
     [switch]$Down
 )
 
@@ -198,10 +199,10 @@ if ($Engine -in 'all', 'informix') {
     else {
         Write-Host "Creando $InformixName en el puerto $InformixPort..." -ForegroundColor Cyan
 
-        # Druse habla DRDA, no el protocolo nativo de Informix, así que lo que se
-        # publica es el puerto 9089 del contenedor —el del escuchador DRDA— y no
-        # el 9088 que atiende SQLI. Publicar el equivocado da un error de
-        # conexión que parece de credenciales.
+        # Se publican **los dos** escuchadores del contenedor, porque Druse habla
+        # los dos protocolos: el 9089 es DRDA, que usa el proveedor de siempre, y
+        # el 9088 es SQLI, el nativo de Informix, que atiende el puente JDBC.
+        # Publicar solo uno deja la mitad de las pruebas sin motor.
         #
         # `LICENSE=accept` es obligatorio: la imagen es de IBM y no arranca sin
         # aceptar sus términos.
@@ -210,6 +211,7 @@ if ($Engine -in 'all', 'informix') {
             -e LICENSE=accept `
             -e DB_INIT=1 `
             -p "${InformixPort}:9089" `
+            -p "${InformixSqliPort}:9088" `
             icr.io/informix/informix-developer-database:latest | Out-Null
     }
 
@@ -246,7 +248,7 @@ if ($Engine -in 'all', 'informix') {
                 "echo `"CREATE DATABASE $database WITH LOG;`" | dbaccess - -" 2>$null | Out-Null
         }
 
-        Write-Host "  Informix listo en 127.0.0.1:$InformixPort (DRDA)" -ForegroundColor Green
+        Write-Host "  Informix listo en 127.0.0.1:$InformixPort (DRDA) y 127.0.0.1:$InformixSqliPort (SQLI)" -ForegroundColor Green
     }
     else {
         throw "$InformixName no respondió a tiempo."

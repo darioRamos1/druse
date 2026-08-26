@@ -5,6 +5,7 @@
     <Project Path="src/Druse.Domain/Druse.Domain.csproj" />
     <Project Path="src/Druse.Host.LocalApi/Druse.Host.LocalApi.csproj" />
     <Project Path="src/Druse.Infrastructure/Druse.Infrastructure.csproj" />
+    <Project Path="src/Druse.Jdbc/Druse.Jdbc.csproj" />
     <Project Path="src/Druse.Persistence.Sqlite/Druse.Persistence.Sqlite.csproj" />
     <Project Path="src/Druse.Platform.Abstractions/Druse.Platform.Abstractions.csproj" />
     <Project Path="src/Druse.Platform.Native/Druse.Platform.Native.csproj" />

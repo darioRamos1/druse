@@ -1,0 +1,50 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Puente ADO.NET sobre JDBC.
+
+    Existe por Informix. Su protocolo nativo —SQLI— es el único que hablan
+    muchos servidores en producción, y **no hay cliente .NET que lo hable**: el
+    `IBM.Data.Informix` clásico se quedó en .NET Framework, y el proveedor de
+    DB2 que usa Druse habla DRDA, que exige un escuchador aparte que no todas
+    las instalaciones levantan.
+
+    El que sí habla SQLI es el driver JDBC de IBM, y es de descarga libre en
+    Maven Central. IKVM lo traduce a un ensamblado .NET en tiempo de
+    compilación, así que **no hace falta Java instalado** ni en este equipo ni
+    en el del usuario: lo que viaja es IL.
+
+    Lo que hay aquí dentro son las cuatro clases de ADO.NET —conexión, comando,
+    lector y transacción— envolviendo sus equivalentes de `java.sql`. Con eso,
+    el proveedor de Informix reutiliza tal cual su catálogo, sus tipos y su
+    diseñador: es el mismo motor, solo cambia por dónde entra.
+  -->
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="IKVM" Version="8.11.2" />
+    <PackageReference Include="IKVM.Maven.Sdk" Version="1.9.3" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!--
+      El driver, resuelto desde Maven Central en tiempo de compilación: no se
+      versiona un binario de IBM en el repositorio.
+
+      **La versión importa más de lo que parece.** La 4.50.3 no sabe leer la
+      versión de un Informix 15 y muere con `NumberFormatException: "150."`
+      antes de conectar. La 15.x lee las anteriores sin problema.
+    -->
+    <MavenReference Include="com.ibm.informix:jdbc" Version="15.0.0.1.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Druse.Database.Abstractions\Druse.Database.Abstractions.csproj" />
+  </ItemGroup>
+
+</Project>

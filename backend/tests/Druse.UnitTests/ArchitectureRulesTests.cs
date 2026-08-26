@@ -41,6 +41,10 @@ public sealed class ArchitectureRulesTests
         // directorio de datos lo resuelve el host al componer.
         ["Druse.Persistence.Sqlite"] = ["Druse.Application", "Druse.Platform.Abstractions"],
 
+        // El puente ADO.NET sobre JDBC encapsula su driver igual que un proveedor:
+        // quien lo use ve `DbConnection`, no `java.sql`.
+        ["Druse.Jdbc"] = ["Druse.Database.Abstractions"],
+
         // Proveedores: sus contratos y su propio driver. Nunca otro proveedor.
         ["Druse.Provider.Informix"] = ["Druse.Database.Abstractions"],
         ["Druse.Provider.MySql"] = ["Druse.Database.Abstractions"],
