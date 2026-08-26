@@ -10,30 +10,42 @@
 
 | Campo | Valor |
 | --- | --- |
-| Última sesión | **030** — 2026-08-20 |
+| Última sesión | **036** — 2026-08-25 |
 | Fase activa | **Migración de datos entre tablas:** fases 1, 2 y 3 cerradas; la **4** cerrada: la pasada de varias tablas, lo que cada tabla hace distinto y las migraciones guardadas (ver «Qué toca retomar»). **Respaldos y restauración:** Fases A–E cerradas. La **F** tiene backend, interfaz, CSV, selector de archivos, restaurar en una base nueva y **el ciclo entero por HTTP en los cuatro motores**; le falta repetir a mano el respaldo real que encontró el error de los índices de expresión |
 | Fases 0–6 | ✅ Cerradas. |
 | Fase 7 | 🟡 **11/12.** El ciclo de instalación está probado sobre este equipo; solo falta arrancar en una máquina sin herramientas de desarrollo. |
 | Fase 8 | ✅ **7/7.** Tres motores sobre el mismo contrato y primera beta preparada. |
 | ¿Compila el backend? | Sí — 0 advertencias, 0 errores |
-| ¿Compila el envoltorio? | Sí |
-| ¿Pasan las pruebas? | Sí — **781 en backend** (422 unitarias, 206 contractuales y 153 de integración) en la sesión 024. En la 030 pasaron las **539 del frontend** y 130 específicas de catálogo/autocompletado; en la 028 pasó además la E2E del menú de conexiones. La última pasada con `DRUSE_REQUIRE_ENGINES=1` y los cuatro motores fue la de la sesión 023; ahora solo estaba levantado PostgreSQL. La suite E2E completa, ahora de 30 casos, no se repitió. Las **6 del envoltorio** tampoco se ejecutaron. |
+| ¿Compila el envoltorio? | Sí — recompilado en la sesión 033 con `build/scripts/msvc-env.ps1` cargado antes; sin él, `cargo` falla en `vswhom-sys` por elegir el MSVC equivocado |
+| ¿Pasan las pruebas? | Sí — **781 en backend** (422 unitarias, 206 contractuales y 153 de integración) en la sesión 024. En la 036 pasaron las **615 del frontend** y las **21 E2E de `interfaz.spec.ts`** con PostgreSQL y SQL Server levantados a la vez; en la 035, las 613 de entonces y las E2E del ancho de columna; en la 034, las 599 de entonces y las E2E de copiar la selección, todas contra PostgreSQL; en la 033, las 567 de entonces y la E2E de la pantalla de carga; en la 032, las 543 de entonces, el typecheck E2E y la E2E del constructor a dos anchos; en la 031 pasaron además las E2E del comentario de líneas y la barra estrecha. La última pasada con `DRUSE_REQUIRE_ENGINES=1` y los cuatro motores fue la de la sesión 023; ahora solo estaba levantado PostgreSQL. La suite E2E completa no se repitió. Las **6 del envoltorio** tampoco se ejecutaron. |
 | ¿Hay aplicación de escritorio? | **Sí.** Instalador NSIS, MSI y ZIP portable, en dos variantes: con Informix y sin él |
 | Motores | **PostgreSQL, SQL Server, MySQL/MariaDB e Informix**, todos sobre el mismo contrato compartido |
-| Trabajo a medias | Las correcciones de las sesiones **028–030** están verificadas pero sin commit: menú por encima de Monaco, catálogo correcto tras el switch y carga automática del esquema de un alias restaurado. Las sesiones 024–027 ya están integradas en `1452a6c` y subidas al remoto. |
+| Trabajo a medias | **Nada sin commitear.** Las sesiones **032 a 036** se repartieron en seis commits temáticos y se subieron junto con `640151c` (sesiones 028–031). Lo que queda es de contenido, no de código: la bitácora describe las cinco sesiones, pero el árbol traía además tres temas sin anotar —agrupar y resumir en el constructor, el progreso con cancelación del panel, y el saneamiento de capas y tokens de color—, que quedaron descritos en los mensajes de sus commits y **falta llevar a §5**. |
 | Bloqueantes | Ninguno para seguir programando. Sí para dar por buenos cuatro motores y cuatro funciones: ver «Qué toca retomar». |
-| Git | El **PR #9 se fusionó** (sesión 022). Se trabaja en `feat/respaldos-y-restauracion`; las sesiones 024–027 se subieron en `1452a6c`. Quedan sin commit las correcciones 028–030. |
+| Git | El **PR #9 se fusionó** (sesión 022). Se trabaja en `feat/respaldos-y-restauracion`, con todo subido: las 024–027 en `1452a6c`, las 028–031 en `640151c`, y las 032–036 en los seis commits que van de `d3ac0d5` a `35d192e`. |
 | Integración continua | 🔴 **Parada, y no por el código.** GitHub aborta los catorce jobs en dos segundos: «recent account payments have failed or your spending limit needs to be increased». Hasta resolver la facturación, ningún PR podrá pasar los checks. |
 
 ### Qué toca retomar en la próxima sesión
 
-#### Lo primero, integrar las correcciones 028–030
+#### Lo primero, anotar los tres temas que el árbol traía de más
 
-Son tres partes del mismo fallo: el menú quedaba detrás de Monaco; después de
-elegir, el autocompletado podía consultar otra base o terminar antes de cargar el
-catálogo; y un SQL restaurado no cargaba el esquema de su alias si estaba fuera
-del precalentado. Ya pasaron frontend completo, Playwright y build; falta el
-commit y el push.
+Ya no queda nada por integrar: las sesiones 032–036 se repartieron en seis
+commits temáticos y están subidas junto con `640151c`. Al agruparlas apareció
+que el árbol traía **tres temas que ninguna entrada de §5 describe**:
+
+1. **Agrupar y resumir en el constructor** — GROUP BY, las cinco funciones de
+   agregado, HAVING sobre esas expresiones, agrupación por día/mes/trimestre/año
+   y varios órdenes, más la vista previa de diez filas (`previewQuery`).
+2. **El progreso de la consulta y la cancelación** — el tiempo transcurrido en
+   el panel, el texto que cambia a los diez segundos, y el botón que dice
+   «Cancelando…» mientras el motor no confirma.
+3. **Capas y tokens** — los z-index sueltos pasaron a seis tokens ordenados, y
+   se corrigieron cuatro tokens de color que no existían en ninguna parte.
+
+El porqué de cada uno quedó escrito en el mensaje de su commit; falta llevarlo a
+§5 como sesiones y decidir si alguno merece entrada propia. **Ninguno se ha
+verificado a mano en la aplicación levantada**: lo que se comprobó en la 036 son
+las pruebas.
 
 Después, cuando estén disponibles los cuatro contenedores, repetir la validación
 general de motores. No hace falta para esta corrección de apilamiento, pero sí
@@ -374,6 +386,283 @@ Y tres límites declarados desde el principio: no hay respaldo binario ni
 recuperación a un punto en el tiempo —eso es del servidor, y la interfaz tendrá
 que decirlo—, no hay respaldos programados, y un límite de filas puede dejar
 filas huérfanas, cosa que se avisa y no se corrige sola.
+
+### Sesión 036 — 2026-08-25 · Las dos mejoras de la cuadrícula, contra SQL Server
+
+Lo de las sesiones 034 y 035 se había comprobado solo contra PostgreSQL. Se
+levantó el contenedor de SQL Server y se repitió allí lo esencial: copiar la
+selección con formato y ajustar el ancho de las columnas.
+
+**Funciona igual en los dos motores.** El entero de T-SQL sale sin comillas y el
+`varchar` con ellas, que es lo que decide el tipo que clasifica el backend; un
+`NULL` de T-SQL sale fuera del `IN`, como debe; y el ancho se arrastra y se
+ajusta sin diferencia.
+
+Apareció un caso que PostgreSQL no da: **una columna sin nombre**. T-SQL devuelve
+así las que no llevan alias —`SELECT 42`—, y con un nombre vacío la condición
+salía como `"" IN (42)`, que no se puede ejecutar y encima parece correcta de un
+vistazo. Ahora se escribe `/* columna sin nombre */ IN (42)`, en la línea de lo
+que ya hacía el escritor de consultas con lo que falta: se ve al pegarlo.
+
+#### Verificado
+
+- **21 de 21 pruebas E2E** de `interfaz.spec.ts` en verde, con los dos motores
+  levantados: las 17 contra PostgreSQL y 4 nuevas contra SQL Server.
+- **615 pruebas frontend**, 2 nuevas para la columna sin nombre.
+
+#### Lo que costó, y que conviene saber
+
+- **No se pueden solapar dos ejecuciones de Playwright.** Comparten puerto y
+  carpeta de datos, así que cuando la primera termina se lleva por delante el
+  backend de la segunda. Media tarde de fallos que parecían del producto —
+  conexiones que no abrían, sesiones perdidas— eran esto.
+- **Las pruebas de SQL Server necesitan abrir antes PostgreSQL.** La barra del
+  editor solo deja elegir dónde se ejecuta cuando la pestaña ya apunta a alguna
+  conexión: sobre una pestaña que nunca ha tenido ninguna, el chip se queda en
+  «sin conexión» aunque haya un motor abierto. Es la misma secuencia que usa la
+  prueba de migración.
+- **`conectar` se conforma con ver `druse_test` en el árbol**, y las dos
+  conexiones de prueba tienen una base con ese nombre: con los dos motores
+  levantados puede dar por abierta la de PostgreSQL sin haberla pulsado. Se
+  intentó cambiar por el estado de la fila —como hace `conectarSqlServer`— y
+  resultó peor, así que se dejó como estaba. Queda anotado.
+- **`ciudad` y `accionista` no las crea nadie.** La prueba del autocompletado
+  tras un alias las necesita y no están en el repositorio ni en `test-db.ps1`;
+  se recrearon a mano en el contenedor. Si alguien levanta los contenedores de
+  cero, esa prueba falla hasta que existan.
+
+**Archivos.** `results-grid/copy-formats.{ts,spec.ts}`, `e2e/tests/interfaz.spec.ts`.
+
+**Estado al cerrar.** Verificado, sin commit.
+
+### Sesión 035 — 2026-08-25 · El ancho de las columnas se ajusta a mano
+
+Los anchos los repartía el reparto inicial y ahí se quedaban. En una columna con
+valores cortos y nombre largo —`identificador_de_la_operacion` con un `1`
+debajo— el título salía cortado y no había forma de leerlo entero.
+
+Ahora el borde derecho de cada cabecera se arrastra, y el doble clic sobre ese
+mismo borde ajusta la columna a lo más largo que contenga, título incluido. El
+asa sobresale tres píxeles por fuera del borde porque el borde es una línea de un
+píxel y nadie acierta a darle; se ilumina al acercarse.
+
+El ajuste automático usa la misma regla que el reparto del arranque —se sacó a
+`fitColumnWidth`, en `column-widths.ts`— con dos diferencias: mira las filas que
+están pintadas en vez de una muestra de sesenta, y admite hasta 900 px en lugar
+de 320. El tope del reparto existe para que un texto largo no se lleve la
+pantalla entera; cuando el ancho lo pide alguien expresamente, esconder las
+columnas de al lado es justo lo que quiere.
+
+Lo ajustado sobrevive a volver a ejecutar la consulta. Se guarda por **nombre de
+columna**, y se olvida en cuanto el resultado trae otras columnas: ensanchar una
+columna, reejecutar y encontrarla otra vez estrecha sería pedir el mismo trabajo
+dos veces. Como el resultado que enseña el panel es uno solo para toda la
+aplicación —no hay un resultado por pestaña—, la lista de columnas es lo que
+distingue «la misma consulta» de «otra».
+
+Y cuando aun así no cabe todo, lo que desaparece es el tipo de dato, no el
+nombre. Antes pasaba lo contrario: `character varying` se quedaba entero pegado a
+la derecha y el que salía con puntos suspensivos era el nombre, que es el dato
+que hace falta para saber qué columna se está mirando. Se resuelve con un factor
+de encogimiento desproporcionado en el tipo, así que cede todo su ancho antes de
+que el nombre ceda el primer píxel.
+
+#### Verificado
+
+- E2E real contra PostgreSQL, con el ratón de verdad: arrastrar el asa ensancha
+  la columna y el nombre deja de estar cortado —se compara `scrollWidth` con
+  `clientWidth`, que es lo que distingue «entero» de «con elipsis»—; el doble
+  clic la deja en lo justo, que es menos.
+- E2E del caso contrario: estrechada a 130 px, el tipo se queda con ancho cero y
+  el nombre conserva el suyo.
+- **613 pruebas frontend** en verde, 14 nuevas: arrastre, suelo de 84 px, que el
+  asa no seleccione la columna, el ajuste al contenido, que sobreviva a una
+  reejecución y que se olvide al cambiar las columnas; más seis del cálculo.
+- Build de producción correcto.
+
+**Un fallo que encontró una prueba.** Al hacer que el reinicio del estado local
+dependiera solo de la firma de columnas, dejó de ejecutarse cuando se reejecuta
+la misma consulta: un `computed` no avisa si su valor no cambia, así que el
+filtro y la selección de la ejecución anterior se quedaban puestos sobre filas
+que ya no eran las mismas. Ahora se lee también el resultado entero.
+
+**Archivos.** `results-grid.{ts,html,scss,spec.ts}`,
+`core/application-gateway/column-widths.{ts,spec.ts}`,
+`e2e/tests/interfaz.spec.ts`.
+
+**Estado al cerrar.** Verificado, sin commit.
+
+### Sesión 034 — 2026-08-25 · Llevarse valores del resultado con el formato de destino
+
+La cuadrícula solo dejaba coger **una** celda, y copiaba siempre igual: con
+tabuladores. Llevarse una lista de identificadores a otra consulta era ir celda
+por celda y escribir a mano las comas y las comillas.
+
+Ahora se selecciona como en una hoja de cálculo. La cabecera coge la columna
+entera —Control añade otra, Mayúsculas coge el tramo entre dos— y sobre las
+filas se arrastra, o se pulsa con Mayúsculas, para coger un rectángulo. Los dos
+modos se excluyen a propósito: pulsar una cabecera olvida el rango de celdas y
+pulsar una celda olvida las columnas, porque una selección mixta no se puede ni
+dibujar ni explicar.
+
+Y se copia eligiendo a dónde va, desde el botón derecho sobre la selección o
+desde «Copiar como» en la barra del panel:
+
+- **Para Excel:** tabuladores con los nombres de columna arriba. Los NULL van
+  como celda vacía, que es lo que representan; escribir la palabra dejaría un
+  texto donde debe haber un hueco y estropearía las fórmulas de la columna. Lo
+  que llevara tabuladores o saltos dentro sale entrecomillado.
+- **Como condición IN:** `pais IN ('MX', 'ES')`, listo para pegar detrás de un
+  `WHERE`. Sin repetidos, y con varias columnas sale una condición por columna
+  unidas por `AND`.
+- **Como lista de valores:** los valores separados por comas, sin tocar el orden
+  ni quitar repetidos: eso es para pegar dentro de algo ya escrito.
+
+Dos decisiones que no se ven pero cambian el resultado. Los NULL no pueden ir
+dentro de un `IN` —`IN (NULL)` no es cierto ni para las filas nulas—, así que
+cuando los hay salen aparte: `(estado IN ('activo') OR estado IS NULL)`. Y el
+tipo de la columna manda sobre el contenido al decidir las comillas: un código
+postal `01234` guardado como texto tiene que salir entrecomillado, porque sin
+comillas el motor lo compararía como el número 1234 y no encontraría nada.
+
+Seleccionar una columna se lleva **todas** las filas que pasan el filtro, no las
+quinientas que están pintadas. Por eso el botón dice qué se lleva —«2 columnas ×
+3 filas»—: sin verlo escrito, quien copia una columna de un resultado grande no
+sabe qué acaba de coger.
+
+Ctrl+C se queda como estaba mientras haya una sola celda: copia el valor tal
+cual, sin encabezado. En cuanto hay más de una, sale con tabuladores.
+
+#### Verificado
+
+- E2E real contra PostgreSQL, **leyendo el portapapeles de verdad**: seleccionar
+  la columna y copiar como `IN` da `pais IN ('MX', 'ES')` —sin el `MX` repetido—;
+  dos columnas con Control dan la tabla con sus nombres arriba; y arrastrar de
+  una fila a otra copia solo el bloque cogido.
+- **599 pruebas frontend** en verde, 32 nuevas: 14 de los formatos —comillas,
+  NULL, repetidos, nombres de columna con espacios, escape de tabuladores—, 15
+  de la selección y 3 de la unión entre el panel y la cuadrícula.
+- El portapapeles de Windows guarda CRLF y Chromium convierte al escribir: la
+  prueba normaliza los saltos, porque eso no lo pone la aplicación y Excel ni lo
+  nota al pegar.
+- Build de producción correcto.
+- Se levantó Docker y el contenedor de PostgreSQL para poder pasar la E2E.
+
+**Archivos.** `results-grid/copy-formats.{ts,spec.ts}` (nuevos),
+`results-grid.{ts,html,scss,spec.ts}`, `results-panel.{ts,html,spec.ts}`,
+`e2e/tests/interfaz.spec.ts`, `e2e/support/druse.ts`.
+
+**Estado al cerrar.** Verificado, sin commit.
+
+### Sesión 033 — 2026-08-25 · La ventana ya no abre vacía, y el ejecutable tiene icono
+
+Al abrir Druse había un hueco de más de un segundo con la ventana en blanco: el
+paquete de Angular tarda en evaluarse, y detrás vienen cinco lecturas contra el
+proceso local —conexiones guardadas, historial, preferencias, fragmentos y las
+pestañas de la sesión anterior— que iban poblando la interfaz a saltos.
+
+Ahora hay una pantalla de carga con la marca de la aplicación, su nombre y una
+barra de progreso. Vive en `index.html` y no en un componente, porque tiene que
+existir **antes** que Angular; los estilos van en línea por lo mismo, y porque la
+CSP del envoltorio prohíbe los scripts en línea pero no los estilos. Los colores
+salen de los tokens con un respaldo detrás, que es el mismo color de fondo que
+declara `tauri.conf.json`: así no hay salto entre la ventana y la página.
+
+Quien la retira es `SplashScreen`, un servicio de `core/startup`. El shell agrupa
+sus cinco lecturas en un `allSettled` y avisa al terminar; que una falle no deja
+la pantalla puesta sobre una aplicación que por lo demás funciona. Se deja ver un
+mínimo de 450 ms contados desde que abrió la ventana —si no, con la API caliente
+aparecería y se iría en el mismo parpadeo— y hay un plazo de 12 s tras el cual se
+va igual: es preferible una interfaz a medio poblar, donde se ve el error, que una
+pantalla de carga eterna. Al final se retira del documento, no se queda invisible:
+un elemento a pantalla completa transparente seguiría interceptando cada clic.
+
+El icono era otro problema, y sin relación: el ejecutable portable salía **sin
+icono**. `icons/icon.ico` tenía una sola imagen de 256x256 **a 4 bits** —16
+colores, sin canal alfa—, así que el degradado de la marca quedaba en un gris
+plano y en los tamaños que usa el Explorador no se veía nada. Se ha regenerado
+desde `icon.png` con las siete medidas habituales a 32 bits, y el generador queda
+en `build/scripts/iconos.ps1` para que la próxima vez que cambie la marca no se
+repita el fallo.
+
+De paso se corrigió lo anotado sobre compilar Rust en este equipo: **sí compila**,
+siempre que antes se cargue `build/scripts/msvc-env.ps1`. Sin él, `cc-rs` elige el
+MSVC de Visual Studio Insiders y `vswhom-sys` revienta.
+
+#### Verificado
+
+- E2E real: la pantalla cubre la ventana entera al arrancar, se lee la marca y se
+  retira sola del documento. La prueba retrasa a propósito la lectura de
+  preferencias, porque con todo caliente el arranque no dura ni un parpadeo.
+- Sigue cubriendo con la interfaz al 80 %: el tamaño se aplica como `zoom` sobre
+  el `body` y llega con las preferencias, o sea, mientras la pantalla aún está.
+  Se cancela ese `zoom` en el propio elemento.
+- **567 pruebas frontend** en verde, 5 de ellas nuevas para `SplashScreen`: el
+  mínimo de permanencia, el plazo de seguridad, que no se repita la salida y que
+  sin elemento en el documento no arme ningún temporizador.
+- `abrir()` espera ahora a que la pantalla se retire, para que ninguna prueba se
+  quede esperando a un clic interceptado.
+- Build de producción correcto: el `<style>` en línea sobrevive a la optimización.
+- Icono comprobado con `PrivateExtractIcons` a 16, 32, 48, 64, 128 y 256 px, en el
+  `.ico` y dentro del `druse.exe` recompilado. Antes salía gris en todos.
+- Envoltorio recompilado dos veces con el entorno de MSVC, sin errores.
+
+**Archivos.** `frontend/src/index.html`, `core/startup/splash-screen.{ts,spec.ts}`,
+`app-shell.ts`, `e2e/tests/interfaz.spec.ts`, `e2e/support/druse.ts`,
+`shells/desktop-tauri/icons/icon.ico`, `build/scripts/iconos.ps1`.
+
+**Estado al cerrar.** Verificado, sin commit. El ZIP portable de `target/portable`
+sigue con el ejecutable del 24 de agosto: Druse estaba abierto desde esa misma
+carpeta y no se tocó. Basta cerrarlo y volver a ejecutar `package.ps1 -Portable`.
+
+### Sesión 032 — 2026-08-20 · Cada JOIN elige con qué tabla se relaciona
+
+El constructor de consultas fijaba siempre el lado izquierdo de todos los JOIN
+a `t0`, la tabla desde la que se abrió. Con tres tablas se podía expresar
+`orders → customers` y `orders → addresses`, pero no una cadena como
+`orders → customers → countries`: el segundo cruce solo ofrecía columnas de
+`orders`.
+
+Cada JOIN guarda ahora de qué relación anterior parte. En la condición `ON`, el
+lado izquierdo tiene dos selectores: primero la tabla —con alias y nombre, por
+ejemplo `t1 · public.customers`— y después una de sus columnas. Solo se ofrecen
+la principal y los JOIN que ya aparecen antes: una tabla posterior todavía no
+existe en ese punto del SQL.
+
+La sección dejó además de ser una hilera de controles sin jerarquía. Cada cruce
+es ahora una tarjeta numerada: arriba quedan el tipo y la tabla que entra; en el
+centro se leen enfrentadas «Tabla existente» y «Tabla incorporada», con el `=`
+entre ambas; y debajo viven aparte las columnas que se devolverán en el SELECT.
+Sin cruces hay un estado vacío que explica el siguiente paso. A 640 px los dos
+lados se apilan, en vez de encoger los nombres hasta volverlos ilegibles.
+
+La referencia se guarda por el identificador estable del cruce, no por `t1` o
+`t2`. Así, si se elimina un JOIN anterior, los alias se renumeran sin apuntar a
+otra tabla por accidente. Si era justo la tabla usada por una condición, esta
+vuelve a la principal y elige una columna válida. Cambiar la tabla de un JOIN
+también corrige las condiciones posteriores que dependían de columnas que ya no
+existen.
+
+#### Verificado
+
+- El segundo JOIN ofrece `t0` y `t1`, cambia sus columnas al elegir `t1` y genera
+  `ON [t1].[name] = [t2].[name]`.
+- Al quitar `t1`, el cruce restante vuelve a `t0`, se renumera como `t1` y no
+  conserva una columna inexistente.
+- **49 pruebas específicas** del constructor y el escritor SQL en verde.
+- **543 pruebas frontend** en verde y typecheck E2E correcto.
+- E2E real contra PostgreSQL: crea dos tablas, abre el constructor desde el
+  árbol, comprueba ambos operandos en paralelo y apilados a 640 px, y limpia las
+  tablas al terminar.
+- Build de producción correcto. Siguen los avisos del bundle y `nearley`; el
+  estilo del constructor queda en **9,98 kB**, por debajo del máximo de 10 kB y
+  por encima del umbral de aviso de 8 kB.
+- `git diff --check` limpio.
+
+**Archivos.** `query-builder.{ts,html,scss,spec.ts}`, `sql-writer.spec.ts`,
+`e2e/tests/interfaz.spec.ts`, `e2e/support/druse.ts`.
+
+**Estado al cerrar.** Verificado, sin commit.
 
 ### Sesión 031 — 2026-08-20 · Comentar fragmentos SQL seleccionados
 
