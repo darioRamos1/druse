@@ -11,6 +11,7 @@ describe('ConnectionDialog', () => {
     secretStore: signal({ available: true, description: 'Administrador de credenciales' }),
     notice: signal<string | null>(null),
     testConnection: vi.fn(),
+    testTunnel: vi.fn(),
     connectionDatabases: vi.fn(),
     connect: vi.fn(),
     saveConnection: vi.fn(),
@@ -19,6 +20,7 @@ describe('ConnectionDialog', () => {
   beforeEach(async () => {
     vi.clearAllMocks();
     store.testConnection.mockResolvedValue('Conexión correcta con SQL Server 16 en 12 ms.');
+    store.testTunnel.mockResolvedValue('Túnel correcto: se llegó a db.interna:5432 en 30 ms.');
     store.connectionDatabases.mockResolvedValue({ databases: [], error: null });
     store.connect.mockResolvedValue(true);
     store.saveConnection.mockResolvedValue(true);
@@ -414,6 +416,51 @@ describe('ConnectionDialog', () => {
 
     return found.querySelector('input') as HTMLInputElement;
   }
+
+  describe('probar el túnel', () => {
+    /** Marca la casilla del túnel, que es lo que hace aparecer el botón. */
+    function activarTunel(): void {
+      const etiqueta = [...fixture.nativeElement.querySelectorAll('label.checkbox')].find(
+        (candidata: Element) => candidata.textContent?.includes('servidor SSH'),
+      ) as HTMLElement;
+
+      etiqueta.querySelector('input')!.click();
+      fixture.detectChanges();
+    }
+
+    /**
+     * Sin servidor intermedio no hay nada que probar.
+     *
+     * Un botón que siempre contesta lo mismo enseña a no leerlo, así que ni
+     * siquiera se ofrece.
+     */
+    it('el botón no está cuando la conexión va directa', () => {
+      expect(button('Probar túnel')).toBeUndefined();
+    });
+
+    it('aparece al activar el servidor intermedio', () => {
+      activarTunel();
+
+      expect(button('Probar túnel')).toBeDefined();
+    });
+
+    /**
+     * No exige el formulario entero.
+     *
+     * Quien está peleándose con el salto todavía no tiene por qué saber el
+     * usuario de la base ni qué base quiere abrir; sí el destino, que es lo que
+     * se comprueba que se alcanza.
+     */
+    it('avisa de lo que falta del túnel sin pedir el resto del formulario', async () => {
+      activarTunel();
+      button('Probar túnel').click();
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      expect(store.testTunnel).not.toHaveBeenCalled();
+      expect(fixture.nativeElement.textContent).toContain('servidor intermedio');
+    });
+  });
 
   function button(label: string): HTMLButtonElement {
     return [...fixture.nativeElement.querySelectorAll('button')].find((candidate: Element) =>

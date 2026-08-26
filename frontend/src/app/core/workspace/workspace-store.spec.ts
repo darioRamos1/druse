@@ -4,6 +4,7 @@ import { Observable, of, throwError } from 'rxjs';
 
 import {
   ApplicationGateway,
+  ConnectRequest,
   ExecuteQueryRequest,
   ExportRequest,
   ImportPreview,
@@ -24,6 +25,7 @@ import {
   SavedConnection,
   SecretStoreStatus,
   SessionInfo,
+  TestTunnelResult,
 } from '../../shared/models/workspace';
 import { WorkspaceStore } from './workspace-store';
 
@@ -159,6 +161,15 @@ class FakeGateway implements Partial<ApplicationGateway> {
   exportQuery(request: ExportRequest): Observable<Blob> {
     this.exportCalls.push(request);
     return of(new Blob());
+  }
+
+  /** Lo que contesta `test-tunnel`. Se cambia en cada prueba. */
+  tunnelResult: TestTunnelResult = { succeeded: true, reach: 'complete', durationMs: 12 };
+  tunnelCalls: ConnectRequest[] = [];
+
+  testTunnel(request: ConnectRequest): Observable<TestTunnelResult> {
+    this.tunnelCalls.push(request);
+    return of(this.tunnelResult);
   }
 
   /** Transacción que devuelve la API para la sesión, imitando su estado real. */
@@ -1569,6 +1580,65 @@ describe('WorkspaceStore', () => {
       await store.export('xlsx');
 
       expect(store.notice()).toBe('Excel rechazó una celda.');
+    });
+  });
+
+  describe('probar el túnel', () => {
+    /**
+     * Un formulario con servidor intermedio, que es el único caso donde esto
+     * tiene algo que decir.
+     */
+    function conTunel(): ConnectionForm {
+      return {
+        ...form,
+        host: 'db.interna',
+        port: 5432,
+        sshTunnel: {
+          host: 'bastion.empresa.com',
+          port: 22,
+          username: 'operador',
+          authentication: 'password',
+          privateKeyPath: '',
+        },
+      };
+    }
+
+    it('cuando el camino entero funciona lo dice nombrando los dos extremos', async () => {
+      gateway.tunnelResult = { succeeded: true, reach: 'complete', durationMs: 42 };
+
+      const mensaje = await store.testTunnel(conTunel());
+
+      expect(mensaje).toContain('Túnel correcto');
+      expect(mensaje).toContain('db.interna:5432');
+      expect(mensaje).toContain('bastion.empresa.com');
+    });
+
+    /**
+     * El mensaje del servidor se enseña tal cual.
+     *
+     * Es la mitad del valor de este botón: quien lee «no se pudo entrar» sabe
+     * que el problema está en su cuenta SSH y no en la base.
+     */
+    it('un fallo se cuenta con el motivo que dio el servidor', async () => {
+      gateway.tunnelResult = {
+        succeeded: false,
+        reach: 'bastion',
+        errorMessage: 'Usuario o clave incorrectos en bastion.empresa.com.',
+        durationMs: 8,
+      };
+
+      const mensaje = await store.testTunnel(conTunel());
+
+      expect(mensaje).toBe('Usuario o clave incorrectos en bastion.empresa.com.');
+    });
+
+    it('no manda la contraseña de la base al servidor intermedio', async () => {
+      await store.testTunnel(conTunel());
+
+      const enviado = gateway.tunnelCalls.at(-1);
+
+      expect(enviado?.profile.sshTunnel?.host).toBe('bastion.empresa.com');
+      expect(enviado?.profile.host).toBe('db.interna');
     });
   });
 

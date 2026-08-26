@@ -1,4 +1,5 @@
 using Druse.Application.Abstractions;
+using Druse.Application.Connections;
 using Druse.Application.Queries;
 using Druse.Application.Tables;
 using Druse.Application.Transactions;
@@ -116,6 +117,19 @@ internal static class ContractMapper
             ServerVersion = result.ServerVersion,
             ErrorMessage = result.Error?.Message,
             ErrorCode = result.Error?.Code,
+            DurationMs = (long)result.Duration.TotalMilliseconds,
+        };
+    }
+
+    public static TestTunnelResponse ToResponse(this TunnelTestResult result)
+    {
+        ArgumentNullException.ThrowIfNull(result);
+
+        return new TestTunnelResponse
+        {
+            Succeeded = result.Succeeded,
+            Reach = result.Reach.ToString().ToLowerInvariant(),
+            ErrorMessage = result.Error?.Message,
             DurationMs = (long)result.Duration.TotalMilliseconds,
         };
     }

@@ -189,6 +189,21 @@ export interface TestConnectionResult {
   readonly durationMs: number;
 }
 
+/**
+ * Hasta dónde llegó la prueba del túnel.
+ *
+ * Importa porque decide a quién hay que pedirle el arreglo: `bastion` es cosa de
+ * la cuenta SSH, `forward` de la red entre el servidor intermedio y la base.
+ */
+export type TunnelReach = 'notconfigured' | 'bastion' | 'forward' | 'complete';
+
+export interface TestTunnelResult {
+  readonly succeeded: boolean;
+  readonly reach: TunnelReach;
+  readonly errorMessage?: string;
+  readonly durationMs: number;
+}
+
 /** Clase de objeto dentro del explorador. Determina el icono y las acciones. */
 export type DatabaseObjectKind =
   'folder' | 'database' | 'schema' | 'table' | 'view' | 'function' | 'procedure' | 'column';

@@ -708,6 +708,52 @@ test.describe('la interfaz por dentro', () => {
   });
 
   /**
+   * Probar el túnel a solas, desde el formulario.
+   *
+   * Lo que se comprueba aquí es la parte que ninguna prueba de componente ve: que
+   * el botón aparece al marcar el túnel, que llega a la API de verdad y que lo
+   * que responde se enseña. El servidor intermedio es inventado a propósito —no
+   * hace falta un bastión para ver que el aviso distingue **dónde** falló—.
+   */
+  test('el formulario prueba el túnel por separado y dice dónde se quedó', async ({ page }) => {
+    await abrir(page);
+
+    await page.getByRole('button', { name: 'Nueva conexión' }).click();
+
+    const dialogo = page.locator('app-connection-dialog');
+    await expect(dialogo).toBeVisible();
+
+    const campo = (etiqueta: string) =>
+      dialogo.locator(`.field:has(.field__label:text-is("${etiqueta}")) input`).first();
+
+    // Sin túnel no se ofrece: un botón que siempre contesta lo mismo enseña a no
+    // leerlo.
+    await expect(dialogo.getByRole('button', { name: 'Probar túnel' })).toHaveCount(0);
+
+    await dialogo
+      .locator('label.checkbox', { hasText: 'servidor SSH' })
+      .locator('input')
+      .check();
+
+    const probar = dialogo.getByRole('button', { name: 'Probar túnel' });
+    await expect(probar).toBeVisible();
+
+    // El destino y el salto; ni usuario de la base ni nombre de conexión, que es
+    // justo lo que este botón no exige.
+    await campo('Servidor').first().fill('db.interna');
+    await campo('Puerto').first().fill('5432');
+    await campo('Servidor SSH').fill('bastion.que.no.existe.invalido');
+    await campo('Usuario SSH').fill('operador');
+
+    await probar.click();
+
+    // Se queda en el salto, y lo dice nombrando el servidor que no contestó.
+    await expect(dialogo.locator('.feedback')).toContainText('bastion.que.no.existe.invalido', {
+      timeout: 60_000,
+    });
+  });
+
+  /**
    * Coger varios registros arrastrando por la columna del número.
    *
    * Con el ratón de verdad y no llamando al componente: lo que falla en un

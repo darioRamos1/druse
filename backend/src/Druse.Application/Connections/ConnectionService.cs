@@ -17,6 +17,105 @@ public sealed class ConnectionService(
     private readonly ISshTunnelFactory _tunnels = tunnels;
     private readonly ISshTunnelRegistry _openTunnels = openTunnels;
 
+    /// <summary>Lo que se espera al salto final antes de darlo por inalcanzable.</summary>
+    private const int TunnelProbeTimeoutSeconds = 10;
+
+    /// <summary>
+    /// Prueba solo el túnel, sin tocar la base de datos.
+    ///
+    /// Sirve para separar dos fallos que «no se pudo conectar» mezcla: que el
+    /// servidor intermedio no deje entrar, y que desde él no se alcance el
+    /// servidor de la base. Se arreglan en sitios distintos y a veces los
+    /// arregla gente distinta.
+    ///
+    /// Abierto el reenvío, se comprueba que su extremo local acepta un socket.
+    /// Eso demuestra el camino entero hasta el puerto del motor **sin hablar su
+    /// protocolo**: aquí no hay usuario de base de datos ni contraseña que
+    /// valga, así que un «no» del motor no puede confundirse con un «no» de la
+    /// red.
+    /// </summary>
+    public async Task<TunnelTestResult> TestTunnelAsync(
+        ConnectionProfile profile,
+        SshCredentials sshCredentials,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(profile);
+
+        if (profile.SshTunnel is null)
+        {
+            return TunnelTestResult.NotConfigured();
+        }
+
+        var stopwatch = Stopwatch.StartNew();
+        ISshTunnel? tunnel;
+
+        try
+        {
+            tunnel = await OpenTunnelAsync(profile, sshCredentials, cancellationToken);
+        }
+        catch (SshTunnelException exception)
+        {
+            stopwatch.Stop();
+
+            return TunnelTestResult.Failure(
+                TunnelReach.Bastion,
+                exception.Message,
+                stopwatch.Elapsed);
+        }
+
+        if (tunnel is null)
+        {
+            stopwatch.Stop();
+            return TunnelTestResult.NotConfigured();
+        }
+
+        await using (tunnel)
+        {
+            try
+            {
+                using var probe = new System.Net.Sockets.TcpClient();
+
+                // Un plazo propio, y corto: el reenvío ya está abierto, así que
+                // lo único que falta es un salto que o va o no va. Sin esto, un
+                // destino que ni siquiera responde dejaría la prueba colgada el
+                // tiempo que decida el sistema.
+                using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                deadline.CancelAfter(TimeSpan.FromSeconds(TunnelProbeTimeoutSeconds));
+
+                await probe.ConnectAsync(tunnel.Host, tunnel.Port, deadline.Token);
+            }
+            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+            {
+                stopwatch.Stop();
+
+                return TunnelTestResult.Failure(
+                    TunnelReach.Forward,
+                    $"Se entró en {profile.SshTunnel.Host}, pero desde allí no se llegó a "
+                        + $"{profile.Host}:{profile.Port} antes de {TunnelProbeTimeoutSeconds} segundos. "
+                        + "Suele ser el cortafuegos del servidor de la base, o que ese nombre no se "
+                        + "resuelve igual desde el servidor intermedio.",
+                    stopwatch.Elapsed);
+            }
+            catch (Exception exception) when (exception is not OperationCanceledException)
+            {
+                stopwatch.Stop();
+
+                // El mensaje del socket es el del extremo local del reenvío, que
+                // no le dice nada a nadie: lo que hay que nombrar es el destino
+                // que el usuario escribió.
+                return TunnelTestResult.Failure(
+                    TunnelReach.Forward,
+                    $"Se entró en {profile.SshTunnel.Host}, pero desde allí se rechazó la conexión a "
+                        + $"{profile.Host}:{profile.Port}.",
+                    stopwatch.Elapsed);
+            }
+
+            stopwatch.Stop();
+
+            return TunnelTestResult.Success(stopwatch.Elapsed);
+        }
+    }
+
     /// <summary>Prueba unas credenciales sin guardarlas ni dejar sesión abierta.</summary>
     public async Task<TestConnectionResult> TestAsync(
         ConnectionProfile profile,

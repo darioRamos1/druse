@@ -20,6 +20,7 @@ import {
   RoutineSignature,
   TableStructure,
   TestConnectionResult,
+  TestTunnelResult,
 } from '../../shared/models/workspace';
 import { initialColumnWidths } from './column-widths';
 import {
@@ -97,6 +98,10 @@ export class HttpApplicationGateway extends ApplicationGateway {
 
   override testConnection(request: ConnectRequest): Observable<TestConnectionResult> {
     return this._http.post<TestConnectionResult>('/api/connections/test', request);
+  }
+
+  override testTunnel(request: ConnectRequest): Observable<TestTunnelResult> {
+    return this._http.post<TestTunnelResult>('/api/connections/test-tunnel', request);
   }
 
   override listConnectionDatabases(request: ConnectRequest): Observable<readonly string[]> {

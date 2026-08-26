@@ -275,6 +275,24 @@ internal static class DatabaseEndpoints
         })
         .WithName("TestConnection");
 
+        app.MapPost("/api/connections/test-tunnel", async (
+            ConnectRequest request,
+            ConnectionService connections,
+            CancellationToken cancellationToken) =>
+        {
+            var profile = request.Profile.ToDomain();
+            var ssh = new SshCredentials(request.SshSecret, request.SshVerificationCode);
+
+            // Sin credenciales del motor a propósito: aquí no se abre ninguna
+            // conexión de base de datos, así que no hay para qué mandarlas.
+            var result = await connections.TestTunnelAsync(profile, ssh, cancellationToken);
+
+            // Como en «probar», que no se llegue es la respuesta, no un fallo de
+            // la API: el formulario quiere leer hasta dónde se llegó.
+            return Results.Ok(result.ToResponse());
+        })
+        .WithName("TestTunnel");
+
         app.MapPost("/api/connections/databases", async (
             ConnectRequest request,
             ConnectionService connections,

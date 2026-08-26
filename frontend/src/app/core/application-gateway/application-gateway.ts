@@ -18,6 +18,7 @@ import {
   RoutineSignature,
   TableStructure,
   TestConnectionResult,
+  TestTunnelResult,
 } from '../../shared/models/workspace';
 
 /** Estado del proceso local que atiende las peticiones de la aplicación. */
@@ -241,6 +242,14 @@ export abstract class ApplicationGateway {
 
   /** Prueba unas credenciales sin abrir sesión ni guardarlas. */
   abstract testConnection(request: ConnectRequest): Observable<TestConnectionResult>;
+
+  /**
+   * Prueba solo el túnel, sin tocar la base de datos.
+   *
+   * Separa dos fallos que «no se pudo conectar» mezcla: que el servidor
+   * intermedio no deje entrar, y que desde él no se alcance el de la base.
+   */
+  abstract testTunnel(request: ConnectRequest): Observable<TestTunnelResult>;
 
   /**
    * Bases que esas credenciales pueden abrir, antes de abrir ninguna sesión.

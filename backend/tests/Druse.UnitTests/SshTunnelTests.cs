@@ -154,6 +154,118 @@ public sealed class SshTunnelTests
         Assert.True(tunnels.Last!.Disposed);
     }
 
+    /// <summary>
+    /// Probar el túnel a solas: hasta dónde se llegó.
+    ///
+    /// Es lo que «probar conexión» no sabe decir. Allí, que el servidor
+    /// intermedio no te deje entrar y que desde él no se alcance la base salen
+    /// con la misma cara, y se arreglan en sitios distintos.
+    /// </summary>
+    [Fact]
+    public async Task SinServidorIntermedioNoHayNadaQueProbar()
+    {
+        var (service, _, tunnels) = Build();
+
+        var result = await service.TestTunnelAsync(Profile(), default, CancellationToken.None);
+
+        Assert.False(result.Succeeded);
+        Assert.Equal(TunnelReach.NotConfigured, result.Reach);
+        Assert.Equal(0, tunnels.Opened);
+    }
+
+    [Fact]
+    public async Task SiElServidorIntermedioNoDejaEntrarSeDiceAsi()
+    {
+        var (service, _, tunnels) = Build();
+        tunnels.Failure = "Usuario o clave incorrectos en bastion.empresa.com.";
+
+        var result = await service.TestTunnelAsync(
+            Profile(Tunnel()),
+            default,
+            CancellationToken.None);
+
+        Assert.False(result.Succeeded);
+        Assert.Equal(TunnelReach.Bastion, result.Reach);
+        Assert.Equal("Usuario o clave incorrectos en bastion.empresa.com.", result.Error?.Message);
+    }
+
+    /// <summary>
+    /// Se entra en el servidor intermedio pero el destino no responde.
+    ///
+    /// El túnel se abre igual —SSH no comprueba el otro extremo hasta que algo
+    /// pasa por él—, así que sin abrir un socket esto se daría por bueno.
+    /// </summary>
+    [Fact]
+    public async Task SiDesdeAlliNoSeLlegaALaBaseSeDistingueDelOtroFallo()
+    {
+        var (service, _, tunnels) = Build();
+
+        // Un puerto que nadie escucha: el reenvío existe, el destino no.
+        tunnels.LocalPort = PuertoLibre();
+
+        var result = await service.TestTunnelAsync(
+            Profile(Tunnel()),
+            default,
+            CancellationToken.None);
+
+        Assert.False(result.Succeeded);
+        Assert.Equal(TunnelReach.Forward, result.Reach);
+
+        // El mensaje nombra el destino que escribió el usuario, no el puerto
+        // local del reenvío, que no le dice nada a nadie.
+        Assert.Contains("db.interna:5432", result.Error?.Message ?? "", StringComparison.Ordinal);
+        Assert.Contains("bastion.empresa.com", result.Error?.Message ?? "", StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task CuandoElCaminoEnteroFuncionaSeDiceCompleto()
+    {
+        var (service, _, tunnels) = Build();
+
+        // Algo que sí escucha al otro lado del reenvío.
+        using var listener = new System.Net.Sockets.TcpListener(
+            System.Net.IPAddress.Loopback,
+            0);
+
+        listener.Start();
+        tunnels.LocalPort = ((System.Net.IPEndPoint)listener.LocalEndpoint).Port;
+
+        var result = await service.TestTunnelAsync(
+            Profile(Tunnel()),
+            default,
+            CancellationToken.None);
+
+        listener.Stop();
+
+        Assert.True(result.Succeeded);
+        Assert.Equal(TunnelReach.Complete, result.Reach);
+        Assert.Null(result.Error);
+    }
+
+    /// <summary>Probar no deja nada abierto: el túnel se cierra al terminar.</summary>
+    [Fact]
+    public async Task ProbarElTunelNoDejaElTunelAbierto()
+    {
+        var (service, _, tunnels) = Build();
+        tunnels.LocalPort = PuertoLibre();
+
+        await service.TestTunnelAsync(Profile(Tunnel()), default, CancellationToken.None);
+
+        Assert.True(tunnels.Last?.Disposed);
+    }
+
+    /// <summary>Un puerto de bucle local que nadie está usando.</summary>
+    private static int PuertoLibre()
+    {
+        var listener = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, 0);
+
+        listener.Start();
+        var port = ((System.Net.IPEndPoint)listener.LocalEndpoint).Port;
+        listener.Stop();
+
+        return port;
+    }
+
     private sealed class FakeTunnelFactory : ISshTunnelFactory
     {
         public int Opened { get; private set; }
@@ -168,6 +280,9 @@ public sealed class SshTunnelTests
 
         /// <summary>Cuando tiene valor, abrir el túnel falla con ese mensaje.</summary>
         public string? Failure { get; set; }
+
+        /// <summary>Puerto local del túnel que se entrega. Cero deja el de siempre.</summary>
+        public int LocalPort { get; set; }
 
         public Task<ISshTunnel> OpenAsync(
             SshTunnelSettings settings,
@@ -185,7 +300,7 @@ public sealed class SshTunnelTests
             LastRemoteHost = remoteHost;
             LastRemotePort = remotePort;
             LastCredentials = credentials;
-            Last = new FakeTunnel();
+            Last = new FakeTunnel { LocalPortOverride = LocalPort };
 
             return Task.FromResult<ISshTunnel>(Last);
         }
@@ -195,11 +310,19 @@ public sealed class SshTunnelTests
     {
         public const int LocalPort = 54_321;
 
+        /// <summary>
+        /// Puerto al que apunta el extremo local.
+        ///
+        /// Configurable porque probar el túnel **abre un socket de verdad** contra
+        /// él: para el camino feliz hay que apuntarlo a algo que escuche.
+        /// </summary>
+        public int LocalPortOverride { get; init; }
+
         public bool Disposed { get; private set; }
 
         public string Host => "127.0.0.1";
 
-        public int Port => LocalPort;
+        public int Port => LocalPortOverride == 0 ? LocalPort : LocalPortOverride;
 
         public bool IsOpen => !Disposed;
 

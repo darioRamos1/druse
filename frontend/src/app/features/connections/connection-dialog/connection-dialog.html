@@ -447,11 +447,29 @@
     <button
       type="button"
       class="btn"
-      [disabled]="testing() || connecting() || saving()"
+      [disabled]="testing() || testingTunnel() || connecting() || saving()"
       (click)="test()"
     >
       {{ testing() ? 'Probando…' : 'Probar conexión' }}
     </button>
+    <!--
+      Solo cuando hay servidor intermedio: sin él no hay nada que probar, y un
+      botón que siempre contesta lo mismo enseña a no leerlo.
+
+      Va aparte de «Probar conexión» porque responde otra pregunta. Aquella dice
+      si se puede entrar en la base; esta, si se llega hasta ella. Cuando falla
+      la primera, saber cuál de las dos cosas falló es la mitad del arreglo.
+    -->
+    @if (sshEnabled()) {
+      <button
+        type="button"
+        class="btn"
+        [disabled]="testing() || testingTunnel() || connecting() || saving()"
+        (click)="testTunnel()"
+      >
+        {{ testingTunnel() ? 'Probando túnel…' : 'Probar túnel' }}
+      </button>
+    }
     <span class="foot__spacer"></span>
     <button type="button" class="btn" (click)="close()">Cancelar</button>
     @if (editing()) {

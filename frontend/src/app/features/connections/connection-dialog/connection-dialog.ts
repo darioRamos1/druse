@@ -218,6 +218,10 @@ export class ConnectionDialog {
 
   protected readonly testing = signal(false);
 
+  /** Señal propia y no compartida con `testing`: son dos pruebas distintas
+   * y el usuario tiene que ver cuál está corriendo. */
+  protected readonly testingTunnel = signal(false);
+
   /** Bases que estas credenciales pueden abrir. Vacío hasta que se pregunta. */
   protected readonly databases = signal<readonly string[]>([]);
 
@@ -393,6 +397,32 @@ export class ConnectionDialog {
     }
   }
 
+  /**
+   * Prueba el túnel a solas.
+   *
+   * No exige que el formulario entero sea válido, solo lo que hace falta para
+   * llegar al servidor intermedio: quien está peleándose con el salto todavía no
+   * tiene por qué saber el usuario de la base ni qué base quiere abrir.
+   */
+  protected async testTunnel(): Promise<void> {
+    const form = this.tunnelOnlyForm();
+
+    if (!form) {
+      return;
+    }
+
+    this.testingTunnel.set(true);
+    this.feedback.set(null);
+
+    try {
+      const message = await this._store.testTunnel(form);
+      this.feedbackKind.set(message.startsWith('Túnel correcto') ? 'success' : 'error');
+      this.feedback.set(message);
+    } finally {
+      this.testingTunnel.set(false);
+    }
+  }
+
   protected async connect(): Promise<void> {
     const form = this.validForm();
 
@@ -514,6 +544,43 @@ export class ConnectionDialog {
     if (Object.keys(errors).length > 0) {
       this.feedbackKind.set('error');
       this.feedback.set('Revisa los campos marcados antes de continuar.');
+      return null;
+    }
+
+    return this.toForm();
+  }
+
+  /**
+   * El formulario, exigiendo solo lo que hace falta para probar el túnel.
+   *
+   * Quien está peleándose con el salto no tiene por qué haber rellenado el
+   * usuario de la base ni el nombre de la conexión: eso se pide para guardar y
+   * para conectar, no para saber si el servidor intermedio deja pasar. Sí se
+   * exige el destino —servidor y puerto—, porque es lo que se comprueba que se
+   * alcanza desde el otro lado.
+   */
+  private tunnelOnlyForm(): ConnectionForm | null {
+    this.validationVisible.set(true);
+
+    if (!this.sshEnabled()) {
+      this.feedbackKind.set('error');
+      this.feedback.set('Activa el servidor intermedio para poder probarlo.');
+      return null;
+    }
+
+    const errors = this.validationErrors();
+    const relevantes: readonly ConnectionField[] = [
+      'host',
+      'port',
+      'sshHost',
+      'sshPort',
+      'sshUsername',
+      'sshPrivateKeyPath',
+    ];
+
+    if (relevantes.some((campo) => errors[campo])) {
+      this.feedbackKind.set('error');
+      this.feedback.set('Revisa los campos del servidor intermedio y del destino.');
       return null;
     }
 

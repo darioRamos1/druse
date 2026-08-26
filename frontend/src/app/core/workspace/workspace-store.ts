@@ -2001,6 +2001,28 @@ export class WorkspaceStore {
     }
   }
 
+  /**
+   * Prueba el túnel y cuenta **hasta dónde se llegó**.
+   *
+   * Es lo que «probar conexión» no puede decir: allí, un fallo del servidor
+   * intermedio y uno de la base salen con la misma cara. Aquí no se abre ninguna
+   * conexión de base de datos, así que lo que responda es de la red y de la
+   * cuenta SSH, de nadie más.
+   */
+  async testTunnel(form: ConnectionForm): Promise<string> {
+    try {
+      const result = await firstValueFrom(this._gateway.testTunnel(toRequest(form)));
+
+      if (result.succeeded) {
+        return `Túnel correcto: se llegó a ${form.host}:${form.port} a través de ${form.sshTunnel?.host ?? 'el servidor intermedio'} en ${result.durationMs} ms.`;
+      }
+
+      return result.errorMessage ?? 'No se pudo abrir el túnel.';
+    } catch (error) {
+      return describeError(error);
+    }
+  }
+
   // --- Diseño de tablas ------------------------------------------------------
 
   /** Tipos que ofrece el motor de esta conexión, para el desplegable. */

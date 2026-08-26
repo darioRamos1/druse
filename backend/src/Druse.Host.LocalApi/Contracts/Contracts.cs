@@ -86,6 +86,24 @@ public sealed record TestConnectionResponse
     public required long DurationMs { get; init; }
 }
 
+/// <summary>
+/// Lo que se aprendió del túnel, sin haber tocado la base de datos.
+///
+/// `reach` dice **hasta dónde se llegó**, que es lo que decide a quién hay que
+/// pedirle el arreglo: `bastion` es cosa de la cuenta SSH, `forward` de la red
+/// entre el servidor intermedio y la base.
+/// </summary>
+public sealed record TestTunnelResponse
+{
+    public required bool Succeeded { get; init; }
+
+    /// <summary>`notconfigured`, `bastion`, `forward` o `complete`.</summary>
+    public required string Reach { get; init; }
+
+    public string? ErrorMessage { get; init; }
+    public required long DurationMs { get; init; }
+}
+
 public sealed record SessionResponse
 {
     public required Guid SessionId { get; init; }
