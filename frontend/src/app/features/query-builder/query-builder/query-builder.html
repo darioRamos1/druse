@@ -47,54 +47,102 @@
 
   <div class="body">
     @if (operation() === 'select') {
-      <section class="block">
-        <h3 class="block__title">Columnas</h3>
-        <p class="hint">Sin marcar ninguna se escribe <code>*</code>.</p>
+      @if (!grouped()) {
+        <section class="block">
+          <h3 class="block__title">Columnas</h3>
+          <p class="hint">Sin marcar ninguna se escribe <code>*</code>.</p>
 
-        <div class="columns">
-          @for (column of columns(); track column.name) {
-            <label class="column" [class.is-on]="isChosen(column.name)">
-              <input
-                type="checkbox"
-                [checked]="isChosen(column.name)"
-                (change)="toggleColumn(column.name)"
-              />
-              <span class="column__name">{{ column.name }}</span>
-              <span class="column__type">{{ column.dataType }}</span>
-            </label>
-          } @empty {
-            <p class="hint">
-              @if (loading()) {
-                Cargando las columnas…
-              } @else {
-                No se pudieron cargar columnas para este objeto.
-              }
-            </p>
-          }
-        </div>
-      </section>
+          <div class="columns">
+            @for (column of columns(); track column.name) {
+              <label class="column" [class.is-on]="isChosen(column.name)">
+                <input
+                  type="checkbox"
+                  [checked]="isChosen(column.name)"
+                  (change)="toggleColumn(column.name)"
+                />
+                <span class="column__name">{{ column.name }}</span>
+                <span class="column__type">{{ column.dataType }}</span>
+              </label>
+            } @empty {
+              <p class="hint">
+                @if (loading()) {
+                  Cargando las columnas…
+                } @else {
+                  No se pudieron cargar columnas para este objeto.
+                }
+              </p>
+            }
+          </div>
+        </section>
+      }
 
       <section class="block joins-block">
-        <h3 class="block__title">Cruces con otras tablas</h3>
-        <p class="hint">
-          Añade tablas de {{ table().database }} y elige cómo se relacionan con {{ table().name }}.
-        </p>
+        <div class="joins-heading">
+          <div>
+            <h3 class="block__title">Cruces con otras tablas</h3>
+            <p class="hint">
+              Cada cruce incorpora una tabla y la relaciona con cualquiera de las anteriores.
+            </p>
+          </div>
+          <button
+            type="button"
+            class="btn btn--small join-add"
+            [disabled]="availableRelations().length === 0 && availableSchemas().length === 0"
+            (click)="addJoin()"
+          >
+            <span aria-hidden="true">+</span>
+            Añadir JOIN
+          </button>
+        </div>
+
+        @if (simpleForeignKeys().length > 0) {
+          <div class="filter">
+            <span class="hint">Relaciones detectadas:</span>
+            @for (key of simpleForeignKeys(); track key.name) {
+              <button type="button" class="btn btn--small" (click)="addForeignKeyJoin(key)">
+                {{ key.columns[0] }} → {{ key.referencedTable }}
+              </button>
+            }
+          </div>
+        }
+
+        @if (joins().length === 0) {
+          <div class="join-empty">
+            <span class="join-empty__mark" aria-hidden="true">ON</span>
+            <span>
+              <strong>Aún no hay cruces</strong>
+              @if (availableRelations().length > 0 || availableSchemas().length > 0) {
+                <small>Añade una tabla para construir la primera relación.</small>
+              } @else {
+                <small>No hay otros esquemas o tablas visibles en esta base.</small>
+              }
+            </span>
+          </div>
+        }
 
         @for (join of joins(); track join.id; let joinIndex = $index) {
           <article class="join-card">
             <header class="join-card__head">
-              <span class="join-card__alias">t{{ joinIndex + 1 }}</span>
-              <select
-                [value]="join.type"
-                (change)="patchJoin(join.id, { type: $any($event.target).value })"
-                aria-label="Tipo de JOIN"
-              >
-                @for (type of joinTypes(); track type) {
-                  <option [value]="type">{{ type }} JOIN</option>
-                }
-              </select>
+              <span class="join-card__step">
+                <small>JOIN {{ joinIndex + 1 }}</small>
+                <strong>t{{ joinIndex + 1 }}</strong>
+              </span>
+              <label class="join-control">
+                <span>Tipo de cruce</span>
+                <select
+                  [value]="join.type"
+                  (change)="patchJoin(join.id, { type: $any($event.target).value })"
+                  aria-label="Tipo de JOIN"
+                >
+                  @for (type of joinTypes(); track type) {
+                    <option [value]="type">{{ type }} JOIN</option>
+                  }
+                </select>
+              </label>
               <div class="join-search">
+                <label [for]="'join-search-' + join.id">Tabla que se incorpora</label>
                 <input
+                  [id]="'join-search-' + join.id"
                   type="search"
                   [value]="join.search"
                   (input)="searchJoinTable(join.id, $any($event.target).value)"
@@ -151,9 +199,10 @@
               </div>
               <button
                 type="button"
-                class="icon"
+                class="icon join-card__remove"
                 (click)="removeJoin(join.id)"
                 aria-label="Quitar JOIN"
+                title="Quitar este JOIN"
               >
                 ×
               </button>
@@ -161,124 +210,373 @@
 
             @if (join.type !== 'CROSS') {
               <div class="join-condition">
-                <span class="join-condition__label">ON t0.</span>
-                <select
-                  [value]="join.leftColumn"
-                  (change)="patchJoin(join.id, { leftColumn: $any($event.target).value })"
-                  aria-label="Columna de la tabla principal"
-                >
-                  @for (column of columns(); track column.name) {
-                    <option [value]="column.name">{{ column.name }}</option>
-                  }
-                </select>
-                <span>= t{{ joinIndex + 1 }}.</span>
-                <select
-                  [value]="join.rightColumn"
-                  (change)="patchJoin(join.id, { rightColumn: $any($event.target).value })"
-                  aria-label="Columna de la tabla cruzada"
-                >
-                  @for (column of join.columns; track column.name) {
-                    <option [value]="column.name">{{ column.name }}</option>
-                  }
-                </select>
+                <div class="join-condition__title">
+                  <span>ON</span>
+                  <small>Condición de relación</small>
+                </div>
+                <div class="join-expression">
+                  <div class="join-operand">
+                    <span class="join-operand__role">Tabla existente</span>
+                    <label>
+                      <span>Tabla</span>
+                      <select
+                        [value]="join.leftJoinId ?? ''"
+                        (change)="changeJoinSource(join.id, $any($event.target).value)"
+                        aria-label="Tabla izquierda del JOIN"
+                      >
+                        @for (source of joinSources(join); track source.joinId) {
+                          <option [value]="source.joinId ?? ''">
+                            {{ source.alias }} · {{ source.label }}
+                          </option>
+                        }
+                      </select>
+                    </label>
+                    <label>
+                      <span>Columna</span>
+                      <select
+                        [value]="join.leftColumn"
+                        (change)="patchJoin(join.id, { leftColumn: $any($event.target).value })"
+                        aria-label="Columna izquierda del JOIN"
+                      >
+                        @for (column of leftColumns(join); track column.name) {
+                          <option [value]="column.name">{{ column.name }}</option>
+                        }
+                      </select>
+                    </label>
+                  </div>
+                  <span class="join-expression__operator" aria-label="igual a">=</span>
+                  <div class="join-operand join-operand--new">
+                    <span class="join-operand__role">Tabla incorporada</span>
+                    <span class="join-operand__table">
+                      <strong>t{{ joinIndex + 1 }}</strong>
+                      <span>{{ relationLabel(joinRelation(join)) || 'Elige una tabla arriba' }}</span>
+                    </span>
+                    <label>
+                      <span>Columna</span>
+                      <select
+                        [value]="join.rightColumn"
+                        (change)="patchJoin(join.id, { rightColumn: $any($event.target).value })"
+                        aria-label="Columna de la tabla cruzada"
+                      >
+                        @for (column of join.columns; track column.name) {
+                          <option [value]="column.name">{{ column.name }}</option>
+                        }
+                      </select>
+                    </label>
+                  </div>
+                </div>
               </div>
             } @else {
-              <p class="hint join-card__cross">CROSS JOIN combina cada fila con todas las filas de la otra tabla.</p>
+              <div class="join-card__cross">
+                <span>CROSS</span>
+                <p>
+                  <strong>Sin condición ON</strong>
+                  <small>Combina cada fila con todas las filas de la tabla incorporada.</small>
+                </p>
+              </div>
             }
 
-            <div class="join-columns">
-              <span class="join-columns__label">Devolver columnas:</span>
-              @for (column of join.columns; track column.name) {
-                <label [class.is-on]="join.chosen.includes(column.name)">
-                  <input
-                    type="checkbox"
-                    [checked]="join.chosen.includes(column.name)"
-                    (change)="toggleJoinColumn(join.id, column.name)"
-                  />
-                  {{ column.name }}
-                </label>
-              } @empty {
-                <span class="hint">{{ join.loading ? 'Cargando columnas…' : 'Sin columnas visibles' }}</span>
-              }
-            </div>
+            @if (!grouped()) {
+              <div class="join-columns">
+                <span class="join-columns__head">
+                  <strong>Columnas de t{{ joinIndex + 1 }}</strong>
+                  <small>Márcalas para incluirlas en el SELECT.</small>
+                </span>
+                <div class="join-columns__options">
+                  @for (column of join.columns; track column.name) {
+                    <label [class.is-on]="join.chosen.includes(column.name)">
+                      <input
+                        type="checkbox"
+                        [checked]="join.chosen.includes(column.name)"
+                        (change)="toggleJoinColumn(join.id, column.name)"
+                      />
+                      {{ column.name }}
+                    </label>
+                  } @empty {
+                    <span class="hint">{{ join.loading ? 'Cargando columnas…' : 'Sin columnas visibles' }}</span>
+                  }
+                </div>
+              </div>
+            }
           </article>
-        }
-
-        <button
-          type="button"
-          class="btn btn--small"
-          [disabled]="availableRelations().length === 0 && availableSchemas().length === 0"
-          (click)="addJoin()"
-        >
-          Añadir JOIN
-        </button>
-        @if (availableRelations().length === 0 && availableSchemas().length === 0) {
-          <span class="hint join-empty">No hay otros esquemas o tablas visibles en esta base.</span>
         }
       </section>
 
-      <section class="block">
-        <h3 class="block__title">Filtros</h3>
+      <section class="block grouping" [class.is-on]="grouped()">
+        <div class="joins-heading">
+          <div>
+            <h3 class="block__title">Agrupar resultados</h3>
+            <p class="hint">
+              Resume las filas por una o más columnas y calcula totales por cada grupo.
+            </p>
+          </div>
+          <label class="check">
+            <input type="checkbox" [checked]="grouped()" (change)="toggleGrouping()" />
+            <span>{{ grouped() ? 'Activado' : 'Activar GROUP BY' }}</span>
+          </label>
+        </div>
 
-        @for (filter of filters(); track $index) {
-          <div class="filter">
-            <select
-              [value]="filter.column"
-              (change)="patchFilter($index, { column: $any($event.target).value })"
-              aria-label="Columna"
-            >
-              @for (column of columns(); track column.name) {
-                <option [value]="column.name">{{ column.name }}</option>
+        @if (grouped()) {
+          <div class="block">
+            <span class="block__title">Columnas de agrupación</span>
+            <p class="hint">Estas columnas aparecerán tanto en SELECT como en GROUP BY.</p>
+            <div class="columns">
+              @for (option of queryColumns(); track option.key) {
+                <label class="column" [class.is-on]="isGrouped(option.key)">
+                  <input
+                    type="checkbox"
+                    [checked]="isGrouped(option.key)"
+                    (change)="toggleGroupColumn(option.key)"
+                  />
+                  <span class="column__name">{{ option.label }}</span>
+                  <small class="column__type">{{ option.column.dataType }}</small>
+                  @if (isGrouped(option.key) && canGroupByDate(option)) {
+                    <select
+                      [value]="groupPeriods()[option.key] ?? 'none'"
+                      (click)="$event.stopPropagation()"
+                      (change)="setGroupPeriod(option.key, $any($event.target).value)"
+                      [attr.aria-label]="'Período para ' + option.label"
+                    >
+                      @for (period of datePeriods; track period.value) {
+                        <option [value]="period.value">{{ period.label }}</option>
+                      }
+                    </select>
+                  }
+                </label>
               }
-            </select>
+            </div>
+          </div>
 
-            <select
-              [value]="filter.operator"
-              (change)="patchFilter($index, { operator: $any($event.target).value })"
-              aria-label="Operador"
-            >
-              @for (operator of operators; track operator) {
-                <option [value]="operator">{{ operator }}</option>
+          <div class="block">
+            <div class="joins-heading">
+              <div>
+                <span class="block__title">Cálculos agregados</span>
+                <p class="hint">COUNT, SUM, AVG, MIN y MAX funcionan en todos los motores.</p>
+              </div>
+              <button type="button" class="btn btn--small" (click)="addAggregate()">
+                Añadir cálculo
+              </button>
+            </div>
+
+            @for (aggregate of aggregates(); track aggregate.id) {
+              <div class="filter">
+                <select
+                  [value]="aggregate.function"
+                  (change)="changeAggregateFunction(aggregate.id, $any($event.target).value)"
+                  aria-label="Función agregada"
+                >
+                  @for (function of aggregateFunctions; track function) {
+                    <option [value]="function">{{ function }}</option>
+                  }
+                </select>
+                <span>(</span>
+                <select
+                  [value]="aggregate.columnKey"
+                  (change)="patchAggregate(aggregate.id, { columnKey: $any($event.target).value })"
+                  aria-label="Columna agregada"
+                >
+                  @if (aggregate.function === 'COUNT') {
+                    <option value="*">* · todas las filas</option>
+                  }
+                  @for (option of queryColumns(); track option.key) {
+                    <option [value]="option.key">{{ option.label }}</option>
+                  }
+                </select>
+                <span>)</span>
+                <label class="check">
+                  <input
+                    type="checkbox"
+                    [checked]="aggregate.distinct"
+                    [disabled]="aggregate.columnKey === '*'"
+                    (change)="patchAggregate(aggregate.id, { distinct: !aggregate.distinct })"
+                  />
+                  DISTINCT
+                </label>
+                <label class="field">
+                  <span>Alias</span>
+                  <input
+                    type="text"
+                    [value]="aggregate.alias"
+                    (input)="patchAggregate(aggregate.id, { alias: $any($event.target).value })"
+                    placeholder="cantidad"
+                    aria-label="Alias del cálculo"
+                  />
+                </label>
+                <button
+                  type="button"
+                  class="icon"
+                  (click)="removeAggregate(aggregate.id)"
+                  aria-label="Quitar cálculo"
+                >
+                  ×
+                </button>
+              </div>
+            }
+          </div>
+        }
+      </section>
+
+      @if (grouped()) {
+        <section class="block">
+          <h3 class="block__title">Condiciones HAVING</h3>
+          <p class="hint">Se aplican después de calcular cada grupo.</p>
+
+          @for (filter of having(); track filter.id; let filterIndex = $index) {
+            <div class="filter">
+              @if (filterIndex > 0) {
+                <select
+                  [value]="filter.conjunction"
+                  (change)="patchHaving(filter.id, { conjunction: $any($event.target).value })"
+                  aria-label="Unión HAVING"
+                >
+                  <option value="AND">AND</option>
+                  <option value="OR">OR</option>
+                </select>
               }
-            </select>
-
-            @if (needsValue(filter.operator)) {
+              <select
+                [value]="filter.aggregateId"
+                (change)="patchHaving(filter.id, { aggregateId: +$any($event.target).value })"
+                aria-label="Cálculo para HAVING"
+              >
+                @for (aggregate of aggregates(); track aggregate.id) {
+                  <option [value]="aggregate.id">{{ aggregateLabel(aggregate) }}</option>
+                }
+              </select>
+              <select
+                [value]="filter.operator"
+                (change)="patchHaving(filter.id, { operator: $any($event.target).value })"
+                aria-label="Operador HAVING"
+              >
+                @for (operator of havingOperators; track operator) {
+                  <option [value]="operator">{{ operator }}</option>
+                }
+              </select>
               <app-value-input
                 [value]="filter.value ?? ''"
-                [kind]="filterKind(filter)"
-                [dataType]="filter.operator === 'IN' ? '1, 2, 3' : 'valor'"
-                label="Valor"
-                (valueChange)="patchFilter($index, { value: $event })"
+                [kind]="havingKind(filter)"
+                dataType="valor de HAVING"
+                label="Valor HAVING"
+                (valueChange)="patchHaving(filter.id, { value: $event })"
               />
-            } @else {
-              <span class="filter__novalue">sin valor</span>
-            }
+              <button
+                type="button"
+                class="icon"
+                (click)="removeHaving(filter.id)"
+                aria-label="Quitar condición HAVING"
+              >
+                ×
+              </button>
+            </div>
+          }
 
-            <button type="button" class="icon" (click)="removeFilter($index)" aria-label="Quitar filtro">
-              ×
-            </button>
+          <button
+            type="button"
+            class="btn btn--small"
+            [disabled]="aggregates().length === 0"
+            (click)="addHaving()"
+          >
+            Añadir condición HAVING
+          </button>
+        </section>
+      }
+        <section class="block">
+          <h3 class="block__title">{{ grouped() ? 'Filtros WHERE' : 'Filtros' }}</h3>
+          @if (grouped()) {
+            <p class="hint">Filtran las filas antes de calcular los grupos.</p>
+          }
+
+          @for (filter of filters(); track $index; let filterIndex = $index) {
+            <div class="filter">
+              @if (filterIndex > 0) {
+                <select
+                  [value]="filter.conjunction ?? 'AND'"
+                  (change)="patchFilter($index, { conjunction: $any($event.target).value })"
+                  aria-label="Unión del filtro"
+                >
+                  <option value="AND">AND</option>
+                  <option value="OR">OR</option>
+                </select>
+              }
+              <select
+                [value]="filter.column"
+                (change)="patchFilter($index, { column: $any($event.target).value })"
+                aria-label="Columna"
+              >
+                @for (column of columns(); track column.name) {
+                  <option [value]="column.name">{{ column.name }}</option>
+                }
+              </select>
+
+              <select
+                [value]="filter.operator"
+                (change)="patchFilter($index, { operator: $any($event.target).value })"
+                aria-label="Operador"
+              >
+                @for (operator of operators; track operator) {
+                  <option [value]="operator">{{ operator }}</option>
+                }
+              </select>
+
+              @if (needsValue(filter.operator)) {
+                <app-value-input
+                  [value]="filter.value ?? ''"
+                  [kind]="filterKind(filter)"
+                  [dataType]="filter.operator === 'IN' ? '1, 2, 3' : 'valor'"
+                  label="Valor"
+                  (valueChange)="patchFilter($index, { value: $event })"
+                />
+              } @else {
+                <span class="filter__novalue">sin valor</span>
+              }
+
+              <button
+                type="button"
+                class="icon"
+                (click)="removeFilter($index)"
+                aria-label="Quitar filtro"
+              >
+                ×
+              </button>
+            </div>
+          }
+
+          <button type="button" class="btn btn--small" (click)="addFilter()">
+            Añadir filtro
+          </button>
+        </section>
+
+      <section class="block">
+        <div class="joins-heading">
+          <h3 class="block__title">Ordenamiento</h3>
+          <button type="button" class="btn btn--small" (click)="addOrder()">Añadir orden</button>
+        </div>
+        @for (order of orders(); track order.id) {
+          <div class="filter">
+            <select
+              [value]="order.target"
+              (change)="patchOrder(order.id, { target: $any($event.target).value })"
+              aria-label="Ordenar por"
+            >
+              <option value="">(sin orden)</option>
+              @for (option of orderOptions(); track option.value) {
+                <option [value]="option.value">{{ option.label }}</option>
+              }
+            </select>
+            <label class="check">
+              <input
+                type="checkbox"
+                [checked]="order.descending"
+                (change)="patchOrder(order.id, { descending: !order.descending })"
+              />
+              Descendente
+            </label>
+            @if (orders().length > 1) {
+              <button type="button" class="icon" (click)="removeOrder(order.id)" aria-label="Quitar orden">×</button>
+            }
           </div>
         }
 
-        <button type="button" class="btn btn--small" (click)="addFilter()">Añadir filtro</button>
-      </section>
-
-      <section class="block block--row">
-        <label class="field">
-          <span class="field__label">Ordenar por</span>
-          <select [value]="orderBy()" (change)="orderBy.set($any($event.target).value)">
-            <option value="">(sin orden)</option>
-            @for (column of columns(); track column.name) {
-              <option [value]="column.name">{{ column.name }}</option>
-            }
-          </select>
-        </label>
-
-        <label class="check">
-          <input type="checkbox" [checked]="descending()" (change)="descending.set(!descending())" />
-          Descendente
-        </label>
-
+        <div class="block--row">
         <label class="field">
           <span class="field__label">Máximo de filas</span>
           <input
@@ -290,6 +588,7 @@
             placeholder="sin límite"
           />
         </label>
+        </div>
       </section>
     } @else if (operation() === 'insert') {
       <section class="block">
@@ -462,7 +761,7 @@
             <button
               type="button"
               class="btn btn--small"
-              [disabled]="counting()"
+              [disabled]="counting() || sqlOverride() !== null"
               (click)="countAffected()"
             >
               {{ counting() ? 'Contando…' : 'Contar filas afectadas' }}
@@ -473,7 +772,61 @@
                 Se borrarían <span class="mono">{{ affected() }}</span>
                 {{ affected() === 1 ? 'fila' : 'filas' }}
               </span>
+            } @else if (sqlOverride() !== null) {
+              <span class="hint">Restablece el SQL para contar con los filtros del formulario.</span>
             }
+          </div>
+        }
+      </section>
+    }
+
+    @if (operation() === 'select' && validationMessages().length > 0) {
+      <section class="block" role="alert">
+        <h3 class="block__title">Revisa la composición</h3>
+        @for (message of validationMessages(); track message) {
+          <p class="hint hint--warning">{{ message }}</p>
+        }
+      </section>
+    }
+
+    @if (operation() === 'select') {
+      <section class="block">
+        <div class="joins-heading">
+          <div>
+            <h3 class="block__title">Composiciones guardadas</h3>
+            <p class="hint">Se guardan para esta conexión y tabla.</p>
+          </div>
+          <div class="filter">
+            <input
+              type="text"
+              [value]="compositionName()"
+              (input)="compositionName.set($any($event.target).value)"
+              placeholder="Nombre de la composición"
+              aria-label="Nombre de la composición"
+            />
+            <button
+              type="button"
+              class="btn btn--small"
+              [disabled]="!compositionName().trim()"
+              (click)="saveComposition()"
+            >
+              Guardar
+            </button>
+          </div>
+        </div>
+        @for (saved of savedCompositions(); track saved.id) {
+          <div class="filter">
+            <button type="button" class="btn btn--small" (click)="loadComposition(saved)">
+              {{ saved.name }}
+            </button>
+            <button
+              type="button"
+              class="icon"
+              (click)="removeComposition(saved.id)"
+              [attr.aria-label]="'Eliminar ' + saved.name"
+            >
+              ×
+            </button>
           </div>
         }
       </section>
@@ -493,6 +846,37 @@
         aria-label="SQL generado"
         spellcheck="false"
       ></textarea>
+
+      @if (operation() === 'select') {
+        <div class="filter">
+          <button
+            type="button"
+            class="btn btn--small"
+            [disabled]="previewRunning() || validationMessages().length > 0"
+            (click)="runPreview()"
+          >
+            {{ previewRunning() ? 'Ejecutando vista previa…' : 'Probar con 10 filas' }}
+          </button>
+          @if (previewRunning()) {
+            <button
+              type="button"
+              class="btn btn--small"
+              [disabled]="previewCanceling()"
+              (click)="cancelQueryPreview()"
+            >
+              {{ previewCanceling() ? 'Cancelando…' : 'Cancelar prueba' }}
+            </button>
+          }
+        </div>
+
+        @if (previewSet(); as set) {
+          <app-results-grid [resultSet]="set" [compact]="true" />
+        } @else if (previewResult()?.error; as error) {
+          <p class="hint hint--warning">{{ error.message }} {{ error.code ?? '' }}</p>
+        } @else if (previewResult()?.state === 'canceled') {
+          <p class="hint">La vista previa fue cancelada.</p>
+        }
+      }
     </section>
   </div>
 
@@ -517,7 +901,12 @@
     <span class="spacer"></span>
 
     <button type="button" class="btn" (click)="close()">Cancelar</button>
-    <button type="button" class="btn btn--primary" (click)="insertSql()">
+    <button
+      type="button"
+      class="btn btn--primary"
+      [disabled]="operation() === 'select' && validationMessages().length > 0"
+      (click)="insertSql()"
+    >
       Insertar {{ operation().toUpperCase() }} en el editor
     </button>
   </footer>

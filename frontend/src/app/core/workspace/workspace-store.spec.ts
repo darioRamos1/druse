@@ -140,6 +140,7 @@ function closedTransaction(overrides: Partial<TransactionState> = {}): Transacti
 
 class FakeGateway implements Partial<ApplicationGateway> {
   executeCalls: ExecuteQueryRequest[] = [];
+  cancelCalls: string[] = [];
   exportCalls: ExportRequest[] = [];
   closedSessions: string[] = [];
   saveCalls: SaveConnectionRequest[] = [];
@@ -489,7 +490,8 @@ class FakeGateway implements Partial<ApplicationGateway> {
     return this.executeResult;
   }
 
-  cancelQuery(): Observable<void> {
+  cancelQuery(executionId: string): Observable<void> {
+    this.cancelCalls.push(executionId);
     return of(undefined);
   }
 }
@@ -1187,6 +1189,55 @@ describe('WorkspaceStore', () => {
       expect(gateway.executeCalls[0].sql).toBe('SELECT 1');
       expect(gateway.executeCalls[0].sessionId).toBe('sesion-1');
       expect(store.resultSet()?.rows.length).toBe(1);
+    });
+
+    it('la vista previa limita filas sin reemplazar el resultado principal', async () => {
+      await store.connect(form);
+
+      const result = await store.previewQuery(
+        store.connections()[0].id,
+        'druse_test',
+        'SELECT 1',
+        'preview-1',
+      );
+
+      expect(result?.state).toBe('succeeded');
+      expect(gateway.executeCalls.at(-1)).toMatchObject({
+        executionId: 'preview-1',
+        sql: 'SELECT 1',
+        database: 'druse_test',
+        maxRows: 10,
+      });
+      expect(store.result()).toBeNull();
+
+      await store.cancelExecution('preview-1');
+      expect(gateway.cancelCalls).toContain('preview-1');
+    });
+
+    it('cancela por el identificador de la ejecución y evita solicitudes duplicadas', async () => {
+      await store.connect(form);
+      store.updateSql('SELECT pg_sleep(30)');
+
+      let finish!: (result: QueryResult) => void;
+      gateway.executeResult = new Observable<QueryResult>((subscriber) => {
+        finish = (result) => subscriber.next(result);
+      });
+
+      const execution = store.execute();
+      await store.cancel();
+
+      expect(store.running()).toBe(true);
+      expect(store.canceling()).toBe(true);
+      expect(gateway.cancelCalls).toEqual([gateway.executeCalls[0].executionId]);
+
+      await store.cancel();
+      expect(gateway.cancelCalls).toHaveLength(1);
+
+      finish(successfulQuery({ state: 'canceled', resultSets: [] }));
+      await execution;
+
+      expect(store.running()).toBe(false);
+      expect(store.canceling()).toBe(false);
     });
 
     it('ejecuta solo la selección sin tocar la pestaña', async () => {

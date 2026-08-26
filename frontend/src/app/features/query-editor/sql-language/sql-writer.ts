@@ -6,7 +6,11 @@ export interface QueryFilter {
   readonly operator: FilterOperator;
   /** `null` significa que todavía no se rellenó; `''` es texto vacío. */
   readonly value: string | null;
+  /** Cómo se enlaza con la condición anterior. La primera ignora este valor. */
+  readonly conjunction?: LogicalOperator;
 }
+
+export type LogicalOperator = 'AND' | 'OR';
 
 export type FilterOperator =
   '=' | '<>' | '>' | '>=' | '<' | '<=' | 'LIKE' | 'IN' | 'IS NULL' | 'IS NOT NULL';
@@ -18,18 +22,54 @@ export interface SelectSpec {
   /** Columnas elegidas. Vacío significa `*`. */
   readonly columns: readonly (string | SelectColumn)[];
   readonly filters: readonly QueryFilter[];
-  readonly orderBy?: string;
+  readonly orderBy?: string | SelectColumn;
   readonly descending?: boolean;
   /** `null` para no limitar. */
   readonly limit: number | null;
   /** Alias de la tabla principal cuando existen cruces. */
   readonly alias?: string;
   readonly joins?: readonly QueryJoin[];
+  readonly groupBy?: readonly (string | SelectColumn)[];
+  readonly aggregates?: readonly SelectAggregate[];
+  readonly having?: readonly AggregateFilter[];
+  readonly dateGroups?: readonly DateGroup[];
+  readonly orders?: readonly SelectOrder[];
 }
 
 export interface SelectColumn {
   readonly alias: string;
   readonly column: string;
+}
+
+export type AggregateFunction = 'COUNT' | 'SUM' | 'AVG' | 'MIN' | 'MAX';
+
+/** Expresión agregada que se muestra en el SELECT y se puede usar en HAVING. */
+export interface SelectAggregate {
+  readonly function: AggregateFunction;
+  readonly column: '*' | string | SelectColumn;
+  readonly alias?: string;
+  readonly distinct?: boolean;
+}
+
+/** Condición aplicada después de agrupar; repite la expresión para ser portable. */
+export interface AggregateFilter {
+  readonly aggregate: SelectAggregate;
+  readonly operator: FilterOperator;
+  readonly value: string | null;
+  readonly conjunction?: LogicalOperator;
+}
+
+export type DatePeriod = 'day' | 'month' | 'quarter' | 'year';
+
+export interface DateGroup {
+  readonly column: string | SelectColumn;
+  readonly period: DatePeriod;
+  readonly alias?: string;
+}
+
+export interface SelectOrder {
+  readonly expression: string | SelectColumn | SelectAggregate | DateGroup;
+  readonly descending?: boolean;
 }
 
 export type JoinType = 'INNER' | 'LEFT' | 'RIGHT' | 'FULL OUTER' | 'CROSS';
@@ -118,21 +158,108 @@ function condition(engine: DatabaseEngine, filter: QueryFilter, alias?: string):
     ? `${quote(engine, alias)}.${quote(engine, filter.column)}`
     : quote(engine, filter.column);
 
+  return comparison(column, filter);
+}
+
+function comparison(expression: string, filter: Pick<QueryFilter, 'operator' | 'value'>): string {
   switch (filter.operator) {
     case 'IS NULL':
     case 'IS NOT NULL':
-      return `${column} ${filter.operator}`;
+      return `${expression} ${filter.operator}`;
 
     case 'IN':
       // Se acepta la lista tal y como se escribe: `1, 2, 3` o `'a', 'b'`.
-      return `${column} IN (${filter.value ?? '/* valores obligatorios */'})`;
+      return `${expression} IN (${filter.value ?? '/* valores obligatorios */'})`;
 
     case 'LIKE':
-      return `${column} LIKE ${filter.value === null ? '/* valor obligatorio */' : literal(filter.value)}`;
+      return `${expression} LIKE ${filter.value === null ? '/* valor obligatorio */' : literal(filter.value)}`;
 
     default:
-      return `${column} ${filter.operator} ${filter.value === null ? '/* valor obligatorio */' : literal(filter.value)}`;
+      return `${expression} ${filter.operator} ${filter.value === null ? '/* valor obligatorio */' : literal(filter.value)}`;
   }
+}
+
+function columnReference(
+  engine: DatabaseEngine,
+  column: string | SelectColumn,
+  defaultAlias?: string,
+): string {
+  if (typeof column !== 'string') {
+    return `${quote(engine, column.alias)}.${quote(engine, column.column)}`;
+  }
+
+  return defaultAlias
+    ? `${quote(engine, defaultAlias)}.${quote(engine, column)}`
+    : quote(engine, column);
+}
+
+function aggregateExpression(
+  engine: DatabaseEngine,
+  aggregate: SelectAggregate,
+  defaultAlias?: string,
+): string {
+  const argument =
+    aggregate.column === '*' ? '*' : columnReference(engine, aggregate.column, defaultAlias);
+
+  return `${aggregate.function}(${aggregate.distinct ? 'DISTINCT ' : ''}${argument})`;
+}
+
+function dateGroupExpression(
+  engine: DatabaseEngine,
+  group: DateGroup,
+  defaultAlias?: string,
+): string {
+  const column = columnReference(engine, group.column, defaultAlias);
+
+  switch (engine) {
+    case 'postgresql':
+      return `DATE_TRUNC('${group.period}', ${column})`;
+    case 'mysql':
+      switch (group.period) {
+        case 'day':
+          return `DATE(${column})`;
+        case 'month':
+          return `DATE_ADD(MAKEDATE(YEAR(${column}), 1), INTERVAL (MONTH(${column}) - 1) MONTH)`;
+        case 'quarter':
+          return `DATE_ADD(MAKEDATE(YEAR(${column}), 1), INTERVAL ((QUARTER(${column}) - 1) * 3) MONTH)`;
+        case 'year':
+          return `MAKEDATE(YEAR(${column}), 1)`;
+      }
+    case 'sqlserver':
+      switch (group.period) {
+        case 'day':
+          return `CONVERT(date, ${column})`;
+        case 'month':
+          return `DATEFROMPARTS(YEAR(${column}), MONTH(${column}), 1)`;
+        case 'quarter':
+          return `DATEFROMPARTS(YEAR(${column}), ((DATEPART(quarter, ${column}) - 1) * 3) + 1, 1)`;
+        case 'year':
+          return `DATEFROMPARTS(YEAR(${column}), 1, 1)`;
+      }
+    default:
+      switch (group.period) {
+        case 'day':
+          return `DATE(${column})`;
+        case 'month':
+          return `MDY(MONTH(${column}), 1, YEAR(${column}))`;
+        case 'quarter':
+          return `MDY(((QUARTER(${column}) - 1) * 3) + 1, 1, YEAR(${column}))`;
+        case 'year':
+          return `MDY(1, 1, YEAR(${column}))`;
+      }
+  }
+}
+
+function conditions<T extends Pick<QueryFilter, 'operator' | 'value' | 'conjunction'>>(
+  filters: readonly T[],
+  expression: (filter: T) => string,
+): string {
+  return filters
+    .map((filter, index) => {
+      const prefix = index === 0 ? '' : `${filter.conjunction ?? 'AND'} `;
+      return `${prefix}${comparison(expression(filter), filter)}`;
+    })
+    .join('\n  ');
 }
 
 /**
@@ -196,18 +323,21 @@ function leadingLimit(engine: DatabaseEngine, limit: number): string {
 
 export function buildSelect(engine: DatabaseEngine, spec: SelectSpec): string {
   const alias = spec.alias ?? ((spec.joins?.length ?? 0) > 0 ? 't0' : undefined);
-  const selectColumn = (column: string | SelectColumn) =>
-    typeof column === 'string'
-      ? alias
-        ? `${quote(engine, alias)}.${quote(engine, column)}`
-        : quote(engine, column)
-      : `${quote(engine, column.alias)}.${quote(engine, column.column)}`;
+  const selected = spec.columns.map((column) => columnReference(engine, column, alias));
+  selected.push(
+    ...(spec.dateGroups ?? []).map((group) => {
+      const expression = dateGroupExpression(engine, group, alias);
+      return group.alias ? `${expression} AS ${quote(engine, group.alias)}` : expression;
+    }),
+  );
+  selected.push(
+    ...(spec.aggregates ?? []).map((aggregate) => {
+      const expression = aggregateExpression(engine, aggregate, alias);
+      return aggregate.alias ? `${expression} AS ${quote(engine, aggregate.alias)}` : expression;
+    }),
+  );
   const columnas =
-    spec.columns.length > 0
-      ? spec.columns.map(selectColumn).join(', ')
-      : alias
-        ? `${quote(engine, alias)}.*`
-        : '*';
+    selected.length > 0 ? selected.join(', ') : alias ? `${quote(engine, alias)}.*` : '*';
 
   const top = spec.limit ? leadingLimit(engine, spec.limit) : '';
 
@@ -229,16 +359,48 @@ export function buildSelect(engine: DatabaseEngine, spec: SelectSpec): string {
   }
 
   if (spec.filters.length > 0) {
-    const condiciones = spec.filters.map((filter) => condition(engine, filter, alias));
-
-    lineas.push(`WHERE ${condiciones.join('\n  AND ')}`);
+    lineas.push(
+      `WHERE ${conditions(spec.filters, (filter) =>
+        alias
+          ? `${quote(engine, alias)}.${quote(engine, filter.column)}`
+          : quote(engine, filter.column),
+      )}`,
+    );
   }
 
-  if (spec.orderBy) {
-    const order = alias
-      ? `${quote(engine, alias)}.${quote(engine, spec.orderBy)}`
-      : quote(engine, spec.orderBy);
-    lineas.push(`ORDER BY ${order}${spec.descending ? ' DESC' : ''}`);
+  const groups = [
+    ...(spec.groupBy ?? []).map((column) => columnReference(engine, column, alias)),
+    ...(spec.dateGroups ?? []).map((group) => dateGroupExpression(engine, group, alias)),
+  ];
+  if (groups.length > 0) {
+    lineas.push(`GROUP BY ${groups.join(', ')}`);
+  }
+
+  if (spec.having && spec.having.length > 0) {
+    lineas.push(
+      `HAVING ${conditions(spec.having, (filter) =>
+        aggregateExpression(engine, filter.aggregate, alias),
+      )}`,
+    );
+  }
+
+  const orders =
+    spec.orders ??
+    (spec.orderBy ? [{ expression: spec.orderBy, descending: spec.descending }] : []);
+  if (orders.length > 0) {
+    const orderExpression = (order: SelectOrder) => {
+      const expression = order.expression;
+      const value =
+        typeof expression === 'string'
+          ? columnReference(engine, expression, alias)
+          : 'function' in expression
+            ? aggregateExpression(engine, expression, alias)
+            : 'period' in expression
+              ? dateGroupExpression(engine, expression, alias)
+              : columnReference(engine, expression, alias);
+      return `${value}${order.descending ? ' DESC' : ''}`;
+    };
+    lineas.push(`ORDER BY ${orders.map(orderExpression).join(', ')}`);
   }
 
   // Solo los motores que no lo pusieron ya delante llevan `LIMIT` al final.

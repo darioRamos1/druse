@@ -163,6 +163,10 @@ export class WorkspaceStore {
   private readonly _running = signal(false);
   readonly running = this._running.asReadonly();
 
+  /** Ya se pidió detener la ejecución y se espera la confirmación del motor. */
+  private readonly _canceling = signal(false);
+  readonly canceling = this._canceling.asReadonly();
+
   private readonly _currentExecutionId = signal<string | null>(null);
 
   /** Rechazo ligado a la operación exacta que el servidor no ejecutó. */
@@ -1412,6 +1416,45 @@ export class WorkspaceStore {
     } catch (error) {
       this.reportFailure(connectionId, error);
       return null;
+    }
+  }
+
+  /** Ejecuta hasta diez filas sin reemplazar el resultado principal del editor. */
+  async previewQuery(
+    connectionId: string,
+    database: string | undefined,
+    sql: string,
+    executionId: string,
+  ): Promise<QueryResult | null> {
+    const sessionId = this.findConnection(connectionId)?.sessionId;
+
+    if (!sessionId) {
+      return null;
+    }
+
+    try {
+      return await firstValueFrom(
+        this._gateway.executeQuery({
+          sessionId,
+          executionId,
+          sql,
+          database,
+          maxRows: 10,
+          timeoutSeconds: this._timeoutSeconds(),
+        }),
+      );
+    } catch (error) {
+      this.reportFailure(connectionId, error);
+      return null;
+    }
+  }
+
+  /** Cancela una ejecución auxiliar, como la vista previa del compositor. */
+  async cancelExecution(executionId: string): Promise<void> {
+    try {
+      await firstValueFrom(this._gateway.cancelQuery(executionId));
+    } catch {
+      // Puede haber terminado entre la pulsación y esta solicitud.
     }
   }
 
@@ -2757,6 +2800,7 @@ export class WorkspaceStore {
     }
 
     this._running.set(true);
+    this._canceling.set(false);
     this._pendingRejection.set(null);
     this._notice.set(null);
 
@@ -2840,6 +2884,7 @@ export class WorkspaceStore {
       return null;
     } finally {
       this._running.set(false);
+      this._canceling.set(false);
       this._currentExecutionId.set(null);
     }
   }
@@ -2875,14 +2920,17 @@ export class WorkspaceStore {
   async cancel(): Promise<void> {
     const executionId = this._currentExecutionId();
 
-    if (!executionId) {
+    if (!executionId || this._canceling()) {
       return;
     }
+
+    this._canceling.set(true);
 
     try {
       await firstValueFrom(this._gateway.cancelQuery(executionId));
     } catch {
       // Si ya había terminado, no hay nada que cancelar.
+      this._canceling.set(false);
     }
   }
 

@@ -123,6 +123,123 @@ describe('escribir SQL', () => {
       expect(sql).toContain('ORDER BY `nombre` DESC');
     });
 
+    it('agrupa y aplica HAVING con sintaxis portable en todos los motores', () => {
+      const cases = [
+        { engine: 'postgresql', category: '"categoria"', amount: '"importe"', alias: '"total"' },
+        { engine: 'mysql', category: '`categoria`', amount: '`importe`', alias: '`total`' },
+        { engine: 'sqlserver', category: '[categoria]', amount: '[importe]', alias: '[total]' },
+        { engine: 'informix', category: '"categoria"', amount: '"importe"', alias: '"total"' },
+      ] as const;
+
+      for (const item of cases) {
+        const total = { function: 'SUM' as const, column: 'importe', alias: 'total' };
+        const sql = buildSelect(item.engine, {
+          ...base,
+          columns: ['categoria'],
+          aggregates: [total, { function: 'COUNT', column: '*', alias: 'cantidad' }],
+          groupBy: ['categoria'],
+          having: [{ aggregate: total, operator: '>', value: '100' }],
+        });
+
+        expect(sql).toContain(
+          `SELECT ${item.category}, SUM(${item.amount}) AS ${item.alias}, COUNT(*) AS`,
+        );
+        expect(sql).toContain(`GROUP BY ${item.category}`);
+        // Se repite la expresión y no el alias: PostgreSQL y SQL Server no
+        // aceptan de forma portable el alias del SELECT dentro de HAVING.
+        expect(sql).toContain(`HAVING SUM(${item.amount}) > 100`);
+        expect(sql).not.toContain(`HAVING ${item.alias}`);
+      }
+    });
+
+    it('GROUP BY y HAVING respetan alias de JOIN y el orden de las cláusulas', () => {
+      const total = {
+        function: 'COUNT' as const,
+        column: { alias: 't1', column: 'id' },
+        alias: 'clientes',
+      };
+      const sql = buildSelect('sqlserver', {
+        ...base,
+        limit: 25,
+        alias: 't0',
+        columns: [{ alias: 't0', column: 'categoria' }],
+        groupBy: [{ alias: 't0', column: 'categoria' }],
+        aggregates: [total],
+        having: [{ aggregate: total, operator: '>=', value: '2' }],
+        orderBy: { alias: 't0', column: 'categoria' },
+      });
+
+      expect(sql).toContain('SELECT TOP 25 [t0].[categoria], COUNT([t1].[id]) AS [clientes]');
+      expect(sql).toContain('GROUP BY [t0].[categoria]');
+      expect(sql).toContain('HAVING COUNT([t1].[id]) >= 2');
+      expect(sql.indexOf('GROUP BY')).toBeLessThan(sql.indexOf('HAVING'));
+      expect(sql.indexOf('HAVING')).toBeLessThan(sql.indexOf('ORDER BY'));
+      expect(sql).not.toContain('LIMIT');
+    });
+
+    it('combina WHERE y HAVING con AND u OR sin confundir sus etapas', () => {
+      const count = { function: 'COUNT' as const, column: '*', alias: 'cantidad' };
+      const sql = buildSelect('postgresql', {
+        ...base,
+        columns: ['categoria'],
+        filters: [
+          { column: 'activo', operator: '=', value: '1' },
+          { column: 'prioridad', operator: '>', value: '3', conjunction: 'OR' },
+        ],
+        groupBy: ['categoria'],
+        aggregates: [count],
+        having: [
+          { aggregate: count, operator: '>', value: '2' },
+          { aggregate: count, operator: '=', value: '1', conjunction: 'OR' },
+        ],
+      });
+
+      expect(sql).toContain('WHERE "activo" = 1\n  OR "prioridad" > 3');
+      expect(sql).toContain('HAVING COUNT(*) > 2\n  OR COUNT(*) = 1');
+      expect(sql.indexOf('WHERE')).toBeLessThan(sql.indexOf('GROUP BY'));
+    });
+
+    it('genera COUNT DISTINCT y varios criterios de orden', () => {
+      const distinct = {
+        function: 'COUNT' as const,
+        column: 'cliente_id',
+        alias: 'clientes',
+        distinct: true,
+      };
+      const sql = buildSelect('mysql', {
+        ...base,
+        columns: ['categoria'],
+        groupBy: ['categoria'],
+        aggregates: [distinct],
+        orders: [
+          { expression: distinct, descending: true },
+          { expression: 'categoria' },
+        ],
+      });
+
+      expect(sql).toContain('COUNT(DISTINCT `cliente_id`) AS `clientes`');
+      expect(sql).toContain('ORDER BY COUNT(DISTINCT `cliente_id`) DESC, `categoria`');
+    });
+
+    it('agrupa fechas por mes con la expresión propia de cada motor', () => {
+      const expected = {
+        postgresql: 'DATE_TRUNC(\'month\', "creado")',
+        mysql: 'DATE_ADD(MAKEDATE(YEAR(`creado`), 1), INTERVAL (MONTH(`creado`) - 1) MONTH)',
+        sqlserver: 'DATEFROMPARTS(YEAR([creado]), MONTH([creado]), 1)',
+        informix: 'MDY(MONTH("creado"), 1, YEAR("creado"))',
+      } as const;
+
+      for (const engine of Object.keys(expected) as (keyof typeof expected)[]) {
+        const sql = buildSelect(engine, {
+          ...base,
+          dateGroups: [{ column: 'creado', period: 'month', alias: 'creado_month' }],
+          aggregates: [{ function: 'COUNT', column: '*', alias: 'cantidad' }],
+        });
+        expect(sql).toContain(`${expected[engine]} AS`);
+        expect(sql).toContain(`GROUP BY ${expected[engine]}`);
+      }
+    });
+
     it('genera varios tipos de JOIN con alias y columnas calificadas', () => {
       const sql = buildSelect('postgresql', {
         ...base,
@@ -147,7 +264,7 @@ describe('escribir SQL', () => {
             schema: 'public',
             table: 'estados',
             alias: 't2',
-            leftAlias: 't0',
+            leftAlias: 't1',
             leftColumn: 'estado_id',
             rightColumn: 'id',
           },
@@ -159,6 +276,7 @@ describe('escribir SQL', () => {
       expect(sql).toContain('INNER JOIN "public"."clientes" AS "t1"');
       expect(sql).toContain('ON "t0"."cliente_id" = "t1"."id"');
       expect(sql).toContain('LEFT JOIN "public"."estados" AS "t2"');
+      expect(sql).toContain('ON "t1"."estado_id" = "t2"."id"');
     });
 
     it('CROSS JOIN no genera condición ON', () => {
