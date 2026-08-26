@@ -30,11 +30,11 @@
   type="button"
   class="btn"
   title="Cancela la consulta en curso"
-  [disabled]="!running()"
+  [disabled]="!running() || canceling()"
   (click)="cancel.emit()"
 >
   <app-icon name="stop" [size]="11" />
-  <span class="label">Cancelar</span>
+  <span class="label">{{ canceling() ? 'Cancelando…' : 'Cancelar' }}</span>
 </button>
 
 <span class="divider" aria-hidden="true"></span>

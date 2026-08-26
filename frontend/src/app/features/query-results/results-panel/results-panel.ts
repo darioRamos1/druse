@@ -6,6 +6,7 @@ import {
   input,
   output,
   signal,
+  viewChild,
 } from '@angular/core';
 
 import { ExportFormat } from '../../../core/application-gateway/application-gateway';
@@ -16,7 +17,9 @@ import {
   ResultSet,
 } from '../../../shared/models/workspace';
 import { Icon } from '../../../shared/ui/icon/icon';
+import { OperationProgress } from '../../../shared/ui/operation-progress/operation-progress';
 import { QueryHistory } from '../../query-history/query-history/query-history';
+import { CopyFormat } from '../results-grid/copy-formats';
 import { ResultsGrid } from '../results-grid/results-grid';
 
 type ResultsTab = 'results' | 'messages' | 'history';
@@ -30,7 +33,7 @@ type ResultsTab = 'results' | 'messages' | 'history';
 @Component({
   selector: 'app-results-panel',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [Icon, ResultsGrid, QueryHistory],
+  imports: [Icon, OperationProgress, ResultsGrid, QueryHistory],
   templateUrl: './results-panel.html',
   styleUrl: './results-panel.scss',
 })
@@ -39,6 +42,9 @@ export class ResultsPanel {
   readonly result = input<QueryResult | null>(null);
   readonly history = input<readonly QueryHistoryEntry[]>([]);
   readonly pageSize = input(500);
+  readonly running = input(false);
+  readonly canceling = input(false);
+  readonly timeoutSeconds = input(30);
 
   readonly exporting = input(false);
 
@@ -56,6 +62,7 @@ export class ResultsPanel {
   readonly copied = output<string>();
   readonly copyFailed = output<void>();
   readonly cellEdited = output<CellEdit>();
+  readonly cancelQuery = output<void>();
 
   /** Filas señaladas para borrar y lo que hace falta para llevarlo a cabo. */
   readonly selectedRows = input<readonly number[]>([]);
@@ -75,8 +82,25 @@ export class ResultsPanel {
   protected readonly activeTab = signal<ResultsTab>('results');
   protected readonly exportOpen = signal(false);
   protected readonly exportPosition = signal({ top: 0, left: 0 });
+
+  protected readonly copyOpen = signal(false);
+  protected readonly copyPosition = signal({ top: 0, left: 0 });
+
+  /**
+   * La cuadrícula que se está viendo.
+   *
+   * El panel necesita preguntarle qué hay seleccionado: la selección es suya
+   * —nace y muere con cada resultado— y sacarla aquí arriba para poder pintar un
+   * botón obligaría a los dos a mantener la misma verdad por duplicado.
+   */
+  private readonly grid = viewChild(ResultsGrid);
+
+  protected readonly hasSelection = computed(() => this.grid()?.hasSelection() ?? false);
+
+  protected readonly selectionLabel = computed(() => this.grid()?.selectionLabel() ?? '');
   protected readonly showFilters = signal(false);
   protected readonly compact = signal(false);
+  protected readonly elapsedMs = signal(0);
 
   /** Índice del conjunto de resultados visible, si la consulta devolvió varios. */
   protected readonly activeSetIndex = signal(0);
@@ -85,6 +109,16 @@ export class ResultsPanel {
   );
 
   protected readonly resultSets = computed(() => this.result()?.resultSets ?? []);
+
+  protected readonly progressSubject = computed(() => {
+    if (this.canceling()) {
+      return 'Esperando que el motor detenga la ejecución';
+    }
+
+    return this.elapsedMs() >= 10_000
+      ? 'La base de datos sigue procesando la consulta'
+      : 'Esperando la respuesta de la base de datos';
+  });
 
   constructor() {
     let previousExecutionId: string | undefined;
@@ -97,6 +131,26 @@ export class ResultsPanel {
         this.activeSetIndex.set(0);
       }
     });
+
+    effect((onCleanup) => {
+      if (!this.running()) {
+        this.elapsedMs.set(0);
+        return;
+      }
+
+      const startedAt = Date.now();
+      const timer = window.setInterval(() => {
+        this.elapsedMs.set(Date.now() - startedAt);
+      }, 250);
+
+      onCleanup(() => window.clearInterval(timer));
+    });
+  }
+
+  protected requestCancel(): void {
+    if (!this.canceling()) {
+      this.cancelQuery.emit();
+    }
   }
 
   /**
@@ -121,6 +175,19 @@ export class ResultsPanel {
   protected chooseExport(format: ExportFormat): void {
     this.exportOpen.set(false);
     this.exportAs.emit(format);
+  }
+
+  protected toggleCopy(event: Event): void {
+    const trigger = event.currentTarget as HTMLElement;
+    const rect = trigger.getBoundingClientRect();
+
+    this.copyPosition.set({ top: rect.bottom + 4, left: Math.max(8, rect.right - 232) });
+    this.copyOpen.update((open) => !open);
+  }
+
+  protected chooseCopy(format: CopyFormat): void {
+    this.copyOpen.set(false);
+    void this.grid()?.copyAs(format);
   }
 
   protected toggleFilters(): void {

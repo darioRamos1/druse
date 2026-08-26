@@ -425,13 +425,17 @@
   }
 
   &__label {
+    flex: 1 1 auto;
+    min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
 
   &__tags {
-    display: inline-flex;
+    display: flex;
+    align-items: center;
+    flex: 0 0 auto;
     gap: 5px;
     margin-left: auto;
   }
@@ -504,12 +508,18 @@
 
 /* Las etiquetas del menú de conexiones: entorno, solo lectura, sin abrir. */
 .tag {
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+  min-height: 15px;
   padding: 1px 6px;
   border-radius: 999px;
   background: var(--dr-surface-active);
   color: var(--dr-text-tertiary);
   font-family: var(--dr-font-ui);
   font-size: 9.5px;
+  line-height: 1;
+  white-space: nowrap;
   text-transform: uppercase;
   letter-spacing: 0.03em;
 }

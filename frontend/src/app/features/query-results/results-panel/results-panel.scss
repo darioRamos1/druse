@@ -189,9 +189,14 @@
   white-space: nowrap;
   cursor: pointer;
 
-  &:hover {
+  &:hover:not(:disabled) {
     background: var(--dr-surface-hover);
     color: var(--dr-text);
+  }
+
+  &:disabled {
+    color: var(--dr-text-dim);
+    cursor: default;
   }
 
   &.is-on {
@@ -202,6 +207,47 @@
   &__hint {
     color: var(--dr-text-faintest);
     font-size: 11px;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Consulta en curso
+// ---------------------------------------------------------------------------
+.query-progress {
+  display: grid;
+  place-items: center;
+  flex: 1;
+  min-height: 0;
+  padding: 22px;
+  overflow: auto;
+  background:
+    radial-gradient(circle at 50% 15%, var(--dr-accent-tint) 0, transparent 42%),
+    var(--dr-surface-panel);
+
+  &__card {
+    width: min(100%, 560px);
+    padding: 20px 22px;
+    border: 1px solid var(--dr-border-subtle);
+    border-left: 3px solid var(--dr-accent);
+    border-radius: var(--dr-radius);
+    background: var(--dr-surface-raised);
+    box-shadow: var(--dr-shadow-popover);
+  }
+
+  &__eyebrow {
+    margin: 0 0 12px;
+    color: var(--dr-accent-bright);
+    font-size: 10px;
+    font-weight: 650;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
+  &__hint {
+    margin: 12px 0 0;
+    color: var(--dr-text-tertiary);
+    font-size: 11.5px;
+    line-height: 1.45;
   }
 }
 

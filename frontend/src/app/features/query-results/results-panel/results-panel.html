@@ -44,7 +44,7 @@
     type="button"
     class="tool-button"
     [class.is-on]="showFilters()"
-    [disabled]="!resultSet()"
+    [disabled]="running() || !resultSet()"
     title="Filtrar las filas mostradas"
     (click)="toggleFilters()"
   >
@@ -56,7 +56,7 @@
     type="button"
     class="tool-button"
     [class.is-on]="compact()"
-    [disabled]="!resultSet()"
+    [disabled]="running() || !resultSet()"
     [attr.aria-pressed]="compact()"
     title="Alternar densidad de filas"
     (click)="toggleDensity()"
@@ -64,11 +64,69 @@
     Densidad {{ compact() ? 'compacta' : 'cómoda' }}
   </button>
 
+  <!--
+    Copiar lo seleccionado. Solo se puede pulsar cuando hay algo cogido: un botón
+    que no dice qué copiaría acabaría copiando lo que el usuario no miraba.
+  -->
   <div class="export">
     <button
       type="button"
       class="tool-button"
-      [disabled]="!resultSet() || exporting()"
+      [disabled]="running() || !resultSet() || !hasSelection()"
+      [attr.aria-expanded]="copyOpen()"
+      [title]="
+        hasSelection()
+          ? 'Copiar la selección con formato'
+          : 'Selecciona columnas o celdas para copiarlas'
+      "
+      (click)="toggleCopy($event)"
+    >
+      <app-icon name="new-query" [size]="12" />
+      Copiar como
+      @if (hasSelection()) {
+        <span class="tool-button__hint">{{ selectionLabel() }}</span>
+      }
+    </button>
+
+    @if (copyOpen()) {
+      <ul
+        class="export__menu"
+        role="menu"
+        [style.top.px]="copyPosition().top"
+        [style.left.px]="copyPosition().left"
+      >
+        <li>
+          <button type="button" class="export__option" role="menuitem" (click)="chooseCopy('excel')">
+            Para Excel
+            <span class="export__hint">Tabuladores, con los nombres arriba</span>
+          </button>
+        </li>
+        <li>
+          <button
+            type="button"
+            class="export__option"
+            role="menuitem"
+            (click)="chooseCopy('where-in')"
+          >
+            Como condición IN
+            <span class="export__hint">Para pegar detrás de un WHERE</span>
+          </button>
+        </li>
+        <li>
+          <button type="button" class="export__option" role="menuitem" (click)="chooseCopy('list')">
+            Como lista de valores
+            <span class="export__hint">Separados por comas</span>
+          </button>
+        </li>
+      </ul>
+    }
+  </div>
+
+  <div class="export">
+    <button
+      type="button"
+      class="tool-button"
+      [disabled]="running() || !resultSet() || exporting()"
       [attr.aria-expanded]="exportOpen()"
       (click)="toggleExport($event)"
     >
@@ -111,7 +169,33 @@
   </div>
 </header>
 
-@switch (activeTab()) {
+@switch (running() ? 'running' : activeTab()) {
+  @case ('running') {
+    <section class="query-progress" aria-label="Consulta en curso" aria-busy="true">
+      <div class="query-progress__card">
+        <p class="query-progress__eyebrow">Consulta en curso</p>
+        <app-operation-progress
+          [step]="canceling() ? 'Cancelando consulta…' : 'Ejecutando consulta…'"
+          [subject]="progressSubject()"
+          [overall]="null"
+          [elapsedMs]="elapsedMs()"
+          [cancellable]="!canceling()"
+          (cancelRequested)="requestCancel()"
+        />
+        <p class="query-progress__hint">
+          @if (canceling()) {
+            La cancelación ya fue enviada. Puede tardar unos segundos mientras el motor libera la
+            operación.
+          } @else if (elapsedMs() >= 10_000) {
+            Está tardando más de lo habitual. Puedes cancelarla sin cerrar la aplicación.
+          } @else {
+            Límite configurado: {{ timeoutSeconds() }} s. Puedes cancelar en cualquier momento.
+          }
+        </p>
+      </div>
+    </section>
+  }
+
   @case ('results') {
     @if (currentSet(); as set) {
       @if (resultSets().length > 1) {
@@ -179,7 +263,9 @@
             </p>
 
             <div class="edits__actions">
-              <button type="button" class="btn" (click)="clearSelection.emit()">Quitar marca</button>
+              <button type="button" class="btn" (click)="clearSelection.emit()">
+                Quitar marca
+              </button>
               <button type="button" class="btn btn--primary" (click)="prepareDelete.emit()">
                 Ver SQL y borrar
               </button>
@@ -280,8 +366,8 @@
       <div class="empty">
         <strong>Los resultados aparecerán aquí</strong>
         <span>
-          Ejecuta el documento con Ctrl+Enter, o con Ctrl+Shift+Enter solo la instrucción
-          donde tengas el cursor.
+          Ejecuta el documento con Ctrl+Enter, o con Ctrl+Shift+Enter solo la instrucción donde
+          tengas el cursor.
         </span>
       </div>
     }

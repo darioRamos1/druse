@@ -12,6 +12,7 @@ import {
 
 import { ExportFormat, SavedSnippet } from '../../core/application-gateway/application-gateway';
 import { SnippetStore } from '../../core/snippets/snippet.store';
+import { SplashScreen } from '../../core/startup/splash-screen';
 import { ThemeName, ThemeService } from '../../core/theme/theme.service';
 import { SettingsDialog } from '../../features/settings/settings-dialog/settings-dialog';
 import { FormatSettings } from '../../core/workspace/format-settings';
@@ -110,6 +111,7 @@ export class AppShell {
   private readonly _sqlFiles = inject(SqlFileService);
   private readonly _snippets = inject(SnippetStore);
   private readonly _themes = inject(ThemeService);
+  private readonly _splash = inject(SplashScreen);
 
   // --- Apariencia ------------------------------------------------------------
   protected readonly theme = this._themes.theme;
@@ -129,6 +131,7 @@ export class AppShell {
   protected readonly editorRatio = signal('16 / 9');
 
   protected openSettings(): void {
+    this.prepareOverlay();
     const box = this._editorElement()?.nativeElement.getBoundingClientRect();
 
     if (box?.height) {
@@ -197,6 +200,7 @@ export class AppShell {
         return;
       }
       event.preventDefault();
+      this.prepareOverlay();
       this.paletteOpen.set(true);
     } else if (event.key === 'Escape' && this.paletteOpen()) {
       this.paletteOpen.set(false);
@@ -207,6 +211,7 @@ export class AppShell {
   protected readonly importTarget = signal<ExplorerNode | null>(null);
 
   protected openImport(node: ExplorerNode): void {
+    this.prepareOverlay();
     this.importTarget.set(node);
   }
 
@@ -223,6 +228,7 @@ export class AppShell {
   protected readonly transferTarget = signal<ExplorerNode | null>(null);
 
   protected openTransfer(node: ExplorerNode): void {
+    this.prepareOverlay();
     this.transferTarget.set(node);
   }
 
@@ -235,6 +241,7 @@ export class AppShell {
   protected readonly transferSetTarget = signal<ExplorerNode | null>(null);
 
   protected openTransferSet(node: ExplorerNode): void {
+    this.prepareOverlay();
     this.transferSetTarget.set(node);
   }
 
@@ -281,6 +288,7 @@ export class AppShell {
   });
 
   protected openRestore(node: ExplorerNode): void {
+    this.prepareOverlay();
     this.restoreTarget.set(node);
     this.restoreOpen.set(true);
   }
@@ -297,6 +305,7 @@ export class AppShell {
   }
 
   protected openBackup(node: ExplorerNode): void {
+    this.prepareOverlay();
     this.backupTarget.set(node);
     this.backupOpen.set(true);
   }
@@ -326,6 +335,7 @@ export class AppShell {
   protected readonly designTarget = signal<ExplorerNode | null>(null);
 
   protected openTableDesigner(node: ExplorerNode): void {
+    this.prepareOverlay();
     this.designTarget.set(node);
   }
 
@@ -337,6 +347,7 @@ export class AppShell {
   protected readonly builderTarget = signal<ExplorerNode | null>(null);
 
   protected openBuilder(node: ExplorerNode): void {
+    this.prepareOverlay();
     this.builderTarget.set(node);
   }
 
@@ -370,6 +381,7 @@ export class AppShell {
   protected readonly procedureTarget = signal<ExplorerNode | null>(null);
 
   protected openProcedureRunner(node: ExplorerNode): void {
+    this.prepareOverlay();
     this.procedureTarget.set(node);
   }
 
@@ -412,6 +424,7 @@ export class AppShell {
   protected readonly resultSet = this._store.resultSet;
   protected readonly result = this._store.result;
   protected readonly running = this._store.running;
+  protected readonly canceling = this._store.canceling;
 
   // Borrado de filas: la selección y el SQL viven en el store, como la edición.
   protected readonly selectedRows = this._store.selectedRows;
@@ -675,20 +688,7 @@ export class AppShell {
   }
 
   constructor() {
-    // Los perfiles guardados deben estar antes de que el usuario mire la barra
-    // lateral; si no, parecería que se han perdido.
-    void this._store.loadSavedConnections();
-    void this._store.loadHistory();
-    void this._store.loadPreferences();
-
-    // Los fragmentos, con lo demás: los ofrece el autocompletado desde la primera
-    // tecla, así que no pueden llegar cuando al usuario ya le hizo falta uno.
-    void this._snippets.load();
-
-    // Lo que quedó escrito y sin ejecutar vuelve tal cual. Va aquí y no más
-    // tarde porque hasta que no se ha leído, el store no guarda nada: la pestaña
-    // vacía del arranque pisaría el trabajo de la sesión anterior.
-    void this._store.restoreTabs();
+    void this.startup();
 
     let tabId = this._store.activeTab()?.id;
     effect(() => {
@@ -701,8 +701,42 @@ export class AppShell {
     });
   }
 
+  /**
+   * Lo que hay que leer para que la ventana tenga algo que enseñar.
+   *
+   * Las cinco lecturas salen a la vez porque ninguna depende de otra, y la
+   * pantalla de carga se retira cuando han terminado todas: hasta entonces, lo
+   * que hay detrás es una interfaz vacía que se iría poblando a saltos.
+   *
+   * `allSettled` y no `all`: que una falle —el historial, pongamos— deja a la
+   * aplicación sin esa parte, pero no es motivo para dejar la pantalla de carga
+   * puesta encima de todo lo demás, que sí funciona.
+   */
+  private async startup(): Promise<void> {
+    await Promise.allSettled([
+      // Los perfiles guardados deben estar antes de que el usuario mire la barra
+      // lateral; si no, parecería que se han perdido.
+      this._store.loadSavedConnections(),
+      this._store.loadHistory(),
+      this._store.loadPreferences(),
+
+      // Los fragmentos, con lo demás: los ofrece el autocompletado desde la
+      // primera tecla, así que no pueden llegar cuando al usuario ya le hizo
+      // falta uno.
+      this._snippets.load(),
+
+      // Lo que quedó escrito y sin ejecutar vuelve tal cual. Va aquí y no más
+      // tarde porque hasta que no se ha leído, el store no guarda nada: la
+      // pestaña vacía del arranque pisaría el trabajo de la sesión anterior.
+      this._store.restoreTabs(),
+    ]);
+
+    this._splash.dismiss();
+  }
+
   // --- Conexiones ------------------------------------------------------------
   protected openDialog(): void {
+    this.prepareOverlay();
     this.editingConnection.set(null);
     this.dialogOpen.set(true);
   }
@@ -720,6 +754,7 @@ export class AppShell {
       return;
     }
 
+    this.prepareOverlay();
     this.editingConnection.set(profile);
     this.dialogOpen.set(true);
   }
@@ -756,6 +791,10 @@ export class AppShell {
   }
 
   protected closeMobileExplorer(): void {
+    this.mobileExplorerOpen.set(false);
+  }
+
+  private prepareOverlay(): void {
     this.mobileExplorerOpen.set(false);
   }
 

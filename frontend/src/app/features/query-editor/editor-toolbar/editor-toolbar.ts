@@ -72,6 +72,7 @@ export class EditorToolbar {
   /** Filas que se traen de cada consulta. */
   readonly maxRows = input(500);
   readonly running = input(false);
+  readonly canceling = input(false);
   readonly hasSelection = input(false);
   /** Hay una conexión abierta contra la que ejecutar. */
   readonly canExecute = input(false);

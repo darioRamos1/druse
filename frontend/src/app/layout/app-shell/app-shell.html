@@ -73,6 +73,7 @@
     <app-editor-toolbar
       [context]="editorContext()"
       [running]="running()"
+      [canceling]="canceling()"
       [hasSelection]="hasSelection()"
       [canExecute]="hasConnection()"
       [timeoutSeconds]="timeoutSeconds()"
@@ -189,6 +190,9 @@
       [style.height.px]="resultsHeight()"
       [resultSet]="resultSet()"
       [result]="result()"
+      [running]="running()"
+      [canceling]="canceling()"
+      [timeoutSeconds]="timeoutSeconds()"
       [history]="history()"
       [exporting]="exporting()"
       [editable]="!!editableTable()"
@@ -215,6 +219,7 @@
       (exportAs)="exportAs($event)"
       (copied)="onCopied($event)"
       (copyFailed)="onCopyFailed()"
+      (cancelQuery)="cancel()"
     />
 
     <app-status-bar
