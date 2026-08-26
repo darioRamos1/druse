@@ -82,7 +82,11 @@
         class="cell cell--number"
         role="cell"
         [class.is-marked]="isRowSelected(row.number)"
-        title="Copiar la fila"
+        [class.is-selected]="isRowChosen(r)"
+        title="Arrastra para coger varias filas; doble clic copia esta"
+        (mousedown)="beginRowSelection(r, $event)"
+        (mouseenter)="extendRowSelection(r, $event)"
+        (contextmenu)="openRowMenu($event, r)"
         (dblclick)="copyRow(row)"
       >
         <!--
@@ -97,6 +101,7 @@
             [checked]="isRowSelected(row.number)"
             [attr.aria-label]="'Señalar la fila ' + row.number + ' para borrar'"
             (click)="$event.stopPropagation()"
+            (mousedown)="$event.stopPropagation()"
             (change)="rowToggled.emit(row.number)"
           />
         }

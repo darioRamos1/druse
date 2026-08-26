@@ -270,8 +270,19 @@
   align-items: center;
   cursor: pointer;
 
+  // El número no es texto que nadie quiera coger, y seleccionarlo al arrastrar
+  // dejaría media cuadrícula en azul por debajo de las filas cogidas.
+  user-select: none;
+
   &:hover {
     color: var(--dr-text-secondary);
+  }
+
+  // Fila cogida para copiar. Va antes que `is-marked` a propósito: si una fila
+  // está a la vez cogida y señalada para borrar, manda el aviso de borrado.
+  &.is-selected {
+    background: var(--dr-accent-tint-strong);
+    color: var(--dr-text);
   }
 
   // Una fila señalada para borrar se ve de un vistazo, sin tener que buscar la

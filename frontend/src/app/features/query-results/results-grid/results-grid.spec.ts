@@ -251,6 +251,15 @@ describe('ResultsGrid', () => {
       return element.querySelectorAll('.cell--value.is-selected').length;
     }
 
+    /** La celda del número, que es de donde se cogen las filas enteras. */
+    function rowNumber(row: number): HTMLElement {
+      return element.querySelectorAll<HTMLElement>('.cell--number')[row];
+    }
+
+    function chosenRowCount(): number {
+      return element.querySelectorAll('.cell--number.is-selected').length;
+    }
+
     beforeEach(() => {
       copied = [];
       fixture.componentInstance.copied.subscribe((text) => copied.push(text));
@@ -315,6 +324,118 @@ describe('ResultsGrid', () => {
       await fixture.whenStable();
 
       expect(selectedCount()).toBe(6);
+    });
+
+    it('el número de fila coge la fila entera', async () => {
+      rowNumber(1).dispatchEvent(new MouseEvent('mousedown', { button: 0 }));
+      await fixture.whenStable();
+
+      // Las tres columnas de esa fila, y ninguna de las otras dos filas.
+      expect(selectedCount()).toBe(3);
+      expect(chosenRowCount()).toBe(1);
+    });
+
+    it('arrastrar por los números coge las filas que se van pisando', async () => {
+      rowNumber(0).dispatchEvent(new MouseEvent('mousedown', { button: 0 }));
+      rowNumber(2).dispatchEvent(new MouseEvent('mouseenter', { buttons: 1 }));
+      await fixture.whenStable();
+
+      expect(chosenRowCount()).toBe(3);
+      expect(selectedCount()).toBe(9);
+    });
+
+    it('el barrido de filas termina al soltar el botón', async () => {
+      rowNumber(0).dispatchEvent(new MouseEvent('mousedown', { button: 0 }));
+      document.dispatchEvent(new MouseEvent('mouseup'));
+      rowNumber(2).dispatchEvent(new MouseEvent('mouseenter', { buttons: 1 }));
+      await fixture.whenStable();
+
+      expect(chosenRowCount()).toBe(1);
+    });
+
+    it('control añade y quita filas sueltas', async () => {
+      rowNumber(0).dispatchEvent(new MouseEvent('mousedown', { button: 0 }));
+      rowNumber(2).dispatchEvent(new MouseEvent('mousedown', { button: 0, ctrlKey: true }));
+      await fixture.whenStable();
+
+      expect(chosenRowCount()).toBe(2);
+
+      rowNumber(2).dispatchEvent(new MouseEvent('mousedown', { button: 0, ctrlKey: true }));
+      await fixture.whenStable();
+
+      expect(chosenRowCount()).toBe(1);
+    });
+
+    it('mayúsculas coge el tramo entre dos filas', async () => {
+      rowNumber(0).dispatchEvent(new MouseEvent('mousedown', { button: 0 }));
+      document.dispatchEvent(new MouseEvent('mouseup'));
+      rowNumber(2).dispatchEvent(new MouseEvent('mousedown', { button: 0, shiftKey: true }));
+      await fixture.whenStable();
+
+      expect(chosenRowCount()).toBe(3);
+    });
+
+    /**
+     * Los tres modos se excluyen: lo que se coge por un camino tiene que soltar
+     * lo cogido por otro, o quedaría una selección imposible de dibujar.
+     */
+    it('coger una columna suelta las filas, y al revés', async () => {
+      rowNumber(0).dispatchEvent(new MouseEvent('mousedown', { button: 0 }));
+      await fixture.whenStable();
+      expect(chosenRowCount()).toBe(1);
+
+      header(1).dispatchEvent(new MouseEvent('click'));
+      await fixture.whenStable();
+
+      expect(chosenRowCount()).toBe(0);
+      expect(selectedCount()).toBe(3);
+
+      rowNumber(0).dispatchEvent(new MouseEvent('mousedown', { button: 0 }));
+      await fixture.whenStable();
+
+      expect(element.querySelectorAll('.cell--head.is-selected').length).toBe(0);
+      expect(chosenRowCount()).toBe(1);
+    });
+
+    it('coger una celda suelta las filas', async () => {
+      rowNumber(0).dispatchEvent(new MouseEvent('mousedown', { button: 0 }));
+      document.dispatchEvent(new MouseEvent('mouseup'));
+      cell(2, 1).dispatchEvent(new MouseEvent('mousedown', { button: 0 }));
+      await fixture.whenStable();
+
+      expect(chosenRowCount()).toBe(0);
+      expect(selectedCount()).toBe(1);
+    });
+
+    it('copia las filas cogidas enteras, con todas sus columnas', async () => {
+      rowNumber(0).dispatchEvent(new MouseEvent('mousedown', { button: 0 }));
+      rowNumber(1).dispatchEvent(new MouseEvent('mouseenter', { buttons: 1 }));
+      await fixture.whenStable();
+
+      await fixture.componentInstance.copyAs('excel');
+
+      expect(copied[0]).toBe(
+        ['id\temail\tis_active', '1\tana@example.com\ttrue', '2\t\tfalse'].join('\n'),
+      );
+    });
+
+    it('el botón derecho sobre un número coge esa fila', async () => {
+      rowNumber(2).dispatchEvent(new MouseEvent('contextmenu', { clientX: 10, clientY: 20 }));
+      await fixture.whenStable();
+
+      expect(chosenRowCount()).toBe(1);
+      expect(element.querySelector('.copy-menu')).not.toBeNull();
+    });
+
+    it('la casilla de borrar no arrastra la fila consigo', async () => {
+      fixture.componentRef.setInput('editable', true);
+      await fixture.whenStable();
+
+      const check = element.querySelector<HTMLElement>('.cell--number__check');
+      check?.dispatchEvent(new MouseEvent('mousedown', { button: 0, bubbles: true }));
+      await fixture.whenStable();
+
+      expect(chosenRowCount()).toBe(0);
     });
 
     it('copia una columna como condición IN', async () => {

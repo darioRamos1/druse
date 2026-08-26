@@ -708,6 +708,50 @@ test.describe('la interfaz por dentro', () => {
   });
 
   /**
+   * Coger varios registros arrastrando por la columna del número.
+   *
+   * Con el ratón de verdad y no llamando al componente: lo que falla en un
+   * arrastre es el orden de los eventos —que el `mousedown` empiece el barrido y
+   * que el `mouseenter` de cada fila lo estire— y eso solo se ve conduciendo.
+   */
+  test('arrastrar por los números coge las filas enteras y las copia', async ({ page }) => {
+    await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
+
+    await abrir(page);
+    await conectar(page);
+    await apuntarPestana(page);
+
+    await escribirSql(
+      page,
+      "SELECT * FROM (VALUES (1, 'MX'), (2, 'ES'), (3, 'AR')) AS t(id, pais);",
+    );
+    await ejecutar(page, 'todo');
+
+    const numeros = page.locator('app-results-grid .row .cell--number');
+
+    // De la primera fila a la segunda, por la columna del número.
+    await numeros.nth(0).hover();
+    await page.mouse.down();
+    await numeros.nth(1).hover();
+    await page.mouse.up();
+
+    // Dos filas enteras: las dos columnas entran sin haberlas tocado.
+    await expect(page.getByRole('button', { name: /Copiar como/ })).toContainText(
+      '2 columnas × 2 filas',
+    );
+
+    await numeros.nth(1).click({ button: 'right' });
+    await page
+      .locator('.copy-menu')
+      .getByRole('menuitem', { name: /Excel/ })
+      .click();
+
+    await expect
+      .poll(() => portapapeles(page))
+      .toBe(['id\tpais', '1\tMX', '2\tES'].join('\n'));
+  });
+
+  /**
    * Ajustar el ancho de una columna para poder leer su título.
    *
    * Con el ratón de verdad: lo que falla en un arrastre es siempre el orden de

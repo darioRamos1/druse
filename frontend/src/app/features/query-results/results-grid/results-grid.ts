@@ -107,11 +107,23 @@ export class ResultsGrid {
   /**
    * Columnas enteras seleccionadas, por índice.
    *
-   * Es el otro modo de selección, y los dos se excluyen: al pulsar una cabecera
-   * se olvida el rango de celdas y al pulsar una celda se olvidan las columnas.
-   * Mezclarlos dejaría una selección que no se puede dibujar ni explicar.
+   * Es otro modo de selección, y los tres se excluyen: al pulsar una cabecera se
+   * olvidan el rango de celdas y las filas, y así con cada uno. Mezclarlos
+   * dejaría una selección que no se puede dibujar ni explicar.
    */
   protected readonly selectedColumns = signal<readonly number[]>([]);
+
+  /**
+   * Filas enteras seleccionadas, por **posición entre las filas visibles**.
+   *
+   * Por posición y no por número de fila, por lo mismo que el rango de celdas:
+   * con un filtro puesto los números dejan de ser consecutivos, y un tramo
+   * apoyado en ellos se llevaría filas que el filtro esconde.
+   *
+   * No confundir con el input `selectedRows`, que son las filas señaladas para
+   * borrar y van por número: aquello marca, esto copia.
+   */
+  protected readonly chosenRows = signal<readonly number[]>([]);
 
   protected readonly menu = signal<MenuPosition | null>(null);
 
@@ -120,8 +132,17 @@ export class ResultsGrid {
   /** La última cabecera pulsada, para que Mayúsculas sepa desde dónde extender. */
   private lastColumn: number | null = null;
 
-  /** Hay un botón pulsado y el ratón está barriendo celdas. */
-  private dragging = false;
+  /** Lo mismo para las filas: desde dónde extiende Mayúsculas. */
+  private lastRow: number | null = null;
+
+  /**
+   * Qué se está barriendo con el botón pulsado, si es que se barre algo.
+   *
+   * Un solo campo y no un booleano por modo: el arrastre empieza en un sitio
+   * —una celda o un número de fila— y lo que se recorra después no puede cambiar
+   * de idea a mitad de camino.
+   */
+  private dragMode: 'cells' | 'rows' | null = null;
 
   /**
    * Anchos que el usuario ha ajustado, por nombre de columna.
@@ -254,7 +275,9 @@ export class ResultsGrid {
     }
 
     this.selectedColumns.set([]);
+    this.chosenRows.set([]);
     this.lastColumn = null;
+    this.lastRow = null;
 
     if (event.shiftKey && this.anchor()) {
       this.focus.set({ row, column });
@@ -263,14 +286,14 @@ export class ResultsGrid {
       this.focus.set({ row, column });
     }
 
-    this.dragging = true;
+    this.dragMode = 'cells';
   }
 
   /** Estira la selección mientras el ratón barre celdas con el botón pulsado. */
   protected extendCellSelection(row: number, column: number, event: MouseEvent): void {
     // `buttons` y no `button`: en un `mouseenter` este último no dice nada, y sin
     // comprobarlo la selección seguiría al puntero después de soltar.
-    if (!this.dragging || event.buttons !== 1) {
+    if (this.dragMode !== 'cells' || event.buttons !== 1) {
       return;
     }
 
@@ -286,6 +309,8 @@ export class ResultsGrid {
   protected selectColumn(column: number, event: MouseEvent): void {
     this.anchor.set(null);
     this.focus.set(null);
+    this.chosenRows.set([]);
+    this.lastRow = null;
 
     if (event.shiftKey && this.lastColumn !== null) {
       const from = Math.min(this.lastColumn, column);
@@ -309,6 +334,75 @@ export class ResultsGrid {
 
     this.selectedColumns.set([column]);
     this.lastColumn = column;
+  }
+
+  /**
+   * Empieza a seleccionar filas enteras desde su número.
+   *
+   * Es el gesto simétrico al de las cabeceras, y hace lo mismo que cualquier
+   * lista con selección múltiple: Control añade o quita una suelta, Mayúsculas
+   * coge el tramo desde la última, y arrastrar barre las que se van pisando.
+   */
+  protected beginRowSelection(row: number, event: MouseEvent): void {
+    // El botón derecho no selecciona: abre el menú sobre lo que ya hubiera.
+    if (event.button === 2) {
+      return;
+    }
+
+    // Empezar a barrer filas con el botón pulsado exige que el arrastre no
+    // seleccione texto por debajo, que es lo que haría el navegador por su
+    // cuenta en cuanto el puntero saliera de la celda.
+    event.preventDefault();
+
+    this.anchor.set(null);
+    this.focus.set(null);
+    this.selectedColumns.set([]);
+    this.lastColumn = null;
+
+    if (event.shiftKey && this.lastRow !== null) {
+      const from = Math.min(this.lastRow, row);
+      const to = Math.max(this.lastRow, row);
+
+      this.chosenRows.set(Array.from({ length: to - from + 1 }, (_, i) => from + i));
+      this.dragMode = 'rows';
+
+      return;
+    }
+
+    if (event.ctrlKey || event.metaKey) {
+      this.chosenRows.update((current) =>
+        current.includes(row)
+          ? current.filter((index) => index !== row)
+          : [...current, row].sort((a, b) => a - b),
+      );
+      this.lastRow = row;
+
+      // Con Control se va picando de una en una; barrer desde aquí se llevaría
+      // por delante justo lo que se está componiendo a mano.
+      return;
+    }
+
+    this.chosenRows.set([row]);
+    this.lastRow = row;
+    this.dragMode = 'rows';
+  }
+
+  /** Estira la selección de filas mientras el ratón las barre. */
+  protected extendRowSelection(row: number, event: MouseEvent): void {
+    // `buttons` y no `button`, igual que en las celdas: en un `mouseenter` el
+    // segundo no dice nada y la selección seguiría al puntero tras soltar.
+    if (this.dragMode !== 'rows' || event.buttons !== 1 || this.lastRow === null) {
+      return;
+    }
+
+    const from = Math.min(this.lastRow, row);
+    const to = Math.max(this.lastRow, row);
+
+    this.chosenRows.set(Array.from({ length: to - from + 1 }, (_, i) => from + i));
+  }
+
+  protected isRowChosen(row: number): boolean {
+    return this.chosenRows().includes(row);
   }
 
   /**
@@ -360,7 +454,7 @@ export class ResultsGrid {
   /** Se suelta el botón en cualquier parte: el barrido termina donde quedó. */
   @HostListener('document:mouseup')
   protected endDrag(): void {
-    this.dragging = false;
+    this.dragMode = null;
     this.resizing = null;
     this.isResizing.set(false);
   }
@@ -409,8 +503,10 @@ export class ResultsGrid {
     this.anchor.set(null);
     this.focus.set(null);
     this.selectedColumns.set([]);
+    this.chosenRows.set([]);
     this.lastColumn = null;
-    this.dragging = false;
+    this.lastRow = null;
+    this.dragMode = null;
   }
 
   /** Empieza a editar una celda, si aquí se puede. */
@@ -521,7 +617,10 @@ export class ResultsGrid {
 
   /** Hay algo que copiar. Lo consulta también la barra del panel. */
   readonly hasSelection = computed(
-    () => this.selectedColumns().length > 0 || this.bounds() !== null,
+    () =>
+      this.selectedColumns().length > 0 ||
+      this.chosenRows().length > 0 ||
+      this.bounds() !== null,
   );
 
   /**
@@ -551,6 +650,12 @@ export class ResultsGrid {
       return { columns: chosen.length, rows: this.visibleRows().length };
     }
 
+    const filas = this.chosenRows();
+
+    if (filas.length > 0) {
+      return { columns: this.resultSet().columns.length, rows: filas.length };
+    }
+
     const bounds = this.bounds();
 
     return bounds
@@ -565,6 +670,10 @@ export class ResultsGrid {
   protected isSelected(row: number, column: number): boolean {
     if (this.selectedColumns().length > 0) {
       return this.selectedColumns().includes(column);
+    }
+
+    if (this.chosenRows().length > 0) {
+      return this.chosenRows().includes(row);
     }
 
     const bounds = this.bounds();
@@ -594,8 +703,30 @@ export class ResultsGrid {
       }
     } else if (!this.isSelected(row, column)) {
       this.selectedColumns.set([]);
+      this.chosenRows.set([]);
       this.anchor.set({ row, column });
       this.focus.set({ row, column });
+    }
+
+    this.menu.set({ top: event.clientY, left: event.clientX });
+  }
+
+  /**
+   * Abre el menú desde el número de fila.
+   *
+   * Si la fila no estaba cogida, se coge sola: pedir «copiar» sobre una fila que
+   * no está marcada tiene que copiar esa fila, no lo que quedó marcado antes en
+   * otra parte, que es la misma regla que sigue el menú de las celdas.
+   */
+  protected openRowMenu(event: MouseEvent, row: number): void {
+    event.preventDefault();
+
+    if (!this.isRowChosen(row)) {
+      this.anchor.set(null);
+      this.focus.set(null);
+      this.selectedColumns.set([]);
+      this.chosenRows.set([row]);
+      this.lastRow = row;
     }
 
     this.menu.set({ top: event.clientY, left: event.clientX });
@@ -648,6 +779,19 @@ export class ResultsGrid {
       return {
         columns: indices.map((index) => columns[index]),
         rows: rows.map((row) => indices.map((index) => this.shownValue(row, index))),
+      };
+    }
+
+    const filas = this.chosenRows();
+
+    if (filas.length > 0) {
+      // Todas las columnas, y solo las filas cogidas: es el simétrico exacto de
+      // seleccionar columnas, que se lleva todas las filas del filtro.
+      return {
+        columns: [...columns],
+        rows: filas
+          .filter((index) => index < rows.length)
+          .map((index) => columns.map((_, i) => this.shownValue(rows[index], i))),
       };
     }
 
