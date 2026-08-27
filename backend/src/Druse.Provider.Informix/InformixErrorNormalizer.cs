@@ -62,22 +62,74 @@ internal static class InformixErrorNormalizer
     }
 
     /// <summary>
+    /// Código con el que el driver JDBC tapa los errores de sintaxis.
+    ///
+    /// No es del motor: es suyo. Comprobado contra el servidor, **el driver
+    /// parsea la sentencia antes de mandarla** y, si no la entiende, ni siquiera
+    /// llega a preguntar. Todo lo demás sí viaja y vuelve con su número de
+    /// Informix —-206 tabla inexistente, -217 columna, -674 función, -236 número
+    /// de valores—; solo la sintaxis se queda por el camino.
+    /// </summary>
+    private const int JdbcParserError = -79716;
+
+    /// <summary>Lo único que dice el driver cuando su parser se atraganta.</summary>
+    private const string JdbcParserMessage = "System or internal error";
+
+    /// <summary>El número que Informix usa para un error de sintaxis.</summary>
+    private const int InformixSyntaxError = -201;
+
+    /// <summary>
     /// Traduce un error llegado por el puente JDBC.
     ///
-    /// Son los mismos números que por DRDA —Informix los numera en negativo, y
-    /// -201 sigue siendo un error de sintaxis—, así que la explicación se busca
-    /// en la misma tabla. Lo que cambia es de dónde se saca el código.
+    /// Son los mismos números que por DRDA, así que la explicación se busca en la
+    /// misma tabla. Lo que cambia es de dónde se saca el código.
     ///
-    /// Cuando el driver no da número, el campo se deja vacío en vez de escribir
-    /// un cero: cero es un código válido y decirlo sería inventarse un dato.
+    /// **Salvo con la sintaxis**, que el driver no deja llegar al servidor: la
+    /// caza su parser y responde con un código propio y un «System or internal
+    /// error» que no le dice nada a nadie. Ese caso —y solo ese, reconocido por
+    /// su código **y** su mensaje— se cuenta como lo que es: el mismo error de
+    /// sintaxis que habría devuelto el motor, con el número que Informix usa
+    /// para él. Así la misma falta se lee igual por los dos transportes, que es
+    /// justo lo que el contrato exige.
+    ///
+    /// Con cualquier otro mensaje bajo ese código se respeta lo que dijo el
+    /// driver: sería un fallo interno de verdad, y llamarlo sintaxis mandaría a
+    /// buscar una falta que no existe.
+    ///
+    /// Cuando no da número, el campo se deja vacío en vez de escribir un cero:
+    /// cero es un código válido y decirlo sería inventarse un dato.
     /// </summary>
-    private static QueryError FromJdbc(Druse.Jdbc.JdbcException exception) => new()
+    private static QueryError FromJdbc(Druse.Jdbc.JdbcException exception)
     {
-        Message = Explain(exception.ErrorCode) ?? exception.Message,
-        Code = exception.ErrorCode != 0
-            ? exception.ErrorCode.ToString(CultureInfo.InvariantCulture)
-            : null,
-    };
+        var esSintaxis = exception.ErrorCode == JdbcParserError
+            && string.Equals(
+                exception.Message?.Trim(),
+                JdbcParserMessage,
+                StringComparison.OrdinalIgnoreCase);
+
+        if (esSintaxis)
+        {
+            return new QueryError
+            {
+                Message = "La instrucción tiene un error de sintaxis. El driver de Informix la "
+                    + "rechaza antes de enviarla, así que el servidor no señala dónde está.",
+                Code = InformixSyntaxError.ToString(CultureInfo.InvariantCulture),
+            };
+        }
+
+        return new QueryError
+        {
+            // El mensaje del driver puede venir vacío; un error sin texto no se
+            // puede enseñar, así que se dice al menos que vino de ahí.
+            Message = Explain(exception.ErrorCode)
+                ?? (string.IsNullOrWhiteSpace(exception.Message)
+                    ? "El driver de Informix rechazó la instrucción sin dar un motivo."
+                    : exception.Message),
+            Code = exception.ErrorCode != 0
+                ? exception.ErrorCode.ToString(CultureInfo.InvariantCulture)
+                : null,
+        };
+    }
 
     /// <summary>
     /// Explica los fallos que un usuario puede arreglar por su cuenta.

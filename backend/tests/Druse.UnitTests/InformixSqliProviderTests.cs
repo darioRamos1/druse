@@ -108,6 +108,55 @@ public sealed class InformixSqliProviderTests
             StringComparison.OrdinalIgnoreCase);
     }
 
+    /// <summary>
+    /// Un error de sintaxis se cuenta como tal, no como «error interno».
+    ///
+    /// Este driver **no deja llegar la sintaxis al servidor**: la caza su propio
+    /// parser y responde con un código suyo y un «System or internal error» que
+    /// no le dice nada a nadie. Comprobado contra el servidor que todo lo demás
+    /// sí viaja y vuelve con su número de Informix —-206, -217, -674—, así que
+    /// este es el único caso que hay que traducir.
+    ///
+    /// Se mira el mensaje y no solo el código porque es lo que el usuario lee.
+    /// </summary>
+    [RequiresInformixSqliFact]
+    public async Task UnErrorDeSintaxisSeExplicaEnVezDeLlamarseInterno()
+    {
+        var provider = new InformixDatabaseProvider(DatabaseEngine.InformixSqli);
+        var executor = new InformixQueryExecutor(DatabaseEngine.InformixSqli);
+
+        await using var sesion = await provider.OpenSessionAsync(
+            Perfil(),
+            Clave,
+            CancellationToken.None);
+
+        var resultado = await executor.ExecuteAsync(
+            sesion,
+            new QueryRequest
+            {
+                SessionId = sesion.Id,
+                Sql = "SELECT * FORM systables",
+                MaxRows = 10,
+                TimeoutSeconds = 30,
+            },
+            CancellationToken.None);
+
+        Assert.Equal(QueryExecutionState.Failed, resultado.State);
+
+        // El número que Informix usa para la sintaxis, el mismo que por DRDA.
+        Assert.Equal("-201", resultado.Error?.Code);
+
+        // Y sobre todo: lo que se enseña ya no es el mensaje del driver.
+        Assert.DoesNotContain(
+            "System or internal error",
+            resultado.Error?.Message ?? "",
+            StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(
+            "sintaxis",
+            resultado.Error?.Message ?? "",
+            StringComparison.OrdinalIgnoreCase);
+    }
+
     [RequiresInformixSqliFact]
     public async Task UnaBaseQueNoExisteSeCuentaConElMensajeDelMotor()
     {
