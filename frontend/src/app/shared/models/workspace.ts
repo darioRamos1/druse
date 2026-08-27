@@ -7,7 +7,14 @@
  */
 
 /** Motores soportados. Nunca se ramifica por motor dentro de los componentes. */
-export type DatabaseEngine = 'postgresql' | 'sqlserver' | 'mysql' | 'informix';
+export type DatabaseEngine =
+  | 'postgresql'
+  | 'sqlserver'
+  | 'mysql'
+  /** Informix por DRDA, que exige un escuchador `drsoctcp` en el servidor. */
+  | 'informix'
+  /** El mismo Informix por SQLI, su protocolo nativo. */
+  | 'informixsqli';
 
 export type ConnectionState = 'connected' | 'disconnected' | 'connecting' | 'error';
 
@@ -171,6 +178,13 @@ export interface ConnectionForm {
   readonly sshVerificationCode?: string;
   /** Recordar el secreto del túnel en el almacén del sistema. */
   readonly storeSshSecret?: boolean;
+  /**
+   * Servidor lógico de Informix, el `INFORMIXSERVER`.
+   *
+   * Solo lo usa el motor `informixsqli`, donde es obligatorio. Es el alias del
+   * `sqlhosts` —`vehi_tcp`, `ol_informix1210`—, **no el nombre de la máquina**.
+   */
+  readonly informixServer?: string;
 }
 
 export interface SessionInfo {

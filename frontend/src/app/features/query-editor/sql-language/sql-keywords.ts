@@ -27,6 +27,18 @@ const COMMON_FUNCTIONS: readonly string[] = [
 ];
 
 /** Lo propio de cada motor. */
+/**
+ * Palabras propias de Informix. Las comparten sus dos motores: cambia el
+ * transporte, no el dialecto.
+ */
+const INFORMIX_KEYWORDS = [
+    // `FIRST` y `SKIP` son lo propio de Informix y lo que peor se recuerda:
+    // van después del SELECT, no al final como `LIMIT`.
+    'FIRST', 'SKIP', 'SERIAL', 'BIGSERIAL', 'LVARCHAR', 'NVL',
+    'CURRENT', 'TODAY', 'EXTEND', 'MATCHES', 'UNITS', 'DBINFO',
+    'MODIFY', 'RENAME COLUMN',
+] as const;
+
 const ENGINE_KEYWORDS: Readonly<Record<DatabaseEngine, readonly string[]>> = {
   postgresql: [
     'ILIKE', 'RETURNING', 'ON CONFLICT', 'DO UPDATE', 'DO NOTHING',
@@ -42,13 +54,8 @@ const ENGINE_KEYWORDS: Readonly<Record<DatabaseEngine, readonly string[]>> = {
     'LIMIT', 'OFFSET', 'AUTO_INCREMENT', 'ENGINE', 'IFNULL', 'GROUP_CONCAT',
     'NOW()', 'CURDATE()', 'ON DUPLICATE KEY UPDATE',
   ],
-  informix: [
-    // `FIRST` y `SKIP` son lo propio de Informix y lo que peor se recuerda:
-    // van después del SELECT, no al final como `LIMIT`.
-    'FIRST', 'SKIP', 'SERIAL', 'BIGSERIAL', 'LVARCHAR', 'NVL',
-    'CURRENT', 'TODAY', 'EXTEND', 'MATCHES', 'UNITS', 'DBINFO',
-    'MODIFY', 'RENAME COLUMN',
-  ],
+  informix: INFORMIX_KEYWORDS,
+  informixsqli: INFORMIX_KEYWORDS,
 };
 
 /** Palabras que deben sugerirse para un motor concreto. */

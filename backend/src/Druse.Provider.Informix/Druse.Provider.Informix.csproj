@@ -2,6 +2,11 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Druse.Database.Abstractions\Druse.Database.Abstractions.csproj" />
+    <!--
+      El puente que habla SQLI. Solo se usa cuando el perfil pide ese
+      transporte; por DRDA no interviene.
+    -->
+    <ProjectReference Include="..\Druse.Jdbc\Druse.Jdbc.csproj" />
   </ItemGroup>
 
   <!--

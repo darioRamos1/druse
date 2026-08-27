@@ -462,6 +462,62 @@ describe('ConnectionDialog', () => {
     });
   });
 
+  describe('Informix por su protocolo nativo', () => {
+    /** Elige un motor por el nombre que se ve en la lista. */
+    function elegirMotor(nombre: string): void {
+      const opcion = [...fixture.nativeElement.querySelectorAll('.engine')].find(
+        (candidata: Element) => candidata.textContent?.includes(nombre),
+      ) as HTMLElement;
+
+      opcion.click();
+      fixture.detectChanges();
+    }
+
+    function campo(etiqueta: string): HTMLInputElement | undefined {
+      return [...fixture.nativeElement.querySelectorAll('.field')]
+        .find((f: Element) => f.querySelector('.field__label')?.textContent?.trim() === etiqueta)
+        ?.querySelector('input') as HTMLInputElement | undefined;
+    }
+
+    /**
+     * El servidor lógico solo se pide donde hace falta.
+     *
+     * Por DRDA no existe ese concepto, y enseñar un campo que no se usa invita a
+     * rellenarlo y a buscar el fallo donde no está.
+     */
+    it('el campo del servidor Informix solo aparece con SQLI', () => {
+      elegirMotor('PostgreSQL');
+      expect(campo('Servidor Informix')).toBeUndefined();
+
+      elegirMotor('Informix (SQLI)');
+      expect(campo('Servidor Informix')).toBeDefined();
+    });
+
+    it('cambiar a SQLI propone su puerto y no el de DRDA', async () => {
+      elegirMotor('Informix (SQLI)');
+
+      // `ngModel` escribe en el DOM en su propio turno: sin esperar, se leería
+      // el valor de antes del clic.
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      // 9088 es SQLI y 9089 DRDA: poner el del otro da un error que parece de
+      // credenciales.
+      expect(campo('Puerto')?.value).toBe('9088');
+    });
+
+    it('sin servidor lógico no se llama a la API y se dice qué falta', async () => {
+      elegirMotor('Informix (SQLI)');
+
+      button('Probar conexión').click();
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      expect(store.testConnection).not.toHaveBeenCalled();
+      expect(fixture.nativeElement.textContent).toContain('sqlhosts');
+    });
+  });
+
   function button(label: string): HTMLButtonElement {
     return [...fixture.nativeElement.querySelectorAll('button')].find((candidate: Element) =>
       candidate.textContent?.includes(label),

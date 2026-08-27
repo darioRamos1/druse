@@ -34,6 +34,13 @@ public sealed record ConnectionProfileDto
 
     /// <summary>Servidor intermedio, o ausente para conectar directamente.</summary>
     public SshTunnelDto? SshTunnel { get; init; }
+
+    /// <summary>
+    /// Nombre del servidor lógico de Informix, el `INFORMIXSERVER`.
+    ///
+    /// Solo lo usa el motor `InformixSqli`, donde es obligatorio.
+    /// </summary>
+    public string? InformixServer { get; init; }
 }
 
 /// <summary>
@@ -259,6 +266,9 @@ public sealed record SavedConnectionDto
 
     /// <summary>Servidor intermedio del perfil, si tiene.</summary>
     public SshTunnelDto? SshTunnel { get; init; }
+
+    /// <summary>Servidor lógico de Informix, cuando el motor es `InformixSqli`.</summary>
+    public string? InformixServer { get; init; }
 
     /// <summary>Hay un secreto de SSH guardado para este perfil.</summary>
     public bool HasStoredSshSecret { get; init; }

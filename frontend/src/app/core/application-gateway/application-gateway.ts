@@ -47,6 +47,8 @@ export interface ConnectRequest {
     readonly connectTimeoutSeconds?: number;
     /** Servidor intermedio, o ausente para ir directo. */
     readonly sshTunnel?: SshTunnel;
+    /** Servidor lógico de Informix. Solo lo usa el motor `informixsqli`. */
+    readonly informixServer?: string;
   };
   readonly password?: string;
   /** Contraseña del usuario SSH, o passphrase de su clave. */

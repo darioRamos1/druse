@@ -3078,6 +3078,7 @@ function toRequest(form: ConnectionForm): ConnectRequest {
       readOnly: form.readOnly,
       sslMode: form.sslMode,
       sshTunnel: form.sshTunnel,
+      informixServer: form.informixServer,
     },
     // Con autenticación de Windows no hay contraseña que enviar: la identidad la
     // pone la sesión del sistema.

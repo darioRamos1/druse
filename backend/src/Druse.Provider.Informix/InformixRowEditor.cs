@@ -8,7 +8,17 @@ namespace Druse.Provider.Informix;
 /// <summary>Escribe cambios de filas en Informix. Solo aporta su dialecto.</summary>
 public sealed class InformixRowEditor : RowEditorBase
 {
-    public override DatabaseEngine Engine => DatabaseEngine.Informix;
+    /// <summary>
+    /// El motor al que sirve esta instancia.
+    ///
+    /// Hay una por transporte —DRDA y SQLI— porque el contrato exige que el
+    /// ejecutor y el catálogo declaren el mismo motor que su proveedor. Lo que
+    /// hacen es idéntico: es el mismo Informix.
+    /// </summary>
+    public InformixRowEditor(DatabaseEngine engine = DatabaseEngine.Informix) =>
+        Engine = engine;
+
+    public override DatabaseEngine Engine { get; }
 
     /// <summary>
     /// Comillas dobles, duplicándolas por dentro.

@@ -15,7 +15,17 @@ namespace Druse.Provider.Informix;
 /// </summary>
 public sealed class InformixQueryExecutor : IQueryExecutor
 {
-    public DatabaseEngine Engine => DatabaseEngine.Informix;
+    /// <summary>
+    /// El motor al que sirve esta instancia.
+    ///
+    /// Hay una por transporte —DRDA y SQLI— porque el contrato exige que el
+    /// ejecutor y el catálogo declaren el mismo motor que su proveedor. Lo que
+    /// hacen es idéntico: es el mismo Informix.
+    /// </summary>
+    public InformixQueryExecutor(DatabaseEngine engine = DatabaseEngine.Informix) =>
+        Engine = engine;
+
+    public DatabaseEngine Engine { get; }
 
     public async Task<QueryResult> ExecuteAsync(
         IDatabaseSession session,
@@ -52,7 +62,17 @@ public sealed class InformixQueryExecutor : IQueryExecutor
             }
         }
 
-        informix.Connection.InfoMessage += OnInfoMessage;
+        // Los mensajes informativos del servidor solo llegan por DRDA: es un
+        // evento del driver de IBM, y el puente JDBC no tiene equivalente —allí
+        // los avisos se preguntan al terminar, que es otra conversación—. Sin
+        // esto, la sección «Mensajes» queda vacía en SQLI; con un `as`, el resto
+        // sigue funcionando igual en los dos.
+        var conDrda = informix.Connection as DB2Connection;
+
+        if (conDrda is not null)
+        {
+            conDrda.InfoMessage += OnInfoMessage;
+        }
 
         // El plazo se controla aquí y no con `CommandTimeout`, por lo mismo que en
         // MySQL: así se distingue quién cortó la consulta. Si venció el reloj es un
@@ -155,7 +175,10 @@ public sealed class InformixQueryExecutor : IQueryExecutor
         }
         finally
         {
-            informix.Connection.InfoMessage -= OnInfoMessage;
+            if (conDrda is not null)
+            {
+                conDrda.InfoMessage -= OnInfoMessage;
+            }
         }
     }
 

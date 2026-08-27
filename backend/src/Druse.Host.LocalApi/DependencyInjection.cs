@@ -101,6 +101,22 @@ internal static class DependencyInjection
         // compilación ligera lo deja fuera. Ver `IncludeInformix` en el csproj.
 #if DRUSE_INFORMIX
         services.AddSingleton<IDatabaseProvider, InformixDatabaseProvider>();
+
+        // El mismo motor por su protocolo nativo. Solo se registra el proveedor:
+        // catálogo, tipos y diseñador los comparte con el de arriba, y de eso se
+        // encarga el registro.
+        services.AddSingleton<IDatabaseProvider>(
+            _ => new InformixDatabaseProvider(Druse.Domain.DatabaseEngine.InformixSqli));
+        services.AddSingleton<IDatabaseMetadataReader>(
+            _ => new InformixMetadataReader(Druse.Domain.DatabaseEngine.InformixSqli));
+        services.AddSingleton<IQueryExecutor>(
+            _ => new InformixQueryExecutor(Druse.Domain.DatabaseEngine.InformixSqli));
+        services.AddSingleton<IRowEditor>(
+            _ => new InformixRowEditor(Druse.Domain.DatabaseEngine.InformixSqli));
+        services.AddSingleton<ITableDesigner>(
+            _ => new InformixTableDesigner(Druse.Domain.DatabaseEngine.InformixSqli));
+        services.AddSingleton<IDatabaseScripter>(
+            _ => new InformixTableDesigner(Druse.Domain.DatabaseEngine.InformixSqli));
         services.AddSingleton<IDatabaseMetadataReader, InformixMetadataReader>();
         services.AddSingleton<IQueryExecutor, InformixQueryExecutor>();
         services.AddSingleton<IRowEditor, InformixRowEditor>();

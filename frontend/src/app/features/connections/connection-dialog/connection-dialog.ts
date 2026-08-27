@@ -59,6 +59,7 @@ type ConnectionField =
   | 'port'
   | 'database'
   | 'username'
+  | 'informixServer'
   | 'sshHost'
   | 'sshPort'
   | 'sshUsername'
@@ -78,6 +79,17 @@ const ENGINES: readonly EngineOption[] = [
   // conecta por DRDA, así que 9089 —el de la edición de desarrollo de IBM— es
   // mejor punto de partida que el 1526 que la gente recuerda.
   { id: 'informix', name: 'Informix', versions: '12.10+ · vía DRDA', defaultPort: 9089, available: true },
+  // El mismo motor por su protocolo nativo. Va aparte porque para quien conecta
+  // son dos cosas distintas: cambia el puerto, hace falta el servidor lógico, y
+  // sobre todo cambia si se puede conectar —DRDA exige un escuchador que muchas
+  // instalaciones no levantan; SQLI lo atiende cualquier Informix—.
+  {
+    id: 'informixsqli',
+    name: 'Informix (SQLI)',
+    versions: '12.10+ · protocolo nativo',
+    defaultPort: 9088,
+    available: true,
+  },
 ];
 
 /**
@@ -205,6 +217,12 @@ export class ConnectionDialog {
   protected readonly sslModes = SSL_MODES;
 
   protected readonly sslMode = signal<SslMode>('prefer');
+
+  /** El `INFORMIXSERVER`. Solo se pide —y solo se manda— con Informix por SQLI. */
+  protected readonly informixServer = signal('');
+
+  /** `true` con el motor que habla el protocolo nativo de Informix. */
+  protected readonly usaSqli = computed(() => this.engine() === 'informixsqli');
 
   protected readonly sshEnabled = signal(false);
   protected readonly sshHost = signal('');
@@ -531,6 +549,7 @@ export class ConnectionDialog {
       case 'mysql':
         return 'mysql';
       case 'informix':
+      case 'informixsqli':
         return 'sysmaster';
       default:
         return 'postgres';
@@ -609,6 +628,13 @@ export class ConnectionDialog {
       errors.username = 'Indica el usuario de la base de datos.';
     }
 
+    // En SQLI el driver no puede deducirlo, y sin él su error habla de red y
+    // manda a mirar el cortafuegos cuando lo que falta es este campo.
+    if (this.usaSqli() && !this.informixServer().trim()) {
+      errors.informixServer =
+        'Indica el servidor Informix del `sqlhosts` (por ejemplo, `vehi_tcp`).';
+    }
+
     if (this.sshEnabled()) {
       const sshPort = this.sshPort();
 
@@ -646,6 +672,9 @@ export class ConnectionDialog {
       authentication: this.authentication(),
       sslMode: this.sslMode(),
       readOnly: this.readOnly(),
+      // Solo con su motor: mandarlo con otro guardaría un dato que nadie usa y
+      // que confundiría al releer el perfil.
+      informixServer: this.usaSqli() ? this.informixServer().trim() : undefined,
       environment: this.environment(),
       save: this.save(),
       // Sin almacén del sistema no se guarda la contraseña, aunque se pida:

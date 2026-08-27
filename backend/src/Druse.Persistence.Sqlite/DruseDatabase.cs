@@ -91,6 +91,7 @@ public sealed class DruseDatabase
                 ssh_authentication       INTEGER NOT NULL DEFAULT 0,
                 ssh_private_key_path     TEXT    NOT NULL DEFAULT '',
                 ssh_timeout_seconds      INTEGER NOT NULL DEFAULT 15,
+                informix_server          TEXT    NOT NULL DEFAULT '',
                 created_at_utc           TEXT    NOT NULL,
                 updated_at_utc           TEXT    NOT NULL
             );
@@ -245,6 +246,15 @@ public sealed class DruseDatabase
                 definition,
                 cancellationToken);
         }
+
+        // El servidor lógico de Informix. Vacío en todo lo que ya existía, que es
+        // lo correcto: los perfiles anteriores son de DRDA, donde no se usa.
+        await AddColumnIfMissingAsync(
+            connection,
+            "connection_profiles",
+            "informix_server",
+            "TEXT NOT NULL DEFAULT ''",
+            cancellationToken);
 
         // Marca de versión del esquema, para poder migrar más adelante sin
         // adivinar en qué estado está el archivo de cada usuario.

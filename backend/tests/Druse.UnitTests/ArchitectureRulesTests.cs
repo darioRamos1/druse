@@ -46,7 +46,9 @@ public sealed class ArchitectureRulesTests
         ["Druse.Jdbc"] = ["Druse.Database.Abstractions"],
 
         // Proveedores: sus contratos y su propio driver. Nunca otro proveedor.
-        ["Druse.Provider.Informix"] = ["Druse.Database.Abstractions"],
+        // Informix es el único que tiene dos transportes: DRDA con el driver de
+        // IBM y SQLI con el puente JDBC.
+        ["Druse.Provider.Informix"] = ["Druse.Database.Abstractions", "Druse.Jdbc"],
         ["Druse.Provider.MySql"] = ["Druse.Database.Abstractions"],
         ["Druse.Provider.PostgreSql"] = ["Druse.Database.Abstractions"],
         ["Druse.Provider.SqlServer"] = ["Druse.Database.Abstractions"],

@@ -18,7 +18,8 @@ public sealed class SqliteConnectionProfileStore(DruseDatabase database) : IConn
         SELECT id, name, engine, host, port, database_name, username,
                environment, read_only, ssl_mode, connect_timeout_seconds,
                authentication, ssh_enabled, ssh_host, ssh_port, ssh_username,
-               ssh_authentication, ssh_private_key_path, ssh_timeout_seconds
+               ssh_authentication, ssh_private_key_path, ssh_timeout_seconds,
+               informix_server
         FROM connection_profiles
         """;
 
@@ -70,14 +71,14 @@ public sealed class SqliteConnectionProfileStore(DruseDatabase database) : IConn
                 authentication, environment, read_only, ssl_mode,
                 connect_timeout_seconds, ssh_enabled, ssh_host, ssh_port,
                 ssh_username, ssh_authentication, ssh_private_key_path,
-                ssh_timeout_seconds, created_at_utc, updated_at_utc
+                ssh_timeout_seconds, informix_server, created_at_utc, updated_at_utc
             )
             VALUES (
                 $id, $name, $engine, $host, $port, $database, $username,
                 $authentication, $environment, $readOnly, $sslMode,
                 $timeout, $sshEnabled, $sshHost, $sshPort,
                 $sshUsername, $sshAuthentication, $sshPrivateKeyPath,
-                $sshTimeout, $now, $now
+                $sshTimeout, $informixServer, $now, $now
             )
             ON CONFLICT (id) DO UPDATE SET
                 name                    = excluded.name,
@@ -98,6 +99,7 @@ public sealed class SqliteConnectionProfileStore(DruseDatabase database) : IConn
                 ssh_authentication      = excluded.ssh_authentication,
                 ssh_private_key_path    = excluded.ssh_private_key_path,
                 ssh_timeout_seconds     = excluded.ssh_timeout_seconds,
+                informix_server         = excluded.informix_server,
                 updated_at_utc          = excluded.updated_at_utc;
             """;
 
@@ -126,6 +128,10 @@ public sealed class SqliteConnectionProfileStore(DruseDatabase database) : IConn
         command.Parameters.AddWithValue("$sshAuthentication", (int)(tunnel?.Authentication ?? SshAuthenticationMode.Password));
         command.Parameters.AddWithValue("$sshPrivateKeyPath", tunnel?.PrivateKeyPath ?? string.Empty);
         command.Parameters.AddWithValue("$sshTimeout", tunnel?.ConnectTimeoutSeconds ?? 15);
+
+        // Cadena vacía y no nulo, como el resto de columnas opcionales: así
+        // leerlas no obliga a comprobar nulos en cada campo.
+        command.Parameters.AddWithValue("$informixServer", profile.InformixServer ?? string.Empty);
         command.Parameters.AddWithValue("$now", DateTimeOffset.UtcNow.ToString("O", CultureInfo.InvariantCulture));
 
         await command.ExecuteNonQueryAsync(cancellationToken);
@@ -140,6 +146,36 @@ public sealed class SqliteConnectionProfileStore(DruseDatabase database) : IConn
         command.Parameters.AddWithValue("$id", id.ToString());
 
         return await command.ExecuteNonQueryAsync(cancellationToken) > 0;
+    }
+
+    /// <summary>
+    /// Lee una columna de texto que puede no estar.
+    ///
+    /// Puede faltar de verdad: la columna se añadió después, y un archivo que
+    /// venga de una versión anterior ya migrada la tiene, pero uno abierto a
+    /// medias de migrar, no. Devolver `null` en vez de reventar deja el perfil
+    /// utilizable, que es lo que importa.
+    /// </summary>
+    private static string? LeerOpcional(DbDataReader reader, string columna)
+    {
+        for (var i = 0; i < reader.FieldCount; i++)
+        {
+            if (!string.Equals(reader.GetName(i), columna, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            if (reader.IsDBNull(i))
+            {
+                return null;
+            }
+
+            var valor = reader.GetString(i);
+
+            return string.IsNullOrWhiteSpace(valor) ? null : valor;
+        }
+
+        return null;
     }
 
     /// <summary>El túnel solo existe si se marcó como activo al guardarlo.</summary>
@@ -171,5 +207,9 @@ public sealed class SqliteConnectionProfileStore(DruseDatabase database) : IConn
         ConnectTimeoutSeconds = reader.GetInt32(10),
         Authentication = (AuthenticationMode)reader.GetInt32(11),
         SshTunnel = MapTunnel(reader),
+
+        // Vacío significa «no aplica»: los perfiles de DRDA no lo usan y los
+        // anteriores a esta columna lo tienen así.
+        InformixServer = LeerOpcional(reader, "informix_server"),
     };
 }

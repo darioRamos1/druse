@@ -7,7 +7,17 @@ namespace Druse.Provider.Informix;
 /// <summary>DDL de Informix. Solo aporta su dialecto.</summary>
 public sealed class InformixTableDesigner : TableDesignerBase
 {
-    public override DatabaseEngine Engine => DatabaseEngine.Informix;
+    /// <summary>
+    /// El motor al que sirve esta instancia.
+    ///
+    /// Hay una por transporte —DRDA y SQLI— porque el contrato exige que el
+    /// ejecutor y el catálogo declaren el mismo motor que su proveedor. Lo que
+    /// hacen es idéntico: es el mismo Informix.
+    /// </summary>
+    public InformixTableDesigner(DatabaseEngine engine = DatabaseEngine.Informix) =>
+        Engine = engine;
+
+    public override DatabaseEngine Engine { get; }
 
     public override IReadOnlyList<string> CommonDataTypes =>
     [

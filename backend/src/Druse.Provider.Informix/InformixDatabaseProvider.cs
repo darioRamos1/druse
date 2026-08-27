@@ -1,4 +1,5 @@
-﻿using System.Diagnostics;
+﻿using System.Data.Common;
+using System.Diagnostics;
 using Druse.Database.Abstractions;
 using Druse.Domain;
 using IBM.Data.Db2;
@@ -14,7 +15,7 @@ internal sealed class InformixSession : IDatabaseSession
         Guid id,
         ConnectionProfile profile,
         DatabaseCredentials credentials,
-        DB2Connection connection)
+        DbConnection connection)
     {
         Id = id;
         Profile = profile;
@@ -26,7 +27,7 @@ internal sealed class InformixSession : IDatabaseSession
 
     public Guid Id { get; }
 
-    public DatabaseEngine Engine => DatabaseEngine.Informix;
+    public DatabaseEngine Engine => Profile.Engine;
 
     public ConnectionProfile Profile { get; }
 
@@ -40,8 +41,15 @@ internal sealed class InformixSession : IDatabaseSession
     /// </summary>
     public SessionTransaction Transaction { get; }
 
-    /// <summary>Solo accesible dentro del proveedor.</summary>
-    internal DB2Connection Connection { get; }
+    /// <summary>
+    /// Solo accesible dentro del proveedor.
+    ///
+    /// Es `DbConnection` y no el tipo de IBM porque **por aquí entran dos
+    /// transportes**: el de DB2 cuando se habla DRDA y el puente JDBC cuando se
+    /// habla SQLI. Todo lo que hay encima —catálogo, tipos, diseñador— funciona
+    /// igual con cualquiera de los dos, que es lo que permite compartirlo.
+    /// </summary>
+    internal DbConnection Connection { get; }
 
     /// <summary>Solo se usa para abrir otra base del mismo servidor.</summary>
     internal DatabaseCredentials Credentials { get; private set; }
@@ -84,7 +92,30 @@ public sealed class InformixDatabaseProvider : IDatabaseProvider
     /// </summary>
     static InformixDatabaseProvider() => InformixNativeLibrary.Ensure();
 
-    public DatabaseEngine Engine => DatabaseEngine.Informix;
+    /// <summary>
+    /// Por dónde se entra al motor.
+    ///
+    /// Se registra una instancia por transporte. Todo lo que hay debajo es
+    /// compartido —es el mismo Informix—; lo único que cambia es cómo se abre la
+    /// conexión y qué puerto se propone.
+    /// </summary>
+    public InformixDatabaseProvider(DatabaseEngine engine = DatabaseEngine.Informix)
+    {
+        if (engine is not (DatabaseEngine.Informix or DatabaseEngine.InformixSqli))
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(engine),
+                engine,
+                "Este proveedor solo atiende a Informix.");
+        }
+
+        Engine = engine;
+    }
+
+    public DatabaseEngine Engine { get; }
+
+    /// <summary>`true` cuando se habla el protocolo nativo en vez de DRDA.</summary>
+    private bool EsSqli => Engine == DatabaseEngine.InformixSqli;
 
     /// <summary>
     /// Puerto del escuchador DRDA, no el nativo de Informix.
@@ -93,7 +124,7 @@ public sealed class InformixDatabaseProvider : IDatabaseProvider
     /// usa la imagen de desarrollo de IBM. Es solo el valor que propone el
     /// formulario: si el administrador puso otro, se escribe a mano.
     /// </summary>
-    public int DefaultPort => 9089;
+    public int DefaultPort => EsSqli ? 9088 : 9089;
 
     /// <summary>`sysmaster` es la base del servidor, y es donde vive el catálogo.</summary>
     public string DefaultDatabase => "sysmaster";
@@ -112,8 +143,7 @@ public sealed class InformixDatabaseProvider : IDatabaseProvider
 
         try
         {
-            await using var connection = new DB2Connection(
-                InformixConnectionStringFactory.Build(profile, credentials));
+            await using var connection = Crear(profile, credentials);
 
             await connection.OpenAsync(cancellationToken);
 
@@ -136,8 +166,7 @@ public sealed class InformixDatabaseProvider : IDatabaseProvider
     {
         ArgumentNullException.ThrowIfNull(profile);
 
-        var connection = new DB2Connection(
-            InformixConnectionStringFactory.Build(profile, credentials));
+        var connection = Crear(profile, credentials);
 
         try
         {
@@ -161,6 +190,29 @@ public sealed class InformixDatabaseProvider : IDatabaseProvider
         // El identificador es aleatorio a propósito: es lo que viaja por HTTP y no
         // debe poder adivinarse (plan §12).
         return new InformixSession(Guid.NewGuid(), profile, credentials, connection);
+    }
+
+    /// <summary>
+    /// Abre la conexión que corresponde al transporte de este proveedor.
+    ///
+    /// Es el único punto donde los dos caminos se separan. Lo que devuelve es
+    /// `DbConnection` en ambos casos, y por eso el resto del proveedor no tiene
+    /// que enterarse de por dónde ha entrado.
+    /// </summary>
+    private DbConnection Crear(ConnectionProfile profile, DatabaseCredentials credentials)
+    {
+        if (!EsSqli)
+        {
+            return new DB2Connection(InformixConnectionStringFactory.Build(profile, credentials));
+        }
+
+        // Idempotente y aquí, no en el constructor estático: el registro solo hace
+        // falta si alguien va a conectar por SQLI, y cargarlo siempre obligaría a
+        // la variante sin Informix a arrastrar el puente.
+        Druse.Jdbc.JdbcConnection.RegisterInformixDriver();
+
+        return new Druse.Jdbc.JdbcConnection(
+            InformixSqliConnectionStringFactory.Build(profile, credentials));
     }
 
     public Task<IDatabaseSession> OpenDatabaseSessionAsync(

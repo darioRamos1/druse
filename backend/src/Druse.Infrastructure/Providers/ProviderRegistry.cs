@@ -45,33 +45,51 @@ public sealed class ProviderRegistry : IProviderRegistry
 
     public IReadOnlyCollection<DatabaseEngine> SupportedEngines => _providers.Keys;
 
-    public IDatabaseProvider GetProvider(DatabaseEngine engine) =>
-        _providers.TryGetValue(engine, out var provider)
-            ? provider
-            : throw new UnsupportedEngineException(engine);
+    public IDatabaseProvider GetProvider(DatabaseEngine engine) => Buscar(_providers, engine);
 
     public IDatabaseMetadataReader GetMetadataReader(DatabaseEngine engine) =>
-        _readers.TryGetValue(engine, out var reader)
-            ? reader
-            : throw new UnsupportedEngineException(engine);
+        Buscar(_readers, engine);
 
-    public IQueryExecutor GetQueryExecutor(DatabaseEngine engine) =>
-        _executors.TryGetValue(engine, out var executor)
-            ? executor
-            : throw new UnsupportedEngineException(engine);
+    public IQueryExecutor GetQueryExecutor(DatabaseEngine engine) => Buscar(_executors, engine);
 
-    public IRowEditor GetRowEditor(DatabaseEngine engine) =>
-        _rowEditors.TryGetValue(engine, out var editor)
-            ? editor
-            : throw new UnsupportedEngineException(engine);
+    public IRowEditor GetRowEditor(DatabaseEngine engine) => Buscar(_rowEditors, engine);
 
     public ITableDesigner GetTableDesigner(DatabaseEngine engine) =>
-        _tableDesigners.TryGetValue(engine, out var designer)
-            ? designer
-            : throw new UnsupportedEngineException(engine);
+        Buscar(_tableDesigners, engine);
 
-    public IDatabaseScripter GetScripter(DatabaseEngine engine) =>
-        _scripters.TryGetValue(engine, out var scripter)
-            ? scripter
-            : throw new UnsupportedEngineException(engine);
+    public IDatabaseScripter GetScripter(DatabaseEngine engine) => Buscar(_scripters, engine);
+
+    /// <summary>
+    /// Busca el servicio del motor, y si no lo hay prueba con el que comparte.
+    ///
+    /// Existe por Informix, que tiene dos motores para un solo producto: DRDA y
+    /// SQLI cambian por dónde se entra, pero **el SQL, el catálogo, los tipos y
+    /// el diseñador son los mismos**. Registrar cinco duplicados que solo se
+    /// diferencian en el valor de una propiedad diría que son distintos cuando
+    /// no lo son, y obligaría a acordarse de tocarlos de dos en dos.
+    ///
+    /// La conexión sí es propia de cada uno, así que el proveedor no comparte:
+    /// hay uno registrado por transporte y este atajo nunca llega a usarse.
+    /// </summary>
+    private static T Buscar<T>(Dictionary<DatabaseEngine, T> registro, DatabaseEngine engine)
+    {
+        if (registro.TryGetValue(engine, out var encontrado))
+        {
+            return encontrado;
+        }
+
+        if (Comparte(engine) is { } hermano && registro.TryGetValue(hermano, out var compartido))
+        {
+            return compartido;
+        }
+
+        throw new UnsupportedEngineException(engine);
+    }
+
+    /// <summary>Con qué motor comparte todo lo que no sea abrir la conexión.</summary>
+    private static DatabaseEngine? Comparte(DatabaseEngine engine) => engine switch
+    {
+        DatabaseEngine.InformixSqli => DatabaseEngine.Informix,
+        _ => null,
+    };
 }

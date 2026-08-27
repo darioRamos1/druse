@@ -41,6 +41,7 @@ internal static class ContractMapper
             SslMode = ParseEnum(dto.SslMode, SslMode.Prefer),
             ConnectTimeoutSeconds = dto.ConnectTimeoutSeconds,
             SshTunnel = dto.SshTunnel?.ToDomain(),
+            InformixServer = dto.InformixServer,
         };
     }
 
@@ -287,6 +288,7 @@ internal static class ContractMapper
             SslMode = profile.SslMode.ToString().ToLowerInvariant(),
             HasStoredPassword = hasStoredPassword,
             SshTunnel = profile.SshTunnel?.ToDto(),
+            InformixServer = profile.InformixServer,
             HasStoredSshSecret = hasStoredSshSecret,
         };
     }

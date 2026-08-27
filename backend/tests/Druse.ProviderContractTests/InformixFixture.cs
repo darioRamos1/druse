@@ -5,29 +5,34 @@ using Druse.Provider.Informix;
 namespace Druse.ProviderContractTests;
 
 /// <summary>Conexión y dialecto de Informix para el contrato común.</summary>
-public sealed class InformixFixture : IProviderFixture
+/// <remarks>
+/// No está sellada porque el mismo motor se alcanza por **dos transportes**, y
+/// entre ellos solo cambia cómo se abre la conexión: el dialecto, los tipos y
+/// los esquemas son idénticos. Lo que varía va marcado como `virtual`.
+/// </remarks>
+public class InformixFixture : IProviderFixture
 {
     private static readonly Lazy<(bool Available, string? Reason)> Probed = new(Probe);
 
-    public string EngineName => "Informix";
+    public virtual string EngineName => "Informix";
 
-    public bool IsAvailable => Probed.Value.Available;
+    public virtual bool IsAvailable => Probed.Value.Available;
 
-    public string? UnavailableReason => Probed.Value.Reason;
+    public virtual string? UnavailableReason => Probed.Value.Reason;
 
-    public IDatabaseProvider Provider { get; } = new InformixDatabaseProvider();
+    public virtual IDatabaseProvider Provider { get; } = new InformixDatabaseProvider();
 
-    public IQueryExecutor Executor { get; } = new InformixQueryExecutor();
+    public virtual IQueryExecutor Executor { get; } = new InformixQueryExecutor();
 
-    public IDatabaseMetadataReader Metadata { get; } = new InformixMetadataReader();
+    public virtual IDatabaseMetadataReader Metadata { get; } = new InformixMetadataReader();
 
-    public IRowEditor RowEditor { get; } = new InformixRowEditor();
+    public virtual IRowEditor RowEditor { get; } = new InformixRowEditor();
 
     private readonly InformixTableDesigner _designer = new();
 
-    public ITableDesigner Designer => _designer;
+    public virtual ITableDesigner Designer => _designer;
 
-    public IDatabaseScripter Scripter => _designer;
+    public virtual IDatabaseScripter Scripter => _designer;
 
     /// <summary>
     /// Sin binarios: `BYTE` y `BLOB` no tienen forma literal, así que una columna
@@ -59,7 +64,7 @@ public sealed class InformixFixture : IProviderFixture
 
     public string DefaultSchemaFor(string database) => DefaultSchema;
 
-    public ConnectionProfile Profile(bool onlyRead = false) => new()
+    public virtual ConnectionProfile Profile(bool onlyRead = false) => new()
     {
         Id = Guid.NewGuid(),
         Name = "Informix de pruebas",
@@ -76,7 +81,7 @@ public sealed class InformixFixture : IProviderFixture
         ConnectTimeoutSeconds = 5,
     };
 
-    public ConnectionProfile ProfileForDatabase(string database, bool onlyRead = false) =>
+    public virtual ConnectionProfile ProfileForDatabase(string database, bool onlyRead = false) =>
         Profile(onlyRead) with { Id = Guid.NewGuid(), Database = database };
 
     public DatabaseCredentials Credentials =>

@@ -103,15 +103,28 @@ public sealed class JdbcConnection : DbConnection
         }
     }
 
-    public override Task OpenAsync(CancellationToken cancellationToken)
-    {
-        // JDBC no tiene apertura asíncrona: lo honesto es decir que esto bloquea
-        // en vez de fingir con un `Task.Run` que solo mueve el bloqueo de hilo.
-        cancellationToken.ThrowIfCancellationRequested();
-        Open();
-
-        return Task.CompletedTask;
-    }
+    /// <summary>
+    /// Abre la conexión sin dejar clavado al que espera.
+    ///
+    /// El trabajo se manda a otro hilo para que quien llamó pueda seguir
+    /// atendiendo su token. **La conexión en curso no se aborta**: eso solo lo
+    /// permite JDBC una vez hay un `Statement`, y aquí todavía no lo hay. Lo que
+    /// se consigue es que la aplicación no se quede congelada esperando a un
+    /// servidor que no contesta, no que el intento termine antes.
+    ///
+    /// El plazo real lo pone `Connect_Timeout` en la propia URL, que es quien
+    /// puede cortarlo de verdad.
+    /// </summary>
+    public override Task OpenAsync(CancellationToken cancellationToken) =>
+        JdbcCancellation.RunAsync<object?>(
+            () =>
+            {
+                Open();
+                return null;
+            },
+            // Nada que cancelar todavía: sin statement, JDBC no ofrece por dónde.
+            () => { },
+            cancellationToken);
 
     public override void Close()
     {

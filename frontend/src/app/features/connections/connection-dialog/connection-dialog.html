@@ -105,6 +105,35 @@
         }
       </label>
 
+      <!--
+        El servidor lógico de Informix, solo con el motor que lo necesita.
+
+        Va **antes** de la base porque es lo que decide con qué instancia se
+        habla: escrito después, se lee como un detalle de la base y no como lo
+        que es. Es el mismo dato que otras herramientas piden como «Server».
+      -->
+      @if (usaSqli()) {
+        <label class="field field--wide">
+          <span class="field__label">Servidor Informix</span>
+          <input
+            class="field__input"
+            type="text"
+            [(ngModel)]="informixServer"
+            placeholder="vehi_tcp"
+            [class.is-invalid]="fieldError('informixServer')"
+            [attr.aria-invalid]="!!fieldError('informixServer')"
+            aria-describedby="connection-informix-server-detail"
+          />
+          @if (fieldError('informixServer'); as error) {
+            <span class="field__error" id="connection-informix-server-detail">{{ error }}</span>
+          } @else {
+            <span class="field__hint" id="connection-informix-server-detail">
+              El nombre del `sqlhosts`, no el de la máquina. Lo sabe quien administra el servidor.
+            </span>
+          }
+        </label>
+      }
+
       <label class="field field--wide">
         <span class="field__label">Base de datos</span>
         <span class="picker">

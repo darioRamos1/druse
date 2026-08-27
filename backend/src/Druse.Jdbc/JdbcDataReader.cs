@@ -14,39 +14,124 @@ namespace Druse.Jdbc;
 /// </summary>
 public sealed class JdbcDataReader : DbDataReader, IEnumerable<DbDataRecord>
 {
-    private readonly java.sql.ResultSet _rs;
-    private readonly java.sql.Statement _statement;
+    private readonly IReadOnlyList<string> _sentencias;
+    private readonly Func<string, java.sql.PreparedStatement> _preparar;
     private readonly JdbcConnection? _cerrarTambien;
-    private readonly java.sql.ResultSetMetaData _meta;
+    private readonly Action _cancelar;
+
+    private java.sql.ResultSet? _rs;
+    private java.sql.Statement? _statement;
+    private java.sql.ResultSetMetaData? _meta;
+    private int _siguiente;
+    private int _afectadas = -1;
     private bool _cerrado;
 
+    /// <summary>
+    /// Recorre las sentencias del lote una a una.
+    ///
+    /// Se abre la primera en el constructor porque quien recibe un lector espera
+    /// poder leer sin llamar antes a `NextResult`, igual que en ADO.NET. Las
+    /// siguientes esperan a que se pidan: ejecutarlas por adelantado haría
+    /// trabajo que quizá nadie mire, y en un guion con escrituras lo haría
+    /// **antes de tiempo**.
+    /// </summary>
     internal JdbcDataReader(
-        java.sql.ResultSet rs,
-        java.sql.Statement statement,
-        JdbcConnection? cerrarTambien)
+        IReadOnlyList<string> sentencias,
+        Func<string, java.sql.PreparedStatement> preparar,
+        JdbcConnection? cerrarTambien,
+        Action cancelar)
     {
-        _rs = rs;
-        _statement = statement;
+        _sentencias = sentencias;
+        _preparar = preparar;
         _cerrarTambien = cerrarTambien;
-        _meta = rs.getMetaData();
-        FieldCount = _meta.getColumnCount();
+        _cancelar = cancelar;
+
+        Avanzar();
     }
 
-    public override int FieldCount { get; }
+    /// <summary>
+    /// Abre la siguiente sentencia. `false` cuando ya no queda ninguna.
+    ///
+    /// Una sentencia que no devuelve filas —un INSERT— no interrumpe el
+    /// recorrido: se anota cuántas afectó y se sigue, que es lo que espera quien
+    /// manda un guion mezclando escrituras y consultas.
+    /// </summary>
+    private bool Avanzar()
+    {
+        CerrarActual();
 
-    public override bool HasRows => true;
+        while (_siguiente < _sentencias.Count)
+        {
+            var sentencia = _sentencias[_siguiente++];
+            var statement = _preparar(sentencia);
+
+            try
+            {
+                if (statement.execute())
+                {
+                    _statement = statement;
+                    _rs = statement.getResultSet();
+                    _meta = Rs.getMetaData();
+                    _columnas = _meta.getColumnCount();
+
+                    return true;
+                }
+
+                var afectadas = statement.getUpdateCount();
+
+                if (afectadas >= 0)
+                {
+                    _afectadas = _afectadas < 0 ? afectadas : _afectadas + afectadas;
+                }
+
+                statement.close();
+            }
+            catch (java.sql.SQLException exception)
+            {
+                statement.close();
+                throw new JdbcException(exception);
+            }
+        }
+
+        _columnas = 0;
+
+        return false;
+    }
+
+    private void CerrarActual()
+    {
+        Silencioso(() => _rs?.close());
+        Silencioso(() => _statement?.close());
+
+        _rs = null;
+        _statement = null;
+        _meta = null;
+    }
+
+    /// <summary>El resultado abierto, o un error claro si ya no hay ninguno.</summary>
+    private java.sql.ResultSet Rs =>
+        _rs ?? throw new InvalidOperationException("No hay ningún resultado que leer.");
+
+    private java.sql.ResultSetMetaData Meta =>
+        _meta ?? throw new InvalidOperationException("No hay ningún resultado que leer.");
+
+    private int _columnas;
+
+    public override int FieldCount => _columnas;
+
+    public override bool HasRows => _rs is not null;
 
     public override bool IsClosed => _cerrado;
 
     public override int Depth => 0;
 
     /// <summary>
-    /// Filas afectadas.
+    /// Filas que escribieron las sentencias del lote que no devolvían resultado.
     ///
-    /// Siempre -1: quien lee un resultado no está contando escrituras, y JDBC no
-    /// ofrece el dato desde un `ResultSet`.
+    /// -1 cuando no hubo ninguna, que es lo que ADO.NET usa para «no aplica» y lo
+    /// que distingue un guion de solo lectura de uno que escribió cero filas.
     /// </summary>
-    public override int RecordsAffected => -1;
+    public override int RecordsAffected => _afectadas;
 
     public override object this[int ordinal] => GetValue(ordinal);
 
@@ -56,7 +141,7 @@ public sealed class JdbcDataReader : DbDataReader, IEnumerable<DbDataRecord>
     {
         try
         {
-            return _rs.next();
+            return Rs.next();
         }
         catch (java.sql.SQLException exception)
         {
@@ -64,16 +149,23 @@ public sealed class JdbcDataReader : DbDataReader, IEnumerable<DbDataRecord>
         }
     }
 
-    public override Task<bool> ReadAsync(CancellationToken cancellationToken)
-    {
-        cancellationToken.ThrowIfCancellationRequested();
+    /// <summary>
+    /// Lee la siguiente fila sin bloquear al que espera.
+    ///
+    /// Traer una fila puede tardar tanto como ejecutar: con un resultado grande,
+    /// el motor va sirviendo por bloques y cada `next` es una ida y vuelta. Si
+    /// esto no atendiera la cancelación, cancelar a mitad de lectura no haría
+    /// nada hasta que llegara la última fila.
+    /// </summary>
+    public override Task<bool> ReadAsync(CancellationToken cancellationToken) =>
+        JdbcCancellation.RunAsync(Read, _cancelar, cancellationToken);
 
-        return Task.FromResult(Read());
-    }
+    public override Task<bool> NextResultAsync(CancellationToken cancellationToken) =>
+        JdbcCancellation.RunAsync(NextResult, _cancelar, cancellationToken);
 
-    public override bool NextResult() => false;
+    public override bool NextResult() => Avanzar();
 
-    public override string GetName(int ordinal) => _meta.getColumnLabel(Ordinal(ordinal)) ?? string.Empty;
+    public override string GetName(int ordinal) => Meta.getColumnLabel(Ordinal(ordinal)) ?? string.Empty;
 
     public override int GetOrdinal(string name)
     {
@@ -90,22 +182,22 @@ public sealed class JdbcDataReader : DbDataReader, IEnumerable<DbDataRecord>
 
     /// <summary>El nombre del tipo tal y como lo llama el motor, no el de Java.</summary>
     public override string GetDataTypeName(int ordinal) =>
-        _meta.getColumnTypeName(Ordinal(ordinal)) ?? string.Empty;
+        Meta.getColumnTypeName(Ordinal(ordinal)) ?? string.Empty;
 
-    public override Type GetFieldType(int ordinal) => Traducir(_meta.getColumnType(Ordinal(ordinal)));
+    public override Type GetFieldType(int ordinal) => Traducir(Meta.getColumnType(Ordinal(ordinal)));
 
     public override bool IsDBNull(int ordinal)
     {
-        _rs.getObject(Ordinal(ordinal));
+        Rs.getObject(Ordinal(ordinal));
 
-        return _rs.wasNull();
+        return Rs.wasNull();
     }
 
     public override object GetValue(int ordinal)
     {
-        var valor = _rs.getObject(Ordinal(ordinal));
+        var valor = Rs.getObject(Ordinal(ordinal));
 
-        if (valor is null || _rs.wasNull())
+        if (valor is null || Rs.wasNull())
         {
             return DBNull.Value;
         }
@@ -125,9 +217,9 @@ public sealed class JdbcDataReader : DbDataReader, IEnumerable<DbDataRecord>
         return cuantos;
     }
 
-    public override bool GetBoolean(int ordinal) => _rs.getBoolean(Ordinal(ordinal));
+    public override bool GetBoolean(int ordinal) => Rs.getBoolean(Ordinal(ordinal));
 
-    public override byte GetByte(int ordinal) => (byte)_rs.getShort(Ordinal(ordinal));
+    public override byte GetByte(int ordinal) => (byte)Rs.getShort(Ordinal(ordinal));
 
     public override char GetChar(int ordinal)
     {
@@ -138,7 +230,7 @@ public sealed class JdbcDataReader : DbDataReader, IEnumerable<DbDataRecord>
 
     public override DateTime GetDateTime(int ordinal)
     {
-        var marca = _rs.getTimestamp(Ordinal(ordinal));
+        var marca = Rs.getTimestamp(Ordinal(ordinal));
 
         // `toString` da el formato ISO de JDBC, que `DateTime.Parse` entiende sin
         // ambigüedad de idioma. Pasar por los milisegundos de época obligaría a
@@ -150,30 +242,30 @@ public sealed class JdbcDataReader : DbDataReader, IEnumerable<DbDataRecord>
 
     public override decimal GetDecimal(int ordinal)
     {
-        var valor = _rs.getBigDecimal(Ordinal(ordinal));
+        var valor = Rs.getBigDecimal(Ordinal(ordinal));
 
         return valor is null
             ? 0m
             : decimal.Parse(valor.toString(), System.Globalization.CultureInfo.InvariantCulture);
     }
 
-    public override double GetDouble(int ordinal) => _rs.getDouble(Ordinal(ordinal));
+    public override double GetDouble(int ordinal) => Rs.getDouble(Ordinal(ordinal));
 
-    public override float GetFloat(int ordinal) => _rs.getFloat(Ordinal(ordinal));
+    public override float GetFloat(int ordinal) => Rs.getFloat(Ordinal(ordinal));
 
     public override Guid GetGuid(int ordinal) => Guid.Parse(GetString(ordinal));
 
-    public override short GetInt16(int ordinal) => _rs.getShort(Ordinal(ordinal));
+    public override short GetInt16(int ordinal) => Rs.getShort(Ordinal(ordinal));
 
-    public override int GetInt32(int ordinal) => _rs.getInt(Ordinal(ordinal));
+    public override int GetInt32(int ordinal) => Rs.getInt(Ordinal(ordinal));
 
-    public override long GetInt64(int ordinal) => _rs.getLong(Ordinal(ordinal));
+    public override long GetInt64(int ordinal) => Rs.getLong(Ordinal(ordinal));
 
-    public override string GetString(int ordinal) => _rs.getString(Ordinal(ordinal)) ?? string.Empty;
+    public override string GetString(int ordinal) => Rs.getString(Ordinal(ordinal)) ?? string.Empty;
 
     public override long GetBytes(int ordinal, long dataOffset, byte[]? buffer, int bufferOffset, int length)
     {
-        var bytes = _rs.getBytes(Ordinal(ordinal));
+        var bytes = Rs.getBytes(Ordinal(ordinal));
 
         if (bytes is null)
         {
@@ -236,8 +328,7 @@ public sealed class JdbcDataReader : DbDataReader, IEnumerable<DbDataRecord>
 
         _cerrado = true;
 
-        Silencioso(() => _rs.close());
-        Silencioso(() => _statement.close());
+        CerrarActual();
 
         _cerrarTambien?.Close();
     }

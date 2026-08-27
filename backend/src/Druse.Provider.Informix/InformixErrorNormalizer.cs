@@ -18,6 +18,10 @@ internal static class InformixErrorNormalizer
     {
         DB2Exception db2 => FromDb2(db2),
 
+        // El mismo motor por SQLI. El código lo trae el driver de Java, y llega
+        // con el mismo signo negativo que usa Informix en su documentación.
+        Druse.Jdbc.JdbcException jdbc => FromJdbc(jdbc),
+
         TimeoutException => new QueryError
         {
             Message = "La operación superó el tiempo de espera.",
@@ -56,6 +60,24 @@ internal static class InformixErrorNormalizer
             Code = code.ToString(CultureInfo.InvariantCulture),
         };
     }
+
+    /// <summary>
+    /// Traduce un error llegado por el puente JDBC.
+    ///
+    /// Son los mismos números que por DRDA —Informix los numera en negativo, y
+    /// -201 sigue siendo un error de sintaxis—, así que la explicación se busca
+    /// en la misma tabla. Lo que cambia es de dónde se saca el código.
+    ///
+    /// Cuando el driver no da número, el campo se deja vacío en vez de escribir
+    /// un cero: cero es un código válido y decirlo sería inventarse un dato.
+    /// </summary>
+    private static QueryError FromJdbc(Druse.Jdbc.JdbcException exception) => new()
+    {
+        Message = Explain(exception.ErrorCode) ?? exception.Message,
+        Code = exception.ErrorCode != 0
+            ? exception.ErrorCode.ToString(CultureInfo.InvariantCulture)
+            : null,
+    };
 
     /// <summary>
     /// Explica los fallos que un usuario puede arreglar por su cuenta.

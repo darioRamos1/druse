@@ -81,6 +81,19 @@ public sealed record ConnectionProfile
     public bool UsesSshTunnel => SshTunnel is not null;
 
     /// <summary>
+    /// Nombre del servidor lógico de Informix, el `INFORMIXSERVER`.
+    ///
+    /// Solo lo usa <see cref="DatabaseEngine.InformixSqli"/>. Es el alias del
+    /// `sqlhosts` —`vehi_tcp`, `ol_informix1210`— y **no es el nombre de la
+    /// máquina**: un mismo servidor publica varios, uno por protocolo, y el de
+    /// SQLI no tiene por qué parecerse al de DRDA.
+    ///
+    /// En SQLI es obligatorio; sin él, el driver no sabe con cuál de las
+    /// instancias del servidor quiere hablar.
+    /// </summary>
+    public string? InformixServer { get; init; }
+
+    /// <summary>
     /// Opciones específicas del motor que no encajan en los campos anteriores.
     /// Nunca deben usarse para transportar credenciales.
     /// </summary>

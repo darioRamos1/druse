@@ -15,7 +15,16 @@ public sealed class JdbcCommand : DbCommand
 {
     private readonly JdbcParameterCollection _parameters = new();
     private JdbcConnection? _connection;
-    private java.sql.PreparedStatement? _abierto;
+    /// <summary>
+    /// El statement que está corriendo ahora mismo.
+    ///
+    /// No es «el último preparado»: en un lote se preparan varios y solo uno
+    /// está en el motor. Cancelar el equivocado no haría nada y dejaría la
+    /// consulta viva, que es la peor forma de fallar —parece que funcionó—.
+    ///
+    /// `volatile` porque lo escribe el hilo que ejecuta y lo lee el que cancela.
+    /// </summary>
+    private volatile java.sql.PreparedStatement? _enCurso;
 
     [AllowNull]
     public override string CommandText { get; set; } = string.Empty;
@@ -47,7 +56,7 @@ public sealed class JdbcCommand : DbCommand
         // falta para el botón «Cancelar» de una consulta larga.
         try
         {
-            _abierto?.cancel();
+            _enCurso?.cancel();
         }
         catch (java.sql.SQLException)
         {
@@ -57,21 +66,34 @@ public sealed class JdbcCommand : DbCommand
 
     public override int ExecuteNonQuery()
     {
-        using var statement = Preparar();
+        var total = 0;
 
-        try
+        // Una por una: JDBC no acepta varias sentencias en el mismo statement, y
+        // lo que se devuelve es la suma, como haría un lote de ADO.NET.
+        foreach (var sentencia in SqlBatch.Split(CommandText))
         {
-            return statement.executeUpdate();
+            using var statement = Preparar(sentencia);
+
+            try
+            {
+                total += statement.executeUpdate();
+            }
+            catch (java.sql.SQLException exception)
+            {
+                throw new JdbcException(exception);
+            }
         }
-        catch (java.sql.SQLException exception)
-        {
-            throw new JdbcException(exception);
-        }
+
+        return total;
     }
 
     public override object? ExecuteScalar()
     {
-        using var statement = Preparar();
+        var sentencias = SqlBatch.Split(CommandText);
+
+        // La primera que haya: un escalar se pide de una consulta, no de un
+        // guion, y ejecutar el resto sería hacer trabajo que nadie pidió.
+        using var statement = Preparar(sentencias.Count > 0 ? sentencias[0] : CommandText);
 
         try
         {
@@ -96,26 +118,48 @@ public sealed class JdbcCommand : DbCommand
         // un statement vivo sin nadie que lo cierre.
     }
 
+    /// <summary>
+    /// Abre el lector sin bloquear al que espera.
+    ///
+    /// Es la ruta que usa Druse, y la única por la que la cancelación llega a
+    /// tiempo: la versión síncrona se queda dentro del driver hasta que el
+    /// servidor conteste.
+    /// </summary>
+    protected override Task<DbDataReader> ExecuteDbDataReaderAsync(
+        CommandBehavior behavior,
+        CancellationToken cancellationToken) =>
+        JdbcCancellation.RunAsync(
+            () => ExecuteDbDataReader(behavior),
+            Cancel,
+            cancellationToken);
+
+    public override Task<int> ExecuteNonQueryAsync(CancellationToken cancellationToken) =>
+        JdbcCancellation.RunAsync(ExecuteNonQuery, Cancel, cancellationToken);
+
+    public override Task<object?> ExecuteScalarAsync(CancellationToken cancellationToken) =>
+        JdbcCancellation.RunAsync(ExecuteScalar, Cancel, cancellationToken);
+
     protected override DbDataReader ExecuteDbDataReader(CommandBehavior behavior)
     {
-        var statement = Preparar();
+        var sentencias = SqlBatch.Split(CommandText);
 
-        try
+        if (sentencias.Count == 0)
         {
-            var rs = statement.executeQuery();
+            sentencias = [CommandText];
+        }
 
-            // El lector se queda con el statement y lo cierra al cerrarse: si lo
-            // cerrara aquí, el ResultSet moriría con él antes de leer una fila.
-            return new JdbcDataReader(rs, statement, behavior.HasFlag(CommandBehavior.CloseConnection) ? _connection : null);
-        }
-        catch (java.sql.SQLException exception)
-        {
-            statement.close();
-            throw new JdbcException(exception);
-        }
+        // El lector va abriendo cada sentencia al avanzar con `NextResult`, que
+        // es como ADO.NET recorre un lote. Ejecutarlas todas aquí obligaría a
+        // guardar en memoria resultados que quizá nadie llegue a leer.
+        return new JdbcDataReader(
+            sentencias,
+            Preparar,
+            behavior.HasFlag(CommandBehavior.CloseConnection) ? _connection : null,
+            Cancel);
     }
 
-    private java.sql.PreparedStatement Preparar()
+    /// <summary>Prepara una sentencia suelta con los parámetros del comando.</summary>
+    internal java.sql.PreparedStatement Preparar(string sentencia)
     {
         if (_connection is null)
         {
@@ -124,7 +168,7 @@ public sealed class JdbcCommand : DbCommand
 
         try
         {
-            var statement = _connection.Java.prepareStatement(CommandText);
+            var statement = _connection.Java.prepareStatement(sentencia);
 
             // En JDBC el plazo va en segundos y cero significa «sin límite», igual
             // que en ADO.NET.
@@ -144,7 +188,7 @@ public sealed class JdbcCommand : DbCommand
                 }
             }
 
-            _abierto = statement;
+            _enCurso = statement;
 
             return statement;
         }

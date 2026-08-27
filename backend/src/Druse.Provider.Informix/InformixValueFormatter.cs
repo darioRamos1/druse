@@ -17,14 +17,19 @@ internal static class InformixValueFormatter
     {
         string text => text,
 
-        // Si el driver entrega un bool, se muestra como en los otros motores.
+        // Un booleano se enseña como el número que manda el motor.
         //
-        // Por DRDA no ocurre: comprobado contra el servidor, un `BOOLEAN` llega
-        // como `SMALLINT` de valor 1 o 0 y el tipo original se pierde por el
-        // camino. No se normaliza a `true` porque para hacerlo habría que
-        // convertir todos los `SMALLINT`, y una columna de cantidades pasaría a
-        // leerse como booleana. Se enseña el número que manda el motor.
-        bool flag => flag ? "true" : "false",
+        // Por DRDA no llega ni siquiera como booleano: comprobado contra el
+        // servidor, un `BOOLEAN` viene como `SMALLINT` de valor 1 o 0 y el tipo
+        // original se pierde. Por SQLI **sí** llega tipado, y ahí está el
+        // problema que esto resuelve: **el mismo dato de la misma columna no
+        // puede leerse distinto según por dónde se haya entrado**. Se escribe el
+        // número, que es lo que ya salía por el camino de siempre.
+        //
+        // No se hace al revés —normalizar a `true`— porque para eso habría que
+        // convertir todos los `SMALLINT` de DRDA, y una columna de cantidades
+        // pasaría a leerse como booleana.
+        bool flag => flag ? "1" : "0",
 
         // DATETIME de Informix llega hasta cinco decimales de segundo
         // (FRACTION(5)); el formato admite los que haya sin inventar ceros.

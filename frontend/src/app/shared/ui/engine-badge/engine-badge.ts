@@ -7,6 +7,7 @@ const ENGINE_LABELS: Readonly<Record<DatabaseEngine, string>> = {
   sqlserver: 'MS',
   mysql: 'MY',
   informix: 'IX',
+  informixsqli: 'IX',
 };
 
 const ENGINE_NAMES: Readonly<Record<DatabaseEngine, string>> = {
@@ -14,6 +15,7 @@ const ENGINE_NAMES: Readonly<Record<DatabaseEngine, string>> = {
   sqlserver: 'SQL Server',
   mysql: 'MySQL',
   informix: 'Informix',
+  informixsqli: 'Informix (SQLI)',
 };
 
 /**

@@ -31,7 +31,17 @@ public sealed class InformixMetadataReader : IDatabaseMetadataReader
     /// </summary>
     private const string UserTables = "t.tabid >= 100";
 
-    public DatabaseEngine Engine => DatabaseEngine.Informix;
+    /// <summary>
+    /// El motor al que sirve esta instancia.
+    ///
+    /// Hay una por transporte —DRDA y SQLI— porque el contrato exige que el
+    /// ejecutor y el catálogo declaren el mismo motor que su proveedor. Lo que
+    /// hacen es idéntico: es el mismo Informix.
+    /// </summary>
+    public InformixMetadataReader(DatabaseEngine engine = DatabaseEngine.Informix) =>
+        Engine = engine;
+
+    public DatabaseEngine Engine { get; }
 
     public async Task<IReadOnlyList<DatabaseObject>> GetDatabasesAsync(
         IDatabaseSession session,
