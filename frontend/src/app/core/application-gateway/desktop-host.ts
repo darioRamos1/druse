@@ -18,10 +18,32 @@ export interface SavedSqlDocument {
   readonly fileName: string;
 }
 
+export interface DesktopAppInfo {
+  readonly version: string;
+  readonly variant: string;
+  readonly variantLabel: string;
+  readonly updatesEnabled: boolean;
+  readonly updatesDisabledReason: string | null;
+}
+
+export interface AvailableUpdate {
+  readonly version: string;
+  readonly notes: string | null;
+  readonly date: string | null;
+}
+
+export type UpdateProgress =
+  | { readonly event: 'started'; readonly total: number | null }
+  | { readonly event: 'progress'; readonly downloaded: number }
+  | { readonly event: 'finished' };
+
 /** Forma en que Tauri expone sus comandos en la ventana. */
 interface TauriBridge {
   core?: { invoke<T>(command: string, args?: unknown): Promise<T> };
   invoke?<T>(command: string, args?: unknown): Promise<T>;
+  event?: {
+    listen<T>(event: string, handler: (event: { payload: T }) => void): Promise<() => void>;
+  };
 }
 
 declare global {
@@ -191,6 +213,40 @@ export class DesktopHost {
 
   clearEditorBackground(): Promise<void> {
     return this.invoke('clear_editor_background');
+  }
+
+  appInfo(): Promise<DesktopAppInfo> {
+    if (!this.isDesktop) {
+      return Promise.resolve({
+        version: 'desarrollo',
+        variant: 'web',
+        variantLabel: 'Navegador',
+        updatesEnabled: false,
+        updatesDisabledReason: 'Las actualizaciones se administran desde la aplicación instalada.',
+      });
+    }
+
+    return this.invoke('app_info');
+  }
+
+  checkForUpdate(): Promise<AvailableUpdate | null> {
+    return this.invoke('check_for_update');
+  }
+
+  downloadAndInstallUpdate(): Promise<void> {
+    return this.invoke('download_and_install_update');
+  }
+
+  listenForUpdateProgress(handler: (progress: UpdateProgress) => void): Promise<() => void> {
+    const events = typeof window === 'undefined' ? undefined : window.__TAURI__?.event;
+
+    if (!events) {
+      return Promise.resolve(() => undefined);
+    }
+
+    return events.listen<UpdateProgress>('druse://update-progress', (event) => {
+      handler(event.payload);
+    });
   }
 
   private invoke<T>(command: string, args?: unknown): Promise<T> {

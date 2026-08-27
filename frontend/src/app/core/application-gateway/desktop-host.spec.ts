@@ -7,6 +7,7 @@ import {
 
 import { apiInterceptor } from './api-interceptor';
 import { DesktopHost } from './desktop-host';
+import { UpdateService } from '../update/update.service';
 
 describe('DesktopHost', () => {
   afterEach(() => {
@@ -146,5 +147,18 @@ describe('apiInterceptor', () => {
     const request = controller.expectOne('/assets/monaco/vs/loader.js');
     expect(request.request.headers.has('X-Druse-Token')).toBe(false);
     request.flush('');
+  });
+
+  it('no deja iniciar operaciones mientras prepara una actualización', () => {
+    setup({ baseUrl: 'http://127.0.0.1:54321', token: 'secreto' });
+    TestBed.inject(UpdateService).state.set('downloading');
+    let message = '';
+
+    http.get('/api/connections').subscribe({
+      error: (error: Error) => (message = error.message),
+    });
+
+    controller.expectNone('http://127.0.0.1:54321/api/connections');
+    expect(message).toContain('actualizando');
   });
 });

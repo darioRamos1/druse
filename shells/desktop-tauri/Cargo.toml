@@ -25,6 +25,7 @@ serde_json = "1"
 # usa IAppPaths en el backend.
 dirs = "5"
 tauri-plugin-dialog = "2"
+tauri-plugin-updater = "2"
 
 [features]
 # Lo activa `tauri build`; en desarrollo se deja fuera para que la consola

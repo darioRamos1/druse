@@ -1,7 +1,9 @@
 import { HttpInterceptorFn } from '@angular/common/http';
 import { inject } from '@angular/core';
+import { throwError } from 'rxjs';
 
 import { DesktopHost } from './desktop-host';
+import { UpdateService } from '../update/update.service';
 
 /**
  * Dirige las llamadas a la API y les añade el token cuando hace falta.
@@ -17,6 +19,12 @@ import { DesktopHost } from './desktop-host';
 export const apiInterceptor: HttpInterceptorFn = (request, next) => {
   if (!request.url.startsWith('/api/')) {
     return next(request);
+  }
+
+  if (inject(UpdateService).blocksDatabaseOperations()) {
+    return throwError(
+      () => new Error('Druse se está actualizando y no puede iniciar una operación nueva.'),
+    );
   }
 
   const { baseUrl, token } = inject(DesktopHost).connection();

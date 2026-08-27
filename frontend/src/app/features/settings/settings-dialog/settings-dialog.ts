@@ -22,6 +22,7 @@ import {
   ThemeName,
 } from '../../../core/theme/appearance';
 import { Icon } from '../../../shared/ui/icon/icon';
+import { UpdateService } from '../../../core/update/update.service';
 
 /**
  * Colores de acento propuestos.
@@ -140,6 +141,11 @@ const FITS: readonly {
 })
 export class SettingsDialog {
   private readonly _themes = inject(ThemeService);
+  protected readonly updates = inject(UpdateService);
+
+  constructor() {
+    void this.updates.initialize();
+  }
 
   /**
    * Proporción del editor de verdad.

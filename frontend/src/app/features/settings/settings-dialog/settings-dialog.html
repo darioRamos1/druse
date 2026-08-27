@@ -6,12 +6,77 @@
   <header class="head">
     <div>
       <h2 class="title" id="settings-title">Preferencias</h2>
-      <p class="subtitle">Cómo se ve Druse. Se recuerda entre arranques.</p>
+      <p class="subtitle">Apariencia, versión y actualizaciones.</p>
     </div>
     <button type="button" class="close" (click)="closed.emit()" aria-label="Cerrar">×</button>
   </header>
 
   <div class="body">
+    <section class="section update">
+      <h3 class="section__title">Acerca de y actualizaciones</h3>
+
+      @if (updates.info(); as info) {
+        <div class="update__identity">
+          <strong>Druse {{ info.version }}</strong>
+          <span>{{ info.variantLabel }}</span>
+        </div>
+
+        @switch (updates.state()) {
+          @case ('disabled') {
+            <p class="section__hint">{{ info.updatesDisabledReason }}</p>
+          }
+          @case ('checking') {
+            <p class="update__status">Buscando actualizaciones…</p>
+          }
+          @case ('current') {
+            <p class="update__status update__status--success">Tienes la versión más reciente.</p>
+          }
+          @case ('available') {
+            @if (updates.available(); as release) {
+              <div class="update__release">
+                <strong>Druse {{ release.version }} está disponible</strong>
+                @if (release.notes) {
+                  <p class="update__notes">{{ release.notes }}</p>
+                }
+              </div>
+              <button type="button" class="primary update__action" (click)="updates.apply()">
+                Descargar e instalar
+              </button>
+            }
+          }
+          @case ('downloading') {
+            <div class="update__progress">
+              <div class="update__progress-head">
+                <span>Descargando actualización…</span>
+                @if (updates.percent(); as percent) {
+                  <span>{{ percent }}%</span>
+                }
+              </div>
+              <progress [value]="updates.downloaded()" [max]="updates.total() || undefined"></progress>
+            </div>
+          }
+          @case ('installing') {
+            <p class="update__status">Instalando. Druse se reiniciará al terminar.</p>
+          }
+          @case ('error') {
+            <p class="problem">{{ updates.error() }}</p>
+            <button type="button" class="secondary" (click)="updates.check()">Reintentar</button>
+          }
+        }
+
+        @if (info.updatesEnabled && updates.state() !== 'error' && updates.state() !== 'checking' && updates.state() !== 'downloading' && updates.state() !== 'installing') {
+          <button type="button" class="link" (click)="updates.check()">Buscar actualizaciones</button>
+        }
+      } @else {
+        @if (updates.state() === 'error') {
+          <p class="problem">{{ updates.error() }}</p>
+          <button type="button" class="secondary" (click)="updates.initialize()">Reintentar</button>
+        } @else {
+          <p class="update__status">Leyendo la versión instalada…</p>
+        }
+      }
+    </section>
+
     <section class="section">
       <h3 class="section__title">Tema</h3>
       <div class="choice" role="group" aria-label="Tema">

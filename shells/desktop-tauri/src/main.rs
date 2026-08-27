@@ -15,6 +15,7 @@ mod exports;
 mod sql_files;
 mod theme;
 mod transactions;
+mod updates;
 
 use std::sync::Mutex;
 
@@ -25,7 +26,7 @@ use tauri_plugin_dialog::{DialogExt, MessageDialogButtons, MessageDialogKind};
 use transactions::PendingTransactions;
 
 /// Estado compartido: el proceso de la API mientras la aplicación vive.
-struct ApiState(Mutex<Option<ApiProcess>>);
+pub(crate) struct ApiState(pub Mutex<Option<ApiProcess>>);
 
 /// Lo que el frontend necesita para hablar con la API.
 #[derive(serde::Serialize)]
@@ -113,6 +114,7 @@ fn main() {
         .manage(SqlFileState::default())
         .manage(PendingTransactions::default())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(|app| {
             if let Some(window) = app.get_webview_window("main") {
                 // Que el ajuste falle no debe impedir que la aplicación arranque.
@@ -160,7 +162,10 @@ fn main() {
             theme::set_window_theme,
             editor_background::choose_editor_background,
             editor_background::read_editor_background,
-            editor_background::clear_editor_background
+            editor_background::clear_editor_background,
+            updates::app_info,
+            updates::check_for_update,
+            updates::download_and_install_update
         ])
         .on_window_event(|window, event| {
             // Cerrar con una transacción abierta tira lo que no esté confirmado:

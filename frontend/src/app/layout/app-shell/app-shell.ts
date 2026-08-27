@@ -14,6 +14,7 @@ import { ExportFormat, SavedSnippet } from '../../core/application-gateway/appli
 import { SnippetStore } from '../../core/snippets/snippet.store';
 import { SplashScreen } from '../../core/startup/splash-screen';
 import { ThemeName, ThemeService } from '../../core/theme/theme.service';
+import { UpdateService } from '../../core/update/update.service';
 import { SettingsDialog } from '../../features/settings/settings-dialog/settings-dialog';
 import { FormatSettings } from '../../core/workspace/format-settings';
 import { WorkspaceStore } from '../../core/workspace/workspace-store';
@@ -112,6 +113,7 @@ export class AppShell {
   private readonly _snippets = inject(SnippetStore);
   private readonly _themes = inject(ThemeService);
   private readonly _splash = inject(SplashScreen);
+  protected readonly updates = inject(UpdateService);
 
   // --- Apariencia ------------------------------------------------------------
   protected readonly theme = this._themes.theme;
@@ -732,6 +734,14 @@ export class AppShell {
     ]);
 
     this._splash.dismiss();
+
+    void this.updates.initialize().then(() => {
+      const release = this.updates.available();
+
+      if (release) {
+        this._store.notify(`Druse ${release.version} está disponible en Preferencias.`);
+      }
+    });
   }
 
   // --- Conexiones ------------------------------------------------------------

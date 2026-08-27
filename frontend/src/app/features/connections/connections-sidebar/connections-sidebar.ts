@@ -36,6 +36,7 @@ const KIND_ICONS: Readonly<Record<ExplorerNode['kind'], IconName | null>> = {
 export class ConnectionsSidebar {
   readonly connections = input.required<readonly ConnectionSummary[]>();
   readonly explorerNodes = input.required<readonly ExplorerNode[]>();
+  readonly version = input('');
 
   readonly addConnection = output<void>();
   readonly toggleConnection = output<string>();

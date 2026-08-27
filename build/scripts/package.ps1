@@ -33,6 +33,10 @@
     portable se llama distinto, para que ambas versiones puedan convivir en la
     misma carpeta sin pisarse.
 
+.PARAMETER RequireUpdaterSignature
+    Falla si no está disponible la clave privada del actualizador. Las
+    publicaciones deben usarlo; una compilación local de prueba puede omitirla.
+
 .PARAMETER CertificateThumbprint
     Huella del certificado de firma de código, ya instalado en el almacén de
     Windows. Si no se indica, se toma de `DRUSE_SIGN_THUMBPRINT`.
@@ -60,6 +64,7 @@ param(
     [switch]$SkipInstaller,
     [switch]$Portable,
     [switch]$WithoutInformix,
+    [switch]$RequireUpdaterSignature,
     [string]$CertificateThumbprint = $env:DRUSE_SIGN_THUMBPRINT,
     [string]$TimestampUrl = 'http://timestamp.digicert.com'
 )
@@ -83,11 +88,23 @@ $signing = [bool]$CertificateThumbprint -or [bool]$signCommand
 # `-completo` en lugar de nada: si una se quedara sin sufijo, la siguiente
 # ejecución sobrescribiría su instalador antes de renombrarlo.
 $VariantSuffix = if ($WithoutInformix) { '-sin-informix' } else { '-completo' }
+$Variant = if ($WithoutInformix) { 'sin-informix' } else { 'completo' }
 
 $repoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $apiProject = Join-Path $repoRoot 'backend/src/Druse.Host.LocalApi'
 $tauriDir = Join-Path $repoRoot 'shells/desktop-tauri'
 $apiOutput = Join-Path $tauriDir 'api'
+$updaterKey = if ($env:TAURI_SIGNING_PRIVATE_KEY_PATH) {
+    $env:TAURI_SIGNING_PRIVATE_KEY_PATH
+}
+else {
+    Join-Path $HOME '.tauri/druse-updater.key'
+}
+$updaterSigning = [bool]$env:TAURI_SIGNING_PRIVATE_KEY -or (Test-Path $updaterKey)
+
+if ($RequireUpdaterSignature -and -not $updaterSigning) {
+    throw "No se encontró la clave privada del actualizador en $updaterKey ni en TAURI_SIGNING_PRIVATE_KEY."
+}
 
 if (-not $Runtime) {
     $Runtime = if ($IsWindows) { 'win-x64' } elseif ($IsMacOS) { 'osx-arm64' } else { 'linux-x64' }
@@ -102,6 +119,14 @@ else {
     # Se dice al empezar y no al terminar: enterarse de que el paquete sale sin
     # firmar después de cinco minutos de compilación no sirve de nada.
     Write-Host 'Sin certificado: los artefactos saldrán sin firmar y Windows avisará al abrirlos.' -ForegroundColor Yellow
+}
+
+if ($updaterSigning) {
+    $keySource = if ($env:TAURI_SIGNING_PRIVATE_KEY) { 'TAURI_SIGNING_PRIVATE_KEY' } else { $updaterKey }
+    Write-Host "Las actualizaciones se firmarán con: $keySource" -ForegroundColor DarkGray
+}
+else {
+    Write-Host 'Sin clave del actualizador: no se generarán artefactos de actualización.' -ForegroundColor Yellow
 }
 
 Write-Host ''
@@ -201,7 +226,10 @@ $buildStartedAt = (Get-Date).AddSeconds(-1)
 # la máquina que compila, no del proyecto, y versionarla obligaría a cada equipo
 # a editar el archivo para poder empaquetar. Se pasa como configuración
 # adicional, que Tauri combina con la del repositorio.
-$tauriOverride = $null
+$tauriOverride = Join-Path $tauriDir 'tauri.packaging.json'
+$bundleOverride = @{
+    createUpdaterArtifacts = $updaterSigning
+}
 
 if ($signing) {
     $windows = @{
@@ -216,12 +244,12 @@ if ($signing) {
         $windows.certificateThumbprint = $CertificateThumbprint
     }
 
-    $tauriOverride = Join-Path $tauriDir 'tauri.signing.json'
-
-    @{ bundle = @{ windows = $windows } } |
-        ConvertTo-Json -Depth 5 |
-        Set-Content $tauriOverride -Encoding UTF8
+    $bundleOverride.windows = $windows
 }
+
+@{ bundle = $bundleOverride } |
+    ConvertTo-Json -Depth 5 |
+    Set-Content $tauriOverride -Encoding UTF8
 
 # `tauri.conf.json` fija los formatos de Windows, que son los que se reparten.
 # Fuera de Windows hay que pedir los de cada plataforma o la construcción no
@@ -230,11 +258,21 @@ if ($signing) {
 $bundles = if ($IsWindows) { $null } elseif ($IsMacOS) { 'dmg,app' } else { 'deb,appimage' }
 
 Push-Location $tauriDir
+$previousVariant = $env:DRUSE_VARIANT
+$previousUpdaterPrivateKey = $env:TAURI_SIGNING_PRIVATE_KEY
 try {
-    # `--no-bundle` no: aquí queremos precisamente el instalador.
-    $tauriArgs = @('tauri', 'build')
+    $env:DRUSE_VARIANT = $Variant
 
-    if ($tauriOverride) { $tauriArgs += @('--config', $tauriOverride) }
+    if ($updaterSigning -and -not $env:TAURI_SIGNING_PRIVATE_KEY) {
+        # El bundler no lee TAURI_SIGNING_PRIVATE_KEY_PATH: admite una ruta como
+        # valor de TAURI_SIGNING_PRIVATE_KEY y carga el contenido por su cuenta.
+        $env:TAURI_SIGNING_PRIVATE_KEY = $updaterKey
+    }
+
+    # `--no-bundle` no: aquí queremos precisamente el instalador.
+    $tauriArgs = @('tauri', 'build', '--ci')
+
+    $tauriArgs += @('--config', $tauriOverride)
     if ($bundles) { $tauriArgs += @('--bundles', $bundles) }
 
     cargo @tauriArgs
@@ -244,11 +282,12 @@ try {
 finally {
     Pop-Location
 
+    $env:DRUSE_VARIANT = $previousVariant
+    $env:TAURI_SIGNING_PRIVATE_KEY = $previousUpdaterPrivateKey
+
     # El archivo lleva la huella del certificado de quien compiló: se borra
     # aunque la construcción falle, para que no acabe en un commit.
-    if ($tauriOverride) {
-        Remove-Item $tauriOverride -Force -ErrorAction SilentlyContinue
-    }
+    Remove-Item $tauriOverride -Force -ErrorAction SilentlyContinue
 }
 
 $bundleDir = Join-Path $tauriDir "target/$Runtime/release/bundle"
@@ -275,10 +314,16 @@ $bundles = Get-ChildItem $bundleDir -Recurse -Include '*.exe', '*.msi', '*.deb',
 # primera desaparece sin previo aviso. Pasó exactamente eso al encadenar las dos
 # ejecuciones.
 $bundles = $bundles | ForEach-Object {
+    $signature = "$($_.FullName).sig"
     $target = Join-Path $_.DirectoryName `
         "$([IO.Path]::GetFileNameWithoutExtension($_.Name))$VariantSuffix$($_.Extension)"
 
     Move-Item $_.FullName $target -Force
+
+    if (Test-Path $signature) {
+        Move-Item $signature "$target.sig" -Force
+    }
+
     Get-Item $target
 }
 
@@ -290,6 +335,7 @@ $bundles | ForEach-Object { "  {0}  ({1:N1} MB)" -f $_.FullName, ($_.Length / 1M
 if ($signing -and $IsWindows) {
     Write-Host ''
     Write-Host 'Firma de los artefactos:' -ForegroundColor Cyan
+    $invalidSignatures = @()
 
     foreach ($bundle in $bundles) {
         $status = (Get-AuthenticodeSignature -FilePath $bundle.FullName).Status
@@ -299,7 +345,12 @@ if ($signing -and $IsWindows) {
         }
         else {
             Write-Host "  ---  $($bundle.Name): $status" -ForegroundColor Red
+            $invalidSignatures += $bundle.Name
         }
+    }
+
+    if ($invalidSignatures.Count -gt 0) {
+        throw "La firma Authenticode no es válida en: $($invalidSignatures -join ', ')"
     }
 }
 
@@ -348,7 +399,8 @@ instalada. Si el equipo no ofrece uno, Druse pedirá la contraseña en cada
 conexión y te lo indicará en la interfaz.
 '@ | Set-Content (Join-Path $staging 'LEEME.txt') -Encoding UTF8
 
-    $zip = Join-Path $tauriDir "target/portable/Druse-0.1.0-$Runtime-portable$VariantSuffix.zip"
+    $version = (Get-Content (Join-Path $tauriDir 'tauri.conf.json') -Raw | ConvertFrom-Json).version
+    $zip = Join-Path $tauriDir "target/portable/Druse-$version-$Runtime-portable$VariantSuffix.zip"
     Remove-Item $zip -Force -ErrorAction SilentlyContinue
     Compress-Archive -Path "$staging\*" -DestinationPath $zip -CompressionLevel Optimal
 

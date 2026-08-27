@@ -29,6 +29,7 @@
     [style.width.px]="sidebarWidth()"
     [connections]="connections()"
     [explorerNodes]="explorerNodes()"
+    [version]="updates.info()?.version ?? ''"
     (addConnection)="openDialog()"
     (toggleConnection)="toggleConnection($event)"
     (connectSaved)="connectSaved($event)"

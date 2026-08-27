@@ -78,6 +78,51 @@ Al empaquetar cambian dos cosas respecto al desarrollo:
 - **La API usa un puerto que le asigna el sistema**, no el 5177. Publica el puerto y su token en `endpoint.json`, dentro del directorio de datos.
 - **Tauri lee ese archivo** y se lo pasa al frontend. En desarrollo esa misma función la cumple el proxy del servidor de Angular. El resto de la aplicación no distingue un caso del otro.
 
+### Publicar actualizaciones
+
+El instalador público es `Druse-<versión>-installer.exe`. Primero pregunta qué
+edición quiere la persona:
+
+- **Completa:** incluye Informix y el controlador de IBM.
+- **Sin Informix:** conserva PostgreSQL, SQL Server, MySQL y MariaDB, pero ocupa
+  bastante menos.
+
+El selector descarga el instalador correspondiente desde GitHub Releases y
+comprueba su SHA-256 antes de ejecutarlo. La edición elegida queda compilada en
+Druse y todas sus actualizaciones posteriores siguen el mismo canal, de modo que
+una instalación sin Informix no descarga Informix por sorpresa.
+
+Druse busca actualizaciones después de arrancar. Si encuentra una, lo comunica y
+la sección **Preferencias > Acerca de y actualizaciones** permite leer las notas,
+descargarla e instalarla. La descarga lleva además la firma obligatoria de Tauri;
+no basta con que la dirección responda. Si hay una transacción sin confirmar, la
+instalación se bloquea para no perder el trabajo.
+
+Para preparar una publicación:
+
+1. Cambia la misma versión SemVer en `shells/desktop-tauri/tauri.conf.json` y
+   `shells/desktop-tauri/Cargo.toml`.
+2. Escribe las notas en `docs/release-notes/<versión>.md`.
+3. Ejecuta `./build/scripts/release.ps1` para revisar los artefactos localmente.
+4. Ejecuta `./build/scripts/release.ps1 -Publish` para crear la GitHub Release, o
+   lanza manualmente el workflow **Publicar versión**.
+
+El proceso produce los dos instaladores, sus `.sig`, `latest.json` y el selector.
+El actualizador consulta siempre
+`https://github.com/darioRamos1/druse/releases/latest/download/latest.json`.
+
+La clave privada de actualización local está en
+`~/.tauri/druse-updater.key`; **hay que guardarle una copia fuera del equipo**.
+La clave pública sí está versionada en `shells/desktop-tauri/tauri.conf.json`.
+Perder la privada impediría publicar actualizaciones aceptadas por quienes ya
+instalaron Druse. GitHub Actions recibe la misma clave mediante el secreto
+`TAURI_SIGNING_PRIVATE_KEY`.
+
+El ZIP portable no se autoactualiza: reemplazar de forma fiable el ejecutable que
+está abierto y su API auxiliar exigiría otro proceso residente. Quien ya tenga un
+portable deberá instalar una vez esta versión mediante el selector; a partir de
+ahí las actualizaciones serán automáticas.
+
 ### Firmar los artefactos
 
 Sin firmar, Windows enseña el aviso de SmartScreen en cada equipo donde se abre la aplicación. No es que sospeche del código: es que no sabe quién lo hizo.
