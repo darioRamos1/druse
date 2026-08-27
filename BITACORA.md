@@ -10,33 +10,49 @@
 
 | Campo | Valor |
 | --- | --- |
-| Última sesión | **037** — 2026-08-26 |
+| Última sesión | **038** — 2026-08-26 |
 | Fase activa | **Migración de datos entre tablas:** fases 1, 2 y 3 cerradas; la **4** cerrada: la pasada de varias tablas, lo que cada tabla hace distinto y las migraciones guardadas (ver «Qué toca retomar»). **Respaldos y restauración:** Fases A–E cerradas. La **F** tiene backend, interfaz, CSV, selector de archivos, restaurar en una base nueva y **el ciclo entero por HTTP en los cuatro motores**; le falta repetir a mano el respaldo real que encontró el error de los índices de expresión |
 | Fases 0–6 | ✅ Cerradas. |
 | Fase 7 | 🟡 **11/12.** El ciclo de instalación está probado sobre este equipo; solo falta arrancar en una máquina sin herramientas de desarrollo. |
 | Fase 8 | ✅ **7/7.** Tres motores sobre el mismo contrato y primera beta preparada. |
 | ¿Compila el backend? | Sí — 0 advertencias, 0 errores |
 | ¿Compila el envoltorio? | Sí — recompilado en la 037 con `build/scripts/msvc-env.ps1` cargado antes; sin él, `cargo` falla en `vswhom-sys` por elegir el MSVC equivocado. **Sus pruebas ya son 10**, con las dos que vigilan la CSP |
-| ¿Pasan las pruebas? | Sí, y por fin **con los cuatro motores a la vez**. En la 037, con `DRUSE_REQUIRE_ENGINES=1` y PostgreSQL, SQL Server, MySQL e Informix levantados: **206 contractuales, 158 de integración y 438 unitarias — 802 en verde, ninguna saltada**. Es la primera pasada así desde la sesión 023. Además **633 del frontend**, las **10 del envoltorio** y la suite E2E, que dio 42 de 44 —una saltada y `migracion.spec.ts:154`, verde al repetirla sola—. Ojo: la **primera** pasada dio tres rojos, los tres de MySQL, por lanzarla trece segundos después de crear su contenedor; repetidos, verdes (ver §9) |
-| ¿Hay aplicación de escritorio? | **Sí.** Instalador NSIS, MSI y ZIP portable, en dos variantes: con Informix y sin él |
-| Motores | **PostgreSQL, SQL Server, MySQL/MariaDB e Informix**, todos sobre el mismo contrato compartido |
-| Trabajo a medias | **Nada.** Todo lo de la 037 está commiteado y subido. Lo que queda sin comprobar es de otra clase: **el selector nativo de carpeta y `save_export` no se han visto abrirse todavía**, aunque en la 037 se descubrió por qué nunca podían funcionar y se arregló (ver §5) |
+| ¿Pasan las pruebas? | Sí, **con los cinco motores a la vez**. En la 038, con `DRUSE_REQUIRE_ENGINES=1`: **450 unitarias, 158 de integración y 255 de 257 contractuales** en el backend, **640 del frontend** y las **13 del envoltorio**. Los cuatro motores de siempre siguen en **206 de 206**: el motor nuevo no rompió nada. Las dos que fallan son de Informix por SQLI y están dichas en §5. La suite E2E no se repitió en la 038 |
+| ¿Hay aplicación de escritorio? | **Sí.** Instalador NSIS y ZIP portable, en dos variantes: con Informix y sin él. Desde la 038 **se actualiza sola** —o lo hará: ver el aviso del repositorio privado en §9—. El MSI dejó de generarse: `tauri.conf.json` solo declara `nsis`, que es lo que necesita el actualizador |
+| Motores | **PostgreSQL, SQL Server, MySQL/MariaDB e Informix**, sobre el mismo contrato. Informix tiene **dos entradas**: por DRDA con el driver de IBM (puerto 9089) y por **SQLI**, su protocolo nativo, con el puente JDBC (9088). Cambia por dónde se entra; el SQL, el catálogo y los tipos son los mismos |
+| Trabajo a medias | **Nada sin commitear.** Lo que queda sin comprobar: **el diálogo del sistema y el selector de carpeta siguen sin verse abrir** —se arregló lo que lo hacía imposible, no que ya ocurra—, y **el actualizador no puede funcionar mientras el repositorio sea privado** (ver §9) |
 | Bloqueantes | Ninguno para seguir programando. Sí para dar por buenos cuatro motores y cuatro funciones: ver «Qué toca retomar». |
-| Git | El **PR #9 se fusionó** (sesión 022). Se trabaja en `feat/respaldos-y-restauracion`, con todo subido: las 024–027 en `1452a6c`, las 028–031 en `640151c`, las 032–036 en los seis commits de `d3ac0d5` a `35d192e`, y la **037** en los cinco que van de `4ba8cce` a `1c2e258` |
+| Git | El **PR #9 se fusionó** (sesión 022). Se trabaja en `feat/respaldos-y-restauracion`, con todo subido: las 024–027 en `1452a6c`, las 028–031 en `640151c`, las 032–036 de `d3ac0d5` a `35d192e`, la 037 de `4ba8cce` a `20727eb`, y la **038** en `a455be7`, `4c6f74a`, `55711f0` y `93f7f26` |
 | Integración continua | 🔴 **Parada, y no por el código.** GitHub aborta los catorce jobs en dos segundos: «recent account payments have failed or your spending limit needs to be increased». Hasta resolver la facturación, ningún PR podrá pasar los checks. |
 
 ### Qué toca retomar en la próxima sesión
 
-#### Lo primero, ver abrirse el diálogo del envoltorio
+#### Lo primero, desbloquear el actualizador
 
-La 037 descubrió que **el puente con el proceso Rust estaba cortado**: `connect-src`
-no dejaba pasar `ipc.localhost`, así que cada `invoke` moría en silencio. Está
-arreglado y la consola del ejecutable ya no da un solo error, pero **el diálogo en
-sí sigue sin verse abrir**. Es lo primero: empaquetar, exportar un resultado y
-comprobar que el selector del sistema aparece y escribe el archivo. Lo mismo con
-el de carpeta de los respaldos, que arrastraba el mismo problema.
+**El repositorio es privado y el actualizador apunta a sus Releases**, así que
+hoy no puede funcionar en ningún equipo: GitHub devuelve 404 a quien no está
+autenticado, y ese 404 ni siquiera se distingue de «no hay versión nueva». Es
+una decisión que hay que tomar antes de repartir nada: repositorio público, o
+publicar los artefactos en otro sitio.
 
-Hasta que eso se vea, lo que hay es un error menos, no una función comprobada.
+#### Y ver abrirse el diálogo del envoltorio
+
+Sigue de la 037: el puente con el proceso Rust estaba cortado y ya no lo está,
+pero **el diálogo del sistema no se ha visto abrir**. Empaquetar, exportar un
+resultado y comprobar que aparece el selector de Windows. Lo mismo con el de
+carpeta de los respaldos.
+
+#### Informix por SQLI: lo que le falta
+
+Funciona y pasa 49 de las 51 del contrato, pero:
+
+1. **Nadie ha conectado a un Informix de verdad por ahí.** Lo probado es el
+   contenedor; el servidor que motivó todo esto es de un tercero. Hasta que
+   alguien lo abra, lo que hay es una función comprobada contra un laboratorio.
+2. **El código de error** llega como el del driver (`-79716`) en vez del de
+   Informix (`-201`).
+3. **Una prueba de respaldo** falla sin diagnosticar.
+4. **El peso y la licencia**, en §9.
 
 #### Los tres temas del árbol ya están anotados
 
@@ -385,6 +401,134 @@ Y tres límites declarados desde el principio: no hay respaldo binario ni
 recuperación a un punto en el tiempo —eso es del servidor, y la interfaz tendrá
 que decirlo—, no hay respaldos programados, y un límite de filas puede dejar
 filas huérfanas, cosa que se avisa y no se corrige sola.
+
+### Sesión 038 — 2026-08-26 · Informix por su protocolo nativo, y Druse se actualiza sola
+
+Segunda tanda del mismo día, y la más larga de todas. Cuatro commits: probar el
+túnel a solas, el puente JDBC, Informix por SQLI y el actualizador.
+
+#### Probar el túnel, aparte de probar la conexión
+
+«Probar conexión» solo sabía decir sí o no, y con un servidor intermedio de por
+medio eso tapa dos problemas que arregla gente distinta: que el bastión no te
+deje entrar, y que desde él no se alcance el servidor de la base. El botón nuevo
+—que aparece solo con el túnel marcado— dice **hasta dónde se llegó**:
+`bastion`, `forward` o `complete`.
+
+Abierto el reenvío se comprueba que su extremo local acepta un socket. Eso
+demuestra el camino hasta el puerto del motor **sin hablar su protocolo**, así
+que un «no» de la base no puede disfrazarse de «no» de la red.
+
+#### Por qué Druse no conectaba a un Informix que DBeaver abre sin problema
+
+Se reportó un `SQL30081N` contra un servidor de un tercero. La causa no era el
+campo que faltaba: **Druse solo hablaba DRDA**, que exige un escuchador
+`drsoctcp` que muchas instalaciones no levantan, mientras que DBeaver habla
+**SQLI**, el nativo, que atiende cualquier Informix. El `sqlhosts` del contenedor
+de IBM lo enseña de un vistazo:
+
+    informix        onsoctcp    *488e28edd714    9088    ← SQLI
+    informix_dr     drsoctcp    *488e28edd714    9089    ← DRDA
+
+Dos protocolos, dos puertos y **dos nombres lógicos distintos**. Se comprobó
+contra ese servidor que el driver .NET de IBM **no admite el `INFORMIXSERVER`
+por ningún sitio**: `base@servidor`, `host:puerto/servidor` y la clave suelta
+fallan cada uno con su error. Añadir la casilla sin más habría dado un campo que
+solo sirve para romper la conexión.
+
+#### El puente: JDBC traducido a .NET
+
+El que sí habla SQLI es el driver JDBC de IBM, **de descarga libre en Maven
+Central**. IKVM lo traduce a un ensamblado .NET al compilar, así que **no hace
+falta Java** ni aquí ni en el equipo del usuario: lo que viaja es IL. Se resuelve
+con `MavenReference`, de modo que no hay ningún binario de IBM versionado.
+
+`Druse.Jdbc` son las cuatro clases de ADO.NET envolviendo `java.sql`. Con eso, el
+proveedor de Informix reutiliza tal cual su catálogo, sus tipos y su diseñador.
+
+**Tres cosas costaron y están donde toca:**
+
+- El driver **4.50.3 no vale**: muere con `NumberFormatException: "150."` leyendo
+  la versión de un Informix 15. El **15.0.0.1.1** conecta a la primera.
+- **`Class.forName` no registra el driver bajo IKVM**: hay que registrar una
+  instancia, o `getConnection` responde «No suitable driver found» aunque esté
+  ahí, que es un mensaje que manda a revisar la URL.
+- Informix rechaza un `?` suelto en la lista del SELECT con un «System or
+  internal error». Los parámetros van en el WHERE.
+
+#### Lo que destapó pasar el contrato
+
+Empezó en 22 de 51 y acabó en 49. Ninguna de las causas era de las pruebas:
+
+- **JDBC ejecuta una sentencia por statement.** Tres `INSERT` seguidos fallaban
+  enteros. El puente parte el lote respetando lo que un `;` puede tener dentro
+  sin ser separador.
+- **Un `CREATE PROCEDURE` lleva `;` en la firma y en cada línea del cuerpo**, así
+  que el partidor lo troceaba. El bloque va entero hasta su `END`.
+- **Un booleano se leía distinto según el transporte**: `1` por DRDA —donde llega
+  como SMALLINT y el tipo se pierde— y `true` por SQLI. El mismo dato de la misma
+  columna no puede dar dos respuestas.
+- El contrato exige que ejecutor y catálogo **declaren el mismo motor** que su
+  proveedor, así que hay una instancia por transporte en lugar de compartirlas.
+
+#### Cancelar no se puede, y así queda escrito
+
+Comprobado contra el servidor con la consulta larga del contrato:
+`Statement.cancel()` a los 3 s, `setQueryTimeout(5)` y cerrar la conexión desde
+otro hilo **terminan los tres a los ~250 s**, que es lo que la consulta tardaba
+igualmente. El driver llega a decir «exceeded timeout of 5 seconds», pero solo
+cuando el servidor responde: el hilo se queda dentro del socket.
+
+Elegido a propósito: **dejar de esperar**. Quien cancela recupera el control al
+instante y la consulta se suelta; sigue viva en el servidor hasta que acabe y
+esa conexión queda ocupada. Es un compromiso, no una victoria, y la alternativa
+—una interfaz congelada— es peor. La tarea soltada se recoge igual: se observa
+su excepción y se cierra lo que devuelva.
+
+#### El actualizador (trabajo de Darío, con otra herramienta)
+
+Actualizador de Tauri con firma minisign, servicio de estado en la interfaz, y
+`release.ps1` con su workflow para construir las dos variantes, generar
+`latest.json` y publicar la Release. Se revisó entero: **nada de lo existente se
+rompió**.
+
+Lo que está bien resuelto y no conviene perder: la clave privada no vive en el
+repositorio, `release.ps1` comprueba que la firma pertenezca a la clave pública
+antes de publicar, la variante se fija con `DRUSE_VARIANT` y `build.rs` invalida
+la caché, el empaquetado sin clave sigue funcionando, y el candado de `ApiState`
+se suelta antes de instalar porque el hook vuelve a tomarlo.
+
+**Y lo que impide que funcione: el repositorio es privado.** Ver §9.
+
+#### Verificado
+
+- **450 unitarias, 158 de integración y 255 de 257 contractuales** con los cinco
+  motores levantados y `DRUSE_REQUIRE_ENGINES=1`; **640 del frontend** y **13 del
+  envoltorio**. Los cuatro motores de siempre: **206 de 206**.
+- El puente, contra Informix real por SQLI: columnas por nombre y posición, que
+  **un nulo no se confunda con cero** —en JDBC un entero nulo vuelve como 0 y hay
+  que preguntar `wasNull()` después—, parámetros en su sitio, el error con su
+  SQLSTATE y que cerrar el lector no tumbe la conexión.
+- El «Probar túnel», contra la API levantada y con una E2E que recorre el
+  formulario.
+
+#### No hecho
+
+- **Dos del contrato**, ninguna de comportamiento: el código de error llega como
+  el del driver (`-79716`) en vez del de Informix (`-201`), y una de respaldo sin
+  diagnosticar.
+- **Nadie ha conectado aún a un Informix de verdad por SQLI**: lo probado es el
+  contenedor. El servidor que motivó todo esto es de un tercero.
+- El **peso** de IKVM no se ha medido con un publish recortado: la pieza es
+  `IKVM.Java.dll`, unos 62 MB por plataforma.
+- La suite E2E no se repitió.
+
+**Archivos.** `Druse.Jdbc/*` (nuevo), `Provider.Informix/*`, `DatabaseEngine.cs`,
+`ConnectionProfile.cs`, `ProviderRegistry.cs`, la persistencia, el diálogo de
+conexión, y del actualizador `updates.rs`, `update.service.ts`, `release.ps1` y
+el workflow.
+
+**Estado al cerrar.** Todo subido: `a455be7`, `4c6f74a`, `55711f0` y `93f7f26`.
 
 ### Sesión 037 — 2026-08-26 · El ejecutable no tenía estilos, y exportar moría por un punto
 
@@ -4763,6 +4907,10 @@ basta solo.
 
 | Riesgo | Impacto | Mitigación |
 | --- | --- | --- |
+| **El actualizador no puede funcionar: el repositorio es privado** | La función entera queda muerta en todos los equipos, y falla de la peor forma: GitHub devuelve **404** a quien no está autenticado, que no se distingue de «no hay versión nueva» | El endpoint es `releases/latest/download/latest.json`. Hacer público el repositorio, o publicar los artefactos y el `latest.json` en otro sitio accesible. **Ninguna prueba lo ve**: la que hay comprueba que el endpoint sea `https`, y lo es |
+| **Informix por SQLI no puede cancelar una consulta** | Quien lanza una consulta larga no la para: la aplicación responde, pero el motor sigue trabajando y esa conexión queda ocupada | No hay arreglo: comprobado que `cancel()`, `setQueryTimeout` y cerrar la conexión tardan lo mismo que la consulta. Se eligió soltar la espera (038). **Por DRDA sí se cancela**, así que es una razón para preferirlo donde haya escuchador |
+| **El peso de IKVM y la licencia del driver** | `IKVM.Java.dll` son ~62 MB por plataforma sobre un paquete que ya iba por 93 MB | Medir con un publish recortado antes de prometer una cifra. Y el jar va bajo el *IBM Informix JDBC Software License Agreement*: **para repartir el instalador hay que leer esos términos**, como se hizo con el `odbc_REDIST.txt` del clidriver |
+| **Compilar en paralelo rompe IKVM** | `dotnet build` sin `-m:1` falla con `os error 32` sobre el log del jar cuando dos proyectos lo traducen a la vez | Compilar la solución con `-m:1`. Pasó varias veces en la 038 y el error no dice de qué va |
 | **Lo que solo falla empaquetado no lo ve nadie** | La ventana abrió sin un solo estilo durante quién sabe cuántas sesiones, y el puente con el proceso Rust llevaba igual de tiempo cortado. Ninguna prueba lo veía: en el navegador todo funciona | Al tocar la CSP, el `index.html` o cualquier `invoke`, **abrir el ejecutable y mirar la consola**: `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=--remote-debugging-port=9222` y conectarse por CDP. Las dos pruebas de `tauri.conf.json` sujetan lo ya conocido, no lo próximo |
 | **El `.exe` se queda tomado y el empaquetado falla** | `os error 32` al parchear el binario para NSIS, con la compilación entera ya hecha | Cerrar todo `druse.exe` antes de empaquetar y no dejar un `cargo build` reciente sujetando el directorio. Relanzar basta; no hay nada que arreglar |
 | **El frontend tiene más de un rojo por tiempo** | Se confunden con fallos del producto y se pierde media tarde | Antes de creerse un rojo del frontend, repetir la suite. En la 037 hubo dos, distintos, y los dos verdes a la segunda |
