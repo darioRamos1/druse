@@ -523,6 +523,59 @@ test.describe('la interfaz por dentro', () => {
   });
 
   /**
+   * Al escribir cerca del borde inferior, Monaco abre las sugerencias hacia
+   * arriba. Su valor por omisión les permite salir del editor y llegaban a tapar
+   * las pestañas y las dos barras de acciones completas.
+   */
+  test('el autocompletado no sale del editor ni cubre sus barras', async ({ page }) => {
+    await abrir(page);
+
+    // Deja poco resultado y mucho editor, como en la captura donde el cursor
+    // estaba casi al pie de la ventana y la lista tuvo que abrir hacia arriba.
+    const resize = page.getByRole('separator', { name: 'Alto del panel de resultados' });
+    await resize.focus();
+    for (let step = 0; step < 14; step += 1) {
+      await resize.press('ArrowDown');
+    }
+
+    const lineas = Array.from({ length: 80 }, (_, indice) => `-- línea ${indice + 1}`);
+    lineas.push('sel');
+    await escribirSql(page, lineas.join('\n'));
+
+    await page.evaluate(() => {
+      const editor = (window as any).monaco.editor.getEditors()[0];
+      const model = editor.getModel();
+      const lineNumber = model.getLineCount();
+
+      // Reproduce el tamaño grande de fuente que hacía crecer también cada fila
+      // del desplegable antes de que ambos tamaños quedaran desacoplados.
+      editor.updateOptions({ fontSize: 24, lineHeight: 41 });
+      editor.setPosition({ lineNumber, column: model.getLineMaxColumn(lineNumber) });
+      editor.revealLine(lineNumber);
+      editor.focus();
+      editor.trigger('e2e', 'editor.action.triggerSuggest', {});
+    });
+
+    const editor = page.locator('app-sql-editor .monaco-editor');
+    const suggestions = editor.locator('.suggest-widget').filter({ visible: true });
+
+    await expect(suggestions).toBeVisible({ timeout: 10_000 });
+
+    const editorBox = await editor.boundingBox();
+    const suggestionsBox = await suggestions.boundingBox();
+
+    expect(editorBox).not.toBeNull();
+    expect(suggestionsBox).not.toBeNull();
+    expect(suggestionsBox!.y).toBeGreaterThanOrEqual(editorBox!.y - 1);
+    expect(await suggestions.locator('.monaco-list-row').count()).toBeGreaterThan(1);
+
+    const suggestionFontSize = await suggestions.evaluate((element) =>
+      Number.parseFloat(getComputedStyle(element).fontSize),
+    );
+    expect(suggestionFontSize).toBeLessThanOrEqual(14);
+  });
+
+  /**
    * Bajando por un guion largo, Monaco deja pegada arriba la línea que abre el
    * bloque. Sin fondo propio se quedaba **escrita encima** del texto que pasaba
    * por debajo: el fondo del editor es transparente a propósito y esa franja lo

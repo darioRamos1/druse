@@ -53,6 +53,9 @@ export interface ExecutionErrorContext {
   readonly startOffset: number;
 }
 
+const MAX_SUGGEST_FONT_SIZE = 14;
+const MAX_SUGGEST_LINE_HEIGHT = 22;
+
 /**
  * Editor SQL sobre Monaco.
  *
@@ -262,7 +265,17 @@ export default class SqlEditor implements OnInit {
       const fontSize = this.fontSize();
 
       if (this.ready()) {
-        this._editor?.updateOptions({ fontSize, lineHeight: Math.round(fontSize * 1.7) });
+        this._editor?.updateOptions({
+          fontSize,
+          lineHeight: Math.round(fontSize * 1.7),
+          // El desplegable es interfaz, no código: si heredara una fuente grande,
+          // doce sugerencias podrían cubrir las pestañas y las barras completas.
+          suggestFontSize: Math.min(fontSize, MAX_SUGGEST_FONT_SIZE),
+          suggestLineHeight: Math.min(
+            Math.round(fontSize * 1.7),
+            MAX_SUGGEST_LINE_HEIGHT,
+          ),
+        });
       }
     });
 
@@ -617,6 +630,11 @@ export default class SqlEditor implements OnInit {
         fontFamily: "'JetBrains Mono', 'Cascadia Code', Consolas, monospace",
         fontSize: this.fontSize(),
         lineHeight: Math.round(this.fontSize() * 1.7),
+        suggestFontSize: Math.min(this.fontSize(), MAX_SUGGEST_FONT_SIZE),
+        suggestLineHeight: Math.min(
+          Math.round(this.fontSize() * 1.7),
+          MAX_SUGGEST_LINE_HEIGHT,
+        ),
         lineNumbersMinChars: 3,
         padding: { top: 12, bottom: 12 },
         minimap: { enabled: true, maxColumn: 70, renderCharacters: false },
