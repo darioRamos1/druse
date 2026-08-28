@@ -224,6 +224,27 @@ public sealed class DruseDatabase
                 ON sql_snippets (updated_at_utc DESC);
             """, cancellationToken);
 
+        // Proveedores de IA. **Sin columna para la clave**, y no por descuido: la
+        // clave vive en el almacén del sistema, igual que las contraseñas de las
+        // conexiones, y una columna aquí sería la puerta para que alguien la
+        // metiera algún día en el archivo (plan §12).
+        //
+        // El modelo va como texto libre porque cada proveedor tiene los suyos y
+        // aparecen más rápido de lo que se publica una versión de Druse.
+        await ExecuteAsync(connection, """
+            CREATE TABLE IF NOT EXISTS ai_providers (
+                id              TEXT    NOT NULL PRIMARY KEY,
+                name            TEXT    NOT NULL,
+                kind            INTEGER NOT NULL DEFAULT 0,
+                base_url        TEXT    NOT NULL DEFAULT '',
+                model           TEXT    NOT NULL DEFAULT '',
+                command         TEXT    NOT NULL DEFAULT '',
+                disclosure      INTEGER NOT NULL DEFAULT 1,
+                is_default      INTEGER NOT NULL DEFAULT 0,
+                created_at_utc  TEXT    NOT NULL
+            );
+            """, cancellationToken);
+
         // Los archivos creados por versiones anteriores ya tienen la tabla, así que
         // `CREATE TABLE IF NOT EXISTS` no les añade la columna: hay que agregarla
         // aparte. El valor por omisión deja los perfiles existentes con usuario y
@@ -258,7 +279,7 @@ public sealed class DruseDatabase
 
         // Marca de versión del esquema, para poder migrar más adelante sin
         // adivinar en qué estado está el archivo de cada usuario.
-        await ExecuteAsync(connection, "PRAGMA user_version = 5;", cancellationToken);
+        await ExecuteAsync(connection, "PRAGMA user_version = 6;", cancellationToken);
     }
 
     /// <summary>Añade una columna solo si el archivo del usuario aún no la tiene.</summary>

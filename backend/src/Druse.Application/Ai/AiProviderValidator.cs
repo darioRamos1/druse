@@ -1,0 +1,97 @@
+using Druse.Application.Connections;
+using Druse.Domain;
+
+namespace Druse.Application.Ai;
+
+/// <summary>
+/// Comprueba que un proveedor tiene sentido antes de preguntarle nada.
+///
+/// Lo que se caza aquí son los errores que, de pasar, salen como un fallo de red
+/// o un 404 del proveedor: una URL que apunta al sitio equivocado, un modelo sin
+/// nombre. Ninguno de esos mensajes le dice a nadie qué escribió mal.
+/// </summary>
+public static class AiProviderValidator
+{
+    private const int MaxNameLength = 120;
+
+    public static ValidationResult Validate(AiProviderProfile? profile)
+    {
+        if (profile is null)
+        {
+            return new ValidationResult(["El proveedor es obligatorio."]);
+        }
+
+        var errors = new List<string>();
+
+        if (string.IsNullOrWhiteSpace(profile.Name))
+        {
+            errors.Add("El nombre del proveedor es obligatorio.");
+        }
+        else if (profile.Name.Length > MaxNameLength)
+        {
+            errors.Add($"El nombre no puede superar {MaxNameLength} caracteres.");
+        }
+
+        if (string.IsNullOrWhiteSpace(profile.Model))
+        {
+            errors.Add("El modelo es obligatorio.");
+        }
+
+        if (profile.Kind == AiProviderKind.LocalCli)
+        {
+            if (string.IsNullOrWhiteSpace(profile.Command))
+            {
+                errors.Add("Falta el programa que atiende a este proveedor.");
+            }
+
+            return new ValidationResult(errors);
+        }
+
+        ValidateBaseUrl(profile, errors);
+
+        return new ValidationResult(errors);
+    }
+
+    private static void ValidateBaseUrl(AiProviderProfile profile, List<string> errors)
+    {
+        if (string.IsNullOrWhiteSpace(profile.BaseUrl))
+        {
+            errors.Add("La URL base es obligatoria.");
+
+            return;
+        }
+
+        if (!Uri.TryCreate(profile.BaseUrl, UriKind.Absolute, out var url)
+            || (url.Scheme != Uri.UriSchemeHttp && url.Scheme != Uri.UriSchemeHttps))
+        {
+            errors.Add("La URL base debe empezar por http:// o https://.");
+
+            return;
+        }
+
+        /*
+         * Pegar la ruta completa es el error que todo el mundo comete.
+         *
+         * Se copia de la documentación del proveedor —que enseña el `curl`
+         * entero— y entonces Druse pide `/v1/chat/completions/chat/completions`,
+         * que responde 404. El mensaje del proveedor no dice qué sobra, así que
+         * lo dice Druse.
+         */
+        if (url.AbsolutePath.Contains("/chat/completions", StringComparison.OrdinalIgnoreCase))
+        {
+            errors.Add("La URL base termina donde empieza /chat/completions: quita esa parte.");
+        }
+
+        /*
+         * Sin cifrar **se avisa, no se prohíbe**.
+         *
+         * Empezó siendo un error, y estaba mal: muchos servidores internos de
+         * empresa —un LiteLLM detrás del cortafuegos, un vLLM en la red local—
+         * solo hablan `http`, y rechazarlos empujaba a escribir `https` sobre un
+         * puerto que no lo atiende. El resultado era un fallo de TLS
+         * incomprensible («corrupted frame») en lugar de una conexión que
+         * funciona. Quién puede espiar esa red es cosa de quien la administra,
+         * no de Druse; el aviso lo da la pantalla.
+         */
+    }
+}

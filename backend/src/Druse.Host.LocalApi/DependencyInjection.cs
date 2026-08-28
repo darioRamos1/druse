@@ -1,4 +1,5 @@
 ﻿using Druse.Application.Abstractions;
+using Druse.Application.Ai;
 using Druse.Application.Backups;
 using Druse.Application.Connections;
 using Druse.Application.Metadata;
@@ -9,6 +10,7 @@ using Druse.Application.Transactions;
 using Druse.Application.Transfers;
 using Druse.Database.Abstractions;
 using Druse.Host.LocalApi.Security;
+using Druse.Infrastructure.Ai;
 using Druse.Infrastructure.Backups;
 using Druse.Infrastructure.Exports;
 using Druse.Infrastructure.Importing;
@@ -65,6 +67,27 @@ internal static class DependencyInjection
         services.AddScoped<ISqlSnippetStore, SqliteSqlSnippetStore>();
         services.AddScoped<IBackupProfileStore, SqliteBackupProfileStore>();
         services.AddScoped<ITransferProfileStore, SqliteTransferProfileStore>();
+        services.AddScoped<IAiProviderStore, SqliteAiProviderStore>();
+        services.AddScoped<SavedAiProviderService>();
+
+        // El cliente HTTP del asistente lleva su propio tiempo de espera, más
+        // largo que el de una petición corriente: un modelo pensando tarda más
+        // que cualquier API, y el corte por omisión de 100 segundos abortaría
+        // respuestas que iban bien. Quien cancela es el usuario, no el reloj.
+        services.AddHttpClient<OpenAiCompatibleProvider>(client =>
+        {
+            client.Timeout = TimeSpan.FromMinutes(10);
+        });
+        services.AddScoped<IAiProvider>(provider =>
+            provider.GetRequiredService<OpenAiCompatibleProvider>());
+
+        // El que habla con un programa del equipo. No necesita cliente HTTP: lo
+        // que lanza es un proceso.
+        services.AddScoped<IAiProvider, LocalCliProvider>();
+
+        // Mira la sesión de esos programas y abre la ventana donde la piden. Va
+        // aparte del proveedor porque no es hablar con un modelo.
+        services.AddSingleton<ICliSession, CliSession>();
 
         // --- Proveedores de motor ---------------------------------------------
         // Cada motor aporta sus piezas y nada más. MySQL entró en la Fase 8
