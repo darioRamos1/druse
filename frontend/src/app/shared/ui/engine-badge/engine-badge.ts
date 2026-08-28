@@ -14,8 +14,8 @@ const ENGINE_NAMES: Readonly<Record<DatabaseEngine, string>> = {
   postgresql: 'PostgreSQL',
   sqlserver: 'SQL Server',
   mysql: 'MySQL',
-  informix: 'Informix',
-  informixsqli: 'Informix (SQLI)',
+  informix: 'Informix (DRDA)',
+  informixsqli: 'Informix',
 };
 
 /**
@@ -68,7 +68,8 @@ const ENGINE_NAMES: Readonly<Record<DatabaseEngine, string>> = {
       color: var(--dr-engine-mysql);
     }
 
-    :host([data-engine='informix']) {
+    :host([data-engine='informix']),
+    :host([data-engine='informixsqli']) {
       background: var(--dr-engine-informix-tint);
       border: 1px solid var(--dr-engine-informix-line);
       color: var(--dr-engine-informix);

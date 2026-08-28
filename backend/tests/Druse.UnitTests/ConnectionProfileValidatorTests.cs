@@ -160,6 +160,48 @@ public sealed class ConnectionProfileValidatorTests
         Assert.False(result.IsValid);
     }
 
+    [Fact]
+    public void InformixSqliExigeSuServerLogico()
+    {
+        var profile = Valid() with
+        {
+            Engine = DatabaseEngine.InformixSqli,
+            Port = 9088,
+            InformixServer = " ",
+        };
+
+        var result = ConnectionProfileValidator.Validate(profile);
+
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, error =>
+            error.Contains("INFORMIXSERVER", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void InformixSqliAceptaHostYServerLogico()
+    {
+        var profile = Valid() with
+        {
+            Engine = DatabaseEngine.InformixSqli,
+            Port = 9088,
+            InformixServer = "vehi_tcp",
+        };
+
+        Assert.True(ConnectionProfileValidator.Validate(profile).IsValid);
+    }
+
+    [Fact]
+    public void InformixDrdaNoExigeServerLogico()
+    {
+        var profile = Valid() with
+        {
+            Engine = DatabaseEngine.Informix,
+            Port = 9089,
+        };
+
+        Assert.True(ConnectionProfileValidator.Validate(profile).IsValid);
+    }
+
     [Theory]
     [InlineData(0)]
     [InlineData(301)]

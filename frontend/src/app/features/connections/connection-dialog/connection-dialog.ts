@@ -75,19 +75,22 @@ const ENGINES: readonly EngineOption[] = [
   { id: 'sqlserver', name: 'SQL Server', versions: '2016 – 2022', defaultPort: 1433, available: true },
   { id: 'postgresql', name: 'PostgreSQL', versions: '12 – 18', defaultPort: 5432, available: true },
   { id: 'mysql', name: 'MySQL', versions: '8.0+ · MariaDB', defaultPort: 3306, available: true },
-  // El puerto es el del escuchador DRDA, no el nativo de Informix: Druse se
-  // conecta por DRDA, así que 9089 —el de la edición de desarrollo de IBM— es
-  // mejor punto de partida que el 1526 que la gente recuerda.
-  { id: 'informix', name: 'Informix', versions: '12.10+ · vía DRDA', defaultPort: 9089, available: true },
-  // El mismo motor por su protocolo nativo. Va aparte porque para quien conecta
-  // son dos cosas distintas: cambia el puerto, hace falta el servidor lógico, y
-  // sobre todo cambia si se puede conectar —DRDA exige un escuchador que muchas
-  // instalaciones no levantan; SQLI lo atiende cualquier Informix—.
+  // Esta es la conexión habitual de DBeaver: JDBC sobre SQLI, con Host y el
+  // servidor lógico (`INFORMIXSERVER`) como datos distintos.
   {
     id: 'informixsqli',
-    name: 'Informix (SQLI)',
-    versions: '12.10+ · protocolo nativo',
+    name: 'Informix',
+    versions: '12.10+ · JDBC/SQLI',
     defaultPort: 9088,
+    available: true,
+  },
+  // DRDA queda explícito porque no usa `INFORMIXSERVER` y requiere un
+  // escuchador distinto en el servidor.
+  {
+    id: 'informix',
+    name: 'Informix (DRDA)',
+    versions: '12.10+ · protocolo DRDA',
+    defaultPort: 9089,
     available: true,
   },
 ];
@@ -504,6 +507,7 @@ export class ConnectionDialog {
     this.port.set(profile.port);
     this.database.set(profile.database);
     this.username.set(profile.username);
+    this.informixServer.set(profile.informixServer ?? '');
     this.authentication.set(profile.authentication ?? 'password');
     this.sslMode.set(profile.sslMode ?? 'prefer');
     this.readOnly.set(profile.readOnly);

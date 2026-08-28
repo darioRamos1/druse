@@ -466,7 +466,8 @@ describe('ConnectionDialog', () => {
     /** Elige un motor por el nombre que se ve en la lista. */
     function elegirMotor(nombre: string): void {
       const opcion = [...fixture.nativeElement.querySelectorAll('.engine')].find(
-        (candidata: Element) => candidata.textContent?.includes(nombre),
+        (candidata: Element) =>
+          candidata.querySelector('.engine__name')?.textContent?.trim() === nombre,
       ) as HTMLElement;
 
       opcion.click();
@@ -485,16 +486,18 @@ describe('ConnectionDialog', () => {
      * Por DRDA no existe ese concepto, y enseñar un campo que no se usa invita a
      * rellenarlo y a buscar el fallo donde no está.
      */
-    it('el campo del servidor Informix solo aparece con SQLI', () => {
+    it('solo Informix SQLI muestra los campos Host y Server separados', () => {
       elegirMotor('PostgreSQL');
-      expect(campo('Servidor Informix')).toBeUndefined();
+      expect(campo('Host')).toBeUndefined();
+      expect(campo('Server (INFORMIXSERVER)')).toBeUndefined();
 
-      elegirMotor('Informix (SQLI)');
-      expect(campo('Servidor Informix')).toBeDefined();
+      elegirMotor('Informix');
+      expect(campo('Host')).toBeDefined();
+      expect(campo('Server (INFORMIXSERVER)')).toBeDefined();
     });
 
     it('cambiar a SQLI propone su puerto y no el de DRDA', async () => {
-      elegirMotor('Informix (SQLI)');
+      elegirMotor('Informix');
 
       // `ngModel` escribe en el DOM en su propio turno: sin esperar, se leería
       // el valor de antes del clic.
@@ -507,7 +510,7 @@ describe('ConnectionDialog', () => {
     });
 
     it('sin servidor lógico no se llama a la API y se dice qué falta', async () => {
-      elegirMotor('Informix (SQLI)');
+      elegirMotor('Informix');
 
       button('Probar conexión').click();
       await fixture.whenStable();
@@ -516,6 +519,66 @@ describe('ConnectionDialog', () => {
       expect(store.testConnection).not.toHaveBeenCalled();
       expect(fixture.nativeElement.textContent).toContain('sqlhosts');
     });
+
+    it('envía Host y Server como datos distintos de la conexión Informix', async () => {
+      elegirMotor('Informix');
+      escribir('Nombre', 'Reportes Informix');
+      escribir('Host', '192.168.99.76');
+      escribir('Server (INFORMIXSERVER)', 'vehi_tcp');
+      escribir('Base de datos', 'bas_reportes');
+      escribir('Usuario', 'casuistica');
+
+      button('Probar conexión').click();
+      await fixture.whenStable();
+
+      expect(store.testConnection).toHaveBeenCalledWith(
+        expect.objectContaining({
+          engine: 'informixsqli',
+          host: '192.168.99.76',
+          informixServer: 'vehi_tcp',
+          database: 'bas_reportes',
+          username: 'casuistica',
+        }),
+      );
+    });
+
+    it('recupera el Server al editar una conexión Informix guardada', async () => {
+      const saved: SavedConnection = {
+        id: 'informix-1',
+        name: 'Reportes Informix',
+        engine: 'informixsqli',
+        host: '192.168.99.76',
+        port: 9010,
+        database: 'bas_reportes',
+        username: 'casuistica',
+        informixServer: 'vehi_tcp',
+        authentication: 'password',
+        sslMode: 'disable',
+        environment: 'production',
+        readOnly: false,
+        hasStoredPassword: true,
+      };
+
+      fixture.componentRef.setInput('connection', saved);
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      expect(campo('Host')?.value).toBe('192.168.99.76');
+      expect(campo('Server (INFORMIXSERVER)')?.value).toBe('vehi_tcp');
+      expect(campo('Puerto')?.value).toBe('9010');
+    });
+
+    function escribir(etiqueta: string, valor: string): void {
+      const input = campo(etiqueta);
+
+      if (!input) {
+        throw new Error(`No se encontró el campo ${etiqueta}.`);
+      }
+
+      input.value = valor;
+      input.dispatchEvent(new Event('input'));
+      fixture.detectChanges();
+    }
   });
 
   function button(label: string): HTMLButtonElement {

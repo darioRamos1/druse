@@ -84,6 +84,8 @@ export interface SavedConnection {
   readonly port: number;
   readonly database: string;
   readonly username: string;
+  /** Servidor lógico de Informix SQLI (`INFORMIXSERVER`). */
+  readonly informixServer?: string;
   readonly authentication: AuthenticationMode;
   readonly environment: ConnectionEnvironment;
   readonly readOnly: boolean;

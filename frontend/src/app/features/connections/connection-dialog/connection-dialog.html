@@ -72,7 +72,7 @@
       </label>
 
       <label class="field field--host">
-        <span class="field__label">Servidor</span>
+        <span class="field__label">{{ usaSqli() ? 'Host' : 'Servidor' }}</span>
         <input
           class="field__input"
           type="text"
@@ -114,7 +114,7 @@
       -->
       @if (usaSqli()) {
         <label class="field field--wide">
-          <span class="field__label">Servidor Informix</span>
+          <span class="field__label">Server (INFORMIXSERVER)</span>
           <input
             class="field__input"
             type="text"
@@ -128,7 +128,7 @@
             <span class="field__error" id="connection-informix-server-detail">{{ error }}</span>
           } @else {
             <span class="field__hint" id="connection-informix-server-detail">
-              El nombre del `sqlhosts`, no el de la máquina. Lo sabe quien administra el servidor.
+              El alias definido en `sqlhosts`, por ejemplo `vehi_tcp`; no es el Host ni la IP.
             </span>
           }
         </label>

@@ -90,6 +90,13 @@ public static class ConnectionProfileValidator
             errors.Add("El motor indicado no es válido.");
         }
 
+        if (profile.Engine == DatabaseEngine.InformixSqli
+            && string.IsNullOrWhiteSpace(profile.InformixServer))
+        {
+            errors.Add(
+                "El Server de Informix (INFORMIXSERVER) es obligatorio para una conexión SQLI.");
+        }
+
         if (profile.ConnectTimeoutSeconds is < 1 or > 300)
         {
             errors.Add("El tiempo de espera de conexión debe estar entre 1 y 300 segundos.");
