@@ -154,6 +154,15 @@ export class AiProviderDialog {
   protected readonly session = signal<CliSessionState | null>(null);
   protected readonly loggingIn = signal(false);
 
+  /**
+   * Este perfil usa su propia cuenta, no la del equipo.
+   *
+   * Apagado por omision porque quien ya tiene sesion iniciada no deberia
+   * volver a entrar. Se enciende justo para lo contrario: cuando se quiere
+   * **otra** cuenta sin cerrar la que ya hay.
+   */
+  protected readonly ownSession = signal(false);
+
   protected readonly isLocalCli = computed(() => this.chosen().kind === 'localcli');
 
   /**
@@ -213,6 +222,24 @@ export class AiProviderDialog {
   }
 
   /**
+   * Cambiar entre la cuenta del equipo y una propia son dos sesiones distintas.
+   *
+   * Al cambiar hay que volver a preguntar: la misma maquina puede tener sesion
+   * en una y no en la otra, y dejar el estado anterior en pantalla diria que
+   * hay cuenta donde no la hay.
+   */
+  protected toggleOwnSession(): void {
+    this.ownSession.set(!this.ownSession());
+    this.session.set(null);
+
+    const command = this.chosen().command;
+
+    if (command) {
+      void this.refreshSession(command);
+    }
+  }
+
+  /**
    * Pregunta al programa si tiene sesion, y con quien.
    *
    * Es lo que evita el peor momento de esta pantalla: configurar el proveedor,
@@ -222,7 +249,9 @@ export class AiProviderDialog {
   private async refreshSession(command: string): Promise<void> {
     try {
       const state = await new Promise<CliSessionState>((resolve, reject) => {
-        this._gateway.getCliSession(command).subscribe({ next: resolve, error: reject });
+        this._gateway
+          .getCliSession(command, this.sessionOwner())
+          .subscribe({ next: resolve, error: reject });
       });
 
       this.session.set(state);
@@ -247,7 +276,9 @@ export class AiProviderDialog {
     try {
       const result = await new Promise<{ started: boolean; message?: string }>(
         (resolve, reject) => {
-          this._gateway.startCliLogin(command).subscribe({ next: resolve, error: reject });
+          this._gateway
+            .startCliLogin(command, this.sessionOwner())
+            .subscribe({ next: resolve, error: reject });
         },
       );
 
@@ -279,6 +310,7 @@ export class AiProviderDialog {
     this.baseUrl.set(provider.baseUrl);
     this.model.set(provider.model);
     this.command.set(provider.command);
+    this.ownSession.set(provider.ownSession);
     this.disclosure.set(provider.disclosure);
 
     // La clave guardada no se lee del almacén ni se enseña: `null` significa
@@ -294,6 +326,7 @@ export class AiProviderDialog {
     this.baseUrl.set(this.chosen().baseUrl);
     this.model.set(this.chosen().model);
     this.command.set(this.chosen().command ?? '');
+    this.ownSession.set(false);
     this.disclosure.set('schema');
     this.apiKey.set(null);
     this.probe.set(null);
@@ -393,6 +426,18 @@ export class AiProviderDialog {
     })[target].set(value);
   }
 
+  /**
+   * De quien es la sesion que se mira o se inicia.
+   *
+   * El identificador del perfil cuando tiene cuenta propia —cada uno guarda sus
+   * credenciales aparte— y nada cuando comparte la del equipo. Un perfil que
+   * todavia no se ha guardado no tiene identificador, asi que hasta entonces se
+   * mira la del equipo: es lo unico que se puede saber de el.
+   */
+  private sessionOwner(): string | undefined {
+    return this.ownSession() ? this.editing()?.id : undefined;
+  }
+
   private request() {
     const editing = this.editing();
 
@@ -404,6 +449,7 @@ export class AiProviderDialog {
       model: this.model().trim(),
       command: this.command().trim(),
       disclosure: this.staysHere() ? ('schemaAndRows' as AiDisclosure) : this.disclosure(),
+      ownSession: this.ownSession(),
       // El primero que se configura es el que se usa: nadie configura uno para
       // luego tener que ir a marcarlo.
       isDefault: editing?.isDefault ?? this.providers().length === 0,

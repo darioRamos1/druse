@@ -2,6 +2,7 @@ using System.Text;
 using System.Text.Json;
 using Druse.Application.Ai;
 using Druse.Domain;
+using Druse.Platform.Abstractions;
 
 namespace Druse.Host.LocalApi.Endpoints;
 
@@ -14,6 +15,7 @@ public sealed record AiProviderDto(
     string Model,
     string Command,
     string Disclosure,
+    bool OwnSession,
     bool IsDefault,
     bool HasStoredKey);
 
@@ -31,6 +33,7 @@ public sealed record SaveAiProviderDto(
     string Model,
     string Command,
     string Disclosure,
+    bool OwnSession,
     bool IsDefault,
     string? ApiKey);
 
@@ -209,6 +212,7 @@ internal static class AiEndpoints
          */
         app.MapGet("/api/ai/cli/{command}", async (
             string command,
+            Guid? profileId,
             ICliSession sessions,
             CancellationToken cancellationToken) =>
         {
@@ -217,7 +221,7 @@ internal static class AiEndpoints
                 return Results.NotFound(new { message = "Ese programa no lo conoce Druse." });
             }
 
-            var state = await sessions.InspectAsync(command, cancellationToken);
+            var state = await sessions.InspectAsync(command, profileId, cancellationToken);
 
             return Results.Ok(new
             {
@@ -231,6 +235,7 @@ internal static class AiEndpoints
 
         app.MapPost("/api/ai/cli/{command}/login", async (
             string command,
+            Guid? profileId,
             ICliSession sessions,
             CancellationToken cancellationToken) =>
         {
@@ -239,7 +244,7 @@ internal static class AiEndpoints
                 return Results.NotFound(new { message = "Ese programa no lo conoce Druse." });
             }
 
-            return await sessions.StartLoginAsync(command, cancellationToken)
+            return await sessions.StartLoginAsync(command, profileId, cancellationToken)
                 ? Results.Ok(new { started = true })
                 : Results.Ok(new
                 {
@@ -252,6 +257,7 @@ internal static class AiEndpoints
             AiChatDto request,
             SavedAiProviderService providers,
             IEnumerable<IAiProvider> known,
+            IAppPaths paths,
             HttpContext context,
             CancellationToken cancellationToken) =>
         {
@@ -270,13 +276,24 @@ internal static class AiEndpoints
 
             await StreamAsync(
                 For(known, profile),
-                new AiRequest(profile, key, messages),
+                new AiRequest(profile, key, messages, SessionDirectoryFor(profile, paths)),
                 context,
                 cancellationToken);
 
             return Results.Empty;
         });
     }
+
+    /// <summary>
+    /// Dónde busca sus credenciales el programa de este perfil.
+    ///
+    /// `null` cuando comparte la sesión del equipo, que es lo normal: quien ya
+    /// tiene sesión iniciada no debería volver a entrar para usar el asistente.
+    /// </summary>
+    private static string? SessionDirectoryFor(AiProviderProfile profile, IAppPaths paths) =>
+        profile.Kind == AiProviderKind.LocalCli && profile.OwnSession
+            ? Path.Combine(paths.DataDirectory, "ai-sessions", profile.Id.ToString("N"))
+            : null;
 
     /// <summary>
     /// Los programas que Druse sabe lanzar.
@@ -419,6 +436,7 @@ internal static class AiEndpoints
             AiDisclosure.SchemaAndRows => "schemaAndRows",
             _ => "schema",
         },
+        profile.OwnSession,
         profile.IsDefault,
         hasKey);
 
@@ -441,6 +459,7 @@ internal static class AiEndpoints
             "schemaAndRows" => AiDisclosure.SchemaAndRows,
             _ => AiDisclosure.Schema,
         },
+        OwnSession = request.OwnSession,
         IsDefault = request.IsDefault,
     };
 }

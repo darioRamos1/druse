@@ -239,6 +239,7 @@ public sealed class DruseDatabase
                 base_url        TEXT    NOT NULL DEFAULT '',
                 model           TEXT    NOT NULL DEFAULT '',
                 command         TEXT    NOT NULL DEFAULT '',
+                own_session     INTEGER NOT NULL DEFAULT 0,
                 disclosure      INTEGER NOT NULL DEFAULT 1,
                 is_default      INTEGER NOT NULL DEFAULT 0,
                 created_at_utc  TEXT    NOT NULL
@@ -275,6 +276,16 @@ public sealed class DruseDatabase
             "connection_profiles",
             "informix_server",
             "TEXT NOT NULL DEFAULT ''",
+            cancellationToken);
+
+        // La cuenta propia del asistente. Los archivos que ya tenían la tabla no
+        // reciben la columna por `CREATE TABLE IF NOT EXISTS`, así que se añade
+        // aparte; apagada, que es como se crearon: usando la sesión del equipo.
+        await AddColumnIfMissingAsync(
+            connection,
+            "ai_providers",
+            "own_session",
+            "INTEGER NOT NULL DEFAULT 0",
             cancellationToken);
 
         // Marca de versión del esquema, para poder migrar más adelante sin

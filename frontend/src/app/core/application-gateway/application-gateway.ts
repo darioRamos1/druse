@@ -678,7 +678,7 @@ export abstract class ApplicationGateway {
   abstract listAiModels(request: SaveAiProviderRequest): Observable<AiModelList>;
 
   /** Si ese programa esta instalado y con sesion iniciada. */
-  abstract getCliSession(command: string): Observable<CliSessionState>;
+  abstract getCliSession(command: string, profileId?: string): Observable<CliSessionState>;
 
   /**
    * Abre la consola donde el programa pide las credenciales.
@@ -686,7 +686,10 @@ export abstract class ApplicationGateway {
    * El inicio de sesion ocurre **en el programa**, no en Druse: no hay forma de
    * que una aplicacion de terceros autentique una cuenta de Claude o de ChatGPT.
    */
-  abstract startCliLogin(command: string): Observable<{ started: boolean; message?: string }>;
+  abstract startCliLogin(
+    command: string,
+    profileId?: string,
+  ): Observable<{ started: boolean; message?: string }>;
 
   /**
    * Pregunta al asistente y devuelve la respuesta por trozos.

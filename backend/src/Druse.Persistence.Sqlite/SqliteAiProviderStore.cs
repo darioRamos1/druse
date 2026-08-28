@@ -15,7 +15,7 @@ namespace Druse.Persistence.Sqlite;
 public sealed class SqliteAiProviderStore(DruseDatabase database) : IAiProviderStore
 {
     private const string Columns =
-        "id, name, kind, base_url, model, command, disclosure, is_default, created_at_utc";
+        "id, name, kind, base_url, model, command, own_session, disclosure, is_default, created_at_utc";
 
     private readonly DruseDatabase _database = database;
 
@@ -69,13 +69,14 @@ public sealed class SqliteAiProviderStore(DruseDatabase database) : IAiProviderS
         // orden de la lista.
         command.CommandText = $"""
             INSERT INTO ai_providers ({Columns})
-            VALUES ($id, $name, $kind, $baseUrl, $model, $command, $disclosure, $isDefault, $created)
+            VALUES ($id, $name, $kind, $baseUrl, $model, $command, $ownSession, $disclosure, $isDefault, $created)
             ON CONFLICT (id) DO UPDATE SET
                 name = excluded.name,
                 kind = excluded.kind,
                 base_url = excluded.base_url,
                 model = excluded.model,
                 command = excluded.command,
+                own_session = excluded.own_session,
                 disclosure = excluded.disclosure,
                 is_default = excluded.is_default;
             """;
@@ -86,6 +87,7 @@ public sealed class SqliteAiProviderStore(DruseDatabase database) : IAiProviderS
         command.Parameters.AddWithValue("$baseUrl", profile.BaseUrl);
         command.Parameters.AddWithValue("$model", profile.Model);
         command.Parameters.AddWithValue("$command", profile.Command);
+        command.Parameters.AddWithValue("$ownSession", profile.OwnSession ? 1 : 0);
         command.Parameters.AddWithValue("$disclosure", (int)profile.Disclosure);
         command.Parameters.AddWithValue("$isDefault", profile.IsDefault ? 1 : 0);
         command.Parameters.AddWithValue(
@@ -114,7 +116,8 @@ public sealed class SqliteAiProviderStore(DruseDatabase database) : IAiProviderS
         BaseUrl = reader.GetString(3),
         Model = reader.GetString(4),
         Command = reader.GetString(5),
-        Disclosure = (AiDisclosure)reader.GetInt32(6),
-        IsDefault = reader.GetInt32(7) != 0,
+        OwnSession = reader.GetInt32(6) != 0,
+        Disclosure = (AiDisclosure)reader.GetInt32(7),
+        IsDefault = reader.GetInt32(8) != 0,
     };
 }

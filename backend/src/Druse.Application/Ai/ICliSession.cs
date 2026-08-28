@@ -32,8 +32,18 @@ public readonly record struct CliSessionState(
 /// </summary>
 public interface ICliSession
 {
-    /// <summary>Averigua qué sabe el programa de su propia sesión.</summary>
-    Task<CliSessionState> InspectAsync(string command, CancellationToken cancellationToken);
+    /// <summary>
+    /// Averigua qué sabe el programa de su propia sesión.
+    /// </summary>
+    /// <param name="profileId">
+    /// Perfil que quiere su propia cuenta, o `null` para mirar la sesión que
+    /// comparte todo el equipo. Son dos preguntas distintas: la misma máquina
+    /// puede tener sesión en una y no en la otra.
+    /// </param>
+    Task<CliSessionState> InspectAsync(
+        string command,
+        Guid? profileId,
+        CancellationToken cancellationToken);
 
     /// <summary>
     /// Abre una consola donde el programa pide las credenciales.
@@ -41,5 +51,8 @@ public interface ICliSession
     /// Devuelve en cuanto la ventana existe: lo que pase dentro —el navegador
     /// que se abre, el código que se pega— es cosa del programa y de su dueño.
     /// </summary>
-    Task<bool> StartLoginAsync(string command, CancellationToken cancellationToken);
+    Task<bool> StartLoginAsync(
+        string command,
+        Guid? profileId,
+        CancellationToken cancellationToken);
 }

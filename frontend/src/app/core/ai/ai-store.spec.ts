@@ -13,6 +13,7 @@ const provider: AiProvider = {
   model: 'DeepSeek-V3',
   command: '',
   disclosure: 'schema',
+  ownSession: false,
   isDefault: true,
   hasStoredKey: true,
 };

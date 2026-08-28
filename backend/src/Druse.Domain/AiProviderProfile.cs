@@ -97,6 +97,20 @@ public sealed record AiProviderProfile
     /// </summary>
     public string Command { get; init; } = string.Empty;
 
+    /// <summary>
+    /// Este perfil inicia sesión por su cuenta, aparte de la del equipo.
+    ///
+    /// Sin esto solo se puede usar **una** cuenta: el programa guarda una sola
+    /// sesión por usuario del sistema, y cambiarla obligaría a cerrar la que
+    /// usa quien programa con esa misma herramienta. Con esto, cada perfil
+    /// puede llevar su propia cuenta —la personal y la del trabajo a la vez— y
+    /// ninguna se pisa con la otra.
+    ///
+    /// Va apagado por omisión: quien ya tiene sesión iniciada en su equipo no
+    /// tiene por qué volver a entrar para usar el asistente.
+    /// </summary>
+    public bool OwnSession { get; init; }
+
     public AiDisclosure Disclosure { get; init; } = AiDisclosure.Schema;
 
     /// <summary>El que se usa mientras el usuario no elija otro.</summary>

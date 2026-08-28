@@ -34,6 +34,14 @@ export interface AiProvider {
   /** Programa que atiende a un proveedor `localcli`. Vacío en los demás. */
   readonly command: string;
   readonly disclosure: AiDisclosure;
+  /**
+   * Este perfil inicia sesion por su cuenta, aparte de la del equipo.
+   *
+   * Es lo que permite tener dos cuentas —la personal y la del trabajo— sin
+   * que una cierre la sesion de la otra, y sin tocar la que usa quien
+   * programa con esa misma herramienta.
+   */
+  readonly ownSession: boolean;
   readonly isDefault: boolean;
   /** Hay una clave suya en el almacén del sistema. */
   readonly hasStoredKey: boolean;
@@ -61,6 +69,7 @@ export interface SaveAiProviderRequest {
   readonly model: string;
   readonly command: string;
   readonly disclosure: AiDisclosure;
+  readonly ownSession: boolean;
   readonly isDefault: boolean;
   readonly apiKey?: string;
 }

@@ -651,3 +651,11 @@
     background: var(--dr-warning);
   }
 }
+
+/** Con que cuenta responde el programa: la del equipo o una propia. */
+.accounts {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}

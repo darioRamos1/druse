@@ -246,6 +246,15 @@ public sealed class LocalCliProvider : IAiProvider
             WorkingDirectory = Path.GetTempPath(),
         };
 
+        // Con cuenta propia, el programa busca sus credenciales donde le diga
+        // Druse y no en la sesión del equipo: es lo que permite preguntar con
+        // una cuenta distinta de la que usa quien programa con esta herramienta.
+        if (request.SessionDirectory is { } home)
+        {
+            Directory.CreateDirectory(home);
+            info.EnvironmentVariables["CLAUDE_CONFIG_DIR"] = home;
+        }
+
         if (shell)
         {
             info.ArgumentList.Add("/c");

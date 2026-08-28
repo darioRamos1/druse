@@ -102,6 +102,39 @@
           guardarlo, escribir una pregunta y descubrir entonces que faltaba
           iniciar sesion.
         -->
+        <!--
+          Con que cuenta responde: la del equipo o una propia.
+          
+          Sin esto solo se puede usar una, porque el programa guarda una sola
+          sesion por usuario del sistema: cambiarla obligaria a cerrar la que usa
+          quien programa con esa misma herramienta.
+        -->
+        <div class="accounts">
+          <button
+            type="button"
+            class="pill"
+            [class.is-selected]="!ownSession()"
+            (click)="ownSession() && toggleOwnSession()"
+          >
+            La sesion de este equipo
+          </button>
+          <button
+            type="button"
+            class="pill"
+            [class.is-selected]="ownSession()"
+            (click)="!ownSession() && toggleOwnSession()"
+          >
+            Otra cuenta, solo para Druse
+          </button>
+        </div>
+
+        @if (ownSession() && !editing()) {
+          <span class="field__hint">
+            Guarda el proveedor primero: su sesion se guarda aparte, con su identificador, y hasta
+            entonces no hay donde ponerla.
+          </span>
+        }
+
         @if (session(); as state) {
           <div
             class="session"

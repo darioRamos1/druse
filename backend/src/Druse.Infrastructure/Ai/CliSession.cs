@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Text.Json;
 using Druse.Application.Ai;
+using Druse.Platform.Abstractions;
 
 namespace Druse.Infrastructure.Ai;
 
@@ -11,8 +12,10 @@ namespace Druse.Infrastructure.Ai;
 /// no se puede averiguar se devuelve como desconocido, porque decir «no tienes
 /// sesión» a quien la tiene lo manda a repetir un inicio de sesión que sobra.
 /// </summary>
-public sealed class CliSession : ICliSession
+public sealed class CliSession(IAppPaths paths) : ICliSession
 {
+    private readonly IAppPaths _paths = paths;
+
     /// <summary>
     /// Cuánto se espera a que el programa conteste.
     ///
@@ -21,9 +24,13 @@ public sealed class CliSession : ICliSession
     /// </summary>
     private static readonly TimeSpan Patience = TimeSpan.FromSeconds(20);
 
-    public async Task<CliSessionState> InspectAsync(string command, CancellationToken cancellationToken)
+    public async Task<CliSessionState> InspectAsync(
+        string command,
+        Guid? profileId,
+        CancellationToken cancellationToken)
     {
-        var version = await RunAsync(command, ["--version"], cancellationToken);
+        var home = SessionDirectory(profileId);
+        var version = await RunAsync(command, ["--version"], home, cancellationToken);
 
         if (version is null)
         {
@@ -52,7 +59,7 @@ public sealed class CliSession : ICliSession
                 $"«{command}» está instalado. No sabe decir si hay sesión iniciada: pruébalo y verás.");
         }
 
-        var status = await RunAsync(command, ["auth", "status", "--json"], cancellationToken);
+        var status = await RunAsync(command, ["auth", "status", "--json"], home, cancellationToken);
 
         if (status is null)
         {
@@ -62,11 +69,16 @@ public sealed class CliSession : ICliSession
         return ReadClaudeStatus(status);
     }
 
-    public async Task<bool> StartLoginAsync(string command, CancellationToken cancellationToken)
+    public async Task<bool> StartLoginAsync(
+        string command,
+        Guid? profileId,
+        CancellationToken cancellationToken)
     {
+        var home = SessionDirectory(profileId);
+
         // Antes de abrir nada se comprueba que hay algo que abrir: una ventana
         // que aparece y se cierra sola no le dice a nadie qué falta.
-        if (await RunAsync(command, ["--version"], cancellationToken) is null)
+        if (await RunAsync(command, ["--version"], home, cancellationToken) is null)
         {
             return false;
         }
@@ -85,12 +97,31 @@ public sealed class CliSession : ICliSession
          */
         var path = CliPath.Find(command) ?? command;
 
-        var info = OperatingSystem.IsWindows()
-            ? new ProcessStartInfo("cmd.exe", $"/k \"{path}\" {arguments}")
-            : new ProcessStartInfo(path, arguments);
+        if (home is not null)
+        {
+            Directory.CreateDirectory(home);
+        }
 
-        info.UseShellExecute = true;
-        info.CreateNoWindow = false;
+        /*
+         * La consola hereda el directorio de credenciales.
+         *
+         * Es lo que hace que la sesión que se inicie ahí sea la de **este
+         * perfil** y no la del equipo: sin la variable, entrar con otra cuenta
+         * cerraría la que ya usa quien programa con la misma herramienta.
+         *
+         * En Windows se pasa con `set` dentro del propio intérprete, y no por
+         * `EnvironmentVariables`, porque eso exigiría `UseShellExecute = false`
+         * y entonces no habría ventana donde teclear. Las comillas alrededor de
+         * la asignación son las que aguantan una ruta con espacios.
+         */
+        var info = new ProcessStartInfo("cmd.exe")
+        {
+            Arguments = home is null
+                ? $"/k \"{path}\" {arguments}"
+                : $"/k set \"CLAUDE_CONFIG_DIR={home}\" && \"{path}\" {arguments}",
+            UseShellExecute = true,
+            CreateNoWindow = false,
+        };
 
         try
         {
@@ -103,6 +134,19 @@ public sealed class CliSession : ICliSession
             return false;
         }
     }
+
+    /// <summary>
+    /// Donde guarda sus credenciales un perfil con cuenta propia.
+    ///
+    /// Cuelga de la carpeta de datos de Druse y lleva el identificador del
+    /// perfil, asi que dos perfiles nunca comparten sesion y borrar uno se lleva
+    /// la suya. `null` —lo normal— es la sesion del equipo, la que ya tiene
+    /// quien use esa herramienta para programar.
+    /// </summary>
+    private string? SessionDirectory(Guid? profileId) =>
+        profileId is { } id
+            ? Path.Combine(_paths.DataDirectory, "ai-sessions", id.ToString("N"))
+            : null;
 
     private static CliSessionState ReadClaudeStatus(string json)
     {
@@ -148,6 +192,7 @@ public sealed class CliSession : ICliSession
     private static async Task<string?> RunAsync(
         string command,
         string[] arguments,
+        string? home,
         CancellationToken cancellationToken)
     {
         var path = CliPath.Find(command);
@@ -169,6 +214,14 @@ public sealed class CliSession : ICliSession
             CreateNoWindow = true,
             WorkingDirectory = Path.GetTempPath(),
         };
+
+        // Con directorio propio, el programa mira ahi sus credenciales y no las
+        // del equipo: es lo que permite tener dos cuentas a la vez.
+        if (home is not null)
+        {
+            Directory.CreateDirectory(home);
+            info.EnvironmentVariables["CLAUDE_CONFIG_DIR"] = home;
+        }
 
         if (shell)
         {
@@ -198,7 +251,18 @@ public sealed class CliSession : ICliSession
 
             await process.WaitForExitAsync(limit.Token);
 
-            return process.ExitCode == 0 ? output.Trim() : null;
+            /*
+             * Lo que dijo vale aunque termine con error.
+             *
+             * `claude auth status` sale con codigo distinto de cero **cuando no
+             * hay sesion**, que es justo el caso que hay que distinguir: tirar su
+             * respuesta por el codigo convertia «no has entrado» en «no se
+             * entendio su estado», y con eso la pantalla no podia ofrecer el
+             * boton de iniciar sesion. Solo se descarta cuando no dijo nada.
+             */
+            var said = output.Trim();
+
+            return said.Length > 0 ? said : null;
         }
         catch (Exception error)
             when (error is System.ComponentModel.Win32Exception

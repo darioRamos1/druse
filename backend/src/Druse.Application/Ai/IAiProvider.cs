@@ -20,10 +20,15 @@ public readonly record struct AiMessage(AiRole Role, string Text);
 /// <param name="Profile">A quién se le pregunta.</param>
 /// <param name="ApiKey">Su clave, recién sacada del almacén. `null` en los que no la usan.</param>
 /// <param name="Messages">La conversación entera, en orden.</param>
+/// <param name="SessionDirectory">
+/// Dónde guarda sus credenciales el programa de consola, cuando este perfil usa
+/// una cuenta propia. `null` significa la sesión que comparte el equipo.
+/// </param>
 public readonly record struct AiRequest(
     AiProviderProfile Profile,
     string? ApiKey,
-    IReadOnlyList<AiMessage> Messages);
+    IReadOnlyList<AiMessage> Messages,
+    string? SessionDirectory = null);
 
 /// <summary>
 /// Un trozo de respuesta según llega.

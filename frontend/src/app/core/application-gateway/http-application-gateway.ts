@@ -591,14 +591,20 @@ export class HttpApplicationGateway extends ApplicationGateway {
     return this._http.post<AiModelList>('/api/ai/providers/models', request);
   }
 
-  override getCliSession(command: string): Observable<CliSessionState> {
-    return this._http.get<CliSessionState>(`/api/ai/cli/${command}`);
+  override getCliSession(command: string, profileId?: string): Observable<CliSessionState> {
+    return this._http.get<CliSessionState>(`/api/ai/cli/${command}`, {
+      params: profileId ? { profileId } : {},
+    });
   }
 
-  override startCliLogin(command: string): Observable<{ started: boolean; message?: string }> {
+  override startCliLogin(
+    command: string,
+    profileId?: string,
+  ): Observable<{ started: boolean; message?: string }> {
     return this._http.post<{ started: boolean; message?: string }>(
       `/api/ai/cli/${command}/login`,
       {},
+      { params: profileId ? { profileId } : {} },
     );
   }
 
