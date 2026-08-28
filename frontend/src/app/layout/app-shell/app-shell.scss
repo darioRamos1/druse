@@ -13,6 +13,25 @@
   min-height: 0;
 }
 
+/**
+ * El asistente, como columna de la ventana.
+ *
+ * Ancho fijo y sin encoger: es un panel de lectura, y dejarlo estrujarse
+ * convertiria el SQL propuesto en una columna de una palabra por linea.
+ */
+.ai {
+  flex: none;
+  width: 380px;
+  min-width: 0;
+}
+
+@media (max-width: 1100px) {
+  // En una ventana estrecha, el asistente y el editor no caben a la vez.
+  .ai {
+    width: 320px;
+  }
+}
+
 .sidebar {
   flex: none;
   // El ancho lo fija el shell mediante [style.width.px]; el mínimo evita que

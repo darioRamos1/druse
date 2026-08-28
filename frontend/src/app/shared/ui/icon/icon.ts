@@ -32,6 +32,7 @@ export type IconName =
   | 'edit'
   | 'trash'
   | 'console'
+  | 'sparkles'
   | 'sort-desc'
   | 'eye'
   | 'eye-off'
@@ -195,6 +196,14 @@ const ICONS: Readonly<Record<IconName, IconDefinition>> = {
     body:
       '<path d="M2.4 3.6h9.2M5.1 3.6V2.2h3.8v1.4M3.7 3.6l.6 8.1h5.4l.6-8.1" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>' +
       '<path d="M5.8 6v3.5M8.2 6v3.5" stroke="currentColor" stroke-width="1.1" stroke-linecap="round"/>',
+  },
+  // Dos destellos, uno grande y otro pequeno: es la marca del asistente en
+  // la barra superior y en su panel, y tiene que leerse a 12 px.
+  sparkles: {
+    viewBox: '0 0 14 14',
+    body:
+      '<path d="M6 1.6 6.95 4.2 9.6 5.1 6.95 6 6 8.6 5.05 6 2.4 5.1 5.05 4.2z" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/>' +
+      '<path d="M10.6 8.4 11.1 9.8 12.5 10.3 11.1 10.8 10.6 12.2 10.1 10.8 8.7 10.3 10.1 9.8z" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/>',
   },
   console: {
     viewBox: '0 0 14 14',

@@ -8,6 +8,8 @@
   (openPalette)="paletteOpen.set(true)"
   (themeSelected)="selectTheme($event)"
   (openSettings)="openSettings()"
+  [assistantOpen]="aiOpen()"
+  (toggleAssistant)="toggleAssistant()"
 />
 
 <div class="body">
@@ -231,6 +233,23 @@
       (showRestore)="reopenRestore()"
     />
   </main>
+
+  <!--
+    El asistente, cuando se pide. Va aquí y no dentro de `main` porque es una
+    columna de la ventana, hermana del explorador: no tapa nada y se cierra
+    dejando la pantalla como estaba.
+  -->
+  @defer (when aiOpen()) {
+    @if (aiOpen()) {
+      <app-ai-panel
+        class="ai"
+        [context]="aiContext()"
+        (insert)="insertFromAi($event)"
+        (configure)="aiProvidersOpen.set(true)"
+        (closed)="aiOpen.set(false)"
+      />
+    }
+  }
 </div>
 
 @if (dialogOpen()) {
@@ -320,6 +339,12 @@
       (run)="runCall($event)"
       (closed)="closeProcedureRunner()"
     />
+  }
+}
+
+@defer (when aiProvidersOpen()) {
+  @if (aiProvidersOpen()) {
+    <app-ai-provider-dialog (closed)="aiProvidersOpen.set(false)" />
   }
 }
 

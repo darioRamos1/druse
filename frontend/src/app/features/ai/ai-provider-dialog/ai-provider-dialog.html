@@ -1,0 +1,296 @@
+<!-- Escape cierra igual que pulsar fuera, como en los demás diálogos. -->
+<div class="backdrop" (click)="close()" (document:keydown.escape)="close()"></div>
+
+<div class="dialog" role="dialog" aria-modal="true" aria-labelledby="ai-provider-title">
+  <header class="head">
+    <div class="head__icon"><app-icon name="sparkles" [size]="16" /></div>
+    <div class="head__text">
+      <h2 class="head__title" id="ai-provider-title">Proveedor de IA</h2>
+      <p class="head__subtitle">
+        Elige quién responde al asistente. La clave se guarda cifrada en este equipo, igual que las
+        contraseñas de las conexiones.
+      </p>
+    </div>
+    <button type="button" class="head__close" (click)="close()" aria-label="Cerrar">×</button>
+  </header>
+
+  <div class="body">
+    @if (providers().length > 0) {
+      <h3 class="section">Configurados</h3>
+
+      <div class="saved">
+        @for (provider of providers(); track provider.id) {
+          <div class="saved__row" [class.is-editing]="editing()?.id === provider.id">
+            <button type="button" class="saved__pick" (click)="edit(provider)">
+              <span class="saved__name">{{ provider.name }}</span>
+              <span class="saved__model">{{ provider.model }}</span>
+              @if (provider.isDefault) {
+                <span class="saved__badge">por omisión</span>
+              }
+            </button>
+            <button
+              type="button"
+              class="saved__remove"
+              (click)="remove(provider)"
+              [attr.aria-label]="'Quitar ' + provider.name"
+            >
+              <app-icon name="trash" [size]="12" />
+            </button>
+          </div>
+        }
+
+        <button type="button" class="saved__new" (click)="startNew()">
+          <app-icon name="plus" [size]="11" />
+          Añadir otro
+        </button>
+      </div>
+    }
+
+    <h3 class="section">{{ editing() ? 'Editar' : 'Proveedor' }}</h3>
+
+    <div class="options">
+      @for (option of options; track option.id) {
+        <button
+          type="button"
+          class="option"
+          [class.is-selected]="chosen().id === option.id"
+          [class.is-disabled]="!option.available"
+          [disabled]="!option.available"
+          (click)="choose(option)"
+        >
+          <span class="option__icon"><app-icon [name]="option.icon" [size]="13" /></span>
+          <span class="option__text">
+            <span class="option__name">{{ option.name }}</span>
+            <span class="option__detail">{{ option.detail }}</span>
+          </span>
+          @if (chosen().id === option.id) {
+            <span class="option__check">✓</span>
+          }
+        </button>
+      }
+    </div>
+
+    <h3 class="section">Conexión</h3>
+
+    <div class="fields">
+      <label class="field">
+        <span class="field__label">Nombre</span>
+        <input
+          class="field__input"
+          type="text"
+          [value]="name()"
+          (input)="set('name', $event)"
+          placeholder="MaaS corporativo"
+        />
+      </label>
+
+      @if (isLocalCli()) {
+        <!--
+          El programa se ensena pero no se escribe: sus argumentos son lo que
+          impide que el asistente toque el disco, y un campo editable aqui seria
+          un campo donde quitarlos.
+        -->
+        <label class="field">
+          <span class="field__label">Programa</span>
+          <input class="field__input" type="text" [value]="command()" readonly disabled />
+        </label>
+
+        <!--
+          La sesion se mira aqui, antes de guardar.
+          
+          Sin esto, el peor momento de esta pantalla era configurar el proveedor,
+          guardarlo, escribir una pregunta y descubrir entonces que faltaba
+          iniciar sesion.
+        -->
+        @if (session(); as state) {
+          <div
+            class="session"
+            [class.is-ready]="state.loggedIn === true"
+            [class.is-missing]="state.installed === false || state.loggedIn === false"
+          >
+            <span class="session__dot"></span>
+            <span class="session__text">
+              @if (state.loggedIn === true) {
+                Sesion iniciada{{ state.account ? ' como ' + state.account : '' }}{{
+                  state.plan ? ' · plan ' + state.plan : ''
+                }}
+              } @else {
+                {{ state.detail }}
+              }
+            </span>
+
+            @if (state.installed && state.loggedIn !== true) {
+              <button type="button" class="btn btn--slim" [disabled]="loggingIn()" (click)="login()">
+                {{ loggingIn() ? 'Abriendo…' : 'Iniciar sesion' }}
+              </button>
+              <button type="button" class="btn btn--slim" (click)="recheck()">Ya entre</button>
+            }
+          </div>
+
+          @if (!state.installed) {
+            <span class="field__hint">
+              Se instala aparte, desde una consola:
+              <code>npm i -g {{ command() === 'codex' ? '@openai/codex' : '@anthropic-ai/claude-code' }}</code>
+            </span>
+          } @else {
+            <span class="field__hint">
+              Responde con tu propia cuenta y consume de su cuota. El inicio de sesion ocurre en el
+              propio programa, no en Druse.
+            </span>
+          }
+        }
+      } @else {
+        <label class="field">
+          <span class="field__label">URL base</span>
+          <input
+            class="field__input"
+            type="text"
+            [value]="baseUrl()"
+            (input)="set('baseUrl', $event)"
+            [placeholder]="chosen().hint ?? 'https://…/v1'"
+          />
+          <span class="field__hint">
+            La que termina en <code>/v1</code>, sin <code>/chat/completions</code>. Sale de la consola de
+            tu proveedor.
+          </span>
+          @if (unencrypted()) {
+            <!--
+              Aviso, no bloqueo: un servidor interno sin cifrar es normal detras
+              de un cortafuegos, y prohibirlo empuja a poner https sobre un
+              puerto que sirve texto plano.
+            -->
+            <span class="field__warn">
+              Sin cifrar: la clave viajara en claro por tu red. Correcto en un servidor interno; no lo
+              uses contra internet.
+            </span>
+          }
+        </label>
+      }
+
+      <div class="grid">
+        @if (!isLocalCli()) {
+          <label class="field">
+            <span class="field__label">Clave</span>
+            <span class="secret">
+              <input
+                class="field__input"
+                [type]="revealKey() ? 'text' : 'password'"
+                [value]="apiKey() ?? ''"
+                (input)="set('apiKey', $event)"
+                [placeholder]="
+                  editing()?.hasStoredKey ? 'Guardada — escribe para cambiarla' : 'Sin clave'
+                "
+              />
+              <button
+                type="button"
+                class="secret__toggle"
+                [attr.aria-pressed]="revealKey()"
+                (click)="revealKey.set(!revealKey())"
+                aria-label="Mostrar la clave"
+              >
+                <app-icon [name]="revealKey() ? 'eye-off' : 'eye'" [size]="13" />
+              </button>
+            </span>
+          </label>
+        }
+
+        <label class="field">
+          <span class="field__label">Modelo</span>
+          <span class="with-action">
+            <input
+              class="field__input"
+              type="text"
+              [value]="model()"
+              (input)="set('model', $event)"
+              placeholder="glm-5.2"
+            />
+            @if (!isLocalCli()) {
+              <button
+                type="button"
+                class="btn btn--slim"
+                [disabled]="listing() || baseUrl().length === 0"
+                (click)="loadModels()"
+              >
+                {{ listing() ? 'Buscando…' : 'Ver los suyos' }}
+              </button>
+            }
+          </span>
+          @if (models().length > 0) {
+            <!--
+              A la vista y de un toque.
+              
+              Antes eran sugerencias de un `datalist`, que solo aparecen al
+              escribir: la pantalla decia «4 modelos disponibles» sin enseñar
+              ninguno, y no habia forma de saber como se llamaban. El campo sigue
+              admitiendo texto porque un proveedor puede tener desplegado uno que
+              no enumera.
+            -->
+            <span class="choices">
+              @for (candidate of models(); track candidate) {
+                <button
+                  type="button"
+                  class="choice"
+                  [class.is-selected]="model() === candidate"
+                  (click)="model.set(candidate)"
+                >
+                  {{ candidate }}
+                </button>
+              }
+            </span>
+          }
+        </label>
+      </div>
+    </div>
+
+    @if (!staysHere()) {
+      <h3 class="section">Qué puede salir de este equipo</h3>
+
+      <div class="disclosures">
+        @for (item of disclosures; track item.value) {
+          <button
+            type="button"
+            class="pill"
+            [class.is-selected]="disclosure() === item.value"
+            (click)="disclosure.set(item.value)"
+          >
+            {{ item.label }}
+          </button>
+        }
+        <span class="disclosures__note">Los nombres de tablas y columnas viajan; las filas no.</span>
+      </div>
+    } @else {
+      <p class="local-note">
+        <app-icon name="eye-off" [size]="12" />
+        Responde en este equipo, así que nada sale a internet.
+      </p>
+    }
+
+    @if (!canStoreKeys()) {
+      <p class="warning">{{ storeDescription() }}</p>
+    }
+
+    @if (error()) {
+      <p class="warning warning--error">{{ error() }}</p>
+    }
+  </div>
+
+  <footer class="foot">
+    <button type="button" class="btn" [disabled]="probing()" (click)="test()">
+      {{ probing() ? 'Probando…' : 'Probar' }}
+    </button>
+
+    @if (probe(); as result) {
+      <span class="probe" [class.is-bad]="!result.ok">
+        <span class="probe__dot"></span>
+        {{ result.ok ? 'Respondió en ' + result.ms + ' ms' : result.detail }}
+      </span>
+    }
+
+    <span class="foot__spacer"></span>
+
+    <button type="button" class="btn" (click)="close()">Cancelar</button>
+    <button type="button" class="btn btn--primary" [disabled]="saving()" (click)="save()">
+      Guardar
+    </button>
+  </footer>
+</div>

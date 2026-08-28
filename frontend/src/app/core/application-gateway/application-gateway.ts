@@ -20,6 +20,16 @@ import {
   TestConnectionResult,
   TestTunnelResult,
 } from '../../shared/models/workspace';
+import {
+  AiChatRequest,
+  AiProbeResult,
+  AiProvider,
+  AiProviderList,
+  AiModelList,
+  AiStreamEvent,
+  CliSessionState,
+  SaveAiProviderRequest,
+} from '../../shared/models/ai';
 
 /** Estado del proceso local que atiende las peticiones de la aplicación. */
 export interface HealthStatus {
@@ -639,6 +649,53 @@ export abstract class ApplicationGateway {
 
   /** Crea una carpeta dentro de otra, sin salir del selector. */
   abstract createFolder(parent: string, name: string): Observable<FolderTarget>;
+
+  // --- Asistente -------------------------------------------------------------
+
+  /** Proveedores configurados y dónde se guardan sus claves. */
+  abstract getAiProviders(): Observable<AiProviderList>;
+
+  /** Crea o actualiza un proveedor. La clave solo viaja de ida. */
+  abstract saveAiProvider(request: SaveAiProviderRequest): Observable<AiProvider>;
+
+  abstract deleteAiProvider(id: string): Observable<void>;
+
+  /**
+   * Comprueba que se llega al proveedor, con lo que hay escrito y sin guardarlo.
+   *
+   * Como «Probar conexión»: descubrir que la clave está mal cuando ya se ha
+   * escrito la pregunta es descubrirlo tarde.
+   */
+  abstract testAiProvider(request: SaveAiProviderRequest): Observable<AiProbeResult>;
+
+  /**
+   * Los modelos que ese proveedor tiene desplegados.
+   *
+   * Evita tener que saberse de memoria el identificador exacto —`glm-5.2`,
+   * `deepseek-v4-pro`—: escribirlo mal no se nota al guardar, sino en la primera
+   * pregunta, con un 404 que no dice cuál era el bueno.
+   */
+  abstract listAiModels(request: SaveAiProviderRequest): Observable<AiModelList>;
+
+  /** Si ese programa esta instalado y con sesion iniciada. */
+  abstract getCliSession(command: string): Observable<CliSessionState>;
+
+  /**
+   * Abre la consola donde el programa pide las credenciales.
+   *
+   * El inicio de sesion ocurre **en el programa**, no en Druse: no hay forma de
+   * que una aplicacion de terceros autentique una cuenta de Claude o de ChatGPT.
+   */
+  abstract startCliLogin(command: string): Observable<{ started: boolean; message?: string }>;
+
+  /**
+   * Pregunta al asistente y devuelve la respuesta por trozos.
+   *
+   * Siempre en streaming, incluso para respuestas cortas: una que tarda veinte
+   * segundos en llegar entera parece colgada, y la misma apareciendo palabra a
+   * palabra no. Cancelar la suscripción corta la petición.
+   */
+  abstract streamAiChat(request: AiChatRequest): Observable<AiStreamEvent>;
 }
 
 /** Qué clase de sitio es una entrada del selector, para pintarle su icono. */

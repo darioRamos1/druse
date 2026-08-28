@@ -278,3 +278,36 @@
   }
 
 }
+
+/**
+ * El asistente, en la barra superior.
+ *
+ * Encendido mientras su panel está abierto: es la única pista de que esa
+ * columna existe y de cómo se cierra.
+ */
+.assistant {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 11px;
+  border: 1px solid transparent;
+  border-radius: var(--dr-radius);
+  background: transparent;
+  color: var(--dr-text-muted);
+  font-family: inherit;
+  font-size: var(--dr-font-size-sm);
+  font-weight: 500;
+  cursor: pointer;
+
+  &:hover {
+    background: var(--dr-surface-hover);
+    color: var(--dr-text);
+  }
+
+  &.is-active {
+    border-color: var(--dr-accent-line);
+    background: var(--dr-accent-tint);
+    color: var(--dr-accent-bright);
+  }
+}

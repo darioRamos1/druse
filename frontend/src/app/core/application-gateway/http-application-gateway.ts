@@ -1,6 +1,6 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
-import { Observable, map } from 'rxjs';
+import { Observable, Subscriber, map } from 'rxjs';
 
 import {
   DatabaseColumn,
@@ -60,6 +60,55 @@ import {
   HealthStatus,
   SaveConnectionRequest,
 } from './application-gateway';
+import { DesktopHost } from './desktop-host';
+import {
+  AiChatRequest,
+  AiProbeResult,
+  AiProvider,
+  AiProviderList,
+  AiModelList,
+  AiStreamEvent,
+  CliSessionState,
+  SaveAiProviderRequest,
+} from '../../shared/models/ai';
+
+/**
+ * Convierte un suceso del flujo en algo que la pantalla entienda.
+ *
+ * Devuelve `null` cuando el bloque no dice nada útil —una línea suelta, un
+ * comentario para mantener viva la conexión—: eso no es un error, es ruido del
+ * protocolo, y tratarlo como fallo cortaría la respuesta a medias.
+ */
+function parseEvent(block: string): AiStreamEvent | null {
+  let nombre = '';
+  let datos = '';
+
+  for (const line of block.split('\n')) {
+    if (line.startsWith('event:')) {
+      nombre = line.slice('event:'.length).trim();
+    } else if (line.startsWith('data:')) {
+      datos += line.slice('data:'.length).trim();
+    }
+  }
+
+  if (nombre === 'done') {
+    return { kind: 'done' };
+  }
+
+  if (nombre !== 'chunk' && nombre !== 'error') {
+    return null;
+  }
+
+  try {
+    const payload = JSON.parse(datos) as { text?: string; message?: string };
+
+    return nombre === 'chunk'
+      ? { kind: 'chunk', text: payload.text ?? '' }
+      : { kind: 'error', message: payload.message ?? 'El asistente falló.' };
+  } catch {
+    return null;
+  }
+}
 
 /** Forma en que la API devuelve un conjunto de resultados. */
 interface ResultSetDto {
@@ -87,6 +136,10 @@ interface QueryResultDto extends Omit<QueryResult, 'resultSets'> {
 @Injectable()
 export class HttpApplicationGateway extends ApplicationGateway {
   private readonly _http = inject(HttpClient);
+
+  // El asistente lee su respuesta con `fetch`, que no pasa por el interceptor:
+  // necesita saber por su cuenta a qué host hablar y con qué token.
+  private readonly _desktop = inject(DesktopHost);
 
   override getHealth(): Observable<HealthStatus> {
     return this._http.get<HealthStatus>('/api/health');
@@ -512,6 +565,145 @@ export class HttpApplicationGateway extends ApplicationGateway {
 
   override createFolder(parent: string, name: string): Observable<FolderTarget> {
     return this._http.post<FolderTarget>('/api/folders', { parent, name });
+  }
+
+  // --- Asistente -------------------------------------------------------------
+
+  override getAiProviders(): Observable<AiProviderList> {
+    return this._http.get<AiProviderList>('/api/ai/providers');
+  }
+
+  override saveAiProvider(request: SaveAiProviderRequest): Observable<AiProvider> {
+    return this._http
+      .post<{ provider: AiProvider }>('/api/ai/providers', request)
+      .pipe(map((response) => response.provider));
+  }
+
+  override deleteAiProvider(id: string): Observable<void> {
+    return this._http.delete<void>(`/api/ai/providers/${id}`);
+  }
+
+  override testAiProvider(request: SaveAiProviderRequest): Observable<AiProbeResult> {
+    return this._http.post<AiProbeResult>('/api/ai/providers/test', request);
+  }
+
+  override listAiModels(request: SaveAiProviderRequest): Observable<AiModelList> {
+    return this._http.post<AiModelList>('/api/ai/providers/models', request);
+  }
+
+  override getCliSession(command: string): Observable<CliSessionState> {
+    return this._http.get<CliSessionState>(`/api/ai/cli/${command}`);
+  }
+
+  override startCliLogin(command: string): Observable<{ started: boolean; message?: string }> {
+    return this._http.post<{ started: boolean; message?: string }>(
+      `/api/ai/cli/${command}/login`,
+      {},
+    );
+  }
+
+  /**
+   * Lee la respuesta según se escribe, con `fetch` y no con `HttpClient`.
+   *
+   * `HttpClient` entrega el cuerpo entero cuando la petición termina, que aquí
+   * es justo lo que no sirve: la gracia del asistente es ver aparecer el texto.
+   * `fetch` da acceso al flujo, y a cambio hay que repetir aquí lo que el
+   * interceptor hace por las demás llamadas —anteponer el host y añadir el
+   * token—, porque no pasa por él.
+   */
+  override streamAiChat(request: AiChatRequest): Observable<AiStreamEvent> {
+    return new Observable<AiStreamEvent>((subscriber) => {
+      const abort = new AbortController();
+      const { baseUrl, token } = this._desktop.connection();
+
+      void this.pump(request, baseUrl, token, abort.signal, subscriber);
+
+      // Cancelar la suscripción corta la petición de verdad: si no, el modelo
+      // seguiría escribiendo —y cobrándose— una respuesta que nadie mira.
+      return () => abort.abort();
+    });
+  }
+
+  private async pump(
+    request: AiChatRequest,
+    baseUrl: string,
+    token: string | null,
+    signal: AbortSignal,
+    subscriber: Subscriber<AiStreamEvent>,
+  ): Promise<void> {
+    try {
+      const response = await fetch(`${baseUrl}/api/ai/chat`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'X-Druse-Token': token } : {}),
+        },
+        body: JSON.stringify(request),
+        signal,
+      });
+
+      if (!response.ok || !response.body) {
+        subscriber.next({
+          kind: 'error',
+          message: `La API respondió ${response.status}.`,
+        });
+        subscriber.complete();
+
+        return;
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      for (;;) {
+        const { done, value } = await reader.read();
+
+        if (done) {
+          break;
+        }
+
+        buffer += decoder.decode(value, { stream: true });
+
+        // Los sucesos van separados por una línea en blanco. Se procesa solo lo
+        // que está completo: un trozo puede partir un suceso por la mitad, y
+        // analizarlo a medias perdería texto.
+        let corte = buffer.indexOf('\n\n');
+
+        while (corte >= 0) {
+          const evento = parseEvent(buffer.slice(0, corte));
+
+          buffer = buffer.slice(corte + 2);
+          corte = buffer.indexOf('\n\n');
+
+          if (evento) {
+            subscriber.next(evento);
+
+            if (evento.kind !== 'chunk') {
+              subscriber.complete();
+
+              return;
+            }
+          }
+        }
+      }
+
+      subscriber.complete();
+    } catch (error) {
+      // Abortar es lo que hace el propio usuario al cancelar: no es un fallo que
+      // haya que contarle.
+      if (signal.aborted) {
+        subscriber.complete();
+
+        return;
+      }
+
+      subscriber.next({
+        kind: 'error',
+        message: error instanceof Error ? error.message : 'No se pudo hablar con el asistente.',
+      });
+      subscriber.complete();
+    }
   }
 
   /** Añade lo que la cuadrícula necesita y la API no tiene por qué saber. */

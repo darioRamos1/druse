@@ -1,0 +1,243 @@
+<div class="head">
+  <span class="head__title">Asistente</span>
+
+  @if (turns().length > 0) {
+    <button type="button" class="head__action" (click)="clear()" title="Empezar de nuevo">
+      <app-icon name="plus" [size]="12" />
+    </button>
+  }
+
+  <span class="head__spacer"></span>
+
+  @if (active(); as provider) {
+    <div class="picker">
+      <button
+        type="button"
+        class="picker__current"
+        [class.is-open]="pickerOpen()"
+        (click)="pickerOpen.set(!pickerOpen())"
+        [attr.aria-expanded]="pickerOpen()"
+        aria-label="Cambiar de proveedor"
+      >
+        <span class="dot" [class.dot--local]="provider.kind === 'localcli'"></span>
+        <span class="picker__name">{{ provider.name }}</span>
+        <app-icon name="chevron-down" [size]="9" />
+      </button>
+
+      @if (pickerOpen()) {
+        <div class="menu" role="menu">
+          <div class="menu__label">Proveedores</div>
+
+          @for (candidate of providers(); track candidate.id) {
+            <button
+              type="button"
+              role="menuitem"
+              class="menu__item"
+              [class.is-active]="candidate.id === provider.id"
+              (click)="choose(candidate.id)"
+            >
+              <span class="dot" [class.dot--local]="candidate.kind === 'localcli'"></span>
+              <span class="menu__text">
+                <span class="menu__name">{{ candidate.name }}</span>
+                <span class="menu__model">{{ candidate.model }}</span>
+              </span>
+            </button>
+          }
+
+          <div class="menu__separator"></div>
+
+          <button type="button" role="menuitem" class="menu__item" (click)="configure.emit()">
+            <app-icon name="settings" [size]="12" />
+            <span class="menu__name">Configurar proveedores…</span>
+          </button>
+        </div>
+      }
+    </div>
+  }
+
+  <button type="button" class="head__action" (click)="closed.emit()" aria-label="Cerrar el asistente">
+    <app-icon name="disconnect" [size]="12" />
+  </button>
+</div>
+
+<div class="body">
+  @if (!configured()) {
+    <!--
+      Sin proveedores no hay asistente. Se dice y se ofrece el paso siguiente, en
+      lugar de enseñar un cuadro de texto que fallaría al pulsar enviar.
+    -->
+    <div class="empty">
+      <div class="empty__mark"><app-icon name="sparkles" [size]="19" /></div>
+      <div class="empty__title">Elige quién responde</div>
+      <p class="empty__text">
+        El asistente habla con el proveedor que tú configures: el de tu empresa, tu propia cuenta o un
+        modelo instalado en este equipo.
+      </p>
+      <button type="button" class="btn btn--primary" (click)="configure.emit()">
+        Configurar un proveedor
+      </button>
+    </div>
+  } @else if (turns().length === 0) {
+    <div class="empty">
+      <div class="empty__mark"><app-icon name="sparkles" [size]="19" /></div>
+      <div class="empty__title">
+        @if (context().database) {
+          Pregunta sobre <code>{{ context().database }}</code>
+        } @else {
+          Pregunta sobre tu SQL
+        }
+      </div>
+      <p class="empty__text">{{ promise() }} No ejecuta nada: lo que escriba pasa por el editor.</p>
+
+      <!--
+        Las sugerencias no son genéricas: cada una usa algo que Druse ya tiene
+        delante —el editor, el esquema, el motor—, que es lo que un chat en el
+        navegador no puede hacer.
+      -->
+      <div class="starters">
+        <button type="button" class="starter" (click)="ask('Explica la consulta que tengo en el editor.')">
+          <app-icon name="format" [size]="14" />
+          <span class="starter__text">
+            <span class="starter__title">Explica la consulta del editor</span>
+            <span class="starter__hint">Qué hace, tabla por tabla</span>
+          </span>
+        </button>
+        <button
+          type="button"
+          class="starter"
+          (click)="draft.set('Escribe una consulta que ')"
+        >
+          <app-icon name="plus" [size]="14" />
+          <span class="starter__text">
+            <span class="starter__title">Escribe una consulta que…</span>
+            <span class="starter__hint">Dilo en tus palabras, sale el SQL</span>
+          </span>
+        </button>
+        <button
+          type="button"
+          class="starter"
+          (click)="ask('¿Por qué puede ir lenta la consulta del editor y qué índice ayudaría?')"
+        >
+          <app-icon name="play-outline" [size]="14" />
+          <span class="starter__text">
+            <span class="starter__title">Por qué esta consulta va lenta</span>
+            <span class="starter__hint">Y qué índice la arreglaría</span>
+          </span>
+        </button>
+      </div>
+    </div>
+  } @else {
+    @if (sharedTables().length > 0) {
+      <!--
+        Lo primero que se lee, antes que la conversación: qué salió de este
+        equipo. Es la línea que convierte una promesa en algo comprobable.
+      -->
+      <div class="disclosure">
+        <app-icon name="eye" [size]="13" />
+        <div class="disclosure__text">
+          <span class="disclosure__what">
+            Contexto enviado: estructura de
+            @for (table of sharedTables(); track table; let last = $last) {
+              <code>{{ table }}</code>{{ last ? '' : ', ' }}
+            }
+          </span>
+          <span class="disclosure__note">{{ promise() }}</span>
+        </div>
+      </div>
+    }
+
+    @for (turn of turns(); track $index) {
+      @if (turn.role === 'user') {
+        <div class="turn turn--user">{{ turn.text }}</div>
+      } @else {
+        <div class="turn turn--assistant">
+          @for (part of turn.parts; track $index) {
+            @if (part.kind === 'text') {
+              <p class="prose">{{ part.text }}</p>
+            } @else {
+              <div class="sql">
+                <div class="sql__head">
+                  <span class="sql__label">SQL</span>
+                  <span class="head__spacer"></span>
+                  <span class="sql__lines">{{ part.text.split('\n').length }} líneas</span>
+                </div>
+                <pre class="sql__code">{{ part.text }}</pre>
+                <div class="sql__foot">
+                  <button type="button" class="btn btn--primary btn--sm" (click)="insert.emit(part.text)">
+                    <app-icon name="plus" [size]="11" />
+                    Insertar en el editor
+                  </button>
+                  <button type="button" class="btn btn--sm" (click)="copy(part.text)">Copiar</button>
+                  <span class="head__spacer"></span>
+                  <span class="sql__warning">No se ejecuta solo</span>
+                </div>
+              </div>
+            }
+          }
+
+          @if (turn.streaming && turn.text.length === 0) {
+            <div class="thinking"><span></span><span></span><span></span></div>
+          }
+
+          @if (turn.error) {
+            <div class="failure">{{ turn.error }}</div>
+          }
+        </div>
+      }
+    }
+  }
+</div>
+
+@if (configured()) {
+  <div class="composer">
+    <div class="composer__box">
+      <textarea
+        class="composer__input"
+        rows="2"
+        [value]="draft()"
+        (input)="onInput($event)"
+        (keydown)="onKeydown($event)"
+        placeholder="Pregunta sobre este esquema o pide una consulta…"
+        aria-label="Pregunta al asistente"
+      ></textarea>
+
+      <div class="composer__tools">
+        @if (context().tables.length > 0) {
+          <button
+            type="button"
+            class="chip"
+            [class.is-on]="includeSchema()"
+            (click)="includeSchema.set(!includeSchema())"
+            [title]="includeSchema() ? 'Deja de enviar la estructura' : 'Envía la estructura de las tablas'"
+          >
+            <app-icon name="table" [size]="10" />
+            {{ context().tables.length }} tablas
+          </button>
+        }
+
+        <span class="head__spacer"></span>
+
+        @if (busy()) {
+          <button type="button" class="composer__send composer__send--stop" (click)="cancel()" aria-label="Parar">
+            <app-icon name="stop" [size]="12" />
+          </button>
+        } @else {
+          <button
+            type="button"
+            class="composer__send"
+            [disabled]="draft().trim().length === 0"
+            (click)="send()"
+            aria-label="Enviar"
+          >
+            <app-icon name="sort-desc" [size]="13" />
+          </button>
+        }
+      </div>
+    </div>
+
+    <div class="composer__promise">
+      <app-icon name="eye-off" [size]="11" />
+      <span>{{ promise() }}</span>
+    </div>
+  </div>
+}

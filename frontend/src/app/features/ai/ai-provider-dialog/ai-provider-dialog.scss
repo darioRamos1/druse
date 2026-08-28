@@ -1,0 +1,653 @@
+// Sigue las medidas del diálogo de conexión: es el mismo problema resuelto de
+// la misma forma, y una diferencia de dos píxeles aquí se leería como descuido.
+:host {
+  position: fixed;
+  inset: 0;
+  z-index: var(--dr-z-modal);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.backdrop {
+  position: absolute;
+  inset: 0;
+  background: var(--dr-scrim);
+  backdrop-filter: blur(2px);
+}
+
+.dialog {
+  position: relative;
+  width: 748px;
+  max-width: calc(100vw - 32px);
+  max-height: calc(100vh - 32px);
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--dr-border-dialog);
+  border-radius: 12px;
+  background: var(--dr-surface-dialog);
+  box-shadow: var(--dr-shadow-dialog);
+  overflow: hidden;
+}
+
+.head {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 18px 20px 16px;
+  border-bottom: 1px solid var(--dr-border);
+
+  &__icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    flex: none;
+    border: 1px solid var(--dr-accent-line-soft);
+    border-radius: 9px;
+    background: var(--dr-accent-tint);
+    color: var(--dr-accent-bright);
+  }
+
+  &__text {
+    flex: 1;
+    min-width: 0;
+  }
+
+  &__title {
+    margin: 0;
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+
+  &__subtitle {
+    margin: 2px 0 0;
+    color: var(--dr-text-dim);
+    font-size: var(--dr-font-size-sm);
+    line-height: 1.45;
+    text-wrap: pretty;
+  }
+
+  &__close {
+    width: 26px;
+    height: 26px;
+    flex: none;
+    border: 0;
+    border-radius: var(--dr-radius-sm);
+    background: transparent;
+    color: var(--dr-text-faint);
+    font-size: 15px;
+    cursor: pointer;
+
+    &:hover {
+      background: var(--dr-surface-active);
+      color: var(--dr-text);
+    }
+  }
+}
+
+.body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 16px 20px;
+}
+
+.section {
+  margin: 0 0 9px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--dr-text-dim);
+
+  &:not(:first-child) {
+    margin-top: 18px;
+  }
+}
+
+.saved {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+
+  &__row {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    border: 1px solid var(--dr-border-subtle);
+    border-radius: 9px;
+    background: var(--dr-surface-inset);
+
+    &.is-editing {
+      border-color: var(--dr-accent-line);
+      background: var(--dr-accent-tint);
+    }
+  }
+
+  &__pick {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    min-width: 0;
+    padding: 9px 11px;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    font-family: inherit;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  &__name {
+    font-size: var(--dr-font-size-sm);
+    font-weight: 500;
+    color: var(--dr-text-secondary);
+  }
+
+  &__model {
+    flex: 1;
+    font-family: var(--dr-font-mono);
+    font-size: 10.5px;
+    color: var(--dr-text-faintest);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &__badge {
+    flex: none;
+    padding: 1px 6px;
+    border-radius: 5px;
+    background: var(--dr-accent-tint-strong);
+    color: var(--dr-accent-bright);
+    font-size: 10px;
+  }
+
+  &__remove {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    flex: none;
+    margin-right: 5px;
+    border: 0;
+    border-radius: var(--dr-radius-sm);
+    background: transparent;
+    color: var(--dr-text-faint);
+    cursor: pointer;
+
+    &:hover {
+      background: var(--dr-danger-tint);
+      color: var(--dr-danger-text);
+    }
+  }
+
+  &__new {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    align-self: flex-start;
+    height: 27px;
+    padding: 0 10px;
+    border: 1px dashed var(--dr-border-strong);
+    border-radius: var(--dr-radius-sm);
+    background: transparent;
+    color: var(--dr-text-dim);
+    font-family: inherit;
+    font-size: var(--dr-font-size-xs);
+    cursor: pointer;
+
+    &:hover {
+      border-style: solid;
+      background: var(--dr-surface-hover);
+      color: var(--dr-text-muted);
+    }
+  }
+}
+
+.options {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 9px;
+}
+
+.option {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 10px 11px;
+  border: 1px solid var(--dr-border-subtle);
+  border-radius: 9px;
+  background: var(--dr-surface-inset);
+  color: inherit;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+
+  &:hover:not(.is-disabled):not(.is-selected) {
+    border-color: var(--dr-border-input-hover);
+    background: var(--dr-surface-hover);
+  }
+
+  &.is-selected {
+    border-color: var(--dr-accent-line);
+    background: var(--dr-accent-tint);
+  }
+
+  // Lo que aún no responde se enseña para que se vea hacia dónde va el
+  // producto, igual que los motores que faltan, pero no se puede elegir.
+  &.is-disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+
+  &__icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    flex: none;
+    border: 1px solid var(--dr-accent-line-soft);
+    border-radius: 7px;
+    background: var(--dr-accent-tint-weak);
+    color: var(--dr-accent-bright);
+  }
+
+  &__text {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+
+  &__name {
+    font-size: var(--dr-font-size-sm);
+    font-weight: 500;
+    color: var(--dr-text-secondary);
+  }
+
+  &__detail {
+    font-size: 10.5px;
+    color: var(--dr-text-faintest);
+  }
+
+  &.is-selected &__name {
+    font-weight: 600;
+    color: var(--dr-text);
+  }
+
+  &__check {
+    position: absolute;
+    top: 8px;
+    right: 9px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 13px;
+    height: 13px;
+    border-radius: 50%;
+    background: var(--dr-accent);
+    color: var(--dr-text-on-accent);
+    font-size: 8px;
+  }
+}
+
+.fields {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+
+  &__label {
+    font-size: 11.5px;
+    color: var(--dr-text-tertiary);
+  }
+
+  &__input {
+    height: 31px;
+    padding: 0 10px;
+    border: 1px solid var(--dr-border-input);
+    border-radius: var(--dr-radius-sm);
+    background: var(--dr-surface-input);
+    color: var(--dr-text);
+    font-family: var(--dr-font-mono);
+    font-size: 12.5px;
+
+    &:focus {
+      border-color: var(--dr-accent-line-strong);
+      outline: none;
+    }
+
+    &::placeholder {
+      color: var(--dr-text-disabled);
+    }
+  }
+
+  &__warn {
+    font-size: 10.5px;
+    line-height: 1.3;
+    color: var(--dr-warning-text);
+  }
+
+  &__hint {
+    font-size: 10.5px;
+    line-height: 1.3;
+    color: var(--dr-text-faint);
+
+    code {
+      font-family: var(--dr-font-mono);
+      color: var(--dr-text-dim);
+    }
+  }
+}
+
+// El botón de mirar va dentro del recuadro para que el campo del secreto ocupe
+// lo mismo que los demás: uno más estrecho señalaría justo el dato que no
+// conviene señalar.
+.secret {
+  position: relative;
+  display: flex;
+  align-items: center;
+
+  .field__input {
+    width: 100%;
+    padding-right: 32px;
+    box-sizing: border-box;
+  }
+
+  &__toggle {
+    position: absolute;
+    right: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border: 0;
+    border-radius: 5px;
+    background: transparent;
+    color: var(--dr-text-tertiary);
+    cursor: pointer;
+
+    &:hover {
+      background: var(--dr-surface-active);
+      color: var(--dr-text);
+    }
+
+    &[aria-pressed='true'] {
+      color: var(--dr-accent-bright);
+    }
+  }
+}
+
+.disclosures {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+
+  &__note {
+    flex: 1;
+    min-width: 180px;
+    text-align: right;
+    font-size: 10.5px;
+    line-height: 1.35;
+    color: var(--dr-text-faint);
+  }
+}
+
+.pill {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  height: 29px;
+  padding: 0 11px;
+  border: 1px solid var(--dr-border-subtle);
+  border-radius: var(--dr-radius);
+  background: transparent;
+  color: var(--dr-text-tertiary);
+  font-family: inherit;
+  font-size: 12px;
+  cursor: pointer;
+
+  &:hover:not(.is-selected) {
+    background: var(--dr-surface-hover);
+    color: var(--dr-text-muted);
+  }
+
+  &.is-selected {
+    border-color: var(--dr-accent-line);
+    background: var(--dr-accent-tint);
+    color: var(--dr-text);
+    font-weight: 500;
+  }
+}
+
+.local-note {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 18px 0 0;
+  font-size: var(--dr-font-size-xs);
+  color: var(--dr-text-dim);
+}
+
+.warning {
+  margin: 14px 0 0;
+  padding: 8px 10px;
+  border: 1px solid var(--dr-warning-line);
+  border-radius: var(--dr-radius);
+  background: var(--dr-warning-tint);
+  color: var(--dr-warning-text);
+  font-size: var(--dr-font-size-xs);
+  line-height: 1.45;
+
+  &--error {
+    border-color: var(--dr-danger-line-soft);
+    background: var(--dr-danger-tint-weak);
+    color: var(--dr-danger-text);
+  }
+}
+
+.foot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 20px;
+  border-top: 1px solid var(--dr-border);
+  background: var(--dr-surface-sunken);
+
+  &__spacer {
+    flex: 1;
+  }
+}
+
+.probe {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  font-size: 11.5px;
+  color: var(--dr-text-muted);
+
+  &__dot {
+    width: 6px;
+    height: 6px;
+    flex: none;
+    border-radius: 50%;
+    background: var(--dr-success);
+  }
+
+  &.is-bad {
+    color: var(--dr-danger-text);
+  }
+
+  &.is-bad &__dot {
+    background: var(--dr-danger);
+  }
+}
+
+.btn {
+  height: 30px;
+  padding: 0 14px;
+  border: 1px solid var(--dr-border-subtle);
+  border-radius: var(--dr-radius);
+  background: transparent;
+  color: var(--dr-text-muted);
+  font-family: inherit;
+  font-size: var(--dr-font-size-sm);
+  font-weight: 500;
+  cursor: pointer;
+
+  &:hover:not(:disabled) {
+    background: var(--dr-surface-hover);
+    color: var(--dr-text);
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: default;
+  }
+
+  &--primary {
+    border-color: transparent;
+    background: var(--dr-accent-button);
+    color: var(--dr-text-on-accent);
+    box-shadow: var(--dr-shadow-accent-button);
+
+    &:hover:not(:disabled) {
+      filter: brightness(1.08);
+      background: var(--dr-accent-button);
+      color: var(--dr-text-on-accent);
+    }
+  }
+}
+
+/** Campo con un boton pegado a la derecha, como «Ver las mias» en conexiones. */
+.with-action {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+
+  .field__input {
+    flex: 1;
+    min-width: 0;
+  }
+}
+
+.btn--slim {
+  height: 31px;
+  flex: none;
+  padding: 0 11px;
+  font-size: var(--dr-font-size-sm);
+}
+
+/**
+ * Los modelos que ofrece el proveedor, a la vista.
+ *
+ * Con tope de alto y desplazamiento porque no siempre son cuatro: un agregador
+ * puede devolver cientos, y sin el tope empujarian el pie del dialogo fuera de
+ * la pantalla.
+ */
+.choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  max-height: 84px;
+  overflow-y: auto;
+  padding-top: 1px;
+}
+
+.choice {
+  height: 23px;
+  flex: none;
+  padding: 0 9px;
+  border: 1px solid var(--dr-border-subtle);
+  border-radius: 6px;
+  background: var(--dr-surface-inset);
+  color: var(--dr-text-muted);
+  font-family: var(--dr-font-mono);
+  font-size: 11px;
+  cursor: pointer;
+
+  &:hover:not(.is-selected) {
+    border-color: var(--dr-border-input-hover);
+    background: var(--dr-surface-hover);
+    color: var(--dr-text);
+  }
+
+  &.is-selected {
+    border-color: var(--dr-accent-line);
+    background: var(--dr-accent-tint);
+    color: var(--dr-text);
+  }
+}
+
+/**
+ * El estado de la sesion del programa, con su salida a mano.
+ *
+ * Se pinta como una fila y no como un aviso suelto porque no siempre es un
+ * problema: cuando hay sesion es la confirmacion de que todo esta listo.
+ */
+.session {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 8px 11px;
+  border: 1px solid var(--dr-border-subtle);
+  border-radius: 9px;
+  background: var(--dr-surface-inset);
+
+  &__dot {
+    width: 7px;
+    height: 7px;
+    flex: none;
+    border-radius: 50%;
+    background: var(--dr-indicator-off);
+  }
+
+  &__text {
+    flex: 1;
+    min-width: 0;
+    font-size: var(--dr-font-size-xs);
+    color: var(--dr-text-muted);
+  }
+
+  &.is-ready {
+    border-color: var(--dr-success-line-soft);
+    background: var(--dr-success-tint);
+  }
+
+  &.is-ready &__dot {
+    background: var(--dr-success);
+    box-shadow: 0 0 6px var(--dr-success-glow);
+  }
+
+  &.is-missing {
+    border-color: var(--dr-warning-line);
+    background: var(--dr-warning-tint);
+  }
+
+  &.is-missing &__dot {
+    background: var(--dr-warning);
+  }
+}

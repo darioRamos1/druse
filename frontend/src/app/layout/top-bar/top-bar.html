@@ -41,6 +41,22 @@
 </div>
 
 <div class="trailing">
+  <!--
+    El asistente se abre y se cierra desde aqui, y el boton se queda encendido
+    mientras esta abierto: es la unica pista de que esa columna existe.
+  -->
+  <button
+    type="button"
+    class="assistant"
+    [class.is-active]="assistantOpen()"
+    [attr.aria-pressed]="assistantOpen()"
+    aria-label="Asistente"
+    (click)="toggleAssistant.emit()"
+  >
+    <app-icon name="sparkles" [size]="13" />
+    Asistente
+  </button>
+
   <div class="segmented" role="group" aria-label="Tema">
     <button
       type="button"

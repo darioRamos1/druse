@@ -23,4 +23,9 @@ export class TopBar {
   readonly openPalette = output<void>();
   readonly themeSelected = output<ThemeName>();
   readonly openSettings = output<void>();
+
+  /** El panel del asistente esta abierto. El boton se queda encendido mientras. */
+  readonly assistantOpen = input(false);
+
+  readonly toggleAssistant = output<void>();
 }

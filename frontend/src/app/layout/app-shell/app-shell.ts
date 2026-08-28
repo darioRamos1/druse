@@ -56,6 +56,19 @@ import { ResizeHandle } from '../../shared/ui/resize-handle/resize-handle';
 import { StatusBar } from '../status-bar/status-bar';
 import { TopBar } from '../top-bar/top-bar';
 import CommandPalette from '../command-palette/command-palette';
+import { AiPanel } from '../../features/ai/ai-panel/ai-panel';
+import { AiProviderDialog } from '../../features/ai/ai-provider-dialog/ai-provider-dialog';
+import { AiStore } from '../../core/ai/ai-store';
+import { describeSchema } from '../../core/ai/ai-context';
+
+/**
+ * Cuantas tablas se precargan al abrir el asistente.
+ *
+ * Cada una es una consulta al catalogo del motor. El tope evita que abrir el
+ * panel sobre una base de cientos de tablas se convierta en una espera, y
+ * coincide con el que aplica el propio compositor del contexto.
+ */
+const MAX_WARMED_TABLES = 40;
 
 /** Límites de arrastre de los paneles, en píxeles. */
 const SIDEBAR_MIN = 200;
@@ -103,6 +116,8 @@ const DISCONNECTED: SessionStatus = {
     CommandPalette,
     SettingsDialog,
     ResizeHandle,
+    AiPanel,
+    AiProviderDialog,
   ],
   templateUrl: './app-shell.html',
   styleUrl: './app-shell.scss',
@@ -124,6 +139,71 @@ export class AppShell {
   protected readonly editorFontSize = computed(() => this._themes.appearance().editorFontSize);
 
   protected readonly settingsOpen = signal(false);
+
+  // --- Asistente -------------------------------------------------------------
+  private readonly _ai = inject(AiStore);
+
+  protected readonly aiOpen = signal(false);
+  protected readonly aiProvidersOpen = signal(false);
+
+  /**
+   * Lo que el asistente puede saber de la base sin que nadie se lo escriba.
+   *
+   * Lo compone el shell porque es quien conoce el espacio de trabajo; el panel
+   * solo lo recibe hecho y decide si mandarlo. De momento son los nombres de
+   * las tablas cargadas en el arbol de la conexion activa: **nombres, nunca
+   * filas**.
+   */
+  protected readonly aiContext = computed(() => {
+    const session = this._store.session();
+    const described = describeSchema(this._store.schemaIndex().relations);
+
+    return {
+      database: session?.database ?? '',
+      tables: described.tables,
+      schema: described.schema,
+    };
+  });
+
+  protected toggleAssistant(): void {
+    const abriendo = !this.aiOpen();
+
+    this.aiOpen.set(abriendo);
+
+    // La lista se pide al abrir y no al arrancar: quien no use el asistente no
+    // tiene por que pagar una peticion mas en cada arranque.
+    if (abriendo) {
+      void this._ai.refresh();
+      void this.warmSchema();
+    }
+  }
+
+  /**
+   * Carga las columnas de las tablas que el usuario no ha desplegado.
+   *
+   * Sin esto, el asistente solo conoce las tablas que estuvieran abiertas en el
+   * arbol —normalmente ninguna— y responde pidiendo los nombres de las columnas
+   * en lugar de escribir la consulta. Se hace al abrir el panel y no al
+   * arrancar, y una sola vez por tabla: el store cachea lo que trae.
+   */
+  private async warmSchema(): Promise<void> {
+    const pending = this._store
+      .schemaIndex()
+      .relations.filter((relation) => relation.columns.length === 0)
+      .slice(0, MAX_WARMED_TABLES);
+
+    // De una en una y no en paralelo: son peticiones al catalogo del motor, y
+    // cuarenta a la vez sobre una conexion compartida compiten con lo que el
+    // usuario este haciendo en ese momento.
+    for (const relation of pending) {
+      await this._store.ensureColumnsAsync(relation.schema || null, relation.name);
+    }
+  }
+
+  /** Lleva al editor el SQL que propuso el asistente. Nadie lo ejecuta por el. */
+  protected insertFromAi(sql: string): void {
+    this._store.updateSql(sql);
+  }
 
   /**
    * Proporción del editor, para que la miniatura de preferencias enseñe el
