@@ -1,0 +1,5 @@
+
+# Las capturas del barrido visual: se regeneran a mano cuando toca mirar la
+# aplicación con calma, y son varios megabytes de PNG que cambian en cada
+# ejecución. Interesa poder compararlas en local, no tenerlas en la historia.
+barrido/

@@ -74,6 +74,37 @@ async function medir(page: Page, donde: string): Promise<void> {
   hallazgos.push(...encontrado);
 }
 
+/**
+ * Cierra un diálogo y anota si no obedece a Escape.
+ *
+ * Escape es lo que se espera de una ventana modal y casi todas lo hacen, así
+ * que la que no lo haga es un hallazgo, no un motivo para cortar el barrido:
+ * se cierra por su aspa y se sigue mirando lo que venga detrás.
+ */
+async function cerrar(page: Page, dialogo: Locator, donde: string): Promise<void> {
+  await page.keyboard.press('Escape');
+
+  /**
+   * Se espera a que se vaya, y solo entonces se juzga.
+   *
+   * Preguntar por `isVisible()` justo después de la tecla no vale: un diálogo
+   * que **sí** obedece está a mitad de destruirse y todavía responde que sí, y
+   * el clic de rescate cae sobre un nodo que Angular acaba de quitar del DOM.
+   * Playwright lo reintenta hasta agotar la prueba entera —cuatro minutos por
+   * un diálogo que se había cerrado bien—.
+   */
+  try {
+    await expect(dialogo).toBeHidden({ timeout: 2_000 });
+
+    return;
+  } catch {
+    hallazgos.push(`${donde}: no se cierra con Escape, a diferencia del resto`);
+  }
+
+  await dialogo.getByRole('button', { name: 'Cerrar' }).first().click();
+  await expect(dialogo).toBeHidden({ timeout: 10_000 });
+}
+
 /** Abre el menú de acciones de un nodo del árbol. */
 async function menuDe(page: Page, nodo: string): Promise<void> {
   await page
@@ -228,8 +259,7 @@ test.describe('barrido visual', () => {
       await page.waitForTimeout(500);
       await medir(page, nombre);
       await foto(page, nombre, dialogo.locator('.dialog').first());
-      await page.keyboard.press('Escape');
-      await expect(dialogo).toBeHidden({ timeout: 10_000 });
+      await cerrar(page, dialogo, nombre);
     }
 
     // --- El asistente de una tabla, con sus pasos --------------------------
@@ -244,6 +274,109 @@ test.describe('barrido visual', () => {
     await foto(page, '13-migrar-una', traslado.locator('.dialog'));
     await page.keyboard.press('Escape');
 
+    // --- Lo que cuelga de una tabla ---------------------------------------
+    const sobreLaTabla: [string, string, string][] = [
+      ['13a-importar', 'app-import-dialog', 'Importar archivo'],
+      ['13b-componer', 'app-query-builder', 'Componer consulta'],
+    ];
+
+    for (const [nombre, selector, opcion] of sobreLaTabla) {
+      await menuDe(page, 'accionista');
+      await page.getByRole('menuitem', { name: opcion }).click();
+
+      const dialogo = page.locator(selector);
+
+      await expect(dialogo).toBeVisible({ timeout: 30_000 });
+      await page.waitForTimeout(600);
+      await medir(page, nombre);
+      await foto(page, nombre, dialogo.locator('.dialog').first());
+      await cerrar(page, dialogo, nombre);
+    }
+
+    // --- Un procedimiento, si la base de pruebas tiene alguno --------------
+    // No se siembra ninguno: se mira el primero que haya y, si no hay, se
+    // sigue. El barrido no afirma nada, así que quedarse sin esta captura vale
+    // más que cortar las que vienen detrás.
+    await page.locator('app-connections-sidebar').getByText('Procedures', { exact: true }).first().click();
+    await page.waitForTimeout(1500);
+
+    // El árbol no marca la clase del nodo, así que el procedimiento se busca
+    // por posición: el primer nodo que cuelga de «Procedures» con más sangría.
+    const suNombre = await page.evaluate(() => {
+      const nodos = [...document.querySelectorAll<HTMLElement>('app-connections-sidebar .node--object')];
+      const indice = nodos.findIndex((nodo) => nodo.textContent?.trim() === 'Procedures');
+
+      if (indice < 0) {
+        return null;
+      }
+
+      const sangria = Number.parseFloat(nodos[indice].style.paddingLeft || '0');
+      const hijo = nodos
+        .slice(indice + 1)
+        .find((nodo) => Number.parseFloat(nodo.style.paddingLeft || '0') > sangria);
+
+      return hijo?.querySelector('.node__label')?.textContent?.trim() ?? null;
+    });
+
+    if (suNombre) {
+      await menuDe(page, suNombre);
+      await page.getByRole('menuitem', { name: 'Ejecutar procedimiento' }).click();
+
+      const runner = page.locator('app-procedure-runner');
+
+      await expect(runner).toBeVisible({ timeout: 30_000 });
+      await page.waitForTimeout(600);
+      await medir(page, 'ejecutar procedimiento');
+      await foto(page, '13c-procedimiento', runner.locator('.dialog'));
+      await page.keyboard.press('Escape');
+    } else {
+      hallazgos.push('procedimientos: la base de pruebas no tiene ninguno, sin captura');
+    }
+
+    // --- El diálogo de conexión con cada motor ----------------------------
+    // Los motores no enseñan los mismos campos —Informix por SQLI añade el
+    // servidor lógico— y es justo donde el diálogo puede quedar descuadrado.
+    for (const motor of ['SQL Server', 'MySQL', 'Informix', 'Informix (DRDA)']) {
+      await page.getByRole('button', { name: 'Nueva conexión' }).click();
+
+      const dialogo = page.locator('app-connection-dialog');
+
+      await expect(dialogo).toBeVisible({ timeout: 30_000 });
+      await dialogo
+        .locator('.engine')
+        .filter({ has: page.locator('.engine__name', { hasText: new RegExp(`^${motor.replace(/[()]/g, '\\$&')}$`) }) })
+        .first()
+        .click();
+      await page.waitForTimeout(400);
+      await medir(page, `conexión ${motor}`);
+      await foto(page, `13d-conexion-${motor.replace(/[^a-z]/gi, '').toLowerCase()}`, dialogo.locator('.dialog'));
+      await cerrar(page, dialogo, `conexion ${motor}`);
+    }
+
+    // --- El asistente ------------------------------------------------------
+    await page.getByRole('button', { name: 'Asistente', exact: true }).click();
+
+    const asistente = page.locator('app-ai-panel');
+
+    await expect(asistente).toBeVisible({ timeout: 30_000 });
+    await page.waitForTimeout(500);
+    await medir(page, 'asistente');
+    await foto(page, '14-asistente');
+
+    // Su diálogo de proveedores, que es donde se elige quién responde.
+    await asistente.getByRole('button', { name: 'Configurar un proveedor' }).click();
+
+    const proveedores = page.locator('app-ai-provider-dialog');
+
+    await expect(proveedores).toBeVisible({ timeout: 30_000 });
+    await page.waitForTimeout(500);
+    await medir(page, 'proveedor de IA');
+    await foto(page, '15-proveedor-ia', proveedores.locator('.dialog'));
+    await cerrar(page, proveedores, 'proveedor de IA');
+
+    await page.getByRole('button', { name: 'Asistente', exact: true }).click();
+    await expect(asistente).toBeHidden({ timeout: 10_000 });
+
     // --- Tema claro en las dos pantallas que más se miran ------------------
     await page.getByRole('button', { name: 'Tema claro' }).click();
     await page.waitForTimeout(400);
@@ -251,12 +384,12 @@ test.describe('barrido visual', () => {
     await ejecutar(page, 'todo');
     await page.waitForTimeout(300);
     await medir(page, 'claro: resultados');
-    await foto(page, '14-claro-resultados');
+    await foto(page, '16-claro-resultados');
 
     await page.getByRole('button', { name: 'Nueva conexión' }).click();
     await expect(page.locator('app-connection-dialog')).toBeVisible();
     await medir(page, 'claro: conexión');
-    await foto(page, '15-claro-conexion', page.locator('app-connection-dialog .dialog'));
+    await foto(page, '17-claro-conexion', page.locator('app-connection-dialog .dialog'));
     await page.keyboard.press('Escape');
     await page.getByRole('button', { name: 'Tema oscuro' }).click();
 
@@ -265,7 +398,7 @@ test.describe('barrido visual', () => {
       await page.setViewportSize({ width: ancho, height: 760 });
       await page.waitForTimeout(400);
       await medir(page, `ancho ${ancho}`);
-      await foto(page, `16-ancho-${ancho}`);
+      await foto(page, `18-ancho-${ancho}`);
     }
 
     console.log('=== HALLAZGOS ===');
