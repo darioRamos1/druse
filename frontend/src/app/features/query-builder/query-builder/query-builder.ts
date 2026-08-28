@@ -956,8 +956,20 @@ export class QueryBuilder implements OnInit {
         break;
       }
       case 'Escape':
-        event.preventDefault();
-        this.closeJoinSuggestions(join.id);
+        /**
+         * Solo con sugerencias a la vista, y sin dejar subir la tecla.
+         *
+         * El diálogo escucha Escape en el documento para cerrarse: sin
+         * detenerla aquí, cerrar el desplegable cerraría también la ventana
+         * entera y se perdería la consulta a medio componer. Y cuando no hay
+         * desplegable, la tecla tiene que llegar arriba para que Escape siga
+         * cerrando el diálogo desde este campo como desde cualquier otro.
+         */
+        if (join.suggestionsOpen) {
+          event.preventDefault();
+          event.stopPropagation();
+          this.closeJoinSuggestions(join.id);
+        }
         break;
     }
   }

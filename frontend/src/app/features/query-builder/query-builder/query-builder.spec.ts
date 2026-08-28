@@ -712,4 +712,55 @@ describe('QueryBuilder', () => {
     fixture.detectChanges();
     expect(fixture.nativeElement.querySelector('.join-suggestions')).toBeNull();
   });
+
+  /**
+   * Lo que se espera de cualquier ventana modal, y lo que ya hacían las demás.
+   *
+   * Este diálogo se quedó fuera cuando se añadió: el barrido visual lo encontró
+   * porque era el único que no obedecía a la tecla.
+   */
+  it('se cierra con Escape', async () => {
+    const fixture = await create(table);
+    let cerrado = false;
+
+    fixture.componentInstance.closed.subscribe(() => (cerrado = true));
+
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    await fixture.whenStable();
+
+    expect(cerrado).toBe(true);
+  });
+
+  /**
+   * Con el desplegable abierto, la tecla es suya.
+   *
+   * Si el diálogo también la atendiera, buscar una tabla para el JOIN y
+   * arrepentirse cerraría la ventana entera y se perdería lo compuesto.
+   */
+  it('Escape cierra las sugerencias del JOIN sin cerrar el diálogo', async () => {
+    const fixture = await create(table);
+    let cerrado = false;
+
+    fixture.componentInstance.closed.subscribe(() => (cerrado = true));
+
+    (fixture.nativeElement.querySelector('.joins-block .btn') as HTMLButtonElement).click();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const search = fixture.nativeElement.querySelector(
+      'input[aria-label="Buscar tabla para JOIN"]',
+    ) as HTMLInputElement;
+
+    search.value = 'customers';
+    search.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('.join-suggestions')).not.toBeNull();
+
+    search.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('.join-suggestions')).toBeNull();
+    expect(cerrado).toBe(false);
+  });
 });
