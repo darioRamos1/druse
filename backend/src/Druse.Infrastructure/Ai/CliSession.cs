@@ -43,20 +43,19 @@ public sealed class CliSession(IAppPaths paths) : ICliSession
         }
 
         /*
-         * `claude` sabe contestar por sí mismo; `codex` no de forma fiable.
+         * Cada uno contesta a su manera, y las dos formas están comprobadas.
          *
-         * Se distingue por el nombre del programa y no por una capacidad
-         * declarada porque son dos, y montar un registro para dos casos sería
-         * más código del que ahorra.
+         * `claude auth status --json` devuelve un objeto con la cuenta y el
+         * plan; `codex login status` devuelve una línea de texto. Se distingue
+         * por el nombre del programa y no por una capacidad declarada porque son
+         * dos, y montar un registro para dos casos sería más código del que
+         * ahorra.
          */
-        if (!command.Equals("claude", StringComparison.OrdinalIgnoreCase))
+        if (command.Equals("codex", StringComparison.OrdinalIgnoreCase))
         {
-            return new CliSessionState(
-                true,
-                null,
-                null,
-                null,
-                $"«{command}» está instalado. No sabe decir si hay sesión iniciada: pruébalo y verás.");
+            var line = await RunAsync(command, ["login", "status"], home, cancellationToken);
+
+            return ReadCodexStatus(line);
         }
 
         var status = await RunAsync(command, ["auth", "status", "--json"], home, cancellationToken);
@@ -118,7 +117,7 @@ public sealed class CliSession(IAppPaths paths) : ICliSession
         {
             Arguments = home is null
                 ? $"/k \"{path}\" {arguments}"
-                : $"/k set \"CLAUDE_CONFIG_DIR={home}\" && \"{path}\" {arguments}",
+                : $"/k set \"{CliPath.SessionVariable(command)}={home}\" && \"{path}\" {arguments}",
             UseShellExecute = true,
             CreateNoWindow = false,
         };
@@ -147,6 +146,52 @@ public sealed class CliSession(IAppPaths paths) : ICliSession
         profileId is { } id
             ? Path.Combine(_paths.DataDirectory, "ai-sessions", id.ToString("N"))
             : null;
+
+    /// <summary>
+    /// Lee lo que dice `codex login status`, que es una línea de texto.
+    ///
+    /// Dice «Logged in using ChatGPT» o «Not logged in». No trae ni la cuenta ni
+    /// el plan, así que no se inventan: lo que se sabe es si hay sesión, y eso
+    /// es lo que decide si hace falta enseñar el botón de entrar.
+    /// </summary>
+    private static CliSessionState ReadCodexStatus(string? line)
+    {
+        if (line is null)
+        {
+            return new CliSessionState(true, null, null, null, "Está instalado, pero no dijo su estado.");
+        }
+
+        /*
+         * Lo primero que se descarta es la negación, y no es un detalle.
+         *
+         * El programa contesta «Not logged in» cuando no hay sesión, y esa frase
+         * **contiene** «logged in»: buscar solo lo segundo daba por iniciada
+         * justo la sesión que faltaba, y la pantalla escondía el botón de entrar
+         * en el único caso donde hace falta.
+         *
+         * Se busca la frase y no la línea entera porque el programa avisa por su
+         * cuenta de cosas que no vienen al caso, como que no pudo crear enlaces
+         * en el PATH.
+         */
+        if (line.Contains("not logged in", StringComparison.OrdinalIgnoreCase))
+        {
+            return new CliSessionState(true, false, null, null, "Está instalado, pero sin sesión.");
+        }
+
+        if (line.Contains("Logged in", StringComparison.OrdinalIgnoreCase))
+        {
+            var chatgpt = line.Contains("ChatGPT", StringComparison.OrdinalIgnoreCase);
+
+            return new CliSessionState(
+                true,
+                true,
+                null,
+                chatgpt ? "ChatGPT" : null,
+                chatgpt ? "Sesión iniciada con tu cuenta de ChatGPT." : "Sesión iniciada.");
+        }
+
+        return new CliSessionState(true, false, null, null, "Está instalado, pero sin sesión.");
+    }
 
     private static CliSessionState ReadClaudeStatus(string json)
     {
@@ -180,6 +225,8 @@ public sealed class CliSession(IAppPaths paths) : ICliSession
             return new CliSessionState(true, null, null, null, "Está instalado, pero no se entendió su estado.");
         }
     }
+
+    private static string? Blank(string text) => text.Trim() is { Length: > 0 } said ? said : null;
 
     private static string? Text(JsonElement root, string name) =>
         root.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.String
@@ -220,7 +267,7 @@ public sealed class CliSession(IAppPaths paths) : ICliSession
         if (home is not null)
         {
             Directory.CreateDirectory(home);
-            info.EnvironmentVariables["CLAUDE_CONFIG_DIR"] = home;
+            info.EnvironmentVariables[CliPath.SessionVariable(command)] = home;
         }
 
         if (shell)
@@ -247,8 +294,19 @@ public sealed class CliSession(IAppPaths paths) : ICliSession
 
             limit.CancelAfter(Patience);
 
-            var output = await process.StandardOutput.ReadToEndAsync(limit.Token);
+            /*
+             * Los dos canales, y a la vez.
+             *
+             * `codex login status` escribe su respuesta por **stderr**, no por
+             * la salida normal: leyendo solo stdout, Druse decia «no dijo su
+             * estado» sobre un programa que estaba contestando «Logged in using
+             * ChatGPT». Se leen los dos, y en paralelo porque leerlos uno detras
+             * de otro se bloquea en cuanto el bufer del que espera se llena.
+             */
+            var outText = process.StandardOutput.ReadToEndAsync(limit.Token);
+            var errText = process.StandardError.ReadToEndAsync(limit.Token);
 
+            await Task.WhenAll(outText, errText);
             await process.WaitForExitAsync(limit.Token);
 
             /*
@@ -260,9 +318,9 @@ public sealed class CliSession(IAppPaths paths) : ICliSession
              * entendio su estado», y con eso la pantalla no podia ofrecer el
              * boton de iniciar sesion. Solo se descarta cuando no dijo nada.
              */
-            var said = output.Trim();
+            var said = outText.Result.Trim();
 
-            return said.Length > 0 ? said : null;
+            return said.Length > 0 ? said : Blank(errText.Result);
         }
         catch (Exception error)
             when (error is System.ComponentModel.Win32Exception

@@ -252,7 +252,7 @@ public sealed class LocalCliProvider : IAiProvider
         if (request.SessionDirectory is { } home)
         {
             Directory.CreateDirectory(home);
-            info.EnvironmentVariables["CLAUDE_CONFIG_DIR"] = home;
+            info.EnvironmentVariables[CliPath.SessionVariable(request.Profile.Command)] = home;
         }
 
         if (shell)

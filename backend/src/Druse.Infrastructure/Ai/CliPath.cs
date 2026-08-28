@@ -81,6 +81,20 @@ public static class CliPath
     }
 
     /// <summary>
+    /// La variable con la que cada programa cambia de carpeta de credenciales.
+    ///
+    /// No es la misma para los dos y **no se puede adivinar**: poner la de uno
+    /// en el otro no da error, simplemente no hace nada, y entonces «otra
+    /// cuenta» acabaría usando la del equipo sin que nadie lo note. Las dos
+    /// están comprobadas contra el programa de verdad: con la carpeta cambiada
+    /// dicen que no hay sesión mientras la del equipo sigue intacta.
+    /// </summary>
+    public static string SessionVariable(string command) =>
+        command.Equals("codex", StringComparison.OrdinalIgnoreCase)
+            ? "CODEX_HOME"
+            : "CLAUDE_CONFIG_DIR";
+
+    /// <summary>
     /// Un `.cmd` o un `.bat` no se ejecutan solos: los corre el intérprete.
     ///
     /// Lanzarlos directamente falla con «no es una aplicación Win32 válida», que
