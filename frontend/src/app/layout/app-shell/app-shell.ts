@@ -151,8 +151,8 @@ export class AppShell {
    *
    * Lo compone el shell porque es quien conoce el espacio de trabajo; el panel
    * solo lo recibe hecho y decide si mandarlo. De momento son los nombres de
-   * las tablas cargadas en el arbol de la conexion activa: **nombres, nunca
-   * filas**.
+   * las tablas cargadas en el arbol de la conexion activa y el SQL abierto:
+   * **nombres y consulta, nunca filas de resultados**.
    */
   protected readonly aiContext = computed(() => {
     const session = this._store.session();
@@ -162,6 +162,7 @@ export class AppShell {
       database: session?.database ?? '',
       tables: described.tables,
       schema: described.schema,
+      sql: this._store.activeTab()?.sql ?? '',
     };
   });
 
@@ -200,9 +201,14 @@ export class AppShell {
     }
   }
 
-  /** Lleva al editor el SQL que propuso el asistente. Nadie lo ejecuta por el. */
+  /** Inserta donde esté el cursor, o sustituye únicamente la selección activa. */
   protected insertFromAi(sql: string): void {
-    this._store.updateSql(sql);
+    this._editor()?.insertText(sql);
+  }
+
+  /** Sustituye solo la selección o sentencia activa; el resto de la pestaña sobrevive. */
+  protected replaceFromAi(sql: string): void {
+    this._editor()?.replaceActiveStatement(sql);
   }
 
   /**

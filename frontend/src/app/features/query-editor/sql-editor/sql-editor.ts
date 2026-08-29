@@ -271,10 +271,7 @@ export default class SqlEditor implements OnInit {
           // El desplegable es interfaz, no código: si heredara una fuente grande,
           // doce sugerencias podrían cubrir las pestañas y las barras completas.
           suggestFontSize: Math.min(fontSize, MAX_SUGGEST_FONT_SIZE),
-          suggestLineHeight: Math.min(
-            Math.round(fontSize * 1.7),
-            MAX_SUGGEST_LINE_HEIGHT,
-          ),
+          suggestLineHeight: Math.min(Math.round(fontSize * 1.7), MAX_SUGGEST_LINE_HEIGHT),
         });
       }
     });
@@ -407,6 +404,53 @@ export default class SqlEditor implements OnInit {
 
     editor.pushUndoStop();
     editor.executeEdits('druse-snippet', [{ range, text, forceMoveMarkers: true }]);
+    editor.pushUndoStop();
+    editor.focus();
+  }
+
+  /**
+   * Sustituye la selección o la sentencia del cursor sin tocar las demás.
+   *
+   * Es la operación segura para una corrección propuesta por la IA: nunca usa
+   * `setValue`, conserva el resto de la pestaña y entra completa en `Ctrl+Z`.
+   */
+  replaceActiveStatement(text: string): void {
+    const editor = this._editor;
+    const monaco = this._monaco;
+    const model = editor?.getModel();
+
+    if (!editor || !monaco || !model) {
+      return;
+    }
+
+    const selection = editor.getSelection();
+    let range: MonacoApi.IRange | null = selection && !selection.isEmpty() ? selection : null;
+
+    if (!range) {
+      const position = editor.getPosition();
+      const source = model.getValue();
+      const statement = position ? statementAt(source, model.getOffsetAt(position)) : null;
+
+      if (!statement) {
+        this.insertText(text);
+        return;
+      }
+
+      const start = model.getPositionAt(statement.startOffset);
+      let endOffset = statement.startOffset + statement.text.length;
+
+      // La sentencia analizada no incluye su terminador; la sustitución sí debe
+      // retirarlo para no dejar `;;` cuando el bloque nuevo ya trae uno.
+      if (source[endOffset] === ';') {
+        endOffset++;
+      }
+
+      const end = model.getPositionAt(endOffset);
+      range = new monaco.Range(start.lineNumber, start.column, end.lineNumber, end.column);
+    }
+
+    editor.pushUndoStop();
+    editor.executeEdits('druse-ai-replace', [{ range, text, forceMoveMarkers: true }]);
     editor.pushUndoStop();
     editor.focus();
   }
@@ -631,10 +675,7 @@ export default class SqlEditor implements OnInit {
         fontSize: this.fontSize(),
         lineHeight: Math.round(this.fontSize() * 1.7),
         suggestFontSize: Math.min(this.fontSize(), MAX_SUGGEST_FONT_SIZE),
-        suggestLineHeight: Math.min(
-          Math.round(this.fontSize() * 1.7),
-          MAX_SUGGEST_LINE_HEIGHT,
-        ),
+        suggestLineHeight: Math.min(Math.round(this.fontSize() * 1.7), MAX_SUGGEST_LINE_HEIGHT),
         lineNumbersMinChars: 3,
         padding: { top: 12, bottom: 12 },
         minimap: { enabled: true, maxColumn: 70, renderCharacters: false },

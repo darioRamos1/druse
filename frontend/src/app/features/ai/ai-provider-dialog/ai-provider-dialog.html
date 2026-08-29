@@ -130,12 +130,17 @@
 
         @if (ownSession() && !editing()) {
           <span class="field__hint">
-            Guarda el proveedor primero: su sesion se guarda aparte, con su identificador, y hasta
-            entonces no hay donde ponerla.
+            Al iniciar sesión se creará este perfil y sus credenciales quedarán separadas de las del
+            equipo.
           </span>
         }
 
-        @if (session(); as state) {
+        @if (sessionLoading()) {
+          <div class="session">
+            <span class="session__dot"></span>
+            <span class="session__text">Comprobando tu cuenta de {{ accountProvider() }}…</span>
+          </div>
+        } @else if (session(); as state) {
           <div
             class="session"
             [class.is-ready]="state.loggedIn === true"
@@ -144,26 +149,36 @@
             <span class="session__dot"></span>
             <span class="session__text">
               @if (state.loggedIn === true) {
-                Sesion iniciada{{ state.account ? ' como ' + state.account : '' }}{{
-                  state.plan ? ' · plan ' + state.plan : ''
-                }}
+                Conectado con {{ accountProvider()
+                }}{{ state.account ? ' como ' + state.account : ''
+                }}{{ state.plan && state.plan !== 'ChatGPT' ? ' · plan ' + state.plan : '' }}
               } @else {
                 {{ state.detail }}
               }
             </span>
 
             @if (state.installed && state.loggedIn !== true) {
-              <button type="button" class="btn btn--slim" [disabled]="loggingIn()" (click)="login()">
-                {{ loggingIn() ? 'Abriendo…' : 'Iniciar sesion' }}
+              <button
+                type="button"
+                class="btn btn--slim"
+                [disabled]="loggingIn()"
+                (click)="login()"
+              >
+                {{ loggingIn() ? 'Abriendo…' : 'Iniciar sesión con ' + accountProvider() }}
               </button>
-              <button type="button" class="btn btn--slim" (click)="recheck()">Ya entre</button>
+              <button type="button" class="btn btn--slim" (click)="recheck()">
+                Ya inicié sesión
+              </button>
             }
           </div>
 
           @if (!state.installed) {
             <span class="field__hint">
               Se instala aparte, desde una consola:
-              <code>npm i -g {{ command() === 'codex' ? '@openai/codex' : '@anthropic-ai/claude-code' }}</code>
+              <code
+                >npm i -g
+                {{ command() === 'codex' ? '@openai/codex' : '@anthropic-ai/claude-code' }}</code
+              >
             </span>
           } @else {
             <span class="field__hint">
@@ -171,6 +186,14 @@
               propio programa, no en Druse.
             </span>
           }
+        } @else {
+          <div class="session is-missing">
+            <span class="session__dot"></span>
+            <span class="session__text">
+              {{ sessionError() || 'No se pudo comprobar la cuenta.' }}
+            </span>
+            <button type="button" class="btn btn--slim" (click)="recheck()">Reintentar</button>
+          </div>
         }
       } @else {
         <label class="field">
@@ -183,8 +206,8 @@
             [placeholder]="chosen().hint ?? 'https://…/v1'"
           />
           <span class="field__hint">
-            La que termina en <code>/v1</code>, sin <code>/chat/completions</code>. Sale de la consola de
-            tu proveedor.
+            La raíz de la API, sin añadir <code>/chat/completions</code>, <code>/messages</code> ni
+            <code>:generateContent</code>.
           </span>
           @if (unencrypted()) {
             <!--
@@ -193,8 +216,8 @@
               puerto que sirve texto plano.
             -->
             <span class="field__warn">
-              Sin cifrar: la clave viajara en claro por tu red. Correcto en un servidor interno; no lo
-              uses contra internet.
+              Sin cifrar: la clave viajara en claro por tu red. Correcto en un servidor interno; no
+              lo uses contra internet.
             </span>
           }
         </label>
@@ -237,17 +260,25 @@
               (input)="set('model', $event)"
               placeholder="glm-5.2"
             />
-            @if (!isLocalCli()) {
+            @if (canListModels()) {
               <button
                 type="button"
                 class="btn btn--slim"
-                [disabled]="listing() || baseUrl().length === 0"
+                [disabled]="listing() || (!isLocalCli() && baseUrl().length === 0)"
                 (click)="loadModels()"
               >
                 {{ listing() ? 'Buscando…' : 'Ver los suyos' }}
               </button>
             }
           </span>
+
+          @if (isLocalCli() && models().length === 0) {
+            <span class="field__hint">
+              Puedes dejarlo vacío para usar el modelo predeterminado de tu cuenta, o escribir uno
+              concreto.
+            </span>
+          }
+
           @if (models().length > 0) {
             <!--
               A la vista y de un toque.
@@ -289,7 +320,13 @@
             {{ item.label }}
           </button>
         }
-        <span class="disclosures__note">Los nombres de tablas y columnas viajan; las filas no.</span>
+        <span class="disclosures__note">
+          {{
+            disclosure() === 'nothing'
+              ? 'No se añade contexto del editor ni de la base.'
+              : 'Puede viajar el SQL abierto y nombres de tablas y columnas; las filas de resultados no.'
+          }}
+        </span>
       </div>
     } @else {
       <p class="local-note">

@@ -124,6 +124,21 @@ public sealed class AiProviderValidatorTests
     }
 
     [Fact]
+    public void CodexPuedeUsarElModeloPredeterminadoDeLaCuenta()
+    {
+        var result = AiProviderValidator.Validate(new AiProviderProfile
+        {
+            Id = Guid.NewGuid(),
+            Name = "ChatGPT",
+            Kind = AiProviderKind.LocalCli,
+            Command = "codex",
+            Model = "",
+        });
+
+        Assert.True(result.IsValid);
+    }
+
+    [Fact]
     public void ElProveedorPorLineaDeOrdenesExigeSuPrograma()
     {
         var result = AiProviderValidator.Validate(new AiProviderProfile
@@ -137,5 +152,21 @@ public sealed class AiProviderValidatorTests
 
         Assert.False(result.IsValid);
         Assert.Contains(result.Errors, error => error.Contains("programa", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void ElProveedorPorLineaDeOrdenesRechazaProgramasArbitrarios()
+    {
+        var result = AiProviderValidator.Validate(new AiProviderProfile
+        {
+            Id = Guid.NewGuid(),
+            Name = "Programa desconocido",
+            Kind = AiProviderKind.LocalCli,
+            Command = "powershell",
+            Model = "algo",
+        });
+
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, error => error.Contains("claude", StringComparison.OrdinalIgnoreCase));
     }
 }

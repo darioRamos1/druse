@@ -1,4 +1,29 @@
-import { split } from './ai-panel';
+import { composeContext, split } from './ai-panel';
+
+describe('composeContext', () => {
+  const context = {
+    sql: 'SELECT c.nombre FROM clientes c;',
+    schema: 'TABLE public.clientes (\n  nombre text\n);',
+    tables: ['public.clientes'],
+    database: 'ventas',
+  };
+
+  it('manda el SQL abierto y el esquema como partes identificables', () => {
+    expect(composeContext(context, true, true)).toBe(
+      'SQL abierto en el editor:\n\n```sql\nSELECT c.nombre FROM clientes c;\n```' +
+        '\n\nEstructura de las tablas en juego:\n\nTABLE public.clientes (\n  nombre text\n);',
+    );
+  });
+
+  it('permite excluir el SQL o el esquema por separado', () => {
+    expect(composeContext(context, false, true)).not.toContain('SELECT');
+    expect(composeContext(context, true, false)).not.toContain('TABLE');
+  });
+
+  it('no manda contexto si no hay contenido elegido', () => {
+    expect(composeContext(context, false, false)).toBeUndefined();
+  });
+});
 
 /**
  * Partir la respuesta en prosa y SQL.
@@ -19,13 +44,21 @@ describe('split', () => {
 
     expect(parts).toEqual([
       { kind: 'text', text: 'Agrupando por accionista:' },
-      { kind: 'sql', text: 'SELECT 1' },
+      { kind: 'sql', text: 'SELECT 1', action: 'insert' },
       { kind: 'text', text: 'Y ya está.' },
     ]);
   });
 
   it('reconoce el bloque sin la etiqueta del lenguaje', () => {
-    expect(split('```\nSELECT 1\n```')).toEqual([{ kind: 'sql', text: 'SELECT 1' }]);
+    expect(split('```\nSELECT 1\n```')).toEqual([
+      { kind: 'sql', text: 'SELECT 1', action: 'insert' },
+    ]);
+  });
+
+  it('reconoce cuándo el modelo recomienda sustituir la consulta', () => {
+    expect(split('```sql-replace\nSELECT corregido;\n```')).toEqual([
+      { kind: 'sql', text: 'SELECT corregido;', action: 'replace' },
+    ]);
   });
 
   it('admite varios bloques en una respuesta', () => {
@@ -48,7 +81,7 @@ describe('split', () => {
 
     expect(parts).toEqual([
       { kind: 'text', text: 'Ahí va:' },
-      { kind: 'sql', text: 'SELECT a.nombre\nFROM accionista a' },
+      { kind: 'sql', text: 'SELECT a.nombre\nFROM accionista a', action: 'insert' },
     ]);
   });
 
@@ -60,6 +93,6 @@ describe('split', () => {
   it('conserva los saltos dentro del SQL', () => {
     const [part] = split('```sql\nSELECT 1,\n       2\n```');
 
-    expect(part).toEqual({ kind: 'sql', text: 'SELECT 1,\n       2' });
+    expect(part).toEqual({ kind: 'sql', text: 'SELECT 1,\n       2', action: 'insert' });
   });
 });

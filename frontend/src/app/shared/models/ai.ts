@@ -13,7 +13,7 @@
  * el MaaS de una empresa, Ollama en el propio equipo, Azure, OpenRouter y la
  * propia OpenAI, porque todos atienden el mismo formato.
  */
-export type AiProviderKind = 'openaicompatible' | 'anthropic' | 'localcli';
+export type AiProviderKind = 'openaicompatible' | 'anthropic' | 'gemini' | 'localcli';
 
 /**
  * Cuánto del trabajo puede acompañar a la pregunta.

@@ -33,6 +33,13 @@ interface ProviderOption {
   readonly command?: string;
   /** URL de ejemplo, para que el campo vacio no sea una pregunta a ciegas. */
   readonly hint?: string;
+  /**
+   * Modelos que se sabe que acepta, cuando el programa no los enumera.
+   *
+   * Los de linea de ordenes no tienen forma de listarlos, y dejar un campo de
+   * texto vacio obliga a saberselos de memoria.
+   */
+  readonly known?: readonly string[];
   /** Se enseña para que se vea hacia dónde va el producto, pero no se puede elegir. */
   readonly available: boolean;
 }
@@ -50,6 +57,36 @@ interface ProviderOption {
  * que permite usar una suscripcion personal sin pedirle credenciales a nadie.
  */
 const OPTIONS: readonly ProviderOption[] = [
+  {
+    id: 'openai',
+    kind: 'openaicompatible',
+    name: 'OpenAI API',
+    detail: 'GPT · con clave de plataforma',
+    icon: 'sparkles',
+    baseUrl: 'https://api.openai.com/v1',
+    model: '',
+    available: true,
+  },
+  {
+    id: 'anthropic',
+    kind: 'anthropic',
+    name: 'Anthropic API',
+    detail: 'Claude · con clave de consola',
+    icon: 'sparkles',
+    baseUrl: 'https://api.anthropic.com/v1',
+    model: '',
+    available: true,
+  },
+  {
+    id: 'gemini',
+    kind: 'gemini',
+    name: 'Google Gemini',
+    detail: 'Gemini · con clave de Google AI',
+    icon: 'sparkles',
+    baseUrl: 'https://generativelanguage.googleapis.com/v1beta',
+    model: '',
+    available: true,
+  },
   {
     id: 'compatible',
     kind: 'openaicompatible',
@@ -82,6 +119,9 @@ const OPTIONS: readonly ProviderOption[] = [
     baseUrl: '',
     model: 'sonnet',
     command: 'claude',
+    // Los que declara su propia ayuda: alias del ultimo de cada familia. El
+    // campo sigue admitiendo el nombre completo, como `claude-fable-5`.
+    known: ['opus', 'sonnet', 'fable'],
     available: true,
   },
   {
@@ -99,8 +139,7 @@ const OPTIONS: readonly ProviderOption[] = [
 
 /** Qué puede acompañar a la pregunta, dicho como lo entendería cualquiera. */
 const DISCLOSURES: readonly { readonly value: AiDisclosure; readonly label: string }[] = [
-  { value: 'schema', label: 'Estructura' },
-  { value: 'schemaAndRows', label: 'Estructura y filas' },
+  { value: 'schema', label: 'SQL y estructura' },
   { value: 'nothing', label: 'Nada, solo lo que escriba' },
 ];
 
@@ -147,11 +186,26 @@ export class AiProviderDialog {
   protected readonly saving = signal(false);
 
   /** Modelos que el proveedor dice tener, cuando se han pedido. */
-  protected readonly models = signal<readonly string[]>([]);
+  private readonly _models = signal<readonly string[]>([]);
+
+  /**
+   * Los que se pueden elegir: lo que diga el proveedor, o lo que sepa la tarjeta.
+   *
+   * Un programa de línea de órdenes no enumera nada, así que sin esta segunda
+   * fuente el campo se quedaba con un solo nombre escrito a fuego y no había
+   * forma de saber que había otros.
+   */
+  protected readonly models = computed<readonly string[]>(() => {
+    const fromServer = this._models();
+
+    return fromServer.length > 0 ? fromServer : (this.chosen().known ?? []);
+  });
   protected readonly listing = signal(false);
 
   /** Lo que se sabe de la sesion del programa elegido, cuando es uno. */
   protected readonly session = signal<CliSessionState | null>(null);
+  protected readonly sessionLoading = signal(false);
+  protected readonly sessionError = signal('');
   protected readonly loggingIn = signal(false);
 
   /**
@@ -164,6 +218,12 @@ export class AiProviderDialog {
   protected readonly ownSession = signal(false);
 
   protected readonly isLocalCli = computed(() => this.chosen().kind === 'localcli');
+  protected readonly canListModels = computed(
+    () => !this.isLocalCli() || this.command() === 'codex',
+  );
+  protected readonly accountProvider = computed(() =>
+    this.command() === 'codex' ? 'ChatGPT' : 'Claude',
+  );
 
   /**
    * Un proveedor que vive aquí no manda nada a ninguna parte, y entonces la
@@ -182,8 +242,8 @@ export class AiProviderDialog {
       !/^http:\/\/(localhost|127\.0\.0\.1|\[::1\])(:|\/|$)/i.test(this.baseUrl()),
   );
 
-  protected readonly staysHere = computed(
-    () => this.isLocalCli() || /^https?:\/\/(localhost|127\.0\.0\.1)/i.test(this.baseUrl()),
+  protected readonly staysHere = computed(() =>
+    /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:|\/|$)/i.test(this.baseUrl()),
   );
 
   protected choose(option: ProviderOption): void {
@@ -191,17 +251,25 @@ export class AiProviderDialog {
       return;
     }
 
+    const changed = this.chosen().id !== option.id;
+
     this.chosen.set(option);
     this.probe.set(null);
     this.error.set('');
 
-    // Los valores propuestos solo se ponen sobre un campo vacío: cambiar de
-    // tarjeta no puede borrar la URL que alguien acaba de escribir.
-    if (this.baseUrl().length === 0) {
+    // Los que trajo el proveedor anterior no valen para este: dejarlos a la
+    // vista ofreceria elegir un modelo que aqui no existe.
+    this._models.set([]);
+
+    // Cada protocolo tiene una raíz distinta. Al cambiar de tarjeta se propone
+    // la suya; después el campo sigue siendo editable para proxies empresariales.
+    if (changed || this.baseUrl().length === 0) {
       this.baseUrl.set(option.baseUrl);
     }
 
-    if (this.model().length === 0) {
+    // Un modelo de otro protocolo casi nunca es válido aquí. Solo se conserva
+    // cuando se vuelve a pulsar la misma tarjeta, para no borrar texto propio.
+    if (changed || this.model().length === 0) {
       this.model.set(option.model);
     }
 
@@ -210,8 +278,8 @@ export class AiProviderDialog {
     // seria un campo donde quitarlo.
     this.command.set(option.command ?? '');
 
-    if (this.name().length === 0) {
-      this.name.set(option.command ? option.name : '');
+    if (this.name().length === 0 || OPTIONS.some((candidate) => candidate.name === this.name())) {
+      this.name.set(option.id === 'compatible' ? '' : option.name);
     }
 
     this.session.set(null);
@@ -247,6 +315,9 @@ export class AiProviderDialog {
    * sesion.
    */
   private async refreshSession(command: string): Promise<void> {
+    this.sessionLoading.set(true);
+    this.sessionError.set('');
+
     try {
       const state = await new Promise<CliSessionState>((resolve, reject) => {
         this._gateway
@@ -255,10 +326,15 @@ export class AiProviderDialog {
       });
 
       this.session.set(state);
-    } catch {
-      // No poder preguntarlo no impide configurar nada: la pantalla se queda
-      // sin decir de la sesion, que es mejor que decir algo falso.
+
+      if (command === 'codex' && state.loggedIn === true && this._models().length === 0) {
+        await this.loadModels();
+      }
+    } catch (error) {
       this.session.set(null);
+      this.sessionError.set(describe(error));
+    } finally {
+      this.sessionLoading.set(false);
     }
   }
 
@@ -274,6 +350,14 @@ export class AiProviderDialog {
     this.error.set('');
 
     try {
+      // Una sesión separada necesita un identificador para tener su propia
+      // carpeta de credenciales. Se crea aquí, en la misma acción de conectar,
+      // para no obligar a guardar, cerrar y volver a abrir el proveedor.
+      if (this.ownSession() && !this.editing()) {
+        const saved = await this._store.save(this.request());
+        this.editing.set(saved);
+      }
+
       const result = await new Promise<{ started: boolean; message?: string }>(
         (resolve, reject) => {
           this._gateway
@@ -284,6 +368,11 @@ export class AiProviderDialog {
 
       if (!result.started) {
         this.error.set(result.message ?? 'No se pudo abrir el inicio de sesion.');
+      } else {
+        this.session.set(null);
+        this.sessionError.set(
+          `Completa el inicio de sesión con ${this.accountProvider()} en la ventana que se abrió.`,
+        );
       }
     } catch (error) {
       this.error.set(describe(error));
@@ -304,14 +393,15 @@ export class AiProviderDialog {
   protected edit(provider: AiProvider): void {
     this.editing.set(provider);
     this.chosen.set(
-      OPTIONS.find((option) => option.kind === provider.kind && matches(option, provider)) ?? OPTIONS[0],
+      OPTIONS.find((option) => option.kind === provider.kind && matches(option, provider)) ??
+        OPTIONS[0],
     );
     this.name.set(provider.name);
     this.baseUrl.set(provider.baseUrl);
     this.model.set(provider.model);
     this.command.set(provider.command);
     this.ownSession.set(provider.ownSession);
-    this.disclosure.set(provider.disclosure);
+    this.disclosure.set(provider.disclosure === 'schemaAndRows' ? 'schema' : provider.disclosure);
 
     // La clave guardada no se lee del almacén ni se enseña: `null` significa
     // «no la toques» al guardar.
@@ -349,7 +439,7 @@ export class AiProviderDialog {
         this._gateway.listAiModels(this.request()).subscribe({ next: resolve, error: reject });
       });
 
-      this.models.set(answer.models);
+      this._models.set(answer.models);
 
       if (answer.models.length === 0) {
         // El motivo manda sobre el mensaje genérico: decir «no los enumera»
@@ -448,7 +538,7 @@ export class AiProviderDialog {
       baseUrl: this.baseUrl().trim(),
       model: this.model().trim(),
       command: this.command().trim(),
-      disclosure: this.staysHere() ? ('schemaAndRows' as AiDisclosure) : this.disclosure(),
+      disclosure: this.staysHere() ? ('schema' as AiDisclosure) : this.disclosure(),
       ownSession: this.ownSession(),
       // El primero que se configura es el que se usa: nadie configura uno para
       // luego tener que ir a marcarlo.
@@ -464,9 +554,25 @@ function matches(option: ProviderOption, provider: AiProvider): boolean {
     return option.command === provider.command;
   }
 
+  if (provider.kind !== option.kind) {
+    return false;
+  }
+
+  if (provider.kind !== 'openaicompatible') {
+    return true;
+  }
+
   const local = /^https?:\/\/(localhost|127\.0\.0\.1)/i.test(provider.baseUrl);
 
-  return option.id === 'local' ? local : !local;
+  if (option.id === 'openai') {
+    return /^https:\/\/api\.openai\.com\//i.test(provider.baseUrl);
+  }
+
+  return option.id === 'local'
+    ? local
+    : option.id === 'compatible' &&
+        !local &&
+        !/^https:\/\/api\.openai\.com\//i.test(provider.baseUrl);
 }
 
 /**
@@ -498,8 +604,7 @@ function describe(error: unknown): string {
      * «La API respondió 400», que es exactamente el mensaje que no ayuda: pasó
      * de verdad al configurar el proveedor de una empresa.
      */
-    const detail =
-      typeof body === 'string' ? body : (body?.message ?? body?.detail ?? body?.title);
+    const detail = typeof body === 'string' ? body : (body?.message ?? body?.detail ?? body?.title);
 
     if (detail) {
       return detail;

@@ -81,6 +81,20 @@ internal static class DependencyInjection
         services.AddScoped<IAiProvider>(provider =>
             provider.GetRequiredService<OpenAiCompatibleProvider>());
 
+        services.AddHttpClient<AnthropicProvider>(client =>
+        {
+            client.Timeout = TimeSpan.FromMinutes(10);
+        });
+        services.AddScoped<IAiProvider>(provider =>
+            provider.GetRequiredService<AnthropicProvider>());
+
+        services.AddHttpClient<GeminiProvider>(client =>
+        {
+            client.Timeout = TimeSpan.FromMinutes(10);
+        });
+        services.AddScoped<IAiProvider>(provider =>
+            provider.GetRequiredService<GeminiProvider>());
+
         // El que habla con un programa del equipo. No necesita cliente HTTP: lo
         // que lanza es un proceso.
         services.AddScoped<IAiProvider, LocalCliProvider>();

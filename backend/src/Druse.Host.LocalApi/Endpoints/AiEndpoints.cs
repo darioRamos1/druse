@@ -42,9 +42,9 @@ public sealed record AiMessageDto(string Role, string Text);
 
 /// <summary>Lo que se le pide al asistente.</summary>
 /// <param name="Context">
-/// Estructura de las tablas en juego, ya compuesta por la interfaz. Va aparte de
-/// los mensajes para que el backend pueda **negarse a enviarla** cuando el
-/// proveedor no tiene permiso para verla.
+/// SQL abierto y estructura de las tablas en juego, ya compuestos por la interfaz.
+/// Van aparte de los mensajes para que el backend pueda **negarse a enviarlos**
+/// cuando el proveedor no tiene permiso para ver contexto.
 /// </param>
 public sealed record AiChatDto(
     Guid ProviderId,
@@ -176,6 +176,7 @@ internal static class AiEndpoints
             SaveAiProviderDto request,
             SavedAiProviderService providers,
             IEnumerable<IAiProvider> known,
+            IAppPaths paths,
             CancellationToken cancellationToken) =>
         {
             var profile = ToDomain(request);
@@ -189,7 +190,7 @@ internal static class AiEndpoints
             try
             {
                 var models = await For(known, profile).ListModelsAsync(
-                    new AiRequest(profile, key, []),
+                    new AiRequest(profile, key, [], SessionDirectoryFor(profile, paths)),
                     cancellationToken);
 
                 return Results.Ok(new { models });
@@ -387,7 +388,7 @@ internal static class AiEndpoints
         {
             messages.Add(new AiMessage(
                 AiRole.System,
-                $"Estructura de las tablas en juego:\n\n{request.Context}"));
+                $"Contexto del editor y de la base:\n\n{request.Context}"));
         }
 
         foreach (var message in request.Messages)
@@ -407,7 +408,9 @@ internal static class AiEndpoints
     private const string SystemPrompt =
         "Eres el asistente de Druse, un cliente de bases de datos. Ayudas a escribir, " +
         "entender y corregir SQL. Responde en español, breve y al grano. " +
-        "Cuando propongas SQL, ponlo en un bloque ```sql. " +
+        "Cuando propongas SQL nuevo o adicional, usa un bloque ```sql-insert. " +
+        "Cuando propongas sustituir por completo la consulta actual para corregirla o modificarla, " +
+        "usa un bloque ```sql-replace; no lo uses para fragmentos sueltos. " +
         "No puedes ejecutar nada: lo que escribas lo revisa una persona antes de correrlo. " +
         "Si te falta una tabla o una columna para responder, dilo en lugar de suponerla.";
 
@@ -424,6 +427,7 @@ internal static class AiEndpoints
         profile.Kind switch
         {
             AiProviderKind.Anthropic => "anthropic",
+            AiProviderKind.Gemini => "gemini",
             AiProviderKind.LocalCli => "localcli",
             _ => "openaicompatible",
         },
@@ -447,6 +451,7 @@ internal static class AiEndpoints
         Kind = request.Kind switch
         {
             "anthropic" => AiProviderKind.Anthropic,
+            "gemini" => AiProviderKind.Gemini,
             "localcli" => AiProviderKind.LocalCli,
             _ => AiProviderKind.OpenAiCompatible,
         },

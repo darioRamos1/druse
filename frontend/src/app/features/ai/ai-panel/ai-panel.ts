@@ -15,6 +15,8 @@ import { Icon } from '../../../shared/ui/icon/icon';
 export interface ChatPart {
   readonly kind: 'text' | 'sql';
   readonly text: string;
+  /** Acción que recomienda el modelo para este bloque. */
+  readonly action?: 'insert' | 'replace';
 }
 
 /**
@@ -24,6 +26,8 @@ export interface ChatPart {
  * trabajo— y llega ya hecho: el panel no habla con la base de datos.
  */
 export interface AiContext {
+  /** Consulta abierta en el editor. Puede estar vacía. */
+  readonly sql: string;
   /** Estructura de las tablas en juego, en texto. Vacío si no hay conexión abierta. */
   readonly schema: string;
   /** Nombres de las tablas que se han metido, para poder enseñarlos. */
@@ -57,36 +61,52 @@ export class AiPanel {
   private readonly _store = inject(AiStore);
 
   /** Lo que se le puede contar al modelo sobre la base abierta. */
-  readonly context = input<AiContext>({ schema: '', tables: [], database: '' });
+  readonly context = input<AiContext>({ sql: '', schema: '', tables: [], database: '' });
 
   readonly closed = output<void>();
 
   /** SQL que el usuario quiere llevarse al editor. */
   readonly insert = output<string>();
 
+  /** SQL que sustituye únicamente la consulta activa del editor. */
+  readonly replace = output<string>();
+
   /** El usuario quiere configurar sus proveedores. */
   readonly configure = output<void>();
 
   protected readonly draft = signal('');
   protected readonly pickerOpen = signal(false);
+  protected readonly includeSql = signal(true);
   protected readonly includeSchema = signal(true);
 
   protected readonly providers = this._store.providers;
   protected readonly active = this._store.active;
   protected readonly busy = this._store.busy;
   protected readonly configured = this._store.configured;
+  protected readonly isLocal = isLocal;
+  protected readonly contextAllowed = computed(() => {
+    const provider = this.active();
+
+    return provider !== null && provider.disclosure !== 'nothing';
+  });
 
   /** La conversación, con la respuesta ya partida en prosa y bloques de SQL. */
   protected readonly turns = computed(() =>
     this._store.turns().map((turn) => ({
       ...turn,
-      parts: turn.role === 'assistant' ? split(turn.text) : [{ kind: 'text' as const, text: turn.text }],
+      parts:
+        turn.role === 'assistant' ? split(turn.text) : [{ kind: 'text' as const, text: turn.text }],
     })),
   );
 
   /** Cuántas tablas viajan con la pregunta. Cero significa que no va ninguna. */
   protected readonly sharedTables = computed(() =>
-    this.includeSchema() ? this.context().tables : [],
+    this.contextAllowed() && this.includeSchema() ? this.context().tables : [],
+  );
+
+  /** Si la consulta abierta forma parte del contexto de la próxima pregunta. */
+  protected readonly sharedSql = computed(
+    () => this.contextAllowed() && this.includeSql() && this.context().sql.trim().length > 0,
   );
 
   /**
@@ -103,16 +123,16 @@ export class AiPanel {
     }
 
     if (provider.kind === 'localcli') {
-      return 'Responde un programa de este equipo, con tu propia cuenta.';
+      return 'La pregunta y el contexto elegido viajan mediante el programa de tu cuenta de IA.';
     }
 
     if (isLocal(provider.baseUrl)) {
-      return 'En este equipo. Nada sale a internet.';
+      return 'La pregunta y el contexto elegido se procesan en este equipo.';
     }
 
     return provider.disclosure === 'nothing'
       ? 'Solo viaja lo que escribas.'
-      : 'Viajan nombres de tablas y columnas. Ninguna fila.';
+      : 'Pueden viajar el SQL abierto y nombres de tablas y columnas. Ninguna fila de resultados.';
   });
 
   protected send(): void {
@@ -122,7 +142,12 @@ export class AiPanel {
       return;
     }
 
-    this._store.ask(text, this.includeSchema() ? this.context().schema : undefined);
+    this._store.ask(
+      text,
+      this.contextAllowed()
+        ? composeContext(this.context(), this.includeSql(), this.includeSchema())
+        : undefined,
+    );
     this.draft.set('');
   }
 
@@ -166,6 +191,26 @@ export class AiPanel {
   }
 }
 
+/** Compone únicamente las partes de contexto que la persona dejó activadas. */
+export function composeContext(
+  context: AiContext,
+  includeSql: boolean,
+  includeSchema: boolean,
+): string | undefined {
+  const parts: string[] = [];
+  const sql = context.sql.trim();
+
+  if (includeSql && sql.length > 0) {
+    parts.push(`SQL abierto en el editor:\n\n\`\`\`sql\n${sql}\n\`\`\``);
+  }
+
+  if (includeSchema && context.schema.trim().length > 0) {
+    parts.push(`Estructura de las tablas en juego:\n\n${context.schema.trim()}`);
+  }
+
+  return parts.length > 0 ? parts.join('\n\n') : undefined;
+}
+
 /**
  * Parte la respuesta en prosa y bloques de SQL.
  *
@@ -175,7 +220,7 @@ export class AiPanel {
  */
 export function split(text: string): readonly ChatPart[] {
   const parts: ChatPart[] = [];
-  const fence = /```(?:sql)?\n?([\s\S]*?)(?:```|$)/gi;
+  const fence = /```(?:sql(?:-(insert|replace))?)?\n?([\s\S]*?)(?:```|$)/gi;
   let cursor = 0;
   let match = fence.exec(text);
 
@@ -186,10 +231,14 @@ export function split(text: string): readonly ChatPart[] {
       parts.push({ kind: 'text', text: before });
     }
 
-    const sql = match[1].trim();
+    const sql = match[2].trim();
 
     if (sql.length > 0) {
-      parts.push({ kind: 'sql', text: sql });
+      parts.push({
+        kind: 'sql',
+        text: sql,
+        action: match[1]?.toLowerCase() === 'replace' ? 'replace' : 'insert',
+      });
     }
 
     cursor = match.index + match[0].length;

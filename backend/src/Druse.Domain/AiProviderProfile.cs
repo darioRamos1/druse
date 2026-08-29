@@ -29,6 +29,9 @@ public enum AiProviderKind
     /// funciona donde ese binario exista.
     /// </summary>
     LocalCli = 2,
+
+    /// <summary>Formato nativo de Google Gemini, con la clave en `x-goog-api-key`.</summary>
+    Gemini = 3,
 }
 
 /// <summary>

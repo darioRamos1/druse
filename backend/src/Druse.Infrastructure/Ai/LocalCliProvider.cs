@@ -94,7 +94,7 @@ public sealed class LocalCliProvider : IAiProvider
         {
             await foreach (var line in lines.Reader.ReadAllAsync(cancellationToken))
             {
-                var (text, error) = Interpret(line);
+                var (text, error) = Interpret(request.Profile.Command, line);
 
                 if (error is not null)
                 {
@@ -129,16 +129,64 @@ public sealed class LocalCliProvider : IAiProvider
     }
 
     /// <summary>
-    /// No hay forma de preguntárselos, y por eso la lista viene vacía.
+    /// Codex conserva el catálogo que recibió para la cuenta autenticada.
     ///
-    /// Estos programas aceptan alias —`opus`, `sonnet`— que no enumeran por
-    /// ninguna orden estable. El campo del modelo sigue admitiendo texto, que es
-    /// lo que hace falta aquí.
+    /// No se usa una lista escrita en Druse: el archivo incluye visibilidad y
+    /// prioridad y se actualiza cuando Codex habla con OpenAI. Claude no expone
+    /// un catálogo equivalente, por lo que sigue usando sus alias conocidos.
     /// </summary>
-    public Task<IReadOnlyList<string>> ListModelsAsync(
+    public async Task<IReadOnlyList<string>> ListModelsAsync(
         AiRequest request,
-        CancellationToken cancellationToken) =>
-        Task.FromResult<IReadOnlyList<string>>([]);
+        CancellationToken cancellationToken)
+    {
+        if (!request.Profile.Command.Equals("codex", StringComparison.OrdinalIgnoreCase))
+        {
+            return [];
+        }
+
+        var home = request.SessionDirectory
+            ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".codex");
+        var cache = Path.Combine(home, "models_cache.json");
+
+        if (!File.Exists(cache))
+        {
+            return [];
+        }
+
+        try
+        {
+            await using var stream = File.OpenRead(cache);
+            using var document = await JsonDocument.ParseAsync(stream, cancellationToken: cancellationToken);
+
+            if (!document.RootElement.TryGetProperty("models", out var models)
+                || models.ValueKind != JsonValueKind.Array)
+            {
+                return [];
+            }
+
+            return [.. models
+                .EnumerateArray()
+                .Where(model => Text(model, "visibility") == "list")
+                .Select(model => new
+                {
+                    Slug = Text(model, "slug"),
+                    Priority = model.TryGetProperty("priority", out var priority)
+                        && priority.TryGetInt32(out var value)
+                            ? value
+                            : int.MaxValue,
+                })
+                .Where(model => !string.IsNullOrWhiteSpace(model.Slug))
+                .OrderBy(model => model.Priority)
+                .ThenBy(model => model.Slug, StringComparer.OrdinalIgnoreCase)
+                .Select(model => model.Slug!)];
+        }
+        catch (JsonException)
+        {
+            // Codex puede estar reemplazando la caché mientras se lee. El campo
+            // sigue aceptando texto y una recarga posterior volverá a intentarlo.
+            return [];
+        }
+    }
 
     /// <summary>
     /// Comprueba que el programa está y responde, **sin gastar cuota**.
@@ -271,6 +319,27 @@ public sealed class LocalCliProvider : IAiProvider
 
     private static IEnumerable<string> Arguments(AiRequest request)
     {
+        if (request.Profile.Command == "codex")
+        {
+            yield return "exec";
+            yield return "--json";
+            yield return "--ephemeral";
+            yield return "--sandbox";
+            yield return "read-only";
+            yield return "--skip-git-repo-check";
+
+            if (request.Profile.Model.Length > 0)
+            {
+                yield return "--model";
+                yield return request.Profile.Model;
+            }
+
+            // Un guion hace que Codex lea el prompt de stdin, donde también cabe
+            // el esquema completo sin topar con el límite de la línea de órdenes.
+            yield return "-";
+            yield break;
+        }
+
         yield return "-p";
         yield return "--output-format";
         yield return "stream-json";
@@ -329,7 +398,7 @@ public sealed class LocalCliProvider : IAiProvider
     /// escribe, y el resumen final —que es donde el programa dice si la cosa
     /// acabó mal—. Todo lo demás es contabilidad suya.
     /// </summary>
-    private static (string Text, string? Error) Interpret(string line)
+    private static (string Text, string? Error) Interpret(string command, string line)
     {
         if (line.Length == 0 || line[0] != '{')
         {
@@ -341,6 +410,33 @@ public sealed class LocalCliProvider : IAiProvider
             using var document = JsonDocument.Parse(line);
             var root = document.RootElement;
             var type = root.TryGetProperty("type", out var kind) ? kind.GetString() : null;
+
+            if (command == "codex")
+            {
+                if (type == "item.completed"
+                    && root.TryGetProperty("item", out var item)
+                    && item.TryGetProperty("type", out var itemType)
+                    && itemType.GetString() == "agent_message"
+                    && item.TryGetProperty("text", out var codexText))
+                {
+                    return (codexText.GetString() ?? string.Empty, null);
+                }
+
+                if (type is "turn.failed" or "error")
+                {
+                    var detail = root.TryGetProperty("message", out var message)
+                        ? message.GetString()
+                        : root.TryGetProperty("error", out var error)
+                            && error.ValueKind == JsonValueKind.Object
+                            && error.TryGetProperty("message", out var nested)
+                            ? nested.GetString()
+                            : null;
+
+                    return (string.Empty, detail ?? "Codex terminó con un error.");
+                }
+
+                return (string.Empty, null);
+            }
 
             if (type == "stream_event"
                 && root.TryGetProperty("event", out var evento)
@@ -411,4 +507,9 @@ public sealed class LocalCliProvider : IAiProvider
 
         return primera.Length > 0 ? primera : $"«{command}» terminó sin responder.";
     }
+
+    private static string? Text(JsonElement element, string property) =>
+        element.TryGetProperty(property, out var value) && value.ValueKind == JsonValueKind.String
+            ? value.GetString()
+            : null;
 }

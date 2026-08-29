@@ -32,19 +32,23 @@ public static class AiProviderValidator
             errors.Add($"El nombre no puede superar {MaxNameLength} caracteres.");
         }
 
-        if (string.IsNullOrWhiteSpace(profile.Model))
-        {
-            errors.Add("El modelo es obligatorio.");
-        }
-
         if (profile.Kind == AiProviderKind.LocalCli)
         {
             if (string.IsNullOrWhiteSpace(profile.Command))
             {
                 errors.Add("Falta el programa que atiende a este proveedor.");
             }
+            else if (profile.Command is not ("claude" or "codex"))
+            {
+                errors.Add("El programa debe ser claude o codex.");
+            }
 
             return new ValidationResult(errors);
+        }
+
+        if (string.IsNullOrWhiteSpace(profile.Model))
+        {
+            errors.Add("El modelo es obligatorio.");
         }
 
         ValidateBaseUrl(profile, errors);
@@ -77,9 +81,16 @@ public static class AiProviderValidator
          * que responde 404. El mensaje del proveedor no dice qué sobra, así que
          * lo dice Druse.
          */
-        if (url.AbsolutePath.Contains("/chat/completions", StringComparison.OrdinalIgnoreCase))
+        var forbiddenPath = profile.Kind switch
         {
-            errors.Add("La URL base termina donde empieza /chat/completions: quita esa parte.");
+            AiProviderKind.Anthropic => "/messages",
+            AiProviderKind.Gemini => ":generateContent",
+            _ => "/chat/completions",
+        };
+
+        if (url.AbsolutePath.Contains(forbiddenPath, StringComparison.OrdinalIgnoreCase))
+        {
+            errors.Add($"La URL base termina donde empieza {forbiddenPath}: quita esa parte.");
         }
 
         /*
