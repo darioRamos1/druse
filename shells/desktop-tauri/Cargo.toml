@@ -1,6 +1,6 @@
 [package]
 name = "druse"
-version = "0.1.0"
+version = "1.0.0"
 description = "Cliente de bases de datos de escritorio"
 authors = ["Darío Ramos"]
 edition = "2021"

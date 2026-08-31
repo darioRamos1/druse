@@ -4,7 +4,7 @@ Aplicación de escritorio para administrar y consultar distintos motores de base
 
 Una *drusa* es la costra de cristales que tapiza el interior de una geoda: la estructura que aparece al abrir la piedra. Es lo que hace la aplicación con una base de datos.
 
-> **Estado: primera beta (0.1.0).** Funciona el flujo completo contra **PostgreSQL, SQL Server y MySQL/MariaDB**: conectar, explorar el catálogo, escribir SQL con ayudas de esquema, ejecutar, cancelar, consultar el historial, **exportar e importar CSV o Excel** y **editar filas desde la cuadrícula**, todo dentro de una aplicación de escritorio que no necesita .NET ni Node.js instalados. Ver las [notas de la versión](docs/release-notes/0.1.0-beta.md).
+> **Estado: versión 1.0.0.** Funciona el flujo completo contra **PostgreSQL, SQL Server y MySQL/MariaDB**: conectar, explorar el catálogo, escribir SQL con ayudas de esquema, ejecutar, cancelar, consultar el historial, **exportar e importar CSV o Excel** y **editar filas desde la cuadrícula**, todo dentro de una aplicación de escritorio que no necesita .NET ni Node.js instalados. Las [notas de la primera beta](docs/release-notes/0.1.0-beta.md) siguen describiendo con qué números se comprobó ese flujo.
 
 ## Editar, importar y exportar
 
@@ -303,7 +303,7 @@ La dirección de las dependencias apunta siempre al núcleo. Está fijada por pr
 | [`PLAN_TRABAJO_DRUSE.md`](PLAN_TRABAJO_DRUSE.md) | Plan maestro: alcance, arquitectura y las 8 fases |
 | [`BITACORA.md`](BITACORA.md) | Bitácora por sesión: estado actual, qué toca retomar y decisiones |
 | [`docs/decisions/`](docs/decisions/) | ADR de las decisiones estructurales |
-| [`docs/release-notes/0.1.0-beta.md`](docs/release-notes/0.1.0-beta.md) | Qué trae la primera beta, con qué números se comprobó y qué no garantiza |
+| [`docs/release-notes/0.1.0-beta.md`](docs/release-notes/0.1.0-beta.md) | Qué trajo la primera beta, con qué números se comprobó y qué no garantizaba |
 | [`docs/mockups/druse-main.html`](docs/mockups/druse-main.html) | Mockup de referencia de la interfaz |
 
 ## Dónde guarda Druse tus datos

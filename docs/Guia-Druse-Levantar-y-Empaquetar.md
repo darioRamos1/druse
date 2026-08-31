@@ -2,7 +2,7 @@
 
 Guía práctica: levantar los servicios a mano y generar los instaladores
 
-*Versión 0.1.0 beta · 18 de agosto de 2026 · Windows, con notas para Linux y macOS*
+*Versión 1.0.0 · 18 de agosto de 2026 · Windows, con notas para Linux y macOS*
 
 Todo lo de esta guía se ejecuta desde la carpeta del repositorio (donde están las carpetas backend, frontend, shells y build) y con **PowerShell**. Si una ruta lleva espacios —como «DB STUDIO»— no pasa nada: los scripts ya lo tienen en cuenta.
 
