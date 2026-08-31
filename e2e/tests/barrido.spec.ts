@@ -194,6 +194,21 @@ test.describe('barrido visual', () => {
     await page.keyboard.press('Escape');
     await page.locator('app-sql-editor').click();
 
+    // --- Filtro del explorador ---------------------------------------------
+    // Se fotografía con el esquema plegado a propósito: es donde se ve que el
+    // filtro llega a lo que el árbol no enseña.
+    const sidebar = page.locator('app-connections-sidebar');
+
+    await sidebar.getByText('public', { exact: true }).first().click();
+    await sidebar.locator('.filter__input').fill('e2e');
+    await page.waitForTimeout(400);
+    await medir(page, 'filtro del explorador');
+    await foto(page, '19-filtro', sidebar);
+    await sidebar.locator('.filter__clear').click();
+
+    // El árbol se deja como estaba: lo que sigue baja por él.
+    await desplegar(page, 'public', 'Tables');
+
     // --- Paleta de comandos ------------------------------------------------
     // También sirve desde Monaco: Druse registra el acorde antes de que el
     // editor se quede esperando la segunda tecla de sus propios atajos.

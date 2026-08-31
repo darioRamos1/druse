@@ -94,6 +94,46 @@
       color: var(--dr-text-faintest);
     }
   }
+
+  &__clear {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 15px;
+    height: 15px;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: transparent;
+    color: var(--dr-text-faintest);
+    font-size: 13px;
+    line-height: 1;
+    cursor: pointer;
+
+    &:hover,
+    &:focus-visible {
+      background: var(--dr-surface-hover);
+      color: var(--dr-text-secondary);
+    }
+  }
+
+  &__count {
+    margin: 6px 2px 0;
+    color: var(--dr-text-faintest);
+    font-size: 11px;
+  }
+}
+
+/**
+ * El trozo que coincide con lo buscado.
+ *
+ * Se pinta con el color de acento y sin fondo: dentro de un árbol denso, un
+ * resaltado macizo por cada nombre haría más ruido que ayuda.
+ */
+.node__hit {
+  background: transparent;
+  color: var(--dr-accent);
+  font-weight: 600;
 }
 
 .tree {

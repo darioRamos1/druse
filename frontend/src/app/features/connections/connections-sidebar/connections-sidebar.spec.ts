@@ -121,6 +121,43 @@ const database: ExplorerNode = {
   },
 };
 
+/**
+ * Un árbol pequeño pero completo, en preorden, como el que aplana el store.
+ *
+ * Hace falta entero porque el filtro trabaja sobre la jerarquía: sin la base
+ * encima, un esquema no tendría de dónde colgar.
+ */
+const arbol: readonly ExplorerNode[] = [
+  database,
+  { ...schema, depth: 2 },
+  { ...table, id: 'connection-1|Table:public.clientes', label: 'clientes', depth: 3 },
+  {
+    ...column,
+    id: 'connection-1|column:public.clientes.descripcion',
+    label: 'descripción',
+    depth: 4,
+  },
+  { ...table, id: 'connection-1|Table:public.factura_cliente', label: 'factura_cliente', depth: 3 },
+  { ...view, id: 'connection-1|View:public.clientes_activos', label: 'clientes_activos', depth: 3 },
+  { ...table, id: 'connection-1|Table:public.pedidos', label: 'pedidos', depth: 3 },
+];
+
+/** Los nombres de los objetos pintados, en el orden en que se ven. */
+function pintados(fixture: ComponentFixture<ConnectionsSidebar>): string[] {
+  return [...fixture.nativeElement.querySelectorAll('.node--object .node__label')].map(
+    (label: Element) => label.textContent?.trim() ?? '',
+  );
+}
+
+/** Escribe en el campo y deja que pase la espera del filtro. */
+function filtrar(fixture: ComponentFixture<ConnectionsSidebar>, texto: string): void {
+  const input = fixture.nativeElement.querySelector('.filter__input') as HTMLInputElement;
+  input.value = texto;
+  input.dispatchEvent(new Event('input'));
+  vi.advanceTimersByTime(200);
+  fixture.detectChanges();
+}
+
 describe('ConnectionsSidebar', () => {
   let fixture: ComponentFixture<ConnectionsSidebar>;
 
@@ -278,5 +315,111 @@ describe('ConnectionsSidebar', () => {
     action.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
 
     expect(toggles).toBe(0);
+  });
+
+  describe('filtro', () => {
+    beforeEach(() => {
+      vi.useFakeTimers();
+      fixture.componentRef.setInput('explorerNodes', []);
+      fixture.componentRef.setInput('catalogNodes', arbol);
+      fixture.detectChanges();
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('encuentra una tabla que cuelga de una rama plegada', () => {
+      filtrar(fixture, 'pedidos');
+
+      expect(pintados(fixture)).toEqual(['druse_test', 'public', 'pedidos']);
+    });
+
+    it('coincidir con un esquema enseña lo que hay dentro, menos las columnas', () => {
+      filtrar(fixture, 'public');
+      const nombres = pintados(fixture);
+
+      expect(nombres).toContain('clientes');
+      expect(nombres).toContain('pedidos');
+      expect(nombres).not.toContain('descripción');
+    });
+
+    it('pone delante la coincidencia más limpia', () => {
+      filtrar(fixture, 'cli');
+      const nombres = pintados(fixture);
+
+      expect(nombres.indexOf('clientes')).toBeLessThan(nombres.indexOf('factura_cliente'));
+    });
+
+    it('ignora los acentos', () => {
+      filtrar(fixture, 'descripcion');
+
+      expect(pintados(fixture)).toContain('descripción');
+    });
+
+    it('exige todos los fragmentos escritos', () => {
+      filtrar(fixture, 'fac cli');
+
+      expect(pintados(fixture)).toEqual(['druse_test', 'public', 'factura_cliente']);
+    });
+
+    it('el prefijo de clase deja fuera lo que no es de esa clase', () => {
+      filtrar(fixture, 'v:cli');
+
+      expect(pintados(fixture)).toEqual(['druse_test', 'public', 'clientes_activos']);
+    });
+
+    it('abre la conexión plegada cuando la coincidencia está dentro', () => {
+      fixture.componentRef.setInput('connections', [{ ...connection, expanded: false }]);
+      fixture.detectChanges();
+
+      filtrar(fixture, 'pedidos');
+
+      expect(pintados(fixture)).toContain('pedidos');
+    });
+
+    it('la conexión se encuentra por su nombre y por el de su base', () => {
+      filtrar(fixture, 'pruebas');
+
+      expect(fixture.nativeElement.querySelector('.node--connection')).not.toBeNull();
+
+      filtrar(fixture, 'druse_test');
+
+      expect(fixture.nativeElement.querySelector('.node--connection')).not.toBeNull();
+    });
+
+    it('subraya el trozo que coincide', () => {
+      filtrar(fixture, 'cli');
+      const marcas = [...fixture.nativeElement.querySelectorAll('.node__hit')].map(
+        (mark: Element) => mark.textContent,
+      );
+
+      expect(marcas).toContain('cli');
+    });
+
+    it('dice cuántos objetos quedan, y cuándo no queda ninguno', () => {
+      filtrar(fixture, 'pedidos');
+
+      expect(fixture.nativeElement.querySelector('.filter__count')?.textContent?.trim()).toBe(
+        '3 objetos',
+      );
+
+      filtrar(fixture, 'no_existe_esta_tabla');
+
+      expect(fixture.nativeElement.querySelector('.filter__count')?.textContent?.trim()).toBe(
+        'Sin coincidencias',
+      );
+    });
+
+    it('limpiar devuelve el árbol al instante, sin esperar', () => {
+      filtrar(fixture, 'pedidos');
+
+      const limpiar = fixture.nativeElement.querySelector('.filter__clear') as HTMLButtonElement;
+      limpiar.click();
+      fixture.detectChanges();
+
+      expect(fixture.nativeElement.querySelector('.filter__count')).toBeNull();
+      expect(pintados(fixture)).toEqual([]);
+    });
   });
 });

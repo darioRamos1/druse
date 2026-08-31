@@ -1,12 +1,149 @@
-import { ChangeDetectionStrategy, Component, computed, input, output, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  DestroyRef,
+  ElementRef,
+  HostListener,
+  computed,
+  inject,
+  input,
+  output,
+  signal,
+  viewChild,
+} from '@angular/core';
 
 import { ConnectionSummary, ExplorerNode } from '../../../shared/models/workspace';
 import { EngineBadge } from '../../../shared/ui/engine-badge/engine-badge';
 import { Icon, IconName } from '../../../shared/ui/icon/icon';
+import {
+  Search,
+  Segment,
+  fold,
+  highlight,
+  parseSearch,
+  scoreMatch,
+} from '../../../shared/util/text-match';
 
 /** Sangría por nivel del árbol, en píxeles. Coincide con el mockup. */
 const INDENT_STEP = 16;
 const INDENT_BASE = 8;
+
+/**
+ * Espera antes de rehacer el árbol filtrado, en milisegundos.
+ *
+ * Lo escrito se pinta al instante; lo que espera es el filtrado, que recorre
+ * todo el catálogo. Con esquemas grandes, hacerlo por cada letra se nota.
+ */
+const FILTER_DELAY = 120;
+
+const NO_NODES: readonly ExplorerNode[] = [];
+
+/** Nodo del árbol con sus hijos, tal y como hace falta para filtrarlo. */
+interface Branch {
+  readonly node: ExplorerNode;
+  readonly children: readonly Branch[];
+}
+
+/** Una rama que sobrevive al filtro, con lo que vale su mejor coincidencia. */
+interface Hit {
+  readonly branch: Branch;
+  readonly score: number;
+}
+
+/** Nombre calificado del objeto, plegado, para medir «ventas.cli». */
+function qualifiedOf(node: ExplorerNode): string {
+  return node.source.schema ? `${node.source.schema}.${node.source.name}` : node.source.name;
+}
+
+function scoreNode(node: ExplorerNode, search: Search): number {
+  if (search.kinds && !search.kinds.has(node.kind)) {
+    return 0;
+  }
+
+  return scoreMatch(fold(node.label), fold(qualifiedOf(node)), search.parts);
+}
+
+/**
+ * El aplanado vuelto árbol, aprovechando que viene en preorden.
+ *
+ * Filtrar sobre la lista plana obligaba a rebuscar los ancestros de cada
+ * coincidencia; con los hijos colgando de su padre, una sola pasada basta.
+ */
+function nest(nodes: readonly ExplorerNode[]): readonly Branch[] {
+  const roots: Branch[] = [];
+  const stack: { node: ExplorerNode; children: Branch[] }[] = [];
+
+  for (const node of nodes) {
+    const branch = { node, children: [] as Branch[] };
+
+    while (stack.length && stack[stack.length - 1].node.depth >= node.depth) {
+      stack.pop();
+    }
+
+    (stack.length ? stack[stack.length - 1].children : roots).push(branch);
+    stack.push(branch);
+  }
+
+  return roots;
+}
+
+/**
+ * Lo que cuelga de una coincidencia, menos las columnas.
+ *
+ * Quien busca un esquema quiere ver sus tablas; nadie quiere ver de golpe las
+ * veinte mil columnas que hay debajo. Una columna sigue apareciendo si coincide
+ * ella misma.
+ */
+function inherit(branches: readonly Branch[]): readonly Branch[] {
+  return branches
+    .filter((branch) => branch.node.kind !== 'column')
+    .map((branch) => ({ node: branch.node, children: inherit(branch.children) }));
+}
+
+/** Las ramas que coinciden, con sus ancestros y su contenido. */
+function prune(branches: readonly Branch[], search: Search): readonly Hit[] {
+  const kept: Hit[] = [];
+
+  for (const branch of branches) {
+    const own = scoreNode(branch.node, search);
+
+    if (own > 0) {
+      kept.push({ branch: { node: branch.node, children: inherit(branch.children) }, score: own });
+      continue;
+    }
+
+    const children = prune(branch.children, search);
+
+    if (children.length) {
+      // Un contenedor vale lo que su mejor descendiente: así la rama que trae la
+      // coincidencia más limpia sube, y las demás quedan debajo sin desaparecer.
+      kept.push({
+        branch: { node: branch.node, children: children.map((hit) => hit.branch) },
+        score: Math.max(...children.map((hit) => hit.score)),
+      });
+    }
+  }
+
+  // `sort` es estable, así que a igual relevancia se conserva el orden del
+  // catálogo, que es el alfabético con el que el usuario ya cuenta.
+  return kept.sort((a, b) => b.score - a.score);
+}
+
+/**
+ * El árbol podado, otra vez plano y listo para pintar.
+ *
+ * Lo que sobrevive al filtro se enseña entero, así que un nodo con hijos
+ * visibles se marca abierto aunque su rama estuviera plegada: dibujarle el
+ * chevron cerrado encima de sus propios hijos no lo entendería nadie.
+ */
+function flatten(branches: readonly Branch[], out: ExplorerNode[]): ExplorerNode[] {
+  for (const branch of branches) {
+    out.push(branch.children.length ? { ...branch.node, expanded: true } : branch.node);
+    flatten(branch.children, out);
+  }
+
+  return out;
+}
 
 /** Icono que corresponde a cada clase de objeto del explorador. */
 const KIND_ICONS: Readonly<Record<ExplorerNode['kind'], IconName | null>> = {
@@ -36,6 +173,14 @@ const KIND_ICONS: Readonly<Record<ExplorerNode['kind'], IconName | null>> = {
 export class ConnectionsSidebar {
   readonly connections = input.required<readonly ConnectionSummary[]>();
   readonly explorerNodes = input.required<readonly ExplorerNode[]>();
+
+  /**
+   * El árbol completo que hay cargado, ramas plegadas incluidas.
+   *
+   * Solo lo usa el filtro. Vacío, el buscador se conforma con lo visible, que es
+   * lo que hacía antes.
+   */
+  readonly catalogNodes = input<readonly ExplorerNode[]>([]);
   readonly version = input('');
 
   readonly addConnection = output<void>();
@@ -125,65 +270,181 @@ export class ConnectionsSidebar {
     () => this.connections().filter((connection) => connection.state === 'connected').length,
   );
 
-  /** Término por el que se filtran conexiones y objetos. */
+  /** Lo que hay escrito en el campo, que se pinta sin esperar a nada. */
+  protected readonly typed = signal('');
+
+  /** Término ya asentado con el que se filtra de verdad. */
   protected readonly filter = signal('');
   protected readonly openMenuId = signal<string | null>(null);
   protected readonly menuPosition = signal({ top: 0, left: 0 });
 
-  protected readonly visibleConnections = computed(() => {
-    const term = this.filter().trim().toLowerCase();
+  protected readonly search = computed(() => parseSearch(this.filter()));
 
-    if (!term) {
+  private readonly _filterInput = viewChild<ElementRef<HTMLInputElement>>('filterInput');
+  private _pending: ReturnType<typeof setTimeout> | null = null;
+
+  constructor() {
+    inject(DestroyRef).onDestroy(() => this.cancelPending());
+  }
+
+  /**
+   * Objetos de cada conexión, ya filtrados, por identificador de conexión.
+   *
+   * Es un `computed` y no un método porque la plantilla lo pide una vez por
+   * conexión en cada ciclo de detección: recorrer el catálogo entero cada vez
+   * era el precio de teclear en el campo.
+   */
+  protected readonly filteredNodes = computed<ReadonlyMap<string, readonly ExplorerNode[]>>(() => {
+    const search = this.search();
+
+    // Con filtro se mira el catálogo entero, plegado incluido; sin filtro, solo
+    // lo que el árbol ya enseña, que es su estado de expansión real.
+    const source =
+      search && this.catalogNodes().length ? this.catalogNodes() : this.explorerNodes();
+    const byConnection = new Map<string, ExplorerNode[]>();
+
+    for (const node of source) {
+      const nodes = byConnection.get(node.connectionId);
+
+      if (nodes) {
+        nodes.push(node);
+      } else {
+        byConnection.set(node.connectionId, [node]);
+      }
+    }
+
+    if (!search) {
+      return byConnection;
+    }
+
+    const filtered = new Map<string, readonly ExplorerNode[]>();
+
+    for (const [connectionId, nodes] of byConnection) {
+      const kept = flatten(
+        prune(nest(nodes), search).map((hit) => hit.branch),
+        [],
+      );
+
+      if (kept.length) {
+        filtered.set(connectionId, kept);
+      }
+    }
+
+    return filtered;
+  });
+
+  /** Cuántos objetos ha dejado el filtro, para decirlo bajo el campo. */
+  protected readonly matchCount = computed(() =>
+    [...this.filteredNodes().values()].reduce((total, nodes) => total + nodes.length, 0),
+  );
+
+  /** Trozos subrayados de cada nombre, por nodo, mientras haya filtro. */
+  protected readonly labelSegments = computed<ReadonlyMap<string, readonly Segment[]>>(() => {
+    const search = this.search();
+    const segments = new Map<string, readonly Segment[]>();
+
+    if (!search?.parts.length) {
+      return segments;
+    }
+
+    for (const nodes of this.filteredNodes().values()) {
+      for (const node of nodes) {
+        segments.set(node.id, highlight(node.label, search.parts));
+      }
+    }
+
+    return segments;
+  });
+
+  protected readonly visibleConnections = computed(() => {
+    const search = this.search();
+
+    if (!search) {
       return this.connections();
     }
 
+    const filtered = this.filteredNodes();
+
     // Una conexión se queda si coincide ella o alguno de sus objetos: al buscar
-    // una tabla, esconder su conexión dejaría el resultado inalcanzable.
-    return this.connections().filter(
-      (connection) =>
-        connection.name.toLowerCase().includes(term) ||
-        connection.database.toLowerCase().includes(term) ||
-        this.explorerNodes().some(
-          (node) => node.connectionId === connection.id && node.label.toLowerCase().includes(term),
-        ),
-    );
+    // una tabla, esconder su conexión dejaría el resultado inalcanzable. Y si lo
+    // que coincide está dentro, se abre: anunciarla plegada y vacía era peor que
+    // no encontrar nada.
+    return this.connections()
+      .filter((connection) => {
+        if (filtered.get(connection.id)?.length) {
+          return true;
+        }
+
+        // Pedir una clase —«t:ventas»— es preguntar por objetos, no por
+        // conexiones: entonces la conexión solo entra si algo suyo coincide.
+        if (search.kinds) {
+          return false;
+        }
+
+        // Se mide contra el nombre del perfil y contra el de su base por
+        // separado, que son los dos por los que se la reconoce.
+        const nombre = fold(connection.name);
+        const base = fold(connection.database);
+
+        return (
+          scoreMatch(nombre, nombre, search.parts) > 0 || scoreMatch(base, base, search.parts) > 0
+        );
+      })
+      .map((connection) =>
+        filtered.get(connection.id)?.length ? { ...connection, expanded: true } : connection,
+      );
   });
 
   protected onFilter(event: Event): void {
-    this.filter.set((event.target as HTMLInputElement).value);
+    const value = (event.target as HTMLInputElement).value;
+
+    this.typed.set(value);
+    this.cancelPending();
+
+    // Vaciar el campo tiene que devolver el árbol al instante: la espera solo
+    // sirve mientras se teclea.
+    if (!value.trim()) {
+      this.filter.set(value);
+
+      return;
+    }
+
+    this._pending = setTimeout(() => this.filter.set(value), FILTER_DELAY);
+  }
+
+  protected clearFilter(): void {
+    this.cancelPending();
+    this.typed.set('');
+    this.filter.set('');
+    this._filterInput()?.nativeElement.focus();
+  }
+
+  /** Llevar el foco al campo desde cualquier sitio de la aplicación. */
+  @HostListener('document:keydown', ['$event'])
+  protected onShortcut(event: KeyboardEvent): void {
+    if ((event.ctrlKey || event.metaKey) && event.shiftKey && event.key.toLowerCase() === 'e') {
+      event.preventDefault();
+      const input = this._filterInput()?.nativeElement;
+      input?.focus();
+      input?.select();
+    }
+  }
+
+  private cancelPending(): void {
+    if (this._pending) {
+      clearTimeout(this._pending);
+      this._pending = null;
+    }
   }
 
   /** Nodos de cada conexión, para pintarlos bajo la suya. */
   protected nodesOf(connectionId: string): readonly ExplorerNode[] {
-    const nodes = this.explorerNodes().filter((node) => node.connectionId === connectionId);
-    const term = this.filter().trim().toLowerCase();
+    return this.filteredNodes().get(connectionId) ?? NO_NODES;
+  }
 
-    if (!term) {
-      return nodes;
-    }
-
-    // Con filtro se muestran las coincidencias y sus ancestros: una tabla suelta
-    // sin su esquema encima no diría de dónde sale.
-    const keep = new Set<string>();
-
-    nodes.forEach((node, index) => {
-      if (!node.label.toLowerCase().includes(term)) {
-        return;
-      }
-
-      keep.add(node.id);
-
-      let depth = node.depth;
-
-      for (let i = index - 1; i >= 0 && depth > 0; i--) {
-        if (nodes[i].depth < depth) {
-          keep.add(nodes[i].id);
-          depth = nodes[i].depth;
-        }
-      }
-    });
-
-    return nodes.filter((node) => keep.has(node.id));
+  /** Trozos del nombre para subrayar la coincidencia, o `null` si no hay filtro. */
+  protected segmentsOf(nodeId: string): readonly Segment[] | null {
+    return this.labelSegments().get(nodeId) ?? null;
   }
 
   /** Nombre calificado del objeto, listo para pegar en una consulta. */

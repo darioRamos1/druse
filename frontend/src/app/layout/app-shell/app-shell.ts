@@ -507,6 +507,9 @@ export class AppShell {
   // --- Estado del área de trabajo -------------------------------------------
   protected readonly connections = this._store.connections;
   protected readonly explorerNodes = this._store.explorerNodes;
+
+  /** Todo lo cargado, para que el filtro del explorador alcance lo plegado. */
+  protected readonly catalogNodes = this._store.catalogNodes;
   protected readonly searchableRelations = this._store.searchableRelations;
   protected readonly tabs = this._store.tabs;
   protected readonly resultSet = this._store.resultSet;

@@ -1180,15 +1180,20 @@ export class WorkspaceStore {
     return { schemas: [...schemas], relations };
   });
 
-  /** Relaciones cargadas, aunque su rama del árbol esté plegada. */
-  readonly searchableRelations = computed<readonly ExplorerNode[]>(() => {
-    const relations: ExplorerNode[] = [];
+  /**
+   * Todo el árbol cargado, con las ramas plegadas dentro.
+   *
+   * Es lo que mira el buscador del explorador, y no {@link explorerNodes}: una
+   * tabla que ya está en memoria pero cuelga de un esquema plegado tiene que
+   * poder encontrarse, porque buscarla es justo lo que se hace en vez de ir
+   * abriendo carpetas.
+   */
+  readonly catalogNodes = computed<readonly ExplorerNode[]>(() => {
+    const nodes: ExplorerNode[] = [];
 
     const walk = (entries: readonly TreeEntry[]): void => {
       for (const entry of entries) {
-        if (entry.object.kind === 'table' || entry.object.kind === 'view') {
-          relations.push(toExplorerNode(entry));
-        }
+        nodes.push(toExplorerNode(entry));
 
         if (entry.children) {
           walk(entry.children);
@@ -1197,28 +1202,19 @@ export class WorkspaceStore {
     };
 
     walk(this._roots());
-    return relations;
+
+    return nodes;
   });
+
+  /** Relaciones cargadas, aunque su rama del árbol esté plegada. */
+  readonly searchableRelations = computed<readonly ExplorerNode[]>(() =>
+    this.catalogNodes().filter((node) => node.kind === 'table' || node.kind === 'view'),
+  );
 
   /** Esquemas conocidos, aunque sus tablas todavía no se hayan cargado. */
-  readonly searchableSchemas = computed<readonly ExplorerNode[]>(() => {
-    const schemas: ExplorerNode[] = [];
-
-    const walk = (entries: readonly TreeEntry[]): void => {
-      for (const entry of entries) {
-        if (entry.object.kind === 'schema') {
-          schemas.push(toExplorerNode(entry));
-        }
-
-        if (entry.children) {
-          walk(entry.children);
-        }
-      }
-    };
-
-    walk(this._roots());
-    return schemas;
-  });
+  readonly searchableSchemas = computed<readonly ExplorerNode[]>(() =>
+    this.catalogNodes().filter((node) => node.kind === 'schema'),
+  );
 
   // --- Edición de filas ------------------------------------------------------
 

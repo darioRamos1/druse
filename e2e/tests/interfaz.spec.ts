@@ -935,6 +935,93 @@ test.describe('la interfaz por dentro', () => {
     await expect.poll(() => tipo.evaluate((el) => el.clientWidth)).toBe(0);
     expect(await nombre.evaluate((el) => el.clientWidth)).toBeGreaterThan(40);
   });
+
+  /**
+   * El filtro del explorador, contra un catálogo de verdad.
+   *
+   * Aquí y no en el frontend porque lo que se comprueba es justo lo que los
+   * dobles no tienen: que el árbol perezoso conserve lo que ya se abrió y que
+   * buscarlo lo encuentre aunque su rama esté plegada. Es el caso por el que se
+   * usa el campo en vez de ir abriendo carpetas a mano.
+   */
+  test('el filtro encuentra una tabla dentro de una rama plegada', async ({ page }) => {
+    await abrir(page);
+    await conectar(page);
+
+    const sidebar = page.locator('app-connections-sidebar');
+
+    // Se baja hasta las tablas una vez, que es lo que las trae a memoria.
+    for (const [nodo, hijo] of [
+      ['druse_test', 'public'],
+      ['public', 'Tables'],
+    ]) {
+      const dentro = sidebar.getByText(hijo, { exact: true }).first();
+
+      if (!(await dentro.isVisible().catch(() => false))) {
+        await sidebar.getByText(nodo, { exact: true }).first().click();
+      }
+
+      await expect(dentro).toBeVisible({ timeout: 30_000 });
+    }
+
+    await sidebar.getByText('Tables', { exact: true }).first().click();
+
+    /**
+     * La tabla con la que se prueba sale del propio árbol, por su sangría.
+     *
+     * Escribir un nombre concreto ataría la prueba a lo que hayan dejado las
+     * otras; el nodo más hondo, en cambio, es una tabla en cualquier caso.
+     */
+    const masHonda = async (): Promise<string> =>
+      sidebar.locator('.node--object').evaluateAll(
+        (filas) =>
+          filas
+            .map((fila) => ({
+              sangria: parseInt(getComputedStyle(fila).paddingLeft, 10) || 0,
+              nombre: fila.querySelector('.node__label')?.textContent?.trim() ?? '',
+            }))
+            .sort((a, b) => b.sangria - a.sangria)[0]?.nombre ?? '',
+      );
+
+    await expect.poll(masHonda, { timeout: 30_000 }).not.toBe('Tables');
+
+    const tabla = await masHonda();
+
+    // Y ahora se pliega el esquema entero: sin filtro, ahí abajo no queda nada.
+    await sidebar.getByText('public', { exact: true }).first().click();
+    await expect(sidebar.getByText('Tables', { exact: true })).toBeHidden({ timeout: 30_000 });
+
+    /**
+     * Al campo se llega con Ctrl+Shift+E desde donde se esté.
+     *
+     * Se prueba con el foco dentro de Monaco, que es donde se pasa el tiempo y
+     * donde otros atajos se quedan por el camino.
+     */
+    await page.locator('app-sql-editor .monaco-editor textarea').first().focus();
+    await page.keyboard.press('Control+Shift+E');
+
+    await expect(sidebar.locator('.filter__input')).toBeFocused({ timeout: 10_000 });
+
+    await page.keyboard.type(tabla);
+
+    const fila = sidebar.locator('.node--object', { hasText: tabla }).first();
+
+    await expect(fila).toBeVisible({ timeout: 30_000 });
+    await expect(fila.locator('.node__hit').first()).toBeVisible();
+    await expect(sidebar.locator('.filter__count')).toContainText('objeto');
+
+    /**
+     * Limpiar devuelve el árbol como estaba.
+     *
+     * Buscar enseña ramas plegadas, pero no las abre: si el filtro dejara tras
+     * de sí lo que desplegó, el explorador acabaría abierto entero después de
+     * tres búsquedas.
+     */
+    await sidebar.locator('.filter__clear').click();
+
+    await expect(sidebar.locator('.filter__count')).toHaveCount(0);
+    await expect(sidebar.getByText('Tables', { exact: true })).toBeHidden();
+  });
 });
 
 /**

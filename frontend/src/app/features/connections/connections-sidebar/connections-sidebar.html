@@ -15,15 +15,46 @@
 <div class="filter-row">
   <div class="filter">
     <app-icon name="search" [size]="12" />
+    <!--
+      El tipo es `text` y no `search`: la cruz que pinta el navegador no se puede
+      alinear con el resto de la barra, y limpiando desde ella el campo no avisa
+      igual en todos los sitios. La de al lado es nuestra.
+    -->
     <input
-      type="search"
+      #filterInput
+      type="text"
       class="filter__input"
       placeholder="Filtrar conexiones y objetos"
-      [value]="filter()"
+      title="Filtrar conexiones y objetos (Ctrl+Shift+E). Prefijos: t: tabla, v: vista, e: esquema, c: columna, f: función, p: procedimiento"
+      [value]="typed()"
       (input)="onFilter($event)"
+      (keydown.escape)="clearFilter()"
       aria-label="Filtrar conexiones y objetos"
     />
+    @if (typed()) {
+      <button
+        type="button"
+        class="filter__clear"
+        title="Limpiar el filtro"
+        aria-label="Limpiar el filtro"
+        (click)="clearFilter()"
+      >
+        ×
+      </button>
+    }
   </div>
+
+  @if (search()) {
+    <p class="filter__count" role="status">
+      @if (matchCount()) {
+        {{ matchCount() }} {{ matchCount() === 1 ? 'objeto' : 'objetos' }}
+      } @else if (visibleConnections().length) {
+        Solo coinciden conexiones
+      } @else {
+        Sin coincidencias
+      }
+    </p>
+  }
 </div>
 
 <div class="tree" role="tree">
@@ -137,7 +168,17 @@
           }
 
           <span class="node__label" [class.is-mono]="node.kind === 'table' || node.kind === 'view'">
-            {{ node.label }}
+            @if (segmentsOf(node.id); as parts) {
+              @for (part of parts; track $index) {
+                @if (part.hit) {
+                  <mark class="node__hit">{{ part.text }}</mark>
+                } @else {
+                  <span>{{ part.text }}</span>
+                }
+              }
+            } @else {
+              {{ node.label }}
+            }
           </span>
 
           @if (node.hint) {

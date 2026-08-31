@@ -31,6 +31,7 @@
     [style.width.px]="sidebarWidth()"
     [connections]="connections()"
     [explorerNodes]="explorerNodes()"
+    [catalogNodes]="catalogNodes()"
     [version]="updates.info()?.version ?? ''"
     (addConnection)="openDialog()"
     (toggleConnection)="toggleConnection($event)"
