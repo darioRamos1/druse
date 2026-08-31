@@ -23,8 +23,25 @@ namespace Druse.Infrastructure.Ai;
 /// puede cambiarlo. Por eso vive detrás de <see cref="IAiProvider"/> como los
 /// demás: el día que cambie, cambia esta clase y nada más.
 /// </summary>
-public sealed class LocalCliProvider : IAiProvider
+public sealed class LocalCliProvider(ICliSession sessions) : IAiProvider
 {
+    private readonly ICliSession _sessions = sessions;
+
+    /// <summary>
+    /// Cuánto puede callarse el programa antes de darlo por colgado.
+    ///
+    /// No es el tiempo de la respuesta, sino el que pasa **sin escribir nada**.
+    /// Antes no había ninguno: el bucle esperaba al canal hasta que el programa
+    /// decidiera hablar, y un `claude` que se quedaba pensando dejaba el turno
+    /// abierto para siempre, sin texto y sin error, con la única salida de
+    /// cerrar Druse.
+    ///
+    /// Tres minutos porque Codex todavía manda su respuesta de una sola vez, al
+    /// final: hasta que llegue no hay nada que contar, y un plazo corto cortaría
+    /// respuestas que iban bien.
+    /// </summary>
+    private static readonly TimeSpan Silence = TimeSpan.FromMinutes(3);
+
     /// <summary>
     /// Herramientas que el asistente no puede usar.
     ///
@@ -44,7 +61,9 @@ public sealed class LocalCliProvider : IAiProvider
         AiRequest request,
         [EnumeratorCancellation] CancellationToken cancellationToken)
     {
-        using var process = Start(request);
+        var model = await ModelAsync(request, cancellationToken);
+
+        using var process = Start(request, model);
 
         /*
          * Las líneas se pasan por un canal en vez de leerse en el bucle.
@@ -89,23 +108,52 @@ public sealed class LocalCliProvider : IAiProvider
         process.StandardInput.Close();
 
         string? failure = null;
+        var reader = new CliTranscript(request.Profile.Command);
 
         try
         {
-            await foreach (var line in lines.Reader.ReadAllAsync(cancellationToken))
+            var talking = true;
+
+            while (talking)
             {
-                var (text, error) = Interpret(request.Profile.Command, line);
-
-                if (error is not null)
+                /*
+                 * La espera se hace aparte porque aquí no cabe.
+                 *
+                 * Un `yield return` no puede vivir dentro de un `try` que
+                 * atrape excepciones, y distinguir «se calló» de «lo cancelaron»
+                 * exige atraparlas: se resuelve fuera y aquí solo llega el
+                 * veredicto.
+                 */
+                switch (await WaitAsync(lines.Reader, cancellationToken))
                 {
-                    failure = error;
+                    case Wait.Silent:
+                        failure = Mute(request.Profile.Command);
+                        talking = false;
 
-                    break;
+                        continue;
+
+                    case Wait.Closed:
+                        talking = false;
+
+                        continue;
                 }
 
-                if (text.Length > 0)
+                while (lines.Reader.TryRead(out var line))
                 {
-                    yield return new AiChunk(text);
+                    var (text, error) = reader.Read(line);
+
+                    if (error is not null)
+                    {
+                        failure = error;
+                        talking = false;
+
+                        break;
+                    }
+
+                    if (text.Length > 0)
+                    {
+                        yield return new AiChunk(text);
+                    }
                 }
             }
         }
@@ -127,6 +175,50 @@ public sealed class LocalCliProvider : IAiProvider
             throw new InvalidOperationException(Explain(request.Profile.Command, errors.ToString()));
         }
     }
+
+    /// <summary>Cómo terminó una espera por la siguiente línea.</summary>
+    private enum Wait
+    {
+        /// <summary>Hay algo escrito, listo para leer.</summary>
+        Line,
+
+        /// <summary>El programa cerró su salida: no va a decir nada más.</summary>
+        Closed,
+
+        /// <summary>Pasó demasiado tiempo sin escribir nada.</summary>
+        Silent,
+    }
+
+    /// <summary>
+    /// Espera a la siguiente línea, sin quedarse esperando para siempre.
+    ///
+    /// El plazo se cuenta desde la última que llegó, no desde el principio: un
+    /// programa que va escribiendo puede tardar lo que necesite, y uno que se
+    /// calla se corta al cabo de <see cref="Silence"/>. La cancelación de quien
+    /// pregunta sigue su camino y no se confunde con el plazo.
+    /// </summary>
+    private static async Task<Wait> WaitAsync(
+        ChannelReader<string> lines,
+        CancellationToken cancellationToken)
+    {
+        using var limit = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+
+        limit.CancelAfter(Silence);
+
+        try
+        {
+            return await lines.WaitToReadAsync(limit.Token) ? Wait.Line : Wait.Closed;
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            return Wait.Silent;
+        }
+    }
+
+    /// <summary>Lo que se le cuenta a quien esperaba una respuesta que no llegó.</summary>
+    private static string Mute(string command) =>
+        $"«{command}» dejó de responder: {Silence.TotalMinutes:0} minutos sin escribir nada. "
+        + "Se cerró el intento; puedes volver a preguntar.";
 
     /// <summary>
     /// Codex conserva el catálogo que recibió para la cuenta autenticada.
@@ -189,79 +281,110 @@ public sealed class LocalCliProvider : IAiProvider
     }
 
     /// <summary>
-    /// Comprueba que el programa está y responde, **sin gastar cuota**.
+    /// Comprueba que se puede preguntar de verdad, **sin gastar cuota**.
     ///
-    /// Se le pide la versión y no una respuesta: probar un proveedor no puede
-    /// costarle al usuario parte del uso que tiene contratado, y lo que hay que
-    /// averiguar aquí —si el binario existe y arranca— se sabe igual.
+    /// Antes solo pedía la versión, y con eso decía que sí a cualquier equipo
+    /// donde el programa estuviera instalado —aunque no hubiera sesión iniciada,
+    /// que es el caso que más se da—. El usuario veía «conecta bien» y descubría
+    /// el problema al mandar la primera pregunta, que es descubrirlo tarde y en
+    /// el peor sitio.
+    ///
+    /// Ahora se mira lo mismo que mira el diálogo: si el programa está, si tiene
+    /// sesión y con qué modelo va a hablar. Ninguna de las tres preguntas cuesta
+    /// nada: son locales, y probar un proveedor no puede consumir parte del uso
+    /// que el usuario tiene contratado.
     /// </summary>
     public async Task<AiProbe> ProbeAsync(AiRequest request, CancellationToken cancellationToken)
     {
+        var command = request.Profile.Command;
         var clock = Stopwatch.StartNew();
+        var state = await _sessions.InspectAsync(
+            command,
+            request.SessionDirectory,
+            cancellationToken);
 
-        try
-        {
-            using var process = new Process
-            {
-                StartInfo = VersionCheck(request.Profile.Command),
-            };
-
-            process.Start();
-
-            var version = (await process.StandardOutput.ReadToEndAsync(cancellationToken)).Trim();
-
-            await process.WaitForExitAsync(cancellationToken);
-            clock.Stop();
-
-            if (process.ExitCode != 0)
-            {
-                return new AiProbe(
-                    false,
-                    $"«{request.Profile.Command}» respondió con un error.",
-                    clock.ElapsedMilliseconds);
-            }
-
-            return new AiProbe(
-                true,
-                version.Length > 0 ? version : $"«{request.Profile.Command}» responde.",
-                clock.ElapsedMilliseconds);
-        }
-        catch (Exception error) when (error is System.ComponentModel.Win32Exception or InvalidOperationException)
+        if (!state.Installed)
         {
             clock.Stop();
 
             return new AiProbe(
                 false,
-                $"No se encontró «{request.Profile.Command}» en este equipo. ¿Está instalado?",
+                $"No se encontró «{command}» en este equipo. ¿Está instalado?",
                 clock.ElapsedMilliseconds);
         }
-    }
 
-    /// <summary>Como se le pregunta la version, resolviendo antes su ruta real.</summary>
-    private static ProcessStartInfo VersionCheck(string command)
-    {
-        var path = CliPath.Find(command)
-            ?? throw new InvalidOperationException($"No se encontro «{command}».");
-        var shell = CliPath.NeedsShell(path);
-
-        var info = new ProcessStartInfo(shell ? "cmd.exe" : path)
+        if (state.LoggedIn == false)
         {
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            UseShellExecute = false,
-            CreateNoWindow = true,
-        };
+            clock.Stop();
 
-        if (shell)
-        {
-            info.ArgumentList.Add("/c");
-            info.ArgumentList.Add(path);
+            return new AiProbe(
+                false,
+                $"{state.Detail} Inicia sesión desde este mismo diálogo.",
+                clock.ElapsedMilliseconds);
         }
 
-        info.ArgumentList.Add("--version");
+        var model = await ModelAsync(request, cancellationToken);
 
-        return info;
+        clock.Stop();
+
+        /*
+         * Una sesión que no se pudo averiguar no es una sesión que no hay.
+         *
+         * Se deja pasar diciendo lo que se sabe, porque negarla mandaría a
+         * repetir un inicio de sesión que quizá esté hecho.
+         */
+        var sesion = state.LoggedIn == true ? state.Detail : $"{state.Detail} Se intentará igual.";
+
+        return new AiProbe(true, $"{sesion} {ModelNote(request, model)}", clock.ElapsedMilliseconds);
     }
+
+    /// <summary>
+    /// Qué se le dice al usuario sobre el modelo con el que va a hablar.
+    ///
+    /// **El predeterminado de Codex no sirve con una cuenta de ChatGPT**, y eso
+    /// no se ve hasta la primera pregunta: el programa contesta que el modelo
+    /// «is not supported when using Codex with a ChatGPT account» y el turno se
+    /// pierde. Comprobado contra el programa real. Por eso el nombre elegido se
+    /// dice aquí, donde todavía se puede cambiar.
+    /// </summary>
+    private static string ModelNote(AiRequest request, string model)
+    {
+        if (model.Length > 0)
+        {
+            return $"Se preguntará con «{model}».";
+        }
+
+        return IsCodex(request.Profile.Command)
+            ? "No se pudo leer el catálogo de la cuenta, así que se usará el modelo "
+                + "predeterminado del programa, que con una cuenta de ChatGPT puede no estar "
+                + "permitido. Elige uno con «Ver los suyos» si falla."
+            : "Se preguntará con el modelo predeterminado de tu cuenta.";
+    }
+
+    /// <summary>
+    /// El modelo con el que se va a hablar, elegido o sacado del catálogo.
+    ///
+    /// Dejar el campo vacío tiene que seguir funcionando —es lo que hace que el
+    /// asistente sirva sin saberse ningún identificador—, y para Codex eso
+    /// obliga a elegir: su predeterminado es un modelo que las cuentas de
+    /// ChatGPT no tienen permitido, así que se toma el primero de los que la
+    /// propia cuenta declara. Claude no publica catálogo y se queda con el suyo,
+    /// que sí funciona.
+    /// </summary>
+    private async Task<string> ModelAsync(AiRequest request, CancellationToken cancellationToken)
+    {
+        if (request.Profile.Model.Length > 0 || !IsCodex(request.Profile.Command))
+        {
+            return request.Profile.Model;
+        }
+
+        var models = await ListModelsAsync(request, cancellationToken);
+
+        return models.Count > 0 ? models[0] : string.Empty;
+    }
+
+    internal static bool IsCodex(string command) =>
+        command.Equals("codex", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>
     /// Arma la orden con la que se le habla al programa.
@@ -270,7 +393,7 @@ public sealed class LocalCliProvider : IAiProvider
     /// asistente no pueda tocar el disco, y un campo de texto donde escribirlos
     /// sería un campo donde quitarlos.
     /// </summary>
-    private static Process Start(AiRequest request)
+    private static Process Start(AiRequest request, string model)
     {
         // El programa se busca en el PATH como lo haria una consola: en Windows
         // los de npm son `.cmd`, y `Process.Start` a secas no los encuentra.
@@ -309,7 +432,7 @@ public sealed class LocalCliProvider : IAiProvider
             info.ArgumentList.Add(path);
         }
 
-        foreach (var argument in Arguments(request))
+        foreach (var argument in Arguments(request, model))
         {
             info.ArgumentList.Add(argument);
         }
@@ -317,9 +440,9 @@ public sealed class LocalCliProvider : IAiProvider
         return new Process { StartInfo = info };
     }
 
-    private static IEnumerable<string> Arguments(AiRequest request)
+    private static IEnumerable<string> Arguments(AiRequest request, string model)
     {
-        if (request.Profile.Command == "codex")
+        if (IsCodex(request.Profile.Command))
         {
             yield return "exec";
             yield return "--json";
@@ -328,10 +451,10 @@ public sealed class LocalCliProvider : IAiProvider
             yield return "read-only";
             yield return "--skip-git-repo-check";
 
-            if (request.Profile.Model.Length > 0)
+            if (model.Length > 0)
             {
                 yield return "--model";
-                yield return request.Profile.Model;
+                yield return model;
             }
 
             // Un guion hace que Codex lea el prompt de stdin, donde también cabe
@@ -358,10 +481,10 @@ public sealed class LocalCliProvider : IAiProvider
         // cuenta, no sobre lo que pueda ir a buscar.
         yield return "--strict-mcp-config";
 
-        if (request.Profile.Model.Length > 0)
+        if (model.Length > 0)
         {
             yield return "--model";
-            yield return request.Profile.Model;
+            yield return model;
         }
     }
 
@@ -389,84 +512,6 @@ public sealed class LocalCliProvider : IAiProvider
         }
 
         return texto.ToString();
-    }
-
-    /// <summary>
-    /// Saca de una línea el texto nuevo, o el fallo si lo hubo.
-    ///
-    /// Cada línea es un JSON suelto. Interesan dos: el trozo de texto según se
-    /// escribe, y el resumen final —que es donde el programa dice si la cosa
-    /// acabó mal—. Todo lo demás es contabilidad suya.
-    /// </summary>
-    private static (string Text, string? Error) Interpret(string command, string line)
-    {
-        if (line.Length == 0 || line[0] != '{')
-        {
-            return (string.Empty, null);
-        }
-
-        try
-        {
-            using var document = JsonDocument.Parse(line);
-            var root = document.RootElement;
-            var type = root.TryGetProperty("type", out var kind) ? kind.GetString() : null;
-
-            if (command == "codex")
-            {
-                if (type == "item.completed"
-                    && root.TryGetProperty("item", out var item)
-                    && item.TryGetProperty("type", out var itemType)
-                    && itemType.GetString() == "agent_message"
-                    && item.TryGetProperty("text", out var codexText))
-                {
-                    return (codexText.GetString() ?? string.Empty, null);
-                }
-
-                if (type is "turn.failed" or "error")
-                {
-                    var detail = root.TryGetProperty("message", out var message)
-                        ? message.GetString()
-                        : root.TryGetProperty("error", out var error)
-                            && error.ValueKind == JsonValueKind.Object
-                            && error.TryGetProperty("message", out var nested)
-                            ? nested.GetString()
-                            : null;
-
-                    return (string.Empty, detail ?? "Codex terminó con un error.");
-                }
-
-                return (string.Empty, null);
-            }
-
-            if (type == "stream_event"
-                && root.TryGetProperty("event", out var evento)
-                && evento.TryGetProperty("type", out var eventType)
-                && eventType.GetString() == "content_block_delta"
-                && evento.TryGetProperty("delta", out var delta)
-                && delta.TryGetProperty("text", out var text))
-            {
-                return (text.GetString() ?? string.Empty, null);
-            }
-
-            if (type == "result"
-                && root.TryGetProperty("is_error", out var isError)
-                && isError.ValueKind == JsonValueKind.True)
-            {
-                var detalle = root.TryGetProperty("result", out var result)
-                    ? result.GetString()
-                    : null;
-
-                return (string.Empty, detalle ?? "El programa terminó con un error.");
-            }
-
-            return (string.Empty, null);
-        }
-        catch (JsonException)
-        {
-            // Una línea que no se entiende no puede llevarse por delante lo que
-            // ya se escribió.
-            return (string.Empty, null);
-        }
     }
 
     /// <summary>Cierra el programa si sigue vivo, que es lo que pasa al cancelar.</summary>

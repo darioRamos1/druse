@@ -99,8 +99,14 @@ public static class CliPath
     ///
     /// Lanzarlos directamente falla con «no es una aplicación Win32 válida», que
     /// es otro mensaje que no le dice nada a nadie.
+    ///
+    /// La pregunta solo tiene sentido en Windows, y por eso se comprueba: fuera
+    /// de ahí un archivo con esa extensión es un archivo con esa extensión, y
+    /// mandarlo a un `cmd.exe` que no existe convertiría un programa que corre
+    /// en un programa que no arranca.
     /// </summary>
     public static bool NeedsShell(string path) =>
-        path.EndsWith(".cmd", StringComparison.OrdinalIgnoreCase)
-        || path.EndsWith(".bat", StringComparison.OrdinalIgnoreCase);
+        OperatingSystem.IsWindows()
+        && (path.EndsWith(".cmd", StringComparison.OrdinalIgnoreCase)
+            || path.EndsWith(".bat", StringComparison.OrdinalIgnoreCase));
 }

@@ -1,7 +1,6 @@
 using System.Diagnostics;
 using System.Text.Json;
 using Druse.Application.Ai;
-using Druse.Platform.Abstractions;
 
 namespace Druse.Infrastructure.Ai;
 
@@ -12,10 +11,8 @@ namespace Druse.Infrastructure.Ai;
 /// no se puede averiguar se devuelve como desconocido, porque decir «no tienes
 /// sesión» a quien la tiene lo manda a repetir un inicio de sesión que sobra.
 /// </summary>
-public sealed class CliSession(IAppPaths paths) : ICliSession
+public sealed class CliSession : ICliSession
 {
-    private readonly IAppPaths _paths = paths;
-
     /// <summary>
     /// Cuánto se espera a que el programa conteste.
     ///
@@ -26,10 +23,10 @@ public sealed class CliSession(IAppPaths paths) : ICliSession
 
     public async Task<CliSessionState> InspectAsync(
         string command,
-        Guid? profileId,
+        string? sessionDirectory,
         CancellationToken cancellationToken)
     {
-        var home = SessionDirectory(profileId);
+        var home = sessionDirectory;
         var version = await RunAsync(command, ["--version"], home, cancellationToken);
 
         if (version is null)
@@ -68,38 +65,26 @@ public sealed class CliSession(IAppPaths paths) : ICliSession
         return ReadClaudeStatus(status);
     }
 
-    public async Task<bool> StartLoginAsync(
+    public async Task<CliLaunch> StartLoginAsync(
         string command,
-        Guid? profileId,
+        string? sessionDirectory,
         CancellationToken cancellationToken)
     {
-        var home = SessionDirectory(profileId);
+        var home = sessionDirectory;
+        var arguments = command.Equals("claude", StringComparison.OrdinalIgnoreCase)
+            ? "auth login"
+            : "login";
+        var variable = CliPath.SessionVariable(command);
+        var manual = CliTerminal.Manual(command, arguments, variable, home);
 
         // Antes de abrir nada se comprueba que hay algo que abrir: una ventana
         // que aparece y se cierra sola no le dice a nadie qué falta.
         if (await RunAsync(command, ["--version"], home, cancellationToken) is null)
         {
-            return false;
+            return new CliLaunch(false, manual);
         }
 
-        var arguments = command.Equals("claude", StringComparison.OrdinalIgnoreCase)
-            ? "auth login"
-            : "login";
-
-        /*
-         * En una consola propia y visible, no dentro de Druse.
-         *
-         * El inicio de sesión abre un navegador y pide pegar un código: hace
-         * falta una ventana donde teclear. Por eso se lanza con el intérprete y
-         * `/k`, que la deja abierta al terminar para que se pueda leer lo que
-         * dijo.
-         */
         var path = CliPath.Find(command) ?? command;
-
-        if (home is not null)
-        {
-            Directory.CreateDirectory(home);
-        }
 
         /*
          * La consola hereda el directorio de credenciales.
@@ -107,45 +92,31 @@ public sealed class CliSession(IAppPaths paths) : ICliSession
          * Es lo que hace que la sesión que se inicie ahí sea la de **este
          * perfil** y no la del equipo: sin la variable, entrar con otra cuenta
          * cerraría la que ya usa quien programa con la misma herramienta.
-         *
-         * En Windows se pasa con `set` dentro del propio intérprete, y no por
-         * `EnvironmentVariables`, porque eso exigiría `UseShellExecute = false`
-         * y entonces no habría ventana donde teclear. Las comillas alrededor de
-         * la asignación son las que aguantan una ruta con espacios.
          */
-        var info = new ProcessStartInfo("cmd.exe")
+        if (home is not null)
         {
-            Arguments = home is null
-                ? $"/k \"{path}\" {arguments}"
-                : $"/k set \"{CliPath.SessionVariable(command)}={home}\" && \"{path}\" {arguments}",
-            UseShellExecute = true,
-            CreateNoWindow = false,
-        };
+            Directory.CreateDirectory(home);
+        }
+
+        if (CliTerminal.Open(path, arguments, variable, home) is not { } info)
+        {
+            // No hay ventana que abrir —un Linux sin escritorio, o sin ninguno
+            // de los emuladores conocidos—. La orden manual deja el trabajo
+            // terminable en vez de dejar un botón que no hace nada.
+            return new CliLaunch(false, manual);
+        }
 
         try
         {
             using var process = Process.Start(info);
 
-            return process is not null;
+            return new CliLaunch(process is not null, manual);
         }
         catch (Exception error) when (error is System.ComponentModel.Win32Exception or InvalidOperationException)
         {
-            return false;
+            return new CliLaunch(false, manual);
         }
     }
-
-    /// <summary>
-    /// Donde guarda sus credenciales un perfil con cuenta propia.
-    ///
-    /// Cuelga de la carpeta de datos de Druse y lleva el identificador del
-    /// perfil, asi que dos perfiles nunca comparten sesion y borrar uno se lleva
-    /// la suya. `null` —lo normal— es la sesion del equipo, la que ya tiene
-    /// quien use esa herramienta para programar.
-    /// </summary>
-    private string? SessionDirectory(Guid? profileId) =>
-        profileId is { } id
-            ? Path.Combine(_paths.DataDirectory, "ai-sessions", id.ToString("N"))
-            : null;
 
     /// <summary>
     /// Lee lo que dice `codex login status`, que es una línea de texto.

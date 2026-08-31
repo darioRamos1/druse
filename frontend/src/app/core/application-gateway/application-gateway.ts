@@ -27,6 +27,7 @@ import {
   AiProviderList,
   AiModelList,
   AiStreamEvent,
+  CliLaunch,
   CliSessionState,
   SaveAiProviderRequest,
 } from '../../shared/models/ai';
@@ -685,11 +686,16 @@ export abstract class ApplicationGateway {
    *
    * El inicio de sesion ocurre **en el programa**, no en Druse: no hay forma de
    * que una aplicacion de terceros autentique una cuenta de Claude o de ChatGPT.
+   *
+   * `manual` es la orden equivalente, con su variable de entorno dentro. Viene
+   * siempre, porque abrir una ventana de consola es lo unico de todo esto que
+   * depende del escritorio que haya delante: donde no se pueda, ensenarla es lo
+   * que diferencia una funcion terminable a mano de un boton muerto.
    */
   abstract startCliLogin(
     command: string,
     profileId?: string,
-  ): Observable<{ started: boolean; message?: string }>;
+  ): Observable<CliLaunch>;
 
   /**
    * Pregunta al asistente y devuelve la respuesta por trozos.

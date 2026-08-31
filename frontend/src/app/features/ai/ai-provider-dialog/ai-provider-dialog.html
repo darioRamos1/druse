@@ -342,6 +342,17 @@
     @if (error()) {
       <p class="warning warning--error">{{ error() }}</p>
     }
+
+    @if (manual(); as order) {
+      <!--
+        Donde no hay ventana que abrir, esto es lo único que queda.
+        Se enseña la orden entera —con su variable de entorno— para poder
+        pegarla en una consola y terminar el inicio de sesión a mano.
+      -->
+      <p class="field__hint">
+        Ábrelo tú en una consola: <code class="manual">{{ order }}</code>
+      </p>
+    }
   </div>
 
   <footer class="foot">

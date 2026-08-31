@@ -102,6 +102,20 @@ export interface CliSessionState {
   readonly detail: string;
 }
 
+/**
+ * Que paso al intentar abrir la consola del inicio de sesion.
+ *
+ * `manual` es la orden equivalente, con la variable de entorno dentro. Llega
+ * siempre: abrir una ventana de consola es lo unico del asistente que depende
+ * del escritorio que haya delante, y donde no se pueda —un Linux sin ninguno
+ * instalado— ensenar que teclear deja el trabajo terminable.
+ */
+export interface CliLaunch {
+  readonly started: boolean;
+  readonly manual: string;
+  readonly message?: string;
+}
+
 /** Resultado de probar un proveedor antes de guardarlo. */
 export interface AiProbeResult {
   readonly reachable: boolean;

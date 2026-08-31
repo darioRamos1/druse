@@ -359,6 +359,18 @@
   }
 }
 
+/**
+ * La orden del inicio de sesión, para copiarla.
+ *
+ * Lleva una ruta dentro, así que se parte por donde haga falta antes que
+ * ensanchar el diálogo, y se selecciona entera de un clic: quien la ve es
+ * porque tiene que pegarla en otro sitio.
+ */
+.manual {
+  user-select: all;
+  word-break: break-all;
+}
+
 // El botón de mirar va dentro del recuadro para que el campo del secreto ocupe
 // lo mismo que los demás: uno más estrecho señalaría justo el dato que no
 // conviene señalar.

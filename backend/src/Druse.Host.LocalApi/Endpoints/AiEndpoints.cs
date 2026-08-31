@@ -131,6 +131,7 @@ internal static class AiEndpoints
             SaveAiProviderDto request,
             SavedAiProviderService providers,
             IEnumerable<IAiProvider> known,
+            IAppPaths paths,
             CancellationToken cancellationToken) =>
         {
             var profile = ToDomain(request);
@@ -154,7 +155,11 @@ internal static class AiEndpoints
             }
 
             var probe = await For(known, profile).ProbeAsync(
-                new AiRequest(profile, key, [new AiMessage(AiRole.User, "ping")]),
+                new AiRequest(
+                    profile,
+                    key,
+                    [new AiMessage(AiRole.User, "ping")],
+                    AiSessionDirectory.For(profile, paths)),
                 cancellationToken);
 
             return Results.Ok(new
@@ -190,7 +195,7 @@ internal static class AiEndpoints
             try
             {
                 var models = await For(known, profile).ListModelsAsync(
-                    new AiRequest(profile, key, [], SessionDirectoryFor(profile, paths)),
+                    new AiRequest(profile, key, [], AiSessionDirectory.For(profile, paths)),
                     cancellationToken);
 
                 return Results.Ok(new { models });
@@ -215,6 +220,7 @@ internal static class AiEndpoints
             string command,
             Guid? profileId,
             ICliSession sessions,
+            IAppPaths paths,
             CancellationToken cancellationToken) =>
         {
             if (!Known(command))
@@ -222,7 +228,10 @@ internal static class AiEndpoints
                 return Results.NotFound(new { message = "Ese programa no lo conoce Druse." });
             }
 
-            var state = await sessions.InspectAsync(command, profileId, cancellationToken);
+            var state = await sessions.InspectAsync(
+                command,
+                AiSessionDirectory.Of(profileId, paths),
+                cancellationToken);
 
             return Results.Ok(new
             {
@@ -238,6 +247,7 @@ internal static class AiEndpoints
             string command,
             Guid? profileId,
             ICliSession sessions,
+            IAppPaths paths,
             CancellationToken cancellationToken) =>
         {
             if (!Known(command))
@@ -245,13 +255,27 @@ internal static class AiEndpoints
                 return Results.NotFound(new { message = "Ese programa no lo conoce Druse." });
             }
 
-            return await sessions.StartLoginAsync(command, profileId, cancellationToken)
-                ? Results.Ok(new { started = true })
-                : Results.Ok(new
-                {
-                    started = false,
-                    message = $"No se encontró «{command}» en este equipo.",
-                });
+            var launch = await sessions.StartLoginAsync(
+                command,
+                AiSessionDirectory.Of(profileId, paths),
+                cancellationToken);
+
+            /*
+             * La orden equivalente va siempre, se haya abierto la ventana o no.
+             *
+             * Abrir una consola es lo único de todo esto que depende del
+             * escritorio que haya delante: donde no se pueda, la pantalla al
+             * menos puede enseñar qué teclear —con la variable de entorno
+             * dentro, que es lo que nadie adivinaría—.
+             */
+            return Results.Ok(new
+            {
+                started = launch.Started,
+                manual = launch.Manual,
+                message = launch.Started
+                    ? null
+                    : $"No se pudo abrir una consola para «{command}» en este equipo.",
+            });
         });
 
         app.MapPost("/api/ai/chat", async (
@@ -277,24 +301,13 @@ internal static class AiEndpoints
 
             await StreamAsync(
                 For(known, profile),
-                new AiRequest(profile, key, messages, SessionDirectoryFor(profile, paths)),
+                new AiRequest(profile, key, messages, AiSessionDirectory.For(profile, paths)),
                 context,
                 cancellationToken);
 
             return Results.Empty;
         });
     }
-
-    /// <summary>
-    /// Dónde busca sus credenciales el programa de este perfil.
-    ///
-    /// `null` cuando comparte la sesión del equipo, que es lo normal: quien ya
-    /// tiene sesión iniciada no debería volver a entrar para usar el asistente.
-    /// </summary>
-    private static string? SessionDirectoryFor(AiProviderProfile profile, IAppPaths paths) =>
-        profile.Kind == AiProviderKind.LocalCli && profile.OwnSession
-            ? Path.Combine(paths.DataDirectory, "ai-sessions", profile.Id.ToString("N"))
-            : null;
 
     /// <summary>
     /// Los programas que Druse sabe lanzar.

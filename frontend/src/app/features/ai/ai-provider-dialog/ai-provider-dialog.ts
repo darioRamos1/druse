@@ -13,6 +13,7 @@ import {
   AiModelList,
   AiProvider,
   AiProviderKind,
+  CliLaunch,
   CliSessionState,
 } from '../../../shared/models/ai';
 import { ApplicationGateway } from '../../../core/application-gateway/application-gateway';
@@ -209,6 +210,15 @@ export class AiProviderDialog {
   protected readonly loggingIn = signal(false);
 
   /**
+   * La orden del inicio de sesion, para teclearla donde no se abra la ventana.
+   *
+   * Vacia mientras no haga falta. Se pone solo cuando el intento falla, porque
+   * ensenarla siempre convertiria el camino normal —pulsar un boton— en una
+   * pantalla llena de instrucciones que nadie necesita leer.
+   */
+  protected readonly manual = signal('');
+
+  /**
    * Este perfil usa su propia cuenta, no la del equipo.
    *
    * Apagado por omision porque quien ya tiene sesion iniciada no deberia
@@ -348,6 +358,7 @@ export class AiProviderDialog {
 
     this.loggingIn.set(true);
     this.error.set('');
+    this.manual.set('');
 
     try {
       // Una sesión separada necesita un identificador para tener su propia
@@ -358,16 +369,17 @@ export class AiProviderDialog {
         this.editing.set(saved);
       }
 
-      const result = await new Promise<{ started: boolean; message?: string }>(
-        (resolve, reject) => {
-          this._gateway
-            .startCliLogin(command, this.sessionOwner())
-            .subscribe({ next: resolve, error: reject });
-        },
-      );
+      const result = await new Promise<CliLaunch>((resolve, reject) => {
+        this._gateway
+          .startCliLogin(command, this.sessionOwner())
+          .subscribe({ next: resolve, error: reject });
+      });
 
       if (!result.started) {
+        // Sin ventana que abrir, lo unico util que queda es la orden: se
+        // ensena entera, con su variable, para poder pegarla en una consola.
         this.error.set(result.message ?? 'No se pudo abrir el inicio de sesion.');
+        this.manual.set(result.manual);
       } else {
         this.session.set(null);
         this.sessionError.set(

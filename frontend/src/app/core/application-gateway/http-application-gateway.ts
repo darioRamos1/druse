@@ -68,6 +68,7 @@ import {
   AiProviderList,
   AiModelList,
   AiStreamEvent,
+  CliLaunch,
   CliSessionState,
   SaveAiProviderRequest,
 } from '../../shared/models/ai';
@@ -597,11 +598,8 @@ export class HttpApplicationGateway extends ApplicationGateway {
     });
   }
 
-  override startCliLogin(
-    command: string,
-    profileId?: string,
-  ): Observable<{ started: boolean; message?: string }> {
-    return this._http.post<{ started: boolean; message?: string }>(
+  override startCliLogin(command: string, profileId?: string): Observable<CliLaunch> {
+    return this._http.post<CliLaunch>(
       `/api/ai/cli/${command}/login`,
       {},
       { params: profileId ? { profileId } : {} },
