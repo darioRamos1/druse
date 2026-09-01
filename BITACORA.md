@@ -454,6 +454,13 @@ paleta y las medidas sacadas de `_tokens.scss`, y se aprobó ahí.
   tabla, y aceptar una sugerencia, que **abre el `ALTER TABLE` en vez de
   ejecutarlo**. Al volver del diseñador el diagrama se relee, así que enseña lo
   que el motor tiene. Ninguna vía de escritura nueva.
+- **Descartar una suposición**, que se guarda con el diagrama —y se puede
+  recuperar—. Es la respuesta más frecuente, porque la mayoría de las
+  suposiciones no serán ciertas.
+- **Fase F menos el PDF:** SVG, PNG, Mermaid y DBML. Las supuestas viajan
+  comentadas o no viajan, y hay una prueba que comprueba que **ninguna línea
+  activa** las menciona. El SVG se redibuja en vez de copiar el DOM: un
+  `foreignObject` con HTML no sobrevive al PNG ni se abre fuera del navegador.
 - Tres arreglos que salieron de **mirar las capturas**, no de leer el código: la
   leyenda flotante tapaba la última tabla, el diálogo de selección heredaba el
   ancho del lienzo —filas de 1232 px para leer «ciudad»— y su alto era fijo.
@@ -483,7 +490,15 @@ paleta y las medidas sacadas de `_tokens.scss`, y se aprobó ahí.
   nodos. Sirve para un esquema normal, no para trescientas tablas.
 - **La pestaña propia.** El diagrama ya se guarda, así que nada la bloquea, pero
   sigue abriéndose como una capa sobre el shell.
-- **La fase F entera:** exportar a SVG, PNG, Mermaid, DBML y PDF.
+- **El PDF paginado**, que es lo único que falta de la fase F: partir un esquema
+  grande en hojas sin cortar ninguna caja por la mitad es problema propio.
+- **Zoom y minimapa.** Hay arrastre del lienzo, pero no zoom, ni minimapa, ni ir
+  a una tabla por su nombre. En un esquema mediano se echan de menos.
+- **Nivel de detalle por tabla**: hoy es global, y el plan quería que cada caja
+  pudiera romper el general.
+- **Arrastrar de una columna a otra** para crear una clave foránea, y **plegar
+  una tabla puente** a una sola línea `N:M`: hoy solo lleva su insignia.
+- **Las vistas como contexto en gris**, que el plan contempla y no entran.
 - La captura del DDL abierto desde el lienzo: el barrido fotografía el diagrama,
   no ese camino.
 - **Ninguna captura demuestra el trazado**: la base de pruebas no declara una
