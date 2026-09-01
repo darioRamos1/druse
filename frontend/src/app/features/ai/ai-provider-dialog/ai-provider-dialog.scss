@@ -9,25 +9,8 @@
   justify-content: center;
 }
 
-.backdrop {
-  position: absolute;
-  inset: 0;
-  background: var(--dr-scrim);
-  backdrop-filter: blur(2px);
-}
-
 .dialog {
-  position: relative;
   width: 748px;
-  max-width: calc(100vw - 32px);
-  max-height: calc(100vh - 32px);
-  display: flex;
-  flex-direction: column;
-  border: 1px solid var(--dr-border-dialog);
-  border-radius: 12px;
-  background: var(--dr-surface-dialog);
-  box-shadow: var(--dr-shadow-dialog);
-  overflow: hidden;
 }
 
 .head {
@@ -520,19 +503,7 @@
 .btn {
   height: 30px;
   padding: 0 14px;
-  border: 1px solid var(--dr-border-subtle);
-  border-radius: var(--dr-radius);
-  background: transparent;
-  color: var(--dr-text-muted);
-  font-family: inherit;
-  font-size: var(--dr-font-size-sm);
   font-weight: 500;
-  cursor: pointer;
-
-  &:hover:not(:disabled) {
-    background: var(--dr-surface-hover);
-    color: var(--dr-text);
-  }
 
   &:disabled {
     opacity: 0.5;

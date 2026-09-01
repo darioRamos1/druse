@@ -1,0 +1,85 @@
+// =============================================================================
+// Druse — piezas compartidas: la caja de los diálogos y el botón
+//
+// Estaban copiadas en cada componente: catorce veces las mismas cinco líneas de
+// velo y once veces el mismo botón. Copiado no es solo peso —que también—,
+// es que cambiar el radio de un diálogo obligaba a repetirlo en catorce
+// archivos, y bastaba olvidar uno para que ese se viera distinto.
+//
+// Aquí está lo que comparten. Lo propio de cada uno —el ancho del diálogo, la
+// altura del botón, sus variantes de color— sigue en su componente, que se
+// pinta después y manda sobre esto.
+// =============================================================================
+
+/** El velo que apaga lo de detrás mientras hay un diálogo delante. */
+.backdrop {
+  position: absolute;
+  inset: 0;
+  background: var(--dr-scrim);
+  backdrop-filter: blur(2px);
+}
+
+/** La caja. Cada diálogo pone su ancho; el resto es igual en todos. */
+.dialog {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  max-width: calc(100vw - 32px);
+  max-height: calc(100vh - 32px);
+  overflow: hidden;
+  border: 1px solid var(--dr-border-dialog);
+  border-radius: 12px;
+  background: var(--dr-surface-dialog);
+  box-shadow: var(--dr-shadow-dialog);
+}
+
+/**
+ * El botón de siempre: borde tenue sobre nada, y al pasar por encima se
+ * enciende. La altura y el ancho los pone cada sitio, porque no son iguales en
+ * una barra de herramientas y en el pie de un diálogo.
+ */
+.btn {
+  border: 1px solid var(--dr-border-subtle);
+  border-radius: var(--dr-radius);
+  background: transparent;
+  color: var(--dr-text-muted);
+  font-family: inherit;
+  font-size: var(--dr-font-size-sm);
+  cursor: pointer;
+
+  &:hover:not(:disabled) {
+    background: var(--dr-surface-hover);
+    color: var(--dr-text);
+  }
+}
+
+/**
+ * La cabecera del diálogo: título, una línea de explicación y la cruz de
+ * cerrar. Las tres clases solo aparecen dentro de un diálogo, y allí dicen
+ * siempre lo mismo.
+ */
+.title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.subtitle {
+  margin: 4px 0 0;
+  color: var(--dr-text-tertiary);
+  font-size: 12px;
+}
+
+.close {
+  margin-left: auto;
+  border: 0;
+  background: transparent;
+  color: var(--dr-text-tertiary);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+
+  &:hover {
+    color: var(--dr-text);
+  }
+}

@@ -541,19 +541,7 @@
   gap: 6px;
   height: 30px;
   padding: 0 14px;
-  border: 1px solid var(--dr-border-subtle);
-  border-radius: var(--dr-radius);
-  background: transparent;
-  color: var(--dr-text-muted);
-  font-family: inherit;
-  font-size: var(--dr-font-size-sm);
   font-weight: 500;
-  cursor: pointer;
-
-  &:hover:not(:disabled) {
-    background: var(--dr-surface-hover);
-    color: var(--dr-text);
-  }
 
   &--sm {
     height: 26px;

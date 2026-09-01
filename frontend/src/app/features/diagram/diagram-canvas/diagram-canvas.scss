@@ -63,18 +63,7 @@
   height: 28px;
   flex: none;
   padding: 0 10px;
-  border: 1px solid var(--dr-border-subtle);
-  border-radius: var(--dr-radius);
-  background: transparent;
-  color: var(--dr-text-muted);
-  font-family: inherit;
   font-size: 12px;
-  cursor: pointer;
-
-  &:hover:not(:disabled) {
-    background: var(--dr-surface-hover);
-    color: var(--dr-text);
-  }
 
   &:disabled {
     color: var(--dr-text-dim);

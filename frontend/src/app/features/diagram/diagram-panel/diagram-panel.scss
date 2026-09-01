@@ -10,21 +10,11 @@
   font-size: var(--dr-font-size-sm);
 }
 
-.backdrop {
-  position: absolute;
-  inset: 0;
-  background: var(--dr-scrim);
-  backdrop-filter: blur(2px);
-}
-
 /*
  * Ancho: un diagrama necesita todo el que haya. A diferencia de los diálogos
  * con formulario, aquí el espacio no sobra nunca.
  */
 .dialog {
-  position: relative;
-  display: flex;
-  flex-direction: column;
   width: calc(100vw - 48px);
   height: calc(100vh - 48px);
 
@@ -48,11 +38,6 @@
     min-height: 220px;
     max-height: min(572px, calc(100vh - 32px));
   }
-  overflow: hidden;
-  border: 1px solid var(--dr-border-dialog);
-  border-radius: 12px;
-  background: var(--dr-surface-dialog);
-  box-shadow: var(--dr-shadow-dialog);
 }
 
 .head {

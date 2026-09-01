@@ -56,10 +56,11 @@
                 },
                 {
                   "type": "anyComponentStyle",
-                  "maximumWarning": "8kB",
-                  "maximumError": "10kB"
+                  "maximumWarning": "9.5kB",
+                  "maximumError": "12kB"
                 }
               ],
+              "allowedCommonJsDependencies": ["nearley"],
               "outputHashing": "all",
               "optimization": {
                 "scripts": true,

@@ -71,14 +71,7 @@
   // una etiqueta en dos líneas dentro de un botón de altura fija, se dejan
   // enteras y las consultas de medios se llevan las que sobran.
   white-space: nowrap;
-  border: 1px solid var(--dr-border-subtle);
-  border-radius: var(--dr-radius);
-  background: transparent;
-  color: var(--dr-text-muted);
-  font-family: inherit;
-  font-size: var(--dr-font-size-sm);
   font-weight: 500;
-  cursor: pointer;
 
   &:hover {
     background: var(--dr-surface-hover);

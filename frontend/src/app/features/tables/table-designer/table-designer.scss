@@ -10,25 +10,8 @@
   font-size: var(--dr-font-size-sm);
 }
 
-.backdrop {
-  position: absolute;
-  inset: 0;
-  background: var(--dr-scrim);
-  backdrop-filter: blur(2px);
-}
-
 .dialog {
-  position: relative;
-  display: flex;
-  flex-direction: column;
   width: 860px;
-  max-width: calc(100vw - 32px);
-  max-height: calc(100vh - 32px);
-  overflow: hidden;
-  border: 1px solid var(--dr-border-dialog);
-  border-radius: 12px;
-  background: var(--dr-surface-dialog);
-  box-shadow: var(--dr-shadow-dialog);
 }
 
 .head {
@@ -426,18 +409,7 @@
 .btn {
   height: 30px;
   padding: 0 14px;
-  border: 1px solid var(--dr-border-subtle);
-  border-radius: var(--dr-radius);
-  background: transparent;
   color: var(--dr-text-secondary);
-  font-family: inherit;
-  font-size: var(--dr-font-size-sm);
-  cursor: pointer;
-
-  &:hover:not(:disabled) {
-    background: var(--dr-surface-hover);
-    color: var(--dr-text);
-  }
 
   &:disabled {
     opacity: 0.5;

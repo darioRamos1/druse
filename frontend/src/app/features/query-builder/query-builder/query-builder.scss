@@ -10,25 +10,8 @@
   font-size: var(--dr-font-size-sm);
 }
 
-.backdrop {
-  position: absolute;
-  inset: 0;
-  background: var(--dr-scrim);
-  backdrop-filter: blur(2px);
-}
-
 .dialog {
-  position: relative;
-  display: flex;
-  flex-direction: column;
   width: 760px;
-  max-width: calc(100vw - 32px);
-  max-height: calc(100vh - 32px);
-  overflow: hidden;
-  border: 1px solid var(--dr-border-dialog);
-  border-radius: 12px;
-  background: var(--dr-surface-dialog);
-  box-shadow: var(--dr-shadow-dialog);
 }
 
 .head {
@@ -37,32 +20,6 @@
   gap: 12px;
   padding: 18px 20px 16px;
   border-bottom: 1px solid var(--dr-border);
-}
-
-.title {
-  margin: 0;
-  font-size: 15px;
-  font-weight: 600;
-}
-
-.subtitle {
-  margin: 4px 0 0;
-  color: var(--dr-text-tertiary);
-  font-size: 12px;
-}
-
-.close {
-  margin-left: auto;
-  border: 0;
-  background: transparent;
-  color: var(--dr-text-tertiary);
-  font-size: 18px;
-  line-height: 1;
-  cursor: pointer;
-
-  &:hover {
-    color: var(--dr-text);
-  }
 }
 
 .body {
@@ -616,18 +573,7 @@ input[type='number'] {
 .btn {
   height: 30px;
   padding: 0 14px;
-  border: 1px solid var(--dr-border-subtle);
-  border-radius: var(--dr-radius);
-  background: transparent;
-  color: var(--dr-text-muted);
-  font-family: inherit;
   font-size: 12px;
-  cursor: pointer;
-
-  &:hover:not(:disabled) {
-    background: var(--dr-surface-hover);
-    color: var(--dr-text);
-  }
 
   &--small {
     height: 26px;

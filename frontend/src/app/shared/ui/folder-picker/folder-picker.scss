@@ -10,13 +10,6 @@
   font-size: var(--dr-font-size-sm);
 }
 
-.backdrop {
-  position: absolute;
-  inset: 0;
-  background: var(--dr-scrim);
-  backdrop-filter: blur(2px);
-}
-
 .picker {
   position: relative;
   display: flex;
@@ -41,23 +34,13 @@
 }
 
 .title {
-  margin: 0;
   font-size: 14px;
-  font-weight: 600;
   color: var(--dr-text);
 }
 
 .close {
   border: none;
-  background: transparent;
   color: var(--dr-text-secondary);
-  font-size: 18px;
-  line-height: 1;
-  cursor: pointer;
-
-  &:hover {
-    color: var(--dr-text);
-  }
 }
 
 .bar {
