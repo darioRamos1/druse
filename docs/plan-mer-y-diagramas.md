@@ -389,6 +389,13 @@ almacenamiento, releer al abrir y marcar lo ausente.
 **Criterio de salida:** se cierra Druse, se vuelve a abrir y el diagrama está
 donde estaba. Se borra una tabla desde fuera y al abrir el diagrama se dice.
 
+_A medias en la sesión 039._ Hecho: el selector —que llega con todo marcado, y
+que no pregunta cuando se abre sobre una tabla suelta— y **traer vecinas**, que
+lee el esquema entero una vez y lo recuerda, porque las tablas que apuntan a una
+no están en el grafo dibujado. Falta lo que da nombre a la fase: **guardar el
+diagrama**. Hasta que exista, sigue siendo una capa sobre el shell y no una
+pestaña, y las posiciones movidas a mano se pierden al cerrar.
+
 ### Fase D — Las relaciones sugeridas
 
 `RelationInference`, confianza, dibujo diferenciado, interruptor, descartar,

@@ -435,7 +435,15 @@ paleta y las medidas sacadas de `_tokens.scss`, y se aprobó ahí.
 - Contrato en lote en los cuatro proveedores, con su servicio y su endpoint.
 - `MetadataBatch`: reparto por tabla y composición, lo único común a los cuatro.
 - Colocación determinista, lienzo, panel contenedor y entrada en el explorador.
-- Prueba de punta a punta del diagrama y su captura `20-mer` en el barrido.
+- Prueba de punta a punta del diagrama y sus capturas en el barrido.
+- **Media fase C:** el selector de tablas —llega con todo marcado y no pregunta
+  sobre una tabla suelta— y **traer vecinas**, que lee el esquema entero una vez
+  y lo recuerda, porque las que apuntan a una tabla no están en el grafo que se
+  dibujó. Sale barato por la lectura en lote: el esquema completo cuesta las
+  mismas cuatro consultas que dos tablas.
+- Tres arreglos que salieron de **mirar las capturas**, no de leer el código: la
+  leyenda flotante tapaba la última tabla, el diálogo de selección heredaba el
+  ancho del lienzo —filas de 1232 px para leer «ciudad»— y su alto era fijo.
 
 #### Verificado
 
@@ -454,10 +462,20 @@ paleta y las medidas sacadas de `_tokens.scss`, y se aprobó ahí.
   antes: en la 038 ya fallaban dos por SQLI. Con esto queda una.
 
 #### No hecho
-- **El barrido de capturas no se ha ejecutado**, así que el diagrama no se ha
-  mirado todavía en los dos temas y en los tres anchos.
-- Fases C a F enteras: selección de tablas, persistencia, relaciones sugeridas,
-  edición desde el lienzo y exportaciones.
+
+- **El diagrama no se ha mirado en tema claro ni en los tres anchos.** El barrido
+  lo fotografía en oscuro y a 1232 px; las variantes de tema y ancho que el resto
+  de la aplicación sí tiene todavía no lo cubren.
+- **La virtualización del lienzo**, que el plan pide: hoy se montan todos los
+  nodos. Sirve para un esquema normal, no para trescientas tablas.
+- **Guardar el diagrama**, que es lo que da nombre a la fase C. Sin eso sigue
+  siendo una capa sobre el shell y no una pestaña, y las posiciones movidas a
+  mano se pierden al cerrar.
+- Fases D a F enteras: relaciones sugeridas, edición desde el lienzo y las
+  exportaciones.
+- **Ninguna captura demuestra el trazado**: la base de pruebas no declara una
+  sola clave foránea, así que ahí no se ve ni una línea, ni una pata de gallo, ni
+  un círculo de opcional. Lo cubren las unitarias, no una imagen.
 
 #### Archivos
 
