@@ -27,6 +27,7 @@ import {
   SessionInfo,
   TestTunnelResult,
 } from '../../shared/models/workspace';
+import { FileSaveService } from '../files/file-save.service';
 import { WorkspaceStore } from './workspace-store';
 
 const form: ConnectionForm = {
@@ -522,11 +523,23 @@ describe('WorkspaceStore', () => {
   let store: WorkspaceStore;
   let gateway: FakeGateway;
 
+  /**
+   * Dejar el archivo en manos del usuario es cosa de `FileSaveService`, y tiene
+   * sus propias pruebas. Aquí hace falta el doble porque el servicio de verdad
+   * crea un enlace y lo pulsa: jsdom no navega, avisa —«Not implemented:
+   * navigation to another Document»— y ese aviso ensuciaba cada pasada.
+   */
+  let archivos: { save: ReturnType<typeof vi.fn> };
+
   beforeEach(() => {
     gateway = new FakeGateway();
+    archivos = { save: vi.fn().mockResolvedValue(true) };
 
     TestBed.configureTestingModule({
-      providers: [{ provide: ApplicationGateway, useValue: gateway }],
+      providers: [
+        { provide: ApplicationGateway, useValue: gateway },
+        { provide: FileSaveService, useValue: archivos },
+      ],
     });
 
     store = TestBed.inject(WorkspaceStore);
