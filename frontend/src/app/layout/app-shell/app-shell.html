@@ -255,41 +255,57 @@
   }
 </div>
 
-@if (dialogOpen()) {
-  <app-connection-dialog [connection]="editingConnection()" (closed)="closeDialog()" />
+<!--
+  Los diálogos se cargan cuando se abren, como el resto de los de más abajo.
+  Entre estos cinco sumaban 185 kB del arranque: es código que nadie mira hasta
+  que pide crear una conexión, trasladar datos o diseñar una tabla, y hasta
+  entonces solo retrasaba el editor, que es lo primero que la ventana enseña.
+-->
+@defer (when dialogOpen()) {
+  @if (dialogOpen()) {
+    <app-connection-dialog [connection]="editingConnection()" (closed)="closeDialog()" />
+  }
 }
 
-@if (importTarget(); as destino) {
-  <app-import-dialog
-    [table]="destino.source"
-    [connectionId]="destino.connectionId"
-    (closed)="closeImport()"
-  />
+@defer (when importTarget()) {
+  @if (importTarget(); as destino) {
+    <app-import-dialog
+      [table]="destino.source"
+      [connectionId]="destino.connectionId"
+      (closed)="closeImport()"
+    />
+  }
 }
 
-@if (transferTarget(); as origen) {
-  <app-transfer-dialog
-    [table]="origen.source"
-    [connectionId]="origen.connectionId"
-    (closed)="closeTransfer()"
-  />
+@defer (when transferTarget()) {
+  @if (transferTarget(); as origen) {
+    <app-transfer-dialog
+      [table]="origen.source"
+      [connectionId]="origen.connectionId"
+      (closed)="closeTransfer()"
+    />
+  }
 }
 
-@if (transferSetTarget(); as origen) {
-  <app-transfer-set-dialog
-    [node]="origen.source"
-    [connectionId]="origen.connectionId"
-    (closed)="closeTransferSet()"
-  />
+@defer (when transferSetTarget()) {
+  @if (transferSetTarget(); as origen) {
+    <app-transfer-set-dialog
+      [node]="origen.source"
+      [connectionId]="origen.connectionId"
+      (closed)="closeTransferSet()"
+    />
+  }
 }
 
-@if (designTarget(); as destino) {
-  <app-table-designer
-    [target]="destino.source"
-    [connectionId]="destino.connectionId"
-    [initialForeignKey]="designedForeignKey()"
-    (closed)="closeTableDesigner()"
-  />
+@defer (when designTarget()) {
+  @if (designTarget(); as destino) {
+    <app-table-designer
+      [target]="destino.source"
+      [connectionId]="destino.connectionId"
+      [initialForeignKey]="designedForeignKey()"
+      (closed)="closeTableDesigner()"
+    />
+  }
 }
 
 <!--
