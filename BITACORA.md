@@ -446,6 +446,14 @@ paleta y las medidas sacadas de `_tokens.scss`, y se aprobó ahí.
   que ya no existen no vuelven al lienzo.
 - **Olvidar**, que el plan no había previsto: sin ella, guardar era irreversible
   —el esquema se abriría siempre igual, sin forma de volver a elegir—.
+- **Fase D:** las relaciones que el motor no declara, deducidas del nombre de las
+  columnas, en `Application/Diagrams`. Ocho de sus dieciséis pruebas comprueban
+  que **no** sugiere —nombres genéricos, tipos que no encajan, dos candidatas—,
+  que es la mitad que importa: una línea falsa es peor que ninguna.
+- **Fase E:** los gestos del lienzo. Doble clic en cabecera o columna, menú de la
+  tabla, y aceptar una sugerencia, que **abre el `ALTER TABLE` en vez de
+  ejecutarlo**. Al volver del diseñador el diagrama se relee, así que enseña lo
+  que el motor tiene. Ninguna vía de escritura nueva.
 - Tres arreglos que salieron de **mirar las capturas**, no de leer el código: la
   leyenda flotante tapaba la última tabla, el diálogo de selección heredaba el
   ancho del lienzo —filas de 1232 px para leer «ciudad»— y su alto era fijo.
@@ -475,8 +483,9 @@ paleta y las medidas sacadas de `_tokens.scss`, y se aprobó ahí.
   nodos. Sirve para un esquema normal, no para trescientas tablas.
 - **La pestaña propia.** El diagrama ya se guarda, así que nada la bloquea, pero
   sigue abriéndose como una capa sobre el shell.
-- Fases D a F enteras: relaciones sugeridas, edición desde el lienzo y las
-  exportaciones.
+- **La fase F entera:** exportar a SVG, PNG, Mermaid, DBML y PDF.
+- La captura del DDL abierto desde el lienzo: el barrido fotografía el diagrama,
+  no ese camino.
 - **Ninguna captura demuestra el trazado**: la base de pruebas no declara una
   sola clave foránea, así que ahí no se ve ni una línea, ni una pata de gallo, ni
   un círculo de opcional. Lo cubren las unitarias, no una imagen.

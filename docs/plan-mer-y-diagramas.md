@@ -423,6 +423,16 @@ cambia un tipo sin salir de la pestaña, y el nodo enseña después lo que el mo
 tiene. El camino entero está en `e2e`, con captura de la previsualización del DDL
 abierta desde el lienzo.
 
+_Cerrada en la sesión 039._ Doble clic en la cabecera o en una columna, menú de
+la tabla con el clic derecho —abrir en el diseñador, ver datos, traer vecinas,
+quitar del diagrama—, y aceptar una sugerencia, que abre el `ALTER TABLE` con la
+clave ya escrita. Al volver del diseñador el diagrama se relee, así que enseña lo
+que el motor tiene y no lo que se pidió. **Ninguna vía de escritura nueva:** todo
+pasa por el diseñador y su previsualización.
+
+Falta la captura del DDL abierto desde el lienzo: el barrido fotografía el
+diagrama, no ese camino.
+
 ### Fase F — Las salidas
 
 SVG, PNG, Mermaid, DBML, PDF e impresión.
