@@ -174,4 +174,25 @@ describe('DiagramCanvas', () => {
   it('la leyenda está siempre a la vista', () => {
     expect(dom().querySelectorAll('.legend__item')).toHaveLength(3);
   });
+
+  /**
+   * El lienzo no resuelve las vecinas: las tablas que apuntan a una no están en
+   * el grafo que tiene. Solo pide que se traigan.
+   */
+  it('traer vecinas pide las de la tabla marcada, y no hace nada sin selección', () => {
+    const pedidas: string[] = [];
+    fixture.componentInstance.bringNeighbours.subscribe((key) => pedidas.push(key));
+
+    const boton = [...dom().querySelectorAll<HTMLButtonElement>('.toolbar .btn')].find((button) =>
+      button.textContent?.includes('Traer vecinas'),
+    )!;
+
+    expect(boton.disabled).toBe(true);
+
+    cabecera('factura').click();
+    fixture.detectChanges();
+    boton.click();
+
+    expect(pedidas).toEqual(['ventas.factura']);
+  });
 });

@@ -261,17 +261,6 @@ test.describe('barrido visual', () => {
           await page.getByRole('menuitem', { name: 'Respaldar' }).click();
         },
       ],
-      // El diagrama se abre sobre el esquema: es donde se ve si la colocación
-      // sirve, porque entran todas sus tablas de golpe.
-      [
-        '20-mer',
-        'app-diagram-panel',
-        async () => {
-          await arbolAbierto(page);
-          await menuDe(page, 'public');
-          await page.getByRole('menuitem', { name: 'Ver diagrama' }).click();
-        },
-      ],
       [
         '11-restaurar',
         'app-restore-dialog',
@@ -302,6 +291,26 @@ test.describe('barrido visual', () => {
       await foto(page, nombre, dialogo.locator('.dialog').first());
       await cerrar(page, dialogo, nombre);
     }
+
+    // --- El diagrama, en sus dos pasos -------------------------------------
+    // Va fuera del bucle porque son dos pantallas y no una: primero se elige
+    // qué tablas entran y después se dibujan.
+    await arbolAbierto(page);
+    await menuDe(page, 'public');
+    await page.getByRole('menuitem', { name: 'Ver diagrama' }).click();
+
+    const diagrama = page.locator('app-diagram-panel');
+
+    await expect(diagrama.locator('.chooser')).toBeVisible({ timeout: 60_000 });
+    await medir(page, 'elegir tablas del diagrama');
+    await foto(page, '20-mer-tablas', diagrama.locator('.dialog'));
+
+    await diagrama.getByRole('button', { name: 'Dibujar' }).click();
+    await expect(diagrama.locator('.node').first()).toBeVisible({ timeout: 60_000 });
+    await page.waitForTimeout(400);
+    await medir(page, 'diagrama');
+    await foto(page, '20-mer', diagrama.locator('.dialog'));
+    await cerrar(page, diagrama, 'diagrama');
 
     // --- El asistente de una tabla, con sus pasos --------------------------
     await desplegar(page, 'Tables', 'accionista');

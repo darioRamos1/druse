@@ -38,6 +38,15 @@ test.describe('el diagrama entidad-relación', () => {
     const panel = page.locator('app-diagram-panel');
     await expect(panel).toBeVisible();
 
+    // Sobre un esquema se pregunta primero qué tablas entran: dibujar las
+    // trescientas de una base es una tela de araña y una espera.
+    const elegir = panel.locator('.chooser');
+    await expect(elegir).toBeVisible({ timeout: 60_000 });
+    await expect(panel.locator('.pick').first()).toBeVisible();
+
+    // Entran todas marcadas, así que basta con confirmar.
+    await panel.getByRole('button', { name: 'Dibujar' }).click();
+
     // La lectura del catálogo tarda: son varias tablas en una sola petición.
     const cajas = panel.locator('.node');
     await expect(cajas.first()).toBeVisible({ timeout: 60_000 });

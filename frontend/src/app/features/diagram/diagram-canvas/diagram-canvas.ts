@@ -65,6 +65,15 @@ export class DiagramCanvas {
   /** Una tabla cambió de sitio: quien nos monta decide si lo guarda. */
   readonly moved = output<{ key: string; x: number; y: number }>();
 
+  /**
+   * Traer al lienzo las tablas que se relacionan con esta.
+   *
+   * El lienzo no puede resolverlo solo: las tablas **que apuntan a ella** no
+   * están en el grafo que tiene: hay que volver a leer el catálogo, y de eso
+   * sabe el panel.
+   */
+  readonly bringNeighbours = output<string>();
+
   protected readonly level = signal<DetailLevel>('full');
   protected readonly selected = signal<string | null>(null);
   protected readonly showSuggested = signal(true);
@@ -222,6 +231,14 @@ export class DiagramCanvas {
 
   protected open(box: PaintedBox): void {
     this.openTable.emit(box.table);
+  }
+
+  protected bring(): void {
+    const selected = this.selected();
+
+    if (selected !== null) {
+      this.bringNeighbours.emit(selected);
+    }
   }
 
   protected identify = (_: number, box: PaintedBox): string => box.key;

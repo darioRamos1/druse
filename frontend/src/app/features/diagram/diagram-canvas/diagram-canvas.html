@@ -48,6 +48,19 @@
     <span>{{ selectionLabel() }}</span>
   </button>
 
+  <!--
+    Traer vecinas es lo que hace que empezar por una tabla no sea un callejón:
+    se abre el diagrama por donde se sabe y se va tirando del hilo.
+  -->
+  <button type="button" class="btn" (click)="bring()" [disabled]="selected() === null">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+      <rect x="3" y="5" width="7" height="5" rx="1.5" />
+      <rect x="14" y="14" width="7" height="5" rx="1.5" />
+      <path d="M10 7.5h2a2 2 0 0 1 2 2v7" />
+    </svg>
+    <span>Traer vecinas</span>
+  </button>
+
   <span class="grow"></span>
 
   @if (summary().missing > 0) {

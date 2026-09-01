@@ -1,14 +1,27 @@
 <div class="backdrop" (click)="close()"></div>
 
-<section class="dialog" role="dialog" aria-label="Diagrama entidad-relación">
+<section
+  class="dialog"
+  [class.is-choosing]="choosing() || loading() || error() !== null"
+  role="dialog"
+  aria-label="Diagrama entidad-relación"
+>
   <header class="head">
     <app-icon name="diagram" [size]="14" />
     <div class="head__text">
       <h2 class="head__title">Diagrama · {{ title() }}</h2>
       <p class="head__subtitle">
-        Lo que el catálogo dice hoy. Se relee cada vez que se abre.
+        @if (choosing()) {
+          Un esquema entero es una tela de araña. Elige por dónde empezar; después se traen las
+          vecinas de cualquier tabla.
+        } @else {
+          Lo que el catálogo dice hoy. Se relee cada vez que se abre.
+        }
       </p>
     </div>
+    @if (!choosing() && candidates().length > 1) {
+      <button type="button" class="head__back" (click)="back()">Cambiar tablas…</button>
+    }
     <button type="button" class="head__close" (click)="close()" aria-label="Cerrar">×</button>
   </header>
 
@@ -19,7 +32,64 @@
       <p>{{ error() }}</p>
       <button type="button" class="state__retry" (click)="retry()">Reintentar</button>
     </div>
+  } @else if (choosing()) {
+    <div class="chooser">
+      <div class="chooser__bar">
+        <button type="button" class="chooser__action" (click)="chooseAll()" [disabled]="allChosen()">
+          Todas
+        </button>
+        <button
+          type="button"
+          class="chooser__action"
+          (click)="chooseNone()"
+          [disabled]="chosen().size === 0"
+        >
+          Ninguna
+        </button>
+      </div>
+
+      <div class="chooser__list">
+        @for (table of candidates(); track table.id) {
+          <button
+            type="button"
+            class="pick"
+            [class.is-chosen]="isChosen(table)"
+            [attr.aria-pressed]="isChosen(table)"
+            (click)="toggle(table)"
+          >
+            <span class="pick__box" [class.is-chosen]="isChosen(table)">
+              @if (isChosen(table)) {
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M5 13l4 4L19 7" />
+                </svg>
+              }
+            </span>
+            <app-icon name="table" [size]="13" />
+            <span class="pick__name">{{ table.name }}</span>
+            @if (table.approximateRowCount !== null && table.approximateRowCount !== undefined) {
+              <span class="pick__rows">~{{ table.approximateRowCount }}</span>
+            }
+          </button>
+        }
+      </div>
+    </div>
+
+    <footer class="foot">
+      <span class="foot__count">{{ chosenLabel() }}</span>
+      <span class="foot__grow"></span>
+      <button type="button" class="foot__cancel" (click)="close()">Cancelar</button>
+      <button type="button" class="foot__draw" (click)="draw()" [disabled]="chosen().size === 0">
+        Dibujar
+      </button>
+    </footer>
   } @else if (graph(); as loaded) {
-    <app-diagram-canvas [graph]="loaded" (openTable)="openTable.emit($event)" />
+    @if (notice(); as aviso) {
+      <p class="notice" role="status">{{ aviso }}</p>
+    }
+    <app-diagram-canvas
+      [graph]="loaded"
+      (openTable)="openTable.emit($event)"
+      (bringNeighbours)="bringNeighbours($event)"
+    />
   }
 </section>
