@@ -303,6 +303,7 @@ La dirección de las dependencias apunta siempre al núcleo. Está fijada por pr
 | [`PLAN_TRABAJO_DRUSE.md`](PLAN_TRABAJO_DRUSE.md) | Plan maestro: alcance, arquitectura y las 8 fases |
 | [`BITACORA.md`](BITACORA.md) | Bitácora por sesión: estado actual, qué toca retomar y decisiones |
 | [`docs/decisions/`](docs/decisions/) | ADR de las decisiones estructurales |
+| [`docs/guia-estrategia-open-source.md`](docs/guia-estrategia-open-source.md) | Ruta futura para abrir el proyecto, conseguir usuarios y evaluar su sostenibilidad |
 | [`docs/release-notes/0.1.0-beta.md`](docs/release-notes/0.1.0-beta.md) | Qué trajo la primera beta, con qué números se comprobó y qué no garantizaba |
 | [`docs/mockups/druse-main.html`](docs/mockups/druse-main.html) | Mockup de referencia de la interfaz |
 
