@@ -1,6 +1,8 @@
+using System.Collections.ObjectModel;
 using System.Data.Common;
 using Druse.Database.Abstractions;
 using Druse.Domain;
+using static Druse.Database.Abstractions.MetadataBatch;
 
 namespace Druse.Provider.PostgreSql;
 
@@ -15,6 +17,9 @@ namespace Druse.Provider.PostgreSql;
 /// </summary>
 public sealed class PostgreSqlMetadataReader : IDatabaseMetadataReader
 {
+    /// <summary>Esquema al que pertenece una tabla cuando nadie dice otro.</summary>
+    private const string DefaultSchema = "public";
+
     /// <summary>Esquemas internos que no aportan nada al usuario.</summary>
     private const string SystemSchemaFilter =
         "n.nspname NOT IN ('pg_catalog', 'information_schema') AND n.nspname NOT LIKE 'pg_toast%' AND n.nspname NOT LIKE 'pg_temp%'";
@@ -68,6 +73,30 @@ public sealed class PostgreSqlMetadataReader : IDatabaseMetadataReader
     {
         ArgumentNullException.ThrowIfNull(table);
 
+        var columns = await GetColumnsAsync(session, [table], cancellationToken);
+
+        return columns.TryGetValue(Key(table), out var found) ? found : [];
+    }
+
+    /// <summary>
+    /// Columnas de varias tablas a la vez.
+    ///
+    /// Es la misma consulta de siempre con el filtro cambiado: donde antes había
+    /// un esquema y un nombre, ahora hay dos arreglos que se recorren juntos con
+    /// <c>unnest</c>. Emparejar por posición es lo que permite pedir
+    /// `ventas.factura` y `compras.factura` en la misma lectura sin traerse el
+    /// producto cruzado de esquemas por nombres.
+    /// </summary>
+    private static async Task<IReadOnlyDictionary<TableRef, IReadOnlyList<DatabaseColumn>>> GetColumnsAsync(
+        IDatabaseSession session,
+        IReadOnlyList<DatabaseObject> tables,
+        CancellationToken cancellationToken)
+    {
+        if (tables.Count == 0)
+        {
+            return ReadOnlyDictionary<TableRef, IReadOnlyList<DatabaseColumn>>.Empty;
+        }
+
         const string Sql = """
             SELECT
                 a.attname,
@@ -79,10 +108,14 @@ public sealed class PostgreSqlMetadataReader : IDatabaseMetadataReader
                 a.attidentity <> ''
                     OR a.attgenerated <> ''
                     OR COALESCE(pg_get_expr(ad.adbin, ad.adrelid), '') LIKE 'nextval(%'
-                                                    AS is_generated
+                                                    AS is_generated,
+                n.nspname                            AS owner_schema,
+                c.relname                            AS owner_table
             FROM pg_attribute a
             JOIN pg_class c     ON c.oid = a.attrelid
             JOIN pg_namespace n ON n.oid = c.relnamespace
+            JOIN unnest(@schemas::text[], @names::text[]) AS want(schema_name, table_name)
+                ON want.schema_name = n.nspname AND want.table_name = c.relname
             LEFT JOIN pg_attrdef ad ON ad.adrelid = c.oid AND ad.adnum = a.attnum
             LEFT JOIN LATERAL (
                 SELECT true AS is_primary
@@ -92,29 +125,33 @@ public sealed class PostgreSqlMetadataReader : IDatabaseMetadataReader
                   AND a.attnum = ANY (i.indkey)
                 LIMIT 1
             ) pk ON true
-            WHERE n.nspname = @schema
-              AND c.relname = @table
-              AND a.attnum > 0
+            WHERE a.attnum > 0
               AND NOT a.attisdropped
-            ORDER BY a.attnum
+            ORDER BY n.nspname, c.relname, a.attnum
             """;
 
-        return await QueryAsync(
+        var (schemas, names) = Wanted(tables);
+
+        var rows = await QueryAsync(
             session,
             Sql,
-            reader => new DatabaseColumn
-            {
-                Name = reader.GetString(0),
-                DataType = reader.GetString(1),
-                IsNullable = reader.GetBoolean(2),
-                IsPrimaryKey = reader.GetBoolean(3),
-                DefaultValue = reader.IsDBNull(4) ? null : reader.GetString(4),
-                Ordinal = reader.GetInt16(5),
-                IsGenerated = reader.GetBoolean(6),
-            },
+            reader => (
+                Owner: Owner(reader, 7),
+                Column: new DatabaseColumn
+                {
+                    Name = reader.GetString(0),
+                    DataType = reader.GetString(1),
+                    IsNullable = reader.GetBoolean(2),
+                    IsPrimaryKey = reader.GetBoolean(3),
+                    DefaultValue = reader.IsDBNull(4) ? null : reader.GetString(4),
+                    Ordinal = reader.GetInt16(5),
+                    IsGenerated = reader.GetBoolean(6),
+                }),
             cancellationToken,
-            ("schema", table.Schema ?? "public"),
-            ("table", table.Name));
+            ("schemas", schemas),
+            ("names", names));
+
+        return GroupByTable(rows);
     }
 
     public Task<string> GetDefinitionAsync(
@@ -141,28 +178,79 @@ public sealed class PostgreSqlMetadataReader : IDatabaseMetadataReader
     {
         ArgumentNullException.ThrowIfNull(table);
 
-        var schema = table.Schema ?? "public";
+        var structures = await GetStructuresAsync(session, [table], cancellationToken);
 
-        var indexes = await GetIndexesAsync(session, schema, table.Name, cancellationToken);
-        var foreignKeys = await GetForeignKeysAsync(session, schema, table.Name, cancellationToken);
-        var (uniques, checks) = await GetConstraintsAsync(session, schema, table.Name, cancellationToken);
+        return structures.TryGetValue(Key(table), out var found) ? found : new TableStructure();
+    }
 
-        var primary = indexes.FirstOrDefault(index => index.IsPrimaryKey);
+    /// <summary>
+    /// Columnas y estructura de varias tablas en cuatro consultas, sean dos
+    /// tablas o sesenta.
+    /// </summary>
+    public async Task<IReadOnlyList<TableDetail>> GetTableDetailsAsync(
+        IDatabaseSession session,
+        IReadOnlyList<DatabaseObject> tables,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(tables);
 
-        return new TableStructure
+        if (tables.Count == 0)
         {
-            PrimaryKey = primary is null
-                ? null
-                : new DatabasePrimaryKey
-                {
-                    Name = primary.Name,
-                    Columns = [.. primary.Columns.Select(column => column.Name)],
-                },
-            Indexes = indexes,
-            ForeignKeys = foreignKeys,
-            UniqueConstraints = uniques,
-            CheckConstraints = checks,
-        };
+            return [];
+        }
+
+        var columns = await GetColumnsAsync(session, tables, cancellationToken);
+        var structures = await GetStructuresAsync(session, tables, cancellationToken);
+
+        return Compose(tables, Key, columns, structures);
+    }
+
+    /// <summary>Estructura de varias tablas, en tres consultas.</summary>
+    private static async Task<IReadOnlyDictionary<TableRef, TableStructure>> GetStructuresAsync(
+        IDatabaseSession session,
+        IReadOnlyList<DatabaseObject> tables,
+        CancellationToken cancellationToken)
+    {
+        if (tables.Count == 0)
+        {
+            return ReadOnlyDictionary<TableRef, TableStructure>.Empty;
+        }
+
+        var indexes = await GetIndexesAsync(session, tables, cancellationToken);
+        var foreignKeys = await GetForeignKeysAsync(session, tables, cancellationToken);
+        var constraints = await GetConstraintsAsync(session, tables, cancellationToken);
+
+        var structures = new Dictionary<TableRef, TableStructure>();
+
+        foreach (var table in tables)
+        {
+            var key = Key(table);
+
+            if (structures.ContainsKey(key))
+            {
+                continue;
+            }
+
+            var own = indexes.TryGetValue(key, out var found) ? found : [];
+            var primary = own.FirstOrDefault(index => index.IsPrimaryKey);
+
+            structures[key] = new TableStructure
+            {
+                PrimaryKey = primary is null
+                    ? null
+                    : new DatabasePrimaryKey
+                    {
+                        Name = primary.Name,
+                        Columns = [.. primary.Columns.Select(column => column.Name)],
+                    },
+                Indexes = own,
+                ForeignKeys = foreignKeys.TryGetValue(key, out var keys) ? keys : [],
+                UniqueConstraints = constraints.Unique.TryGetValue(key, out var uniques) ? uniques : [],
+                CheckConstraints = constraints.Check.TryGetValue(key, out var checks) ? checks : [],
+            };
+        }
+
+        return structures;
     }
 
     /// <summary>
@@ -179,10 +267,9 @@ public sealed class PostgreSqlMetadataReader : IDatabaseMetadataReader
     /// <c>false OR NULL</c> vale <c>NULL</c>, no <c>false</c>: sin él, leer la
     /// estructura de cualquier tabla con un índice normal fallaba.
     /// </summary>
-    private static async Task<IReadOnlyList<DatabaseIndex>> GetIndexesAsync(
+    private static async Task<IReadOnlyDictionary<TableRef, IReadOnlyList<DatabaseIndex>>> GetIndexesAsync(
         IDatabaseSession session,
-        string schema,
-        string table,
+        IReadOnlyList<DatabaseObject> tables,
         CancellationToken cancellationToken)
     {
         const string Sql = """
@@ -213,20 +300,24 @@ public sealed class PostgreSqlMetadataReader : IDatabaseMetadataReader
                 -- desde sus columnas, que es lo que la interfaz sabe editar.
                 CASE WHEN i.indexprs IS NOT NULL
                      THEN pg_get_indexdef(i.indexrelid)
-                END AS definition
+                END AS definition,
+                n.nspname AS owner_schema,
+                c.relname AS owner_table
             FROM pg_index i
             JOIN pg_class c      ON c.oid = i.indrelid
             JOIN pg_class ic     ON ic.oid = i.indexrelid
             JOIN pg_namespace n  ON n.oid = c.relnamespace
             JOIN pg_am am        ON am.oid = ic.relam
+            JOIN unnest(@schemas::text[], @names::text[]) AS want(schema_name, table_name)
+                ON want.schema_name = n.nspname AND want.table_name = c.relname
             LEFT JOIN pg_constraint con ON con.conindid = i.indexrelid
-            WHERE n.nspname = @schema
-              AND c.relname = @table
-              AND i.indislive
-            ORDER BY ic.relname
+            WHERE i.indislive
+            ORDER BY n.nspname, c.relname, ic.relname
             """;
 
-        return await QueryAsync(
+        var (schemas, names) = Wanted(tables);
+
+        var rows = await QueryAsync(
             session,
             Sql,
             reader =>
@@ -234,7 +325,7 @@ public sealed class PostgreSqlMetadataReader : IDatabaseMetadataReader
                 var columns = reader.IsDBNull(6) ? [] : reader.GetFieldValue<string[]>(6);
                 var directions = reader.IsDBNull(7) ? [] : reader.GetFieldValue<string[]>(7);
 
-                return new DatabaseIndex
+                return (Owner: Owner(reader, 10), Index: new DatabaseIndex
                 {
                     Name = reader.GetString(0),
                     IsUnique = reader.GetBoolean(1),
@@ -254,11 +345,13 @@ public sealed class PostgreSqlMetadataReader : IDatabaseMetadataReader
                     ],
                     IncludedColumns = reader.IsDBNull(8) ? [] : reader.GetFieldValue<string[]>(8),
                     Definition = reader.IsDBNull(9) ? null : reader.GetString(9),
-                };
+                });
             },
             cancellationToken,
-            ("schema", schema),
-            ("table", table));
+            ("schemas", schemas),
+            ("names", names));
+
+        return GroupByTable(rows);
     }
 
     /// <summary>
@@ -268,10 +361,9 @@ public sealed class PostgreSqlMetadataReader : IDatabaseMetadataReader
     /// así que se recorren con <c>WITH ORDINALITY</c>: emparejarlas por nombre
     /// las descolocaría en cuanto una clave apunte a columnas de nombre distinto.
     /// </summary>
-    private static async Task<IReadOnlyList<DatabaseForeignKey>> GetForeignKeysAsync(
+    private static async Task<IReadOnlyDictionary<TableRef, IReadOnlyList<DatabaseForeignKey>>> GetForeignKeysAsync(
         IDatabaseSession session,
-        string schema,
-        string table,
+        IReadOnlyList<DatabaseObject> tables,
         CancellationToken cancellationToken)
     {
         const string Sql = """
@@ -290,22 +382,26 @@ public sealed class PostgreSqlMetadataReader : IDatabaseMetadataReader
                     SELECT array_agg(a.attname ORDER BY k.ord)
                     FROM unnest(con.confkey) WITH ORDINALITY AS k(attnum, ord)
                     JOIN pg_attribute a ON a.attrelid = con.confrelid AND a.attnum = k.attnum
-                ) AS referenced_columns
+                ) AS referenced_columns,
+                n.nspname AS owner_schema,
+                c.relname AS owner_table
             FROM pg_constraint con
             JOIN pg_class c       ON c.oid = con.conrelid
             JOIN pg_namespace n   ON n.oid = c.relnamespace
             JOIN pg_class fc      ON fc.oid = con.confrelid
             JOIN pg_namespace fn  ON fn.oid = fc.relnamespace
-            WHERE n.nspname = @schema
-              AND c.relname = @table
-              AND con.contype = 'f'
-            ORDER BY con.conname
+            JOIN unnest(@schemas::text[], @names::text[]) AS want(schema_name, table_name)
+                ON want.schema_name = n.nspname AND want.table_name = c.relname
+            WHERE con.contype = 'f'
+            ORDER BY n.nspname, c.relname, con.conname
             """;
 
-        return await QueryAsync(
+        var (schemas, names) = Wanted(tables);
+
+        var rows = await QueryAsync(
             session,
             Sql,
-            reader => new DatabaseForeignKey
+            reader => (Owner: Owner(reader, 7), Key: new DatabaseForeignKey
             {
                 Name = reader.GetString(0),
                 ReferencedSchema = reader.GetString(1),
@@ -314,17 +410,20 @@ public sealed class PostgreSqlMetadataReader : IDatabaseMetadataReader
                 OnUpdate = ParseAction(reader.GetString(4)),
                 Columns = reader.IsDBNull(5) ? [] : reader.GetFieldValue<string[]>(5),
                 ReferencedColumns = reader.IsDBNull(6) ? [] : reader.GetFieldValue<string[]>(6),
-            },
+            }),
             cancellationToken,
-            ("schema", schema),
-            ("table", table));
+            ("schemas", schemas),
+            ("names", names));
+
+        return GroupByTable(rows);
     }
 
-    private static async Task<(IReadOnlyList<DatabaseUniqueConstraint> Unique, IReadOnlyList<DatabaseCheckConstraint> Check)>
+    private static async Task<(
+        IReadOnlyDictionary<TableRef, IReadOnlyList<DatabaseUniqueConstraint>> Unique,
+        IReadOnlyDictionary<TableRef, IReadOnlyList<DatabaseCheckConstraint>> Check)>
         GetConstraintsAsync(
             IDatabaseSession session,
-            string schema,
-            string table,
+            IReadOnlyList<DatabaseObject> tables,
             CancellationToken cancellationToken)
     {
         // Las restricciones que respaldan una columna `NOT NULL` se descartan:
@@ -343,42 +442,45 @@ public sealed class PostgreSqlMetadataReader : IDatabaseMetadataReader
                     SELECT array_agg(a.attname ORDER BY k.ord)
                     FROM unnest(con.conkey) WITH ORDINALITY AS k(attnum, ord)
                     JOIN pg_attribute a ON a.attrelid = con.conrelid AND a.attnum = k.attnum
-                ) AS columns
+                ) AS columns,
+                n.nspname AS owner_schema,
+                c.relname AS owner_table
             FROM pg_constraint con
             JOIN pg_class c     ON c.oid = con.conrelid
             JOIN pg_namespace n ON n.oid = c.relnamespace
-            WHERE n.nspname = @schema
-              AND c.relname = @table
-              AND con.contype IN ('u', 'c')
+            JOIN unnest(@schemas::text[], @names::text[]) AS want(schema_name, table_name)
+                ON want.schema_name = n.nspname AND want.table_name = c.relname
+            WHERE con.contype IN ('u', 'c')
               AND NOT con.conname LIKE '%_not_null'
-            ORDER BY con.conname
+            ORDER BY n.nspname, c.relname, con.conname
             """;
+
+        var (schemas, names) = Wanted(tables);
 
         var rows = await QueryAsync(
             session,
             Sql,
             reader => (
+                Owner: Owner(reader, 4),
                 Type: reader.GetString(0),
                 Name: reader.GetString(1),
                 Definition: reader.GetString(2),
                 Columns: reader.IsDBNull(3) ? [] : reader.GetFieldValue<string[]>(3)),
             cancellationToken,
-            ("schema", schema),
-            ("table", table));
+            ("schemas", schemas),
+            ("names", names));
 
-        var unique = rows
+        var unique = GroupByTable(rows
             .Where(row => row.Type == "u")
-            .Select(row => new DatabaseUniqueConstraint { Name = row.Name, Columns = row.Columns })
-            .ToList();
+            .Select(row => (row.Owner, new DatabaseUniqueConstraint { Name = row.Name, Columns = row.Columns })));
 
-        var check = rows
+        var check = GroupByTable(rows
             .Where(row => row.Type == "c")
-            .Select(row => new DatabaseCheckConstraint
+            .Select(row => (row.Owner, new DatabaseCheckConstraint
             {
                 Name = row.Name,
                 Expression = Unwrap(row.Definition),
-            })
-            .ToList();
+            })));
 
         return (unique, check);
     }
@@ -808,6 +910,35 @@ public sealed class PostgreSqlMetadataReader : IDatabaseMetadataReader
     /// venga del propio catálogo, concatenarlo sería crear el hábito equivocado.
     /// Los fragmentos interpolados de las consultas son constantes del código.
     /// </summary>
+    /// <summary>
+    /// Las tablas pedidas como dos arreglos que emparejan por posición, que es
+    /// lo que <c>unnest</c> sabe recorrer.
+    /// </summary>
+    private static (string[] Schemas, string[] Names) Wanted(IReadOnlyList<DatabaseObject> tables)
+    {
+        var wanted = Unique(tables, Key);
+
+        return ([.. wanted.Select(table => table.Schema ?? DefaultSchema)], [.. wanted.Select(table => table.Name)]);
+    }
+
+    /// <summary>
+    /// La tabla a la que pertenece la fila que se está leyendo.
+    ///
+    /// Las dos columnas van siempre al final de cada consulta, de modo que
+    /// añadirlas no descoloca los índices de lo que ya se leía.
+    /// </summary>
+    private static TableRef Owner(DbDataReader reader, int index) =>
+        new(reader.GetString(index), reader.GetString(index + 1));
+
+    /// <summary>
+    /// Clave con la que se busca una tabla en lo leído.
+    ///
+    /// Aplica el esquema por omisión igual que lo hace la consulta: sin esto, una
+    /// tabla pedida sin esquema se buscaría como <c>(null, factura)</c> y el
+    /// catálogo la habría devuelto como <c>(public, factura)</c>.
+    /// </summary>
+    private static TableRef Key(DatabaseObject table) => new(table.Schema ?? DefaultSchema, table.Name);
+
     private static async Task<IReadOnlyList<T>> QueryAsync<T>(
         IDatabaseSession session,
         string sql,

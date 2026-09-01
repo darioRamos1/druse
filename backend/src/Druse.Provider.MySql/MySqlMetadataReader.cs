@@ -1,7 +1,11 @@
+using System.Collections.ObjectModel;
 using System.Data.Common;
+using System.Globalization;
+using System.Text;
 using Druse.Database.Abstractions;
 using Druse.Domain;
 using MySqlConnector;
+using static Druse.Database.Abstractions.MetadataBatch;
 
 namespace Druse.Provider.MySql;
 
@@ -75,10 +79,28 @@ public sealed class MySqlMetadataReader : IDatabaseMetadataReader
     {
         ArgumentNullException.ThrowIfNull(table);
 
+        var columns = await GetColumnsAsync(session, [table], cancellationToken);
+
+        return columns.TryGetValue(Key(session, table), out var found) ? found : [];
+    }
+
+    /// <summary>Columnas de varias tablas a la vez.</summary>
+    private static async Task<IReadOnlyDictionary<TableRef, IReadOnlyList<DatabaseColumn>>> GetColumnsAsync(
+        IDatabaseSession session,
+        IReadOnlyList<DatabaseObject> tables,
+        CancellationToken cancellationToken)
+    {
+        if (tables.Count == 0)
+        {
+            return ReadOnlyDictionary<TableRef, IReadOnlyList<DatabaseColumn>>.Empty;
+        }
+
+        var (pairs, parameters) = Wanted(session, tables);
+
         // COLUMN_TYPE trae el tipo completo —`varchar(200)`, `decimal(10,2)`,
         // `enum('a','b')`—, mientras que DATA_TYPE solo daría la familia.
         // ORDINAL_POSITION es un entero sin signo, que .NET no lee como Int32.
-        const string Sql = """
+        var sql = $"""
             SELECT
                 c.COLUMN_NAME,
                 c.COLUMN_TYPE,
@@ -87,31 +109,35 @@ public sealed class MySqlMetadataReader : IDatabaseMetadataReader
                 c.COLUMN_DEFAULT,
                 CAST(c.ORDINAL_POSITION AS SIGNED) AS ordinal,
                 c.EXTRA LIKE '%auto_increment%'
-                    OR c.EXTRA LIKE '%GENERATED%' AS is_generated
+                    OR c.EXTRA LIKE '%GENERATED%' AS is_generated,
+                c.TABLE_SCHEMA AS owner_schema,
+                c.TABLE_NAME AS owner_table
             FROM information_schema.COLUMNS c
-            WHERE c.TABLE_SCHEMA = @schema
-              AND c.TABLE_NAME = @table
-            ORDER BY c.ORDINAL_POSITION
+            WHERE (c.TABLE_SCHEMA, c.TABLE_NAME) IN ({pairs})
+            ORDER BY c.TABLE_SCHEMA, c.TABLE_NAME, c.ORDINAL_POSITION
             """;
 
-        return await QueryAsync(
+        var rows = await QueryAsync(
             session,
-            Sql,
-            reader => new DatabaseColumn
-            {
-                Name = reader.GetString(0),
-                DataType = reader.GetString(1),
-                // Se declara como texto 'YES'/'NO', no como booleano.
-                IsNullable = reader.GetString(2) == "YES",
-                // 'PRI' marca la clave primaria; 'UNI' y 'MUL' son otros índices.
-                IsPrimaryKey = reader.GetString(3) == "PRI",
-                DefaultValue = reader.IsDBNull(4) ? null : reader.GetString(4),
-                Ordinal = (int)reader.GetInt64(5),
-                IsGenerated = reader.GetBoolean(6),
-            },
+            sql,
+            reader => (
+                Owner: Owner(reader, 7),
+                Column: new DatabaseColumn
+                {
+                    Name = reader.GetString(0),
+                    DataType = reader.GetString(1),
+                    // Se declara como texto 'YES'/'NO', no como booleano.
+                    IsNullable = reader.GetString(2) == "YES",
+                    // 'PRI' marca la clave primaria; 'UNI' y 'MUL' son otros índices.
+                    IsPrimaryKey = reader.GetString(3) == "PRI",
+                    DefaultValue = reader.IsDBNull(4) ? null : reader.GetString(4),
+                    Ordinal = (int)reader.GetInt64(5),
+                    IsGenerated = reader.GetBoolean(6),
+                }),
             cancellationToken,
-            ("schema", Schema(session, table)),
-            ("table", table.Name));
+            parameters);
+
+        return GroupByTable(rows);
     }
 
     public Task<string> GetDefinitionAsync(
@@ -138,29 +164,79 @@ public sealed class MySqlMetadataReader : IDatabaseMetadataReader
     {
         ArgumentNullException.ThrowIfNull(table);
 
-        var schema = Schema(session, table);
+        var structures = await GetStructuresAsync(session, [table], cancellationToken);
 
-        var indexes = await GetIndexesAsync(session, schema, table.Name, cancellationToken);
-        var foreignKeys = await GetForeignKeysAsync(session, schema, table.Name, cancellationToken);
-        var checks = await GetCheckConstraintsAsync(session, schema, table.Name, cancellationToken);
-        var uniques = UniqueConstraints(indexes);
+        return structures.TryGetValue(Key(session, table), out var found) ? found : new TableStructure();
+    }
 
-        var primary = indexes.FirstOrDefault(index => index.IsPrimaryKey);
+    /// <summary>
+    /// Columnas y estructura de varias tablas en cuatro consultas, sean dos
+    /// tablas o sesenta.
+    /// </summary>
+    public async Task<IReadOnlyList<TableDetail>> GetTableDetailsAsync(
+        IDatabaseSession session,
+        IReadOnlyList<DatabaseObject> tables,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(tables);
 
-        return new TableStructure
+        if (tables.Count == 0)
         {
-            PrimaryKey = primary is null
-                ? null
-                : new DatabasePrimaryKey
-                {
-                    Name = primary.Name,
-                    Columns = [.. primary.Columns.Select(column => column.Name)],
-                },
-            Indexes = indexes,
-            ForeignKeys = foreignKeys,
-            UniqueConstraints = uniques,
-            CheckConstraints = checks,
-        };
+            return [];
+        }
+
+        var columns = await GetColumnsAsync(session, tables, cancellationToken);
+        var structures = await GetStructuresAsync(session, tables, cancellationToken);
+
+        return Compose(tables, table => Key(session, table), columns, structures);
+    }
+
+    /// <summary>Estructura de varias tablas, en tres consultas.</summary>
+    private static async Task<IReadOnlyDictionary<TableRef, TableStructure>> GetStructuresAsync(
+        IDatabaseSession session,
+        IReadOnlyList<DatabaseObject> tables,
+        CancellationToken cancellationToken)
+    {
+        if (tables.Count == 0)
+        {
+            return ReadOnlyDictionary<TableRef, TableStructure>.Empty;
+        }
+
+        var indexes = await GetIndexesAsync(session, tables, cancellationToken);
+        var foreignKeys = await GetForeignKeysAsync(session, tables, cancellationToken);
+        var checks = await GetCheckConstraintsAsync(session, tables, cancellationToken);
+
+        var structures = new Dictionary<TableRef, TableStructure>();
+
+        foreach (var table in tables)
+        {
+            var key = Key(session, table);
+
+            if (structures.ContainsKey(key))
+            {
+                continue;
+            }
+
+            var own = indexes.TryGetValue(key, out var found) ? found : [];
+            var primary = own.FirstOrDefault(index => index.IsPrimaryKey);
+
+            structures[key] = new TableStructure
+            {
+                PrimaryKey = primary is null
+                    ? null
+                    : new DatabasePrimaryKey
+                    {
+                        Name = primary.Name,
+                        Columns = [.. primary.Columns.Select(column => column.Name)],
+                    },
+                Indexes = own,
+                ForeignKeys = foreignKeys.TryGetValue(key, out var keys) ? keys : [],
+                UniqueConstraints = UniqueConstraints(own),
+                CheckConstraints = checks.TryGetValue(key, out var check) ? check : [],
+            };
+        }
+
+        return structures;
     }
 
     /// <summary>
@@ -175,79 +251,79 @@ public sealed class MySqlMetadataReader : IDatabaseMetadataReader
     /// La clave primaria se llama siempre `PRIMARY` en MySQL, que es como se
     /// reconoce: no hay una columna que lo diga.
     /// </summary>
-    private static async Task<IReadOnlyList<DatabaseIndex>> GetIndexesAsync(
+    private static async Task<IReadOnlyDictionary<TableRef, IReadOnlyList<DatabaseIndex>>> GetIndexesAsync(
         IDatabaseSession session,
-        string schema,
-        string table,
+        IReadOnlyList<DatabaseObject> tables,
         CancellationToken cancellationToken)
     {
-        const string Sql = """
+        var (pairs, parameters) = Wanted(session, tables);
+
+        var sql = $"""
             SELECT
                 INDEX_NAME,
                 SEQ_IN_INDEX,
                 COLUMN_NAME,
                 NON_UNIQUE,
                 COLLATION,
-                INDEX_TYPE
+                INDEX_TYPE,
+                TABLE_SCHEMA AS owner_schema,
+                TABLE_NAME AS owner_table
             FROM information_schema.STATISTICS
-            WHERE TABLE_SCHEMA = @schema
-              AND TABLE_NAME = @table
-            ORDER BY INDEX_NAME, SEQ_IN_INDEX
+            WHERE (TABLE_SCHEMA, TABLE_NAME) IN ({pairs})
+            ORDER BY TABLE_SCHEMA, TABLE_NAME, INDEX_NAME, SEQ_IN_INDEX
             """;
 
         var rows = await QueryAsync(
             session,
-            Sql,
+            sql,
             reader => (
+                Owner: Owner(reader, 6),
                 Index: reader.GetString(0),
                 Column: reader.IsDBNull(2) ? null : reader.GetString(2),
                 NonUnique: reader.GetInt64(3) != 0,
                 Descending: !reader.IsDBNull(4) && reader.GetString(4) == "D",
                 Type: reader.IsDBNull(5) ? null : reader.GetString(5)),
             cancellationToken,
-            ("schema", schema),
-            ("table", table));
+            parameters);
 
-        return
-        [
-            .. rows
-                .GroupBy(row => row.Index, StringComparer.Ordinal)
-                .Select(group => new DatabaseIndex
-                {
-                    Name = group.Key,
-                    IsUnique = !group.First().NonUnique,
-                    IsPrimaryKey = group.Key == "PRIMARY",
+        return GroupByTable(rows
+            .GroupBy(row => (row.Owner, row.Index))
+            .Select(group => (group.Key.Owner, new DatabaseIndex
+            {
+                Name = group.Key.Index,
+                IsUnique = !group.First().NonUnique,
+                IsPrimaryKey = group.Key.Index == "PRIMARY",
 
-                    // En MySQL un índice único *es* la restricción de unicidad:
-                    // no son dos objetos como en los otros motores. Se marca para
-                    // que la interfaz no ofrezca borrarlo dos veces por caminos
-                    // distintos.
-                    IsConstraintIndex = group.Key == "PRIMARY" || !group.First().NonUnique,
-                    Method = group.First().Type?.ToLowerInvariant(),
-                    Columns =
-                    [
-                        .. group
-                            .Where(row => row.Column is not null)
-                            .Select(row => new IndexColumn
-                            {
-                                Name = row.Column!,
-                                Direction = row.Descending
-                                    ? IndexSortDirection.Descending
-                                    : IndexSortDirection.Ascending,
-                            }),
-                    ],
-                })
-                .OrderBy(index => index.Name, StringComparer.Ordinal),
-        ];
+                // En MySQL un índice único *es* la restricción de unicidad:
+                // no son dos objetos como en los otros motores. Se marca para
+                // que la interfaz no ofrezca borrarlo dos veces por caminos
+                // distintos.
+                IsConstraintIndex = group.Key.Index == "PRIMARY" || !group.First().NonUnique,
+                Method = group.First().Type?.ToLowerInvariant(),
+                Columns =
+                [
+                    .. group
+                        .Where(row => row.Column is not null)
+                        .Select(row => new IndexColumn
+                        {
+                            Name = row.Column!,
+                            Direction = row.Descending
+                                ? IndexSortDirection.Descending
+                                : IndexSortDirection.Ascending,
+                        }),
+                ],
+            }))
+            .OrderBy(entry => entry.Item2.Name, StringComparer.Ordinal));
     }
 
-    private static async Task<IReadOnlyList<DatabaseForeignKey>> GetForeignKeysAsync(
+    private static async Task<IReadOnlyDictionary<TableRef, IReadOnlyList<DatabaseForeignKey>>> GetForeignKeysAsync(
         IDatabaseSession session,
-        string schema,
-        string table,
+        IReadOnlyList<DatabaseObject> tables,
         CancellationToken cancellationToken)
     {
-        const string Sql = """
+        var (pairs, parameters) = Wanted(session, tables);
+
+        var sql = $"""
             SELECT
                 k.CONSTRAINT_NAME,
                 k.ORDINAL_POSITION,
@@ -256,22 +332,24 @@ public sealed class MySqlMetadataReader : IDatabaseMetadataReader
                 k.REFERENCED_TABLE_NAME,
                 k.REFERENCED_COLUMN_NAME,
                 r.DELETE_RULE,
-                r.UPDATE_RULE
+                r.UPDATE_RULE,
+                k.TABLE_SCHEMA AS owner_schema,
+                k.TABLE_NAME AS owner_table
             FROM information_schema.KEY_COLUMN_USAGE k
             JOIN information_schema.REFERENTIAL_CONSTRAINTS r
               ON r.CONSTRAINT_SCHEMA = k.CONSTRAINT_SCHEMA
              AND r.CONSTRAINT_NAME = k.CONSTRAINT_NAME
              AND r.TABLE_NAME = k.TABLE_NAME
-            WHERE k.TABLE_SCHEMA = @schema
-              AND k.TABLE_NAME = @table
+            WHERE (k.TABLE_SCHEMA, k.TABLE_NAME) IN ({pairs})
               AND k.REFERENCED_TABLE_NAME IS NOT NULL
-            ORDER BY k.CONSTRAINT_NAME, k.ORDINAL_POSITION
+            ORDER BY k.TABLE_SCHEMA, k.TABLE_NAME, k.CONSTRAINT_NAME, k.ORDINAL_POSITION
             """;
 
         var rows = await QueryAsync(
             session,
-            Sql,
+            sql,
             reader => (
+                Owner: Owner(reader, 8),
                 Name: reader.GetString(0),
                 Column: reader.GetString(2),
                 ReferencedSchema: reader.IsDBNull(3) ? null : reader.GetString(3),
@@ -280,25 +358,21 @@ public sealed class MySqlMetadataReader : IDatabaseMetadataReader
                 OnDelete: reader.GetString(6),
                 OnUpdate: reader.GetString(7)),
             cancellationToken,
-            ("schema", schema),
-            ("table", table));
+            parameters);
 
-        return
-        [
-            .. rows
-                .GroupBy(row => row.Name, StringComparer.Ordinal)
-                .Select(group => new DatabaseForeignKey
-                {
-                    Name = group.Key,
-                    ReferencedSchema = group.First().ReferencedSchema,
-                    ReferencedTable = group.First().ReferencedTable,
-                    OnDelete = ParseAction(group.First().OnDelete),
-                    OnUpdate = ParseAction(group.First().OnUpdate),
-                    Columns = [.. group.Select(row => row.Column)],
-                    ReferencedColumns = [.. group.Select(row => row.ReferencedColumn)],
-                })
-                .OrderBy(key => key.Name, StringComparer.Ordinal),
-        ];
+        return GroupByTable(rows
+            .GroupBy(row => (row.Owner, row.Name))
+            .Select(group => (group.Key.Owner, new DatabaseForeignKey
+            {
+                Name = group.Key.Name,
+                ReferencedSchema = group.First().ReferencedSchema,
+                ReferencedTable = group.First().ReferencedTable,
+                OnDelete = ParseAction(group.First().OnDelete),
+                OnUpdate = ParseAction(group.First().OnUpdate),
+                Columns = [.. group.Select(row => row.Column)],
+                ReferencedColumns = [.. group.Select(row => row.ReferencedColumn)],
+            }))
+            .OrderBy(entry => entry.Item2.Name, StringComparer.Ordinal));
     }
 
     /// <summary>
@@ -329,40 +403,49 @@ public sealed class MySqlMetadataReader : IDatabaseMetadataReader
     /// ver los índices por eso sería peor que no enseñar las condiciones: se
     /// devuelve vacío.
     /// </summary>
-    private static async Task<IReadOnlyList<DatabaseCheckConstraint>> GetCheckConstraintsAsync(
+    private static async Task<IReadOnlyDictionary<TableRef, IReadOnlyList<DatabaseCheckConstraint>>> GetCheckConstraintsAsync(
         IDatabaseSession session,
-        string schema,
-        string table,
+        IReadOnlyList<DatabaseObject> tables,
         CancellationToken cancellationToken)
     {
-        const string Sql = """
-            SELECT c.CONSTRAINT_NAME, c.CHECK_CLAUSE
+        var (pairs, parameters) = Wanted(session, tables);
+
+        var sql = $"""
+            SELECT
+                c.CONSTRAINT_NAME,
+                c.CHECK_CLAUSE,
+                t.TABLE_SCHEMA AS owner_schema,
+                t.TABLE_NAME AS owner_table
             FROM information_schema.CHECK_CONSTRAINTS c
             JOIN information_schema.TABLE_CONSTRAINTS t
               ON t.CONSTRAINT_SCHEMA = c.CONSTRAINT_SCHEMA
              AND t.CONSTRAINT_NAME = c.CONSTRAINT_NAME
-            WHERE t.TABLE_SCHEMA = @schema
-              AND t.TABLE_NAME = @table
-            ORDER BY c.CONSTRAINT_NAME
+            WHERE (t.TABLE_SCHEMA, t.TABLE_NAME) IN ({pairs})
+            ORDER BY t.TABLE_SCHEMA, t.TABLE_NAME, c.CONSTRAINT_NAME
             """;
 
         try
         {
-            return await QueryAsync(
+            var rows = await QueryAsync(
                 session,
-                Sql,
-                reader => new DatabaseCheckConstraint
+                sql,
+                reader => (Owner: Owner(reader, 2), Constraint: new DatabaseCheckConstraint
                 {
                     Name = reader.GetString(0),
                     Expression = Unescape(reader.GetString(1)),
-                },
+                }),
                 cancellationToken,
-                ("schema", schema),
-                ("table", table));
+                parameters);
+
+            return GroupByTable(rows);
         }
-        catch (MySqlException error) when (error.Number is 1109 or 1146)
+        // El error se reconoce por su código ya normalizado y no por
+        // `MySqlException`: `QueryAsync` la convierte antes de que salga de él,
+        // así que atrapar el tipo del driver aquí no atraparía nunca nada y un
+        // servidor viejo se quedaría sin ver ni sus índices.
+        catch (DatabaseOperationException error) when (error.Error.Code is "1109" or "1146")
         {
-            return [];
+            return ReadOnlyDictionary<TableRef, IReadOnlyList<DatabaseCheckConstraint>>.Empty;
         }
     }
 
@@ -717,6 +800,55 @@ public sealed class MySqlMetadataReader : IDatabaseMetadataReader
     /// </summary>
     private static string Schema(IDatabaseSession session, DatabaseObject node) =>
         node.Schema ?? node.Database ?? session.Profile.Database;
+
+    /// <summary>
+    /// Las tablas pedidas como lista de pares para un <c>IN</c> de tuplas.
+    ///
+    /// MySQL sabe comparar `(TABLE_SCHEMA, TABLE_NAME) IN ((…), (…))`, que es lo
+    /// más parecido al <c>unnest</c> de PostgreSQL sin depender de una versión
+    /// concreta. Se interpolan **solo nombres de parámetro**; ningún identificador
+    /// entra en el texto de la consulta.
+    /// </summary>
+    private static (string Pairs, (string Name, object Value)[] Parameters) Wanted(
+        IDatabaseSession session,
+        IReadOnlyList<DatabaseObject> tables)
+    {
+        var wanted = Unique(tables, table => Key(session, table));
+        var pairs = new StringBuilder();
+        var parameters = new (string Name, object Value)[wanted.Count * 2];
+
+        for (var index = 0; index < wanted.Count; index++)
+        {
+            if (index > 0)
+            {
+                pairs.Append(", ");
+            }
+
+            pairs.Append(CultureInfo.InvariantCulture, $"(@s{index}, @n{index})");
+
+            parameters[index * 2] = ($"s{index}", wanted[index].Schema ?? string.Empty);
+            parameters[(index * 2) + 1] = ($"n{index}", wanted[index].Name);
+        }
+
+        return (pairs.ToString(), parameters);
+    }
+
+    /// <summary>
+    /// La tabla a la que pertenece la fila que se está leyendo. Las dos columnas
+    /// van al final de cada consulta para no descolocar lo que ya se leía.
+    /// </summary>
+    private static TableRef Owner(DbDataReader reader, int index) =>
+        new(reader.GetString(index), reader.GetString(index + 1));
+
+    /// <summary>
+    /// Clave con la que se busca una tabla en lo leído.
+    ///
+    /// Pasa por <see cref="Schema"/> porque en MySQL el esquema puede venir del
+    /// nodo, de su base o de la sesión, y la consulta filtra por el mismo valor
+    /// que se guarda aquí.
+    /// </summary>
+    private static TableRef Key(IDatabaseSession session, DatabaseObject table) =>
+        new(Schema(session, table), table.Name);
 
     private static string Quote(string identifier) =>
         $"`{identifier.Replace("`", "``", StringComparison.Ordinal)}`";

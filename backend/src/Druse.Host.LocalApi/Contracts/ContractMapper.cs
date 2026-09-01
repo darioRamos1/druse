@@ -616,6 +616,25 @@ internal static class ContractMapper
         };
     }
 
+    public static SchemaGraphResponse ToResponse(this SchemaGraph graph)
+    {
+        ArgumentNullException.ThrowIfNull(graph);
+
+        return new SchemaGraphResponse
+        {
+            Tables =
+            [
+                .. graph.Tables.Select(detail => new TableDetailResponse
+                {
+                    Table = detail.Table.ToDto(),
+                    Columns = [.. detail.Columns.Select(ToDto)],
+                    Structure = detail.Structure.ToResponse(),
+                }),
+            ],
+            Missing = [.. graph.Missing.Select(ToDto)],
+        };
+    }
+
     public static TableStructureResponse ToResponse(this TableStructure structure)
     {
         ArgumentNullException.ThrowIfNull(structure);

@@ -88,6 +88,19 @@ public sealed record DatabasePrimaryKey
 }
 
 /// <summary>
+/// Una tabla concreta dentro de una lectura en lote.
+///
+/// El <see cref="DatabaseObject"/> entero no sirve como clave: trae el
+/// identificador del nodo del explorador y el recuento aproximado de filas, que
+/// cambian sin que la tabla cambie. Lo que identifica a una tabla dentro de una
+/// base es su esquema y su nombre, y eso es lo que se compara aquí.
+/// </summary>
+public readonly record struct TableRef(string? Schema, string Name)
+{
+    public static TableRef Of(DatabaseObject table) => new(table.Schema, table.Name);
+}
+
+/// <summary>
 /// Todo lo que sostiene una tabla además de sus columnas.
 ///
 /// Va junto en una sola lectura porque se enseña junto y porque separarlo
@@ -105,4 +118,38 @@ public sealed record TableStructure
     public IReadOnlyList<DatabaseUniqueConstraint> UniqueConstraints { get; init; } = [];
 
     public IReadOnlyList<DatabaseCheckConstraint> CheckConstraints { get; init; } = [];
+}
+
+/// <summary>
+/// Todo lo que un diagrama necesita de una tabla: sus columnas y lo que la
+/// sostiene.
+///
+/// Existe porque la unidad de una lectura en lote es la tabla entera. Pedir
+/// primero todas las columnas y después todas las estructuras dejaría al que
+/// llama emparejando dos listas por esquema y nombre, que es justo lo que este
+/// tipo evita hacer cuatro veces.
+/// </summary>
+public sealed record TableDetail
+{
+    /// <summary>La tabla tal y como se pidió, con su identificador del explorador.</summary>
+    public required DatabaseObject Table { get; init; }
+
+    public required IReadOnlyList<DatabaseColumn> Columns { get; init; }
+
+    public required TableStructure Structure { get; init; }
+}
+
+/// <summary>
+/// Lo que se leyó de un conjunto de tablas pedido de una vez.
+///
+/// Lleva aparte las que no aparecieron. Devolver solo las encontradas dejaría al
+/// diagrama dibujando cincuenta y nueve cajas sin poder decir qué pasó con la
+/// sexagésima, y la respuesta —alguien la borró— es justo la que hay que enseñar.
+/// </summary>
+public sealed record SchemaGraph
+{
+    public required IReadOnlyList<TableDetail> Tables { get; init; }
+
+    /// <summary>Las que se pidieron y ya no están en el catálogo.</summary>
+    public required IReadOnlyList<DatabaseObject> Missing { get; init; }
 }

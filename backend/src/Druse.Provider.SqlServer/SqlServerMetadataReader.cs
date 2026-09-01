@@ -1,7 +1,11 @@
+using System.Collections.ObjectModel;
 using System.Data.Common;
+using System.Globalization;
+using System.Text;
 using Druse.Database.Abstractions;
 using Druse.Domain;
 using Microsoft.Data.SqlClient;
+using static Druse.Database.Abstractions.MetadataBatch;
 
 namespace Druse.Provider.SqlServer;
 
@@ -15,6 +19,9 @@ namespace Druse.Provider.SqlServer;
 /// </summary>
 public sealed class SqlServerMetadataReader : IDatabaseMetadataReader
 {
+    /// <summary>Esquema al que pertenece una tabla cuando nadie dice otro.</summary>
+    private const string DefaultSchema = "dbo";
+
     /// <summary>Esquemas del sistema que no aportan nada al usuario.</summary>
     private const string SystemSchemaFilter = """
         s.name NOT IN ('sys', 'INFORMATION_SCHEMA', 'guest', 'db_owner', 'db_accessadmin',
@@ -70,7 +77,30 @@ public sealed class SqlServerMetadataReader : IDatabaseMetadataReader
     {
         ArgumentNullException.ThrowIfNull(table);
 
-        const string Sql = """
+        var columns = await GetColumnsAsync(session, [table], cancellationToken);
+
+        return columns.TryGetValue(Key(table), out var found) ? found : [];
+    }
+
+    /// <summary>
+    /// Columnas de varias tablas a la vez.
+    ///
+    /// Misma consulta, otro filtro: donde había un esquema y un nombre hay ahora
+    /// una tabla derivada con los pares pedidos.
+    /// </summary>
+    private static async Task<IReadOnlyDictionary<TableRef, IReadOnlyList<DatabaseColumn>>> GetColumnsAsync(
+        IDatabaseSession session,
+        IReadOnlyList<DatabaseObject> tables,
+        CancellationToken cancellationToken)
+    {
+        if (tables.Count == 0)
+        {
+            return ReadOnlyDictionary<TableRef, IReadOnlyList<DatabaseColumn>>.Empty;
+        }
+
+        var (values, parameters) = Wanted(tables);
+
+        var sql = $"""
             SELECT
                 c.name,
                 t.name AS type_name,
@@ -85,11 +115,15 @@ public sealed class SqlServerMetadataReader : IDatabaseMetadataReader
                            OR c.is_computed = 1
                            OR c.generated_always_type <> 0
                            OR t.name IN ('timestamp', 'rowversion')
-                     THEN 1 ELSE 0 END AS is_generated
+                     THEN 1 ELSE 0 END AS is_generated,
+                s.name AS owner_schema,
+                o.name AS owner_table
             FROM sys.columns c
             JOIN sys.objects o     ON o.object_id = c.object_id
             JOIN sys.schemas s     ON s.schema_id = o.schema_id
             JOIN sys.types t       ON t.user_type_id = c.user_type_id
+            JOIN (VALUES {values}) AS want(schema_name, table_name)
+                ON want.schema_name = s.name AND want.table_name = o.name
             LEFT JOIN sys.default_constraints dc ON dc.object_id = c.default_object_id
             LEFT JOIN (
                 SELECT ic.object_id, ic.column_id
@@ -97,31 +131,32 @@ public sealed class SqlServerMetadataReader : IDatabaseMetadataReader
                 JOIN sys.indexes i ON i.object_id = ic.object_id AND i.index_id = ic.index_id
                 WHERE i.is_primary_key = 1
             ) pk ON pk.object_id = c.object_id AND pk.column_id = c.column_id
-            WHERE s.name = @schema
-              AND o.name = @table
-            ORDER BY c.column_id
+            ORDER BY s.name, o.name, c.column_id
             """;
 
-        return await QueryAsync(
+        var rows = await QueryAsync(
             session,
-            Sql,
-            reader => new DatabaseColumn
-            {
-                Name = reader.GetString(0),
-                DataType = FormatType(
-                    reader.GetString(1),
-                    reader.GetInt16(2),
-                    reader.GetByte(3),
-                    reader.GetByte(4)),
-                IsNullable = reader.GetBoolean(5),
-                IsPrimaryKey = reader.GetInt32(6) != 0,
-                DefaultValue = reader.IsDBNull(7) ? null : reader.GetString(7),
-                Ordinal = reader.GetInt32(8),
-                IsGenerated = reader.GetInt32(9) != 0,
-            },
+            sql,
+            reader => (
+                Owner: Owner(reader, 10),
+                Column: new DatabaseColumn
+                {
+                    Name = reader.GetString(0),
+                    DataType = FormatType(
+                        reader.GetString(1),
+                        reader.GetInt16(2),
+                        reader.GetByte(3),
+                        reader.GetByte(4)),
+                    IsNullable = reader.GetBoolean(5),
+                    IsPrimaryKey = reader.GetInt32(6) != 0,
+                    DefaultValue = reader.IsDBNull(7) ? null : reader.GetString(7),
+                    Ordinal = reader.GetInt32(8),
+                    IsGenerated = reader.GetInt32(9) != 0,
+                }),
             cancellationToken,
-            ("schema", table.Schema ?? "dbo"),
-            ("table", table.Name));
+            parameters);
+
+        return GroupByTable(rows);
     }
 
     public Task<string> GetDefinitionAsync(
@@ -148,29 +183,80 @@ public sealed class SqlServerMetadataReader : IDatabaseMetadataReader
     {
         ArgumentNullException.ThrowIfNull(table);
 
-        var schema = table.Schema ?? "dbo";
+        var structures = await GetStructuresAsync(session, [table], cancellationToken);
 
-        var indexes = await GetIndexesAsync(session, schema, table.Name, cancellationToken);
-        var foreignKeys = await GetForeignKeysAsync(session, schema, table.Name, cancellationToken);
-        var uniques = await GetUniqueConstraintsAsync(session, schema, table.Name, cancellationToken);
-        var checks = await GetCheckConstraintsAsync(session, schema, table.Name, cancellationToken);
+        return structures.TryGetValue(Key(table), out var found) ? found : new TableStructure();
+    }
 
-        var primary = indexes.FirstOrDefault(index => index.IsPrimaryKey);
+    /// <summary>
+    /// Columnas y estructura de varias tablas en cinco consultas, sean dos tablas
+    /// o sesenta.
+    /// </summary>
+    public async Task<IReadOnlyList<TableDetail>> GetTableDetailsAsync(
+        IDatabaseSession session,
+        IReadOnlyList<DatabaseObject> tables,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(tables);
 
-        return new TableStructure
+        if (tables.Count == 0)
         {
-            PrimaryKey = primary is null
-                ? null
-                : new DatabasePrimaryKey
-                {
-                    Name = primary.Name,
-                    Columns = [.. primary.Columns.Select(column => column.Name)],
-                },
-            Indexes = indexes,
-            ForeignKeys = foreignKeys,
-            UniqueConstraints = uniques,
-            CheckConstraints = checks,
-        };
+            return [];
+        }
+
+        var columns = await GetColumnsAsync(session, tables, cancellationToken);
+        var structures = await GetStructuresAsync(session, tables, cancellationToken);
+
+        return Compose(tables, Key, columns, structures);
+    }
+
+    /// <summary>Estructura de varias tablas, en cuatro consultas.</summary>
+    private static async Task<IReadOnlyDictionary<TableRef, TableStructure>> GetStructuresAsync(
+        IDatabaseSession session,
+        IReadOnlyList<DatabaseObject> tables,
+        CancellationToken cancellationToken)
+    {
+        if (tables.Count == 0)
+        {
+            return ReadOnlyDictionary<TableRef, TableStructure>.Empty;
+        }
+
+        var indexes = await GetIndexesAsync(session, tables, cancellationToken);
+        var foreignKeys = await GetForeignKeysAsync(session, tables, cancellationToken);
+        var uniques = await GetUniqueConstraintsAsync(session, tables, cancellationToken);
+        var checks = await GetCheckConstraintsAsync(session, tables, cancellationToken);
+
+        var structures = new Dictionary<TableRef, TableStructure>();
+
+        foreach (var table in tables)
+        {
+            var key = Key(table);
+
+            if (structures.ContainsKey(key))
+            {
+                continue;
+            }
+
+            var own = indexes.TryGetValue(key, out var found) ? found : [];
+            var primary = own.FirstOrDefault(index => index.IsPrimaryKey);
+
+            structures[key] = new TableStructure
+            {
+                PrimaryKey = primary is null
+                    ? null
+                    : new DatabasePrimaryKey
+                    {
+                        Name = primary.Name,
+                        Columns = [.. primary.Columns.Select(column => column.Name)],
+                    },
+                Indexes = own,
+                ForeignKeys = foreignKeys.TryGetValue(key, out var keys) ? keys : [],
+                UniqueConstraints = uniques.TryGetValue(key, out var unique) ? unique : [],
+                CheckConstraints = checks.TryGetValue(key, out var check) ? check : [],
+            };
+        }
+
+        return structures;
     }
 
     /// <summary>
@@ -181,13 +267,14 @@ public sealed class SqlServerMetadataReader : IDatabaseMetadataReader
     /// sentido. Las columnas se juntan con <c>STRING_AGG</c> ordenando por
     /// <c>key_ordinal</c>, porque en un índice el orden es lo que decide su uso.
     /// </summary>
-    private static async Task<IReadOnlyList<DatabaseIndex>> GetIndexesAsync(
+    private static async Task<IReadOnlyDictionary<TableRef, IReadOnlyList<DatabaseIndex>>> GetIndexesAsync(
         IDatabaseSession session,
-        string schema,
-        string table,
+        IReadOnlyList<DatabaseObject> tables,
         CancellationToken cancellationToken)
     {
-        const string Sql = """
+        var (values, parameters) = Wanted(tables);
+
+        var sql = $"""
             SELECT
                 i.name,
                 i.is_unique,
@@ -214,21 +301,23 @@ public sealed class SqlServerMetadataReader : IDatabaseMetadataReader
                     WHERE ic.object_id = i.object_id
                       AND ic.index_id = i.index_id
                       AND ic.is_included_column = 1
-                )
+                ),
+                s.name AS owner_schema,
+                t.name AS owner_table
             FROM sys.indexes i
             JOIN sys.tables t   ON t.object_id = i.object_id
             JOIN sys.schemas s  ON s.schema_id = t.schema_id
-            WHERE s.name = @schema
-              AND t.name = @table
-              AND i.index_id > 0
+            JOIN (VALUES {values}) AS want(schema_name, table_name)
+                ON want.schema_name = s.name AND want.table_name = t.name
+            WHERE i.index_id > 0
               AND i.name IS NOT NULL
-            ORDER BY i.name
+            ORDER BY s.name, t.name, i.name
             """;
 
-        return await QueryAsync(
+        var rows = await QueryAsync(
             session,
-            Sql,
-            reader => new DatabaseIndex
+            sql,
+            reader => (Owner: Owner(reader, 8), Index: new DatabaseIndex
             {
                 Name = reader.GetString(0),
                 IsUnique = reader.GetBoolean(1),
@@ -238,21 +327,23 @@ public sealed class SqlServerMetadataReader : IDatabaseMetadataReader
                 Filter = reader.IsDBNull(5) ? null : reader.GetString(5),
                 Columns = reader.IsDBNull(6) ? [] : ParseIndexColumns(reader.GetString(6)),
                 IncludedColumns = reader.IsDBNull(7) ? [] : Split(reader.GetString(7)),
-            },
+            }),
             cancellationToken,
-            ("schema", schema),
-            ("table", table));
+            parameters);
+
+        return GroupByTable(rows);
     }
 
-    private static async Task<IReadOnlyList<DatabaseForeignKey>> GetForeignKeysAsync(
+    private static async Task<IReadOnlyDictionary<TableRef, IReadOnlyList<DatabaseForeignKey>>> GetForeignKeysAsync(
         IDatabaseSession session,
-        string schema,
-        string table,
+        IReadOnlyList<DatabaseObject> tables,
         CancellationToken cancellationToken)
     {
+        var (values, parameters) = Wanted(tables);
+
         // Las dos listas de columnas se ordenan por `constraint_column_id`, que es
         // lo que las empareja: son posicionales, no coincidentes por nombre.
-        const string Sql = """
+        var sql = $"""
             SELECT
                 fk.name,
                 rs.name AS referenced_schema,
@@ -272,21 +363,23 @@ public sealed class SqlServerMetadataReader : IDatabaseMetadataReader
                     JOIN sys.columns c
                       ON c.object_id = fkc.referenced_object_id AND c.column_id = fkc.referenced_column_id
                     WHERE fkc.constraint_object_id = fk.object_id
-                )
+                ),
+                s.name AS owner_schema,
+                t.name AS owner_table
             FROM sys.foreign_keys fk
             JOIN sys.tables t   ON t.object_id = fk.parent_object_id
             JOIN sys.schemas s  ON s.schema_id = t.schema_id
             JOIN sys.tables rt  ON rt.object_id = fk.referenced_object_id
             JOIN sys.schemas rs ON rs.schema_id = rt.schema_id
-            WHERE s.name = @schema
-              AND t.name = @table
-            ORDER BY fk.name
+            JOIN (VALUES {values}) AS want(schema_name, table_name)
+                ON want.schema_name = s.name AND want.table_name = t.name
+            ORDER BY s.name, t.name, fk.name
             """;
 
-        return await QueryAsync(
+        var rows = await QueryAsync(
             session,
-            Sql,
-            reader => new DatabaseForeignKey
+            sql,
+            reader => (Owner: Owner(reader, 7), Key: new DatabaseForeignKey
             {
                 Name = reader.GetString(0),
                 ReferencedSchema = reader.GetString(1),
@@ -295,19 +388,21 @@ public sealed class SqlServerMetadataReader : IDatabaseMetadataReader
                 OnUpdate = ParseAction(reader.GetByte(4)),
                 Columns = reader.IsDBNull(5) ? [] : Split(reader.GetString(5)),
                 ReferencedColumns = reader.IsDBNull(6) ? [] : Split(reader.GetString(6)),
-            },
+            }),
             cancellationToken,
-            ("schema", schema),
-            ("table", table));
+            parameters);
+
+        return GroupByTable(rows);
     }
 
-    private static async Task<IReadOnlyList<DatabaseUniqueConstraint>> GetUniqueConstraintsAsync(
+    private static async Task<IReadOnlyDictionary<TableRef, IReadOnlyList<DatabaseUniqueConstraint>>> GetUniqueConstraintsAsync(
         IDatabaseSession session,
-        string schema,
-        string table,
+        IReadOnlyList<DatabaseObject> tables,
         CancellationToken cancellationToken)
     {
-        const string Sql = """
+        var (values, parameters) = Wanted(tables);
+
+        var sql = $"""
             SELECT
                 i.name,
                 (
@@ -318,56 +413,61 @@ public sealed class SqlServerMetadataReader : IDatabaseMetadataReader
                     WHERE ic.object_id = i.object_id
                       AND ic.index_id = i.index_id
                       AND ic.is_included_column = 0
-                )
+                ),
+                s.name AS owner_schema,
+                t.name AS owner_table
             FROM sys.indexes i
             JOIN sys.tables t   ON t.object_id = i.object_id
             JOIN sys.schemas s  ON s.schema_id = t.schema_id
-            WHERE s.name = @schema
-              AND t.name = @table
-              AND i.is_unique_constraint = 1
-            ORDER BY i.name
+            JOIN (VALUES {values}) AS want(schema_name, table_name)
+                ON want.schema_name = s.name AND want.table_name = t.name
+            WHERE i.is_unique_constraint = 1
+            ORDER BY s.name, t.name, i.name
             """;
 
-        return await QueryAsync(
+        var rows = await QueryAsync(
             session,
-            Sql,
-            reader => new DatabaseUniqueConstraint
+            sql,
+            reader => (Owner: Owner(reader, 2), Constraint: new DatabaseUniqueConstraint
             {
                 Name = reader.GetString(0),
                 Columns = reader.IsDBNull(1) ? [] : Split(reader.GetString(1)),
-            },
+            }),
             cancellationToken,
-            ("schema", schema),
-            ("table", table));
+            parameters);
+
+        return GroupByTable(rows);
     }
 
-    private static async Task<IReadOnlyList<DatabaseCheckConstraint>> GetCheckConstraintsAsync(
+    private static async Task<IReadOnlyDictionary<TableRef, IReadOnlyList<DatabaseCheckConstraint>>> GetCheckConstraintsAsync(
         IDatabaseSession session,
-        string schema,
-        string table,
+        IReadOnlyList<DatabaseObject> tables,
         CancellationToken cancellationToken)
     {
-        const string Sql = """
-            SELECT cc.name, cc.definition
+        var (values, parameters) = Wanted(tables);
+
+        var sql = $"""
+            SELECT cc.name, cc.definition, s.name AS owner_schema, t.name AS owner_table
             FROM sys.check_constraints cc
             JOIN sys.tables t   ON t.object_id = cc.parent_object_id
             JOIN sys.schemas s  ON s.schema_id = t.schema_id
-            WHERE s.name = @schema
-              AND t.name = @table
-            ORDER BY cc.name
+            JOIN (VALUES {values}) AS want(schema_name, table_name)
+                ON want.schema_name = s.name AND want.table_name = t.name
+            ORDER BY s.name, t.name, cc.name
             """;
 
-        return await QueryAsync(
+        var rows = await QueryAsync(
             session,
-            Sql,
-            reader => new DatabaseCheckConstraint
+            sql,
+            reader => (Owner: Owner(reader, 2), Constraint: new DatabaseCheckConstraint
             {
                 Name = reader.GetString(0),
                 Expression = Unwrap(reader.GetString(1)),
-            },
+            }),
             cancellationToken,
-            ("schema", schema),
-            ("table", table));
+            parameters);
+
+        return GroupByTable(rows);
     }
 
     /// <summary>
@@ -863,6 +963,54 @@ public sealed class SqlServerMetadataReader : IDatabaseMetadataReader
                 return typeName;
         }
     }
+
+    /// <summary>
+    /// Las tablas pedidas como una tabla derivada de <c>VALUES</c>.
+    ///
+    /// SQL Server no sabe recorrer dos arreglos como hace PostgreSQL con
+    /// <c>unnest</c>, y un tipo tabla obligaría a crearlo dentro de la base del
+    /// usuario. Lo que se interpola en la consulta es **solo la lista de nombres
+    /// de parámetro** —`(@s0, @n0), (@s1, @n1)`—, que son constantes generadas
+    /// aquí: ningún nombre de esquema ni de tabla entra en el texto del SQL.
+    ///
+    /// El tope de parámetros de SQL Server son 2100, así que caben mil tablas en
+    /// una lectura. Un diagrama con mil tablas tiene otros problemas antes.
+    /// </summary>
+    private static (string Values, (string Name, object Value)[] Parameters) Wanted(
+        IReadOnlyList<DatabaseObject> tables)
+    {
+        var wanted = Unique(tables, Key);
+        var values = new StringBuilder();
+        var parameters = new (string Name, object Value)[wanted.Count * 2];
+
+        for (var index = 0; index < wanted.Count; index++)
+        {
+            if (index > 0)
+            {
+                values.Append(", ");
+            }
+
+            values.Append(CultureInfo.InvariantCulture, $"(@s{index}, @n{index})");
+
+            parameters[index * 2] = ($"s{index}", wanted[index].Schema ?? DefaultSchema);
+            parameters[(index * 2) + 1] = ($"n{index}", wanted[index].Name);
+        }
+
+        return (values.ToString(), parameters);
+    }
+
+    /// <summary>
+    /// La tabla a la que pertenece la fila que se está leyendo. Las dos columnas
+    /// van al final de cada consulta para no descolocar lo que ya se leía.
+    /// </summary>
+    private static TableRef Owner(DbDataReader reader, int index) =>
+        new(reader.GetString(index), reader.GetString(index + 1));
+
+    /// <summary>
+    /// Clave con la que se busca una tabla en lo leído, con el esquema por
+    /// omisión ya aplicado igual que lo hace el filtro de la consulta.
+    /// </summary>
+    private static TableRef Key(DatabaseObject table) => new(table.Schema ?? DefaultSchema, table.Name);
 
     /// <summary>Ejecuta una consulta de catálogo y proyecta cada fila.</summary>
     private static async Task<IReadOnlyList<T>> QueryAsync<T>(

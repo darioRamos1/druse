@@ -1878,6 +1878,220 @@ public abstract class DatabaseProviderContractTests<TFixture>
         }
     }
 
+    /// <summary>
+    /// La lectura en lote la escribe **cada proveedor**.
+    ///
+    /// `IDatabaseMetadataReader` trae una implementación por defecto que recorre
+    /// las tablas de una en una, y existe solo para que un proveedor nuevo
+    /// arranque. Quedarse en ella funciona —devuelve lo mismo— pero convierte un
+    /// diagrama de sesenta tablas en más de doscientos viajes contra una conexión
+    /// que no admite dos cosas a la vez, y eso no se nota hasta que alguien abre
+    /// un esquema grande.
+    ///
+    /// Contar los viajes de verdad exigiría instrumentar los cuatro drivers, que
+    /// no comparten un punto por donde pasen todas sus consultas. Lo que sí se
+    /// puede comprobar sin ambigüedad es que el proveedor declara el método: si
+    /// no lo declara, se está quedando en la implementación base.
+    /// </summary>
+    [Fact]
+    public void LaLecturaEnLoteLaEscribeCadaProveedor()
+    {
+        var declared = Fixture.Metadata.GetType().GetMethod(
+            nameof(IDatabaseMetadataReader.GetTableDetailsAsync),
+            [typeof(IDatabaseSession), typeof(IReadOnlyList<DatabaseObject>), typeof(CancellationToken)]);
+
+        Assert.True(
+            declared is not null,
+            $"{Fixture.EngineName} no implementa GetTableDetailsAsync y se queda en la " +
+            "implementación por defecto, que hace una lectura por tabla.");
+    }
+
+    /// <summary>
+    /// Leer varias tablas de una vez devuelve exactamente lo mismo que leerlas
+    /// una a una.
+    ///
+    /// Es la comprobación que importa: una consulta que abarca varias tablas se
+    /// rompe siempre por el mismo sitio —los índices de una acaban colgando de
+    /// otra—, y ese fallo no se ve mirando una sola tabla. Por eso hay tres: una
+    /// con clave foránea, la que la recibe, y una suelta que no debe heredar
+    /// nada.
+    ///
+    /// La cuarta que se pide **no existe**, y comprobar que no vuelve es lo que
+    /// sostiene el aviso de la interfaz cuando un diagrama guardado nombra una
+    /// tabla que alguien borró.
+    /// </summary>
+    [Fact]
+    public async Task LeeVariasTablasDeUnaVez_YDevuelveLoMismoQueUnaAUna()
+    {
+        if (Skip) { return; }
+
+        await using var session = await OpenAsync();
+
+        var suffix = Guid.NewGuid().ToString("N")[..8];
+        var parent = $"druse_lote_p_{suffix}";
+        var child = $"druse_lote_h_{suffix}";
+        var alone = $"druse_lote_s_{suffix}";
+
+        DatabaseObject Target(string name) => new()
+        {
+            Id = name,
+            Name = name,
+            Kind = DatabaseObjectKind.Table,
+            Database = Fixture.DatabaseName,
+            Schema = Fixture.DefaultSchema,
+        };
+
+        try
+        {
+            await Fixture.Designer.CreateAsync(
+                session,
+                new TableDefinition
+                {
+                    Database = Fixture.DatabaseName,
+                    Schema = Fixture.DefaultSchema,
+                    Name = parent,
+                    Columns =
+                    [
+                        new TableColumnDefinition
+                        {
+                            Name = "id",
+                            DataType = "INTEGER",
+                            IsNullable = false,
+                            IsPrimaryKey = true,
+                        },
+                        new TableColumnDefinition { Name = "codigo", DataType = "VARCHAR(20)" },
+                    ],
+                },
+                CancellationToken.None);
+
+            await Fixture.Designer.CreateAsync(
+                session,
+                new TableDefinition
+                {
+                    Database = Fixture.DatabaseName,
+                    Schema = Fixture.DefaultSchema,
+                    Name = child,
+                    Columns =
+                    [
+                        new TableColumnDefinition
+                        {
+                            Name = "id",
+                            DataType = "INTEGER",
+                            IsNullable = false,
+                            IsPrimaryKey = true,
+                        },
+                        new TableColumnDefinition { Name = "padre_id", DataType = "INTEGER" },
+                    ],
+                },
+                CancellationToken.None);
+
+            await Fixture.Designer.CreateAsync(
+                session,
+                new TableDefinition
+                {
+                    Database = Fixture.DatabaseName,
+                    Schema = Fixture.DefaultSchema,
+                    Name = alone,
+                    Columns =
+                    [
+                        new TableColumnDefinition
+                        {
+                            Name = "id",
+                            DataType = "INTEGER",
+                            IsNullable = false,
+                            IsPrimaryKey = true,
+                        },
+                    ],
+                },
+                CancellationToken.None);
+
+            await Fixture.Designer.AlterAsync(
+                session,
+                new TableAlteration
+                {
+                    Table = Target(child),
+                    AddedForeignKeys =
+                    [
+                        new ForeignKeyDefinition
+                        {
+                            Name = $"fk_{child}",
+                            Columns = ["padre_id"],
+                            ReferencedSchema = Fixture.DefaultSchema,
+                            ReferencedTable = parent,
+                            ReferencedColumns = ["id"],
+                        },
+                    ],
+                },
+                CancellationToken.None);
+
+            var wanted = new[]
+            {
+                Target(parent),
+                Target(child),
+                Target(alone),
+                Target($"druse_lote_x_{suffix}"),
+            };
+
+            var batch = await Fixture.Metadata.GetTableDetailsAsync(
+                session,
+                wanted,
+                CancellationToken.None);
+
+            // La que no existe no vuelve, y las otras tres sí, en el orden pedido.
+            Assert.Equal(
+                new[] { parent, child, alone },
+                batch.Select(detail => detail.Table.Name));
+
+            foreach (var table in wanted.Take(3))
+            {
+                var columns = await Fixture.Metadata.GetColumnsAsync(
+                    session,
+                    table,
+                    CancellationToken.None);
+
+                var structure = await Fixture.Metadata.GetTableStructureAsync(
+                    session,
+                    table,
+                    CancellationToken.None);
+
+                var detail = batch.Single(entry => entry.Table.Name == table.Name);
+
+                Assert.Equal(
+                    columns.Select(column => (column.Name, column.IsPrimaryKey, column.Ordinal)),
+                    detail.Columns.Select(column => (column.Name, column.IsPrimaryKey, column.Ordinal)));
+
+                Assert.Equal(
+                    structure.PrimaryKey?.Columns ?? [],
+                    detail.Structure.PrimaryKey?.Columns ?? []);
+
+                Assert.Equal(
+                    structure.ForeignKeys.Select(key => (key.Name, Columns: string.Join(",", key.Columns), key.ReferencedTable)),
+                    detail.Structure.ForeignKeys.Select(key => (key.Name, Columns: string.Join(",", key.Columns), key.ReferencedTable)));
+
+                Assert.Equal(
+                    structure.Indexes.Select(index => index.Name).Order(StringComparer.Ordinal),
+                    detail.Structure.Indexes.Select(index => index.Name).Order(StringComparer.Ordinal));
+
+                Assert.Equal(
+                    structure.UniqueConstraints.Select(unique => unique.Name).Order(StringComparer.Ordinal),
+                    detail.Structure.UniqueConstraints.Select(unique => unique.Name).Order(StringComparer.Ordinal));
+            }
+
+            // Lo que la lectura conjunta puede romper: que lo de una tabla se
+            // cuele en otra. La tabla suelta no tiene claves foráneas y la hija
+            // tiene exactamente una.
+            Assert.Empty(batch.Single(detail => detail.Table.Name == alone).Structure.ForeignKeys);
+            Assert.Single(batch.Single(detail => detail.Table.Name == child).Structure.ForeignKeys);
+            Assert.Empty(batch.Single(detail => detail.Table.Name == parent).Structure.ForeignKeys);
+        }
+        finally
+        {
+            await ExecuteAsync(session, Fixture.DropTable(child));
+            await ExecuteAsync(session, Fixture.DropTable(parent));
+            await ExecuteAsync(session, Fixture.DropTable(alone));
+        }
+    }
+
     // -----------------------------------------------------------------------
     // Escribir sobre lo que ya está
     // -----------------------------------------------------------------------

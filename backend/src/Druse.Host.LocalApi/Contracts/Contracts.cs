@@ -664,6 +664,34 @@ public sealed record TableStructureResponse
     public required IReadOnlyList<DatabaseConstraintDto> CheckConstraints { get; init; }
 }
 
+/// <summary>Las tablas cuyo grafo se quiere leer, en una sola petición.</summary>
+public sealed record SchemaGraphRequest
+{
+    public required IReadOnlyList<DatabaseObjectDto> Tables { get; init; }
+}
+
+/// <summary>Una tabla del grafo, con todo lo que hace falta para dibujarla.</summary>
+public sealed record TableDetailResponse
+{
+    public required DatabaseObjectDto Table { get; init; }
+    public required IReadOnlyList<DatabaseColumnDto> Columns { get; init; }
+    public required TableStructureResponse Structure { get; init; }
+}
+
+/// <summary>
+/// Lo leído de las tablas pedidas.
+///
+/// `missing` no es una lista de errores: son las tablas que se pidieron y ya no
+/// están en el catálogo. Un diagrama guardado hace meses las trae, y la interfaz
+/// tiene que poder decir cuáles se fueron en vez de dibujar menos cajas sin
+/// explicación.
+/// </summary>
+public sealed record SchemaGraphResponse
+{
+    public required IReadOnlyList<TableDetailResponse> Tables { get; init; }
+    public required IReadOnlyList<DatabaseObjectDto> Missing { get; init; }
+}
+
 /// <summary>
 /// Un parámetro de un procedimiento, para dibujar su formulario.
 ///

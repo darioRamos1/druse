@@ -1,8 +1,10 @@
+using System.Collections.ObjectModel;
 using System.Data.Common;
 using System.Globalization;
 using System.Text;
 using Druse.Database.Abstractions;
 using Druse.Domain;
+using static Druse.Database.Abstractions.MetadataBatch;
 using IBM.Data.Db2;
 
 namespace Druse.Provider.Informix;
@@ -112,6 +114,32 @@ public sealed class InformixMetadataReader : IDatabaseMetadataReader
     {
         ArgumentNullException.ThrowIfNull(table);
 
+        var constraints = await GetConstraintsAsync(session, [table], withChecks: false, cancellationToken);
+        var columns = await GetColumnsAsync(session, [table], constraints, cancellationToken);
+
+        return columns.TryGetValue(Key(session, table), out var found) ? found : [];
+    }
+
+    /// <summary>
+    /// Columnas de varias tablas a la vez, ya marcadas con su clave primaria.
+    ///
+    /// La primaria no está en <c>syscolumns</c> y llega en
+    /// <paramref name="constraints"/>, que se lee antes: pedirla aquí por cada
+    /// tabla sería volver al viaje por tabla que esta lectura existe para evitar.
+    /// </summary>
+    private static async Task<IReadOnlyDictionary<TableRef, IReadOnlyList<DatabaseColumn>>> GetColumnsAsync(
+        IDatabaseSession session,
+        IReadOnlyList<DatabaseObject> tables,
+        IReadOnlyDictionary<TableRef, TableConstraintSet> constraints,
+        CancellationToken cancellationToken)
+    {
+        if (tables.Count == 0)
+        {
+            return ReadOnlyDictionary<TableRef, IReadOnlyList<DatabaseColumn>>.Empty;
+        }
+
+        var (filter, parameters) = Wanted(session, tables);
+
         // `default` de una columna vive en `sysdefaults`, con el valor en `default`
         // y una letra en `type` que dice de qué clase es. Se toma solo el literal,
         // que es lo que el diseñador puede volver a escribir.
@@ -120,7 +148,7 @@ public sealed class InformixMetadataReader : IDatabaseMetadataReader
         // `CLOB` y `LVARCHAR` comparten `coltype` y solo se distinguen por su
         // nombre extendido. Sin este `JOIN`, un `BOOLEAN` se anuncia como `CLOB`
         // —lo hacía— y entonces se le escriben literales de texto.
-        const string Sql = """
+        var sql = $"""
             SELECT
                 c.colname,
                 c.coltype,
@@ -128,25 +156,27 @@ public sealed class InformixMetadataReader : IDatabaseMetadataReader
                 c.colno,
                 d.type,
                 d.default,
-                x.name
+                x.name,
+                t.tabname,
+                t.owner
             FROM syscolumns c
             JOIN systables t ON t.tabid = c.tabid
             LEFT JOIN sysdefaults d ON d.tabid = c.tabid AND d.colno = c.colno
             LEFT JOIN sysxtdtypes x ON x.extended_id = c.extended_id
-            WHERE t.tabname = ? AND t.owner = ?
-            ORDER BY c.colno
+            WHERE {filter}
+            ORDER BY t.owner, t.tabname, c.colno
             """;
 
-        var columns = await QueryAsync(
+        var rows = await QueryAsync(
             session,
-            Sql,
+            sql,
             reader =>
             {
                 var coltype = Number(reader, 1);
                 var collength = Number(reader, 2);
                 var extended = reader.IsDBNull(6) ? null : Text(reader, 6);
 
-                return new DatabaseColumn
+                return (Owner: OwnerOf(reader, 7), Column: new DatabaseColumn
                 {
                     Name = Text(reader, 0),
                     DataType = InformixTypeNames.Format(coltype, collength, extended),
@@ -156,19 +186,19 @@ public sealed class InformixMetadataReader : IDatabaseMetadataReader
                     IsGenerated = InformixTypeNames.IsSerial(coltype),
                     DefaultValue = DefaultValue(reader, 4, 5, coltype),
                     Ordinal = (short)Number(reader, 3),
-                };
+                });
             },
             cancellationToken,
-            table.Name,
-            Owner(session, table));
+            parameters);
 
-        var key = await GetPrimaryKeyColumnsAsync(session, table, cancellationToken);
+        return GroupByTable(rows.Select(row =>
+        {
+            var key = constraints.TryGetValue(row.Owner, out var set) ? set.Primary?.Columns ?? [] : [];
 
-        return key.Count == 0
-            ? columns
-            : [.. columns.Select(column => key.Contains(column.Name)
-                ? column with { IsPrimaryKey = true }
-                : column)];
+            return (row.Owner, key.Contains(row.Column.Name)
+                ? row.Column with { IsPrimaryKey = true }
+                : row.Column);
+        }));
     }
 
     public Task<string> GetDefinitionAsync(
@@ -195,13 +225,59 @@ public sealed class InformixMetadataReader : IDatabaseMetadataReader
     {
         ArgumentNullException.ThrowIfNull(table);
 
-        var indexes = await GetIndexesAsync(session, table, cancellationToken);
-        var (primary, primaryIndex, unique, foreignKeys, checks, constraintIndexes) =
-            await GetConstraintsAsync(session, table, cancellationToken);
+        var constraints = await GetConstraintsAsync(session, [table], withChecks: true, cancellationToken);
+
+        return Structure(Key(session, table), constraints);
+    }
+
+    /// <summary>
+    /// Columnas y estructura de varias tablas en cinco consultas, sean dos tablas
+    /// o sesenta.
+    ///
+    /// Es donde más se nota: leerlas de una en una costaba aquí unas diez
+    /// consultas por tabla, porque el catálogo de Informix obliga a resolver los
+    /// números de columna, los índices y las restricciones antes de poder decir
+    /// nada de una tabla.
+    /// </summary>
+    public async Task<IReadOnlyList<TableDetail>> GetTableDetailsAsync(
+        IDatabaseSession session,
+        IReadOnlyList<DatabaseObject> tables,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(tables);
+
+        if (tables.Count == 0)
+        {
+            return [];
+        }
+
+        var constraints = await GetConstraintsAsync(session, tables, withChecks: true, cancellationToken);
+        var columns = await GetColumnsAsync(session, tables, constraints, cancellationToken);
+
+        var structures = new Dictionary<TableRef, TableStructure>();
+
+        foreach (var table in tables)
+        {
+            var key = Key(session, table);
+            structures.TryAdd(key, Structure(key, constraints));
+        }
+
+        return Compose(tables, table => Key(session, table), columns, structures);
+    }
+
+    /// <summary>Arma la estructura de una tabla con lo ya leído del catálogo.</summary>
+    private static TableStructure Structure(
+        TableRef table,
+        IReadOnlyDictionary<TableRef, TableConstraintSet> constraints)
+    {
+        if (!constraints.TryGetValue(table, out var set))
+        {
+            return new TableStructure();
+        }
 
         return new TableStructure
         {
-            PrimaryKey = primary,
+            PrimaryKey = set.Primary,
             // Un índice queda marcado como sostenido por una restricción si su
             // nombre aparece entre los índices que respaldan las restricciones,
             // que aquí incluyen las claves foráneas.
@@ -210,15 +286,15 @@ public sealed class InformixMetadataReader : IDatabaseMetadataReader
             // el de la restricción: aquí son dos nombres distintos.
             Indexes =
             [
-                .. indexes.Select(index => index with
+                .. set.Indexes.Select(index => index with
                 {
-                    IsPrimaryKey = primaryIndex is not null && index.Name == primaryIndex,
-                    IsConstraintIndex = constraintIndexes.Contains(index.Name),
+                    IsPrimaryKey = set.PrimaryIndex is not null && index.Name == set.PrimaryIndex,
+                    IsConstraintIndex = set.ConstraintIndexes.Contains(index.Name),
                 }),
             ],
-            ForeignKeys = foreignKeys,
-            UniqueConstraints = unique,
-            CheckConstraints = checks,
+            ForeignKeys = set.ForeignKeys,
+            UniqueConstraints = set.Unique,
+            CheckConstraints = set.Checks,
         };
     }
 
@@ -231,30 +307,39 @@ public sealed class InformixMetadataReader : IDatabaseMetadataReader
     /// `syscolumns` de una vez, así que se traen las partes y se resuelven contra
     /// los nombres ya leídos.
     /// </summary>
-    private static async Task<IReadOnlyList<DatabaseIndex>> GetIndexesAsync(
+    private static async Task<IReadOnlyDictionary<TableRef, IReadOnlyList<DatabaseIndex>>> GetIndexesAsync(
         IDatabaseSession session,
-        DatabaseObject table,
+        IReadOnlyList<DatabaseObject> tables,
         CancellationToken cancellationToken)
     {
-        const string Sql = """
+        var (filter, parameters) = Wanted(session, tables);
+
+        var sql = $"""
             SELECT
                 i.idxname,
                 i.idxtype,
                 i.part1, i.part2, i.part3, i.part4, i.part5, i.part6, i.part7, i.part8,
-                i.part9, i.part10, i.part11, i.part12, i.part13, i.part14, i.part15, i.part16
+                i.part9, i.part10, i.part11, i.part12, i.part13, i.part14, i.part15, i.part16,
+                t.tabname,
+                t.owner
             FROM sysindexes i
             JOIN systables t ON t.tabid = i.tabid
-            WHERE t.tabname = ? AND t.owner = ?
-            ORDER BY i.idxname
+            WHERE {filter}
+            ORDER BY t.owner, t.tabname, i.idxname
             """;
 
-        var names = await GetColumnNumbersAsync(session, table, cancellationToken);
+        var names = await GetColumnNumbersAsync(session, tables, cancellationToken);
 
-        return await QueryAsync(
+        var rows = await QueryAsync(
             session,
-            Sql,
+            sql,
             reader =>
             {
+                var owner = OwnerOf(reader, 18);
+                var byNumber = names.TryGetValue(owner, out var found)
+                    ? found
+                    : new Dictionary<int, string>();
+
                 var columns = new List<IndexColumn>();
 
                 for (var part = 0; part < 16; part++)
@@ -266,9 +351,9 @@ public sealed class InformixMetadataReader : IDatabaseMetadataReader
                         break;
                     }
 
-                    var number = Math.Abs((int)position);
+                    var number = Math.Abs(position);
 
-                    if (!names.TryGetValue(number, out var name))
+                    if (!byNumber.TryGetValue(number, out var name))
                     {
                         continue;
                     }
@@ -282,17 +367,18 @@ public sealed class InformixMetadataReader : IDatabaseMetadataReader
                     });
                 }
 
-                return new DatabaseIndex
+                return (Owner: owner, Index: new DatabaseIndex
                 {
                     Name = Text(reader, 0),
                     // `idxtype` es 'U' para único y 'D' para admitir duplicados.
                     IsUnique = Text(reader, 1).StartsWith('U'),
                     Columns = columns,
-                };
+                });
             },
             cancellationToken,
-            table.Name,
-            Owner(session, table));
+            parameters);
+
+        return GroupByTable(rows);
     }
 
     /// <summary>
@@ -302,19 +388,20 @@ public sealed class InformixMetadataReader : IDatabaseMetadataReader
     /// primaria, 'U' unicidad, 'R' referencial y 'C' comprobación. Cada una apunta
     /// a un índice cuyas columnas son las de la restricción.
     /// </summary>
-    private static async Task<(
-        DatabasePrimaryKey? Primary,
-        string? PrimaryIndex,
-        IReadOnlyList<DatabaseUniqueConstraint> Unique,
-        IReadOnlyList<DatabaseForeignKey> ForeignKeys,
-        IReadOnlyList<DatabaseCheckConstraint> Checks,
-        IReadOnlySet<string> ConstraintIndexes)>
-        GetConstraintsAsync(
-            IDatabaseSession session,
-            DatabaseObject table,
-            CancellationToken cancellationToken)
+    private static async Task<IReadOnlyDictionary<TableRef, TableConstraintSet>> GetConstraintsAsync(
+        IDatabaseSession session,
+        IReadOnlyList<DatabaseObject> tables,
+        bool withChecks,
+        CancellationToken cancellationToken)
     {
-        const string Sql = """
+        if (tables.Count == 0)
+        {
+            return ReadOnlyDictionary<TableRef, TableConstraintSet>.Empty;
+        }
+
+        var (filter, parameters) = Wanted(session, tables);
+
+        var sql = $"""
             SELECT
                 c.constrname,
                 c.constrtype,
@@ -322,19 +409,22 @@ public sealed class InformixMetadataReader : IDatabaseMetadataReader
                 c.constrid,
                 pt.tabname,
                 pt.owner,
-                r.delrule
+                r.delrule,
+                t.tabname,
+                t.owner
             FROM sysconstraints c
             JOIN systables t ON t.tabid = c.tabid
             LEFT JOIN sysreferences r ON r.constrid = c.constrid
             LEFT JOIN systables pt ON pt.tabid = r.ptabid
-            WHERE t.tabname = ? AND t.owner = ?
-            ORDER BY c.constrname
+            WHERE {filter}
+            ORDER BY t.owner, t.tabname, c.constrname
             """;
 
         var rows = await QueryAsync(
             session,
-            Sql,
+            sql,
             reader => (
+                Owner: OwnerOf(reader, 7),
                 Name: Text(reader, 0),
                 Type: Text(reader, 1),
                 IndexName: reader.IsDBNull(2) ? null : Text(reader, 2),
@@ -343,10 +433,57 @@ public sealed class InformixMetadataReader : IDatabaseMetadataReader
                 ReferencedOwner: reader.IsDBNull(5) ? null : Text(reader, 5),
                 DeleteRule: reader.IsDBNull(6) ? null : Text(reader, 6)),
             cancellationToken,
-            table.Name,
-            Owner(session, table));
+            parameters);
 
-        var indexes = await GetIndexesAsync(session, table, cancellationToken);
+        var indexes = await GetIndexesAsync(session, tables, cancellationToken);
+
+        // El texto de todas las condiciones de todas las tablas, en una lectura.
+        // `syschecks` las guarda troceadas y por identificador de restricción, así
+        // que se piden juntas y se reparten después.
+        var checkTexts = withChecks
+            ? await GetCheckTextsAsync(
+                session,
+                [.. rows.Where(row => row.Type == "C").Select(row => row.ConstraintId)],
+                cancellationToken)
+            : ReadOnlyDictionary<int, string>.Empty;
+
+        var sets = new Dictionary<TableRef, TableConstraintSet>();
+
+        foreach (var group in rows.GroupBy(row => row.Owner))
+        {
+            var own = indexes.TryGetValue(group.Key, out var found) ? found : [];
+            sets[group.Key] = Build(group.Key, [.. group], own, checkTexts);
+        }
+
+        // Una tabla puede no tener ni una restricción y sí tener índices sueltos.
+        foreach (var table in tables)
+        {
+            var key = Key(session, table);
+
+            if (!sets.ContainsKey(key))
+            {
+                sets[key] = Build(key, [], indexes.TryGetValue(key, out var own) ? own : [], checkTexts);
+            }
+        }
+
+        return sets;
+    }
+
+    /// <summary>Reparte las restricciones ya leídas de una tabla por su clase.</summary>
+    private static TableConstraintSet Build(
+        TableRef table,
+        IReadOnlyList<(
+            TableRef Owner,
+            string Name,
+            string Type,
+            string? IndexName,
+            int ConstraintId,
+            string? ReferencedTable,
+            string? ReferencedOwner,
+            string? DeleteRule)> rows,
+        IReadOnlyList<DatabaseIndex> indexes,
+        IReadOnlyDictionary<int, string> checkTexts)
+    {
         var byIndex = indexes.ToDictionary(index => index.Name, StringComparer.OrdinalIgnoreCase);
 
         IReadOnlyList<string> ColumnsOf(string? indexName) =>
@@ -400,16 +537,14 @@ public sealed class InformixMetadataReader : IDatabaseMetadataReader
             })
             .ToList();
 
-        var checks = new List<DatabaseCheckConstraint>();
-
-        foreach (var row in rows.Where(row => row.Type == "C"))
-        {
-            checks.Add(new DatabaseCheckConstraint
+        var checks = rows
+            .Where(row => row.Type == "C")
+            .Select(row => new DatabaseCheckConstraint
             {
                 Name = row.Name,
-                Expression = await GetCheckTextAsync(session, row.ConstraintId, cancellationToken),
-            });
-        }
+                Expression = checkTexts.TryGetValue(row.ConstraintId, out var text) ? text : string.Empty,
+            })
+            .ToList();
 
         // Todo índice que sostiene una restricción, sea del tipo que sea.
         //
@@ -424,7 +559,41 @@ public sealed class InformixMetadataReader : IDatabaseMetadataReader
             .Where(name => name.Length > 0)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
-        return (primary, primaryRow.IndexName, unique, foreignKeys, checks, constraintIndexes);
+        return new TableConstraintSet
+        {
+            Table = table,
+            Primary = primary,
+            PrimaryIndex = primaryRow.IndexName,
+            Indexes = indexes,
+            Unique = unique,
+            ForeignKeys = foreignKeys,
+            Checks = checks,
+            ConstraintIndexes = constraintIndexes,
+        };
+    }
+
+    /// <summary>Lo que Informix guarda de una tabla fuera de sus columnas.</summary>
+    private sealed record TableConstraintSet
+    {
+        public required TableRef Table { get; init; }
+
+        public DatabasePrimaryKey? Primary { get; init; }
+
+        /// <summary>
+        /// Nombre del **índice** que sostiene la primaria, que en Informix no es
+        /// el de la restricción.
+        /// </summary>
+        public string? PrimaryIndex { get; init; }
+
+        public required IReadOnlyList<DatabaseIndex> Indexes { get; init; }
+
+        public required IReadOnlyList<DatabaseUniqueConstraint> Unique { get; init; }
+
+        public required IReadOnlyList<DatabaseForeignKey> ForeignKeys { get; init; }
+
+        public required IReadOnlyList<DatabaseCheckConstraint> Checks { get; init; }
+
+        public required HashSet<string> ConstraintIndexes { get; init; }
     }
 
     /// <summary>
@@ -435,68 +604,136 @@ public sealed class InformixMetadataReader : IDatabaseMetadataReader
     /// escribió el usuario (`type = 'T'`). Se toma la segunda, que es la única
     /// legible.
     /// </summary>
-    private static async Task<string> GetCheckTextAsync(
+    private static async Task<IReadOnlyDictionary<int, string>> GetCheckTextsAsync(
         IDatabaseSession session,
-        int constraintId,
+        IReadOnlyList<int> constraintIds,
         CancellationToken cancellationToken)
     {
-        const string Sql = """
-            SELECT checktext
+        if (constraintIds.Count == 0)
+        {
+            return ReadOnlyDictionary<int, string>.Empty;
+        }
+
+        var wanted = constraintIds.Distinct().ToArray();
+        var placeholders = string.Join(", ", wanted.Select(_ => "?"));
+
+        var sql = $"""
+            SELECT constrid, checktext
             FROM syschecks
-            WHERE constrid = ? AND type = 'T'
-            ORDER BY seqno
+            WHERE constrid IN ({placeholders}) AND type = 'T'
+            ORDER BY constrid, seqno
             """;
 
         var parts = await QueryAsync(
             session,
-            Sql,
-            reader => Text(reader, 0),
+            sql,
+            reader => (Constraint: Number(reader, 0), Part: Text(reader, 1)),
             cancellationToken,
-            constraintId);
+            [.. wanted.Cast<object>()]);
 
-        var text = new StringBuilder();
+        var texts = new Dictionary<int, StringBuilder>();
 
-        foreach (var part in parts)
+        foreach (var (constraint, part) in parts)
         {
+            if (!texts.TryGetValue(constraint, out var text))
+            {
+                text = new StringBuilder();
+                texts[constraint] = text;
+            }
+
             text.Append(part);
         }
 
-        return text.ToString().Trim();
+        return texts.ToDictionary(entry => entry.Key, entry => entry.Value.ToString().Trim());
     }
 
-    private static async Task<IReadOnlyList<string>> GetPrimaryKeyColumnsAsync(
+    /// <summary>
+    /// Número de columna a nombre, por tabla, para resolver las partes de un
+    /// índice.
+    /// </summary>
+    private static async Task<IReadOnlyDictionary<TableRef, Dictionary<int, string>>> GetColumnNumbersAsync(
         IDatabaseSession session,
-        DatabaseObject table,
+        IReadOnlyList<DatabaseObject> tables,
         CancellationToken cancellationToken)
     {
-        var (primary, _, _, _, _, _) = await GetConstraintsAsync(session, table, cancellationToken);
+        var (filter, parameters) = Wanted(session, tables);
 
-        return primary?.Columns ?? [];
-    }
-
-    /// <summary>Número de columna a nombre, para resolver las partes de un índice.</summary>
-    private static async Task<Dictionary<int, string>> GetColumnNumbersAsync(
-        IDatabaseSession session,
-        DatabaseObject table,
-        CancellationToken cancellationToken)
-    {
-        const string Sql = """
-            SELECT c.colno, c.colname
+        var sql = $"""
+            SELECT c.colno, c.colname, t.tabname, t.owner
             FROM syscolumns c
             JOIN systables t ON t.tabid = c.tabid
-            WHERE t.tabname = ? AND t.owner = ?
+            WHERE {filter}
             """;
 
         var rows = await QueryAsync(
             session,
-            Sql,
-            reader => (Number: Number(reader, 0), Name: Text(reader, 1)),
+            sql,
+            reader => (Owner: OwnerOf(reader, 2), Number: Number(reader, 0), Name: Text(reader, 1)),
             cancellationToken,
-            table.Name,
-            Owner(session, table));
+            parameters);
 
-        return rows.ToDictionary(row => row.Number, row => row.Name);
+        var numbers = new Dictionary<TableRef, Dictionary<int, string>>();
+
+        foreach (var row in rows)
+        {
+            if (!numbers.TryGetValue(row.Owner, out var byNumber))
+            {
+                byNumber = [];
+                numbers[row.Owner] = byNumber;
+            }
+
+            byNumber[row.Number] = row.Name;
+        }
+
+        return numbers;
     }
+
+    /// <summary>
+    /// Las tablas pedidas como un filtro de pares.
+    ///
+    /// Informix no tiene <c>unnest</c> ni admite comparar tuplas, así que el
+    /// filtro es una cadena de `(tabname = ? AND owner = ?)` unidas por `OR`. Lo
+    /// que se interpola son **solo los signos de interrogación**: el proveedor de
+    /// IBM usa parámetros posicionales y ningún identificador entra en el texto.
+    /// </summary>
+    private static (string Filter, object[] Parameters) Wanted(
+        IDatabaseSession session,
+        IReadOnlyList<DatabaseObject> tables)
+    {
+        var wanted = Unique(tables, table => Key(session, table));
+        var filter = new StringBuilder();
+        var parameters = new object[wanted.Count * 2];
+
+        for (var index = 0; index < wanted.Count; index++)
+        {
+            if (index > 0)
+            {
+                filter.Append(" OR ");
+            }
+
+            filter.Append("(t.tabname = ? AND t.owner = ?)");
+
+            parameters[index * 2] = wanted[index].Name;
+            parameters[(index * 2) + 1] = wanted[index].Schema ?? session.Profile.Username;
+        }
+
+        return (filter.ToString(), parameters);
+    }
+
+    /// <summary>
+    /// La tabla a la que pertenece la fila que se está leyendo.
+    ///
+    /// El índice apunta a <c>tabname</c> y el propietario va justo detrás, en ese
+    /// orden porque es el que llevan las consultas. Ambos pasan por
+    /// <see cref="Text"/>: sin quitar el relleno, la clave no coincidiría nunca
+    /// con la que se construye desde el nodo.
+    /// </summary>
+    private static TableRef OwnerOf(DbDataReader reader, int index) =>
+        new(Text(reader, index + 1), Text(reader, index));
+
+    /// <summary>Clave con la que se busca una tabla en lo leído.</summary>
+    private static TableRef Key(IDatabaseSession session, DatabaseObject table) =>
+        new(Owner(session, table), table.Name);
 
     private static async Task<IReadOnlyList<DatabaseObject>> GetSchemasAsync(
         IDatabaseSession session,

@@ -384,6 +384,30 @@ internal static class DatabaseEndpoints
         })
         .WithName("GetColumns");
 
+        app.MapPost("/api/sessions/{sessionId:guid}/metadata/graph", async (
+            Guid sessionId,
+            SchemaGraphRequest request,
+            MetadataService metadata,
+            CancellationToken cancellationToken) =>
+        {
+            try
+            {
+                var graph = await metadata.GetSchemaGraphAsync(
+                    sessionId,
+                    [.. request.Tables.Select(table => table.ToDomain())],
+                    cancellationToken);
+
+                return Results.Ok(graph.ToResponse());
+            }
+            catch (ArgumentException error)
+            {
+                // Pedir vistas o más tablas de la cuenta es una petición mal
+                // formada, no un fallo del servidor: se contesta con el motivo.
+                return Results.BadRequest(new { message = error.Message });
+            }
+        })
+        .WithName("GetSchemaGraph");
+
         app.MapPost("/api/sessions/{sessionId:guid}/metadata/definition", async (
             Guid sessionId,
             DatabaseObjectDto databaseObject,

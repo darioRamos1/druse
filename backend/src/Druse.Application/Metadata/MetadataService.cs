@@ -15,6 +15,16 @@ public sealed class MetadataService(
     IProviderRegistry providers,
     ConnectionService connections)
 {
+    /// <summary>
+    /// Tope de tablas por lectura del grafo.
+    ///
+    /// No es el tamaño que se puede dibujar —eso lo decide quien mira— sino el
+    /// que se puede leer sin que una sola petición ocupe la conexión durante
+    /// minutos. Por encima, la interfaz pide acotar la selección, que es lo que
+    /// hace su árbol desde el primer momento.
+    /// </summary>
+    private const int MaxGraphTables = 300;
+
     private readonly IProviderRegistry _providers = providers;
     private readonly ConnectionService _connections = connections;
 
@@ -100,6 +110,70 @@ public sealed class MetadataService(
             table.Database,
             selected => reader.GetTableStructureAsync(selected, table, cancellationToken),
             cancellationToken);
+    }
+
+    /// <summary>
+    /// Columnas y estructura de varias tablas, para dibujar un diagrama.
+    ///
+    /// Entra **una sola vez** al turno de la sesión: si cada tabla lo pidiera por
+    /// su cuenta, sesenta lecturas se irían turnando con lo que el explorador y
+    /// el editor estén haciendo, y el diagrama tardaría lo que tarde el resto.
+    ///
+    /// Las tablas se agrupan por base porque cambiar de base abre una sesión
+    /// auxiliar: hacerlo una vez por tabla sería el mismo problema con otro
+    /// nombre.
+    /// </summary>
+    public async Task<SchemaGraph> GetSchemaGraphAsync(
+        Guid sessionId,
+        IReadOnlyList<DatabaseObject> tables,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(tables);
+
+        if (tables.Any(table => table.Kind != DatabaseObjectKind.Table))
+        {
+            throw new ArgumentException(
+                "El grafo se lee de tablas. Una vista no tiene claves foráneas que dibujar.",
+                nameof(tables));
+        }
+
+        if (tables.Count > MaxGraphTables)
+        {
+            throw new ArgumentException(
+                $"No se pueden leer más de {MaxGraphTables} tablas de una vez.",
+                nameof(tables));
+        }
+
+        if (tables.Count == 0)
+        {
+            return new SchemaGraph { Tables = [], Missing = [] };
+        }
+
+        using var turn = await _connections.EnterAsync(sessionId, cancellationToken);
+
+        var session = _connections.Require(sessionId);
+        var reader = _providers.GetMetadataReader(session.Engine);
+
+        var details = new List<TableDetail>(tables.Count);
+
+        foreach (var group in tables.GroupBy(table => table.Database, StringComparer.Ordinal))
+        {
+            var read = await _connections.UseDatabaseAsync(
+                session,
+                group.Key,
+                selected => reader.GetTableDetailsAsync(selected, [.. group], cancellationToken),
+                cancellationToken);
+
+            details.AddRange(read);
+        }
+
+        var found = details.Select(detail => detail.Table.Id).ToHashSet(StringComparer.Ordinal);
+
+        return new SchemaGraph
+        {
+            Tables = details,
+            Missing = [.. tables.Where(table => !found.Contains(table.Id))],
+        };
     }
 
     public async Task<string> GetDefinitionAsync(
