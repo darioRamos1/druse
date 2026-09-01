@@ -1,4 +1,4 @@
-﻿using Druse.Application.Abstractions;
+using Druse.Application.Abstractions;
 using Druse.Application.Ai;
 using Druse.Application.Backups;
 using Druse.Application.Connections;
@@ -65,6 +65,7 @@ internal static class DependencyInjection
         services.AddScoped<IPreferencesStore, SqlitePreferencesStore>();
         services.AddScoped<IEditorTabStore, SqliteEditorTabStore>();
         services.AddScoped<ISqlSnippetStore, SqliteSqlSnippetStore>();
+        services.AddScoped<IDiagramStore, SqliteDiagramStore>();
         services.AddScoped<IBackupProfileStore, SqliteBackupProfileStore>();
         services.AddScoped<ITransferProfileStore, SqliteTransferProfileStore>();
         services.AddScoped<IAiProviderStore, SqliteAiProviderStore>();

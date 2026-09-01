@@ -19,6 +19,14 @@
         }
       </p>
     </div>
+    @if (!choosing() && graph() !== null) {
+      <button type="button" class="head__save" (click)="save()">
+        {{ dirty() ? 'Guardar cambios' : 'Guardar' }}
+      </button>
+    }
+    @if (!choosing() && saved()) {
+      <button type="button" class="head__back" (click)="forget()">Olvidar</button>
+    }
     @if (!choosing() && candidates().length > 1) {
       <button type="button" class="head__back" (click)="back()">Cambiar tablas…</button>
     }
@@ -88,8 +96,10 @@
     }
     <app-diagram-canvas
       [graph]="loaded"
+      [positions]="positions()"
       (openTable)="openTable.emit($event)"
       (bringNeighbours)="bringNeighbours($event)"
+      (moved)="moved($event)"
     />
   }
 </section>

@@ -83,6 +83,25 @@
     color: var(--dr-text-tertiary);
   }
 
+  &__save {
+    height: 26px;
+    flex: none;
+    padding: 0 12px;
+    border: 0;
+    border-radius: var(--dr-radius-sm);
+    background: var(--dr-accent-button);
+    color: var(--dr-text-on-accent);
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 600;
+    box-shadow: var(--dr-shadow-accent-button);
+    cursor: pointer;
+
+    &:hover {
+      filter: brightness(1.08);
+    }
+  }
+
   &__back {
     height: 26px;
     flex: none;

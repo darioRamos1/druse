@@ -9,7 +9,12 @@ import {
   signal,
 } from '@angular/core';
 
-import { ApplicationGateway } from '../../../core/application-gateway/application-gateway';
+import { firstValueFrom } from 'rxjs';
+
+import {
+  ApplicationGateway,
+  SavedDiagram,
+} from '../../../core/application-gateway/application-gateway';
 import { WorkspaceStore } from '../../../core/workspace/workspace-store';
 import { DatabaseObject, ExplorerNode, SchemaGraph } from '../../../shared/models/workspace';
 import { Icon } from '../../../shared/ui/icon/icon';
@@ -29,6 +34,18 @@ const MAX_DEPTH = 4;
  * el número delante, en vez de dejar que el servidor lo rechace.
  */
 const MAX_TABLES = 300;
+
+/**
+ * Lo que se guarda de un diagrama.
+ *
+ * Ni columnas ni tipos: qué esquema o tabla es, qué tablas entran y dónde las
+ * dejó el usuario. El resto se relee del catálogo al abrirlo.
+ */
+interface DiagramModel {
+  readonly target: string;
+  readonly tables: readonly string[];
+  readonly positions?: Record<string, { x: number; y: number }>;
+}
 
 /**
  * Lo que envuelve al lienzo: resuelve qué tablas entran y las lee.
@@ -77,6 +94,15 @@ export class DiagramPanel {
 
   /** Un aviso que no impide seguir mirando el diagrama. */
   protected readonly notice = signal<string | null>(null);
+
+  /** Dónde puso el usuario cada tabla. Es la mitad de lo que se guarda. */
+  protected readonly positions = signal<ReadonlyMap<string, { x: number; y: number }>>(new Map());
+
+  /** Hay cambios sin guardar. */
+  protected readonly dirty = signal(false);
+
+  /** El diagrama guardado que corresponde a este esquema o tabla, si lo hay. */
+  private readonly _saved = signal<SavedDiagram | null>(null);
 
   /**
    * El esquema entero, cuando ha hecho falta leerlo para saber quién apunta a
@@ -213,6 +239,111 @@ export class DiagramPanel {
     this.draw();
   }
 
+  /** Una tabla cambió de sitio: se recuerda para poder guardarlo. */
+  protected moved(move: { key: string; x: number; y: number }): void {
+    const next = new Map(this.positions());
+    next.set(move.key, { x: move.x, y: move.y });
+
+    this.positions.set(next);
+    this.dirty.set(true);
+  }
+
+  /**
+   * Guarda el diagrama: qué tablas entran y dónde están.
+   *
+   * **Nunca el esquema.** Las columnas y los tipos se releen del catálogo cada
+   * vez que se abre, que es lo que evita que un diagrama de hace seis meses siga
+   * enseñando una columna borrada.
+   */
+  protected async save(): Promise<void> {
+    const model: DiagramModel = {
+      target: this.targetKey(),
+      tables: [...this.chosen()],
+      positions: Object.fromEntries(this.positions()),
+    };
+
+    const existing = this._saved();
+
+    const diagram: SavedDiagram = {
+      id: existing?.id ?? crypto.randomUUID(),
+      connectionId: this.connectionId(),
+      name: this.title(),
+      model: JSON.stringify(model),
+      createdAtUtc: existing?.createdAtUtc,
+    };
+
+    try {
+      await firstValueFrom(this._gateway.saveDiagram(diagram));
+
+      this._saved.set(diagram);
+      this.dirty.set(false);
+      this.notice.set(null);
+    } catch {
+      this.notice.set('No se pudo guardar el diagrama.');
+    }
+  }
+
+  /** Hay un diagrama guardado para este esquema o tabla. */
+  protected readonly saved = computed(() => this._saved() !== null);
+
+  /**
+   * Olvida el diagrama guardado.
+   *
+   * Sin esto, guardar sería irreversible: el diagrama se abriría siempre como se
+   * dejó y no habría forma de volver a elegir desde cero. No borra ninguna
+   * tabla, solo el dibujo.
+   */
+  protected async forget(): Promise<void> {
+    const saved = this._saved();
+
+    if (saved === null) {
+      return;
+    }
+
+    try {
+      await firstValueFrom(this._gateway.deleteDiagram(saved.id));
+
+      this._saved.set(null);
+      this.positions.set(new Map());
+      this.dirty.set(false);
+      this.notice.set('Se olvidó el diagrama guardado. Las tablas siguen donde estaban.');
+    } catch {
+      this.notice.set('No se pudo olvidar el diagrama guardado.');
+    }
+  }
+
+  /** Lo guardado para este mismo esquema o tabla, si lo hay. */
+  private async restore(connectionId: string): Promise<DiagramModel | null> {
+    try {
+      const saved = await firstValueFrom(this._gateway.getDiagrams(connectionId));
+      const target = this.targetKey();
+
+      for (const diagram of saved) {
+        const model = JSON.parse(diagram.model) as DiagramModel;
+
+        if (model.target === target) {
+          this._saved.set(diagram);
+
+          return model;
+        }
+      }
+    } catch {
+      // Que no haya diagramas guardados, o que el archivo local no responda, no
+      // impide dibujar: se sigue como la primera vez.
+    }
+
+    return null;
+  }
+
+  /** Qué esquema o tabla es este diagrama, para reconocer el suyo al abrirlo. */
+  private targetKey(): string {
+    const source = this.target().source;
+
+    return source.kind === 'table'
+      ? `table:${tableKey(source)}`
+      : `schema:${source.schema ?? source.name}`;
+  }
+
   /** El grafo del esquema entero, leído una sola vez y recordado. */
   private async wholeSchema(): Promise<SchemaGraph | null> {
     const known = this._whole();
@@ -258,11 +389,31 @@ export class DiagramPanel {
       this.candidates.set(tables);
       this.chosen.set(new Set(tables.map((table) => tableKey(table))));
       this._whole.set(null);
+      this._saved.set(null);
+      this.positions.set(new Map());
+      this.dirty.set(false);
       this.notice.set(null);
 
       if (tables.length === 0) {
         this.choosing.set(false);
         this.error.set('Aquí no hay tablas que dibujar.');
+        return;
+      }
+
+      // Lo guardado manda: si este esquema ya tiene diagrama, se abre como se
+      // dejó y no se vuelve a preguntar.
+      const model = await this.restore(connectionId);
+
+      if (model !== null) {
+        const known = new Set(tables.map((table) => tableKey(table)));
+
+        // Solo se recuperan las tablas que siguen existiendo. Las que no,
+        // desaparecen del lienzo, y la lectura del catálogo dirá cuáles faltan.
+        this.chosen.set(new Set(model.tables.filter((key) => known.has(key))));
+        this.positions.set(new Map(Object.entries(model.positions ?? {})));
+
+        this.choosing.set(false);
+        await this.read(connectionId, tables.filter((table) => this.chosen().has(tableKey(table))));
         return;
       }
 

@@ -549,6 +549,40 @@ internal static class ContractMapper
         };
     }
 
+    public static SavedDiagramDto ToDto(this SavedDiagram diagram)
+    {
+        ArgumentNullException.ThrowIfNull(diagram);
+
+        return new SavedDiagramDto
+        {
+            Id = diagram.Id.ToString(),
+            ConnectionId = diagram.ConnectionId.ToString(),
+            Name = diagram.Name,
+            Model = diagram.Model,
+            CreatedAtUtc = diagram.CreatedAtUtc,
+            UpdatedAtUtc = diagram.UpdatedAtUtc,
+        };
+    }
+
+    public static SavedDiagram ToDomain(this SavedDiagramDto diagram, Guid id)
+    {
+        ArgumentNullException.ThrowIfNull(diagram);
+
+        var now = DateTimeOffset.UtcNow;
+
+        return new SavedDiagram
+        {
+            Id = id,
+            ConnectionId = Guid.TryParse(diagram.ConnectionId, out var connection)
+                ? connection
+                : Guid.Empty,
+            Name = diagram.Name,
+            Model = diagram.Model,
+            CreatedAtUtc = diagram.CreatedAtUtc ?? now,
+            UpdatedAtUtc = now,
+        };
+    }
+
     public static SqlSnippetDto ToDto(this SqlSnippet snippet)
     {
         ArgumentNullException.ThrowIfNull(snippet);

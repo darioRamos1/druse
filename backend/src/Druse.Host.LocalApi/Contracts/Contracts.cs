@@ -361,6 +361,23 @@ public sealed record SqlSnippetDto
     public DateTimeOffset? UpdatedAtUtc { get; init; }
 }
 
+/// <summary>
+/// Un diagrama guardado.
+///
+/// `model` es lo que la interfaz necesita para volver a dibujarlo —qué tablas
+/// entran y dónde están—, **nunca el esquema**: las columnas y los tipos se
+/// releen del catálogo cada vez que se abre.
+/// </summary>
+public sealed record SavedDiagramDto
+{
+    public required string Id { get; init; }
+    public required string ConnectionId { get; init; }
+    public required string Name { get; init; }
+    public required string Model { get; init; }
+    public DateTimeOffset? CreatedAtUtc { get; init; }
+    public DateTimeOffset? UpdatedAtUtc { get; init; }
+}
+
 // ---------------------------------------------------------------------------
 // Edición de filas
 // ---------------------------------------------------------------------------

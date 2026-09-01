@@ -224,6 +224,21 @@ export interface StoredEditorTab {
  * el mismo `SELECT` sirve en pruebas y en producción, y atarlo a un perfil
  * obligaría a decidir qué hacer con él cuando ese perfil se borra.
  */
+/**
+ * Un diagrama guardado.
+ *
+ * `model` es JSON con lo que hace falta para volver a dibujarlo: qué tablas
+ * entran y dónde están. Nunca columnas ni tipos.
+ */
+export interface SavedDiagram {
+  readonly id: string;
+  readonly connectionId: string;
+  readonly name: string;
+  readonly model: string;
+  readonly createdAtUtc?: string;
+  readonly updatedAtUtc?: string;
+}
+
 export interface SavedSnippet {
   readonly id: string;
   readonly name: string;
@@ -481,6 +496,19 @@ export abstract class ApplicationGateway {
   abstract saveSnippet(snippet: SavedSnippet): Observable<void>;
 
   abstract deleteSnippet(id: string): Observable<void>;
+
+  /**
+   * Diagramas guardados de una conexión.
+   *
+   * Lo que se guarda son las decisiones de quien lo armó —qué tablas entran,
+   * dónde están—, **nunca el esquema**: las columnas se releen del catálogo al
+   * abrirlo, y por eso un diagrama de hace meses no miente.
+   */
+  abstract getDiagrams(connectionId: string): Observable<readonly SavedDiagram[]>;
+
+  abstract saveDiagram(diagram: SavedDiagram): Observable<void>;
+
+  abstract deleteDiagram(id: string): Observable<void>;
 
   /**
    * Exporta el resultado de una consulta.

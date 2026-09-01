@@ -46,6 +46,7 @@ import {
   RowDeleteRequest,
   RowEditRequest,
   RowEditResult,
+  SavedDiagram,
   SavedSnippet,
   TableChangeResult,
   StoredEditorTab,
@@ -405,6 +406,20 @@ export class HttpApplicationGateway extends ApplicationGateway {
 
   override deleteSnippet(id: string): Observable<void> {
     return this._http.delete<void>(`/api/workspace/snippets/${id}`);
+  }
+
+  override getDiagrams(connectionId: string): Observable<readonly SavedDiagram[]> {
+    return this._http.get<SavedDiagram[]>('/api/workspace/diagrams', {
+      params: { connectionId },
+    });
+  }
+
+  override saveDiagram(diagram: SavedDiagram): Observable<void> {
+    return this._http.put<void>(`/api/workspace/diagrams/${diagram.id}`, diagram);
+  }
+
+  override deleteDiagram(id: string): Observable<void> {
+    return this._http.delete<void>(`/api/workspace/diagrams/${id}`);
   }
 
   override exportQuery(request: ExportRequest): Observable<Blob> {

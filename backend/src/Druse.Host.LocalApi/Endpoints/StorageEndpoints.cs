@@ -20,6 +20,58 @@ internal static class StorageEndpoints
         MapPreferences(app);
         MapEditorTabs(app);
         MapSnippets(app);
+        MapDiagrams(app);
+    }
+
+    /// <summary>
+    /// Diagramas guardados, por conexión.
+    ///
+    /// Lo que viaja en `model` son las decisiones de quien lo armó —qué tablas
+    /// entran, dónde están—, nunca el esquema: eso se relee del catálogo al
+    /// abrirlo.
+    /// </summary>
+    private static void MapDiagrams(IEndpointRouteBuilder app)
+    {
+        app.MapGet("/api/workspace/diagrams", async (
+            Guid connectionId,
+            IDiagramStore diagrams,
+            CancellationToken cancellationToken) =>
+            Results.Ok(
+                (await diagrams.GetAllAsync(connectionId, cancellationToken))
+                    .Select(diagram => diagram.ToDto())))
+        .WithName("GetDiagrams");
+
+        app.MapPut("/api/workspace/diagrams/{id:guid}", async (
+            Guid id,
+            SavedDiagramDto request,
+            IDiagramStore diagrams,
+            CancellationToken cancellationToken) =>
+        {
+            var name = request.Name?.Trim() ?? string.Empty;
+
+            // Sin nombre no se vuelve a encontrar en la lista, y sin modelo no
+            // hay nada que volver a dibujar.
+            if (name.Length == 0 || string.IsNullOrWhiteSpace(request.Model))
+            {
+                return Results.BadRequest(new { message = "Un diagrama necesita nombre y contenido." });
+            }
+
+            await diagrams.SaveAsync((request with { Name = name }).ToDomain(id), cancellationToken);
+
+            return Results.NoContent();
+        })
+        .WithName("SaveDiagram");
+
+        app.MapDelete("/api/workspace/diagrams/{id:guid}", async (
+            Guid id,
+            IDiagramStore diagrams,
+            CancellationToken cancellationToken) =>
+        {
+            await diagrams.DeleteAsync(id, cancellationToken);
+
+            return Results.NoContent();
+        })
+        .WithName("DeleteDiagram");
     }
 
     private static void MapConnections(IEndpointRouteBuilder app)

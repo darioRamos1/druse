@@ -288,9 +288,36 @@ public sealed class DruseDatabase
             "INTEGER NOT NULL DEFAULT 0",
             cancellationToken);
 
+        // Diagramas entidad-relación guardados.
+        //
+        // **`model` no contiene ni una columna ni un tipo del catálogo**: lleva
+        // qué tablas entran, dónde las puso el usuario y qué descartó. El
+        // esquema se relee del motor cada vez que se abre el diagrama, que es lo
+        // que evita que enseñe una columna borrada hace seis meses.
+        //
+        // Va como JSON y no repartido en tablas porque su forma la decide el
+        // lienzo y cambiará con él; lo que la base necesita para listar y borrar
+        // son las columnas de al lado.
+        await ExecuteAsync(connection, """
+            CREATE TABLE IF NOT EXISTS diagrams (
+                id              TEXT NOT NULL PRIMARY KEY,
+                connection_id   TEXT NOT NULL,
+                name            TEXT NOT NULL,
+                model           TEXT NOT NULL,
+                created_at_utc  TEXT NOT NULL,
+                updated_at_utc  TEXT NOT NULL
+            );
+            """, cancellationToken);
+
+        // Se listan siempre por conexión y por lo último que se tocó.
+        await ExecuteAsync(connection, """
+            CREATE INDEX IF NOT EXISTS ix_diagrams_connection
+                ON diagrams (connection_id, updated_at_utc DESC);
+            """, cancellationToken);
+
         // Marca de versión del esquema, para poder migrar más adelante sin
         // adivinar en qué estado está el archivo de cada usuario.
-        await ExecuteAsync(connection, "PRAGMA user_version = 6;", cancellationToken);
+        await ExecuteAsync(connection, "PRAGMA user_version = 7;", cancellationToken);
     }
 
     /// <summary>Añade una columna solo si el archivo del usuario aún no la tiene.</summary>
