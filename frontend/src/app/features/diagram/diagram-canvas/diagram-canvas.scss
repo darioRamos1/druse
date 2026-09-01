@@ -234,6 +234,25 @@
       background: var(--dr-warning-tint-strong);
     }
   }
+
+  /* Descartar es la respuesta corriente, pero no la que se destaca. */
+  &__dismiss {
+    height: 24px;
+    flex: none;
+    padding: 0 10px;
+    border: 1px solid transparent;
+    border-radius: var(--dr-radius-sm);
+    background: transparent;
+    color: var(--dr-text-tertiary);
+    font-family: inherit;
+    font-size: 11.5px;
+    cursor: pointer;
+
+    &:hover {
+      border-color: var(--dr-border-subtle);
+      color: var(--dr-text);
+    }
+  }
 }
 
 /* El lienzo. La cuadrícula de puntos es lo único que dice que se puede arrastrar. */

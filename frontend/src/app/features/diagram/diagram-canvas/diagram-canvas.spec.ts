@@ -345,6 +345,58 @@ describe('DiagramCanvas', () => {
     expect(guardado[0].blob.type).toContain('image/svg+xml');
   });
 
+  /**
+   * Descartar es la respuesta corriente a una suposición —la mayoría no serán
+   * ciertas—, y no puede ser irreversible: quien se equivoca se quedaría sin
+   * forma de volver a verlas.
+   */
+  it('una sugerencia se puede descartar, y lo descartado se puede recuperar', () => {
+    const descartadas: string[] = [];
+    let recuperar = 0;
+
+    fixture.componentInstance.dismissSuggestion.subscribe((s) => descartadas.push(s.column));
+    fixture.componentInstance.restoreDismissed.subscribe(() => recuperar++);
+
+    fixture.componentRef.setInput('graph', {
+      ...grafo,
+      suggestions: [
+        {
+          fromSchema: 'ventas',
+          fromTable: 'bitacora',
+          column: 'cliente_id',
+          toSchema: 'ventas',
+          toTable: 'cliente',
+          referencedColumn: 'id',
+          confidence: 'high' as const,
+          reason: 'nombra a cliente',
+        },
+      ],
+    } satisfies SchemaGraph);
+    fixture.detectChanges();
+
+    cabecera('bitacora').click();
+    fixture.detectChanges();
+
+    dom().querySelector<HTMLButtonElement>('.pending__dismiss')!.click();
+
+    expect(descartadas).toEqual(['cliente_id']);
+
+    // Con descartes, el lienzo ofrece recuperarlas; sin ellos, no.
+    expect(dom().textContent).not.toContain('Recuperar');
+
+    fixture.componentRef.setInput('dismissedCount', 1);
+    fixture.detectChanges();
+
+    const recuperarBoton = [...dom().querySelectorAll<HTMLButtonElement>('.toolbar .btn')].find(
+      (button) => button.textContent?.includes('Recuperar'),
+    )!;
+
+    expect(recuperarBoton.textContent).toContain('1');
+    recuperarBoton.click();
+
+    expect(recuperar).toBe(1);
+  });
+
   it('la leyenda está siempre a la vista', () => {
     expect(dom().querySelectorAll('.legend__item')).toHaveLength(3);
   });

@@ -41,6 +41,16 @@
     <span class="toggle__count">{{ summary().suggested }}</span>
   </button>
 
+  <!--
+    Descartar no puede ser irreversible: quien se equivoca descartando se
+    quedaría sin forma de volver a verlas.
+  -->
+  @if (dismissedCount() > 0) {
+    <button type="button" class="btn" (click)="restoreDismissed.emit()">
+      <span>Recuperar {{ dismissedCount() }} descartada(s)</span>
+    </button>
+  }
+
   <button type="button" class="btn" (click)="clearSelection()" [disabled]="selected() === null">
     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
       <path d="M3 12h4l3-7 4 14 3-7h4" />
@@ -111,6 +121,14 @@
         <span class="pending__text">{{ suggestion.reason }}</span>
         <button type="button" class="pending__accept" (click)="accept(suggestion)">
           Ver el ALTER TABLE…
+        </button>
+        <button
+          type="button"
+          class="pending__dismiss"
+          (click)="dismiss(suggestion)"
+          title="En este diagrama, esa relación no existe"
+        >
+          Descartar
         </button>
       </div>
     }

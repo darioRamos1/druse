@@ -102,6 +102,21 @@ export class DiagramCanvas {
   readonly acceptSuggestion = output<SuggestedRelation>();
 
   /**
+   * Descartar una suposición: en este diagrama, esa no era.
+   *
+   * Es lo que hace que la segunda pasada por un esquema sea más limpia que la
+   * primera. El lienzo solo lo pide; quien decide qué se recuerda es el panel,
+   * que es quien guarda.
+   */
+  readonly dismissSuggestion = output<SuggestedRelation>();
+
+  /** Volver a mirar las que se descartaron. */
+  readonly restoreDismissed = output<void>();
+
+  /** Cuántas suposiciones se descartaron en este diagrama. */
+  readonly dismissedCount = input(0);
+
+  /**
    * Quitar una tabla del lienzo.
    *
    * **No la borra.** Deja de dibujarse, y por eso la palabra del menú es
@@ -315,6 +330,10 @@ export class DiagramCanvas {
 
   protected accept(suggestion: SuggestedRelation): void {
     this.acceptSuggestion.emit(suggestion);
+  }
+
+  protected dismiss(suggestion: SuggestedRelation): void {
+    this.dismissSuggestion.emit(suggestion);
   }
 
   /** El menú de exportar está abierto. */

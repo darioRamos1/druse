@@ -90,16 +90,19 @@
         Dibujar
       </button>
     </footer>
-  } @else if (graph(); as loaded) {
+  } @else if (visibleGraph(); as loaded) {
     @if (notice(); as aviso) {
       <p class="notice" role="status">{{ aviso }}</p>
     }
     <app-diagram-canvas
       [graph]="loaded"
       [positions]="positions()"
+      [dismissedCount]="dismissed().size"
       (openTable)="openTable.emit($event)"
       (bringNeighbours)="bringNeighbours($event)"
       (acceptSuggestion)="accept($event)"
+      (dismissSuggestion)="dismiss($event)"
+      (restoreDismissed)="restoreDismissed()"
       (removeTable)="remove($event)"
       (openData)="openData.emit($event)"
       (exported)="download($event)"

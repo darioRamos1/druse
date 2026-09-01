@@ -51,6 +51,21 @@ interface DiagramModel {
   readonly target: string;
   readonly tables: readonly string[];
   readonly positions?: Record<string, { x: number; y: number }>;
+
+  /** Las suposiciones que alguien miró y dijo que no. */
+  readonly dismissed?: readonly string[];
+}
+
+/**
+ * Cómo se nombra una suposición para poder recordarla.
+ *
+ * Por la columna que la origina y la tabla a la que apunta: si el esquema
+ * cambia y esa columna deja de existir, la clave deja de coincidir sola y el
+ * descarte se olvida, que es lo correcto.
+ */
+function suggestionKey(suggestion: SuggestedRelation): string {
+  return `${suggestion.fromSchema}.${suggestion.fromTable}.${suggestion.column}` +
+    `->${suggestion.toSchema}.${suggestion.toTable}`;
 }
 
 /**
@@ -109,6 +124,33 @@ export class DiagramPanel {
 
   /** Dónde puso el usuario cada tabla. Es la mitad de lo que se guarda. */
   protected readonly positions = signal<ReadonlyMap<string, { x: number; y: number }>>(new Map());
+
+  /**
+   * Las suposiciones que alguien miró y dijo que no.
+   *
+   * Se guardan con el diagrama: es lo que hace que la segunda vez que se abre un
+   * esquema esté más limpio que la primera. No borran nada de la base —una
+   * suposición nunca estuvo ahí—, solo dejan de dibujarse.
+   */
+  protected readonly dismissed = signal<ReadonlySet<string>>(new Set());
+
+  /** El grafo tal y como lo ve el lienzo: sin lo descartado. */
+  protected readonly visibleGraph = computed<SchemaGraph | null>(() => {
+    const graph = this.graph();
+
+    if (graph === null) {
+      return null;
+    }
+
+    const dismissed = this.dismissed();
+
+    return {
+      ...graph,
+      suggestions: (graph.suggestions ?? []).filter(
+        (suggestion) => !dismissed.has(suggestionKey(suggestion)),
+      ),
+    };
+  });
 
   /** Hay cambios sin guardar. */
   protected readonly dirty = signal(false);
@@ -349,6 +391,22 @@ export class DiagramPanel {
     }
   }
 
+  /** En este diagrama, esa relación no era. Deja de dibujarse y se recuerda. */
+  protected dismiss(suggestion: SuggestedRelation): void {
+    const next = new Set(this.dismissed());
+    next.add(suggestionKey(suggestion));
+
+    this.dismissed.set(next);
+    this.dirty.set(true);
+    this.notice.set(null);
+  }
+
+  /** Vuelve a mirar las descartadas: descartar no puede ser irreversible. */
+  protected restoreDismissed(): void {
+    this.dismissed.set(new Set());
+    this.dirty.set(true);
+  }
+
   /** Una tabla cambió de sitio: se recuerda para poder guardarlo. */
   protected moved(move: { key: string; x: number; y: number }): void {
     const next = new Map(this.positions());
@@ -370,6 +428,7 @@ export class DiagramPanel {
       target: this.targetKey(),
       tables: [...this.chosen()],
       positions: Object.fromEntries(this.positions()),
+      dismissed: [...this.dismissed()],
     };
 
     const existing = this._saved();
@@ -501,6 +560,7 @@ export class DiagramPanel {
       this._whole.set(null);
       this._saved.set(null);
       this.positions.set(new Map());
+      this.dismissed.set(new Set());
       this.dirty.set(false);
       this.notice.set(null);
 
@@ -521,6 +581,7 @@ export class DiagramPanel {
         // desaparecen del lienzo, y la lectura del catálogo dirá cuáles faltan.
         this.chosen.set(new Set(model.tables.filter((key) => known.has(key))));
         this.positions.set(new Map(Object.entries(model.positions ?? {})));
+        this.dismissed.set(new Set(model.dismissed ?? []));
 
         this.choosing.set(false);
         await this.read(connectionId, tables.filter((table) => this.chosen().has(tableKey(table))));
