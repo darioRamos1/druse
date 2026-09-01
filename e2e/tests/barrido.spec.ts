@@ -114,6 +114,19 @@ async function menuDe(page: Page, nodo: string): Promise<void> {
     .click();
 }
 
+/**
+ * Deja el árbol abierto hasta las tablas.
+ *
+ * Los diálogos que se piden desde el menú de un nodo lo necesitan, y entre paso
+ * y paso el árbol puede haberse quedado plegado: el del filtro lo pliega a
+ * propósito, y basta con que algo lo recargue para que `Tables` deje de estar.
+ * Sin esto, el barrido se queda esperando un botón de un nodo que no se ve.
+ */
+async function arbolAbierto(page: Page): Promise<void> {
+  await desplegar(page, 'druse_test', 'public');
+  await desplegar(page, 'public', 'Tables');
+}
+
 async function desplegar(page: Page, nodo: string, hijo: string): Promise<void> {
   const sidebar = page.locator('app-connections-sidebar');
   const dentro = sidebar.getByText(hijo, { exact: true }).first();
@@ -235,6 +248,7 @@ test.describe('barrido visual', () => {
         '09-disenador',
         'app-table-designer',
         async () => {
+          await arbolAbierto(page);
           await menuDe(page, 'Tables');
           await page.getByRole('menuitem', { name: 'Crear tabla' }).click();
         },
@@ -245,6 +259,17 @@ test.describe('barrido visual', () => {
         async () => {
           await menuDe(page, 'druse_test');
           await page.getByRole('menuitem', { name: 'Respaldar' }).click();
+        },
+      ],
+      // El diagrama se abre sobre el esquema: es donde se ve si la colocación
+      // sirve, porque entran todas sus tablas de golpe.
+      [
+        '20-mer',
+        'app-diagram-panel',
+        async () => {
+          await arbolAbierto(page);
+          await menuDe(page, 'public');
+          await page.getByRole('menuitem', { name: 'Ver diagrama' }).click();
         },
       ],
       [
@@ -259,6 +284,7 @@ test.describe('barrido visual', () => {
         '12-migrar-varias',
         'app-transfer-set-dialog',
         async () => {
+          await arbolAbierto(page);
           await menuDe(page, 'Tables');
           await page.getByRole('menuitem', { name: 'Migrar tablas a…' }).click();
         },
