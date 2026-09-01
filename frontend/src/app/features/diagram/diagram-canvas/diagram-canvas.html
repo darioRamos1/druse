@@ -72,6 +72,23 @@
   <span class="count">{{ summary().tables }} tablas · {{ summary().declared }} relaciones</span>
 </div>
 
+<!--
+  Lo que Druse supone sobre la tabla marcada, para poder aceptarlo.
+  Aceptar no crea nada: abre el `ALTER TABLE` con los campos puestos.
+-->
+@if (pending().length > 0) {
+  <div class="pending">
+    @for (suggestion of pending(); track suggestion.fromTable + suggestion.column) {
+      <div class="pending__item">
+        <span class="pending__text">{{ suggestion.reason }}</span>
+        <button type="button" class="pending__accept" (click)="accept(suggestion)">
+          Ver el ALTER TABLE…
+        </button>
+      </div>
+    }
+  </div>
+}
+
 <div
   class="canvas"
   #canvas

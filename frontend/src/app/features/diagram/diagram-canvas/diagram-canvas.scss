@@ -191,6 +191,51 @@
   font-size: 11.5px;
 }
 
+/*
+ * Las suposiciones que tocan a la tabla marcada.
+ *
+ * En color de advertencia, como su línea: aceptar una no la crea, abre el DDL.
+ */
+.pending {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: none;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--dr-warning-line);
+  background: var(--dr-warning-tint);
+
+  &__item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  &__text {
+    flex: 1;
+    min-width: 0;
+    font-size: 11.5px;
+    color: var(--dr-warning-text);
+  }
+
+  &__accept {
+    height: 24px;
+    flex: none;
+    padding: 0 10px;
+    border: 1px solid var(--dr-warning-line);
+    border-radius: var(--dr-radius-sm);
+    background: transparent;
+    color: var(--dr-warning);
+    font-family: inherit;
+    font-size: 11.5px;
+    cursor: pointer;
+
+    &:hover {
+      background: var(--dr-warning-tint-strong);
+    }
+  }
+}
+
 /* El lienzo. La cuadrícula de puntos es lo único que dice que se puede arrastrar. */
 .canvas {
   position: relative;

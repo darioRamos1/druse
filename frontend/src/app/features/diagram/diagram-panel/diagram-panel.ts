@@ -16,7 +16,13 @@ import {
   SavedDiagram,
 } from '../../../core/application-gateway/application-gateway';
 import { WorkspaceStore } from '../../../core/workspace/workspace-store';
-import { DatabaseObject, ExplorerNode, SchemaGraph } from '../../../shared/models/workspace';
+import {
+  DatabaseObject,
+  ExplorerNode,
+  ForeignKeyDesign,
+  SchemaGraph,
+  SuggestedRelation,
+} from '../../../shared/models/workspace';
 import { Icon } from '../../../shared/ui/icon/icon';
 import { DiagramCanvas } from '../diagram-canvas/diagram-canvas';
 import { tableKey } from '../diagram-layout';
@@ -74,6 +80,9 @@ export class DiagramPanel {
 
   /** Alguien quiere abrir una tabla del diagrama en el diseñador. */
   readonly openTable = output<DatabaseObject>();
+
+  /** Abrir el diseñador con una clave foránea ya escrita, para revisarla. */
+  readonly designForeignKey = output<{ table: DatabaseObject; key: ForeignKeyDesign }>();
 
   protected readonly loading = signal(true);
   protected readonly error = signal<string | null>(null);
@@ -237,6 +246,39 @@ export class DiagramPanel {
     this.notice.set(null);
     this.chosen.set(next);
     this.draw();
+  }
+
+  /**
+   * Alguien aceptó una suposición: se abre el diseñador con la clave escrita.
+   *
+   * No se crea nada aquí. El diseñador enseña el `ALTER TABLE` y lo aplica con
+   * las mismas protecciones que cualquier otro cambio de estructura, que es lo
+   * que impide que una suposición de Druse acabe en la base sin que nadie la
+   * lea.
+   */
+  protected accept(suggestion: SuggestedRelation): void {
+    const table = this.candidates().find(
+      (candidate) =>
+        tableKey(candidate) ===
+        tableKey({ schema: suggestion.fromSchema, name: suggestion.fromTable }),
+    );
+
+    if (!table) {
+      return;
+    }
+
+    this.designForeignKey.emit({
+      table,
+      key: {
+        name: `fk_${suggestion.fromTable}_${suggestion.toTable}`,
+        columns: [suggestion.column],
+        referencedSchema: suggestion.toSchema,
+        referencedTable: suggestion.toTable,
+        referencedColumns: [suggestion.referencedColumn],
+        onDelete: 'noAction',
+        onUpdate: 'noAction',
+      },
+    });
   }
 
   /** Una tabla cambió de sitio: se recuerda para poder guardarlo. */

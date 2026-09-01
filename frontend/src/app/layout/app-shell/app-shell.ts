@@ -48,6 +48,7 @@ import {
   DatabaseEngine,
   DatabaseObject,
   ExplorerNode,
+  ForeignKeyDesign,
   KnownColumn,
   QueryHistoryEntry,
   SavedConnection,
@@ -431,6 +432,10 @@ export class AppShell {
 
   protected closeTableDesigner(): void {
     this.designTarget.set(null);
+
+    // La clave que llegó del diagrama se olvida al cerrar: si no, volvería a
+    // aparecer la próxima vez que alguien abriera el diseñador desde el árbol.
+    this.designedForeignKey.set(null);
   }
 
   /**
@@ -468,6 +473,20 @@ export class AppShell {
 
     this.diagramTarget.set(null);
     this.openTableDesigner({ ...target, source: table });
+  }
+
+  /**
+   * Una clave foránea que llega escrita desde el diagrama.
+   *
+   * Es una suposición que alguien aceptó, y **aceptarla no la crea**: se abre el
+   * diseñador con los campos puestos para que enseñe su `ALTER TABLE` como
+   * cualquier otro cambio.
+   */
+  protected readonly designedForeignKey = signal<ForeignKeyDesign | null>(null);
+
+  protected designKeyFromDiagram(request: { table: DatabaseObject; key: ForeignKeyDesign }): void {
+    this.designedForeignKey.set(request.key);
+    this.designFromDiagram(request.table);
   }
 
   /** Tabla sobre la que se está componiendo una consulta. */

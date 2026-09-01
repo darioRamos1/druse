@@ -287,6 +287,7 @@
   <app-table-designer
     [target]="destino.source"
     [connectionId]="destino.connectionId"
+    [initialForeignKey]="designedForeignKey()"
     (closed)="closeTableDesigner()"
   />
 }
@@ -302,6 +303,7 @@
       [connectionId]="destino.connectionId"
       [sessionId]="diagramSessionId()"
       (openTable)="designFromDiagram($event)"
+      (designForeignKey)="designKeyFromDiagram($event)"
       (closed)="closeDiagram()"
     />
   }

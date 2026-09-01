@@ -125,6 +125,16 @@ export class TableDesigner {
   /** Esquema donde crear la tabla, o la tabla que se está modificando. */
   readonly target = input.required<DatabaseObject>();
 
+  /**
+   * Una clave foránea ya escrita, para abrir el diseñador con ella puesta.
+   *
+   * Es como llega una sugerencia del diagrama: Druse cree que una columna apunta
+   * a otra tabla, y aceptarlo **no la crea** —abre este formulario con los
+   * campos rellenos, y de ahí sale por la misma previsualización del DDL que
+   * todo lo demás—.
+   */
+  readonly initialForeignKey = input<ForeignKeyDesign | null>(null);
+
   readonly closed = output<void>();
 
   /** Está modificando una tabla que ya existe. */
@@ -613,6 +623,29 @@ export class TableDesigner {
         dropped: false,
       })),
     );
+
+    // Una clave que llega ya escrita —una sugerencia del diagrama que alguien
+    // aceptó— entra como una fila nueva más, y el formulario se abre por ella:
+    // sin esto habría que buscarla entre las pestañas para ver qué se aceptó.
+    const suggested = this.initialForeignKey();
+
+    if (suggested !== null) {
+      this.foreignKeys.update((rows) => [
+        ...rows,
+        {
+          name: suggested.name,
+          columns: suggested.columns.join(', '),
+          referencedSchema: suggested.referencedSchema ?? '',
+          referencedTable: suggested.referencedTable,
+          referencedColumns: suggested.referencedColumns.join(', '),
+          onDelete: suggested.onDelete ?? 'noAction',
+          onUpdate: suggested.onUpdate ?? 'noAction',
+          dropped: false,
+        },
+      ]);
+
+      this.section.set('keys');
+    }
 
     this.constraints.set([
       ...structure.uniqueConstraints.map(

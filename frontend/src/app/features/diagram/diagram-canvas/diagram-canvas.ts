@@ -12,7 +12,11 @@ import {
   viewChild,
 } from '@angular/core';
 
-import { DatabaseObject, SchemaGraph } from '../../../shared/models/workspace';
+import {
+  DatabaseObject,
+  SchemaGraph,
+  SuggestedRelation,
+} from '../../../shared/models/workspace';
 import {
   BOX,
   DetailLevel,
@@ -73,6 +77,14 @@ export class DiagramCanvas {
    * sabe el panel.
    */
   readonly bringNeighbours = output<string>();
+
+  /**
+   * Alguien quiere convertir una suposición en una clave foránea de verdad.
+   *
+   * El lienzo no la crea: pide que se abra el `ALTER TABLE`. Ninguna suposición
+   * de Druse llega a la base sin que alguien lea el SQL.
+   */
+  readonly acceptSuggestion = output<SuggestedRelation>();
 
   protected readonly level = signal<DetailLevel>('full');
   protected readonly selected = signal<string | null>(null);
@@ -245,6 +257,31 @@ export class DiagramCanvas {
     if (selected !== null) {
       this.bringNeighbours.emit(selected);
     }
+  }
+
+  /**
+   * Las sugerencias que tocan a la tabla marcada, para poder aceptarlas.
+   *
+   * Se listan solo con una tabla marcada: en un esquema entero serían decenas y
+   * la barra no es sitio para una lista.
+   */
+  protected readonly pending = computed<readonly SuggestedRelation[]>(() => {
+    const selected = this.selected();
+
+    if (selected === null || !this.showSuggested()) {
+      return [];
+    }
+
+    return (this.graph().suggestions ?? []).filter((suggestion) => {
+      const from = tableKey({ schema: suggestion.fromSchema, name: suggestion.fromTable });
+      const to = tableKey({ schema: suggestion.toSchema, name: suggestion.toTable });
+
+      return from === selected || to === selected;
+    });
+  });
+
+  protected accept(suggestion: SuggestedRelation): void {
+    this.acceptSuggestion.emit(suggestion);
   }
 
   protected identify = (_: number, box: PaintedBox): string => box.key;

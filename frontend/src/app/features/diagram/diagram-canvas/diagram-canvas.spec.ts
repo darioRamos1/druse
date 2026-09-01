@@ -204,6 +204,46 @@ describe('DiagramCanvas', () => {
     expect(dom().querySelector('.missing')?.textContent).toContain('1 tabla');
   });
 
+  /**
+   * Aceptar una suposición **no la crea**: pide abrir el `ALTER TABLE`. Es lo
+   * que impide que algo que Druse dedujo del nombre de una columna acabe en la
+   * base sin que nadie lea el SQL.
+   */
+  it('aceptar una sugerencia pide el ALTER TABLE, y no crea nada', () => {
+    const pedidas: string[] = [];
+    fixture.componentInstance.acceptSuggestion.subscribe((s) => pedidas.push(s.column));
+
+    fixture.componentRef.setInput('graph', {
+      ...grafo,
+      suggestions: [
+        {
+          fromSchema: 'ventas',
+          fromTable: 'bitacora',
+          column: 'cliente_id',
+          toSchema: 'ventas',
+          toTable: 'cliente',
+          referencedColumn: 'id',
+          confidence: 'high' as const,
+          reason: '«cliente_id» nombra a «cliente» y el tipo encaja.',
+        },
+      ],
+    } satisfies SchemaGraph);
+    fixture.detectChanges();
+
+    // Sin tabla marcada no se ofrece: en un esquema entero serían decenas.
+    expect(dom().querySelectorAll('.pending__item')).toHaveLength(0);
+
+    cabecera('bitacora').click();
+    fixture.detectChanges();
+
+    const item = dom().querySelector<HTMLElement>('.pending__item')!;
+    expect(item.textContent).toContain('nombra a');
+
+    item.querySelector<HTMLButtonElement>('.pending__accept')!.click();
+
+    expect(pedidas).toEqual(['cliente_id']);
+  });
+
   it('la leyenda está siempre a la vista', () => {
     expect(dom().querySelectorAll('.legend__item')).toHaveLength(3);
   });
