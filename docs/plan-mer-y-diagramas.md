@@ -389,12 +389,20 @@ almacenamiento, releer al abrir y marcar lo ausente.
 **Criterio de salida:** se cierra Druse, se vuelve a abrir y el diagrama está
 donde estaba. Se borra una tabla desde fuera y al abrir el diagrama se dice.
 
-_A medias en la sesión 039._ Hecho: el selector —que llega con todo marcado, y
-que no pregunta cuando se abre sobre una tabla suelta— y **traer vecinas**, que
-lee el esquema entero una vez y lo recuerda, porque las tablas que apuntan a una
-no están en el grafo dibujado. Falta lo que da nombre a la fase: **guardar el
-diagrama**. Hasta que exista, sigue siendo una capa sobre el shell y no una
-pestaña, y las posiciones movidas a mano se pierden al cerrar.
+_Cerrada en la sesión 039._ El selector —que llega con todo marcado y no pregunta
+sobre una tabla suelta—, **traer vecinas** —que lee el esquema entero una vez y
+lo recuerda, porque las tablas que apuntan a una no están en el grafo dibujado—,
+y el guardado: tabla `diagrams`, `PRAGMA user_version` 7 y
+`/api/workspace/diagrams`. El modelo guardado es `{target, tables, positions}`,
+sin una sola columna ni tipo, así que las tablas que ya no existen no vuelven al
+lienzo.
+
+Salió además una pieza que el plan no había previsto: **Olvidar**. Sin ella
+guardar era irreversible —el esquema se abriría siempre igual, sin forma de
+volver a elegir—, y una función que solo se puede activar está a medias.
+
+Sigue sin ser una pestaña: es una capa sobre el shell. Ahora que el diagrama se
+guarda, la pestaña ya no tiene nada que la bloquee.
 
 ### Fase D — Las relaciones sugeridas
 

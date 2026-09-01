@@ -436,11 +436,16 @@ paleta y las medidas sacadas de `_tokens.scss`, y se aprobó ahí.
 - `MetadataBatch`: reparto por tabla y composición, lo único común a los cuatro.
 - Colocación determinista, lienzo, panel contenedor y entrada en el explorador.
 - Prueba de punta a punta del diagrama y sus capturas en el barrido.
-- **Media fase C:** el selector de tablas —llega con todo marcado y no pregunta
-  sobre una tabla suelta— y **traer vecinas**, que lee el esquema entero una vez
+- **Fase C entera:** el selector de tablas —llega con todo marcado y no pregunta
+  sobre una tabla suelta—, **traer vecinas**, que lee el esquema entero una vez
   y lo recuerda, porque las que apuntan a una tabla no están en el grafo que se
-  dibujó. Sale barato por la lectura en lote: el esquema completo cuesta las
-  mismas cuatro consultas que dos tablas.
+  dibujó —sale barato por la lectura en lote: el esquema completo cuesta las
+  mismas cuatro consultas que dos tablas—, y el **guardado**: tabla `diagrams`,
+  `user_version` 7 y `/api/workspace/diagrams`. Lo guardado es
+  `{target, tables, positions}`, sin una columna ni un tipo, así que las tablas
+  que ya no existen no vuelven al lienzo.
+- **Olvidar**, que el plan no había previsto: sin ella, guardar era irreversible
+  —el esquema se abriría siempre igual, sin forma de volver a elegir—.
 - Tres arreglos que salieron de **mirar las capturas**, no de leer el código: la
   leyenda flotante tapaba la última tabla, el diálogo de selección heredaba el
   ancho del lienzo —filas de 1232 px para leer «ciudad»— y su alto era fijo.
@@ -468,9 +473,8 @@ paleta y las medidas sacadas de `_tokens.scss`, y se aprobó ahí.
   de la aplicación sí tiene todavía no lo cubren.
 - **La virtualización del lienzo**, que el plan pide: hoy se montan todos los
   nodos. Sirve para un esquema normal, no para trescientas tablas.
-- **Guardar el diagrama**, que es lo que da nombre a la fase C. Sin eso sigue
-  siendo una capa sobre el shell y no una pestaña, y las posiciones movidas a
-  mano se pierden al cerrar.
+- **La pestaña propia.** El diagrama ya se guarda, así que nada la bloquea, pero
+  sigue abriéndose como una capa sobre el shell.
 - Fases D a F enteras: relaciones sugeridas, edición desde el lienzo y las
   exportaciones.
 - **Ninguna captura demuestra el trazado**: la base de pruebas no declara una
