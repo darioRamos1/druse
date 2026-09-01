@@ -1114,6 +1114,42 @@ a un punto en el tiempo —eso pertenece al servidor y la interfaz lo dirá—, 
 traduce entre motores, y no hay respaldos programados, que exigirían un servicio
 vivo con la ventana cerrada.
 
+### Diagramas entidad-relación — planificado
+
+Pedido por el usuario: ver la forma de una base y **cambiarla desde ahí**. Una
+pestaña con un lienzo donde las tablas elegidas se dibujan con sus claves
+foráneas en notación de pata de gallo, y donde cada gesto de edición termina en
+el diseñador de tablas que ya existe, con su previsualización de DDL.
+
+El plan completo, con sus seis fases y sus criterios de salida, está en
+[`docs/plan-mer-y-diagramas.md`](docs/plan-mer-y-diagramas.md).
+
+- [x] **Lectura del catálogo en lote**, tras `GetTableDetailsAsync` en el
+  contrato de metadatos. Hoy la estructura se lee tabla a tabla y un diagrama de
+  sesenta tablas serían ciento ochenta viajes sobre una conexión que no admite
+  dos cosas a la vez. _(Fase A cerrada, sesión 039: cuatro consultas en
+  PostgreSQL y MySQL, cinco en SQL Server e Informix, sean dos tablas o sesenta,
+  y la equivalencia con la lectura de una en una comprobada en los cinco
+  fixtures.)_
+- [x] **Lienzo SVG propio, sin dependencias nuevas**, con colocación automática
+  determinista. Exportar a SVG, PNG y PDF saldrá del mismo dibujo. _(Fase B,
+  sesión 039. **Le falta la virtualización por vista**: hoy se montan todos los
+  nodos, que sirve para un esquema normal y no para trescientas tablas.)_
+- [ ] **Relaciones sugeridas por nombre**, en línea punteada y siempre
+  distinguibles de las declaradas. Sin ellas, una base sin claves foráneas
+  —MyISAM, y buena parte de las heredadas— sale como tablas sueltas. Aceptar una
+  sugerencia abre el `ALTER TABLE`, no lo ejecuta.
+- [ ] **El diagrama nunca guarda columnas ni tipos**: se releen del catálogo al
+  abrirlo y lo que ya no existe se marca. Se guardan las decisiones del usuario
+  —qué entra, dónde está, qué descartó—, no el esquema.
+- [ ] **Editar desde el diagrama** reutilizando el diseñador de tablas entero.
+  Ninguna vía de escritura nueva.
+- [ ] **Salidas**: SVG, PNG, Mermaid, DBML y PDF paginado.
+
+**Lo que no se hace, y es una decisión:** no se modela en blanco, no se mezclan
+conexiones en un mismo diagrama, no hay comparación de esquemas —es otra entrada
+de este backlog— y las vistas entran como contexto en gris, no como entidades.
+
 ### Prioridad alta
 
 - ~~Autenticación integrada de Windows para SQL Server.~~ Hecho (sesión 014).
@@ -1122,7 +1158,8 @@ vivo con la ventana cerrada.
 
 ### Prioridad media
 
-- Diagramas entidad-relación.
+- Diagramas entidad-relación. Planificado; ver arriba y
+  [`docs/plan-mer-y-diagramas.md`](docs/plan-mer-y-diagramas.md).
 - Comparación de esquemas.
 - Planes de ejecución gráficos.
 - ~~Gestión visual de índices.~~ Hecho en el diseñador de tablas (sesión 019).

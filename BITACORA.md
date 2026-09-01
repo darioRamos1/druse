@@ -10,17 +10,17 @@
 
 | Campo | Valor |
 | --- | --- |
-| Última sesión | **038** — 2026-08-26 |
-| Fase activa | **Migración de datos entre tablas:** fases 1, 2 y 3 cerradas; la **4** cerrada: la pasada de varias tablas, lo que cada tabla hace distinto y las migraciones guardadas (ver «Qué toca retomar»). **Respaldos y restauración:** Fases A–E cerradas. La **F** tiene backend, interfaz, CSV, selector de archivos, restaurar en una base nueva y **el ciclo entero por HTTP en los cuatro motores**; le falta repetir a mano el respaldo real que encontró el error de los índices de expresión |
+| Última sesión | **039** — 2026-09-01 |
+| Fase activa | **Migración de datos entre tablas:** fases 1, 2 y 3 cerradas; la **4** cerrada: la pasada de varias tablas, lo que cada tabla hace distinto y las migraciones guardadas (ver «Qué toca retomar»). **Respaldos y restauración:** Fases A–E cerradas. La **F** tiene backend, interfaz, CSV, selector de archivos, restaurar en una base nueva y **el ciclo entero por HTTP en los cuatro motores**; le falta repetir a mano el respaldo real que encontró el error de los índices de expresión. **Diagramas entidad-relación:** plan escrito y **Fase A** (lectura del catálogo en lote, cuatro motores) y **Fase B** (colocación determinista y lienzo) implementadas; falta cerrar la A contra los cuatro motores y ver el barrido de capturas |
 | Fases 0–6 | ✅ Cerradas. |
 | Fase 7 | 🟡 **11/12.** El ciclo de instalación está probado sobre este equipo; solo falta arrancar en una máquina sin herramientas de desarrollo. |
 | Fase 8 | ✅ **7/7.** Tres motores sobre el mismo contrato y primera beta preparada. |
 | ¿Compila el backend? | Sí — 0 advertencias, 0 errores |
 | ¿Compila el envoltorio? | Sí — recompilado en la 037 con `build/scripts/msvc-env.ps1` cargado antes; sin él, `cargo` falla en `vswhom-sys` por elegir el MSVC equivocado. **Sus pruebas ya son 10**, con las dos que vigilan la CSP |
-| ¿Pasan las pruebas? | Sí, **con los cinco motores a la vez**. En la 038, con `DRUSE_REQUIRE_ENGINES=1`: **450 unitarias, 158 de integración y 255 de 257 contractuales** en el backend, **640 del frontend** y las **13 del envoltorio**. Los cuatro motores de siempre siguen en **206 de 206**: el motor nuevo no rompió nada. Las dos que fallan son de Informix por SQLI y están dichas en §5. La suite E2E no se repitió en la 038 |
+| ¿Pasan las pruebas? | Sí. En la **039**, con los cuatro motores levantados y `DRUSE_REQUIRE_ENGINES=1`: **266 de 267 contractuales** —las diez nuevas de la lectura en lote pasan en los cinco fixtures— y **500 unitarias** en el backend; **739 en el frontend**, 23 de ellas nuevas del diagrama. El único fallo contractual es de Informix por SQLI al recargar datos respaldados (conversión de fecha), y viene de la 038. `sql-formatting.spec.ts` se pasa del tiempo cuando corre con los otros 49 archivos a la vez y **pasa sola en 1,6 s**. Integración y envoltorio no se repitieron |
 | ¿Hay aplicación de escritorio? | **Sí.** Instalador NSIS y ZIP portable, en dos variantes: con Informix y sin él. Desde la 038 **se actualiza sola** —o lo hará: ver el aviso del repositorio privado en §9—. El MSI dejó de generarse: `tauri.conf.json` solo declara `nsis`, que es lo que necesita el actualizador |
 | Motores | **PostgreSQL, SQL Server, MySQL/MariaDB e Informix**, sobre el mismo contrato. Informix tiene **dos entradas**: por DRDA con el driver de IBM (puerto 9089) y por **SQLI**, su protocolo nativo, con el puente JDBC (9088). Cambia por dónde se entra; el SQL, el catálogo y los tipos son los mismos |
-| Trabajo a medias | **Nada sin commitear.** Lo que queda sin comprobar: **el diálogo del sistema y el selector de carpeta siguen sin verse abrir** —se arregló lo que lo hacía imposible, no que ya ocurra—, y **el actualizador no puede funcionar mientras el repositorio sea privado** (ver §9) |
+| Trabajo a medias | **Todo el diagrama entidad-relación está sin commitear.** Y sin comprobar: las contractuales de la lectura en lote contra los cuatro motores, el barrido de capturas del lienzo, y de antes — **el diálogo del sistema y el selector de carpeta siguen sin verse abrir**, y **el actualizador no puede funcionar mientras el repositorio sea privado** (ver §9) |
 | Bloqueantes | Ninguno para seguir programando. Sí para dar por buenos cuatro motores y cuatro funciones: ver «Qué toca retomar». |
 | Git | El **PR #9 se fusionó** (sesión 022). Se trabaja en `feat/respaldos-y-restauracion`, con todo subido: las 024–027 en `1452a6c`, las 028–031 en `640151c`, las 032–036 de `d3ac0d5` a `35d192e`, la 037 de `4ba8cce` a `20727eb`, y la **038** en `a455be7`, `4c6f74a`, `55711f0` y `93f7f26` |
 | Integración continua | 🔴 **Parada, y no por el código.** GitHub aborta los catorce jobs en dos segundos: «recent account payments have failed or your spending limit needs to be increased». Hasta resolver la facturación, ningún PR podrá pasar los checks. |
@@ -343,6 +343,134 @@ Pendiente de verificar cuando toque: Docker (pruebas de integración con contene
 ---
 
 ## 5. Registro de sesiones
+
+### Sesión 039 — 2026-09-01 · El diagrama entidad-relación: se planifica, se lee y se dibuja
+
+Sesión larga y de una sola cosa: el MER, del backlog al lienzo.
+
+#### Lo que se decidió antes de escribir nada
+
+El plan entero está en `docs/plan-mer-y-diagramas.md`, con seis fases y sus
+criterios de salida. Nueve decisiones, todas del usuario salvo las que se
+señalan:
+
+1. **Leer y editar desde el diagrama**, no solo mirarlo. El diagrama es donde se
+   ve el problema; mandar a otra pantalla para resolverlo parte el gesto.
+2. **Las claves declaradas y las inferidas por nombre, señaladas aparte.** Sin
+   inferencia, media base real sale como tablas sueltas —MyISAM y casi toda base
+   heredada—; sin distinguirlas, el diagrama miente.
+3. **Pestaña propia**, que es donde cabe un esquema de trescientas tablas.
+4. **Cualquier objeto de la misma conexión** en el mismo lienzo.
+5. **Siempre se pregunta qué tablas entran.** Trescientas de golpe son una tela
+   de araña y una espera.
+6. **SVG propio, sin dependencias nuevas.** El frontend solo depende hoy de
+   Monaco y `sql-formatter`, y con SVG propio exportar sale casi gratis.
+7. **Imagen, texto (Mermaid y DBML) y papel**, las tres sobre el mismo SVG.
+8. **Pata de gallo**, que se lee sin leyenda (decidido aquí).
+9. **Una conexión por diagrama** (decidido aquí): mezclarlas dibujaría relaciones
+   que ningún motor puede comprobar.
+
+Y una regla que gobierna el resto: **el diagrama guardado no contendrá ni una
+columna ni un tipo.** Se guardan las decisiones del usuario —qué entra, dónde
+está, qué descartó— y el esquema se relee del catálogo al abrirlo, marcando lo
+que ya no existe. Un diagrama que enseña una columna borrada hace seis meses no
+se mira.
+
+#### Fase A — la lectura en lote
+
+La mitad del backend ya estaba: `GetTableStructureAsync` devuelve
+`DatabaseForeignKey` con columnas, destino y acciones en los cuatro motores, que
+es literalmente una arista. Lo que faltaba era **leer muchas tablas de una vez**.
+
+Se añadió `GetTableDetailsAsync` al contrato de metadatos, con implementación por
+defecto que itera —solo para que un proveedor nuevo arranque— y **las cuatro
+propias**, cada una con el filtro que su catálogo admite: `unnest(@schemas,
+@names)` en PostgreSQL, `JOIN (VALUES (@s0,@n0), …)` en SQL Server, `IN` de
+tuplas en MySQL y una cadena de `OR` de pares en Informix, que no admite ninguna
+de las tres. En los cuatro se interpolan **solo nombres de parámetro**.
+
+El coste pasa a ser fijo: 4 consultas en PostgreSQL y MySQL, 5 en SQL Server e
+Informix, **sean dos tablas o sesenta**. Informix era el caso grave —gastaba unas
+diez por tabla, porque su catálogo obliga a resolver números de columna, índices
+y restricciones antes de decir nada—: de ~600 viajes a 5.
+
+Los métodos de una sola tabla siguen existiendo y **delegan en el lote**, así que
+hay un único SQL por cosa y no dos que se separan.
+
+Encima: `MetadataService.GetSchemaGraphAsync` —un solo turno de sesión, agrupando
+por base— y `POST /api/sessions/{id}/metadata/graph`, que devuelve las tablas
+leídas y, aparte, **las que se pidieron y ya no están**.
+
+**Un fallo encontrado de paso:** en `MySqlMetadataReader`, el `catch` que toleraba
+servidores sin `CHECK_CONSTRAINTS` —MySQL anterior a 8.0.16, MariaDB anterior a
+10.2— atrapaba `MySqlException`, pero `QueryAsync` ya la había convertido en
+`DatabaseOperationException`. **Nunca se cumplía**, así que en un servidor viejo
+leer la estructura de cualquier tabla fallaba entera. Ahora se reconoce por el
+código ya normalizado.
+
+#### Fase B — el lienzo
+
+La colocación es lógica pura y probada, que era el riesgo del plan: capas por
+profundidad de dependencia, orden por baricentro y desempate por nombre. **Es
+determinista** —hay una prueba que le pasa el mismo esquema en orden inverso y
+exige posiciones idénticas—, los ciclos no la cuelgan, y el trazo ancla en la
+fila de la clave cuando esa columna se ve.
+
+El lienzo copia la anatomía de la aplicación: barra de 42 px con botones de 28,
+tres niveles de detalle, interruptor de sugeridas en color de advertencia,
+insignia `N:M` en las tablas puente, leyenda fija y arrastre. **Ni un color
+literal:** todo pasa por los tokens, así que el tema claro sale solo.
+
+Se abre desde el menú del explorador sobre un esquema o una tabla, como una capa
+sobre el shell —igual que el diseñador de tablas—. **No es todavía la pestaña
+propia del plan:** una pestaña exige persistirla, que es la Fase C, y una pestaña
+de diagrama guardada como pestaña de SQL vacía sería peor que no tenerla.
+
+Antes de escribir el componente se hizo el diseño en un lienzo aparte, con la
+paleta y las medidas sacadas de `_tokens.scss`, y se aprobó ahí.
+
+#### Hecho
+
+- Plan `docs/plan-mer-y-diagramas.md` y entrada en el backlog del plan maestro.
+- Contrato en lote en los cuatro proveedores, con su servicio y su endpoint.
+- `MetadataBatch`: reparto por tabla y composición, lo único común a los cuatro.
+- Colocación determinista, lienzo, panel contenedor y entrada en el explorador.
+- Prueba de punta a punta del diagrama y su captura `20-mer` en el barrido.
+
+#### Verificado
+
+- **Backend:** compila con 0 advertencias. 500 unitarias verdes, 8 de ellas
+  nuevas sobre el reparto en lote.
+- **Frontend:** compila; el diagrama sale como carga perezosa de 69 kB. **23
+  pruebas nuevas** —15 de colocación, 8 del lienzo— y las 86 de shell, explorador
+  y diagrama juntas. La suite entera queda en 739.
+- **Contractuales con los cuatro motores levantados y `DRUSE_REQUIRE_ENGINES=1`:
+  266 de 267 en 12 min 12 s.** Las **diez nuevas de la lectura en lote pasan en
+  los cinco fixtures** —PostgreSQL, SQL Server, MySQL, Informix por DRDA e
+  Informix por SQLI—, comprobado además una a una. **La Fase A queda cerrada.**
+- El único fallo es `InformixSqliContractTests.RespaldaLosDatosDeUnaTablaYLosVuelveACargar`:
+  «String to date conversion error» al reinsertar un `DATE` guionizado como
+  `'2026-08-17 00:00:00'`. Es **de los respaldos y no del diagrama**, y viene de
+  antes: en la 038 ya fallaban dos por SQLI. Con esto queda una.
+
+#### No hecho
+- **El barrido de capturas no se ha ejecutado**, así que el diagrama no se ha
+  mirado todavía en los dos temas y en los tres anchos.
+- Fases C a F enteras: selección de tablas, persistencia, relaciones sugeridas,
+  edición desde el lienzo y exportaciones.
+
+#### Archivos
+
+`backend/src/Druse.Domain/TableStructure.cs`,
+`Druse.Database.Abstractions/{IDatabaseMetadataReader,MetadataBatch}.cs`,
+los cuatro `Druse.Provider.*/*MetadataReader.cs`,
+`Druse.Application/Metadata/MetadataService.cs`,
+`Druse.Host.LocalApi/{Contracts,Endpoints}`,
+`frontend/src/app/features/diagram/**`,
+`core/application-gateway/*`, `core/workspace/workspace-store.ts`,
+`features/connections/connections-sidebar/*`, `layout/app-shell/*`,
+`shared/ui/icon/icon.ts`, `shared/models/workspace.ts`,
+`e2e/tests/{diagrama,barrido}.spec.ts`, `docs/plan-mer-y-diagramas.md`.
 
 ### Sesión 022 — 2026-08-17 · El PR fusionado y el plan de los respaldos
 
