@@ -480,6 +480,25 @@ export interface TableStructure {
   readonly checkConstraints: readonly DatabaseConstraint[];
 }
 
+/** Una tabla del diagrama: sus columnas y lo que la sostiene, leídas de una vez. */
+export interface TableDetail {
+  readonly table: DatabaseObject;
+  readonly columns: readonly DatabaseColumn[];
+  readonly structure: TableStructure;
+}
+
+/**
+ * Lo leído de las tablas que el diagrama pidió.
+ *
+ * `missing` no es una lista de errores: son las que se pidieron y ya no están en
+ * el catálogo. Un diagrama guardado hace meses las nombra, y hay que poder decir
+ * cuáles se fueron en lugar de dibujar menos cajas sin explicación.
+ */
+export interface SchemaGraph {
+  readonly tables: readonly TableDetail[];
+  readonly missing: readonly DatabaseObject[];
+}
+
 /** Tabla que se va a crear. */
 export interface TableDesign {
   readonly database?: string;

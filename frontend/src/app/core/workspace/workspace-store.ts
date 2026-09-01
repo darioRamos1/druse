@@ -44,6 +44,7 @@ import {
   TableAlteration,
   TableDesign,
   RoutineSignature,
+  SchemaGraph,
   TableStructure,
 } from '../../shared/models/workspace';
 
@@ -2074,6 +2075,31 @@ export class WorkspaceStore {
    * Es el punto de partida para modificarlos: igual que con las columnas, se
    * describe en qué se diferencia lo que hay de lo que se quiere.
    */
+  /**
+   * Columnas y estructura de varias tablas de una vez, para dibujar un diagrama.
+   *
+   * Va por su propia llamada y no por `tableStructure` repetida: sesenta tablas
+   * serían sesenta peticiones turnándose con lo que el explorador y el editor
+   * estén haciendo sobre la misma conexión.
+   */
+  async schemaGraph(
+    connectionId: string,
+    tables: readonly DatabaseObject[],
+  ): Promise<SchemaGraph | null> {
+    const sessionId = this.findConnection(connectionId)?.sessionId;
+
+    if (!sessionId) {
+      return null;
+    }
+
+    try {
+      return await firstValueFrom(this._gateway.getSchemaGraph(sessionId, tables));
+    } catch (error) {
+      this.reportFailure(connectionId, error);
+      return null;
+    }
+  }
+
   async tableStructure(
     connectionId: string,
     table: DatabaseObject,

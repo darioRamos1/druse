@@ -20,6 +20,7 @@ export type IconName =
   | 'database'
   | 'schema'
   | 'table'
+  | 'diagram'
   | 'play'
   | 'play-outline'
   | 'stop'
@@ -117,6 +118,14 @@ const ICONS: Readonly<Record<IconName, IconDefinition>> = {
       '<rect x="1.4" y="9.4" width="3.6" height="3" rx=".8" stroke="currentColor" stroke-width="1.2"/>' +
       '<rect x="9" y="9.4" width="3.6" height="3" rx=".8" stroke="currentColor" stroke-width="1.2"/>' +
       '<path d="M7 4.4v2.3M3.2 9.4V7.2h7.6v2.2" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>',
+  },
+  /** Dos tablas unidas por una relación: es lo que dibuja el diagrama. */
+  diagram: {
+    viewBox: '0 0 14 14',
+    body:
+      '<rect x="1.4" y="1.8" width="4.6" height="3.6" rx="1" stroke="currentColor" stroke-width="1.2"/>' +
+      '<rect x="8" y="8.6" width="4.6" height="3.6" rx="1" stroke="currentColor" stroke-width="1.2"/>' +
+      '<path d="M6 3.6h1.4a1.6 1.6 0 0 1 1.6 1.6v3.4" stroke="currentColor" stroke-width="1.2" fill="none"/>',
   },
   table: {
     viewBox: '0 0 14 14',

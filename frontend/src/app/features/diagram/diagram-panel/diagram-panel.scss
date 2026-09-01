@@ -1,0 +1,116 @@
+/* Mismo lenguaje que el diseñador de tablas: una capa sobre el shell. */
+:host {
+  position: fixed;
+  inset: 0;
+  z-index: var(--dr-z-modal);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--dr-font-ui);
+  font-size: var(--dr-font-size-sm);
+}
+
+.backdrop {
+  position: absolute;
+  inset: 0;
+  background: var(--dr-scrim);
+  backdrop-filter: blur(2px);
+}
+
+/*
+ * Ancho: un diagrama necesita todo el que haya. A diferencia de los diálogos
+ * con formulario, aquí el espacio no sobra nunca.
+ */
+.dialog {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: calc(100vw - 48px);
+  height: calc(100vh - 48px);
+  overflow: hidden;
+  border: 1px solid var(--dr-border-dialog);
+  border-radius: 12px;
+  background: var(--dr-surface-dialog);
+  box-shadow: var(--dr-shadow-dialog);
+}
+
+.head {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  flex: none;
+  padding: 14px 20px 12px;
+  border-bottom: 1px solid var(--dr-border);
+  color: var(--dr-text-tertiary);
+
+  &__text {
+    flex: 1;
+    min-width: 0;
+  }
+
+  &__title {
+    margin: 0 0 3px;
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--dr-text);
+  }
+
+  &__subtitle {
+    margin: 0;
+    font-size: 11.5px;
+    line-height: 1.45;
+    color: var(--dr-text-tertiary);
+  }
+
+  &__close {
+    border: none;
+    background: none;
+    color: var(--dr-text-tertiary);
+    font-size: 18px;
+    line-height: 1;
+    cursor: pointer;
+
+    &:hover {
+      color: var(--dr-text);
+    }
+  }
+}
+
+.state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  flex: 1;
+  color: var(--dr-text-tertiary);
+  font-size: 12.5px;
+
+  p {
+    margin: 0;
+    max-width: 44ch;
+    text-align: center;
+    line-height: 1.5;
+  }
+
+  &--error {
+    color: var(--dr-danger-text);
+  }
+
+  &__retry {
+    height: 28px;
+    padding: 0 12px;
+    border: 1px solid var(--dr-border-subtle);
+    border-radius: var(--dr-radius);
+    background: transparent;
+    color: var(--dr-text-muted);
+    font-family: inherit;
+    font-size: 12px;
+    cursor: pointer;
+
+    &:hover {
+      background: var(--dr-surface-hover);
+      color: var(--dr-text);
+    }
+  }
+}

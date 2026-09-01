@@ -1,0 +1,25 @@
+<div class="backdrop" (click)="close()"></div>
+
+<section class="dialog" role="dialog" aria-label="Diagrama entidad-relación">
+  <header class="head">
+    <app-icon name="diagram" [size]="14" />
+    <div class="head__text">
+      <h2 class="head__title">Diagrama · {{ title() }}</h2>
+      <p class="head__subtitle">
+        Lo que el catálogo dice hoy. Se relee cada vez que se abre.
+      </p>
+    </div>
+    <button type="button" class="head__close" (click)="close()" aria-label="Cerrar">×</button>
+  </header>
+
+  @if (loading()) {
+    <div class="state">Leyendo el catálogo…</div>
+  } @else if (error()) {
+    <div class="state state--error">
+      <p>{{ error() }}</p>
+      <button type="button" class="state__retry" (click)="retry()">Reintentar</button>
+    </div>
+  } @else if (graph(); as loaded) {
+    <app-diagram-canvas [graph]="loaded" (openTable)="openTable.emit($event)" />
+  }
+</section>

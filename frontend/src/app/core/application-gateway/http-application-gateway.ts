@@ -19,6 +19,7 @@ import {
   InputKind,
   RoutineSignature,
   TableStructure,
+  SchemaGraph,
   TestConnectionResult,
   TestTunnelResult,
 } from '../../shared/models/workspace';
@@ -270,6 +271,13 @@ export class HttpApplicationGateway extends ApplicationGateway {
 
   override getTableStructure(sessionId: string, table: DatabaseObject): Observable<TableStructure> {
     return this._http.post<TableStructure>(`/api/sessions/${sessionId}/tables/structure`, table);
+  }
+
+  override getSchemaGraph(
+    sessionId: string,
+    tables: readonly DatabaseObject[],
+  ): Observable<SchemaGraph> {
+    return this._http.post<SchemaGraph>(`/api/sessions/${sessionId}/metadata/graph`, { tables });
   }
 
   override previewCreateTable(

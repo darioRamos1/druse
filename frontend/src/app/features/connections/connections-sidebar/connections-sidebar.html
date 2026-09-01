@@ -292,6 +292,21 @@
                     </button>
                   }
 
+                  <!-- El diagrama se pide sobre un esquema —«enséñame cómo es
+                       esto»— o sobre una tabla, que entra con sus vecinas. Sobre
+                       la base entera no: son trescientas tablas y una tela de
+                       araña. -->
+                  @if (node.kind === 'schema' || node.kind === 'table') {
+                    <button
+                      type="button"
+                      role="menuitem"
+                      (click)="act($event, () => diagram.emit(node))"
+                    >
+                      <app-icon name="diagram" [size]="12" />
+                      Ver diagrama…
+                    </button>
+                  }
+
                   <!-- Respaldar se ofrece en los tres sitios desde los que se
                        piensa «me llevo esto»: la base entera, un esquema o una
                        tabla suelta. El asistente resuelve qué cuelga de cada

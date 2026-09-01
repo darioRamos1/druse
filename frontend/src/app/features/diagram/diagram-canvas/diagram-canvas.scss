@@ -1,0 +1,425 @@
+/*
+ * Ningún color literal: todo pasa por los tokens, porque hay dos temas y un
+ * color escrito a mano aquí sería una zona que se queda oscura en claro.
+ */
+:host {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  font-family: var(--dr-font-ui);
+}
+
+/* La barra copia la del editor: mismo alto, mismos botones de 28 px. */
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  row-gap: 6px;
+  min-height: var(--dr-editor-toolbar-height);
+  flex: 0 0 auto;
+  padding: 5px 12px;
+  background: var(--dr-surface-panel);
+  border-bottom: 1px solid var(--dr-border-faint);
+}
+
+.sep {
+  width: 1px;
+  height: 18px;
+  background: var(--dr-border-faint);
+}
+
+.grow {
+  flex: 1;
+}
+
+.run {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  height: 28px;
+  flex: none;
+  padding: 0 13px;
+  border: 0;
+  border-radius: var(--dr-radius);
+  background: var(--dr-accent-button);
+  color: var(--dr-text-on-accent);
+  font-family: inherit;
+  font-size: var(--dr-font-size-sm);
+  font-weight: 600;
+  box-shadow: var(--dr-shadow-accent-button);
+  cursor: pointer;
+
+  &:hover {
+    filter: brightness(1.08);
+  }
+}
+
+.btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  flex: none;
+  padding: 0 10px;
+  border: 1px solid var(--dr-border-subtle);
+  border-radius: var(--dr-radius);
+  background: transparent;
+  color: var(--dr-text-muted);
+  font-family: inherit;
+  font-size: 12px;
+  cursor: pointer;
+
+  &:hover:not(:disabled) {
+    background: var(--dr-surface-hover);
+    color: var(--dr-text);
+  }
+
+  &:disabled {
+    color: var(--dr-text-dim);
+    cursor: default;
+  }
+}
+
+.segmented {
+  display: flex;
+  align-items: center;
+  height: 28px;
+  flex: none;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--dr-border-subtle);
+  border-radius: var(--dr-radius);
+
+  &__item {
+    height: 22px;
+    padding: 0 10px;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--dr-text-tertiary);
+    font-family: inherit;
+    font-size: 12px;
+    cursor: pointer;
+
+    &:hover {
+      color: var(--dr-text);
+    }
+
+    &.is-active {
+      background: var(--dr-surface-active);
+      color: var(--dr-text);
+      font-weight: 500;
+    }
+  }
+}
+
+/*
+ * El interruptor de las sugeridas va en color de advertencia, igual que las
+ * líneas que enciende: es lo que evita que una suposición parezca un hecho.
+ */
+.toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 28px;
+  flex: none;
+  padding: 0 10px;
+  border: 1px solid var(--dr-border-subtle);
+  border-radius: var(--dr-radius);
+  background: transparent;
+  color: var(--dr-text-muted);
+  font-family: inherit;
+  font-size: 12px;
+  cursor: pointer;
+
+  &.is-on {
+    border-color: var(--dr-warning-line);
+    background: var(--dr-warning-tint);
+    color: var(--dr-warning);
+  }
+
+  &__track {
+    position: relative;
+    display: block;
+    width: 22px;
+    height: 13px;
+    flex: none;
+    border-radius: 7px;
+    background: var(--dr-border);
+  }
+
+  &.is-on &__track {
+    background: var(--dr-warning-line);
+  }
+
+  &__knob {
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: var(--dr-text-dim);
+    transition: left 120ms ease;
+  }
+
+  &.is-on &__knob {
+    left: 11px;
+    background: var(--dr-warning);
+  }
+
+  &__count {
+    font-family: var(--dr-font-mono);
+    font-size: 11px;
+    color: var(--dr-text-faint);
+  }
+}
+
+.count {
+  font-size: 11.5px;
+  color: var(--dr-text-faint);
+}
+
+.missing {
+  padding: 3px 8px;
+  border: 1px solid var(--dr-danger-line-soft);
+  border-radius: var(--dr-radius-sm);
+  background: var(--dr-danger-tint);
+  color: var(--dr-danger-text);
+  font-size: 11.5px;
+}
+
+/* El lienzo. La cuadrícula de puntos es lo único que dice que se puede arrastrar. */
+.canvas {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--dr-surface-base);
+  background-image: radial-gradient(var(--dr-border) 1px, transparent 0);
+  background-size: 22px 22px;
+  cursor: grab;
+  touch-action: none;
+
+  &:active {
+    cursor: grabbing;
+  }
+}
+
+.surface {
+  position: absolute;
+  inset: 0;
+}
+
+.wires {
+  position: absolute;
+  top: 0;
+  left: 0;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.wire {
+  &__line,
+  &__feet,
+  &__bar {
+    fill: none;
+    stroke: var(--dr-accent);
+    stroke-width: 1.5;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  &__dot {
+    fill: var(--dr-surface-base);
+    stroke: var(--dr-accent);
+    stroke-width: 1.5;
+  }
+
+  &.is-suggested {
+    .wire__line,
+    .wire__feet,
+    .wire__bar {
+      stroke: var(--dr-warning);
+    }
+
+    .wire__dot {
+      stroke: var(--dr-warning);
+    }
+  }
+
+  &.is-strong {
+    .wire__line,
+    .wire__feet,
+    .wire__bar {
+      stroke-width: 2;
+    }
+  }
+
+  /* Apagado, no escondido: la relación sigue estando y se ve que está. */
+  &.is-dim {
+    opacity: 0.14;
+  }
+}
+
+.node {
+  position: absolute;
+  border: 1px solid var(--dr-border);
+  border-radius: var(--dr-radius);
+  background: var(--dr-surface-panel);
+  box-shadow: 0 6px 18px rgb(0 0 0 / 32%);
+  overflow: hidden;
+
+  &.is-dim {
+    opacity: 0.22;
+  }
+
+  &.is-selected {
+    border-color: var(--dr-accent-line);
+    box-shadow: 0 0 0 1px var(--dr-accent-line-soft), var(--dr-shadow-popover);
+  }
+
+  &__head {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    height: 30px;
+    padding: 0 9px;
+    background: var(--dr-surface-grid-header);
+    border-bottom: 1px solid var(--dr-border);
+    color: var(--dr-text-tertiary);
+    cursor: grab;
+    touch-action: none;
+
+    &:active {
+      cursor: grabbing;
+    }
+  }
+
+  &.is-selected &__head {
+    background: var(--dr-accent-tint);
+    color: var(--dr-accent-bright);
+  }
+
+  &__name {
+    font-family: var(--dr-font-mono);
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--dr-text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &.is-selected &__name {
+    color: var(--dr-accent-bright);
+  }
+
+  &__badge {
+    margin-left: auto;
+    flex: none;
+    padding: 1px 5px;
+    border: 1px solid var(--dr-border-strong);
+    border-radius: 4px;
+    color: var(--dr-text-faint);
+    font-family: var(--dr-font-mono);
+    font-size: 9px;
+    letter-spacing: 0.04em;
+  }
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 21px;
+  padding: 0 9px;
+
+  /* La clave primaria lleva el mismo tinte que la señala en el diseñador. */
+  &--pk {
+    background: var(--dr-warning-tint);
+  }
+
+  &__mark {
+    flex: none;
+    width: 15px;
+    font-family: var(--dr-font-mono);
+    font-size: 8.5px;
+    font-weight: 500;
+    letter-spacing: 0.03em;
+    color: var(--dr-text-faint);
+
+    &--pk {
+      color: var(--dr-warning);
+    }
+
+    &--fk {
+      color: var(--dr-accent-bright);
+    }
+  }
+
+  &__name {
+    font-family: var(--dr-font-mono);
+    font-size: 11px;
+    color: var(--dr-text-tertiary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+
+    &--key {
+      color: var(--dr-text-secondary);
+    }
+  }
+
+  &__type {
+    margin-left: auto;
+    flex: none;
+    font-family: var(--dr-font-mono);
+    font-size: 10px;
+    color: var(--dr-text-faintest);
+  }
+}
+
+/*
+ * La leyenda está fija y no detrás de un botón: la pata de gallo se entiende
+ * sola, pero el círculo de «admite nulos» no, y la línea punteada tiene que
+ * decir siempre que es una suposición.
+ */
+.legend {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  flex: none;
+  padding: 0 14px;
+  height: 30px;
+  border-top: 1px solid var(--dr-border-hairline);
+  background: var(--dr-surface-statusbar);
+
+  &__item {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    font-size: 11.5px;
+    color: var(--dr-text-tertiary);
+  }
+
+  &__declared {
+    fill: none;
+    stroke: var(--dr-accent);
+    stroke-width: 1.5;
+  }
+
+  &__suggested {
+    fill: none;
+    stroke: var(--dr-warning);
+    stroke-width: 1.5;
+  }
+
+  &__optional {
+    fill: none;
+    stroke: var(--dr-text-tertiary);
+    stroke-width: 1.5;
+  }
+}

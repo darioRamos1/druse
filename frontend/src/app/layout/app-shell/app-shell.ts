@@ -38,6 +38,7 @@ import { ImportDialog } from '../../features/import/import-dialog/import-dialog'
 import { TransferDialog } from '../../features/transfer/transfer-dialog/transfer-dialog';
 import { TransferSetDialog } from '../../features/transfer/transfer-set-dialog/transfer-set-dialog';
 import { TableDesigner } from '../../features/tables/table-designer/table-designer';
+import { DiagramPanel } from '../../features/diagram/diagram-panel/diagram-panel';
 import { ProcedureRunner } from '../../features/query-builder/procedure-runner/procedure-runner';
 import { QueryBuilder } from '../../features/query-builder/query-builder/query-builder';
 import { buildSelect } from '../../features/query-editor/sql-language/sql-writer';
@@ -111,6 +112,7 @@ const DISCONNECTED: SessionStatus = {
     BackupDialog,
     RestoreDialog,
     TableDesigner,
+    DiagramPanel,
     QueryBuilder,
     ProcedureRunner,
     CommandPalette,
@@ -429,6 +431,43 @@ export class AppShell {
 
   protected closeTableDesigner(): void {
     this.designTarget.set(null);
+  }
+
+  /**
+   * Esquema o tabla cuyo diagrama se está mirando.
+   *
+   * Vive aquí y no entre las pestañas porque el diagrama todavía no se guarda:
+   * en cuanto se pueda guardar tendrá pestaña propia, que es donde caben varios
+   * abiertos a la vez.
+   */
+  protected readonly diagramTarget = signal<ExplorerNode | null>(null);
+
+  /** Sesión de la conexión cuyo diagrama se mira; vacía si se perdió. */
+  protected readonly diagramSessionId = computed(() => {
+    const target = this.diagramTarget();
+
+    return target ? (this._store.sessionForConnection(target.connectionId) ?? '') : '';
+  });
+
+  protected openDiagram(node: ExplorerNode): void {
+    this.prepareOverlay();
+    this.diagramTarget.set(node);
+  }
+
+  protected closeDiagram(): void {
+    this.diagramTarget.set(null);
+  }
+
+  /** Del diagrama al diseñador: el mismo camino que desde el explorador. */
+  protected designFromDiagram(table: DatabaseObject): void {
+    const target = this.diagramTarget();
+
+    if (!target) {
+      return;
+    }
+
+    this.diagramTarget.set(null);
+    this.openTableDesigner({ ...target, source: table });
   }
 
   /** Tabla sobre la que se está componiendo una consulta. */

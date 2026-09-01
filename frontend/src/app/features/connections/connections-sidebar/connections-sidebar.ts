@@ -230,6 +230,15 @@ export class ConnectionsSidebar {
   readonly backup = output<ExplorerNode>();
 
   /**
+   * Dibujar el diagrama de lo que cuelga de este nodo.
+   *
+   * Sobre un esquema entran sus tablas; sobre una tabla, ella y las que la
+   * rodean. Sobre la base entera no se ofrece: serían trescientas cajas y una
+   * espera, y para eso está el selector.
+   */
+  readonly diagram = output<ExplorerNode>();
+
+  /**
    * Aplicar un respaldo sobre esta base.
    *
    * Solo se ofrece sobre la base y no sobre un esquema o una tabla: un artefacto

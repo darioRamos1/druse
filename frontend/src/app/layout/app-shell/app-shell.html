@@ -47,6 +47,7 @@
     (transferFrom)="openTransfer($event)"
     (transferTablesFrom)="openTransferSet($event)"
     (backup)="openBackup($event)"
+    (diagram)="openDiagram($event)"
     (restore)="openRestore($event)"
     (createTable)="openTableDesigner($event)"
     (designTable)="openTableDesigner($event)"
@@ -288,6 +289,22 @@
     [connectionId]="destino.connectionId"
     (closed)="closeTableDesigner()"
   />
+}
+
+<!--
+  El diagrama se carga tarde: dibuja un lienzo que no hace falta hasta que
+  alguien lo pide, y arrastrarlo en el arranque retrasaría el editor.
+-->
+@defer (when diagramTarget() !== null) {
+  @if (diagramTarget(); as destino) {
+    <app-diagram-panel
+      [target]="destino"
+      [connectionId]="destino.connectionId"
+      [sessionId]="diagramSessionId()"
+      (openTable)="designFromDiagram($event)"
+      (closed)="closeDiagram()"
+    />
+  }
 }
 
 <!--

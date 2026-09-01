@@ -17,6 +17,7 @@ import {
   TableDesign,
   RoutineSignature,
   TableStructure,
+  SchemaGraph,
   TestConnectionResult,
   TestTunnelResult,
 } from '../../shared/models/workspace';
@@ -383,6 +384,18 @@ export abstract class ApplicationGateway {
 
   /** Índices, claves foráneas y demás restricciones de una tabla. */
   abstract getTableStructure(sessionId: string, table: DatabaseObject): Observable<TableStructure>;
+
+  /**
+   * Columnas y estructura de varias tablas en una sola petición.
+   *
+   * Es lo que hace posible el diagrama. Pedirlas de una en una serían sesenta
+   * peticiones que además se turnarían con lo que el explorador y el editor
+   * estén haciendo sobre la misma conexión.
+   */
+  abstract getSchemaGraph(
+    sessionId: string,
+    tables: readonly DatabaseObject[],
+  ): Observable<SchemaGraph>;
 
   /**
    * El SQL que crearía la tabla, para enseñarlo antes de ejecutarlo.
