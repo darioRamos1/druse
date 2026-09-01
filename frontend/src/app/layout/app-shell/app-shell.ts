@@ -436,6 +436,15 @@ export class AppShell {
     // La clave que llegó del diagrama se olvida al cerrar: si no, volvería a
     // aparecer la próxima vez que alguien abriera el diseñador desde el árbol.
     this.designedForeignKey.set(null);
+
+    // Y si se vino del diagrama, se vuelve a él. Al montarse otra vez relee el
+    // catálogo, así que el cambio que se acabe de aplicar sale dibujado.
+    const back = this._backToDiagram();
+
+    if (back !== null) {
+      this._backToDiagram.set(null);
+      this.diagramTarget.set(back);
+    }
   }
 
   /**
@@ -463,6 +472,15 @@ export class AppShell {
     this.diagramTarget.set(null);
   }
 
+  /**
+   * A dónde volver cuando se cierre el diseñador.
+   *
+   * Quien llegó al diseñador desde el diagrama espera volver al diagrama, y de
+   * paso es lo que lo hace releer el catálogo: lo que se enseñe después tiene
+   * que ser lo que el motor tiene ahora, no lo que se pidió.
+   */
+  private readonly _backToDiagram = signal<ExplorerNode | null>(null);
+
   /** Del diagrama al diseñador: el mismo camino que desde el explorador. */
   protected designFromDiagram(table: DatabaseObject): void {
     const target = this.diagramTarget();
@@ -471,8 +489,21 @@ export class AppShell {
       return;
     }
 
+    this._backToDiagram.set(target);
     this.diagramTarget.set(null);
     this.openTableDesigner({ ...target, source: table });
+  }
+
+  /** Ver los datos de una tabla del diagrama, sin cerrar el diagrama. */
+  protected dataFromDiagram(table: DatabaseObject): void {
+    const target = this.diagramTarget();
+
+    if (!target) {
+      return;
+    }
+
+    this.diagramTarget.set(null);
+    this.openNode({ ...target, source: table });
   }
 
   /**

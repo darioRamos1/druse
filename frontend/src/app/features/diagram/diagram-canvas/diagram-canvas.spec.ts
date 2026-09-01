@@ -244,6 +244,51 @@ describe('DiagramCanvas', () => {
     expect(pedidas).toEqual(['cliente_id']);
   });
 
+  /**
+   * El menú de una tabla. Lo que importa aquí es la palabra: **quitar del
+   * diagrama** no borra nada, y el lienzo solo lo pide.
+   */
+  it('el menú de una tabla ofrece quitarla del diagrama sin borrarla', () => {
+    const quitadas: string[] = [];
+    const datos: string[] = [];
+
+    fixture.componentInstance.removeTable.subscribe((key) => quitadas.push(key));
+    fixture.componentInstance.openData.subscribe((table) => datos.push(table.name));
+
+    cabecera('factura').dispatchEvent(new MouseEvent('contextmenu', { bubbles: true }));
+    fixture.detectChanges();
+
+    const menu = dom().querySelector('.menu')!;
+    const items = [...menu.querySelectorAll<HTMLButtonElement>('.menu__item')];
+
+    expect(items.map((item) => item.textContent?.trim())).toEqual([
+      'Abrir en el diseñador',
+      'Ver datos',
+      'Traer sus vecinas',
+      'Quitar del diagrama',
+    ]);
+
+    items[3].click();
+    fixture.detectChanges();
+
+    expect(quitadas).toEqual(['ventas.factura']);
+    expect(dom().querySelector('.menu')).toBeNull();
+    expect(datos).toEqual([]);
+  });
+
+  it('el doble clic en una columna abre el diseñador de su tabla', () => {
+    const abiertas: string[] = [];
+    fixture.componentInstance.openTable.subscribe((table) => abiertas.push(table.name));
+
+    const fila = nodos()
+      .find((node) => node.querySelector('.node__name')?.textContent?.trim() === 'factura')!
+      .querySelector('.row')!;
+
+    fila.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+
+    expect(abiertas).toEqual(['factura']);
+  });
+
   it('la leyenda está siempre a la vista', () => {
     expect(dom().querySelectorAll('.legend__item')).toHaveLength(3);
   });

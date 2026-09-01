@@ -136,6 +136,7 @@
           (pointerdown)="startDrag($event, box)"
           (click)="select(box.key)"
           (dblclick)="open(box)"
+          (contextmenu)="openMenu($event, box)"
           [title]="box.table.schema ? box.table.schema + '.' + box.table.name : box.table.name"
         >
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
@@ -149,7 +150,15 @@
         </div>
 
         @for (column of box.columns; track column.name) {
-          <div class="row" [class.row--pk]="column.isPrimaryKey">
+          <!-- Doble clic en una columna abre el diseñador, igual que en la
+               cabecera: quien mira una columna y quiere cambiarla no debería
+               tener que buscar por dónde. -->
+          <div
+            class="row"
+            [class.row--pk]="column.isPrimaryKey"
+            (dblclick)="open(box)"
+            [title]="column.name + ' · ' + column.dataType"
+          >
             <span
               class="row__mark"
               [class.row__mark--pk]="column.isPrimaryKey"
@@ -163,6 +172,26 @@
             <span class="row__type">{{ column.dataType }}</span>
           </div>
         }
+      </div>
+    }
+
+    <!--
+      El menú de una tabla. Va dentro de la superficie para moverse con ella al
+      arrastrar el lienzo: fijo a la ventana se quedaría señalando otra caja.
+    -->
+    @if (menuBox(); as box) {
+      <div class="menu" [style.left.px]="box.x + box.width + 8" [style.top.px]="box.y">
+        <button type="button" class="menu__item" (click)="design(box)">
+          Abrir en el diseñador
+        </button>
+        <button type="button" class="menu__item" (click)="showData(box)">Ver datos</button>
+        <button type="button" class="menu__item" (click)="bringNeighbours.emit(box.key)">
+          Traer sus vecinas
+        </button>
+        <div class="menu__separator"></div>
+        <button type="button" class="menu__item" (click)="removeFromDiagram(box)">
+          Quitar del diagrama
+        </button>
       </div>
     }
   </div>

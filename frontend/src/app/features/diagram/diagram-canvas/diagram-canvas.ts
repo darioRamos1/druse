@@ -86,6 +86,18 @@ export class DiagramCanvas {
    */
   readonly acceptSuggestion = output<SuggestedRelation>();
 
+  /**
+   * Quitar una tabla del lienzo.
+   *
+   * **No la borra.** Deja de dibujarse, y por eso la palabra del menú es
+   * «Quitar del diagrama»: borrar de verdad sigue estando en el explorador, con
+   * su confirmación.
+   */
+  readonly removeTable = output<string>();
+
+  /** Ver los datos de una tabla, que es el otro «y esto qué tiene dentro». */
+  readonly openData = output<DatabaseObject>();
+
   protected readonly level = signal<DetailLevel>('full');
   protected readonly selected = signal<string | null>(null);
   protected readonly showSuggested = signal(true);
@@ -282,6 +294,41 @@ export class DiagramCanvas {
 
   protected accept(suggestion: SuggestedRelation): void {
     this.acceptSuggestion.emit(suggestion);
+  }
+
+  /** Qué tabla tiene el menú abierto, o ninguna. */
+  protected readonly menuFor = signal<string | null>(null);
+
+  protected openMenu(event: MouseEvent, box: PaintedBox): void {
+    event.preventDefault();
+    event.stopPropagation();
+
+    this.menuFor.update((current) => (current === box.key ? null : box.key));
+  }
+
+  protected closeMenu(): void {
+    this.menuFor.set(null);
+  }
+
+  protected menuBox(): PaintedBox | null {
+    const key = this.menuFor();
+
+    return key === null ? null : (this.boxes().find((box) => box.key === key) ?? null);
+  }
+
+  protected removeFromDiagram(box: PaintedBox): void {
+    this.closeMenu();
+    this.removeTable.emit(box.key);
+  }
+
+  protected showData(box: PaintedBox): void {
+    this.closeMenu();
+    this.openData.emit(box.table);
+  }
+
+  protected design(box: PaintedBox): void {
+    this.closeMenu();
+    this.openTable.emit(box.table);
   }
 
   protected identify = (_: number, box: PaintedBox): string => box.key;

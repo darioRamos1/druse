@@ -84,6 +84,9 @@ export class DiagramPanel {
   /** Abrir el diseñador con una clave foránea ya escrita, para revisarla. */
   readonly designForeignKey = output<{ table: DatabaseObject; key: ForeignKeyDesign }>();
 
+  /** Ver los datos de una tabla del diagrama. */
+  readonly openData = output<DatabaseObject>();
+
   protected readonly loading = signal(true);
   protected readonly error = signal<string | null>(null);
   protected readonly graph = signal<SchemaGraph | null>(null);
@@ -279,6 +282,42 @@ export class DiagramPanel {
         onUpdate: 'noAction',
       },
     });
+  }
+
+  /**
+   * Quita una tabla del lienzo.
+   *
+   * No borra nada: deja de dibujarse. Vuelve con «Cambiar tablas…» o trayendo
+   * las vecinas de otra.
+   */
+  protected remove(key: string): void {
+    const next = new Set(this.chosen());
+
+    if (!next.delete(key)) {
+      return;
+    }
+
+    if (next.size === 0) {
+      this.notice.set('Un diagrama sin tablas no dibuja nada; se dejó como estaba.');
+      return;
+    }
+
+    this.notice.set(null);
+    this.chosen.set(next);
+    this.dirty.set(true);
+    this.draw();
+  }
+
+  /**
+   * Vuelve a leer el catálogo de lo que está dibujado.
+   *
+   * Se llama al volver del diseñador: lo que se enseñe después tiene que ser lo
+   * que el motor tiene ahora, no lo que se pidió. Es la diferencia entre un
+   * diagrama y un dibujo de nuestras intenciones.
+   */
+  reread(): void {
+    this._whole.set(null);
+    this.draw();
   }
 
   /** Una tabla cambió de sitio: se recuerda para poder guardarlo. */

@@ -304,6 +304,7 @@
       [sessionId]="diagramSessionId()"
       (openTable)="designFromDiagram($event)"
       (designForeignKey)="designKeyFromDiagram($event)"
+      (openData)="dataFromDiagram($event)"
       (closed)="closeDiagram()"
     />
   }
