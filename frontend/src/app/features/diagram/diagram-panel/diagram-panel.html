@@ -102,6 +102,8 @@
       (acceptSuggestion)="accept($event)"
       (removeTable)="remove($event)"
       (openData)="openData.emit($event)"
+      (exported)="download($event)"
+      (copied)="copy($event)"
       (moved)="moved($event)"
     />
   }

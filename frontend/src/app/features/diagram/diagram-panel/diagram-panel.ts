@@ -320,6 +320,35 @@ export class DiagramPanel {
     this.draw();
   }
 
+  /**
+   * Guarda un archivo exportado del diagrama.
+   *
+   * Va por un enlace temporal y no por el selector de carpetas del sistema: lo
+   * que se exporta aquí es una imagen que casi siempre acaba pegada en otro
+   * sitio, y pedir una ruta para eso sobra.
+   */
+  protected download(file: { name: string; blob: Blob }): void {
+    const url = URL.createObjectURL(file.blob);
+    const link = document.createElement('a');
+
+    link.href = url;
+    link.download = file.name;
+    link.click();
+
+    URL.revokeObjectURL(url);
+    this.notice.set(`Se descargó ${file.name}.`);
+  }
+
+  /** Copia al portapapeles lo que el lienzo generó como texto. */
+  protected async copy(payload: { text: string; label: string }): Promise<void> {
+    try {
+      await navigator.clipboard.writeText(payload.text);
+      this.notice.set(`Copiado como ${payload.label}. Las relaciones supuestas van comentadas.`);
+    } catch {
+      this.notice.set('No se pudo copiar al portapapeles.');
+    }
+  }
+
   /** Una tabla cambió de sitio: se recuerda para poder guardarlo. */
   protected moved(move: { key: string; x: number; y: number }): void {
     const next = new Map(this.positions());

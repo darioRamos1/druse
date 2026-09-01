@@ -289,6 +289,62 @@ describe('DiagramCanvas', () => {
     expect(abiertas).toEqual(['factura']);
   });
 
+  /**
+   * Lo que no se puede romper al exportar: un archivo no puede presentar una
+   * suposición como una clave foránea.
+   */
+  it('exporta a texto con las supuestas comentadas, y a SVG con su tamaño', () => {
+    const copiado: { text: string; label: string }[] = [];
+    const guardado: { name: string; blob: Blob }[] = [];
+
+    fixture.componentInstance.copied.subscribe((payload) => copiado.push(payload));
+    fixture.componentInstance.exported.subscribe((file) => guardado.push(file));
+
+    fixture.componentRef.setInput('graph', {
+      ...grafo,
+      suggestions: [
+        {
+          fromSchema: 'ventas',
+          fromTable: 'bitacora',
+          column: 'cliente_id',
+          toSchema: 'ventas',
+          toTable: 'cliente',
+          referencedColumn: 'id',
+          confidence: 'high' as const,
+          reason: 'nombra a cliente',
+        },
+      ],
+    } satisfies SchemaGraph);
+    fixture.detectChanges();
+
+    const abrir = () => {
+      dom().querySelector<HTMLButtonElement>('.export .btn')!.click();
+      fixture.detectChanges();
+    };
+
+    abrir();
+    const items = [...dom().querySelectorAll<HTMLButtonElement>('.export__item')];
+    expect(items.map((item) => item.textContent?.trim())).toEqual([
+      'Imagen SVG',
+      'Imagen PNG',
+      'Copiar como Mermaid',
+      'Copiar como DBML',
+    ]);
+
+    items[2].click();
+    fixture.detectChanges();
+
+    expect(copiado[0].label).toBe('Mermaid');
+    expect(copiado[0].text).toContain('erDiagram');
+    expect(copiado[0].text).toContain('%% supuesta por Druse');
+
+    abrir();
+    [...dom().querySelectorAll<HTMLButtonElement>('.export__item')][0].click();
+
+    expect(guardado[0].name).toBe('diagrama.svg');
+    expect(guardado[0].blob.type).toContain('image/svg+xml');
+  });
+
   it('la leyenda está siempre a la vista', () => {
     expect(dom().querySelectorAll('.legend__item')).toHaveLength(3);
   });

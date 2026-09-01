@@ -26,6 +26,21 @@ import {
   neighbours,
   tableKey,
 } from '../diagram-layout';
+import { toDbml, toMermaid } from '../diagram-export';
+
+/**
+ * Escapa lo que no puede ir suelto dentro de un SVG.
+ *
+ * Un nombre de tabla con `&` deja el archivo sin abrir, y el visor no dice por
+ * qué: solo enseña una página en blanco.
+ */
+function escapeXml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
 
 /** Una caja con lo que hace falta para pintarla en el estado en que está. */
 interface PaintedBox extends DiagramBox {
@@ -97,6 +112,12 @@ export class DiagramCanvas {
 
   /** Ver los datos de una tabla, que es el otro «y esto qué tiene dentro». */
   readonly openData = output<DatabaseObject>();
+
+  /** Un archivo listo para guardar, con el nombre que debería llevar. */
+  readonly exported = output<{ name: string; blob: Blob }>();
+
+  /** Texto listo para copiar, con lo que hay que decirle al usuario. */
+  readonly copied = output<{ text: string; label: string }>();
 
   protected readonly level = signal<DetailLevel>('full');
   protected readonly selected = signal<string | null>(null);
@@ -294,6 +315,174 @@ export class DiagramCanvas {
 
   protected accept(suggestion: SuggestedRelation): void {
     this.acceptSuggestion.emit(suggestion);
+  }
+
+  /** El menú de exportar está abierto. */
+  protected readonly exportOpen = signal(false);
+
+  protected toggleExport(): void {
+    this.exportOpen.update((open) => !open);
+  }
+
+  /**
+   * El diagrama como texto, para pegarlo en un `README` o versionarlo.
+   *
+   * Las relaciones supuestas van **comentadas**: un archivo que las presente
+   * como claves foráneas es peor que no exportarlo, porque quien lo lea no tiene
+   * forma de saber cuáles comprueba el motor.
+   */
+  protected exportText(format: 'mermaid' | 'dbml'): void {
+    this.exportOpen.set(false);
+
+    const options = { includeSuggested: this.showSuggested() };
+    const text = format === 'mermaid'
+      ? toMermaid(this.graph(), options)
+      : toDbml(this.graph(), options);
+
+    this.copied.emit({
+      text,
+      label: format === 'mermaid' ? 'Mermaid' : 'DBML',
+    });
+  }
+
+  /**
+   * El lienzo como SVG.
+   *
+   * Se serializa el `<svg>` de las relaciones junto con las cajas, que son HTML:
+   * las cajas se vuelcan a `<foreignObject>`… **no**. Se dibujan como `<text>` y
+   * `<rect>` calculados aquí, que es lo único que sobrevive fuera del navegador.
+   */
+  protected exportSvg(): void {
+    this.exportOpen.set(false);
+
+    const svg = this.buildSvg();
+
+    this.exported.emit({
+      name: 'diagrama.svg',
+      blob: new Blob([svg], { type: 'image/svg+xml;charset=utf-8' }),
+    });
+  }
+
+  /** El mismo SVG rasterizado, para pegarlo donde no admiten vectores. */
+  protected async exportPng(): Promise<void> {
+    this.exportOpen.set(false);
+
+    const svg = this.buildSvg();
+    const url = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml;charset=utf-8' }));
+
+    try {
+      const image = new Image();
+
+      await new Promise<void>((resolve, reject) => {
+        image.onload = () => resolve();
+        image.onerror = () => reject(new Error('No se pudo dibujar el diagrama.'));
+        image.src = url;
+      });
+
+      // Al doble de escala: un PNG a tamaño natural se ve borroso en cuanto
+      // alguien lo amplía en una presentación.
+      const canvas = document.createElement('canvas');
+      canvas.width = this.width() * 2;
+      canvas.height = this.height() * 2;
+
+      const context = canvas.getContext('2d');
+
+      if (context === null) {
+        return;
+      }
+
+      context.scale(2, 2);
+      context.drawImage(image, 0, 0);
+
+      const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/png'));
+
+      if (blob !== null) {
+        this.exported.emit({ name: 'diagrama.png', blob });
+      }
+    } finally {
+      URL.revokeObjectURL(url);
+    }
+  }
+
+  /**
+   * Dibuja el lienzo entero como un SVG que se sostiene solo.
+   *
+   * No se copia el DOM: las cajas son `div`, y un `<foreignObject>` con HTML
+   * dentro no sobrevive a la conversión a PNG ni se abre bien fuera del
+   * navegador. Se redibujan como rectángulos y texto, que es lo que el formato
+   * garantiza.
+   */
+  private buildSvg(): string {
+    const width = this.width();
+    const height = this.height();
+    const style = getComputedStyle(this._canvas()?.nativeElement ?? document.body);
+
+    const color = (token: string, fallback: string) =>
+      style.getPropertyValue(token).trim() || fallback;
+
+    const background = color('--dr-surface-base', '#0e1413');
+    const border = color('--dr-border', '#26312e');
+    const header = color('--dr-surface-grid-header', '#1b2523');
+    const panel = color('--dr-surface-panel', '#151d1b');
+    const text = color('--dr-text', '#e6edea');
+    const soft = color('--dr-text-tertiary', '#7c8a85');
+    const accent = color('--dr-accent', '#6c8bff');
+    const warning = color('--dr-warning', '#f5bf4f');
+
+    const parts: string[] = [
+      `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" ` +
+        `viewBox="0 0 ${width} ${height}">`,
+      `<rect width="${width}" height="${height}" fill="${background}"/>`,
+      `<g font-family="JetBrains Mono, Consolas, monospace">`,
+    ];
+
+    for (const link of this.links()) {
+      const stroke = link.kind === 'suggested' ? warning : accent;
+      const dash = link.kind === 'suggested' ? ' stroke-dasharray="6 5"' : '';
+
+      parts.push(
+        `<path d="${link.path}" fill="none" stroke="${stroke}" stroke-width="1.5"${dash}/>`,
+        `<path d="${link.feet}" fill="none" stroke="${stroke}" stroke-width="1.5"/>`,
+        `<path d="${link.bar}" fill="none" stroke="${stroke}" stroke-width="1.5"/>`,
+      );
+
+      if (link.optional) {
+        parts.push(
+          `<circle cx="${link.dotX}" cy="${link.dotY}" r="3.5" fill="${background}" ` +
+            `stroke="${stroke}" stroke-width="1.5"/>`,
+        );
+      }
+    }
+
+    for (const box of this.boxes()) {
+      parts.push(
+        `<rect x="${box.x}" y="${box.y}" width="${box.width}" height="${box.height}" rx="8" ` +
+          `fill="${panel}" stroke="${border}"/>`,
+        `<path d="M ${box.x} ${box.y + BOX.header} h ${box.width}" stroke="${border}"/>`,
+        `<rect x="${box.x}" y="${box.y}" width="${box.width}" height="${BOX.header}" ` +
+          `fill="${header}" opacity="0.6"/>`,
+        `<text x="${box.x + 10}" y="${box.y + 19}" fill="${text}" font-size="12" ` +
+          `font-weight="500">${escapeXml(box.table.name)}</text>`,
+      );
+
+      box.columns.forEach((column, index) => {
+        const y = box.y + BOX.header + index * BOX.row + 14;
+        const mark = column.isPrimaryKey ? 'PK' : column.isForeignKey ? 'FK' : '';
+
+        parts.push(
+          `<text x="${box.x + 10}" y="${y}" fill="${column.isPrimaryKey ? warning : soft}" ` +
+            `font-size="8.5">${mark}</text>`,
+          `<text x="${box.x + 30}" y="${y}" fill="${text}" font-size="11">` +
+            `${escapeXml(column.name)}</text>`,
+          `<text x="${box.x + box.width - 10}" y="${y}" fill="${soft}" font-size="10" ` +
+            `text-anchor="end">${escapeXml(column.dataType)}</text>`,
+        );
+      });
+    }
+
+    parts.push('</g>', '</svg>');
+
+    return parts.join('\n');
   }
 
   /** Qué tabla tiene el menú abierto, o ninguna. */

@@ -70,6 +70,34 @@
   }
 
   <span class="count">{{ summary().tables }} tablas · {{ summary().declared }} relaciones</span>
+
+  <!--
+    Exportar. Las cuatro salidas salen del mismo diagrama, y las supuestas viajan
+    comentadas o no viajan: un archivo que las presente como claves foráneas es
+    peor que no exportarlo.
+  -->
+  <div class="export">
+    <button type="button" class="btn" (click)="toggleExport()" [attr.aria-expanded]="exportOpen()">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true">
+        <path d="M12 4v11M8 11l4 4 4-4M4 19h16" />
+      </svg>
+      <span>Exportar</span>
+    </button>
+
+    @if (exportOpen()) {
+      <div class="export__menu">
+        <button type="button" class="export__item" (click)="exportSvg()">Imagen SVG</button>
+        <button type="button" class="export__item" (click)="exportPng()">Imagen PNG</button>
+        <div class="export__separator"></div>
+        <button type="button" class="export__item" (click)="exportText('mermaid')">
+          Copiar como Mermaid
+        </button>
+        <button type="button" class="export__item" (click)="exportText('dbml')">
+          Copiar como DBML
+        </button>
+      </div>
+    }
+  </div>
 </div>
 
 <!--
