@@ -497,6 +497,26 @@ export interface TableDetail {
 export interface SchemaGraph {
   readonly tables: readonly TableDetail[];
   readonly missing: readonly DatabaseObject[];
+
+  /** Lo que Druse supone por el nombre. No son claves foráneas. */
+  readonly suggestions?: readonly SuggestedRelation[];
+}
+
+/**
+ * Una relación que el motor no declara y el nombre sugiere.
+ *
+ * Se dibuja distinta de una clave foránea, siempre, y lleva su motivo para poder
+ * enseñarlo: aceptarla no la crea, abre el `ALTER TABLE`.
+ */
+export interface SuggestedRelation {
+  readonly fromSchema: string;
+  readonly fromTable: string;
+  readonly column: string;
+  readonly toSchema: string;
+  readonly toTable: string;
+  readonly referencedColumn: string;
+  readonly confidence: 'high' | 'low';
+  readonly reason: string;
 }
 
 /** Tabla que se va a crear. */

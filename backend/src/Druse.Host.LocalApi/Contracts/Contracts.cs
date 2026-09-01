@@ -707,6 +707,28 @@ public sealed record SchemaGraphResponse
 {
     public required IReadOnlyList<TableDetailResponse> Tables { get; init; }
     public required IReadOnlyList<DatabaseObjectDto> Missing { get; init; }
+
+    /// <summary>
+    /// Lo que Druse **supone** por el nombre de las columnas. No son claves
+    /// foráneas y viajan aparte para que no se confundan con ellas.
+    /// </summary>
+    public required IReadOnlyList<SuggestedRelationDto> Suggestions { get; init; }
+}
+
+/// <summary>Una relación supuesta, con su motivo para poder enseñarlo.</summary>
+public sealed record SuggestedRelationDto
+{
+    public required string FromSchema { get; init; }
+    public required string FromTable { get; init; }
+    public required string Column { get; init; }
+    public required string ToSchema { get; init; }
+    public required string ToTable { get; init; }
+    public required string ReferencedColumn { get; init; }
+
+    /// <summary>`high` se dibuja sola; `low` se cuenta y se enseña si se pide.</summary>
+    public required string Confidence { get; init; }
+
+    public required string Reason { get; init; }
 }
 
 /// <summary>

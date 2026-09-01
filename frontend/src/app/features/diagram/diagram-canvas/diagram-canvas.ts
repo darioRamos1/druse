@@ -39,9 +39,9 @@ interface PaintedLink extends DiagramLink {
 /**
  * El lienzo del diagrama entidad-relación.
  *
- * Dibuja lo que el catálogo dice y **nada más**: las relaciones sugeridas por
- * nombre llegan en una fase posterior y ya se distinguen aquí por `kind`, para
- * que el día que entren no haya que tocar el trazo.
+ * Dibuja lo que el catálogo dice y, aparte, lo que Druse supone por el nombre de
+ * las columnas. Las dos cosas no se pueden confundir: trazo, color y leyenda las
+ * separan, y el interruptor de la barra apaga las supuestas.
  *
  * No guarda nada por su cuenta. Recibe el grafo ya leído y devuelve los gestos
  * hacia arriba: quién quiere abrir el diseñador, qué tabla se ha movido.
@@ -136,7 +136,13 @@ export class DiagramCanvas {
       fixed.set(key, position);
     }
 
-    return layoutDiagram(this.graph().tables, this.level(), fixed, this._viewport());
+    return layoutDiagram(
+      this.graph().tables,
+      this.level(),
+      fixed,
+      this._viewport(),
+      this.graph().suggestions ?? [],
+    );
   });
 
   protected readonly width = computed(() => this._layout().width);

@@ -158,6 +158,39 @@ describe('DiagramCanvas', () => {
   });
 
   /**
+   * Lo que hace útil el diagrama en una base sin claves declaradas, y lo que más
+   * fácil sería hacer mal: una suposición no puede parecer un hecho.
+   */
+  it('dibuja las sugeridas aparte, y el interruptor solo apaga esas', () => {
+    fixture.componentRef.setInput('graph', {
+      ...grafo,
+      suggestions: [
+        {
+          fromSchema: 'ventas',
+          fromTable: 'bitacora',
+          column: 'cliente_id',
+          toSchema: 'ventas',
+          toTable: 'cliente',
+          referencedColumn: 'id',
+          confidence: 'high' as const,
+          reason: '«cliente_id» nombra a «cliente» y el tipo encaja.',
+        },
+      ],
+    } satisfies SchemaGraph);
+    fixture.detectChanges();
+
+    expect(dom().querySelectorAll('.wire')).toHaveLength(2);
+    expect(dom().querySelectorAll('.wire.is-suggested')).toHaveLength(1);
+
+    // Apagarlas deja las declaradas donde estaban.
+    dom().querySelector<HTMLButtonElement>('.toggle')!.click();
+    fixture.detectChanges();
+
+    expect(dom().querySelectorAll('.wire')).toHaveLength(1);
+    expect(dom().querySelectorAll('.wire.is-suggested')).toHaveLength(0);
+  });
+
+  /**
    * Una tabla que ya no está en el catálogo se dice; no se calla dibujando una
    * caja menos.
    */

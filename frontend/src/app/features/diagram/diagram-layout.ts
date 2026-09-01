@@ -1,4 +1,9 @@
-import { DatabaseColumn, DatabaseObject, TableDetail } from '../../shared/models/workspace';
+import {
+  DatabaseColumn,
+  DatabaseObject,
+  SuggestedRelation,
+  TableDetail,
+} from '../../shared/models/workspace';
 
 /**
  * Cuánto se enseña de cada tabla.
@@ -185,6 +190,7 @@ export function layoutDiagram(
   level: DetailLevel,
   positions: ReadonlyMap<string, { x: number; y: number }> = new Map(),
   available = 760,
+  suggestions: readonly SuggestedRelation[] = [],
 ): DiagramLayout {
   const details = new Map<string, TableDetail>();
 
@@ -341,6 +347,35 @@ export function layoutDiagram(
         }),
       );
     }
+  }
+
+  // Las supuestas se trazan igual que las declaradas y se distinguen por
+  // `kind`: el trazo es el mismo problema geométrico, y lo que cambia —color,
+  // línea punteada, leyenda— es cosa de quien pinta.
+  for (const suggestion of suggestions) {
+    const child = placed.get(tableKey({ schema: suggestion.fromSchema, name: suggestion.fromTable }));
+    const parent = placed.get(tableKey({ schema: suggestion.toSchema, name: suggestion.toTable }));
+
+    if (!child || !parent) { continue; }
+
+    const nullable = child.columns.find(
+      (column) => column.name.toLowerCase() === suggestion.column.toLowerCase(),
+    )?.isNullable;
+
+    links.push(
+      link({
+        id: `~${suggestion.fromTable}.${suggestion.column}`,
+        child,
+        parent,
+        column: suggestion.column,
+        columns: child.columns,
+        parentColumns: parent.columns,
+        parentColumn: suggestion.referencedColumn,
+        kind: 'suggested',
+        // Nadie la comprueba, así que la opcionalidad es la de la columna.
+        optional: nullable ?? true,
+      }),
+    );
   }
 
   const width = Math.max(...boxes.map((box) => box.x + box.width), 0) + BOX.marginX;

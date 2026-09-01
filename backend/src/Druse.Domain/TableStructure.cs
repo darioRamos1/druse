@@ -152,4 +152,53 @@ public sealed record SchemaGraph
 
     /// <summary>Las que se pidieron y ya no están en el catálogo.</summary>
     public required IReadOnlyList<DatabaseObject> Missing { get; init; }
+
+    /// <summary>
+    /// Relaciones que Druse **supone** por el nombre de las columnas.
+    ///
+    /// No son claves foráneas: nadie las comprueba. Viajan aparte de
+    /// <see cref="TableStructure.ForeignKeys"/> justamente para que no se puedan
+    /// confundir con ellas por descuido de quien las lee.
+    /// </summary>
+    public IReadOnlyList<SuggestedRelation> Suggestions { get; init; } = [];
+}
+
+/// <summary>Cuánto se puede confiar en una relación supuesta.</summary>
+public enum SuggestionConfidence
+{
+    /// <summary>Se enseña sola: el nombre lo dice y el tipo encaja exacto.</summary>
+    High = 0,
+
+    /// <summary>Se cuenta, pero no se dibuja salvo que se pidan.</summary>
+    Low = 1,
+}
+
+/// <summary>
+/// Una relación que el motor no declara y el nombre sugiere.
+///
+/// Existe porque media base real no tiene claves foráneas —MyISAM, y casi
+/// cualquier esquema heredado— y un diagrama que solo lea el catálogo dibujaría
+/// ochenta tablas sueltas: correcto e inútil.
+///
+/// **Nunca se disfraza de hecho.** Lleva su motivo escrito para poder enseñarlo,
+/// y quien la acepte pasa por la previsualización del `ALTER TABLE` como
+/// cualquier otro cambio.
+/// </summary>
+public sealed record SuggestedRelation
+{
+    /// <summary>Tabla que llevaría la clave foránea.</summary>
+    public required TableRef From { get; init; }
+
+    public required string Column { get; init; }
+
+    /// <summary>Tabla a la que parece apuntar.</summary>
+    public required TableRef To { get; init; }
+
+    /// <summary>Columna de destino, que es siempre su clave primaria.</summary>
+    public required string ReferencedColumn { get; init; }
+
+    public required SuggestionConfidence Confidence { get; init; }
+
+    /// <summary>Por qué se supone, en una frase que se pueda enseñar.</summary>
+    public required string Reason { get; init; }
 }

@@ -1,5 +1,6 @@
 using Druse.Application.Abstractions;
 using Druse.Application.Connections;
+using Druse.Application.Diagrams;
 using Druse.Domain;
 
 namespace Druse.Application.Metadata;
@@ -173,6 +174,10 @@ public sealed class MetadataService(
         {
             Tables = details,
             Missing = [.. tables.Where(table => !found.Contains(table.Id))],
+
+            // Las suposiciones se calculan aquí y no dentro de la lectura: el
+            // catálogo cuenta lo que el motor dice, y esto es otra cosa.
+            Suggestions = RelationInference.Suggest(details),
         };
     }
 

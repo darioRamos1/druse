@@ -666,6 +666,20 @@ internal static class ContractMapper
                 }),
             ],
             Missing = [.. graph.Missing.Select(ToDto)],
+            Suggestions =
+            [
+                .. graph.Suggestions.Select(suggestion => new SuggestedRelationDto
+                {
+                    FromSchema = suggestion.From.Schema ?? string.Empty,
+                    FromTable = suggestion.From.Name,
+                    Column = suggestion.Column,
+                    ToSchema = suggestion.To.Schema ?? string.Empty,
+                    ToTable = suggestion.To.Name,
+                    ReferencedColumn = suggestion.ReferencedColumn,
+                    Confidence = suggestion.Confidence.ToString().ToLowerInvariant(),
+                    Reason = suggestion.Reason,
+                }),
+            ],
         };
     }
 
