@@ -10,19 +10,19 @@
 
 | Campo | Valor |
 | --- | --- |
-| Última sesión | **039** — 2026-09-01 |
+| Última sesión | **040** — 2026-09-01 |
 | Fase activa | **Migración de datos entre tablas:** fases 1, 2 y 3 cerradas; la **4** cerrada: la pasada de varias tablas, lo que cada tabla hace distinto y las migraciones guardadas (ver «Qué toca retomar»). **Respaldos y restauración:** Fases A–E cerradas. La **F** tiene backend, interfaz, CSV, selector de archivos, restaurar en una base nueva y **el ciclo entero por HTTP en los cuatro motores**; le falta repetir a mano el respaldo real que encontró el error de los índices de expresión. **Diagramas entidad-relación:** plan escrito y **Fase A** (lectura del catálogo en lote, cuatro motores) y **Fase B** (colocación determinista y lienzo) implementadas; falta cerrar la A contra los cuatro motores y ver el barrido de capturas |
 | Fases 0–6 | ✅ Cerradas. |
 | Fase 7 | 🟡 **11/12.** El ciclo de instalación está probado sobre este equipo; solo falta arrancar en una máquina sin herramientas de desarrollo. |
 | Fase 8 | ✅ **7/7.** Tres motores sobre el mismo contrato y primera beta preparada. |
 | ¿Compila el backend? | Sí — 0 advertencias, 0 errores |
-| ¿Compila el envoltorio? | Sí — recompilado en la 037 con `build/scripts/msvc-env.ps1` cargado antes; sin él, `cargo` falla en `vswhom-sys` por elegir el MSVC equivocado. **Sus pruebas ya son 10**, con las dos que vigilan la CSP |
-| ¿Pasan las pruebas? | Sí. En la **039**, con los cuatro motores levantados y `DRUSE_REQUIRE_ENGINES=1`: **266 de 267 contractuales** —las diez nuevas de la lectura en lote pasan en los cinco fixtures— y **500 unitarias** en el backend; **739 en el frontend**, 23 de ellas nuevas del diagrama. El único fallo contractual es de Informix por SQLI al recargar datos respaldados (conversión de fecha), y viene de la 038. `sql-formatting.spec.ts` se pasa del tiempo cuando corre con los otros 49 archivos a la vez y **pasa sola en 1,6 s**. Integración y envoltorio no se repitieron |
-| ¿Hay aplicación de escritorio? | **Sí.** Instalador NSIS y ZIP portable, en dos variantes: con Informix y sin él. Desde la 038 **se actualiza sola** —o lo hará: ver el aviso del repositorio privado en §9—. El MSI dejó de generarse: `tauri.conf.json` solo declara `nsis`, que es lo que necesita el actualizador |
+| ¿Compila el envoltorio? | Sí — recompilado en la 037 con `build/scripts/msvc-env.ps1` cargado antes; sin él, `cargo` falla en `vswhom-sys` por elegir el MSVC equivocado. **Sus pruebas ya son 17**, con las dos que vigilan la CSP y las cuatro de `DRUSE_DATA_DIR` |
+| ¿Pasan las pruebas? | Sí. En la **040**: **779 en el frontend** —40 nuevas—, **17 del envoltorio**, el backend recompilado con `-m:1` sin advertencias, y de `e2e` **las ocho del editor y el barrido entero**, este último con la consola del navegador limpia. Las contractuales no se repitieron: lo de la 040 es todo de frontend y envoltorio. De la **039** siguen valiendo **266 de 267 contractuales** con los cuatro motores y `DRUSE_REQUIRE_ENGINES=1`, y **500 unitarias** del backend; el único fallo es de Informix por SQLI al recargar datos respaldados (conversión de fecha), y viene de la 038 |
+| ¿Hay aplicación de escritorio? | **Sí.** Instalador NSIS y ZIP portable, en dos variantes: con Informix y sin él. Desde la 038 **se actualiza sola** —o lo hará: ver el aviso del repositorio privado en §9—. El MSI dejó de generarse: `tauri.conf.json` solo declara `nsis`, que es lo que necesita el actualizador. En la **040** se regeneraron los instaladores y **la variante completa quedó instalada y abierta en este equipo**, con el arreglo del envoltorio dentro. Siguen **sin firma Authenticode**: SmartScreen en cada equipo |
 | Motores | **PostgreSQL, SQL Server, MySQL/MariaDB e Informix**, sobre el mismo contrato. Informix tiene **dos entradas**: por DRDA con el driver de IBM (puerto 9089) y por **SQLI**, su protocolo nativo, con el puente JDBC (9088). Cambia por dónde se entra; el SQL, el catálogo y los tipos son los mismos |
-| Trabajo a medias | **Todo el diagrama entidad-relación está sin commitear.** Y sin comprobar: las contractuales de la lectura en lote contra los cuatro motores, el barrido de capturas del lienzo, y de antes — **el diálogo del sistema y el selector de carpeta siguen sin verse abrir**, y **el actualizador no puede funcionar mientras el repositorio sea privado** (ver §9) |
+| Trabajo a medias | **Nada sin commitear.** Sin comprobar: las contractuales de la lectura en lote contra los cuatro motores desde la 039, **el multicursor dentro de la ventana empaquetada**, y de antes —**el diálogo del sistema y el selector de carpeta siguen sin verse abrir**, y **el actualizador no puede funcionar mientras el repositorio sea privado** (ver §9) |
 | Bloqueantes | Ninguno para seguir programando. Sí para dar por buenos cuatro motores y cuatro funciones: ver «Qué toca retomar». |
-| Git | El **PR #9 se fusionó** (sesión 022). Se trabaja en `feat/respaldos-y-restauracion`, con todo subido: las 024–027 en `1452a6c`, las 028–031 en `640151c`, las 032–036 de `d3ac0d5` a `35d192e`, la 037 de `4ba8cce` a `20727eb`, y la **038** en `a455be7`, `4c6f74a`, `55711f0` y `93f7f26` |
+| Git | El **PR #9 se fusionó** (sesión 022). Se trabaja en `feat/respaldos-y-restauracion`, con todo subido: las 024–027 en `1452a6c`, las 028–031 en `640151c`, las 032–036 de `d3ac0d5` a `35d192e`, la 037 de `4ba8cce` a `20727eb`, la **038** en `a455be7`, `4c6f74a`, `55711f0` y `93f7f26`, la **039** hasta `5c2d09b`, y la **040** en `80da9f6`, `03c3478`, `a04c706`, `117b15f`, `2946156` y `2d52c8e` |
 | Integración continua | 🔴 **Parada, y no por el código.** GitHub aborta los catorce jobs en dos segundos: «recent account payments have failed or your spending limit needs to be increased». Hasta resolver la facturación, ningún PR podrá pasar los checks. |
 
 ### Qué toca retomar en la próxima sesión
@@ -34,6 +34,20 @@ hoy no puede funcionar en ningún equipo: GitHub devuelve 404 a quien no está
 autenticado, y ese 404 ni siquiera se distingue de «no hay versión nueva». Es
 una decisión que hay que tomar antes de repartir nada: repositorio público, o
 publicar los artefactos en otro sitio.
+
+#### Lo que deja abierto la 040
+
+Dos comprobaciones y una decisión:
+
+1. **Los cursores múltiples, dentro de la ventana empaquetada.** La prueba de
+   punta a punta corre en Chromium; el WebView2 no se ha probado, y es la clase
+   de cosa que aquí ya ha fallado solo empaquetada.
+2. **Los atajos nuevos, en uso real.** `Alt+←` es «atrás» en muchos programas y
+   `F5` es «recargar» en el navegador: si alguno estorba, qué tecla significa
+   qué está en `core/shortcuts/shortcuts.ts` y moverlo es un renglón y su
+   prueba.
+3. **La firma Authenticode.** Los instaladores se regeneran e instalan bien,
+   pero sin firma cada equipo enseña SmartScreen.
 
 #### Y ver abrirse el diálogo del envoltorio
 
@@ -343,6 +357,184 @@ Pendiente de verificar cuando toque: Docker (pruebas de integración con contene
 ---
 
 ## 5. Registro de sesiones
+
+### Sesión 040 — 2026-09-01 · Los avisos que nadie leía, el envoltorio que no obedecía y el teclado
+
+Sesión de cuatro temas, encadenados: se empezó por callar los avisos de la
+compilación y se acabó encontrando un fallo del envoltorio que engañaba
+pareciendo que funcionaba.
+
+#### Los cuatro avisos del build, arreglados por su causa
+
+Compilar el frontend daba cuatro avisos desde hacía tiempo. Se arreglaron los
+cuatro **sin subir ningún techo**, salvo uno que se subió a conciencia y ya
+saneado:
+
+1. **El arranque pesaba 611 kB contra un presupuesto de 500.** La causa no era
+   Angular: eran cinco diálogos —conexión, importar, migrar una tabla, migrar
+   varias y el diseñador— que viajaban con la ventana aunque nadie los abriera,
+   185 kB entre los cinco. Ahora van en `@defer`, que es lo que ya hacían los
+   otros nueve del mismo archivo. **611.27 → 376.83 kB**, y el presupuesto se
+   queda donde estaba.
+2. **Tres estilos de componente pasaban de 8 kB.** `.backdrop` estaba copiado
+   literalmente en catorce componentes, `.dialog` en doce, la base de `.btn` en
+   once y la cabecera del diálogo en nueve: **10.9 kB de CSS repetido** que ahora
+   viven en `styles/_shell.scss`. Manda el componente, que se pinta después y con
+   más especificidad, así que las tres excepciones reales —el velo más borroso de
+   la paleta, el cerrar con fondo de preferencias, el botón secundario del
+   diseñador— siguen ganando sin `!important`.
+3. **Dos «Not implemented: navigation to another Document» en cada pasada de
+   pruebas.** Salían de las pruebas de exportación de `WorkspaceStore`, que
+   usaban el `FileSaveService` de verdad: ese servicio crea un enlace y lo pulsa,
+   y jsdom avisa. Ahora reciben un doble. El aviso no señalaba nada roto, y ese
+   era el problema: un ruido fijo en la salida enseña a no leerla.
+4. **`nearley`** queda declarado como dependencia CommonJS —lo carga
+   `sql-formatter` y no hay versión ESM—, que es lo que Angular pide hacer.
+
+Lo único que subió fue el presupuesto de estilo por componente, a **9.5 kB**, y
+sobre un CSS del que ya se había quitado todo lo copiado: los tres que lo rozan
+—el panel del asistente, el diálogo de proveedores y el compositor de consultas—
+son pantallas densas cuyo CSS es suyo, y bajarlos exigiría partir los
+componentes, que es otra conversación.
+
+#### El envoltorio no obedecía a `DRUSE_DATA_DIR`
+
+Se descubrió intentando mirar el ejecutable empaquetado sin tocar el Druse que el
+usuario tenía abierto. **La API respeta esa variable desde que se montaron las
+pruebas de punta a punta** —se descubrió entonces que creían correr aisladas y
+estaban usando la base de verdad— pero el envoltorio de Tauri no la miraba:
+calculaba el directorio de datos por la convención del sistema y ahí buscaba el
+`endpoint.json`.
+
+Con la variable puesta, cada mitad hacía una cosa. La API arrancaba perfectamente
+y publicaba su punto de conexión donde se le pedía; el envoltorio lo esperaba en
+el perfil del usuario, no lo veía nunca, y a los treinta segundos la ventana
+moría con un `panic` de Tauri diciendo que **la API no había arrancado**. Había
+arrancado, y estaba escuchando.
+
+Y el modo de fallar no era lo peor: si en el perfil quedaba el `endpoint.json` de
+otra instancia de Druse —la del usuario, abierta— la ventana nueva se conectaba a
+**la API de esa otra**. Abría, parecía correcta, y estaba trabajando contra el
+espacio que se creía aislado. Es el mismo engaño que la API documenta haber
+sufrido, repetido en la otra mitad. **Pasó de verdad en esta sesión**, con una
+ventana de prueba hablando con el espacio de trabajo real.
+
+`data_directory` aplica ahora la misma regla que `AppPaths`: la variable manda, y
+una ruta relativa se ignora en lugar de escribir en un sitio sorpresa. La
+decisión vive en `resolve_data_directory`, aparte del entorno del proceso, para
+poder probarla sin tocar variables globales que comparten todas las pruebas.
+Cuatro pruebas nuevas; **el envoltorio pasa de 13 a 17**.
+
+#### El diagrama, también de la base entera
+
+«Ver diagrama…» solo salía sobre un esquema o una tabla. En PostgreSQL con todo
+en `public`, o en MySQL —donde no hay esquema aparte de la base—, eso ya era el
+mapa completo; pero en SQL Server e Informix una base tiene varios esquemas, y el
+mapa de la base no se podía pedir sin abrirlos uno a uno.
+
+El panel ya sabía hacerlo: `tablesUnder` desciende sola por carpetas **y por
+esquemas**, y al abrir se pregunta siempre qué entra, así que ofrecerlo sobre una
+base no dibuja trescientas cajas de golpe. Lo que hizo falta fue decir de qué
+esquema es cada tabla, y se resuelve **distinto en cada sitio porque el problema
+es distinto**:
+
+- **En el selector**, el esquema delante de todas las filas en cuanto hay más de
+  uno: elegir entre dos filas que ponen «orders» no es elegir.
+- **En el lienzo**, solo en las cajas cuyo nombre se repite. La caja mide 218 px
+  fijos; anteponerlo a todas cortaría nombres que hoy caben, a cambio de repetir
+  un dato que allí no desempata nada.
+
+Se vio dibujando una base con dos esquemas: **dos cajas «accionista» idénticas y
+una flecha entre ellas que no se podía leer**. Esa comprobación —hecha creando un
+esquema de prueba y borrándolo después— es la que trajo el cambio del lienzo, que
+no estaba previsto.
+
+Y la clave con la que se reconoce un diagrama guardado dice ahora de qué clase
+es: `database:ventas` y `schema:ventas` son cosas distintas, y una base y un
+esquema homónimos son lo corriente en MySQL.
+
+#### El teclado: varios cursores, los atajos que faltaban y una hoja
+
+**Varios cursores con Ctrl+clic.** Ya existían —Monaco los trae desde siempre—
+pero con Alt, que es lo que usan VS Code y los que vienen de ahí; quien llega
+desde Notepad++ prueba Ctrl, no ve nada y da por hecho que no están. Es una
+opción de configuración, así que **ninguna prueba de componente la ve** —en ellas
+Monaco es un doble— y se comprueba en `e2e/tests/editor.spec.ts` con el editor de
+verdad cargado.
+
+**Los atajos que faltaban**, y el más obvio era moverse entre pestañas:
+`Alt+1..8` a la enésima, `Alt+9` a la última, `Alt+←/→` dando la vuelta por los
+extremos, `Ctrl+F4` cerrar. Van con Alt y F4 a propósito: `Ctrl+Tab`, `Ctrl+W` y
+`Ctrl+1` se los queda el navegador y no llegan a la página, y **un atajo que
+funciona empaquetado y no en el navegador es peor que no tenerlo**. Además
+`Ctrl+Shift+R` lleva el teclado a los resultados —enfocando una celda, no el
+marco, porque de la celda cuelgan las flechas y el copiado—, `Esc` lo devuelve al
+editor, `F5` repite la ejecución y `Ctrl+Shift+X` abre el menú de exportar. Con
+un diálogo delante no actúa ninguno.
+
+Qué tecla significa qué vive en `core/shortcuts`, como función pura y con once
+pruebas. Ahí se comprueban los modificadores **enteros**: sin eso, `Ctrl+Alt+1`
+—que en varios teclados es como se escribe un carácter— cambiaría de pestaña
+mientras alguien escribe.
+
+**Una hoja con todos, en F1.** Estaban repartidos entre el editor, el shell, el
+explorador y los tooltips de media aplicación, y no había dónde verlos juntos. La
+hoja es documentación, y una documentación que miente es peor que ninguna: una
+prueba comprueba que los atajos globales que anuncia los atiende de verdad
+`shortcutFor`.
+
+**Dos cosas salieron del barrido y no de las pruebas:** Monaco se quedaba `F1`
+para su propia paleta de comandos —hubo que registrarlo también dentro del
+editor—, y la hoja no se cerraba con `Esc` porque el foco seguía en Monaco, que
+tiene esa tecla para cancelar; ahora el diálogo toma el foco al abrirse.
+
+**Ocho comandos nuevos en la paleta:** duplicar la pestaña, cerrar las demás,
+copiar el nombre calificado, ver el diagrama de donde se trabaja, las tres de
+transacción y la hoja de atajos. Las de transacción **sin atajo a propósito**:
+confirmar o deshacer de un dedazo es de las pocas cosas de Druse que no se
+deshacen.
+
+#### Verificado
+
+- **Compilación sin un solo aviso.** Arranque en **376.83 kB** (era 611.27).
+- **779 pruebas del frontend en verde**, 40 nuevas en la sesión. Y **17 del
+  envoltorio**, cuatro nuevas.
+- **Backend recompilado con `-m:1`: 0 advertencias, 0 errores.**
+- **`e2e`: las ocho del editor** —incluida la del multicursor con Monaco de
+  verdad— y **el barrido entero**, con la consola del navegador limpia y dos
+  capturas nuevas: `06b-atajos` y `20-mer-base-tablas`.
+- **Las quince capturas de diálogos salieron idénticas píxel a píxel** antes y
+  después del refactor de estilos. La barra de ediciones del panel de resultados
+  no entra en el barrido y se fotografió aparte, con y sin el cambio: también
+  idéntica.
+- **Instaladores regenerados tres veces y la variante completa instalada y
+  abierta**, comprobando que el binario instalado lleva el arreglo del envoltorio.
+
+#### No hecho
+
+- **El multicursor no se ha probado dentro de la ventana empaquetada.** La prueba
+  de punta a punta corre en Chromium; es el mismo Monaco, pero es literalmente la
+  clase de cosa que en este proyecto ya ha fallado solo empaquetada.
+- **Los instaladores siguen sin firma Authenticode**: SmartScreen en cada equipo.
+- **Los tres estilos por encima de 8 kB** siguen ahí, ahora bajo un techo de 9.5.
+  Bajarlos de verdad exige partir el panel del asistente, el diálogo de
+  proveedores y el compositor de consultas.
+- **El diagrama de una base con varios esquemas no queda fotografiado en el
+  barrido**: la base de pruebas tiene un solo esquema, y el segundo se creó y se
+  borró en la sesión.
+
+#### Archivos
+
+`frontend/src/styles/_shell.scss` y `styles.scss`, diecinueve `*.scss` de
+`features/**` y `layout/**`, `frontend/angular.json`,
+`layout/app-shell/{app-shell.html,app-shell.ts,app-shell.spec.ts}`,
+`core/workspace/workspace-store.spec.ts`,
+`core/shortcuts/{shortcuts.ts,shortcuts.spec.ts}`, `layout/shortcuts-sheet/**`,
+`layout/command-palette/*`, `features/query-editor/sql-editor/sql-editor.ts`,
+`features/query-results/{results-grid,results-panel}/*`,
+`features/diagram/{diagram-panel,diagram-canvas}/*` con su primer
+`diagram-panel.spec.ts`, `features/connections/connections-sidebar/*`,
+`shells/desktop-tauri/src/api_process.rs`, `e2e/tests/{barrido,editor}.spec.ts`.
 
 ### Sesión 039 — 2026-09-01 · El diagrama entidad-relación: se planifica, se lee y se dibuja
 
@@ -5085,7 +5277,7 @@ basta solo.
 | **Informix por SQLI no puede cancelar una consulta** | Quien lanza una consulta larga no la para: la aplicación responde, pero el motor sigue trabajando y esa conexión queda ocupada | No hay arreglo: comprobado que `cancel()`, `setQueryTimeout` y cerrar la conexión tardan lo mismo que la consulta. Se eligió soltar la espera (038). **Por DRDA sí se cancela**, así que es una razón para preferirlo donde haya escuchador |
 | **El peso de IKVM y la licencia del driver** | `IKVM.Java.dll` son ~62 MB por plataforma sobre un paquete que ya iba por 93 MB | Medir con un publish recortado antes de prometer una cifra. Y el jar va bajo el *IBM Informix JDBC Software License Agreement*: **para repartir el instalador hay que leer esos términos**, como se hizo con el `odbc_REDIST.txt` del clidriver |
 | **Compilar en paralelo rompe IKVM** | `dotnet build` sin `-m:1` falla con `os error 32` sobre el log del jar cuando dos proyectos lo traducen a la vez | Compilar la solución con `-m:1`. Pasó varias veces en la 038 y el error no dice de qué va |
-| **Lo que solo falla empaquetado no lo ve nadie** | La ventana abrió sin un solo estilo durante quién sabe cuántas sesiones, y el puente con el proceso Rust llevaba igual de tiempo cortado. Ninguna prueba lo veía: en el navegador todo funciona | Al tocar la CSP, el `index.html` o cualquier `invoke`, **abrir el ejecutable y mirar la consola**: `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=--remote-debugging-port=9222` y conectarse por CDP. Las dos pruebas de `tauri.conf.json` sujetan lo ya conocido, no lo próximo |
+| **Lo que solo falla empaquetado no lo ve nadie** | La ventana abrió sin un solo estilo durante quién sabe cuántas sesiones, y el puente con el proceso Rust llevaba igual de tiempo cortado. Ninguna prueba lo veía: en el navegador todo funciona | Al tocar la CSP, el `index.html` o cualquier `invoke`, **abrir el ejecutable y mirar la consola**. Hacen falta **tres** variables, no una (040): `DRUSE_DATA_DIR` para no tocar el espacio del usuario, `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=--remote-debugging-port=9223` y **`WEBVIEW2_USER_DATA_FOLDER` propio** —sin él WebView2 reutiliza el navegador de la instancia ya abierta, que arrancó sin depuración, y el puerto no llega a abrirse—. El target de CDP se llama `about:blank` pero su URL es `http://tauri.localhost/`. Las dos pruebas de `tauri.conf.json` sujetan lo ya conocido, no lo próximo |
 | **El `.exe` se queda tomado y el empaquetado falla** | `os error 32` al parchear el binario para NSIS, con la compilación entera ya hecha | Cerrar todo `druse.exe` antes de empaquetar y no dejar un `cargo build` reciente sujetando el directorio. Relanzar basta; no hay nada que arreglar |
 | **El frontend tiene más de un rojo por tiempo** | Se confunden con fallos del producto y se pierde media tarde | Antes de creerse un rojo del frontend, repetir la suite. En la 037 hubo dos, distintos, y los dos verdes a la segunda |
 | **El MVP no se ha probado en un equipo limpio** | Es el criterio que demuestra que el paquete se basta solo | Instalar el NSIS en una máquina sin .NET ni Node. **Es lo único que queda del MVP** |
@@ -5098,6 +5290,8 @@ basta solo.
 | 3 vulnerabilidades moderadas en `@angular/cli` | Solo desarrollo; no llegan al bundle | Esperar actualización de Angular. Degradar a la 21 sería peor |
 | Detalles visuales fuera del shell principal | La comparación de la sesión 011 cubrió la pantalla principal, no todos los estados | Repetir la comparación al tocar diálogos, filtros o vistas menos transitadas |
 | `formatSql` falla a veces en las pruebas del frontend | Un rojo que no es del código: pasa al repetir | Se creía que solo pasaba con `ng serve` en paralelo. **En la 037 saltó sin el servidor levantado**, así que la explicación no era completa: es una prueba que se va por tiempo cuando la máquina está cargada. Repetir antes de investigarla |
+| **El disco de este equipo se llena empaquetando** | `release.ps1` falló a mitad con «espacio en disco insuficiente» y dejó el backend sin compilar. La unidad P: son 30 GB y el proyecto ocupaba 15,4 | En la 040 se liberaron 14,6 GB con `cargo clean` y borrando `bin`/`obj`. Cada empaquetado deja ~2 GB de intermedios: **mirar el espacio antes de empaquetar**, y `cargo clean` recupera casi 10 GB cuando aprieta |
+| **Una variable `Platform=x64` del entorno rompe `dotnet build`** | Falla con `MSB4126: Debug|x64 no es válida` antes de compilar nada, y el mensaje no menciona la variable | No está en el entorno de usuario ni de máquina, así que viene de la sesión que lanza el proceso. Anularla (`$env:Platform=$null`) y compilar |
 | Identificador `druse` no reservado | Podría ocuparlo otro | Reservar dominio, org de GitHub y NuGet/npm cuando haya algo publicable |
 
 _Retirado en la 037: «el selector nativo de carpeta no se ha podido probar porque aquí no compila Rust» —las dos mitades eran falsas: Rust compila con `msvc-env.ps1`, y el diálogo no funcionaba porque la CSP bloqueaba el IPC. Lo que queda no es un riesgo, es una comprobación pendiente._
