@@ -4,6 +4,8 @@
 //! lógica de base de datos (ADR 0001). Todo lo que sabe es lanzar el ejecutable,
 //! esperar a que publique su punto de conexión y matarlo al cerrar.
 
+use std::env;
+use std::ffi::OsString;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command};
@@ -17,6 +19,20 @@ use serde::Deserialize;
 
 /// Nombre del archivo que la API escribe con su puerto y su token.
 const ENDPOINT_FILE: &str = "endpoint.json";
+
+/// Variable que manda sobre la convención del sistema.
+///
+/// **La API ya la respeta** —`AppPaths.DataDirectoryVariable`— y el envoltorio
+/// no lo hacía: la API publicaba su punto de conexión en el directorio pedido
+/// mientras aquí se buscaba en el perfil del usuario. Nadie encontraba a nadie
+/// y la ventana moría a los treinta segundos diciendo que la API no había
+/// arrancado, cuando había arrancado perfectamente y estaba escuchando.
+///
+/// Peor todavía: si en el perfil quedaba el `endpoint.json` de otra instancia
+/// de Druse, esta se conectaba a **la API de esa otra**, es decir, al espacio de
+/// trabajo que se creía estar aislando. Es el mismo engaño que la API documenta
+/// haber sufrido al montar las pruebas de punta a punta.
+const DATA_DIRECTORY_VARIABLE: &str = "DRUSE_DATA_DIR";
 
 /// `CREATE_NO_WINDOW`.
 ///
@@ -169,6 +185,29 @@ pub fn data_directory() -> Result<PathBuf, String> {
     #[cfg(all(not(target_os = "windows"), not(target_os = "macos")))]
     let base = dirs::data_dir().map(|dir| dir.join("druse"));
 
+    resolve_data_directory(env::var_os(DATA_DIRECTORY_VARIABLE), base)
+}
+
+/// Decide el directorio de datos a partir de la variable y de la convención.
+///
+/// Está separada de `data_directory` para poder probarla sin tocar el entorno
+/// del proceso, que es global y compartido con las demás pruebas.
+fn resolve_data_directory(
+    custom: Option<OsString>,
+    base: Option<PathBuf>,
+) -> Result<PathBuf, String> {
+    if let Some(custom) = custom {
+        let custom = PathBuf::from(custom);
+
+        // Una ruta relativa se resolvería contra el directorio de trabajo, que
+        // no es el que nadie espera: se exige absoluta o se ignora, igual que
+        // hace la API. Que ambos lados apliquen la misma regla es justamente lo
+        // que se está arreglando aquí.
+        if custom.is_absolute() {
+            return Ok(custom);
+        }
+    }
+
     base.ok_or_else(|| "No se pudo determinar el directorio de datos.".to_string())
 }
 
@@ -189,4 +228,51 @@ pub fn locate_api(resource_dir: &Path) -> Option<PathBuf> {
     ];
 
     candidates.into_iter().find(|path| path.exists())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_variable_wins_over_the_system_convention() {
+        let pedido = if cfg!(windows) {
+            PathBuf::from(r"C:\datos\druse")
+        } else {
+            PathBuf::from("/datos/druse")
+        };
+
+        let elegido = resolve_data_directory(
+            Some(OsString::from(pedido.as_os_str())),
+            Some(PathBuf::from("/perfil/druse")),
+        );
+
+        assert_eq!(elegido, Ok(pedido));
+    }
+
+    /// Es la misma regla que aplica la API: una ruta relativa dependería del
+    /// directorio de trabajo, así que se ignora en lugar de escribir en un sitio
+    /// sorpresa.
+    #[test]
+    fn a_relative_path_is_ignored() {
+        let base = PathBuf::from("/perfil/druse");
+
+        let elegido = resolve_data_directory(Some(OsString::from("datos")), Some(base.clone()));
+
+        assert_eq!(elegido, Ok(base));
+    }
+
+    #[test]
+    fn without_the_variable_the_convention_applies() {
+        let base = PathBuf::from("/perfil/druse");
+
+        assert_eq!(resolve_data_directory(None, Some(base.clone())), Ok(base));
+    }
+
+    #[test]
+    fn without_variable_or_convention_it_explains_itself() {
+        let error = resolve_data_directory(None, None).unwrap_err();
+
+        assert!(error.contains("directorio de datos"), "{error}");
+    }
 }
