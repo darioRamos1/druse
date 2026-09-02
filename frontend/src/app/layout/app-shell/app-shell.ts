@@ -11,6 +11,7 @@ import {
 } from '@angular/core';
 
 import { ExportFormat, SavedSnippet } from '../../core/application-gateway/application-gateway';
+import { shortcutFor } from '../../core/shortcuts/shortcuts';
 import { SnippetStore } from '../../core/snippets/snippet.store';
 import { SplashScreen } from '../../core/startup/splash-screen';
 import { ThemeName, ThemeService } from '../../core/theme/theme.service';
@@ -58,6 +59,7 @@ import { ResizeHandle } from '../../shared/ui/resize-handle/resize-handle';
 import { StatusBar } from '../status-bar/status-bar';
 import { TopBar } from '../top-bar/top-bar';
 import CommandPalette from '../command-palette/command-palette';
+import { ShortcutsSheet } from '../shortcuts-sheet/shortcuts-sheet';
 import { AiPanel } from '../../features/ai/ai-panel/ai-panel';
 import { AiProviderDialog } from '../../features/ai/ai-provider-dialog/ai-provider-dialog';
 import { AiStore } from '../../core/ai/ai-store';
@@ -117,6 +119,7 @@ const DISCONNECTED: SessionStatus = {
     QueryBuilder,
     ProcedureRunner,
     CommandPalette,
+    ShortcutsSheet,
     SettingsDialog,
     ResizeHandle,
     AiPanel,
@@ -274,28 +277,142 @@ export class AppShell {
 
   @HostListener('document:keydown', ['$event'])
   protected onGlobalKeydown(event: KeyboardEvent): void {
-    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
-      if (this.paletteOpen()) {
-        return;
+    // Con un diálogo delante el teclado es suyo: cambiar de pestaña o exportar
+    // por detrás dejaría al usuario mirando un formulario que ya no corresponde
+    // a lo que hay debajo.
+    if (this.overlayOpen()) {
+      if (event.key === 'Escape' && this.paletteOpen()) {
+        this.paletteOpen.set(false);
       }
-      if (
-        this.dialogOpen() ||
-        this.importTarget() ||
-        this.transferTarget() ||
-        this.transferSetTarget() ||
-        this.builderTarget() ||
-        this.designTarget() ||
-        this.backupOpen() ||
-        this.restoreOpen()
-      ) {
-        return;
-      }
-      event.preventDefault();
-      this.prepareOverlay();
-      this.paletteOpen.set(true);
-    } else if (event.key === 'Escape' && this.paletteOpen()) {
-      this.paletteOpen.set(false);
+
+      return;
     }
+
+    const shortcut = shortcutFor(event);
+
+    if (shortcut === null) {
+      return;
+    }
+
+    switch (shortcut.kind) {
+      case 'palette':
+        event.preventDefault();
+        this.prepareOverlay();
+        this.paletteOpen.set(true);
+        return;
+
+      case 'shortcuts':
+        event.preventDefault();
+        this.prepareOverlay();
+        this.shortcutsOpen.set(true);
+        return;
+
+      case 'tab':
+        this.goToTab(shortcut.index, event);
+        return;
+
+      case 'tab-last':
+        this.goToTab(this.tabs().length - 1, event);
+        return;
+
+      case 'tab-next':
+        this.stepTab(1, event);
+        return;
+
+      case 'tab-previous':
+        this.stepTab(-1, event);
+        return;
+
+      case 'tab-close': {
+        const active = this._store.activeTab();
+
+        if (active) {
+          event.preventDefault();
+          this.closeTab(active.id);
+        }
+
+        return;
+      }
+
+      case 'focus-results':
+        event.preventDefault();
+        this._resultsPanel()?.focusGrid();
+        return;
+
+      case 'focus-editor':
+        // Escape ya significa «cancelar» dentro del editor, así que solo se
+        // atiende desde fuera: si el foco ya está ahí, no hay nada que traer.
+        if (!this.editorHasFocus()) {
+          event.preventDefault();
+          this._editor()?.focus();
+        }
+
+        return;
+
+      case 'run-again':
+        // F5 recargaría la página, y recargar es perder las pestañas abiertas.
+        event.preventDefault();
+        this.execute();
+        return;
+
+      case 'export':
+        event.preventDefault();
+        this._resultsPanel()?.openExportMenu();
+        return;
+    }
+  }
+
+  /** Si hay algo por encima del espacio de trabajo que se lleve el teclado. */
+  private overlayOpen(): boolean {
+    return (
+      this.paletteOpen() ||
+      this.shortcutsOpen() ||
+      this.settingsOpen() ||
+      this.aiProvidersOpen() ||
+      this.dialogOpen() ||
+      this.importTarget() !== null ||
+      this.transferTarget() !== null ||
+      this.transferSetTarget() !== null ||
+      this.builderTarget() !== null ||
+      this.designTarget() !== null ||
+      this.procedureTarget() !== null ||
+      this.diagramTarget() !== null ||
+      this.backupOpen() ||
+      this.restoreOpen()
+    );
+  }
+
+  /** Si el editor tiene el foco ahora mismo. */
+  private editorHasFocus(): boolean {
+    const element = this._editorElement()?.nativeElement as HTMLElement | undefined;
+
+    return element?.contains(document.activeElement) ?? false;
+  }
+
+  /** Va a la pestaña que ocupa esa posición, si existe. */
+  private goToTab(index: number, event: KeyboardEvent): void {
+    const tab = this.tabs()[index];
+
+    if (tab) {
+      event.preventDefault();
+      this.selectTab(tab.id);
+    }
+  }
+
+  /** La siguiente o la anterior, dando la vuelta por los extremos. */
+  private stepTab(paso: number, event: KeyboardEvent): void {
+    const tabs = this.tabs();
+    const actual = tabs.findIndex((tab) => tab.active);
+
+    if (tabs.length < 2 || actual === -1) {
+      return;
+    }
+
+    event.preventDefault();
+
+    // Da la vuelta a propósito: con tres pestañas, «siguiente» desde la última
+    // solo puede querer decir la primera.
+    this.selectTab(tabs[(actual + paso + tabs.length) % tabs.length].id);
   }
 
   /** Tabla a la que se está importando, si el diálogo está abierto. */
@@ -454,6 +571,9 @@ export class AppShell {
    * en cuanto se pueda guardar tendrá pestaña propia, que es donde caben varios
    * abiertos a la vez.
    */
+  /** La hoja de atajos, que se pide con F1 y desde la paleta. */
+  protected readonly shortcutsOpen = signal(false);
+
   protected readonly diagramTarget = signal<ExplorerNode | null>(null);
 
   /** Sesión de la conexión cuyo diagrama se mira; vacía si se perdió. */
@@ -1132,6 +1252,102 @@ export class AppShell {
   protected createTab(): void {
     this.executionError.set(null);
     this._store.createTab();
+  }
+
+  /**
+   * Otra pestaña con el mismo SQL.
+   *
+   * Para probar una variante —cambiar un `WHERE`, quitar un `JOIN`— sin perder
+   * la consulta que ya funcionaba. Copiar y pegar en una pestaña nueva es lo que
+   * se hace hoy, y esto es lo mismo en un paso.
+   */
+  protected duplicateTab(): void {
+    const tab = this._store.activeTab();
+
+    if (!tab) {
+      return;
+    }
+
+    this.executionError.set(null);
+    this._store.createTab(tab.sql, tab.sourceTable, tab.connectionId);
+  }
+
+  /** Cierra las demás, preguntando por cada una que tenga cambios sin guardar. */
+  protected closeOtherTabs(): void {
+    const active = this._store.activeTab();
+
+    if (!active) {
+      return;
+    }
+
+    for (const tab of this.tabs().filter((item) => item.id !== active.id)) {
+      this.closeTab(tab.id);
+    }
+  }
+
+  /**
+   * El nombre calificado de la tabla de esta pestaña, al portapapeles.
+   *
+   * Es lo que se escribe veinte veces al día. El explorador ya lo ofrece sobre
+   * cada tabla; esto lo alcanza sin buscarla en el árbol cuando ya se está
+   * trabajando sobre ella.
+   */
+  protected async copyQualifiedName(): Promise<void> {
+    const table = this._store.activeTab()?.sourceTable;
+
+    if (!table) {
+      this._store.notify('Esta pestaña no viene de ninguna tabla.');
+      return;
+    }
+
+    const name = table.schema ? `${table.schema}.${table.name}` : table.name;
+
+    try {
+      await navigator.clipboard.writeText(name);
+    } catch {
+      this._store.notify('No se pudo copiar al portapapeles.');
+    }
+  }
+
+  /**
+   * El diagrama de donde se está trabajando.
+   *
+   * Sale de la tabla de la pestaña: es lo que hay a mano sin volver al árbol. Si
+   * la pestaña es SQL suelto no hay de dónde deducirlo, y se dice.
+   */
+  protected openDiagramHere(): void {
+    const tab = this._store.activeTab();
+    const table = tab?.sourceTable;
+
+    if (!tab || !table || !tab.connectionId) {
+      this._store.notify(
+        'Esta pestaña no viene de ninguna tabla: abre el diagrama desde el explorador.',
+      );
+      return;
+    }
+
+    this.openDiagram({
+      id: `${tab.connectionId}|${table.id}`,
+      label: table.name,
+      kind: table.kind,
+      depth: 0,
+      expandable: false,
+      expanded: false,
+      loading: false,
+      source: table,
+      connectionId: tab.connectionId,
+    });
+  }
+
+  /** Abrir, confirmar o deshacer la transacción desde la paleta. */
+  protected runTransactionCommand(action: 'begin' | 'commit' | 'rollback'): void {
+    if (action === 'begin') {
+      this.beginTransaction();
+    } else if (action === 'commit') {
+      this.commitTransaction();
+    } else {
+      this.rollbackTransaction();
+    }
   }
 
   // --- Editor ----------------------------------------------------------------

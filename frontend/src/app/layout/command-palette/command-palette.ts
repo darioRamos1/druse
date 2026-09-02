@@ -73,6 +73,28 @@ export default class CommandPalette implements AfterViewInit {
   readonly activateConnection = output<string>();
   readonly openNode = output<ExplorerNode>();
 
+  /** Otra pestaña con el mismo SQL, para probar una variante sin perder esta. */
+  readonly duplicateTab = output<void>();
+
+  /** Cerrar todas menos la de delante. */
+  readonly closeOtherTabs = output<void>();
+
+  /** El nombre calificado de la tabla de la pestaña, al portapapeles. */
+  readonly copyQualifiedName = output<void>();
+
+  /** El diagrama de donde se está trabajando. */
+  readonly openDiagram = output<void>();
+
+  /** Abrir, confirmar o deshacer la transacción.
+   *
+   * Desde aquí y sin atajo a propósito: confirmar o deshacer con un dedazo
+   * es de las pocas cosas de Druse que no se pueden deshacer.
+   */
+  readonly transaction = output<'begin' | 'commit' | 'rollback'>();
+
+  /** La hoja con todos los atajos. */
+  readonly showShortcuts = output<void>();
+
   protected readonly query = signal('');
   protected readonly selected = signal(0);
 
@@ -119,6 +141,24 @@ export default class CommandPalette implements AfterViewInit {
         label: 'Guardar como fragmento',
         hint: 'Lo seleccionado, o la instrucción del cursor',
       },
+      { id: 'duplicate-tab', kind: 'command', label: 'Duplicar la pestaña', hint: 'Con el mismo SQL' },
+      {
+        id: 'close-other-tabs',
+        kind: 'command',
+        label: 'Cerrar las demás pestañas',
+        hint: 'Se preguntará por las que tengan cambios',
+      },
+      {
+        id: 'copy-qualified-name',
+        kind: 'command',
+        label: 'Copiar el nombre calificado',
+        hint: 'De la tabla de esta pestaña',
+      },
+      { id: 'diagram', kind: 'command', label: 'Ver el diagrama', hint: 'De donde se está trabajando' },
+      { id: 'transaction-begin', kind: 'command', label: 'Iniciar transacción', hint: 'Nada se escribe hasta confirmar' },
+      { id: 'transaction-commit', kind: 'command', label: 'Confirmar la transacción', hint: 'Escribe los cambios. No se deshace' },
+      { id: 'transaction-rollback', kind: 'command', label: 'Deshacer la transacción', hint: 'Tira lo hecho desde que se abrió' },
+      { id: 'shortcuts', kind: 'command', label: 'Ver los atajos de teclado', hint: 'F1' },
     ];
     const connections: PaletteItem[] = this.connections().map((connection) => ({
       id: `connection:${connection.id}`,
@@ -289,6 +329,32 @@ export default class CommandPalette implements AfterViewInit {
         case 'save-snippet':
           // No se cierra: hace falta el nombre, y se pide en este mismo campo.
           this.startNaming();
+          return;
+        case 'duplicate-tab':
+          this.duplicateTab.emit();
+          break;
+        case 'close-other-tabs':
+          this.closeOtherTabs.emit();
+          break;
+        case 'copy-qualified-name':
+          this.copyQualifiedName.emit();
+          break;
+        case 'diagram':
+          this.closeWithoutRestoringFocus();
+          this.openDiagram.emit();
+          return;
+        case 'transaction-begin':
+          this.transaction.emit('begin');
+          break;
+        case 'transaction-commit':
+          this.transaction.emit('commit');
+          break;
+        case 'transaction-rollback':
+          this.transaction.emit('rollback');
+          break;
+        case 'shortcuts':
+          this.closeWithoutRestoringFocus();
+          this.showShortcuts.emit();
           return;
       }
     } else if (item.kind === 'connection') {

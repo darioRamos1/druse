@@ -1,0 +1,99 @@
+:host {
+  position: fixed;
+  inset: 0;
+  z-index: var(--dr-z-modal);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--dr-font-ui);
+  font-size: var(--dr-font-size-sm);
+}
+
+.dialog {
+  width: 720px;
+
+  /* Recibe el foco al abrirse para poder cerrarse con Escape, pero no es un
+     control: dibujarle un anillo alrededor sería decir que se puede pulsar. */
+  &:focus {
+    outline: none;
+  }
+}
+
+.head {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 18px 20px 16px;
+  border-bottom: 1px solid var(--dr-border);
+
+  &__text {
+    flex: 1;
+    min-width: 0;
+  }
+}
+
+.body {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 28px;
+  padding: 16px 20px 20px;
+  overflow-y: auto;
+}
+
+.column {
+  min-width: 0;
+}
+
+.group {
+  margin-bottom: 18px;
+
+  &__title {
+    margin: 0 0 7px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--dr-text-dim);
+  }
+}
+
+.row {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 3px 0;
+
+  &__keys {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    flex: none;
+    /*
+     * Ancho fijo para las teclas: con la columna alineada, la vista baja por los
+     * nombres de las acciones sin ir zigzagueando detrás de cada combinación.
+     */
+    width: 152px;
+  }
+
+  &__plus {
+    color: var(--dr-text-faintest);
+    font-size: 10px;
+  }
+
+  &__what {
+    color: var(--dr-text-muted);
+    text-wrap: pretty;
+  }
+}
+
+.key {
+  padding: 1px 6px;
+  border: 1px solid var(--dr-border-strong);
+  border-radius: 5px;
+  background: var(--dr-surface-inset);
+  color: var(--dr-text-secondary);
+  font-family: var(--dr-font-mono);
+  font-size: 11px;
+  line-height: 17px;
+  white-space: nowrap;
+}

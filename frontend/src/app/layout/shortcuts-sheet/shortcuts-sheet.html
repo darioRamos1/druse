@@ -1,0 +1,38 @@
+<div class="backdrop" (click)="close()" (document:keydown.escape)="close()"></div>
+
+<section #dialog class="dialog" tabindex="-1" role="dialog" aria-label="Atajos de teclado">
+  <header class="head">
+    <app-icon name="console" [size]="14" />
+    <div class="head__text">
+      <h2 class="title">Atajos de teclado</h2>
+      <p class="subtitle">Los mismos que anuncian los botones, todos juntos.</p>
+    </div>
+    <button type="button" class="close" (click)="close()" aria-label="Cerrar">×</button>
+  </header>
+
+  <div class="body">
+    @for (column of columns(); track $index) {
+      <div class="column">
+        @for (group of column; track group.title) {
+          <section class="group">
+            <h3 class="group__title">{{ group.title }}</h3>
+
+            @for (shortcut of group.shortcuts; track shortcut.what) {
+              <div class="row">
+                <span class="row__keys">
+                  @for (key of shortcut.keys; track $index) {
+                    @if (!$first) {
+                      <span class="row__plus">+</span>
+                    }
+                    <kbd class="key">{{ key }}</kbd>
+                  }
+                </span>
+                <span class="row__what">{{ shortcut.what }}</span>
+              </div>
+            }
+          </section>
+        }
+      </div>
+    }
+  </div>
+</section>

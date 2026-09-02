@@ -160,6 +160,21 @@ export class ResultsGrid {
   private readonly host = inject(ElementRef<HTMLElement>);
 
   /**
+   * Lleva el teclado a la cuadrícula.
+   *
+   * Se enfoca una celda y no el contenedor: las flechas, el copiado y la
+   * edición cuelgan de la celda, así que enfocar el marco dejaría el foco en un
+   * sitio donde no funciona nada. Si ya había una celda seleccionada se vuelve a
+   * ella; si no, a la primera.
+   */
+  focusGrid(): void {
+    const element = this.host.nativeElement as HTMLElement;
+    const seleccionada = element.querySelector<HTMLElement>('.cell--value.is-selected');
+
+    (seleccionada ?? element.querySelector<HTMLElement>('.cell--value'))?.focus();
+  }
+
+  /**
    * Qué columnas trae el resultado, en orden.
    *
    * Es lo que distingue «la misma consulta otra vez» de «otra consulta»: mientras

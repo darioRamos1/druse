@@ -132,6 +132,7 @@
         (openFile)="openSqlFile()"
         (newTab)="createTab()"
         (openPalette)="paletteOpen.set(true)"
+        (showShortcuts)="shortcutsOpen.set(true)"
         (formatFailed)="onFormatFailed($event)"
       />
     } @placeholder {
@@ -386,6 +387,13 @@
   }
 }
 
+<!-- Se pide con F1 y desde la paleta; no hace nada, solo enseña. -->
+@defer (when shortcutsOpen()) {
+  @if (shortcutsOpen()) {
+    <app-shortcuts-sheet (closed)="shortcutsOpen.set(false)" />
+  }
+}
+
 @defer (when settingsOpen()) {
   @if (settingsOpen()) {
     <app-settings-dialog [editorRatio]="editorRatio()" (closed)="settingsOpen.set(false)" />
@@ -412,6 +420,12 @@
       (deleteSnippet)="deleteSnippet($event)"
       (activateConnection)="activateFromPalette($event)"
       (openNode)="openNode($event)"
+      (duplicateTab)="duplicateTab()"
+      (closeOtherTabs)="closeOtherTabs()"
+      (copyQualifiedName)="copyQualifiedName()"
+      (openDiagram)="openDiagramHere()"
+      (transaction)="runTransactionCommand($event)"
+      (showShortcuts)="shortcutsOpen.set(true)"
     />
   }
 }

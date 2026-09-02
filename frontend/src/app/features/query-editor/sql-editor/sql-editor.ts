@@ -220,6 +220,15 @@ export default class SqlEditor implements OnInit {
    * tiempo se pasa—.
    */
   readonly openPalette = output<void>();
+
+  /**
+   * La hoja de atajos.
+   *
+   * Hace falta pedirla desde aquí porque **Monaco se queda F1** para su propia
+   * paleta de comandos: con el foco en el editor —que es donde está casi
+   * siempre— la tecla no llegaba al resto de la aplicación.
+   */
+  readonly showShortcuts = output<void>();
   /** El formateo falló; lo comunica quien lo pidió. */
   readonly formatFailed = output<string>();
 
@@ -684,6 +693,18 @@ export default class SqlEditor implements OnInit {
         smoothScrolling: true,
         cursorBlinking: 'smooth',
         tabSize: 2,
+        /*
+         * Varios cursores con Ctrl+clic, como en Notepad++.
+         *
+         * Monaco los trae desde siempre, pero con Alt, que es lo que usan VS
+         * Code y los editores que vienen de ahí. Quien llega a Druse desde un
+         * editor de texto de Windows prueba Ctrl, no ve nada y da por hecho que
+         * la función no existe.
+         *
+         * Alt+clic queda libre para «ir a la definición», que aquí no hay: el
+         * SQL no tiene a dónde saltar.
+         */
+        multiCursorModifier: 'ctrlCmd',
         // Ahora que hay sugerencias de esquema reales, las de palabras sueltas
         // del propio documento solo añadirían ruido.
         wordBasedSuggestions: 'off',
@@ -863,6 +884,14 @@ export default class SqlEditor implements OnInit {
     editor.addCommand(
       monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyK,
       run(() => this.openPalette.emit()),
+    );
+
+    // La hoja de atajos: F1, quitándosela a la paleta de comandos de Monaco,
+    // que enseña acciones de un editor de código genérico —plegar regiones,
+    // cambiar el idioma del documento— y no de Druse.
+    editor.addCommand(
+      monaco.KeyCode.F1,
+      run(() => this.showShortcuts.emit()),
     );
 
     // Formatear: Ctrl/Cmd + Shift + F, el mismo que usa el resto de editores.

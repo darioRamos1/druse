@@ -267,6 +267,103 @@ describe('AppShell', () => {
     expect(element.querySelector('app-command-palette')).toBeTruthy();
   });
 
+  describe('atajos de pestañas', () => {
+    /** Deja tres pestañas abiertas y la tercera activa. */
+    async function tresPestanas(): Promise<WorkspaceStore> {
+      const store = TestBed.inject(WorkspaceStore);
+
+      store.createTab();
+      store.createTab();
+      fixture.detectChanges();
+      await fixture.whenStable();
+
+      return store;
+    }
+
+    function pulsar(key: string, modificadores: Partial<KeyboardEventInit> = {}): void {
+      document.dispatchEvent(new KeyboardEvent('keydown', { key, ...modificadores }));
+      fixture.detectChanges();
+    }
+
+    it('Alt y un número va a esa pestaña', async () => {
+      const store = await tresPestanas();
+
+      pulsar('1', { altKey: true });
+
+      expect(store.tabs()[0].active).toBe(true);
+    });
+
+    it('Alt+9 va a la última aunque no sean nueve', async () => {
+      const store = await tresPestanas();
+      pulsar('1', { altKey: true });
+
+      pulsar('9', { altKey: true });
+
+      expect(store.tabs().at(-1)?.active).toBe(true);
+    });
+
+    /** Con tres pestañas, «siguiente» desde la última es la primera. */
+    it('las flechas dan la vuelta por los extremos', async () => {
+      const store = await tresPestanas();
+
+      pulsar('ArrowRight', { altKey: true });
+
+      expect(store.tabs()[0].active).toBe(true);
+
+      pulsar('ArrowLeft', { altKey: true });
+
+      expect(store.tabs().at(-1)?.active).toBe(true);
+    });
+
+    it('Ctrl+F4 cierra la pestaña de delante', async () => {
+      const store = await tresPestanas();
+      const antes = store.tabs().length;
+
+      pulsar('F4', { ctrlKey: true });
+      await fixture.whenStable();
+
+      expect(store.tabs().length).toBe(antes - 1);
+      expect(store.tabs().filter((tab) => tab.active)).toHaveLength(1);
+    });
+
+    /**
+     * Con un diálogo delante el teclado es suyo: cambiar de pestaña por detrás
+     * dejaría al usuario mirando un formulario que ya no corresponde.
+     */
+    it('con la paleta abierta, los atajos de pestaña no actúan', async () => {
+      const store = await tresPestanas();
+      const activa = store.tabs().findIndex((tab) => tab.active);
+
+      pulsar('k', { ctrlKey: true });
+      await fixture.whenStable();
+      pulsar('1', { altKey: true });
+
+      expect(store.tabs().findIndex((tab) => tab.active)).toBe(activa);
+    });
+  });
+
+  it('F1 abre la hoja de atajos', async () => {
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'F1' }));
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    expect(element.querySelector('app-shortcuts-sheet')).toBeTruthy();
+  });
+
+  it('duplicar la pestaña deja el mismo SQL en otra nueva', async () => {
+    const store = TestBed.inject(WorkspaceStore);
+    store.updateSql('SELECT 42;');
+    fixture.detectChanges();
+    const antes = store.tabs().length;
+
+    element.querySelector('app-command-palette');
+    (fixture.componentInstance as unknown as { duplicateTab(): void }).duplicateTab();
+    await fixture.whenStable();
+
+    expect(store.tabs().length).toBe(antes + 1);
+    expect(store.activeTab()?.sql).toBe('SELECT 42;');
+  });
+
   /**
    * El enganche completo de la función: sin esto, el asistente existe en el
    * paquete pero no hay forma de llegar a él desde la aplicación.

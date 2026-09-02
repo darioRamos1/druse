@@ -164,4 +164,49 @@ test.describe('el editor', () => {
     // Se deja como estaba: las pruebas comparten aplicación y preferencias.
     await elegirFilas('500');
   });
+
+  /**
+   * Varios cursores con Ctrl+clic, como en Notepad++.
+   *
+   * Monaco los trae de serie pero con Alt, y aquí se ha cambiado el modificador.
+   * Eso es una opción de configuración: **ninguna prueba de componente la ve**,
+   * porque en ellas Monaco es un doble. O se comprueba con el editor de verdad
+   * cargado o no se comprueba.
+   */
+  test('Ctrl+clic pone otro cursor, y Alt+clic ya no', async ({ page }) => {
+    await abrir(page);
+    await conectar(page);
+    await escribirSql(page, 'SELECT uno\nSELECT dos\nSELECT tres');
+
+    const cursores = async (): Promise<number> =>
+      page.evaluate(
+        () => (window as any).monaco.editor.getEditors()[0].getSelections().length,
+      );
+
+    const linea = (numero: number) => page.locator('.view-line').nth(numero - 1);
+
+    await linea(1).click();
+
+    expect(await cursores()).toBe(1);
+
+    await linea(2).click({ modifiers: ['Control'] });
+    await linea(3).click({ modifiers: ['Control'] });
+
+    expect(await cursores()).toBe(3);
+
+    // Y lo que escriba ahora va a los tres sitios.
+    await page.keyboard.type('-- ');
+
+    const texto = await page.evaluate(() =>
+      (window as any).monaco.editor.getEditors()[0].getValue(),
+    );
+
+    expect(texto.split('\n').filter((l: string) => l.includes('-- '))).toHaveLength(3);
+
+    // Alt+clic era el modificador de antes: ahora no debe añadir nada.
+    await linea(1).click();
+    await linea(2).click({ modifiers: ['Alt'] });
+
+    expect(await cursores()).toBe(1);
+  });
 });

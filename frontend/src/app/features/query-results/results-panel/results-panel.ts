@@ -1,8 +1,10 @@
 import {
   ChangeDetectionStrategy,
   Component,
+  ElementRef,
   computed,
   effect,
+  inject,
   input,
   output,
   signal,
@@ -94,6 +96,7 @@ export class ResultsPanel {
    * botón obligaría a los dos a mantener la misma verdad por duplicado.
    */
   private readonly grid = viewChild(ResultsGrid);
+  private readonly host = inject(ElementRef<HTMLElement>);
 
   protected readonly hasSelection = computed(() => this.grid()?.hasSelection() ?? false);
 
@@ -230,6 +233,37 @@ export class ResultsPanel {
 
   openHistory(): void {
     this.select('history');
+  }
+
+  /**
+   * Lleva el teclado a los datos.
+   *
+   * Si lo que se está mirando es el historial o los mensajes, primero se vuelve
+   * a los resultados: pedir el foco en la cuadrícula con otra pestaña delante no
+   * puede querer decir otra cosa.
+   */
+  focusGrid(): void {
+    if (this.activeTab() !== 'results') {
+      this.select('results');
+    }
+
+    this.grid()?.focusGrid();
+  }
+
+  /**
+   * Abre el menú de exportar como si se hubiera pulsado su botón.
+   *
+   * Se abre el menú y no se exporta a un formato fijo: elegir CSV o Excel es
+   * media decisión, y adivinarla desde un atajo escribiría el archivo que no era.
+   */
+  openExportMenu(): void {
+    const boton = (this.host.nativeElement as HTMLElement).querySelector<HTMLElement>(
+      '.export .tool-button',
+    );
+
+    if (boton) {
+      boton.click();
+    }
   }
 
   protected readonly hasFilters = computed(() =>

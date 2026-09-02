@@ -232,6 +232,16 @@ test.describe('barrido visual', () => {
     await foto(page, '06-paleta');
     await page.keyboard.press('Escape');
 
+    // --- La hoja de atajos, que se pide con F1 -----------------------------
+    await page.keyboard.press('F1');
+
+    const atajos = page.locator('app-shortcuts-sheet');
+
+    await expect(atajos).toBeVisible({ timeout: 30_000 });
+    await medir(page, 'hoja de atajos');
+    await foto(page, '06b-atajos', atajos.locator('.dialog'));
+    await page.keyboard.press('Escape');
+
     // --- Diálogos ----------------------------------------------------------
     const dialogos: [string, string, () => Promise<void>][] = [
       [

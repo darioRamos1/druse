@@ -93,6 +93,48 @@ describe('CommandPalette', () => {
     expect(emitted).toBe(1);
   });
 
+  it('ofrece los comandos de pestaña, diagrama y transacción', () => {
+    const text = (fixture.nativeElement as HTMLElement).textContent;
+
+    expect(text).toContain('Duplicar la pestaña');
+    expect(text).toContain('Cerrar las demás pestañas');
+    expect(text).toContain('Copiar el nombre calificado');
+    expect(text).toContain('Ver el diagrama');
+    expect(text).toContain('Iniciar transacción');
+    expect(text).toContain('Ver los atajos de teclado');
+  });
+
+  /**
+   * Confirmar y deshacer se piden desde aquí y **sin atajo**: son de las pocas
+   * cosas de Druse que no se pueden deshacer, y un dedazo no debería llegar a
+   * ellas.
+   */
+  it('confirmar la transacción se pide con su nombre entero', () => {
+    const pedidos: string[] = [];
+    fixture.componentInstance.transaction.subscribe((accion) => pedidos.push(accion));
+
+    const input = fixture.nativeElement.querySelector('input') as HTMLInputElement;
+    input.value = 'confirmar la transacción';
+    input.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
+
+    expect(pedidos).toEqual(['commit']);
+  });
+
+  it('duplicar la pestaña se pide desde la paleta', () => {
+    let pedido = 0;
+    fixture.componentInstance.duplicateTab.subscribe(() => pedido++);
+
+    const input = fixture.nativeElement.querySelector('input') as HTMLInputElement;
+    input.value = 'duplicar';
+    input.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
+
+    expect(pedido).toBe(1);
+  });
+
   it('distingue los objetos por conexión y base', () => {
     const text = (fixture.nativeElement as HTMLElement).textContent;
 
