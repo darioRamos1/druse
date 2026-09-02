@@ -533,7 +533,7 @@ describe('WorkspaceStore', () => {
 
   beforeEach(() => {
     gateway = new FakeGateway();
-    archivos = { save: vi.fn().mockResolvedValue(true) };
+    archivos = { save: vi.fn().mockResolvedValue({ saved: true, path: 'C:\\datos\\ventas.xlsx' }) };
 
     TestBed.configureTestingModule({
       providers: [
@@ -1518,7 +1518,8 @@ describe('WorkspaceStore', () => {
         sql: 'SELECT 2;',
         format: 'xlsx',
       });
-      expect(store.notice()).toBe('Exportado a XLSX.');
+      // El aviso dice dónde quedó: «no sé dónde se guardan» era la queja.
+    expect(store.notice()).toBe('Exportado a XLSX en C:\\datos\\ventas.xlsx');
     });
 
     /**

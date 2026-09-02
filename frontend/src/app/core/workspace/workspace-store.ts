@@ -13,7 +13,7 @@ import {
   RowEditRequest,
   TransactionState,
 } from '../application-gateway/application-gateway';
-import { FileSaveService } from '../files/file-save.service';
+import { FileSaveService, describeSave } from '../files/file-save.service';
 import { PendingWorkService } from '../files/pending-work.service';
 import { ThemeService } from '../theme/theme.service';
 import {
@@ -488,11 +488,15 @@ export class WorkspaceStore {
         // Se anuncia después de guardar y solo si de verdad se guardó. Antes se
         // daba por hecho, y en la aplicación empaquetada eso significaba decir
         // «Exportado» sin haber escrito nada en ningún sitio.
-        const saved = await this._files.save(fileName, blob);
+        const outcome = await this._files.save(fileName, blob);
 
         if (stillCurrent()) {
           this._notice.set(
-            saved ? `Exportado a ${format.toUpperCase()}.` : 'Exportación cancelada.',
+            describeSave(
+              outcome,
+              `Exportado a ${format.toUpperCase()}`,
+              'Exportación cancelada.',
+            ),
           );
         }
       }

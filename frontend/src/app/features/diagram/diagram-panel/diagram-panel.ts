@@ -15,6 +15,7 @@ import {
   ApplicationGateway,
   SavedDiagram,
 } from '../../../core/application-gateway/application-gateway';
+import { FileSaveService, describeSave } from '../../../core/files/file-save.service';
 import { WorkspaceStore } from '../../../core/workspace/workspace-store';
 import {
   DatabaseObject,
@@ -84,6 +85,7 @@ function suggestionKey(suggestion: SuggestedRelation): string {
 export class DiagramPanel {
   private readonly _gateway = inject(ApplicationGateway);
   private readonly _store = inject(WorkspaceStore);
+  private readonly _files = inject(FileSaveService);
 
   readonly connectionId = input.required<string>();
   readonly sessionId = input.required<string>();
@@ -378,20 +380,27 @@ export class DiagramPanel {
   /**
    * Guarda un archivo exportado del diagrama.
    *
-   * Va por un enlace temporal y no por el selector de carpetas del sistema: lo
-   * que se exporta aquí es una imagen que casi siempre acaba pegada en otro
-   * sitio, y pedir una ruta para eso sobra.
+   * Iba por un enlace `download`, con el argumento de que una imagen casi
+   * siempre acaba pegada en otro sitio y pedir una ruta para eso sobra. El
+   * argumento era razonable en el navegador y **falso en la ventana
+   * empaquetada**: ahí ese enlace no escribe nada —la CSP solo admite `blob:`
+   * para imágenes y workers, y el WebView no trae gestor de descargas— y
+   * tampoco falla, así que el diagrama decía «Se descargó» sin haber guardado
+   * ningún archivo. Es el mismo fallo que ya se arregló para exportar
+   * resultados, repetido aquí.
+   *
+   * Ahora va por `FileSaveService`, que es quien sabe distinguir las dos formas
+   * de ejecutar Druse: diálogo del sistema en el escritorio, descarga en el
+   * navegador. Y el aviso dice **dónde** quedó el archivo.
    */
-  protected download(file: { name: string; blob: Blob }): void {
-    const url = URL.createObjectURL(file.blob);
-    const link = document.createElement('a');
+  protected async download(file: { name: string; blob: Blob }): Promise<void> {
+    try {
+      const outcome = await this._files.save(file.name, file.blob);
 
-    link.href = url;
-    link.download = file.name;
-    link.click();
-
-    URL.revokeObjectURL(url);
-    this.notice.set(`Se descargó ${file.name}.`);
+      this.notice.set(describeSave(outcome, `Se guardó ${file.name}`, 'No se guardó nada.'));
+    } catch {
+      this.notice.set(`No se pudo guardar ${file.name}.`);
+    }
   }
 
   /** Copia al portapapeles lo que el lienzo generó como texto. */

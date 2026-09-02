@@ -5,6 +5,7 @@ import {
   ApplicationGateway,
   SavedDiagram,
 } from '../../../core/application-gateway/application-gateway';
+import { FileSaveService } from '../../../core/files/file-save.service';
 import { WorkspaceStore } from '../../../core/workspace/workspace-store';
 import { DatabaseObject, ExplorerNode, SchemaGraph } from '../../../shared/models/workspace';
 import { DiagramPanel } from './diagram-panel';
@@ -72,6 +73,7 @@ describe('DiagramPanel', () => {
   let fixture: ComponentFixture<DiagramPanel>;
   let guardados: SavedDiagram[];
   let escritos: SavedDiagram[];
+  let archivos: { save: ReturnType<typeof vi.fn> };
 
   function crear(source: DatabaseObject): void {
     fixture = TestBed.createComponent(DiagramPanel);
@@ -99,6 +101,9 @@ describe('DiagramPanel', () => {
   beforeEach(async () => {
     guardados = [];
     escritos = [];
+    archivos = {
+      save: vi.fn().mockResolvedValue({ saved: true, path: 'C:\\export\\diagrama.svg' }),
+    };
 
     const gateway = {
       getChildren: (_session: string, parent: DatabaseObject) => of(hijos.get(parent.id) ?? []),
@@ -115,6 +120,7 @@ describe('DiagramPanel', () => {
       providers: [
         { provide: ApplicationGateway, useValue: gateway },
         { provide: WorkspaceStore, useValue: { schemaGraph: async () => grafoVacio } },
+        { provide: FileSaveService, useValue: archivos },
       ],
     }).compileComponents();
   });
@@ -173,5 +179,56 @@ describe('DiagramPanel', () => {
 
     // Sigue preguntando qué entra: no ha reconocido ese diagrama como suyo.
     expect(elegibles()).toHaveLength(3);
+  });
+
+  /**
+   * Exportar el diagrama iba por un enlace `download`, que **dentro de la
+   * ventana empaquetada no escribe nada y tampoco falla**: decía «Se descargó»
+   * sin haber guardado ningún archivo. Ahora pasa por `FileSaveService`, que es
+   * quien sabe distinguir el navegador del escritorio.
+   */
+  describe('exportar', () => {
+    it('guarda por el servicio de archivos, no por un enlace', async () => {
+      crear(base);
+      await asentar();
+      const click = vi.spyOn(HTMLAnchorElement.prototype, 'click');
+
+      await fixture.componentInstance['download']({
+        name: 'diagrama.svg',
+        blob: new Blob(['<svg />'], { type: 'image/svg+xml' }),
+      });
+
+      expect(archivos.save).toHaveBeenCalledWith('diagrama.svg', expect.any(Blob));
+      expect(click).not.toHaveBeenCalled();
+
+      click.mockRestore();
+    });
+
+    it('el aviso dice dónde quedó el archivo', async () => {
+      crear(base);
+      await asentar();
+
+      await fixture.componentInstance['download']({
+        name: 'diagrama.svg',
+        blob: new Blob(['<svg />']),
+      });
+
+      expect(fixture.componentInstance['notice']()).toBe(
+        'Se guardó diagrama.svg en C:\\export\\diagrama.svg',
+      );
+    });
+
+    it('cerrar el diálogo sin elegir no anuncia ningún guardado', async () => {
+      archivos.save.mockResolvedValue({ saved: false });
+      crear(base);
+      await asentar();
+
+      await fixture.componentInstance['download']({
+        name: 'diagrama.svg',
+        blob: new Blob(['<svg />']),
+      });
+
+      expect(fixture.componentInstance['notice']()).toBe('No se guardó nada.');
+    });
   });
 });

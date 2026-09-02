@@ -17,6 +17,34 @@ import { DesktopHost } from '../application-gateway/desktop-host';
  * misma clase de fallo que la hoja de estilos bloqueada por la CSP: **solo se ve
  * empaquetando**.
  */
+/**
+ * Qué pasó al guardar.
+ *
+ * `path` solo lo hay en el escritorio, donde el usuario eligió la ruta; en el
+ * navegador el archivo se descarga y nadie sabe dónde acaba.
+ */
+export type SaveOutcome =
+  | { readonly saved: false }
+  | { readonly saved: true; readonly path: string | null };
+
+/**
+ * Cómo contarle a alguien dónde quedó su archivo.
+ *
+ * En el escritorio se nombra la ruta entera: es la respuesta a «lo exporté y no
+ * sé dónde está». En el navegador no se inventa nada, porque no se sabe.
+ */
+export function describeSave(
+  outcome: SaveOutcome,
+  done: string,
+  cancelled = 'Guardado cancelado.',
+): string {
+  if (!outcome.saved) {
+    return cancelled;
+  }
+
+  return outcome.path ? `${done} en ${outcome.path}` : `${done}.`;
+}
+
 @Injectable({ providedIn: 'root' })
 export class FileSaveService {
   private readonly _desktop = inject(DesktopHost);
@@ -24,21 +52,25 @@ export class FileSaveService {
   /**
    * Guarda el contenido con el nombre propuesto.
    *
-   * @returns `true` si el archivo quedó guardado; `false` si el usuario cerró el
-   * diálogo sin elegir destino. Distinguir ambos casos es lo que permite no
-   * anunciar una exportación que no ocurrió.
+   * Devuelve **dónde** quedó, no solo si quedó. En el escritorio la ruta la
+   * elige el usuario en el diálogo del sistema, y decírsela de vuelta es la
+   * diferencia entre «Exportado» y saber qué archivo abrir: es literalmente lo
+   * que se preguntaba —«no sé dónde se guardan»—. En el navegador no hay ruta
+   * que dar: el archivo va a donde el navegador descargue, y `path` es `null`.
    */
-  async save(fileName: string, blob: Blob): Promise<boolean> {
+  async save(fileName: string, blob: Blob): Promise<SaveOutcome> {
     if (this._desktop.isDesktop) {
       const bytes = new Uint8Array(await blob.arrayBuffer());
       const path = await this._desktop.saveExport(fileName, bytes);
 
-      return path !== null;
+      // `null` es que el usuario cerró el diálogo sin elegir destino. Distinguir
+      // ese caso es lo que permite no anunciar una exportación que no ocurrió.
+      return path === null ? { saved: false } : { saved: true, path };
     }
 
     this.download(fileName, blob);
 
-    return true;
+    return { saved: true, path: null };
   }
 
   /**

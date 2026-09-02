@@ -33,7 +33,8 @@ describe('FileSaveService', () => {
 
     const saved = await create().save('ventas.csv', new Blob(['a,b']));
 
-    expect(saved).toBe(true);
+    // En el navegador no hay ruta que dar: el archivo va a donde descargue.
+    expect(saved).toEqual({ saved: true, path: null });
     expect(link.download).toBe('ventas.csv');
     expect(click).toHaveBeenCalled();
     // Sin revocar, el navegador conserva el archivo en memoria hasta recargar.
@@ -59,7 +60,8 @@ describe('FileSaveService', () => {
 
     const saved = await create().save('ventas.xlsx', new Blob([new Uint8Array([1, 2, 3])]));
 
-    expect(saved).toBe(true);
+    // La ruta vuelve para poder decirle al usuario dónde quedó el archivo.
+    expect(saved).toEqual({ saved: true, path: 'C:\\Users\\dario\\ventas.xlsx' });
     expect(click).not.toHaveBeenCalled();
 
     const [name, bytes] = desktop.saveExport.mock.calls[0];
@@ -76,6 +78,6 @@ describe('FileSaveService', () => {
     desktop.isDesktop = true;
     desktop.saveExport.mockResolvedValue(null);
 
-    expect(await create().save('ventas.csv', new Blob(['a']))).toBe(false);
+    expect(await create().save('ventas.csv', new Blob(['a']))).toEqual({ saved: false });
   });
 });
