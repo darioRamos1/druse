@@ -63,4 +63,47 @@ describe('EditorTabs', () => {
     expect(tabs[1].getAttribute('tabindex')).toBe('-1');
     expect(selected).toEqual(['q2']);
   });
+  it('lista todas las abiertas y va a la que se elige', () => {
+    const otras = Array.from({ length: 11 }, (_, index) => ({
+      ...tab,
+      id: `q${index + 2}`,
+      title: `consulta ${index + 2}`,
+      active: false,
+    }));
+    fixture.componentRef.setInput('tabs', [tab, ...otras]);
+    fixture.detectChanges();
+    const selected: string[] = [];
+    fixture.componentInstance.select.subscribe((id) => selected.push(id));
+
+    const toggle = fixture.nativeElement.querySelector('.listing__toggle') as HTMLButtonElement;
+    toggle.click();
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelectorAll('.listing__option').length).toBe(12);
+    expect(toggle.textContent).toContain('12');
+
+    // La que se busca es una de las que ya no caben en la barra.
+    const search = fixture.nativeElement.querySelector(
+      '.listing__search input',
+    ) as HTMLInputElement;
+    search.value = 'consulta 11';
+    search.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+    const options = fixture.nativeElement.querySelectorAll('.listing__option');
+
+    expect(options.length).toBe(1);
+    options[0].click();
+    fixture.detectChanges();
+
+    expect(selected).toEqual(['q11']);
+    expect(fixture.nativeElement.querySelector('.listing__menu')).toBeNull();
+  });
+
+  it('no trae buscador con pocas pestañas', () => {
+    (fixture.nativeElement.querySelector('.listing__toggle') as HTMLButtonElement).click();
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('.listing__option')).not.toBeNull();
+    expect(fixture.nativeElement.querySelector('.listing__search')).toBeNull();
+  });
 });

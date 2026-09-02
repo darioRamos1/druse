@@ -1,7 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 
 import { SavedSnippet } from '../../core/application-gateway/application-gateway';
-import { ConnectionSummary, ExplorerNode } from '../../shared/models/workspace';
+import { ConnectionSummary, ExplorerNode, QueryTab } from '../../shared/models/workspace';
 import CommandPalette from './command-palette';
 
 const connection: ConnectionSummary = {
@@ -44,6 +44,15 @@ const snippet: SavedSnippet = {
   sql: ['-- los de hoy', 'SELECT * FROM pedidos WHERE creado >= CURRENT_DATE'].join('\n'),
 };
 
+const openTab: QueryTab = {
+  id: 'q7',
+  title: 'facturas pendientes',
+  active: false,
+  dirty: true,
+  sql: 'SELECT * FROM facturas',
+  connectionId: connection.id,
+};
+
 describe('CommandPalette', () => {
   let fixture: ComponentFixture<CommandPalette>;
 
@@ -54,6 +63,7 @@ describe('CommandPalette', () => {
     fixture.componentRef.setInput('connections', [connection]);
     fixture.componentRef.setInput('nodes', [table]);
     fixture.componentRef.setInput('snippets', [snippet]);
+    fixture.componentRef.setInput('tabs', [openTab]);
     fixture.detectChanges();
     await fixture.whenStable();
   });
@@ -246,5 +256,19 @@ describe('CommandPalette', () => {
     borrar();
 
     expect(deleted[0]?.id).toBe(snippet.id);
+  });
+  it('encuentra una pestaña abierta y salta a ella', () => {
+    const activated: string[] = [];
+    fixture.componentInstance.activateTab.subscribe((id) => activated.push(id));
+
+    const input = fixture.nativeElement.querySelector('input') as HTMLInputElement;
+    input.value = 'facturas pend';
+    input.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+
+    expect((fixture.nativeElement as HTMLElement).textContent).toContain('Pruebas · druse_test');
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
+
+    expect(activated).toEqual([openTab.id]);
   });
 });

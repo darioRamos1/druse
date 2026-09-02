@@ -232,6 +232,43 @@ test.describe('barrido visual', () => {
     await foto(page, '06-paleta');
     await page.keyboard.press('Escape');
 
+    // --- Muchas pestañas abiertas ------------------------------------------
+    // Doce no caben en la barra: interesa ver que se llega a las de detrás.
+    const barra = page.locator('app-editor-tabs');
+    // Las que ya había: el espacio de trabajo de las pruebas se guarda entre
+    // ejecuciones, así que el punto de partida no es una pestaña sola.
+    const antes = await barra.locator('.tab').count();
+    const activa = (await barra.locator('.tab.is-active .tab__title').textContent()) ?? '';
+
+    // Hasta doce, y nunca menos de tres nuevas: la foto necesita una barra
+    // desbordada y el buscador, alguna «Query N» que encontrar.
+    const nuevas = Math.max(3, 12 - antes);
+
+    for (let vez = 0; vez < nuevas; vez += 1) {
+      await barra.getByRole('button', { name: 'Nueva consulta' }).click();
+    }
+
+    await expect(barra.locator('.tab')).toHaveCount(antes + nuevas);
+    await medir(page, 'barra con muchas pestañas');
+    await foto(page, '06c-pestanas', barra);
+
+    await barra.locator('.listing__toggle').click();
+    await expect(barra.locator('.listing__menu')).toBeVisible();
+    await medir(page, 'lista de pestañas');
+    await foto(page, '06d-lista-pestanas');
+
+    await barra.locator('.listing__search input').fill('Query 1');
+    await page.waitForTimeout(200);
+    await foto(page, '06e-lista-pestanas-buscando');
+    await page.keyboard.press('Escape');
+
+    // Se deja como estaba: lo que sigue trabaja sobre la pestaña apuntada.
+    while ((await barra.locator('.tab').count()) > antes) {
+      await barra.locator('.tab').last().locator('.tab__close').click();
+    }
+
+    await barra.locator('.tab', { hasText: activa }).first().click();
+
     // --- La hoja de atajos, que se pide con F1 -----------------------------
     await page.keyboard.press('F1');
 

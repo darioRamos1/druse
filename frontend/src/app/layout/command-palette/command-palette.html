@@ -29,7 +29,7 @@
       <input
         #search
         type="search"
-        placeholder="Buscar conexiones, tablas, vistas o comandos"
+        placeholder="Buscar pestañas, conexiones, tablas o comandos"
         aria-label="Buscar comandos"
         aria-controls="palette-results"
         [attr.aria-activedescendant]="items().length ? 'palette-option-' + selected() : null"
@@ -66,6 +66,8 @@
           <span class="result__icon">
             @if (item.kind === 'connection') {
               <app-engine-badge [engine]="item.connection.engine" />
+            } @else if (item.kind === 'tab') {
+              <app-icon name="new-query" [size]="13" />
             } @else if (item.kind === 'object') {
               <app-icon name="table" [size]="13" />
             } @else if (item.kind === 'snippet') {

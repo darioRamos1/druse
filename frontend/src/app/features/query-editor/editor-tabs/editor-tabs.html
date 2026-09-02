@@ -1,4 +1,4 @@
-<div class="tabs" role="tablist">
+<div class="tabs" role="tablist" #strip (wheel)="onWheel($event)">
   @for (tab of tabs(); track tab.id; let index = $index) {
     <div
       class="tab"
@@ -57,6 +57,86 @@
   >
     +
   </button>
+</div>
+
+<!--
+  La lista de todas las pestañas.
+
+  Vive fuera de la tira que se desplaza a propósito: es la salida cuando las
+  pestañas ya no caben, y una salida que también se ha ido de la pantalla no
+  sirve de nada.
+-->
+<div class="listing">
+  <button
+    type="button"
+    class="listing__toggle"
+    [class.is-open]="listing()"
+    title="Todas las pestañas abiertas"
+    aria-label="Todas las pestañas abiertas"
+    [attr.aria-expanded]="listing()"
+    (click)="toggleListing()"
+  >
+    <app-icon name="chevron-down" [size]="9" />
+    <span class="listing__count">{{ tabs().length }}</span>
+  </button>
+
+  @if (listing()) {
+    <div class="listing__menu" (keydown.escape)="closeListing()">
+      @if (tabs().length > searchFrom) {
+        <!-- Con esta cantidad ya no se lee la lista: se busca por el nombre. -->
+        <label class="listing__search">
+          <app-icon name="search" [size]="12" />
+          <input
+            #search
+            type="search"
+            placeholder="Buscar entre las abiertas"
+            aria-label="Buscar entre las pestañas abiertas"
+            [value]="filter()"
+            (input)="onFilter($event)"
+            (keydown.enter)="chooseFirst(); $event.preventDefault()"
+          />
+        </label>
+      }
+
+      <ul role="listbox" aria-label="Pestañas abiertas">
+        @for (tab of listed(); track tab.id) {
+          <li>
+            <button
+              type="button"
+              class="listing__option"
+              role="option"
+              [attr.aria-selected]="tab.active"
+              [class.is-selected]="tab.active"
+              (click)="choose(tab.id)"
+            >
+              @if (connectionFor(tab); as connection) {
+                <app-engine-badge [engine]="connection.engine" />
+              }
+              <span class="listing__text">
+                <strong>{{ tab.title }}</strong>
+                <small>
+                  @if (connectionFor(tab); as connection) {
+                    {{ connection.name }} · {{ tab.database ?? connection.database }}
+                  } @else {
+                    Sin conexión asignada
+                  }
+                </small>
+              </span>
+              @if (tab.dirty) {
+                <span
+                  class="listing__dirty"
+                  title="Cambios sin guardar"
+                  aria-label="Cambios sin guardar"
+                ></span>
+              }
+            </button>
+          </li>
+        } @empty {
+          <li class="listing__empty">Ninguna pestaña se llama así.</li>
+        }
+      </ul>
+    </div>
+  }
 </div>
 
 <div class="meta">{{ encoding() }}</div>

@@ -406,6 +406,8 @@
       [connections]="connections()"
       [nodes]="searchableRelations()"
       [snippets]="snippets()"
+      [tabs]="tabs()"
+      (activateTab)="selectTab($event)"
       (closed)="paletteOpen.set(false)"
       (newConnection)="openDialog()"
       (newQuery)="createTab()"

@@ -12,12 +12,19 @@ import {
 } from '@angular/core';
 
 import { SavedSnippet } from '../../core/application-gateway/application-gateway';
-import { ConnectionSummary, ExplorerNode } from '../../shared/models/workspace';
+import { ConnectionSummary, ExplorerNode, QueryTab } from '../../shared/models/workspace';
 import { EngineBadge } from '../../shared/ui/engine-badge/engine-badge';
 import { Icon } from '../../shared/ui/icon/icon';
 
 type PaletteItem =
   | { readonly id: string; readonly kind: 'command'; readonly label: string; readonly hint: string }
+  | {
+      readonly id: string;
+      readonly kind: 'tab';
+      readonly label: string;
+      readonly hint: string;
+      readonly tab: QueryTab;
+    }
   | {
       readonly id: string;
       readonly kind: 'connection';
@@ -52,6 +59,9 @@ export default class CommandPalette implements AfterViewInit {
   readonly nodes = input.required<readonly ExplorerNode[]>();
   readonly snippets = input<readonly SavedSnippet[]>([]);
 
+  /** Las consultas abiertas, para llegar a las que ya no caben en la barra. */
+  readonly tabs = input<readonly QueryTab[]>([]);
+
   readonly closed = output<void>();
   readonly newConnection = output<void>();
   readonly newQuery = output<void>();
@@ -71,6 +81,7 @@ export default class CommandPalette implements AfterViewInit {
   readonly insertSnippet = output<SavedSnippet>();
   readonly deleteSnippet = output<SavedSnippet>();
   readonly activateConnection = output<string>();
+  readonly activateTab = output<string>();
   readonly openNode = output<ExplorerNode>();
 
   /** Otra pestaña con el mismo SQL, para probar una variante sin perder esta. */
@@ -160,6 +171,30 @@ export default class CommandPalette implements AfterViewInit {
       { id: 'transaction-rollback', kind: 'command', label: 'Deshacer la transacción', hint: 'Tira lo hecho desde que se abrió' },
       { id: 'shortcuts', kind: 'command', label: 'Ver los atajos de teclado', hint: 'F1' },
     ];
+    /*
+     * Las pestañas abiertas, delante de todo.
+     *
+     * En la barra solo caben las que caben, y con doce abiertas la única forma
+     * de volver a una era ir pasándolas de una en una. Aquí se busca por su
+     * nombre, o por la conexión y la base contra las que trabaja.
+     */
+    const tabs: PaletteItem[] = this.tabs().map((tab) => {
+      const connection = this.connections().find((item) => item.id === tab.connectionId);
+      const estado = [tab.dirty ? 'sin guardar' : '', tab.active ? 'delante' : '']
+        .filter(Boolean)
+        .join(' · ');
+      const contexto = connection
+        ? `${connection.name} · ${tab.database ?? connection.database}`
+        : 'Sin conexión asignada';
+
+      return {
+        id: `tab:${tab.id}`,
+        kind: 'tab',
+        label: tab.title,
+        hint: estado ? `${contexto} · ${estado}` : contexto,
+        tab,
+      };
+    });
     const connections: PaletteItem[] = this.connections().map((connection) => ({
       id: `connection:${connection.id}`,
       kind: 'connection',
@@ -187,7 +222,7 @@ export default class CommandPalette implements AfterViewInit {
       snippet,
     }));
 
-    const all = [...commands, ...snippets, ...connections, ...objects];
+    const all = [...tabs, ...commands, ...snippets, ...connections, ...objects];
 
     return term
       ? all.filter((item) => `${item.label} ${item.hint}`.toLowerCase().includes(term))
@@ -231,6 +266,10 @@ export default class CommandPalette implements AfterViewInit {
 
     if (nombre === 'snippet') {
       return 'fragmento';
+    }
+
+    if (nombre === 'tab') {
+      return 'pestaña';
     }
 
 
@@ -357,6 +396,8 @@ export default class CommandPalette implements AfterViewInit {
           this.showShortcuts.emit();
           return;
       }
+    } else if (item.kind === 'tab') {
+      this.activateTab.emit(item.tab.id);
     } else if (item.kind === 'connection') {
       this.activateConnection.emit(item.connection.id);
     } else if (item.kind === 'snippet') {
