@@ -312,6 +312,20 @@ test.describe('barrido visual', () => {
     await foto(page, '20-mer', diagrama.locator('.dialog'));
     await cerrar(page, diagrama, 'diagrama');
 
+    // --- El mismo diagrama, pero de la base entera -------------------------
+    // Donde una base tiene varios esquemas, el selector dice de cuál es cada
+    // tabla: dos «orders» sin apellido no se pueden elegir.
+    await arbolAbierto(page);
+    await menuDe(page, 'druse_test');
+    await page.getByRole('menuitem', { name: 'Ver diagrama' }).click();
+
+    const diagramaBase = page.locator('app-diagram-panel');
+
+    await expect(diagramaBase.locator('.chooser')).toBeVisible({ timeout: 60_000 });
+    await medir(page, 'elegir tablas de la base');
+    await foto(page, '20-mer-base-tablas', diagramaBase.locator('.dialog'));
+    await cerrar(page, diagramaBase, 'diagrama de la base');
+
     // --- El asistente de una tabla, con sus pasos --------------------------
     await desplegar(page, 'Tables', 'accionista');
     await menuDe(page, 'accionista');

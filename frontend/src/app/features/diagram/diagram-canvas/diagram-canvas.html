@@ -189,6 +189,9 @@
             <rect x="3" y="4" width="18" height="16" rx="2" />
             <path d="M3 9h18M9 9v11" />
           </svg>
+          @if (showSchema(box)) {
+            <span class="node__schema">{{ box.table.schema }}.</span>
+          }
           <span class="node__name">{{ box.table.name }}</span>
           @if (box.isBridge) {
             <span class="node__badge" title="Toda su clave primaria son claves foráneas">N:M</span>

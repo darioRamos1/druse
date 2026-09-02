@@ -292,11 +292,13 @@
                     </button>
                   }
 
-                  <!-- El diagrama se pide sobre un esquema —«enséñame cómo es
-                       esto»— o sobre una tabla, que entra con sus vecinas. Sobre
-                       la base entera no: son trescientas tablas y una tela de
-                       araña. -->
-                  @if (node.kind === 'schema' || node.kind === 'table') {
+                  <!-- El diagrama se pide sobre una base —«enséñame cómo es
+                       esto», con sus esquemas dentro—, sobre un esquema o sobre
+                       una tabla, que entra con sus vecinas. Que la base entera
+                       sean trescientas tablas no es motivo para no ofrecerla: el
+                       panel pregunta siempre qué entra al lienzo, y por ahí se
+                       empieza eligiendo. -->
+                  @if (node.kind === 'database' || node.kind === 'schema' || node.kind === 'table') {
                     <button
                       type="button"
                       role="menuitem"

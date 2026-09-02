@@ -177,6 +177,19 @@ export class DiagramPanel {
     () => `${this.chosen().size} de ${this.candidates().length} tablas elegidas`,
   );
 
+  /**
+   * Si hay que decir de qué esquema es cada tabla al elegirlas.
+   *
+   * Dentro de un esquema el nombre basta y repetirlo en cada fila sería ruido.
+   * Abriendo una base entera no: `dbo.orders` y `ventas.orders` se ven igual, y
+   * elegir a ciegas entre dos filas idénticas no es elegir.
+   */
+  protected readonly showSchemas = computed(() => {
+    const esquemas = new Set(this.candidates().map((table) => table.schema ?? ''));
+
+    return esquemas.size > 1;
+  });
+
   constructor() {
     effect(() => {
       const target = this.target();
@@ -504,16 +517,33 @@ export class DiagramPanel {
     return null;
   }
 
-  /** Qué esquema o tabla es este diagrama, para reconocer el suyo al abrirlo. */
+  /** Qué base, esquema o tabla es este diagrama, para reconocer el suyo al abrirlo. */
   private targetKey(): string {
     const source = this.target().source;
 
-    return source.kind === 'table'
-      ? `table:${tableKey(source)}`
+    if (source.kind === 'table') {
+      return `table:${tableKey(source)}`;
+    }
+
+    // Una base y un esquema pueden llamarse igual —en MySQL es lo
+    // corriente—, así que la clase va delante: sin ella, el diagrama de la
+    // base `ventas` se abriría al pedir el del esquema `ventas`.
+    return source.kind === 'database'
+      ? `database:${source.name}`
       : `schema:${source.schema ?? source.name}`;
   }
 
-  /** El grafo del esquema entero, leído una sola vez y recordado. */
+  /**
+   * Cómo llamar a lo que se abrió cuando hay que decírselo al usuario.
+   *
+   * Sobre una tabla el ámbito sigue siendo su esquema: las vecinas se buscan
+   * ahí, no en la base entera.
+   */
+  private scopeLabel(): string {
+    return this.target().source.kind === 'database' ? 'La base' : 'El esquema';
+  }
+
+  /** El grafo entero de lo que se abrió, leído una sola vez y recordado. */
   private async wholeSchema(): Promise<SchemaGraph | null> {
     const known = this._whole();
 
@@ -525,8 +555,8 @@ export class DiagramPanel {
 
     if (candidates.length > MAX_TABLES) {
       this.notice.set(
-        `El esquema tiene ${candidates.length} tablas y no se pueden leer más de ${MAX_TABLES} ` +
-          'de una vez, así que no se puede saber cuáles apuntan a esta.',
+        `${this.scopeLabel()} tiene ${candidates.length} tablas y no se pueden leer más de ` +
+          `${MAX_TABLES} de una vez, así que no se puede saber cuáles apuntan a esta.`,
       );
       return null;
     }

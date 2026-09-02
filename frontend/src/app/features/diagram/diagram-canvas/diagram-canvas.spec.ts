@@ -92,6 +92,56 @@ describe('DiagramCanvas', () => {
     fixture.detectChanges();
   });
 
+  /**
+   * El diagrama de una base entera trae tablas de varios esquemas, y dos que se
+   * llamen igual se dibujan como dos cajas idénticas: sin el esquema delante,
+   * una flecha entre ellas no dice a cuál llega.
+   */
+  describe('tablas que se llaman igual', () => {
+    /** El mismo `cliente` en dos esquemas, más una tabla que no se repite. */
+    const repetido: SchemaGraph = {
+      tables: [
+        detail('cliente', [column('id', { pk: true })], [], ['id']),
+        {
+          ...detail('cliente', [column('id', { pk: true })], [], ['id']),
+          table: {
+            id: 'compras.cliente',
+            name: 'cliente',
+            kind: 'table',
+            database: 'druse_test',
+            schema: 'compras',
+            hasChildren: true,
+          },
+        },
+        detail('bitacora', [column('id', { pk: true })], [], ['id']),
+      ],
+      missing: [],
+    };
+
+    beforeEach(() => {
+      fixture.componentRef.setInput('graph', repetido);
+      fixture.detectChanges();
+    });
+
+    it('las cajas repetidas dicen de qué esquema son', () => {
+      // El orden lo decide la colocación, así que se comparan como conjunto.
+      const esquemas = [...dom().querySelectorAll('.node__schema')].map((span) =>
+        span.textContent?.trim(),
+      );
+
+      expect(esquemas.sort()).toEqual(['compras.', 'ventas.']);
+    });
+
+    /** Repetirlo donde no desempata nada solo gasta el ancho de la caja. */
+    it('la que no se repite no lo dice', () => {
+      const bitacora = nodos().find(
+        (node) => node.querySelector('.node__name')?.textContent?.trim() === 'bitacora',
+      )!;
+
+      expect(bitacora.querySelector('.node__schema')).toBeNull();
+    });
+  });
+
   it('dibuja una caja por tabla y una línea por clave foránea', () => {
     expect(nodos()).toHaveLength(3);
     expect(dom().querySelectorAll('.wire')).toHaveLength(1);

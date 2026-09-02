@@ -302,6 +302,61 @@ describe('ConnectionsSidebar', () => {
     expect(pedidos[0].source.name).toBe('orders');
   });
 
+  /**
+   * El diagrama de la base entera. Antes solo se ofrecía sobre un esquema, y en
+   * SQL Server o Informix —donde una base tiene varios— no había forma de pedir
+   * el mapa completo sin abrir uno por uno.
+   */
+  it('el diagrama se ofrece también sobre una base', () => {
+    fixture.componentRef.setInput('explorerNodes', [database]);
+    fixture.detectChanges();
+
+    const trigger = fixture.nativeElement.querySelector('.node__menu-trigger') as HTMLButtonElement;
+    trigger.click();
+    fixture.detectChanges();
+
+    const labels = [...fixture.nativeElement.querySelectorAll('.node-menu button')].map(
+      (button: Element) => button.textContent?.trim(),
+    );
+
+    expect(labels).toContain('Ver diagrama…');
+  });
+
+  it('pedir el diagrama de una base entrega la base, no un esquema suyo', () => {
+    fixture.componentRef.setInput('explorerNodes', [database]);
+    fixture.detectChanges();
+    const pedidos: ExplorerNode[] = [];
+    fixture.componentInstance.diagram.subscribe((node) => pedidos.push(node));
+
+    const trigger = fixture.nativeElement.querySelector('.node__menu-trigger') as HTMLButtonElement;
+    trigger.click();
+    fixture.detectChanges();
+    const accion = [...fixture.nativeElement.querySelectorAll('.node-menu button')].find(
+      (button: Element) => button.textContent?.includes('Ver diagrama'),
+    ) as HTMLButtonElement;
+    accion.click();
+
+    expect(pedidos).toHaveLength(1);
+    expect(pedidos[0].source.kind).toBe('database');
+    expect(pedidos[0].source.name).toBe('druse_test');
+  });
+
+  /** Sobre lo que no tiene tablas debajo, el diagrama no dice nada. */
+  it('sobre un procedimiento no se ofrece el diagrama', () => {
+    fixture.componentRef.setInput('explorerNodes', [procedure]);
+    fixture.detectChanges();
+
+    const trigger = fixture.nativeElement.querySelector('.node__menu-trigger') as HTMLButtonElement;
+    trigger.click();
+    fixture.detectChanges();
+
+    const labels = [...fixture.nativeElement.querySelectorAll('.node-menu button')].map(
+      (button: Element) => button.textContent?.trim(),
+    );
+
+    expect(labels).not.toContain('Ver diagrama…');
+  });
+
   it('Enter en una acción no pliega el nodo del árbol', () => {
     fixture.componentRef.setInput('explorerNodes', [view]);
     fixture.detectChanges();

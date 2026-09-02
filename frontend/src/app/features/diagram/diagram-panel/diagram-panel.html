@@ -12,7 +12,7 @@
       <h2 class="head__title">Diagrama · {{ title() }}</h2>
       <p class="head__subtitle">
         @if (choosing()) {
-          Un esquema entero es una tela de araña. Elige por dónde empezar; después se traen las
+          Dibujarlo entero es una tela de araña. Elige por dónde empezar; después se traen las
           vecinas de cualquier tabla.
         } @else {
           Lo que el catálogo dice hoy. Se relee cada vez que se abre.
@@ -73,6 +73,9 @@
               }
             </span>
             <app-icon name="table" [size]="13" />
+            @if (showSchemas() && table.schema) {
+              <span class="pick__schema">{{ table.schema }}.</span>
+            }
             <span class="pick__name">{{ table.name }}</span>
             @if (table.approximateRowCount !== null && table.approximateRowCount !== undefined) {
               <span class="pick__rows">~{{ table.approximateRowCount }}</span>

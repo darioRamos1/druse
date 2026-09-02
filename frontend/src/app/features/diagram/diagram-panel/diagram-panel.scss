@@ -218,6 +218,18 @@
     }
   }
 
+  /*
+   * El esquema, delante del nombre y en gris: distingue las dos `orders` de una
+   * base con varios esquemas sin robarle la vista al nombre, que es lo que se
+   * lee. El punto va pegado, como se escribe en SQL.
+   */
+  &__schema {
+    margin-right: -7px;
+    color: var(--dr-text-faint);
+    font-family: var(--dr-font-mono);
+    font-size: 12.5px;
+  }
+
   &__name {
     font-family: var(--dr-font-mono);
     font-size: 12.5px;

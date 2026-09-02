@@ -225,6 +225,30 @@ export class DiagramCanvas {
     }));
   });
 
+  /**
+   * Los nombres de tabla que aparecen más de una vez en el lienzo.
+   *
+   * Con el diagrama de una base entera, `public.accionista` y
+   * `ventas.accionista` son dos cajas que ponen «accionista», y entonces una
+   * flecha entre ellas no se puede leer. Se marca el esquema **solo en esas**:
+   * la caja mide 218 px fijos y anteponer el esquema a todas cortaría nombres
+   * que hoy caben, a cambio de repetir un dato que allí no desempata nada.
+   */
+  private readonly _repeated = computed(() => {
+    const veces = new Map<string, number>();
+
+    for (const box of this._layout().boxes) {
+      veces.set(box.table.name, (veces.get(box.table.name) ?? 0) + 1);
+    }
+
+    return new Set([...veces].filter(([, cuantas]) => cuantas > 1).map(([name]) => name));
+  });
+
+  /** Si esta caja necesita decir de qué esquema es. */
+  protected showSchema(box: PaintedBox): boolean {
+    return box.table.schema !== undefined && this._repeated().has(box.table.name);
+  }
+
   protected readonly links = computed<readonly PaintedLink[]>(() => {
     const near = this._near();
     const selected = this.selected();
