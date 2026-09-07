@@ -305,6 +305,33 @@ describe('BackupDialog', () => {
     expect(request().overwrite).toBe(false);
   });
 
+  /**
+   * Se vio en el barrido de capturas: con «Carpeta por tipo de objeto» elegida,
+   * el campo del destino seguía proponiendo un `respaldo-....sql`. Quien acepta
+   * la propuesta acaba con una carpeta llamada como un archivo.
+   */
+  it('la propuesta de nombre no lleva extensión cuando el destino es una carpeta', () => {
+    const { layout, compress } = output();
+
+    layout.set('FolderByKind');
+    compress.set(false);
+    fixture.detectChanges();
+
+    const propuesta = (
+      fixture.componentInstance as unknown as { suggestedName: () => string }
+    ).suggestedName();
+
+    expect(propuesta).not.toContain('.sql');
+    expect(propuesta).not.toContain('.zip');
+
+    compress.set(true);
+    fixture.detectChanges();
+
+    expect(
+      (fixture.componentInstance as unknown as { suggestedName: () => string }).suggestedName(),
+    ).toContain('.zip');
+  });
+
   it('borrar un perfil lo quita de la lista', async () => {
     element.querySelector<HTMLButtonElement>('.profiles__delete')?.click();
     await settle(fixture);

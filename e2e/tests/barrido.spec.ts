@@ -339,6 +339,29 @@ test.describe('barrido visual', () => {
       await cerrar(page, dialogo, nombre);
     }
 
+    // --- El paso donde se elige el destino del respaldo --------------------
+    // La casilla de sobrescribir solo sale cuando lo que se va a escribir es una
+    // carpeta: un archivo o un zip los nombra el usuario en el diálogo del
+    // sistema, que ya pregunta antes de reemplazar uno. Una carpeta no pregunta
+    // nada, y sin marcarla el respaldo se rechaza en vez de mezclarse.
+    await menuDe(page, 'druse_test');
+    await page.getByRole('menuitem', { name: 'Respaldar' }).click();
+
+    const respaldo = page.locator('app-backup-dialog');
+
+    await expect(respaldo).toBeVisible({ timeout: 30_000 });
+    await respaldo.getByRole('button', { name: '3. Cómo' }).click();
+    await respaldo.getByRole('radio', { name: 'Carpeta por tipo de objeto' }).check();
+
+    await expect(
+      respaldo.getByText('Sobrescribir el respaldo anterior de esa carpeta'),
+    ).toBeVisible();
+
+    await page.waitForTimeout(300);
+    await medir(page, 'destino del respaldo');
+    await foto(page, '10b-respaldo-destino', respaldo.locator('.dialog'));
+    await cerrar(page, respaldo, 'destino del respaldo');
+
     // --- El diagrama, en sus dos pasos -------------------------------------
     // Va fuera del bucle porque son dos pantallas y no una: primero se elige
     // qué tablas entran y después se dibujan.

@@ -332,6 +332,13 @@ export class BackupDialog {
     const stamp = new Date().toISOString().slice(0, 10);
     const base = `respaldo-${this.target().source.database ?? 'base'}-${stamp}`;
 
+    // Una carpeta no lleva extensión. Proponer un `.sql` donde va a aparecer un
+    // directorio hace esperar un archivo, y quien acepte la propuesta acaba con
+    // una carpeta llamada «respaldo-ventas-2026-09-07.sql» dentro.
+    if (this.writesFolder()) {
+      return base;
+    }
+
     return this.compress() ? `${base}.zip` : `${base}.sql`;
   });
 
