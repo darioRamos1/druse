@@ -171,6 +171,9 @@ public sealed class MySqlQueryExecutor : IQueryExecutor
         var resultSets = new List<ResultSet>();
         long? rowsAffected = null;
 
+        // Lo que queda del tope para todo el lote.
+        var remaining = maxRows;
+
         do
         {
             if (reader.FieldCount == 0)
@@ -183,7 +186,15 @@ public sealed class MySqlQueryExecutor : IQueryExecutor
                 continue;
             }
 
-            resultSets.Add(await ReadResultSetAsync(reader, maxRows, cancellationToken));
+            // El tope es del lote entero, no de cada resultado: una pulsación
+            // de «Ejecutar» con diez `SELECT` traía diez veces el límite a la
+            // memoria del proceso y del navegador. Cuando se agota, los
+            // siguientes llegan vacíos y marcados como recortados, que es la
+            // verdad: hay más y no se trajeron.
+            var set = await ReadResultSetAsync(reader, remaining, cancellationToken);
+
+            remaining -= set.Rows.Count;
+            resultSets.Add(set);
         }
         while (await reader.NextResultAsync(cancellationToken));
 

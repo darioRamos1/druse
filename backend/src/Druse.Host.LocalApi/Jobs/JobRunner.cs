@@ -118,6 +118,14 @@ public sealed class JobRunner(
         // o porque la API se apaga.
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(job.Token, stoppingToken);
 
+        // Todo lo que registre este trabajo lleva su identificador delante. Sin
+        // eso, un respaldo y una consulta a la vez dejan un registro intercalado
+        // que se lee como si todo le hubiera pasado a lo mismo.
+        using var logScope = _logger.BeginScope(new Dictionary<string, object?>
+        {
+            ["JobId"] = job.Id,
+        });
+
         await using var scope = _scopes.CreateAsyncScope();
 
         var store = scope.ServiceProvider.GetRequiredService<IJobStore>();

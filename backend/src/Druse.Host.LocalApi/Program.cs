@@ -2,9 +2,11 @@
 using Druse.Application.Abstractions;
 using Druse.Database.Abstractions;
 using Druse.Host.LocalApi;
+using Druse.Host.LocalApi.Diagnostics;
 using Druse.Host.LocalApi.Endpoints;
 using Druse.Host.LocalApi.Security;
 using Druse.Persistence.Sqlite;
+using Druse.Platform.Native;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -35,6 +37,17 @@ builder.WebHost.ConfigureKestrel(options =>
 
 builder.Services.AddOpenApi();
 builder.Services.AddDruse();
+
+// Registro en archivo, porque **la aplicación empaquetada no tiene consola**: el
+// envoltorio arranca la API sin ventana —una consola de ASP.NET delante de Druse
+// sería peor— y con ella se iba el único sitio donde se veían los registros. Un
+// fallo en el equipo de un usuario no dejaba rastro ninguno.
+//
+// Rota por tamaño y conserva unos pocos archivos: esto vive en el equipo de una
+// persona, y unos registros que crecen sin fin son un problema nuevo.
+builder.Logging.AddProvider(new FileLoggerProvider(
+    new AppPaths(),
+    builder.Configuration.GetSection("Logging:File").Get<FileLogOptions>() ?? new FileLogOptions()));
 
 // La API es un proceso auxiliar de la ventana: si quien la arrancó desaparece,
 // no tiene a quién servir. Sin esto, una ventana que muere de golpe deja la API

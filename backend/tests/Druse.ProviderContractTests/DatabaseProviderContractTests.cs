@@ -328,6 +328,38 @@ public abstract class DatabaseProviderContractTests<TFixture>
         Assert.True(set.Truncated);
     }
 
+    /// <summary>
+    /// El tope de filas es de la pulsación entera, no de cada resultado.
+    ///
+    /// Se aplicaba a cada uno por separado: un lote con tres `SELECT` y un tope de
+    /// dos traía seis filas a la memoria del proceso y del navegador. Con diez
+    /// instrucciones —que es lo normal en un guion— el tope dejaba de significar
+    /// nada.
+    ///
+    /// Lo que se comprueba es la suma, y que lo que se queda fuera se dice: un
+    /// resultado vacío sin marca se lee como «esa consulta no devolvió nada».
+    /// </summary>
+    [Fact]
+    public async Task LimiteDeFilas_ValeParaElLoteEntero()
+    {
+        if (Skip) { return; }
+
+        await using var session = await OpenAsync();
+
+        var result = await ExecuteAsync(session, Fixture.ThreeResultSets, maxRows: 2);
+
+        Assert.Equal(QueryExecutionState.Succeeded, result.State);
+        Assert.Equal(3, result.ResultSets.Count);
+
+        var total = result.ResultSets.Sum(set => set.Rows.Count);
+
+        Assert.True(total <= 2, $"El lote trajo {total} filas con un tope de 2.");
+
+        // Las dos primeras caben —una fila cada una— y la tercera se queda fuera,
+        // dicho.
+        Assert.True(result.ResultSets[2].Truncated);
+    }
+
     [Fact]
     public async Task LimiteDeFilas_NoMarcaTruncadoSiCabeEntero()
     {
