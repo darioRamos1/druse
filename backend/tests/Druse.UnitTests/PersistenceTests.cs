@@ -95,7 +95,14 @@ public sealed class ConnectionProfileStoreTests : IDisposable
         await _store.SaveAsync(sqlServer, CancellationToken.None);
         await _store.SaveAsync(postgres, CancellationToken.None);
 
-        // Volver a migrar es lo que pasa al abrir Druse después de actualizar.
+        // Se retrocede la marca de versión para que el archivo parezca de la
+        // versión anterior, que es de donde vienen los perfiles que hay que
+        // migrar. Sin esto no se estaría probando la migración, porque el paso
+        // que toca datos se aplica una sola vez y ya se aplicó al crear la base.
+        await SetSchemaVersionAsync(8);
+
+        // Y ahora sí: volver a migrar es lo que pasa al abrir Druse después de
+        // actualizar.
         await _database.MigrateAsync(CancellationToken.None);
 
         var migrado = await _store.FindAsync(sqlServer.Id, CancellationToken.None);
@@ -107,6 +114,44 @@ public sealed class ConnectionProfileStoreTests : IDisposable
         // cifrar sin comprobar, así que subirles el listón sería cambiarles la
         // conexión por su cuenta.
         Assert.Equal(SslMode.Require, intacto?.SslMode);
+    }
+
+    /// <summary>
+    /// La migración de datos se aplica **una vez**, no en cada arranque.
+    ///
+    /// El `UPDATE` que mueve los perfiles de SQL Server a «certificado y nombre»
+    /// corría siempre: quien después eligiera a conciencia solo cifrado se lo
+    /// encontraba cambiado de vuelta al abrir Druse la próxima vez. Una migración
+    /// que se repite deja de ser una migración y pasa a ser una opinión.
+    /// </summary>
+    /// <summary>Deja el archivo diciendo que es de una versión anterior.</summary>
+    private async Task SetSchemaVersionAsync(int version)
+    {
+        await using var connection = await _database.OpenAsync(CancellationToken.None);
+        await using var command = connection.CreateCommand();
+
+        command.CommandText = $"PRAGMA user_version = {version};";
+
+        await command.ExecuteNonQueryAsync(CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task LaMigracionDeDatosNoSeRepiteEnCadaArranque()
+    {
+        // Este archivo ya está migrado: lo hizo el constructor de la prueba.
+        var elegido = Profile("Con cifrado a secas") with
+        {
+            Engine = DatabaseEngine.SqlServer,
+            SslMode = SslMode.Require,
+        };
+
+        await _store.SaveAsync(elegido, CancellationToken.None);
+
+        await _database.MigrateAsync(CancellationToken.None);
+
+        var recuperado = await _store.FindAsync(elegido.Id, CancellationToken.None);
+
+        Assert.Equal(SslMode.Require, recuperado?.SslMode);
     }
 
     [Fact]

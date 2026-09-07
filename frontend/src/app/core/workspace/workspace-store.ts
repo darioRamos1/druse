@@ -22,10 +22,12 @@ import {
   formatPreferences,
   parseFormatSettings,
 } from './format-settings';
+import { ENGINE_NAMES } from '../../shared/ui/engine-badge/engine-badge';
 import {
   ConnectionForm,
   ConnectionSummary,
   DatabaseColumn,
+  DatabaseEngine,
   DatabaseObject,
   ExplorerNode,
   QueryHistoryEntry,
@@ -3359,8 +3361,10 @@ function validationFieldMessage(field: string): string | null {
 }
 
 function describeVersion(engine: string, serverVersion: string): string {
-  const name =
-    engine === 'postgresql' ? 'PostgreSQL' : engine === 'sqlserver' ? 'SQL Server' : 'MySQL';
+  // Del mapa que ya existe, y no de un condicional propio: escrito a mano, todo
+  // lo que no fuera PostgreSQL o SQL Server terminaba llamándose «MySQL», así que
+  // una conexión Informix decía «MySQL 14» en la barra de estado.
+  const name = ENGINE_NAMES[engine as DatabaseEngine] ?? engine;
 
   // La versión llega como «18.0.0»; en la barra de estado basta la mayor.
   const major = serverVersion.split('.')[0];

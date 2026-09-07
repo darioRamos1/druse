@@ -1,4 +1,6 @@
-﻿using Druse.Platform.Abstractions;
+﻿using System.Globalization;
+
+using Druse.Platform.Abstractions;
 using Microsoft.Data.Sqlite;
 
 namespace Druse.Persistence.Sqlite;
@@ -64,17 +66,36 @@ public sealed class DruseDatabase
         return connection;
     }
 
+    /// <summary>Versión del esquema que escribe esta compilación.</summary>
+    private const int SchemaVersion = 9;
+
     /// <summary>
-    /// Crea el esquema si falta.
+    /// Crea el esquema si falta y aplica lo que le falte al archivo del usuario.
     ///
     /// Se usa SQL explícito en lugar de migraciones de un ORM: son un puñado de
     /// tablas y el control sobre el archivo del usuario debe ser total.
+    ///
+    /// **Dos reglas, y las dos importan:**
+    ///
+    /// - Todo va dentro de **una transacción**. A mitad de camino el archivo
+    ///   tendría unas tablas sí y otras no, y el siguiente arranque encontraría un
+    ///   estado que ningún paso esperaba.
+    /// - Lo que **toca datos** se aplica una sola vez, mirando `user_version`. El
+    ///   esquema en sí es idempotente —`CREATE TABLE IF NOT EXISTS`— y puede
+    ///   repetirse sin daño, pero un `UPDATE` que corrija valores no: repetirlo en
+    ///   cada arranque le deshace al usuario lo que haya cambiado a mano. Pasó con
+    ///   el modo de cifrado de SQL Server, que volvía a `VerifyFull` cada vez que
+    ///   se abría Druse.
     /// </summary>
     public async Task MigrateAsync(CancellationToken cancellationToken)
     {
         _paths.EnsureCreated();
 
         await using var connection = await OpenAsync(cancellationToken);
+
+        var previous = await ReadVersionAsync(connection, cancellationToken);
+
+        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
 
         await ExecuteAsync(connection, """
             CREATE TABLE IF NOT EXISTS connection_profiles (
@@ -347,6 +368,8 @@ public sealed class DruseDatabase
                 ON jobs (started_at_utc DESC);
             """, cancellationToken);
 
+        // --- Pasos que tocan datos: una sola vez ---------------------------
+        //
         // En SQL Server, «exigir cifrado» valía además por verificar el
         // certificado: era el único modo que ponía `TrustServerCertificate` en
         // falso. Desde la 1.1.1, `Require` significa lo mismo en los cuatro
@@ -361,15 +384,42 @@ public sealed class DruseDatabase
         // Los números son los del enumerado —`DatabaseEngine.SqlServer` es 2,
         // `SslMode.Require` es 2 y `SslMode.VerifyFull` es 4— porque así se
         // guardan, y ninguno se reordena nunca por esta misma razón.
-        await ExecuteAsync(connection, """
-            UPDATE connection_profiles
-            SET ssl_mode = 4
-            WHERE engine = 2 AND ssl_mode = 2;
-            """, cancellationToken);
+        if (previous < 9)
+        {
+            await ExecuteAsync(connection, """
+                UPDATE connection_profiles
+                SET ssl_mode = 4
+                WHERE engine = 2 AND ssl_mode = 2;
+                """, cancellationToken);
+        }
 
-        // Marca de versión del esquema, para poder migrar más adelante sin
-        // adivinar en qué estado está el archivo de cada usuario.
-        await ExecuteAsync(connection, "PRAGMA user_version = 9;", cancellationToken);
+        // La marca de versión va dentro de la misma transacción: si algo falla,
+        // el archivo se queda como estaba **y diciendo la versión que era**.
+        await ExecuteAsync(
+            connection,
+            $"PRAGMA user_version = {SchemaVersion.ToString(CultureInfo.InvariantCulture)};",
+            cancellationToken);
+
+        await transaction.CommitAsync(cancellationToken);
+    }
+
+    /// <summary>
+    /// Qué versión del esquema tiene el archivo que hay delante.
+    ///
+    /// Cero es un archivo nuevo, o uno de antes de que existiera la marca: en los
+    /// dos casos se le aplica todo, que es lo correcto.
+    /// </summary>
+    private static async Task<int> ReadVersionAsync(
+        SqliteConnection connection,
+        CancellationToken cancellationToken)
+    {
+        await using var command = connection.CreateCommand();
+
+        command.CommandText = "PRAGMA user_version;";
+
+        var value = await command.ExecuteScalarAsync(cancellationToken);
+
+        return value is long version ? (int)version : 0;
     }
 
     /// <summary>

@@ -566,6 +566,15 @@ describe('WorkspaceStore', () => {
       expect(status?.database).toBe('druse_test');
     });
 
+    /// Todo lo que no era PostgreSQL ni SQL Server se llamaba «MySQL» en la barra
+    /// de estado, Informix incluido: el nombre se escribía con un condicional de
+    /// tres ramas en vez de leerlo de la lista que ya existía.
+    it('la barra de estado llama a cada motor por su nombre', async () => {
+      await store.connect({ ...form, engine: 'informixsqli' });
+
+      expect(store.session()?.engineVersion).toBe('Informix 18');
+    });
+
     it('liga la pestaña inicial a la primera conexión activada', async () => {
       await store.connect(form);
 

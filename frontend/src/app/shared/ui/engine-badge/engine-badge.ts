@@ -10,7 +10,14 @@ const ENGINE_LABELS: Readonly<Record<DatabaseEngine, string>> = {
   informixsqli: 'IX',
 };
 
-const ENGINE_NAMES: Readonly<Record<DatabaseEngine, string>> = {
+/**
+ * Cómo se llama cada motor cuando hay que escribirlo entero.
+ *
+ * Se exporta porque **es la única lista**: la barra de estado lo escribía por su
+ * cuenta con un condicional de tres ramas y todo lo que no fuera PostgreSQL o SQL
+ * Server acababa llamándose «MySQL», Informix incluido.
+ */
+export const ENGINE_NAMES: Readonly<Record<DatabaseEngine, string>> = {
   postgresql: 'PostgreSQL',
   sqlserver: 'SQL Server',
   mysql: 'MySQL',
