@@ -1,4 +1,4 @@
-using System.Text;
+﻿using System.Text;
 using Druse.Application.Abstractions;
 using Druse.Infrastructure.Importing;
 
@@ -21,6 +21,38 @@ public sealed class CsvTableFileReaderTests
         using var stream = new MemoryStream(Encoding.UTF8.GetBytes(csv));
 
         return await reader.ReadAsync(stream, options ?? new ImportOptions(), 1000, CancellationToken.None);
+    }
+
+    /// <summary>
+    /// El tope corta **mientras se lee**, no después.
+    ///
+    /// Antes se traía el archivo entero a memoria y se recortaba al final: con un
+    /// CSV de dos gigas el proceso se caía antes de llegar al límite, que es justo
+    /// lo que pasa cuando alguien se equivoca de archivo al importar.
+    /// </summary>
+    [Fact]
+    public async Task ElTopeDeFilasCortaYLoDice()
+    {
+        var muchas = string.Join(string.Empty, Enumerable.Range(1, 50).Select(fila => $"{fila},fila {fila}\n"));
+
+        var reader = new CsvTableFileReader();
+        using var stream = new MemoryStream(Encoding.UTF8.GetBytes("id,nombre\n" + muchas));
+
+        var file = await reader.ReadAsync(stream, new ImportOptions(), 5, CancellationToken.None);
+
+        Assert.Equal(5, file.Rows.Count);
+
+        // Y se dice: un archivo recortado en silencio se lee como si eso fuera
+        // todo lo que traía.
+        Assert.True(file.Truncated);
+    }
+
+    [Fact]
+    public async Task SiCabeEnteroNoSeMarcaRecortado()
+    {
+        var file = await LeerAsync("id,nombre\n1,Ana\n2,Bea\n");
+
+        Assert.False(file.Truncated);
     }
 
     [Fact]

@@ -1,4 +1,4 @@
-namespace Druse.Application.Abstractions;
+﻿namespace Druse.Application.Abstractions;
 
 /// <summary>Formatos que se pueden importar. Los mismos a los que se exporta.</summary>
 public enum ImportFormat
@@ -41,6 +41,16 @@ public sealed record TableFile
 
     /// <summary>Filas leídas. `null` en una celda es un nulo, no una cadena vacía.</summary>
     public required IReadOnlyList<IReadOnlyList<string?>> Rows { get; init; }
+
+    /// <summary>
+    /// El archivo tenía más filas de las que se leyeron.
+    ///
+    /// Se corta **mientras se lee**, no después: un archivo de dos gigas no cabe
+    /// en memoria, y leerlo entero para quedarse con las primeras mil es la forma
+    /// de tumbar el proceso justo cuando el usuario está probando una
+    /// importación.
+    /// </summary>
+    public bool Truncated { get; init; }
 }
 
 /// <summary>

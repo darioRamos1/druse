@@ -40,26 +40,52 @@ public sealed class CsvTableFileReader : ITableFileReader
         // BOM manda el BOM, que es lo que escribe el propio exportador.
         using var reader = new StreamReader(file, encoding, detectEncodingFromByteOrderMarks: true);
 
-        var texto = await reader.ReadToEndAsync(cancellationToken);
-        var filas = Parse(texto, options.Delimiter);
+        // Se lee fila a fila y se corta al llegar al tope. Antes se traía el
+        // archivo entero a memoria y se recortaba después: con un CSV de dos
+        // gigas, el proceso se caía antes de mirar el límite, y eso es justo lo
+        // que hace un usuario probando una importación que se equivocó de
+        // archivo.
+        List<string>? cabeceras = null;
+        var filas = new List<IReadOnlyList<string?>>();
+        var ancho = 0;
+        var truncado = false;
 
-        if (filas.Count == 0)
+        await foreach (var fila in CsvRowReader.ReadAsync(reader, options.Delimiter, cancellationToken))
+        {
+            if (options.HasHeaders && cabeceras is null)
+            {
+                cabeceras = [.. fila.Select(Nombre)];
+                ancho = cabeceras.Count;
+
+                continue;
+            }
+
+            if (filas.Count >= maxRows)
+            {
+                // Se sabe que hay más porque se ha llegado hasta aquí, y se deja
+                // de leer en el acto.
+                truncado = true;
+                break;
+            }
+
+            ancho = Math.Max(ancho, fila.Count);
+            filas.Add(fila);
+        }
+
+        if (cabeceras is null && ancho == 0)
         {
             return new TableFile { Columns = [], Rows = [] };
         }
 
-        var columnas = options.HasHeaders
-            ? filas[0].Select((valor, indice) => Nombre(valor, indice)).ToList()
-            : Enumerable.Range(1, filas.Max(fila => fila.Count))
-                .Select(indice => $"Columna {indice}")
-                .ToList();
-
-        var cuerpo = filas.Skip(options.HasHeaders ? 1 : 0).Take(maxRows);
+        // Sin cabeceras, las columnas se nombran por su posición, y el ancho es el
+        // de la fila más larga de las que se leyeron.
+        var columnas = cabeceras ?? [.. Enumerable.Range(1, ancho).Select(indice => $"Columna {indice}")];
 
         return new TableFile
         {
             Columns = columnas,
-            Rows = [.. cuerpo.Select(fila => Ajustar(fila, columnas.Count, options.NullText))],
+            Rows = [.. filas.Select(fila => Ajustar(fila, columnas.Count, options.NullText))],
+            Truncated = truncado,
         };
     }
 

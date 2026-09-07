@@ -1,3 +1,5 @@
+﻿using System.IO.Compression;
+
 using ClosedXML.Excel;
 using Druse.Application.Abstractions;
 
@@ -13,6 +15,29 @@ namespace Druse.Infrastructure.Importing;
 /// </summary>
 public sealed class XlsxTableFileReader : ITableFileReader
 {
+    /// <summary>
+    /// Cuánto puede ocupar el libro una vez descomprimido.
+    ///
+    /// Un `.xlsx` es un zip, y un zip puede prometer poco y traer mucho: dos
+    /// megas de archivo con veinte gigas dentro es un ataque conocido y viejo.
+    /// Aquí no hace falta ni mala intención —una hoja con un millón de filas
+    /// comprime durísimo— y el resultado es el mismo: ClosedXML lo carga entero
+    /// en memoria y el proceso se cae.
+    ///
+    /// El tope se mira **antes de abrir el libro**, que es el único momento en
+    /// que sirve de algo.
+    /// </summary>
+    private const long MaxUncompressedBytes = 256L * 1024 * 1024;
+
+    /// <summary>
+    /// Cuántas veces puede crecer al descomprimirse antes de considerarlo un
+    /// archivo preparado para hacer daño.
+    ///
+    /// Una hoja normal comprime bien —texto repetido, mucho XML— pero no mil
+    /// veces. Se deja margen de sobra: lo que se busca cazar es lo absurdo.
+    /// </summary>
+    private const int MaxCompressionRatio = 200;
+
     public ImportFormat Format => ImportFormat.Xlsx;
 
     public Task<TableFile> ReadAsync(
@@ -23,6 +48,8 @@ public sealed class XlsxTableFileReader : ITableFileReader
     {
         ArgumentNullException.ThrowIfNull(file);
         ArgumentNullException.ThrowIfNull(options);
+
+        EnsureReasonable(file);
 
         using var workbook = new XLWorkbook(file);
         var hoja = workbook.Worksheets.FirstOrDefault();
@@ -55,6 +82,65 @@ public sealed class XlsxTableFileReader : ITableFileReader
             .ToList();
 
         return Task.FromResult(new TableFile { Columns = columnas, Rows = cuerpo });
+    }
+
+    /// <summary>
+    /// Mira el índice del zip antes de dejar que nadie lo abra.
+    ///
+    /// Los tamaños los declara el propio archivo y podrían mentir, y aun así esta
+    /// comprobación vale: lo que se está evitando es cargar en memoria algo
+    /// desproporcionado, y un archivo que **declara** veinte gigas ya no hay que
+    /// abrirlo. Un zip que mintiera hacia abajo se caería más adelante, donde ya
+    /// hay un límite de filas.
+    ///
+    /// Si el flujo no se puede rebobinar no se comprueba nada en lugar de fallar:
+    /// quien lea después se encontrará el archivo tal cual, y el aviso habría sido
+    /// peor que el silencio.
+    /// </summary>
+    private static void EnsureReasonable(Stream file)
+    {
+        if (!file.CanSeek)
+        {
+            return;
+        }
+
+        var comprimido = file.Length;
+        long descomprimido = 0;
+
+        try
+        {
+            using (var zip = new ZipArchive(file, ZipArchiveMode.Read, leaveOpen: true))
+            {
+                foreach (var entry in zip.Entries)
+                {
+                    descomprimido += entry.Length;
+
+                    if (descomprimido > MaxUncompressedBytes)
+                    {
+                        throw new InvalidOperationException(
+                            "El libro ocupa más de 256 MB una vez descomprimido y no se abre: " +
+                            "cargarlo entero en memoria tumbaría Druse. Pásalo a CSV o pártelo.");
+                    }
+                }
+            }
+        }
+        catch (InvalidDataException)
+        {
+            // No es un zip válido. Que lo diga quien sabe leer libros, con su
+            // mensaje: aquí solo se estaba midiendo.
+            file.Position = 0;
+
+            return;
+        }
+
+        file.Position = 0;
+
+        if (comprimido > 0 && descomprimido / comprimido > MaxCompressionRatio)
+        {
+            throw new InvalidOperationException(
+                "El libro se expande más de doscientas veces al descomprimirlo. No se abre: " +
+                "un archivo así no se hace sin querer.");
+        }
     }
 
     private static string Nombre(string valor, int indice) =>
