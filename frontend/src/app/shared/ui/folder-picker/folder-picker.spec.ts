@@ -64,9 +64,7 @@ class FakeGateway implements Partial<ApplicationGateway> {
     }
 
     // Como la API: sin extensiones pedidas no viaja ningún archivo.
-    return of(
-      options?.files?.length ? escritorio : { ...escritorio, files: [] },
-    );
+    return of(options?.files?.length ? escritorio : { ...escritorio, files: [] });
   }
 
   resolveFolderTarget(folder: string, name: string): Observable<FolderTarget> {

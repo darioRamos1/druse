@@ -52,7 +52,10 @@
                   <span>{{ percent }}%</span>
                 }
               </div>
-              <progress [value]="updates.downloaded()" [max]="updates.total() || undefined"></progress>
+              <progress
+                [value]="updates.downloaded()"
+                [max]="updates.total() || undefined"
+              ></progress>
             </div>
           }
           @case ('installing') {
@@ -64,8 +67,16 @@
           }
         }
 
-        @if (info.updatesEnabled && updates.state() !== 'error' && updates.state() !== 'checking' && updates.state() !== 'downloading' && updates.state() !== 'installing') {
-          <button type="button" class="link" (click)="updates.check()">Buscar actualizaciones</button>
+        @if (
+          info.updatesEnabled &&
+          updates.state() !== 'error' &&
+          updates.state() !== 'checking' &&
+          updates.state() !== 'downloading' &&
+          updates.state() !== 'installing'
+        ) {
+          <button type="button" class="link" (click)="updates.check()">
+            Buscar actualizaciones
+          </button>
         }
       } @else {
         @if (updates.state() === 'error') {
@@ -83,13 +94,18 @@
         enseñarlo: los registros van saneados desde que se escriben.
       -->
       <div class="diagnostics">
-        <button type="button" class="secondary" [disabled]="savingDiagnostics()" (click)="saveDiagnostics()">
+        <button
+          type="button"
+          class="secondary"
+          [disabled]="savingDiagnostics()"
+          (click)="saveDiagnostics()"
+        >
           {{ savingDiagnostics() ? 'Preparando…' : 'Guardar diagnóstico…' }}
         </button>
 
         <p class="section__hint">
-          Los registros de Druse y la versión, en un zip. No lleva contraseñas, ni
-          las consultas que ejecutas, ni los datos de tus tablas.
+          Los registros de Druse y la versión, en un zip. No lleva contraseñas, ni las consultas que
+          ejecutas, ni los datos de tus tablas.
         </p>
 
         @if (diagnosticsMessage(); as mensaje) {
@@ -127,8 +143,8 @@
     <section class="section">
       <h3 class="section__title">Tamaño</h3>
       <p class="section__hint">
-        La interfaz se agranda entera —texto, barras e iconos a la vez—, así que nada se sale de
-        su sitio. El editor lleva su propio cuerpo de letra.
+        La interfaz se agranda entera —texto, barras e iconos a la vez—, así que nada se sale de su
+        sitio. El editor lleva su propio cuerpo de letra.
       </p>
 
       <label class="field">
@@ -165,8 +181,8 @@
     <section class="section">
       <h3 class="section__title">Color de acento</h3>
       <p class="section__hint">
-        Botones, selección, foco y el cursor del editor. El texto que va encima se elige solo
-        según el contraste.
+        Botones, selección, foco y el cursor del editor. El texto que va encima se elige solo según
+        el contraste.
       </p>
 
       <div class="swatches">
@@ -201,8 +217,8 @@
     <section class="section">
       <h3 class="section__title">Tono de la interfaz</h3>
       <p class="section__hint">
-        Tiñe paneles, bordes y texto sin tocar su luminosidad, así que la interfaz sigue
-        leyéndose igual. Los colores de estado no cambian: un error sigue siendo rojo.
+        Tiñe paneles, bordes y texto sin tocar su luminosidad, así que la interfaz sigue leyéndose
+        igual. Los colores de estado no cambian: un error sigue siendo rojo.
       </p>
 
       <div class="swatches">
@@ -237,8 +253,8 @@
     <section class="section">
       <h3 class="section__title">Fondo del editor</h3>
       <p class="section__hint">
-        Una imagen detrás del código, atenuada. La imagen se guarda con la aplicación, no en la
-        base de preferencias.
+        Una imagen detrás del código, atenuada. La imagen se guarda con la aplicación, no en la base
+        de preferencias.
       </p>
 
       @if (background(); as image) {
@@ -255,7 +271,11 @@
               <span class="preview__line">
                 <span class="preview__gutter"></span>
                 @for (token of line; track $index) {
-                  <span class="preview__token" [class]="'is-' + token.kind" [style.width.%]="token.width"></span>
+                  <span
+                    class="preview__token"
+                    [class]="'is-' + token.kind"
+                    [style.width.%]="token.width"
+                  ></span>
                 }
               </span>
             }
@@ -346,9 +366,7 @@
           Centrar y volver al tamaño original
         </button>
       } @else {
-        <button type="button" class="secondary" (click)="chooseBackground()">
-          Elegir imagen…
-        </button>
+        <button type="button" class="secondary" (click)="chooseBackground()">Elegir imagen…</button>
       }
 
       @if (problem(); as message) {

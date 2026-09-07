@@ -140,7 +140,10 @@ describe('TransferStore', () => {
   it('sin estimación no inventa un porcentaje', async () => {
     gateway.statuses = [running({ rowsEstimated: undefined, rowsCopied: 340 })];
 
-    await store.start({ ...request, source: { ...request.source, approximateRowCount: undefined } });
+    await store.start({
+      ...request,
+      source: { ...request.source, approximateRowCount: undefined },
+    });
     await sondear();
 
     expect(store.overall()).toBeNull();

@@ -42,7 +42,14 @@ describe('apariencia', () => {
         editorFontSize: 16,
         accent: '#3ddc97',
         tint: '#a89272',
-        background: { name: 'foto.jpg', opacity: 24, fit: 'scale' as const, scale: 140, x: 20, y: 80 },
+        background: {
+          name: 'foto.jpg',
+          opacity: 24,
+          fit: 'scale' as const,
+          scale: 140,
+          x: 20,
+          y: 80,
+        },
       };
 
       expect(parseAppearance(appearancePreferences(appearance))).toEqual(appearance);
@@ -94,7 +101,9 @@ describe('apariencia', () => {
     });
 
     it('la escala solo se escribe cuando no es la de partida', () => {
-      expect(appearanceVariables({ ...DEFAULT_APPEARANCE, scale: 100 })['--dr-scale']).toBeUndefined();
+      expect(
+        appearanceVariables({ ...DEFAULT_APPEARANCE, scale: 100 })['--dr-scale'],
+      ).toBeUndefined();
       expect(appearanceVariables({ ...DEFAULT_APPEARANCE, scale: 125 })['--dr-scale']).toBe('1.25');
     });
   });
@@ -114,22 +123,24 @@ describe('apariencia', () => {
     });
 
     it('escribe el tamaño solo cuando lo decide el usuario', () => {
-      expect(backgroundStyle({ ...image, fit: 'scale', scale: 140 }, 'x')['--dr-editor-background-size']).toBe(
-        '140% auto',
-      );
-      expect(backgroundStyle({ ...image, fit: 'tile', scale: 40 }, 'x')['--dr-editor-background-repeat']).toBe(
-        'repeat',
-      );
+      expect(
+        backgroundStyle({ ...image, fit: 'scale', scale: 140 }, 'x')['--dr-editor-background-size'],
+      ).toBe('140% auto');
+      expect(
+        backgroundStyle({ ...image, fit: 'tile', scale: 40 }, 'x')['--dr-editor-background-repeat'],
+      ).toBe('repeat');
     });
 
     it('lleva el encuadre a la posición del fondo', () => {
-      expect(backgroundStyle({ ...image, x: 10, y: 90 }, 'x')['--dr-editor-background-position']).toBe(
-        '10% 90%',
-      );
+      expect(
+        backgroundStyle({ ...image, x: 10, y: 90 }, 'x')['--dr-editor-background-position'],
+      ).toBe('10% 90%');
     });
 
     it('la intensidad viaja como fracción, que es lo que entiende la opacidad', () => {
-      expect(backgroundStyle({ ...image, opacity: 25 }, 'x')['--dr-editor-background-opacity']).toBe('0.25');
+      expect(
+        backgroundStyle({ ...image, opacity: 25 }, 'x')['--dr-editor-background-opacity'],
+      ).toBe('0.25');
     });
   });
 });

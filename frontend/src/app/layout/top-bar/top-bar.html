@@ -22,7 +22,12 @@
     <app-icon name="save" [size]="13" />
     Guardar
   </button>
-  <button type="button" class="btn btn--file btn--save-as" title="Guardar como (Ctrl+Shift+S)" (click)="saveSqlAs.emit()">
+  <button
+    type="button"
+    class="btn btn--file btn--save-as"
+    title="Guardar como (Ctrl+Shift+S)"
+    (click)="saveSqlAs.emit()"
+  >
     Guardar como…
   </button>
 </div>

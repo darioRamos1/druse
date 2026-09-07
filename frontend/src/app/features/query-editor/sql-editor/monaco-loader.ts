@@ -92,11 +92,7 @@ export class MonacoLoader {
             resolve(window.monaco);
           },
           (error: unknown) => {
-            reject(
-              new Error(
-                `No se pudieron cargar los módulos del editor: ${describe(error)}`,
-              ),
-            );
+            reject(new Error(`No se pudieron cargar los módulos del editor: ${describe(error)}`));
           },
         );
       };

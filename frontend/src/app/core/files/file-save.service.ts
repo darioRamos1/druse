@@ -24,8 +24,7 @@ import { DesktopHost } from '../application-gateway/desktop-host';
  * navegador el archivo se descarga y nadie sabe dónde acaba.
  */
 export type SaveOutcome =
-  | { readonly saved: false }
-  | { readonly saved: true; readonly path: string | null };
+  { readonly saved: false } | { readonly saved: true; readonly path: string | null };
 
 /**
  * Cómo contarle a alguien dónde quedó su archivo.

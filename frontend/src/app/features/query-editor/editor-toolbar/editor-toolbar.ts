@@ -173,7 +173,11 @@ export class EditorToolbar {
       label: 'Reparto de líneas',
       options: [
         { value: 'standard', label: 'Estándar', hint: 'Cada elemento en su línea, sangrado' },
-        { value: 'tabular', label: 'Tabular', hint: 'Palabra clave a la izquierda y valores en columna' },
+        {
+          value: 'tabular',
+          label: 'Tabular',
+          hint: 'Palabra clave a la izquierda y valores en columna',
+        },
       ],
     },
     {

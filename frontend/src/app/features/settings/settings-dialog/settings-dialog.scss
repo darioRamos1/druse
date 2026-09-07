@@ -209,22 +209,16 @@
   /* La marca de elegido va fuera del círculo: dentro taparía justo el color que
      hay que juzgar. */
   &.is-active {
-    box-shadow: 0 0 0 2px var(--dr-surface-dialog), 0 0 0 4px var(--dr-accent);
+    box-shadow:
+      0 0 0 2px var(--dr-surface-dialog),
+      0 0 0 4px var(--dr-accent);
   }
 
   &--custom {
     display: grid;
     place-items: center;
     overflow: hidden;
-    background: conic-gradient(
-      from 90deg,
-      #f2686b,
-      #f0b429,
-      #3ddc97,
-      #6c8bff,
-      #9a7cff,
-      #f2686b
-    );
+    background: conic-gradient(from 90deg, #f2686b, #f0b429, #3ddc97, #6c8bff, #9a7cff, #f2686b);
 
     input {
       width: 200%;

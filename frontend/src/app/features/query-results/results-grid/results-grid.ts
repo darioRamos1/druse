@@ -440,7 +440,10 @@ export class ResultsGrid {
       return;
     }
 
-    this.setWidth(this.resizing.column, this.resizing.startWidth + (event.clientX - this.resizing.startX));
+    this.setWidth(
+      this.resizing.column,
+      this.resizing.startWidth + (event.clientX - this.resizing.startX),
+    );
   }
 
   /**
@@ -508,9 +511,7 @@ export class ResultsGrid {
     const definition = this.resultSet().columns[column];
 
     return (
-      (definition && this.customWidths()[definition.name]) ??
-      definition?.width ??
-      MIN_COLUMN_WIDTH
+      (definition && this.customWidths()[definition.name]) ?? definition?.width ?? MIN_COLUMN_WIDTH
     );
   }
 
@@ -633,9 +634,7 @@ export class ResultsGrid {
   /** Hay algo que copiar. Lo consulta también la barra del panel. */
   readonly hasSelection = computed(
     () =>
-      this.selectedColumns().length > 0 ||
-      this.chosenRows().length > 0 ||
-      this.bounds() !== null,
+      this.selectedColumns().length > 0 || this.chosenRows().length > 0 || this.bounds() !== null,
   );
 
   /**

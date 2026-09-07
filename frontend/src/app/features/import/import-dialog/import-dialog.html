@@ -59,11 +59,14 @@
     @if (preview(); as resumen) {
       <section class="preview">
         <h3 class="preview__title">
-          {{ resumen.rowCount }} {{ resumen.rowCount === 1 ? 'fila' : 'filas' }} listas para insertar
+          {{ resumen.rowCount }} {{ resumen.rowCount === 1 ? 'fila' : 'filas' }} listas para
+          insertar
         </h3>
 
         <table class="mapping">
-          <caption class="sr-only">Correspondencia entre las columnas del archivo y las de la tabla</caption>
+          <caption class="sr-only">
+            Correspondencia entre las columnas del archivo y las de la tabla
+          </caption>
           <thead>
             <tr>
               <th scope="col">Columna del archivo</th>
@@ -83,8 +86,8 @@
         @if (resumen.missingRequired.length > 0) {
           <p class="warn">
             Sin valor y obligatorias en la tabla:
-            <strong>{{ resumen.missingRequired.join(', ') }}</strong>. El motor rechazará el lote
-            salvo que tengan un valor por defecto.
+            <strong>{{ resumen.missingRequired.join(', ') }}</strong
+            >. El motor rechazará el lote salvo que tengan un valor por defecto.
           </p>
         }
 

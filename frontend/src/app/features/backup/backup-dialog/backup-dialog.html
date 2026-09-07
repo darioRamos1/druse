@@ -78,7 +78,10 @@
           @if (progress.warnings.length > 0) {
             <ul class="warnings">
               @for (warning of progress.warnings; track warning.subject + warning.message) {
-                <li><strong>{{ warning.subject }}</strong>: {{ warning.message }}</li>
+                <li>
+                  <strong>{{ warning.subject }}</strong
+                  >: {{ warning.message }}
+                </li>
               }
             </ul>
           }
@@ -140,7 +143,9 @@
                       <app-icon name="save" />
                       <span class="name">{{ profile.name }}</span>
                       @if (profile.lastRunAtUtc) {
-                        <span class="when">último uso {{ profile.lastRunAtUtc | date: 'short' }}</span>
+                        <span class="when"
+                          >último uso {{ profile.lastRunAtUtc | date: 'short' }}</span
+                        >
                       } @else {
                         <span class="when">sin lanzar todavía</span>
                       }
@@ -193,9 +198,7 @@
               <p class="error">{{ error }}</p>
             }
 
-            <p class="hint">
-              {{ selectedCount() }} de {{ candidates().length }} tablas marcadas.
-            </p>
+            <p class="hint">{{ selectedCount() }} de {{ candidates().length }} tablas marcadas.</p>
 
             <div class="tree dr-scroll-fade">
               @for (schema of schemas(); track schema) {
@@ -249,9 +252,15 @@
                   />
                   <span>
                     @switch (mode) {
-                      @case ('StructureOnly') { Solo estructura }
-                      @case ('StructureAndData') { Estructura y datos }
-                      @default { Solo datos }
+                      @case ('StructureOnly') {
+                        Solo estructura
+                      }
+                      @case ('StructureAndData') {
+                        Estructura y datos
+                      }
+                      @default {
+                        Solo datos
+                      }
                     }
                   </span>
                 </label>
@@ -259,8 +268,8 @@
             </fieldset>
 
             <p class="hint">
-              Y aquí lo que se sale de esa regla. Es el caso de siempre: todo sin datos,
-              salvo las tablas de catálogo.
+              Y aquí lo que se sale de esa regla. Es el caso de siempre: todo sin datos, salvo las
+              tablas de catálogo.
             </p>
 
             <div class="tree dr-scroll-fade">
@@ -369,8 +378,8 @@
             </label>
 
             <p class="hint">
-              Lo escribe el proceso local, no el navegador: un respaldo de varios gigabytes
-              no cabe dos veces en memoria.
+              Lo escribe el proceso local, no el navegador: un respaldo de varios gigabytes no cabe
+              dos veces en memoria.
             </p>
           }
 
@@ -388,8 +397,12 @@
                 <dt>Forma</dt>
                 <dd>
                   {{ layout() === 'SingleFile' ? 'Un archivo' : 'Carpeta' }}
-                  @if (compress()) { · comprimida }
-                  @if (dataFormat() === 'Csv') { · datos en CSV }
+                  @if (compress()) {
+                    · comprimida
+                  }
+                  @if (dataFormat() === 'Csv') {
+                    · datos en CSV
+                  }
                 </dd>
               </div>
               <div class="wide">
@@ -399,20 +412,19 @@
             </dl>
 
             @if (exceptions().length > 0) {
-              <p class="hint">
-                {{ exceptions().length }} tabla(s) se salen de la regla general:
-              </p>
+              <p class="hint">{{ exceptions().length }} tabla(s) se salen de la regla general:</p>
               <ul class="warnings">
                 @for (exception of exceptions(); track exception.key) {
-                  <li><strong>{{ exception.key }}</strong>: {{ modeLabel(exception.mode) }}</li>
+                  <li>
+                    <strong>{{ exception.key }}</strong
+                    >: {{ modeLabel(exception.mode) }}
+                  </li>
                 }
               </ul>
             }
 
             @if (!outputValid()) {
-              <p class="error">
-                Los datos en CSV necesitan la salida por carpetas.
-              </p>
+              <p class="error">Los datos en CSV necesitan la salida por carpetas.</p>
             }
 
             <div class="preview">
@@ -426,7 +438,9 @@
               } @else if (store.preview(); as preview) {
                 <pre class="sql">{{ preview.statements.join('\n') }}</pre>
                 @if (preview.truncated) {
-                  <p class="hint">Se enseñan las primeras instrucciones; el respaldo llevará más.</p>
+                  <p class="hint">
+                    Se enseñan las primeras instrucciones; el respaldo llevará más.
+                  </p>
                 }
               }
             </div>

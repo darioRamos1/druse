@@ -1,9 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { HttpClient, provideHttpClient, withInterceptors } from '@angular/common/http';
-import {
-  HttpTestingController,
-  provideHttpClientTesting,
-} from '@angular/common/http/testing';
+import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 
 import { apiInterceptor } from './api-interceptor';
 import { DesktopHost } from './desktop-host';
@@ -27,8 +24,7 @@ describe('DesktopHost', () => {
   it('dentro del escritorio pide el punto de conexión al envoltorio', async () => {
     (window as { __TAURI__?: unknown }).__TAURI__ = {
       core: {
-        invoke: () =>
-          Promise.resolve({ base_url: 'http://127.0.0.1:54321', token: 'secreto' }),
+        invoke: () => Promise.resolve({ base_url: 'http://127.0.0.1:54321', token: 'secreto' }),
       },
     };
 
@@ -109,9 +105,7 @@ describe('apiInterceptor', () => {
     host = TestBed.inject(DesktopHost);
     // El estado real lo fija `initialize`; aquí se inyecta directamente para
     // probar el interceptor sin depender del envoltorio.
-    (host as unknown as { _connection: { set(value: unknown): void } })._connection.set(
-      connection,
-    );
+    (host as unknown as { _connection: { set(value: unknown): void } })._connection.set(connection);
 
     http = TestBed.inject(HttpClient);
     controller = TestBed.inject(HttpTestingController);

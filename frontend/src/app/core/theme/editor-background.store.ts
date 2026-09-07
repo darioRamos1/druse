@@ -107,9 +107,7 @@ export class EditorBackgroundStore {
           reader.addEventListener('load', () =>
             resolve({ name: file.name, source: String(reader.result) }),
           );
-          reader.addEventListener('error', () =>
-            reject(new Error('No se pudo leer la imagen.')),
-          );
+          reader.addEventListener('error', () => reject(new Error('No se pudo leer la imagen.')));
           reader.readAsDataURL(file);
         },
         { once: true },

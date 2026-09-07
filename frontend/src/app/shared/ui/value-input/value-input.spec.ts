@@ -3,10 +3,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { InputKind } from '../../models/workspace';
 import { ValueInput } from './value-input';
 
-async function create(
-  kind: InputKind,
-  value = '',
-): Promise<ComponentFixture<ValueInput>> {
+async function create(kind: InputKind, value = ''): Promise<ComponentFixture<ValueInput>> {
   const fixture = TestBed.createComponent(ValueInput);
 
   fixture.componentRef.setInput('kind', kind);

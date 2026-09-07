@@ -274,7 +274,12 @@
 
             <!-- Lo que solo tiene sentido en algunos motores se dibuja a partir
                  de lo que el proveedor declara, nunca preguntando por el motor. -->
-            @if (!row.locked && (capabilities().supportsIncludedColumns || capabilities().supportsFilter || methods().length > 0)) {
+            @if (
+              !row.locked &&
+              (capabilities().supportsIncludedColumns ||
+                capabilities().supportsFilter ||
+                methods().length > 0)
+            ) {
               <div class="rows__line rows__line--secondary">
                 @if (methods().length > 0) {
                   <select

@@ -52,7 +52,9 @@ export function parseHex(value: string): Rgb | null {
 }
 
 export function toHex({ r, g, b }: Rgb): string {
-  return '#' + [r, g, b].map((v) => clamp(Math.round(v), 0, 255).toString(16).padStart(2, '0')).join('');
+  return (
+    '#' + [r, g, b].map((v) => clamp(Math.round(v), 0, 255).toString(16).padStart(2, '0')).join('')
+  );
 }
 
 /**
@@ -77,12 +79,7 @@ export function rgbToHsl({ r, g, b }: Rgb): Hsl {
   }
 
   const s = d / (1 - Math.abs(2 * l - 1));
-  const h =
-    max === rn
-      ? ((gn - bn) / d) % 6
-      : max === gn
-        ? (bn - rn) / d + 2
-        : (rn - gn) / d + 4;
+  const h = max === rn ? ((gn - bn) / d) % 6 : max === gn ? (bn - rn) / d + 2 : (rn - gn) / d + 4;
 
   return { h: (h * 60 + 360) % 360, s: s * 100, l: l * 100 };
 }

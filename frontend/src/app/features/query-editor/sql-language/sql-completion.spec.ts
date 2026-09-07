@@ -11,7 +11,6 @@ function col(
   return { name, dataType, isPrimaryKey: pk, isNullable: nullable };
 }
 
-
 /**
  * Monaco mínimo para poder probar el proveedor sin cargar el editor entero.
  *
@@ -91,7 +90,11 @@ const multiSchema: SchemaIndex = {
       name: 'usuarios',
       kind: 'table',
       qualified: 'tpublico.usuarios',
-      columns: [col('id', 'int', { pk: true }), col('nombre', 'varchar(200)'), col('correo', 'varchar(200)', { nullable: true })],
+      columns: [
+        col('id', 'int', { pk: true }),
+        col('nombre', 'varchar(200)'),
+        col('correo', 'varchar(200)', { nullable: true }),
+      ],
     },
     {
       schema: 'tpublico',
@@ -164,17 +167,20 @@ describe('autocompletado SQL', () => {
   it('forma el alias con las iniciales de un nombre compuesto', () => {
     const index: SchemaIndex = {
       schemas: ['public'],
-      relations: [{
-        schema: 'public',
-        name: 'order_items',
-        kind: 'table',
-        qualified: 'public.order_items',
-        columns: [],
-      }],
+      relations: [
+        {
+          schema: 'public',
+          name: 'order_items',
+          kind: 'table',
+          qualified: 'public.order_items',
+          columns: [],
+        },
+      ],
     };
 
-    const table = complete('SELECT * FROM ', 'postgresql', index)
-      .find((item) => item.label === 'order_items AS oi');
+    const table = complete('SELECT * FROM ', 'postgresql', index).find(
+      (item) => item.label === 'order_items AS oi',
+    );
 
     expect(table?.insertText).toBe('public.order_items AS ${1:oi}');
   });
@@ -342,13 +348,15 @@ describe('autocompletado SQL', () => {
           esquemas.push(schemaName);
           index = {
             schemas: ['archivo'],
-            relations: [{
-              schema: 'archivo',
-              name: 'expedientes',
-              kind: 'table',
-              qualified: 'archivo.expedientes',
-              columns: [],
-            }],
+            relations: [
+              {
+                schema: 'archivo',
+                name: 'expedientes',
+                kind: 'table',
+                qualified: 'archivo.expedientes',
+                columns: [],
+              },
+            ],
           };
           return Promise.resolve();
         },
@@ -407,7 +415,10 @@ describe('autocompletado SQL', () => {
         column: lines[lines.length - 1].length + 1,
       });
 
-      expect(result.suggestions.map((item: { label: string }) => item.label)).toEqual(['id', 'importe']);
+      expect(result.suggestions.map((item: { label: string }) => item.label)).toEqual([
+        'id',
+        'importe',
+      ]);
       // Con su esquema, para no traer las de la tabla homónima de otro.
       expect(pedidas).toEqual([{ schema: 'tpublico', name: 'facturas' }]);
     });

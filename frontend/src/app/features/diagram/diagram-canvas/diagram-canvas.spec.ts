@@ -75,7 +75,9 @@ describe('DiagramCanvas', () => {
   const nodos = (): HTMLElement[] => [...dom().querySelectorAll<HTMLElement>('.node')];
 
   const cabecera = (name: string): HTMLElement => {
-    const nodo = nodos().find((node) => node.querySelector('.node__name')?.textContent?.trim() === name);
+    const nodo = nodos().find(
+      (node) => node.querySelector('.node__name')?.textContent?.trim() === name,
+    );
 
     if (!nodo) {
       throw new Error(`No se dibujó la tabla ${name}.`);

@@ -1,11 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 
 import { WorkspaceStore } from '../../../core/workspace/workspace-store';
-import {
-  DatabaseEngine,
-  DatabaseObject,
-  RoutineSignature,
-} from '../../../shared/models/workspace';
+import { DatabaseEngine, DatabaseObject, RoutineSignature } from '../../../shared/models/workspace';
 import { ProcedureRunner } from './procedure-runner';
 
 const procedure: DatabaseObject = {
@@ -43,7 +39,9 @@ const store = {
   },
 };
 
-async function create(engine: DatabaseEngine = 'sqlserver'): Promise<ComponentFixture<ProcedureRunner>> {
+async function create(
+  engine: DatabaseEngine = 'sqlserver',
+): Promise<ComponentFixture<ProcedureRunner>> {
   const fixture = TestBed.createComponent(ProcedureRunner);
 
   fixture.componentRef.setInput('procedure', procedure);

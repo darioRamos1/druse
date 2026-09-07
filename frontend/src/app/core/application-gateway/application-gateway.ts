@@ -751,10 +751,7 @@ export abstract class ApplicationGateway {
    * depende del escritorio que haya delante: donde no se pueda, ensenarla es lo
    * que diferencia una funcion terminable a mano de un boton muerto.
    */
-  abstract startCliLogin(
-    command: string,
-    profileId?: string,
-  ): Observable<CliLaunch>;
+  abstract startCliLogin(command: string, profileId?: string): Observable<CliLaunch>;
 
   /**
    * Pregunta al asistente y devuelve la respuesta por trozos.

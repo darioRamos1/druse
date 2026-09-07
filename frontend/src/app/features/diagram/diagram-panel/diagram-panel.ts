@@ -66,8 +66,10 @@ interface DiagramModel {
  * descarte se olvida, que es lo correcto.
  */
 function suggestionKey(suggestion: SuggestedRelation): string {
-  return `${suggestion.fromSchema}.${suggestion.fromTable}.${suggestion.column}` +
-    `->${suggestion.toSchema}.${suggestion.toTable}`;
+  return (
+    `${suggestion.fromSchema}.${suggestion.fromTable}.${suggestion.column}` +
+    `->${suggestion.toSchema}.${suggestion.toTable}`
+  );
 }
 
 /**
@@ -171,9 +173,7 @@ export class DiagramPanel {
     () => this.candidates().length > 0 && this.chosen().size === this.candidates().length,
   );
 
-  protected readonly someChosen = computed(
-    () => this.chosen().size > 0 && !this.allChosen(),
-  );
+  protected readonly someChosen = computed(() => this.chosen().size > 0 && !this.allChosen());
 
   /** Lo que dice el pie mientras se elige. */
   protected readonly chosenLabel = computed(
@@ -284,8 +284,12 @@ export class DiagramPanel {
           name: foreign.referencedTable,
         });
 
-        if (own === key) { near.add(target); }
-        if (target === key) { near.add(own); }
+        if (own === key) {
+          near.add(target);
+        }
+        if (target === key) {
+          near.add(own);
+        }
       }
     }
 
@@ -583,11 +587,7 @@ export class DiagramPanel {
     }
   }
 
-  private async load(
-    connectionId: string,
-    sessionId: string,
-    node: DatabaseObject,
-  ): Promise<void> {
+  private async load(connectionId: string, sessionId: string, node: DatabaseObject): Promise<void> {
     this.loading.set(true);
     this.error.set(null);
     this.graph.set(null);
@@ -624,7 +624,10 @@ export class DiagramPanel {
         this.dismissed.set(new Set(model.dismissed ?? []));
 
         this.choosing.set(false);
-        await this.read(connectionId, tables.filter((table) => this.chosen().has(tableKey(table))));
+        await this.read(
+          connectionId,
+          tables.filter((table) => this.chosen().has(tableKey(table))),
+        );
         return;
       }
 
@@ -639,19 +642,14 @@ export class DiagramPanel {
       this.choosing.set(true);
     } catch (error) {
       this.choosing.set(false);
-      this.error.set(
-        error instanceof Error ? error.message : 'No se pudieron leer las tablas.',
-      );
+      this.error.set(error instanceof Error ? error.message : 'No se pudieron leer las tablas.');
     } finally {
       this.loading.set(false);
     }
   }
 
   /** Lee el catálogo de las tablas elegidas y las dibuja. */
-  private async read(
-    connectionId: string,
-    tables: readonly DatabaseObject[],
-  ): Promise<void> {
+  private async read(connectionId: string, tables: readonly DatabaseObject[]): Promise<void> {
     if (tables.length === 0) {
       return;
     }
@@ -677,9 +675,7 @@ export class DiagramPanel {
 
       this.graph.set(graph);
     } catch (error) {
-      this.error.set(
-        error instanceof Error ? error.message : 'No se pudo leer el catálogo.',
-      );
+      this.error.set(error instanceof Error ? error.message : 'No se pudo leer el catálogo.');
     } finally {
       this.loading.set(false);
     }

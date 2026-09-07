@@ -82,10 +82,7 @@ export function tableKey(table: { schema?: string; name: string }): string {
 }
 
 /** Las columnas que se ven en cada nivel de detalle. */
-export function visibleColumns(
-  detail: TableDetail,
-  level: DetailLevel,
-): readonly DiagramColumn[] {
+export function visibleColumns(detail: TableDetail, level: DetailLevel): readonly DiagramColumn[] {
   if (level === 'collapsed') {
     return [];
   }
@@ -208,7 +205,9 @@ export function layoutDiagram(
   // Una clave foránea apunta al padre; el destino puede no estar en el lienzo.
   for (const key of keys) {
     const detail = details.get(key);
-    if (!detail) { continue; }
+    if (!detail) {
+      continue;
+    }
 
     for (const foreign of detail.structure.foreignKeys) {
       const target = tableKey({
@@ -318,10 +317,14 @@ export function layoutDiagram(
   for (const key of keys) {
     const detail = details.get(key);
     const child = placed.get(key);
-    if (!detail || !child) { continue; }
+    if (!detail || !child) {
+      continue;
+    }
 
     const nullable = new Set(
-      detail.columns.filter((column) => column.isNullable).map((column) => column.name.toLowerCase()),
+      detail.columns
+        .filter((column) => column.isNullable)
+        .map((column) => column.name.toLowerCase()),
     );
 
     for (const foreign of detail.structure.foreignKeys) {
@@ -331,7 +334,9 @@ export function layoutDiagram(
       });
 
       const parent = placed.get(targetKey);
-      if (!parent) { continue; }
+      if (!parent) {
+        continue;
+      }
 
       links.push(
         link({
@@ -353,10 +358,14 @@ export function layoutDiagram(
   // `kind`: el trazo es el mismo problema geométrico, y lo que cambia —color,
   // línea punteada, leyenda— es cosa de quien pinta.
   for (const suggestion of suggestions) {
-    const child = placed.get(tableKey({ schema: suggestion.fromSchema, name: suggestion.fromTable }));
+    const child = placed.get(
+      tableKey({ schema: suggestion.fromSchema, name: suggestion.fromTable }),
+    );
     const parent = placed.get(tableKey({ schema: suggestion.toSchema, name: suggestion.toTable }));
 
-    if (!child || !parent) { continue; }
+    if (!child || !parent) {
+      continue;
+    }
 
     const nullable = child.columns.find(
       (column) => column.name.toLowerCase() === suggestion.column.toLowerCase(),
@@ -390,9 +399,7 @@ function rowY(box: DiagramBox, columns: readonly DiagramColumn[], column: string
     (candidate) => candidate.name.toLowerCase() === column.toLowerCase(),
   );
 
-  return index < 0
-    ? box.y + box.height / 2
-    : box.y + BOX.header + index * BOX.row + BOX.row / 2;
+  return index < 0 ? box.y + box.height / 2 : box.y + BOX.header + index * BOX.row + BOX.row / 2;
 }
 
 /**
@@ -478,8 +485,12 @@ export function neighbours(
   const near = new Set<string>([selected]);
 
   for (const link of links) {
-    if (link.from === selected) { near.add(link.to); }
-    if (link.to === selected) { near.add(link.from); }
+    if (link.from === selected) {
+      near.add(link.to);
+    }
+    if (link.to === selected) {
+      near.add(link.from);
+    }
   }
 
   return near;

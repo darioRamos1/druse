@@ -149,7 +149,9 @@ describe('EditorToolbar', () => {
       );
       openMenu();
 
-      options().find((option) => option.textContent?.trim() === 'Tabular')?.click();
+      options()
+        .find((option) => option.textContent?.trim() === 'Tabular')
+        ?.click();
 
       expect(cambios).toEqual([{ style: 'tabular' }]);
     });
@@ -161,7 +163,9 @@ describe('EditorToolbar', () => {
     it('el menú sigue abierto tras elegir, para poder ajustar varias cosas', () => {
       openMenu();
 
-      options().find((option) => option.textContent?.trim() === '120')?.click();
+      options()
+        .find((option) => option.textContent?.trim() === '120')
+        ?.click();
       fixture.detectChanges();
 
       expect(element().querySelector('.format__menu')).not.toBeNull();
@@ -200,9 +204,7 @@ describe('EditorToolbar', () => {
       fixture.componentRef.instance.databaseChange.subscribe((name) => elegidas.push(name));
       openChooser();
 
-      element()
-        .querySelectorAll<HTMLButtonElement>('.context__option')[1]
-        ?.click();
+      element().querySelectorAll<HTMLButtonElement>('.context__option')[1]?.click();
       fixture.detectChanges();
 
       expect(elegidas).toEqual(['ventas_pruebas']);

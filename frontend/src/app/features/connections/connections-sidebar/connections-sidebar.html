@@ -95,7 +95,9 @@
           <span
             class="tool"
             [class.tool--attention]="connection.lost"
-            [attr.title]="connection.lost ? 'La conexión se perdió: volver a conectar' : 'Volver a conectar'"
+            [attr.title]="
+              connection.lost ? 'La conexión se perdió: volver a conectar' : 'Volver a conectar'
+            "
             (click)="act($event, () => reconnect.emit(connection.id))"
           >
             <app-icon name="refresh" [size]="12" />
@@ -298,7 +300,9 @@
                        sean trescientas tablas no es motivo para no ofrecerla: el
                        panel pregunta siempre qué entra al lienzo, y por ahí se
                        empieza eligiendo. -->
-                  @if (node.kind === 'database' || node.kind === 'schema' || node.kind === 'table') {
+                  @if (
+                    node.kind === 'database' || node.kind === 'schema' || node.kind === 'table'
+                  ) {
                     <button
                       type="button"
                       role="menuitem"
@@ -313,7 +317,9 @@
                        piensa «me llevo esto»: la base entera, un esquema o una
                        tabla suelta. El asistente resuelve qué cuelga de cada
                        uno. -->
-                  @if (node.kind === 'database' || node.kind === 'schema' || node.kind === 'table') {
+                  @if (
+                    node.kind === 'database' || node.kind === 'schema' || node.kind === 'table'
+                  ) {
                     <button
                       type="button"
                       role="menuitem"

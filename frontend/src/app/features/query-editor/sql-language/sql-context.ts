@@ -12,8 +12,24 @@ export interface SqlReference {
  * `FROM usuarios WHERE …` declararía un alias llamado «where» si no se filtran.
  */
 const NOT_ALIASES = new Set([
-  'WHERE', 'ON', 'INNER', 'LEFT', 'RIGHT', 'FULL', 'CROSS', 'JOIN', 'GROUP',
-  'ORDER', 'SET', 'VALUES', 'UNION', 'HAVING', 'LIMIT', 'OFFSET', 'AS', 'USING',
+  'WHERE',
+  'ON',
+  'INNER',
+  'LEFT',
+  'RIGHT',
+  'FULL',
+  'CROSS',
+  'JOIN',
+  'GROUP',
+  'ORDER',
+  'SET',
+  'VALUES',
+  'UNION',
+  'HAVING',
+  'LIMIT',
+  'OFFSET',
+  'AS',
+  'USING',
 ]);
 
 const IDENTIFIER = '[\\p{L}_][\\p{L}\\p{N}_$]*';
@@ -109,9 +125,7 @@ export function findRelation(
   reference: SqlReference,
 ): KnownRelation | undefined {
   const name = reference.name.toLowerCase();
-  const byName = index.relations.filter(
-    (candidate) => candidate.name.toLowerCase() === name,
-  );
+  const byName = index.relations.filter((candidate) => candidate.name.toLowerCase() === name);
 
   if (!reference.schema) {
     return byName[0];

@@ -182,12 +182,11 @@ describe('ConnectionsSidebar', () => {
     fixture.componentRef.setInput('explorerNodes', [schema]);
     fixture.detectChanges();
 
-    const schemaIcon = fixture.debugElement
-      .query(By.css('.node--object app-icon.node__icon'))
+    const schemaIcon = fixture.debugElement.query(By.css('.node--object app-icon.node__icon'))
       .componentInstance as Icon;
-    const deleteIcon = fixture.debugElement
-      .query(By.css('[title="Eliminar esta conexión guardada"] app-icon'))
-      .componentInstance as Icon;
+    const deleteIcon = fixture.debugElement.query(
+      By.css('[title="Eliminar esta conexión guardada"] app-icon'),
+    ).componentInstance as Icon;
 
     expect(schemaIcon.name()).toBe('schema');
     expect(deleteIcon.name()).toBe('trash');

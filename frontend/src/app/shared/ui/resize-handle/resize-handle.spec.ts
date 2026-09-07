@@ -5,9 +5,7 @@ import { ResizeHandle } from './resize-handle';
 
 @Component({
   imports: [ResizeHandle],
-  template: `
-    <app-resize-handle axis="width" [(size)]="width" [min]="100" [max]="400" />
-  `,
+  template: ` <app-resize-handle axis="width" [(size)]="width" [min]="100" [max]="400" /> `,
 })
 class HostComponent {
   readonly width = signal(200);

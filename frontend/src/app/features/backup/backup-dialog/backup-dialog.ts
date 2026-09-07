@@ -1,4 +1,13 @@
-import { ChangeDetectionStrategy, Component, computed, effect, inject, input, output, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  effect,
+  inject,
+  input,
+  output,
+  signal,
+} from '@angular/core';
 import { DatePipe } from '@angular/common';
 import { firstValueFrom } from 'rxjs';
 
@@ -485,9 +494,7 @@ export class BackupDialog {
     this.profileError.set(null);
 
     try {
-      const saved = await firstValueFrom(
-        this._gateway.saveBackupProfile(this.profileInput()),
-      );
+      const saved = await firstValueFrom(this._gateway.saveBackupProfile(this.profileInput()));
 
       this.activeProfile.set(saved);
       await this.loadProfiles();

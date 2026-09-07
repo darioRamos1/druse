@@ -12,11 +12,7 @@ import {
   viewChild,
 } from '@angular/core';
 
-import {
-  DatabaseObject,
-  SchemaGraph,
-  SuggestedRelation,
-} from '../../../shared/models/workspace';
+import { DatabaseObject, SchemaGraph, SuggestedRelation } from '../../../shared/models/workspace';
 import {
   BOX,
   DetailLevel,
@@ -378,9 +374,8 @@ export class DiagramCanvas {
     this.exportOpen.set(false);
 
     const options = { includeSuggested: this.showSuggested() };
-    const text = format === 'mermaid'
-      ? toMermaid(this.graph(), options)
-      : toDbml(this.graph(), options);
+    const text =
+      format === 'mermaid' ? toMermaid(this.graph(), options) : toDbml(this.graph(), options);
 
     this.copied.emit({
       text,

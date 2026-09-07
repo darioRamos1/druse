@@ -1,5 +1,11 @@
 import { SchemaIndex } from '../../../shared/models/workspace';
-import { aliasMap, declaredNames, findRelation, isSchemaLoaded, relationMentions } from './sql-context';
+import {
+  aliasMap,
+  declaredNames,
+  findRelation,
+  isSchemaLoaded,
+  relationMentions,
+} from './sql-context';
 
 /** Un aviso sobre un trozo del SQL, en posiciones absolutas del texto. */
 export interface SqlProblem {

@@ -428,7 +428,10 @@ export class QueryBuilder implements OnInit {
 
   protected readonly orderOptions = computed(() => {
     if (!this.grouped()) {
-      return this.columns().map((column) => ({ value: `column:${column.name}`, label: column.name }));
+      return this.columns().map((column) => ({
+        value: `column:${column.name}`,
+        label: column.name,
+      }));
     }
 
     return [
@@ -451,7 +454,9 @@ export class QueryBuilder implements OnInit {
     }
 
     for (const aggregate of this.aggregates()) {
-      const column = this.queryColumns().find((option) => option.key === aggregate.columnKey)?.column;
+      const column = this.queryColumns().find(
+        (option) => option.key === aggregate.columnKey,
+      )?.column;
 
       if (
         column &&
@@ -699,8 +704,7 @@ export class QueryBuilder implements OnInit {
     const schema = key.referencedSchema ?? this.table().schema ?? '';
     await this._store.ensureRelationsAsync(schema, this.connectionId(), this.table().database);
     const relation = this.availableRelations().find(
-      (node) =>
-        node.source.schema === schema && node.source.name === key.referencedTable,
+      (node) => node.source.schema === schema && node.source.name === key.referencedTable,
     );
 
     if (!relation) {
@@ -730,9 +734,8 @@ export class QueryBuilder implements OnInit {
     let referenced: string | undefined = key.referencedColumns[0];
     if (!referenced) {
       const structure = await this._store.tableStructure(this.connectionId(), relation.source);
-      referenced = structure?.primaryKey?.columns.length === 1
-        ? structure.primaryKey.columns[0]
-        : undefined;
+      referenced =
+        structure?.primaryKey?.columns.length === 1 ? structure.primaryKey.columns[0] : undefined;
     }
 
     if (referenced) {
@@ -753,11 +756,7 @@ export class QueryBuilder implements OnInit {
             ? {
                 ...join,
                 leftJoinId: null,
-                leftColumn: this.preferredColumn(
-                  this.columns(),
-                  join.leftColumn,
-                  join.rightColumn,
-                ),
+                leftColumn: this.preferredColumn(this.columns(), join.leftColumn, join.rightColumn),
               }
             : join,
         ),
@@ -876,12 +875,11 @@ export class QueryBuilder implements OnInit {
   protected joinSuggestions(join: JoinDraft): JoinSuggestion[] {
     const term = join.search.trim().toLowerCase();
     const selected = this.relationLabel(this.joinRelation(join)).toLowerCase();
-    const schemas = this.availableSchemas()
-      .map<JoinSuggestion>((node) => ({
-        id: `schema:${node.source.name}`,
-        kind: 'schema',
-        schema: node.source.name,
-      }));
+    const schemas = this.availableSchemas().map<JoinSuggestion>((node) => ({
+      id: `schema:${node.source.name}`,
+      kind: 'schema',
+      schema: node.source.name,
+    }));
     const tables = this.availableRelations().map<JoinSuggestion>((node) => ({
       id: node.source.id,
       kind: 'table',
@@ -1027,7 +1025,9 @@ export class QueryBuilder implements OnInit {
       return suggestion.schema.toLowerCase().startsWith(term) ? 0 : 3;
     }
 
-    const relation = this.availableRelations().find((node) => node.source.id === suggestion.tableId);
+    const relation = this.availableRelations().find(
+      (node) => node.source.id === suggestion.tableId,
+    );
     return relation ? this.matchRank(relation.source, term) + 1 : 4;
   }
 
@@ -1104,7 +1104,10 @@ export class QueryBuilder implements OnInit {
           ? {
               ...draft,
               ...patch,
-              text: patch.mode === 'value' && draft.mode !== 'value' ? null : (patch.text ?? draft.text),
+              text:
+                patch.mode === 'value' && draft.mode !== 'value'
+                  ? null
+                  : (patch.text ?? draft.text),
             }
           : draft,
       ),
@@ -1279,11 +1282,7 @@ export class QueryBuilder implements OnInit {
     this.pruneGrouping();
   }
 
-  private preferredColumn(
-    columns: readonly KnownColumn[],
-    current: string,
-    peer: string,
-  ): string {
+  private preferredColumn(columns: readonly KnownColumn[], current: string, peer: string): string {
     return (
       columns.find((column) => column.name === current)?.name ??
       columns.find((column) => column.name === peer)?.name ??

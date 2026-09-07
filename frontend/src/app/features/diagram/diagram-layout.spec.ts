@@ -12,10 +12,7 @@ function table(name: string, schema = 'ventas'): DatabaseObject {
   };
 }
 
-function column(
-  name: string,
-  options: { pk?: boolean; nullable?: boolean; type?: string } = {},
-) {
+function column(name: string, options: { pk?: boolean; nullable?: boolean; type?: string } = {}) {
   return {
     name,
     dataType: options.type ?? 'int8',
@@ -64,14 +61,24 @@ function detail(
 /** cliente ← factura ← factura_detalle → producto, más una tabla suelta. */
 function esquema(): TableDetail[] {
   return [
-    detail('cliente', [column('id', { pk: true }), column('nombre', { type: 'varchar' })], [], ['id']),
+    detail(
+      'cliente',
+      [column('id', { pk: true }), column('nombre', { type: 'varchar' })],
+      [],
+      ['id'],
+    ),
     detail(
       'factura',
       [column('id', { pk: true }), column('cliente_id'), column('total', { type: 'numeric' })],
       [{ name: 'fk_factura_cliente', columns: ['cliente_id'], referencedTable: 'cliente' }],
       ['id'],
     ),
-    detail('producto', [column('id', { pk: true }), column('sku', { type: 'varchar' })], [], ['id']),
+    detail(
+      'producto',
+      [column('id', { pk: true }), column('sku', { type: 'varchar' })],
+      [],
+      ['id'],
+    ),
     detail(
       'factura_detalle',
       [column('factura_id', { pk: true }), column('producto_id', { pk: true }), column('cantidad')],
@@ -81,7 +88,12 @@ function esquema(): TableDetail[] {
       ],
       ['factura_id', 'producto_id'],
     ),
-    detail('bitacora', [column('id', { pk: true }), column('mensaje', { type: 'text' })], [], ['id']),
+    detail(
+      'bitacora',
+      [column('id', { pk: true }), column('mensaje', { type: 'text' })],
+      [],
+      ['id'],
+    ),
   ];
 }
 
@@ -254,8 +266,12 @@ describe('colocación del diagrama', () => {
    * caja cuando el nivel de detalle la esconde.
    */
   it('el trazo ancla en la fila de la clave, y en el centro si está plegada', () => {
-    const completo = layoutDiagram(esquema(), 'full').links.find((link) => link.id === 'fk_factura_cliente');
-    const plegado = layoutDiagram(esquema(), 'collapsed').links.find((link) => link.id === 'fk_factura_cliente');
+    const completo = layoutDiagram(esquema(), 'full').links.find(
+      (link) => link.id === 'fk_factura_cliente',
+    );
+    const plegado = layoutDiagram(esquema(), 'collapsed').links.find(
+      (link) => link.id === 'fk_factura_cliente',
+    );
 
     expect(completo?.path).not.toEqual(plegado?.path);
     expect(completo?.feet).toContain('M ');

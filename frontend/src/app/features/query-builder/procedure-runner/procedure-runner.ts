@@ -198,7 +198,10 @@ export class ProcedureRunner implements OnInit {
           value:
             draft.mode === 'null'
               ? ({ kind: 'null' } as const)
-              : ({ kind: 'value', text: draft.text.trim().length > 0 ? draft.text : null } as const),
+              : ({
+                  kind: 'value',
+                  text: draft.text.trim().length > 0 ? draft.text : null,
+                } as const),
         };
       });
   }

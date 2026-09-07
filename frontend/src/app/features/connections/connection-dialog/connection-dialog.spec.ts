@@ -105,14 +105,14 @@ describe('ConnectionDialog', () => {
     await fixture.whenStable();
     fixture.detectChanges();
 
-    const opciones = [...fixture.nativeElement.querySelectorAll('#connection-databases option')].map(
-      (option: HTMLOptionElement) => option.value,
-    );
+    const opciones = [
+      ...fixture.nativeElement.querySelectorAll('#connection-databases option'),
+    ].map((option: HTMLOptionElement) => option.value);
 
     expect(opciones).toEqual(['compras', 'ventas']);
-    expect(fixture.nativeElement.querySelector('#connection-database-detail')?.textContent).toContain(
-      '2 bases disponibles',
-    );
+    expect(
+      fixture.nativeElement.querySelector('#connection-database-detail')?.textContent,
+    ).toContain('2 bases disponibles');
   });
 
   it('con una sola base la deja puesta, que no hay nada que elegir', async () => {
@@ -149,9 +149,9 @@ describe('ConnectionDialog', () => {
     await fixture.whenStable();
     fixture.detectChanges();
 
-    expect(fixture.nativeElement.querySelector('#connection-database-detail')?.textContent).toContain(
-      'La contraseña no es correcta.',
-    );
+    expect(
+      fixture.nativeElement.querySelector('#connection-database-detail')?.textContent,
+    ).toContain('La contraseña no es correcta.');
   });
 
   it('con autenticación de Windows no pide usuario ni contraseña', async () => {
@@ -600,7 +600,9 @@ describe('ConnectionDialog', () => {
   }
 
   function setInput(index: number, value: string): void {
-    const input = fixture.nativeElement.querySelectorAll('.field__input')[index] as HTMLInputElement;
+    const input = fixture.nativeElement.querySelectorAll('.field__input')[
+      index
+    ] as HTMLInputElement;
     input.value = value;
     input.dispatchEvent(new Event('input'));
     fixture.detectChanges();

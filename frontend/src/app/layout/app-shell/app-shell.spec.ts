@@ -372,9 +372,7 @@ describe('AppShell', () => {
     TestBed.resetTestingModule();
     await TestBed.configureTestingModule({
       imports: [AppShell],
-      providers: [
-        { provide: ApplicationGateway, useValue: backupGateway() },
-      ],
+      providers: [{ provide: ApplicationGateway, useValue: backupGateway() }],
     }).compileComponents();
 
     const shell = TestBed.createComponent(AppShell);

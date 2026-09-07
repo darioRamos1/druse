@@ -153,8 +153,9 @@ describe('CommandPalette', () => {
 
   it('presenta los tipos de resultado en español', () => {
     const element = fixture.nativeElement as HTMLElement;
-    const kinds = [...element.querySelectorAll<HTMLElement>('.result__kind')]
-      .map((item) => item.textContent?.trim());
+    const kinds = [...element.querySelectorAll<HTMLElement>('.result__kind')].map((item) =>
+      item.textContent?.trim(),
+    );
 
     expect(kinds).toContain('comando');
     expect(kinds).toContain('conexión');

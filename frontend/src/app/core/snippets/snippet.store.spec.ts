@@ -1,10 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { Observable, of, throwError } from 'rxjs';
 
-import {
-  ApplicationGateway,
-  SavedSnippet,
-} from '../application-gateway/application-gateway';
+import { ApplicationGateway, SavedSnippet } from '../application-gateway/application-gateway';
 import { SnippetStore } from './snippet.store';
 
 class FakeGateway implements Partial<ApplicationGateway> {

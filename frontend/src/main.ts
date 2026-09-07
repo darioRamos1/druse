@@ -10,5 +10,4 @@ import { applyAppearance, cachedAppearance } from './app/core/theme/theme.servic
 // disponible.
 applyAppearance(cachedAppearance());
 
-bootstrapApplication(App, appConfig)
-  .catch((err) => console.error(err));
+bootstrapApplication(App, appConfig).catch((err) => console.error(err));

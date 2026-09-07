@@ -342,6 +342,12 @@ jobs:
       - name: Instalar dependencias
         run: npm ci
 
+      # El formato se comprueba, no se pide por favor: sin esto, cada quien
+      # escribe como le sale y los diffs se llenan de líneas que no cambian nada.
+      # Se arregla con `npm run format`.
+      - name: Comprobar el formato
+        run: npm run format:check
+
       - name: Compilar
         run: npm run build
 

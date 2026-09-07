@@ -135,19 +135,13 @@ describe('formatSelection', () => {
 
   describe('lista de valores', () => {
     it('separa por comas sin tocar el orden ni los repetidos', () => {
-      const texto = formatSelection(
-        selection([column('pais')], [['MX'], ['ES'], ['MX']]),
-        'list',
-      );
+      const texto = formatSelection(selection([column('pais')], [['MX'], ['ES'], ['MX']]), 'list');
 
       expect(texto).toBe("'MX', 'ES', 'MX'");
     });
 
     it('escribe los NULL como NULL', () => {
-      const texto = formatSelection(
-        selection([column('id', 'number')], [['1'], [null]]),
-        'list',
-      );
+      const texto = formatSelection(selection([column('id', 'number')], [['1'], [null]]), 'list');
 
       expect(texto).toBe('1, NULL');
     });

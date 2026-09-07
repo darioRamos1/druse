@@ -13,16 +13,22 @@
 
   <span class="sep" aria-hidden="true"></span>
 
-  <div class="item">Base de datos <span class="mono">{{ s.database }}</span></div>
+  <div class="item">
+    Base de datos <span class="mono">{{ s.database }}</span>
+  </div>
 
   <span class="sep" aria-hidden="true"></span>
 
-  <div class="item">Usuario <span class="mono">{{ s.user }}</span></div>
+  <div class="item">
+    Usuario <span class="mono">{{ s.user }}</span>
+  </div>
 
   <span class="spacer"></span>
 
   @if (s.lastDurationMs !== null) {
-    <div class="item">Última ejecución <span class="mono">{{ s.lastDurationMs }} ms</span></div>
+    <div class="item">
+      Última ejecución <span class="mono">{{ s.lastDurationMs }} ms</span>
+    </div>
     <span class="sep" aria-hidden="true"></span>
   }
 

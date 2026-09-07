@@ -218,9 +218,7 @@ describe('RestoreDialog', () => {
   it('lanzar manda la ruta que se miró', async () => {
     await inspect();
 
-    [...element.querySelectorAll<HTMLButtonElement>('.foot button')]
-      .at(-1)
-      ?.click();
+    [...element.querySelectorAll<HTMLButtonElement>('.foot button')].at(-1)?.click();
 
     await settle(fixture);
 
@@ -265,8 +263,9 @@ describe('RestoreDialog', () => {
     expect(element.textContent).toContain('Se paró en la instrucción 5');
     expect(element.querySelector('.sql')?.textContent).toContain('INSERT INTO tienda.pedidos');
 
-    const resume = [...element.querySelectorAll<HTMLButtonElement>('.actions button')]
-      .find((button) => button.textContent?.includes('Reanudar'));
+    const resume = [...element.querySelectorAll<HTMLButtonElement>('.actions button')].find(
+      (button) => button.textContent?.includes('Reanudar'),
+    );
 
     expect(resume?.textContent).toContain('5');
 
@@ -284,8 +283,9 @@ describe('RestoreDialog', () => {
    * solo**: eso es lo que se iba a hacer a continuación de todos modos.
    */
   it('en el navegador se busca el respaldo con el selector y se inspecciona al elegirlo', async () => {
-    const buscar = [...element.querySelectorAll<HTMLButtonElement>('.picker button')]
-      .find((button) => button.textContent?.includes('Buscar'));
+    const buscar = [...element.querySelectorAll<HTMLButtonElement>('.picker button')].find(
+      (button) => button.textContent?.includes('Buscar'),
+    );
 
     expect(buscar).toBeDefined();
 

@@ -1,4 +1,12 @@
-import { ChangeDetectionStrategy, Component, computed, inject, input, output, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  inject,
+  input,
+  output,
+  signal,
+} from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { firstValueFrom } from 'rxjs';
 
@@ -174,9 +182,8 @@ export class TransferSetDialog {
       .map((table) => ({
         source: table,
         target:
-          destino.find(
-            (candidate) => candidate.name.toLowerCase() === table.name.toLowerCase(),
-          ) ?? null,
+          destino.find((candidate) => candidate.name.toLowerCase() === table.name.toLowerCase()) ??
+          null,
       }));
   });
 

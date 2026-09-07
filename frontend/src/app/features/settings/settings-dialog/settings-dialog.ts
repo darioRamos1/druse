@@ -93,9 +93,7 @@ const PREVIEW_LINES: readonly (readonly PreviewToken[])[] = [
     { kind: 'keyword', width: 8 },
     { kind: 'number', width: 9 },
   ],
-  [
-    { kind: 'comment', width: 34 },
-  ],
+  [{ kind: 'comment', width: 34 }],
 ];
 
 /** Traduce un encuadre a la esquina —o el centro— donde queda. */

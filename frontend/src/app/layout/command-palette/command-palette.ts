@@ -152,7 +152,12 @@ export default class CommandPalette implements AfterViewInit {
         label: 'Guardar como fragmento',
         hint: 'Lo seleccionado, o la instrucción del cursor',
       },
-      { id: 'duplicate-tab', kind: 'command', label: 'Duplicar la pestaña', hint: 'Con el mismo SQL' },
+      {
+        id: 'duplicate-tab',
+        kind: 'command',
+        label: 'Duplicar la pestaña',
+        hint: 'Con el mismo SQL',
+      },
       {
         id: 'close-other-tabs',
         kind: 'command',
@@ -165,10 +170,30 @@ export default class CommandPalette implements AfterViewInit {
         label: 'Copiar el nombre calificado',
         hint: 'De la tabla de esta pestaña',
       },
-      { id: 'diagram', kind: 'command', label: 'Ver el diagrama', hint: 'De donde se está trabajando' },
-      { id: 'transaction-begin', kind: 'command', label: 'Iniciar transacción', hint: 'Nada se escribe hasta confirmar' },
-      { id: 'transaction-commit', kind: 'command', label: 'Confirmar la transacción', hint: 'Escribe los cambios. No se deshace' },
-      { id: 'transaction-rollback', kind: 'command', label: 'Deshacer la transacción', hint: 'Tira lo hecho desde que se abrió' },
+      {
+        id: 'diagram',
+        kind: 'command',
+        label: 'Ver el diagrama',
+        hint: 'De donde se está trabajando',
+      },
+      {
+        id: 'transaction-begin',
+        kind: 'command',
+        label: 'Iniciar transacción',
+        hint: 'Nada se escribe hasta confirmar',
+      },
+      {
+        id: 'transaction-commit',
+        kind: 'command',
+        label: 'Confirmar la transacción',
+        hint: 'Escribe los cambios. No se deshace',
+      },
+      {
+        id: 'transaction-rollback',
+        kind: 'command',
+        label: 'Deshacer la transacción',
+        hint: 'Tira lo hecho desde que se abrió',
+      },
       { id: 'shortcuts', kind: 'command', label: 'Ver los atajos de teclado', hint: 'F1' },
     ];
     /*
@@ -271,7 +296,6 @@ export default class CommandPalette implements AfterViewInit {
     if (nombre === 'tab') {
       return 'pestaña';
     }
-
 
     switch (nombre) {
       case 'command':

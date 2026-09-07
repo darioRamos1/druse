@@ -58,7 +58,9 @@
         <p class="empty">Aquí no hay tablas que migrar.</p>
       } @else {
         <div class="bulk">
-          <span class="bulk__count">{{ selected().size }} de {{ sourceTables().length }} marcadas</span>
+          <span class="bulk__count"
+            >{{ selected().size }} de {{ sourceTables().length }} marcadas</span
+          >
           <button type="button" class="link" (click)="all()">Todas</button>
           <button type="button" class="link" (click)="none()">Ninguna</button>
         </div>
@@ -95,7 +97,10 @@
         >
           @for (connection of connections(); track connection.id) {
             <option [value]="connection.id">
-              {{ connection.name }}@if (connection.id === connectionId()) { (esta misma) }
+              {{ connection.name }}
+              @if (connection.id === connectionId()) {
+                (esta misma)
+              }
             </option>
           }
         </select>
@@ -164,7 +169,9 @@
                perdería. -->
           <select (change)="onMode($any($event.target).value)">
             @for (option of modes; track option.id) {
-              <option [value]="option.id" [selected]="option.id === mode()">{{ option.label }}</option>
+              <option [value]="option.id" [selected]="option.id === mode()">
+                {{ option.label }}
+              </option>
             }
           </select>
         </label>
@@ -199,7 +206,9 @@
         <section class="gaps">
           <h3 class="gaps__title">Lo que el perfil pedía y hoy no se puede migrar</h3>
           @for (gap of profileGaps(); track gap.table) {
-            <p class="warn"><strong>{{ gap.table }}:</strong> {{ gap.reason }}</p>
+            <p class="warn">
+              <strong>{{ gap.table }}:</strong> {{ gap.reason }}
+            </p>
           }
         </section>
       }
@@ -325,8 +334,8 @@
         @if (missing().length > 0) {
           <p class="warn">
             No están en el destino y se quedan fuera:
-            <strong>{{ missing().length }}</strong> —
-            {{ missingNames() }}. Créalas antes, o migra esas de una en una.
+            <strong>{{ missing().length }}</strong> — {{ missingNames() }}. Créalas antes, o migra
+            esas de una en una.
           </p>
         }
       </section>
@@ -366,22 +375,28 @@
                 Copiadas {{ progress.rowsCopied }} filas de {{ progress.tablesDone }} tablas, con
                 avisos
               }
-              @case ('Cancelled') { Cancelado con {{ progress.rowsCopied }} filas ya copiadas }
-              @default { No se pudo terminar }
+              @case ('Cancelled') {
+                Cancelado con {{ progress.rowsCopied }} filas ya copiadas
+              }
+              @default {
+                No se pudo terminar
+              }
             }
           </h3>
 
           @if (progress.failure) {
             <p class="problem">{{ progress.failure.message }}</p>
             <p class="summary__line">
-              Se pararon en «{{ progress.currentObject }}», con
-              {{ progress.tablesDone }} de {{ progress.tablesTotal }} tablas ya copiadas enteras. Lo
-              que entró se queda: repite desde ahí, no desde el principio.
+              Se pararon en «{{ progress.currentObject }}», con {{ progress.tablesDone }} de
+              {{ progress.tablesTotal }} tablas ya copiadas enteras. Lo que entró se queda: repite
+              desde ahí, no desde el principio.
             </p>
           }
 
           @for (warning of progress.warnings; track $index) {
-            <p class="warn"><strong>{{ warning.subject }}:</strong> {{ warning.message }}</p>
+            <p class="warn">
+              <strong>{{ warning.subject }}:</strong> {{ warning.message }}
+            </p>
           }
 
           <details class="summary__report">

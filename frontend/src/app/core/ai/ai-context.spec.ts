@@ -50,7 +50,9 @@ describe('describeSchema', () => {
   });
 
   it('distingue una vista de una tabla', () => {
-    const { schema } = describeSchema([relation('v_resumen', [column('total', 'numeric')], 'view')]);
+    const { schema } = describeSchema([
+      relation('v_resumen', [column('total', 'numeric')], 'view'),
+    ]);
 
     expect(schema).toContain('VIEW public.v_resumen');
   });

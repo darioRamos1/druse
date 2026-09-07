@@ -465,9 +465,7 @@ export class TransferDialog {
     const chosen = this.keyColumns();
 
     this.keyColumns.set(
-      chosen.includes(column)
-        ? chosen.filter((name) => name !== column)
-        : [...chosen, column],
+      chosen.includes(column) ? chosen.filter((name) => name !== column) : [...chosen, column],
     );
 
     this._transfers.clearPreview();

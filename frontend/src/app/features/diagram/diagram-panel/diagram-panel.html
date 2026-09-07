@@ -43,7 +43,12 @@
   } @else if (choosing()) {
     <div class="chooser">
       <div class="chooser__bar">
-        <button type="button" class="chooser__action" (click)="chooseAll()" [disabled]="allChosen()">
+        <button
+          type="button"
+          class="chooser__action"
+          (click)="chooseAll()"
+          [disabled]="allChosen()"
+        >
           Todas
         </button>
         <button
@@ -67,7 +72,17 @@
           >
             <span class="pick__box" [class.is-chosen]="isChosen(table)">
               @if (isChosen(table)) {
-                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <svg
+                  width="10"
+                  height="10"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="3.4"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  aria-hidden="true"
+                >
                   <path d="M5 13l4 4L19 7" />
                 </svg>
               }

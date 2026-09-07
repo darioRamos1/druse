@@ -11,12 +11,7 @@
     permite darse cuenta de que se está en la unidad equivocada.
   -->
   <div class="bar">
-    <button
-      type="button"
-      class="ghost"
-      [disabled]="!listing() || (folder() === '' )"
-      (click)="up()"
-    >
+    <button type="button" class="ghost" [disabled]="!listing() || folder() === ''" (click)="up()">
       Subir
     </button>
 
@@ -137,9 +132,7 @@
           <span class="result__path">{{ file.path }}</span>
         </p>
       } @else {
-        <p class="result">
-          Elige un archivo, o entra en la carpeta del respaldo y úsala tal cual.
-        </p>
+        <p class="result">Elige un archivo, o entra en la carpeta del respaldo y úsala tal cual.</p>
       }
     }
 

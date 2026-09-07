@@ -1,0 +1,5 @@
+# Lo que no escribe nadie a mano.
+dist/
+node_modules/
+coverage/
+.angular/

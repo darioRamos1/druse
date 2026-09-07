@@ -73,7 +73,10 @@ export class RestoreDialog {
    * avisar y avisar de verdad.
    */
   protected readonly rowsAtRisk = computed(() =>
-    (this.inspection()?.collisions ?? []).reduce((total, collision) => total + (collision.rows ?? 0), 0),
+    (this.inspection()?.collisions ?? []).reduce(
+      (total, collision) => total + (collision.rows ?? 0),
+      0,
+    ),
   );
 
   /** Elige el artefacto con el diálogo del sistema. */

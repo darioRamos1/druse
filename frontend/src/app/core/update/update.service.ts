@@ -120,7 +120,9 @@ export class UpdateService {
   }
 
   private fail(error: unknown, fallback: string): void {
-    this.error.set(error instanceof Error ? error.message : typeof error === 'string' ? error : fallback);
+    this.error.set(
+      error instanceof Error ? error.message : typeof error === 'string' ? error : fallback,
+    );
     this.state.set('error');
   }
 }

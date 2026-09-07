@@ -331,7 +331,9 @@
 
   &.is-selected {
     border-color: var(--dr-accent-line);
-    box-shadow: 0 0 0 1px var(--dr-accent-line-soft), var(--dr-shadow-popover);
+    box-shadow:
+      0 0 0 1px var(--dr-accent-line-soft),
+      var(--dr-shadow-popover);
   }
 
   &__head {

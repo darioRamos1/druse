@@ -6,9 +6,24 @@
   <header class="head">
     <span class="head__icon" aria-hidden="true">
       <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-        <ellipse cx="8" cy="4" rx="5.2" ry="2.2" stroke="var(--dr-accent-bright)" stroke-width="1.3" />
-        <path d="M2.8 4v8c0 1.2 2.33 2.2 5.2 2.2s5.2-1 5.2-2.2V4" stroke="var(--dr-accent-bright)" stroke-width="1.3" />
-        <path d="M2.8 8c0 1.2 2.33 2.2 5.2 2.2s5.2-1 5.2-2.2" stroke="var(--dr-accent-bright)" stroke-width="1.3" />
+        <ellipse
+          cx="8"
+          cy="4"
+          rx="5.2"
+          ry="2.2"
+          stroke="var(--dr-accent-bright)"
+          stroke-width="1.3"
+        />
+        <path
+          d="M2.8 4v8c0 1.2 2.33 2.2 5.2 2.2s5.2-1 5.2-2.2V4"
+          stroke="var(--dr-accent-bright)"
+          stroke-width="1.3"
+        />
+        <path
+          d="M2.8 8c0 1.2 2.33 2.2 5.2 2.2s5.2-1 5.2-2.2"
+          stroke="var(--dr-accent-bright)"
+          stroke-width="1.3"
+        />
       </svg>
     </span>
     <div class="head__text">
@@ -20,8 +35,8 @@
           Cambia lo que necesites. Las contraseñas guardadas no se muestran: si dejas el campo
           vacío, se conservan tal y como están.
         } @else {
-          Configura el acceso a un motor de base de datos. La contraseña se usa para abrir la
-          sesión y no se guarda todavía.
+          Configura el acceso a un motor de base de datos. La contraseña se usa para abrir la sesión
+          y no se guarda todavía.
         }
       </p>
     </div>
@@ -348,9 +363,7 @@
             @if (fieldError('sshPrivateKeyPath'); as error) {
               <span class="field__error">{{ error }}</span>
             } @else {
-              <span class="field__hint">
-                Se guarda la ruta, nunca el contenido de la clave.
-              </span>
+              <span class="field__hint"> Se guarda la ruta, nunca el contenido de la clave. </span>
             }
           </label>
         }
@@ -504,12 +517,7 @@
     @if (editing()) {
       <!-- Guardar y conectar son cosas distintas: quien corrige el puerto de una
            conexión de producción no está pidiendo entrar en ella. -->
-      <button
-        type="button"
-        class="btn btn--primary"
-        [disabled]="saving()"
-        (click)="saveChanges()"
-      >
+      <button type="button" class="btn btn--primary" [disabled]="saving()" (click)="saveChanges()">
         {{ saving() ? 'Guardando…' : 'Guardar cambios' }}
       </button>
     } @else {

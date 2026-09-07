@@ -1,13 +1,13 @@
 <!doctype html>
 <html lang="en">
-<head>
-  <meta charset="utf-8">
-  <title>Frontend</title>
-  <base href="/">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <link rel="icon" type="image/x-icon" href="favicon.ico">
+  <head>
+    <meta charset="utf-8" />
+    <title>Frontend</title>
+    <base href="/" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" type="image/x-icon" href="favicon.ico" />
 
-  <!--
+    <!--
     Pantalla de carga.
 
     Vive aquí y no en un componente porque tiene que estar pintada antes de que
@@ -22,20 +22,20 @@
 
     Quien la retira es `SplashScreen`, ya desde Angular.
   -->
-  <style>
-    .druse-splash {
-      position: fixed;
-      inset: 0;
-      z-index: 9999;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      gap: 18px;
-      background: var(--dr-surface-outer, #0b0d11);
-      font-family: var(--dr-font-ui, 'Segoe UI', system-ui, sans-serif);
+    <style>
+      .druse-splash {
+        position: fixed;
+        inset: 0;
+        z-index: 9999;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 18px;
+        background: var(--dr-surface-outer, #0b0d11);
+        font-family: var(--dr-font-ui, 'Segoe UI', system-ui, sans-serif);
 
-      /*
+        /*
        * El tamaño de la interfaz se aplica como `zoom` sobre el `body`, y un
        * elemento fijo lo hereda igual que el resto: con la escala al 80 %, la
        * pantalla dejaba de cubrir la esquina inferior derecha justo cuando
@@ -43,109 +43,122 @@
        * no es interfaz que el usuario tenga que poder agrandar: es lo que la
        * tapa mientras no está.
        */
-      zoom: calc(1 / var(--dr-scale, 1));
-    }
+        zoom: calc(1 / var(--dr-scale, 1));
+      }
 
-    /*
+      /*
      * La transición se declara solo en la salida: la entrada no se anima, porque
      * el primer fotograma ya tiene que estar ahí.
      */
-    .druse-splash.is-leaving {
-      opacity: 0;
-      pointer-events: none;
-      transition: opacity 260ms ease;
-    }
+      .druse-splash.is-leaving {
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 260ms ease;
+      }
 
-    /*
+      /*
      * La misma marca que la barra de arriba, en grande: el cuadrado de acento
      * con el rombo hueco dentro. Inventar aquí otro dibujo sería enseñar dos
      * marcas distintas en el primer segundo de la aplicación.
      */
-    .druse-splash__mark {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      width: 56px;
-      height: 56px;
-      border-radius: var(--dr-radius-window, 10px);
-      background: var(--dr-accent-gradient, linear-gradient(140deg, #6c8bff, #9a7cff));
-      box-shadow: var(--dr-shadow-accent, 0 2px 10px rgb(108 139 255 / 45%));
-      animation: druse-splash-breathe 2.4s ease-in-out infinite;
-    }
+      .druse-splash__mark {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 56px;
+        height: 56px;
+        border-radius: var(--dr-radius-window, 10px);
+        background: var(--dr-accent-gradient, linear-gradient(140deg, #6c8bff, #9a7cff));
+        box-shadow: var(--dr-shadow-accent, 0 2px 10px rgb(108 139 255 / 45%));
+        animation: druse-splash-breathe 2.4s ease-in-out infinite;
+      }
 
-    .druse-splash__core {
-      width: 20px;
-      height: 20px;
-      border-radius: var(--dr-radius-xs, 2px);
-      background: var(--dr-surface-base, #0e1015);
-      transform: rotate(45deg);
-    }
+      .druse-splash__core {
+        width: 20px;
+        height: 20px;
+        border-radius: var(--dr-radius-xs, 2px);
+        background: var(--dr-surface-base, #0e1015);
+        transform: rotate(45deg);
+      }
 
-    .druse-splash__name {
-      margin: 0;
-      color: var(--dr-text, #e6e9f2);
-      font-size: 15px;
-      font-weight: 500;
-      letter-spacing: 0.34em;
-      /*
+      .druse-splash__name {
+        margin: 0;
+        color: var(--dr-text, #e6e9f2);
+        font-size: 15px;
+        font-weight: 500;
+        letter-spacing: 0.34em;
+        /*
        * El espaciado se reparte a la derecha de cada letra, también de la última:
        * sin esto la palabra queda medio carácter a la izquierda del centro.
        */
-      text-indent: 0.34em;
-      text-transform: uppercase;
-    }
+        text-indent: 0.34em;
+        text-transform: uppercase;
+      }
 
-    .druse-splash__track {
-      width: 148px;
-      height: 2px;
-      overflow: hidden;
-      border-radius: 999px;
-      background: var(--dr-accent-tint-strong, rgb(108 139 255 / 17%));
-    }
+      .druse-splash__track {
+        width: 148px;
+        height: 2px;
+        overflow: hidden;
+        border-radius: 999px;
+        background: var(--dr-accent-tint-strong, rgb(108 139 255 / 17%));
+      }
 
-    .druse-splash__bar {
-      display: block;
-      width: 38%;
-      height: 100%;
-      border-radius: inherit;
-      background: var(--dr-accent, #6c8bff);
-      animation: druse-splash-slide 1.15s ease-in-out infinite;
-    }
+      .druse-splash__bar {
+        display: block;
+        width: 38%;
+        height: 100%;
+        border-radius: inherit;
+        background: var(--dr-accent, #6c8bff);
+        animation: druse-splash-slide 1.15s ease-in-out infinite;
+      }
 
-    @keyframes druse-splash-slide {
-      from { transform: translateX(-110%); }
-      to { transform: translateX(320%); }
-    }
+      @keyframes druse-splash-slide {
+        from {
+          transform: translateX(-110%);
+        }
+        to {
+          transform: translateX(320%);
+        }
+      }
 
-    @keyframes druse-splash-breathe {
-      0%, 100% { transform: scale(1); opacity: 0.86; }
-      50% { transform: scale(1.06); opacity: 1; }
-    }
+      @keyframes druse-splash-breathe {
+        0%,
+        100% {
+          transform: scale(1);
+          opacity: 0.86;
+        }
+        50% {
+          transform: scale(1.06);
+          opacity: 1;
+        }
+      }
 
-    /*
+      /*
      * Sin movimiento, la barra deja de correr y se queda quieta y entera. Lo que
      * no puede pasar es que quien pide menos animación se quede sin la señal de
      * que la aplicación está arrancando.
      */
-    @media (prefers-reduced-motion: reduce) {
-      .druse-splash__mark,
-      .druse-splash__bar {
-        animation: none;
-      }
+      @media (prefers-reduced-motion: reduce) {
+        .druse-splash__mark,
+        .druse-splash__bar {
+          animation: none;
+        }
 
-      .druse-splash__bar {
-        width: 100%;
+        .druse-splash__bar {
+          width: 100%;
+        }
       }
-    }
-  </style>
-</head>
-<body>
-  <div id="druse-splash" class="druse-splash" role="status" aria-label="Iniciando Druse">
-    <div class="druse-splash__mark" aria-hidden="true"><span class="druse-splash__core"></span></div>
-    <p class="druse-splash__name">Druse</p>
-    <div class="druse-splash__track"><span class="druse-splash__bar"></span></div>
-  </div>
+    </style>
+  </head>
+  <body>
+    <div id="druse-splash" class="druse-splash" role="status" aria-label="Iniciando Druse">
+      <div class="druse-splash__mark" aria-hidden="true">
+        <span class="druse-splash__core"></span>
+      </div>
+      <p class="druse-splash__name">Druse</p>
+      <div class="druse-splash__track"><span class="druse-splash__bar"></span></div>
+    </div>
 
-  <app-root></app-root>
-</body>
+    <app-root></app-root>
+  </body>
 </html>

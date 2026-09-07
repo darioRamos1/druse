@@ -200,7 +200,10 @@ class FakeGateway implements Partial<ApplicationGateway> {
         () =>
           new HttpErrorResponse({
             status: 409,
-            error: { reason: 'notopen', message: 'No hay ninguna transacción abierta que confirmar.' },
+            error: {
+              reason: 'notopen',
+              message: 'No hay ninguna transacción abierta que confirmar.',
+            },
           }),
       );
     }
@@ -1528,7 +1531,7 @@ describe('WorkspaceStore', () => {
         format: 'xlsx',
       });
       // El aviso dice dónde quedó: «no sé dónde se guardan» era la queja.
-    expect(store.notice()).toBe('Exportado a XLSX en C:\\datos\\ventas.xlsx');
+      expect(store.notice()).toBe('Exportado a XLSX en C:\\datos\\ventas.xlsx');
     });
 
     /**
@@ -2096,7 +2099,9 @@ describe('WorkspaceStore', () => {
       expect(store.activeConnection()?.id).toBe(savedProfile.id);
       expect(store.schemaIndex().relations.length).toBeGreaterThan(0);
       expect(
-        store.schemaIndex().relations.every((relation) => relation.connectionId === savedProfile.id),
+        store
+          .schemaIndex()
+          .relations.every((relation) => relation.connectionId === savedProfile.id),
       ).toBe(true);
     });
 

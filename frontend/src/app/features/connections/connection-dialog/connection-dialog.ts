@@ -73,7 +73,13 @@ type ConnectionField =
  * enseñar un motor por venir sin dejar elegirlo.
  */
 const ENGINES: readonly EngineOption[] = [
-  { id: 'sqlserver', name: 'SQL Server', versions: '2016 – 2022', defaultPort: 1433, available: true },
+  {
+    id: 'sqlserver',
+    name: 'SQL Server',
+    versions: '2016 – 2022',
+    defaultPort: 1433,
+    available: true,
+  },
   { id: 'postgresql', name: 'PostgreSQL', versions: '12 – 18', defaultPort: 5432, available: true },
   { id: 'mysql', name: 'MySQL', versions: '8.0+ · MariaDB', defaultPort: 3306, available: true },
   // Esta es la conexión habitual de DBeaver: JDBC sobre SQLI, con Host y el
@@ -245,7 +251,8 @@ export class ConnectionDialog {
     this.engine() === 'postgresql' || this.engine() === 'mysql'
       ? 'Druse pone la sesión en solo lectura: el servidor rechaza cualquier escritura.'
       : 'Este motor no tiene sesiones de solo lectura: Druse avisa antes de ejecutar, ' +
-        'pero la garantía es un usuario con permisos restringidos en el servidor.');
+        'pero la garantía es un usuario con permisos restringidos en el servidor.',
+  );
   protected readonly environment = signal<ConnectionEnvironment>('development');
   protected readonly save = signal(true);
   protected readonly storePassword = signal(true);
@@ -496,7 +503,8 @@ export class ConnectionDialog {
       } else {
         this.feedbackKind.set('error');
         this.feedback.set(
-          this._store.notice() ?? 'No se pudo abrir la conexión. Revisa los datos e inténtalo de nuevo.',
+          this._store.notice() ??
+            'No se pudo abrir la conexión. Revisa los datos e inténtalo de nuevo.',
         );
       }
     } finally {
@@ -718,10 +726,7 @@ export class ConnectionDialog {
       // Sin almacén del sistema no se guarda la contraseña, aunque se pida:
       // fingir que quedó a salvo sería peor que decir que no se guardó.
       storePassword:
-        !windows &&
-        this.save() &&
-        this.storePassword() &&
-        (this.secretStore()?.available ?? false),
+        !windows && this.save() && this.storePassword() && (this.secretStore()?.available ?? false),
       ...this.tunnelForm(),
     };
   }

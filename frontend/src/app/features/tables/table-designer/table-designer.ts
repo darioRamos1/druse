@@ -649,24 +649,20 @@ export class TableDesigner {
     }
 
     this.constraints.set([
-      ...structure.uniqueConstraints.map(
-        (unique): ConstraintRow => ({
-          origin: unique.name,
-          kind: 'unique',
-          name: unique.name,
-          body: unique.columns.join(', '),
-          dropped: false,
-        }),
-      ),
-      ...structure.checkConstraints.map(
-        (check): ConstraintRow => ({
-          origin: check.name,
-          kind: 'check',
-          name: check.name,
-          body: check.expression ?? '',
-          dropped: false,
-        }),
-      ),
+      ...structure.uniqueConstraints.map((unique): ConstraintRow => ({
+        origin: unique.name,
+        kind: 'unique',
+        name: unique.name,
+        body: unique.columns.join(', '),
+        dropped: false,
+      })),
+      ...structure.checkConstraints.map((check): ConstraintRow => ({
+        origin: check.name,
+        kind: 'check',
+        name: check.name,
+        body: check.expression ?? '',
+        dropped: false,
+      })),
     ]);
   }
 

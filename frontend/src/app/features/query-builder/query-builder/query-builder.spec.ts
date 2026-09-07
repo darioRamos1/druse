@@ -102,32 +102,32 @@ const store = {
             { name: 'name', dataType: 'nvarchar(200)', isNullable: false, isPrimaryKey: false },
           ]
         : [
-      {
-        name: 'id',
-        dataType: 'int',
-        isNullable: false,
-        isPrimaryKey: true,
-        isGenerated: true,
-      },
-      {
-        name: 'total',
-        dataType: 'numeric(12,2)',
-        isNullable: false,
-        isPrimaryKey: false,
-      },
-      {
-        name: 'note',
-        dataType: 'nvarchar(200)',
-        isNullable: true,
-        isPrimaryKey: false,
-      },
-      {
-        name: 'created_at',
-        dataType: 'datetime2',
-        isNullable: false,
-        isPrimaryKey: false,
-        defaultValue: 'sysdatetime()',
-      },
+            {
+              name: 'id',
+              dataType: 'int',
+              isNullable: false,
+              isPrimaryKey: true,
+              isGenerated: true,
+            },
+            {
+              name: 'total',
+              dataType: 'numeric(12,2)',
+              isNullable: false,
+              isPrimaryKey: false,
+            },
+            {
+              name: 'note',
+              dataType: 'nvarchar(200)',
+              isNullable: true,
+              isPrimaryKey: false,
+            },
+            {
+              name: 'created_at',
+              dataType: 'datetime2',
+              isNullable: false,
+              isPrimaryKey: false,
+              defaultValue: 'sysdatetime()',
+            },
           ],
     ),
   tableStructure: () => Promise.resolve({ foreignKeys: tableForeignKeys }),
@@ -394,8 +394,9 @@ describe('QueryBuilder', () => {
     (element.querySelector('.grouping input[type="checkbox"]') as HTMLInputElement).click();
     fixture.detectChanges();
 
-    const joinedName = [...element.querySelectorAll<HTMLLabelElement>('.grouping .columns label')]
-      .find((label) => label.textContent?.includes('t1 · name'))!;
+    const joinedName = [
+      ...element.querySelectorAll<HTMLLabelElement>('.grouping .columns label'),
+    ].find((label) => label.textContent?.includes('t1 · name'))!;
     joinedName.click();
     fixture.detectChanges();
 
@@ -420,8 +421,8 @@ describe('QueryBuilder', () => {
     await fixture.whenStable();
     fixture.detectChanges();
     const element = fixture.nativeElement as HTMLElement;
-    const button = [...element.querySelectorAll<HTMLButtonElement>('button')].find(
-      (candidate) => candidate.textContent?.includes('id → customers'),
+    const button = [...element.querySelectorAll<HTMLButtonElement>('button')].find((candidate) =>
+      candidate.textContent?.includes('id → customers'),
     )!;
 
     button.click();
@@ -451,8 +452,8 @@ describe('QueryBuilder', () => {
     });
     const fixture = await create(table);
     const element = fixture.nativeElement as HTMLElement;
-    const button = [...element.querySelectorAll<HTMLButtonElement>('button')].find(
-      (candidate) => candidate.textContent?.includes('Probar con 10 filas'),
+    const button = [...element.querySelectorAll<HTMLButtonElement>('button')].find((candidate) =>
+      candidate.textContent?.includes('Probar con 10 filas'),
     )!;
     const sql = element.querySelector('textarea.sql') as HTMLTextAreaElement;
     sql.value = 'SELECT TOP 7 [id] FROM [public].[orders];';
@@ -475,7 +476,9 @@ describe('QueryBuilder', () => {
   it('guarda y vuelve a cargar una composición para la tabla', async () => {
     const fixture = await create(table);
     const element = fixture.nativeElement as HTMLElement;
-    const name = element.querySelector('input[aria-label="Nombre de la composición"]') as HTMLInputElement;
+    const name = element.querySelector(
+      'input[aria-label="Nombre de la composición"]',
+    ) as HTMLInputElement;
     name.value = 'Ventas por mes';
     name.dispatchEvent(new Event('input'));
     fixture.detectChanges();
@@ -505,8 +508,9 @@ describe('QueryBuilder', () => {
     expect(card.querySelector('.join-condition__title')?.textContent).toContain(
       'Condición de relación',
     );
-    expect([...card.querySelectorAll('.join-operand__role')].map((item) => item.textContent?.trim()))
-      .toEqual(['Tabla existente', 'Tabla incorporada']);
+    expect(
+      [...card.querySelectorAll('.join-operand__role')].map((item) => item.textContent?.trim()),
+    ).toEqual(['Tabla existente', 'Tabla incorporada']);
     expect(card.querySelector('.join-operand__table strong')?.textContent).toContain('t1');
     expect(card.querySelector('.join-operand__table span')?.textContent).toContain(
       'public.customers',
@@ -594,9 +598,9 @@ describe('QueryBuilder', () => {
     fixture.detectChanges();
 
     expect(fixture.nativeElement.querySelector('.join-condition')).toBeNull();
-    expect((fixture.nativeElement.querySelector('textarea.sql') as HTMLTextAreaElement).value).toContain(
-      'CROSS JOIN `public`.`customers` AS `t1`',
-    );
+    expect(
+      (fixture.nativeElement.querySelector('textarea.sql') as HTMLTextAreaElement).value,
+    ).toContain('CROSS JOIN `public`.`customers` AS `t1`');
   });
 
   it('busca tablas por esquema y nombre sin ofrecer otras bases', async () => {
@@ -629,9 +633,9 @@ describe('QueryBuilder', () => {
     await fixture.whenStable();
     fixture.detectChanges();
 
-    expect((fixture.nativeElement.querySelector('textarea.sql') as HTMLTextAreaElement).value).toContain(
-      'JOIN [audit].[customers] AS [t1]',
-    );
+    expect(
+      (fixture.nativeElement.querySelector('textarea.sql') as HTMLTextAreaElement).value,
+    ).toContain('JOIN [audit].[customers] AS [t1]');
   });
 
   it('carga las tablas al elegir un esquema sin relaciones precargadas', async () => {
@@ -674,9 +678,9 @@ describe('QueryBuilder', () => {
     await fixture.whenStable();
     fixture.detectChanges();
 
-    expect((fixture.nativeElement.querySelector('textarea.sql') as HTMLTextAreaElement).value).toContain(
-      'INNER JOIN [audit].[customers] AS [t1]',
-    );
+    expect(
+      (fixture.nativeElement.querySelector('textarea.sql') as HTMLTextAreaElement).value,
+    ).toContain('INNER JOIN [audit].[customers] AS [t1]');
   });
 
   it('permite recorrer sugerencias con flechas, elegir con Enter y cerrar con Escape', async () => {
@@ -695,9 +699,9 @@ describe('QueryBuilder', () => {
     expect(fixture.nativeElement.querySelectorAll('.join-suggestions button').length).toBe(2);
     search.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown' }));
     fixture.detectChanges();
-    expect(fixture.nativeElement.querySelector('.join-suggestions .is-active')?.textContent).toContain(
-      'audit',
-    );
+    expect(
+      fixture.nativeElement.querySelector('.join-suggestions .is-active')?.textContent,
+    ).toContain('audit');
 
     search.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
     await fixture.whenStable();

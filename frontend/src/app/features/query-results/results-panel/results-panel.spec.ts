@@ -109,7 +109,9 @@ describe('ResultsPanel', () => {
     });
 
     it('se habilita al seleccionar una columna y dice cuánto se lleva', () => {
-      element.querySelectorAll<HTMLElement>('.cell--head')[1].dispatchEvent(new MouseEvent('click'));
+      element
+        .querySelectorAll<HTMLElement>('.cell--head')[1]
+        .dispatchEvent(new MouseEvent('click'));
       fixture.detectChanges();
 
       expect(copyButton().disabled).toBe(false);
@@ -125,7 +127,9 @@ describe('ResultsPanel', () => {
         clipboard: { writeText: (text: string) => Promise.resolve(text) },
       });
 
-      element.querySelectorAll<HTMLElement>('.cell--head')[1].dispatchEvent(new MouseEvent('click'));
+      element
+        .querySelectorAll<HTMLElement>('.cell--head')[1]
+        .dispatchEvent(new MouseEvent('click'));
       fixture.detectChanges();
 
       copyButton().click();

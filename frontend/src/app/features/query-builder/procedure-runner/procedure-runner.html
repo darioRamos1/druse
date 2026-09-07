@@ -6,9 +6,7 @@
   <header class="head">
     <div>
       <h2 class="title" id="runner-title">Ejecutar {{ procedure().name }}</h2>
-      <p class="subtitle">
-        {{ procedure().database }} · {{ procedure().schema }} · {{ engine() }}
-      </p>
+      <p class="subtitle">{{ procedure().database }} · {{ procedure().schema }} · {{ engine() }}</p>
     </div>
     <button type="button" class="close" (click)="closed.emit()" aria-label="Cerrar">×</button>
   </header>
@@ -85,8 +83,7 @@
             Informix solo entrega los parámetros de salida dentro de otro procedimiento, así que
             aquí la llamada se ejecuta sin recogerlos.
           } @else {
-            La llamada declara y lee los parámetros de salida; su valor sale como un resultado
-            más.
+            La llamada declara y lee los parámetros de salida; su valor sale como un resultado más.
           }
         </p>
       }

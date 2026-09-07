@@ -211,10 +211,7 @@ describe('escribir SQL', () => {
         columns: ['categoria'],
         groupBy: ['categoria'],
         aggregates: [distinct],
-        orders: [
-          { expression: distinct, descending: true },
-          { expression: 'categoria' },
-        ],
+        orders: [{ expression: distinct, descending: true }, { expression: 'categoria' }],
       });
 
       expect(sql).toContain('COUNT(DISTINCT `cliente_id`) AS `clientes`');
@@ -413,7 +410,7 @@ describe('escribir SQL', () => {
         ],
       });
 
-      expect(sql).toContain('VALUES (12, \'O\'\'Brien\', \'\', NULL)');
+      expect(sql).toContain("VALUES (12, 'O''Brien', '', NULL)");
     });
 
     it('un valor sin rellenar queda como marcador visible', () => {
@@ -491,7 +488,10 @@ describe('escribir SQL', () => {
       const sql = buildCall('sqlserver', {
         schema: 'dbo',
         routine: 'registrar',
-        parameters: [{ ...entrada, name: '@entrada' }, { ...salida, name: '@salida' }],
+        parameters: [
+          { ...entrada, name: '@entrada' },
+          { ...salida, name: '@salida' },
+        ],
       });
 
       expect(sql).toContain('DECLARE @out_salida varchar(30);');
@@ -581,9 +581,7 @@ describe('escribir SQL', () => {
       const condiciones = (sql: string) => sql.slice(sql.indexOf('WHERE'));
 
       expect(recuento).toContain('SELECT COUNT(*) AS filas FROM `usuarios`');
-      expect(condiciones(recuento).replace(';', '')).toBe(
-        condiciones(borrado).replace(';\n', ''),
-      );
+      expect(condiciones(recuento).replace(';', '')).toBe(condiciones(borrado).replace(';\n', ''));
     });
 
     it('sin filtros no hay nada que contar', () => {

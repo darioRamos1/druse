@@ -49,9 +49,7 @@ export class StatusBar {
   protected readonly interruptedLabel = computed(() => {
     const count = this.interrupted().length;
 
-    return count === 1
-      ? '1 trabajo quedó sin terminar'
-      : `${count} trabajos quedaron sin terminar`;
+    return count === 1 ? '1 trabajo quedó sin terminar' : `${count} trabajos quedaron sin terminar`;
   });
 
   /** El detalle, en el tooltip: qué era cada uno y sobre qué trabajaba. */
@@ -59,7 +57,9 @@ export class StatusBar {
     [
       'Estaban en marcha cuando Druse se cerró; lo que escribieron puede estar a medias.',
       '',
-      ...this.interrupted().map((job) => `· ${nameOf(job.kind)}${job.subject ? `: ${job.subject}` : ''}`),
+      ...this.interrupted().map(
+        (job) => `· ${nameOf(job.kind)}${job.subject ? `: ${job.subject}` : ''}`,
+      ),
       '',
       'Pulsa para descartar este aviso.',
     ].join('\n'),
@@ -88,7 +88,9 @@ export class StatusBar {
     return overall === null ? null : Math.round(overall * 100);
   });
 
-  protected readonly restoreSubject = computed(() => shorten(this.restore.progress()?.currentObject));
+  protected readonly restoreSubject = computed(() =>
+    shorten(this.restore.progress()?.currentObject),
+  );
 }
 
 /** Recorta un nombre largo para que no empuje al resto de la barra. */

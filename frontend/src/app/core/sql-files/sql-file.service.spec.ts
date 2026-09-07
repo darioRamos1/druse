@@ -53,12 +53,7 @@ describe('SqlFileService', () => {
     );
 
     expect(desktop.saveSqlFileAs).toHaveBeenNthCalledWith(1, 'Query 1.sql', 'SELECT 1;', undefined);
-    expect(desktop.saveSqlFileAs).toHaveBeenNthCalledWith(
-      2,
-      'ventas.sql',
-      'SELECT 2;',
-      'sql-1',
-    );
+    expect(desktop.saveSqlFileAs).toHaveBeenNthCalledWith(2, 'ventas.sql', 'SELECT 2;', 'sql-1');
   });
 
   /**

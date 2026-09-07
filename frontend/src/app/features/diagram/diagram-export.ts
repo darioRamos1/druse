@@ -69,8 +69,12 @@ export function toMermaid(graph: SchemaGraph, options: ExportOptions): string {
     for (const column of detail.columns) {
       const marks: string[] = [];
 
-      if (primary.has(column.name.toLowerCase())) { marks.push('PK'); }
-      if (foreign.has(column.name.toLowerCase())) { marks.push('FK'); }
+      if (primary.has(column.name.toLowerCase())) {
+        marks.push('PK');
+      }
+      if (foreign.has(column.name.toLowerCase())) {
+        marks.push('FK');
+      }
 
       lines.push(
         `        ${safeType(column.dataType)} ${safeName(column.name)}${marks.length > 0 ? ` ${marks.join(',')}` : ''}`,
@@ -82,7 +86,9 @@ export function toMermaid(graph: SchemaGraph, options: ExportOptions): string {
 
   for (const detail of graph.tables) {
     const nullable = new Set(
-      detail.columns.filter((column) => column.isNullable).map((column) => column.name.toLowerCase()),
+      detail.columns
+        .filter((column) => column.isNullable)
+        .map((column) => column.name.toLowerCase()),
     );
 
     for (const key of detail.structure.foreignKeys) {
@@ -122,8 +128,12 @@ export function toDbml(graph: SchemaGraph, options: ExportOptions): string {
     for (const column of detail.columns) {
       const notes: string[] = [];
 
-      if (primary.has(column.name.toLowerCase())) { notes.push('pk'); }
-      if (!column.isNullable) { notes.push('not null'); }
+      if (primary.has(column.name.toLowerCase())) {
+        notes.push('pk');
+      }
+      if (!column.isNullable) {
+        notes.push('not null');
+      }
 
       lines.push(
         `  ${safeName(column.name)} ${safeType(column.dataType)}` +

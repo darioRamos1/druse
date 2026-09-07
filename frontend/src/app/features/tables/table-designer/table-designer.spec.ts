@@ -81,9 +81,7 @@ describe('TableDesigner', () => {
       },
     ],
     uniqueConstraints: [{ name: 'uq_pedidos_codigo', columns: ['codigo'] }],
-    checkConstraints: [
-      { name: 'ck_pedidos_total', columns: [], expression: 'total > 0' },
-    ],
+    checkConstraints: [{ name: 'ck_pedidos_total', columns: [], expression: 'total > 0' }],
   };
 
   beforeEach(async () => {
@@ -199,8 +197,9 @@ describe('TableDesigner', () => {
     fixture.detectChanges();
     type.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
     fixture.detectChanges();
-    expect(fixture.nativeElement.querySelector('.type-picker__menu .is-active')?.textContent)
-      .toContain('NVARCHAR(255)');
+    expect(
+      fixture.nativeElement.querySelector('.type-picker__menu .is-active')?.textContent,
+    ).toContain('NVARCHAR(255)');
     type.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
     fixture.detectChanges();
 
@@ -411,8 +410,9 @@ describe('TableDesigner', () => {
   function typeOptions(): string[] {
     const element = fixture.nativeElement as HTMLElement;
 
-    return [...element.querySelectorAll<HTMLButtonElement>('.type-picker__menu button')]
-      .map((option) => option.textContent?.trim() ?? '');
+    return [...element.querySelectorAll<HTMLButtonElement>('.type-picker__menu button')].map(
+      (option) => option.textContent?.trim() ?? '',
+    );
   }
 
   /**

@@ -69,7 +69,12 @@ class FakeGateway implements Partial<ApplicationGateway> {
   resolution: BackupProfileResolution = {
     profile: guardado,
     tables: [
-      { id: 'Table:tienda.cat_paises', name: 'cat_paises', schema: 'tienda', database: 'druse_test' },
+      {
+        id: 'Table:tienda.cat_paises',
+        name: 'cat_paises',
+        schema: 'tienda',
+        database: 'druse_test',
+      },
       { id: 'Table:otro.movimientos', name: 'movimientos', schema: 'otro', database: 'druse_test' },
     ],
     gaps: [
@@ -154,8 +159,9 @@ describe('BackupDialog', () => {
 
   /** Lo que el diálogo mandaría al guardar, sin pasar por la pantalla. */
   function input(): BackupProfileInput {
-    return (fixture.componentInstance as unknown as { profileInput: () => BackupProfileInput })
-      .profileInput();
+    return (
+      fixture.componentInstance as unknown as { profileInput: () => BackupProfileInput }
+    ).profileInput();
   }
 
   /** Lo que se mandaría al lanzar el respaldo, sin pasar por la pantalla. */
@@ -187,17 +193,24 @@ describe('BackupDialog', () => {
   it('no escribe «filas» cuando el catálogo devuelve nulo', () => {
     const component = fixture.componentInstance as unknown as {
       candidates: {
-        set(value: readonly {
-          key: string;
-          source: DatabaseObject;
-          schema: string;
-          rows: number | null;
-        }[]): void;
+        set(
+          value: readonly {
+            key: string;
+            source: DatabaseObject;
+            schema: string;
+            rows: number | null;
+          }[],
+        ): void;
       };
     };
 
     component.candidates.set([
-      { key: 'tienda.sin_estimacion', source: table('sin_estimacion'), schema: 'tienda', rows: null },
+      {
+        key: 'tienda.sin_estimacion',
+        source: table('sin_estimacion'),
+        schema: 'tienda',
+        rows: null,
+      },
     ]);
     fixture.detectChanges();
 

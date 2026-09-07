@@ -233,7 +233,9 @@ export class BackupStore {
       }
     }
 
-    lines.push(...progress.warnings.map((warning) => `Aviso en ${warning.subject}: ${warning.message}`));
+    lines.push(
+      ...progress.warnings.map((warning) => `Aviso en ${warning.subject}: ${warning.message}`),
+    );
 
     return lines.join('\n');
   });

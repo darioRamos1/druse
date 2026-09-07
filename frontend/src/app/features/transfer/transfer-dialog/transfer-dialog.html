@@ -31,7 +31,10 @@
         >
           @for (connection of connections(); track connection.id) {
             <option [value]="connection.id">
-              {{ connection.name }}@if (connection.id === connectionId()) { (esta misma) }
+              {{ connection.name }}
+              @if (connection.id === connectionId()) {
+                (esta misma)
+              }
             </option>
           }
         </select>
@@ -99,8 +102,8 @@
 
       @if (translations().length === 0) {
         <p class="preview__line">
-          Las dos conexiones son del mismo motor, así que la tabla se crea con los mismos
-          tipos que tiene el origen.
+          Las dos conexiones son del mismo motor, así que la tabla se crea con los mismos tipos que
+          tiene el origen.
         </p>
       } @else {
         <!-- Lo que se pierde al cruzar de motor es lo que hay que leer aquí: el
@@ -108,13 +111,15 @@
         @if (untranslatable().length > 0) {
           <p class="problem">
             Estas columnas no tienen dónde ir en el motor de destino:
-            {{ untranslatable().length }}. Escríbeles un tipo a mano o déjalas fuera del
-            traslado; la tabla no se puede crear mientras estén así.
+            {{ untranslatable().length }}. Escríbeles un tipo a mano o déjalas fuera del traslado;
+            la tabla no se puede crear mientras estén así.
           </p>
         }
 
         <table class="mapping">
-          <caption class="sr-only">Tipos con los que se creará cada columna</caption>
+          <caption class="sr-only">
+            Tipos con los que se creará cada columna
+          </caption>
           <thead>
             <tr>
               <th scope="col">Columna</th>
@@ -138,10 +143,9 @@
               @if (translation.note) {
                 <tr class="note-row">
                   <td colspan="3">
-                    <span
-                      class="note"
-                      [class.note--lost]="translation.fidelity === 'None'"
-                    >{{ translation.note }}</span>
+                    <span class="note" [class.note--lost]="translation.fidelity === 'None'">{{
+                      translation.note
+                    }}</span>
                   </td>
                 </tr>
               }
@@ -322,18 +326,18 @@
             @if (preview.rowsEstimated) {
               de unas <strong>{{ preview.rowsEstimated }}</strong> filas.
             } @else if (where().trim()) {
-              y no se sabe cuántas filas: con una condición delante, el catálogo no
-              las estima.
+              y no se sabe cuántas filas: con una condición delante, el catálogo no las estima.
             } @else {
-              y no se sabe cuántas filas: el catálogo no tiene un recuento de esta
-              tabla. La barra irá contando lo que lleve copiado.
+              y no se sabe cuántas filas: el catálogo no tiene un recuento de esta tabla. La barra
+              irá contando lo que lleve copiado.
             }
           </p>
 
           @if (preview.keyColumns.length > 0) {
             <p class="preview__line">
               Una fila del destino se reconoce por
-              <strong>{{ preview.keyColumns.join(', ') }}</strong>.
+              <strong>{{ preview.keyColumns.join(', ') }}</strong
+              >.
             </p>
           }
 
@@ -347,7 +351,9 @@
           }
 
           @for (issue of preview.issues; track issue.column) {
-            <p class="warn"><strong>{{ issue.column }}:</strong> {{ issue.message }}</p>
+            <p class="warn">
+              <strong>{{ issue.column }}:</strong> {{ issue.message }}
+            </p>
           }
 
           @if (preview.missingRequired.length > 0) {
@@ -392,13 +398,20 @@
           <h3 class="summary__title">
             @switch (progress.outcome) {
               @case ('Completed') {
-                Copiadas {{ progress.rowsCopied }} filas@if (progress.rowsSkipped > 0) {
+                Copiadas {{ progress.rowsCopied }} filas
+                @if (progress.rowsSkipped > 0) {
                   , y {{ progress.rowsSkipped }} que ya estaban se quedaron como estaban
                 }
               }
-              @case ('CompletedWithWarnings') { Copiadas {{ progress.rowsCopied }} filas, con avisos }
-              @case ('Cancelled') { Cancelado con {{ progress.rowsCopied }} filas ya copiadas }
-              @default { No se pudo terminar }
+              @case ('CompletedWithWarnings') {
+                Copiadas {{ progress.rowsCopied }} filas, con avisos
+              }
+              @case ('Cancelled') {
+                Cancelado con {{ progress.rowsCopied }} filas ya copiadas
+              }
+              @default {
+                No se pudo terminar
+              }
             }
           </h3>
 
@@ -419,7 +432,9 @@
           }
 
           @for (warning of progress.warnings; track $index) {
-            <p class="warn"><strong>{{ warning.subject }}:</strong> {{ warning.message }}</p>
+            <p class="warn">
+              <strong>{{ warning.subject }}:</strong> {{ warning.message }}
+            </p>
           }
 
           <details class="summary__report">
@@ -433,9 +448,7 @@
 
   <footer class="foot">
     @if (step() === 'columns') {
-      <span class="hint">
-        {{ mapped() }} de {{ sourceColumns().length }} columnas se copian
-      </span>
+      <span class="hint"> {{ mapped() }} de {{ sourceColumns().length }} columnas se copian </span>
     }
 
     <span class="spacer"></span>
@@ -463,12 +476,7 @@
           {{ previewing() ? 'Mirando…' : 'Ver qué va a pasar' }}
         </button>
 
-        <button
-          type="button"
-          class="btn btn--danger"
-          [disabled]="!canRun()"
-          (click)="run()"
-        >
+        <button type="button" class="btn btn--danger" [disabled]="!canRun()" (click)="run()">
           Copiar las filas
         </button>
       }

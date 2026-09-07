@@ -220,7 +220,11 @@ function parseFit(value: string | undefined): BackgroundFit {
  * toque nada.
  */
 export function appearanceVariables(appearance: Appearance): Readonly<Record<string, string>> {
-  return { ...accentVariables(appearance), ...tintVariables(appearance), ...scaleVariables(appearance) };
+  return {
+    ...accentVariables(appearance),
+    ...tintVariables(appearance),
+    ...scaleVariables(appearance),
+  };
 }
 
 /**
@@ -318,7 +322,10 @@ export function tintStrength(hex: string): number {
  * `contain` calculan el suyo, y darles además un porcentaje sería pedirles dos
  * cosas incompatibles.
  */
-export function backgroundStyle(background: EditorBackground, source: string): Record<string, string> {
+export function backgroundStyle(
+  background: EditorBackground,
+  source: string,
+): Record<string, string> {
   const sized = background.fit === 'tile' || background.fit === 'scale';
   const scale = clamp(background.scale, MIN_BACKGROUND_SCALE, MAX_BACKGROUND_SCALE);
 

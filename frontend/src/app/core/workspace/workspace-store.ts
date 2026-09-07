@@ -494,11 +494,7 @@ export class WorkspaceStore {
 
         if (stillCurrent()) {
           this._notice.set(
-            describeSave(
-              outcome,
-              `Exportado a ${format.toUpperCase()}`,
-              'Exportación cancelada.',
-            ),
+            describeSave(outcome, `Exportado a ${format.toUpperCase()}`, 'Exportación cancelada.'),
           );
         }
       }
@@ -506,12 +502,7 @@ export class WorkspaceStore {
       const rejection = await asRejectionFromBlob(error);
 
       if (rejection) {
-        if (
-          tab &&
-          connection &&
-          this.activeTab()?.id === tab.id &&
-          stillCurrent()
-        ) {
+        if (tab && connection && this.activeTab()?.id === tab.id && stillCurrent()) {
           this._pendingRejection.set({
             value: rejection,
             operation: 'export',
@@ -589,17 +580,20 @@ export class WorkspaceStore {
 
   /** Entra en modo manual: a partir de aquí nada se confirma solo. */
   async beginTransaction(): Promise<boolean> {
-    return this.runTransaction((sessionId) => this._gateway.beginTransaction(sessionId), (state) => {
-      const aviso = state.ddlIsReversible
-        ? ''
-        : ' Crear o modificar tablas no se deshace en este motor, aunque uses «Deshacer».';
+    return this.runTransaction(
+      (sessionId) => this._gateway.beginTransaction(sessionId),
+      (state) => {
+        const aviso = state.ddlIsReversible
+          ? ''
+          : ' Crear o modificar tablas no se deshace en este motor, aunque uses «Deshacer».';
 
-      return (
-        `Transacción abierta en «${state.connectionName}». ` +
-        'Todo lo que ejecutes en esta conexión entra en ella hasta que la confirmes o la deshagas.' +
-        aviso
-      );
-    });
+        return (
+          `Transacción abierta en «${state.connectionName}». ` +
+          'Todo lo que ejecutes en esta conexión entra en ella hasta que la confirmes o la deshagas.' +
+          aviso
+        );
+      },
+    );
   }
 
   async commitTransaction(): Promise<boolean> {
@@ -1042,12 +1036,9 @@ export class WorkspaceStore {
       // de otro servidor.
       this.updateTabs((tabs) =>
         tabs.map((item) =>
-          item.id === tab.id
-            ? { ...item, connectionId, database, sourceTable: undefined }
-            : item,
+          item.id === tab.id ? { ...item, connectionId, database, sourceTable: undefined } : item,
         ),
       );
-
     }
 
     // El resultado en pantalla salió del servidor anterior. Se retira mire lo que
@@ -2202,10 +2193,7 @@ export class WorkspaceStore {
    * Devuelve las instrucciones ejecutadas, o `null` si no se aplicó nada: el
    * diálogo las enseña como confirmación de lo que acaba de ocurrir.
    */
-  async createTable(
-    connectionId: string,
-    design: TableDesign,
-  ): Promise<readonly string[] | null> {
+  async createTable(connectionId: string, design: TableDesign): Promise<readonly string[] | null> {
     const sessionId = this.findConnection(connectionId)?.sessionId;
 
     if (!sessionId) {

@@ -1,8 +1,4 @@
-import {
-  DEFAULT_FORMAT_SETTINGS,
-  formatPreferences,
-  parseFormatSettings,
-} from './format-settings';
+import { DEFAULT_FORMAT_SETTINGS, formatPreferences, parseFormatSettings } from './format-settings';
 
 describe('ajustes de formateo', () => {
   it('sin nada guardado, formatea como siempre lo hizo', () => {
