@@ -142,13 +142,29 @@ const SSL_MODES: readonly SslOption[] = [
   },
   {
     id: 'prefer',
-    label: 'Cifrado',
-    hint: 'Cifra si el servidor lo ofrece y acepta su certificado sin verificarlo.',
+    label: 'Cifra si puede',
+    hint: 'Cifra si el servidor lo ofrece, y sigue adelante si no.',
   },
   {
     id: 'require',
-    label: 'Cifrado verificado',
-    hint: 'Exige un certificado válido. Es lo que piden los servicios en la nube.',
+    label: 'Cifrado',
+    hint:
+      'Exige cifrado, pero no comprueba el certificado: protege de quien escucha el ' +
+      'cable, no de quien se hace pasar por el servidor.',
+  },
+  {
+    id: 'verifyca',
+    label: 'Certificado de confianza',
+    hint:
+      'Exige que el certificado lo firme una autoridad de confianza. No comprueba que ' +
+      'el nombre sea el de este servidor.',
+  },
+  {
+    id: 'verifyfull',
+    label: 'Certificado y nombre',
+    hint:
+      'Comprueba además que el certificado sea el de este servidor. Es el único modo ' +
+      'que protege de un intermediario, y lo que piden los servicios en la nube.',
   },
 ];
 

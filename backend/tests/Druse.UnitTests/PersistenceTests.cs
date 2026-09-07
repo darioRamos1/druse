@@ -1,4 +1,4 @@
-using Druse.Application.Abstractions;
+﻿using Druse.Application.Abstractions;
 using Druse.Application.Connections;
 using Druse.Domain;
 using Druse.Persistence.Sqlite;
@@ -72,6 +72,42 @@ public sealed class ConnectionProfileStoreTests : IDisposable
         ReadOnly = true,
         ConnectTimeoutSeconds = 20,
     };
+
+    /// <summary>
+    /// En SQL Server, «exigir cifrado» valía además por verificar el certificado:
+    /// era el único modo que ponía `TrustServerCertificate` en falso. Desde que
+    /// `Require` significa lo mismo en los cuatro motores —cifra y no comprueba—,
+    /// dejar ese perfil como estaba le quitaría la verificación **sin decirlo**.
+    ///
+    /// La migración lo mueve a `VerifyFull`, que es lo que ya estaba haciendo.
+    /// </summary>
+    [Fact]
+    public async Task UnPerfilDeSqlServerConRequire_SeMigraAVerifyFull()
+    {
+        var sqlServer = Profile("Producción") with
+        {
+            Engine = DatabaseEngine.SqlServer,
+            SslMode = SslMode.Require,
+        };
+
+        var postgres = Profile("Desarrollo") with { SslMode = SslMode.Require };
+
+        await _store.SaveAsync(sqlServer, CancellationToken.None);
+        await _store.SaveAsync(postgres, CancellationToken.None);
+
+        // Volver a migrar es lo que pasa al abrir Druse después de actualizar.
+        await _database.MigrateAsync(CancellationToken.None);
+
+        var migrado = await _store.FindAsync(sqlServer.Id, CancellationToken.None);
+        var intacto = await _store.FindAsync(postgres.Id, CancellationToken.None);
+
+        Assert.Equal(SslMode.VerifyFull, migrado?.SslMode);
+
+        // Y solo SQL Server: en los demás motores `Require` siempre significó
+        // cifrar sin comprobar, así que subirles el listón sería cambiarles la
+        // conexión por su cuenta.
+        Assert.Equal(SslMode.Require, intacto?.SslMode);
+    }
 
     [Fact]
     public async Task GuardaYRecuperaUnPerfilCompleto()

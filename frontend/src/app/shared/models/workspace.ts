@@ -44,7 +44,14 @@ export type AuthenticationMode = 'password' | 'windows';
  * Es independiente del túnel SSH: uno protege el camino hasta el servidor
  * intermedio y el otro, la conversación con la base.
  */
-export type SslMode = 'disable' | 'prefer' | 'require';
+/**
+ * Cuánto se exige del cifrado del transporte.
+ *
+ * `require` **cifra pero no comprueba con quién se habla**: protege de quien
+ * escucha el cable, no de quien se hace pasar por el servidor. Para eso están los
+ * dos últimos.
+ */
+export type SslMode = 'disable' | 'prefer' | 'require' | 'verifyca' | 'verifyfull';
 
 /**
  * Cómo se identifica Druse ante el servidor SSH intermedio.

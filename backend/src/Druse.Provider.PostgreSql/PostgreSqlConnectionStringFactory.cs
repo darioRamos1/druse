@@ -1,4 +1,4 @@
-using Druse.Database.Abstractions;
+﻿using Druse.Database.Abstractions;
 using Druse.Domain;
 using Npgsql;
 
@@ -61,10 +61,17 @@ internal static class PostgreSqlConnectionStringFactory
         return builder.ConnectionString;
     }
 
+    /// <summary>
+    /// Traduce el modo neutral al de Npgsql, que **se llaman igual y significan lo
+    /// mismo**: `Require` cifra sin mirar el certificado, y solo `VerifyCA` y
+    /// `VerifyFull` comprueban con quién se está hablando.
+    /// </summary>
     private static Npgsql.SslMode Translate(Domain.SslMode mode) => mode switch
     {
         Domain.SslMode.Disable => Npgsql.SslMode.Disable,
         Domain.SslMode.Require => Npgsql.SslMode.Require,
+        Domain.SslMode.VerifyCA => Npgsql.SslMode.VerifyCA,
+        Domain.SslMode.VerifyFull => Npgsql.SslMode.VerifyFull,
         _ => Npgsql.SslMode.Prefer,
     };
 }

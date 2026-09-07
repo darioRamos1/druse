@@ -208,12 +208,24 @@ describe('ConnectionDialog', () => {
       expect.objectContaining({ sslMode: 'prefer' }),
     );
 
-    button('Cifrado verificado').click();
+    // «Cifrado» a secas exige cifrar y **no** comprueba el certificado: es lo que
+    // significa `require` en los cuatro motores, y por eso ya no se llama
+    // «verificado» en la pantalla.
+    button('Cifrado').click();
     button('Probar conexión').click();
     await fixture.whenStable();
 
     expect(store.testConnection).toHaveBeenLastCalledWith(
       expect.objectContaining({ sslMode: 'require' }),
+    );
+
+    // Comprobar de verdad con quién se habla es el último modo.
+    button('Certificado y nombre').click();
+    button('Probar conexión').click();
+    await fixture.whenStable();
+
+    expect(store.testConnection).toHaveBeenLastCalledWith(
+      expect.objectContaining({ sslMode: 'verifyfull' }),
     );
   });
 
@@ -323,7 +335,7 @@ describe('ConnectionDialog', () => {
       expect(values).toContain('bastion.empresa.com');
       expect(values).toContain('2222');
       expect(values).toContain('C:\\claves\\id_ed25519');
-      expect(selected('Cifrado verificado')).toBe(true);
+      expect(selected('Cifrado')).toBe(true);
       expect(selected('Clave privada')).toBe(true);
     });
 

@@ -1,4 +1,4 @@
-namespace Druse.Domain;
+﻿namespace Druse.Domain;
 
 /// <summary>Entorno al que apunta una conexión. Determina el color y las advertencias.</summary>
 public enum ConnectionEnvironment
@@ -104,7 +104,34 @@ public sealed record ConnectionProfile
 /// <summary>Modo de cifrado del transporte, neutral respecto del motor.</summary>
 public enum SslMode
 {
+    /// <summary>Sin cifrado. La contraseña y los datos viajan en claro.</summary>
     Disable = 0,
+
+    /// <summary>Cifra si el servidor lo ofrece, y sigue adelante si no.</summary>
     Prefer = 1,
+
+    /// <summary>
+    /// Exige cifrado, **pero no comprueba con quién se está hablando**.
+    ///
+    /// Protege de quien escucha el cable, no de quien se hace pasar por el
+    /// servidor: un certificado autofirmado, caducado o de otro dominio vale
+    /// igual. Es lo que quiere una instalación de desarrollo, y por eso no se
+    /// llama «seguro» en ningún sitio de la interfaz.
+    /// </summary>
     Require = 2,
+
+    /// <summary>
+    /// Exige cifrado y que el certificado lo firme una autoridad de confianza.
+    ///
+    /// Ya no vale un autofirmado. Lo que **no** comprueba es que el nombre del
+    /// certificado sea el del servidor al que se pidió conectar: para eso está
+    /// <see cref="VerifyFull"/>.
+    /// </summary>
+    VerifyCA = 3,
+
+    /// <summary>
+    /// Cifrado, certificado de confianza **y** nombre que coincide con el
+    /// servidor. Es el único modo que protege de un intermediario.
+    /// </summary>
+    VerifyFull = 4,
 }

@@ -341,9 +341,29 @@ public sealed class DruseDatabase
                 ON jobs (started_at_utc DESC);
             """, cancellationToken);
 
+        // En SQL Server, «exigir cifrado» valía además por verificar el
+        // certificado: era el único modo que ponía `TrustServerCertificate` en
+        // falso. Desde la 1.1.1, `Require` significa lo mismo en los cuatro
+        // motores —cifra y no comprueba— y quien quiera comprobación pide
+        // `VerifyFull`.
+        //
+        // Sin esta migración, un perfil de SQL Server guardado con `Require`
+        // pasaría a **no verificar nada** y nadie se enteraría: una garantía que
+        // desaparece en silencio al actualizar. Se mueve a `VerifyFull`, que es lo
+        // que ese perfil ya estaba haciendo.
+        //
+        // Los números son los del enumerado —`DatabaseEngine.SqlServer` es 2,
+        // `SslMode.Require` es 2 y `SslMode.VerifyFull` es 4— porque así se
+        // guardan, y ninguno se reordena nunca por esta misma razón.
+        await ExecuteAsync(connection, """
+            UPDATE connection_profiles
+            SET ssl_mode = 4
+            WHERE engine = 2 AND ssl_mode = 2;
+            """, cancellationToken);
+
         // Marca de versión del esquema, para poder migrar más adelante sin
         // adivinar en qué estado está el archivo de cada usuario.
-        await ExecuteAsync(connection, "PRAGMA user_version = 8;", cancellationToken);
+        await ExecuteAsync(connection, "PRAGMA user_version = 9;", cancellationToken);
     }
 
     /// <summary>Añade una columna solo si el archivo del usuario aún no la tiene.</summary>

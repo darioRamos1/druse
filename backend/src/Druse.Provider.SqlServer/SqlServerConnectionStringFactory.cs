@@ -1,4 +1,4 @@
-using Druse.Database.Abstractions;
+﻿using Druse.Database.Abstractions;
 using Druse.Domain;
 using Microsoft.Data.SqlClient;
 
@@ -78,8 +78,18 @@ internal static class SqlServerConnectionStringFactory
     /// SqlClient 4 cambió el valor por omisión de `Encrypt` a `true`, lo que rompe
     /// la conexión contra servidores con certificado autofirmado —el caso de
     /// cualquier instalación de desarrollo—. Por eso, cuando el usuario no exige
-    /// cifrado, se acepta explícitamente el certificado del servidor en lugar de
-    /// fallar con un error de confianza que no explica nada.
+    /// verificación, se acepta explícitamente el certificado del servidor en lugar
+    /// de fallar con un error de confianza que no explica nada.
+    ///
+    /// **SqlClient no separa `VerifyCA` de `VerifyFull`**: con
+    /// `TrustServerCertificate = false` valida la cadena y el nombre a la vez. Los
+    /// dos modos se traducen igual, y el más fuerte es el que se cumple, que es el
+    /// lado correcto por el que equivocarse.
+    ///
+    /// Ojo con el cambio de la versión 1.1.1: antes `Require` valía por
+    /// verificación. Ahora `Require` es solo cifrado —como en los demás motores— y
+    /// los perfiles que ya existían se migran a `VerifyFull` para que nadie pierda
+    /// la comprobación que tenía.
     /// </summary>
     private static void Apply(SqlConnectionStringBuilder builder, Domain.SslMode mode)
     {
@@ -89,7 +99,8 @@ internal static class SqlServerConnectionStringFactory
                 builder.Encrypt = false;
                 break;
 
-            case Domain.SslMode.Require:
+            case Domain.SslMode.VerifyCA:
+            case Domain.SslMode.VerifyFull:
                 builder.Encrypt = true;
                 builder.TrustServerCertificate = false;
                 break;

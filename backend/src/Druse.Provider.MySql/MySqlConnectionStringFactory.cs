@@ -1,4 +1,4 @@
-using Druse.Database.Abstractions;
+﻿using Druse.Database.Abstractions;
 using Druse.Domain;
 using MySqlConnector;
 
@@ -91,17 +91,19 @@ internal static class MySqlConnectionStringFactory
     /// <summary>
     /// Traduce el modo SSL neutral.
     ///
-    /// `Preferred` cifra si el servidor lo ofrece y continúa si no, que es el
-    /// comportamiento esperado contra una instalación de desarrollo con
-    /// certificado autofirmado. `Required` exige cifrado pero no valida la cadena
-    /// de confianza: para eso están VerifyCA y VerifyFull, que exigen configurar
-    /// el certificado y todavía no se pueden pedir desde la interfaz.
+    /// Los cinco valen y significan lo mismo que en el resto: `Required` exige
+    /// cifrado pero **no** valida la cadena de confianza, y para comprobar con
+    /// quién se habla están `VerifyCA` y `VerifyFull`. Sin certificado propio
+    /// configurado, la validación se hace contra el almacén de confianza del
+    /// sistema, que es lo que sirve para un servidor con certificado de verdad.
     /// </summary>
     private static void Apply(MySqlConnectionStringBuilder builder, Domain.SslMode mode) =>
         builder.SslMode = mode switch
         {
             Domain.SslMode.Disable => MySqlSslMode.Disabled,
             Domain.SslMode.Require => MySqlSslMode.Required,
+            Domain.SslMode.VerifyCA => MySqlSslMode.VerifyCA,
+            Domain.SslMode.VerifyFull => MySqlSslMode.VerifyFull,
             _ => MySqlSslMode.Preferred,
         };
 }
