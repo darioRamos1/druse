@@ -84,6 +84,86 @@ public sealed class ReadOnlySessionTests
     }
 
     /// <summary>
+    /// El caso que ningún análisis de texto puede ver: **una función que escribe
+    /// por dentro**.
+    ///
+    /// Desde fuera es un `SELECT` normal —el analizador de Druse lo deja pasar, y
+    /// hace bien— y lo que hace es un `INSERT`. Si el motor no estuviera en solo
+    /// lectura, la fila entraría.
+    /// </summary>
+    [Fact]
+    public async Task PostgreSql_ConSesionDeSoloLectura_UnaFuncionQueEscribeTampocoEscribe()
+    {
+        var fixture = new PostgreSqlFixture();
+
+        if (!fixture.IsAvailable) { return; }
+
+        var sufijo = Guid.NewGuid().ToString("N")[..8];
+        var tabla = $"druse_ro_t_{sufijo}";
+        var funcion = $"druse_ro_f_{sufijo}";
+
+        await using var writable = await fixture.Provider.OpenSessionAsync(
+            fixture.Profile(),
+            fixture.Credentials,
+            CancellationToken.None);
+
+        try
+        {
+            await RunAsync(fixture, writable, $"CREATE TABLE {tabla} (id integer)");
+
+            await RunAsync(fixture, writable, $"""
+                CREATE FUNCTION {funcion}() RETURNS integer AS $$
+                BEGIN
+                    INSERT INTO {tabla} (id) VALUES (1);
+                    RETURN 1;
+                END;
+                $$ LANGUAGE plpgsql;
+                """);
+
+            await using var session = await fixture.Provider.OpenSessionAsync(
+                fixture.Profile(onlyRead: true),
+                fixture.Credentials,
+                CancellationToken.None);
+
+            // Para el analizador esto es una lectura, y no se le puede pedir otra
+            // cosa: lo que hay dentro de la función está en el servidor.
+            Assert.False(SqlSafetyAnalyzer.IsMutating($"SELECT {funcion}()"));
+
+            var rechazado = await fixture.Executor.ExecuteAsync(
+                session,
+                Query($"SELECT {funcion}()"),
+                CancellationToken.None);
+
+            Assert.Equal(QueryExecutionState.Failed, rechazado.State);
+
+            // Y la tabla sigue vacía: no es que fallara después de escribir.
+            var filas = await fixture.Executor.ExecuteAsync(
+                writable,
+                Query($"SELECT count(*) FROM {tabla}"),
+                CancellationToken.None);
+
+            Assert.Equal("0", filas.ResultSets[0].Rows[0][0]);
+        }
+        finally
+        {
+            await RunAsync(fixture, writable, $"DROP FUNCTION IF EXISTS {funcion}()");
+            await RunAsync(fixture, writable, $"DROP TABLE IF EXISTS {tabla}");
+        }
+    }
+
+    private static async Task RunAsync(
+        PostgreSqlFixture fixture,
+        IDatabaseSession session,
+        string sql)
+    {
+        var result = await fixture.Executor.ExecuteAsync(session, Query(sql), CancellationToken.None);
+
+        Assert.True(
+            result.State == QueryExecutionState.Succeeded,
+            $"No se pudo preparar la prueba: {result.Error?.Message}");
+    }
+
+    /// <summary>
     /// El mismo caso en MySQL, con la escritura más directa que hay: si el motor
     /// la rechaza, lo hace por la sesión y no por el analizador, porque aquí se
     /// habla con el ejecutor directamente.

@@ -278,26 +278,56 @@ no solamente validaciones visuales.
 
 ### Solo lectura
 
-- [ ] **SEC-001:** aplicar modo read-only nativo de conexión o transacción cuando el motor lo soporte.
-- [ ] **SEC-002:** mantener el analizador SQL como aviso preventivo, no como frontera de seguridad.
-- [ ] **SEC-003:** documentar que un usuario restringido en el servidor sigue siendo la garantía definitiva.
-- [ ] **SEC-004:** probar `CALL`, `EXEC`, `SELECT INTO`, `COPY FROM`, `LOAD DATA` y funciones con efectos laterales.
+- [x] **SEC-001:** aplicar modo read-only nativo de conexión o transacción cuando el motor lo soporte.
+- [x] **SEC-002:** mantener el analizador SQL como aviso preventivo, no como frontera de seguridad.
+- [x] **SEC-003:** documentar que un usuario restringido en el servidor sigue siendo la garantía definitiva.
+- [x] **SEC-004:** probar `CALL`, `EXEC`, `SELECT INTO`, `COPY FROM`, `LOAD DATA` y funciones con efectos laterales.
 
 ### TLS
 
-- [ ] **SEC-005:** ampliar la configuración a `Disable`, `Prefer`, `Require`, `VerifyCA` y `VerifyFull` cuando el proveedor lo permita.
-- [ ] **SEC-006:** no presentar como verificada una conexión que cifra pero acepta cualquier certificado.
+- [x] **SEC-005:** ampliar la configuración a `Disable`, `Prefer`, `Require`, `VerifyCA` y `VerifyFull` cuando el proveedor lo permita.
+- [x] **SEC-006:** no presentar como verificada una conexión que cifra pero acepta cualquier certificado.
 - [ ] **SEC-007:** permitir configurar CA, certificado cliente y validación de hostname cuando corresponda.
-- [ ] **SEC-008:** actualizar valores por defecto y mensajes de ayuda sin romper perfiles guardados.
+- [x] **SEC-008:** actualizar valores por defecto y mensajes de ayuda sin romper perfiles guardados.
 
 ### Restauración y archivos
 
-- [ ] **SEC-009:** devolver en la inspección un identificador o hash SHA-256 del artefacto aprobado.
-- [ ] **SEC-010:** exigir ese identificador y una confirmación explícita al ejecutar la restauración.
-- [ ] **SEC-011:** rechazar la ejecución si el archivo cambió después de inspeccionarlo.
-- [ ] **SEC-012:** tratar un fallo de lectura del catálogo como estado desconocido, nunca como “sin colisiones”.
-- [ ] **SEC-013:** establecer permisos restrictivos para SQLite, logs y `endpoint.json`.
-- [ ] **SEC-014:** decidir y documentar una defensa contra fórmulas al exportar CSV para hojas de cálculo.
+- [x] **SEC-009:** devolver en la inspección un identificador o hash SHA-256 del artefacto aprobado.
+- [x] **SEC-010:** exigir ese identificador y una confirmación explícita al ejecutar la restauración.
+- [x] **SEC-011:** rechazar la ejecución si el archivo cambió después de inspeccionarlo.
+- [x] **SEC-012:** tratar un fallo de lectura del catálogo como estado desconocido, nunca como “sin colisiones”.
+- [x] **SEC-013:** establecer permisos restrictivos para SQLite, logs y `endpoint.json`.
+- [x] **SEC-014:** decidir y documentar una defensa contra fórmulas al exportar CSV para hojas de cálculo.
+
+> Estado al 7 de septiembre de 2026: cerrado todo menos **SEC-007**.
+>
+> «Solo lectura» pasa a ser algo que impide el motor donde el motor lo permite
+> —PostgreSQL y MySQL—, y donde no —SQL Server e Informix— se dice en vez de
+> disimularlo. Está comprobado con lo que ningún análisis de texto puede ver: una
+> función que hace `INSERT` por dentro, llamada con un `SELECT` que el analizador
+> aprueba, y que el servidor rechaza.
+>
+> El cifrado deja de llamarse «verificado» cuando no verifica nada: cinco modos
+> con el mismo significado en los cuatro motores, y los perfiles de SQL Server que
+> tenían `Require` —el único que allí sí verificaba— se migran a `VerifyFull` para
+> que nadie pierda esa comprobación en silencio.
+>
+> Restaurar aplica lo que se inspeccionó y no lo que haya en la ruta; el catálogo
+> ilegible deja de leerse como «no hay colisiones»; el directorio de datos y la
+> base local quedan cerrados a las demás cuentas de la máquina; y un CSV exportado
+> ya no puede ejecutarse al abrirlo en una hoja de cálculo —en los respaldos no,
+> porque ese CSV vuelve a una base—.
+>
+> **SEC-007 sigue abierta**: elegir la CA y el certificado de cliente. Sin eso,
+> `VerifyCA` y `VerifyFull` validan contra el almacén de confianza del sistema,
+> que sirve para un servidor con certificado de verdad y no para una CA propia.
+> Lleva campos nuevos en el perfil, su sitio en la pantalla y decidir dónde se
+> guardan esas rutas.
+>
+> De **SEC-004** quedan fuera `COPY FROM` y `LOAD DATA`: no se envían como una
+> instrucción más —usan su propio protocolo, con el archivo del lado del cliente—
+> y probarlos exige montar ese camino aparte. Lo que sí se probó es lo que
+> comparte su naturaleza: escribir sin que la palabra aparezca en el texto.
 
 ### Criterios de aceptación
 

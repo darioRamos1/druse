@@ -10,19 +10,19 @@
 
 | Campo | Valor |
 | --- | --- |
-| Última sesión | **042** — 2026-09-07 |
+| Última sesión | **043** — 2026-09-07 |
 | Fase activa | **Migración de datos entre tablas:** fases 1, 2 y 3 cerradas; la **4** cerrada: la pasada de varias tablas, lo que cada tabla hace distinto y las migraciones guardadas (ver «Qué toca retomar»). **Respaldos y restauración:** Fases A–E cerradas. La **F** tiene backend, interfaz, CSV, selector de archivos, restaurar en una base nueva y **el ciclo entero por HTTP en los cuatro motores**; le falta repetir a mano el respaldo real que encontró el error de los índices de expresión. **Diagramas entidad-relación:** plan escrito y **Fase A** (lectura del catálogo en lote, cuatro motores) y **Fase B** (colocación determinista y lienzo) implementadas; falta cerrar la A contra los cuatro motores y ver el barrido de capturas |
 | Fases 0–6 | ✅ Cerradas. |
 | Fase 7 | 🟡 **11/12.** El ciclo de instalación está probado sobre este equipo; solo falta arrancar en una máquina sin herramientas de desarrollo. |
 | Fase 8 | ✅ **7/7.** Tres motores sobre el mismo contrato y primera beta preparada. |
 | ¿Compila el backend? | Sí — 0 advertencias, 0 errores |
 | ¿Compila el envoltorio? | Sí — recompilado en la 037 con `build/scripts/msvc-env.ps1` cargado antes; sin él, `cargo` falla en `vswhom-sys` por elegir el MSVC equivocado. **Sus pruebas ya son 17**, con las dos que vigilan la CSP y las cuatro de `DRUSE_DATA_DIR` |
-| ¿Pasan las pruebas? | Sí. En la **042**: **964 del backend** con PostgreSQL levantado —539 unitarias, 158 de integración de 161 y 267 contractuales—, **792 del frontend** y **23 del envoltorio**, con `cargo fmt --check` y `clippy -- -D warnings` limpios. En la **041** el comando de siempre pasó de ejecutar **cero** pruebas a ejecutarlas todas. Las contractuales salen verdes **sin los otros tres motores delante**: sin `DRUSE_REQUIRE_ENGINES=1` cada prueba termina sin comprobar nada cuando el servidor no responde. El `DATE` de Informix por SQLI de la 039 sigue sin repetirse: hace falta ese contenedor |
+| ¿Pasan las pruebas? | Sí. En la **043**: **980 del backend** con PostgreSQL y MySQL levantados —547 unitarias, 159 de integración de 162 y 274 contractuales— y **792 del frontend**. Las **23 del envoltorio** y el barrido de capturas son de la 042, y siguen valiendo: la 043 no tocó Rust ni pantallas nuevas. Las contractuales salen verdes **sin los motores delante**: sin `DRUSE_REQUIRE_ENGINES=1` cada prueba termina sin comprobar nada cuando el servidor no responde. El `DATE` de Informix por SQLI de la 039 sigue sin repetirse: hace falta ese contenedor |
 | ¿Hay aplicación de escritorio? | **Sí.** Instalador NSIS y ZIP portable, en dos variantes: con Informix y sin él. Desde la 038 **se actualiza sola** —o lo hará: ver el aviso del repositorio privado en §9—. El MSI dejó de generarse: `tauri.conf.json` solo declara `nsis`, que es lo que necesita el actualizador. En la **040** se regeneraron los instaladores y **la variante completa quedó instalada y abierta en este equipo**, con el arreglo del envoltorio dentro. Siguen **sin firma Authenticode**: SmartScreen en cada equipo |
 | Motores | **PostgreSQL, SQL Server, MySQL/MariaDB e Informix**, sobre el mismo contrato. Informix tiene **dos entradas**: por DRDA con el driver de IBM (puerto 9089) y por **SQLI**, su protocolo nativo, con el puente JDBC (9088). Cambia por dónde se entra; el SQL, el catálogo y los tipos son los mismos |
 | Trabajo a medias | **Nada sin commitear.** De la 041 queda `PLAN_MEJORAS_DRUSE.md` con las fases 0 y 1 marcadas y el resto por hacer. Sin comprobar: las contractuales de la lectura en lote contra los cuatro motores desde la 039, **el multicursor dentro de la ventana empaquetada**, y de antes —**el diálogo del sistema y el selector de carpeta siguen sin verse abrir**, y **el actualizador no puede funcionar mientras el repositorio sea privado** (ver §9) |
 | Bloqueantes | Ninguno para seguir programando. Sí para dar por buenos cuatro motores y cuatro funciones: ver «Qué toca retomar». |
-| Git | El **PR #9 se fusionó** (sesión 022). Se trabaja en `feat/respaldos-y-restauracion`, con todo subido: las 024–027 en `1452a6c`, las 028–031 en `640151c`, las 032–036 de `d3ac0d5` a `35d192e`, la 037 de `4ba8cce` a `20727eb`, la **038** en `a455be7`, `4c6f74a`, `55711f0` y `93f7f26`, la **039** hasta `5c2d09b`, y la **040** en `80da9f6`, `03c3478`, `a04c706`, `117b15f`, `2946156` y `2d52c8e`, la **041** en `64c2adf`, `203b771`, `6d31a86`, `5a924c6`, `8bcf83a`, `f4f683e` y `f65cd73`, y la **042** en `0ae38fa`, `120485f`, `2a6f151` y `837cbb6`, ya sobre `main` |
+| Git | El **PR #9 se fusionó** (sesión 022). Se trabaja en `feat/respaldos-y-restauracion`, con todo subido: las 024–027 en `1452a6c`, las 028–031 en `640151c`, las 032–036 de `d3ac0d5` a `35d192e`, la 037 de `4ba8cce` a `20727eb`, la **038** en `a455be7`, `4c6f74a`, `55711f0` y `93f7f26`, la **039** hasta `5c2d09b`, y la **040** en `80da9f6`, `03c3478`, `a04c706`, `117b15f`, `2946156` y `2d52c8e`, la **041** en `64c2adf`, `203b771`, `6d31a86`, `5a924c6`, `8bcf83a`, `f4f683e` y `f65cd73`, la **042** en `0ae38fa`, `120485f`, `2a6f151` y `837cbb6`, y la **043** de `ebf42ac` a `fd9432d`, ya sobre `main` |
 | Integración continua | 🔴 **Parada, y no por el código.** GitHub aborta los jobs en dos segundos: «recent account payments have failed or your spending limit needs to be increased». Hasta resolver la facturación, ningún PR podrá pasar los checks. Lo que sí cambió en la **041**: cuando vuelva a correr, **ejecutará pruebas de verdad** —hasta ahora el job del backend terminaba en verde sin ejecutar ninguna—, y publicar exige que el commit tenga su ejecución de CI en verde. |
 
 ### Qué toca retomar en la próxima sesión
@@ -35,12 +35,17 @@ autenticado, y ese 404 ni siquiera se distingue de «no hay versión nueva». Es
 una decisión que hay que tomar antes de repartir nada: repositorio público, o
 publicar los artefactos en otro sitio.
 
+#### Lo que deja abierta la 043
+
+1. **SEC-007**: elegir la CA y el certificado de cliente de una conexión. Hoy
+   `VerifyCA` y `VerifyFull` validan contra el almacén de confianza del sistema,
+   que no sirve para una CA propia.
+2. **Las fases 4 a 6 del plan de mejoras**: observabilidad y límites de recursos,
+   contrato HTTP y accesibilidad, y distribución.
+
 #### Lo que deja abierta la 042
 
-1. **La fase 3 del plan de mejoras**: seguridad. Modo solo lectura nativo del
-   motor, TLS que verifique de verdad y exigir el hash del artefacto
-   inspeccionado antes de restaurarlo.
-2. **El aviso al cerrar, en la aplicación instalada.** Se vio salir en la ventana
+1. **El aviso al cerrar, en la aplicación instalada.** Se vio salir en la ventana
    de `cargo tauri dev`, que es el mismo WebView2; el instalador no se ha
    regenerado con esto dentro.
 3. **El apagado ordenado contra la API empaquetada.** Al probarlo, la de
@@ -380,6 +385,83 @@ Pendiente de verificar cuando toque: Docker (pruebas de integración con contene
 ---
 
 ## 5. Registro de sesiones
+
+### Sesión 043 — 2026-09-07 · Las promesas de seguridad que no cumplía nadie
+
+Fase 3 del plan de mejoras, entera salvo una tarea. Todo lo de aquí eran cosas
+que la pantalla prometía y nadie cumplía.
+
+#### «Solo lectura» no impedía escribir
+
+Marcar la conexión como solo lectura hacía **una** cosa: que el analizador de SQL
+rechazara el texto si contenía `INSERT`, `UPDATE` y unas cuantas palabras más. Es
+un análisis léxico, y hay escrituras que no ve.
+
+Ahora, donde el motor tiene sesiones de solo lectura, Druse las pide al abrir:
+`SET SESSION CHARACTERISTICS AS TRANSACTION READ ONLY` en PostgreSQL y `SET
+SESSION TRANSACTION READ ONLY` en MySQL. SQL Server e Informix no tienen nada
+equivalente y **eso se dice** en vez de disimularse: la sesión expone si la
+protección es del motor, y el diálogo de conexión cambia su texto según el caso.
+
+La prueba que lo demuestra es una función de PostgreSQL que hace `INSERT` por
+dentro: llamada con un `SELECT`, el analizador la aprueba —y hace bien, lo que
+hay dentro está en el servidor— y el motor la rechaza. La tabla queda vacía.
+
+#### «Cifrado verificado» no verificaba nada
+
+Era la etiqueta de `require`, y en PostgreSQL y MySQL `require` **solo cifra**:
+acepta un certificado autofirmado, caducado o de otro dominio. Ahora los modos son
+cinco, significan lo mismo en los cuatro motores y cada uno dice de qué protege.
+
+SQL Server era el raro: allí `require` sí ponía `TrustServerCertificate` en falso.
+Al pasar a la semántica común esos perfiles habrían perdido la comprobación sin
+que nadie se enterase, así que la migración de la base local los mueve a
+`VerifyFull`, que es lo que ya hacían.
+
+#### Restaurar aplicaba lo que hubiera en la ruta
+
+Entre inspeccionar y aceptar cabía cualquier cosa. Ahora la inspección devuelve
+una huella del artefacto y la restauración la exige: sin ella no se aplica nada, y
+si no coincide tampoco. **No es un hash del contenido** —leer gigabytes otra vez
+sumaría minutos a cada restauración— sino un resumen de qué archivos lo forman,
+cuánto ocupan y cuándo se tocaron; está escrito qué detecta y qué no.
+
+Y el catálogo del destino deja de mentir: cuando no se puede leer, se dice, en
+lugar de devolver «no hay colisiones», que en la pantalla se lee igual que «no se
+sobrescribe nada».
+
+#### Lo que estaba abierto en el disco
+
+El directorio de datos y la base local se creaban en Unix con permisos legibles
+para cualquier cuenta de la máquina: ahí están las conexiones del usuario, su
+historial y **el token de la API local**. Ahora quedan en `700` y `600`, con los
+`-wal` y `-shm` incluidos.
+
+Y un CSV exportado podía ejecutarse al abrirlo: las hojas de cálculo interpretan
+como fórmula lo que empiece por `=`, `+`, `-` o `@`, y ese texto viene de la base.
+Al exportar para mirar sale como texto; **en los respaldos no**, porque ese CSV
+vuelve a una base y tiene que salir tal cual entró.
+
+**Verificado.** Contra PostgreSQL y MySQL de verdad: el `SELECT … INTO` que el
+analizador deja pasar, la función con efectos laterales, el `CREATE TABLE` por el
+ejecutor, y los modos de cifrado —exigirlo contra un servidor sin TLS falla, que
+es la única forma de saber que la opción llega al driver—. La huella se comprobó
+restaurando sin ella y con una de antes de tocar el archivo: las dos veces se
+planta y la tabla del artefacto no llega a existir.
+
+**No hecho.** **SEC-007**: elegir la CA y el certificado de cliente. Y de SEC-004
+quedan fuera `COPY FROM` y `LOAD DATA`, que no viajan como una instrucción más
+—usan su propio protocolo— y exigen montar ese camino aparte.
+
+**Pruebas.** 980 del backend con PostgreSQL y MySQL levantados —547 unitarias, 159
+de integración de 162 y 274 contractuales— y **792 del frontend**.
+
+**Archivos.** Los cuatro proveedores, `IDatabaseProvider.cs`, `ConnectionProfile.cs`,
+`RestoreService.cs`, `ArtifactFingerprint.cs`, `CsvResultExporter.cs`,
+`AppPaths.cs`, `DruseDatabase.cs`, contratos, `connection-dialog.*`,
+`restore.store.ts` y sus pruebas.
+
+**Estado al cerrar.** Commiteado en `main`.
 
 ### Sesión 042 — 2026-09-07 · Cerrar Druse con trabajo en marcha, y la API que ya no muere a la fuerza
 
