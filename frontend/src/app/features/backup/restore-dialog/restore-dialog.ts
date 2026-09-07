@@ -17,6 +17,7 @@ import { ExplorerNode } from '../../../shared/models/workspace';
 import { FolderPicker } from '../../../shared/ui/folder-picker/folder-picker';
 import { Icon } from '../../../shared/ui/icon/icon';
 import { OperationProgress } from '../../../shared/ui/operation-progress/operation-progress';
+import { DialogFocus } from '../../../shared/a11y/dialog-focus';
 
 /**
  * Aplica un respaldo sobre la base abierta.
@@ -33,7 +34,7 @@ import { OperationProgress } from '../../../shared/ui/operation-progress/operati
 @Component({
   selector: 'app-restore-dialog',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FolderPicker, Icon, OperationProgress],
+  imports: [DialogFocus, FolderPicker, Icon, OperationProgress],
   templateUrl: './restore-dialog.html',
   styleUrl: './restore-dialog.scss',
 })

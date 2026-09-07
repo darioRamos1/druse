@@ -1,4 +1,4 @@
-using Druse.Database.Abstractions;
+﻿using Druse.Database.Abstractions;
 using Druse.Domain;
 using Druse.Provider.PostgreSql;
 
@@ -137,7 +137,18 @@ public sealed class PostgreSqlFixture : IProviderFixture
         AS $$ BEGIN salida := 'hecho'; END $$
         """;
 
-    public string DropProcedure(string name) => $"DROP PROCEDURE IF EXISTS {name}()";
+    /// <summary>
+    /// Sin la lista de argumentos, que es lo que la hacía fallar en silencio.
+    ///
+    /// `DROP PROCEDURE nombre()` busca **la sobrecarga sin parámetros**, y la que
+    /// crean estas pruebas tiene dos: no borraba nada, y con `IF EXISTS` tampoco
+    /// se quejaba. La base de pruebas se fue llenando de procedimientos que
+    /// después salían en el barrido de capturas.
+    ///
+    /// Desde PostgreSQL 10 se puede omitir la lista cuando el nombre no es
+    /// ambiguo, y aquí nunca lo es: lleva un GUID dentro.
+    /// </summary>
+    public string DropProcedure(string name) => $"DROP PROCEDURE IF EXISTS {name}";
 
     public string TimestampTypeName => "timestamp with time zone";
 

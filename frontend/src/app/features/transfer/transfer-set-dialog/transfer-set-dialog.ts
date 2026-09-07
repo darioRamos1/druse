@@ -17,6 +17,7 @@ import { TransferStore } from '../../../core/transfer/transfer.store';
 import { WorkspaceStore } from '../../../core/workspace/workspace-store';
 import { DatabaseObject } from '../../../shared/models/workspace';
 import { OperationProgress } from '../../../shared/ui/operation-progress/operation-progress';
+import { DialogFocus } from '../../../shared/a11y/dialog-focus';
 
 type Step = 'tables' | 'target' | 'plan' | 'running';
 
@@ -42,7 +43,7 @@ interface Pair {
 @Component({
   selector: 'app-transfer-set-dialog',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, OperationProgress],
+  imports: [DialogFocus, FormsModule, OperationProgress],
   templateUrl: './transfer-set-dialog.html',
   styleUrl: './transfer-set-dialog.scss',
 })

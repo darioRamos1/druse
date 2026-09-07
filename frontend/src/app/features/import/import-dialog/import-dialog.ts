@@ -11,6 +11,7 @@ import { FormsModule } from '@angular/forms';
 
 import { WorkspaceStore } from '../../../core/workspace/workspace-store';
 import { DatabaseObject } from '../../../shared/models/workspace';
+import { DialogFocus } from '../../../shared/a11y/dialog-focus';
 
 /**
  * Importar un archivo dentro de una tabla.
@@ -23,7 +24,7 @@ import { DatabaseObject } from '../../../shared/models/workspace';
 @Component({
   selector: 'app-import-dialog',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule],
+  imports: [DialogFocus, FormsModule],
   templateUrl: './import-dialog.html',
   styleUrl: './import-dialog.scss',
 })

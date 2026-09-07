@@ -28,6 +28,7 @@ import {
   TableDesign,
   UniqueConstraintDesign,
 } from '../../../shared/models/workspace';
+import { DialogFocus } from '../../../shared/a11y/dialog-focus';
 
 /** Pestañas del diseñador. */
 export type DesignerSection = 'columns' | 'indexes' | 'keys' | 'constraints';
@@ -113,7 +114,7 @@ interface DesignRow {
 @Component({
   selector: 'app-table-designer',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule],
+  imports: [DialogFocus, FormsModule],
   templateUrl: './table-designer.html',
   styleUrl: './table-designer.scss',
 })

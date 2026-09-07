@@ -22,6 +22,7 @@ import {
 } from '../../../shared/models/workspace';
 import { EngineBadge } from '../../../shared/ui/engine-badge/engine-badge';
 import { Icon } from '../../../shared/ui/icon/icon';
+import { DialogFocus } from '../../../shared/a11y/dialog-focus';
 
 interface EngineOption {
   readonly id: DatabaseEngine;
@@ -183,7 +184,7 @@ const ENVIRONMENTS: readonly EnvironmentOption[] = [
 @Component({
   selector: 'app-connection-dialog',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, EngineBadge, Icon],
+  imports: [DialogFocus, FormsModule, EngineBadge, Icon],
   templateUrl: './connection-dialog.html',
   styleUrl: './connection-dialog.scss',
 })

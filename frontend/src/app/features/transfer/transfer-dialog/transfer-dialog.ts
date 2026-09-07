@@ -22,6 +22,7 @@ import { TransferStore } from '../../../core/transfer/transfer.store';
 import { WorkspaceStore } from '../../../core/workspace/workspace-store';
 import { DatabaseColumn, DatabaseObject } from '../../../shared/models/workspace';
 import { OperationProgress } from '../../../shared/ui/operation-progress/operation-progress';
+import { DialogFocus } from '../../../shared/a11y/dialog-focus';
 
 /** En qué pantalla del asistente estamos. */
 type Step = 'target' | 'types' | 'columns' | 'running';
@@ -41,7 +42,7 @@ type Step = 'target' | 'types' | 'columns' | 'running';
 @Component({
   selector: 'app-transfer-dialog',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, OperationProgress],
+  imports: [DialogFocus, FormsModule, OperationProgress],
   templateUrl: './transfer-dialog.html',
   styleUrl: './transfer-dialog.scss',
 })

@@ -9,6 +9,7 @@ import {
 } from '@angular/core';
 
 import { Icon } from '../../shared/ui/icon/icon';
+import { DialogFocus } from '../../shared/a11y/dialog-focus';
 
 /** Un atajo: qué teclas y qué hace. */
 interface Atajo {
@@ -95,7 +96,7 @@ export const SHORTCUT_GROUPS: readonly Grupo[] = [
 @Component({
   selector: 'app-shortcuts-sheet',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [Icon],
+  imports: [DialogFocus, Icon],
   templateUrl: './shortcuts-sheet.html',
   styleUrl: './shortcuts-sheet.scss',
 })

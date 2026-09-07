@@ -27,6 +27,7 @@ import {
 import { Icon } from '../../../shared/ui/icon/icon';
 import { DiagramCanvas } from '../diagram-canvas/diagram-canvas';
 import { tableKey } from '../diagram-layout';
+import { DialogFocus } from '../../../shared/a11y/dialog-focus';
 
 /**
  * El árbol más hondo es base → esquema → carpeta → tabla. El tope está para que
@@ -78,7 +79,7 @@ function suggestionKey(suggestion: SuggestedRelation): string {
 @Component({
   selector: 'app-diagram-panel',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [DiagramCanvas, Icon],
+  imports: [DialogFocus, DiagramCanvas, Icon],
   templateUrl: './diagram-panel.html',
   styleUrl: './diagram-panel.scss',
 })
