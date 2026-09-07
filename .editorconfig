@@ -68,6 +68,27 @@ dotnet_naming_symbols.interface_symbols.applicable_kinds = interface
 dotnet_naming_style.prefix_i_pascal_case.required_prefix = I
 dotnet_naming_style.prefix_i_pascal_case.capitalization = pascal_case
 
+# Nomenclatura: constantes y estáticos de solo lectura, en PascalCase
+#
+# En C# un `const` también es un campo, así que la regla del guion bajo que va
+# debajo los alcanzaba: el analizador pedía `_maxRows` para un `private const int
+# MaxRows`, que es lo contrario de lo que dice .NET y de lo que hace este
+# repositorio entero. Manda la **primera** regla que coincide con el símbolo, así
+# que estas dos van antes.
+dotnet_naming_rule.constants_should_be_pascal_case.severity = warning
+dotnet_naming_rule.constants_should_be_pascal_case.symbols = constant_symbols
+dotnet_naming_rule.constants_should_be_pascal_case.style = pascal_case_style
+dotnet_naming_symbols.constant_symbols.applicable_kinds = field
+dotnet_naming_symbols.constant_symbols.applicable_accessibilities = *
+dotnet_naming_symbols.constant_symbols.required_modifiers = const
+
+dotnet_naming_rule.static_readonly_fields_should_be_pascal_case.severity = warning
+dotnet_naming_rule.static_readonly_fields_should_be_pascal_case.symbols = static_readonly_field_symbols
+dotnet_naming_rule.static_readonly_fields_should_be_pascal_case.style = pascal_case_style
+dotnet_naming_symbols.static_readonly_field_symbols.applicable_kinds = field
+dotnet_naming_symbols.static_readonly_field_symbols.applicable_accessibilities = *
+dotnet_naming_symbols.static_readonly_field_symbols.required_modifiers = static,readonly
+
 # Nomenclatura: campos privados con _
 dotnet_naming_rule.private_fields_should_be_camel_case_with_underscore.severity = warning
 dotnet_naming_rule.private_fields_should_be_camel_case_with_underscore.symbols = private_field_symbols
