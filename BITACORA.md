@@ -10,20 +10,20 @@
 
 | Campo | Valor |
 | --- | --- |
-| Última sesión | **040** — 2026-09-01 |
+| Última sesión | **041** — 2026-09-07 |
 | Fase activa | **Migración de datos entre tablas:** fases 1, 2 y 3 cerradas; la **4** cerrada: la pasada de varias tablas, lo que cada tabla hace distinto y las migraciones guardadas (ver «Qué toca retomar»). **Respaldos y restauración:** Fases A–E cerradas. La **F** tiene backend, interfaz, CSV, selector de archivos, restaurar en una base nueva y **el ciclo entero por HTTP en los cuatro motores**; le falta repetir a mano el respaldo real que encontró el error de los índices de expresión. **Diagramas entidad-relación:** plan escrito y **Fase A** (lectura del catálogo en lote, cuatro motores) y **Fase B** (colocación determinista y lienzo) implementadas; falta cerrar la A contra los cuatro motores y ver el barrido de capturas |
 | Fases 0–6 | ✅ Cerradas. |
 | Fase 7 | 🟡 **11/12.** El ciclo de instalación está probado sobre este equipo; solo falta arrancar en una máquina sin herramientas de desarrollo. |
 | Fase 8 | ✅ **7/7.** Tres motores sobre el mismo contrato y primera beta preparada. |
 | ¿Compila el backend? | Sí — 0 advertencias, 0 errores |
 | ¿Compila el envoltorio? | Sí — recompilado en la 037 con `build/scripts/msvc-env.ps1` cargado antes; sin él, `cargo` falla en `vswhom-sys` por elegir el MSVC equivocado. **Sus pruebas ya son 17**, con las dos que vigilan la CSP y las cuatro de `DRUSE_DATA_DIR` |
-| ¿Pasan las pruebas? | Sí. En la **040**: **779 en el frontend** —40 nuevas—, **17 del envoltorio**, el backend recompilado con `-m:1` sin advertencias, y de `e2e` **las ocho del editor y el barrido entero**, este último con la consola del navegador limpia. Las contractuales no se repitieron: lo de la 040 es todo de frontend y envoltorio. De la **039** siguen valiendo **266 de 267 contractuales** con los cuatro motores y `DRUSE_REQUIRE_ENGINES=1`, y **500 unitarias** del backend; el único fallo es de Informix por SQLI al recargar datos respaldados (conversión de fecha), y viene de la 038 |
+| ¿Pasan las pruebas? | Sí, y en la **041** por fin las ejecuta el comando de siempre: `dotnet test backend/Druse.slnx` pasó de **cero** pruebas a **956** con PostgreSQL levantado —534 unitarias, 155 de integración de 158 y 267 contractuales—. Además **787 del frontend** —dos nuevas—, **17 del envoltorio** con `cargo fmt --check` y `clippy -- -D warnings` limpios, y el **barrido de capturas entero** con la consola del navegador limpia. Las contractuales salieron verdes **sin los otros tres motores delante**: sin `DRUSE_REQUIRE_ENGINES=1` cada prueba termina sin comprobar nada cuando el servidor no responde. El `DATE` de Informix por SQLI de la 039 sigue sin repetirse: hace falta ese contenedor |
 | ¿Hay aplicación de escritorio? | **Sí.** Instalador NSIS y ZIP portable, en dos variantes: con Informix y sin él. Desde la 038 **se actualiza sola** —o lo hará: ver el aviso del repositorio privado en §9—. El MSI dejó de generarse: `tauri.conf.json` solo declara `nsis`, que es lo que necesita el actualizador. En la **040** se regeneraron los instaladores y **la variante completa quedó instalada y abierta en este equipo**, con el arreglo del envoltorio dentro. Siguen **sin firma Authenticode**: SmartScreen en cada equipo |
 | Motores | **PostgreSQL, SQL Server, MySQL/MariaDB e Informix**, sobre el mismo contrato. Informix tiene **dos entradas**: por DRDA con el driver de IBM (puerto 9089) y por **SQLI**, su protocolo nativo, con el puente JDBC (9088). Cambia por dónde se entra; el SQL, el catálogo y los tipos son los mismos |
-| Trabajo a medias | **Nada sin commitear.** Sin comprobar: las contractuales de la lectura en lote contra los cuatro motores desde la 039, **el multicursor dentro de la ventana empaquetada**, y de antes —**el diálogo del sistema y el selector de carpeta siguen sin verse abrir**, y **el actualizador no puede funcionar mientras el repositorio sea privado** (ver §9) |
+| Trabajo a medias | **Nada sin commitear.** De la 041 queda `PLAN_MEJORAS_DRUSE.md` con las fases 0 y 1 marcadas y el resto por hacer. Sin comprobar: las contractuales de la lectura en lote contra los cuatro motores desde la 039, **el multicursor dentro de la ventana empaquetada**, y de antes —**el diálogo del sistema y el selector de carpeta siguen sin verse abrir**, y **el actualizador no puede funcionar mientras el repositorio sea privado** (ver §9) |
 | Bloqueantes | Ninguno para seguir programando. Sí para dar por buenos cuatro motores y cuatro funciones: ver «Qué toca retomar». |
-| Git | El **PR #9 se fusionó** (sesión 022). Se trabaja en `feat/respaldos-y-restauracion`, con todo subido: las 024–027 en `1452a6c`, las 028–031 en `640151c`, las 032–036 de `d3ac0d5` a `35d192e`, la 037 de `4ba8cce` a `20727eb`, la **038** en `a455be7`, `4c6f74a`, `55711f0` y `93f7f26`, la **039** hasta `5c2d09b`, y la **040** en `80da9f6`, `03c3478`, `a04c706`, `117b15f`, `2946156` y `2d52c8e` |
-| Integración continua | 🔴 **Parada, y no por el código.** GitHub aborta los catorce jobs en dos segundos: «recent account payments have failed or your spending limit needs to be increased». Hasta resolver la facturación, ningún PR podrá pasar los checks. |
+| Git | El **PR #9 se fusionó** (sesión 022). Se trabaja en `feat/respaldos-y-restauracion`, con todo subido: las 024–027 en `1452a6c`, las 028–031 en `640151c`, las 032–036 de `d3ac0d5` a `35d192e`, la 037 de `4ba8cce` a `20727eb`, la **038** en `a455be7`, `4c6f74a`, `55711f0` y `93f7f26`, la **039** hasta `5c2d09b`, y la **040** en `80da9f6`, `03c3478`, `a04c706`, `117b15f`, `2946156` y `2d52c8e` , y la **041** en `64c2adf`, `203b771`, `6d31a86`, `5a924c6`, `8bcf83a`, `f4f683e` y `f65cd73`, ya sobre `main` |
+| Integración continua | 🔴 **Parada, y no por el código.** GitHub aborta los jobs en dos segundos: «recent account payments have failed or your spending limit needs to be increased». Hasta resolver la facturación, ningún PR podrá pasar los checks. Lo que sí cambió en la **041**: cuando vuelva a correr, **ejecutará pruebas de verdad** —hasta ahora el job del backend terminaba en verde sin ejecutar ninguna—, y publicar exige que el commit tenga su ejecución de CI en verde. |
 
 ### Qué toca retomar en la próxima sesión
 
@@ -34,6 +34,17 @@ hoy no puede funcionar en ningún equipo: GitHub devuelve 404 a quien no está
 autenticado, y ese 404 ni siquiera se distingue de «no hay versión nueva». Es
 una decisión que hay que tomar antes de repartir nada: repositorio público, o
 publicar los artefactos en otro sitio.
+
+#### Lo que deja abierta la 041
+
+1. **El `DATE` de Informix por SQLI** (BKP-006 del plan de mejoras): el único
+   rojo de las contractuales de la 039, y reproducirlo necesita ese contenedor.
+2. **La fase 2 del plan de mejoras**: cerrar Druse durante un respaldo o una
+   restauración sigue sin preguntar nada, y los trabajos largos no sobreviven a
+   un reinicio ni se marcan como interrumpidos.
+3. **La carpeta de destino, vista en la aplicación empaquetada.** La casilla de
+   sobrescribir se comprobó en Chromium con el barrido; el selector de carpeta
+   del sistema sigue sin verse abrir, que es lo de siempre.
 
 #### Lo que deja abierto la 040
 
@@ -357,6 +368,110 @@ Pendiente de verificar cuando toque: Docker (pruebas de integración con contene
 ---
 
 ## 5. Registro de sesiones
+
+### Sesión 041 — 2026-09-07 · El CI que no probaba nada y el respaldo que no volvía igual
+
+Sesión de las dos primeras fases de `PLAN_MEJORAS_DRUSE.md`, escrito en la 040 y
+todavía sin commitear al empezar.
+
+#### El comando de pruebas del backend no ejecutaba ninguna
+
+`dotnet test backend/Druse.slnx` terminaba **correctamente** sin ejecutar una
+sola prueba. Desde el SDK 10.0.400 el comando solo entra en los proyectos que se
+declaran de prueba con `IsTestProject`, y ninguno de los tres lo hacía. Con la
+propiedad puesta, la misma orden pasa de **cero a 870**: 521 unitarias, 82 de
+integración y 267 contractuales.
+
+Eso es lo peor que puede pasarle a un check: quedarse verde sin comprobar nada.
+Para que no se repita en silencio, `build/scripts/check-tests.ps1` lee los TRX de
+la pasada y rompe el job si falta una suite, si alguna no descubrió pruebas o si
+el total no llega al mínimo; de paso deja el recuento en el resumen del job.
+
+Con eso, el resto de la fase 0: `-m:1` en el backend —la carrera de IKVM—, el
+puerto 9088 de Informix publicado con `DRUSE_TEST_IFX_SQLI_PORT` (sin él las
+pruebas del transporte SQLI se omitían calladas), `npm run typecheck` en las
+pruebas de punta a punta, y `cargo fmt --check`, `cargo clippy -- -D warnings` y
+las 17 pruebas del envoltorio, que hasta ahora solo se lanzaban a mano. `cargo
+fmt` cambió cinco archivos, en su propio commit.
+
+Y publicar deja de poder hacerse a ciegas: `release.yml` pregunta por la última
+ejecución de CI de ese commit y se planta si no terminó en verde. Lo único que
+queda de la fase 0 es la facturación de GitHub, que no es código.
+
+#### El respaldo pasa al formato 2, que es el primero reversible
+
+Tres cosas impedían que un ida y vuelta devolviera lo que había, y las tres
+pasaban sin decir nada:
+
+1. **Los archivos se llamaban solo como la tabla.** `ventas.clientes` y
+   `compras.clientes` compartían archivo: en una carpeta el segundo se escribía
+   **a continuación** del primero y en un zip quedaban dos entradas con el mismo
+   nombre, de las que quien lo abre ve una. Ahora cada entrada se nombra
+   `esquema.tabla`, y al restaurar se resuelve primero por ese nombre y luego,
+   si el destino no tiene ese esquema, por el corto —que es lo que permite
+   restaurar en otra base—.
+2. **En los CSV, el nulo y la cadena vacía se escribían igual**, y los dos
+   volvían como cadena vacía. Se adopta la convención de `COPY ... WITH CSV`: el
+   nulo en blanco, la cadena vacía con sus dos comillas. La exportación normal no
+   cambia, que esa acaba en una hoja de cálculo.
+3. **El manifiesto de una carpeta a medias era de relleno**: PostgreSQL, versión
+   0.0.0, sin servidor ni base y siempre «cancelado». Una carpeta de SQL Server
+   que había fallado se presentaba como una de PostgreSQL que alguien paró.
+
+Los artefactos anteriores se siguen restaurando y sus blancos siguen siendo
+cadena vacía —leerlos como nulos cambiaría datos ya guardados—, y la inspección
+lo avisa. El aviso genérico que salía siempre que había CSV se quedó **solo para
+esos**: desde el formato 2 no advierte de nada, y un aviso que no advierte enseña
+a no leerlos.
+
+#### Y deja de escribir encima de lo que había
+
+- **La carpeta se reutilizaba en silencio.** Ahora se rechaza antes de tocar
+  nada, con una casilla nueva en el asistente para decir que sí; entonces borra
+  el respaldo anterior y **solo** el respaldo anterior, que la carpeta puede
+  tener además cosas del usuario.
+- **El archivo se creaba con su nombre definitivo.** Durante las horas que tarda,
+  un `.sql` a medias tiene la pinta de uno terminado, y si fallaba, el bueno del
+  día anterior ya no estaba. Se escribe como `.parcial` y solo recibe su nombre
+  al estar entero.
+- **`ResumeFrom` por encima del final** se saltaba todas las instrucciones y la
+  restauración se daba por buena sin aplicar ni una. Se valida contra lo que trae
+  el artefacto, que ya se contaba para la barra.
+
+#### Lo que enseñó mirarlo
+
+Con la casilla nueva en el barrido de capturas se vio que, con «Carpeta por tipo
+de objeto» elegida, el campo del destino seguía proponiendo `respaldo-….sql`:
+quien acepta la propuesta acaba con una carpeta llamada como un archivo. Un
+renglón y su prueba.
+
+Y el barrido no arrancaba: **`ciudad` y `accionista` no las creaba nadie**
+—anotado en la 034 y nunca resuelto—, así que un contenedor recién levantado
+dejaba el diagrama sin nada que dibujar. Ahora las siembra `test-db.ps1` al
+crear PostgreSQL.
+
+**Verificado.** 870 pruebas del backend descubiertas y ejecutadas por el comando
+de siempre; con PostgreSQL levantado, **155 de 158 de integración** —las otras 3
+son de motores que no estaban— incluido el respaldo y la restauración reales por
+HTTP con nulos y cadenas vacías conservados; **787 del frontend**; **17 del
+envoltorio**, con `fmt` y `clippy` limpios; y el **barrido entero en verde con la
+consola limpia**, con la captura nueva `10b-respaldo-destino.png`.
+
+**No hecho.** El `DATE` de Informix por SQLI (BKP-006) sigue abierto: reproducirlo
+necesita ese contenedor y en esta sesión solo se levantó PostgreSQL. Ojo con las
+contractuales: **las 267 salen verdes sin motores delante**, porque cuando el
+servidor no responde cada prueba termina sin comprobar nada; solo
+`DRUSE_REQUIRE_ENGINES=1` —lo que pone el CI— lo convierte en rojo.
+
+**Archivos.** `.github/workflows/{ci,release}.yml`,
+`build/scripts/{check-tests.ps1,test-db.ps1}`, los tres `.csproj` de pruebas,
+`Backups/{BackupService,RestoreService,PreviewSink}.cs`,
+`Infrastructure/Backups/{BackupSinks,BackupArchive}.cs`,
+`Exports/CsvResultExporter.cs`, `Importing/{CsvRowReader,CsvTableFileReader}.cs`,
+`Domain/Backup.cs`, contratos y endpoints de respaldo, `backup-dialog.*`,
+`application-gateway.ts`, `e2e/tests/barrido.spec.ts`, y sus pruebas.
+
+**Estado al cerrar.** Commiteado en `main`.
 
 ### Sesión 040 — 2026-09-01 · Los avisos que nadie leía, el envoltorio que no obedecía y el teclado
 
