@@ -10,19 +10,19 @@
 
 | Campo | Valor |
 | --- | --- |
-| Última sesión | **044** — 2026-09-07 |
+| Última sesión | **045** — 2026-09-07 |
 | Fase activa | **Migración de datos entre tablas:** fases 1, 2 y 3 cerradas; la **4** cerrada: la pasada de varias tablas, lo que cada tabla hace distinto y las migraciones guardadas (ver «Qué toca retomar»). **Respaldos y restauración:** Fases A–E cerradas. La **F** tiene backend, interfaz, CSV, selector de archivos, restaurar en una base nueva y **el ciclo entero por HTTP en los cuatro motores**; le falta repetir a mano el respaldo real que encontró el error de los índices de expresión. **Diagramas entidad-relación:** plan escrito y **Fase A** (lectura del catálogo en lote, cuatro motores) y **Fase B** (colocación determinista y lienzo) implementadas; falta cerrar la A contra los cuatro motores y ver el barrido de capturas |
 | Fases 0–6 | ✅ Cerradas. |
 | Fase 7 | 🟡 **11/12.** El ciclo de instalación está probado sobre este equipo; solo falta arrancar en una máquina sin herramientas de desarrollo. |
 | Fase 8 | ✅ **7/7.** Tres motores sobre el mismo contrato y primera beta preparada. |
 | ¿Compila el backend? | Sí — 0 advertencias, 0 errores |
 | ¿Compila el envoltorio? | Sí — recompilado en la 037 con `build/scripts/msvc-env.ps1` cargado antes; sin él, `cargo` falla en `vswhom-sys` por elegir el MSVC equivocado. **Sus pruebas ya son 17**, con las dos que vigilan la CSP y las cuatro de `DRUSE_DATA_DIR` |
-| ¿Pasan las pruebas? | Sí. En la **044**: **1.002 del backend** con PostgreSQL y MySQL levantados —551 unitarias, 172 de integración de 175 y 279 contractuales— y **795 del frontend**. Las **23 del envoltorio** y el barrido son de la 042 y siguen valiendo. Las contractuales salen verdes **sin los motores delante**: sin `DRUSE_REQUIRE_ENGINES=1` cada prueba termina sin comprobar nada cuando el servidor no responde. El `DATE` de Informix por SQLI de la 039 sigue sin repetirse: hace falta ese contenedor |
+| ¿Pasan las pruebas? | Sí. En la **045**: **1.005 del backend** con PostgreSQL y MySQL levantados —552 unitarias, 174 de integración de 177 y 279 contractuales—, **801 del frontend** y el **barrido entero** con la consola limpia. Las **23 del envoltorio** son de la 042 y siguen valiendo. Las contractuales salen verdes **sin los motores delante**: sin `DRUSE_REQUIRE_ENGINES=1` cada prueba termina sin comprobar nada cuando el servidor no responde. El `DATE` de Informix por SQLI de la 039 sigue sin repetirse: hace falta ese contenedor |
 | ¿Hay aplicación de escritorio? | **Sí.** Instalador NSIS y ZIP portable, en dos variantes: con Informix y sin él. Desde la 038 **se actualiza sola** —o lo hará: ver el aviso del repositorio privado en §9—. El MSI dejó de generarse: `tauri.conf.json` solo declara `nsis`, que es lo que necesita el actualizador. En la **040** se regeneraron los instaladores y **la variante completa quedó instalada y abierta en este equipo**, con el arreglo del envoltorio dentro. Siguen **sin firma Authenticode**: SmartScreen en cada equipo |
 | Motores | **PostgreSQL, SQL Server, MySQL/MariaDB e Informix**, sobre el mismo contrato. Informix tiene **dos entradas**: por DRDA con el driver de IBM (puerto 9089) y por **SQLI**, su protocolo nativo, con el puente JDBC (9088). Cambia por dónde se entra; el SQL, el catálogo y los tipos son los mismos |
 | Trabajo a medias | **Nada sin commitear.** De la 041 queda `PLAN_MEJORAS_DRUSE.md` con las fases 0 y 1 marcadas y el resto por hacer. Sin comprobar: las contractuales de la lectura en lote contra los cuatro motores desde la 039, **el multicursor dentro de la ventana empaquetada**, y de antes —**el diálogo del sistema y el selector de carpeta siguen sin verse abrir**, y **el actualizador no puede funcionar mientras el repositorio sea privado** (ver §9) |
 | Bloqueantes | Ninguno para seguir programando. Sí para dar por buenos cuatro motores y cuatro funciones: ver «Qué toca retomar». |
-| Git | El **PR #9 se fusionó** (sesión 022). Se trabaja en `feat/respaldos-y-restauracion`, con todo subido: las 024–027 en `1452a6c`, las 028–031 en `640151c`, las 032–036 de `d3ac0d5` a `35d192e`, la 037 de `4ba8cce` a `20727eb`, la **038** en `a455be7`, `4c6f74a`, `55711f0` y `93f7f26`, la **039** hasta `5c2d09b`, y la **040** en `80da9f6`, `03c3478`, `a04c706`, `117b15f`, `2946156` y `2d52c8e`, la **041** en `64c2adf`, `203b771`, `6d31a86`, `5a924c6`, `8bcf83a`, `f4f683e` y `f65cd73`, la **042** en `0ae38fa`, `120485f`, `2a6f151` y `837cbb6`, la **043** de `ebf42ac` a `fd9432d`, y la **044** de `7e60185` a `c57b31e`, ya sobre `main` |
+| Git | El **PR #9 se fusionó** (sesión 022). Se trabaja en `feat/respaldos-y-restauracion`, con todo subido: las 024–027 en `1452a6c`, las 028–031 en `640151c`, las 032–036 de `d3ac0d5` a `35d192e`, la 037 de `4ba8cce` a `20727eb`, la **038** en `a455be7`, `4c6f74a`, `55711f0` y `93f7f26`, la **039** hasta `5c2d09b`, y la **040** en `80da9f6`, `03c3478`, `a04c706`, `117b15f`, `2946156` y `2d52c8e`, la **041** en `64c2adf`, `203b771`, `6d31a86`, `5a924c6`, `8bcf83a`, `f4f683e` y `f65cd73`, la **042** en `0ae38fa`, `120485f`, `2a6f151` y `837cbb6`, la **043** de `ebf42ac` a `fd9432d`, la **044** de `7e60185` a `e98422e`, y la **045** de `dc7b97e` a `ba3d866`, ya sobre `main` |
 | Integración continua | 🔴 **Parada, y no por el código.** GitHub aborta los jobs en dos segundos: «recent account payments have failed or your spending limit needs to be increased». Hasta resolver la facturación, ningún PR podrá pasar los checks. Lo que sí cambió en la **041**: cuando vuelva a correr, **ejecutará pruebas de verdad** —hasta ahora el job del backend terminaba en verde sin ejecutar ninguna—, y publicar exige que el commit tenga su ejecución de CI en verde. |
 
 ### Qué toca retomar en la próxima sesión
@@ -34,6 +34,14 @@ hoy no puede funcionar en ningún equipo: GitHub devuelve 404 a quien no está
 autenticado, y ese 404 ni siquiera se distingue de «no hay versión nueva». Es
 una decisión que hay que tomar antes de repartir nada: repositorio público, o
 publicar los artefactos en otro sitio.
+
+#### Lo que deja abierta la 045
+
+1. **Lo grande de la fase 5**: partir `WorkspaceStore` y `AppShell`, activar
+   `strict` en el frontend, separar `TransferService`, y la accesibilidad de la
+   cuadrícula de resultados.
+2. **A11Y-005**, que no es programar: navegar Druse entero con lector de pantalla.
+3. **La fase 7**, de interfaz: nueve cosas vistas en las capturas y sin arreglar.
 
 #### Lo que deja abierta la 044
 
@@ -394,6 +402,67 @@ Pendiente de verificar cuando toque: Docker (pruebas de integración con contene
 ---
 
 ## 5. Registro de sesiones
+
+### Sesión 045 — 2026-09-07 · El contrato, el foco y una migración que se repetía
+
+Fase 5 del plan de mejoras: lo que se podía cerrar sin abrir un frente grande.
+
+#### El contrato HTTP no estaba escrito en ninguna parte
+
+El gateway de Angular llama a rutas literales escritas a mano. Renombrar una en el
+backend **no rompe ninguna compilación**: rompe la aplicación en marcha, y solo
+cuando alguien pulsa ese botón.
+
+Ahora el documento OpenAPI vive en `docs/api/openapi.json` —81 rutas, 48 esquemas—
+y dos pruebas lo sujetan: que lo publicado y lo guardado digan lo mismo, y que
+cada ruta que llama la interfaz exista en el contrato. Se comparan por su forma y
+no por el nombre del parámetro: el servidor declara `{sessionId}` y el cliente
+escribe `${id}`, y hablan del mismo hueco.
+
+#### Los diálogos se abrían y el foco se quedaba detrás
+
+Con `Tab` se recorrían los botones de la barra superior sin verlos, y al cerrar
+el foco se quedaba en el cuerpo del documento. Una directiva se encarga de las
+tres partes —entrar, quedarse y volver— en los trece diálogos, aplicada por la
+clase que ya comparten.
+
+#### Una migración que se repetía en cada arranque
+
+El `UPDATE` que movía los perfiles de SQL Server a «certificado y nombre»
+—escrito ayer mismo— corría cada vez que se abría Druse: quien después eligiera a
+conciencia solo cifrado se lo encontraba cambiado de vuelta. Ahora se lee
+`user_version`, los pasos que tocan datos se aplican una sola vez, y todo va
+dentro de una transacción.
+
+Y la barra de estado llama a cada motor por su nombre: se escribía con un
+condicional de tres ramas, así que una conexión Informix decía «MySQL 14».
+
+#### Y las contractuales dejaban basura
+
+`DROP PROCEDURE nombre()` busca la sobrecarga sin parámetros y la que crean tiene
+dos: no borraba nada y con `IF EXISTS` tampoco se quejaba. Doce procedimientos se
+habían ido acumulando en la base de pruebas y salían en el barrido de capturas.
+
+**Verificado.** En la aplicación real: al abrir Preferencias el foco entra en el
+diálogo y al cerrar con Escape vuelve al botón que lo abrió. El barrido recorre
+los trece diálogos con la consola limpia. Y tras ejecutar la contractual del
+procedimiento, la base queda sin rastro.
+
+**No hecho.** Lo que queda de la fase 5 es lo grande: **FE-001 a FE-003** son
+extracciones de `WorkspaceStore` y `AppShell` que no se pueden hacer a medias;
+**FE-004** es incremental y ruidoso; **BE-001 y BE-002**, lo mismo en el backend.
+**A11Y-001 a A11Y-003** tocan la cuadrícula de resultados, el componente más
+delicado que hay, y **A11Y-005** no es programar: es sentarse con un lector de
+pantalla.
+
+**Pruebas.** 1.005 del backend —552 unitarias, 174 de integración de 177 y 279
+contractuales— y **801 del frontend**, con el barrido entero en verde.
+
+**Archivos.** `ApiContractTests.cs`, `docs/api/openapi.json`, `DruseDatabase.cs`,
+`shared/a11y/dialog-focus.ts` y los trece diálogos, `workspace-store.ts`,
+`engine-badge.ts`, `PostgreSqlFixture.cs` y sus pruebas.
+
+**Estado al cerrar.** Commiteado en `main`.
 
 ### Sesión 044 — 2026-09-07 · Un fallo en el equipo del usuario deja de perderse
 

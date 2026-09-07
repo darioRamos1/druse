@@ -403,9 +403,9 @@ no solamente validaciones visuales.
 
 ### Contrato HTTP
 
-- [ ] **API-001:** generar y versionar el documento OpenAPI en CI.
-- [ ] **API-002:** detectar cambios incompatibles del contrato en pull requests.
-- [ ] **API-003:** generar tipos o cliente TypeScript, o validar automáticamente el gateway manual contra OpenAPI.
+- [x] **API-001:** generar y versionar el documento OpenAPI en CI.
+- [x] **API-002:** detectar cambios incompatibles del contrato en pull requests.
+- [x] **API-003:** generar tipos o cliente TypeScript, o validar automáticamente el gateway manual contra OpenAPI.
 - [ ] **API-004:** añadir pruebas HTTP para IA/SSE, pestañas, diagramas y trabajos largos.
 
 ### Frontend
@@ -415,13 +415,13 @@ no solamente validaciones visuales.
 - [ ] **FE-003:** extraer de `AppShell` la coordinación de diálogos y comandos.
 - [ ] **FE-004:** activar `strict` y `strictTemplates` de manera incremental.
 - [ ] **FE-005:** añadir scripts verificables de formato y lint.
-- [ ] **FE-006:** corregir la etiqueta de versión que muestra Informix como MySQL.
+- [x] **FE-006:** corregir la etiqueta de versión que muestra Informix como MySQL.
 
 ### Backend
 
 - [ ] **BE-001:** separar planificación, ejecución y progreso de `TransferService`.
 - [ ] **BE-002:** extraer scripting de datos y ejecución DDL de `TableDesignerBase` solo cuando exista una prueba que proteja la extracción.
-- [ ] **BE-003:** hacer transaccionales y dirigidas por versión las migraciones SQLite.
+- [x] **BE-003:** hacer transaccionales y dirigidas por versión las migraciones SQLite.
 - [ ] **BE-004:** definir compensación entre SQLite y el almacén de secretos cuando una escritura parcial falla.
 
 ### Accesibilidad
@@ -429,8 +429,30 @@ no solamente validaciones visuales.
 - [ ] **A11Y-001:** dar semántica completa `grid` o `table` a la cuadrícula de resultados.
 - [ ] **A11Y-002:** permitir seleccionar y redimensionar columnas con teclado.
 - [ ] **A11Y-003:** añadir valores ARIA al separador de tamaño.
-- [ ] **A11Y-004:** implementar foco inicial, trampa, Escape y restauración de foco en todos los diálogos.
+- [x] **A11Y-004:** implementar foco inicial, trampa, Escape y restauración de foco en todos los diálogos.
 - [ ] **A11Y-005:** probar navegación completa sin ratón y con lector de pantalla.
+
+> Estado al 7 de septiembre de 2026: hecho lo que se podía cerrar sin abrir un
+> frente grande.
+>
+> **El contrato HTTP ya se versiona** (`docs/api/openapi.json`, 81 rutas y 48
+> esquemas) y dos pruebas lo sujetan: que lo publicado y lo guardado digan lo
+> mismo, y que cada ruta que llama la interfaz exista en el contrato. Eso último
+> es el caso que se escapaba siempre: renombrar una ruta compila en los dos lados
+> y rompe la aplicación al pulsar un botón.
+>
+> **El foco de los diálogos** entra, se queda dentro y vuelve a donde estaba, en
+> los trece. **La migración de la base local** dejó de repetirse en cada arranque
+> —el paso que tocaba datos le deshacía al usuario lo que hubiera cambiado— y va
+> dentro de una transacción. Y la barra de estado llama a cada motor por su
+> nombre, que antes decía «MySQL» de todo lo que no fuera PostgreSQL o SQL Server.
+>
+> **Lo que queda es lo grande y lo que hay que mirar:** FE-001 a FE-003 son
+> extracciones de `WorkspaceStore` y `AppShell` que no pueden hacerse a medias;
+> FE-004 (`strict` y `strictTemplates`) es incremental y ruidoso; BE-001 y BE-002
+> son lo mismo en el backend. A11Y-001 a A11Y-003 tocan la cuadrícula de
+> resultados, que es el componente más delicado que hay. Y A11Y-005 no es
+> programar: es sentarse con un lector de pantalla.
 
 ### Criterios de aceptación
 
