@@ -305,6 +305,139 @@ public sealed class BackupSinkTests : IDisposable
     }
 
     /// <summary>
+    /// Dos respaldos seguidos a la misma carpeta se mezclaban.
+    ///
+    /// Los archivos se abren en modo «append» porque los datos de una tabla
+    /// llegan en muchas instrucciones, así que el segundo respaldo se escribía a
+    /// continuación del primero: una tabla acababa con las filas de las dos
+    /// pasadas, las tablas que ya no existían seguían ahí, y el manifiesto —ese
+    /// sí reescrito— decía que aquello era un respaldo de un momento.
+    /// </summary>
+    [Fact]
+    public async Task UnaCarpetaQueYaTieneUnRespaldo_SeRechazaEnVezDeMezclarse()
+    {
+        var folder = At("carpeta");
+
+        await using (var sink = new FolderBackupSink(folder))
+        {
+            await sink.WriteAsync(BackupEntryKind.Structure, "pedidos", "CREATE TABLE pedidos ();", default);
+            await sink.CompleteAsync(Manifest(), default);
+        }
+
+        var error = Assert.Throws<IOException>(() => new FolderBackupSink(folder));
+
+        Assert.Contains("ya tiene un respaldo", error.Message, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// Quien lo pide explícitamente sí reemplaza, y reemplaza del todo: lo que ya
+    /// no está en la base tampoco puede quedarse en la carpeta.
+    /// </summary>
+    [Fact]
+    public async Task ConSobrescritura_LaCarpetaQuedaConElRespaldoNuevoYSoloConEl()
+    {
+        var folder = At("carpeta");
+
+        await using (var sink = new FolderBackupSink(folder))
+        {
+            await sink.WriteAsync(BackupEntryKind.Structure, "vieja", "CREATE TABLE vieja ();", default);
+            await sink.CompleteAsync(Manifest(), default);
+        }
+
+        await using (var sink = new FolderBackupSink(folder, overwrite: true))
+        {
+            await sink.WriteAsync(BackupEntryKind.Structure, "nueva", "CREATE TABLE nueva ();", default);
+            await sink.CompleteAsync(Manifest(), default);
+        }
+
+        Assert.True(File.Exists(Path.Combine(folder, "tablas", "nueva.sql")));
+        Assert.False(File.Exists(Path.Combine(folder, "tablas", "vieja.sql")));
+    }
+
+    /// <summary>
+    /// Sobrescribir es sobrescribir el respaldo, no vaciar la carpeta.
+    ///
+    /// El usuario pudo elegir una que tenga además cosas suyas, y llevárselas por
+    /// delante sería mucho peor que el problema que esto resuelve.
+    /// </summary>
+    [Fact]
+    public async Task ConSobrescritura_NoSeBorraLoQueNoEsDelRespaldo()
+    {
+        var folder = At("carpeta");
+
+        await using (var sink = new FolderBackupSink(folder))
+        {
+            await sink.WriteAsync(BackupEntryKind.Structure, "pedidos", "CREATE TABLE pedidos ();", default);
+            await sink.CompleteAsync(Manifest(), default);
+        }
+
+        var ajeno = Path.Combine(folder, "notas.txt");
+
+        await File.WriteAllTextAsync(ajeno, "esto es del usuario");
+
+        await using (var sink = new FolderBackupSink(folder, overwrite: true))
+        {
+            await sink.CompleteAsync(Manifest(), default);
+        }
+
+        Assert.True(File.Exists(ajeno));
+    }
+
+    /// <summary>
+    /// El nombre bueno solo aparece cuando el archivo está entero.
+    ///
+    /// Mientras se escribe, un `.sql` de gigabytes tiene el tamaño y la pinta de
+    /// uno terminado: quien lo copie a mitad se lleva algo que parece un respaldo.
+    /// </summary>
+    [Fact]
+    public async Task MientrasSeEscribe_ElArchivoNoTieneTodaviaSuNombre()
+    {
+        var file = At("respaldo.sql");
+
+        await using (var sink = new SingleFileBackupSink(file))
+        {
+            await sink.WriteAsync(BackupEntryKind.Structure, "pedidos", "CREATE TABLE pedidos ();", default);
+
+            Assert.False(File.Exists(file));
+            Assert.True(File.Exists(file + ".parcial"));
+
+            await sink.CompleteAsync(Manifest(), default);
+        }
+
+        Assert.True(File.Exists(file));
+        Assert.False(File.Exists(file + ".parcial"));
+    }
+
+    /// <summary>
+    /// Un respaldo que falla no puede llevarse por delante el que había.
+    ///
+    /// Antes se creaba el archivo con su nombre definitivo desde el principio, así
+    /// que el respaldo bueno del día anterior desaparecía en cuanto empezaba uno
+    /// nuevo, y al fallar no quedaba ninguno.
+    /// </summary>
+    [Fact]
+    public async Task SiFallaElRespaldoNuevo_ElAnteriorSigueDondeEstaba()
+    {
+        var file = At("respaldo.sql");
+
+        await using (var sink = new SingleFileBackupSink(file))
+        {
+            await sink.WriteAsync(BackupEntryKind.Structure, "pedidos", "CREATE TABLE pedidos ();", default);
+            await sink.CompleteAsync(Manifest(), default);
+        }
+
+        var bueno = await File.ReadAllTextAsync(file);
+
+        await using (var sink = new SingleFileBackupSink(file))
+        {
+            await sink.WriteAsync(BackupEntryKind.Structure, "otra", "CREATE TABLE otra ();", default);
+            await sink.DiscardAsync(Manifest(BackupOutcome.Failed), default);
+        }
+
+        Assert.Equal(bueno, await File.ReadAllTextAsync(file));
+    }
+
+    /// <summary>
     /// Los datos en CSV necesitan carpetas: un archivo suelto no puede llevar
     /// dentro un archivo por tabla, y decirlo es mejor que escribir algo raro.
     /// </summary>

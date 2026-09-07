@@ -40,6 +40,20 @@ public sealed record BackupOutput
     public bool Compress { get; init; }
 
     /// <summary>
+    /// Permite escribir sobre un respaldo anterior que ya esté en la carpeta de
+    /// destino.
+    ///
+    /// Solo importa en la salida por carpetas: el archivo suelto y el `.zip` los
+    /// nombra el usuario en el diálogo del sistema, que ya pregunta antes de
+    /// reemplazar uno. Una carpeta no pregunta nada, y sin esto el respaldo nuevo
+    /// se **añadía** al viejo.
+    ///
+    /// Por omisión no: quien repite un respaldo sobre su carpeta de siempre lo
+    /// dice, y quien se equivoca de carpeta se entera antes de que se mezcle nada.
+    /// </summary>
+    public bool Overwrite { get; init; }
+
+    /// <summary>
     /// Los datos en CSV exigen carpetas: un `.sql` suelto no puede llevar dentro
     /// un archivo por tabla.
     /// </summary>

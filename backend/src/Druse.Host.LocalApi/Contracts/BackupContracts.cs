@@ -1,4 +1,4 @@
-using Druse.Application.Backups;
+﻿using Druse.Application.Backups;
 using Druse.Domain;
 
 namespace Druse.Host.LocalApi.Contracts;
@@ -59,6 +59,14 @@ public sealed record BackupRequestDto
     public string DataFormat { get; init; } = nameof(BackupDataFormat.Inserts);
 
     public bool Compress { get; init; }
+
+    /// <summary>
+    /// Escribir sobre el respaldo anterior si el destino ya tiene uno.
+    ///
+    /// Solo lo mira la salida por carpetas. Sin esto, el respaldo se rechaza
+    /// antes de tocar nada en vez de mezclarse con el que había.
+    /// </summary>
+    public bool Overwrite { get; init; }
 
     /// <summary>
     /// Dónde se escribe.
@@ -181,6 +189,7 @@ internal static class BackupMapper
                 Layout = Parse<BackupLayout>(dto.Layout, nameof(dto.Layout)),
                 Data = Parse<BackupDataFormat>(dto.DataFormat, nameof(dto.DataFormat)),
                 Compress = dto.Compress,
+                Overwrite = dto.Overwrite,
             },
         };
     }

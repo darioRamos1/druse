@@ -85,6 +85,16 @@ export class BackupDialog {
   protected readonly layout = signal<BackupLayout>('SingleFile');
   protected readonly dataFormat = signal<BackupDataFormat>('Inserts');
   protected readonly compress = signal(false);
+
+  /**
+   * Escribir sobre el respaldo anterior de esa carpeta.
+   *
+   * Solo aparece cuando el destino es una carpeta. Un archivo o un `.zip` se
+   * nombran en el diálogo del sistema, que ya pregunta antes de reemplazar; una
+   * carpeta no pregunta nada, y por eso el respaldo se rechaza si ya hay uno
+   * dentro salvo que se marque esto.
+   */
+  protected readonly overwrite = signal(false);
   protected readonly destination = signal('');
 
   protected readonly outcomeLabel = outcomeLabel;
@@ -268,7 +278,7 @@ export class BackupDialog {
     }
 
     const suggested = this.suggestedName();
-    const chosen = this.layout() === 'FolderByKind' && !this.compress()
+    const chosen = this.writesFolder()
       ? await this._desktop.chooseBackupFolder()
       : await this._desktop.chooseBackupFile(suggested);
 
@@ -299,15 +309,18 @@ export class BackupDialog {
     return tail.trim().length > 0 ? tail : this.suggestedName();
   });
 
+  /** Si lo que se va a escribir es una carpeta y no un archivo. */
+  protected readonly writesFolder = computed(
+    () => this.layout() === 'FolderByKind' && !this.compress(),
+  );
+
   /**
    * Un respaldo por carpetas sin comprimir **crea una carpeta**, no un archivo.
    * El nombre es el mismo campo, pero llamarlo igual en los dos casos haría
    * esperar un `.sql` donde va a aparecer un directorio.
    */
   protected readonly pickerLabel = computed(() =>
-    this.layout() === 'FolderByKind' && !this.compress()
-      ? 'Nombre de la carpeta'
-      : 'Nombre del archivo',
+    this.writesFolder() ? 'Nombre de la carpeta' : 'Nombre del archivo',
   );
 
   protected picked(path: string): void {
@@ -344,6 +357,7 @@ export class BackupDialog {
     layout: this.layout(),
     dataFormat: this.dataFormat(),
     compress: this.compress(),
+    overwrite: this.writesFolder() && this.overwrite(),
     destination: this.destination(),
   }));
 

@@ -251,7 +251,20 @@ public sealed partial class RestoreService(
         // el total, la única opción sería una barra indeterminada durante media
         // hora. Se paga una lectura entera del archivo, que es barata al lado de
         // ejecutarlo.
-        state.Total(await CountAsync(archive, cancellationToken));
+        var total = await CountAsync(archive, cancellationToken);
+
+        state.Total(total);
+
+        // Reanudar por encima de lo que trae el artefacto se saltaría todas las
+        // entradas y terminaría en verde sin haber aplicado ni una: una
+        // restauración que dice que fue bien y no hizo nada. Y un número negativo
+        // no significa nada, aunque hoy se comporte como empezar de cero.
+        if (request.ResumeFrom < 0 || (total > 0 && request.ResumeFrom >= total))
+        {
+            throw new InvalidOperationException(
+                $"No se puede reanudar desde la instrucción {request.ResumeFrom}: el respaldo " +
+                $"trae {total} y se reanuda con un número entre 0 y {total - 1}.");
+        }
 
         // La base nueva, si se pidió una. Se crea **antes** de tocar el artefacto:
         // si el nombre estaba cogido o faltan permisos, mejor enterarse ahora que

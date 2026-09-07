@@ -38,6 +38,17 @@ public abstract class BackupSinkBase : IBackupSink
     protected const string ManifestName = "manifest.json";
 
     /// <summary>
+    /// Cómo se llama el archivo mientras se está escribiendo.
+    ///
+    /// Un respaldo tarda lo que tarda, y durante ese rato el archivo tiene el
+    /// tamaño y la pinta de uno terminado: quien lo copie a mitad se lleva algo
+    /// que parece un respaldo y no lo es. Escribiéndolo aparte y renombrándolo al
+    /// final, el nombre bueno solo existe cuando el contenido está entero, y
+    /// renombrar dentro del mismo volumen es una operación indivisible.
+    /// </summary>
+    protected static string StagingOf(string path) => path + ".parcial";
+
+    /// <summary>
     /// Carpeta que le toca a cada clase de entrada.
     ///
     /// En español y en plural porque el árbol lo va a mirar una persona, y porque
@@ -50,6 +61,10 @@ public abstract class BackupSinkBase : IBackupSink
         BackupEntryKind.Data => "datos",
         _ => "restricciones",
     };
+
+    /// <summary>Las cuatro carpetas de un respaldo, sin repetir.</summary>
+    protected static IEnumerable<string> Folders() =>
+        Enum.GetValues<BackupEntryKind>().Select(FolderOf).Distinct(StringComparer.Ordinal);
 
     /// <summary>
     /// Un nombre de objeto convertido en nombre de archivo.
@@ -137,6 +152,7 @@ public abstract class BackupSinkBase : IBackupSink
 public sealed class SingleFileBackupSink : BackupSinkBase
 {
     private readonly string _path;
+    private readonly string _staging;
     private readonly StreamWriter _writer;
     private string? _current;
     private bool _discarded;
@@ -146,8 +162,13 @@ public sealed class SingleFileBackupSink : BackupSinkBase
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
 
         _path = path;
+        _staging = StagingOf(path);
+
         Directory.CreateDirectory(Path.GetDirectoryName(path) ?? ".");
-        _writer = new StreamWriter(File.Create(path), new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
+
+        _writer = new StreamWriter(
+            File.Create(_staging),
+            new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
     }
 
     public override async Task WriteAsync(
@@ -194,6 +215,9 @@ public sealed class SingleFileBackupSink : BackupSinkBase
         await _writer.FlushAsync(cancellationToken);
         await _writer.DisposeAsync();
 
+        // Y solo ahora aparece con su nombre, ya completo.
+        File.Move(_staging, _path, overwrite: true);
+
         return new BackupArtifact(_path, new FileInfo(_path).Length);
     }
 
@@ -210,9 +234,12 @@ public sealed class SingleFileBackupSink : BackupSinkBase
 
         await _writer.DisposeAsync();
 
-        if (File.Exists(_path))
+        // Se borra lo escrito a medias, no el destino: si ahí había un respaldo
+        // anterior sigue estando, y es el bueno. Antes se borraba el destino, de
+        // modo que un respaldo fallido se llevaba por delante el que había.
+        if (File.Exists(_staging))
         {
-            File.Delete(_path);
+            File.Delete(_staging);
         }
     }
 
@@ -241,11 +268,78 @@ public sealed class SingleFileBackupSink : BackupSinkBase
 /// borrar el trabajo de tres horas por una cancelación sería peor. Lo que se hace
 /// es dejarlo marcado como incompleto en su manifiesto.
 /// </summary>
-public sealed class FolderBackupSink(string root) : BackupSinkBase
+public sealed class FolderBackupSink : BackupSinkBase
 {
-    private readonly string _root = !string.IsNullOrWhiteSpace(root)
-        ? root
-        : throw new ArgumentException("Hace falta una carpeta de destino.", nameof(root));
+    private readonly string _root;
+
+    /// <param name="root">Carpeta de destino.</param>
+    /// <param name="overwrite">
+    /// Si se puede escribir sobre un respaldo anterior que esté en esa carpeta.
+    ///
+    /// Sin esto, el segundo respaldo hacia la misma carpeta se **añadía** al
+    /// primero: los archivos se abren en modo «append» porque los datos de una
+    /// tabla llegan en muchas instrucciones, así que una tabla acababa con las
+    /// filas de las dos pasadas y las tablas que ya no existían seguían ahí. El
+    /// manifiesto, reescrito, decía que todo eso era un respaldo del momento.
+    ///
+    /// Con `overwrite` se borra lo anterior antes de empezar, que es lo que quiere
+    /// quien repite un respaldo sobre su carpeta de siempre. Sin él se rechaza
+    /// antes de tocar nada: mezclarlos no es una opción razonable en ningún caso.
+    /// </param>
+    public FolderBackupSink(string root, bool overwrite = false)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(root);
+
+        _root = root;
+
+        if (!HasBackup(root))
+        {
+            return;
+        }
+
+        if (!overwrite)
+        {
+            throw new IOException(
+                "esa carpeta ya tiene un respaldo dentro. Escribir aquí lo mezclaría con el " +
+                "anterior: elige otra carpeta o marca que quieres sobrescribir el que hay.");
+        }
+
+        Clear(root);
+    }
+
+    /// <summary>Si en esa carpeta hay algo que sea un respaldo.</summary>
+    private static bool HasBackup(string root) =>
+        File.Exists(Path.Combine(root, ManifestName)) ||
+        Folders().Any(folder =>
+            Directory.Exists(Path.Combine(root, folder)) &&
+            Directory.EnumerateFileSystemEntries(Path.Combine(root, folder)).Any());
+
+    /// <summary>
+    /// Quita el respaldo anterior y **solo** el respaldo anterior.
+    ///
+    /// Se borran las cuatro carpetas conocidas y el manifiesto, no la carpeta
+    /// entera: el usuario pudo elegir una que tenga además cosas suyas, y
+    /// llevárselas por delante sería mucho peor que el problema que esto resuelve.
+    /// </summary>
+    private static void Clear(string root)
+    {
+        foreach (var folder in Folders())
+        {
+            var directory = Path.Combine(root, folder);
+
+            if (Directory.Exists(directory))
+            {
+                Directory.Delete(directory, recursive: true);
+            }
+        }
+
+        var manifest = Path.Combine(root, ManifestName);
+
+        if (File.Exists(manifest))
+        {
+            File.Delete(manifest);
+        }
+    }
 
     public override async Task WriteAsync(
         BackupEntryKind kind,
@@ -347,6 +441,7 @@ public sealed class FolderBackupSink(string root) : BackupSinkBase
 public sealed class ZipBackupSink : BackupSinkBase
 {
     private readonly string _path;
+    private readonly string _staging;
     private readonly ZipArchive _archive;
     private readonly StringBuilder _buffer = new();
 
@@ -358,8 +453,11 @@ public sealed class ZipBackupSink : BackupSinkBase
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
 
         _path = path;
+        _staging = StagingOf(path);
+
         Directory.CreateDirectory(Path.GetDirectoryName(path) ?? ".");
-        _archive = new ZipArchive(File.Create(path), ZipArchiveMode.Create);
+
+        _archive = new ZipArchive(File.Create(_staging), ZipArchiveMode.Create);
     }
 
     public override async Task WriteAsync(
@@ -418,6 +516,10 @@ public sealed class ZipBackupSink : BackupSinkBase
 
         _archive.Dispose();
 
+        // Un zip a medias ni siquiera se puede abrir —le falta el índice del
+        // final—, así que hasta que no está entero no lleva su nombre.
+        File.Move(_staging, _path, overwrite: true);
+
         return new BackupArtifact(_path, new FileInfo(_path).Length);
     }
 
@@ -429,9 +531,9 @@ public sealed class ZipBackupSink : BackupSinkBase
         _discarded = true;
         _archive.Dispose();
 
-        if (File.Exists(_path))
+        if (File.Exists(_staging))
         {
-            File.Delete(_path);
+            File.Delete(_staging);
         }
 
         return Task.CompletedTask;

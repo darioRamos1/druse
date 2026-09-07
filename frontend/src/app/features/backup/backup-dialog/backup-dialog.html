@@ -341,6 +341,17 @@
               Empaquetar en un .zip con su manifiesto
             </label>
 
+            @if (writesFolder()) {
+              <label class="check">
+                <input
+                  type="checkbox"
+                  [checked]="overwrite()"
+                  (change)="overwrite.set(!overwrite())"
+                />
+                Sobrescribir el respaldo anterior de esa carpeta
+              </label>
+            }
+
             <label class="field">
               <span class="field__label">Dónde se guarda</span>
               <div class="path-row">

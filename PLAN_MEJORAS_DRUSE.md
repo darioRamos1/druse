@@ -155,16 +155,37 @@ ejecuciones, perder tablas ni cambiar valores.
 
 ### Tareas
 
-- [ ] **BKP-001:** impedir que un respaldo por carpetas reutilice silenciosamente un destino con contenido anterior.
-- [ ] **BKP-002:** escribir primero en un destino temporal y publicar el artefacto final de forma atómica cuando sea posible.
-- [ ] **BKP-003:** identificar archivos por motor, base, esquema y tabla, no solo por nombre de tabla.
-- [ ] **BKP-004:** definir una codificación reversible para diferenciar `NULL` de `""` en CSV.
-- [ ] **BKP-005:** versionar en el manifiesto el formato y las reglas de representación de datos.
+- [x] **BKP-001:** impedir que un respaldo por carpetas reutilice silenciosamente un destino con contenido anterior.
+- [x] **BKP-002:** escribir primero en un destino temporal y publicar el artefacto final de forma atómica cuando sea posible.
+- [x] **BKP-003:** identificar archivos por motor, base, esquema y tabla, no solo por nombre de tabla.
+- [x] **BKP-004:** definir una codificación reversible para diferenciar `NULL` de `""` en CSV.
+- [x] **BKP-005:** versionar en el manifiesto el formato y las reglas de representación de datos.
 - [ ] **BKP-006:** corregir el formateo de columnas `DATE` en Informix SQLI para no escribir una hora inexistente.
-- [ ] **BKP-007:** validar que `ResumeFrom` esté dentro del rango permitido.
-- [ ] **BKP-008:** conservar en manifiestos parciales el motor y resultado reales; no etiquetar todo como PostgreSQL cancelado.
-- [ ] **BKP-009:** distinguir fallo, cancelación y artefacto incompleto en interfaz y manifiesto.
-- [ ] **BKP-010:** advertir claramente si se intenta restaurar un formato antiguo que no conserva `NULL`.
+- [x] **BKP-007:** validar que `ResumeFrom` esté dentro del rango permitido.
+- [x] **BKP-008:** conservar en manifiestos parciales el motor y resultado reales; no etiquetar todo como PostgreSQL cancelado.
+- [x] **BKP-009:** distinguir fallo, cancelación y artefacto incompleto en interfaz y manifiesto.
+- [x] **BKP-010:** advertir claramente si se intenta restaurar un formato antiguo que no conserva `NULL`.
+
+> Estado al 7 de septiembre de 2026: el artefacto pasa a **formato 2**, que es el
+> primero reversible. Cada entrada se nombra `esquema.tabla`; en los CSV el nulo
+> va en blanco y la cadena vacía con sus dos comillas; el manifiesto de una
+> carpeta a medias lleva el motor, el origen y el resultado reales; un `.sql` o
+> un `.zip` se escriben como `.parcial` y solo reciben su nombre al estar
+> enteros, de modo que un respaldo fallido ya no se lleva por delante el
+> anterior; una carpeta que ya tiene un respaldo se rechaza salvo que se marque
+> «sobrescribir», que borra el respaldo viejo y **solo** el respaldo viejo; y
+> reanudar por encima de lo que trae el artefacto deja de terminar en verde sin
+> aplicar nada.
+>
+> **BKP-002 queda a medias a propósito** en la salida por carpetas: ahí no hay un
+> temporal que publicar de una vez, porque renombrar la carpeta elegida por el
+> usuario tiene sus propios problemas. Lo que se hace es no mezclar.
+>
+> **BKP-006 sigue abierta**: reproducir el `DATE` de Informix por SQLI necesita
+> el contenedor levantado, y en esta sesión no había Docker. Ojo con esto: las
+> 267 contractuales salen en verde **sin motores delante**, porque cuando el
+> servidor no responde cada prueba termina sin comprobar nada. `ElMotorEstabaDisponible`
+> lo caza solo con `DRUSE_REQUIRE_ENGINES=1`, que es lo que pone el CI.
 
 ### Compatibilidad
 

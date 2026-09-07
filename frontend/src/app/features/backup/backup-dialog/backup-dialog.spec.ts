@@ -1,11 +1,14 @@
+import { WritableSignal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { Observable, of } from 'rxjs';
 
 import {
   ApplicationGateway,
+  BackupLayout,
   BackupProfile,
   BackupProfileInput,
   BackupProfileResolution,
+  BackupRequest,
 } from '../../../core/application-gateway/application-gateway';
 import { DatabaseObject, ExplorerNode } from '../../../shared/models/workspace';
 import { BackupDialog } from './backup-dialog';
@@ -155,6 +158,24 @@ describe('BackupDialog', () => {
       .profileInput();
   }
 
+  /** Lo que se mandaría al lanzar el respaldo, sin pasar por la pantalla. */
+  function request(): BackupRequest {
+    return (fixture.componentInstance as unknown as { request: () => BackupRequest }).request();
+  }
+
+  /** Las señales de salida del diálogo, para colocar el escenario de cada caso. */
+  function output(): {
+    layout: WritableSignal<BackupLayout>;
+    compress: WritableSignal<boolean>;
+    overwrite: WritableSignal<boolean>;
+  } {
+    return fixture.componentInstance as unknown as {
+      layout: WritableSignal<BackupLayout>;
+      compress: WritableSignal<boolean>;
+      overwrite: WritableSignal<boolean>;
+    };
+  }
+
   function checkboxes(): HTMLInputElement[] {
     return [...element.querySelectorAll<HTMLInputElement>('.tree input[type="checkbox"]')];
   }
@@ -255,6 +276,33 @@ describe('BackupDialog', () => {
     expect(applied.destination).toBe('C:/respaldos/desarrollo');
     // Guardar después actualiza el mismo perfil en vez de crear otro.
     expect(applied.id).toBe('perfil-1');
+  });
+
+  /**
+   * Sin marcarlo, un segundo respaldo a la misma carpeta se rechaza en el
+   * proceso local en vez de mezclarse con el anterior. La casilla es la única
+   * forma de decir que sí, y solo existe cuando el destino es una carpeta.
+   */
+  it('sobrescribir solo se ofrece y se manda cuando el destino es una carpeta', () => {
+    const { layout, compress, overwrite } = output();
+
+    layout.set('FolderByKind');
+    compress.set(false);
+    fixture.detectChanges();
+
+    expect(request().overwrite).toBe(false);
+
+    overwrite.set(true);
+    fixture.detectChanges();
+
+    expect(request().overwrite).toBe(true);
+
+    // Un archivo o un zip los nombra el usuario en el diálogo del sistema, que ya
+    // pregunta antes de reemplazar: la casilla desaparece y no se manda marcada.
+    compress.set(true);
+    fixture.detectChanges();
+
+    expect(request().overwrite).toBe(false);
   });
 
   it('borrar un perfil lo quita de la lista', async () => {

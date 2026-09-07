@@ -985,6 +985,15 @@ export interface BackupRequest {
   readonly layout: BackupLayout;
   readonly dataFormat: BackupDataFormat;
   readonly compress: boolean;
+  /**
+   * Escribir sobre el respaldo que ya hubiera en la carpeta de destino.
+   *
+   * Solo lo mira la salida por carpetas: un archivo o un `.zip` los nombra el
+   * usuario en el diálogo del sistema, que ya pregunta antes de reemplazar. Sin
+   * esto, un segundo respaldo a la misma carpeta se rechaza en vez de mezclarse
+   * con el anterior.
+   */
+  readonly overwrite?: boolean;
   /** Ruta elegida con el selector del sistema. La escribe el proceso local. */
   readonly destination: string;
 }

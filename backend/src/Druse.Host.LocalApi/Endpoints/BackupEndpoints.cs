@@ -1,4 +1,4 @@
-using Druse.Application.Abstractions;
+﻿using Druse.Application.Abstractions;
 using Druse.Application.Backups;
 using Druse.Domain;
 using Druse.Host.LocalApi.Contracts;
@@ -250,7 +250,7 @@ internal static class BackupEndpoints
     private static IBackupSink SinkFor(BackupRequestDto request, BackupOutput output) => output switch
     {
         { Compress: true } => new ZipBackupSink(request.Destination),
-        { Layout: BackupLayout.FolderByKind } => new FolderBackupSink(request.Destination),
+        { Layout: BackupLayout.FolderByKind } => new FolderBackupSink(request.Destination, output.Overwrite),
         _ => new SingleFileBackupSink(request.Destination),
     };
 
