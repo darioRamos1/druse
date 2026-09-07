@@ -1,0 +1,3910 @@
+{
+  "openapi": "3.1.1",
+  "info": {
+    "title": "Druse.Host.LocalApi | v1",
+    "version": "1.0.0"
+  },
+  "servers": [
+    {
+      "url": "http://localhost/"
+    }
+  ],
+  "paths": {
+    "/api/health": {
+      "get": {
+        "tags": [
+          "Druse.Host.LocalApi"
+        ],
+        "operationId": "GetHealth",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/diagnostics": {
+      "get": {
+        "tags": [
+          "Druse.Host.LocalApi"
+        ],
+        "operationId": "GetDiagnostics",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/jobs": {
+      "get": {
+        "tags": [
+          "Druse.Host.LocalApi"
+        ],
+        "operationId": "GetJobs",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/shutdown": {
+      "post": {
+        "tags": [
+          "Druse.Host.LocalApi"
+        ],
+        "operationId": "Shutdown",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/engines": {
+      "get": {
+        "tags": [
+          "Druse.Host.LocalApi"
+        ],
+        "operationId": "GetEngines",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/connections/test": {
+      "post": {
+        "tags": [
+          "Druse.Host.LocalApi"
+        ],
+        "operationId": "TestConnection",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConnectRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/connections/test-tunnel": {
+      "post": {
+        "tags": [
+          "Druse.Host.LocalApi"
+        ],
+        "operationId": "TestTunnel",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConnectRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/connections/databases": {
+      "post": {
+        "tags": [
+          "Druse.Host.LocalApi"
+        ],
+        "operationId": "ListConnectionDatabases",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConnectRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/sessions": {
+      "post": {
+        "tags": [
+          "Druse.Host.LocalApi"
+        ],
+        "operationId": "OpenSession",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConnectRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/sessions/{sessionId}": {
+      "delete": {
+        "tags": [
+          "Druse.Host.LocalApi"
+        ],
+        "operationId": "CloseSession",
+        "parameters": [
+          {
+            "name": "sessionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/sessions/{sessionId}/metadata/databases": {
+      "get": {
+        "tags": [
+          "Druse.Host.LocalApi"
+        ],
+        "operationId": "GetDatabases",
+        "parameters": [
+          {
+            "name": "sessionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/sessions/{sessionId}/metadata/children": {
+      "post": {
+        "tags": [
+          "Druse.Host.LocalApi"
+        ],
+        "operationId": "GetChildren",
+        "parameters": [
+          {
+            "name": "sessionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DatabaseObjectDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/sessions/{sessionId}/metadata/columns": {
+      "post": {
+        "tags": [
+          "Druse.Host.LocalApi"
+        ],
+        "operationId": "GetColumns",
+        "parameters": [
+          {
+            "name": "sessionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DatabaseObjectDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/sessions/{sessionId}/metadata/graph": {
+      "post": {
+        "tags": [
+          "Druse.Host.LocalApi"
+        ],
+        "operationId": "GetSchemaGraph",
+        "parameters": [
+          {
+            "name": "sessionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SchemaGraphRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/sessions/{sessionId}/metadata/definition": {
+      "post": {
+        "tags": [
+          "Druse.Host.LocalApi"
+        ],
+        "operationId": "GetDefinition",
+        "parameters": [
+          {
+            "name": "sessionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DatabaseObjectDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/sessions/{sessionId}/metadata/routine": {
+      "post": {
+        "tags": [
+          "Druse.Host.LocalApi"
+        ],
+        "operationId": "GetRoutineSignature",
+        "parameters": [
+          {
+            "name": "sessionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DatabaseObjectDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/queries": {
+      "post": {
+        "tags": [
+          "Druse.Host.LocalApi"
+        ],
+        "operationId": "ExecuteQuery",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExecuteQueryRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/queries/{executionId}": {
+      "delete": {
+        "tags": [
+          "Druse.Host.LocalApi"
+        ],
+        "operationId": "CancelQuery",
+        "parameters": [
+          {
+            "name": "executionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/rows/preview": {
+      "post": {
+        "tags": [
+          "Druse.Host.LocalApi"
+        ],
+        "operationId": "PreviewRowEdits",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RowEditRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/rows": {
+      "post": {
+        "tags": [
+          "Druse.Host.LocalApi"
+        ],
+        "operationId": "ApplyRowEdits",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RowEditRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/rows/delete/preview": {
+      "post": {
+        "tags": [
+          "Druse.Host.LocalApi"
+        ],
+        "operationId": "PreviewRowDeletes",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RowDeleteRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/rows/delete": {
+      "post": {
+        "tags": [
+          "Druse.Host.LocalApi"
+        ],
+        "operationId": "DeleteRows",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RowDeleteRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/sessions/{sessionId}/tables/data-types": {
+      "get": {
+        "tags": [
+          "Druse.Host.LocalApi"
+        ],
+        "operationId": "GetTableDataTypes",
+        "parameters": [
+          {
+            "name": "sessionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/sessions/{sessionId}/tables/capabilities": {
+      "get": {
+        "tags": [
+          "Druse.Host.LocalApi"
+        ],
+        "operationId": "GetTableCapabilities",
+        "parameters": [
+          {
+            "name": "sessionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/sessions/{sessionId}/tables/structure": {
+      "post": {
+        "tags": [
+          "Druse.Host.LocalApi"
+        ],
+        "operationId": "GetTableStructure",
+        "parameters": [
+          {
+            "name": "sessionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DatabaseObjectDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/tables/preview": {
+      "post": {
+        "tags": [
+          "Druse.Host.LocalApi"
+        ],
+        "operationId": "PreviewCreateTable",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateTableRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/tables": {
+      "post": {
+        "tags": [
+          "Druse.Host.LocalApi"
+        ],
+        "operationId": "CreateTable",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateTableRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/tables/alter/preview": {
+      "post": {
+        "tags": [
+          "Druse.Host.LocalApi"
+        ],
+        "operationId": "PreviewAlterTable",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AlterTableRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/tables/alter": {
+      "post": {
+        "tags": [
+          "Druse.Host.LocalApi"
+        ],
+        "operationId": "AlterTable",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AlterTableRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/sessions/{sessionId}/transaction": {
+      "get": {
+        "tags": [
+          "Druse.Host.LocalApi"
+        ],
+        "operationId": "GetTransaction",
+        "parameters": [
+          {
+            "name": "sessionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Druse.Host.LocalApi"
+        ],
+        "operationId": "BeginTransaction",
+        "parameters": [
+          {
+            "name": "sessionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/sessions/{sessionId}/transaction/commit": {
+      "post": {
+        "tags": [
+          "Druse.Host.LocalApi"
+        ],
+        "operationId": "CommitTransaction",
+        "parameters": [
+          {
+            "name": "sessionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/sessions/{sessionId}/transaction/rollback": {
+      "post": {
+        "tags": [
+          "Druse.Host.LocalApi"
+        ],
+        "operationId": "RollbackTransaction",
+        "parameters": [
+          {
+            "name": "sessionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/connections": {
+      "get": {
+        "tags": [
+          "Druse.Host.LocalApi"
+        ],
+        "operationId": "GetConnections",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Druse.Host.LocalApi"
+        ],
+        "operationId": "CreateConnection",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveConnectionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/connections/secret-store": {
+      "get": {
+        "tags": [
+          "Druse.Host.LocalApi"
+        ],
+        "operationId": "GetSecretStoreStatus",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/connections/{id}": {
+      "put": {
+        "tags": [
+          "Druse.Host.LocalApi"
+        ],
+        "operationId": "UpdateConnection",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveConnectionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Druse.Host.LocalApi"
+        ],
+        "operationId": "DeleteConnection",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/connections/{id}/sessions": {
+      "post": {
+        "tags": [
+          "Druse.Host.LocalApi"
+        ],
+        "operationId": "OpenSavedSession",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "$ref": "#/components/schemas/OpenSavedSessionRequest"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/history": {
+      "get": {
+        "tags": [
+          "Druse.Host.LocalApi"
+        ],
+        "operationId": "GetHistory",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32"
+            }
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Druse.Host.LocalApi"
+        ],
+        "operationId": "ClearHistory",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/preferences": {
+      "get": {
+        "tags": [
+          "Druse.Host.LocalApi"
+        ],
+        "operationId": "GetPreferences",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/preferences/{key}": {
+      "put": {
+        "tags": [
+          "Druse.Host.LocalApi"
+        ],
+        "operationId": "SetPreference",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PreferenceValueDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/workspace/tabs": {
+      "get": {
+        "tags": [
+          "Druse.Host.LocalApi"
+        ],
+        "operationId": "GetEditorTabs",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Druse.Host.LocalApi"
+        ],
+        "operationId": "SaveEditorTabs",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/EditorTabDto"
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/workspace/snippets": {
+      "get": {
+        "tags": [
+          "Druse.Host.LocalApi"
+        ],
+        "operationId": "GetSqlSnippets",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/workspace/snippets/{id}": {
+      "put": {
+        "tags": [
+          "Druse.Host.LocalApi"
+        ],
+        "operationId": "SaveSqlSnippet",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SqlSnippetDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Druse.Host.LocalApi"
+        ],
+        "operationId": "DeleteSqlSnippet",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/workspace/diagrams": {
+      "get": {
+        "tags": [
+          "Druse.Host.LocalApi"
+        ],
+        "operationId": "GetDiagrams",
+        "parameters": [
+          {
+            "name": "connectionId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/workspace/diagrams/{id}": {
+      "put": {
+        "tags": [
+          "Druse.Host.LocalApi"
+        ],
+        "operationId": "SaveDiagram",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SavedDiagramDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Druse.Host.LocalApi"
+        ],
+        "operationId": "DeleteDiagram",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/folders": {
+      "get": {
+        "tags": [
+          "Druse.Host.LocalApi"
+        ],
+        "operationId": "BrowseFolders",
+        "parameters": [
+          {
+            "name": "path",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "files",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "marker",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Druse.Host.LocalApi"
+        ],
+        "operationId": "CreateFolder",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateFolderRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/folders/target": {
+      "get": {
+        "tags": [
+          "Druse.Host.LocalApi"
+        ],
+        "operationId": "ResolveFolderTarget",
+        "parameters": [
+          {
+            "name": "folder",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "name",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/exports/csv": {
+      "post": {
+        "tags": [
+          "Druse.Host.LocalApi"
+        ],
+        "operationId": "ExportCsv",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExportRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/exports/xlsx": {
+      "post": {
+        "tags": [
+          "Druse.Host.LocalApi"
+        ],
+        "operationId": "ExportXlsx",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExportRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/imports/preview": {
+      "post": {
+        "tags": [
+          "Druse.Host.LocalApi"
+        ],
+        "operationId": "PreviewImport",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/imports": {
+      "post": {
+        "tags": [
+          "Druse.Host.LocalApi"
+        ],
+        "operationId": "Import",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/backup/run": {
+      "post": {
+        "tags": [
+          "Druse.Host.LocalApi"
+        ],
+        "operationId": "RunBackup",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BackupRequestDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/backup/preview": {
+      "post": {
+        "tags": [
+          "Druse.Host.LocalApi"
+        ],
+        "operationId": "PreviewBackup",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BackupRequestDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/backup/{id}/status": {
+      "get": {
+        "tags": [
+          "Druse.Host.LocalApi"
+        ],
+        "operationId": "GetBackupStatus",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/backup/{id}/cancel": {
+      "post": {
+        "tags": [
+          "Druse.Host.LocalApi"
+        ],
+        "operationId": "CancelBackup",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/backup/profiles": {
+      "get": {
+        "tags": [
+          "Druse.Host.LocalApi"
+        ],
+        "operationId": "GetBackupProfiles",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Druse.Host.LocalApi"
+        ],
+        "operationId": "SaveBackupProfile",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BackupProfileDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/backup/profiles/{id}": {
+      "get": {
+        "tags": [
+          "Druse.Host.LocalApi"
+        ],
+        "operationId": "GetBackupProfile",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Druse.Host.LocalApi"
+        ],
+        "operationId": "DeleteBackupProfile",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/backup/profiles/{id}/resolve": {
+      "post": {
+        "tags": [
+          "Druse.Host.LocalApi"
+        ],
+        "operationId": "ResolveBackupProfile",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResolveBackupProfileDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/backup/profiles/{id}/ran": {
+      "post": {
+        "tags": [
+          "Druse.Host.LocalApi"
+        ],
+        "operationId": "MarkBackupProfileRun",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/restore/inspect": {
+      "post": {
+        "tags": [
+          "Druse.Host.LocalApi"
+        ],
+        "operationId": "InspectRestore",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InspectRestoreDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/restore/run": {
+      "post": {
+        "tags": [
+          "Druse.Host.LocalApi"
+        ],
+        "operationId": "RunRestore",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RestoreRequestDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/restore/{id}/status": {
+      "get": {
+        "tags": [
+          "Druse.Host.LocalApi"
+        ],
+        "operationId": "GetRestoreStatus",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/restore/{id}/cancel": {
+      "post": {
+        "tags": [
+          "Druse.Host.LocalApi"
+        ],
+        "operationId": "CancelRestore",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/transfers/preview": {
+      "post": {
+        "tags": [
+          "Druse.Host.LocalApi"
+        ],
+        "operationId": "PreviewTransfer",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TransferRequestDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/transfers/translation": {
+      "post": {
+        "tags": [
+          "Druse.Host.LocalApi"
+        ],
+        "operationId": "TranslateTransferTypes",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TransferRequestDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/transfers/target": {
+      "post": {
+        "tags": [
+          "Druse.Host.LocalApi"
+        ],
+        "operationId": "CreateTransferTarget",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TransferRequestDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/transfers/set/order": {
+      "post": {
+        "tags": [
+          "Druse.Host.LocalApi"
+        ],
+        "operationId": "OrderTransferSet",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TransferSetRequestDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/transfers": {
+      "post": {
+        "tags": [
+          "Druse.Host.LocalApi"
+        ],
+        "operationId": "RunTransfer",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TransferRequestDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/transfers/set": {
+      "post": {
+        "tags": [
+          "Druse.Host.LocalApi"
+        ],
+        "operationId": "RunTransferSet",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TransferSetRequestDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/transfers/{id}/status": {
+      "get": {
+        "tags": [
+          "Druse.Host.LocalApi"
+        ],
+        "operationId": "GetTransferStatus",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/transfers/{id}/cancel": {
+      "post": {
+        "tags": [
+          "Druse.Host.LocalApi"
+        ],
+        "operationId": "CancelTransfer",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/transfers/profiles": {
+      "get": {
+        "tags": [
+          "Druse.Host.LocalApi"
+        ],
+        "operationId": "GetTransferProfiles",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Druse.Host.LocalApi"
+        ],
+        "operationId": "SaveTransferProfile",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TransferProfileDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/transfers/profiles/{id}": {
+      "get": {
+        "tags": [
+          "Druse.Host.LocalApi"
+        ],
+        "operationId": "GetTransferProfile",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Druse.Host.LocalApi"
+        ],
+        "operationId": "DeleteTransferProfile",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/transfers/profiles/{id}/resolve": {
+      "post": {
+        "tags": [
+          "Druse.Host.LocalApi"
+        ],
+        "operationId": "ResolveTransferProfile",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResolveTransferProfileDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/transfers/profiles/{id}/ran": {
+      "post": {
+        "tags": [
+          "Druse.Host.LocalApi"
+        ],
+        "operationId": "MarkTransferProfileRun",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/ai/providers": {
+      "get": {
+        "tags": [
+          "Druse.Host.LocalApi"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Druse.Host.LocalApi"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveAiProviderDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/ai/providers/{id}": {
+      "delete": {
+        "tags": [
+          "Druse.Host.LocalApi"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/ai/providers/test": {
+      "post": {
+        "tags": [
+          "Druse.Host.LocalApi"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveAiProviderDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/ai/providers/models": {
+      "post": {
+        "tags": [
+          "Druse.Host.LocalApi"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveAiProviderDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/ai/cli/{command}": {
+      "get": {
+        "tags": [
+          "Druse.Host.LocalApi"
+        ],
+        "parameters": [
+          {
+            "name": "command",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "profileId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/ai/cli/{command}/login": {
+      "post": {
+        "tags": [
+          "Druse.Host.LocalApi"
+        ],
+        "parameters": [
+          {
+            "name": "command",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "profileId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/ai/chat": {
+      "post": {
+        "tags": [
+          "Druse.Host.LocalApi"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AiChatDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AiChatDto": {
+        "required": [
+          "providerId",
+          "messages",
+          "context"
+        ],
+        "type": "object",
+        "properties": {
+          "providerId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "messages": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AiMessageDto"
+            }
+          },
+          "context": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "AiMessageDto": {
+        "required": [
+          "role",
+          "text"
+        ],
+        "type": "object",
+        "properties": {
+          "role": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          }
+        }
+      },
+      "AlterTableRequest": {
+        "required": [
+          "sessionId",
+          "table"
+        ],
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "table": {
+            "$ref": "#/components/schemas/DatabaseObjectDto"
+          },
+          "newName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "addedColumns": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TableColumnDesignDto"
+            }
+          },
+          "alteredColumns": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ColumnAlterationDto"
+            }
+          },
+          "droppedColumns": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "addedIndexes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/IndexDesignDto"
+            }
+          },
+          "alteredIndexes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/IndexAlterationDto"
+            }
+          },
+          "droppedIndexes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "addedForeignKeys": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ForeignKeyDesignDto"
+            }
+          },
+          "droppedForeignKeys": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "addedUniqueConstraints": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UniqueConstraintDesignDto"
+            }
+          },
+          "droppedUniqueConstraints": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "addedCheckConstraints": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CheckConstraintDesignDto"
+            }
+          },
+          "droppedCheckConstraints": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "newPrimaryKey": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/PrimaryKeyDesignDto"
+              }
+            ]
+          },
+          "droppedPrimaryKeyName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "confirmed": {
+            "type": "boolean"
+          },
+          "confirmedDestructive": {
+            "type": "boolean"
+          }
+        }
+      },
+      "BackupFilterDto": {
+        "type": "object",
+        "properties": {
+          "where": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "maxRows": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "excludedColumns": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "BackupProfileDto": {
+        "required": [
+          "name"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "connectionId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "database": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "selection": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BackupSelectorDto"
+            }
+          },
+          "dataMode": {
+            "type": "string"
+          },
+          "dataOverrides": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "filters": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/BackupFilterDto"
+            }
+          },
+          "layout": {
+            "type": "string"
+          },
+          "dataFormat": {
+            "type": "string"
+          },
+          "compress": {
+            "type": "boolean"
+          },
+          "destination": {
+            "type": "string"
+          },
+          "knownTables": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "createdAtUtc": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "updatedAtUtc": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "lastRunAtUtc": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          }
+        }
+      },
+      "BackupRequestDto": {
+        "required": [
+          "sessionId",
+          "tables",
+          "destination"
+        ],
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "tables": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BackupTableDto"
+            }
+          },
+          "dataMode": {
+            "type": "string"
+          },
+          "dataOverrides": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "filters": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/BackupFilterDto"
+            }
+          },
+          "layout": {
+            "type": "string"
+          },
+          "dataFormat": {
+            "type": "string"
+          },
+          "compress": {
+            "type": "boolean"
+          },
+          "overwrite": {
+            "type": "boolean"
+          },
+          "destination": {
+            "type": "string"
+          }
+        }
+      },
+      "BackupSelectorDto": {
+        "required": [
+          "schema"
+        ],
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string"
+          },
+          "schema": {
+            "type": "string"
+          },
+          "name": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "BackupTableDto": {
+        "required": [
+          "id",
+          "name"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "database": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "schema": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "approximateRowCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          }
+        }
+      },
+      "CellValueDto": {
+        "required": [
+          "column"
+        ],
+        "type": "object",
+        "properties": {
+          "column": {
+            "type": "string"
+          },
+          "value": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "CheckConstraintDesignDto": {
+        "required": [
+          "name",
+          "expression"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "expression": {
+            "type": "string"
+          }
+        }
+      },
+      "ColumnAlterationDto": {
+        "required": [
+          "currentName",
+          "column"
+        ],
+        "type": "object",
+        "properties": {
+          "currentName": {
+            "type": "string"
+          },
+          "column": {
+            "$ref": "#/components/schemas/TableColumnDesignDto"
+          }
+        }
+      },
+      "ColumnMappingDto": {
+        "required": [
+          "source"
+        ],
+        "type": "object",
+        "properties": {
+          "source": {
+            "type": "string"
+          },
+          "target": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "ConnectionProfileDto": {
+        "required": [
+          "name",
+          "engine",
+          "host",
+          "port",
+          "database"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "engine": {
+            "type": "string"
+          },
+          "host": {
+            "type": "string"
+          },
+          "port": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "database": {
+            "type": "string"
+          },
+          "username": {
+            "type": "string"
+          },
+          "authentication": {
+            "type": "string"
+          },
+          "environment": {
+            "type": "string"
+          },
+          "readOnly": {
+            "type": "boolean"
+          },
+          "sslMode": {
+            "type": "string"
+          },
+          "connectTimeoutSeconds": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "sshTunnel": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/SshTunnelDto"
+              }
+            ]
+          },
+          "informixServer": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "ConnectRequest": {
+        "required": [
+          "profile"
+        ],
+        "type": "object",
+        "properties": {
+          "profile": {
+            "$ref": "#/components/schemas/ConnectionProfileDto"
+          },
+          "password": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "sshSecret": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "sshVerificationCode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "CreateFolderRequest": {
+        "required": [
+          "parent",
+          "name"
+        ],
+        "type": "object",
+        "properties": {
+          "parent": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        }
+      },
+      "CreateTableRequest": {
+        "required": [
+          "sessionId",
+          "name",
+          "columns"
+        ],
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "database": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "schema": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "columns": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TableColumnDesignDto"
+            }
+          },
+          "indexes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/IndexDesignDto"
+            }
+          },
+          "foreignKeys": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ForeignKeyDesignDto"
+            }
+          },
+          "uniqueConstraints": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UniqueConstraintDesignDto"
+            }
+          },
+          "checkConstraints": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CheckConstraintDesignDto"
+            }
+          },
+          "confirmed": {
+            "type": "boolean"
+          }
+        }
+      },
+      "DatabaseObjectDto": {
+        "required": [
+          "id",
+          "name",
+          "kind"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "database": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "schema": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "hasChildren": {
+            "type": "boolean"
+          },
+          "approximateRowCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          }
+        }
+      },
+      "EditorTabDto": {
+        "required": [
+          "id",
+          "title"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "sql": {
+            "type": "string"
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "isDirty": {
+            "type": "boolean"
+          },
+          "connectionId": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "database": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "fileName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "documentId": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "ExecuteQueryRequest": {
+        "required": [
+          "sessionId",
+          "sql"
+        ],
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "sql": {
+            "type": "string"
+          },
+          "database": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "executionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "maxRows": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "timeoutSeconds": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "confirmDestructive": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ExportRequest": {
+        "required": [
+          "sessionId",
+          "sql"
+        ],
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "sql": {
+            "type": "string"
+          },
+          "database": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "fileName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "encoding": {
+            "type": "string"
+          },
+          "delimiter": {
+            "type": "string"
+          },
+          "includeHeaders": {
+            "type": "boolean"
+          },
+          "nullText": {
+            "type": "string"
+          },
+          "maxRows": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "timeoutSeconds": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "confirmDestructive": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ForeignKeyDesignDto": {
+        "required": [
+          "name",
+          "columns",
+          "referencedTable",
+          "referencedColumns"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "columns": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "referencedDatabase": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "referencedSchema": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "referencedTable": {
+            "type": "string"
+          },
+          "referencedColumns": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "onDelete": {
+            "type": "string"
+          },
+          "onUpdate": {
+            "type": "string"
+          }
+        }
+      },
+      "HealthResponse": {
+        "required": [
+          "status",
+          "product",
+          "version",
+          "environment",
+          "timestampUtc"
+        ],
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string"
+          },
+          "product": {
+            "type": "string"
+          },
+          "version": {
+            "type": "string"
+          },
+          "environment": {
+            "type": "string"
+          },
+          "timestampUtc": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "IndexAlterationDto": {
+        "required": [
+          "currentName",
+          "index"
+        ],
+        "type": "object",
+        "properties": {
+          "currentName": {
+            "type": "string"
+          },
+          "index": {
+            "$ref": "#/components/schemas/IndexDesignDto"
+          }
+        }
+      },
+      "IndexColumnDto": {
+        "required": [
+          "name"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "direction": {
+            "type": "string"
+          }
+        }
+      },
+      "IndexDesignDto": {
+        "required": [
+          "name",
+          "columns"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "columns": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/IndexColumnDto"
+            }
+          },
+          "isUnique": {
+            "type": "boolean"
+          },
+          "includedColumns": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "filter": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "method": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "InspectRestoreDto": {
+        "required": [
+          "sessionId",
+          "path"
+        ],
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "path": {
+            "type": "string"
+          }
+        }
+      },
+      "OpenSavedSessionRequest": {
+        "type": "object",
+        "properties": {
+          "password": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "sshSecret": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "sshVerificationCode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "PreferenceValueDto": {
+        "required": [
+          "value"
+        ],
+        "type": "object",
+        "properties": {
+          "value": {
+            "type": "string"
+          }
+        }
+      },
+      "PrimaryKeyDesignDto": {
+        "required": [
+          "columns"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "columns": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "ResolveBackupProfileDto": {
+        "required": [
+          "sessionId"
+        ],
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "ResolveTransferProfileDto": {
+        "required": [
+          "sourceSessionId",
+          "targetSessionId"
+        ],
+        "type": "object",
+        "properties": {
+          "sourceSessionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "targetSessionId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "RestoreRequestDto": {
+        "required": [
+          "sessionId",
+          "path"
+        ],
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "path": {
+            "type": "string"
+          },
+          "resumeFrom": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "fingerprint": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "newDatabase": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "RowDeleteRequest": {
+        "required": [
+          "sessionId",
+          "table",
+          "keys"
+        ],
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "table": {
+            "$ref": "#/components/schemas/DatabaseObjectDto"
+          },
+          "keys": {
+            "type": "array",
+            "items": {
+              "type": "array",
+              "items": {
+                "$ref": "#/components/schemas/CellValueDto"
+              }
+            }
+          },
+          "confirmed": {
+            "type": "boolean"
+          }
+        }
+      },
+      "RowEditDto": {
+        "required": [
+          "key",
+          "changes"
+        ],
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CellValueDto"
+            }
+          },
+          "changes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CellValueDto"
+            }
+          }
+        }
+      },
+      "RowEditRequest": {
+        "required": [
+          "sessionId",
+          "table",
+          "edits"
+        ],
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "table": {
+            "$ref": "#/components/schemas/DatabaseObjectDto"
+          },
+          "edits": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RowEditDto"
+            }
+          },
+          "confirmed": {
+            "type": "boolean"
+          }
+        }
+      },
+      "SaveAiProviderDto": {
+        "required": [
+          "id",
+          "name",
+          "kind",
+          "baseUrl",
+          "model",
+          "command",
+          "disclosure",
+          "ownSession",
+          "isDefault",
+          "apiKey"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "baseUrl": {
+            "type": "string"
+          },
+          "model": {
+            "type": "string"
+          },
+          "command": {
+            "type": "string"
+          },
+          "disclosure": {
+            "type": "string"
+          },
+          "ownSession": {
+            "type": "boolean"
+          },
+          "isDefault": {
+            "type": "boolean"
+          },
+          "apiKey": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "SaveConnectionRequest": {
+        "required": [
+          "profile"
+        ],
+        "type": "object",
+        "properties": {
+          "profile": {
+            "$ref": "#/components/schemas/ConnectionProfileDto"
+          },
+          "password": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "storePassword": {
+            "type": "boolean"
+          },
+          "sshSecret": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "storeSshSecret": {
+            "type": "boolean"
+          }
+        }
+      },
+      "SavedDiagramDto": {
+        "required": [
+          "id",
+          "connectionId",
+          "name",
+          "model"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "connectionId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "model": {
+            "type": "string"
+          },
+          "createdAtUtc": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "updatedAtUtc": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          }
+        }
+      },
+      "SchemaGraphRequest": {
+        "required": [
+          "tables"
+        ],
+        "type": "object",
+        "properties": {
+          "tables": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DatabaseObjectDto"
+            }
+          }
+        }
+      },
+      "SqlSnippetDto": {
+        "required": [
+          "id",
+          "name",
+          "sql"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "sql": {
+            "type": "string"
+          },
+          "createdAtUtc": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "updatedAtUtc": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          }
+        }
+      },
+      "SshTunnelDto": {
+        "required": [
+          "host",
+          "username"
+        ],
+        "type": "object",
+        "properties": {
+          "host": {
+            "type": "string"
+          },
+          "port": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "username": {
+            "type": "string"
+          },
+          "authentication": {
+            "type": "string"
+          },
+          "privateKeyPath": {
+            "type": "string"
+          },
+          "connectTimeoutSeconds": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          }
+        }
+      },
+      "TableColumnDesignDto": {
+        "required": [
+          "name",
+          "dataType"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "dataType": {
+            "type": "string"
+          },
+          "isNullable": {
+            "type": "boolean"
+          },
+          "isPrimaryKey": {
+            "type": "boolean"
+          },
+          "isIdentity": {
+            "type": "boolean"
+          },
+          "defaultValue": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "TransferProfileDto": {
+        "required": [
+          "name"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "sourceConnectionId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "sourceDatabase": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "sourceSchema": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "targetConnectionId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "targetDatabase": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "targetSchema": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "tables": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "mode": {
+            "type": "string"
+          },
+          "tableOptions": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/TransferTableOptionsDto"
+            }
+          },
+          "ordered": {
+            "type": "boolean"
+          },
+          "atomic": {
+            "type": "boolean"
+          },
+          "keepIdentity": {
+            "type": "boolean"
+          },
+          "batchSize": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "createdAtUtc": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "updatedAtUtc": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "lastRunAtUtc": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          }
+        }
+      },
+      "TransferRequestDto": {
+        "required": [
+          "sourceSessionId",
+          "source",
+          "targetSessionId",
+          "target"
+        ],
+        "type": "object",
+        "properties": {
+          "sourceSessionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "source": {
+            "$ref": "#/components/schemas/TransferTableDto"
+          },
+          "targetSessionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "target": {
+            "$ref": "#/components/schemas/TransferTableDto"
+          },
+          "filter": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/BackupFilterDto"
+              }
+            ]
+          },
+          "mappings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ColumnMappingDto"
+            }
+          },
+          "mode": {
+            "type": "string"
+          },
+          "keyColumns": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "typeOverrides": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "atomic": {
+            "type": "boolean"
+          },
+          "batchSize": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "keepIdentity": {
+            "type": "boolean"
+          },
+          "confirmed": {
+            "type": "boolean"
+          },
+          "replaceConfirmation": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "TransferSetRequestDto": {
+        "type": "object",
+        "properties": {
+          "tables": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TransferRequestDto"
+            }
+          },
+          "ordered": {
+            "type": "boolean"
+          }
+        }
+      },
+      "TransferTableDto": {
+        "required": [
+          "id",
+          "name"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "database": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "schema": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "approximateRowCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          }
+        }
+      },
+      "TransferTableOptionsDto": {
+        "type": "object",
+        "properties": {
+          "mode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "where": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "keyColumns": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "UniqueConstraintDesignDto": {
+        "required": [
+          "name",
+          "columns"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "columns": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "Druse.Host.LocalApi"
+    }
+  ]
+}
