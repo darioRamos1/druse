@@ -186,6 +186,24 @@ app.MapGet("/api/health", () => new HealthResponse(
     TimestampUtc: DateTimeOffset.UtcNow))
    .WithName("GetHealth");
 
+// Apagado ordenado, pedido por el envoltorio al cerrar la ventana.
+//
+// Antes lo único que había era matar el proceso, y matarlo **se salta
+// `ApplicationStopping`**: las sesiones contra las bases del usuario no se
+// cierran, se cortan, y una transacción abierta se queda a lo que decida el
+// servidor. Con esto se le pide a la API que se apague por su cuenta; quien lo
+// pide espera, y solo si no muere lo mata (`api_process.rs`).
+//
+// Responde antes de apagar porque no puede responder después: el apagado cierra
+// el servidor que tendría que enviar la respuesta.
+app.MapPost("/api/shutdown", (IHostApplicationLifetime lifetime) =>
+{
+    lifetime.StopApplication();
+
+    return Results.Accepted();
+})
+.WithName("Shutdown");
+
 app.MapDatabaseEndpoints();
 app.MapStorageEndpoints();
 app.MapFolderEndpoints();

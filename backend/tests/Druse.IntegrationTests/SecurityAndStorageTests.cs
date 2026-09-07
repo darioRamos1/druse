@@ -1,4 +1,4 @@
-using System.Net;
+﻿using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 
@@ -61,6 +61,24 @@ public sealed class TokenAuthenticationTests : IClassFixture<DruseApiFactory>
         var response = await client.GetAsync("/api/health");
 
         response.EnsureSuccessStatusCode();
+    }
+
+    /// <summary>
+    /// Apagar la API es lo más destructivo que se le puede pedir por HTTP: corta
+    /// las sesiones abiertas contra las bases del usuario. Sin token, cualquier
+    /// proceso de la máquina podría tumbarle Druse a mitad de un respaldo.
+    ///
+    /// No se comprueba aquí que apague de verdad: eso pararía el servidor que
+    /// comparten las demás pruebas de esta clase.
+    /// </summary>
+    [Fact]
+    public async Task ApagarLaApiExigeToken()
+    {
+        using var client = _factory.CreateClient();
+
+        var response = await client.PostAsync("/api/shutdown", content: null);
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
     [Fact]

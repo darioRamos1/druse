@@ -7,6 +7,8 @@
 use std::env;
 use std::ffi::OsString;
 use std::fs;
+use std::io::{Read, Write};
+use std::net::{Ipv4Addr, SocketAddr, TcpStream};
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command};
 use std::thread;
@@ -44,6 +46,16 @@ const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 
 /// Cuánto se espera a que la API arranque antes de darse por vencido.
 const STARTUP_TIMEOUT: Duration = Duration::from_secs(30);
+
+/// Cuánto se espera a que la API se apague sola antes de matarla.
+///
+/// Al apagarse cierra las sesiones abiertas contra las bases del usuario y sus
+/// túneles SSH, y eso puede llevar un momento. Pasado el plazo se da por
+/// colgada: dejar la ventana cerrándose para siempre sería peor.
+const SHUTDOWN_TIMEOUT: Duration = Duration::from_secs(10);
+
+/// Cuánto se espera a que la API conteste que ha recibido la petición de apagado.
+const SHUTDOWN_REQUEST_TIMEOUT: Duration = Duration::from_secs(2);
 
 /// Datos de conexión que publica la API al arrancar.
 #[derive(Debug, Clone, Deserialize)]
@@ -127,18 +139,120 @@ impl ApiProcess {
     }
 
     /// Detiene la API si la lanzamos nosotros.
+    ///
+    /// **Primero por las buenas.** Matar el proceso se salta el apagado de la
+    /// API, que es donde cierra las sesiones contra las bases del usuario y sus
+    /// túneles: cortarlas de golpe deja al servidor decidiendo qué hacer con lo
+    /// que hubiera abierto, y una transacción sin confirmar a su suerte. Así que
+    /// se le pide que se apague, se espera, y **matar queda para cuando no
+    /// responde**, que es el caso para el que hace falta.
     pub fn stop(&mut self) {
-        if let Some(child) = self.child.as_mut() {
+        let Some(child) = self.child.as_mut() else {
+            return;
+        };
+
+        // Si la API ni siquiera acepta la petición —una versión vieja que no
+        // conoce la ruta, un token que ya no vale— no hay nada que esperar:
+        // esperarla sería diez segundos de ventana congelada para nada.
+        let aceptado = request_shutdown(self.endpoint.port, &self.endpoint.token);
+
+        if !aceptado || !wait_for_exit(child, SHUTDOWN_TIMEOUT) {
             let _ = child.kill();
             let _ = child.wait();
+        }
 
-            // `kill` no da tiempo a la API a ejecutar su manejador de apagado,
-            // así que el archivo del punto de conexión lo borramos aquí. Dejarlo
-            // no sería una brecha —ese token ya no lo acepta nadie— pero sí
-            // ensuciaría el directorio del usuario.
-            let _ = fs::remove_file(&self.endpoint_path);
+        // El archivo del punto de conexión lo borra la API al apagarse bien; si
+        // hubo que matarla no le dio tiempo, así que se borra aquí. Dejarlo no
+        // sería una brecha —ese token ya no lo acepta nadie— pero sí ensuciaría
+        // el directorio del usuario.
+        let _ = fs::remove_file(&self.endpoint_path);
+    }
+}
+
+/// La petición HTTP que pide a la API que se apague.
+///
+/// Se escribe a mano sobre un socket en vez de traer un cliente HTTP: es una
+/// petición sin cuerpo a `127.0.0.1`, sin TLS ni redirecciones, y esto corre
+/// dentro del cierre de la ventana, donde no hay runtime asíncrono.
+///
+/// `Connection: close` porque no va a haber una segunda petición, y
+/// `Content-Length: 0` porque sin él Kestrel espera un cuerpo que no llega.
+pub fn shutdown_request(port: u16, token: &str) -> String {
+    let mut peticion = String::new();
+
+    peticion.push_str("POST /api/shutdown HTTP/1.1\r\n");
+    peticion.push_str(&format!("Host: 127.0.0.1:{port}\r\n"));
+    peticion.push_str(&format!("X-Druse-Token: {token}\r\n"));
+    peticion.push_str("Content-Length: 0\r\n");
+    peticion.push_str("Connection: close\r\n\r\n");
+
+    peticion
+}
+
+/// Le pide a la API que se apague por su cuenta. Devuelve si aceptó.
+///
+/// Un fallo de red no se distingue de un rechazo, y da igual: en los dos casos
+/// lo que toca es matarla, que es lo que hace quien llama.
+fn request_shutdown(port: u16, token: &str) -> bool {
+    let address = SocketAddr::from((Ipv4Addr::LOCALHOST, port));
+
+    let Ok(mut stream) = TcpStream::connect_timeout(&address, SHUTDOWN_REQUEST_TIMEOUT) else {
+        return false;
+    };
+
+    let _ = stream.set_write_timeout(Some(SHUTDOWN_REQUEST_TIMEOUT));
+    let _ = stream.set_read_timeout(Some(SHUTDOWN_REQUEST_TIMEOUT));
+
+    if stream
+        .write_all(shutdown_request(port, token).as_bytes())
+        .is_err()
+    {
+        return false;
+    }
+
+    // Se lee la respuesta: además de saber si aceptó, cerrar el socket antes de
+    // que la API conteste puede hacer que dé la petición por abandonada.
+    let mut respuesta = [0_u8; 64];
+
+    match stream.read(&mut respuesta) {
+        Ok(leidos) => accepted(&String::from_utf8_lossy(&respuesta[..leidos])),
+        Err(_) => false,
+    }
+}
+
+/// Si la primera línea de la respuesta dice que la API se está apagando.
+///
+/// Se mira el código y no solo que haya contestado: una API de una versión
+/// anterior contesta **404** a esta ruta, y darla por buena dejaría la ventana
+/// esperando diez segundos a un apagado que nadie va a hacer. Pasó al probarlo:
+/// el binario empaquetado era de antes de que existiera la ruta.
+fn accepted(response: &str) -> bool {
+    response
+        .split_whitespace()
+        .nth(1)
+        .and_then(|code| code.parse::<u16>().ok())
+        .is_some_and(|code| (200..300).contains(&code))
+}
+
+/// Espera a que el proceso termine, hasta el plazo dado.
+///
+/// Devuelve si terminó. Se sondea en vez de bloquear en `wait()` porque este es
+/// el camino del cierre de la ventana: sin plazo, una API colgada dejaría a
+/// Druse cerrándose para siempre.
+fn wait_for_exit(child: &mut Child, timeout: Duration) -> bool {
+    let deadline = Instant::now() + timeout;
+
+    while Instant::now() < deadline {
+        match child.try_wait() {
+            Ok(Some(_)) => return true,
+            Ok(None) => thread::sleep(Duration::from_millis(50)),
+            // No se puede saber si sigue vivo: se trata como si no, y quien
+            // llama lo matará.
+            Err(_) => return false,
         }
     }
+
+    false
 }
 
 impl Drop for ApiProcess {
@@ -230,6 +344,35 @@ pub fn locate_api(resource_dir: &Path) -> Option<PathBuf> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Una API que no conoce la ruta —una versión anterior— contesta 404, y
+    /// esperarla sería congelar la ventana diez segundos para nada.
+    #[test]
+    fn solo_un_2xx_cuenta_como_apagado_aceptado() {
+        assert!(accepted("HTTP/1.1 202 Accepted"));
+        assert!(accepted("HTTP/1.1 200 OK"));
+
+        assert!(!accepted("HTTP/1.1 404 Not Found"));
+        assert!(!accepted("HTTP/1.1 401 Unauthorized"));
+        assert!(!accepted(""));
+        assert!(!accepted("basura"));
+    }
+
+    /// La petición de apagado lleva el token: sin él la API responde 401 y el
+    /// cierre acabaría matando el proceso, que es justo lo que se quiere evitar.
+    #[test]
+    fn la_peticion_de_apagado_va_firmada_con_el_token() {
+        let peticion = shutdown_request(5177, "un-token");
+
+        assert!(peticion.starts_with("POST /api/shutdown HTTP/1.1\r\n"));
+        assert!(peticion.contains("\r\nX-Druse-Token: un-token\r\n"));
+        assert!(peticion.contains("\r\nHost: 127.0.0.1:5177\r\n"));
+
+        // Sin `Content-Length` Kestrel espera un cuerpo que no llega, y sin la
+        // línea en blanco del final no da la petición por terminada.
+        assert!(peticion.contains("\r\nContent-Length: 0\r\n"));
+        assert!(peticion.ends_with("\r\n\r\n"));
+    }
 
     #[test]
     fn the_variable_wins_over_the_system_convention() {

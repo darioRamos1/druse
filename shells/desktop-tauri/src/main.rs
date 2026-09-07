@@ -12,18 +12,18 @@ mod api_process;
 mod backups;
 mod editor_background;
 mod exports;
+mod pending_work;
 mod sql_files;
 mod theme;
-mod transactions;
 mod updates;
 
 use std::sync::Mutex;
 
 use api_process::{ApiProcess, Endpoint};
+use pending_work::{Blocker, PendingWork};
 use sql_files::SqlFileState;
 use tauri::{Manager, PhysicalPosition, PhysicalSize, State, WebviewWindow};
 use tauri_plugin_dialog::{DialogExt, MessageDialogButtons, MessageDialogKind};
-use transactions::PendingTransactions;
 
 /// Estado compartido: el proceso de la API mientras la aplicación vive.
 pub(crate) struct ApiState(pub Mutex<Option<ApiProcess>>);
@@ -112,7 +112,7 @@ fn main() {
     tauri::Builder::default()
         .manage(ApiState(Mutex::new(None)))
         .manage(SqlFileState::default())
-        .manage(PendingTransactions::default())
+        .manage(PendingWork::default())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(|app| {
@@ -158,7 +158,9 @@ fn main() {
             backups::choose_backup_file,
             backups::choose_backup_folder,
             backups::choose_restore_source,
-            transactions::set_transaction_pending,
+            pending_work::set_transaction_pending,
+            pending_work::set_running_job,
+            pending_work::confirm_close,
             theme::set_window_theme,
             editor_background::choose_editor_background,
             editor_background::read_editor_background,
@@ -168,22 +170,23 @@ fn main() {
             updates::download_and_install_update
         ])
         .on_window_event(|window, event| {
-            // Cerrar con una transacción abierta tira lo que no esté confirmado:
-            // al soltar la sesión, el proceso local la deshace. Puede ser el
-            // trabajo de un buen rato, así que se pregunta antes.
+            // Cerrar con algo en marcha tiene consecuencias que no se ven:
+            // una transacción abierta se deshace al soltar la sesión, y un
+            // respaldo interrumpido deja un archivo que no sirve. Se pregunta
+            // antes, y se dice de qué se está hablando.
             //
             // El aviso vive aquí y no en la página porque `beforeunload` no es
             // fiable dentro del WebView: la ventana la cierra el sistema, no el
             // navegador.
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
-                let pending = window
-                    .try_state::<PendingTransactions>()
-                    .map(|state| transactions::has_pending(&state))
-                    .unwrap_or(false);
+                let blocker = window
+                    .try_state::<PendingWork>()
+                    .and_then(|state| pending_work::blocker(&state));
 
-                if pending {
+                if let Some(blocker) = blocker {
                     api.prevent_close();
 
+                    let (titulo, cuerpo, seguir) = pending_work::warning(&blocker);
                     let window = window.clone();
 
                     // Con respuesta diferida y no con un diálogo que bloquee:
@@ -191,19 +194,27 @@ fn main() {
                     // la ventana que se intenta cerrar.
                     window
                         .dialog()
-                        .message(
-                            "Hay una transacción abierta con cambios sin confirmar. \
-                             Si cierras Druse ahora, se perderán.",
-                        )
-                        .title("Cambios sin confirmar")
+                        .message(cuerpo)
+                        .title(titulo)
                         .kind(MessageDialogKind::Warning)
                         .buttons(MessageDialogButtons::OkCancelCustom(
-                            "Cerrar y perderlos".to_string(),
+                            seguir,
                             "Volver".to_string(),
                         ))
                         .show(move |confirmado| {
-                            if confirmado {
-                                let _ = window.destroy();
+                            if !confirmado {
+                                return;
+                            }
+
+                            match blocker {
+                                // Un trabajo largo no se abandona: se le pide a
+                                // la interfaz que lo cancele y que avise cuando
+                                // la API lo haya confirmado. Cerrar antes lo
+                                // dejaría corriendo en un proceso que se muere.
+                                Blocker::Job(_) => pending_work::ask_to_cancel(&window),
+                                Blocker::Transaction => {
+                                    let _ = window.destroy();
+                                }
                             }
                         });
                 }

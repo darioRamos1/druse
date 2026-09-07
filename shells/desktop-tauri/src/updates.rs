@@ -2,7 +2,8 @@ use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager, State};
 use tauri_plugin_updater::UpdaterExt;
 
-use crate::{transactions, ApiState};
+use crate::pending_work::{self, Blocker, PendingWork};
+use crate::ApiState;
 
 const UPDATE_ENDPOINT: &str =
     "https://github.com/darioRamos1/druse/releases/latest/download/latest.json";
@@ -127,12 +128,22 @@ pub async fn check_for_update(app: AppHandle) -> Result<Option<AvailableUpdate>,
 #[tauri::command]
 pub async fn download_and_install_update(
     app: AppHandle,
-    pending_transactions: State<'_, transactions::PendingTransactions>,
+    pending: State<'_, PendingWork>,
 ) -> Result<(), String> {
-    if transactions::has_pending(&pending_transactions) {
-        return Err(
-            "Confirma o deshaz las transacciones abiertas antes de actualizar Druse.".to_string(),
-        );
+    // Actualizar cierra Druse para reemplazarlo, así que vale lo mismo que al
+    // cerrar la ventana: un respaldo a medias se queda a medias, y una
+    // transacción sin confirmar la deshace el servidor. La diferencia es que
+    // aquí no se pregunta —se dice que no— porque instalar puede esperar.
+    if let Some(blocker) = pending_work::blocker(&pending) {
+        return Err(match blocker {
+            Blocker::Job(job) => format!(
+                "Druse está haciendo {job}. Espera a que termine o cancélalo antes de actualizar."
+            ),
+            Blocker::Transaction => {
+                "Confirma o deshaz las transacciones abiertas antes de actualizar Druse."
+                    .to_string()
+            }
+        });
     }
 
     let api_app = app.clone();
@@ -185,17 +196,19 @@ pub async fn download_and_install_update(
         .map_err(|error| error.to_string())?;
 
     // La descarga puede durar minutos. Se comprueba otra vez porque durante ese
-    // tiempo el usuario podría haber abierto una transacción nueva.
-    let pending = pending_transactions
-        .0
-        .lock()
-        .map_err(|_| "El estado de las transacciones quedó inconsistente.".to_string())?;
-
-    if *pending {
-        return Err(
-            "La actualización se descargó, pero hay transacciones abiertas. Confírmalas o deshazlas y vuelve a intentarlo."
-                .to_string(),
-        );
+    // tiempo el usuario ha podido abrir una transacción o lanzar un respaldo.
+    if let Some(blocker) = pending_work::blocker(&pending) {
+        return Err(match blocker {
+            Blocker::Job(job) => format!(
+                "La actualización se descargó, pero Druse está haciendo {job}. Espera a que \
+                 termine y vuelve a intentarlo."
+            ),
+            Blocker::Transaction => {
+                "La actualización se descargó, pero hay transacciones abiertas. Confírmalas o \
+                 deshazlas y vuelve a intentarlo."
+                    .to_string()
+            }
+        });
     }
 
     // `install` prepara primero el ejecutable temporal y solo después ejecuta el
@@ -216,7 +229,6 @@ pub async fn download_and_install_update(
     }
 
     update.install(bytes).map_err(|error| error.to_string())?;
-    drop(pending);
 
     #[cfg(not(target_os = "windows"))]
     app.restart();

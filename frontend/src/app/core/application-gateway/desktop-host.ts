@@ -173,6 +173,47 @@ export class DesktopHost {
   }
 
   /**
+   * Declara qué trabajo largo hay en marcha, nombrado como se leerá en el aviso.
+   *
+   * Se manda el texto y no un identificador porque el envoltorio no sabe de
+   * respaldos ni de traslados, y no tiene por qué: solo necesita poder decir qué
+   * se va a interrumpir.
+   */
+  setRunningJob(label: string | null): Promise<void> {
+    return this.invoke('set_running_job', { label });
+  }
+
+  /**
+   * Avisa al envoltorio de que ya se puede cerrar la ventana.
+   *
+   * Es la segunda mitad de {@link listenForCancelAndClose}: primero se para lo
+   * que hubiera en marcha —cancelar un trabajo es una petición a la API que
+   * tarda en confirmarse— y solo después se cierra.
+   */
+  confirmClose(): Promise<void> {
+    return this.invoke('confirm_close');
+  }
+
+  /**
+   * El envoltorio pide parar lo que haya en marcha y cerrar después.
+   *
+   * Llega cuando el usuario, avisado de que hay un trabajo largo, elige cerrar
+   * de todos modos. Cerrar sin esperar dejaría el trabajo corriendo dentro de un
+   * proceso que se está muriendo.
+   */
+  listenForCancelAndClose(handler: () => void): Promise<() => void> {
+    const events = typeof window === 'undefined' ? undefined : window.__TAURI__?.event;
+
+    if (!events) {
+      return Promise.resolve(() => undefined);
+    }
+
+    return events.listen<unknown>('druse://cancel-and-close', () => {
+      handler();
+    });
+  }
+
+  /**
    * Pide al envoltorio que ponga la ventana en el mismo tema que la interfaz.
    *
    * El marco y la barra de título los dibuja el sistema y no leen CSS, así que

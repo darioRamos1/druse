@@ -11,6 +11,7 @@ import {
 } from '@angular/core';
 
 import { ExportFormat, SavedSnippet } from '../../core/application-gateway/application-gateway';
+import { RunningJobsService } from '../../core/jobs/running-jobs.service';
 import { shortcutFor } from '../../core/shortcuts/shortcuts';
 import { SnippetStore } from '../../core/snippets/snippet.store';
 import { SplashScreen } from '../../core/startup/splash-screen';
@@ -135,6 +136,16 @@ export class AppShell {
   private readonly _themes = inject(ThemeService);
   private readonly _splash = inject(SplashScreen);
   protected readonly updates = inject(UpdateService);
+
+  /**
+   * No se usa desde aquí: se inyecta para que exista.
+   *
+   * Es quien le dice al envoltorio que hay un respaldo en marcha —y quien lo
+   * cancela si el usuario decide cerrar igual—, y nada más lo pide. Sin esta
+   * línea, el servicio no se construiría y cerrar Druse durante un respaldo
+   * volvería a no preguntar nada.
+   */
+  private readonly _runningJobs = inject(RunningJobsService);
 
   // --- Apariencia ------------------------------------------------------------
   protected readonly theme = this._themes.theme;
