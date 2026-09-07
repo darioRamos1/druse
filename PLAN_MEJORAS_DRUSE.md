@@ -353,15 +353,39 @@ no solamente validaciones visuales.
 
 ### Tareas
 
-- [ ] **OBS-001:** escribir logs locales rotativos con tamaño y retención limitados.
-- [ ] **OBS-002:** añadir identificadores de petición, sesión y trabajo largo.
-- [ ] **OBS-003:** excluir contraseñas, tokens, claves, cadenas de conexión, SQL y datos de filas por defecto.
-- [ ] **OBS-004:** añadir una acción para abrir o exportar un paquete de diagnóstico saneado.
-- [ ] **PERF-001:** procesar CSV de importación en streaming y cortar al alcanzar el límite.
-- [ ] **PERF-002:** proteger XLSX frente a archivos comprimidos desproporcionados y libros excesivos.
-- [ ] **PERF-003:** aplicar el límite de resultados al lote completo, no de nuevo a cada result set.
+- [x] **OBS-001:** escribir logs locales rotativos con tamaño y retención limitados.
+- [x] **OBS-002:** añadir identificadores de petición, sesión y trabajo largo.
+- [x] **OBS-003:** excluir contraseñas, tokens, claves, cadenas de conexión, SQL y datos de filas por defecto.
+- [x] **OBS-004:** añadir una acción para abrir o exportar un paquete de diagnóstico saneado.
+- [x] **PERF-001:** procesar CSV de importación en streaming y cortar al alcanzar el límite.
+- [x] **PERF-002:** proteger XLSX frente a archivos comprimidos desproporcionados y libros excesivos.
+- [x] **PERF-003:** aplicar el límite de resultados al lote completo, no de nuevo a cada result set.
 - [ ] **PERF-004:** medir memoria en exportaciones XLSX y documentar el límite con datos reales.
 - [ ] **PERF-005:** revisar el bloqueo por sesión para que un backup largo no congele navegación que pueda usar otra conexión segura.
+
+> Estado al 7 de septiembre de 2026: hecha la observabilidad entera y tres de los
+> cinco límites.
+>
+> Los registros iban a la consola, y **la aplicación empaquetada no tiene
+> consola**: un fallo en el equipo de alguien no dejaba rastro. Ahora hay archivo
+> con rotación, cada línea dice de qué operación es, y todo pasa por un saneado
+> que no es opción sino único camino —los drivers ponen la cadena de conexión
+> entera en sus errores—. El paquete de diagnóstico se pide desde Preferencias y
+> lleva lo que se puede enseñar: registros y versión, ni SQL ni filas.
+>
+> De los límites: el CSV de importación se lee en streaming y corta al llegar al
+> tope —antes se traía entero y se recortaba después, así que un archivo de dos
+> gigas tumbaba el proceso—; un `.xlsx` que declare expandirse de forma absurda
+> no se abre; y el tope de filas pasa a ser del lote entero y no de cada
+> resultado, que con diez `SELECT` dejaba de significar nada.
+>
+> **PERF-004 y PERF-005 siguen abiertas.** La primera es medir de verdad, no
+> programar: hay que exportar libros grandes y anotar cuánta memoria pide
+> ClosedXML para poder documentar un límite con datos y no con una corazonada. La
+> segunda es más delicada de lo que parece: el turno por sesión es lo que impide
+> que dos operaciones se pisen en la misma conexión, y aflojarlo pide entender
+> antes qué se puede hacer por una conexión aparte sin cambiar lo que el usuario
+> ve.
 
 ### Criterios de aceptación
 

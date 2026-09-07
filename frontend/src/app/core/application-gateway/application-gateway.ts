@@ -549,6 +549,15 @@ export abstract class ApplicationGateway {
    */
   abstract getJobs(): Observable<readonly JobSummary[]>;
 
+  /**
+   * El paquete de diagnóstico: los registros y un resumen de versión y sistema.
+   *
+   * Va saneado desde el proceso local —sin contraseñas, tokens, cadenas de
+   * conexión, SQL ni datos de filas—, que es lo que permite mandarlo sin tener
+   * que revisarlo antes.
+   */
+  abstract getDiagnostics(): Observable<Blob>;
+
   // --- Perfiles de respaldo -------------------------------------------------
 
   abstract getBackupProfiles(): Observable<readonly BackupProfile[]>;

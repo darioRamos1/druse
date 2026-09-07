@@ -1,3 +1,5 @@
+using System.IO.Compression;
+
 using Druse.Host.LocalApi.Diagnostics;
 using Druse.Platform.Abstractions;
 
@@ -226,5 +228,82 @@ public sealed class FileLoggerTests : IDisposable
 
         Assert.Contains(lineas, line => line.Contains("fuera del trabajo", StringComparison.Ordinal)
             && !line.Contains("JobId", StringComparison.Ordinal));
+    }
+}
+
+/// <summary>
+/// El paquete que se manda cuando algo falla.
+///
+/// Lo importante no es solo que se genere, sino **qué lleva dentro**: si hubiera
+/// que revisarlo antes de mandarlo, no lo mandaría nadie.
+/// </summary>
+public sealed class DiagnosticPackageTests : IDisposable
+{
+    private readonly TemporaryLogPaths _paths = new();
+
+    public DiagnosticPackageTests() => _paths.EnsureCreated();
+
+    public void Dispose() => _paths.Dispose();
+
+    private static Dictionary<string, string> Abrir(byte[] paquete)
+    {
+        using var stream = new MemoryStream(paquete);
+        using var zip = new ZipArchive(stream, ZipArchiveMode.Read);
+
+        var contenido = new Dictionary<string, string>(StringComparer.Ordinal);
+
+        foreach (var entry in zip.Entries)
+        {
+            using var reader = new StreamReader(entry.Open());
+
+            contenido[entry.FullName] = reader.ReadToEnd();
+        }
+
+        return contenido;
+    }
+
+    [Fact]
+    public void ElPaqueteLlevaElResumenYLosRegistros()
+    {
+        using (var provider = new FileLoggerProvider(_paths, new FileLogOptions()))
+        {
+            provider.CreateLogger("Druse.Prueba").LogWarning("algo que mirar");
+        }
+
+        var contenido = Abrir(DiagnosticPackage.Build(_paths, "Production"));
+
+        Assert.Contains("resumen.txt", contenido.Keys, StringComparer.Ordinal);
+        Assert.Contains("logs/druse.log", contenido.Keys, StringComparer.Ordinal);
+        Assert.Contains("algo que mirar", contenido["logs/druse.log"], StringComparison.Ordinal);
+
+        // Lo que se pregunta al recibir un fallo: qué versión y qué sistema.
+        Assert.Contains("Versión:", contenido["resumen.txt"], StringComparison.Ordinal);
+        Assert.Contains("Sistema:", contenido["resumen.txt"], StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// El registro está abierto por el propio proceso que escribe: leerlo para
+    /// empaquetarlo no puede fallar justo cuando alguien intenta contar un
+    /// problema.
+    /// </summary>
+    [Fact]
+    public void SePuedeEmpaquetarConElRegistroAbierto()
+    {
+        using var provider = new FileLoggerProvider(_paths, new FileLogOptions());
+
+        provider.CreateLogger("Druse.Prueba").LogError("mientras se escribe");
+
+        var contenido = Abrir(DiagnosticPackage.Build(_paths, "Production"));
+
+        Assert.Contains("mientras se escribe", contenido["logs/druse.log"], StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void SinRegistrosElPaqueteSigueSiendoUtil()
+    {
+        var contenido = Abrir(DiagnosticPackage.Build(_paths, "Production"));
+
+        Assert.Single(contenido);
+        Assert.Contains("resumen.txt", contenido.Keys, StringComparer.Ordinal);
     }
 }

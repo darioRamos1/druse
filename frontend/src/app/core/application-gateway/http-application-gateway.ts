@@ -447,6 +447,11 @@ export class HttpApplicationGateway extends ApplicationGateway {
     return this._http.get<readonly JobSummary[]>('/api/jobs');
   }
 
+  override getDiagnostics(): Observable<Blob> {
+    // Un archivo, no JSON: sin `responseType` Angular intentaría interpretarlo.
+    return this._http.get('/api/diagnostics', { responseType: 'blob' });
+  }
+
   override getBackupStatus(backupId: string): Observable<BackupProgress> {
     return this._http.get<BackupProgress>(`/api/backup/${backupId}/status`);
   }

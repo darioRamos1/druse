@@ -6,6 +6,7 @@ using Druse.Host.LocalApi.Diagnostics;
 using Druse.Host.LocalApi.Endpoints;
 using Druse.Host.LocalApi.Security;
 using Druse.Persistence.Sqlite;
+using Druse.Platform.Abstractions;
 using Druse.Platform.Native;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -234,6 +235,19 @@ app.MapGet("/api/health", () => new HealthResponse(
 //
 // Responde antes de apagar porque no puede responder después: el apagado cierra
 // el servidor que tendría que enviar la respuesta.
+// Todo lo que hace falta para entender un fallo, en un archivo que se puede
+// mandar: los registros y un resumen de versión y sistema.
+//
+// Existe por lo mismo que el registro en archivo —en la aplicación empaquetada no
+// hay consola— y porque pedirle a alguien que busque un directorio dentro de su
+// perfil es pedirle que no lo haga.
+app.MapGet("/api/diagnostics", (IAppPaths paths) =>
+    Results.File(
+        DiagnosticPackage.Build(paths, app.Environment.EnvironmentName),
+        "application/zip",
+        DiagnosticPackage.FileName))
+.WithName("GetDiagnostics");
+
 // Los trabajos largos que hubo, con los que quedaron a medias entre ellos.
 //
 // Es la única forma de saberlo después de cerrar Druse: lo que guardan los

@@ -75,6 +75,27 @@
           <p class="update__status">Leyendo la versión instalada…</p>
         }
       }
+      <!--
+        Lo que hace falta para contar un fallo, en un archivo.
+
+        Va aquí y no escondido en un menú porque el momento en que se necesita es
+        el peor para buscarlo. Lo que lleva dentro está pensado para poder
+        enseñarlo: los registros van saneados desde que se escriben.
+      -->
+      <div class="diagnostics">
+        <button type="button" class="secondary" [disabled]="savingDiagnostics()" (click)="saveDiagnostics()">
+          {{ savingDiagnostics() ? 'Preparando…' : 'Guardar diagnóstico…' }}
+        </button>
+
+        <p class="section__hint">
+          Los registros de Druse y la versión, en un zip. No lleva contraseñas, ni
+          las consultas que ejecutas, ni los datos de tus tablas.
+        </p>
+
+        @if (diagnosticsMessage(); as mensaje) {
+          <p class="section__hint">{{ mensaje }}</p>
+        }
+      </div>
     </section>
 
     <section class="section">

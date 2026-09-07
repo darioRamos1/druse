@@ -86,7 +86,12 @@ public sealed class TokenAuthenticationTests : IClassFixture<DruseApiFactory>
     {
         using var client = _factory.CreateClient();
 
-        foreach (var path in new[] { "/api/engines", "/api/history", "/api/preferences", "/api/jobs" })
+        // El diagnóstico lleva los registros del usuario: aunque vayan saneados,
+        // dicen qué bases abre y cuándo.
+        foreach (var path in new[]
+        {
+            "/api/engines", "/api/history", "/api/preferences", "/api/jobs", "/api/diagnostics",
+        })
         {
             var response = await client.GetAsync(path);
 

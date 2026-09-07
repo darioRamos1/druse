@@ -10,19 +10,19 @@
 
 | Campo | Valor |
 | --- | --- |
-| Última sesión | **043** — 2026-09-07 |
+| Última sesión | **044** — 2026-09-07 |
 | Fase activa | **Migración de datos entre tablas:** fases 1, 2 y 3 cerradas; la **4** cerrada: la pasada de varias tablas, lo que cada tabla hace distinto y las migraciones guardadas (ver «Qué toca retomar»). **Respaldos y restauración:** Fases A–E cerradas. La **F** tiene backend, interfaz, CSV, selector de archivos, restaurar en una base nueva y **el ciclo entero por HTTP en los cuatro motores**; le falta repetir a mano el respaldo real que encontró el error de los índices de expresión. **Diagramas entidad-relación:** plan escrito y **Fase A** (lectura del catálogo en lote, cuatro motores) y **Fase B** (colocación determinista y lienzo) implementadas; falta cerrar la A contra los cuatro motores y ver el barrido de capturas |
 | Fases 0–6 | ✅ Cerradas. |
 | Fase 7 | 🟡 **11/12.** El ciclo de instalación está probado sobre este equipo; solo falta arrancar en una máquina sin herramientas de desarrollo. |
 | Fase 8 | ✅ **7/7.** Tres motores sobre el mismo contrato y primera beta preparada. |
 | ¿Compila el backend? | Sí — 0 advertencias, 0 errores |
 | ¿Compila el envoltorio? | Sí — recompilado en la 037 con `build/scripts/msvc-env.ps1` cargado antes; sin él, `cargo` falla en `vswhom-sys` por elegir el MSVC equivocado. **Sus pruebas ya son 17**, con las dos que vigilan la CSP y las cuatro de `DRUSE_DATA_DIR` |
-| ¿Pasan las pruebas? | Sí. En la **043**: **980 del backend** con PostgreSQL y MySQL levantados —547 unitarias, 159 de integración de 162 y 274 contractuales— y **792 del frontend**. Las **23 del envoltorio** y el barrido de capturas son de la 042, y siguen valiendo: la 043 no tocó Rust ni pantallas nuevas. Las contractuales salen verdes **sin los motores delante**: sin `DRUSE_REQUIRE_ENGINES=1` cada prueba termina sin comprobar nada cuando el servidor no responde. El `DATE` de Informix por SQLI de la 039 sigue sin repetirse: hace falta ese contenedor |
+| ¿Pasan las pruebas? | Sí. En la **044**: **1.002 del backend** con PostgreSQL y MySQL levantados —551 unitarias, 172 de integración de 175 y 279 contractuales— y **795 del frontend**. Las **23 del envoltorio** y el barrido son de la 042 y siguen valiendo. Las contractuales salen verdes **sin los motores delante**: sin `DRUSE_REQUIRE_ENGINES=1` cada prueba termina sin comprobar nada cuando el servidor no responde. El `DATE` de Informix por SQLI de la 039 sigue sin repetirse: hace falta ese contenedor |
 | ¿Hay aplicación de escritorio? | **Sí.** Instalador NSIS y ZIP portable, en dos variantes: con Informix y sin él. Desde la 038 **se actualiza sola** —o lo hará: ver el aviso del repositorio privado en §9—. El MSI dejó de generarse: `tauri.conf.json` solo declara `nsis`, que es lo que necesita el actualizador. En la **040** se regeneraron los instaladores y **la variante completa quedó instalada y abierta en este equipo**, con el arreglo del envoltorio dentro. Siguen **sin firma Authenticode**: SmartScreen en cada equipo |
 | Motores | **PostgreSQL, SQL Server, MySQL/MariaDB e Informix**, sobre el mismo contrato. Informix tiene **dos entradas**: por DRDA con el driver de IBM (puerto 9089) y por **SQLI**, su protocolo nativo, con el puente JDBC (9088). Cambia por dónde se entra; el SQL, el catálogo y los tipos son los mismos |
 | Trabajo a medias | **Nada sin commitear.** De la 041 queda `PLAN_MEJORAS_DRUSE.md` con las fases 0 y 1 marcadas y el resto por hacer. Sin comprobar: las contractuales de la lectura en lote contra los cuatro motores desde la 039, **el multicursor dentro de la ventana empaquetada**, y de antes —**el diálogo del sistema y el selector de carpeta siguen sin verse abrir**, y **el actualizador no puede funcionar mientras el repositorio sea privado** (ver §9) |
 | Bloqueantes | Ninguno para seguir programando. Sí para dar por buenos cuatro motores y cuatro funciones: ver «Qué toca retomar». |
-| Git | El **PR #9 se fusionó** (sesión 022). Se trabaja en `feat/respaldos-y-restauracion`, con todo subido: las 024–027 en `1452a6c`, las 028–031 en `640151c`, las 032–036 de `d3ac0d5` a `35d192e`, la 037 de `4ba8cce` a `20727eb`, la **038** en `a455be7`, `4c6f74a`, `55711f0` y `93f7f26`, la **039** hasta `5c2d09b`, y la **040** en `80da9f6`, `03c3478`, `a04c706`, `117b15f`, `2946156` y `2d52c8e`, la **041** en `64c2adf`, `203b771`, `6d31a86`, `5a924c6`, `8bcf83a`, `f4f683e` y `f65cd73`, la **042** en `0ae38fa`, `120485f`, `2a6f151` y `837cbb6`, y la **043** de `ebf42ac` a `fd9432d`, ya sobre `main` |
+| Git | El **PR #9 se fusionó** (sesión 022). Se trabaja en `feat/respaldos-y-restauracion`, con todo subido: las 024–027 en `1452a6c`, las 028–031 en `640151c`, las 032–036 de `d3ac0d5` a `35d192e`, la 037 de `4ba8cce` a `20727eb`, la **038** en `a455be7`, `4c6f74a`, `55711f0` y `93f7f26`, la **039** hasta `5c2d09b`, y la **040** en `80da9f6`, `03c3478`, `a04c706`, `117b15f`, `2946156` y `2d52c8e`, la **041** en `64c2adf`, `203b771`, `6d31a86`, `5a924c6`, `8bcf83a`, `f4f683e` y `f65cd73`, la **042** en `0ae38fa`, `120485f`, `2a6f151` y `837cbb6`, la **043** de `ebf42ac` a `fd9432d`, y la **044** de `7e60185` a `c57b31e`, ya sobre `main` |
 | Integración continua | 🔴 **Parada, y no por el código.** GitHub aborta los jobs en dos segundos: «recent account payments have failed or your spending limit needs to be increased». Hasta resolver la facturación, ningún PR podrá pasar los checks. Lo que sí cambió en la **041**: cuando vuelva a correr, **ejecutará pruebas de verdad** —hasta ahora el job del backend terminaba en verde sin ejecutar ninguna—, y publicar exige que el commit tenga su ejecución de CI en verde. |
 
 ### Qué toca retomar en la próxima sesión
@@ -34,6 +34,15 @@ hoy no puede funcionar en ningún equipo: GitHub devuelve 404 a quien no está
 autenticado, y ese 404 ni siquiera se distingue de «no hay versión nueva». Es
 una decisión que hay que tomar antes de repartir nada: repositorio público, o
 publicar los artefactos en otro sitio.
+
+#### Lo que deja abierta la 044
+
+1. **PERF-004 y PERF-005**: medir la memoria de una exportación XLSX grande, y
+   revisar el turno por sesión para que un respaldo largo no congele la
+   navegación.
+2. **La fase 7 del plan**, recién escrita: nueve cosas de interfaz vistas en las
+   capturas y ninguna arreglada todavía.
+3. **Las fases 5 y 6**: contrato HTTP y accesibilidad, y distribución.
 
 #### Lo que deja abierta la 043
 
@@ -385,6 +394,71 @@ Pendiente de verificar cuando toque: Docker (pruebas de integración con contene
 ---
 
 ## 5. Registro de sesiones
+
+### Sesión 044 — 2026-09-07 · Un fallo en el equipo del usuario deja de perderse
+
+Fase 4 del plan de mejoras: observabilidad y límites. Y, de camino, una fase 7
+nueva en el plan —interfaz— que no estaba y hacía falta.
+
+#### La API registraba en una consola que no existe
+
+El envoltorio arranca la API sin ventana —una consola de ASP.NET delante de Druse
+sería peor— y con ella se iba el único sitio donde se veían los registros. El
+directorio de registros llevaba desde el principio en `AppPaths`, **vacío**.
+
+Ahora hay registro en archivo con rotación por tamaño y unos pocos archivos
+conservados. Se escribe a mano: son un archivo, un candado y un contador de
+bytes, frente a una dependencia más dentro del instalador.
+
+**Y no puede llevar secretos.** Cada línea pasa por un saneado, y no como opción
+sino como único camino: los drivers ponen la cadena de conexión entera en sus
+mensajes de error, con la contraseña dentro. El token de la API tampoco pasa.
+Cada línea dice además de qué operación es —sin eso, un respaldo y una consulta a
+la vez dejan un registro que no se puede separar—.
+
+Encima de eso, el **paquete de diagnóstico**: un botón en Preferencias que
+descarga un zip con los registros y un resumen de versión y sistema. Lo que lleva
+está pensado para poder enseñarlo; si hubiera que revisarlo antes de mandarlo, no
+lo mandaría nadie.
+
+#### Tres límites que no limitaban
+
+- **El tope de filas se aplicaba a cada resultado.** Una pulsación de «Ejecutar»
+  con diez `SELECT` y un tope de 500 traía cinco mil filas a la memoria del
+  proceso y del navegador. Ahora el presupuesto es del lote, y lo que se queda
+  fuera se marca: un resultado vacío sin marca se lee como «no devolvió nada».
+- **El CSV de importación se leía entero** y se recortaba después. Con dos gigas,
+  el proceso se caía antes de mirar el límite. Ahora se lee fila a fila y se corta
+  al llegar.
+- **Un `.xlsx` es un zip**, y ClosedXML lo carga entero: dos megas de archivo con
+  veinte gigas dentro tumban Druse. Se mira el índice antes de abrirlo.
+
+#### Y una fase que faltaba en el plan
+
+Preguntado si el plan cubría UX/UI, la respuesta era **no**: solo accesibilidad y
+refactor de frontend. Mirando las capturas del barrido de la 042 apareció una real
+y arreglada —el `overviewRuler` de Monaco es un `<canvas>` y no hereda el fondo:
+en el tema claro dejaba una franja negra pegada al borde derecho— y nueve más
+anotadas en la **fase 7** del plan: tipos de columna que se cortan, la barra de
+estado recortada a 900 px, `Ln/Col` dicho dos veces, «~ filas» sin número.
+
+**Verificado.** Con la API real: el archivo de registro aparece con las líneas del
+arranque y el token no está dentro; `/api/diagnostics` responde 401 sin token y
+devuelve el zip con `resumen.txt` y `logs/druse.log` con él. La franja del editor
+se comprobó levantando la aplicación y llegando al elemento por el DOM.
+
+**No hecho.** **PERF-004**: medir la memoria de una exportación XLSX grande, que
+es medir y no programar. **PERF-005**: aflojar el turno por sesión, que es lo que
+hoy impide que dos operaciones se pisen en la misma conexión.
+
+**Pruebas.** 1.002 del backend —551 unitarias, 172 de integración de 175 y 279
+contractuales— y **795 del frontend**.
+
+**Archivos.** `Diagnostics/{FileLogger,LogRedaction,LogScope,DiagnosticPackage}.cs`,
+`Program.cs`, los cuatro `*QueryExecutor.cs`, `CsvTableFileReader.cs`,
+`XlsxTableFileReader.cs`, `druse-theme.ts`, `settings-dialog.*` y sus pruebas.
+
+**Estado al cerrar.** Commiteado en `main`.
 
 ### Sesión 043 — 2026-09-07 · Las promesas de seguridad que no cumplía nadie
 

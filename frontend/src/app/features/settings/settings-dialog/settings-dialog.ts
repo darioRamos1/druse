@@ -7,7 +7,10 @@ import {
   output,
   signal,
 } from '@angular/core';
+import { firstValueFrom } from 'rxjs';
 
+import { ApplicationGateway } from '../../../core/application-gateway/application-gateway';
+import { FileSaveService } from '../../../core/files/file-save.service';
 import { ThemeService } from '../../../core/theme/theme.service';
 import {
   BackgroundFit,
@@ -142,6 +145,42 @@ const FITS: readonly {
 export class SettingsDialog {
   private readonly _themes = inject(ThemeService);
   protected readonly updates = inject(UpdateService);
+
+  private readonly _gateway = inject(ApplicationGateway);
+  private readonly _files = inject(FileSaveService);
+
+  protected readonly savingDiagnostics = signal(false);
+  protected readonly diagnosticsMessage = signal<string | null>(null);
+
+  /**
+   * Pide el paquete de diagnóstico y lo guarda donde diga el usuario.
+   *
+   * Se dice **dónde quedó**, por lo mismo que al exportar un resultado: sin la
+   * ruta, «guardado» no ayuda a encontrarlo, que es justo lo que hace falta para
+   * poder adjuntarlo.
+   */
+  protected async saveDiagnostics(): Promise<void> {
+    this.savingDiagnostics.set(true);
+    this.diagnosticsMessage.set(null);
+
+    try {
+      const paquete = await firstValueFrom(this._gateway.getDiagnostics());
+      const nombre = `druse-diagnostico-${new Date().toISOString().slice(0, 10)}.zip`;
+      const resultado = await this._files.save(nombre, paquete);
+
+      this.diagnosticsMessage.set(
+        resultado.saved
+          ? resultado.path
+            ? `Guardado en ${resultado.path}`
+            : 'Guardado en tus descargas.'
+          : null,
+      );
+    } catch {
+      this.diagnosticsMessage.set('No se pudo preparar el diagnóstico.');
+    } finally {
+      this.savingDiagnostics.set(false);
+    }
+  }
 
   constructor() {
     void this.updates.initialize();
