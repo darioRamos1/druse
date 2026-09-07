@@ -1,4 +1,4 @@
-using Druse.Application.Abstractions;
+﻿using Druse.Application.Abstractions;
 using Druse.Application.Rows;
 using Druse.Application.Transfers;
 using Druse.Domain;
@@ -113,18 +113,18 @@ internal static class TransferEndpoints
         // una se probaría a fondo.
         app.MapPost("/api/transfers", (
             TransferRequestDto request,
-            TransferService transfers,
+            IBackgroundJobs jobs,
             ITransferTracker tracker,
             ILoggerFactory logs) =>
-            Launch(new TransferSetRequestDto { Tables = [request] }, transfers, tracker, logs))
+            Launch(new TransferSetRequestDto { Tables = [request] }, jobs, tracker, logs))
         .WithName("RunTransfer");
 
         app.MapPost("/api/transfers/set", (
             TransferSetRequestDto request,
-            TransferService transfers,
+            IBackgroundJobs jobs,
             ITransferTracker tracker,
             ILoggerFactory logs) =>
-            Launch(request, transfers, tracker, logs))
+            Launch(request, jobs, tracker, logs))
         .WithName("RunTransferSet");
 
         app.MapGet("/api/transfers/{id:guid}/status", (Guid id, ITransferTracker tracker) =>
@@ -255,13 +255,13 @@ internal static class TransferEndpoints
     /// <summary>
     /// Lanza la pasada y devuelve su identificador.
     ///
-    /// El trabajo se va a un hilo suelto y la petición termina: lo que sigue se
-    /// pregunta por `status`. Es lo mismo que hace un respaldo, y aquí importa más,
-    /// porque lo que queda a medias son filas en una base ajena.
+    /// El trabajo se va a la cola y la petición termina: lo que sigue se pregunta
+    /// por `status`. Es lo mismo que hace un respaldo, y aquí importa más, porque
+    /// lo que queda a medias son filas en una base ajena.
     /// </summary>
     private static IResult Launch(
         TransferSetRequestDto request,
-        TransferService transfers,
+        IBackgroundJobs jobs,
         ITransferTracker tracker,
         ILoggerFactory logs)
     {
@@ -294,9 +294,17 @@ internal static class TransferEndpoints
 
         tracker.Report(Starting(id, domain));
 
-        _ = Task.Run(
-            async () =>
+        jobs.Enqueue(new QueuedJob
+        {
+            Id = id,
+            Kind = JobKind.Transfer,
+            Subject = domain.Tables.Count == 1
+                ? domain.Tables[0].Target.Name
+                : $"{domain.Tables.Count} tablas",
+            Token = token,
+            RunAsync = async (services, cancellationToken) =>
             {
+                var transfers = services.GetRequiredService<TransferService>();
                 var log = logs.CreateLogger("Druse.Transfer");
 
                 try
@@ -304,9 +312,11 @@ internal static class TransferEndpoints
                     var progress = new Progress<TransferProgress>(state =>
                         tracker.Report(state with { Id = id }));
 
-                    var result = await transfers.RunSetAsync(domain, progress, token);
+                    var result = await transfers.RunSetAsync(domain, progress, cancellationToken);
 
                     tracker.Report(result with { Id = id });
+
+                    return result.Outcome.ToString();
                 }
                 catch (RowEditRejectedException rejected)
                 {
@@ -315,6 +325,8 @@ internal static class TransferEndpoints
                     // ser de solo lectura—. Va al estado y no a la respuesta, que
                     // hace rato que se envió.
                     tracker.Report(Failed(id, domain, rejected.Rejection.Message, tracker.Find(id)));
+
+                    return nameof(TransferOutcome.Failed);
                 }
                 catch (Exception error)
                 {
@@ -324,13 +336,15 @@ internal static class TransferEndpoints
                     log.LogError(error, "El traslado {Id} terminó con un error no previsto.", id);
 
                     tracker.Report(Failed(id, domain, error.Message, tracker.Find(id)));
+
+                    return nameof(TransferOutcome.Failed);
                 }
                 finally
                 {
                     tracker.Finish(id);
                 }
             },
-            CancellationToken.None);
+        });
 
         return Results.Accepted($"/api/transfers/{id}/status", new { id });
     }

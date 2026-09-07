@@ -1,4 +1,4 @@
-using Druse.Application.Abstractions;
+﻿using Druse.Application.Abstractions;
 using Druse.Application.Backups;
 using Druse.Domain;
 using Druse.Host.LocalApi.Contracts;
@@ -37,6 +37,7 @@ internal static class RestoreEndpoints
         app.MapPost("/api/restore/run", async (
             RestoreRequestDto request,
             RestoreService restore,
+            IBackgroundJobs jobs,
             IRestoreTracker tracker,
             ILoggerFactory logs,
             CancellationToken cancellationToken) =>
@@ -74,9 +75,18 @@ internal static class RestoreEndpoints
                 StatementsTotal = inspection.Statements,
             });
 
-            _ = Task.Run(
-                async () =>
+            // A la cola: la petición termina aquí y la restauración dura lo que
+            // dure. El servicio que la ejecuta se resuelve allí, con su propio
+            // scope; el de esta petición se cierra al responder.
+            jobs.Enqueue(new QueuedJob
+            {
+                Id = id,
+                Kind = JobKind.Restore,
+                Subject = request.Path,
+                Token = token,
+                RunAsync = async (services, cancellationToken) =>
                 {
+                    var restoring = services.GetRequiredService<RestoreService>();
                     var log = logs.CreateLogger("Druse.Restore");
 
                     try
@@ -84,7 +94,7 @@ internal static class RestoreEndpoints
                         var progress = new Progress<RestoreProgress>(state =>
                             tracker.Report(state with { Id = id }));
 
-                        var result = await restore.RunAsync(
+                        var result = await restoring.RunAsync(
                             new RestoreRequest
                             {
                                 SessionId = request.SessionId,
@@ -93,9 +103,11 @@ internal static class RestoreEndpoints
                                 NewDatabase = request.NewDatabase,
                             },
                             progress,
-                            token);
+                            cancellationToken);
 
                         tracker.Report(result with { Id = id });
+
+                        return result.Outcome.ToString();
                     }
                     catch (Exception error)
                     {
@@ -111,13 +123,15 @@ internal static class RestoreEndpoints
                             Outcome = RestoreOutcome.Failed,
                             Failure = new RestoreFailure(0, string.Empty, error.Message),
                         });
+
+                        return nameof(RestoreOutcome.Failed);
                     }
                     finally
                     {
                         tracker.Finish(id);
                     }
                 },
-                CancellationToken.None);
+            });
 
             return Results.Accepted($"/api/restore/{id}/status", new { id });
         })

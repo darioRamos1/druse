@@ -2,6 +2,7 @@ import { ChangeDetectionStrategy, Component, computed, inject, input, output } f
 
 import { BackupStore } from '../../core/backup/backup.store';
 import { RestoreStore } from '../../core/backup/restore.store';
+import { RunningJobsService } from '../../core/jobs/running-jobs.service';
 import { SessionStatus } from '../../shared/models/workspace';
 import { EngineBadge } from '../../shared/ui/engine-badge/engine-badge';
 
@@ -34,6 +35,36 @@ export class StatusBar {
    */
   protected readonly backup = inject(BackupStore);
 
+  /**
+   * Lo que quedó a medias la última vez que se cerró Druse.
+   *
+   * Va aquí y no en un diálogo porque no exige hacer nada: es un dato que el
+   * usuario tiene que ver al volver —«aquel respaldo no terminó»— y decidir por
+   * su cuenta qué hacer con lo que quedó escrito.
+   */
+  protected readonly jobs = inject(RunningJobsService);
+
+  protected readonly interrupted = this.jobs.interrupted;
+
+  protected readonly interruptedLabel = computed(() => {
+    const count = this.interrupted().length;
+
+    return count === 1
+      ? '1 trabajo quedó sin terminar'
+      : `${count} trabajos quedaron sin terminar`;
+  });
+
+  /** El detalle, en el tooltip: qué era cada uno y sobre qué trabajaba. */
+  protected readonly interruptedDetail = computed(() =>
+    [
+      'Estaban en marcha cuando Druse se cerró; lo que escribieron puede estar a medias.',
+      '',
+      ...this.interrupted().map((job) => `· ${nameOf(job.kind)}${job.subject ? `: ${job.subject}` : ''}`),
+      '',
+      'Pulsa para descartar este aviso.',
+    ].join('\n'),
+  );
+
   /** Porcentaje redondeado, o `null` mientras no se conozca el total. */
   protected readonly percent = computed(() => {
     const overall = this.backup.overall();
@@ -65,4 +96,16 @@ function shorten(name: string | undefined): string {
   const text = name ?? '';
 
   return text.length > 32 ? `${text.slice(0, 31)}…` : text;
+}
+
+/** Cómo se llama cada clase de trabajo cuando hay que nombrarla. */
+function nameOf(kind: string): string {
+  switch (kind) {
+    case 'Backup':
+      return 'Respaldo';
+    case 'Restore':
+      return 'Restauración';
+    default:
+      return 'Traslado de datos';
+  }
 }

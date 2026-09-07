@@ -540,6 +540,15 @@ export abstract class ApplicationGateway {
 
   abstract cancelBackup(backupId: string): Observable<void>;
 
+  /**
+   * Los trabajos largos que hubo, con los que quedaron a medias entre ellos.
+   *
+   * Es lo único que sobrevive a cerrar Druse: los estados de respaldos,
+   * restauraciones y traslados viven en la memoria del proceso local y se van con
+   * él, que es justo cuando hace falta saber qué estaba corriendo.
+   */
+  abstract getJobs(): Observable<readonly JobSummary[]>;
+
   // --- Perfiles de respaldo -------------------------------------------------
 
   abstract getBackupProfiles(): Observable<readonly BackupProfile[]>;
@@ -972,6 +981,24 @@ export interface BackupTable {
   readonly schema?: string;
   /** Filas estimadas por el catálogo. Sirve para la barra, y es aproximada. */
   readonly approximateRowCount?: number;
+}
+
+/** En qué quedó un trabajo largo, según lo que el proceso local anotó de él. */
+export type JobState = 'Running' | 'Finished' | 'Interrupted';
+
+export type JobKind = 'Backup' | 'Restore' | 'Transfer';
+
+/** Un trabajo largo del pasado, tal y como lo cuenta el proceso local. */
+export interface JobSummary {
+  readonly id: string;
+  readonly kind: JobKind;
+  /** Sobre qué trabajaba: el destino, el artefacto, la tabla. */
+  readonly subject?: string;
+  readonly state: JobState;
+  /** Cómo acabó, con las palabras de su propia operación. */
+  readonly outcome?: string;
+  readonly startedAtUtc: string;
+  readonly finishedAtUtc?: string;
 }
 
 export interface BackupRequest {

@@ -85,6 +85,17 @@
   }
 }
 
+/* Lo que quedó a medias la última vez. No es un trabajo en curso —no lleva
+   barra— pero sí algo sobre lo que se puede pulsar, así que comparte la forma
+   del resto y se distingue por el color de un aviso. */
+.op--interrupted {
+  color: var(--dr-warning-text);
+
+  &:hover {
+    color: var(--dr-warning);
+  }
+}
+
 .op-bar {
   position: relative;
   flex: 0 0 56px;

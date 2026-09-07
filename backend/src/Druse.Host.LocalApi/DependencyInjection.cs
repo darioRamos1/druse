@@ -1,4 +1,4 @@
-using Druse.Application.Abstractions;
+﻿using Druse.Application.Abstractions;
 using Druse.Application.Ai;
 using Druse.Application.Backups;
 using Druse.Application.Connections;
@@ -9,6 +9,7 @@ using Druse.Application.Tables;
 using Druse.Application.Transactions;
 using Druse.Application.Transfers;
 using Druse.Database.Abstractions;
+using Druse.Host.LocalApi.Jobs;
 using Druse.Host.LocalApi.Security;
 using Druse.Infrastructure.Ai;
 using Druse.Infrastructure.Backups;
@@ -69,6 +70,11 @@ internal static class DependencyInjection
         services.AddScoped<IBackupProfileStore, SqliteBackupProfileStore>();
         services.AddScoped<ITransferProfileStore, SqliteTransferProfileStore>();
         services.AddScoped<IAiProviderStore, SqliteAiProviderStore>();
+
+        // Los trabajos largos que hubo. Va en SQLite y no en memoria porque la
+        // pregunta que responde —«¿quedó algo a medias?»— solo se hace después de
+        // que el proceso anterior desapareciera.
+        services.AddScoped<IJobStore, SqliteJobStore>();
         services.AddScoped<SavedAiProviderService>();
 
         // El cliente HTTP del asistente lleva su propio tiempo de espera, más
@@ -176,6 +182,15 @@ internal static class DependencyInjection
         services.AddSingleton<IBackupTracker, BackupTracker>();
         services.AddSingleton<IRestoreTracker, RestoreTracker>();
         services.AddSingleton<ITransferTracker, TransferTracker>();
+
+        // Los trabajos largos —respaldos, restauraciones y traslados— salen de la
+        // petición que los pide y siguen por su cuenta. La cola es singleton
+        // porque es el proceso quien los tiene, y **cada trabajo recibe su propio
+        // scope de servicios**: antes se llevaban los de la petición HTTP y los
+        // seguían usando después de que esa petición cerrara su scope.
+        services.AddSingleton<JobRunner>();
+        services.AddSingleton<IBackgroundJobs>(provider => provider.GetRequiredService<JobRunner>());
+        services.AddHostedService(provider => provider.GetRequiredService<JobRunner>());
 
         // Un túnel dura lo que dura su sesión, así que se guarda igual que ella.
         services.AddSingleton<ISshTunnelRegistry, SshTunnelRegistry>();

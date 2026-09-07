@@ -1,6 +1,8 @@
 import { WritableSignal, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
+import { Observable, of } from 'rxjs';
 
+import { ApplicationGateway, JobSummary } from '../application-gateway/application-gateway';
 import { DesktopHost } from '../application-gateway/desktop-host';
 import { BackupStore } from '../backup/backup.store';
 import { RestoreStore } from '../backup/restore.store';
@@ -35,6 +37,15 @@ class FakePendingWork {
   }
 }
 
+/** El proceso local, con los trabajos que le queden anotados de la vez anterior. */
+class FakeGateway implements Partial<ApplicationGateway> {
+  jobs: JobSummary[] = [];
+
+  getJobs(): Observable<readonly JobSummary[]> {
+    return of(this.jobs);
+  }
+}
+
 class FakeDesktop {
   handler: (() => void) | null = null;
   closes = 0;
@@ -58,6 +69,7 @@ describe('RunningJobsService', () => {
   let transfers: FakeJobStore;
   let pendingWork: FakePendingWork;
   let desktop: FakeDesktop;
+  let gateway: FakeGateway;
   let service: RunningJobsService;
 
   beforeEach(() => {
@@ -66,10 +78,12 @@ describe('RunningJobsService', () => {
     transfers = new FakeJobStore();
     pendingWork = new FakePendingWork();
     desktop = new FakeDesktop();
+    gateway = new FakeGateway();
 
     TestBed.configureTestingModule({
       providers: [
         RunningJobsService,
+        { provide: ApplicationGateway, useValue: gateway },
         { provide: BackupStore, useValue: backups },
         { provide: RestoreStore, useValue: restores },
         { provide: TransferStore, useValue: transfers },
@@ -79,6 +93,38 @@ describe('RunningJobsService', () => {
     });
 
     service = TestBed.inject(RunningJobsService);
+  });
+
+  /**
+   * Lo que quedó «en marcha» cuando Druse se cerró: nadie llegó a saber cómo
+   * acabó, y quien vuelve tiene que enterarse.
+   */
+  it('al abrir se recogen los trabajos que quedaron a medias', async () => {
+    gateway.jobs = [
+      {
+        id: 'j1',
+        kind: 'Backup',
+        subject: 'C:/respaldos/anoche',
+        state: 'Interrupted',
+        startedAtUtc: '2026-09-06T22:00:00Z',
+      },
+      {
+        id: 'j2',
+        kind: 'Transfer',
+        state: 'Finished',
+        outcome: 'Completed',
+        startedAtUtc: '2026-09-06T21:00:00Z',
+      },
+    ];
+
+    await service.loadInterrupted();
+
+    // Solo los interrumpidos: de los que terminaron ya se enteró quien los lanzó.
+    expect(service.interrupted().map((job) => job.id)).toEqual(['j1']);
+
+    service.dismissInterrupted();
+
+    expect(service.interrupted()).toEqual([]);
   });
 
   it('sin nada en marcha no hay nada que declarar', () => {

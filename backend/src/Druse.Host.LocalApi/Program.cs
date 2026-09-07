@@ -59,6 +59,10 @@ if (parentProcessId > 0)
 // La política es estricta a propósito: solo estos dos orígenes, y se exige que el
 // navegador pueda enviar la cabecera del token (plan §12).
 const string DevelopmentCorsPolicy = "druse-dev";
+
+// Cuántos trabajos largos se enseñan. Es una lista para mirar «qué pasó», no un
+// historial que nadie va a recorrer entero.
+const int JobHistoryLimit = 20;
 builder.Services.AddCors(options => options.AddPolicy(DevelopmentCorsPolicy, policy =>
     policy.WithOrigins(
               // Servidor de desarrollo de Angular.
@@ -78,6 +82,27 @@ var app = builder.Build();
 
 // La base local debe existir antes de atender la primera petición.
 await app.Services.GetRequiredService<DruseDatabase>().MigrateAsync(CancellationToken.None);
+
+// Un trabajo que figure «en marcha» en un proceso que acaba de arrancar es uno
+// que el cierre anterior se llevó por delante: nadie llegó a saber cómo acabó, y
+// lo que dejó escrito —un archivo a medias, unas filas— sigue donde esté.
+//
+// Se hace aquí y no en un servicio alojado para que ocurra **antes** de atender
+// la primera petición: si no, el primer `GET /api/jobs` podría contestar que hay
+// un respaldo corriendo que murió anoche.
+using (var scope = app.Services.CreateScope())
+{
+    var interrupted = await scope.ServiceProvider
+        .GetRequiredService<IJobStore>()
+        .InterruptRunningAsync(CancellationToken.None);
+
+    if (interrupted > 0)
+    {
+        app.Logger.LogWarning(
+            "{Count} trabajo(s) largo(s) quedaron interrumpidos al cerrarse Druse.",
+            interrupted);
+    }
+}
 
 if (app.Environment.IsDevelopment())
 {
@@ -196,6 +221,15 @@ app.MapGet("/api/health", () => new HealthResponse(
 //
 // Responde antes de apagar porque no puede responder después: el apagado cierra
 // el servidor que tendría que enviar la respuesta.
+// Los trabajos largos que hubo, con los que quedaron a medias entre ellos.
+//
+// Es la única forma de saberlo después de cerrar Druse: lo que guardan los
+// registros de respaldos y traslados vive en memoria y se va con el proceso.
+app.MapGet("/api/jobs", async (IJobStore jobs, CancellationToken cancellationToken) =>
+    Results.Ok((await jobs.RecentAsync(JobHistoryLimit, cancellationToken))
+        .Select(job => job.ToDto())))
+.WithName("GetJobs");
+
 app.MapPost("/api/shutdown", (IHostApplicationLifetime lifetime) =>
 {
     lifetime.StopApplication();
@@ -251,6 +285,40 @@ app.Lifetime.ApplicationStopping.Register(() =>
 });
 
 app.Run();
+
+/// <summary>Un trabajo largo tal y como se cuenta por HTTP.</summary>
+internal sealed record JobDto
+{
+    public required Guid Id { get; init; }
+
+    /// <summary>`Backup`, `Restore` o `Transfer`.</summary>
+    public required string Kind { get; init; }
+
+    public string? Subject { get; init; }
+
+    /// <summary>`Running`, `Finished` o `Interrupted`.</summary>
+    public required string State { get; init; }
+
+    public string? Outcome { get; init; }
+
+    public required DateTimeOffset StartedAtUtc { get; init; }
+
+    public DateTimeOffset? FinishedAtUtc { get; init; }
+}
+
+internal static class JobDtoMapper
+{
+    public static JobDto ToDto(this JobRecord job) => new()
+    {
+        Id = job.Id,
+        Kind = job.Kind.ToString(),
+        Subject = job.Subject,
+        State = job.State.ToString(),
+        Outcome = job.Outcome,
+        StartedAtUtc = job.StartedAtUtc,
+        FinishedAtUtc = job.FinishedAtUtc,
+    };
+}
 
 /// <summary>Respuesta de <c>GET /api/health</c>.</summary>
 internal sealed record HealthResponse(

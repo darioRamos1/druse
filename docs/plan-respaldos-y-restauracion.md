@@ -584,6 +584,23 @@ se borran: un respaldo a medias con aspecto de completo es más peligroso que no
 tener ninguno. La carpeta conserva lo escrito —ahí sí se ve qué hay y qué falta—
 con el manifiesto marcado como incompleto.
 
+### Lo que queda a medias si Druse se cierra
+
+Desde la versión 1.1.1 el proceso local **anota cada trabajo largo en su SQLite**
+—qué era, sobre qué, cuándo empezó y cómo acabó— y al arrancar marca como
+`Interrupted` lo que siguiera figurando en marcha: si nadie escribió su final, es
+que el cierre anterior se lo llevó por delante. La barra de estado lo dice al
+volver a abrir.
+
+Qué hacer con uno de esos depende de qué era, y **lo decide quien mira su base**:
+
+| Trabajo | Qué hacer |
+| --- | --- |
+| Respaldo | Repetirlo entero. Lo escrito no sirve —sin manifiesto, o marcado como incompleto— y rehacerlo no toca el origen |
+| Restauración | **Se reanuda** con `ResumeFrom`: repetirla desde el principio fallaría en el primer `CREATE TABLE` y duplicaría filas |
+| Traslado «todo o nada» | Repetirlo entero: la transacción se deshizo y en el destino no quedó nada |
+| Traslado normal | Lo que entró está confirmado. Repetirlo duplica salvo que el modo sea actualizar u omitir lo existente |
+
 **El manifiesto va donde puede ir:** un `manifest.json` en la carpeta y en el zip,
 y un bloque de comentarios en el `.sql`, con la cabecera al empezar y los
 recuentos y avisos al final. Reescribir la cabecera obligaría a copiar un archivo

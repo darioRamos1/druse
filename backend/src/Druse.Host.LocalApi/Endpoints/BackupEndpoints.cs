@@ -23,7 +23,7 @@ internal static class BackupEndpoints
     {
         app.MapPost("/api/backup/run", (
             BackupRequestDto request,
-            BackupService backups,
+            IBackgroundJobs jobs,
             IBackupTracker tracker,
             ILoggerFactory logs) =>
         {
@@ -63,9 +63,18 @@ internal static class BackupEndpoints
 
             tracker.Report(Starting(id, domain.Tables.Count));
 
-            _ = Task.Run(
-                async () =>
+            // A la cola, no a un `Task.Run` suelto: la petición termina aquí y
+            // el respaldo dura lo que dure, así que necesita servicios propios y
+            // alguien que sepa que existe.
+            jobs.Enqueue(new QueuedJob
+            {
+                Id = id,
+                Kind = JobKind.Backup,
+                Subject = request.Destination,
+                Token = token,
+                RunAsync = async (services, cancellationToken) =>
                 {
+                    var backups = services.GetRequiredService<BackupService>();
                     var log = logs.CreateLogger("Druse.Backup");
 
                     try
@@ -75,9 +84,15 @@ internal static class BackupEndpoints
                             var progress = new Progress<BackupProgress>(state =>
                                 tracker.Report(state with { Id = id }));
 
-                            var result = await backups.RunAsync(domain, sink, progress, token);
+                            var result = await backups.RunAsync(
+                                domain,
+                                sink,
+                                progress,
+                                cancellationToken);
 
                             tracker.Report(result with { Id = id });
+
+                            return result.Outcome.ToString();
                         }
                     }
                     catch (Exception error)
@@ -88,13 +103,15 @@ internal static class BackupEndpoints
                         log.LogError(error, "El respaldo {Id} terminó con un error no previsto.", id);
 
                         tracker.Report(Failed(id, domain.Tables.Count, error));
+
+                        return nameof(BackupOutcome.Failed);
                     }
                     finally
                     {
                         tracker.Finish(id);
                     }
                 },
-                CancellationToken.None);
+            });
 
             return Results.Accepted($"/api/backup/{id}/status", new { id });
         })

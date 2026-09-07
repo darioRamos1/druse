@@ -335,6 +335,68 @@ public sealed class BackupEndpointTests(DruseApiFactory factory) : IClassFixture
             """);
     }
 
+    /// <summary>
+    /// El respaldo queda anotado fuera del proceso, que es lo único que sobrevive
+    /// a cerrar Druse.
+    ///
+    /// El registro en memoria se va con el proceso, y es justo entonces cuando
+    /// hace falta saber qué estaba corriendo. Aquí se comprueba la otra mitad: que
+    /// lo que terminó queda como terminado y con lo que dijo.
+    /// </summary>
+    [RequiresPostgreSqlFact]
+    public async Task UnRespaldoQuedaAnotadoEnElRegistroDeTrabajos()
+    {
+        using var client = _factory.CreateAuthenticatedClient();
+
+        var session = await OpenAsync(client);
+
+        if (session is null) { return; }
+
+        var suffix = Guid.NewGuid().ToString("N")[..8];
+        var tabla = $"druse_job_{suffix}";
+        var root = Path.Combine(Path.GetTempPath(), $"druse_job_{suffix}");
+        var destination = Path.Combine(root, "respaldo.sql");
+
+        try
+        {
+            await RunSqlAsync(client, session.Value, $"CREATE TABLE {tabla} (id integer PRIMARY KEY)");
+
+            var (final, _) = await BackupAsync(client, new
+            {
+                sessionId = session.Value,
+                tables = new[] { new { id = tabla, name = tabla, schema = "public" } },
+                dataMode = "StructureAndData",
+                layout = "SingleFile",
+                dataFormat = "Inserts",
+                compress = false,
+                destination,
+            });
+
+            var id = final.GetProperty("id").GetGuid();
+
+            var jobs = await client.GetFromJsonAsync<JsonElement>("/api/jobs");
+
+            var job = jobs.EnumerateArray().Single(entry => entry.GetProperty("id").GetGuid() == id);
+
+            Assert.Equal("Backup", job.GetProperty("kind").GetString());
+            Assert.Equal("Finished", job.GetProperty("state").GetString());
+            Assert.Equal(destination, job.GetProperty("subject").GetString());
+
+            // El resultado es el que dio la operación, con sus palabras: aquí no
+            // se traduce a un «bien o mal» que perdería los avisos.
+            Assert.Equal(final.GetProperty("outcome").GetString(), job.GetProperty("outcome").GetString());
+        }
+        finally
+        {
+            await CleanAsync(client, session.Value, $"DROP TABLE IF EXISTS {tabla}");
+
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+    }
+
     [Fact]
     public async Task ElEstadoDeUnRespaldoQueNadieConoce_DevuelveNoEncontrado()
     {

@@ -86,7 +86,7 @@ public sealed class TokenAuthenticationTests : IClassFixture<DruseApiFactory>
     {
         using var client = _factory.CreateClient();
 
-        foreach (var path in new[] { "/api/engines", "/api/history", "/api/preferences" })
+        foreach (var path in new[] { "/api/engines", "/api/history", "/api/preferences", "/api/jobs" })
         {
             var response = await client.GetAsync(path);
 

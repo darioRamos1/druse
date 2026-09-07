@@ -93,3 +93,23 @@
     }
   </button>
 }
+
+<!--
+  Lo que quedó a medias la última vez.
+  
+  Un trabajo que figuraba «en marcha» cuando Druse se cerró: nadie llegó a saber
+  cómo acabó, y lo que dejó escrito sigue donde esté. Se enseña al abrir y se va
+  al pulsarlo, que es lo que dice que alguien ya lo ha visto.
+-->
+@if (interrupted().length > 0) {
+  <span class="sep" aria-hidden="true"></span>
+
+  <button
+    type="button"
+    class="op op--interrupted"
+    (click)="jobs.dismissInterrupted()"
+    [title]="interruptedDetail()"
+  >
+    <span class="op-step">{{ interruptedLabel() }}</span>
+  </button>
+}

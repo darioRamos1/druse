@@ -43,6 +43,7 @@ import {
   ExportRequest,
   ImportOptions,
   ImportPreview,
+  JobSummary,
   RowDeleteRequest,
   RowEditRequest,
   RowEditResult,
@@ -440,6 +441,10 @@ export class HttpApplicationGateway extends ApplicationGateway {
     return this._http
       .post<{ id: string }>('/api/backup/run', request)
       .pipe(map((response) => response.id));
+  }
+
+  override getJobs(): Observable<readonly JobSummary[]> {
+    return this._http.get<readonly JobSummary[]>('/api/jobs');
   }
 
   override getBackupStatus(backupId: string): Observable<BackupProgress> {

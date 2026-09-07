@@ -1,4 +1,4 @@
-using Druse.Platform.Abstractions;
+﻿using Druse.Platform.Abstractions;
 using Microsoft.Data.Sqlite;
 
 namespace Druse.Persistence.Sqlite;
@@ -315,9 +315,35 @@ public sealed class DruseDatabase
                 ON diagrams (connection_id, updated_at_utc DESC);
             """, cancellationToken);
 
+        // Los trabajos largos que hubo: respaldos, restauraciones y traslados.
+        //
+        // **Se guarda para poder decir qué quedó a medias.** Un trabajo que
+        // figure «en marcha» en un archivo recién abierto es uno que el cierre
+        // anterior se llevó por delante, y lo que dejó escrito sigue donde esté.
+        //
+        // Solo qué era, sobre qué, cuándo y cómo acabó: ni credenciales, ni SQL,
+        // ni filas. Esto lo puede abrir cualquiera con un visor de SQLite.
+        await ExecuteAsync(connection, """
+            CREATE TABLE IF NOT EXISTS jobs (
+                id              TEXT NOT NULL PRIMARY KEY,
+                kind            TEXT NOT NULL,
+                subject         TEXT NULL,
+                state           TEXT NOT NULL,
+                outcome         TEXT NULL,
+                started_at_utc  TEXT NOT NULL,
+                finished_at_utc TEXT NULL
+            );
+            """, cancellationToken);
+
+        // Se listan siempre por lo más reciente.
+        await ExecuteAsync(connection, """
+            CREATE INDEX IF NOT EXISTS ix_jobs_started
+                ON jobs (started_at_utc DESC);
+            """, cancellationToken);
+
         // Marca de versión del esquema, para poder migrar más adelante sin
         // adivinar en qué estado está el archivo de cada usuario.
-        await ExecuteAsync(connection, "PRAGMA user_version = 7;", cancellationToken);
+        await ExecuteAsync(connection, "PRAGMA user_version = 8;", cancellationToken);
     }
 
     /// <summary>Añade una columna solo si el archivo del usuario aún no la tiene.</summary>

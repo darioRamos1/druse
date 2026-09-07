@@ -1,5 +1,7 @@
-import { Injectable, computed, effect, inject } from '@angular/core';
+import { Injectable, computed, effect, inject, signal } from '@angular/core';
+import { firstValueFrom } from 'rxjs';
 
+import { ApplicationGateway, JobSummary } from '../application-gateway/application-gateway';
 import { BackupStore } from '../backup/backup.store';
 import { RestoreStore } from '../backup/restore.store';
 import { DesktopHost } from '../application-gateway/desktop-host';
@@ -39,6 +41,18 @@ export class RunningJobsService {
   private readonly _transfers = inject(TransferStore);
   private readonly _pendingWork = inject(PendingWorkService);
   private readonly _desktop = inject(DesktopHost);
+  private readonly _gateway = inject(ApplicationGateway);
+
+  private readonly _interrupted = signal<readonly JobSummary[]>([]);
+
+  /**
+   * Trabajos que estaban corriendo la última vez que Druse se cerró.
+   *
+   * Nadie llegó a saber cómo acabaron: lo que dejaron escrito —un archivo a
+   * medias, unas filas— sigue donde esté, y quien lo mire tiene que decidir qué
+   * hacer con ello. Se enseñan una vez, al abrir, y se descartan al leerlos.
+   */
+  readonly interrupted = this._interrupted.asReadonly();
 
   /**
    * Cómo se llama en el aviso lo que está en marcha, o `null` si no hay nada.
@@ -77,6 +91,31 @@ export class RunningJobsService {
     void this._desktop.listenForCancelAndClose(() => {
       void this.cancelAndClose();
     });
+
+    void this.loadInterrupted();
+  }
+
+  /**
+   * Pregunta qué quedó a medias la última vez.
+   *
+   * Se hace una vez, al construirse el servicio, que es al abrir la ventana: el
+   * proceso local marca los interrumpidos al arrancar y esa lista ya no cambia
+   * sola.
+   */
+  async loadInterrupted(): Promise<void> {
+    try {
+      const jobs = await firstValueFrom(this._gateway.getJobs());
+
+      this._interrupted.set(jobs.filter((job) => job.state === 'Interrupted'));
+    } catch {
+      // No poder contar lo de la vez anterior no es motivo para estropear el
+      // arranque de esta.
+    }
+  }
+
+  /** El usuario ya lo ha visto. */
+  dismissInterrupted(): void {
+    this._interrupted.set([]);
   }
 
   /**
