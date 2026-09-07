@@ -144,29 +144,27 @@ public sealed partial class RestoreService(
                 $"El respaldo quedó {summary.Manifest.Outcome} y puede estar incompleto."));
         }
 
-        // Un artefacto viejo con datos en CSV no puede restaurarse tal cual era:
-        // en su formato el nulo y la cadena vacía se escribían igual. Se restaura
-        // —negarse sería peor—, pero quien lo haga tiene que saber qué recibe.
-        if (summary.Manifest is { DataFormat: BackupDataFormat.Csv } antiguo &&
-            antiguo.FormatVersion < BackupManifest.ReversibleFormat)
+        // Los CSV del formato 1 escribían igual el nulo y la cadena vacía, así que
+        // al restaurarlos los dos entran como cadena vacía. Se restaura —negarse
+        // sería peor—, pero quien lo haga tiene que saber qué recibe.
+        //
+        // Un artefacto sin manifiesto cuenta como antiguo: no dice su formato, y
+        // suponerle el nuevo sería suponer justo lo que no se puede comprobar.
+        // Desde el formato 2 no hay nada que avisar, y un aviso que no advierte de
+        // nada enseña a no leerlos.
+        if (summary.CsvRows > 0 &&
+            summary.Manifest?.FormatVersion is not (int and >= BackupManifest.ReversibleFormat))
         {
-            warnings.Add(new BackupWarning(
-                string.Empty,
-                $"El respaldo usa el formato {antiguo.FormatVersion}, donde un nulo y una cadena " +
-                "vacía se escribían igual en los datos en CSV: las dos cosas se restaurarán como " +
-                "cadena vacía. Para conservar los nulos hay que volver a respaldar con esta versión."));
-        }
+            var formato = summary.Manifest is null
+                ? "sin manifiesto que diga su formato"
+                : $"del formato {summary.Manifest.FormatVersion}";
 
-        // Los datos en CSV pierden por el camino la diferencia entre un nulo y una
-        // cadena vacía: el archivo escribe los dos igual. En las columnas de texto
-        // no hay forma de recuperarla y los nulos vuelven como cadena vacía, así
-        // que se dice antes y no después.
-        if (summary.CsvRows > 0)
-        {
             warnings.Add(new BackupWarning(
                 string.Empty,
-                $"Los datos vienen en CSV ({summary.CsvRows} filas). En las columnas de texto, " +
-                "un nulo del origen se restaura como cadena vacía: el archivo escribe los dos igual."));
+                $"Los datos vienen en CSV {formato} ({summary.CsvRows} filas), donde un nulo y una " +
+                "cadena vacía se escribían igual: en las columnas de texto los dos se restaurarán " +
+                "como cadena vacía. Para conservar los nulos hay que volver a respaldar con esta " +
+                "versión de Druse."));
         }
 
         return new RestoreInspection

@@ -1,8 +1,10 @@
-using System.Globalization;
+﻿using System.Globalization;
 using System.IO.Compression;
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+
+using Druse.Domain;
 
 namespace Druse.IntegrationTests;
 
@@ -235,7 +237,7 @@ public sealed class BackupEndpointTests(DruseApiFactory factory) : IClassFixture
             // --- Y el manifiesto describe lo que hay dentro -------------------
             var manifest = ReadManifest(path!, layout, compress);
 
-            Assert.Equal(1, manifest.GetProperty("formatVersion").GetInt32());
+            Assert.Equal(BackupManifest.ReversibleFormat, manifest.GetProperty("formatVersion").GetInt32());
             Assert.Equal("PostgreSql", manifest.GetProperty("engine").GetString());
             Assert.Equal(2, manifest.GetProperty("tables").GetInt32());
             Assert.Equal(4, manifest.GetProperty("rows").GetInt64());
@@ -324,7 +326,7 @@ public sealed class BackupEndpointTests(DruseApiFactory factory) : IClassFixture
 
         return JsonSerializer.Deserialize<JsonElement>("""
             {
-              "formatVersion": 1,
+              "formatVersion": 2,
               "engine": "PostgreSql",
               "tables": 2,
               "rows": 4,

@@ -1,4 +1,4 @@
-using System.Globalization;
+﻿using System.Globalization;
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
@@ -720,34 +720,39 @@ public sealed class RestoreEndpointTests(DruseApiFactory factory) : IClassFixtur
                 CREATE TABLE {tabla} (
                     id     integer PRIMARY KEY,
                     nombre text NOT NULL,
+                    nota   text,
                     total  numeric(10,2),
                     alta   date
                 );
                 """);
 
             await RunSqlAsync(client, origin.Value, $"""
-                INSERT INTO {tabla} (id, nombre, total, alta) VALUES
-                    (1, 'con, coma',        10.50, DATE '2026-01-31'),
-                    (2, 'con "comillas"',   NULL,  NULL),
-                    (3, E'con\nsalto',      0.00,  DATE '2026-08-18');
+                INSERT INTO {tabla} (id, nombre, nota, total, alta) VALUES
+                    (1, 'con, coma',        '',     10.50, DATE '2026-01-31'),
+                    (2, 'con "comillas"',   NULL,   NULL,  NULL),
+                    (3, E'con\nsalto',      'algo', 0.00,  DATE '2026-08-18');
                 """);
 
             var path = await BackupToCsvAsync(client, Postgres, origin.Value, root, tabla);
 
-            // Los datos están en su archivo, no dentro del guion.
-            Assert.True(File.Exists(Path.Combine(path, "datos", $"{tabla}.csv")));
+            // Los datos están en su archivo, no dentro del guion, y el archivo lleva
+            // el esquema en el nombre: dos tablas homónimas de esquemas distintos
+            // no pueden compartirlo.
+            Assert.True(File.Exists(Path.Combine(path, "datos", $"public.{tabla}.csv")));
 
             var inspection = await InspectAsync(client, target.Value, path);
 
             Assert.True(inspection.GetProperty("canRestore").GetBoolean());
 
-            // Se avisa de lo que el formato no sabe conservar antes de aplicarlo.
+            // Desde el formato 2 no hay nada que avisar de los CSV: el nulo y la
+            // cadena vacía se escriben distintos y vuelven distintos. Un aviso que
+            // no advierte de nada enseña a no leerlos.
             var warnings = inspection.GetProperty("warnings")
                 .EnumerateArray()
                 .Select(warning => warning.GetProperty("message").GetString() ?? string.Empty)
                 .ToList();
 
-            Assert.Contains(warnings, message => message.Contains("CSV", StringComparison.Ordinal));
+            Assert.DoesNotContain(warnings, message => message.Contains("CSV", StringComparison.Ordinal));
 
             var result = await RestoreAsync(client, new { sessionId = target.Value, path });
 
@@ -755,7 +760,11 @@ public sealed class RestoreEndpointTests(DruseApiFactory factory) : IClassFixtur
             Assert.Equal(3, result.GetProperty("rowsWritten").GetInt64());
 
             var rows = await RunSqlAsync(client, target.Value, $"""
-                SELECT nombre, coalesce(total::text, '·'), coalesce(alta::text, '·')
+                SELECT
+                    nombre,
+                    CASE WHEN nota IS NULL THEN '(nulo)' ELSE '[' || nota || ']' END,
+                    coalesce(total::text, '·'),
+                    coalesce(alta::text, '·')
                 FROM {tabla}
                 ORDER BY id;
                 """);
@@ -766,12 +775,12 @@ public sealed class RestoreEndpointTests(DruseApiFactory factory) : IClassFixtur
                 .Select(row => row.EnumerateArray().Select(cell => cell.GetString()).ToList())
                 .ToList();
 
-            Assert.Equal(["con, coma", "10.50", "2026-01-31"], restored[0]);
-
-            // El nulo de una columna que no es texto sí se conserva: una celda
-            // vacía en una fecha o en un número solo puede querer decir nulo.
-            Assert.Equal(["con \"comillas\"", "·", "·"], restored[1]);
-            Assert.Equal(["con\nsalto", "0.00", "2026-08-18"], restored[2]);
+            // La cadena vacía vuelve vacía y el nulo vuelve nulo, que es lo que el
+            // formato 1 no sabía hacer: los escribía igual y los dos entraban como
+            // cadena vacía, dejando sin nulos una columna que los tenía.
+            Assert.Equal(["con, coma", "[]", "10.50", "2026-01-31"], restored[0]);
+            Assert.Equal(["con \"comillas\"", "(nulo)", "·", "·"], restored[1]);
+            Assert.Equal(["con\nsalto", "[algo]", "0.00", "2026-08-18"], restored[2]);
         }
         finally
         {
