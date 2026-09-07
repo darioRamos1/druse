@@ -29,7 +29,6 @@ import { Icon } from '../../../shared/ui/icon/icon';
 export class EditorTabs {
   readonly tabs = input.required<readonly QueryTab[]>();
   readonly connections = input.required<readonly ConnectionSummary[]>();
-  readonly encoding = input('UTF-8 · LF');
 
   readonly select = output<string>();
   readonly close = output<string>();

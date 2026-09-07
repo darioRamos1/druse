@@ -18,7 +18,14 @@ export class StatusBar {
   readonly session = input.required<SessionStatus>();
   readonly line = input(1);
   readonly column = input(1);
-  readonly encoding = input('UTF-8');
+  /**
+   * Codificación y fin de línea del documento.
+   *
+   * Van juntos y **solo aquí**: la fila de pestañas decía lo mismo unos píxeles
+   * más arriba, así que la misma información aparecía dos veces en la pantalla y
+   * a 900 px le quitaba sitio a las pestañas.
+   */
+  readonly encoding = input('UTF-8 · LF');
 
   /** Volver al detalle del respaldo en marcha. */
   readonly showBackup = output<void>();
