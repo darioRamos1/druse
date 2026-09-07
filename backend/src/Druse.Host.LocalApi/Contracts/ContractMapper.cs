@@ -342,6 +342,12 @@ internal static class ContractMapper
             Delimiter = request.Delimiter.Length == 1 ? request.Delimiter[0] : ',',
             IncludeHeaders = request.IncludeHeaders,
             NullText = request.NullText,
+
+            // Lo que se exporta desde aquí acaba en una hoja de cálculo, y allí
+            // una celda que empiece por `=` es una fórmula que se ejecuta. Ese
+            // texto viene de la base, no de Druse. Los respaldos no llevan esto:
+            // su CSV vuelve a una base y tiene que salir tal cual entró.
+            EscapeFormulas = true,
             MaxRows = Math.Clamp(request.MaxRows, 1, 1_000_000),
         };
     }

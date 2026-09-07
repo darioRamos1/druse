@@ -97,6 +97,43 @@ public sealed class CsvResultExporterTests
         Assert.Equal("nulo,vacio\r\n(nulo),\r\n", csv);
     }
 
+    /// <summary>
+    /// Una celda que empieza por `=` la ejecuta la hoja de cálculo, y ese texto no
+    /// lo escribió Druse: **está en la base**, y basta con que alguien haya podido
+    /// escribir una fila para que llegue hasta el archivo.
+    ///
+    /// El apóstrofo delante, entre comillas, es lo que las hojas entienden por
+    /// «esto es texto».
+    /// </summary>
+    [Fact]
+    public async Task LoQueUnaHojaDeCalculoTomariaPorFormula_SaleComoTexto()
+    {
+        var csv = await ExportAsync(
+            ["formula", "suma", "arroba", "normal"],
+            [["=1+1", "+A1", "@SUM(A1)", "hola"]],
+            new ExportOptions { EscapeFormulas = true });
+
+        Assert.Equal(
+            "formula,suma,arroba,normal\r\n\"'=1+1\",\"'+A1\",\"'@SUM(A1)\",hola\r\n",
+            csv);
+    }
+
+    /// <summary>
+    /// En un respaldo no: ese CSV vuelve a una base, y un apóstrofo de más sería
+    /// un dato cambiado. Lo que protege allí es que nadie abre un respaldo con
+    /// Excel para trabajar con él.
+    /// </summary>
+    [Fact]
+    public async Task SinLaOpcion_ElValorSaleTalCual()
+    {
+        var csv = await ExportAsync(
+            ["formula"],
+            [["=1+1"]],
+            new ExportOptions { DistinguishNull = true });
+
+        Assert.Equal("formula\r\n=1+1\r\n", csv);
+    }
+
     [Fact]
     public async Task PuedeOmitirLasCabeceras()
     {

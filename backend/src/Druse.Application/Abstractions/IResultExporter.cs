@@ -57,6 +57,23 @@ public sealed record ExportOptions
     /// </summary>
     public bool DistinguishNull { get; init; }
 
+    /// <summary>
+    /// Neutraliza los valores que una hoja de cálculo tomaría por fórmula.
+    ///
+    /// Excel y sus parientes interpretan como fórmula cualquier celda que empiece
+    /// por `=`, `+`, `-` o `@`, y una fórmula puede llamar a funciones que traen
+    /// datos de fuera o piden abrir un programa. Ese texto no lo escribió Druse:
+    /// **está en la base de datos**, y basta con que alguien haya podido escribir
+    /// una fila para que llegue hasta aquí.
+    ///
+    /// Con esto activado, esos valores salen entrecomillados y con un apóstrofo
+    /// delante, que es lo que las hojas de cálculo entienden por «esto es texto».
+    /// El dato cambia —el apóstrofo se ve en un editor de texto— y por eso **no
+    /// se activa en los respaldos**: allí el archivo se vuelve a meter en una base
+    /// y tiene que volver tal cual salió.
+    /// </summary>
+    public bool EscapeFormulas { get; init; }
+
     /// <summary>Tope de filas. Protege de exportar sin querer una tabla entera.</summary>
     public int MaxRows { get; init; } = 1_000_000;
 }

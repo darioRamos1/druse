@@ -1,4 +1,4 @@
-using Druse.Platform.Abstractions;
+﻿using Druse.Platform.Abstractions;
 
 namespace Druse.Platform.Native;
 
@@ -98,6 +98,41 @@ public sealed class AppPaths : IAppPaths
         foreach (var directory in new[] { DataDirectory, ConfigDirectory, CacheDirectory, LogDirectory })
         {
             Directory.CreateDirectory(directory);
+            Restrict(directory);
+        }
+    }
+
+    /// <summary>
+    /// Deja el directorio a nombre de su dueño y de nadie más.
+    ///
+    /// Aquí dentro hay conexiones a bases ajenas, historial de consultas y el
+    /// token con el que se manda sobre la API local. En un equipo compartido, los
+    /// permisos por omisión de Unix —`755`— dejan todo eso **legible para
+    /// cualquier otra cuenta de la máquina**, y quien lea el token puede abrir
+    /// sesiones contra las bases del usuario.
+    ///
+    /// En Windows no hay nada que hacer: el perfil del usuario ya está cerrado a
+    /// las demás cuentas, y tocar las ACL desde aquí solo podría estropearlo. Si
+    /// el sistema no deja cambiarlo, se sigue: no poder endurecer los permisos no
+    /// es motivo para no arrancar.
+    /// </summary>
+    private static void Restrict(string directory)
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        try
+        {
+            File.SetUnixFileMode(
+                directory,
+                UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+        {
+            // Un sistema de archivos que no admite permisos —una unidad FAT, un
+            // recurso de red— no puede cerrarse así.
         }
     }
 

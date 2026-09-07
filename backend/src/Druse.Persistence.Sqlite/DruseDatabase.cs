@@ -49,6 +49,12 @@ public sealed class DruseDatabase
 
         await connection.OpenAsync(cancellationToken);
 
+        // El archivo lo crea SQLite en la primera apertura, y lo crea con los
+        // permisos por omisión: en Unix, legible por cualquier cuenta de la
+        // máquina. Aquí dentro están las conexiones del usuario y su historial de
+        // consultas, así que se cierra en cuanto existe.
+        Restrict(_paths.DatabaseFile);
+
         // WAL permite leer mientras otro escribe, que es justo lo que hace el
         // historial mientras el usuario consulta sus conexiones.
         await ExecuteAsync(connection, "PRAGMA journal_mode = WAL;", cancellationToken);
@@ -364,6 +370,40 @@ public sealed class DruseDatabase
         // Marca de versión del esquema, para poder migrar más adelante sin
         // adivinar en qué estado está el archivo de cada usuario.
         await ExecuteAsync(connection, "PRAGMA user_version = 9;", cancellationToken);
+    }
+
+    /// <summary>
+    /// Deja el archivo a nombre de su dueño y de nadie más.
+    ///
+    /// En Windows no hay nada que hacer: el perfil del usuario ya está cerrado a
+    /// las demás cuentas. Si el sistema de archivos no admite modos POSIX —una
+    /// unidad FAT, un recurso de red— se sigue: no poder endurecer los permisos
+    /// no es motivo para no abrir la base.
+    ///
+    /// Se aplica también a `-wal` y `-shm`, que llevan los mismos datos mientras
+    /// hay escrituras en vuelo y se crean aparte.
+    /// </summary>
+    private static void Restrict(string databaseFile)
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        foreach (var path in new[] { databaseFile, databaseFile + "-wal", databaseFile + "-shm" })
+        {
+            try
+            {
+                if (File.Exists(path))
+                {
+                    File.SetUnixFileMode(path, UnixFileMode.UserRead | UnixFileMode.UserWrite);
+                }
+            }
+            catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+            {
+                // Sistemas de archivos que no admiten modos POSIX.
+            }
+        }
     }
 
     /// <summary>Añade una columna solo si el archivo del usuario aún no la tiene.</summary>

@@ -1,4 +1,5 @@
-﻿using System.Text;
+﻿using System.Buffers;
+using System.Text;
 using Druse.Application.Abstractions;
 using Druse.Database.Abstractions;
 
@@ -82,7 +83,7 @@ public sealed class CsvResultExporter : IResultExporter
 
             if (!options.DistinguishNull)
             {
-                WriteField(line, value ?? options.NullText, options.Delimiter);
+                WriteField(line, value ?? options.NullText, options.Delimiter, options.EscapeFormulas);
                 continue;
             }
 
@@ -100,12 +101,21 @@ public sealed class CsvResultExporter : IResultExporter
                 continue;
             }
 
-            WriteField(line, value, options.Delimiter);
+            WriteField(line, value, options.Delimiter, options.EscapeFormulas);
         }
 
         // Fin de línea CRLF: es lo que exige el RFC y lo que espera Excel.
         await writer.WriteAsync(line.Append("\r\n").ToString().AsMemory(), cancellationToken);
     }
+
+    /// <summary>
+    /// Con qué caracteres empieza lo que una hoja de cálculo toma por fórmula.
+    ///
+    /// El tabulador y el retorno de carro están por lo mismo: hay versiones que
+    /// los saltan y evalúan lo que venga detrás.
+    /// </summary>
+    private static readonly SearchValues<char> FormulaStarts =
+        SearchValues.Create("=+-@\t\r");
 
     /// <summary>La cadena vacía escrita de forma que se distinga de un nulo.</summary>
     private const string EmptyString = "\"\"";
@@ -117,9 +127,19 @@ public sealed class CsvResultExporter : IResultExporter
     /// línea; dentro, las comillas se duplican. Sin esto, un valor con una coma
     /// desplazaría todas las columnas siguientes de esa fila.
     /// </summary>
-    private static void WriteField(StringBuilder line, string value, char delimiter)
+    private static void WriteField(
+        StringBuilder line,
+        string value,
+        char delimiter,
+        bool escapeFormulas = false)
     {
+        // Una celda que empieza por uno de estos la ejecuta la hoja de cálculo.
+        // El apóstrofo delante es lo que entienden por «esto es texto», y las
+        // comillas hacen falta porque el apóstrofo solo cuenta dentro de ellas.
+        var formula = escapeFormulas && value.Length > 0 && FormulaStarts.Contains(value[0]);
+
         var needsQuotes =
+            formula ||
             value.Contains(delimiter) ||
             value.Contains('"') ||
             value.Contains('\n') ||
@@ -128,6 +148,25 @@ public sealed class CsvResultExporter : IResultExporter
         if (!needsQuotes)
         {
             line.Append(value);
+            return;
+        }
+
+        if (formula)
+        {
+            line.Append('"').Append('\'');
+
+            foreach (var character in value)
+            {
+                if (character == '"')
+                {
+                    line.Append('"');
+                }
+
+                line.Append(character);
+            }
+
+            line.Append('"');
+
             return;
         }
 
