@@ -109,6 +109,12 @@ const DARK: MonacoApi.editor.IStandaloneThemeData = {
     'minimap.background': '#00000000',
     'editorGutter.background': '#00000000',
     'editorOverviewRuler.border': '#151B26',
+
+    // La regla de la derecha es un `<canvas>`, y un canvas no hereda el fondo
+    // del contenedor como hace el resto del editor: pintarlo con el
+    // `#00000000` del editor lo deja **negro sólido**. Aquí apenas se nota; en
+    // el tema claro es una franja negra de diez píxeles pegada al borde.
+    'editorOverviewRuler.background': '#0B0D11',
   },
 };
 
@@ -152,5 +158,9 @@ const LIGHT: MonacoApi.editor.IStandaloneThemeData = {
     'minimap.background': '#00000000',
     'editorGutter.background': '#00000000',
     'editorOverviewRuler.border': '#EAEDF4',
+
+    // El color del panel, por lo mismo que en el tema oscuro: sin esto, el
+    // canvas de la regla queda negro sobre un editor blanco.
+    'editorOverviewRuler.background': '#FFFFFF',
   },
 };

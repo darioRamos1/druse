@@ -77,7 +77,13 @@ Fase 5: Contrato, frontend y accesibilidad
     |
     v
 Fase 6: Distribución y compatibilidad
+    |
+    v
+Fase 7: Lo que se ve y se usa
 ```
+
+La fase 7 no sigue a las demás: se puede tocar en cualquier momento, y conviene
+hacerlo cada vez que se mira el barrido de capturas.
 
 No comenzar una extracción grande de `WorkspaceStore` o `TransferService` antes
 de cerrar las fases 0 y 1.
@@ -435,6 +441,70 @@ no solamente validaciones visuales.
 - SmartScreen reconoce el editor cuando la reputación del certificado lo permita.
 - Las versiones mínimas declaradas tienen una comprobación automatizada periódica.
 - La documentación pública coincide con el producto distribuido.
+
+---
+
+## 11.bis Fase 7 — Lo que se ve y se usa
+
+**Prioridad:** P2  
+**Esfuerzo estimado:** incremental  
+**Resultado esperado:** la pantalla dice la verdad, cabe donde tiene que caber y
+no repite lo que ya dijo.
+
+Esta fase **no estaba en el plan original**, y es una omisión: el barrido de la
+sesión 042 salió limpio de errores de consola y de las medidas automáticas, pero
+mirando las capturas aparecen cosas que ninguna prueba puede afirmar. Lo de aquí
+sale de mirarlas, no de suponer.
+
+No es lo mismo que la accesibilidad de §10 —aquello es poder usar Druse sin
+ratón y con lector de pantalla— ni que `docs/plan-mejoras-visuales.md`, que se
+cerró en la 027 y trataba defectos de maquetación.
+
+### Lo que se ve
+
+- [x] **UX-001:** dar fondo al `overviewRuler` del editor. Es un `<canvas>`, no
+      hereda el fondo del contenedor y salía **negro**: una franja de diez
+      píxeles pegada al borde derecho, invisible en el tema oscuro y evidente en
+      el claro. _(Hecho el 7 de septiembre de 2026.)_
+- [ ] **UX-002:** el tipo de la columna se corta en las cabeceras estrechas
+      —«intege»— y, cuando la última columna es ancha, queda pegado al borde
+      derecho pareciendo de otra. Decidir si se abrevia, se pasa al tooltip o se
+      esconde por debajo de cierto ancho.
+- [ ] **UX-003:** la barra de estado se corta a 900 px —«Última eje…»— en lugar
+      de envolver o de soltar lo menos importante. Decidir un orden de descarte.
+- [ ] **UX-004:** el placeholder del buscador global se corta en todos los anchos
+      y lo reporta cada barrido. O cabe, o se acorta el texto, o se deja de
+      medir; lo que no puede es salir en la lista de hallazgos para siempre.
+
+### Lo que se repite
+
+- [ ] **UX-005:** `Ln 1, Col 1` y `UTF-8` aparecen **dos veces**: en la fila de
+      pestañas y en la barra de estado. Elegir un sitio.
+- [ ] **UX-006:** el motor, la base y el usuario se dicen en la barra del editor
+      y otra vez en la de estado. Lo mismo.
+- [ ] **UX-007:** entre la barra de la aplicación, la de pestañas, la de acciones
+      y la de contexto hay **cuatro filas de cromo** antes del SQL: en una
+      pantalla de 720 px de alto quedan seis líneas de editor. Ver qué se puede
+      juntar sin esconder nada.
+
+### Lo que no dice lo que debería
+
+- [ ] **UX-008:** en «Migrar tablas» cada fila enseña «~ filas» sin número cuando
+      el catálogo no tiene la estimación. Un hueco con tilde no informa: o va la
+      cifra, o no va nada.
+- [ ] **UX-009:** «Restaurar» está deshabilitado hasta inspeccionar el artefacto
+      —y con razón— pero no dice por qué. Un botón apagado sin motivo se lee como
+      una avería.
+- [ ] **UX-010:** el aviso de trabajos interrumpidos vive en la barra de estado y
+      es discreto de más para lo que cuenta —un respaldo que quedó a medias—.
+      Verlo con alguien delante antes de decidir si sube de sitio.
+
+### Cómo se comprueba
+
+Ninguna de estas se cierra con una prueba en verde: se cierran **mirando**. El
+barrido (`e2e/tests/barrido.spec.ts`) es la herramienta, y toda función nueva con
+interfaz añade su captura. Lo que sí puede quedar sujeto por una prueba es el
+detalle concreto que se arregló, como en UX-001.
 
 ---
 
