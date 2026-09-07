@@ -414,7 +414,7 @@
       <input type="checkbox" [(ngModel)]="readOnly" />
       <span>
         Solo lectura
-        <span class="checkbox__hint">Bloquea cualquier instrucción que modifique datos.</span>
+        <span class="checkbox__hint">{{ readOnlyHint() }}</span>
       </span>
     </label>
 

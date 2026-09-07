@@ -30,6 +30,18 @@ internal sealed class SqlServerSession : IDatabaseSession
 
     public ConnectionProfile Profile { get; }
 
+    /// <summary>
+    /// Siempre `false`: **SQL Server no tiene sesiones de solo lectura**.
+    ///
+    /// `ApplicationIntent=ReadOnly` no sirve —solo enruta hacia una réplica de
+    /// lectura en un grupo de disponibilidad, y sin él la conexión escribe
+    /// igual—, y poner la base entera en `READ_ONLY` es una decisión del
+    /// servidor, no de quien se conecta. Aquí, marcar «solo lectura» es un aviso
+    /// del analizador de SQL, y la garantía de verdad es un usuario con permisos
+    /// restringidos. Decirlo es mejor que enseñar un candado que no cierra.
+    /// </summary>
+    public bool ReadOnlyEnforcedByEngine => false;
+
     public string ServerVersion { get; }
 
     public bool IsOpen => !_disposed && Connection.State == System.Data.ConnectionState.Open;

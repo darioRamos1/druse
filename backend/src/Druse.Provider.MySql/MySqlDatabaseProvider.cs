@@ -14,7 +14,8 @@ internal sealed class MySqlSession : IDatabaseSession
         Guid id,
         ConnectionProfile profile,
         DatabaseCredentials credentials,
-        MySqlConnection connection)
+        MySqlConnection connection,
+        bool readOnlyEnforcedByEngine)
     {
         Id = id;
         Profile = profile;
@@ -22,6 +23,7 @@ internal sealed class MySqlSession : IDatabaseSession
         Connection = connection;
         Transaction = new SessionTransaction(connection);
         ServerVersion = connection.ServerVersion;
+        ReadOnlyEnforcedByEngine = readOnlyEnforcedByEngine;
     }
 
     public Guid Id { get; }
@@ -29,6 +31,12 @@ internal sealed class MySqlSession : IDatabaseSession
     public DatabaseEngine Engine => DatabaseEngine.MySql;
 
     public ConnectionProfile Profile { get; }
+
+    /// <summary>
+    /// MySQL sí tiene sesiones de solo lectura, y en autocommit alcanzan a cada
+    /// instrucción: cada una es su propia transacción.
+    /// </summary>
+    public bool ReadOnlyEnforcedByEngine { get; }
 
     public string ServerVersion { get; }
 
@@ -143,9 +151,48 @@ public sealed class MySqlDatabaseProvider : IDatabaseProvider
             throw new DatabaseOperationException(MySqlErrorNormalizer.Normalize(exception));
         }
 
+        // Solo lectura de verdad, no un aviso: el servidor rechaza toda escritura
+        // de esta sesión, venga por donde venga —un `LOAD DATA`, un `CALL` a un
+        // procedimiento que escriba—. El analizador de SQL sigue avisando antes,
+        // pero deja de ser lo único que hay.
+        var enforced = await ApplyReadOnlyAsync(connection, profile, cancellationToken);
+
         // El identificador es aleatorio a propósito: es lo que viaja por HTTP y no
         // debe poder adivinarse (plan §12).
-        return new MySqlSession(Guid.NewGuid(), profile, credentials, connection);
+        return new MySqlSession(Guid.NewGuid(), profile, credentials, connection, enforced);
+    }
+
+    /// <summary>
+    /// Pone la sesión en solo lectura cuando el perfil lo pide.
+    ///
+    /// Devuelve si el motor se hizo cargo. Un fallo no tumba la sesión: se
+    /// responde que no está garantizado por el motor, que es la verdad, y la
+    /// interfaz lo dirá tal cual.
+    /// </summary>
+    private static async Task<bool> ApplyReadOnlyAsync(
+        MySqlConnection connection,
+        ConnectionProfile profile,
+        CancellationToken cancellationToken)
+    {
+        if (!profile.ReadOnly)
+        {
+            return false;
+        }
+
+        try
+        {
+            await using var command = connection.CreateCommand();
+
+            command.CommandText = "SET SESSION TRANSACTION READ ONLY;";
+
+            await command.ExecuteNonQueryAsync(cancellationToken);
+
+            return true;
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            return false;
+        }
     }
 
     public Task<IDatabaseSession> OpenDatabaseSessionAsync(

@@ -1,4 +1,4 @@
-using Druse.Application.Abstractions;
+﻿using Druse.Application.Abstractions;
 using Druse.Application.Connections;
 using Druse.Database.Abstractions;
 using Druse.Domain;
@@ -64,6 +64,11 @@ public sealed class QueryService(
 
         var risks = SqlSafetyAnalyzer.Analyze(request.Sql);
 
+        // El analizador para lo evidente **antes** de mandarlo al motor, que es
+        // donde ahorra el descuido. No es la frontera: lo que de verdad impide
+        // escribir es la sesión de solo lectura del motor —donde la hay— y, por
+        // encima de todo, un usuario con permisos restringidos en el servidor.
+        // Un análisis léxico no ve lo que hace por dentro un procedimiento.
         if (context.ReadOnly && SqlSafetyAnalyzer.IsMutating(request.Sql))
         {
             return new QueryRejection(

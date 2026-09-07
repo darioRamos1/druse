@@ -1,4 +1,4 @@
-using Druse.Domain;
+﻿using Druse.Domain;
 
 namespace Druse.Database.Abstractions;
 
@@ -43,6 +43,23 @@ public interface IDatabaseSession : IAsyncDisposable
 
     /// <summary>Perfil con el que se abrió. No contiene la contraseña.</summary>
     ConnectionProfile Profile { get; }
+
+    /// <summary>
+    /// Si el **motor** está impidiendo escribir por esta conexión.
+    ///
+    /// `Profile.ReadOnly` dice lo que pidió el usuario; esto dice si además hay
+    /// algo real detrás. En PostgreSQL y MySQL sí: la sesión se pone en solo
+    /// lectura y el servidor rechaza cualquier escritura, venga por donde venga
+    /// —una función con efectos laterales, un `SELECT INTO`, un procedimiento—.
+    /// SQL Server e Informix no tienen un modo de sesión equivalente, así que ahí
+    /// lo único que hay es el aviso del analizador, **que no es una frontera**:
+    /// la garantía definitiva sigue siendo un usuario con permisos restringidos
+    /// en el servidor.
+    ///
+    /// Se expone para poder decir la verdad en la interfaz. Enseñar el mismo
+    /// candado en los cuatro motores sería prometer lo que solo dos cumplen.
+    /// </summary>
+    bool ReadOnlyEnforcedByEngine { get; }
 
     string ServerVersion { get; }
 

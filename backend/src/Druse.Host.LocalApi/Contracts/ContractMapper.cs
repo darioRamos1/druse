@@ -1,4 +1,4 @@
-using Druse.Application.Abstractions;
+﻿using Druse.Application.Abstractions;
 using Druse.Application.Connections;
 using Druse.Application.Queries;
 using Druse.Application.Tables;
@@ -86,6 +86,7 @@ internal static class ContractMapper
             ServerVersion = session.ServerVersion,
             Database = session.Profile.Database,
             ReadOnly = session.Profile.ReadOnly,
+            ReadOnlyEnforcedByEngine = session.ReadOnlyEnforcedByEngine,
         };
     }
 

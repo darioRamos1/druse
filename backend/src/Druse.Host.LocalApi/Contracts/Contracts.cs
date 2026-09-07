@@ -1,4 +1,4 @@
-using Druse.Domain;
+﻿using Druse.Domain;
 
 namespace Druse.Host.LocalApi.Contracts;
 
@@ -118,6 +118,16 @@ public sealed record SessionResponse
     public required string ServerVersion { get; init; }
     public required string Database { get; init; }
     public required bool ReadOnly { get; init; }
+
+    /// <summary>
+    /// Si el motor está impidiendo escribir por su cuenta, y no solo el aviso de
+    /// Druse.
+    ///
+    /// PostgreSQL y MySQL sí; SQL Server e Informix no tienen sesiones de solo
+    /// lectura. La interfaz lo dice tal cual: enseñar el mismo candado en los
+    /// cuatro sería prometer lo que solo dos cumplen.
+    /// </summary>
+    public bool ReadOnlyEnforcedByEngine { get; init; }
 }
 
 public sealed record DatabaseObjectDto

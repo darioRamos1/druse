@@ -1,4 +1,4 @@
-using Druse.Application.Abstractions;
+﻿using Druse.Application.Abstractions;
 using Druse.Application.Connections;
 using Druse.Application.Metadata;
 using Druse.Application.Rows;
@@ -558,6 +558,9 @@ public sealed class TransferPlanTests
 
         /// <summary>No habla con ningún motor, así que no hay dónde abrir una.</summary>
         public SessionTransaction Transaction => SessionTransaction.None;
+
+        /// <summary>Los dobles no hablan con ningún motor: no hay nada que garantizar.</summary>
+        public bool ReadOnlyEnforcedByEngine => false;
 
         public ConnectionProfile Profile { get; } = new()
         {

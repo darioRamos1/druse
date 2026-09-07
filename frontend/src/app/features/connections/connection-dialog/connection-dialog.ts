@@ -212,6 +212,23 @@ export class ConnectionDialog {
   protected readonly sshSecretVisible = signal(false);
   protected readonly authentication = signal<AuthenticationMode>('password');
   protected readonly readOnly = signal(false);
+
+  /**
+   * Qué garantiza «solo lectura» en el motor elegido.
+   *
+   * PostgreSQL y MySQL tienen sesiones de solo lectura: Druse las pide y el
+   * servidor rechaza cualquier escritura, incluida la que el analizador de SQL no
+   * vería —un procedimiento que escribe por dentro, un `SELECT INTO`—. SQL Server
+   * e Informix no tienen nada equivalente, así que allí es solo un aviso.
+   *
+   * Se dice cuál de las dos cosas es. Enseñar la misma frase en los cinco casos
+   * sería prometer lo que solo dos cumplen.
+   */
+  protected readonly readOnlyHint = computed(() =>
+    this.engine() === 'postgresql' || this.engine() === 'mysql'
+      ? 'Druse pone la sesión en solo lectura: el servidor rechaza cualquier escritura.'
+      : 'Este motor no tiene sesiones de solo lectura: Druse avisa antes de ejecutar, ' +
+        'pero la garantía es un usuario con permisos restringidos en el servidor.');
   protected readonly environment = signal<ConnectionEnvironment>('development');
   protected readonly save = signal(true);
   protected readonly storePassword = signal(true);

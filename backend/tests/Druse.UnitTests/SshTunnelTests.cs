@@ -393,6 +393,9 @@ public sealed class SshTunnelTests
 
         public ConnectionProfile Profile => profile;
 
+        /// <summary>Los dobles no hablan con ningún motor: no hay nada que garantizar.</summary>
+        public bool ReadOnlyEnforcedByEngine => false;
+
         public string ServerVersion => "18.0";
 
         public bool IsOpen => !_disposed;

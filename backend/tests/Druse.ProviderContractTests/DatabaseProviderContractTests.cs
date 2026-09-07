@@ -3014,6 +3014,9 @@ public abstract class DatabaseProviderContractTests<TFixture>
         /// <summary>No habla con ningún motor, así que no hay dónde abrir una.</summary>
         public SessionTransaction Transaction => SessionTransaction.None;
 
+        /// <summary>Los dobles no hablan con ningún motor: no hay nada que garantizar.</summary>
+        public bool ReadOnlyEnforcedByEngine => false;
+
         public ConnectionProfile Profile => new()
         {
             Id = Guid.NewGuid(),

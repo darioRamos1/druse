@@ -31,6 +31,15 @@ internal sealed class InformixSession : IDatabaseSession
 
     public ConnectionProfile Profile { get; }
 
+    /// <summary>
+    /// Siempre `false`: Informix no tiene un modo de sesión de solo lectura.
+    ///
+    /// `SET ISOLATION` cambia cómo se lee, no si se puede escribir. Marcar «solo
+    /// lectura» aquí es el aviso del analizador de SQL, y la garantía de verdad
+    /// es un usuario con permisos restringidos en el servidor.
+    /// </summary>
+    public bool ReadOnlyEnforcedByEngine => false;
+
     public string ServerVersion { get; }
 
     public bool IsOpen => !_disposed && Connection.State == System.Data.ConnectionState.Open;

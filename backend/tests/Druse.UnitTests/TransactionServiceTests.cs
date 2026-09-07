@@ -1,4 +1,4 @@
-using Druse.Application.Abstractions;
+﻿using Druse.Application.Abstractions;
 using Druse.Application.Transactions;
 using Druse.Database.Abstractions;
 using Druse.Domain;
@@ -301,6 +301,9 @@ public sealed class TransactionServiceTests
         public DatabaseEngine Engine => engine;
 
         public SessionTransaction Transaction { get; } = new(connection);
+
+        /// <summary>Los dobles no hablan con ningún motor: no hay nada que garantizar.</summary>
+        public bool ReadOnlyEnforcedByEngine => false;
 
         public ConnectionProfile Profile => new()
         {

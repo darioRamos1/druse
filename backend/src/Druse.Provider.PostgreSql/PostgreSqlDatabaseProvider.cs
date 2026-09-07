@@ -14,7 +14,8 @@ internal sealed class PostgreSqlSession : IDatabaseSession
         Guid id,
         ConnectionProfile profile,
         DatabaseCredentials credentials,
-        NpgsqlConnection connection)
+        NpgsqlConnection connection,
+        bool readOnlyEnforcedByEngine)
     {
         Id = id;
         Profile = profile;
@@ -22,6 +23,7 @@ internal sealed class PostgreSqlSession : IDatabaseSession
         Connection = connection;
         Transaction = new SessionTransaction(connection);
         ServerVersion = connection.PostgreSqlVersion.ToString();
+        ReadOnlyEnforcedByEngine = readOnlyEnforcedByEngine;
     }
 
     public Guid Id { get; }
@@ -29,6 +31,9 @@ internal sealed class PostgreSqlSession : IDatabaseSession
     public DatabaseEngine Engine => DatabaseEngine.PostgreSql;
 
     public ConnectionProfile Profile { get; }
+
+    /// <summary>Aquí sí: PostgreSQL tiene sesiones de solo lectura de verdad.</summary>
+    public bool ReadOnlyEnforcedByEngine { get; }
 
     public string ServerVersion { get; }
 
@@ -133,9 +138,49 @@ public sealed class PostgreSqlDatabaseProvider : IDatabaseProvider
             throw new DatabaseOperationException(PostgreSqlErrorNormalizer.Normalize(exception));
         }
 
+        // Solo lectura de verdad, no un aviso: el servidor rechaza toda
+        // escritura de esta sesión, venga por donde venga —un `SELECT INTO`, un
+        // `COPY ... FROM`, una función que escriba por dentro—. El analizador de
+        // SQL sigue avisando antes, pero deja de ser lo único que hay.
+        var enforced = await ApplyReadOnlyAsync(connection, profile, cancellationToken);
+
         // El identificador es aleatorio a propósito: es lo que viaja por HTTP y no
         // debe poder adivinarse (plan §12).
-        return new PostgreSqlSession(Guid.NewGuid(), profile, credentials, connection);
+        return new PostgreSqlSession(Guid.NewGuid(), profile, credentials, connection, enforced);
+    }
+
+    /// <summary>
+    /// Pone la sesión en solo lectura cuando el perfil lo pide.
+    ///
+    /// Devuelve si el motor se hizo cargo. Un fallo no cierra la conexión ni
+    /// tumba la sesión: se responde que no está garantizado por el motor, que es
+    /// la verdad, y la interfaz lo dirá tal cual. Fingir lo contrario sería peor
+    /// que no tenerlo.
+    /// </summary>
+    private static async Task<bool> ApplyReadOnlyAsync(
+        NpgsqlConnection connection,
+        ConnectionProfile profile,
+        CancellationToken cancellationToken)
+    {
+        if (!profile.ReadOnly)
+        {
+            return false;
+        }
+
+        try
+        {
+            await using var command = connection.CreateCommand();
+
+            command.CommandText = "SET SESSION CHARACTERISTICS AS TRANSACTION READ ONLY;";
+
+            await command.ExecuteNonQueryAsync(cancellationToken);
+
+            return true;
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            return false;
+        }
     }
 
     public Task<IDatabaseSession> OpenDatabaseSessionAsync(
