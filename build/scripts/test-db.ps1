@@ -1,4 +1,4 @@
-#!/usr/bin/env pwsh
+﻿#!/usr/bin/env pwsh
 <#
 .SYNOPSIS
     Levanta o retira los motores desechables que usan las pruebas.
@@ -103,7 +103,27 @@ if ($Engine -in 'all', 'postgres') {
             docker exec $PostgresName createdb -U postgres druse_test_secondary 2>$null
         }
 
-        Write-Host "  PostgreSQL listo en 127.0.0.1:$PostgresPort" -ForegroundColor Green
+        # Las dos tablas que las pruebas de punta a punta dan por hechas.
+        #
+        # No las creaba nadie: se escribieron a mano en el contenedor en su día y
+        # se fueron con él. Quien levantaba los motores de cero se encontraba con
+        # el autocompletado tras un alias en rojo y el barrido de capturas parado
+        # en el diagrama, que quedaba sin nada que dibujar.
+        #
+        # `id_ciudad` apunta a `accionista` —que no tiene sentido de negocio, pero
+        # es lo que las pruebas escriben— y de paso da una relación que dibujar.
+        $semilla = @(
+            'CREATE TABLE IF NOT EXISTS accionista (id integer PRIMARY KEY, nombre text NOT NULL, participacion numeric(5,2))',
+            'CREATE TABLE IF NOT EXISTS ciudad (id integer PRIMARY KEY, nombre text NOT NULL, id_ciudad integer REFERENCES accionista (id))',
+            "INSERT INTO accionista (id, nombre, participacion) VALUES (1, 'Ana', 51.00), (2, 'Bea', 49.00) ON CONFLICT DO NOTHING",
+            "INSERT INTO ciudad (id, nombre, id_ciudad) VALUES (1, 'Guadalajara', 1), (2, 'Monterrey', 2) ON CONFLICT DO NOTHING"
+        )
+
+        foreach ($sentencia in $semilla) {
+            docker exec $PostgresName psql -U postgres -d druse_test -v ON_ERROR_STOP=1 -c $sentencia | Out-Null
+        }
+
+        Write-Host "  PostgreSQL listo en 127.0.0.1:$PostgresPort, con accionista y ciudad dentro" -ForegroundColor Green
     }
     else {
         throw "$PostgresName no respondió a tiempo."
