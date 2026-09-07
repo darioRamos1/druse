@@ -24,5 +24,7 @@ pub fn set_window_theme(app: AppHandle, theme: String) -> Result<(), String> {
         .get_webview_window("main")
         .ok_or_else(|| "No se encontró la ventana principal.".to_string())?;
 
-    window.set_theme(Some(requested)).map_err(|error| error.to_string())
+    window
+        .set_theme(Some(requested))
+        .map_err(|error| error.to_string())
 }

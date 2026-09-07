@@ -62,8 +62,8 @@ pub async fn choose_editor_background(app: AppHandle) -> Result<Option<ChosenBac
         .map_err(|_| "La selección no es un archivo local.".to_string())?;
 
     let (extension, mime) = format_of(&path)?;
-    let metadata = std::fs::metadata(&path)
-        .map_err(|error| format!("No se pudo leer la imagen: {error}"))?;
+    let metadata =
+        std::fs::metadata(&path).map_err(|error| format!("No se pudo leer la imagen: {error}"))?;
 
     if !metadata.is_file() {
         return Err("La selección no es un archivo regular.".to_string());

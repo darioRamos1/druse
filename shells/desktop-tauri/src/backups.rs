@@ -82,10 +82,7 @@ pub async fn choose_backup_folder(app: AppHandle) -> Result<Option<String>, Stri
 ///
 /// Tampoco aquí viajan los bytes: se devuelve la ruta y el proceso local lo lee.
 #[tauri::command]
-pub async fn choose_restore_source(
-    app: AppHandle,
-    folder: bool,
-) -> Result<Option<String>, String> {
+pub async fn choose_restore_source(app: AppHandle, folder: bool) -> Result<Option<String>, String> {
     let selected = if folder {
         app.dialog()
             .file()

@@ -100,7 +100,10 @@ mod tests {
         assert_eq!(safe_file_name("ventas.csv"), "ventas.csv");
         assert_eq!(safe_file_name("../../ventas.csv"), "ventas.csv");
         assert_eq!(safe_file_name("  "), "druse");
-        assert_eq!(safe_file_name("C:\\otro\\sitio\\ventas.xlsx"), "ventas.xlsx");
+        assert_eq!(
+            safe_file_name("C:\\otro\\sitio\\ventas.xlsx"),
+            "ventas.xlsx"
+        );
     }
 
     #[test]

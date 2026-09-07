@@ -189,7 +189,8 @@ fn main() {
                     // Con respuesta diferida y no con un diálogo que bloquee:
                     // esto corre en el bucle de eventos, y esperar aquí colgaría
                     // la ventana que se intenta cerrar.
-                    window.dialog()
+                    window
+                        .dialog()
                         .message(
                             "Hay una transacción abierta con cambios sin confirmar. \
                              Si cierras Druse ahora, se perderán.",

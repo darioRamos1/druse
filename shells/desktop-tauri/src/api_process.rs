@@ -222,10 +222,7 @@ pub fn locate_api(resource_dir: &Path) -> Option<PathBuf> {
         "Druse.Host.LocalApi"
     };
 
-    let candidates = [
-        resource_dir.join(name),
-        resource_dir.join("api").join(name),
-    ];
+    let candidates = [resource_dir.join(name), resource_dir.join("api").join(name)];
 
     candidates.into_iter().find(|path| path.exists())
 }
