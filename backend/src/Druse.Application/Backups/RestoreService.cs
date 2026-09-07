@@ -34,6 +34,17 @@ public sealed record RestoreRequest
     /// sería sobrescribirla creyendo que se está copiando.
     /// </summary>
     public string? NewDatabase { get; init; }
+
+    /// <summary>
+    /// La huella que devolvió la inspección de este mismo artefacto.
+    ///
+    /// Es la forma de decir «aplica **esto**, lo que miré» en vez de «aplica lo
+    /// que haya en esa ruta». Entre mirar y aceptar cabe cualquier cosa: que el
+    /// archivo se sobrescriba, que la carpeta se llene con otro respaldo. Sin
+    /// ella no se restaura: no hay forma de saber si lo que hay delante es lo que
+    /// se aprobó.
+    /// </summary>
+    public string? Fingerprint { get; init; }
 }
 
 /// <summary>
@@ -129,7 +140,22 @@ public sealed partial class RestoreService(
             }
         }
 
+        var collisions = rejections.Count > 0
+            ? new CollisionReport([], Known: true)
+            : await CollisionsAsync(sessionId, summary.Tables, cancellationToken);
+
         var warnings = new List<BackupWarning>(summary.Manifest?.Warnings ?? []);
+
+        // Sin catálogo no se sabe qué hay al otro lado. Se dice, porque la
+        // alternativa es que la pantalla enseñe «no se sobrescribe nada» sin que
+        // nadie lo haya comprobado.
+        if (!collisions.Known)
+        {
+            warnings.Add(new BackupWarning(
+                string.Empty,
+                "No se pudo leer el catálogo del destino: no se sabe qué tablas de este " +
+                "respaldo ya existen ahí ni qué se va a sobrescribir."));
+        }
 
         if (summary.Manifest is null)
         {
@@ -175,13 +201,12 @@ public sealed partial class RestoreService(
             Manifest = summary.Manifest,
             Statements = summary.Statements,
             Tables = summary.Tables,
-            Collisions = rejections.Count > 0
-                ? []
-                : await CollisionsAsync(sessionId, summary.Tables, cancellationToken),
+            Collisions = collisions.Collisions,
             Rejections = rejections,
             Warnings = warnings,
             SourceDatabase = summary.Manifest?.Database,
             Databases = await DatabasesAsync(sessionId, cancellationToken),
+            Fingerprint = ArtifactFingerprint.Of(path),
         };
     }
 
@@ -249,6 +274,26 @@ public sealed partial class RestoreService(
         // el total, la única opción sería una barra indeterminada durante media
         // hora. Se paga una lectura entera del archivo, que es barata al lado de
         // ejecutarlo.
+        // Lo que se aplica tiene que ser lo que se miró. Entre inspeccionar y
+        // aceptar cabe cualquier cosa —sobrescribir el archivo, dejar otro
+        // respaldo en la carpeta—, y lo que se aplicaría entonces sería algo que
+        // nadie aprobó, sobre una base de verdad.
+        var fingerprint = ArtifactFingerprint.Of(request.Path);
+
+        if (string.IsNullOrWhiteSpace(request.Fingerprint))
+        {
+            throw new InvalidOperationException(
+                "Falta la huella del artefacto inspeccionado. Vuelve a inspeccionarlo antes de " +
+                "restaurar: sin ella no se puede saber si lo que hay ahí es lo que se aprobó.");
+        }
+
+        if (!string.Equals(request.Fingerprint, fingerprint, StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException(
+                "El artefacto cambió después de inspeccionarlo: no es el mismo que se aprobó. " +
+                "Vuelve a inspeccionarlo para ver qué hay ahí ahora.");
+        }
+
         var total = await CountAsync(archive, cancellationToken);
 
         state.Total(total);
@@ -494,14 +539,14 @@ public sealed partial class RestoreService(
     /// Se leen del catálogo y no se pregunta tabla a tabla: son dos lecturas del
     /// árbol frente a una consulta por nombre, y el árbol ya está cacheado.
     /// </summary>
-    private async Task<IReadOnlyList<RestoreCollision>> CollisionsAsync(
+    private async Task<CollisionReport> CollisionsAsync(
         Guid sessionId,
         IReadOnlyList<string> tables,
         CancellationToken cancellationToken)
     {
         if (tables.Count == 0)
         {
-            return [];
+            return new CollisionReport([], Known: true);
         }
 
         var existing = new Dictionary<string, DatabaseObject>(StringComparer.OrdinalIgnoreCase);
@@ -519,10 +564,11 @@ public sealed partial class RestoreService(
         }
         catch (Exception error) when (error is not OperationCanceledException)
         {
-            // Sin catálogo se restaura igual: no poder avisar de lo que se
-            // sobrescribe no es motivo para impedirlo, pero tampoco se finge que
-            // no hay nada.
-            return [];
+            // Sin catálogo se restaura igual —no poder avisar de lo que se
+            // sobrescribe no es motivo para impedirlo— pero **no se dice que no
+            // haya nada**: una lista vacía y «no se pudo mirar» se leen igual en
+            // la pantalla, y solo una de las dos es cierta.
+            return new CollisionReport([], Known: false);
         }
 
         // Se empareja con la misma tolerancia que al meter datos: el artefacto
@@ -530,17 +576,30 @@ public sealed partial class RestoreService(
         // la base y no viaja con el respaldo— y aun así estar hablando de una que
         // ya existe aquí. Compararlo por clave exacta diría «no hay nada que
         // sobrescribir» justo antes de sobrescribirlo.
-        return
-        [
-            .. tables
-                .Select(table => (Name: table, Match: existing.Values.FirstOrDefault(
-                    candidate => Matches(DataSelection.KeyOf(candidate), table))))
-                .Where(pair => pair.Match is not null)
-                .Select(pair => new RestoreCollision(
-                    pair.Name,
-                    pair.Match!.ApproximateRowCount)),
-        ];
+        return new CollisionReport(
+            [
+                .. tables
+                    .Select(table => (Name: table, Match: existing.Values.FirstOrDefault(
+                        candidate => Matches(DataSelection.KeyOf(candidate), table))))
+                    .Where(pair => pair.Match is not null)
+                    .Select(pair => new RestoreCollision(
+                        pair.Name,
+                        pair.Match!.ApproximateRowCount)),
+            ],
+            Known: true);
     }
+
+    /// <summary>
+    /// Qué se va a sobrescribir, **y si se pudo saber**.
+    ///
+    /// Las dos cosas viajan juntas porque separadas se confunden: una lista vacía
+    /// puede significar «no hay nada que pisar» o «no se pudo mirar el catálogo»,
+    /// y quien decide restaurar sobre una base de verdad necesita saber cuál de
+    /// las dos es.
+    /// </summary>
+    private readonly record struct CollisionReport(
+        IReadOnlyList<RestoreCollision> Collisions,
+        bool Known);
 
     /// <summary>Hasta dónde se baja por el árbol buscando tablas.</summary>
     private const int MaxDepth = 6;

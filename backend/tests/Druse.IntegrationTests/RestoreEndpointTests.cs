@@ -119,9 +119,19 @@ public sealed class RestoreEndpointTests(DruseApiFactory factory) : IClassFixtur
     }
 
     /// <summary>Lanza la restauración y espera a que termine.</summary>
+    /// <summary>
+    /// Restaura y espera al final, poniendo la huella si quien llama no la puso.
+    ///
+    /// La huella la exige el proceso local: sale de inspeccionar el artefacto y es
+    /// lo que le dice «aplica esto, lo que acabo de mirar». Aquí se hace lo mismo
+    /// que hace la interfaz —inspeccionar y devolverla— para que cada prueba no
+    /// tenga que repetirlo; las que comprueban **la exigencia** la pasan a mano.
+    /// </summary>
     private static async Task<JsonElement> RestoreAsync(HttpClient client, object request)
     {
-        using var started = await client.PostAsJsonAsync("/api/restore/run", request);
+        var body = await WithFingerprintAsync(client, request);
+
+        using var started = await client.PostAsJsonAsync("/api/restore/run", body);
 
         started.EnsureSuccessStatusCode();
 
@@ -148,6 +158,34 @@ public sealed class RestoreEndpointTests(DruseApiFactory factory) : IClassFixtur
         Assert.Fail("La restauración no terminó a tiempo.");
 
         return default;
+    }
+
+    /// <summary>
+    /// Completa la petición con la huella del artefacto, si no la trae.
+    ///
+    /// Se pasa por JSON y vuelta porque las pruebas construyen objetos anónimos
+    /// de formas distintas: así vale para todas sin repetir sus campos.
+    /// </summary>
+    private static async Task<Dictionary<string, JsonElement>> WithFingerprintAsync(
+        HttpClient client,
+        object request)
+    {
+        var body = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(
+            JsonSerializer.Serialize(request))!;
+
+        if (body.ContainsKey("fingerprint"))
+        {
+            return body;
+        }
+
+        var inspection = await InspectAsync(
+            client,
+            body["sessionId"].GetGuid(),
+            body["path"].GetString()!);
+
+        body["fingerprint"] = inspection.GetProperty("fingerprint");
+
+        return body;
     }
 
     private static async Task<JsonElement> InspectAsync(HttpClient client, Guid session, string path)
@@ -796,6 +834,130 @@ public sealed class RestoreEndpointTests(DruseApiFactory factory) : IClassFixtur
                 Directory.Delete(root, recursive: true);
             }
         }
+    }
+
+    /// <summary>
+    /// Entre mirar el artefacto y aceptar restaurarlo cabe cualquier cosa: que el
+    /// archivo se sobrescriba, que alguien deje otro respaldo en esa ruta. Lo que
+    /// se aplicaría entonces sería algo que nadie aprobó, sobre una base de
+    /// verdad.
+    ///
+    /// Por eso la inspección devuelve una huella y la restauración la exige. Aquí
+    /// se comprueban los dos casos que importan: que sin ella no se restaura, y
+    /// que con una de antes del cambio tampoco.
+    /// </summary>
+    [RequiresPostgreSqlFact]
+    public async Task ElArtefactoQueCambioDespuesDeInspeccionarlo_NoSeAplica()
+    {
+        using var client = _factory.CreateAuthenticatedClient();
+
+        var session = await OpenAsync(client, Postgres, Postgres.Database);
+
+        if (session is null) { return; }
+
+        var suffix = Guid.NewGuid().ToString("N")[..8];
+        var tabla = $"druse_fp_{suffix}";
+        var root = Path.Combine(Path.GetTempPath(), $"druse-fp-{suffix}");
+        var path = Path.Combine(root, "respaldo.sql");
+
+        Directory.CreateDirectory(root);
+
+        try
+        {
+            await File.WriteAllTextAsync(
+                path,
+                $"CREATE TABLE {tabla} (id integer PRIMARY KEY);\n" +
+                "-- Respaldo generado por Druse\n" +
+                "-- Motor: PostgreSql 18.0\n");
+
+            var inspection = await InspectAsync(client, session.Value, path);
+            var huella = inspection.GetProperty("fingerprint").GetString();
+
+            Assert.False(string.IsNullOrWhiteSpace(huella));
+
+            // --- Sin huella no se restaura ----------------------------------
+            using (var sinHuella = await client.PostAsJsonAsync(
+                "/api/restore/run",
+                new { sessionId = session.Value, path, fingerprint = string.Empty }))
+            {
+                var estado = await WaitOrRejectAsync(client, sinHuella);
+
+                Assert.Contains("huella", estado, StringComparison.OrdinalIgnoreCase);
+            }
+
+            // --- Y con una de antes del cambio, tampoco ---------------------
+            // Se espera un instante para que la fecha de modificación cambie de
+            // verdad: en Windows tiene grano suficiente, pero no infinito.
+            await Task.Delay(1100);
+
+            await File.AppendAllTextAsync(path, $"DROP TABLE {tabla};\n");
+
+            using (var conHuellaVieja = await client.PostAsJsonAsync(
+                "/api/restore/run",
+                new { sessionId = session.Value, path, fingerprint = huella }))
+            {
+                var estado = await WaitOrRejectAsync(client, conHuellaVieja);
+
+                Assert.Contains("cambió", estado, StringComparison.OrdinalIgnoreCase);
+            }
+
+            // Y no llegó a tocarse la base: la tabla del artefacto no existe.
+            var existe = await RunSqlAsync(
+                client,
+                session.Value,
+                $"SELECT to_regclass('{tabla}') IS NULL AS ausente");
+
+            Assert.Equal(
+                "True",
+                existe.GetProperty("resultSets")[0].GetProperty("rows")[0][0].GetString(),
+                ignoreCase: true);
+        }
+        finally
+        {
+            await CleanAsync(client, session.Value, $"DROP TABLE IF EXISTS {tabla}");
+
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+    }
+
+    /// <summary>
+    /// El motivo del rechazo, venga como respuesta o como estado final.
+    ///
+    /// Una restauración que ni siquiera arranca contesta 400; una que arranca y se
+    /// planta lo cuenta en su estado. Las dos son «no se aplicó», y lo que la
+    /// prueba quiere leer es el porqué.
+    /// </summary>
+    private static async Task<string> WaitOrRejectAsync(
+        HttpClient client,
+        HttpResponseMessage response)
+    {
+        var body = await response.Content.ReadAsStringAsync();
+
+        if (!response.IsSuccessStatusCode)
+        {
+            return body;
+        }
+
+        var id = JsonSerializer.Deserialize<JsonElement>(body).GetProperty("id").GetGuid();
+
+        for (var attempt = 0; attempt < 200; attempt++)
+        {
+            using var status = await client.GetAsync($"/api/restore/{id}/status");
+
+            var progress = await status.Content.ReadFromJsonAsync<JsonElement>();
+
+            if (progress.GetProperty("outcome").GetString() != "Running")
+            {
+                return progress.ToString();
+            }
+
+            await Task.Delay(50);
+        }
+
+        return "no terminó a tiempo";
     }
 
     /// <summary>

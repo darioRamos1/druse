@@ -821,6 +821,14 @@ export interface RestoreRequest {
   readonly newDatabase?: string;
   /** Instrucción desde la que se sigue. Cero es empezar de nuevo. */
   readonly resumeFrom?: number;
+  /**
+   * La huella que devolvió la inspección de este artefacto.
+   *
+   * Sin ella el proceso local no restaura: es lo que distingue «aplica esto, que
+   * lo he mirado» de «aplica lo que haya en esa ruta». Entre inspeccionar y
+   * aceptar cabe que el archivo cambie.
+   */
+  readonly fingerprint?: string;
 }
 
 /** Una tabla del artefacto que ya existe en el destino. */
@@ -857,6 +865,8 @@ export interface RestoreManifest {
 export interface RestoreInspection {
   readonly path: string;
   readonly layout: BackupLayout;
+  /** Huella de este artefacto al mirarlo. Se devuelve al restaurar. */
+  readonly fingerprint: string;
   readonly compressed: boolean;
   readonly manifest?: RestoreManifest;
   readonly statements: number;

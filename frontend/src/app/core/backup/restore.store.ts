@@ -116,10 +116,19 @@ export class RestoreStore {
   async start(request: RestoreRequest): Promise<void> {
     this._error.set(null);
 
-    const total = this._inspection()?.statements ?? 0;
+    const inspection = this._inspection();
+    const total = inspection?.statements ?? 0;
 
     try {
-      const id = await firstValueFrom(this._gateway.runRestore(request));
+      // La huella va siempre, y sale de la inspección que el usuario tiene
+      // delante: es lo que le dice al proceso local «aplica **esto**, lo que
+      // acabo de mirar». Si el artefacto cambió entre medias, se planta.
+      const id = await firstValueFrom(
+        this._gateway.runRestore({
+          ...request,
+          fingerprint: request.fingerprint ?? inspection?.fingerprint,
+        }),
+      );
 
       this._progress.set({
         id,

@@ -1,4 +1,4 @@
-namespace Druse.Domain;
+﻿namespace Druse.Domain;
 
 /// <summary>En qué anda una restauración.</summary>
 public enum RestoreStep
@@ -80,6 +80,25 @@ public sealed record RestoreInspection
 
     /// <summary>Cómo está repartido: un archivo, una carpeta o un `.zip`.</summary>
     public required BackupLayout Layout { get; init; }
+
+    /// <summary>
+    /// Huella de **este** artefacto, tal y como estaba al mirarlo.
+    ///
+    /// Quien restaura la devuelve, y si para entonces el artefacto ya no es el
+    /// mismo, la restauración se para. Sin esto, entre mirar y aceptar cabe
+    /// cualquier cosa: el archivo se sobrescribe, la carpeta se llena con otro
+    /// respaldo, alguien mueve un `.zip` a esa ruta. Lo que se aplicaría sería
+    /// otra cosa distinta de la que se aprobó, sobre una base de verdad.
+    ///
+    /// **No es un hash del contenido.** Un respaldo puede ocupar gigabytes y
+    /// leerlo entero dos veces para eso sería pagar minutos por cada
+    /// restauración: se resume lo que identifica al artefacto —qué archivos lo
+    /// forman, cuánto ocupan y cuándo se tocaron—. Detecta lo que pasa de verdad;
+    /// no detectaría una edición que dejara el tamaño y la fecha intactos, y eso
+    /// ya no es un descuido sino alguien intentándolo a propósito, contra lo que
+    /// protegen los permisos del sistema de archivos.
+    /// </summary>
+    public string Fingerprint { get; init; } = string.Empty;
 
     public bool Compressed { get; init; }
 

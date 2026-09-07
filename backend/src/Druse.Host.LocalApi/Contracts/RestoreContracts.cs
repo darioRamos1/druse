@@ -1,4 +1,4 @@
-using Druse.Domain;
+﻿using Druse.Domain;
 
 namespace Druse.Host.LocalApi.Contracts;
 
@@ -20,6 +20,14 @@ public sealed record RestoreRequestDto
 
     /// <summary>Instrucción desde la que se sigue. Cero es empezar de nuevo.</summary>
     public int ResumeFrom { get; init; }
+
+    /// <summary>
+    /// La huella que devolvió la inspección de este artefacto.
+    ///
+    /// Sin ella no se restaura: es lo que distingue «aplica esto, que lo he
+    /// mirado» de «aplica lo que haya en esa ruta».
+    /// </summary>
+    public string? Fingerprint { get; init; }
 
     /// <summary>
     /// Nombre de una base **nueva** donde volcar el respaldo.
@@ -77,6 +85,14 @@ public sealed record RestoreInspectionDto
     public required string Path { get; init; }
 
     public required string Layout { get; init; }
+
+    /// <summary>
+    /// Huella de este artefacto tal y como estaba al mirarlo.
+    ///
+    /// Hay que devolverla al restaurar: es lo que impide aplicar algo distinto de
+    /// lo que se aprobó.
+    /// </summary>
+    public string Fingerprint { get; init; } = string.Empty;
 
     public bool Compressed { get; init; }
 
@@ -150,6 +166,7 @@ internal static class RestoreMapper
         {
             Path = inspection.Path,
             Layout = inspection.Layout.ToString(),
+            Fingerprint = inspection.Fingerprint,
             Compressed = inspection.Compressed,
             Manifest = inspection.Manifest is { } manifest
                 ? new RestoreManifestDto

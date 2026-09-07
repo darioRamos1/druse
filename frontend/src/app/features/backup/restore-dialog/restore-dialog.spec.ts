@@ -32,6 +32,9 @@ const database: ExplorerNode = {
 const limpio: RestoreInspection = {
   path: 'C:/respaldos/tienda.sql',
   layout: 'SingleFile',
+  // La huella del artefacto tal y como estaba al mirarlo: se devuelve al
+  // restaurar, y sin ella el proceso local no aplica nada.
+  fingerprint: 'HUELLA-DE-PRUEBA',
   compressed: false,
   manifest: {
     formatVersion: 1,

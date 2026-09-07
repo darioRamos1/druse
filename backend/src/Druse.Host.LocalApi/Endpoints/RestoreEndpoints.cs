@@ -101,6 +101,7 @@ internal static class RestoreEndpoints
                                 Path = request.Path,
                                 ResumeFrom = request.ResumeFrom,
                                 NewDatabase = request.NewDatabase,
+                                Fingerprint = request.Fingerprint,
                             },
                             progress,
                             cancellationToken);
