@@ -234,11 +234,11 @@ sin control ni artefactos con apariencia válida.
 
 ### Segunda entrega durable
 
-- [ ] **JOB-005:** sustituir los `Task.Run` de endpoints por una cola administrada y un `BackgroundService`.
-- [ ] **JOB-006:** crear scopes de DI por trabajo y no conservar servicios del scope HTTP.
-- [ ] **JOB-007:** persistir identificador, tipo, estado, progreso y resultado de cada trabajo en SQLite.
-- [ ] **JOB-008:** marcar como interrumpido cualquier trabajo que estuviera activo al arrancar de nuevo.
-- [ ] **JOB-009:** definir qué operaciones pueden reanudarse y cuáles deben reiniciarse desde cero.
+- [x] **JOB-005:** sustituir los `Task.Run` de endpoints por una cola administrada y un `BackgroundService`.
+- [x] **JOB-006:** crear scopes de DI por trabajo y no conservar servicios del scope HTTP.
+- [x] **JOB-007:** persistir identificador, tipo, estado, progreso y resultado de cada trabajo en SQLite.
+- [x] **JOB-008:** marcar como interrumpido cualquier trabajo que estuviera activo al arrancar de nuevo.
+- [x] **JOB-009:** definir qué operaciones pueden reanudarse y cuáles deben reiniciarse desde cero.
 - [x] **JOB-010:** corregir el progreso de transferencias atómicas para no contar como copiadas filas que acabaron en rollback.
 
 > Estado al 7 de septiembre de 2026: **la primera entrega está cerrada y vista
@@ -248,13 +248,17 @@ sin control ni artefactos con apariencia válida.
 > aplica la misma regla. La API deja de morir a la fuerza: se le pide el apagado
 > por HTTP y matarla queda para cuando no responde o no acepta.
 >
-> De la segunda entrega solo está **JOB-010**, que no dependía del rediseño: un
-> traslado «todo o nada» que falla informaba las filas que el motor acababa de
-> deshacer. **JOB-005 a JOB-009 siguen abiertas** y son otra cosa: cola
-> administrada, `BackgroundService`, scopes de DI por trabajo y estado en SQLite.
-> Con eso llega el criterio que falta —«reiniciar Druse permite conocer que un
-> trabajo anterior fue interrumpido»—, y también la decisión de qué se reanuda y
-> qué se reinicia desde cero.
+> **La segunda entrega también está.** Los `Task.Run` de los endpoints pasan a
+> una cola con un `BackgroundService`: cada trabajo recibe su propio scope de
+> servicios —antes se llevaban los de la petición HTTP y los usaban horas después
+> de que ese scope cerrara— y un token que se cancela al apagar la API. Cada uno
+> queda anotado en SQLite, y lo que siga «en marcha» al arrancar se marca como
+> interrumpido y se enseña en la barra de estado. Qué hacer con uno de esos
+> —repetir, reanudar o repetir entero— está escrito en `JobKind` y en el plan de
+> respaldos: Druse dice qué quedó a medias, y decide quien mira su base.
+>
+> Lo único que no se automatiza es la reanudación en sí, y es a propósito: es la
+> clase de decisión que no se toma por el usuario.
 
 ### Criterios de aceptación
 

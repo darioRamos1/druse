@@ -17,12 +17,12 @@
 | Fase 8 | ✅ **7/7.** Tres motores sobre el mismo contrato y primera beta preparada. |
 | ¿Compila el backend? | Sí — 0 advertencias, 0 errores |
 | ¿Compila el envoltorio? | Sí — recompilado en la 037 con `build/scripts/msvc-env.ps1` cargado antes; sin él, `cargo` falla en `vswhom-sys` por elegir el MSVC equivocado. **Sus pruebas ya son 17**, con las dos que vigilan la CSP y las cuatro de `DRUSE_DATA_DIR` |
-| ¿Pasan las pruebas? | Sí. En la **042**: **958 del backend** con PostgreSQL levantado —534 unitarias, 157 de integración de 160 y 267 contractuales—, **791 del frontend** y **23 del envoltorio**, con `cargo fmt --check` y `clippy -- -D warnings` limpios. En la **041** el comando de siempre pasó de ejecutar **cero** pruebas a ejecutarlas todas. Las contractuales salen verdes **sin los otros tres motores delante**: sin `DRUSE_REQUIRE_ENGINES=1` cada prueba termina sin comprobar nada cuando el servidor no responde. El `DATE` de Informix por SQLI de la 039 sigue sin repetirse: hace falta ese contenedor |
+| ¿Pasan las pruebas? | Sí. En la **042**: **964 del backend** con PostgreSQL levantado —539 unitarias, 158 de integración de 161 y 267 contractuales—, **792 del frontend** y **23 del envoltorio**, con `cargo fmt --check` y `clippy -- -D warnings` limpios. En la **041** el comando de siempre pasó de ejecutar **cero** pruebas a ejecutarlas todas. Las contractuales salen verdes **sin los otros tres motores delante**: sin `DRUSE_REQUIRE_ENGINES=1` cada prueba termina sin comprobar nada cuando el servidor no responde. El `DATE` de Informix por SQLI de la 039 sigue sin repetirse: hace falta ese contenedor |
 | ¿Hay aplicación de escritorio? | **Sí.** Instalador NSIS y ZIP portable, en dos variantes: con Informix y sin él. Desde la 038 **se actualiza sola** —o lo hará: ver el aviso del repositorio privado en §9—. El MSI dejó de generarse: `tauri.conf.json` solo declara `nsis`, que es lo que necesita el actualizador. En la **040** se regeneraron los instaladores y **la variante completa quedó instalada y abierta en este equipo**, con el arreglo del envoltorio dentro. Siguen **sin firma Authenticode**: SmartScreen en cada equipo |
 | Motores | **PostgreSQL, SQL Server, MySQL/MariaDB e Informix**, sobre el mismo contrato. Informix tiene **dos entradas**: por DRDA con el driver de IBM (puerto 9089) y por **SQLI**, su protocolo nativo, con el puente JDBC (9088). Cambia por dónde se entra; el SQL, el catálogo y los tipos son los mismos |
 | Trabajo a medias | **Nada sin commitear.** De la 041 queda `PLAN_MEJORAS_DRUSE.md` con las fases 0 y 1 marcadas y el resto por hacer. Sin comprobar: las contractuales de la lectura en lote contra los cuatro motores desde la 039, **el multicursor dentro de la ventana empaquetada**, y de antes —**el diálogo del sistema y el selector de carpeta siguen sin verse abrir**, y **el actualizador no puede funcionar mientras el repositorio sea privado** (ver §9) |
 | Bloqueantes | Ninguno para seguir programando. Sí para dar por buenos cuatro motores y cuatro funciones: ver «Qué toca retomar». |
-| Git | El **PR #9 se fusionó** (sesión 022). Se trabaja en `feat/respaldos-y-restauracion`, con todo subido: las 024–027 en `1452a6c`, las 028–031 en `640151c`, las 032–036 de `d3ac0d5` a `35d192e`, la 037 de `4ba8cce` a `20727eb`, la **038** en `a455be7`, `4c6f74a`, `55711f0` y `93f7f26`, la **039** hasta `5c2d09b`, y la **040** en `80da9f6`, `03c3478`, `a04c706`, `117b15f`, `2946156` y `2d52c8e`, la **041** en `64c2adf`, `203b771`, `6d31a86`, `5a924c6`, `8bcf83a`, `f4f683e` y `f65cd73`, y la **042** en `0ae38fa`, `120485f` y `2a6f151`, ya sobre `main` |
+| Git | El **PR #9 se fusionó** (sesión 022). Se trabaja en `feat/respaldos-y-restauracion`, con todo subido: las 024–027 en `1452a6c`, las 028–031 en `640151c`, las 032–036 de `d3ac0d5` a `35d192e`, la 037 de `4ba8cce` a `20727eb`, la **038** en `a455be7`, `4c6f74a`, `55711f0` y `93f7f26`, la **039** hasta `5c2d09b`, y la **040** en `80da9f6`, `03c3478`, `a04c706`, `117b15f`, `2946156` y `2d52c8e`, la **041** en `64c2adf`, `203b771`, `6d31a86`, `5a924c6`, `8bcf83a`, `f4f683e` y `f65cd73`, y la **042** en `0ae38fa`, `120485f`, `2a6f151` y `837cbb6`, ya sobre `main` |
 | Integración continua | 🔴 **Parada, y no por el código.** GitHub aborta los jobs en dos segundos: «recent account payments have failed or your spending limit needs to be increased». Hasta resolver la facturación, ningún PR podrá pasar los checks. Lo que sí cambió en la **041**: cuando vuelva a correr, **ejecutará pruebas de verdad** —hasta ahora el job del backend terminaba en verde sin ejecutar ninguna—, y publicar exige que el commit tenga su ejecución de CI en verde. |
 
 ### Qué toca retomar en la próxima sesión
@@ -37,9 +37,9 @@ publicar los artefactos en otro sitio.
 
 #### Lo que deja abierta la 042
 
-1. **La segunda entrega de la fase 2** (JOB-005 a JOB-009): cola administrada,
-   `BackgroundService`, scopes de DI por trabajo y estado en SQLite. Es lo que
-   falta para saber, al volver a abrir Druse, que un trabajo quedó interrumpido.
+1. **La fase 3 del plan de mejoras**: seguridad. Modo solo lectura nativo del
+   motor, TLS que verifique de verdad y exigir el hash del artefacto
+   inspeccionado antes de restaurarlo.
 2. **El aviso al cerrar, en la aplicación instalada.** Se vio salir en la ventana
    de `cargo tauri dev`, que es el mismo WebView2; el instalador no se ha
    regenerado con esto dentro.
@@ -436,19 +436,42 @@ nada, así que ahora se lee el código de la respuesta: si no es 2xx, se mata si
 esperar. De paso quedó comprobado que el token viaja bien —un token malo habría
 dado 401 antes de llegar al enrutador—.
 
-**No hecho.** **JOB-005 a JOB-009**: cola administrada, `BackgroundService`,
-scopes de DI por trabajo y estado en SQLite. Es lo que falta para el criterio
-«reiniciar Druse permite conocer que un trabajo anterior fue interrumpido», y
-lleva consigo decidir qué se reanuda y qué se reinicia desde cero.
+#### Y los trabajos largos dejan de colgar de la petición que los pidió
 
-**Pruebas.** 958 del backend con PostgreSQL levantado —534 unitarias, 157 de
-integración de 160 y 267 contractuales—, **791 del frontend** —cuatro nuevas del
-servicio de trabajos en marcha— y **23 del envoltorio**, con `fmt` y `clippy`
-limpios.
+Cada endpoint lanzaba su `Task.Run` y se iba. Ese hilo se llevaba **los servicios
+del scope de la petición HTTP** —el de respaldo, el de conexiones, los almacenes
+de SQLite— y los seguía usando durante horas, con ese scope ya cerrado. Ahora hay
+una cola con un `BackgroundService`: cada trabajo recibe su propio scope y un
+token que se cancela también al apagar la API. **No se serializan**: arrancan en
+cuanto llegan, como antes; lo que cambia es que alguien los conoce y los espera.
+
+Y quedan anotados en SQLite —qué era, sobre qué, cuándo y cómo acabó; ni
+credenciales, ni SQL, ni filas—. Al arrancar, lo que siga figurando «en marcha»
+se marca **interrumpido**: si nadie escribió su final, el cierre anterior se lo
+llevó por delante. La barra de estado lo dice al volver a abrir, con el detalle
+en el tooltip, y se descarta al pulsarlo.
+
+Qué hacer con uno de esos no lo decide Druse: un respaldo se repite, una
+restauración se reanuda con `ResumeFrom` y un traslado depende de si era «todo o
+nada». Está escrito en `JobKind` y en el plan de respaldos.
+
+**Comprobado con la API de verdad**: se dejó un trabajo «en marcha» en la base,
+se mató el proceso y al reabrir apareció como interrumpido en `/api/jobs`, con su
+línea en el log. Y el aviso se vio en la barra de estado del navegador, con su
+texto y su tooltip, y desapareció al pulsarlo. **No entra en el barrido de
+capturas**: para que salga hay que dejar un trabajo a medias en la base, y eso el
+barrido no lo puede fabricar sin escribir en el SQLite por su cuenta.
+
+**Pruebas.** 964 del backend con PostgreSQL levantado —539 unitarias, 158 de
+integración de 161 y 267 contractuales—, **792 del frontend** y **23 del
+envoltorio**, con `fmt` y `clippy` limpios.
 
 **Archivos.** `shells/desktop-tauri/src/{pending_work.rs,api_process.rs,main.rs,updates.rs}`,
-`Program.cs`, `Transfers/TransferService.cs`, `core/jobs/running-jobs.service.ts`,
-`core/files/pending-work.service.ts`, `desktop-host.ts`, `app-shell.ts` y sus
+`Program.cs`, `DependencyInjection.cs`, `Jobs/JobRunner.cs`,
+`Abstractions/IBackgroundJobs.cs`, `SqliteJobStore.cs`, `DruseDatabase.cs`, los
+tres endpoints de trabajos largos, `Transfers/TransferService.cs`,
+`core/jobs/running-jobs.service.ts`, `core/files/pending-work.service.ts`,
+`desktop-host.ts`, `application-gateway.ts`, `status-bar.*`, `app-shell.ts` y sus
 pruebas.
 
 **Estado al cerrar.** Commiteado en `main`.
