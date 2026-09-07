@@ -414,7 +414,7 @@ no solamente validaciones visuales.
 - [ ] **FE-002:** separar primero sesiones/transacciones, pestañas, explorador y ejecución de consultas.
 - [ ] **FE-003:** extraer de `AppShell` la coordinación de diálogos y comandos.
 - [ ] **FE-004:** activar `strict` y `strictTemplates` de manera incremental.
-- [ ] **FE-005:** añadir scripts verificables de formato y lint.
+- [x] **FE-005:** añadir scripts verificables de formato y lint. _(Formato hecho y comprobado en CI; **el lint no**: no hay ESLint en el proyecto y añadirlo es una dependencia nueva más triar lo que saque la primera pasada, que es una decisión de proyecto.)_
 - [x] **FE-006:** corregir la etiqueta de versión que muestra Informix como MySQL.
 
 ### Backend
@@ -428,7 +428,7 @@ no solamente validaciones visuales.
 
 - [ ] **A11Y-001:** dar semántica completa `grid` o `table` a la cuadrícula de resultados.
 - [ ] **A11Y-002:** permitir seleccionar y redimensionar columnas con teclado.
-- [ ] **A11Y-003:** añadir valores ARIA al separador de tamaño.
+- [x] **A11Y-003:** añadir valores ARIA al separador de tamaño. _(Ya estaba: `app-resize-handle` lleva `role`, `aria-orientation`, `aria-valuenow/min/max`, `tabindex` y las flechas. Comprobado el 7 de septiembre de 2026; la tarea estaba desactualizada.)_
 - [x] **A11Y-004:** implementar foco inicial, trampa, Escape y restauración de foco en todos los diálogos.
 - [ ] **A11Y-005:** probar navegación completa sin ratón y con lector de pantalla.
 
@@ -450,9 +450,12 @@ no solamente validaciones visuales.
 > **Lo que queda es lo grande y lo que hay que mirar:** FE-001 a FE-003 son
 > extracciones de `WorkspaceStore` y `AppShell` que no pueden hacerse a medias;
 > FE-004 (`strict` y `strictTemplates`) es incremental y ruidoso; BE-001 y BE-002
-> son lo mismo en el backend. A11Y-001 a A11Y-003 tocan la cuadrícula de
+> son lo mismo en el backend. A11Y-001 y A11Y-002 tocan la cuadrícula de
 > resultados, que es el componente más delicado que hay. Y A11Y-005 no es
 > programar: es sentarse con un lector de pantalla.
+>
+> **A11Y-003 estaba desactualizada**: el separador ya llevaba sus valores ARIA y
+> sus flechas. Comprobado, no escrito.
 
 ### Criterios de aceptación
 
@@ -524,7 +527,7 @@ cerró en la 027 y trataba defectos de maquetación.
 
 ### Lo que se repite
 
-- [ ] **UX-005:** `Ln 1, Col 1` y `UTF-8` aparecen **dos veces**: en la fila de
+- [x] **UX-005:** `Ln 1, Col 1` y `UTF-8` aparecen **dos veces**: en la fila de
       pestañas y en la barra de estado. Elegir un sitio.
 - [ ] **UX-006:** el motor, la base y el usuario se dicen en la barra del editor
       y otra vez en la de estado. Lo mismo.
@@ -535,10 +538,10 @@ cerró en la 027 y trataba defectos de maquetación.
 
 ### Lo que no dice lo que debería
 
-- [ ] **UX-008:** en «Migrar tablas» cada fila enseña «~ filas» sin número cuando
+- [x] **UX-008:** en «Migrar tablas» cada fila enseña «~ filas» sin número cuando
       el catálogo no tiene la estimación. Un hueco con tilde no informa: o va la
       cifra, o no va nada.
-- [ ] **UX-009:** «Restaurar» está deshabilitado hasta inspeccionar el artefacto
+- [x] **UX-009:** «Restaurar» está deshabilitado hasta inspeccionar el artefacto
       —y con razón— pero no dice por qué. Un botón apagado sin motivo se lee como
       una avería.
 - [ ] **UX-010:** el aviso de trabajos interrumpidos vive en la barra de estado y
