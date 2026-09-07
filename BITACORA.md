@@ -10,19 +10,19 @@
 
 | Campo | Valor |
 | --- | --- |
-| Última sesión | **041** — 2026-09-07 |
+| Última sesión | **042** — 2026-09-07 |
 | Fase activa | **Migración de datos entre tablas:** fases 1, 2 y 3 cerradas; la **4** cerrada: la pasada de varias tablas, lo que cada tabla hace distinto y las migraciones guardadas (ver «Qué toca retomar»). **Respaldos y restauración:** Fases A–E cerradas. La **F** tiene backend, interfaz, CSV, selector de archivos, restaurar en una base nueva y **el ciclo entero por HTTP en los cuatro motores**; le falta repetir a mano el respaldo real que encontró el error de los índices de expresión. **Diagramas entidad-relación:** plan escrito y **Fase A** (lectura del catálogo en lote, cuatro motores) y **Fase B** (colocación determinista y lienzo) implementadas; falta cerrar la A contra los cuatro motores y ver el barrido de capturas |
 | Fases 0–6 | ✅ Cerradas. |
 | Fase 7 | 🟡 **11/12.** El ciclo de instalación está probado sobre este equipo; solo falta arrancar en una máquina sin herramientas de desarrollo. |
 | Fase 8 | ✅ **7/7.** Tres motores sobre el mismo contrato y primera beta preparada. |
 | ¿Compila el backend? | Sí — 0 advertencias, 0 errores |
 | ¿Compila el envoltorio? | Sí — recompilado en la 037 con `build/scripts/msvc-env.ps1` cargado antes; sin él, `cargo` falla en `vswhom-sys` por elegir el MSVC equivocado. **Sus pruebas ya son 17**, con las dos que vigilan la CSP y las cuatro de `DRUSE_DATA_DIR` |
-| ¿Pasan las pruebas? | Sí, y en la **041** por fin las ejecuta el comando de siempre: `dotnet test backend/Druse.slnx` pasó de **cero** pruebas a **956** con PostgreSQL levantado —534 unitarias, 155 de integración de 158 y 267 contractuales—. Además **787 del frontend** —dos nuevas—, **17 del envoltorio** con `cargo fmt --check` y `clippy -- -D warnings` limpios, y el **barrido de capturas entero** con la consola del navegador limpia. Las contractuales salieron verdes **sin los otros tres motores delante**: sin `DRUSE_REQUIRE_ENGINES=1` cada prueba termina sin comprobar nada cuando el servidor no responde. El `DATE` de Informix por SQLI de la 039 sigue sin repetirse: hace falta ese contenedor |
+| ¿Pasan las pruebas? | Sí. En la **042**: **958 del backend** con PostgreSQL levantado —534 unitarias, 157 de integración de 160 y 267 contractuales—, **791 del frontend** y **23 del envoltorio**, con `cargo fmt --check` y `clippy -- -D warnings` limpios. En la **041** el comando de siempre pasó de ejecutar **cero** pruebas a ejecutarlas todas. Las contractuales salen verdes **sin los otros tres motores delante**: sin `DRUSE_REQUIRE_ENGINES=1` cada prueba termina sin comprobar nada cuando el servidor no responde. El `DATE` de Informix por SQLI de la 039 sigue sin repetirse: hace falta ese contenedor |
 | ¿Hay aplicación de escritorio? | **Sí.** Instalador NSIS y ZIP portable, en dos variantes: con Informix y sin él. Desde la 038 **se actualiza sola** —o lo hará: ver el aviso del repositorio privado en §9—. El MSI dejó de generarse: `tauri.conf.json` solo declara `nsis`, que es lo que necesita el actualizador. En la **040** se regeneraron los instaladores y **la variante completa quedó instalada y abierta en este equipo**, con el arreglo del envoltorio dentro. Siguen **sin firma Authenticode**: SmartScreen en cada equipo |
 | Motores | **PostgreSQL, SQL Server, MySQL/MariaDB e Informix**, sobre el mismo contrato. Informix tiene **dos entradas**: por DRDA con el driver de IBM (puerto 9089) y por **SQLI**, su protocolo nativo, con el puente JDBC (9088). Cambia por dónde se entra; el SQL, el catálogo y los tipos son los mismos |
 | Trabajo a medias | **Nada sin commitear.** De la 041 queda `PLAN_MEJORAS_DRUSE.md` con las fases 0 y 1 marcadas y el resto por hacer. Sin comprobar: las contractuales de la lectura en lote contra los cuatro motores desde la 039, **el multicursor dentro de la ventana empaquetada**, y de antes —**el diálogo del sistema y el selector de carpeta siguen sin verse abrir**, y **el actualizador no puede funcionar mientras el repositorio sea privado** (ver §9) |
 | Bloqueantes | Ninguno para seguir programando. Sí para dar por buenos cuatro motores y cuatro funciones: ver «Qué toca retomar». |
-| Git | El **PR #9 se fusionó** (sesión 022). Se trabaja en `feat/respaldos-y-restauracion`, con todo subido: las 024–027 en `1452a6c`, las 028–031 en `640151c`, las 032–036 de `d3ac0d5` a `35d192e`, la 037 de `4ba8cce` a `20727eb`, la **038** en `a455be7`, `4c6f74a`, `55711f0` y `93f7f26`, la **039** hasta `5c2d09b`, y la **040** en `80da9f6`, `03c3478`, `a04c706`, `117b15f`, `2946156` y `2d52c8e` , y la **041** en `64c2adf`, `203b771`, `6d31a86`, `5a924c6`, `8bcf83a`, `f4f683e` y `f65cd73`, ya sobre `main` |
+| Git | El **PR #9 se fusionó** (sesión 022). Se trabaja en `feat/respaldos-y-restauracion`, con todo subido: las 024–027 en `1452a6c`, las 028–031 en `640151c`, las 032–036 de `d3ac0d5` a `35d192e`, la 037 de `4ba8cce` a `20727eb`, la **038** en `a455be7`, `4c6f74a`, `55711f0` y `93f7f26`, la **039** hasta `5c2d09b`, y la **040** en `80da9f6`, `03c3478`, `a04c706`, `117b15f`, `2946156` y `2d52c8e`, la **041** en `64c2adf`, `203b771`, `6d31a86`, `5a924c6`, `8bcf83a`, `f4f683e` y `f65cd73`, y la **042** en `0ae38fa`, `120485f` y `2a6f151`, ya sobre `main` |
 | Integración continua | 🔴 **Parada, y no por el código.** GitHub aborta los jobs en dos segundos: «recent account payments have failed or your spending limit needs to be increased». Hasta resolver la facturación, ningún PR podrá pasar los checks. Lo que sí cambió en la **041**: cuando vuelva a correr, **ejecutará pruebas de verdad** —hasta ahora el job del backend terminaba en verde sin ejecutar ninguna—, y publicar exige que el commit tenga su ejecución de CI en verde. |
 
 ### Qué toca retomar en la próxima sesión
@@ -34,6 +34,18 @@ hoy no puede funcionar en ningún equipo: GitHub devuelve 404 a quien no está
 autenticado, y ese 404 ni siquiera se distingue de «no hay versión nueva». Es
 una decisión que hay que tomar antes de repartir nada: repositorio público, o
 publicar los artefactos en otro sitio.
+
+#### Lo que deja abierta la 042
+
+1. **La segunda entrega de la fase 2** (JOB-005 a JOB-009): cola administrada,
+   `BackgroundService`, scopes de DI por trabajo y estado en SQLite. Es lo que
+   falta para saber, al volver a abrir Druse, que un trabajo quedó interrumpido.
+2. **El aviso al cerrar, en la aplicación instalada.** Se vio salir en la ventana
+   de `cargo tauri dev`, que es el mismo WebView2; el instalador no se ha
+   regenerado con esto dentro.
+3. **El apagado ordenado contra la API empaquetada.** Al probarlo, la de
+   `shells/desktop-tauri/api` era anterior a la ruta y contestó 404: hay que
+   volver a publicarla ahí para que el camino bueno se ejerza de verdad.
 
 #### Lo que deja abierta la 041
 
@@ -368,6 +380,78 @@ Pendiente de verificar cuando toque: Docker (pruebas de integración con contene
 ---
 
 ## 5. Registro de sesiones
+
+### Sesión 042 — 2026-09-07 · Cerrar Druse con trabajo en marcha, y la API que ya no muere a la fuerza
+
+Fase 2 del plan de mejoras: el ciclo de vida de las operaciones largas. Entra
+entera la **primera entrega**; de la segunda solo lo que no dependía del
+rediseño.
+
+#### Cerrar ya no tira el trabajo sin preguntar
+
+Con una transacción abierta, cerrar preguntaba. Con un respaldo, una restauración
+o un traslado en marcha, no: se cerraba y el trabajo moría dentro del proceso,
+dejando un artefacto a medias con pinta de terminado o una base a medio escribir.
+
+Ahora la interfaz declara qué hay en marcha —«un respaldo», «una restauración»,
+«un traslado de datos»— igual que ya declaraba las transacciones, y el envoltorio
+lo nombra en el aviso. `transactions.rs` pasó a `pending_work.rs`, que es lo que
+guarda ahora: las dos cosas que no se pueden perder al cerrar. Con las dos, manda
+el trabajo.
+
+Y «Cancelarlo y cerrar» **no cierra de inmediato**: pide a la interfaz que
+cancele, espera a que la API lo confirme y solo entonces destruye la ventana. Si
+no para en treinta segundos, no se cierra. Actualizar sigue la misma regla, pero
+ahí no se pregunta: se dice que no y se explica qué está corriendo.
+
+#### La API se apaga, no se mata
+
+`stop()` la mataba siempre, y matarla **se salta `ApplicationStopping`**: ahí es
+donde cierra las sesiones contra las bases del usuario y sus túneles SSH. Es
+decir, cada cierre normal de Druse cortaba esas conexiones de golpe.
+
+Ahora se le pide el apagado por HTTP —`POST /api/shutdown`, con el token, que es
+la ruta más destructiva que tiene— y se espera hasta diez segundos; matarla queda
+para cuando no responde. La petición se escribe a mano sobre un socket: es una
+petición sin cuerpo a `127.0.0.1`, y esto corre dentro del cierre de la ventana,
+donde no hay runtime asíncrono.
+
+#### Un traslado «todo o nada» que falla no copió nada
+
+El contador sumaba cada lote escrito, también dentro de la transacción, así que al
+fallar el resultado decía «se copiaron 40.000 filas» mientras el motor las estaba
+deshaciendo. Ahora se cuentan aparte las filas sin confirmar: se enseñan mientras
+corre, cuentan al confirmar y se descuentan —con un aviso— al fallar o cancelar.
+
+**Verificado.** El aviso se vio salir en la ventana de verdad: se levantó la API
+y Angular con `DRUSE_DATA_DIR` aislado, `cargo tauri dev` con el puerto de
+depuración del WebView, y desde CDP se declaró un trabajo en marcha y se pidió
+cerrar. Salió el diálogo con su texto, y al aceptarlo la interfaz canceló, llamó a
+`confirm_close` y la ventana se cerró.
+
+**Y mirarlo enseñó algo que las pruebas no decían**: el envoltorio pidió el
+apagado y recibió **404**, porque el binario de `shells/desktop-tauri/api` era de
+una compilación anterior a la ruta. Esperar diez segundos a esa API no sirve de
+nada, así que ahora se lee el código de la respuesta: si no es 2xx, se mata sin
+esperar. De paso quedó comprobado que el token viaja bien —un token malo habría
+dado 401 antes de llegar al enrutador—.
+
+**No hecho.** **JOB-005 a JOB-009**: cola administrada, `BackgroundService`,
+scopes de DI por trabajo y estado en SQLite. Es lo que falta para el criterio
+«reiniciar Druse permite conocer que un trabajo anterior fue interrumpido», y
+lleva consigo decidir qué se reanuda y qué se reinicia desde cero.
+
+**Pruebas.** 958 del backend con PostgreSQL levantado —534 unitarias, 157 de
+integración de 160 y 267 contractuales—, **791 del frontend** —cuatro nuevas del
+servicio de trabajos en marcha— y **23 del envoltorio**, con `fmt` y `clippy`
+limpios.
+
+**Archivos.** `shells/desktop-tauri/src/{pending_work.rs,api_process.rs,main.rs,updates.rs}`,
+`Program.cs`, `Transfers/TransferService.cs`, `core/jobs/running-jobs.service.ts`,
+`core/files/pending-work.service.ts`, `desktop-host.ts`, `app-shell.ts` y sus
+pruebas.
+
+**Estado al cerrar.** Commiteado en `main`.
 
 ### Sesión 041 — 2026-09-07 · El CI que no probaba nada y el respaldo que no volvía igual
 
