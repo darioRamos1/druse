@@ -1,4 +1,5 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
+using System.Globalization;
 using Druse.Application.Abstractions;
 using Druse.Application.Backups;
 using Druse.Application.Connections;
@@ -695,13 +696,15 @@ public sealed class TransferService(
             }
 
             firstRow = await FlushAsync(
-                plan, state, target, editor, targets, batch, firstRow, cancellationToken);
+                plan, state, target, editor, targets, batch, firstRow,
+                request.Atomic, cancellationToken);
         }
 
         if (batch.Count > 0)
         {
             await FlushAsync(
-                plan, state, target, editor, targets, batch, firstRow, cancellationToken);
+                plan, state, target, editor, targets, batch, firstRow,
+                request.Atomic, cancellationToken);
         }
     }
 
@@ -714,6 +717,7 @@ public sealed class TransferService(
         IReadOnlyList<DatabaseColumn?> targets,
         List<IReadOnlyList<string?>> batch,
         long firstRow,
+        bool atomic,
         CancellationToken cancellationToken)
     {
         var prepared = RowBatchPlanner.Prepare(
@@ -740,7 +744,10 @@ public sealed class TransferService(
             plan.KeyColumns,
             cancellationToken);
 
-        state.Rows(result.RowsAffected, result.RowsSkipped);
+        // Con «todo o nada» el lote está dentro de una transacción que puede
+        // deshacerse entera: se enseña, pero no cuenta como copiado hasta que se
+        // confirme.
+        state.Rows(result.RowsAffected, result.RowsSkipped, inTransaction: atomic);
 
         var next = firstRow + batch.Count;
 
@@ -1250,6 +1257,17 @@ internal sealed class TransferState(Guid id, IProgress<TransferProgress>? progre
     private int _batches;
     private long _skipped;
 
+    /// <summary>
+    /// De las filas escritas, cuántas están dentro de una transacción que
+    /// todavía no se ha confirmado.
+    ///
+    /// Se cuentan aparte porque **pueden dejar de existir**: si el traslado es
+    /// «todo o nada» y falla, el motor las deshace y en el destino no queda
+    /// ninguna. Mientras corre sí se enseñan —la barra tiene que avanzar—, pero
+    /// el resultado final no puede decir que se copiaron.
+    /// </summary>
+    private long _uncommitted;
+
     public long RowsCopied { get; private set; }
 
     /// <summary>
@@ -1272,12 +1290,22 @@ internal sealed class TransferState(Guid id, IProgress<TransferProgress>? progre
         Report();
     }
 
-    public void Rows(long written, long skipped = 0)
+    /// <param name="inTransaction">
+    /// Si el lote fue dentro de una transacción sin confirmar, y por tanto puede
+    /// deshacerse entero.
+    /// </param>
+    public void Rows(long written, long skipped = 0, bool inTransaction = false)
     {
         RowsCopied += written;
         _tableRows += written;
         _skipped += skipped;
         _batches++;
+
+        if (inTransaction)
+        {
+            _uncommitted += written;
+        }
+
         Report();
     }
 
@@ -1289,7 +1317,36 @@ internal sealed class TransferState(Guid id, IProgress<TransferProgress>? progre
     }
 
     /// <summary>Con «todo o nada», los lotes solo cuentan cuando se confirma la transacción.</summary>
-    public void Committed() => Report();
+    public void Committed()
+    {
+        _uncommitted = 0;
+        Report();
+    }
+
+    /// <summary>
+    /// Lo que se escribió dentro de una transacción que no llegó a confirmarse.
+    ///
+    /// El motor lo deshace al soltarla, así que en el destino no queda nada de
+    /// eso: descontarlo es la diferencia entre decir «se copiaron 40.000 filas» y
+    /// decir la verdad, que es que no se copió ninguna. Se dice además en un
+    /// aviso, porque un contador que baja solo no explica por qué.
+    /// </summary>
+    private void Undo()
+    {
+        if (_uncommitted == 0)
+        {
+            return;
+        }
+
+        _warnings.Add(new TransferWarning(
+            _table ?? string.Empty,
+            $"Las {_uncommitted.ToString(CultureInfo.InvariantCulture)} filas escritas se " +
+            "deshicieron: el traslado era «todo o nada» y su transacción no llegó a confirmarse."));
+
+        RowsCopied -= _uncommitted;
+        _tableRows -= _uncommitted;
+        _uncommitted = 0;
+    }
 
     public void Warn(string subject, string message)
     {
@@ -1306,10 +1363,23 @@ internal sealed class TransferState(Guid id, IProgress<TransferProgress>? progre
             : TransferOutcome.Completed);
     }
 
-    public TransferProgress Cancelled() => Report(TransferOutcome.Cancelled);
+    public TransferProgress Cancelled()
+    {
+        Undo();
 
-    public TransferProgress Failed(TransferFailure failure) =>
-        Report(TransferOutcome.Failed, failure);
+        return Report(TransferOutcome.Cancelled);
+    }
+
+    public TransferProgress Failed(TransferFailure failure)
+    {
+        Undo();
+
+        // La cifra del fallo se recalcula después de descontar: la que traía es
+        // la de antes de saber que aquella transacción no iba a confirmarse.
+        return Report(
+            TransferOutcome.Failed,
+            failure with { RowsCommitted = RowsCopied });
+    }
 
     private TransferProgress Report(
         TransferOutcome outcome = TransferOutcome.Running,

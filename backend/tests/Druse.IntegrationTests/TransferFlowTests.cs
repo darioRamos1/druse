@@ -1,4 +1,4 @@
-using System.Globalization;
+﻿using System.Globalization;
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
@@ -274,6 +274,63 @@ public sealed class TransferFlowTests(DruseApiFactory factory) : IClassFixture<D
 
             Assert.Equal("Completed", progress.GetProperty("outcome").GetString());
             Assert.Equal(4, await ContarAsync(client, sessionId, destino));
+        }
+        finally
+        {
+            await LimpiarAsync(client, sessionId, origen, destino);
+        }
+    }
+
+    /// <summary>
+    /// Un traslado «todo o nada» que falla no copió nada, y tiene que decirlo.
+    ///
+    /// El contador sumaba cada lote escrito, también dentro de la transacción, así
+    /// que al fallar el resultado decía «se copiaron dos filas» mientras el motor
+    /// las estaba deshaciendo. Quien lo lea decide sobre el destino con ese
+    /// número: si dice dos, cabe pensar que el traslado se puede reanudar desde
+    /// la tercera.
+    ///
+    /// El fallo se provoca con una clave repetida en el segundo lote: el primero
+    /// entra de verdad —es lo que hace la prueba distinta de una que falla antes
+    /// de escribir— y después revienta.
+    /// </summary>
+    [RequiresPostgreSqlFact]
+    public async Task TodoONadaQueFalla_NoCuentaLasFilasQueElMotorDeshizo()
+    {
+        var (client, sessionId) = await ConnectAsync();
+        var origen = Nombre();
+        var destino = Nombre();
+
+        try
+        {
+            await CrearAsync(client, sessionId, origen, filas: 4);
+
+            await RunAsync(
+                client,
+                sessionId,
+                $"CREATE TABLE {destino} (id int PRIMARY KEY, nombre text, saldo numeric(10,2))");
+
+            // Ya está la tercera: el primer lote entrará y el segundo chocará.
+            await RunAsync(client, sessionId, $"INSERT INTO {destino} VALUES (3, 'ya estaba', 0.00)");
+
+            var progress = await TransferAsync(
+                client,
+                Request(sessionId, origen, destino) with { Atomic = true, BatchSize = 2 });
+
+            Assert.Equal("Failed", progress.GetProperty("outcome").GetString());
+
+            // Ni en el progreso ni en el detalle del fallo: las dos cifras las
+            // lee la misma persona y no pueden contradecirse.
+            Assert.Equal(0, progress.GetProperty("rowsCopied").GetInt64());
+            Assert.Equal(0, progress.GetProperty("failure").GetProperty("rowsCommitted").GetInt64());
+
+            // Y en el destino solo sigue lo que ya había.
+            Assert.Equal(1, await ContarAsync(client, sessionId, destino));
+
+            Assert.Contains(
+                progress.GetProperty("warnings").EnumerateArray()
+                    .Select(warning => warning.GetProperty("message").GetString() ?? string.Empty),
+                message => message.Contains("se deshicieron", StringComparison.Ordinal));
         }
         finally
         {

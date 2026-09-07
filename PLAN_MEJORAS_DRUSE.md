@@ -227,10 +227,10 @@ sin control ni artefactos con apariencia válida.
 
 ### Primera entrega mínima
 
-- [ ] **JOB-001:** exponer a Tauri si existen backups, restauraciones o transferencias activas.
-- [ ] **JOB-002:** bloquear el cierre y la actualización mientras exista trabajo destructivo, igual que ya se hace con transacciones.
-- [ ] **JOB-003:** permitir cancelar, esperar la confirmación de cancelación y cerrar después.
-- [ ] **JOB-004:** eliminar el `kill()` inmediato del camino normal y reservarlo para timeout o proceso no responsivo.
+- [x] **JOB-001:** exponer a Tauri si existen backups, restauraciones o transferencias activas.
+- [x] **JOB-002:** bloquear el cierre y la actualización mientras exista trabajo destructivo, igual que ya se hace con transacciones.
+- [x] **JOB-003:** permitir cancelar, esperar la confirmación de cancelación y cerrar después.
+- [x] **JOB-004:** eliminar el `kill()` inmediato del camino normal y reservarlo para timeout o proceso no responsivo.
 
 ### Segunda entrega durable
 
@@ -239,7 +239,22 @@ sin control ni artefactos con apariencia válida.
 - [ ] **JOB-007:** persistir identificador, tipo, estado, progreso y resultado de cada trabajo en SQLite.
 - [ ] **JOB-008:** marcar como interrumpido cualquier trabajo que estuviera activo al arrancar de nuevo.
 - [ ] **JOB-009:** definir qué operaciones pueden reanudarse y cuáles deben reiniciarse desde cero.
-- [ ] **JOB-010:** corregir el progreso de transferencias atómicas para no contar como copiadas filas que acabaron en rollback.
+- [x] **JOB-010:** corregir el progreso de transferencias atómicas para no contar como copiadas filas que acabaron en rollback.
+
+> Estado al 7 de septiembre de 2026: **la primera entrega está cerrada y vista
+> funcionando**. Cerrar Druse con un respaldo, una restauración o un traslado en
+> marcha pregunta y nombra lo que se va a interrumpir; «Cancelarlo y cerrar»
+> cancela, espera la confirmación de la API y solo entonces cierra; actualizar
+> aplica la misma regla. La API deja de morir a la fuerza: se le pide el apagado
+> por HTTP y matarla queda para cuando no responde o no acepta.
+>
+> De la segunda entrega solo está **JOB-010**, que no dependía del rediseño: un
+> traslado «todo o nada» que falla informaba las filas que el motor acababa de
+> deshacer. **JOB-005 a JOB-009 siguen abiertas** y son otra cosa: cola
+> administrada, `BackgroundService`, scopes de DI por trabajo y estado en SQLite.
+> Con eso llega el criterio que falta —«reiniciar Druse permite conocer que un
+> trabajo anterior fue interrumpido»—, y también la decisión de qué se reanuda y
+> qué se reinicia desde cero.
 
 ### Criterios de aceptación
 
