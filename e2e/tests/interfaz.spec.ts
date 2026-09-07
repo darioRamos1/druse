@@ -41,6 +41,52 @@ test.describe('la interfaz por dentro', () => {
   });
 
   /**
+   * Pulsar fuera **no** cierra un diálogo con trabajo dentro.
+   *
+   * Antes sí: un roce del ratón a medio asistente lo borraba entero sin
+   * preguntar. Esto no se puede comprobar en una prueba de componente porque lo
+   * que se quiere saber es que la directiva está puesta en los diálogos de
+   * verdad, no que la directiva funcione.
+   */
+  test('pulsar fuera no cierra un diálogo con trabajo dentro', async ({ page }) => {
+    await abrir(page);
+
+    await page.getByRole('button', { name: 'Nueva conexión' }).click();
+    await expect(page.locator('app-connection-dialog .dialog')).toBeVisible();
+
+    const nombre = page.locator('app-connection-dialog input').first();
+
+    await nombre.fill('Mi conexión a medias');
+
+    // Una esquina del velo, lo más lejos posible del diálogo.
+    await page.mouse.click(30, 30);
+    await page.waitForTimeout(200);
+
+    await expect(page.locator('app-connection-dialog .dialog')).toBeVisible();
+    await expect(nombre).toHaveValue('Mi conexión a medias');
+
+    // Y Escape sigue cerrando: lo que se quita es el accidente, no la salida.
+    await page.keyboard.press('Escape');
+    await expect(page.locator('app-connection-dialog')).toBeHidden();
+  });
+
+  /**
+   * Y los ligeros siguen cerrándose al pulsar fuera: en preferencias no hay nada
+   * que perder —lo que se toca se aplica al momento— y cerrar de un manotazo es
+   * cómodo.
+   */
+  test('pulsar fuera sí cierra los diálogos ligeros', async ({ page }) => {
+    await abrir(page);
+
+    await page.getByRole('button', { name: 'Preferencias' }).click();
+    await expect(page.locator('app-settings-dialog .dialog')).toBeVisible();
+
+    await page.mouse.click(30, 30);
+
+    await expect(page.locator('app-settings-dialog')).toBeHidden();
+  });
+
+  /**
    * Ctrl+K abre la búsqueda global **con el foco dentro del editor**.
    *
    * Monaco se queda con esa combinación —la usa como principio de sus propios

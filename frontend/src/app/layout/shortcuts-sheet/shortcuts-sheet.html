@@ -1,4 +1,9 @@
-<div class="backdrop" (click)="close()" (document:keydown.escape)="close()"></div>
+<div
+  class="backdrop"
+  [closeOnClick]="true"
+  (dismiss)="close()"
+  (document:keydown.escape)="close()"
+></div>
 
 <section #dialog class="dialog" tabindex="-1" role="dialog" aria-label="Atajos de teclado">
   <header class="head">

@@ -547,6 +547,13 @@ cerró en la 027 y trataba defectos de maquetación.
 - [ ] **UX-010:** el aviso de trabajos interrumpidos vive en la barra de estado y
       es discreto de más para lo que cuenta —un respaldo que quedó a medias—.
       Verlo con alguien delante antes de decidir si sube de sitio.
+- [x] **UX-011:** pulsar fuera cerraba cualquier diálogo al primer roce, y con él
+      todo lo que llevara escrito. Ahora los que guardan trabajo **no se cierran
+      así** —se sale con Escape, Cancelar o la ×— y se sacuden para decir que
+      siguen ahí; los ligeros —preferencias, atajos, la paleta— sí cierran, pero
+      solo si el gesto entero ocurrió en el velo, que quita el otro accidente:
+      arrastrar dentro para seleccionar y soltar fuera. _(Pedido por el usuario,
+      7 de septiembre de 2026.)_
 
 ### Cómo se comprueba
 

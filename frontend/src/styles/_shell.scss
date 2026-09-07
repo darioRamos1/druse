@@ -19,6 +19,31 @@
   backdrop-filter: blur(2px);
 }
 
+/**
+ * La sacudida de «no me cierro así».
+ *
+ * Cuando se pulsa fuera de un diálogo que no se cierra al primer roce, hace falta
+ * **decir algo**: sin señal, quien lo intenta cree que la aplicación se ha
+ * quedado colgada y lo vuelve a intentar más fuerte.
+ *
+ * Corta y pequeña a propósito: es un aviso, no un regaño. Y se apaga entera con
+ * `prefers-reduced-motion`, donde el movimiento molesta más de lo que informa.
+ */
+@keyframes dialog-nudge {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+
+  25% {
+    transform: translateX(-4px);
+  }
+
+  75% {
+    transform: translateX(4px);
+  }
+}
+
 /** La caja. Cada diálogo pone su ancho; el resto es igual en todos. */
 .dialog {
   position: relative;
@@ -31,6 +56,16 @@
   border-radius: 12px;
   background: var(--dr-surface-dialog);
   box-shadow: var(--dr-shadow-dialog);
+}
+
+.dialog.is-nudging {
+  animation: dialog-nudge 180ms ease-in-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dialog.is-nudging {
+    animation: none;
+  }
 }
 
 /**

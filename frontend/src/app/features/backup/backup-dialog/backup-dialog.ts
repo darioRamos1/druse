@@ -30,6 +30,7 @@ import { Icon } from '../../../shared/ui/icon/icon';
 import { FolderPicker } from '../../../shared/ui/folder-picker/folder-picker';
 import { OperationProgress } from '../../../shared/ui/operation-progress/operation-progress';
 import { DialogFocus } from '../../../shared/a11y/dialog-focus';
+import { DialogBackdrop } from '../../../shared/a11y/dialog-backdrop';
 
 /** Hasta dónde se baja buscando tablas. Con margen sobre el árbol más hondo. */
 const MAX_DEPTH = 6;
@@ -60,7 +61,7 @@ interface Candidate {
 @Component({
   selector: 'app-backup-dialog',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [DialogFocus, DatePipe, FolderPicker, Icon, OperationProgress],
+  imports: [DialogBackdrop, DialogFocus, DatePipe, FolderPicker, Icon, OperationProgress],
   templateUrl: './backup-dialog.html',
   styleUrl: './backup-dialog.scss',
 })

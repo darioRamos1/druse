@@ -10,6 +10,7 @@ import {
 
 import { Icon } from '../../shared/ui/icon/icon';
 import { DialogFocus } from '../../shared/a11y/dialog-focus';
+import { DialogBackdrop } from '../../shared/a11y/dialog-backdrop';
 
 /** Un atajo: qué teclas y qué hace. */
 interface Atajo {
@@ -96,7 +97,7 @@ export const SHORTCUT_GROUPS: readonly Grupo[] = [
 @Component({
   selector: 'app-shortcuts-sheet',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [DialogFocus, Icon],
+  imports: [DialogBackdrop, DialogFocus, Icon],
   templateUrl: './shortcuts-sheet.html',
   styleUrl: './shortcuts-sheet.scss',
 })

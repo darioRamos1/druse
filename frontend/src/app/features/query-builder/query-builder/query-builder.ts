@@ -41,6 +41,7 @@ import {
   buildUpdateValues,
 } from '../../query-editor/sql-language/sql-writer';
 import { DialogFocus } from '../../../shared/a11y/dialog-focus';
+import { DialogBackdrop } from '../../../shared/a11y/dialog-backdrop';
 
 type Operation = 'select' | 'insert' | 'update' | 'delete';
 type InputMode = 'omit' | 'value' | 'null' | 'default';
@@ -158,7 +159,7 @@ const DATE_PERIODS: readonly { readonly value: DatePeriod | 'none'; readonly lab
 @Component({
   selector: 'app-query-builder',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [DialogFocus, ValueInput, ResultsGrid],
+  imports: [DialogBackdrop, DialogFocus, ValueInput, ResultsGrid],
   templateUrl: './query-builder.html',
   styleUrl: './query-builder.scss',
 })

@@ -18,6 +18,7 @@ import { FolderPicker } from '../../../shared/ui/folder-picker/folder-picker';
 import { Icon } from '../../../shared/ui/icon/icon';
 import { OperationProgress } from '../../../shared/ui/operation-progress/operation-progress';
 import { DialogFocus } from '../../../shared/a11y/dialog-focus';
+import { DialogBackdrop } from '../../../shared/a11y/dialog-backdrop';
 
 /**
  * Aplica un respaldo sobre la base abierta.
@@ -34,7 +35,7 @@ import { DialogFocus } from '../../../shared/a11y/dialog-focus';
 @Component({
   selector: 'app-restore-dialog',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [DialogFocus, FolderPicker, Icon, OperationProgress],
+  imports: [DialogBackdrop, DialogFocus, FolderPicker, Icon, OperationProgress],
   templateUrl: './restore-dialog.html',
   styleUrl: './restore-dialog.scss',
 })

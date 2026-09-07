@@ -20,6 +20,7 @@ import {
 } from '../../../shared/models/workspace';
 import { RoutineArgument, buildCall } from '../../query-editor/sql-language/sql-writer';
 import { DialogFocus } from '../../../shared/a11y/dialog-focus';
+import { DialogBackdrop } from '../../../shared/a11y/dialog-backdrop';
 
 /**
  * Qué se hace con un parámetro.
@@ -49,7 +50,7 @@ interface ParameterDraft {
 @Component({
   selector: 'app-procedure-runner',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [DialogFocus, Icon, ValueInput],
+  imports: [DialogBackdrop, DialogFocus, Icon, ValueInput],
   templateUrl: './procedure-runner.html',
   styleUrl: './procedure-runner.scss',
 })

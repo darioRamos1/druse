@@ -27,6 +27,7 @@ import {
 import { Icon } from '../../../shared/ui/icon/icon';
 import { UpdateService } from '../../../core/update/update.service';
 import { DialogFocus } from '../../../shared/a11y/dialog-focus';
+import { DialogBackdrop } from '../../../shared/a11y/dialog-backdrop';
 
 /**
  * Colores de acento propuestos.
@@ -137,7 +138,7 @@ const FITS: readonly {
 @Component({
   selector: 'app-settings-dialog',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [DialogFocus, Icon],
+  imports: [DialogBackdrop, DialogFocus, Icon],
   templateUrl: './settings-dialog.html',
   styleUrl: './settings-dialog.scss',
 })

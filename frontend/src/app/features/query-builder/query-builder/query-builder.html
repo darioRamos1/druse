@@ -1,7 +1,7 @@
 <!-- Escape cierra igual que pulsar fuera: es lo que se espera de una
      ventana modal, y es lo que ya hacen los demás diálogos. El buscador de
      JOINs se queda con la tecla mientras tiene sugerencias abiertas. -->
-<div class="backdrop" (click)="close()" (document:keydown.escape)="close()"></div>
+<div class="backdrop" (document:keydown.escape)="close()"></div>
 
 <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="builder-title">
   <header class="head">

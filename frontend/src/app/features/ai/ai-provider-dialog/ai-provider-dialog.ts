@@ -20,6 +20,7 @@ import { ApplicationGateway } from '../../../core/application-gateway/applicatio
 import { Icon } from '../../../shared/ui/icon/icon';
 import { IconName } from '../../../shared/ui/icon/icon';
 import { DialogFocus } from '../../../shared/a11y/dialog-focus';
+import { DialogBackdrop } from '../../../shared/a11y/dialog-backdrop';
 
 /** Una forma de llegar al modelo, tal y como se elige en el diálogo. */
 interface ProviderOption {
@@ -155,7 +156,7 @@ const DISCLOSURES: readonly { readonly value: AiDisclosure; readonly label: stri
  */
 @Component({
   selector: 'app-ai-provider-dialog',
-  imports: [DialogFocus, Icon],
+  imports: [DialogBackdrop, DialogFocus, Icon],
   templateUrl: './ai-provider-dialog.html',
   styleUrl: './ai-provider-dialog.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,

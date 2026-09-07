@@ -1,6 +1,11 @@
 <!-- Escape cierra igual que pulsar fuera: es lo que se espera de una
      ventana modal, y hasta ahora no lo hacía ninguna. -->
-<div class="backdrop" (click)="closed.emit()" (document:keydown.escape)="closed.emit()"></div>
+<div
+  class="backdrop"
+  [closeOnClick]="true"
+  (dismiss)="closed.emit()"
+  (document:keydown.escape)="closed.emit()"
+></div>
 
 <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="settings-title">
   <header class="head">

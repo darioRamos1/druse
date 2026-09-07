@@ -1,6 +1,10 @@
-<!-- Escape cierra igual que pulsar fuera: es lo que se espera de una
-     ventana modal, y hasta ahora no lo hacía ninguna. -->
-<div class="backdrop" (click)="close()" (document:keydown.escape)="close()"></div>
+<!--
+  Escape cierra; **pulsar fuera no**. Un roce del ratón a media faena borraba
+  todo lo escrito sin preguntar, y ese es un error que se comete una vez y se
+  recuerda siempre. Al pulsar fuera, el diálogo se sacude para decir que sigue
+  ahí: sin esa señal parece que la aplicación se ha colgado.
+-->
+<div class="backdrop" (document:keydown.escape)="close()"></div>
 
 <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="connection-dialog-title">
   <header class="head">

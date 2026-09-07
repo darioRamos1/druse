@@ -15,6 +15,7 @@ import { SavedSnippet } from '../../core/application-gateway/application-gateway
 import { ConnectionSummary, ExplorerNode, QueryTab } from '../../shared/models/workspace';
 import { EngineBadge } from '../../shared/ui/engine-badge/engine-badge';
 import { Icon } from '../../shared/ui/icon/icon';
+import { DialogBackdrop } from '../../shared/a11y/dialog-backdrop';
 
 type PaletteItem =
   | { readonly id: string; readonly kind: 'command'; readonly label: string; readonly hint: string }
@@ -50,7 +51,7 @@ type PaletteItem =
 @Component({
   selector: 'app-command-palette',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [Icon, EngineBadge],
+  imports: [DialogBackdrop, Icon, EngineBadge],
   templateUrl: './command-palette.html',
   styleUrl: './command-palette.scss',
 })
