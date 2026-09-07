@@ -173,6 +173,28 @@ export class RestoreDialog {
     () => this.canRestore() && this.destinationProblem() === null,
   );
 
+  /**
+   * Por qué no se puede restaurar todavía.
+   *
+   * Un botón apagado sin motivo se lee como una avería: quien lo mira no sabe si
+   * le falta hacer algo o si Druse está roto. Y el motivo más común es el menos
+   * evidente —hay que mirar el respaldo antes— porque es una decisión de
+   * seguridad, no un paso de más: lo que se aplica tiene que ser lo que se vio.
+   */
+  protected readonly launchBlocker = computed(() => {
+    if (this.canLaunch()) {
+      return null;
+    }
+
+    if (!this.canRestore()) {
+      return this.inspection() === null
+        ? 'Mira antes el respaldo: se restaura lo que se ha inspeccionado, no lo que haya en esa ruta.'
+        : 'Este respaldo no se puede aplicar aquí. El motivo está arriba.';
+    }
+
+    return this.destinationProblem();
+  });
+
   /** Lo que se manda al proceso local: la base nueva solo si se pidió una. */
   private request(): RestoreRequest {
     return {

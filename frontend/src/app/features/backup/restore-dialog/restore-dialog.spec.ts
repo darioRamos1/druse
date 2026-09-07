@@ -158,11 +158,15 @@ describe('RestoreDialog', () => {
     await settle(fixture);
   }
 
-  it('no deja restaurar hasta haber mirado el respaldo', () => {
+  it('no deja restaurar hasta haber mirado el respaldo, y dice por qué', () => {
     const run = [...element.querySelectorAll<HTMLButtonElement>('.foot button')].at(-1);
 
     expect(run?.textContent).toContain('Restaurar');
     expect(run?.disabled).toBe(true);
+
+    // Un botón apagado sin motivo se lee como una avería, y este apagado no es
+    // un paso de más: lo que se aplica tiene que ser lo que se ha mirado.
+    expect(element.querySelector('.foot__hint')?.textContent).toContain('Mira antes el respaldo');
   });
 
   it('al mirarlo enseña de qué motor viene y qué trae', async () => {

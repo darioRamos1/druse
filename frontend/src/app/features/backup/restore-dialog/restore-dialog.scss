@@ -240,6 +240,18 @@
   border-top: 1px solid var(--dr-border);
 }
 
+/* Por qué está apagado el botón de restaurar. Va en el pie, al lado de lo que
+   explica, y encoge antes que los botones: el texto puede ser largo y lo que no
+   puede desaparecer es el botón. */
+.foot__hint {
+  flex: 0 1 auto;
+  margin: 0;
+  overflow: hidden;
+  color: var(--dr-text-dim);
+  font-size: 12px;
+  text-overflow: ellipsis;
+}
+
 .spacer {
   flex: 1;
 }

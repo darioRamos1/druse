@@ -23,7 +23,11 @@ function folder(name: string, schema = 'public'): DatabaseObject {
   };
 }
 
-function table(name: string, schema = 'public'): DatabaseObject {
+function table(
+  name: string,
+  schema = 'public',
+  approximateRowCount?: number | null,
+): DatabaseObject {
   return {
     id: `Table:${schema}.${name}`,
     name,
@@ -31,6 +35,7 @@ function table(name: string, schema = 'public'): DatabaseObject {
     database: 'druse_test',
     schema,
     hasChildren: false,
+    approximateRowCount: approximateRowCount ?? undefined,
   };
 }
 
@@ -211,6 +216,18 @@ describe('TransferSetDialog', () => {
     boton('Migrar a').click();
     await settle(fixture);
   }
+
+  /**
+   * El catálogo no siempre sabe cuántas filas hay, y entonces llega `null`. La
+   * fila enseñaba «~ filas» —un hueco con tilde— porque solo se comprobaba
+   * `undefined`.
+   */
+  it('sin recuento de filas no se enseña el hueco', () => {
+    const filas = [...element.querySelectorAll('.tables__row')];
+
+    expect(filas.length).toBeGreaterThan(0);
+    expect(element.textContent).not.toContain('~ filas');
+  });
 
   it('empieza con todas las tablas del sitio marcadas', () => {
     const casillas = [...element.querySelectorAll<HTMLInputElement>('.tables input')];

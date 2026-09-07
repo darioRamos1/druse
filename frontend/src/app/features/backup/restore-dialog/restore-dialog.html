@@ -277,6 +277,12 @@
 
     <footer class="foot">
       <button type="button" class="ghost" (click)="close()">Cancelar</button>
+
+      <!-- Por qué está apagado el botón. Sin esto se lee como una avería. -->
+      @if (launchBlocker(); as motivo) {
+        <p class="foot__hint">{{ motivo }}</p>
+      }
+
       <span class="spacer"></span>
       <button type="button" class="primary" [disabled]="!canLaunch()" (click)="run()">
         {{ destination() === 'new' ? 'Crear y restaurar' : 'Restaurar' }}

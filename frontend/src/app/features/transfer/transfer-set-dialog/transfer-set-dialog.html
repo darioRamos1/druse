@@ -75,7 +75,13 @@
                   (change)="setSelected(table, $any($event.target).checked)"
                 />
                 <span class="tables__name">{{ table.name }}</span>
-                @if (table.approximateRowCount !== undefined) {
+                <!--
+                  Con `!= null`, que cubre las dos formas de no haber recuento: el
+                  catálogo no siempre lo da, y entonces llega `null`. Comprobando
+                  solo `undefined`, la fila enseñaba «~ filas» —un hueco con tilde
+                  que no dice nada— en vez de callarse.
+                -->
+                @if (table.approximateRowCount != null) {
                   <span class="tables__rows">~{{ table.approximateRowCount }} filas</span>
                 }
               </label>
