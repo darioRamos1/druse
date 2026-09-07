@@ -1,4 +1,4 @@
-using System.Text;
+﻿using System.Text;
 using Druse.Application.Abstractions;
 using Druse.Database.Abstractions;
 using Druse.Domain;
@@ -61,6 +61,40 @@ public sealed class CsvResultExporterTests
         var csv = await ExportAsync(["id", "nombre"], [["1", "Ana"], ["2", "Luis"]]);
 
         Assert.Equal("id,nombre\r\n1,Ana\r\n2,Luis\r\n", csv);
+    }
+
+    /// <summary>
+    /// Un respaldo tiene que poder devolver el nulo y la cadena vacía distintos.
+    ///
+    /// Escritos los dos en blanco —lo que hacía antes— el archivo no los
+    /// distingue, y al restaurar todo entra como texto vacío. La convención es la
+    /// de `COPY ... WITH CSV`: el nulo va en blanco y la cadena vacía, con sus
+    /// dos comillas.
+    /// </summary>
+    [Fact]
+    public async Task ConNulosDistinguibles_ElVacioYElNuloSeEscribenDistinto()
+    {
+        var csv = await ExportAsync(
+            ["nulo", "vacio", "texto"],
+            [[null, "", "Ana"]],
+            new ExportOptions { DistinguishNull = true });
+
+        Assert.Equal("nulo,vacio,texto\r\n,\"\",Ana\r\n", csv);
+    }
+
+    /// <summary>
+    /// Sin la opción, la exportación de siempre: el nulo se representa con lo que
+    /// pida quien exporta, porque eso acaba en una hoja de cálculo.
+    /// </summary>
+    [Fact]
+    public async Task SinNulosDistinguibles_ElNuloSigueSiendoElTextoQueSePida()
+    {
+        var csv = await ExportAsync(
+            ["nulo", "vacio"],
+            [[null, ""]],
+            new ExportOptions { NullText = "(nulo)" });
+
+        Assert.Equal("nulo,vacio\r\n(nulo),\r\n", csv);
     }
 
     [Fact]

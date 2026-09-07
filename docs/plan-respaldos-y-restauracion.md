@@ -156,6 +156,24 @@ El campo `formato` es la versión del propio artefacto: si mañana cambia su
 estructura, un Druse nuevo tiene que saber leer los viejos o negarse con un
 mensaje claro, no reventar a medias.
 
+**Formato 2** (desde Druse 1.1.1). Es el primero que se puede restaurar sin que
+cambie ningún valor. Dos reglas lo separan del 1:
+
+- Cada archivo se llama `esquema.tabla`. En el 1 se llamaba solo como la tabla,
+  así que `ventas.clientes` y `compras.clientes` compartían archivo: en una
+  carpeta el segundo se escribía a continuación del primero y en un zip aparecían
+  dos entradas con el mismo nombre. El respaldo decía que se llevaba las dos y
+  solo una podía restaurarse.
+- En los datos en CSV, **un campo en blanco es un nulo y uno escrito como dos
+  comillas es la cadena vacía**, que es la convención de `COPY ... WITH CSV` de
+  PostgreSQL. En el 1 los dos se escribían igual y al restaurar todo entraba como
+  cadena vacía.
+
+Un artefacto del formato 1 se sigue restaurando, y sus blancos siguen
+significando lo que significaban: cadena vacía. Reinterpretarlos ahora como nulos
+cambiaría datos ya guardados. Lo que sí hace la inspección es **avisarlo**, para
+que quien lo restaure sepa que los nulos de aquel respaldo no van a volver.
+
 `motor` es lo que impide restaurar un respaldo de SQL Server en PostgreSQL: no se
 intenta y se dice por qué.
 

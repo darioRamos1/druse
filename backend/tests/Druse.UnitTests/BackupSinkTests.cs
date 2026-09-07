@@ -1,4 +1,4 @@
-using System.IO.Compression;
+﻿using System.IO.Compression;
 using System.Text.Json;
 using Druse.Application.Abstractions;
 using Druse.Domain;
@@ -81,7 +81,7 @@ public sealed class BackupSinkTests : IDisposable
         await using (var sink = new SingleFileBackupSink(file))
         {
             await sink.WriteAsync(BackupEntryKind.Structure, "pedidos", "CREATE TABLE pedidos ();", default);
-            await sink.DiscardAsync(default);
+            await sink.DiscardAsync(Manifest(BackupOutcome.Cancelled), default);
         }
 
         Assert.False(File.Exists(file));
@@ -95,7 +95,7 @@ public sealed class BackupSinkTests : IDisposable
         await using (var sink = new ZipBackupSink(file))
         {
             await sink.WriteAsync(BackupEntryKind.Structure, "pedidos", "CREATE TABLE pedidos ();", default);
-            await sink.DiscardAsync(default);
+            await sink.DiscardAsync(Manifest(BackupOutcome.Cancelled), default);
         }
 
         Assert.False(File.Exists(file));
@@ -113,7 +113,7 @@ public sealed class BackupSinkTests : IDisposable
         await using (var sink = new FolderBackupSink(folder))
         {
             await sink.WriteAsync(BackupEntryKind.Structure, "pedidos", "CREATE TABLE pedidos ();", default);
-            await sink.DiscardAsync(default);
+            await sink.DiscardAsync(Manifest(BackupOutcome.Cancelled), default);
         }
 
         Assert.True(File.Exists(Path.Combine(folder, "tablas", "pedidos.sql")));
@@ -122,6 +122,50 @@ public sealed class BackupSinkTests : IDisposable
             await File.ReadAllTextAsync(Path.Combine(folder, "manifest.json")));
 
         Assert.Equal("Cancelled", manifest.GetProperty("outcome").GetString());
+    }
+
+    /// <summary>
+    /// El manifiesto de una carpeta a medias describe **ese** respaldo.
+    ///
+    /// Antes se escribía uno de relleno: PostgreSQL, versión 0.0.0, sin servidor
+    /// ni base y siempre «cancelado». Una carpeta de SQL Server que había fallado
+    /// se presentaba como una de PostgreSQL que alguien paró, y eso es lo único
+    /// que tiene delante quien la encuentre medio año después.
+    /// </summary>
+    [Fact]
+    public async Task ElManifiestoDeUnaCarpetaAMedias_ConservaElOrigenYElResultadoReales()
+    {
+        var folder = At("carpeta");
+
+        await using (var sink = new FolderBackupSink(folder))
+        {
+            await sink.WriteAsync(BackupEntryKind.Structure, "pedidos", "CREATE TABLE pedidos ();", default);
+
+            await sink.DiscardAsync(
+                Manifest(BackupOutcome.Failed) with
+                {
+                    Engine = DatabaseEngine.SqlServer,
+                    ServerVersion = "16.0",
+                    Warnings = [new BackupWarning(string.Empty, "El respaldo falló y quedó incompleto: sin permisos.")],
+                },
+                default);
+        }
+
+        var manifest = JsonSerializer.Deserialize<JsonElement>(
+            await File.ReadAllTextAsync(Path.Combine(folder, "manifest.json")));
+
+        // Un fallo no es una cancelación: uno se rompió y el otro se paró
+        // queriendo, y la diferencia cambia qué hacer con lo que quedó.
+        Assert.Equal("Failed", manifest.GetProperty("outcome").GetString());
+        Assert.Equal("SqlServer", manifest.GetProperty("engine").GetString());
+        Assert.Equal("srv-prod", manifest.GetProperty("server").GetString());
+        Assert.Equal("ventas", manifest.GetProperty("database").GetString());
+        Assert.Equal("1.0.0", manifest.GetProperty("druseVersion").GetString());
+
+        Assert.Contains(
+            "sin permisos",
+            manifest.GetProperty("warnings")[0].GetProperty("message").GetString(),
+            StringComparison.Ordinal);
     }
 
     [Fact]
@@ -165,6 +209,78 @@ public sealed class BackupSinkTests : IDisposable
         Assert.NotNull(archive.GetEntry("tablas/pedidos.sql"));
         Assert.NotNull(archive.GetEntry("datos/pedidos.sql"));
         Assert.NotNull(archive.GetEntry("manifest.json"));
+    }
+
+    /// <summary>
+    /// Dos tablas que se llaman igual en esquemas distintos son dos tablas.
+    ///
+    /// Cuando el nombre del archivo era solo el de la tabla, la segunda se
+    /// escribía **a continuación** de la primera en la carpeta y como una entrada
+    /// repetida en el zip. El respaldo decía que se había llevado las dos y solo
+    /// una podía restaurarse.
+    /// </summary>
+    [Fact]
+    public async Task DosTablasHomonimasEnEsquemasDistintos_NoCompartenArchivo()
+    {
+        var folder = At("carpeta");
+
+        await using (var sink = new FolderBackupSink(folder))
+        {
+            await sink.WriteAsync(
+                BackupEntryKind.Structure,
+                "ventas.clientes",
+                "CREATE TABLE ventas.clientes (id int);",
+                default);
+
+            await sink.WriteAsync(
+                BackupEntryKind.Structure,
+                "compras.clientes",
+                "CREATE TABLE compras.clientes (id int);",
+                default);
+
+            await sink.CompleteAsync(Manifest(), default);
+        }
+
+        var ventas = await File.ReadAllTextAsync(Path.Combine(folder, "tablas", "ventas.clientes.sql"));
+        var compras = await File.ReadAllTextAsync(Path.Combine(folder, "tablas", "compras.clientes.sql"));
+
+        Assert.Contains("CREATE TABLE ventas.clientes", ventas, StringComparison.Ordinal);
+        Assert.DoesNotContain("compras", ventas, StringComparison.Ordinal);
+        Assert.Contains("CREATE TABLE compras.clientes", compras, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task EnUnZip_DosTablasHomonimasSonDosEntradas()
+    {
+        var file = At("respaldo.zip");
+
+        await using (var sink = new ZipBackupSink(file))
+        {
+            await sink.WriteAsync(
+                BackupEntryKind.Structure,
+                "ventas.clientes",
+                "CREATE TABLE ventas.clientes (id int);",
+                default);
+
+            await sink.WriteAsync(
+                BackupEntryKind.Structure,
+                "compras.clientes",
+                "CREATE TABLE compras.clientes (id int);",
+                default);
+
+            await sink.CompleteAsync(Manifest(), default);
+        }
+
+        using var archive = ZipFile.OpenRead(file);
+
+        Assert.NotNull(archive.GetEntry("tablas/ventas.clientes.sql"));
+        Assert.NotNull(archive.GetEntry("tablas/compras.clientes.sql"));
+
+        // Y ninguna repetida: un zip admite dos entradas con el mismo nombre, y
+        // quien lo abra verá una sola.
+        Assert.Equal(
+            archive.Entries.Count,
+            archive.Entries.Select(entry => entry.FullName).Distinct(StringComparer.Ordinal).Count());
     }
 
     /// <summary>

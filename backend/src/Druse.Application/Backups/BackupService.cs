@@ -1,4 +1,4 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using Druse.Application.Abstractions;
 using Druse.Application.Connections;
 using Druse.Database.Abstractions;
@@ -55,7 +55,7 @@ public sealed class BackupService(
         exporters.ToDictionary(exporter => exporter.Format);
 
     /// <summary>Versión del artefacto que escribe esta implementación.</summary>
-    public const int FormatVersion = 1;
+    public const int FormatVersion = BackupManifest.ReversibleFormat;
 
     /// <summary>
     /// El guion que se escribiría, para enseñarlo antes de tocar nada.
@@ -156,11 +156,14 @@ public sealed class BackupService(
         // el manifiesto lo dice.
         await using var snapshot = await scripter.BeginSnapshotAsync(session, cancellationToken);
 
+        // Fuera del `try` porque el manifiesto de un respaldo que se canceló o
+        // falló también las necesita: lo que quedó en disco es lo que alcanzó a
+        // escribirse de estas tablas, y decir cuántas eran es media explicación.
+        var tables = new List<ScriptedTable>(request.Tables.Count);
+
         try
         {
             state.Enter(BackupStep.ReadingStructure);
-
-            var tables = new List<ScriptedTable>(request.Tables.Count);
 
             foreach (var table in request.Tables)
             {
@@ -221,7 +224,7 @@ public sealed class BackupService(
 
                 await sink.WriteAsync(
                     BackupEntryKind.Structure,
-                    table.Table.Name,
+                    DataSelection.KeyOf(table.Table),
                     Join(scripter.ScriptTable(table)),
                     cancellationToken);
             }
@@ -284,7 +287,7 @@ public sealed class BackupService(
                 {
                     await sink.WriteAsync(
                         BackupEntryKind.Constraints,
-                        table.Table.Name,
+                        DataSelection.KeyOf(table.Table),
                         Join(statements),
                         cancellationToken);
                 }
@@ -304,14 +307,37 @@ public sealed class BackupService(
         catch (OperationCanceledException)
         {
             // El archivo parcial se tira: un respaldo a medias con aspecto de
-            // completo es más peligroso que no tener ninguno.
-            await sink.DiscardAsync(CancellationToken.None);
+            // completo es más peligroso que no tener ninguno. Lo que sobrevive
+            // —la salida por carpetas— se queda diciendo que lo pararon, sobre
+            // qué motor y con qué llevaba copiado.
+            await sink.DiscardAsync(
+                Manifest(
+                    session,
+                    request,
+                    state,
+                    tables,
+                    snapshot.IsConsistent,
+                    BackupOutcome.Cancelled,
+                    "El respaldo se canceló antes de terminar: lo que hay aquí está incompleto."),
+                CancellationToken.None);
 
             return state.Cancelled();
         }
         catch (Exception error)
         {
-            await sink.DiscardAsync(CancellationToken.None);
+            // Fallo y cancelación no son lo mismo y el artefacto no puede
+            // contarlos igual: uno se paró queriendo y el otro se rompió. Quien
+            // encuentre la carpeta seis meses después solo tiene el manifiesto.
+            await sink.DiscardAsync(
+                Manifest(
+                    session,
+                    request,
+                    state,
+                    tables,
+                    snapshot.IsConsistent,
+                    BackupOutcome.Failed,
+                    $"El respaldo falló y quedó incompleto: {error.Message}"),
+                CancellationToken.None);
 
             return state.Failed(new BackupFailure(
                 state.CurrentObject ?? string.Empty,
@@ -388,7 +414,18 @@ public sealed class BackupService(
     /// una tabla de tres millones de filas se respaldaría con un millón y el
     /// artefacto no lo diría en ningún sitio.
     /// </summary>
-    private static readonly ExportOptions CsvOptions = new() { MaxRows = int.MaxValue };
+    /// <summary>
+    /// Cómo se escriben los datos en CSV de un respaldo.
+    ///
+    /// `DistinguishNull` es lo que separa este CSV del que se exporta para mirar:
+    /// aquí el archivo se va a volver a meter en una base, y un nulo que vuelve
+    /// como cadena vacía es un dato cambiado.
+    /// </summary>
+    private static readonly ExportOptions CsvOptions = new()
+    {
+        MaxRows = int.MaxValue,
+        DistinguishNull = true,
+    };
 
     private async Task WriteCsvAsync(
         IDatabaseSession session,
@@ -431,7 +468,7 @@ public sealed class BackupService(
             var truncated = false;
 
             await sink.WriteDataStreamAsync(
-                table.Table.Name,
+                DataSelection.KeyOf(table.Table),
                 exporter.FileExtension,
                 async (stream, token) =>
                 {
@@ -460,6 +497,17 @@ public sealed class BackupService(
         }
     }
 
+    /// <summary>
+    /// Cada entrada se nombra con su esquema, no solo con la tabla.
+    ///
+    /// Sin él, `ventas.clientes` y `compras.clientes` acaban en el mismo archivo:
+    /// en una carpeta el segundo se añade a continuación del primero y en un zip
+    /// aparecen dos entradas con el mismo nombre. En los dos casos el respaldo
+    /// dice que se llevó las dos tablas y solo hay una restaurable.
+    ///
+    /// El motor y la base no van en el nombre porque no hacen falta: un artefacto
+    /// es de una sola base y eso ya lo dice su manifiesto.
+    /// </summary>
     private static Task WriteAsync(
         IBackupSink sink,
         ScriptedTable table,
@@ -469,19 +517,28 @@ public sealed class BackupService(
             ? Task.CompletedTask
             : sink.WriteAsync(
                 BackupEntryKind.Data,
-                table.Table.Name,
+                DataSelection.KeyOf(table.Table),
                 Join(statements),
                 cancellationToken);
 
     private static string Join(IReadOnlyList<string> statements) =>
         statements.Count == 0 ? string.Empty : string.Join(Environment.NewLine, statements);
 
+    /// <summary>
+    /// El manifiesto de este respaldo, terminara como terminara.
+    ///
+    /// <paramref name="outcome"/> llega de fuera porque solo quien atrapó la
+    /// excepción sabe si aquello fue una cancelación o un fallo; sin argumento se
+    /// deduce de los avisos, que es el caso del respaldo que sí llegó al final.
+    /// </summary>
     private static BackupManifest Manifest(
         IDatabaseSession session,
         BackupRequest request,
         BackupState state,
         List<ScriptedTable> tables,
-        bool consistent) => new()
+        bool consistent,
+        BackupOutcome? outcome = null,
+        string? reason = null) => new()
         {
             FormatVersion = FormatVersion,
             DruseVersion = typeof(BackupService).Assembly.GetName().Version?.ToString() ?? "0.0.0",
@@ -495,15 +552,20 @@ public sealed class BackupService(
             Tables = tables.Count,
             TablesWithData = tables.Count(table => request.Data.IncludesData(table.Table)),
             Rows = state.TotalRows,
-            Outcome = state.Warnings.Count > 0
+            Outcome = outcome ?? (state.Warnings.Count > 0
                 ? BackupOutcome.CompletedWithWarnings
-                : BackupOutcome.Completed,
+                : BackupOutcome.Completed),
 
             // Lo que el motor concedió de verdad, no lo que se pidió: una base de
             // SQL Server sin instantáneas habilitadas rechaza la transacción, y el
             // respaldo se hace igual pero sin esa garantía.
             ConsistentSnapshot = consistent,
-            Warnings = state.Warnings,
+
+            // El motivo va el primero de los avisos: es lo que explica por qué la
+            // lista de los demás se corta donde se corta.
+            Warnings = reason is null
+                ? state.Warnings
+                : [new BackupWarning(string.Empty, reason), .. state.Warnings],
         };
 }
 

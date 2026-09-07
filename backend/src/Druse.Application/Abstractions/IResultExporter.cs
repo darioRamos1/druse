@@ -1,4 +1,4 @@
-using Druse.Database.Abstractions;
+﻿using Druse.Database.Abstractions;
 
 namespace Druse.Application.Abstractions;
 
@@ -38,6 +38,24 @@ public sealed record ExportOptions
 
     /// <summary>Texto con el que se representa un nulo. Vacío lo hace indistinguible de la cadena vacía.</summary>
     public string NullText { get; init; } = string.Empty;
+
+    /// <summary>
+    /// Si un nulo y una cadena vacía tienen que poder distinguirse al releer el
+    /// archivo.
+    ///
+    /// Con esto activado el nulo se deja en blanco y la cadena vacía se escribe
+    /// entrecomillada, que es lo que hace `COPY ... WITH CSV` de PostgreSQL y la
+    /// única forma de devolver los dos valores tal como estaban. Lo usa el
+    /// respaldo, donde el archivo se va a volver a meter en una base.
+    ///
+    /// No se activa siempre porque una exportación normal acaba en una hoja de
+    /// cálculo: ahí `NullText` es una decisión de presentación —«(nulo)», «N/A»,
+    /// nada— y unas comillas de más se ven.
+    ///
+    /// Manda sobre <see cref="NullText"/>: representar el nulo con un texto lo
+    /// vuelve indistinguible de un dato que diga eso mismo.
+    /// </summary>
+    public bool DistinguishNull { get; init; }
 
     /// <summary>Tope de filas. Protege de exportar sin querer una tabla entera.</summary>
     public int MaxRows { get; init; } = 1_000_000;

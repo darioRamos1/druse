@@ -1,4 +1,4 @@
-using Druse.Domain;
+﻿using Druse.Domain;
 
 namespace Druse.Application.Abstractions;
 
@@ -71,6 +71,12 @@ public interface IBackupSink : IAsyncDisposable
     /// completo es más peligroso que no tener ninguno**. En una salida por
     /// carpetas, lo ya escrito se conserva pero el manifiesto queda marcado como
     /// incompleto, porque ahí sí se ve qué hay y qué falta.
+    ///
+    /// El manifiesto llega hecho por la misma razón que en
+    /// <see cref="CompleteAsync"/>: describe **este** respaldo —su motor, su
+    /// origen, lo que alcanzó a copiar y por qué paró—. Inventarlo aquí obligaría
+    /// a cada implementación a adivinar datos que solo tiene el servicio, y lo que
+    /// se acaba escribiendo es un relleno que miente.
     /// </summary>
-    Task DiscardAsync(CancellationToken cancellationToken);
+    Task DiscardAsync(BackupManifest manifest, CancellationToken cancellationToken);
 }

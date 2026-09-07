@@ -104,6 +104,7 @@ public abstract class BackupArchive : IBackupArchive
         string table,
         string source,
         Stream stream,
+        bool emptyIsNull,
         [EnumeratorCancellation] CancellationToken cancellationToken)
     {
         // El BOM manda si lo hay, que es lo que escribe el exportador; sin él se
@@ -119,11 +120,13 @@ public abstract class BackupArchive : IBackupArchive
         var first = 1L;
         var read = 0L;
 
-        await foreach (var row in CsvRowReader.ReadAsync(reader, CsvDelimiter, cancellationToken))
+        await foreach (var row in CsvRowReader.ReadAsync(reader, CsvDelimiter, cancellationToken, emptyIsNull))
         {
             if (columns is null)
             {
-                columns = [.. row];
+                // La cabecera son nombres de columna: ahí un campo en blanco no
+                // es un nulo, es una columna sin nombre.
+                columns = [.. row.Select(name => name ?? string.Empty)];
                 continue;
             }
 
@@ -167,9 +170,10 @@ public abstract class BackupArchive : IBackupArchive
     /// La tabla a la que pertenece un archivo de datos.
     ///
     /// Es el nombre del archivo sin extensión, que es como lo escribió el
-    /// respaldo. Puede no traer el esquema —dos tablas iguales en esquemas
-    /// distintos comparten nombre de archivo—, y de resolverlo se encarga quien
-    /// restaura, que sí tiene delante el catálogo del destino.
+    /// respaldo: `esquema.tabla` desde que las dos tablas homónimas dejaron de
+    /// compartir archivo, y solo la tabla en los artefactos anteriores y en los
+    /// motores donde el esquema no viaja. En los dos casos, a qué tabla del
+    /// destino va lo decide quien restaura, que sí tiene delante su catálogo.
     /// </summary>
     protected static string TableOf(string file) =>
         System.IO.Path.GetFileNameWithoutExtension(file);
@@ -368,6 +372,9 @@ public sealed class FolderArchive : BackupArchive
         [EnumeratorCancellation]
         CancellationToken cancellationToken)
     {
+        var emptyIsNull = await ReadManifestAsync(cancellationToken)
+            is { FormatVersion: >= BackupManifest.ReversibleFormat };
+
         foreach (var folder in FolderOrder)
         {
             var directory = System.IO.Path.Combine(Path, folder);
@@ -394,6 +401,7 @@ public sealed class FolderArchive : BackupArchive
                         TableOf(file),
                         System.IO.Path.Combine(folder, System.IO.Path.GetFileName(file)),
                         File.OpenRead(file),
+                        emptyIsNull,
                         cancellationToken);
 
                     await foreach (var batch in rows)
@@ -443,6 +451,9 @@ public sealed class ZippedArchive : BackupArchive
         [EnumeratorCancellation]
         CancellationToken cancellationToken)
     {
+        var emptyIsNull = await ReadManifestAsync(cancellationToken)
+            is { FormatVersion: >= BackupManifest.ReversibleFormat };
+
         foreach (var folder in FolderOrder)
         {
             var prefix = $"{folder}/";
@@ -462,6 +473,7 @@ public sealed class ZippedArchive : BackupArchive
                         TableOf(entry.Name),
                         entry.FullName,
                         entry.Open(),
+                        emptyIsNull,
                         cancellationToken);
 
                     await foreach (var batch in rows)

@@ -1,5 +1,6 @@
-using System.IO.Compression;
+﻿using System.IO.Compression;
 using System.Text;
+using System.Text.Json;
 
 using Druse.Application.Abstractions;
 using Druse.Infrastructure.Backups;
@@ -159,6 +160,84 @@ public sealed class BackupArchiveTests : IDisposable
         Assert.Equal("pedidos", rows.Table);
         Assert.Equal("datos/pedidos.csv", rows.Source);
         Assert.Equal(["7"], rows.Rows[0]);
+    }
+
+    /// <summary>
+    /// El esquema del nombre del archivo llega hasta quien restaura.
+    ///
+    /// Es lo que le permite meter cada CSV en su tabla cuando el destino tiene dos
+    /// que se llaman igual. Los artefactos anteriores no lo traían, y esos siguen
+    /// leyéndose: el nombre queda corto y se resuelve como antes.
+    /// </summary>
+    [Fact]
+    public async Task ElNombreDelArchivoDeDatosConservaSuEsquema()
+    {
+        Write("datos/ventas.clientes.csv", "id\r\n1\r\n");
+        Write("datos/compras.clientes.csv", "id\r\n2\r\n");
+        Write("datos/heredado.csv", "id\r\n3\r\n");
+
+        var tablas = (await EntriesOf(_root))
+            .OfType<BackupRows>()
+            .Select(rows => rows.Table)
+            .ToList();
+
+        Assert.Contains("ventas.clientes", tablas, StringComparer.Ordinal);
+        Assert.Contains("compras.clientes", tablas, StringComparer.Ordinal);
+        Assert.Contains("heredado", tablas, StringComparer.Ordinal);
+    }
+
+    /// <summary>
+    /// Un manifiesto mínimo con la versión de formato que se quiera probar.
+    ///
+    /// Es lo que decide cómo se leen los blancos de los CSV, así que las dos
+    /// pruebas siguientes solo se diferencian en este número.
+    /// </summary>
+    private void WriteManifest(int formatVersion) =>
+        Write("manifest.json", JsonSerializer.Serialize(new
+        {
+            formatVersion,
+            druseVersion = "1.1.0",
+            createdAt = "2026-09-07T10:00:00Z",
+            engine = "PostgreSql",
+            serverVersion = "18.0",
+        }));
+
+    /// <summary>
+    /// Desde el formato 2, un campo en blanco es un nulo y uno con dos comillas es
+    /// la cadena vacía.
+    ///
+    /// Sin esa diferencia los dos vuelven como texto vacío, y una columna que
+    /// tenía nulos se restaura con cadenas vacías: un dato cambiado, y encima uno
+    /// que nadie va a mirar al terminar.
+    /// </summary>
+    [Fact]
+    public async Task EnElFormatoReversible_ElBlancoEsNuloYLasDosComillasLaCadenaVacia()
+    {
+        WriteManifest(2);
+        Write("datos/tienda.pedidos.csv", "id,nota\r\n1,\r\n2,\"\"\r\n3,algo\r\n");
+
+        var lotes = (await EntriesOf(_root)).OfType<BackupRows>().Single();
+
+        Assert.Equal(["1", null], lotes.Rows[0]);
+        Assert.Equal(["2", ""], lotes.Rows[1]);
+        Assert.Equal(["3", "algo"], lotes.Rows[2]);
+    }
+
+    /// <summary>
+    /// En un artefacto anterior, el blanco sigue significando lo que significaba.
+    ///
+    /// Leerlo ahora como nulo cambiaría datos ya guardados: en el formato 1 los
+    /// dos valores se escribían igual, y lo que se restauraba era texto vacío.
+    /// </summary>
+    [Fact]
+    public async Task EnUnArtefactoAnterior_ElBlancoSigueSiendoCadenaVacia()
+    {
+        WriteManifest(1);
+        Write("datos/pedidos.csv", "id,nota\r\n1,\r\n");
+
+        var lotes = (await EntriesOf(_root)).OfType<BackupRows>().Single();
+
+        Assert.Equal(["1", ""], lotes.Rows[0]);
     }
 
     [Fact]

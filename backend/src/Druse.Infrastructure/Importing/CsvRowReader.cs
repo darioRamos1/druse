@@ -1,4 +1,4 @@
-using System.Runtime.CompilerServices;
+﻿using System.Runtime.CompilerServices;
 using System.Text;
 
 namespace Druse.Infrastructure.Importing;
@@ -15,12 +15,25 @@ namespace Druse.Infrastructure.Importing;
 /// Dos formas de partir un CSV serían dos formas de equivocarse con las
 /// comillas, que es justo lo que el RFC existe para evitar.
 /// </summary>
-internal sealed class CsvSplitter(char delimiter)
+/// <param name="delimiter">Separador de campos.</param>
+/// <param name="emptyIsNull">
+/// Si un campo vacío **sin comillas** es un nulo y uno escrito como dos comillas
+/// es la cadena vacía. Es como escribe los datos el respaldo desde el formato 2, y
+/// la única forma de que un ida y vuelta devuelva los dos valores distintos.
+///
+/// No vale para un CSV cualquiera: el que trae una persona de una hoja de cálculo
+/// no sigue esa convención, y allí un campo en blanco es lo que el usuario diga
+/// en `NullText`.
+/// </param>
+internal sealed class CsvSplitter(char delimiter, bool emptyIsNull = false)
 {
-    private readonly List<string> _row = [];
+    private readonly List<string?> _row = [];
     private readonly StringBuilder _field = new();
 
     private bool _quoted;
+
+    /// <summary>Si el campo que se está leyendo llegó entrecomillado.</summary>
+    private bool _fieldQuoted;
 
     /// <summary>
     /// Se vio una comilla dentro de un campo entrecomillado y todavía no se sabe
@@ -29,7 +42,7 @@ internal sealed class CsvSplitter(char delimiter)
     private bool _pending;
 
     /// <summary>Empuja un carácter. Devuelve la fila cuando se completa.</summary>
-    public List<string>? Push(char character)
+    public List<string?>? Push(char character)
     {
         if (_pending)
         {
@@ -62,6 +75,7 @@ internal sealed class CsvSplitter(char delimiter)
         {
             case '"' when _field.Length == 0:
                 _quoted = true;
+                _fieldQuoted = true;
                 return null;
 
             // Se ignora: el salto lo marca el \n que viene detrás.
@@ -74,8 +88,7 @@ internal sealed class CsvSplitter(char delimiter)
             default:
                 if (character == delimiter)
                 {
-                    _row.Add(_field.ToString());
-                    _field.Clear();
+                    EndField();
                     return null;
                 }
 
@@ -85,20 +98,32 @@ internal sealed class CsvSplitter(char delimiter)
     }
 
     /// <summary>Lo que quede sin salto de línea final también es una fila.</summary>
-    public List<string>? Flush()
+    public List<string?>? Flush()
     {
         _pending = false;
         _quoted = false;
 
-        return _field.Length > 0 || _row.Count > 0 ? EndRow() : null;
+        return _field.Length > 0 || _fieldQuoted || _row.Count > 0 ? EndRow() : null;
     }
 
-    private List<string> EndRow()
+    private void EndField()
     {
-        _row.Add(_field.ToString());
-        _field.Clear();
+        // Un campo vacío que no venía entrecomillado es un nulo; uno escrito como
+        // dos comillas es la cadena vacía. Sin esa diferencia los dos vuelven como
+        // lo mismo, y lo que era un nulo entra en la base como texto vacío.
+        _row.Add(emptyIsNull && !_fieldQuoted && _field.Length == 0
+            ? null
+            : _field.ToString());
 
-        var row = new List<string>(_row);
+        _field.Clear();
+        _fieldQuoted = false;
+    }
+
+    private List<string?> EndRow()
+    {
+        EndField();
+
+        var row = new List<string?>(_row);
 
         _row.Clear();
 
@@ -119,14 +144,20 @@ public static class CsvRowReader
     private const int BufferSize = 8 * 1024;
 
     /// <summary>Las filas del archivo, tal cual vienen y sin interpretar nada.</summary>
-    public static async IAsyncEnumerable<IReadOnlyList<string>> ReadAsync(
+    /// <param name="emptyIsNull">
+    /// Si un campo vacío sin comillas se entrega como nulo. Lo pide la
+    /// restauración de un respaldo del formato 2 en adelante, que es donde el
+    /// archivo se escribió para poder distinguirlos.
+    /// </param>
+    public static async IAsyncEnumerable<IReadOnlyList<string?>> ReadAsync(
         TextReader reader,
         char delimiter,
-        [EnumeratorCancellation] CancellationToken cancellationToken)
+        [EnumeratorCancellation] CancellationToken cancellationToken,
+        bool emptyIsNull = false)
     {
         ArgumentNullException.ThrowIfNull(reader);
 
-        var splitter = new CsvSplitter(delimiter);
+        var splitter = new CsvSplitter(delimiter, emptyIsNull);
         var buffer = new char[BufferSize];
 
         int read;

@@ -122,7 +122,7 @@ public abstract class BackupSinkBase : IBackupSink
         BackupManifest manifest,
         CancellationToken cancellationToken);
 
-    public abstract Task DiscardAsync(CancellationToken cancellationToken);
+    public abstract Task DiscardAsync(BackupManifest manifest, CancellationToken cancellationToken);
 
     public abstract ValueTask DisposeAsync();
 }
@@ -197,7 +197,14 @@ public sealed class SingleFileBackupSink : BackupSinkBase
         return new BackupArtifact(_path, new FileInfo(_path).Length);
     }
 
-    public override async Task DiscardAsync(CancellationToken cancellationToken)
+    /// <summary>
+    /// El archivo se borra entero, así que el manifiesto no llega a escribirse.
+    ///
+    /// No es un descuido: aquí no queda artefacto que describir. Lo que se
+    /// conserva —y con su resultado real— es la salida por carpetas, donde sí se
+    /// puede mirar qué entró y qué faltó.
+    /// </summary>
+    public override async Task DiscardAsync(BackupManifest manifest, CancellationToken cancellationToken)
     {
         _discarded = true;
 
@@ -295,8 +302,19 @@ public sealed class FolderBackupSink(string root) : BackupSinkBase
         return new BackupArtifact(_root, SizeOf(_root));
     }
 
-    public override async Task DiscardAsync(CancellationToken cancellationToken)
+    /// <summary>
+    /// Lo escrito se queda, con un manifiesto que dice qué es.
+    ///
+    /// El manifiesto es el del respaldo real —su motor, su servidor, su base y su
+    /// resultado— y no un relleno: antes se escribía siempre PostgreSQL y
+    /// «cancelado», de modo que una carpeta a medias de SQL Server que había
+    /// fallado se presentaba como una de PostgreSQL que alguien paró. Quien la
+    /// encuentre medio año después solo tiene este archivo para saberlo.
+    /// </summary>
+    public override async Task DiscardAsync(BackupManifest manifest, CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(manifest);
+
         if (!Directory.Exists(_root))
         {
             return;
@@ -304,15 +322,7 @@ public sealed class FolderBackupSink(string root) : BackupSinkBase
 
         await File.WriteAllBytesAsync(
             Path.Combine(_root, ManifestName),
-            Serialize(new BackupManifest
-            {
-                DruseVersion = "0.0.0",
-                CreatedAt = DateTimeOffset.UtcNow,
-                Engine = DatabaseEngine.PostgreSql,
-                ServerVersion = string.Empty,
-                Outcome = BackupOutcome.Cancelled,
-                Warnings = [new BackupWarning(string.Empty, "El respaldo no llegó a terminar.")],
-            }),
+            Serialize(manifest),
             cancellationToken);
     }
 
@@ -411,7 +421,10 @@ public sealed class ZipBackupSink : BackupSinkBase
         return new BackupArtifact(_path, new FileInfo(_path).Length);
     }
 
-    public override Task DiscardAsync(CancellationToken cancellationToken)
+    /// <summary>
+    /// Como el archivo suelto: el `.zip` se borra y no queda nada que describir.
+    /// </summary>
+    public override Task DiscardAsync(BackupManifest manifest, CancellationToken cancellationToken)
     {
         _discarded = true;
         _archive.Dispose();

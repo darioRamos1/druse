@@ -1,4 +1,4 @@
-using System.Text;
+﻿using System.Text;
 using Druse.Application.Abstractions;
 
 namespace Druse.Infrastructure.Importing;
@@ -75,7 +75,7 @@ public sealed class CsvTableFileReader : ITableFileReader
     /// usuario lo verá en la previsualización.
     /// </summary>
     internal static string?[] Ajustar(
-        IReadOnlyList<string> fila,
+        IReadOnlyList<string?> fila,
         int columnas,
         string nullText)
     {
@@ -106,10 +106,13 @@ public sealed class CsvTableFileReader : ITableFileReader
     /// entrega el texto ya leído; quien no puede permitírselo lo recorre con
     /// <see cref="CsvRowReader"/>, que usa la misma máquina.
     /// </summary>
-    private static List<IReadOnlyList<string>> Parse(string texto, char delimiter)
+    private static List<IReadOnlyList<string?>> Parse(string texto, char delimiter)
     {
+        // Sin `emptyIsNull`: este es el camino de la importación, y el archivo lo
+        // trae una persona de donde sea. Ahí un campo en blanco es lo que diga
+        // `NullText`, no una convención del respaldo.
         var splitter = new CsvSplitter(delimiter);
-        var filas = new List<IReadOnlyList<string>>();
+        var filas = new List<IReadOnlyList<string?>>();
 
         foreach (var caracter in texto)
         {

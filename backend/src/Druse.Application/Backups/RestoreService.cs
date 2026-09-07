@@ -1,4 +1,4 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.Text.RegularExpressions;
 
 using Druse.Application.Abstractions;
@@ -58,7 +58,7 @@ public sealed partial class RestoreService(
     private readonly IBackupArchiveFactory _archives = archives;
 
     /// <summary>Versión de formato que esta implementación sabe leer.</summary>
-    public const int SupportedFormat = 1;
+    public const int SupportedFormat = BackupManifest.ReversibleFormat;
 
     /// <summary>
     /// Qué trae el artefacto y qué pasaría al aplicarlo aquí, **sin tocar nada**.
@@ -142,6 +142,19 @@ public sealed partial class RestoreService(
             warnings.Add(new BackupWarning(
                 string.Empty,
                 $"El respaldo quedó {summary.Manifest.Outcome} y puede estar incompleto."));
+        }
+
+        // Un artefacto viejo con datos en CSV no puede restaurarse tal cual era:
+        // en su formato el nulo y la cadena vacía se escribían igual. Se restaura
+        // —negarse sería peor—, pero quien lo haga tiene que saber qué recibe.
+        if (summary.Manifest is { DataFormat: BackupDataFormat.Csv } antiguo &&
+            antiguo.FormatVersion < BackupManifest.ReversibleFormat)
+        {
+            warnings.Add(new BackupWarning(
+                string.Empty,
+                $"El respaldo usa el formato {antiguo.FormatVersion}, donde un nulo y una cadena " +
+                "vacía se escribían igual en los datos en CSV: las dos cosas se restaurarán como " +
+                "cadena vacía. Para conservar los nulos hay que volver a respaldar con esta versión."));
         }
 
         // Los datos en CSV pierden por el camino la diferencia entre un nulo y una
@@ -688,10 +701,15 @@ public sealed partial class RestoreService(
     /// <summary>
     /// A qué tabla del destino van los datos de un archivo.
     ///
-    /// El archivo se llama como la tabla, sin su esquema, así que se busca en el
-    /// catálogo del destino —ya con las tablas creadas por el propio respaldo—.
-    /// Si el nombre vale para dos, no se elige una: insertar en la equivocada es
-    /// peor que parar.
+    /// Los artefactos de esta versión nombran el archivo con su esquema, así que
+    /// primero se busca esa tabla exacta. Los anteriores lo nombraban solo con la
+    /// tabla, y por eso queda la segunda pasada: se prueba con el nombre corto, y
+    /// si vale para dos no se elige una —insertar en la equivocada es peor que
+    /// parar—.
+    ///
+    /// La segunda pasada sirve además para lo que la función existe: restaurar en
+    /// otro sitio. Un respaldo de `ventas.clientes` puede ir a una base donde esa
+    /// tabla vive en `public`, y exigir el esquema de origen lo impediría.
     /// </summary>
     private async Task<DatabaseObject> ResolveAsync(
         IDatabaseSession session,
@@ -701,10 +719,14 @@ public sealed partial class RestoreService(
     {
         targets.Tables ??= await TablesAsync(session, cancellationToken);
 
-        var candidates = targets.Tables
-            .Where(table => Matches(DataSelection.KeyOf(table), name) ||
-                            string.Equals(table.Name, name, StringComparison.OrdinalIgnoreCase))
-            .ToList();
+        var candidates = Candidates(targets.Tables, name);
+
+        // El nombre corto solo entra cuando el cualificado no encontró nada: si
+        // el destino tiene la tabla en su esquema, esa gana sin ambigüedad.
+        if (candidates.Count == 0 && name.LastIndexOf('.') is var cut && cut > 0)
+        {
+            candidates = Candidates(targets.Tables, name[(cut + 1)..]);
+        }
 
         return candidates.Count switch
         {
@@ -717,6 +739,12 @@ public sealed partial class RestoreService(
                 "El archivo de datos no dice en cuál va."),
         };
     }
+
+    private static List<DatabaseObject> Candidates(
+        IReadOnlyList<DatabaseObject> tables,
+        string name) =>
+        [.. tables.Where(table => Matches(DataSelection.KeyOf(table), name) ||
+                                  string.Equals(table.Name, name, StringComparison.OrdinalIgnoreCase))];
 
     private async Task<IReadOnlyList<DatabaseColumn>> ColumnsAsync(
         IDatabaseSession session,

@@ -1,4 +1,4 @@
-using System.Text;
+﻿using System.Text;
 using Druse.Application.Abstractions;
 using Druse.Database.Abstractions;
 
@@ -78,12 +78,37 @@ public sealed class CsvResultExporter : IResultExporter
                 line.Append(options.Delimiter);
             }
 
-            WriteField(line, values[index] ?? options.NullText, options.Delimiter);
+            var value = values[index];
+
+            if (!options.DistinguishNull)
+            {
+                WriteField(line, value ?? options.NullText, options.Delimiter);
+                continue;
+            }
+
+            // El nulo se deja en blanco y la cadena vacía se escribe con sus dos
+            // comillas. Escritos así, quien relea el archivo puede devolver cada
+            // uno a lo que era; con los dos en blanco, no.
+            if (value is null)
+            {
+                continue;
+            }
+
+            if (value.Length == 0)
+            {
+                line.Append(EmptyString);
+                continue;
+            }
+
+            WriteField(line, value, options.Delimiter);
         }
 
         // Fin de línea CRLF: es lo que exige el RFC y lo que espera Excel.
         await writer.WriteAsync(line.Append("\r\n").ToString().AsMemory(), cancellationToken);
     }
+
+    /// <summary>La cadena vacía escrita de forma que se distinga de un nulo.</summary>
+    private const string EmptyString = "\"\"";
 
     /// <summary>
     /// Escribe un campo entrecomillándolo solo cuando hace falta.

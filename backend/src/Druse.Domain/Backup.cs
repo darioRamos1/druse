@@ -1,4 +1,4 @@
-namespace Druse.Domain;
+﻿namespace Druse.Domain;
 
 /// <summary>Cómo se reparte el respaldo en archivos.</summary>
 public enum BackupLayout
@@ -158,6 +158,23 @@ public readonly record struct BackupFailure(string Subject, string Message, stri
 /// </summary>
 public sealed record BackupManifest
 {
+    /// <summary>
+    /// El primer formato que se puede restaurar sin cambiar valores.
+    ///
+    /// Lo que trae el 2 y no tenía el 1:
+    ///
+    /// - Cada archivo se llama `esquema.tabla`, así que dos tablas homónimas de
+    ///   esquemas distintos dejan de compartirlo.
+    /// - En los datos en CSV, un campo en blanco es un nulo y uno escrito como
+    ///   dos comillas es la cadena vacía. En el 1 los dos se escribían igual y
+    ///   todo volvía como texto vacío.
+    ///
+    /// Un artefacto del formato 1 se sigue restaurando: lo que no se hace es
+    /// reinterpretar sus blancos como nulos, porque entonces se estarían
+    /// cambiando datos ya guardados. Quien restaure uno recibe el aviso.
+    /// </summary>
+    public const int ReversibleFormat = 2;
+
     /// <summary>
     /// Versión del **formato del artefacto**, no la de Druse.
     ///

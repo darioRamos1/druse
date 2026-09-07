@@ -1,4 +1,4 @@
-using Druse.Application.Abstractions;
+﻿using Druse.Application.Abstractions;
 using Druse.Domain;
 
 namespace Druse.Application.Backups;
@@ -70,7 +70,8 @@ internal sealed class PreviewSink(int maxStatements) : IBackupSink
         CancellationToken cancellationToken) =>
         Task.FromResult(new BackupArtifact(string.Empty, 0));
 
-    public Task DiscardAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+    public Task DiscardAsync(BackupManifest manifest, CancellationToken cancellationToken) =>
+        Task.CompletedTask;
 
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 }
