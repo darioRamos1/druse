@@ -5,6 +5,14 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
+
+    <!--
+      Sin esto, `dotnet test backend/Druse.slnx` termina en verde sin ejecutar
+      una sola prueba: desde el SDK 10.0.400 el comando solo entra en los
+      proyectos que se declaran de prueba, y el paquete de xunit no lo declara
+      por su cuenta. Un check verde que no probó nada es peor que uno rojo.
+    -->
+    <IsTestProject>true</IsTestProject>
   </PropertyGroup>
 
   <ItemGroup>

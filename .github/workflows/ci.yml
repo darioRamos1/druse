@@ -36,14 +36,36 @@ jobs:
         if: matrix.os == 'ubuntu-latest'
         run: sudo apt-get update && sudo apt-get install -y libxml2
 
+      # `-m:1` en los tres pasos: IKVM traduce el jar de Informix y dos proyectos
+      # haciéndolo a la vez chocan sobre su propio log con «os error 32». El
+      # mensaje no menciona el paralelismo, así que cuesta reconocerlo.
       - name: Restaurar
-        run: dotnet restore backend/Druse.slnx
+        run: dotnet restore backend/Druse.slnx -m:1
 
       - name: Compilar
-        run: dotnet build backend/Druse.slnx --configuration Release --no-restore
+        run: dotnet build backend/Druse.slnx --configuration Release --no-restore -m:1
 
       - name: Probar
-        run: dotnet test backend/Druse.slnx --configuration Release --no-build --verbosity normal
+        run: >
+          dotnet test backend/Druse.slnx
+          --configuration Release
+          --no-build
+          -m:1
+          --verbosity normal
+          --results-directory artifacts/test-results
+          --logger trx
+
+      # Un verde sin pruebas ejecutadas no se distingue de un verde de verdad.
+      # Este paso lee los TRX y rompe el job si falta una suite o si alguna no
+      # ejecutó nada.
+      - name: Comprobar que se ejecutaron pruebas
+        if: always()
+        shell: pwsh
+        run: >
+          ./build/scripts/check-tests.ps1
+          -ResultsDirectory artifacts/test-results
+          -ExpectedSuites 3
+          -MinimumTests 500
 
   # Las pruebas contra motores reales solo corren en Linux: los ejecutores de
   # Windows y macOS no traen Docker, y montarlo ahí multiplicaría el tiempo sin
@@ -122,6 +144,7 @@ jobs:
       DRUSE_TEST_IFX_SECOND_DB: druse_test2
       DRUSE_TEST_IFX_USER: informix
       DRUSE_TEST_IFX_PASSWORD: in4mix
+      DRUSE_TEST_IFX_SQLI_PORT: 9088
 
       # Sin esto, un motor caído se manifestaría como una suite en verde que no
       # comprobó nada. Aquí ese caso debe romper la compilación.
@@ -148,14 +171,17 @@ jobs:
       # failed to start» sin más explicación. Aquí se espera con el mismo bucle
       # que usa `build/scripts/test-db.ps1`, que es el que ya funciona en local.
       #
-      # Se publica el 9089, que es el escuchador DRDA por donde habla Druse; el
-      # 9088 atiende el protocolo nativo y usarlo da un error que parece de
-      # credenciales.
+      # Se publican los dos escuchadores. El 9089 es DRDA, por donde habla el
+      # proveedor nativo; el 9088 atiende SQLI, que es por donde entra el puente
+      # JDBC. Confundirlos da un error que parece de credenciales, pero las
+      # pruebas del transporte SQLI necesitan el 9088 abierto: sin él se omiten
+      # en silencio y la suite queda verde sin haberlo probado.
       - name: Levantar Informix
         run: |
           docker run -d --name druse-informix \
             -e LICENSE=accept \
             -e DB_INIT=1 \
+            -p 9088:9088 \
             -p 9089:9089 \
             icr.io/informix/informix-developer-database:latest
 
@@ -196,7 +222,22 @@ jobs:
              echo "CREATE DATABASE druse_test2 WITH LOG;" | dbaccess - -'
 
       - name: Probar contra los cuatro motores
-        run: dotnet test backend/Druse.slnx --configuration Release --verbosity normal
+        run: >
+          dotnet test backend/Druse.slnx
+          --configuration Release
+          -m:1
+          --verbosity normal
+          --results-directory artifacts/test-results
+          --logger trx
+
+      - name: Comprobar que se ejecutaron pruebas
+        if: always()
+        shell: pwsh
+        run: >
+          ./build/scripts/check-tests.ps1
+          -ResultsDirectory artifacts/test-results
+          -ExpectedSuites 3
+          -MinimumTests 800
 
   # La aplicación entera por donde la usa una persona: Angular, la API local y un
   # PostgreSQL de verdad. Es el único job que prueba las tres capas juntas, y por
@@ -248,6 +289,13 @@ jobs:
       - name: Instalar dependencias de las pruebas
         working-directory: e2e
         run: npm ci
+
+      # Las pruebas de Playwright son TypeScript que nadie compila: cada archivo
+      # se transpila y se ejecuta. Un error de tipos no aparece hasta que rompe
+      # una prueba por otra razón, o no aparece.
+      - name: Comprobar tipos de las pruebas
+        working-directory: e2e
+        run: npm run typecheck
 
       # Solo Chromium: los navegadores pesan y aquí no se está probando la
       # compatibilidad entre ellos, sino que la aplicación funcione.
@@ -316,6 +364,8 @@ jobs:
 
       - name: Instalar Rust
         uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
 
       - name: Dependencias de Tauri en Linux
         if: matrix.os == 'ubuntu-latest'
@@ -339,6 +389,20 @@ jobs:
       - name: Comprobar que el envoltorio compila
         working-directory: shells/desktop-tauri
         run: cargo check --locked
+
+      # Las pruebas del envoltorio solo se ejecutaban a mano, y en este equipo
+      # además hace falta cargar antes el entorno de MSVC. Aquí corren siempre.
+      - name: Comprobar el formato
+        working-directory: shells/desktop-tauri
+        run: cargo fmt --check
+
+      - name: Analizar con Clippy
+        working-directory: shells/desktop-tauri
+        run: cargo clippy --locked --all-targets -- -D warnings
+
+      - name: Probar el envoltorio
+        working-directory: shells/desktop-tauri
+        run: cargo test --locked
 
   # Comprueba que la API se puede publicar autocontenida para cada plataforma
   # objetivo, sin que el usuario final necesite el SDK de .NET (ADR 0003).
