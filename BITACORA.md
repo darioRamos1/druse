@@ -17,7 +17,7 @@
 | Fase 8 | ✅ **7/7.** Tres motores sobre el mismo contrato y primera beta preparada. |
 | ¿Compila el backend? | Sí — 0 advertencias, 0 errores |
 | ¿Compila el envoltorio? | Sí — recompilado en la 037 con `build/scripts/msvc-env.ps1` cargado antes; sin él, `cargo` falla en `vswhom-sys` por elegir el MSVC equivocado. **Sus pruebas ya son 17**, con las dos que vigilan la CSP y las cuatro de `DRUSE_DATA_DIR` |
-| ¿Pasan las pruebas? | Sí. En la **046**: **732 del backend** en las dos suites que no piden motores —558 unitarias y 174 de integración de 177—, **815 del frontend** y el **barrido entero** con la consola limpia y un solo hallazgo, que no es un defecto. Del e2e, 43 en verde; las cuatro de SQL Server esperaban a su contenedor, que se levantó en esta sesión. Las **23 del envoltorio** son de la 042 y siguen valiendo. Las contractuales salen verdes **sin los motores delante**: sin `DRUSE_REQUIRE_ENGINES=1` cada prueba termina sin comprobar nada cuando el servidor no responde. El `DATE` de Informix por SQLI de la 039 sigue sin repetirse: hace falta ese contenedor |
+| ¿Pasan las pruebas? | Sí. En la **046**: **740 del backend** —563 unitarias y las 177 de integración, con PostgreSQL, MySQL y SQL Server levantados—, **815 del frontend** y el **barrido entero** con la consola limpia y un solo hallazgo, que no es un defecto. Del e2e, 43 en verde; las cuatro de SQL Server esperaban a su contenedor, que se levantó en esta sesión. Las **23 del envoltorio** son de la 042 y siguen valiendo. Las contractuales salen verdes **sin los motores delante**: sin `DRUSE_REQUIRE_ENGINES=1` cada prueba termina sin comprobar nada cuando el servidor no responde. El `DATE` de Informix por SQLI de la 039 sigue sin repetirse: hace falta ese contenedor |
 | ¿Hay aplicación de escritorio? | **Sí.** Instalador NSIS y ZIP portable, en dos variantes: con Informix y sin él. Desde la 038 **se actualiza sola** —o lo hará: ver el aviso del repositorio privado en §9—. El MSI dejó de generarse: `tauri.conf.json` solo declara `nsis`, que es lo que necesita el actualizador. En la **040** se regeneraron los instaladores y **la variante completa quedó instalada y abierta en este equipo**, con el arreglo del envoltorio dentro. Siguen **sin firma Authenticode**: SmartScreen en cada equipo |
 | Motores | **PostgreSQL, SQL Server, MySQL/MariaDB e Informix**, sobre el mismo contrato. Informix tiene **dos entradas**: por DRDA con el driver de IBM (puerto 9089) y por **SQLI**, su protocolo nativo, con el puente JDBC (9088). Cambia por dónde se entra; el SQL, el catálogo y los tipos son los mismos |
 | Trabajo a medias | **Nada sin commitear.** `PLAN_MEJORAS_DRUSE.md` lleva marcadas las fases 0 a 5 salvo lo grande —FE-001 a FE-003, BE-001, BE-002, A11Y-005— más BKP-006, SEC-007, PERF-004 y PERF-005. Sin comprobar: las contractuales de la lectura en lote contra los cuatro motores desde la 039, **el multicursor dentro de la ventana empaquetada**, y de antes —**el diálogo del sistema y el selector de carpeta siguen sin verse abrir**, y **el actualizador no puede funcionar mientras el repositorio sea privado** (ver §9) |
@@ -470,21 +470,41 @@ celda dice dónde está, y la cabecera y el asa se manejan con el teclado: Intro
 Espacio seleccionan la columna, las flechas la ensanchan y Mayúsculas va de 64 en
 64. Ajustar una columna era lo único que exigía arrastrar el ratón.
 
+#### Y el tope del XLSX contaba lo que no era
+
+«200 000 filas caben holgadamente» era una corazonada, y estaba puesta en la
+magnitud equivocada. Medido —diez columnas de texto, en este equipo— la memoria
+va lineal con las **celdas**: 72 MB de montón vivo con 10 000 filas, 200 MB con
+50 000, 370 MB con 100 000 y **732 MB con 200 000**, reservando 3,1 GB por el
+camino. Unos 370 bytes por celda. Con cuarenta columnas, el mismo tope en filas
+pedía cerca de 3 GB y el proceso moría a mitad. Ahora el límite cuenta celdas
+—dos millones— y el pico se queda en unos 730 MB sea cual sea la forma de la
+tabla. La medición se pide con `DRUSE_MEDIR_XLSX=1`; la cuenta del tope se
+comprueba siempre.
+
 **Verificado.** El barrido entero, con la consola limpia y **un solo hallazgo**
 —que la base de pruebas no tiene procedimientos, que no es un defecto—; a 1.440,
 1.024 y 900 px nada desborda. Las capturas de los tres anchos revisadas a ojo.
 Y el camino crítico contra PostgreSQL, con su conexión guardada y borrada.
 
-**Pruebas.** 815 del frontend, 558 unitarias del backend y 174 de integración
-de 177. Del e2e: 43 pasan; las de SQL Server necesitaban su contenedor, que se
-levantó.
+**Pruebas.** 815 del frontend, **563 unitarias** del backend y **177 de
+integración de 177**, con PostgreSQL, MySQL y SQL Server levantados. Del e2e: 43
+pasaron en una pasada completa y las cuatro de SQL Server, que entonces fallaban
+por no tener su contenedor, pasan ahora en 1,2 minutos con él levantado. **La
+pasada completa final quedó a medias**, parada a petición: lo comprobado son los
+archivos por separado, todos en verde.
+
+Un aviso para la próxima: cuatro de esos fallos no eran del código sino del
+estado acumulado en `%TEMP%\druse-e2e-datos` tras varias pasadas del barrido
+—agotaban los cuatro minutos de tiempo máximo—. Vaciar esa carpeta los devolvió
+a verde; conviene borrarla cuando las pruebas empiecen a ir lentas.
 
 **Archivos.** `SecretWriter.cs` (nuevo), `SavedConnectionService.cs`,
 `SavedAiProviderService.cs`, `Contracts.cs`, `status-bar.*`, `top-bar.*`,
 `results-grid.*`, `editor-toolbar.*`, `diagram-panel.html`,
 `settings-dialog.scss`, `tsconfig.json`, `.github/workflows/*`,
 `.github/dependabot.yml` (nuevo), `docs/decisions/0004-*.md`, `barrido.spec.ts`,
-`test-db.ps1`.
+`test-db.ps1`, `XlsxResultExporter.cs` y `XlsxMemoryTests.cs` (nuevo).
 
 **Estado al cerrar.** Commiteado en `main`.
 
