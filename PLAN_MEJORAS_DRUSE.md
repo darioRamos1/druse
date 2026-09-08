@@ -421,8 +421,26 @@ no solamente validaciones visuales.
 
 ### Frontend
 
-- [ ] **FE-001:** dividir `WorkspaceStore` por responsabilidades sin introducir otra biblioteca de estado por defecto.
-- [ ] **FE-002:** separar primero sesiones/transacciones, pestañas, explorador y ejecución de consultas.
+- [ ] **FE-001:** dividir `WorkspaceStore` por responsabilidades sin introducir
+      otra biblioteca de estado por defecto. **Empezado el 8 de septiembre de
+      2026**: sin biblioteca nueva —siguen siendo Signals— y **sin cambiar una
+      sola llamada de los componentes**, que es lo que permite hacerlo por
+      partes. El almacén pasó de 3.372 líneas a 2.919 y lo que salió vive en
+      cuatro archivos con su propia prueba: `errors.ts` —las palabras con las que
+      se cuenta un fallo, que ahora comparten todas las piezas—,
+      `notice-store.ts`, `connection-store.ts`, `tab-store.ts` y
+      `transaction-store.ts`. Faltan el explorador y la ejecución, que son los
+      dos bloques grandes que quedan.
+- [ ] **FE-002:** separar primero sesiones/transacciones, pestañas, explorador y
+      ejecución de consultas. **Dos de cuatro**: sesiones y transacciones el 8 de
+      septiembre de 2026 —las conexiones, su sesión y cuál está activa en
+      `ConnectionStore`; las transacciones, con su reloj y el aviso de la que se
+      deshace sola, en `TransactionStore`— y las pestañas el mismo día, con el
+      guardado con retardo que las protege de un cierre inesperado. Quedan el
+      explorador y la ejecución. **El explorador tiene un nudo que resolver
+      antes**: cuando una sesión se pierde hay que limpiar el árbol, y hoy quien
+      lo hace es el almacén; sacar el árbol sin más deja al explorador y al
+      almacén llamándose el uno al otro.
 - [ ] **FE-003:** extraer de `AppShell` la coordinación de diálogos y comandos.
 - [x] **FE-004:** activar `strict` y `strictTemplates` de manera incremental.
       **No hizo falta que fuera incremental**: activados los dos de golpe, el
@@ -475,9 +493,14 @@ no solamente validaciones visuales.
 > nombre, que antes decía «MySQL» de todo lo que no fuera PostgreSQL o SQL Server.
 >
 > **Lo que queda es lo grande y lo que hay que mirar:** FE-001 a FE-003 son
-> extracciones de `WorkspaceStore` y `AppShell` que no pueden hacerse a medias;
-> BE-001 y BE-002 son lo mismo en el backend. Y A11Y-005 no es programar: es
-> sentarse con un lector de pantalla.
+> extracciones de `WorkspaceStore` y `AppShell`; BE-001 y BE-002 son lo mismo en
+> el backend. Y A11Y-005 no es programar: es sentarse con un lector de pantalla.
+>
+> **Y sí se pueden hacer a medias**, que es lo que se creía que no. La del 8 de
+> septiembre de 2026 sacó cuatro piezas del almacén dejando su fachada intacta:
+> ningún componente cambió, las 815 pruebas siguieron pasando sin tocar una sola
+> expectativa, y las piezas nuevas ganaron 25 pruebas propias que antes no había
+> dónde escribir.
 >
 > **A11Y-003 estaba desactualizada**: el separador ya llevaba sus valores ARIA y
 > sus flechas. Comprobado, no escrito.
