@@ -186,6 +186,14 @@ export class AiProviderDialog {
   protected readonly probing = signal(false);
   protected readonly probe = signal<{ ok: boolean; detail: string; ms: number } | null>(null);
   protected readonly error = signal('');
+
+  /**
+   * Lo que salió mal con el llavero sin que fallara el guardado.
+   *
+   * Va aparte del error porque no es un error: el proveedor quedó guardado y lo
+   * único que no se pudo fue recordar su clave.
+   */
+  protected readonly warning = signal('');
   protected readonly saving = signal(false);
 
   /** Modelos que el proveedor dice tener, cuando se han pedido. */
@@ -495,9 +503,20 @@ export class AiProviderDialog {
   protected async save(): Promise<void> {
     this.saving.set(true);
     this.error.set('');
+    this.warning.set('');
 
     try {
-      await this._store.save(this.request());
+      const saved = await this._store.save(this.request());
+
+      if (saved.secretWarning) {
+        // El proveedor está guardado; lo que falló fue el llavero. Cerrar aquí
+        // se llevaría por delante el único sitio donde el usuario puede
+        // enterarse de que su clave no quedó recordada.
+        this.warning.set(saved.secretWarning);
+
+        return;
+      }
+
       this.closed.emit();
     } catch (error) {
       this.error.set(describe(error));

@@ -282,6 +282,15 @@ public sealed record SavedConnectionDto
 
     /// <summary>Hay un secreto de SSH guardado para este perfil.</summary>
     public bool HasStoredSshSecret { get; init; }
+
+    /// <summary>
+    /// Qué salió mal con el almacén del sistema al guardar, si algo salió mal.
+    ///
+    /// El perfil está guardado igual —esa mitad no depende del llavero—, así que
+    /// no es un error de la petición: es lo que hay que contarle al usuario sobre
+    /// su contraseña. Solo aparece al guardar; al listar no tendría sentido.
+    /// </summary>
+    public string? SecretWarning { get; init; }
 }
 
 public sealed record SaveConnectionRequest

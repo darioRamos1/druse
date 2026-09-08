@@ -772,9 +772,152 @@ public sealed class SavedConnectionServiceTests : IDisposable
             () => _service.SaveAsync(invalid, null, false, CancellationToken.None));
     }
 
+    [Fact]
+    public async Task GuardarSinIncidenciasNoAvisaDeNada()
+    {
+        var result = await _service.SaveAsync(
+            Profile(),
+            "secreta",
+            storePassword: true,
+            CancellationToken.None);
+
+        // El aviso es para cuando algo va mal; si aparece siempre, deja de leerse.
+        Assert.Null(result.SecretWarning);
+    }
+
+    /// <summary>
+    /// Son dos escrituras sin transacción común. Si falla la del llavero, la del
+    /// perfil ya está hecha: reventar la petición haría creer que no se guardó
+    /// nada, y el usuario volvería a crear la conexión entera.
+    /// </summary>
+    [Fact]
+    public async Task SiElLlaveroFallaAlEscribirElPerfilSeQuedaYSeAvisa()
+    {
+        var profile = Profile();
+        _secrets.FailsOnSet = true;
+
+        var result = await _service.SaveAsync(
+            profile,
+            "secreta",
+            storePassword: true,
+            CancellationToken.None);
+
+        Assert.False(result.PasswordStored);
+        Assert.NotNull(result.SecretWarning);
+        Assert.Contains("No se pudo guardar la contraseña", result.SecretWarning, StringComparison.Ordinal);
+        Assert.NotNull(await _profiles.FindAsync(profile.Id, CancellationToken.None));
+    }
+
+    /// <summary>
+    /// Y lo que hubiera antes se retira. Dejar la contraseña vieja pegada a unos
+    /// datos nuevos es peor que no tener ninguna: la conexión falla al entrar y
+    /// nadie sabe por qué, porque la interfaz dice que hay una guardada.
+    /// </summary>
+    [Fact]
+    public async Task SiElLlaveroFallaAlEscribirNoDejaLaContrasenaAnterior()
+    {
+        var profile = Profile();
+        await _service.SaveAsync(profile, "vieja", storePassword: true, CancellationToken.None);
+
+        _secrets.FailsOnSet = true;
+
+        await _service.SaveAsync(profile, "nueva", storePassword: true, CancellationToken.None);
+
+        Assert.Empty(_secrets.Entries);
+        Assert.False(await _service.HasStoredPasswordAsync(profile.Id, CancellationToken.None));
+    }
+
+    /// <summary>
+    /// El aviso que más importa: el usuario pidió dejar de recordar su contraseña
+    /// y sigue en su llavero. Callarlo sería decirle que se borró algo que no se
+    /// borró.
+    /// </summary>
+    [Fact]
+    public async Task SiNoSePudoRetirarLaContrasenaSeDiceEnVozAlta()
+    {
+        var profile = Profile();
+        await _service.SaveAsync(profile, "secreta", storePassword: true, CancellationToken.None);
+
+        _secrets.FailsOnDelete = true;
+
+        var result = await _service.SaveAsync(
+            profile,
+            null,
+            storePassword: false,
+            CancellationToken.None);
+
+        Assert.False(result.PasswordStored);
+        Assert.NotNull(result.SecretWarning);
+        Assert.Contains("no se pudo retirar la contraseña", result.SecretWarning, StringComparison.Ordinal);
+        Assert.NotEmpty(_secrets.Entries);
+    }
+
+    /// <summary>
+    /// Si no se puede ni mirar, se responde que no hay: eso lleva a pedirla al
+    /// conectar, que funciona. Lo que no puede es tumbar el guardado del perfil.
+    /// </summary>
+    [Fact]
+    public async Task SiElLlaveroNoDejaConsultarSeGuardaIgualYSeAvisa()
+    {
+        var profile = Profile();
+        await _service.SaveAsync(profile, "secreta", storePassword: true, CancellationToken.None);
+
+        _secrets.FailsOnGet = true;
+
+        var result = await _service.SaveAsync(
+            profile with { Name = "Renombrada" },
+            null,
+            storePassword: true,
+            CancellationToken.None);
+
+        Assert.False(result.PasswordStored);
+        Assert.NotNull(result.SecretWarning);
+        Assert.Equal(
+            "Renombrada",
+            (await _profiles.FindAsync(profile.Id, CancellationToken.None))!.Name);
+    }
+
+    /// <summary>
+    /// Al borrar, el orden es el contrario que al guardar, y a propósito: la clave
+    /// del secreto se deriva del identificador del perfil, así que un perfil
+    /// borrado antes de tiempo dejaría en el llavero una contraseña que ya nadie
+    /// sabe nombrar. Un perfil que no se dejó borrar se vuelve a borrar.
+    /// </summary>
+    [Fact]
+    public async Task SiNoSePuedeBorrarElSecretoTampocoSeBorraElPerfil()
+    {
+        var profile = Profile();
+        await _service.SaveAsync(profile, "secreta", storePassword: true, CancellationToken.None);
+
+        _secrets.FailsOnDelete = true;
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => _service.DeleteAsync(profile.Id, CancellationToken.None));
+
+        Assert.NotNull(await _profiles.FindAsync(profile.Id, CancellationToken.None));
+    }
+
+    /// <summary>
+    /// Un llavero de mentira que además sabe fallar.
+    ///
+    /// Los tres interruptores son lo que de verdad pasa en las máquinas de la
+    /// gente: el llavero bloqueado, una sesión sin escritorio, una política de
+    /// empresa. Sin poder provocarlo aquí, la mitad interesante de este servicio
+    /// —qué queda guardado cuando solo una de las dos escrituras funciona— no se
+    /// probaría nunca.
+    /// </summary>
     private sealed class FakeSecretStore : ISecretStore
     {
         public Dictionary<string, string> Entries { get; } = new(StringComparer.Ordinal);
+
+        /// <summary>El llavero no deja escribir.</summary>
+        public bool FailsOnSet { get; set; }
+
+        /// <summary>El llavero no deja borrar: lo que hay se queda.</summary>
+        public bool FailsOnDelete { get; set; }
+
+        /// <summary>Ni siquiera deja mirar.</summary>
+        public bool FailsOnGet { get; set; }
 
         public bool IsAvailable => true;
 
@@ -782,15 +925,32 @@ public sealed class SavedConnectionServiceTests : IDisposable
 
         public Task SetAsync(string key, string secret, CancellationToken cancellationToken)
         {
+            if (FailsOnSet)
+            {
+                throw new InvalidOperationException("El almacén no aceptó la escritura.");
+            }
+
             Entries[key] = secret;
             return Task.CompletedTask;
         }
 
-        public Task<string?> GetAsync(string key, CancellationToken cancellationToken) =>
-            Task.FromResult(Entries.TryGetValue(key, out var secret) ? secret : null);
+        public Task<string?> GetAsync(string key, CancellationToken cancellationToken)
+        {
+            if (FailsOnGet)
+            {
+                throw new InvalidOperationException("El almacén no dejó leer.");
+            }
+
+            return Task.FromResult(Entries.TryGetValue(key, out var secret) ? secret : null);
+        }
 
         public Task DeleteAsync(string key, CancellationToken cancellationToken)
         {
+            if (FailsOnDelete)
+            {
+                throw new InvalidOperationException("El almacén no aceptó el borrado.");
+            }
+
             Entries.Remove(key);
             return Task.CompletedTask;
         }

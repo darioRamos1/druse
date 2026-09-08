@@ -1,4 +1,5 @@
 using Druse.Application.Abstractions;
+using Druse.Application.Secrets;
 using Druse.Domain;
 using Druse.Platform.Abstractions;
 
@@ -8,10 +9,15 @@ namespace Druse.Application.Ai;
 /// <param name="Profile">Perfil ya persistido.</param>
 /// <param name="KeyStored">La clave quedó en el almacén del sistema.</param>
 /// <param name="StoreDescription">Dónde quedó, o por qué no se pudo guardar.</param>
+/// <param name="SecretWarning">
+/// Qué salió mal con el almacén del sistema, si algo salió mal. El proveedor está
+/// guardado igual: ver <see cref="SecretWriter"/>.
+/// </param>
 public readonly record struct SaveAiProviderResult(
     AiProviderProfile Profile,
     bool KeyStored,
-    string StoreDescription);
+    string StoreDescription,
+    string? SecretWarning = null);
 
 /// <summary>
 /// Proveedores guardados y sus claves.
@@ -74,16 +80,27 @@ public sealed class SavedAiProviderService(
             await ClearOtherDefaultsAsync(profile.Id, cancellationToken);
         }
 
-        var stored = await SaveKeyAsync(profile, apiKey, cancellationToken);
+        // El perfil ya está en la base: lo que falle en el llavero se cuenta, no
+        // se lanza (ver SecretWriter).
+        var writer = new SecretWriter(_secrets);
+        var stored = await SaveKeyAsync(profile, apiKey, writer, cancellationToken);
 
-        return new SaveAiProviderResult(profile, stored, _secrets.Description);
+        return new SaveAiProviderResult(profile, stored, _secrets.Description, writer.Warning);
     }
 
     /// <summary>Recupera la clave guardada, o `null` si no hay ninguna.</summary>
     public Task<string?> GetKeyAsync(Guid id, CancellationToken cancellationToken) =>
         _secrets.GetAsync(SecretPrefix + id.ToString("N"), cancellationToken);
 
-    /// <summary>Borra el perfil y, con él, su clave.</summary>
+    /// <summary>
+    /// Borra el perfil y, con él, su clave.
+    ///
+    /// **La clave va primero, y si no se puede borrar el perfil se queda.** La
+    /// clave del secreto se deriva del identificador del proveedor, así que borrar
+    /// el perfil antes dejaría en el llavero una clave de API que ya nadie sabe
+    /// nombrar. Un perfil que no se dejó borrar se vuelve a borrar; un secreto
+    /// huérfano se queda ahí para siempre.
+    /// </summary>
     public async Task<bool> DeleteAsync(Guid id, CancellationToken cancellationToken)
     {
         // El secreto se borra pase lo que pase con el perfil: si el perfil ya no
@@ -97,6 +114,7 @@ public sealed class SavedAiProviderService(
     private async Task<bool> SaveKeyAsync(
         AiProviderProfile profile,
         string? apiKey,
+        SecretWriter writer,
         CancellationToken cancellationToken)
     {
         if (apiKey is null)
@@ -108,7 +126,7 @@ public sealed class SavedAiProviderService(
 
         if (apiKey.Length == 0)
         {
-            await _secrets.DeleteAsync(key, cancellationToken);
+            await writer.ForgetAsync(key, "la clave del proveedor", cancellationToken);
 
             return false;
         }
@@ -118,9 +136,7 @@ public sealed class SavedAiProviderService(
             return false;
         }
 
-        await _secrets.SetAsync(key, apiKey, cancellationToken);
-
-        return true;
+        return await writer.StoreAsync(key, apiKey, "la clave del proveedor", cancellationToken);
     }
 
     private async Task ClearOtherDefaultsAsync(Guid keep, CancellationToken cancellationToken)

@@ -101,6 +101,14 @@ export interface SavedConnection {
   /** Ausente cuando la conexión va directa al motor. */
   readonly sshTunnel?: SshTunnel;
   readonly hasStoredSshSecret?: boolean;
+  /**
+   * Qué salió mal con el almacén del sistema al guardar, si algo salió mal.
+   *
+   * El perfil se guardó igual —va a la base local, que no depende del llavero—,
+   * así que esto no es un error de la operación: es lo que hay que contarle al
+   * usuario sobre su contraseña. Solo llega en la respuesta de guardar.
+   */
+  readonly secretWarning?: string;
 }
 
 /** Dónde se guardan las contraseñas en esta máquina. */

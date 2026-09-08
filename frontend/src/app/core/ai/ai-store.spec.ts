@@ -23,8 +23,10 @@ describe('AiStore', () => {
   let lastRequest: AiChatRequest | null;
   let subscriptions: number;
   let unsubscriptions: number;
+  let savedProvider: AiProvider;
 
   beforeEach(() => {
+    savedProvider = provider;
     stream = new Subject<AiStreamEvent>();
     lastRequest = null;
     subscriptions = 0;
@@ -33,6 +35,7 @@ describe('AiStore', () => {
     const gateway = {
       getAiProviders: () =>
         of({ providers: [provider], canStoreKeys: true, storeDescription: 'Credenciales' }),
+      saveAiProvider: () => of(savedProvider),
       streamAiChat: (request: AiChatRequest) => {
         lastRequest = request;
 
@@ -60,6 +63,35 @@ describe('AiStore', () => {
 
     return store;
   }
+
+  /**
+   * El proveedor va a la base local y su clave al llavero del sistema: dos
+   * escrituras, y la segunda puede fallar sola. El aviso tiene que llegar entero
+   * hasta quien guardó, porque el diálogo lo enseña en lugar de cerrarse; si el
+   * almacén lo perdiera por el camino, el usuario cerraría creyendo que su clave
+   * quedó recordada.
+   */
+  it('devuelve el aviso del llavero al guardar', async () => {
+    savedProvider = {
+      ...provider,
+      secretWarning: 'No se pudo guardar la clave del proveedor en Credenciales.',
+    };
+
+    const store = await ready();
+
+    const saved = await store.save({
+      name: provider.name,
+      kind: provider.kind,
+      baseUrl: provider.baseUrl,
+      model: provider.model,
+      command: provider.command,
+      disclosure: provider.disclosure,
+      ownSession: provider.ownSession,
+      isDefault: true,
+    });
+
+    expect(saved.secretWarning).toContain('No se pudo guardar la clave');
+  });
 
   it('toma como activo el marcado por omisión', async () => {
     const store = await ready();

@@ -119,7 +119,10 @@ internal static class StorageEndpoints
 
             return Results.Created(
                 $"/api/connections/{result.Profile.Id}",
-                result.Profile.ToSavedDto(result.PasswordStored, result.SshSecretStored));
+                result.Profile.ToSavedDto(
+                    result.PasswordStored,
+                    result.SshSecretStored,
+                    result.SecretWarning));
         })
         .WithName("CreateConnection");
 
@@ -149,7 +152,10 @@ internal static class StorageEndpoints
                 request.StoreSshSecret);
 
             return Results.Ok(
-                result.Profile.ToSavedDto(result.PasswordStored, result.SshSecretStored));
+                result.Profile.ToSavedDto(
+                    result.PasswordStored,
+                    result.SshSecretStored,
+                    result.SecretWarning));
         })
         .WithName("UpdateConnection");
 

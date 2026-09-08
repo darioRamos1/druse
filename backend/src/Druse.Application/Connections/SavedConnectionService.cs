@@ -1,4 +1,5 @@
 using Druse.Application.Abstractions;
+using Druse.Application.Secrets;
 using Druse.Database.Abstractions;
 using Druse.Domain;
 using Druse.Platform.Abstractions;
@@ -10,11 +11,16 @@ namespace Druse.Application.Connections;
 /// <param name="PasswordStored">La contraseña quedó en el almacén del sistema.</param>
 /// <param name="StoreDescription">Dónde quedó, o por qué no se pudo guardar.</param>
 /// <param name="SshSecretStored">El secreto del túnel quedó en el almacén del sistema.</param>
+/// <param name="SecretWarning">
+/// Qué salió mal con el almacén del sistema, si algo salió mal. El perfil está
+/// guardado igual: ver <see cref="SecretWriter"/>.
+/// </param>
 public readonly record struct SaveConnectionResult(
     ConnectionProfile Profile,
     bool PasswordStored,
     string StoreDescription,
-    bool SshSecretStored = false);
+    bool SshSecretStored = false,
+    string? SecretWarning = null);
 
 /// <summary>
 /// Perfiles guardados y sus contraseñas.
@@ -23,6 +29,11 @@ public readonly record struct SaveConnectionResult(
 /// perfil van a SQLite, donde se pueden leer y editar, y la contraseña al almacén
 /// del sistema operativo, que la cifra y la protege con la sesión del usuario.
 /// Nunca se juntan en el mismo sitio (plan §12).
+///
+/// Que sean dos almacenes significa que son dos escrituras sin transacción común,
+/// y que una puede fallar sin la otra. Lo que se hace entonces está en
+/// <see cref="SecretWriter"/>, y el orden de las dos operaciones —qué va primero
+/// al guardar y qué al borrar— es parte de esa decisión, no una casualidad.
 /// </summary>
 public sealed class SavedConnectionService(
     IConnectionProfileStore profiles,
@@ -66,6 +77,13 @@ public sealed class SavedConnectionService(
     /// la toques», y solo la cadena vacía o desactivar el guardado la retiran. Sin
     /// esta distinción, cambiar el nombre de una conexión le borraría la
     /// contraseña.
+    ///
+    /// **El perfil se guarda primero.** Es la mitad que el usuario ve y puede
+    /// corregir; si después falla el llavero, el perfil se queda y el resultado lo
+    /// cuenta en <see cref="SaveConnectionResult.SecretWarning"/> en vez de
+    /// reventar la petición. Al revés —el secreto primero— un fallo del perfil
+    /// dejaría en el llavero el secreto de una conexión que no existe, y nadie
+    /// volvería a saber su clave para retirarlo.
     /// </summary>
     public async Task<SaveConnectionResult> SaveAsync(
         ConnectionProfile profile,
@@ -84,51 +102,91 @@ public sealed class SavedConnectionService(
 
         await _profiles.SaveAsync(profile, cancellationToken);
 
+        // De aquí en adelante el perfil ya está en la base: lo que falle en el
+        // llavero se cuenta, no se lanza.
+        var writer = new SecretWriter(_secrets);
+
         var sshStored = await SaveSshSecretAsync(
             profile,
             sshSecret,
             storeSshSecret,
+            writer,
             cancellationToken);
 
+        var passwordStored = await SavePasswordAsync(
+            profile,
+            password,
+            storePassword,
+            writer,
+            cancellationToken);
+
+        return new SaveConnectionResult(
+            profile,
+            passwordStored,
+            _secrets.Description,
+            sshStored,
+            writer.Warning);
+    }
+
+    /// <summary>
+    /// Borra el perfil y sus secretos, si los tenía.
+    ///
+    /// **Los secretos van primero, y si no se pueden borrar el perfil se queda.**
+    /// Es al revés que al guardar, y por la misma razón: la clave del secreto se
+    /// deriva del identificador del perfil, así que borrar el perfil antes de
+    /// tiempo dejaría en el llavero del usuario una contraseña que ya nadie sabe
+    /// nombrar. Un perfil que no se dejó borrar se vuelve a borrar; un secreto
+    /// huérfano se queda ahí para siempre.
+    /// </summary>
+    public async Task<bool> DeleteAsync(Guid id, CancellationToken cancellationToken)
+    {
+        // Se borran aunque el perfil ya no esté: dejarlos huérfanos en el llavero
+        // del usuario sería ensuciar su sistema.
+        await _secrets.DeleteAsync(SecretKey(id), cancellationToken);
+        await _secrets.DeleteAsync(SshSecretKey(id), cancellationToken);
+
+        return await _profiles.DeleteAsync(id, cancellationToken);
+    }
+
+    /// <summary>Guarda la contraseña de la base, la conserva o la retira.</summary>
+    private async Task<bool> SavePasswordAsync(
+        ConnectionProfile profile,
+        string? password,
+        bool store,
+        SecretWriter writer,
+        CancellationToken cancellationToken)
+    {
         // Una conexión integrada no tiene contraseña que recordar; guardar la que
         // llegase dejaría un secreto que nadie va a volver a usar.
-        if (profile.UsesIntegratedSecurity || !storePassword || password is "")
+        if (profile.UsesIntegratedSecurity || !store || password is "")
         {
             // Si antes había una guardada y ahora se pide no guardarla, hay que
             // retirarla: dejarla ahí contradiría lo que el usuario acaba de elegir.
-            await _secrets.DeleteAsync(SecretKey(profile.Id), cancellationToken);
+            await writer.ForgetAsync(SecretKey(profile.Id), "la contraseña", cancellationToken);
 
-            return new SaveConnectionResult(profile, false, _secrets.Description, sshStored);
+            return false;
         }
 
         if (password is null)
         {
             // Se pidió seguir recordándola sin decir cuál: es una edición que no
             // tocó la contraseña, así que la que hubiera se queda como estaba.
-            var kept = await HasStoredPasswordAsync(profile.Id, cancellationToken);
-
-            return new SaveConnectionResult(profile, kept, _secrets.Description, sshStored);
+            return await writer.ExistsAsync(
+                SecretKey(profile.Id),
+                "la contraseña",
+                cancellationToken);
         }
 
         if (!_secrets.IsAvailable)
         {
-            return new SaveConnectionResult(profile, false, _secrets.Description, sshStored);
+            return false;
         }
 
-        await _secrets.SetAsync(SecretKey(profile.Id), password, cancellationToken);
-
-        return new SaveConnectionResult(profile, true, _secrets.Description, sshStored);
-    }
-
-    /// <summary>Borra el perfil y sus secretos, si los tenía.</summary>
-    public async Task<bool> DeleteAsync(Guid id, CancellationToken cancellationToken)
-    {
-        // Los secretos se borran siempre, aunque el perfil ya no esté: dejarlos
-        // huérfanos en el llavero del usuario sería ensuciar su sistema.
-        await _secrets.DeleteAsync(SecretKey(id), cancellationToken);
-        await _secrets.DeleteAsync(SshSecretKey(id), cancellationToken);
-
-        return await _profiles.DeleteAsync(id, cancellationToken);
+        return await writer.StoreAsync(
+            SecretKey(profile.Id),
+            password,
+            "la contraseña",
+            cancellationToken);
     }
 
     /// <summary>
@@ -141,18 +199,26 @@ public sealed class SavedConnectionService(
         ConnectionProfile profile,
         string? secret,
         bool store,
+        SecretWriter writer,
         CancellationToken cancellationToken)
     {
         if (!profile.UsesSshTunnel || !store || secret is "")
         {
-            await _secrets.DeleteAsync(SshSecretKey(profile.Id), cancellationToken);
+            await writer.ForgetAsync(
+                SshSecretKey(profile.Id),
+                "el secreto del túnel",
+                cancellationToken);
+
             return false;
         }
 
         // Mismo trato que la contraseña de la base: `null` es «no lo toques».
         if (secret is null)
         {
-            return await HasStoredSshSecretAsync(profile.Id, cancellationToken);
+            return await writer.ExistsAsync(
+                SshSecretKey(profile.Id),
+                "el secreto del túnel",
+                cancellationToken);
         }
 
         if (!_secrets.IsAvailable)
@@ -160,9 +226,11 @@ public sealed class SavedConnectionService(
             return false;
         }
 
-        await _secrets.SetAsync(SshSecretKey(profile.Id), secret, cancellationToken);
-
-        return true;
+        return await writer.StoreAsync(
+            SshSecretKey(profile.Id),
+            secret,
+            "el secreto del túnel",
+            cancellationToken);
     }
 
     /// <summary>Secreto del túnel: contraseña del usuario SSH o passphrase de su clave.</summary>

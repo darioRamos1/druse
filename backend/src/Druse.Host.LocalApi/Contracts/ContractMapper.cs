@@ -270,7 +270,8 @@ internal static class ContractMapper
     public static SavedConnectionDto ToSavedDto(
         this ConnectionProfile profile,
         bool hasStoredPassword,
-        bool hasStoredSshSecret = false)
+        bool hasStoredSshSecret = false,
+        string? secretWarning = null)
     {
         ArgumentNullException.ThrowIfNull(profile);
 
@@ -291,6 +292,7 @@ internal static class ContractMapper
             SshTunnel = profile.SshTunnel?.ToDto(),
             InformixServer = profile.InformixServer,
             HasStoredSshSecret = hasStoredSshSecret,
+            SecretWarning = secretWarning,
         };
     }
 

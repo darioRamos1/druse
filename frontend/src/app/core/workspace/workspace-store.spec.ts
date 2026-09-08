@@ -147,6 +147,9 @@ class FakeGateway implements Partial<ApplicationGateway> {
   exportCalls: ExportRequest[] = [];
   closedSessions: string[] = [];
   saveCalls: SaveConnectionRequest[] = [];
+
+  /** Lo que el servidor contesta cuando el llavero falló pero el perfil se guardó. */
+  secretWarningOnSave: string | null = null;
   deletedConnections: string[] = [];
   openSavedCalls: { id: string; password?: string }[] = [];
   openShouldFail = false;
@@ -244,6 +247,7 @@ class FakeGateway implements Partial<ApplicationGateway> {
       environment: 'development',
       readOnly: false,
       hasStoredPassword: request.storePassword,
+      ...(this.secretWarningOnSave ? { secretWarning: this.secretWarningOnSave } : {}),
     });
   }
 
@@ -694,6 +698,22 @@ describe('WorkspaceStore', () => {
       expect(gateway.saveCalls.length).toBe(1);
       expect(gateway.saveCalls[0].storePassword).toBe(true);
       expect(gateway.saveCalls[0].password).toBe('secreta');
+    });
+
+    /**
+     * El perfil va a la base local y la contraseña al llavero del sistema: son
+     * dos escrituras, y la segunda puede fallar sola. Cuando pasa, la conexión
+     * existe y funciona, así que no es un error; lo que no puede es quedarse
+     * callado, porque el usuario cree que su contraseña quedó recordada.
+     */
+    it('avisa cuando el perfil se guardó pero la contraseña no', async () => {
+      gateway.secretWarningOnSave =
+        'No se pudo guardar la contraseña en Almacén de prueba; se pedirá cuando haga falta.';
+
+      const saved = await store.saveConnection({ ...form, storePassword: true });
+
+      expect(saved).toBe(true);
+      expect(store.notice()).toContain('No se pudo guardar la contraseña');
     });
 
     it('no guarda nada si el usuario no lo pide', async () => {

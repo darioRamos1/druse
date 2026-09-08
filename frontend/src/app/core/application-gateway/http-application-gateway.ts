@@ -609,8 +609,17 @@ export class HttpApplicationGateway extends ApplicationGateway {
 
   override saveAiProvider(request: SaveAiProviderRequest): Observable<AiProvider> {
     return this._http
-      .post<{ provider: AiProvider }>('/api/ai/providers', request)
-      .pipe(map((response) => response.provider));
+      .post<{ provider: AiProvider; secretWarning?: string }>('/api/ai/providers', request)
+      .pipe(
+        // El aviso del llavero viaja fuera del proveedor porque no es suyo: es
+        // de la operación. Se pega aquí para que quien guardó pueda enseñarlo,
+        // que es el único momento en que sirve de algo.
+        map((response) =>
+          response.secretWarning
+            ? { ...response.provider, secretWarning: response.secretWarning }
+            : response.provider,
+        ),
+      );
   }
 
   override deleteAiProvider(id: string): Observable<void> {

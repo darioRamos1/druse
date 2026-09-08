@@ -422,7 +422,7 @@ no solamente validaciones visuales.
 - [ ] **BE-001:** separar planificación, ejecución y progreso de `TransferService`.
 - [ ] **BE-002:** extraer scripting de datos y ejecución DDL de `TableDesignerBase` solo cuando exista una prueba que proteja la extracción.
 - [x] **BE-003:** hacer transaccionales y dirigidas por versión las migraciones SQLite.
-- [ ] **BE-004:** definir compensación entre SQLite y el almacén de secretos cuando una escritura parcial falla.
+- [x] **BE-004:** definir compensación entre SQLite y el almacén de secretos cuando una escritura parcial falla.
 
 ### Accesibilidad
 

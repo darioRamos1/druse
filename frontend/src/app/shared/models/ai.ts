@@ -45,6 +45,13 @@ export interface AiProvider {
   readonly isDefault: boolean;
   /** Hay una clave suya en el almacén del sistema. */
   readonly hasStoredKey: boolean;
+  /**
+   * Qué salió mal con el almacén del sistema al guardar, si algo salió mal.
+   *
+   * El proveedor se guardó igual: va a la base local, que no depende del
+   * llavero. Solo llega en la respuesta de guardar, nunca al listar.
+   */
+  readonly secretWarning?: string;
 }
 
 /** Lo que sabe la aplicación sobre los proveedores y sobre dónde guardar sus claves. */

@@ -108,6 +108,10 @@ internal static class AiEndpoints
                 provider = ToDto(result.Profile, result.KeyStored),
                 keyStored = result.KeyStored,
                 storeDescription = result.StoreDescription,
+
+                // El proveedor quedó guardado aunque el llavero fallara; esto es
+                // lo que hay que enseñarle al usuario cuando pasa.
+                secretWarning = result.SecretWarning,
             });
         });
 

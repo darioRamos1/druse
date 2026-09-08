@@ -343,6 +343,10 @@
       <p class="warning warning--error">{{ error() }}</p>
     }
 
+    @if (warning()) {
+      <p class="warning">{{ warning() }}</p>
+    }
+
     @if (manual(); as order) {
       <!--
         Donde no hay ventana que abrir, esto es lo único que queda.

@@ -1934,7 +1934,14 @@ export class WorkspaceStore {
     return true;
   }
 
-  /** Guarda el perfil en la base local; la contraseña va al almacén del sistema. */
+  /**
+   * Guarda el perfil en la base local; la contraseña va al almacén del sistema.
+   *
+   * Son dos sitios distintos y el segundo puede fallar solo. Cuando pasa, el
+   * perfil **sí** queda guardado y el servidor lo cuenta en `secretWarning`: se
+   * enseña como aviso, no como error, porque la conexión existe y funciona; lo
+   * único que ocurre es que la contraseña se pedirá al entrar.
+   */
   private async persist(form: ConnectionForm, id: string): Promise<SavedConnection | null> {
     const request = {
       profile: { ...toRequest(form).profile, id },
@@ -1953,6 +1960,10 @@ export class WorkspaceStore {
         ...profiles.filter((profile) => profile.id !== saved.id),
         saved,
       ]);
+
+      if (saved.secretWarning) {
+        this._notice.set(saved.secretWarning);
+      }
 
       return saved;
     } catch (error) {
