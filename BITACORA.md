@@ -17,10 +17,10 @@
 | Fase 8 | ✅ **7/7.** Tres motores sobre el mismo contrato y primera beta preparada. |
 | ¿Compila el backend? | Sí — 0 advertencias, 0 errores |
 | ¿Compila el envoltorio? | Sí — recompilado en la 037 con `build/scripts/msvc-env.ps1` cargado antes; sin él, `cargo` falla en `vswhom-sys` por elegir el MSVC equivocado. **Sus pruebas ya son 17**, con las dos que vigilan la CSP y las cuatro de `DRUSE_DATA_DIR` |
-| ¿Pasan las pruebas? | Sí. En la **047**: **851 del frontend** —las 815 de siempre más 36 de las piezas que salieron de `WorkspaceStore`— y la **suite de punta a punta entera en verde**: 52 pasadas, 1 saltada, 0 fallos, contra PostgreSQL y SQL Server reales. Los rojos que salieron por el camino eran de tiempo, en el frontend, y de **servidores de e2e levantados desde la sesión anterior**, que `reuseExistingServer` reutiliza. En la **046**: **740 del backend** —563 unitarias y las 177 de integración, con PostgreSQL, MySQL y SQL Server levantados—, **815 del frontend** y el **barrido entero** con la consola limpia y un solo hallazgo, que no es un defecto. Del e2e, 43 en verde; las cuatro de SQL Server esperaban a su contenedor, que se levantó en esta sesión. Las **23 del envoltorio** son de la 042 y siguen valiendo. Las contractuales salen verdes **sin los motores delante**: sin `DRUSE_REQUIRE_ENGINES=1` cada prueba termina sin comprobar nada cuando el servidor no responde. El `DATE` de Informix por SQLI de la 039 sigue sin repetirse: hace falta ese contenedor |
+| ¿Pasan las pruebas? | Sí. En la **047**: **859 del frontend** —las 815 de siempre más 44 de las piezas que salieron de `WorkspaceStore`— y la **suite de punta a punta entera en verde**: 52 pasadas, 1 saltada, 0 fallos, contra PostgreSQL y SQL Server reales. Los rojos que salieron por el camino eran de tiempo, en el frontend, y de **servidores de e2e levantados desde la sesión anterior**, que `reuseExistingServer` reutiliza. En la **046**: **740 del backend** —563 unitarias y las 177 de integración, con PostgreSQL, MySQL y SQL Server levantados—, **815 del frontend** y el **barrido entero** con la consola limpia y un solo hallazgo, que no es un defecto. Del e2e, 43 en verde; las cuatro de SQL Server esperaban a su contenedor, que se levantó en esta sesión. Las **23 del envoltorio** son de la 042 y siguen valiendo. Las contractuales salen verdes **sin los motores delante**: sin `DRUSE_REQUIRE_ENGINES=1` cada prueba termina sin comprobar nada cuando el servidor no responde. El `DATE` de Informix por SQLI de la 039 sigue sin repetirse: hace falta ese contenedor |
 | ¿Hay aplicación de escritorio? | **Sí.** Instalador NSIS y ZIP portable, en dos variantes: con Informix y sin él. Desde la 038 **se actualiza sola** —o lo hará: ver el aviso del repositorio privado en §9—. El MSI dejó de generarse: `tauri.conf.json` solo declara `nsis`, que es lo que necesita el actualizador. En la **040** se regeneraron los instaladores y **la variante completa quedó instalada y abierta en este equipo**, con el arreglo del envoltorio dentro. Siguen **sin firma Authenticode**: SmartScreen en cada equipo |
 | Motores | **PostgreSQL, SQL Server, MySQL/MariaDB e Informix**, sobre el mismo contrato. Informix tiene **dos entradas**: por DRDA con el driver de IBM (puerto 9089) y por **SQLI**, su protocolo nativo, con el puente JDBC (9088). Cambia por dónde se entra; el SQL, el catálogo y los tipos son los mismos |
-| Trabajo a medias | **Nada sin commitear.** `PLAN_MEJORAS_DRUSE.md` lleva marcadas las fases 0 a 5 salvo lo grande —**FE-001 y FE-002 a medias desde la 047**: fuera las conexiones, las transacciones, las pestañas y el explorador; queda la ejecución—, FE-003, BE-001, BE-002, A11Y-005 más BKP-006, SEC-007, PERF-004 y PERF-005. Sin comprobar: las contractuales de la lectura en lote contra los cuatro motores desde la 039, **el multicursor dentro de la ventana empaquetada**, y de antes —**el diálogo del sistema y el selector de carpeta siguen sin verse abrir**, y **el actualizador no puede funcionar mientras el repositorio sea privado** (ver §9) |
+| Trabajo a medias | **Nada sin commitear.** `PLAN_MEJORAS_DRUSE.md` lleva marcadas las fases 0 a 5 salvo lo grande —**FE-001 y FE-002 cerradas en la 047**: `WorkspaceStore` partido en seis piezas—, FE-003, BE-001, BE-002, A11Y-005 más BKP-006, SEC-007, PERF-004 y PERF-005. Sin comprobar: las contractuales de la lectura en lote contra los cuatro motores desde la 039, **el multicursor dentro de la ventana empaquetada**, y de antes —**el diálogo del sistema y el selector de carpeta siguen sin verse abrir**, y **el actualizador no puede funcionar mientras el repositorio sea privado** (ver §9) |
 | Bloqueantes | Ninguno para seguir programando. Sí para dar por buenos cuatro motores y cuatro funciones: ver «Qué toca retomar». |
 | Git | El **PR #9 se fusionó** (sesión 022). Se trabaja en `feat/respaldos-y-restauracion`, con todo subido: las 024–027 en `1452a6c`, las 028–031 en `640151c`, las 032–036 de `d3ac0d5` a `35d192e`, la 037 de `4ba8cce` a `20727eb`, la **038** en `a455be7`, `4c6f74a`, `55711f0` y `93f7f26`, la **039** hasta `5c2d09b`, y la **040** en `80da9f6`, `03c3478`, `a04c706`, `117b15f`, `2946156` y `2d52c8e`, la **041** en `64c2adf`, `203b771`, `6d31a86`, `5a924c6`, `8bcf83a`, `f4f683e` y `f65cd73`, la **042** en `0ae38fa`, `120485f`, `2a6f151` y `837cbb6`, la **043** de `ebf42ac` a `fd9432d`, la **044** de `7e60185` a `e98422e`, la **045** de `dc7b97e` a `ba3d866`, y la **046** de `c9de27f` a `90e03c7`, ya sobre `main` |
 | Integración continua | 🔴 **Parada, y no por el código.** GitHub aborta los jobs en dos segundos: «recent account payments have failed or your spending limit needs to be increased». Hasta resolver la facturación, ningún PR podrá pasar los checks. Lo que sí cambió en la **041**: cuando vuelva a correr, **ejecutará pruebas de verdad** —hasta ahora el job del backend terminaba en verde sin ejecutar ninguna—, y publicar exige que el commit tenga su ejecución de CI en verde. |
@@ -37,12 +37,10 @@ publicar los artefactos en otro sitio.
 
 #### Lo que deja abierta la 047
 
-1. **La ejecución de consultas**, que es lo último que queda de partir
-   `WorkspaceStore`: el resultado en pantalla, el rechazo pendiente, la
-   cancelación y de qué pestaña salió lo que se ve. Con el patrón ya asentado
-   —fachada intacta y manejador para lo que sube— no debería tener sorpresas.
-2. **`AppShell`** (FE-003), que sigue con sus 1.488 líneas.
-3. **De la fase 7 quedan tres**: UX-006 y UX-010 son decisiones que hay que ver
+1. **`AppShell`** (FE-003), con sus 1.488 líneas: extraer la coordinación de
+   diálogos y comandos. Es lo mismo que se acaba de hacer con el almacén, y el
+   patrón vale igual: dejar la plantilla llamando a lo de siempre.
+2. **De la fase 7 quedan tres**: UX-006 y UX-010 son decisiones que hay que ver
    con alguien delante —si la base debe decirse dos veces a pantalla ancha, y si
    el aviso de trabajos interrumpidos sube de sitio— y **UX-007** sí es trabajo:
    cuatro filas de cromo antes del SQL dejan seis líneas de editor en una
@@ -480,20 +478,46 @@ recibe sobre qué conexión y qué base va, porque eso lo sabe la pestaña activ
 La fachada pública no cambia; los valores por defecto se siguen resolviendo en
 el almacén.
 
-**Lo que queda**: la ejecución de consultas.
+#### Y la ejecución, que cierra la lista
+
+La última pieza es la que decide qué se ve: el resultado, de dónde salió, si algo
+está corriendo, si se pidió pararlo y qué operación quedó esperando
+confirmación. `ExecutionStore` guarda todo eso y **genera el identificador de
+ejecución**, que es lo que hace posible cancelar: si lo pusiera el servidor solo
+llegaría con la respuesta, cuando ya no queda nada que cancelar.
+
+Lo que no hace es interpretar: `run` lanza lo que falle, porque distinguir un
+409 que pide confirmación de una sesión perdida —y saber si la pestaña sigue
+siendo la misma cuando la respuesta llega— es del área de trabajo. Esa
+comprobación es la que evita pintar en una pestaña el resultado de otra, y sigue
+donde estaba.
+
+Con esto **FE-001 y FE-002 quedan cerradas**. El almacén termina en **2.293
+líneas** de las 3.372 con las que empezó el día, y lo que sigue dentro es
+coordinación —qué pasa al conectar, al cambiar de base, al perder una sesión— más
+la edición de filas, la importación y el diseñador de tablas, que son funciones
+enteras y no estado repartido.
 
 **Verificado.** La suite de punta a punta entera contra PostgreSQL y SQL Server
-reales, **dos veces**: una tras las cuatro primeras piezas y otra tras el
-explorador. **52 en verde y 1 saltada, 0 fallos** las dos. Es la comprobación
+reales, **tres veces**: tras las cuatro primeras piezas, tras el explorador y
+tras la ejecución. **52 en verde y 1 saltada, 0 fallos** las tres. Es la
+comprobación
 que importa aquí, porque un refactor sin cambio visible solo se puede desmentir
 usando la aplicación: conectar, explorar, ejecutar, cambiar de pestaña, migrar
 tablas y cerrar.
 
-**Pruebas.** **851 del frontend** —las 815 de antes más 36 nuevas de las piezas
-extraídas—, todas en verde y en una sola pasada al final. Por el camino hicieron
+**Pruebas.** **859 del frontend** —las 815 de antes más 44 nuevas de las piezas
+extraídas—, todas en verde. Por el camino hicieron
 falta repeticiones: cinco rojos en tres pasadas distintas, ninguno repetido, y
 todos verdes al ejecutar su archivo solo. Es el rojo por tiempo que ya está
 anotado en §9, agravado por lanzar `tsc` en paralelo.
+
+**Un ayudante de las pruebas que fallaba por ambigüedad.** `ejecutar()` espera a
+la respuesta del servidor y después comprueba que «Cancelar» esté deshabilitado,
+pero **mientras el panel de «Consulta en curso» sigue pintado hay dos botones con
+ese nombre** —el suyo y el de la barra— y Playwright falla por ambigüedad en vez
+de esperar. Solo se ve cuando la máquina va cargada y el pintado llega tarde, y
+se lee como un fallo del producto. Ahora espera primero a que ese panel se vaya.
 
 **Y un aviso que costó media hora**: la segunda pasada del e2e dio cuatro fallos
 en el editor —«druse_test» no aparecía en el árbol— justo después de tocar el
@@ -504,8 +528,8 @@ servidor de desarrollo llevaban levantados desde la sesión anterior**, y
 e2e, comprobar de cuándo son los servidores.
 
 **Archivos.** `errors.ts`, `notice-store.ts`, `connection-store.ts`,
-`tab-store.ts`, `transaction-store.ts`, `explorer-store.ts` y sus cuatro specs
-(todos nuevos), `workspace-store.ts` (3.372 → 2.344 líneas) y
+`tab-store.ts`, `transaction-store.ts`, `explorer-store.ts`, `execution-store.ts`
+y sus cinco specs (todos nuevos), `workspace-store.ts` (3.372 → 2.293 líneas) y
 `PLAN_MEJORAS_DRUSE.md`.
 
 **Estado al cerrar.** Commiteado en `main`.

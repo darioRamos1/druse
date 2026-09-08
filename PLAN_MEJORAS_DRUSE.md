@@ -421,17 +421,20 @@ no solamente validaciones visuales.
 
 ### Frontend
 
-- [ ] **FE-001:** dividir `WorkspaceStore` por responsabilidades sin introducir
-      otra biblioteca de estado por defecto. **Empezado el 8 de septiembre de
+- [x] **FE-001:** dividir `WorkspaceStore` por responsabilidades sin introducir
+      otra biblioteca de estado por defecto. **Hecho el 8 de septiembre de
       2026**: sin biblioteca nueva —siguen siendo Signals— y **sin cambiar una
       sola llamada de los componentes**, que es lo que permite hacerlo por
       partes. El almacén pasó de **3.372 líneas a 2.344** —menos de la mitad de
       lo que salió— y lo que se fue vive en seis archivos con sus pruebas:
       `errors.ts` —las palabras con las que se cuenta un fallo, que ahora
       comparten todas las piezas—, `notice-store.ts`, `connection-store.ts`,
-      `tab-store.ts`, `transaction-store.ts` y `explorer-store.ts`. Falta la
-      ejecución de consultas, que es el bloque grande que queda.
-- [ ] **FE-002:** separar primero sesiones/transacciones, pestañas, explorador y
+      `tab-store.ts`, `transaction-store.ts`, `explorer-store.ts` y
+      `execution-store.ts`. Lo que queda dentro es coordinación —qué pasa cuando
+      se conecta, se cambia de base o se pierde una sesión— más la edición de
+      filas, la importación y el diseñador de tablas, que son funciones enteras y
+      no estado repartido.
+- [x] **FE-002:** separar primero sesiones/transacciones, pestañas, explorador y
       ejecución de consultas. **Dos de cuatro**: sesiones y transacciones el 8 de
       septiembre de 2026 —las conexiones, su sesión y cuál está activa en
       `ConnectionStore`; las transacciones, con su reloj y el aviso de la que se
@@ -442,8 +445,12 @@ no solamente validaciones visuales.
       conexión, olvidar su transacción y ofrecer «Reconectar», que no es suyo.
       Ahora avisa hacia arriba por un manejador que el área de trabajo instala
       —`reportSessionLossWith`— y recibe `forget(connectionId)` en la otra
-      dirección, igual que las transacciones. **Queda la ejecución de
-      consultas.**
+      dirección, igual que las transacciones. **Y la ejecución cierra la lista**:
+      el resultado en pantalla, de dónde salió, si algo corre, si se pidió
+      pararlo y qué operación espera confirmación. El almacén sigue decidiendo
+      sobre qué conexión se ejecuta y si lo que vuelve corresponde todavía a la
+      pestaña que se está mirando —`run` lanza y no interpreta—, que es la regla
+      que evita pintar en una pestaña el resultado de otra.
 - [ ] **FE-003:** extraer de `AppShell` la coordinación de diálogos y comandos.
 - [x] **FE-004:** activar `strict` y `strictTemplates` de manera incremental.
       **No hizo falta que fuera incremental**: activados los dos de golpe, el
@@ -495,15 +502,15 @@ no solamente validaciones visuales.
 > dentro de una transacción. Y la barra de estado llama a cada motor por su
 > nombre, que antes decía «MySQL» de todo lo que no fuera PostgreSQL o SQL Server.
 >
-> **Lo que queda es lo grande y lo que hay que mirar:** FE-001 a FE-003 son
-> extracciones de `WorkspaceStore` y `AppShell`; BE-001 y BE-002 son lo mismo en
-> el backend. Y A11Y-005 no es programar: es sentarse con un lector de pantalla.
+> **Lo que queda es lo grande y lo que hay que mirar:** FE-003 es la extracción
+> de `AppShell`; BE-001 y BE-002 son lo mismo en el backend. Y A11Y-005 no es
+> programar: es sentarse con un lector de pantalla.
 >
-> **Y sí se pueden hacer a medias**, que es lo que se creía que no. La del 8 de
-> septiembre de 2026 sacó cuatro piezas del almacén dejando su fachada intacta:
-> ningún componente cambió, las 815 pruebas siguieron pasando sin tocar una sola
-> expectativa, y las piezas nuevas ganaron 25 pruebas propias que antes no había
-> dónde escribir.
+> **`WorkspaceStore` está partido** (FE-001 y FE-002, 8 de septiembre de 2026),
+> y se pudo hacer a medias, que es lo que se creía que no: seis piezas fuera
+> dejando la fachada intacta. Ningún componente cambió, las 815 pruebas que había
+> siguieron pasando sin tocar una sola expectativa, y lo extraído ganó 44 pruebas
+> propias que antes no había dónde escribir. De 3.372 líneas a 2.293.
 >
 > **A11Y-003 estaba desactualizada**: el separador ya llevaba sus valores ARIA y
 > sus flechas. Comprobado, no escrito.
