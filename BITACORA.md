@@ -10,19 +10,19 @@
 
 | Campo | Valor |
 | --- | --- |
-| Última sesión | **045** — 2026-09-07 |
+| Última sesión | **046** — 2026-09-07 |
 | Fase activa | **Migración de datos entre tablas:** fases 1, 2 y 3 cerradas; la **4** cerrada: la pasada de varias tablas, lo que cada tabla hace distinto y las migraciones guardadas (ver «Qué toca retomar»). **Respaldos y restauración:** Fases A–E cerradas. La **F** tiene backend, interfaz, CSV, selector de archivos, restaurar en una base nueva y **el ciclo entero por HTTP en los cuatro motores**; le falta repetir a mano el respaldo real que encontró el error de los índices de expresión. **Diagramas entidad-relación:** plan escrito y **Fase A** (lectura del catálogo en lote, cuatro motores) y **Fase B** (colocación determinista y lienzo) implementadas; falta cerrar la A contra los cuatro motores y ver el barrido de capturas |
 | Fases 0–6 | ✅ Cerradas. |
 | Fase 7 | 🟡 **11/12.** El ciclo de instalación está probado sobre este equipo; solo falta arrancar en una máquina sin herramientas de desarrollo. |
 | Fase 8 | ✅ **7/7.** Tres motores sobre el mismo contrato y primera beta preparada. |
 | ¿Compila el backend? | Sí — 0 advertencias, 0 errores |
 | ¿Compila el envoltorio? | Sí — recompilado en la 037 con `build/scripts/msvc-env.ps1` cargado antes; sin él, `cargo` falla en `vswhom-sys` por elegir el MSVC equivocado. **Sus pruebas ya son 17**, con las dos que vigilan la CSP y las cuatro de `DRUSE_DATA_DIR` |
-| ¿Pasan las pruebas? | Sí. En la **045**: **1.005 del backend** con PostgreSQL y MySQL levantados —552 unitarias, 174 de integración de 177 y 279 contractuales—, **801 del frontend** y el **barrido entero** con la consola limpia. Las **23 del envoltorio** son de la 042 y siguen valiendo. Las contractuales salen verdes **sin los motores delante**: sin `DRUSE_REQUIRE_ENGINES=1` cada prueba termina sin comprobar nada cuando el servidor no responde. El `DATE` de Informix por SQLI de la 039 sigue sin repetirse: hace falta ese contenedor |
+| ¿Pasan las pruebas? | Sí. En la **046**: **732 del backend** en las dos suites que no piden motores —558 unitarias y 174 de integración de 177—, **815 del frontend** y el **barrido entero** con la consola limpia y un solo hallazgo, que no es un defecto. Del e2e, 43 en verde; las cuatro de SQL Server esperaban a su contenedor, que se levantó en esta sesión. Las **23 del envoltorio** son de la 042 y siguen valiendo. Las contractuales salen verdes **sin los motores delante**: sin `DRUSE_REQUIRE_ENGINES=1` cada prueba termina sin comprobar nada cuando el servidor no responde. El `DATE` de Informix por SQLI de la 039 sigue sin repetirse: hace falta ese contenedor |
 | ¿Hay aplicación de escritorio? | **Sí.** Instalador NSIS y ZIP portable, en dos variantes: con Informix y sin él. Desde la 038 **se actualiza sola** —o lo hará: ver el aviso del repositorio privado en §9—. El MSI dejó de generarse: `tauri.conf.json` solo declara `nsis`, que es lo que necesita el actualizador. En la **040** se regeneraron los instaladores y **la variante completa quedó instalada y abierta en este equipo**, con el arreglo del envoltorio dentro. Siguen **sin firma Authenticode**: SmartScreen en cada equipo |
 | Motores | **PostgreSQL, SQL Server, MySQL/MariaDB e Informix**, sobre el mismo contrato. Informix tiene **dos entradas**: por DRDA con el driver de IBM (puerto 9089) y por **SQLI**, su protocolo nativo, con el puente JDBC (9088). Cambia por dónde se entra; el SQL, el catálogo y los tipos son los mismos |
-| Trabajo a medias | **Nada sin commitear.** De la 041 queda `PLAN_MEJORAS_DRUSE.md` con las fases 0 y 1 marcadas y el resto por hacer. Sin comprobar: las contractuales de la lectura en lote contra los cuatro motores desde la 039, **el multicursor dentro de la ventana empaquetada**, y de antes —**el diálogo del sistema y el selector de carpeta siguen sin verse abrir**, y **el actualizador no puede funcionar mientras el repositorio sea privado** (ver §9) |
+| Trabajo a medias | **Nada sin commitear.** `PLAN_MEJORAS_DRUSE.md` lleva marcadas las fases 0 a 5 salvo lo grande —FE-001 a FE-003, BE-001, BE-002, A11Y-005— más BKP-006, SEC-007, PERF-004 y PERF-005. Sin comprobar: las contractuales de la lectura en lote contra los cuatro motores desde la 039, **el multicursor dentro de la ventana empaquetada**, y de antes —**el diálogo del sistema y el selector de carpeta siguen sin verse abrir**, y **el actualizador no puede funcionar mientras el repositorio sea privado** (ver §9) |
 | Bloqueantes | Ninguno para seguir programando. Sí para dar por buenos cuatro motores y cuatro funciones: ver «Qué toca retomar». |
-| Git | El **PR #9 se fusionó** (sesión 022). Se trabaja en `feat/respaldos-y-restauracion`, con todo subido: las 024–027 en `1452a6c`, las 028–031 en `640151c`, las 032–036 de `d3ac0d5` a `35d192e`, la 037 de `4ba8cce` a `20727eb`, la **038** en `a455be7`, `4c6f74a`, `55711f0` y `93f7f26`, la **039** hasta `5c2d09b`, y la **040** en `80da9f6`, `03c3478`, `a04c706`, `117b15f`, `2946156` y `2d52c8e`, la **041** en `64c2adf`, `203b771`, `6d31a86`, `5a924c6`, `8bcf83a`, `f4f683e` y `f65cd73`, la **042** en `0ae38fa`, `120485f`, `2a6f151` y `837cbb6`, la **043** de `ebf42ac` a `fd9432d`, la **044** de `7e60185` a `e98422e`, y la **045** de `dc7b97e` a `ba3d866`, ya sobre `main` |
+| Git | El **PR #9 se fusionó** (sesión 022). Se trabaja en `feat/respaldos-y-restauracion`, con todo subido: las 024–027 en `1452a6c`, las 028–031 en `640151c`, las 032–036 de `d3ac0d5` a `35d192e`, la 037 de `4ba8cce` a `20727eb`, la **038** en `a455be7`, `4c6f74a`, `55711f0` y `93f7f26`, la **039** hasta `5c2d09b`, y la **040** en `80da9f6`, `03c3478`, `a04c706`, `117b15f`, `2946156` y `2d52c8e`, la **041** en `64c2adf`, `203b771`, `6d31a86`, `5a924c6`, `8bcf83a`, `f4f683e` y `f65cd73`, la **042** en `0ae38fa`, `120485f`, `2a6f151` y `837cbb6`, la **043** de `ebf42ac` a `fd9432d`, la **044** de `7e60185` a `e98422e`, la **045** de `dc7b97e` a `ba3d866`, y la **046** de `c9de27f` a `90e03c7`, ya sobre `main` |
 | Integración continua | 🔴 **Parada, y no por el código.** GitHub aborta los jobs en dos segundos: «recent account payments have failed or your spending limit needs to be increased». Hasta resolver la facturación, ningún PR podrá pasar los checks. Lo que sí cambió en la **041**: cuando vuelva a correr, **ejecutará pruebas de verdad** —hasta ahora el job del backend terminaba en verde sin ejecutar ninguna—, y publicar exige que el commit tenga su ejecución de CI en verde. |
 
 ### Qué toca retomar en la próxima sesión
@@ -402,6 +402,91 @@ Pendiente de verificar cuando toque: Docker (pruebas de integración con contene
 ---
 
 ## 5. Registro de sesiones
+
+### Sesión 046 — 2026-09-07 · El llavero que falla, lo que no cabía y la cuadrícula que nadie podía leer
+
+Siguiendo el plan de mejoras por donde quedó: lo que se podía cerrar entero y
+comprobar.
+
+#### Un llavero que falla se llevaba por delante lo que sí se había guardado
+
+Guardar una conexión son **dos escrituras sin transacción común**: el perfil a
+SQLite y la contraseña al almacén del sistema. La segunda puede fallar sola —el
+llavero bloqueado, una sesión sin escritorio, una política de empresa— y hasta
+ahora subía como excepción: el cliente recibía un 500 y el perfil se había
+guardado igual, así que el usuario creía que no se guardó nada y volvía a
+crearlo.
+
+La compensación no es deshacer el perfil, sino dejarlo todo en el estado que
+Druse ya sabe tratar: perfil guardado, sin secreto, y **dicho en voz alta**. Es
+lo mismo que pasa en una máquina sin almacén, que aquí es de primera clase. Las
+reglas viven en un solo sitio —`SecretWriter`— y las usan las conexiones y los
+proveedores de IA: si no se pudo escribir no queda nada escrito, si no se pudo
+retirar se avisa (y solo si de verdad seguía ahí), y un fallo al consultar no
+tumba nada. Al borrar el orden es el contrario, y a propósito: la clave del
+secreto se deriva del identificador del perfil, así que borrar el perfil antes
+dejaría en el llavero una contraseña que ya nadie sabe nombrar.
+
+#### Tres cosas que el barrido reportaba en cada ejecución
+
+Medidas en la aplicación levantada, antes y después. La **barra de estado**
+desbordaba 151 px a 1.024 y 275 a 900, y lo resolvía cortando la última palabra
+por la mitad —«Última eje…»—: ahora hay un orden de descarte escrito, primero
+las palabras que acompañan a los datos y por último la posición del cursor,
+mientras que contra qué se trabaja no se suelta nunca. El **buscador global**
+perdía su hueco más deprisa que su texto —a 1.024 quedaban 93 px para un rótulo
+de 230— y por debajo de 1.280 px es solo su icono. Y el **tipo de la columna** se
+cortaba en las cabeceras estrechas y en las anchas se iba al borde derecho
+pareciendo de la siguiente: ahora la cabecera se mide a sí misma y por debajo de
+150 px no lo enseña.
+
+De camino: el diagrama era el único diálogo que no cerraba con Escape, y el
+círculo de color de preferencias escondía 26 px para agrandar su área de clic.
+El propio barrido aprendió a distinguir **recortar de cortar**: un texto con
+puntos suspensivos y sitio para leerse es una decisión, no un hallazgo.
+
+#### Nada de fuera entra ya por una etiqueta que otro puede mover
+
+`actions/checkout@v4` y `mssql/server:2022-latest` son punteros ajenos: quien los
+controle cambia lo que ejecutan los runners —con los secretos delante— sin que
+aquí cambie una línea. Las seis acciones van por SHA y las tres imágenes de
+servicio con etiqueta y digest, comprobados contra sus registros. `dtolnay/rust-toolchain`
+necesitó además `toolchain: stable` explícito: fijada por SHA ya no puede deducir
+el canal del nombre de la rama. Y entra Dependabot en la misma tanda, porque
+«fijado» se convierte en «olvidado» en unos meses.
+
+#### El modo estricto cabía, y la cuadrícula no se podía leer
+
+`strict` y `strictTemplates` estaban por activar y el plan los daba por
+incrementales y ruidosos. Activados de golpe, el frontend compiló **sin un solo
+error**: salieron cuatro avisos de `??` y `?.`, tres ciertos y uno que delataba
+un tipo que mentía —un `Record` promete que toda clave existe y devuelve
+`undefined` igual—.
+
+La cuadrícula de resultados eran divs con aspecto de tabla: sin `role="grid"` por
+encima, las filas y celdas no son nada para un lector de pantalla. Ahora dice su
+tamaño —el total de verdad, contando las filas que aún no se han pintado—, cada
+celda dice dónde está, y la cabecera y el asa se manejan con el teclado: Intro y
+Espacio seleccionan la columna, las flechas la ensanchan y Mayúsculas va de 64 en
+64. Ajustar una columna era lo único que exigía arrastrar el ratón.
+
+**Verificado.** El barrido entero, con la consola limpia y **un solo hallazgo**
+—que la base de pruebas no tiene procedimientos, que no es un defecto—; a 1.440,
+1.024 y 900 px nada desborda. Las capturas de los tres anchos revisadas a ojo.
+Y el camino crítico contra PostgreSQL, con su conexión guardada y borrada.
+
+**Pruebas.** 815 del frontend, 558 unitarias del backend y 174 de integración
+de 177. Del e2e: 43 pasan; las de SQL Server necesitaban su contenedor, que se
+levantó.
+
+**Archivos.** `SecretWriter.cs` (nuevo), `SavedConnectionService.cs`,
+`SavedAiProviderService.cs`, `Contracts.cs`, `status-bar.*`, `top-bar.*`,
+`results-grid.*`, `editor-toolbar.*`, `diagram-panel.html`,
+`settings-dialog.scss`, `tsconfig.json`, `.github/workflows/*`,
+`.github/dependabot.yml` (nuevo), `docs/decisions/0004-*.md`, `barrido.spec.ts`,
+`test-db.ps1`.
+
+**Estado al cerrar.** Commiteado en `main`.
 
 ### Sesión 045 — 2026-09-07 · El contrato, el foco y una migración que se repetía
 
