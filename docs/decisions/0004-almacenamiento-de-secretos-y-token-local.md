@@ -33,7 +33,21 @@ Si el sistema no ofrece uno —modo portable, o un escritorio Linux sin libsecre
 
 La alternativa habitual sería cifrar un archivo con una clave que también está en el disco. Eso no protege de nadie: quien puede leer el archivo cifrado puede leer la clave. Sería seguridad aparente, que es peor que la ausencia de seguridad, porque el usuario confiaría en ella.
 
-### 3. La API local exige un token
+### 3. Cuando solo una de las dos escrituras funciona
+
+Guardar un perfil son **dos escrituras sin transacción que las una**: los datos van a SQLite y el secreto al llavero del sistema. La segunda puede fallar sola —el llavero bloqueado, una sesión sin escritorio, una política de empresa que lo prohíbe— y hay que decidir qué queda entonces.
+
+**Al guardar, el perfil va primero y no se deshace.** Si el llavero falla después, el resultado lo cuenta en un aviso en lugar de reventar la petición: el estado en el que queda —perfil guardado, sin secreto— es el mismo que el de una máquina sin almacén, que ya es de primera clase aquí. Borrar el perfil sería peor, porque el usuario perdería el formulario entero por un fallo ajeno a lo que escribió. Al revés —el secreto primero— un fallo del perfil dejaría en el llavero el secreto de una conexión que no existe.
+
+**Tres reglas gobiernan el secreto** (`SecretWriter`, en `Druse.Application/Secrets`):
+
+- Si no se pudo escribir, no queda nada escrito: lo que hubiera se retira. Una contraseña vieja pegada a unos datos nuevos falla al conectar sin decir por qué, mientras la interfaz asegura que hay una guardada.
+- Si no se pudo retirar, **se dice**, y solo si de verdad seguía ahí. Es el aviso que más importa: el usuario pidió dejar de recordar algo y sigue en su llavero.
+- Un fallo al consultar no es un fallo: se responde «no hay», que lleva a pedirlo.
+
+**Al borrar, el orden es el contrario**: primero el secreto y, si no se puede, el perfil se queda. La clave del secreto se deriva del identificador del perfil, así que borrar el perfil antes dejaría en el llavero una contraseña que ya nadie sabe nombrar ni retirar. Un perfil que no se dejó borrar se vuelve a borrar; un secreto huérfano se queda para siempre.
+
+### 4. La API local exige un token
 
 Escuchar solo en loopback impide el acceso desde la red, **pero no desde la propia máquina**. Sin token, cualquier proceso del usuario —incluida una página web abierta en el navegador— podría abrir sesiones contra sus bases de datos y ejecutar lo que quisiera.
 
