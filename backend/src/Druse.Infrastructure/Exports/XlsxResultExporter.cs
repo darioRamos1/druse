@@ -18,14 +18,55 @@ public sealed class XlsxResultExporter : IResultExporter
     private const string TruncatedCellSuffix = "… [recortado por el límite de Excel]";
 
     /// <summary>
-    /// Tope propio de este formato.
+    /// Tope propio de este formato, en filas.
     ///
     /// Una hoja de Excel admite 1 048 576 filas, pero mucho antes de llegar ahí
-    /// el proceso se quedaría sin memoria construyendo el libro. 200 000 es un
-    /// límite que cabe holgadamente y sigue siendo más de lo que nadie va a
-    /// revisar a mano.
+    /// el proceso se quedaría sin memoria construyendo el libro. 200 000 sigue
+    /// siendo más de lo que nadie va a revisar a mano.
     /// </summary>
     private const int FormatRowLimit = 200_000;
+
+    /// <summary>
+    /// Y el tope que de verdad manda: celdas.
+    ///
+    /// La memoria no depende de las filas sino del producto filas × columnas, y
+    /// un límite en filas deja la puerta abierta a la tabla ancha. Medido en este
+    /// equipo, con diez columnas de texto corriente
+    /// (`XlsxMemoryTests`, con `DRUSE_MEDIR_XLSX=1`):
+    ///
+    /// | Filas   | Celdas | Montón vivo | Reservado | Tiempo |
+    /// | ------- | ------ | ----------- | --------- | ------ |
+    /// | 10 000  | 100 k  | 72 MB       | 164 MB    | 0,6 s  |
+    /// | 50 000  | 500 k  | 200 MB      | 886 MB    | 4,3 s  |
+    /// | 100 000 | 1 M    | 370 MB      | 1,5 GB    | 3,5 s  |
+    /// | 200 000 | 2 M    | 732 MB      | 3,1 GB    | 6,6 s  |
+    ///
+    /// Son unos **370 bytes de memoria viva por celda**, lineales. Con el tope
+    /// anterior —solo filas— una tabla de cuarenta columnas pedía cuatro veces
+    /// eso: cerca de 3 GB, y ahí el proceso muere a mitad y se lleva por delante
+    /// el trabajo de la sesión.
+    ///
+    /// Dos millones de celdas dejan el pico en unos 730 MB **sea cual sea la
+    /// forma de la tabla**, y con las diez columnas de siempre no cambia nada
+    /// respecto a antes. Para volúmenes mayores está el CSV, que se escribe en
+    /// streaming y no crece.
+    /// </summary>
+    private const int FormatCellLimit = 2_000_000;
+
+    /// <summary>
+    /// Cuántas filas caben, contando lo ancha que es la tabla.
+    ///
+    /// Se separa del cuerpo de la exportación para poder comprobarla sin
+    /// construir un libro de un giga.
+    /// </summary>
+    internal static int RowsThatFit(int columns, int requested)
+    {
+        // Una tabla sin columnas no reserva nada por fila; el tope en filas sigue
+        // aplicando y evita dividir por cero.
+        var byCells = columns <= 0 ? FormatRowLimit : Math.Max(1, FormatCellLimit / columns);
+
+        return Math.Min(requested, Math.Min(FormatRowLimit, byCells));
+    }
 
     public ExportFormat Format => ExportFormat.Xlsx;
 
@@ -44,7 +85,7 @@ public sealed class XlsxResultExporter : IResultExporter
         ArgumentNullException.ThrowIfNull(destination);
         ArgumentNullException.ThrowIfNull(options);
 
-        var limit = Math.Min(options.MaxRows, FormatRowLimit);
+        var limit = RowsThatFit(reader.Columns.Count, options.MaxRows);
 
         using var workbook = new XLWorkbook();
         var sheet = workbook.AddWorksheet("Resultados");

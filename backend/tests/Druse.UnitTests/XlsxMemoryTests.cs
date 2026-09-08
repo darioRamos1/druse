@@ -75,8 +75,29 @@ public sealed class XlsxMemoryTests(ITestOutputHelper output)
             $"vivo {Megabytes(live),7:N0} MB | reservado {Megabytes(allocated),8:N0} MB | " +
             $"archivo {Megabytes(destination.Length),5:N0} MB | {elapsed.TotalSeconds,6:N1} s"));
 
-        Assert.Equal(rows, result.Rows);
+        Assert.Equal(rows, result.RowCount);
     }
+
+    /// <summary>
+    /// Y lo que sale de la medición, convertido en regla: el tope cuenta celdas.
+    ///
+    /// Esta sí corre siempre, porque comprueba la cuenta y no construye ningún
+    /// libro. La medición de arriba es lo que justifica el número; esto es lo que
+    /// impide que alguien lo cambie sin darse cuenta.
+    /// </summary>
+    [Theory]
+    // La tabla de siempre: diez columnas, y el tope en filas manda.
+    [InlineData(10, int.MaxValue, 200_000)]
+    // Cuarenta columnas son cuatro veces la memoria por fila: caben cuatro veces
+    // menos filas, y el pico se queda donde estaba.
+    [InlineData(40, int.MaxValue, 50_000)]
+    [InlineData(200, int.MaxValue, 10_000)]
+    // Lo que pide quien exporta manda si es menos que el tope.
+    [InlineData(10, 500, 500)]
+    // Un resultado sin columnas no reserva nada por fila y no divide por cero.
+    [InlineData(0, int.MaxValue, 200_000)]
+    public void ElTopeCuentaCeldasYNoSoloFilas(int columns, int requested, int expected) =>
+        Assert.Equal(expected, XlsxResultExporter.RowsThatFit(columns, requested));
 
     private static double Megabytes(long bytes) => bytes / 1024d / 1024d;
 

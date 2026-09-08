@@ -360,7 +360,15 @@ no solamente validaciones visuales.
 - [x] **PERF-001:** procesar CSV de importación en streaming y cortar al alcanzar el límite.
 - [x] **PERF-002:** proteger XLSX frente a archivos comprimidos desproporcionados y libros excesivos.
 - [x] **PERF-003:** aplicar el límite de resultados al lote completo, no de nuevo a cada result set.
-- [ ] **PERF-004:** medir memoria en exportaciones XLSX y documentar el límite con datos reales.
+- [x] **PERF-004:** medir memoria en exportaciones XLSX y documentar el límite con
+      datos reales. Medido con `DRUSE_MEDIR_XLSX=1` sobre diez columnas de texto:
+      10 000 filas piden 72 MB de montón vivo, 50 000 piden 200 MB, 100 000 piden
+      370 MB y 200 000 piden **732 MB** (3,1 GB reservados en total, 6,6 s). Son
+      unos **370 bytes por celda**, lineales, así que el tope en filas dejaba
+      pasar la tabla ancha: cuarenta columnas pedían cerca de 3 GB y el proceso
+      moría a mitad. El límite pasa a contar **celdas** —dos millones— y el pico
+      se queda en unos 730 MB sea cual sea la forma de la tabla; con diez columnas
+      no cambia nada. _(Hecho el 7 de septiembre de 2026.)_
 - [ ] **PERF-005:** revisar el bloqueo por sesión para que un backup largo no congele navegación que pueda usar otra conexión segura.
 
 > Estado al 7 de septiembre de 2026: hecha la observabilidad entera y tres de los
@@ -379,13 +387,16 @@ no solamente validaciones visuales.
 > no se abre; y el tope de filas pasa a ser del lote entero y no de cada
 > resultado, que con diez `SELECT` dejaba de significar nada.
 >
-> **PERF-004 y PERF-005 siguen abiertas.** La primera es medir de verdad, no
-> programar: hay que exportar libros grandes y anotar cuánta memoria pide
-> ClosedXML para poder documentar un límite con datos y no con una corazonada. La
-> segunda es más delicada de lo que parece: el turno por sesión es lo que impide
-> que dos operaciones se pisen en la misma conexión, y aflojarlo pide entender
-> antes qué se puede hacer por una conexión aparte sin cambiar lo que el usuario
-> ve.
+> **PERF-004 cerrada con datos** (7 de septiembre): la medición está en
+> `XlsxMemoryTests` y se pide con `DRUSE_MEDIR_XLSX=1`, porque construir libros de
+> 200 000 filas tarda y reserva gigas. Lo que enseñó es que el límite estaba
+> puesto en la magnitud equivocada: la memoria depende de las celdas, no de las
+> filas, así que el tope ahora cuenta celdas y una tabla ancha recorta antes.
+>
+> **PERF-005 sigue abierta**, y es más delicada de lo que parece: el turno por
+> sesión es lo que impide que dos operaciones se pisen en la misma conexión, y
+> aflojarlo pide entender antes qué se puede hacer por una conexión aparte sin
+> cambiar lo que el usuario ve.
 
 ### Criterios de aceptación
 
