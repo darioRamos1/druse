@@ -425,22 +425,25 @@ no solamente validaciones visuales.
       otra biblioteca de estado por defecto. **Empezado el 8 de septiembre de
       2026**: sin biblioteca nueva —siguen siendo Signals— y **sin cambiar una
       sola llamada de los componentes**, que es lo que permite hacerlo por
-      partes. El almacén pasó de 3.372 líneas a 2.919 y lo que salió vive en
-      cuatro archivos con su propia prueba: `errors.ts` —las palabras con las que
-      se cuenta un fallo, que ahora comparten todas las piezas—,
-      `notice-store.ts`, `connection-store.ts`, `tab-store.ts` y
-      `transaction-store.ts`. Faltan el explorador y la ejecución, que son los
-      dos bloques grandes que quedan.
+      partes. El almacén pasó de **3.372 líneas a 2.344** —menos de la mitad de
+      lo que salió— y lo que se fue vive en seis archivos con sus pruebas:
+      `errors.ts` —las palabras con las que se cuenta un fallo, que ahora
+      comparten todas las piezas—, `notice-store.ts`, `connection-store.ts`,
+      `tab-store.ts`, `transaction-store.ts` y `explorer-store.ts`. Falta la
+      ejecución de consultas, que es el bloque grande que queda.
 - [ ] **FE-002:** separar primero sesiones/transacciones, pestañas, explorador y
       ejecución de consultas. **Dos de cuatro**: sesiones y transacciones el 8 de
       septiembre de 2026 —las conexiones, su sesión y cuál está activa en
       `ConnectionStore`; las transacciones, con su reloj y el aviso de la que se
       deshace sola, en `TransactionStore`— y las pestañas el mismo día, con el
-      guardado con retardo que las protege de un cierre inesperado. Quedan el
-      explorador y la ejecución. **El explorador tiene un nudo que resolver
-      antes**: cuando una sesión se pierde hay que limpiar el árbol, y hoy quien
-      lo hace es el almacén; sacar el árbol sin más deja al explorador y al
-      almacén llamándose el uno al otro.
+      guardado con retardo que las protege de un cierre inesperado. **Y el
+      explorador el mismo día**, con el nudo que lo bloqueaba resuelto: el árbol
+      es quien primero descubre una sesión perdida, pero contarlo exige marcar la
+      conexión, olvidar su transacción y ofrecer «Reconectar», que no es suyo.
+      Ahora avisa hacia arriba por un manejador que el área de trabajo instala
+      —`reportSessionLossWith`— y recibe `forget(connectionId)` en la otra
+      dirección, igual que las transacciones. **Queda la ejecución de
+      consultas.**
 - [ ] **FE-003:** extraer de `AppShell` la coordinación de diálogos y comandos.
 - [x] **FE-004:** activar `strict` y `strictTemplates` de manera incremental.
       **No hizo falta que fuera incremental**: activados los dos de golpe, el
