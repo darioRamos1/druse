@@ -17,6 +17,7 @@ import { FileSaveService, describeSave } from '../files/file-save.service';
 import { ThemeService } from '../theme/theme.service';
 import { describeError, isSessionLost } from './errors';
 import { ConnectionStore } from './connection-store';
+import { ExecutionStore } from './execution-store';
 import { ExplorerStore } from './explorer-store';
 import { NoticeStore } from './notice-store';
 import { TabStore } from './tab-store';
@@ -42,7 +43,6 @@ import {
   QueryResult,
   KnownColumn,
   KnownRelation,
-  ResultSet,
   SavedConnection,
   SchemaIndex,
   SecretStoreStatus,
@@ -53,23 +53,6 @@ import {
   SchemaGraph,
   TableStructure,
 } from '../../shared/models/workspace';
-
-interface PendingRejection {
-  readonly value: QueryRejected;
-  readonly operation: 'execute' | 'export';
-  readonly tabId: string;
-  readonly connectionId: string;
-  readonly sql: string;
-  readonly format?: ExportFormat;
-}
-
-interface DisplayedResultSource {
-  readonly tabId: string | null;
-  readonly connectionId: string;
-  readonly database?: string;
-  readonly sql: string;
-  readonly title: string;
-}
 
 /**
  * Cómo acabó un intento de volver a abrir una conexión.
@@ -112,6 +95,7 @@ export class WorkspaceStore {
   private readonly _files = inject(FileSaveService);
   private readonly _theme = inject(ThemeService);
   private readonly _connectionStore = inject(ConnectionStore);
+  private readonly _execution = inject(ExecutionStore);
   private readonly _explorer = inject(ExplorerStore);
   private readonly _notices = inject(NoticeStore);
   private readonly _tabStore = inject(TabStore);
@@ -191,22 +175,15 @@ export class WorkspaceStore {
   readonly tabs = this._tabStore.tabs;
 
   // --- Ejecución -------------------------------------------------------------
-  private readonly _result = signal<QueryResult | null>(null);
-  readonly result = this._result.asReadonly();
-  private readonly _resultSource = signal<DisplayedResultSource | null>(null);
 
-  private readonly _running = signal(false);
-  readonly running = this._running.asReadonly();
+  /** Lo que hay en la cuadrícula y su estado; vive en {@link ExecutionStore}. */
+  readonly result = this._execution.result;
 
-  /** Ya se pidió detener la ejecución y se espera la confirmación del motor. */
-  private readonly _canceling = signal(false);
-  readonly canceling = this._canceling.asReadonly();
+  readonly running = this._execution.running;
 
-  private readonly _currentExecutionId = signal<string | null>(null);
+  readonly canceling = this._execution.canceling;
 
-  /** Rechazo ligado a la operación exacta que el servidor no ejecutó. */
-  private readonly _pendingRejection = signal<PendingRejection | null>(null);
-  readonly rejection = computed(() => this._pendingRejection()?.value ?? null);
+  readonly rejection = this._execution.rejection;
 
   readonly notice = this._notices.notice;
 
@@ -368,7 +345,7 @@ export class WorkspaceStore {
     confirmDestructive = false,
     sqlOverride?: string,
   ): Promise<void> {
-    const source = this._result() ? this._resultSource() : null;
+    const source = this._execution.result() ? this._execution.source() : null;
     const connection = source ? this.findConnection(source.connectionId) : this.activeConnection();
     const tab = this.activeTab();
     const tabId = source?.tabId ?? tab?.id;
@@ -376,7 +353,7 @@ export class WorkspaceStore {
     const tabSql = tab?.sql;
     const stillCurrent = (): boolean =>
       source
-        ? this._resultSource() === source
+        ? this._execution.source() === source
         : this.activeTab()?.id === tabId && this.activeTab()?.sql === tabSql;
 
     if (!connection?.sessionId) {
@@ -390,7 +367,7 @@ export class WorkspaceStore {
     }
 
     this._exporting.set(true);
-    this._pendingRejection.set(null);
+    this._execution.dismissRejection();
 
     try {
       const blob = await firstValueFrom(
@@ -423,7 +400,7 @@ export class WorkspaceStore {
 
       if (rejection) {
         if (tab && connection && this.activeTab()?.id === tab.id && stillCurrent()) {
-          this._pendingRejection.set({
+          this._execution.noteRejection({
             value: rejection,
             operation: 'export',
             tabId: tab.id,
@@ -763,7 +740,7 @@ export class WorkspaceStore {
       ),
     );
 
-    if (this._resultSource()?.tabId === tab.id) {
+    if (this._execution.source()?.tabId === tab.id) {
       this.clearDisplayedResult();
     }
 
@@ -842,7 +819,7 @@ export class WorkspaceStore {
     // El resultado en pantalla salió del servidor anterior. Se retira mire lo que
     // mire: unas filas de desarrollo bajo una barra que ya dice «preproducción»
     // son la clase de detalle que lleva a tomar una decisión al revés.
-    const source = this._resultSource();
+    const source = this._execution.source();
 
     if (source && (source.connectionId === previous || source.tabId === tab?.id)) {
       this.clearDisplayedResult();
@@ -888,7 +865,7 @@ export class WorkspaceStore {
   }
 
   /** Primer conjunto de resultados, que es el que muestra la cuadrícula. */
-  readonly resultSet = computed<ResultSet | null>(() => this._result()?.resultSets[0] ?? null);
+  readonly resultSet = this._execution.resultSet;
 
   // --- Edición de filas ------------------------------------------------------
 
@@ -1120,11 +1097,7 @@ export class WorkspaceStore {
 
   /** Cancela una ejecución auxiliar, como la vista previa del compositor. */
   async cancelExecution(executionId: string): Promise<void> {
-    try {
-      await firstValueFrom(this._gateway.cancelQuery(executionId));
-    } catch {
-      // Puede haber terminado entre la pulsación y esta solicitud.
-    }
+    await this._execution.cancelExecution(executionId);
   }
 
   // --- Borrado de filas ------------------------------------------------------
@@ -1493,7 +1466,7 @@ export class WorkspaceStore {
 
     // El resultado en pantalla salió de la sesión anterior; conservarlo sería
     // enseñar filas que ya no se pueden ni refrescar ni editar.
-    if (this._resultSource()?.connectionId === connectionId) {
+    if (this._execution.source()?.connectionId === connectionId) {
       this.clearDisplayedResult();
     }
 
@@ -2000,7 +1973,7 @@ export class WorkspaceStore {
 
   updateSql(sql: string): void {
     this._tabStore.updateSql(sql);
-    this._pendingRejection.set(null);
+    this._execution.dismissRejection();
     this.discardEdits();
   }
 
@@ -2056,33 +2029,20 @@ export class WorkspaceStore {
       return null;
     }
 
-    this._running.set(true);
-    this._canceling.set(false);
-    this._pendingRejection.set(null);
     this._notices.clear();
 
-    // El identificador se genera aquí y se envía con la petición: cancelar exige
-    // conocerlo mientras la consulta corre, y si lo pusiera el servidor solo
-    // llegaría con la respuesta, cuando ya no hay nada que cancelar.
-    const executionId = crypto.randomUUID();
-    this._currentExecutionId.set(executionId);
-
     try {
-      const result = await firstValueFrom(
-        this._gateway.executeQuery({
-          sessionId: connection.sessionId,
-          executionId,
-          sql,
-          database: tab?.database,
-          maxRows: this._maxRows(),
-          timeoutSeconds: this._timeoutSeconds(),
-          confirmDestructive,
-        }),
-      );
+      const result = await this._execution.run({
+        sessionId: connection.sessionId,
+        sql,
+        database: tab?.database,
+        maxRows: this._maxRows(),
+        timeoutSeconds: this._timeoutSeconds(),
+        confirmDestructive,
+      });
 
       if (this.activeTab()?.id === tabId && this.activeTab()?.sql === tabSql) {
-        this._result.set(result);
-        this._resultSource.set({
+        this._execution.show(result, {
           tabId: tabId ?? null,
           connectionId: connection.id,
           database: tab?.database,
@@ -2114,7 +2074,7 @@ export class WorkspaceStore {
           this.activeTab()?.id === tab.id &&
           this.activeTab()?.sql === tabSql
         ) {
-          this._pendingRejection.set({
+          this._execution.noteRejection({
             value: rejection,
             operation: 'execute',
             tabId: tab.id,
@@ -2129,24 +2089,20 @@ export class WorkspaceStore {
       }
 
       return null;
-    } finally {
-      this._running.set(false);
-      this._canceling.set(false);
-      this._currentExecutionId.set(null);
     }
   }
 
   /** Confirma exactamente la operación que el servidor rechazó. */
   async confirmAndExecute(): Promise<QueryResult | null> {
-    const pending = this._pendingRejection();
+    const pending = this._execution.pendingRejection();
     const tab = this.activeTab();
 
     if (!pending || tab?.id !== pending.tabId || tab.connectionId !== pending.connectionId) {
-      this._pendingRejection.set(null);
+      this._execution.dismissRejection();
       return null;
     }
 
-    this._pendingRejection.set(null);
+    this._execution.dismissRejection();
 
     if (pending.operation === 'export' && pending.format) {
       await this.export(pending.format, true, pending.sql);
@@ -2157,28 +2113,16 @@ export class WorkspaceStore {
   }
 
   dismissRejection(): void {
-    this._pendingRejection.set(null);
+    this._execution.dismissRejection();
   }
 
   dismissNotice(): void {
     this._notices.clear();
   }
 
+  /** Pide parar la consulta en curso. */
   async cancel(): Promise<void> {
-    const executionId = this._currentExecutionId();
-
-    if (!executionId || this._canceling()) {
-      return;
-    }
-
-    this._canceling.set(true);
-
-    try {
-      await firstValueFrom(this._gateway.cancelQuery(executionId));
-    } catch {
-      // Si ya había terminado, no hay nada que cancelar.
-      this._canceling.set(false);
-    }
+    await this._execution.cancel();
   }
 
   // --- Utilidades privadas ---------------------------------------------------
@@ -2198,10 +2142,15 @@ export class WorkspaceStore {
     );
   }
 
+  /**
+   * Retira lo que hay en pantalla y los cambios que colgaban de ello.
+   *
+   * Los cambios sin guardar de la cuadrícula se van con el resultado a
+   * propósito: señalan filas de una consulta que ya no está delante, y
+   * aplicarlos después sería escribir a ciegas.
+   */
   private clearDisplayedResult(): void {
-    this._result.set(null);
-    this._resultSource.set(null);
-    this._pendingRejection.set(null);
+    this._execution.clear();
     this.discardEdits();
   }
 

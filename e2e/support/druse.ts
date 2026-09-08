@@ -353,7 +353,12 @@ export async function ejecutar(page: Page, que: 'todo' | 'la del cursor'): Promi
 
   await respuesta;
 
-  // La respuesta ya está; falta que Angular la pinte.
+  // La respuesta ya está; falta que Angular la pinte. Primero se espera a que el
+  // panel de «Consulta en curso» se vaya: mientras está, **hay dos botones
+  // «Cancelar»** —el suyo y el de la barra— y preguntar por el nombre falla por
+  // ambigüedad en vez de esperar. Pasa cuando la máquina va cargada y el pintado
+  // llega tarde, y se lee como un fallo del producto.
+  await expect(page.getByLabel('Consulta en curso')).toBeHidden({ timeout: 30_000 });
   await expect(page.getByRole('button', { name: 'Cancelar' })).toBeDisabled({ timeout: 30_000 });
 }
 
