@@ -562,9 +562,13 @@ test.describe('la interfaz por dentro', () => {
       ).map((fila) => fila.textContent?.trim() ?? ''),
     );
 
-    // Las de `ciudad`, con su tipo al lado; ninguna de `accionista`.
+    // Las de `ciudad`, con su tipo al lado; ninguna de `accionista`. Se miran
+    // las dos que solo tiene ella —`id` y `nombre` están en ambas, así que no
+    // demuestran nada— y se comprueba que `participacion`, que es de la otra,
+    // no aparece.
     expect(sugerencias.some((fila) => fila.startsWith('id_ciudad'))).toBe(true);
-    expect(sugerencias.some((fila) => fila.startsWith('ciudad'))).toBe(true);
+    expect(sugerencias.some((fila) => fila.startsWith('poblacion'))).toBe(true);
+    expect(sugerencias.some((fila) => fila.startsWith('participacion'))).toBe(false);
     expect(sugerencias.length).toBeLessThan(6);
   });
 

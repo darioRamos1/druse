@@ -114,9 +114,15 @@ if ($Engine -in 'all', 'postgres') {
         # es lo que las pruebas escriben— y de paso da una relación que dibujar.
         $semilla = @(
             'CREATE TABLE IF NOT EXISTS accionista (id integer PRIMARY KEY, nombre text NOT NULL, participacion numeric(5,2))',
-            'CREATE TABLE IF NOT EXISTS ciudad (id integer PRIMARY KEY, nombre text NOT NULL, id_ciudad integer REFERENCES accionista (id))',
+            'CREATE TABLE IF NOT EXISTS ciudad (id integer PRIMARY KEY, nombre text NOT NULL, poblacion integer, id_ciudad integer REFERENCES accionista (id))',
+            # Para las bases que ya existían de antes: sin esto, el autocompletado
+            # tras un alias no tiene ninguna columna que solo sea de `ciudad`, que
+            # es justo lo que esa prueba comprueba.
+            'ALTER TABLE ciudad ADD COLUMN IF NOT EXISTS poblacion integer',
             "INSERT INTO accionista (id, nombre, participacion) VALUES (1, 'Ana', 51.00), (2, 'Bea', 49.00) ON CONFLICT DO NOTHING",
-            "INSERT INTO ciudad (id, nombre, id_ciudad) VALUES (1, 'Guadalajara', 1), (2, 'Monterrey', 2) ON CONFLICT DO NOTHING"
+            "INSERT INTO ciudad (id, nombre, poblacion, id_ciudad) VALUES (1, 'Guadalajara', 1495189, 1), (2, 'Monterrey', 1142994, 2) ON CONFLICT DO NOTHING",
+            "UPDATE ciudad SET poblacion = 1495189 WHERE id = 1 AND poblacion IS NULL",
+            "UPDATE ciudad SET poblacion = 1142994 WHERE id = 2 AND poblacion IS NULL"
         )
 
         foreach ($sentencia in $semilla) {
