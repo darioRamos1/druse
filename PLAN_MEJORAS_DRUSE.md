@@ -432,8 +432,18 @@ no solamente validaciones visuales.
 
 ### Accesibilidad
 
-- [ ] **A11Y-001:** dar semántica completa `grid` o `table` a la cuadrícula de resultados.
-- [ ] **A11Y-002:** permitir seleccionar y redimensionar columnas con teclado.
+- [x] **A11Y-001:** dar semántica completa `grid` o `table` a la cuadrícula de
+      resultados. El contenedor es `role="grid"` con su total de filas y
+      columnas —el de verdad, contando las que aún no se han pintado—, las
+      celdas dicen en qué fila y columna van, las cabeceras dicen si ordenan, y
+      lo que no es una fila —el aviso de «sin filas», el «Mostrar más»— va
+      envuelto en una. _(Hecho el 7 de septiembre de 2026.)_
+- [x] **A11Y-002:** permitir seleccionar y redimensionar columnas con teclado. La
+      cabecera se enfoca y responde a Intro y Espacio, con Control y Mayúsculas
+      como en el ratón; el asa se enfoca, dice cuánto mide la columna y responde
+      a las flechas —Mayúsculas para ir más rápido— y a Intro para ajustarla al
+      contenido. Era lo único de la cuadrícula que exigía arrastrar el ratón.
+      _(Hecho el 7 de septiembre de 2026.)_
 - [x] **A11Y-003:** añadir valores ARIA al separador de tamaño. _(Ya estaba: `app-resize-handle` lleva `role`, `aria-orientation`, `aria-valuenow/min/max`, `tabindex` y las flechas. Comprobado el 7 de septiembre de 2026; la tarea estaba desactualizada.)_
 - [x] **A11Y-004:** implementar foco inicial, trampa, Escape y restauración de foco en todos los diálogos.
 - [ ] **A11Y-005:** probar navegación completa sin ratón y con lector de pantalla.
@@ -455,9 +465,8 @@ no solamente validaciones visuales.
 >
 > **Lo que queda es lo grande y lo que hay que mirar:** FE-001 a FE-003 son
 > extracciones de `WorkspaceStore` y `AppShell` que no pueden hacerse a medias;
-> BE-001 y BE-002 son lo mismo en el backend. A11Y-001 y A11Y-002 tocan la cuadrícula de
-> resultados, que es el componente más delicado que hay. Y A11Y-005 no es
-> programar: es sentarse con un lector de pantalla.
+> BE-001 y BE-002 son lo mismo en el backend. Y A11Y-005 no es programar: es
+> sentarse con un lector de pantalla.
 >
 > **A11Y-003 estaba desactualizada**: el separador ya llevaba sus valores ARIA y
 > sus flechas. Comprobado, no escrito.

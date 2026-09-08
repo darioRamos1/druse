@@ -637,4 +637,88 @@ describe('ResultsGrid', () => {
       expect(template()).toBe('44px 120px');
     });
   });
+  /**
+   * Sin esto, la cuadrícula es un montón de divs con aspecto de tabla: se ve
+   * bien y no se puede usar de ninguna otra forma.
+   */
+  describe('se anuncia como tabla y se maneja sin ratón', () => {
+    function head(column: number): HTMLElement {
+      return element.querySelectorAll<HTMLElement>('.cell--head')[column];
+    }
+
+    function handle(column: number): HTMLElement {
+      return element.querySelectorAll<HTMLElement>('.cell__resize')[column];
+    }
+
+    it('el contenedor dice que es una cuadrícula y cuánto mide', () => {
+      const grid = element.querySelector<HTMLElement>('.body');
+
+      expect(grid?.getAttribute('role')).toBe('grid');
+      // La cabecera cuenta como fila, y la columna del número como columna.
+      expect(grid?.getAttribute('aria-rowcount')).toBe('4');
+      expect(grid?.getAttribute('aria-colcount')).toBe('4');
+    });
+
+    /**
+     * El total es el de verdad, no el de lo pintado: con noventa mil filas por
+     * traer, decir «500 de 500» es mentir a quien no puede mirar la pantalla.
+     */
+    it('cuenta las filas que aún no se han pintado', async () => {
+      fixture.componentRef.setInput('resultSet', {
+        ...resultSet,
+        rows: Array.from({ length: 700 }, (_, i) => ({
+          number: i + 1,
+          values: [String(i), null, 'true'],
+        })),
+      });
+      await fixture.whenStable();
+
+      expect(element.querySelectorAll('.row').length).toBeLessThan(700);
+      expect(element.querySelector('.body')?.getAttribute('aria-rowcount')).toBe('701');
+    });
+
+    it('cada celda dice en qué fila y en qué columna está', () => {
+      const row = element.querySelectorAll<HTMLElement>('.row')[1];
+      const cell = row.querySelectorAll<HTMLElement>('.cell--value')[2];
+
+      expect(row.getAttribute('aria-rowindex')).toBe('3');
+      expect(cell.getAttribute('role')).toBe('gridcell');
+      expect(cell.getAttribute('aria-colindex')).toBe('4');
+    });
+
+    it('Intro en una cabecera selecciona la columna entera', async () => {
+      head(1).dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+      await fixture.whenStable();
+
+      expect(element.querySelectorAll('.cell--value.is-selected').length).toBe(3);
+    });
+
+    /**
+     * Ajustar una columna era lo único que exigía arrastrar el ratón: quien no
+     * puede hacerlo se quedaba con los anchos que le tocaran.
+     */
+    it('las flechas sobre el asa ensanchan y estrechan la columna', async () => {
+      handle(0).dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
+      await fixture.whenStable();
+
+      expect(element.querySelector<HTMLElement>('.head')?.style.gridTemplateColumns).toBe(
+        '44px 96px 200px 1fr',
+      );
+
+      handle(0).dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'ArrowLeft', shiftKey: true, bubbles: true }),
+      );
+      await fixture.whenStable();
+
+      // 96 menos los 64 del paso largo, con el suelo de 84 px por delante.
+      expect(element.querySelector<HTMLElement>('.head')?.style.gridTemplateColumns).toBe(
+        '44px 84px 200px 1fr',
+      );
+    });
+
+    it('el asa dice cuánto mide ahora la columna', () => {
+      expect(handle(1).getAttribute('aria-valuenow')).toBe('200');
+      expect(handle(1).getAttribute('aria-valuemin')).toBe('84');
+    });
+  });
 });

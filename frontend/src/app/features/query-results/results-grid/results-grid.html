@@ -7,9 +7,26 @@
   cosas a la vez —fija al bajar, acompaña al ir a la derecha—, que es justo lo
   que se espera de un encabezado.
 -->
-<div class="body" [class.is-compact]="compact()" [class.is-resizing]="isResizing()">
-  <div class="head" role="row" [style.grid-template-columns]="gridTemplate()">
-    <div class="cell cell--check" role="columnheader">
+<!--
+  El contenedor es la cuadrícula, no un montón de divs con aspecto de tabla.
+
+  Sin `role="grid"` por encima, las filas y las celdas de dentro no son nada
+  para un lector de pantalla: se leen como texto suelto, sin decir en qué
+  columna van ni cuántas filas hay. El total anunciado cuenta las filas que aún
+  no se han pintado, que es lo que hay de verdad.
+-->
+<div
+  class="body"
+  role="grid"
+  aria-label="Resultados de la consulta"
+  [attr.aria-rowcount]="announcedRowCount()"
+  [attr.aria-colcount]="resultSet().columns.length + 1"
+  [attr.aria-readonly]="!editable()"
+  [class.is-compact]="compact()"
+  [class.is-resizing]="isResizing()"
+>
+  <div class="head" role="row" aria-rowindex="1" [style.grid-template-columns]="gridTemplate()">
+    <div class="cell cell--check" role="columnheader" aria-colindex="1">
       <button
         type="button"
         class="copy-all"
@@ -27,6 +44,9 @@
       <div
         class="cell cell--head"
         role="columnheader"
+        tabindex="0"
+        [attr.aria-colindex]="i + 2"
+        [attr.aria-sort]="column.sorted ? 'descending' : 'none'"
         [class.is-selected]="isColumnSelected(i)"
         [attr.aria-selected]="isColumnSelected(i)"
         [title]="
@@ -36,6 +56,8 @@
           ' — Seleccionar la columna (Control para añadir, Mayúsculas para un tramo)'
         "
         (click)="selectColumn(i, $event)"
+        (keydown.enter)="selectColumn(i, $event)"
+        (keydown.space)="selectColumn(i, $event)"
         (contextmenu)="openMenu($event, null, i)"
       >
         <span class="cell__name" [class.is-sorted]="!!column.sorted">{{ column.name }}</span>
@@ -52,11 +74,19 @@
         <span
           class="cell__resize"
           role="separator"
+          tabindex="0"
           aria-orientation="vertical"
           [attr.aria-label]="'Ajustar el ancho de ' + column.name"
-          title="Arrastra para ajustar el ancho. Doble clic para ajustarlo al contenido."
+          [attr.aria-valuenow]="widthOf(i)"
+          [attr.aria-valuemin]="minWidth"
+          title="Arrastra o usa las flechas para ajustar el ancho. Doble clic o Intro lo ajusta al contenido."
           (mousedown)="beginResize(i, $event)"
           (dblclick)="autoFit(i, $event)"
+          (keydown.enter)="autoFit(i, $event)"
+          (keydown.arrowleft)="nudgeWidth(i, -16, $event)"
+          (keydown.arrowright)="nudgeWidth(i, 16, $event)"
+          (keydown.shift.arrowleft)="nudgeWidth(i, -64, $event)"
+          (keydown.shift.arrowright)="nudgeWidth(i, 64, $event)"
           (click)="$event.stopPropagation()"
         ></span>
       </div>
@@ -64,10 +94,15 @@
   </div>
 
   @if (showFilters()) {
-    <div class="filters" role="row" [style.grid-template-columns]="gridTemplate()">
-      <div class="cell cell--check"></div>
+    <div
+      class="filters"
+      role="row"
+      aria-rowindex="2"
+      [style.grid-template-columns]="gridTemplate()"
+    >
+      <div class="cell cell--check" role="gridcell" aria-colindex="1"></div>
       @for (column of resultSet().columns; track column.name; let i = $index) {
-        <div class="cell cell--filter">
+        <div class="cell cell--filter" role="gridcell" [attr.aria-colindex]="i + 2">
           <input
             type="search"
             class="filters__input"
@@ -82,10 +117,16 @@
   }
 
   @for (row of renderedRows(); track row.number; let r = $index) {
-    <div class="row" role="row" [style.grid-template-columns]="gridTemplate()">
+    <div
+      class="row"
+      role="row"
+      [attr.aria-rowindex]="headerRows() + r + 1"
+      [style.grid-template-columns]="gridTemplate()"
+    >
       <div
         class="cell cell--number"
-        role="cell"
+        role="gridcell"
+        aria-colindex="1"
         [class.is-marked]="isRowSelected(row.number)"
         [class.is-selected]="isRowChosen(r)"
         title="Arrastra para coger varias filas; doble clic copia esta"
@@ -115,8 +156,10 @@
       @for (column of resultSet().columns; track column.name; let i = $index) {
         <div
           class="cell cell--value"
-          role="cell"
+          role="gridcell"
           tabindex="0"
+          [attr.aria-colindex]="i + 2"
+          [attr.aria-selected]="isSelected(r, i)"
           [attr.data-kind]="column.kind"
           [class.is-selected]="isSelected(r, i)"
           [class.is-dirty]="isDirty(row.number, i)"
@@ -161,19 +204,25 @@
       }
     </div>
   } @empty {
-    @if (filtered()) {
-      <p class="empty">Ninguna fila coincide con los filtros.</p>
-    } @else {
-      <p class="empty">La consulta no devolvió filas.</p>
-    }
+    <!-- Dentro de una cuadrícula todo cuelga de una fila, también lo que solo
+         explica que no hay nada que enseñar. -->
+    <div role="row">
+      @if (filtered()) {
+        <p class="empty" role="gridcell">Ninguna fila coincide con los filtros.</p>
+      } @else {
+        <p class="empty" role="gridcell">La consulta no devolvió filas.</p>
+      }
+    </div>
   }
 
   @if (remainingRows() > 0) {
-    <div class="more" role="status">
-      <span>Mostrando {{ renderedRows().length }} de {{ visibleRows().length }} filas.</span>
-      <button type="button" (click)="showMore()">
-        Mostrar {{ remainingRows() > 500 ? 500 : remainingRows() }} más
-      </button>
+    <div role="row">
+      <div class="more" role="gridcell">
+        <span>Mostrando {{ renderedRows().length }} de {{ visibleRows().length }} filas.</span>
+        <button type="button" (click)="showMore()">
+          Mostrar {{ remainingRows() > 500 ? 500 : remainingRows() }} más
+        </button>
+      </div>
     </div>
   }
 </div>

@@ -326,13 +326,15 @@ export class ResultsGrid {
    * Control añade o quita una suelta y Mayúsculas coge el tramo entre la última
    * y esta, que es lo que hace cualquier lista con selección múltiple.
    */
-  protected selectColumn(column: number, event: MouseEvent): void {
+  protected selectColumn(column: number, event: Event): void {
+    const { shift, toggle } = modifiersOf(event);
+
     this.anchor.set(null);
     this.focus.set(null);
     this.chosenRows.set([]);
     this.lastRow = null;
 
-    if (event.shiftKey && this.lastColumn !== null) {
+    if (shift && this.lastColumn !== null) {
       const from = Math.min(this.lastColumn, column);
       const to = Math.max(this.lastColumn, column);
 
@@ -341,7 +343,7 @@ export class ResultsGrid {
       return;
     }
 
-    if (event.ctrlKey || event.metaKey) {
+    if (toggle) {
       this.selectedColumns.update((current) =>
         current.includes(column)
           ? current.filter((index) => index !== column)
@@ -459,7 +461,7 @@ export class ResultsGrid {
    * lo que hay delante, y recorrer cien mil filas para eso costaría más que el
    * problema que resuelve.
    */
-  protected autoFit(column: number, event: MouseEvent): void {
+  protected autoFit(column: number, event: Event): void {
     event.preventDefault();
     event.stopPropagation();
 
@@ -481,6 +483,43 @@ export class ResultsGrid {
     this.resizing = null;
     this.isResizing.set(false);
   }
+
+  /**
+   * Ensancha o estrecha una columna con el teclado.
+   *
+   * El asa se puede enfocar y responde a las flechas, con Mayúsculas para ir
+   * más rápido. Sin esto, ajustar una columna era lo único de la cuadrícula que
+   * exigía arrastrar el ratón, y quien no puede hacerlo se quedaba con los
+   * anchos que le tocaran.
+   */
+  protected nudgeWidth(column: number, delta: number, event: Event): void {
+    event.preventDefault();
+    event.stopPropagation();
+
+    this.setWidth(column, this.renderedWidth(column) + delta);
+  }
+
+  /** Lo que mide la columna, para anunciarlo en el asa. */
+  protected widthOf(column: number): number {
+    return Math.round(this.renderedWidth(column));
+  }
+
+  /** El mínimo al que se puede estrechar, que es el que aplica `setWidth`. */
+  protected readonly minWidth = MIN_COLUMN_WIDTH;
+
+  /**
+   * Filas que anuncia la cuadrícula, contando las que aún no se han pintado.
+   *
+   * Un lector de pantalla necesita saber cuántas hay en total, no cuántas
+   * llegaron a entrar en el DOM: si no, dice «fila 500 de 500» cuando quedan
+   * noventa mil por traer.
+   */
+  protected readonly announcedRowCount = computed(
+    () => this.headerRows() + this.visibleRows().length,
+  );
+
+  /** Cabecera y, si está, la fila de filtros: las filas que van antes de los datos. */
+  protected readonly headerRows = computed(() => (this.showFilters() ? 2 : 1));
 
   private setWidth(column: number, width: number): void {
     const name = this.resultSet().columns[column]?.name;
@@ -884,4 +923,20 @@ export class ResultsGrid {
       this.copyFailed.emit();
     }
   }
+}
+
+/**
+ * Las teclas de acompañamiento del gesto, venga del ratón o del teclado.
+ *
+ * La misma acción llega por dos caminos —un clic en la cabecera o Intro sobre
+ * ella— y Angular tipa como `Event` los eventos de teclado con modificador, así
+ * que aquí se normaliza una vez en lugar de duplicar el cuerpo del método.
+ */
+function modifiersOf(event: Event): { shift: boolean; toggle: boolean } {
+  const source = event as Partial<MouseEvent & KeyboardEvent>;
+
+  return {
+    shift: source.shiftKey === true,
+    toggle: source.ctrlKey === true || source.metaKey === true,
+  };
 }
