@@ -478,8 +478,18 @@ no solamente validaciones visuales.
 - [ ] **REL-003:** comprobar los selectores nativos de archivo y carpeta en la aplicación empaquetada.
 - [ ] **REL-004:** probar multicursor y atajos dentro de WebView2.
 - [ ] **REL-005:** obtener firma Authenticode y verificar sellado de tiempo.
-- [ ] **REL-006:** fijar GitHub Actions por SHA y contenedores de CI por versión o digest.
-- [ ] **REL-007:** añadir Dependabot o Renovate y auditoría periódica de NuGet, npm y Cargo.
+- [x] **REL-006:** fijar GitHub Actions por SHA y contenedores de CI por versión
+      o digest. Las seis acciones van por SHA con su versión en el comentario, y
+      las tres imágenes de servicio llevan etiqueta **y** digest. `dtolnay/rust-toolchain`
+      necesitó además `toolchain: stable` explícito: fijada por SHA, la acción ya
+      no puede deducir el canal del nombre de la rama. _(Hecho el 7 de septiembre
+      de 2026.)_
+- [x] **REL-007:** añadir Dependabot o Renovate y auditoría periódica de NuGet,
+      npm y Cargo. `.github/dependabot.yml` cubre los cinco ecosistemas —acciones,
+      npm del frontend, npm del e2e, NuGet proyecto a proyecto y Cargo del
+      envoltorio— agrupados para que no lleguen veinte PR sueltos, que es como
+      esto acaba apagado. Es también lo que evita que «fijado» se convierta en
+      «olvidado» después de REL-006. _(Hecho el 7 de septiembre de 2026.)_
 - [ ] **REL-008:** crear una matriz programada para versiones mínimas soportadas y MariaDB.
 - [ ] **REL-009:** comprobar todos los RIDs prometidos por el plan maestro.
 - [ ] **REL-010:** actualizar README, descripción Tauri y notas de versión para reflejar motores y transportes actuales.

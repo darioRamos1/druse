@@ -1,0 +1,62 @@
+# Actualizaciones de dependencias, propuestas como PR.
+#
+# Existe por lo mismo que los SHA fijados en los workflows: sin nada que avise,
+# «fijado» se convierte en «olvidado», y una versión clavada durante un año es
+# tan mala idea como una etiqueta que se mueve sola. Aquí el salto llega como un
+# PR con su diario de cambios y lo mira alguien.
+#
+# Las actualizaciones van agrupadas a propósito. Cinco ecosistemas sueltos
+# generan tantos PR sueltos que se dejan de leer, que es la forma habitual de
+# que esto acabe apagado.
+version: 2
+
+updates:
+  # Las acciones de los workflows, que es lo que ejecuta código con los secretos
+  # del repositorio delante.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      acciones:
+        patterns: ['*']
+
+  - package-ecosystem: npm
+    directory: /frontend
+    schedule:
+      interval: weekly
+    groups:
+      angular:
+        patterns: ['@angular*', 'zone.js', 'rxjs', 'typescript']
+      resto:
+        patterns: ['*']
+        exclude-patterns: ['@angular*', 'zone.js', 'rxjs', 'typescript']
+
+  - package-ecosystem: npm
+    directory: /e2e
+    schedule:
+      interval: weekly
+    groups:
+      pruebas:
+        patterns: ['*']
+
+  # Los proyectos, uno a uno: aquí no hay gestión central de versiones y en la
+  # carpeta de arriba solo vive la solución, donde Dependabot no encontraría
+  # ningún paquete que mirar.
+  - package-ecosystem: nuget
+    directories:
+      - /backend/src/*
+      - /backend/tests/*
+    schedule:
+      interval: weekly
+    groups:
+      backend:
+        patterns: ['*']
+
+  - package-ecosystem: cargo
+    directory: /shells/desktop-tauri
+    schedule:
+      interval: weekly
+    groups:
+      envoltorio:
+        patterns: ['*']
