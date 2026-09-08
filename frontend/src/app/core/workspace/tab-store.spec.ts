@@ -115,7 +115,12 @@ describe('TabStore', () => {
     tabs.create();
 
     // Sin adelantar el contador, la nueva se llamaría igual que la restaurada.
-    expect(tabs.active()?.id).toBe('q8');
+    // El número exacto no se fija: el contador es del módulo y otras pruebas de
+    // la misma pasada ya lo han movido; lo que importa es que va por delante.
+    const nueva = tabs.active()!.id;
+
+    expect(nueva).not.toBe('q7');
+    expect(Number.parseInt(nueva.slice(1), 10)).toBeGreaterThan(7);
   });
 
   it('si lo guardado no marca ninguna activa, activa la primera', async () => {
