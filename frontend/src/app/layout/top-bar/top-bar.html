@@ -33,10 +33,17 @@
 </div>
 
 <div class="search-slot">
+  <!--
+    Cuando no cabe el texto, se queda el icono: a media ventana el rótulo se
+    recortaba a nada —«Buscar tabl…», y a 1.024 px ni eso— y un campo de búsqueda
+    con un jirón de frase dentro no dice para qué sirve. El título va siempre,
+    así que la explicación no se pierde con la palabra.
+  -->
   <button
     type="button"
     class="search"
     aria-label="Abrir búsqueda global"
+    title="Buscar tablas, consultas y conexiones (Ctrl+K)"
     (click)="openPalette.emit()"
   >
     <app-icon name="search" [size]="13" />

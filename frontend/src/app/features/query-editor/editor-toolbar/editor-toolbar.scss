@@ -85,10 +85,16 @@
     display: none;
   }
 
-  // Y la base, si es larga, se corta: prefiero verla a medias con las demás
-  // cosas en su sitio que perder una fila entera por el nombre completo.
+  // Y en vez de recortar `base.esquema` por la mitad —«druse_test.p…», que
+  // ocupa lo mismo y dice menos—, se enseña solo la base. El nombre completo
+  // sigue en el título del chip.
   .chip__mono {
-    max-width: 92px;
+    display: none;
+  }
+
+  .chip__short {
+    display: inline;
+    max-width: 110px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -485,6 +491,15 @@
   }
 
   &__mono {
+    font-family: var(--dr-font-mono);
+    font-size: 11.5px;
+  }
+
+  // La versión corta del contexto: solo la base, y solo cuando la barra
+  // estrecha. Lleva clase propia y no un modificador de `__mono` porque las
+  // pruebas buscan el contexto por esa clase y encontrarían dos.
+  &__short {
+    display: none;
     font-family: var(--dr-font-mono);
     font-size: 11.5px;
   }

@@ -1,4 +1,10 @@
-<div class="backdrop"></div>
+<!--
+  Escape cierra, como en el resto de los diálogos. Faltaba solo aquí, y quien lo
+  abría se quedaba pulsando una tecla que en toda la aplicación funciona. Pulsar
+  fuera no cierra —lo trae `DialogBackdrop`—: el diagrama guarda colocación y un
+  roce del ratón se llevaría por delante lo movido.
+-->
+<div class="backdrop" (document:keydown.escape)="close()"></div>
 
 <section
   class="dialog"

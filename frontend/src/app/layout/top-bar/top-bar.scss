@@ -245,14 +245,31 @@
   .divider--spaced {
     display: none;
   }
-
-  .search {
-    width: min(360px, 100%);
-  }
 }
 
 @media (max-width: 1180px) {
   .btn--save-as {
+    display: none;
+  }
+}
+
+/*
+ * Por debajo de este ancho la búsqueda es solo su icono.
+ *
+ * El hueco que le deja la barra se encoge más deprisa que el texto: a 1.024 px
+ * quedaban 93 px para un rótulo de 230, así que el campo enseñaba un recorte
+ * ilegible. Un icono cuadrado, con su título y su atajo intactos, dice lo mismo
+ * y cabe siempre.
+ */
+@media (max-width: 1280px) {
+  .search {
+    width: 30px;
+    padding: 0;
+    justify-content: center;
+  }
+
+  .search__placeholder,
+  .search__shortcut {
     display: none;
   }
 }

@@ -105,6 +105,10 @@
   overflow: hidden;
   white-space: nowrap;
 
+  /* La cabecera se mide a sí misma: lo que enseña depende de lo ancha que la
+     haya dejado el usuario, no de lo ancha que sea la ventana. */
+  container-type: inline-size;
+
   &__text {
     min-width: 0;
     overflow: hidden;
@@ -138,12 +142,18 @@
    * quien acababa cortado era el nombre, que es lo que hay que leer para saber
    * qué columna es. El factor de encogimiento desproporcionado hace que ceda
    * todo su ancho antes de que el nombre ceda el primer píxel.
+   *
+   * Va pegado al nombre y no al borde derecho: con la columna ancha, `auto` a la
+   * izquierda lo mandaba al final de la celda y se leía como el tipo de la
+   * columna siguiente. Y lo poco que le quede se recorta con puntos suspensivos,
+   * que dicen que hay más; cortado a mitad de palabra —«intege»— parecía un
+   * nombre de tipo inventado.
    */
   &__type {
     flex: 0 1000000 auto;
     min-width: 0;
-    margin-left: auto;
     overflow: hidden;
+    text-overflow: ellipsis;
     font-family: var(--dr-font-mono);
     font-size: 9.5px;
     font-weight: 400;
@@ -438,5 +448,18 @@
     color: var(--dr-text-faintest);
     font-family: var(--dr-font-mono);
     font-size: 11px;
+  }
+}
+
+/*
+ * En una columna estrecha, el tipo no se enseña.
+ *
+ * Encogerlo hasta «int…» gasta el sitio del nombre para no decir nada; por
+ * debajo de este ancho el nombre se queda con toda la celda y el tipo se lee en
+ * el título de la cabecera, que lo dice entero.
+ */
+@container (max-width: 150px) {
+  .cell__type {
+    display: none;
   }
 }

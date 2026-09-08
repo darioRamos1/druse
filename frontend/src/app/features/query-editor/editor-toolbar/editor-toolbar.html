@@ -174,7 +174,7 @@
     [attr.aria-expanded]="choosingDatabase()"
     [attr.title]="
       databases().length > 0 || connections().length > 0
-        ? 'Conexión y base contra las que se ejecuta'
+        ? context() + ' — conexión y base contra las que se ejecuta'
         : 'Conecta para elegir dónde se ejecuta'
     "
     (click)="toggleDatabases()"
@@ -185,6 +185,7 @@
       <span class="chip__sep" aria-hidden="true">·</span>
     }
     <span class="chip__mono">{{ context() }}</span>
+    <span class="chip__short">{{ contextDatabase() }}</span>
     <app-icon name="chevron-down" [size]="9" />
   </button>
 

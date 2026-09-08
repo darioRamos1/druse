@@ -4,39 +4,42 @@
     <span class="state-label">{{ s.connected ? 'Conectado' : 'Sin conexión' }}</span>
   </div>
 
-  <span class="sep" aria-hidden="true"></span>
-
-  <div class="item">
+  <div class="item item--engine">
     <app-engine-badge [engine]="s.engine" [size]="13" class="engine" />
-    {{ s.engineVersion }}
+    <!-- La versión es dato, no etiqueta: aguanta más que las palabras. -->
+    <span class="version">{{ s.engineVersion }}</span>
   </div>
 
-  <span class="sep" aria-hidden="true"></span>
+  <!--
+    Las palabras se van antes que los datos.
 
-  <div class="item">
-    Base de datos <span class="mono">{{ s.database }}</span>
+    A partir de cierto ancho la barra no cabe entera, y lo primero que sobra son
+    las etiquetas: «druse_test» se entiende sin que delante ponga «Base de
+    datos», y el nombre en monoespaciada ya dice que es un dato y no una frase.
+    Van en un `title` para que sigan estando cuando ya no se vean.
+  -->
+  <div class="item item--database" title="Base de datos">
+    <span class="text">Base de datos</span>
+    <span class="mono">{{ s.database }}</span>
   </div>
 
-  <span class="sep" aria-hidden="true"></span>
-
-  <div class="item">
-    Usuario <span class="mono">{{ s.user }}</span>
+  <div class="item item--user" title="Usuario de la sesión">
+    <span class="text">Usuario</span>
+    <span class="mono">{{ s.user }}</span>
   </div>
 
   <span class="spacer"></span>
 
   @if (s.lastDurationMs !== null) {
-    <div class="item">
-      Última ejecución <span class="mono">{{ s.lastDurationMs }} ms</span>
+    <div class="item item--duration" title="Última ejecución">
+      <span class="text">Última ejecución</span>
+      <span class="mono">{{ s.lastDurationMs }} ms</span>
     </div>
-    <span class="sep" aria-hidden="true"></span>
   }
 
-  <div class="item">Ln {{ line() }}, Col {{ column() }}</div>
+  <div class="item item--caret">Ln {{ line() }}, Col {{ column() }}</div>
 
-  <span class="sep" aria-hidden="true"></span>
-
-  <div class="item mono">{{ encoding() }}</div>
+  <div class="item item--encoding mono">{{ encoding() }}</div>
 }
 
 <!--

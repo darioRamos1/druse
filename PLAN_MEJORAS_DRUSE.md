@@ -515,22 +515,44 @@ cerró en la 027 y trataba defectos de maquetación.
       hereda el fondo del contenedor y salía **negro**: una franja de diez
       píxeles pegada al borde derecho, invisible en el tema oscuro y evidente en
       el claro. _(Hecho el 7 de septiembre de 2026.)_
-- [ ] **UX-002:** el tipo de la columna se corta en las cabeceras estrechas
+- [x] **UX-002:** el tipo de la columna se corta en las cabeceras estrechas
       —«intege»— y, cuando la última columna es ancha, queda pegado al borde
-      derecho pareciendo de otra. Decidir si se abrevia, se pasa al tooltip o se
-      esconde por debajo de cierto ancho.
-- [ ] **UX-003:** la barra de estado se corta a 900 px —«Última eje…»— en lugar
-      de envolver o de soltar lo menos importante. Decidir un orden de descarte.
-- [ ] **UX-004:** el placeholder del buscador global se corta en todos los anchos
-      y lo reporta cada barrido. O cabe, o se acorta el texto, o se deja de
-      medir; lo que no puede es salir en la lista de hallazgos para siempre.
+      derecho pareciendo de otra. **Decidido: por debajo de 150 px de columna no
+      se enseña** —la cabecera se mide a sí misma con una consulta de
+      contenedor—, deja de ir pegado al borde derecho y, si aun así no cabe, se
+      recorta con puntos suspensivos en vez de a mitad de palabra. El tipo
+      entero pasa al título de la cabecera, junto al nombre. _(Hecho el 7 de
+      septiembre de 2026.)_
+- [x] **UX-003:** la barra de estado se corta a 900 px —«Última eje…»— en lugar
+      de envolver o de soltar lo menos importante. **Orden de descarte decidido**
+      y escrito en la hoja de estilo: a 1.280 px se van las palabras que
+      acompañan a los datos —«Base de datos», «Usuario»— y quedan los valores; a
+      1.100, cuánto tardó la última consulta, que ya está en el panel de
+      resultados; a 980, la codificación y la versión del motor —el distintivo
+      sigue diciendo cuál es—; a 880, la posición del cursor. Contra qué se
+      trabaja no se suelta nunca. Medido en la aplicación: **a 1.440, 1.024 y 900
+      no desborda ni un píxel**, cuando antes sobraban 151 y 275. _(Hecho el 7 de
+      septiembre de 2026.)_
+- [x] **UX-004:** el placeholder del buscador global se corta en todos los anchos
+      y lo reporta cada barrido. **Medido**: el hueco que la barra le deja
+      encoge más deprisa que el texto —a 1.024 px quedaban 93 px para un rótulo
+      de 230— así que por debajo de 1.280 px la búsqueda es solo su icono, con
+      el título y el atajo intactos. Ya no sale en los hallazgos. _(Hecho el 7 de
+      septiembre de 2026.)_
 
 ### Lo que se repite
 
 - [x] **UX-005:** `Ln 1, Col 1` y `UTF-8` aparecen **dos veces**: en la fila de
       pestañas y en la barra de estado. Elegir un sitio.
 - [ ] **UX-006:** el motor, la base y el usuario se dicen en la barra del editor
-      y otra vez en la de estado. Lo mismo.
+      y otra vez en la de estado. Lo mismo. **Medio hecho:** lo repetido de
+      verdad es solo la base —la barra del editor no dice ni motor ni usuario—, y
+      la repetición ya cuesta menos: las palabras de la barra de estado se van al
+      estrechar (UX-003) y el chip del editor pasa a enseñar solo la base, sin el
+      esquema, en lugar de recortar «druse_test.p…». Queda **la decisión de
+      producto**: si a pantalla ancha la base debe seguir diciéndose dos veces.
+      Argumento para dejarla: el chip es de la pestaña y la barra es de la
+      sesión, y ejecutar en la base equivocada es el error más caro de todos.
 - [ ] **UX-007:** entre la barra de la aplicación, la de pestañas, la de acciones
       y la de contexto hay **cuatro filas de cromo** antes del SQL: en una
       pantalla de 720 px de alto quedan seis líneas de editor. Ver qué se puede
@@ -554,6 +576,14 @@ cerró en la 027 y trataba defectos de maquetación.
       solo si el gesto entero ocurrió en el velo, que quita el otro accidente:
       arrastrar dentro para seleccionar y soltar fuera. _(Pedido por el usuario,
       7 de septiembre de 2026.)_
+- [x] **UX-012:** el diagrama era el único diálogo que **no se cerraba con
+      Escape**. Quien lo abría se quedaba pulsando una tecla que funciona en toda
+      la aplicación y tenía que buscar la ×. _(Hecho el 7 de septiembre de
+      2026.)_
+- [x] **UX-013:** el círculo de color personalizado de preferencias escondía
+      26 px por debajo del borde: el campo nativo medía el doble que su hueco
+      para que el clic valiese en cualquier punto. Puesto encima con `inset`
+      ocupa lo mismo sin desbordar. _(Hecho el 7 de septiembre de 2026.)_
 
 ### Cómo se comprueba
 
@@ -561,6 +591,13 @@ Ninguna de estas se cierra con una prueba en verde: se cierran **mirando**. El
 barrido (`e2e/tests/barrido.spec.ts`) es la herramienta, y toda función nueva con
 interfaz añade su captura. Lo que sí puede quedar sujeto por una prueba es el
 detalle concreto que se arregló, como en UX-001.
+
+El barrido también distingue ahora **recortar de cortar**: un texto con puntos
+suspensivos y sitio para leerse es una decisión y no sale en los hallazgos; uno
+recortado hasta menos de 40 px sigue saliendo, porque ahí no se lee ni el
+principio. Sin esa distinción, la celda de datos con un texto largo dentro
+—que el usuario elige, no quien diseña— aparecía en cada ejecución y hacía que
+la lista dejara de leerse.
 
 ---
 

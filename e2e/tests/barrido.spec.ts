@@ -45,7 +45,26 @@ async function medir(page: Page, donde: string): Promise<void> {
       const recorta = style.overflowX === 'hidden' || style.overflowX === 'clip';
       const sobra = element.scrollWidth - element.clientWidth;
 
-      if (recorta && sobra > 2 && element.children.length === 0 && element.textContent?.trim()) {
+      /*
+       * Recortar con puntos suspensivos no es un defecto: es una decisión, y
+       * además se ve. Una celda de datos con un texto largo dentro va a
+       * desbordar siempre —el dato lo pone quien consulta, no quien diseña— y,
+       * mientras quede sitio para leer un trozo y los puntos, hace lo que se le
+       * pidió.
+       *
+       * Lo que sí es un defecto es recortar hasta dejarlo en nada: ahí no hay
+       * decisión que valga, porque no se lee ni el principio. De ahí el ancho
+       * mínimo, en lugar de un «tiene ellipsis, se perdona».
+       */
+      const decidido = style.textOverflow === 'ellipsis' && element.clientWidth >= 40;
+
+      if (
+        recorta &&
+        !decidido &&
+        sobra > 2 &&
+        element.children.length === 0 &&
+        element.textContent?.trim()
+      ) {
         problemas.push(`${sitio}: «${element.textContent.trim().slice(0, 32)}» se corta (${sobra}px)`);
       }
 

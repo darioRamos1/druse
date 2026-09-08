@@ -283,6 +283,16 @@ export class EditorToolbar {
     }
   }
 
+  /**
+   * El contexto sin el esquema: `druse_test.public` se queda en `druse_test`.
+   *
+   * Es lo que se enseña cuando la barra estrecha. Recortar la cadena entera
+   * dejaba «druse_test.p…», que gasta el mismo sitio para decir menos: el
+   * esquema casi siempre es el de siempre y la base es la que hay que mirar
+   * antes de pulsar Ejecutar.
+   */
+  protected readonly contextDatabase = computed(() => this.context().split('.')[0]);
+
   /** La conexión de la pestaña, para escribirla en el chip. */
   protected readonly connection = computed(
     () => this.connections().find((option) => option.id === this.connectionId()) ?? null,

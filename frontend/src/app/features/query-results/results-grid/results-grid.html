@@ -29,7 +29,12 @@
         role="columnheader"
         [class.is-selected]="isColumnSelected(i)"
         [attr.aria-selected]="isColumnSelected(i)"
-        title="Seleccionar la columna (Control para añadir, Mayúsculas para un tramo)"
+        [title]="
+          column.name +
+          ' · ' +
+          column.dataType +
+          ' — Seleccionar la columna (Control para añadir, Mayúsculas para un tramo)'
+        "
         (click)="selectColumn(i, $event)"
         (contextmenu)="openMenu($event, null, i)"
       >

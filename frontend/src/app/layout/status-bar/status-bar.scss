@@ -21,6 +21,18 @@
   &--state {
     padding: 0 12px 0 0;
   }
+
+  /* La raya la dibuja cada dato a su izquierda, en lugar de ir suelta entre
+     medias: así, cuando el ancho obliga a soltar uno, su raya se va con él y no
+     quedan dos juntas separando nada. */
+  + .item::before {
+    content: '';
+    width: 1px;
+    height: 12px;
+    margin-right: 6px;
+    margin-left: -6px;
+    background: var(--dr-border);
+  }
 }
 
 .sep {
@@ -141,4 +153,50 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/*
+ * Qué se suelta cuando la ventana estrecha, y en qué orden.
+ *
+ * La barra dice cuatro cosas de la sesión y tres del editor, y a menos de
+ * 1.200 px no caben todas: hasta ahora la última simplemente se cortaba a mitad
+ * de palabra —«Última eje…»—, que es la peor forma de no caber, porque parece
+ * una avería y no una decisión.
+ *
+ * El orden va de lo prescindible a lo que no puede faltar: primero las palabras
+ * que acompañan a los datos, luego cuánto tardó la última consulta —que ya se
+ * dice en el panel de resultados—, luego la codificación, luego la versión del
+ * motor —el distintivo de al lado sigue diciendo cuál es— y por último la
+ * posición del cursor. **Contra qué se está trabajando —conexión, motor, base y
+ * usuario— no se suelta nunca**: es lo que evita ejecutar en la base
+ * equivocada.
+ */
+@media (max-width: 1280px) {
+  .item .text {
+    display: none;
+  }
+
+  /* Sin la palabra delante, el dato no necesita tanto aire alrededor. */
+  .item {
+    padding: 0 8px;
+  }
+}
+
+@media (max-width: 1100px) {
+  .item--duration {
+    display: none;
+  }
+}
+
+@media (max-width: 980px) {
+  .item--encoding,
+  .item--engine .version {
+    display: none;
+  }
+}
+
+@media (max-width: 880px) {
+  .item--caret {
+    display: none;
+  }
 }
