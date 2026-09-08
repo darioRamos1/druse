@@ -186,6 +186,12 @@
   .item--duration {
     display: none;
   }
+
+  // La raya la dibuja cada dato a su izquierda, así que al irse este el
+  // siguiente empezaría el grupo con una raya colgando de nada.
+  .item--duration + .item::before {
+    content: none;
+  }
 }
 
 @media (max-width: 980px) {

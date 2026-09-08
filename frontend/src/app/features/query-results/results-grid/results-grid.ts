@@ -499,9 +499,23 @@ export class ResultsGrid {
     this.setWidth(column, this.renderedWidth(column) + delta);
   }
 
-  /** Lo que mide la columna, para anunciarlo en el asa. */
-  protected widthOf(column: number): number {
-    return Math.round(this.renderedWidth(column));
+  /**
+   * Lo que mide la columna, para anunciarlo en el asa.
+   *
+   * Sale del ancho declarado y no del DOM: preguntar por el rectángulo de cada
+   * cabecera en cada ciclo de detección obligaría al navegador a recalcular la
+   * maquetación una vez por columna, y aquí hay tablas de cincuenta. La última
+   * columna se estira para llenar lo que sobra, así que no tiene número que
+   * anunciar y el atributo no se pone: mentir con uno inventado sería peor.
+   */
+  protected widthOf(column: number): number | null {
+    const definition = this.resultSet().columns[column];
+
+    if (!definition) {
+      return null;
+    }
+
+    return this.customWidths()[definition.name] ?? definition.width ?? null;
   }
 
   /** El mínimo al que se puede estrechar, que es el que aplica `setWidth`. */
