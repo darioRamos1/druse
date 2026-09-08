@@ -3,6 +3,20 @@
 {
   "compileOnSave": false,
   "compilerOptions": {
+    /*
+      El modo estricto, con las plantillas dentro.
+
+      Se activó de golpe porque se probó y cabía: el código ya estaba escrito
+      así, y lo único que salió fueron cuatro avisos de `??` y `?.` que el
+      compilador daba por innecesarios. Tres eran ciertos; el cuarto no, y lo que
+      estaba mal era el tipo —un `Record` sin `undefined` promete que toda clave
+      existe, y leer una que no está devuelve `undefined` igualmente—.
+
+      `strictTemplates` es la mitad que más vale: comprueba lo que se escribe
+      entre llaves, que es donde un cambio de tipo se colaba sin que nada se
+      quejara hasta verlo en pantalla.
+    */
+    "strict": true,
     "noImplicitOverride": true,
     "noPropertyAccessFromIndexSignature": true,
     "noImplicitReturns": true,
@@ -17,7 +31,8 @@
   "angularCompilerOptions": {
     "enableI18nLegacyMessageIdFormat": false,
     "strictInjectionParameters": true,
-    "strictInputAccessModifiers": true
+    "strictInputAccessModifiers": true,
+    "strictTemplates": true
   },
   "files": [],
   "references": [

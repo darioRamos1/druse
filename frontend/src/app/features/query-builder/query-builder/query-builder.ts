@@ -202,7 +202,9 @@ export class QueryBuilder implements OnInit {
   protected readonly filters = signal<readonly QueryFilter[]>([]);
   protected readonly grouped = signal(false);
   protected readonly groupByKeys = signal<readonly string[]>([]);
-  protected readonly groupPeriods = signal<Readonly<Record<string, DatePeriod | 'none'>>>({});
+  protected readonly groupPeriods = signal<
+    Readonly<Record<string, DatePeriod | 'none' | undefined>>
+  >({});
   protected readonly aggregates = signal<readonly AggregateDraft[]>([]);
   protected readonly having = signal<readonly HavingDraft[]>([]);
   protected readonly orders = signal<readonly OrderDraft[]>([

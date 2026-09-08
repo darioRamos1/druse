@@ -413,7 +413,13 @@ no solamente validaciones visuales.
 - [ ] **FE-001:** dividir `WorkspaceStore` por responsabilidades sin introducir otra biblioteca de estado por defecto.
 - [ ] **FE-002:** separar primero sesiones/transacciones, pestañas, explorador y ejecución de consultas.
 - [ ] **FE-003:** extraer de `AppShell` la coordinación de diálogos y comandos.
-- [ ] **FE-004:** activar `strict` y `strictTemplates` de manera incremental.
+- [x] **FE-004:** activar `strict` y `strictTemplates` de manera incremental.
+      **No hizo falta que fuera incremental**: activados los dos de golpe, el
+      frontend compiló sin un solo error de tipos. Lo único que salió fueron
+      cuatro avisos de `??` y `?.` sobrantes; tres lo eran, y el cuarto delataba
+      un tipo que mentía —un `Record` sin `undefined` promete que toda clave
+      existe—. Las 809 pruebas siguen pasando. _(Hecho el 7 de septiembre de
+      2026.)_
 - [x] **FE-005:** añadir scripts verificables de formato y lint. _(Formato hecho y comprobado en CI; **el lint no**: no hay ESLint en el proyecto y añadirlo es una dependencia nueva más triar lo que saque la primera pasada, que es una decisión de proyecto.)_
 - [x] **FE-006:** corregir la etiqueta de versión que muestra Informix como MySQL.
 
@@ -449,8 +455,7 @@ no solamente validaciones visuales.
 >
 > **Lo que queda es lo grande y lo que hay que mirar:** FE-001 a FE-003 son
 > extracciones de `WorkspaceStore` y `AppShell` que no pueden hacerse a medias;
-> FE-004 (`strict` y `strictTemplates`) es incremental y ruidoso; BE-001 y BE-002
-> son lo mismo en el backend. A11Y-001 y A11Y-002 tocan la cuadrícula de
+> BE-001 y BE-002 son lo mismo en el backend. A11Y-001 y A11Y-002 tocan la cuadrícula de
 > resultados, que es el componente más delicado que hay. Y A11Y-005 no es
 > programar: es sentarse con un lector de pantalla.
 >

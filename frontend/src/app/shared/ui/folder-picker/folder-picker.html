@@ -69,7 +69,7 @@
         </button>
       }
 
-      @for (file of current.files ?? []; track file.path) {
+      @for (file of current.files; track file.path) {
         <button
           type="button"
           class="row row--file"
@@ -86,7 +86,7 @@
         </button>
       }
 
-      @if (current.folders.length === 0 && (current.files ?? []).length === 0 && !current.error) {
+      @if (current.folders.length === 0 && current.files.length === 0 && !current.error) {
         @if (mode() === 'open') {
           <p class="empty">Aquí no hay respaldos ni carpetas.</p>
         } @else {

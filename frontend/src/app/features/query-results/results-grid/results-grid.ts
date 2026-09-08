@@ -92,7 +92,7 @@ export class ResultsGrid {
   protected readonly editing = signal<CellPosition | null>(null);
 
   /** Filtro escrito por el usuario en cada columna, por índice. */
-  protected readonly filters = signal<Readonly<Record<number, string>>>({});
+  protected readonly filters = signal<Readonly<Record<number, string | undefined>>>({});
 
   /**
    * La selección de celdas: dónde empezó y hasta dónde llega.
@@ -240,7 +240,12 @@ export class ResultsGrid {
    * la consulta, que es lo que el usuario espera de una herramienta SQL.
    */
   protected readonly visibleRows = computed<readonly ResultRow[]>(() => {
-    const active = Object.entries(this.filters()).filter(([, term]) => term.trim().length > 0);
+    // `Object.entries` de un registro que admite huecos devuelve pares cuyo
+    // valor puede faltar; el filtro los descarta y de paso deja el tipo limpio
+    // para el resto del cálculo.
+    const active = Object.entries(this.filters()).flatMap(([index, term]) =>
+      term && term.trim().length > 0 ? [[index, term] as const] : [],
+    );
 
     if (active.length === 0) {
       return this.resultSet().rows;

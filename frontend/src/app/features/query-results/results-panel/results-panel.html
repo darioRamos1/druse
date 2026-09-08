@@ -353,8 +353,8 @@
       <div class="empty">
         @if (executed.state === 'failed') {
           <span class="empty__error">{{ executed.error?.message }}</span>
-          @if (executed.error?.code) {
-            <code class="empty__code">{{ executed.error?.code }}</code>
+          @if (executed.error?.code; as code) {
+            <code class="empty__code">{{ code }}</code>
           }
           <button type="button" class="empty__action" (click)="copyError()">Copiar error</button>
         } @else if (executed.state === 'canceled') {
