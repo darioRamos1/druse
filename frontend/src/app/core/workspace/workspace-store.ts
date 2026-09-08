@@ -14,8 +14,12 @@ import {
   TransactionState,
 } from '../application-gateway/application-gateway';
 import { FileSaveService, describeSave } from '../files/file-save.service';
-import { PendingWorkService } from '../files/pending-work.service';
 import { ThemeService } from '../theme/theme.service';
+import { describeError, isSessionLost } from './errors';
+import { ConnectionStore } from './connection-store';
+import { NoticeStore } from './notice-store';
+import { TabStore } from './tab-store';
+import { TransactionStore } from './transaction-store';
 import {
   DEFAULT_FORMAT_SETTINGS,
   FormatSettings,
@@ -37,7 +41,6 @@ import {
   QueryResult,
   KnownColumn,
   KnownRelation,
-  QueryTab,
   ResultSet,
   SavedConnection,
   SchemaIndex,
@@ -103,26 +106,6 @@ const DEFAULT_ROW_LIMIT = 500;
 const MAX_ROW_LIMIT = 100_000;
 
 /**
- * Espera antes de guardar el trabajo sin ejecutar, en milisegundos.
- *
- * Corto porque lo que protege es un cierre inesperado, y largo porque escribir
- * cambia el estado en cada tecla: sin esta pausa habría una escritura en disco
- * por pulsación.
- */
-const TABS_SAVE_DELAY_MS = 1000;
-
-/**
- * Cada cuánto se vuelve a preguntar por una transacción abierta.
- *
- * Medio minuto: lo bastante seguido para que el indicador no mienta mucho rato
- * después de que el proceso local la deshaga por inactividad, y lo bastante
- * espaciado para que no sea una petición constante contra la API.
- */
-const TRANSACTION_WATCH_MS = 30_000;
-
-let tabCounter = 1;
-
-/**
  * Estado del área de trabajo: conexiones, explorador, pestañas y resultados.
  *
  * Es el sustituto de los datos simulados de la Fase 1. Vive en un servicio y no
@@ -136,27 +119,22 @@ let tabCounter = 1;
 export class WorkspaceStore {
   private readonly _gateway = inject(ApplicationGateway);
   private readonly _files = inject(FileSaveService);
-  private readonly _pendingWork = inject(PendingWorkService);
   private readonly _theme = inject(ThemeService);
+  private readonly _connectionStore = inject(ConnectionStore);
+  private readonly _notices = inject(NoticeStore);
+  private readonly _tabStore = inject(TabStore);
+  private readonly _transactions = inject(TransactionStore);
 
   // --- Conexiones ------------------------------------------------------------
-  private readonly _connections = signal<readonly ConnectionSummary[]>([]);
-  readonly connections = this._connections.asReadonly();
+  readonly connections = this._connectionStore.connections;
 
   /** Árbol por conexión, en forma de raíces con hijos perezosos. */
   private readonly _roots = signal<readonly TreeEntry[]>([]);
 
   // --- Pestañas --------------------------------------------------------------
-  private readonly _tabs = signal<readonly QueryTab[]>([
-    { id: 'q1', title: 'Query 1', active: true, dirty: false, sql: '' },
-  ]);
-  readonly tabs = this._tabs.asReadonly();
 
-  /** Guardado pendiente del trabajo sin ejecutar, o `null` si no hay ninguno. */
-  private _tabsSaveTimer: ReturnType<typeof setTimeout> | null = null;
-
-  /** Hasta que no se ha leído lo guardado, no se guarda nada encima. */
-  private _tabsRestored = false;
+  /** Las pestañas abiertas; el estado y su guardado viven en {@link TabStore}. */
+  readonly tabs = this._tabStore.tabs;
 
   // --- Ejecución -------------------------------------------------------------
   private readonly _result = signal<QueryResult | null>(null);
@@ -176,8 +154,7 @@ export class WorkspaceStore {
   private readonly _pendingRejection = signal<PendingRejection | null>(null);
   readonly rejection = computed(() => this._pendingRejection()?.value ?? null);
 
-  private readonly _notice = signal<string | null>(null);
-  readonly notice = this._notice.asReadonly();
+  readonly notice = this._notices.notice;
 
   /**
    * Tiempo máximo de ejecución, en segundos.
@@ -211,7 +188,7 @@ export class WorkspaceStore {
 
   /** Muestra un aviso al usuario. */
   notify(message: string): void {
-    this._notice.set(message);
+    this._notices.set(message);
   }
 
   /**
@@ -273,118 +250,19 @@ export class WorkspaceStore {
   }
 
   /**
-   * Cambia las pestañas y programa su guardado.
-   *
-   * Todo lo que las toca pasa por aquí para que recuperar el trabajo no dependa
-   * de acordarse de guardar en cada sitio: son ocho, y el que se olvide sería
-   * justo el que pierda lo escrito.
-   */
-  private updateTabs(change: (tabs: readonly QueryTab[]) => readonly QueryTab[]): void {
-    this._tabs.update(change);
-    this.scheduleTabsSave();
-  }
-
-  /**
-   * Guarda el trabajo sin ejecutar, poco después de dejar de escribir.
-   *
-   * El retardo existe porque escribir cambia el estado en cada tecla y guardar
-   * en cada una sería una escritura por pulsación. Un segundo es corto para lo
-   * que se protege —un cierre inesperado— y suficiente para no castigar el
-   * teclado.
-   */
-  private scheduleTabsSave(): void {
-    if (!this._tabsRestored) {
-      // Antes de restaurar no se guarda nada: la pestaña vacía del arranque
-      // pisaría lo que se dejó escrito en la sesión anterior.
-      return;
-    }
-
-    if (this._tabsSaveTimer !== null) {
-      clearTimeout(this._tabsSaveTimer);
-    }
-
-    this._tabsSaveTimer = setTimeout(() => {
-      this._tabsSaveTimer = null;
-      void this.saveTabsNow();
-    }, TABS_SAVE_DELAY_MS);
-  }
-
-  /**
    * Guarda ya lo que estuviera esperando.
    *
-   * El retardo deja una rendija: cerrar justo después de escribir se llevaría lo
-   * último. Se llama al perder el foco y al cerrar, que es cuando esa rendija
-   * importa.
+   * El retardo del guardado deja una rendija: cerrar justo después de escribir
+   * se llevaría lo último. Se llama al perder el foco y al cerrar, que es cuando
+   * esa rendija importa.
    */
   flushTabs(): void {
-    if (this._tabsSaveTimer === null) {
-      return;
-    }
-
-    clearTimeout(this._tabsSaveTimer);
-    this._tabsSaveTimer = null;
-    void this.saveTabsNow();
+    this._tabStore.flush();
   }
 
-  private async saveTabsNow(): Promise<void> {
-    const tabs = this._tabs().map((tab) => ({
-      id: tab.id,
-      title: tab.title,
-      sql: tab.sql,
-      isActive: tab.active,
-      isDirty: tab.dirty,
-      connectionId: tab.connectionId,
-      database: tab.database,
-      fileName: tab.fileName,
-      documentId: tab.documentId,
-    }));
-
-    try {
-      await firstValueFrom(this._gateway.saveEditorTabs(tabs));
-    } catch {
-      // Guardar el borrador es una red de seguridad: si falla, el usuario sigue
-      // teniendo su trabajo delante y avisarle no le sirve de nada.
-    }
-  }
-
-  /**
-   * Devuelve las pestañas de la última sesión, con lo que no se llegó a ejecutar.
-   *
-   * Se llama una vez al arrancar. Si no hay nada guardado se deja la pestaña
-   * vacía de siempre, que es lo que ve quien abre Druse por primera vez.
-   */
+  /** Devuelve las pestañas de la última sesión, con lo que no se llegó a ejecutar. */
   async restoreTabs(): Promise<void> {
-    try {
-      const stored = await firstValueFrom(this._gateway.getEditorTabs());
-
-      if (stored.length > 0) {
-        this._tabs.set(
-          stored.map((tab, index) => ({
-            id: tab.id,
-            title: tab.title,
-            active: tab.isActive || (index === 0 && !stored.some((other) => other.isActive)),
-            dirty: tab.isDirty,
-            sql: tab.sql,
-            connectionId: tab.connectionId,
-            database: tab.database,
-            fileName: tab.fileName,
-            documentId: tab.documentId,
-          })),
-        );
-
-        // El contador se adelanta a lo restaurado: si volviera a empezar, la
-        // siguiente pestaña nueva se llamaría igual que una recuperada y las dos
-        // se pisarían.
-        tabCounter = Math.max(
-          tabCounter,
-          ...stored.map((tab) => Number.parseInt(tab.id.replace(/^q/, ''), 10) || 0),
-        );
-      }
-    } catch {
-      // Sin lo guardado se arranca como siempre.
-    } finally {
-      this._tabsRestored = true;
-    }
+    await this._tabStore.restore();
   }
 
   /**
@@ -418,19 +296,7 @@ export class WorkspaceStore {
 
   /** Aplica el resultado de guardar únicamente si el contenido no cambió mientras se escribía. */
   markTabSaved(id: string, sql: string, fileName: string, documentId?: string): void {
-    this.updateTabs((tabs) =>
-      tabs.map((tab) =>
-        tab.id === id
-          ? {
-              ...tab,
-              title: fileName,
-              fileName,
-              documentId: documentId || tab.documentId,
-              dirty: tab.sql === sql ? false : tab.dirty,
-            }
-          : tab,
-      ),
-    );
+    this._tabStore.markSaved(id, sql, fileName, documentId);
   }
 
   private readonly _exporting = signal(false);
@@ -460,12 +326,12 @@ export class WorkspaceStore {
         : this.activeTab()?.id === tabId && this.activeTab()?.sql === tabSql;
 
     if (!connection?.sessionId) {
-      this._notice.set('No hay ninguna conexión abierta.');
+      this._notices.set('No hay ninguna conexión abierta.');
       return;
     }
 
     if (!sql) {
-      this._notice.set('No hay ninguna consulta que exportar.');
+      this._notices.set('No hay ninguna consulta que exportar.');
       return;
     }
 
@@ -493,7 +359,7 @@ export class WorkspaceStore {
         const outcome = await this._files.save(fileName, blob);
 
         if (stillCurrent()) {
-          this._notice.set(
+          this._notices.set(
             describeSave(outcome, `Exportado a ${format.toUpperCase()}`, 'Exportación cancelada.'),
           );
         }
@@ -521,7 +387,7 @@ export class WorkspaceStore {
           const message = await describeBlobError(error);
 
           if (stillCurrent()) {
-            this._notice.set(message);
+            this._notices.set(message);
           }
         }
       }
@@ -531,51 +397,32 @@ export class WorkspaceStore {
   }
 
   // --- Sesión activa ---------------------------------------------------------
-  private readonly _activeConnectionId = signal<string | null>(null);
-  private readonly _sessions = signal<ReadonlyMap<string, SessionStatus>>(new Map());
-
   readonly session = computed(() => {
     const connectionId = this.activeConnection()?.id;
 
-    return connectionId ? (this._sessions().get(connectionId) ?? null) : null;
+    return connectionId ? (this._connectionStore.sessionFor(connectionId) ?? null) : null;
   });
 
   // --- Transacciones manuales ------------------------------------------------
 
   /**
-   * La transacción de cada conexión, indexada por conexión y no por pestaña.
+   * La transacción abierta en la conexión activa, o `null` si va en autocommit.
    *
-   * No es un detalle de implementación: **la transacción pertenece a la
-   * conexión**. Dos pestañas del mismo perfil comparten sesión, así que lo que
-   * se ejecute en cualquiera de ellas entra en la misma transacción, y guardarla
-   * por pestaña haría creer lo contrario.
+   * El estado vive en {@link TransactionStore}; aquí solo se elige de cuál de
+   * las conexiones se habla, que es lo que este almacén sabe y aquel no.
    */
-  private readonly _transactions = signal<ReadonlyMap<string, TransactionState>>(new Map());
-
-  /** La transacción abierta en la conexión activa, o `null` si va en autocommit. */
   readonly transaction = computed(() => {
     const connectionId = this.activeConnection()?.id;
-    const state = connectionId ? this._transactions().get(connectionId) : undefined;
+    const state = connectionId ? this._transactions.stateFor(connectionId) : undefined;
 
     return state?.isOpen ? state : null;
   });
 
-  private readonly _transactionBusy = signal(false);
-  readonly transactionBusy = this._transactionBusy.asReadonly();
-
-  /**
-   * Reloj que vuelve a preguntar por la transacción abierta.
-   *
-   * Existe por una sola razón: el proceso local la deshace solo si se queda
-   * inactiva, y eso ocurre sin que nadie pulse nada. Sin este reloj, el
-   * indicador seguiría diciendo que hay una transacción abierta mucho después de
-   * que dejara de haberla.
-   */
-  private _transactionWatch: ReturnType<typeof setInterval> | null = null;
+  readonly transactionBusy = this._transactions.busy;
 
   /** Hay una transacción abierta en esa conexión. */
   hasOpenTransaction(connectionId: string): boolean {
-    return this._transactions().get(connectionId)?.isOpen === true;
+    return this._transactions.hasOpen(connectionId);
   }
 
   /** Entra en modo manual: a partir de aquí nada se confirma solo. */
@@ -610,6 +457,10 @@ export class WorkspaceStore {
     );
   }
 
+  /**
+   * Lo común a abrir, confirmar y deshacer: sobre qué sesión va, qué se dice al
+   * salir bien y qué se hace cuando falla.
+   */
   private async runTransaction(
     operation: (sessionId: string) => Observable<TransactionState>,
     describe: (state: TransactionState) => string,
@@ -617,18 +468,15 @@ export class WorkspaceStore {
     const connection = this.activeConnection();
 
     if (!connection?.sessionId) {
-      this._notice.set('Abre una conexión para poder usar transacciones.');
+      this._notices.set('Abre una conexión para poder usar transacciones.');
 
       return false;
     }
 
-    this._transactionBusy.set(true);
-
     try {
-      const state = await firstValueFrom(operation(connection.sessionId));
+      const state = await this._transactions.run(connection.id, connection.sessionId, operation);
 
-      this.setTransaction(connection.id, state);
-      this._notice.set(describe(state));
+      this._notices.set(describe(state));
 
       return true;
     } catch (error) {
@@ -638,104 +486,15 @@ export class WorkspaceStore {
         return false;
       }
 
-      this._notice.set(describeError(error));
+      this._notices.set(describeError(error));
 
       // El estado local pudo quedarse atrás —otra pestaña la cerró, o se
       // deshizo sola—, así que se vuelve a preguntar en lugar de dejar los
       // botones mintiendo.
-      await this.refreshTransaction(connection.id);
+      await this._transactions.refresh(connection.id, connection.sessionId);
 
       return false;
-    } finally {
-      this._transactionBusy.set(false);
     }
-  }
-
-  /** Vuelve a preguntar por la transacción de una conexión. */
-  private async refreshTransaction(connectionId: string): Promise<void> {
-    const connection = this.findConnection(connectionId);
-
-    if (!connection?.sessionId) {
-      return;
-    }
-
-    try {
-      const state = await firstValueFrom(this._gateway.getTransaction(connection.sessionId));
-      const previous = this._transactions().get(connectionId);
-
-      this.setTransaction(connectionId, state);
-
-      // Se cuenta una sola vez, comparando con lo último que se sabía: sin esa
-      // comparación el aviso volvería a salir en cada vuelta del reloj.
-      if (
-        state.autoRolledBackAt &&
-        state.autoRolledBackAt !== previous?.autoRolledBackAt &&
-        !state.isOpen
-      ) {
-        const minutos = Math.max(1, Math.round(state.idleTimeoutSeconds / 60));
-
-        this._notice.set(
-          `La transacción de «${state.connectionName}» se deshizo sola tras ${minutos} min sin ` +
-            'actividad, para no dejar filas bloqueadas. Los cambios sin confirmar se perdieron.',
-        );
-      }
-    } catch {
-      // Preguntar por el estado no puede molestar al usuario: si la API no
-      // responde, ya se lo dirá la siguiente cosa que intente hacer.
-    }
-  }
-
-  private setTransaction(connectionId: string, state: TransactionState): void {
-    this._transactions.update((current) => {
-      const next = new Map(current);
-      next.set(connectionId, state);
-
-      return next;
-    });
-
-    this.watchTransactions();
-  }
-
-  /** Mantiene el reloj vivo solo mientras haya alguna transacción abierta. */
-  private watchTransactions(): void {
-    const abiertas = [...this._transactions().values()].some((state) => state.isOpen);
-
-    // Quien avisa al cerrar la ventana necesita saberlo aquí y no al final: en
-    // el escritorio, el aviso lo da el envoltorio, y para entonces preguntarle a
-    // la página ya sería tarde.
-    this._pendingWork.set(abiertas);
-
-    if (!abiertas) {
-      if (this._transactionWatch !== null) {
-        clearInterval(this._transactionWatch);
-        this._transactionWatch = null;
-      }
-
-      return;
-    }
-
-    if (this._transactionWatch !== null) {
-      return;
-    }
-
-    this._transactionWatch = setInterval(() => {
-      for (const [connectionId, state] of this._transactions()) {
-        if (state.isOpen) {
-          void this.refreshTransaction(connectionId);
-        }
-      }
-    }, TRANSACTION_WATCH_MS);
-  }
-
-  private forgetTransaction(connectionId: string): void {
-    this._transactions.update((current) => {
-      const next = new Map(current);
-      next.delete(connectionId);
-
-      return next;
-    });
-
-    this.watchTransactions();
   }
 
   // --- Persistencia ----------------------------------------------------------
@@ -778,7 +537,7 @@ export class WorkspaceStore {
       // Los perfiles guardados aparecen desconectados: abrir todas las
       // conexiones al arrancar sería lento y podría despertar servidores que el
       // usuario no pensaba tocar.
-      this._connections.update((current) => {
+      this._connectionStore.update((current) => {
         const live = current.filter((connection) => connection.sessionId);
         const liveIds = new Set(live.map((connection) => connection.id));
 
@@ -801,7 +560,7 @@ export class WorkspaceStore {
         return [...live, ...restored];
       });
     } catch (error) {
-      this._notice.set(describeError(error));
+      this._notices.set(describeError(error));
     }
   }
 
@@ -861,7 +620,7 @@ export class WorkspaceStore {
       }
 
       this.patchConnection(connectionId, { state: 'error', error: describeError(error) });
-      this._notice.set(describeError(error));
+      this._notices.set(describeError(error));
 
       return 'failed';
     }
@@ -876,11 +635,11 @@ export class WorkspaceStore {
     try {
       await firstValueFrom(this._gateway.deleteConnection(connectionId));
     } catch (error) {
-      this._notice.set(describeError(error));
+      this._notices.set(describeError(error));
       return;
     }
 
-    this._connections.update((connections) =>
+    this._connectionStore.update((connections) =>
       connections.filter((connection) => connection.id !== connectionId),
     );
     this.forgetPrimed(connectionId);
@@ -891,7 +650,7 @@ export class WorkspaceStore {
     try {
       this._history.set(await firstValueFrom(this._gateway.getHistory(search)));
     } catch (error) {
-      this._notice.set(describeError(error));
+      this._notices.set(describeError(error));
     }
   }
 
@@ -900,13 +659,13 @@ export class WorkspaceStore {
       await firstValueFrom(this._gateway.clearHistory());
       this._history.set([]);
     } catch (error) {
-      this._notice.set(describeError(error));
+      this._notices.set(describeError(error));
     }
   }
 
   // --- Derivados -------------------------------------------------------------
 
-  readonly activeTab = computed(() => this._tabs().find((tab) => tab.active) ?? null);
+  readonly activeTab = this._tabStore.active;
 
   /**
    * La conexión que perdió su sesión, si hay alguna.
@@ -914,9 +673,7 @@ export class WorkspaceStore {
    * Sirve para poner «Reconectar» en el aviso: quien acaba de leer que se cayó
    * la conexión no debería tener que buscar dónde se arregla.
    */
-  readonly lostConnection = computed(
-    () => this._connections().find((connection) => connection.lost) ?? null,
-  );
+  readonly lostConnection = this._connectionStore.lost;
 
   /**
    * Bases de una conexión, tal y como las trajo el explorador al abrirla.
@@ -955,7 +712,7 @@ export class WorkspaceStore {
       return;
     }
 
-    this.updateTabs((tabs) =>
+    this._tabStore.update((tabs) =>
       tabs.map((item) =>
         item.id === tab.id
           ? // La procedencia editable también era de la base anterior: esas filas
@@ -980,7 +737,7 @@ export class WorkspaceStore {
     // Druse pueda arreglar, pero callarlo dejaría creer que esos cambios se
     // pueden deshacer con Rollback.
     if (this.hasOpenTransaction(connectionId)) {
-      this._notice.set(
+      this._notices.set(
         `Lo que ejecutes contra «${database}» no entra en la transacción abierta: ` +
           'va por otra conexión y se confirma solo.',
       );
@@ -1026,15 +783,15 @@ export class WorkspaceStore {
       }
     }
 
-    const database = this._sessions().get(connectionId)?.database;
+    const database = this._connectionStore.sessionFor(connectionId)?.database;
 
-    this._activeConnectionId.set(connectionId);
+    this._connectionStore.activate(connectionId);
 
     if (tab) {
       // La base y la procedencia editable eran de la conexión anterior: aquí no
       // significan nada, y arrastrarlas es cómo se acaba escribiendo en la tabla
       // de otro servidor.
-      this.updateTabs((tabs) =>
+      this._tabStore.update((tabs) =>
         tabs.map((item) =>
           item.id === tab.id ? { ...item, connectionId, database, sourceTable: undefined } : item,
         ),
@@ -1056,7 +813,7 @@ export class WorkspaceStore {
     if (previous && this.hasOpenTransaction(previous)) {
       const before = this.findConnection(previous)?.name ?? 'la conexión anterior';
 
-      this._notice.set(
+      this._notices.set(
         `La transacción abierta en «${before}» sigue ahí: es de esa conexión y no ` +
           'se cierra al cambiar de pestaña.',
       );
@@ -1072,13 +829,7 @@ export class WorkspaceStore {
   }
 
   readonly activeConnection = computed(() => {
-    const connectionId = this.activeTab()?.connectionId ?? this._activeConnectionId();
-
-    return connectionId
-      ? (this._connections().find(
-          (connection) => connection.id === connectionId && connection.sessionId,
-        ) ?? null)
-      : (this._connections().find((connection) => connection.sessionId) ?? null);
+    return this._connectionStore.resolve(this.activeTab()?.connectionId);
   });
 
   engineForConnection(connectionId: string): ConnectionSummary['engine'] | null {
@@ -1294,7 +1045,7 @@ export class WorkspaceStore {
     try {
       this._editPreview.set(await firstValueFrom(this._gateway.previewRowEdits(request)));
     } catch (error) {
-      this._notice.set(describeError(error));
+      this._notices.set(describeError(error));
     }
   }
 
@@ -1320,7 +1071,7 @@ export class WorkspaceStore {
 
       // El aviso va **después** de releer: `execute` limpia el aviso al empezar,
       // así que ponerlo antes equivalía a no ponerlo.
-      this._notice.set(
+      this._notices.set(
         `${result.rowsAffected} ${result.rowsAffected === 1 ? 'fila guardada' : 'filas guardadas'}.`,
       );
 
@@ -1329,7 +1080,7 @@ export class WorkspaceStore {
       const connectionId = this.activeConnection()?.id;
 
       if (!connectionId || !this.noteSessionLoss(connectionId, error)) {
-        this._notice.set(describeError(error));
+        this._notices.set(describeError(error));
       }
 
       return false;
@@ -1496,7 +1247,7 @@ export class WorkspaceStore {
     try {
       this._deletePreview.set(await firstValueFrom(this._gateway.previewRowDeletes(request)));
     } catch (error) {
-      this._notice.set(describeError(error));
+      this._notices.set(describeError(error));
     }
   }
 
@@ -1519,7 +1270,7 @@ export class WorkspaceStore {
 
       // Después de releer, por lo mismo que al guardar: `execute` limpia el
       // aviso al empezar.
-      this._notice.set(
+      this._notices.set(
         `${result.rowsAffected} ${result.rowsAffected === 1 ? 'fila borrada' : 'filas borradas'}.`,
       );
 
@@ -1528,7 +1279,7 @@ export class WorkspaceStore {
       const connectionId = this.activeConnection()?.id;
 
       if (!connectionId || !this.noteSessionLoss(connectionId, error)) {
-        this._notice.set(describeError(error));
+        this._notices.set(describeError(error));
       }
 
       return false;
@@ -1597,7 +1348,7 @@ export class WorkspaceStore {
       ?.sessionId;
 
     if (!sessionId) {
-      this._notice.set('No hay ninguna conexión abierta.');
+      this._notices.set('No hay ninguna conexión abierta.');
       return;
     }
 
@@ -1609,7 +1360,7 @@ export class WorkspaceStore {
       );
     } catch (error) {
       this._importPreview.set(null);
-      this._notice.set(describeError(error));
+      this._notices.set(describeError(error));
     } finally {
       this._importing.set(false);
     }
@@ -1626,7 +1377,7 @@ export class WorkspaceStore {
       ?.sessionId;
 
     if (!sessionId) {
-      this._notice.set('No hay ninguna conexión abierta.');
+      this._notices.set('No hay ninguna conexión abierta.');
       return false;
     }
 
@@ -1636,7 +1387,7 @@ export class WorkspaceStore {
       const result = await firstValueFrom(this._gateway.runImport(sessionId, table, file, options));
 
       this._importPreview.set(null);
-      this._notice.set(
+      this._notices.set(
         `${result.rowsAffected} ${result.rowsAffected === 1 ? 'fila importada' : 'filas importadas'} en ${table.name}.`,
       );
 
@@ -1645,7 +1396,7 @@ export class WorkspaceStore {
 
       return true;
     } catch (error) {
-      this._notice.set(describeError(error));
+      this._notices.set(describeError(error));
       return false;
     } finally {
       this._importing.set(false);
@@ -1691,7 +1442,7 @@ export class WorkspaceStore {
       }
     }
 
-    this._connections.update((connections) => [
+    this._connectionStore.update((connections) => [
       ...connections.filter((connection) => connection.id !== id),
       {
         id,
@@ -1737,7 +1488,7 @@ export class WorkspaceStore {
       return true;
     } catch (error) {
       this.patchConnection(id, { state: 'error', error: describeError(error) });
-      this._notice.set(describeError(error));
+      this._notices.set(describeError(error));
 
       return false;
     }
@@ -1771,15 +1522,10 @@ export class WorkspaceStore {
     // el servidor ya deshizo al soltar la conexión.
     this.forgetPrimed(connectionId);
     this._roots.update((roots) => roots.filter((root) => root.connectionId !== connectionId));
-    this._sessions.update((sessions) => {
-      const next = new Map(sessions);
-      next.delete(connectionId);
+    this._connectionStore.forgetSession(connectionId);
+    this._transactions.forget(connectionId);
 
-      return next;
-    });
-    this.forgetTransaction(connectionId);
-
-    this._notice.set(
+    this._notices.set(
       `Se perdió la conexión con «${connection?.name ?? 'la base'}». Vuelve a conectarla para seguir.`,
     );
 
@@ -1795,7 +1541,7 @@ export class WorkspaceStore {
    */
   private reportFailure(connectionId: string, error: unknown): void {
     if (!this.noteSessionLoss(connectionId, error)) {
-      this._notice.set(describeError(error));
+      this._notices.set(describeError(error));
     }
   }
 
@@ -1818,7 +1564,7 @@ export class WorkspaceStore {
     }
 
     if (!connection.saved) {
-      this._notice.set(
+      this._notices.set(
         `«${connection.name}» no está guardada, así que Druse no tiene con qué volver a abrirla. ` +
           'Créala de nuevo desde «Nueva conexión».',
       );
@@ -1834,7 +1580,7 @@ export class WorkspaceStore {
       }
     }
 
-    this.forgetTransaction(connectionId);
+    this._transactions.forget(connectionId);
     this.forgetPrimed(connectionId);
     this._roots.update((roots) => roots.filter((root) => root.connectionId !== connectionId));
     this.patchConnection(connectionId, { sessionId: undefined, lost: false, error: undefined });
@@ -1849,7 +1595,7 @@ export class WorkspaceStore {
 
     if (connected) {
       this.patchConnection(connectionId, { lost: false });
-      this._notice.set(`Conexión con «${connection.name}» restablecida.`);
+      this._notices.set(`Conexión con «${connection.name}» restablecida.`);
 
       return 'ok';
     }
@@ -1883,26 +1629,24 @@ export class WorkspaceStore {
         sessionId: undefined,
       });
     } else {
-      this._connections.update((connections) =>
+      this._connectionStore.update((connections) =>
         connections.filter((item) => item.id !== connectionId),
       );
     }
 
     this.forgetPrimed(connectionId);
     this._roots.update((roots) => roots.filter((root) => root.connectionId !== connectionId));
-    this._sessions.update((sessions) => {
-      const next = new Map(sessions);
-      next.delete(connectionId);
-      return next;
-    });
+    this._connectionStore.forgetSession(connectionId);
 
     // Cerrar la conexión deshace lo que no estuviera confirmado —lo hace el
     // proceso local al soltar la sesión—, así que aquí no queda transacción de
     // la que hablar. Quien avisa antes de llegar hasta aquí es la interfaz.
-    this.forgetTransaction(connectionId);
+    this._transactions.forget(connectionId);
 
-    if (this._activeConnectionId() === connectionId) {
-      this._activeConnectionId.set(this._connections().find((item) => item.sessionId)?.id ?? null);
+    if (this._connectionStore.activeId() === connectionId) {
+      this._connectionStore.activate(
+        this._connectionStore.connections().find((item) => item.sessionId)?.id ?? null,
+      );
     }
   }
 
@@ -1962,12 +1706,12 @@ export class WorkspaceStore {
       ]);
 
       if (saved.secretWarning) {
-        this._notice.set(saved.secretWarning);
+        this._notices.set(saved.secretWarning);
       }
 
       return saved;
     } catch (error) {
-      this._notice.set(describeError(error));
+      this._notices.set(describeError(error));
       return null;
     }
   }
@@ -2193,7 +1937,7 @@ export class WorkspaceStore {
           : this._gateway.previewCreateTable(sessionId, design),
       );
     } catch (error) {
-      this._notice.set(describeError(error));
+      this._notices.set(describeError(error));
       return [];
     }
   }
@@ -2451,7 +2195,7 @@ export class WorkspaceStore {
     const connection = this.findConnection(node.connectionId);
 
     if (!connection?.sessionId) {
-      this._notice.set('La conexión de este objeto no está abierta.');
+      this._notices.set('La conexión de este objeto no está abierta.');
       return;
     }
 
@@ -2468,7 +2212,7 @@ export class WorkspaceStore {
         node.source.database,
       );
     } catch (error) {
-      this._notice.set(describeError(error));
+      this._notices.set(describeError(error));
     }
   }
 
@@ -2491,7 +2235,7 @@ export class WorkspaceStore {
         })),
       ]);
     } catch (error) {
-      this._notice.set(describeError(error));
+      this._notices.set(describeError(error));
     }
   }
 
@@ -2534,7 +2278,7 @@ export class WorkspaceStore {
       // no se puede leer, el autocompletado tendrá menos, y ya está. Cuando el
       // usuario abra ese nodo a mano sí verá el motivo.
       if (!quiet) {
-        this._notice.set(describeError(error));
+        this._notices.set(describeError(error));
       }
     } finally {
       entry.loading = false;
@@ -2732,20 +2476,12 @@ export class WorkspaceStore {
   // --- Pestañas --------------------------------------------------------------
 
   selectTab(id: string): void {
-    this.updateTabs((tabs) => tabs.map((tab) => ({ ...tab, active: tab.id === id })));
+    this._tabStore.select(id);
     this.clearDisplayedResult();
   }
 
   closeTab(id: string): void {
-    this.updateTabs((tabs) => {
-      const remaining = tabs.filter((tab) => tab.id !== id);
-
-      if (remaining.length > 0 && !remaining.some((tab) => tab.active)) {
-        return remaining.map((tab, index) => ({ ...tab, active: index === 0 }));
-      }
-
-      return remaining;
-    });
+    this._tabStore.close(id);
     this.clearDisplayedResult();
   }
 
@@ -2753,26 +2489,12 @@ export class WorkspaceStore {
     sql = '',
     sourceTable?: DatabaseObject,
     connectionId: string | undefined = this.activeTab()?.connectionId ??
-      this._activeConnectionId() ??
+      this._connectionStore.activeId() ??
       undefined,
     title?: string,
     database: string | undefined = this.activeTab()?.database,
   ): void {
-    tabCounter++;
-
-    this.updateTabs((tabs) => [
-      ...tabs.map((tab) => ({ ...tab, active: false })),
-      {
-        id: `q${tabCounter}`,
-        title: title ?? `Query ${tabCounter}`,
-        active: true,
-        dirty: false,
-        sql,
-        connectionId,
-        database,
-        sourceTable,
-      },
-    ]);
+    this._tabStore.create({ sql, sourceTable, connectionId, title, database });
 
     // Cambiar de pestaña cambia lo que hay en la cuadrícula: los cambios
     // pendientes de la anterior no pueden seguir vivos.
@@ -2780,18 +2502,15 @@ export class WorkspaceStore {
   }
 
   openSqlFile(fileName: string, sql: string, documentId?: string): void {
-    this.createTab(sql, undefined, undefined, fileName, undefined);
-    this.updateTabs((tabs) =>
-      tabs.map((tab) =>
-        tab.active ? { ...tab, fileName, documentId: documentId || undefined } : tab,
-      ),
-    );
+    this._tabStore.openFile(fileName, sql, documentId, {
+      connectionId: this.activeTab()?.connectionId ?? this._connectionStore.activeId() ?? undefined,
+      database: this.activeTab()?.database,
+    });
+    this.clearDisplayedResult();
   }
 
   updateSql(sql: string): void {
-    this.updateTabs((tabs) =>
-      tabs.map((tab) => (tab.active ? { ...tab, sql, dirty: true, sourceTable: undefined } : tab)),
-    );
+    this._tabStore.updateSql(sql);
     this._pendingRejection.set(null);
     this.discardEdits();
   }
@@ -2837,21 +2556,21 @@ export class WorkspaceStore {
     const tabSql = tab?.sql;
 
     if (!connection?.sessionId) {
-      this._notice.set('No hay ninguna conexión abierta.');
+      this._notices.set('No hay ninguna conexión abierta.');
       return null;
     }
 
     const sql = sqlOverride ?? tab?.sql ?? '';
 
     if (!sql.trim()) {
-      this._notice.set('No hay ninguna instrucción que ejecutar.');
+      this._notices.set('No hay ninguna instrucción que ejecutar.');
       return null;
     }
 
     this._running.set(true);
     this._canceling.set(false);
     this._pendingRejection.set(null);
-    this._notice.set(null);
+    this._notices.clear();
 
     // El identificador se genera aquí y se envía con la petición: cancelar exige
     // conocerlo mientras la consulta corre, y si lo pusiera el servidor solo
@@ -2885,17 +2604,7 @@ export class WorkspaceStore {
         return null;
       }
 
-      this._sessions.update((sessions) => {
-        const current = sessions.get(connection.id);
-
-        if (!current) {
-          return sessions;
-        }
-
-        const next = new Map(sessions);
-        next.set(connection.id, { ...current, lastDurationMs: result.durationMs });
-        return next;
-      });
+      this._connectionStore.patchSession(connection.id, { lastDurationMs: result.durationMs });
 
       // El error de una consulta **no va al aviso de arriba**: el panel ya lo
       // enseña con su código y su botón de copiar, y el editor subraya la
@@ -2926,7 +2635,7 @@ export class WorkspaceStore {
         }
       } else if (!this.noteSessionLoss(connection.id, error)) {
         if (this.activeTab()?.id === tabId && this.activeTab()?.sql === tabSql) {
-          this._notice.set(describeError(error));
+          this._notices.set(describeError(error));
         }
       }
 
@@ -2963,7 +2672,7 @@ export class WorkspaceStore {
   }
 
   dismissNotice(): void {
-    this._notice.set(null);
+    this._notices.clear();
   }
 
   async cancel(): Promise<void> {
@@ -2986,16 +2695,16 @@ export class WorkspaceStore {
   // --- Utilidades privadas ---------------------------------------------------
 
   private findConnection(id: string): ConnectionSummary | undefined {
-    return this._connections().find((connection) => connection.id === id);
+    return this._connectionStore.find(id);
   }
 
   private setSession(connectionId: string, session: SessionStatus): void {
-    this._sessions.update((sessions) => new Map(sessions).set(connectionId, session));
+    this._connectionStore.setSession(connectionId, session);
   }
 
   private activateConnection(connectionId: string): void {
-    this._activeConnectionId.set(connectionId);
-    this.updateTabs((tabs) =>
+    this._connectionStore.activate(connectionId);
+    this._tabStore.update((tabs) =>
       tabs.map((tab) => (tab.active && !tab.connectionId ? { ...tab, connectionId } : tab)),
     );
   }
@@ -3008,11 +2717,7 @@ export class WorkspaceStore {
   }
 
   private patchConnection(id: string, patch: Partial<ConnectionSummary>): void {
-    this._connections.update((connections) =>
-      connections.map((connection) =>
-        connection.id === id ? { ...connection, ...patch } : connection,
-      ),
-    );
+    this._connectionStore.patch(id, patch);
   }
 
   private findEntry(nodeId: string): TreeEntry | null {
@@ -3196,164 +2901,6 @@ async function describeBlobError(error: unknown): Promise<string> {
 function asRejection(error: unknown): QueryRejected | null {
   if (error instanceof HttpErrorResponse && error.status === 409 && error.error?.reason) {
     return error.error as QueryRejected;
-  }
-
-  return null;
-}
-
-/**
- * Qué decirle al usuario cuando algo falla.
- *
- * Nunca se muestra el objeto de error completo: puede traer cabeceras, cuerpos y
- * rutas internas que no aportan al usuario (plan §12).
- *
- * Y el número de un código HTTP tampoco significa nada para quien está
- * consultando una base de datos: «502» no dice qué pasó ni qué hacer. Cada caso
- * se cuenta con palabras y, cuando se puede, con el siguiente paso. El código se
- * conserva al final entre paréntesis, pequeño y sin protagonismo: no le sirve al
- * usuario, pero es lo primero que hace falta el día que tenga que contarle el
- * problema a alguien.
- */
-function describeError(error: unknown): string {
-  if (!(error instanceof HttpErrorResponse)) {
-    return 'Druse encontró un problema inesperado. Si vuelve a ocurrir, reinicia la aplicación.';
-  }
-
-  const body = error.error;
-
-  // Un fallo de validación sabe exactamente qué campo está mal, así que se
-  // cuenta campo por campo en lugar de resumirlo en un código.
-  const validation = validationMessages(body?.errors);
-
-  if (validation.length > 0) {
-    return `Revisa los datos enviados: ${validation.join(' ')}`;
-  }
-
-  // Cuando el servidor explica el motivo, se enseña tal cual: sus mensajes ya
-  // están escritos para leerse, y son más concretos que cualquier traducción
-  // que se pudiera hacer aquí a partir del código.
-  const message = body?.message ?? body?.detail;
-
-  if (typeof message === 'string' && message.trim().length > 0) {
-    return message;
-  }
-
-  return `${explainStatus(error.status)} (${error.status})`;
-}
-
-/**
- * El fallo es que la sesión ya no existe en el proceso local.
- *
- * Pasa más de lo que parece: el servidor cierra por inactividad, se cae la red,
- * el proceso de la API se reinicia. Distinguirlo de cualquier otro 404 es lo que
- * permite ofrecer «Reconectar» en vez de soltar un mensaje que no dice qué hacer.
- */
-function isSessionLost(error: unknown): boolean {
-  if (!(error instanceof HttpErrorResponse) || error.status !== 404) {
-    return false;
-  }
-
-  const message = error.error?.message;
-
-  return typeof message === 'string' && message.includes('no está abierta');
-}
-
-/** Lo que significa cada código, dicho como se lo contarías a alguien. */
-function explainStatus(status: number): string {
-  switch (status) {
-    // Angular usa el 0 cuando la petición ni siquiera llegó a salir.
-    case 0:
-      return 'Druse no obtuvo respuesta de su propio motor. Comprueba que la aplicación siga abierta y vuelve a intentarlo.';
-
-    case 400:
-      return 'La solicitud contiene datos incompletos o con un formato incorrecto.';
-
-    case 401:
-    case 403:
-      return 'Esta ventana perdió el permiso para hablar con el motor de Druse. Cierra la aplicación y vuelve a abrirla.';
-
-    case 404:
-      return 'Eso ya no existe. Es probable que la conexión se haya cerrado; vuelve a abrirla y repite la operación.';
-
-    case 408:
-      return 'La operación tardó demasiado y se cortó. Prueba otra vez, o con menos datos.';
-
-    case 409:
-      return 'La operación no se aplicó porque algo había cambiado mientras tanto. Actualiza y vuelve a intentarlo.';
-
-    case 413:
-      return 'El archivo es demasiado grande para procesarlo de una vez.';
-
-    case 428:
-      return 'Falta una contraseña para abrir esta conexión.';
-
-    case 500:
-      return 'Algo falló dentro de Druse mientras atendía la petición. No se aplicó ningún cambio.';
-
-    // 502, 503 y 504 significan lo mismo desde aquí: el proceso que hace el
-    // trabajo no está atendiendo. Es lo que se ve si se cerró o si aún arranca.
-    case 502:
-    case 503:
-    case 504:
-      return 'El motor de Druse no está respondiendo: puede que se haya cerrado o que todavía esté arrancando. Espera unos segundos y, si sigue igual, reinicia la aplicación.';
-
-    default:
-      return status >= 500
-        ? 'El motor de Druse falló al atender la petición.'
-        : 'Druse no pudo completar la operación.';
-  }
-}
-
-function validationMessages(errors: unknown): string[] {
-  if (!errors || typeof errors !== 'object') {
-    return [];
-  }
-
-  const messages = Object.entries(errors as Record<string, unknown>).flatMap(([field, value]) => {
-    const known = validationFieldMessage(field);
-
-    if (known) {
-      return [known];
-    }
-
-    if (!Array.isArray(value)) {
-      return [];
-    }
-
-    return value
-      .filter((message): message is string => typeof message === 'string')
-      .map((message) => {
-        if (/required/i.test(message)) {
-          return 'Falta un dato obligatorio.';
-        }
-        if (/could not be converted|invalid/i.test(message)) {
-          return 'Uno de los valores tiene un formato incorrecto.';
-        }
-
-        return message;
-      });
-  });
-
-  return [...new Set(messages)];
-}
-
-function validationFieldMessage(field: string): string | null {
-  const normalized = field.toLowerCase();
-
-  if (normalized.endsWith('.name')) {
-    return 'El nombre de la conexión es obligatorio.';
-  }
-  if (normalized.endsWith('.host')) {
-    return 'El servidor es obligatorio.';
-  }
-  if (normalized.endsWith('.port')) {
-    return 'El puerto debe ser un número entre 1 y 65535.';
-  }
-  if (normalized.endsWith('.database')) {
-    return 'La base de datos es obligatoria.';
-  }
-  if (normalized.endsWith('.username')) {
-    return 'El usuario es obligatorio.';
   }
 
   return null;
