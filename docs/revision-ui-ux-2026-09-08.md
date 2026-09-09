@@ -147,6 +147,8 @@ Se crearon dos perfiles ficticios, sin contraseñas, exclusivamente en el direct
 
 No se ejecutaron consultas contra motores reales ni se validó Tauri en ejecución; la suite E2E completa tampoco se ejecutó en esta entrega, aunque sus selectores están al día. El barrido de capturas todavía no incluye el diálogo de Actividad ni el aviso de alcance de los filtros.
 
+La comprobación manual utilizó una API de prueba con datos ficticios. Actividad se revisó en oscuro a 1280 px y en claro a 900 px con escala 125 %: el diálogo quedó entre los píxeles 20 y 700 de una ventana de 720 px, con el pie visible y sin desbordamiento horizontal. Ocultar avisos conservó los cuatro registros mostrados y llevó el foco a Cerrar; Escape lo devolvió a Actividad. En resultados, filtrar Bogotá mostró correctamente tres coincidencias entre cinco filas cargadas, tanto en el aviso como en el contador del pie. Tras el último ajuste de foco se repitieron las 17 pruebas de Actividad y resultados, todas aprobadas, y la compilación de producción terminó correctamente con 418,54 kB iniciales.
+
 ### Pendiente
 
 Distribución inicial de resultados, organización de Preferencias, el asistente redimensionable y el explorador contraíble. La fuente común de atajos sigue aplicándose solo a las barras: falta la paleta y la hoja de atajos. Y queda el barrido E2E completo, con motores levantados y las capturas nuevas de esta entrega.
