@@ -1,7 +1,7 @@
 :host {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
 
   // **Envuelve en lugar de recortar.** Con una sola línea fija, en una ventana
   // estrecha se perdían por la derecha el selector de conexión, el límite de
@@ -11,12 +11,11 @@
   row-gap: 6px;
   min-height: var(--dr-editor-toolbar-height);
   flex: 0 0 auto;
-  padding: 5px 12px;
+  padding: 5px 10px;
   background: var(--dr-surface-panel);
   border-bottom: 1px solid var(--dr-border-faint);
 
-  // El desplegable del timeout se sale de la barra; recortarlo lo haría
-  // invisible.
+  // Los desplegables se salen de la barra; recortarlos los haría invisibles.
   overflow: visible;
 
   // **Quién decide si los botones caben es la barra, no la ventana.** El editor
@@ -31,19 +30,26 @@
   z-index: 10;
 }
 
-/**
- * Barra estrecha: los botones se quedan en icono.
- *
- * Envolver evitó perder controles, pero a 900 px de ventana la barra ocupaba
- * tres filas y se comía un cuarto del editor. Las etiquetas se retiran de la
- * vista **sin salir del árbol de accesibilidad** —siguen siendo el nombre del
- * botón— y el `title` dice a la vista lo mismo que ellas decían.
- */
-@container editor-toolbar (max-width: 780px) {
-  :host {
-    gap: 4px;
-  }
+// Las acciones de ejecución conservan texto; las secundarias se compactan.
+.compact-label {
+  display: none;
+}
 
+@container editor-toolbar (max-width: 1100px) {
+  [data-secondary] .label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+}
+
+@container editor-toolbar (max-width: 900px) {
+  .divider {
+    display: none;
+  }
   .label {
     position: absolute;
     width: 1px;
@@ -71,11 +77,8 @@
     padding-inline: 4px;
   }
 
-  // El atajo solo se enseña cuando hay sitio: con el botón en icono compite
-  // con lo único que queda por leer.
-  .run__shortcut,
-  .btn__shortcut {
-    display: none;
+  .compact-label {
+    display: inline;
   }
 
   // Del contexto sobrevive la base, que es contra lo que se ejecuta; el nombre
@@ -92,7 +95,7 @@
     display: none;
   }
 
-  .chip__short {
+  :host .chip__short {
     display: inline;
     max-width: 110px;
     overflow: hidden;
@@ -101,77 +104,43 @@
   }
 }
 
-.timeout {
+.limits {
   position: relative;
   flex: none;
 
   &__menu {
     position: absolute;
-    top: calc(100% + 4px);
+    top: calc(100% + 5px);
     right: 0;
-    z-index: 20;
-    min-width: 96px;
-    margin: 0;
-    padding: 4px;
-    list-style: none;
+    width: 240px;
+    padding: 14px;
     border: 1px solid var(--dr-border-strong);
     border-radius: var(--dr-radius);
     background: var(--dr-surface-overlay);
     box-shadow: var(--dr-shadow-menu);
   }
 
-  /* El menú ahora tiene dos listas —conexión y base— y necesita separarlas. */
-  &__title {
-    margin: 6px 9px 3px;
-    color: var(--dr-text-tertiary);
-    font-family: var(--dr-font-ui);
-    font-size: 10px;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
-  }
-
-  &__menu ul {
-    margin: 0;
-    padding: 0;
-    list-style: none;
-  }
-
-  &__label {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  &__tags {
-    display: inline-flex;
+  label {
+    display: grid;
     gap: 5px;
-    margin-left: auto;
+    margin-bottom: 12px;
+    color: var(--dr-text-secondary);
+    font-size: 12px;
   }
-
-  &__option {
-    display: flex;
-    align-items: center;
-    gap: 8px;
+  select {
     width: 100%;
-    padding: 5px 9px;
-    border: 0;
+    min-height: 32px;
+    border: 1px solid var(--dr-border-input);
     border-radius: 5px;
-    background: transparent;
-    color: var(--dr-text-muted);
-    font-family: var(--dr-font-mono);
-    font-size: 11.5px;
-    text-align: left;
-    cursor: pointer;
-
-    &:hover {
-      background: var(--dr-surface-active);
-      color: var(--dr-text);
-    }
-
-    &.is-selected {
-      background: var(--dr-accent-tint-strong);
-      color: var(--dr-accent-bright);
-    }
+    padding: 4px 8px;
+    background: var(--dr-surface-input);
+    color: var(--dr-text);
+    font: inherit;
+  }
+  p {
+    margin: 0;
+    color: var(--dr-text-tertiary);
+    font-size: 12px;
   }
 }
 
@@ -389,7 +358,7 @@
   &__menu {
     position: absolute;
     top: calc(100% + 4px);
-    left: 0;
+    right: 0;
     z-index: 20;
     min-width: 160px;
     max-height: 260px;
@@ -491,6 +460,10 @@
   }
 
   &__mono {
+    max-width: 150px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
     font-family: var(--dr-font-mono);
     font-size: 11.5px;
   }
@@ -546,6 +519,10 @@
 
 .chip__name {
   color: var(--dr-text);
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .chip__sep {

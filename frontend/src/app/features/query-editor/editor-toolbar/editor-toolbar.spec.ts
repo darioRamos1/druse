@@ -243,6 +243,64 @@ describe('EditorToolbar', () => {
     return fixture.nativeElement as HTMLElement;
   }
 
+  it('selección y documento completo mantienen acciones independientes', () => {
+    const document = vi.fn();
+    const selection = vi.fn();
+    fixture.componentInstance.execute.subscribe(document);
+    fixture.componentInstance.executeSelection.subscribe(selection);
+    fixture.componentRef.setInput('hasSelection', true);
+    fixture.detectChanges();
+    const current = element().querySelector<HTMLButtonElement>('.current')!;
+    expect(current.getAttribute('aria-label')).toBe('Ejecutar selección');
+    current.click();
+    expect(selection).toHaveBeenCalledTimes(1);
+    expect(document).not.toHaveBeenCalled();
+    element().querySelector<HTMLButtonElement>('.run')!.click();
+    expect(document).toHaveBeenCalledTimes(1);
+  });
+
+  it('permite ajustar ambos límites sin ejecutar SQL y devuelve el foco con Escape', () => {
+    const rows = vi.fn();
+    const timeout = vi.fn();
+    const execute = vi.fn();
+    fixture.componentInstance.maxRowsChange.subscribe(rows);
+    fixture.componentInstance.timeoutChange.subscribe(timeout);
+    fixture.componentInstance.execute.subscribe(execute);
+    const trigger = element().querySelector<HTMLButtonElement>('.limits > .chip')!;
+    trigger.click();
+    fixture.detectChanges();
+    const fields = element().querySelectorAll<HTMLSelectElement>('.limits select');
+    expect(fields[0].value).toBe('500');
+    expect(fields[1].value).toBe('30');
+    fields[0].value = '1000';
+    fields[0].dispatchEvent(new Event('change'));
+    fixture.detectChanges();
+    fields[1].value = '60';
+    fields[1].dispatchEvent(new Event('change'));
+    fixture.detectChanges();
+    expect(rows).toHaveBeenCalledWith(1000);
+    expect(timeout).toHaveBeenCalledWith(60);
+    expect(execute).not.toHaveBeenCalled();
+    expect(element().querySelector('.limits__menu')).not.toBeNull();
+    fields[1].dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    fixture.detectChanges();
+    expect(element().querySelector('.limits__menu')).toBeNull();
+    expect(document.activeElement).toBe(trigger);
+  });
+
+  it('ofrece cancelar solo durante la ejecución y espera al cancelar', () => {
+    const cancel = () =>
+      element().querySelector<HTMLButtonElement>('[title="Cancela la consulta en curso"]');
+    expect(cancel()).toBeNull();
+    fixture.componentRef.setInput('running', true);
+    fixture.detectChanges();
+    expect(cancel()?.disabled).toBe(false);
+    fixture.componentRef.setInput('canceling', true);
+    fixture.detectChanges();
+    expect(cancel()?.disabled).toBe(true);
+    expect(cancel()?.textContent).toContain('Cancelando');
+  });
+
   /**
    * Cambiar de conexión sin salir de la pestaña: el caso de mirar algo en
    * desarrollo y repetirlo en preproducción sin pegar el SQL en otro sitio.

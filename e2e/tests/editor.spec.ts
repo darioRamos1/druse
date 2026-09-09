@@ -133,9 +133,11 @@ test.describe('el editor', () => {
 
     /** Elige un límite en la barra. Devuelve el foco a quien lo pida después. */
     async function elegirFilas(etiqueta: string): Promise<void> {
-      await barra.getByRole('button', { name: 'Filas' }).click();
-      await barra.getByRole('option', { name: etiqueta, exact: true }).click();
-      await expect(barra.getByRole('button', { name: 'Filas' })).toContainText(etiqueta);
+      const limites = barra.getByRole('button', { name: /Opciones de ejecución/ });
+      await limites.click();
+      await barra.getByLabel('Límite de filas').selectOption(etiqueta.replaceAll('.', ''));
+      await barra.getByLabel('Límite de filas').press('Escape');
+      await expect(limites).toContainText(etiqueta);
     }
 
     await abrir(page);

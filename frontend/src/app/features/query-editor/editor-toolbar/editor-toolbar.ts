@@ -16,6 +16,7 @@ import {
   FormatSettings,
 } from '../../../core/workspace/format-settings';
 import { Icon } from '../../../shared/ui/icon/icon';
+import { shortcutLabel } from '../../../core/shortcuts/shortcut-label';
 
 /**
  * Una conexión a la que la pestaña puede cambiarse.
@@ -64,7 +65,8 @@ interface FormatGroup {
   styleUrl: './editor-toolbar.scss',
 })
 export class EditorToolbar {
-  private readonly _host = inject(ElementRef<HTMLElement>);
+  protected readonly shortcut = shortcutLabel;
+  private readonly _host = inject<ElementRef<HTMLElement>>(ElementRef);
 
   readonly context = input.required<string>();
   readonly timeoutSeconds = input(30);
@@ -154,9 +156,7 @@ export class EditorToolbar {
    */
   protected readonly rowOptions = [100, 500, 1_000, 5_000, 10_000, 100_000];
 
-  protected readonly editingTimeout = signal(false);
-
-  protected readonly editingRows = signal(false);
+  protected readonly editingLimits = signal(false);
 
   protected readonly editingFormat = signal(false);
 
@@ -228,31 +228,27 @@ export class EditorToolbar {
       return;
     }
 
-    this.editingTimeout.set(false);
-    this.editingRows.set(false);
+    this.editingLimits.set(false);
     this.editingFormat.set(false);
     this.choosingDatabase.set(false);
   }
 
-  protected toggleTimeout(): void {
+  protected toggleLimits(): void {
     this.editingFormat.set(false);
-    this.editingRows.set(false);
     this.choosingDatabase.set(false);
-    this.editingTimeout.update((open) => !open);
+    this.editingLimits.update((open) => !open);
   }
 
-  protected toggleRows(): void {
-    this.editingFormat.set(false);
-    this.editingTimeout.set(false);
-    this.choosingDatabase.set(false);
-    this.editingRows.update((open) => !open);
+  protected closeLimits(event: Event): void {
+    event.stopPropagation();
+    this.editingLimits.set(false);
+    this._host.nativeElement.querySelector<HTMLButtonElement>('.limits > .chip')?.focus();
   }
 
   protected toggleFormat(): void {
     // Dos menús abiertos a la vez en la misma barra no aportan nada y se tapan
     // entre ellos.
-    this.editingTimeout.set(false);
-    this.editingRows.set(false);
+    this.editingLimits.set(false);
     this.choosingDatabase.set(false);
     this.editingFormat.update((open) => !open);
   }
@@ -260,8 +256,7 @@ export class EditorToolbar {
   protected readonly choosingDatabase = signal(false);
 
   protected toggleDatabases(): void {
-    this.editingTimeout.set(false);
-    this.editingRows.set(false);
+    this.editingLimits.set(false);
     this.editingFormat.set(false);
     this.choosingDatabase.update((open) => !open);
   }
@@ -314,12 +309,10 @@ export class EditorToolbar {
   }
 
   protected chooseTimeout(seconds: number): void {
-    this.editingTimeout.set(false);
     this.timeoutChange.emit(seconds);
   }
 
   protected chooseRows(rows: number): void {
-    this.editingRows.set(false);
     this.maxRowsChange.emit(rows);
   }
 

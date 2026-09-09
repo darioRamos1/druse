@@ -14,22 +14,31 @@
     <app-icon name="new-query" [size]="12" />
     Nueva consulta
   </button>
-  <button type="button" class="btn btn--file" title="Abrir archivo SQL" (click)="openSql.emit()">
-    <app-icon name="folder-open" [size]="13" />
-    Abrir SQL
-  </button>
-  <button type="button" class="btn btn--file" title="Guardar (Ctrl+S)" (click)="saveSql.emit()">
-    <app-icon name="save" [size]="13" />
-    Guardar
-  </button>
-  <button
-    type="button"
-    class="btn btn--file btn--save-as"
-    title="Guardar como (Ctrl+Shift+S)"
-    (click)="saveSqlAs.emit()"
-  >
-    Guardar como…
-  </button>
+  <details class="file-menu" appDisclosure #fileMenu="disclosure">
+    <summary class="btn" aria-label="Archivo">
+      <app-icon name="folder-open" [size]="13" />
+      Archivo
+      <app-icon name="chevron-down" [size]="10" />
+    </summary>
+    <div class="file-menu__panel" role="group" aria-label="Acciones de archivo">
+      <button type="button" aria-label="Abrir SQL" (click)="fileMenu.close(true); openSql.emit()">
+        <app-icon name="folder-open" [size]="14" />
+        Abrir SQL <kbd>{{ shortcut('Ctrl+O') }}</kbd>
+      </button>
+      <button type="button" aria-label="Guardar" (click)="fileMenu.close(true); saveSql.emit()">
+        <app-icon name="save" [size]="14" />
+        Guardar <kbd>{{ shortcut('Ctrl+S') }}</kbd>
+      </button>
+      <button
+        type="button"
+        aria-label="Guardar como"
+        (click)="fileMenu.close(true); saveSqlAs.emit()"
+      >
+        <span class="file-menu__indent"></span>
+        Guardar como… <kbd>{{ shortcut('Ctrl+Shift+S') }}</kbd>
+      </button>
+    </div>
+  </details>
 </div>
 
 <div class="search-slot">
@@ -43,12 +52,12 @@
     type="button"
     class="search"
     aria-label="Abrir búsqueda global"
-    title="Buscar tablas, consultas y conexiones (Ctrl+K)"
+    [title]="'Buscar tablas, consultas y conexiones (' + shortcut('Ctrl+K') + ')'"
     (click)="openPalette.emit()"
   >
     <app-icon name="search" [size]="13" />
-    <span class="search__placeholder">Buscar tablas, consultas, conexiones…</span>
-    <kbd class="search__shortcut">Ctrl K</kbd>
+    <span class="search__placeholder">Buscar en Druse…</span>
+    <kbd class="search__shortcut">{{ shortcut('Ctrl+K') }}</kbd>
   </button>
 </div>
 

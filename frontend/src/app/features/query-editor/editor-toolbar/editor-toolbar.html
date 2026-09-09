@@ -3,39 +3,50 @@
   class="run"
   [disabled]="running() || !canExecute()"
   [attr.title]="
-    canExecute() ? 'Ejecuta toda la consulta (Ctrl+Enter)' : 'Abre una conexión para poder ejecutar'
+    canExecute()
+      ? 'Ejecuta todo el documento (' + shortcut('Ctrl+Enter') + ')'
+      : 'Abre una conexión para poder ejecutar'
   "
   (click)="execute.emit()"
 >
   <app-icon name="play" [size]="11" />
-  <span class="label">Ejecutar</span>
-  <kbd class="run__shortcut">⌘⏎</kbd>
+  <span class="run__label">Ejecutar</span>
 </button>
 
 <button
   type="button"
-  class="btn"
+  class="btn current"
   [disabled]="running() || !canExecute()"
   [attr.title]="
-    hasSelection() ? 'Ejecuta solo lo seleccionado' : 'Ejecuta la instrucción donde está el cursor'
+    (hasSelection()
+      ? 'Ejecuta solo lo seleccionado'
+      : 'Ejecuta la instrucción donde está el cursor') +
+    ' (' +
+    shortcut('Ctrl+Shift+Enter') +
+    ')'
   "
+  [attr.aria-label]="hasSelection() ? 'Ejecutar selección' : 'Ejecutar instrucción actual'"
   (click)="executeSelection.emit()"
 >
   <app-icon name="play-outline" [size]="11" />
-  <span class="label">Ejecutar actual</span>
-  <kbd class="btn__shortcut">⇧⌘⏎</kbd>
+  <span class="label">{{ hasSelection() ? 'Ejecutar selección' : 'Ejecutar actual' }}</span>
+  <span class="compact-label" aria-hidden="true">{{
+    hasSelection() ? 'Selección' : 'Actual'
+  }}</span>
 </button>
 
-<button
-  type="button"
-  class="btn"
-  title="Cancela la consulta en curso"
-  [disabled]="!running() || canceling()"
-  (click)="cancel.emit()"
->
-  <app-icon name="stop" [size]="11" />
-  <span class="label">{{ canceling() ? 'Cancelando…' : 'Cancelar' }}</span>
-</button>
+@if (running()) {
+  <button
+    type="button"
+    class="btn"
+    title="Cancela la consulta en curso"
+    [disabled]="!running() || canceling()"
+    (click)="cancel.emit()"
+  >
+    <app-icon name="stop" [size]="11" />
+    <span class="label">{{ canceling() ? 'Cancelando…' : 'Cancelar' }}</span>
+  </button>
+}
 
 <span class="divider" aria-hidden="true"></span>
 
@@ -48,7 +59,7 @@
   <button
     type="button"
     class="btn btn--split"
-    title="Formatear (Ctrl+Shift+F)"
+    [title]="'Formatear (' + shortcut('Ctrl+Shift+F') + ')'"
     (click)="format.emit()"
   >
     <app-icon name="format" [size]="11" />
@@ -97,12 +108,12 @@
 <button
   type="button"
   class="btn"
-  title="Comentar/descomentar líneas (Ctrl+/)"
+  [title]="'Comentar/descomentar líneas (' + shortcut('Ctrl+/') + ')'"
+  data-secondary
   (click)="toggleLineComment.emit()"
 >
   <app-icon name="comment" [size]="12" />
   <span class="label">Comentar</span>
-  <kbd class="btn__shortcut">⌘/</kbd>
 </button>
 
 <span class="divider" aria-hidden="true"></span>
@@ -150,6 +161,7 @@
         : 'Abre una conexión para poder usar transacciones'
     "
     (click)="beginTransaction.emit()"
+    data-secondary
   >
     <app-icon name="transaction" [size]="11" />
     <span class="label">Iniciar transacción</span>
@@ -174,7 +186,9 @@
     [attr.aria-expanded]="choosingDatabase()"
     [attr.title]="
       databases().length > 0 || connections().length > 0
-        ? context() + ' — conexión y base contra las que se ejecuta'
+        ? (connection()?.name ? connection()!.name + ' · ' : '') +
+          context() +
+          ' — conexión y base contra las que se ejecuta'
         : 'Conecta para elegir dónde se ejecuta'
     "
     (click)="toggleDatabases()"
@@ -185,7 +199,10 @@
       <span class="chip__sep" aria-hidden="true">·</span>
     }
     <span class="chip__mono">{{ context() }}</span>
-    <span class="chip__short">{{ contextDatabase() }}</span>
+    <span class="chip__short">{{ database() ?? contextDatabase() }}</span>
+    @if (connection()?.environment === 'production') {
+      <span class="tag tag--production">Producción</span>
+    }
     <app-icon name="chevron-down" [size]="9" />
   </button>
 
@@ -248,70 +265,60 @@
   }
 </div>
 
-<div class="timeout">
+<div class="limits">
   <button
     type="button"
     class="chip"
-    [attr.aria-expanded]="editingRows()"
-    title="Filas que se traen de cada consulta"
-    (click)="toggleRows()"
+    [attr.aria-expanded]="editingLimits()"
+    [attr.aria-label]="
+      'Opciones de ejecución: ' +
+      rowsLabel(maxRows()) +
+      ' filas, tiempo límite ' +
+      label(timeoutSeconds())
+    "
+    title="Límite de filas y tiempo de ejecución"
+    (click)="toggleLimits()"
   >
     <app-icon name="table" [size]="12" />
-    <span class="label">Filas</span>
-    <span class="chip__value">{{ rowsLabel(maxRows()) }}</span>
+    <span class="chip__value">{{ rowsLabel(maxRows()) }} · {{ label(timeoutSeconds()) }}</span>
     <app-icon name="chevron-down" [size]="9" />
   </button>
-
-  @if (editingRows()) {
-    <ul class="timeout__menu" role="listbox">
-      @for (option of rowOptions; track option) {
-        <li>
-          <button
-            type="button"
-            class="timeout__option"
-            role="option"
-            [attr.aria-selected]="option === maxRows()"
-            [class.is-selected]="option === maxRows()"
-            (click)="chooseRows(option)"
-          >
-            {{ rowsLabel(option) }}
-          </button>
-        </li>
-      }
-    </ul>
-  }
-</div>
-
-<div class="timeout">
-  <button
-    type="button"
-    class="chip"
-    [attr.aria-expanded]="editingTimeout()"
-    title="Tiempo máximo de ejecución"
-    (click)="toggleTimeout()"
-  >
-    <app-icon name="clock" [size]="12" />
-    <span class="label">Timeout</span>
-    <span class="chip__value">{{ label(timeoutSeconds()) }}</span>
-    <app-icon name="chevron-down" [size]="9" />
-  </button>
-
-  @if (editingTimeout()) {
-    <ul class="timeout__menu" role="listbox">
-      @for (option of timeoutOptions; track option) {
-        <li>
-          <button
-            type="button"
-            class="timeout__option"
-            role="option"
-            [attr.aria-selected]="option === timeoutSeconds()"
-            [class.is-selected]="option === timeoutSeconds()"
-            (click)="chooseTimeout(option)"
-          >
-            {{ label(option) }}
-          </button>
-        </li>
-      }
-    </ul>
+  @if (editingLimits()) {
+    <div
+      class="limits__menu"
+      role="dialog"
+      aria-label="Opciones de ejecución"
+      (keydown.escape)="closeLimits($event)"
+    >
+      <label>
+        <span>Límite de filas</span>
+        <select
+          aria-label="Límite de filas"
+          [value]="maxRows()"
+          (change)="chooseRows(+$any($event.target).value)"
+        >
+          @for (option of rowOptions; track option) {
+            <option [value]="option" [selected]="option === maxRows()">
+              {{ rowsLabel(option) }} filas
+            </option>
+          }
+        </select>
+      </label>
+      <label>
+        <span>Tiempo límite</span>
+        <select
+          aria-label="Tiempo límite"
+          [value]="timeoutSeconds()"
+          (change)="chooseTimeout(+$any($event.target).value)"
+        >
+          @for (option of timeoutOptions; track option) {
+            <option [value]="option" [selected]="option === timeoutSeconds()">
+              {{ label(option) }}
+            </option>
+          }
+        </select>
+      </label>
+      <p>Se aplican a la próxima ejecución.</p>
+    </div>
   }
 </div>

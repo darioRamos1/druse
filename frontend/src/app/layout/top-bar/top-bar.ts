@@ -2,16 +2,19 @@ import { ChangeDetectionStrategy, Component, input, output } from '@angular/core
 
 import { ThemeName } from '../../core/theme/theme.service';
 import { Icon } from '../../shared/ui/icon/icon';
+import { Disclosure } from '../../shared/a11y/disclosure';
+import { shortcutLabel } from '../../core/shortcuts/shortcut-label';
 
 /** Barra superior: marca, acciones principales, búsqueda global y controles de ventana. */
 @Component({
   selector: 'app-top-bar',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [Icon],
+  imports: [Icon, Disclosure],
   templateUrl: './top-bar.html',
   styleUrl: './top-bar.scss',
 })
 export class TopBar {
+  protected readonly shortcut = shortcutLabel;
   /** Tema en uso. La barra lo enseña, pero no lo decide ni lo guarda. */
   readonly theme = input<ThemeName>('dark');
 

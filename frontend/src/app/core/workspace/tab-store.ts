@@ -49,7 +49,7 @@ export class TabStore {
   private readonly _gateway = inject(ApplicationGateway);
 
   private readonly _tabs = signal<readonly QueryTab[]>([
-    { id: 'q1', title: 'Query 1', active: true, dirty: false, sql: '' },
+    { id: 'q1', title: 'Consulta 1', active: true, dirty: false, sql: '' },
   ]);
 
   readonly tabs = this._tabs.asReadonly();
@@ -219,7 +219,7 @@ export class TabStore {
       ...tabs.map((tab) => ({ ...tab, active: false })),
       {
         id: `q${tabCounter}`,
-        title: title ?? `Query ${tabCounter}`,
+        title: title ?? `Consulta ${tabCounter}`,
         active: true,
         dirty: false,
         sql,

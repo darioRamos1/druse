@@ -1,4 +1,6 @@
 :host {
+  position: relative;
+  z-index: 30;
   display: flex;
   align-items: center;
   gap: 14px;
@@ -56,9 +58,79 @@
   align-items: center;
   gap: 8px;
 
-  // Los botones no se encogen: perder «Guardar como…» por falta de sitio es peor
-  // que dejar la búsqueda estrecha, que sigue sirviendo con dos palabras.
   flex: none;
+}
+
+.file-menu {
+  position: relative;
+
+  summary:focus-visible,
+  button:focus-visible {
+    outline: 2px solid var(--dr-accent);
+    outline-offset: 2px;
+  }
+
+  summary {
+    list-style: none;
+    cursor: pointer;
+    border: 1px solid var(--dr-border);
+    border-radius: var(--dr-radius);
+    color: var(--dr-text-secondary);
+    font-size: var(--dr-font-size-sm);
+
+    &::-webkit-details-marker {
+      display: none;
+    }
+  }
+
+  &[open] summary,
+  summary:hover {
+    background: var(--dr-surface-active);
+    color: var(--dr-text);
+  }
+
+  &__panel {
+    position: absolute;
+    top: calc(100% + 7px);
+    left: 0;
+    width: 290px;
+    max-width: calc(100vw - 24px);
+    padding: 5px;
+    border: 1px solid var(--dr-border-strong);
+    border-radius: var(--dr-radius);
+    background: var(--dr-surface-overlay);
+    box-shadow: var(--dr-shadow-menu);
+  }
+
+  &__panel button {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    width: 100%;
+    min-height: 36px;
+    padding: 7px 9px;
+    border: 0;
+    border-radius: 5px;
+    background: transparent;
+    color: var(--dr-text-secondary);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+
+    &:hover {
+      background: var(--dr-surface-active);
+    }
+  }
+
+  kbd {
+    margin-left: auto;
+    color: var(--dr-text-tertiary);
+    font: 11px var(--dr-font-mono);
+  }
+
+  &__indent {
+    width: 14px;
+  }
 }
 
 .btn {
@@ -115,7 +187,7 @@
   border: 1px solid var(--dr-border-input);
   border-radius: var(--dr-radius);
   background: var(--dr-surface-input);
-  color: var(--dr-text-faintest);
+  color: var(--dr-text-tertiary);
   font-family: inherit;
   text-align: left;
   cursor: text;
@@ -239,16 +311,10 @@
     gap: 8px;
   }
 
-  .actions .btn:not(.btn--primary),
+  .actions > .btn:not(.btn--primary),
   .segmented,
   .window-controls,
   .divider--spaced {
-    display: none;
-  }
-}
-
-@media (max-width: 1180px) {
-  .btn--save-as {
     display: none;
   }
 }
@@ -261,7 +327,7 @@
  * ilegible. Un icono cuadrado, con su título y su atajo intactos, dice lo mismo
  * y cabe siempre.
  */
-@media (max-width: 1280px) {
+@media (max-width: 1000px) {
   .search {
     width: 30px;
     padding: 0;
