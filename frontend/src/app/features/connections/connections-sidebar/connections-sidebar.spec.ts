@@ -181,6 +181,8 @@ describe('ConnectionsSidebar', () => {
     fixture.componentRef.setInput('connections', [{ ...connection, saved: true }]);
     fixture.componentRef.setInput('explorerNodes', [schema]);
     fixture.detectChanges();
+    fixture.nativeElement.querySelector('.connection-menu-trigger').click();
+    fixture.detectChanges();
 
     const schemaIcon = fixture.debugElement.query(By.css('.node--object app-icon.node__icon'))
       .componentInstance as Icon;
@@ -369,6 +371,134 @@ describe('ConnectionsSidebar', () => {
     action.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
 
     expect(toggles).toBe(0);
+  });
+
+  describe('teclado del explorador', () => {
+    const root = { ...database, expanded: true };
+    const child = { ...schema, expanded: false };
+    let element: HTMLElement;
+    beforeEach(() => {
+      fixture.componentRef.setInput('connections', [
+        connection,
+        { ...connection, id: 'segunda', expanded: false },
+      ]);
+      fixture.componentRef.setInput('explorerNodes', [root, child]);
+      fixture.detectChanges();
+      element = fixture.nativeElement;
+    });
+    const key = (target: HTMLElement, value: string, shiftKey = false) => {
+      target.dispatchEvent(new KeyboardEvent('keydown', { key: value, shiftKey, bubbles: true }));
+      fixture.detectChanges();
+    };
+    const rows = () => Array.from(element.querySelectorAll<HTMLElement>('[role="treeitem"]'));
+
+    it('recorre solo las filas visibles sin activar conexiones ni objetos', () => {
+      const connect = vi.fn();
+      const toggle = vi.fn();
+      fixture.componentInstance.connectSaved.subscribe(connect);
+      fixture.componentInstance.toggleNode.subscribe(toggle);
+      expect(rows().filter((row) => row.tabIndex === 0)).toHaveLength(1);
+      expect(rows()[0].getAttribute('aria-setsize')).toBe('2');
+      expect(rows()[3].getAttribute('aria-posinset')).toBe('2');
+      expect(rows()[2].getAttribute('aria-level')).toBe('3');
+      expect(rows()[2].getAttribute('aria-setsize')).toBe('1');
+      rows()[0].focus();
+      key(rows()[0], 'ArrowDown');
+      expect(document.activeElement).toBe(rows()[1]);
+      key(rows()[1], 'End');
+      expect(document.activeElement).toBe(rows()[3]);
+      key(rows()[3], 'ArrowUp');
+      expect(document.activeElement).toBe(rows()[2]);
+      key(rows()[2], 'Home');
+      expect(document.activeElement).toBe(rows()[0]);
+      expect(connect).not.toHaveBeenCalled();
+      expect(toggle).not.toHaveBeenCalled();
+    });
+
+    it('derecha entra en hijos o despliega; izquierda pliega o vuelve al padre', () => {
+      const toggle = vi.fn();
+      fixture.componentInstance.toggleNode.subscribe(toggle);
+      key(rows()[0], 'ArrowRight');
+      expect(document.activeElement).toBe(rows()[1]);
+      key(rows()[1], 'ArrowRight');
+      expect(document.activeElement).toBe(rows()[2]);
+      key(rows()[2], 'ArrowRight');
+      expect(toggle).toHaveBeenLastCalledWith(child.id);
+      key(rows()[2], 'ArrowLeft');
+      expect(document.activeElement).toBe(rows()[1]);
+      key(rows()[1], 'ArrowLeft');
+      expect(toggle).toHaveBeenLastCalledWith(root.id);
+    });
+
+    it('Enter abre una tabla y Espacio conserva la expansión', () => {
+      fixture.componentRef.setInput('explorerNodes', [table]);
+      fixture.detectChanges();
+      const open = vi.fn();
+      const toggle = vi.fn();
+      fixture.componentInstance.openNode.subscribe(open);
+      fixture.componentInstance.toggleNode.subscribe(toggle);
+      key(rows()[1], 'Enter');
+      expect(open).toHaveBeenCalledWith(table);
+      expect(toggle).not.toHaveBeenCalled();
+      key(rows()[1], ' ');
+      expect(toggle).toHaveBeenCalledWith(table.id);
+    });
+
+    it('el menú usa flechas y Escape devuelve el foco sin plegar la conexión', async () => {
+      const toggled = vi.fn();
+      fixture.componentInstance.toggleConnection.subscribe(toggled);
+      fixture.componentRef.setInput('connections', [{ ...connection, saved: true }]);
+      fixture.detectChanges();
+      key(rows()[0], 'F10', true);
+      await fixture.whenStable();
+      const trigger = element.querySelector<HTMLButtonElement>('.connection-menu-trigger')!;
+      const items = element.querySelectorAll<HTMLButtonElement>('[role="menuitem"]');
+      expect(items.length).toBe(4);
+      expect(document.activeElement).toBe(items[0]);
+      key(items[0], 'ArrowDown');
+      expect(document.activeElement).toBe(items[1]);
+      key(items[1], 'End');
+      expect(document.activeElement).toBe(items[3]);
+      key(items[3], 'Escape');
+      expect(element.querySelector('[role="menu"]')).toBeNull();
+      expect(document.activeElement).toBe(trigger);
+      expect(toggled).not.toHaveBeenCalled();
+    });
+
+    it('cada acción de conexión emite solo su intención y cierra el menú', () => {
+      fixture.componentRef.setInput('connections', [{ ...connection, saved: true }]);
+      fixture.detectChanges();
+      const actions: string[] = [];
+      const toggle = vi.fn();
+      fixture.componentInstance.reconnect.subscribe((id) => actions.push('reconnect:' + id));
+      fixture.componentInstance.disconnect.subscribe((id) => actions.push('disconnect:' + id));
+      fixture.componentInstance.edit.subscribe((id) => actions.push('edit:' + id));
+      fixture.componentInstance.forget.subscribe((id) => actions.push('forget:' + id));
+      fixture.componentInstance.toggleConnection.subscribe(toggle);
+      const trigger = element.querySelector<HTMLButtonElement>('.connection-menu-trigger')!;
+      for (let i = 0; i < 4; i++) {
+        trigger.click();
+        fixture.detectChanges();
+        element.querySelectorAll<HTMLButtonElement>('[role="menuitem"]')[i].click();
+        fixture.detectChanges();
+        expect(element.querySelector('[role="menu"]')).toBeNull();
+      }
+      expect(actions).toEqual([
+        'reconnect:connection-1',
+        'disconnect:connection-1',
+        'edit:connection-1',
+        'forget:connection-1',
+      ]);
+      expect(toggle).not.toHaveBeenCalled();
+    });
+
+    it('el menú se cierra al pulsar fuera', () => {
+      element.querySelector<HTMLButtonElement>('.connection-menu-trigger')!.click();
+      fixture.detectChanges();
+      document.body.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
+      fixture.detectChanges();
+      expect(element.querySelector('[role="menu"]')).toBeNull();
+    });
   });
 
   describe('filtro', () => {

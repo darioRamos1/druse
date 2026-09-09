@@ -4,6 +4,8 @@ import {
   DestroyRef,
   ElementRef,
   HostListener,
+  Injector,
+  afterNextRender,
   computed,
   inject,
   input,
@@ -286,6 +288,46 @@ export class ConnectionsSidebar {
   protected readonly filter = signal('');
   protected readonly openMenuId = signal<string | null>(null);
   protected readonly menuPosition = signal({ top: 0, left: 0 });
+  protected readonly focusedId = signal<string | null>(null);
+  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
+  private readonly injector = inject(Injector);
+  private menuTrigger: HTMLElement | null = null;
+
+  /** Un punto de entrada al árbol; las flechas recorren solo las filas visibles. */
+  protected readonly treeRows = computed(() =>
+    this.visibleConnections().flatMap((connection) => [
+      { id: connection.id, level: 1, connection, node: null as ExplorerNode | null },
+      ...(connection.expanded ? this.nodesOf(connection.id) : []).map((node) => ({
+        id: node.id,
+        level: node.depth + 1,
+        connection,
+        node,
+      })),
+    ]),
+  );
+  protected readonly tabStop = computed(() => {
+    const rows = this.treeRows();
+    return rows.some((row) => row.id === this.focusedId())
+      ? this.focusedId()
+      : (rows[0]?.id ?? null);
+  });
+  protected readonly treePositions = computed(() => {
+    const stack: { id: string; level: number }[] = [];
+    const siblings = new Map<string, string[]>();
+    for (const row of this.treeRows()) {
+      while (stack.length && stack[stack.length - 1].level >= row.level) stack.pop();
+      const parent = stack[stack.length - 1]?.id ?? '';
+      const group = siblings.get(parent) ?? [];
+      group.push(row.id);
+      siblings.set(parent, group);
+      stack.push(row);
+    }
+    const positions = new Map<string, { index: number; count: number }>();
+    for (const group of siblings.values()) {
+      group.forEach((id, index) => positions.set(id, { index: index + 1, count: group.length }));
+    }
+    return positions;
+  });
 
   protected readonly search = computed(() => parseSearch(this.filter()));
 
@@ -463,7 +505,7 @@ export class ConnectionsSidebar {
 
   protected async copyName(event: Event, node: ExplorerNode): Promise<void> {
     event.stopPropagation();
-    this.openMenuId.set(null);
+    this.dismissMenu();
 
     try {
       await navigator.clipboard.writeText(this.qualifiedName(node));
@@ -484,43 +526,187 @@ export class ConnectionsSidebar {
 
   protected toggleMenu(event: Event, nodeId: string): void {
     event.stopPropagation();
-    const current = this.openMenuId();
-
-    if (current === nodeId) {
-      this.openMenuId.set(null);
+    if (this.openMenuId() === nodeId) {
+      this.dismissMenu();
       return;
     }
-
-    const trigger = event.currentTarget as HTMLElement;
-    const rect = trigger.getBoundingClientRect();
-    const menuHeight = 190;
-    const top =
-      rect.bottom + menuHeight <= window.innerHeight - 8
-        ? rect.bottom + 3
-        : Math.max(8, rect.top - menuHeight - 3);
-
-    this.menuPosition.set({ top, left: Math.max(8, rect.right - 190) });
-    this.openMenuId.set(nodeId);
+    this.showMenu(event.currentTarget as HTMLElement, nodeId);
   }
 
-  protected onNodeKeydown(event: KeyboardEvent, nodeId: string): void {
-    if (event.target !== event.currentTarget) {
-      return;
-    }
+  private showMenu(trigger: HTMLElement, nodeId: string, last = false): void {
+    this.menuTrigger = trigger;
+    this.focusedId.set(nodeId);
+    this.openMenuId.set(nodeId);
+    afterNextRender(
+      () => {
+        if (this.openMenuId() !== nodeId) return;
+        const menu = trigger.parentElement?.querySelector<HTMLElement>('[role="menu"]');
+        if (!menu) return;
+        const rect = trigger.getBoundingClientRect();
+        const scale = rect.width / trigger.offsetWidth || 1;
+        const height = menu.getBoundingClientRect().height;
+        const top =
+          rect.bottom + height + 3 <= window.innerHeight - 8
+            ? rect.bottom + 3
+            : Math.max(8 * scale, rect.top - height - 3);
+        this.menuPosition.set({
+          top: top / scale,
+          left: Math.max(
+            8,
+            Math.min(
+              rect.right / scale - menu.offsetWidth,
+              window.innerWidth / scale - menu.offsetWidth - 8,
+            ),
+          ),
+        });
+        const items = menu.querySelectorAll<HTMLButtonElement>('button:not(:disabled)');
+        items[last ? items.length - 1 : 0]?.focus();
+      },
+      { injector: this.injector },
+    );
+  }
 
-    if (event.key === 'Enter' || event.key === ' ') {
+  protected onMenuTriggerKeydown(event: KeyboardEvent, id: string): void {
+    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
       event.preventDefault();
-      this.toggleNode.emit(nodeId);
+      event.stopPropagation();
+      this.showMenu(event.currentTarget as HTMLElement, id, event.key === 'ArrowUp');
+    } else if (event.key === 'Escape') {
+      event.stopPropagation();
+      this.dismissMenu();
+    }
+  }
+
+  protected onTreeKeydown(event: KeyboardEvent): void {
+    const target = event.target as HTMLElement;
+    if (
+      target.getAttribute('role') !== 'treeitem' ||
+      event.ctrlKey ||
+      event.metaKey ||
+      event.altKey
+    )
+      return;
+    const rows = this.treeRows();
+    const index = rows.findIndex((row) => row.id === target.dataset['treeId']);
+    const row = rows[index];
+    if (!row) return;
+    const focus = (next: number) => {
+      const id = rows[next]?.id;
+      if (!id) return;
+      this.focusedId.set(id);
+      Array.from(this.host.nativeElement.querySelectorAll<HTMLElement>('[role="treeitem"]'))
+        .find((item) => item.dataset['treeId'] === id)
+        ?.focus();
+    };
+    const expanded = row.node ? row.node.expanded : row.connection.expanded;
+    const expandable = row.node ? row.node.expandable : row.connection.state === 'connected';
+    const toggle = () =>
+      row.node ? this.toggleNode.emit(row.id) : this.toggleConnection.emit(row.id);
+    switch (event.key) {
+      case 'ArrowDown':
+        focus(Math.min(rows.length - 1, index + 1));
+        break;
+      case 'ArrowUp':
+        focus(Math.max(0, index - 1));
+        break;
+      case 'Home':
+        focus(0);
+        break;
+      case 'End':
+        focus(rows.length - 1);
+        break;
+      case 'ArrowRight':
+        if (expandable && !expanded) toggle();
+        else if (expanded && rows[index + 1]?.level > row.level) focus(index + 1);
+        break;
+      case 'ArrowLeft':
+        if (expandable && expanded && !this.search()) toggle();
+        else {
+          for (let parent = index - 1; parent >= 0; parent--) {
+            if (rows[parent].level < row.level) {
+              focus(parent);
+              break;
+            }
+          }
+        }
+        break;
+      case 'Enter':
+        if (!row.node) this.activate(row.connection);
+        else if (row.node.kind === 'table' || row.node.kind === 'view')
+          this.openNode.emit(row.node);
+        else this.toggleNode.emit(row.id);
+        break;
+      case ' ':
+        if (row.node) toggle();
+        else this.activate(row.connection);
+        break;
+      case 'F10':
+        if (!event.shiftKey) return;
+        this.openRowMenu(target, row.id);
+        break;
+      case 'ContextMenu':
+        this.openRowMenu(target, row.id);
+        break;
+      default:
+        return;
+    }
+    event.preventDefault();
+    event.stopPropagation();
+  }
+
+  private openRowMenu(row: HTMLElement, id: string): void {
+    const trigger = row.querySelector<HTMLElement>('[data-menu-trigger]');
+    if (trigger) this.showMenu(trigger, id);
+  }
+
+  private dismissMenu(restoreFocus = true): void {
+    this.openMenuId.set(null);
+    if (restoreFocus && this.menuTrigger?.isConnected) this.menuTrigger.focus();
+  }
+
+  @HostListener('document:pointerdown', ['$event'])
+  protected outsideMenu(event: Event): void {
+    if (
+      this.openMenuId() &&
+      event.target instanceof Node &&
+      !this.menuTrigger?.parentElement?.contains(event.target)
+    ) {
+      this.dismissMenu(false);
     }
   }
 
   protected stopMenuKeydown(event: KeyboardEvent): void {
     event.stopPropagation();
-
     if (event.key === 'Escape') {
-      this.openMenuId.set(null);
-      ((event.currentTarget as HTMLElement).closest('.node') as HTMLElement | null)?.focus();
+      event.preventDefault();
+      this.dismissMenu();
+      return;
     }
+    const items = Array.from(
+      (event.currentTarget as HTMLElement).querySelectorAll<HTMLButtonElement>(
+        'button:not(:disabled)',
+      ),
+    );
+    const index = items.indexOf(event.target as HTMLButtonElement);
+    let next: number;
+    switch (event.key) {
+      case 'ArrowDown':
+        next = (index + 1) % items.length;
+        break;
+      case 'ArrowUp':
+        next = (index - 1 + items.length) % items.length;
+        break;
+      case 'Home':
+        next = 0;
+        break;
+      case 'End':
+        next = items.length - 1;
+        break;
+      default:
+        return;
+    }
+    event.preventDefault();
+    items[next]?.focus();
   }
 
   protected closeMenu(event: FocusEvent, nodeId: string): void {
@@ -535,7 +721,7 @@ export class ConnectionsSidebar {
   /** Evita que el botón de una acción propague el clic al nodo. */
   protected act(event: Event, action: () => void): void {
     event.stopPropagation();
-    this.openMenuId.set(null);
+    this.dismissMenu();
     action();
   }
 }

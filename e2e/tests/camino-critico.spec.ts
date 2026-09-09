@@ -66,7 +66,7 @@ test.describe('el camino crítico', () => {
     await dialogo.getByRole('button', { name: 'Sin cifrar' }).click();
 
     // Lo primero: que el formulario sepa decir cuáles hay.
-    await dialogo.getByRole('button', { name: 'Ver las mías' }).click();
+    await dialogo.getByRole('button', { name: 'Buscar bases de datos' }).click();
     await expect(dialogo.locator('#connection-database-detail')).toContainText('disponibles', {
       timeout: 30_000,
     });
@@ -97,9 +97,9 @@ test.describe('el camino crítico', () => {
      */
     const fila = sidebar.locator('.node--connection', { hasText: nombre }).first();
 
-    await fila.hover();
+    await fila.locator('.connection-menu-trigger').click();
     await fila.locator('[title="Desconectar"]').click();
-    await fila.hover();
+    await fila.locator('.connection-menu-trigger').click();
     await fila.locator('[title="Eliminar esta conexión guardada"]').click();
     await expect(sidebar.getByText(nombre)).toHaveCount(0, { timeout: 30_000 });
   });

@@ -57,16 +57,27 @@
   }
 </div>
 
-<div class="tree" role="tree">
+<div class="tree" role="tree" aria-label="Conexiones y objetos" (keydown)="onTreeKeydown($event)">
   @for (connection of visibleConnections(); track connection.id) {
-    <button
-      type="button"
+    <div
       class="node node--connection"
       [class.is-active]="connection.expanded"
       [class.is-offline]="connection.state !== 'connected'"
       [attr.data-environment]="connection.environment"
+      [attr.data-tree-id]="connection.id"
+      [attr.tabindex]="tabStop() === connection.id ? 0 : -1"
       role="treeitem"
+      aria-level="1"
+      [attr.aria-posinset]="treePositions().get(connection.id)?.index"
+      [attr.aria-setsize]="treePositions().get(connection.id)?.count"
+      [attr.aria-label]="
+        connection.name +
+        ' · ' +
+        statusLabel(connection) +
+        (connection.readOnly ? ' · Solo lectura' : '')
+      "
       [attr.aria-expanded]="connection.expanded"
+      (focus)="focusedId.set(connection.id)"
       (click)="activate(connection)"
     >
       <app-icon
@@ -76,60 +87,12 @@
         [class.is-collapsed]="!connection.expanded"
       />
       <app-engine-badge [engine]="connection.engine" />
-
       <span class="node__label">
         {{ connection.name }}
         @if (connection.readOnly) {
           <span class="node__tag" title="Solo lectura">RO</span>
         }
       </span>
-
-      <span class="node__tools">
-        <!--
-          Reconectar está en las guardadas y no solo en las caídas: sirve igual
-          para recuperar una sesión perdida que para empezar limpio con una que
-          lleva horas abierta. Cuando se detecta la caída se resalta, porque
-          entonces es lo único que hay que hacer.
-        -->
-        @if (connection.saved) {
-          <span
-            class="tool"
-            [class.tool--attention]="connection.lost"
-            [attr.title]="
-              connection.lost ? 'La conexión se perdió: volver a conectar' : 'Volver a conectar'
-            "
-            (click)="act($event, () => reconnect.emit(connection.id))"
-          >
-            <app-icon name="refresh" [size]="12" />
-          </span>
-        }
-        @if (connection.state === 'connected') {
-          <span
-            class="tool tool--danger"
-            title="Desconectar"
-            (click)="act($event, () => disconnect.emit(connection.id))"
-          >
-            <app-icon name="disconnect" [size]="11" />
-          </span>
-        }
-        @if (connection.saved) {
-          <span
-            class="tool"
-            title="Editar esta conexión"
-            (click)="act($event, () => edit.emit(connection.id))"
-          >
-            <app-icon name="edit" [size]="12" />
-          </span>
-          <span
-            class="tool tool--danger"
-            title="Eliminar esta conexión guardada"
-            (click)="act($event, () => forget.emit(connection.id))"
-          >
-            <app-icon name="trash" [size]="12" />
-          </span>
-        }
-      </span>
-
       <span
         class="status-dot"
         [class.status-dot--off]="connection.state !== 'connected'"
@@ -137,8 +100,84 @@
         [class.status-dot--busy]="connection.state === 'connecting'"
         [attr.title]="connection.error ?? statusLabel(connection)"
       ></span>
-    </button>
-
+      @if (connection.saved || connection.state === 'connected') {
+        <div class="node__menu-wrap" (focusout)="closeMenu($event, connection.id)">
+          <button
+            type="button"
+            class="connection-menu-trigger"
+            data-menu-trigger
+            [class.is-attention]="connection.lost"
+            [attr.tabindex]="tabStop() === connection.id ? 0 : -1"
+            [attr.aria-label]="'Acciones de conexión ' + connection.name"
+            [attr.title]="
+              connection.lost
+                ? 'Conexión perdida. Abre las acciones para reconectar.'
+                : 'Acciones de conexión'
+            "
+            [attr.aria-expanded]="openMenuId() === connection.id"
+            aria-haspopup="menu"
+            (click)="toggleMenu($event, connection.id)"
+            (keydown)="onMenuTriggerKeydown($event, connection.id)"
+          >
+            ⋯
+          </button>
+          @if (openMenuId() === connection.id) {
+            <div
+              class="node-menu"
+              role="menu"
+              [attr.aria-label]="'Acciones de conexión ' + connection.name"
+              [style.top.px]="menuPosition().top"
+              [style.left.px]="menuPosition().left"
+              (click)="$event.stopPropagation()"
+              (keydown)="stopMenuKeydown($event)"
+            >
+              @if (connection.saved) {
+                <button
+                  type="button"
+                  role="menuitem"
+                  title="Volver a conectar"
+                  [disabled]="connection.state === 'connecting'"
+                  (click)="act($event, () => reconnect.emit(connection.id))"
+                >
+                  <app-icon name="refresh" [size]="12" /> Volver a conectar
+                </button>
+              }
+              @if (connection.state === 'connected') {
+                <button
+                  type="button"
+                  role="menuitem"
+                  title="Desconectar"
+                  (click)="act($event, () => disconnect.emit(connection.id))"
+                >
+                  <app-icon name="disconnect" [size]="12" /> Desconectar
+                </button>
+              }
+              @if (connection.saved) {
+                <button
+                  type="button"
+                  role="menuitem"
+                  title="Editar esta conexión"
+                  [disabled]="connection.state === 'connecting'"
+                  (click)="act($event, () => edit.emit(connection.id))"
+                >
+                  <app-icon name="edit" [size]="12" /> Editar conexión
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  class="is-danger"
+                  title="Eliminar esta conexión guardada"
+                  [disabled]="connection.state === 'connecting'"
+                  (click)="act($event, () => forget.emit(connection.id))"
+                >
+                  <app-icon name="trash" [size]="12" /> Eliminar conexión guardada
+                </button>
+              }
+            </div>
+          }
+        </div>
+      }
+    </div>
     @if (connection.expanded) {
       @for (node of nodesOf(connection.id); track node.id) {
         <div
@@ -146,10 +185,16 @@
           [class.is-selected]="node.selected"
           [style.padding-left.px]="indentFor(node)"
           role="treeitem"
-          tabindex="0"
+          [attr.data-tree-id]="node.id"
+          [attr.tabindex]="tabStop() === node.id ? 0 : -1"
+          [attr.aria-level]="node.depth + 1"
+          [attr.aria-posinset]="treePositions().get(node.id)?.index"
+          [attr.aria-setsize]="treePositions().get(node.id)?.count"
+          [attr.aria-label]="node.label + (node.hint ? ' · ' + node.hint : '')"
+          [attr.aria-selected]="!!node.selected"
           [attr.aria-expanded]="node.expandable ? node.expanded : null"
+          (focus)="focusedId.set(node.id)"
           (click)="toggleNode.emit(node.id)"
-          (keydown)="onNodeKeydown($event, node.id)"
           (dblclick)="openNode.emit(node)"
         >
           @if (node.expandable) {
@@ -205,10 +250,13 @@
               <button
                 type="button"
                 class="node__menu-trigger"
+                data-menu-trigger
+                [attr.tabindex]="tabStop() === node.id ? 0 : -1"
                 [attr.aria-label]="'Acciones para ' + node.label"
                 [attr.aria-expanded]="openMenuId() === node.id"
                 aria-haspopup="menu"
                 (click)="toggleMenu($event, node.id)"
+                (keydown)="onMenuTriggerKeydown($event, node.id)"
               >
                 ⋯
               </button>
@@ -217,6 +265,7 @@
                 <div
                   class="node-menu"
                   role="menu"
+                  [attr.aria-label]="'Acciones para ' + node.label"
                   [style.top.px]="menuPosition().top"
                   [style.left.px]="menuPosition().left"
                   (click)="$event.stopPropagation()"

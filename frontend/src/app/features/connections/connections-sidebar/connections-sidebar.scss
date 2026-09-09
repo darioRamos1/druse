@@ -77,6 +77,10 @@
   color: var(--dr-text-faintest);
   cursor: text;
 
+  &:focus-within {
+    border-color: var(--dr-accent);
+  }
+
   &__input {
     flex: 1;
     min-width: 0;
@@ -91,7 +95,7 @@
     }
 
     &::placeholder {
-      color: var(--dr-text-faintest);
+      color: var(--dr-text-tertiary);
     }
   }
 
@@ -151,6 +155,7 @@
   align-items: center;
   gap: 7px;
   width: 100%;
+  flex: none;
   border: 1px solid transparent;
   background: transparent;
   color: var(--dr-text-muted);
@@ -159,13 +164,18 @@
   text-align: left;
   cursor: pointer;
 
+  &:focus-visible {
+    outline: 2px solid var(--dr-accent);
+    outline-offset: -2px;
+  }
+
   &:hover {
     background: var(--dr-surface-hover);
   }
 
   &--connection {
     position: relative;
-    height: 28px;
+    min-height: 32px;
     padding: 0 8px 0 11px;
     border-radius: var(--dr-radius-sm);
     color: var(--dr-text-secondary);
@@ -205,7 +215,7 @@
 
   &--object {
     position: relative;
-    height: 26px;
+    min-height: 28px;
     padding-right: 8px;
     border-radius: 6px;
 
@@ -272,23 +282,18 @@
     color: var(--dr-text-faintest);
   }
 
-  &__tools {
-    display: flex;
-    align-items: center;
-    gap: 1px;
-  }
-
   &__menu-wrap {
     position: relative;
     flex: none;
   }
 
-  &__menu-trigger {
+  &__menu-trigger,
+  .connection-menu-trigger {
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 24px;
-    height: 22px;
+    width: 28px;
+    height: 26px;
     border: 0;
     border-radius: 5px;
     background: transparent;
@@ -296,6 +301,16 @@
     font-size: 16px;
     line-height: 1;
     cursor: pointer;
+
+    &:focus-visible {
+      outline: 2px solid var(--dr-accent);
+      outline-offset: -2px;
+    }
+
+    &.is-attention {
+      background: var(--dr-warning-tint);
+      color: var(--dr-warning-strong);
+    }
 
     &:hover,
     &[aria-expanded='true'] {
@@ -313,7 +328,10 @@
 .node-menu {
   position: fixed;
   z-index: 30;
-  width: 190px;
+  width: 240px;
+  max-width: calc(100vw / var(--dr-scale, 1) - 16px);
+  max-height: calc(100dvh / var(--dr-scale, 1) - 16px);
+  overflow-y: auto;
   padding: 5px;
   border: 1px solid var(--dr-border-subtle);
   border-radius: 8px;
@@ -325,56 +343,32 @@
     align-items: center;
     gap: 8px;
     width: 100%;
-    min-height: 30px;
-    padding: 0 8px;
+    min-height: 34px;
+    padding: 6px 8px;
     border: 0;
     border-radius: 5px;
     background: transparent;
     color: var(--dr-text-muted);
     font-family: inherit;
-    font-size: 11.5px;
+    font-size: 12px;
     text-align: left;
     cursor: pointer;
 
+    &:disabled {
+      color: var(--dr-text-dim);
+      cursor: default;
+    }
+
+    &.is-danger {
+      color: var(--dr-danger-text);
+    }
+
     &:hover,
     &:focus-visible {
-      outline: none;
+      outline: 2px solid var(--dr-accent);
+      outline-offset: -2px;
       background: var(--dr-surface-active);
       color: var(--dr-text);
-    }
-  }
-}
-
-.tool {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 19px;
-  height: 19px;
-  border-radius: 5px;
-  color: var(--dr-text-tertiary);
-
-  &:hover {
-    background: var(--dr-surface-active-strong);
-    color: var(--dr-text);
-  }
-
-  &--danger:hover {
-    background: var(--dr-danger-tint);
-    color: var(--dr-danger);
-  }
-
-  // Las herramientas de una conexión solo se ven al pasar por encima; esta no,
-  // cuando la conexión se ha caído: es lo único que hay que hacer y el usuario
-  // no tiene por qué ir a buscarla.
-  &--attention {
-    background: var(--dr-warning-tint);
-    color: var(--dr-warning-strong);
-    opacity: 1;
-
-    &:hover {
-      background: var(--dr-warning-tint-strong);
-      color: var(--dr-warning-strong);
     }
   }
 }

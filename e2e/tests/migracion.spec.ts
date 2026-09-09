@@ -674,7 +674,7 @@ test.describe('migrar datos entre tablas', () => {
       .locator('app-connections-sidebar .node--connection', { hasText: SQLSERVER.nombre })
       .first();
 
-    await sqlserver.hover();
+    await sqlserver.locator('.connection-menu-trigger').click();
     await sqlserver.locator('[title="Desconectar"]').click();
     await expect(sqlserver).toHaveClass(/is-offline/, { timeout: 30_000 });
   });
