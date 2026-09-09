@@ -11,373 +11,420 @@
   <header class="head">
     <div>
       <h2 class="title" id="settings-title">Preferencias</h2>
-      <p class="subtitle">Apariencia, versión y actualizaciones.</p>
+      <p class="subtitle">Los cambios se guardan automáticamente.</p>
     </div>
     <button type="button" class="close" (click)="closed.emit()" aria-label="Cerrar">×</button>
   </header>
 
-  <div class="body">
-    <section class="section update">
-      <h3 class="section__title">Acerca de y actualizaciones</h3>
+  <nav class="categories" role="tablist" aria-label="Secciones de preferencias">
+    @for (item of sections; track item.id) {
+      <button
+        type="button"
+        role="tab"
+        [id]="'settings-tab-' + item.id"
+        [attr.aria-controls]="'settings-panel-' + item.id"
+        [attr.aria-selected]="section() === item.id"
+        [attr.tabindex]="section() === item.id ? 0 : -1"
+        [class.is-active]="section() === item.id"
+        (click)="selectSection(item.id)"
+        (keydown)="onSectionKeydown($event, $index)"
+      >
+        {{ item.label }}
+      </button>
+    }
+  </nav>
 
-      @if (updates.info(); as info) {
-        <div class="update__identity">
-          <strong>Druse {{ info.version }}</strong>
-          <span>{{ info.variantLabel }}</span>
+  <div #body class="body">
+    <div
+      class="settings-panel"
+      role="tabpanel"
+      id="settings-panel-appearance"
+      aria-labelledby="settings-tab-appearance"
+      [hidden]="section() !== 'appearance'"
+    >
+      <section class="section">
+        <h3 class="section__title">Tema</h3>
+        <div class="choice" role="group" aria-label="Tema">
+          <button
+            type="button"
+            class="choice__item"
+            [class.is-active]="theme() === 'light'"
+            [attr.aria-pressed]="theme() === 'light'"
+            (click)="setTheme('light')"
+          >
+            <app-icon name="sun" [size]="13" />
+            Claro
+          </button>
+          <button
+            type="button"
+            class="choice__item"
+            [class.is-active]="theme() === 'dark'"
+            [attr.aria-pressed]="theme() === 'dark'"
+            (click)="setTheme('dark')"
+          >
+            <app-icon name="moon" [size]="13" />
+            Oscuro
+          </button>
         </div>
+      </section>
 
-        @switch (updates.state()) {
-          @case ('disabled') {
-            <p class="section__hint">{{ info.updatesDisabledReason }}</p>
+      <section class="section">
+        <h3 class="section__title">Tamaño</h3>
+        <p class="section__hint">
+          La interfaz se agranda entera —texto, barras e iconos a la vez—, así que nada se sale de
+          su sitio. El editor lleva su propio cuerpo de letra.
+        </p>
+
+        <label class="field">
+          <span class="field__label">Interfaz</span>
+          <input
+            type="range"
+            [min]="minScale"
+            [max]="maxScale"
+            step="5"
+            [value]="appearance().scale"
+            (input)="setScale($any($event.target).value)"
+          />
+          <span class="field__value">{{ appearance().scale }}%</span>
+        </label>
+      </section>
+
+      <section class="section">
+        <h3 class="section__title">Color de acento</h3>
+        <p class="section__hint">
+          Botones, selección, foco y el cursor del editor. El texto que va encima se elige solo
+          según el contraste.
+        </p>
+
+        <div class="swatches">
+          @for (accent of accents; track accent.value) {
+            <button
+              type="button"
+              class="swatch"
+              [class.is-active]="appearance().accent === accent.value"
+              [style.--swatch]="accent.value"
+              [title]="accent.name"
+              [attr.aria-label]="'Acento ' + accent.name"
+              [attr.aria-pressed]="appearance().accent === accent.value"
+              (click)="setAccent(accent.value)"
+            ></button>
           }
-          @case ('checking') {
-            <p class="update__status">Buscando actualizaciones…</p>
+
+          <label class="swatch swatch--custom" title="Elegir otro color">
+            <input
+              type="color"
+              [value]="accentValue()"
+              aria-label="Color de acento personalizado"
+              (change)="setAccent($any($event.target).value)"
+            />
+          </label>
+
+          @if (appearance().accent) {
+            <button type="button" class="link" (click)="clearAccent()">Usar el del tema</button>
           }
-          @case ('current') {
-            <p class="update__status update__status--success">Tienes la versión más reciente.</p>
+        </div>
+      </section>
+
+      <section class="section">
+        <h3 class="section__title">Tono de la interfaz</h3>
+        <p class="section__hint">
+          Tiñe paneles, bordes y texto sin tocar su luminosidad, así que la interfaz sigue leyéndose
+          igual. Los colores de estado no cambian: un error sigue siendo rojo.
+        </p>
+
+        <div class="swatches">
+          @for (tint of tints; track tint.value) {
+            <button
+              type="button"
+              class="swatch"
+              [class.is-active]="appearance().tint === tint.value"
+              [style.--swatch]="tint.value"
+              [title]="tint.name"
+              [attr.aria-label]="'Tono ' + tint.name"
+              [attr.aria-pressed]="appearance().tint === tint.value"
+              (click)="setTint(tint.value)"
+            ></button>
           }
-          @case ('available') {
-            @if (updates.available(); as release) {
-              <div class="update__release">
-                <strong>Druse {{ release.version }} está disponible</strong>
-                @if (release.notes) {
-                  <p class="update__notes">{{ release.notes }}</p>
-                }
-              </div>
-              <button type="button" class="primary update__action" (click)="updates.apply()">
-                Descargar e instalar
+
+          <label class="swatch swatch--custom" title="Elegir otro tono">
+            <input
+              type="color"
+              [value]="tintValue()"
+              aria-label="Tono personalizado"
+              (change)="setTint($any($event.target).value)"
+            />
+          </label>
+
+          @if (appearance().tint) {
+            <button type="button" class="link" (click)="clearTint()">Usar el del tema</button>
+          }
+        </div>
+      </section>
+    </div>
+    <div
+      class="settings-panel"
+      role="tabpanel"
+      id="settings-panel-editor"
+      aria-labelledby="settings-tab-editor"
+      [hidden]="section() !== 'editor'"
+    >
+      <section class="section">
+        <h3 class="section__title">Letra del editor</h3>
+        <div class="field">
+          <span class="field__label">Editor</span>
+          <div class="choice choice--wrap" role="group" aria-label="Cuerpo de letra del editor">
+            @for (size of fontSizes; track size) {
+              <button
+                type="button"
+                class="choice__item choice__item--compact"
+                [class.is-active]="appearance().editorFontSize === size"
+                [attr.aria-pressed]="appearance().editorFontSize === size"
+                (click)="setEditorFontSize(size)"
+              >
+                {{ size }}
               </button>
             }
-          }
-          @case ('downloading') {
-            <div class="update__progress">
-              <div class="update__progress-head">
-                <span>Descargando actualización…</span>
-                @if (updates.percent(); as percent) {
-                  <span>{{ percent }}%</span>
-                }
-              </div>
-              <progress
-                [value]="updates.downloaded()"
-                [max]="updates.total() || undefined"
-              ></progress>
-            </div>
-          }
-          @case ('installing') {
-            <p class="update__status">Instalando. Druse se reiniciará al terminar.</p>
-          }
-          @case ('error') {
-            <p class="problem">{{ updates.error() }}</p>
-            <button type="button" class="secondary" (click)="updates.check()">Reintentar</button>
-          }
-        }
+          </div>
+        </div>
+      </section>
 
-        @if (
-          info.updatesEnabled &&
-          updates.state() !== 'error' &&
-          updates.state() !== 'checking' &&
-          updates.state() !== 'downloading' &&
-          updates.state() !== 'installing'
-        ) {
-          <button type="button" class="link" (click)="updates.check()">
-            Buscar actualizaciones
+      <section class="section">
+        <h3 class="section__title">Fondo del editor</h3>
+        <p class="section__hint">
+          Una imagen detrás del código, atenuada. La imagen se guarda con la aplicación, no en la
+          base de preferencias.
+        </p>
+
+        @if (background(); as image) {
+          <!--
+          La miniatura usa las mismas variables que pinta el editor, así que lo
+          que se ve aquí es el mismo recorte, no una aproximación. Las líneas de
+          código son de mentira y están para lo único que importa decidir: si
+          encima de esa imagen se seguirá leyendo el SQL.
+        -->
+          <div class="preview" [style.aspect-ratio]="editorRatio()">
+            <div class="preview__image"></div>
+            <div class="preview__code" aria-hidden="true">
+              @for (line of previewLines; track $index) {
+                <span class="preview__line">
+                  <span class="preview__gutter"></span>
+                  @for (token of line; track $index) {
+                    <span
+                      class="preview__token"
+                      [class]="'is-' + token.kind"
+                      [style.width.%]="token.width"
+                    ></span>
+                  }
+                </span>
+              }
+            </div>
+          </div>
+          <p class="preview__caption">{{ framing() }}</p>
+
+          <p class="file">
+            <app-icon name="folder-open" [size]="13" />
+            <span class="file__name">{{ image.name }}</span>
+            <button type="button" class="link" (click)="clearBackground()">Quitar</button>
+          </p>
+
+          <label class="field">
+            <span class="field__label">Intensidad</span>
+            <input
+              type="range"
+              min="0"
+              [max]="maxOpacity"
+              step="1"
+              [value]="image.opacity"
+              (input)="setOpacity($any($event.target).value)"
+            />
+            <span class="field__value">{{ image.opacity }}%</span>
+          </label>
+
+          <div class="choice choice--wrap" role="group" aria-label="Encaje de la imagen">
+            @for (fit of fits; track fit.value) {
+              <button
+                type="button"
+                class="choice__item"
+                [class.is-active]="image.fit === fit.value"
+                [attr.aria-pressed]="image.fit === fit.value"
+                [title]="fit.hint"
+                (click)="setFit(fit.value)"
+              >
+                {{ fit.label }}
+              </button>
+            }
+          </div>
+
+          <!--
+          El tamaño solo aparece cuando el encaje no lo decide él: en «llenar» y
+          «encajar» sería un control que no hace nada.
+        -->
+          @if (image.fit === 'tile' || image.fit === 'scale') {
+            <label class="field">
+              <span class="field__label">Tamaño</span>
+              <input
+                type="range"
+                [min]="minBackgroundScale"
+                [max]="maxBackgroundScale"
+                step="5"
+                [value]="image.scale"
+                (input)="setBackgroundScale($any($event.target).value)"
+              />
+              <span class="field__value">{{ image.scale }}%</span>
+            </label>
+          }
+
+          <label class="field">
+            <span class="field__label">Horizontal</span>
+            <input
+              type="range"
+              min="0"
+              max="100"
+              step="1"
+              [value]="image.x"
+              (input)="setPosition($any($event.target).value, null)"
+            />
+            <span class="field__value">{{ image.x }}%</span>
+          </label>
+
+          <label class="field">
+            <span class="field__label">Vertical</span>
+            <input
+              type="range"
+              min="0"
+              max="100"
+              step="1"
+              [value]="image.y"
+              (input)="setPosition(null, $any($event.target).value)"
+            />
+            <span class="field__value">{{ image.y }}%</span>
+          </label>
+
+          <button type="button" class="link link--inline" (click)="centerBackground()">
+            Centrar y volver al tamaño original
+          </button>
+        } @else {
+          <button type="button" class="secondary" (click)="chooseBackground()">
+            Elegir imagen…
           </button>
         }
-      } @else {
-        @if (updates.state() === 'error') {
-          <p class="problem">{{ updates.error() }}</p>
-          <button type="button" class="secondary" (click)="updates.initialize()">Reintentar</button>
-        } @else {
-          <p class="update__status">Leyendo la versión instalada…</p>
+
+        @if (problem(); as message) {
+          <p class="problem">{{ message }}</p>
         }
-      }
-      <!--
+      </section>
+    </div>
+    <div
+      class="settings-panel"
+      role="tabpanel"
+      id="settings-panel-about"
+      aria-labelledby="settings-tab-about"
+      [hidden]="section() !== 'about'"
+    >
+      <section class="section update">
+        <h3 class="section__title">Acerca de y actualizaciones</h3>
+
+        @if (updates.info(); as info) {
+          <div class="update__identity">
+            <strong>Druse {{ info.version }}</strong>
+            <span>{{ info.variantLabel }}</span>
+          </div>
+
+          @switch (updates.state()) {
+            @case ('disabled') {
+              <p class="section__hint">{{ info.updatesDisabledReason }}</p>
+            }
+            @case ('checking') {
+              <p class="update__status">Buscando actualizaciones…</p>
+            }
+            @case ('current') {
+              <p class="update__status update__status--success">Tienes la versión más reciente.</p>
+            }
+            @case ('available') {
+              @if (updates.available(); as release) {
+                <div class="update__release">
+                  <strong>Druse {{ release.version }} está disponible</strong>
+                  @if (release.notes) {
+                    <p class="update__notes">{{ release.notes }}</p>
+                  }
+                </div>
+                <button type="button" class="primary update__action" (click)="updates.apply()">
+                  Descargar e instalar
+                </button>
+              }
+            }
+            @case ('downloading') {
+              <div class="update__progress">
+                <div class="update__progress-head">
+                  <span>Descargando actualización…</span>
+                  @if (updates.percent(); as percent) {
+                    <span>{{ percent }}%</span>
+                  }
+                </div>
+                <progress
+                  [value]="updates.downloaded()"
+                  [max]="updates.total() || undefined"
+                ></progress>
+              </div>
+            }
+            @case ('installing') {
+              <p class="update__status">Instalando. Druse se reiniciará al terminar.</p>
+            }
+            @case ('error') {
+              <p class="problem">{{ updates.error() }}</p>
+              <button type="button" class="secondary" (click)="updates.check()">Reintentar</button>
+            }
+          }
+
+          @if (
+            info.updatesEnabled &&
+            updates.state() !== 'error' &&
+            updates.state() !== 'checking' &&
+            updates.state() !== 'downloading' &&
+            updates.state() !== 'installing'
+          ) {
+            <button type="button" class="link" (click)="updates.check()">
+              Buscar actualizaciones
+            </button>
+          }
+        } @else {
+          @if (updates.state() === 'error') {
+            <p class="problem">{{ updates.error() }}</p>
+            <button type="button" class="secondary" (click)="updates.initialize()">
+              Reintentar
+            </button>
+          } @else {
+            <p class="update__status">Leyendo la versión instalada…</p>
+          }
+        }
+        <!--
         Lo que hace falta para contar un fallo, en un archivo.
 
         Va aquí y no escondido en un menú porque el momento en que se necesita es
         el peor para buscarlo. Lo que lleva dentro está pensado para poder
         enseñarlo: los registros van saneados desde que se escriben.
       -->
-      <div class="diagnostics">
-        <button
-          type="button"
-          class="secondary"
-          [disabled]="savingDiagnostics()"
-          (click)="saveDiagnostics()"
-        >
-          {{ savingDiagnostics() ? 'Preparando…' : 'Guardar diagnóstico…' }}
-        </button>
-
-        <p class="section__hint">
-          Los registros de Druse y la versión, en un zip. No lleva contraseñas, ni las consultas que
-          ejecutas, ni los datos de tus tablas.
-        </p>
-
-        @if (diagnosticsMessage(); as mensaje) {
-          <p class="section__hint">{{ mensaje }}</p>
-        }
-      </div>
-    </section>
-
-    <section class="section">
-      <h3 class="section__title">Tema</h3>
-      <div class="choice" role="group" aria-label="Tema">
-        <button
-          type="button"
-          class="choice__item"
-          [class.is-active]="theme() === 'light'"
-          [attr.aria-pressed]="theme() === 'light'"
-          (click)="setTheme('light')"
-        >
-          <app-icon name="sun" [size]="13" />
-          Claro
-        </button>
-        <button
-          type="button"
-          class="choice__item"
-          [class.is-active]="theme() === 'dark'"
-          [attr.aria-pressed]="theme() === 'dark'"
-          (click)="setTheme('dark')"
-        >
-          <app-icon name="moon" [size]="13" />
-          Oscuro
-        </button>
-      </div>
-    </section>
-
-    <section class="section">
-      <h3 class="section__title">Tamaño</h3>
-      <p class="section__hint">
-        La interfaz se agranda entera —texto, barras e iconos a la vez—, así que nada se sale de su
-        sitio. El editor lleva su propio cuerpo de letra.
-      </p>
-
-      <label class="field">
-        <span class="field__label">Interfaz</span>
-        <input
-          type="range"
-          [min]="minScale"
-          [max]="maxScale"
-          step="5"
-          [value]="appearance().scale"
-          (input)="setScale($any($event.target).value)"
-        />
-        <span class="field__value">{{ appearance().scale }}%</span>
-      </label>
-
-      <div class="field">
-        <span class="field__label">Editor</span>
-        <div class="choice choice--wrap" role="group" aria-label="Cuerpo de letra del editor">
-          @for (size of fontSizes; track size) {
-            <button
-              type="button"
-              class="choice__item choice__item--compact"
-              [class.is-active]="appearance().editorFontSize === size"
-              [attr.aria-pressed]="appearance().editorFontSize === size"
-              (click)="setEditorFontSize(size)"
-            >
-              {{ size }}
-            </button>
-          }
-        </div>
-      </div>
-    </section>
-
-    <section class="section">
-      <h3 class="section__title">Color de acento</h3>
-      <p class="section__hint">
-        Botones, selección, foco y el cursor del editor. El texto que va encima se elige solo según
-        el contraste.
-      </p>
-
-      <div class="swatches">
-        @for (accent of accents; track accent.value) {
+        <div class="diagnostics">
           <button
             type="button"
-            class="swatch"
-            [class.is-active]="appearance().accent === accent.value"
-            [style.--swatch]="accent.value"
-            [title]="accent.name"
-            [attr.aria-label]="'Acento ' + accent.name"
-            [attr.aria-pressed]="appearance().accent === accent.value"
-            (click)="setAccent(accent.value)"
-          ></button>
-        }
+            class="secondary"
+            [disabled]="savingDiagnostics()"
+            (click)="saveDiagnostics()"
+          >
+            {{ savingDiagnostics() ? 'Preparando…' : 'Guardar diagnóstico…' }}
+          </button>
 
-        <label class="swatch swatch--custom" title="Elegir otro color">
-          <input
-            type="color"
-            [value]="accentValue()"
-            aria-label="Color de acento personalizado"
-            (change)="setAccent($any($event.target).value)"
-          />
-        </label>
+          <p class="section__hint">
+            Los registros de Druse y la versión, en un zip. No lleva contraseñas, ni las consultas
+            que ejecutas, ni los datos de tus tablas.
+          </p>
 
-        @if (appearance().accent) {
-          <button type="button" class="link" (click)="clearAccent()">Usar el del tema</button>
-        }
-      </div>
-    </section>
-
-    <section class="section">
-      <h3 class="section__title">Tono de la interfaz</h3>
-      <p class="section__hint">
-        Tiñe paneles, bordes y texto sin tocar su luminosidad, así que la interfaz sigue leyéndose
-        igual. Los colores de estado no cambian: un error sigue siendo rojo.
-      </p>
-
-      <div class="swatches">
-        @for (tint of tints; track tint.value) {
-          <button
-            type="button"
-            class="swatch"
-            [class.is-active]="appearance().tint === tint.value"
-            [style.--swatch]="tint.value"
-            [title]="tint.name"
-            [attr.aria-label]="'Tono ' + tint.name"
-            [attr.aria-pressed]="appearance().tint === tint.value"
-            (click)="setTint(tint.value)"
-          ></button>
-        }
-
-        <label class="swatch swatch--custom" title="Elegir otro tono">
-          <input
-            type="color"
-            [value]="tintValue()"
-            aria-label="Tono personalizado"
-            (change)="setTint($any($event.target).value)"
-          />
-        </label>
-
-        @if (appearance().tint) {
-          <button type="button" class="link" (click)="clearTint()">Usar el del tema</button>
-        }
-      </div>
-    </section>
-
-    <section class="section">
-      <h3 class="section__title">Fondo del editor</h3>
-      <p class="section__hint">
-        Una imagen detrás del código, atenuada. La imagen se guarda con la aplicación, no en la base
-        de preferencias.
-      </p>
-
-      @if (background(); as image) {
-        <!--
-          La miniatura usa las mismas variables que pinta el editor, así que lo
-          que se ve aquí es el mismo recorte, no una aproximación. Las líneas de
-          código son de mentira y están para lo único que importa decidir: si
-          encima de esa imagen se seguirá leyendo el SQL.
-        -->
-        <div class="preview" [style.aspect-ratio]="editorRatio()">
-          <div class="preview__image"></div>
-          <div class="preview__code" aria-hidden="true">
-            @for (line of previewLines; track $index) {
-              <span class="preview__line">
-                <span class="preview__gutter"></span>
-                @for (token of line; track $index) {
-                  <span
-                    class="preview__token"
-                    [class]="'is-' + token.kind"
-                    [style.width.%]="token.width"
-                  ></span>
-                }
-              </span>
-            }
-          </div>
-        </div>
-        <p class="preview__caption">{{ framing() }}</p>
-
-        <p class="file">
-          <app-icon name="folder-open" [size]="13" />
-          <span class="file__name">{{ image.name }}</span>
-          <button type="button" class="link" (click)="clearBackground()">Quitar</button>
-        </p>
-
-        <label class="field">
-          <span class="field__label">Intensidad</span>
-          <input
-            type="range"
-            min="0"
-            [max]="maxOpacity"
-            step="1"
-            [value]="image.opacity"
-            (input)="setOpacity($any($event.target).value)"
-          />
-          <span class="field__value">{{ image.opacity }}%</span>
-        </label>
-
-        <div class="choice choice--wrap" role="group" aria-label="Encaje de la imagen">
-          @for (fit of fits; track fit.value) {
-            <button
-              type="button"
-              class="choice__item"
-              [class.is-active]="image.fit === fit.value"
-              [attr.aria-pressed]="image.fit === fit.value"
-              [title]="fit.hint"
-              (click)="setFit(fit.value)"
-            >
-              {{ fit.label }}
-            </button>
+          @if (diagnosticsMessage(); as mensaje) {
+            <p class="section__hint">{{ mensaje }}</p>
           }
         </div>
-
-        <!--
-          El tamaño solo aparece cuando el encaje no lo decide él: en «llenar» y
-          «encajar» sería un control que no hace nada.
-        -->
-        @if (image.fit === 'tile' || image.fit === 'scale') {
-          <label class="field">
-            <span class="field__label">Tamaño</span>
-            <input
-              type="range"
-              [min]="minBackgroundScale"
-              [max]="maxBackgroundScale"
-              step="5"
-              [value]="image.scale"
-              (input)="setBackgroundScale($any($event.target).value)"
-            />
-            <span class="field__value">{{ image.scale }}%</span>
-          </label>
-        }
-
-        <label class="field">
-          <span class="field__label">Horizontal</span>
-          <input
-            type="range"
-            min="0"
-            max="100"
-            step="1"
-            [value]="image.x"
-            (input)="setPosition($any($event.target).value, null)"
-          />
-          <span class="field__value">{{ image.x }}%</span>
-        </label>
-
-        <label class="field">
-          <span class="field__label">Vertical</span>
-          <input
-            type="range"
-            min="0"
-            max="100"
-            step="1"
-            [value]="image.y"
-            (input)="setPosition(null, $any($event.target).value)"
-          />
-          <span class="field__value">{{ image.y }}%</span>
-        </label>
-
-        <button type="button" class="link link--inline" (click)="centerBackground()">
-          Centrar y volver al tamaño original
-        </button>
-      } @else {
-        <button type="button" class="secondary" (click)="chooseBackground()">Elegir imagen…</button>
-      }
-
-      @if (problem(); as message) {
-        <p class="problem">{{ message }}</p>
-      }
-    </section>
+      </section>
+    </div>
   </div>
 
   <footer class="foot">

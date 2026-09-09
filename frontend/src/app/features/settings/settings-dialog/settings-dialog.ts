@@ -1,11 +1,13 @@
 import {
   ChangeDetectionStrategy,
   Component,
+  ElementRef,
   computed,
   inject,
   input,
   output,
   signal,
+  viewChild,
 } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 
@@ -128,13 +130,9 @@ const FITS: readonly {
   { value: 'scale', label: 'Tamaño', hint: 'El tamaño lo decides tú' },
 ];
 
-/**
- * Preferencias de la aplicación.
- *
- * Hoy solo tiene apariencia. Se hace como panel con secciones y no como un menú
- * suelto porque el formato del SQL y el tiempo máximo de ejecución viven en la
- * barra del editor, y acabarán aquí: lo que falta es que haya un aquí.
- */
+type SettingsSection = 'appearance' | 'editor' | 'about';
+
+/** Preferencias agrupadas por lo que se quiere ajustar. */
 @Component({
   selector: 'app-settings-dialog',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -143,6 +141,40 @@ const FITS: readonly {
   styleUrl: './settings-dialog.scss',
 })
 export class SettingsDialog {
+  protected readonly section = signal<SettingsSection>('appearance');
+  protected readonly sections: readonly { id: SettingsSection; label: string }[] = [
+    { id: 'appearance', label: 'Apariencia' },
+    { id: 'editor', label: 'Editor' },
+    { id: 'about', label: 'Acerca de' },
+  ];
+  private readonly body = viewChild<ElementRef<HTMLElement>>('body');
+
+  protected selectSection(section: SettingsSection): void {
+    this.section.set(section);
+    const body = this.body()?.nativeElement;
+    if (body) body.scrollTop = 0;
+  }
+
+  protected onSectionKeydown(event: KeyboardEvent, index: number): void {
+    const count = this.sections.length;
+    const next =
+      event.key === 'Home'
+        ? 0
+        : event.key === 'End'
+          ? count - 1
+          : event.key === 'ArrowRight'
+            ? (index + 1) % count
+            : event.key === 'ArrowLeft'
+              ? (index - 1 + count) % count
+              : null;
+    if (next === null) return;
+    event.preventDefault();
+    this.selectSection(this.sections[next].id);
+    (event.currentTarget as HTMLElement).parentElement
+      ?.querySelectorAll<HTMLButtonElement>('[role="tab"]')
+      [next]?.focus();
+  }
+
   private readonly _themes = inject(ThemeService);
   protected readonly updates = inject(UpdateService);
 

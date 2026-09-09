@@ -152,3 +152,11 @@ La comprobación manual utilizó una API de prueba con datos ficticios. Activida
 ### Pendiente
 
 Distribución inicial de resultados, organización de Preferencias, el asistente redimensionable y el explorador contraíble. La fuente común de atajos sigue aplicándose solo a las barras: falta la paleta y la hoja de atajos. Y queda el barrido E2E completo, con motores levantados y las capturas nuevas de esta entrega.
+
+## Cuarta entrega — mejoras publicadas por separado
+
+### Preferencias organizadas
+
+Apariencia reúne tema, escala y colores; Editor agrupa letra e imagen de fondo; Acerca de contiene versión, actualizaciones y diagnóstico. Las pestañas admiten flechas e Inicio/Fin y conservan los valores al cambiar de sección. El diálogo abre Apariencia y mantiene visibles las acciones de cierre.
+
+Validación: cuatro pruebas de componente aprobadas y compilación de producción correcta. En navegador se revisaron Apariencia a 1280 px y la navegación entre las tres secciones a 900 px con escala 125 %. El tamaño de letra elegido se conservó al volver a Editor y el pie quedó dentro de la ventana.
