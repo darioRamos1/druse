@@ -1,4 +1,5 @@
 :host {
+  container: results / size;
   display: flex;
   flex-direction: column;
   min-height: 0;
@@ -426,6 +427,41 @@
   &__hint {
     color: var(--dr-text-tertiary);
     font-size: 12px;
+  }
+}
+
+// Al reservar más espacio al editor, la primera conexión sigue a un clic.
+@container results (max-height: 260px) {
+  .welcome {
+    padding: 12px;
+    gap: 8px;
+  }
+  .welcome__icon,
+  .welcome__hint {
+    display: none;
+  }
+  .welcome h2 {
+    font-size: 16px;
+  }
+  .welcome button {
+    min-height: 30px;
+    padding: 5px 10px;
+  }
+}
+
+@container results (max-height: 190px) {
+  .welcome {
+    padding: 8px 12px;
+    gap: 6px;
+  }
+  .welcome p {
+    display: none;
+  }
+  .welcome h2 {
+    font-size: 14px;
+  }
+  .welcome__actions {
+    margin-top: 0;
   }
 }
 

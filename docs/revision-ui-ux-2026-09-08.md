@@ -160,3 +160,9 @@ Distribución inicial de resultados, organización de Preferencias, el asistente
 Apariencia reúne tema, escala y colores; Editor agrupa letra e imagen de fondo; Acerca de contiene versión, actualizaciones y diagnóstico. Las pestañas admiten flechas e Inicio/Fin y conservan los valores al cambiar de sección. El diálogo abre Apariencia y mantiene visibles las acciones de cierre.
 
 Validación: cuatro pruebas de componente aprobadas y compilación de producción correcta. En navegador se revisaron Apariencia a 1280 px y la navegación entre las tres secciones a 900 px con escala 125 %. El tamaño de letra elegido se conservó al volver a Editor y el pie quedó dentro de la ventana.
+
+### Distribución de editor y resultados
+
+La altura inicial de resultados se adapta al espacio disponible después de las barras. El límite del tirador reserva espacio para seguir escribiendo y se recalcula al cambiar el tamaño de la ventana o de los avisos. Intro o doble clic en el separador restablece el reparto automático. Los arrastres convierten la distancia de pantalla a píxeles CSS para respetar el zoom. La bienvenida se compacta cuando falta altura, conservando sus acciones visibles.
+
+Validación: pruebas del cálculo de tamaños, del tirador con zoom y de su integración con el shell aprobadas (35 casos entre las tres suites). A 900 × 720 px y escala 125 %, el editor inicial midió 301,5 px; al ampliar resultados al máximo conservó 200,25 px, sin desbordar la ventana. Crear conexión permaneció visible en el reparto automático.

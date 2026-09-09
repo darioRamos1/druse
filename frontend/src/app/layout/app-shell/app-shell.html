@@ -183,9 +183,13 @@
 
     <app-resize-handle
       axis="height"
-      [(size)]="resultsHeight"
-      [min]="resultsMin"
-      [max]="resultsMax"
+      [size]="resultsHeight()"
+      (sizeChange)="requestedResultsHeight.set($event)"
+      [min]="resultsMin()"
+      [max]="resultsMax()"
+      title="Arrastra o usa las flechas para ajustar. Intro o doble clic recupera el tamaño automático."
+      (dblclick)="requestedResultsHeight.set(null)"
+      (keydown.enter)="requestedResultsHeight.set(null); $event.preventDefault()"
       [inverted]="true"
       aria-label="Alto del panel de resultados"
     />

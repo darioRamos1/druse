@@ -83,6 +83,7 @@ export class ResizeHandle {
 
   private _origin = 0;
   private _startSize = 0;
+  private _dragScale = 1;
 
   protected onPointerDown(event: PointerEvent): void {
     // Solo el botón principal arrastra.
@@ -91,7 +92,14 @@ export class ResizeHandle {
     }
 
     event.preventDefault();
-    (event.target as HTMLElement).setPointerCapture(event.pointerId);
+    const target = event.currentTarget as HTMLElement;
+    target.setPointerCapture(event.pointerId);
+    // Pointer Events usa píxeles de pantalla; los tamaños del panel son píxeles CSS.
+    const rect = target.getBoundingClientRect();
+    this._dragScale =
+      (this.axis() === 'width'
+        ? rect.width / target.offsetWidth
+        : rect.height / target.offsetHeight) || 1;
 
     this._origin = this.axis() === 'width' ? event.clientX : event.clientY;
     this._startSize = this.size();
@@ -104,7 +112,7 @@ export class ResizeHandle {
     }
 
     const current = this.axis() === 'width' ? event.clientX : event.clientY;
-    const delta = (current - this._origin) * (this.inverted() ? -1 : 1);
+    const delta = ((current - this._origin) / this._dragScale) * (this.inverted() ? -1 : 1);
 
     this.apply(this._startSize + delta);
   }

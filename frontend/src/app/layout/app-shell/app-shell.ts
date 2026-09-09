@@ -1,7 +1,9 @@
 import {
   ChangeDetectionStrategy,
   Component,
+  DestroyRef,
   ElementRef,
+  afterNextRender,
   computed,
   effect,
   HostListener,
@@ -59,6 +61,7 @@ import {
 } from '../../shared/models/workspace';
 import { ResizeHandle } from '../../shared/ui/resize-handle/resize-handle';
 import { StatusBar } from '../status-bar/status-bar';
+import { resultPanelLayout } from '../panel-layout';
 import { TopBar } from '../top-bar/top-bar';
 import CommandPalette from '../command-palette/command-palette';
 import { ShortcutsSheet } from '../shortcuts-sheet/shortcuts-sheet';
@@ -79,8 +82,6 @@ const MAX_WARMED_TABLES = 40;
 /** Límites de arrastre de los paneles, en píxeles. */
 const SIDEBAR_MIN = 200;
 const SIDEBAR_MAX = 520;
-const RESULTS_MIN = 120;
-const RESULTS_MAX = 700;
 
 /** Estado que se muestra mientras no hay ninguna conexión abierta. */
 const DISCONNECTED: SessionStatus = {
@@ -262,12 +263,56 @@ export class AppShell {
   // --- Tamaños de panel ------------------------------------------------------
   protected readonly sidebarWidth = signal(274);
   protected readonly mobileExplorerOpen = signal(false);
-  protected readonly resultsHeight = signal(322);
+  protected readonly requestedResultsHeight = signal<number | null>(null);
+  private readonly availablePanelHeight = signal(580);
+  private readonly resultsLayout = computed(() =>
+    resultPanelLayout(this.availablePanelHeight(), this.requestedResultsHeight()),
+  );
+  protected readonly resultsHeight = computed(() => this.resultsLayout().height);
 
   protected readonly sidebarMin = SIDEBAR_MIN;
   protected readonly sidebarMax = SIDEBAR_MAX;
-  protected readonly resultsMin = RESULTS_MIN;
-  protected readonly resultsMax = RESULTS_MAX;
+  protected readonly resultsMin = computed(() => this.resultsLayout().min);
+  protected readonly resultsMax = computed(() => this.resultsLayout().max);
+  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
+  private readonly destroyRef = inject(DestroyRef);
+
+  /** Solo mide las barras fijas: cambiar el resultado no provoca un ciclo de medidas. */
+  private observePanelSpace(): void {
+    const main = this.host.nativeElement.querySelector<HTMLElement>('.main');
+    if (!main || typeof ResizeObserver === 'undefined') return;
+    const fixed = () =>
+      Array.from(main.children).filter(
+        (child) => !child.classList.contains('editor') && !child.classList.contains('results'),
+      );
+    const measure = () => {
+      if (!main.clientHeight) return;
+      const occupied = fixed().reduce((total, child) => {
+        const styles = getComputedStyle(child);
+        return (
+          total +
+          (child as HTMLElement).offsetHeight +
+          (parseFloat(styles.marginTop) || 0) +
+          (parseFloat(styles.marginBottom) || 0)
+        );
+      }, 0);
+      this.availablePanelHeight.set(Math.max(0, main.clientHeight - occupied));
+    };
+    const resize = new ResizeObserver(measure);
+    const observe = () => {
+      resize.disconnect();
+      resize.observe(main);
+      fixed().forEach((child) => resize.observe(child));
+      measure();
+    };
+    const children = new MutationObserver(observe);
+    children.observe(main, { childList: true });
+    observe();
+    this.destroyRef.onDestroy(() => {
+      resize.disconnect();
+      children.disconnect();
+    });
+  }
 
   // --- Diálogo ---------------------------------------------------------------
   protected readonly dialogOpen = signal(false);
@@ -1011,6 +1056,7 @@ export class AppShell {
   }
 
   constructor() {
+    afterNextRender(() => this.observePanelSpace());
     void this.startup();
 
     let tabId = this._store.activeTab()?.id;

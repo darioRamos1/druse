@@ -136,12 +136,19 @@ describe('AppShell', () => {
     expect(element.querySelector('app-status-bar')).toBeTruthy();
   });
 
-  it('arranca con las proporciones del mockup', () => {
+  it('permite ajustar resultados y volver al tamaño automático con Intro', () => {
     const sidebar = element.querySelector<HTMLElement>('app-connections-sidebar');
     const results = element.querySelector<HTMLElement>('app-results-panel');
 
     expect(sidebar?.style.width).toBe('274px');
-    expect(results?.style.height).toBe('322px');
+    const initial = Number.parseFloat(results!.style.height);
+    const handle = element.querySelector<HTMLElement>('app-resize-handle[axis="height"]')!;
+    handle.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true }));
+    fixture.detectChanges();
+    expect(Number.parseFloat(results!.style.height)).toBe(initial + 16);
+    handle.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    fixture.detectChanges();
+    expect(Number.parseFloat(results!.style.height)).toBe(initial);
   });
 
   it('ofrece un tirador por cada panel redimensionable', () => {
