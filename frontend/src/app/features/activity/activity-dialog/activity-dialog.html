@@ -1,0 +1,98 @@
+<div class="backdrop" [closeOnClick]="true" (dismiss)="closed.emit()"></div>
+
+<section
+  class="dialog"
+  role="dialog"
+  aria-modal="true"
+  aria-label="Actividad reciente"
+  tabindex="-1"
+  (keydown.escape)="$event.stopPropagation(); closed.emit()"
+>
+  <header class="head">
+    <div>
+      <h2>Actividad reciente</h2>
+      <p>Últimos 20 respaldos, restauraciones y traslados de datos.</p>
+    </div>
+    <button type="button" class="btn close" aria-label="Cerrar actividad" (click)="closed.emit()">
+      ×
+    </button>
+  </header>
+
+  <div class="toolbar">
+    <span>Actualiza para consultar el estado más reciente.</span>
+    <button type="button" class="btn" [disabled]="loading()" (click)="refresh()">
+      {{ loading() ? 'Actualizando…' : 'Actualizar' }}
+    </button>
+  </div>
+
+  <div class="body" [attr.aria-busy]="loading()">
+    @if (failed()) {
+      <p class="notice notice--error" role="alert">
+        No se pudo actualizar la actividad. Vuelve a intentarlo con Actualizar.
+      </p>
+    }
+    @for (job of jobs(); track job.id) {
+      <article class="job" [class.job--attention]="needsAttention(job)">
+        <div class="job__head">
+          <h3>{{ name(job) }}</h3>
+          <span
+            class="state"
+            [class.state--attention]="needsAttention(job)"
+            [class.state--failed]="job.outcome === 'Failed'"
+            [class.state--running]="job.state === 'Running'"
+            >{{ state(job) }}</span
+          >
+        </div>
+        <p class="job__subject">{{ job.subject || 'Sin destino registrado' }}</p>
+        <dl class="job__dates">
+          <div>
+            <dt>Inicio</dt>
+            <dd>
+              <time [attr.datetime]="job.startedAtUtc">{{ date(job.startedAtUtc) }}</time>
+            </dd>
+          </div>
+          @if (job.finishedAtUtc; as finished) {
+            <div>
+              <dt>Fin</dt>
+              <dd>
+                <time [attr.datetime]="finished">{{ date(finished) }}</time>
+              </dd>
+            </div>
+          }
+        </dl>
+        @if (job.state === 'Interrupted') {
+          <p class="notice">
+            Druse se cerró antes de registrar cómo terminó este trabajo.
+            @if (job.kind === 'Backup') {
+              Revisa el archivo o la carpeta de respaldo antes de utilizarlo; puede estar
+              incompleto.
+            } @else {
+              Revisa los datos del destino antes de repetir la operación; puede haber cambios ya
+              aplicados.
+            }
+          </p>
+        }
+      </article>
+    } @empty {
+      @if (loading()) {
+        <p class="empty" role="status">Cargando actividad…</p>
+      } @else if (!failed()) {
+        <div class="empty">
+          <h3>Aún no hay trabajos registrados</h3>
+          <p>Aquí podrás consultar tus respaldos, restauraciones y traslados.</p>
+        </div>
+      }
+    }
+  </div>
+
+  <footer class="foot">
+    @if (runningJobs.interrupted().length > 0) {
+      <button type="button" class="btn" (click)="dismissNotices()">
+        Ocultar avisos por esta sesión
+      </button>
+    }
+    <button #closeButton type="button" class="btn btn--primary" (click)="closed.emit()">
+      Cerrar
+    </button>
+  </footer>
+</section>

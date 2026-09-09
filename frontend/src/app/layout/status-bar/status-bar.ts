@@ -32,6 +32,7 @@ export class StatusBar {
 
   /** Volver al detalle de la restauración en marcha. */
   readonly showRestore = output<void>();
+  readonly showActivity = output<void>();
 
   /**
    * El respaldo se mira desde aquí porque **sobrevive al asistente**.
@@ -59,7 +60,7 @@ export class StatusBar {
     return count === 1 ? '1 trabajo quedó sin terminar' : `${count} trabajos quedaron sin terminar`;
   });
 
-  /** El detalle, en el tooltip: qué era cada uno y sobre qué trabajaba. */
+  /** El aviso abre la actividad; descartarlo es una decisión aparte. */
   protected readonly interruptedDetail = computed(() =>
     [
       'Estaban en marcha cuando Druse se cerró; lo que escribieron puede estar a medias.',
@@ -68,7 +69,7 @@ export class StatusBar {
         (job) => `· ${nameOf(job.kind)}${job.subject ? `: ${job.subject}` : ''}`,
       ),
       '',
-      'Pulsa para descartar este aviso.',
+      'Ver detalle en Actividad.',
     ].join('\n'),
   );
 

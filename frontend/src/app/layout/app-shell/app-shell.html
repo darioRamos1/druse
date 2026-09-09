@@ -200,6 +200,9 @@
       [canceling]="canceling()"
       [timeoutSeconds]="timeoutSeconds()"
       [history]="history()"
+      [firstSession]="firstSession()"
+      (createConnection)="openDialog()"
+      (openSql)="openSqlFile()"
       [exporting]="exporting()"
       [editable]="!!editableTable()"
       [edits]="edits()"
@@ -234,6 +237,7 @@
       [column]="cursor().column"
       (showBackup)="reopenBackup()"
       (showRestore)="reopenRestore()"
+      (showActivity)="activityOpen.set(true)"
     />
   </main>
 
@@ -397,6 +401,12 @@
 @defer (when settingsOpen()) {
   @if (settingsOpen()) {
     <app-settings-dialog [editorRatio]="editorRatio()" (closed)="settingsOpen.set(false)" />
+  }
+}
+
+@defer (when activityOpen()) {
+  @if (activityOpen()) {
+    <app-activity-dialog (closed)="activityOpen.set(false)" />
   }
 }
 

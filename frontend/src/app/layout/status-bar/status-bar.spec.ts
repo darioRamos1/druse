@@ -7,9 +7,11 @@ import {
   BackupRequest,
   RestoreProgress,
   RestoreRequest,
+  JobSummary,
 } from '../../core/application-gateway/application-gateway';
 import { BackupStore } from '../../core/backup/backup.store';
 import { RestoreStore } from '../../core/backup/restore.store';
+import { RunningJobsService } from '../../core/jobs/running-jobs.service';
 import { SessionStatus } from '../../shared/models/workspace';
 import { StatusBar } from './status-bar';
 
@@ -39,6 +41,10 @@ const restoreRequest: RestoreRequest = {
 
 /** Gateway que deja el respaldo y la restauración clavados en lo que se le pida. */
 class FakeGateway implements Partial<ApplicationGateway> {
+  jobs: readonly JobSummary[] = [];
+  getJobs(): Observable<readonly JobSummary[]> {
+    return of(this.jobs);
+  }
   status: BackupProgress = {
     id: 'b1',
     step: 'WritingData',
@@ -115,6 +121,31 @@ describe('StatusBar', () => {
   });
 
   afterEach(() => vi.useRealTimers());
+
+  it('Actividad abre el detalle sin descartar los trabajos interrumpidos', async () => {
+    gateway.jobs = [
+      {
+        id: 'b1',
+        kind: 'Backup',
+        subject: 'prueba.sql',
+        state: 'Interrupted',
+        startedAtUtc: '2026-09-09T11:00:00Z',
+      },
+    ];
+    const jobs = TestBed.inject(RunningJobsService);
+    await jobs.loadInterrupted();
+    fixture.detectChanges();
+    const show = vi.fn();
+    fixture.componentInstance.showActivity.subscribe(show);
+    const button = element.querySelector<HTMLButtonElement>('.op--activity')!;
+    expect(button.getAttribute('aria-label')).toContain('1 trabajo quedó sin terminar');
+    button.click();
+    expect(show).toHaveBeenCalledOnce();
+    expect(jobs.interrupted()).toHaveLength(1);
+    jobs.dismissInterrupted();
+    fixture.detectChanges();
+    expect(element.querySelector('.op--activity')).not.toBeNull();
+  });
 
   async function respaldar(): Promise<void> {
     await store.start(request);

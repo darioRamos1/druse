@@ -1,0 +1,153 @@
+:host {
+  position: fixed;
+  inset: 0;
+  z-index: var(--dr-z-modal);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--dr-font-size-sm);
+}
+
+.dialog {
+  width: 680px;
+}
+.head,
+.toolbar,
+.foot {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex: none;
+  padding: 16px 20px;
+}
+.head {
+  align-items: flex-start;
+  border-bottom: 1px solid var(--dr-border);
+}
+.head > div {
+  flex: 1;
+}
+h2,
+h3,
+p {
+  margin: 0;
+}
+h2 {
+  font-size: 18px;
+  color: var(--dr-text);
+}
+h3 {
+  font-size: 13px;
+  color: var(--dr-text);
+}
+.head p {
+  margin-top: 6px;
+  color: var(--dr-text-tertiary);
+  line-height: 1.5;
+}
+.btn {
+  min-height: 32px;
+  padding: 6px 12px;
+}
+.close {
+  font-size: 20px;
+  line-height: 1;
+}
+.toolbar {
+  justify-content: space-between;
+  color: var(--dr-text-tertiary);
+  font-size: 12px;
+  padding-block: 12px;
+}
+.toolbar .btn {
+  flex: none;
+}
+.body {
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0 20px 16px;
+}
+.job {
+  padding: 16px;
+  border: 1px solid var(--dr-border);
+  border-radius: var(--dr-radius);
+  background: var(--dr-surface-panel);
+}
+.job + .job {
+  margin-top: 10px;
+}
+.job--attention {
+  border-left: 3px solid var(--dr-warning);
+}
+.job__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.job__subject {
+  margin-top: 10px;
+  font-family: var(--dr-font-mono);
+  color: var(--dr-text-secondary);
+  overflow-wrap: anywhere;
+  line-height: 1.5;
+}
+.job__dates {
+  display: flex;
+  gap: 8px 24px;
+  flex-wrap: wrap;
+  margin: 10px 0 0;
+  color: var(--dr-text-tertiary);
+  font-size: 12px;
+}
+.job__dates > div {
+  display: flex;
+  gap: 8px;
+}
+dd {
+  margin: 0;
+}
+.state {
+  padding: 3px 7px;
+  border: 1px solid var(--dr-border);
+  border-radius: 5px;
+  font-size: 12px;
+  color: var(--dr-text-secondary);
+}
+.state--attention {
+  color: var(--dr-warning-text);
+}
+.state--failed {
+  color: var(--dr-danger-text);
+}
+.state--running {
+  color: var(--dr-accent-bright);
+}
+.notice {
+  margin-top: 12px;
+  color: var(--dr-text-secondary);
+  font-size: 12px;
+  line-height: 1.6;
+}
+.notice--error {
+  margin: 0 0 12px;
+  color: var(--dr-danger-text);
+}
+.empty {
+  padding: 36px 16px;
+  text-align: center;
+  color: var(--dr-text-tertiary);
+  line-height: 1.6;
+}
+.empty h3 {
+  margin-bottom: 8px;
+}
+.foot {
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  border-top: 1px solid var(--dr-border);
+}
+.foot .btn:first-child:not(:last-child) {
+  margin-right: auto;
+}

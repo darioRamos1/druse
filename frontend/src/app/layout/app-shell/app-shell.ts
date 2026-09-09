@@ -18,6 +18,7 @@ import { SplashScreen } from '../../core/startup/splash-screen';
 import { ThemeName, ThemeService } from '../../core/theme/theme.service';
 import { UpdateService } from '../../core/update/update.service';
 import { SettingsDialog } from '../../features/settings/settings-dialog/settings-dialog';
+import { ActivityDialog } from '../../features/activity/activity-dialog/activity-dialog';
 import { FormatSettings } from '../../core/workspace/format-settings';
 import { WorkspaceStore } from '../../core/workspace/workspace-store';
 import { SqlFileService } from '../../core/sql-files/sql-file.service';
@@ -122,6 +123,7 @@ const DISCONNECTED: SessionStatus = {
     CommandPalette,
     ShortcutsSheet,
     SettingsDialog,
+    ActivityDialog,
     ResizeHandle,
     AiPanel,
     AiProviderDialog,
@@ -156,6 +158,7 @@ export class AppShell {
   protected readonly editorFontSize = computed(() => this._themes.appearance().editorFontSize);
 
   protected readonly settingsOpen = signal(false);
+  protected readonly activityOpen = signal(false);
 
   // --- Asistente -------------------------------------------------------------
   private readonly _ai = inject(AiStore);
@@ -379,6 +382,7 @@ export class AppShell {
       this.paletteOpen() ||
       this.shortcutsOpen() ||
       this.settingsOpen() ||
+      this.activityOpen() ||
       this.aiProvidersOpen() ||
       this.dialogOpen() ||
       this.importTarget() !== null ||
@@ -784,6 +788,14 @@ export class AppShell {
   });
 
   protected readonly sql = computed(() => this._store.activeTab()?.sql ?? '');
+  private readonly startedWriting = signal(false);
+  protected readonly firstSession = computed(
+    () =>
+      !this.startedWriting() &&
+      this.connections().length === 0 &&
+      this.history().length === 0 &&
+      this.tabs().every((tab) => !tab.sql.trim() && !tab.fileName),
+  );
 
   protected readonly hasConnection = computed(() => !!this._store.activeConnection()?.sessionId);
 
@@ -1363,6 +1375,7 @@ export class AppShell {
 
   // --- Editor ----------------------------------------------------------------
   protected onSqlChange(sql: string): void {
+    if (sql.trim()) this.startedWriting.set(true);
     this.executionError.set(null);
     this._store.updateSql(sql);
   }

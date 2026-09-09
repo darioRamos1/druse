@@ -10,6 +10,7 @@ import { AppShell } from './app-shell';
 function silentGateway(): Partial<ApplicationGateway> {
   return {
     getEngines: () => of([]),
+    getJobs: () => of([]),
     getDatabases: () => of([]),
     getChildren: () => of([]),
   };
@@ -153,6 +154,23 @@ describe('AppShell', () => {
 
   it('sin conexiones, invita a crear una', () => {
     expect(element.querySelector('.empty__action')?.textContent).toContain('Crear una conexión');
+  });
+
+  it('la ayuda inicial abre el formulario de conexión', async () => {
+    expect(element.querySelector('.welcome h2')?.textContent).toContain('primera base de datos');
+    element.querySelector<HTMLButtonElement>('.welcome__primary')!.click();
+    await fixture.whenStable();
+    expect(element.querySelector('app-connection-dialog')).not.toBeNull();
+  });
+
+  it('la ayuda inicial se retira cuando ya hay SQL en una pestaña', async () => {
+    const store = TestBed.inject(WorkspaceStore);
+    store.updateSql('SELECT 1;');
+    await fixture.whenStable();
+    expect(element.querySelector('.welcome')).toBeNull();
+    store.createTab();
+    await fixture.whenStable();
+    expect(element.querySelector('.welcome')).toBeNull();
   });
 
   it('sin conexión, la barra de estado lo dice', () => {
@@ -348,6 +366,20 @@ describe('AppShell', () => {
     await fixture.whenStable();
 
     expect(element.querySelector('app-shortcuts-sheet')).toBeTruthy();
+  });
+
+  it('Actividad se abre desde la barra, bloquea atajos de fondo y cierra con Escape', async () => {
+    element.querySelector<HTMLButtonElement>('.op--activity')!.click();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    const dialog = element.querySelector<HTMLElement>('app-activity-dialog .dialog');
+    expect(dialog).not.toBeNull();
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'F1' }));
+    fixture.detectChanges();
+    expect(element.querySelector('app-shortcuts-sheet')).toBeNull();
+    dialog!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    fixture.detectChanges();
+    expect(element.querySelector('app-activity-dialog')).toBeNull();
   });
 
   it('duplicar la pestaña deja el mismo SQL en otra nueva', async () => {

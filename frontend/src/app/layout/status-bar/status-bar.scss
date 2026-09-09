@@ -117,6 +117,25 @@
   background: var(--dr-surface-raised);
 }
 
+.op--activity {
+  flex: none;
+  min-height: 24px;
+}
+.op-count {
+  padding: 0 5px;
+  border: 1px solid currentColor;
+  border-radius: 4px;
+}
+.item--database,
+.item--user {
+  min-width: 0;
+}
+.item--database .mono,
+.item--user .mono {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .op-fill {
   display: block;
   height: 100%;

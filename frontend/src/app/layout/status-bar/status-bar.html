@@ -107,18 +107,23 @@
   Lo que quedó a medias la última vez.
   
   Un trabajo que figuraba «en marcha» cuando Druse se cerró: nadie llegó a saber
-  cómo acabó, y lo que dejó escrito sigue donde esté. Se enseña al abrir y se va
-  al pulsarlo, que es lo que dice que alguien ya lo ha visto.
+  cómo acabó, y lo que dejó escrito sigue donde esté. Actividad permite consultar
+  el detalle antes de decidir si se ocultan los avisos de esta sesión.
 -->
-@if (interrupted().length > 0) {
-  <span class="sep" aria-hidden="true"></span>
+<span class="sep" aria-hidden="true"></span>
 
-  <button
-    type="button"
-    class="op op--interrupted"
-    (click)="jobs.dismissInterrupted()"
-    [title]="interruptedDetail()"
-  >
-    <span class="op-step">{{ interruptedLabel() }}</span>
-  </button>
-}
+<button
+  type="button"
+  class="op op--activity"
+  [class.op--interrupted]="interrupted().length > 0"
+  (click)="showActivity.emit()"
+  [attr.aria-label]="
+    interrupted().length ? 'Actividad: ' + interruptedLabel() : 'Ver actividad reciente'
+  "
+  [title]="interrupted().length ? interruptedDetail() : 'Ver actividad reciente'"
+>
+  Actividad
+  @if (interrupted().length > 0) {
+    <span class="op-count" aria-hidden="true">{{ interrupted().length }}</span>
+  }
+</button>
