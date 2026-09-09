@@ -2,6 +2,9 @@ import {
   ChangeDetectionStrategy,
   Component,
   ElementRef,
+  HostListener,
+  Injector,
+  afterNextRender,
   computed,
   effect,
   inject,
@@ -47,6 +50,9 @@ export class ResultsPanel {
   readonly running = input(false);
   readonly canceling = input(false);
   readonly timeoutSeconds = input(30);
+  readonly firstSession = input(false);
+  readonly createConnection = output<void>();
+  readonly openSql = output<void>();
 
   readonly exporting = input(false);
 
@@ -96,11 +102,17 @@ export class ResultsPanel {
    * botón obligaría a los dos a mantener la misma verdad por duplicado.
    */
   private readonly grid = viewChild(ResultsGrid);
-  private readonly host = inject(ElementRef<HTMLElement>);
+  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
+  private readonly injector = inject(Injector);
+  private menuTrigger: HTMLElement | null = null;
 
   protected readonly hasSelection = computed(() => this.grid()?.hasSelection() ?? false);
 
   protected readonly selectionLabel = computed(() => this.grid()?.selectionLabel() ?? '');
+  protected readonly activeFilterCount = computed(() => this.grid()?.activeFilterCount() ?? 0);
+  protected readonly filteredRowCount = computed(
+    () => this.grid()?.filteredRowCount() ?? this.rowCount(),
+  );
   protected readonly showFilters = signal(false);
   protected readonly compact = signal(false);
   protected readonly elapsedMs = signal(0);
@@ -148,6 +160,14 @@ export class ResultsPanel {
 
       onCleanup(() => window.clearInterval(timer));
     });
+
+    effect(() => {
+      this.currentSet();
+      this.activeTab();
+      this.running();
+      this.exporting();
+      this.closeMenus();
+    });
   }
 
   protected requestCancel(): void {
@@ -169,32 +189,131 @@ export class ResultsPanel {
   });
 
   protected toggleExport(event: Event): void {
-    const trigger = event.currentTarget as HTMLElement;
-    const rect = trigger.getBoundingClientRect();
-    this.exportPosition.set({ top: rect.bottom + 4, left: Math.max(8, rect.right - 190) });
-    this.exportOpen.update((open) => !open);
+    this.toggleMenu(event.currentTarget as HTMLElement, 'export');
   }
 
   protected chooseExport(format: ExportFormat): void {
-    this.exportOpen.set(false);
+    this.closeMenus(true);
     this.exportAs.emit(format);
   }
 
   protected toggleCopy(event: Event): void {
-    const trigger = event.currentTarget as HTMLElement;
-    const rect = trigger.getBoundingClientRect();
-
-    this.copyPosition.set({ top: rect.bottom + 4, left: Math.max(8, rect.right - 232) });
-    this.copyOpen.update((open) => !open);
+    this.toggleMenu(event.currentTarget as HTMLElement, 'copy');
   }
 
   protected chooseCopy(format: CopyFormat): void {
-    this.copyOpen.set(false);
+    this.closeMenus(true);
     void this.grid()?.copyAs(format);
   }
 
   protected toggleFilters(): void {
+    this.select('results');
     this.showFilters.update((visible) => !visible);
+  }
+
+  protected resetFilters(): void {
+    this.grid()?.clearFilters();
+    this.host.nativeElement.querySelector<HTMLButtonElement>('.filter-toggle')?.focus();
+  }
+
+  private closeMenus(restoreFocus = false): void {
+    this.exportOpen.set(false);
+    this.copyOpen.set(false);
+    if (restoreFocus) this.menuTrigger?.focus();
+  }
+
+  private toggleMenu(
+    trigger: HTMLElement,
+    kind: 'export' | 'copy',
+    last = false,
+    forceOpen = false,
+  ): void {
+    const state = kind === 'export' ? this.exportOpen : this.copyOpen;
+    const wasOpen = state();
+    this.closeMenus();
+    if (wasOpen && !forceOpen) return;
+    this.menuTrigger = trigger;
+    state.set(true);
+    afterNextRender(
+      () => {
+        if (!state() || this.menuTrigger !== trigger) return;
+        const menu = trigger.parentElement?.querySelector<HTMLElement>('[role="menu"]');
+        if (!menu) return;
+        const rect = trigger.getBoundingClientRect();
+        const scale = rect.width / trigger.offsetWidth || 1;
+        const height = menu.getBoundingClientRect().height;
+        const top =
+          rect.bottom + height + 4 <= window.innerHeight - 8
+            ? rect.bottom + 4
+            : Math.max(8 * scale, rect.top - height - 4);
+        (kind === 'export' ? this.exportPosition : this.copyPosition).set({
+          top: top / scale,
+          left: Math.max(
+            8,
+            Math.min(
+              rect.right / scale - menu.offsetWidth,
+              window.innerWidth / scale - menu.offsetWidth - 8,
+            ),
+          ),
+        });
+        const items = menu.querySelectorAll<HTMLButtonElement>('[role="menuitem"]');
+        items[last ? items.length - 1 : 0]?.focus();
+      },
+      { injector: this.injector },
+    );
+  }
+
+  protected onMenuKeydown(event: KeyboardEvent, kind: 'export' | 'copy'): void {
+    const container = event.currentTarget as HTMLElement;
+    const trigger = container.querySelector<HTMLButtonElement>('.tool-button');
+    if (!trigger || trigger.disabled) return;
+    const onTrigger = event.target === trigger;
+    if (onTrigger && ['ArrowDown', 'ArrowUp'].includes(event.key)) {
+      event.preventDefault();
+      event.stopPropagation();
+      this.toggleMenu(trigger, kind, event.key === 'ArrowUp', true);
+      return;
+    }
+    if (!this.exportOpen() && !this.copyOpen()) return;
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      event.stopPropagation();
+      this.closeMenus(true);
+      return;
+    }
+    if (onTrigger || !['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return;
+    const items = Array.from(container.querySelectorAll<HTMLButtonElement>('[role="menuitem"]'));
+    if (!items.length) return;
+    const current = items.indexOf(event.target as HTMLButtonElement);
+    const next =
+      event.key === 'Home'
+        ? 0
+        : event.key === 'End'
+          ? items.length - 1
+          : (current + (event.key === 'ArrowDown' ? 1 : -1) + items.length) % items.length;
+    event.preventDefault();
+    event.stopPropagation();
+    items[next]?.focus();
+  }
+
+  protected onMenuFocusOut(event: FocusEvent): void {
+    if (
+      !(event.relatedTarget instanceof Node) ||
+      !(event.currentTarget as HTMLElement).contains(event.relatedTarget)
+    ) {
+      this.closeMenus();
+    }
+  }
+
+  @HostListener('document:pointerdown', ['$event'])
+  protected onOutsideMenu(event: Event): void {
+    if (!(event.target instanceof Node) || !this.menuTrigger?.parentElement?.contains(event.target))
+      this.closeMenus();
+  }
+
+  @HostListener('window:resize')
+  protected onResize(): void {
+    this.closeMenus();
   }
 
   protected toggleDensity(): void {
@@ -258,17 +377,14 @@ export class ResultsPanel {
    */
   openExportMenu(): void {
     const boton = (this.host.nativeElement as HTMLElement).querySelector<HTMLElement>(
-      '.export .tool-button',
+      '.export--query .tool-button',
     );
 
-    if (boton) {
+    if (boton && !this.exportOpen()) {
+      boton.focus();
       boton.click();
     }
   }
-
-  protected readonly hasFilters = computed(() =>
-    (this.currentSet()?.columns ?? []).some((column) => !!column.filter),
-  );
 
   protected readonly rowCount = computed(() => this.currentSet()?.rows.length ?? 0);
 
@@ -298,6 +414,9 @@ export class ResultsPanel {
 
   protected readonly rangeLabel = computed(() => {
     const set = this.currentSet();
+
+    if (this.activeFilterCount())
+      return `${this.filteredRowCount()} de ${this.rowCount()} cargadas`;
 
     if (!set || set.rows.length === 0) {
       return 'Sin filas';

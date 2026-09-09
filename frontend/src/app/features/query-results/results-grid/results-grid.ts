@@ -262,6 +262,17 @@ export class ResultsGrid {
     () => this.visibleRows().length !== this.resultSet().rows.length,
   );
 
+  /** El panel consulta el alcance real, aunque se oculte la fila de filtros. */
+  readonly activeFilterCount = computed(
+    () => Object.values(this.filters()).filter((term) => !!term?.trim()).length,
+  );
+  readonly filteredRowCount = computed(() => this.visibleRows().length);
+
+  clearFilters(): void {
+    this.filters.set({});
+    this.visibleLimit.set(ROW_PAGE_SIZE);
+  }
+
   protected readonly renderedRows = computed(() =>
     this.visibleRows().slice(0, this.visibleLimit()),
   );

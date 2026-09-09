@@ -19,6 +19,24 @@ describe('ResultsPanel', () => {
     vi.useRealTimers();
   });
 
+  it('la primera sesión ofrece conectar y abrir SQL como acciones separadas', () => {
+    const connect = vi.fn();
+    const open = vi.fn();
+    fixture.componentInstance.createConnection.subscribe(connect);
+    fixture.componentInstance.openSql.subscribe(open);
+    fixture.componentRef.setInput('firstSession', true);
+    fixture.detectChanges();
+    const actions = element.querySelectorAll<HTMLButtonElement>('.welcome button');
+    actions[0].click();
+    expect(connect).toHaveBeenCalledTimes(1);
+    expect(open).not.toHaveBeenCalled();
+    actions[1].click();
+    expect(open).toHaveBeenCalledTimes(1);
+    fixture.componentRef.setInput('running', true);
+    fixture.detectChanges();
+    expect(element.querySelector('.welcome')).toBeNull();
+  });
+
   it('muestra actividad, tiempo y cancelación mientras se ejecuta', () => {
     fixture.componentRef.setInput('running', true);
     fixture.componentRef.setInput('timeoutSeconds', 30);
@@ -101,6 +119,111 @@ describe('ResultsPanel', () => {
     beforeEach(() => {
       fixture.componentRef.setInput('resultSet', resultSet);
       fixture.detectChanges();
+    });
+
+    function filtersButton(): HTMLButtonElement {
+      return Array.from(element.querySelectorAll<HTMLButtonElement>('.tool-button')).find(
+        (button) => button.textContent?.includes('Filtros'),
+      )!;
+    }
+
+    function filter(term: string): void {
+      const input = element.querySelector<HTMLInputElement>('[aria-label="Filtrar pais"]')!;
+      input.value = term;
+      input.dispatchEvent(new Event('input'));
+      fixture.detectChanges();
+    }
+
+    it('cuenta las coincidencias locales y mantiene el aviso al ocultar los campos', () => {
+      filtersButton().click();
+      fixture.detectChanges();
+      filter('mx');
+      expect(element.querySelector('.filter-scope')?.textContent).toContain(
+        '1 de 2 filas cargadas',
+      );
+      expect(element.querySelector('.pager__range')?.textContent).toContain('1 de 2 cargadas');
+      filtersButton().click();
+      fixture.detectChanges();
+      expect(element.querySelector('.filters__input')).toBeNull();
+      expect(element.querySelector('.filter-scope')?.textContent).toContain(
+        'no se aplican al exportar',
+      );
+      element.querySelector<HTMLButtonElement>('.filter-scope button')!.click();
+      fixture.detectChanges();
+      expect(element.querySelectorAll('app-results-grid .row')).toHaveLength(2);
+      expect(element.querySelector('.filter-scope')).toBeNull();
+    });
+
+    it('un filtro sin coincidencias muestra cero y una nueva ejecución limpia su alcance', () => {
+      filtersButton().click();
+      fixture.detectChanges();
+      filter('ninguno');
+      expect(element.querySelector('.filter-scope')?.textContent).toContain(
+        '0 de 2 filas cargadas',
+      );
+      fixture.componentRef.setInput('resultSet', { ...resultSet });
+      fixture.detectChanges();
+      fixture.detectChanges();
+      expect(element.querySelector('.filter-scope')?.textContent).toContain(
+        'Filtra sobre las 2 filas cargadas',
+      );
+      expect(element.querySelector<HTMLInputElement>('[aria-label="Filtrar pais"]')?.value).toBe(
+        '',
+      );
+    });
+
+    it('el atajo abre Exportar aunque Copiar esté deshabilitado y solo exporta al elegir formato', () => {
+      const exported = vi.fn();
+      fixture.componentInstance.exportAs.subscribe(exported);
+      expect(copyButton().disabled).toBe(true);
+      fixture.componentInstance.openExportMenu();
+      fixture.detectChanges();
+      expect(element.querySelector('.export--copy [role="menu"]')).toBeNull();
+      expect(element.querySelector('.export__scope')?.textContent).toContain(
+        'Se volverá a ejecutar el SQL',
+      );
+      expect(exported).not.toHaveBeenCalled();
+      element.querySelector<HTMLButtonElement>('.export--query [role="menuitem"]')!.click();
+      expect(exported).toHaveBeenCalledExactlyOnceWith('csv');
+    });
+
+    it('las flechas recorren Exportar, Escape restaura foco y pulsar fuera lo cierra', () => {
+      const trigger = element.querySelector<HTMLButtonElement>('.export--query .tool-button')!;
+      trigger.focus();
+      trigger.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
+      fixture.detectChanges();
+      const options = element.querySelectorAll<HTMLButtonElement>(
+        '.export--query [role="menuitem"]',
+      );
+      expect(document.activeElement).toBe(options[0]);
+      options[0].dispatchEvent(new KeyboardEvent('keydown', { key: 'End', bubbles: true }));
+      expect(document.activeElement).toBe(options[1]);
+      options[1].dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+      fixture.detectChanges();
+      expect(document.activeElement).toBe(trigger);
+      expect(element.querySelector('[role="menu"]')).toBeNull();
+      trigger.click();
+      fixture.detectChanges();
+      document.body.dispatchEvent(new Event('pointerdown', { bubbles: true }));
+      fixture.detectChanges();
+      expect(element.querySelector('[role="menu"]')).toBeNull();
+    });
+
+    it('los controles usan el conjunto elegido incluso sin el input de resultado único', () => {
+      fixture.componentRef.setInput('resultSet', null);
+      fixture.componentRef.setInput('result', {
+        executionId: 'multi',
+        state: 'succeeded',
+        resultSets: [resultSet, { ...resultSet, rows: [] }],
+        messages: [],
+        durationMs: 4,
+      });
+      fixture.detectChanges();
+      expect(filtersButton().disabled).toBe(false);
+      element.querySelectorAll<HTMLButtonElement>('.sets__tab')[1].click();
+      filtersButton().click();
+      fixture.detectChanges();
+      expect(element.querySelector('.filter-scope')?.textContent).toContain('0 filas cargadas');
     });
 
     it('no se puede pulsar mientras no hay nada seleccionado', () => {

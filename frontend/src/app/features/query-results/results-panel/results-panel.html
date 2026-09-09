@@ -42,21 +42,25 @@
 
   <button
     type="button"
-    class="tool-button"
-    [class.is-on]="showFilters()"
-    [disabled]="running() || !resultSet()"
-    title="Filtrar las filas mostradas"
+    class="tool-button filter-toggle"
+    [class.is-on]="showFilters() || activeFilterCount() > 0"
+    [disabled]="running() || !currentSet()"
+    [attr.aria-expanded]="showFilters()"
+    title="Filtrar solo las filas cargadas, sin consultar la base de datos"
     (click)="toggleFilters()"
   >
     <app-icon name="filter" [size]="12" />
     Filtros
+    @if (activeFilterCount()) {
+      <span>{{ activeFilterCount() }}</span>
+    }
   </button>
 
   <button
     type="button"
     class="tool-button"
     [class.is-on]="compact()"
-    [disabled]="running() || !resultSet()"
+    [disabled]="running() || !currentSet()"
     [attr.aria-pressed]="compact()"
     title="Alternar densidad de filas"
     (click)="toggleDensity()"
@@ -68,11 +72,16 @@
     Copiar lo seleccionado. Solo se puede pulsar cuando hay algo cogido: un botón
     que no dice qué copiaría acabaría copiando lo que el usuario no miraba.
   -->
-  <div class="export">
+  <div
+    class="export export--copy"
+    (keydown)="onMenuKeydown($event, 'copy')"
+    (focusout)="onMenuFocusOut($event)"
+  >
     <button
       type="button"
       class="tool-button"
-      [disabled]="running() || !resultSet() || !hasSelection()"
+      [disabled]="running() || !currentSet() || !hasSelection()"
+      aria-haspopup="menu"
       [attr.aria-expanded]="copyOpen()"
       [title]="
         hasSelection()
@@ -92,6 +101,7 @@
       <ul
         class="export__menu"
         role="menu"
+        aria-label="Copiar la selección"
         [style.top.px]="copyPosition().top"
         [style.left.px]="copyPosition().left"
       >
@@ -127,11 +137,17 @@
     }
   </div>
 
-  <div class="export">
+  <div
+    class="export export--query"
+    (keydown)="onMenuKeydown($event, 'export')"
+    (focusout)="onMenuFocusOut($event)"
+  >
     <button
       type="button"
       class="tool-button"
-      [disabled]="running() || !resultSet() || exporting()"
+      [disabled]="running() || !currentSet() || exporting()"
+      aria-haspopup="menu"
+      title="Exportar: vuelve a ejecutar el SQL original sin los filtros locales"
       [attr.aria-expanded]="exportOpen()"
       (click)="toggleExport($event)"
     >
@@ -142,11 +158,20 @@
 
     @if (exportOpen()) {
       <ul
-        class="export__menu"
+        class="export__menu export__menu--query"
         role="menu"
+        aria-label="Exportar la consulta original"
         [style.top.px]="exportPosition().top"
         [style.left.px]="exportPosition().left"
       >
+        <li role="presentation" class="export__scope">
+          <strong>Exportar la consulta original</strong>
+          Se volverá a ejecutar el SQL que generó estos resultados, sin los filtros locales ni el
+          límite de filas del editor.
+          @if (resultSets().length > 1) {
+            Cambiar de pestaña de resultado no cambia el SQL exportado.
+          }
+        </li>
         <li>
           <button
             type="button"
@@ -155,7 +180,7 @@
             (click)="chooseExport('csv')"
           >
             CSV
-            <span class="export__hint">Todas las filas del resultado</span>
+            <span class="export__hint">Hasta 1 000 000 de filas</span>
           </button>
         </li>
         <li>
@@ -166,7 +191,7 @@
             (click)="chooseExport('xlsx')"
           >
             Excel
-            <span class="export__hint">Hasta 200 000 filas</span>
+            <span class="export__hint">Hasta 200 000 filas o 2 millones de celdas</span>
           </button>
         </li>
       </ul>
@@ -217,6 +242,23 @@
               Resultado {{ $index + 1 }}
               <span class="sets__count">{{ item.rows.length }}</span>
             </button>
+          }
+        </div>
+      }
+
+      @if (showFilters() || activeFilterCount() > 0) {
+        <div class="filter-scope">
+          <span role="status">
+            @if (activeFilterCount()) {
+              <strong>{{ filteredRowCount() }} de {{ set.rows.length }} filas cargadas</strong>
+              coinciden.
+            } @else {
+              Filtra sobre las {{ set.rows.length }} filas cargadas.
+            }
+            Los filtros son locales; no se aplican al exportar.
+          </span>
+          @if (activeFilterCount()) {
+            <button type="button" class="btn" (click)="resetFilters()">Limpiar filtros</button>
           }
         </div>
       }
@@ -331,8 +373,7 @@
         @if (set.truncated) {
           <span class="sep" aria-hidden="true"></span>
           <div class="foot__item foot__item--warning" title="Se alcanzó el límite de filas">
-            Resultado recortado: se muestran {{ set.rows.length }} de
-            {{ set.totalRows.toLocaleString('es') }}
+            Resultado recortado: hay más filas sin cargar
           </div>
         }
 
@@ -367,6 +408,23 @@
           La instrucción se ejecutó correctamente y no devolvió filas.
         }
       </div>
+    } @else if (firstSession()) {
+      <section class="welcome" aria-labelledby="welcome-title">
+        <span class="welcome__icon" aria-hidden="true"
+          ><app-icon name="database" [size]="22"
+        /></span>
+        <h2 id="welcome-title">Conecta tu primera base de datos</h2>
+        <p>Explora tus tablas y ejecuta consultas en PostgreSQL, SQL Server, MySQL o Informix.</p>
+        <div class="welcome__actions">
+          <button type="button" class="welcome__primary" (click)="createConnection.emit()">
+            <app-icon name="plus" [size]="13" /> Crear conexión
+          </button>
+          <button type="button" (click)="openSql.emit()">
+            <app-icon name="folder-open" [size]="13" /> Abrir SQL
+          </button>
+        </div>
+        <span class="welcome__hint">También puedes empezar a escribir SQL en el editor.</span>
+      </section>
     } @else {
       <div class="empty">
         <strong>Los resultados aparecerán aquí</strong>
