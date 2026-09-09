@@ -49,8 +49,8 @@
   position: relative;
   display: flex;
   flex-direction: column;
-  max-width: calc(100vw - 32px);
-  max-height: calc(100vh - 32px);
+  max-width: calc(100vw / var(--dr-scale, 1) - 32px);
+  max-height: calc(100dvh / var(--dr-scale, 1) - 32px);
   overflow: hidden;
   border: 1px solid var(--dr-border-dialog);
   border-radius: 12px;

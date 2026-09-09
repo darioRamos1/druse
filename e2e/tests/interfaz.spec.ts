@@ -22,6 +22,44 @@ import {
  * pasar.
  */
 test.describe('la interfaz por dentro', () => {
+  test('al 125 % el espacio de trabajo y los diálogos caben en la ventana', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 760 });
+    await abrir(page);
+    await page.getByRole('button', { name: 'Preferencias', exact: true }).click();
+    const escala = page.getByRole('slider', { name: /^Interfaz/ });
+    const original = Number(await escala.inputValue());
+    const ajustar = async (porcentaje: number) => {
+      await escala.press('Home');
+      for (let valor = 80; valor < porcentaje; valor += 5) {
+        await escala.press('ArrowRight');
+      }
+    };
+    const cabe = async (selector: string) => {
+      const caja = await page.locator(selector).boundingBox();
+      expect(caja).not.toBeNull();
+      expect(caja!.x).toBeGreaterThanOrEqual(0);
+      expect(caja!.y).toBeGreaterThanOrEqual(0);
+      expect(caja!.x + caja!.width).toBeLessThanOrEqual(1281);
+      expect(caja!.y + caja!.height).toBeLessThanOrEqual(761);
+    };
+    try {
+      await ajustar(125);
+      await expect(escala).toHaveValue('125');
+      await cabe('app-settings-dialog .dialog');
+      await page.getByRole('button', { name: 'Listo', exact: true }).click();
+      await expect(page.locator('app-settings-dialog')).toBeHidden();
+      await cabe('app-shell');
+      await page.getByRole('button', { name: 'Nueva conexión', exact: true }).click();
+      await cabe('app-connection-dialog .dialog');
+      await cabe('app-connection-dialog .foot');
+    } finally {
+      await page.keyboard.press('Escape');
+      await page.getByRole('button', { name: 'Preferencias', exact: true }).click();
+      await ajustar(original);
+      await page.getByRole('button', { name: 'Listo', exact: true }).click();
+    }
+  });
+
   test('escape cierra los diálogos', async ({ page }) => {
     await abrir(page);
     await conectar(page);
@@ -291,17 +329,17 @@ test.describe('la interfaz por dentro', () => {
     await abrir(page);
 
     const toolbar = page.locator('app-editor-toolbar');
-    const compactLabel = toolbar.locator('.run .label');
+    const compactLabel = toolbar.locator('.run__label');
     const compactBox = await compactLabel.boundingBox();
     const toolbarBox = await toolbar.boundingBox();
 
-    expect(compactBox?.width).toBeLessThanOrEqual(1);
+    expect(compactBox?.width).toBeGreaterThan(1);
     expect(toolbarBox?.height).toBeLessThanOrEqual(44);
 
-    // Aunque el texto esté visualmente recogido, sigue nombrando el botón y el
-    // desplegable queda por encima de Monaco y recibe el clic.
-    await toolbar.getByRole('button', { name: /Filas/ }).click();
-    await expect(toolbar.getByRole('listbox')).toBeVisible();
+    // Ejecutar conserva texto y el desplegable sigue recibiendo clic sobre Monaco.
+    await toolbar.getByRole('button', { name: /Opciones de ejecución/ }).click();
+    await expect(toolbar.getByRole('dialog', { name: 'Opciones de ejecución' })).toBeVisible();
+    await toolbar.getByLabel('Límite de filas').selectOption('100');
 
     const historyBox = await page.getByRole('tab', { name: 'Historial' }).boundingBox();
     const filtersBox = await page.getByRole('button', { name: 'Filtros' }).boundingBox();
@@ -833,6 +871,7 @@ test.describe('la interfaz por dentro', () => {
     // leerlo.
     await expect(dialogo.getByRole('button', { name: 'Probar túnel' })).toHaveCount(0);
 
+    await dialogo.getByRole('button', { name: /Opciones avanzadas/ }).click();
     await dialogo
       .locator('label.checkbox', { hasText: 'servidor SSH' })
       .locator('input')

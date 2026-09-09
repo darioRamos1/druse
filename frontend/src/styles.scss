@@ -26,6 +26,8 @@ body {
    * acabaría recortándolo dentro de barras que no crecen.
    */
   zoom: var(--dr-scale, 1);
+  // Las unidades de ventana no se reducen automáticamente al aplicar zoom.
+  height: calc(100dvh / var(--dr-scale, 1));
   background: var(--dr-surface-outer);
   color: var(--dr-text);
   font-family: var(--dr-font-ui);
