@@ -634,9 +634,11 @@ cerró en la 027 y trataba defectos de maquetación.
 - [x] **UX-009:** «Restaurar» está deshabilitado hasta inspeccionar el artefacto
       —y con razón— pero no dice por qué. Un botón apagado sin motivo se lee como
       una avería.
-- [ ] **UX-010:** el aviso de trabajos interrumpidos vive en la barra de estado y
-      es discreto de más para lo que cuenta —un respaldo que quedó a medias—.
-      Verlo con alguien delante antes de decidir si sube de sitio.
+- [x] **UX-010:** el aviso de trabajos interrumpidos vivía en la barra de estado
+      y su único clic **descartaba el aviso**, que era justo lo que se quería
+      leer. Ahora el botón se llama Actividad, está siempre y abre el detalle de
+      los últimos veinte trabajos —estado, destino y qué revisar si quedó a
+      medias—; ocultar los avisos de la sesión es una acción aparte.
 - [x] **UX-011:** pulsar fuera cerraba cualquier diálogo al primer roce, y con él
       todo lo que llevara escrito. Ahora los que guardan trabajo **no se cierran
       así** —se sale con Escape, Cancelar o la ×— y se sacuden para decir que
