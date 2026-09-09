@@ -276,7 +276,7 @@ test.describe('barrido visual', () => {
     await medir(page, 'lista de pestañas');
     await foto(page, '06d-lista-pestanas');
 
-    await barra.locator('.listing__search input').fill('Query 1');
+    await barra.locator('.listing__search input').fill('Consulta 1');
     await page.waitForTimeout(200);
     await foto(page, '06e-lista-pestanas-buscando');
     await page.keyboard.press('Escape');
@@ -497,10 +497,13 @@ test.describe('barrido visual', () => {
       await expect(dialogo).toBeVisible({ timeout: 30_000 });
       await dialogo
         .locator('.engine')
-        .filter({ has: page.locator('.engine__name', { hasText: new RegExp(`^${motor.replace(/[()]/g, '\\$&')}$`) }) })
+        .filter({ has: page.locator('.engine__name', { hasText: new RegExp(`^${(motor === 'Informix (DRDA)' ? 'Informix' : motor).replace(/[()]/g, '\\$&')}$`) }) })
         .first()
         .click();
       await page.waitForTimeout(400);
+      if (motor === 'Informix (DRDA)') {
+        await dialogo.getByRole('button', { name: 'DRDA', exact: true }).click();
+      }
       await medir(page, `conexión ${motor}`);
       await foto(page, `13d-conexion-${motor.replace(/[^a-z]/gi, '').toLowerCase()}`, dialogo.locator('.dialog'));
       await cerrar(page, dialogo, `conexion ${motor}`);

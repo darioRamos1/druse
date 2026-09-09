@@ -211,7 +211,20 @@ export class ConnectionDialog {
   /** Está editando un perfil que ya existía. */
   protected readonly editing = computed(() => this.connection() !== null);
 
-  protected readonly engines = ENGINES;
+  protected readonly engines = ENGINES.filter((option) => option.id !== 'informix');
+  protected readonly informixProtocols = ENGINES.filter(
+    (option) => option.id === 'informix' || option.id === 'informixsqli',
+  );
+  protected readonly isInformix = computed(
+    () => this.engine() === 'informix' || this.engine() === 'informixsqli',
+  );
+  protected readonly advancedOpen = signal(false);
+  protected readonly advancedSummary = computed(
+    () =>
+      (SSL_MODES.find((option) => option.id === this.sslMode())?.label ?? '') +
+      ' · ' +
+      (this.sshEnabled() ? 'SSH activado' : 'Sin túnel SSH'),
+  );
   protected readonly environments = ENVIRONMENTS;
   protected readonly authentications = AUTHENTICATIONS;
 
@@ -316,6 +329,13 @@ export class ConnectionDialog {
       loaded = true;
       this.load(profile);
     });
+  }
+
+  protected selectEngineFamily(option: EngineOption): void {
+    if (option.id === 'informixsqli' && this.isInformix()) {
+      return;
+    }
+    this.selectEngine(option);
   }
 
   protected selectEngine(option: EngineOption): void {
@@ -563,6 +583,8 @@ export class ConnectionDialog {
 
     const tunnel = profile.sshTunnel;
 
+    this.advancedOpen.set(!!tunnel);
+
     this.sshEnabled.set(!!tunnel);
     this.storeSshSecret.set(profile.hasStoredSshSecret ?? false);
 
@@ -586,7 +608,7 @@ export class ConnectionDialog {
   }
 
   protected namePlaceholder(): string {
-    return `${this.engines.find((option) => option.id === this.engine())?.name ?? 'Base de datos'} — Desarrollo`;
+    return `${ENGINES.find((option) => option.id === this.engine())?.name ?? 'Base de datos'} — Desarrollo`;
   }
 
   protected databasePlaceholder(): string {
@@ -608,6 +630,9 @@ export class ConnectionDialog {
     const errors = this.validationErrors();
 
     if (Object.keys(errors).length > 0) {
+      if (Object.keys(errors).some((field) => field.startsWith('ssh'))) {
+        this.advancedOpen.set(true);
+      }
       this.feedbackKind.set('error');
       this.feedback.set('Revisa los campos marcados antes de continuar.');
       return null;
@@ -645,6 +670,7 @@ export class ConnectionDialog {
     ];
 
     if (relevantes.some((campo) => errors[campo])) {
+      this.advancedOpen.set(true);
       this.feedbackKind.set('error');
       this.feedback.set('Revisa los campos del servidor intermedio y del destino.');
       return null;

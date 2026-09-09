@@ -101,7 +101,7 @@ describe('ConnectionDialog', () => {
     setInput(1, 'localhost');
     setInput(4, 'postgres');
 
-    button('Ver las mías').click();
+    button('Buscar bases de datos').click();
     await fixture.whenStable();
     fixture.detectChanges();
 
@@ -122,7 +122,7 @@ describe('ConnectionDialog', () => {
     setInput(1, 'localhost');
     setInput(4, 'postgres');
 
-    button('Ver las mías').click();
+    button('Buscar bases de datos').click();
     await fixture.whenStable();
     fixture.detectChanges();
 
@@ -145,7 +145,7 @@ describe('ConnectionDialog', () => {
     setInput(1, 'localhost');
     setInput(4, 'postgres');
 
-    button('Ver las mías').click();
+    button('Buscar bases de datos').click();
     await fixture.whenStable();
     fixture.detectChanges();
 
@@ -593,10 +593,63 @@ describe('ConnectionDialog', () => {
     }
   });
 
+  it('conserva cifrado y datos de acceso al plegar las opciones avanzadas', () => {
+    setInput(0, 'Conexión de pruebas');
+    button('Opciones avanzadas').click();
+    fixture.detectChanges();
+    button('Cifrado').click();
+    fixture.detectChanges();
+    button('Opciones avanzadas').click();
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('.advanced').hidden).toBe(true);
+    expect(fixture.nativeElement.querySelector('.advanced-toggle').textContent).toContain(
+      'Cifrado',
+    );
+    button('Opciones avanzadas').click();
+    fixture.detectChanges();
+    expect(button('Cifrado').getAttribute('aria-pressed')).toBe('true');
+    expect(fixture.nativeElement.querySelector('.field__input').value).toBe('Conexión de pruebas');
+  });
+
+  it('agrupa Informix y conserva DRDA al volver a pulsar su tarjeta', async () => {
+    expect(fixture.nativeElement.querySelectorAll('.engine')).toHaveLength(4);
+    button('Informix').click();
+    fixture.detectChanges();
+    button('DRDA').click();
+    fixture.detectChanges();
+    expect(button('DRDA').getAttribute('aria-pressed')).toBe('true');
+    button('Informix').click();
+    fixture.detectChanges();
+    expect(button('DRDA').getAttribute('aria-pressed')).toBe('true');
+    await fixture.whenStable();
+    expect(fixture.nativeElement.querySelectorAll('.field__input')[2].value).toBe('9089');
+    expect(fixture.nativeElement.textContent).not.toContain('Server (INFORMIXSERVER)');
+    button('SQLI (JDBC)').click();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    expect(fixture.nativeElement.querySelectorAll('.field__input')[2].value).toBe('9088');
+    expect(fixture.nativeElement.textContent).toContain('Server (INFORMIXSERVER)');
+  });
+
+  it('abre las opciones avanzadas si hay errores SSH ocultos', () => {
+    button('Opciones avanzadas').click();
+    fixture.detectChanges();
+    checkbox('Conectar a través de un servidor SSH').click();
+    fixture.detectChanges();
+    button('Opciones avanzadas').click();
+    fixture.detectChanges();
+    button('Probar conexión').click();
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('.advanced').hidden).toBe(false);
+    expect(store.testConnection).not.toHaveBeenCalled();
+  });
+
   function button(label: string): HTMLButtonElement {
-    return [...fixture.nativeElement.querySelectorAll('button')].find((candidate: Element) =>
-      candidate.textContent?.includes(label),
-    ) as HTMLButtonElement;
+    const buttons = [
+      ...(fixture.nativeElement as HTMLElement).querySelectorAll<HTMLButtonElement>('button'),
+    ];
+    return (buttons.find((candidate) => candidate.textContent?.trim() === label) ??
+      buttons.find((candidate) => candidate.textContent?.includes(label))) as HTMLButtonElement;
   }
 
   function setInput(index: number, value: string): void {
