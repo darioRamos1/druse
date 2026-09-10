@@ -141,4 +141,24 @@ public interface IDatabaseProvider
         IDatabaseSession source,
         string database,
         CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Crea la base que el perfil nombra.
+    ///
+    /// **Abrir y crear son dos intenciones distintas y no deben poder
+    /// confundirse.** Por eso esto existe aparte y no como una opción de abrir:
+    /// una ruta mal escrita tiene que decir que ese archivo no está, no dejar una
+    /// base vacía en el disco y una conexión que «funciona».
+    ///
+    /// Solo lo implementa quien declara <see cref="EngineCapabilities.CanCreateDatabase"/>.
+    /// Lo demás lanza, y lanza a propósito: llegar aquí con un motor que no puede
+    /// es un error de quien llama, y devolver «no se hizo nada» lo dejaría pasar
+    /// sin que nadie se enterara.
+    /// </summary>
+    Task CreateDatabaseAsync(
+        ConnectionProfile profile,
+        DatabaseCredentials credentials,
+        CancellationToken cancellationToken) =>
+        throw new NotSupportedException(
+            $"El proveedor {Engine} no sabe crear una base de datos.");
 }

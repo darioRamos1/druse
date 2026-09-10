@@ -151,6 +151,29 @@
         }
       }
     },
+    "/api/connections/database": {
+      "post": {
+        "tags": [
+          "Druse.Host.LocalApi"
+        ],
+        "operationId": "CreateConnectionDatabase",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConnectRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
     "/api/sessions": {
       "post": {
         "tags": [

@@ -180,6 +180,44 @@ public sealed class ConnectionService(
     }
 
     /// <summary>
+    /// Crea la base que el perfil nombra, si su motor sabe.
+    ///
+    /// **No abre nada después.** Crear y conectar son dos cosas: quien crea una
+    /// base quiere después decidir si la abre, y encadenarlo dejaría una sesión
+    /// viva que nadie pidió.
+    ///
+    /// Se comprueba antes que el motor puede, y no se deja al proveedor lanzar:
+    /// el mensaje de aquí explica **por qué** no se puede, y el suyo solo diría
+    /// que no lo sabe hacer.
+    /// </summary>
+    public async Task CreateDatabaseAsync(
+        ConnectionProfile profile,
+        DatabaseCredentials credentials,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(profile);
+
+        var validation = ConnectionProfileValidator.Validate(profile, Capabilities(profile));
+
+        if (!validation.IsValid)
+        {
+            throw new ArgumentException(string.Join(" ", validation.Errors), nameof(profile));
+        }
+
+        if (Capabilities(profile) is not { CanCreateDatabase: true })
+        {
+            throw new ArgumentException(
+                $"Druse no crea bases de datos de {profile.Engine}: créala en el servidor y " +
+                "vuelve a conectar.",
+                nameof(profile));
+        }
+
+        await _providers
+            .GetProvider(profile.Engine)
+            .CreateDatabaseAsync(profile, credentials, cancellationToken);
+    }
+
+    /// <summary>
     /// Qué bases puede abrir esta conexión, **antes** de abrir ninguna sesión.
     ///
     /// Es lo que deja elegir en el formulario en vez de tener que saberse el

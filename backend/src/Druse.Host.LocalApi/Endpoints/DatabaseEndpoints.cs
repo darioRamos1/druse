@@ -325,6 +325,26 @@ internal static class DatabaseEndpoints
             return Results.Ok(new { databases });
         })
         .WithName("ListConnectionDatabases");
+
+        // Crear una base es **otra cosa que abrirla**, y por eso es otra ruta.
+        //
+        // Hoy solo la atienden los motores que son un archivo, que son los que
+        // pueden crear uno vacío sin preguntar nada: no hay codificación, ni
+        // espacio de tablas, ni cotejo que decidir. Los demás lo rechazan con su
+        // motivo, que el middleware traduce a un 409.
+        app.MapPost("/api/connections/database", async (
+            ConnectRequest request,
+            ConnectionService connections,
+            CancellationToken cancellationToken) =>
+        {
+            await connections.CreateDatabaseAsync(
+                request.Profile.ToDomain(),
+                new DatabaseCredentials(request.Password),
+                cancellationToken);
+
+            return Results.NoContent();
+        })
+        .WithName("CreateConnectionDatabase");
     }
 
     private static void MapSessions(IEndpointRouteBuilder app)

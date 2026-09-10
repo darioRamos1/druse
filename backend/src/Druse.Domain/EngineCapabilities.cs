@@ -62,6 +62,21 @@ public sealed record EngineCapabilities
     public bool UsesFilePath { get; init; }
 
     /// <summary>
+    /// Druse sabe crear una base de este motor desde el formulario de conexión.
+    ///
+    /// Hoy solo los que son un archivo: crear uno vacío es una operación cerrada
+    /// y sin decisiones —no hay codificación, ni espacio de tablas, ni cotejo que
+    /// preguntar— y **es la única forma de empezar**, porque un archivo que no
+    /// existe no se puede abrir.
+    ///
+    /// En un servidor no está, y no por falta de ganas: `CREATE DATABASE` lleva
+    /// detrás media docena de decisiones que cambian según el motor, y ofrecerlo
+    /// como un botón sin ellas crearía bases que después hay que rehacer. Es una
+    /// función por derecho propio, no un añadido de este formulario.
+    /// </summary>
+    public bool CanCreateDatabase { get; init; }
+
+    /// <summary>
     /// Hace falta el nombre del servidor lógico, aparte del de la máquina.
     ///
     /// Hoy solo Informix por SQLI, donde es el alias del <c>sqlhosts</c> y sin él

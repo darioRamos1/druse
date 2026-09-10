@@ -282,6 +282,9 @@ public sealed record EngineCapabilitiesDto
     /// <summary>La base **es un archivo del disco**, y lo que se guarda es su ruta.</summary>
     public required bool UsesFilePath { get; init; }
 
+    /// <summary>Druse sabe crear una base de este motor desde el formulario.</summary>
+    public required bool CanCreateDatabase { get; init; }
+
     /// <summary>Pide además el servidor lógico. Hoy solo Informix por SQLI.</summary>
     public required bool RequiresLogicalServer { get; init; }
 

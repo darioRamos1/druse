@@ -106,6 +106,7 @@ public sealed class SqliteDatabaseProvider : IDatabaseProvider
         RequiresUsername = false,
         RequiresDatabase = true,
         UsesFilePath = true,
+        CanCreateDatabase = true,
         SupportsSshTunnel = false,
         SupportsTransportEncryption = false,
         EnforcesReadOnlySessions = true,
@@ -258,6 +259,57 @@ public sealed class SqliteDatabaseProvider : IDatabaseProvider
     /// es correcto y barato, y evita que el árbol tenga que saber que este motor
     /// es distinto.
     /// </summary>
+    /// <summary>
+    /// Crea el archivo, y **solo si no estaba**.
+    ///
+    /// Es lo contrario de abrir: aquí sí se deja algo en el disco, así que se
+    /// hace cuando alguien lo pide y nunca por descuido. Si el archivo ya existe
+    /// no se toca ni se vacía —eso sería borrar una base con un botón que dice
+    /// «crear»— y se dice que ya estaba.
+    ///
+    /// Abrir en modo de creación no basta: SQLite escribe el archivo pero lo deja
+    /// de cero bytes hasta la primera escritura, y un archivo vacío no es una
+    /// base —al abrirlo después, cualquier consulta falla con «file is not a
+    /// database»—. Por eso se pide algo que obligue a escribir la cabecera.
+    /// </summary>
+    public async Task CreateDatabaseAsync(
+        ConnectionProfile profile,
+        DatabaseCredentials credentials,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(profile);
+        ArgumentException.ThrowIfNullOrWhiteSpace(profile.Database);
+
+        if (File.Exists(profile.Database))
+        {
+            throw new DatabaseOperationException(new QueryError
+            {
+                Message = "Ya hay un archivo en esa ruta. Ábrelo, o elige otro nombre.",
+            });
+        }
+
+        try
+        {
+            await using var connection = new SqliteConnection(
+                SqliteConnectionStringFactory.BuildForCreate(profile));
+
+            await connection.OpenAsync(cancellationToken);
+
+            await using var command = connection.CreateCommand();
+
+            // Cambiar la versión del usuario escribe la cabecera, que es lo que
+            // convierte un archivo de cero bytes en una base de datos. No deja
+            // ninguna tabla dentro: la base nace vacía, que es lo que se pidió.
+            command.CommandText = "PRAGMA user_version = 0;";
+
+            await command.ExecuteNonQueryAsync(cancellationToken);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            throw new DatabaseOperationException(SqliteErrorNormalizer.Normalize(exception));
+        }
+    }
+
     public Task<IDatabaseSession> OpenDatabaseSessionAsync(
         IDatabaseSession source,
         string database,
