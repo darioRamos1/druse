@@ -10,7 +10,7 @@
 
 | Campo | Valor |
 | --- | --- |
-| Última sesión | **047** — 2026-09-08 |
+| Última sesión | **048** — 2026-09-10 |
 | Fase activa | **Migración de datos entre tablas:** fases 1, 2 y 3 cerradas; la **4** cerrada: la pasada de varias tablas, lo que cada tabla hace distinto y las migraciones guardadas (ver «Qué toca retomar»). **Respaldos y restauración:** Fases A–E cerradas. La **F** tiene backend, interfaz, CSV, selector de archivos, restaurar en una base nueva y **el ciclo entero por HTTP en los cuatro motores**; le falta repetir a mano el respaldo real que encontró el error de los índices de expresión. **Diagramas entidad-relación:** plan escrito y **Fase A** (lectura del catálogo en lote, cuatro motores) y **Fase B** (colocación determinista y lienzo) implementadas; falta cerrar la A contra los cuatro motores y ver el barrido de capturas |
 | Fases 0–6 | ✅ Cerradas. |
 | Fase 7 | 🟡 **11/12.** El ciclo de instalación está probado sobre este equipo; solo falta arrancar en una máquina sin herramientas de desarrollo. |
@@ -19,10 +19,10 @@
 | ¿Compila el envoltorio? | Sí — recompilado en la 037 con `build/scripts/msvc-env.ps1` cargado antes; sin él, `cargo` falla en `vswhom-sys` por elegir el MSVC equivocado. **Sus pruebas ya son 17**, con las dos que vigilan la CSP y las cuatro de `DRUSE_DATA_DIR` |
 | ¿Pasan las pruebas? | Sí. En la **047**: **859 del frontend** —las 815 de siempre más 44 de las piezas que salieron de `WorkspaceStore`— y la **suite de punta a punta entera en verde**: 52 pasadas, 1 saltada, 0 fallos, contra PostgreSQL y SQL Server reales. Los rojos que salieron por el camino eran de tiempo, en el frontend, y de **servidores de e2e levantados desde la sesión anterior**, que `reuseExistingServer` reutiliza. En la **046**: **740 del backend** —563 unitarias y las 177 de integración, con PostgreSQL, MySQL y SQL Server levantados—, **815 del frontend** y el **barrido entero** con la consola limpia y un solo hallazgo, que no es un defecto. Del e2e, 43 en verde; las cuatro de SQL Server esperaban a su contenedor, que se levantó en esta sesión. Las **23 del envoltorio** son de la 042 y siguen valiendo. Las contractuales salen verdes **sin los motores delante**: sin `DRUSE_REQUIRE_ENGINES=1` cada prueba termina sin comprobar nada cuando el servidor no responde. El `DATE` de Informix por SQLI de la 039 sigue sin repetirse: hace falta ese contenedor |
 | ¿Hay aplicación de escritorio? | **Sí.** Instalador NSIS y ZIP portable, en dos variantes: con Informix y sin él. Desde la 038 **se actualiza sola** —o lo hará: ver el aviso del repositorio privado en §9—. El MSI dejó de generarse: `tauri.conf.json` solo declara `nsis`, que es lo que necesita el actualizador. En la **040** se regeneraron los instaladores y **la variante completa quedó instalada y abierta en este equipo**, con el arreglo del envoltorio dentro. Siguen **sin firma Authenticode**: SmartScreen en cada equipo |
-| Motores | **PostgreSQL, SQL Server, MySQL/MariaDB e Informix**, sobre el mismo contrato. Informix tiene **dos entradas**: por DRDA con el driver de IBM (puerto 9089) y por **SQLI**, su protocolo nativo, con el puente JDBC (9088). Cambia por dónde se entra; el SQL, el catálogo y los tipos son los mismos |
+| Motores | **PostgreSQL, SQL Server, MySQL/MariaDB e Informix**, sobre el mismo contrato. Desde la **048** cada uno declara sus `EngineCapabilities` y **un motor nuevo no compila hasta decir qué familias de datos guarda**; lo siguiente es Oracle, con el plan en `docs/plan-nuevos-motores.md` y el procedimiento en `docs/como-anadir-un-motor.md`. Informix tiene **dos entradas**: por DRDA con el driver de IBM (puerto 9089) y por **SQLI**, su protocolo nativo, con el puente JDBC (9088). Cambia por dónde se entra; el SQL, el catálogo y los tipos son los mismos |
 | Trabajo a medias | **Nada sin commitear.** `PLAN_MEJORAS_DRUSE.md` lleva marcadas las fases 0 a 5 salvo lo grande —**FE-001 y FE-002 cerradas en la 047**: `WorkspaceStore` partido en seis piezas—, FE-003, BE-001, BE-002, A11Y-005 más BKP-006, SEC-007, PERF-004 y PERF-005. Sin comprobar: las contractuales de la lectura en lote contra los cuatro motores desde la 039, **el multicursor dentro de la ventana empaquetada**, y de antes —**el diálogo del sistema y el selector de carpeta siguen sin verse abrir**, y **el actualizador no puede funcionar mientras el repositorio sea privado** (ver §9) |
 | Bloqueantes | Ninguno para seguir programando. Sí para dar por buenos cuatro motores y cuatro funciones: ver «Qué toca retomar». |
-| Git | El **PR #9 se fusionó** (sesión 022). Se trabaja en `feat/respaldos-y-restauracion`, con todo subido: las 024–027 en `1452a6c`, las 028–031 en `640151c`, las 032–036 de `d3ac0d5` a `35d192e`, la 037 de `4ba8cce` a `20727eb`, la **038** en `a455be7`, `4c6f74a`, `55711f0` y `93f7f26`, la **039** hasta `5c2d09b`, y la **040** en `80da9f6`, `03c3478`, `a04c706`, `117b15f`, `2946156` y `2d52c8e`, la **041** en `64c2adf`, `203b771`, `6d31a86`, `5a924c6`, `8bcf83a`, `f4f683e` y `f65cd73`, la **042** en `0ae38fa`, `120485f`, `2a6f151` y `837cbb6`, la **043** de `ebf42ac` a `fd9432d`, la **044** de `7e60185` a `e98422e`, la **045** de `dc7b97e` a `ba3d866`, y la **046** de `c9de27f` a `90e03c7`, ya sobre `main` |
+| Git | El **PR #9 se fusionó** (sesión 022). Se trabaja en `feat/respaldos-y-restauracion`, con todo subido: las 024–027 en `1452a6c`, las 028–031 en `640151c`, las 032–036 de `d3ac0d5` a `35d192e`, la 037 de `4ba8cce` a `20727eb`, la **038** en `a455be7`, `4c6f74a`, `55711f0` y `93f7f26`, la **039** hasta `5c2d09b`, y la **040** en `80da9f6`, `03c3478`, `a04c706`, `117b15f`, `2946156` y `2d52c8e`, la **041** en `64c2adf`, `203b771`, `6d31a86`, `5a924c6`, `8bcf83a`, `f4f683e` y `f65cd73`, la **042** en `0ae38fa`, `120485f`, `2a6f151` y `837cbb6`, la **043** de `ebf42ac` a `fd9432d`, la **044** de `7e60185` a `e98422e`, la **045** de `dc7b97e` a `ba3d866`, y la **046** de `c9de27f` a `90e03c7`, ya sobre `main`, y la **048** en `3509bb7`, `5d337cc`, `0c5507f` y el de la documentación |
 | Integración continua | 🔴 **Parada, y no por el código.** GitHub aborta los jobs en dos segundos: «recent account payments have failed or your spending limit needs to be increased». Hasta resolver la facturación, ningún PR podrá pasar los checks. Lo que sí cambió en la **041**: cuando vuelva a correr, **ejecutará pruebas de verdad** —hasta ahora el job del backend terminaba en verde sin ejecutar ninguna—, y publicar exige que el commit tenga su ejecución de CI en verde. |
 
 ### Qué toca retomar en la próxima sesión
@@ -409,6 +409,111 @@ Pendiente de verificar cuando toque: Docker (pruebas de integración con contene
 ---
 
 ## 5. Registro de sesiones
+
+### Sesión 048 — 2026-09-10 · Un motor nuevo ya no puede colarse sin decir lo que es
+
+Se pidió un plan para añadir motores «que se puedan usar en todas las
+funcionalidades». Está en `docs/plan-nuevos-motores.md` —Oracle y SQLite, con la
+lista de dieciocho funciones que hay que recorrer antes de dar un motor por
+terminado— y esta sesión ejecuta su **fase 0**: cerrar lo que hoy se le escapa a
+un motor nuevo, antes de añadir ninguno.
+
+#### Lo que se encontró al mirar
+
+La arquitectura aguanta bien: seis contratos, un registro que los localiza y
+**ni un `switch` por motor en los casos de uso**. Pero fuera de esa frontera
+había tres fugas, y las tres fallan **en silencio**:
+
+1. **`TypeTranslator.Keeps` terminaba en `_ => true`.** Un motor recién añadido
+   heredaba la respuesta más optimista posible: el asistente de traslado diría
+   «traducción exacta» al llevar un booleano a un motor sin booleanos, y la
+   pérdida se descubriría después de copiar. En esa pantalla **el aviso es el
+   producto**, no el tipo propuesto.
+2. **`sql-writer.ts` tenía cuatro `switch` con `default` de PostgreSQL**, y
+   `informixsqli` no aparecía en ninguno. No era una preparación para el futuro:
+   **estaba roto hoy**. Una conexión por el protocolo nativo de Informix recibía
+   `LIMIT` al final —que su servidor rechaza— y un `DEFAULT VALUES` que no
+   admite.
+3. **La lista de motores del diálogo estaba escrita a mano y `getEngines()` no
+   lo llamaba nadie.** El endpoint existía, el gateway lo exponía y ningún
+   componente lo consumía; por eso la compilación ligera, la que se hace sin
+   Informix, seguía ofreciéndolo en el formulario y fallaba al conectar.
+
+#### Lo que se hizo
+
+**`EngineCapabilities`**, en el dominio y publicada por `IDatabaseProvider`. Dice
+lo que el motor necesita —servidor, usuario, servidor lógico, identidad del
+sistema, túnel, cifrado—, si sus sesiones de solo lectura son una frontera real,
+y **qué familias de datos guarda con un tipo propio**. Esa última es `required`:
+un motor que no la declare **no compila**, en vez de contestar que lo conserva
+todo. El precedente era `IndexCapabilities`, que ya dibujaba el formulario de
+índices sin que ningún componente supiera contra qué estaba conectado.
+
+Con eso, tres sitios dejaron de nombrar motores: el traductor de tipos, el
+validador de perfiles —la identidad de Windows y el `INFORMIXSERVER` los contesta
+ahora el proveedor— y el diálogo de conexión, que pide la lista a
+`/api/engines` y dibuja cada motor con lo que este declara.
+
+**`sql-dialects.ts`**, tabla exhaustiva con las cuatro reglas que cambian al
+escribir SQL: comillas, límite de filas, truncado de fechas e `INSERT` sin
+columnas. Sin rama por omisión: el motor que falte no compila. Informix aparece
+dos veces, una por transporte, apuntando al mismo dialecto —que es exactamente lo
+que faltaba—. `buildCall` perdió también su `default`.
+
+**Dónde vive cada cosa.** Las capacidades dicen lo que el motor *es* y viajan por
+la API; **la sintaxis del SQL no viaja**: vive donde se escribe, en el diseñador
+de cada proveedor y en la tabla del navegador. Mandar `TOP {n} ` por HTTP sería
+enviar plantillas de texto para que las rellene otro.
+
+Y se decidió **no declarar lo que nadie lee todavía**: «tiene esquemas», «tiene
+procedimientos» y «tiene varias bases» entran con Oracle y SQLite, que es cuando
+el árbol tendrá que preguntarlo.
+
+#### Lo que se ve
+
+El formulario quedó igual salvo en un sitio: **el marcador de «Base de datos»
+ahora es la base desde la que el motor pregunta qué bases hay**, así que MySQL lo
+tiene vacío —conecta sin nombrar base— donde antes proponía `mysql`, que es su
+catálogo interno y no lo que nadie quiere abrir. Decidido con el usuario dejarlo
+vacío: el texto de debajo ya explica qué significa.
+
+Las tarjetas siguen agrupando Informix en una sola con sus dos protocolos, pero
+ya no por un literal en la plantilla: por `ENGINE_FAMILIES`. Y volver a pulsar la
+tarjeta estando en DRDA sigue sin devolver a SQLI.
+
+**Pruebas.** Backend: **565 unitarias** (dos nuevas: un motor inventado que
+declara que no guarda booleanos **sí** avisa, y si declara que sí, no se inventa
+el aviso), **177 de integración** y **279 contractuales** contra PostgreSQL,
+MySQL y SQL Server levantados. Frontend: **913**, con la prueba que fija que el
+protocolo de Informix no cambia el SQL. E2E: **35 en verde** y el **barrido
+entero** con la consola limpia y ningún hallazgo. Los rojos del camino fueron de
+tiempo, distintos en cada pasada y verdes al ejecutar su archivo solo: el de §9.
+
+`docs/api/openapi.json` **no cambió**: `/api/engines` no declara el cuerpo de su
+respuesta, así que ampliar el DTO no toca el contrato publicado.
+
+**Un tropiezo conocido.** El heredoc de Python convirtió `\n` en saltos reales al
+insertar expectativas en un spec, tal y como está anotado: con la herramienta de
+edición directa salió a la primera.
+
+**Y otro que costó una compilación**: el `dotnet run` del API de desarrollo
+llevaba levantado desde la sesión anterior y bloqueaba los DLL del host. Se
+compiló a un directorio aparte con `-p:BaseOutputPath=` para seguir sin tocarlo,
+y al final se paró con permiso para cerrar la integración.
+
+**Archivos.** `EngineCapabilities.cs`, `sql-dialects.ts`,
+`docs/como-anadir-un-motor.md` y `docs/plan-nuevos-motores.md` (nuevos);
+`IDatabaseProvider.cs`, los cuatro `*DatabaseProvider.cs`, `TypeTranslator.cs`,
+`ConnectionProfileValidator.cs`, `ConnectionService.cs`,
+`SavedConnectionService.cs`, `Contracts.cs`, `ContractMapper.cs`,
+`DatabaseEndpoints.cs`, `workspace.ts`, `engine-badge.ts`, `workspace-store.ts`,
+`connection-dialog.{ts,html,scss}`, `sql-writer.ts`, cinco specs y `README.md`.
+
+**Estado al cerrar.** Commiteado en `main`, en cuatro commits temáticos:
+`3509bb7` las capacidades del motor con el traductor y el validador, `5d337cc` la
+lista de motores que sale de la API, `0c5507f` la tabla de dialectos con el
+arreglo de SQLI, y este mismo con la documentación. El plan queda con la fase 0
+marcada y Oracle como lo siguiente.
 
 ### Sesión 047 — 2026-09-08 · El almacén de tres mil líneas empieza a tener dueños
 
