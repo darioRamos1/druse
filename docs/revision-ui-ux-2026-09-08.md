@@ -210,3 +210,18 @@ El barrido con datos reales detectó que base y usuario se reducían a unos poco
 La nueva regresión E2E pasó con PostgreSQL real: base y usuario caben al abrir el asistente y después de ampliarlo 64 píxeles. También pasaron las 11 pruebas de la barra de estado, la compilación (425,41 kB iniciales) y el typecheck.
 
 El barrido final terminó correctamente con **43 capturas**, consola limpia y sin los recortes de base y usuario que detectó la primera pasada. Se revisaron visualmente Preferencias, Actividad, alcance de exportación y filtros, el asistente en sus dos anchos y la vista de 900 px. Solo se omitió la captura de procedimientos porque la base de prueba no contiene ninguno. Las imágenes finales están en `e2e/barrido/ui-ux-2026-09-10-final/`, un directorio local excluido de Git; las de antes del ajuste se conservan en `e2e/barrido/ui-ux-2026-09-10/` para comparar.
+
+## Barra superior en Tauri — 10 de septiembre de 2026
+
+La revisión en Windows confirmó que los tres círculos de la barra superior duplicaban visualmente los controles reales del marco. Eran elementos decorativos sin acción. Se retiraron junto con su separador y sus estilos; minimizar, maximizar, restaurar y cerrar siguen a cargo del sistema operativo. La búsqueda y las acciones de la aplicación disponen del espacio liberado.
+
+Validación de esta mejora:
+
+- **4 pruebas de TopBar aprobadas**, incluido el menú Archivo y su manejo del foco.
+- **Compilación de producción correcta**, con 425,37 kB iniciales, y compilación del ejecutable de Tauri correcta con MSVC.
+- Inspección de la barra en WebView2 con los temas claro y oscuro: sin círculos duplicados, con búsqueda, Asistente, tema y Preferencias visibles. El marco nativo también adopta el tema elegido; se recuperó el oscuro al terminar.
+- Comprobación de maximizar, minimizar y recuperar la ventana, con la barra inferior dentro del área visible. Preferencias abre desde la barra y se cierra con Escape. El selector nativo de SQL abre y se cancela sin elegir archivos.
+
+La API y el frontend de prueba se prepararon en `%TEMP%/druse-ui-native-20260910`, a partir del código confirmado en `de80c8a` y aplicando solamente el ajuste de la barra. La API utilizó un directorio temporal de datos y el puerto 5399; el frontend, el 4200. No se ejecutaron consultas ni se validó la integración de motores que avanzaba en paralelo. Esta comprobación cubre Windows; los recorridos nativos de macOS y Linux y los demás diálogos de escritorio permanecen pendientes.
+
+Mientras se validaba, el trabajo paralelo incluyó los dos archivos de la barra en `148adb1`. Se conserva ese commit y se registra aquí la evidencia por separado, sin reescribir el historial compartido.
