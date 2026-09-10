@@ -2,12 +2,59 @@ import { signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 
 import { WorkspaceStore } from '../../../core/workspace/workspace-store';
-import { SavedConnection } from '../../../shared/models/workspace';
+import {
+  DatabaseEngine,
+  EngineCapabilities,
+  EngineInfo,
+  SavedConnection,
+} from '../../../shared/models/workspace';
 import { ConnectionDialog } from './connection-dialog';
+
+/** Lo que declara un motor de servidor corriente. */
+const CORRIENTES: EngineCapabilities = {
+  requiresHost: true,
+  requiresUsername: true,
+  requiresLogicalServer: false,
+  supportsIntegratedSecurity: false,
+  supportsSshTunnel: true,
+  supportsTransportEncryption: true,
+  enforcesReadOnlySessions: false,
+};
+
+function motor(
+  id: DatabaseEngine,
+  name: string,
+  defaultPort: number,
+  defaultDatabase: string,
+  capabilities: Partial<EngineCapabilities> = {},
+): EngineInfo {
+  return {
+    id,
+    name,
+    defaultPort,
+    defaultDatabase,
+    capabilities: { ...CORRIENTES, ...capabilities },
+  };
+}
+
+/**
+ * Lo que contestaría la API con los cuatro motores compilados.
+ *
+ * El formulario ya no lleva su propia lista, así que sin esto no habría ni una
+ * tarjeta que pulsar: es la misma dependencia que tiene la aplicación de verdad.
+ */
+const ENGINES: readonly EngineInfo[] = [
+  motor('postgresql', 'PostgreSQL', 5432, 'postgres', { enforcesReadOnlySessions: true }),
+  motor('sqlserver', 'SQL Server', 1433, 'master', { supportsIntegratedSecurity: true }),
+  motor('mysql', 'MySQL', 3306, '', { enforcesReadOnlySessions: true }),
+  motor('informix', 'Informix (DRDA)', 9089, 'sysmaster'),
+  motor('informixsqli', 'Informix', 9088, 'sysmaster', { requiresLogicalServer: true }),
+];
 
 describe('ConnectionDialog', () => {
   let fixture: ComponentFixture<ConnectionDialog>;
   const store = {
+    engines: signal(ENGINES),
     secretStore: signal({ available: true, description: 'Administrador de credenciales' }),
     notice: signal<string | null>(null),
     testConnection: vi.fn(),

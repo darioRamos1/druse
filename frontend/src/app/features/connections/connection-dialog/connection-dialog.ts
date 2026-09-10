@@ -16,21 +16,38 @@ import {
   ConnectionEnvironment,
   ConnectionForm,
   DatabaseEngine,
+  EngineCapabilities,
+  EngineInfo,
   SavedConnection,
   SshAuthenticationMode,
   SslMode,
 } from '../../../shared/models/workspace';
-import { EngineBadge } from '../../../shared/ui/engine-badge/engine-badge';
+import {
+  ENGINE_FAMILIES,
+  ENGINE_NAMES,
+  ENGINE_ORDER,
+  ENGINE_TRANSPORTS,
+  ENGINE_VERSIONS,
+  EngineBadge,
+  isKnownEngine,
+} from '../../../shared/ui/engine-badge/engine-badge';
 import { Icon } from '../../../shared/ui/icon/icon';
 import { DialogFocus } from '../../../shared/a11y/dialog-focus';
 import { DialogBackdrop } from '../../../shared/a11y/dialog-backdrop';
 
+/**
+ * Un motor tal y como se ofrece en el formulario.
+ *
+ * Junta lo que dice la API —que existe y en qué puerto escucha— con lo que dice
+ * la interfaz —cómo se llama y qué versiones se anuncian—. Ninguna de las dos
+ * mitades puede escribir la otra: el proveedor no sabe qué versión se probó, y
+ * el navegador no sabe qué está compilado en el servidor.
+ */
 interface EngineOption {
   readonly id: DatabaseEngine;
   readonly name: string;
   readonly versions: string;
   readonly defaultPort: number;
-  readonly available: boolean;
 }
 
 interface EnvironmentOption {
@@ -68,40 +85,30 @@ type ConnectionField =
   | 'sshPrivateKeyPath';
 
 /**
- * Motores que se ofrecen.
+ * Lo que se supone de un motor mientras la API no ha contestado, o del que esta
+ * versión de la interfaz no conoce.
  *
- * `available` sigue existiendo aunque hoy los tres lo estén: es lo que permite
- * enseñar un motor por venir sin dejar elegirlo.
+ * Describe al motor corriente: un servidor con host y usuario. Es la misma
+ * suposición que hace el validador del servidor, y por el mismo motivo: pecar de
+ * exigente deja al usuario un campo de más, y pecar de permisivo le deja mandar
+ * un perfil que no se puede abrir.
  */
-const ENGINES: readonly EngineOption[] = [
-  {
-    id: 'sqlserver',
-    name: 'SQL Server',
-    versions: '2016 – 2022',
-    defaultPort: 1433,
-    available: true,
-  },
-  { id: 'postgresql', name: 'PostgreSQL', versions: '12 – 18', defaultPort: 5432, available: true },
-  { id: 'mysql', name: 'MySQL', versions: '8.0+ · MariaDB', defaultPort: 3306, available: true },
-  // Esta es la conexión habitual de DBeaver: JDBC sobre SQLI, con Host y el
-  // servidor lógico (`INFORMIXSERVER`) como datos distintos.
-  {
-    id: 'informixsqli',
-    name: 'Informix',
-    versions: '12.10+ · JDBC/SQLI',
-    defaultPort: 9088,
-    available: true,
-  },
-  // DRDA queda explícito porque no usa `INFORMIXSERVER` y requiere un
-  // escuchador distinto en el servidor.
-  {
-    id: 'informix',
-    name: 'Informix (DRDA)',
-    versions: '12.10+ · protocolo DRDA',
-    defaultPort: 9089,
-    available: true,
-  },
-];
+const CAPACIDADES_CORRIENTES: EngineCapabilities = {
+  requiresHost: true,
+  requiresUsername: true,
+  requiresLogicalServer: false,
+  supportsIntegratedSecurity: false,
+  supportsSshTunnel: true,
+  supportsTransportEncryption: true,
+  enforcesReadOnlySessions: false,
+};
+
+/** Dónde va cada motor en la lista. Lo no declarado, al final. */
+function posicion(engine: DatabaseEngine): number {
+  const indice = ENGINE_ORDER.indexOf(engine);
+
+  return indice === -1 ? ENGINE_ORDER.length : indice;
+}
 
 /**
  * Métodos de autenticación.
@@ -211,12 +218,82 @@ export class ConnectionDialog {
   /** Está editando un perfil que ya existía. */
   protected readonly editing = computed(() => this.connection() !== null);
 
-  protected readonly engines = ENGINES.filter((option) => option.id !== 'informix');
-  protected readonly informixProtocols = ENGINES.filter(
-    (option) => option.id === 'informix' || option.id === 'informixsqli',
+  /**
+   * Los motores que la API dice tener, en el orden en que se ofrecen y sin los
+   * que esta interfaz no sabría dibujar.
+   */
+  private readonly available = computed<readonly EngineOption[]>(() => {
+    const known = this._store
+      .engines()
+      .filter((info) => isKnownEngine(info.id))
+      .map<EngineOption>((info) => ({
+        id: info.id,
+        // El nombre lo pone la interfaz cuando lo tiene: la API llama «Informix»
+        // a los dos transportes y aquí hay que distinguirlos.
+        name: ENGINE_NAMES[info.id] ?? info.name,
+        versions: ENGINE_VERSIONS[info.id],
+        defaultPort: info.defaultPort,
+      }));
+
+    return [...known].sort((a, b) => posicion(a.id) - posicion(b.id));
+  });
+
+  /**
+   * Una tarjeta por familia, no por motor.
+   *
+   * Informix son dos motores para un solo producto —DRDA y SQLI— y ofrecer dos
+   * tarjetas haría elegir un protocolo a quien solo quería elegir una base de
+   * datos. El protocolo se pregunta después, y solo si hay más de uno.
+   */
+  protected readonly engines = computed<readonly EngineOption[]>(() => {
+    const vistas = new Set<string>();
+
+    return this.available().filter((option) => {
+      const familia = ENGINE_FAMILIES[option.id];
+
+      if (vistas.has(familia)) {
+        return false;
+      }
+
+      vistas.add(familia);
+
+      return true;
+    });
+  });
+
+  /** Los caminos de la familia elegida, o vacío si solo hay uno. */
+  protected readonly transports = computed<readonly EngineOption[]>(() => {
+    const familia = ENGINE_FAMILIES[this.engine()];
+    const hermanos = this.available().filter((option) => ENGINE_FAMILIES[option.id] === familia);
+
+    return hermanos.length > 1 ? hermanos : [];
+  });
+
+  /** Cómo se llama el camino de este motor dentro de su familia. */
+  protected transportName(engine: DatabaseEngine): string {
+    return ENGINE_TRANSPORTS[engine] ?? ENGINE_NAMES[engine];
+  }
+
+  /** La tarjeta de esta familia está elegida, sea cual sea el camino. */
+  protected isSelected(option: EngineOption): boolean {
+    return ENGINE_FAMILIES[option.id] === ENGINE_FAMILIES[this.engine()];
+  }
+
+  /** El motor elegido, tal y como lo describe la API. */
+  private readonly selected = computed<EngineInfo | undefined>(() =>
+    this._store.engines().find((info) => info.id === this.engine()),
   );
-  protected readonly isInformix = computed(
-    () => this.engine() === 'informix' || this.engine() === 'informixsqli',
+
+  /**
+   * Lo que el motor elegido necesita.
+   *
+   * Es lo que sustituye a los condicionales por motor que había repartidos por
+   * el formulario. Mientras la API no contesta se usa lo corriente: el diálogo
+   * se abre mucho después del arranque, así que en la práctica siempre hay
+   * respuesta.
+   */
+  protected readonly capabilities = computed<EngineCapabilities>(
+    () => this.selected()?.capabilities ?? CAPACIDADES_CORRIENTES,
   );
   protected readonly advancedOpen = signal(false);
   protected readonly advancedSummary = computed(
@@ -262,7 +339,7 @@ export class ConnectionDialog {
    * sería prometer lo que solo dos cumplen.
    */
   protected readonly readOnlyHint = computed(() =>
-    this.engine() === 'postgresql' || this.engine() === 'mysql'
+    this.capabilities().enforcesReadOnlySessions
       ? 'Druse pone la sesión en solo lectura: el servidor rechaza cualquier escritura.'
       : 'Este motor no tiene sesiones de solo lectura: Druse avisa antes de ejecutar, ' +
         'pero la garantía es un usuario con permisos restringidos en el servidor.',
@@ -279,8 +356,8 @@ export class ConnectionDialog {
   /** El `INFORMIXSERVER`. Solo se pide —y solo se manda— con Informix por SQLI. */
   protected readonly informixServer = signal('');
 
-  /** `true` con el motor que habla el protocolo nativo de Informix. */
-  protected readonly usaSqli = computed(() => this.engine() === 'informixsqli');
+  /** El motor pide además el nombre del servidor lógico. */
+  protected readonly usaSqli = computed(() => this.capabilities().requiresLogicalServer);
 
   protected readonly sshEnabled = signal(false);
   protected readonly sshHost = signal('');
@@ -331,33 +408,36 @@ export class ConnectionDialog {
     });
   }
 
+  /**
+   * Elige la familia sin tocar el camino ya elegido dentro de ella.
+   *
+   * Pulsar la tarjeta de Informix estando en DRDA no debe devolver a SQLI: el
+   * usuario ya dijo por dónde entra, y la tarjeta solo dice qué producto es.
+   */
   protected selectEngineFamily(option: EngineOption): void {
-    if (option.id === 'informixsqli' && this.isInformix()) {
+    if (this.isSelected(option)) {
       return;
     }
+
     this.selectEngine(option);
   }
 
   protected selectEngine(option: EngineOption): void {
-    if (!option.available) {
-      return;
-    }
-
     this.engine.set(option.id);
     this.port.set(option.defaultPort);
     this.feedback.set(null);
 
-    // Cambiar a un motor que no admite la identidad de Windows debe devolver el
+    // Cambiar a un motor que no admite la identidad del sistema debe devolver el
     // formulario a usuario y contraseña; si no, quedaría elegido un método que
     // ya no se puede ver ni corregir.
-    if (option.id !== 'sqlserver') {
+    if (!this.capabilities().supportsIntegratedSecurity) {
       this.authentication.set('password');
     }
   }
 
-  /** Solo SQL Server admite elegir cómo se identifica el usuario. */
+  /** El motor admite elegir cómo se identifica el usuario. */
   protected supportsWindowsAuth(): boolean {
-    return this.engine() === 'sqlserver';
+    return this.capabilities().supportsIntegratedSecurity;
   }
 
   protected usesWindowsAuth(): boolean {
@@ -608,21 +688,18 @@ export class ConnectionDialog {
   }
 
   protected namePlaceholder(): string {
-    return `${ENGINES.find((option) => option.id === this.engine())?.name ?? 'Base de datos'} — Desarrollo`;
+    return `${ENGINE_NAMES[this.engine()] ?? 'Base de datos'} — Desarrollo`;
   }
 
+  /**
+   * La base que se propone es **la que el motor usa para preguntar qué bases
+   * hay**, que es la única que se sabe que existe antes de conectar.
+   *
+   * MySQL conecta sin nombrar base y la deja vacía a propósito: ahí el ejemplo
+   * sería una base concreta de un servidor que aún no se ha visto.
+   */
   protected databasePlaceholder(): string {
-    switch (this.engine()) {
-      case 'sqlserver':
-        return 'master';
-      case 'mysql':
-        return 'mysql';
-      case 'informix':
-      case 'informixsqli':
-        return 'sysmaster';
-      default:
-        return 'postgres';
-    }
+    return this.selected()?.defaultDatabase ?? '';
   }
 
   private validForm(): ConnectionForm | null {
@@ -687,7 +764,7 @@ export class ConnectionDialog {
     if (!this.name().trim()) {
       errors.name = 'Escribe un nombre para identificar esta conexión.';
     }
-    if (!this.host().trim()) {
+    if (this.capabilities().requiresHost && !this.host().trim()) {
       errors.host = 'Indica el servidor o la dirección IP.';
     }
     if (!namedSqlServer && (!Number.isInteger(port) || port! < 1 || port! > 65_535)) {
@@ -696,8 +773,13 @@ export class ConnectionDialog {
       errors.port = 'Indica un puerto entre 1 y 65535.';
     }
     // Con autenticación de Windows el usuario lo pone el sistema y el campo ni
-    // siquiera se muestra, así que no hay nada que exigir.
-    if (!this.usesWindowsAuth() && !this.username().trim()) {
+    // siquiera se muestra, así que no hay nada que exigir. Y hay motores que no
+    // tienen usuarios en absoluto.
+    if (
+      this.capabilities().requiresUsername &&
+      !this.usesWindowsAuth() &&
+      !this.username().trim()
+    ) {
       errors.username = 'Indica el usuario de la base de datos.';
     }
 

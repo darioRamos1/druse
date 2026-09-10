@@ -50,38 +50,30 @@
   <div class="body">
     <h3 class="section">Motor</h3>
     <div class="engines">
-      @for (option of engines; track option.id) {
+      @for (option of engines(); track option.id) {
         <button
           type="button"
           class="engine"
-          [class.is-selected]="
-            engine() === option.id || (option.id === 'informixsqli' && isInformix())
-          "
-          [class.is-disabled]="!option.available"
-          [attr.aria-pressed]="
-            engine() === option.id || (option.id === 'informixsqli' && isInformix())
-          "
-          [attr.title]="option.available ? null : 'Disponible en una fase posterior'"
+          [class.is-selected]="isSelected(option)"
+          [attr.aria-pressed]="isSelected(option)"
           (click)="selectEngineFamily(option)"
         >
           <app-engine-badge [engine]="option.id" [size]="24" class="engine__badge" />
           <span class="engine__text">
             <span class="engine__name">{{ option.name }}</span>
-            <span class="engine__versions">{{
-              option.id === 'informixsqli' ? '12.10+' : option.versions
-            }}</span>
+            <span class="engine__versions">{{ option.versions }}</span>
           </span>
-          @if (engine() === option.id || (option.id === 'informixsqli' && isInformix())) {
+          @if (isSelected(option)) {
             <span class="engine__check" aria-hidden="true">✓</span>
           }
         </button>
       }
     </div>
 
-    @if (isInformix()) {
-      <div class="protocols" role="group" aria-label="Protocolo de Informix">
+    @if (transports().length) {
+      <div class="protocols" role="group" aria-label="Protocolo de conexión">
         <span class="field__label">Protocolo</span>
-        @for (option of informixProtocols; track option.id) {
+        @for (option of transports(); track option.id) {
           <button
             type="button"
             class="environment"
@@ -89,7 +81,7 @@
             [attr.aria-pressed]="engine() === option.id"
             (click)="selectEngine(option)"
           >
-            {{ option.id === 'informixsqli' ? 'SQLI (JDBC)' : 'DRDA' }}
+            {{ transportName(option.id) }}
           </button>
         }
       </div>

@@ -26,6 +26,83 @@ export const ENGINE_NAMES: Readonly<Record<DatabaseEngine, string>> = {
 };
 
 /**
+ * Versiones que se anuncian de cada motor.
+ *
+ * Es texto de la interfaz, no un dato del servidor, y por eso vive aquí y no
+ * viaja por la API: cuál es la versión mínima soportada se decide al probarla,
+ * no lo sabe el proveedor.
+ *
+ * Está declarado como registro exhaustivo a propósito. Junto a los otros dos de
+ * este archivo y a los colores del tema, es lo que hace que **un motor nuevo no
+ * compile hasta que alguien decida cómo se dibuja**, en lugar de aparecer en el
+ * formulario sin nombre, sin color y sin versiones.
+ */
+export const ENGINE_VERSIONS: Readonly<Record<DatabaseEngine, string>> = {
+  postgresql: '12 – 18',
+  sqlserver: '2016 – 2022',
+  mysql: '8.0+ · MariaDB',
+  informix: '12.10+ · protocolo DRDA',
+  informixsqli: '12.10+',
+};
+
+/**
+ * A qué producto pertenece cada motor.
+ *
+ * Casi siempre a sí mismo. La excepción es Informix, que son **dos motores para
+ * un solo producto**: DRDA y SQLI cambian por dónde se entra y nada más. El
+ * formulario ofrece una tarjeta por familia, porque quien elige motor está
+ * eligiendo base de datos, no protocolo.
+ */
+export const ENGINE_FAMILIES: Readonly<Record<DatabaseEngine, string>> = {
+  postgresql: 'postgresql',
+  sqlserver: 'sqlserver',
+  mysql: 'mysql',
+  informix: 'informix',
+  informixsqli: 'informix',
+};
+
+/**
+ * Cómo se llama el camino de cada motor, cuando su familia tiene más de uno.
+ *
+ * `null` en los motores que son el único camino a su producto: ahí no hay nada
+ * que preguntar y el formulario no enseña la elección.
+ */
+export const ENGINE_TRANSPORTS: Readonly<Record<DatabaseEngine, string | null>> = {
+  postgresql: null,
+  sqlserver: null,
+  mysql: null,
+  informix: 'DRDA',
+  informixsqli: 'SQLI (JDBC)',
+};
+
+/**
+ * Orden en el que se ofrecen los motores.
+ *
+ * La API los devuelve alfabéticamente, que no es el orden en el que la gente los
+ * busca. Lo que no esté aquí va al final, en el orden que llegara: un motor
+ * nuevo se ve aunque nadie se acuerde de colocarlo.
+ */
+export const ENGINE_ORDER: readonly DatabaseEngine[] = [
+  'sqlserver',
+  'postgresql',
+  'mysql',
+  'informixsqli',
+  'informix',
+];
+
+/**
+ * Si la interfaz sabe dibujar este motor.
+ *
+ * La lista de motores la manda la API, así que puede traer uno que este
+ * navegador no conozca —una compilación del servidor más nueva que la del
+ * paquete—. Enseñarlo daría una tarjeta sin nombre, sin color y sin distintivo;
+ * es mejor no ofrecerlo que ofrecerlo roto.
+ */
+export function isKnownEngine(engine: string): engine is DatabaseEngine {
+  return engine in ENGINE_NAMES;
+}
+
+/**
  * Distintivo de dos letras con el color propio de cada motor.
  *
  * Centraliza el color por motor: es lo único del sistema que puede depender del

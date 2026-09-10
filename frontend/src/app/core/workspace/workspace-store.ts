@@ -35,6 +35,7 @@ import {
   DatabaseColumn,
   DatabaseEngine,
   DatabaseObject,
+  EngineInfo,
   ExplorerNode,
   QueryHistoryEntry,
   CellEdit,
@@ -532,6 +533,17 @@ export class WorkspaceStore {
   private readonly _secretStore = signal<SecretStoreStatus | null>(null);
   readonly secretStore = this._secretStore.asReadonly();
 
+  /**
+   * Motores que la API dice tener, con lo que cada uno necesita para conectar.
+   *
+   * **Es la única lista.** El formulario de conexión la tenía escrita a mano y
+   * nadie preguntaba a la API, así que la compilación ligera —la que se hace sin
+   * Informix— seguía ofreciéndolo y fallaba al conectar. Se pide una vez al
+   * arrancar: no cambia mientras el proceso viva.
+   */
+  private readonly _engines = signal<readonly EngineInfo[]>([]);
+  readonly engines = this._engines.asReadonly();
+
   private readonly _history = signal<readonly QueryHistoryEntry[]>([]);
   readonly history = this._history.asReadonly();
 
@@ -557,12 +569,14 @@ export class WorkspaceStore {
    */
   async loadSavedConnections(): Promise<void> {
     try {
-      const [saved, secretStore] = await Promise.all([
+      const [saved, secretStore, engines] = await Promise.all([
         firstValueFrom(this._gateway.getSavedConnections()),
         firstValueFrom(this._gateway.getSecretStoreStatus()),
+        firstValueFrom(this._gateway.getEngines()),
       ]);
 
       this._secretStore.set(secretStore);
+      this._engines.set(engines);
       this._savedProfiles.set(saved);
 
       // Los perfiles guardados aparecen desconectados: abrir todas las

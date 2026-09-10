@@ -243,11 +243,18 @@ internal static class DatabaseEndpoints
         app.MapGet("/api/engines", (IProviderRegistry registry) =>
         {
             var engines = registry.SupportedEngines
-                .Select(engine => new EngineDto
+                .Select(engine =>
                 {
-                    Id = ContractMapper.EngineId(engine),
-                    Name = ContractMapper.EngineName(engine),
-                    DefaultPort = registry.GetProvider(engine).DefaultPort,
+                    var provider = registry.GetProvider(engine);
+
+                    return new EngineDto
+                    {
+                        Id = ContractMapper.EngineId(engine),
+                        Name = ContractMapper.EngineName(engine),
+                        DefaultPort = provider.DefaultPort,
+                        DefaultDatabase = provider.DefaultDatabase,
+                        Capabilities = provider.Capabilities.ToDto(),
+                    };
                 })
                 .OrderBy(engine => engine.Name, StringComparer.Ordinal);
 

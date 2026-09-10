@@ -18,11 +18,38 @@ export type DatabaseEngine =
 
 export type ConnectionState = 'connected' | 'disconnected' | 'connecting' | 'error';
 
+/**
+ * Lo que un motor necesita para conectar, dicho por él mismo.
+ *
+ * Es lo que permite que el formulario de conexión no pregunte «¿y si es SQL
+ * Server?»: enseña lo que el motor dice que hace falta. Cada bandera nueva sale
+ * de un condicional que antes estaba escrito en el componente.
+ */
+export interface EngineCapabilities {
+  /** Hay un servidor al que apuntar. Falso en los motores que son un archivo. */
+  readonly requiresHost: boolean;
+  readonly requiresUsername: boolean;
+  /** Pide además el servidor lógico. Hoy solo Informix por SQLI. */
+  readonly requiresLogicalServer: boolean;
+  /** Admite la identidad de la sesión de Windows. Hoy solo SQL Server. */
+  readonly supportsIntegratedSecurity: boolean;
+  readonly supportsSshTunnel: boolean;
+  readonly supportsTransportEncryption: boolean;
+  /**
+   * El servidor rechaza de verdad las escrituras en una sesión de solo lectura.
+   * Donde es falso solo hay un aviso, y el formulario lo dice con esas palabras.
+   */
+  readonly enforcesReadOnlySessions: boolean;
+}
+
 /** Motor disponible, según lo que declara la API. */
 export interface EngineInfo {
   readonly id: DatabaseEngine;
   readonly name: string;
   readonly defaultPort: number;
+  /** Base que se propone cuando el perfil no dice ninguna. Vacía donde no hace falta. */
+  readonly defaultDatabase: string;
+  readonly capabilities: EngineCapabilities;
 }
 
 /** Entorno al que apunta una conexión. Cambia su color y sus advertencias. */

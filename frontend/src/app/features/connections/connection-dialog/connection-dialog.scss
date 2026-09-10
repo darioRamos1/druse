@@ -107,7 +107,7 @@
   text-align: left;
   cursor: pointer;
 
-  &:hover:not(.is-disabled):not(.is-selected) {
+  &:hover:not(.is-selected) {
     border-color: var(--dr-border-input-hover);
     background: var(--dr-surface-hover);
   }
@@ -119,11 +119,6 @@
 
   // Los motores que aún no existen se muestran para que se vea hacia dónde va
   // el producto, pero no se pueden elegir.
-  &.is-disabled {
-    opacity: 0.45;
-    cursor: not-allowed;
-  }
-
   &__badge {
     border-radius: 7px;
     font-size: 10px;

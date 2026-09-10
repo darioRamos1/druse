@@ -239,11 +239,59 @@ public sealed record QueryRejectedResponse
     public required IReadOnlyList<SqlRiskDto> Risks { get; init; }
 }
 
+/// <summary>
+/// Un motor disponible y lo que necesita para conectar.
+///
+/// Es la única lista de motores que existe. La interfaz la tenía escrita a mano
+/// y **nadie llamaba a este endpoint**: la compilación ligera, que se hace sin
+/// Informix, seguía ofreciéndolo en el formulario y fallaba al conectar. Ahora
+/// lo que se ofrece es lo que hay registrado.
+/// </summary>
 public sealed record EngineDto
 {
     public required string Id { get; init; }
     public required string Name { get; init; }
     public required int DefaultPort { get; init; }
+
+    /// <summary>
+    /// Base desde la que se pregunta qué bases hay, cuando el perfil no dice
+    /// ninguna. Vacía en los motores que conectan sin nombrar base.
+    /// </summary>
+    public required string DefaultDatabase { get; init; }
+
+    public required EngineCapabilitiesDto Capabilities { get; init; }
+}
+
+/// <summary>
+/// Lo que el formulario de conexión necesita saber del motor para dibujarse.
+///
+/// Es un recorte de lo que declara el proveedor: aquí solo viaja lo que cambia
+/// la pantalla. Lo que el motor guarda de cada familia de datos se queda en el
+/// servidor, porque quien lo usa —el traductor de tipos— también está allí.
+/// </summary>
+public sealed record EngineCapabilitiesDto
+{
+    /// <summary>Hay un servidor al que apuntar. Falso en los motores que son un archivo.</summary>
+    public required bool RequiresHost { get; init; }
+
+    public required bool RequiresUsername { get; init; }
+
+    /// <summary>Pide además el servidor lógico. Hoy solo Informix por SQLI.</summary>
+    public required bool RequiresLogicalServer { get; init; }
+
+    /// <summary>Admite la identidad de la sesión del sistema. Hoy solo SQL Server.</summary>
+    public required bool SupportsIntegratedSecurity { get; init; }
+
+    public required bool SupportsSshTunnel { get; init; }
+
+    public required bool SupportsTransportEncryption { get; init; }
+
+    /// <summary>
+    /// El servidor rechaza de verdad las escrituras cuando la sesión es de solo
+    /// lectura. Donde es falso, lo único que hay es el aviso del analizador, y el
+    /// formulario tiene que decirlo con esas palabras.
+    /// </summary>
+    public required bool EnforcesReadOnlySessions { get; init; }
 }
 
 // ---------------------------------------------------------------------------

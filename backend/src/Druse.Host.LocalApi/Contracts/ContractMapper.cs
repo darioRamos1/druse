@@ -817,6 +817,22 @@ internal static class ContractMapper
         Message = rejection.Message,
     };
 
+    public static EngineCapabilitiesDto ToDto(this EngineCapabilities capabilities)
+    {
+        ArgumentNullException.ThrowIfNull(capabilities);
+
+        return new EngineCapabilitiesDto
+        {
+            RequiresHost = capabilities.RequiresHost,
+            RequiresUsername = capabilities.RequiresUsername,
+            RequiresLogicalServer = capabilities.RequiresLogicalServer,
+            SupportsIntegratedSecurity = capabilities.SupportsIntegratedSecurity,
+            SupportsSshTunnel = capabilities.SupportsSshTunnel,
+            SupportsTransportEncryption = capabilities.SupportsTransportEncryption,
+            EnforcesReadOnlySessions = capabilities.EnforcesReadOnlySessions,
+        };
+    }
+
     public static string EngineId(DatabaseEngine engine) => engine switch
     {
         DatabaseEngine.PostgreSql => "postgresql",
