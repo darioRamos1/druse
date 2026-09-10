@@ -23,7 +23,9 @@ test.describe('el camino crítico', () => {
   test('la aplicación arranca con el editor listo', async ({ page }) => {
     await abrir(page);
 
-    await expect(page.getByRole('button', { name: 'Ejecutar', exact: false }).first()).toBeVisible();
+    await expect(
+      page.getByRole('button', { name: 'Ejecutar', exact: false }).first(),
+    ).toBeVisible();
     await expect(page.locator('app-results-panel')).toBeVisible();
 
     // Sin conexión no se puede ejecutar, y la barra lo dice en lugar de dejar
@@ -63,6 +65,7 @@ test.describe('el camino crítico', () => {
     await campo('Puerto').fill(String(CONTENEDOR.puerto));
     await campo('Usuario').fill(CONTENEDOR.usuario);
     await campo('Contraseña').fill(CONTENEDOR.contrasena);
+    await dialogo.getByRole('button', { name: /Opciones avanzadas/ }).click();
     await dialogo.getByRole('button', { name: 'Sin cifrar' }).click();
 
     // Lo primero: que el formulario sepa decir cuáles hay.
@@ -70,9 +73,9 @@ test.describe('el camino crítico', () => {
     await expect(dialogo.locator('#connection-database-detail')).toContainText('disponibles', {
       timeout: 30_000,
     });
-    await expect(dialogo.locator(`#connection-databases option[value="${CONTENEDOR.base}"]`)).toHaveCount(
-      1,
-    );
+    await expect(
+      dialogo.locator(`#connection-databases option[value="${CONTENEDOR.base}"]`),
+    ).toHaveCount(1);
 
     // Y que dejándola vacía se conecte igual.
     await campo('Base de datos').fill('');

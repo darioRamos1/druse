@@ -8,6 +8,7 @@ import {
   conectar,
   conectarSqlServer,
   ejecutar,
+  esperarFinDeConsulta,
   escribirSql,
   primeraColumna,
 } from '../support/druse';
@@ -32,10 +33,7 @@ test.describe('migrar datos entre tablas', () => {
    * análisis de riesgo, y saltárselo aquí sería probar una aplicación que no es
    * la que se reparte—. La prueba confirma igual que lo haría una persona.
    */
-  async function prepararTablas(
-    page: Page,
-    options: { conClave?: boolean } = {},
-  ): Promise<void> {
+  async function prepararTablas(page: Page, options: { conClave?: boolean } = {}): Promise<void> {
     // La clave primaria solo hace falta para los modos que reconocen filas; en
     // los demás se deja fuera para no dar por hecho que la tabla la tiene.
     const clave = options.conClave ? ' PRIMARY KEY' : '';
@@ -78,9 +76,7 @@ test.describe('migrar datos entre tablas', () => {
 
     await expect(aviso).toBeHidden({ timeout: 60_000 });
     await respuesta;
-    await expect(page.getByRole('button', { name: 'Cancelar' }).first()).toBeDisabled({
-      timeout: 30_000,
-    });
+    await esperarFinDeConsulta(page);
   }
 
   /**
@@ -295,7 +291,10 @@ test.describe('migrar datos entre tablas', () => {
 
     await escribirSql(page, `DROP TABLE IF EXISTS ${nueva}`);
     await page.keyboard.press('Control+Enter');
-    await page.getByRole('alertdialog').getByRole('button', { name: 'Ejecutar de todos modos' }).click();
+    await page
+      .getByRole('alertdialog')
+      .getByRole('button', { name: 'Ejecutar de todos modos' })
+      .click();
   });
 
   /**
@@ -625,9 +624,9 @@ test.describe('migrar datos entre tablas', () => {
     await expect(tipos).toBeVisible({ timeout: 60_000 });
 
     // El tipo propuesto va en un campo, porque se puede cambiar antes de crear.
-    await expect(tipos.locator('tbody tr', { hasText: 'uuid' }).first().locator('input')).toHaveValue(
-      'uniqueidentifier',
-    );
+    await expect(
+      tipos.locator('tbody tr', { hasText: 'uuid' }).first().locator('input'),
+    ).toHaveValue('uniqueidentifier');
 
     // Y lo que hay que leer: qué deja de ser cierto al otro lado.
     await expect(dialogo.locator('.body')).toContainText('deja de comprobar que lo sea');
@@ -755,10 +754,7 @@ test.describe('migrar datos entre tablas', () => {
     expect(await contar(page, `${esquema}.e2e_clave_clientes`)).toBe('2');
 
     // Y se actualizó de verdad: el nombre viejo ya no está.
-    await escribirSql(
-      page,
-      `SELECT nombre FROM ${esquema}.e2e_clave_clientes WHERE codigo = 'A'`,
-    );
+    await escribirSql(page, `SELECT nombre FROM ${esquema}.e2e_clave_clientes WHERE codigo = 'A'`);
     await ejecutar(page, 'todo');
 
     expect((await primeraColumna(page))[0]).toBe('Ana');

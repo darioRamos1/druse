@@ -7,6 +7,7 @@ import {
   conectar,
   conectarSqlServer,
   ejecutar,
+  esperarFinDeConsulta,
   escribirSql,
   portapapeles,
   situarCursor,
@@ -176,8 +177,9 @@ test.describe('la interfaz por dentro', () => {
     await escribirSql(page, original);
 
     await page.evaluate(() => {
-      const editor = (window as unknown as { monaco: { editor: { getEditors(): any[] } } }).monaco
-        .editor.getEditors()[0];
+      const editor = (
+        window as unknown as { monaco: { editor: { getEditors(): any[] } } }
+      ).monaco.editor.getEditors()[0];
       const model = editor.getModel();
 
       editor.setSelection({
@@ -191,8 +193,8 @@ test.describe('la interfaz por dentro', () => {
 
     const value = () =>
       page.evaluate(() =>
-        (window as unknown as { monaco: { editor: { getEditors(): any[] } } }).monaco
-          .editor.getEditors()[0]
+        (window as unknown as { monaco: { editor: { getEditors(): any[] } } }).monaco.editor
+          .getEditors()[0]
           .getValue(),
       );
 
@@ -204,8 +206,9 @@ test.describe('la interfaz por dentro', () => {
 
     // Monaco conserva además el atajo estándar con el foco dentro del editor.
     await page.evaluate(() => {
-      const editor = (window as unknown as { monaco: { editor: { getEditors(): any[] } } }).monaco
-        .editor.getEditors()[0];
+      const editor = (
+        window as unknown as { monaco: { editor: { getEditors(): any[] } } }
+      ).monaco.editor.getEditors()[0];
 
       editor.focus();
     });
@@ -226,10 +229,7 @@ test.describe('la interfaz por dentro', () => {
 
     const nombre = `Fragmento ${Date.now()}`;
 
-    await escribirSql(
-      page,
-      'SELECT 1 AS no_guardar;\nSELECT * FROM ciudad WHERE id_ciudad > 10;',
-    );
+    await escribirSql(page, 'SELECT 1 AS no_guardar;\nSELECT * FROM ciudad WHERE id_ciudad > 10;');
     await situarCursor(page, 2, 10);
 
     // Guardar: la paleta pide el nombre en su propio campo.
@@ -265,16 +265,16 @@ test.describe('la interfaz por dentro', () => {
     await expect(page.locator('app-command-palette')).toContainText(nombre);
     await page.keyboard.press('Enter');
 
-    await expect(page.locator('app-sql-editor .monaco-editor')).toContainText(
-      'FROM ciudad',
-      { timeout: 10_000 },
-    );
+    await expect(page.locator('app-sql-editor .monaco-editor')).toContainText('FROM ciudad', {
+      timeout: 10_000,
+    });
     await expect(page.locator('app-sql-editor .monaco-editor')).not.toContainText('no_guardar');
 
     // Insertar usa la pila de Monaco, no reemplaza el modelo desde fuera.
     const canUndo = await page.evaluate(() => {
-      const editor = (window as unknown as { monaco: { editor: { getEditors(): any[] } } }).monaco
-        .editor.getEditors()[0];
+      const editor = (
+        window as unknown as { monaco: { editor: { getEditors(): any[] } } }
+      ).monaco.editor.getEditors()[0];
 
       editor.focus();
 
@@ -284,8 +284,9 @@ test.describe('la interfaz por dentro', () => {
     expect(canUndo).toBe(true);
     await page.keyboard.press('Control+z');
     const afterUndo = await page.evaluate(() => {
-      const editor = (window as unknown as { monaco: { editor: { getEditors(): any[] } } }).monaco
-        .editor.getEditors()[0];
+      const editor = (
+        window as unknown as { monaco: { editor: { getEditors(): any[] } } }
+      ).monaco.editor.getEditors()[0];
 
       return editor.getValue();
     });
@@ -347,13 +348,15 @@ test.describe('la interfaz por dentro', () => {
     expect(historyBox && filtersBox).not.toBeNull();
     expect(
       historyBox!.x + historyBox!.width > filtersBox!.x &&
-      filtersBox!.x + filtersBox!.width > historyBox!.x &&
-      historyBox!.y + historyBox!.height > filtersBox!.y &&
-      filtersBox!.y + filtersBox!.height > historyBox!.y,
+        filtersBox!.x + filtersBox!.width > historyBox!.x &&
+        historyBox!.y + historyBox!.height > filtersBox!.y &&
+        filtersBox!.y + filtersBox!.height > historyBox!.y,
     ).toBe(false);
 
     await page.setViewportSize({ width: 1440, height: 760 });
-    await expect.poll(async () => (await compactLabel.boundingBox())?.width ?? 0).toBeGreaterThan(1);
+    await expect
+      .poll(async () => (await compactLabel.boundingBox())?.width ?? 0)
+      .toBeGreaterThan(1);
   });
 
   test('el chip de conexión abre su menú por encima del editor', async ({ page }) => {
@@ -495,7 +498,7 @@ test.describe('la interfaz por dentro', () => {
 
       await warning.getByRole('button', { name: 'Ejecutar de todos modos' }).click();
       await response;
-      await expect(page.getByRole('button', { name: 'Cancelar' }).first()).toBeDisabled();
+      await esperarFinDeConsulta(page);
     };
 
     await ejecutarConAviso(
@@ -584,8 +587,9 @@ test.describe('la interfaz por dentro', () => {
 
     // El cursor, justo detrás de «SELECT ».
     await page.evaluate(() => {
-      const editor = (window as unknown as { monaco: { editor: { getEditors(): any[] } } }).monaco
-        .editor.getEditors()[0];
+      const editor = (
+        window as unknown as { monaco: { editor: { getEditors(): any[] } } }
+      ).monaco.editor.getEditors()[0];
 
       editor.setPosition({ lineNumber: 1, column: 8 });
       editor.focus();
@@ -595,9 +599,9 @@ test.describe('la interfaz por dentro', () => {
     await page.waitForTimeout(1500);
 
     const sugerencias = await page.evaluate(() =>
-      Array.from(
-        document.querySelectorAll('.monaco-editor .suggest-widget .monaco-list-row'),
-      ).map((fila) => fila.textContent?.trim() ?? ''),
+      Array.from(document.querySelectorAll('.monaco-editor .suggest-widget .monaco-list-row')).map(
+        (fila) => fila.textContent?.trim() ?? '',
+      ),
     );
 
     // Las de `ciudad`, con su tipo al lado; ninguna de `accionista`. Se miran
@@ -872,10 +876,7 @@ test.describe('la interfaz por dentro', () => {
     await expect(dialogo.getByRole('button', { name: 'Probar túnel' })).toHaveCount(0);
 
     await dialogo.getByRole('button', { name: /Opciones avanzadas/ }).click();
-    await dialogo
-      .locator('label.checkbox', { hasText: 'servidor SSH' })
-      .locator('input')
-      .check();
+    await dialogo.locator('label.checkbox', { hasText: 'servidor SSH' }).locator('input').check();
 
     const probar = dialogo.getByRole('button', { name: 'Probar túnel' });
     await expect(probar).toBeVisible();
@@ -929,14 +930,9 @@ test.describe('la interfaz por dentro', () => {
     );
 
     await numeros.nth(1).click({ button: 'right' });
-    await page
-      .locator('.copy-menu')
-      .getByRole('menuitem', { name: /Excel/ })
-      .click();
+    await page.locator('.copy-menu').getByRole('menuitem', { name: /Excel/ }).click();
 
-    await expect
-      .poll(() => portapapeles(page))
-      .toBe(['id\tpais', '1\tMX', '2\tES'].join('\n'));
+    await expect.poll(() => portapapeles(page)).toBe(['id\tpais', '1\tMX', '2\tES'].join('\n'));
   });
 
   /**
@@ -981,9 +977,9 @@ test.describe('la interfaz por dentro', () => {
     // Y el doble clic la deja en lo justo que necesita, que es menos.
     await asa.dblclick();
 
-    await expect.poll(async () => (await cabecera.boundingBox())!.width).toBeLessThan(
-      anchoInicial + 100,
-    );
+    await expect
+      .poll(async () => (await cabecera.boundingBox())!.width)
+      .toBeLessThan(anchoInicial + 100);
     expect(await nombre.evaluate((el) => el.scrollWidth <= el.clientWidth + 1)).toBe(true);
   });
 
@@ -1152,7 +1148,10 @@ test.describe('la cuadrícula contra SQL Server', () => {
 
     await cabeceras.filter({ hasText: 'pais' }).click();
     await cabeceras.filter({ hasText: 'pais' }).click({ button: 'right' });
-    await page.locator('.copy-menu').getByRole('menuitem', { name: /condición IN/ }).click();
+    await page
+      .locator('.copy-menu')
+      .getByRole('menuitem', { name: /condición IN/ })
+      .click();
 
     await expect.poll(() => portapapeles(page)).toBe("pais IN ('MX', 'ES')");
 
@@ -1160,7 +1159,10 @@ test.describe('la cuadrícula contra SQL Server', () => {
     // el tipo lo clasifica el backend y es ahí donde los motores se separan.
     await cabeceras.filter({ hasText: 'id' }).click();
     await cabeceras.filter({ hasText: 'id' }).click({ button: 'right' });
-    await page.locator('.copy-menu').getByRole('menuitem', { name: /condición IN/ }).click();
+    await page
+      .locator('.copy-menu')
+      .getByRole('menuitem', { name: /condición IN/ })
+      .click();
 
     await expect.poll(() => portapapeles(page)).toBe('id IN (1, 2, 3)');
   });
@@ -1179,11 +1181,12 @@ test.describe('la cuadrícula contra SQL Server', () => {
 
     await cabecera.click();
     await cabecera.click({ button: 'right' });
-    await page.locator('.copy-menu').getByRole('menuitem', { name: /condición IN/ }).click();
+    await page
+      .locator('.copy-menu')
+      .getByRole('menuitem', { name: /condición IN/ })
+      .click();
 
-    await expect
-      .poll(() => portapapeles(page))
-      .toBe("(estado IN ('activo') OR estado IS NULL)");
+    await expect.poll(() => portapapeles(page)).toBe("(estado IN ('activo') OR estado IS NULL)");
   });
 
   test('el ancho de la columna se ajusta igual', async ({ page }) => {
@@ -1234,7 +1237,10 @@ test.describe('la cuadrícula contra SQL Server', () => {
 
     await cabecera.click();
     await cabecera.click({ button: 'right' });
-    await page.locator('.copy-menu').getByRole('menuitem', { name: /Para Excel/ }).click();
+    await page
+      .locator('.copy-menu')
+      .getByRole('menuitem', { name: /Para Excel/ })
+      .click();
 
     // Para una hoja de cálculo, el valor es lo que importa y llega entero.
     await expect.poll(() => portapapeles(page)).toContain('42');

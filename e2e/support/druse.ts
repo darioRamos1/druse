@@ -48,7 +48,8 @@ export const SQLSERVER = {
  */
 export async function abrir(page: Page): Promise<void> {
   const conexiones = page.waitForResponse(
-    (response) => response.url().endsWith('/api/connections') && response.request().method() === 'GET',
+    (response) =>
+      response.url().endsWith('/api/connections') && response.request().method() === 'GET',
     { timeout: 60_000 },
   );
 
@@ -169,6 +170,7 @@ async function crearConexion(
   // SQL Server se queda con el cifrado por omisión, que acepta su certificado
   // autofirmado: sin cifrar, su driver ni siquiera lo intenta.
   if (motor === 'PostgreSQL') {
+    await dialogo.getByRole('button', { name: /Opciones avanzadas/ }).click();
     await dialogo.getByRole('button', { name: 'Sin cifrar' }).click();
   }
 
@@ -198,7 +200,9 @@ async function crearConexion(
   try {
     await expect(dialogo).toBeHidden({ timeout: 60_000 });
   } catch (error) {
-    const enPantalla = await dialogo.locator('.field__error, .alert, [role="alert"]').allTextContents();
+    const enPantalla = await dialogo
+      .locator('.field__error, .alert, [role="alert"]')
+      .allTextContents();
 
     throw new Error(
       'El diálogo de conexión no se cerró.\n' +
@@ -220,11 +224,7 @@ export async function apuntarPestana(page: Page): Promise<void> {
  * Hace falta para cruzar de motor: lo que se copió a SQL Server se cuenta desde
  * una pestaña que mire a SQL Server, no desde la de PostgreSQL.
  */
-export async function apuntarPestanaA(
-  page: Page,
-  conexion: string,
-  base: string,
-): Promise<void> {
+export async function apuntarPestanaA(page: Page, conexion: string, base: string): Promise<void> {
   const chip = page.locator('app-editor-toolbar .chip').first();
   const conexionActual = (
     await chip
@@ -338,10 +338,9 @@ export async function marcaDeError(
  * Ejecuta y espera a que el resultado esté en pantalla.
  *
  * La espera se arma **antes** de pulsar, y por la respuesta del servidor y no
- * por el estado de los botones: «Cancelar» está deshabilitado tanto cuando la
- * consulta ha terminado como cuando todavía no ha empezado, así que esperar a
- * que lo esté daba por hecha una ejecución que aún no había salido y se miraba
- * la rejilla de la consulta anterior.
+ * por el estado de los botones: «Ejecutar» está habilitado tanto antes de empezar
+ * como después de terminar. Sin esperar la respuesta se podría mirar la rejilla
+ * de la consulta anterior.
  */
 export async function ejecutar(page: Page, que: 'todo' | 'la del cursor'): Promise<void> {
   const respuesta = page.waitForResponse(
@@ -353,13 +352,15 @@ export async function ejecutar(page: Page, que: 'todo' | 'la del cursor'): Promi
 
   await respuesta;
 
-  // La respuesta ya está; falta que Angular la pinte. Primero se espera a que el
-  // panel de «Consulta en curso» se vaya: mientras está, **hay dos botones
-  // «Cancelar»** —el suyo y el de la barra— y preguntar por el nombre falla por
-  // ambigüedad en vez de esperar. Pasa cuando la máquina va cargada y el pintado
-  // llega tarde, y se lee como un fallo del producto.
+  await esperarFinDeConsulta(page);
+}
+
+/** Tras recibir la respuesta, espera a que Angular refleje el fin de la ejecución. */
+export async function esperarFinDeConsulta(page: Page): Promise<void> {
   await expect(page.getByLabel('Consulta en curso')).toBeHidden({ timeout: 30_000 });
-  await expect(page.getByRole('button', { name: 'Cancelar' })).toBeDisabled({ timeout: 30_000 });
+  await expect(
+    page.locator('app-editor-toolbar').getByRole('button', { name: 'Ejecutar', exact: true }),
+  ).toBeEnabled({ timeout: 30_000 });
 }
 
 /**

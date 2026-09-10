@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 
-import { abrir, conectar, escribirSql } from '../support/druse';
+import { abrir, conectar, escribirSql, esperarFinDeConsulta } from '../support/druse';
 
 /**
  * El diagrama entidad-relación, de punta a punta.
@@ -118,91 +118,90 @@ test.describe('el diagrama entidad-relación', () => {
     await expect(panel).toBeHidden();
   });
 
-/**
- * La razón de ser de las relaciones sugeridas: una base sin claves foráneas.
- *
- * Se crean dos tablas relacionadas **solo por el nombre**, que es como está media
- * base heredada, y se comprueba que el diagrama las une con su trazo propio. Es
- * lo único que demuestra el dibujo de relaciones de punta a punta: el esquema de
- * pruebas no declara ni una clave foránea.
- *
- * La columna se llama `mer_cliente_id` y no `cliente_id` a propósito: lo que
- * Druse busca es el nombre **de la tabla**, y `cliente_id` no nombra a
- * `mer_cliente`. Escribirlo mal la primera vez dejó el lienzo sin líneas, que es
- * exactamente lo que tenía que pasar.
- */
-test('supone la relación que el motor no declara, y se puede apagar', async ({ page }) => {
-  await abrir(page);
-  await conectar(page);
+  /**
+   * La razón de ser de las relaciones sugeridas: una base sin claves foráneas.
+   *
+   * Se crean dos tablas relacionadas **solo por el nombre**, que es como está media
+   * base heredada, y se comprueba que el diagrama las une con su trazo propio. Es
+   * lo único que demuestra el dibujo de relaciones de punta a punta: el esquema de
+   * pruebas no declara ni una clave foránea.
+   *
+   * La columna se llama `mer_cliente_id` y no `cliente_id` a propósito: lo que
+   * Druse busca es el nombre **de la tabla**, y `cliente_id` no nombra a
+   * `mer_cliente`. Escribirlo mal la primera vez dejó el lienzo sin líneas, que es
+   * exactamente lo que tenía que pasar.
+   */
+  test('supone la relación que el motor no declara, y se puede apagar', async ({ page }) => {
+    await abrir(page);
+    await conectar(page);
 
-  const panel = page.locator('app-diagram-panel');
+    const panel = page.locator('app-diagram-panel');
 
-  await ejecutarConAviso(
-    page,
-    `DROP TABLE IF EXISTS mer_pedido;
+    await ejecutarConAviso(
+      page,
+      `DROP TABLE IF EXISTS mer_pedido;
      DROP TABLE IF EXISTS mer_cliente;
      CREATE TABLE mer_cliente (id integer PRIMARY KEY, nombre text);
      CREATE TABLE mer_pedido (id integer PRIMARY KEY, mer_cliente_id integer)`,
-  );
+    );
 
-  try {
-    await abrirDiagrama(page);
-    await expect(panel.locator('.chooser')).toBeVisible({ timeout: 60_000 });
+    try {
+      await abrirDiagrama(page);
+      await expect(panel.locator('.chooser')).toBeVisible({ timeout: 60_000 });
 
-    // Solo las dos nuevas, para que el diagrama diga exactamente una cosa.
-    await panel.getByRole('button', { name: 'Ninguna' }).click();
-    await panel.locator('.pick', { hasText: 'mer_cliente' }).first().click();
-    await panel.locator('.pick', { hasText: 'mer_pedido' }).first().click();
-    await panel.getByRole('button', { name: 'Dibujar' }).click();
+      // Solo las dos nuevas, para que el diagrama diga exactamente una cosa.
+      await panel.getByRole('button', { name: 'Ninguna' }).click();
+      await panel.locator('.pick', { hasText: 'mer_cliente' }).first().click();
+      await panel.locator('.pick', { hasText: 'mer_pedido' }).first().click();
+      await panel.getByRole('button', { name: 'Dibujar' }).click();
 
-    await expect(panel.locator('.node')).toHaveCount(2, { timeout: 60_000 });
+      await expect(panel.locator('.node')).toHaveCount(2, { timeout: 60_000 });
 
-    // Ninguna clave declarada, y aun así están unidas: eso es la suposición.
-    await expect(panel.locator('.wire.is-suggested')).toHaveCount(1);
-    await expect(panel.locator('.wire:not(.is-suggested)')).toHaveCount(0);
+      // Ninguna clave declarada, y aun así están unidas: eso es la suposición.
+      await expect(panel.locator('.wire.is-suggested')).toHaveCount(1);
+      await expect(panel.locator('.wire:not(.is-suggested)')).toHaveCount(0);
 
-    // Y se pueden apagar, que es lo que devuelve el diagrama a lo que el motor
-    // garantiza.
-    await panel.locator('.toggle').click();
-    await expect(panel.locator('.wire')).toHaveCount(0);
+      // Y se pueden apagar, que es lo que devuelve el diagrama a lo que el motor
+      // garantiza.
+      await panel.locator('.toggle').click();
+      await expect(panel.locator('.wire')).toHaveCount(0);
 
-    await panel.getByRole('button', { name: 'Cerrar' }).click();
-    await expect(panel).toBeHidden();
-  } finally {
-    // La limpieza no puede poner en rojo una prueba que pasó: si algo va mal
-    // aquí, las tablas quedan y el arranque de la próxima ejecución las borra,
-    // que para eso empieza por `DROP TABLE IF EXISTS`.
-    await ejecutarConAviso(
-      page,
-      'DROP TABLE IF EXISTS mer_pedido;\nDROP TABLE IF EXISTS mer_cliente',
-    ).catch(() => {});
+      await panel.getByRole('button', { name: 'Cerrar' }).click();
+      await expect(panel).toBeHidden();
+    } finally {
+      // La limpieza no puede poner en rojo una prueba que pasó: si algo va mal
+      // aquí, las tablas quedan y el arranque de la próxima ejecución las borra,
+      // que para eso empieza por `DROP TABLE IF EXISTS`.
+      await ejecutarConAviso(
+        page,
+        'DROP TABLE IF EXISTS mer_pedido;\nDROP TABLE IF EXISTS mer_cliente',
+      ).catch(() => {});
+    }
+  });
+
+  /**
+   * Ejecuta SQL que Druse considera peligroso, confirmando como lo haría alguien.
+   *
+   * Lleva `DROP`, así que la aplicación pide confirmación: es su análisis de
+   * riesgo, y saltárselo aquí sería probar una aplicación que no es la que se
+   * reparte.
+   */
+  async function ejecutarConAviso(page: Page, sql: string): Promise<void> {
+    await escribirSql(page, sql);
+    await page.keyboard.press('Control+Enter');
+
+    const aviso = page.getByRole('alertdialog');
+    await expect(aviso).toBeVisible({ timeout: 30_000 });
+    const respuesta = page.waitForResponse(
+      (response) =>
+        response.url().includes('/api/queries') && response.request().method() === 'POST',
+      { timeout: 60_000 },
+    );
+    await aviso.getByRole('button', { name: 'Ejecutar de todos modos' }).click();
+    await expect(aviso).toBeHidden({ timeout: 30_000 });
+    await respuesta;
+    await esperarFinDeConsulta(page);
   }
-});
-
-/**
- * Ejecuta SQL que Druse considera peligroso, confirmando como lo haría alguien.
- *
- * Lleva `DROP`, así que la aplicación pide confirmación: es su análisis de
- * riesgo, y saltárselo aquí sería probar una aplicación que no es la que se
- * reparte.
- */
-async function ejecutarConAviso(page: Page, sql: string): Promise<void> {
-  await escribirSql(page, sql);
-  await page.keyboard.press('Control+Enter');
-
-  const aviso = page.getByRole('alertdialog');
-  await expect(aviso).toBeVisible({ timeout: 30_000 });
-  await aviso.getByRole('button', { name: 'Ejecutar de todos modos' }).click();
-  await expect(aviso).toBeHidden({ timeout: 30_000 });
-
-  // Se espera a que la ejecución termine por el botón de cancelar de la barra,
-  // que es lo que la aplicación enseña. Va por su título porque **hay dos**:
-  // mientras la consulta corre, el indicador flotante tiene el suyo, y pedir
-  // «Cancelar» a secas resuelve a los dos y Playwright se niega a elegir.
-  await expect(
-    page.getByRole('button', { name: 'Cancelar', description: 'Cancela la consulta en curso' }),
-  ).toBeDisabled({ timeout: 60_000 });
-}
 });
 
 /** Abre el diagrama desde el menú del esquema `public`. */
