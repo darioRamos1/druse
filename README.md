@@ -180,6 +180,7 @@ selector web y guardar descarga un `.sql` nuevo.
 | SQL Server 2016 – 2022 | Funcionando (autenticación SQL; la integrada de Windows está en el backlog) |
 | MySQL 8.0+ y MariaDB | Funcionando |
 | Oracle 12c – 23ai | Funcionando |
+| SQLite 3.16+ | Funcionando (es un archivo: sin servidor, sin usuario y sin procedimientos) |
 | Informix 12.10+ | Funcionando (por DRDA; en Linux necesita `libxml2`) |
 
 Todos superan **el mismo conjunto de pruebas contractuales**, sin excepciones

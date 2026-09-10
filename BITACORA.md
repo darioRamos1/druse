@@ -10,19 +10,19 @@
 
 | Campo | Valor |
 | --- | --- |
-| Última sesión | **049** — 2026-09-10 |
-| Fase activa | **Migración de datos entre tablas:** fases 1, 2 y 3 cerradas; la **4** cerrada: la pasada de varias tablas, lo que cada tabla hace distinto y las migraciones guardadas (ver «Qué toca retomar»). **Respaldos y restauración:** Fases A–E cerradas. La **F** tiene backend, interfaz, CSV, selector de archivos, restaurar en una base nueva y **el ciclo entero por HTTP en los cuatro motores**; le falta repetir a mano el respaldo real que encontró el error de los índices de expresión. **Motores nuevos:** plan escrito (`docs/plan-nuevos-motores.md`), **fase 0 cerrada** en la 048 —las fugas de dialecto que se le escapaban a un motor nuevo— y **fase 1 cerrada** en la 049: Oracle pasa las 54 contractuales. La **2** es SQLite y está sin empezar. **Diagramas entidad-relación:** plan escrito y **Fase A** (lectura del catálogo en lote, cuatro motores) y **Fase B** (colocación determinista y lienzo) implementadas; falta cerrar la A contra los cuatro motores y ver el barrido de capturas |
+| Última sesión | **050** — 2026-09-10 |
+| Fase activa | **Migración de datos entre tablas:** fases 1, 2 y 3 cerradas; la **4** cerrada: la pasada de varias tablas, lo que cada tabla hace distinto y las migraciones guardadas (ver «Qué toca retomar»). **Respaldos y restauración:** Fases A–E cerradas. La **F** tiene backend, interfaz, CSV, selector de archivos, restaurar en una base nueva y **el ciclo entero por HTTP en los cuatro motores**; le falta repetir a mano el respaldo real que encontró el error de los índices de expresión. **Motores nuevos:** plan escrito (`docs/plan-nuevos-motores.md`), **fase 0 cerrada** en la 048 —las fugas de dialecto que se le escapaban a un motor nuevo— **fase 1 cerrada** en la 049 —Oracle— y **fase 2 cerrada** en la 050 —SQLite—. El plan de motores nuevos queda cerrado: **seis motores sobre el mismo contrato**. **Diagramas entidad-relación:** plan escrito y **Fase A** (lectura del catálogo en lote, cuatro motores) y **Fase B** (colocación determinista y lienzo) implementadas; falta cerrar la A contra los cuatro motores y ver el barrido de capturas |
 | Fases 0–6 | ✅ Cerradas. |
 | Fase 7 | 🟡 **11/12.** El ciclo de instalación está probado sobre este equipo; solo falta arrancar en una máquina sin herramientas de desarrollo. |
 | Fase 8 | ✅ **7/7.** Tres motores sobre el mismo contrato y primera beta preparada. |
 | ¿Compila el backend? | Sí — 0 advertencias, 0 errores |
 | ¿Compila el envoltorio? | Sí — recompilado en la 037 con `build/scripts/msvc-env.ps1` cargado antes; sin él, `cargo` falla en `vswhom-sys` por elegir el MSVC equivocado. **Sus pruebas ya son 17**, con las dos que vigilan la CSP y las cuatro de `DRUSE_DATA_DIR` |
-| ¿Pasan las pruebas? | Sí. En la **049**: **334 contractuales** —las 280 de antes más las 54 de Oracle— contra PostgreSQL, MySQL, SQL Server y Oracle reales; **567 unitarias**, **177 de integración**, **913 del frontend**, la **suite de punta a punta entera (55)** y el **barrido** limpio. En la **048**, las cuatro suites del repositorio: **565 unitarias**, **177 de integración** y **279 contractuales** con PostgreSQL, MySQL y SQL Server levantados —Informix no—, **913 del frontend**, **35 de punta a punta** y el **barrido entero** con la consola limpia y ningún hallazgo. Los rojos del camino fueron de tiempo, distintos en cada pasada y verdes al ejecutar su archivo solo. `docs/api/openapi.json` no cambió: `/api/engines` no declara el cuerpo de su respuesta, así que ampliar su DTO no toca el contrato publicado. En la **047**: **859 del frontend** —las 815 de siempre más 44 de las piezas que salieron de `WorkspaceStore`— y la **suite de punta a punta entera en verde**: 52 pasadas, 1 saltada, 0 fallos, contra PostgreSQL y SQL Server reales. Los rojos que salieron por el camino eran de tiempo, en el frontend, y de **servidores de e2e levantados desde la sesión anterior**, que `reuseExistingServer` reutiliza. En la **046**: **740 del backend** —563 unitarias y las 177 de integración, con PostgreSQL, MySQL y SQL Server levantados—, **815 del frontend** y el **barrido entero** con la consola limpia y un solo hallazgo, que no es un defecto. Del e2e, 43 en verde; las cuatro de SQL Server esperaban a su contenedor, que se levantó en esta sesión. Las **23 del envoltorio** son de la 042 y siguen valiendo. Las contractuales salen verdes **sin los motores delante**: sin `DRUSE_REQUIRE_ENGINES=1` cada prueba termina sin comprobar nada cuando el servidor no responde. El `DATE` de Informix por SQLI de la 039 sigue sin repetirse: hace falta ese contenedor |
+| ¿Pasan las pruebas? | Sí. En la **050**: **388 contractuales** —las 54 de SQLite entre ellas—, **567 unitarias**, **177 de integración**, **914 del frontend** y la **suite de punta a punta entera (56)**, con el barrido limpio. En la **049**: **334 contractuales** —las 280 de antes más las 54 de Oracle— contra PostgreSQL, MySQL, SQL Server y Oracle reales; **567 unitarias**, **177 de integración**, **913 del frontend**, la **suite de punta a punta entera (55)** y el **barrido** limpio. En la **048**, las cuatro suites del repositorio: **565 unitarias**, **177 de integración** y **279 contractuales** con PostgreSQL, MySQL y SQL Server levantados —Informix no—, **913 del frontend**, **35 de punta a punta** y el **barrido entero** con la consola limpia y ningún hallazgo. Los rojos del camino fueron de tiempo, distintos en cada pasada y verdes al ejecutar su archivo solo. `docs/api/openapi.json` no cambió: `/api/engines` no declara el cuerpo de su respuesta, así que ampliar su DTO no toca el contrato publicado. En la **047**: **859 del frontend** —las 815 de siempre más 44 de las piezas que salieron de `WorkspaceStore`— y la **suite de punta a punta entera en verde**: 52 pasadas, 1 saltada, 0 fallos, contra PostgreSQL y SQL Server reales. Los rojos que salieron por el camino eran de tiempo, en el frontend, y de **servidores de e2e levantados desde la sesión anterior**, que `reuseExistingServer` reutiliza. En la **046**: **740 del backend** —563 unitarias y las 177 de integración, con PostgreSQL, MySQL y SQL Server levantados—, **815 del frontend** y el **barrido entero** con la consola limpia y un solo hallazgo, que no es un defecto. Del e2e, 43 en verde; las cuatro de SQL Server esperaban a su contenedor, que se levantó en esta sesión. Las **23 del envoltorio** son de la 042 y siguen valiendo. Las contractuales salen verdes **sin los motores delante**: sin `DRUSE_REQUIRE_ENGINES=1` cada prueba termina sin comprobar nada cuando el servidor no responde. El `DATE` de Informix por SQLI de la 039 sigue sin repetirse: hace falta ese contenedor |
 | ¿Hay aplicación de escritorio? | **Sí.** Instalador NSIS y ZIP portable, en dos variantes: con Informix y sin él. Desde la 038 **se actualiza sola** —o lo hará: ver el aviso del repositorio privado en §9—. El MSI dejó de generarse: `tauri.conf.json` solo declara `nsis`, que es lo que necesita el actualizador. En la **040** se regeneraron los instaladores y **la variante completa quedó instalada y abierta en este equipo**, con el arreglo del envoltorio dentro. Siguen **sin firma Authenticode**: SmartScreen en cada equipo |
-| Motores | **PostgreSQL, SQL Server, MySQL/MariaDB, Oracle e Informix**, sobre el mismo contrato. Desde la **048** cada uno declara sus `EngineCapabilities` y **un motor nuevo no compila hasta decir qué familias de datos guarda**; lo siguiente es Oracle, con el plan en `docs/plan-nuevos-motores.md` y el procedimiento en `docs/como-anadir-un-motor.md`. Informix tiene **dos entradas**: por DRDA con el driver de IBM (puerto 9089) y por **SQLI**, su protocolo nativo, con el puente JDBC (9088). Cambia por dónde se entra; el SQL, el catálogo y los tipos son los mismos |
+| Motores | **PostgreSQL, SQL Server, MySQL/MariaDB, Oracle, SQLite e Informix**, sobre el mismo contrato. Desde la **048** cada uno declara sus `EngineCapabilities` y **un motor nuevo no compila hasta decir qué familias de datos guarda**; lo siguiente es Oracle, con el plan en `docs/plan-nuevos-motores.md` y el procedimiento en `docs/como-anadir-un-motor.md`. Informix tiene **dos entradas**: por DRDA con el driver de IBM (puerto 9089) y por **SQLI**, su protocolo nativo, con el puente JDBC (9088). Cambia por dónde se entra; el SQL, el catálogo y los tipos son los mismos |
 | Trabajo a medias | **Nada sin commitear.** `PLAN_MEJORAS_DRUSE.md` lleva marcadas las fases 0 a 5 salvo lo grande —**FE-001 y FE-002 cerradas en la 047**: `WorkspaceStore` partido en seis piezas—, FE-003, BE-001, BE-002, A11Y-005 más BKP-006, SEC-007, PERF-004 y PERF-005. Sin comprobar: las contractuales de la lectura en lote contra los cuatro motores desde la 039, **el multicursor dentro de la ventana empaquetada**, y de antes —**el diálogo del sistema y el selector de carpeta siguen sin verse abrir**, y **el actualizador no puede funcionar mientras el repositorio sea privado** (ver §9) |
 | Bloqueantes | Ninguno para seguir programando. Sí para dar por buenos cuatro motores y cuatro funciones: ver «Qué toca retomar». |
-| Git | El **PR #9 se fusionó** (sesión 022). Se trabaja en `feat/respaldos-y-restauracion`, con todo subido: las 024–027 en `1452a6c`, las 028–031 en `640151c`, las 032–036 de `d3ac0d5` a `35d192e`, la 037 de `4ba8cce` a `20727eb`, la **038** en `a455be7`, `4c6f74a`, `55711f0` y `93f7f26`, la **039** hasta `5c2d09b`, y la **040** en `80da9f6`, `03c3478`, `a04c706`, `117b15f`, `2946156` y `2d52c8e`, la **041** en `64c2adf`, `203b771`, `6d31a86`, `5a924c6`, `8bcf83a`, `f4f683e` y `f65cd73`, la **042** en `0ae38fa`, `120485f`, `2a6f151` y `837cbb6`, la **043** de `ebf42ac` a `fd9432d`, la **044** de `7e60185` a `e98422e`, la **045** de `dc7b97e` a `ba3d866`, y la **046** de `c9de27f` a `90e03c7`, ya sobre `main`, y la **048** en `3509bb7`, `5d337cc`, `0c5507f`, `a04af7d` y `de80c8a`, y la **049** en `52efd09`, `eee2656`, `84a84d2`, `148adb1` y el de la documentación |
+| Git | El **PR #9 se fusionó** (sesión 022). Se trabaja en `feat/respaldos-y-restauracion`, con todo subido: las 024–027 en `1452a6c`, las 028–031 en `640151c`, las 032–036 de `d3ac0d5` a `35d192e`, la 037 de `4ba8cce` a `20727eb`, la **038** en `a455be7`, `4c6f74a`, `55711f0` y `93f7f26`, la **039** hasta `5c2d09b`, y la **040** en `80da9f6`, `03c3478`, `a04c706`, `117b15f`, `2946156` y `2d52c8e`, la **041** en `64c2adf`, `203b771`, `6d31a86`, `5a924c6`, `8bcf83a`, `f4f683e` y `f65cd73`, la **042** en `0ae38fa`, `120485f`, `2a6f151` y `837cbb6`, la **043** de `ebf42ac` a `fd9432d`, la **044** de `7e60185` a `e98422e`, la **045** de `dc7b97e` a `ba3d866`, y la **046** de `c9de27f` a `90e03c7`, ya sobre `main`, y la **048** en `3509bb7`, `5d337cc`, `0c5507f`, `a04af7d` y `de80c8a`, y la **049** en `52efd09`, `eee2656`, `84a84d2`, `148adb1` y `be3a27d`, y la **050** en `10c8349`, `d6e8cd2`, `f03f3b8`, `8744c9e`, `9372132` y el de la documentación |
 | Integración continua | 🔴 **Parada, y no por el código.** GitHub aborta los jobs en dos segundos: «recent account payments have failed or your spending limit needs to be increased». Hasta resolver la facturación, ningún PR podrá pasar los checks. Lo que sí cambió en la **041**: cuando vuelva a correr, **ejecutará pruebas de verdad** —hasta ahora el job del backend terminaba en verde sin ejecutar ninguna—, y publicar exige que el commit tenga su ejecución de CI en verde. |
 
 ### Qué toca retomar en la próxima sesión
@@ -35,23 +35,29 @@ autenticado, y ese 404 ni siquiera se distingue de «no hay versión nueva». Es
 una decisión que hay que tomar antes de repartir nada: repositorio público, o
 publicar los artefactos en otro sitio.
 
-#### Lo que deja abierta la 049
+#### Lo que deja abierta la 050
 
-1. **SQLite**, que es la fase 2 de `docs/plan-nuevos-motores.md`. Empieza por el
-   modelo y no por el proveedor: rompe el supuesto de que un perfil tiene
-   servidor y usuario. El validador y el formulario ya preguntan a las
-   capacidades precisamente para eso, así que el terreno está; lo que falta es el
-   campo de ruta en `ConnectionProfile`, su migración, y decidir qué pasa si el
-   archivo no existe.
-2. **Las tres capacidades que siguen sin declarar**: «tiene esquemas», «tiene
-   procedimientos» y «tiene varias bases». Oracle no las necesitó —su árbol se
-   resolvió con el mismo truco que MySQL— pero SQLite sí: allí no hay
-   procedimientos, y enseñar la carpeta vacía sería fingir que los hay.
-3. **Lo que Oracle deja declarado y sin resolver**, todo anotado en el §7 del
-   plan: el lote de varias instrucciones —que es una función de Druse y no del
-   proveedor—, la posición del error de sintaxis, y los paquetes en el árbol.
-4. **El contenedor de Oracle tarda**: dos minutos la primera vez. Conviene
-   levantarlo al empezar la sesión, no cuando haga falta.
+1. **Crear una base de SQLite desde la aplicación.** Hoy Druse abre archivos y no
+   los crea nunca, a propósito: una ruta mal escrita tiene que decirlo en vez de
+   dejar una base vacía en el disco. Pero crear una es algo que la gente querrá
+   hacer, y el proveedor ya tiene el camino escrito
+   (`SqliteConnectionStringFactory.BuildForCreate`); lo que falta es la acción en
+   la interfaz, con su confirmación.
+2. **Un selector de archivo de verdad** en el formulario. Ahora la ruta se
+   escribe a mano, y ya hay un selector nativo en el envoltorio para los
+   respaldos: es el mismo trabajo.
+3. **Lo que cada motor deja declarado y sin resolver**, en los §7 y §8 del plan:
+   de Oracle, el lote de varias instrucciones —que es una función de Druse y no
+   del proveedor—, la posición del error de sintaxis y los paquetes en el árbol;
+   de SQLite, que la reconstrucción de una tabla no conserva sus disparadores ni
+   las vistas que la miraban, y que sus condiciones de comprobación no se pueden
+   leer.
+4. **La compilación ligera podría dejar fuera más que Informix.** Con seis
+   motores, `IncludeInformix` se queda corto como idea: quien solo usa SQLite y
+   PostgreSQL carga hoy con los clientes de Oracle, SQL Server y MySQL. Medir
+   antes de decidir.
+5. **El contenedor de Oracle tarda**: dos minutos la primera vez. SQLite no
+   necesita ninguno.
 
 #### Lo que deja abierta la 047
 
@@ -427,6 +433,93 @@ Pendiente de verificar cuando toque: Docker (pruebas de integración con contene
 ---
 
 ## 5. Registro de sesiones
+
+### Sesión 050 — 2026-09-10 · SQLite, el motor que no es un servidor
+
+Fase 2 del plan de motores nuevos, y la última. **El contrato pasó entero a la
+primera: 54 de 54.** No fue suerte: es lo que dejaron hechas la fase 0 y Oracle.
+
+#### Lo que rompía, y por qué el plan lo puso el segundo
+
+SQLite no es «un motor más pequeño»: es el que no encaja. No hay host, ni puerto,
+ni usuario, ni contraseña, ni transporte que cifrar, ni servidor intermedio por el
+que pasar. Lo que el perfil llama base de datos es **la ruta de un archivo**.
+
+Se resolvió con dos capacidades nuevas —`RequiresDatabase` y `UsesFilePath`— y no
+con condicionales: el formulario pierde medio contenido porque el motor lo dice,
+no porque el componente sepa qué motor es. En pantalla, el campo se llama
+«Archivo», no hay usuario ni contraseña, y donde estaban las opciones avanzadas no
+hay nada, porque no hay nada que decidir.
+
+#### La reconstrucción de tabla, que obligó a una costura
+
+`ALTER TABLE` en SQLite hace cuatro cosas: renombrar la tabla, renombrar una
+columna, añadirla y quitarla. **Cambiar un tipo, tocar la clave primaria o añadir
+una restricción no están.** Eso se hace creando otra tabla, copiando las filas,
+borrando la vieja y renombrando.
+
+Y para escribir esa tabla nueva hay que saber cómo es la de ahora, que es justo lo
+que el cambio no dice: el cambio dice qué se toca, no lo que se queda. De ahí
+`ITableDesigner.DescribeAlterAsync`, que es lo mismo que `DescribeAlter` pero con
+la sesión delante. Los otros cinco motores no la reescriben. Va entera en una
+transacción porque **aquí el DDL sí se deshace**, que es de los pocos sitios donde
+pasa.
+
+#### Un fallo que solo apareció con la aplicación levantada
+
+Reabrir una conexión guardada **pedía contraseña a un motor que no tiene
+usuarios**. SQLite conectaba la primera vez y no volvía a conectar nunca más. El
+contrato no lo veía —va por debajo de la API—, las pruebas del navegador tampoco,
+y la de punta a punta solo lo vio **a la segunda ejecución**, cuando ya había un
+perfil guardado. El endpoint ahora pregunta al motor si tiene identidad antes de
+pedirla.
+
+Es exactamente el motivo por el que estas cosas se miran con Druse levantado.
+
+#### Lo demás que es suyo
+
+- **Su candado de solo lectura es el más fuerte de los seis**: no es un modo que
+  el servidor haga cumplir, es que el archivo se abre sin permiso de escritura.
+- **El tipo de una columna no obliga a nada**: una `INTEGER` acepta el texto
+  `hola`. Por eso declara cuatro familias —texto, entero, decimal y binario—, que
+  son las que sobreviven al viaje de ida y vuelta. Ni booleano, ni fecha, ni hora,
+  ni marca de tiempo, ni identificador único.
+- **No tiene procedimientos**, así que su árbol enseña dos carpetas y no cuatro:
+  enseñarlas vacías diría que la base no tiene ninguno.
+- **Las condiciones de comprobación no se leen.** Las admite y no las devuelve: no
+  hay `PRAGMA` que las enseñe. Por eso el diseñador tampoco las ofrece.
+- **Druse no crea el archivo.** Una ruta mal escrita tiene que decirlo, no dejar
+  una base vacía en el disco.
+
+#### Lo que costó cero
+
+`Microsoft.Data.Sqlite` **ya viajaba en el paquete**: la persistencia local de
+Druse es SQLite. Es el único de los seis proveedores cuya dependencia no había que
+traer, y el instalador no engorda.
+
+**Pruebas.** **388 contractuales** —las 334 de antes más las 54 de SQLite— contra
+PostgreSQL, MySQL, SQL Server, Oracle y un archivo; **567 unitarias**, **177 de
+integración**, **914 del frontend** y la **suite de punta a punta entera: 56 en
+verde**, con una nueva propia de SQLite que **no necesita ningún contenedor**: se
+crea su archivo con `node:sqlite`. El barrido, limpio y sin hallazgos.
+
+**Archivos.** `Druse.Provider.Sqlite/` entero (9 archivos, 2.240 líneas),
+`SqliteFixture.cs`, `e2e/tests/sqlite.spec.ts` (nuevos); `DatabaseEngine.cs`,
+`EngineCapabilities.cs`, `ITableDesigner.cs`, `TableDesignerBase.cs`,
+`ConnectionProfileValidator.cs`, `ConnectionService.cs`, `TableDesignService.cs`,
+`StorageEndpoints.cs`, `DatabaseEndpoints.cs`, `Contracts.cs`,
+`ContractMapper.cs`, `ProviderContract.cs`,
+`DatabaseProviderContractTests.cs`, `ArchitectureRulesTests.cs`, los cinco
+archivos de dialecto del frontend, `_tokens.scss`, `engine-badge.ts`,
+`workspace.ts`, `connection-dialog.{ts,html,spec.ts}`, `README.md`, el plan y el
+README del e2e.
+
+**Estado al cerrar.** Commiteado en `main`, en seis commits temáticos:
+`10c8349` lo que las abstracciones tuvieron que aprender —que un motor puede no
+ser un servidor—, `d6e8cd2` el proveedor, `f03f3b8` el arreglo de la contraseña
+que se pedía de más, `8744c9e` las pruebas, `9372132` la interfaz y este mismo
+con la documentación. Con esto, el plan de motores nuevos queda cerrado: seis
+motores sobre el mismo contrato.
 
 ### Sesión 049 — 2026-09-10 · Oracle, y las tres cosas suyas que nadie ve venir
 

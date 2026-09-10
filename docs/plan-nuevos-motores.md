@@ -73,6 +73,8 @@ Lo que hay hoy en cada carpeta `Druse.Provider.*`, para saber a qué se firma un
 | `*ValueFormatter` | 28 | 28 | 35 | 54 | 71 |
 | **Total** | ~2.020 | ~2.170 | ~2.130 | ~2.740 | ~2.860 |
 
+SQLite son **~2.240**, el más corto de los seis: no tiene fábrica de cadena que negociar, su normalizador cabe en sesenta líneas y su catálogo es una tabla y unos `PRAGMA`. Lo que le abulta es el diseñador, por la reconstrucción.
+
 El lector de metadatos es la mitad del trabajo en los cinco. No es casualidad:
 es lo único que no se puede escribir sin conocer el catálogo del motor de verdad.
 
@@ -318,7 +320,7 @@ formatos de fecha nada más abrirse.
 
 ---
 
-## 8. Fase 2 — SQLite — **lo siguiente**
+## 8. Fase 2 — SQLite — **hecha**
 
 SQLite no es «un motor más pequeño»: es el que rompe los supuestos. Por eso va
 después, y por eso su fase empieza por el modelo y no por el proveedor.
@@ -342,25 +344,78 @@ después, y por eso su fase empieza por el modelo y no por el proveedor.
 
 ### 8.2. Tareas
 
-- [ ] **MOT-030:** `DatabaseEngine.Sqlite = 7` y campo de ruta en
+- [x] **MOT-030:** `DatabaseEngine.Sqlite = 7` y campo de ruta en
   `ConnectionProfile`, con su migración de SQLite y su `user_version`.
-- [ ] **MOT-031:** el diálogo de conexión dirigido por capacidades: selector de
+- [x] **MOT-031:** el diálogo de conexión dirigido por capacidades: selector de
   archivo, sin credenciales, sin túnel, con «solo lectura» ya real.
-- [ ] **MOT-032:** decidir y documentar qué pasa si el archivo no existe. Propuesta:
+- [x] **MOT-032:** decidir y documentar qué pasa si el archivo no existe. Propuesta:
   **no crearlo en silencio**; ofrecerlo como una acción explícita.
-- [ ] **MOT-033:** proveedor, lector (`sqlite_master`, `PRAGMA table_info`,
+- [x] **MOT-033:** proveedor, lector (`sqlite_master`, `PRAGMA table_info`,
   `index_list`, `index_info`, `foreign_key_list`), ejecutor y lector de resultados.
-- [ ] **MOT-034:** `SqliteTableDesigner` con la reconstrucción de tabla para todo
+- [x] **MOT-034:** `SqliteTableDesigner` con la reconstrucción de tabla para todo
   lo que `ALTER TABLE` no admite, y el DDL previsualizado tal cual se ejecutará.
-- [ ] **MOT-035:** `ReadOnlyEnforcedByEngine = true` con `Mode=ReadOnly`. Es una
+- [x] **MOT-035:** `ReadOnlyEnforcedByEngine = true` con `Mode=ReadOnly`. Es una
   frontera de verdad, no un aviso del analizador, y la interfaz puede prometerlo.
-- [ ] **MOT-036:** un solo escritor: importación y traslado en un único hilo, con
+- [x] **MOT-036:** un solo escritor: importación y traslado en un único hilo, con
   `busy_timeout` y `WAL` declarados.
-- [ ] **MOT-037:** distintivo, color, dialecto `sqlite` del formateador, palabras
+- [x] **MOT-037:** distintivo, color, dialecto `sqlite` del formateador, palabras
   clave, plantillas y entrada en la tabla de `sql-writer`.
-- [ ] **MOT-038:** `SqliteFixture` — la única que no necesita Docker, lo que la
+- [x] **MOT-038:** `SqliteFixture` — la única que no necesita Docker, lo que la
   convierte en la fixture que **siempre** corre en integración continua.
-- [ ] **MOT-039:** recorrido manual del §5 y anotación en `BITACORA.md`.
+- [x] **MOT-039:** recorrido contra un archivo real, con el barrido de capturas y
+  una prueba de punta a punta propia (`e2e/tests/sqlite.spec.ts`) que **no
+  necesita ningún contenedor**.
+
+### Cómo fue
+
+**El contrato pasó entero a la primera: 54 de 54.** No es suerte: es lo que la
+fase 0 y Oracle dejaron hecho. Las tres cosas que Oracle obligó a absorber —el
+terminador que no viaja, el nivel de aislamiento, la clasificación de tipos— ya
+estaban, y las dos banderas de dialecto que SQLite necesitaba se declaran igual
+que las suyas.
+
+Lo que sí hizo falta fue una costura nueva, y era la que el plan anunciaba:
+`ITableDesigner.DescribeAlterAsync`. Reconstruir una tabla exige **saber cómo
+está hoy**, y el cambio solo dice qué se toca; sin la sesión no hay forma de
+escribir el `CREATE TABLE` nuevo. Los otros cinco motores no la reescriben.
+
+### Las tres cosas suyas
+
+- **La reconstrucción.** `ALTER TABLE` hace cuatro cosas —renombrar la tabla,
+  renombrar una columna, añadirla y quitarla— y nada más. Cambiar un tipo, tocar
+  la clave primaria o añadir una restricción se hacen creando otra tabla,
+  copiando las filas, borrando la vieja y renombrando. Va entero en una
+  transacción, porque aquí **el DDL sí se deshace**.
+- **El candado de solo lectura es el más fuerte de los seis.** No es un modo que
+  el servidor haga cumplir: el archivo se abre sin permiso de escritura y no hay
+  instrucción que pueda saltárselo.
+- **El tipo de una columna no obliga a nada.** Una columna `INTEGER` acepta el
+  texto `hola`. Por eso sus familias declaradas son cuatro —texto, entero,
+  decimal y binario—: son las que sobreviven al viaje de ida y vuelta. No hay
+  booleano, ni fecha, ni hora, ni marca de tiempo, ni identificador único.
+
+### Un fallo que solo apareció con la aplicación levantada
+
+Reabrir una conexión guardada **pedía contraseña a un motor que no tiene
+usuarios**, así que SQLite conectaba la primera vez y no volvía a conectar nunca
+más. El contrato no lo veía —va por debajo de la API— y las pruebas del navegador
+tampoco. Lo encontró la prueba de punta a punta a la segunda ejecución. El
+endpoint ahora pregunta al motor si tiene identidad antes de pedirla.
+
+### Lo que queda declarado, no resuelto
+
+- **Las condiciones de comprobación no se leen.** SQLite las admite pero no las
+  expone en ningún `PRAGMA`: lo único que queda es el `CREATE TABLE` en texto.
+  Por eso el diseñador tampoco las ofrece: un campo que se guarda y desaparece al
+  releer es peor que no tenerlo.
+- **La reconstrucción no conserva disparadores ni vistas** que apuntaran a la
+  tabla: se van con ella y SQLite no avisa. Recuperarlos exigiría leerlos y
+  volver a escribirlos.
+- **Druse no crea el archivo.** Una ruta mal escrita tiene que decirlo, no dejar
+  una base vacía en el disco. Crear una desde la aplicación es una acción
+  explícita que todavía no está en la interfaz.
+- **No hay recuento aproximado de filas** en el explorador: SQLite no guarda
+  estadísticas salvo que alguien pida `ANALYZE`.
 
 ---
 

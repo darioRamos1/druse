@@ -33,6 +33,9 @@ Y para las que cruzan de motor, el suyo: SQL Server (`-Engine sqlserver`) y
 Oracle (`-Engine oracle`). Este último tarda un par de minutos la primera vez,
 porque crea la base al arrancar.
 
+**SQLite no necesita nada.** Su prueba se crea su propio archivo, así que corre
+en cualquier máquina sin levantar un solo contenedor.
+
 ## Ejecutarlas
 
 ```bash
