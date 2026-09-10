@@ -20,12 +20,12 @@
   -->
   <div class="item item--database" title="Base de datos">
     <span class="text">Base de datos</span>
-    <span class="mono">{{ s.database }}</span>
+    <span class="mono" [title]="s.database">{{ s.database }}</span>
   </div>
 
   <div class="item item--user" title="Usuario de la sesión">
     <span class="text">Usuario</span>
-    <span class="mono">{{ s.user }}</span>
+    <span class="mono" [title]="s.user">{{ s.user }}</span>
   </div>
 
   <span class="spacer"></span>

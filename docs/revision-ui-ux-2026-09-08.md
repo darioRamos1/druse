@@ -202,3 +202,9 @@ Docker vuelve a estar disponible y se levantaron los contenedores de pruebas de 
 Los recorridos E2E se actualizaron para abrir Opciones avanzadas antes de elegir el cifrado de PostgreSQL y esperar el final de la consulta mediante la respuesta HTTP y la recuperación del botón Ejecutar. Cancelar ahora desaparece al terminar, por lo que esperar que siguiera visible y deshabilitado daba falsos fallos. Diagramas y migraciones comparten la nueva espera; el diagrama también espera la respuesta antes de continuar.
 
 **53 pruebas E2E aprobadas en 3,3 minutos**, sin reintentos. Cubren conexión y consultas reales, diagramas, teclado, escala 125 %, cuadrícula en PostgreSQL y SQL Server y migraciones entre ambos motores. El único caso omitido es el barrido visual, que se activa por separado. El typecheck también pasó. MySQL se levantó, pero esta suite de interfaz no lo ejercita; Informix y la interfaz nativa de Tauri no se validaron en esta ejecución.
+
+### Barra de estado al abrir el asistente
+
+El barrido con datos reales detectó que base y usuario se reducían a unos pocos caracteres al abrir el asistente en una ventana de 1280 px. La barra conservaba duración, versión y codificación porque sus reglas dependían del viewport. Ahora usa consultas de contenedor sobre su propio ancho y retira primero esa información secundaria; los nombres completos también quedan disponibles en sus títulos.
+
+La nueva regresión E2E pasó con PostgreSQL real: base y usuario caben al abrir el asistente y después de ampliarlo 64 píxeles. La compilación y el typecheck son correctos. Las capturas automáticas están en `e2e/barrido/ui-ux-2026-09-10/`, un directorio local excluido de Git.

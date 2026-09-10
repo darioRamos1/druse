@@ -1,4 +1,5 @@
 :host {
+  container: status-bar / inline-size;
   display: flex;
   align-items: center;
   height: var(--dr-statusbar-height);
@@ -175,12 +176,11 @@
 }
 
 /*
- * Qué se suelta cuando la ventana estrecha, y en qué orden.
+ * Qué se suelta cuando se estrecha el panel, y en qué orden.
  *
- * La barra dice cuatro cosas de la sesión y tres del editor, y a menos de
- * 1.200 px no caben todas: hasta ahora la última simplemente se cortaba a mitad
- * de palabra —«Última eje…»—, que es la peor forma de no caber, porque parece
- * una avería y no una decisión.
+ * Cuenta el ancho de esta barra, porque el explorador y el asistente pueden
+ * ocupar buena parte de la ventana. Usar el viewport recortaba los datos de la
+ * sesión mientras conservaba la codificación y la duración.
  *
  * El orden va de lo prescindible a lo que no puede faltar: primero las palabras
  * que acompañan a los datos, luego cuánto tardó la última consulta —que ya se
@@ -190,7 +190,7 @@
  * usuario— no se suelta nunca**: es lo que evita ejecutar en la base
  * equivocada.
  */
-@media (max-width: 1280px) {
+@container status-bar (max-width: 1050px) {
   .item .text {
     display: none;
   }
@@ -201,7 +201,7 @@
   }
 }
 
-@media (max-width: 1100px) {
+@container status-bar (max-width: 850px) {
   .item--duration {
     display: none;
   }
@@ -213,14 +213,14 @@
   }
 }
 
-@media (max-width: 980px) {
+@container status-bar (max-width: 720px) {
   .item--encoding,
   .item--engine .version {
     display: none;
   }
 }
 
-@media (max-width: 880px) {
+@container status-bar (max-width: 620px) {
   .item--caret {
     display: none;
   }

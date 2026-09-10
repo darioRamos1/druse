@@ -359,6 +359,40 @@ test.describe('la interfaz por dentro', () => {
       .toBeGreaterThan(1);
   });
 
+  test('la barra de estado conserva los datos al abrir y ampliar el asistente', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1280, height: 720 });
+    await abrir(page);
+    await conectar(page);
+    await escribirSql(page, 'SELECT 1 AS uno');
+    await ejecutar(page, 'todo');
+    await page.getByRole('button', { name: 'Asistente', exact: true }).click();
+    const datos = page.locator(
+      'app-status-bar .item--database .mono, app-status-bar .item--user .mono',
+    );
+    const comprobar = async () => {
+      await expect(datos).toHaveCount(2);
+      await expect
+        .poll(() =>
+          datos.evaluateAll((elements) =>
+            elements.every(
+              (element) =>
+                element.clientWidth >= 40 && element.scrollWidth <= element.clientWidth + 1,
+            ),
+          ),
+        )
+        .toBe(true);
+      await expect(page.locator('app-status-bar .item--encoding')).toBeHidden();
+    };
+    await comprobar();
+    const separador = page.getByRole('separator', { name: 'Ancho del asistente', exact: true });
+    for (let step = 0; step < 4; step++) await separador.press('ArrowLeft');
+    await comprobar();
+    await separador.press('Escape');
+    await expect(page.locator('app-ai-panel')).toBeHidden();
+  });
+
   test('el chip de conexión abre su menú por encima del editor', async ({ page }) => {
     await abrir(page);
     await conectar(page);
