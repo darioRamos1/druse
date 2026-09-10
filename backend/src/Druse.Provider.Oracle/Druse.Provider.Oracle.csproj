@@ -1,0 +1,36 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\Druse.Database.Abstractions\Druse.Database.Abstractions.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!--
+      El cliente gestionado, no el que necesita Instant Client.
+
+      `Oracle.ManagedDataAccess.Core` habla el protocolo de Oracle en IL puro: no
+      hay binario nativo que instalar ni variables de entorno que preparar en la
+      máquina del usuario, que es lo que Druse promete. El otro camino —el puente
+      JDBC que ya existe por Informix— habría funcionado, pero cargaría con el
+      driver de Oracle y con IKVM para resolver un problema que aquí no hay.
+    -->
+    <PackageReference Include="Oracle.ManagedDataAccess.Core" Version="23.26.301" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!--
+      El normalizador y la fábrica de la cadena son internos —nadie fuera del
+      proveedor debe conocer los tipos de ODP.NET— pero son justo lo que se puede
+      probar sin un servidor delante: que el servicio y el SID se escriban donde
+      toca, y que un `ORA-…` se traduzca sin arrastrar la contraseña.
+    -->
+    <InternalsVisibleTo Include="Druse.UnitTests" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+</Project>

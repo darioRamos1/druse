@@ -29,4 +29,12 @@ public enum DatabaseEngine
     /// mismo motor, y el proveedor los comparte.
     /// </summary>
     InformixSqli = 5,
+
+    /// <summary>
+    /// Oracle Database, por su cliente gestionado.
+    ///
+    /// No hace falta Instant Client ni nada instalado en la máquina del usuario,
+    /// que es la promesa de Druse: lo que viaja es IL.
+    /// </summary>
+    Oracle = 6,
 }
