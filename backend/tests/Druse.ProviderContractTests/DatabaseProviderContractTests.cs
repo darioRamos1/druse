@@ -531,9 +531,16 @@ public abstract class DatabaseProviderContractTests<TFixture>
 
         var folders = await Fixture.Metadata.GetChildrenAsync(session, schema, CancellationToken.None);
 
-        Assert.Equal(4, folders.Count);
         Assert.All(folders, folder => Assert.Equal(DatabaseObjectKind.Folder, folder.Kind));
-        Assert.Equal(["Tables", "Views", "Functions", "Procedures"], folders.Select(f => f.Name));
+
+        // Un motor sin rutinas no enseña sus dos carpetas vacías: eso diría que la
+        // base no tiene ninguna, cuando lo que pasa es que el motor no sabe lo que
+        // son.
+        Assert.Equal(
+            Fixture.HasRoutines
+                ? ["Tables", "Views", "Functions", "Procedures"]
+                : (string[])["Tables", "Views"],
+            folders.Select(folder => folder.Name));
     }
 
     [Fact]
@@ -2576,7 +2583,7 @@ public abstract class DatabaseProviderContractTests<TFixture>
     [Fact]
     public async Task LeeLosParametrosDeUnProcedimiento()
     {
-        if (Skip) { return; }
+        if (Skip || !Fixture.HasRoutines) { return; }
 
         await using var session = await OpenAsync();
 
@@ -2683,7 +2690,7 @@ public abstract class DatabaseProviderContractTests<TFixture>
     [Fact]
     public async Task ObtieneLaDefinicionDeUnProcedimiento()
     {
-        if (Skip) { return; }
+        if (Skip || !Fixture.HasRoutines) { return; }
 
         await using var session = await OpenAsync();
 
@@ -2729,7 +2736,7 @@ public abstract class DatabaseProviderContractTests<TFixture>
     [Fact]
     public async Task UnaSegundaBaseAutorizada_SeListaYSePuedeRecorrer()
     {
-        if (Skip) { return; }
+        if (Skip || !Fixture.HasMultipleDatabases) { return; }
 
         var databaseName = Fixture.SecondaryDatabaseName;
         var schemaName = Fixture.DefaultSchemaFor(databaseName);

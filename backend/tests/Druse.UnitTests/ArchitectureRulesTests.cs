@@ -52,6 +52,7 @@ public sealed class ArchitectureRulesTests
         ["Druse.Provider.MySql"] = ["Druse.Database.Abstractions"],
         ["Druse.Provider.Oracle"] = ["Druse.Database.Abstractions"],
         ["Druse.Provider.PostgreSql"] = ["Druse.Database.Abstractions"],
+        ["Druse.Provider.Sqlite"] = ["Druse.Database.Abstractions"],
         ["Druse.Provider.SqlServer"] = ["Druse.Database.Abstractions"],
 
         // Capacidades nativas: solo su abstracción.
@@ -70,6 +71,7 @@ public sealed class ArchitectureRulesTests
             "Druse.Provider.MySql",
             "Druse.Provider.Oracle",
             "Druse.Provider.PostgreSql",
+            "Druse.Provider.Sqlite",
             "Druse.Provider.SqlServer",
             "Druse.Persistence.Sqlite",
             "Druse.Platform.Native",

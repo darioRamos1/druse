@@ -32,6 +32,7 @@
     <ProjectReference Include="..\..\src\Druse.Provider.MySql\Druse.Provider.MySql.csproj" />
     <ProjectReference Include="..\..\src\Druse.Provider.Oracle\Druse.Provider.Oracle.csproj" />
     <ProjectReference Include="..\..\src\Druse.Provider.PostgreSql\Druse.Provider.PostgreSql.csproj" />
+    <ProjectReference Include="..\..\src\Druse.Provider.Sqlite\Druse.Provider.Sqlite.csproj" />
     <ProjectReference Include="..\..\src\Druse.Provider.SqlServer\Druse.Provider.SqlServer.csproj" />
   </ItemGroup>
 

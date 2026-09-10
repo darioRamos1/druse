@@ -121,6 +121,25 @@ public interface IProviderFixture
     bool TransportsBooleans => true;
 
     /// <summary>
+    /// Si este motor tiene procedimientos y funciones almacenadas.
+    ///
+    /// **SQLite no.** No es que no traiga ninguno: es que no existe el concepto ni
+    /// el lenguaje en el que escribirlos. Lo que se le puede añadir son funciones
+    /// del programa que abre el archivo, y esas viven en el programa. Por eso su
+    /// árbol enseña dos carpetas y no cuatro.
+    /// </summary>
+    bool HasRoutines => true;
+
+    /// <summary>
+    /// Si en este motor una conexión llega a más de una base.
+    ///
+    /// **En SQLite el archivo es la base**, así que no hay a dónde ir sin cambiar
+    /// de archivo. Lo más parecido es `ATTACH`, que es una decisión del usuario
+    /// dentro de su sesión y no una base que estuviera ahí esperando.
+    /// </summary>
+    bool HasMultipleDatabases => true;
+
+    /// <summary>
     /// El nombre tal y como acaba guardado en este motor.
     ///
     /// Oracle **pasa a mayúsculas todo identificador que no vaya citado**, y el
