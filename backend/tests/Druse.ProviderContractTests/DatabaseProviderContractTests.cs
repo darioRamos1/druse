@@ -166,7 +166,7 @@ public abstract class DatabaseProviderContractTests<TFixture>
         Assert.Equal(QueryExecutionState.Succeeded, result.State);
         var set = Assert.Single(result.ResultSets);
         Assert.Equal(2, set.Columns.Count);
-        Assert.Equal("numero", set.Columns[0].Name);
+        Assert.Equal(Fixture.Stored("numero"), set.Columns[0].Name);
         Assert.Equal(["1", "texto"], set.Rows[0]);
     }
 
@@ -196,6 +196,17 @@ public abstract class DatabaseProviderContractTests<TFixture>
         var row = result.ResultSets[0].Rows[0];
 
         Assert.Null(row[0]);
+
+        // Un motor sin cadenas vacías —Oracle— llega hasta aquí: allí `''` **es**
+        // nulo, así que lo que se comprueba es que las dos columnas se lean
+        // igual, no que la segunda traiga un texto de cero caracteres que el
+        // motor no sabe representar.
+        if (!Fixture.HasEmptyStrings)
+        {
+            Assert.Null(row[1]);
+            return;
+        }
+
         Assert.Equal(string.Empty, row[1]);
     }
 
@@ -309,8 +320,8 @@ public abstract class DatabaseProviderContractTests<TFixture>
 
         Assert.Equal(QueryExecutionState.Succeeded, result.State);
         Assert.Equal(3, result.ResultSets.Count);
-        Assert.Equal("a", result.ResultSets[0].Columns[0].Name);
-        Assert.Equal("c", result.ResultSets[2].Columns[0].Name);
+        Assert.Equal(Fixture.Stored("a"), result.ResultSets[0].Columns[0].Name);
+        Assert.Equal(Fixture.Stored("c"), result.ResultSets[2].Columns[0].Name);
     }
 
     [Fact]
@@ -418,7 +429,7 @@ public abstract class DatabaseProviderContractTests<TFixture>
 
         await using var session = await OpenAsync();
 
-        var table = $"druse_tmp_{Guid.NewGuid():N}";
+        var table = Fixture.Stored($"druse_tmp_{Guid.NewGuid():N}");
 
         try
         {
@@ -532,7 +543,7 @@ public abstract class DatabaseProviderContractTests<TFixture>
 
         await using var session = await OpenAsync();
 
-        var table = $"druse_tmp_{Guid.NewGuid():N}";
+        var table = Fixture.Stored($"druse_tmp_{Guid.NewGuid():N}");
 
         try
         {
@@ -557,7 +568,7 @@ public abstract class DatabaseProviderContractTests<TFixture>
             Assert.Equal(4, columns.Count);
 
             var id = columns[0];
-            Assert.Equal("id", id.Name);
+            Assert.Equal(Fixture.Stored("id"), id.Name);
             Assert.True(id.IsPrimaryKey);
             Assert.False(id.IsNullable);
             Assert.True(id.IsGenerated);
@@ -597,7 +608,7 @@ public abstract class DatabaseProviderContractTests<TFixture>
 
         await using var session = await OpenAsync();
 
-        var table = $"druse_mid_{Guid.NewGuid().ToString("N")[..8]}";
+        var table = Fixture.Stored($"druse_mid_{Guid.NewGuid().ToString("N")[..8]}");
 
         var target = new DatabaseObject
         {
@@ -644,7 +655,7 @@ public abstract class DatabaseProviderContractTests<TFixture>
                 [
                     new IndexDefinition
                     {
-                        Name = $"ix_{table}",
+                        Name = Fixture.Stored($"ix_{table}"),
                         Columns = [new IndexColumn { Name = "no_existe" }],
                     },
                 ],
@@ -704,7 +715,7 @@ public abstract class DatabaseProviderContractTests<TFixture>
 
         await using var session = await OpenAsync();
 
-        var table = $"druse_col_{Guid.NewGuid().ToString("N")[..8]}";
+        var table = Fixture.Stored($"druse_col_{Guid.NewGuid().ToString("N")[..8]}");
 
         var target = new DatabaseObject
         {
@@ -800,7 +811,7 @@ public abstract class DatabaseProviderContractTests<TFixture>
 
         await using var session = await OpenAsync();
 
-        var table = $"druse_pk_{Guid.NewGuid().ToString("N")[..8]}";
+        var table = Fixture.Stored($"druse_pk_{Guid.NewGuid().ToString("N")[..8]}");
 
         var target = new DatabaseObject
         {
@@ -848,7 +859,7 @@ public abstract class DatabaseProviderContractTests<TFixture>
                 CancellationToken.None);
 
             Assert.NotNull(before.PrimaryKey);
-            Assert.Equal(["id"], before.PrimaryKey!.Columns);
+            Assert.Equal([Fixture.Stored("id")], before.PrimaryKey!.Columns);
 
             await Fixture.Designer.AlterAsync(
                 session,
@@ -858,7 +869,7 @@ public abstract class DatabaseProviderContractTests<TFixture>
                     DroppedPrimaryKeyName = before.PrimaryKey.Name,
                     NewPrimaryKey = new PrimaryKeyDefinition
                     {
-                        Name = $"pk_{table}",
+                        Name = Fixture.Stored($"pk_{table}"),
                         Columns = ["id", "codigo"],
                     },
                 },
@@ -870,7 +881,9 @@ public abstract class DatabaseProviderContractTests<TFixture>
                 CancellationToken.None);
 
             Assert.NotNull(after.PrimaryKey);
-            Assert.Equal(["id", "codigo"], after.PrimaryKey!.Columns);
+            Assert.Equal(
+                [Fixture.Stored("id"), Fixture.Stored("codigo")],
+                after.PrimaryKey!.Columns);
         }
         finally
         {
@@ -893,8 +906,8 @@ public abstract class DatabaseProviderContractTests<TFixture>
         await using var session = await OpenAsync();
 
         var suffix = Guid.NewGuid().ToString("N")[..8];
-        var parent = $"druse_fkp_{suffix}";
-        var child = $"druse_fkh_{suffix}";
+        var parent = Fixture.Stored($"druse_fkp_{suffix}");
+        var child = Fixture.Stored($"druse_fkh_{suffix}");
 
         var target = new DatabaseObject
         {
@@ -957,7 +970,7 @@ public abstract class DatabaseProviderContractTests<TFixture>
                     [
                         new ForeignKeyDefinition
                         {
-                            Name = $"fk_{child}",
+                            Name = Fixture.Stored($"fk_{child}"),
                             Columns = ["padre_id"],
                             ReferencedSchema = Fixture.DefaultSchema,
                             ReferencedTable = parent,
@@ -974,7 +987,7 @@ public abstract class DatabaseProviderContractTests<TFixture>
 
             var foreign = Assert.Single(structure.ForeignKeys);
 
-            Assert.Equal("padre_id", Assert.Single(foreign.Columns), ignoreCase: true);
+            Assert.Equal(Fixture.Stored("padre_id"), Assert.Single(foreign.Columns), ignoreCase: true);
             Assert.Equal(parent, foreign.ReferencedTable, ignoreCase: true);
 
             // Las columnas referenciadas se comprueban **si el motor las
@@ -1027,7 +1040,7 @@ public abstract class DatabaseProviderContractTests<TFixture>
 
         await using var session = await OpenAsync();
 
-        var table = $"druse_tmp_{Guid.NewGuid():N}";
+        var table = Fixture.Stored($"druse_tmp_{Guid.NewGuid():N}");
 
         try
         {
@@ -1049,7 +1062,7 @@ public abstract class DatabaseProviderContractTests<TFixture>
                 [
                     new IndexDefinition
                     {
-                        Name = $"ix_{table}",
+                        Name = Fixture.Stored($"ix_{table}"),
                         Columns = [new IndexColumn { Name = "id", Direction = IndexSortDirection.Descending }],
                     },
                 ],
@@ -1062,7 +1075,7 @@ public abstract class DatabaseProviderContractTests<TFixture>
                     [
                         new CheckConstraintDefinition
                         {
-                            Name = $"ck_{table}",
+                            Name = Fixture.Stored($"ck_{table}"),
                             Expression = "nombre <> ''",
                         },
                     ]
@@ -1076,28 +1089,28 @@ public abstract class DatabaseProviderContractTests<TFixture>
                 target,
                 CancellationToken.None);
 
-            var index = Assert.Single(structure.Indexes, item => item.Name == $"ix_{table}");
+            var index = Assert.Single(structure.Indexes, item => item.Name == Fixture.Stored($"ix_{table}"));
 
-            Assert.Equal("id", Assert.Single(index.Columns).Name);
+            Assert.Equal(Fixture.Stored("id"), Assert.Single(index.Columns).Name);
             Assert.False(index.IsPrimaryKey);
             Assert.False(index.IsConstraintIndex);
 
             // La clave primaria de la tabla llega como tal, y su índice queda
             // marcado para que la interfaz no ofrezca borrarlo suelto.
             Assert.NotNull(structure.PrimaryKey);
-            Assert.Contains("id", structure.PrimaryKey!.Columns);
+            Assert.Contains(Fixture.Stored("id"), structure.PrimaryKey!.Columns);
             Assert.Contains(structure.Indexes, item => item.IsPrimaryKey && item.IsConstraintIndex);
 
             if (Fixture.Designer.IndexCapabilities.SupportsCheckConstraints)
             {
-                Assert.Contains(structure.CheckConstraints, item => item.Name == $"ck_{table}");
+                Assert.Contains(structure.CheckConstraints, item => item.Name == Fixture.Stored($"ck_{table}"));
             }
 
             // Y al quitarlo, desaparece: leer después de borrar es lo que
             // distingue un borrado real de una instrucción que no hizo nada.
             await Fixture.Designer.AlterAsync(
                 session,
-                new TableAlteration { Table = target, DroppedIndexes = [$"ix_{table}"] },
+                new TableAlteration { Table = target, DroppedIndexes = [Fixture.Stored($"ix_{table}")] },
                 CancellationToken.None);
 
             var after = await Fixture.Metadata.GetTableStructureAsync(
@@ -1105,7 +1118,7 @@ public abstract class DatabaseProviderContractTests<TFixture>
                 target,
                 CancellationToken.None);
 
-            Assert.DoesNotContain(after.Indexes, item => item.Name == $"ix_{table}");
+            Assert.DoesNotContain(after.Indexes, item => item.Name == Fixture.Stored($"ix_{table}"));
         }
         finally
         {
@@ -1129,7 +1142,7 @@ public abstract class DatabaseProviderContractTests<TFixture>
 
         await using var session = await OpenAsync();
 
-        var table = $"druse_apl_{Guid.NewGuid().ToString("N")[..8]}";
+        var table = Fixture.Stored($"druse_apl_{Guid.NewGuid().ToString("N")[..8]}");
 
         try
         {
@@ -1178,7 +1191,7 @@ public abstract class DatabaseProviderContractTests<TFixture>
     {
         if (Skip) { return; }
 
-        var schema = $"druse_esq_{Guid.NewGuid().ToString("N")[..8]}";
+        var schema = Fixture.Stored($"druse_esq_{Guid.NewGuid().ToString("N")[..8]}");
         var script = Fixture.Scripter.ScriptSchema(schema);
 
         if (script.Count == 0)
@@ -1256,8 +1269,8 @@ public abstract class DatabaseProviderContractTests<TFixture>
         await using var session = await OpenAsync();
 
         var suffix = Guid.NewGuid().ToString("N")[..8];
-        var parent = $"druse_pad_{suffix}";
-        var child = $"druse_hij_{suffix}";
+        var parent = Fixture.Stored($"druse_pad_{suffix}");
+        var child = Fixture.Stored($"druse_hij_{suffix}");
 
         var target = new DatabaseObject
         {
@@ -1327,7 +1340,7 @@ public abstract class DatabaseProviderContractTests<TFixture>
                 [
                     new UniqueConstraintDefinition
                     {
-                        Name = $"uq_{child}",
+                        Name = Fixture.Stored($"uq_{child}"),
                         Columns = ["codigo"],
                     },
                 ],
@@ -1338,7 +1351,7 @@ public abstract class DatabaseProviderContractTests<TFixture>
                     [
                         new CheckConstraintDefinition
                         {
-                            Name = $"ck_{child}",
+                            Name = Fixture.Stored($"ck_{child}"),
                             Expression = "codigo <> ''",
                         },
                     ]
@@ -1347,7 +1360,7 @@ public abstract class DatabaseProviderContractTests<TFixture>
                 [
                     new ForeignKeyDefinition
                     {
-                        Name = $"fk_{child}",
+                        Name = Fixture.Stored($"fk_{child}"),
                         Columns = ["padre_id"],
                         ReferencedSchema = Fixture.DefaultSchema,
                         ReferencedTable = parent,
@@ -1358,7 +1371,7 @@ public abstract class DatabaseProviderContractTests<TFixture>
                 [
                     new IndexDefinition
                     {
-                        Name = $"ix_{child}",
+                        Name = Fixture.Stored($"ix_{child}"),
                         Columns = [new IndexColumn { Name = "total" }],
                     },
                 ],
@@ -1457,9 +1470,9 @@ public abstract class DatabaseProviderContractTests<TFixture>
             }
 
             // --- Índices, restricciones y claves foráneas ----------------------
-            var index = Assert.Single(after.Structure.Indexes, item => item.Name == $"ix_{child}");
+            var index = Assert.Single(after.Structure.Indexes, item => item.Name == Fixture.Stored($"ix_{child}"));
 
-            Assert.Equal("total", Assert.Single(index.Columns).Name);
+            Assert.Equal(Fixture.Stored("total"), Assert.Single(index.Columns).Name);
 
             // De la unicidad importan las columnas, que se comparan siempre; el
             // nombre solo donde el motor deje leerlo. En Informix lo que se lee es
@@ -1474,24 +1487,24 @@ public abstract class DatabaseProviderContractTests<TFixture>
 
             if (Fixture.Scripter.Capabilities.NamesUniqueConstraints)
             {
-                Assert.Contains(after.Structure.UniqueConstraints, item => item.Name == $"uq_{child}");
+                Assert.Contains(after.Structure.UniqueConstraints, item => item.Name == Fixture.Stored($"uq_{child}"));
             }
 
             if (Fixture.Designer.IndexCapabilities.SupportsCheckConstraints)
             {
-                Assert.Contains(after.Structure.CheckConstraints, item => item.Name == $"ck_{child}");
+                Assert.Contains(after.Structure.CheckConstraints, item => item.Name == Fixture.Stored($"ck_{child}"));
             }
 
             var sourceKey = Assert.Single(
                 before.Structure.ForeignKeys,
-                item => item.Name == $"fk_{child}");
+                item => item.Name == Fixture.Stored($"fk_{child}"));
 
             var foreignKey = Assert.Single(
                 after.Structure.ForeignKeys,
-                item => item.Name == $"fk_{child}");
+                item => item.Name == Fixture.Stored($"fk_{child}"));
 
             Assert.Equal(parent, foreignKey.ReferencedTable);
-            Assert.Equal("padre_id", Assert.Single(foreignKey.Columns));
+            Assert.Equal(Fixture.Stored("padre_id"), Assert.Single(foreignKey.Columns));
 
             // Las columnas referenciadas se comparan **entre las dos lecturas** y
             // no contra un literal: el catálogo de Informix no las entrega, y
@@ -1530,7 +1543,7 @@ public abstract class DatabaseProviderContractTests<TFixture>
 
         await using var session = await OpenAsync();
 
-        var name = $"druse_dat_{Guid.NewGuid().ToString("N")[..8]}";
+        var name = Fixture.Stored($"druse_dat_{Guid.NewGuid().ToString("N")[..8]}");
         var families = Fixture.TypesByFamily.Keys.Order().ToList();
 
         var target = new DatabaseObject
@@ -1572,7 +1585,7 @@ public abstract class DatabaseProviderContractTests<TFixture>
 
             var table = await ReadAsync(session, target);
             var columns = table.Columns
-                .Where(column => column.Name != "id")
+                .Where(column => column.Name != Fixture.Stored("id"))
                 .OrderBy(column => column.Ordinal)
                 .ToList();
 
@@ -1671,7 +1684,7 @@ public abstract class DatabaseProviderContractTests<TFixture>
 
         await using var session = await OpenAsync();
 
-        var name = $"druse_csv_{Guid.NewGuid().ToString("N")[..8]}";
+        var name = Fixture.Stored($"druse_csv_{Guid.NewGuid().ToString("N")[..8]}");
         var families = Fixture.TypesByFamily.Keys.Order().ToList();
 
         var target = new DatabaseObject
@@ -1713,7 +1726,7 @@ public abstract class DatabaseProviderContractTests<TFixture>
 
             var table = await ReadAsync(session, target);
             var columns = table.Columns
-                .Where(column => column.Name != "id")
+                .Where(column => column.Name != Fixture.Stored("id"))
                 .OrderBy(column => column.Ordinal)
                 .ToList();
 
@@ -1784,7 +1797,7 @@ public abstract class DatabaseProviderContractTests<TFixture>
 
         await using var session = await OpenAsync();
 
-        var name = $"druse_ins_{Guid.NewGuid().ToString("N")[..8]}";
+        var name = Fixture.Stored($"druse_ins_{Guid.NewGuid().ToString("N")[..8]}");
 
         var target = new DatabaseObject
         {
@@ -1848,7 +1861,7 @@ public abstract class DatabaseProviderContractTests<TFixture>
 
         await using var session = await OpenAsync();
 
-        var name = $"druse_fil_{Guid.NewGuid().ToString("N")[..8]}";
+        var name = Fixture.Stored($"druse_fil_{Guid.NewGuid().ToString("N")[..8]}");
 
         var target = new DatabaseObject
         {
@@ -1886,7 +1899,7 @@ public abstract class DatabaseProviderContractTests<TFixture>
             var withoutName = await ScriptAsync(
                 session,
                 table,
-                new TableDataFilter { ExcludedColumns = ["email"] });
+                new TableDataFilter { ExcludedColumns = [Fixture.Stored("email")] });
 
             Assert.NotEmpty(withoutName);
             Assert.All(withoutName, statement =>
@@ -1960,9 +1973,9 @@ public abstract class DatabaseProviderContractTests<TFixture>
         await using var session = await OpenAsync();
 
         var suffix = Guid.NewGuid().ToString("N")[..8];
-        var parent = $"druse_lote_p_{suffix}";
-        var child = $"druse_lote_h_{suffix}";
-        var alone = $"druse_lote_s_{suffix}";
+        var parent = Fixture.Stored($"druse_lote_p_{suffix}");
+        var child = Fixture.Stored($"druse_lote_h_{suffix}");
+        var alone = Fixture.Stored($"druse_lote_s_{suffix}");
 
         DatabaseObject Target(string name) => new()
         {
@@ -2046,7 +2059,7 @@ public abstract class DatabaseProviderContractTests<TFixture>
                     [
                         new ForeignKeyDefinition
                         {
-                            Name = $"fk_{child}",
+                            Name = Fixture.Stored($"fk_{child}"),
                             Columns = ["padre_id"],
                             ReferencedSchema = Fixture.DefaultSchema,
                             ReferencedTable = parent,
@@ -2142,7 +2155,7 @@ public abstract class DatabaseProviderContractTests<TFixture>
         if (Skip) { return; }
 
         await using var session = await OpenAsync();
-        var name = $"druse_up_{Guid.NewGuid().ToString("N")[..8]}";
+        var name = Fixture.Stored($"druse_up_{Guid.NewGuid().ToString("N")[..8]}");
         ScriptedTable? table = null;
 
         try
@@ -2186,7 +2199,7 @@ public abstract class DatabaseProviderContractTests<TFixture>
         if (Skip) { return; }
 
         await using var session = await OpenAsync();
-        var name = $"druse_up_{Guid.NewGuid().ToString("N")[..8]}";
+        var name = Fixture.Stored($"druse_up_{Guid.NewGuid().ToString("N")[..8]}");
         ScriptedTable? table = null;
 
         try
@@ -2231,7 +2244,7 @@ public abstract class DatabaseProviderContractTests<TFixture>
         if (Skip) { return; }
 
         await using var session = await OpenAsync();
-        var name = $"druse_up_{Guid.NewGuid().ToString("N")[..8]}";
+        var name = Fixture.Stored($"druse_up_{Guid.NewGuid().ToString("N")[..8]}");
         ScriptedTable? table = null;
 
         try
@@ -2276,7 +2289,7 @@ public abstract class DatabaseProviderContractTests<TFixture>
         if (Skip) { return; }
 
         await using var session = await OpenAsync();
-        var name = $"druse_up_{Guid.NewGuid().ToString("N")[..8]}";
+        var name = Fixture.Stored($"druse_up_{Guid.NewGuid().ToString("N")[..8]}");
         ScriptedTable? table = null;
 
         try
@@ -2320,7 +2333,7 @@ public abstract class DatabaseProviderContractTests<TFixture>
         if (Skip) { return; }
 
         await using var session = await OpenAsync();
-        var name = $"druse_up_{Guid.NewGuid().ToString("N")[..8]}";
+        var name = Fixture.Stored($"druse_up_{Guid.NewGuid().ToString("N")[..8]}");
         ScriptedTable? table = null;
 
         try
@@ -2567,7 +2580,7 @@ public abstract class DatabaseProviderContractTests<TFixture>
 
         await using var session = await OpenAsync();
 
-        var procedureName = $"druse_params_{Guid.NewGuid():N}";
+        var procedureName = Fixture.Stored($"druse_params_{Guid.NewGuid():N}");
 
         try
         {
@@ -2636,7 +2649,7 @@ public abstract class DatabaseProviderContractTests<TFixture>
 
         await using var session = await OpenAsync();
 
-        var viewName = $"druse_view_{Guid.NewGuid():N}";
+        var viewName = Fixture.Stored($"druse_view_{Guid.NewGuid():N}");
 
         try
         {
@@ -2674,7 +2687,7 @@ public abstract class DatabaseProviderContractTests<TFixture>
 
         await using var session = await OpenAsync();
 
-        var procedureName = $"druse_procedure_{Guid.NewGuid():N}";
+        var procedureName = Fixture.Stored($"druse_procedure_{Guid.NewGuid():N}");
 
         try
         {
@@ -2720,8 +2733,8 @@ public abstract class DatabaseProviderContractTests<TFixture>
 
         var databaseName = Fixture.SecondaryDatabaseName;
         var schemaName = Fixture.DefaultSchemaFor(databaseName);
-        var tableName = $"druse_multibase_{Guid.NewGuid():N}";
-        var viewName = $"druse_multibase_view_{Guid.NewGuid():N}";
+        var tableName = Fixture.Stored($"druse_multibase_{Guid.NewGuid():N}");
+        var viewName = Fixture.Stored($"druse_multibase_view_{Guid.NewGuid():N}");
 
         await using var browser = await OpenAsync();
         await using var selected = await Fixture.Provider.OpenDatabaseSessionAsync(
@@ -2804,7 +2817,7 @@ public abstract class DatabaseProviderContractTests<TFixture>
 
         await using var session = await OpenAsync();
 
-        var table = $"druse_tmp_{Guid.NewGuid():N}";
+        var table = Fixture.Stored($"druse_tmp_{Guid.NewGuid():N}");
 
         try
         {
@@ -2849,7 +2862,7 @@ public abstract class DatabaseProviderContractTests<TFixture>
 
         await using var session = await OpenAsync();
 
-        var table = $"druse_tmp_{Guid.NewGuid():N}";
+        var table = Fixture.Stored($"druse_tmp_{Guid.NewGuid():N}");
 
         try
         {
@@ -2891,7 +2904,7 @@ public abstract class DatabaseProviderContractTests<TFixture>
 
         await using var session = await OpenAsync();
 
-        var table = $"druse_tmp_{Guid.NewGuid():N}";
+        var table = Fixture.Stored($"druse_tmp_{Guid.NewGuid():N}");
 
         try
         {
@@ -2953,7 +2966,7 @@ public abstract class DatabaseProviderContractTests<TFixture>
 
         // Se comprueba la forma, no el dialecto: cada motor cita a su manera.
         Assert.StartsWith("UPDATE ", sql, StringComparison.Ordinal);
-        Assert.Contains("usuarios", sql, StringComparison.Ordinal);
+        Assert.Contains(Fixture.Stored("usuarios"), sql, StringComparison.Ordinal);
         Assert.Contains("SET ", sql, StringComparison.Ordinal);
         Assert.Contains("'Ana'", sql, StringComparison.Ordinal);
         Assert.Contains("WHERE ", sql, StringComparison.Ordinal);
@@ -2967,7 +2980,7 @@ public abstract class DatabaseProviderContractTests<TFixture>
 
         await using var session = await OpenAsync();
 
-        var table = $"druse_tmp_{Guid.NewGuid():N}";
+        var table = Fixture.Stored($"druse_tmp_{Guid.NewGuid():N}");
 
         try
         {

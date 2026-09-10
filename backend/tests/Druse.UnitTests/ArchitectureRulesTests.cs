@@ -50,6 +50,7 @@ public sealed class ArchitectureRulesTests
         // IBM y SQLI con el puente JDBC.
         ["Druse.Provider.Informix"] = ["Druse.Database.Abstractions", "Druse.Jdbc"],
         ["Druse.Provider.MySql"] = ["Druse.Database.Abstractions"],
+        ["Druse.Provider.Oracle"] = ["Druse.Database.Abstractions"],
         ["Druse.Provider.PostgreSql"] = ["Druse.Database.Abstractions"],
         ["Druse.Provider.SqlServer"] = ["Druse.Database.Abstractions"],
 
@@ -67,6 +68,7 @@ public sealed class ArchitectureRulesTests
             "Druse.Infrastructure",
             "Druse.Provider.Informix",
             "Druse.Provider.MySql",
+            "Druse.Provider.Oracle",
             "Druse.Provider.PostgreSql",
             "Druse.Provider.SqlServer",
             "Druse.Persistence.Sqlite",

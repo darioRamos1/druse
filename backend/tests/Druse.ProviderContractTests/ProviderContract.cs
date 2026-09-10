@@ -120,6 +120,37 @@ public interface IProviderFixture
     /// </summary>
     bool TransportsBooleans => true;
 
+    /// <summary>
+    /// El nombre tal y como acaba guardado en este motor.
+    ///
+    /// Oracle **pasa a mayúsculas todo identificador que no vaya citado**, y el
+    /// proveedor lo respeta en lugar de citarlo todo: una tabla creada desde
+    /// Druse tiene que poder leerse después desde SQL*Plus o desde cualquier
+    /// informe, y para eso se llama `CLIENTES` y no `clientes` (ver
+    /// `OracleIdentifier`).
+    ///
+    /// La consecuencia es que el nombre con el que se crea algo no es el que
+    /// devuelve el catálogo, y estas pruebas comparan las dos cosas. Se aplica
+    /// donde se compara con lo que el motor devolvió: nombres de objeto, alias de
+    /// una consulta y columnas leídas del catálogo.
+    /// </summary>
+    string Stored(string name) => name;
+
+    /// <summary>
+    /// Si en este motor una cadena vacía es distinta de un nulo.
+    ///
+    /// En Oracle **no lo es**: `''` es `NULL`, no hay forma de guardar un texto de
+    /// cero caracteres y `''` en una consulta devuelve nulo. No es un detalle
+    /// exótico —es de lo primero que sorprende a quien llega de otro motor— y
+    /// afecta a todo lo que se escriba encima: un filtro por cadena vacía no
+    /// encuentra nada, y una columna obligatoria acepta `''` porque para el motor
+    /// es lo mismo que no poner nada.
+    ///
+    /// Se declara aquí porque no se puede fingir: la prueba comprueba lo que el
+    /// motor devuelve, y en Oracle devuelve nulo por definición.
+    /// </summary>
+    bool HasEmptyStrings => true;
+
     /// <summary>Consulta con un valor de cada tipo básico, en este orden:
     /// entero, decimal 3.5, booleano verdadero, fecha 2026-08-11.</summary>
     string SelectBasicTypes { get; }

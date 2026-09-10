@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env pwsh
+#!/usr/bin/env pwsh
 <#
 .SYNOPSIS
     Levanta o retira los motores desechables que usan las pruebas.
@@ -12,10 +12,11 @@
 
     Si un puerto está ocupado, pásale otro y exporta la variable correspondiente
     antes de ejecutar las pruebas (DRUSE_TEST_PG_PORT, DRUSE_TEST_MSSQL_PORT,
-    DRUSE_TEST_MYSQL_PORT).
+    DRUSE_TEST_MYSQL_PORT, DRUSE_TEST_ORACLE_PORT).
 
 .PARAMETER Engine
-    Qué motor levantar: postgres, sqlserver, mysql o all (por defecto).
+    Qué motor levantar: postgres, sqlserver, mysql, oracle, informix o all
+    (por defecto).
 
 .PARAMETER Down
     Detiene y elimina los contenedores en lugar de crearlos.
@@ -32,12 +33,13 @@
 #>
 [CmdletBinding()]
 param(
-    [ValidateSet('all', 'postgres', 'sqlserver', 'mysql', 'informix')]
+    [ValidateSet('all', 'postgres', 'sqlserver', 'mysql', 'oracle', 'informix')]
     [string]$Engine = 'all',
 
     [int]$PostgresPort = 55440,
     [int]$SqlServerPort = 14433,
     [int]$MySqlPort = 33306,
+    [int]$OraclePort = 15210,
     [int]$InformixPort = 9089,
     [int]$InformixSqliPort = 9088,
     [switch]$Down
@@ -48,6 +50,7 @@ $ErrorActionPreference = 'Stop'
 $PostgresName = 'druse-pg-test'
 $SqlServerName = 'druse-mssql-test'
 $MySqlName = 'druse-mysql-test'
+$OracleName = 'druse-oracle-test'
 $InformixName = 'druse-informix-test'
 
 function Remove-Container([string]$Name) {
@@ -59,6 +62,7 @@ if ($Down) {
     if ($Engine -in 'all', 'postgres') { Remove-Container $PostgresName }
     if ($Engine -in 'all', 'sqlserver') { Remove-Container $SqlServerName }
     if ($Engine -in 'all', 'mysql') { Remove-Container $MySqlName }
+    if ($Engine -in 'all', 'oracle') { Remove-Container $OracleName }
     if ($Engine -in 'all', 'informix') { Remove-Container $InformixName }
 
     Write-Host 'Listo.' -ForegroundColor Green
@@ -214,6 +218,81 @@ if ($Engine -in 'all', 'mysql') {
     else {
         throw "$MySqlName no respondió a tiempo."
     }
+}
+
+# --- Oracle -----------------------------------------------------------------
+if ($Engine -in 'all', 'oracle') {
+    if (Test-ContainerExists $OracleName) {
+        Write-Host "$OracleName ya existe; se reinicia." -ForegroundColor Cyan
+        docker start $OracleName | Out-Null
+    }
+    else {
+        Write-Host "Creando $OracleName en el puerto $OraclePort..." -ForegroundColor Cyan
+        Write-Host '  (la imagen ocupa ~2 GB y el primer arranque tarda un par de minutos)' -ForegroundColor DarkGray
+
+        # La imagen de `gvenzl` y no la oficial de Oracle: pesa la mitad, arranca
+        # sola y no exige aceptar una licencia a mano en el registro.
+        docker run -d `
+            --name $OracleName `
+            -e ORACLE_PASSWORD=druse_dev_only `
+            -e APP_USER=druse `
+            -e APP_USER_PASSWORD=druse_dev_only `
+            -p "${OraclePort}:1521" `
+            gvenzl/oracle-free:slim | Out-Null
+    }
+
+    # Oracle es el que más tarda de los cinco: la primera vez crea la base.
+    $ready = $false
+
+    foreach ($attempt in 1..180) {
+        Start-Sleep -Seconds 1
+
+        docker exec $OracleName bash -lc "echo 'SELECT 1 FROM DUAL;' | sqlplus -s system/druse_dev_only@localhost/FREEPDB1" 2>$null | Out-Null
+
+        if ($LASTEXITCODE -eq 0) { $ready = $true; break }
+    }
+
+    if (-not $ready) {
+        throw "$OracleName no respondió a tiempo."
+    }
+
+    # El segundo esquema y los permisos que pide el contrato.
+    #
+    # Los `ANY` son para que el usuario de pruebas pueda crear y borrar en el
+    # segundo esquema, que es lo que comprueba la navegación entre esquemas. En
+    # una instalación de verdad nadie los tiene, y no hacen falta: solo esta
+    # prueba trabaja fuera de su propio esquema.
+    #
+    # `SELECT ANY SEQUENCE` no es de más: una columna de identidad crea por
+    # detrás una secuencia, y sin poder leerla el `CREATE TABLE` en el otro
+    # esquema falla con `ORA-41900`.
+    $preparacion = @'
+DECLARE
+  ya NUMBER;
+BEGIN
+  SELECT COUNT(*) INTO ya FROM all_users WHERE username = 'DRUSE_SECUNDARIO';
+  IF ya = 0 THEN
+    EXECUTE IMMEDIATE 'CREATE USER druse_secundario IDENTIFIED BY druse_dev_only';
+    EXECUTE IMMEDIATE 'ALTER USER druse_secundario QUOTA UNLIMITED ON USERS';
+  END IF;
+END;
+/
+GRANT CREATE SESSION, CREATE TABLE, CREATE VIEW, CREATE PROCEDURE,
+      CREATE SEQUENCE, CREATE TRIGGER, CREATE SYNONYM TO druse;
+ALTER USER druse QUOTA UNLIMITED ON USERS;
+GRANT CREATE ANY TABLE, ALTER ANY TABLE, DROP ANY TABLE,
+      SELECT ANY TABLE, INSERT ANY TABLE, UPDATE ANY TABLE, DELETE ANY TABLE,
+      CREATE ANY VIEW, DROP ANY VIEW,
+      CREATE ANY PROCEDURE, DROP ANY PROCEDURE, EXECUTE ANY PROCEDURE,
+      CREATE ANY INDEX, DROP ANY INDEX,
+      CREATE ANY SEQUENCE, DROP ANY SEQUENCE, SELECT ANY SEQUENCE TO druse;
+EXIT;
+'@
+
+    $preparacion | docker exec -i $OracleName bash -lc "cat > /tmp/druse-setup.sql" | Out-Null
+    docker exec $OracleName bash -lc "sqlplus -s system/druse_dev_only@localhost/FREEPDB1 @/tmp/druse-setup.sql" | Out-Null
+
+    Write-Host "  Oracle listo en 127.0.0.1:$OraclePort, servicio FREEPDB1, usuario druse" -ForegroundColor Green
 }
 
 # --- Informix ---------------------------------------------------------------

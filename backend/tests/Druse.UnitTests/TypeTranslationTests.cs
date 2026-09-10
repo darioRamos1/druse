@@ -4,6 +4,7 @@ using Druse.Database.Abstractions;
 using Druse.Domain;
 using Druse.Provider.Informix;
 using Druse.Provider.MySql;
+using Druse.Provider.Oracle;
 using Druse.Provider.PostgreSql;
 using Druse.Provider.SqlServer;
 
@@ -228,6 +229,39 @@ public sealed class TypeTranslationTests
         Assert.Contains("excluir la columna", translation.Note!, StringComparison.Ordinal);
     }
 
+    /// <summary>
+    /// Oracle no tiene booleano, y llevarle uno se avisa.
+    ///
+    /// Como columna solo existe desde 23ai, y la inmensa mayoría de las
+    /// instalaciones no lo son: el valor llega como 1 y 0, que significa lo mismo
+    /// pero se lee como número.
+    /// </summary>
+    [Fact]
+    public void UnBooleanoQueLlegaAOracleSeAvisa()
+    {
+        var translation = Translate(DatabaseEngine.PostgreSql, DatabaseEngine.Oracle, "boolean");
+
+        Assert.Equal("NUMBER(1)", translation.TargetType);
+        Assert.Equal(TranslationFidelity.Approximate, translation.Fidelity);
+        Assert.Contains("1 y 0", translation.Note!, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// Pero la zona horaria sí la conserva, y entonces no se dice nada.
+    ///
+    /// Es lo que separa un aviso útil de un aviso de más: Oracle guarda el huso
+    /// junto a la marca de tiempo, como PostgreSQL y SQL Server, y al revés que
+    /// MySQL e Informix.
+    /// </summary>
+    [Fact]
+    public void UnaMarcaConZonaQueLlegaAOracleNoAvisaDeNada()
+    {
+        var translation = Translate(DatabaseEngine.PostgreSql, DatabaseEngine.Oracle, "timestamptz");
+
+        Assert.Equal("TIMESTAMP(6) WITH TIME ZONE", translation.TargetType);
+        Assert.Equal(TranslationFidelity.Exact, translation.Fidelity);
+    }
+
     // -----------------------------------------------------------------------
     // Lo que hereda un motor nuevo
     // -----------------------------------------------------------------------
@@ -324,6 +358,7 @@ public sealed class TypeTranslationTests
             DatabaseEngine.PostgreSql => new PostgreSqlTableDesigner(),
             DatabaseEngine.SqlServer => new SqlServerTableDesigner(),
             DatabaseEngine.MySql => new MySqlTableDesigner(),
+            DatabaseEngine.Oracle => new OracleTableDesigner(),
             Inventado => new PostgreSqlTableDesigner(),
             _ => new InformixTableDesigner(),
         };
@@ -333,6 +368,7 @@ public sealed class TypeTranslationTests
             DatabaseEngine.PostgreSql => new PostgreSqlDatabaseProvider(),
             DatabaseEngine.SqlServer => new SqlServerDatabaseProvider(),
             DatabaseEngine.MySql => new MySqlDatabaseProvider(),
+            DatabaseEngine.Oracle => new OracleDatabaseProvider(),
             DatabaseEngine.InformixSqli => new InformixDatabaseProvider(engine),
             Inventado => new MotorInventado(_inventadas),
             _ => new InformixDatabaseProvider(),

@@ -7,11 +7,12 @@
 # reutilizarse para nada más ni parecerse a credenciales reales (plan §11).
 #
 # Uso:
-#   ./build/scripts/test-db.sh                  # los tres motores
+#   ./build/scripts/test-db.sh                  # todos los motores
 #   ./build/scripts/test-db.sh postgres         # solo PostgreSQL
 #   ./build/scripts/test-db.sh sqlserver        # solo SQL Server
 #   ./build/scripts/test-db.sh mysql            # solo MySQL
-#   ./build/scripts/test-db.sh down             # eliminar los tres
+#   ./build/scripts/test-db.sh oracle           # solo Oracle
+#   ./build/scripts/test-db.sh down             # eliminar todos
 
 set -euo pipefail
 
@@ -29,10 +30,15 @@ MYSQL_PORT="${DRUSE_TEST_MYSQL_PORT:-33306}"
 MYSQL_IMAGE="${DRUSE_TEST_MYSQL_IMAGE:-mysql:8.4}"
 MYSQL_PASSWORD='druse_dev_only'
 
+ORACLE_NAME="${DRUSE_TEST_ORACLE_NAME:-druse-oracle-test}"
+ORACLE_PORT="${DRUSE_TEST_ORACLE_PORT:-15210}"
+ORACLE_IMAGE="${DRUSE_TEST_ORACLE_IMAGE:-gvenzl/oracle-free:slim}"
+ORACLE_PASSWORD='druse_dev_only'
+
 TARGET="${1:-all}"
 
 if [[ "$TARGET" == "down" ]]; then
-    for name in "$PG_NAME" "$MSSQL_NAME" "$MYSQL_NAME"; do
+    for name in "$PG_NAME" "$MSSQL_NAME" "$MYSQL_NAME" "$ORACLE_NAME"; do
         echo "Eliminando $name..."
         docker rm -f "$name" >/dev/null 2>&1 || true
     done
@@ -144,6 +150,60 @@ if [[ "$TARGET" == "all" || "$TARGET" == "mysql" ]]; then
     docker exec "$MYSQL_NAME" mysql -uroot -p"$MYSQL_PASSWORD" \
         -e 'CREATE DATABASE IF NOT EXISTS druse_test_secondary;' >/dev/null 2>&1
     echo "  MySQL listo en 127.0.0.1:$MYSQL_PORT"
+fi
+
+# --- Oracle -----------------------------------------------------------------
+if [[ "$TARGET" == "all" || "$TARGET" == "oracle" ]]; then
+    if container_exists "$ORACLE_NAME"; then
+        echo "$ORACLE_NAME ya existe; se reinicia."
+        docker start "$ORACLE_NAME" >/dev/null
+    else
+        echo "Creando $ORACLE_NAME en el puerto $ORACLE_PORT..."
+        echo "  (la imagen ocupa ~2 GB y el primer arranque tarda un par de minutos)"
+        docker run -d             --name "$ORACLE_NAME"             -e "ORACLE_PASSWORD=$ORACLE_PASSWORD"             -e APP_USER=druse             -e "APP_USER_PASSWORD=$ORACLE_PASSWORD"             -p "${ORACLE_PORT}:1521"             "$ORACLE_IMAGE" >/dev/null
+    fi
+
+    ready=0
+    for _ in $(seq 1 180); do
+        sleep 1
+        if docker exec "$ORACLE_NAME" bash -lc             "echo 'SELECT 1 FROM DUAL;' | sqlplus -s system/$ORACLE_PASSWORD@localhost/FREEPDB1"             >/dev/null 2>&1; then
+            ready=1
+            break
+        fi
+    done
+
+    [[ "$ready" -eq 1 ]] || { echo "$ORACLE_NAME no respondió a tiempo." >&2; exit 1; }
+
+    # El segundo esquema y los permisos que pide el contrato. Los `ANY` son para
+    # poder crear y borrar en ese segundo esquema, que es lo único que trabaja
+    # fuera del suyo; `SELECT ANY SEQUENCE` hace falta porque una columna de
+    # identidad crea una secuencia por detrás.
+    docker exec -i "$ORACLE_NAME" bash -lc "cat > /tmp/druse-setup.sql" <<'SQL'
+DECLARE
+  ya NUMBER;
+BEGIN
+  SELECT COUNT(*) INTO ya FROM all_users WHERE username = 'DRUSE_SECUNDARIO';
+  IF ya = 0 THEN
+    EXECUTE IMMEDIATE 'CREATE USER druse_secundario IDENTIFIED BY druse_dev_only';
+    EXECUTE IMMEDIATE 'ALTER USER druse_secundario QUOTA UNLIMITED ON USERS';
+  END IF;
+END;
+/
+GRANT CREATE SESSION, CREATE TABLE, CREATE VIEW, CREATE PROCEDURE,
+      CREATE SEQUENCE, CREATE TRIGGER, CREATE SYNONYM TO druse;
+ALTER USER druse QUOTA UNLIMITED ON USERS;
+GRANT CREATE ANY TABLE, ALTER ANY TABLE, DROP ANY TABLE,
+      SELECT ANY TABLE, INSERT ANY TABLE, UPDATE ANY TABLE, DELETE ANY TABLE,
+      CREATE ANY VIEW, DROP ANY VIEW,
+      CREATE ANY PROCEDURE, DROP ANY PROCEDURE, EXECUTE ANY PROCEDURE,
+      CREATE ANY INDEX, DROP ANY INDEX,
+      CREATE ANY SEQUENCE, DROP ANY SEQUENCE, SELECT ANY SEQUENCE TO druse;
+EXIT;
+SQL
+
+    docker exec "$ORACLE_NAME" bash -lc         "sqlplus -s system/$ORACLE_PASSWORD@localhost/FREEPDB1 @/tmp/druse-setup.sql" >/dev/null
+
+    echo "  Oracle listo en 127.0.0.1:$ORACLE_PORT, servicio FREEPDB1, usuario druse"
 fi
 
 echo

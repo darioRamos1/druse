@@ -224,6 +224,33 @@ public sealed class ReadOnlySessionTests
         Assert.False(session.ReadOnlyEnforcedByEngine);
     }
 
+    /// <summary>
+    /// Oracle tampoco promete lo que no da.
+    ///
+    /// Tiene `SET TRANSACTION READ ONLY`, que a primera vista parece justo lo que
+    /// hace falta, pero **dura lo que dura una transacción**: se pierde en el
+    /// primer `COMMIT` y no vuelve sola. No es un modo de la sesión como el de
+    /// PostgreSQL o MySQL, así que enseñar el mismo candado sería enseñar uno que
+    /// se abre solo a la primera confirmación.
+    ///
+    /// La prueba existe para que **si algún día cambia, alguien se entere**.
+    /// </summary>
+    [Fact]
+    public async Task Oracle_NoPrometeUnaProteccionQueElMotorNoDa()
+    {
+        var fixture = new OracleFixture();
+
+        if (!fixture.IsAvailable) { return; }
+
+        await using var session = await fixture.Provider.OpenSessionAsync(
+            fixture.Profile(onlyRead: true),
+            fixture.Credentials,
+            CancellationToken.None);
+
+        Assert.True(session.Profile.ReadOnly);
+        Assert.False(session.ReadOnlyEnforcedByEngine);
+    }
+
     private static QueryRequest Query(string sql) => new()
     {
         SessionId = Guid.NewGuid(),
