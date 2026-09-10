@@ -207,4 +207,6 @@ Los recorridos E2E se actualizaron para abrir Opciones avanzadas antes de elegir
 
 El barrido con datos reales detectó que base y usuario se reducían a unos pocos caracteres al abrir el asistente en una ventana de 1280 px. La barra conservaba duración, versión y codificación porque sus reglas dependían del viewport. Ahora usa consultas de contenedor sobre su propio ancho y retira primero esa información secundaria; los nombres completos también quedan disponibles en sus títulos.
 
-La nueva regresión E2E pasó con PostgreSQL real: base y usuario caben al abrir el asistente y después de ampliarlo 64 píxeles. La compilación y el typecheck son correctos. Las capturas automáticas están en `e2e/barrido/ui-ux-2026-09-10/`, un directorio local excluido de Git.
+La nueva regresión E2E pasó con PostgreSQL real: base y usuario caben al abrir el asistente y después de ampliarlo 64 píxeles. También pasaron las 11 pruebas de la barra de estado, la compilación (425,41 kB iniciales) y el typecheck.
+
+El barrido final terminó correctamente con **43 capturas**, consola limpia y sin los recortes de base y usuario que detectó la primera pasada. Se revisaron visualmente Preferencias, Actividad, alcance de exportación y filtros, el asistente en sus dos anchos y la vista de 900 px. Solo se omitió la captura de procedimientos porque la base de prueba no contiene ninguno. Las imágenes finales están en `e2e/barrido/ui-ux-2026-09-10-final/`, un directorio local excluido de Git; las de antes del ajuste se conservan en `e2e/barrido/ui-ux-2026-09-10/` para comparar.
