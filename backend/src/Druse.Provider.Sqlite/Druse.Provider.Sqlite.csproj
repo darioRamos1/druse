@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\Druse.Database.Abstractions\Druse.Database.Abstractions.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!--
+      El mismo paquete que ya usa la persistencia local de Druse, y por eso este
+      motor **no engorda el instalador**: la biblioteca nativa ya viaja dentro.
+
+      Es la única dependencia de los cinco proveedores que no había que traer.
+    -->
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.11" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!--
+      La fábrica de la cadena y el normalizador son internos —nadie fuera del
+      proveedor debe conocer los tipos de Microsoft.Data.Sqlite— pero son lo que
+      se puede comprobar sin abrir un archivo: que el modo de solo lectura llegue
+      donde tiene que llegar, y que un archivo que no está se cuente como tal.
+    -->
+    <InternalsVisibleTo Include="Druse.UnitTests" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+</Project>

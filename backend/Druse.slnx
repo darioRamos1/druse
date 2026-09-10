@@ -13,6 +13,7 @@
     <Project Path="src/Druse.Provider.MySql/Druse.Provider.MySql.csproj" />
     <Project Path="src/Druse.Provider.Oracle/Druse.Provider.Oracle.csproj" />
     <Project Path="src/Druse.Provider.PostgreSql/Druse.Provider.PostgreSql.csproj" />
+    <Project Path="src/Druse.Provider.Sqlite/Druse.Provider.Sqlite.csproj" />
     <Project Path="src/Druse.Provider.SqlServer/Druse.Provider.SqlServer.csproj" />
     <Project Path="src/Druse.Ssh/Druse.Ssh.csproj" />
   </Folder>

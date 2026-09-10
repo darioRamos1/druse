@@ -22,6 +22,7 @@
     <ProjectReference Include="..\Druse.Provider.MySql\Druse.Provider.MySql.csproj" />
     <ProjectReference Include="..\Druse.Provider.Oracle\Druse.Provider.Oracle.csproj" />
     <ProjectReference Include="..\Druse.Provider.PostgreSql\Druse.Provider.PostgreSql.csproj" />
+    <ProjectReference Include="..\Druse.Provider.Sqlite\Druse.Provider.Sqlite.csproj" />
     <ProjectReference Include="..\Druse.Provider.SqlServer\Druse.Provider.SqlServer.csproj" />
     <ProjectReference Include="..\Druse.Persistence.Sqlite\Druse.Persistence.Sqlite.csproj" />
     <ProjectReference Include="..\Druse.Platform.Native\Druse.Platform.Native.csproj" />

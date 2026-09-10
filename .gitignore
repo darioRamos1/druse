@@ -536,6 +536,14 @@ build/artifacts/
 backend/src/Druse.Persistence.Sqlite/*
 !backend/src/Druse.Persistence.Sqlite/*.cs
 !backend/src/Druse.Persistence.Sqlite/Druse.Persistence.Sqlite.csproj
+
+# Y lo mismo con el proveedor, por lo mismo: en Windows la comparación no
+# distingue mayúsculas, así que `*.sqlite` se tragaba el directorio entero y el
+# proyecto se quedaba fuera del commit **sin decir nada**.
+!backend/src/Druse.Provider.Sqlite/
+backend/src/Druse.Provider.Sqlite/*
+!backend/src/Druse.Provider.Sqlite/*.cs
+!backend/src/Druse.Provider.Sqlite/Druse.Provider.Sqlite.csproj
 appsettings.Local.json
 appsettings.*.Local.json
 secrets.json

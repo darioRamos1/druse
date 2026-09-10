@@ -29,6 +29,7 @@ using Druse.Provider.Informix;
 using Druse.Provider.MySql;
 using Druse.Provider.Oracle;
 using Druse.Provider.PostgreSql;
+using Druse.Provider.Sqlite;
 using Druse.Provider.SqlServer;
 using Druse.Ssh;
 
@@ -134,6 +135,13 @@ internal static class DependencyInjection
         services.AddSingleton<IRowEditor, SqlServerRowEditor>();
         services.AddSingleton<ITableDesigner, SqlServerTableDesigner>();
         services.AddSingleton<IDatabaseScripter, SqlServerTableDesigner>();
+
+        services.AddSingleton<IDatabaseProvider, SqliteDatabaseProvider>();
+        services.AddSingleton<IDatabaseMetadataReader, SqliteMetadataReader>();
+        services.AddSingleton<IQueryExecutor, SqliteQueryExecutor>();
+        services.AddSingleton<IRowEditor, SqliteRowEditor>();
+        services.AddSingleton<ITableDesigner, SqliteTableDesigner>();
+        services.AddSingleton<IDatabaseScripter, SqliteTableDesigner>();
 
         services.AddSingleton<IDatabaseProvider, OracleDatabaseProvider>();
         services.AddSingleton<IDatabaseMetadataReader, OracleMetadataReader>();
