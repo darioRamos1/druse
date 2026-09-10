@@ -14,6 +14,8 @@ import { ConnectionDialog } from './connection-dialog';
 const CORRIENTES: EngineCapabilities = {
   requiresHost: true,
   requiresUsername: true,
+  requiresDatabase: false,
+  usesFilePath: false,
   requiresLogicalServer: false,
   supportsIntegratedSecurity: false,
   supportsSshTunnel: true,
@@ -49,6 +51,17 @@ const ENGINES: readonly EngineInfo[] = [
   motor('mysql', 'MySQL', 3306, '', { enforcesReadOnlySessions: true }),
   motor('informix', 'Informix (DRDA)', 9089, 'sysmaster'),
   motor('informixsqli', 'Informix', 9088, 'sysmaster', { requiresLogicalServer: true }),
+  // El que no es un servidor: sin host, sin usuario, con ruta obligatoria y sin
+  // nada que cifrar ni por donde tunelar.
+  motor('sqlite', 'SQLite', 0, '', {
+    requiresHost: false,
+    requiresUsername: false,
+    requiresDatabase: true,
+    usesFilePath: true,
+    supportsSshTunnel: false,
+    supportsTransportEncryption: false,
+    enforcesReadOnlySessions: true,
+  }),
 ];
 
 describe('ConnectionDialog', () => {
@@ -659,7 +672,9 @@ describe('ConnectionDialog', () => {
   });
 
   it('agrupa Informix y conserva DRDA al volver a pulsar su tarjeta', async () => {
-    expect(fixture.nativeElement.querySelectorAll('.engine')).toHaveLength(4);
+    // Cinco tarjetas para seis motores: Informix agrupa sus dos protocolos en
+    // una, que es lo que esta prueba comprueba.
+    expect(fixture.nativeElement.querySelectorAll('.engine')).toHaveLength(5);
     button('Informix').click();
     fixture.detectChanges();
     button('DRDA').click();

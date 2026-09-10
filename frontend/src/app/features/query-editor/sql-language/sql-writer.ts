@@ -560,6 +560,11 @@ export function buildCall(engine: DatabaseEngine, spec: CallSpec): string {
       return buildInformixCall(target, spec.parameters, salidas);
     case 'oracle':
       return buildOracleCall(target, spec.parameters, salidas);
+    case 'sqlite':
+      // No hay procedimientos que llamar, y no es que la base no tenga ninguno:
+      // el motor no sabe lo que son. El explorador ni siquiera enseña la carpeta,
+      // así que aquí no se llega salvo por un guion escrito a mano.
+      return '-- SQLite no tiene procedimientos almacenados: no hay nada que llamar.\n';
   }
 }
 

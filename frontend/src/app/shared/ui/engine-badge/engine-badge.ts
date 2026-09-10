@@ -9,6 +9,7 @@ const ENGINE_LABELS: Readonly<Record<DatabaseEngine, string>> = {
   informix: 'IX',
   informixsqli: 'IX',
   oracle: 'OR',
+  sqlite: 'SL',
 };
 
 /**
@@ -25,6 +26,7 @@ export const ENGINE_NAMES: Readonly<Record<DatabaseEngine, string>> = {
   informix: 'Informix (DRDA)',
   informixsqli: 'Informix',
   oracle: 'Oracle',
+  sqlite: 'SQLite',
 };
 
 /**
@@ -46,6 +48,7 @@ export const ENGINE_VERSIONS: Readonly<Record<DatabaseEngine, string>> = {
   informix: '12.10+ · protocolo DRDA',
   informixsqli: '12.10+',
   oracle: '12c – 23ai',
+  sqlite: '3.16+ · archivo local',
 };
 
 /**
@@ -63,6 +66,7 @@ export const ENGINE_FAMILIES: Readonly<Record<DatabaseEngine, string>> = {
   informix: 'informix',
   informixsqli: 'informix',
   oracle: 'oracle',
+  sqlite: 'sqlite',
 };
 
 /**
@@ -78,6 +82,7 @@ export const ENGINE_TRANSPORTS: Readonly<Record<DatabaseEngine, string | null>> 
   informix: 'DRDA',
   informixsqli: 'SQLI (JDBC)',
   oracle: null,
+  sqlite: null,
 };
 
 /**
@@ -94,6 +99,7 @@ export const ENGINE_ORDER: readonly DatabaseEngine[] = [
   'informixsqli',
   'informix',
   'oracle',
+  'sqlite',
 ];
 
 /**
@@ -169,6 +175,12 @@ export function isKnownEngine(engine: string): engine is DatabaseEngine {
       background: var(--dr-engine-oracle-tint);
       border: 1px solid var(--dr-engine-oracle-line);
       color: var(--dr-engine-oracle);
+    }
+
+    :host([data-engine='sqlite']) {
+      background: var(--dr-engine-sqlite-tint);
+      border: 1px solid var(--dr-engine-sqlite-line);
+      color: var(--dr-engine-sqlite);
     }
   `,
 })

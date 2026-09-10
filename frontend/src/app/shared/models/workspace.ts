@@ -15,7 +15,9 @@ export type DatabaseEngine =
   | 'informix'
   /** El mismo Informix por SQLI, su protocolo nativo. */
   | 'informixsqli'
-  | 'oracle';
+  | 'oracle'
+  /** SQLite, que no es un servidor sino un archivo. */
+  | 'sqlite';
 
 export type ConnectionState = 'connected' | 'disconnected' | 'connecting' | 'error';
 
@@ -30,6 +32,10 @@ export interface EngineCapabilities {
   /** Hay un servidor al que apuntar. Falso en los motores que son un archivo. */
   readonly requiresHost: boolean;
   readonly requiresUsername: boolean;
+  /** Hay que decir a qué base se va. Falso en los servidores, donde vacío vale. */
+  readonly requiresDatabase: boolean;
+  /** La base **es un archivo del disco**, y lo que se guarda es una ruta. */
+  readonly usesFilePath: boolean;
   /** Pide además el servidor lógico. Hoy solo Informix por SQLI. */
   readonly requiresLogicalServer: boolean;
   /** Admite la identidad de la sesión de Windows. Hoy solo SQL Server. */

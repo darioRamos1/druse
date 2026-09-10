@@ -276,6 +276,12 @@ public sealed record EngineCapabilitiesDto
 
     public required bool RequiresUsername { get; init; }
 
+    /// <summary>Hay que decir a qué base se va. Falso en los servidores.</summary>
+    public required bool RequiresDatabase { get; init; }
+
+    /// <summary>La base **es un archivo del disco**, y lo que se guarda es su ruta.</summary>
+    public required bool UsesFilePath { get; init; }
+
     /// <summary>Pide además el servidor lógico. Hoy solo Informix por SQLI.</summary>
     public required bool RequiresLogicalServer { get; init; }
 

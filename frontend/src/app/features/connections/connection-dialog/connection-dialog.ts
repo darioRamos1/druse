@@ -96,6 +96,8 @@ type ConnectionField =
 const CAPACIDADES_CORRIENTES: EngineCapabilities = {
   requiresHost: true,
   requiresUsername: true,
+  requiresDatabase: false,
+  usesFilePath: false,
   requiresLogicalServer: false,
   supportsIntegratedSecurity: false,
   supportsSshTunnel: true,
@@ -338,12 +340,20 @@ export class ConnectionDialog {
    * Se dice cuál de las dos cosas es. Enseñar la misma frase en los cinco casos
    * sería prometer lo que solo dos cumplen.
    */
-  protected readonly readOnlyHint = computed(() =>
-    this.capabilities().enforcesReadOnlySessions
-      ? 'Druse pone la sesión en solo lectura: el servidor rechaza cualquier escritura.'
-      : 'Este motor no tiene sesiones de solo lectura: Druse avisa antes de ejecutar, ' +
-        'pero la garantía es un usuario con permisos restringidos en el servidor.',
-  );
+  protected readonly readOnlyHint = computed(() => {
+    if (!this.capabilities().enforcesReadOnlySessions) {
+      return (
+        'Este motor no tiene sesiones de solo lectura: Druse avisa antes de ejecutar, ' +
+        'pero la garantía es un usuario con permisos restringidos en el servidor.'
+      );
+    }
+
+    // En un motor que es un archivo el candado es el más fuerte de todos: se
+    // abre sin permiso de escritura y no hay instrucción que pueda saltárselo.
+    return this.esArchivo()
+      ? 'El archivo se abre sin permiso de escritura: no hay forma de tocarlo desde aquí.'
+      : 'Druse pone la sesión en solo lectura: el servidor rechaza cualquier escritura.';
+  });
   protected readonly environment = signal<ConnectionEnvironment>('development');
   protected readonly save = signal(true);
   protected readonly storePassword = signal(true);
@@ -358,6 +368,31 @@ export class ConnectionDialog {
 
   /** El motor pide además el nombre del servidor lógico. */
   protected readonly usaSqli = computed(() => this.capabilities().requiresLogicalServer);
+
+  /**
+   * El motor es un archivo del disco y no un servidor.
+   *
+   * Cambia medio formulario: sin servidor, sin puerto, sin identidad y sin nada
+   * que cifrar ni por donde tunelar. Lo que queda es un nombre y una ruta.
+   */
+  protected readonly esArchivo = computed(() => this.capabilities().usesFilePath);
+
+  /** Hay servidor al que apuntar, así que hay servidor y puerto que escribir. */
+  protected readonly pideServidor = computed(() => this.capabilities().requiresHost);
+
+  /** Hay identidad que dar, así que hay usuario y contraseña. */
+  protected readonly pideIdentidad = computed(() => this.capabilities().requiresUsername);
+
+  /**
+   * Queda algo que enseñar en las opciones avanzadas.
+   *
+   * En un motor que es un archivo, no: ni transporte que cifrar ni servidor
+   * intermedio por el que pasar. Enseñar la sección vacía sería ofrecer dos
+   * decisiones que no existen.
+   */
+  protected readonly hayAvanzadas = computed(
+    () => this.capabilities().supportsTransportEncryption || this.capabilities().supportsSshTunnel,
+  );
 
   protected readonly sshEnabled = signal(false);
   protected readonly sshHost = signal('');
@@ -524,6 +559,10 @@ export class ConnectionDialog {
    * Druse que entre por la primera base a la que se tenga acceso.
    */
   protected databaseHint(): string {
+    if (this.esArchivo()) {
+      return 'La ruta del archivo, por ejemplo C:\\datos\\ventas.db. Druse no lo crea: tiene que existir.';
+    }
+
     const notice = this.databasesNotice();
 
     if (notice) {
@@ -699,7 +738,12 @@ export class ConnectionDialog {
    * sería una base concreta de un servidor que aún no se ha visto.
    */
   protected databasePlaceholder(): string {
-    return this.selected()?.defaultDatabase ?? '';
+    return this.esArchivo() ? 'ruta del archivo .db' : (this.selected()?.defaultDatabase ?? '');
+  }
+
+  /** Cómo se llama aquí lo que en un servidor es «la base de datos». */
+  protected databaseLabel(): string {
+    return this.esArchivo() ? 'Archivo' : 'Base de datos';
   }
 
   private validForm(): ConnectionForm | null {
@@ -767,7 +811,20 @@ export class ConnectionDialog {
     if (this.capabilities().requiresHost && !this.host().trim()) {
       errors.host = 'Indica el servidor o la dirección IP.';
     }
-    if (!namedSqlServer && (!Number.isInteger(port) || port! < 1 || port! > 65_535)) {
+
+    // En un servidor, la base vacía significa «la primera a la que tenga
+    // acceso». En un motor que es un archivo no hay tal cosa: sin la ruta no hay
+    // nada que abrir.
+    if (this.capabilities().requiresDatabase && !this.database().trim()) {
+      errors.database = this.esArchivo()
+        ? 'Indica el archivo de la base de datos.'
+        : 'Indica la base de datos.';
+    }
+    if (
+      this.capabilities().requiresHost &&
+      !namedSqlServer &&
+      (!Number.isInteger(port) || port! < 1 || port! > 65_535)
+    ) {
       errors.port = 'Indica un puerto entre 1 y 65535.';
     } else if (port !== null && (!Number.isInteger(port) || port < 0 || port > 65_535)) {
       errors.port = 'Indica un puerto entre 1 y 65535.';

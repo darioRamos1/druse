@@ -105,39 +105,41 @@
         }
       </label>
 
-      <label class="field field--host">
-        <span class="field__label">{{ usaSqli() ? 'Host' : 'Servidor' }}</span>
-        <input
-          class="field__input"
-          type="text"
-          [(ngModel)]="host"
-          [class.is-invalid]="fieldError('host')"
-          [attr.aria-invalid]="!!fieldError('host')"
-          aria-describedby="connection-host-error"
-        />
-        @if (fieldError('host'); as error) {
-          <span class="field__error" id="connection-host-error">{{ error }}</span>
-        }
-      </label>
+      @if (pideServidor()) {
+        <label class="field field--host">
+          <span class="field__label">{{ usaSqli() ? 'Host' : 'Servidor' }}</span>
+          <input
+            class="field__input"
+            type="text"
+            [(ngModel)]="host"
+            [class.is-invalid]="fieldError('host')"
+            [attr.aria-invalid]="!!fieldError('host')"
+            aria-describedby="connection-host-error"
+          />
+          @if (fieldError('host'); as error) {
+            <span class="field__error" id="connection-host-error">{{ error }}</span>
+          }
+        </label>
 
-      <label class="field field--port">
-        <span class="field__label">Puerto</span>
-        <input
-          class="field__input"
-          type="number"
-          min="1"
-          max="65535"
-          [(ngModel)]="port"
-          [class.is-invalid]="fieldError('port')"
-          [attr.aria-invalid]="!!fieldError('port')"
-          aria-describedby="connection-port-detail"
-        />
-        @if (fieldError('port'); as error) {
-          <span class="field__error" id="connection-port-detail">{{ error }}</span>
-        } @else if (portHint(); as hint) {
-          <span class="field__hint" id="connection-port-detail">{{ hint }}</span>
-        }
-      </label>
+        <label class="field field--port">
+          <span class="field__label">Puerto</span>
+          <input
+            class="field__input"
+            type="number"
+            min="1"
+            max="65535"
+            [(ngModel)]="port"
+            [class.is-invalid]="fieldError('port')"
+            [attr.aria-invalid]="!!fieldError('port')"
+            aria-describedby="connection-port-detail"
+          />
+          @if (fieldError('port'); as error) {
+            <span class="field__error" id="connection-port-detail">{{ error }}</span>
+          } @else if (portHint(); as hint) {
+            <span class="field__hint" id="connection-port-detail">{{ hint }}</span>
+          }
+        </label>
+      }
 
       <!--
         El servidor lógico de Informix, solo con el motor que lo necesita.
@@ -169,7 +171,7 @@
       }
 
       <label class="field field--wide">
-        <span class="field__label">Base de datos</span>
+        <span class="field__label">{{ databaseLabel() }}</span>
         <span class="picker">
           <input
             class="field__input"
@@ -177,27 +179,36 @@
             list="connection-databases"
             [(ngModel)]="database"
             [placeholder]="databasePlaceholder()"
+            [class.is-invalid]="fieldError('database')"
+            [attr.aria-invalid]="!!fieldError('database')"
             aria-describedby="connection-database-detail"
           />
           <!-- Preguntar exige conectar, así que es un botón y no algo que pase
-               solo mientras se escribe el servidor. -->
-          <button
-            type="button"
-            class="picker__load"
-            [disabled]="loadingDatabases()"
-            (click)="loadDatabases()"
-          >
-            {{ loadingDatabases() ? 'Buscando…' : 'Buscar bases de datos' }}
-          </button>
+               solo mientras se escribe el servidor. En un motor que es un
+               archivo no hay nada que preguntar: la base es el archivo. -->
+          @if (!esArchivo()) {
+            <button
+              type="button"
+              class="picker__load"
+              [disabled]="loadingDatabases()"
+              (click)="loadDatabases()"
+            >
+              {{ loadingDatabases() ? 'Buscando…' : 'Buscar bases de datos' }}
+            </button>
+          }
         </span>
         <datalist id="connection-databases">
           @for (option of databases(); track option) {
             <option [value]="option"></option>
           }
         </datalist>
-        <span class="field__hint" id="connection-database-detail">
-          {{ databaseHint() }}
-        </span>
+        @if (fieldError('database'); as error) {
+          <span class="field__error" id="connection-database-detail">{{ error }}</span>
+        } @else {
+          <span class="field__hint" id="connection-database-detail">
+            {{ databaseHint() }}
+          </span>
+        }
       </label>
 
       @if (supportsWindowsAuth()) {
@@ -220,7 +231,7 @@
         </div>
       }
 
-      @if (!usesWindowsAuth()) {
+      @if (pideIdentidad() && !usesWindowsAuth()) {
         <label class="field">
           <span class="field__label">Usuario</span>
           <input
@@ -263,13 +274,22 @@
             </button>
           </span>
         </label>
-      } @else {
+      } @else if (pideIdentidad()) {
         <!-- Sin este aviso, el hueco donde estaban usuario y contraseña haría
              dudar de si falta algo por rellenar. -->
         <div class="field field--wide">
           <span class="field__label">Identidad</span>
           <span class="field__hint">
             La sesión se abre con la cuenta de Windows con la que estás usando este equipo.
+          </span>
+        </div>
+      } @else {
+        <!-- Y en un motor que es un archivo tampoco hay identidad que dar: quien
+             puede leer el archivo puede leer la base. -->
+        <div class="field field--wide">
+          <span class="field__label">Identidad</span>
+          <span class="field__hint">
+            Este motor no tiene usuarios: el permiso es el del archivo en el disco.
           </span>
         </div>
       }
@@ -300,178 +320,180 @@
       </span>
     </label>
 
-    <button
-      type="button"
-      class="advanced-toggle"
-      [attr.aria-expanded]="advancedOpen()"
-      aria-controls="connection-advanced"
-      (click)="advancedOpen.update((open) => !open)"
-    >
-      <span class="advanced-toggle__title">
-        <app-icon name="settings" [size]="14" />
-        Opciones avanzadas
-      </span>
-      <span class="advanced-toggle__summary">{{ advancedSummary() }}</span>
-      <app-icon name="chevron-down" [size]="12" />
-    </button>
-    <section
-      class="advanced"
-      id="connection-advanced"
-      [hidden]="!advancedOpen()"
-      aria-label="Cifrado y túnel SSH"
-    >
-      <h3 class="section">Cifrado</h3>
-      <div class="environments" role="group" aria-label="Cifrado de la conexión">
-        @for (option of sslModes; track option.id) {
-          <button
-            type="button"
-            class="environment"
-            [class.is-selected]="sslMode() === option.id"
-            [attr.aria-pressed]="sslMode() === option.id"
-            (click)="selectSslMode(option.id)"
-          >
-            {{ option.label }}
-          </button>
-        }
-      </div>
-      <p class="field__hint">{{ sslHint() }}</p>
-
-      <h3 class="section">Túnel SSH</h3>
-      <label class="checkbox">
-        <input type="checkbox" [(ngModel)]="sshEnabled" />
-        <span>
-          Conectar a través de un servidor SSH
-          <span class="checkbox__hint">
-            Para bases que solo son accesibles desde otra máquina. El tráfico viaja dentro de la
-            sesión SSH.
-          </span>
+    @if (hayAvanzadas()) {
+      <button
+        type="button"
+        class="advanced-toggle"
+        [attr.aria-expanded]="advancedOpen()"
+        aria-controls="connection-advanced"
+        (click)="advancedOpen.update((open) => !open)"
+      >
+        <span class="advanced-toggle__title">
+          <app-icon name="settings" [size]="14" />
+          Opciones avanzadas
         </span>
-      </label>
-
-      @if (sshEnabled()) {
-        <div class="grid grid--tunnel">
-          <label class="field field--host">
-            <span class="field__label">Servidor SSH</span>
-            <input
-              class="field__input"
-              type="text"
-              [(ngModel)]="sshHost"
-              placeholder="bastion.empresa.com"
-              [class.is-invalid]="fieldError('sshHost')"
-              [attr.aria-invalid]="!!fieldError('sshHost')"
-            />
-            @if (fieldError('sshHost'); as error) {
-              <span class="field__error">{{ error }}</span>
-            }
-          </label>
-
-          <label class="field field--port">
-            <span class="field__label">Puerto</span>
-            <input
-              class="field__input"
-              type="number"
-              min="1"
-              max="65535"
-              [(ngModel)]="sshPort"
-              [class.is-invalid]="fieldError('sshPort')"
-              [attr.aria-invalid]="!!fieldError('sshPort')"
-            />
-            @if (fieldError('sshPort'); as error) {
-              <span class="field__error">{{ error }}</span>
-            }
-          </label>
-
-          <label class="field">
-            <span class="field__label">Usuario SSH</span>
-            <input
-              class="field__input"
-              type="text"
-              [(ngModel)]="sshUsername"
-              autocomplete="off"
-              [class.is-invalid]="fieldError('sshUsername')"
-              [attr.aria-invalid]="!!fieldError('sshUsername')"
-            />
-            @if (fieldError('sshUsername'); as error) {
-              <span class="field__error">{{ error }}</span>
-            }
-          </label>
-
-          <div class="field">
-            <span class="field__label" id="ssh-auth-label">Acceso al servidor SSH</span>
-            <div class="environments" role="group" aria-labelledby="ssh-auth-label">
-              @for (option of sshAuthentications; track option.id) {
-                <button
-                  type="button"
-                  class="environment"
-                  [class.is-selected]="sshAuthentication() === option.id"
-                  [attr.aria-pressed]="sshAuthentication() === option.id"
-                  (click)="selectSshAuthentication(option.id)"
-                >
-                  {{ option.label }}
-                </button>
-              }
-            </div>
-          </div>
-
-          @if (usesSshKey()) {
-            <label class="field field--wide">
-              <span class="field__label">Archivo de clave privada</span>
-              <input
-                class="field__input"
-                type="text"
-                [(ngModel)]="sshPrivateKeyPath"
-                placeholder="C:\Users\tu-usuario\.ssh\id_ed25519"
-                [class.is-invalid]="fieldError('sshPrivateKeyPath')"
-                [attr.aria-invalid]="!!fieldError('sshPrivateKeyPath')"
-              />
-              @if (fieldError('sshPrivateKeyPath'); as error) {
-                <span class="field__error">{{ error }}</span>
-              } @else {
-                <span class="field__hint">
-                  Se guarda la ruta, nunca el contenido de la clave.
-                </span>
-              }
-            </label>
-          }
-
-          <label class="field">
-            <span class="field__label">{{ sshSecretLabel() }}</span>
-            <span class="secret">
-              <input
-                class="field__input"
-                [type]="sshSecretVisible() ? 'text' : 'password'"
-                [(ngModel)]="sshSecret"
-                autocomplete="off"
-              />
-              <button
-                type="button"
-                class="secret__toggle"
-                [attr.aria-label]="sshSecretVisible() ? 'Ocultar el secreto' : 'Ver el secreto'"
-                [attr.aria-pressed]="sshSecretVisible()"
-                [attr.title]="sshSecretVisible() ? 'Ocultar' : 'Ver'"
-                (click)="sshSecretVisible.set(!sshSecretVisible())"
-              >
-                <app-icon [name]="sshSecretVisible() ? 'eye-off' : 'eye'" [size]="13" />
-              </button>
-            </span>
-          </label>
-
-          @if (usesSshPrompts()) {
-            <label class="field">
-              <span class="field__label">Código de un solo uso</span>
-              <input
-                class="field__input"
-                type="text"
-                [(ngModel)]="sshVerificationCode"
-                autocomplete="off"
-                inputmode="numeric"
-              />
-              <span class="field__hint">Caduca en segundos, así que nunca se guarda.</span>
-            </label>
+        <span class="advanced-toggle__summary">{{ advancedSummary() }}</span>
+        <app-icon name="chevron-down" [size]="12" />
+      </button>
+      <section
+        class="advanced"
+        id="connection-advanced"
+        [hidden]="!advancedOpen()"
+        aria-label="Cifrado y túnel SSH"
+      >
+        <h3 class="section">Cifrado</h3>
+        <div class="environments" role="group" aria-label="Cifrado de la conexión">
+          @for (option of sslModes; track option.id) {
+            <button
+              type="button"
+              class="environment"
+              [class.is-selected]="sslMode() === option.id"
+              [attr.aria-pressed]="sslMode() === option.id"
+              (click)="selectSslMode(option.id)"
+            >
+              {{ option.label }}
+            </button>
           }
         </div>
-      }
-    </section>
+        <p class="field__hint">{{ sslHint() }}</p>
+
+        <h3 class="section">Túnel SSH</h3>
+        <label class="checkbox">
+          <input type="checkbox" [(ngModel)]="sshEnabled" />
+          <span>
+            Conectar a través de un servidor SSH
+            <span class="checkbox__hint">
+              Para bases que solo son accesibles desde otra máquina. El tráfico viaja dentro de la
+              sesión SSH.
+            </span>
+          </span>
+        </label>
+
+        @if (sshEnabled()) {
+          <div class="grid grid--tunnel">
+            <label class="field field--host">
+              <span class="field__label">Servidor SSH</span>
+              <input
+                class="field__input"
+                type="text"
+                [(ngModel)]="sshHost"
+                placeholder="bastion.empresa.com"
+                [class.is-invalid]="fieldError('sshHost')"
+                [attr.aria-invalid]="!!fieldError('sshHost')"
+              />
+              @if (fieldError('sshHost'); as error) {
+                <span class="field__error">{{ error }}</span>
+              }
+            </label>
+
+            <label class="field field--port">
+              <span class="field__label">Puerto</span>
+              <input
+                class="field__input"
+                type="number"
+                min="1"
+                max="65535"
+                [(ngModel)]="sshPort"
+                [class.is-invalid]="fieldError('sshPort')"
+                [attr.aria-invalid]="!!fieldError('sshPort')"
+              />
+              @if (fieldError('sshPort'); as error) {
+                <span class="field__error">{{ error }}</span>
+              }
+            </label>
+
+            <label class="field">
+              <span class="field__label">Usuario SSH</span>
+              <input
+                class="field__input"
+                type="text"
+                [(ngModel)]="sshUsername"
+                autocomplete="off"
+                [class.is-invalid]="fieldError('sshUsername')"
+                [attr.aria-invalid]="!!fieldError('sshUsername')"
+              />
+              @if (fieldError('sshUsername'); as error) {
+                <span class="field__error">{{ error }}</span>
+              }
+            </label>
+
+            <div class="field">
+              <span class="field__label" id="ssh-auth-label">Acceso al servidor SSH</span>
+              <div class="environments" role="group" aria-labelledby="ssh-auth-label">
+                @for (option of sshAuthentications; track option.id) {
+                  <button
+                    type="button"
+                    class="environment"
+                    [class.is-selected]="sshAuthentication() === option.id"
+                    [attr.aria-pressed]="sshAuthentication() === option.id"
+                    (click)="selectSshAuthentication(option.id)"
+                  >
+                    {{ option.label }}
+                  </button>
+                }
+              </div>
+            </div>
+
+            @if (usesSshKey()) {
+              <label class="field field--wide">
+                <span class="field__label">Archivo de clave privada</span>
+                <input
+                  class="field__input"
+                  type="text"
+                  [(ngModel)]="sshPrivateKeyPath"
+                  placeholder="C:\Users\tu-usuario\.ssh\id_ed25519"
+                  [class.is-invalid]="fieldError('sshPrivateKeyPath')"
+                  [attr.aria-invalid]="!!fieldError('sshPrivateKeyPath')"
+                />
+                @if (fieldError('sshPrivateKeyPath'); as error) {
+                  <span class="field__error">{{ error }}</span>
+                } @else {
+                  <span class="field__hint">
+                    Se guarda la ruta, nunca el contenido de la clave.
+                  </span>
+                }
+              </label>
+            }
+
+            <label class="field">
+              <span class="field__label">{{ sshSecretLabel() }}</span>
+              <span class="secret">
+                <input
+                  class="field__input"
+                  [type]="sshSecretVisible() ? 'text' : 'password'"
+                  [(ngModel)]="sshSecret"
+                  autocomplete="off"
+                />
+                <button
+                  type="button"
+                  class="secret__toggle"
+                  [attr.aria-label]="sshSecretVisible() ? 'Ocultar el secreto' : 'Ver el secreto'"
+                  [attr.aria-pressed]="sshSecretVisible()"
+                  [attr.title]="sshSecretVisible() ? 'Ocultar' : 'Ver'"
+                  (click)="sshSecretVisible.set(!sshSecretVisible())"
+                >
+                  <app-icon [name]="sshSecretVisible() ? 'eye-off' : 'eye'" [size]="13" />
+                </button>
+              </span>
+            </label>
+
+            @if (usesSshPrompts()) {
+              <label class="field">
+                <span class="field__label">Código de un solo uso</span>
+                <input
+                  class="field__input"
+                  type="text"
+                  [(ngModel)]="sshVerificationCode"
+                  autocomplete="off"
+                  inputmode="numeric"
+                />
+                <span class="field__hint">Caduca en segundos, así que nunca se guarda.</span>
+              </label>
+            }
+          </div>
+        }
+      </section>
+    }
 
     <!-- Un perfil que se edita ya está guardado; ofrecer no guardarlo solo
          serviría para perderlo sin querer. -->

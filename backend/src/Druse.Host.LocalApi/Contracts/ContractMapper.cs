@@ -825,6 +825,8 @@ internal static class ContractMapper
         {
             RequiresHost = capabilities.RequiresHost,
             RequiresUsername = capabilities.RequiresUsername,
+            RequiresDatabase = capabilities.RequiresDatabase,
+            UsesFilePath = capabilities.UsesFilePath,
             RequiresLogicalServer = capabilities.RequiresLogicalServer,
             SupportsIntegratedSecurity = capabilities.SupportsIntegratedSecurity,
             SupportsSshTunnel = capabilities.SupportsSshTunnel,

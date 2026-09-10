@@ -179,6 +179,37 @@ const ORACLE: SqlDialect = {
       : `INSERT INTO ${table}\nVALUES ();\n`,
 };
 
+/**
+ * SQLite, que se parece a PostgreSQL más que a nadie.
+ *
+ * Comillas dobles, `LIMIT` al final y `DEFAULT VALUES` para una fila que el
+ * motor rellena entera: las tres cosas iguales. Lo único suyo es cómo trunca una
+ * fecha, porque **no tiene tipo de fecha**: lo que hay es texto ISO, y `strftime`
+ * recorta ese texto por donde toque.
+ */
+const SQLITE: SqlDialect = {
+  quote: doubleQuote,
+  leadingLimit: null,
+  dateTrunc: (column, period) => {
+    switch (period) {
+      case 'day':
+        return `date(${column})`;
+      case 'month':
+        return `date(${column}, 'start of month')`;
+      case 'quarter':
+        // No hay «principio de trimestre»: se va al principio del año y se
+        // suman los meses que correspondan al trimestre de la fecha.
+        return (
+          `date(${column}, 'start of year', ` +
+          `'+' || ((CAST(strftime('%m', ${column}) AS INTEGER) - 1) / 3) * 3 || ' months')`
+        );
+      case 'year':
+        return `date(${column}, 'start of year')`;
+    }
+  },
+  allGeneratedInsert: (table) => `INSERT INTO ${table}\nDEFAULT VALUES;\n`,
+};
+
 export const SQL_DIALECTS: Readonly<Record<DatabaseEngine, SqlDialect>> = {
   postgresql: POSTGRESQL,
   sqlserver: SQLSERVER,
@@ -186,4 +217,5 @@ export const SQL_DIALECTS: Readonly<Record<DatabaseEngine, SqlDialect>> = {
   informix: INFORMIX,
   informixsqli: INFORMIX,
   oracle: ORACLE,
+  sqlite: SQLITE,
 };

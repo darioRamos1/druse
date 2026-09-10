@@ -277,6 +277,13 @@
   --dr-engine-oracle-tint: rgb(164 122 214 / 14%);
   --dr-engine-oracle-line: rgb(164 122 214 / 31%);
 
+  // Gris azulado: es el único motor que no es un producto de nadie, y el que
+  // menos tiene que llamar la atención en una lista donde el resto son
+  // servidores. Los cinco colores fuertes ya estaban cogidos.
+  --dr-engine-sqlite: #93a4b8;
+  --dr-engine-sqlite-tint: rgb(147 164 184 / 13%);
+  --dr-engine-sqlite-line: rgb(147 164 184 / 30%);
+
   // ---------------------------------------------------------------------------
   // Sombras y velos
   //
@@ -446,6 +453,10 @@
   --dr-engine-oracle: #6b3fa0;
   --dr-engine-oracle-tint: rgb(107 63 160 / 11%);
   --dr-engine-oracle-line: rgb(107 63 160 / 30%);
+
+  --dr-engine-sqlite: #4a5a6e;
+  --dr-engine-sqlite-tint: rgb(74 90 110 / 10%);
+  --dr-engine-sqlite-line: rgb(74 90 110 / 28%);
 
   // ---------------------------------------------------------------------------
   // Sombras y velos

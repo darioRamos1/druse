@@ -114,6 +114,19 @@ const BY_ENGINE: Readonly<Record<DatabaseEngine, readonly SqlSnippet[]>> = {
       body: 'SELECT ${1:SYSDATE} FROM DUAL',
     },
   ],
+  sqlite: [
+    {
+      trigger: 'limit',
+      description: 'Primeras filas (SQLite)',
+      body: 'SELECT ${1:*}\nFROM ${2:tabla}\nORDER BY ${3:columna}\nLIMIT ${4:100}',
+    },
+    {
+      // Lo que todo el mundo busca al abrir un archivo que no conoce.
+      trigger: 'tablas',
+      description: 'Qué hay en el archivo (SQLite)',
+      body: "SELECT name, type FROM sqlite_master WHERE type IN ('table', 'view') ORDER BY name",
+    },
+  ],
 };
 
 export function snippetsFor(engine: DatabaseEngine): readonly SqlSnippet[] {
