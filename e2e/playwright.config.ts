@@ -29,6 +29,9 @@ const APP_PORT = 4300;
  * petición llegaba.
  */
 const DATA_DIR = join(tmpdir(), 'druse-e2e-datos');
+// Windows bloquea las DLL del backend mientras la vista previa está abierta.
+// E2E compila todos los proyectos referenciados en su propio directorio.
+const BUILD_DIR = join(tmpdir(), 'druse-e2e-build');
 
 /**
  * La carpeta persiste entre ejecuciones a propósito.
@@ -95,7 +98,7 @@ export default defineConfig({
    */
   webServer: [
     {
-      command: `dotnet run --project ../backend/src/Druse.Host.LocalApi --no-launch-profile`,
+      command: `dotnet run --project ../backend/src/Druse.Host.LocalApi --no-launch-profile --artifacts-path "${BUILD_DIR}"`,
       url: `http://127.0.0.1:${API_PORT}/api/health`,
       timeout: 4 * 60 * 1000,
       reuseExistingServer: !process.env.CI,

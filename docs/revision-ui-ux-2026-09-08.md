@@ -194,3 +194,7 @@ Validación: 36 pruebas aprobadas entre etiquetas, paleta y hoja de ayuda, con c
 - UX-007 se marca completado con las medidas del editor documentadas arriba. Permanecen pendientes la revisión visual de Tauri y sus controles decorativos de ventana, y la comprobación nativa de las combinaciones de macOS/Linux. Se conserva el contexto de conexión y base junto a Ejecutar.
 
 Mejoras publicadas individualmente: `dd12d41` Preferencias, `b378202` resultados adaptables, `ddb03c8` explorador plegable, `127d20f` asistente redimensionable y `d31d411` atajos por plataforma.
+
+## Validación con Docker — 10 de septiembre de 2026
+
+Docker vuelve a estar disponible y se levantaron los contenedores de pruebas de PostgreSQL, SQL Server y MySQL. El primer arranque E2E falló antes de ejecutar casos porque la API de la vista previa bloqueaba sus DLL en Windows. La configuración ahora compila la API y sus referencias en `%TEMP%\druse-e2e-build`, conservando los datos E2E en su carpeta independiente. El typecheck pasó y ambas API respondieron simultáneamente en 5188 y 5299; la vista previa no se detuvo.

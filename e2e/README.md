@@ -42,6 +42,10 @@ Los servidores los levanta Playwright: la API en el 5188 y el frontend en el
 4300, **no** en los puertos de `dev.ps1`. Se puede seguir desarrollando en 4200
 con las pruebas corriendo.
 
+La compilación de la API también queda aislada en `%TEMP%\druse-e2e-build`.
+Así, en Windows, una API de desarrollo abierta no bloquea las DLL que necesita
+compilar E2E. Los datos de las pruebas siguen en su carpeta separada.
+
 Otras formas de lanzarlas:
 
 ```bash
