@@ -145,6 +145,20 @@ export class DesktopHost {
     return this.invoke('choose_backup_file', { suggestedName });
   }
 
+  /**
+   * Elige el archivo de una base de datos que **es** un archivo.
+   *
+   * `create` cambia de diálogo, no de filtro: al crear se abre el de guardar, que
+   * deja escribir un nombre que todavía no existe, y al abrir el de abrir, que
+   * solo deja elegir algo que ya está. Es la misma distinción que hace el
+   * proveedor al conectar.
+   *
+   * @returns Ruta elegida, o `null` si el usuario cerró el diálogo.
+   */
+  chooseDatabaseFile(create: boolean): Promise<string | null> {
+    return this.invoke('choose_database_file', { create });
+  }
+
   /** Elige la carpeta donde escribir un respaldo repartido por tipo de objeto. */
   chooseBackupFolder(): Promise<string | null> {
     return this.invoke('choose_backup_folder');

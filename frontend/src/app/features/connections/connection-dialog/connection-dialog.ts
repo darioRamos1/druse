@@ -10,6 +10,7 @@ import {
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
+import { DesktopHost } from '../../../core/application-gateway/desktop-host';
 import { WorkspaceStore } from '../../../core/workspace/workspace-store';
 import {
   AuthenticationMode,
@@ -98,6 +99,7 @@ const CAPACIDADES_CORRIENTES: EngineCapabilities = {
   requiresUsername: true,
   requiresDatabase: false,
   usesFilePath: false,
+  canCreateDatabase: false,
   requiresLogicalServer: false,
   supportsIntegratedSecurity: false,
   supportsSshTunnel: true,
@@ -206,6 +208,7 @@ const ENVIRONMENTS: readonly EnvironmentOption[] = [
 })
 export class ConnectionDialog {
   private readonly _store = inject(WorkspaceStore);
+  private readonly _desktop = inject(DesktopHost);
 
   /**
    * Perfil que se está editando, o `null` para crear uno nuevo.
@@ -382,6 +385,20 @@ export class ConnectionDialog {
 
   /** Hay identidad que dar, así que hay usuario y contraseña. */
   protected readonly pideIdentidad = computed(() => this.capabilities().requiresUsername);
+
+  /**
+   * Druse sabe crear una base de este motor.
+   *
+   * Solo se ofrece **dentro de la aplicación de escritorio**: fuera no hay
+   * diálogo del sistema con el que nombrar el archivo, y pedirle la ruta a mano
+   * a quien quiere crear algo es justo lo que este botón viene a evitar.
+   */
+  protected readonly puedeCrear = computed(
+    () => this.capabilities().canCreateDatabase && this._desktop.isDesktop,
+  );
+
+  /** Se está creando el archivo. */
+  protected readonly creando = signal(false);
 
   /**
    * Queda algo que enseñar en las opciones avanzadas.
@@ -713,6 +730,55 @@ export class ConnectionDialog {
       this.sshUsername.set(tunnel.username);
       this.sshAuthentication.set(tunnel.authentication);
       this.sshPrivateKeyPath.set(tunnel.privateKeyPath);
+    }
+  }
+
+  /**
+   * Abre el diálogo del sistema para elegir el archivo.
+   *
+   * Solo tiene sentido dentro del escritorio; fuera, el campo se sigue
+   * escribiendo a mano y el botón no está.
+   */
+  protected async elegirArchivo(): Promise<void> {
+    const chosen = await this._desktop.chooseDatabaseFile(false);
+
+    if (chosen) {
+      this.database.set(chosen);
+      this.feedback.set(null);
+      this.validationVisible.set(false);
+    }
+  }
+
+  /**
+   * Crea una base nueva donde el usuario diga.
+   *
+   * Son dos pasos y ninguno se salta: primero se nombra el archivo en el diálogo
+   * del sistema —que es lo que impide que la página escriba donde le apetezca— y
+   * después se pide crearlo. **No se conecta después**: quien crea una base
+   * quiere ver que está antes de abrirla, y el botón de conectar sigue donde
+   * estaba.
+   *
+   * Si el archivo ya existía no se toca, y se dice: vaciarlo con un botón que
+   * pone «crear» sería borrar una base sin avisar.
+   */
+  protected async crearBase(): Promise<void> {
+    const chosen = await this._desktop.chooseDatabaseFile(true);
+
+    if (!chosen) {
+      return;
+    }
+
+    this.database.set(chosen);
+    this.creando.set(true);
+    this.feedback.set(null);
+
+    try {
+      const error = await this._store.createDatabase(this.toForm());
+
+      this.feedbackKind.set(error ? 'error' : 'success');
+      this.feedback.set(error ?? 'Base creada y vacía. Pulsa Conectar para abrirla.');
+    } finally {
+      this.creando.set(false);
     }
   }
 

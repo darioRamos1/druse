@@ -269,6 +269,14 @@ export abstract class ApplicationGateway {
   /** Motores con proveedor registrado. */
   abstract getEngines(): Observable<readonly EngineInfo[]>;
 
+  /**
+   * Crea la base que el perfil nombra, sin abrirla.
+   *
+   * Crear y conectar son dos cosas: quien crea una base quiere después decidir
+   * si la abre, y encadenarlo dejaría una sesión viva que nadie pidió.
+   */
+  abstract createDatabase(request: ConnectRequest): Observable<void>;
+
   /** Prueba unas credenciales sin abrir sesión ni guardarlas. */
   abstract testConnection(request: ConnectRequest): Observable<TestConnectionResult>;
 

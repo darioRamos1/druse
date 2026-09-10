@@ -156,6 +156,7 @@ fn main() {
             sql_files::save_sql_file_as,
             exports::save_export,
             backups::choose_backup_file,
+            backups::choose_database_file,
             backups::choose_backup_folder,
             backups::choose_restore_source,
             pending_work::set_transaction_pending,

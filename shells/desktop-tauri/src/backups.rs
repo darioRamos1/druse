@@ -107,6 +107,56 @@ pub async fn choose_restore_source(app: AppHandle, folder: bool) -> Result<Optio
     Ok(Some(path.to_string_lossy().to_string()))
 }
 
+/// Elige el archivo de una base de datos que **es** un archivo.
+///
+/// Dos modos, y la diferencia importa: `create` abre el diálogo de guardar —se
+/// escribe un nombre que todavía no existe— y sin él el de abrir, que solo deja
+/// elegir algo que ya está. Es la misma distinción que hace el proveedor al
+/// conectar, y por eso se pregunta en vez de adivinarla: un diálogo de abrir no
+/// deja nombrar un archivo nuevo, y uno de guardar deja escribir cualquier cosa.
+///
+/// **Aquí no viajan los bytes**: se devuelve la ruta y el proceso local abre el
+/// archivo. Es lo mismo que con los respaldos, y por el mismo motivo.
+///
+/// Las tres extensiones son las que usa todo el mundo para lo mismo; el filtro
+/// las ofrece juntas porque nadie recuerda cuál eligió hace dos años.
+#[tauri::command]
+pub async fn choose_database_file(
+    app: AppHandle,
+    create: bool,
+) -> Result<Option<String>, String> {
+    let dialog = app
+        .dialog()
+        .file()
+        .add_filter("Base de datos SQLite", &["db", "sqlite", "sqlite3"]);
+
+    let selected = if create {
+        dialog
+            .set_title("Crear una base de datos")
+            .set_file_name("datos.db")
+            .blocking_save_file()
+    } else {
+        dialog.set_title("Abrir una base de datos").blocking_pick_file()
+    };
+
+    let Some(selected) = selected else {
+        return Ok(None);
+    };
+
+    let mut path = selected
+        .into_path()
+        .map_err(|_| "La selección no es una ruta local.".to_string())?;
+
+    // Al crear se repone la extensión si el usuario la borró: un archivo sin ella
+    // no se distingue de cualquier otro al buscarlo meses después. Al abrir no se
+    // toca, porque el archivo ya existe y se llama como se llama.
+    if create && path.extension().is_none() {
+        path.set_extension("db");
+    }
+
+    Ok(Some(path.to_string_lossy().to_string()))
+}
+
 /// Se queda con el nombre del archivo y descarta cualquier ruta que traiga.
 ///
 /// Lo propone la página, así que podría venir con `..` o con separadores. El

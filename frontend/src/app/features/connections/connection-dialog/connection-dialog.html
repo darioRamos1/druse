@@ -195,6 +195,14 @@
             >
               {{ loadingDatabases() ? 'Buscando…' : 'Buscar bases de datos' }}
             </button>
+          } @else if (puedeCrear()) {
+            <!-- Dos acciones y no una: abrir un archivo que ya está y nombrar
+                 uno que todavía no existe son diálogos distintos del sistema, y
+                 el primero no deja hacer lo segundo. -->
+            <button type="button" class="picker__load" (click)="elegirArchivo()">Examinar…</button>
+            <button type="button" class="picker__load" [disabled]="creando()" (click)="crearBase()">
+              {{ creando() ? 'Creando…' : 'Crear una nueva' }}
+            </button>
           }
         </span>
         <datalist id="connection-databases">

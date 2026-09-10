@@ -153,6 +153,10 @@ export class HttpApplicationGateway extends ApplicationGateway {
     return this._http.get<EngineInfo[]>('/api/engines');
   }
 
+  override createDatabase(request: ConnectRequest): Observable<void> {
+    return this._http.post<void>('/api/connections/database', request);
+  }
+
   override testConnection(request: ConnectRequest): Observable<TestConnectionResult> {
     return this._http.post<TestConnectionResult>('/api/connections/test', request);
   }

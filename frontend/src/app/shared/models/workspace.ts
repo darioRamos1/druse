@@ -36,6 +36,14 @@ export interface EngineCapabilities {
   readonly requiresDatabase: boolean;
   /** La base **es un archivo del disco**, y lo que se guarda es una ruta. */
   readonly usesFilePath: boolean;
+  /**
+   * Druse sabe crear una base de este motor desde el formulario.
+   *
+   * Hoy solo los que son un archivo: crear uno vacío no tiene decisiones que
+   * preguntar, y es la única forma de empezar porque un archivo que no existe no
+   * se puede abrir.
+   */
+  readonly canCreateDatabase: boolean;
   /** Pide además el servidor lógico. Hoy solo Informix por SQLI. */
   readonly requiresLogicalServer: boolean;
   /** Admite la identidad de la sesión de Windows. Hoy solo SQL Server. */

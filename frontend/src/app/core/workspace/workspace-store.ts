@@ -1609,6 +1609,26 @@ export class WorkspaceStore {
   }
 
   /**
+   * Crea la base que el formulario nombra, **sin abrirla**.
+   *
+   * Devuelve el motivo cuando no se pudo, igual que preguntar por las bases:
+   * quien pulsa «Crear» necesita saber si el archivo ya estaba, si la carpeta no
+   * deja escribir o si el motor no sabe hacerlo, y las tres cosas se arreglan de
+   * forma distinta.
+   *
+   * @returns `null` si se creó; el motivo si no.
+   */
+  async createDatabase(form: ConnectionForm): Promise<string | null> {
+    try {
+      await firstValueFrom(this._gateway.createDatabase(toRequest(form)));
+
+      return null;
+    } catch (error) {
+      return describeError(error);
+    }
+  }
+
+  /**
    * Qué bases puede abrir esta conexión.
    *
    * Devuelve la lista **y el motivo cuando no la hay**: el formulario necesita

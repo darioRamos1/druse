@@ -98,6 +98,13 @@ test.describe('SQLite de punta a punta', () => {
       // Y la base de datos se llama archivo, porque eso es.
       await expect(campo('Archivo')).toBeVisible();
 
+      // **Examinar y crear no están aquí**, y es correcto: los dos abren un
+      // diálogo del sistema, y esto corre en un navegador. Dentro de la
+      // aplicación de escritorio sí aparecen. Se comprueba para que quede dicho
+      // que la ausencia es la decisión y no un olvido.
+      await expect(dialogo.getByRole('button', { name: 'Examinar…' })).toHaveCount(0);
+      await expect(dialogo.getByRole('button', { name: 'Crear una nueva' })).toHaveCount(0);
+
       await campo('Nombre').fill('E2E SQLite');
       await campo('Archivo').fill(ARCHIVO);
 
