@@ -60,21 +60,27 @@ existe y solo habría que cambiar la `MavenReference`.
 
 Lo que hay hoy en cada carpeta `Druse.Provider.*`, para saber a qué se firma uno:
 
-| Archivo | PostgreSQL | SQL Server | MySQL | Informix |
-| --- | --- | --- | --- | --- |
-| `*ConnectionStringFactory` | 77 | 114 | 109 | 112 (+114 SQLI) |
-| `*DatabaseProvider` | 205 | 177 | 217 | 249 |
-| `*ErrorNormalizer` | 109 | 78 | 79 | 155 |
-| `*MetadataReader` | **1.008** | **1.068** | **912** | **1.234** |
-| `*QueryExecutor` | 236 | 252 | 284 | 290 |
-| `*ResultReader` | 121 | 119 | 119 | 119 |
-| `*RowEditor` | 72 | 100 | 101 | 151 |
-| `*TableDesigner` | 165 | 231 | 271 | 264 |
-| `*ValueFormatter` | 28 | 28 | 35 | 54 |
-| **Total** | ~2.020 | ~2.170 | ~2.130 | ~2.740 |
+| Archivo | PostgreSQL | SQL Server | MySQL | Informix | Oracle |
+| --- | --- | --- | --- | --- | --- |
+| `*ConnectionStringFactory` | 77 | 114 | 109 | 112 (+114 SQLI) | 119 |
+| `*DatabaseProvider` | 205 | 177 | 217 | 249 | 358 |
+| `*ErrorNormalizer` | 109 | 78 | 79 | 155 | 65 |
+| `*MetadataReader` | **1.008** | **1.068** | **912** | **1.234** | **1.031** |
+| `*QueryExecutor` | 236 | 252 | 284 | 290 | 274 |
+| `*ResultReader` | 121 | 119 | 119 | 119 | 126 |
+| `*RowEditor` | 72 | 100 | 101 | 151 | 156 |
+| `*TableDesigner` | 165 | 231 | 271 | 264 | 277 |
+| `*ValueFormatter` | 28 | 28 | 35 | 54 | 71 |
+| **Total** | ~2.020 | ~2.170 | ~2.130 | ~2.740 | ~2.860 |
 
-El lector de metadatos es la mitad del trabajo en los cuatro. No es casualidad:
+El lector de metadatos es la mitad del trabajo en los cinco. No es casualidad:
 es lo único que no se puede escribir sin conocer el catálogo del motor de verdad.
+
+Oracle suma además cuatro archivos que los otros no tienen, y cada uno resuelve
+algo que solo pasa allí: `OracleIdentifier` (cuándo citar un nombre y cuándo
+dejar que el motor lo pliegue), `OracleStatement` (el punto y coma que no viaja),
+`OracleTypeNames` (el tipo, que el catálogo guarda repartido en cinco columnas) y
+`OracleServerOutput` (los mensajes, que el servidor no manda: los guarda).
 
 ---
 
@@ -222,56 +228,97 @@ lo que declara la familia.
 
 ---
 
-## 7. Fase 1 — Oracle
+## 7. Fase 1 — Oracle — **hecha**
 
 ### 7.1. El proveedor
 
-- [ ] **MOT-010:** `DatabaseEngine.Oracle = 6`, proyecto `Druse.Provider.Oracle`,
+- [x] **MOT-010:** `DatabaseEngine.Oracle = 6`, proyecto `Druse.Provider.Oracle`,
   referencia en `Druse.slnx` y en el host.
-- [ ] **MOT-011:** `OracleConnectionStringFactory` — servicio o SID, `TNS_ADMIN`
+- [x] **MOT-011:** `OracleConnectionStringFactory` — servicio o SID, `TNS_ADMIN`
   si aparece, tiempo de espera, TLS. Con pruebas unitarias como las de Informix
   (`InformixConnectionStringTests`), que comprueban la cadena sin conectar.
-- [ ] **MOT-012:** `OracleDatabaseProvider` — abrir, probar, puerto 1521,
+- [x] **MOT-012:** `OracleDatabaseProvider` — abrir, probar, puerto 1521,
   `SystemDatabases` con `SYS`, `SYSTEM`, `SYSAUX`, `XDB`, `OUTLN`.
-- [ ] **MOT-013:** `OracleErrorNormalizer` — de `ORA-…` a `QueryError`, sin
+- [x] **MOT-013:** `OracleErrorNormalizer` — de `ORA-…` a `QueryError`, sin
   filtrar credenciales.
-- [ ] **MOT-014:** `OracleMetadataReader` sobre `ALL_TABLES`, `ALL_VIEWS`,
+- [x] **MOT-014:** `OracleMetadataReader` sobre `ALL_TABLES`, `ALL_VIEWS`,
   `ALL_TAB_COLUMNS`, `ALL_CONSTRAINTS`, `ALL_CONS_COLUMNS`, `ALL_INDEXES`,
   `ALL_PROCEDURES`, `ALL_ARGUMENTS`; definiciones con `DBMS_METADATA.GET_DDL`.
-- [ ] **MOT-015:** `GetTableDetailsAsync` **en una lectura**. La prueba
+- [x] **MOT-015:** `GetTableDetailsAsync` **en una lectura**. La prueba
   contractual cuenta viajes y rechaza la implementación por omisión: un proveedor
   que se quede en ella falla, en vez de pasar desapercibido y hacer lento el
   diagrama.
-- [ ] **MOT-016:** `OracleQueryExecutor` + `OracleResultReader` — cancelación,
+- [x] **MOT-016:** `OracleQueryExecutor` + `OracleResultReader` — cancelación,
   varios conjuntos de resultados vía `SYS_REFCURSOR`, `DBMS_OUTPUT` como los
   mensajes informativos del servidor.
-- [ ] **MOT-017:** `OracleValueFormatter` y `OracleRowEditor`, con `ROWID` como
+- [x] **MOT-017:** `OracleValueFormatter` y `OracleRowEditor`, con `ROWID` como
   respaldo cuando la tabla no tiene clave primaria.
-- [ ] **MOT-018:** `OracleTableDesigner` (que es también el `IDatabaseScripter`):
+- [x] **MOT-018:** `OracleTableDesigner` (que es también el `IDatabaseScripter`):
   `NUMBER`, `VARCHAR2`, `CLOB`, `BLOB`, `TIMESTAMP WITH TIME ZONE`, `RAW(16)`.
   **`SupportsTransactionalDdl = false`**, que es de las cosas que más sorprenden
   al que viene de PostgreSQL.
-- [ ] **MOT-019:** declarar las capacidades: sin booleano nativo antes de 23ai,
+- [x] **MOT-019:** declarar las capacidades: sin booleano nativo antes de 23ai,
   sin identificador único, sí conserva zona horaria, limita con
   `OFFSET … FETCH NEXT`, tiene esquemas y procedimientos.
 
 ### 7.2. Lo de fuera
 
-- [ ] **MOT-020:** las seis líneas de `DependencyInjection`, tras el `#if` que
+- [x] **MOT-020:** las seis líneas de `DependencyInjection`, tras el `#if` que
   corresponda si el driver acaba pesando lo suficiente.
-- [ ] **MOT-021:** distintivo `OR`, nombre «Oracle», color propio en los dos temas.
-- [ ] **MOT-022:** dialecto `plsql` del formateador, palabras clave y plantillas.
-- [ ] **MOT-023:** entrada en la tabla de dialecto de `sql-writer` (comillas
+- [x] **MOT-021:** distintivo `OR`, nombre «Oracle», color propio en los dos temas.
+- [x] **MOT-022:** dialecto `plsql` del formateador, palabras clave y plantillas.
+- [x] **MOT-023:** entrada en la tabla de dialecto de `sql-writer` (comillas
   dobles, `FETCH FIRST`, `TRUNC(fecha, 'MM')`, `INSERT … VALUES (DEFAULT)`).
-- [ ] **MOT-024:** `OracleFixture` y las pruebas contractuales completas.
-- [ ] **MOT-025:** contenedor en `test-db.ps1`/`.sh` (`gvenzl/oracle-free`, que
+- [x] **MOT-024:** `OracleFixture` y las pruebas contractuales completas.
+- [x] **MOT-025:** contenedor en `test-db.ps1`/`.sh` (`gvenzl/oracle-free`, que
   es mucho más ligera y rápida de arrancar que las imágenes oficiales).
-- [ ] **MOT-026:** recorrer a mano la tabla del §5 contra un Oracle real y
-  anotarlo en `BITACORA.md`, con el barrido de capturas que ya se usa.
+- [x] **MOT-026:** recorrido contra un Oracle real, con el barrido de capturas y
+  una prueba de punta a punta propia (`e2e/tests/oracle.spec.ts`).
+
+### Lo que Oracle obligó a cambiar fuera de su carpeta
+
+Cuatro cosas, y las cuatro eran huecos de verdad y no concesiones al motor:
+
+| Qué | Por qué |
+| --- | --- |
+| `TableDesignerBase.ToCommand` | El punto y coma se escribe en el guion —que se parte por él— y **no viaja por el cable**: Oracle responde `ORA-00911`. La costura evita repetir el recorte en las diez plantillas que componen instrucciones |
+| `BackupIsolation.Serializable` | Oracle no admite `RepeatableRead` como nivel de ADO: su driver lo rechaza con `ORA-50002`, y lo que él llama serializable es justo lo que hacía falta —lecturas consistentes que no bloquean a quien escribe—. De paso, un nivel rechazado ya no tumba el respaldo |
+| `ColumnValueParser` | No conocía `NUMBER` ni `RAW`, que son **los** tipos numérico y binario de Oracle. Sin eso, una columna de enteros se clasificaba como texto y el respaldo la escribía entrecomillada |
+| `IProviderFixture.Stored` y `HasEmptyStrings` | Dos hechos de Oracle que no se pueden fingir: pliega a mayúsculas lo que no va citado, y `''` **es** `NULL` |
+
+### Dos decisiones que costaron varias vueltas
+
+**Los identificadores no se citan por costumbre.** Los otros cuatro proveedores
+citan todo, porque allí es gratis. En Oracle citar además fija la caja, así que
+citar todo produciría tablas llamadas `clientes` que ningún informe ni ningún
+SQL*Plus sabe consultar —preguntan por `CLIENTES`—. `OracleIdentifier` cita solo
+lo que lo necesita y pliega lo demás, que es lo que hacen SQL Developer y
+DBeaver. El coste está escrito allí: un objeto cuyo nombre real esté en minúscula
+no se puede referir por este camino.
+
+**La sesión se reinicia al abrirla.** El explorador se asoma a otro esquema con
+`ALTER SESSION SET CURRENT_SCHEMA`, y eso **se queda pegado a la conexión** cuando
+vuelve al pool: la siguiente consulta que la tomara resolvería sus tablas en el
+esquema ajeno y fallaría hablando de una tabla que sí está. Costó cuatro pruebas
+rojas intermitentes averiguarlo. Ahora cada sesión vuelve a su esquema y fija sus
+formatos de fecha nada más abrirse.
+
+### Lo que queda declarado, no resuelto
+
+- **Un lote con varias instrucciones no se puede ejecutar de una vez.** Oracle no
+  encadena con punto y coma, y partir el texto es una función de Druse —no del
+  proveedor— que hoy no existe. Quien pegue dos consultas y pulse Ejecutar recibe
+  `ORA-00911`.
+- **No se dice dónde falló un error de sintaxis.** El servidor sabe el
+  desplazamiento; ODP.NET no lo expone.
+- **Los paquetes no salen en el árbol.** Los procedimientos que viven dentro de
+  uno no se listan: colgarlos del esquema daría nombres que no se pueden llamar.
+- **Sin booleano**, salvo en 23ai. Se traduce a `NUMBER(1)` y el traslado lo
+  avisa.
 
 ---
 
-## 8. Fase 2 — SQLite
+## 8. Fase 2 — SQLite — **lo siguiente**
 
 SQLite no es «un motor más pequeño»: es el que rompe los supuestos. Por eso va
 después, y por eso su fase empieza por el modelo y no por el proveedor.

@@ -29,6 +29,10 @@ Hace falta el contenedor de PostgreSQL, el mismo que usan las contractuales:
 ./build/scripts/test-db.ps1 -Engine postgres
 ```
 
+Y para las que cruzan de motor, el suyo: SQL Server (`-Engine sqlserver`) y
+Oracle (`-Engine oracle`). Este último tarda un par de minutos la primera vez,
+porque crea la base al arrancar.
+
 ## Ejecutarlas
 
 ```bash

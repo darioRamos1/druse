@@ -179,9 +179,12 @@ selector web y guardar descarga un `.sql` nuevo.
 | PostgreSQL 12 – 18 | Funcionando |
 | SQL Server 2016 – 2022 | Funcionando (autenticación SQL; la integrada de Windows está en el backlog) |
 | MySQL 8.0+ y MariaDB | Funcionando |
+| Oracle 12c – 23ai | Funcionando |
 | Informix 12.10+ | Funcionando (por DRDA; en Linux necesita `libxml2`) |
 
-Los tres superan **el mismo conjunto de 24 pruebas contractuales**, sin excepciones por motor.
+Todos superan **el mismo conjunto de pruebas contractuales**, sin excepciones
+por motor: lo que un motor no puede hacer se declara en su fixture —Oracle no
+tiene booleanos ni cadenas vacías— en lugar de relajar la comprobación.
 
 En MySQL, `SCHEMA` es un sinónimo de `DATABASE`, así que el explorador muestra un esquema del mismo nombre que su base. El árbol se comporta igual en los tres motores; la alternativa habría sido ramificar por motor en la interfaz, que es justo lo que el plan prohíbe.
 
