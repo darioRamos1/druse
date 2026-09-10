@@ -29,8 +29,12 @@ public sealed class ConnectionService(
     /// Ese caso no lo arregla el validador —lo dirá <c>GetProvider</c> un momento
     /// después, con su propio mensaje—; aquí basta con no reventar antes de
     /// llegar.
+    ///
+    /// Es público porque el host también lo necesita: al reabrir una conexión
+    /// guardada hay que saber **si este motor tiene contraseña siquiera** antes
+    /// de pedirla.
     /// </summary>
-    private EngineCapabilities? Capabilities(ConnectionProfile? profile) =>
+    public EngineCapabilities? Capabilities(ConnectionProfile? profile) =>
         profile is not null && _providers.SupportedEngines.Contains(profile.Engine)
             ? _providers.GetProvider(profile.Engine).Capabilities
             : null;

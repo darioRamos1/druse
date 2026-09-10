@@ -186,15 +186,25 @@ internal static class StorageEndpoints
                 return Results.NotFound();
             }
 
-            // Con autenticación de Windows no hay contraseña: ni se busca en el
-            // almacén ni se pide, porque la identidad la pone la sesión del sistema.
-            var credentials = profile.UsesIntegratedSecurity
+            // Hay dos motivos por los que una conexión no lleva contraseña, y los
+            // dos hay que contemplarlos antes de pedirla:
+            //
+            // - **La identidad la pone el sistema**, que es la autenticación de
+            //   Windows de SQL Server.
+            // - **El motor no tiene usuarios.** SQLite es un archivo: quien puede
+            //   leerlo puede leer la base, y no hay credencial que guardar ni que
+            //   pedir. Pedirla dejaría el motor entero inservible al reabrir una
+            //   conexión guardada, que es justo lo que pasaba.
+            var motor = connections.Capabilities(profile);
+            var pideContraseña = !profile.UsesIntegratedSecurity && (motor?.RequiresUsername ?? true);
+
+            var credentials = !pideContraseña
                 ? new Database.Abstractions.DatabaseCredentials(null)
                 : string.IsNullOrEmpty(request?.Password)
                     ? await saved.GetCredentialsAsync(id, cancellationToken)
                     : new Database.Abstractions.DatabaseCredentials(request.Password);
 
-            if (!profile.UsesIntegratedSecurity && string.IsNullOrEmpty(credentials.Password))
+            if (pideContraseña && string.IsNullOrEmpty(credentials.Password))
             {
                 return Results.Json(
                     new { message = "Esta conexión no tiene contraseña guardada.", requiresPassword = true },
