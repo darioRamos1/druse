@@ -14,6 +14,12 @@ describe('shortcutFor', () => {
     expect(pulsar('F1')).toEqual({ kind: 'shortcuts' });
   });
 
+  it('Ctrl o Cmd con Shift+E enfoca el explorador sin aceptar Alt', () => {
+    expect(pulsar('E', { ctrlKey: true, shiftKey: true })).toEqual({ kind: 'focus-explorer' });
+    expect(pulsar('e', { metaKey: true, shiftKey: true })).toEqual({ kind: 'focus-explorer' });
+    expect(pulsar('e', { ctrlKey: true, shiftKey: true, altKey: true })).toBeNull();
+  });
+
   describe('pestañas', () => {
     it('Alt y un número van a esa pestaña, contando desde cero', () => {
       expect(pulsar('1', { altKey: true })).toEqual({ kind: 'tab', index: 0 });

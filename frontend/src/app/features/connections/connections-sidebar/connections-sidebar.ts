@@ -470,15 +470,11 @@ export class ConnectionsSidebar {
     this._filterInput()?.nativeElement.focus();
   }
 
-  /** Llevar el foco al campo desde cualquier sitio de la aplicación. */
-  @HostListener('document:keydown', ['$event'])
-  protected onShortcut(event: KeyboardEvent): void {
-    if ((event.ctrlKey || event.metaKey) && event.shiftKey && event.key.toLowerCase() === 'e') {
-      event.preventDefault();
-      const input = this._filterInput()?.nativeElement;
-      input?.focus();
-      input?.select();
-    }
+  /** El shell revela el panel antes de llevar el foco a su filtro. */
+  focusFilter(): void {
+    const input = this._filterInput()?.nativeElement;
+    input?.focus();
+    input?.select();
   }
 
   private cancelPending(): void {

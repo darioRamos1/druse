@@ -306,6 +306,16 @@
   }
 }
 
+.explorer-toggle[aria-expanded='true'] {
+  color: var(--dr-accent-bright);
+}
+
+@media (max-width: 720px) {
+  .explorer-toggle {
+    display: none;
+  }
+}
+
 @media (max-width: 900px) {
   :host {
     gap: 8px;

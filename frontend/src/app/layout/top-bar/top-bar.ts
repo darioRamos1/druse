@@ -31,4 +31,6 @@ export class TopBar {
   readonly assistantOpen = input(false);
 
   readonly toggleAssistant = output<void>();
+  readonly explorerOpen = input(true);
+  readonly toggleExplorer = output<void>();
 }

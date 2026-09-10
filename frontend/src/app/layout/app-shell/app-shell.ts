@@ -8,6 +8,7 @@ import {
   effect,
   HostListener,
   inject,
+  Injector,
   signal,
   viewChild,
 } from '@angular/core';
@@ -262,6 +263,7 @@ export class AppShell {
 
   // --- Tamaños de panel ------------------------------------------------------
   protected readonly sidebarWidth = signal(274);
+  protected readonly explorerOpen = signal(true);
   protected readonly mobileExplorerOpen = signal(false);
   protected readonly requestedResultsHeight = signal<number | null>(null);
   private readonly availablePanelHeight = signal(580);
@@ -276,6 +278,8 @@ export class AppShell {
   protected readonly resultsMax = computed(() => this.resultsLayout().max);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly injector = inject(Injector);
+  private readonly explorer = viewChild(ConnectionsSidebar);
 
   /** Solo mide las barras fijas: cambiar el resultado no provoca un ciclo de medidas. */
   private observePanelSpace(): void {
@@ -354,6 +358,15 @@ export class AppShell {
     }
 
     switch (shortcut.kind) {
+      case 'focus-explorer':
+        event.preventDefault();
+        this.explorerOpen.set(true);
+        if (window.matchMedia?.('(max-width: 720px)').matches) {
+          this.mobileExplorerOpen.set(true);
+        }
+        afterNextRender(() => this.explorer()?.focusFilter(), { injector: this.injector });
+        return;
+
       case 'palette':
         event.preventDefault();
         this.prepareOverlay();

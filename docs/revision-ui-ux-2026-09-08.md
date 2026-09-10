@@ -166,3 +166,9 @@ Validación: cuatro pruebas de componente aprobadas y compilación de producció
 La altura inicial de resultados se adapta al espacio disponible después de las barras. El límite del tirador reserva espacio para seguir escribiendo y se recalcula al cambiar el tamaño de la ventana o de los avisos. Intro o doble clic en el separador restablece el reparto automático. Los arrastres convierten la distancia de pantalla a píxeles CSS para respetar el zoom. La bienvenida se compacta cuando falta altura, conservando sus acciones visibles.
 
 Validación: pruebas del cálculo de tamaños, del tirador con zoom y de su integración con el shell aprobadas (35 casos entre las tres suites). A 900 × 720 px y escala 125 %, el editor inicial midió 301,5 px; al ampliar resultados al máximo conservó 200,25 px, sin desbordar la ventana. Crear conexión permaneció visible en el reparto automático.
+
+### Explorador plegable
+
+Un botón junto a la marca permite ocultar y recuperar el explorador en escritorio. Se conservan el ancho, el filtro y el componente con su árbol. Ctrl/Cmd+Mayús+E revela el panel y selecciona su filtro, respetando los diálogos abiertos; en móvil sigue abriendo el cajón existente.
+
+Validación: 70 pruebas aprobadas entre shell, explorador y atajos; compilación de producción correcta. A 900 × 720 px y escala 125 % se comprobó que el panel desaparece del árbol accesible, el editor ocupa el ancho liberado y el atajo recupera el filtro «ventas» seleccionado y con foco. La barra superior conserva sus acciones visibles.

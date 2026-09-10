@@ -18,6 +18,7 @@ export type Shortcut =
   | { readonly kind: 'tab-previous' }
   | { readonly kind: 'tab-close' }
   | { readonly kind: 'focus-results' }
+  | { readonly kind: 'focus-explorer' }
   | { readonly kind: 'focus-editor' }
   | { readonly kind: 'run-again' }
   | { readonly kind: 'export' };
@@ -32,6 +33,10 @@ export type Shortcut =
 export function shortcutFor(event: KeyboardEvent): Shortcut | null {
   const mando = event.ctrlKey || event.metaKey;
   const key = event.key;
+
+  if (mando && event.shiftKey && !event.altKey && key.toLowerCase() === 'e') {
+    return { kind: 'focus-explorer' };
+  }
 
   if (mando && !event.altKey && !event.shiftKey && key.toLowerCase() === 'k') {
     return { kind: 'palette' };

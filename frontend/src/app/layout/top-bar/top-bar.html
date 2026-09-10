@@ -1,4 +1,19 @@
 <div class="brand">
+  <button
+    type="button"
+    class="icon-button explorer-toggle"
+    [attr.aria-label]="
+      explorerOpen()
+        ? 'Ocultar explorador de bases de datos'
+        : 'Mostrar explorador de bases de datos'
+    "
+    [attr.aria-expanded]="explorerOpen()"
+    aria-controls="connections-explorer"
+    [title]="'Explorador de bases de datos (' + shortcut('Ctrl+Shift+E') + ')'"
+    (click)="toggleExplorer.emit()"
+  >
+    <app-icon name="panel-left" [size]="16" />
+  </button>
   <span class="brand__mark" aria-hidden="true"><span class="brand__core"></span></span>
   <span class="brand__name">Druse</span>
 </div>

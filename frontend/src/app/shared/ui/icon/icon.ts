@@ -7,6 +7,7 @@ import { inject } from '@angular/core';
  * exista se detecta al compilar, no en tiempo de ejecución.
  */
 export type IconName =
+  | 'panel-left'
   | 'plus'
   | 'new-query'
   | 'folder-open'
@@ -50,6 +51,10 @@ interface IconDefinition {
  * Todos usan `currentColor` para heredar el color del contexto.
  */
 const ICONS: Readonly<Record<IconName, IconDefinition>> = {
+  'panel-left': {
+    viewBox: '0 0 16 16',
+    body: '<rect x="1.5" y="2" width="13" height="12" rx="2" stroke="currentColor" stroke-width="1.3"/><path d="M6 2v12" stroke="currentColor" stroke-width="1.3"/>',
+  },
   plus: {
     viewBox: '0 0 12 12',
     body: '<path d="M6 1.5v9M1.5 6h9" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>',

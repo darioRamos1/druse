@@ -443,4 +443,43 @@ describe('AppShell', () => {
   it('en móvil conserva un control para abrir el explorador', () => {
     expect(element.querySelector('.mobile-explorer-toggle')).toBeTruthy();
   });
+
+  it('pliega el explorador sin perder el filtro ni el ancho elegido y el atajo lo recupera', async () => {
+    const toggle = element.querySelector<HTMLButtonElement>('.explorer-toggle')!;
+    const sidebar = element.querySelector<HTMLElement>('.sidebar')!;
+    const input = sidebar.querySelector<HTMLInputElement>('.filter__input')!;
+    const resize = element.querySelector<HTMLElement>('.sidebar + app-resize-handle')!;
+    input.value = 'ventas';
+    input.dispatchEvent(new Event('input'));
+    resize.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight' }));
+    await fixture.whenStable();
+    const width = sidebar.style.width;
+    toggle.click();
+    await fixture.whenStable();
+    expect(toggle.getAttribute('aria-expanded')).toBe('false');
+    expect(sidebar.classList.contains('is-collapsed')).toBe(true);
+    document.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'E', ctrlKey: true, shiftKey: true }),
+    );
+    await fixture.whenStable();
+    expect(toggle.getAttribute('aria-expanded')).toBe('true');
+    expect(sidebar.classList.contains('is-collapsed')).toBe(false);
+    expect(sidebar.style.width).toBe(width);
+    expect(sidebar.querySelector('.filter__input')).toBe(input);
+    expect(input.value).toBe('ventas');
+    expect(document.activeElement).toBe(input);
+    expect(input.selectionEnd).toBe(6);
+  });
+
+  it('el atajo del explorador respeta el diálogo abierto', async () => {
+    element.querySelector<HTMLButtonElement>('.explorer-toggle')!.click();
+    element.querySelector<HTMLButtonElement>('.op--activity')!.click();
+    await fixture.whenStable();
+    document.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'E', ctrlKey: true, shiftKey: true }),
+    );
+    await fixture.whenStable();
+    expect(element.querySelector('.sidebar')!.classList.contains('is-collapsed')).toBe(true);
+    expect(document.activeElement?.closest('app-connections-sidebar')).toBeNull();
+  });
 });

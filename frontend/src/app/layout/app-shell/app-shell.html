@@ -10,6 +10,8 @@
   (openSettings)="openSettings()"
   [assistantOpen]="aiOpen()"
   (toggleAssistant)="toggleAssistant()"
+  [explorerOpen]="explorerOpen()"
+  (toggleExplorer)="explorerOpen.update((open) => !open)"
 />
 
 <div class="body">
@@ -18,6 +20,7 @@
     class="mobile-explorer-toggle"
     aria-label="Abrir explorador de bases de datos"
     [attr.aria-expanded]="mobileExplorerOpen()"
+    aria-controls="connections-explorer"
     (click)="mobileExplorerOpen.update((open) => !open)"
   >
     Bases
@@ -26,7 +29,9 @@
     <div class="mobile-sidebar-backdrop" (click)="closeMobileExplorer()"></div>
   }
   <app-connections-sidebar
+    id="connections-explorer"
     class="sidebar"
+    [class.is-collapsed]="!explorerOpen()"
     [class.is-mobile-open]="mobileExplorerOpen()"
     [style.width.px]="sidebarWidth()"
     [connections]="connections()"

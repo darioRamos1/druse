@@ -39,6 +39,13 @@
   min-width: 0;
 }
 
+@media (min-width: 721px) {
+  .sidebar.is-collapsed,
+  .sidebar.is-collapsed + app-resize-handle {
+    display: none;
+  }
+}
+
 .main {
   display: flex;
   flex-direction: column;
