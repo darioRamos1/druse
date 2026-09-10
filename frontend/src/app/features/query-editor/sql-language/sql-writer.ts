@@ -1,4 +1,13 @@
 import { DatabaseEngine, KnownColumn } from '../../../shared/models/workspace';
+import { DatePeriod, SQL_DIALECTS } from './sql-dialects';
+
+/**
+ * El periodo al que se agrupa una fecha.
+ *
+ * Se declara con los dialectos, que son quienes saben escribirlo, y se
+ * reexporta desde aquí porque es parte de la forma de una consulta.
+ */
+export type { DatePeriod };
 
 /** Un filtro de la cláusula WHERE, tal y como se compone en el panel. */
 export interface QueryFilter {
@@ -59,8 +68,6 @@ export interface AggregateFilter {
   readonly conjunction?: LogicalOperator;
 }
 
-export type DatePeriod = 'day' | 'month' | 'quarter' | 'year';
-
 export interface DateGroup {
   readonly column: string | SelectColumn;
   readonly period: DatePeriod;
@@ -117,16 +124,7 @@ export interface UpdateValuesSpec {
  * consulta, y en PostgreSQL un nombre con mayúsculas deja de encontrarse.
  */
 export function quote(engine: DatabaseEngine, identifier: string): string {
-  switch (engine) {
-    case 'sqlserver':
-      return `[${identifier.replace(/]/g, ']]')}]`;
-
-    case 'mysql':
-      return `\`${identifier.replace(/`/g, '``')}\``;
-
-    default:
-      return `"${identifier.replace(/"/g, '""')}"`;
-  }
+  return SQL_DIALECTS[engine].quote(identifier);
 }
 
 /** Nombre calificado, con el esquema si lo hay. */
@@ -209,45 +207,10 @@ function dateGroupExpression(
   group: DateGroup,
   defaultAlias?: string,
 ): string {
-  const column = columnReference(engine, group.column, defaultAlias);
-
-  switch (engine) {
-    case 'postgresql':
-      return `DATE_TRUNC('${group.period}', ${column})`;
-    case 'mysql':
-      switch (group.period) {
-        case 'day':
-          return `DATE(${column})`;
-        case 'month':
-          return `DATE_ADD(MAKEDATE(YEAR(${column}), 1), INTERVAL (MONTH(${column}) - 1) MONTH)`;
-        case 'quarter':
-          return `DATE_ADD(MAKEDATE(YEAR(${column}), 1), INTERVAL ((QUARTER(${column}) - 1) * 3) MONTH)`;
-        case 'year':
-          return `MAKEDATE(YEAR(${column}), 1)`;
-      }
-    case 'sqlserver':
-      switch (group.period) {
-        case 'day':
-          return `CONVERT(date, ${column})`;
-        case 'month':
-          return `DATEFROMPARTS(YEAR(${column}), MONTH(${column}), 1)`;
-        case 'quarter':
-          return `DATEFROMPARTS(YEAR(${column}), ((DATEPART(quarter, ${column}) - 1) * 3) + 1, 1)`;
-        case 'year':
-          return `DATEFROMPARTS(YEAR(${column}), 1, 1)`;
-      }
-    default:
-      switch (group.period) {
-        case 'day':
-          return `DATE(${column})`;
-        case 'month':
-          return `MDY(MONTH(${column}), 1, YEAR(${column}))`;
-        case 'quarter':
-          return `MDY(((QUARTER(${column}) - 1) * 3) + 1, 1, YEAR(${column}))`;
-        case 'year':
-          return `MDY(1, 1, YEAR(${column}))`;
-      }
-  }
+  return SQL_DIALECTS[engine].dateTrunc(
+    columnReference(engine, group.column, defaultAlias),
+    group.period,
+  );
 }
 
 function conditions<T extends Pick<QueryFilter, 'operator' | 'value' | 'conjunction'>>(
@@ -270,12 +233,11 @@ function conditions<T extends Pick<QueryFilter, 'operator' | 'value' | 'conjunct
  * `FIRST` en Informix van justo después del SELECT.
  */
 /**
- * El INSERT de una tabla cuyas columnas las rellena todas el motor.
+ * El `INSERT` de una tabla cuyas columnas las rellena todas el motor.
  *
- * Cada motor lo dice a su manera y **Informix no tiene ninguna**: no admite
- * `DEFAULT VALUES` ni la lista vacía de MySQL. Su forma idiomática es nombrar la
- * columna serial y darle un cero, que es la señal para que asigne el siguiente
- * valor. Sin este caso aparte se generaría SQL que su servidor rechaza.
+ * Cada motor lo dice a su manera y **Informix no tiene ninguna**: lo suyo es
+ * nombrar la columna serial y darle un cero. Lo que escriba cada uno está en su
+ * dialecto; aquí solo se le pasa la única columna que puede necesitar.
  */
 function allGeneratedInsert(
   engine: DatabaseEngine,
@@ -283,42 +245,12 @@ function allGeneratedInsert(
   table: string,
   columns: readonly KnownColumn[],
 ): string {
-  const name = qualify(engine, schema, table);
+  const serial = columns[0];
 
-  if (engine === 'mysql') {
-    return `INSERT INTO ${name} ()\nVALUES ();\n`;
-  }
-
-  if (engine === 'informix') {
-    const serial = columns[0];
-
-    return serial
-      ? `INSERT INTO ${name} (${quote(engine, serial.name)})\nVALUES (0);\n`
-      : `INSERT INTO ${name}\nVALUES ();\n`;
-  }
-
-  return `INSERT INTO ${name}\nDEFAULT VALUES;\n`;
-}
-
-/**
- * Lo que va entre `SELECT` y las columnas para limitar filas.
- *
- * Devuelve cadena vacía en los motores que lo escriben al final con `LIMIT`, y
- * esa misma cadena vacía es la que decide después si hay que añadirlo allí. Así
- * la regla vive en un solo sitio y no puede quedar a medias: un motor nuevo que
- * la ponga delante no arrastra además un `LIMIT` al final.
- */
-function leadingLimit(engine: DatabaseEngine, limit: number): string {
-  switch (engine) {
-    case 'sqlserver':
-      return `TOP ${limit} `;
-
-    case 'informix':
-      return `FIRST ${limit} `;
-
-    default:
-      return '';
-  }
+  return SQL_DIALECTS[engine].allGeneratedInsert(
+    qualify(engine, schema, table),
+    serial ? quote(engine, serial.name) : null,
+  );
 }
 
 export function buildSelect(engine: DatabaseEngine, spec: SelectSpec): string {
@@ -339,7 +271,8 @@ export function buildSelect(engine: DatabaseEngine, spec: SelectSpec): string {
   const columnas =
     selected.length > 0 ? selected.join(', ') : alias ? `${quote(engine, alias)}.*` : '*';
 
-  const top = spec.limit ? leadingLimit(engine, spec.limit) : '';
+  const leading = SQL_DIALECTS[engine].leadingLimit;
+  const top = spec.limit && leading ? leading(spec.limit) : '';
 
   const from = alias
     ? `${qualify(engine, spec.schema, spec.table)} AS ${quote(engine, alias)}`
@@ -404,7 +337,7 @@ export function buildSelect(engine: DatabaseEngine, spec: SelectSpec): string {
   }
 
   // Solo los motores que no lo pusieron ya delante llevan `LIMIT` al final.
-  if (spec.limit && leadingLimit(engine, spec.limit) === '') {
+  if (spec.limit && !leading) {
     lineas.push(`LIMIT ${spec.limit}`);
   }
 
@@ -610,6 +543,8 @@ export function buildCall(engine: DatabaseEngine, spec: CallSpec): string {
   const target = qualify(engine, spec.schema, spec.routine);
   const salidas = spec.parameters.filter((parameter) => parameter.direction !== 'input');
 
+  // Sin rama `default`: un motor nuevo tiene que decir cómo llama a un
+  // procedimiento en lugar de heredar en silencio la forma de Informix.
   switch (engine) {
     case 'sqlserver':
       return buildSqlServerCall(target, spec.parameters, salidas);
@@ -617,7 +552,8 @@ export function buildCall(engine: DatabaseEngine, spec: CallSpec): string {
       return buildMySqlCall(engine, target, spec.parameters, salidas);
     case 'postgresql':
       return buildPostgreSqlCall(spec.parameters, target);
-    default:
+    case 'informix':
+    case 'informixsqli':
       return buildInformixCall(target, spec.parameters, salidas);
   }
 }

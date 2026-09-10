@@ -76,6 +76,21 @@ describe('escribir SQL', () => {
       expect(informix).not.toContain('LIMIT');
     });
 
+    /**
+     * El transporte no cambia el dialecto: DRDA y SQLI son el mismo motor.
+     *
+     * Esto estuvo roto. Cada regla de dialecto era un `switch` con una rama
+     * `default` que valía PostgreSQL, y `informixsqli` no aparecía en ninguna:
+     * una conexión por el protocolo nativo recibía `LIMIT` al final y un
+     * `DEFAULT VALUES`, dos cosas que su servidor rechaza. Ahora los dialectos
+     * son una tabla exhaustiva y el motor que falte no compila.
+     */
+    it('el protocolo de Informix no cambia el SQL que se escribe', () => {
+      const spec = { ...base, limit: 100 };
+
+      expect(buildSelect('informixsqli', spec)).toBe(buildSelect('informix', spec));
+    });
+
     it('junta los filtros con AND', () => {
       const sql = buildSelect('postgresql', {
         ...base,
@@ -341,6 +356,11 @@ describe('escribir SQL', () => {
       expect(buildInsert('postgresql', soloIdentidad)).toContain('DEFAULT VALUES');
       expect(buildInsert('sqlserver', soloIdentidad)).toContain('DEFAULT VALUES');
       expect(buildInsert('mysql', soloIdentidad)).toContain('()\nVALUES ()');
+
+      // Informix no admite ninguna de las dos formas: nombra su columna serial y
+      // le da un cero. Y lo hace igual por sus dos protocolos.
+      expect(buildInsert('informix', soloIdentidad)).toContain('("id")\nVALUES (0)');
+      expect(buildInsert('informixsqli', soloIdentidad)).toContain('("id")\nVALUES (0)');
     });
 
     it('el UPDATE trae el WHERE por clave primaria', () => {
