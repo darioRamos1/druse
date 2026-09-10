@@ -600,8 +600,18 @@ public sealed class TransferPlanTests
         public IReadOnlyCollection<DatabaseEngine> SupportedEngines =>
             [source.Engine, target.Engine];
 
-        public IDatabaseProvider GetProvider(DatabaseEngine engine) =>
-            throw new NotSupportedException();
+        /// <summary>
+        /// El proveedor del motor que se pide, por lo mismo que el diseñador: es
+        /// quien dice qué familias de datos guarda ese motor con un tipo propio,
+        /// y de ahí salen los avisos de la vista previa.
+        /// </summary>
+        public IDatabaseProvider GetProvider(DatabaseEngine engine) => engine switch
+        {
+            DatabaseEngine.SqlServer => new SqlServerDatabaseProvider(),
+            DatabaseEngine.MySql => new MySqlDatabaseProvider(),
+            DatabaseEngine.Informix => new InformixDatabaseProvider(),
+            _ => new PostgreSqlDatabaseProvider(),
+        };
 
         public IDatabaseMetadataReader GetMetadataReader(DatabaseEngine engine) =>
             new FakeMetadataReader(catalog, structure);

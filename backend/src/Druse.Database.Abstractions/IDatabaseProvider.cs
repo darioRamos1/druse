@@ -87,6 +87,17 @@ public interface IDatabaseProvider
 {
     DatabaseEngine Engine { get; }
 
+    /// <summary>
+    /// Lo que este motor sabe hacer.
+    ///
+    /// Es lo que permite que el validador, el traductor de tipos y el formulario
+    /// de conexión dejen de preguntar «¿y si es MySQL?»: preguntan aquí y
+    /// trabajan con la respuesta. Un motor nuevo no puede olvidarse de
+    /// contestar, porque la propiedad es del contrato y las familias de datos que
+    /// conserva son <c>required</c>.
+    /// </summary>
+    EngineCapabilities Capabilities { get; }
+
     /// <summary>Puerto habitual del motor, para rellenar el formulario de conexión.</summary>
     int DefaultPort { get; }
 

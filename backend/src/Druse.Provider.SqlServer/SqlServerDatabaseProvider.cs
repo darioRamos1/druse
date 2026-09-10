@@ -86,6 +86,33 @@ public sealed class SqlServerDatabaseProvider : IDatabaseProvider
 {
     public DatabaseEngine Engine => DatabaseEngine.SqlServer;
 
+    /// <summary>
+    /// Tiene un tipo para cada familia —`uniqueidentifier`, `bit`,
+    /// `datetimeoffset`— pero **no un tipo JSON**: lo que llama JSON son
+    /// funciones sobre texto, así que un `jsonb` que aterrice aquí deja de
+    /// comprobarse.
+    ///
+    /// Y no tiene sesiones de solo lectura: lo único que hay es el aviso del
+    /// analizador, que no es una frontera.
+    /// </summary>
+    public EngineCapabilities Capabilities { get; } = new()
+    {
+        SupportsIntegratedSecurity = true,
+        NativeFamilies =
+        [
+            ColumnFamily.Text,
+            ColumnFamily.Integral,
+            ColumnFamily.Fractional,
+            ColumnFamily.Boolean,
+            ColumnFamily.Date,
+            ColumnFamily.Time,
+            ColumnFamily.Timestamp,
+            ColumnFamily.TimestampWithZone,
+            ColumnFamily.Binary,
+            ColumnFamily.Uuid,
+        ],
+    };
+
     public int DefaultPort => 1433;
 
     /// <summary>`master` la ve cualquier inicio de sesión, por poco permiso que tenga.</summary>

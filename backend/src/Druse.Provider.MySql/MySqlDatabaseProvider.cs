@@ -83,6 +83,32 @@ public sealed class MySqlDatabaseProvider : IDatabaseProvider
 {
     public DatabaseEngine Engine => DatabaseEngine.MySql;
 
+    /// <summary>
+    /// Tiene JSON de verdad, pero le faltan dos tipos que en otros motores se dan
+    /// por hechos: **no hay identificador único** —se guarda escrito, con sus 36
+    /// caracteres— y **no hay marca de tiempo con zona**: el instante se conserva
+    /// convertido a UTC y de qué huso venía se pierde.
+    ///
+    /// El booleano sí cuenta como propio aunque por dentro sea un `tinyint(1)`:
+    /// el motor lo nombra, lo lee y lo escribe como booleano.
+    /// </summary>
+    public EngineCapabilities Capabilities { get; } = new()
+    {
+        EnforcesReadOnlySessions = true,
+        StoresJson = true,
+        NativeFamilies =
+        [
+            ColumnFamily.Text,
+            ColumnFamily.Integral,
+            ColumnFamily.Fractional,
+            ColumnFamily.Boolean,
+            ColumnFamily.Date,
+            ColumnFamily.Time,
+            ColumnFamily.Timestamp,
+            ColumnFamily.Binary,
+        ],
+    };
+
     public int DefaultPort => 3306;
 
     /// <summary>

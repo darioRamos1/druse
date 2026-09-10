@@ -22,12 +22,38 @@ public static class ConnectionProfileValidator
 {
     private const int MaxNameLength = 120;
 
-    public static ValidationResult Validate(ConnectionProfile? profile)
+    /// <summary>
+    /// Lo que se supone de un motor del que no se sabe nada.
+    ///
+    /// Se usa cuando nadie pasa capacidades —las pruebas que solo miran el
+    /// nombre o el puerto, y un motor cuyo proveedor no está registrado en esta
+    /// compilación—. Describe al motor corriente: un servidor con host y
+    /// usuario. Suponer lo contrario dejaría pasar perfiles vacíos.
+    /// </summary>
+    private static readonly EngineCapabilities Corriente = new() { NativeFamilies = [] };
+
+    public static ValidationResult Validate(ConnectionProfile? profile) =>
+        Validate(profile, capabilities: null);
+
+    /// <summary>
+    /// Comprueba el perfil contra lo que el motor dice de sí mismo.
+    /// </summary>
+    /// <param name="capabilities">
+    /// Lo que este motor necesita para conectar. Es lo que permite que la misma
+    /// función valga para un servidor y para un motor que es un archivo: sin
+    /// esto habría que preguntar aquí por el motor, y cada motor nuevo añadiría
+    /// su condicional.
+    /// </param>
+    public static ValidationResult Validate(
+        ConnectionProfile? profile,
+        EngineCapabilities? capabilities)
     {
         if (profile is null)
         {
             return new ValidationResult(["El perfil de conexión es obligatorio."]);
         }
+
+        var motor = capabilities ?? Corriente;
 
         var errors = new List<string>();
 
@@ -40,7 +66,7 @@ public static class ConnectionProfileValidator
             errors.Add($"El nombre no puede superar {MaxNameLength} caracteres.");
         }
 
-        if (string.IsNullOrWhiteSpace(profile.Host))
+        if (motor.RequiresHost && string.IsNullOrWhiteSpace(profile.Host))
         {
             errors.Add("El servidor es obligatorio.");
         }
@@ -65,7 +91,9 @@ public static class ConnectionProfileValidator
 
         // Con autenticación de Windows la identidad la pone la sesión del sistema,
         // así que exigir un usuario obligaría a inventarse uno que nadie usa.
-        if (!profile.UsesIntegratedSecurity && string.IsNullOrWhiteSpace(profile.Username))
+        if (motor.RequiresUsername
+            && !profile.UsesIntegratedSecurity
+            && string.IsNullOrWhiteSpace(profile.Username))
         {
             errors.Add("El usuario es obligatorio.");
         }
@@ -74,7 +102,7 @@ public static class ConnectionProfileValidator
         {
             errors.Add("El método de autenticación indicado no es válido.");
         }
-        else if (profile.UsesIntegratedSecurity && profile.Engine != DatabaseEngine.SqlServer)
+        else if (profile.UsesIntegratedSecurity && !motor.SupportsIntegratedSecurity)
         {
             errors.Add("La autenticación de Windows solo está disponible en SQL Server.");
         }
@@ -90,8 +118,7 @@ public static class ConnectionProfileValidator
             errors.Add("El motor indicado no es válido.");
         }
 
-        if (profile.Engine == DatabaseEngine.InformixSqli
-            && string.IsNullOrWhiteSpace(profile.InformixServer))
+        if (motor.RequiresLogicalServer && string.IsNullOrWhiteSpace(profile.InformixServer))
         {
             errors.Add(
                 "El Server de Informix (INFORMIXSERVER) es obligatorio para una conexión SQLI.");

@@ -73,6 +73,32 @@ public sealed class PostgreSqlDatabaseProvider : IDatabaseProvider
 {
     public DatabaseEngine Engine => DatabaseEngine.PostgreSql;
 
+    /// <summary>
+    /// El motor con menos huecos de los cuatro: guarda todas las familias con un
+    /// tipo propio, tiene JSON que se consulta por sus campos y columnas que
+    /// guardan varios valores. Por eso es el único destino al que se puede llevar
+    /// cualquier cosa sin avisar de nada.
+    /// </summary>
+    public EngineCapabilities Capabilities { get; } = new()
+    {
+        EnforcesReadOnlySessions = true,
+        StoresJson = true,
+        StoresArrays = true,
+        NativeFamilies =
+        [
+            ColumnFamily.Text,
+            ColumnFamily.Integral,
+            ColumnFamily.Fractional,
+            ColumnFamily.Boolean,
+            ColumnFamily.Date,
+            ColumnFamily.Time,
+            ColumnFamily.Timestamp,
+            ColumnFamily.TimestampWithZone,
+            ColumnFamily.Binary,
+            ColumnFamily.Uuid,
+        ],
+    };
+
     public int DefaultPort => 5432;
 
     /// <summary>`postgres` existe en toda instalación y es donde se pregunta.</summary>

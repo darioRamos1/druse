@@ -1,10 +1,37 @@
 using Druse.Application.Connections;
 using Druse.Domain;
+using Druse.Provider.Informix;
+using Druse.Provider.MySql;
+using Druse.Provider.PostgreSql;
+using Druse.Provider.SqlServer;
 
 namespace Druse.UnitTests;
 
 public sealed class ConnectionProfileValidatorTests
 {
+    /// <summary>
+    /// Valida como lo hace la aplicación: preguntando antes al motor lo que sabe
+    /// de sí mismo.
+    ///
+    /// Las reglas que dependían de un `if` por motor —quién admite la identidad
+    /// de Windows, quién exige el servidor lógico— ahora las contesta el
+    /// proveedor, así que una prueba que no se lo preguntara estaría comprobando
+    /// otra cosa que la que corre de verdad.
+    /// </summary>
+    private static ValidationResult Validate(ConnectionProfile? profile) =>
+        ConnectionProfileValidator.Validate(profile, Capabilities(profile?.Engine));
+
+    /// <summary>Las capacidades reales del motor, o `null` si nadie lo implementa.</summary>
+    private static EngineCapabilities? Capabilities(DatabaseEngine? engine) => engine switch
+    {
+        DatabaseEngine.PostgreSql => new PostgreSqlDatabaseProvider().Capabilities,
+        DatabaseEngine.SqlServer => new SqlServerDatabaseProvider().Capabilities,
+        DatabaseEngine.MySql => new MySqlDatabaseProvider().Capabilities,
+        DatabaseEngine.Informix or DatabaseEngine.InformixSqli =>
+            new InformixDatabaseProvider(engine.Value).Capabilities,
+        _ => null,
+    };
+
     private static ConnectionProfile Valid() => new()
     {
         Id = Guid.NewGuid(),
@@ -19,7 +46,7 @@ public sealed class ConnectionProfileValidatorTests
     [Fact]
     public void AceptaUnPerfilCompleto()
     {
-        var result = ConnectionProfileValidator.Validate(Valid());
+        var result = Validate(Valid());
 
         Assert.True(result.IsValid);
         Assert.Empty(result.Errors);
@@ -28,7 +55,7 @@ public sealed class ConnectionProfileValidatorTests
     [Fact]
     public void RechazaUnPerfilNulo()
     {
-        var result = ConnectionProfileValidator.Validate(null);
+        var result = Validate(null);
 
         Assert.False(result.IsValid);
     }
@@ -38,7 +65,7 @@ public sealed class ConnectionProfileValidatorTests
     [InlineData("   ")]
     public void ExigeNombre(string name)
     {
-        var result = ConnectionProfileValidator.Validate(Valid() with { Name = name });
+        var result = Validate(Valid() with { Name = name });
 
         Assert.False(result.IsValid);
         Assert.Contains(result.Errors, error => error.Contains("nombre", StringComparison.OrdinalIgnoreCase));
@@ -50,7 +77,7 @@ public sealed class ConnectionProfileValidatorTests
     [InlineData(65536)]
     public void RechazaPuertosFueraDeRango(int port)
     {
-        var result = ConnectionProfileValidator.Validate(Valid() with { Port = port });
+        var result = Validate(Valid() with { Port = port });
 
         Assert.False(result.IsValid);
         Assert.Contains(result.Errors, error => error.Contains("puerto", StringComparison.OrdinalIgnoreCase));
@@ -62,7 +89,7 @@ public sealed class ConnectionProfileValidatorTests
     [InlineData(65535)]
     public void AceptaPuertosValidos(int port)
     {
-        Assert.True(ConnectionProfileValidator.Validate(Valid() with { Port = port }).IsValid);
+        Assert.True(Validate(Valid() with { Port = port }).IsValid);
     }
 
     [Fact]
@@ -75,7 +102,7 @@ public sealed class ConnectionProfileValidatorTests
             Port = 0,
         };
 
-        Assert.True(ConnectionProfileValidator.Validate(profile).IsValid);
+        Assert.True(Validate(profile).IsValid);
     }
 
     [Fact]
@@ -83,7 +110,7 @@ public sealed class ConnectionProfileValidatorTests
     {
         var profile = Valid() with { Host = "", Username = "" };
 
-        var result = ConnectionProfileValidator.Validate(profile);
+        var result = Validate(profile);
 
         Assert.False(result.IsValid);
         Assert.Equal(2, result.Errors.Count);
@@ -102,7 +129,7 @@ public sealed class ConnectionProfileValidatorTests
     {
         var profile = Valid() with { Database = "" };
 
-        Assert.True(ConnectionProfileValidator.Validate(profile).IsValid);
+        Assert.True(Validate(profile).IsValid);
     }
 
     /// <summary>Perfil de SQL Server con la identidad de la sesión de Windows.</summary>
@@ -117,7 +144,7 @@ public sealed class ConnectionProfileValidatorTests
     [Fact]
     public void LaAutenticacionDeWindowsNoExigeUsuario()
     {
-        var result = ConnectionProfileValidator.Validate(Integrated());
+        var result = Validate(Integrated());
 
         // Fuera de Windows el propio validador la rechaza, y ahí la prueba solo
         // puede comprobar que no es el usuario lo que falta.
@@ -137,7 +164,7 @@ public sealed class ConnectionProfileValidatorTests
     [InlineData(DatabaseEngine.MySql)]
     public void LaAutenticacionDeWindowsSoloValeParaSqlServer(DatabaseEngine engine)
     {
-        var result = ConnectionProfileValidator.Validate(Integrated() with { Engine = engine });
+        var result = Validate(Integrated() with { Engine = engine });
 
         Assert.False(result.IsValid);
         Assert.Contains(result.Errors, error =>
@@ -149,13 +176,13 @@ public sealed class ConnectionProfileValidatorTests
     {
         var profile = Valid() with { Authentication = (AuthenticationMode)7 };
 
-        Assert.False(ConnectionProfileValidator.Validate(profile).IsValid);
+        Assert.False(Validate(profile).IsValid);
     }
 
     [Fact]
     public void RechazaUnMotorDesconocido()
     {
-        var result = ConnectionProfileValidator.Validate(Valid() with { Engine = (DatabaseEngine)99 });
+        var result = Validate(Valid() with { Engine = (DatabaseEngine)99 });
 
         Assert.False(result.IsValid);
     }
@@ -170,7 +197,7 @@ public sealed class ConnectionProfileValidatorTests
             InformixServer = " ",
         };
 
-        var result = ConnectionProfileValidator.Validate(profile);
+        var result = Validate(profile);
 
         Assert.False(result.IsValid);
         Assert.Contains(result.Errors, error =>
@@ -187,7 +214,7 @@ public sealed class ConnectionProfileValidatorTests
             InformixServer = "vehi_tcp",
         };
 
-        Assert.True(ConnectionProfileValidator.Validate(profile).IsValid);
+        Assert.True(Validate(profile).IsValid);
     }
 
     [Fact]
@@ -199,7 +226,7 @@ public sealed class ConnectionProfileValidatorTests
             Port = 9089,
         };
 
-        Assert.True(ConnectionProfileValidator.Validate(profile).IsValid);
+        Assert.True(Validate(profile).IsValid);
     }
 
     [Theory]
@@ -207,7 +234,7 @@ public sealed class ConnectionProfileValidatorTests
     [InlineData(301)]
     public void RechazaTiemposDeEsperaAbsurdos(int seconds)
     {
-        var result = ConnectionProfileValidator.Validate(Valid() with { ConnectTimeoutSeconds = seconds });
+        var result = Validate(Valid() with { ConnectTimeoutSeconds = seconds });
 
         Assert.False(result.IsValid);
     }
@@ -224,7 +251,7 @@ public sealed class ConnectionProfileValidatorTests
     {
         var profile = Valid() with { SshTunnel = Tunnel() };
 
-        Assert.True(ConnectionProfileValidator.Validate(profile).IsValid);
+        Assert.True(Validate(profile).IsValid);
     }
 
     [Fact]
@@ -235,7 +262,7 @@ public sealed class ConnectionProfileValidatorTests
             SshTunnel = Tunnel() with { Host = "", Username = "" },
         };
 
-        var result = ConnectionProfileValidator.Validate(profile);
+        var result = Validate(profile);
 
         Assert.False(result.IsValid);
         Assert.Equal(2, result.Errors.Count);
@@ -252,7 +279,7 @@ public sealed class ConnectionProfileValidatorTests
             SshTunnel = Tunnel() with { Authentication = SshAuthenticationMode.PrivateKey },
         };
 
-        var result = ConnectionProfileValidator.Validate(profile);
+        var result = Validate(profile);
 
         Assert.False(result.IsValid);
         Assert.Contains(result.Errors, error =>
@@ -264,7 +291,7 @@ public sealed class ConnectionProfileValidatorTests
     {
         var profile = Valid() with { SshTunnel = Tunnel() with { Port = 0 } };
 
-        Assert.False(ConnectionProfileValidator.Validate(profile).IsValid);
+        Assert.False(Validate(profile).IsValid);
     }
 
     [Fact]
@@ -280,7 +307,7 @@ public sealed class ConnectionProfileValidatorTests
             SshTunnel = Tunnel(),
         };
 
-        var result = ConnectionProfileValidator.Validate(profile);
+        var result = Validate(profile);
 
         Assert.False(result.IsValid);
         Assert.Contains(result.Errors, error =>

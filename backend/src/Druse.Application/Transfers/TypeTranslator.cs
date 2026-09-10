@@ -52,8 +52,16 @@ public sealed record TypeTranslation(
 /// Vive en la capa de aplicación y trabaja sobre <see cref="DatabaseEngine"/> como
 /// dato, no sobre proveedores: las reglas de arquitectura prohíben que un motor
 /// conozca a otro, y aquí precisamente hay que mirarlos de dos en dos. Lo que se
-/// le pide a cada uno —cómo llama a un tipo— pasa por su
-/// <see cref="Druse.Database.Abstractions.ITableDesigner"/>.
+/// le pide a cada uno son dos cosas y las dos las contesta él: cómo llama a un
+/// tipo, por su <see cref="Druse.Database.Abstractions.ITableDesigner"/>, y qué
+/// familias guarda con un tipo propio, por sus
+/// <see cref="EngineCapabilities"/>.
+///
+/// **Aquí no se nombra ningún motor.** Antes sí: una tabla decía qué conservaba
+/// cada uno, y su rama final —«cualquier otro motor lo conserva»— daba a un
+/// motor recién añadido la respuesta más optimista posible. El aviso se perdía
+/// en silencio, que es justo lo contrario de lo que hace falta cuando el aviso
+/// es el producto.
 /// </summary>
 public sealed class TypeTranslator(IProviderRegistry providers)
 {
@@ -77,6 +85,7 @@ public sealed class TypeTranslator(IProviderRegistry providers)
         ArgumentNullException.ThrowIfNull(columns);
 
         var designer = _providers.GetTableDesigner(target);
+        var capabilities = _providers.GetProvider(target).Capabilities;
 
         return
         [
@@ -109,7 +118,7 @@ public sealed class TypeTranslator(IProviderRegistry providers)
                 var facets = TypeFacets.Parse(column.DataType);
                 var proposed = designer.TypeFor(facets);
 
-                return Judge(column, facets, proposed, target);
+                return Judge(column, facets, proposed, target, capabilities);
             }),
         ];
     }
@@ -125,15 +134,16 @@ public sealed class TypeTranslator(IProviderRegistry providers)
         DatabaseColumn column,
         TypeFacets facets,
         string proposed,
-        DatabaseEngine target)
+        DatabaseEngine target,
+        EngineCapabilities capabilities)
     {
         TypeTranslation With(TranslationFidelity fidelity, string? note = null) =>
             new(column.Name, column.DataType, proposed, fidelity, note);
 
-        // Una columna que guarda varios valores no tiene equivalente fuera de
-        // PostgreSQL. Meterla como texto convertiría «tres etiquetas» en la
-        // cadena que las representa, y nadie volvería a leerlas como tres.
-        if (facets.IsArray && target != DatabaseEngine.PostgreSql)
+        // Una columna que guarda varios valores casi nunca tiene equivalente.
+        // Meterla como texto convertiría «tres etiquetas» en la cadena que las
+        // representa, y nadie volvería a leerlas como tres.
+        if (facets.IsArray && !capabilities.StoresArrays)
         {
             return With(
                 TranslationFidelity.None,
@@ -142,7 +152,7 @@ public sealed class TypeTranslator(IProviderRegistry providers)
                 "conviene excluir la columna o repartirla en otra tabla.");
         }
 
-        if (facets.IsJson && !Keeps(target, ColumnFamily.Text, json: true))
+        if (facets.IsJson && !capabilities.StoresJson)
         {
             return With(
                 TranslationFidelity.Approximate,
@@ -150,7 +160,7 @@ public sealed class TypeTranslator(IProviderRegistry providers)
                 "comprobar que lo sea y de poder consultarlo por sus campos.");
         }
 
-        if (facets.Family == ColumnFamily.Uuid && !Keeps(target, ColumnFamily.Uuid))
+        if (facets.Family == ColumnFamily.Uuid && !capabilities.Stores(ColumnFamily.Uuid))
         {
             return With(
                 TranslationFidelity.Approximate,
@@ -158,7 +168,8 @@ public sealed class TypeTranslator(IProviderRegistry providers)
                 "pero ocupa más y el motor ya no comprueba que sea un identificador.");
         }
 
-        if (facets.Family == ColumnFamily.TimestampWithZone && !Keeps(target, ColumnFamily.TimestampWithZone))
+        if (facets.Family == ColumnFamily.TimestampWithZone
+            && !capabilities.Stores(ColumnFamily.TimestampWithZone))
         {
             return With(
                 TranslationFidelity.Approximate,
@@ -166,7 +177,7 @@ public sealed class TypeTranslator(IProviderRegistry providers)
                 "instante se conserva, pero de qué huso venía se pierde.");
         }
 
-        if (facets.Family == ColumnFamily.Boolean && !Keeps(target, ColumnFamily.Boolean))
+        if (facets.Family == ColumnFamily.Boolean && !capabilities.Stores(ColumnFamily.Boolean))
         {
             return With(
                 TranslationFidelity.Approximate,
@@ -184,25 +195,6 @@ public sealed class TypeTranslator(IProviderRegistry providers)
         }
 
         return With(TranslationFidelity.Exact);
-    }
-
-    /// <summary>Si el motor tiene un tipo propio para esa familia.</summary>
-    private static bool Keeps(DatabaseEngine engine, ColumnFamily family, bool json = false)
-    {
-        if (json)
-        {
-            return engine is DatabaseEngine.PostgreSql or DatabaseEngine.MySql;
-        }
-
-        return family switch
-        {
-            ColumnFamily.Uuid => engine is DatabaseEngine.PostgreSql or DatabaseEngine.SqlServer,
-            ColumnFamily.Boolean => engine is DatabaseEngine.PostgreSql or DatabaseEngine.SqlServer
-                or DatabaseEngine.MySql,
-            ColumnFamily.TimestampWithZone => engine is DatabaseEngine.PostgreSql
-                or DatabaseEngine.SqlServer,
-            _ => true,
-        };
     }
 
     /// <summary>El tope declarado de un tipo, si lo declara y no es «sin límite».</summary>

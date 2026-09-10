@@ -342,6 +342,9 @@ public sealed class SshTunnelTests
 
         public DatabaseEngine Engine => DatabaseEngine.PostgreSql;
 
+        /// <summary>Las de un motor corriente: aquí solo se prueban túneles.</summary>
+        public EngineCapabilities Capabilities { get; } = new() { NativeFamilies = [] };
+
         public int DefaultPort => 5432;
 
         public string DefaultDatabase => "postgres";

@@ -37,7 +37,8 @@ public readonly record struct SaveConnectionResult(
 /// </summary>
 public sealed class SavedConnectionService(
     IConnectionProfileStore profiles,
-    ISecretStore secrets)
+    ISecretStore secrets,
+    IProviderRegistry providers)
 {
     /// <summary>Prefijo de la clave con la que se guarda cada secreto.</summary>
     private const string SecretPrefix = "Druse:connection:";
@@ -52,6 +53,22 @@ public sealed class SavedConnectionService(
 
     private readonly IConnectionProfileStore _profiles = profiles;
     private readonly ISecretStore _secrets = secrets;
+    private readonly IProviderRegistry _providers = providers;
+
+    /// <summary>
+    /// Lo que el motor del perfil dice de sí mismo, o `null` si en esta
+    /// compilación no hay quien lo implemente.
+    ///
+    /// Se pregunta **antes** de validar, así que hay que contemplar el motor sin
+    /// proveedor: un perfil pudo guardarse con una compilación que sí lo traía.
+    /// Ese caso no lo arregla el validador —lo dirá <c>GetProvider</c> un momento
+    /// después, con su propio mensaje—; aquí basta con no reventar antes de
+    /// llegar.
+    /// </summary>
+    private EngineCapabilities? Capabilities(ConnectionProfile? profile) =>
+        profile is not null && _providers.SupportedEngines.Contains(profile.Engine)
+            ? _providers.GetProvider(profile.Engine).Capabilities
+            : null;
 
     /// <summary>Dónde se guardan las contraseñas en esta máquina.</summary>
     public string SecretStoreDescription => _secrets.Description;
@@ -93,7 +110,7 @@ public sealed class SavedConnectionService(
         string? sshSecret = null,
         bool storeSshSecret = false)
     {
-        var validation = ConnectionProfileValidator.Validate(profile);
+        var validation = ConnectionProfileValidator.Validate(profile, Capabilities(profile));
 
         if (!validation.IsValid)
         {

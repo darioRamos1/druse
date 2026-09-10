@@ -123,6 +123,31 @@ public sealed class InformixDatabaseProvider : IDatabaseProvider
 
     public DatabaseEngine Engine { get; }
 
+    /// <summary>
+    /// Las mismas para los dos transportes: el SQL, el catálogo y los tipos son
+    /// los del mismo motor, y lo único que cambia es por dónde se entra —de ahí
+    /// que SQLI sí pida el servidor lógico y DRDA no—.
+    ///
+    /// **El booleano no cuenta como propio.** Informix tiene tipo `BOOLEAN`, pero
+    /// llega al cliente como `SMALLINT` de valor 1 o 0, sin nada que lo distinga
+    /// de un entero pequeño cualquiera. Prometer que se conserva sería prometer
+    /// algo que no se puede leer de vuelta.
+    /// </summary>
+    public EngineCapabilities Capabilities => new()
+    {
+        RequiresLogicalServer = EsSqli,
+        NativeFamilies =
+        [
+            ColumnFamily.Text,
+            ColumnFamily.Integral,
+            ColumnFamily.Fractional,
+            ColumnFamily.Date,
+            ColumnFamily.Time,
+            ColumnFamily.Timestamp,
+            ColumnFamily.Binary,
+        ],
+    };
+
     /// <summary>`true` cuando se habla el protocolo nativo en vez de DRDA.</summary>
     private bool EsSqli => Engine == DatabaseEngine.InformixSqli;
 

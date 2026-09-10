@@ -1,8 +1,10 @@
 ﻿using Druse.Application.Abstractions;
 using Druse.Application.Connections;
+using Druse.Database.Abstractions;
 using Druse.Domain;
 using Druse.Persistence.Sqlite;
 using Druse.Platform.Abstractions;
+using Druse.Provider.PostgreSql;
 
 namespace Druse.UnitTests;
 
@@ -590,7 +592,7 @@ public sealed class SavedConnectionServiceTests : IDisposable
         database.MigrateAsync(CancellationToken.None).GetAwaiter().GetResult();
 
         _profiles = new SqliteConnectionProfileStore(database);
-        _service = new SavedConnectionService(_profiles, _secrets);
+        _service = new SavedConnectionService(_profiles, _secrets, new Motores());
     }
 
     public void Dispose() => _paths.Dispose();
@@ -752,10 +754,38 @@ public sealed class SavedConnectionServiceTests : IDisposable
         Assert.Null(await _profiles.FindAsync(profile.Id, CancellationToken.None));
     }
 
+    /// <summary>
+    /// Registro con los motores reales, que es lo único que se le pide aquí: el
+    /// servicio pregunta al proveedor qué necesita el perfil antes de validarlo.
+    /// </summary>
+    private sealed class Motores : IProviderRegistry
+    {
+        public IReadOnlyCollection<DatabaseEngine> SupportedEngines =>
+            [DatabaseEngine.PostgreSql];
+
+        public IDatabaseProvider GetProvider(DatabaseEngine engine) =>
+            new PostgreSqlDatabaseProvider();
+
+        public IDatabaseMetadataReader GetMetadataReader(DatabaseEngine engine) =>
+            throw new NotSupportedException();
+
+        public IQueryExecutor GetQueryExecutor(DatabaseEngine engine) =>
+            throw new NotSupportedException();
+
+        public IRowEditor GetRowEditor(DatabaseEngine engine) =>
+            throw new NotSupportedException();
+
+        public ITableDesigner GetTableDesigner(DatabaseEngine engine) =>
+            throw new NotSupportedException();
+
+        public IDatabaseScripter GetScripter(DatabaseEngine engine) =>
+            throw new NotSupportedException();
+    }
+
     [Fact]
     public async Task SinAlmacenDisponibleLoDiceEnLugarDeFallar()
     {
-        var service = new SavedConnectionService(_profiles, new NullSecretStore());
+        var service = new SavedConnectionService(_profiles, new NullSecretStore(), new Motores());
 
         var result = await service.SaveAsync(Profile(), "secreta", storePassword: true, CancellationToken.None);
 

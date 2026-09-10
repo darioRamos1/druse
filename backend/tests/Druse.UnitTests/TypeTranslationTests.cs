@@ -229,6 +229,48 @@ public sealed class TypeTranslationTests
     }
 
     // -----------------------------------------------------------------------
+    // Lo que hereda un motor nuevo
+    // -----------------------------------------------------------------------
+
+    /// <summary>
+    /// Un motor recién llegado **no hereda «lo conserva todo»**.
+    ///
+    /// Es la regresión que se quiere impedir: mientras la tabla de familias vivía
+    /// aquí dentro, su rama final daba por bueno cualquier motor que nadie
+    /// hubiera contemplado. El asistente de traslado decía «traducción exacta» y
+    /// la pérdida se descubría después de copiar los datos.
+    ///
+    /// Ahora la respuesta la da el motor, y un motor que declare que no guarda
+    /// booleanos lo avisa aunque nadie haya oído hablar de él.
+    /// </summary>
+    [Fact]
+    public void UnMotorDesconocidoQueNoGuardaBooleanosLoAvisa()
+    {
+        var translation = Translate(DatabaseEngine.PostgreSql, Inventado, "boolean");
+
+        Assert.Equal(TranslationFidelity.Approximate, translation.Fidelity);
+        Assert.Contains("1 y 0", translation.Note!, StringComparison.Ordinal);
+    }
+
+    /// <summary>Y si dice que sí los guarda, no se inventa un aviso.</summary>
+    [Fact]
+    public void UnMotorDesconocidoQueSiGuardaBooleanosNoAvisaDeNada()
+    {
+        var translator = new TypeTranslator(new Registry(new[] { ColumnFamily.Boolean }));
+
+        var translation = translator.Translate(
+            DatabaseEngine.PostgreSql,
+            Inventado,
+            [Column("c", "boolean")])[0];
+
+        Assert.Equal(TranslationFidelity.Exact, translation.Fidelity);
+        Assert.Null(translation.Note);
+    }
+
+    /// <summary>Un motor que el enumerado no nombra: sirve para representar al que venga.</summary>
+    private const DatabaseEngine Inventado = (DatabaseEngine)99;
+
+    // -----------------------------------------------------------------------
     // Las medidas que se leen del tipo
     // -----------------------------------------------------------------------
 
@@ -259,9 +301,21 @@ public sealed class TypeTranslationTests
         Assert.Equal(4, facets.Scale);
     }
 
-    /// <summary>Registro que solo sabe entregar los diseñadores de los cuatro motores.</summary>
-    private sealed class Registry : IProviderRegistry
+    /// <summary>
+    /// Registro que entrega los diseñadores y los proveedores de los cuatro
+    /// motores.
+    ///
+    /// Los proveedores hacen falta porque son ellos quienes dicen qué familias de
+    /// datos guarda cada motor con un tipo propio. Dejarlos sin implementar
+    /// significaría probar el traductor contra unas capacidades inventadas, y lo
+    /// que aquí se comprueba es precisamente que el aviso salga de lo que el
+    /// motor declara de sí mismo.
+    /// </summary>
+    private sealed class Registry(IReadOnlyList<ColumnFamily>? inventadas = null) : IProviderRegistry
     {
+        /// <summary>Lo que guarda el motor inventado. Vacío mientras nadie diga otra cosa.</summary>
+        private readonly IReadOnlyList<ColumnFamily> _inventadas = inventadas ?? [];
+
         public IReadOnlyCollection<DatabaseEngine> SupportedEngines =>
             [.. Enum.GetValues<DatabaseEngine>()];
 
@@ -270,11 +324,19 @@ public sealed class TypeTranslationTests
             DatabaseEngine.PostgreSql => new PostgreSqlTableDesigner(),
             DatabaseEngine.SqlServer => new SqlServerTableDesigner(),
             DatabaseEngine.MySql => new MySqlTableDesigner(),
+            Inventado => new PostgreSqlTableDesigner(),
             _ => new InformixTableDesigner(),
         };
 
-        public IDatabaseProvider GetProvider(DatabaseEngine engine) =>
-            throw new NotSupportedException();
+        public IDatabaseProvider GetProvider(DatabaseEngine engine) => engine switch
+        {
+            DatabaseEngine.PostgreSql => new PostgreSqlDatabaseProvider(),
+            DatabaseEngine.SqlServer => new SqlServerDatabaseProvider(),
+            DatabaseEngine.MySql => new MySqlDatabaseProvider(),
+            DatabaseEngine.InformixSqli => new InformixDatabaseProvider(engine),
+            Inventado => new MotorInventado(_inventadas),
+            _ => new InformixDatabaseProvider(),
+        };
 
         public IDatabaseMetadataReader GetMetadataReader(DatabaseEngine engine) =>
             throw new NotSupportedException();
@@ -287,5 +349,39 @@ public sealed class TypeTranslationTests
 
         public IDatabaseScripter GetScripter(DatabaseEngine engine) =>
             throw new NotSupportedException();
+    }
+
+    /// <summary>
+    /// Un motor que solo sabe contestar qué guarda.
+    ///
+    /// Representa al proveedor que alguien añada mañana: lo único que el
+    /// traductor le pide es eso, y el contrato le obliga a decirlo.
+    /// </summary>
+    private sealed class MotorInventado(IReadOnlyList<ColumnFamily> familias) : IDatabaseProvider
+    {
+        public DatabaseEngine Engine => Inventado;
+
+        public EngineCapabilities Capabilities { get; } = new() { NativeFamilies = familias };
+
+        public int DefaultPort => 1234;
+
+        public string DefaultDatabase => string.Empty;
+
+        public IReadOnlyList<string> SystemDatabases => [];
+
+        public Task<TestConnectionResult> TestConnectionAsync(
+            ConnectionProfile profile,
+            DatabaseCredentials credentials,
+            CancellationToken cancellationToken) => throw new NotSupportedException();
+
+        public Task<IDatabaseSession> OpenSessionAsync(
+            ConnectionProfile profile,
+            DatabaseCredentials credentials,
+            CancellationToken cancellationToken) => throw new NotSupportedException();
+
+        public Task<IDatabaseSession> OpenDatabaseSessionAsync(
+            IDatabaseSession source,
+            string database,
+            CancellationToken cancellationToken) => throw new NotSupportedException();
     }
 }

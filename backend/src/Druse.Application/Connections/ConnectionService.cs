@@ -21,6 +21,21 @@ public sealed class ConnectionService(
     private const int TunnelProbeTimeoutSeconds = 10;
 
     /// <summary>
+    /// Lo que el motor del perfil dice de sí mismo, o `null` si en esta
+    /// compilación no hay quien lo implemente.
+    ///
+    /// Se pregunta **antes** de validar, así que hay que contemplar el motor sin
+    /// proveedor: un perfil pudo guardarse con una compilación que sí lo traía.
+    /// Ese caso no lo arregla el validador —lo dirá <c>GetProvider</c> un momento
+    /// después, con su propio mensaje—; aquí basta con no reventar antes de
+    /// llegar.
+    /// </summary>
+    private EngineCapabilities? Capabilities(ConnectionProfile? profile) =>
+        profile is not null && _providers.SupportedEngines.Contains(profile.Engine)
+            ? _providers.GetProvider(profile.Engine).Capabilities
+            : null;
+
+    /// <summary>
     /// Prueba solo el túnel, sin tocar la base de datos.
     ///
     /// Sirve para separar dos fallos que «no se pudo conectar» mezcla: que el
@@ -123,7 +138,7 @@ public sealed class ConnectionService(
         SshCredentials sshCredentials,
         CancellationToken cancellationToken)
     {
-        var validation = ConnectionProfileValidator.Validate(profile);
+        var validation = ConnectionProfileValidator.Validate(profile, Capabilities(profile));
 
         if (!validation.IsValid)
         {
@@ -176,7 +191,7 @@ public sealed class ConnectionService(
     {
         ArgumentNullException.ThrowIfNull(profile);
 
-        var validation = ConnectionProfileValidator.Validate(profile);
+        var validation = ConnectionProfileValidator.Validate(profile, Capabilities(profile));
 
         if (!validation.IsValid)
         {
@@ -281,7 +296,7 @@ public sealed class ConnectionService(
         SshCredentials sshCredentials,
         CancellationToken cancellationToken)
     {
-        var validation = ConnectionProfileValidator.Validate(profile);
+        var validation = ConnectionProfileValidator.Validate(profile, Capabilities(profile));
 
         if (!validation.IsValid)
         {
