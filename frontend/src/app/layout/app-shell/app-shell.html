@@ -250,22 +250,39 @@
     />
   </main>
 
-  <!--
-    El asistente, cuando se pide. Va aquí y no dentro de `main` porque es una
-    columna de la ventana, hermana del explorador: no tapa nada y se cierra
-    dejando la pantalla como estaba.
-  -->
   @defer (when aiOpen()) {
     @if (aiOpen()) {
-      <app-ai-panel
-        class="ai"
-        [context]="aiContext()"
-        (insert)="insertFromAi($event)"
-        (replace)="replaceFromAi($event)"
-        (configure)="aiProvidersOpen.set(true)"
-        (closed)="aiOpen.set(false)"
+      <app-resize-handle
+        class="ai-resize"
+        [class.is-overlay]="assistantLayout().overlay"
+        [style.right.px]="assistantLayout().overlay ? assistantLayout().width : null"
+        axis="width"
+        [inverted]="true"
+        [size]="assistantLayout().width"
+        (sizeChange)="requestedAssistantWidth.set($event)"
+        [min]="assistantLayout().min"
+        [max]="assistantLayout().max"
+        aria-label="Ancho del asistente"
+        aria-controls="sql-assistant"
+        title="Arrastra o usa las flechas para ajustar. Intro o doble clic recupera el ancho inicial."
+        (dblclick)="requestedAssistantWidth.set(null)"
+        (keydown.enter)="requestedAssistantWidth.set(null); $event.preventDefault()"
       />
     }
+    <app-ai-panel
+      id="sql-assistant"
+      class="ai"
+      role="complementary"
+      aria-label="Asistente SQL"
+      [hidden]="!aiOpen()"
+      [class.is-overlay]="assistantLayout().overlay"
+      [style.width.px]="assistantLayout().width"
+      [context]="aiContext()"
+      (insert)="insertFromAi($event)"
+      (replace)="replaceFromAi($event)"
+      (configure)="aiProvidersOpen.set(true)"
+      (closed)="closeAssistant()"
+    />
   }
 </div>
 

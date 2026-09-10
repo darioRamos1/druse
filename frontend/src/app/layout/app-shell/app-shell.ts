@@ -62,7 +62,7 @@ import {
 } from '../../shared/models/workspace';
 import { ResizeHandle } from '../../shared/ui/resize-handle/resize-handle';
 import { StatusBar } from '../status-bar/status-bar';
-import { resultPanelLayout } from '../panel-layout';
+import { assistantPanelLayout, resultPanelLayout } from '../panel-layout';
 import { TopBar } from '../top-bar/top-bar';
 import CommandPalette from '../command-palette/command-palette';
 import { ShortcutsSheet } from '../shortcuts-sheet/shortcuts-sheet';
@@ -201,6 +201,11 @@ export class AppShell {
     }
   }
 
+  protected closeAssistant(): void {
+    this.aiOpen.set(false);
+    this.host.nativeElement.querySelector<HTMLButtonElement>('app-top-bar .assistant')?.focus();
+  }
+
   /**
    * Carga las columnas de las tablas que el usuario no ha desplegado.
    *
@@ -266,6 +271,12 @@ export class AppShell {
   protected readonly explorerOpen = signal(true);
   protected readonly mobileExplorerOpen = signal(false);
   protected readonly requestedResultsHeight = signal<number | null>(null);
+  protected readonly requestedAssistantWidth = signal<number | null>(null);
+  private readonly sidePanelSpace = signal({ width: 1280, sidebar: 275 });
+  protected readonly assistantLayout = computed(() => {
+    const space = this.sidePanelSpace();
+    return assistantPanelLayout(space.width, space.sidebar, this.requestedAssistantWidth());
+  });
   private readonly availablePanelHeight = signal(580);
   private readonly resultsLayout = computed(() =>
     resultPanelLayout(this.availablePanelHeight(), this.requestedResultsHeight()),
@@ -280,6 +291,21 @@ export class AppShell {
   private readonly destroyRef = inject(DestroyRef);
   private readonly injector = inject(Injector);
   private readonly explorer = viewChild(ConnectionsSidebar);
+
+  private observeSidePanelSpace(): void {
+    const body = this.host.nativeElement.querySelector<HTMLElement>('.body');
+    const sidebar = this.host.nativeElement.querySelector<HTMLElement>('.sidebar');
+    if (!body || !sidebar || typeof ResizeObserver === 'undefined') return;
+    const measure = () => {
+      const occupied = getComputedStyle(sidebar).position === 'fixed' ? 0 : sidebar.offsetWidth;
+      this.sidePanelSpace.set({ width: body.clientWidth, sidebar: occupied ? occupied + 1 : 0 });
+    };
+    const resize = new ResizeObserver(measure);
+    resize.observe(body);
+    resize.observe(sidebar);
+    measure();
+    this.destroyRef.onDestroy(() => resize.disconnect());
+  }
 
   /** Solo mide las barras fijas: cambiar el resultado no provoca un ciclo de medidas. */
   private observePanelSpace(): void {
@@ -412,6 +438,11 @@ export class AppShell {
         return;
 
       case 'focus-editor':
+        if ((event.target as HTMLElement | null)?.closest?.('.ai, .ai-resize')) {
+          event.preventDefault();
+          this.closeAssistant();
+          return;
+        }
         // Escape ya significa «cancelar» dentro del editor, así que solo se
         // atiende desde fuera: si el foco ya está ahí, no hay nada que traer.
         if (!this.editorHasFocus()) {
@@ -1069,7 +1100,10 @@ export class AppShell {
   }
 
   constructor() {
-    afterNextRender(() => this.observePanelSpace());
+    afterNextRender(() => {
+      this.observePanelSpace();
+      this.observeSidePanelSpace();
+    });
     void this.startup();
 
     let tabId = this._store.activeTab()?.id;

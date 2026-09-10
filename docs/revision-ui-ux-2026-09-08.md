@@ -172,3 +172,9 @@ Validación: pruebas del cálculo de tamaños, del tirador con zoom y de su inte
 Un botón junto a la marca permite ocultar y recuperar el explorador en escritorio. Se conservan el ancho, el filtro y el componente con su árbol. Ctrl/Cmd+Mayús+E revela el panel y selecciona su filtro, respetando los diálogos abiertos; en móvil sigue abriendo el cajón existente.
 
 Validación: 70 pruebas aprobadas entre shell, explorador y atajos; compilación de producción correcta. A 900 × 720 px y escala 125 % se comprobó que el panel desaparece del árbol accesible, el editor ocupa el ancho liberado y el atajo recupera el filtro «ventas» seleccionado y con foco. La barra superior conserva sus acciones visibles.
+
+### Asistente redimensionable
+
+El separador permite cambiar el ancho con arrastre o flechas y restaurarlo con Intro o doble clic. El tamaño se limita para conservar 360 píxeles CSS de editor; si ambos paneles no caben, el asistente se superpone. Al recuperar espacio vuelve a la distribución en columnas y al ancho solicitado. Cerrar conserva también el borrador sin enviar, y Escape desde el panel devuelve el foco a su botón.
+
+Validación: 41 pruebas aprobadas entre distribución, separadores y shell, incluida la conservación del borrador; compilación de producción correcta. A 900 px y escala 125 %, plegar el explorador permitió pasar del asistente superpuesto a columnas, dejando 450 px físicos para el editor. Al ampliar a 1440 px recuperó los 495 px físicos elegidos para el asistente; Escape cerró el panel. No se enviaron preguntas a proveedores.

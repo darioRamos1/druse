@@ -87,6 +87,8 @@
     [class.is-active]="assistantOpen()"
     [attr.aria-pressed]="assistantOpen()"
     aria-label="Asistente"
+    [attr.aria-expanded]="assistantOpen()"
+    aria-controls="sql-assistant"
     (click)="toggleAssistant.emit()"
   >
     <app-icon name="sparkles" [size]="13" />

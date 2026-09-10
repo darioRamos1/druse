@@ -11,6 +11,7 @@ function silentGateway(): Partial<ApplicationGateway> {
   return {
     getEngines: () => of([]),
     getJobs: () => of([]),
+    getAiProviders: () => of({ providers: [], canStoreKeys: true, storeDescription: '' }),
     getDatabases: () => of([]),
     getChildren: () => of([]),
   };
@@ -442,6 +443,63 @@ describe('AppShell', () => {
 
   it('en móvil conserva un control para abrir el explorador', () => {
     expect(element.querySelector('.mobile-explorer-toggle')).toBeTruthy();
+  });
+
+  it('ajusta el asistente con teclado, conserva el panel al cerrar y restablece su ancho', async () => {
+    vi.spyOn(TestBed.inject(ApplicationGateway), 'getAiProviders').mockReturnValue(
+      of({
+        providers: [
+          {
+            id: 'local-test',
+            name: 'Prueba',
+            kind: 'openaicompatible',
+            baseUrl: 'http://localhost:11434',
+            model: 'prueba',
+            command: '',
+            disclosure: 'nothing',
+            ownSession: false,
+            isDefault: true,
+            hasStoredKey: false,
+          },
+        ],
+        canStoreKeys: true,
+        storeDescription: '',
+      }),
+    );
+    const toggle = element.querySelector<HTMLButtonElement>('app-top-bar .assistant')!;
+    toggle.click();
+    await fixture.whenStable();
+    const panel = element.querySelector<HTMLElement>('app-ai-panel')!;
+    const initial = parseFloat(panel.style.width);
+    const draft = panel.querySelector<HTMLTextAreaElement>('textarea')!;
+    draft.value = 'Explica esta consulta';
+    draft.dispatchEvent(new Event('input'));
+    element
+      .querySelector<HTMLElement>('.ai-resize')!
+      .dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft' }));
+    await fixture.whenStable();
+    expect(parseFloat(panel.style.width)).toBe(initial + 16);
+    panel.querySelector<HTMLButtonElement>('[aria-label="Cerrar el asistente"]')!.click();
+    await fixture.whenStable();
+    expect(panel.hidden).toBe(true);
+    expect(document.activeElement).toBe(toggle);
+    toggle.click();
+    await fixture.whenStable();
+    expect(element.querySelector('app-ai-panel')).toBe(panel);
+    expect(panel.hidden).toBe(false);
+    expect(panel.querySelector('textarea')?.value).toBe('Explica esta consulta');
+    expect(parseFloat(panel.style.width)).toBe(initial + 16);
+    element
+      .querySelector<HTMLElement>('.ai-resize')!
+      .dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
+    await fixture.whenStable();
+    expect(parseFloat(panel.style.width)).toBe(initial);
+    element
+      .querySelector<HTMLElement>('.ai-resize')!
+      .dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    await fixture.whenStable();
+    expect(panel.hidden).toBe(true);
+    expect(document.activeElement).toBe(toggle);
   });
 
   it('pliega el explorador sin perder el filtro ni el ancho elegido y el atajo lo recupera', async () => {

@@ -1,4 +1,4 @@
-import { resultPanelLayout } from './panel-layout';
+import { assistantPanelLayout, resultPanelLayout } from './panel-layout';
 
 describe('Distribución de resultados', () => {
   it('reserva más espacio para escribir al iniciar en una ventana pequeña', () => {
@@ -24,5 +24,24 @@ describe('Distribución de resultados', () => {
       expect(layout.height).toBeLessThanOrEqual(space);
       expect(layout.min).toBeLessThanOrEqual(layout.max);
     }
+  });
+});
+
+describe('Distribución del asistente', () => {
+  it('limita el ancho para conservar 360 px de editor y un separador', () => {
+    const layout = assistantPanelLayout(1280, 275, 640);
+    expect(layout.overlay).toBe(false);
+    expect(1280 - 275 - layout.width - 1).toBeGreaterThanOrEqual(360);
+  });
+
+  it('se superpone si no caben ambos paneles, incluso con zoom', () => {
+    expect(assistantPanelLayout(900 / 1.25, 275, null).overlay).toBe(true);
+    expect(assistantPanelLayout(900 / 1.25, 0, null).overlay).toBe(false);
+    expect(assistantPanelLayout(320, 0, 640).width).toBe(280);
+  });
+
+  it('recupera el ancho elegido cuando la ventana vuelve a crecer', () => {
+    expect(assistantPanelLayout(1000, 275, 500).width).toBe(364);
+    expect(assistantPanelLayout(1440, 275, 500).width).toBe(500);
   });
 });
