@@ -91,6 +91,20 @@ describe('escribir SQL', () => {
       expect(buildSelect('informixsqli', spec)).toBe(buildSelect('informix', spec));
     });
 
+    /**
+     * Oracle limita al final como PostgreSQL, pero con otras palabras, y sus
+     * nombres van en mayúsculas y sin comillas: es como los guarda el motor, y
+     * citarlos crearía una tabla distinta de la que el usuario ve en el árbol.
+     */
+    it('Oracle limita con FETCH FIRST y no cita los nombres simples', () => {
+      const sql = buildSelect('oracle', { ...base, limit: 100 });
+
+      expect(sql).toContain('FETCH FIRST 100 ROWS ONLY');
+      expect(sql).not.toContain('LIMIT');
+      expect(sql).toContain('TPUBLICO.USUARIOS');
+      expect(sql).not.toContain('"');
+    });
+
     it('junta los filtros con AND', () => {
       const sql = buildSelect('postgresql', {
         ...base,

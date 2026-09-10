@@ -336,9 +336,12 @@ export function buildSelect(engine: DatabaseEngine, spec: SelectSpec): string {
     lineas.push(`ORDER BY ${orders.map(orderExpression).join(', ')}`);
   }
 
-  // Solo los motores que no lo pusieron ya delante llevan `LIMIT` al final.
+  // Solo los motores que no lo pusieron ya delante lo llevan al final, y no
+  // todos lo escriben `LIMIT`: Oracle usa el `FETCH FIRST` del estándar.
   if (spec.limit && !leading) {
-    lineas.push(`LIMIT ${spec.limit}`);
+    const trailing = SQL_DIALECTS[engine].trailingLimit;
+
+    lineas.push(trailing ? trailing(spec.limit) : `LIMIT ${spec.limit}`);
   }
 
   return `${lineas.join('\n')};\n`;
@@ -555,11 +558,59 @@ export function buildCall(engine: DatabaseEngine, spec: CallSpec): string {
     case 'informix':
     case 'informixsqli':
       return buildInformixCall(target, spec.parameters, salidas);
+    case 'oracle':
+      return buildOracleCall(target, spec.parameters, salidas);
   }
 }
 
 /**
- * SQL Server nombra los parámetros con `@` y marca las salidas con `OUTPUT`.
+ * En Oracle una llamada con salidas es un bloque PL/SQL.
+ *
+ * No hay una instrucción suelta que recoja un `OUT`: hace falta declarar las
+ * variables en un `DECLARE`, llamar dentro del `BEGIN` y enseñarlas después.
+ * Enseñarlas es `DBMS_OUTPUT`, que es justo lo que Druse recoge como mensajes
+ * del servidor, así que el guion sale completo y se ejecuta tal cual.
+ *
+ * Sin salidas basta con `BEGIN … END;`, que es como se llama a un procedimiento
+ * aquí: el `EXEC` que todo el mundo escribe es de SQL*Plus y no viaja al
+ * servidor.
+ */
+function buildOracleCall(
+  target: string,
+  parameters: readonly RoutineArgument[],
+  salidas: readonly RoutineArgument[],
+): string {
+  const argumentos = parameters
+    .map((parameter) =>
+      parameter.direction === 'input' ? writeArgument(parameter) : oracleVariable(parameter),
+    )
+    .join(', ');
+
+  const llamada = `  ${target}(${argumentos});`;
+
+  if (salidas.length === 0) {
+    return `BEGIN\n${llamada}\nEND;\n`;
+  }
+
+  const lineas = ['DECLARE'];
+
+  for (const salida of salidas) {
+    lineas.push(`  ${oracleVariable(salida)} ${salida.dataType};`);
+  }
+
+  lineas.push('BEGIN', llamada);
+
+  for (const salida of salidas) {
+    lineas.push(`  DBMS_OUTPUT.PUT_LINE('${salida.name} = ' || ${oracleVariable(salida)});`);
+  }
+
+  lineas.push('END;');
+
+  return `${lineas.join('\n')}\n`;
+}
+
+/**
+ * SQL Server nombra los parámetros con `\n` y marca las salidas con `OUTPUT`.
  *
  * La variable que las recoge se llama distinto del parámetro —`@out_algo`— a
  * propósito: `@salida = @salida OUTPUT` es válido pero se lee fatal, y en un
@@ -688,6 +739,18 @@ function bare(name: string): string {
 
 function outputVariable(parameter: RoutineArgument): string {
   return `@out_${bare(parameter.name)}`;
+}
+
+/**
+ * La variable donde Oracle recoge una salida.
+ *
+ * Sin `@`, que aquí no es parte de un nombre sino el separador de una base
+ * remota: `algo@enlace` apunta a otro servidor. El prefijo `v_` es la convención
+ * de PL/SQL y evita chocar con el nombre del propio parámetro, que dentro del
+ * bloque también existe.
+ */
+function oracleVariable(parameter: RoutineArgument): string {
+  return `v_${bare(parameter.name)}`;
 }
 
 function sessionVariable(parameter: RoutineArgument): string {

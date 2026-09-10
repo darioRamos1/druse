@@ -25,6 +25,7 @@ const DIALECTS: Readonly<Record<DatabaseEngine, SqlLanguage>> = {
   informix: 'db2',
   // El transporte no cambia el dialecto: es el mismo Informix.
   informixsqli: 'db2',
+  oracle: 'plsql',
 };
 
 /**

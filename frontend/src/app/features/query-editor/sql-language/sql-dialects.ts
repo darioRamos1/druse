@@ -42,6 +42,16 @@ export interface SqlDialect {
    */
   readonly leadingLimit: ((limit: number) => string) | null;
 
+  /**
+   * Lo que va **al final** para limitar filas, en los motores que no lo ponen
+   * delante.
+   *
+   * Casi todos escriben `LIMIT n`, y por eso es lo que se supone cuando no se
+   * dice nada. Oracle usa el `FETCH FIRST n ROWS ONLY` del estándar, que ocupa
+   * el mismo sitio y se escribe distinto.
+   */
+  readonly trailingLimit?: (limit: number) => string;
+
   /** Trunca una fecha al principio de su día, mes, trimestre o año. */
   readonly dateTrunc: (column: string, period: DatePeriod) => string;
 
@@ -131,10 +141,49 @@ const INFORMIX: SqlDialect = {
       : `INSERT INTO ${table}\nVALUES ();\n`,
 };
 
+/**
+ * Oracle, que es el que menos se parece a los demás.
+ *
+ * No tiene `LIMIT` ni `TOP`: usa el `OFFSET … FETCH` del estándar, que va al
+ * final como el primero pero se escribe distinto. Y **no admite `DEFAULT
+ * VALUES`**: para insertar una fila que el motor rellena entera hay que nombrar
+ * una columna y darle su propio valor por omisión.
+ *
+ * Los nombres simples se escriben en mayúsculas y sin comillas, que es como los
+ * guarda el motor. Citarlos convertiría el `clientes` que el usuario ve en el
+ * árbol en una tabla distinta; el porqué largo está en el proveedor, en
+ * `OracleIdentifier`.
+ */
+const ORACLE: SqlDialect = {
+  quote: (identifier) =>
+    /^[A-Za-z][A-Za-z0-9_$#]*$/.test(identifier)
+      ? identifier.toUpperCase()
+      : '"' + identifier.replace(/"/g, '""') + '"',
+  leadingLimit: null,
+  trailingLimit: (limit) => `FETCH FIRST ${limit} ROWS ONLY`,
+  dateTrunc: (column, period) => {
+    switch (period) {
+      case 'day':
+        return `TRUNC(${column})`;
+      case 'month':
+        return `TRUNC(${column}, 'MM')`;
+      case 'quarter':
+        return `TRUNC(${column}, 'Q')`;
+      case 'year':
+        return `TRUNC(${column}, 'YYYY')`;
+    }
+  },
+  allGeneratedInsert: (table, serial) =>
+    serial
+      ? `INSERT INTO ${table} (${serial})\nVALUES (DEFAULT);\n`
+      : `INSERT INTO ${table}\nVALUES ();\n`,
+};
+
 export const SQL_DIALECTS: Readonly<Record<DatabaseEngine, SqlDialect>> = {
   postgresql: POSTGRESQL,
   sqlserver: SQLSERVER,
   mysql: MYSQL,
   informix: INFORMIX,
   informixsqli: INFORMIX,
+  oracle: ORACLE,
 };

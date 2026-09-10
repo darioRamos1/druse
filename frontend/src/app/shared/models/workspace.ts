@@ -14,7 +14,8 @@ export type DatabaseEngine =
   /** Informix por DRDA, que exige un escuchador `drsoctcp` en el servidor. */
   | 'informix'
   /** El mismo Informix por SQLI, su protocolo nativo. */
-  | 'informixsqli';
+  | 'informixsqli'
+  | 'oracle';
 
 export type ConnectionState = 'connected' | 'disconnected' | 'connecting' | 'error';
 

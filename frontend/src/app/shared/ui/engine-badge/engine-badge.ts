@@ -8,6 +8,7 @@ const ENGINE_LABELS: Readonly<Record<DatabaseEngine, string>> = {
   mysql: 'MY',
   informix: 'IX',
   informixsqli: 'IX',
+  oracle: 'OR',
 };
 
 /**
@@ -23,6 +24,7 @@ export const ENGINE_NAMES: Readonly<Record<DatabaseEngine, string>> = {
   mysql: 'MySQL',
   informix: 'Informix (DRDA)',
   informixsqli: 'Informix',
+  oracle: 'Oracle',
 };
 
 /**
@@ -43,6 +45,7 @@ export const ENGINE_VERSIONS: Readonly<Record<DatabaseEngine, string>> = {
   mysql: '8.0+ · MariaDB',
   informix: '12.10+ · protocolo DRDA',
   informixsqli: '12.10+',
+  oracle: '12c – 23ai',
 };
 
 /**
@@ -59,6 +62,7 @@ export const ENGINE_FAMILIES: Readonly<Record<DatabaseEngine, string>> = {
   mysql: 'mysql',
   informix: 'informix',
   informixsqli: 'informix',
+  oracle: 'oracle',
 };
 
 /**
@@ -73,6 +77,7 @@ export const ENGINE_TRANSPORTS: Readonly<Record<DatabaseEngine, string | null>> 
   mysql: null,
   informix: 'DRDA',
   informixsqli: 'SQLI (JDBC)',
+  oracle: null,
 };
 
 /**
@@ -88,6 +93,7 @@ export const ENGINE_ORDER: readonly DatabaseEngine[] = [
   'mysql',
   'informixsqli',
   'informix',
+  'oracle',
 ];
 
 /**
@@ -157,6 +163,12 @@ export function isKnownEngine(engine: string): engine is DatabaseEngine {
       background: var(--dr-engine-informix-tint);
       border: 1px solid var(--dr-engine-informix-line);
       color: var(--dr-engine-informix);
+    }
+
+    :host([data-engine='oracle']) {
+      background: var(--dr-engine-oracle-tint);
+      border: 1px solid var(--dr-engine-oracle-line);
+      color: var(--dr-engine-oracle);
     }
   `,
 })

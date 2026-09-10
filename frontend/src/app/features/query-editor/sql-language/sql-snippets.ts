@@ -100,6 +100,20 @@ const BY_ENGINE: Readonly<Record<DatabaseEngine, readonly SqlSnippet[]>> = {
   ],
   informix: INFORMIX_SNIPPETS,
   informixsqli: INFORMIX_SNIPPETS,
+  oracle: [
+    {
+      trigger: 'fetch',
+      description: 'Primeras filas (Oracle)',
+      body: 'SELECT ${1:*}\nFROM ${2:tabla}\nORDER BY ${3:columna}\nFETCH FIRST ${4:100} ROWS ONLY',
+    },
+    {
+      // `DUAL` es la tabla de una sola fila con la que Oracle resuelve todo lo
+      // que no sale de ninguna tabla, y es lo primero que se echa en falta.
+      trigger: 'dual',
+      description: 'Consulta sin tabla (Oracle)',
+      body: 'SELECT ${1:SYSDATE} FROM DUAL',
+    },
+  ],
 };
 
 export function snippetsFor(engine: DatabaseEngine): readonly SqlSnippet[] {

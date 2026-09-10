@@ -270,6 +270,13 @@
   --dr-engine-informix-tint: rgb(122 186 158 / 13%);
   --dr-engine-informix-line: rgb(122 186 158 / 30%);
 
+  // Morado: es el hueco que quedaba entre el azul, el rojo, el ámbar y el verde
+  // de los otros cuatro. El rojo de Oracle habría chocado con SQL Server, que es
+  // justo el motor del que hay que distinguirlo de un vistazo en una lista.
+  --dr-engine-oracle: #b48ae0;
+  --dr-engine-oracle-tint: rgb(164 122 214 / 14%);
+  --dr-engine-oracle-line: rgb(164 122 214 / 31%);
+
   // ---------------------------------------------------------------------------
   // Sombras y velos
   //
@@ -435,6 +442,10 @@
   --dr-engine-informix: #2c7a5c;
   --dr-engine-informix-tint: rgb(44 122 92 / 11%);
   --dr-engine-informix-line: rgb(44 122 92 / 30%);
+
+  --dr-engine-oracle: #6b3fa0;
+  --dr-engine-oracle-tint: rgb(107 63 160 / 11%);
+  --dr-engine-oracle-line: rgb(107 63 160 / 30%);
 
   // ---------------------------------------------------------------------------
   // Sombras y velos

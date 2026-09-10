@@ -47,10 +47,6 @@
   width: 1px;
   height: 20px;
   background: var(--dr-border);
-
-  &--spaced {
-    margin: 0 4px;
-  }
 }
 
 .actions {
@@ -280,32 +276,6 @@
   }
 }
 
-.window-controls {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-
-  &__dot {
-    width: 12px;
-    height: 12px;
-    border-radius: 50%;
-    background: var(--dr-indicator-off);
-    transition: background 120ms ease;
-
-    &--minimize:hover {
-      background: var(--dr-warning);
-    }
-
-    &--maximize:hover {
-      background: var(--dr-success);
-    }
-
-    &--close:hover {
-      background: var(--dr-danger);
-    }
-  }
-}
-
 .explorer-toggle[aria-expanded='true'] {
   color: var(--dr-accent-bright);
 }
@@ -322,9 +292,7 @@
   }
 
   .actions > .btn:not(.btn--primary),
-  .segmented,
-  .window-controls,
-  .divider--spaced {
+  .segmented {
     display: none;
   }
 }
