@@ -11,10 +11,16 @@ import {
 import { Icon } from '../../shared/ui/icon/icon';
 import { DialogFocus } from '../../shared/a11y/dialog-focus';
 import { DialogBackdrop } from '../../shared/a11y/dialog-backdrop';
+import {
+  EditorShortcut,
+  editorShortcutLabel,
+  shortcutLabel,
+} from '../../core/shortcuts/shortcut-label';
 
 /** Un atajo: qué teclas y qué hace. */
 interface Atajo {
   readonly keys: readonly string[];
+  readonly editorAction?: EditorShortcut;
   readonly what: string;
 }
 
@@ -66,14 +72,18 @@ export const SHORTCUT_GROUPS: readonly Grupo[] = [
     title: 'Escribir',
     shortcuts: [
       { keys: ['Ctrl', 'clic'], what: 'Poner otro cursor donde se pulse' },
-      { keys: ['Ctrl', 'Alt', '↑'], what: 'Otro cursor arriba o abajo' },
+      {
+        keys: ['Ctrl', 'Alt', '↑'],
+        editorAction: 'cursor-above',
+        what: 'Otro cursor arriba o abajo',
+      },
       { keys: ['Ctrl', 'D'], what: 'Añadir la siguiente ocurrencia a la selección' },
       { keys: ['Alt', '↑'], what: 'Mover la línea arriba o abajo' },
-      { keys: ['Shift', 'Alt', '↓'], what: 'Duplicar la línea' },
+      { keys: ['Shift', 'Alt', '↓'], editorAction: 'copy-line-down', what: 'Duplicar la línea' },
       { keys: ['Ctrl', '/'], what: 'Comentar o descomentar' },
       { keys: ['Ctrl', 'Shift', 'F'], what: 'Formatear el SQL' },
       { keys: ['Ctrl', 'F'], what: 'Buscar' },
-      { keys: ['Ctrl', 'H'], what: 'Buscar y reemplazar' },
+      { keys: ['Ctrl', 'H'], editorAction: 'replace', what: 'Buscar y reemplazar' },
     ],
   },
   {
@@ -87,6 +97,20 @@ export const SHORTCUT_GROUPS: readonly Grupo[] = [
     ],
   },
 ];
+
+export function shortcutGroups(platform?: string): readonly Grupo[] {
+  return SHORTCUT_GROUPS.map((group) => ({
+    ...group,
+    shortcuts: group.shortcuts.map((shortcut) => ({
+      ...shortcut,
+      keys: (shortcut.editorAction
+        ? editorShortcutLabel(shortcut.editorAction, platform)
+        : shortcutLabel(shortcut.keys.join('+'), platform)
+      ).split('+'),
+      what: shortcutLabel(shortcut.what, platform),
+    })),
+  }));
+}
 
 /**
  * La hoja de atajos.
@@ -118,16 +142,16 @@ export class ShortcutsSheet {
     afterNextRender(() => this._dialog()?.nativeElement.focus());
   }
 
-  protected readonly groups = SHORTCUT_GROUPS;
+  protected readonly groups = shortcutGroups();
 
   /** En dos columnas, repartidas por grupos enteros y equilibradas por alto. */
   protected readonly columns = computed<readonly (readonly Grupo[])[]>(() => {
-    const total = SHORTCUT_GROUPS.reduce((suma, grupo) => suma + grupo.shortcuts.length, 0);
+    const total = this.groups.reduce((suma, grupo) => suma + grupo.shortcuts.length, 0);
     const izquierda: Grupo[] = [];
     const derecha: Grupo[] = [];
     let contadas = 0;
 
-    for (const grupo of SHORTCUT_GROUPS) {
+    for (const grupo of this.groups) {
       if (contadas < total / 2) {
         izquierda.push(grupo);
       } else {

@@ -178,3 +178,9 @@ Validación: 70 pruebas aprobadas entre shell, explorador y atajos; compilación
 El separador permite cambiar el ancho con arrastre o flechas y restaurarlo con Intro o doble clic. El tamaño se limita para conservar 360 píxeles CSS de editor; si ambos paneles no caben, el asistente se superpone. Al recuperar espacio vuelve a la distribución en columnas y al ancho solicitado. Cerrar conserva también el borrador sin enviar, y Escape desde el panel devuelve el foco a su botón.
 
 Validación: 41 pruebas aprobadas entre distribución, separadores y shell, incluida la conservación del borrador; compilación de producción correcta. A 900 px y escala 125 %, plegar el explorador permitió pasar del asistente superpuesto a columnas, dejando 450 px físicos para el editor. Al ampliar a 1440 px recuperó los 495 px físicos elegidos para el asistente; Escape cerró el panel. No se enviaron preguntas a proveedores.
+
+### Atajos por plataforma
+
+La paleta y la hoja de ayuda usan la fuente común de etiquetas, incluidos ⌘, ⇧ y ⌥ en macOS. Se documentaron además las excepciones verificadas en el Monaco instalado: reemplazar con ⌘+⌥+F en macOS y las combinaciones de Linux para añadir cursores y duplicar líneas. Las etiquetas largas pueden ocupar dos líneas sin invadir la descripción.
+
+Validación: 36 pruebas aprobadas entre etiquetas, paleta y hoja de ayuda, con casos de Windows, Linux y macOS; compilación de producción correcta. Se inspeccionó la hoja en tema claro a 900 × 720 px con escala 125 %, con cierre visible y desplazamiento del contenido. La ejecución nativa de los atajos de macOS y Linux queda pendiente; las combinaciones se contrastaron con el código de Monaco incluido en las dependencias.

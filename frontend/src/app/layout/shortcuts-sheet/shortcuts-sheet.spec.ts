@@ -1,7 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 
 import { shortcutFor } from '../../core/shortcuts/shortcuts';
-import { SHORTCUT_GROUPS, ShortcutsSheet } from './shortcuts-sheet';
+import { SHORTCUT_GROUPS, ShortcutsSheet, shortcutGroups } from './shortcuts-sheet';
 
 describe('ShortcutsSheet', () => {
   let fixture: ComponentFixture<ShortcutsSheet>;
@@ -23,6 +23,23 @@ describe('ShortcutsSheet', () => {
 
   it('reparte los grupos en dos columnas', () => {
     expect(fixture.nativeElement.querySelectorAll('.column')).toHaveLength(2);
+  });
+
+  it('adapta los grupos a macOS y Linux sin alterar la documentación base', () => {
+    const mac = shortcutGroups('MacIntel').flatMap((group) => group.shortcuts);
+    const linux = shortcutGroups('Linux x86_64').flatMap((group) => group.shortcuts);
+    expect(mac.find((shortcut) => shortcut.what === 'Buscar y reemplazar')?.keys).toEqual([
+      '⌘',
+      '⌥',
+      'F',
+    ]);
+    expect(linux.find((shortcut) => shortcut.what === 'Duplicar la línea')?.keys).toEqual([
+      'Ctrl',
+      'Shift',
+      'Alt',
+      '↓',
+    ]);
+    expect(SHORTCUT_GROUPS[0].shortcuts[0].keys).toEqual(['Ctrl', 'Enter']);
   });
 
   it('se cierra con la cruz', () => {
@@ -49,6 +66,7 @@ describe('ShortcutsSheet', () => {
       ['k', { ctrlKey: true }],
       ['x', { ctrlKey: true, shiftKey: true }],
       ['r', { ctrlKey: true, shiftKey: true }],
+      ['e', { ctrlKey: true, shiftKey: true }],
       ['F4', { ctrlKey: true }],
       ['1', { altKey: true }],
       ['9', { altKey: true }],

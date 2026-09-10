@@ -16,6 +16,7 @@ import { ConnectionSummary, ExplorerNode, QueryTab } from '../../shared/models/w
 import { EngineBadge } from '../../shared/ui/engine-badge/engine-badge';
 import { Icon } from '../../shared/ui/icon/icon';
 import { DialogBackdrop } from '../../shared/a11y/dialog-backdrop';
+import { editorShortcutLabel, shortcutLabel } from '../../core/shortcuts/shortcut-label';
 
 type PaletteItem =
   | { readonly id: string; readonly kind: 'command'; readonly label: string; readonly hint: string }
@@ -145,7 +146,12 @@ export default class CommandPalette implements AfterViewInit {
       },
       // El buscador del editor existía y no lo decía nadie.
       { id: 'find', kind: 'command', label: 'Buscar en el editor', hint: 'Ctrl+F' },
-      { id: 'replace', kind: 'command', label: 'Buscar y reemplazar', hint: 'Ctrl+H' },
+      {
+        id: 'replace',
+        kind: 'command',
+        label: 'Buscar y reemplazar',
+        hint: editorShortcutLabel('replace'),
+      },
       { id: 'history', kind: 'command', label: 'Abrir historial', hint: 'Consultas anteriores' },
       {
         id: 'save-snippet',
@@ -248,7 +254,13 @@ export default class CommandPalette implements AfterViewInit {
       snippet,
     }));
 
-    const all = [...tabs, ...commands, ...snippets, ...connections, ...objects];
+    const all = [
+      ...tabs,
+      ...commands.map((command) => ({ ...command, hint: shortcutLabel(command.hint) })),
+      ...snippets,
+      ...connections,
+      ...objects,
+    ];
 
     return term
       ? all.filter((item) => `${item.label} ${item.hint}`.toLowerCase().includes(term))

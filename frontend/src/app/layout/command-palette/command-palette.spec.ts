@@ -90,6 +90,20 @@ describe('CommandPalette', () => {
     expect(text).toContain('Abrir historial');
   });
 
+  it('muestra la combinación real de reemplazar en macOS', () => {
+    const platform = vi.spyOn(navigator, 'platform', 'get').mockReturnValue('MacIntel');
+    try {
+      const input = fixture.nativeElement.querySelector('input') as HTMLInputElement;
+      input.value = 'reemplazar';
+      input.dispatchEvent(new Event('input'));
+      fixture.detectChanges();
+      expect(fixture.nativeElement.textContent).toContain('⌘+⌥+F');
+      expect(fixture.nativeElement.textContent).not.toContain('Ctrl+H');
+    } finally {
+      platform.mockRestore();
+    }
+  });
+
   it('ejecuta comentar líneas desde la paleta', () => {
     let emitted = 0;
     fixture.componentInstance.toggleLineComment.subscribe(() => emitted++);
