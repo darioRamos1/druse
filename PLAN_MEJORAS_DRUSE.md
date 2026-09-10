@@ -621,10 +621,15 @@ cerró en la 027 y trataba defectos de maquetación.
       producto**: si a pantalla ancha la base debe seguir diciéndose dos veces.
       Argumento para dejarla: el chip es de la pestaña y la barra es de la
       sesión, y ejecutar en la base equivocada es el error más caro de todos.
-- [ ] **UX-007:** entre la barra de la aplicación, la de pestañas, la de acciones
+- [x] **UX-007:** entre la barra de la aplicación, la de pestañas, la de acciones
       y la de contexto hay **cuatro filas de cromo** antes del SQL: en una
       pantalla de 720 px de alto quedan seis líneas de editor. Ver qué se puede
-      juntar sin esconder nada.
+      juntar sin esconder nada. La barra de acciones se compactó, los límites de
+      ejecución se agruparon y el reparto de resultados ahora reserva espacio
+      para escribir. A 900 × 720 px y escala 125 %, el editor inicial conserva
+      301,5 px físicos; al ampliar resultados al máximo conserva 200,25 px.
+      _(Validado el 9 de septiembre de 2026; detalle en
+      `docs/revision-ui-ux-2026-09-08.md`.)_
 
 ### Lo que no dice lo que debería
 

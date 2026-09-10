@@ -65,7 +65,9 @@ async function medir(page: Page, donde: string): Promise<void> {
         element.children.length === 0 &&
         element.textContent?.trim()
       ) {
-        problemas.push(`${sitio}: «${element.textContent.trim().slice(0, 32)}» se corta (${sobra}px)`);
+        problemas.push(
+          `${sitio}: «${element.textContent.trim().slice(0, 32)}» se corta (${sobra}px)`,
+        );
       }
 
       // Alto que se desborda sin poder desplazarse.
@@ -83,7 +85,9 @@ async function medir(page: Page, donde: string): Promise<void> {
       const nombre = boton.getAttribute('aria-label') ?? boton.getAttribute('title') ?? '';
 
       if (texto.length === 0 && nombre.length === 0) {
-        problemas.push(`${sitio}: botón sin nombre accesible (.${String(boton.className).split(' ')[0]})`);
+        problemas.push(
+          `${sitio}: botón sin nombre accesible (.${String(boton.className).split(' ')[0]})`,
+        );
       }
     }
 
@@ -193,12 +197,28 @@ test.describe('barrido visual', () => {
        FROM generate_series(1, 40)`,
     );
     await ejecutar(page, 'todo');
-    await expect(page.locator('.pager__range')).toBeVisible({ timeout: 30_000 });
+    await expect(page.locator('.pager__range')).toBeVisible({
+      timeout: 30_000,
+    });
     await medir(page, 'resultados');
     await foto(page, '01-resultados');
 
+    await page.getByRole('button', { name: 'Filtros', exact: true }).click();
+    await page.getByRole('searchbox', { name: 'Filtrar numero', exact: true }).fill('1');
+    await expect(page.locator('.filter-scope')).toContainText('no se aplican al exportar');
+    await foto(page, '01b-alcance-filtros');
+    await page.getByRole('button', { name: /Exportar CSV/ }).click();
+    await expect(page.getByRole('menu', { name: 'Exportar la consulta original' })).toBeVisible();
+    await foto(page, '01c-alcance-exportacion');
+    await page.keyboard.press('Escape');
+    await page.getByRole('button', { name: 'Limpiar filtros', exact: true }).click();
+    await page.getByRole('button', { name: 'Filtros', exact: true }).click();
+
     // Pestañas del panel inferior.
-    await page.getByRole('tab', { name: 'Mensajes' }).click().catch(() => {});
+    await page
+      .getByRole('tab', { name: 'Mensajes' })
+      .click()
+      .catch(() => {});
     await page.locator('app-results-panel').getByText('Mensajes').first().click();
     await page.waitForTimeout(200);
     await medir(page, 'mensajes');
@@ -311,6 +331,17 @@ test.describe('barrido visual', () => {
         async () => page.getByRole('button', { name: 'Preferencias' }).click(),
       ],
       [
+        '08d-actividad',
+        'app-activity-dialog',
+        async () =>
+          page
+            .getByRole('button', {
+              name: 'Ver actividad reciente',
+              exact: true,
+            })
+            .click(),
+      ],
+      [
         '09-disenador',
         'app-table-designer',
         async () => {
@@ -355,6 +386,15 @@ test.describe('barrido visual', () => {
       await page.waitForTimeout(500);
       await medir(page, nombre);
       await foto(page, nombre, dialogo.locator('.dialog').first());
+      if (selector === 'app-settings-dialog') {
+        for (const [tab, file] of [
+          ['Editor', '08b-preferencias-editor'],
+          ['Acerca de', '08c-preferencias-version'],
+        ]) {
+          await dialogo.getByRole('tab', { name: tab, exact: true }).click();
+          await foto(page, file, dialogo.locator('.dialog'));
+        }
+      }
       await cerrar(page, dialogo, nombre);
     }
 
@@ -395,7 +435,9 @@ test.describe('barrido visual', () => {
     await foto(page, '20-mer-tablas', diagrama.locator('.dialog'));
 
     await diagrama.getByRole('button', { name: 'Dibujar' }).click();
-    await expect(diagrama.locator('.node').first()).toBeVisible({ timeout: 60_000 });
+    await expect(diagrama.locator('.node').first()).toBeVisible({
+      timeout: 60_000,
+    });
     await page.waitForTimeout(400);
     await medir(page, 'diagrama');
     await foto(page, '20-mer', diagrama.locator('.dialog'));
@@ -410,7 +452,9 @@ test.describe('barrido visual', () => {
 
     const diagramaBase = page.locator('app-diagram-panel');
 
-    await expect(diagramaBase.locator('.chooser')).toBeVisible({ timeout: 60_000 });
+    await expect(diagramaBase.locator('.chooser')).toBeVisible({
+      timeout: 60_000,
+    });
     await medir(page, 'elegir tablas de la base');
     await foto(page, '20-mer-base-tablas', diagramaBase.locator('.dialog'));
     await cerrar(page, diagramaBase, 'diagrama de la base');
@@ -450,13 +494,19 @@ test.describe('barrido visual', () => {
     // No se siembra ninguno: se mira el primero que haya y, si no hay, se
     // sigue. El barrido no afirma nada, así que quedarse sin esta captura vale
     // más que cortar las que vienen detrás.
-    await page.locator('app-connections-sidebar').getByText('Procedures', { exact: true }).first().click();
+    await page
+      .locator('app-connections-sidebar')
+      .getByText('Procedures', { exact: true })
+      .first()
+      .click();
     await page.waitForTimeout(1500);
 
     // El árbol no marca la clase del nodo, así que el procedimiento se busca
     // por posición: el primer nodo que cuelga de «Procedures» con más sangría.
     const suNombre = await page.evaluate(() => {
-      const nodos = [...document.querySelectorAll<HTMLElement>('app-connections-sidebar .node--object')];
+      const nodos = [
+        ...document.querySelectorAll<HTMLElement>('app-connections-sidebar .node--object'),
+      ];
       const indice = nodos.findIndex((nodo) => nodo.textContent?.trim() === 'Procedures');
 
       if (indice < 0) {
@@ -497,7 +547,13 @@ test.describe('barrido visual', () => {
       await expect(dialogo).toBeVisible({ timeout: 30_000 });
       await dialogo
         .locator('.engine')
-        .filter({ has: page.locator('.engine__name', { hasText: new RegExp(`^${(motor === 'Informix (DRDA)' ? 'Informix' : motor).replace(/[()]/g, '\\$&')}$`) }) })
+        .filter({
+          has: page.locator('.engine__name', {
+            hasText: new RegExp(
+              `^${(motor === 'Informix (DRDA)' ? 'Informix' : motor).replace(/[()]/g, '\\$&')}$`,
+            ),
+          }),
+        })
         .first()
         .click();
       await page.waitForTimeout(400);
@@ -505,7 +561,11 @@ test.describe('barrido visual', () => {
         await dialogo.getByRole('button', { name: 'DRDA', exact: true }).click();
       }
       await medir(page, `conexión ${motor}`);
-      await foto(page, `13d-conexion-${motor.replace(/[^a-z]/gi, '').toLowerCase()}`, dialogo.locator('.dialog'));
+      await foto(
+        page,
+        `13d-conexion-${motor.replace(/[^a-z]/gi, '').toLowerCase()}`,
+        dialogo.locator('.dialog'),
+      );
       await cerrar(page, dialogo, `conexion ${motor}`);
     }
 
@@ -518,6 +578,29 @@ test.describe('barrido visual', () => {
     await page.waitForTimeout(500);
     await medir(page, 'asistente');
     await foto(page, '14-asistente');
+
+    const anchoAsistente = page.getByRole('separator', {
+      name: 'Ancho del asistente',
+      exact: true,
+    });
+    await anchoAsistente.press('ArrowLeft');
+    await anchoAsistente.press('ArrowLeft');
+    await foto(page, '14b-asistente-ampliado');
+    await page
+      .getByRole('button', {
+        name: 'Ocultar explorador de bases de datos',
+        exact: true,
+      })
+      .click();
+    await expect(page.locator('app-connections-sidebar')).toBeHidden();
+    await foto(page, '14c-explorador-plegado');
+    await page
+      .getByRole('button', {
+        name: 'Mostrar explorador de bases de datos',
+        exact: true,
+      })
+      .click();
+    await anchoAsistente.press('Enter');
 
     // Su diálogo de proveedores, que es donde se elige quién responde.
     await asistente.getByRole('button', { name: 'Configurar un proveedor' }).click();
@@ -550,7 +633,7 @@ test.describe('barrido visual', () => {
     await page.getByRole('button', { name: 'Tema oscuro' }).click();
 
     // --- Anchos ------------------------------------------------------------
-    for (const ancho of [1440, 1024, 900]) {
+    for (const ancho of [1440, 1280, 1024, 900]) {
       await page.setViewportSize({ width: ancho, height: 760 });
       await page.waitForTimeout(400);
       await medir(page, `ancho ${ancho}`);

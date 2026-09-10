@@ -184,3 +184,13 @@ Validación: 41 pruebas aprobadas entre distribución, separadores y shell, incl
 La paleta y la hoja de ayuda usan la fuente común de etiquetas, incluidos ⌘, ⇧ y ⌥ en macOS. Se documentaron además las excepciones verificadas en el Monaco instalado: reemplazar con ⌘+⌥+F en macOS y las combinaciones de Linux para añadir cursores y duplicar líneas. Las etiquetas largas pueden ocupar dos líneas sin invadir la descripción.
 
 Validación: 36 pruebas aprobadas entre etiquetas, paleta y hoja de ayuda, con casos de Windows, Linux y macOS; compilación de producción correcta. Se inspeccionó la hoja en tema claro a 900 × 720 px con escala 125 %, con cierre visible y desplazamiento del contenido. La ejecución nativa de los atajos de macOS y Linux queda pendiente; las combinaciones se contrastaron con el código de Monaco incluido en las dependencias.
+
+### Cierre de validación de la cuarta entrega
+
+- **912 pruebas del frontend aprobadas**, en 68 suites, y compilación de producción correcta (425,24 kB iniciales).
+- **23 pruebas de Rust/Tauri aprobadas** después de cargar el entorno MSVC con `build/scripts/msvc-env.ps1`. Esto no valida la interfaz dentro de WebView2 ni los diálogos nativos.
+- Comprobación de tipos E2E correcta. El barrido incluye ahora las tres secciones de Preferencias, Actividad, alcance de filtros y exportación, asistente ampliado y explorador plegado, además de 1280 px entre sus tamaños de captura.
+- La API y la revisión manual usaron datos temporales. Docker Desktop se intentó iniciar, pero su motor siguió sin estar disponible (`dockerDesktopLinuxEngine` ausente); no se ejecutaron la suite E2E ni el barrido automático con motores reales. Las nuevas capturas automáticas quedan pendientes de esa ejecución.
+- UX-007 se marca completado con las medidas del editor documentadas arriba. Permanecen pendientes la revisión visual de Tauri y sus controles decorativos de ventana, y la comprobación nativa de las combinaciones de macOS/Linux. Se conserva el contexto de conexión y base junto a Ejecutar.
+
+Mejoras publicadas individualmente: `dd12d41` Preferencias, `b378202` resultados adaptables, `ddb03c8` explorador plegable, `127d20f` asistente redimensionable y `d31d411` atajos por plataforma.
