@@ -10,14 +10,14 @@
 
 | Campo | Valor |
 | --- | --- |
-| Última sesión | **050** — 2026-09-10 |
+| Última sesión | **051** — 2026-09-10 |
 | Fase activa | **Migración de datos entre tablas:** fases 1, 2 y 3 cerradas; la **4** cerrada: la pasada de varias tablas, lo que cada tabla hace distinto y las migraciones guardadas (ver «Qué toca retomar»). **Respaldos y restauración:** Fases A–E cerradas. La **F** tiene backend, interfaz, CSV, selector de archivos, restaurar en una base nueva y **el ciclo entero por HTTP en los cuatro motores**; le falta repetir a mano el respaldo real que encontró el error de los índices de expresión. **Motores nuevos:** plan escrito (`docs/plan-nuevos-motores.md`), **fase 0 cerrada** en la 048 —las fugas de dialecto que se le escapaban a un motor nuevo— **fase 1 cerrada** en la 049 —Oracle— y **fase 2 cerrada** en la 050 —SQLite—. El plan de motores nuevos queda cerrado: **seis motores sobre el mismo contrato**. **Diagramas entidad-relación:** plan escrito y **Fase A** (lectura del catálogo en lote, cuatro motores) y **Fase B** (colocación determinista y lienzo) implementadas; falta cerrar la A contra los cuatro motores y ver el barrido de capturas |
 | Fases 0–6 | ✅ Cerradas. |
 | Fase 7 | 🟡 **11/12.** El ciclo de instalación está probado sobre este equipo; solo falta arrancar en una máquina sin herramientas de desarrollo. |
 | Fase 8 | ✅ **7/7.** Tres motores sobre el mismo contrato y primera beta preparada. |
 | ¿Compila el backend? | Sí — 0 advertencias, 0 errores |
 | ¿Compila el envoltorio? | Sí — recompilado en la 037 con `build/scripts/msvc-env.ps1` cargado antes; sin él, `cargo` falla en `vswhom-sys` por elegir el MSVC equivocado. **Sus pruebas ya son 17**, con las dos que vigilan la CSP y las cuatro de `DRUSE_DATA_DIR` |
-| ¿Pasan las pruebas? | Sí. En la **050**: **388 contractuales** —las 54 de SQLite entre ellas—, **567 unitarias**, **177 de integración**, **914 del frontend** y la **suite de punta a punta entera (56)**, con el barrido limpio. En la **049**: **334 contractuales** —las 280 de antes más las 54 de Oracle— contra PostgreSQL, MySQL, SQL Server y Oracle reales; **567 unitarias**, **177 de integración**, **913 del frontend**, la **suite de punta a punta entera (55)** y el **barrido** limpio. En la **048**, las cuatro suites del repositorio: **565 unitarias**, **177 de integración** y **279 contractuales** con PostgreSQL, MySQL y SQL Server levantados —Informix no—, **913 del frontend**, **35 de punta a punta** y el **barrido entero** con la consola limpia y ningún hallazgo. Los rojos del camino fueron de tiempo, distintos en cada pasada y verdes al ejecutar su archivo solo. `docs/api/openapi.json` no cambió: `/api/engines` no declara el cuerpo de su respuesta, así que ampliar su DTO no toca el contrato publicado. En la **047**: **859 del frontend** —las 815 de siempre más 44 de las piezas que salieron de `WorkspaceStore`— y la **suite de punta a punta entera en verde**: 52 pasadas, 1 saltada, 0 fallos, contra PostgreSQL y SQL Server reales. Los rojos que salieron por el camino eran de tiempo, en el frontend, y de **servidores de e2e levantados desde la sesión anterior**, que `reuseExistingServer` reutiliza. En la **046**: **740 del backend** —563 unitarias y las 177 de integración, con PostgreSQL, MySQL y SQL Server levantados—, **815 del frontend** y el **barrido entero** con la consola limpia y un solo hallazgo, que no es un defecto. Del e2e, 43 en verde; las cuatro de SQL Server esperaban a su contenedor, que se levantó en esta sesión. Las **23 del envoltorio** son de la 042 y siguen valiendo. Las contractuales salen verdes **sin los motores delante**: sin `DRUSE_REQUIRE_ENGINES=1` cada prueba termina sin comprobar nada cuando el servidor no responde. El `DATE` de Informix por SQLI de la 039 sigue sin repetirse: hace falta ese contenedor |
+| ¿Pasan las pruebas? | Sí. En la **051**: **571 unitarias**, **180 de integración**, **914 del frontend**, **56 de punta a punta** y el barrido limpio. En la **050**: **388 contractuales** —las 54 de SQLite entre ellas—, **567 unitarias**, **177 de integración**, **914 del frontend** y la **suite de punta a punta entera (56)**, con el barrido limpio. En la **049**: **334 contractuales** —las 280 de antes más las 54 de Oracle— contra PostgreSQL, MySQL, SQL Server y Oracle reales; **567 unitarias**, **177 de integración**, **913 del frontend**, la **suite de punta a punta entera (55)** y el **barrido** limpio. En la **048**, las cuatro suites del repositorio: **565 unitarias**, **177 de integración** y **279 contractuales** con PostgreSQL, MySQL y SQL Server levantados —Informix no—, **913 del frontend**, **35 de punta a punta** y el **barrido entero** con la consola limpia y ningún hallazgo. Los rojos del camino fueron de tiempo, distintos en cada pasada y verdes al ejecutar su archivo solo. `docs/api/openapi.json` no cambió: `/api/engines` no declara el cuerpo de su respuesta, así que ampliar su DTO no toca el contrato publicado. En la **047**: **859 del frontend** —las 815 de siempre más 44 de las piezas que salieron de `WorkspaceStore`— y la **suite de punta a punta entera en verde**: 52 pasadas, 1 saltada, 0 fallos, contra PostgreSQL y SQL Server reales. Los rojos que salieron por el camino eran de tiempo, en el frontend, y de **servidores de e2e levantados desde la sesión anterior**, que `reuseExistingServer` reutiliza. En la **046**: **740 del backend** —563 unitarias y las 177 de integración, con PostgreSQL, MySQL y SQL Server levantados—, **815 del frontend** y el **barrido entero** con la consola limpia y un solo hallazgo, que no es un defecto. Del e2e, 43 en verde; las cuatro de SQL Server esperaban a su contenedor, que se levantó en esta sesión. Las **23 del envoltorio** son de la 042 y siguen valiendo. Las contractuales salen verdes **sin los motores delante**: sin `DRUSE_REQUIRE_ENGINES=1` cada prueba termina sin comprobar nada cuando el servidor no responde. El `DATE` de Informix por SQLI de la 039 sigue sin repetirse: hace falta ese contenedor |
 | ¿Hay aplicación de escritorio? | **Sí.** Instalador NSIS y ZIP portable, en dos variantes: con Informix y sin él. Desde la 038 **se actualiza sola** —o lo hará: ver el aviso del repositorio privado en §9—. El MSI dejó de generarse: `tauri.conf.json` solo declara `nsis`, que es lo que necesita el actualizador. En la **040** se regeneraron los instaladores y **la variante completa quedó instalada y abierta en este equipo**, con el arreglo del envoltorio dentro. Siguen **sin firma Authenticode**: SmartScreen en cada equipo |
 | Motores | **PostgreSQL, SQL Server, MySQL/MariaDB, Oracle, SQLite e Informix**, sobre el mismo contrato. Desde la **048** cada uno declara sus `EngineCapabilities` y **un motor nuevo no compila hasta decir qué familias de datos guarda**; lo siguiente es Oracle, con el plan en `docs/plan-nuevos-motores.md` y el procedimiento en `docs/como-anadir-un-motor.md`. Informix tiene **dos entradas**: por DRDA con el driver de IBM (puerto 9089) y por **SQLI**, su protocolo nativo, con el puente JDBC (9088). Cambia por dónde se entra; el SQL, el catálogo y los tipos son los mismos |
 | Trabajo a medias | **Nada sin commitear.** `PLAN_MEJORAS_DRUSE.md` lleva marcadas las fases 0 a 5 salvo lo grande —**FE-001 y FE-002 cerradas en la 047**: `WorkspaceStore` partido en seis piezas—, FE-003, BE-001, BE-002, A11Y-005 más BKP-006, SEC-007, PERF-004 y PERF-005. Sin comprobar: las contractuales de la lectura en lote contra los cuatro motores desde la 039, **el multicursor dentro de la ventana empaquetada**, y de antes —**el diálogo del sistema y el selector de carpeta siguen sin verse abrir**, y **el actualizador no puede funcionar mientras el repositorio sea privado** (ver §9) |
@@ -35,28 +35,22 @@ autenticado, y ese 404 ni siquiera se distingue de «no hay versión nueva». Es
 una decisión que hay que tomar antes de repartir nada: repositorio público, o
 publicar los artefactos en otro sitio.
 
-#### Lo que deja abierta la 050
+#### Lo que deja abierta la 051
 
-1. **Crear una base de SQLite desde la aplicación.** Hoy Druse abre archivos y no
-   los crea nunca, a propósito: una ruta mal escrita tiene que decirlo en vez de
-   dejar una base vacía en el disco. Pero crear una es algo que la gente querrá
-   hacer, y el proveedor ya tiene el camino escrito
-   (`SqliteConnectionStringFactory.BuildForCreate`); lo que falta es la acción en
-   la interfaz, con su confirmación.
-2. **Un selector de archivo de verdad** en el formulario. Ahora la ruta se
-   escribe a mano, y ya hay un selector nativo en el envoltorio para los
-   respaldos: es el mismo trabajo.
-3. **Lo que cada motor deja declarado y sin resolver**, en los §7 y §8 del plan:
+1. **Pulsar los dos botones nuevos dentro de Druse instalado.** El diálogo del
+   sistema es una ventana modal y ninguna prueba puede conducirlo; lo demás está
+   cubierto, pero esto hay que mirarlo con la aplicación empaquetada delante.
+2. **Lo que cada motor deja declarado y sin resolver**, en los §7 y §8 del plan:
    de Oracle, el lote de varias instrucciones —que es una función de Druse y no
    del proveedor—, la posición del error de sintaxis y los paquetes en el árbol;
    de SQLite, que la reconstrucción de una tabla no conserva sus disparadores ni
    las vistas que la miraban, y que sus condiciones de comprobación no se pueden
    leer.
-4. **La compilación ligera podría dejar fuera más que Informix.** Con seis
+3. **La compilación ligera podría dejar fuera más que Informix.** Con seis
    motores, `IncludeInformix` se queda corto como idea: quien solo usa SQLite y
    PostgreSQL carga hoy con los clientes de Oracle, SQL Server y MySQL. Medir
    antes de decidir.
-5. **El contenedor de Oracle tarda**: dos minutos la primera vez. SQLite no
+4. **El contenedor de Oracle tarda**: dos minutos la primera vez. SQLite no
    necesita ninguno.
 
 #### Lo que deja abierta la 047
@@ -433,6 +427,72 @@ Pendiente de verificar cuando toque: Docker (pruebas de integración con contene
 ---
 
 ## 5. Registro de sesiones
+
+### Sesión 051 — 2026-09-10 · Lo que le faltaba a SQLite para poder empezar
+
+Las dos cosas que la 050 dejó anotadas, y que juntas son la diferencia entre
+«el motor funciona» y «se puede usar»: elegir el archivo sin escribir la ruta a
+mano, y **poder crear uno**, que con SQLite es la única forma de empezar.
+
+#### Crear es lo contrario de abrir, y por eso va aparte
+
+Druse sigue sin crear un archivo al abrirlo: una ruta mal escrita tiene que decir
+que no está, no dejar una base vacía en el disco y una conexión que parece
+funcionar. Lo que se añade es la otra mitad, como operación propia
+—`CreateDatabaseAsync`— con su capacidad, `CanCreateDatabase`.
+
+**Solo la declaran los motores que son un archivo.** No es falta de ganas: un
+`CREATE DATABASE` en un servidor lleva detrás media docena de decisiones que
+cambian según el motor —codificación, cotejo, espacio de tablas, plantilla— y
+ofrecerlo como un botón sin ellas crearía bases que después hay que rehacer. Los
+demás lanzan, a propósito: un «no hice nada» silencioso lo dejaría pasar.
+
+Tres decisiones, cada una con su prueba:
+
+- **No machaca lo que ya está.** Vaciar una base con un botón que pone «crear»
+  sería borrarla sin avisar.
+- **Lo que crea es una base, no un archivo vacío.** Es la trampa del motor: abrir
+  en modo de creación deja el archivo a cero bytes hasta la primera escritura, y
+  un archivo de cero bytes no se puede abrir después. Se escribe la cabecera a
+  propósito.
+- **No conecta después.** Quien crea una base quiere ver que está antes de
+  abrirla.
+
+#### Dos botones y no uno
+
+«Examinar…» y «Crear una nueva» abren **diálogos distintos del sistema**: el de
+abrir no deja nombrar un archivo que todavía no existe, y el de guardar deja
+escribir cualquier cosa. Es la misma distinción que ya se hacía al restaurar un
+respaldo.
+
+El comando va en el envoltorio, como los del respaldo y por lo mismo: la página
+no puede pedir que se escriba en un sitio concreto, y eso es lo que impide que
+esto sea una vía para dejar archivos donde le apetezca. Solo aparecen dentro de
+la aplicación de escritorio; en el navegador la ruta se sigue escribiendo a mano.
+
+#### Lo que no se pudo comprobar automáticamente
+
+**El diálogo nativo no se puede conducir desde una prueba**: es una ventana modal
+del sistema. Lo que sí quedó cubierto es todo lo demás —el proveedor con cuatro
+unitarias que no necesitan servidor, el endpoint con tres de integración, y que
+los botones no aparezcan fuera del escritorio, en la de punta a punta— y el
+envoltorio compila. Pulsar los dos botones dentro de Druse instalado sigue siendo
+cosa de mirarlo.
+
+**Pruebas.** **571 unitarias** —cuatro nuevas—, **180 de integración** —tres
+nuevas—, **914 del frontend**, **56 de punta a punta** y el barrido limpio.
+`docs/api/openapi.json` sí cambió esta vez, con la ruta nueva: su prueba lo dijo
+y se regeneró.
+
+**Archivos.** `SqliteCreateDatabaseTests.cs`, `CreateDatabaseEndpointTests.cs`
+(nuevos); `EngineCapabilities.cs`, `IDatabaseProvider.cs`,
+`SqliteDatabaseProvider.cs`, `ConnectionService.cs`, `DatabaseEndpoints.cs`,
+`Contracts.cs`, `ContractMapper.cs`, `openapi.json`, `backups.rs`, `main.rs`,
+`desktop-host.ts`, `application-gateway.ts`, `http-application-gateway.ts`,
+`workspace-store.ts`, `workspace.ts`, `connection-dialog.{ts,html,spec.ts}`,
+`sqlite.spec.ts` y el plan.
+
+**Estado al cerrar.** Commiteado en `main`, en tres commits temáticos.
 
 ### Sesión 050 — 2026-09-10 · SQLite, el motor que no es un servidor
 

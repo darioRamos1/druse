@@ -402,6 +402,25 @@ más. El contrato no lo veía —va por debajo de la API— y las pruebas del na
 tampoco. Lo encontró la prueba de punta a punta a la segunda ejecución. El
 endpoint ahora pregunta al motor si tiene identidad antes de pedirla.
 
+### Crear una base, que es lo contrario de abrirla
+
+Se añade como operación propia del proveedor —`CreateDatabaseAsync`— y con su
+capacidad, `CanCreateDatabase`. **Hoy solo la declaran los motores que son un
+archivo**, y no por falta de ganas: `CREATE DATABASE` en un servidor lleva detrás
+media docena de decisiones que cambian según el motor —codificación, cotejo,
+espacio de tablas, plantilla— y ofrecerlo como un botón sin ellas crearía bases
+que después hay que rehacer. Es una función por derecho propio, no un añadido del
+formulario de conexión.
+
+Tres cosas que la implementación decide y conviene saber:
+
+- **No machaca lo que ya está.** Vaciar una base con un botón que pone «crear»
+  sería borrarla sin avisar.
+- **Lo que crea es una base, no un archivo vacío.** Abrir en modo de creación deja
+  el archivo a cero bytes hasta la primera escritura, y un archivo de cero bytes
+  no se puede abrir después: se escribe la cabecera a propósito.
+- **No conecta después.** Encadenarlo dejaría una sesión viva que nadie pidió.
+
 ### Lo que queda declarado, no resuelto
 
 - **Las condiciones de comprobación no se leen.** SQLite las admite pero no las
@@ -411,9 +430,12 @@ endpoint ahora pregunta al motor si tiene identidad antes de pedirla.
 - **La reconstrucción no conserva disparadores ni vistas** que apuntaran a la
   tabla: se van con ella y SQLite no avisa. Recuperarlos exigiría leerlos y
   volver a escribirlos.
-- **Druse no crea el archivo.** Una ruta mal escrita tiene que decirlo, no dejar
-  una base vacía en el disco. Crear una desde la aplicación es una acción
-  explícita que todavía no está en la interfaz.
+- **Druse no crea el archivo al abrirlo**, y eso no cambia: una ruta mal escrita
+  tiene que decirlo, no dejar una base vacía en el disco. Crear una **sí** se
+  puede, como acción aparte: el formulario tiene «Examinar…» y «Crear una nueva»,
+  y las dos abren el diálogo del sistema, que es lo que impide que la página
+  escriba donde le apetezca. Crear no conecta: quien crea una base quiere ver que
+  está antes de abrirla.
 - **No hay recuento aproximado de filas** en el explorador: SQLite no guarda
   estadísticas salvo que alguien pida `ANALYZE`.
 
