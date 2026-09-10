@@ -78,16 +78,30 @@ public static class ConnectionProfileValidator
             // reenviar, por mucho que la instancia tenga nombre.
             && !profile.UsesSshTunnel;
 
-        if (profile.Port is < 1 or > 65535 && !(namedSqlServerInstance && profile.Port == 0))
+        // El puerto solo tiene sentido donde hay un servidor al que llegar: un
+        // motor que es un archivo no tiene ninguno, y exigirle uno le pediría un
+        // dato que no existe.
+        if (motor.RequiresHost
+            && profile.Port is < 1 or > 65535
+            && !(namedSqlServerInstance && profile.Port == 0))
         {
             errors.Add(
                 "El puerto debe estar entre 1 y 65535, salvo en una instancia con nombre de SQL Server.");
         }
 
-        // La base **no** es obligatoria. Vacía significa «la primera a la que
-        // tenga acceso»: quien abre una conexión a un servidor ajeno rara vez se
-        // sabe de memoria el nombre de su base, y exigírselo antes de dejarle
-        // conectar es pedirle el dato que venía a buscar.
+        // La base **no** es obligatoria en un servidor. Vacía significa «la
+        // primera a la que tenga acceso»: quien abre una conexión a un servidor
+        // ajeno rara vez se sabe de memoria el nombre de su base, y exigírselo
+        // antes de dejarle conectar es pedirle el dato que venía a buscar.
+        //
+        // En un motor que es un archivo sí lo es: sin la ruta no hay nada que
+        // abrir, y «la primera a la que tenga acceso» no significa nada.
+        if (motor.RequiresDatabase && string.IsNullOrWhiteSpace(profile.Database))
+        {
+            errors.Add(motor.UsesFilePath
+                ? "Indica el archivo de la base de datos."
+                : "La base de datos es obligatoria.");
+        }
 
         // Con autenticación de Windows la identidad la pone la sesión del sistema,
         // así que exigir un usuario obligaría a inventarse uno que nadie usa.

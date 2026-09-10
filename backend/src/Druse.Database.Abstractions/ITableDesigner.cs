@@ -65,6 +65,27 @@ public interface ITableDesigner
     IReadOnlyList<string> DescribeAlter(TableAlteration alteration);
 
     /// <summary>
+    /// Lo mismo, pero **pudiendo mirar cómo está la tabla hoy**.
+    ///
+    /// Existe por SQLite. Allí `ALTER TABLE` casi no existe: renombrar, añadir
+    /// una columna y quitarla, y nada más. Cambiar el tipo de una columna, tocar
+    /// la clave primaria o añadir una restricción se hacen **reconstruyendo la
+    /// tabla**: crear una nueva con la forma que se quiere, copiar las filas,
+    /// borrar la vieja y renombrar. Y para escribir esa tabla nueva hay que saber
+    /// cómo era la anterior, que es justo lo que el cambio no dice: el cambio
+    /// dice qué se toca, no lo que se queda.
+    ///
+    /// Los cinco motores restantes no necesitan mirar nada, y por eso lo de
+    /// arriba sigue siendo lo normal: esta versión se limita a llamarlo. Un
+    /// proveedor la reescribe solo si de verdad le hace falta.
+    /// </summary>
+    Task<IReadOnlyList<string>> DescribeAlterAsync(
+        IDatabaseSession session,
+        TableAlteration alteration,
+        CancellationToken cancellationToken) =>
+        Task.FromResult(DescribeAlter(alteration));
+
+    /// <summary>
     /// Crea la tabla.
     ///
     /// Devuelve lo mismo que <see cref="DescribeCreate"/> ejecutado: quien mira el

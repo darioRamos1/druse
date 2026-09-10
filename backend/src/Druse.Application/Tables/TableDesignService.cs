@@ -111,12 +111,24 @@ public sealed class TableDesignService(
             cancellationToken);
     }
 
-    /// <summary>Las instrucciones que cambiarían la tabla, sin ejecutarlas.</summary>
-    public IReadOnlyList<string> PreviewAlter(Guid sessionId, TableAlteration alteration)
+    /// <summary>
+    /// Las instrucciones que cambiarían la tabla, sin ejecutarlas.
+    ///
+    /// Va por la sesión y no solo por el diseño porque **hay un motor que
+    /// necesita mirar la tabla para saber qué escribiría**: en SQLite un cambio
+    /// de columna es reconstruirla entera, y para eso hace falta saber cómo es
+    /// ahora. Lo que se enseña aquí tiene que ser lo mismo que se va a ejecutar,
+    /// así que las dos preguntas pasan por el mismo sitio.
+    /// </summary>
+    public Task<IReadOnlyList<string>> PreviewAlterAsync(
+        Guid sessionId,
+        TableAlteration alteration,
+        CancellationToken cancellationToken)
     {
         var designer = Prepare(sessionId, alteration);
+        var session = _connections.Require(sessionId);
 
-        return designer.DescribeAlter(alteration);
+        return designer.DescribeAlterAsync(session, alteration, cancellationToken);
     }
 
     public async Task<TableChangeResult> AlterAsync(

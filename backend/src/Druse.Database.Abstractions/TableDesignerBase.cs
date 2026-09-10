@@ -1088,11 +1088,31 @@ public abstract class TableDesignerBase : ITableDesigner, IDatabaseScripter
         CancellationToken cancellationToken) =>
         ExecuteAsync(session, DescribeCreate(table), cancellationToken);
 
-    public Task<TableChangeResult> AlterAsync(
+    /// <summary>
+    /// Lo mismo que <see cref="DescribeAlter"/>, con la sesión a mano.
+    ///
+    /// La implementa aquí y no se hereda de la interfaz porque una clase no ve
+    /// los miembros por omisión de sus interfaces sin convertirse a ellas. Los
+    /// cinco motores que no necesitan mirar la tabla se quedan con esto; SQLite
+    /// lo reescribe, y el porqué está en <see cref="ITableDesigner"/>.
+    /// </summary>
+    public virtual Task<IReadOnlyList<string>> DescribeAlterAsync(
         IDatabaseSession session,
         TableAlteration alteration,
         CancellationToken cancellationToken) =>
-        ExecuteAsync(session, DescribeAlter(alteration), cancellationToken);
+        Task.FromResult(DescribeAlter(alteration));
+
+    public async Task<TableChangeResult> AlterAsync(
+        IDatabaseSession session,
+        TableAlteration alteration,
+        CancellationToken cancellationToken) =>
+        await ExecuteAsync(
+            session,
+            // La versión que puede mirar la tabla, no la que no. Son la misma en
+            // cinco de los seis motores; en SQLite es la diferencia entre cambiar
+            // una columna y no poder.
+            await DescribeAlterAsync(session, alteration, cancellationToken),
+            cancellationToken);
 
     /// <summary>
     /// Ejecuta las instrucciones que este mismo objeto acaba de escribir.

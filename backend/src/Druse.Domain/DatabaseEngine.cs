@@ -37,4 +37,13 @@ public enum DatabaseEngine
     /// que es la promesa de Druse: lo que viaja es IL.
     /// </summary>
     Oracle = 6,
+
+    /// <summary>
+    /// SQLite, que **no es un servidor**: es un archivo.
+    ///
+    /// No hay host, ni puerto, ni usuario, ni contraseña, ni transporte que
+    /// cifrar. Lo que el perfil llama base de datos es la ruta de ese archivo, y
+    /// es lo único que hace falta para abrirlo.
+    /// </summary>
+    Sqlite = 7,
 }

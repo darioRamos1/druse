@@ -40,6 +40,28 @@ public sealed record EngineCapabilities
     public bool RequiresUsername { get; init; } = true;
 
     /// <summary>
+    /// Hay que decir a qué base se va, y no vale dejarlo en blanco.
+    ///
+    /// En un servidor, una base vacía significa «la primera a la que tenga
+    /// acceso»: quien conecta a un servidor ajeno rara vez se sabe de memoria el
+    /// nombre de su base, y exigírselo antes de dejarle entrar es pedirle el dato
+    /// que venía a buscar. **En un motor que es un archivo no hay tal cosa**: sin
+    /// la ruta no hay nada que abrir.
+    /// </summary>
+    public bool RequiresDatabase { get; init; }
+
+    /// <summary>
+    /// La base de datos **es un archivo del disco**, y lo que el perfil guarda en
+    /// su lugar es una ruta.
+    ///
+    /// Cambia el formulario entero: donde había un nombre que escribir hay un
+    /// archivo que elegir, y las palabras dejan de hablar de servidores. No es
+    /// una preferencia estética: decirle «el servidor es obligatorio» a quien
+    /// solo tenía que buscar un `.db` no le dice nada.
+    /// </summary>
+    public bool UsesFilePath { get; init; }
+
+    /// <summary>
     /// Hace falta el nombre del servidor lógico, aparte del de la máquina.
     ///
     /// Hoy solo Informix por SQLI, donde es el alias del <c>sqlhosts</c> y sin él

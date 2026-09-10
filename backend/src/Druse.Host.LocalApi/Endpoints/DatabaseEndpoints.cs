@@ -189,15 +189,19 @@ internal static class DatabaseEndpoints
         })
         .WithName("CreateTable");
 
-        app.MapPost("/api/tables/alter/preview", (
+        app.MapPost("/api/tables/alter/preview", async (
             AlterTableRequest request,
-            TableDesignService tables) =>
+            TableDesignService tables,
+            CancellationToken cancellationToken) =>
         {
             try
             {
                 return Results.Ok(new
                 {
-                    statements = tables.PreviewAlter(request.SessionId, request.ToDomain()),
+                    statements = await tables.PreviewAlterAsync(
+                        request.SessionId,
+                        request.ToDomain(),
+                        cancellationToken),
                 });
             }
             catch (TableChangeRejectedException exception)
