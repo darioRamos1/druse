@@ -114,4 +114,15 @@ public enum BackupIsolation
     /// escriba: un respaldo no debe parar la base que está copiando.
     /// </summary>
     Snapshot = 2,
+
+    /// <summary>
+    /// Transacción serializable, que es como se pide en Oracle lo que los demás
+    /// llaman lecturas repetibles.
+    ///
+    /// No es lo mismo aunque se parezca: allí una transacción serializable ve la
+    /// base como estaba al empezar y **no bloquea a quien escriba**, que es justo
+    /// lo que hace falta en un respaldo. Su driver además rechaza los otros dos
+    /// niveles, así que no es una preferencia: es el único que concede.
+    /// </summary>
+    Serializable = 3,
 }

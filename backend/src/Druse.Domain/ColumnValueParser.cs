@@ -82,9 +82,24 @@ public static class ColumnValueParser
 
         if (type.Contains("bytea", StringComparison.Ordinal) ||
             type.Contains("binary", StringComparison.Ordinal) ||
-            type.Contains("blob", StringComparison.Ordinal))
+            type.Contains("blob", StringComparison.Ordinal) ||
+            // `RAW` y `LONG RAW` son los binarios de Oracle. Va por delante el
+            // `binary` de arriba, que también atrapa su `BINARY_DOUBLE`, así que
+            // este caso se mira con el nombre entero y no con una subcadena.
+            type.StartsWith("raw", StringComparison.Ordinal) ||
+            type.StartsWith("long raw", StringComparison.Ordinal))
         {
             return ColumnFamily.Binary;
+        }
+
+        // `NUMBER` es el único tipo numérico de Oracle: entero y decimal salen los
+        // dos de ahí, y lo que los distingue es la escala. Sin escala declarada
+        // admite decimales, así que se clasifica por lo que **puede** guardar y no
+        // por lo que suela llevar dentro: dar por entero un `NUMBER` a secas
+        // convertiría un 3,5 en 4 al releerlo.
+        if (type.StartsWith("number", StringComparison.Ordinal))
+        {
+            return Scale(type) == 0 ? ColumnFamily.Integral : ColumnFamily.Fractional;
         }
 
         if (type.Contains("numeric", StringComparison.Ordinal) ||
@@ -104,6 +119,30 @@ public static class ColumnValueParser
         }
 
         return ColumnFamily.Text;
+    }
+
+    /// <summary>
+    /// La escala declarada entre paréntesis, o `null` si no se declaró ninguna.
+    ///
+    /// `NUMBER(10)` da cero —no hay decimales— y `NUMBER(10,2)` da dos. Un
+    /// `NUMBER` a secas no declara nada, y eso no es lo mismo que declarar cero.
+    /// </summary>
+    private static int? Scale(string type)
+    {
+        var open = type.IndexOf('(', StringComparison.Ordinal);
+
+        if (open < 0)
+        {
+            return null;
+        }
+
+        var close = type.IndexOf(')', open);
+        var inside = close < 0 ? type[(open + 1)..] : type[(open + 1)..close];
+        var comma = inside.IndexOf(',', StringComparison.Ordinal);
+
+        return comma < 0
+            ? 0
+            : int.TryParse(inside[(comma + 1)..].Trim(), out var scale) ? scale : null;
     }
 
     /// <summary>

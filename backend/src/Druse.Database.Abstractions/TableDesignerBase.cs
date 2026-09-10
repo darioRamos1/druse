@@ -511,7 +511,7 @@ public abstract class TableDesignerBase : ITableDesigner, IDatabaseScripter
 
         await using var command = Connection(session).CreateCommand();
 
-        command.CommandText = statement;
+        command.CommandText = ToCommand(statement);
         command.Transaction = session.Transaction.Current;
 
         var affected = await command.ExecuteNonQueryAsync(cancellationToken);
@@ -658,9 +658,12 @@ public abstract class TableDesignerBase : ITableDesigner, IDatabaseScripter
             return new BorrowedSnapshot(null);
         }
 
-        var level = isolation == BackupIsolation.Snapshot
-            ? System.Data.IsolationLevel.Snapshot
-            : System.Data.IsolationLevel.RepeatableRead;
+        var level = isolation switch
+        {
+            BackupIsolation.Snapshot => System.Data.IsolationLevel.Snapshot,
+            BackupIsolation.Serializable => System.Data.IsolationLevel.Serializable,
+            _ => System.Data.IsolationLevel.RepeatableRead,
+        };
 
         try
         {
@@ -671,7 +674,11 @@ public abstract class TableDesignerBase : ITableDesigner, IDatabaseScripter
                 session.Transaction,
                 await connection.BeginTransactionAsync(level, cancellationToken));
         }
-        catch (Exception error) when (error is DbException or InvalidOperationException or NotSupportedException)
+        // `ArgumentException` está porque ODP.NET rechaza así los niveles que no
+        // admite —`ORA-50002`— en vez de con una excepción de base de datos.
+        catch (Exception error)
+            when (error is DbException or InvalidOperationException or NotSupportedException
+                  or ArgumentException)
         {
             // Pasa de verdad: una base de SQL Server sin `ALLOW_SNAPSHOT_ISOLATION`
             // rechaza la transacción. El respaldo sigue sin garantía y **lo dice en
@@ -880,6 +887,21 @@ public abstract class TableDesignerBase : ITableDesigner, IDatabaseScripter
 
         return sql.ToString();
     }
+
+    /// <summary>
+    /// La instrucción tal y como hay que mandarla al servidor.
+    ///
+    /// Lo que se escribe aquí arriba lleva punto y coma, y así tiene que ser: un
+    /// guion de respaldo se parte por él, y lo que se le enseña al usuario antes
+    /// de aplicar un cambio de tabla es lo que él escribiría. Pero **hay motores
+    /// que no lo aceptan por el cable** —Oracle responde `ORA-00911`— y la
+    /// diferencia no es de dialecto: es de dónde va el texto.
+    ///
+    /// Por eso el terminador se quita aquí y no en cada sitio donde se compone
+    /// una instrucción: son diez, y bastaría olvidarse de uno para que el motor
+    /// rechazara justo el cambio que nadie probó.
+    /// </summary>
+    protected virtual string ToCommand(string statement) => statement;
 
     /// <summary>Lo que va entre `SELECT` y las columnas para limitar filas: `TOP`, `FIRST`.</summary>
     protected virtual string RowLimitPrefix(int maxRows) => string.Empty;
@@ -1107,7 +1129,7 @@ public abstract class TableDesignerBase : ITableDesigner, IDatabaseScripter
         foreach (var sql in statements)
         {
             await using var command = connection.CreateCommand();
-            command.CommandText = sql;
+            command.CommandText = ToCommand(sql);
             command.Transaction = scope?.Transaction;
 
             try
