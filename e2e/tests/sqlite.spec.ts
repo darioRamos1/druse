@@ -5,7 +5,13 @@ import { DatabaseSync } from 'node:sqlite';
 
 import { expect, test, type Page } from '@playwright/test';
 
-import { abrir, ejecutar, escribirSql, primeraColumna } from '../support/druse';
+import {
+  abrir,
+  ejecutar,
+  escribirSql,
+  esperarFinDeConsulta,
+  primeraColumna,
+} from '../support/druse';
 
 /**
  * SQLite, por donde lo usa una persona.
@@ -382,5 +388,117 @@ test.describe('SQLite de punta a punta', () => {
     await expect(async () => expect(await primeraColumna(page)).toEqual(['2'])).toPass({
       timeout: 30_000,
     });
+  });
+
+  /**
+   * Un cambio rechazado **por los datos que ya había** se puede ir a ver.
+   *
+   * Escribir una condición que la tabla de hoy no cumple es lo más normal del
+   * mundo al ordenar una base que creció sin reglas, y hasta ahora el aviso
+   * decía qué pasaba sin decir dónde: encontrar las filas era escribir la
+   * consulta a mano, con el diseñador abierto por delante.
+   *
+   * Esto es lo que no se puede probar más abajo: que el rechazo llega con su
+   * consulta, que el botón la abre en una pestaña **de esta conexión** y que lo
+   * que sale al ejecutarla son las filas culpables. Y de paso, que el cambio no
+   * se aplicó: la tabla no se queda con una condición que su contenido incumple.
+   */
+  test('lo que el diseñador rechaza se puede ir a ver sin salir de Druse', async ({ page }) => {
+    await abrir(page);
+    await hastaLasTablas(page);
+
+    await menuDeNodo(page, 'clientes');
+    await page.getByRole('menuitem', { name: 'Modificar tabla' }).click();
+
+    const disenador = page.locator('app-table-designer');
+
+    await expect(disenador).toBeVisible({ timeout: 30_000 });
+
+    await disenador.getByRole('tab', { name: 'Restricciones' }).click();
+
+    // **Primero la que ya existe.** El diálogo se dibuja antes de que llegue la
+    // estructura de la tabla, y lo que llega la reemplaza: añadir una condición
+    // en ese hueco la borra al instante siguiente, y lo que queda delante es la
+    // de siempre, que no se deja escribir por venir del catálogo.
+    await expect(
+      disenador.locator('.rows__item', { hasText: 'Condición' }).first(),
+    ).toBeVisible({ timeout: 30_000 });
+
+    await disenador.getByRole('button', { name: 'Añadir condición' }).click();
+
+    // Los campos de las que ya existen están deshabilitados, así que **buscar el
+    // que se deja escribir** es buscar la recién añadida sin depender de su sitio
+    // en la lista.
+    const nombre = disenador
+      .locator('.rows__item input[aria-label="Nombre de la restricción"]:not([disabled])')
+      .last();
+
+    await expect(nombre).toBeVisible({ timeout: 30_000 });
+    await nombre.fill('ck_nombre_largo');
+
+    await disenador
+      .locator('.rows__item input[aria-label="Contenido de la restricción"]:not([disabled])')
+      .last()
+      .fill('length(nombre) > 50');
+
+    await disenador.getByRole('button', { name: 'Ver SQL' }).click();
+
+    await expect(disenador.locator('pre.sql')).toContainText('ck_nombre_largo', {
+      timeout: 30_000,
+    });
+
+    await disenador.getByRole('button', { name: 'Aplicar cambios' }).click();
+
+    // El aviso dice **por qué**, no «CHECK constraint failed»: quien lo lee acaba
+    // de escribir esa condición y creería que la escribió mal.
+    await expect(disenador.locator('.feedback')).toContainText('no cumplen', {
+      timeout: 60_000,
+    });
+
+    if (process.env['DRUSE_BARRIDO']) {
+      await disenador.locator('.dialog').first().screenshot({
+        path: `${BARRIDO}/19-sqlite-rechazo-con-consulta.png`,
+      });
+    }
+
+    await disenador.getByRole('button', { name: 'Ver las filas que lo impiden' }).click();
+
+    // El diálogo se cierra solo: la pestaña queda detrás, y dejarlo abierto sería
+    // un botón que aparenta no hacer nada.
+    await expect(disenador).toBeHidden({ timeout: 30_000 });
+
+    const consulta = await page.evaluate(
+      () => (window as any).monaco.editor.getEditors()[0].getValue() as string,
+    );
+
+    expect(consulta).toContain('length(nombre) > 50');
+
+    // Se ejecuta tal cual llegó, sin reescribirla: lo que se comprueba es que la
+    // consulta que manda el motor vale contra la tabla que hay ahora mismo.
+    const respuesta = page.waitForResponse(
+      (r) => r.url().includes('/api/queries') && r.request().method() === 'POST',
+      { timeout: 60_000 },
+    );
+
+    await page
+      .locator('app-editor-toolbar')
+      .getByRole('button', { name: 'Ejecutar', exact: true })
+      .click();
+
+    await respuesta;
+    await esperarFinDeConsulta(page);
+
+    await expect(page.locator('app-results-grid')).toContainText('Ana', { timeout: 30_000 });
+
+    // Y no se aplicó nada: la tabla no se queda con una condición que incumple.
+    await escribirSql(page, "SELECT sql FROM sqlite_master WHERE name = 'clientes'");
+    await ejecutar(page, 'todo');
+
+    await expect(async () => {
+      const [definicion] = await primeraColumna(page);
+
+      expect(definicion).toContain('ck_nombre');
+      expect(definicion).not.toContain('ck_nombre_largo');
+    }).toPass({ timeout: 30_000 });
   });
 });
