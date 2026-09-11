@@ -294,7 +294,15 @@ public abstract class TableDesignerBase : ITableDesigner, IDatabaseScripter
 
         foreach (var check in table.CheckConstraints.Where(_ => IndexCapabilities.SupportsCheckConstraints))
         {
-            lines.Add($"  {NamedConstraint(check.Name, $"CHECK ({check.Expression.Trim()})")}");
+            var body = $"CHECK ({check.Expression.Trim()})";
+
+            // Sin nombre se escribe sin nombre, igual que las de unicidad.
+            // Importa al reproducir una tabla que ya existe: SQLite no les pone
+            // nombre, y ponérselo aquí le cambiaría su `CREATE TABLE` por el
+            // camino.
+            lines.Add(check.Name.Length > 0
+                ? $"  {NamedConstraint(check.Name, body)}"
+                : $"  {body}");
         }
 
         foreach (var foreignKey in table.ForeignKeys)
@@ -1086,7 +1094,7 @@ public abstract class TableDesignerBase : ITableDesigner, IDatabaseScripter
         IDatabaseSession session,
         TableDefinition table,
         CancellationToken cancellationToken) =>
-        ExecuteAsync(session, DescribeCreate(table), cancellationToken);
+        ExecuteAsync(session, DescribeCreate(table), alteration: null, cancellationToken);
 
     /// <summary>
     /// Lo mismo que <see cref="DescribeAlter"/>, con la sesión a mano.
@@ -1112,7 +1120,29 @@ public abstract class TableDesignerBase : ITableDesigner, IDatabaseScripter
             // cinco de los seis motores; en SQLite es la diferencia entre cambiar
             // una columna y no poder.
             await DescribeAlterAsync(session, alteration, cancellationToken),
+            alteration,
             cancellationToken);
+
+    /// <summary>
+    /// Lo que haya que preparar en la conexión **antes de abrir la transacción**,
+    /// y deshacer al terminar.
+    ///
+    /// Existe por un caso concreto y real: hay ajustes de sesión que un motor
+    /// ignora en silencio si ya hay una transacción en curso. En SQLite,
+    /// `PRAGMA foreign_keys` es uno de ellos, y reconstruir una tabla con las
+    /// claves foráneas encendidas **borra las filas de sus tablas hijas** por la
+    /// cascada del `DROP TABLE`. Hecho dentro de la transacción, el pragma no
+    /// hace nada y nadie se entera.
+    ///
+    /// Por omisión no hay nada que preparar: devuelve `null` y los cinco motores
+    /// restantes no pagan ni una consulta. Lo que se devuelva se libera **después
+    /// de la transacción**, haya terminado bien o mal.
+    /// </summary>
+    protected virtual Task<IAsyncDisposable?> PrepareChangeAsync(
+        IDatabaseSession session,
+        TableAlteration? alteration,
+        CancellationToken cancellationToken) =>
+        Task.FromResult<IAsyncDisposable?>(null);
 
     /// <summary>
     /// Ejecuta las instrucciones que este mismo objeto acaba de escribir.
@@ -1124,12 +1154,21 @@ public abstract class TableDesignerBase : ITableDesigner, IDatabaseScripter
     private async Task<TableChangeResult> ExecuteAsync(
         IDatabaseSession session,
         IReadOnlyList<string> statements,
+        TableAlteration? alteration,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(session);
 
         var connection = Connection(session);
         var stopwatch = Stopwatch.StartNew();
+
+        // Se declara antes que la transacción **para liberarse después**: `await
+        // using` deshace en orden inverso, así que lo que esto prepare sigue en
+        // pie mientras la transacción vive y se restaura cuando ya no.
+        await using var preparation = await PrepareChangeAsync(
+            session,
+            alteration,
+            cancellationToken);
 
         // Con una transacción manual abierta hay que unirse a ella aunque el
         // motor no prometa DDL transaccional: los comandos van por esa conexión

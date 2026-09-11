@@ -56,19 +56,20 @@ public sealed class SqliteTableDesigner : TableDesignerBase
     /// SQLite tiene índices parciales —los inventó antes que MySQL— pero no
     /// columnas incluidas ni estructuras que elegir: todos son árboles B.
     ///
-    /// **Las condiciones de comprobación no se ofrecen**, y no porque el motor no
-    /// las admita: las admite. Es que no las devuelve. No hay `PRAGMA` que las
-    /// enseñe y lo único que queda es el `CREATE TABLE` original en texto, así que
-    /// una condición escrita desde el diseñador se guardaría y desaparecería de la
-    /// pantalla al releer la tabla. Ofrecer un campo que se traga lo que se
-    /// escribe es peor que no tenerlo.
+    /// **Las condiciones de comprobación sí se ofrecen**, y eso es nuevo. El motor
+    /// siempre las admitió; lo que faltaba era poder leerlas, porque no hay
+    /// `PRAGMA` que las enseñe y ofrecer un campo que se guarda y desaparece al
+    /// releer la tabla habría sido peor que no tenerlo. Se sacan del `CREATE TABLE`
+    /// que el motor guarda literal —ver `SqliteCheckConstraints`—, así que lo que
+    /// se escribe se vuelve a ver, y lo que ya estaba **sobrevive a reconstruir la
+    /// tabla** en vez de irse sin avisar.
     /// </summary>
     public override IndexCapabilities IndexCapabilities => new()
     {
         SupportsIncludedColumns = false,
         SupportsFilter = true,
         SupportsSortDirection = true,
-        SupportsCheckConstraints = false,
+        SupportsCheckConstraints = true,
         Methods = [],
         ForeignKeyActions =
         [
@@ -231,15 +232,15 @@ public sealed class SqliteTableDesigner : TableDesignerBase
     /// 2. Copiar en ella las columnas que sobreviven, **por nombre**.
     /// 3. Borrar la vieja.
     /// 4. Ponerle a la nueva el nombre de la vieja.
-    /// 5. Volver a crear sus índices, que se fueron con la tabla.
+    /// 5. Volver a crear sus índices y sus disparadores, que se fueron con ella.
     ///
     /// Va entero dentro de una transacción —aquí el DDL sí se deshace— así que o
     /// se hace todo o no se hace nada.
     ///
-    /// **Lo que esto no conserva**, y hay que saberlo: los disparadores y las
-    /// vistas que apuntaban a la tabla se van con ella. SQLite tampoco avisa. Se
-    /// deja escrito aquí y en el plan porque recuperarlos exigiría leerlos y
-    /// volver a escribirlos, y hacerlo a medias sería peor.
+    /// **Los disparadores hay que leerlos antes de tirar la tabla**, porque el
+    /// `DROP TABLE` se los lleva y después ya no queda dónde mirarlos. Se leen
+    /// aquí, que es donde todavía existen, y se vuelven a escribir tal cual al
+    /// final.
     /// </summary>
     public override async Task<IReadOnlyList<string>> DescribeAlterAsync(
         IDatabaseSession session,
@@ -260,7 +261,222 @@ public sealed class SqliteTableDesigner : TableDesignerBase
             alteration.Table,
             cancellationToken);
 
-        return Rebuild(alteration, columnas, estructura);
+        var disparadores = await DisparadoresAsync(
+            session,
+            alteration.Table.Name,
+            cancellationToken);
+
+        return Rebuild(alteration, columnas, estructura, disparadores);
+    }
+
+    /// <summary>
+    /// Los `CREATE TRIGGER` de la tabla, **tal como SQLite los guarda**.
+    ///
+    /// Se piden literales y no por partes porque un disparador es un programa: su
+    /// cuerpo lleva instrucciones, puede llevar una condición y puede tocar otras
+    /// tablas, y eso no se reconstruye desde un catálogo. El texto original es lo
+    /// único que lo reproduce.
+    ///
+    /// `sql` es nulo en los objetos que el motor se crea para sí, así que esos se
+    /// descartan: ejecutar un nulo rompería la reconstrucción entera.
+    /// </summary>
+    private async Task<IReadOnlyList<string>> DisparadoresAsync(
+        IDatabaseSession session,
+        string table,
+        CancellationToken cancellationToken)
+    {
+        var connection = Connection(session);
+
+        await using var command = connection.CreateCommand();
+
+        command.Transaction = session.Transaction.Current;
+        command.CommandText =
+            "SELECT sql FROM sqlite_master " +
+            "WHERE type = 'trigger' AND tbl_name = $tabla AND sql IS NOT NULL";
+
+        var parameter = command.CreateParameter();
+        parameter.ParameterName = "$tabla";
+        parameter.Value = table;
+        command.Parameters.Add(parameter);
+
+        var disparadores = new List<string>();
+
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            disparadores.Add(reader.GetString(0));
+        }
+
+        return disparadores;
+    }
+
+    /// <summary>
+    /// Deja la conexión lista para reconstruir, y apunta cómo devolverla.
+    ///
+    /// Lo principal que hace es **apagar las claves foráneas, fuera de la
+    /// transacción**.
+    ///
+    /// Es el paso 1 del procedimiento que documenta SQLite, y no es una precaución
+    /// teórica: con las claves foráneas encendidas, el `DROP TABLE` de la tabla
+    /// vieja ejecuta un borrado implícito que **dispara las cascadas de quien la
+    /// referencia**. Cambiarle el tipo a una columna de la tabla de clientes
+    /// borraría todos sus pedidos, sin aviso y dentro de la misma transacción que
+    /// se confirma sola.
+    ///
+    /// El pragma **no hace nada dentro de una transacción** —así lo documenta el
+    /// motor— y ahí está el peligro: puesto entre las instrucciones del cambio se
+    /// ejecutaría sin efecto y nadie lo notaría. Por eso va por este camino, antes
+    /// de abrirla; y por eso, con una transacción manual del usuario ya abierta, la
+    /// reconstrucción **se para** en lugar de seguir con la cascada armada.
+    ///
+    /// `defer_foreign_keys`, que sí se puede dentro, no sirve: retrasa la
+    /// *comprobación* de las restricciones, y una cascada no es una comprobación
+    /// sino una acción. Se ejecuta igual.
+    ///
+    /// Y lo otro que hace es **prometer que los dos ajustes vuelven a su sitio**
+    /// pase lo que pase. Los pragmas no son parte de la transacción: si una
+    /// instrucción de la reconstrucción falla, lo escrito se deshace pero
+    /// `legacy_alter_table` se quedaría encendido en esa conexión, y el siguiente
+    /// renombrado —de cualquier tabla— dejaría de arrastrar las vistas sin que
+    /// nadie hubiera pedido eso.
+    /// </summary>
+    protected override async Task<IAsyncDisposable?> PrepareChangeAsync(
+        IDatabaseSession session,
+        TableAlteration? alteration,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(session);
+
+        if (alteration is null || !NecesitaReconstruir(alteration))
+        {
+            return null;
+        }
+
+        var connection = Connection(session);
+        var manual = session.Transaction.Current;
+        var apagadas = false;
+
+        if (manual is not null)
+        {
+            // Aquí no se pueden apagar. Si nadie referencia la tabla no hay
+            // cascada que temer y el cambio sigue su camino; si alguien la
+            // referencia, se dice por qué no se puede en vez de borrarle las filas.
+            if (await TieneHijasAsync(connection, manual, alteration.Table.Name, cancellationToken))
+            {
+                throw new DatabaseOperationException(new QueryError
+                {
+                    Message =
+                        $"Reconstruir «{alteration.Table.Name}» exige apagar las claves foráneas, " +
+                        "y SQLite no deja hacerlo con una transacción abierta. Hay tablas que " +
+                        "referencian a esta, y sus filas se borrarían por la cascada. Confirma o " +
+                        "deshaz la transacción y vuelve a aplicar el cambio.",
+                });
+            }
+        }
+        else if (await ForeignKeysAsync(connection, cancellationToken))
+        {
+            await PragmaAsync(connection, "PRAGMA foreign_keys = OFF;", cancellationToken);
+            apagadas = true;
+        }
+
+        // Si ya estaban apagadas no se tocan ni se encienden al salir: encenderlas
+        // le cambiaría la sesión a quien la abrió así.
+        return new Restaurar(connection, apagadas);
+    }
+
+    /// <summary>Si las claves foráneas están encendidas en esta conexión.</summary>
+    private static async Task<bool> ForeignKeysAsync(
+        DbConnection connection,
+        CancellationToken cancellationToken)
+    {
+        await using var command = connection.CreateCommand();
+
+        command.CommandText = "PRAGMA foreign_keys;";
+
+        var value = await command.ExecuteScalarAsync(cancellationToken);
+
+        return value is not null
+            && value is not DBNull
+            && Convert.ToInt64(value, CultureInfo.InvariantCulture) != 0;
+    }
+
+    /// <summary>
+    /// Si alguna otra tabla la referencia.
+    ///
+    /// Se pregunta tabla por tabla porque SQLite **no tiene catálogo de claves
+    /// foráneas**: cada una se lee con `pragma_foreign_key_list` de la tabla que la
+    /// declara, así que hay que recorrerlas todas. La consulta para en la primera
+    /// que aparezca, que es lo único que hace falta saber.
+    ///
+    /// La comparación va sin distinguir mayúsculas porque el motor tampoco las
+    /// distingue al resolver el nombre de una tabla.
+    /// </summary>
+    private static async Task<bool> TieneHijasAsync(
+        DbConnection connection,
+        DbTransaction? transaction,
+        string table,
+        CancellationToken cancellationToken)
+    {
+        await using var command = connection.CreateCommand();
+
+        command.Transaction = transaction;
+
+        // `table` es palabra reservada y va entre corchetes, que SQLite admite
+        // para citar identificadores igual que las comillas dobles.
+        command.CommandText =
+            "SELECT 1 FROM sqlite_master AS m " +
+            "JOIN pragma_foreign_key_list(m.name) AS f " +
+            "WHERE m.type = 'table' AND m.name <> $tabla " +
+            "AND f.[table] = $tabla COLLATE NOCASE LIMIT 1";
+
+        var parameter = command.CreateParameter();
+        parameter.ParameterName = "$tabla";
+        parameter.Value = table;
+        command.Parameters.Add(parameter);
+
+        return await command.ExecuteScalarAsync(cancellationToken) is not null;
+    }
+
+    private static async Task PragmaAsync(
+        DbConnection connection,
+        string pragma,
+        CancellationToken cancellationToken)
+    {
+        await using var command = connection.CreateCommand();
+
+        command.CommandText = pragma;
+
+        await command.ExecuteNonQueryAsync(cancellationToken);
+    }
+
+    /// <summary>
+    /// Devuelve la conexión a como estaba cuando el cambio termina, salga bien o
+    /// salga mal.
+    ///
+    /// `legacy_alter_table` se apaga siempre porque siempre se encendió: lo pide
+    /// la primera instrucción de la reconstrucción y lo apaga la última, pero esa
+    /// última no se ejecuta si algo falla antes. Es su valor de fábrica, así que
+    /// apagarlo dos veces no le quita nada a nadie.
+    ///
+    /// Sin cancelación a propósito: lo que restaura son ajustes de la conexión, y
+    /// dejarlos a medias la devolvería al resto de la aplicación en un estado que
+    /// nadie pidió. Eso es peor que esperar una instrucción más.
+    /// </summary>
+    private sealed class Restaurar(DbConnection connection, bool foreignKeys) : IAsyncDisposable
+    {
+        public async ValueTask DisposeAsync()
+        {
+            await PragmaAsync(
+                connection,
+                "PRAGMA legacy_alter_table = OFF;",
+                CancellationToken.None);
+
+            if (foreignKeys)
+            {
+                await PragmaAsync(connection, "PRAGMA foreign_keys = ON;", CancellationToken.None);
+            }
+        }
     }
 
     /// <summary>
@@ -293,16 +509,26 @@ public sealed class SqliteTableDesigner : TableDesignerBase
             || change.Column.DefaultValue is not null;
 
     /// <summary>
-    /// Las seis instrucciones de la reconstrucción.
+    /// Las instrucciones de la reconstrucción.
     ///
     /// La tabla nueva se llama como la vieja con un sufijo que nadie escribiría a
     /// mano. Si algo fallara a mitad, la transacción lo deshace y ese nombre no
     /// llega a quedarse.
+    ///
+    /// **El orden importa, y no es el obvio.** La tabla nueva recupera siempre el
+    /// nombre de la vieja, y el renombrado que pidiera el usuario va al final, como
+    /// una instrucción aparte. Parece un paso de más y es justo lo contrario: los
+    /// índices y los disparadores se vuelven a escribir con el texto original, que
+    /// nombra la tabla de antes, así que tienen que encontrarla con ese nombre. Una
+    /// vez están puestos, **el renombrado final lo hace el motor y arrastra con él
+    /// las vistas y los disparadores**, que es precisamente lo que no se sabe hacer
+    /// a mano sin ponerse a interpretar su texto.
     /// </summary>
     private List<string> Rebuild(
         TableAlteration alteration,
         IReadOnlyList<DatabaseColumn> current,
-        TableStructure structure)
+        TableStructure structure,
+        IReadOnlyList<string> triggers)
     {
         var original = alteration.Table.Name;
         var temporal = $"{original}_druse_nueva";
@@ -315,14 +541,28 @@ public sealed class SqliteTableDesigner : TableDesignerBase
             Columns = columnas.Nuevas,
             PrimaryKey = ClavePrimaria(alteration, structure, columnas.Nuevas),
             UniqueConstraints = Unicas(alteration, structure),
-            CheckConstraints = alteration.AddedCheckConstraints,
+            CheckConstraints = Comprobaciones(alteration, structure),
             ForeignKeys = Foraneas(alteration, structure),
             // Los índices se crean después, ya con el nombre definitivo: creados
             // aquí se llamarían igual que los que la tabla vieja todavía tiene.
             Indexes = [],
         };
 
-        var statements = new List<string>(DescribeCreate(definicion));
+        var statements = new List<string>
+        {
+            // **Sin esto la reconstrucción ni empieza** cuando hay una vista que
+            // mira la tabla. Desde la versión 3.25 el motor valida todas las vistas
+            // y disparadores de la base al renombrar una tabla, y a mitad de la
+            // reconstrucción esas vistas apuntan a algo que ya se borró: el
+            // renombrado falla y se cae el cambio entero. Con el modo antiguo, el
+            // renombrado solo renombra, que es lo que aquí hace falta.
+            //
+            // Se apaga en cuanto deja de hacer falta, unas líneas más abajo: es un
+            // ajuste de la conexión y no debe sobrevivir a esta operación.
+            "PRAGMA legacy_alter_table = ON;",
+        };
+
+        statements.AddRange(DescribeCreate(definicion));
 
         // La copia va **por nombre y en el mismo orden en las dos listas**, que es
         // lo que impide que un cambio de orden mueva los datos de una columna a
@@ -338,14 +578,12 @@ public sealed class SqliteTableDesigner : TableDesignerBase
         }
 
         statements.Add($"DROP TABLE {Quote(original)};");
-
-        var definitivo = alteration.NewName ?? original;
-
-        statements.Add($"ALTER TABLE {Quote(temporal)} RENAME TO {Quote(definitivo)};");
+        statements.Add($"ALTER TABLE {Quote(temporal)} RENAME TO {Quote(original)};");
+        statements.Add("PRAGMA legacy_alter_table = OFF;");
 
         // Los índices se fueron con la tabla vieja. Se rehacen los que había,
         // menos los que el cambio pedía borrar, y se añaden los que pedía crear.
-        var destinoObjeto = alteration.Table with { Name = definitivo };
+        var destinoObjeto = alteration.Table;
         var borrados = new HashSet<string>(
             alteration.DroppedIndexes.Concat(
                 alteration.AlteredIndexes.Select(change => change.CurrentName)),
@@ -360,17 +598,34 @@ public sealed class SqliteTableDesigner : TableDesignerBase
                 continue;
             }
 
-            statements.Add(Recrear(index, definitivo));
+            statements.Add(Recrear(index, original));
         }
 
         foreach (var index in alteration.AddedIndexes)
         {
-            statements.Add(CreateIndex(Quote(definitivo), destinoObjeto, index));
+            statements.Add(CreateIndex(Quote(original), destinoObjeto, index));
         }
 
         foreach (var change in alteration.AlteredIndexes)
         {
-            statements.Add(CreateIndex(Quote(definitivo), destinoObjeto, change.Index));
+            statements.Add(CreateIndex(Quote(original), destinoObjeto, change.Index));
+        }
+
+        // Los disparadores, con su texto tal cual. Se ponen después de los índices
+        // por ningún motivo técnico —no se estorban— y antes del renombrado por uno
+        // que sí lo es: su texto nombra la tabla de antes.
+        foreach (var trigger in triggers)
+        {
+            statements.Add(trigger.TrimEnd().TrimEnd(';') + ";");
+        }
+
+        // Y si además se pedía renombrar la tabla, ahora: aquí `legacy_alter_table`
+        // ya está apagado, así que este renombrado es el bueno y el motor reescribe
+        // con él las vistas y los disparadores que la nombran.
+        if (alteration.NewName is { Length: > 0 } nuevo
+            && !string.Equals(nuevo, original, StringComparison.Ordinal))
+        {
+            statements.Add($"ALTER TABLE {Quote(original)} RENAME TO {Quote(nuevo)};");
         }
 
         return statements;
@@ -492,6 +747,35 @@ public sealed class SqliteTableDesigner : TableDesignerBase
         return presentes.Count == vieja.Columns.Count
             ? new PrimaryKeyDefinition { Name = null, Columns = presentes }
             : null;
+    }
+
+    /// <summary>
+    /// Las condiciones de comprobación que quedan, con las que se añaden.
+    ///
+    /// Las que ya estaban hay que volver a escribirlas **o se pierden**: la tabla
+    /// nueva solo tiene lo que se le ponga. Las que no tienen nombre se quedan sin
+    /// nombre, que es como estaban; y por lo mismo, soltar una exige que lo tenga,
+    /// que es cosa de quien escribió la tabla.
+    /// </summary>
+    private static IReadOnlyList<CheckConstraintDefinition> Comprobaciones(
+        TableAlteration alteration,
+        TableStructure structure)
+    {
+        var borradas = new HashSet<string>(
+            alteration.DroppedCheckConstraints,
+            StringComparer.OrdinalIgnoreCase);
+
+        return
+        [
+            .. structure.CheckConstraints
+                .Where(check => check.Name.Length == 0 || !borradas.Contains(check.Name))
+                .Select(check => new CheckConstraintDefinition
+                {
+                    Name = check.Name,
+                    Expression = check.Expression,
+                }),
+            .. alteration.AddedCheckConstraints,
+        ];
     }
 
     /// <summary>Las restricciones de unicidad que quedan, con las que se añaden.</summary>
