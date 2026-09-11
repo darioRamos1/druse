@@ -373,6 +373,9 @@ después, y por eso su fase empieza por el modelo y no por el proveedor.
 - [x] **MOT-041:** que la reconstrucción tampoco rompa a las demás: el paso 10 del
   procedimiento —`foreign_key_check` antes de confirmar— y la traducción del error
   que sale al copiar las filas que no cumplen lo que se acaba de pedir.
+- [x] **MOT-042:** que lo rechazado se pueda arreglar sin salir de Druse: con el
+  motivo viaja **la consulta que enseña las filas culpables**, y el diseñador
+  ofrece abrirla en una pestaña.
 
 ### Cómo fue
 
@@ -515,6 +518,60 @@ significa otra cosa según el paso en que salga —al insertar una fila habla de
 fila—, así que la traducción vive donde se sabe el paso y no en el normalizador,
 que es común a todo. Lo mismo vale para quitar los nulos de una columna que los
 tiene y para declarar única una que está repetida.
+
+### Y las filas que hay que ir a ver
+
+Explicar por qué no se puede aplicar un cambio deja el trabajo a medias: «hay
+filas que no cumplen la condición» es cierto, y quien lo lee sigue sin saber
+cuáles. Encontrarlas era escribir la consulta a mano, con el diseñador abierto por
+delante. La escribe ahora quien rechazó, que es **el único que sabe qué miró**, y
+viaja con el error en `QueryError.Diagnostic`; el diseñador ofrece un botón que la
+abre en una pestaña de esa misma conexión.
+
+Los cinco motivos que sabe convertir en consulta son los cinco que salen de los
+datos que ya había:
+
+| Lo que rechaza | Lo que se abre |
+| --- | --- |
+| Una condición que las filas no cumplen | `SELECT * FROM t WHERE NOT (condición)` |
+| Una columna que deja de admitir nulos | `SELECT * FROM t WHERE c IS NULL` |
+| Una columna que pasa a ser única | Los valores repetidos, **agrupados y contados** |
+| Una clave foránea que los datos incumplen | Las filas sin madre, por `NOT EXISTS` |
+| La clave de otra tabla que se quedaría rota | `pragma_foreign_key_list` de esa tabla |
+
+Tres detalles que no se ven y decidían si la consulta vale:
+
+- **La consulta corre sobre la tabla de hoy, no sobre la que se pedía.** El motor
+  nombra la columna por como iba a llamarse, y el cambio se deshizo entero: escrita
+  con ese nombre fallaría con «no such column» delante de quien intenta arreglar
+  algo. El renombrado se deshace antes de escribirla.
+- **`NOT (condición)` y no `condición = 0`.** En SQLite una condición que da nulo
+  **se cumple**, y `NOT` de un nulo sigue siendo nulo: la consulta deja fuera
+  exactamente las mismas filas que el motor dejó pasar.
+- **La fila con la clave foránea vacía no sale.** También se cumple, así que
+  enseñarla sería mandar a corregir algo que no está mal.
+
+Y los repetidos se enseñan agrupados y no como filas sueltas: con las filas
+delante todavía habría que emparejarlas a ojo para saber cuáles chocan entre sí.
+
+### Lo que cuestan las dos comprobaciones
+
+Medido sobre este equipo, con la hija entera referenciando a la madre y en dos
+tamaños: 300.000 + 300.000 filas —12 MB— y 1.500.000 + 1.500.000 —62 MB—.
+
+| Paso | 300.000 + 300.000 | 1.500.000 + 1.500.000 |
+| --- | --- | --- |
+| Encontrar las tablas que la referencian | 1 ms | 0 ms |
+| `foreign_key_check` de la tabla reconstruida | 8 ms | 9 ms |
+| `foreign_key_check` de la hija | 69 ms | 350 ms |
+| **La reconstrucción entera** | **705 ms** | **2.596 ms** |
+
+Las comprobaciones son el **11 %** del primer caso y el **14 %** del segundo. Lo
+que cuestan crece con las filas **de las hijas**, no con las de la tabla que se
+cambia, y a un ritmo constante: unos 4,3 millones de filas por segundo en las dos
+medidas. Es la décima parte de una operación que ya está copiando todas las filas
+de la tabla, así que no hay nada que optimizar; lo que había que saber es que no
+es un coste que se dispare.
 
 ### Lo que queda declarado, no resuelto
 
