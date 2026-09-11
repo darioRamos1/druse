@@ -38,7 +38,15 @@ internal sealed class OracleResultReader : IQueryResultReader
         CancellationToken cancellationToken)
     {
         var command = session.Connection.CreateCommand();
-        command.CommandText = OracleStatement.Prepare(request.Sql);
+
+        // De un guion con varias instrucciones se exporta **la primera**, que es
+        // lo que ya ocurre en los demás motores: allí el guion entero viaja en un
+        // comando y el lector se queda con el primer resultado. Aquí hay que
+        // partirlo antes —Oracle no encadena— y quedarse con la misma.
+        command.CommandText = OracleScript.Split(request.Sql) is [var first, ..]
+            ? first.Text
+            : OracleStatement.Prepare(request.Sql);
+
         command.CommandTimeout = request.TimeoutSeconds;
 
         // Cuántas filas trae el driver de una vez. De serie son 64 KB, que en una

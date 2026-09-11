@@ -186,9 +186,14 @@ public sealed class OracleFixture : IProviderFixture
     public string MissingTableCode => "ORA-00942";
 
     /// <summary>
-    /// Oracle no encadena consultas con punto y coma: cada instrucción va sola.
-    /// Varios resultados salen de un bloque que los devuelve **implícitamente**,
-    /// que es lo que hay desde 12c y lo que usan sus propios clientes.
+    /// El motor no encadena consultas con punto y coma: cada instrucción viaja
+    /// sola, y desde que existe `OracleScript` es Druse quien parte el guion.
+    ///
+    /// Aquí se sigue usando el bloque que devuelve los cursores
+    /// **implícitamente** —lo que hay desde 12c y lo que usan sus propios
+    /// clientes— a propósito: es la otra forma de traer varios resultados, y sin
+    /// esta prueba se quedaría sin cubrir. Que un guion de tres `SELECT` también
+    /// funcione lo comprueba `OracleBatchTests`.
     /// </summary>
     public string ThreeResultSets => """
         DECLARE

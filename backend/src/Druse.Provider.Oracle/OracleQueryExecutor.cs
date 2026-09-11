@@ -49,30 +49,43 @@ public sealed class OracleQueryExecutor : IQueryExecutor
             cancellationToken,
             deadline.Token);
 
+        // Cuál de las instrucciones del guion se está ejecutando, para poder
+        // decirlo si falla. Vive fuera del `try` justo para eso.
+        var ordinal = 0;
+        var statements = Batch(request.Sql);
+
         try
         {
-            await using var command = oracle.Connection.CreateCommand();
-            command.CommandText = OracleStatement.Prepare(request.Sql);
-            command.CommandTimeout = 0;
+            var resultSets = new List<ResultSet>();
+            long? rowsAffected = null;
 
-            // Si el usuario abrió una transacción manual, esta consulta entra en
-            // ella. En Oracle **toda** instrucción abre transacción de todas
-            // formas —no hay autocommit por debajo— así que sin esto los botones
-            // de confirmar y deshacer gobernarían una transacción distinta de la
-            // que el usuario cree estar viendo.
-            ((DbCommand)command).Transaction = oracle.Transaction.Current;
+            // El tope de filas es del guion entero, no de cada instrucción: lo
+            // que se lleva una es lo que le falta a la siguiente, igual que
+            // cuando un solo comando devuelve varios resultados.
+            var remaining = request.MaxRows;
 
-            // ODP.NET no atiende el token mientras espera al servidor: hay que
-            // decirle que cancele el comando, que es lo que manda el aviso por la
-            // conexión.
-            await using var registration = linked.Token.Register(Cancelar, command);
+            for (; ordinal < statements.Count; ordinal++)
+            {
+                var (sets, affected) = await RunAsync(
+                    oracle,
+                    statements[ordinal],
+                    Math.Max(0, remaining),
+                    linked.Token);
 
-            await using var reader = await command.ExecuteReaderAsync(linked.Token);
+                foreach (var set in sets)
+                {
+                    remaining -= set.Rows.Count;
+                    resultSets.Add(set);
+                }
 
-            var (resultSets, rowsAffected) = await ReadAllAsync(
-                (OracleDataReader)reader,
-                request.MaxRows,
-                linked.Token);
+                // Las filas tocadas se suman: un guion que inserta en dos tablas
+                // ha tocado las de las dos, y enseñar solo las de la última sería
+                // decir que se hizo menos de lo que se hizo.
+                if (affected is not null)
+                {
+                    rowsAffected = (rowsAffected ?? 0) + affected.Value;
+                }
+            }
 
             // Si el plazo venció durante la lectura, lo leído está incompleto
             // aunque el servidor no se haya quejado.
@@ -142,9 +155,87 @@ public sealed class OracleQueryExecutor : IQueryExecutor
                 ResultSets = [],
                 Messages = messages,
                 Duration = stopwatch.Elapsed,
-                Error = OracleErrorNormalizer.Normalize(exception),
+                Error = Situar(OracleErrorNormalizer.Normalize(exception), ordinal, statements.Count),
             };
         }
+    }
+
+    /// <summary>
+    /// Las instrucciones que hay que mandar, en orden.
+    ///
+    /// Un guion que solo tiene comentarios no deja ninguna: entonces se manda tal
+    /// cual estaba y contesta el motor, que es quien sabe explicar por qué eso no
+    /// es una instrucción.
+    /// </summary>
+    private static IReadOnlyList<string> Batch(string sql)
+    {
+        var statements = OracleScript.Split(sql);
+
+        return statements.Count > 0
+            ? [.. statements.Select(statement => statement.Text)]
+            : [OracleStatement.Prepare(sql)];
+    }
+
+    /// <summary>
+    /// Dice **cuál** de las instrucciones falló, y que las de antes ya corrieron.
+    ///
+    /// Sin esto, quien ejecuta un guion de diez instrucciones recibe un `ORA-…`
+    /// sin saber dónde mirar ni qué quedó hecho. Y lo segundo importa tanto como
+    /// lo primero: aquí no hay vuelta atrás automática, así que lo anterior sigue
+    /// en pie —dentro de la transacción, que se puede deshacer a mano—.
+    ///
+    /// Con una sola instrucción no se toca el mensaje: no hay nada que situar, y
+    /// el contrato dice que Oracle no sabe decir dónde falla dentro de una.
+    /// </summary>
+    private static QueryError Situar(QueryError error, int ordinal, int total)
+    {
+        if (total <= 1)
+        {
+            return error;
+        }
+
+        var antes = ordinal == 0
+            ? "No se ejecutó ninguna de las anteriores."
+            : $"Las {ordinal} anteriores ya se ejecutaron y siguen en pie.";
+
+        return error with
+        {
+            Message = $"Falló la instrucción {ordinal + 1} de {total}. {antes} {error.Message}",
+        };
+    }
+
+    /// <summary>
+    /// Manda una instrucción y lee lo que devuelva.
+    ///
+    /// Un comando por instrucción, y no uno reutilizado: cambiarle el texto a un
+    /// comando que acaba de devolver un lector deja al driver con trabajo a medio
+    /// cerrar, y lo que se ahorra —un objeto— no vale ese riesgo.
+    /// </summary>
+    private static async Task<(List<ResultSet> ResultSets, long? RowsAffected)> RunAsync(
+        OracleSession oracle,
+        string sql,
+        int maxRows,
+        CancellationToken cancellationToken)
+    {
+        await using var command = oracle.Connection.CreateCommand();
+        command.CommandText = sql;
+        command.CommandTimeout = 0;
+
+        // Si el usuario abrió una transacción manual, esta consulta entra en
+        // ella. En Oracle **toda** instrucción abre transacción de todas formas
+        // —no hay autocommit por debajo— así que sin esto los botones de
+        // confirmar y deshacer gobernarían una transacción distinta de la que el
+        // usuario cree estar viendo.
+        ((DbCommand)command).Transaction = oracle.Transaction.Current;
+
+        // ODP.NET no atiende el token mientras espera al servidor: hay que
+        // decirle que cancele el comando, que es lo que manda el aviso por la
+        // conexión.
+        await using var registration = cancellationToken.Register(Cancelar, command);
+
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+
+        return await ReadAllAsync((OracleDataReader)reader, maxRows, cancellationToken);
     }
 
     /// <summary>

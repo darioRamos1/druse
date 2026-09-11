@@ -62,13 +62,27 @@ internal static partial class OracleStatement
     }
 
     /// <summary>
+    /// Si queda algo que ejecutar una vez quitados espacios y comentarios.
+    ///
+    /// Lo usa <see cref="OracleScript"/> para no mandar al motor el fragmento que
+    /// queda detrás del último punto y coma, que en un guion comentado es solo
+    /// texto para leer.
+    /// </summary>
+    public static bool HasCode(string sql)
+    {
+        ArgumentNullException.ThrowIfNull(sql);
+
+        return Significant(sql).Length > 0;
+    }
+
+    /// <summary>
     /// El texto sin los comentarios ni los espacios de delante.
     ///
     /// Sin esto, un bloque que empiece con un comentario —lo normal en un
     /// procedimiento que alguien documentó— no se reconocería como PL/SQL y
     /// perdería su último punto y coma.
     /// </summary>
-    private static string Significant(string sql)
+    internal static string Significant(string sql)
     {
         var index = 0;
 
