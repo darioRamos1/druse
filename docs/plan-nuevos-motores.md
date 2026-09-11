@@ -625,9 +625,16 @@ Lo que apareció al arreglarlo:
   driver no hace nada, y una consulta con un plazo de un segundo tardó **285
   segundos**, que es lo que tardaba en terminar sola. Ahora se llama a
   `sqlite3_interrupt` sobre la conexión y el corte es inmediato.
-- **Seis pruebas del contrato en rojo**, que son hallazgos y no regresiones. La
-  peor: el guion de restauración escribe `ALTER TABLE … ADD CONSTRAINT … FOREIGN
-  KEY`, que SQLite no admite. Quedan anotadas en la bitácora de la 055.
+- **Seis pruebas del contrato en rojo**, que eran hallazgos y no regresiones.
+  **Cerradas todas**, y cuatro eran defectos de verdad: el guion de restauración
+  escribía `ALTER TABLE … ADD CONSTRAINT … FOREIGN KEY`, que SQLite no admite —de
+  ahí `AddsForeignKeysAfterwards`—; los nombres de las restricciones de unicidad y
+  de las claves foráneas se perdían al releer la tabla, que es lo mismo que ya
+  pasaba con las condiciones antes de la 052; una clave primaria de enteros se
+  enseñaba como opcional; y un `CREATE TABLE` decía haber escrito una fila. Los
+  otros dos no eran defectos sino preguntas que a un motor sin servidor no se le
+  pueden hacer tal cual, y se resolvieron cambiando **a dónde apuntar mal** en vez
+  de saltar la prueba.
 
 La lección no es de SQLite: **una fixture que dice que su motor no responde es
 indistinguible de un motor apagado**, y las dos cosas dejan la suite verde. La

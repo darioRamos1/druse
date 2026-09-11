@@ -10,14 +10,14 @@
 
 | Campo | Valor |
 | --- | --- |
-| Última sesión | **055** — 2026-09-11 |
+| Última sesión | **056** — 2026-09-11 |
 | Fase activa | **Migración de datos entre tablas:** fases 1, 2 y 3 cerradas; la **4** cerrada: la pasada de varias tablas, lo que cada tabla hace distinto y las migraciones guardadas (ver «Qué toca retomar»). **Respaldos y restauración:** Fases A–E cerradas. La **F** tiene backend, interfaz, CSV, selector de archivos, restaurar en una base nueva y **el ciclo entero por HTTP en los cuatro motores**; le falta repetir a mano el respaldo real que encontró el error de los índices de expresión. **Motores nuevos:** plan escrito (`docs/plan-nuevos-motores.md`), **fase 0 cerrada** en la 048 —las fugas de dialecto que se le escapaban a un motor nuevo— **fase 1 cerrada** en la 049 —Oracle— y **fase 2 cerrada** en la 050 —SQLite—. El plan de motores nuevos queda cerrado: **seis motores sobre el mismo contrato**; en la **052** se cerró lo que SQLite dejaba declarado y sin resolver —la reconstrucción de una tabla ya no se lleva sus disparadores, sus condiciones, las vistas que la miraban ni las filas de las tablas hijas—, en la **053** que tampoco rompa a las tablas que la referencian, y en la **054** que **lo rechazado se pueda ir a ver**: con el motivo viaja la consulta que enseña las filas culpables, y en la **055** lo que le quedaba a Oracle —**un guion con varias instrucciones se ejecuta entero**, que era trabajo de Druse y no del proveedor— más las pruebas que el plan pedía en su §9, que destaparon el aviso de fechas que le faltaba a SQLite. **Diagramas entidad-relación:** plan escrito y **Fase A** (lectura del catálogo en lote, cuatro motores) y **Fase B** (colocación determinista y lienzo) implementadas; falta cerrar la A contra los cuatro motores y ver el barrido de capturas |
 | Fases 0–6 | ✅ Cerradas. |
 | Fase 7 | 🟡 **11/12.** El ciclo de instalación está probado sobre este equipo; solo falta arrancar en una máquina sin herramientas de desarrollo. |
 | Fase 8 | ✅ **7/7.** Tres motores sobre el mismo contrato y primera beta preparada. |
 | ¿Compila el backend? | Sí — 0 advertencias, 0 errores |
 | ¿Compila el envoltorio? | Sí — recompilado en la 037 con `build/scripts/msvc-env.ps1` cargado antes; sin él, `cargo` falla en `vswhom-sys` por elegir el MSVC equivocado. **Sus pruebas ya son 17**, con las dos que vigilan la CSP y las cuatro de `DRUSE_DATA_DIR` |
-| ¿Pasan las pruebas? | En la **055**: **653 unitarias**, **182 de integración** y las **2 de Oracle de punta a punta** en verde, y **389 de 395 contractuales**. Los seis rojos son de SQLite y **son hallazgos, no regresiones**: su fixture llevaba desde la 050 diciendo que el motor no respondía —una reentrada en su propio `Lazy`— y sus 54 pruebas se saltaban enteras. Arreglado eso, se vio además que **la cancelación no cortaba nada** (285 s con un plazo de 1 s). El frontend no se tocó y su suite no se repitió. En la **054**: **602 unitarias**, **388 contractuales**, **182 de integración** —con los cuatro contenedores levantados— y las **3 de SQLite de punta a punta**, que son las que ven el rechazo por donde se usa. Del frontend, **933 de 936** en la segunda pasada: tres rojos por tiempo —`app`, `query-builder` y `results-grid`—, cuatro en la primera, y **los cuatro archivos verdes al ejecutarlos solos**, `table-designer` incluido. En la **053**, el backend entero sí: **597 unitarias**, **388 contractuales**, **180 de integración**, sin advertencias de compilación, y **las 61 de punta a punta (1 saltada, el barrido)**. El **frontend dio 922 de 932**, todas por tiempo agotado en montajes pesados y con la suite tardando el doble que ayer: la máquina tenía los cuatro contenedores, Druse abierto y ~4 GB libres de 16. La 053 **no toca frontend**, y esa misma suite salió entera en verde en la 052. El barrido no se repitió: esta sesión no cambia nada que se vea. En la **052**: **594 unitarias**, **388 contractuales** —las 54 de SQLite entre ellas—, **180 de integración**, **932 del frontend**, **61 de punta a punta** (1 saltada, el barrido) y el **barrido limpio**, sin errores de consola y sin advertencias de compilación. Esas cuentas del frontend y del e2e incluyen las pruebas de los tres commits de interfaz que el usuario metió en `main` durante la sesión. En la **051**: **571 unitarias**, **180 de integración**, **914 del frontend**, **56 de punta a punta** y el barrido limpio. En la **050**: **388 contractuales** —las 54 de SQLite entre ellas—, **567 unitarias**, **177 de integración**, **914 del frontend** y la **suite de punta a punta entera (56)**, con el barrido limpio. En la **049**: **334 contractuales** —las 280 de antes más las 54 de Oracle— contra PostgreSQL, MySQL, SQL Server y Oracle reales; **567 unitarias**, **177 de integración**, **913 del frontend**, la **suite de punta a punta entera (55)** y el **barrido** limpio. En la **048**, las cuatro suites del repositorio: **565 unitarias**, **177 de integración** y **279 contractuales** con PostgreSQL, MySQL y SQL Server levantados —Informix no—, **913 del frontend**, **35 de punta a punta** y el **barrido entero** con la consola limpia y ningún hallazgo. Los rojos del camino fueron de tiempo, distintos en cada pasada y verdes al ejecutar su archivo solo. `docs/api/openapi.json` no cambió: `/api/engines` no declara el cuerpo de su respuesta, así que ampliar su DTO no toca el contrato publicado. En la **047**: **859 del frontend** —las 815 de siempre más 44 de las piezas que salieron de `WorkspaceStore`— y la **suite de punta a punta entera en verde**: 52 pasadas, 1 saltada, 0 fallos, contra PostgreSQL y SQL Server reales. Los rojos que salieron por el camino eran de tiempo, en el frontend, y de **servidores de e2e levantados desde la sesión anterior**, que `reuseExistingServer` reutiliza. En la **046**: **740 del backend** —563 unitarias y las 177 de integración, con PostgreSQL, MySQL y SQL Server levantados—, **815 del frontend** y el **barrido entero** con la consola limpia y un solo hallazgo, que no es un defecto. Del e2e, 43 en verde; las cuatro de SQL Server esperaban a su contenedor, que se levantó en esta sesión. Las **23 del envoltorio** son de la 042 y siguen valiendo. Las contractuales salen verdes **sin los motores delante**: sin `DRUSE_REQUIRE_ENGINES=1` cada prueba termina sin comprobar nada cuando el servidor no responde. El `DATE` de Informix por SQLI de la 039 sigue sin repetirse: hace falta ese contenedor |
+| ¿Pasan las pruebas? | En la **056**: **las 54 del contrato de SQLite en verde por primera vez**, y con los seis motores delante —Informix levantado— **394 de 395 contractuales**, **653 unitarias**, **182 de integración** y las **3 de SQLite de punta a punta**. El único rojo es el `DATE` de Informix por SQLI de la 039, que no es de este trabajo y por fin se pudo reproducir. En la **055**: **653 unitarias**, **182 de integración** y las **2 de Oracle de punta a punta** en verde, y **389 de 395 contractuales**. Los seis rojos son de SQLite y **son hallazgos, no regresiones**: su fixture llevaba desde la 050 diciendo que el motor no respondía —una reentrada en su propio `Lazy`— y sus 54 pruebas se saltaban enteras. Arreglado eso, se vio además que **la cancelación no cortaba nada** (285 s con un plazo de 1 s). El frontend no se tocó y su suite no se repitió. En la **054**: **602 unitarias**, **388 contractuales**, **182 de integración** —con los cuatro contenedores levantados— y las **3 de SQLite de punta a punta**, que son las que ven el rechazo por donde se usa. Del frontend, **933 de 936** en la segunda pasada: tres rojos por tiempo —`app`, `query-builder` y `results-grid`—, cuatro en la primera, y **los cuatro archivos verdes al ejecutarlos solos**, `table-designer` incluido. En la **053**, el backend entero sí: **597 unitarias**, **388 contractuales**, **180 de integración**, sin advertencias de compilación, y **las 61 de punta a punta (1 saltada, el barrido)**. El **frontend dio 922 de 932**, todas por tiempo agotado en montajes pesados y con la suite tardando el doble que ayer: la máquina tenía los cuatro contenedores, Druse abierto y ~4 GB libres de 16. La 053 **no toca frontend**, y esa misma suite salió entera en verde en la 052. El barrido no se repitió: esta sesión no cambia nada que se vea. En la **052**: **594 unitarias**, **388 contractuales** —las 54 de SQLite entre ellas—, **180 de integración**, **932 del frontend**, **61 de punta a punta** (1 saltada, el barrido) y el **barrido limpio**, sin errores de consola y sin advertencias de compilación. Esas cuentas del frontend y del e2e incluyen las pruebas de los tres commits de interfaz que el usuario metió en `main` durante la sesión. En la **051**: **571 unitarias**, **180 de integración**, **914 del frontend**, **56 de punta a punta** y el barrido limpio. En la **050**: **388 contractuales** —las 54 de SQLite entre ellas—, **567 unitarias**, **177 de integración**, **914 del frontend** y la **suite de punta a punta entera (56)**, con el barrido limpio. En la **049**: **334 contractuales** —las 280 de antes más las 54 de Oracle— contra PostgreSQL, MySQL, SQL Server y Oracle reales; **567 unitarias**, **177 de integración**, **913 del frontend**, la **suite de punta a punta entera (55)** y el **barrido** limpio. En la **048**, las cuatro suites del repositorio: **565 unitarias**, **177 de integración** y **279 contractuales** con PostgreSQL, MySQL y SQL Server levantados —Informix no—, **913 del frontend**, **35 de punta a punta** y el **barrido entero** con la consola limpia y ningún hallazgo. Los rojos del camino fueron de tiempo, distintos en cada pasada y verdes al ejecutar su archivo solo. `docs/api/openapi.json` no cambió: `/api/engines` no declara el cuerpo de su respuesta, así que ampliar su DTO no toca el contrato publicado. En la **047**: **859 del frontend** —las 815 de siempre más 44 de las piezas que salieron de `WorkspaceStore`— y la **suite de punta a punta entera en verde**: 52 pasadas, 1 saltada, 0 fallos, contra PostgreSQL y SQL Server reales. Los rojos que salieron por el camino eran de tiempo, en el frontend, y de **servidores de e2e levantados desde la sesión anterior**, que `reuseExistingServer` reutiliza. En la **046**: **740 del backend** —563 unitarias y las 177 de integración, con PostgreSQL, MySQL y SQL Server levantados—, **815 del frontend** y el **barrido entero** con la consola limpia y un solo hallazgo, que no es un defecto. Del e2e, 43 en verde; las cuatro de SQL Server esperaban a su contenedor, que se levantó en esta sesión. Las **23 del envoltorio** son de la 042 y siguen valiendo. Las contractuales salen verdes **sin los motores delante**: sin `DRUSE_REQUIRE_ENGINES=1` cada prueba termina sin comprobar nada cuando el servidor no responde. El `DATE` de Informix por SQLI de la 039 sigue sin repetirse: hace falta ese contenedor |
 | ¿Hay aplicación de escritorio? | **Sí.** Instalador NSIS y ZIP portable, en dos variantes: con Informix y sin él. Desde la 038 **se actualiza sola** —o lo hará: ver el aviso del repositorio privado en §9—. El MSI dejó de generarse: `tauri.conf.json` solo declara `nsis`, que es lo que necesita el actualizador. En la **040** se regeneraron los instaladores y **la variante completa quedó instalada y abierta en este equipo**, con el arreglo del envoltorio dentro. Siguen **sin firma Authenticode**: SmartScreen en cada equipo |
 | Motores | **PostgreSQL, SQL Server, MySQL/MariaDB, Oracle, SQLite e Informix**, sobre el mismo contrato. Desde la **048** cada uno declara sus `EngineCapabilities` y **un motor nuevo no compila hasta decir qué familias de datos guarda**; lo siguiente es Oracle, con el plan en `docs/plan-nuevos-motores.md` y el procedimiento en `docs/como-anadir-un-motor.md`. Informix tiene **dos entradas**: por DRDA con el driver de IBM (puerto 9089) y por **SQLI**, su protocolo nativo, con el puente JDBC (9088). Cambia por dónde se entra; el SQL, el catálogo y los tipos son los mismos |
 | Trabajo a medias | **Nada sin commitear.** `PLAN_MEJORAS_DRUSE.md` lleva marcadas las fases 0 a 5 salvo lo grande —**FE-001 y FE-002 cerradas en la 047**: `WorkspaceStore` partido en seis piezas—, FE-003, BE-001, BE-002, A11Y-005 más BKP-006, SEC-007, PERF-004 y PERF-005. Sin comprobar: las contractuales de la lectura en lote contra los cuatro motores desde la 039, **el multicursor dentro de la ventana empaquetada**, y de antes —**el diálogo del sistema y el selector de carpeta siguen sin verse abrir**, y **el actualizador no puede funcionar mientras el repositorio sea privado** (ver §9) |
@@ -35,18 +35,16 @@ autenticado, y ese 404 ni siquiera se distingue de «no hay versión nueva». Es
 una decisión que hay que tomar antes de repartir nada: repositorio público, o
 publicar los artefactos en otro sitio.
 
-#### Lo que deja abierta la 055
+#### Lo que deja abierta la 056
 
-1. **Los seis rojos del contrato de SQLite**, con su tabla en la entrada de la
-   055. El que más pesa: el guion de restauración escribe `ALTER TABLE … ADD
-   CONSTRAINT … FOREIGN KEY`, que ese motor no admite, así que **restaurar una
-   estructura con claves foráneas falla**. Dos de los seis son declaraciones que
-   le faltan a la fixture —aquí no hay host ni contraseña— y hay que decidir cómo
-   se declaran sin engordar `IProviderFixture`.
-2. **Merece la pena mirar las otras fixtures igual.** La de SQLite llevaba desde
-   la 050 diciendo que el motor no respondía y nadie lo vio, porque sin
-   `DRUSE_REQUIRE_ENGINES=1` eso es una suite verde. Informix está en el mismo
-   sitio hoy, aunque ahí el motivo sí es que falta el contenedor.
+1. **El `DATE` de Informix por SQLI**, que por fin se reprodujo: un `INSERT` con
+   `'2026-08-17 00:00:00'` en una columna `DATE` da «String to date conversion
+   error», y por DRDA la misma prueba pasa. Es el respaldo de datos, así que hoy
+   **un respaldo de Informix por SQLI no se puede volver a cargar** si lleva
+   fechas. El contenedor quedó levantado: se puede atacar ya.
+2. **Merece la pena mirar las otras fixtures como se miró la de SQLite.** Aquella
+   llevaba desde la 050 diciendo que el motor no respondía y nadie lo vio, porque
+   sin `DRUSE_REQUIRE_ENGINES=1` eso es una suite verde.
 3. **La consulta de diagnóstico sigue siendo solo de SQLite.** Es lo que ya decía
    la 054 y no ha cambiado: el `Diagnostic` es del contrato, y PostgreSQL, MySQL,
    SQL Server y Oracle rechazan por lo mismo sin decir dónde mirar.
@@ -473,6 +471,65 @@ Pendiente de verificar cuando toque: Docker (pruebas de integración con contene
 ---
 
 ## 5. Registro de sesiones
+
+### Sesión 056 — 2026-09-11 · Los seis rojos de SQLite
+
+Los seis que dejó a la vista la 055 al descubrir que el contrato de este motor no
+se estaba ejecutando. **Los seis cerrados**, y cuatro eran defectos de verdad.
+
+#### Restaurar una base con relaciones se caía entera
+
+El peor, y el que se pidió primero. El guion de respaldo escribe las tablas y
+cuelga las claves foráneas después, con la tabla a la que apuntan ya creada. En
+SQLite eso no existe: no hay `ALTER TABLE … ADD CONSTRAINT`, y una clave foránea
+solo puede declararse dentro del `CREATE TABLE`. El guion moría en la primera con
+«near "FOREIGN": syntax error», y con él la restauración completa.
+
+`ScripterCapabilities` gana `AddsForeignKeysAfterwards`. Donde es falso las claves
+viajan dentro de la tabla y no se escriben aparte. Cambia **cuándo** se comprueban
+—la tabla nombra a otra que quizá aún no existe— y ahí este motor ayuda: no valida
+la referencia al crear sino al escribir filas, que es cuando el guion ya creó
+todas las tablas.
+
+#### Y tres cosas que se perdían por el camino
+
+- **Los nombres de las restricciones.** Una de unicidad se releía como
+  `sqlite_autoindex_pedidos_1` y una clave foránea como `fk_pedidos_0`. No son
+  nombres: son lo que el catálogo tiene a mano. El de verdad está en el texto del
+  `CREATE TABLE`, donde ya se leían las condiciones desde la 052, y **se perdía de
+  verdad**: el diseñador reconstruye la tabla desde lo que sepa de ella, así que
+  una restricción que entró como `uq_pedidos_codigo` salía con el nombre de su
+  índice interno.
+- **La clave primaria se enseñaba como opcional.** `PRAGMA table_info` dice que
+  una `INTEGER PRIMARY KEY` admite nulos y no es cierto: insertarle un nulo genera
+  el número siguiente. No se generaliza a toda clave primaria porque una `TEXT
+  PRIMARY KEY` **sí** los admite —un agujero histórico de SQLite— y decir lo
+  contrario sería la mentira simétrica.
+- **Un `CREATE TABLE` decía haber escrito una fila.** El driver contesta con el
+  contador de cambios de la conexión, que una instrucción de definición no pone a
+  cero. Quien restauraba veía filas escritas donde solo se creó una tabla vacía.
+
+#### Y dos que no eran defectos
+
+Una contraseña equivocada no falla donde no hay identidad, y un host inexistente
+no falla donde el destino es un archivo. Saltarlas habría sido perder cobertura,
+así que se conserva lo que se quiere comprobar y se cambia lo que depende del
+motor: **el destino que no existe** sale ahora de `ProfileToNowhere()` —un host que
+no resuelve, o una ruta que no está—, que en SQLite es además la prueba que
+sostiene su decisión de fondo: abrir no crea. La de la contraseña se pregunta solo
+donde hay identidad, y con lo que el proveedor ya declara en sus capacidades.
+
+#### Estado
+
+**Las 54 del contrato de SQLite en verde por primera vez.** Con los seis motores
+delante —Informix levantado en esta sesión— son **394 de 395**, más **653
+unitarias**, **182 de integración** y las **3 de SQLite de punta a punta**.
+
+El rojo que queda **no es de este trabajo y ya estaba escrito**: es el `DATE` de
+Informix por SQLI de la 039, que llevaba desde entonces sin poder reproducirse por
+no tener el contenedor. Levantado, reaparece: un `INSERT` con `'2026-08-17
+00:00:00'` en una columna `DATE` da «String to date conversion error». Por DRDA la
+misma prueba pasa, así que es del transporte SQLI y no del respaldo.
 
 ### Sesión 055 — 2026-09-11 · El guion que Oracle no sabía ejecutar
 
