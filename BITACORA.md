@@ -17,7 +17,7 @@
 | Fase 8 | ✅ **7/7.** Tres motores sobre el mismo contrato y primera beta preparada. |
 | ¿Compila el backend? | Sí — 0 advertencias, 0 errores |
 | ¿Compila el envoltorio? | Sí — recompilado en la 037 con `build/scripts/msvc-env.ps1` cargado antes; sin él, `cargo` falla en `vswhom-sys` por elegir el MSVC equivocado. **Sus pruebas ya son 17**, con las dos que vigilan la CSP y las cuatro de `DRUSE_DATA_DIR` |
-| ¿Pasan las pruebas? | Sí. En la **052**: **594 unitarias**, **388 contractuales** —las 54 de SQLite entre ellas—, **180 de integración**, **932 del frontend**, **61 de punta a punta** (1 saltada, el barrido) y el **barrido limpio**, sin errores de consola y sin advertencias de compilación. Esas cuentas del frontend y del e2e incluyen las pruebas de los tres commits de interfaz que el usuario metió en `main` durante la sesión. En la **051**: **571 unitarias**, **180 de integración**, **914 del frontend**, **56 de punta a punta** y el barrido limpio. En la **050**: **388 contractuales** —las 54 de SQLite entre ellas—, **567 unitarias**, **177 de integración**, **914 del frontend** y la **suite de punta a punta entera (56)**, con el barrido limpio. En la **049**: **334 contractuales** —las 280 de antes más las 54 de Oracle— contra PostgreSQL, MySQL, SQL Server y Oracle reales; **567 unitarias**, **177 de integración**, **913 del frontend**, la **suite de punta a punta entera (55)** y el **barrido** limpio. En la **048**, las cuatro suites del repositorio: **565 unitarias**, **177 de integración** y **279 contractuales** con PostgreSQL, MySQL y SQL Server levantados —Informix no—, **913 del frontend**, **35 de punta a punta** y el **barrido entero** con la consola limpia y ningún hallazgo. Los rojos del camino fueron de tiempo, distintos en cada pasada y verdes al ejecutar su archivo solo. `docs/api/openapi.json` no cambió: `/api/engines` no declara el cuerpo de su respuesta, así que ampliar su DTO no toca el contrato publicado. En la **047**: **859 del frontend** —las 815 de siempre más 44 de las piezas que salieron de `WorkspaceStore`— y la **suite de punta a punta entera en verde**: 52 pasadas, 1 saltada, 0 fallos, contra PostgreSQL y SQL Server reales. Los rojos que salieron por el camino eran de tiempo, en el frontend, y de **servidores de e2e levantados desde la sesión anterior**, que `reuseExistingServer` reutiliza. En la **046**: **740 del backend** —563 unitarias y las 177 de integración, con PostgreSQL, MySQL y SQL Server levantados—, **815 del frontend** y el **barrido entero** con la consola limpia y un solo hallazgo, que no es un defecto. Del e2e, 43 en verde; las cuatro de SQL Server esperaban a su contenedor, que se levantó en esta sesión. Las **23 del envoltorio** son de la 042 y siguen valiendo. Las contractuales salen verdes **sin los motores delante**: sin `DRUSE_REQUIRE_ENGINES=1` cada prueba termina sin comprobar nada cuando el servidor no responde. El `DATE` de Informix por SQLI de la 039 sigue sin repetirse: hace falta ese contenedor |
+| ¿Pasan las pruebas? | En la **053**, el backend entero sí: **597 unitarias**, **388 contractuales**, **180 de integración**, sin advertencias de compilación, y **las 61 de punta a punta (1 saltada, el barrido)**. El **frontend dio 922 de 932**, todas por tiempo agotado en montajes pesados y con la suite tardando el doble que ayer: la máquina tenía los cuatro contenedores, Druse abierto y ~4 GB libres de 16. La 053 **no toca frontend**, y esa misma suite salió entera en verde en la 052. El barrido no se repitió: esta sesión no cambia nada que se vea. En la **052**: **594 unitarias**, **388 contractuales** —las 54 de SQLite entre ellas—, **180 de integración**, **932 del frontend**, **61 de punta a punta** (1 saltada, el barrido) y el **barrido limpio**, sin errores de consola y sin advertencias de compilación. Esas cuentas del frontend y del e2e incluyen las pruebas de los tres commits de interfaz que el usuario metió en `main` durante la sesión. En la **051**: **571 unitarias**, **180 de integración**, **914 del frontend**, **56 de punta a punta** y el barrido limpio. En la **050**: **388 contractuales** —las 54 de SQLite entre ellas—, **567 unitarias**, **177 de integración**, **914 del frontend** y la **suite de punta a punta entera (56)**, con el barrido limpio. En la **049**: **334 contractuales** —las 280 de antes más las 54 de Oracle— contra PostgreSQL, MySQL, SQL Server y Oracle reales; **567 unitarias**, **177 de integración**, **913 del frontend**, la **suite de punta a punta entera (55)** y el **barrido** limpio. En la **048**, las cuatro suites del repositorio: **565 unitarias**, **177 de integración** y **279 contractuales** con PostgreSQL, MySQL y SQL Server levantados —Informix no—, **913 del frontend**, **35 de punta a punta** y el **barrido entero** con la consola limpia y ningún hallazgo. Los rojos del camino fueron de tiempo, distintos en cada pasada y verdes al ejecutar su archivo solo. `docs/api/openapi.json` no cambió: `/api/engines` no declara el cuerpo de su respuesta, así que ampliar su DTO no toca el contrato publicado. En la **047**: **859 del frontend** —las 815 de siempre más 44 de las piezas que salieron de `WorkspaceStore`— y la **suite de punta a punta entera en verde**: 52 pasadas, 1 saltada, 0 fallos, contra PostgreSQL y SQL Server reales. Los rojos que salieron por el camino eran de tiempo, en el frontend, y de **servidores de e2e levantados desde la sesión anterior**, que `reuseExistingServer` reutiliza. En la **046**: **740 del backend** —563 unitarias y las 177 de integración, con PostgreSQL, MySQL y SQL Server levantados—, **815 del frontend** y el **barrido entero** con la consola limpia y un solo hallazgo, que no es un defecto. Del e2e, 43 en verde; las cuatro de SQL Server esperaban a su contenedor, que se levantó en esta sesión. Las **23 del envoltorio** son de la 042 y siguen valiendo. Las contractuales salen verdes **sin los motores delante**: sin `DRUSE_REQUIRE_ENGINES=1` cada prueba termina sin comprobar nada cuando el servidor no responde. El `DATE` de Informix por SQLI de la 039 sigue sin repetirse: hace falta ese contenedor |
 | ¿Hay aplicación de escritorio? | **Sí.** Instalador NSIS y ZIP portable, en dos variantes: con Informix y sin él. Desde la 038 **se actualiza sola** —o lo hará: ver el aviso del repositorio privado en §9—. El MSI dejó de generarse: `tauri.conf.json` solo declara `nsis`, que es lo que necesita el actualizador. En la **040** se regeneraron los instaladores y **la variante completa quedó instalada y abierta en este equipo**, con el arreglo del envoltorio dentro. Siguen **sin firma Authenticode**: SmartScreen en cada equipo |
 | Motores | **PostgreSQL, SQL Server, MySQL/MariaDB, Oracle, SQLite e Informix**, sobre el mismo contrato. Desde la **048** cada uno declara sus `EngineCapabilities` y **un motor nuevo no compila hasta decir qué familias de datos guarda**; lo siguiente es Oracle, con el plan en `docs/plan-nuevos-motores.md` y el procedimiento en `docs/como-anadir-un-motor.md`. Informix tiene **dos entradas**: por DRDA con el driver de IBM (puerto 9089) y por **SQLI**, su protocolo nativo, con el puente JDBC (9088). Cambia por dónde se entra; el SQL, el catálogo y los tipos son los mismos |
 | Trabajo a medias | **Nada sin commitear.** `PLAN_MEJORAS_DRUSE.md` lleva marcadas las fases 0 a 5 salvo lo grande —**FE-001 y FE-002 cerradas en la 047**: `WorkspaceStore` partido en seis piezas—, FE-003, BE-001, BE-002, A11Y-005 más BKP-006, SEC-007, PERF-004 y PERF-005. Sin comprobar: las contractuales de la lectura en lote contra los cuatro motores desde la 039, **el multicursor dentro de la ventana empaquetada**, y de antes —**el diálogo del sistema y el selector de carpeta siguen sin verse abrir**, y **el actualizador no puede funcionar mientras el repositorio sea privado** (ver §9) |
@@ -35,18 +35,28 @@ autenticado, y ese 404 ni siquiera se distingue de «no hay versión nueva». Es
 una decisión que hay que tomar antes de repartir nada: repositorio público, o
 publicar los artefactos en otro sitio.
 
+#### Lo que deja abierta la 053
+
+1. **Lo que se rechaza, hay que poder arreglarlo sin salir de Druse.** Ahora el
+   diseñador dice que no y explica por qué —filas que no cumplen la condición, una
+   clave foránea que los datos incumplen—, pero no ayuda a encontrarlas: quien lo
+   lea tiene que escribir la consulta a mano. Un enlace del aviso a una consulta
+   que las enseñe sería lo natural.
+2. **Las dos comprobaciones nuevas cuestan consultas en cada reconstrucción.** En
+   un archivo pequeño no se nota; convendría medirlo con una tabla grande antes de
+   dar por buena la cifra.
+3. **El registro de trabajos y el respaldo tienen una carrera.** Nada más
+   responder el respaldo, el trabajo puede leerse todavía como `Running`. Salió
+   dos veces en la 053 y no se pudo repetir después. Visto desde la interfaz sería
+   un respaldo terminado que sigue diciendo que va en marcha, así que merece una
+   mirada aunque la prueba vuelva a pasar.
+
 #### Lo que deja abierta la 052
 
-1. **Las condiciones de comprobación ahora se escriben desde el diseñador**, y
-   eso es nuevo en SQLite: conviene probarlo a mano contra un archivo con datos
-   que ya incumplan la condición que se quiere poner, para ver qué dice el motor
-   y si lo que se ve se entiende.
-2. **La reconstrucción no comprueba las claves foráneas al terminar.** El paso 10
-   del procedimiento de SQLite es un `PRAGMA foreign_key_check` antes de
-   confirmar, y no está: devuelve filas en vez de fallar, así que no se puede
-   encadenar con las demás instrucciones. Hoy no hace falta —la reconstrucción
-   conserva las claves tal cual—, pero si algún día un cambio pudiera dejar
-   huérfanas, esto es lo que lo notaría.
+1. **Las condiciones de comprobación se escriben desde el diseñador**, y eso es
+   nuevo en SQLite: conviene probarlo a mano, con la aplicación delante, contra un
+   archivo con datos de verdad. El mensaje que sale cuando los datos no cumplen ya
+   está cubierto por pruebas desde la 053.
 
 #### Lo que deja abierta la 051
 
@@ -438,6 +448,84 @@ Pendiente de verificar cuando toque: Docker (pruebas de integración con contene
 ---
 
 ## 5. Registro de sesiones
+
+### Sesión 053 — 2026-09-11 · Lo que la reconstrucción rompía en la tabla de al lado
+
+Los dos puntos que dejó abierta la 052, y el segundo resultó ser un fallo de
+verdad y no la precaución teórica que yo había escrito.
+
+#### El paso 10 no era opcional
+
+La 052 anotó que `PRAGMA foreign_key_check` —el último paso del procedimiento que
+documenta SQLite— no estaba, «pero hoy no hace falta porque la reconstrucción
+conserva las claves tal cual». **Sí hacía falta**, y lo que faltaba era mirar el
+otro lado de la relación: las claves de la tabla reconstruida se conservan, pero
+las de **las tablas que apuntan a ella** no las conserva nadie.
+
+Dos caminos, ninguno raro:
+
+- **Renombrar o borrar una columna a la que apunta la clave foránea de otra
+  tabla.** La otra sigue diciendo `REFERENCES clientes (id)`; si `id` deja de
+  llamarse así, esa frase ya no señala a nada y **cualquier escritura en esa otra
+  tabla** falla desde entonces con «foreign key mismatch». La reconstrucción decía
+  que había ido bien.
+- **Añadir una clave foránea que los datos de hoy no cumplen**, que es lo que hace
+  cualquiera al ordenar una base que creció sin relaciones declaradas. Como la
+  reconstrucción trabaja con las claves apagadas, la tabla se quedaba con una
+  relación que su propio contenido incumple.
+
+Y no se podía arreglar añadiendo el pragma a la lista de instrucciones, que es lo
+que yo había supuesto: **lanza en el primer caso y devuelve filas en el segundo**,
+así que ejecutado entre las demás se tragaría el segundo sin que nadie leyera su
+respuesta. Va en una comprobación aparte, dentro de la transacción y antes de
+confirmar, que es el único momento en que todavía puede impedir algo. Se miran la
+tabla y las que la referencian, no la base entera.
+
+De paso se cayó una creencia que yo mismo había escrito: **un cambio de tipo no
+descoloca a las hijas**. Al comparar, el motor aplica la afinidad de la columna
+madre al valor de la hija, así que un `'900'` de texto que pasa a ser el número
+`900` sigue casando. La prueba que lo daba por roto no fallaba, y la respuesta
+correcta era cambiar la prueba, no el código.
+
+#### «CHECK constraint failed» no explica nada
+
+El otro punto era mirar qué se ve al poner una condición que los datos de hoy ya
+incumplen. Lo que se veía era el mensaje del motor tal cual: *CHECK constraint
+failed: ck_cantidad*. Es verdad y no sirve, porque quien lo lee **acaba de escribir
+esa condición** y va a creer que la escribió mal, cuando lo que pasa es que la
+tabla no la cumple.
+
+El mismo error significa otra cosa según dónde salga —al insertar una fila habla
+de esa fila—, así que la traducción no puede vivir en el normalizador, que es
+común a todo. Vive donde se sabe en qué paso de la reconstrucción se estaba, y
+cubre los tres casos que sacan a la luz los datos que ya había: la condición que no
+se cumple, los nulos de una columna que deja de admitirlos y los repetidos de una
+que pasa a ser única. El mensaje del motor se conserva al final, que es lo que se
+puede buscar.
+
+#### Estado
+
+Tres pruebas nuevas, las tres sobre casos que antes pasaban en silencio.
+**597 unitarias**, **388 contractuales**, **180 de integración** y **las 61 de punta a punta (1 saltada, el barrido)**,
+sin advertencias de compilación.
+
+Dos rojos que **no son de este trabajo** y conviene no perder de vista:
+
+- **El frontend dio 922 de 932**, y los diez son «Test timed out in 5000ms» o
+  «Hook timed out in 10000ms» en montajes pesados —`App`, `AppShell`,
+  `ConnectionDialog`—. **El recuento cambia en cada pasada** —16, 11, 10, 11—, que
+  es la firma de un problema de tiempos y no de un fallo determinista; la suite
+  tarda además el doble que ayer, cuando salió entera en verde. La máquina tenía
+  los cuatro contenedores levantados, Druse abierto y unos 4 GB libres de 16. Se
+  descartó de paso al sospechoso obvio: excluir `monaco-loader.spec.ts` —que acaba
+  de estrenar temporizadores falsos— deja los mismos once rojos. Este trabajo no
+  toca una sola línea del frontend.
+- **`BackupEndpointTests.UnRespaldoQuedaAnotadoEnElRegistroDeTrabajos` falló dos
+  veces** y después pasó seis seguidas, tres de ellas con el código de esta sesión
+  guardado aparte para compararlo. Lee el trabajo como `Running` justo después de
+  que el respaldo respondiera: es una carrera entre la respuesta y el registro. No
+  es del diseñador de tablas, pero **si se ve desde la interfaz es un respaldo
+  terminado que sigue diciendo que va en marcha**, así que queda anotado abajo.
 
 ### Sesión 052 — 2026-09-10 · La reconstrucción que se llevaba por delante lo que no se veía
 

@@ -370,6 +370,9 @@ después, y por eso su fase empieza por el modelo y no por el proveedor.
   disparadores, sus condiciones de comprobación, las vistas que la miraban y las
   filas de las tablas que la referencian. Con la lectura de condiciones que hacía
   falta para lo tercero, que las saca del `CREATE TABLE`.
+- [x] **MOT-041:** que la reconstrucción tampoco rompa a las demás: el paso 10 del
+  procedimiento —`foreign_key_check` antes de confirmar— y la traducción del error
+  que sale al copiar las filas que no cumplen lo que se acaba de pedir.
 
 ### Cómo fue
 
@@ -472,6 +475,46 @@ su texto.
 Los dos pragmas vuelven a su sitio pase lo que pase, y eso hubo que escribirlo
 aparte: no entran en la transacción, así que un fallo a mitad deshace lo escrito y
 dejaría los ajustes puestos para todo lo que viniera después por esa conexión.
+
+### Y lo que la reconstrucción rompía en otras tablas
+
+Apagar las claves foráneas para reconstruir abre un segundo agujero, y este no se
+ve porque **el daño cae en una tabla que nadie tocó**. Mientras están apagadas el
+motor no dice nada, así que la reconstrucción termina bien y lo que se rompió se
+descubre la próxima vez que alguien escriba. Dos formas de llegar, ninguna rara:
+
+- **Renombrar o borrar una columna a la que apunta la clave foránea de otra
+  tabla.** La otra sigue diciendo `REFERENCES clientes (id)`; si `id` deja de
+  existir, esa frase ya no señala a nada y **cualquier escritura en la otra tabla**
+  falla desde entonces con «foreign key mismatch».
+- **Añadir una clave foránea que los datos de hoy no cumplen**, que es lo que hace
+  cualquiera al ordenar una base que creció sin relaciones declaradas: la tabla se
+  queda con una relación que su propio contenido incumple.
+
+Es el paso 10 del procedimiento de SQLite —el `PRAGMA foreign_key_check` antes de
+confirmar— que el plan daba por no hecho «porque hoy no hace falta». Sí hacía
+falta, y no se podía escribir como una instrucción más: el pragma **lanza** en el
+primer caso y **devuelve filas** en el segundo, así que puesto entre las demás se
+tragaría el segundo sin que nadie leyera su respuesta. Va en una comprobación
+aparte, dentro de la transacción y antes de confirmar, que es el único momento en
+que todavía puede impedir algo. Se miran la tabla y las que la referencian, no la
+base entera: sin argumento el pragma recorre todas las tablas.
+
+Un cambio de tipo, en cambio, **no descoloca a las hijas**, aunque lo pareciera: al
+comparar, el motor aplica la afinidad de la columna madre al valor de la hija, así
+que un `'900'` de texto que pasa a ser el número `900` sigue casando. Se probó
+antes de escribirlo.
+
+### Y el error que había que traducir
+
+Poner una condición de comprobación que **las filas de hoy ya incumplen** falla al
+copiarlas, y el motor dice «CHECK constraint failed: ck_cantidad». Es verdad y no
+explica nada: quien lo lee acaba de escribir esa condición y va a creer que la
+escribió mal, cuando lo que pasa es que la tabla no la cumple. El mismo error
+significa otra cosa según el paso en que salga —al insertar una fila habla de esa
+fila—, así que la traducción vive donde se sabe el paso y no en el normalizador,
+que es común a todo. Lo mismo vale para quitar los nulos de una columna que los
+tiene y para declarar única una que está repetida.
 
 ### Lo que queda declarado, no resuelto
 
