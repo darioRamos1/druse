@@ -8,6 +8,14 @@ namespace Druse.Provider.Sqlite;
 /// <summary>DDL de SQLite. Solo aporta su dialecto… y su reconstrucción.</summary>
 public sealed class SqliteTableDesigner : TableDesignerBase
 {
+    /// <summary>
+    /// Lo que se le añade al nombre de la tabla mientras se reconstruye.
+    ///
+    /// Nadie lo escribiría a mano, y por eso sirve además para reconocer después
+    /// **cuál de las instrucciones** de la reconstrucción es la que falló.
+    /// </summary>
+    private const string Sufijo = "_druse_nueva";
+
     public override DatabaseEngine Engine => DatabaseEngine.Sqlite;
 
     /// <summary>
@@ -362,7 +370,9 @@ public sealed class SqliteTableDesigner : TableDesignerBase
             // Aquí no se pueden apagar. Si nadie referencia la tabla no hay
             // cascada que temer y el cambio sigue su camino; si alguien la
             // referencia, se dice por qué no se puede en vez de borrarle las filas.
-            if (await TieneHijasAsync(connection, manual, alteration.Table.Name, cancellationToken))
+            var hijas = await HijasAsync(connection, manual, alteration.Table.Name, cancellationToken);
+
+            if (hijas.Count > 0)
             {
                 throw new DatabaseOperationException(new QueryError
                 {
@@ -402,17 +412,16 @@ public sealed class SqliteTableDesigner : TableDesignerBase
     }
 
     /// <summary>
-    /// Si alguna otra tabla la referencia.
+    /// Las tablas que la referencian.
     ///
     /// Se pregunta tabla por tabla porque SQLite **no tiene catálogo de claves
     /// foráneas**: cada una se lee con `pragma_foreign_key_list` de la tabla que la
-    /// declara, así que hay que recorrerlas todas. La consulta para en la primera
-    /// que aparezca, que es lo único que hace falta saber.
+    /// declara, así que hay que recorrerlas todas.
     ///
     /// La comparación va sin distinguir mayúsculas porque el motor tampoco las
     /// distingue al resolver el nombre de una tabla.
     /// </summary>
-    private static async Task<bool> TieneHijasAsync(
+    private static async Task<IReadOnlyList<string>> HijasAsync(
         DbConnection connection,
         DbTransaction? transaction,
         string table,
@@ -425,17 +434,183 @@ public sealed class SqliteTableDesigner : TableDesignerBase
         // `table` es palabra reservada y va entre corchetes, que SQLite admite
         // para citar identificadores igual que las comillas dobles.
         command.CommandText =
-            "SELECT 1 FROM sqlite_master AS m " +
+            "SELECT DISTINCT m.name FROM sqlite_master AS m " +
             "JOIN pragma_foreign_key_list(m.name) AS f " +
             "WHERE m.type = 'table' AND m.name <> $tabla " +
-            "AND f.[table] = $tabla COLLATE NOCASE LIMIT 1";
+            "AND f.[table] = $tabla COLLATE NOCASE";
 
         var parameter = command.CreateParameter();
         parameter.ParameterName = "$tabla";
         parameter.Value = table;
         command.Parameters.Add(parameter);
 
-        return await command.ExecuteScalarAsync(cancellationToken) is not null;
+        var hijas = new List<string>();
+
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            hijas.Add(reader.GetString(0));
+        }
+
+        return hijas;
+    }
+
+    /// <summary>
+    /// Antes de confirmar: que la reconstrucción **no haya roto a nadie**.
+    ///
+    /// Es el paso 10 del procedimiento que documenta SQLite, y aquí hace falta más
+    /// que allí, porque durante la reconstrucción las claves foráneas están
+    /// apagadas: mientras tanto el motor no dice nada, y lo que se rompa se
+    /// descubre la próxima vez que alguien escriba.
+    ///
+    /// Son dos cosas distintas y ninguna es rara:
+    ///
+    /// - **Renombrar o borrar una columna a la que apunta la clave foránea de otra
+    ///   tabla.** La otra sigue diciendo `REFERENCES clientes (id)`, `id` ya no
+    ///   existe, y a partir de ahí cualquier escritura suya falla con «foreign key
+    ///   mismatch» —no la de esta tabla: la de la otra, que nadie tocó—.
+    /// - **Añadir una clave foránea que los datos de hoy no cumplen**, que es lo
+    ///   que hace cualquiera al ordenar una base que creció sin relaciones
+    ///   declaradas. La tabla se queda con una relación que su propio contenido
+    ///   incumple, y eso no se descubre hasta la siguiente escritura.
+    ///
+    /// Un cambio de tipo, en cambio, **no descoloca a las hijas**: al comparar, el
+    /// motor aplica la afinidad de la columna madre al valor de la hija, así que un
+    /// `'900'` de texto que pasa a ser el número `900` sigue casando. Se comprobó.
+    ///
+    /// El pragma cuenta los dos casos de forma incómoda: la referencia rota
+    /// **lanza**, y las filas que sobran **se devuelven como filas**. Por eso esto
+    /// no puede ser una instrucción más de la lista: ejecutarla entre las otras se
+    /// tragaría el segundo caso sin que nadie leyera la respuesta.
+    ///
+    /// Se mira la tabla y sus hijas, no la base entera: `foreign_key_check` sin
+    /// argumento recorre todas las tablas, y en un archivo grande eso se nota.
+    /// </summary>
+    protected override async Task VerifyChangeAsync(
+        IDatabaseSession session,
+        TableAlteration? alteration,
+        DbTransaction? transaction,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(session);
+
+        if (alteration is null || !NecesitaReconstruir(alteration))
+        {
+            return;
+        }
+
+        var connection = Connection(session);
+        var tabla = alteration.NewName is { Length: > 0 } nueva ? nueva : alteration.Table.Name;
+
+        // Las hijas se piden por el nombre que la tabla tiene ahora, que dentro de
+        // la transacción ya es el definitivo.
+        var revisar = new List<string> { tabla };
+
+        revisar.AddRange(await HijasAsync(connection, transaction, tabla, cancellationToken));
+
+        foreach (var nombre in revisar)
+        {
+            await ComprobarAsync(connection, transaction, nombre, tabla, cancellationToken);
+        }
+    }
+
+    /// <summary>Una tabla contra sus claves foráneas, con el fallo ya contado.</summary>
+    private async Task ComprobarAsync(
+        DbConnection connection,
+        DbTransaction? transaction,
+        string tabla,
+        string reconstruida,
+        CancellationToken cancellationToken)
+    {
+        await using var command = connection.CreateCommand();
+
+        command.Transaction = transaction;
+
+        // El nombre no puede ir como parámetro: `foreign_key_check` lo quiere como
+        // identificador. Va citado por el mismo sitio que el resto del DDL.
+        command.CommandText = $"PRAGMA foreign_key_check({Quote(tabla)});";
+
+        try
+        {
+            await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+
+            if (!await reader.ReadAsync(cancellationToken))
+            {
+                return;
+            }
+        }
+        catch (Exception error) when (error is not OperationCanceledException)
+        {
+            throw new DatabaseOperationException(new QueryError
+            {
+                Message =
+                    $"Reconstruir «{reconstruida}» dejaría rota la clave foránea de «{tabla}»: " +
+                    "apunta a una columna que después del cambio ya no existe. Cambia primero " +
+                    $"esa clave en «{tabla}», o conserva la columna a la que apunta. " +
+                    "No se aplicó nada.",
+                Code = "foreign_key_mismatch",
+            });
+        }
+
+        throw new DatabaseOperationException(new QueryError
+        {
+            Message =
+                $"Reconstruir «{reconstruida}» dejaría filas de «{tabla}» sin la fila a la que " +
+                "apuntan. Suele pasar al cambiar el tipo de una columna referenciada: el valor " +
+                "guardado deja de casar con el de la otra tabla. No se aplicó nada.",
+            Code = "foreign_key_violation",
+        });
+    }
+
+    /// <summary>
+    /// Traduce el error de **copiar las filas** a la tabla nueva.
+    ///
+    /// Es el paso donde salen a la luz los datos que ya estaban: poner una
+    /// condición de comprobación que las filas de hoy no cumplen, quitar los nulos
+    /// de una columna que los tiene, o declarar única una que está repetida. El
+    /// motor dice «CHECK constraint failed: ck_cant», que es verdad y no explica
+    /// nada: quien lo lee acaba de escribir esa condición y cree que está mal
+    /// escrita, cuando lo que pasa es que **la tabla ya no la cumple**.
+    ///
+    /// Solo se toca ese paso, que se reconoce por el nombre de la tabla temporal.
+    /// El mismo error en cualquier otro sitio habla de otra cosa y se deja como
+    /// está.
+    /// </summary>
+    protected override QueryError Explain(QueryError failure, string statement)
+    {
+        ArgumentNullException.ThrowIfNull(failure);
+        ArgumentNullException.ThrowIfNull(statement);
+
+        if (!statement.StartsWith("INSERT INTO", StringComparison.Ordinal)
+            || !statement.Contains(Sufijo, StringComparison.Ordinal))
+        {
+            return failure;
+        }
+
+        var porque = failure.Message switch
+        {
+            var m when m.Contains("CHECK constraint failed", StringComparison.Ordinal) =>
+                "hay filas que no cumplen la condición de comprobación",
+
+            var m when m.Contains("NOT NULL constraint failed", StringComparison.Ordinal) =>
+                "hay filas con el valor vacío en una columna que ya no admite nulos",
+
+            var m when m.Contains("UNIQUE constraint failed", StringComparison.Ordinal) =>
+                "hay valores repetidos en una columna que ya no admite repetidos",
+
+            _ => null,
+        };
+
+        return porque is null
+            ? failure
+            : failure with
+            {
+                Message =
+                    $"El cambio no se puede aplicar porque {porque}. Es lo que hay hoy en la " +
+                    $"tabla, no lo que se acaba de escribir. El motor dijo: {failure.Message} " +
+                    "No se aplicó nada.",
+            };
     }
 
     private static async Task PragmaAsync(
@@ -531,7 +706,7 @@ public sealed class SqliteTableDesigner : TableDesignerBase
         IReadOnlyList<string> triggers)
     {
         var original = alteration.Table.Name;
-        var temporal = $"{original}_druse_nueva";
+        var temporal = $"{original}{Sufijo}";
 
         var columnas = Resultantes(alteration, current);
 

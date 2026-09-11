@@ -438,6 +438,182 @@ public sealed class SqliteRebuildTests : IDisposable
         Assert.Contains(columnas, column => column.Name == "nit");
     }
 
+    /// <summary>
+    /// Renombrar una columna a la que **apunta otra tabla** no se aplica a medias:
+    /// se rechaza entero.
+    ///
+    /// Es el caso que rompe a alguien que no está mirando. La tabla de pedidos
+    /// sigue diciendo `REFERENCES clientes (id)`; si `id` pasa a llamarse `clave`,
+    /// esa frase ya no señala a nada, y a partir de ahí **cualquier escritura en
+    /// pedidos falla** con «foreign key mismatch». No la de clientes: la de
+    /// pedidos, que nadie tocó.
+    ///
+    /// Y no se nota en el momento porque durante la reconstrucción las claves
+    /// foráneas están apagadas. Por eso hay que preguntarlo a propósito antes de
+    /// confirmar.
+    /// </summary>
+    [Fact]
+    public async Task RenombrarUnaColumnaALaQueApuntaOtraTablaSeRechaza()
+    {
+        await using var session = await AbrirAsync();
+
+        await EjecutarAsync(session, """
+            CREATE TABLE clientes (id INTEGER PRIMARY KEY, nombre TEXT);
+            CREATE TABLE pedidos (
+              id         INTEGER PRIMARY KEY,
+              cliente_id INTEGER REFERENCES clientes (id)
+            );
+            INSERT INTO clientes (id, nombre) VALUES (1, 'Ana');
+            INSERT INTO pedidos (id, cliente_id) VALUES (10, 1);
+            """);
+
+        var error = await Assert.ThrowsAsync<DatabaseOperationException>(() =>
+            _designer.AlterAsync(
+                session,
+                new TableAlteration
+                {
+                    Table = Tabla("clientes"),
+                    AlteredColumns =
+                    [
+                        new ColumnAlteration
+                        {
+                            CurrentName = "id",
+                            Column = new TableColumnDefinition
+                            {
+                                Name = "clave",
+                                DataType = "INTEGER",
+                            },
+                        },
+                    ],
+                },
+                CancellationToken.None));
+
+        Assert.Contains("pedidos", error.Error.Message, StringComparison.Ordinal);
+
+        // Y lo que importa: **no se aplicó nada**. La columna sigue llamándose
+        // como se llamaba, y la hija sigue pudiendo escribir.
+        var columnas = await new SqliteMetadataReader().GetColumnsAsync(
+            session,
+            Tabla("clientes"),
+            CancellationToken.None);
+
+        Assert.Contains(columnas, column => column.Name == "id");
+
+        var escribir = await EjecutarAsync(
+            session,
+            "INSERT INTO pedidos (id, cliente_id) VALUES (11, 1)");
+
+        Assert.Equal(QueryExecutionState.Succeeded, escribir.State);
+    }
+
+    /// <summary>
+    /// Añadir una clave foránea que **los datos de hoy no cumplen** no se aplica.
+    ///
+    /// Es lo que hace cualquiera al ordenar una base que creció sin relaciones
+    /// declaradas, y es donde más fácil se cuela: añadir una clave foránea obliga a
+    /// reconstruir, la reconstrucción trabaja con las claves apagadas, y la tabla
+    /// nueva se queda con una relación que **su propio contenido incumple**. El
+    /// motor no protesta en ese momento; protesta meses después, al escribir.
+    ///
+    /// Este caso el pragma lo cuenta de una forma incómoda: devuelve las filas que
+    /// sobran en vez de fallar. Es justo por lo que no basta con ejecutarlo entre
+    /// las demás instrucciones —habría que leer su respuesta, y nadie la leería—.
+    /// </summary>
+    [Fact]
+    public async Task AnadirUnaClaveForaneaQueLosDatosNoCumplenSeRechaza()
+    {
+        await using var session = await AbrirAsync();
+
+        await EjecutarAsync(session, """
+            CREATE TABLE clientes (id INTEGER PRIMARY KEY, nombre TEXT);
+            CREATE TABLE pedidos (id INTEGER PRIMARY KEY, cliente_id INTEGER);
+            INSERT INTO clientes (id, nombre) VALUES (1, 'Ana');
+            INSERT INTO pedidos (id, cliente_id) VALUES (10, 1), (11, 999);
+            """);
+
+        var error = await Assert.ThrowsAsync<DatabaseOperationException>(() =>
+            _designer.AlterAsync(
+                session,
+                new TableAlteration
+                {
+                    Table = Tabla("pedidos"),
+                    AddedForeignKeys =
+                    [
+                        new ForeignKeyDefinition
+                        {
+                            Name = "fk_pedidos_cliente",
+                            Columns = ["cliente_id"],
+                            ReferencedTable = "clientes",
+                            ReferencedColumns = ["id"],
+                        },
+                    ],
+                },
+                CancellationToken.None));
+
+        Assert.Contains("pedidos", error.Error.Message, StringComparison.Ordinal);
+
+        // No se aplicó nada: la tabla sigue sin la clave, y la fila que sobraba
+        // sigue donde estaba en vez de haber desaparecido o haberse quedado a
+        // medias dentro de una relación que nadie cumple.
+        var estructura = await new SqliteMetadataReader().GetTableStructureAsync(
+            session,
+            Tabla("pedidos"),
+            CancellationToken.None);
+
+        Assert.Empty(estructura.ForeignKeys);
+
+        var filas = await EjecutarAsync(session, "SELECT COUNT(*) FROM pedidos");
+
+        Assert.Equal("2", filas.ResultSets[0].Rows[0][0]);
+    }
+
+    /// <summary>
+    /// Poner una condición que **los datos de hoy ya incumplen** se explica por lo
+    /// que es.
+    ///
+    /// El motor dice «CHECK constraint failed: ck_cantidad», que es verdad y no
+    /// explica nada: quien lo lee acaba de escribir esa condición y va a creer que
+    /// la escribió mal. Lo que pasa es que la tabla ya no la cumple, y eso hay que
+    /// decirlo con esas palabras.
+    /// </summary>
+    [Fact]
+    public async Task UnaCondicionQueLosDatosDeHoyIncumplenSeExplica()
+    {
+        await using var session = await AbrirAsync();
+
+        await EjecutarAsync(session, """
+            CREATE TABLE pedidos (id INTEGER PRIMARY KEY, cantidad INTEGER);
+            INSERT INTO pedidos (id, cantidad) VALUES (1, 5), (2, -3);
+            """);
+
+        var error = await Assert.ThrowsAsync<TableChangeFailedException>(() =>
+            _designer.AlterAsync(
+                session,
+                new TableAlteration
+                {
+                    Table = Tabla("pedidos"),
+                    AddedCheckConstraints =
+                    [
+                        new CheckConstraintDefinition
+                        {
+                            Name = "ck_cantidad",
+                            Expression = "cantidad > 0",
+                        },
+                    ],
+                },
+                CancellationToken.None));
+
+        Assert.Contains("no cumplen", error.Error.Message, StringComparison.Ordinal);
+
+        // El motor sigue estando, porque su mensaje es el que se puede buscar.
+        Assert.Contains("CHECK constraint failed", error.Error.Message, StringComparison.Ordinal);
+
+        // Y la fila que no cumplía sigue ahí: no se aplicó nada.
+        var filas = await EjecutarAsync(session, "SELECT COUNT(*) FROM pedidos WHERE cantidad < 0");
+
+        Assert.Equal("1", filas.ResultSets[0].Rows[0][0]);
+    }
+
     /// <summary>El cambio de tipo más simple, que es el que obliga a reconstruir.</summary>
     private static TableAlteration Cambiar(string table, string column) => new()
     {

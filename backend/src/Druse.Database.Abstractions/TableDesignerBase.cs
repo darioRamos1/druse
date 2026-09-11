@@ -1145,6 +1145,40 @@ public abstract class TableDesignerBase : ITableDesigner, IDatabaseScripter
         Task.FromResult<IAsyncDisposable?>(null);
 
     /// <summary>
+    /// Lo que hay que mirar **antes de confirmar**, cuando el motor no lo mira solo.
+    ///
+    /// Existe porque hay comprobaciones que no se pueden escribir como una
+    /// instrucción más: `PRAGMA foreign_key_check` de SQLite devuelve las filas
+    /// que sobran en vez de fallar, así que ejecutarlo entre las demás lo dejaría
+    /// pasar sin que nadie leyera su respuesta.
+    ///
+    /// Lanzar desde aquí deshace el cambio entero, que es lo que se quiere: un
+    /// cambio que deja la base en un estado que el motor no acepta no es un cambio
+    /// a medias, es un cambio que no se hace.
+    ///
+    /// Por omisión no hay nada que mirar.
+    /// </summary>
+    protected virtual Task VerifyChangeAsync(
+        IDatabaseSession session,
+        TableAlteration? alteration,
+        DbTransaction? transaction,
+        CancellationToken cancellationToken) =>
+        Task.CompletedTask;
+
+    /// <summary>
+    /// El mismo error del motor, contado según **en qué paso** se produjo.
+    ///
+    /// Hay errores que significan cosas distintas según dónde salgan, y el motor
+    /// no distingue. «CHECK constraint failed» al insertar una fila habla de esa
+    /// fila; el mismo error al copiar las filas de una tabla que se está
+    /// reconstruyendo habla de **las que ya estaban**, que es otra conversación y
+    /// otra decisión.
+    ///
+    /// Por omisión no se toca: el motor lo dijo bien.
+    /// </summary>
+    protected virtual QueryError Explain(QueryError failure, string statement) => failure;
+
+    /// <summary>
     /// Ejecuta las instrucciones que este mismo objeto acaba de escribir.
     ///
     /// Nunca recibe SQL de fuera: quien llama entrega el diseño y aquí se
@@ -1202,7 +1236,7 @@ public abstract class TableDesignerBase : ITableDesigner, IDatabaseScripter
                 // las anteriores. Donde el motor no deshace el DDL, esas se
                 // quedan, y la tabla ya no es la que el diseñador tenía delante.
                 throw new TableChangeFailedException(
-                    Normalize(error),
+                    Explain(Normalize(error), sql),
                     sql,
                     applied,
                     reverted: scope is not null);
@@ -1210,6 +1244,11 @@ public abstract class TableDesignerBase : ITableDesigner, IDatabaseScripter
 
             applied.Add(sql);
         }
+
+        // **Dentro de la transacción y antes de confirmar**, que es el único
+        // momento en que una comprobación puede impedir algo: después ya está
+        // hecho, y antes todavía no hay nada que mirar.
+        await VerifyChangeAsync(session, alteration, scope?.Transaction, cancellationToken);
 
         if (scope is not null)
         {
