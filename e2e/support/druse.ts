@@ -226,18 +226,12 @@ export async function apuntarPestana(page: Page): Promise<void> {
  */
 export async function apuntarPestanaA(page: Page, conexion: string, base: string): Promise<void> {
   const chip = page.locator('app-editor-toolbar .chip').first();
-  const conexionActual = (
-    await chip
-      .locator('.chip__name')
-      .textContent()
-      .catch(() => '')
-  )?.trim();
-  const baseActual = (
-    await chip
-      .locator('.chip__mono')
-      .textContent()
-      .catch(() => '')
-  )?.trim();
+  // Una pestaña restaurada puede no tener sesión: el nombre entonces no existe.
+  // Leerlo como locator esperado consumía el timeout entero antes de poder elegir.
+  const { conexionActual, baseActual } = await chip.evaluate((element) => ({
+    conexionActual: element.querySelector('.chip__name')?.textContent?.trim() ?? '',
+    baseActual: element.querySelector('.chip__mono')?.textContent?.trim() ?? '',
+  }));
   const apuntaALaBase = baseActual === base || baseActual?.startsWith(`${base}.`);
 
   if (conexionActual === conexion && apuntaALaBase) {
