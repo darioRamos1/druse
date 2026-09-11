@@ -426,7 +426,7 @@
           ><app-icon name="database" [size]="22"
         /></span>
         <h2 id="welcome-title">Conecta tu primera base de datos</h2>
-        <p>Explora tus tablas y ejecuta consultas en PostgreSQL, SQL Server, MySQL o Informix.</p>
+        <p>Explora tus tablas y ejecuta consultas desde un mismo espacio de trabajo.</p>
         <div class="welcome__actions">
           <button type="button" class="welcome__primary" (click)="createConnection.emit()">
             <app-icon name="plus" [size]="13" /> Crear conexión
@@ -437,12 +437,27 @@
         </div>
         <span class="welcome__hint">También puedes empezar a escribir SQL en el editor.</span>
       </section>
+    } @else if (readyToQuery()) {
+      <section class="welcome" aria-labelledby="query-start-title">
+        <span class="welcome__icon" aria-hidden="true"
+          ><app-icon name="database" [size]="22"
+        /></span>
+        <h2 id="query-start-title">Conexión lista</h2>
+        <p>Busca una tabla en el explorador o empieza una consulta en el editor.</p>
+        <div class="welcome__actions">
+          <button type="button" class="welcome__primary" (click)="exploreTables.emit()">
+            <app-icon name="search" [size]="13" /> Explorar tablas
+          </button>
+          <button type="button" (click)="writeSql.emit()">Escribir SQL</button>
+        </div>
+        <span class="welcome__hint">Ejecuta tu consulta con {{ shortcut('Ctrl+Enter') }}.</span>
+      </section>
     } @else {
       <div class="empty">
         <strong>Los resultados aparecerán aquí</strong>
         <span>
-          Ejecuta el documento con Ctrl+Enter, o con Ctrl+Shift+Enter solo la instrucción donde
-          tengas el cursor.
+          Ejecuta el documento con {{ shortcut('Ctrl+Enter') }}, o con
+          {{ shortcut('Ctrl+Shift+Enter') }} solo la instrucción donde tengas el cursor.
         </span>
       </div>
     }

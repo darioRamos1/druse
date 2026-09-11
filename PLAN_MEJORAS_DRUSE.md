@@ -612,15 +612,13 @@ cerró en la 027 y trataba defectos de maquetación.
 
 - [x] **UX-005:** `Ln 1, Col 1` y `UTF-8` aparecen **dos veces**: en la fila de
       pestañas y en la barra de estado. Elegir un sitio.
-- [ ] **UX-006:** el motor, la base y el usuario se dicen en la barra del editor
-      y otra vez en la de estado. Lo mismo. **Medio hecho:** lo repetido de
-      verdad es solo la base —la barra del editor no dice ni motor ni usuario—, y
-      la repetición ya cuesta menos: las palabras de la barra de estado se van al
-      estrechar (UX-003) y el chip del editor pasa a enseñar solo la base, sin el
-      esquema, en lugar de recortar «druse_test.p…». Queda **la decisión de
-      producto**: si a pantalla ancha la base debe seguir diciéndose dos veces.
-      Argumento para dejarla: el chip es de la pestaña y la barra es de la
-      sesión, y ejecutar en la base equivocada es el error más caro de todos.
+- [x] **UX-006:** conservar la base activa junto a Ejecutar y en la barra de
+      estado. Lo que se repite es la base; la barra del editor no repite motor
+      ni usuario. Los dos indicadores siguen el destino de la pestaña activa,
+      incluso al cambiar de base dentro de una sesión. La repetición permite
+      comprobar ese destino cerca de la acción y durante la lectura del estado.
+      Al estrechar la ventana, UX-003 retira los datos secundarios y el chip
+      muestra solo la base. _(Decisión de revisión: 11 de septiembre de 2026.)_
 - [x] **UX-007:** entre la barra de la aplicación, la de pestañas, la de acciones
       y la de contexto hay **cuatro filas de cromo** antes del SQL: en una
       pantalla de 720 px de alto quedan seis líneas de editor. Ver qué se puede

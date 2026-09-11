@@ -299,6 +299,18 @@ export class AppShell {
     this.maximizedPanel.update((current) => (current === panel ? null : panel));
   }
 
+  protected focusExplorer(): void {
+    this.explorerOpen.set(true);
+    if (window.matchMedia?.('(max-width: 720px)').matches) {
+      this.mobileExplorerOpen.set(true);
+    }
+    afterNextRender(() => this.explorer()?.focusFilter(), { injector: this.injector });
+  }
+
+  protected focusEditor(): void {
+    this.revealPanel('editor', () => this._editor()?.focus());
+  }
+
   /** Mostrar antes de enfocar: un panel oculto conserva su trabajo, pero no admite foco. */
   private revealPanel(panel: 'editor' | 'results', action: () => void = () => {}): void {
     const maximized = this.maximizedPanel();
@@ -405,11 +417,7 @@ export class AppShell {
     switch (shortcut.kind) {
       case 'focus-explorer':
         event.preventDefault();
-        this.explorerOpen.set(true);
-        if (window.matchMedia?.('(max-width: 720px)').matches) {
-          this.mobileExplorerOpen.set(true);
-        }
-        afterNextRender(() => this.explorer()?.focusFilter(), { injector: this.injector });
+        this.focusExplorer();
         return;
 
       case 'palette':

@@ -265,3 +265,19 @@ Observación ajena a la barra: la API de pruebas devolvió un error al proyectar
 La configuración E2E admite puertos y carpetas propios mediante `DRUSE_E2E_API_PORT`, `DRUSE_E2E_APP_PORT`, `DRUSE_E2E_DATA_DIR`, `DRUSE_E2E_BUILD_DIR` y `DRUSE_E2E_SQLITE_DIR`. Así se puede revisar otro worktree sin compartir la API, sus DLL ni el archivo SQLite que las pruebas reconstruyen. Los valores predeterminados se conservan; los motores en contenedores requieren coordinación si se modifican las mismas tablas.
 
 La suite del cargador de Monaco dejaba un `window.monaco` incompleto en el navegador compartido y causaba un rechazo sin manejar al montar `App` en otra suite. Ahora restaura los globales originales y recoge sus temporizadores. Las 19 pruebas de cargador, arranque y formato SQL pasan; el formateador conserva su importación bajo demanda y sus aserciones. El typecheck E2E también pasa. El resultado de la batería general se registra en la siguiente entrega.
+
+## Primeros pasos tras conectar y revisión general — 11 de septiembre de 2026
+
+Una consulta vacía con conexión abierta ofrece «Conexión lista». «Explorar tablas» revela el explorador y enfoca su filtro, también en una ventana estrecha. «Escribir SQL» enfoca la pestaña actual y restaura el editor si los resultados estaban ampliados. La guía se retira al escribir o desconectar y nunca sustituye resultados, errores ni una ejecución en curso.
+
+La bienvenida utiliza un texto válido para todos los motores y las ayudas de ejecución reutilizan las etiquetas de atajos de cada plataforma. Se cierra UX-006 conservando la base activa junto a Ejecutar y en la barra de estado: ambos indicadores siguen el destino de la pestaña y permiten comprobarlo en los dos lugares.
+
+Validación:
+
+- **933 pruebas de componentes y lógica aprobadas**, en 68 archivos, sin errores sin manejar. Por la carga del equipo se usó una configuración temporal con dos procesos, 30 s por prueba y 60 s por preparación; no se cambiaron aserciones ni tiempos de la aplicación. Se retiró esa configuración tras la revisión. Los intentos previos con límites predeterminados agotaron tiempos de carga; no se cuentan como aprobados.
+- **63 escenarios E2E distintos cubiertos en dos tandas**: 46 casos de la revisión inicial y 18 de la continuación, con un caso repetido. Incluyen PostgreSQL, SQL Server, Oracle, SQLite, migraciones, edición, paneles y la nueva guía. La primera tanda se interrumpió al encontrar una ayuda que esperaba `.chip__name` en una pestaña sin conexión; se corrigió la lectura opcional y los cuatro recorridos de SQL Server pasaron después. La continuación terminó con sus 18 casos aprobados.
+- **Compilación de producción correcta**, sin advertencias, con 438,94 kB iniciales, y comprobación de tipos E2E correcta. La API se compiló desde `a93913b` en una carpeta propia, con cero errores y advertencias; estos recorridos no incluyen cambios posteriores de los proveedores.
+- El recorrido de la guía verifica teclado, recuperación del foco, conservación de pestañas y resultados, ventana de 680 px y acciones utilizables a 900 × 720 px con escala del 125 %. El barrido visual no reportó recortes ni controles sin nombre; su consola quedó limpia. Se inspeccionaron capturas de resultados en claro y oscuro, diseñador, Actividad y la guía.
+- Las capturas están en `e2e/barrido/ui-ux-2026-09-11-revision/`, fuera de Git. `21-conexion-lista-125.png` muestra la nueva guía. La vista previa del puerto 4200 recibió los cuatro archivos de interfaz modificados; el intento de inspeccionarla con la automatización del navegador agotó su tiempo de espera, por lo que la evidencia visual procede de E2E.
+
+Siguen pendientes A11Y-005 (recorrido completo con lector de pantalla), REL-003 (selectores nativos de archivo y carpeta), REL-004 (multicursor y atajos en WebView2), instalación/actualización limpia y comprobaciones nativas en macOS y Linux. La revisión web no cierra esas verificaciones de escritorio.

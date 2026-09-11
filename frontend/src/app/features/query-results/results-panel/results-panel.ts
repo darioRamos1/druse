@@ -15,6 +15,7 @@ import {
 } from '@angular/core';
 
 import { ExportFormat } from '../../../core/application-gateway/application-gateway';
+import { shortcutLabel } from '../../../core/shortcuts/shortcut-label';
 import {
   CellEdit,
   QueryHistoryEntry,
@@ -51,10 +52,14 @@ export class ResultsPanel {
   readonly canceling = input(false);
   readonly timeoutSeconds = input(30);
   readonly firstSession = input(false);
+  readonly readyToQuery = input(false);
   readonly maximized = input(false);
   readonly toggleMaximize = output<void>();
   readonly createConnection = output<void>();
   readonly openSql = output<void>();
+  readonly exploreTables = output<void>();
+  readonly writeSql = output<void>();
+  protected readonly shortcut = shortcutLabel;
 
   readonly exporting = input(false);
 

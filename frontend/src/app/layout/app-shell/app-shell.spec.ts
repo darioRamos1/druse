@@ -241,6 +241,38 @@ describe('AppShell', () => {
     expect(element.querySelector('app-status-bar')?.textContent).toContain('Sin conexión');
   });
 
+  it('orienta una consulta vacía solo mientras su conexión está abierta', async () => {
+    TestBed.resetTestingModule();
+    await TestBed.configureTestingModule({
+      imports: [AppShell],
+      providers: [
+        {
+          provide: ApplicationGateway,
+          useValue: {
+            ...connectedGateway('mysql', 'druse_test'),
+            closeSession: () => of(undefined),
+          },
+        },
+      ],
+    }).compileComponents();
+    fixture = TestBed.createComponent(AppShell);
+    element = fixture.nativeElement as HTMLElement;
+    await fixture.whenStable();
+    const store = TestBed.inject(WorkspaceStore);
+    await store.connect(connectionForm);
+    await fixture.whenStable();
+    expect(element.querySelector('#query-start-title')?.textContent).toBe('Conexión lista');
+    store.updateSql('SELECT 1;');
+    await fixture.whenStable();
+    expect(element.querySelector('#query-start-title')).toBeNull();
+    store.updateSql('');
+    await fixture.whenStable();
+    expect(element.querySelector('#query-start-title')).not.toBeNull();
+    await store.disconnect(store.activeConnection()!.id);
+    await fixture.whenStable();
+    expect(element.querySelector('#query-start-title')).toBeNull();
+  });
+
   it('sin conexión, no se puede ejecutar', () => {
     const run = element.querySelector<HTMLButtonElement>('app-editor-toolbar .run');
 
