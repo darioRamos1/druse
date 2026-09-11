@@ -1,4 +1,5 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { WritableSignal } from '@angular/core';
 
 import { EditorToolbar } from './editor-toolbar';
 
@@ -242,6 +243,104 @@ describe('EditorToolbar', () => {
   function element(): HTMLElement {
     return fixture.nativeElement as HTMLElement;
   }
+
+  describe('acciones en la barra estrecha', () => {
+    beforeEach(() => {
+      // JSDOM no calcula anchos; el cambio real por ResizeObserver se cubre en E2E.
+      (fixture.componentInstance as unknown as { compact: WritableSignal<boolean> }).compact.set(
+        true,
+      );
+      fixture.detectChanges();
+    });
+
+    function details(): HTMLDetailsElement {
+      return element().querySelector<HTMLDetailsElement>('.secondary-actions')!;
+    }
+
+    function press(target: HTMLElement, key: string): void {
+      target.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true }));
+      fixture.detectChanges();
+    }
+
+    it('las flechas recorren las acciones disponibles y Escape devuelve el foco a Más', () => {
+      fixture.componentRef.setInput('canExecute', false);
+      fixture.detectChanges();
+      const summary = details().querySelector('summary')!;
+      summary.focus();
+      press(summary, 'ArrowDown');
+      const actions = details().querySelectorAll('button');
+      expect(details().open).toBe(true);
+      expect(document.activeElement).toBe(actions[0]);
+      press(actions[0], 'End');
+      expect(document.activeElement).toBe(actions[2]);
+      press(actions[2], 'ArrowDown');
+      expect(document.activeElement).toBe(actions[0]);
+      press(actions[0], 'Escape');
+      expect(details().open).toBe(false);
+      expect(document.activeElement).toBe(summary);
+    });
+
+    it('comentar conserva la misma acción y cierra el desplegable', () => {
+      const comment = vi.fn();
+      fixture.componentInstance.toggleLineComment.subscribe(comment);
+      details().open = true;
+      details()
+        .querySelector<HTMLButtonElement>('[aria-label="Comentar o descomentar líneas"]')!
+        .click();
+      expect(comment).toHaveBeenCalledTimes(1);
+      expect(details().open).toBe(false);
+    });
+
+    it('la transacción explica por qué espera y solo se inicia cuando está disponible', () => {
+      const begin = vi.fn();
+      fixture.componentInstance.beginTransaction.subscribe(begin);
+      const button = details().querySelector<HTMLButtonElement>('.secondary-actions__transaction')!;
+      fixture.componentRef.setInput('running', true);
+      fixture.detectChanges();
+      expect(button.disabled).toBe(true);
+      expect(button.textContent).toContain('termine la consulta');
+      button.click();
+      expect(begin).not.toHaveBeenCalled();
+      fixture.componentRef.setInput('running', false);
+      fixture.componentRef.setInput('transactionBusy', true);
+      fixture.detectChanges();
+      expect(button.textContent).toContain('operación de transacción');
+      fixture.componentRef.setInput('transactionBusy', false);
+      fixture.detectChanges();
+      button.click();
+      expect(begin).toHaveBeenCalledTimes(1);
+      open();
+      expect(details().querySelector('.secondary-actions__transaction')).toBeNull();
+      expect(element().querySelector('.btn--commit')).not.toBeNull();
+      expect(element().querySelector('.btn--rollback')).not.toBeNull();
+    });
+
+    it('abre las opciones de formato y Escape vuelve a Más sin ejecutar SQL', async () => {
+      const execute = vi.fn();
+      fixture.componentInstance.execute.subscribe(execute);
+      details().open = true;
+      details().querySelector<HTMLButtonElement>('[aria-label="Opciones de formateo"]')!.click();
+      await fixture.whenStable();
+      const firstOption = element().querySelector<HTMLButtonElement>('.format__option')!;
+      expect(details().open).toBe(false);
+      expect(document.activeElement).toBe(firstOption);
+      press(firstOption, 'Escape');
+      expect(element().querySelector('.format__menu')).toBeNull();
+      expect(document.activeElement).toBe(details().querySelector('summary'));
+      expect(execute).not.toHaveBeenCalled();
+    });
+
+    it('cierra al salir con Tab o al abrir otro desplegable', () => {
+      details().open = true;
+      details().dispatchEvent(new FocusEvent('focusout', { relatedTarget: document.body }));
+      expect(details().open).toBe(false);
+      details().open = true;
+      element().querySelector<HTMLButtonElement>('.limits .chip')!.click();
+      fixture.detectChanges();
+      expect(details().open).toBe(false);
+      expect(element().querySelector('.limits__menu')).not.toBeNull();
+    });
+  });
 
   it('selección y documento completo mantienen acciones independientes', () => {
     const document = vi.fn();

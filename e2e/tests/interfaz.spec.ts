@@ -198,10 +198,15 @@ test.describe('la interfaz por dentro', () => {
           .getValue(),
       );
 
-    await page.getByRole('button', { name: /Comentar/ }).click();
+    const comentar = async () => {
+      const more = page.locator('summary[aria-label="Más acciones del editor"]');
+      if (await more.isVisible()) await more.click();
+      await page.getByRole('button', { name: /Comentar/ }).click();
+    };
+    await comentar();
     await expect.poll(value).toBe('-- SELECT 1 AS uno;\n-- SELECT 2 AS dos;');
 
-    await page.getByRole('button', { name: /Comentar/ }).click();
+    await comentar();
     await expect.poll(value).toBe(original);
 
     // Monaco conserva además el atajo estándar con el foco dentro del editor.

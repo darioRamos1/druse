@@ -1,8 +1,11 @@
 import {
   ChangeDetectionStrategy,
   Component,
+  DestroyRef,
   ElementRef,
   HostListener,
+  Injector,
+  afterNextRender,
   computed,
   inject,
   input,
@@ -16,6 +19,7 @@ import {
   FormatSettings,
 } from '../../../core/workspace/format-settings';
 import { Icon } from '../../../shared/ui/icon/icon';
+import { Disclosure } from '../../../shared/a11y/disclosure';
 import { shortcutLabel } from '../../../core/shortcuts/shortcut-label';
 
 /**
@@ -60,13 +64,42 @@ interface FormatGroup {
 @Component({
   selector: 'app-editor-toolbar',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [Icon],
+  imports: [Icon, Disclosure],
   templateUrl: './editor-toolbar.html',
   styleUrl: './editor-toolbar.scss',
 })
 export class EditorToolbar {
   protected readonly shortcut = shortcutLabel;
   private readonly _host = inject<ElementRef<HTMLElement>>(ElementRef);
+  private readonly injector = inject(Injector);
+  private readonly destroyRef = inject(DestroyRef);
+  protected readonly compact = signal(false);
+
+  constructor() {
+    afterNextRender(() => {
+      if (typeof ResizeObserver === 'undefined') return;
+      const host = this._host.nativeElement;
+      const measure = () => {
+        if (!host.clientWidth) return;
+        const compact = host.clientWidth <= 1100;
+        if (compact === this.compact()) return;
+        const focused = document.activeElement;
+        const restoreFocus =
+          focused instanceof Element &&
+          host.contains(focused) &&
+          !!focused.closest('.format, [data-secondary]');
+        this.compact.set(compact);
+        this.editingFormat.set(false);
+        if (restoreFocus) {
+          afterNextRender(() => this.formatTrigger()?.focus(), { injector: this.injector });
+        }
+      };
+      const observer = new ResizeObserver(measure);
+      observer.observe(host);
+      measure();
+      this.destroyRef.onDestroy(() => observer.disconnect());
+    });
+  }
 
   readonly context = input.required<string>();
   readonly timeoutSeconds = input(30);
@@ -131,6 +164,70 @@ export class EditorToolbar {
   readonly beginTransaction = output<void>();
   readonly commit = output<void>();
   readonly rollback = output<void>();
+
+  protected readonly beginTransactionReason = computed(() =>
+    !this.canExecute()
+      ? 'Abre una conexión para usar transacciones.'
+      : this.running()
+        ? 'Espera a que termine la consulta.'
+        : this.transactionBusy()
+          ? 'Espera a que termine la operación de transacción.'
+          : null,
+  );
+
+  protected startTransaction(): void {
+    if (!this.beginTransactionReason() && !this.transactionOpen()) this.beginTransaction.emit();
+  }
+
+  protected closeSecondary(): void {
+    const details =
+      this._host.nativeElement.querySelector<HTMLDetailsElement>('.secondary-actions');
+    if (details) details.open = false;
+  }
+
+  protected onSecondaryToggle(event: Event): void {
+    if ((event.target as HTMLDetailsElement).open) {
+      this.editingFormat.set(false);
+      this.editingLimits.set(false);
+      this.choosingDatabase.set(false);
+    }
+  }
+
+  /** Tab conserva su recorrido nativo; las flechas ofrecen un acceso rápido adicional. */
+  protected onSecondaryKeydown(event: KeyboardEvent): void {
+    if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return;
+    const details = event.currentTarget as HTMLDetailsElement;
+    const items = Array.from(details.querySelectorAll<HTMLButtonElement>('button:not(:disabled)'));
+    if (!items.length) return;
+    event.preventDefault();
+    event.stopPropagation();
+    details.open = true;
+    const index = items.indexOf(document.activeElement as HTMLButtonElement);
+    const next =
+      event.key === 'Home'
+        ? 0
+        : event.key === 'End'
+          ? items.length - 1
+          : index < 0
+            ? event.key === 'ArrowUp'
+              ? items.length - 1
+              : 0
+            : (index + (event.key === 'ArrowUp' ? -1 : 1) + items.length) % items.length;
+    items[next].focus();
+  }
+
+  private formatTrigger(): HTMLElement | null {
+    return this._host.nativeElement.querySelector(
+      this.compact() ? '.secondary-actions > summary' : '.btn--caret',
+    );
+  }
+
+  protected closeFormat(event: Event): void {
+    event.preventDefault();
+    event.stopPropagation();
+    this.editingFormat.set(false);
+    this.formatTrigger()?.focus();
+  }
 
   /**
    * Qué implica tener esta transacción abierta.
@@ -236,6 +333,7 @@ export class EditorToolbar {
   }
 
   protected toggleLimits(): void {
+    this.closeSecondary();
     this.editingFormat.set(false);
     this.choosingDatabase.set(false);
     this.editingLimits.update((open) => !open);
@@ -248,16 +346,24 @@ export class EditorToolbar {
   }
 
   protected toggleFormat(): void {
+    this.closeSecondary();
     // Dos menús abiertos a la vez en la misma barra no aportan nada y se tapan
     // entre ellos.
     this.editingLimits.set(false);
     this.choosingDatabase.set(false);
     this.editingFormat.update((open) => !open);
+    if (this.editingFormat()) {
+      afterNextRender(
+        () => this._host.nativeElement.querySelector<HTMLButtonElement>('.format__option')?.focus(),
+        { injector: this.injector },
+      );
+    }
   }
 
   protected readonly choosingDatabase = signal(false);
 
   protected toggleDatabases(): void {
+    this.closeSecondary();
     this.editingLimits.set(false);
     this.editingFormat.set(false);
     this.choosingDatabase.update((open) => !open);

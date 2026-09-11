@@ -44,45 +44,99 @@
     (click)="cancel.emit()"
   >
     <app-icon name="stop" [size]="11" />
-    <span class="label">{{ canceling() ? 'Cancelando…' : 'Cancelar' }}</span>
+    <span>{{ canceling() ? 'Cancelando…' : 'Cancelar' }}</span>
   </button>
 }
 
 <span class="divider" aria-hidden="true"></span>
 
 <!--
-  Formatear y elegir cómo formatear son dos botones y no uno: quien pulsa
-  «Formatear» quiere formatear ya, y esconder esa acción detrás de un menú la
-  encarecería por una configuración que se toca una vez.
+  Con espacio, Formatear conserva su acción directa. Cuando la barra estrecha,
+  las acciones secundarias pasan al desplegable con sus nombres completos.
 -->
-<div class="format">
-  <button
-    type="button"
-    class="btn btn--split"
-    [title]="'Formatear (' + shortcut('Ctrl+Shift+F') + ')'"
-    (click)="format.emit()"
-  >
-    <app-icon name="format" [size]="11" />
-    <span class="label">Formatear</span>
-  </button>
+<div class="format" [class.is-compact]="compact()">
+  @if (!compact()) {
+    <button
+      type="button"
+      class="btn btn--split"
+      [title]="'Formatear (' + shortcut('Ctrl+Shift+F') + ')'"
+      (click)="format.emit()"
+    >
+      <app-icon name="format" [size]="11" />
+      <span class="label">Formatear</span>
+    </button>
 
-  <button
-    type="button"
-    class="btn btn--caret"
-    title="Cómo se formatea"
-    aria-label="Opciones de formateo"
-    [attr.aria-expanded]="editingFormat()"
-    (click)="toggleFormat()"
-  >
-    <app-icon name="chevron-down" [size]="9" />
-  </button>
+    <button
+      type="button"
+      class="btn btn--caret"
+      title="Cómo se formatea"
+      aria-label="Opciones de formateo"
+      [attr.aria-expanded]="editingFormat()"
+      (click)="toggleFormat()"
+    >
+      <app-icon name="chevron-down" [size]="9" />
+    </button>
+  } @else {
+    <details
+      class="secondary-actions"
+      appDisclosure
+      #secondaryMenu="disclosure"
+      (toggle)="onSecondaryToggle($event)"
+      (keydown)="onSecondaryKeydown($event)"
+    >
+      <summary class="btn" aria-label="Más acciones del editor" title="Más acciones del editor">
+        Más <app-icon name="chevron-down" [size]="9" />
+      </summary>
+      <div class="secondary-actions__menu" role="group" aria-label="Acciones del editor">
+        <button
+          type="button"
+          aria-label="Formatear SQL"
+          (click)="secondaryMenu.close(true); format.emit()"
+        >
+          <app-icon name="format" [size]="14" />
+          <span>Formatear SQL</span><kbd>{{ shortcut('Ctrl+Shift+F') }}</kbd>
+        </button>
+        <button
+          type="button"
+          aria-label="Opciones de formateo"
+          (click)="secondaryMenu.close(true); toggleFormat()"
+        >
+          <app-icon name="settings" [size]="14" /><span>Opciones de formateo…</span>
+        </button>
+        <button
+          type="button"
+          aria-label="Comentar o descomentar líneas"
+          (click)="secondaryMenu.close(true); toggleLineComment.emit()"
+        >
+          <app-icon name="comment" [size]="14" />
+          <span>Comentar / descomentar</span><kbd>{{ shortcut('Ctrl+/') }}</kbd>
+        </button>
+        @if (!transactionOpen()) {
+          <button
+            type="button"
+            class="secondary-actions__transaction"
+            [disabled]="beginTransactionReason() !== null"
+            (click)="secondaryMenu.close(true); startTransaction()"
+          >
+            <app-icon name="transaction" [size]="14" />
+            <span
+              >Iniciar transacción
+              <small>{{
+                beginTransactionReason() ?? 'Agrupa consultas hasta confirmar o deshacer.'
+              }}</small>
+            </span>
+          </button>
+        }
+      </div>
+    </details>
+  }
 
   @if (editingFormat()) {
     <div
       class="format__menu"
       role="dialog"
       aria-label="Opciones de formateo"
-      (keydown.escape)="editingFormat.set(false)"
+      (keydown.escape)="closeFormat($event)"
     >
       @for (group of formatGroups; track group.key) {
         <p class="format__label">{{ group.label }}</p>
@@ -105,16 +159,18 @@
   }
 </div>
 
-<button
-  type="button"
-  class="btn"
-  [title]="'Comentar/descomentar líneas (' + shortcut('Ctrl+/') + ')'"
-  data-secondary
-  (click)="toggleLineComment.emit()"
->
-  <app-icon name="comment" [size]="12" />
-  <span class="label">Comentar</span>
-</button>
+@if (!compact()) {
+  <button
+    type="button"
+    class="btn"
+    [title]="'Comentar/descomentar líneas (' + shortcut('Ctrl+/') + ')'"
+    data-secondary
+    (click)="toggleLineComment.emit()"
+  >
+    <app-icon name="comment" [size]="12" />
+    <span class="label">Comentar</span>
+  </button>
+}
 
 <span class="divider" aria-hidden="true"></span>
 
@@ -146,7 +202,7 @@
   >
     Rollback
   </button>
-} @else {
+} @else if (!compact()) {
   <!--
     Al modo manual se entra a propósito. El autocommit sigue siendo lo normal, y
     Commit y Rollback no aparecen mientras no haya nada que confirmar.
@@ -154,13 +210,9 @@
   <button
     type="button"
     class="btn"
-    [disabled]="transactionBusy() || !canExecute()"
-    [attr.title]="
-      canExecute()
-        ? 'Nada se confirmará hasta que pulses Commit'
-        : 'Abre una conexión para poder usar transacciones'
-    "
-    (click)="beginTransaction.emit()"
+    [disabled]="beginTransactionReason() !== null"
+    [title]="beginTransactionReason() ?? 'Agrupa consultas hasta confirmar o deshacer.'"
+    (click)="startTransaction()"
     data-secondary
   >
     <app-icon name="transaction" [size]="11" />
