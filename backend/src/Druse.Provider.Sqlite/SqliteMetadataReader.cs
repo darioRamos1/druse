@@ -167,7 +167,18 @@ public sealed class SqliteMetadataReader : IDatabaseMetadataReader
                 {
                     Name = column.Name,
                     DataType = column.Type,
-                    IsNullable = !column.NotNull,
+                    // La clave que **es** el `rowid` nunca queda vacía, por más
+                    // que el pragma diga que admite nulos: insertarle un nulo no
+                    // guarda un nulo, genera el número siguiente. Enseñarla como
+                    // opcional sería enseñar una clave primaria que se puede dejar
+                    // en blanco, y el diseñador ofrecería desmarcar algo que el
+                    // motor no va a respetar.
+                    //
+                    // No se generaliza a toda clave primaria a propósito: en
+                    // SQLite una `TEXT PRIMARY KEY` **sí** admite nulos —un
+                    // agujero histórico que mantienen por compatibilidad— y ahí
+                    // decir lo contrario sería la mentira simétrica.
+                    IsNullable = !column.NotNull && !(esRowId && column.PrimaryKey),
                     IsPrimaryKey = column.PrimaryKey,
                     DefaultValue = column.Default,
                     // `cid` cuenta desde cero y el resto del sistema desde uno.
@@ -260,6 +271,7 @@ public sealed class SqliteMetadataReader : IDatabaseMetadataReader
         var indexes = await GetIndexesAsync(session, tables, cancellationToken);
         var foreignKeys = await GetForeignKeysAsync(session, tables, cancellationToken);
         var checks = await GetCheckConstraintsAsync(session, tables, cancellationToken);
+        var declaradas = await GetDeclaredAsync(session, tables, cancellationToken);
 
         var wanted = Unique(tables, Key);
         var result = new Dictionary<TableRef, TableStructure>();
@@ -289,15 +301,34 @@ public sealed class SqliteMetadataReader : IDatabaseMetadataReader
                         Columns = claves,
                     },
                 Indexes = tableIndexes,
-                ForeignKeys = foreignKeys.TryGetValue(table, out var keys) ? keys : [],
+                ForeignKeys = Named(
+                    foreignKeys.TryGetValue(table, out var keys) ? keys : [],
+                    declaradas.TryGetValue(table, out var escritas) ? escritas.ForeignKeys : []),
                 UniqueConstraints =
                 [
                     .. tableIndexes
                         .Where(index => index.IsConstraintIndex && !index.IsPrimaryKey)
-                        .Select(index => new DatabaseUniqueConstraint
+                        .Select(index =>
                         {
-                            Name = index.Name,
-                            Columns = [.. index.Columns.Select(column => column.Name)],
+                            var columnas = index.Columns.Select(column => column.Name).ToArray();
+
+                            // El nombre que da el catálogo es el del índice que
+                            // sostiene la restricción, y ese se llama siempre
+                            // `sqlite_autoindex_…`. El de verdad —el que alguien
+                            // escribió— solo está en el texto del `CREATE TABLE`,
+                            // y se empareja por columnas porque es lo único que
+                            // las dos formas tienen en común.
+                            var nombre = declaradas.TryGetValue(table, out var lista)
+                                ? lista.Unique.FirstOrDefault(item => item.Columns.SequenceEqual(
+                                    columnas,
+                                    StringComparer.OrdinalIgnoreCase))?.Name
+                                : null;
+
+                            return new DatabaseUniqueConstraint
+                            {
+                                Name = nombre ?? index.Name,
+                                Columns = columnas,
+                            };
                         }),
                 ],
 
@@ -449,6 +480,82 @@ public sealed class SqliteMetadataReader : IDatabaseMetadataReader
             if (found.Count > 0)
             {
                 grouped[new TableRef(null, row.Table)] = found;
+            }
+        }
+
+        return grouped;
+    }
+
+    /// <summary>
+    /// Las claves foráneas con el nombre que les puso quien escribió la tabla.
+    ///
+    /// `PRAGMA foreign_key_list` las numera pero no las nombra, así que sin esto
+    /// una clave se relee como `fk_pedidos_0` —y con ese nombre se vuelve a
+    /// escribir al reconstruir la tabla, que es como se pierde el original—. Se
+    /// emparejan por columnas, que es lo único que las dos formas comparten.
+    /// </summary>
+    private static IReadOnlyList<DatabaseForeignKey> Named(
+        IReadOnlyList<DatabaseForeignKey> keys,
+        IReadOnlyList<DeclaredConstraint> declared)
+    {
+        if (declared.Count == 0 || keys.Count == 0)
+        {
+            return keys;
+        }
+
+        return
+        [
+            .. keys.Select(key =>
+            {
+                var escrita = declared.FirstOrDefault(item =>
+                    item.Columns.SequenceEqual(key.Columns, StringComparer.OrdinalIgnoreCase));
+
+                return escrita is null ? key : key with { Name = escrita.Name };
+            }),
+        ];
+    }
+
+    /// <summary>
+    /// Lo que el `CREATE TABLE` declara y el catálogo no publica: los nombres de
+    /// las restricciones de unicidad y de las claves foráneas.
+    ///
+    /// Va con las condiciones de comprobación en la misma lectura porque salen del
+    /// mismo texto, y pedirlo dos veces sería recorrer `sqlite_master` dos veces
+    /// para lo mismo.
+    /// </summary>
+    private static async Task<IReadOnlyDictionary<TableRef, DeclaredConstraints>>
+        GetDeclaredAsync(
+            IDatabaseSession session,
+            IReadOnlyList<DatabaseObject> tables,
+            CancellationToken cancellationToken)
+    {
+        var (placeholders, parameters) = Wanted(tables);
+
+        var sql = $"""
+            SELECT m.name, m.sql
+            FROM sqlite_master m
+            WHERE m.type = 'table' AND m.name IN ({placeholders})
+            """;
+
+        var rows = await QueryAsync(
+            session,
+            sql,
+            reader => (
+                Table: reader.GetString(0),
+                Sql: reader.IsDBNull(1) ? null : reader.GetString(1)),
+            cancellationToken,
+            parameters);
+
+        var grouped = new Dictionary<TableRef, DeclaredConstraints>();
+
+        foreach (var row in rows)
+        {
+            var unique = SqliteCheckConstraints.ReadUnique(row.Sql);
+            var keys = SqliteCheckConstraints.ReadForeignKeys(row.Sql);
+
+            if (unique.Count > 0 || keys.Count > 0)
+            {
+                grouped[new TableRef(null, row.Table)] = new DeclaredConstraints(unique, keys);
             }
         }
 

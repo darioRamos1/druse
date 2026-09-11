@@ -36,15 +36,54 @@ internal static class SqliteCheckConstraints
     /// SQLite no les inventa uno. Quien las vuelva a escribir las escribe igual,
     /// sin nombre, porque ponerles uno cambiaría la tabla por el camino.
     /// </summary>
-    public static IReadOnlyList<DatabaseCheckConstraint> Read(string? createTable)
+    public static IReadOnlyList<DatabaseCheckConstraint> Read(string? createTable) =>
+        Scan(createTable).Checks;
+
+    /// <summary>
+    /// Las restricciones de unicidad **con nombre** que declara ese `CREATE
+    /// TABLE`, con las columnas sobre las que van.
+    ///
+    /// Por lo mismo que las condiciones: el nombre solo está aquí. Lo que SQLite
+    /// publica de una restricción de unicidad es el índice que la sostiene, y ese
+    /// se llama siempre `sqlite_autoindex_<tabla>_<n>` por más que quien la
+    /// escribió le pusiera `uq_pedidos_codigo`. Leerlo del texto es lo que hace
+    /// que el nombre sobreviva a releer la tabla —y a reconstruirla, que es
+    /// cuando de verdad se pierde lo que no se lee—.
+    ///
+    /// Solo se reconocen las de la tabla, que son las que llevan sus columnas
+    /// entre paréntesis. Un `codigo TEXT CONSTRAINT uq UNIQUE` escrito en la
+    /// columna no se recoge: no dice columnas, así que no hay con qué emparejarlo
+    /// sin interpretar el resto de la definición.
+    /// </summary>
+    public static IReadOnlyList<DeclaredConstraint> ReadUnique(string? createTable) =>
+        Scan(createTable).Unique;
+
+    /// <summary>
+    /// Las claves foráneas **con nombre**, con las columnas de las que salen.
+    ///
+    /// Lo mismo que con la unicidad: `PRAGMA foreign_key_list` numera las claves
+    /// de una tabla pero no dice cómo se llaman, así que sin leer el texto la
+    /// clave `fk_pedidos_cliente` se relee como `fk_pedidos_0` —y con ese nombre
+    /// se vuelve a escribir al reconstruir la tabla—.
+    /// </summary>
+    public static IReadOnlyList<DeclaredConstraint> ReadForeignKeys(string? createTable) =>
+        Scan(createTable).ForeignKeys;
+
+    private static (
+        IReadOnlyList<DatabaseCheckConstraint> Checks,
+        IReadOnlyList<DeclaredConstraint> Unique,
+        IReadOnlyList<DeclaredConstraint> ForeignKeys)
+        Scan(string? createTable)
     {
         if (string.IsNullOrWhiteSpace(createTable))
         {
-            return [];
+            return ([], [], []);
         }
 
         var text = createTable;
         var found = new List<DatabaseCheckConstraint>();
+        var unique = new List<DeclaredConstraint>();
+        var foreignKeys = new List<DeclaredConstraint>();
 
         // La profundidad de paréntesis. Una condición vive dentro del cuerpo de la
         // tabla, nunca en el nivel cero.
@@ -163,6 +202,36 @@ internal static class SqliteCheckConstraints
                     }
 
                     pending = null;
+
+                    continue;
+                }
+
+                // `UNIQUE (a, b)` en el cuerpo de la tabla. Sin nombre no hay nada
+                // que rescatar —el catálogo ya da el del índice— y un `UNIQUE` sin
+                // paréntesis detrás es el de una columna, que no dice cuáles.
+                if (depth == 1 && word.Equals("UNIQUE", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (Expression(text, ref i) is { } columns && pending is { } name)
+                    {
+                        unique.Add(new DeclaredConstraint(name, Columns(columns)));
+                    }
+
+                    pending = null;
+
+                    continue;
+                }
+
+                // `FOREIGN KEY (a) REFERENCES …`, que es la otra restricción cuyo
+                // nombre solo vive aquí.
+                if (depth == 1
+                    && pending is not null
+                    && word.Equals("FOREIGN", StringComparison.OrdinalIgnoreCase)
+                    && TrySkipWord(text, ref i, "KEY")
+                    && Expression(text, ref i) is { } origen)
+                {
+                    foreignKeys.Add(new DeclaredConstraint(pending, Columns(origen)));
+
+                    pending = null;
                 }
 
                 continue;
@@ -171,8 +240,46 @@ internal static class SqliteCheckConstraints
             i++;
         }
 
-        return found;
+        return (found, unique, foreignKeys);
     }
+
+    /// <summary>
+    /// Consume la palabra que viene a continuación si es la esperada.
+    ///
+    /// Sirve para `FOREIGN KEY`, que son dos palabras: sin esto habría que
+    /// tratar `KEY` por separado y una columna llamada `foreign` abriría una
+    /// clave que no existe.
+    /// </summary>
+    private static bool TrySkipWord(string text, ref int i, string expected)
+    {
+        var j = SkipTrivia(text, i);
+
+        if (j + expected.Length > text.Length
+            || !text.AsSpan(j, expected.Length).Equals(expected, StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        var end = j + expected.Length;
+
+        if (end < text.Length && (char.IsLetterOrDigit(text[end]) || text[end] is '_' or '$'))
+        {
+            return false;
+        }
+
+        i = end;
+
+        return true;
+    }
+
+    /// <summary>Los nombres de columna de un `UNIQUE (a, "b c")`, ya sin comillas.</summary>
+    private static IReadOnlyList<string> Columns(string list) =>
+    [
+        .. list.Split(',')
+            .Select(part => part.Trim())
+            .Select(part => part is ['\'' or '"' or '`' or '[', ..] ? Unquote(part) : part)
+            .Where(part => part.Length > 0),
+    ];
 
     /// <summary>
     /// Lo que hay dentro del paréntesis de un `CHECK`, contando paréntesis.
@@ -334,3 +441,21 @@ internal static class SqliteCheckConstraints
             : inner.Replace($"{close}{close}", $"{close}", StringComparison.Ordinal);
     }
 }
+
+/// <summary>
+/// Una restricción con columnas tal como la declaró quien escribió la tabla.
+///
+/// El nombre es el único dato que no se puede obtener de otra forma; las columnas
+/// vienen con él para poder emparejarla con la que devuelve el catálogo, que sí
+/// las trae pero con el nombre del índice interno.
+/// </summary>
+/// <param name="Name">El nombre escrito tras `CONSTRAINT`.</param>
+/// <param name="Columns">Las columnas entre paréntesis, en su orden.</param>
+internal sealed record DeclaredConstraint(string Name, IReadOnlyList<string> Columns);
+
+/// <summary>Lo que una tabla declara en su texto y el catálogo no publica.</summary>
+/// <param name="Unique">Las restricciones de unicidad con nombre.</param>
+/// <param name="ForeignKeys">Las claves foráneas con nombre.</param>
+internal sealed record DeclaredConstraints(
+    IReadOnlyList<DeclaredConstraint> Unique,
+    IReadOnlyList<DeclaredConstraint> ForeignKeys);
