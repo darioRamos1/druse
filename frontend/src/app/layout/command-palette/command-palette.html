@@ -59,7 +59,10 @@
           [id]="'palette-option-' + index"
           role="option"
           [class.is-selected]="index === selected()"
+          [class.is-unavailable]="!!item.disabledReason"
           [attr.aria-selected]="index === selected()"
+          [attr.aria-disabled]="item.disabledReason ? 'true' : null"
+          [attr.title]="item.disabledReason ?? item.hint"
           (mouseenter)="selected.set(index)"
           (click)="run(item)"
         >
@@ -78,7 +81,9 @@
           </span>
           <span class="result__text">
             <strong>{{ item.label }}</strong>
-            <small>{{ item.hint }}</small>
+            <small [class.result__reason]="!!item.disabledReason">{{
+              item.disabledReason ?? item.hint
+            }}</small>
           </span>
           @if (item.kind === 'snippet' && confirmingDelete() === item.snippet.id) {
             <span class="result__warn">Shift+Supr otra vez para borrarlo</span>
@@ -92,13 +97,19 @@
 
     <footer class="foot">
       <span><kbd>↑</kbd><kbd>↓</kbd> navegar</span>
-      <span><kbd>Enter</kbd> abrir</span>
+      @if (items()[selected()]; as item) {
+        @if (item.disabledReason) {
+          <span>No disponible</span>
+        } @else {
+          <span><kbd>Enter</kbd> abrir</span>
+        }
+      }
       <!-- El atajo se anuncia solo cuando hay algo que borrar con él. -->
       @if (selectedSnippet()) {
         <span><kbd>Shift</kbd><kbd>Supr</kbd> borrar</span>
       }
       <span class="spacer"></span>
-      <span>{{ items().length }} resultados</span>
+      <span>{{ items().length }} {{ items().length === 1 ? 'resultado' : 'resultados' }}</span>
     </footer>
   }
 </section>

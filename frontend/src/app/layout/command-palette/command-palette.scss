@@ -83,6 +83,14 @@ kbd {
     color: var(--dr-text);
   }
 
+  &.is-unavailable {
+    cursor: default;
+
+    .result__icon {
+      color: var(--dr-text-muted);
+    }
+  }
+
   &__icon {
     display: grid;
     width: 24px;
@@ -112,6 +120,14 @@ kbd {
       margin-top: 3px;
       color: var(--dr-text-faint);
       font-size: 10.5px;
+    }
+
+    .result__reason {
+      color: var(--dr-text-muted);
+      font-size: 12px;
+      line-height: 1.4;
+      white-space: normal;
+      overflow-wrap: anywhere;
     }
   }
 

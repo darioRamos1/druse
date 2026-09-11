@@ -225,3 +225,15 @@ Validación de esta mejora:
 La API y el frontend de prueba se prepararon en `%TEMP%/druse-ui-native-20260910`, a partir del código confirmado en `de80c8a` y aplicando solamente el ajuste de la barra. La API utilizó un directorio temporal de datos y el puerto 5399; el frontend, el 4200. No se ejecutaron consultas ni se validó la integración de motores que avanzaba en paralelo. Esta comprobación cubre Windows; los recorridos nativos de macOS y Linux y los demás diálogos de escritorio permanecen pendientes.
 
 Mientras se validaba, el trabajo paralelo incluyó los dos archivos de la barra en `148adb1`. Se conserva ese commit y se registra aquí la evidencia por separado, sin reescribir el historial compartido.
+
+## Disponibilidad en la paleta — 10 de septiembre de 2026
+
+La paleta indica por qué no se puede ejecutar una acción: falta de conexión, SQL o tabla de origen; consulta u operación de transacción en curso; ausencia de una transacción abierta o de otras pestañas. Las opciones siguen siendo recorribles con las flechas para leer el motivo y exponen `aria-disabled`. Enter y clic no emiten la acción ni cierran la paleta cuando falta un requisito; la disponibilidad se vuelve a consultar al activar, por si la sesión cambió antes de que se repintara la fila.
+
+El estado proviene del mismo workspace que alimenta la barra del editor. La búsqueda se conserva cuando cambia la conexión, y «Ejecutar selección» refleja la selección del editor. El pie deja de ofrecer Enter sobre una opción no disponible. Iniciar transacción ya no promete que nada se escribe antes de confirmar, porque esa frase no cubría el DDL de todos los motores.
+
+Validación tras integrar el código confirmado de los motores hasta `3d074cb`: **53 pruebas aprobadas** entre paleta y shell, **compilación de producción correcta** (428,21 kB iniciales) y comprobación de tipos E2E correcta. Se cubren pérdida y recuperación de sesión, bloqueo por teclado y clic, navegación por acciones no disponibles, transacciones y origen de tabla. La prueba de teclado simula `scrollIntoView`, que JSDOM no implementa.
+
+En navegador se comprobó que Enter conserva la búsqueda bloqueada y que «Nueva consulta» crea y activa una pestaña. Se revisaron el tema oscuro a 1280 × 720 y el claro a 900 × 720 con escala 125 %: la paleta mide 775 px de ancho y termina a 450,6 px de alto, dentro de la ventana. Se restauraron el tema oscuro, la escala 100 % y el tamaño original del navegador. La consola no registró errores ni advertencias durante la revisión.
+
+La revisión manual usó la API temporal de la entrega anterior, sin conectar motores ni ejecutar SQL. La captura está en `e2e/barrido/ui-ux-2026-09-10-paleta/paleta-disponibilidad.png`, excluida de Git. El barrido incorpora además una captura y una comprobación de Enter sobre Confirmar sin transacción; el barrido completo no se repitió en esta entrega.

@@ -293,6 +293,25 @@ describe('AppShell', () => {
     expect(element.querySelector('app-command-palette')).toBeTruthy();
   });
 
+  it('la paleta conserva la búsqueda y explica por qué no puede ejecutar sin sesión', async () => {
+    const store = TestBed.inject(WorkspaceStore);
+    store.updateSql('SELECT 1;');
+    const execute = vi.spyOn(store, 'execute');
+    element.querySelector<HTMLButtonElement>('[aria-label="Abrir búsqueda global"]')!.click();
+    await fixture.whenStable();
+    const search = element.querySelector<HTMLInputElement>('app-command-palette input')!;
+    search.value = 'Ejecutar consulta activa';
+    search.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+    search.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    await fixture.whenStable();
+    expect(execute).not.toHaveBeenCalled();
+    expect(
+      element.querySelector('app-command-palette [aria-disabled="true"]')?.textContent,
+    ).toContain('Abre una conexión');
+    expect(search.value).toBe('Ejecutar consulta activa');
+  });
+
   describe('atajos de pestañas', () => {
     /** Deja tres pestañas abiertas y la tercera activa. */
     async function tresPestanas(): Promise<WorkspaceStore> {

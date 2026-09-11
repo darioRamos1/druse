@@ -18,7 +18,7 @@ import { Icon } from '../../shared/ui/icon/icon';
 import { DialogBackdrop } from '../../shared/a11y/dialog-backdrop';
 import { editorShortcutLabel, shortcutLabel } from '../../core/shortcuts/shortcut-label';
 
-type PaletteItem =
+type PaletteItem = { readonly disabledReason?: string | null } & (
   | { readonly id: string; readonly kind: 'command'; readonly label: string; readonly hint: string }
   | {
       readonly id: string;
@@ -47,7 +47,8 @@ type PaletteItem =
       readonly label: string;
       readonly hint: string;
       readonly snippet: SavedSnippet;
-    };
+    }
+);
 
 @Component({
   selector: 'app-command-palette',
@@ -63,6 +64,15 @@ export default class CommandPalette implements AfterViewInit {
 
   /** Las consultas abiertas, para llegar a las que ya no caben en la barra. */
   readonly tabs = input<readonly QueryTab[]>([]);
+
+  /** El mismo estado que usa la barra del editor, resuelto por el workspace. */
+  readonly hasConnection = input(false);
+  readonly running = input(false);
+  readonly transactionOpen = input(false);
+  readonly transactionBusy = input(false);
+  readonly hasSelection = input(false);
+
+  private readonly activeTab = computed(() => this.tabs().find((tab) => tab.active));
 
   readonly closed = output<void>();
   readonly newConnection = output<void>();
@@ -134,7 +144,7 @@ export default class CommandPalette implements AfterViewInit {
       {
         id: 'execute-current',
         kind: 'command',
-        label: 'Ejecutar instrucción actual',
+        label: this.hasSelection() ? 'Ejecutar selección' : 'Ejecutar instrucción actual',
         hint: 'Ctrl+Shift+Enter',
       },
       { id: 'format', kind: 'command', label: 'Formatear SQL', hint: 'Ctrl+Shift+F' },
@@ -187,7 +197,7 @@ export default class CommandPalette implements AfterViewInit {
         id: 'transaction-begin',
         kind: 'command',
         label: 'Iniciar transacción',
-        hint: 'Nada se escribe hasta confirmar',
+        hint: 'Agrupa las siguientes consultas en una transacción',
       },
       {
         id: 'transaction-commit',
@@ -256,7 +266,11 @@ export default class CommandPalette implements AfterViewInit {
 
     const all = [
       ...tabs,
-      ...commands.map((command) => ({ ...command, hint: shortcutLabel(command.hint) })),
+      ...commands.map((command) => ({
+        ...command,
+        hint: shortcutLabel(command.hint),
+        disabledReason: this.commandDisabledReason(command.id),
+      })),
       ...snippets,
       ...connections,
       ...objects,
@@ -266,6 +280,49 @@ export default class CommandPalette implements AfterViewInit {
       ? all.filter((item) => `${item.label} ${item.hint}`.toLowerCase().includes(term))
       : all;
   });
+
+  private commandDisabledReason(id: string): string | null {
+    const tab = this.activeTab();
+    const connectionRequired = 'Abre una conexión para usar esta acción.';
+    const queryRequired = 'Abre una consulta para usar esta acción.';
+    const sqlRequired = 'Escribe SQL en la consulta activa.';
+
+    switch (id) {
+      case 'execute':
+      case 'execute-current':
+        if (!this.hasConnection()) return connectionRequired;
+        if (this.running()) return 'Espera a que termine la consulta en curso.';
+        if (this.transactionBusy()) return 'Espera a que termine la operación de transacción.';
+        return !tab?.sql.trim() ? sqlRequired : null;
+      case 'format':
+      case 'save-snippet':
+        return !tab?.sql.trim() ? sqlRequired : null;
+      case 'toggle-line-comment':
+      case 'find':
+      case 'replace':
+      case 'duplicate-tab':
+        return tab ? null : queryRequired;
+      case 'close-other-tabs':
+        return this.tabs().length > 1 ? null : 'Abre otra pestaña para usar esta acción.';
+      case 'copy-qualified-name':
+        return tab?.sourceTable ? null : 'Abre una tabla desde el explorador.';
+      case 'diagram':
+        if (!tab?.sourceTable || !tab.connectionId) return 'Abre una tabla desde el explorador.';
+        return this.hasConnection() ? null : connectionRequired;
+      case 'transaction-begin':
+      case 'transaction-commit':
+      case 'transaction-rollback':
+        if (!this.hasConnection()) return connectionRequired;
+        if (this.transactionBusy()) return 'Espera a que termine la operación de transacción.';
+        if (this.running()) return 'Espera a que termine la consulta en curso.';
+        if (id === 'transaction-begin') {
+          return this.transactionOpen() ? 'La conexión ya tiene una transacción abierta.' : null;
+        }
+        return this.transactionOpen() ? null : 'No hay una transacción abierta en esta conexión.';
+      default:
+        return null;
+    }
+  }
 
   ngAfterViewInit(): void {
     this._returnFocus = document.activeElement as HTMLElement | null;
@@ -368,6 +425,12 @@ export default class CommandPalette implements AfterViewInit {
     if (!item) {
       return;
     }
+
+    // La sesión puede perderse mientras la paleta está abierta. Se consulta
+    // el estado actual también al activar con ratón, no solo al pintar la fila.
+    const current = this.items().find((candidate) => candidate.id === item.id);
+    if (!current || current.disabledReason) return;
+    item = current;
 
     if (item.kind === 'command') {
       switch (item.id) {

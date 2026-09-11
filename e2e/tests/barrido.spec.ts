@@ -269,6 +269,12 @@ test.describe('barrido visual', () => {
     await expect(page.locator('app-command-palette')).toBeVisible();
     await medir(page, 'paleta');
     await foto(page, '06-paleta');
+    await page.getByLabel('Buscar comandos', { exact: true }).fill('Confirmar la transacción');
+    await expect(page.getByRole('option', { name: /^Confirmar la transacción/ }))
+      .toHaveAttribute('aria-disabled', 'true');
+    await page.getByLabel('Buscar comandos', { exact: true }).press('Enter');
+    await expect(page.locator('app-command-palette')).toBeVisible();
+    await foto(page, '06b-paleta-transaccion');
     await page.keyboard.press('Escape');
 
     // --- Muchas pestañas abiertas ------------------------------------------
