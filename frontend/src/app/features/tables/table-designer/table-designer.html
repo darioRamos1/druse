@@ -20,7 +20,7 @@
   <div class="body">
     @if (applied(); as statements) {
       <!-- Ya se aplicó: lo único que queda por hacer es enseñar qué se ejecutó. -->
-      <p class="done">Cambios aplicados.</p>
+      <p class="done" role="status">Cambios aplicados.</p>
       <pre class="sql">{{ statements.join('\n') }}</pre>
     } @else {
       <label class="field">
@@ -109,6 +109,7 @@
               (ngModelChange)="touched()"
               [disabled]="row.dropped"
               placeholder="nombre"
+              aria-label="Nombre de la columna"
             />
 
             <div class="type-picker">
@@ -193,6 +194,7 @@
               (ngModelChange)="touched()"
               [disabled]="row.dropped"
               placeholder="—"
+              aria-label="Valor por defecto"
             />
 
             <button

@@ -510,6 +510,9 @@ $RECYCLE.BIN/
 node_modules/
 frontend/dist/
 frontend/.angular/
+# La caché del compilador de Angular, que aparece donde se lance `ng`:
+# el servidor de las pruebas de punta a punta lo lanza desde la raíz.
+.angular/
 frontend/coverage/
 npm-debug.log*
 yarn-error.log*
