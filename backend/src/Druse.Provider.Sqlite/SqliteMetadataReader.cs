@@ -259,6 +259,7 @@ public sealed class SqliteMetadataReader : IDatabaseMetadataReader
         var columns = await GetColumnsAsync(session, tables, cancellationToken);
         var indexes = await GetIndexesAsync(session, tables, cancellationToken);
         var foreignKeys = await GetForeignKeysAsync(session, tables, cancellationToken);
+        var checks = await GetCheckConstraintsAsync(session, tables, cancellationToken);
 
         var wanted = Unique(tables, Key);
         var result = new Dictionary<TableRef, TableStructure>();
@@ -300,15 +301,14 @@ public sealed class SqliteMetadataReader : IDatabaseMetadataReader
                         }),
                 ],
 
-                // **Las condiciones de comprobación no se leen.**
-                //
-                // SQLite las admite, pero no las expone en ningún `PRAGMA`: lo
-                // único que hay es el `CREATE TABLE` original, en texto. Sacarlas
-                // de ahí exigiría interpretar SQL, y hacerlo a medias produciría
-                // condiciones inventadas. Por eso el diseñador tampoco las ofrece
-                // —ver `IndexCapabilities`—: enseñar un campo que se guarda y
-                // desaparece al releer sería peor que no tenerlo.
-                CheckConstraints = [],
+                // **Estas salen del texto**, no del catálogo: SQLite las aplica
+                // pero no las publica en ningún `PRAGMA`, y el `CREATE TABLE`
+                // original es lo único que las guarda. El porqué de leerlas así
+                // —y por qué hace falta leerlas— está en
+                // `SqliteCheckConstraints`.
+                CheckConstraints = checks.TryGetValue(table, out var condiciones)
+                    ? condiciones
+                    : [],
             };
         }
 
@@ -410,6 +410,51 @@ public sealed class SqliteMetadataReader : IDatabaseMetadataReader
     /// `WHERE`, que en un `CREATE INDEX` solo puede ser eso. Se enseña tal cual y
     /// no se vuelve a escribir a partir de ella.
     /// </summary>
+    /// <summary>
+    /// Las condiciones de comprobación de varias tablas, de una consulta.
+    ///
+    /// Lo que se pide es el `CREATE TABLE` entero de cada una, porque es donde
+    /// están: no hay `PRAGMA` que las enseñe. De interpretarlo se encarga
+    /// <see cref="SqliteCheckConstraints"/>, que explica lo que hace y lo que no.
+    /// </summary>
+    private static async Task<IReadOnlyDictionary<TableRef, IReadOnlyList<DatabaseCheckConstraint>>>
+        GetCheckConstraintsAsync(
+            IDatabaseSession session,
+            IReadOnlyList<DatabaseObject> tables,
+            CancellationToken cancellationToken)
+    {
+        var (placeholders, parameters) = Wanted(tables);
+
+        var sql = $"""
+            SELECT m.name, m.sql
+            FROM sqlite_master m
+            WHERE m.type = 'table' AND m.name IN ({placeholders})
+            """;
+
+        var rows = await QueryAsync(
+            session,
+            sql,
+            reader => (
+                Table: reader.GetString(0),
+                Sql: reader.IsDBNull(1) ? null : reader.GetString(1)),
+            cancellationToken,
+            parameters);
+
+        var grouped = new Dictionary<TableRef, IReadOnlyList<DatabaseCheckConstraint>>();
+
+        foreach (var row in rows)
+        {
+            var found = SqliteCheckConstraints.Read(row.Sql);
+
+            if (found.Count > 0)
+            {
+                grouped[new TableRef(null, row.Table)] = found;
+            }
+        }
+
+        return grouped;
+    }
+
     private static string? Where(string? definition)
     {
         if (definition is null)
