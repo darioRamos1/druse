@@ -73,7 +73,20 @@ public sealed class SqliteFixture : IProviderFixture
 
     public string DefaultSchemaFor(string database) => database;
 
-    public ConnectionProfile Profile(bool onlyRead = false) => new()
+    public ConnectionProfile Profile(bool onlyRead = false) => PerfilPara(Archivo.Value.Path, onlyRead);
+
+    /// <summary>
+    /// El perfil de un archivo concreto, sin preguntar cuál es el de la fixture.
+    ///
+    /// Existe por una reentrada que dejaba a este motor sin probar: la
+    /// comprobación de disponibilidad **es** la fábrica de `Archivo`, y si para
+    /// armar su perfil preguntaba por `Archivo.Value` se preguntaba a sí misma. El
+    /// `Lazy` contesta a eso con una excepción, la comprobación la recogía como
+    /// «SQLite no responde», y las cincuenta y cuatro pruebas del contrato se
+    /// saltaban en silencio. Verde y sin comprobar nada, que es justo lo que
+    /// `DRUSE_REQUIRE_ENGINES=1` existe para descubrir.
+    /// </summary>
+    private static ConnectionProfile PerfilPara(string path, bool onlyRead = false) => new()
     {
         Id = Guid.NewGuid(),
         Name = "SQLite de pruebas",
@@ -82,7 +95,7 @@ public sealed class SqliteFixture : IProviderFixture
         // validador lo respeta.
         Host = string.Empty,
         Port = 0,
-        Database = Archivo.Value.Path,
+        Database = path,
         Username = string.Empty,
         ReadOnly = onlyRead,
         ConnectTimeoutSeconds = 5,
@@ -235,9 +248,12 @@ public sealed class SqliteFixture : IProviderFixture
 
             using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
 
+            // Con el perfil del archivo que se acaba de crear, y no con el de la
+            // fixture: pedírselo a ella sería preguntar por lo que esta misma
+            // función está calculando.
             var result = fixture.Provider
                 .TestConnectionAsync(
-                    fixture.Profile() with { Database = path },
+                    PerfilPara(path),
                     default,
                     timeout.Token)
                 .GetAwaiter()
