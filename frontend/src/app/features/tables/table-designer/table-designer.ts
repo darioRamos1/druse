@@ -172,7 +172,29 @@ export class TableDesigner {
   protected readonly statements = signal<readonly string[]>([]);
   protected readonly applied = signal<readonly string[] | null>(null);
   protected readonly busy = signal(false);
+
+  /**
+   * Todavía se está leyendo la tabla, así que no hay nada que editar.
+   *
+   * No es un adorno de cortesía. El diálogo se dibujaba entero antes de que
+   * llegaran las columnas y la estructura —dos viajes al proceso local, que en un
+   * catálogo lento son segundos— y **lo que llega reemplaza lo que hubiera**:
+   * quien añadía una condición en ese hueco la veía desaparecer sin que nada se
+   * lo dijera. Se descubrió porque una prueba de punta a punta fue más rápida que
+   * el catálogo, que es exactamente lo que le pasa a alguien con una base grande.
+   */
+  protected readonly loading = signal(true);
   protected readonly error = signal<string | null>(null);
+
+  /**
+   * La consulta que enseña las filas por las que el cambio no se pudo aplicar.
+   *
+   * Solo aparece cuando el motor rechazó por **lo que ya había en la tabla**
+   * —filas que no cumplen la condición nueva, valores repetidos, huecos en una
+   * columna que deja de admitirlos—. El aviso dice qué pasa; esto es lo que
+   * permite ir a verlo sin salir de Druse y sin escribir la búsqueda a mano.
+   */
+  protected readonly offending = signal<string | null>(null);
 
   /** Nombre original, para saber si el usuario lo cambió. */
   private original = '';
@@ -191,7 +213,7 @@ export class TableDesigner {
       }
 
       loaded = true;
-      void this.load();
+      void this.loadOnce();
     });
   }
 
@@ -477,6 +499,7 @@ export class TableDesigner {
   protected touched(): void {
     this.statements.set([]);
     this.error.set(null);
+    this.offending.set(null);
   }
 
   protected async preview(): Promise<void> {
@@ -487,6 +510,7 @@ export class TableDesigner {
     }
 
     this.busy.set(true);
+    this.offending.set(null);
 
     try {
       const statements = await this._store.previewTable(this.connectionId(), design);
@@ -509,6 +533,7 @@ export class TableDesigner {
     }
 
     this.busy.set(true);
+    this.offending.set(null);
 
     try {
       const statements =
@@ -520,10 +545,37 @@ export class TableDesigner {
         this.applied.set(statements);
       } else {
         this.error.set(this._store.notice() ?? 'No se pudo aplicar el cambio.');
+        this.offending.set(this._store.noticeQuery());
       }
     } finally {
       this.busy.set(false);
     }
+  }
+
+  /**
+   * Abre en una pestaña la consulta que enseña las filas que impiden el cambio.
+   *
+   * Se cierra el diseñador al hacerlo, y no es un descuido: la pestaña queda
+   * detrás de este diálogo, así que dejarlo abierto sería ofrecer un botón que
+   * aparentemente no hace nada. Lo que el usuario tenía escrito se pierde, sí, y
+   * la alternativa —mirar las filas en otro sitio y volver— no existe.
+   */
+  protected showOffending(): void {
+    const sql = this.offending();
+
+    if (!sql) {
+      return;
+    }
+
+    this._store.createTab(
+      sql,
+      undefined,
+      this.connectionId(),
+      `${this.target().name} · filas`,
+      this.target().database,
+    );
+
+    this.closed.emit();
   }
 
   protected close(): void {
@@ -540,6 +592,14 @@ export class TableDesigner {
     const schema = this.editing() ? target.schema : target.name;
 
     return schema ? `${schema}` : (target.database ?? '');
+  }
+
+  private async loadOnce(): Promise<void> {
+    try {
+      await this.load();
+    } finally {
+      this.loading.set(false);
+    }
   }
 
   private async load(): Promise<void> {

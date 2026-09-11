@@ -16,17 +16,33 @@ import { Injectable, signal } from '@angular/core';
 @Injectable({ providedIn: 'root' })
 export class NoticeStore {
   private readonly _notice = signal<string | null>(null);
+  private readonly _query = signal<string | null>(null);
 
   /** Lo que hay que decirle al usuario ahora mismo, o `null` si nada. */
   readonly notice = this._notice.asReadonly();
 
+  /**
+   * La consulta que enseña lo que el aviso cuenta, cuando el motor la trajo.
+   *
+   * Hay avisos que no se pueden arreglar leyéndolos: «hay filas que no cumplen
+   * la condición» es cierto y no dice cuáles. El proceso local, que es quien
+   * miró, sabe escribir la consulta que las encuentra y la manda con el rechazo.
+   *
+   * Viaja pegada al aviso y no aparte a propósito: solo hay un aviso a la vez, y
+   * guardarla en otro sitio sería la forma de acabar ofreciendo la consulta de un
+   * rechazo anterior debajo de un mensaje nuevo.
+   */
+  readonly query = this._query.asReadonly();
+
   /** Dice algo al usuario, reemplazando lo anterior. */
-  set(message: string): void {
+  set(message: string, query: string | null = null): void {
     this._notice.set(message);
+    this._query.set(query);
   }
 
   /** Retira el aviso, porque el usuario lo cerró o dejó de valer. */
   clear(): void {
     this._notice.set(null);
+    this._query.set(null);
   }
 }

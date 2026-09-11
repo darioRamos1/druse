@@ -31,6 +31,8 @@ describe('TableDesigner', () => {
 
   const store = {
     notice: signal<string | null>(null),
+    noticeQuery: signal<string | null>(null),
+    createTab: vi.fn(),
     tableDataTypes: vi.fn(),
     tableColumns: vi.fn(),
     tableCapabilities: vi.fn(),
@@ -86,6 +88,8 @@ describe('TableDesigner', () => {
 
   beforeEach(async () => {
     vi.clearAllMocks();
+    store.notice.set(null);
+    store.noticeQuery.set(null);
     store.tableCapabilities.mockResolvedValue(capaces);
     store.tableStructure.mockResolvedValue(estructura);
     store.tableDataTypes.mockResolvedValue(['INT', 'NVARCHAR(255)']);
@@ -400,6 +404,96 @@ describe('TableDesigner', () => {
       'none',
       'none',
     ]);
+  });
+
+  /**
+   * Mientras se lee la tabla no hay nada que escribir, y es a propósito.
+   *
+   * El diálogo se dibujaba entero antes de que llegaran las columnas y la
+   * estructura, y **lo que llega reemplaza lo que hubiera**: una condición
+   * añadida en ese hueco desaparecía sin que nada lo dijera. Con un catálogo
+   * lento ese hueco son segundos.
+   */
+  it('no deja escribir nada hasta haber leído la tabla', async () => {
+    // Una lectura que no termina nunca, que es el hueco visto a cámara lenta.
+    store.tableStructure.mockReturnValue(new Promise(() => {}));
+
+    fixture.componentRef.setInput('target', table);
+    fixture.componentRef.setInput('connectionId', 'c1');
+    fixture.detectChanges();
+
+    for (let vuelta = 0; vuelta < 5; vuelta++) {
+      await fixture.whenStable();
+      fixture.detectChanges();
+    }
+
+    expect(fixture.nativeElement.querySelector('.loading')).not.toBeNull();
+    expect(fixture.nativeElement.querySelector('.tabs')).toBeNull();
+    expect(button('Ver SQL').disabled).toBe(true);
+  });
+
+  /**
+   * Un cambio rechazado por los datos que ya había ofrece ir a verlos.
+   *
+   * Es lo que separa un aviso de una ayuda: «hay filas que no cumplen la
+   * condición» es cierto y no dice cuáles, y buscarlas a mano es escribir la
+   * consulta uno mismo, con el diseñador abierto por delante.
+   */
+  it('ofrece ver las filas que impiden el cambio y abre la consulta que las enseña', async () => {
+    await open(table);
+
+    store.alterTable.mockResolvedValue(null);
+    store.notice.set('El cambio no se puede aplicar porque hay filas que no cumplen la condición.');
+    store.noticeQuery.set('SELECT * FROM "pedidos" WHERE NOT (total > 0);');
+
+    button('Ver SQL').click();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    button('Aplicar cambios').click();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('.feedback').textContent).toContain('no cumplen');
+
+    let cerrado = false;
+    fixture.componentInstance.closed.subscribe(() => (cerrado = true));
+
+    button('Ver las filas que lo impiden').click();
+    fixture.detectChanges();
+
+    // La consulta se abre en una pestaña con la conexión y la base de la tabla:
+    // sin ellas iría a parar a la que estuviera activa, que puede ser otra.
+    expect(store.createTab).toHaveBeenCalledWith(
+      'SELECT * FROM "pedidos" WHERE NOT (total > 0);',
+      undefined,
+      'c1',
+      'pedidos · filas',
+      'app',
+    );
+
+    // Y el diseñador se cierra: la pestaña queda detrás de este diálogo, así que
+    // dejarlo abierto sería un botón que aparenta no hacer nada.
+    expect(cerrado).toBe(true);
+  });
+
+  /** Sin filas que enseñar no hay botón: un botón que no lleva a nada estorba. */
+  it('no ofrece nada que ver cuando el rechazo no trae consulta', async () => {
+    await open(table);
+
+    store.alterTable.mockResolvedValue(null);
+    store.notice.set('No tienes permiso para modificar esta tabla.');
+
+    button('Ver SQL').click();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    button('Aplicar cambios').click();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('.feedback').textContent).toContain('permiso');
+    expect(fixture.nativeElement.querySelector('.culprits')).toBeNull();
   });
 
   function escribir(input: HTMLInputElement, value: string): void {

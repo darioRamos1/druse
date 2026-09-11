@@ -22,6 +22,10 @@
       <!-- Ya se aplicó: lo único que queda por hacer es enseñar qué se ejecutó. -->
       <p class="done" role="status">Cambios aplicados.</p>
       <pre class="sql">{{ statements.join('\n') }}</pre>
+    } @else if (loading()) {
+      <!-- Nada editable hasta que esté leída: lo que llega reemplaza lo que
+           hubiera, así que un campo escrito antes de tiempo se perdía. -->
+      <p class="loading" role="status">Leyendo la tabla…</p>
     } @else {
       <label class="field">
         <span class="field__label">Nombre de la tabla</span>
@@ -508,6 +512,13 @@
 
       @if (error(); as message) {
         <p class="feedback" role="status">{{ message }}</p>
+
+        @if (offending()) {
+          <p class="culprits">
+            <button type="button" (click)="showOffending()">Ver las filas que lo impiden</button>
+            <span>Se abre en una pestaña nueva y cierra este diálogo.</span>
+          </p>
+        }
       }
 
       @if (statements().length > 0) {
@@ -522,7 +533,7 @@
       <span class="foot__spacer"></span>
       <button type="button" class="btn btn--primary" (click)="close()">Cerrar</button>
     } @else {
-      <button type="button" class="btn" [disabled]="busy()" (click)="preview()">
+      <button type="button" class="btn" [disabled]="busy() || loading()" (click)="preview()">
         {{ busy() ? 'Un momento…' : 'Ver SQL' }}
       </button>
       <span class="foot__spacer"></span>

@@ -244,6 +244,13 @@
   white-space: pre-wrap;
 }
 
+.loading {
+  margin: 24px 0;
+  color: var(--dr-text-faint);
+  font-size: 11.5px;
+  text-align: center;
+}
+
 .warning,
 .feedback,
 .done {
@@ -270,6 +277,42 @@
   border: 1px solid var(--dr-success-line);
   background: var(--dr-success-tint);
   color: var(--dr-success);
+}
+
+/**
+ * Lo que se hace con el aviso de arriba, no otro aviso.
+ *
+ * Va suelto y sin recuadro para que no compita con él: el recuadro amarillo es
+ * el que tiene que leerse primero, y esto es el paso siguiente.
+ */
+.culprits {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+  margin: 6px 0 0;
+
+  button {
+    min-height: 26px;
+    padding: 3px 10px;
+    border: 1px solid var(--dr-border-strong);
+    border-radius: var(--dr-radius-sm);
+    background: var(--dr-surface-raised);
+    color: var(--dr-text);
+    font-family: inherit;
+    font-size: 11.5px;
+    cursor: pointer;
+
+    &:hover {
+      border-color: var(--dr-accent-line-strong);
+      color: var(--dr-accent-bright);
+    }
+  }
+
+  span {
+    color: var(--dr-text-faint);
+    font-size: 11px;
+  }
 }
 
 .tabs {

@@ -49,6 +49,26 @@ export function describeError(error: unknown): string {
 }
 
 /**
+ * La consulta que el proceso local mandó con el rechazo, si mandó alguna.
+ *
+ * Hay negativas que no se arreglan leyéndolas: «hay filas que no cumplen la
+ * condición» es verdad y no dice cuáles, y encontrarlas es escribir una consulta
+ * a mano. Quien rechazó el cambio es el único que sabe qué miró, así que la
+ * escribe él y la manda; aquí solo se recoge.
+ *
+ * Nunca se ejecuta sola: se le ofrece al usuario, que decide.
+ */
+export function diagnosticQuery(error: unknown): string | null {
+  if (!(error instanceof HttpErrorResponse)) {
+    return null;
+  }
+
+  const query = error.error?.diagnostic;
+
+  return typeof query === 'string' && query.trim().length > 0 ? query : null;
+}
+
+/**
  * El fallo es que la sesión ya no existe en el proceso local.
  *
  * Pasa más de lo que parece: el servidor cierra por inactividad, se cae la red,

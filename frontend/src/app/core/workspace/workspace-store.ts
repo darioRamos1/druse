@@ -15,7 +15,7 @@ import {
 } from '../application-gateway/application-gateway';
 import { FileSaveService, describeSave } from '../files/file-save.service';
 import { ThemeService } from '../theme/theme.service';
-import { describeError, isSessionLost } from './errors';
+import { describeError, diagnosticQuery, isSessionLost } from './errors';
 import { ConnectionStore } from './connection-store';
 import { ExecutionStore } from './execution-store';
 import { ExplorerStore } from './explorer-store';
@@ -187,6 +187,9 @@ export class WorkspaceStore {
   readonly rejection = this._execution.rejection;
 
   readonly notice = this._notices.notice;
+
+  /** La consulta que enseña lo que el aviso cuenta, si el motor la trajo. */
+  readonly noticeQuery = this._notices.query;
 
   /**
    * Tiempo máximo de ejecución, en segundos.
@@ -1435,7 +1438,10 @@ export class WorkspaceStore {
    */
   private reportFailure(connectionId: string, error: unknown): void {
     if (!this.noteSessionLoss(connectionId, error)) {
-      this._notices.set(describeError(error));
+      // Con el mensaje va la consulta que enseña lo que lo provocó, cuando el
+      // proceso local supo escribirla: sin ella, arreglar un rechazo por los
+      // datos que ya había empieza por escribir la búsqueda a mano.
+      this._notices.set(describeError(error), diagnosticQuery(error));
     }
   }
 
