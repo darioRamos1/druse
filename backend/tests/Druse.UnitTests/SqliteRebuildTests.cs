@@ -614,6 +614,276 @@ public sealed class SqliteRebuildTests : IDisposable
         Assert.Equal("1", filas.ResultSets[0].Rows[0][0]);
     }
 
+    /// <summary>
+    /// El rechazo trae **la consulta que enseña las filas** que lo provocaron.
+    ///
+    /// Decir «hay filas que no cumplen la condición» es cierto y deja el trabajo a
+    /// medias: quien lo lee tiene que escribir a mano la consulta que las busca, y
+    /// esa consulta la sabe escribir quien rechazó el cambio.
+    ///
+    /// La prueba no se conforma con que venga escrita: **la ejecuta**, que es lo
+    /// único que demuestra que señala a las filas de verdad y no a un nombre que ya
+    /// no existe después de deshacer el cambio.
+    /// </summary>
+    [Fact]
+    public async Task LaCondicionQueNoSeCumpleTraeLaConsultaQueEnsenaLasFilas()
+    {
+        await using var session = await AbrirAsync();
+
+        await EjecutarAsync(session, """
+            CREATE TABLE pedidos (id INTEGER PRIMARY KEY, cantidad INTEGER);
+            INSERT INTO pedidos (id, cantidad) VALUES (1, 5), (2, -3), (3, NULL);
+            """);
+
+        var error = await Assert.ThrowsAsync<TableChangeFailedException>(() =>
+            _designer.AlterAsync(
+                session,
+                new TableAlteration
+                {
+                    Table = Tabla("pedidos"),
+                    AddedCheckConstraints =
+                    [
+                        new CheckConstraintDefinition
+                        {
+                            Name = "ck_cantidad",
+                            Expression = "cantidad > 0",
+                        },
+                    ],
+                },
+                CancellationToken.None));
+
+        var consulta = error.Error.Diagnostic;
+
+        Assert.NotNull(consulta);
+
+        var filas = await EjecutarAsync(session, consulta);
+
+        Assert.Equal(QueryExecutionState.Succeeded, filas.State);
+
+        // Solo la que incumple. **La del valor vacío no**: en SQLite una condición
+        // que da nulo se cumple, así que señalarla sería acusar a una fila que el
+        // motor acepta.
+        Assert.Single(filas.ResultSets[0].Rows);
+        Assert.Equal("2", filas.ResultSets[0].Rows[0][0]);
+    }
+
+    /// <summary>
+    /// La consulta corre sobre **la tabla de hoy**, no sobre la que se pedía.
+    ///
+    /// Es lo que se rompe sin pensarlo: el motor nombra la columna por como iba a
+    /// llamarse, y el cambio se ha deshecho entero, así que una consulta escrita
+    /// con ese nombre fallaría con «no such column» delante de quien intenta
+    /// arreglar algo. Aquí el renombrado se deshace antes de escribirla.
+    /// </summary>
+    [Fact]
+    public async Task LaColumnaQueDejaDeAdmitirNulosSeBuscaPorSuNombreDeHoy()
+    {
+        await using var session = await AbrirAsync();
+
+        await EjecutarAsync(session, """
+            CREATE TABLE pedidos (id INTEGER PRIMARY KEY, nota TEXT);
+            INSERT INTO pedidos (id, nota) VALUES (1, 'urgente'), (2, NULL);
+            """);
+
+        var error = await Assert.ThrowsAsync<TableChangeFailedException>(() =>
+            _designer.AlterAsync(
+                session,
+                new TableAlteration
+                {
+                    Table = Tabla("pedidos"),
+                    AlteredColumns =
+                    [
+                        new ColumnAlteration
+                        {
+                            CurrentName = "nota",
+                            Column = new TableColumnDefinition
+                            {
+                                Name = "comentario",
+                                DataType = "TEXT",
+                                IsNullable = false,
+                            },
+                        },
+                    ],
+                },
+                CancellationToken.None));
+
+        var consulta = error.Error.Diagnostic;
+
+        Assert.NotNull(consulta);
+
+        // El nombre que el motor dio en su mensaje era el nuevo; el de la consulta
+        // tiene que ser el de antes, que es el que la tabla sigue teniendo.
+        Assert.Contains("nota", consulta, StringComparison.Ordinal);
+        Assert.DoesNotContain("comentario", consulta, StringComparison.Ordinal);
+
+        var filas = await EjecutarAsync(session, consulta);
+
+        Assert.Equal(QueryExecutionState.Succeeded, filas.State);
+        Assert.Single(filas.ResultSets[0].Rows);
+        Assert.Equal("2", filas.ResultSets[0].Rows[0][0]);
+    }
+
+    /// <summary>
+    /// Los repetidos se enseñan **agrupados**, con cuántas veces aparece cada uno.
+    ///
+    /// Listar las filas sueltas obligaría a emparejarlas a ojo para saber cuáles
+    /// chocan entre sí; lo que hay que ver es el valor que está dos veces.
+    /// </summary>
+    [Fact]
+    public async Task LosValoresRepetidosSeEnsenanAgrupados()
+    {
+        await using var session = await AbrirAsync();
+
+        await EjecutarAsync(session, """
+            CREATE TABLE clientes (id INTEGER PRIMARY KEY, correo TEXT);
+            INSERT INTO clientes (id, correo)
+            VALUES (1, 'ana@ejemplo.com'), (2, 'ana@ejemplo.com'), (3, 'luis@ejemplo.com');
+            """);
+
+        var error = await Assert.ThrowsAsync<TableChangeFailedException>(() =>
+            _designer.AlterAsync(
+                session,
+                new TableAlteration
+                {
+                    Table = Tabla("clientes"),
+                    AddedUniqueConstraints =
+                    [
+                        new UniqueConstraintDefinition
+                        {
+                            Name = "uq_clientes_correo",
+                            Columns = ["correo"],
+                        },
+                    ],
+                },
+                CancellationToken.None));
+
+        var consulta = error.Error.Diagnostic;
+
+        Assert.NotNull(consulta);
+
+        var filas = await EjecutarAsync(session, consulta);
+
+        Assert.Equal(QueryExecutionState.Succeeded, filas.State);
+
+        // Un solo valor repetido, y dicho cuántas veces está.
+        Assert.Single(filas.ResultSets[0].Rows);
+        Assert.Equal("ana@ejemplo.com", filas.ResultSets[0].Rows[0][0]);
+        Assert.Equal("2", filas.ResultSets[0].Rows[0][1]);
+    }
+
+    /// <summary>
+    /// Las filas que se quedan sin madre se enseñan por lo que son, no por su
+    /// `rowid`.
+    ///
+    /// El pragma que las encuentra solo devuelve el `rowid` de cada una, y un
+    /// `rowid` no dice qué fila es: hay que ir a buscarla. La consulta que se
+    /// ofrece la trae entera.
+    /// </summary>
+    [Fact]
+    public async Task LaClaveForaneaQueLosDatosNoCumplenTraeLasFilasHuerfanas()
+    {
+        await using var session = await AbrirAsync();
+
+        await EjecutarAsync(session, """
+            CREATE TABLE clientes (id INTEGER PRIMARY KEY, nombre TEXT);
+            CREATE TABLE pedidos (id INTEGER PRIMARY KEY, cliente_id INTEGER);
+            INSERT INTO clientes (id, nombre) VALUES (1, 'Ana');
+            INSERT INTO pedidos (id, cliente_id) VALUES (10, 1), (11, 999), (12, NULL);
+            """);
+
+        var error = await Assert.ThrowsAsync<DatabaseOperationException>(() =>
+            _designer.AlterAsync(
+                session,
+                new TableAlteration
+                {
+                    Table = Tabla("pedidos"),
+                    AddedForeignKeys =
+                    [
+                        new ForeignKeyDefinition
+                        {
+                            Name = "fk_pedidos_cliente",
+                            Columns = ["cliente_id"],
+                            ReferencedTable = "clientes",
+                            ReferencedColumns = ["id"],
+                        },
+                    ],
+                },
+                CancellationToken.None));
+
+        var consulta = error.Error.Diagnostic;
+
+        Assert.NotNull(consulta);
+
+        var filas = await EjecutarAsync(session, consulta);
+
+        Assert.Equal(QueryExecutionState.Succeeded, filas.State);
+
+        // La del 999 y solo esa: **la del valor vacío cumple la clave foránea** en
+        // SQLite, así que enseñarla sería mandar a corregir algo que no está mal.
+        Assert.Single(filas.ResultSets[0].Rows);
+        Assert.Equal("11", filas.ResultSets[0].Rows[0][0]);
+    }
+
+    /// <summary>
+    /// Cuando lo que no cuadra son las definiciones, se enseña **a qué apunta** la
+    /// clave de la otra tabla.
+    ///
+    /// Aquí no hay filas culpables: ninguna fila está mal, lo que está mal es que
+    /// la clave de la tabla de al lado nombra una columna que el cambio hacía
+    /// desaparecer. Lo que hace falta ver es esa clave.
+    /// </summary>
+    [Fact]
+    public async Task LaClaveRotaDeLaOtraTablaSeEnsenaEntera()
+    {
+        await using var session = await AbrirAsync();
+
+        await EjecutarAsync(session, """
+            CREATE TABLE clientes (id INTEGER PRIMARY KEY, nombre TEXT);
+            CREATE TABLE pedidos (
+              id         INTEGER PRIMARY KEY,
+              cliente_id INTEGER REFERENCES clientes (id)
+            );
+            INSERT INTO clientes (id, nombre) VALUES (1, 'Ana');
+            INSERT INTO pedidos (id, cliente_id) VALUES (10, 1);
+            """);
+
+        var error = await Assert.ThrowsAsync<DatabaseOperationException>(() =>
+            _designer.AlterAsync(
+                session,
+                new TableAlteration
+                {
+                    Table = Tabla("clientes"),
+                    AlteredColumns =
+                    [
+                        new ColumnAlteration
+                        {
+                            CurrentName = "id",
+                            Column = new TableColumnDefinition
+                            {
+                                Name = "clave",
+                                DataType = "INTEGER",
+                            },
+                        },
+                    ],
+                },
+                CancellationToken.None));
+
+        var consulta = error.Error.Diagnostic;
+
+        Assert.NotNull(consulta);
+
+        var filas = await EjecutarAsync(session, consulta);
+
+        Assert.Equal(QueryExecutionState.Succeeded, filas.State);
+        Assert.Single(filas.ResultSets[0].Rows);
+
+        // La clave de pedidos, con la tabla y la columna a las que apunta.
+        var fila = string.Join(" ", filas.ResultSets[0].Rows[0]);
+
+        Assert.Contains("clientes", fila, StringComparison.Ordinal);
+        Assert.Contains("cliente_id", fila, StringComparison.Ordinal);
+    }
+
     /// <summary>El cambio de tipo más simple, que es el que obliga a reconstruir.</summary>
     private static TableAlteration Cambiar(string table, string column) => new()
     {

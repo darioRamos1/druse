@@ -511,46 +511,82 @@ public sealed class SqliteTableDesigner : TableDesignerBase
 
         foreach (var nombre in revisar)
         {
-            await ComprobarAsync(connection, transaction, nombre, tabla, cancellationToken);
+            await ComprobarAsync(
+                connection,
+                transaction,
+                nombre,
+                tabla,
+                alteration.Table.Name,
+                cancellationToken);
         }
     }
 
-    /// <summary>Una tabla contra sus claves foráneas, con el fallo ya contado.</summary>
+    /// <summary>
+    /// Una tabla contra sus claves foráneas, con el fallo ya contado y con la
+    /// consulta que enseña las filas culpables.
+    ///
+    /// El nombre de la tabla aparece aquí de dos formas y **no son la misma**:
+    /// dentro de la transacción la tabla reconstruida ya se llama como se va a
+    /// llamar, y la consulta que se ofrece se ejecutará después, cuando el rechazo
+    /// haya deshecho el cambio entero y la tabla vuelva a llamarse como se llamaba.
+    /// Por eso el nombre de antes viaja aparte.
+    /// </summary>
     private async Task ComprobarAsync(
         DbConnection connection,
         DbTransaction? transaction,
         string tabla,
         string reconstruida,
+        string original,
         CancellationToken cancellationToken)
     {
-        await using var command = connection.CreateCommand();
+        // Cómo se llamará cada tabla cuando el rechazo haya deshecho el cambio.
+        string Despues(string nombre) =>
+            string.Equals(nombre, reconstruida, StringComparison.OrdinalIgnoreCase)
+                ? original
+                : nombre;
 
-        command.Transaction = transaction;
+        long clave;
 
-        // El nombre no puede ir como parámetro: `foreign_key_check` lo quiere como
-        // identificador. Va citado por el mismo sitio que el resto del DDL.
-        command.CommandText = $"PRAGMA foreign_key_check({Quote(tabla)});";
-
-        try
+        await using (var command = connection.CreateCommand())
         {
-            await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+            command.Transaction = transaction;
 
-            if (!await reader.ReadAsync(cancellationToken))
+            // El nombre no puede ir como parámetro: `foreign_key_check` lo quiere
+            // como identificador. Va citado por el mismo sitio que el resto del DDL.
+            command.CommandText = $"PRAGMA foreign_key_check({Quote(tabla)});";
+
+            try
             {
-                return;
+                await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+
+                if (!await reader.ReadAsync(cancellationToken))
+                {
+                    return;
+                }
+
+                // El pragma devuelve la tabla, el `rowid` de la fila que sobra, la
+                // tabla madre y **cuál** de las claves foráneas es. Ese número es lo
+                // único con lo que se puede escribir después la consulta.
+                clave = Convert.ToInt64(reader.GetValue(3), CultureInfo.InvariantCulture);
             }
-        }
-        catch (Exception error) when (error is not OperationCanceledException)
-        {
-            throw new DatabaseOperationException(new QueryError
+            catch (Exception error) when (error is not OperationCanceledException)
             {
-                Message =
-                    $"Reconstruir «{reconstruida}» dejaría rota la clave foránea de «{tabla}»: " +
-                    "apunta a una columna que después del cambio ya no existe. Cambia primero " +
-                    $"esa clave en «{tabla}», o conserva la columna a la que apunta. " +
-                    "No se aplicó nada.",
-                Code = "foreign_key_mismatch",
-            });
+                throw new DatabaseOperationException(new QueryError
+                {
+                    Message =
+                        $"Reconstruir «{reconstruida}» dejaría rota la clave foránea de «{tabla}»: " +
+                        "apunta a una columna que después del cambio ya no existe. Cambia primero " +
+                        $"esa clave en «{tabla}», o conserva la columna a la que apunta. " +
+                        "No se aplicó nada.",
+                    Code = "foreign_key_mismatch",
+
+                    // Aquí no hay filas culpables: lo que no cuadra son las
+                    // definiciones. Lo que hace falta ver es **a qué apunta** cada
+                    // clave de la otra tabla, que es lo que este pragma enseña.
+                    Diagnostic =
+                        $"SELECT * FROM pragma_foreign_key_list({TextLiteral(Despues(tabla))});",
+                });
+            }
         }
 
         throw new DatabaseOperationException(new QueryError
@@ -560,7 +596,132 @@ public sealed class SqliteTableDesigner : TableDesignerBase
                 "apuntan. Suele pasar al cambiar el tipo de una columna referenciada: el valor " +
                 "guardado deja de casar con el de la otra tabla. No se aplicó nada.",
             Code = "foreign_key_violation",
+            Diagnostic = await HuerfanasAsync(
+                connection,
+                transaction,
+                tabla,
+                clave,
+                Despues,
+                cancellationToken),
         });
+    }
+
+    /// <summary>
+    /// La consulta que enseña las filas sin madre, escrita a partir de la clave
+    /// foránea que el pragma señaló.
+    ///
+    /// Se escribe con `NOT EXISTS` y no con el pragma porque el pragma solo
+    /// devuelve `rowid`, y un `rowid` no dice qué fila es: hay que ir a buscarla.
+    /// Así la consulta enseña **las filas**, que es lo que hay que arreglar.
+    ///
+    /// La columna nula se deja fuera a propósito: en SQLite una clave foránea con
+    /// un valor nulo **se cumple**, así que enseñarla sería señalar como culpable a
+    /// una fila que el motor acepta.
+    ///
+    /// Devuelve `null` si la clave no se encuentra o si la madre no declara clave
+    /// primaria: una consulta escrita a medias es peor que ninguna.
+    /// </summary>
+    private async Task<string?> HuerfanasAsync(
+        DbConnection connection,
+        DbTransaction? transaction,
+        string tabla,
+        long clave,
+        Func<string, string> despues,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(despues);
+
+        var madre = string.Empty;
+        var columnas = new List<(long Orden, string Hija, string? Madre)>();
+
+        await using (var command = connection.CreateCommand())
+        {
+            command.Transaction = transaction;
+            command.CommandText = $"PRAGMA foreign_key_list({Quote(tabla)});";
+
+            await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+
+            while (await reader.ReadAsync(cancellationToken))
+            {
+                if (Convert.ToInt64(reader.GetValue(0), CultureInfo.InvariantCulture) != clave)
+                {
+                    continue;
+                }
+
+                madre = reader.GetString(2);
+
+                columnas.Add((
+                    Convert.ToInt64(reader.GetValue(1), CultureInfo.InvariantCulture),
+                    reader.GetString(3),
+                    reader.IsDBNull(4) ? null : reader.GetString(4)));
+            }
+        }
+
+        if (madre.Length == 0 || columnas.Count == 0)
+        {
+            return null;
+        }
+
+        var pares = columnas.OrderBy(columna => columna.Orden).ToList();
+
+        // Una clave escrita sin decir a qué columna apunta señala a la clave
+        // primaria de la madre, y eso hay que ir a preguntarlo.
+        if (pares.Exists(par => par.Madre is null))
+        {
+            var primaria = await PrimariaAsync(connection, transaction, madre, cancellationToken);
+
+            if (primaria.Count != pares.Count)
+            {
+                return null;
+            }
+
+            pares = [.. pares.Select((par, indice) => (par.Orden, par.Hija, (string?)primaria[indice]))];
+        }
+
+        var hija = Quote(despues(tabla));
+        var referida = Quote(despues(madre));
+
+        var noNulas = string.Join(
+            " AND ",
+            pares.Select(par => $"d.{Quote(par.Hija)} IS NOT NULL"));
+
+        var empareja = string.Join(
+            " AND ",
+            pares.Select(par => $"m.{Quote(par.Madre!)} = d.{Quote(par.Hija)}"));
+
+        return $"SELECT d.* FROM {hija} d WHERE {noNulas} "
+            + $"AND NOT EXISTS (SELECT 1 FROM {referida} m WHERE {empareja});";
+    }
+
+    /// <summary>Las columnas de la clave primaria, en su orden.</summary>
+    private async Task<IReadOnlyList<string>> PrimariaAsync(
+        DbConnection connection,
+        DbTransaction? transaction,
+        string tabla,
+        CancellationToken cancellationToken)
+    {
+        await using var command = connection.CreateCommand();
+
+        command.Transaction = transaction;
+        command.CommandText = $"PRAGMA table_info({Quote(tabla)});";
+
+        var columnas = new List<(long Orden, string Nombre)>();
+
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            // La última columna dice si la columna está en la clave primaria y en
+            // qué posición: 0 es que no está.
+            var orden = Convert.ToInt64(reader.GetValue(5), CultureInfo.InvariantCulture);
+
+            if (orden > 0)
+            {
+                columnas.Add((orden, reader.GetString(1)));
+            }
+        }
+
+        return [.. columnas.OrderBy(columna => columna.Orden).Select(columna => columna.Nombre)];
     }
 
     /// <summary>
@@ -576,30 +737,41 @@ public sealed class SqliteTableDesigner : TableDesignerBase
     /// Solo se toca ese paso, que se reconoce por el nombre de la tabla temporal.
     /// El mismo error en cualquier otro sitio habla de otra cosa y se deja como
     /// está.
+    ///
+    /// Y con el motivo va **la consulta que enseña las filas culpables**, porque
+    /// decir «hay filas que no cumplen» sin decir cuáles deja el trabajo a medias:
+    /// quien lo lee tendría que escribirla a mano, y aquí se sabe escribir.
     /// </summary>
-    protected override QueryError Explain(QueryError failure, string statement)
+    protected override QueryError Explain(
+        QueryError failure,
+        string statement,
+        TableAlteration? alteration)
     {
         ArgumentNullException.ThrowIfNull(failure);
         ArgumentNullException.ThrowIfNull(statement);
 
         if (!statement.StartsWith("INSERT INTO", StringComparison.Ordinal)
-            || !statement.Contains(Sufijo, StringComparison.Ordinal))
+            || !statement.Contains(Sufijo, StringComparison.Ordinal)
+            || alteration is null)
         {
             return failure;
         }
 
-        var porque = failure.Message switch
+        var (porque, consulta) = failure.Message switch
         {
             var m when m.Contains("CHECK constraint failed", StringComparison.Ordinal) =>
-                "hay filas que no cumplen la condición de comprobación",
+                ("hay filas que no cumplen la condición de comprobación",
+                    FilasQueNoCumplen(alteration, m)),
 
             var m when m.Contains("NOT NULL constraint failed", StringComparison.Ordinal) =>
-                "hay filas con el valor vacío en una columna que ya no admite nulos",
+                ("hay filas con el valor vacío en una columna que ya no admite nulos",
+                    FilasVacias(alteration, m)),
 
             var m when m.Contains("UNIQUE constraint failed", StringComparison.Ordinal) =>
-                "hay valores repetidos en una columna que ya no admite repetidos",
+                ("hay valores repetidos en una columna que ya no admite repetidos",
+                    FilasRepetidas(alteration, m)),
 
-            _ => null,
+            _ => (null, null),
         };
 
         return porque is null
@@ -610,7 +782,122 @@ public sealed class SqliteTableDesigner : TableDesignerBase
                     $"El cambio no se puede aplicar porque {porque}. Es lo que hay hoy en la " +
                     $"tabla, no lo que se acaba de escribir. El motor dijo: {failure.Message} " +
                     "No se aplicó nada.",
+                Diagnostic = consulta,
             };
+    }
+
+    /// <summary>
+    /// Las filas que la condición nueva no admite.
+    ///
+    /// `NOT (condición)` y no `condición = 0` a propósito: en SQLite una condición
+    /// que da nulo **la cumple**, y `NOT` de un nulo sigue siendo nulo, así que la
+    /// consulta deja fuera exactamente las mismas filas que el motor dejó pasar.
+    ///
+    /// La condición sale del cambio pedido, que es donde está escrita. Si el motor
+    /// señala una que no viene en el cambio —una que ya estaba y que el tipo nuevo
+    /// deja de cumplir— no hay nada que enseñar: aquí no tenemos su expresión.
+    /// </summary>
+    private string? FilasQueNoCumplen(TableAlteration alteration, string mensaje)
+    {
+        var nombre = TrasLosDosPuntos(mensaje);
+
+        var condicion = alteration.AddedCheckConstraints.FirstOrDefault(check =>
+            string.Equals(check.Name, nombre, StringComparison.OrdinalIgnoreCase));
+
+        // Una condición anónima no se puede buscar por nombre; si el cambio trae
+        // una sola, no hay otra a la que el motor pueda estar refiriéndose.
+        condicion ??= alteration.AddedCheckConstraints.Count == 1
+            ? alteration.AddedCheckConstraints[0]
+            : null;
+
+        return condicion is null
+            ? null
+            : $"SELECT * FROM {Quote(alteration.Table.Name)} WHERE NOT ({condicion.Expression});";
+    }
+
+    /// <summary>
+    /// Las filas vacías en la columna que deja de admitirlas.
+    ///
+    /// El mensaje nombra la columna por como va a llamarse, y la consulta corre
+    /// sobre la tabla de hoy: si el mismo cambio la renombraba, aquí se deshace ese
+    /// nombre. Y si la columna **se está añadiendo**, no hay filas que enseñar
+    /// —les falta a todas— y no se ofrece consulta.
+    /// </summary>
+    private string? FilasVacias(TableAlteration alteration, string mensaje)
+    {
+        var columna = TrasElPunto(TrasLosDosPuntos(mensaje));
+
+        if (columna.Length == 0 || EsAñadida(alteration, columna))
+        {
+            return null;
+        }
+
+        return $"SELECT * FROM {Quote(alteration.Table.Name)} "
+            + $"WHERE {Quote(DeOrigen(alteration, columna))} IS NULL;";
+    }
+
+    /// <summary>
+    /// Los valores que se repiten en lo que pasa a ser único, y cuántas veces.
+    ///
+    /// Se agrupa en vez de listar las filas porque lo que hay que ver es **el valor
+    /// repetido**: con las filas sueltas delante todavía habría que emparejarlas a
+    /// ojo para saber cuáles chocan entre sí.
+    /// </summary>
+    private string? FilasRepetidas(TableAlteration alteration, string mensaje)
+    {
+        var columnas = TrasLosDosPuntos(mensaje)
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(TrasElPunto)
+            .Where(columna => columna.Length > 0 && !EsAñadida(alteration, columna))
+            .Select(columna => Quote(DeOrigen(alteration, columna)))
+            .ToList();
+
+        if (columnas.Count == 0)
+        {
+            return null;
+        }
+
+        var lista = string.Join(", ", columnas);
+
+        return $"SELECT {lista}, COUNT(*) AS repeticiones "
+            + $"FROM {Quote(alteration.Table.Name)} "
+            + $"GROUP BY {lista} HAVING COUNT(*) > 1;";
+    }
+
+    /// <summary>Cómo se llama hoy una columna que el cambio renombra.</summary>
+    private static string DeOrigen(TableAlteration alteration, string columna) =>
+        alteration.AlteredColumns
+            .FirstOrDefault(change =>
+                string.Equals(change.Column.Name, columna, StringComparison.OrdinalIgnoreCase))
+            ?.CurrentName
+        ?? columna;
+
+    private static bool EsAñadida(TableAlteration alteration, string columna) =>
+        alteration.AddedColumns.Any(added =>
+            string.Equals(added.Name, columna, StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>
+    /// Lo que el motor pone detrás de «: », que es donde nombra lo que falló.
+    ///
+    /// El driver envuelve el mensaje del motor: «SQLite Error 19: 'CHECK constraint
+    /// failed: ck_cantidad'.». Por eso el corte es por el **último** «: » y por eso
+    /// se quitan después la comilla y el punto que cierran.
+    /// </summary>
+    private static string TrasLosDosPuntos(string mensaje)
+    {
+        var corte = mensaje.LastIndexOf(": ", StringComparison.Ordinal);
+
+        var resto = corte < 0 ? mensaje : mensaje[(corte + 2)..];
+
+        return resto.TrimEnd('.', ' ').Trim('\'');
+    }
+
+    /// <summary>De `tabla.columna`, la columna. Sin punto, lo que había.</summary>
+    private static string TrasElPunto(string referencia)
+    {
+        var corte = referencia.LastIndexOf('.');
+
+        return corte < 0 ? referencia : referencia[(corte + 1)..];
     }
 
     private static async Task PragmaAsync(

@@ -1174,9 +1174,16 @@ public abstract class TableDesignerBase : ITableDesigner, IDatabaseScripter
     /// reconstruyendo habla de **las que ya estaban**, que es otra conversación y
     /// otra decisión.
     ///
+    /// Es además el único sitio con lo que hace falta para **escribir la consulta
+    /// que enseña las filas culpables**: el paso dice qué se estaba haciendo y el
+    /// cambio pedido dice sobre qué. De ahí que reciba la alteración entera.
+    ///
     /// Por omisión no se toca: el motor lo dijo bien.
     /// </summary>
-    protected virtual QueryError Explain(QueryError failure, string statement) => failure;
+    protected virtual QueryError Explain(
+        QueryError failure,
+        string statement,
+        TableAlteration? alteration) => failure;
 
     /// <summary>
     /// Ejecuta las instrucciones que este mismo objeto acaba de escribir.
@@ -1236,7 +1243,7 @@ public abstract class TableDesignerBase : ITableDesigner, IDatabaseScripter
                 // las anteriores. Donde el motor no deshace el DDL, esas se
                 // quedan, y la tabla ya no es la que el diseñador tenía delante.
                 throw new TableChangeFailedException(
-                    Explain(Normalize(error), sql),
+                    Explain(Normalize(error), sql, alteration),
                     sql,
                     applied,
                     reverted: scope is not null);

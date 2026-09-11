@@ -105,6 +105,21 @@ public sealed record QueryError
 
     /// <summary>Línea dentro del SQL, si el motor la reporta. Base 1.</summary>
     public int? Line { get; init; }
+
+    /// <summary>
+    /// Consulta que **enseña las filas** por las que el motor dijo que no.
+    ///
+    /// Hay rechazos que se explican con palabras y no se pueden arreglar con
+    /// ellas: «hay filas que no cumplen la condición» es cierto, y quien lo lee
+    /// sigue sin saber cuáles. Encontrarlas es escribir una consulta a mano, y
+    /// esa consulta la sabe escribir quien rechazó el cambio, que es el único
+    /// que sabe qué miró.
+    ///
+    /// Es SQL listo para ejecutar contra la misma conexión, no una plantilla.
+    /// `null` cuando no hay filas que enseñar —un permiso que falta, un nombre
+    /// que ya existe— o cuando el motivo no se puede convertir en una consulta.
+    /// </summary>
+    public string? Diagnostic { get; init; }
 }
 
 /// <summary>Resultado completo de una ejecución.</summary>

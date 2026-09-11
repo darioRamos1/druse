@@ -172,6 +172,11 @@ app.Use(async (context, next) =>
             statement = exception.Statement,
             applied = exception.Applied,
             reverted = exception.Reverted,
+
+            // Y, cuando el motivo son las filas que ya había, la consulta que las
+            // enseña: el mensaje dice qué pasa y esto es lo que permite arreglarlo
+            // sin salir de Druse.
+            diagnostic = exception.Error.Diagnostic,
         });
     }
     catch (DatabaseOperationException exception)
@@ -193,11 +198,14 @@ app.Use(async (context, next) =>
         context.Response.StatusCode = StatusCodes.Status409Conflict;
 
         // Sin campo `reason`: ese lo usa el cliente para reconocer los avisos que
-        // se pueden confirmar, y esto no se confirma, se arregla.
+        // se pueden confirmar, y esto no se confirma, se arregla. Y arreglarlo a
+        // veces es mirar unas filas, así que va la consulta que las enseña cuando
+        // quien rechazó supo escribirla.
         await context.Response.WriteAsJsonAsync(new
         {
             message = exception.Error.Message,
             code = exception.Error.Code,
+            diagnostic = exception.Error.Diagnostic,
         });
     }
     catch (Exception exception)
