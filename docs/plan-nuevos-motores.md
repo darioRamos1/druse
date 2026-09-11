@@ -276,6 +276,9 @@ lo que declara la familia.
   es mucho más ligera y rápida de arrancar que las imágenes oficiales).
 - [x] **MOT-026:** recorrido contra un Oracle real, con el barrido de capturas y
   una prueba de punta a punta propia (`e2e/tests/oracle.spec.ts`).
+- [x] **MOT-027:** que un guion con varias instrucciones se ejecute entero, que
+  es lo que hacen los otros cinco motores por su cuenta y aquí tenía que hacer
+  Druse: `OracleScript` parte el texto y el ejecutor recorre lo partido.
 
 ### Lo que Oracle obligó a cambiar fuera de su carpeta
 
@@ -287,6 +290,39 @@ Cuatro cosas, y las cuatro eran huecos de verdad y no concesiones al motor:
 | `BackupIsolation.Serializable` | Oracle no admite `RepeatableRead` como nivel de ADO: su driver lo rechaza con `ORA-50002`, y lo que él llama serializable es justo lo que hacía falta —lecturas consistentes que no bloquean a quien escribe—. De paso, un nivel rechazado ya no tumba el respaldo |
 | `ColumnValueParser` | No conocía `NUMBER` ni `RAW`, que son **los** tipos numérico y binario de Oracle. Sin eso, una columna de enteros se clasificaba como texto y el respaldo la escribía entrecomillada |
 | `IProviderFixture.Stored` y `HasEmptyStrings` | Dos hechos de Oracle que no se pueden fingir: pliega a mayúsculas lo que no va citado, y `''` **es** `NULL` |
+
+### Y el guion que no se podía ejecutar entero
+
+Quedaba declarado y sin resolver: pegar dos consultas y pulsar Ejecutar devolvía
+`ORA-00911`. Los otros cinco motores encadenan por su cuenta y el guion entero
+viaja en un comando; Oracle no, porque el punto y coma es de SQL*Plus y no del
+protocolo. **Partirlo es trabajo de Druse**, y ese trabajo es el que faltaba.
+
+Lo hace `OracleScript`, con el mismo criterio que `SqlStatementReader` aplica al
+leer un respaldo y `sql-statements.ts` para «Ejecutar actual»: el punto y coma
+solo separa cuando está fuera de un literal, de un identificador citado y de un
+comentario. Aquí se añade lo que en los otros dos no hacía falta, porque allí no
+se sabe de qué motor viene el texto y aquí sí:
+
+- **El literal alternativo `q'[…]'`**, que es de Oracle y de nadie más, y que
+  existe justo para escribir textos llenos de comillas y de puntos y coma: es
+  donde más daño haría cortar mal.
+- **Los bloques PL/SQL no se parten.** Ahí el punto y coma es del lenguaje, y lo
+  que termina el bloque es la barra sola en su línea. Un bloque sin barra se
+  lleva el resto del guion —lo mismo que hacen SQL*Plus, SQL Developer y
+  DBeaver—, y por eso la barra no es opcional cuando detrás viene algo más.
+
+Tres decisiones del ejecutor, que son las que se ven desde la pantalla:
+
+| Qué | Por qué |
+| --- | --- |
+| El tope de filas es del guion entero | Lo que se lleva una instrucción es lo que le falta a la siguiente. Dos instrucciones no dan derecho al doble de filas, igual que no lo dan dos resultados de un mismo comando |
+| Las filas tocadas se suman | Un guion que inserta en dos tablas ha tocado las de las dos; enseñar solo las de la última sería decir que se hizo menos de lo que se hizo |
+| El error dice **cuál** falló y qué quedó hecho | Aquí no hay vuelta atrás automática: lo anterior sigue en pie, dentro de la transacción y deshacible a mano. Con una sola instrucción el mensaje no se toca, que es lo que ve casi siempre |
+
+Y al exportar se manda **la primera** instrucción, que es lo que ya ocurría en
+los demás motores sin que nadie lo hubiera escrito: allí el guion entero viaja en
+un comando y el lector se queda con el primer resultado.
 
 ### Dos decisiones que costaron varias vueltas
 
@@ -307,10 +343,6 @@ formatos de fecha nada más abrirse.
 
 ### Lo que queda declarado, no resuelto
 
-- **Un lote con varias instrucciones no se puede ejecutar de una vez.** Oracle no
-  encadena con punto y coma, y partir el texto es una función de Druse —no del
-  proveedor— que hoy no existe. Quien pegue dos consultas y pulse Ejecutar recibe
-  `ORA-00911`.
 - **No se dice dónde falló un error de sintaxis.** El servidor sabe el
   desplazamiento; ODP.NET no lo expone.
 - **Los paquetes no salen en el árbol.** Los procedimientos que viven dentro de
@@ -573,6 +605,57 @@ medidas. Es la décima parte de una operación que ya está copiando todas las f
 de la tabla, así que no hay nada que optimizar; lo que había que saber es que no
 es un coste que se dispare.
 
+### Lo que se descubrió al exigir los motores
+
+`DRUSE_REQUIRE_ENGINES=1` —MOT-042— existe para que un motor caído sea un fallo y
+no una suite verde que no comprobó nada. La primera vez que se usó de verdad
+contestó lo que nadie esperaba: **SQLite no estaba disponible**, y sus 54 pruebas
+del contrato se saltaban enteras desde que el motor entró en la fase 2.
+
+No era el motor sino su fixture: la comprobación de disponibilidad **es** la
+fábrica del `Lazy` que guarda la ruta del archivo, y para armar su perfil
+preguntaba por `Archivo.Value`, es decir, por lo que esa misma función estaba
+calculando. El `Lazy` responde a la reentrada con una excepción, y la fixture la
+recogía como «este motor no responde».
+
+Lo que apareció al arreglarlo:
+
+- **La cancelación no cancelaba.** El ejecutor llamaba a `SqliteCommand.Cancel()`
+  creyendo que detrás estaba `sqlite3_interrupt`. No lo está: ese método del
+  driver no hace nada, y una consulta con un plazo de un segundo tardó **285
+  segundos**, que es lo que tardaba en terminar sola. Ahora se llama a
+  `sqlite3_interrupt` sobre la conexión y el corte es inmediato.
+- **Seis pruebas del contrato en rojo**, que son hallazgos y no regresiones. La
+  peor: el guion de restauración escribe `ALTER TABLE … ADD CONSTRAINT … FOREIGN
+  KEY`, que SQLite no admite. Quedan anotadas en la bitácora de la 055.
+
+La lección no es de SQLite: **una fixture que dice que su motor no responde es
+indistinguible de un motor apagado**, y las dos cosas dejan la suite verde. La
+variable estaba puesta en la integración continua desde hace sesiones, pero la
+integración continua lleva parada por la facturación, así que nadie la había
+visto contestar.
+
+### El aviso que a SQLite le faltaba
+
+Escribir las pruebas del traductor de tipos para este motor —MOT-043— destapó un
+hueco que llevaba ahí desde antes: **el traslado no avisaba de que se pierden las
+fechas**.
+
+El traductor pregunta por lo que el destino no guarda —columnas de varios
+valores, JSON, identificadores únicos, la zona horaria, el booleano— y con eso
+cubría a los cinco motores anteriores, porque **todos guardan fechas**. SQLite es
+el primero que no: no tiene fecha, ni hora, ni marca de tiempo, y lo que llega se
+guarda como texto o como número. Sin ese aviso, un traslado a un archivo prometía
+una copia exacta que no lo era.
+
+Ahora la pregunta se hace antes que la de la zona horaria, y a propósito: cuando
+el destino no guarda fechas de ninguna clase, decir que se pierde el huso sería
+quedarse muy corto.
+
+Y va donde va —en el traductor, mirando lo que el motor declara— y no en una
+excepción para SQLite: el motor que alguien añada mañana y que tampoco guarde
+fechas hereda el aviso sin tocar nada.
+
 ### Lo que queda declarado, no resuelto
 
 - **Druse no crea el archivo al abrirlo**, y eso no cambia: una ruta mal escrita
@@ -593,17 +676,29 @@ que se comprueba es idéntico para todos los motores, y **si hubiera que cambiar
 una comprobación para que pase en uno concreto, sería señal de que se coló una
 fuga de dialecto en las abstracciones**.
 
-- [ ] **MOT-040:** `OracleFixture` y `SqliteFixture` implementando
+- [x] **MOT-040:** `OracleFixture` y `SqliteFixture` implementando
   `IProviderFixture` entero, incluido `TypesByFamily`. Recordar que **una familia
   ausente es una declaración, no un olvido**.
-- [ ] **MOT-041:** vigilar el tamaño de `IProviderFixture`. Si crece mucho con
+- [x] **MOT-041:** vigilar el tamaño de `IProviderFixture`. Si crece mucho con
   estos dos motores, la conclusión no es «ya está», es que las abstracciones están
-  dejando pasar diferencias que deberían absorber.
-- [ ] **MOT-042:** `DRUSE_REQUIRE_ENGINES=1` en integración continua, para que un
-  motor caído sea un fallo y no una suite verde que no comprobó nada.
-- [ ] **MOT-043:** pruebas unitarias de cadena de conexión y del traductor de
+  dejando pasar diferencias que deberían absorber. **No creció por el lote de
+  Oracle**: lo que ese motor hace distinto se resolvió partiendo el guion en el
+  proveedor, y las pruebas propias viven en `OracleBatchTests` sin pedirle nada
+  nuevo a la fixture compartida.
+- [x] **MOT-042:** `DRUSE_REQUIRE_ENGINES=1` en integración continua, para que un
+  motor caído sea un fallo y no una suite verde que no comprobó nada. Está puesto
+  en `ci.yml`; la integración continua sigue parada por la facturación de GitHub,
+  así que **no se ha visto correr**.
+- [x] **MOT-043:** pruebas unitarias de cadena de conexión y del traductor de
   tipos —las traducciones con pérdida, una por una, con su aviso—.
-- [ ] **MOT-044:** ampliar el barrido e2e con un perfil por motor nuevo.
+  `OracleConnectionStringTests` (servicio, SID, TCPS) y
+  `SqliteConnectionStringTests` (**abrir no crea**, que es la decisión que más
+  fácil se deshace sin querer). Escribir las del traductor destapó un aviso que
+  faltaba: ver más abajo.
+- [x] **MOT-044:** ampliar el barrido e2e con un perfil por motor nuevo. Cada uno
+  aporta sus capturas desde su propio archivo —`sqlite.spec.ts` y
+  `oracle.spec.ts`— y no desde `barrido.spec.ts`, porque necesitan su contenedor
+  y el barrido tiene que poder correr con solo PostgreSQL delante.
 
 ---
 
