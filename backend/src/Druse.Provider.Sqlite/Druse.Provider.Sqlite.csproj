@@ -12,6 +12,15 @@
       Es la única dependencia de los cinco proveedores que no había que traer.
     -->
     <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.11" />
+
+    <!--
+      Ya viajaba debajo del anterior, y se declara porque ahora **se usa**:
+      `sqlite3_interrupt` es lo único que corta una consulta en marcha, y no está
+      en la superficie de Microsoft.Data.Sqlite. Sin esta línea la dependencia
+      seguiría funcionando por transitiva, que es la forma de que un día
+      desaparezca sin que nadie sepa por qué.
+    -->
+    <PackageReference Include="SQLitePCLRaw.core" Version="2.1.12" />
   </ItemGroup>
 
   <ItemGroup>

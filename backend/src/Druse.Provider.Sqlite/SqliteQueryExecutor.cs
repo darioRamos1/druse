@@ -64,11 +64,12 @@ public sealed class SqliteQueryExecutor : IQueryExecutor
             // nada.
             command.Transaction = (SqliteTransaction?)sqlite.Transaction.Current;
 
-            // Lo que corta una consulta en marcha es `sqlite3_interrupt`, y es lo
-            // que hay detrás de esto. Sin la llamada, el token solo se miraría
-            // entre una instrucción y la siguiente: una sola consulta larga
-            // llegaría hasta el final.
-            await using var registration = linked.Token.Register(Interrumpir, command);
+            // Lo que corta una consulta en marcha es `sqlite3_interrupt`, y hay
+            // que llamarlo **sobre la conexión**. Sin esto, el token solo se
+            // miraría entre una fila y la siguiente: una consulta que tarda en
+            // devolver la primera —un recuento, una ordenación, un recorrido
+            // entero— llega hasta el final aunque nadie la espere ya.
+            await using var registration = linked.Token.Register(Interrumpir, sqlite.Connection);
 
             await using var reader = await command.ExecuteReaderAsync(linked.Token);
 
@@ -143,7 +144,17 @@ public sealed class SqliteQueryExecutor : IQueryExecutor
     }
 
     /// <summary>
-    /// Le pide al motor que corte lo que está haciendo.
+    /// Le pide al motor que corte lo que está haciendo, de verdad.
+    ///
+    /// **`SqliteCommand.Cancel()` no hace nada**: el driver lo declara y lo
+    /// cumple, así que llamarlo dejaba la consulta corriendo hasta el final. Con
+    /// un plazo de un segundo, una consulta pesada tardaba **285 segundos** en
+    /// darse por vencida, y ninguna prueba lo veía porque las del contrato de
+    /// SQLite se estaban saltando enteras.
+    ///
+    /// Lo que sí corta es `sqlite3_interrupt`, que es de la biblioteca nativa y
+    /// va sobre la conexión, no sobre el comando. Deja la conexión utilizable: la
+    /// instrucción en curso devuelve `SQLITE_INTERRUPT` y ahí se acaba.
     ///
     /// Va aparte porque puede fallar por su cuenta —si el comando ya terminó— y
     /// esa excepción saltaría dentro del registro del token, donde no la
@@ -153,7 +164,10 @@ public sealed class SqliteQueryExecutor : IQueryExecutor
     {
         try
         {
-            (state as SqliteCommand)?.Cancel();
+            if (state is SqliteConnection { Handle: { } handle })
+            {
+                SQLitePCL.raw.sqlite3_interrupt(handle);
+            }
         }
         catch (Exception)
         {
