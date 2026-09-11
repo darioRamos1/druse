@@ -76,6 +76,8 @@ export class EditorToolbar {
   readonly running = input(false);
   readonly canceling = input(false);
   readonly hasSelection = input(false);
+  readonly maximized = input(false);
+  readonly toggleMaximize = output<void>();
   /** Hay una conexión abierta contra la que ejecutar. */
   readonly canExecute = input(false);
 

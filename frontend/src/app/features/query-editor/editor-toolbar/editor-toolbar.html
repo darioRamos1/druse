@@ -322,3 +322,16 @@
     </div>
   }
 </div>
+
+<button
+  type="button"
+  class="btn panel-toggle"
+  [attr.aria-label]="maximized() ? 'Restaurar editor y resultados' : 'Maximizar editor'"
+  [title]="maximized() ? 'Restaurar editor y resultados' : 'Maximizar editor'"
+  (click)="toggleMaximize.emit()"
+>
+  <app-icon [name]="maximized() ? 'panel-split' : 'maximize'" [size]="14" />
+  @if (maximized()) {
+    Restaurar
+  }
+</button>

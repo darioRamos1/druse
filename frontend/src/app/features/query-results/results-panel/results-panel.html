@@ -197,6 +197,18 @@
       </ul>
     }
   </div>
+  <button
+    type="button"
+    class="tool-button panel-toggle"
+    [attr.aria-label]="maximized() ? 'Restaurar editor y resultados' : 'Maximizar resultados'"
+    [title]="maximized() ? 'Restaurar editor y resultados' : 'Maximizar resultados'"
+    (click)="toggleMaximize.emit()"
+  >
+    <app-icon [name]="maximized() ? 'panel-split' : 'maximize'" [size]="14" />
+    @if (maximized()) {
+      Restaurar
+    }
+  </button>
 </header>
 
 @switch (running() ? 'running' : activeTab()) {

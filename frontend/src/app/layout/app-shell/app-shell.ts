@@ -10,6 +10,7 @@ import {
   inject,
   Injector,
   signal,
+  untracked,
   viewChild,
 } from '@angular/core';
 
@@ -230,12 +231,12 @@ export class AppShell {
 
   /** Inserta donde esté el cursor, o sustituye únicamente la selección activa. */
   protected insertFromAi(sql: string): void {
-    this._editor()?.insertText(sql);
+    this.revealPanel('editor', () => this._editor()?.insertText(sql));
   }
 
   /** Sustituye solo la selección o sentencia activa; el resto de la pestaña sobrevive. */
   protected replaceFromAi(sql: string): void {
-    this._editor()?.replaceActiveStatement(sql);
+    this.revealPanel('editor', () => this._editor()?.replaceActiveStatement(sql));
   }
 
   /**
@@ -271,6 +272,8 @@ export class AppShell {
   protected readonly explorerOpen = signal(true);
   protected readonly mobileExplorerOpen = signal(false);
   protected readonly requestedResultsHeight = signal<number | null>(null);
+  /** Temporal: no modifica el tamaño elegido ni desmonta los paneles. */
+  protected readonly maximizedPanel = signal<'editor' | 'results' | null>(null);
   protected readonly requestedAssistantWidth = signal<number | null>(null);
   private readonly sidePanelSpace = signal({ width: 1280, sidebar: 275 });
   protected readonly assistantLayout = computed(() => {
@@ -291,6 +294,21 @@ export class AppShell {
   private readonly destroyRef = inject(DestroyRef);
   private readonly injector = inject(Injector);
   private readonly explorer = viewChild(ConnectionsSidebar);
+
+  protected togglePanel(panel: 'editor' | 'results'): void {
+    this.maximizedPanel.update((current) => (current === panel ? null : panel));
+  }
+
+  /** Mostrar antes de enfocar: un panel oculto conserva su trabajo, pero no admite foco. */
+  private revealPanel(panel: 'editor' | 'results', action: () => void = () => {}): void {
+    const maximized = this.maximizedPanel();
+    if (maximized && maximized !== panel) {
+      this.maximizedPanel.set(null);
+      afterNextRender(action, { injector: this.injector });
+    } else {
+      action();
+    }
+  }
 
   private observeSidePanelSpace(): void {
     const body = this.host.nativeElement.querySelector<HTMLElement>('.body');
@@ -319,6 +337,7 @@ export class AppShell {
       if (!main.clientHeight) return;
       const occupied = fixed().reduce((total, child) => {
         const styles = getComputedStyle(child);
+        if (styles.display === 'none') return total;
         return (
           total +
           (child as HTMLElement).offsetHeight +
@@ -434,7 +453,7 @@ export class AppShell {
 
       case 'focus-results':
         event.preventDefault();
-        this._resultsPanel()?.focusGrid();
+        this.revealPanel('results', () => this._resultsPanel()?.focusGrid());
         return;
 
       case 'focus-editor':
@@ -447,7 +466,7 @@ export class AppShell {
         // atiende desde fuera: si el foco ya está ahí, no hay nada que traer.
         if (!this.editorHasFocus()) {
           event.preventDefault();
-          this._editor()?.focus();
+          this.revealPanel('editor', () => this._editor()?.focus());
         }
 
         return;
@@ -460,7 +479,7 @@ export class AppShell {
 
       case 'export':
         event.preventDefault();
-        this._resultsPanel()?.openExportMenu();
+        this.revealPanel('results', () => this._resultsPanel()?.openExportMenu());
         return;
     }
   }
@@ -982,7 +1001,7 @@ export class AppShell {
   private readonly _resultsPanel = viewChild<ResultsPanel>('resultsPanel');
 
   protected showHistory(): void {
-    this._resultsPanel()?.openHistory();
+    this.revealPanel('results', () => this._resultsPanel()?.openHistory());
   }
 
   /** Última selección y su origen, para trasladar a Monaco los errores del motor. */
@@ -993,15 +1012,15 @@ export class AppShell {
   // --- Productividad del editor ----------------------------------------------
 
   protected format(): void {
-    void this._editor()?.formatDocument();
+    this.revealPanel('editor', () => void this._editor()?.formatDocument());
   }
 
   protected toggleLineComment(): void {
-    this._editor()?.toggleLineComment();
+    this.revealPanel('editor', () => this._editor()?.toggleLineComment());
   }
 
   protected findInEditor(replace: boolean): void {
-    this._editor()?.openFind(replace);
+    this.revealPanel('editor', () => this._editor()?.openFind(replace));
   }
 
   // --- Fragmentos guardados ---------------------------------------------------
@@ -1035,7 +1054,7 @@ export class AppShell {
 
   /** Lo pone donde esté el cursor, que es de donde vino el usuario. */
   protected insertSnippet(snippet: SavedSnippet): void {
-    this._editor()?.insertText(snippet.sql);
+    this.revealPanel('editor', () => this._editor()?.insertText(snippet.sql));
   }
 
   protected async deleteSnippet(snippet: SavedSnippet): Promise<void> {
@@ -1113,7 +1132,13 @@ export class AppShell {
       if (nextTabId !== tabId) {
         tabId = nextTabId;
         this.executionError.set(null);
+        untracked(() => this.revealPanel('editor'));
       }
+    });
+
+    // Solo al iniciar una ejecución: se puede ampliar el editor de nuevo mientras espera.
+    effect(() => {
+      if (this.running()) untracked(() => this.revealPanel('results'));
     });
   }
 
@@ -1524,6 +1549,8 @@ export class AppShell {
     if (this.running()) {
       return;
     }
+
+    if (this.hasConnection() && sql.trim()) this.revealPanel('results');
 
     this._executionContext = { sql, startOffset };
     this.executionError.set(null);

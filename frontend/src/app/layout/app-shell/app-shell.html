@@ -71,7 +71,7 @@
     aria-label="Ancho del panel de conexiones"
   />
 
-  <main class="main">
+  <main class="main" [class.is-results-maximized]="maximizedPanel() === 'results'">
     <app-editor-tabs
       [tabs]="tabs()"
       [connections]="connections()"
@@ -81,6 +81,8 @@
     />
 
     <app-editor-toolbar
+      [maximized]="maximizedPanel() === 'editor'"
+      (toggleMaximize)="togglePanel('editor')"
       [context]="editorContext()"
       [running]="running()"
       [canceling]="canceling()"
@@ -116,6 +118,7 @@
       <app-sql-editor
         #editor
         class="editor"
+        [hidden]="maximizedPanel() === 'results'"
         [value]="sql()"
         [engine]="activeEngine()"
         [theme]="theme()"
@@ -141,7 +144,7 @@
         (formatFailed)="onFormatFailed($event)"
       />
     } @placeholder {
-      <div class="editor"></div>
+      <div class="editor" [hidden]="maximizedPanel() === 'results'"></div>
     }
 
     @if (rejection(); as pending) {
@@ -188,6 +191,7 @@
 
     <app-resize-handle
       axis="height"
+      [hidden]="maximizedPanel() !== null"
       [size]="resultsHeight()"
       (sizeChange)="requestedResultsHeight.set($event)"
       [min]="resultsMin()"
@@ -202,7 +206,10 @@
     <app-results-panel
       #resultsPanel
       class="results"
-      [style.height.px]="resultsHeight()"
+      [hidden]="maximizedPanel() === 'editor'"
+      [maximized]="maximizedPanel() === 'results'"
+      (toggleMaximize)="togglePanel('results')"
+      [style.height.px]="maximizedPanel() === 'results' ? null : resultsHeight()"
       [resultSet]="resultSet()"
       [result]="result()"
       [running]="running()"

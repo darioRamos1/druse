@@ -237,3 +237,13 @@ Validación tras integrar el código confirmado de los motores hasta `3d074cb`: 
 En navegador se comprobó que Enter conserva la búsqueda bloqueada y que «Nueva consulta» crea y activa una pestaña. Se revisaron el tema oscuro a 1280 × 720 y el claro a 900 × 720 con escala 125 %: la paleta mide 775 px de ancho y termina a 450,6 px de alto, dentro de la ventana. Se restauraron el tema oscuro, la escala 100 % y el tamaño original del navegador. La consola no registró errores ni advertencias durante la revisión.
 
 La revisión manual usó la API temporal de la entrega anterior, sin conectar motores ni ejecutar SQL. La captura está en `e2e/barrido/ui-ux-2026-09-10-paleta/paleta-disponibilidad.png`, excluida de Git. El barrido incorpora además una captura y una comprobación de Enter sobre Confirmar sin transacción; el barrido completo no se repitió en esta entrega.
+
+## Maximizar editor y resultados — 10 de septiembre de 2026
+
+Implementada la ampliación temporal propuesta en la revisión original. Cada panel ofrece un botón Maximizar que pasa a Restaurar. El editor y la cuadrícula permanecen montados: se conservan SQL, historial de deshacer y filtros. Restaurar recupera el tamaño elegido mediante el separador; si cambia la ventana, se adapta al espacio disponible. La barra de ejecución, el destino de la consulta y el estado de conexión siguen visibles.
+
+Ejecutar desde el editor ampliado vuelve a mostrar los resultados. Los accesos a resultados, historial y exportación revelan su panel; buscar, formatear o insertar SQL revelan el editor. Cambiar o crear una pestaña también recupera el editor. El foco se aplica después de mostrar el panel y el separador oculto deja de contar en el cálculo del espacio.
+
+Validación: **76 pruebas de componentes aprobadas**, **compilación de producción correcta** (431,22 kB iniciales), comprobación de tipos E2E y **2 recorridos E2E aprobados** con PostgreSQL real. Cubren conservar filtros y Deshacer, restaurar el tamaño manual, ampliar con teclado, llevar el foco a resultados y volver con Escape, ejecutar desde el editor ampliado y cambiar de ventana al 125 %. Se inspeccionaron cuatro capturas a 1280 × 760 y 900 × 720, además de la vista previa del puerto 4200.
+
+El recorrido final empleó puertos propios (4311 y 5191) y datos en `%TEMP%/druse-paneles-e2e-datos`, porque otra ejecución pasó a ocupar los puertos E2E habituales. Se usó la API ya compilada en el directorio de artefactos E2E; el frontend procede de la rama de esta mejora. La configuración temporal se retiró al terminar. Las capturas están en `e2e/barrido/ui-ux-2026-09-10-paneles/`, excluidas de Git. No se repitieron la suite completa ni los recorridos nativos de Tauri en esta entrega.

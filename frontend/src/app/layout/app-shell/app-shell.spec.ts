@@ -160,6 +160,62 @@ describe('AppShell', () => {
     expect(handles[1].getAttribute('aria-orientation')).toBe('horizontal');
   });
 
+  it('amplía ambos paneles sin desmontarlos y recupera el tamaño ajustado', async () => {
+    const results = element.querySelector<HTMLElement>('app-results-panel')!;
+    const handle = element.querySelector<HTMLElement>('app-resize-handle[axis="height"]')!;
+    handle.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true }));
+    await fixture.whenStable();
+    const height = results.style.height;
+    const toggle = (panel: string) =>
+      element.querySelector<HTMLButtonElement>(`${panel} .panel-toggle`)!.click();
+
+    toggle('app-editor-toolbar');
+    await fixture.whenStable();
+    expect(results.hidden).toBe(true);
+    expect(handle.hidden).toBe(true);
+    toggle('app-editor-toolbar');
+    await fixture.whenStable();
+    expect(results.hidden).toBe(false);
+    expect(results.style.height).toBe(height);
+
+    toggle('app-results-panel');
+    await fixture.whenStable();
+    expect(element.querySelector('.main')?.classList).toContain('is-results-maximized');
+    expect(element.querySelector<HTMLElement>('.editor')?.hidden).toBe(true);
+    toggle('app-results-panel');
+    await fixture.whenStable();
+    expect(element.querySelector('app-results-panel')).toBe(results);
+    expect(results.style.height).toBe(height);
+    expect(handle.hidden).toBe(false);
+    expect(element.querySelector<HTMLElement>('.editor')?.hidden).toBe(false);
+  });
+
+  it('el atajo a resultados los muestra aunque el editor estuviera ampliado', async () => {
+    element.querySelector<HTMLButtonElement>('app-editor-toolbar .panel-toggle')!.click();
+    await fixture.whenStable();
+    document.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'R', ctrlKey: true, shiftKey: true }),
+    );
+    await fixture.whenStable();
+    expect(element.querySelector<HTMLElement>('app-results-panel')!.hidden).toBe(false);
+    expect(element.querySelector<HTMLElement>('app-resize-handle[axis="height"]')!.hidden).toBe(
+      false,
+    );
+  });
+
+  it('una pestaña nueva vuelve a mostrar el editor sin perder el SQL anterior', async () => {
+    const store = TestBed.inject(WorkspaceStore);
+    store.updateSql('SELECT 42;');
+    await fixture.whenStable();
+    const previous = store.activeTab()!.id;
+    element.querySelector<HTMLButtonElement>('app-results-panel .panel-toggle')!.click();
+    await fixture.whenStable();
+    element.querySelector<HTMLButtonElement>('app-editor-tabs .tabs__add')!.click();
+    await fixture.whenStable();
+    expect(element.querySelector<HTMLElement>('.editor')!.hidden).toBe(false);
+    expect(store.tabs().find((tab) => tab.id === previous)!.sql).toBe('SELECT 42;');
+  });
+
   it('sin conexiones, invita a crear una', () => {
     expect(element.querySelector('.empty__action')?.textContent).toContain('Crear una conexión');
   });

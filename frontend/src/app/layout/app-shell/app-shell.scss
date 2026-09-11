@@ -71,6 +71,15 @@
   min-height: 0;
 }
 
+.main > [hidden] {
+  display: none;
+}
+
+.main.is-results-maximized > .results {
+  flex: 1;
+  height: auto;
+}
+
 .mobile-explorer-toggle,
 .mobile-sidebar-backdrop {
   display: none;

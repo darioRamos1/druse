@@ -51,6 +51,8 @@ export class ResultsPanel {
   readonly canceling = input(false);
   readonly timeoutSeconds = input(30);
   readonly firstSession = input(false);
+  readonly maximized = input(false);
+  readonly toggleMaximize = output<void>();
   readonly createConnection = output<void>();
   readonly openSql = output<void>();
 

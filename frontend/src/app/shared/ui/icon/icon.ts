@@ -8,6 +8,8 @@ import { inject } from '@angular/core';
  */
 export type IconName =
   | 'panel-left'
+  | 'maximize'
+  | 'panel-split'
   | 'plus'
   | 'new-query'
   | 'folder-open'
@@ -51,6 +53,14 @@ interface IconDefinition {
  * Todos usan `currentColor` para heredar el color del contexto.
  */
 const ICONS: Readonly<Record<IconName, IconDefinition>> = {
+  maximize: {
+    viewBox: '0 0 16 16',
+    body: '<path d="M6 2H2v4m8-4h4v4M2 10v4h4m8-4v4h-4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>',
+  },
+  'panel-split': {
+    viewBox: '0 0 16 16',
+    body: '<rect x="1.5" y="2" width="13" height="12" rx="2" stroke="currentColor" stroke-width="1.3"/><path d="M1.5 8h13" stroke="currentColor" stroke-width="1.3"/>',
+  },
   'panel-left': {
     viewBox: '0 0 16 16',
     body: '<rect x="1.5" y="2" width="13" height="12" rx="2" stroke="currentColor" stroke-width="1.3"/><path d="M6 2v12" stroke="currentColor" stroke-width="1.3"/>',
