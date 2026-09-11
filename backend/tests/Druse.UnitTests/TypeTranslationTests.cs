@@ -6,6 +6,7 @@ using Druse.Provider.Informix;
 using Druse.Provider.MySql;
 using Druse.Provider.Oracle;
 using Druse.Provider.PostgreSql;
+using Druse.Provider.Sqlite;
 using Druse.Provider.SqlServer;
 
 namespace Druse.UnitTests;
@@ -263,6 +264,90 @@ public sealed class TypeTranslationTests
     }
 
     // -----------------------------------------------------------------------
+    // SQLite, que es el que más huecos tiene
+    // -----------------------------------------------------------------------
+
+    /// <summary>
+    /// SQLite no tiene fecha, ni hora, ni marca de tiempo: guarda texto o
+    /// números, y al releerlos nadie sabe que lo eran.
+    ///
+    /// Es el aviso que faltaba. Los otros cinco motores guardan fechas, así que
+    /// el traductor nunca había tenido que decirlo, y un traslado a un archivo
+    /// prometía una copia exacta que no lo es.
+    /// </summary>
+    [Theory]
+    [InlineData("date")]
+    [InlineData("time")]
+    [InlineData("timestamp")]
+    [InlineData("timestamptz")]
+    public void UnaFechaQueLlegaASqliteSeAvisa(string dataType)
+    {
+        var translation = Translate(DatabaseEngine.PostgreSql, DatabaseEngine.Sqlite, dataType);
+
+        Assert.Equal(TranslationFidelity.Approximate, translation.Fidelity);
+        Assert.Contains("ni de hora", translation.Note!, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// Y donde sí hay fechas, el aviso no sale: lo que separa un aviso útil de
+    /// uno de más es que no aparezca cuando no hay nada que perder.
+    /// </summary>
+    [Fact]
+    public void UnaFechaQueLlegaAUnMotorConFechasNoAvisaDeNada()
+    {
+        var translation = Translate(DatabaseEngine.PostgreSql, DatabaseEngine.SqlServer, "date");
+
+        Assert.Equal(TranslationFidelity.Exact, translation.Fidelity);
+    }
+
+    /// <summary>
+    /// Tampoco hay booleano: los valores llegan como 1 y 0, igual que en Oracle.
+    /// </summary>
+    [Fact]
+    public void UnBooleanoQueLlegaASqliteSeAvisa()
+    {
+        var translation = Translate(DatabaseEngine.PostgreSql, DatabaseEngine.Sqlite, "boolean");
+
+        Assert.Equal(TranslationFidelity.Approximate, translation.Fidelity);
+        Assert.Contains("1 y 0", translation.Note!, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// Ni identificador único: se guarda escrito, con sus 36 caracteres.
+    /// </summary>
+    [Fact]
+    public void UnIdentificadorQueLlegaASqliteSeAvisa()
+    {
+        var translation = Translate(DatabaseEngine.PostgreSql, DatabaseEngine.Sqlite, "uuid");
+
+        Assert.Equal(TranslationFidelity.Approximate, translation.Fidelity);
+        Assert.Contains("36 caracteres", translation.Note!, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// Lo que sí guarda no se avisa: el texto es una de sus cuatro familias.
+    /// </summary>
+    [Fact]
+    public void UnTextoQueLlegaASqliteNoPierdeNada()
+    {
+        var translation = Translate(DatabaseEngine.PostgreSql, DatabaseEngine.Sqlite, "text");
+
+        Assert.Equal(TranslationFidelity.Exact, translation.Fidelity);
+    }
+
+    /// <summary>
+    /// Y una columna de varios valores no tiene equivalente en ningún sitio,
+    /// tampoco aquí: eso no se avisa, se desaconseja.
+    /// </summary>
+    [Fact]
+    public void UnaColumnaDeVariosValoresQueLlegaASqliteNoSeRecomienda()
+    {
+        var translation = Translate(DatabaseEngine.PostgreSql, DatabaseEngine.Sqlite, "text[]");
+
+        Assert.Equal(TranslationFidelity.None, translation.Fidelity);
+    }
+
+    // -----------------------------------------------------------------------
     // Lo que hereda un motor nuevo
     // -----------------------------------------------------------------------
 
@@ -359,6 +444,7 @@ public sealed class TypeTranslationTests
             DatabaseEngine.SqlServer => new SqlServerTableDesigner(),
             DatabaseEngine.MySql => new MySqlTableDesigner(),
             DatabaseEngine.Oracle => new OracleTableDesigner(),
+            DatabaseEngine.Sqlite => new SqliteTableDesigner(),
             Inventado => new PostgreSqlTableDesigner(),
             _ => new InformixTableDesigner(),
         };
@@ -369,6 +455,7 @@ public sealed class TypeTranslationTests
             DatabaseEngine.SqlServer => new SqlServerDatabaseProvider(),
             DatabaseEngine.MySql => new MySqlDatabaseProvider(),
             DatabaseEngine.Oracle => new OracleDatabaseProvider(),
+            DatabaseEngine.Sqlite => new SqliteDatabaseProvider(),
             DatabaseEngine.InformixSqli => new InformixDatabaseProvider(engine),
             Inventado => new MotorInventado(_inventadas),
             _ => new InformixDatabaseProvider(),

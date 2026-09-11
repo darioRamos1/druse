@@ -123,6 +123,15 @@ public sealed class TypeTranslator(IProviderRegistry providers)
         ];
     }
 
+    /// <summary>Las familias que guardan un momento en el tiempo, sea cual sea su forma.</summary>
+    private static readonly ColumnFamily[] Temporales =
+    [
+        ColumnFamily.Date,
+        ColumnFamily.Time,
+        ColumnFamily.Timestamp,
+        ColumnFamily.TimestampWithZone,
+    ];
+
     /// <summary>
     /// Decide cuánto se conserva y lo explica.
     ///
@@ -166,6 +175,21 @@ public sealed class TypeTranslator(IProviderRegistry providers)
                 TranslationFidelity.Approximate,
                 "El identificador se guarda escrito, con sus 36 caracteres. Se lee igual, " +
                 "pero ocupa más y el motor ya no comprueba que sea un identificador.");
+        }
+
+        // Antes que la de la zona horaria, y a propósito: cuando el destino no
+        // guarda fechas **de ninguna clase**, decir que se pierde el huso sería
+        // quedarse muy corto. Es el caso de SQLite, que no tiene fecha, ni hora,
+        // ni marca de tiempo: lo que llega se guarda como texto o como número y
+        // al releerlo nadie sabe que era una fecha.
+        if (Temporales.Contains(facets.Family)
+            && !Temporales.Any(capabilities.Stores))
+        {
+            return With(
+                TranslationFidelity.Approximate,
+                "El destino no tiene tipos de fecha ni de hora: el valor se guarda escrito " +
+                "y el motor deja de comprobar que lo sea. Se lee igual, pero comparar o " +
+                "sumar días exige convertirlo en cada consulta.");
         }
 
         if (facets.Family == ColumnFamily.TimestampWithZone
