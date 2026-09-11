@@ -530,6 +530,11 @@ tiempo, `app`, `query-builder` y `results-grid`; cuatro en la primera, y **los
 cuatro archivos verdes al ejecutarlos solos**, `table-designer` incluido—, con
 los cuatro contenedores levantados.
 
+La función nueva añade su captura al barrido —`19-sqlite-rechazo-con-consulta`,
+que la prueba de punta a punta saca con `DRUSE_BARRIDO=1`— y **está mirada**: el
+aviso entero se lee sin cortarse, y debajo el botón con la frase que avisa de que
+se abre en otra pestaña y cierra el diálogo.
+
 El trabajo salió en cinco commits temáticos sobre `main`: el contrato y el
 proveedor de SQLite, la interfaz del diseñador, la prueba de punta a punta, la
 carrera del registro de trabajos y esta documentación.
