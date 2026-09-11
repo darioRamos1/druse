@@ -82,6 +82,25 @@ public sealed record ScripterCapabilities
     public bool SupportsBinaryLiterals { get; init; } = true;
 
     /// <summary>
+    /// Las claves foráneas se pueden colgar de una tabla que ya existe.
+    ///
+    /// En SQLite no: no hay `ALTER TABLE … ADD CONSTRAINT`, y una clave foránea
+    /// **solo existe dentro del `CREATE TABLE`**. Guionizarla aparte produce una
+    /// instrucción que ese motor rechaza con un error de sintaxis, y con ella se
+    /// cae el respaldo entero de cualquier base con relaciones.
+    ///
+    /// Donde es `false`, las claves viajan dentro de la tabla y
+    /// `ScriptForeignKeys` no escribe nada. Eso cambia **cuándo** se comprueban
+    /// —la tabla se crea nombrando a una que quizá aún no existe— y ahí SQLite
+    /// ayuda: no valida la referencia al crear, sino al escribir filas, que es
+    /// después de que el guion haya creado todas las tablas.
+    ///
+    /// Se declara aquí y no en el proveedor para que el motor que venga mañana
+    /// con la misma limitación herede el comportamiento en vez de repetirlo.
+    /// </summary>
+    public bool AddsForeignKeysAfterwards { get; init; } = true;
+
+    /// <summary>
     /// Con qué aislamiento se lee un respaldo entero para que todas las tablas se
     /// vean en el mismo instante.
     ///

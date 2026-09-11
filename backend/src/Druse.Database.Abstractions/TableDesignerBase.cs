@@ -526,7 +526,41 @@ public abstract class TableDesignerBase : ITableDesigner, IDatabaseScripter
 
         // Un `CREATE TABLE` devuelve -1 en casi todos los proveedores: no son
         // filas escritas, son «esto no contaba filas».
-        return affected < 0 ? 0 : affected;
+        //
+        // Y en SQLite devuelve **1**, que es peor que -1 porque parece un dato:
+        // el driver contesta con el contador de cambios de la conexión, que una
+        // instrucción de definición no pone a cero. Quien restaura un artefacto ve
+        // entonces filas escritas donde solo se creó una tabla vacía, así que lo
+        // que manda es lo que la instrucción es, no lo que el driver conteste.
+        return !WritesRows(statement) || affected < 0 ? 0 : affected;
+    }
+
+    /// <summary>
+    /// Si esta instrucción puede haber escrito filas.
+    ///
+    /// Se mira por lo que **no** las escribe —definir, borrar un objeto, dar
+    /// permisos— y no por lo que sí: la lista de lo que escribe tiene casos con
+    /// los que no vale mirar la primera palabra, empezando por un `WITH … INSERT`.
+    /// Equivocarse aquí solo puede sobrar, nunca faltar: lo que no se reconozca
+    /// sigue devolviendo lo que diga el motor.
+    /// </summary>
+    private static bool WritesRows(string statement)
+    {
+        var word = statement.AsSpan().TrimStart();
+        var end = word.IndexOfAny(" \t\r\n(".AsSpan());
+
+        if (end > 0)
+        {
+            word = word[..end];
+        }
+
+        return !(word.Equals("CREATE", StringComparison.OrdinalIgnoreCase)
+            || word.Equals("ALTER", StringComparison.OrdinalIgnoreCase)
+            || word.Equals("DROP", StringComparison.OrdinalIgnoreCase)
+            || word.Equals("COMMENT", StringComparison.OrdinalIgnoreCase)
+            || word.Equals("GRANT", StringComparison.OrdinalIgnoreCase)
+            || word.Equals("REVOKE", StringComparison.OrdinalIgnoreCase)
+            || word.Equals("PRAGMA", StringComparison.OrdinalIgnoreCase));
     }
 
     public IReadOnlyList<string> ScriptIndexes(ScriptedTable table)
@@ -578,6 +612,14 @@ public abstract class TableDesignerBase : ITableDesigner, IDatabaseScripter
         table = Portable(table);
 
         var qualified = Qualify(table.Table.Database, table.Table.Schema, table.Table.Name);
+
+        // Donde no se pueden colgar después, ya viajaron dentro del `CREATE
+        // TABLE`: escribirlas aquí sería escribirlas dos veces, y en el motor que
+        // obliga a eso —SQLite— la instrucción ni siquiera existe.
+        if (!Capabilities.AddsForeignKeysAfterwards)
+        {
+            return [];
+        }
 
         return
         [
@@ -1066,6 +1108,13 @@ public abstract class TableDesignerBase : ITableDesigner, IDatabaseScripter
                         Expression = check.Expression,
                     }),
             ],
+
+            // Normalmente vacías: las claves foráneas se cuelgan después, con la
+            // tabla a la que apuntan ya creada. Donde no se puede —SQLite no tiene
+            // `ALTER TABLE … ADD CONSTRAINT`— es aquí o en ningún sitio.
+            ForeignKeys = Capabilities.AddsForeignKeysAfterwards
+                ? []
+                : [.. table.Structure.ForeignKeys.Select(ToDefinition)],
         };
     }
 

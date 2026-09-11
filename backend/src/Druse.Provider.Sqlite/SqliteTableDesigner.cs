@@ -101,6 +101,12 @@ public sealed class SqliteTableDesigner : TableDesignerBase
     {
         Isolation = BackupIsolation.RepeatableRead,
         SupportsSchemas = false,
+
+        // No hay `ALTER TABLE … ADD CONSTRAINT`: una clave foránea solo existe
+        // dentro del `CREATE TABLE`, así que el guion la escribe ahí. Hasta que
+        // se declaró, el respaldo de cualquier base con relaciones se caía al
+        // restaurarlo, con un error de sintaxis sobre `FOREIGN`.
+        AddsForeignKeysAfterwards = false,
     };
 
     /// <summary>
