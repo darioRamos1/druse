@@ -28,7 +28,7 @@ import { abrir, ejecutar, escribirSql, primeraColumna } from '../support/druse';
  * que ya no está, y la segunda pasada fallaría al conectar sin que nada del
  * producto hubiera cambiado.
  */
-const CARPETA = join(tmpdir(), 'druse-e2e-sqlite');
+const CARPETA = process.env['DRUSE_E2E_SQLITE_DIR'] ?? join(tmpdir(), 'druse-e2e-sqlite');
 const ARCHIVO = join(CARPETA, 'ventas.db');
 
 /**

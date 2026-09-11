@@ -11,6 +11,8 @@ import { MonacoLoader } from './monaco-loader';
 describe('MonacoLoader', () => {
   let loader: MonacoLoader;
   let scripts: HTMLScriptElement[];
+  let originalMonaco: PropertyDescriptor | undefined;
+  let originalRequire: PropertyDescriptor | undefined;
 
   /** Sustituye la inserción del script para no cargar Monaco de verdad. */
   function interceptScripts(): void {
@@ -23,9 +25,12 @@ describe('MonacoLoader', () => {
   }
 
   beforeEach(() => {
+    vi.useFakeTimers();
     TestBed.configureTestingModule({});
     loader = TestBed.inject(MonacoLoader);
 
+    originalMonaco = Object.getOwnPropertyDescriptor(window, 'monaco');
+    originalRequire = Object.getOwnPropertyDescriptor(window, 'require');
     delete (window as { monaco?: unknown }).monaco;
     delete (window as { require?: unknown }).require;
 
@@ -33,6 +38,17 @@ describe('MonacoLoader', () => {
   });
 
   afterEach(() => {
+    // El runner comparte el navegador entre archivos: dejar { editor: {} }
+    // aquí hacía que App intentara montar un Monaco incompleto en otra suite.
+    for (const [key, descriptor] of [
+      ['monaco', originalMonaco],
+      ['require', originalRequire],
+    ] as const) {
+      if (descriptor) Object.defineProperty(window, key, descriptor);
+      else Reflect.deleteProperty(window, key);
+    }
+    vi.clearAllTimers();
+    vi.useRealTimers();
     vi.restoreAllMocks();
   });
 

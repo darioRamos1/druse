@@ -53,6 +53,24 @@ La compilación de la API también queda aislada en `%TEMP%\druse-e2e-build`.
 Así, en Windows, una API de desarrollo abierta no bloquea las DLL que necesita
 compilar E2E. Los datos de las pruebas siguen en su carpeta separada.
 
+Para revisar otra copia del proyecto sin compartir servidores ni archivos de
+prueba, se pueden configurar los puertos y directorios. Por ejemplo, desde `e2e`:
+
+```powershell
+$reviewRoot = Join-Path $env:TEMP 'druse-e2e-mi-revision'
+$env:DRUSE_E2E_API_PORT = '5191'
+$env:DRUSE_E2E_APP_PORT = '4311'
+$env:DRUSE_E2E_DATA_DIR = Join-Path $reviewRoot 'data'
+$env:DRUSE_E2E_BUILD_DIR = Join-Path $reviewRoot 'build'
+$env:DRUSE_E2E_SQLITE_DIR = Join-Path $reviewRoot 'sqlite'
+npm test
+```
+
+Cada ejecución simultánea necesita sus propios valores. También se separa el
+archivo SQLite que la suite prepara y reconstruye. Los servidores de bases de
+datos siguen siendo los configurados en `DRUSE_TEST_*`; las pruebas que modifican
+las mismas tablas requieren turnarse o usar contenedores distintos.
+
 Otras formas de lanzarlas:
 
 ```bash

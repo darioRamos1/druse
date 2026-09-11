@@ -10,8 +10,8 @@ import { tmpdir } from 'node:os';
  * usaran esos, o bien matarían su sesión o bien se ejecutarían contra ella —con
  * sus conexiones y sus pestañas— y dejarían de probar lo que dicen probar.
  */
-const API_PORT = 5188;
-const APP_PORT = 4300;
+const API_PORT = Number(process.env['DRUSE_E2E_API_PORT'] ?? 5188);
+const APP_PORT = Number(process.env['DRUSE_E2E_APP_PORT'] ?? 4300);
 
 /**
  * Dónde escribe Druse mientras corren las pruebas.
@@ -28,10 +28,10 @@ const APP_PORT = 4300;
  * vacía. Se descubrió aquí: el proxy se iba al puerto por omisión y ninguna
  * petición llegaba.
  */
-const DATA_DIR = join(tmpdir(), 'druse-e2e-datos');
+const DATA_DIR = process.env['DRUSE_E2E_DATA_DIR'] ?? join(tmpdir(), 'druse-e2e-datos');
 // Windows bloquea las DLL del backend mientras la vista previa está abierta.
 // E2E compila todos los proyectos referenciados en su propio directorio.
-const BUILD_DIR = join(tmpdir(), 'druse-e2e-build');
+const BUILD_DIR = process.env['DRUSE_E2E_BUILD_DIR'] ?? join(tmpdir(), 'druse-e2e-build');
 
 /**
  * La carpeta persiste entre ejecuciones a propósito.

@@ -259,3 +259,9 @@ Validación: **61 pruebas de componentes aprobadas** entre barra y shell; **4 re
 Las pruebas utilizaron los puertos 4311/5191 y `%TEMP%/druse-toolbar-e2e-datos`, con configuración temporal retirada después de validar. Las capturas se guardan en `e2e/barrido/ui-ux-2026-09-10-barra/`, excluidas de Git. El recorrido existente de comentar se adaptó al nuevo acceso. Quedan pendientes el barrido completo, la suite general y la validación nativa/accesible del plan.
 
 Observación ajena a la barra: la API de pruebas devolvió un error al proyectar directamente `pg_sleep(3)`, cuyo resultado PostgreSQL es de tipo `void`. La comprobación de espera usa `SELECT 1 AS espera FROM pg_sleep(3)` y verifica la fila. El tratamiento del tipo `void` queda pendiente de revisión en el proveedor.
+
+## Aislamiento de la revisión — 11 de septiembre de 2026
+
+La configuración E2E admite puertos y carpetas propios mediante `DRUSE_E2E_API_PORT`, `DRUSE_E2E_APP_PORT`, `DRUSE_E2E_DATA_DIR`, `DRUSE_E2E_BUILD_DIR` y `DRUSE_E2E_SQLITE_DIR`. Así se puede revisar otro worktree sin compartir la API, sus DLL ni el archivo SQLite que las pruebas reconstruyen. Los valores predeterminados se conservan; los motores en contenedores requieren coordinación si se modifican las mismas tablas.
+
+La suite del cargador de Monaco dejaba un `window.monaco` incompleto en el navegador compartido y causaba un rechazo sin manejar al montar `App` en otra suite. Ahora restaura los globales originales y recoge sus temporizadores. Las 19 pruebas de cargador, arranque y formato SQL pasan; el formateador conserva su importación bajo demanda y sus aserciones. El typecheck E2E también pasa. El resultado de la batería general se registra en la siguiente entrega.
