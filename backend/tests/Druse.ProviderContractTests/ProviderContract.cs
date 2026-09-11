@@ -140,6 +140,32 @@ public interface IProviderFixture
     bool HasMultipleDatabases => true;
 
     /// <summary>
+    /// Un perfil que apunta a un sitio donde no hay nada.
+    ///
+    /// Donde el destino es un servidor basta con un nombre que no resuelve. En un
+    /// motor de archivo el equivalente es una ruta que no está, y por eso esto se
+    /// puede cambiar: lo que el contrato exige es que apuntar mal falle con un
+    /// mensaje legible, no que todos los motores tengan servidor.
+    /// </summary>
+    ConnectionProfile ProfileToNowhere() =>
+        Profile() with { Host = "host-que-no-existe.invalid" };
+
+    /// <summary>
+    /// Si el catálogo publica un índice para la clave primaria.
+    ///
+    /// **En SQLite no siempre**, y no por omisión suya: una clave primaria de
+    /// enteros *es* el `rowid` de la tabla, que ya está ordenado, así que no hay
+    /// un índice aparte que enseñar. Con cualquier otro tipo —o con una clave de
+    /// varias columnas— sí aparece su `sqlite_autoindex`.
+    ///
+    /// Lo que la prueba comprueba con esto es que la interfaz no ofrezca borrar
+    /// suelto el índice que sostiene una clave primaria. Donde no hay índice, no
+    /// hay nada que ofrecer y el objetivo se cumple solo; afirmarlo igual sería
+    /// exigir que el proveedor invente un objeto que la base no tiene.
+    /// </summary>
+    bool PublishesPrimaryKeyIndex => true;
+
+    /// <summary>
     /// El nombre tal y como acaba guardado en este motor.
     ///
     /// Oracle **pasa a mayúsculas todo identificador que no vaya citado**, y el

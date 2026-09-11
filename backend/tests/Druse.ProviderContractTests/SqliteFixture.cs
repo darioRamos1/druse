@@ -71,6 +71,25 @@ public sealed class SqliteFixture : IProviderFixture
 
     public string DefaultSchema => "main";
 
+    /// <summary>
+    /// No: la clave primaria de estas pruebas es de enteros, y en SQLite eso **es**
+    /// el `rowid`. No hay índice aparte porque la tabla ya está ordenada por él.
+    /// </summary>
+    public bool PublishesPrimaryKeyIndex => false;
+
+    /// <summary>
+    /// Un archivo que no está, que es lo que aquí significa apuntar a ninguna
+    /// parte: el host no se mira siquiera.
+    ///
+    /// Tiene que fallar, y es justo la decisión que este motor tomó: abrir no
+    /// crea, así que una ruta mal escrita se dice en vez de dejar una base vacía
+    /// en el disco.
+    /// </summary>
+    public ConnectionProfile ProfileToNowhere() =>
+        PerfilPara(Path.Combine(
+            Path.GetTempPath(),
+            $"druse-no-existe-{Guid.NewGuid():N}.db"));
+
     public string DefaultSchemaFor(string database) => database;
 
     public ConnectionProfile Profile(bool onlyRead = false) => PerfilPara(Archivo.Value.Path, onlyRead);

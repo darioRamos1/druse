@@ -97,10 +97,19 @@ public abstract class DatabaseProviderContractTests<TFixture>
         Assert.False(string.IsNullOrWhiteSpace(result.ServerVersion));
     }
 
+    /// <summary>
+    /// Una contraseña equivocada no entra, y el mensaje que se enseña no la
+    /// lleva dentro.
+    ///
+    /// **Donde no hay identidad no hay nada que comprobar**: en SQLite se abre un
+    /// archivo, y la contraseña que se le pase da igual porque no se usa. Se
+    /// pregunta al motor —que ya declara si pide usuario— en vez de declararlo
+    /// otra vez aquí.
+    /// </summary>
     [Fact]
     public async Task ConexionConCredencialesMalas_FallaSinRevelarLaContrasena()
     {
-        if (Skip) { return; }
+        if (Skip || !Fixture.Provider.Capabilities.RequiresUsername) { return; }
 
         const string WrongPassword = "contrasena-incorrecta-de-prueba";
 
@@ -117,15 +126,22 @@ public abstract class DatabaseProviderContractTests<TFixture>
         Assert.DoesNotContain(WrongPassword, result.Error.Message, StringComparison.Ordinal);
     }
 
+    /// <summary>
+    /// Un destino que no existe se dice, y se dice con algo que se pueda leer.
+    ///
+    /// Para cinco motores el destino es un servidor y para SQLite es un archivo,
+    /// así que **lo que cambia es a dónde apuntar mal**, no lo que se exige: en
+    /// los dos casos hay que fallar en vez de quedarse en silencio. En SQLite eso
+    /// es además la decisión de fondo del motor —abrir no crea— y esta es la
+    /// prueba que la sostiene desde el contrato común.
+    /// </summary>
     [Fact]
     public async Task ConexionAUnHostInexistente_FallaConMensajeUtil()
     {
         if (Skip) { return; }
 
-        var profile = Fixture.Profile() with { Host = "host-que-no-existe.invalid" };
-
         var result = await Fixture.Provider.TestConnectionAsync(
-            profile,
+            Fixture.ProfileToNowhere(),
             Fixture.Credentials,
             CancellationToken.None);
 
@@ -1103,10 +1119,16 @@ public abstract class DatabaseProviderContractTests<TFixture>
             Assert.False(index.IsConstraintIndex);
 
             // La clave primaria de la tabla llega como tal, y su índice queda
-            // marcado para que la interfaz no ofrezca borrarlo suelto.
+            // marcado para que la interfaz no ofrezca borrarlo suelto. Donde no
+            // hay índice que marcar —una clave de enteros en SQLite **es** el
+            // `rowid`— no hay nada que ofrecer, y eso se declara.
             Assert.NotNull(structure.PrimaryKey);
             Assert.Contains(Fixture.Stored("id"), structure.PrimaryKey!.Columns);
-            Assert.Contains(structure.Indexes, item => item.IsPrimaryKey && item.IsConstraintIndex);
+
+            if (Fixture.PublishesPrimaryKeyIndex)
+            {
+                Assert.Contains(structure.Indexes, item => item.IsPrimaryKey && item.IsConstraintIndex);
+            }
 
             if (Fixture.Designer.IndexCapabilities.SupportsCheckConstraints)
             {
