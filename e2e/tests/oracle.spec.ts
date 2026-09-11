@@ -1,6 +1,14 @@
-import { expect, test } from '@playwright/test';
+import { type Page, expect, test } from '@playwright/test';
 
-import { abrir } from '../support/druse';
+import {
+  abrir,
+  apuntarPestanaA,
+  conjuntos,
+  ejecutar,
+  escribirSql,
+  esperarFinDeConsulta,
+  primeraColumna,
+} from '../support/druse';
 
 /**
  * Oracle, por donde lo usa una persona.
@@ -11,10 +19,15 @@ import { abrir } from '../support/druse';
  * formulario lo ofrezca, que el clic llegue hasta el servidor y que lo que
  * vuelve se dibuje en el árbol.
  *
- * **Ejecutar no se prueba desde aquí.** Apuntar una pestaña a otro motor es un
- * baile de menús que ya cubren las pruebas de PostgreSQL y SQL Server, y lo que
- * añadiría no es del motor: lo que Oracle ejecuta lo comprueban sus cincuenta y
- * cuatro pruebas de contrato contra un servidor real.
+ * **Ejecutar una consulta suelta no se prueba desde aquí.** Apuntar una pestaña a
+ * otro motor es un baile de menús que ya cubren las pruebas de PostgreSQL y SQL
+ * Server, y lo que añadiría no es del motor: lo que Oracle ejecuta lo comprueban
+ * sus pruebas de contrato contra un servidor real.
+ *
+ * Lo que sí se prueba aquí es **el guion con varias instrucciones**, porque es lo
+ * único que este motor hace distinto de los otros cinco: ellos encadenan solos y
+ * en Oracle el guion lo parte Druse, así que el camino que va del editor al
+ * servidor es el que hay que ver entero.
  *
  * Va en su propio archivo y no en el barrido porque necesita su contenedor, que
  * tarda un par de minutos en arrancar la primera vez:
@@ -34,6 +47,59 @@ const ORACLE = {
   esquema: 'DRUSE',
 };
 
+const BARRIDO = process.env['DRUSE_BARRIDO_DIR'] ?? 'barrido';
+
+/** Rellena el formulario y conecta. Es el camino que recorre quien empieza. */
+async function crearConexion(page: Page): Promise<void> {
+  await page.getByRole('button', { name: 'Nueva conexión' }).click();
+
+  const dialogo = page.locator('app-connection-dialog');
+
+  await expect(dialogo).toBeVisible();
+
+  // La tarjeta existe porque la lista sale de `/api/engines`: si el motor no
+  // estuviera registrado en el servidor, aquí no habría nada que pulsar.
+  await dialogo.locator('.engine', { hasText: 'Oracle' }).first().click();
+
+  const campo = (etiqueta: string) =>
+    dialogo.locator(`.field:has(.field__label:text-is("${etiqueta}")) input`).first();
+
+  await campo('Nombre').fill(ORACLE.nombre);
+  await campo('Servidor').fill(ORACLE.host);
+  await campo('Puerto').fill(String(ORACLE.puerto));
+  await campo('Base de datos').fill(ORACLE.servicio);
+  await campo('Usuario').fill(ORACLE.usuario);
+  await campo('Contraseña').fill(ORACLE.contrasena);
+
+  // Sin cifrar: en Oracle el cifrado no es una opción de la misma conexión
+  // sino otro protocolo —TCPS— con su propio escuchador, que el contenedor
+  // de pruebas no levanta.
+  await dialogo.getByRole('button', { name: 'Opciones avanzadas' }).click();
+  await dialogo.getByRole('button', { name: 'Sin cifrar' }).click();
+
+  await dialogo.getByRole('button', { name: 'Conectar' }).click();
+  await expect(dialogo).toBeHidden({ timeout: 60_000 });
+}
+
+/**
+ * Deja la conexión creada, la haya creado esta prueba o la anterior.
+ *
+ * Cada prueba abre su navegador desde cero pero el perfil vive en el proceso
+ * local, que las dos comparten: sin esto, la segunda dependería de que la
+ * primera se hubiera ejecutado antes.
+ */
+async function conectarOracle(page: Page): Promise<void> {
+  const sidebar = page.locator('app-connections-sidebar');
+  const fila = sidebar.locator('.node--connection', { hasText: ORACLE.nombre }).first();
+
+  if ((await fila.count()) === 0) {
+    await crearConexion(page);
+    return;
+  }
+
+  await fila.click();
+}
+
 test.describe('Oracle de punta a punta', () => {
   test('se conecta, se explora y se consulta', async ({ page }) => {
     await abrir(page);
@@ -42,34 +108,7 @@ test.describe('Oracle de punta a punta', () => {
     const fila = sidebar.locator('.node--connection', { hasText: ORACLE.nombre }).first();
 
     if ((await fila.count()) === 0) {
-      await page.getByRole('button', { name: 'Nueva conexión' }).click();
-
-      const dialogo = page.locator('app-connection-dialog');
-
-      await expect(dialogo).toBeVisible();
-
-      // La tarjeta existe porque la lista sale de `/api/engines`: si el motor no
-      // estuviera registrado en el servidor, aquí no habría nada que pulsar.
-      await dialogo.locator('.engine', { hasText: 'Oracle' }).first().click();
-
-      const campo = (etiqueta: string) =>
-        dialogo.locator(`.field:has(.field__label:text-is("${etiqueta}")) input`).first();
-
-      await campo('Nombre').fill(ORACLE.nombre);
-      await campo('Servidor').fill(ORACLE.host);
-      await campo('Puerto').fill(String(ORACLE.puerto));
-      await campo('Base de datos').fill(ORACLE.servicio);
-      await campo('Usuario').fill(ORACLE.usuario);
-      await campo('Contraseña').fill(ORACLE.contrasena);
-
-      // Sin cifrar: en Oracle el cifrado no es una opción de la misma conexión
-      // sino otro protocolo —TCPS— con su propio escuchador, que el contenedor
-      // de pruebas no levanta.
-      await dialogo.getByRole('button', { name: 'Opciones avanzadas' }).click();
-      await dialogo.getByRole('button', { name: 'Sin cifrar' }).click();
-
-      await dialogo.getByRole('button', { name: 'Conectar' }).click();
-      await expect(dialogo).toBeHidden({ timeout: 60_000 });
+      await crearConexion(page);
     }
 
     // --- El árbol -----------------------------------------------------------
@@ -103,5 +142,38 @@ test.describe('Oracle de punta a punta', () => {
       timeout: 30_000,
     });
     await expect(sidebar.getByText('Views', { exact: true }).first()).toBeVisible();
+  });
+
+  /**
+   * Lo que este motor hace distinto: pegar dos consultas y pulsar Ejecutar.
+   *
+   * Antes devolvía `ORA-00911` —el punto y coma es de SQL*Plus y no viaja al
+   * servidor— y quien lo veía no tenía forma de saber que el problema era ese.
+   * Ahora Druse parte el guion, y lo que se comprueba aquí es que las dos
+   * instrucciones llegan, en orden, y que sus dos resultados se dibujan.
+   */
+  test('un guion con varias instrucciones se ejecuta entero', async ({ page }) => {
+    await abrir(page);
+    await conectarOracle(page);
+    await apuntarPestanaA(page, ORACLE.nombre, ORACLE.esquema);
+
+    await escribirSql(page, ['SELECT 1 AS uno FROM DUAL;', 'SELECT 2 AS dos FROM DUAL;'].join('\n'));
+    await ejecutar(page, 'todo');
+    await esperarFinDeConsulta(page);
+
+    // Dos pestañas de resultados, una por instrucción.
+    await expect(conjuntos(page)).toHaveCount(2, { timeout: 60_000 });
+    expect(await primeraColumna(page)).toEqual(['1']);
+
+    if (process.env['DRUSE_BARRIDO']) {
+      await page.locator('app-results-panel').screenshot({
+        path: `${BARRIDO}/21-oracle-guion-de-varias.png`,
+      });
+    }
+
+    // Y la segunda es la segunda: el orden del guion es el orden de los
+    // resultados, que es lo que permite leerlos sin adivinar cuál es cuál.
+    await conjuntos(page).nth(1).click();
+    expect(await primeraColumna(page)).toEqual(['2']);
   });
 });
