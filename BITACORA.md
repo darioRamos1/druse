@@ -11,13 +11,13 @@
 | Campo | Valor |
 | --- | --- |
 | Última sesión | **051** — 2026-09-10 |
-| Fase activa | **Migración de datos entre tablas:** fases 1, 2 y 3 cerradas; la **4** cerrada: la pasada de varias tablas, lo que cada tabla hace distinto y las migraciones guardadas (ver «Qué toca retomar»). **Respaldos y restauración:** Fases A–E cerradas. La **F** tiene backend, interfaz, CSV, selector de archivos, restaurar en una base nueva y **el ciclo entero por HTTP en los cuatro motores**; le falta repetir a mano el respaldo real que encontró el error de los índices de expresión. **Motores nuevos:** plan escrito (`docs/plan-nuevos-motores.md`), **fase 0 cerrada** en la 048 —las fugas de dialecto que se le escapaban a un motor nuevo— **fase 1 cerrada** en la 049 —Oracle— y **fase 2 cerrada** en la 050 —SQLite—. El plan de motores nuevos queda cerrado: **seis motores sobre el mismo contrato**. **Diagramas entidad-relación:** plan escrito y **Fase A** (lectura del catálogo en lote, cuatro motores) y **Fase B** (colocación determinista y lienzo) implementadas; falta cerrar la A contra los cuatro motores y ver el barrido de capturas |
+| Fase activa | **Migración de datos entre tablas:** fases 1, 2 y 3 cerradas; la **4** cerrada: la pasada de varias tablas, lo que cada tabla hace distinto y las migraciones guardadas (ver «Qué toca retomar»). **Respaldos y restauración:** Fases A–E cerradas. La **F** tiene backend, interfaz, CSV, selector de archivos, restaurar en una base nueva y **el ciclo entero por HTTP en los cuatro motores**; le falta repetir a mano el respaldo real que encontró el error de los índices de expresión. **Motores nuevos:** plan escrito (`docs/plan-nuevos-motores.md`), **fase 0 cerrada** en la 048 —las fugas de dialecto que se le escapaban a un motor nuevo— **fase 1 cerrada** en la 049 —Oracle— y **fase 2 cerrada** en la 050 —SQLite—. El plan de motores nuevos queda cerrado: **seis motores sobre el mismo contrato**; en la **052** se cerró lo que SQLite dejaba declarado y sin resolver —la reconstrucción de una tabla ya no se lleva sus disparadores, sus condiciones, las vistas que la miraban ni las filas de las tablas hijas—. **Diagramas entidad-relación:** plan escrito y **Fase A** (lectura del catálogo en lote, cuatro motores) y **Fase B** (colocación determinista y lienzo) implementadas; falta cerrar la A contra los cuatro motores y ver el barrido de capturas |
 | Fases 0–6 | ✅ Cerradas. |
 | Fase 7 | 🟡 **11/12.** El ciclo de instalación está probado sobre este equipo; solo falta arrancar en una máquina sin herramientas de desarrollo. |
 | Fase 8 | ✅ **7/7.** Tres motores sobre el mismo contrato y primera beta preparada. |
 | ¿Compila el backend? | Sí — 0 advertencias, 0 errores |
 | ¿Compila el envoltorio? | Sí — recompilado en la 037 con `build/scripts/msvc-env.ps1` cargado antes; sin él, `cargo` falla en `vswhom-sys` por elegir el MSVC equivocado. **Sus pruebas ya son 17**, con las dos que vigilan la CSP y las cuatro de `DRUSE_DATA_DIR` |
-| ¿Pasan las pruebas? | Sí. En la **051**: **571 unitarias**, **180 de integración**, **914 del frontend**, **56 de punta a punta** y el barrido limpio. En la **050**: **388 contractuales** —las 54 de SQLite entre ellas—, **567 unitarias**, **177 de integración**, **914 del frontend** y la **suite de punta a punta entera (56)**, con el barrido limpio. En la **049**: **334 contractuales** —las 280 de antes más las 54 de Oracle— contra PostgreSQL, MySQL, SQL Server y Oracle reales; **567 unitarias**, **177 de integración**, **913 del frontend**, la **suite de punta a punta entera (55)** y el **barrido** limpio. En la **048**, las cuatro suites del repositorio: **565 unitarias**, **177 de integración** y **279 contractuales** con PostgreSQL, MySQL y SQL Server levantados —Informix no—, **913 del frontend**, **35 de punta a punta** y el **barrido entero** con la consola limpia y ningún hallazgo. Los rojos del camino fueron de tiempo, distintos en cada pasada y verdes al ejecutar su archivo solo. `docs/api/openapi.json` no cambió: `/api/engines` no declara el cuerpo de su respuesta, así que ampliar su DTO no toca el contrato publicado. En la **047**: **859 del frontend** —las 815 de siempre más 44 de las piezas que salieron de `WorkspaceStore`— y la **suite de punta a punta entera en verde**: 52 pasadas, 1 saltada, 0 fallos, contra PostgreSQL y SQL Server reales. Los rojos que salieron por el camino eran de tiempo, en el frontend, y de **servidores de e2e levantados desde la sesión anterior**, que `reuseExistingServer` reutiliza. En la **046**: **740 del backend** —563 unitarias y las 177 de integración, con PostgreSQL, MySQL y SQL Server levantados—, **815 del frontend** y el **barrido entero** con la consola limpia y un solo hallazgo, que no es un defecto. Del e2e, 43 en verde; las cuatro de SQL Server esperaban a su contenedor, que se levantó en esta sesión. Las **23 del envoltorio** son de la 042 y siguen valiendo. Las contractuales salen verdes **sin los motores delante**: sin `DRUSE_REQUIRE_ENGINES=1` cada prueba termina sin comprobar nada cuando el servidor no responde. El `DATE` de Informix por SQLI de la 039 sigue sin repetirse: hace falta ese contenedor |
+| ¿Pasan las pruebas? | Sí. En la **052**: **594 unitarias**, **388 contractuales** —las 54 de SQLite entre ellas—, **180 de integración**, **932 del frontend**, **61 de punta a punta** (1 saltada, el barrido) y el **barrido limpio**, sin errores de consola y sin advertencias de compilación. Esas cuentas del frontend y del e2e incluyen las pruebas de los tres commits de interfaz que el usuario metió en `main` durante la sesión. En la **051**: **571 unitarias**, **180 de integración**, **914 del frontend**, **56 de punta a punta** y el barrido limpio. En la **050**: **388 contractuales** —las 54 de SQLite entre ellas—, **567 unitarias**, **177 de integración**, **914 del frontend** y la **suite de punta a punta entera (56)**, con el barrido limpio. En la **049**: **334 contractuales** —las 280 de antes más las 54 de Oracle— contra PostgreSQL, MySQL, SQL Server y Oracle reales; **567 unitarias**, **177 de integración**, **913 del frontend**, la **suite de punta a punta entera (55)** y el **barrido** limpio. En la **048**, las cuatro suites del repositorio: **565 unitarias**, **177 de integración** y **279 contractuales** con PostgreSQL, MySQL y SQL Server levantados —Informix no—, **913 del frontend**, **35 de punta a punta** y el **barrido entero** con la consola limpia y ningún hallazgo. Los rojos del camino fueron de tiempo, distintos en cada pasada y verdes al ejecutar su archivo solo. `docs/api/openapi.json` no cambió: `/api/engines` no declara el cuerpo de su respuesta, así que ampliar su DTO no toca el contrato publicado. En la **047**: **859 del frontend** —las 815 de siempre más 44 de las piezas que salieron de `WorkspaceStore`— y la **suite de punta a punta entera en verde**: 52 pasadas, 1 saltada, 0 fallos, contra PostgreSQL y SQL Server reales. Los rojos que salieron por el camino eran de tiempo, en el frontend, y de **servidores de e2e levantados desde la sesión anterior**, que `reuseExistingServer` reutiliza. En la **046**: **740 del backend** —563 unitarias y las 177 de integración, con PostgreSQL, MySQL y SQL Server levantados—, **815 del frontend** y el **barrido entero** con la consola limpia y un solo hallazgo, que no es un defecto. Del e2e, 43 en verde; las cuatro de SQL Server esperaban a su contenedor, que se levantó en esta sesión. Las **23 del envoltorio** son de la 042 y siguen valiendo. Las contractuales salen verdes **sin los motores delante**: sin `DRUSE_REQUIRE_ENGINES=1` cada prueba termina sin comprobar nada cuando el servidor no responde. El `DATE` de Informix por SQLI de la 039 sigue sin repetirse: hace falta ese contenedor |
 | ¿Hay aplicación de escritorio? | **Sí.** Instalador NSIS y ZIP portable, en dos variantes: con Informix y sin él. Desde la 038 **se actualiza sola** —o lo hará: ver el aviso del repositorio privado en §9—. El MSI dejó de generarse: `tauri.conf.json` solo declara `nsis`, que es lo que necesita el actualizador. En la **040** se regeneraron los instaladores y **la variante completa quedó instalada y abierta en este equipo**, con el arreglo del envoltorio dentro. Siguen **sin firma Authenticode**: SmartScreen en cada equipo |
 | Motores | **PostgreSQL, SQL Server, MySQL/MariaDB, Oracle, SQLite e Informix**, sobre el mismo contrato. Desde la **048** cada uno declara sus `EngineCapabilities` y **un motor nuevo no compila hasta decir qué familias de datos guarda**; lo siguiente es Oracle, con el plan en `docs/plan-nuevos-motores.md` y el procedimiento en `docs/como-anadir-un-motor.md`. Informix tiene **dos entradas**: por DRDA con el driver de IBM (puerto 9089) y por **SQLI**, su protocolo nativo, con el puente JDBC (9088). Cambia por dónde se entra; el SQL, el catálogo y los tipos son los mismos |
 | Trabajo a medias | **Nada sin commitear.** `PLAN_MEJORAS_DRUSE.md` lleva marcadas las fases 0 a 5 salvo lo grande —**FE-001 y FE-002 cerradas en la 047**: `WorkspaceStore` partido en seis piezas—, FE-003, BE-001, BE-002, A11Y-005 más BKP-006, SEC-007, PERF-004 y PERF-005. Sin comprobar: las contractuales de la lectura en lote contra los cuatro motores desde la 039, **el multicursor dentro de la ventana empaquetada**, y de antes —**el diálogo del sistema y el selector de carpeta siguen sin verse abrir**, y **el actualizador no puede funcionar mientras el repositorio sea privado** (ver §9) |
@@ -35,6 +35,19 @@ autenticado, y ese 404 ni siquiera se distingue de «no hay versión nueva». Es
 una decisión que hay que tomar antes de repartir nada: repositorio público, o
 publicar los artefactos en otro sitio.
 
+#### Lo que deja abierta la 052
+
+1. **Las condiciones de comprobación ahora se escriben desde el diseñador**, y
+   eso es nuevo en SQLite: conviene probarlo a mano contra un archivo con datos
+   que ya incumplan la condición que se quiere poner, para ver qué dice el motor
+   y si lo que se ve se entiende.
+2. **La reconstrucción no comprueba las claves foráneas al terminar.** El paso 10
+   del procedimiento de SQLite es un `PRAGMA foreign_key_check` antes de
+   confirmar, y no está: devuelve filas en vez de fallar, así que no se puede
+   encadenar con las demás instrucciones. Hoy no hace falta —la reconstrucción
+   conserva las claves tal cual—, pero si algún día un cambio pudiera dejar
+   huérfanas, esto es lo que lo notaría.
+
 #### Lo que deja abierta la 051
 
 1. **Pulsar los dos botones nuevos dentro de Druse instalado.** El diálogo del
@@ -42,10 +55,8 @@ publicar los artefactos en otro sitio.
    cubierto, pero esto hay que mirarlo con la aplicación empaquetada delante.
 2. **Lo que cada motor deja declarado y sin resolver**, en los §7 y §8 del plan:
    de Oracle, el lote de varias instrucciones —que es una función de Druse y no
-   del proveedor—, la posición del error de sintaxis y los paquetes en el árbol;
-   de SQLite, que la reconstrucción de una tabla no conserva sus disparadores ni
-   las vistas que la miraban, y que sus condiciones de comprobación no se pueden
-   leer.
+   del proveedor—, la posición del error de sintaxis y los paquetes en el árbol.
+   **Lo de SQLite se cerró en la 052.**
 3. **La compilación ligera podría dejar fuera más que Informix.** Con seis
    motores, `IncludeInformix` se queda corto como idea: quien solo usa SQLite y
    PostgreSQL carga hoy con los clientes de Oracle, SQL Server y MySQL. Medir
@@ -427,6 +438,112 @@ Pendiente de verificar cuando toque: Docker (pruebas de integración con contene
 ---
 
 ## 5. Registro de sesiones
+
+### Sesión 052 — 2026-09-10 · La reconstrucción que se llevaba por delante lo que no se veía
+
+Tocaba el punto 2 de lo que dejó abierta la 051: de SQLite, que reconstruir una
+tabla no conserva sus disparadores ni las vistas que la miraban, y que sus
+condiciones de comprobación no se pueden leer. Escribir la prueba que lo
+demostrara **encontró tres cosas peores que las dos documentadas**.
+
+#### Lo que la prueba encontró
+
+Era una sola prueba: una tabla con un índice, una vista, un disparador y filas,
+se le cambia el tipo a una columna, y los cuatro tienen que seguir. No llegó a
+comprobar nada, porque el cambio **falló entero**:
+
+> SQLite Error 1: 'error in view resumen: no such table: main.clientes'
+
+Desde la versión 3.25, el motor valida todas las vistas y disparadores de la base
+al renombrar una tabla. A mitad de la reconstrucción esas vistas apuntan a algo
+que ya se borró, y el renombrado aborta. **Con una vista delante, cambiar el tipo
+de una columna no funcionaba**, y eso no estaba escrito en ninguna parte.
+
+La segunda salió de preguntarse qué más pasa por ese `DROP TABLE`: con las claves
+foráneas encendidas ejecuta un borrado implícito, y ese borrado **dispara las
+cascadas de quien la referencia**. Cambiarle el tipo a una columna de la tabla de
+clientes borraba todos sus pedidos, sin aviso, dentro de la misma transacción que
+se confirma sola. Es la clase de pérdida que nadie atribuye jamás a su causa.
+
+Y la tercera es la otra limitación documentada, que resultó ser la misma: las
+condiciones de comprobación no se leían, y **lo que no se lee no se puede volver a
+escribir**, así que la reconstrucción también se las llevaba. Una condición que
+desaparece no rompe nada el día que se pierde: deja entrar meses después la fila
+que existía para impedir.
+
+#### Lo que hubo que hacer
+
+- **Pedir el modo antiguo del renombrado** —`legacy_alter_table`— solo durante el
+  borrado y el renombrado, que es cuando las vistas cuelgan de nada.
+- **Apagar las claves foráneas, y fuera de la transacción.** Es el paso 1 del
+  procedimiento que documenta SQLite, y el pragma que las apaga **no hace nada
+  dentro de una transacción**: puesto entre las instrucciones del cambio se
+  habría ejecutado sin efecto y nadie lo habría notado. Hizo falta un enganche en
+  el diseñador base para poder preparar la conexión antes de abrirla; los otros
+  cinco motores no pagan ni una consulta por él. Con una transacción manual del
+  usuario abierta, la reconstrucción ahora **se para y dice por qué** en vez de
+  seguir con la cascada armada. `defer_foreign_keys`, que sí se puede dentro, se
+  probó y no sirve: retrasa la comprobación de las restricciones, y una cascada no
+  es una comprobación sino una acción.
+- **Leer los disparadores antes de tirar la tabla** y volver a escribirlos tal
+  cual, que es mientras todavía existen.
+- **Leer las condiciones de comprobación del `CREATE TABLE`**, que es el único
+  sitio donde SQLite las guarda. Con eso la capacidad pasa a verdadera: el
+  diseñador ya las enseña y las deja escribir, porque ahora lo que se escribe se
+  vuelve a ver.
+
+El orden de la reconstrucción cambió por un motivo que no se ve: la tabla nueva
+recupera **siempre** el nombre de la vieja, y el renombrado que pidiera el usuario
+va al final, aparte. Los índices y los disparadores se reescriben con su texto
+original, que nombra la tabla de antes; una vez puestos, **el renombrado final lo
+hace el motor y arrastra con él las vistas y los disparadores**, que es lo que no
+se puede hacer a mano sin ponerse a interpretar su texto.
+
+#### Leer un `CHECK` sin interpretar SQL
+
+Lo que hace el lector nuevo no es entender SQL, y la distinción importa porque
+entenderlo a medias inventaría condiciones —que la siguiente reconstrucción
+escribiría de verdad en la tabla—. Busca la palabra `CHECK`, cuenta paréntesis y
+copia la expresión **sin entenderla**. Lo que sí sabe es dónde no mirar: dentro de
+una cadena, de un identificador citado o de un comentario, porque un `CHECK`
+escrito ahí es texto. Las dieciséis pruebas que lo rodean son casi todas de eso.
+
+#### Lo que se vio con Druse levantado
+
+La prueba de punta a punta abre el diseñador sobre una tabla del archivo de
+verdad: la pestaña **Restricciones marca 1** y enseña `ck_nombre` con su
+expresión, que no sale de ningún catálogo sino del texto. Después del cambio
+siguen en pie las filas de la tabla hija, la vista, el disparador y la condición
+—comprobada por lo que rechaza, no por lo que dice el catálogo—. La captura
+`18-sqlite-reconstruccion.png` se toma aquí y no en el barrido porque aquel
+recorrido trabaja sobre PostgreSQL.
+
+De paso salieron tres detalles de interfaz que la prueba destapó: el campo del
+nombre de una columna y el del valor por omisión **no tenían nombre accesible**,
+al revés que todos los demás controles de esa fila, y el «Cambios aplicados» no se
+anunciaba.
+
+#### Un hueco que abrí yo
+
+Los pragmas no entran en la transacción. Si una instrucción de la reconstrucción
+falla, lo escrito se deshace pero los dos ajustes se quedarían puestos: con las
+claves foráneas apagadas el resto de la sesión escribe relaciones que nadie
+comprueba, y con `legacy_alter_table` encendido el siguiente renombrado de
+cualquier tabla deja de arrastrar sus vistas. Se restauran los dos pase lo que
+pase, y hay una prueba que provoca el fallo a mitad para comprobarlo.
+
+#### Estado
+
+**Siete pruebas nuevas de reconstrucción, dieciséis del lector de condiciones y
+una de punta a punta.** Todo en verde: **594 unitarias**, **388 contractuales**
+—las 54 de SQLite entre ellas—, **180 de integración**, **932 del frontend**,
+**61 de punta a punta** (1 saltada, que es el barrido) y el **barrido limpio**,
+con la consola sin errores. Compilación sin advertencias.
+
+Conviene saberlo para leer los números: **mientras esta sesión trabajaba entraron
+en `main` tres commits de interfaz del usuario** —la paleta, el maximizado y la
+barra compacta—, así que las cuentas del frontend y del e2e incluyen sus pruebas,
+no solo las de aquí. Las suites se repitieron enteras después de ellos.
 
 ### Sesión 051 — 2026-09-10 · Lo que le faltaba a SQLite para poder empezar
 

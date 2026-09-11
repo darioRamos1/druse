@@ -340,7 +340,8 @@ después, y por eso su fase empieza por el modelo y no por el proveedor.
 - **`ALTER TABLE` casi no existe.** Renombrar tabla o columna, añadir columna y
   poco más. Cualquier otro cambio del diseñador obliga a la danza de las siete
   instrucciones: crear la nueva, copiar, borrar la vieja, renombrar, rehacer
-  índices y disparadores. Va dentro de una transacción, que aquí sí abarca DDL.
+  índices y disparadores. Va dentro de una transacción, que aquí sí abarca DDL —
+  salvo los pragmas que hacen falta alrededor, que no entran en ella.
 
 ### 8.2. Tareas
 
@@ -365,6 +366,10 @@ después, y por eso su fase empieza por el modelo y no por el proveedor.
 - [x] **MOT-039:** recorrido contra un archivo real, con el barrido de capturas y
   una prueba de punta a punta propia (`e2e/tests/sqlite.spec.ts`) que **no
   necesita ningún contenedor**.
+- [x] **MOT-040:** que la reconstrucción no se lleve nada por delante: sus
+  disparadores, sus condiciones de comprobación, las vistas que la miraban y las
+  filas de las tablas que la referencian. Con la lectura de condiciones que hacía
+  falta para lo tercero, que las saca del `CREATE TABLE`.
 
 ### Cómo fue
 
@@ -421,15 +426,55 @@ Tres cosas que la implementación decide y conviene saber:
   no se puede abrir después: se escribe la cabecera a propósito.
 - **No conecta después.** Encadenarlo dejaría una sesión viva que nadie pidió.
 
+### Lo que la reconstrucción se llevaba, y ya no
+
+Lo que se escribió aquí al cerrar la fase 2 —«la reconstrucción no conserva
+disparadores ni vistas»— **se quedaba corto en las dos direcciones**: perdía más
+de lo dicho, y en un caso ni siquiera llegaba a terminar. Al escribir la prueba
+que lo demostrara salieron cuatro cosas, tres peores que la documentada:
+
+- **Con una vista mirando la tabla, el cambio fallaba entero.** Desde la versión
+  3.25, SQLite valida todas las vistas y disparadores de la base al renombrar una
+  tabla; a mitad de la reconstrucción esas vistas apuntan a algo que ya se borró y
+  el renombrado aborta. Se pide el modo antiguo del renombrado
+  —`legacy_alter_table`— solo durante esos dos pasos.
+- **Se llevaba por delante las filas de las tablas hijas.** Con las claves
+  foráneas encendidas, el `DROP TABLE` de la tabla vieja ejecuta un borrado
+  implícito que dispara las cascadas de quien la referencia: cambiarle el tipo a
+  una columna de la tabla de clientes borraba todos sus pedidos, sin aviso y
+  dentro de la misma transacción que se confirma sola. Es el paso 1 del
+  procedimiento que documenta SQLite, y **hay que darlo fuera de la transacción**,
+  porque el pragma que las apaga no hace nada dentro de una. Con una transacción
+  manual abierta, la reconstrucción ahora se para en vez de seguir con la cascada
+  armada. `defer_foreign_keys`, que sí se puede dentro, no sirve: retrasa la
+  comprobación de las restricciones, y una cascada no es una comprobación sino una
+  acción.
+- **Perdía las condiciones de comprobación**, que era la otra limitación
+  declarada y resultó ser la misma: no se leían, y lo que no se lee no se puede
+  volver a escribir. Ahora se sacan del `CREATE TABLE` que el motor guarda
+  literal, así que sobreviven a la reconstrucción y además se ven y se escriben
+  desde el diseñador. Lo que hace el lector **no es interpretar SQL**: busca la
+  palabra `CHECK`, cuenta paréntesis y copia la expresión sin entenderla; lo que
+  sí sabe es dónde no mirar —cadenas, identificadores citados y comentarios—,
+  porque un `CHECK` escrito ahí es texto.
+- **Perdía los disparadores**, que era lo único documentado. Se leen antes de
+  tirar la tabla, que es mientras todavía existen, y se vuelven a escribir tal
+  cual.
+
+El orden de la reconstrucción cambió por un motivo que no se ve: la tabla nueva
+recupera **siempre** el nombre de la vieja, y el renombrado que pidiera el usuario
+va al final, como una instrucción aparte. Los índices y los disparadores se
+reescriben con su texto original, que nombra la tabla de antes; una vez puestos,
+el renombrado final lo hace el motor y **arrastra con él las vistas y los
+disparadores**, que es lo que no se puede hacer a mano sin ponerse a interpretar
+su texto.
+
+Los dos pragmas vuelven a su sitio pase lo que pase, y eso hubo que escribirlo
+aparte: no entran en la transacción, así que un fallo a mitad deshace lo escrito y
+dejaría los ajustes puestos para todo lo que viniera después por esa conexión.
+
 ### Lo que queda declarado, no resuelto
 
-- **Las condiciones de comprobación no se leen.** SQLite las admite pero no las
-  expone en ningún `PRAGMA`: lo único que queda es el `CREATE TABLE` en texto.
-  Por eso el diseñador tampoco las ofrece: un campo que se guarda y desaparece al
-  releer es peor que no tenerlo.
-- **La reconstrucción no conserva disparadores ni vistas** que apuntaran a la
-  tabla: se van con ella y SQLite no avisa. Recuperarlos exigiría leerlos y
-  volver a escribirlos.
 - **Druse no crea el archivo al abrirlo**, y eso no cambia: una ruta mal escrita
   tiene que decirlo, no dejar una base vacía en el disco. Crear una **sí** se
   puede, como acción aparte: el formulario tiene «Examinar…» y «Crear una nueva»,
