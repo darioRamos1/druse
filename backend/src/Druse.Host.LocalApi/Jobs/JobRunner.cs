@@ -166,7 +166,31 @@ public sealed class JobRunner(
             // única línea que dice cómo acabó.
             await WriteAsync(() => store.FinishedAsync(job.Id, outcome, CancellationToken.None), job.Id);
 
+            // Y **después** se dice que terminó, no antes: quien pregunte por los
+            // trabajos justo al ver el final ya lo encuentra anotado. Al revés
+            // —que es como estaba— queda un instante en el que una operación
+            // terminada figura en marcha en el registro.
+            Announce(job);
+
             _running.TryRemove(job.Id, out _);
+        }
+    }
+
+    /// <summary>
+    /// Cuenta el final sin dejar que un fallo suyo tumbe el trabajo.
+    ///
+    /// Por lo mismo que el registro: lo que se publica es información, y no vale
+    /// perder un respaldo entero porque contarlo falló.
+    /// </summary>
+    private void Announce(QueuedJob job)
+    {
+        try
+        {
+            job.Announce?.Invoke();
+        }
+        catch (Exception error)
+        {
+            _logger.LogWarning(error, "No se pudo publicar el final del trabajo {JobId}.", job.Id);
         }
     }
 

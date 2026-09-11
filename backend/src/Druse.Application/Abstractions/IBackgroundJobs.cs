@@ -65,6 +65,26 @@ public sealed record QueuedJob
     /// rompió. Es lo que queda escrito para la próxima vez que se abra Druse.
     /// </summary>
     public required Func<IServiceProvider, CancellationToken, Task<string>> RunAsync { get; init; }
+
+    /// <summary>
+    /// Decirle a quien espera que esto terminó, **una vez ya está anotado**.
+    ///
+    /// Existe por una carrera que se ve desde la pantalla: el estado que consulta
+    /// la interfaz vive en memoria y el registro de trabajos en SQLite, y son dos
+    /// escrituras distintas. Publicando el final dentro del propio trabajo, entre
+    /// las dos queda un hueco en el que el respaldo ya dice «terminado» y el
+    /// registro todavía dice «en marcha»: quien mire los trabajos en ese instante
+    /// ve uno que sigue corriendo y que no va a moverse nunca más.
+    ///
+    /// El hueco no se puede cerrar —son dos almacenes— pero sí se puede elegir de
+    /// qué lado cae: anotando primero y anunciando después, lo peor que se ve es
+    /// un trabajo que tarda unos milisegundos de más en decir que acabó, que es lo
+    /// que de verdad estaba pasando.
+    ///
+    /// Opcional: un trabajo que no tenga a nadie esperándolo no necesita anunciar
+    /// nada.
+    /// </summary>
+    public Action? Announce { get; init; }
 }
 
 /// <summary>En qué estado quedó un trabajo largo, según lo que se guardó de él.</summary>

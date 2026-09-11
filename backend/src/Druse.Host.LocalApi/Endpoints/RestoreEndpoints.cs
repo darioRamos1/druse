@@ -75,6 +75,11 @@ internal static class RestoreEndpoints
                 StatementsTotal = inspection.Statements,
             });
 
+            // Cómo acabó, guardado hasta que el trabajo quede anotado: entre
+            // publicarlo y anotarlo hay dos almacenes distintos, y al revés queda
+            // un instante en el que una restauración terminada figura en marcha.
+            RestoreProgress? terminado = null;
+
             // A la cola: la petición termina aquí y la restauración dura lo que
             // dure. El servicio que la ejecuta se resuelve allí, con su propio
             // scope; el de esta petición se cierra al responder.
@@ -106,7 +111,7 @@ internal static class RestoreEndpoints
                             progress,
                             cancellationToken);
 
-                        tracker.Report(result with { Id = id });
+                        terminado = result with { Id = id };
 
                         return result.Outcome.ToString();
                     }
@@ -117,19 +122,26 @@ internal static class RestoreEndpoints
                         // marcha» para siempre en la pantalla de quien la lanzó.
                         log.LogError(error, "La restauración {Id} terminó con un error no previsto.", id);
 
-                        tracker.Report(new RestoreProgress
+                        terminado = new RestoreProgress
                         {
                             Id = id,
                             Step = RestoreStep.Done,
                             Outcome = RestoreOutcome.Failed,
                             Failure = new RestoreFailure(0, string.Empty, error.Message),
-                        });
+                        };
 
                         return nameof(RestoreOutcome.Failed);
                     }
                     finally
                     {
                         tracker.Finish(id);
+                    }
+                },
+                Announce = () =>
+                {
+                    if (terminado is not null)
+                    {
+                        tracker.Report(terminado);
                     }
                 },
             });

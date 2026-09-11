@@ -294,6 +294,12 @@ internal static class TransferEndpoints
 
         tracker.Report(Starting(id, domain));
 
+        // Cómo acabó, guardado hasta que el trabajo quede anotado: el estado que
+        // mira la interfaz y el registro de trabajos son dos escrituras, y
+        // publicar antes de anotar deja un traslado terminado que sigue diciendo
+        // que va en marcha.
+        TransferProgress? terminado = null;
+
         jobs.Enqueue(new QueuedJob
         {
             Id = id,
@@ -314,7 +320,7 @@ internal static class TransferEndpoints
 
                     var result = await transfers.RunSetAsync(domain, progress, cancellationToken);
 
-                    tracker.Report(result with { Id = id });
+                    terminado = result with { Id = id };
 
                     return result.Outcome.ToString();
                 }
@@ -324,7 +330,7 @@ internal static class TransferEndpoints
                     // trabajo —la sesión se cerró entre medias, el destino resultó
                     // ser de solo lectura—. Va al estado y no a la respuesta, que
                     // hace rato que se envió.
-                    tracker.Report(Failed(id, domain, rejected.Rejection.Message, tracker.Find(id)));
+                    terminado = Failed(id, domain, rejected.Rejection.Message, tracker.Find(id));
 
                     return nameof(TransferOutcome.Failed);
                 }
@@ -335,13 +341,20 @@ internal static class TransferEndpoints
                     // siempre en la pantalla de quien lo lanzó.
                     log.LogError(error, "El traslado {Id} terminó con un error no previsto.", id);
 
-                    tracker.Report(Failed(id, domain, error.Message, tracker.Find(id)));
+                    terminado = Failed(id, domain, error.Message, tracker.Find(id));
 
                     return nameof(TransferOutcome.Failed);
                 }
                 finally
                 {
                     tracker.Finish(id);
+                }
+            },
+            Announce = () =>
+            {
+                if (terminado is not null)
+                {
+                    tracker.Report(terminado);
                 }
             },
         });

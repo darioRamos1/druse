@@ -63,6 +63,11 @@ internal static class BackupEndpoints
 
             tracker.Report(Starting(id, domain.Tables.Count));
 
+            // Cómo acabó, guardado hasta que el trabajo quede anotado. Publicarlo
+            // desde dentro del trabajo dejaba un instante en el que el respaldo ya
+            // decía «terminado» y el registro todavía decía «en marcha».
+            BackupProgress? terminado = null;
+
             // A la cola, no a un `Task.Run` suelto: la petición termina aquí y
             // el respaldo dura lo que dure, así que necesita servicios propios y
             // alguien que sepa que existe.
@@ -90,7 +95,7 @@ internal static class BackupEndpoints
                                 progress,
                                 cancellationToken);
 
-                            tracker.Report(result with { Id = id });
+                            terminado = result with { Id = id };
 
                             return result.Outcome.ToString();
                         }
@@ -102,13 +107,20 @@ internal static class BackupEndpoints
                         // para siempre en la pantalla de quien lo lanzó.
                         log.LogError(error, "El respaldo {Id} terminó con un error no previsto.", id);
 
-                        tracker.Report(Failed(id, domain.Tables.Count, error));
+                        terminado = Failed(id, domain.Tables.Count, error);
 
                         return nameof(BackupOutcome.Failed);
                     }
                     finally
                     {
                         tracker.Finish(id);
+                    }
+                },
+                Announce = () =>
+                {
+                    if (terminado is not null)
+                    {
+                        tracker.Report(terminado);
                     }
                 },
             });
