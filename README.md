@@ -302,6 +302,9 @@ La dirección de las dependencias apunta siempre al núcleo. Está fijada por pr
 
 ## Documentación
 
+La landing está en [`landing/`](landing/index.html), con despliegue independiente
+en GitHub Pages. Consulta [cómo previsualizarla y publicarla](docs/landing-github-pages.md).
+
 | Documento | Contenido |
 | --- | --- |
 | [`PLAN_TRABAJO_DRUSE.md`](PLAN_TRABAJO_DRUSE.md) | Plan maestro: alcance, arquitectura y las 8 fases |

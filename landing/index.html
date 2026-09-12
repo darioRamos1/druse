@@ -1,0 +1,576 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#0b0c10" />
+    <meta name="referrer" content="strict-origin-when-cross-origin" />
+    <meta
+      name="description"
+      content="Druse reúne tus bases de datos en un solo espacio de trabajo. Explora, escribe SQL y trabaja con tus datos desde una aplicación de escritorio."
+    />
+    <meta
+      property="og:title"
+      content="Druse — Tus bases de datos. Un solo lugar."
+    />
+    <meta
+      property="og:description"
+      content="Un cliente de escritorio para explorar, consultar y trabajar con tus bases de datos. PostgreSQL, MySQL, SQL Server y más."
+    />
+    <meta property="og:type" content="website" />
+    <title>Druse — Tus bases de datos. Un solo lugar.</title>
+    <link rel="icon" type="image/png" href="./assets/druse.png" />
+    <link
+      rel="preload"
+      href="./assets/inter-latin-400-normal.woff2"
+      as="font"
+      type="font/woff2"
+      crossorigin
+    />
+    <link rel="stylesheet" href="./styles.css" />
+    <link rel="stylesheet" href="./effects.css" />
+    <link rel="stylesheet" href="./privacy.css" />
+    <script src="./script.js" defer></script>
+    <script src="./privacy.js" defer></script>
+    <script src="./effects.js" defer></script>
+  </head>
+  <body>
+    <div class="hero-atmosphere" aria-hidden="true">
+      <div class="aurora aurora-purple"></div>
+      <div class="aurora aurora-blue"></div>
+      <div class="atmosphere-grid"></div>
+      <div class="light-orbit"></div>
+      <div class="light-orbit light-orbit-second"></div>
+      <div class="stars"><i></i><i></i><i></i><i></i><i></i><i></i></div>
+    </div>
+    <a class="skip-link" href="#contenido">Saltar al contenido</a>
+    <header class="site-header">
+      <div class="container nav-wrap">
+        <a class="brand" href="#" aria-label="Druse, inicio"
+          ><img
+            src="./assets/druse.png"
+            alt=""
+            width="32"
+            height="32"
+          />druse<span class="brand-period">.</span></a
+        >
+        <button
+          class="menu-toggle"
+          type="button"
+          aria-expanded="false"
+          aria-controls="navigation"
+          aria-label="Abrir menú"
+        >
+          <span></span><span></span>
+        </button>
+        <nav id="navigation" aria-label="Navegación principal">
+          <a href="#herramientas">Herramientas</a>
+          <a href="#motores">Compatibilidad</a>
+          <a href="#preguntas">Preguntas</a>
+          <a class="button button-small" href="#descargar"
+            >Obtener Druse <span aria-hidden="true">↗</span></a
+          >
+        </nav>
+        <button
+          class="effects-toggle"
+          type="button"
+          aria-label="Pausar efectos"
+          aria-pressed="false"
+          hidden
+        >
+          <svg aria-hidden="true" viewBox="0 0 24 24">
+            <path
+              d="m12 3 2.5 6.5L21 12l-6.5 2.5L12 21l-2.5-6.5L3 12l6.5-2.5Z"
+            />
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <main id="contenido">
+      <section class="hero container" aria-labelledby="hero-title">
+        <div class="eyebrow hero-badge">
+          <span class="mini-diamond" aria-hidden="true"></span> TU NUEVO ESPACIO
+          DE TRABAJO SQL
+        </div>
+        <h1 id="hero-title">
+          Tus bases de datos.<br /><span>Un solo lugar.</span>
+        </h1>
+        <p class="hero-description">
+          Menos cambiar de herramienta. Más entender tus datos.<br
+            class="desktop-break"
+          />
+          Conecta, explora y escribe SQL con Druse, tu cliente de escritorio.
+        </p>
+        <div class="hero-actions">
+          <a class="button button-primary" href="#descargar"
+            ><svg aria-hidden="true" viewBox="0 0 24 24">
+              <path d="M12 3v12m-5-5 5 5 5-5M5 16v5h14v-5" /></svg
+            >Obtener Druse</a
+          >
+          <a class="button button-quiet" href="#vista-previa"
+            >Explorar la interfaz <span aria-hidden="true">↓</span></a
+          >
+        </div>
+        <p class="hero-note">
+          Hecho para el escritorio. Con tus datos bajo control.
+        </p>
+
+        <div class="preview-stage" id="vista-previa">
+          <div
+            class="app-window"
+            aria-label="Vista ilustrativa de Druse con datos de ejemplo"
+          >
+            <div class="app-titlebar">
+              <div class="window-dots" aria-hidden="true">
+                <i></i><i></i><i></i>
+              </div>
+              <span
+                ><img src="./assets/druse.png" alt="" width="16" height="16" />
+                Druse <span class="titlebar-separator">/</span> Workspace</span
+              ><span class="titlebar-right">Tema oscuro</span>
+            </div>
+            <div class="app-body">
+              <aside class="app-sidebar" aria-label="Explorador de ejemplo">
+                <div class="sidebar-heading">
+                  EXPLORADOR <span aria-hidden="true">＋</span>
+                </div>
+                <div class="connection">
+                  <span class="connection-dot"></span> Mi PostgreSQL
+                  <span class="engine-small">PG</span>
+                </div>
+                <div class="tree-row">
+                  ⌄ <span aria-hidden="true">▤</span> studio_db
+                </div>
+                <div class="tree-row tree-indent">
+                  ⌄ <span aria-hidden="true">▱</span> public
+                </div>
+                <div class="tree-row tree-indent-2">
+                  ⌄ <span aria-hidden="true">▦</span> Tablas
+                  <span class="tree-count">4</span>
+                </div>
+                <div class="tree-table selected">
+                  <span aria-hidden="true">▤</span> projects
+                </div>
+                <div class="tree-table">
+                  <span aria-hidden="true">▤</span> customers
+                </div>
+                <div class="tree-table">
+                  <span aria-hidden="true">▤</span> invoices
+                </div>
+                <div class="tree-table">
+                  <span aria-hidden="true">▤</span> team_members
+                </div>
+                <div class="tree-row tree-indent-2 muted">
+                  › <span aria-hidden="true">◫</span> Vistas
+                </div>
+                <div class="tree-row tree-indent-2 muted">
+                  › <span aria-hidden="true">ƒ</span> Funciones
+                </div>
+                <div class="sidebar-bottom">
+                  <span aria-hidden="true">◷</span> Historial de consultas
+                </div>
+              </aside>
+              <div class="app-workspace">
+                <div class="query-tabs">
+                  <span class="query-tab"
+                    ><span>SQL</span> proyectos.sql
+                    <span class="tab-unsaved" aria-hidden="true"></span></span
+                  ><span class="tab-plus" aria-hidden="true">＋</span>
+                </div>
+                <div class="editor-toolbar">
+                  <button class="demo-run" type="button" disabled>
+                    <span aria-hidden="true">▶</span> Ejecutar demo</button
+                  ><span class="shortcut">Datos de ejemplo</span
+                  ><span class="toolbar-database">studio_db / public</span>
+                </div>
+                <div class="code-editor" aria-label="Consulta SQL de ejemplo">
+                  <div class="line-numbers" aria-hidden="true">
+                    1<br />2<br />3<br />4<br />5<br />6<br />7
+                  </div>
+                  <pre><code><span class="sql-comment">-- Dale una nueva perspectiva a tus datos.</span>
+<span class="sql-purple">SELECT</span> name, status, revenue
+<span class="sql-purple">FROM</span> <span class="sql-blue">public</span>.projects
+<span class="sql-purple">WHERE</span> status = <span class="sql-green">'active'</span>
+<span class="sql-purple">ORDER BY</span> revenue <span class="sql-purple">DESC</span>;
+
+<span class="editor-cursor" aria-hidden="true"> </span></code></pre>
+                </div>
+                <div class="result-heading">
+                  <span
+                    ><span aria-hidden="true">▦</span> Resultados
+                    <span
+                      class="result-count"
+                      aria-live="polite"
+                      aria-atomic="true"
+                      >4 filas</span
+                    ></span
+                  ><span class="result-timing"
+                    >Consulta completada <span>· 24 ms</span></span
+                  >
+                </div>
+                <div
+                  class="result-scroll"
+                  tabindex="0"
+                  role="region"
+                  aria-label="Resultados con datos de ejemplo"
+                >
+                  <table class="result-table">
+                    <thead>
+                      <tr>
+                        <th scope="col">#</th>
+                        <th scope="col">name <span>varchar</span></th>
+                        <th scope="col">status <span>varchar</span></th>
+                        <th scope="col">revenue <span>numeric</span></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td>1</td>
+                        <td>Website redesign</td>
+                        <td><span class="status-tag">active</span></td>
+                        <td>12,500.00</td>
+                      </tr>
+                      <tr>
+                        <td>2</td>
+                        <td>Mobile experience</td>
+                        <td><span class="status-tag">active</span></td>
+                        <td>9,800.00</td>
+                      </tr>
+                      <tr>
+                        <td>3</td>
+                        <td>Analytics dashboard</td>
+                        <td><span class="status-tag">active</span></td>
+                        <td>7,250.00</td>
+                      </tr>
+                      <tr>
+                        <td>4</td>
+                        <td>Brand platform</td>
+                        <td><span class="status-tag">active</span></td>
+                        <td>4,600.00</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+            <div class="app-statusbar">
+              <span><span class="connection-dot"></span> PostgreSQL</span
+              ><span
+                >UTF-8 <span class="statusbar-separator">|</span> SQL
+                <span class="statusbar-separator">|</span> Druse</span
+              >
+            </div>
+          </div>
+          <p class="preview-caption">
+            UNA INTERFAZ, TODO EL CONTEXTO
+            <span>Vista ilustrativa · datos de ejemplo</span>
+          </p>
+        </div>
+      </section>
+
+      <section
+        class="engines container"
+        id="motores"
+        aria-labelledby="engines-title"
+      >
+        <p class="eyebrow" id="engines-title">
+          TUS MOTORES DE SIEMPRE. UNA NUEVA FORMA DE TRABAJAR.
+        </p>
+        <ul class="engine-list">
+          <li>PostgreSQL</li>
+          <li>MySQL<span> / MariaDB</span></li>
+          <li>SQL Server</li>
+          <li>SQLite</li>
+          <li>Oracle</li>
+          <li>Informix</li>
+        </ul>
+      </section>
+
+      <section
+        class="features container section-space"
+        id="herramientas"
+        aria-labelledby="features-title"
+      >
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">DE LA CONEXIÓN AL RESULTADO</p>
+            <h2 id="features-title">
+              Todo lo que necesitas.<br /><span>Nada que te distraiga.</span>
+            </h2>
+          </div>
+          <p>
+            Un flujo de trabajo continuo, desde explorar una tabla hasta
+            llevarte el resultado.
+          </p>
+        </div>
+        <div class="feature-grid">
+          <article class="feature-card feature-editor">
+            <div class="feature-icon" aria-hidden="true">&gt;_</div>
+            <h3>SQL que sigue tu ritmo.</h3>
+            <p>
+              Escribe con autocompletado de tablas y columnas, formatea tus
+              consultas y ejecuta solo la selección que necesitas.
+            </p>
+            <div class="mini-editor" aria-hidden="true">
+              <div>
+                <span class="sql-purple">SELECT</span> p.<span
+                  class="small-cursor"
+                ></span>
+              </div>
+              <div class="suggestions">
+                <span class="suggestion-active"
+                  ><b>▤</b> name <em>varchar</em></span
+                ><span><b>▤</b> status <em>varchar</em></span
+                ><span><b>▤</b> revenue <em>numeric</em></span>
+              </div>
+              <span class="mini-editor-hint"
+                >El contexto está en tu esquema.</span
+              >
+            </div>
+            <span class="card-footnote"
+              >Tu siguiente consulta empieza aquí.</span
+            >
+          </article>
+          <article class="feature-card">
+            <div class="feature-icon" aria-hidden="true">▦</div>
+            <h3>Explora sin perder el hilo.</h3>
+            <p>
+              Conexiones, esquemas, tablas y vistas en un mismo explorador.
+              Encuentra la estructura detrás de cada dato.
+            </p>
+            <div class="schema-strip" aria-hidden="true">
+              <span>conexión</span><i> / </i><span>esquema</span><i> / </i
+              ><span class="accent">tabla</span>
+            </div>
+          </article>
+          <article class="feature-card">
+            <div class="feature-icon" aria-hidden="true">⇄</div>
+            <h3>Tus datos, en movimiento.</h3>
+            <p>
+              Importa y exporta CSV o Excel. Edita filas desde la cuadrícula y
+              revisa el SQL antes de aplicar los cambios.
+            </p>
+            <div class="format-chips" aria-label="Formatos compatibles">
+              <span>.csv</span><span>.xlsx</span><span>.sql</span>
+            </div>
+          </article>
+          <article class="feature-card feature-control">
+            <div>
+              <div class="feature-icon" aria-hidden="true">◇</div>
+              <h3>El control se queda contigo.</h3>
+              <p>
+                Credenciales en el almacén seguro del sistema, conexiones de
+                solo lectura y confirmación para operaciones destructivas.
+              </p>
+            </div>
+            <div class="safety-preview">
+              <span class="safety-check" aria-hidden="true">✓</span>
+              <div>
+                Conexión de solo lectura<small
+                  >Explora con una protección adicional.</small
+                >
+              </div>
+              <span class="lock-icon" aria-hidden="true">▣</span>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section
+        class="workflow container section-space"
+        aria-labelledby="workflow-title"
+      >
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">MENOS PASOS. MÁS CLARIDAD.</p>
+            <h2 id="workflow-title">De conectar a crear.</h2>
+          </div>
+        </div>
+        <ol class="steps">
+          <li>
+            <span class="step-number">01</span>
+            <h3>Conecta tu base</h3>
+            <p>
+              Elige el motor y guarda tu perfil para tener tus conexiones a
+              mano.
+            </p>
+          </li>
+          <li>
+            <span class="step-number">02</span>
+            <h3>Encuentra la respuesta</h3>
+            <p>
+              Explora el esquema, escribe SQL y consulta los resultados en el
+              mismo espacio.
+            </p>
+          </li>
+          <li>
+            <span class="step-number">03</span>
+            <h3>Llévala más lejos</h3>
+            <p>
+              Edita, exporta o vuelve a una consulta desde el historial. Sigue
+              donde lo dejaste.
+            </p>
+          </li>
+        </ol>
+      </section>
+
+      <section
+        class="download-section container"
+        id="descargar"
+        aria-labelledby="download-title"
+      >
+        <div class="download-copy">
+          <p class="eyebrow">UN ESPACIO PARA TUS DATOS</p>
+          <h2 id="download-title">
+            Tu próxima consulta<br />empieza con Druse.
+          </h2>
+          <p>
+            Una aplicación de escritorio con todo lo necesario para empezar. Sin
+            instalar .NET ni Node.js.
+          </p>
+          <a class="button button-primary" id="download-link" hidden
+            ><svg aria-hidden="true" viewBox="0 0 24 24">
+              <path d="M12 3v12m-5-5 5 5 5-5M5 16v5h14v-5" /></svg
+            >Descargar para Windows</a
+          >
+          <p class="availability" id="download-status">
+            La descarga pública estará disponible próximamente.
+          </p>
+        </div>
+        <div class="download-mark" aria-hidden="true">
+          <img src="./assets/druse.png" alt="" width="128" height="128" /><span
+            >Tu escritorio. Tus conexiones.<br />Tu forma de trabajar.</span
+          >
+        </div>
+      </section>
+
+      <section
+        class="faq container section-space"
+        id="preguntas"
+        aria-labelledby="faq-title"
+      >
+        <div>
+          <p class="eyebrow">ALGUNAS RESPUESTAS</p>
+          <h2 id="faq-title">Antes de empezar.</h2>
+        </div>
+        <div class="faq-list">
+          <details>
+            <summary>
+              ¿Qué bases de datos puedo conectar?<span aria-hidden="true"
+                >+</span
+              >
+            </summary>
+            <p>
+              Druse admite PostgreSQL, SQL Server, MySQL, MariaDB, SQLite,
+              Oracle e Informix. La disponibilidad de Informix depende de la
+              edición instalada.
+            </p>
+          </details>
+          <details>
+            <summary>
+              ¿Druse funciona en el navegador?<span aria-hidden="true">+</span>
+            </summary>
+            <p>
+              Druse es una aplicación de escritorio. Esta página presenta la
+              aplicación; para conectar tus bases de datos necesitas instalarla
+              en tu equipo.
+            </p>
+          </details>
+          <details>
+            <summary>
+              ¿Necesito instalar herramientas adicionales?<span
+                aria-hidden="true"
+                >+</span
+              >
+            </summary>
+            <p>
+              El instalador de Windows incluye los componentes de ejecución de
+              Druse. No necesitas instalar .NET ni Node.js. Solo debes tener
+              acceso a la base de datos con la que quieras trabajar.
+            </p>
+          </details>
+          <details>
+            <summary>
+              ¿Dónde se guardan mis contraseñas?<span aria-hidden="true"
+                >+</span
+              >
+            </summary>
+            <p>
+              Las contraseñas se guardan en el almacén seguro del sistema
+              operativo. Si no está disponible, Druse te pide la contraseña en
+              cada conexión en lugar de guardarla sin protección.
+            </p>
+          </details>
+        </div>
+      </section>
+    </main>
+
+    <footer class="container site-footer">
+      <a class="brand" href="#" aria-label="Druse, volver al inicio"
+        ><img
+          src="./assets/druse.png"
+          alt=""
+          width="26"
+          height="26"
+        />druse<span class="brand-period">.</span></a
+      >
+      <p>
+        Soporte:
+        <a href="mailto:druse.contacto@gmail.com?subject=Druse%20-%20Soporte"
+          >druse.contacto@gmail.com</a
+        >
+      </p>
+      <a href="#contenido">Volver arriba <span aria-hidden="true">↑</span></a>
+    </footer>
+    <div class="container legal-footer">
+      <p>
+        Sin analítica ni publicidad. Tú decides si guardamos tus preferencias.
+      </p>
+      <nav aria-label="Información legal">
+        <a href="./legal.html#privacidad">Privacidad y datos</a>
+        <a href="./legal.html#cookies">Cookies</a>
+        <a href="./legal.html#condiciones">Aviso legal</a>
+        <button class="privacy-open" type="button" hidden>
+          Preferencias de privacidad
+        </button>
+      </nav>
+    </div>
+    <dialog
+      class="privacy-dialog"
+      aria-labelledby="privacy-dialog-title"
+      aria-describedby="privacy-dialog-intro"
+    >
+      <form method="dialog">
+        <button class="dialog-close" aria-label="Cerrar preferencias">×</button>
+      </form>
+      <p class="eyebrow">TÚ TIENES EL CONTROL</p>
+      <h2 id="privacy-dialog-title">Tus preferencias.</h2>
+      <p id="privacy-dialog-intro">
+        Esta web no incorpora cookies de publicidad ni herramientas de
+        analítica. Puedes usarla sin guardar preferencias en tu navegador.
+      </p>
+      <label class="preference-option"
+        ><input type="checkbox" id="remember-effects" /><span
+          >Recordar mi preferencia de efectos<small
+            >Guarda si has pausado las animaciones, en este navegador, durante
+            un máximo de 180 días. No se envía al servidor.</small
+          ></span
+        ></label
+      >
+      <p class="privacy-dialog-note">
+        El alojamiento puede registrar datos técnicos para servir y proteger la
+        web.
+        <a href="./legal.html#privacidad">Consulta el aviso de privacidad.</a>
+      </p>
+      <div class="privacy-actions">
+        <button class="button" type="button" id="privacy-reject">
+          No guardar preferencias</button
+        ><button class="button" type="button" id="privacy-save">
+          Guardar mi elección
+        </button>
+      </div>
+      <p class="privacy-status" role="status" aria-live="polite"></p>
+    </dialog>
+  </body>
+</html>
