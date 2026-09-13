@@ -523,6 +523,7 @@ shells/desktop-tauri/target/
 shells/desktop-tauri/gen/
 
 # Artefactos de publicación y empaquetado
+/artifacts/
 build/artifacts/
 *.msi
 *.appx
@@ -570,6 +571,11 @@ shells/desktop-tauri/api/*
 # pero si la construcción se interrumpe a la fuerza puede quedar: lleva la huella
 # del certificado de quien compiló, que es de su máquina y no del proyecto.
 shells/desktop-tauri/tauri.signing.json
+shells/desktop-tauri/tauri.packaging.json
+
+# Claves privadas del actualizador: las públicas van en tauri.conf.json.
+druse-updater*.key
+*.p12
 
 # Pruebas de punta a punta (Playwright): todo lo que produce una ejecución.
 # `test-results/` ya está más arriba, pero el informe y la marca de la última
