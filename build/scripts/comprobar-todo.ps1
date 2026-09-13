@@ -157,15 +157,38 @@ if (-not $Rapido) {
 # --- Envoltorio de escritorio ------------------------------------------------
 # En Windows hay que cargar el entorno de MSVC o cargo encuentra un enlazador sin
 # las librerías del SDK y falla con un mensaje que no explica la causa.
-. (Join-Path $PSScriptRoot 'msvc-env.ps1')
+#
+# **Y hay que quitarlo al terminar.** `vcvars64.bat` exporta, entre otras,
+# `Platform=x64`, y esa variable se queda en la sesión de PowerShell. MSBuild la
+# lee como propiedad, y la solución no tiene configuración `Release|x64`: la
+# siguiente vez que alguien lanza `dotnet test` en esa misma ventana, el backend
+# entero falla con MSB4126 sin haber compilado una línea. Pasó ejecutando este
+# guion dos veces seguidas —la primera verde, la segunda roja sin cambiar nada—,
+# que es exactamente el tipo de rojo que no debe existir.
+$entornoPrevio = @{}
+Get-ChildItem env: | ForEach-Object { $entornoPrevio[$_.Name] = $_.Value }
 
-$tauri = Join-Path $repoRoot 'shells/desktop-tauri'
+try {
+    . (Join-Path $PSScriptRoot 'msvc-env.ps1')
 
-Invoke-Bloque 'Envoltorio: formato' { cargo fmt --check } -Directorio $tauri
-Invoke-Bloque 'Envoltorio: pruebas' { cargo test --locked } -Directorio $tauri
+    $tauri = Join-Path $repoRoot 'shells/desktop-tauri'
 
-if (-not $Rapido) {
-    Invoke-Bloque 'Envoltorio: Clippy' { cargo clippy --locked --all-targets -- -D warnings } -Directorio $tauri
+    Invoke-Bloque 'Envoltorio: formato' { cargo fmt --check } -Directorio $tauri
+    Invoke-Bloque 'Envoltorio: pruebas' { cargo test --locked } -Directorio $tauri
+
+    if (-not $Rapido) {
+        Invoke-Bloque 'Envoltorio: Clippy' { cargo clippy --locked --all-targets -- -D warnings } -Directorio $tauri
+    }
+}
+finally {
+    # Se deja la sesión como estaba: lo que añadió MSVC se quita y lo que cambió
+    # recupera su valor, incluido `Path`.
+    Get-ChildItem env: | Where-Object { -not $entornoPrevio.ContainsKey($_.Name) } |
+        ForEach-Object { Remove-Item "env:$($_.Name)" -ErrorAction SilentlyContinue }
+
+    foreach ($nombre in $entornoPrevio.Keys) {
+        Set-Item "env:$nombre" -Value $entornoPrevio[$nombre] -ErrorAction SilentlyContinue
+    }
 }
 
 # --- Punta a punta -----------------------------------------------------------
