@@ -436,7 +436,11 @@
 
 @defer (when settingsOpen()) {
   @if (settingsOpen()) {
-    <app-settings-dialog [editorRatio]="editorRatio()" (closed)="settingsOpen.set(false)" />
+    <app-settings-dialog
+      [editorRatio]="editorRatio()"
+      (autoUpdateCheckChange)="setAutoUpdateCheck($event)"
+      (closed)="settingsOpen.set(false)"
+    />
   }
 }
 

@@ -1083,6 +1083,10 @@ export class AppShell {
     this._store.setMaxRows(rows);
   }
 
+  protected setAutoUpdateCheck(enabled: boolean): void {
+    void this._store.setAutoUpdateCheck(enabled);
+  }
+
   protected setTimeout(seconds: number): void {
     this._store.setTimeout(seconds);
   }
@@ -1183,6 +1187,16 @@ export class AppShell {
     this._splash.dismiss();
 
     void this.updates.initialize().then(() => {
+      // Mientras nadie haya elegido, Druse no ha consultado nada y hay que
+      // decirlo: un programa que calla sobre las conexiones que abre —o que deja
+      // de abrir— no deja elegir, solo decide por su cuenta.
+      if (this.updates.state() === 'undecided') {
+        this._store.notify(
+          'Druse no busca actualizaciones por su cuenta. Elige si quieres que lo haga en Preferencias.',
+        );
+        return;
+      }
+
       const release = this.updates.available();
 
       if (release) {

@@ -14,8 +14,22 @@ describe('SettingsDialog', () => {
   const appearance = signal(DEFAULT_APPEARANCE);
   const save = vi.fn(async () => ({ saved: true, path: 'prueba.zip' }));
 
+  /**
+   * El estado del actualizador, movible desde cada prueba.
+   *
+   * Hace falta porque la casilla de búsqueda automática solo existe donde la
+   * distribución puede actualizarse, y eso —en la aplicación de verdad— solo
+   * ocurre en una copia instalada: ni el navegador ni el barrido llegan ahí.
+   */
+  const updateInfo = signal({ version: '1.0', variantLabel: 'Prueba', updatesEnabled: false });
+  const autoCheck = signal<boolean | null>(null);
+  const updateState = signal('disabled');
+
   beforeEach(async () => {
     appearance.set(DEFAULT_APPEARANCE);
+    updateInfo.set({ version: '1.0', variantLabel: 'Prueba', updatesEnabled: false });
+    autoCheck.set(null);
+    updateState.set('disabled');
     save.mockClear();
     await TestBed.configureTestingModule({
       imports: [SettingsDialog],
@@ -32,8 +46,9 @@ describe('SettingsDialog', () => {
           provide: UpdateService,
           useValue: {
             initialize: async () => undefined,
-            info: signal({ version: '1.0', variantLabel: 'Prueba', updatesEnabled: false }),
-            state: signal('disabled'),
+            info: updateInfo,
+            state: updateState,
+            autoCheck,
           },
         },
         {
@@ -90,6 +105,55 @@ describe('SettingsDialog', () => {
     fixture.detectChanges();
     expect(size.getAttribute('aria-pressed')).toBe('true');
     expect(appearance().editorFontSize).toBe(16);
+  });
+
+  /** Lo que enseña la pestaña cuando la copia sí puede actualizarse sola. */
+  function casillaDeActualizaciones(): HTMLInputElement | null {
+    return element.querySelector<HTMLInputElement>('#settings-panel-about .checkbox input');
+  }
+
+  it('sin poder actualizarse, no ofrece una casilla que no haría nada', () => {
+    tab('Acerca de').click();
+    fixture.detectChanges();
+
+    expect(casillaDeActualizaciones()).toBeNull();
+  });
+
+  it('mientras nadie haya elegido, la casilla aparece sin marcar', () => {
+    updateInfo.set({ version: '1.0', variantLabel: 'Prueba', updatesEnabled: true });
+    updateState.set('undecided');
+    tab('Acerca de').click();
+    fixture.detectChanges();
+
+    expect(casillaDeActualizaciones()?.checked).toBe(false);
+    expect(element.querySelector('#settings-panel-about')?.textContent).toContain(
+      'Druse no ha consultado nada',
+    );
+  });
+
+  it('marcarla avisa al área de trabajo, que es quien lo recuerda', () => {
+    updateInfo.set({ version: '1.0', variantLabel: 'Prueba', updatesEnabled: true });
+    tab('Acerca de').click();
+    fixture.detectChanges();
+
+    const elegido: boolean[] = [];
+    fixture.componentInstance.autoUpdateCheckChange.subscribe((value) => elegido.push(value));
+
+    const casilla = casillaDeActualizaciones()!;
+    casilla.checked = true;
+    casilla.dispatchEvent(new Event('change'));
+
+    expect(elegido).toEqual([true]);
+  });
+
+  it('lo ya autorizado se enseña marcado', () => {
+    updateInfo.set({ version: '1.0', variantLabel: 'Prueba', updatesEnabled: true });
+    autoCheck.set(true);
+    updateState.set('current');
+    tab('Acerca de').click();
+    fixture.detectChanges();
+
+    expect(casillaDeActualizaciones()?.checked).toBe(true);
   });
 
   it('Acerca de mantiene accesible el diagnóstico y confirma dónde se guardó', async () => {

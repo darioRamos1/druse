@@ -330,7 +330,28 @@
             <span>{{ info.variantLabel }}</span>
           </div>
 
+          @if (info.updatesEnabled) {
+            <label class="checkbox">
+              <input
+                type="checkbox"
+                [checked]="updates.autoCheck() === true"
+                (change)="toggleAutoCheck($event)"
+              />
+              <span>
+                Buscar actualizaciones al abrir Druse
+                <span class="checkbox__hint">
+                  Consulta en GitHub cuál es la última versión publicada. Es una petición HTTPS y no
+                  lleva datos tuyos; GitHub registra la dirección IP, como en cualquier descarga.
+                  Sin esto, Druse no se conecta solo y puedes buscarlas a mano cuando quieras.
+                </span>
+              </span>
+            </label>
+          }
+
           @switch (updates.state()) {
+            @case ('undecided') {
+              <p class="update__status">Todavía no has elegido. Druse no ha consultado nada.</p>
+            }
             @case ('disabled') {
               <p class="section__hint">{{ info.updatesDisabledReason }}</p>
             }

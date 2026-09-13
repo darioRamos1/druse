@@ -114,6 +114,30 @@
   }
 }
 
+// Misma forma que la casilla del diálogo de conexión: quien ya ha visto una
+// reconoce la otra sin releerla.
+.checkbox {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  color: var(--dr-text-secondary);
+  font-size: var(--dr-font-size-sm);
+  cursor: pointer;
+
+  input {
+    margin-top: 2px;
+    accent-color: var(--dr-accent);
+  }
+
+  &__hint {
+    display: block;
+    margin-top: 2px;
+    color: var(--dr-text-tertiary);
+    font-size: 12px;
+    line-height: 1.5;
+  }
+}
+
 .update {
   &__identity {
     display: flex;

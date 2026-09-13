@@ -15,6 +15,7 @@ import {
 } from '../application-gateway/application-gateway';
 import { FileSaveService, describeSave } from '../files/file-save.service';
 import { ThemeService } from '../theme/theme.service';
+import { AUTO_CHECK_PREFERENCE, UpdateService } from '../update/update.service';
 import { describeError, diagnosticQuery, isSessionLost } from './errors';
 import { ConnectionStore } from './connection-store';
 import { ExecutionStore } from './execution-store';
@@ -95,6 +96,7 @@ export class WorkspaceStore {
   private readonly _gateway = inject(ApplicationGateway);
   private readonly _files = inject(FileSaveService);
   private readonly _theme = inject(ThemeService);
+  private readonly _updates = inject(UpdateService);
   private readonly _connectionStore = inject(ConnectionStore);
   private readonly _execution = inject(ExecutionStore);
   private readonly _explorer = inject(ExplorerStore);
@@ -271,6 +273,26 @@ export class WorkspaceStore {
     }
   }
 
+  /**
+   * Decide si Druse busca actualizaciones al abrirse, y lo recuerda.
+   *
+   * El guardado vive aquí y no en el servicio de actualización porque a aquel lo
+   * inyecta la interceptora de HTTP: darle el gateway cerraría un círculo entre
+   * el cliente y su propia interceptora. Aquí, en cambio, ya está el resto de
+   * preferencias.
+   */
+  async setAutoUpdateCheck(enabled: boolean): Promise<void> {
+    await this._updates.setAutoCheck(enabled);
+
+    try {
+      await firstValueFrom(this._gateway.setPreference(AUTO_CHECK_PREFERENCE, String(enabled)));
+    } catch {
+      // La elección ya vale en esta sesión. No haberla podido guardar significa
+      // que en el siguiente arranque se vuelve a preguntar, que es el lado
+      // seguro de este error: nunca dar por autorizado lo que no se recordó.
+    }
+  }
+
   async setTimeout(seconds: number): Promise<void> {
     const clamped = Math.min(3600, Math.max(1, Math.round(seconds)));
 
@@ -324,6 +346,11 @@ export class WorkspaceStore {
 
       this._formatSettings.set(parseFormatSettings(preferences));
       this._theme.adopt(preferences);
+
+      // Y de aquí sale también si Druse puede buscar actualizaciones al abrirse.
+      // Tiene que estar leído antes de que el shell arranque el actualizador: si
+      // llegara después, la consulta ya habría salido sin permiso.
+      this._updates.adopt(preferences);
     } catch {
       // Se sigue con los valores por defecto.
     }

@@ -219,6 +219,20 @@ export class SettingsDialog {
   }
 
   /**
+   * Activa o desactiva la búsqueda automática.
+   *
+   * Es el único ajuste de esta ventana que cambia si Druse abre una conexión por
+   * su cuenta, y por eso se aplica en cuanto se marca: dejarlo pendiente de un
+   * botón «Aplicar» dejaría la duda de si llegó a valer.
+   *
+   * Sale por un evento, como el resto de ajustes del área de trabajo: quien lo
+   * recuerda es el store, no la ventana que lo enseña.
+   */
+  protected toggleAutoCheck(event: Event): void {
+    this.autoUpdateCheckChange.emit((event.target as HTMLInputElement).checked);
+  }
+
+  /**
    * Proporción del editor de verdad.
    *
    * La miniatura la copia porque el recorte de una imagen depende de la forma
@@ -226,6 +240,9 @@ export class SettingsDialog {
    * encuadre que después no se ve.
    */
   readonly editorRatio = input('16 / 9');
+
+  /** Si Druse debe buscar actualizaciones al abrirse. */
+  readonly autoUpdateCheckChange = output<boolean>();
 
   readonly closed = output<void>();
 

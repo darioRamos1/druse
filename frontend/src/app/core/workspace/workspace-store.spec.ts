@@ -28,6 +28,7 @@ import {
   TestTunnelResult,
 } from '../../shared/models/workspace';
 import { FileSaveService } from '../files/file-save.service';
+import { UpdateService } from '../update/update.service';
 import { WorkspaceStore } from './workspace-store';
 
 const form: ConnectionForm = {
@@ -2044,6 +2045,41 @@ describe('WorkspaceStore', () => {
 
       expect(store.formatSettings().style).toBe('tabular');
       expect(store.formatSettings().expressionWidth).toBe(120);
+    });
+  });
+
+  /**
+   * Buscar actualizaciones es la única conexión que Druse abriría sin que nadie
+   * la pidiera, así que la elección se guarda como cualquier otra preferencia y
+   * el servicio la recibe antes de que el arranque llegue a consultarla.
+   */
+  describe('búsqueda de actualizaciones', () => {
+    it('recuerda que se autorizó', async () => {
+      await store.setAutoUpdateCheck(true);
+
+      expect(gateway.preferences['updates.autoCheck']).toBe('true');
+      expect(TestBed.inject(UpdateService).autoCheck()).toBe(true);
+    });
+
+    it('recuerda que se rechazó', async () => {
+      await store.setAutoUpdateCheck(false);
+
+      expect(gateway.preferences['updates.autoCheck']).toBe('false');
+      expect(TestBed.inject(UpdateService).autoCheck()).toBe(false);
+    });
+
+    it('la lectura del arranque se la pasa al actualizador', async () => {
+      gateway.preferences = { 'updates.autoCheck': 'true' };
+
+      await store.loadPreferences();
+
+      expect(TestBed.inject(UpdateService).autoCheck()).toBe(true);
+    });
+
+    it('sin preferencia guardada, queda sin decidir', async () => {
+      await store.loadPreferences();
+
+      expect(TestBed.inject(UpdateService).autoCheck()).toBeNull();
     });
   });
   describe('reconectar y navegar entre bases', () => {
