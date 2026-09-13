@@ -35,17 +35,50 @@ public abstract class DatabaseProviderContractTests<TFixture>
     /// tiene un riesgo: una suite entera en verde que en realidad no comprobó
     /// nada. Con `DRUSE_REQUIRE_ENGINES=1` —lo que hace la integración continua—
     /// esa situación pasa a ser un fallo en lugar de un silencio.
+    ///
+    /// `DRUSE_OPTIONAL_ENGINES` nombra los que esa exigencia no alcanza, separados
+    /// por comas. Existe porque **no todas las ejecuciones levantan los mismos
+    /// motores**: la integración continua deja fuera Oracle —su imagen ronda los
+    /// 2 GB y tarda un par de minutos en arrancar— y sin esta lista exigirlo allí
+    /// convertía el job entero en rojo por un motor que nadie pensaba levantar.
+    /// Decirlo por su nombre es distinto de no exigir nada: queda escrito qué se
+    /// dejó fuera y dónde.
     /// </summary>
     [Fact]
     public void ElMotorEstabaDisponible()
     {
-        var required = Environment.GetEnvironmentVariable("DRUSE_REQUIRE_ENGINES") == "1";
+        var required =
+            Environment.GetEnvironmentVariable("DRUSE_REQUIRE_ENGINES") == "1"
+            && !IsOptional(Fixture.EngineName);
 
         Assert.True(
             Fixture.IsAvailable || !required,
             $"Se exigían todos los motores y {Fixture.EngineName} no respondió. " +
             $"Motivo: {Fixture.UnavailableReason ?? "desconocido"}. " +
-            "Levanta el contenedor con build/scripts/test-db.ps1.");
+            "Levanta el contenedor con build/scripts/test-db.ps1, " +
+            "o nómbralo en DRUSE_OPTIONAL_ENGINES si esta ejecución no lo levanta.");
+    }
+
+    /// <summary>
+    /// Si este motor figura entre los que la ejecución no exige.
+    ///
+    /// Compara con el nombre del fixture sin distinguir mayúsculas ni espacios,
+    /// que es como se escribe una variable de entorno a mano: `oracle` debe valer
+    /// para «Oracle», y `informix` alcanza también a «Informix (SQLI)», porque
+    /// los dos salen del mismo contenedor.
+    /// </summary>
+    private static bool IsOptional(string engine)
+    {
+        var optional = Environment.GetEnvironmentVariable("DRUSE_OPTIONAL_ENGINES");
+
+        if (string.IsNullOrWhiteSpace(optional))
+        {
+            return false;
+        }
+
+        return optional
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Any(name => engine.StartsWith(name, StringComparison.OrdinalIgnoreCase));
     }
 
     private async Task<IDatabaseSession> OpenAsync(bool onlyRead = false) =>

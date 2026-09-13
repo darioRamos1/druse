@@ -162,6 +162,14 @@ jobs:
       # comprobó nada. Aquí ese caso debe romper la compilación.
       DRUSE_REQUIRE_ENGINES: '1'
 
+      # Menos Oracle, que este job no levanta: su imagen ronda los 2 GB y tarda
+      # un par de minutos en arrancar. Exigirlo aquí ponía en rojo el job entero
+      # por un motor que nunca se pensó levantar, y el nombre de este job —«los
+      # cuatro motores»— ya decía cuáles son. Oracle se prueba en local con
+      # build/scripts/test-db.ps1 -Engine oracle; queda anotado en
+      # docs/matriz-de-motores.md para que la ausencia no pase por cobertura.
+      DRUSE_OPTIONAL_ENGINES: oracle
+
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
@@ -188,6 +196,11 @@ jobs:
       # JDBC. Confundirlos da un error que parece de credenciales, pero las
       # pruebas del transporte SQLI necesitan el 9088 abierto: sin él se omiten
       # en silencio y la suite queda verde sin haberlo probado.
+      #
+      # La imagen va por digest como el resto (REL-006). Iba por `latest`, que es
+      # un puntero que alguien más mueve: la versión contra la que se prueba
+      # podía cambiar sin que cambiara una línea de este repositorio, y sin que
+      # nadie se enterara hasta ver un fallo raro.
       - name: Levantar Informix
         run: |
           docker run -d --name druse-informix \
@@ -195,7 +208,7 @@ jobs:
             -e DB_INIT=1 \
             -p 9088:9088 \
             -p 9089:9089 \
-            icr.io/informix/informix-developer-database:latest
+            icr.io/informix/informix-developer-database:latest@sha256:8202d69ba5674df4b13140d5121dd11b7b26b28dc60119b7e8f87e533e538ba1
 
           # Se espera a «On-Line», no a que `onstat` responda: el servidor pasa
           # primero por modo administrativo, donde ya contesta pero rechaza toda
@@ -328,6 +341,29 @@ jobs:
           name: e2e-informe
           path: e2e/playwright-report/**
           retention-days: 14
+
+  # Las pruebas de los guiones de construcción. No compilan, no publican y no
+  # levantan contenedores: ejercitan con dobles lo que decide si un paquete se
+  # puede repartir —qué archivos lleva dentro— y si las bases de prueba quedan
+  # expuestas a la red. Es un minuto de runner y son justo las comprobaciones
+  # que nadie recuerda ejecutar a mano antes de una release.
+  guiones-de-construccion:
+    name: Guiones de construcción
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Contenido del paquete y manifiesto
+        shell: pwsh
+        run: ./build/tests/manifiesto-paquete.ps1
+
+      - name: Puertos de las bases de prueba (PowerShell)
+        shell: pwsh
+        run: ./build/tests/test-db-loopback.ps1
+
+      - name: Puertos de las bases de prueba (Bash)
+        run: bash build/tests/test-db-loopback.sh
 
   frontend:
     name: Frontend (${{ matrix.os }})
