@@ -1,0 +1,67 @@
+name: Compatibilidad de un motor
+description: Cuenta cómo se portó Druse con una versión concreta de un motor
+labels: ['compatibilidad']
+body:
+  - type: markdown
+    attributes:
+      value: |
+        La [matriz de motores](https://github.com/darioRamos1/druse/blob/main/docs/matriz-de-motores.md)
+        solo recoge versiones contra las que se ejecutaron pruebas. Este informe
+        es la forma de que crezca.
+
+        Sirve tanto si todo funcionó como si no. **Sin contraseñas ni datos de
+        tus clientes.**
+
+  - type: input
+    id: motor
+    attributes:
+      label: Motor y versión exacta del servidor
+      placeholder: 'MariaDB 11.4.3'
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Versión y variante de Druse
+      placeholder: '1.1.0 sin Informix'
+    validations:
+      required: true
+
+  - type: dropdown
+    id: resultado
+    attributes:
+      label: Resultado general
+      options:
+        - Funcionó todo lo que probé
+        - Funcionó con pegas
+        - No pude ni conectar
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: probado
+    attributes:
+      label: Qué llegaste a probar
+      options:
+        - label: Conectar
+        - label: Explorar el catálogo
+        - label: Ejecutar consultas
+        - label: Editar filas desde la cuadrícula
+        - label: Exportar o importar
+        - label: Respaldar o restaurar
+        - label: Diagramas
+
+  - type: textarea
+    id: detalle
+    attributes:
+      label: Qué falló, si falló
+      description: Con el mensaje tal cual, sin las partes sensibles.
+    validations:
+      required: false
+
+  - type: input
+    id: sistema
+    attributes:
+      label: Sistema operativo
+      placeholder: 'Windows 11 24H2'

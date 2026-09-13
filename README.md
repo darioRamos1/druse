@@ -125,7 +125,7 @@ ahí las actualizaciones serán automáticas.
 
 ### Firmar los artefactos
 
-Sin firmar, Windows enseña el aviso de SmartScreen en cada equipo donde se abre la aplicación. No es que sospeche del código: es que no sabe quién lo hizo.
+SmartScreen evalúa la reputación del archivo descargado y de su editor. Un instalador nuevo sin firma puede mostrar una advertencia; firmarlo con un certificado confiable identifica al editor, pero no garantiza que el aviso desaparezca inmediatamente.
 
 ```powershell
 $env:DRUSE_SIGN_THUMBPRINT = 'huella del certificado'
@@ -144,12 +144,18 @@ La huella es la de un certificado **ya instalado en el almacén de Windows**. No
 
 Se firma el ejecutable, los dos instaladores y **también la API que viaja dentro**: Tauri no la toca, y un instalador firmado que suelta un binario sin firmar es lo que hace saltar a los antivirus corporativos. El runtime de .NET no se refirma, porque ya viene firmado por Microsoft.
 
+El estado real de la firma de lo que se publica —hoy, sin Authenticode— y cómo comprobar un instalador descargado están en [`CODE_SIGNING_POLICY.md`](CODE_SIGNING_POLICY.md).
+
+Cada empaquetado deja además un **manifiesto** en `artifacts/paquete/` con el SHA-256 de cada archivo que viaja dentro y de los artefactos generados. Antes de eso, `package.ps1` compara el contenido con [`build/paquete-excluidos.json`](build/paquete-excluidos.json) y **se detiene** si aparece algo que esa variante no debe llevar: es lo que evita repartir una versión «sin Informix» que arrastre el controlador de IBM por una dependencia transitiva.
+
 Dos advertencias que evitan un chasco caro:
 
-- **Firmar no apaga SmartScreen al instante.** Con un certificado OV el aviso puede seguir apareciendo hasta que el ejecutable acumule reputación. Los certificados EV eran la vía a la confianza inmediata, aunque ese comportamiento ha ido cambiando.
+- **Firmar no apaga SmartScreen al instante.** Tanto OV como EV pueden mostrar avisos hasta acumular reputación. Microsoft indica que los certificados EV ya no conceden confianza inmediata; no conviene pagar su sobrecoste solo para SmartScreen.
 - **El sellado de tiempo no es opcional.** Sin él, la firma deja de validar el día que caduca el certificado, y fallan las copias ya repartidas.
 
 La huella nunca se escribe en `tauri.conf.json`: es de la máquina que compila, no del proyecto. El script genera la configuración de firma al vuelo y la borra al terminar, incluso si la construcción falla.
+
+La firma `.sig` del actualizador de Tauri valida actualizaciones, pero **no es Authenticode** y no aporta por sí sola confianza a SmartScreen. Para distribuir sin comprar un certificado, consulta el [plan de MSIX y Microsoft Store](docs/distribucion-windows-smartscreen.md). La Store firma los paquetes MSIX que aprueba; subir el mismo EXE de NSIS no equivale a esa ruta. Referencia: [opciones de firma de Microsoft](https://learn.microsoft.com/en-us/windows/apps/package-and-deploy/code-signing-options).
 
 ## Atajos del editor
 
@@ -186,6 +192,10 @@ selector web y guardar descarga un `.sql` nuevo.
 Todos superan **el mismo conjunto de pruebas contractuales**, sin excepciones
 por motor: lo que un motor no puede hacer se declara en su fixture —Oracle no
 tiene booleanos ni cadenas vacías— en lugar de relajar la comprobación.
+
+Esos rangos son la compatibilidad que el proveedor pretende cubrir. **Contra qué
+versión se ejecutaron pruebas de verdad** —una por motor, no el rango entero— está
+en la [matriz de motores](docs/matriz-de-motores.md).
 
 En MySQL, `SCHEMA` es un sinónimo de `DATABASE`, así que el explorador muestra un esquema del mismo nombre que su base. El árbol se comporta igual en los tres motores; la alternativa habría sido ramificar por motor en la interfaz, que es justo lo que el plan prohíbe.
 
@@ -313,6 +323,12 @@ en GitHub Pages. Consulta [cómo previsualizarla y publicarla](docs/landing-gith
 | [`docs/como-anadir-un-motor.md`](docs/como-anadir-un-motor.md) | Qué hay que escribir y qué hay que tocar para que Druse hable con un motor más |
 | [`docs/plan-nuevos-motores.md`](docs/plan-nuevos-motores.md) | Plan de Oracle y SQLite, con la lista de lo que un motor tiene que cubrir para estar terminado |
 | [`docs/guia-estrategia-open-source.md`](docs/guia-estrategia-open-source.md) | Ruta futura para abrir el proyecto, conseguir usuarios y evaluar su sostenibilidad |
+| [`docs/plan-signpath-donaciones.md`](docs/plan-signpath-donaciones.md) | Tareas, decisiones y verificaciones para solicitar SignPath y habilitar aportes voluntarios |
+| [`docs/auditoria-apertura-2026-09-13.md`](docs/auditoria-apertura-2026-09-13.md) | Resultados iniciales del análisis de historial, dependencias y preparación de la publicación |
+| [`docs/matriz-de-motores.md`](docs/matriz-de-motores.md) | Contra qué versiones se ejecutaron pruebas de verdad, y qué rangos solo están anunciados |
+| [`docs/privacidad-aplicacion.md`](docs/privacidad-aplicacion.md) | Qué sale del equipo, qué se guarda y dónde, con la evidencia de dónde se comprobó |
+| [`CODE_SIGNING_POLICY.md`](CODE_SIGNING_POLICY.md) | Estado de la firma de los artefactos y cómo comprobar lo que descargaste |
+| [`SECURITY.md`](SECURITY.md) y [`CONTRIBUTING.md`](CONTRIBUTING.md) | Cómo informar de un fallo de seguridad y qué se puede aportar hoy |
 | [`docs/release-notes/0.1.0-beta.md`](docs/release-notes/0.1.0-beta.md) | Qué trajo la primera beta, con qué números se comprobó y qué no garantizaba |
 | [`docs/mockups/druse-main.html`](docs/mockups/druse-main.html) | Mockup de referencia de la interfaz |
 

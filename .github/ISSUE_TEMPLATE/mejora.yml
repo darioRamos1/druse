@@ -1,0 +1,33 @@
+name: Propuesta de mejora
+description: Algo que falta o que podría funcionar mejor
+labels: ['mejora']
+body:
+  - type: textarea
+    id: problema
+    attributes:
+      label: Qué problema tienes hoy
+      description: El problema, no la solución. Qué intentabas hacer y con qué te chocaste.
+    validations:
+      required: true
+
+  - type: textarea
+    id: propuesta
+    attributes:
+      label: Qué propones
+    validations:
+      required: false
+
+  - type: textarea
+    id: alternativas
+    attributes:
+      label: Cómo lo resuelves mientras tanto
+      description: 'Si hay una forma de apañarlo, cuéntala: ayuda a saber cuánto duele.'
+    validations:
+      required: false
+
+  - type: markdown
+    attributes:
+      value: |
+        Druse está mantenido por una persona y no toda propuesta razonable acaba
+        implementada. Que una incidencia quede abierta no significa que se haya
+        descartado, y que se cierre no significa que la idea fuera mala.

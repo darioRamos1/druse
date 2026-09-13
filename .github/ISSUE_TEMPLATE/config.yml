@@ -1,0 +1,12 @@
+# Las incidencias en blanco quedan desactivadas: casi siempre llegan sin versión
+# ni pasos, y pedirlos después alarga el arreglo más que rellenar un formulario.
+blank_issues_enabled: false
+
+contact_links:
+  - name: Fallo de seguridad
+    url: https://github.com/darioRamos1/druse/blob/main/SECURITY.md
+    about: No abras una incidencia pública. Escribe a druse.contacto@gmail.com con el asunto «Seguridad».
+
+  - name: Pregunta de uso
+    url: https://github.com/darioRamos1/druse/blob/main/README.md
+    about: El README explica requisitos, atajos, motores y dónde guarda Druse tus datos.
