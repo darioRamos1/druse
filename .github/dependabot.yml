@@ -31,6 +31,18 @@ updates:
       resto:
         patterns: ['*']
         exclude-patterns: ['@angular*', 'zone.js', 'rxjs', 'typescript']
+    ignore:
+      # TypeScript no lo elige este proyecto: lo elige Angular. `@angular/build`
+      # declara `typescript: ">=6.0 <6.1"`, así que una versión mayor no es una
+      # mejora que haya que probar, es un paquete que **no instala**: `npm ci`
+      # se niega por conflicto de peer dependencies y el PR queda inservible.
+      # Pasó con el PR #13, que subía Angular 22.1.0 → 22.1.5 junto con
+      # TypeScript 6 → 7 y se llevó por delante todo el grupo.
+      #
+      # Las versiones menores y los parches siguen llegando. El salto de mayor
+      # se hace a mano el día que Angular amplíe ese rango.
+      - dependency-name: typescript
+        update-types: ['version-update:semver-major']
 
   - package-ecosystem: npm
     directory: /e2e
