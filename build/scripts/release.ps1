@@ -184,12 +184,13 @@ function Invoke-DruseConstruccion {
 
 <#
 .SYNOPSIS
-    Estado de la integración continua para un commit exacto.
+    Publica la release ya verificada.
 
 .DESCRIPTION
-    No vale «la rama está verde»: lo que se publica es un commit, y es el suyo el
-    que tiene que estar comprobado. Se consulta con `gh`; si no hay ninguna
-    comprobación registrada, eso **no** cuenta como verde.
+    Exige integración continua verde para el commit exacto que se construyó —no
+    para la rama—, comprueba que la etiqueta no apunta a otro commit, escribe la
+    evidencia y crea la GitHub Release. Cómo se decide si la CI está verde vive
+    en `Get-DruseEstadoCI`, dentro de `verificacion-release.ps1`.
 #>
 function Invoke-DrusePublicacion([object]$verificacion) {
     $commit = (git rev-parse HEAD).Trim()
