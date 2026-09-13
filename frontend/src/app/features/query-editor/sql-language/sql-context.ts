@@ -30,13 +30,31 @@ const NOT_ALIASES = new Set([
   'OFFSET',
   'AS',
   'USING',
+  'NATURAL',
+  'OUTER',
+  'EXCEPT',
+  'INTERSECT',
+  'RETURNING',
 ]);
 
 const IDENTIFIER = '[\\p{L}_][\\p{L}\\p{N}_$]*';
 
-/** `FROM tabla alias`, `JOIN esquema.tabla AS alias`, `UPDATE tabla`… */
+/**
+ * `FROM tabla alias`, `JOIN esquema.tabla AS alias`, `UPDATE tabla`…
+ *
+ * **El alias no puede ser una de esas palabras, y no basta con descartarla
+ * después.** Si la expresión la acepta, se la come: en `FROM users JOIN pedidos`
+ * tomaba `JOIN` como alias de `users`, y como ese `JOIN` ya estaba consumido, la
+ * siguiente búsqueda empezaba detrás de él y `pedidos` no aparecía nunca. Con
+ * alias —`FROM users u JOIN pedidos p`— funcionaba, así que el fallo solo lo veía
+ * quien no pone alias, que es justo quien más depende de que la herramienta sepa
+ * qué tablas hay en la consulta.
+ */
 const RELATION_PATTERN = new RegExp(
-  `\\b(FROM|JOIN|UPDATE|INTO)\\s+(${IDENTIFIER}(?:\\.${IDENTIFIER})?)(?:\\s+(?:AS\\s+)?(${IDENTIFIER}))?`,
+  `\\b(FROM|JOIN|UPDATE|INTO)\\s+(${IDENTIFIER}(?:\\.${IDENTIFIER})?)` +
+    // El final de la palabra se comprueba con clases Unicode y no con `\b`, que
+    // solo entiende ASCII: con `\b`, un alias `oné` parecería el `ON` reservado.
+    `(?:\\s+(?:AS\\s+)?(?!(?:${[...NOT_ALIASES].join('|')})(?![\\p{L}\\p{N}_$]))(${IDENTIFIER}))?`,
   'giu',
 );
 
