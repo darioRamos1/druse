@@ -27,7 +27,9 @@ Cuando exista un servicio de firma:
 4. Tauri construye el instalador y, si hay clave del actualizador, su `.sig`.
 5. `release.ps1` calcula el SHA-256 de ambos instaladores, los incrusta en el instalador selector y publica la release con sus artefactos y `latest.json`.
 
-El orden importa y está anotado: **la firma Authenticode modifica el archivo**, así que cualquier hash o `.sig` calculado antes de firmar deja de corresponder a los bytes que se reparten. Firmar va antes de calcular, siempre.
+Antes de publicar, una etapa de verificación comprueba sobre los bytes finales que cada firma de actualización pertenece a la clave que lleva dentro la aplicación **y corresponde a ese archivo**, que `latest.json` dice lo mismo que los archivos, que ninguna firma Authenticode es inválida y que los instaladores son los que revisó el empaquetado. Publicar exige además integración continua verde para ese commit exacto, y cada release deja un `evidencia.json` con el commit, los hashes y el resultado de cada comprobación.
+
+El orden importa y está anotado: **la firma Authenticode modifica el archivo**, así que cualquier hash o `.sig` calculado antes de firmar deja de corresponder a los bytes que se reparten. Firmar va antes de calcular, siempre. Hay pruebas que alteran un artefacto firmado y exigen que se rechace, porque esa es la clase de error que no avisa hasta que la actualización falla en el equipo de otra persona.
 
 ## Quién aprueba una release
 
@@ -51,6 +53,6 @@ Qué pasaría entonces: se retira el artefacto de la release, se publica un avis
 
 Druse installers are **not yet signed with Authenticode**. The application update files are signed with the Tauri updater key (minisign) and verified before an update is applied, which protects the update channel but is not code signing.
 
-An application to the SignPath Foundation is **prepared but not yet submitted**; no signing service has been granted, so no SignPath attribution appears here or in the product. Releases are built from a clean Git tree, their package contents are checked against an explicit exclusion list, a SHA-256 manifest is produced for every build, and each release is approved manually by the maintainer, whose GitHub account uses two-factor authentication. Only Druse's own binaries and installers would be submitted for signing; third-party components would not.
+An application to the SignPath Foundation is **prepared but not yet submitted**; no signing service has been granted, so no SignPath attribution appears here or in the product. Releases are built from a clean Git tree, their package contents are checked against an explicit exclusion list, and a SHA-256 manifest is produced for every build. Before publishing, every signature is verified against the final bytes and the release is refused if anything does not match; publishing also requires a green CI run for that exact commit, and each release records its commit, hashes and check results. Each release is approved manually by the maintainer, whose GitHub account uses two-factor authentication. Only Druse's own binaries and installers would be submitted for signing; third-party components would not.
 
 Report anything suspicious to `druse.contacto@gmail.com`.

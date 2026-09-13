@@ -358,6 +358,13 @@ jobs:
         shell: pwsh
         run: ./build/tests/manifiesto-paquete.ps1
 
+      - name: Rechazo de un artefacto alterado
+        run: node build/tests/verificacion-de-actualizacion.cjs
+
+      - name: Guardas de una publicación
+        shell: pwsh
+        run: ./build/tests/release-verificacion.ps1
+
       - name: Puertos de las bases de prueba (PowerShell)
         shell: pwsh
         run: ./build/tests/test-db-loopback.ps1

@@ -92,9 +92,11 @@ comprueba su SHA-256 antes de ejecutarlo. La edición elegida queda compilada en
 Druse y todas sus actualizaciones posteriores siguen el mismo canal, de modo que
 una instalación sin Informix no descarga Informix por sorpresa.
 
-Druse busca actualizaciones después de arrancar. Si encuentra una, lo comunica y
-la sección **Preferencias > Acerca de y actualizaciones** permite leer las notas,
-descargarla e instalarla. La descarga lleva además la firma obligatoria de Tauri;
+Druse **no busca actualizaciones por su cuenta mientras nadie lo autorice**: la
+casilla está en **Preferencias > Acerca de y actualizaciones**, junto a lo que se
+envía al hacerlo, y hasta que se marca no se consulta nada. Buscar a mano sigue
+disponible siempre. Cuando hay una versión nueva, esa misma sección permite leer
+las notas, descargarla e instalarla. La descarga lleva además la firma obligatoria de Tauri;
 no basta con que la dirección responda. Si hay una transacción sin confirmar, la
 instalación se bloquea para no perder el trabajo.
 
@@ -103,9 +105,20 @@ Para preparar una publicación:
 1. Cambia la misma versión SemVer en `shells/desktop-tauri/tauri.conf.json` y
    `shells/desktop-tauri/Cargo.toml`.
 2. Escribe las notas en `docs/release-notes/<versión>.md`.
-3. Ejecuta `./build/scripts/release.ps1` para revisar los artefactos localmente.
+3. Ejecuta `./build/scripts/release.ps1` para construir y verificar los
+   artefactos localmente.
 4. Ejecuta `./build/scripts/release.ps1 -Publish` para crear la GitHub Release, o
    lanza manualmente el workflow **Publicar versión**.
+
+El guion va por etapas —`-Etapa construir`, `verificar` o `publicar`— para que la
+verificación y la publicación puedan ejecutarse sin reconstruir: cuando la firma
+la haga un servicio externo, los bytes que vuelven son los que hay que publicar,
+y reconstruir produciría otros. La etapa de verificación comprueba que cada `.sig`
+**corresponde a los bytes** del artefacto, que `latest.json` dice lo mismo que los
+archivos, que Authenticode no es inválido y que los instaladores son los que
+revisó el empaquetado. Publicar exige además integración continua verde para ese
+commit exacto; `-SinComprobarCI` lo salta y lo deja anotado en `evidencia.json`,
+junto al commit, los hashes y el resultado de cada comprobación.
 
 El proceso produce los dos instaladores, sus `.sig`, `latest.json` y el selector.
 El actualizador consulta siempre

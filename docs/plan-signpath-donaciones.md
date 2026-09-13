@@ -79,7 +79,7 @@ Dependencias: beta pública y alcance resuelto. Estimación propia de ingenierí
 - [ ] **SIG-01:** preparar un expediente con repositorio, licencia, release candidata, matriz de dependencias, política, equipo y evidencia de uso. Darío revisa y presenta la [solicitud](https://signpath.org/apply.html). Registrar respuesta y condiciones particulares.
 - [ ] **SIG-02:** una vez habilitado el servicio, configurar el proyecto con los identificadores reales de SignPath. Usar runners alojados por GitHub para los jobs previos a la solicitud, subir el artefacto a Actions y enviarlo por su ID al conector. Guardar el token como secreto limitado, fijar acciones por SHA y descargar el resultado firmado. [Integración oficial](https://docs.signpath.io/trusted-build-systems/github).
 - [ ] **SIG-03:** acordar el alcance de firma del EXE NSIS y los PE propios internos, con metadatos de producto/versión restringidos. No aplicar una regla global que firme DLL de terceros. Comprobar qué formatos y anidamientos admite la configuración antes de diseñar el flujo; no asumir que NSIS permite el mismo proceso que MSI. [Referencia de artefactos](https://docs.signpath.io/artifact-configuration/reference).
-- [ ] **SIG-04:** dividir `release.ps1` en construcción, firma/verificación y publicación. Mantener el requisito de CI verde para el commit exacto y detener la publicación ante firma rechazada, caducidad de la solicitud o fallo de verificación.
+- [x] **SIG-04:** dividir `release.ps1` en construcción, firma/verificación y publicación. Mantener el requisito de CI verde para el commit exacto y detener la publicación ante firma rechazada, caducidad de la solicitud o fallo de verificación. Tres etapas ejecutables por separado —`-Etapa construir|verificar|publicar`—, porque cuando firme un servicio externo habrá que verificar y publicar los bytes que vuelven, no reconstruirlos. La verificación comprueba que cada `.sig` corresponde a los bytes, que `latest.json` dice lo mismo que los archivos, que Authenticode no es inválido y que los instaladores son los que revisó el empaquetado. Publicar exige integración continua verde para el commit exacto; `-SinComprobarCI` la salta y queda anotado en `evidencia.json` junto al commit, los hashes y cada comprobación.
 
 Orden propuesto para Druse, a ajustar al flujo aprobado por SignPath:
 
@@ -93,7 +93,7 @@ Commit y CI verificados
   → verificar manifiestos y publicar
 ```
 
-La firma Authenticode modifica el archivo: una `.sig` o un hash calculados antes ya no sirven para ese instalador. Añadir una prueba negativa que altere una copia y compruebe el rechazo por el actualizador. Conservar request ID, commit, workflow, hashes y resultados de firma como evidencia de la release.
+La firma Authenticode modifica el archivo: una `.sig` o un hash calculados antes ya no sirven para ese instalador. La prueba negativa ya existe —`build/tests/verificacion-de-actualizacion.cjs` altera un artefacto firmado y comprueba el rechazo, y `build/tests/release-verificacion.ps1` hace lo propio con las guardas de la publicación—, y se comprobó también contra el instalador real de 1.1.0: con un byte cambiado, rechazado. Falta conservar el request ID de SignPath cuando exista; commit, hashes y resultado de cada comprobación ya se guardan en `evidencia.json`.
 
 **Salida:** instalación y actualización desde una release pública con Authenticode y sellado de tiempo válidos, además de la firma Tauri. Solo entonces evaluar el cierre de REL-005. El aviso de SmartScreen sigue dependiendo de reputación; no prometer su desaparición por usar SignPath.
 
@@ -140,5 +140,7 @@ Lo ejecutable sin decisiones del titular está hecho. Lo que sigue depende de **
 3. **P-01 de privacidad:** hecho dentro de la aplicación —la consulta automática queda desactivada mientras nadie la autorice, con aviso en el primer arranque y ajuste en Preferencias—, pero las condiciones de SignPath la piden **durante la instalación**. La pregunta está añadida al borrador de consulta; si su respuesta exige el instalador, hará falta una página propia en el NSIS de Tauri.
 4. **PKG-04:** probar instalación, actualización y desinstalación en un Windows limpio; de ahí sale la respuesta a P-02.
 5. **DON-01:** alta en Sponsors con los datos del titular. Solo después se crea `.github/FUNDING.yml`.
+
+De la fase D queda hecho lo que no depende de SignPath: **SIG-04**, con las etapas de release, sus guardas y la prueba negativa. SIG-01/02/03 siguen esperando la respuesta y los identificadores del servicio.
 
 Las dos cosas que la matriz de motores dejó a la vista ya están corregidas: la exigencia de motores de la integración continua se acotó con `DRUSE_OPTIONAL_ENGINES=oracle` —la cobertura de Oracle sigue siendo local, pero ahora está declarada— y la imagen de Informix va por digest.
