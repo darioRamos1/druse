@@ -121,10 +121,7 @@ pub async fn choose_restore_source(app: AppHandle, folder: bool) -> Result<Optio
 /// Las tres extensiones son las que usa todo el mundo para lo mismo; el filtro
 /// las ofrece juntas porque nadie recuerda cuál eligió hace dos años.
 #[tauri::command]
-pub async fn choose_database_file(
-    app: AppHandle,
-    create: bool,
-) -> Result<Option<String>, String> {
+pub async fn choose_database_file(app: AppHandle, create: bool) -> Result<Option<String>, String> {
     let dialog = app
         .dialog()
         .file()
@@ -136,7 +133,9 @@ pub async fn choose_database_file(
             .set_file_name("datos.db")
             .blocking_save_file()
     } else {
-        dialog.set_title("Abrir una base de datos").blocking_pick_file()
+        dialog
+            .set_title("Abrir una base de datos")
+            .blocking_pick_file()
     };
 
     let Some(selected) = selected else {

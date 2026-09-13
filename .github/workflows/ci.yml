@@ -30,11 +30,12 @@
 
 name: CI
 
+# **No se dispara con los push.** Ver el comentario de arriba: mientras la cuenta
+# no tenga cuota de Actions, cada push producía dieciséis trabajos rojos que no
+# llegaban a empezar, y un rojo que no significa nada acaba enseñando a ignorar
+# los rojos. Lo que comprueba esto lo ejecuta `build/scripts/comprobar-todo.ps1`
+# en la máquina de quien programa; aquí se pide a mano cuando haya con qué.
 on:
-  push:
-    branches: [main]
-  pull_request:
-    branches: [main]
   workflow_dispatch:
     inputs:
       completo:

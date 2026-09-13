@@ -254,6 +254,24 @@ npm run build
 npm test
 ```
 
+Todo junto, que es lo que comprobaría la integración continua:
+
+```powershell
+./build/scripts/comprobar-todo.ps1            # backend, frontend, guiones y envoltorio
+./build/scripts/comprobar-todo.ps1 -Rapido    # sin compilar el frontend ni pasar Clippy
+./build/scripts/comprobar-todo.ps1 -ConMotores -ConE2E
+```
+
+Sigue hasta el final aunque algo falle, resume qué pasó con cada bloque y deja la
+salida de cada uno en `artifacts/comprobaciones/`. Al terminar dice también **qué
+no comprobó**: sin `-ConMotores` los proveedores se saltan solos, y lo que solo
+falla en otro sistema operativo aquí no se ve.
+
+**Este guion es hoy la única comprobación que se ejecuta.** El workflow de
+GitHub Actions quedó a petición —`workflow_dispatch`— porque la cuenta no tiene
+cuota: sus trabajos morían en tres segundos sin llegar a empezar, y dieciséis
+rojos por push que no significan nada enseñan a ignorar los rojos.
+
 ### De punta a punta
 
 La aplicación entera por donde la usa una persona —Angular, la API local y un
