@@ -298,6 +298,11 @@ no solamente validaciones visuales.
 
 ### Restauración y archivos
 
+Avance de apertura al 13 de septiembre de 2026: los scripts de motores de prueba
+publican ahora los puertos nuevos en `127.0.0.1`. Se comprobó con Docker simulado
+en Bash y PowerShell. Los contenedores existentes requieren revisión separada;
+véase la [auditoría de apertura](docs/auditoria-apertura-2026-09-13.md).
+
 - [x] **SEC-009:** devolver en la inspección un identificador o hash SHA-256 del artefacto aprobado.
 - [x] **SEC-010:** exigir ese identificador y una confirmación explícita al ejecutar la restauración.
 - [x] **SEC-011:** rechazar la ejecución si el archivo cambió después de inspeccionarlo.
@@ -536,6 +541,8 @@ no solamente validaciones visuales.
 - [ ] **REL-003:** comprobar los selectores nativos de archivo y carpeta en la aplicación empaquetada.
 - [ ] **REL-004:** probar multicursor y atajos dentro de WebView2.
 - [ ] **REL-005:** obtener firma Authenticode y verificar sellado de tiempo.
+      La ruta de código abierto se desarrolla en el [plan de SignPath y donaciones](docs/plan-signpath-donaciones.md), con auditoría de dependencias, candidatura e integración pendientes.
+      Para la distribución sin comprar certificado, evaluar MSIX mediante Microsoft Store según el [plan de distribución y SmartScreen](docs/distribucion-windows-smartscreen.md). La firma del actualizador no sustituye Authenticode; un certificado autofirmado no resuelve la confianza en equipos ajenos. REL-005 sigue pendiente.
 - [x] **REL-006:** fijar GitHub Actions por SHA y contenedores de CI por versión
       o digest. Las seis acciones van por SHA con su versión en el comentario, y
       las tres imágenes de servicio llevan etiqueta **y** digest. `dtolnay/rust-toolchain`
