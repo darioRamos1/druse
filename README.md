@@ -339,6 +339,7 @@ en GitHub Pages. Consulta [cómo previsualizarla y publicarla](docs/landing-gith
 | [`docs/plan-signpath-donaciones.md`](docs/plan-signpath-donaciones.md) | Tareas, decisiones y verificaciones para solicitar SignPath y habilitar aportes voluntarios |
 | [`docs/auditoria-apertura-2026-09-13.md`](docs/auditoria-apertura-2026-09-13.md) | Resultados iniciales del análisis de historial, dependencias y preparación de la publicación |
 | [`docs/matriz-de-motores.md`](docs/matriz-de-motores.md) | Contra qué versiones se ejecutaron pruebas de verdad, y qué rangos solo están anunciados |
+| [`docs/expediente-signpath.md`](docs/expediente-signpath.md) | Lo reunido para la candidatura a SignPath y lo que todavía no se cumple |
 | [`docs/privacidad-aplicacion.md`](docs/privacidad-aplicacion.md) | Qué sale del equipo, qué se guarda y dónde, con la evidencia de dónde se comprobó |
 | [`CODE_SIGNING_POLICY.md`](CODE_SIGNING_POLICY.md) | Estado de la firma de los artefactos y cómo comprobar lo que descargaste |
 | [`SECURITY.md`](SECURITY.md) y [`CONTRIBUTING.md`](CONTRIBUTING.md) | Cómo informar de un fallo de seguridad y qué se puede aportar hoy |

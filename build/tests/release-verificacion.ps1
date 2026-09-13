@@ -147,6 +147,36 @@ try {
     $otraVersion | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $latest -Encoding UTF8
     Debe-Rechazar $clave 'anuncia la versión' 'un latest.json de otra versión'
 
+    # --- Las dos ediciones siendo el mismo instalador ---------------------------
+    # No es hipotético: Tauri nombra igual los dos instaladores y ya pasó que la
+    # segunda construcción pisara a la primera antes de renombrarla. Si eso
+    # vuelve a ocurrir, los dos artefactos son el mismo archivo con dos nombres,
+    # cada comprobación por separado pasa, y una instalación sin Informix se
+    # actualiza a la completa con los 111 MB del controlador de IBM detrás.
+    $clave = Nueva-Release
+    Copy-Item -LiteralPath $completo -Destination $ligero -Force
+    Copy-Item -LiteralPath "$completo.sig" -Destination "$ligero.sig" -Force
+    $mezclado = Get-Content -LiteralPath $latest -Raw | ConvertFrom-Json
+    $mezclado.platforms.'windows-x86_64-sin-informix'.signature = (Get-Content -LiteralPath "$ligero.sig" -Raw).Trim()
+    $mezclado | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $latest -Encoding UTF8
+    Debe-Rechazar $clave 'cambiaría de edición' 'las dos ediciones siendo el mismo archivo'
+
+    # Y la firma de una edición anunciada bajo la otra, que es lo que deja sin
+    # actualizaciones a quien la pida.
+    $clave = Nueva-Release
+    $firmaCruzada = Get-Content -LiteralPath $latest -Raw | ConvertFrom-Json
+    $firmaCruzada.platforms.'windows-x86_64-sin-informix'.signature = $firmaCruzada.platforms.'windows-x86_64-completo'.signature
+    $firmaCruzada | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $latest -Encoding UTF8
+    Debe-Rechazar $clave 'no es la del archivo .sig' 'una edición con la firma de la otra'
+
+    # --- Un manifiesto de contenido de otra edición ------------------------------
+    $clave = Nueva-Release
+    $cruzado = Join-Path $manifestDir "manifiesto-sin-informix-$version-win-x64.json"
+    $documento = Get-Content -LiteralPath $cruzado -Raw | ConvertFrom-Json
+    $documento.variante = 'completo'
+    $documento | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $cruzado -Encoding UTF8
+    Debe-Rechazar $clave 'describe la variante' 'un manifiesto de contenido de otra edición'
+
     # --- Bytes que no son los que revisó el empaquetado -------------------------
     $clave = Nueva-Release
     $manifiestoPaquete = Join-Path $manifestDir "manifiesto-completo-$version-win-x64.json"
@@ -160,7 +190,7 @@ try {
     Remove-Item -LiteralPath "$ligero.sig" -Force
     Debe-Rechazar $clave 'Faltan artefactos' 'una release incompleta'
 
-    'OK: release correcta aceptada; artefacto tocado, firma ajena, latest.json desincronizado o de otra versión, contenido distinto y release incompleta, rechazados.'
+    'OK: release correcta aceptada; artefacto tocado, firma ajena, latest.json desincronizado o de otra versión, ediciones cruzadas, manifiesto de otra edición, contenido distinto y release incompleta, rechazados.'
 }
 finally {
     Remove-Item -LiteralPath $raiz -Recurse -Force -ErrorAction SilentlyContinue

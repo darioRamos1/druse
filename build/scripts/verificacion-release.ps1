@@ -154,7 +154,20 @@ function Invoke-DruseReleaseVerificacion {
         }
     }
 
-    Write-Host '  OK   latest.json corresponde a los artefactos' -ForegroundColor Green
+    # Las dos ediciones comparten `latest.json` y lo único que las separa es su
+    # clave. Si una acabara anunciando el instalador de la otra —copiar y pegar
+    # basta—, una instalación sin Informix se actualizaría a la completa y se
+    # llevaría los 111 MB del controlador de IBM que alguien decidió no
+    # instalar. Una actualización no cambia de edición.
+    $completoAnunciado = $manifiesto.platforms.'windows-x86_64-completo'
+    $ligeroAnunciado = $manifiesto.platforms.'windows-x86_64-sin-informix'
+
+    if ($completoAnunciado.url -eq $ligeroAnunciado.url -or
+        $completoAnunciado.signature.Trim() -eq $ligeroAnunciado.signature.Trim()) {
+        throw 'Las dos ediciones anuncian el mismo artefacto en latest.json: una actualización cambiaría de edición.'
+    }
+
+    Write-Host '  OK   cada edición anuncia su propio instalador' -ForegroundColor Green
 
     # 4. Authenticode. Una firma inválida detiene la publicación; **no tenerla**
     #    es el estado de hoy y solo se avisa, porque bloquear por eso dejaría el
@@ -199,6 +212,10 @@ function Invoke-DruseReleaseVerificacion {
 
         $contenido = Get-Content -LiteralPath $manifiestoPaquete -Raw | ConvertFrom-Json
         $hash = (Get-FileHash -LiteralPath $artefacto -Algorithm SHA256).Hash.ToLowerInvariant()
+
+        if ($contenido.variante -ne $variante) {
+            throw "El manifiesto de contenido de $variante describe la variante $($contenido.variante)."
+        }
 
         if (-not ($contenido.contenido | Where-Object { $_.sha256 -eq $hash })) {
             throw "El instalador $variante no figura en su manifiesto de contenido: sus bytes no son los que se revisaron."

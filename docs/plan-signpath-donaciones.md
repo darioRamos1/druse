@@ -55,7 +55,7 @@ Dependencias: OSS-02/03 y DEC-03. Estimación propia: 3–6 jornadas.
 
 - [ ] **PKG-01:** si procede una edición distinta, definir su contenido explícito en `build/scripts/package.ps1`, referencias del host y registro de proveedores. Proponer un identificador de canal propio; todavía no existe una variante «SignPath» implementada.
 - [x] **PKG-02:** revisar el contenido real del paquete publicado, incluidas dependencias transitivas. Fallar la construcción si aparecen archivos excluidos por la decisión OSS-03. Generar un inventario de archivos y hashes de cada build. `build/scripts/manifiesto.ps1` inventaría cada archivo con su SHA-256, `build/paquete-excluidos.json` declara qué no puede viajar en cada variante y `package.ps1` detiene la construcción si aparece. Comprobado con las dos variantes reales: 612 archivos y 298 MB la completa, 402 y 140 MB la ligera, sin rastro de IBM ni IKVM en esta última. Oracle y SNI figuran como pendientes y **no** detienen nada mientras OSS-03 y DEC-03 sigan abiertos.
-- [ ] **PKG-03:** ajustar selector, lista de motores, documentación y actualizaciones para que cada edición conserve sus capacidades. Una actualización nunca debe cambiar de edición o incorporar controladores excluidos sin una decisión explícita del usuario.
+- [x] **PKG-03:** ajustar selector, lista de motores, documentación y actualizaciones para que cada edición conserve sus capacidades. Una actualización nunca debe cambiar de edición o incorporar controladores excluidos sin una decisión explícita del usuario. El selector, el canal por edición y la documentación ya existían; lo que faltaba era que alguien lo comprobara. Una prueba de Rust fija que el canal de actualización lleva la edición dentro —sin ese sufijo, las dos pedirían la misma entrada de `latest.json`— y la verificación de release rechaza que las dos ediciones anuncien el mismo artefacto o que un manifiesto de contenido describa otra variante. Ese caso no es hipotético: Tauri nombra igual los dos instaladores y ya pasó que la segunda construcción pisara a la primera.
 - [ ] **PKG-04:** probar instalación, primera conexión, consulta, exportación, actualización y desinstalación en Windows sin herramientas de desarrollo, con datos sintéticos. Comprobar WebView2, proceso auxiliar y recuperación tras fallos de red.
 
 **Salida:** artefacto candidato identificable, contenido revisado y pruebas registradas. Mantener la edición completa fuera del circuito de firma hasta resolver su alcance.
@@ -76,7 +76,7 @@ Dependencias: fases A/B y DEC-01/02. Estimación propia: 2–4 jornadas, sin con
 
 Dependencias: beta pública y alcance resuelto. Estimación propia de ingeniería: 2–5 jornadas; revisión externa sin plazo comprometido.
 
-- [ ] **SIG-01:** preparar un expediente con repositorio, licencia, release candidata, matriz de dependencias, política, equipo y evidencia de uso. Darío revisa y presenta la [solicitud](https://signpath.org/apply.html). Registrar respuesta y condiciones particulares.
+- [x] **SIG-01:** preparar un expediente con repositorio, licencia, release candidata, matriz de dependencias, política, equipo y evidencia de uso. Darío revisa y presenta la [solicitud](https://signpath.org/apply.html). Registrar respuesta y condiciones particulares. Reunido en [expediente-signpath.md](expediente-signpath.md), con el texto en inglés para el formulario y una lista de lo que hoy **no** se cumple: repositorio privado, sin licencia, sin release pública y sin evidencia de uso. Presentarlo sigue siendo decisión de Darío, y hacerlo antes de resolver esos cuatro puntos es pedir un rechazo.
 - [ ] **SIG-02:** una vez habilitado el servicio, configurar el proyecto con los identificadores reales de SignPath. Usar runners alojados por GitHub para los jobs previos a la solicitud, subir el artefacto a Actions y enviarlo por su ID al conector. Guardar el token como secreto limitado, fijar acciones por SHA y descargar el resultado firmado. [Integración oficial](https://docs.signpath.io/trusted-build-systems/github).
 - [ ] **SIG-03:** acordar el alcance de firma del EXE NSIS y los PE propios internos, con metadatos de producto/versión restringidos. No aplicar una regla global que firme DLL de terceros. Comprobar qué formatos y anidamientos admite la configuración antes de diseñar el flujo; no asumir que NSIS permite el mismo proceso que MSI. [Referencia de artefactos](https://docs.signpath.io/artifact-configuration/reference).
 - [x] **SIG-04:** dividir `release.ps1` en construcción, firma/verificación y publicación. Mantener el requisito de CI verde para el commit exacto y detener la publicación ante firma rechazada, caducidad de la solicitud o fallo de verificación. Tres etapas ejecutables por separado —`-Etapa construir|verificar|publicar`—, porque cuando firme un servicio externo habrá que verificar y publicar los bytes que vuelven, no reconstruirlos. La verificación comprueba que cada `.sig` corresponde a los bytes, que `latest.json` dice lo mismo que los archivos, que Authenticode no es inválido y que los instaladores son los que revisó el empaquetado. Publicar exige integración continua verde para el commit exacto; `-SinComprobarCI` la salta y queda anotado en `evidencia.json` junto al commit, los hashes y cada comprobación.
@@ -118,9 +118,9 @@ GitHub Sponsors admite Colombia y aportes únicos o mensuales. GitHub no cobra c
 | Hito | Evidencia para cerrarlo | Estado |
 | --- | --- | --- |
 | H1 — Elegibilidad técnica y licencia | OSS-01/04 y decisiones registradas | Pendiente |
-| H2 — Beta pública | PKG-01/04 y PUB-01/05, URLs comprobadas | Pendiente; PKG-02, PUB-01 y PUB-03 hechos |
+| H2 — Beta pública | PKG-01/04 y PUB-01/05, URLs comprobadas | Pendiente; PKG-02, PKG-03, PUB-01 y PUB-03 hechos |
 | H3 — Donaciones habilitadas | DON-01/07, sin exigir ingresos | Pendiente |
-| H4 — Solicitud SignPath presentada | Expediente y acuse de SIG-01 | Pendiente |
+| H4 — Solicitud SignPath presentada | Expediente y acuse de SIG-01 | Pendiente; el expediente está reunido, sin presentar |
 | H5 — Primera release firmada | SIG-02/04 y pruebas de instalación/actualización | Pendiente |
 
 Plan orientativo: semanas 1–2 para auditoría y decisiones; semanas 3–4 para edición y beta; después donaciones, recogida de evidencia y solicitud. Las estimaciones son de trabajo técnico, no fechas de aprobación ni previsiones de ingresos.
@@ -141,6 +141,6 @@ Lo ejecutable sin decisiones del titular está hecho. Lo que sigue depende de **
 4. **PKG-04:** probar instalación, actualización y desinstalación en un Windows limpio; de ahí sale la respuesta a P-02.
 5. **DON-01:** alta en Sponsors con los datos del titular. Solo después se crea `.github/FUNDING.yml`.
 
-De la fase D queda hecho lo que no depende de SignPath: **SIG-04**, con las etapas de release, sus guardas y la prueba negativa. SIG-01/02/03 siguen esperando la respuesta y los identificadores del servicio.
+De la fase D queda hecho lo que no depende de SignPath: **SIG-04**, con las etapas de release, sus guardas y la prueba negativa, y **SIG-01**, el expediente reunido y sin presentar. SIG-02 y SIG-03 necesitan los identificadores del servicio, que solo existen si lo conceden.
 
 Las dos cosas que la matriz de motores dejó a la vista ya están corregidas: la exigencia de motores de la integración continua se acotó con `DRUSE_OPTIONAL_ENGINES=oracle` —la cobertura de Oracle sigue siendo local, pero ahora está declarada— y la imagen de Informix va por digest.

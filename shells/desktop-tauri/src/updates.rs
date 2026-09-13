@@ -251,6 +251,38 @@ mod tests {
         assert!(UPDATE_ENDPOINT.starts_with("https://"));
     }
 
+    /// El canal de actualización lleva la edición dentro, y eso es lo que impide
+    /// que una instalación sin Informix reciba la completa.
+    ///
+    /// Las dos comparten `latest.json`: lo único que las separa es la clave que
+    /// cada una pide dentro de ese archivo. Si el sufijo se perdiera, ambas
+    /// pedirían `windows-x86_64` y la que sale sobrando son 111 MB de
+    /// controlador de IBM que alguien decidió no instalar.
+    #[test]
+    fn el_canal_de_actualizacion_lleva_la_edicion() {
+        let Some(plataforma) = tauri_plugin_updater::target() else {
+            // En una plataforma sin actualizador no hay canal que comprobar, y
+            // `updater_target` ya contesta con un error explicando por qué.
+            assert!(updater_target().is_err());
+            return;
+        };
+
+        let objetivo = updater_target().expect("la variante compilada es válida");
+
+        assert_eq!(objetivo, format!("{plataforma}-{VARIANT}"));
+        assert!(objetivo.ends_with(&format!("-{VARIANT}")));
+
+        // El nombre exacto es el contrato con `release.ps1`, que escribe estas
+        // mismas claves en `latest.json`. Cambiarlo en un solo sitio deja a los
+        // instalados sin actualizaciones, sin ningún error visible.
+        if cfg!(target_os = "windows") {
+            assert!(matches!(
+                objetivo.as_str(),
+                "windows-x86_64-completo" | "windows-x86_64-sin-informix"
+            ));
+        }
+    }
+
     #[test]
     fn la_clave_publica_no_es_un_marcador() {
         let config: serde_json::Value = serde_json::from_str(include_str!("../tauri.conf.json"))
