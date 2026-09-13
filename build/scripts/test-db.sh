@@ -61,7 +61,7 @@ if [[ "$TARGET" == "all" || "$TARGET" == "postgres" ]]; then
             --name "$PG_NAME" \
             -e POSTGRES_PASSWORD=druse_dev_only \
             -e POSTGRES_DB=druse_test \
-            -p "${PG_PORT}:5432" \
+            -p "127.0.0.1:${PG_PORT}:5432" \
             "$PG_IMAGE" >/dev/null
     fi
 
@@ -97,7 +97,7 @@ if [[ "$TARGET" == "all" || "$TARGET" == "sqlserver" ]]; then
             -e 'ACCEPT_EULA=Y' \
             -e "MSSQL_SA_PASSWORD=$MSSQL_PASSWORD" \
             -e 'MSSQL_PID=Developer' \
-            -p "${MSSQL_PORT}:1433" \
+            -p "127.0.0.1:${MSSQL_PORT}:1433" \
             "$MSSQL_IMAGE" >/dev/null
     fi
 
@@ -133,7 +133,7 @@ if [[ "$TARGET" == "all" || "$TARGET" == "mysql" ]]; then
             --name "$MYSQL_NAME" \
             -e "MYSQL_ROOT_PASSWORD=$MYSQL_PASSWORD" \
             -e MYSQL_DATABASE=druse_test \
-            -p "${MYSQL_PORT}:3306" \
+            -p "127.0.0.1:${MYSQL_PORT}:3306" \
             "$MYSQL_IMAGE" >/dev/null
     fi
 
@@ -160,7 +160,7 @@ if [[ "$TARGET" == "all" || "$TARGET" == "oracle" ]]; then
     else
         echo "Creando $ORACLE_NAME en el puerto $ORACLE_PORT..."
         echo "  (la imagen ocupa ~2 GB y el primer arranque tarda un par de minutos)"
-        docker run -d             --name "$ORACLE_NAME"             -e "ORACLE_PASSWORD=$ORACLE_PASSWORD"             -e APP_USER=druse             -e "APP_USER_PASSWORD=$ORACLE_PASSWORD"             -p "${ORACLE_PORT}:1521"             "$ORACLE_IMAGE" >/dev/null
+        docker run -d             --name "$ORACLE_NAME"             -e "ORACLE_PASSWORD=$ORACLE_PASSWORD"             -e APP_USER=druse             -e "APP_USER_PASSWORD=$ORACLE_PASSWORD"             -p "127.0.0.1:${ORACLE_PORT}:1521"             "$ORACLE_IMAGE" >/dev/null
     fi
 
     ready=0

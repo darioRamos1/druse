@@ -86,7 +86,7 @@ if ($Engine -in 'all', 'postgres') {
             --name $PostgresName `
             -e POSTGRES_PASSWORD=druse_dev_only `
             -e POSTGRES_DB=druse_test `
-            -p "${PostgresPort}:5432" `
+            -p "127.0.0.1:${PostgresPort}:5432" `
             postgres:18-alpine | Out-Null
     }
 
@@ -155,7 +155,7 @@ if ($Engine -in 'all', 'sqlserver') {
             -e 'ACCEPT_EULA=Y' `
             -e 'MSSQL_SA_PASSWORD=Druse_dev_only_1' `
             -e 'MSSQL_PID=Developer' `
-            -p "${SqlServerPort}:1433" `
+            -p "127.0.0.1:${SqlServerPort}:1433" `
             mcr.microsoft.com/mssql/server:2022-latest | Out-Null
     }
 
@@ -196,7 +196,7 @@ if ($Engine -in 'all', 'mysql') {
             --name $MySqlName `
             -e MYSQL_ROOT_PASSWORD=druse_dev_only `
             -e MYSQL_DATABASE=druse_test `
-            -p "${MySqlPort}:3306" `
+            -p "127.0.0.1:${MySqlPort}:3306" `
             mysql:8.4 | Out-Null
     }
 
@@ -237,7 +237,7 @@ if ($Engine -in 'all', 'oracle') {
             -e ORACLE_PASSWORD=druse_dev_only `
             -e APP_USER=druse `
             -e APP_USER_PASSWORD=druse_dev_only `
-            -p "${OraclePort}:1521" `
+            -p "127.0.0.1:${OraclePort}:1521" `
             gvenzl/oracle-free:slim | Out-Null
     }
 
@@ -315,8 +315,8 @@ if ($Engine -in 'all', 'informix') {
             --name $InformixName `
             -e LICENSE=accept `
             -e DB_INIT=1 `
-            -p "${InformixPort}:9089" `
-            -p "${InformixSqliPort}:9088" `
+            -p "127.0.0.1:${InformixPort}:9089" `
+            -p "127.0.0.1:${InformixSqliPort}:9088" `
             icr.io/informix/informix-developer-database:latest | Out-Null
     }
 
