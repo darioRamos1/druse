@@ -50,7 +50,7 @@ Un mantenedor único es lo que hay. No se inventan revisores ni un tamaño de eq
 4. `release.ps1` trabaja en tres etapas —construir, verificar y publicar— precisamente para que la firma pueda ocurrir fuera de la máquina de construcción y los bytes firmados se publiquen sin reconstruirse.
 5. La verificación comprueba, sobre los bytes finales, que cada firma de actualización corresponde a su archivo, que `latest.json` coincide con lo que hay en disco, que ninguna firma Authenticode es inválida y que los instaladores son los que se revisaron. Publicar exige integración continua verde para ese commit exacto y deja `evidencia.json` con commit, hashes y resultados.
 
-**Estado de la integración continua:** hoy no ejecuta. Las últimas ejecuciones terminan en fallo en segundos con todos sus trabajos sin ejecutar un paso, lo que apunta a un bloqueo de facturación de GitHub Actions. Está anotado en el [presupuesto](financiacion.md) y es un requisito previo para la ruta de firma: el conector de SignPath necesita un sistema de construcción admitido y verificable.
+**Estado de la integración continua:** hoy no ejecuta. Los trabajos terminan en tres segundos sin runner y sin ejecutar un solo paso, y GitHub lo explica en la anotación de cada uno: «The job was not started because recent account payments have failed or your spending limit needs to be increased». El mismo mensaje aparece al menos desde el 11 de septiembre de 2026. Está anotado en el [presupuesto](financiacion.md) y es un requisito previo para la ruta de firma: el conector de SignPath necesita un sistema de construcción admitido y verificable.
 
 ## 5. Dependencias que hay que resolver
 

@@ -10,6 +10,22 @@
 # de algo que ocurrió sin que nadie lo mirara. La versión legible va en el
 # comentario de al lado para no tener que resolver el SHA al leer.
 
+# Y no todo corre en los tres sistemas en cada push, por dinero.
+#
+# En un repositorio privado los minutos de Actions se consumen de la cuota, y no
+# valen lo mismo: un minuto de Windows cuenta por dos y uno de macOS por diez.
+# Con quince trabajos por push, nueve de ellos en esos dos sistemas, la cuota se
+# acaba —y cuando se acaba, GitHub no ejecuta nada: los trabajos mueren en tres
+# segundos con «The job was not started because recent account payments have
+# failed or your spending limit needs to be increased», que es exactamente lo que
+# lleva pasando desde el 11 de septiembre de 2026.
+#
+# Así que en cada push corre lo que solo puede fallar en su sistema —Windows es
+# donde se reparte Druse— y lo que no depende del sistema corre una sola vez, en
+# Linux. Lo demás va al recorrido completo: semanal, o a mano con `completo`.
+# Si el repositorio se abriera, los runners estándar dejarían de costar y esto
+# podría revisarse.
+
 name: CI
 
 on:
@@ -18,6 +34,16 @@ on:
   pull_request:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      completo:
+        description: 'Recorrer también Windows y macOS donde no se hace en cada push'
+        type: boolean
+        default: false
+  # El recorrido completo, una vez por semana. Lo que se deja fuera de cada push
+  # no queda sin probar: queda probado más tarde, y eso hay que decirlo en vez de
+  # llamarlo cobertura.
+  schedule:
+    - cron: '30 5 * * 1'
 
 env:
   DOTNET_NOLOGO: true
@@ -31,7 +57,14 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [windows-latest, ubuntu-latest, macos-latest]
+        # Windows en cada push porque es donde se reparte Druse y donde vive el
+        # código que solo existe ahí —el almacén de credenciales, las rutas del
+        # perfil—. macOS, en el recorrido completo: cuesta diez veces más y
+        # ninguna release sale de ahí todavía.
+        os: >-
+          ${{ fromJSON((github.event_name == 'schedule' || github.event.inputs.completo == 'true')
+          && '["windows-latest","ubuntu-latest","macos-latest"]'
+          || '["windows-latest","ubuntu-latest"]') }}
 
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
@@ -378,7 +411,13 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [windows-latest, ubuntu-latest, macos-latest]
+        # Las pruebas del frontend son Node y un navegador sin cabeza: lo que
+        # comprueban no cambia por el sistema de debajo. Repetirlas tres veces
+        # costaba trece minutos de cuota por cada minuto real.
+        os: >-
+          ${{ fromJSON((github.event_name == 'schedule' || github.event.inputs.completo == 'true')
+          && '["windows-latest","ubuntu-latest","macos-latest"]'
+          || '["ubuntu-latest"]') }}
 
     defaults:
       run:
@@ -472,17 +511,16 @@ jobs:
   # objetivo, sin que el usuario final necesite el SDK de .NET (ADR 0003).
   publicacion-autocontenida:
     name: Publicación autocontenida (${{ matrix.rid }})
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - os: windows-latest
-            rid: win-x64
-          - os: ubuntu-latest
-            rid: linux-x64
-          - os: macos-latest
-            rid: osx-arm64
+        # Los tres desde Linux. `dotnet publish -r <rid>` no necesita estar en
+        # ese sistema: restaura los paquetes de ese RID y copia sus archivos.
+        # Comprobado publicando osx-arm64 desde Windows, que es la misma
+        # operación al revés. Lo que este job comprueba es que la publicación
+        # autocontenida existe para cada plataforma, no que arranque allí.
+        rid: [win-x64, linux-x64, osx-arm64]
 
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
@@ -513,13 +551,13 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - os: ubuntu-latest
-            rid: linux-x64
-            bundles: deb,appimage
-          - os: macos-latest
-            rid: osx-arm64
-            bundles: dmg,app
+        # El instalador de macOS solo puede construirse en macOS, y eso son
+        # diez minutos de cuota por cada minuto real. Va al recorrido completo;
+        # el de Linux sigue en cada push.
+        include: >-
+          ${{ fromJSON((github.event_name == 'schedule' || github.event.inputs.completo == 'true')
+          && '[{"os":"ubuntu-latest","rid":"linux-x64","bundles":"deb,appimage"},{"os":"macos-latest","rid":"osx-arm64","bundles":"dmg,app"}]'
+          || '[{"os":"ubuntu-latest","rid":"linux-x64","bundles":"deb,appimage"}]') }}
 
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
