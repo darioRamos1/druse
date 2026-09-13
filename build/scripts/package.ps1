@@ -76,6 +76,7 @@ $ErrorActionPreference = 'Stop'
 # fallar con un mensaje que no explica la causa.
 . (Join-Path $PSScriptRoot 'msvc-env.ps1')
 . (Join-Path $PSScriptRoot 'signing.ps1')
+. (Join-Path $PSScriptRoot 'manifiesto.ps1')
 
 if ($env:DRUSE_SIGN_TIMESTAMP_URL) {
     $TimestampUrl = $env:DRUSE_SIGN_TIMESTAMP_URL
@@ -94,6 +95,12 @@ $repoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $apiProject = Join-Path $repoRoot 'backend/src/Druse.Host.LocalApi'
 $tauriDir = Join-Path $repoRoot 'shells/desktop-tauri'
 $apiOutput = Join-Path $tauriDir 'api'
+
+# La versión sale de `tauri.conf.json`, que es la que acaba en el nombre del
+# instalador: leerla de otro sitio produciría un manifiesto que dice una versión
+# distinta de la que se reparte.
+$appVersion = (Get-Content (Join-Path $tauriDir 'tauri.conf.json') -Raw | ConvertFrom-Json).version
+$manifestDir = Join-Path $repoRoot 'artifacts/paquete'
 $updaterKey = if ($env:TAURI_SIGNING_PRIVATE_KEY_PATH) {
     $env:TAURI_SIGNING_PRIVATE_KEY_PATH
 }
@@ -166,6 +173,37 @@ if (-not (Test-Path $gitkeep)) {
     New-Item -ItemType File $gitkeep | Out-Null
 }
 
+# --- Contenido del paquete ---------------------------------------------------
+# Se comprueba aquí y no al final por tiempo: el frontend y el instalador son
+# cinco minutos, y lo que decide si este paquete puede repartirse ya está en el
+# disco. Si la variante ligera trae el controlador de IBM, mejor saberlo ahora.
+$inventory = @(Get-DrusePackageInventory -Path $apiOutput -Prefix 'api')
+$findings = @(Test-DrusePackageContent `
+        -Inventory $inventory `
+        -Rules (Get-DrusePackageRules -Variant $Variant))
+
+foreach ($finding in $findings) {
+    $sample = ($finding.archivos | Select-Object -First 3) -join ', '
+    $extra = if ($finding.archivos.Count -gt 3) { " (+$($finding.archivos.Count - 3) más)" } else { '' }
+
+    if ($finding.aplicar) {
+        Write-Host "      Excluido pero presente [$($finding.regla)]: $sample$extra" -ForegroundColor Red
+    }
+    else {
+        # Pendiente de decisión: se cuenta y se anota, no detiene nada. Fallar
+        # por esto sería aplicar una decisión que todavía no está tomada.
+        Write-Host "      Pendiente de decisión [$($finding.regla)]: $($finding.archivos.Count) archivo(s)" -ForegroundColor Yellow
+    }
+}
+
+$blocking = @($findings | Where-Object { $_.aplicar })
+
+if ($blocking.Count -gt 0) {
+    throw "El paquete '$Variant' contiene archivos excluidos por $($blocking.regla -join ', '). Revisa build/paquete-excluidos.json."
+}
+
+Write-Host ("      Contenido inventariado: {0:N0} archivos" -f $inventory.Count) -ForegroundColor Green
+
 # La API viaja dentro del paquete y es un ejecutable más, pero Tauri solo firma
 # el suyo y los instaladores: esto hay que hacerlo aquí o no lo hace nadie. Un
 # instalador firmado que suelta un binario sin firmar es justo lo que hace saltar
@@ -209,8 +247,19 @@ Write-Host '      Frontend compilado.' -ForegroundColor Green
 # --- 3. Instalador ----------------------------------------------------------
 if ($SkipInstaller) {
     Write-Host '[3/3] Instalador omitido (-SkipInstaller).' -ForegroundColor Yellow
+
+    $manifest = Write-DrusePackageManifest `
+        -Inventory $inventory `
+        -Variant $Variant `
+        -Version $appVersion `
+        -Runtime $Runtime `
+        -Path (Join-Path $manifestDir "manifiesto-$Variant-$appVersion-$Runtime-sin-instalador.json") `
+        -Findings $findings `
+        -Signed ($signing -and $IsWindows)
+
     Write-Host ''
     Write-Host "Contenido preparado en: $apiOutput" -ForegroundColor DarkGray
+    Write-Host "Manifiesto: $manifest" -ForegroundColor DarkGray
     return
 }
 
@@ -399,10 +448,33 @@ instalada. Si el equipo no ofrece uno, Druse pedirá la contraseña en cada
 conexión y te lo indicará en la interfaz.
 '@ | Set-Content (Join-Path $staging 'LEEME.txt') -Encoding UTF8
 
-    $version = (Get-Content (Join-Path $tauriDir 'tauri.conf.json') -Raw | ConvertFrom-Json).version
-    $zip = Join-Path $tauriDir "target/portable/Druse-$version-$Runtime-portable$VariantSuffix.zip"
+    $zip = Join-Path $tauriDir "target/portable/Druse-$appVersion-$Runtime-portable$VariantSuffix.zip"
     Remove-Item $zip -Force -ErrorAction SilentlyContinue
     Compress-Archive -Path "$staging\*" -DestinationPath $zip -CompressionLevel Optimal
 
     "  {0}  ({1:N1} MB)" -f $zip, ((Get-Item $zip).Length / 1MB)
 }
+
+# --- Manifiesto --------------------------------------------------------------
+# Se escribe al final y con los artefactos ya renombrados y firmados, porque el
+# SHA-256 que sirve es el de los bytes que se reparten. Firmar después de
+# calcularlo produciría un manifiesto que no corresponde a ningún archivo
+# existente, que es el mismo error que invalidaría la `.sig` del actualizador.
+$artifactPaths = @(foreach ($bundle in $bundles) { $bundle.FullName; "$($bundle.FullName).sig" })
+
+# El ZIP portable solo existe con -Portable, y `Get-DruseArtifactEntries` ignora
+# lo que no está: así el manifiesto lista lo que se generó de verdad en esta
+# ejecución, sin una entrada vacía para lo que no se pidió.
+if ($Portable) { $artifactPaths += $zip }
+
+$manifest = Write-DrusePackageManifest `
+    -Inventory ($inventory + @(Get-DruseArtifactEntries -Path $artifactPaths)) `
+    -Variant $Variant `
+    -Version $appVersion `
+    -Runtime $Runtime `
+    -Path (Join-Path $manifestDir "manifiesto-$Variant-$appVersion-$Runtime.json") `
+    -Findings $findings `
+    -Signed ($signing -and $IsWindows)
+
+Write-Host ''
+Write-Host "Manifiesto del paquete: $manifest" -ForegroundColor Green

@@ -1,0 +1,55 @@
+{
+  "descripcion": "Qué no puede viajar dentro de cada variante del paquete de Druse. Lo aplica build/scripts/manifiesto.ps1 desde package.ps1 (PKG-02 del plan de SignPath y donaciones).",
+  "revision": "13 de septiembre de 2026",
+  "como_se_lee": "Cada regla se compara con la ruta relativa del archivo dentro del paquete, en minúsculas y con barras normales. Una regla con 'aplicar': true detiene el empaquetado si alguno de sus patrones coincide. Una regla con 'aplicar': false solo se cuenta y se anota en el manifiesto: describe una decisión que todavía no se ha tomado, y el empaquetado no debe fingir que sí.",
+  "variantes": {
+    "completo": {
+      "reglas": []
+    },
+    "sin-informix": {
+      "reglas": [
+        {
+          "id": "ifx-driver-ibm",
+          "aplicar": true,
+          "motivo": "La variante sin Informix se construye con -p:IncludeInformix=false. Si el controlador de IBM aparece igual, el paquete ligero no es lo que anuncia su nombre y arrastra términos de IBM que esa edición dice no incluir.",
+          "patrones": [
+            "ibm.data.db2.dll",
+            "clidriver/*",
+            "druse.provider.informix.dll",
+            "*/informix*.dll"
+          ]
+        },
+        {
+          "id": "ifx-ikvm",
+          "aplicar": true,
+          "motivo": "IKVM solo entra por Druse.Jdbc, y Druse.Jdbc solo lo referencia el proveedor de Informix. Si sobrevive a la exclusión, el paquete conserva el runtime Java y sus avisos de licencia sin usarlos.",
+          "patrones": [
+            "ikvm.dll",
+            "ikvm.properties",
+            "ikvm.*.dll",
+            "ikvm/*",
+            "druse.jdbc.dll"
+          ]
+        }
+      ]
+    }
+  },
+  "pendientes_de_decision": [
+    {
+      "id": "oracle-managed",
+      "aplicar": false,
+      "motivo": "Oracle.ManagedDataAccess.Core se distribuye bajo Oracle Free Distribution, Hosting, and Use Terms. Su permanencia en una edición candidata a SignPath depende de OSS-03 y DEC-03; hasta que se resuelvan, se cuenta pero no se excluye.",
+      "patrones": [
+        "oracle.manageddataaccess.dll"
+      ]
+    },
+    {
+      "id": "sqlclient-sni",
+      "aplicar": false,
+      "motivo": "Microsoft.Data.SqlClient.SNI.dll tiene términos de Microsoft propios, distintos de los del paquete administrado. Retirarlo dejaría sin SQL Server a la edición: la decisión es de alcance, no de empaquetado.",
+      "patrones": [
+        "microsoft.data.sqlclient.sni.dll"
+      ]
+    }
+  ]
+}
