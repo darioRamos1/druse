@@ -6,10 +6,11 @@ import {
   KnownRelation,
   SchemaIndex,
 } from '../../../shared/models/workspace';
-import { SqlReference, aliasMap, findRelation } from './sql-context';
+import { SqlReference, aliasMap, findRelation, relationMentions } from './sql-context';
 import { SavedSnippet } from '../../../core/application-gateway/application-gateway';
 import { functionsFor, keywordsFor } from './sql-keywords';
 import { snippetsFor } from './sql-snippets';
+import { statementAt } from './sql-statements';
 
 /**
  * Cómo se describe una columna en una línea.
@@ -94,6 +95,80 @@ function qualifierBefore(line: string): SqlReference | null {
   ).exec(line);
 
   return match ? { schema: match[1] ?? null, name: match[2] } : null;
+}
+
+/** Palabras detrás de las cuales lo que se escribe es una tabla, no una columna. */
+const TABLE_POSITIONS = new Set(['FROM', 'JOIN', 'UPDATE', 'INTO', 'TABLE']);
+
+/**
+ * Palabras que dicen en qué parte de la instrucción está el cursor.
+ *
+ * `AS` no está a propósito: `FROM usuarios AS |` sigue siendo el FROM, y si
+ * contara, lo último visto sería `AS` y se ofrecerían columnas donde se escribe
+ * un alias.
+ */
+const CLAUSE_KEYWORD =
+  /\b(SELECT|WHERE|AND|OR|NOT|ON|BY|SET|HAVING|FROM|JOIN|UPDATE|INTO|TABLE|VALUES|WHEN|THEN|ELSE|RETURNING|DISTINCT)\b/giu;
+
+/**
+ * ¿Lo que se está escribiendo es el nombre de una tabla?
+ *
+ * Se mira la última palabra de cláusula antes del cursor, **sin contar la que
+ * se está tecleando**: escribir `on` para buscar la tabla `onboarding` no puede
+ * convertirse en un `ON` que pida columnas.
+ */
+function expectsTable(textBeforeCursor: string): boolean {
+  const withoutCurrentWord = textBeforeCursor.replace(/[\p{L}\p{N}_$]*$/u, '');
+  let last: string | null = null;
+
+  for (const match of withoutCurrentWord.matchAll(CLAUSE_KEYWORD)) {
+    last = match[1].toUpperCase();
+  }
+
+  return last !== null && TABLE_POSITIONS.has(last);
+}
+
+/** Una tabla de la instrucción, con el nombre con el que se la califica. */
+interface ColumnSource {
+  /** El alias si lo hay; si no, el nombre de la tabla tal y como se escribió. */
+  readonly qualifier: string;
+  readonly relation: KnownRelation;
+}
+
+/**
+ * Las tablas nombradas en la instrucción donde está el cursor.
+ *
+ * Una entrada por alias, no por tabla: `FROM users a JOIN users b` son dos
+ * fuentes aunque sea la misma relación, y cada una necesita su calificador.
+ */
+function columnSources(sql: string, offset: number, index: SchemaIndex): ColumnSource[] | null {
+  const statement = statementAt(sql, offset);
+
+  if (!statement || expectsTable(sql.slice(statement.startOffset, offset))) {
+    return null;
+  }
+
+  const sources = new Map<string, ColumnSource>();
+
+  for (const mention of relationMentions(statement.text)) {
+    const relation = findRelation(index, mention.reference);
+
+    if (!relation || sources.has(mention.alias)) {
+      continue;
+    }
+
+    // Sin alias, el calificador es el nombre tal como está escrito en el SQL:
+    // `relationMentions` lo guarda en minúsculas, y en un PostgreSQL con nombres
+    // entre comillas `Clientes` y `clientes` no son la misma tabla.
+    const qualifier =
+      mention.alias === mention.reference.name.toLowerCase()
+        ? mention.reference.name
+        : mention.alias;
+
+    sources.set(mention.alias, { qualifier, relation });
+  }
+
+  return [...sources.values()];
 }
 
 /**
@@ -364,6 +439,79 @@ export function registerSqlCompletion(
           sortText: `4_${fn}`,
           range,
         });
+      }
+
+      // Columnas sueltas de las tablas de la instrucción, sin alias delante.
+      //
+      // Hasta ahora las columnas solo aparecían detrás de un punto: quien escribe
+      // `SELECT nom` sobre `FROM usuarios`, sin alias, no recibía nada y tenía
+      // que ir a mirar la tabla o escribir `usuarios.` para que le sugiriera.
+      const sources = columnSources(model.getValue(), model.getOffsetAt(position), schema);
+
+      const bareColumnItems = (
+        loaded: readonly (ColumnSource & { readonly columns: readonly KnownColumn[] })[],
+      ): MonacoApi.languages.CompletionItem[] => {
+        // Una columna que está en dos tablas no se puede escribir suelta: el
+        // motor la rechazaría por ambigua. Esas se ofrecen ya calificadas.
+        const repeticiones = new Map<string, number>();
+
+        for (const source of loaded) {
+          for (const column of source.columns) {
+            const key = column.name.toLowerCase();
+            repeticiones.set(key, (repeticiones.get(key) ?? 0) + 1);
+          }
+        }
+
+        return loaded.flatMap((source, sourceIndex) =>
+          source.columns.map((column, columnIndex) => {
+            const ambigua = (repeticiones.get(column.name.toLowerCase()) ?? 0) > 1;
+            const texto = ambigua ? `${source.qualifier}.${column.name}` : column.name;
+
+            return {
+              label: texto,
+              kind: monaco.languages.CompletionItemKind.Field,
+              insertText: texto,
+              // Se filtra por el nombre de la columna aunque se inserte
+              // calificada: quien busca `id` escribe `id`, no `users.id`.
+              filterText: column.name,
+              detail: `${source.qualifier} · ${describeColumn(column)}`,
+              documentation: `${source.relation.qualified}.${column.name}`,
+              // Delante de las tablas —donde se piden columnas es lo que se
+              // busca— y en el orden de cada tabla, que es el que conoce quien
+              // conoce su esquema.
+              sortText: `01_${String(sourceIndex).padStart(2, '0')}_${String(columnIndex).padStart(4, '0')}`,
+              range,
+            };
+          }),
+        );
+      };
+
+      if (sources && sources.length > 0) {
+        const faltan = sources.some((source) => source.relation.columns.length === 0);
+
+        // Como tras el punto: una tabla que nadie ha abierto en el explorador
+        // trae sus columnas ahora, una sola vez, en lugar de quedarse fuera.
+        if (faltan && loadColumns) {
+          const conColumnas = Promise.all(
+            sources.map(async (source) => ({
+              ...source,
+              columns:
+                source.relation.columns.length > 0
+                  ? source.relation.columns
+                  : await loadColumns(source.relation.schema || null, source.relation.name),
+            })),
+          );
+
+          return conColumnas.then((loaded) => ({
+            suggestions: [...suggestions, ...bareColumnItems(loaded)],
+          }));
+        }
+
+        suggestions.push(
+          ...bareColumnItems(
+            sources.map((source) => ({ ...source, columns: source.relation.columns })),
+          ),
+        );
       }
 
       return { suggestions };

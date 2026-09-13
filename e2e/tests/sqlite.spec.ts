@@ -501,4 +501,94 @@ test.describe('SQLite de punta a punta', () => {
       expect(definicion).not.toContain('ck_nombre_largo');
     }).toPass({ timeout: 30_000 });
   });
+
+  /**
+   * Las columnas se sugieren también sin alias ni tabla delante.
+   *
+   * Antes solo aparecían detrás de un punto. Y había un segundo fallo debajo que
+   * solo veía quien no usa alias: en `FROM clientes JOIN pedidos`, `JOIN` se
+   * tomaba por alias de `clientes` y `pedidos` desaparecía de la consulta.
+   *
+   * Va en SQLite porque no necesita contenedor, y porque las tablas no se abren
+   * en el explorador: sus columnas tienen que llegar bajo demanda, que es el
+   * camino que se ejercita aquí.
+   */
+  test('sugiere las columnas sueltas aunque las tablas no tengan alias', async ({ page }) => {
+    await abrir(page);
+    await hastaLasTablas(page);
+
+    // La pestaña se abre desde el árbol para que nazca apuntando a este archivo:
+    // el autocompletado mira la conexión de la pestaña, y la suite deja otras
+    // mirando a servidores que en esta ejecución no están.
+    await menuDeNodo(page, 'altas');
+    await page.getByRole('menuitem', { name: 'Abrir SELECT' }).click();
+
+    await escribirSql(
+      page,
+      'SELECT  FROM clientes JOIN pedidos ON pedidos.cliente_id = clientes.id',
+    );
+
+    // El cursor, justo detrás de «SELECT ».
+    await page.evaluate(() => {
+      const editor = (window as any).monaco.editor.getEditors()[0];
+
+      editor.setPosition({ lineNumber: 1, column: 8 });
+      editor.focus();
+      editor.trigger('e2e', 'editor.action.triggerSuggest', {});
+    });
+
+    const desplegable = page.locator('app-sql-editor .suggest-widget').filter({ visible: true });
+
+    await expect(desplegable).toBeVisible({ timeout: 30_000 });
+
+    const nombres = async () =>
+      page.evaluate(() =>
+        Array.from(
+          document.querySelectorAll(
+            '.monaco-editor .suggest-widget .monaco-list-row .monaco-icon-name-container',
+          ),
+        ).map((nombre) => nombre.textContent?.trim() ?? ''),
+      );
+
+    // Las columnas llegan después de pedirlas, así que se reintenta.
+    await expect(async () => {
+      const etiquetas = await nombres();
+
+      // Las que solo tiene una tabla, sueltas.
+      expect(etiquetas).toContain('nombre');
+      expect(etiquetas).toContain('email');
+      // `id` está en las dos: suelta, SQLite la rechazaría por ambigua.
+      expect(etiquetas).toContain('clientes.id');
+      expect(etiquetas).toContain('pedidos.id');
+      expect(etiquetas).not.toContain('id');
+    }).toPass({ timeout: 30_000 });
+
+    if (process.env['DRUSE_BARRIDO']) {
+      await page
+        .locator('app-sql-editor')
+        .screenshot({ path: `${BARRIDO}/22-autocompletado-sin-alias.png` });
+    }
+
+    // Y lo que se inserta es SQL que el motor acepta: se elige `total`, que solo
+    // está en `pedidos`, y la consulta se ejecuta.
+    await page.keyboard.type('tota');
+    await expect(async () => {
+      expect((await nombres())[0]).toBe('total');
+    }).toPass({ timeout: 10_000 });
+    await page.keyboard.press('Enter');
+
+    const consulta = await page.evaluate(
+      () => (window as any).monaco.editor.getEditors()[0].getValue() as string,
+    );
+
+    expect(consulta).toBe(
+      'SELECT total FROM clientes JOIN pedidos ON pedidos.cliente_id = clientes.id',
+    );
+
+    await ejecutar(page, 'todo');
+
+    await expect(async () => {
+      expect(await primeraColumna(page)).toEqual(['5', '7']);
+    }).toPass({ timeout: 30_000 });
+  });
 });

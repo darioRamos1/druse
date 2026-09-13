@@ -40,6 +40,11 @@ function fakeModel(text: string) {
 
   return {
     getValue: () => text,
+    // Como el de Monaco: líneas completas anteriores, con su salto, más la columna.
+    getOffsetAt: (position: { lineNumber: number; column: number }) =>
+      lines.slice(0, position.lineNumber - 1).reduce((total, line) => total + line.length + 1, 0) +
+      position.column -
+      1,
     getWordUntilPosition: () => ({ startColumn: 1, endColumn: 1 }),
     getValueInRange: (range: any) => {
       const line = lines[range.startLineNumber - 1] ?? '';
@@ -137,6 +142,50 @@ function complete(
   }[];
 }
 
+interface Suggestion {
+  label: string;
+  detail?: string;
+  insertText?: string;
+  filterText?: string;
+  sortText?: string;
+}
+
+/**
+ * Como `complete`, pero con el cursor donde diga `|`.
+ *
+ * Las columnas sueltas se piden en mitad de la instrucción —`SELECT | FROM
+ * users`—, y con el cursor siempre al final no habría forma de probarlo.
+ */
+function completeAt(
+  sqlWithCursor: string,
+  index: SchemaIndex = schema,
+  loadColumns?: (schema: string | null, name: string) => Promise<readonly ReturnType<typeof col>[]>,
+): { suggestions: Suggestion[] } | Promise<{ suggestions: Suggestion[] }> {
+  const offset = sqlWithCursor.indexOf('|');
+  const sql = sqlWithCursor.replace('|', '');
+  const before = sql.slice(0, offset).split('\n');
+  const position = { lineNumber: before.length, column: before[before.length - 1].length + 1 };
+  const { monaco, provider } = fakeMonaco();
+
+  registerSqlCompletion(monaco as never, () => ({
+    engine: 'postgresql',
+    schema: index,
+    loadColumns,
+  }));
+
+  return provider().provideCompletionItems(fakeModel(sql) as never, position);
+}
+
+/** Lo mismo cuando no hay nada que cargar y la respuesta llega en el acto. */
+function completeAtNow(sqlWithCursor: string): Suggestion[] {
+  return (completeAt(sqlWithCursor) as { suggestions: Suggestion[] }).suggestions;
+}
+
+/** Solo las columnas sueltas: ni tablas, ni reservadas, ni plantillas. */
+function columnasSueltas(suggestions: readonly Suggestion[]): Suggestion[] {
+  return suggestions.filter((item) => item.sortText?.startsWith('01_'));
+}
+
 describe('autocompletado SQL', () => {
   it('sugiere tablas, esquemas y palabras reservadas', () => {
     const labels = complete('SELECT ').map((item) => item.label);
@@ -214,6 +263,136 @@ describe('autocompletado SQL', () => {
 
   it('no sugiere nada tras un punto de algo desconocido', () => {
     expect(complete('SELECT desconocida.')).toEqual([]);
+  });
+
+  describe('columnas sin alias', () => {
+    it('sugiere las columnas de la tabla del FROM aunque no tenga alias', () => {
+      const labels = columnasSueltas(completeAtNow('SELECT | FROM users')).map(
+        (item) => item.label,
+      );
+
+      expect(labels).toEqual(['id', 'name', 'email']);
+    });
+
+    it('las inserta sueltas cuando no hay duda de a qué tabla pertenecen', () => {
+      const name = columnasSueltas(completeAtNow('SELECT na| FROM users')).find(
+        (item) => item.label === 'name',
+      );
+
+      expect(name?.insertText).toBe('name');
+      expect(name?.detail).toContain('users');
+      expect(name?.detail).toContain('text');
+    });
+
+    it('también en el WHERE, que está detrás del FROM', () => {
+      const labels = columnasSueltas(completeAtNow('SELECT * FROM users WHERE em|')).map(
+        (item) => item.label,
+      );
+
+      expect(labels).toContain('email');
+    });
+
+    it('califica las columnas que se repiten en dos tablas', () => {
+      // `id` está en las dos: suelta, el motor la rechazaría por ambigua.
+      const columnas = columnasSueltas(completeAtNow('SELECT | FROM users JOIN pedidos ON true'));
+
+      expect(columnas.map((item) => item.insertText)).toEqual([
+        'users.id',
+        'name',
+        'email',
+        'pedidos.id',
+        'total',
+      ]);
+      // Se busca escribiendo el nombre de la columna, no el calificado.
+      expect(columnas.find((item) => item.insertText === 'pedidos.id')?.filterText).toBe('id');
+    });
+
+    it('con alias, califica con el alias y no con el nombre de la tabla', () => {
+      const insertadas = columnasSueltas(
+        completeAtNow('SELECT | FROM users u JOIN pedidos p ON u.id = p.id'),
+      ).map((item) => item.insertText);
+
+      expect(insertadas).toContain('u.id');
+      expect(insertadas).toContain('p.id');
+    });
+
+    it('la misma tabla dos veces son dos fuentes distintas', () => {
+      const insertadas = columnasSueltas(
+        completeAtNow('SELECT | FROM users a JOIN users b ON a.id = b.id'),
+      ).map((item) => item.insertText);
+
+      // Todas se repiten, así que ninguna puede ir suelta.
+      expect(insertadas).toContain('a.name');
+      expect(insertadas).toContain('b.name');
+      expect(insertadas).not.toContain('name');
+    });
+
+    it('no ofrece columnas donde se escribe el nombre de una tabla', () => {
+      for (const sql of ['SELECT * FROM |', 'SELECT * FROM us|', 'SELECT * FROM users JOIN |']) {
+        expect(columnasSueltas(completeAtNow(sql))).toEqual([]);
+      }
+    });
+
+    it('buscar una tabla que empieza como una palabra reservada no pide columnas', () => {
+      // `on` es lo que se está tecleando, no un ON de verdad.
+      expect(columnasSueltas(completeAtNow('SELECT * FROM users JOIN on|'))).toEqual([]);
+    });
+
+    it('solo mira la instrucción donde está el cursor', () => {
+      const labels = columnasSueltas(
+        completeAtNow('SELECT * FROM pedidos;\nSELECT | FROM users'),
+      ).map((item) => item.label);
+
+      // Sin separar instrucciones, `id` saldría calificado por culpa de la otra
+      // consulta, y `total` aparecería sin tener nada que ver.
+      expect(labels).toEqual(['id', 'name', 'email']);
+    });
+
+    it('sin tabla en la instrucción no inventa columnas', () => {
+      expect(columnasSueltas(completeAtNow('SELECT |'))).toEqual([]);
+    });
+
+    it('pide las columnas de una tabla que nadie ha abierto', async () => {
+      const sinAbrir: SchemaIndex = {
+        schemas: ['public'],
+        relations: [
+          {
+            schema: 'public',
+            name: 'facturas',
+            kind: 'table',
+            qualified: 'public.facturas',
+            columns: [],
+          },
+        ],
+      };
+      const pedidas: string[] = [];
+
+      const result = await completeAt('SELECT | FROM facturas', sinAbrir, (schemaName, name) => {
+        pedidas.push(`${schemaName}.${name}`);
+        return Promise.resolve([col('id', 'int8', { pk: true }), col('importe', 'numeric')]);
+      });
+
+      expect(columnasSueltas(result.suggestions).map((item) => item.label)).toEqual([
+        'id',
+        'importe',
+      ]);
+      expect(pedidas).toEqual(['public.facturas']);
+      // Lo demás sigue llegando: las columnas se suman, no sustituyen.
+      expect(result.suggestions.some((item) => item.label === 'FROM')).toBe(true);
+    });
+
+    it('no pide nada cuando las columnas ya están cargadas', () => {
+      const pedidas: string[] = [];
+
+      const result = completeAt('SELECT | FROM users', schema, (_schema, name) => {
+        pedidas.push(name);
+        return Promise.resolve([]);
+      });
+
+      // Consultar el catálogo en cada pulsación sería peor que no sugerir.
+      expect(result).not.toBeInstanceOf(Promise);
+      expect(pedidas).toEqual([]);
+    });
   });
 
   describe('ayudas del editor', () => {
