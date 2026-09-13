@@ -18,6 +18,47 @@
     Este archivo solo aporta funciones. Quien las llama es `release.ps1`.
 #>
 
+# Consulta el workflow del proyecto, nunca checks ajenos como Dependabot.
+# No filtrar por completed: una ejecución nueva pendiente invalida el verde anterior.
+function Get-DruseEstadoCI {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)][string]$Repository,
+        [Parameter(Mandatory)][ValidatePattern('^[0-9a-fA-F]{40}$')][string]$Commit
+    )
+    if (-not (Get-Command gh -ErrorAction SilentlyContinue)) {
+        return @{ verde = $false; detalle = 'no se encontró gh para consultar CI' }
+    }
+    $endpoint = "repos/$Repository/actions/workflows/ci.yml/runs?head_sha=$Commit&per_page=100"
+    $respuesta = gh api $endpoint --paginate --slurp --jq '[.[].workflow_runs[] | {id, path, head_sha, status, conclusion, created_at, run_started_at, run_attempt, html_url}]' 2>&1
+    if ($LASTEXITCODE -ne 0) {
+        return @{ verde = $false; detalle = 'no se pudo consultar el workflow ci.yml' }
+    }
+    try {
+        $ejecuciones = @($respuesta | ConvertFrom-Json -ErrorAction Stop)
+        if ($ejecuciones.Count -eq 0) {
+            return @{ verde = $false; detalle = 'el commit no tiene ninguna ejecución de ci.yml' }
+        }
+        foreach ($ejecucion in $ejecuciones) {
+            if ($ejecucion.head_sha -ne $Commit -or $ejecucion.path -ne '.github/workflows/ci.yml' -or -not $ejecucion.id) {
+                return @{ verde = $false; detalle = 'la respuesta no corresponde al workflow y commit requeridos' }
+            }
+        }
+        $ultima = $ejecuciones | Sort-Object -Descending -Property @{
+            Expression = { [DateTimeOffset]$(if ($_.run_started_at) { $_.run_started_at } else { $_.created_at }) }
+        }, id | Select-Object -First 1
+        return @{
+            verde = $ultima.status -eq 'completed' -and $ultima.conclusion -eq 'success'
+            detalle = "ci.yml: ejecución $($ultima.id), intento $($ultima.run_attempt), $($ultima.status)/$($ultima.conclusion)"
+            run_id = $ultima.id
+            url = $ultima.html_url
+        }
+    }
+    catch {
+        return @{ verde = $false; detalle = 'no se pudo interpretar la respuesta de ci.yml' }
+    }
+}
+
 <#
 .SYNOPSIS
     Los ocho bytes con los que Minisign identifica una clave o una firma.
@@ -59,8 +100,8 @@ function Get-DruseMinisignKeyId {
     Clave pública del actualizador, tal como está en `tauri.conf.json`.
 
 .PARAMETER ManifestDir
-    Dónde buscar los manifiestos de contenido que escribe `package.ps1`. Si no se
-    indica, esa comprobación se omite y se dice.
+    Directorio obligatorio con los dos manifiestos de contenido de `package.ps1`.
+    Omitirlo o perder un manifiesto impide verificar y publicar la release.
 
 .PARAMETER SinAuthenticode
     Salta la comprobación de Authenticode.
@@ -79,6 +120,10 @@ function Invoke-DruseReleaseVerificacion {
         [string]$ManifestDir,
         [switch]$SinAuthenticode
     )
+
+    if ([string]::IsNullOrWhiteSpace($ManifestDir)) {
+        throw 'Se requiere ManifestDir con los manifiestos de las dos variantes.'
+    }
 
     $completeName = "Druse-$Version-windows-x86_64-completo-setup.exe"
     $liteName = "Druse-$Version-windows-x86_64-sin-informix-setup.exe"
@@ -201,13 +246,10 @@ function Invoke-DruseReleaseVerificacion {
     foreach ($par in @(@('completo', $complete), @('sin-informix', $lite))) {
         $variante, $artefacto = $par
 
-        if (-not $ManifestDir) { continue }
-
         $manifiestoPaquete = Join-Path $ManifestDir "manifiesto-$variante-$Version-win-x64.json"
 
-        if (-not (Test-Path -LiteralPath $manifiestoPaquete)) {
-            Write-Host "  ---  sin manifiesto de contenido para la variante $variante" -ForegroundColor Yellow
-            continue
+        if (-not (Test-Path -LiteralPath $manifiestoPaquete -PathType Leaf)) {
+            throw "Falta el manifiesto de contenido de la variante $variante. No se publicará."
         }
 
         $contenido = Get-Content -LiteralPath $manifiestoPaquete -Raw | ConvertFrom-Json
@@ -215,6 +257,10 @@ function Invoke-DruseReleaseVerificacion {
 
         if ($contenido.variante -ne $variante) {
             throw "El manifiesto de contenido de $variante describe la variante $($contenido.variante)."
+        }
+
+        if ($contenido.producto -ne 'Druse' -or $contenido.version -ne $Version) {
+            throw "El manifiesto de contenido de $variante no corresponde al producto y versión requeridos."
         }
 
         if (-not ($contenido.contenido | Where-Object { $_.sha256 -eq $hash })) {

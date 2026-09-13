@@ -14,6 +14,17 @@ $raiz = Join-Path ([IO.Path]::GetTempPath()) "druse-release-$([Guid]::NewGuid().
 $releaseDir = Join-Path $raiz 'release'
 $manifestDir = Join-Path $raiz 'paquete'
 
+function Remove-TestDirectory([string]$Target) {
+    $resolved = [IO.Path]::GetFullPath($Target)
+    $testRoot = [IO.Path]::GetFullPath($raiz)
+    $tempRoot = [IO.Path]::GetFullPath([IO.Path]::GetTempPath()).TrimEnd([IO.Path]::DirectorySeparatorChar)
+    if ((Split-Path -Parent $testRoot) -ne $tempRoot -or
+        ($resolved -ne $testRoot -and -not $resolved.StartsWith($testRoot + [IO.Path]::DirectorySeparatorChar))) {
+        throw 'El directorio a borrar no pertenece a esta prueba.'
+    }
+    if (Test-Path -LiteralPath $resolved) { Remove-Item -LiteralPath $resolved -Recurse -Force }
+}
+
 $completo = Join-Path $releaseDir "Druse-$version-windows-x86_64-completo-setup.exe"
 $ligero = Join-Path $releaseDir "Druse-$version-windows-x86_64-sin-informix-setup.exe"
 $selector = Join-Path $releaseDir "Druse-$version-installer.exe"
@@ -28,7 +39,7 @@ $latest = Join-Path $releaseDir 'latest.json'
     Así, cuando una falla, se sabe cuál es esa cosa.
 #>
 function Nueva-Release {
-    if (Test-Path $releaseDir) { Remove-Item $releaseDir -Recurse -Force }
+    Remove-TestDirectory $releaseDir
 
     New-Item -ItemType Directory -Force $releaseDir | Out-Null
     New-Item -ItemType Directory -Force $manifestDir | Out-Null
@@ -118,6 +129,30 @@ try {
         throw 'Las dos variantes deberían contrastarse con su manifiesto de contenido.'
     }
 
+    # No se puede convertir la ausencia de evidencia en una simple advertencia.
+    foreach ($variante in @('completo', 'sin-informix')) {
+        $clave = Nueva-Release
+        Remove-Item -LiteralPath (Join-Path $manifestDir "manifiesto-$variante-$version-win-x64.json") -Force
+        Debe-Rechazar $clave 'Falta el manifiesto de contenido' "manifiesto ausente: $variante"
+    }
+    $clave = Nueva-Release
+    $rejected = $false
+    try {
+        Invoke-DruseReleaseVerificacion -SinAuthenticode -ReleaseDir $releaseDir -Version $version -PublicKey $clave | Out-Null
+    } catch {
+        if ($_.Exception.Message -notmatch 'Se requiere ManifestDir') { throw }
+        $rejected = $true
+    }
+    if (-not $rejected) { throw 'ManifestDir omitido debería impedir la publicación.' }
+    foreach ($field in @('version', 'producto')) {
+        $clave = Nueva-Release
+        $file = Join-Path $manifestDir "manifiesto-completo-$version-win-x64.json"
+        $doc = Get-Content -LiteralPath $file -Raw | ConvertFrom-Json
+        $doc.$field = 'otro'
+        $doc | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $file -Encoding UTF8
+        Debe-Rechazar $clave 'producto y versión requeridos' "manifiesto de otro $field"
+    }
+
     # --- El caso que esto existe para cazar ------------------------------------
     # Firmar con Authenticode modifica el archivo. Si la `.sig` se calculó antes,
     # la release sale con una firma que no corresponde a esos bytes y el rechazo
@@ -190,8 +225,8 @@ try {
     Remove-Item -LiteralPath "$ligero.sig" -Force
     Debe-Rechazar $clave 'Faltan artefactos' 'una release incompleta'
 
-    'OK: release correcta aceptada; artefacto tocado, firma ajena, latest.json desincronizado o de otra versión, ediciones cruzadas, manifiesto de otra edición, contenido distinto y release incompleta, rechazados.'
+    'OK: release correcta aceptada; ausencia de manifiestos, producto/versión incorrectos, artefacto tocado, firma ajena, latest.json desincronizado, ediciones cruzadas y release incompleta, rechazados.'
 }
 finally {
-    Remove-Item -LiteralPath $raiz -Recurse -Force -ErrorAction SilentlyContinue
+    Remove-TestDirectory $raiz
 }

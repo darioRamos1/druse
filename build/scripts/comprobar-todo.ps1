@@ -134,6 +134,7 @@ else {
 Invoke-Bloque 'Guiones: contenido del paquete' { & "$PSScriptRoot/../tests/manifiesto-paquete.ps1" }
 Invoke-Bloque 'Guiones: rechazo de un artefacto alterado' { node build/tests/verificacion-de-actualizacion.cjs }
 Invoke-Bloque 'Guiones: guardas de una publicación' { & "$PSScriptRoot/../tests/release-verificacion.ps1" }
+Invoke-Bloque 'Guiones: workflow CI de la publicación' { & "$PSScriptRoot/../tests/ci-release.ps1" }
 Invoke-Bloque 'Guiones: puertos de las bases de prueba' { & "$PSScriptRoot/../tests/test-db-loopback.ps1" }
 
 # --- Backend -----------------------------------------------------------------

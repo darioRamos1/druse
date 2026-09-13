@@ -191,40 +191,11 @@ function Invoke-DruseConstruccion {
     que tiene que estar comprobado. Se consulta con `gh`; si no hay ninguna
     comprobación registrada, eso **no** cuenta como verde.
 #>
-function Get-DruseEstadoCI([string]$commit) {
-    $gh = Get-Command 'gh' -ErrorAction SilentlyContinue
-
-    if (-not $gh) {
-        return @{ verde = $false; detalle = 'no se encontró gh para consultar la integración continua' }
-    }
-
-    $respuesta = gh api "repos/$Repository/commits/$commit/check-runs" --jq '[.check_runs[] | {name, status, conclusion}]' 2>&1
-
-    if ($LASTEXITCODE -ne 0) {
-        return @{ verde = $false; detalle = "no se pudo consultar la integración continua: $respuesta" }
-    }
-
-    $comprobaciones = @($respuesta | ConvertFrom-Json)
-
-    if ($comprobaciones.Count -eq 0) {
-        return @{ verde = $false; detalle = 'el commit no tiene ninguna comprobación registrada' }
-    }
-
-    $fallidas = @($comprobaciones | Where-Object { $_.status -ne 'completed' -or $_.conclusion -notin @('success', 'skipped', 'neutral') })
-
-    if ($fallidas.Count -gt 0) {
-        $nombres = ($fallidas | ForEach-Object { "$($_.name) ($($_.conclusion ?? $_.status))" }) -join ', '
-        return @{ verde = $false; detalle = "comprobaciones sin superar: $nombres" }
-    }
-
-    return @{ verde = $true; detalle = "$($comprobaciones.Count) comprobaciones superadas" }
-}
-
 function Invoke-DrusePublicacion([object]$verificacion) {
     $commit = (git rev-parse HEAD).Trim()
     if ($LASTEXITCODE -ne 0) { throw 'No se pudo determinar el commit que se ha construido.' }
 
-    $ci = Get-DruseEstadoCI $commit
+    $ci = Get-DruseEstadoCI -Commit $commit -Repository $Repository
 
     if ($ci.verde) {
         Write-Host "  OK   integración continua verde para $($commit.Substring(0, 8)): $($ci.detalle)" -ForegroundColor Green
@@ -262,6 +233,9 @@ function Invoke-DrusePublicacion([object]$verificacion) {
             verde   = $ci.verde
             detalle = $ci.detalle
             omitida = [bool]$SinComprobarCI
+            workflow = 'ci.yml'
+            run_id   = $ci.run_id
+            url      = $ci.url
         }
         verificacion = $verificacion
     }

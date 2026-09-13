@@ -396,6 +396,10 @@ jobs:
         shell: pwsh
         run: ./build/tests/release-verificacion.ps1
 
+      - name: Workflow CI requerido para publicar
+        shell: pwsh
+        run: ./build/tests/ci-release.ps1
+
       - name: Puertos de las bases de prueba (PowerShell)
         shell: pwsh
         run: ./build/tests/test-db-loopback.ps1
