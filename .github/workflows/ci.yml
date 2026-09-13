@@ -22,9 +22,11 @@
 #
 # Así que en cada push corre lo que solo puede fallar en su sistema —Windows es
 # donde se reparte Druse— y lo que no depende del sistema corre una sola vez, en
-# Linux. Lo demás va al recorrido completo: semanal, o a mano con `completo`.
-# Si el repositorio se abriera, los runners estándar dejarían de costar y esto
-# podría revisarse.
+# Linux. Lo demás va al recorrido completo, que **no se dispara solo**: se pide a
+# mano con la entrada `completo`, y por eso no hay aquí ninguna tarea programada.
+# Nada de esto gasta cuota sin que alguien lo pida, y lo que se deja fuera de un
+# push no queda probado hasta que se pida ese recorrido. Si el repositorio se
+# abriera, los runners estándar dejarían de costar y esto podría revisarse.
 
 name: CI
 
@@ -39,11 +41,6 @@ on:
         description: 'Recorrer también Windows y macOS donde no se hace en cada push'
         type: boolean
         default: false
-  # El recorrido completo, una vez por semana. Lo que se deja fuera de cada push
-  # no queda sin probar: queda probado más tarde, y eso hay que decirlo en vez de
-  # llamarlo cobertura.
-  schedule:
-    - cron: '30 5 * * 1'
 
 env:
   DOTNET_NOLOGO: true
@@ -62,7 +59,7 @@ jobs:
         # perfil—. macOS, en el recorrido completo: cuesta diez veces más y
         # ninguna release sale de ahí todavía.
         os: >-
-          ${{ fromJSON((github.event_name == 'schedule' || github.event.inputs.completo == 'true')
+          ${{ fromJSON((github.event.inputs.completo == 'true')
           && '["windows-latest","ubuntu-latest","macos-latest"]'
           || '["windows-latest","ubuntu-latest"]') }}
 
@@ -415,7 +412,7 @@ jobs:
         # comprueban no cambia por el sistema de debajo. Repetirlas tres veces
         # costaba trece minutos de cuota por cada minuto real.
         os: >-
-          ${{ fromJSON((github.event_name == 'schedule' || github.event.inputs.completo == 'true')
+          ${{ fromJSON((github.event.inputs.completo == 'true')
           && '["windows-latest","ubuntu-latest","macos-latest"]'
           || '["ubuntu-latest"]') }}
 
@@ -555,7 +552,7 @@ jobs:
         # diez minutos de cuota por cada minuto real. Va al recorrido completo;
         # el de Linux sigue en cada push.
         include: >-
-          ${{ fromJSON((github.event_name == 'schedule' || github.event.inputs.completo == 'true')
+          ${{ fromJSON((github.event.inputs.completo == 'true')
           && '[{"os":"ubuntu-latest","rid":"linux-x64","bundles":"deb,appimage"},{"os":"macos-latest","rid":"osx-arm64","bundles":"dmg,app"}]'
           || '[{"os":"ubuntu-latest","rid":"linux-x64","bundles":"deb,appimage"}]') }}
 
