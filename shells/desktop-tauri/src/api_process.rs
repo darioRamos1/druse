@@ -345,6 +345,22 @@ pub fn locate_api(resource_dir: &Path) -> Option<PathBuf> {
 mod tests {
     use super::*;
 
+    /// El envoltorio y la API tienen que mirar la **misma** carpeta.
+    ///
+    /// La API escribe ahí su `endpoint.json` usando `ApplicationData`, que en
+    /// Windows es `%APPDATA%`; el envoltorio llega por `dirs::data_dir()`. Si
+    /// una actualización de `dirs` cambiara esa convención —es el tipo de cambio
+    /// que trae una versión mayor—, el envoltorio buscaría el punto de conexión
+    /// donde nadie lo escribe. Compilaría, pasaría las pruebas y la aplicación
+    /// no arrancaría, que es la peor forma de enterarse.
+    #[cfg(target_os = "windows")]
+    #[test]
+    fn el_directorio_de_datos_es_el_mismo_que_usa_la_api() {
+        let esperado = PathBuf::from(env::var_os("APPDATA").expect("APPDATA en Windows"));
+
+        assert_eq!(dirs::data_dir().expect("data_dir en Windows"), esperado);
+    }
+
     /// Una API que no conoce la ruta —una versión anterior— contesta 404, y
     /// esperarla sería congelar la ventana diez segundos para nada.
     #[test]
