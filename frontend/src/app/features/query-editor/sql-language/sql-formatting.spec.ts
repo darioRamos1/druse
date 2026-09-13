@@ -2,6 +2,24 @@ import { DEFAULT_FORMAT_SETTINGS } from '../../../core/workspace/format-settings
 import { formatSql } from './sql-formatting';
 
 describe('formatSql', () => {
+  /**
+   * La carga de `sql-formatter` se paga aquí, y no dentro de la primera prueba.
+   *
+   * `formatSql` importa la biblioteca de forma perezosa —en la aplicación es lo
+   * correcto: nadie debería descargarla hasta que formatea por primera vez—, así
+   * que la primera prueba que la llamaba cargaba en frío un módulo grande con
+   * todos sus dialectos. Con la máquina ocupada, justo después de dos minutos de
+   * `dotnet test`, eso tardó 7,6 segundos contra el límite de 5 y la suite salió
+   * roja de forma intermitente: una vez sí y cuatro no, que es el peor tipo de
+   * rojo, el que enseña a ignorarlos.
+   *
+   * El módulo queda en la caché de Vitest, de modo que el `import()` de dentro de
+   * `formatSql` lo encuentra ya resuelto. El margen amplio va solo en este
+   * gancho: subir el límite global escondería lentitudes de verdad en las otras
+   * novecientas pruebas.
+   */
+  beforeAll(() => import('sql-formatter'), 30_000);
+
   it('pone las palabras reservadas en mayúsculas y reparte en líneas', async () => {
     const result = await formatSql('select id, name from users where active = true', 'postgresql');
 
