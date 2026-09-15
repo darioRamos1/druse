@@ -591,4 +591,100 @@ test.describe('SQLite de punta a punta', () => {
       expect(await primeraColumna(page)).toEqual(['5', '7']);
     }).toPass({ timeout: 30_000 });
   });
+
+  /**
+   * Y en el WHERE, **escribiendo**, sin pedir el desplegable a mano.
+   *
+   * La anterior lo abre con la acción del editor y el cursor en el SELECT. Esta
+   * teclea detrás del WHERE y del AND, que es como se usa: si el desplegable no
+   * saliera solo al escribir, quien filtra sin alias seguiría sin ayuda aunque la
+   * lógica de debajo supiera qué columnas ofrecer.
+   */
+  test('sugiere las columnas sueltas en el WHERE al escribir', async ({ page }) => {
+    await abrir(page);
+    await hastaLasTablas(page);
+
+    await menuDeNodo(page, 'altas');
+    await page.getByRole('menuitem', { name: 'Abrir SELECT' }).click();
+
+    const inicio =
+      'SELECT pedidos.id FROM clientes JOIN pedidos ON pedidos.cliente_id = clientes.id WHERE ';
+
+    await escribirSql(page, inicio);
+    await page.evaluate(() => {
+      const editor = (window as any).monaco.editor.getEditors()[0];
+      const model = editor.getModel();
+
+      editor.setPosition(model.getPositionAt(model.getValueLength()));
+      editor.focus();
+    });
+
+    const desplegable = page.locator('app-sql-editor .suggest-widget').filter({ visible: true });
+
+    const nombres = async () =>
+      page.evaluate(() =>
+        Array.from(
+          document.querySelectorAll(
+            '.monaco-editor .suggest-widget .monaco-list-row .monaco-icon-name-container',
+          ),
+        ).map((nombre) => nombre.textContent?.trim() ?? ''),
+      );
+
+    // Primera condición: una columna que solo tiene `pedidos`.
+    await page.keyboard.type('tot', { delay: 60 });
+    await expect(desplegable).toBeVisible({ timeout: 30_000 });
+    await expect(async () => {
+      expect((await nombres())[0]).toBe('total');
+    }).toPass({ timeout: 30_000 });
+
+    if (process.env['DRUSE_BARRIDO']) {
+      await page
+        .locator('app-sql-editor')
+        .screenshot({ path: `${BARRIDO}/23-autocompletado-where.png` });
+    }
+
+    await page.keyboard.press('Enter');
+    await page.keyboard.type(" > 6 AND ", { delay: 30 });
+    await page.keyboard.press('Escape');
+
+    // Segunda, detrás del AND: `id` está en las dos tablas y sale calificada.
+    await page.keyboard.type('id', { delay: 60 });
+    await expect(desplegable).toBeVisible({ timeout: 30_000 });
+    await expect(async () => {
+      const etiquetas = await nombres();
+
+      expect(etiquetas).toContain('clientes.id');
+      expect(etiquetas).toContain('pedidos.id');
+      expect(etiquetas).not.toContain('id');
+    }).toPass({ timeout: 30_000 });
+
+    if (process.env['DRUSE_BARRIDO']) {
+      await page
+        .locator('app-sql-editor')
+        .screenshot({ path: `${BARRIDO}/24-autocompletado-where-ambigua.png` });
+    }
+
+    await page.keyboard.press('Escape');
+    await page.keyboard.press('Backspace');
+    await page.keyboard.press('Backspace');
+    await page.keyboard.type('nomb', { delay: 60 });
+    await expect(async () => {
+      expect((await nombres())[0]).toBe('nombre');
+    }).toPass({ timeout: 30_000 });
+    await page.keyboard.press('Enter');
+    await page.keyboard.type(" = 'Ana'", { delay: 30 });
+    await page.keyboard.press('Escape');
+
+    const consulta = await page.evaluate(
+      () => (window as any).monaco.editor.getEditors()[0].getValue() as string,
+    );
+
+    expect(consulta).toBe(`${inicio}total > 6 AND nombre = 'Ana'`);
+
+    await ejecutar(page, 'todo');
+
+    await expect(async () => {
+      expect(await primeraColumna(page)).toEqual(['11']);
+    }).toPass({ timeout: 30_000 });
+  });
 });
