@@ -1,5 +1,6 @@
 {
   "name": "druse-e2e",
+  "license": "GPL-3.0-only",
   "version": "0.0.0",
   "private": true,
   "description": "Pruebas de punta a punta: la aplicación entera, por donde la usa una persona.",

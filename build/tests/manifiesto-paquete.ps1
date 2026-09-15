@@ -86,6 +86,49 @@ try {
         throw 'La variante completa no debe bloquearse por los componentes que sí distribuye.'
     }
 
+    # --- Avisos legales ------------------------------------------------------
+    # El paquete de arriba no los lleva, y eso es justo lo que debe detectarse.
+    $sinAvisos = @(Test-DruseRequiredNotices -Inventory $inventario)
+
+    if ($sinAvisos.Count -ne 3) {
+        throw "Un paquete sin avisos debería dar tres ausencias; dio $($sinAvisos.Count)."
+    }
+
+    $avisos = @(Get-DruseRequiredNotices)
+
+    foreach ($aviso in $avisos) {
+        if (-not (Test-Path -LiteralPath $aviso.origen -PathType Leaf)) {
+            throw "El origen de $($aviso.ruta) no existe en el repositorio."
+        }
+
+        Copy-Item -LiteralPath $aviso.origen -Destination (Join-Path $raiz $aviso.ruta) -Force
+    }
+
+    $conAvisos = @(Get-DrusePackageInventory -Path $paquete -Prefix 'api')
+
+    if (@(Test-DruseRequiredNotices -Inventory $conAvisos).Count -ne 0) {
+        throw 'Con los tres avisos copiados del repositorio no debería faltar nada.'
+    }
+
+    # Mismo nombre, otro contenido: la copia de una construcción anterior.
+    Add-Content -LiteralPath (Join-Path $raiz 'api/COPYRIGHT-Druse.txt') -Value 'editado' -Encoding UTF8
+    $viejo = @(Test-DruseRequiredNotices -Inventory @(Get-DrusePackageInventory -Path $paquete -Prefix 'api'))
+
+    if ($viejo.Count -ne 1 -or $viejo[0] -notmatch 'COPYRIGHT-Druse\.txt no coincide') {
+        throw "Un aviso con otro contenido debería detectarse como tal; resultado: $($viejo -join '; ')"
+    }
+
+    # Las reglas de exclusión no deben tocar los avisos en ninguna variante.
+    foreach ($variante in @('completo', 'sin-informix')) {
+        $alcanzados = @(Test-DrusePackageContent -Inventory $conAvisos -Rules (Get-DrusePackageRules -Variant $variante)).archivos
+
+        foreach ($aviso in $avisos) {
+            if ($alcanzados -contains $aviso.ruta) {
+                throw "Una regla de la variante $variante alcanza al aviso $($aviso.ruta)."
+            }
+        }
+    }
+
     # --- Manifiesto -----------------------------------------------------------
     $destino = Join-Path $raiz 'manifiesto.json'
 
@@ -113,7 +156,7 @@ try {
         throw 'El manifiesto no debe contener rutas absolutas de la máquina que empaqueta.'
     }
 
-    'OK: inventario con SHA-256, exclusiones de la variante ligera, pendientes contados y manifiesto sin rutas locales.'
+    'OK: inventario con SHA-256, exclusiones de la variante ligera, pendientes contados, avisos legales ausentes o viejos detectados y manifiesto sin rutas locales.'
 }
 finally {
     Remove-Item -LiteralPath $raiz -Recurse -Force -ErrorAction SilentlyContinue

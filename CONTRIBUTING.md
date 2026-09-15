@@ -2,17 +2,19 @@
 
 Gracias por el interés. Este archivo explica qué se puede aportar hoy, cómo se trabaja aquí y qué se espera de un cambio.
 
-## Lo primero: la licencia todavía no está elegida
+## Licencia de las contribuciones
 
-Druse **no tiene archivo `LICENSE`**. Mientras no lo tenga, no se fusionará código de terceros: sin licencia no hay términos bajo los que aceptarlo ni bajo los que tú lo cedes, y aceptar código en ese vacío le crearía un problema a quien contribuye y al proyecto. La decisión está registrada como **DEC-02** en el [plan de SignPath y donaciones](docs/planes/plan-signpath-donaciones.md).
+El código original de Druse usa **GPL-3.0-only**: GNU General Public License, exclusivamente versión 3, disponible en [LICENSE](LICENSE), con el permiso adicional de [COPYRIGHT](COPYRIGHT) para combinarlo con los controladores de Oracle, IBM y Microsoft que no son libres. Al proponer código original para incorporarlo a Druse, debes poder aportarlo bajo esos mismos términos, **permiso adicional incluido**, y conservar los avisos de autoría aplicables. Sin el permiso, tu parte no podría distribuirse junto a esos controladores. No se exige ceder la titularidad de tu contribución.
 
-Hasta entonces sí son útiles, y mucho:
+Cada contribución se revisa antes de fusionarse. Declara la procedencia y licencia de cualquier material ajeno, y no aportes código de tu empleador o de un cliente sin tener los derechos necesarios. Las dependencias nuevas requieren revisión de compatibilidad; consulta [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+
+También son útiles:
 
 - **Informes de fallo** con pasos para reproducirlos.
 - **Informes de compatibilidad** de un motor y versión concretos: qué funcionó y qué no.
 - Preguntas sobre documentación que no se entiende o que ya no describe lo que hace el programa.
 
-Cuando la licencia esté decidida, este archivo dirá cómo se aceptan los cambios de código y bajo qué términos.
+La apertura pública del repositorio sigue siendo una decisión separada, registrada en el [plan de SignPath y donaciones](docs/planes/plan-signpath-donaciones.md).
 
 ## Antes de abrir una incidencia
 

@@ -214,6 +214,86 @@ function Test-DrusePackageContent {
 
 <#
 .SYNOPSIS
+    Los avisos legales que tienen que viajar dentro de cada paquete.
+
+.DESCRIPTION
+    El reverso de las exclusiones: lo que no puede faltar. La GPL exige que el
+    texto de la licencia acompañe a cada copia que se reparte, y un instalador
+    sin él no se puede distribuir aunque todo lo demás esté bien.
+
+    Cada entrada dice de dónde sale el archivo en el repositorio y con qué ruta
+    queda en el paquete. `package.ps1` copia con esta lista y la comprobación
+    compara con esta misma lista: si cambia un nombre, cambia en los dos sitios.
+
+.PARAMETER RepoRoot
+    Raíz del repositorio. Por defecto, la que contiene a `build/`.
+#>
+function Get-DruseRequiredNotices {
+    [CmdletBinding()]
+    param(
+        [string]$RepoRoot
+    )
+
+    if (-not $RepoRoot) {
+        $RepoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
+    }
+
+    foreach ($notice in @(
+            @('LICENSE', 'api/LICENSE-Druse.txt'),
+            @('COPYRIGHT', 'api/COPYRIGHT-Druse.txt'),
+            @('THIRD_PARTY_NOTICES.md', 'api/THIRD_PARTY_NOTICES-Druse.md'))) {
+        [pscustomobject]@{
+            origen = Join-Path $RepoRoot $notice[0]
+            ruta   = $notice[1]
+        }
+    }
+}
+
+<#
+.SYNOPSIS
+    Comprueba que un inventario lleva los avisos legales, y que son los vigentes.
+
+.DESCRIPTION
+    Devuelve un texto por cada aviso ausente o distinto del que hay en el
+    repositorio; vacío si están todos. No basta con que exista el archivo: una
+    copia de otra construcción, o un `THIRD_PARTY_NOTICES` de antes de añadir
+    una dependencia, tiene el nombre correcto y dice otra cosa. Por eso se
+    compara el SHA-256 con el del origen.
+
+    Sirve igual para el inventario recién hecho en `package.ps1` que para el
+    `contenido` de un manifiesto ya escrito, que es lo que lee la verificación
+    de la release: los dos tienen `ruta` y `sha256`.
+#>
+function Test-DruseRequiredNotices {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)][AllowEmptyCollection()][object[]]$Inventory,
+        [object[]]$Notices = @(Get-DruseRequiredNotices)
+    )
+
+    foreach ($notice in $Notices) {
+        if (-not (Test-Path -LiteralPath $notice.origen -PathType Leaf)) {
+            "falta en el repositorio el origen de $($notice.ruta)"
+            continue
+        }
+
+        $entry = $Inventory | Where-Object { $_.ruta -eq $notice.ruta } | Select-Object -First 1
+
+        if (-not $entry) {
+            "falta $($notice.ruta)"
+            continue
+        }
+
+        $expected = (Get-FileHash -LiteralPath $notice.origen -Algorithm SHA256).Hash.ToLowerInvariant()
+
+        if ($entry.sha256 -ne $expected) {
+            "$($notice.ruta) no coincide con $([IO.Path]::GetFileName($notice.origen)) del repositorio"
+        }
+    }
+}
+
+<#
+.SYNOPSIS
     Escribe el manifiesto de una construcción.
 
 .DESCRIPTION

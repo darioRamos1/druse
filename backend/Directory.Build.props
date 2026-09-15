@@ -38,6 +38,7 @@
     <Product>Druse</Product>
     <Company>Darío Ramos</Company>
     <Authors>Darío Ramos</Authors>
+    <PackageLicenseExpression>GPL-3.0-only</PackageLicenseExpression>
     <Copyright>© 2026 Darío Ramos</Copyright>
     <Version>1.1.0</Version>
     <NeutralLanguage>es</NeutralLanguage>

@@ -205,6 +205,27 @@
   }
 }
 
+.license {
+  &__text {
+    margin: 0;
+    color: var(--dr-text-secondary);
+    line-height: 1.5;
+  }
+
+  // Se puede seleccionar para copiarla: es la única forma de llegar a ella
+  // desde aquí, porque el diálogo no abre enlaces.
+  &__url,
+  code {
+    user-select: text;
+    overflow-wrap: anywhere;
+  }
+
+  code {
+    font-family: var(--dr-font-mono);
+    font-size: 11.5px;
+  }
+}
+
 .choice {
   display: flex;
   gap: 6px;

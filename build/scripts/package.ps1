@@ -173,11 +173,26 @@ if (-not (Test-Path $gitkeep)) {
     New-Item -ItemType File $gitkeep | Out-Null
 }
 
+# --- Avisos legales ----------------------------------------------------------
+# Van dentro de `api/` porque es lo único que comparten el instalador (por el
+# `resources` de Tauri) y el ZIP portable. La lista sale de `manifiesto.ps1`,
+# que es también la que comprueba que llegaron.
+foreach ($notice in Get-DruseRequiredNotices -RepoRoot $repoRoot) {
+    Copy-Item -LiteralPath $notice.origen -Destination (Join-Path $tauriDir $notice.ruta) -Force
+}
+
 # --- Contenido del paquete ---------------------------------------------------
 # Se comprueba aquí y no al final por tiempo: el frontend y el instalador son
 # cinco minutos, y lo que decide si este paquete puede repartirse ya está en el
 # disco. Si la variante ligera trae el controlador de IBM, mejor saberlo ahora.
 $inventory = @(Get-DrusePackageInventory -Path $apiOutput -Prefix 'api')
+
+$missingNotices = @(Test-DruseRequiredNotices -Inventory $inventory -Notices @(Get-DruseRequiredNotices -RepoRoot $repoRoot))
+
+if ($missingNotices.Count -gt 0) {
+    throw "El paquete no lleva los avisos legales que exige la licencia: $($missingNotices -join '; ')."
+}
+
 $findings = @(Test-DrusePackageContent `
         -Inventory $inventory `
         -Rules (Get-DrusePackageRules -Variant $Variant))
@@ -446,6 +461,15 @@ Contraseñas
 Se guardan en el almacén de credenciales del sistema, igual que en la versión
 instalada. Si el equipo no ofrece uno, Druse pedirá la contraseña en cada
 conexión y te lo indicará en la interfaz.
+
+Licencia
+--------
+El código original de Druse se distribuye bajo la GNU GPL, exclusivamente
+versión 3 (GPL-3.0-only), sin ninguna garantía. El texto completo está en
+api\LICENSE-Druse.txt. El aviso de autoría, api\COPYRIGHT-Druse.txt, incluye
+un permiso adicional para combinar Druse con los controladores de Oracle, IBM
+y Microsoft que no son libres. Los componentes de terceros conservan sus
+propias licencias: consulta api\THIRD_PARTY_NOTICES-Druse.md.
 '@ | Set-Content (Join-Path $staging 'LEEME.txt') -Encoding UTF8
 
     $zip = Join-Path $tauriDir "target/portable/Druse-$appVersion-$Runtime-portable$VariantSuffix.zip"

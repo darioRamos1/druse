@@ -44,8 +44,8 @@ empieza por el [README principal](../README.md).
 - [Contrato de la API](api/).
 - [Mockups](mockups/).
 - [Inventario de licencias de dependencias](licencias-dependencias.csv).
-- [Contribuciones](../CONTRIBUTING.md), [seguridad](../SECURITY.md) y
-  [firma de código](../CODE_SIGNING_POLICY.md).
+- [Contribuciones](../CONTRIBUTING.md), [seguridad](../SECURITY.md),
+  [firma de código](../CODE_SIGNING_POLICY.md) y [avisos de terceros](../THIRD_PARTY_NOTICES.md).
 
 ## Dónde guardar nuevos documentos
 

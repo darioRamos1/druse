@@ -77,13 +77,22 @@ function Nueva-Release {
             producto  = 'Druse'
             version   = $version
             variante  = $variante
+            # El instalador va primero: el caso de bytes no revisados altera la
+            # primera entrada. Detrás, los avisos legales tal como están en el
+            # repositorio, que es lo que anotaría un empaquetado correcto.
             contenido = @(
                 [ordered]@{
                     ruta   = "bundle/$([IO.Path]::GetFileName($artefacto))"
                     bytes  = (Get-Item -LiteralPath $artefacto).Length
                     sha256 = (Get-FileHash -LiteralPath $artefacto -Algorithm SHA256).Hash.ToLowerInvariant()
                 }
-            )
+            ) + @(foreach ($aviso in Get-DruseRequiredNotices) {
+                    [ordered]@{
+                        ruta   = $aviso.ruta
+                        bytes  = (Get-Item -LiteralPath $aviso.origen).Length
+                        sha256 = (Get-FileHash -LiteralPath $aviso.origen -Algorithm SHA256).Hash.ToLowerInvariant()
+                    }
+                })
         }
 
         $contenido | ConvertTo-Json -Depth 6 |
@@ -220,12 +229,31 @@ try {
     $contenido | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $manifiestoPaquete -Encoding UTF8
     Debe-Rechazar $clave 'no figura en su manifiesto de contenido' 'un instalador que no es el revisado'
 
+    # --- Sin los avisos que exige la licencia ------------------------------------
+    # Un paquete sin el texto de la GPL no se puede repartir, aunque los bytes y
+    # las firmas estén bien. Y uno con un aviso viejo dice algo que ya no es.
+    foreach ($variante in @('completo', 'sin-informix')) {
+        $clave = Nueva-Release
+        $manifiestoPaquete = Join-Path $manifestDir "manifiesto-$variante-$version-win-x64.json"
+        $contenido = Get-Content -LiteralPath $manifiestoPaquete -Raw | ConvertFrom-Json
+        $contenido.contenido = @($contenido.contenido | Where-Object { $_.ruta -ne 'api/LICENSE-Druse.txt' })
+        $contenido | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $manifiestoPaquete -Encoding UTF8
+        Debe-Rechazar $clave 'avisos legales vigentes: falta api/LICENSE-Druse.txt' "una variante $variante sin LICENSE"
+    }
+
+    $clave = Nueva-Release
+    $manifiestoPaquete = Join-Path $manifestDir "manifiesto-completo-$version-win-x64.json"
+    $contenido = Get-Content -LiteralPath $manifiestoPaquete -Raw | ConvertFrom-Json
+    ($contenido.contenido | Where-Object { $_.ruta -eq 'api/THIRD_PARTY_NOTICES-Druse.md' }).sha256 = 'f' * 64
+    $contenido | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $manifiestoPaquete -Encoding UTF8
+    Debe-Rechazar $clave 'no coincide con THIRD_PARTY_NOTICES.md' 'un aviso de terceros desactualizado'
+
     # --- Falta un artefacto -----------------------------------------------------
     $clave = Nueva-Release
     Remove-Item -LiteralPath "$ligero.sig" -Force
     Debe-Rechazar $clave 'Faltan artefactos' 'una release incompleta'
 
-    'OK: release correcta aceptada; ausencia de manifiestos, producto/versión incorrectos, artefacto tocado, firma ajena, latest.json desincronizado, ediciones cruzadas y release incompleta, rechazados.'
+    'OK: release correcta aceptada; ausencia de manifiestos, producto/versión incorrectos, artefacto tocado, firma ajena, latest.json desincronizado, ediciones cruzadas, avisos legales ausentes o viejos y release incompleta, rechazados.'
 }
 finally {
     Remove-TestDirectory $raiz

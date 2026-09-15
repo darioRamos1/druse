@@ -18,6 +18,8 @@
     Este archivo solo aporta funciones. Quien las llama es `release.ps1`.
 #>
 
+. (Join-Path $PSScriptRoot 'manifiesto.ps1')
+
 # Consulta el workflow del proyecto, nunca checks ajenos como Dependabot.
 # No filtrar por completed: una ejecución nueva pendiente invalida el verde anterior.
 function Get-DruseEstadoCI {
@@ -266,6 +268,15 @@ function Invoke-DruseReleaseVerificacion {
 
         if (-not ($contenido.contenido | Where-Object { $_.sha256 -eq $hash })) {
             throw "El instalador $variante no figura en su manifiesto de contenido: sus bytes no son los que se revisaron."
+        }
+
+        # La licencia obliga a repartir su texto con cada copia. `package.ps1` ya
+        # se detiene sin él, pero un manifiesto de otra construcción, o de antes
+        # de esa guarda, llegaría hasta aquí igual.
+        $avisos = @(Test-DruseRequiredNotices -Inventory @($contenido.contenido))
+
+        if ($avisos.Count -gt 0) {
+            throw "La variante $variante no lleva los avisos legales vigentes: $($avisos -join '; '). No se publicará."
         }
 
         $revisados += $variante

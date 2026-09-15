@@ -1,0 +1,60 @@
+Druse — cliente de bases de datos de escritorio
+Copyright (C) 2026 Darío Ramos
+
+SPDX-License-Identifier: GPL-3.0-only
+
+Druse is free software: you can redistribute it and/or modify it under
+the terms of the GNU General Public License version 3 as published by
+the Free Software Foundation.
+
+Druse is distributed in the hope that it will be useful, but WITHOUT ANY
+WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License along
+with Druse. If not, see <https://www.gnu.org/licenses/>.
+
+This notice applies to Druse's original code. Third-party components retain
+their own copyright notices and licenses; see THIRD_PARTY_NOTICES.md.
+
+
+Additional permission under GNU GPL version 3 section 7
+-------------------------------------------------------
+
+If you modify this Program, or any covered work, by linking or combining it
+with one or more of the Database Driver Libraries listed below (or a
+modified version of those libraries, including a form of them translated
+into .NET assemblies by IKVM), containing parts covered by the terms of
+their respective licenses, the licensors of this Program grant you
+additional permission to convey the resulting work.
+
+Corresponding Source for a non-source form of such a combination shall
+include the source code for the parts of the covered work, but need not
+include the source code of the Database Driver Libraries.
+
+The "Database Driver Libraries" are the following, in any version released
+by their respective licensors:
+
+  1. Oracle Data Provider for .NET, Managed Driver
+     (NuGet package Oracle.ManagedDataAccess.Core), by Oracle.
+
+  2. IBM Data Server Provider for .NET, including the IBM Data Server Driver
+     (clidriver) distributed with it
+     (NuGet packages Net.IBM.Data.Db2, Net.IBM.Data.Db2-lnx and
+     Net.IBM.Data.Db2-osx), by IBM.
+
+  3. IBM Informix JDBC Driver
+     (Maven artifact com.ibm.informix:jdbc), by IBM.
+
+  4. Microsoft SqlClient SNI native library
+     (NuGet package Microsoft.Data.SqlClient.SNI.runtime), by Microsoft.
+
+This permission covers only the Database Driver Libraries. It does not
+extend to any other library or work that is not licensed under terms
+compatible with the GNU General Public License, and it grants no rights in
+the Database Driver Libraries themselves, whose use and redistribution
+remain subject to their own license terms.
+
+As section 7 allows, when you convey a copy of a covered work you may
+remove this additional permission from that copy. A copy without it can no
+longer be conveyed in combination with the Database Driver Libraries.

@@ -166,4 +166,17 @@ describe('SettingsDialog', () => {
       'Guardado en prueba.zip',
     );
   });
+
+  it('Acerca de enseña autoría, licencia, ausencia de garantía y dónde leer el texto', () => {
+    tab('Acerca de').click();
+    fixture.detectChanges();
+    const texto = element.querySelector('#settings-panel-about .license')?.textContent ?? '';
+    expect(texto).toContain('© 2026 Darío Ramos');
+    expect(texto).toContain('GPL-3.0-only');
+    expect(texto).toContain('permiso adicional');
+    expect(texto).toContain('api/COPYRIGHT-Druse.txt');
+    expect(texto).toContain('sin ninguna garantía');
+    expect(texto).toContain('api/LICENSE-Druse.txt');
+    expect(texto).toContain('api/THIRD_PARTY_NOTICES-Druse.md');
+  });
 });
