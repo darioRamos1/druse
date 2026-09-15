@@ -65,6 +65,8 @@ El botón de diagnóstico empaqueta esos registros ya saneados más un resumen d
 
 ## 7. Dónde se comprobó cada cosa
 
+El [protocolo de pruebas del instalador](../distribucion/pruebas-instalador-signpath.md) define los casos y evidencias para cerrar P-02 y P-03. Está preparado, todavía sin resultados en Windows limpio.
+
 | Afirmación | Evidencia |
 | --- | --- |
 | Sin telemetría | Búsqueda de integraciones de analítica en `backend/src`, `frontend/src`, `shells/desktop-tauri/src` |

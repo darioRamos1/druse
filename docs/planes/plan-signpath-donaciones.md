@@ -1,6 +1,12 @@
 # Plan de preparación para SignPath Foundation y donaciones
 
-Creación: 12 de septiembre de 2026. Actualización: 13 de septiembre de 2026. Estado: fase A abierta; preparación de fases B, C y E adelantada en lo que no depende de decisiones del titular.
+Avance del 15 de septiembre: [revisión de controladores](../revisiones/controladores-signpath-2026-09-15.md), ocho documentos de evidencia local con hashes y consulta de elegibilidad actualizada a GPL v3 con el permiso adicional existente. OSS-03/04 siguen abiertos: faltan términos completos del JDBC, reconciliación de redistribuibles IBM y aclaración de elegibilidad. No se retiraron motores ni se envió la consulta.
+
+Creación: 12 de septiembre de 2026. Actualización: 14 de septiembre de 2026. Estado: fase A abierta; preparación de fases B, C y E adelantada en lo que no depende de decisiones del titular.
+
+Última comprobación: [revisión del 14 de septiembre](../revisiones/revision-signpath-2026-09-14.md), con inventario actualizado, guardas de CI y manifiestos verificadas, y pendientes de candidatura. SIG-01 sigue abierto: preparar el expediente no equivale a presentarlo.
+
+Continuación del 14 de septiembre: aviso de privacidad incorporado a Preferencias y enlazado desde la landing con contenido compartido (P-04 implementado, pendiente de distribución). Preparado el [protocolo del instalador](../distribucion/pruebas-instalador-signpath.md); PKG-04, P-02 y P-03 siguen abiertos hasta ejecutarlo en Windows limpio.
 
 Primer bloque ejecutado: [auditoría de apertura](../revisiones/auditoria-apertura-2026-09-13.md), inventario de dependencias y corrección de puertos de pruebas. OSS-01 continúa abierto por las comprobaciones de procedencia y alcance pendientes; no hay aprobación de publicación.
 
@@ -14,7 +20,7 @@ Complementa la [guía de sostenibilidad](../guias/guia-estrategia-open-source.md
 
 | Evidencia local | Consecuencia para el plan |
 | --- | --- |
-| Repositorio `darioRamos1/druse` privado; sin `LICENSE` del proyecto | La apertura y la licencia siguen siendo decisiones pendientes del titular. |
+| Repositorio `darioRamos1/druse` privado; `LICENSE` GPL-3.0-only incorporado el 14 de septiembre | Licencia elegida; apertura y revisión de procedencia pendientes. |
 | Instalador completo 1.1.0 generado, con firma Tauri verificada y sin Authenticode | Hay una base de empaquetado; todavía no una release firmada por SignPath. |
 | `Druse.Provider.Oracle` usa `Oracle.ManagedDataAccess.Core` | Auditar los términos incluidos en ese paquete. |
 | `Druse.Provider.Informix` usa `Net.IBM.Data.Db2`; `Druse.Jdbc` incorpora JDBC de IBM | Auditar los tres componentes y sus archivos redistribuidos. |
@@ -32,7 +38,8 @@ SignPath pide licencia OSI sin doble licencia comercial, mantenimiento, publicac
 Decisiones a registrar por Darío antes de ejecutar las acciones correspondientes:
 
 - [ ] **DEC-01:** autorizar la publicación del código auditado y definir si se abre el repositorio actual o se prepara una publicación separada que conserve autoría.
-- [ ] **DEC-02:** elegir la licencia después del inventario de dependencias y confirmar los derechos sobre el código y los recursos aportados por colaboradores.
+- [x] **DEC-02-L:** Darío eligió GPL v3 el 14 de septiembre de 2026; aplicada como `GPL-3.0-only`, exclusivamente versión 3, al código original de Druse. Texto oficial en `LICENSE` y metadatos actualizados.
+- [ ] **DEC-02-R:** confirmar derechos sobre código y recursos, incluidos aportes de colaboradores y trabajo realizado en contexto laboral. La elección de licencia no cierra esta revisión ni cambia términos de terceros.
 - [ ] **DEC-03:** decidir qué compatibilidad de motores debe conservar la edición candidata. No retirar Informix u Oracle del producto principal por defecto.
 - [ ] **DEC-04:** confirmar titular, residencia, cuenta receptora y niveles de aportes. Colombia es la hipótesis de trabajo, no una verificación de residencia.
 
@@ -43,9 +50,9 @@ Responsables propuestos: Darío decide publicación, licencia, identidad y solic
 Dependencias: ninguna para iniciar la revisión. Estimación propia: 2–4 jornadas, ampliables si aparecen incidencias.
 
 - [ ] **OSS-01:** revisar archivos versionados, ramas, etiquetas e historial para detectar credenciales, claves de firma, bases de datos, dumps, capturas y datos de empresas. Guardar hallazgos con valores ocultos; rotar cualquier secreto expuesto antes de publicar. Un `.gitignore` no limpia el historial.
-- [x] **OSS-02:** producir el inventario inicial `docs/licencias-dependencias.csv`: componente, versión, procedencia, licencia, fuente de sus términos, inclusión en cada edición y decisión pendiente/aprobada. Generadas 1.164 entradas y un inventario local de 612 archivos de API. La cobertura y las limitaciones están en la auditoría; falta reconciliar cada archivo distribuido y resolver las decisiones de licencia antes de cerrar H1.
+- [x] **OSS-02:** producir el inventario inicial `docs/licencias-dependencias.csv`: componente, versión, procedencia, licencia, fuente de sus términos, inclusión en cada edición y decisión pendiente/aprobada. Actualizado a 1.144 entradas y un inventario local de 612 archivos de API. Incluye dependencias de desarrollo y otras plataformas. La cobertura y las limitaciones están en la revisión del 14 de septiembre; falta reconciliar cada archivo distribuido y resolver las decisiones de licencia antes de cerrar H1.
 - [ ] **OSS-03:** resolver específicamente Oracle, Db2 y JDBC de Informix. Si su compatibilidad con la candidatura sigue dudosa, preparar una consulta concreta para SignPath; enviarla solo cuando Darío autorice el contacto. No asumir que descargar el controlador aparte resuelve la elegibilidad del proyecto.
-- [ ] **OSS-04:** preparar `LICENSE`, avisos de terceros y registro de procedencia únicamente después de DEC-02. Revisar también los derechos de código creado en un contexto laboral.
+- [ ] **OSS-04:** `LICENSE` y `COPYRIGHT` incorporados; `THIRD_PARTY_NOTICES.md` identifica el inventario y las revisiones pendientes. Los tres viajan en `api/` de cada paquete: `package.ps1` se detiene si faltan o no coinciden con el repositorio, y la verificación de la release rechaza un manifiesto sin ellos. "Acerca de" muestra autoría, licencia y ausencia de garantía. `COPYRIGHT` concede un permiso adicional (GPL v3, sección 7) para combinar Druse con cuatro controladores no libres: Oracle.ManagedDataAccess.Core, Net.IBM.Data.Db2 con su clidriver, el JDBC de Informix y Microsoft.Data.SqlClient.SNI. Falta completar los avisos originales por archivo distribuido, revisar los términos de redistribución de esos controladores y finalizar procedencia.
 
 **Salida:** alcance de publicación definido, hallazgos sensibles resueltos e inventario sin componentes de estado desconocido en la edición candidata. Esta fase permite decidir si conviene continuar con SignPath antes de invertir en integración.
 
@@ -64,8 +71,8 @@ Dependencias: OSS-02/03 y DEC-03. Estimación propia: 3–6 jornadas.
 
 Dependencias: fases A/B y DEC-01/02. Estimación propia: 2–4 jornadas, sin contar captación de usuarios.
 
-- [x] **PUB-01:** preparar `SECURITY.md`, `CONTRIBUTING.md`, plantillas de incidencias y una matriz de motores realmente comprobados. Pedir reportes sin contraseñas ni datos de clientes. Escritos, con tres plantillas de incidencia y una de PR. `CONTRIBUTING.md` dice que no se fusiona código de terceros hasta DEC-02. La [matriz de motores](../motores/matriz-de-motores.md) separa el rango anunciado de la versión probada y deja a la vista que Oracle no se prueba en CI y que MariaDB no se prueba en ningún sitio.
-- [ ] **PUB-02:** completar privacidad de Druse: conexiones elegidas por el usuario, búsqueda automática de actualizaciones, proveedores de IA si existen, registros y credenciales. Comparar texto con tráfico real de la aplicación y comportamiento del instalador. Finalizar los datos del titular pendientes en la landing. Redactada la [privacidad de la aplicación](../privacidad/privacidad-aplicacion.md) contrastada con el código. **Sigue abierta** por tres motivos anotados allí: la búsqueda de actualizaciones no se puede desactivar y SignPath exige aviso y opción durante la instalación (P-01), no se ha comprobado qué deja atrás la desinstalación (P-02) y no se ha capturado tráfico real (P-03).
+- [x] **PUB-01:** preparar `SECURITY.md`, `CONTRIBUTING.md`, plantillas de incidencias y una matriz de motores realmente comprobados. Pedir reportes sin contraseñas ni datos de clientes. Escritos, con tres plantillas de incidencia y una de PR. `CONTRIBUTING.md` establece GPL-3.0-only para aportes y exige revisión de procedencia. La [matriz de motores](../motores/matriz-de-motores.md) separa el rango anunciado de la versión probada y deja a la vista que Oracle no se prueba en CI y que MariaDB no se prueba en ningún sitio.
+- [ ] **PUB-02:** completar privacidad de Druse: conexiones elegidas por el usuario, búsqueda automática de actualizaciones, proveedores de IA, registros y credenciales. Redactada la [privacidad de la aplicación](../privacidad/privacidad-aplicacion.md) contrastada con el código. La consulta automática ya está desactivada hasta recibir autorización y puede desactivarse en Preferencias. **Sigue abierta** por aclarar el aviso durante la instalación (P-01), comprobar qué deja la desinstalación (P-02), observar tráfico real (P-03), mostrar o enlazar la política (P-04) y completar los datos del responsable (P-05).
 - [x] **PUB-03:** preparar `CODE_SIGNING_POLICY.md` en borrador y enlazarlo desde README y descargas. Añadir la atribución requerida por SignPath solo cuando corresponda a un servicio concedido; antes indicar «solicitud pendiente». Incluir procedimiento de incidente y contacto.
 - [ ] **PUB-04:** publicar el código aprobado y una beta con notas, hashes y estado real de firma. Comprobar desde una sesión sin autenticar el README, los archivos de release, la landing y las URLs del actualizador.
 - [ ] **PUB-05:** recoger pruebas voluntarias, incidencias y correcciones públicas. Preparar enlaces a esta evidencia para la candidatura; las estrellas compradas o los testimonios inventados no son evidencia.
@@ -76,7 +83,7 @@ Dependencias: fases A/B y DEC-01/02. Estimación propia: 2–4 jornadas, sin con
 
 Dependencias: beta pública y alcance resuelto. Estimación propia de ingeniería: 2–5 jornadas; revisión externa sin plazo comprometido.
 
-- [x] **SIG-01:** preparar un expediente con repositorio, licencia, release candidata, matriz de dependencias, política, equipo y evidencia de uso. Darío revisa y presenta la [solicitud](https://signpath.org/apply.html). Registrar respuesta y condiciones particulares. Reunido en [expediente-signpath.md](../distribucion/expediente-signpath.md), con el texto en inglés para el formulario y una lista de lo que hoy **no** se cumple: repositorio privado, sin licencia, sin release pública y sin evidencia de uso. Presentarlo sigue siendo decisión de Darío, y hacerlo antes de resolver esos cuatro puntos es pedir un rechazo.
+- [ ] **SIG-01:** completar, revisar y presentar la [solicitud](https://signpath.org/apply.html); registrar respuesta y condiciones particulares. El borrador está reunido en [expediente-signpath.md](../distribucion/expediente-signpath.md), con texto en inglés y pendientes explícitos. Faltan derechos y compatibilidad de licencias revisados, enlaces públicos, alcance de dependencias resuelto y evidencia de uso. **Preparación adelantada; presentación y respuesta pendientes.**
 - [ ] **SIG-02:** una vez habilitado el servicio, configurar el proyecto con los identificadores reales de SignPath. Usar runners alojados por GitHub para los jobs previos a la solicitud, subir el artefacto a Actions y enviarlo por su ID al conector. Guardar el token como secreto limitado, fijar acciones por SHA y descargar el resultado firmado. [Integración oficial](https://docs.signpath.io/trusted-build-systems/github).
 - [ ] **SIG-03:** acordar el alcance de firma del EXE NSIS y los PE propios internos, con metadatos de producto/versión restringidos. No aplicar una regla global que firme DLL de terceros. Comprobar qué formatos y anidamientos admite la configuración antes de diseñar el flujo; no asumir que NSIS permite el mismo proceso que MSI. [Referencia de artefactos](https://docs.signpath.io/artifact-configuration/reference).
 - [x] **SIG-04:** dividir `release.ps1` en construcción, firma/verificación y publicación. Mantener el requisito de CI verde para el commit exacto y detener la publicación ante firma rechazada, caducidad de la solicitud o fallo de verificación. Tres etapas ejecutables por separado —`-Etapa construir|verificar|publicar`—, porque cuando firme un servicio externo habrá que verificar y publicar los bytes que vuelven, no reconstruirlos. La verificación comprueba que cada `.sig` corresponde a los bytes, que `latest.json` dice lo mismo que los archivos, que Authenticode no es inválido y que los instaladores son los que revisó el empaquetado. Publicar exige integración continua verde para el commit exacto; `-SinComprobarCI` la salta y queda anotado en `evidencia.json` junto al commit, los hashes y cada comprobación.
@@ -133,14 +140,14 @@ Revisar mensualmente descargas agregadas, reportes voluntarios, usuarios que reg
 
 ## 9. Qué toca ahora
 
-Lo ejecutable sin decisiones del titular está hecho. Lo que sigue depende de **DEC-01 a DEC-04** o de trabajo que sí requiere una elección previa:
+La documentación y las guardas de publicación han avanzado. Siguen pendientes decisiones **DEC-01 a DEC-04**, revisión de procedencia/licencias y verificaciones técnicas de Windows y privacidad:
 
-1. **DEC-02 y OSS-04:** elegir licencia para poder preparar `LICENSE`, avisos de terceros y aceptar contribuciones. Hoy `CONTRIBUTING.md` tiene que decir que no se fusiona código ajeno.
+1. **DEC-02-R y OSS-04:** GPL-3.0-only ya está elegida y aplicada al código original. Completar derechos, avisos de terceros y compatibilidad de distribución. `CONTRIBUTING.md` ya establece términos GPL para aportes y revisión de procedencia.
 2. **OSS-03:** autorizar —o no— el envío del [borrador de consulta](../distribucion/consulta-signpath-borrador.md) sobre Oracle, IBM y SNI. Mientras tanto, el empaquetado los cuenta y no los bloquea.
 3. **P-01 de privacidad:** hecho dentro de la aplicación —la consulta automática queda desactivada mientras nadie la autorice, con aviso en el primer arranque y ajuste en Preferencias—, pero las condiciones de SignPath la piden **durante la instalación**. La pregunta está añadida al borrador de consulta; si su respuesta exige el instalador, hará falta una página propia en el NSIS de Tauri.
 4. **PKG-04:** probar instalación, actualización y desinstalación en un Windows limpio; de ahí sale la respuesta a P-02.
 5. **DON-01:** alta en Sponsors con los datos del titular. Solo después se crea `.github/FUNDING.yml`.
 
-De la fase D queda hecho lo que no depende de SignPath: **SIG-04**, con las etapas de release, sus guardas y la prueba negativa, y **SIG-01**, el expediente reunido y sin presentar. SIG-02 y SIG-03 necesitan los identificadores del servicio, que solo existen si lo conceden.
+En la fase D, **SIG-04** tiene etapas de release y guardas comprobadas: requiere el workflow `ci.yml` del commit exacto y ambos manifiestos con producto, versión, variante y hashes correctos. La excepción explícita `-SinComprobarCI` sigue registrada; no acredita una construcción verificada para SignPath. **SIG-01 permanece abierto**, con el expediente preparado pero sin presentar. SIG-02 y SIG-03 se completan con la configuración y el alcance que acuerde SignPath si concede el servicio.
 
 Las dos cosas que la matriz de motores dejó a la vista ya están corregidas: la exigencia de motores de la integración continua se acotó con `DRUSE_OPTIONAL_ENGINES=oracle` —la cobertura de Oracle sigue siendo local, pero ahora está declarada— y la imagen de Informix va por digest.

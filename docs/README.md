@@ -28,6 +28,7 @@ empieza por el [README principal](../README.md).
 - [Distribución en Windows y SmartScreen](distribucion/distribucion-windows-smartscreen.md).
 - [Expediente de SignPath](distribucion/expediente-signpath.md).
 - [Borrador de consulta a SignPath](distribucion/consulta-signpath-borrador.md).
+- [Pruebas del instalador](distribucion/pruebas-instalador-signpath.md).
 - [Financiación](distribucion/financiacion.md).
 - [Notas de versiones](release-notes/).
 
@@ -36,6 +37,8 @@ empieza por el [README principal](../README.md).
 - [Privacidad de la aplicación](privacidad/privacidad-aplicacion.md).
 - [Privacidad de la landing](privacidad/landing-privacidad.md).
 - [Auditoría de apertura — 13 de septiembre de 2026](revisiones/auditoria-apertura-2026-09-13.md).
+- [Revisión de SignPath — 14 de septiembre de 2026](revisiones/revision-signpath-2026-09-14.md).
+- [Controladores y SignPath — 15 de septiembre de 2026](revisiones/controladores-signpath-2026-09-15.md).
 - [Revisión de interfaz y experiencia — 8 de septiembre de 2026](revisiones/revision-ui-ux-2026-09-08.md).
 
 ## Referencias técnicas y políticas

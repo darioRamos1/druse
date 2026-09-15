@@ -1,6 +1,12 @@
 # Expediente para SignPath Foundation — borrador sin presentar
 
+Actualización del 15 de septiembre: [revisión documental de los cuatro controladores](../revisiones/controladores-signpath-2026-09-15.md). La consulta declara ahora GPL-3.0-only y el permiso adicional presente en `COPYRIGHT`; todavía no hay respuesta de SignPath ni revisión de redistribución cerrada.
+
 Preparación: 13 de septiembre de 2026. Corresponde a **SIG-01** del [plan de SignPath y donaciones](../planes/plan-signpath-donaciones.md).
+
+Revisión técnica: [14 de septiembre de 2026](../revisiones/revision-signpath-2026-09-14.md). El inventario y las guardas de publicación están actualizados; la solicitud sigue pendiente de presentación. La excepción explícita `-SinComprobarCI` se registra y no puede describirse como CI verificada ante SignPath.
+
+Privacidad: el aviso provisional ya está incorporado al código de Preferencias y a la landing. Pendiente de distribuir, completar datos del responsable y ejecutar el [protocolo de Windows limpio](pruebas-instalador-signpath.md); todavía no es una política final validada por tráfico real.
 
 **Esto no es una solicitud presentada.** Es el material reunido para que Darío lo revise y decida si presenta la [solicitud](https://signpath.org/apply.html), y para ver de un vistazo qué falta. Hay requisitos que hoy no se cumplen y están marcados como tales: presentar un expediente que exagere el estado del proyecto es la forma más rápida de que lo rechacen.
 
@@ -9,7 +15,7 @@ Preparación: 13 de septiembre de 2026. Corresponde a **SIG-01** del [plan de Si
 | Qué falta | De quién depende |
 | --- | --- |
 | El repositorio es privado | **DEC-01** |
-| No hay licencia OSI elegida ni archivo `LICENSE` | **DEC-02** |
+| GPL-3.0-only elegida y `LICENSE` incorporado; faltan procedencia y compatibilidad de terceros | **DEC-02-R**, **OSS-03/04** |
 | No hay release pública ni evidencia de uso | **PUB-04**, y después **PUB-05** |
 | El alcance de Oracle, IBM y SNI sigue sin resolver | **OSS-03**, con la [consulta](consulta-signpath-borrador.md) todavía sin enviar |
 | La opción de desactivar la búsqueda de actualizaciones no se ofrece durante la instalación | Respuesta a esa misma consulta |
@@ -26,7 +32,7 @@ Los cuatro primeros son decisiones o trabajo; el quinto puede que no haga falta,
 | Versión actual | 1.1.0, sin publicar |
 | Repositorio | `github.com/darioRamos1/druse` (privado hoy) |
 | Contacto público | `druse.contacto@gmail.com` |
-| Licencia | Pendiente de **DEC-02** |
+| Licencia | GNU GPL v3 exclusivamente (`GPL-3.0-only`), elegida por Darío el 14 de septiembre de 2026; [LICENSE](../../LICENSE). Con un permiso adicional de la sección 7 en [COPYRIGHT](../../COPYRIGHT), limitado a cuatro controladores de bases de datos no libres |
 
 Druse no es una herramienta de seguridad ofensiva: no explota vulnerabilidades ni elude protecciones del sistema. Se conecta a las bases de datos que configura quien lo usa, con las credenciales que esa persona introduce.
 
@@ -36,7 +42,7 @@ Druse no es una herramienta de seguridad ofensiva: no explota vulnerabilidades n
 | --- | --- |
 | Responsable identificable del proyecto | Darío Ramos, mantenedor único |
 | Autenticación en dos pasos | Activa en la cuenta de GitHub del proyecto |
-| Quién revisa las contribuciones | Darío. Hoy no se aceptan contribuciones de código: sin licencia no hay términos bajo los que aceptarlas, y así lo dice [`CONTRIBUTING.md`](../../CONTRIBUTING.md) |
+| Quién revisa las contribuciones | Darío. [`CONTRIBUTING.md`](../../CONTRIBUTING.md) establece aportes bajo GPL-3.0-only, revisión y declaración de procedencia |
 | Quién aprueba cada firma | Darío, de forma manual. No hay publicación automática desencadenada por un commit |
 | Política de firma pública | [`CODE_SIGNING_POLICY.md`](../../CODE_SIGNING_POLICY.md), en borrador y sin atribución a SignPath porque no hay servicio concedido |
 
@@ -54,7 +60,7 @@ Un mantenedor único es lo que hay. No se inventan revisores ni un tamaño de eq
 
 ## 5. Dependencias que hay que resolver
 
-El inventario completo está en [`licencias-dependencias.csv`](../licencias-dependencias.csv): 1.164 registros de npm, Cargo, NuGet, Maven, fuentes y WebView2, con la licencia identificada y la decisión pendiente en todos. Lo que decide la elegibilidad es esta lista corta:
+El inventario completo está en [`licencias-dependencias.csv`](../licencias-dependencias.csv): 1.144 registros de npm, Cargo, NuGet, Maven, fuentes y WebView2, con la licencia identificada y la decisión pendiente en todos. Lo que decide la elegibilidad es esta lista corta:
 
 | Componente | Términos | Situación |
 | --- | --- | --- |
@@ -87,9 +93,11 @@ Lo que sí se puede enseñar hoy: historial de desarrollo sostenido, suite de pr
 
 > Druse is a Windows desktop database client (Tauri shell, self-contained .NET local API) for PostgreSQL, SQL Server, MySQL/MariaDB, Oracle, SQLite and Informix. It is maintained by a single developer.
 >
+> Druse's original code is licensed under GPL-3.0-only, with an additional permission under GPL v3 section 7 that allows combining it with four non-free database drivers (Oracle, IBM Db2/Informix and Microsoft SqlClient SNI) without extending to any other library. Third-party components retain their own licenses; dependency compatibility and distribution scope remain under review. The repository is still private and no public candidate release is claimed.
+>
 > Releases are produced from a clean Git tree by a staged script: the package contents are checked against an explicit exclusion list and the build is stopped if an excluded component appears; a SHA-256 manifest is produced for every build; before publishing, every updater signature is verified against the final bytes, the update manifest is checked against the artifacts on disk, and any invalid Authenticode signature stops the release. Publishing requires a green CI run for that exact commit and records commit, hashes and check results as release evidence. Only Druse's own installers and binaries would be submitted for signing; third-party components would not.
 >
-> The project's code signing policy is published in the repository. The maintainer approves every release manually and uses two-factor authentication. The application has no telemetry and no backend of its own: it connects only to the databases the user configures. Its one non-user-initiated connection is an update check, which stays disabled until the user explicitly enables it.
+> The project's draft code signing policy is available in the currently private repository. The maintainer approves every release manually and uses two-factor authentication. Code review found no telemetry integration; network behavior still needs runtime validation. Druse runs a local API and connects to user-configured databases, SSH servers and optional AI providers. Automatic update checks stay disabled until the user explicitly enables them. The application privacy draft describes these connections and the data involved.
 >
 > Open items we are aware of: the dependency scope of Oracle, IBM and Microsoft SNI components (subject of a separate eligibility question), and offering the update opt-out during installation rather than on first run.
 

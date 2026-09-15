@@ -1,10 +1,10 @@
 # Política de firma de código — borrador
 
-Revisión: 13 de septiembre de 2026. Corresponde a **PUB-03** del [plan de SignPath y donaciones](docs/planes/plan-signpath-donaciones.md).
+Revisión: 14 de septiembre de 2026. Corresponde a **PUB-03** del [plan de SignPath y donaciones](docs/planes/plan-signpath-donaciones.md).
 
 ## Estado actual: sin firma
 
-**Los instaladores de Druse no están firmados con Authenticode.** Windows muestra el aviso de SmartScreen al abrirlos, y es correcto que lo muestre: sin firma, el sistema no sabe quién hizo el archivo.
+**Los instaladores de Druse no están firmados con Authenticode.** Windows puede mostrar un aviso de SmartScreen; actualmente el instalador no acredita su editor mediante esa firma.
 
 No hay certificado propio ni servicio de firma concedido. **La solicitud a SignPath Foundation está pendiente de presentarse**, y hasta que exista una respuesta no se usa su nombre, su logotipo ni la atribución que su programa exige: hacerlo antes sería anunciar un patrocinio que no se ha concedido.
 
@@ -27,7 +27,7 @@ Cuando exista un servicio de firma:
 4. Tauri construye el instalador y, si hay clave del actualizador, su `.sig`.
 5. `release.ps1` calcula el SHA-256 de ambos instaladores, los incrusta en el instalador selector y publica la release con sus artefactos y `latest.json`.
 
-Antes de publicar, una etapa de verificación comprueba sobre los bytes finales que cada firma de actualización pertenece a la clave que lleva dentro la aplicación **y corresponde a ese archivo**, que `latest.json` dice lo mismo que los archivos, que ninguna firma Authenticode es inválida y que los instaladores son los que revisó el empaquetado. Publicar exige además integración continua verde para ese commit exacto, y cada release deja un `evidencia.json` con el commit, los hashes y el resultado de cada comprobación.
+Antes de publicar, una etapa de verificación comprueba sobre los bytes finales que cada firma de actualización pertenece a la clave que lleva dentro la aplicación **y corresponde a ese archivo**, que `latest.json` coincide con los archivos y que ninguna firma Authenticode es inválida. Los manifiestos de ambas variantes son obligatorios y deben coincidir en producto, versión, variante y hashes. Por defecto, publicar exige la ejecución más reciente de `ci.yml` satisfactoria para ese commit exacto. Existe una excepción explícita `-SinComprobarCI`, registrada en `evidencia.json` junto al commit, hashes y comprobaciones; usarla no acredita una construcción verificada por SignPath.
 
 El orden importa y está anotado: **la firma Authenticode modifica el archivo**, así que cualquier hash o `.sig` calculado antes de firmar deja de corresponder a los bytes que se reparten. Firmar va antes de calcular, siempre. Hay pruebas que alteran un artefacto firmado y exigen que se rechace, porque esa es la clase de error que no avisa hasta que la actualización falla en el equipo de otra persona.
 
@@ -56,3 +56,5 @@ Druse installers are **not yet signed with Authenticode**. The application updat
 An application to the SignPath Foundation is **prepared but not yet submitted**; no signing service has been granted, so no SignPath attribution appears here or in the product. Releases are built from a clean Git tree, their package contents are checked against an explicit exclusion list, and a SHA-256 manifest is produced for every build. Before publishing, every signature is verified against the final bytes and the release is refused if anything does not match; publishing also requires a green CI run for that exact commit, and each release records its commit, hashes and check results. Each release is approved manually by the maintainer, whose GitHub account uses two-factor authentication. Only Druse's own binaries and installers would be submitted for signing; third-party components would not.
 
 Report anything suspicious to `druse.contacto@gmail.com`.
+
+CI enforcement clarification: the required run is the latest execution of `ci.yml` for the exact commit. An explicit `-SinComprobarCI` exception still exists and is recorded in local release evidence; it must not be represented as verified CI or SignPath build provenance. Both package manifests are mandatory and checked against the expected product, version, variant and hashes.
