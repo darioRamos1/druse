@@ -7,7 +7,7 @@ $api = @{ response = '[]'; exitCode = 0; calls = 0 }
 $previousGh = Get-Item Function:gh -ErrorAction SilentlyContinue
 ${function:gh} = {
     if ($args[0] -ne 'api' -or $args[1] -ne "repos/$repository/actions/workflows/ci.yml/runs?head_sha=$commit&per_page=100" -or
-        $args -notcontains '--paginate' -or $args -notcontains '--slurp') {
+        $args -notcontains '--paginate' -or $args -notcontains '--slurp' -or $args -contains '--jq') {
         throw 'La consulta no identifica el workflow y commit exactos con todas sus ejecuciones.'
     }
     $api.calls++
@@ -25,7 +25,7 @@ function Run([int]$Id, [string]$Status = 'completed', [string]$Conclusion = 'suc
     }
 }
 function Check([string]$Case, [object[]]$Runs, [bool]$Expected) {
-    $api.response = ConvertTo-Json -InputObject @($Runs) -Depth 5 -Compress
+    $api.response = ConvertTo-Json -InputObject @(@{ workflow_runs = @($Runs) }) -Depth 5 -Compress
     $result = Get-DruseEstadoCI -Repository $repository -Commit $commit
     if ($result.verde -ne $Expected) { throw "Resultado incorrecto para ${Case}: $($result.detalle)" }
     return $result
@@ -52,6 +52,8 @@ try {
     Check 'pendiente sin fecha de inicio' @((Run 1), $queued) $false | Out-Null
     $invalidDate = Run 1; $invalidDate.run_started_at = 'invalid'
     Check 'fecha inválida' @($invalidDate) $false | Out-Null
+    $api.response = ConvertTo-Json -InputObject @(@{ workflow_runs = @((Run 2)) }, @{ workflow_runs = @($retry) }) -Depth 5 -Compress
+    if ((Get-DruseEstadoCI -Repository $repository -Commit $commit).verde) { throw 'Se ignoró la segunda página con un reintento más reciente fallido.' }
     foreach ($invalid in @('not-json', 'null', '{}', '')) {
         $api.response = $invalid
         if ((Get-DruseEstadoCI -Repository $repository -Commit $commit).verde) { throw 'Respuesta inválida aceptada.' }

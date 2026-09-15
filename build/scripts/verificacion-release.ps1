@@ -30,12 +30,13 @@ function Get-DruseEstadoCI {
         return @{ verde = $false; detalle = 'no se encontró gh para consultar CI' }
     }
     $endpoint = "repos/$Repository/actions/workflows/ci.yml/runs?head_sha=$Commit&per_page=100"
-    $respuesta = gh api $endpoint --paginate --slurp --jq '[.[].workflow_runs[] | {id, path, head_sha, status, conclusion, created_at, run_started_at, run_attempt, html_url}]' 2>&1
+    $respuesta = gh api $endpoint --paginate --slurp 2>&1
     if ($LASTEXITCODE -ne 0) {
         return @{ verde = $false; detalle = 'no se pudo consultar el workflow ci.yml' }
     }
     try {
-        $ejecuciones = @($respuesta | ConvertFrom-Json -ErrorAction Stop)
+        $paginas = $respuesta | ConvertFrom-Json -ErrorAction Stop
+        $ejecuciones = @($paginas | ForEach-Object { $_.workflow_runs } | Where-Object { $null -ne $_ })
         if ($ejecuciones.Count -eq 0) {
             return @{ verde = $false; detalle = 'el commit no tiene ninguna ejecución de ci.yml' }
         }
