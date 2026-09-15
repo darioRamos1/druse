@@ -179,4 +179,18 @@ describe('SettingsDialog', () => {
     expect(texto).toContain('api/LICENSE-Druse.txt');
     expect(texto).toContain('api/THIRD_PARTY_NOTICES-Druse.md');
   });
+
+  it('permite leer privacidad sin autorizar actualizaciones ni exportar diagnósticos', () => {
+    const changed = vi.fn();
+    fixture.componentInstance.autoUpdateCheckChange.subscribe(changed);
+    tab('Privacidad').click();
+    fixture.detectChanges();
+    const panel = element.querySelector<HTMLElement>('#settings-panel-privacy')!;
+    expect(panel.hidden).toBe(false);
+    expect(element.querySelectorAll('[role="tabpanel"]:not([hidden])')).toHaveLength(1);
+    expect(panel.textContent).toContain('druse.contacto@gmail.com');
+    expect(panel.textContent).toContain('Aviso provisional');
+    expect(changed).not.toHaveBeenCalled();
+    expect(save).not.toHaveBeenCalled();
+  });
 });

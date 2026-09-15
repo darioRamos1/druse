@@ -5,6 +5,8 @@ on:
     branches: [main]
     paths:
       - "landing/**"
+      - "frontend/src/app/shared/privacy/privacy-notice.html"
+      - "build/scripts/generar-privacidad-web.cjs"
       - ".github/workflows/pages.yml"
   workflow_dispatch:
 
@@ -29,6 +31,8 @@ jobs:
     steps:
       - name: Obtener el repositorio
         uses: actions/checkout@v6
+      - name: Comprobar el aviso compartido de privacidad
+        run: node build/scripts/generar-privacidad-web.cjs --check
       - name: Configurar Pages
         uses: actions/configure-pages@v5
       - name: Subir únicamente la landing

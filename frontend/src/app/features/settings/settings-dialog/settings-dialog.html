@@ -317,6 +317,15 @@
     <div
       class="settings-panel"
       role="tabpanel"
+      id="settings-panel-privacy"
+      aria-labelledby="settings-tab-privacy"
+      [hidden]="section() !== 'privacy'"
+    >
+      <app-privacy-notice />
+    </div>
+    <div
+      class="settings-panel"
+      role="tabpanel"
       id="settings-panel-about"
       aria-labelledby="settings-tab-about"
       [hidden]="section() !== 'about'"
@@ -341,8 +350,9 @@
                 Buscar actualizaciones al abrir Druse
                 <span class="checkbox__hint">
                   Consulta en GitHub cuál es la última versión publicada. Es una petición HTTPS y no
-                  lleva datos tuyos; GitHub registra la dirección IP, como en cualquier descarga.
-                  Sin esto, Druse no se conecta solo y puedes buscarlas a mano cuando quieras.
+                  lleva SQL ni credenciales; GitHub recibe la dirección IP y las cabeceras de la
+                  petición. Sin esto, Druse no se conecta solo y puedes buscarlas a mano cuando
+                  quieras.
                 </span>
               </span>
             </label>
@@ -436,8 +446,9 @@
           </button>
 
           <p class="section__hint">
-            Los registros de Druse y la versión, en un zip. No lleva contraseñas, ni las consultas
-            que ejecutas, ni los datos de tus tablas.
+            Los registros de Druse y la versión, en un zip. Se filtran credenciales, pero los
+            errores pueden incluir nombres de servidores, bases o tablas. Revisa el archivo antes de
+            compartirlo.
           </p>
 
           @if (diagnosticsMessage(); as mensaje) {

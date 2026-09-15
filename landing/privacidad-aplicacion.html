@@ -1,0 +1,120 @@
+<!doctype html>
+<!-- Generado por build/scripts/generar-privacidad-web.cjs. Editar privacy-notice.html. -->
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex" />
+    <meta name="referrer" content="no-referrer" />
+    <title>Privacidad de la aplicación — Druse</title>
+    <link rel="icon" href="./assets/druse.png" />
+    <link rel="stylesheet" href="./styles.css" />
+    <link rel="stylesheet" href="./privacy.css" />
+    <link rel="stylesheet" href="./application-privacy.css" />
+  </head>
+  <body class="legal-page">
+    <a class="skip-link" href="#contenido">Saltar al contenido</a>
+    <header class="container legal-footer"><a href="./">← Volver a Druse</a></header>
+    <main class="container legal-layout" id="contenido">
+      <nav class="legal-sidebar" aria-label="Información legal">
+        <a href="./legal.html#privacidad">Privacidad de la web</a>
+        <a href="./legal.html#cookies">Cookies de la web</a>
+        <a href="./legal.html#contacto">Contacto</a>
+      </nav>
+      <div class="legal-content">
+        <h1>Privacidad de la aplicación</h1>
+        <article class="privacy-notice" aria-label="Privacidad de la aplicación Druse">
+  <h2>Tus datos en Druse</h2>
+  <p class="privacy-notice__date">Aplicación de escritorio · Revisión: 14 de septiembre de 2026</p>
+  <aside class="privacy-notice__draft">
+    <strong>Aviso provisional</strong>
+    <p>
+      Describe el funcionamiento revisado en el código. Falta confirmar los datos legales del
+      responsable y completar las pruebas de tráfico y desinstalación antes de finalizar esta
+      política.
+    </p>
+  </aside>
+
+  <h3>Qué se guarda en tu equipo</h3>
+  <p>
+    Druse guarda conexiones, historial SQL, fragmentos, diagramas y perfiles en una base local. En
+    Windows se encuentra en <code>%APPDATA%\Druse\druse.db</code>. Las contraseñas de conexión y
+    claves de proveedores de IA se guardan en el Administrador de credenciales de Windows.
+  </p>
+  <p>
+    Los registros y la caché se guardan en <code>%LOCALAPPDATA%\Druse</code>. Las exportaciones y
+    respaldos quedan donde elijas. Una configuración personalizada de la carpeta de datos puede
+    cambiar estas rutas. Protege también los archivos que exportes o compartas.
+  </p>
+
+  <h3>Cuándo salen datos del equipo</h3>
+  <ul>
+    <li>
+      <strong>Bases de datos y SSH.</strong> Al conectarte se envían las credenciales, consultas y
+      datos necesarios a los servidores que configures.
+    </li>
+    <li>
+      <strong>Actualizaciones.</strong> La búsqueda automática en GitHub está desactivada hasta que
+      la autorices. Puedes cambiarla en Preferencias → Acerca de o buscar manualmente. GitHub recibe
+      la dirección IP y las cabeceras de la petición; la consulta de versión no incluye tu SQL,
+      resultados ni credenciales de bases de datos.
+    </li>
+    <li>
+      <strong>Asistente de IA.</strong> Al enviar una pregunta, el proveedor que configures recibe
+      el texto y, según el contexto que elijas, el SQL abierto y la estructura de tablas. Druse no
+      añade las filas de resultados al contexto; cualquier dato que pegues en la pregunta sí se
+      enviará. Revisa el contenido antes de enviarlo. Un programa de IA local puede conectarse a
+      servicios externos según su propia configuración.
+    </li>
+    <li>
+      <strong>WebView2.</strong> Druse utiliza este componente de Microsoft. Su instalación,
+      actualización y comportamiento de red dependen de Windows y de la configuración del
+      componente.
+    </li>
+  </ul>
+  <p>
+    No hay cuentas de usuario de Druse ni integraciones de publicidad o analítica identificadas en
+    el código revisado. La API que utiliza la aplicación se ejecuta en tu equipo y escucha en la
+    interfaz local.
+  </p>
+
+  <h3>Diagnóstico y soporte</h3>
+  <p>
+    El diagnóstico contiene registros y datos de versión y sistema. Druse aplica filtros para
+    ocultar credenciales, pero los mensajes de error pueden incluir nombres de servidores, bases o
+    tablas. Revisa el ZIP antes de compartirlo y retira datos sensibles. Guardarlo no lo envía
+    automáticamente al equipo de Druse.
+  </p>
+  <p>
+    Contacto: <strong>druse.contacto&#64;gmail.com</strong>. Si escribes, Gmail procesa tu
+    dirección, mensaje y adjuntos. No incluyas contraseñas, claves ni datos de clientes. Los datos
+    legales del responsable y las condiciones de conservación de las solicitudes siguen pendientes
+    de confirmar.
+  </p>
+
+  <h3>Al desinstalar</h3>
+  <p>
+    Puedes usar la opción de desinstalación de Windows. Todavía se está verificando qué datos y
+    credenciales conserva ese proceso; no asumas que elimina todo tu historial. Haz una copia de los
+    datos que quieras conservar y consulta el estado de esta comprobación antes de borrar carpetas o
+    credenciales manualmente.
+  </p>
+  <p>
+    Este aviso corresponde a la aplicación de escritorio. La web tiene su propio aviso de privacidad
+    y cookies. Los servidores y proveedores que elijas tienen sus propias políticas de tratamiento.
+  </p>
+</article>
+        <section aria-labelledby="proveedores">
+          <h2 id="proveedores">Políticas de los servicios</h2>
+          <ul>
+            <li><a href="https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement" rel="noreferrer">GitHub — descargas y actualizaciones</a></li>
+            <li><a href="https://policies.google.com/privacy?hl=es" rel="noreferrer">Google — correo de contacto</a></li>
+            <li><a href="https://privacy.microsoft.com/es-es/privacystatement" rel="noreferrer">Microsoft — WebView2</a></li>
+          </ul>
+          <p>Para bases de datos, SSH e IA, consulta la política del proveedor que hayas configurado.</p>
+        </section>
+      </div>
+    </main>
+    <footer class="container legal-footer"><a href="./">Volver a Druse</a></footer>
+  </body>
+</html>

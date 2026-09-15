@@ -30,6 +30,7 @@ import { Icon } from '../../../shared/ui/icon/icon';
 import { UpdateService } from '../../../core/update/update.service';
 import { DialogFocus } from '../../../shared/a11y/dialog-focus';
 import { DialogBackdrop } from '../../../shared/a11y/dialog-backdrop';
+import { PrivacyNotice } from '../../../shared/privacy/privacy-notice';
 
 /**
  * Colores de acento propuestos.
@@ -130,13 +131,13 @@ const FITS: readonly {
   { value: 'scale', label: 'Tamaño', hint: 'El tamaño lo decides tú' },
 ];
 
-type SettingsSection = 'appearance' | 'editor' | 'about';
+type SettingsSection = 'appearance' | 'editor' | 'privacy' | 'about';
 
 /** Preferencias agrupadas por lo que se quiere ajustar. */
 @Component({
   selector: 'app-settings-dialog',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [DialogBackdrop, DialogFocus, Icon],
+  imports: [DialogBackdrop, DialogFocus, Icon, PrivacyNotice],
   templateUrl: './settings-dialog.html',
   styleUrl: './settings-dialog.scss',
 })
@@ -145,6 +146,7 @@ export class SettingsDialog {
   protected readonly sections: readonly { id: SettingsSection; label: string }[] = [
     { id: 'appearance', label: 'Apariencia' },
     { id: 'editor', label: 'Editor' },
+    { id: 'privacy', label: 'Privacidad' },
     { id: 'about', label: 'Acerca de' },
   ];
   private readonly body = viewChild<ElementRef<HTMLElement>>('body');
