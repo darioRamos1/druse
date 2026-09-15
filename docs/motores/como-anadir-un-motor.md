@@ -1,7 +1,7 @@
 # Cómo añadir un motor a Druse
 
 > Guía de trabajo. El plan de los motores que vienen —Oracle y SQLite— está en
-> [`plan-nuevos-motores.md`](plan-nuevos-motores.md); aquí está el procedimiento,
+> [`plan-nuevos-motores.md`](../planes/plan-nuevos-motores.md); aquí está el procedimiento,
 > que sirve para cualquiera.
 
 Druse habla con cinco motores hoy —PostgreSQL, SQL Server, MySQL/MariaDB e
@@ -113,9 +113,9 @@ falta uno, no compila.
     abstracciones.
 13. Contenedor desechable en `build/scripts/test-db.ps1` y `test-db.sh`.
 14. **Recorrerlo a mano contra un servidor real**, con capturas, y anotarlo en
-    `BITACORA.md`. Las pruebas en verde no son la verificación: la lista de
+    `docs/seguimiento/BITACORA.md`. Las pruebas en verde no son la verificación: la lista de
     dieciocho funcionalidades que hay que recorrer está en el §5 de
-    [`plan-nuevos-motores.md`](plan-nuevos-motores.md).
+    [`plan-nuevos-motores.md`](../planes/plan-nuevos-motores.md).
 
 ---
 

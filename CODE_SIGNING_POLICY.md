@@ -1,6 +1,6 @@
 # Política de firma de código — borrador
 
-Revisión: 13 de septiembre de 2026. Corresponde a **PUB-03** del [plan de SignPath y donaciones](docs/plan-signpath-donaciones.md).
+Revisión: 13 de septiembre de 2026. Corresponde a **PUB-03** del [plan de SignPath y donaciones](docs/planes/plan-signpath-donaciones.md).
 
 ## Estado actual: sin firma
 

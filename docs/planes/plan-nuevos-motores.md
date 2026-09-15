@@ -1,7 +1,7 @@
 # Plan — Motores nuevos: Oracle y SQLite
 
 > Documento de trabajo de una función concreta. El plan maestro vive en
-> `PLAN_TRABAJO_DRUSE.md` y la bitácora en `BITACORA.md`. Aquí está el detalle
+> `docs/planes/PLAN_TRABAJO_DRUSE.md` y la bitácora en `docs/seguimiento/BITACORA.md`. Aquí está el detalle
 > que no cabe en el backlog: qué se construye, en qué orden y qué se decidió
 > descartar.
 
@@ -206,7 +206,7 @@ Es trabajo que se paga solo con el segundo motor.
 - [x] **MOT-006:** `ConnectionProfileValidator` pregunta a las capacidades en vez
   de exigir `Host` y `Username` a todos, y las dos reglas que nombraban un motor
   —la identidad de Windows y el `INFORMIXSERVER`— las contesta ahora el proveedor.
-- [x] **MOT-007:** [`como-anadir-un-motor.md`](como-anadir-un-motor.md), enlazado
+- [x] **MOT-007:** [`como-anadir-un-motor.md`](../motores/como-anadir-un-motor.md), enlazado
   desde el README.
 
 ### Dónde acabó cada cosa, y por qué
@@ -751,7 +751,7 @@ décimo.
 10. `<Motor>Fixture` y las pruebas contractuales **completas**.
 11. Contenedor en `test-db.ps1` y `test-db.sh`.
 12. Recorrer a mano la tabla del §5 contra un servidor real, con capturas, y
-    anotarlo en `BITACORA.md`. Las pruebas en verde no son la verificación.
+    anotarlo en `docs/seguimiento/BITACORA.md`. Las pruebas en verde no son la verificación.
 
 ---
 

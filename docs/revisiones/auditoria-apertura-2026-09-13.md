@@ -1,6 +1,6 @@
 # Auditoría inicial para la apertura de Druse
 
-Fecha: 13 de septiembre de 2026. Alcance: primer bloque del [plan de SignPath y donaciones](plan-signpath-donaciones.md), tareas OSS-01 y OSS-02, con preparación parcial de OSS-03 y donaciones.
+Fecha: 13 de septiembre de 2026. Alcance: primer bloque del [plan de SignPath y donaciones](../planes/plan-signpath-donaciones.md), tareas OSS-01 y OSS-02, con preparación parcial de OSS-03 y donaciones.
 
 ## Resultado
 
@@ -50,7 +50,7 @@ También se añadieron exclusiones compartidas para `/artifacts/`, la configurac
 
 ## 3. Inventario de dependencias
 
-Archivo generado: [licencias-dependencias.csv](licencias-dependencias.csv).
+Archivo generado: [licencias-dependencias.csv](../licencias-dependencias.csv).
 
 | Ecosistema | Entradas |
 | --- | ---: |
@@ -110,7 +110,7 @@ Para archivos actuales, usar `gitleaks dir` sobre la ruta del último `snapshot.
 
 ## 5. Próximo bloque
 
-1. Resolver las condiciones de Oracle, IBM y Microsoft SNI y su alcance para la candidatura; está preparado un [borrador de consulta](consulta-signpath-borrador.md), todavía sin enviar.
+1. Resolver las condiciones de Oracle, IBM y Microsoft SNI y su alcance para la candidatura; está preparado un [borrador de consulta](../distribucion/consulta-signpath-borrador.md), todavía sin enviar.
 2. Confirmar derechos y ejemplos antes de elegir licencia y publicación. OSS-01 permanece abierto; OSS-02 tiene inventario inicial terminado pero reconciliación final pendiente.
 3. Preparar los avisos de redistribución a partir de la edición que se acuerde. No atribuir a Druse licencias de terceros ni publicar un `LICENSE` sin la decisión del titular.
-4. Continuar el [borrador de financiación](financiacion.md) y configurar Sponsors cuando el titular complete sus datos y la plataforma apruebe el perfil.
+4. Continuar el [borrador de financiación](../distribucion/financiacion.md) y configurar Sponsors cuando el titular complete sus datos y la plataforma apruebe el perfil.

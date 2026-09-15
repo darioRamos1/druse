@@ -7,7 +7,7 @@ namespace Druse.IntegrationTests;
 
 /// <summary>
 /// Criterio de salida de la Fase 0: la API local responde en /api/health.
-/// Ver PLAN_TRABAJO_DRUSE.md §7 (API local propuesta).
+/// Ver docs/planes/PLAN_TRABAJO_DRUSE.md §7 (API local propuesta).
 /// </summary>
 public sealed class HealthEndpointTests : IClassFixture<DruseApiFactory>
 {

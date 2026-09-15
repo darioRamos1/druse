@@ -4,7 +4,7 @@ namespace Druse.UnitTests;
 
 /// <summary>
 /// Reglas automáticas que impiden dependencias inválidas entre proyectos.
-/// Ver PLAN_TRABAJO_DRUSE.md §5 (Límites de los módulos) y §10 (dirección de las referencias).
+/// Ver docs/planes/PLAN_TRABAJO_DRUSE.md §5 (Límites de los módulos) y §10 (dirección de las referencias).
 ///
 /// Se leen los archivos .csproj en lugar de los ensamblados compilados porque lo que
 /// se quiere fijar es la dirección declarada de las dependencias, no lo que el

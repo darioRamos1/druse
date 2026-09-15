@@ -1,6 +1,6 @@
 # Consulta de elegibilidad — borrador sin enviar
 
-Preparación: 13 de septiembre de 2026. Relacionada con OSS-03 del [plan](plan-signpath-donaciones.md).
+Preparación: 13 de septiembre de 2026. Relacionada con OSS-03 del [plan](../planes/plan-signpath-donaciones.md).
 
 El titular debe revisar el alcance y autorizar el contacto. No adjuntar código privado, inventarios con rutas personales ni credenciales. Las versiones y nombres de paquetes siguientes son metadatos públicos de dependencias.
 

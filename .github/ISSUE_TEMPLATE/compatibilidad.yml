@@ -5,7 +5,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        La [matriz de motores](https://github.com/darioRamos1/druse/blob/main/docs/matriz-de-motores.md)
+        La [matriz de motores](https://github.com/darioRamos1/druse/blob/main/docs/motores/matriz-de-motores.md)
         solo recoge versiones contra las que se ejecutaron pruebas. Este informe
         es la forma de que crezca.
 

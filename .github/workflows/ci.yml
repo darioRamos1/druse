@@ -198,7 +198,7 @@ jobs:
       # por un motor que nunca se pensó levantar, y el nombre de este job —«los
       # cuatro motores»— ya decía cuáles son. Oracle se prueba en local con
       # build/scripts/test-db.ps1 -Engine oracle; queda anotado en
-      # docs/matriz-de-motores.md para que la ausencia no pase por cobertura.
+      # docs/motores/matriz-de-motores.md para que la ausencia no pase por cobertura.
       DRUSE_OPTIONAL_ENGINES: oracle
 
     steps:

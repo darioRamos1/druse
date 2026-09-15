@@ -1,6 +1,6 @@
 # Expediente para SignPath Foundation — borrador sin presentar
 
-Preparación: 13 de septiembre de 2026. Corresponde a **SIG-01** del [plan de SignPath y donaciones](plan-signpath-donaciones.md).
+Preparación: 13 de septiembre de 2026. Corresponde a **SIG-01** del [plan de SignPath y donaciones](../planes/plan-signpath-donaciones.md).
 
 **Esto no es una solicitud presentada.** Es el material reunido para que Darío lo revise y decida si presenta la [solicitud](https://signpath.org/apply.html), y para ver de un vistazo qué falta. Hay requisitos que hoy no se cumplen y están marcados como tales: presentar un expediente que exagere el estado del proyecto es la forma más rápida de que lo rechacen.
 
@@ -36,16 +36,16 @@ Druse no es una herramienta de seguridad ofensiva: no explota vulnerabilidades n
 | --- | --- |
 | Responsable identificable del proyecto | Darío Ramos, mantenedor único |
 | Autenticación en dos pasos | Activa en la cuenta de GitHub del proyecto |
-| Quién revisa las contribuciones | Darío. Hoy no se aceptan contribuciones de código: sin licencia no hay términos bajo los que aceptarlas, y así lo dice [`CONTRIBUTING.md`](../CONTRIBUTING.md) |
+| Quién revisa las contribuciones | Darío. Hoy no se aceptan contribuciones de código: sin licencia no hay términos bajo los que aceptarlas, y así lo dice [`CONTRIBUTING.md`](../../CONTRIBUTING.md) |
 | Quién aprueba cada firma | Darío, de forma manual. No hay publicación automática desencadenada por un commit |
-| Política de firma pública | [`CODE_SIGNING_POLICY.md`](../CODE_SIGNING_POLICY.md), en borrador y sin atribución a SignPath porque no hay servicio concedido |
+| Política de firma pública | [`CODE_SIGNING_POLICY.md`](../../CODE_SIGNING_POLICY.md), en borrador y sin atribución a SignPath porque no hay servicio concedido |
 
 Un mantenedor único es lo que hay. No se inventan revisores ni un tamaño de equipo que el repositorio desmentiría en dos minutos.
 
 ## 4. Cómo se construye y se publica
 
 1. El árbol de Git debe estar limpio: los binarios corresponden a un commit exacto.
-2. `package.ps1` publica la API .NET autocontenida y **comprueba el contenido del paquete** contra [`build/paquete-excluidos.json`](../build/paquete-excluidos.json), deteniendo la construcción si aparece un componente que esa edición no debe llevar.
+2. `package.ps1` publica la API .NET autocontenida y **comprueba el contenido del paquete** contra [`build/paquete-excluidos.json`](../../build/paquete-excluidos.json), deteniendo la construcción si aparece un componente que esa edición no debe llevar.
 3. Se genera un manifiesto con el SHA-256 de cada archivo distribuido y de los artefactos finales.
 4. `release.ps1` trabaja en tres etapas —construir, verificar y publicar— precisamente para que la firma pueda ocurrir fuera de la máquina de construcción y los bytes firmados se publiquen sin reconstruirse.
 5. La verificación comprueba, sobre los bytes finales, que cada firma de actualización corresponde a su archivo, que `latest.json` coincide con lo que hay en disco, que ninguna firma Authenticode es inválida y que los instaladores son los que se revisaron. Publicar exige integración continua verde para ese commit exacto y deja `evidencia.json` con commit, hashes y resultados.
@@ -54,7 +54,7 @@ Un mantenedor único es lo que hay. No se inventan revisores ni un tamaño de eq
 
 ## 5. Dependencias que hay que resolver
 
-El inventario completo está en [`licencias-dependencias.csv`](licencias-dependencias.csv): 1.164 registros de npm, Cargo, NuGet, Maven, fuentes y WebView2, con la licencia identificada y la decisión pendiente en todos. Lo que decide la elegibilidad es esta lista corta:
+El inventario completo está en [`licencias-dependencias.csv`](../licencias-dependencias.csv): 1.164 registros de npm, Cargo, NuGet, Maven, fuentes y WebView2, con la licencia identificada y la decisión pendiente en todos. Lo que decide la elegibilidad es esta lista corta:
 
 | Componente | Términos | Situación |
 | --- | --- | --- |
@@ -71,9 +71,9 @@ La edición sin Informix está comprobada: 402 archivos y 140 MB, **sin un solo 
 
 | Requisito | Estado |
 | --- | --- |
-| Desinstalación | El instalador NSIS la ofrece. **No se ha comprobado qué deja atrás**: es P-02 de la [privacidad](privacidad-aplicacion.md) y se resuelve en PKG-04 |
+| Desinstalación | El instalador NSIS la ofrece. **No se ha comprobado qué deja atrás**: es P-02 de la [privacidad](../privacidad/privacidad-aplicacion.md) y se resuelve en PKG-04 |
 | Aviso de cambios en el sistema | Instalación por usuario (`currentUser`); pendiente de documentar con una instalación limpia |
-| Protección de la privacidad | [Documentada y contrastada con el código](privacidad-aplicacion.md): sin telemetría, sin servidor propio, credenciales en el Administrador de credenciales de Windows, API local solo en loopback y con token |
+| Protección de la privacidad | [Documentada y contrastada con el código](../privacidad/privacidad-aplicacion.md): sin telemetría, sin servidor propio, credenciales en el Administrador de credenciales de Windows, API local solo en loopback y con token |
 | Aviso y opción de desactivar transferencias de datos | La única conexión no pedida por el usuario es la búsqueda de actualizaciones. **Está desactivada mientras nadie la autorice**, con aviso en el primer arranque y ajuste en Preferencias. Falta ofrecerlo durante la instalación, que es lo que se pregunta en la consulta |
 | Nada de explotar vulnerabilidades ni eludir protecciones | Se cumple |
 
@@ -81,7 +81,7 @@ La edición sin Informix está comprobada: 402 archivos y 140 MB, **sin un solo 
 
 **No hay ninguna todavía, y no se va a inventar.** El repositorio es privado, no hay release pública, ni descargas, ni incidencias de terceros, ni usuarios que hayan reportado nada. Esa evidencia solo puede existir después de PUB-04 y PUB-05.
 
-Lo que sí se puede enseñar hoy: historial de desarrollo sostenido, suite de pruebas —950 del frontend, más de 1.100 del backend, pruebas de contrato por motor y de punta a punta— y la [matriz de motores](matriz-de-motores.md) que distingue lo probado de lo anunciado.
+Lo que sí se puede enseñar hoy: historial de desarrollo sostenido, suite de pruebas —950 del frontend, más de 1.100 del backend, pruebas de contrato por motor y de punta a punta— y la [matriz de motores](../motores/matriz-de-motores.md) que distingue lo probado de lo anunciado.
 
 ## 8. Texto en inglés para el formulario
 

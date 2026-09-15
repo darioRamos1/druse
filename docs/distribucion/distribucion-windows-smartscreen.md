@@ -28,7 +28,7 @@ La inscripción por el nuevo flujo de Microsoft Store se anuncia sin cuota de re
 
 ## Ruta pendiente para Microsoft Store
 
-La alternativa mediante código abierto está detallada en el [plan de SignPath y donaciones](plan-signpath-donaciones.md). Son rutas diferentes y ninguna está aprobada todavía para Druse.
+La alternativa mediante código abierto está detallada en el [plan de SignPath y donaciones](../planes/plan-signpath-donaciones.md). Son rutas diferentes y ninguna está aprobada todavía para Druse.
 
 1. Dar de alta la cuenta de desarrollador por el flujo oficial y reservar el nombre disponible. Obtener de Partner Center la identidad exacta del paquete y del editor; no inventarlas.
 2. Preparar el empaquetado MSIX de Druse con sus binarios, API auxiliar, recursos e iconos. Declarar las capacidades requeridas y justificar las que exija la Store.

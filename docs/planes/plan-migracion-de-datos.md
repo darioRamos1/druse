@@ -1,7 +1,7 @@
 # Plan — Migración de datos entre tablas
 
 > Documento de trabajo de una función concreta. El plan maestro vive en
-> `PLAN_TRABAJO_DRUSE.md` y la bitácora en `BITACORA.md`. Aquí está el detalle
+> `docs/planes/PLAN_TRABAJO_DRUSE.md` y la bitácora en `docs/seguimiento/BITACORA.md`. Aquí está el detalle
 > que no cabe en el backlog: qué se construye, en qué orden y qué se decidió
 > descartar.
 

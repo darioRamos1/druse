@@ -260,7 +260,7 @@ export interface TransactionRejected {
  * Hoy la implementa `HttpApplicationGateway`; cuando Tauri administre el proceso
  * (Fase 7) podrá sustituirse por una implementación IPC sin tocar la interfaz.
  *
- * Ver PLAN_TRABAJO_DRUSE.md §2 (Arquitectura) y §5 (Límites de los módulos).
+ * Ver docs/planes/PLAN_TRABAJO_DRUSE.md §2 (Arquitectura) y §5 (Límites de los módulos).
  */
 export abstract class ApplicationGateway {
   /** Verifica que el proceso local está activo. */

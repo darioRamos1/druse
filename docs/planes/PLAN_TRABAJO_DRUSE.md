@@ -157,7 +157,7 @@ Estas funciones deben permanecer en el backlog para evitar que el primer lanzami
 
 ```text
 druse/
-├── PLAN_TRABAJO_DRUSE.md
+├── docs/planes/PLAN_TRABAJO_DRUSE.md
 ├── README.md
 ├── .editorconfig
 ├── .gitignore
@@ -1069,8 +1069,8 @@ secuencias y disparadores, y se decide **con datos o sin ellos** —en general y
 tabla por tabla—, con filtro por filas, límite y columnas excluidas.
 
 El plan completo, con sus seis fases y sus criterios de salida, está en
-[`docs/plan-respaldos-y-restauracion.md`](docs/plan-respaldos-y-restauracion.md).
-Lo estructural, en el [ADR 0005](docs/decisions/0005-respaldos-guionizados-por-druse.md).
+[`docs/planes/plan-respaldos-y-restauracion.md`](plan-respaldos-y-restauracion.md).
+Lo estructural, en el [ADR 0005](../decisions/0005-respaldos-guionizados-por-druse.md).
 
 - [x] **Druse guioniza el respaldo** desde el catálogo que ya lee, tras un puerto
   `IDatabaseScripter` al lado de `ITableDesigner`. No depende de `pg_dump` ni de
@@ -1122,7 +1122,7 @@ foráneas en notación de pata de gallo, y donde cada gesto de edición termina 
 el diseñador de tablas que ya existe, con su previsualización de DDL.
 
 El plan completo, con sus seis fases y sus criterios de salida, está en
-[`docs/plan-mer-y-diagramas.md`](docs/plan-mer-y-diagramas.md).
+[`docs/planes/plan-mer-y-diagramas.md`](plan-mer-y-diagramas.md).
 
 - [x] **Lectura del catálogo en lote**, tras `GetTableDetailsAsync` en el
   contrato de metadatos. Hoy la estructura se lee tabla a tabla y un diagrama de
@@ -1159,7 +1159,7 @@ de este backlog— y las vistas entran como contexto en gris, no como entidades.
 ### Prioridad media
 
 - Diagramas entidad-relación. Planificado; ver arriba y
-  [`docs/plan-mer-y-diagramas.md`](docs/plan-mer-y-diagramas.md).
+  [`docs/planes/plan-mer-y-diagramas.md`](plan-mer-y-diagramas.md).
 - Comparación de esquemas.
 - Planes de ejecución gráficos.
 - ~~Gestión visual de índices.~~ Hecho en el diseñador de tablas (sesión 019).
@@ -1211,7 +1211,7 @@ Cuando una IA ayude a implementar Druse:
 ### Prompt inicial recomendado
 
 ```text
-Lee PLAN_TRABAJO_DRUSE.md y revisa el mockup ubicado en
+Lee docs/planes/PLAN_TRABAJO_DRUSE.md y revisa el mockup ubicado en
 docs/mockups/druse-main.html. Estamos trabajando en la Fase 0.
 
 Antes de escribir código:

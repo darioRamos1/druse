@@ -2,7 +2,7 @@
 
   <!--
     Druse — propiedades comunes a todos los proyectos del backend.
-    Ver PLAN_TRABAJO_DRUSE.md §5 (Diseño del backend) y §12 (Seguridad).
+    Ver docs/planes/PLAN_TRABAJO_DRUSE.md §5 (Diseño del backend) y §12 (Seguridad).
   -->
 
   <PropertyGroup>

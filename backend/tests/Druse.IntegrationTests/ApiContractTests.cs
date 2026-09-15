@@ -193,7 +193,7 @@ public sealed class ApiContractTests(DruseApiFactory factory) : IClassFixture<Dr
 
         while (directory is not null)
         {
-            if (File.Exists(Path.Combine(directory.FullName, "PLAN_TRABAJO_DRUSE.md")))
+            if (File.Exists(Path.Combine(directory.FullName, "docs", "planes", "PLAN_TRABAJO_DRUSE.md")))
             {
                 return directory.FullName;
             }

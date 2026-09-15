@@ -41,4 +41,4 @@ Cuando exista un instalador accesible sin iniciar sesión, cambia `WINDOWS_DOWNL
 
 La página no incluye analítica, formularios ni contenido incrustado de servicios externos. Los enlaces de contacto abren el cliente de correo del visitante. No se anuncia una licencia, precio o disponibilidad de instaladores que aún no se haya definido.
 
-La ausencia de analítica no significa ausencia de tratamiento técnico: GitHub Pages registra IP por seguridad. Consulta [la revisión de privacidad y los pendientes](landing-privacidad.md) antes de publicar o incorporar servicios nuevos.
+La ausencia de analítica no significa ausencia de tratamiento técnico: GitHub Pages registra IP por seguridad. Consulta [la revisión de privacidad y los pendientes](../privacidad/landing-privacidad.md) antes de publicar o incorporar servicios nuevos.

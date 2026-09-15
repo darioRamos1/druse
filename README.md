@@ -168,7 +168,7 @@ Dos advertencias que evitan un chasco caro:
 
 La huella nunca se escribe en `tauri.conf.json`: es de la máquina que compila, no del proyecto. El script genera la configuración de firma al vuelo y la borra al terminar, incluso si la construcción falla.
 
-La firma `.sig` del actualizador de Tauri valida actualizaciones, pero **no es Authenticode** y no aporta por sí sola confianza a SmartScreen. Para distribuir sin comprar un certificado, consulta el [plan de MSIX y Microsoft Store](docs/distribucion-windows-smartscreen.md). La Store firma los paquetes MSIX que aprueba; subir el mismo EXE de NSIS no equivale a esa ruta. Referencia: [opciones de firma de Microsoft](https://learn.microsoft.com/en-us/windows/apps/package-and-deploy/code-signing-options).
+La firma `.sig` del actualizador de Tauri valida actualizaciones, pero **no es Authenticode** y no aporta por sí sola confianza a SmartScreen. Para distribuir sin comprar un certificado, consulta el [plan de MSIX y Microsoft Store](docs/distribucion/distribucion-windows-smartscreen.md). La Store firma los paquetes MSIX que aprueba; subir el mismo EXE de NSIS no equivale a esa ruta. Referencia: [opciones de firma de Microsoft](https://learn.microsoft.com/en-us/windows/apps/package-and-deploy/code-signing-options).
 
 ## Atajos del editor
 
@@ -208,7 +208,7 @@ tiene booleanos ni cadenas vacías— en lugar de relajar la comprobación.
 
 Esos rangos son la compatibilidad que el proveedor pretende cubrir. **Contra qué
 versión se ejecutaron pruebas de verdad** —una por motor, no el rango entero— está
-en la [matriz de motores](docs/matriz-de-motores.md).
+en la [matriz de motores](docs/motores/matriz-de-motores.md).
 
 En MySQL, `SCHEMA` es un sinónimo de `DATABASE`, así que el explorador muestra un esquema del mismo nombre que su base. El árbol se comporta igual en los tres motores; la alternativa habría sido ramificar por motor en la interfaz, que es justo lo que el plan prohíbe.
 
@@ -333,7 +333,15 @@ druse/
 ├── shells/             Envoltorio de escritorio (Tauri, Fase 7)
 ├── build/              Scripts y empaquetado
 └── docs/
-    ├── architecture/
+    ├── README.md       Índice de documentación
+    ├── planes/         Plan maestro y planes por funcionalidad
+    ├── seguimiento/    Bitácora de sesiones
+    ├── guias/          Desarrollo, empaquetado y publicación
+    ├── motores/        Compatibilidad y nuevos proveedores
+    ├── distribucion/   Instaladores, firma y financiación
+    ├── privacidad/     Aplicación y landing
+    ├── revisiones/     Auditorías y revisiones fechadas
+    ├── api/            Contrato HTTP
     ├── decisions/      ADR
     ├── release-notes/  Notas de cada versión publicada
     └── mockups/        Mockup de referencia
@@ -343,22 +351,25 @@ La dirección de las dependencias apunta siempre al núcleo. Está fijada por pr
 
 ## Documentación
 
+Consulta el [índice de documentación](docs/README.md) para ver los planes, guías,
+revisiones y políticas organizados por tema.
+
 La landing está en [`landing/`](landing/index.html), con despliegue independiente
-en GitHub Pages. Consulta [cómo previsualizarla y publicarla](docs/landing-github-pages.md).
+en GitHub Pages. Consulta [cómo previsualizarla y publicarla](docs/guias/landing-github-pages.md).
 
 | Documento | Contenido |
 | --- | --- |
-| [`PLAN_TRABAJO_DRUSE.md`](PLAN_TRABAJO_DRUSE.md) | Plan maestro: alcance, arquitectura y las 8 fases |
-| [`BITACORA.md`](BITACORA.md) | Bitácora por sesión: estado actual, qué toca retomar y decisiones |
+| [`docs/planes/PLAN_TRABAJO_DRUSE.md`](docs/planes/PLAN_TRABAJO_DRUSE.md) | Plan maestro: alcance, arquitectura y las 8 fases |
+| [`docs/seguimiento/BITACORA.md`](docs/seguimiento/BITACORA.md) | Bitácora por sesión: estado actual, qué toca retomar y decisiones |
 | [`docs/decisions/`](docs/decisions/) | ADR de las decisiones estructurales |
-| [`docs/como-anadir-un-motor.md`](docs/como-anadir-un-motor.md) | Qué hay que escribir y qué hay que tocar para que Druse hable con un motor más |
-| [`docs/plan-nuevos-motores.md`](docs/plan-nuevos-motores.md) | Plan de Oracle y SQLite, con la lista de lo que un motor tiene que cubrir para estar terminado |
-| [`docs/guia-estrategia-open-source.md`](docs/guia-estrategia-open-source.md) | Ruta futura para abrir el proyecto, conseguir usuarios y evaluar su sostenibilidad |
-| [`docs/plan-signpath-donaciones.md`](docs/plan-signpath-donaciones.md) | Tareas, decisiones y verificaciones para solicitar SignPath y habilitar aportes voluntarios |
-| [`docs/auditoria-apertura-2026-09-13.md`](docs/auditoria-apertura-2026-09-13.md) | Resultados iniciales del análisis de historial, dependencias y preparación de la publicación |
-| [`docs/matriz-de-motores.md`](docs/matriz-de-motores.md) | Contra qué versiones se ejecutaron pruebas de verdad, y qué rangos solo están anunciados |
-| [`docs/expediente-signpath.md`](docs/expediente-signpath.md) | Lo reunido para la candidatura a SignPath y lo que todavía no se cumple |
-| [`docs/privacidad-aplicacion.md`](docs/privacidad-aplicacion.md) | Qué sale del equipo, qué se guarda y dónde, con la evidencia de dónde se comprobó |
+| [`docs/motores/como-anadir-un-motor.md`](docs/motores/como-anadir-un-motor.md) | Qué hay que escribir y qué hay que tocar para que Druse hable con un motor más |
+| [`docs/planes/plan-nuevos-motores.md`](docs/planes/plan-nuevos-motores.md) | Plan de Oracle y SQLite, con la lista de lo que un motor tiene que cubrir para estar terminado |
+| [`docs/guias/guia-estrategia-open-source.md`](docs/guias/guia-estrategia-open-source.md) | Ruta futura para abrir el proyecto, conseguir usuarios y evaluar su sostenibilidad |
+| [`docs/planes/plan-signpath-donaciones.md`](docs/planes/plan-signpath-donaciones.md) | Tareas, decisiones y verificaciones para solicitar SignPath y habilitar aportes voluntarios |
+| [`docs/revisiones/auditoria-apertura-2026-09-13.md`](docs/revisiones/auditoria-apertura-2026-09-13.md) | Resultados iniciales del análisis de historial, dependencias y preparación de la publicación |
+| [`docs/motores/matriz-de-motores.md`](docs/motores/matriz-de-motores.md) | Contra qué versiones se ejecutaron pruebas de verdad, y qué rangos solo están anunciados |
+| [`docs/distribucion/expediente-signpath.md`](docs/distribucion/expediente-signpath.md) | Lo reunido para la candidatura a SignPath y lo que todavía no se cumple |
+| [`docs/privacidad/privacidad-aplicacion.md`](docs/privacidad/privacidad-aplicacion.md) | Qué sale del equipo, qué se guarda y dónde, con la evidencia de dónde se comprobó |
 | [`CODE_SIGNING_POLICY.md`](CODE_SIGNING_POLICY.md) | Estado de la firma de los artefactos y cómo comprobar lo que descargaste |
 | [`SECURITY.md`](SECURITY.md) y [`CONTRIBUTING.md`](CONTRIBUTING.md) | Cómo informar de un fallo de seguridad y qué se puede aportar hoy |
 | [`docs/release-notes/0.1.0-beta.md`](docs/release-notes/0.1.0-beta.md) | Qué trajo la primera beta, con qué números se comprobó y qué no garantizaba |

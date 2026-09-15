@@ -1,8 +1,8 @@
 # Privacidad de la aplicación Druse — borrador
 
-Preparación: 13 de septiembre de 2026. Corresponde a **PUB-02** del [plan de SignPath y donaciones](plan-signpath-donaciones.md). Alcance: Druse 1.1.0 para Windows, variantes completa y sin Informix.
+Preparación: 13 de septiembre de 2026. Corresponde a **PUB-02** del [plan de SignPath y donaciones](../planes/plan-signpath-donaciones.md). Alcance: Druse 1.1.0 para Windows, variantes completa y sin Informix.
 
-Este documento describe la aplicación de escritorio. La [política de la landing](../landing/legal.html) cubre la página web y no sirve para la aplicación: son dos cosas distintas y confundirlas es justo lo que SignPath revisa.
+Este documento describe la aplicación de escritorio. La [política de la landing](../../landing/legal.html) cubre la página web y no sirve para la aplicación: son dos cosas distintas y confundirlas es justo lo que SignPath revisa.
 
 **Estado: borrador contrastado con el código, no con tráfico capturado.** Cada afirmación cita dónde se comprobó. Lo que falta por comprobar está en la sección 6 y no se disimula: un texto de privacidad que promete más de lo que se verificó es peor que no tenerlo.
 

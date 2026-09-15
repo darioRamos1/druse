@@ -37,7 +37,7 @@ Druse es una aplicación de escritorio que se conecta a las bases de datos que t
 
 ## Lo que Druse ya hace
 
-Resumido; el detalle está en la [privacidad de la aplicación](docs/privacidad-aplicacion.md).
+Resumido; el detalle está en la [privacidad de la aplicación](docs/privacidad/privacidad-aplicacion.md).
 
 - La API local escucha solo en `127.0.0.1` y exige un token de 32 bytes generado en cada arranque, comparado en tiempo constante.
 - Las contraseñas van al Administrador de credenciales de Windows. La base local no tiene columna para guardarlas, y hay pruebas que lo comprueban.

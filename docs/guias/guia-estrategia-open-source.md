@@ -3,7 +3,7 @@
 > Documento de referencia para tomar decisiones futuras. No obliga a publicar el
 > código ni sustituye una revisión legal de las licencias de terceros.
 
-El [plan operativo de SignPath y donaciones](plan-signpath-donaciones.md) concreta
+El [plan operativo de SignPath y donaciones](../planes/plan-signpath-donaciones.md) concreta
 esta guía en tareas y criterios de aceptación. Las opciones futuras de módulos
 propietarios o doble licencia necesitan una nueva evaluación de elegibilidad;
 no deben asumirse compatibles con SignPath Foundation.

@@ -1,7 +1,7 @@
 # Bitácora de seguimiento — Druse
 
 > Documento vivo. Se actualiza **al final de cada sesión de trabajo**.
-> El plan maestro (alcance, arquitectura, fases) vive en `PLAN_TRABAJO_DRUSE.md`.
+> El plan maestro (alcance, arquitectura, fases) vive en `docs/planes/PLAN_TRABAJO_DRUSE.md`.
 > Esta bitácora responde solo a tres preguntas: **qué se hizo**, **en qué estado quedó** y **qué toca retomar**.
 
 ---
@@ -11,7 +11,7 @@
 | Campo | Valor |
 | --- | --- |
 | Última sesión | **056** — 2026-09-11 |
-| Fase activa | **Migración de datos entre tablas:** fases 1, 2 y 3 cerradas; la **4** cerrada: la pasada de varias tablas, lo que cada tabla hace distinto y las migraciones guardadas (ver «Qué toca retomar»). **Respaldos y restauración:** Fases A–E cerradas. La **F** tiene backend, interfaz, CSV, selector de archivos, restaurar en una base nueva y **el ciclo entero por HTTP en los cuatro motores**; le falta repetir a mano el respaldo real que encontró el error de los índices de expresión. **Motores nuevos:** plan escrito (`docs/plan-nuevos-motores.md`), **fase 0 cerrada** en la 048 —las fugas de dialecto que se le escapaban a un motor nuevo— **fase 1 cerrada** en la 049 —Oracle— y **fase 2 cerrada** en la 050 —SQLite—. El plan de motores nuevos queda cerrado: **seis motores sobre el mismo contrato**; en la **052** se cerró lo que SQLite dejaba declarado y sin resolver —la reconstrucción de una tabla ya no se lleva sus disparadores, sus condiciones, las vistas que la miraban ni las filas de las tablas hijas—, en la **053** que tampoco rompa a las tablas que la referencian, y en la **054** que **lo rechazado se pueda ir a ver**: con el motivo viaja la consulta que enseña las filas culpables, y en la **055** lo que le quedaba a Oracle —**un guion con varias instrucciones se ejecuta entero**, que era trabajo de Druse y no del proveedor— más las pruebas que el plan pedía en su §9, que destaparon el aviso de fechas que le faltaba a SQLite. **Diagramas entidad-relación:** plan escrito y **Fase A** (lectura del catálogo en lote, cuatro motores) y **Fase B** (colocación determinista y lienzo) implementadas; falta cerrar la A contra los cuatro motores y ver el barrido de capturas |
+| Fase activa | **Migración de datos entre tablas:** fases 1, 2 y 3 cerradas; la **4** cerrada: la pasada de varias tablas, lo que cada tabla hace distinto y las migraciones guardadas (ver «Qué toca retomar»). **Respaldos y restauración:** Fases A–E cerradas. La **F** tiene backend, interfaz, CSV, selector de archivos, restaurar en una base nueva y **el ciclo entero por HTTP en los cuatro motores**; le falta repetir a mano el respaldo real que encontró el error de los índices de expresión. **Motores nuevos:** plan escrito (`docs/planes/plan-nuevos-motores.md`), **fase 0 cerrada** en la 048 —las fugas de dialecto que se le escapaban a un motor nuevo— **fase 1 cerrada** en la 049 —Oracle— y **fase 2 cerrada** en la 050 —SQLite—. El plan de motores nuevos queda cerrado: **seis motores sobre el mismo contrato**; en la **052** se cerró lo que SQLite dejaba declarado y sin resolver —la reconstrucción de una tabla ya no se lleva sus disparadores, sus condiciones, las vistas que la miraban ni las filas de las tablas hijas—, en la **053** que tampoco rompa a las tablas que la referencian, y en la **054** que **lo rechazado se pueda ir a ver**: con el motivo viaja la consulta que enseña las filas culpables, y en la **055** lo que le quedaba a Oracle —**un guion con varias instrucciones se ejecuta entero**, que era trabajo de Druse y no del proveedor— más las pruebas que el plan pedía en su §9, que destaparon el aviso de fechas que le faltaba a SQLite. **Diagramas entidad-relación:** plan escrito y **Fase A** (lectura del catálogo en lote, cuatro motores) y **Fase B** (colocación determinista y lienzo) implementadas; falta cerrar la A contra los cuatro motores y ver el barrido de capturas |
 | Fases 0–6 | ✅ Cerradas. |
 | Fase 7 | 🟡 **11/12.** El ciclo de instalación está probado sobre este equipo; solo falta arrancar en una máquina sin herramientas de desarrollo. |
 | Fase 8 | ✅ **7/7.** Tres motores sobre el mismo contrato y primera beta preparada. |
@@ -19,8 +19,8 @@
 | ¿Compila el envoltorio? | Sí — recompilado en la 037 con `build/scripts/msvc-env.ps1` cargado antes; sin él, `cargo` falla en `vswhom-sys` por elegir el MSVC equivocado. **Sus pruebas ya son 17**, con las dos que vigilan la CSP y las cuatro de `DRUSE_DATA_DIR` |
 | ¿Pasan las pruebas? | En la **056**: **las 54 del contrato de SQLite en verde por primera vez**, y con los seis motores delante —Informix levantado— **394 de 395 contractuales**, **653 unitarias**, **182 de integración** y las **3 de SQLite de punta a punta**. El único rojo es el `DATE` de Informix por SQLI de la 039, que no es de este trabajo y por fin se pudo reproducir. En la **055**: **653 unitarias**, **182 de integración** y las **2 de Oracle de punta a punta** en verde, y **389 de 395 contractuales**. Los seis rojos son de SQLite y **son hallazgos, no regresiones**: su fixture llevaba desde la 050 diciendo que el motor no respondía —una reentrada en su propio `Lazy`— y sus 54 pruebas se saltaban enteras. Arreglado eso, se vio además que **la cancelación no cortaba nada** (285 s con un plazo de 1 s). El frontend no se tocó y su suite no se repitió. En la **054**: **602 unitarias**, **388 contractuales**, **182 de integración** —con los cuatro contenedores levantados— y las **3 de SQLite de punta a punta**, que son las que ven el rechazo por donde se usa. Del frontend, **933 de 936** en la segunda pasada: tres rojos por tiempo —`app`, `query-builder` y `results-grid`—, cuatro en la primera, y **los cuatro archivos verdes al ejecutarlos solos**, `table-designer` incluido. En la **053**, el backend entero sí: **597 unitarias**, **388 contractuales**, **180 de integración**, sin advertencias de compilación, y **las 61 de punta a punta (1 saltada, el barrido)**. El **frontend dio 922 de 932**, todas por tiempo agotado en montajes pesados y con la suite tardando el doble que ayer: la máquina tenía los cuatro contenedores, Druse abierto y ~4 GB libres de 16. La 053 **no toca frontend**, y esa misma suite salió entera en verde en la 052. El barrido no se repitió: esta sesión no cambia nada que se vea. En la **052**: **594 unitarias**, **388 contractuales** —las 54 de SQLite entre ellas—, **180 de integración**, **932 del frontend**, **61 de punta a punta** (1 saltada, el barrido) y el **barrido limpio**, sin errores de consola y sin advertencias de compilación. Esas cuentas del frontend y del e2e incluyen las pruebas de los tres commits de interfaz que el usuario metió en `main` durante la sesión. En la **051**: **571 unitarias**, **180 de integración**, **914 del frontend**, **56 de punta a punta** y el barrido limpio. En la **050**: **388 contractuales** —las 54 de SQLite entre ellas—, **567 unitarias**, **177 de integración**, **914 del frontend** y la **suite de punta a punta entera (56)**, con el barrido limpio. En la **049**: **334 contractuales** —las 280 de antes más las 54 de Oracle— contra PostgreSQL, MySQL, SQL Server y Oracle reales; **567 unitarias**, **177 de integración**, **913 del frontend**, la **suite de punta a punta entera (55)** y el **barrido** limpio. En la **048**, las cuatro suites del repositorio: **565 unitarias**, **177 de integración** y **279 contractuales** con PostgreSQL, MySQL y SQL Server levantados —Informix no—, **913 del frontend**, **35 de punta a punta** y el **barrido entero** con la consola limpia y ningún hallazgo. Los rojos del camino fueron de tiempo, distintos en cada pasada y verdes al ejecutar su archivo solo. `docs/api/openapi.json` no cambió: `/api/engines` no declara el cuerpo de su respuesta, así que ampliar su DTO no toca el contrato publicado. En la **047**: **859 del frontend** —las 815 de siempre más 44 de las piezas que salieron de `WorkspaceStore`— y la **suite de punta a punta entera en verde**: 52 pasadas, 1 saltada, 0 fallos, contra PostgreSQL y SQL Server reales. Los rojos que salieron por el camino eran de tiempo, en el frontend, y de **servidores de e2e levantados desde la sesión anterior**, que `reuseExistingServer` reutiliza. En la **046**: **740 del backend** —563 unitarias y las 177 de integración, con PostgreSQL, MySQL y SQL Server levantados—, **815 del frontend** y el **barrido entero** con la consola limpia y un solo hallazgo, que no es un defecto. Del e2e, 43 en verde; las cuatro de SQL Server esperaban a su contenedor, que se levantó en esta sesión. Las **23 del envoltorio** son de la 042 y siguen valiendo. Las contractuales salen verdes **sin los motores delante**: sin `DRUSE_REQUIRE_ENGINES=1` cada prueba termina sin comprobar nada cuando el servidor no responde. El `DATE` de Informix por SQLI de la 039 sigue sin repetirse: hace falta ese contenedor |
 | ¿Hay aplicación de escritorio? | **Sí.** Instalador NSIS y ZIP portable, en dos variantes: con Informix y sin él. Desde la 038 **se actualiza sola** —o lo hará: ver el aviso del repositorio privado en §9—. El MSI dejó de generarse: `tauri.conf.json` solo declara `nsis`, que es lo que necesita el actualizador. En la **040** se regeneraron los instaladores y **la variante completa quedó instalada y abierta en este equipo**, con el arreglo del envoltorio dentro. Siguen **sin firma Authenticode**: SmartScreen en cada equipo |
-| Motores | **PostgreSQL, SQL Server, MySQL/MariaDB, Oracle, SQLite e Informix**, sobre el mismo contrato. Desde la **048** cada uno declara sus `EngineCapabilities` y **un motor nuevo no compila hasta decir qué familias de datos guarda**; lo siguiente es Oracle, con el plan en `docs/plan-nuevos-motores.md` y el procedimiento en `docs/como-anadir-un-motor.md`. Informix tiene **dos entradas**: por DRDA con el driver de IBM (puerto 9089) y por **SQLI**, su protocolo nativo, con el puente JDBC (9088). Cambia por dónde se entra; el SQL, el catálogo y los tipos son los mismos |
-| Trabajo a medias | **Nada sin commitear.** `PLAN_MEJORAS_DRUSE.md` lleva marcadas las fases 0 a 5 salvo lo grande —**FE-001 y FE-002 cerradas en la 047**: `WorkspaceStore` partido en seis piezas—, FE-003, BE-001, BE-002, A11Y-005 más BKP-006, SEC-007, PERF-004 y PERF-005. Sin comprobar: las contractuales de la lectura en lote contra los cuatro motores desde la 039, **el multicursor dentro de la ventana empaquetada**, y de antes —**el diálogo del sistema y el selector de carpeta siguen sin verse abrir**, y **el actualizador no puede funcionar mientras el repositorio sea privado** (ver §9) |
+| Motores | **PostgreSQL, SQL Server, MySQL/MariaDB, Oracle, SQLite e Informix**, sobre el mismo contrato. Desde la **048** cada uno declara sus `EngineCapabilities` y **un motor nuevo no compila hasta decir qué familias de datos guarda**; lo siguiente es Oracle, con el plan en `docs/planes/plan-nuevos-motores.md` y el procedimiento en `docs/motores/como-anadir-un-motor.md`. Informix tiene **dos entradas**: por DRDA con el driver de IBM (puerto 9089) y por **SQLI**, su protocolo nativo, con el puente JDBC (9088). Cambia por dónde se entra; el SQL, el catálogo y los tipos son los mismos |
+| Trabajo a medias | **Nada sin commitear.** `docs/planes/PLAN_MEJORAS_DRUSE.md` lleva marcadas las fases 0 a 5 salvo lo grande —**FE-001 y FE-002 cerradas en la 047**: `WorkspaceStore` partido en seis piezas—, FE-003, BE-001, BE-002, A11Y-005 más BKP-006, SEC-007, PERF-004 y PERF-005. Sin comprobar: las contractuales de la lectura en lote contra los cuatro motores desde la 039, **el multicursor dentro de la ventana empaquetada**, y de antes —**el diálogo del sistema y el selector de carpeta siguen sin verse abrir**, y **el actualizador no puede funcionar mientras el repositorio sea privado** (ver §9) |
 | Bloqueantes | Ninguno para seguir programando. Sí para dar por buenos cuatro motores y cuatro funciones: ver «Qué toca retomar». |
 | Git | El **PR #9 se fusionó** (sesión 022). Se trabaja en `feat/respaldos-y-restauracion`, con todo subido: las 024–027 en `1452a6c`, las 028–031 en `640151c`, las 032–036 de `d3ac0d5` a `35d192e`, la 037 de `4ba8cce` a `20727eb`, la **038** en `a455be7`, `4c6f74a`, `55711f0` y `93f7f26`, la **039** hasta `5c2d09b`, y la **040** en `80da9f6`, `03c3478`, `a04c706`, `117b15f`, `2946156` y `2d52c8e`, la **041** en `64c2adf`, `203b771`, `6d31a86`, `5a924c6`, `8bcf83a`, `f4f683e` y `f65cd73`, la **042** en `0ae38fa`, `120485f`, `2a6f151` y `837cbb6`, la **043** de `ebf42ac` a `fd9432d`, la **044** de `7e60185` a `e98422e`, la **045** de `dc7b97e` a `ba3d866`, y la **046** de `c9de27f` a `90e03c7`, ya sobre `main`, y la **048** en `3509bb7`, `5d337cc`, `0c5507f`, `a04af7d` y `de80c8a`, y la **049** en `52efd09`, `eee2656`, `84a84d2`, `148adb1` y `be3a27d`, y la **050** en `10c8349`, `d6e8cd2`, `f03f3b8`, `8744c9e`, `9372132` y el de la documentación, y la **054** en `5f70c41`, `ad0af20`, `6226acb`, `0382018` y el de la documentación |
 | Integración continua | 🔴 **Parada, y no por el código.** GitHub aborta los jobs en dos segundos: «recent account payments have failed or your spending limit needs to be increased». Hasta resolver la facturación, ningún PR podrá pasar los checks. Lo que sí cambió en la **041**: cuando vuelva a correr, **ejecutará pruebas de verdad** —hasta ahora el job del backend terminaba en verde sin ejecutar ninguna—, y publicar exige que el commit tenga su ejecución de CI en verde. |
@@ -197,7 +197,7 @@ están hechos y ahora tienen regresiones donde faltaban, incluidos los cuatro qu
 quedaban —el degradado de las listas, la barra del editor en una fila a 900 px,
 el ancho inicial de las columnas sacado de los valores y los **fragmentos
 guardados**—. El detalle está en
-`docs/plan-mejoras-visuales.md` y en la entrada de §5.
+`docs/planes/plan-mejoras-visuales.md` y en la entrada de §5.
 
 Dos cosas quedan dichas, ninguna bloqueante:
 
@@ -226,7 +226,7 @@ la pasada, que se hace de una en una porque es una decisión con tipos y clave
 primaria.
 
 El plan completo, con el porqué de cada decisión y lo aprendido en las cuatro
-fases, está en `docs/plan-migracion-de-datos.md`.
+fases, está en `docs/planes/plan-migracion-de-datos.md`.
 
 #### Respaldos: lo que le falta a la Fase F
 
@@ -407,7 +407,7 @@ compilado con un servidor estático que devuelva la CSP exacta del envoltorio.
 ## 2. Cómo retomar (prompt de arranque de sesión)
 
 ```text
-Lee BITACORA.md y PLAN_TRABAJO_DRUSE.md, y revisa el mockup de referencia
+Lee docs/seguimiento/BITACORA.md y docs/planes/PLAN_TRABAJO_DRUSE.md, y revisa el mockup de referencia
 docs/mockups/druse-main.html.
 
 Antes de escribir código:
@@ -1166,7 +1166,7 @@ mismo con la documentación. Lo siguiente es la fase 2, SQLite.
 ### Sesión 048 — 2026-09-10 · Un motor nuevo ya no puede colarse sin decir lo que es
 
 Se pidió un plan para añadir motores «que se puedan usar en todas las
-funcionalidades». Está en `docs/plan-nuevos-motores.md` —Oracle y SQLite, con la
+funcionalidades». Está en `docs/planes/plan-nuevos-motores.md` —Oracle y SQLite, con la
 lista de dieciocho funciones que hay que recorrer antes de dar un motor por
 terminado— y esta sesión ejecuta su **fase 0**: cerrar lo que hoy se le escapa a
 un motor nuevo, antes de añadir ninguno.
@@ -1255,7 +1255,7 @@ compiló a un directorio aparte con `-p:BaseOutputPath=` para seguir sin tocarlo
 y al final se paró con permiso para cerrar la integración.
 
 **Archivos.** `EngineCapabilities.cs`, `sql-dialects.ts`,
-`docs/como-anadir-un-motor.md` y `docs/plan-nuevos-motores.md` (nuevos);
+`docs/motores/como-anadir-un-motor.md` y `docs/planes/plan-nuevos-motores.md` (nuevos);
 `IDatabaseProvider.cs`, los cuatro `*DatabaseProvider.cs`, `TypeTranslator.cs`,
 `ConnectionProfileValidator.cs`, `ConnectionService.cs`,
 `SavedConnectionService.cs`, `Contracts.cs`, `ContractMapper.cs`,
@@ -1388,7 +1388,7 @@ e2e, comprobar de cuándo son los servidores.
 **Archivos.** `errors.ts`, `notice-store.ts`, `connection-store.ts`,
 `tab-store.ts`, `transaction-store.ts`, `explorer-store.ts`, `execution-store.ts`
 y sus cinco specs (todos nuevos), `workspace-store.ts` (3.372 → 2.293 líneas) y
-`PLAN_MEJORAS_DRUSE.md`.
+`docs/planes/PLAN_MEJORAS_DRUSE.md`.
 
 **Estado al cerrar.** Commiteado en `main`.
 
@@ -1797,7 +1797,7 @@ pruebas.
 
 ### Sesión 041 — 2026-09-07 · El CI que no probaba nada y el respaldo que no volvía igual
 
-Sesión de las dos primeras fases de `PLAN_MEJORAS_DRUSE.md`, escrito en la 040 y
+Sesión de las dos primeras fases de `docs/planes/PLAN_MEJORAS_DRUSE.md`, escrito en la 040 y
 todavía sin commitear al empezar.
 
 #### El comando de pruebas del backend no ejecutaba ninguna
@@ -2083,7 +2083,7 @@ Sesión larga y de una sola cosa: el MER, del backlog al lienzo.
 
 #### Lo que se decidió antes de escribir nada
 
-El plan entero está en `docs/plan-mer-y-diagramas.md`, con seis fases y sus
+El plan entero está en `docs/planes/plan-mer-y-diagramas.md`, con seis fases y sus
 criterios de salida. Nueve decisiones, todas del usuario salvo las que se
 señalan:
 
@@ -2164,7 +2164,7 @@ paleta y las medidas sacadas de `_tokens.scss`, y se aprobó ahí.
 
 #### Hecho
 
-- Plan `docs/plan-mer-y-diagramas.md` y entrada en el backlog del plan maestro.
+- Plan `docs/planes/plan-mer-y-diagramas.md` y entrada en el backlog del plan maestro.
 - Contrato en lote en los cuatro proveedores, con su servicio y su endpoint.
 - `MetadataBatch`: reparto por tabla y composición, lo único común a los cuatro.
 - Colocación determinista, lienzo, panel contenedor y entrada en el explorador.
@@ -2249,7 +2249,7 @@ los cuatro `Druse.Provider.*/*MetadataReader.cs`,
 `core/application-gateway/*`, `core/workspace/workspace-store.ts`,
 `features/connections/connections-sidebar/*`, `layout/app-shell/*`,
 `shared/ui/icon/icon.ts`, `shared/models/workspace.ts`,
-`e2e/tests/{diagrama,barrido}.spec.ts`, `docs/plan-mer-y-diagramas.md`.
+`e2e/tests/{diagrama,barrido}.spec.ts`, `docs/planes/plan-mer-y-diagramas.md`.
 
 ### Sesión 022 — 2026-08-17 · El PR fusionado y el plan de los respaldos
 
@@ -2274,7 +2274,7 @@ Después, `main` al día y rama nueva: `feat/respaldos-y-restauracion`.
 
 Una herramienta de respaldo **personalizable**, pedida así: poder construir el
 respaldo de lo que haga falta —esquemas, tablas, objetos— y elegir **con datos o
-sin ellos**. El plan entero está en `docs/plan-respaldos-y-restauracion.md`; lo
+sin ellos**. El plan entero está en `docs/planes/plan-respaldos-y-restauracion.md`; lo
 estructural, en el ADR 0005.
 
 Seis decisiones se tomaron antes de escribir nada, porque cada una cambia el
@@ -3062,7 +3062,7 @@ plan visual y esta bitácora.
 
 ### Sesión 026 — 2026-08-20 · El plan visual se cierra con regresiones reales
 
-Se pidió terminar `docs/plan-mejoras-visuales.md`, que la sesión 024 marcaba como
+Se pidió terminar `docs/planes/plan-mejoras-visuales.md`, que la sesión 024 marcaba como
 cerrado. Al contrastar cada afirmación con el CSS, las pruebas y el navegador
 aparecieron dos huecos funcionales:
 
@@ -3256,7 +3256,7 @@ comprobación de perfiles de respaldo tendrá que volver a sembrarla.
 `http-application-gateway.ts`, `command-palette.{ts,html,scss,spec.ts}`,
 `app-shell.{ts,html}`, `sql-editor.ts`, `sql-completion.ts`, `icon.ts`,
 `editor-toolbar.{html,scss}`, `query-history.html`, `backup-dialog.html` y
-`styles.scss`. Y `e2e/tests/interfaz.spec.ts`, `docs/plan-mejoras-visuales.md`.
+`styles.scss`. Y `e2e/tests/interfaz.spec.ts`, `docs/planes/plan-mejoras-visuales.md`.
 
 ### Sesión 023s — 2026-08-19 · El catálogo que no volvía a cargarse
 
@@ -3332,7 +3332,7 @@ el error va al resultado y **no** al aviso— y **24 de punta a punta**. El barr
 relanzado confirma las tres en las capturas.
 
 **Archivos.** `table-designer.scss`, `workspace-store.ts` y su prueba,
-`connection-dialog.scss`, y el plan al día en `docs/plan-mejoras-visuales.md`.
+`connection-dialog.scss`, y el plan al día en `docs/planes/plan-mejoras-visuales.md`.
 
 ### Sesión 023q — 2026-08-19 · Ejecutar el plan visual: cinco arreglos
 
@@ -3372,7 +3372,7 @@ Ctrl+K abre la búsqueda con el foco dentro del editor.
 
 **Archivos.** `results-panel.scss`, `backup-dialog.html`, `results-grid` (plantilla
 y estilos), `command-palette` (plantilla y componente), `sql-editor.ts` y
-`app-shell.html`; el plan en `docs/plan-mejoras-visuales.md` y la prueba en
+`app-shell.html`; el plan en `docs/planes/plan-mejoras-visuales.md` y la prueba en
 `e2e/tests/interfaz.spec.ts`.
 
 ### Sesión 023p — 2026-08-19 · Mirar la aplicación entera, y anotar lo que se ve
@@ -3380,7 +3380,7 @@ y estilos), `command-palette` (plantilla y componente), `sql-editor.ts` y
 Segundo barrido, esta vez completo: dieciocho capturas —resultados, mensajes,
 historial, el error de una consulta, el menú del árbol, la paleta, seis diálogos,
 el asistente de migrar, los dos temas y tres anchos— con las medidas de desborde
-y la consola. El resultado está en `docs/plan-mejoras-visuales.md`, ordenado por
+y la consola. El resultado está en `docs/planes/plan-mejoras-visuales.md`, ordenado por
 lo que más molesta.
 
 Nueve hallazgos, ninguno grave. Los dos primeros son de los que se arreglan en un
@@ -3411,7 +3411,7 @@ contrario—.
 
 **Verificado.** Las 23 de punta a punta siguen en verde, con el barrido saltado.
 
-**Archivos.** `docs/plan-mejoras-visuales.md` y `e2e/tests/barrido.spec.ts`.
+**Archivos.** `docs/planes/plan-mejoras-visuales.md` y `e2e/tests/barrido.spec.ts`.
 
 ### Sesión 023o — 2026-08-19 · Barrido visual: cuatro cosas que se veían mal
 
@@ -3987,7 +3987,7 @@ fase.
 `OrderAsync`, `ClearAsync` y el estado en dos niveles), `TransferContracts.cs` y
 `TransferEndpoints.cs` —`/api/transfers/set` y `/api/transfers/set/order`—.
 Pruebas: `TransferOrderTests` y `TransferSetFlowTests`. La fase 4 en curso, con la
-decisión y su porqué, en `docs/plan-migracion-de-datos.md`.
+decisión y su porqué, en `docs/planes/plan-migracion-de-datos.md`.
 
 ### Sesión 023c — 2026-08-19 · Cruzar de motor sin traducir en silencio
 
@@ -4060,7 +4060,7 @@ del asistente no tiene pruebas de componente en el frontend.
 gateway y el paso `types` del asistente. Pruebas: `TypeTranslationTests`,
 `TransferPlanTests`, `CrossEngineTransferTests`, `TestServerFixture` y
 `e2e/tests/migracion.spec.ts`. Documentación: la fase 3 cerrada y la 4 detallada
-en `docs/plan-migracion-de-datos.md`.
+en `docs/planes/plan-migracion-de-datos.md`.
 
 ### Sesión 023b — 2026-08-19 · Qué hacer con lo que ya está en el destino
 
@@ -4426,7 +4426,7 @@ convirtió el primer fallo en un diagnóstico en un minuto.
 **Archivos.** `SessionTransaction.cs`, `TableDesignerBase.cs`,
 `MySqlTableDesigner.cs`, `IDatabaseScripter.cs`, `RestoreService.cs`,
 `RestoreEngines.cs` (nuevo), `RestoreEndpointTests.cs`, `TableScripterTests.cs`,
-`sql-editor.ts`, `docs/plan-respaldos-y-restauracion.md`.
+`sql-editor.ts`, `docs/planes/plan-respaldos-y-restauracion.md`.
 
 **No hecho.** Repetir a mano el respaldo de `empresa_estado_financiero`: esa base
 no está en los contenedores, es de un servidor del usuario.
@@ -4478,7 +4478,7 @@ en frontend**. Las nuevas cubren el índice de expresión de punta a punta, la b
 nueva (creada y rechazada por nombre repetido), el camino del navegador al abrir
 un `.sql` y el cambio de conexión.
 
-**De propina.** `docs/Guia-Druse-Levantar-y-Empaquetar.md`: cómo levantar los
+**De propina.** `docs/guias/Guia-Druse-Levantar-y-Empaquetar.md`: cómo levantar los
 servicios a mano y generar instaladores y portable, con las rutas exactas de cada
 artefacto. Se redactó en Word, pero **al repositorio entra en Markdown**: un
 `.docx` es un binario y ningún diff lo enseña. El original se queda fuera, en
@@ -6640,7 +6640,7 @@ El usuario abrió su SQL Server de preproducción y lo que salió no estaba en n
 - Extraídas paleta, tipografías y medidas del mockup (§7).
 - Verificado el toolchain instalado.
 - **Cambio de nombre:** «Quarzo Studio» → **Druse**, con verificación previa de colisiones. Se descartó Geode por Apache Geode.
-- Renombradas las 40 referencias del plan y el archivo a `PLAN_TRABAJO_DRUSE.md`.
+- Renombradas las 40 referencias del plan y el archivo a `docs/planes/PLAN_TRABAJO_DRUSE.md`.
 - Creada esta bitácora.
 
 **Notas:** el cambio de nombre se hizo antes de generar código, así que no hubo que tocar namespaces ni `.csproj`.

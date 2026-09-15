@@ -80,7 +80,7 @@ Propuesta: distinguir «Exportar filas visibles» y «Exportar consulta completa
 
 **Hallazgo de código.** Hay progreso en la barra de estado, pero el botón de trabajos interrumpidos llama directamente a `jobs.dismissInterrupted()`: el clic descarta el aviso.
 
-Propuesta: abrir un panel Actividad con el estado, la operación afectada, el detalle y la acción de recuperación que realmente soporte cada operación. Separar «Ver detalle» de «Descartar aviso». Esto amplía el UX-010 ya pendiente en `PLAN_MEJORAS_DRUSE.md`.
+Propuesta: abrir un panel Actividad con el estado, la operación afectada, el detalle y la acción de recuperación que realmente soporte cada operación. Separar «Ver detalle» de «Descartar aviso». Esto amplía el UX-010 ya pendiente en `docs/planes/PLAN_MEJORAS_DRUSE.md`.
 
 **Ubicación:** `frontend/src/app/layout/status-bar/status-bar.html`, línea 119.
 

@@ -4,7 +4,7 @@ Gracias por el interés. Este archivo explica qué se puede aportar hoy, cómo s
 
 ## Lo primero: la licencia todavía no está elegida
 
-Druse **no tiene archivo `LICENSE`**. Mientras no lo tenga, no se fusionará código de terceros: sin licencia no hay términos bajo los que aceptarlo ni bajo los que tú lo cedes, y aceptar código en ese vacío le crearía un problema a quien contribuye y al proyecto. La decisión está registrada como **DEC-02** en el [plan de SignPath y donaciones](docs/plan-signpath-donaciones.md).
+Druse **no tiene archivo `LICENSE`**. Mientras no lo tenga, no se fusionará código de terceros: sin licencia no hay términos bajo los que aceptarlo ni bajo los que tú lo cedes, y aceptar código en ese vacío le crearía un problema a quien contribuye y al proyecto. La decisión está registrada como **DEC-02** en el [plan de SignPath y donaciones](docs/planes/plan-signpath-donaciones.md).
 
 Hasta entonces sí son útiles, y mucho:
 
@@ -57,4 +57,4 @@ Las pruebas de los guiones de construcción no compilan nada y tardan un segundo
 
 ## Compatibilidad de motores
 
-Si pruebas Druse contra un motor o una versión que no figura como comprobada en la [matriz de motores](docs/matriz-de-motores.md), cuéntalo: qué versión, qué funcionó, qué falló y con qué mensaje. Esa matriz solo puede crecer con informes concretos, y hoy hay versiones anunciadas que nadie ha verificado una por una.
+Si pruebas Druse contra un motor o una versión que no figura como comprobada en la [matriz de motores](docs/motores/matriz-de-motores.md), cuéntalo: qué versión, qué funcionó, qué falló y con qué mensaje. Esa matriz solo puede crecer con informes concretos, y hoy hay versiones anunciadas que nadie ha verificado una por una.

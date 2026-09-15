@@ -1,8 +1,8 @@
 # Matriz de motores realmente comprobados
 
-Preparación: 13 de septiembre de 2026. Corresponde a **PUB-01** del [plan de SignPath y donaciones](plan-signpath-donaciones.md).
+Preparación: 13 de septiembre de 2026. Corresponde a **PUB-01** del [plan de SignPath y donaciones](../planes/plan-signpath-donaciones.md).
 
-El [README](../README.md) anuncia rangos de versiones. Esta tabla dice otra cosa: **contra qué se ejecutaron pruebas de verdad**. Son dos afirmaciones distintas y conviene no confundirlas, porque la primera es una intención de compatibilidad y la segunda es evidencia.
+El [README](../../README.md) anuncia rangos de versiones. Esta tabla dice otra cosa: **contra qué se ejecutaron pruebas de verdad**. Son dos afirmaciones distintas y conviene no confundirlas, porque la primera es una intención de compatibilidad y la segunda es evidencia.
 
 ## Lo comprobado
 

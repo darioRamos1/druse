@@ -1,7 +1,7 @@
 # Plan de mejoras y endurecimiento — Druse
 
 > Plan operativo derivado del barrido técnico realizado el 5 de septiembre de
-> 2026. Complementa `PLAN_TRABAJO_DRUSE.md`: aquel conserva la visión general del
+> 2026. Complementa `docs/planes/PLAN_TRABAJO_DRUSE.md`: aquel conserva la visión general del
 > producto; este documento ordena el trabajo necesario para aumentar la
 > fiabilidad de la versión 1.1.0 antes de seguir ampliando funciones.
 
@@ -35,7 +35,7 @@ Comprobado durante el barrido:
 | Contratos con motores | Último registro: 266 de 267; falla una restauración `DATE` por Informix SQLI |
 | Rust/Tauri | La bitácora registra 17 pruebas; no se repitieron por entorno MSVC local incompleto |
 | Dependencias frontend | Una alerta alta y una moderada, ambas transitivas de herramientas de desarrollo |
-| GitHub Actions | Bloqueado por facturación según `BITACORA.md` |
+| GitHub Actions | Bloqueado por facturación según `docs/seguimiento/BITACORA.md` |
 | Actualizador | Inoperante mientras los artefactos permanezcan en Releases privadas |
 
 Problema de control detectado: con .NET SDK 10.0.400, el comando actual
@@ -301,7 +301,7 @@ no solamente validaciones visuales.
 Avance de apertura al 13 de septiembre de 2026: los scripts de motores de prueba
 publican ahora los puertos nuevos en `127.0.0.1`. Se comprobó con Docker simulado
 en Bash y PowerShell. Los contenedores existentes requieren revisión separada;
-véase la [auditoría de apertura](docs/auditoria-apertura-2026-09-13.md).
+véase la [auditoría de apertura](../revisiones/auditoria-apertura-2026-09-13.md).
 
 - [x] **SEC-009:** devolver en la inspección un identificador o hash SHA-256 del artefacto aprobado.
 - [x] **SEC-010:** exigir ese identificador y una confirmación explícita al ejecutar la restauración.
@@ -541,8 +541,8 @@ véase la [auditoría de apertura](docs/auditoria-apertura-2026-09-13.md).
 - [ ] **REL-003:** comprobar los selectores nativos de archivo y carpeta en la aplicación empaquetada.
 - [ ] **REL-004:** probar multicursor y atajos dentro de WebView2.
 - [ ] **REL-005:** obtener firma Authenticode y verificar sellado de tiempo.
-      La ruta de código abierto se desarrolla en el [plan de SignPath y donaciones](docs/plan-signpath-donaciones.md), con auditoría de dependencias, candidatura e integración pendientes.
-      Para la distribución sin comprar certificado, evaluar MSIX mediante Microsoft Store según el [plan de distribución y SmartScreen](docs/distribucion-windows-smartscreen.md). La firma del actualizador no sustituye Authenticode; un certificado autofirmado no resuelve la confianza en equipos ajenos. REL-005 sigue pendiente.
+      La ruta de código abierto se desarrolla en el [plan de SignPath y donaciones](plan-signpath-donaciones.md), con auditoría de dependencias, candidatura e integración pendientes.
+      Para la distribución sin comprar certificado, evaluar MSIX mediante Microsoft Store según el [plan de distribución y SmartScreen](../distribucion/distribucion-windows-smartscreen.md). La firma del actualizador no sustituye Authenticode; un certificado autofirmado no resuelve la confianza en equipos ajenos. REL-005 sigue pendiente.
 - [x] **REL-006:** fijar GitHub Actions por SHA y contenedores de CI por versión
       o digest. Las seis acciones van por SHA con su versión en el comentario, y
       las tres imágenes de servicio llevan etiqueta **y** digest. `dtolnay/rust-toolchain`
@@ -581,7 +581,7 @@ mirando las capturas aparecen cosas que ninguna prueba puede afirmar. Lo de aqu�
 sale de mirarlas, no de suponer.
 
 No es lo mismo que la accesibilidad de §10 —aquello es poder usar Druse sin
-ratón y con lector de pantalla— ni que `docs/plan-mejoras-visuales.md`, que se
+ratón y con lector de pantalla— ni que `docs/planes/plan-mejoras-visuales.md`, que se
 cerró en la 027 y trataba defectos de maquetación.
 
 ### Lo que se ve
@@ -634,7 +634,7 @@ cerró en la 027 y trataba defectos de maquetación.
       para escribir. A 900 × 720 px y escala 125 %, el editor inicial conserva
       301,5 px físicos; al ampliar resultados al máximo conserva 200,25 px.
       _(Validado el 9 de septiembre de 2026; detalle en
-      `docs/revision-ui-ux-2026-09-08.md`.)_
+      `docs/revisiones/revision-ui-ux-2026-09-08.md`.)_
 
 ### Lo que no dice lo que debería
 

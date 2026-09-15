@@ -12,7 +12,7 @@ using Druse.Platform.Native;
 var builder = WebApplication.CreateBuilder(args);
 
 // La API local escucha exclusivamente en la interfaz de loopback y nunca en 0.0.0.0.
-// Ver PLAN_TRABAJO_DRUSE.md §2 (Decisión de implementación) y §12 (Seguridad desde el inicio).
+// Ver docs/planes/PLAN_TRABAJO_DRUSE.md §2 (Decisión de implementación) y §12 (Seguridad desde el inicio).
 //
 // El puerto 0 pide uno libre al sistema, que es lo que usa la aplicación de
 // escritorio: un puerto fijo puede estar ocupado por otro programa, o por otra
