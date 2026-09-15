@@ -28,13 +28,13 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - name: Obtener el repositorio
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7.0.1
       - name: Configurar Pages
-        uses: actions/configure-pages@v5
+        uses: actions/configure-pages@v6
       - name: Subir únicamente la landing
-        uses: actions/upload-pages-artifact@v4
+        uses: actions/upload-pages-artifact@v5
         with:
           path: landing
       - name: Publicar
         id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5
