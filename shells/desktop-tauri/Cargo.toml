@@ -24,7 +24,7 @@ serde_json = "1"
 
 # Para localizar el directorio de datos del usuario con la misma convención que
 # usa IAppPaths en el backend.
-dirs = "6"
+dirs = "7"
 tauri-plugin-dialog = "2"
 tauri-plugin-updater = "2"
 
