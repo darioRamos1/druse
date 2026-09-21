@@ -5,6 +5,7 @@ on:
   pull_request:
     paths:
       - 'backend/**'
+      - 'frontend/**'
       - 'build/**'
       - 'shells/desktop-tauri/**'
       - '.github/workflows/comunidad.yml'
@@ -40,13 +41,19 @@ jobs:
           npm ci
       - name: Comprobar exclusiones
         shell: pwsh
-        run: ./build/tests/manifiesto-paquete.ps1
+        run: |
+          ./build/tests/manifiesto-paquete.ps1
+          ./build/tests/avisos-frontend.ps1
+          ./build/tests/evidencia-licencias-comunidad.ps1
       - name: Preparar API y frontend de Comunidad
         shell: pwsh
         run: ./build/scripts/package.ps1 -Community -SkipInstaller
       - name: Probar independencia y consulta SQLite
         shell: pwsh
         run: ./build/tests/comunidad-publicada.ps1
+      - name: Recoger evidencia de terceros de la API publicada
+        shell: pwsh
+        run: ./build/scripts/evidencia-licencias-comunidad.ps1 -OutputPath artifacts/licencias-comunidad/ci
       - name: Verificar canal de actualización de Comunidad
         working-directory: shells/desktop-tauri
         run: cargo test --locked updates::tests
@@ -66,5 +73,6 @@ jobs:
           path: |
             shells/desktop-tauri/target/release/bundle/nsis/*-comunidad.exe
             artifacts/paquete/manifiesto-comunidad-*.json
+            artifacts/licencias-comunidad/ci/**
           if-no-files-found: error
           retention-days: 14
