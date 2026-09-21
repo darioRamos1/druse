@@ -279,7 +279,9 @@ mod tests {
         if cfg!(target_os = "windows") {
             assert!(matches!(
                 objetivo.as_str(),
-                "windows-x86_64-completo" | "windows-x86_64-sin-informix" | "windows-x86_64-comunidad"
+                "windows-x86_64-completo"
+                    | "windows-x86_64-sin-informix"
+                    | "windows-x86_64-comunidad"
             ));
         }
     }

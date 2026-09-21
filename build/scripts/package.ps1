@@ -104,6 +104,11 @@ $repoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $apiProject = Join-Path $repoRoot 'backend/src/Druse.Host.LocalApi'
 $tauriDir = Join-Path $repoRoot 'shells/desktop-tauri'
 $apiOutput = Join-Path $tauriDir 'api'
+$cargoTargetDir = if ($env:CARGO_TARGET_DIR) {
+    [IO.Path]::GetFullPath($env:CARGO_TARGET_DIR, $tauriDir)
+} else {
+    Join-Path $tauriDir 'target'
+}
 
 # La versión sale de `tauri.conf.json`, que es la que acaba en el nombre del
 # instalador: leerla de otro sitio produciría un manifiesto que dice una versión
@@ -373,10 +378,10 @@ finally {
     Remove-Item $tauriOverride -Force -ErrorAction SilentlyContinue
 }
 
-$bundleDir = Join-Path $tauriDir "target/$Runtime/release/bundle"
+$bundleDir = Join-Path $cargoTargetDir "$Runtime/release/bundle"
 
 if (-not (Test-Path $bundleDir)) {
-    $bundleDir = Join-Path $tauriDir 'target/release/bundle'
+    $bundleDir = Join-Path $cargoTargetDir 'release/bundle'
 }
 
 Write-Host ''
@@ -442,7 +447,7 @@ if ($Portable) {
     Write-Host ''
     Write-Host '[4/4] Creando la distribución portable...' -ForegroundColor Cyan
 
-    $releaseDir = Join-Path $tauriDir 'target/release'
+    $releaseDir = Join-Path $cargoTargetDir 'release'
     $appName = if ($IsWindows) { 'druse.exe' } else { 'druse' }
     $appPath = Join-Path $releaseDir $appName
 
