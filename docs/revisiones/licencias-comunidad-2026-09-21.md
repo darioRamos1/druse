@@ -46,3 +46,14 @@ Angular escribe `frontend/dist/frontend/3rdpartylicenses.txt` fuera de `browser/
 La prueba `build/tests/avisos-frontend.ps1` comprueba los bytes, el inventario, las tres ediciones y el fallo ante un original ausente aunque quede una copia antigua. Esto corrige esa omisión concreta; no declara completo el conjunto de avisos de terceros.
 
 El workflow de Comunidad ejecuta ambas pruebas nuevas y recoge la evidencia NuGet de la API que acaba de publicar, conservándola junto al instalador. También se activa ante cambios de frontend y de los tres avisos del repositorio. La ejecución satisfactoria del PR #18 es anterior a estos cambios y no se presenta como validación de esta revisión.
+
+## Comprobación del instalador corregido
+
+Se completó localmente `package.ps1 -Community` con los avisos actuales. Resultado: `Druse Comunidad_1.1.0_x64-setup-comunidad.exe`, 50.473.725 bytes; SHA-256 `79e030d8979a0cdbd6da3f9e64c144672d7f8034794b160865f06c88d8e907dc`.
+
+- Manifiesto final: 408 entradas (406 archivos de API/avisos, instalador y firma del actualizador). Los cinco avisos del frontend y los tres avisos propios coinciden con sus fuentes e inventario.
+- Firma del actualizador: verificada contra los bytes finales y la clave pública de Druse. Authenticode: **NotSigned**; no identifica un editor certificado ante Windows.
+- API publicada: arranque, cuatro motores y `SELECT 42` en SQLite correctos. Pasaron las pruebas de avisos, evidencia de licencias, inventario y verificador de releases. YAML analizado correctamente con el parser de Prettier.
+- La herramienta de evidencia se repitió sobre el paquete corregido: 406 archivos, 377 coincidencias NuGet, 37 entradas de paquetes/runtime y 28 sin aviso local localizado. Los CSV anteriores conservan deliberadamente la instantánea de 401 archivos examinada al inicio.
+
+El binario permanece como candidato local; no se publicó una nueva release ni se instaló/desinstaló en el equipo habitual. La compilación conserva el aviso previo de tamaño inicial de Angular (649,27 kB). No se ha ejecutado todavía en GitHub la revisión nueva del workflow.
