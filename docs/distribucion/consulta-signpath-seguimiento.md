@@ -1,6 +1,8 @@
-# Seguimiento a SignPath — borrador sin enviar
+# Seguimiento a SignPath — enviado
 
-Preparado el 21 de septiembre de 2026. Responder al hilo de Phillip en `support@signpath.io` desde `druse.contacto@gmail.com`. No enviado por preparar este documento.
+Enviado el 21 de septiembre de 2026 a las 16:33 (America/Bogota), tras autorización expresa de Darío, a `support@signpath.io` desde `druse.contacto@gmail.com`, como respuesta a Phillip. Gmail confirmó la etiqueta `SENT`, mensaje `1a0c5e3a818b1ae2`, hilo `1a0a683d44455314`. Se verificaron destinatario, remitente y cabecera de respuesta. Pendiente de contestación; no es una solicitud formal de admisión.
+
+[Abrir el correo enviado](https://mail.google.com/mail/u/?authuser=druse.contacto%40gmail.com#all/1a0c5e3a818b1ae2).
 
 Subject: Re: Eligibility clarification for Druse database client dependencies
 
