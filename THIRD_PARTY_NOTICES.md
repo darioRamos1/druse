@@ -4,6 +4,8 @@ El código original de Druse se licencia bajo **GPL-3.0-only**. Esta elección n
 
 El [inventario de dependencias](docs/licencias-dependencias.csv) recoge versiones, procedencia y fuentes de sus términos. Incluye herramientas de desarrollo y otras plataformas; no representa el contenido exacto de cada instalador ni sustituye los avisos originales. Los manifiestos del empaquetado identifican los archivos que viajan en cada variante.
 
+El empaquetado conserva la extracción de licencias de Angular y los avisos originales de Monaco, Inter y JetBrains Mono en `api/licenses/frontend/`. Esa carpeta no representa una revisión completa de todos los componentes. La [reconciliación de Comunidad](docs/revisiones/licencias-comunidad-2026-09-21.md) identifica los archivos de su API que coinciden con NuGet y los textos todavía pendientes.
+
 ## Controladores de bases de datos no libres
 
 Cuatro controladores que usa Druse no son software libre:

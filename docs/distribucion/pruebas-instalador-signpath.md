@@ -4,7 +4,7 @@ Estado: protocolo preparado el 14 de septiembre de 2026; ejecución pendiente. C
 
 ## Entorno y evidencia
 
-Usar una máquina virtual Windows limpia y una cuenta de pruebas sin datos personales, credenciales reales ni herramientas de desarrollo. No ejecutar desinstalaciones de prueba sobre la instalación habitual. Conservar una instantánea inicial de la máquina virtual y repetir por separado para las variantes completa y sin Informix.
+Usar una máquina virtual Windows limpia y una cuenta de pruebas sin datos personales, credenciales reales ni herramientas de desarrollo. No ejecutar desinstalaciones de prueba sobre la instalación habitual. Conservar una instantánea inicial de la máquina virtual. Priorizar Comunidad, que es la candidata a SignPath; comprobar completa y sin Informix por separado si se publican, sin extrapolarles sus resultados.
 
 Registrar antes de empezar:
 
@@ -25,6 +25,7 @@ No usar una release generada con `-SinComprobarCI` como evidencia de CI satisfac
 | Actualizaciones | Probar rechazo, búsqueda manual, autorización y posterior desactivación; reiniciar tras cada elección | Se conserva la elección; registrar peticiones a GitHub y errores de red. La consulta manual debe seguir disponible |
 | Datos sintéticos | Crear una SQLite temporal, una tabla `prueba_privacidad` y filas ficticias; consultar, exportar, cerrar y abrir | Datos y exportación correctos; ningún dato o credencial real utilizado |
 | Motores | Conectar a servidores de prueba de los motores incluidos; contrastar con la matriz de motores | Registrar motor/versión y resultado. Un motor no disponible queda «no probado», no «correcto» |
+| Alcance Comunidad | Inspeccionar selector de motores, recursos instalados y `api/licenses/frontend/` | Cuatro motores: PostgreSQL, SQL Server, MySQL/MariaDB y SQLite; sin Oracle/IBM/IKVM; cinco avisos del frontend presentes y con hashes del manifiesto candidato |
 | IA opcional | Usar un proveedor de pruebas que registre solicitudes con preguntas sintéticas y cada nivel de contexto | Contrastar cuerpo enviado con el aviso: pregunta, SQL y esquema según elección; no incluir filas automáticamente |
 | Cambio de versión | Actualizar desde una versión anterior usando el canal y artefactos candidatos verificables | Versión nueva, datos preservados, variante conservada y rechazo de una firma inválida en entorno aislado |
 | Diagnóstico | Provocar errores con nombres y contraseñas ficticias; guardar y revisar el ZIP | Verificar redacción; registrar metadatos que permanezcan; guardar el ZIP no debe enviarlo por sí solo |

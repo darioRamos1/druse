@@ -277,6 +277,13 @@ finally {
 
 Write-Host '      Frontend compilado.' -ForegroundColor Green
 
+. (Join-Path $PSScriptRoot 'avisos-frontend.ps1')
+Copy-DruseFrontendNotices -RepoRoot $repoRoot -ApiOutput $apiOutput
+# Incluye los avisos recién generados y los bytes de la API después de firmarla.
+$inventory = @(Get-DrusePackageInventory -Path $apiOutput -Prefix 'api')
+$findings = @(Test-DrusePackageContent -Inventory $inventory -Rules (Get-DrusePackageRules -Variant $Variant))
+if (@($findings | Where-Object aplicar).Count) { throw 'El contenido final incluye archivos excluidos.' }
+
 # --- 3. Instalador ----------------------------------------------------------
 if ($SkipInstaller) {
     Write-Host '[3/3] Instalador omitido (-SkipInstaller).' -ForegroundColor Yellow
