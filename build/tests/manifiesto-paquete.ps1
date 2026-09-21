@@ -86,6 +86,16 @@ try {
         throw 'La variante completa no debe bloquearse por los componentes que sí distribuye.'
     }
 
+    # Comunidad debe rechazar también Oracle aunque SNI siga pendiente.
+    $comunidad = @(Test-DrusePackageContent -Inventory $inventario -Rules (Get-DrusePackageRules -Variant 'comunidad'))
+    $excluidosComunidad = @($comunidad | Where-Object { $_.aplicar }).archivos
+    foreach ($excluido in @('api/Oracle.ManagedDataAccess.dll', 'api/IBM.Data.Db2.dll', 'api/Druse.Jdbc.dll', 'api/IKVM.Runtime.dll')) {
+        if ($excluidosComunidad -notcontains $excluido) { throw "Comunidad admite $excluido por error." }
+    }
+    if ($excluidosComunidad -contains 'api/Microsoft.Data.SqlClient.SNI.dll') {
+        throw 'SNI sigue pendiente de aclaración; no se debe retirar SQL Server implícitamente.'
+    }
+
     # --- Avisos legales ------------------------------------------------------
     # El paquete de arriba no los lleva, y eso es justo lo que debe detectarse.
     $sinAvisos = @(Test-DruseRequiredNotices -Inventory $inventario)
@@ -119,7 +129,7 @@ try {
     }
 
     # Las reglas de exclusión no deben tocar los avisos en ninguna variante.
-    foreach ($variante in @('completo', 'sin-informix')) {
+    foreach ($variante in @('completo', 'sin-informix', 'comunidad')) {
         $alcanzados = @(Test-DrusePackageContent -Inventory $conAvisos -Rules (Get-DrusePackageRules -Variant $variante)).archivos
 
         foreach ($aviso in $avisos) {

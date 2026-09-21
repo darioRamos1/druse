@@ -42,12 +42,13 @@ fn variant_label() -> &'static str {
     match VARIANT {
         "completo" => "Completa (incluye Informix)",
         "sin-informix" => "Sin Informix",
+        "comunidad" => "Comunidad (sin Oracle ni Informix)",
         _ => "Desconocida",
     }
 }
 
 fn updater_target() -> Result<String, String> {
-    if !matches!(VARIANT, "completo" | "sin-informix") {
+    if !matches!(VARIANT, "completo" | "sin-informix" | "comunidad") {
         return Err(format!("La variante de Druse no es válida: {VARIANT}."));
     }
 
@@ -58,7 +59,7 @@ fn updater_target() -> Result<String, String> {
 }
 
 fn disabled_reason() -> Option<&'static str> {
-    if !matches!(VARIANT, "completo" | "sin-informix") {
+    if !matches!(VARIANT, "completo" | "sin-informix" | "comunidad") {
         return Some("La aplicación no identifica correctamente su variante.");
     }
 
@@ -242,7 +243,7 @@ mod tests {
 
     #[test]
     fn la_variante_compilada_es_conocida() {
-        assert!(matches!(VARIANT, "completo" | "sin-informix"));
+        assert!(matches!(VARIANT, "completo" | "sin-informix" | "comunidad"));
         assert_ne!(variant_label(), "Desconocida");
     }
 
@@ -278,7 +279,7 @@ mod tests {
         if cfg!(target_os = "windows") {
             assert!(matches!(
                 objetivo.as_str(),
-                "windows-x86_64-completo" | "windows-x86_64-sin-informix"
+                "windows-x86_64-completo" | "windows-x86_64-sin-informix" | "windows-x86_64-comunidad"
             ));
         }
     }
