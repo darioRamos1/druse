@@ -1,6 +1,6 @@
 # Expediente para SignPath Foundation — borrador sin presentar
 
-Actualización del 21 de septiembre: [repositorio público](https://github.com/darioRamos1/druse), GPL y avisos disponibles. La [edición Comunidad](edicion-comunidad.md) excluye Oracle/IBM/IKVM y supera la prueba local de arranque y SQLite. Falta validar/publicar el instalador candidato y aclarar SNI, WebView2 y consentimiento; no se ha presentado una solicitud formal.
+Actualización del 21 de septiembre: [repositorio público](https://github.com/darioRamos1/druse), GPL y avisos disponibles. La [edición Comunidad](edicion-comunidad.md) excluye Oracle/IBM/IKVM; el PR #18 está integrado y su CI produjo el instalador y el inventario, descargados con hash coincidente. Falta completar pruebas de Windows limpio, publicar una beta revisada y aclarar SNI, WebView2 y consentimiento; no se ha presentado una solicitud formal.
 
 Actualización del 16 de septiembre: [respuesta a la consulta](consulta-signpath-borrador.md). SignPath considera que Druse todavía no está listo para revisión y admite evaluar una edición separada sin Oracle/IBM bajo condiciones; no ha aprobado la candidatura. SNI, WebView2, consentimiento durante la instalación y revisión de redistribución siguen abiertos. La [revisión documental de controladores](../revisiones/controladores-signpath-2026-09-15.md) conserva la evidencia local.
 
@@ -19,7 +19,7 @@ Privacidad: el aviso provisional ya está incorporado al código de Preferencias
 | Repositorio público desde el 16 de septiembre | **DEC-01 cerrado**; verificación de procedencia sigue separada |
 | GPL-3.0-only elegida y `LICENSE` incorporado; faltan procedencia y compatibilidad de terceros | **DEC-02-R**, **OSS-03/04** |
 | No hay release pública ni evidencia de uso | **PUB-04**, y después **PUB-05** |
-| El alcance de Oracle, IBM, SNI y WebView2 sigue sin resolver | **OSS-03 / DEC-03**: respuesta recibida; edición separada sin Oracle/IBM evaluable bajo condiciones, SNI/WebView2 sin resolución expresa |
+| Comunidad excluye Oracle/IBM; SNI y WebView2 siguen sin resolución expresa | **OSS-03**: edición separada construida y funcional; elegibilidad todavía pendiente |
 | La opción de desactivar la búsqueda de actualizaciones no se ofrece durante la instalación | **P-01**: la respuesta valora la activación explícita, pero no aclara si basta el primer arranque |
 
 La respuesta pide repositorio público, artefacto publicado en la forma que se firmaría, licencia, inventario y flujo de construcción/firma. Debe aclararse el quinto punto; no se considera cerrado por la valoración favorable de la activación explícita.
@@ -58,7 +58,7 @@ Un mantenedor único es lo que hay. No se inventan revisores ni un tamaño de eq
 4. `release.ps1` trabaja en tres etapas —construir, verificar y publicar— precisamente para que la firma pueda ocurrir fuera de la máquina de construcción y los bytes firmados se publiquen sin reconstruirse.
 5. La verificación comprueba, sobre los bytes finales, que cada firma de actualización corresponde a su archivo, que `latest.json` coincide con lo que hay en disco, que ninguna firma Authenticode es inválida y que los instaladores son los que se revisaron. Publicar exige integración continua verde para ese commit exacto y deja `evidencia.json` con commit, hashes y resultados.
 
-**Estado de la integración continua:** las ejecuciones anteriores a la apertura fallaban sin iniciar pasos por facturación/cuota. El 21 de septiembre el workflow de Pages sí inició y ejecutó sus pasos; eso no acredita todavía la CI de la aplicación. El workflow específico de Comunidad prepara instalador e inventario en un runner alojado por GitHub. Hay que comprobar su resultado para el commit candidato y completar la integración de firma, todavía no concedida.
+**Estado de la integración continua:** las ejecuciones anteriores a la apertura fallaban sin iniciar pasos por facturación/cuota. El 21 de septiembre finalizaron correctamente Pages y el [workflow específico de Comunidad](https://github.com/darioRamos1/druse/actions/runs/35625598733), que construyó instalador e inventario en un runner alojado por GitHub. Los commits, hashes y límites de estas comprobaciones están en la [evidencia de Comunidad](edicion-comunidad.md). Esto no acredita la CI general de todos los proveedores ni una integración de firma, todavía no concedida.
 
 ## 5. Dependencias que hay que resolver
 

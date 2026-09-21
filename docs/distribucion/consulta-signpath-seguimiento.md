@@ -6,7 +6,7 @@ Subject: Re: Eligibility clarification for Druse database client dependencies
 
 Hello Phillip,
 
-Thank you for the clarification. Druse's repository is now public at https://github.com/darioRamos1/druse under GPL-3.0-only, with the previously described linking permission. We are preparing a separate Community edition excluding Oracle and IBM drivers and the JDBC/IKVM bridge. Local checks confirm that its API starts and executes a SQLite query without those components; this is not yet a reviewed public release.
+Thank you for the clarification. Druse's repository is now public at https://github.com/darioRamos1/druse under GPL-3.0-only, with the previously described linking permission. We have implemented a separate Community edition excluding Oracle and IBM drivers and the JDBC/IKVM bridge. GitHub-hosted Windows CI has built its installer and dependency inventory and verified that its API starts and executes a SQLite query without those components: https://github.com/darioRamos1/druse/actions/runs/35625598733. The downloaded installer's SHA-256 matches the inventory. This is an unsigned candidate, not yet a reviewed public release; clean-Windows lifecycle and runtime traffic checks remain pending.
 
 Before finalizing its package, could you clarify three outstanding points?
 

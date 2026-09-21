@@ -31,6 +31,19 @@ El workflow [comunidad.yml](../../.github/workflows/comunidad.yml) construye en 
 
 El manifiesto detallado local se genera en `artifacts/paquete/`. Estas pruebas no sustituyen una instalación/desinstalación en Windows limpio ni la revisión completa de tráfico.
 
+## Instalador y validación completados el 21 de septiembre
+
+El [PR #18](https://github.com/darioRamos1/druse/pull/18) se integró en `main`. La [construcción de Comunidad en GitHub](https://github.com/darioRamos1/druse/actions/runs/35625598733) terminó correctamente para la revisión `7dddc0c5e2804702ace58a4ccd849b526bb35ba7`. El checkout de integración de ese PR fue `b5e1d87f8a686322fb1551143d42196dc75a63ba`, que identifica el artefacto de Actions.
+
+- Instalador: `Druse Comunidad_1.1.0_x64-setup-comunidad.exe`, 50.447.507 bytes.
+- SHA-256: `7b0905b2286bd40bdb184b33c4003b1b19bfd10cc16cd8839c9ce7eff076dc0c`, comprobado tras descargarlo contra el manifiesto final de CI.
+- Authenticode: `NotSigned`. El artefacto de Actions se conserva durante 14 días; todavía no es una release pública estable ni una firma concedida por SignPath.
+- CI de Comunidad: exclusiones, arranque de la API y SQLite, cuatro pruebas Rust del actualizador y construcción NSIS aprobados. No equivale a ejecutar la CI general de todos los proveedores.
+- Frontend local con Vitest 4.1.11: **969 pruebas aprobadas en 69 archivos**. El primer intento tuvo tres timeouts durante la compilación simultánea de Rust; la repetición completa sin esa carga pasó sin modificar las pruebas.
+- Verificaciones locales del inventario y de releases existentes aprobadas; también se generó un instalador local, cuyos bytes son distintos del artefacto de GitHub.
+
+La landing tiene despliegue satisfactorio en [GitHub Pages](https://github.com/darioRamos1/druse/actions/runs/35624053451), en `https://darioramos1.github.io/druse/`. La lectura HTTP desde el equipo local agotó el tiempo de espera, por lo que no se registra aquí una comprobación visual de esa URL pública.
+
 ## Pendientes antes de solicitar la firma
 
 1. Aclarar con SignPath SNI, WebView2 y el lugar del consentimiento de actualizaciones. La respuesta anterior no aprobó esos tres puntos.
