@@ -20,7 +20,6 @@
     <ProjectReference Include="..\Druse.Application\Druse.Application.csproj" />
     <ProjectReference Include="..\Druse.Infrastructure\Druse.Infrastructure.csproj" />
     <ProjectReference Include="..\Druse.Provider.MySql\Druse.Provider.MySql.csproj" />
-    <ProjectReference Include="..\Druse.Provider.Oracle\Druse.Provider.Oracle.csproj" />
     <ProjectReference Include="..\Druse.Provider.PostgreSql\Druse.Provider.PostgreSql.csproj" />
     <ProjectReference Include="..\Druse.Provider.Sqlite\Druse.Provider.Sqlite.csproj" />
     <ProjectReference Include="..\Druse.Provider.SqlServer\Druse.Provider.SqlServer.csproj" />
@@ -50,12 +49,18 @@
   </ItemGroup>
 
   <PropertyGroup>
+    <IncludeOracle Condition="'$(IncludeOracle)' == ''">true</IncludeOracle>
+    <DefineConstants Condition="'$(IncludeOracle)' == 'true'">$(DefineConstants);DRUSE_ORACLE</DefineConstants>
     <IncludeInformix Condition="'$(IncludeInformix)' == ''">true</IncludeInformix>
     <DefineConstants Condition="'$(IncludeInformix)' == 'true'">$(DefineConstants);DRUSE_INFORMIX</DefineConstants>
   </PropertyGroup>
 
   <ItemGroup Condition="'$(IncludeInformix)' == 'true'">
     <ProjectReference Include="..\Druse.Provider.Informix\Druse.Provider.Informix.csproj" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(IncludeOracle)' == 'true'">
+    <ProjectReference Include="..\Druse.Provider.Oracle\Druse.Provider.Oracle.csproj" />
   </ItemGroup>
 
 </Project>

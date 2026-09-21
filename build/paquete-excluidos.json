@@ -3,6 +3,31 @@
   "revision": "13 de septiembre de 2026",
   "como_se_lee": "Cada regla se compara con la ruta relativa del archivo dentro del paquete, en minúsculas y con barras normales. Una regla con 'aplicar': true detiene el empaquetado si alguno de sus patrones coincide. Una regla con 'aplicar': false solo se cuenta y se anota en el manifiesto: describe una decisión que todavía no se ha tomado, y el empaquetado no debe fingir que sí.",
   "variantes": {
+    "comunidad": {
+      "reglas": [
+        {
+          "id": "comunidad-oracle-ibm",
+          "aplicar": true,
+          "motivo": "La edición Comunidad excluye Oracle e IBM y debe funcionar sin sus proveedores ni controladores. Esto no acredita la elegibilidad de SNI o WebView2.",
+          "patrones": [
+            "oracle*.dll",
+            "druse.provider.oracle.dll",
+            "ibm*.dll",
+            "clidriver/*",
+            "*/clidriver/*",
+            "druse.provider.informix.dll",
+            "*informix*.dll",
+            "*.jar"
+          ]
+        },
+        {
+          "id": "comunidad-ikvm",
+          "aplicar": true,
+          "motivo": "La edición Comunidad no incluye el puente JDBC ni su runtime IKVM.",
+          "patrones": ["ikvm.dll", "ikvm.properties", "ikvm.*.dll", "ikvm/*", "druse.jdbc.dll"]
+        }
+      ]
+    },
     "completo": {
       "reglas": []
     },
