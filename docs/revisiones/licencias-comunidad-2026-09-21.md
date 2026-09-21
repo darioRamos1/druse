@@ -44,3 +44,5 @@ Angular escribe `frontend/dist/frontend/3rdpartylicenses.txt` fuera de `browser/
 `package.ps1` ahora copia cinco documentos originales a `api/licenses/frontend/` después de construir Angular: su extracción de licencias, licencia y avisos de Monaco, y licencias de Inter y JetBrains Mono. Los recursos de API se incluyen tanto en NSIS como en portable. Se comprueba que los cinco originales existan, no estén vacíos y coincidan por hash con sus copias; el inventario se recalcula después de copiarlos y después de la posible firma de la API.
 
 La prueba `build/tests/avisos-frontend.ps1` comprueba los bytes, el inventario, las tres ediciones y el fallo ante un original ausente aunque quede una copia antigua. Esto corrige esa omisión concreta; no declara completo el conjunto de avisos de terceros.
+
+El workflow de Comunidad ejecuta ambas pruebas nuevas y recoge la evidencia NuGet de la API que acaba de publicar, conservándola junto al instalador. También se activa ante cambios de frontend y de los tres avisos del repositorio. La ejecución satisfactoria del PR #18 es anterior a estos cambios y no se presenta como validación de esta revisión.

@@ -9,6 +9,9 @@ on:
       - 'build/**'
       - 'shells/desktop-tauri/**'
       - '.github/workflows/comunidad.yml'
+      - 'LICENSE'
+      - 'COPYRIGHT'
+      - 'THIRD_PARTY_NOTICES.md'
 
 permissions:
   contents: read
