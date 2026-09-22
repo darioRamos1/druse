@@ -36,7 +36,8 @@ function* sourceFiles(dir) {
     const path = join(dir, name);
 
     if (statSync(path).isDirectory()) {
-      if (name !== 'i18n') {
+      // Solo la carpeta de los catálogos, no `core/i18n`, que es código.
+      if (path !== catalogs) {
         yield* sourceFiles(path);
       }
     } else if (/\.(ts|html)$/.test(name) && !name.endsWith('.spec.ts')) {
@@ -133,6 +134,12 @@ function literalsIn(html) {
 const withLiterals = new Map();
 
 for (const file of sourceFiles(frontend)) {
+  // `index.html` se pinta antes que Angular: su nombre accesible lo pone
+  // `prepareLocale` al decidir el idioma, y el resto es la marca.
+  if (relative(frontend, file) === 'index.html') {
+    continue;
+  }
+
   // Las plantillas escritas dentro del componente (`template: \`…\``) cuentan
   // igual que las de su propio archivo.
   const html = file.endsWith('.html')

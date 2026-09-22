@@ -40,6 +40,15 @@ export async function prepareLocale(): Promise<void> {
 
   applyDocumentLocale(prepared.locale);
   setFormatLocale(intlOf(prepared.locale));
+
+  // La pantalla de carga está en `index.html`, antes que Angular: su nombre
+  // accesible se pone aquí, que es lo primero que ya sabe el idioma.
+  const splash = document.getElementById('druse-splash');
+  const starting = prepared.catalog['app.starting'] ?? SOURCE_CATALOG['app.starting'];
+
+  if (splash && starting) {
+    splash.setAttribute('aria-label', starting);
+  }
 }
 
 /** El pseudoidioma formatea como el español, del que sale. */

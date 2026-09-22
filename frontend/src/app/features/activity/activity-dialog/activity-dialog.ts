@@ -8,6 +8,9 @@ import {
   signal,
   viewChild,
 } from '@angular/core';
+
+import { I18nService } from '../../../core/i18n/i18n.service';
+import { TranslatePipe } from '../../../core/i18n/translate.pipe';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { finalize } from 'rxjs';
 
@@ -24,7 +27,7 @@ import { formatDate } from '../../../core/i18n/locale-format';
 @Component({
   selector: 'app-activity-dialog',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [DialogBackdrop, DialogFocus],
+  imports: [DialogBackdrop, DialogFocus, TranslatePipe],
   templateUrl: './activity-dialog.html',
   styleUrl: './activity-dialog.scss',
 })
@@ -33,6 +36,7 @@ export class ActivityDialog {
   protected readonly runningJobs = inject(RunningJobsService);
   private readonly gateway = inject(ApplicationGateway);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly _i18n = inject(I18nService);
   private readonly closeButton = viewChild<ElementRef<HTMLButtonElement>>('closeButton');
 
   // Si la API no responde, todavía se puede consultar el aviso del arranque.
@@ -67,24 +71,14 @@ export class ActivityDialog {
   }
 
   protected name(job: JobSummary): string {
-    return { Backup: 'Respaldo', Restore: 'Restauración', Transfer: 'Traslado de datos' }[job.kind];
+    return this._i18n.t('activity.kind', { kind: job.kind });
   }
 
   protected state(job: JobSummary): string {
-    if (job.state === 'Interrupted') return 'Interrumpido';
-    if (job.state === 'Running') return 'En curso';
-    switch (job.outcome) {
-      case 'Completed':
-        return 'Completado';
-      case 'CompletedWithWarnings':
-        return 'Completado con avisos';
-      case 'Failed':
-        return 'Fallido';
-      case 'Cancelled':
-        return 'Cancelado';
-      default:
-        return 'Finalizado';
-    }
+    const state =
+      job.state === 'Interrupted' || job.state === 'Running' ? job.state : (job.outcome ?? '');
+
+    return this._i18n.t('activity.state', { state });
   }
 
   protected needsAttention(job: JobSummary): boolean {
@@ -94,7 +88,7 @@ export class ActivityDialog {
   protected date(value: string): string {
     const date = new Date(value);
     return Number.isNaN(date.getTime())
-      ? 'Fecha no disponible'
+      ? this._i18n.t('activity.noDate')
       : formatDate(date, { dateStyle: 'medium', timeStyle: 'short' });
   }
 }

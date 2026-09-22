@@ -3,10 +3,10 @@
   <input
     type="search"
     class="search__input"
-    placeholder="Filtrar por SQL o conexión…"
+    [placeholder]="'history.filter.placeholder' | t"
     [value]="term()"
     (input)="onSearch($event)"
-    aria-label="Filtrar el historial"
+    [attr.aria-label]="'history.filter.label' | t"
   />
 </div>
 
@@ -17,7 +17,7 @@
         <button
           type="button"
           class="item__sql"
-          title="Abrir en una pestaña nueva"
+          [title]="'history.reuse' | t"
           (click)="reuse.emit(entry)"
         >
           {{ summarize(entry.sql) }}
@@ -27,10 +27,10 @@
           <span class="item__dot" aria-hidden="true">·</span>
           <span>{{ entry.connectionName }}</span>
           <span class="item__dot" aria-hidden="true">·</span>
-          <span>{{ entry.durationMs }} ms</span>
+          <span>{{ 'history.duration' | t: { ms: entry.durationMs } }}</span>
           @if (entry.succeeded && entry.rowCount !== undefined && entry.rowCount !== null) {
             <span class="item__dot" aria-hidden="true">·</span>
-            <span>{{ entry.rowCount }} filas</span>
+            <span>{{ 'history.rows' | t: { count: entry.rowCount } }}</span>
           }
           @if (!entry.succeeded) {
             <span class="item__dot" aria-hidden="true">·</span>
@@ -42,14 +42,14 @@
   </ul>
 
   <footer class="foot">
-    <span class="foot__count">{{ entries().length }} entradas</span>
+    <span class="foot__count">{{ 'history.count' | t: { count: entries().length } }}</span>
     <span class="foot__spacer"></span>
-    <button type="button" class="foot__action" (click)="clear.emit()">Vaciar historial</button>
+    <button type="button" class="foot__action" (click)="clear.emit()">
+      {{ 'history.clear' | t }}
+    </button>
   </footer>
 } @else if (term()) {
-  <p class="empty">Ninguna consulta coincide con «{{ term() }}».</p>
+  <p class="empty">{{ 'history.noMatch' | t: { term: term() } }}</p>
 } @else {
-  <p class="empty">
-    Todavía no hay consultas en el historial. Se guarda automáticamente al ejecutar.
-  </p>
+  <p class="empty">{{ 'history.empty' | t }}</p>
 }

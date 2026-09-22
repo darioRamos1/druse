@@ -10,7 +10,7 @@
     @if (cancellable()) {
       <button type="button" class="cancel" (click)="cancelRequested.emit()">
         <app-icon name="stop" />
-        Cancelar
+        {{ 'common.cancel' | t }}
       </button>
     }
   </div>

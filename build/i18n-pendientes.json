@@ -1,5 +1,4 @@
 [
-  "frontend/src/app/features/activity/activity-dialog/activity-dialog.html",
   "frontend/src/app/features/ai/ai-panel/ai-panel.html",
   "frontend/src/app/features/ai/ai-provider-dialog/ai-provider-dialog.html",
   "frontend/src/app/features/backup/backup-dialog/backup-dialog.html",
@@ -9,12 +8,9 @@
   "frontend/src/app/features/import/import-dialog/import-dialog.html",
   "frontend/src/app/features/query-builder/procedure-runner/procedure-runner.html",
   "frontend/src/app/features/query-builder/query-builder/query-builder.html",
-  "frontend/src/app/features/query-history/query-history/query-history.html",
   "frontend/src/app/features/tables/table-designer/table-designer.html",
   "frontend/src/app/features/transfer/transfer-dialog/transfer-dialog.html",
   "frontend/src/app/features/transfer/transfer-set-dialog/transfer-set-dialog.html",
   "frontend/src/app/shared/privacy/privacy-notice.html",
-  "frontend/src/app/shared/ui/folder-picker/folder-picker.html",
-  "frontend/src/app/shared/ui/operation-progress/operation-progress.html",
-  "frontend/src/index.html"
+  "frontend/src/app/shared/ui/folder-picker/folder-picker.html"
 ]

@@ -1,5 +1,7 @@
-import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
+import { inject, ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
 
+import { I18nService } from '../../../core/i18n/i18n.service';
+import { TranslatePipe } from '../../../core/i18n/translate.pipe';
 import { Icon } from '../icon/icon';
 import { formatNumber } from '../../../core/i18n/locale-format';
 
@@ -22,7 +24,7 @@ import { formatNumber } from '../../../core/i18n/locale-format';
 @Component({
   selector: 'app-operation-progress',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [Icon],
+  imports: [Icon, TranslatePipe],
   templateUrl: './operation-progress.html',
   styleUrl: './operation-progress.scss',
 })
@@ -54,6 +56,8 @@ export class OperationProgress {
 
   readonly cancelRequested = output<void>();
 
+  private readonly _i18n = inject(I18nService);
+
   protected readonly percent = computed(() => toPercent(this.overall()));
 
   protected readonly currentPercent = computed(() => toPercent(this.current()));
@@ -70,26 +74,28 @@ export class OperationProgress {
     const estimated = this.rowsEstimated();
 
     if (!estimated || estimated <= 0) {
-      return this.rowsDone() > 0 ? `${done} filas escritas` : '';
+      return this.rowsDone() > 0 ? this._i18n.t('progress.rowsWritten', { done }) : '';
     }
 
-    return `${done} de ~${format(estimated)} filas`;
+    return this._i18n.t('progress.rowsOf', { done, estimated: format(estimated) });
   });
 
   protected readonly objects = computed(() =>
-    this.total() > 0 ? `${this.done()} de ${this.total()} objetos` : '',
+    this.total() > 0
+      ? this._i18n.t('progress.objects', { done: this.done(), total: this.total() })
+      : '',
   );
 
   protected readonly elapsed = computed(() => {
     const seconds = Math.floor(this.elapsedMs() / 1000);
 
     if (seconds < 60) {
-      return `${seconds} s`;
+      return this._i18n.t('progress.seconds', { seconds });
     }
 
     const minutes = Math.floor(seconds / 60);
 
-    return `${minutes} min ${seconds % 60} s`;
+    return this._i18n.t('progress.minutes', { minutes, seconds: seconds % 60 });
   });
 }
 

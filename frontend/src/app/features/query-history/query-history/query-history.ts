@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, input, output, signal } from '@angular/core';
 
+import { TranslatePipe } from '../../../core/i18n/translate.pipe';
 import { QueryHistoryEntry } from '../../../shared/models/workspace';
 import { Icon } from '../../../shared/ui/icon/icon';
 import { formatDate as formatLocaleDate } from '../../../core/i18n/locale-format';
@@ -14,7 +15,7 @@ import { formatDate as formatLocaleDate } from '../../../core/i18n/locale-format
 @Component({
   selector: 'app-query-history',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [Icon],
+  imports: [Icon, TranslatePipe],
   templateUrl: './query-history.html',
   styleUrl: './query-history.scss',
 })

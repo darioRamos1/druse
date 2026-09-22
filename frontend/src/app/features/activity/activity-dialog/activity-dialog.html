@@ -4,31 +4,36 @@
   class="dialog"
   role="dialog"
   aria-modal="true"
-  aria-label="Actividad reciente"
+  [attr.aria-label]="'activity.title' | t"
   tabindex="-1"
   (keydown.escape)="$event.stopPropagation(); closed.emit()"
 >
   <header class="head">
     <div>
-      <h2>Actividad reciente</h2>
-      <p>Últimos 20 respaldos, restauraciones y traslados de datos.</p>
+      <h2>{{ 'activity.title' | t }}</h2>
+      <p>{{ 'activity.subtitle' | t }}</p>
     </div>
-    <button type="button" class="btn close" aria-label="Cerrar actividad" (click)="closed.emit()">
+    <button
+      type="button"
+      class="btn close"
+      [attr.aria-label]="'activity.close' | t"
+      (click)="closed.emit()"
+    >
       ×
     </button>
   </header>
 
   <div class="toolbar">
-    <span>Actualiza para consultar el estado más reciente.</span>
+    <span>{{ 'activity.refreshHint' | t }}</span>
     <button type="button" class="btn" [disabled]="loading()" (click)="refresh()">
-      {{ loading() ? 'Actualizando…' : 'Actualizar' }}
+      {{ (loading() ? 'activity.refreshing' : 'activity.refresh') | t }}
     </button>
   </div>
 
   <div class="body" [attr.aria-busy]="loading()">
     @if (failed()) {
       <p class="notice notice--error" role="alert">
-        No se pudo actualizar la actividad. Vuelve a intentarlo con Actualizar.
+        {{ 'activity.failed' | t }}
       </p>
     }
     @for (job of jobs(); track job.id) {
@@ -43,17 +48,17 @@
             >{{ state(job) }}</span
           >
         </div>
-        <p class="job__subject">{{ job.subject || 'Sin destino registrado' }}</p>
+        <p class="job__subject">{{ job.subject || ('activity.noSubject' | t) }}</p>
         <dl class="job__dates">
           <div>
-            <dt>Inicio</dt>
+            <dt>{{ 'activity.start' | t }}</dt>
             <dd>
               <time [attr.datetime]="job.startedAtUtc">{{ date(job.startedAtUtc) }}</time>
             </dd>
           </div>
           @if (job.finishedAtUtc; as finished) {
             <div>
-              <dt>Fin</dt>
+              <dt>{{ 'activity.end' | t }}</dt>
               <dd>
                 <time [attr.datetime]="finished">{{ date(finished) }}</time>
               </dd>
@@ -62,24 +67,22 @@
         </dl>
         @if (job.state === 'Interrupted') {
           <p class="notice">
-            Druse se cerró antes de registrar cómo terminó este trabajo.
+            {{ 'activity.interrupted' | t }}
             @if (job.kind === 'Backup') {
-              Revisa el archivo o la carpeta de respaldo antes de utilizarlo; puede estar
-              incompleto.
+              {{ 'activity.interruptedBackup' | t }}
             } @else {
-              Revisa los datos del destino antes de repetir la operación; puede haber cambios ya
-              aplicados.
+              {{ 'activity.interruptedOther' | t }}
             }
           </p>
         }
       </article>
     } @empty {
       @if (loading()) {
-        <p class="empty" role="status">Cargando actividad…</p>
+        <p class="empty" role="status">{{ 'activity.loading' | t }}</p>
       } @else if (!failed()) {
         <div class="empty">
-          <h3>Aún no hay trabajos registrados</h3>
-          <p>Aquí podrás consultar tus respaldos, restauraciones y traslados.</p>
+          <h3>{{ 'activity.empty.title' | t }}</h3>
+          <p>{{ 'activity.empty.text' | t }}</p>
         </div>
       }
     }
@@ -88,11 +91,11 @@
   <footer class="foot">
     @if (runningJobs.interrupted().length > 0) {
       <button type="button" class="btn" (click)="dismissNotices()">
-        Ocultar avisos por esta sesión
+        {{ 'activity.hideNotices' | t }}
       </button>
     }
     <button #closeButton type="button" class="btn btn--primary" (click)="closed.emit()">
-      Cerrar
+      {{ 'common.close' | t }}
     </button>
   </footer>
 </section>
