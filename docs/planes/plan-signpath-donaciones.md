@@ -1,5 +1,7 @@
 # Plan de preparación para SignPath Foundation y donaciones
 
+Textos NuGet reunidos el 21 de septiembre: [expediente de Comunidad](../terceros/comunidad/README.md), con 41 documentos originales para las 37 entradas del grafo de API. Se localizaron textos para las 28 entradas antes pendientes, con commits o etiquetas resueltos y hashes. Comunidad los incorpora al paquete y rechaza versiones sin ficha o avisos alterados. Esto reduce el pendiente de recopilación de OSS-04; no cierra compatibilidad, obligaciones de terceros, procedencia ni elegibilidad. SNI/WebView2 y Windows limpio siguen abiertos.
+
 Continuación del 21 de septiembre: [reconciliación de Comunidad](../revisiones/licencias-comunidad-2026-09-21.md), con 377 de 401 archivos de API vinculados por SHA-256 a NuGet y 28 paquetes del grafo sin aviso local localizado. Se corrige la omisión de los avisos generados por Angular y los avisos originales de Monaco/fuentes en el empaquetado. OSS-04 sigue abierto; recopilar evidencia no equivale a aprobar redistribución. El protocolo de Windows limpio ahora identifica Comunidad como candidata y comprueba sus cuatro motores y los avisos instalados.
 
 [Seguimiento enviado a SignPath](../distribucion/consulta-signpath-seguimiento.md) el 21 de septiembre a las 16:33, autorizado por Darío y confirmado en Gmail. Comunica repositorio público y candidato construido, y pregunta por SNI, WebView2 y consentimiento. Espera respuesta; no se ha presentado una solicitud formal ni concedido firma.

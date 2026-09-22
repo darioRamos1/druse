@@ -54,3 +54,6 @@
 
 # Generado: no ensuciar las revisiones de código
 package-lock.json linguist-generated=true -diff
+
+# Textos originales de terceros: conservar bytes y hashes también al clonar.
+docs/terceros/comunidad/fuentes/** -text

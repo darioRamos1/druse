@@ -1,0 +1,1054 @@
+{
+  "esquema": 1,
+  "generado": "2026-09-21T23:36:14.8496955-05:00",
+  "alcance": "Textos para las 37 entradas NuGet/runtime de la API local de Comunidad examinada el 21 de septiembre. No es aprobación de redistribución ni de SignPath.",
+  "depsSha256": "ebb490351aef90bcb3bf3875daf35fef88cf140c298556046330672fc4bf8f25",
+  "limites": [
+    "Recopilación de textos originales; no demuestra cubrir cada obligación o archivo de terceros.",
+    "Las etiquetas de versión se resolvieron a commits; no equivalen a una reconstrucción verificable del paquete NuGet.",
+    "La procedencia declarada y el hash identifican evidencia, no autentican por sí solos a un editor.",
+    "No cubre Rust, NSIS ni WebView2."
+  ],
+  "paquetes": [
+    {
+      "componente": "ExcelNumberFormat",
+      "version": "1.1.0",
+      "licenciaDeclarada": "MIT",
+      "procedencia": "etiqueta de versión",
+      "repositorio": "https://github.com/andersnm/ExcelNumberFormat",
+      "commit": "38c6a71919ad3895e3ba61d7a888012670d26303",
+      "etiqueta": "v1.1.0",
+      "nuspecSha256": "e5f439f21cb51cd7c6376bd06778e94b601c0b5bf6779d8fbb92113921fb2001",
+      "evidenciaDll": null,
+      "documentos": [
+        {
+          "archivo": "fuentes/excelnumberformat-38c6a719/LICENSE",
+          "sha256": "6650b0063a39e7dced886e53c6dac66fcd909beb8b9abb868452c9b621fa2018",
+          "origen": "LICENSE",
+          "url": "https://github.com/andersnm/ExcelNumberFormat/blob/38c6a71919ad3895e3ba61d7a888012670d26303/LICENSE",
+          "gitBlob": "957a067be97100bd312dc6ae74d2922e3569d955"
+        }
+      ],
+      "estado": "TEXTOS RECOPILADOS; REVISION PENDIENTE"
+    },
+    {
+      "componente": "SQLitePCLRaw.lib.e_sqlite3",
+      "version": "2.1.12",
+      "licenciaDeclarada": "Apache-2.0",
+      "procedencia": "etiqueta de versión",
+      "repositorio": "https://github.com/ericsink/SQLitePCL.raw",
+      "commit": "ca835d21508bff43121c65081035840ac5006c4c",
+      "etiqueta": "v2.1.12",
+      "nuspecSha256": "0e82e5cda14ccb8c546596d39393a6a9ba94146ffeeac86069df29ce9d57a731",
+      "evidenciaDll": null,
+      "documentos": [
+        {
+          "archivo": "fuentes/sqlitepcl.raw-ca835d21/LICENSE.TXT",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "origen": "LICENSE.TXT",
+          "url": "https://github.com/ericsink/SQLitePCL.raw/blob/ca835d21508bff43121c65081035840ac5006c4c/LICENSE.TXT",
+          "gitBlob": "d645695673349e3947e8e5ae42332d0ac3164cd7"
+        },
+        {
+          "archivo": "fuentes/sqlitepcl.raw-ca835d21/NOTICE.TXT",
+          "sha256": "485b276b3d2bfaa26df348e1e5c84df3648981e09b88531a6a53006f0705c24b",
+          "origen": "NOTICE.TXT",
+          "url": "https://github.com/ericsink/SQLitePCL.raw/blob/ca835d21508bff43121c65081035840ac5006c4c/NOTICE.TXT",
+          "gitBlob": "9b4d10b6022750c492749e0b4bb22b0f0e70ef5b"
+        }
+      ],
+      "estado": "TEXTOS RECOPILADOS; REVISION PENDIENTE"
+    },
+    {
+      "componente": "SQLitePCLRaw.provider.e_sqlite3",
+      "version": "2.1.12",
+      "licenciaDeclarada": "Apache-2.0",
+      "procedencia": "etiqueta de versión",
+      "repositorio": "https://github.com/ericsink/SQLitePCL.raw",
+      "commit": "ca835d21508bff43121c65081035840ac5006c4c",
+      "etiqueta": "v2.1.12",
+      "nuspecSha256": "7e5b604b8ad8121fa75f01eec61f56989b717fadfd530188a57d35759d93f573",
+      "evidenciaDll": null,
+      "documentos": [
+        {
+          "archivo": "fuentes/sqlitepcl.raw-ca835d21/LICENSE.TXT",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "origen": "LICENSE.TXT",
+          "url": "https://github.com/ericsink/SQLitePCL.raw/blob/ca835d21508bff43121c65081035840ac5006c4c/LICENSE.TXT",
+          "gitBlob": "d645695673349e3947e8e5ae42332d0ac3164cd7"
+        },
+        {
+          "archivo": "fuentes/sqlitepcl.raw-ca835d21/NOTICE.TXT",
+          "sha256": "485b276b3d2bfaa26df348e1e5c84df3648981e09b88531a6a53006f0705c24b",
+          "origen": "NOTICE.TXT",
+          "url": "https://github.com/ericsink/SQLitePCL.raw/blob/ca835d21508bff43121c65081035840ac5006c4c/NOTICE.TXT",
+          "gitBlob": "9b4d10b6022750c492749e0b4bb22b0f0e70ef5b"
+        }
+      ],
+      "estado": "TEXTOS RECOPILADOS; REVISION PENDIENTE"
+    },
+    {
+      "componente": "Microsoft.OpenApi",
+      "version": "2.7.5",
+      "licenciaDeclarada": "MIT",
+      "procedencia": "nuspec.repository.commit",
+      "repositorio": "https://github.com/Microsoft/OpenAPI.NET",
+      "commit": "99fc3f830ca7a8e95f9db48babdf06118ecfa50f",
+      "etiqueta": null,
+      "nuspecSha256": "d1621fbc03cf982a120c92b6174f68464e05573041cee99fa95606e9f338dfd9",
+      "evidenciaDll": null,
+      "documentos": [
+        {
+          "archivo": "fuentes/openapi.net-99fc3f83/LICENSE",
+          "sha256": "5d177f23ecfeb0ea8e050b6a5a16355e1ae9a0b286436ca8f83ed08b3795be6b",
+          "origen": "LICENSE",
+          "url": "https://github.com/Microsoft/OpenAPI.NET/blob/99fc3f830ca7a8e95f9db48babdf06118ecfa50f/LICENSE",
+          "gitBlob": "017b9885a46ad4c7f4367ad2949fb66fb56f977f"
+        }
+      ],
+      "estado": "TEXTOS RECOPILADOS; REVISION PENDIENTE"
+    },
+    {
+      "componente": "MySqlConnector",
+      "version": "2.6.2",
+      "licenciaDeclarada": "MIT",
+      "procedencia": "nuspec.repository.commit",
+      "repositorio": "https://github.com/mysql-net/MySqlConnector",
+      "commit": "775689bb3e1ab55d16171e0795264fa746e364c4",
+      "etiqueta": null,
+      "nuspecSha256": "5adf00ca05c59d3879e534fd8e159ac314d574be3dea33d49b38c093a326bbe0",
+      "evidenciaDll": null,
+      "documentos": [
+        {
+          "archivo": "fuentes/mysqlconnector-775689bb/LICENSE",
+          "sha256": "8b976f3fbc2575d2b3456ae02c8c438e12e39ba31056d26538b1820dffcbce33",
+          "origen": "LICENSE",
+          "url": "https://github.com/mysql-net/MySqlConnector/blob/775689bb3e1ab55d16171e0795264fa746e364c4/LICENSE",
+          "gitBlob": "5979e053b64c29564f052c009913132cc562a331"
+        }
+      ],
+      "estado": "TEXTOS RECOPILADOS; REVISION PENDIENTE"
+    },
+    {
+      "componente": "Npgsql",
+      "version": "10.0.3",
+      "licenciaDeclarada": "PostgreSQL",
+      "procedencia": "nuspec.repository.commit",
+      "repositorio": "https://github.com/npgsql/npgsql",
+      "commit": "d3768398c17877b3a916c3c4d87e8e11698991fc",
+      "etiqueta": null,
+      "nuspecSha256": "ae37839d2561cd05c88e1180bcc36304a10837e121dc5cde1ffaf440f10402d1",
+      "evidenciaDll": null,
+      "documentos": [
+        {
+          "archivo": "fuentes/npgsql-d3768398/LICENSE",
+          "sha256": "2e1d9cc6ed4eb7fe6fa82091846c06b4f58571a2c3b54777db6baeca10dd2d74",
+          "origen": "LICENSE",
+          "url": "https://github.com/npgsql/npgsql/blob/d3768398c17877b3a916c3c4d87e8e11698991fc/LICENSE",
+          "gitBlob": "c551cb7b0c921b082c2424f213e12fb6b84a864c"
+        }
+      ],
+      "estado": "TEXTOS RECOPILADOS; REVISION PENDIENTE"
+    },
+    {
+      "componente": "SixLabors.Fonts",
+      "version": "1.0.0",
+      "licenciaDeclarada": "Apache-2.0",
+      "procedencia": "nuspec.repository.commit",
+      "repositorio": "https://github.com/SixLabors/Fonts",
+      "commit": "32bef42997adb10268369ca149777f00e4241ce9",
+      "etiqueta": null,
+      "nuspecSha256": "dbd5856e3bbf6d25087250dbad4fe3140383dfe82610c3cce4929fbc59c7e7a8",
+      "evidenciaDll": null,
+      "documentos": [
+        {
+          "archivo": "fuentes/fonts-32bef429/LICENSE",
+          "sha256": "f38dc2765451fd2b19d7e0f47ed655f3a1cb889b28341ea6266efd75d8425a6f",
+          "origen": "LICENSE",
+          "url": "https://github.com/SixLabors/Fonts/blob/32bef42997adb10268369ca149777f00e4241ce9/LICENSE",
+          "gitBlob": "8d5852d37414b28cad15d8e7411a5fc211882ba6"
+        }
+      ],
+      "estado": "TEXTOS RECOPILADOS; REVISION PENDIENTE"
+    },
+    {
+      "componente": "SSH.NET",
+      "version": "2026.0.0",
+      "licenciaDeclarada": "MIT",
+      "procedencia": "nuspec.repository.commit",
+      "repositorio": "https://github.com/sshnet/SSH.NET",
+      "commit": "7b2fd3dbf2c86a80a7b06cea020aa5f821c9902e",
+      "etiqueta": null,
+      "nuspecSha256": "219617f6fe22256e72ab26160875a9da4d679cbb7f3a6d7ffc4aa9760de47ee9",
+      "evidenciaDll": null,
+      "documentos": [
+        {
+          "archivo": "fuentes/ssh.net-7b2fd3db/LICENSE",
+          "sha256": "84c79a38515de2833a7c353395e04056c0cbd77545d450fe216d569e1570b78e",
+          "origen": "LICENSE",
+          "url": "https://github.com/sshnet/SSH.NET/blob/7b2fd3dbf2c86a80a7b06cea020aa5f821c9902e/LICENSE",
+          "gitBlob": "f2aef4f38b516e48c51f0f5f77bead6a7ab69d3b"
+        },
+        {
+          "archivo": "fuentes/ssh.net-7b2fd3db/THIRD-PARTY-NOTICES.TXT",
+          "sha256": "9ce436c5811f18ba3deb9442dacdbad4fada7923cba5a582a4250a5e4b195426",
+          "origen": "THIRD-PARTY-NOTICES.TXT",
+          "url": "https://github.com/sshnet/SSH.NET/blob/7b2fd3dbf2c86a80a7b06cea020aa5f821c9902e/THIRD-PARTY-NOTICES.TXT",
+          "gitBlob": "5f75d165089774209f52afebd2212796f3378b03"
+        }
+      ],
+      "estado": "TEXTOS RECOPILADOS; REVISION PENDIENTE"
+    },
+    {
+      "componente": "RBush.Signed",
+      "version": "4.0.0",
+      "licenciaDeclarada": "MIT",
+      "procedencia": "nuspec.repository.commit",
+      "repositorio": "https://github.com/viceroypenguin/RBush",
+      "commit": "b8690322abac35d835baa2fdca4a3918ed77a910",
+      "etiqueta": null,
+      "nuspecSha256": "d4983dbce60e9e35718273f5870e43860d3d2d66876d38d564a40d881c2236f4",
+      "evidenciaDll": null,
+      "documentos": [
+        {
+          "archivo": "fuentes/rbush-b8690322/LICENSE",
+          "sha256": "f6bfae3ff6477fbca0c850f115da170516b1c633a98619ea5dcc6720dcdcb288",
+          "origen": "LICENSE",
+          "url": "https://github.com/viceroypenguin/RBush/blob/b8690322abac35d835baa2fdca4a3918ed77a910/LICENSE",
+          "gitBlob": "e8d9dd21cd943acbbd87e26434a2bf31c2afcee9"
+        }
+      ],
+      "estado": "TEXTOS RECOPILADOS; REVISION PENDIENTE"
+    },
+    {
+      "componente": "BouncyCastle.Cryptography",
+      "version": "2.7.0",
+      "licenciaDeclarada": "MIT",
+      "procedencia": "texto incluido en el paquete NuGet de la caché examinada",
+      "repositorio": null,
+      "commit": null,
+      "etiqueta": null,
+      "nuspecSha256": "89c51e6b51c6d804b0ca2bfc55e00e797ef5e5d79656680d769616995832efc1",
+      "evidenciaDll": null,
+      "documentos": [
+        {
+          "sha256": "be0592a6c76f398356fbf252a4fb43476fb3ca3c45331428c2f4f22c499e8311",
+          "url": "https://www.nuget.org/packages/BouncyCastle.Cryptography/2.7.0",
+          "gitBlob": null,
+          "archivo": "fuentes/bouncycastle.cryptography-89c51e6b/LICENSE.md",
+          "origen": "LICENSE.md"
+        }
+      ],
+      "estado": "TEXTOS RECOPILADOS; REVISION PENDIENTE"
+    },
+    {
+      "componente": "Microsoft.AspNetCore.OpenApi",
+      "version": "10.0.10",
+      "licenciaDeclarada": "MIT",
+      "procedencia": "aviso local y licencia/avisos upstream en nuspec.repository.commit",
+      "repositorio": "https://github.com/dotnet/dotnet",
+      "commit": "f7d90799ce4ef09a0bb257852a57248d2a8fb8dd",
+      "etiqueta": null,
+      "nuspecSha256": "bb37ba0769a06cfcc87022c38cb2aa440c2b6ccc012f812d41b173d79b533963",
+      "evidenciaDll": null,
+      "documentos": [
+        {
+          "sha256": "307d014f65d8482314f1400ddeae7a0cbabb96c2207bcc77f6233cc10588e5d9",
+          "url": "https://www.nuget.org/packages/Microsoft.AspNetCore.OpenApi/10.0.10",
+          "gitBlob": null,
+          "archivo": "fuentes/microsoft.aspnetcore.openapi-bb37ba07/THIRD-PARTY-NOTICES.TXT",
+          "origen": "THIRD-PARTY-NOTICES.TXT"
+        },
+        {
+          "origen": "src/aspnetcore/LICENSE.txt",
+          "gitBlob": "984713a49622a96da110443c15477613bc12656b",
+          "url": "https://github.com/dotnet/dotnet/blob/f7d90799ce4ef09a0bb257852a57248d2a8fb8dd/src/aspnetcore/LICENSE.txt",
+          "archivo": "fuentes/aspnetcore-f7d90799/LICENSE.txt",
+          "sha256": "cfc21f5e8bd655ae997eec916138b707b1d290b83272c02a95c9f821b8c87310"
+        },
+        {
+          "origen": "src/aspnetcore/THIRD-PARTY-NOTICES.txt",
+          "gitBlob": "484f2d5485153f66280acb8646f1e019a58b069c",
+          "url": "https://github.com/dotnet/dotnet/blob/f7d90799ce4ef09a0bb257852a57248d2a8fb8dd/src/aspnetcore/THIRD-PARTY-NOTICES.txt",
+          "archivo": "fuentes/aspnetcore-f7d90799/THIRD-PARTY-NOTICES.txt",
+          "sha256": "52af3d603b6d069e635f8afd08ec44ec01559255b5f3afd161ae9e6fe7e7aa54"
+        }
+      ],
+      "estado": "TEXTOS RECOPILADOS; REVISION PENDIENTE"
+    },
+    {
+      "componente": "Microsoft.Bcl.Cryptography",
+      "version": "9.0.13",
+      "licenciaDeclarada": "MIT",
+      "procedencia": "texto incluido en el paquete NuGet de la caché examinada",
+      "repositorio": null,
+      "commit": null,
+      "etiqueta": null,
+      "nuspecSha256": "2c27966df2516ac6973e4eb961d053388fa8d75ed81f8ae363ffcc3cf198acfd",
+      "evidenciaDll": null,
+      "documentos": [
+        {
+          "sha256": "d7a68596ab69b06f51ca278a6545148e4269a9381c26d597c13df5d88e08cf5b",
+          "url": "https://www.nuget.org/packages/Microsoft.Bcl.Cryptography/9.0.13",
+          "gitBlob": null,
+          "archivo": "fuentes/microsoft.bcl.cryptography-2c27966d/LICENSE.TXT",
+          "origen": "LICENSE.TXT"
+        },
+        {
+          "sha256": "40686c6447a7d5b5d3693068e4571b5f483d7ed335aeee773ef662440de4c5d5",
+          "url": "https://www.nuget.org/packages/Microsoft.Bcl.Cryptography/9.0.13",
+          "gitBlob": null,
+          "archivo": "fuentes/microsoft.bcl.cryptography-2c27966d/THIRD-PARTY-NOTICES.TXT",
+          "origen": "THIRD-PARTY-NOTICES.TXT"
+        }
+      ],
+      "estado": "TEXTOS RECOPILADOS; REVISION PENDIENTE"
+    },
+    {
+      "componente": "Microsoft.Data.SqlClient.SNI.runtime",
+      "version": "6.0.2",
+      "licenciaDeclarada": "LICENSE.txt",
+      "procedencia": "texto incluido en el paquete NuGet de la caché examinada",
+      "repositorio": null,
+      "commit": null,
+      "etiqueta": null,
+      "nuspecSha256": "66232cc42f75a62d47f6662b6c1235b322bdd39ea5908a8a31a0fd7fd21f31c9",
+      "evidenciaDll": null,
+      "documentos": [
+        {
+          "sha256": "9335e8bad875dd7be4eebd55d2335eb6433d1cea61aadb3817af7807bef8932a",
+          "url": "https://www.nuget.org/packages/Microsoft.Data.SqlClient.SNI.runtime/6.0.2",
+          "gitBlob": null,
+          "archivo": "fuentes/microsoft.data.sqlclient.sni.run-66232cc4/LICENSE.txt",
+          "origen": "LICENSE.txt"
+        }
+      ],
+      "estado": "TEXTOS RECOPILADOS; REVISION PENDIENTE"
+    },
+    {
+      "componente": "Microsoft.AspNetCore.App.Runtime.win-x64",
+      "version": "10.0.12",
+      "licenciaDeclarada": "MIT",
+      "procedencia": "texto incluido en el paquete NuGet de la caché examinada",
+      "repositorio": null,
+      "commit": null,
+      "etiqueta": null,
+      "nuspecSha256": "6f3d800ff6669f05fab40d3c9fcfe3ab162c2d36717d78ef39d6e1baa0eabc59",
+      "evidenciaDll": null,
+      "documentos": [
+        {
+          "sha256": "d7a68596ab69b06f51ca278a6545148e4269a9381c26d597c13df5d88e08cf5b",
+          "url": "https://www.nuget.org/packages/Microsoft.AspNetCore.App.Runtime.win-x64/10.0.12",
+          "gitBlob": null,
+          "archivo": "fuentes/microsoft.aspnetcore.app.runtime-6f3d800f/LICENSE.txt",
+          "origen": "LICENSE.txt"
+        },
+        {
+          "sha256": "307d014f65d8482314f1400ddeae7a0cbabb96c2207bcc77f6233cc10588e5d9",
+          "url": "https://www.nuget.org/packages/Microsoft.AspNetCore.App.Runtime.win-x64/10.0.12",
+          "gitBlob": null,
+          "archivo": "fuentes/microsoft.aspnetcore.app.runtime-6f3d800f/THIRD-PARTY-NOTICES.TXT",
+          "origen": "THIRD-PARTY-NOTICES.TXT"
+        }
+      ],
+      "estado": "TEXTOS RECOPILADOS; REVISION PENDIENTE"
+    },
+    {
+      "componente": "Microsoft.NETCore.App.Runtime.win-x64",
+      "version": "10.0.12",
+      "licenciaDeclarada": "MIT",
+      "procedencia": "texto incluido en el paquete NuGet de la caché examinada",
+      "repositorio": null,
+      "commit": null,
+      "etiqueta": null,
+      "nuspecSha256": "2649fc5fcb95c80f991b6d47ad8e10b772923249e87d98f409ca54cee548c379",
+      "evidenciaDll": null,
+      "documentos": [
+        {
+          "sha256": "d7a68596ab69b06f51ca278a6545148e4269a9381c26d597c13df5d88e08cf5b",
+          "url": "https://www.nuget.org/packages/Microsoft.NETCore.App.Runtime.win-x64/10.0.12",
+          "gitBlob": null,
+          "archivo": "fuentes/microsoft.netcore.app.runtime.wi-2649fc5f/LICENSE.TXT",
+          "origen": "LICENSE.TXT"
+        },
+        {
+          "sha256": "6d15e10a101c6bfff2ab4429ed061bf76c456fc4b23ad6b03e0d0f8377148a21",
+          "url": "https://www.nuget.org/packages/Microsoft.NETCore.App.Runtime.win-x64/10.0.12",
+          "gitBlob": null,
+          "archivo": "fuentes/microsoft.netcore.app.runtime.wi-2649fc5f/THIRD-PARTY-NOTICES.TXT",
+          "origen": "THIRD-PARTY-NOTICES.TXT"
+        }
+      ],
+      "estado": "TEXTOS RECOPILADOS; REVISION PENDIENTE"
+    },
+    {
+      "componente": "System.Configuration.ConfigurationManager",
+      "version": "9.0.13",
+      "licenciaDeclarada": "MIT",
+      "procedencia": "texto incluido en el paquete NuGet de la caché examinada",
+      "repositorio": null,
+      "commit": null,
+      "etiqueta": null,
+      "nuspecSha256": "a23804df159140a67e06ebb74598e6b388451092bfd571d51a9fba5563864e0e",
+      "evidenciaDll": null,
+      "documentos": [
+        {
+          "sha256": "d7a68596ab69b06f51ca278a6545148e4269a9381c26d597c13df5d88e08cf5b",
+          "url": "https://www.nuget.org/packages/System.Configuration.ConfigurationManager/9.0.13",
+          "gitBlob": null,
+          "archivo": "fuentes/system.configuration.configurati-a23804df/LICENSE.TXT",
+          "origen": "LICENSE.TXT"
+        },
+        {
+          "sha256": "40686c6447a7d5b5d3693068e4571b5f483d7ed335aeee773ef662440de4c5d5",
+          "url": "https://www.nuget.org/packages/System.Configuration.ConfigurationManager/9.0.13",
+          "gitBlob": null,
+          "archivo": "fuentes/system.configuration.configurati-a23804df/THIRD-PARTY-NOTICES.TXT",
+          "origen": "THIRD-PARTY-NOTICES.TXT"
+        }
+      ],
+      "estado": "TEXTOS RECOPILADOS; REVISION PENDIENTE"
+    },
+    {
+      "componente": "SQLitePCLRaw.core",
+      "version": "2.1.12",
+      "licenciaDeclarada": "Apache-2.0",
+      "procedencia": "etiqueta de versión",
+      "repositorio": "https://github.com/ericsink/SQLitePCL.raw",
+      "commit": "ca835d21508bff43121c65081035840ac5006c4c",
+      "etiqueta": "v2.1.12",
+      "nuspecSha256": "8ab9189071aef856b12a9a3d68ac055a01ec6f8fc51b85ac1029e7c5ba12eecc",
+      "evidenciaDll": null,
+      "documentos": [
+        {
+          "archivo": "fuentes/sqlitepcl.raw-ca835d21/LICENSE.TXT",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "origen": "LICENSE.TXT",
+          "url": "https://github.com/ericsink/SQLitePCL.raw/blob/ca835d21508bff43121c65081035840ac5006c4c/LICENSE.TXT",
+          "gitBlob": "d645695673349e3947e8e5ae42332d0ac3164cd7"
+        },
+        {
+          "archivo": "fuentes/sqlitepcl.raw-ca835d21/NOTICE.TXT",
+          "sha256": "485b276b3d2bfaa26df348e1e5c84df3648981e09b88531a6a53006f0705c24b",
+          "origen": "NOTICE.TXT",
+          "url": "https://github.com/ericsink/SQLitePCL.raw/blob/ca835d21508bff43121c65081035840ac5006c4c/NOTICE.TXT",
+          "gitBlob": "9b4d10b6022750c492749e0b4bb22b0f0e70ef5b"
+        }
+      ],
+      "estado": "TEXTOS RECOPILADOS; REVISION PENDIENTE"
+    },
+    {
+      "componente": "System.IO.Packaging",
+      "version": "8.0.1",
+      "licenciaDeclarada": "MIT",
+      "procedencia": "texto incluido en el paquete NuGet de la caché examinada",
+      "repositorio": null,
+      "commit": null,
+      "etiqueta": null,
+      "nuspecSha256": "28198c2ab50ffecd09b1403ad7315bf0406d98cab8a69258ce6a6ca2d6479c62",
+      "evidenciaDll": null,
+      "documentos": [
+        {
+          "sha256": "d7a68596ab69b06f51ca278a6545148e4269a9381c26d597c13df5d88e08cf5b",
+          "url": "https://www.nuget.org/packages/System.IO.Packaging/8.0.1",
+          "gitBlob": null,
+          "archivo": "fuentes/system.io.packaging-28198c2a/LICENSE.TXT",
+          "origen": "LICENSE.TXT"
+        },
+        {
+          "sha256": "b60b2912da28eaa6518593c9e2efb5334ee062d3c42e80d8fdfa806b3dc52977",
+          "url": "https://www.nuget.org/packages/System.IO.Packaging/8.0.1",
+          "gitBlob": null,
+          "archivo": "fuentes/system.io.packaging-28198c2a/THIRD-PARTY-NOTICES.TXT",
+          "origen": "THIRD-PARTY-NOTICES.TXT"
+        }
+      ],
+      "estado": "TEXTOS RECOPILADOS; REVISION PENDIENTE"
+    },
+    {
+      "componente": "SQLitePCLRaw.bundle_e_sqlite3",
+      "version": "2.1.12",
+      "licenciaDeclarada": "Apache-2.0",
+      "procedencia": "etiqueta de versión",
+      "repositorio": "https://github.com/ericsink/SQLitePCL.raw",
+      "commit": "ca835d21508bff43121c65081035840ac5006c4c",
+      "etiqueta": "v2.1.12",
+      "nuspecSha256": "2faa9f418c3b8831efdf92df6aca8322ffa9f7a556e915b46e5daa8e1f8e3233",
+      "evidenciaDll": null,
+      "documentos": [
+        {
+          "archivo": "fuentes/sqlitepcl.raw-ca835d21/LICENSE.TXT",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "origen": "LICENSE.TXT",
+          "url": "https://github.com/ericsink/SQLitePCL.raw/blob/ca835d21508bff43121c65081035840ac5006c4c/LICENSE.TXT",
+          "gitBlob": "d645695673349e3947e8e5ae42332d0ac3164cd7"
+        },
+        {
+          "archivo": "fuentes/sqlitepcl.raw-ca835d21/NOTICE.TXT",
+          "sha256": "485b276b3d2bfaa26df348e1e5c84df3648981e09b88531a6a53006f0705c24b",
+          "origen": "NOTICE.TXT",
+          "url": "https://github.com/ericsink/SQLitePCL.raw/blob/ca835d21508bff43121c65081035840ac5006c4c/NOTICE.TXT",
+          "gitBlob": "9b4d10b6022750c492749e0b4bb22b0f0e70ef5b"
+        }
+      ],
+      "estado": "TEXTOS RECOPILADOS; REVISION PENDIENTE"
+    },
+    {
+      "componente": "Microsoft.Data.SqlClient.Internal.Logging",
+      "version": "7.0.2",
+      "licenciaDeclarada": "MIT",
+      "procedencia": "nuspec.repository.commit",
+      "repositorio": "https://github.com/dotnet/SqlClient",
+      "commit": "8c70cec98444338ddb0b97be94c34fde93970241",
+      "etiqueta": null,
+      "nuspecSha256": "a56c64b71e0008f4de286b1062a14b09990a9b0da23f0d0facd664180c52b6c4",
+      "evidenciaDll": null,
+      "documentos": [
+        {
+          "archivo": "fuentes/sqlclient-8c70cec9/COPYRIGHT.md",
+          "sha256": "c16067a715383a17949174ef6928434b2ff0b324a98dbbf248bc14afc3432f76",
+          "origen": "COPYRIGHT.md",
+          "url": "https://github.com/dotnet/SqlClient/blob/8c70cec98444338ddb0b97be94c34fde93970241/COPYRIGHT.md",
+          "gitBlob": "a1df5f1f9f22bfa413964f3ca7e82372c9e89739"
+        },
+        {
+          "archivo": "fuentes/sqlclient-8c70cec9/LICENSE",
+          "sha256": "9fa73cb72fb654d029c9214f0e3eec32c301a0c23be71b50fe3910e61553fa34",
+          "origen": "LICENSE",
+          "url": "https://github.com/dotnet/SqlClient/blob/8c70cec98444338ddb0b97be94c34fde93970241/LICENSE",
+          "gitBlob": "a33fe1c58fdd2c89165eda0b4257aa759d9c8326"
+        },
+        {
+          "archivo": "fuentes/sqlclient-8c70cec9/NOTICE.txt",
+          "sha256": "db4e07b72af7b58c5a6cd39762fe757e7db7f9af4e67e8d6ecc05731dd7ff66c",
+          "origen": "NOTICE.txt",
+          "url": "https://github.com/dotnet/SqlClient/blob/8c70cec98444338ddb0b97be94c34fde93970241/NOTICE.txt",
+          "gitBlob": "0b936c6bb60efa99c0c1e4c853cc516eb3f7835b"
+        }
+      ],
+      "estado": "TEXTOS RECOPILADOS; REVISION PENDIENTE"
+    },
+    {
+      "componente": "Microsoft.IdentityModel.Abstractions",
+      "version": "8.16.0",
+      "licenciaDeclarada": "MIT",
+      "procedencia": "nuspec.repository.commit",
+      "repositorio": "https://github.com/AzureAD/azure-activedirectory-identitymodel-extensions-for-dotnet",
+      "commit": "f8172402e711c043a59bef81bba2609cf1fb9f46",
+      "etiqueta": null,
+      "nuspecSha256": "e4547c1410a16cb88686db74433dfe90aa8d5f3bda6add30340a70d1630e59e5",
+      "evidenciaDll": null,
+      "documentos": [
+        {
+          "archivo": "fuentes/azure-activedirectory-id-f8172402/LICENSE.txt",
+          "sha256": "cba03f5387b05405e56b688376421acae396136af4b5116738dc6e5160f87ddd",
+          "origen": "LICENSE.txt",
+          "url": "https://github.com/AzureAD/azure-activedirectory-identitymodel-extensions-for-dotnet/blob/f8172402e711c043a59bef81bba2609cf1fb9f46/LICENSE.txt",
+          "gitBlob": "e76165455b59fa89f59ddcbbf78741e52d75a328"
+        },
+        {
+          "archivo": "fuentes/azure-activedirectory-id-f8172402/NOTICE.html",
+          "sha256": "d9f0289a2c38b4eedf5f22a045b6b37212d0989afb5f416a5f9ace59958136f7",
+          "origen": "NOTICE.html",
+          "url": "https://github.com/AzureAD/azure-activedirectory-identitymodel-extensions-for-dotnet/blob/f8172402e711c043a59bef81bba2609cf1fb9f46/NOTICE.html",
+          "gitBlob": "464135948f55faaa0cab7e58fa6a9c83b69c0f7d"
+        },
+        {
+          "archivo": "fuentes/azure-activedirectory-id-f8172402/ThirdPartyNotice.txt",
+          "sha256": "8d53e3a82ef34420b78b856dc5199ebed5ad854fc586014526ac17224fbbbc5e",
+          "origen": "ThirdPartyNotice.txt",
+          "url": "https://github.com/AzureAD/azure-activedirectory-identitymodel-extensions-for-dotnet/blob/f8172402e711c043a59bef81bba2609cf1fb9f46/ThirdPartyNotice.txt",
+          "gitBlob": "9df59fb688c09e9421e855935d682ce539cdc7ac"
+        }
+      ],
+      "estado": "TEXTOS RECOPILADOS; REVISION PENDIENTE"
+    },
+    {
+      "componente": "Microsoft.IdentityModel.JsonWebTokens",
+      "version": "8.16.0",
+      "licenciaDeclarada": "MIT",
+      "procedencia": "nuspec.repository.commit",
+      "repositorio": "https://github.com/AzureAD/azure-activedirectory-identitymodel-extensions-for-dotnet",
+      "commit": "f8172402e711c043a59bef81bba2609cf1fb9f46",
+      "etiqueta": null,
+      "nuspecSha256": "86437872036be2a6c3a864c7214c0d69870fd2b42304323448845d87948f1849",
+      "evidenciaDll": null,
+      "documentos": [
+        {
+          "archivo": "fuentes/azure-activedirectory-id-f8172402/LICENSE.txt",
+          "sha256": "cba03f5387b05405e56b688376421acae396136af4b5116738dc6e5160f87ddd",
+          "origen": "LICENSE.txt",
+          "url": "https://github.com/AzureAD/azure-activedirectory-identitymodel-extensions-for-dotnet/blob/f8172402e711c043a59bef81bba2609cf1fb9f46/LICENSE.txt",
+          "gitBlob": "e76165455b59fa89f59ddcbbf78741e52d75a328"
+        },
+        {
+          "archivo": "fuentes/azure-activedirectory-id-f8172402/NOTICE.html",
+          "sha256": "d9f0289a2c38b4eedf5f22a045b6b37212d0989afb5f416a5f9ace59958136f7",
+          "origen": "NOTICE.html",
+          "url": "https://github.com/AzureAD/azure-activedirectory-identitymodel-extensions-for-dotnet/blob/f8172402e711c043a59bef81bba2609cf1fb9f46/NOTICE.html",
+          "gitBlob": "464135948f55faaa0cab7e58fa6a9c83b69c0f7d"
+        },
+        {
+          "archivo": "fuentes/azure-activedirectory-id-f8172402/ThirdPartyNotice.txt",
+          "sha256": "8d53e3a82ef34420b78b856dc5199ebed5ad854fc586014526ac17224fbbbc5e",
+          "origen": "ThirdPartyNotice.txt",
+          "url": "https://github.com/AzureAD/azure-activedirectory-identitymodel-extensions-for-dotnet/blob/f8172402e711c043a59bef81bba2609cf1fb9f46/ThirdPartyNotice.txt",
+          "gitBlob": "9df59fb688c09e9421e855935d682ce539cdc7ac"
+        }
+      ],
+      "estado": "TEXTOS RECOPILADOS; REVISION PENDIENTE"
+    },
+    {
+      "componente": "Microsoft.IdentityModel.Logging",
+      "version": "8.16.0",
+      "licenciaDeclarada": "MIT",
+      "procedencia": "nuspec.repository.commit",
+      "repositorio": "https://github.com/AzureAD/azure-activedirectory-identitymodel-extensions-for-dotnet",
+      "commit": "f8172402e711c043a59bef81bba2609cf1fb9f46",
+      "etiqueta": null,
+      "nuspecSha256": "2ee47996d612bd9eb11ec502bee5f70b0590a268fbbcf8c861c746f10c7b7520",
+      "evidenciaDll": null,
+      "documentos": [
+        {
+          "archivo": "fuentes/azure-activedirectory-id-f8172402/LICENSE.txt",
+          "sha256": "cba03f5387b05405e56b688376421acae396136af4b5116738dc6e5160f87ddd",
+          "origen": "LICENSE.txt",
+          "url": "https://github.com/AzureAD/azure-activedirectory-identitymodel-extensions-for-dotnet/blob/f8172402e711c043a59bef81bba2609cf1fb9f46/LICENSE.txt",
+          "gitBlob": "e76165455b59fa89f59ddcbbf78741e52d75a328"
+        },
+        {
+          "archivo": "fuentes/azure-activedirectory-id-f8172402/NOTICE.html",
+          "sha256": "d9f0289a2c38b4eedf5f22a045b6b37212d0989afb5f416a5f9ace59958136f7",
+          "origen": "NOTICE.html",
+          "url": "https://github.com/AzureAD/azure-activedirectory-identitymodel-extensions-for-dotnet/blob/f8172402e711c043a59bef81bba2609cf1fb9f46/NOTICE.html",
+          "gitBlob": "464135948f55faaa0cab7e58fa6a9c83b69c0f7d"
+        },
+        {
+          "archivo": "fuentes/azure-activedirectory-id-f8172402/ThirdPartyNotice.txt",
+          "sha256": "8d53e3a82ef34420b78b856dc5199ebed5ad854fc586014526ac17224fbbbc5e",
+          "origen": "ThirdPartyNotice.txt",
+          "url": "https://github.com/AzureAD/azure-activedirectory-identitymodel-extensions-for-dotnet/blob/f8172402e711c043a59bef81bba2609cf1fb9f46/ThirdPartyNotice.txt",
+          "gitBlob": "9df59fb688c09e9421e855935d682ce539cdc7ac"
+        }
+      ],
+      "estado": "TEXTOS RECOPILADOS; REVISION PENDIENTE"
+    },
+    {
+      "componente": "Microsoft.IdentityModel.Protocols.OpenIdConnect",
+      "version": "8.16.0",
+      "licenciaDeclarada": "MIT",
+      "procedencia": "nuspec.repository.commit",
+      "repositorio": "https://github.com/AzureAD/azure-activedirectory-identitymodel-extensions-for-dotnet",
+      "commit": "f8172402e711c043a59bef81bba2609cf1fb9f46",
+      "etiqueta": null,
+      "nuspecSha256": "c098153a08776ae2881d2597d6e2cd3d53a9b33bc6b0ea4b30318534b79deada",
+      "evidenciaDll": null,
+      "documentos": [
+        {
+          "archivo": "fuentes/azure-activedirectory-id-f8172402/LICENSE.txt",
+          "sha256": "cba03f5387b05405e56b688376421acae396136af4b5116738dc6e5160f87ddd",
+          "origen": "LICENSE.txt",
+          "url": "https://github.com/AzureAD/azure-activedirectory-identitymodel-extensions-for-dotnet/blob/f8172402e711c043a59bef81bba2609cf1fb9f46/LICENSE.txt",
+          "gitBlob": "e76165455b59fa89f59ddcbbf78741e52d75a328"
+        },
+        {
+          "archivo": "fuentes/azure-activedirectory-id-f8172402/NOTICE.html",
+          "sha256": "d9f0289a2c38b4eedf5f22a045b6b37212d0989afb5f416a5f9ace59958136f7",
+          "origen": "NOTICE.html",
+          "url": "https://github.com/AzureAD/azure-activedirectory-identitymodel-extensions-for-dotnet/blob/f8172402e711c043a59bef81bba2609cf1fb9f46/NOTICE.html",
+          "gitBlob": "464135948f55faaa0cab7e58fa6a9c83b69c0f7d"
+        },
+        {
+          "archivo": "fuentes/azure-activedirectory-id-f8172402/ThirdPartyNotice.txt",
+          "sha256": "8d53e3a82ef34420b78b856dc5199ebed5ad854fc586014526ac17224fbbbc5e",
+          "origen": "ThirdPartyNotice.txt",
+          "url": "https://github.com/AzureAD/azure-activedirectory-identitymodel-extensions-for-dotnet/blob/f8172402e711c043a59bef81bba2609cf1fb9f46/ThirdPartyNotice.txt",
+          "gitBlob": "9df59fb688c09e9421e855935d682ce539cdc7ac"
+        }
+      ],
+      "estado": "TEXTOS RECOPILADOS; REVISION PENDIENTE"
+    },
+    {
+      "componente": "Microsoft.IdentityModel.Protocols",
+      "version": "8.16.0",
+      "licenciaDeclarada": "MIT",
+      "procedencia": "nuspec.repository.commit",
+      "repositorio": "https://github.com/AzureAD/azure-activedirectory-identitymodel-extensions-for-dotnet",
+      "commit": "f8172402e711c043a59bef81bba2609cf1fb9f46",
+      "etiqueta": null,
+      "nuspecSha256": "2291771c6906d02cbc548e85863e887660b7079bc130b4899c823a21678b60cf",
+      "evidenciaDll": null,
+      "documentos": [
+        {
+          "archivo": "fuentes/azure-activedirectory-id-f8172402/LICENSE.txt",
+          "sha256": "cba03f5387b05405e56b688376421acae396136af4b5116738dc6e5160f87ddd",
+          "origen": "LICENSE.txt",
+          "url": "https://github.com/AzureAD/azure-activedirectory-identitymodel-extensions-for-dotnet/blob/f8172402e711c043a59bef81bba2609cf1fb9f46/LICENSE.txt",
+          "gitBlob": "e76165455b59fa89f59ddcbbf78741e52d75a328"
+        },
+        {
+          "archivo": "fuentes/azure-activedirectory-id-f8172402/NOTICE.html",
+          "sha256": "d9f0289a2c38b4eedf5f22a045b6b37212d0989afb5f416a5f9ace59958136f7",
+          "origen": "NOTICE.html",
+          "url": "https://github.com/AzureAD/azure-activedirectory-identitymodel-extensions-for-dotnet/blob/f8172402e711c043a59bef81bba2609cf1fb9f46/NOTICE.html",
+          "gitBlob": "464135948f55faaa0cab7e58fa6a9c83b69c0f7d"
+        },
+        {
+          "archivo": "fuentes/azure-activedirectory-id-f8172402/ThirdPartyNotice.txt",
+          "sha256": "8d53e3a82ef34420b78b856dc5199ebed5ad854fc586014526ac17224fbbbc5e",
+          "origen": "ThirdPartyNotice.txt",
+          "url": "https://github.com/AzureAD/azure-activedirectory-identitymodel-extensions-for-dotnet/blob/f8172402e711c043a59bef81bba2609cf1fb9f46/ThirdPartyNotice.txt",
+          "gitBlob": "9df59fb688c09e9421e855935d682ce539cdc7ac"
+        }
+      ],
+      "estado": "TEXTOS RECOPILADOS; REVISION PENDIENTE"
+    },
+    {
+      "componente": "Microsoft.IdentityModel.Tokens",
+      "version": "8.16.0",
+      "licenciaDeclarada": "MIT",
+      "procedencia": "nuspec.repository.commit",
+      "repositorio": "https://github.com/AzureAD/azure-activedirectory-identitymodel-extensions-for-dotnet",
+      "commit": "f8172402e711c043a59bef81bba2609cf1fb9f46",
+      "etiqueta": null,
+      "nuspecSha256": "4ffc02b171b5ce7eb91b785f3654c1ae97e566fed247fa5f46f2f9535d98e6b2",
+      "evidenciaDll": null,
+      "documentos": [
+        {
+          "archivo": "fuentes/azure-activedirectory-id-f8172402/LICENSE.txt",
+          "sha256": "cba03f5387b05405e56b688376421acae396136af4b5116738dc6e5160f87ddd",
+          "origen": "LICENSE.txt",
+          "url": "https://github.com/AzureAD/azure-activedirectory-identitymodel-extensions-for-dotnet/blob/f8172402e711c043a59bef81bba2609cf1fb9f46/LICENSE.txt",
+          "gitBlob": "e76165455b59fa89f59ddcbbf78741e52d75a328"
+        },
+        {
+          "archivo": "fuentes/azure-activedirectory-id-f8172402/NOTICE.html",
+          "sha256": "d9f0289a2c38b4eedf5f22a045b6b37212d0989afb5f416a5f9ace59958136f7",
+          "origen": "NOTICE.html",
+          "url": "https://github.com/AzureAD/azure-activedirectory-identitymodel-extensions-for-dotnet/blob/f8172402e711c043a59bef81bba2609cf1fb9f46/NOTICE.html",
+          "gitBlob": "464135948f55faaa0cab7e58fa6a9c83b69c0f7d"
+        },
+        {
+          "archivo": "fuentes/azure-activedirectory-id-f8172402/ThirdPartyNotice.txt",
+          "sha256": "8d53e3a82ef34420b78b856dc5199ebed5ad854fc586014526ac17224fbbbc5e",
+          "origen": "ThirdPartyNotice.txt",
+          "url": "https://github.com/AzureAD/azure-activedirectory-identitymodel-extensions-for-dotnet/blob/f8172402e711c043a59bef81bba2609cf1fb9f46/ThirdPartyNotice.txt",
+          "gitBlob": "9df59fb688c09e9421e855935d682ce539cdc7ac"
+        }
+      ],
+      "estado": "TEXTOS RECOPILADOS; REVISION PENDIENTE"
+    },
+    {
+      "componente": "System.IdentityModel.Tokens.Jwt",
+      "version": "8.16.0",
+      "licenciaDeclarada": "MIT",
+      "procedencia": "nuspec.repository.commit",
+      "repositorio": "https://github.com/AzureAD/azure-activedirectory-identitymodel-extensions-for-dotnet",
+      "commit": "f8172402e711c043a59bef81bba2609cf1fb9f46",
+      "etiqueta": null,
+      "nuspecSha256": "b3b4769273fba1a411954685d1c566da19e902b31fe9117d17622f83eb4c09b7",
+      "evidenciaDll": null,
+      "documentos": [
+        {
+          "archivo": "fuentes/azure-activedirectory-id-f8172402/LICENSE.txt",
+          "sha256": "cba03f5387b05405e56b688376421acae396136af4b5116738dc6e5160f87ddd",
+          "origen": "LICENSE.txt",
+          "url": "https://github.com/AzureAD/azure-activedirectory-identitymodel-extensions-for-dotnet/blob/f8172402e711c043a59bef81bba2609cf1fb9f46/LICENSE.txt",
+          "gitBlob": "e76165455b59fa89f59ddcbbf78741e52d75a328"
+        },
+        {
+          "archivo": "fuentes/azure-activedirectory-id-f8172402/NOTICE.html",
+          "sha256": "d9f0289a2c38b4eedf5f22a045b6b37212d0989afb5f416a5f9ace59958136f7",
+          "origen": "NOTICE.html",
+          "url": "https://github.com/AzureAD/azure-activedirectory-identitymodel-extensions-for-dotnet/blob/f8172402e711c043a59bef81bba2609cf1fb9f46/NOTICE.html",
+          "gitBlob": "464135948f55faaa0cab7e58fa6a9c83b69c0f7d"
+        },
+        {
+          "archivo": "fuentes/azure-activedirectory-id-f8172402/ThirdPartyNotice.txt",
+          "sha256": "8d53e3a82ef34420b78b856dc5199ebed5ad854fc586014526ac17224fbbbc5e",
+          "origen": "ThirdPartyNotice.txt",
+          "url": "https://github.com/AzureAD/azure-activedirectory-identitymodel-extensions-for-dotnet/blob/f8172402e711c043a59bef81bba2609cf1fb9f46/ThirdPartyNotice.txt",
+          "gitBlob": "9df59fb688c09e9421e855935d682ce539cdc7ac"
+        }
+      ],
+      "estado": "TEXTOS RECOPILADOS; REVISION PENDIENTE"
+    },
+    {
+      "componente": "ClosedXML.Parser",
+      "version": "2.0.0",
+      "licenciaDeclarada": "MIT",
+      "procedencia": "nuspec.repository.commit",
+      "repositorio": "https://github.com/ClosedXML/ClosedXML.Parser",
+      "commit": "658973aeedc2fe289e0ccba2bb9959f67692ded5",
+      "etiqueta": null,
+      "nuspecSha256": "c7ea6db9150273036dbf8fbead151abff7df87975e2528bca9e9b617566ca27f",
+      "evidenciaDll": null,
+      "documentos": [
+        {
+          "archivo": "fuentes/closedxml.parser-658973ae/LICENSE.txt",
+          "sha256": "7133dfd8c1167ffa77389859013ac5bf2d184639f5a291a00d33b0b7d7b84df3",
+          "origen": "LICENSE.txt",
+          "url": "https://github.com/ClosedXML/ClosedXML.Parser/blob/658973aeedc2fe289e0ccba2bb9959f67692ded5/LICENSE.txt",
+          "gitBlob": "6145d0837e2a37d81095ac1f087bbb7da22f1b97"
+        }
+      ],
+      "estado": "TEXTOS RECOPILADOS; REVISION PENDIENTE"
+    },
+    {
+      "componente": "ClosedXML",
+      "version": "0.105.1",
+      "licenciaDeclarada": "MIT",
+      "procedencia": "nuspec.repository.commit",
+      "repositorio": "https://github.com/ClosedXML/ClosedXML",
+      "commit": "b4ebe47bd3ecebf8480dea7422188d16b35b9d9a",
+      "etiqueta": null,
+      "nuspecSha256": "3b044e86595606b1c69c36d537bf67a19f1e8ea3f47d7b99cc167771309a0f77",
+      "evidenciaDll": null,
+      "documentos": [
+        {
+          "archivo": "fuentes/closedxml-b4ebe47b/LICENSE",
+          "sha256": "3071658fba9a054edce74e756314ba926fe3ffe5c6622f209d21a0c8f1d2a99e",
+          "origen": "LICENSE",
+          "url": "https://github.com/ClosedXML/ClosedXML/blob/b4ebe47bd3ecebf8480dea7422188d16b35b9d9a/LICENSE",
+          "gitBlob": "f054603e7633dcd22d57382517af1eef1211473f"
+        }
+      ],
+      "estado": "TEXTOS RECOPILADOS; REVISION PENDIENTE"
+    },
+    {
+      "componente": "Microsoft.Data.Sqlite.Core",
+      "version": "10.0.11",
+      "licenciaDeclarada": "MIT",
+      "procedencia": "nuspec.repository.commit",
+      "repositorio": "https://github.com/dotnet/dotnet",
+      "commit": "e2f47b0110ed922f21a1522da67279133ce28f32",
+      "etiqueta": null,
+      "nuspecSha256": "eb2b71b591dd57337216cd7824a267cc24f647848cafffc6730abc3f4766d9bc",
+      "evidenciaDll": null,
+      "documentos": [
+        {
+          "archivo": "fuentes/dotnet-e2f47b01/LICENSE.txt",
+          "sha256": "ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b",
+          "origen": "src/efcore/LICENSE.txt",
+          "url": "https://github.com/dotnet/dotnet/blob/e2f47b0110ed922f21a1522da67279133ce28f32/src/efcore/LICENSE.txt",
+          "gitBlob": "a616ed188dfce68ee308f674350ad242d8588c2b"
+        }
+      ],
+      "estado": "TEXTOS RECOPILADOS; REVISION PENDIENTE"
+    },
+    {
+      "componente": "Microsoft.Data.Sqlite",
+      "version": "10.0.11",
+      "licenciaDeclarada": "MIT",
+      "procedencia": "nuspec.repository.commit",
+      "repositorio": "https://github.com/dotnet/dotnet",
+      "commit": "e2f47b0110ed922f21a1522da67279133ce28f32",
+      "etiqueta": null,
+      "nuspecSha256": "f9bb1e3e9729613b74ec96bf330192488c8a10ecff5217caff7fab9e065c40c5",
+      "evidenciaDll": null,
+      "documentos": [
+        {
+          "archivo": "fuentes/dotnet-e2f47b01/LICENSE.txt",
+          "sha256": "ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b",
+          "origen": "src/efcore/LICENSE.txt",
+          "url": "https://github.com/dotnet/dotnet/blob/e2f47b0110ed922f21a1522da67279133ce28f32/src/efcore/LICENSE.txt",
+          "gitBlob": "a616ed188dfce68ee308f674350ad242d8588c2b"
+        }
+      ],
+      "estado": "TEXTOS RECOPILADOS; REVISION PENDIENTE"
+    },
+    {
+      "componente": "DocumentFormat.OpenXml.Framework",
+      "version": "3.1.1",
+      "licenciaDeclarada": "MIT",
+      "procedencia": "nuspec.repository.commit",
+      "repositorio": "https://github.com/dotnet/Open-XML-SDK",
+      "commit": "f9e6ad7524e22b6b1f932deabc9055201b7870c0",
+      "etiqueta": null,
+      "nuspecSha256": "d3446279fb7923b5612ae01323c7c062ff534fdc4851c29855d3d5a90b5a00ab",
+      "evidenciaDll": null,
+      "documentos": [
+        {
+          "archivo": "fuentes/open-xml-sdk-f9e6ad75/LICENSE",
+          "sha256": "ed03ba352313a4ba7019d5bed4bd3218ac17f3e44442a3bb1aaff54dcca9a2bc",
+          "origen": "LICENSE",
+          "url": "https://github.com/dotnet/Open-XML-SDK/blob/f9e6ad7524e22b6b1f932deabc9055201b7870c0/LICENSE",
+          "gitBlob": "12bd8f3f79693e49ff70d4ce182ff8d2e7baa390"
+        },
+        {
+          "archivo": "fuentes/open-xml-sdk-f9e6ad75/NOTICE",
+          "sha256": "17f127daf81a23e7835b735b91c7486fbc99538102942bf1bce8d73e63a65038",
+          "origen": "NOTICE",
+          "url": "https://github.com/dotnet/Open-XML-SDK/blob/f9e6ad7524e22b6b1f932deabc9055201b7870c0/NOTICE",
+          "gitBlob": "6f2ed3ab64f890c375b0ef03a918e649f0484164"
+        }
+      ],
+      "estado": "TEXTOS RECOPILADOS; REVISION PENDIENTE"
+    },
+    {
+      "componente": "DocumentFormat.OpenXml",
+      "version": "3.1.1",
+      "licenciaDeclarada": "MIT",
+      "procedencia": "nuspec.repository.commit",
+      "repositorio": "https://github.com/dotnet/Open-XML-SDK",
+      "commit": "f9e6ad7524e22b6b1f932deabc9055201b7870c0",
+      "etiqueta": null,
+      "nuspecSha256": "d6ea629022a51027ddc75c6398a25b65fc90780471db32dfeebcc53b4c2481fa",
+      "evidenciaDll": null,
+      "documentos": [
+        {
+          "archivo": "fuentes/open-xml-sdk-f9e6ad75/LICENSE",
+          "sha256": "ed03ba352313a4ba7019d5bed4bd3218ac17f3e44442a3bb1aaff54dcca9a2bc",
+          "origen": "LICENSE",
+          "url": "https://github.com/dotnet/Open-XML-SDK/blob/f9e6ad7524e22b6b1f932deabc9055201b7870c0/LICENSE",
+          "gitBlob": "12bd8f3f79693e49ff70d4ce182ff8d2e7baa390"
+        },
+        {
+          "archivo": "fuentes/open-xml-sdk-f9e6ad75/NOTICE",
+          "sha256": "17f127daf81a23e7835b735b91c7486fbc99538102942bf1bce8d73e63a65038",
+          "origen": "NOTICE",
+          "url": "https://github.com/dotnet/Open-XML-SDK/blob/f9e6ad7524e22b6b1f932deabc9055201b7870c0/NOTICE",
+          "gitBlob": "6f2ed3ab64f890c375b0ef03a918e649f0484164"
+        }
+      ],
+      "estado": "TEXTOS RECOPILADOS; REVISION PENDIENTE"
+    },
+    {
+      "componente": "Microsoft.SqlServer.Server",
+      "version": "1.0.0",
+      "licenciaDeclarada": "MIT",
+      "procedencia": "ProductVersion de DLL del paquete NuGet",
+      "repositorio": "https://github.com/dotnet/sqlclient",
+      "commit": "54ab5aef2e1b74c0971a00711fecb003b624efdf",
+      "etiqueta": null,
+      "nuspecSha256": "915859887900d955b91355efbd7c33d5cd40973a2bc9ba8019580fd44c5a7ec6",
+      "evidenciaDll": {
+        "sha256": "bed8676415d3bb0cb63f57e96606604ed25ca87dc84238c1da9074c719432f98",
+        "ruta": "lib/net46/Microsoft.SqlServer.Server.dll",
+        "version": "1.0.0-dev+54ab5aef2e1b74c0971a00711fecb003b624efdf"
+      },
+      "documentos": [
+        {
+          "archivo": "fuentes/sqlclient-54ab5aef/COPYRIGHT.md",
+          "sha256": "0a9618dea0bc60519a96fff9ecb262492a263139c17c0aa6c9633c66f1ca75c2",
+          "origen": "COPYRIGHT.md",
+          "url": "https://github.com/dotnet/sqlclient/blob/54ab5aef2e1b74c0971a00711fecb003b624efdf/COPYRIGHT.md",
+          "gitBlob": "f9013b465f070796e9af8faa263ebdfacbb24b84"
+        },
+        {
+          "archivo": "fuentes/sqlclient-54ab5aef/LICENSE",
+          "sha256": "9fa73cb72fb654d029c9214f0e3eec32c301a0c23be71b50fe3910e61553fa34",
+          "origen": "LICENSE",
+          "url": "https://github.com/dotnet/sqlclient/blob/54ab5aef2e1b74c0971a00711fecb003b624efdf/LICENSE",
+          "gitBlob": "a33fe1c58fdd2c89165eda0b4257aa759d9c8326"
+        },
+        {
+          "archivo": "fuentes/sqlclient-54ab5aef/NOTICE.txt",
+          "sha256": "008bcf51af79e7fc49bbf869d692742df31f4ba0d0c6882f40fbf8a39e251a28",
+          "origen": "NOTICE.txt",
+          "url": "https://github.com/dotnet/sqlclient/blob/54ab5aef2e1b74c0971a00711fecb003b624efdf/NOTICE.txt",
+          "gitBlob": "2c3d638a8a35201addd3bb14eb5a06befc78fc1a"
+        }
+      ],
+      "estado": "TEXTOS RECOPILADOS; REVISION PENDIENTE"
+    },
+    {
+      "componente": "Microsoft.Data.SqlClient.Extensions.Abstractions",
+      "version": "7.0.2",
+      "licenciaDeclarada": "MIT",
+      "procedencia": "nuspec.repository.commit",
+      "repositorio": "https://github.com/dotnet/SqlClient",
+      "commit": "8c70cec98444338ddb0b97be94c34fde93970241",
+      "etiqueta": null,
+      "nuspecSha256": "d46aa2bc5eb5544810a1cd88f656d7dffb449c2845afce2acd00a92dcab1aab7",
+      "evidenciaDll": null,
+      "documentos": [
+        {
+          "archivo": "fuentes/sqlclient-8c70cec9/COPYRIGHT.md",
+          "sha256": "c16067a715383a17949174ef6928434b2ff0b324a98dbbf248bc14afc3432f76",
+          "origen": "COPYRIGHT.md",
+          "url": "https://github.com/dotnet/SqlClient/blob/8c70cec98444338ddb0b97be94c34fde93970241/COPYRIGHT.md",
+          "gitBlob": "a1df5f1f9f22bfa413964f3ca7e82372c9e89739"
+        },
+        {
+          "archivo": "fuentes/sqlclient-8c70cec9/LICENSE",
+          "sha256": "9fa73cb72fb654d029c9214f0e3eec32c301a0c23be71b50fe3910e61553fa34",
+          "origen": "LICENSE",
+          "url": "https://github.com/dotnet/SqlClient/blob/8c70cec98444338ddb0b97be94c34fde93970241/LICENSE",
+          "gitBlob": "a33fe1c58fdd2c89165eda0b4257aa759d9c8326"
+        },
+        {
+          "archivo": "fuentes/sqlclient-8c70cec9/NOTICE.txt",
+          "sha256": "db4e07b72af7b58c5a6cd39762fe757e7db7f9af4e67e8d6ecc05731dd7ff66c",
+          "origen": "NOTICE.txt",
+          "url": "https://github.com/dotnet/SqlClient/blob/8c70cec98444338ddb0b97be94c34fde93970241/NOTICE.txt",
+          "gitBlob": "0b936c6bb60efa99c0c1e4c853cc516eb3f7835b"
+        }
+      ],
+      "estado": "TEXTOS RECOPILADOS; REVISION PENDIENTE"
+    },
+    {
+      "componente": "Microsoft.Data.SqlClient",
+      "version": "7.0.2",
+      "licenciaDeclarada": "MIT",
+      "procedencia": "nuspec.repository.commit",
+      "repositorio": "https://github.com/dotnet/SqlClient",
+      "commit": "8c70cec98444338ddb0b97be94c34fde93970241",
+      "etiqueta": null,
+      "nuspecSha256": "ccc7c4fd504c1fe26cb5246eabca58f7f387712b8aad9c5c9e154d8b6c2aedac",
+      "evidenciaDll": null,
+      "documentos": [
+        {
+          "archivo": "fuentes/sqlclient-8c70cec9/COPYRIGHT.md",
+          "sha256": "c16067a715383a17949174ef6928434b2ff0b324a98dbbf248bc14afc3432f76",
+          "origen": "COPYRIGHT.md",
+          "url": "https://github.com/dotnet/SqlClient/blob/8c70cec98444338ddb0b97be94c34fde93970241/COPYRIGHT.md",
+          "gitBlob": "a1df5f1f9f22bfa413964f3ca7e82372c9e89739"
+        },
+        {
+          "archivo": "fuentes/sqlclient-8c70cec9/LICENSE",
+          "sha256": "9fa73cb72fb654d029c9214f0e3eec32c301a0c23be71b50fe3910e61553fa34",
+          "origen": "LICENSE",
+          "url": "https://github.com/dotnet/SqlClient/blob/8c70cec98444338ddb0b97be94c34fde93970241/LICENSE",
+          "gitBlob": "a33fe1c58fdd2c89165eda0b4257aa759d9c8326"
+        },
+        {
+          "archivo": "fuentes/sqlclient-8c70cec9/NOTICE.txt",
+          "sha256": "db4e07b72af7b58c5a6cd39762fe757e7db7f9af4e67e8d6ecc05731dd7ff66c",
+          "origen": "NOTICE.txt",
+          "url": "https://github.com/dotnet/SqlClient/blob/8c70cec98444338ddb0b97be94c34fde93970241/NOTICE.txt",
+          "gitBlob": "0b936c6bb60efa99c0c1e4c853cc516eb3f7835b"
+        }
+      ],
+      "estado": "TEXTOS RECOPILADOS; REVISION PENDIENTE"
+    },
+    {
+      "componente": "System.Security.Cryptography.ProtectedData",
+      "version": "9.0.13",
+      "licenciaDeclarada": "MIT",
+      "procedencia": "texto incluido en el paquete NuGet de la caché examinada",
+      "repositorio": null,
+      "commit": null,
+      "etiqueta": null,
+      "nuspecSha256": "bedf8f2179c200b68119000dad43e18dbb73efeb42968c2138af2b3b1e035f6b",
+      "evidenciaDll": null,
+      "documentos": [
+        {
+          "sha256": "d7a68596ab69b06f51ca278a6545148e4269a9381c26d597c13df5d88e08cf5b",
+          "url": "https://www.nuget.org/packages/System.Security.Cryptography.ProtectedData/9.0.13",
+          "gitBlob": null,
+          "archivo": "fuentes/system.security.cryptography.pro-bedf8f21/LICENSE.TXT",
+          "origen": "LICENSE.TXT"
+        },
+        {
+          "sha256": "40686c6447a7d5b5d3693068e4571b5f483d7ed335aeee773ef662440de4c5d5",
+          "url": "https://www.nuget.org/packages/System.Security.Cryptography.ProtectedData/9.0.13",
+          "gitBlob": null,
+          "archivo": "fuentes/system.security.cryptography.pro-bedf8f21/THIRD-PARTY-NOTICES.TXT",
+          "origen": "THIRD-PARTY-NOTICES.TXT"
+        }
+      ],
+      "estado": "TEXTOS RECOPILADOS; REVISION PENDIENTE"
+    }
+  ]
+}
