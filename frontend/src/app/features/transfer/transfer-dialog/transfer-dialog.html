@@ -9,13 +9,14 @@
 <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="transfer-title">
   <header class="head">
     <div>
-      <h2 class="title" id="transfer-title">Migrar datos de {{ sourceName() }}</h2>
-      <p class="subtitle">
-        Elige la tabla de destino y qué columnas viajan. Antes de escribir nada verás qué se va a
-        copiar.
-      </p>
+      <h2 class="title" id="transfer-title">
+        {{ 'transfer.title' | t: { source: sourceName() } }}
+      </h2>
+      <p class="subtitle">{{ 'transfer.subtitle' | t }}</p>
     </div>
-    <button type="button" class="close" (click)="close()" aria-label="Cerrar">×</button>
+    <button type="button" class="close" (click)="close()" [attr.aria-label]="'common.close' | t">
+      ×
+    </button>
   </header>
 
   <div class="body">
@@ -28,7 +29,7 @@
     <!-- ---------------------------------------------------------------- -->
     @if (step() === 'target') {
       <label class="field">
-        <span class="field__label">Conexión de destino</span>
+        <span class="field__label">{{ 'transfer.targetConnection' | t }}</span>
         <select
           [value]="targetConnectionId()"
           (change)="onTargetConnection($any($event.target).value)"
@@ -37,15 +38,17 @@
             <option [value]="connection.id">
               {{ connection.name }}
               @if (connection.id === connectionId()) {
-                (esta misma)
+                {{ 'transfer.sameConnection' | t }}
               }
             </option>
           }
         </select>
       </label>
 
-      <nav class="trail" aria-label="Dónde estás">
-        <button type="button" class="trail__step" (click)="back()">Bases</button>
+      <nav class="trail" [attr.aria-label]="'transfer.trail' | t">
+        <button type="button" class="trail__step" (click)="back()">
+          {{ 'transfer.databases' | t }}
+        </button>
         @for (node of trail(); track node.id; let i = $index) {
           <span class="trail__sep">›</span>
           <button type="button" class="trail__step" (click)="back(i)">{{ node.name }}</button>
@@ -53,12 +56,12 @@
       </nav>
 
       <label class="field field--inline new-table">
-        <span class="field__label">¿No está la tabla? Créala aquí</span>
+        <span class="field__label">{{ 'transfer.newTable' | t }}</span>
         <input
           type="text"
           [value]="newTableName()"
           (input)="newTableName.set($any($event.target).value)"
-          placeholder="nombre de la tabla nueva"
+          [placeholder]="'transfer.newTableName' | t"
         />
         <button
           type="button"
@@ -66,15 +69,15 @@
           [disabled]="!newTableName().trim() || loadingColumns()"
           (click)="prepareNewTable()"
         >
-          Crear tabla…
+          {{ 'transfer.createTable' | t }}
         </button>
       </label>
 
       <div class="browser">
         @if (browsing() || loadingColumns()) {
-          <p class="browser__empty">Leyendo el catálogo…</p>
+          <p class="browser__empty">{{ 'transfer.readingCatalog' | t }}</p>
         } @else if (nodes().length === 0) {
-          <p class="browser__empty">Aquí no hay nada que enseñar.</p>
+          <p class="browser__empty">{{ 'transfer.nothingHere' | t }}</p>
         } @else {
           <ul class="browser__list">
             @for (node of nodes(); track node.id) {
@@ -100,35 +103,34 @@
     <!-- ---------------------------------------------------------------- -->
     @if (step() === 'types') {
       <p class="route">
-        Se va a crear <code>{{ targetName() }}</code>
-        <button type="button" class="link" (click)="step.set('target')">Elegir otro sitio</button>
+        {{ 'transfer.willCreate' | t }} <code>{{ targetName() }}</code>
+        <button type="button" class="link" (click)="step.set('target')">
+          {{ 'transfer.chooseElsewhere' | t }}
+        </button>
       </p>
 
       @if (translations().length === 0) {
-        <p class="preview__line">
-          Las dos conexiones son del mismo motor, así que la tabla se crea con los mismos tipos que
-          tiene el origen.
-        </p>
+        <p class="preview__line">{{ 'transfer.sameEngine' | t }}</p>
       } @else {
         <!-- Lo que se pierde al cruzar de motor es lo que hay que leer aquí: el
              tipo propuesto casi siempre es el evidente. -->
         @if (untranslatable().length > 0) {
           <p class="problem">
-            Estas columnas no tienen dónde ir en el motor de destino:
-            {{ untranslatable().length }}. Escríbeles un tipo a mano o déjalas fuera del traslado;
-            la tabla no se puede crear mientras estén así.
+            {{ 'transfer.untranslatable' | t: { count: untranslatable().length } }}
           </p>
         }
 
         <table class="mapping">
           <caption class="sr-only">
-            Tipos con los que se creará cada columna
+            {{
+              'transfer.typesCaption' | t
+            }}
           </caption>
           <thead>
             <tr>
-              <th scope="col">Columna</th>
-              <th scope="col">En el origen</th>
-              <th scope="col">Se creará como</th>
+              <th scope="col">{{ 'transfer.column' | t }}</th>
+              <th scope="col">{{ 'transfer.inSource' | t }}</th>
+              <th scope="col">{{ 'transfer.createdAs' | t }}</th>
             </tr>
           </thead>
           <tbody>
@@ -158,7 +160,7 @@
         </table>
 
         @if (losses().length === 0) {
-          <p class="preview__line">Todos los tipos tienen equivalente exacto en el destino.</p>
+          <p class="preview__line">{{ 'transfer.exactTypes' | t }}</p>
         }
       }
     }
@@ -169,17 +171,21 @@
     @if (step() === 'columns') {
       <p class="route">
         <code>{{ sourceName() }}</code> → <code>{{ targetName() }}</code>
-        <button type="button" class="link" (click)="step.set('target')">Cambiar destino</button>
+        <button type="button" class="link" (click)="step.set('target')">
+          {{ 'transfer.changeTarget' | t }}
+        </button>
       </p>
 
       <table class="mapping">
         <caption class="sr-only">
-          Correspondencia entre las columnas del origen y las del destino
+          {{
+            'transfer.columnsCaption' | t
+          }}
         </caption>
         <thead>
           <tr>
-            <th scope="col">Columna del origen</th>
-            <th scope="col">Va a</th>
+            <th scope="col">{{ 'transfer.sourceColumn' | t }}</th>
+            <th scope="col">{{ 'transfer.goesTo' | t }}</th>
           </tr>
         </thead>
         <tbody>
@@ -195,14 +201,18 @@
                      `[value]` arriba el desplegable aparecería vacío aunque la
                      columna sí tenga pareja. -->
                 <select (change)="setTarget(column.name, $any($event.target).value)">
-                  <option value="" [selected]="!targetOf(column.name)">— no se copia —</option>
+                  <option value="" [selected]="!targetOf(column.name)">
+                    {{ 'transfer.notCopied' | t }}
+                  </option>
                   @for (candidate of targetColumns(); track candidate.name) {
                     <option
                       [value]="candidate.name"
                       [selected]="candidate.name === targetOf(column.name)"
                       [disabled]="taken(column.name, candidate.name)"
                     >
-                      {{ candidate.name }} ({{ candidate.dataType }})
+                      {{
+                        'transfer.candidate' | t: { name: candidate.name, type: candidate.dataType }
+                      }}
                     </option>
                   }
                 </select>
@@ -214,23 +224,25 @@
 
       <div class="options">
         <label class="field field--inline">
-          <span class="field__label">Qué hacer con lo que ya hay</span>
+          <span class="field__label">{{ 'transfer.mode' | t }}</span>
           <select (change)="onModeChange($any($event.target).value)">
-            <option value="Insert" [selected]="mode() === 'Insert'">Añadir las filas</option>
+            <option value="Insert" [selected]="mode() === 'Insert'">
+              {{ 'transfer.mode.insert' | t }}
+            </option>
             <option value="Upsert" [selected]="mode() === 'Upsert'">
-              Actualizar la que ya esté, y añadir el resto
+              {{ 'transfer.mode.upsert' | t }}
             </option>
             <option value="SkipExisting" [selected]="mode() === 'SkipExisting'">
-              Añadir solo lo que falte
+              {{ 'transfer.mode.skip' | t }}
             </option>
             <option value="Replace" [selected]="mode() === 'Replace'">
-              Vaciar el destino y cargar
+              {{ 'transfer.mode.replace' | t }}
             </option>
           </select>
         </label>
 
         <label class="field field--inline">
-          <span class="field__label">Filas por lote</span>
+          <span class="field__label">{{ 'transfer.batchSize' | t }}</span>
           <input
             type="number"
             min="1"
@@ -242,7 +254,7 @@
 
         <label class="check">
           <input type="checkbox" [checked]="atomic()" (change)="atomic.set(!atomic())" />
-          Todo o nada
+          {{ 'transfer.atomic' | t }}
         </label>
 
         <label class="check">
@@ -251,18 +263,17 @@
             [checked]="keepIdentity()"
             (change)="keepIdentity.set(!keepIdentity())"
           />
-          Conservar los identificadores del origen
+          {{ 'transfer.keepIdentity' | t }}
         </label>
       </div>
 
       @if (needsKey()) {
         <div class="keys">
-          <p class="keys__title">Con qué columnas se reconoce una fila que ya está</p>
+          <p class="keys__title">{{ 'transfer.keys' | t }}</p>
 
           @if (effectiveKey().length === 0) {
             <p class="warn">
-              {{ targetName() }} no tiene clave primaria, así que hay que decir qué columnas
-              identifican la fila. Tienen que ser columnas que no se repitan.
+              {{ 'transfer.noPrimaryKey' | t: { target: targetName() } }}
             </p>
           }
 
@@ -277,7 +288,7 @@
                 />
                 {{ column.name }}
                 @if (column.isPrimaryKey) {
-                  <span class="keys__hint">clave primaria</span>
+                  <span class="keys__hint">{{ 'transfer.primaryKey' | t }}</span>
                 }
               </label>
             }
@@ -286,20 +297,25 @@
       }
 
       <label class="field">
-        <span class="field__label">Solo las filas que cumplan (opcional, sin escribir WHERE)</span>
+        <span class="field__label">{{ 'transfer.where' | t }}</span>
         <input
           type="text"
           [value]="where()"
           (input)="where.set($any($event.target).value)"
-          placeholder="creado_en >= '2026-01-01'"
+          [placeholder]="'transfer.whereExample' | t"
         />
       </label>
 
       @if (mode() === 'Replace') {
         <div class="danger">
           <p class="danger__text">
-            Esto borra todas las filas de <strong>{{ targetName() }}</strong> antes de copiar, y no
-            se deshace. Escribe el nombre de la tabla para confirmarlo.
+            @for (part of replaceParts(targetName()); track $index) {
+              @if (part.tag === 'target') {
+                <strong>{{ part.text }}</strong>
+              } @else {
+                {{ part.text }}
+              }
+            }
           </p>
           <input
             type="text"
@@ -313,9 +329,11 @@
       @if (ignored().length > 0) {
         <p class="warn">
           @if (ignored().length === 1) {
-            No se copia la columna {{ ignored()[0] }} del origen.
+            {{ 'transfer.ignoredOne' | t: { column: ignored()[0] } }}
           } @else {
-            No se copian {{ ignored().length }} columnas del origen: {{ ignored().join(', ') }}.
+            {{
+              'transfer.ignoredMany' | t: { count: ignored().length, columns: ignored().join(', ') }
+            }}
           }
         </p>
       }
@@ -323,56 +341,80 @@
       <!-- La vista previa: lo único que separa mirar de escribir. -->
       @if (preview(); as preview) {
         <section class="preview">
-          <h3 class="preview__title">Esto es lo que va a pasar</h3>
+          <h3 class="preview__title">{{ 'transfer.previewTitle' | t }}</h3>
 
           <p class="preview__line">
-            Se copian <strong>{{ mapped() }}</strong> columnas
+            @for (part of columnsParts(mapped()); track $index) {
+              @if (part.tag === 'count') {
+                <strong>{{ part.text }}</strong>
+              } @else {
+                {{ part.text }}
+              }
+            }
             @if (preview.rowsEstimated) {
-              de unas <strong>{{ preview.rowsEstimated }}</strong> filas.
+              @for (part of rowsParts(preview.rowsEstimated); track $index) {
+                @if (part.tag === 'rows') {
+                  <strong>{{ part.text }}</strong>
+                } @else {
+                  {{ part.text }}
+                }
+              }
             } @else if (where().trim()) {
-              y no se sabe cuántas filas: con una condición delante, el catálogo no las estima.
+              {{ 'transfer.previewWhere' | t }}
             } @else {
-              y no se sabe cuántas filas: el catálogo no tiene un recuento de esta tabla. La barra
-              irá contando lo que lleve copiado.
+              {{ 'transfer.previewUnknown' | t }}
             }
           </p>
 
           @if (preview.keyColumns.length > 0) {
             <p class="preview__line">
-              Una fila del destino se reconoce por
-              <strong>{{ preview.keyColumns.join(', ') }}</strong
-              >.
+              @for (part of keyParts(preview.keyColumns.join(', ')); track $index) {
+                @if (part.tag === 'columns') {
+                  <strong>{{ part.text }}</strong>
+                } @else {
+                  {{ part.text }}
+                }
+              }
             </p>
           }
 
           @for (translation of preview.translations; track translation.column) {
             @if (translation.note) {
               <p class="warn">
-                <strong>{{ translation.column }}</strong> ({{ translation.sourceType }} →
-                {{ translation.targetType }}): {{ translation.note }}
+                @for (part of noteParts(translation); track $index) {
+                  @if (part.tag === 'column') {
+                    <strong>{{ part.text }}</strong>
+                  } @else {
+                    {{ part.text }}
+                  }
+                }
               </p>
             }
           }
 
           @for (issue of preview.issues; track issue.column) {
             <p class="warn">
-              <strong>{{ issue.column }}:</strong> {{ issue.message }}
+              @for (part of issueParts(issue.column, issue.message); track $index) {
+                @if (part.tag === 'column') {
+                  <strong>{{ part.text }}</strong>
+                } @else {
+                  {{ part.text }}
+                }
+              }
             </p>
           }
 
           @if (preview.missingRequired.length > 0) {
             <p class="warn">
-              Estas columnas del destino son obligatorias y no las llena nadie:
-              {{ preview.missingRequired.join(', ') }}. Si no tienen valor por omisión, el motor
-              rechazará el primer lote.
+              {{ 'transfer.previewMissing' | t: { columns: preview.missingRequired.join(', ') } }}
             </p>
           }
 
           <div class="sql">
-            <p class="sql__title">Se leerá del origen</p>
+            <p class="sql__title">{{ 'transfer.willRead' | t }}</p>
             <code class="sql__statement">{{ preview.select }}</code>
 
-            <p class="sql__title">Y se escribirá en el destino</p>
+            <p class="sql__title">{{ 'transfer.willWrite' | t }}</p>
             @for (statement of preview.statements; track $index) {
               <code class="sql__statement">{{ statement }}</code>
             }
@@ -402,19 +444,19 @@
           <h3 class="summary__title">
             @switch (progress.outcome) {
               @case ('Completed') {
-                Copiadas {{ progress.rowsCopied }} filas
+                {{ 'transfer.doneRows' | t: { rows: count(progress.rowsCopied) } }}
                 @if (progress.rowsSkipped > 0) {
-                  , y {{ progress.rowsSkipped }} que ya estaban se quedaron como estaban
+                  {{ 'transfer.doneSkipped' | t: { rows: count(progress.rowsSkipped) } }}
                 }
               }
               @case ('CompletedWithWarnings') {
-                Copiadas {{ progress.rowsCopied }} filas, con avisos
+                {{ 'transfer.doneWarnings' | t: { rows: count(progress.rowsCopied) } }}
               }
               @case ('Cancelled') {
-                Cancelado con {{ progress.rowsCopied }} filas ya copiadas
+                {{ 'transfer.doneCancelled' | t: { rows: count(progress.rowsCopied) } }}
               }
               @default {
-                No se pudo terminar
+                {{ 'transfer.doneFailed' | t }}
               }
             }
           </h3>
@@ -422,27 +464,31 @@
           @if (progress.failure) {
             <p class="problem">{{ progress.failure.message }}</p>
             <p class="summary__line">
-              En el destino quedaron {{ progress.failure.rowsCommitted }} filas.
+              {{ 'transfer.committed' | t: { rows: count(progress.failure.rowsCommitted) } }}
               @if (progress.failure.rowsCommitted > 0) {
-                Tenlo en cuenta antes de repetir la copia: volver a lanzarla las duplicaría.
+                {{ 'transfer.committedHint' | t }}
               }
             </p>
           }
 
           @if (progress.outcome === 'Cancelled' && progress.rowsCopied > 0) {
-            <p class="summary__line">
-              Lo ya copiado se queda: cancelar no deshace los lotes que el destino dio por buenos.
-            </p>
+            <p class="summary__line">{{ 'transfer.cancelledHint' | t }}</p>
           }
 
           @for (warning of progress.warnings; track $index) {
             <p class="warn">
-              <strong>{{ warning.subject }}:</strong> {{ warning.message }}
+              @for (part of warningParts(warning.subject, warning.message); track $index) {
+                @if (part.tag === 'subject') {
+                  <strong>{{ part.text }}</strong>
+                } @else {
+                  {{ part.text }}
+                }
+              }
             </p>
           }
 
           <details class="summary__report">
-            <summary>Ver el registro</summary>
+            <summary>{{ 'transfer.seeReport' | t }}</summary>
             <pre>{{ report() }}</pre>
           </details>
         </section>
@@ -452,17 +498,21 @@
 
   <footer class="foot">
     @if (step() === 'columns') {
-      <span class="hint"> {{ mapped() }} de {{ sourceColumns().length }} columnas se copian </span>
+      <span class="hint">
+        {{ 'transfer.mapped' | t: { mapped: mapped(), total: sourceColumns().length } }}
+      </span>
     }
 
     <span class="spacer"></span>
 
     @if (step() === 'running' && finished()) {
-      <button type="button" class="btn" (click)="dismiss()">Cerrar</button>
+      <button type="button" class="btn" (click)="dismiss()">{{ 'common.close' | t }}</button>
     } @else if (step() === 'running') {
-      <button type="button" class="btn" (click)="close()">Dejarlo en segundo plano</button>
+      <button type="button" class="btn" (click)="close()">
+        {{ 'transfer.background' | t }}
+      </button>
     } @else {
-      <button type="button" class="btn" (click)="close()">Cancelar</button>
+      <button type="button" class="btn" (click)="close()">{{ 'common.cancel' | t }}</button>
 
       @if (step() === 'types') {
         <button
@@ -471,17 +521,17 @@
           [disabled]="creating() || untranslatable().length > 0"
           (click)="createTarget()"
         >
-          {{ creating() ? 'Creando…' : 'Crear la tabla' }}
+          {{ (creating() ? 'transfer.creating' : 'transfer.create') | t }}
         </button>
       }
 
       @if (step() === 'columns') {
         <button type="button" class="btn" [disabled]="previewing()" (click)="analyze()">
-          {{ previewing() ? 'Mirando…' : 'Ver qué va a pasar' }}
+          {{ (previewing() ? 'transfer.analyzing' : 'transfer.analyze') | t }}
         </button>
 
         <button type="button" class="btn btn--danger" [disabled]="!canRun()" (click)="run()">
-          Copiar las filas
+          {{ 'transfer.run' | t }}
         </button>
       }
     }

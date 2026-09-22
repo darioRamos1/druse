@@ -18,6 +18,9 @@ import {
   TransferTable,
   TypeTranslation,
 } from '../../../core/application-gateway/application-gateway';
+import { I18nService } from '../../../core/i18n/i18n.service';
+import { formatNumber } from '../../../core/i18n/locale-format';
+import { TranslatePipe } from '../../../core/i18n/translate.pipe';
 import { TransferStore } from '../../../core/transfer/transfer.store';
 import { WorkspaceStore } from '../../../core/workspace/workspace-store';
 import { DatabaseColumn, DatabaseObject } from '../../../shared/models/workspace';
@@ -43,7 +46,7 @@ type Step = 'target' | 'types' | 'columns' | 'running';
 @Component({
   selector: 'app-transfer-dialog',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [DialogBackdrop, DialogFocus, FormsModule, OperationProgress],
+  imports: [DialogBackdrop, DialogFocus, FormsModule, OperationProgress, TranslatePipe],
   templateUrl: './transfer-dialog.html',
   styleUrl: './transfer-dialog.scss',
 })
@@ -51,6 +54,54 @@ export class TransferDialog {
   private readonly _workspace = inject(WorkspaceStore);
   private readonly _gateway = inject(ApplicationGateway);
   private readonly _transfers = inject(TransferStore);
+  private readonly _i18n = inject(I18nService);
+
+  /** Las frases con un trozo en negrita, sin partirlas en varias claves. */
+  protected replaceParts(target: string) {
+    return this._i18n.tParts('transfer.replaceWarning', { target });
+  }
+
+  protected columnsParts(count: number) {
+    return this._i18n.tParts('transfer.previewColumns', { count: formatNumber(count) });
+  }
+
+  protected rowsParts(rows: number) {
+    return this._i18n.tParts('transfer.previewRows', { rows: formatNumber(rows) });
+  }
+
+  protected keyParts(columns: string) {
+    return this._i18n.tParts('transfer.previewKey', { columns });
+  }
+
+  protected noteParts(translation: {
+    column: string;
+    sourceType: string;
+    targetType: string;
+    note?: string;
+  }) {
+    return this._i18n.tParts(
+      'transfer.previewNote',
+      { column: translation.column },
+      {
+        source: translation.sourceType,
+        target: translation.targetType,
+        note: translation.note ?? '',
+      },
+    );
+  }
+
+  protected issueParts(column: string, message: string) {
+    return this._i18n.tParts('transfer.previewIssue', { column }, { message });
+  }
+
+  protected warningParts(subject: string, message: string) {
+    return this._i18n.tParts('transfer.warning', { subject }, { message });
+  }
+
+  /** Las filas, con los separadores del idioma. */
+  protected count(value: number): string {
+    return formatNumber(value);
+  }
 
   /** Tabla de origen, la que el usuario eligió en el explorador. */
   readonly table = input.required<DatabaseObject>();

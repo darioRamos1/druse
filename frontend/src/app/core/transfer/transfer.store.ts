@@ -70,15 +70,15 @@ export class TransferStore {
 
     switch (progress.step) {
       case 'ReadingStructure':
-        return 'Leyendo las columnas de las dos tablas';
+        return this._i18n.t('transfer.step.readingStructure');
       case 'ClearingTarget':
         // Se nombra porque es el paso que borra, y porque en una tabla grande
         // tarda: sin decirlo, parece que la copia no ha empezado.
-        return 'Vaciando la tabla de destino';
+        return this._i18n.t('transfer.step.clearingTarget');
       case 'CopyingRows':
-        return 'Copiando filas';
+        return this._i18n.t('transfer.step.copyingRows');
       default:
-        return 'Terminado';
+        return this._i18n.t('transfer.step.done');
     }
   });
 
@@ -136,7 +136,7 @@ export class TransferStore {
       this._preview.set(await firstValueFrom(this._gateway.previewTransfer(request)));
     } catch (error) {
       this._preview.set(null);
-      this._error.set(message(error));
+      this._error.set(message(error, this._i18n.t('transfer.noProcess')));
     } finally {
       this._previewing.set(false);
     }
@@ -173,7 +173,7 @@ export class TransferStore {
 
       this.poll(id);
     } catch (error) {
-      this._error.set(message(error));
+      this._error.set(message(error, this._i18n.t('transfer.noProcess')));
     }
   }
 
@@ -190,7 +190,7 @@ export class TransferStore {
     try {
       return await firstValueFrom(this._gateway.orderTransferSet(request));
     } catch (error) {
-      this._error.set(message(error));
+      this._error.set(message(error, this._i18n.t('transfer.noProcess')));
 
       return null;
     }
@@ -228,7 +228,7 @@ export class TransferStore {
 
       this.poll(id);
     } catch (error) {
-      this._error.set(message(error));
+      this._error.set(message(error, this._i18n.t('transfer.noProcess')));
     }
   }
 
@@ -249,7 +249,7 @@ export class TransferStore {
     try {
       await firstValueFrom(this._gateway.cancelTransfer(progress.id));
     } catch (error) {
-      this._error.set(message(error));
+      this._error.set(message(error, this._i18n.t('transfer.noProcess')));
     }
   }
 
@@ -282,28 +282,46 @@ export class TransferStore {
     }
 
     const lines = [
-      `Traslado ${progress.id}`,
-      `Destino: ${progress.currentObject ?? '—'}`,
-      `Estado: ${this._i18n.t(outcomeLabel(progress.outcome))}`,
+      this._i18n.t('transfer.report.title', { id: progress.id }),
+      this._i18n.t('transfer.report.target', { target: progress.currentObject ?? '—' }),
+      this._i18n.t('transfer.report.state', {
+        outcome: this._i18n.t(outcomeLabel(progress.outcome)),
+      }),
       ...(progress.tablesTotal > 1
-        ? [`Tablas: ${progress.tablesDone} de ${progress.tablesTotal}`]
+        ? [
+            this._i18n.t('transfer.report.tables', {
+              done: progress.tablesDone,
+              total: progress.tablesTotal,
+            }),
+          ]
         : []),
-      `Filas copiadas: ${progress.rowsCopied}`,
-      `Lotes: ${progress.batchesDone}`,
-      `Duración: ${Math.round(progress.elapsedMilliseconds / 1000)} s`,
+      this._i18n.t('transfer.report.rows', { rows: progress.rowsCopied }),
+      this._i18n.t('transfer.report.batches', { batches: progress.batchesDone }),
+      this._i18n.t('transfer.report.duration', {
+        seconds: Math.round(progress.elapsedMilliseconds / 1000),
+      }),
     ];
 
     if (progress.failure) {
-      lines.push(`Error: ${progress.failure.message}`);
-      lines.push(`Filas que quedaron en el destino: ${progress.failure.rowsCommitted}`);
+      lines.push(this._i18n.t('transfer.report.failure', { message: progress.failure.message }));
+      lines.push(
+        this._i18n.t('transfer.report.committed', { rows: progress.failure.rowsCommitted }),
+      );
 
       if (progress.failure.statement) {
-        lines.push(`Instrucción: ${progress.failure.statement}`);
+        lines.push(
+          this._i18n.t('transfer.report.statement', { statement: progress.failure.statement }),
+        );
       }
     }
 
     lines.push(
-      ...progress.warnings.map((warning) => `Aviso en ${warning.subject}: ${warning.message}`),
+      ...progress.warnings.map((warning) =>
+        this._i18n.t('transfer.report.warning', {
+          subject: warning.subject,
+          message: warning.message,
+        }),
+      ),
     );
 
     return lines.join('\n');
@@ -337,7 +355,7 @@ export class TransferStore {
   }
 }
 
-function message(error: unknown): string {
+function message(error: unknown, fallback: string): string {
   if (typeof error === 'object' && error !== null && 'error' in error) {
     const body = (error as { error?: { message?: string } }).error;
 
@@ -346,5 +364,5 @@ function message(error: unknown): string {
     }
   }
 
-  return error instanceof Error ? error.message : 'No se pudo hablar con el proceso local.';
+  return error instanceof Error ? error.message : fallback;
 }
