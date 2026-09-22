@@ -10,41 +10,53 @@
   class="dialog"
   [class.is-choosing]="choosing() || loading() || error() !== null"
   role="dialog"
-  aria-label="Diagrama entidad-relación"
+  [attr.aria-label]="'diagram.dialog' | t"
 >
   <header class="head">
     <app-icon name="diagram" [size]="14" />
     <div class="head__text">
-      <h2 class="head__title">Diagrama · {{ title() }}</h2>
+      <h2 class="head__title">{{ 'diagram.title' | t: { name: title() } }}</h2>
       <p class="head__subtitle">
         @if (choosing()) {
-          Dibujarlo entero es una tela de araña. Elige por dónde empezar; después se traen las
-          vecinas de cualquier tabla.
+          {{ 'diagram.subtitle.choosing' | t }}
         } @else {
-          Lo que el catálogo dice hoy. Se relee cada vez que se abre.
+          {{ 'diagram.subtitle.live' | t }}
         }
       </p>
     </div>
     @if (!choosing() && graph() !== null) {
       <button type="button" class="head__save" (click)="save()">
-        {{ dirty() ? 'Guardar cambios' : 'Guardar' }}
+        {{ (dirty() ? 'diagram.saveChanges' : 'diagram.save') | t }}
       </button>
     }
     @if (!choosing() && saved()) {
-      <button type="button" class="head__back" (click)="forget()">Olvidar</button>
+      <button type="button" class="head__back" (click)="forget()">
+        {{ 'diagram.forget' | t }}
+      </button>
     }
     @if (!choosing() && candidates().length > 1) {
-      <button type="button" class="head__back" (click)="back()">Cambiar tablas…</button>
+      <button type="button" class="head__back" (click)="back()">
+        {{ 'diagram.changeTables' | t }}
+      </button>
     }
-    <button type="button" class="head__close" (click)="close()" aria-label="Cerrar">×</button>
+    <button
+      type="button"
+      class="head__close"
+      (click)="close()"
+      [attr.aria-label]="'common.close' | t"
+    >
+      ×
+    </button>
   </header>
 
   @if (loading()) {
-    <div class="state">Leyendo el catálogo…</div>
+    <div class="state">{{ 'diagram.readingCatalog' | t }}</div>
   } @else if (error()) {
     <div class="state state--error">
       <p>{{ error() }}</p>
-      <button type="button" class="state__retry" (click)="retry()">Reintentar</button>
+      <button type="button" class="state__retry" (click)="retry()">
+        {{ 'common.retry' | t }}
+      </button>
     </div>
   } @else if (choosing()) {
     <div class="chooser">
@@ -55,7 +67,7 @@
           (click)="chooseAll()"
           [disabled]="allChosen()"
         >
-          Todas
+          {{ 'diagram.chooseAll' | t }}
         </button>
         <button
           type="button"
@@ -63,7 +75,7 @@
           (click)="chooseNone()"
           [disabled]="chosen().size === 0"
         >
-          Ninguna
+          {{ 'diagram.chooseNone' | t }}
         </button>
       </div>
 
@@ -109,9 +121,11 @@
     <footer class="foot">
       <span class="foot__count">{{ chosenLabel() }}</span>
       <span class="foot__grow"></span>
-      <button type="button" class="foot__cancel" (click)="close()">Cancelar</button>
+      <button type="button" class="foot__cancel" (click)="close()">
+        {{ 'common.cancel' | t }}
+      </button>
       <button type="button" class="foot__draw" (click)="draw()" [disabled]="chosen().size === 0">
-        Dibujar
+        {{ 'diagram.draw' | t }}
       </button>
     </footer>
   } @else if (visibleGraph(); as loaded) {

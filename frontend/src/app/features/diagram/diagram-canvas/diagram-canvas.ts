@@ -12,6 +12,8 @@ import {
   viewChild,
 } from '@angular/core';
 
+import { I18nService } from '../../../core/i18n/i18n.service';
+import { TranslatePipe } from '../../../core/i18n/translate.pipe';
 import { DatabaseObject, SchemaGraph, SuggestedRelation } from '../../../shared/models/workspace';
 import {
   BOX,
@@ -64,6 +66,7 @@ interface PaintedLink extends DiagramLink {
 @Component({
   selector: 'app-diagram-canvas',
   changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [TranslatePipe],
   templateUrl: './diagram-canvas.html',
   styleUrl: './diagram-canvas.scss',
 })
@@ -165,6 +168,7 @@ export class DiagramCanvas {
    * por debajo del borde.
    */
   private readonly _viewport = signal(760);
+  private readonly _i18n = inject(I18nService);
 
   constructor() {
     const destroyRef = inject(DestroyRef);
@@ -274,18 +278,21 @@ export class DiagramCanvas {
     const selected = this.selected();
 
     if (selected === null) {
-      return 'Resaltar vecinas';
+      return this._i18n.t('diagram.highlight');
     }
 
     const box = this._layout().boxes.find((entry) => entry.key === selected);
 
-    return box ? `${box.table.name} y sus vecinas` : 'Resaltar vecinas';
+    return box
+      ? this._i18n.t('diagram.highlightTable', { name: box.table.name })
+      : this._i18n.t('diagram.highlight');
   });
 
+  /** `label` es una clave del catálogo. */
   protected readonly levels: readonly { readonly id: DetailLevel; readonly label: string }[] = [
-    { id: 'full', label: 'Completo' },
-    { id: 'keys', label: 'Claves' },
-    { id: 'collapsed', label: 'Plegado' },
+    { id: 'full', label: 'diagram.level.full' },
+    { id: 'keys', label: 'diagram.level.keys' },
+    { id: 'collapsed', label: 'diagram.level.collapsed' },
   ];
 
   protected setLevel(level: DetailLevel): void {
@@ -396,7 +403,7 @@ export class DiagramCanvas {
     const svg = this.buildSvg();
 
     this.exported.emit({
-      name: 'diagrama.svg',
+      name: `${this._i18n.t('diagram.fileName')}.svg`,
       blob: new Blob([svg], { type: 'image/svg+xml;charset=utf-8' }),
     });
   }
@@ -413,7 +420,7 @@ export class DiagramCanvas {
 
       await new Promise<void>((resolve, reject) => {
         image.onload = () => resolve();
-        image.onerror = () => reject(new Error('No se pudo dibujar el diagrama.'));
+        image.onerror = () => reject(new Error(this._i18n.t('diagram.drawFailed')));
         image.src = url;
       });
 
@@ -435,7 +442,7 @@ export class DiagramCanvas {
       const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/png'));
 
       if (blob !== null) {
-        this.exported.emit({ name: 'diagrama.png', blob });
+        this.exported.emit({ name: `${this._i18n.t('diagram.fileName')}.png`, blob });
       }
     } finally {
       URL.revokeObjectURL(url);

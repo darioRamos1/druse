@@ -9,13 +9,15 @@ import {
   signal,
 } from '@angular/core';
 
+import { I18nService } from '../../../core/i18n/i18n.service';
+import { TranslatePipe } from '../../../core/i18n/translate.pipe';
 import { firstValueFrom } from 'rxjs';
 
 import {
   ApplicationGateway,
   SavedDiagram,
 } from '../../../core/application-gateway/application-gateway';
-import { FileSaveService, describeSave } from '../../../core/files/file-save.service';
+import { FileSaveService } from '../../../core/files/file-save.service';
 import { WorkspaceStore } from '../../../core/workspace/workspace-store';
 import {
   DatabaseObject,
@@ -82,7 +84,7 @@ function suggestionKey(suggestion: SuggestedRelation): string {
 @Component({
   selector: 'app-diagram-panel',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [DialogBackdrop, DialogFocus, DiagramCanvas, Icon],
+  imports: [DialogBackdrop, DialogFocus, DiagramCanvas, Icon, TranslatePipe],
   templateUrl: './diagram-panel.html',
   styleUrl: './diagram-panel.scss',
 })
@@ -90,6 +92,7 @@ export class DiagramPanel {
   private readonly _gateway = inject(ApplicationGateway);
   private readonly _store = inject(WorkspaceStore);
   private readonly _files = inject(FileSaveService);
+  private readonly _i18n = inject(I18nService);
 
   readonly connectionId = input.required<string>();
   readonly sessionId = input.required<string>();
@@ -177,8 +180,11 @@ export class DiagramPanel {
   protected readonly someChosen = computed(() => this.chosen().size > 0 && !this.allChosen());
 
   /** Lo que dice el pie mientras se elige. */
-  protected readonly chosenLabel = computed(
-    () => `${this.chosen().size} de ${this.candidates().length} tablas elegidas`,
+  protected readonly chosenLabel = computed(() =>
+    this._i18n.t('diagram.chosen', {
+      chosen: this.chosen().size,
+      total: this.candidates().length,
+    }),
   );
 
   /**
@@ -305,7 +311,7 @@ export class DiagramPanel {
     }
 
     if (added === 0) {
-      this.notice.set('Esa tabla no se relaciona con ninguna otra que no esté ya en el lienzo.');
+      this.notice.set(this._i18n.t('diagram.noNeighbours'));
       return;
     }
 
@@ -361,7 +367,7 @@ export class DiagramPanel {
     }
 
     if (next.size === 0) {
-      this.notice.set('Un diagrama sin tablas no dibuja nada; se dejó como estaba.');
+      this.notice.set(this._i18n.t('diagram.cannotEmpty'));
       return;
     }
 
@@ -403,9 +409,15 @@ export class DiagramPanel {
     try {
       const outcome = await this._files.save(file.name, file.blob);
 
-      this.notice.set(describeSave(outcome, `Se guardó ${file.name}`, 'No se guardó nada.'));
+      this.notice.set(
+        !outcome.saved
+          ? this._i18n.t('diagram.fileNotSaved')
+          : outcome.path
+            ? this._i18n.t('diagram.fileSavedAt', { name: file.name, path: outcome.path })
+            : this._i18n.t('diagram.fileSaved', { name: file.name }),
+      );
     } catch {
-      this.notice.set(`No se pudo guardar ${file.name}.`);
+      this.notice.set(this._i18n.t('diagram.fileFailed', { name: file.name }));
     }
   }
 
@@ -413,9 +425,9 @@ export class DiagramPanel {
   protected async copy(payload: { text: string; label: string }): Promise<void> {
     try {
       await navigator.clipboard.writeText(payload.text);
-      this.notice.set(`Copiado como ${payload.label}. Las relaciones supuestas van comentadas.`);
+      this.notice.set(this._i18n.t('diagram.copied', { format: payload.label }));
     } catch {
-      this.notice.set('No se pudo copiar al portapapeles.');
+      this.notice.set(this._i18n.t('diagram.copyFailed'));
     }
   }
 
@@ -476,7 +488,7 @@ export class DiagramPanel {
       this.dirty.set(false);
       this.notice.set(null);
     } catch {
-      this.notice.set('No se pudo guardar el diagrama.');
+      this.notice.set(this._i18n.t('diagram.saveFailed'));
     }
   }
 
@@ -503,9 +515,9 @@ export class DiagramPanel {
       this._saved.set(null);
       this.positions.set(new Map());
       this.dirty.set(false);
-      this.notice.set('Se olvidó el diagrama guardado. Las tablas siguen donde estaban.');
+      this.notice.set(this._i18n.t('diagram.forgotten'));
     } catch {
-      this.notice.set('No se pudo olvidar el diagrama guardado.');
+      this.notice.set(this._i18n.t('diagram.forgetFailed'));
     }
   }
 
@@ -548,16 +560,6 @@ export class DiagramPanel {
       : `schema:${source.schema ?? source.name}`;
   }
 
-  /**
-   * Cómo llamar a lo que se abrió cuando hay que decírselo al usuario.
-   *
-   * Sobre una tabla el ámbito sigue siendo su esquema: las vecinas se buscan
-   * ahí, no en la base entera.
-   */
-  private scopeLabel(): string {
-    return this.target().source.kind === 'database' ? 'La base' : 'El esquema';
-  }
-
   /** El grafo entero de lo que se abrió, leído una sola vez y recordado. */
   private async wholeSchema(): Promise<SchemaGraph | null> {
     const known = this._whole();
@@ -569,9 +571,15 @@ export class DiagramPanel {
     const candidates = this.candidates();
 
     if (candidates.length > MAX_TABLES) {
+      // Sobre una tabla el ámbito sigue siendo su esquema: las vecinas se buscan
+      // ahí, no en la base entera.
       this.notice.set(
-        `${this.scopeLabel()} tiene ${candidates.length} tablas y no se pueden leer más de ` +
-          `${MAX_TABLES} de una vez, así que no se puede saber cuáles apuntan a esta.`,
+        this._i18n.t(
+          this.target().source.kind === 'database'
+            ? 'diagram.tooManyInDatabase'
+            : 'diagram.tooManyInSchema',
+          { count: candidates.length, max: MAX_TABLES },
+        ),
       );
       return null;
     }
@@ -607,7 +615,7 @@ export class DiagramPanel {
 
       if (tables.length === 0) {
         this.choosing.set(false);
-        this.error.set('Aquí no hay tablas que dibujar.');
+        this.error.set(this._i18n.t('diagram.noTables'));
         return;
       }
 
@@ -643,7 +651,7 @@ export class DiagramPanel {
       this.choosing.set(true);
     } catch (error) {
       this.choosing.set(false);
-      this.error.set(error instanceof Error ? error.message : 'No se pudieron leer las tablas.');
+      this.error.set(error instanceof Error ? error.message : this._i18n.t('diagram.tablesFailed'));
     } finally {
       this.loading.set(false);
     }
@@ -656,9 +664,7 @@ export class DiagramPanel {
     }
 
     if (tables.length > MAX_TABLES) {
-      this.error.set(
-        `Son ${tables.length} tablas y no se pueden leer más de ${MAX_TABLES} de una vez.`,
-      );
+      this.error.set(this._i18n.t('diagram.tooMany', { count: tables.length, max: MAX_TABLES }));
       return;
     }
 
@@ -670,13 +676,15 @@ export class DiagramPanel {
       const graph = await this._store.schemaGraph(connectionId, tables);
 
       if (graph === null) {
-        this.error.set('No se pudo leer el catálogo.');
+        this.error.set(this._i18n.t('diagram.catalogFailed'));
         return;
       }
 
       this.graph.set(graph);
     } catch (error) {
-      this.error.set(error instanceof Error ? error.message : 'No se pudo leer el catálogo.');
+      this.error.set(
+        error instanceof Error ? error.message : this._i18n.t('diagram.catalogFailed'),
+      );
     } finally {
       this.loading.set(false);
     }

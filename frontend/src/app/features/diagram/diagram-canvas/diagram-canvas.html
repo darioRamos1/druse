@@ -3,12 +3,7 @@
   y de `diagram-layout.ts`, que es quien sabe dónde va cada caja.
 -->
 <div class="toolbar">
-  <button
-    type="button"
-    class="run"
-    (click)="rearrange()"
-    title="Devolver las tablas a su colocación automática"
-  >
+  <button type="button" class="run" (click)="rearrange()" [title]="'diagram.rearrangeHint' | t">
     <svg
       width="13"
       height="13"
@@ -23,12 +18,12 @@
       <rect x="11" y="4" width="6" height="6" rx="1.5" />
       <rect x="9" y="14" width="5" height="6" rx="1.5" />
     </svg>
-    <span>Reorganizar</span>
+    <span>{{ 'diagram.rearrange' | t }}</span>
   </button>
 
   <span class="sep" aria-hidden="true"></span>
 
-  <div class="segmented" role="group" aria-label="Nivel de detalle">
+  <div class="segmented" role="group" [attr.aria-label]="'diagram.detailLevel' | t">
     @for (option of levels; track option.id) {
       <button
         type="button"
@@ -37,7 +32,7 @@
         [attr.aria-pressed]="level() === option.id"
         (click)="setLevel(option.id)"
       >
-        {{ option.label }}
+        {{ option.label | t }}
       </button>
     }
   </div>
@@ -48,10 +43,10 @@
     [class.is-on]="showSuggested()"
     [attr.aria-pressed]="showSuggested()"
     (click)="toggleSuggested()"
-    title="Las relaciones que Druse supone por el nombre de las columnas"
+    [title]="'diagram.suggestedHint' | t"
   >
     <span class="toggle__track"><span class="toggle__knob"></span></span>
-    <span>Sugeridas</span>
+    <span>{{ 'diagram.suggested' | t }}</span>
     <span class="toggle__count">{{ summary().suggested }}</span>
   </button>
 
@@ -61,7 +56,7 @@
   -->
   @if (dismissedCount() > 0) {
     <button type="button" class="btn" (click)="restoreDismissed.emit()">
-      <span>Recuperar {{ dismissedCount() }} descartada(s)</span>
+      <span>{{ 'diagram.restoreDismissed' | t: { count: dismissedCount() } }}</span>
     </button>
   }
 
@@ -98,18 +93,20 @@
       <rect x="14" y="14" width="7" height="5" rx="1.5" />
       <path d="M10 7.5h2a2 2 0 0 1 2 2v7" />
     </svg>
-    <span>Traer vecinas</span>
+    <span>{{ 'diagram.bring' | t }}</span>
   </button>
 
   <span class="grow"></span>
 
   @if (summary().missing > 0) {
     <span class="missing" role="status">
-      {{ summary().missing }} tabla(s) del diagrama ya no están en el catálogo
+      {{ 'diagram.missing' | t: { count: summary().missing } }}
     </span>
   }
 
-  <span class="count">{{ summary().tables }} tablas · {{ summary().declared }} relaciones</span>
+  <span class="count">
+    {{ 'diagram.count' | t: { tables: summary().tables, relations: summary().declared } }}
+  </span>
 
   <!--
     Exportar. Las cuatro salidas salen del mismo diagrama, y las supuestas viajan
@@ -130,19 +127,23 @@
       >
         <path d="M12 4v11M8 11l4 4 4-4M4 19h16" />
       </svg>
-      <span>Exportar</span>
+      <span>{{ 'diagram.export' | t }}</span>
     </button>
 
     @if (exportOpen()) {
       <div class="export__menu">
-        <button type="button" class="export__item" (click)="exportSvg()">Imagen SVG</button>
-        <button type="button" class="export__item" (click)="exportPng()">Imagen PNG</button>
+        <button type="button" class="export__item" (click)="exportSvg()">
+          {{ 'diagram.export.svg' | t }}
+        </button>
+        <button type="button" class="export__item" (click)="exportPng()">
+          {{ 'diagram.export.png' | t }}
+        </button>
         <div class="export__separator"></div>
         <button type="button" class="export__item" (click)="exportText('mermaid')">
-          Copiar como Mermaid
+          {{ 'diagram.export.copyAs' | t: { format: 'Mermaid' } }}
         </button>
         <button type="button" class="export__item" (click)="exportText('dbml')">
-          Copiar como DBML
+          {{ 'diagram.export.copyAs' | t: { format: 'DBML' } }}
         </button>
       </div>
     }
@@ -159,15 +160,15 @@
       <div class="pending__item">
         <span class="pending__text">{{ suggestion.reason }}</span>
         <button type="button" class="pending__accept" (click)="accept(suggestion)">
-          Ver el ALTER TABLE…
+          {{ 'diagram.showAlter' | t }}
         </button>
         <button
           type="button"
           class="pending__dismiss"
           (click)="dismiss(suggestion)"
-          title="En este diagrama, esa relación no existe"
+          [title]="'diagram.dismissHint' | t"
         >
-          Descartar
+          {{ 'diagram.dismiss' | t }}
         </button>
       </div>
     }
@@ -241,7 +242,7 @@
           }
           <span class="node__name">{{ box.table.name }}</span>
           @if (box.isBridge) {
-            <span class="node__badge" title="Toda su clave primaria son claves foráneas">N:M</span>
+            <span class="node__badge" [title]="'diagram.bridgeHint' | t">N:M</span>
           }
         </div>
 
@@ -281,15 +282,17 @@
     @if (menuBox(); as box) {
       <div class="menu" [style.left.px]="box.x + box.width + 8" [style.top.px]="box.y">
         <button type="button" class="menu__item" (click)="design(box)">
-          Abrir en el diseñador
+          {{ 'diagram.menu.design' | t }}
         </button>
-        <button type="button" class="menu__item" (click)="showData(box)">Ver datos</button>
+        <button type="button" class="menu__item" (click)="showData(box)">
+          {{ 'diagram.menu.data' | t }}
+        </button>
         <button type="button" class="menu__item" (click)="bringNeighbours.emit(box.key)">
-          Traer sus vecinas
+          {{ 'diagram.menu.bring' | t }}
         </button>
         <div class="menu__separator"></div>
         <button type="button" class="menu__item" (click)="removeFromDiagram(box)">
-          Quitar del diagrama
+          {{ 'diagram.menu.remove' | t }}
         </button>
       </div>
     }
@@ -308,7 +311,7 @@
       <path class="legend__declared" d="M6 5V1.5M6 5v3.5" />
       <path class="legend__declared" d="M40 5l-6-3.5M40 5l-6 3.5M40 5h-6" />
     </svg>
-    <span>Clave foránea declarada</span>
+    <span>{{ 'diagram.legend.declared' | t }}</span>
   </div>
   <div class="legend__item">
     <svg width="42" height="10" viewBox="0 0 42 10" aria-hidden="true">
@@ -316,13 +319,13 @@
       <path class="legend__suggested" d="M6 5V1.5M6 5v3.5" />
       <path class="legend__suggested" d="M40 5l-6-3.5M40 5l-6 3.5M40 5h-6" />
     </svg>
-    <span>Sugerida por Druse · nadie la comprueba</span>
+    <span>{{ 'diagram.legend.suggested' | t }}</span>
   </div>
   <div class="legend__item">
     <svg width="42" height="10" viewBox="0 0 42 10" aria-hidden="true">
       <circle class="legend__optional" cx="8" cy="5" r="3" />
       <path class="legend__optional" d="M13 5h27" />
     </svg>
-    <span>Opcional: la columna admite nulos</span>
+    <span>{{ 'diagram.legend.optional' | t }}</span>
   </div>
 </div>
