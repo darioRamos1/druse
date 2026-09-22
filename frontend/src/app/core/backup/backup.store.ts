@@ -1,6 +1,8 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 
+import { I18nService } from '../i18n/i18n.service';
+
 import {
   ApplicationGateway,
   BackupOutcome,
@@ -28,6 +30,7 @@ const POLL_MS = 500;
 @Injectable({ providedIn: 'root' })
 export class BackupStore {
   private readonly _gateway = inject(ApplicationGateway);
+  private readonly _i18n = inject(I18nService);
 
   private readonly _progress = signal<BackupProgress | null>(null);
   private readonly _error = signal<string | null>(null);
@@ -70,21 +73,21 @@ export class BackupStore {
 
     switch (progress.step) {
       case 'Resolving':
-        return 'Resolviendo la selección';
+        return this._i18n.t('backup.step.resolving');
       case 'ReadingStructure':
-        return 'Leyendo la estructura';
+        return this._i18n.t('backup.step.readingStructure');
       case 'WritingStructure':
-        return 'Escribiendo estructura';
+        return this._i18n.t('backup.step.writingStructure');
       case 'WritingData':
-        return 'Escribiendo datos';
+        return this._i18n.t('backup.step.writingData');
       case 'WritingConstraints':
-        return 'Escribiendo índices y claves';
+        return this._i18n.t('backup.step.writingConstraints');
       case 'Packaging':
         // Se nombra porque comprimir varios gigabytes tarda, y para entonces la
         // barra de datos ya está llena: sin decirlo, parece colgado al final.
-        return 'Empaquetando';
+        return this._i18n.t('backup.step.packaging');
       default:
-        return 'Terminado';
+        return this._i18n.t('backup.step.done');
     }
   });
 
@@ -133,7 +136,7 @@ export class BackupStore {
       this._preview.set(await firstValueFrom(this._gateway.previewBackup(request)));
     } catch (error) {
       this._preview.set(null);
-      this._error.set(message(error));
+      this._error.set(message(error, this._i18n.t('backup.noProcess')));
     } finally {
       this._previewing.set(false);
     }
@@ -166,7 +169,7 @@ export class BackupStore {
 
       this.poll(id);
     } catch (error) {
-      this._error.set(message(error));
+      this._error.set(message(error, this._i18n.t('backup.noProcess')));
     }
   }
 
@@ -181,7 +184,7 @@ export class BackupStore {
     try {
       await firstValueFrom(this._gateway.cancelBackup(progress.id));
     } catch (error) {
-      this._error.set(message(error));
+      this._error.set(message(error, this._i18n.t('backup.noProcess')));
     }
   }
 
@@ -214,27 +217,46 @@ export class BackupStore {
     }
 
     const lines = [
-      `Respaldo ${progress.id}`,
-      `Estado: ${outcomeLabel(progress.outcome)}`,
-      `Objetos: ${progress.objectsDone} de ${progress.objectsTotal}`,
-      `Filas: ${progress.totalRows}`,
-      `Duración: ${Math.round(progress.elapsedMilliseconds / 1000)} s`,
+      this._i18n.t('backup.report.title', { id: progress.id }),
+      this._i18n.t('backup.report.state', {
+        outcome: this._i18n.t(outcomeLabel(progress.outcome)),
+      }),
+      this._i18n.t('backup.report.objects', {
+        done: progress.objectsDone,
+        total: progress.objectsTotal,
+      }),
+      this._i18n.t('backup.report.rows', { rows: progress.totalRows }),
+      this._i18n.t('backup.report.duration', {
+        seconds: Math.round(progress.elapsedMilliseconds / 1000),
+      }),
     ];
 
     if (progress.path) {
-      lines.push(`Archivo: ${progress.path}`);
+      lines.push(this._i18n.t('backup.report.path', { path: progress.path }));
     }
 
     if (progress.failure) {
-      lines.push(`Error en ${progress.failure.subject}: ${progress.failure.message}`);
+      lines.push(
+        this._i18n.t('backup.report.failure', {
+          subject: progress.failure.subject,
+          message: progress.failure.message,
+        }),
+      );
 
       if (progress.failure.statement) {
-        lines.push(`Instrucción: ${progress.failure.statement}`);
+        lines.push(
+          this._i18n.t('backup.report.statement', { statement: progress.failure.statement }),
+        );
       }
     }
 
     lines.push(
-      ...progress.warnings.map((warning) => `Aviso en ${warning.subject}: ${warning.message}`),
+      ...progress.warnings.map((warning) =>
+        this._i18n.t('backup.report.warning', {
+          subject: warning.subject,
+          message: warning.message,
+        }),
+      ),
     );
 
     return lines.join('\n');
@@ -277,23 +299,23 @@ export class BackupStore {
   }
 }
 
-/** Cómo acabó, dicho para leerlo. */
+/** Cómo acabó: la clave del catálogo, que traduce quien lo pinta. */
 export function outcomeLabel(outcome: BackupOutcome): string {
   switch (outcome) {
     case 'Completed':
-      return 'Correcto';
+      return 'backup.outcome.completed';
     case 'CompletedWithWarnings':
-      return 'Correcto con avisos';
+      return 'backup.outcome.warnings';
     case 'Failed':
-      return 'Fallido';
+      return 'backup.outcome.failed';
     case 'Cancelled':
-      return 'Cancelado';
+      return 'backup.outcome.cancelled';
     default:
-      return 'En marcha';
+      return 'backup.outcome.running';
   }
 }
 
-function message(error: unknown): string {
+function message(error: unknown, fallback: string): string {
   if (typeof error === 'object' && error !== null && 'error' in error) {
     const body = (error as { error?: { message?: string } }).error;
 
@@ -302,5 +324,5 @@ function message(error: unknown): string {
     }
   }
 
-  return error instanceof Error ? error.message : 'No se pudo hablar con el proceso local.';
+  return error instanceof Error ? error.message : fallback;
 }

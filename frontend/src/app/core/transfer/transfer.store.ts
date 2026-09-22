@@ -10,6 +10,7 @@ import {
   TransferSetRequest,
 } from '../application-gateway/application-gateway';
 import { outcomeLabel } from '../backup/backup.store';
+import { I18nService } from '../i18n/i18n.service';
 
 /** Cada cuánto se pregunta cómo va. */
 const POLL_MS = 500;
@@ -26,6 +27,7 @@ const POLL_MS = 500;
 @Injectable({ providedIn: 'root' })
 export class TransferStore {
   private readonly _gateway = inject(ApplicationGateway);
+  private readonly _i18n = inject(I18nService);
 
   private readonly _progress = signal<TransferProgress | null>(null);
   private readonly _error = signal<string | null>(null);
@@ -282,7 +284,7 @@ export class TransferStore {
     const lines = [
       `Traslado ${progress.id}`,
       `Destino: ${progress.currentObject ?? '—'}`,
-      `Estado: ${outcomeLabel(progress.outcome)}`,
+      `Estado: ${this._i18n.t(outcomeLabel(progress.outcome))}`,
       ...(progress.tablesTotal > 1
         ? [`Tablas: ${progress.tablesDone} de ${progress.tablesTotal}`]
         : []),

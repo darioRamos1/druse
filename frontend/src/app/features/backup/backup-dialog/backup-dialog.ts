@@ -8,7 +8,6 @@ import {
   output,
   signal,
 } from '@angular/core';
-import { DatePipe } from '@angular/common';
 import { firstValueFrom } from 'rxjs';
 
 import {
@@ -25,6 +24,9 @@ import {
 } from '../../../core/application-gateway/application-gateway';
 import { DesktopHost } from '../../../core/application-gateway/desktop-host';
 import { BackupStore, outcomeLabel } from '../../../core/backup/backup.store';
+import { I18nService } from '../../../core/i18n/i18n.service';
+import { formatDate, formatNumber } from '../../../core/i18n/locale-format';
+import { TranslatePipe } from '../../../core/i18n/translate.pipe';
 import { DatabaseObject, ExplorerNode } from '../../../shared/models/workspace';
 import { Icon } from '../../../shared/ui/icon/icon';
 import { FolderPicker } from '../../../shared/ui/folder-picker/folder-picker';
@@ -61,13 +63,14 @@ interface Candidate {
 @Component({
   selector: 'app-backup-dialog',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [DialogBackdrop, DialogFocus, DatePipe, FolderPicker, Icon, OperationProgress],
+  imports: [DialogBackdrop, DialogFocus, FolderPicker, Icon, OperationProgress, TranslatePipe],
   templateUrl: './backup-dialog.html',
   styleUrl: './backup-dialog.scss',
 })
 export class BackupDialog {
   private readonly _gateway = inject(ApplicationGateway);
   private readonly _desktop = inject(DesktopHost);
+  private readonly _i18n = inject(I18nService);
 
   protected readonly store = inject(BackupStore);
 
@@ -135,16 +138,34 @@ export class BackupDialog {
    *
    * En el resumen salía el nombre del contrato —`StructureAndData`—, que es lo
    * único de la pantalla escrito para el servidor y no para quien lo lee.
+   * Devuelve la clave del catálogo: la traduce quien la pinta.
    */
   protected modeLabel(mode: BackupDataMode): string {
     switch (mode) {
       case 'StructureOnly':
-        return 'Solo estructura';
+        return 'backup.mode.structure';
       case 'DataOnly':
-        return 'Solo datos';
+        return 'backup.mode.data';
       default:
-        return 'Estructura y datos';
+        return 'backup.mode.both';
     }
+  }
+
+  /** Las filas y los segundos, con los separadores del idioma. */
+  protected count(value: number): string {
+    return formatNumber(value);
+  }
+
+  protected seconds(milliseconds: number): string {
+    return formatNumber(milliseconds / 1000, {
+      minimumFractionDigits: 1,
+      maximumFractionDigits: 1,
+    });
+  }
+
+  /** Cuándo se usó el perfil por última vez, en el idioma elegido. */
+  protected when(value: string): string {
+    return formatDate(value, { dateStyle: 'short', timeStyle: 'short' });
   }
 
   constructor() {
@@ -341,7 +362,10 @@ export class BackupDialog {
 
   protected readonly suggestedName = computed(() => {
     const stamp = new Date().toISOString().slice(0, 10);
-    const base = `respaldo-${this.target().source.database ?? 'base'}-${stamp}`;
+    const base = this._i18n.t('backup.fileName', {
+      database: this.target().source.database ?? this._i18n.t('backup.defaultDatabase'),
+      date: stamp,
+    });
 
     // Una carpeta no lleva extensión. Proponer un `.sql` donde va a aparecer un
     // directorio hace esperar un archivo, y quien acepte la propuesta acaba con
@@ -500,7 +524,7 @@ export class BackupDialog {
       this.activeProfile.set(saved);
       await this.loadProfiles();
     } catch (error) {
-      this.profileError.set(reason(error, 'No se pudo guardar el perfil.'));
+      this.profileError.set(reason(error, this._i18n.t('backup.saveFailed')));
     } finally {
       this.savingProfile.set(false);
     }
@@ -519,7 +543,7 @@ export class BackupDialog {
     }
 
     this.activeProfile.set(null);
-    this.profileName.set(`${current.name} (copia)`);
+    this.profileName.set(this._i18n.t('backup.copySuffix', { name: current.name }));
 
     await this.saveProfile();
   }
@@ -536,7 +560,7 @@ export class BackupDialog {
 
       await this.loadProfiles();
     } catch (error) {
-      this.profileError.set(reason(error, 'No se pudo borrar el perfil.'));
+      this.profileError.set(reason(error, this._i18n.t('backup.deleteFailed')));
     }
   }
 
@@ -598,7 +622,7 @@ export class BackupDialog {
       this.added.set(resolution.added);
       this.step.set('what');
     } catch (error) {
-      this.profileError.set(reason(error, 'No se pudo abrir el perfil.'));
+      this.profileError.set(reason(error, this._i18n.t('backup.openFailed')));
     } finally {
       this.loading.set(false);
     }
@@ -641,7 +665,7 @@ export class BackupDialog {
       this.selected.set(new Set(candidates.map((candidate) => candidate.key)));
     } catch (error) {
       this.loadError.set(
-        error instanceof Error ? error.message : 'No se pudieron leer las tablas.',
+        error instanceof Error ? error.message : this._i18n.t('backup.tablesFailed'),
       );
     } finally {
       this.loading.set(false);

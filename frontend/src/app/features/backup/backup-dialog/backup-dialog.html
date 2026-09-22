@@ -9,12 +9,12 @@
 <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="backup-title">
   <header class="head">
     <div>
-      <h2 class="title" id="backup-title">Respaldar {{ target().label }}</h2>
-      <p class="subtitle">
-        Eliges qué se lleva y qué no. Antes de escribir nada puedes ver el guion exacto.
-      </p>
+      <h2 class="title" id="backup-title">{{ 'backup.title' | t: { target: target().label } }}</h2>
+      <p class="subtitle">{{ 'backup.subtitle' | t }}</p>
     </div>
-    <button type="button" class="close" (click)="close()" aria-label="Cerrar">×</button>
+    <button type="button" class="close" (click)="close()" [attr.aria-label]="'common.close' | t">
+      ×
+    </button>
   </header>
 
   <!--
@@ -37,9 +37,7 @@
           (cancelRequested)="cancel()"
         />
 
-        <p class="hint">
-          Puedes cerrar esta ventana: el respaldo sigue y lo verás en la barra de estado.
-        </p>
+        <p class="hint">{{ 'backup.keepsGoing' | t }}</p>
       } @else {
         <!--
           El resumen se queda hasta que el usuario lo cierre. Un aviso de tres
@@ -47,24 +45,31 @@
           sin nadie mirando.
         -->
         <div class="result" [class]="'result--' + progress.outcome.toLowerCase()">
-          <h3 class="result__title">{{ outcomeLabel(progress.outcome) }}</h3>
+          <h3 class="result__title">{{ outcomeLabel(progress.outcome) | t }}</h3>
 
           <dl class="result__facts">
             <div>
-              <dt>Objetos</dt>
-              <dd>{{ progress.objectsDone }} de {{ progress.objectsTotal }}</dd>
+              <dt>{{ 'backup.objects' | t }}</dt>
+              <dd>
+                {{
+                  'backup.objectsDone'
+                    | t: { done: progress.objectsDone, total: progress.objectsTotal }
+                }}
+              </dd>
             </div>
             <div>
-              <dt>Filas</dt>
-              <dd>{{ progress.totalRows }}</dd>
+              <dt>{{ 'backup.rows' | t }}</dt>
+              <dd>{{ count(progress.totalRows) }}</dd>
             </div>
             <div>
-              <dt>Duración</dt>
-              <dd>{{ (progress.elapsedMilliseconds / 1000).toFixed(1) }} s</dd>
+              <dt>{{ 'backup.duration' | t }}</dt>
+              <dd>
+                {{ 'backup.seconds' | t: { seconds: seconds(progress.elapsedMilliseconds) } }}
+              </dd>
             </div>
             @if (progress.path) {
               <div class="wide">
-                <dt>Dónde quedó</dt>
+                <dt>{{ 'backup.where' | t }}</dt>
                 <dd class="path">{{ progress.path }}</dd>
               </div>
             }
@@ -72,7 +77,9 @@
 
           @if (progress.failure; as failure) {
             <div class="failure">
-              <p class="failure__what">{{ failure.subject }}: {{ failure.message }}</p>
+              <p class="failure__what">
+                {{ 'backup.failure' | t: { subject: failure.subject, message: failure.message } }}
+              </p>
               @if (failure.statement) {
                 <pre class="failure__sql">{{ failure.statement }}</pre>
               }
@@ -95,33 +102,37 @@
 
     <footer class="foot">
       @if (!store.running()) {
-        <button type="button" class="ghost" (click)="copyReport()">Copiar informe</button>
+        <button type="button" class="ghost" (click)="copyReport()">
+          {{ 'backup.copyReport' | t }}
+        </button>
         <span class="spacer"></span>
-        <button type="button" class="primary" (click)="dismiss()">Cerrar</button>
+        <button type="button" class="primary" (click)="dismiss()">{{ 'common.close' | t }}</button>
       } @else {
         <span class="spacer"></span>
-        <button type="button" class="ghost" (click)="close()">Seguir en segundo plano</button>
+        <button type="button" class="ghost" (click)="close()">
+          {{ 'backup.background' | t }}
+        </button>
       }
     </footer>
   } @else {
-    <nav class="steps" aria-label="Pasos">
+    <nav class="steps" [attr.aria-label]="'backup.steps' | t">
       <button type="button" [class.is-active]="step() === 'what'" (click)="go('what')">
-        1. Qué
+        {{ 'backup.step.what' | t }}
       </button>
       <button type="button" [class.is-active]="step() === 'data'" (click)="go('data')">
-        2. Datos
+        {{ 'backup.step.data' | t }}
       </button>
       <button type="button" [class.is-active]="step() === 'how'" (click)="go('how')">
-        3. Cómo
+        {{ 'backup.step.how' | t }}
       </button>
       <button type="button" [class.is-active]="step() === 'review'" (click)="go('review')">
-        4. Revisar
+        {{ 'backup.step.review' | t }}
       </button>
     </nav>
 
     <div class="body">
       @if (loading()) {
-        <p class="hint">Leyendo el catálogo…</p>
+        <p class="hint">{{ 'backup.readingCatalog' | t }}</p>
       } @else if (loadError(); as error) {
         <p class="error">{{ error }}</p>
       } @else {
@@ -134,7 +145,7 @@
             -->
             @if (profiles().length > 0) {
               <div class="profiles">
-                <p class="profiles__title">Respaldos guardados</p>
+                <p class="profiles__title">{{ 'backup.profiles' | t }}</p>
 
                 @for (profile of profiles(); track profile.id) {
                   <div class="profiles__row" [class.is-active]="activeProfile()?.id === profile.id">
@@ -142,16 +153,16 @@
                       type="button"
                       class="profiles__open"
                       (click)="openProfile(profile)"
-                      [title]="'Abrir ' + profile.name"
+                      [title]="'backup.openProfile' | t: { name: profile.name }"
                     >
                       <app-icon name="save" />
                       <span class="name">{{ profile.name }}</span>
                       @if (profile.lastRunAtUtc) {
-                        <span class="when"
-                          >último uso {{ profile.lastRunAtUtc | date: 'short' }}</span
-                        >
+                        <span class="when">
+                          {{ 'backup.lastRun' | t: { date: when(profile.lastRunAtUtc) } }}
+                        </span>
                       } @else {
-                        <span class="when">sin lanzar todavía</span>
+                        <span class="when">{{ 'backup.neverRun' | t }}</span>
                       }
                     </button>
 
@@ -159,7 +170,7 @@
                       type="button"
                       class="profiles__delete"
                       (click)="deleteProfile(profile)"
-                      [title]="'Borrar ' + profile.name"
+                      [title]="'backup.deleteProfile' | t: { name: profile.name }"
                     >
                       <app-icon name="trash" />
                     </button>
@@ -175,7 +186,7 @@
             @if (gaps().length > 0) {
               <div class="reconcile reconcile--gaps">
                 <p class="reconcile__title">
-                  {{ gaps().length }} objeto(s) del perfil ya no existen:
+                  {{ 'backup.gaps' | t: { count: gaps().length } }}
                 </p>
                 <ul class="warnings">
                   @for (gap of gaps(); track gap.reason) {
@@ -188,7 +199,7 @@
             @if (added().length > 0) {
               <div class="reconcile">
                 <p class="reconcile__title">
-                  {{ added().length }} tabla(s) nuevas dentro de lo que el perfil elegía entero:
+                  {{ 'backup.added' | t: { count: added().length } }}
                 </p>
                 <ul class="warnings">
                   @for (table of added(); track table) {
@@ -202,7 +213,9 @@
               <p class="error">{{ error }}</p>
             }
 
-            <p class="hint">{{ selectedCount() }} de {{ candidates().length }} tablas marcadas.</p>
+            <p class="hint">
+              {{ 'backup.marked' | t: { selected: selectedCount(), total: candidates().length } }}
+            </p>
 
             <div class="tree dr-scroll-fade">
               @for (schema of schemas(); track schema) {
@@ -233,7 +246,9 @@
                         se leía como un fallo de la aplicación.
                       -->
                       @if (table.rows !== undefined && table.rows !== null) {
-                        <span class="rows">~{{ table.rows }} filas</span>
+                        <span class="rows">{{
+                          'backup.tableRows' | t: { rows: count(table.rows) }
+                        }}</span>
                       }
                     </label>
                   }
@@ -244,7 +259,7 @@
 
           @case ('data') {
             <fieldset class="modes">
-              <legend>De todas las tablas</legend>
+              <legend>{{ 'backup.allTables' | t }}</legend>
 
               @for (mode of ['StructureOnly', 'StructureAndData', 'DataOnly']; track mode) {
                 <label class="radio">
@@ -255,26 +270,13 @@
                     (change)="dataMode.set($any(mode))"
                   />
                   <span>
-                    @switch (mode) {
-                      @case ('StructureOnly') {
-                        Solo estructura
-                      }
-                      @case ('StructureAndData') {
-                        Estructura y datos
-                      }
-                      @default {
-                        Solo datos
-                      }
-                    }
+                    {{ modeLabel($any(mode)) | t }}
                   </span>
                 </label>
               }
             </fieldset>
 
-            <p class="hint">
-              Y aquí lo que se sale de esa regla. Es el caso de siempre: todo sin datos, salvo las
-              tablas de catálogo.
-            </p>
+            <p class="hint">{{ 'backup.exceptionsHint' | t }}</p>
 
             <div class="tree dr-scroll-fade">
               @for (table of chosen(); track table.key) {
@@ -286,13 +288,13 @@
                     [value]="modeOf(table.key)"
                     (change)="setMode(table.key, $any($event.target).value)"
                   >
-                    <option value="StructureOnly">Solo estructura</option>
-                    <option value="StructureAndData">Estructura y datos</option>
-                    <option value="DataOnly">Solo datos</option>
+                    <option value="StructureOnly">{{ 'backup.mode.structure' | t }}</option>
+                    <option value="StructureAndData">{{ 'backup.mode.both' | t }}</option>
+                    <option value="DataOnly">{{ 'backup.mode.data' | t }}</option>
                   </select>
 
                   @if (modeOf(table.key) !== dataMode()) {
-                    <span class="badge">excepción</span>
+                    <span class="badge">{{ 'backup.exception' | t }}</span>
                   }
                 </div>
               }
@@ -301,7 +303,7 @@
 
           @case ('how') {
             <fieldset class="modes">
-              <legend>Cómo se reparte</legend>
+              <legend>{{ 'backup.layout' | t }}</legend>
 
               <label class="radio">
                 <input
@@ -311,7 +313,7 @@
                   [disabled]="dataFormat() === 'Csv'"
                   (change)="layout.set('SingleFile')"
                 />
-                <span>Un solo archivo .sql</span>
+                <span>{{ 'backup.layout.single' | t }}</span>
               </label>
 
               <label class="radio">
@@ -321,12 +323,12 @@
                   [checked]="layout() === 'FolderByKind'"
                   (change)="layout.set('FolderByKind')"
                 />
-                <span>Carpeta por tipo de objeto</span>
+                <span>{{ 'backup.layout.folder' | t }}</span>
               </label>
             </fieldset>
 
             <fieldset class="modes">
-              <legend>Cómo se escriben las filas</legend>
+              <legend>{{ 'backup.format' | t }}</legend>
 
               <label class="radio">
                 <input
@@ -335,7 +337,7 @@
                   [checked]="dataFormat() === 'Inserts'"
                   (change)="setDataFormat('Inserts')"
                 />
-                <span>INSERT, listos para ejecutar</span>
+                <span>{{ 'backup.format.inserts' | t }}</span>
               </label>
 
               <label class="radio">
@@ -345,13 +347,13 @@
                   [checked]="dataFormat() === 'Csv'"
                   (change)="setDataFormat('Csv')"
                 />
-                <span>CSV por tabla — más rápido y pequeño; exige carpetas</span>
+                <span>{{ 'backup.format.csv' | t }}</span>
               </label>
             </fieldset>
 
             <label class="check">
               <input type="checkbox" [checked]="compress()" (change)="compress.set(!compress())" />
-              Empaquetar en un .zip con su manifiesto
+              {{ 'backup.compress' | t }}
             </label>
 
             @if (writesFolder()) {
@@ -361,12 +363,12 @@
                   [checked]="overwrite()"
                   (change)="overwrite.set(!overwrite())"
                 />
-                Sobrescribir el respaldo anterior de esa carpeta
+                {{ 'backup.overwrite' | t }}
               </label>
             }
 
             <label class="field">
-              <span class="field__label">Dónde se guarda</span>
+              <span class="field__label">{{ 'backup.destination' | t }}</span>
               <div class="path-row">
                 <input
                   type="text"
@@ -376,75 +378,72 @@
                 />
                 <button type="button" class="ghost" (click)="choose()">
                   <app-icon name="folder-open" />
-                  Elegir…
+                  {{ 'backup.choose' | t }}
                 </button>
               </div>
             </label>
 
-            <p class="hint">
-              Lo escribe el proceso local, no el navegador: un respaldo de varios gigabytes no cabe
-              dos veces en memoria.
-            </p>
+            <p class="hint">{{ 'backup.localProcess' | t }}</p>
           }
 
           @default {
             <dl class="result__facts">
               <div>
-                <dt>Tablas</dt>
+                <dt>{{ 'backup.tables' | t }}</dt>
                 <dd>{{ selectedCount() }}</dd>
               </div>
               <div>
-                <dt>Con datos</dt>
+                <dt>{{ 'backup.withData' | t }}</dt>
                 <dd>{{ withData() }}</dd>
               </div>
               <div>
-                <dt>Forma</dt>
+                <dt>{{ 'backup.shape' | t }}</dt>
                 <dd>
-                  {{ layout() === 'SingleFile' ? 'Un archivo' : 'Carpeta' }}
+                  {{
+                    (layout() === 'SingleFile' ? 'backup.shape.single' : 'backup.shape.folder') | t
+                  }}
                   @if (compress()) {
-                    · comprimida
+                    · {{ 'backup.shape.compressed' | t }}
                   }
                   @if (dataFormat() === 'Csv') {
-                    · datos en CSV
+                    · {{ 'backup.shape.csv' | t }}
                   }
                 </dd>
               </div>
               <div class="wide">
-                <dt>Destino</dt>
-                <dd class="path">{{ destination() || 'sin elegir' }}</dd>
+                <dt>{{ 'backup.target' | t }}</dt>
+                <dd class="path">{{ destination() || ('backup.noTarget' | t) }}</dd>
               </div>
             </dl>
 
             @if (exceptions().length > 0) {
-              <p class="hint">{{ exceptions().length }} tabla(s) se salen de la regla general:</p>
+              <p class="hint">{{ 'backup.exceptions' | t: { count: exceptions().length } }}</p>
               <ul class="warnings">
                 @for (exception of exceptions(); track exception.key) {
                   <li>
                     <strong>{{ exception.key }}</strong
-                    >: {{ modeLabel(exception.mode) }}
+                    >: {{ modeLabel(exception.mode) | t }}
                   </li>
                 }
               </ul>
             }
 
             @if (!outputValid()) {
-              <p class="error">Los datos en CSV necesitan la salida por carpetas.</p>
+              <p class="error">{{ 'backup.csvNeedsFolder' | t }}</p>
             }
 
             <div class="preview">
               <button type="button" class="ghost" [disabled]="!canRun()" (click)="preview()">
                 <app-icon name="eye" />
-                Ver el guion
+                {{ 'backup.preview' | t }}
               </button>
 
               @if (store.previewing()) {
-                <p class="hint">Componiendo…</p>
+                <p class="hint">{{ 'backup.composing' | t }}</p>
               } @else if (store.preview(); as preview) {
                 <pre class="sql">{{ preview.statements.join('\n') }}</pre>
                 @if (preview.truncated) {
-                  <p class="hint">
-                    Se enseñan las primeras instrucciones; el respaldo llevará más.
-                  </p>
+                  <p class="hint">{{ 'backup.truncated' | t }}</p>
                 }
               }
             </div>
@@ -455,7 +454,7 @@
             -->
             <div class="save-profile">
               <label class="save-profile__label" for="backup-profile-name">
-                Guardar esta selección como perfil
+                {{ 'backup.saveProfile' | t }}
               </label>
 
               <div class="save-profile__row">
@@ -463,7 +462,7 @@
                   id="backup-profile-name"
                   type="text"
                   class="save-profile__name"
-                  placeholder="Estructura a desarrollo"
+                  [placeholder]="'backup.profileExample' | t"
                   [value]="profileName()"
                   (input)="profileName.set($any($event.target).value)"
                 />
@@ -475,7 +474,7 @@
                   (click)="saveProfile()"
                 >
                   <app-icon name="save" />
-                  {{ activeProfile() ? 'Guardar cambios' : 'Guardar perfil' }}
+                  {{ (activeProfile() ? 'backup.saveChanges' : 'backup.saveNew') | t }}
                 </button>
 
                 @if (activeProfile()) {
@@ -486,14 +485,14 @@
                     (click)="duplicateProfile()"
                   >
                     <app-icon name="plus" />
-                    Duplicar
+                    {{ 'backup.duplicate' | t }}
                   </button>
                 }
               </div>
 
               @if (activeProfile()) {
                 <p class="hint">
-                  Cambiar el nombre y guardar renombra «{{ activeProfile()!.name }}».
+                  {{ 'backup.renames' | t: { name: activeProfile()!.name } }}
                 </p>
               }
 
@@ -511,7 +510,7 @@
     </div>
 
     <footer class="foot">
-      <button type="button" class="ghost" (click)="close()">Cancelar</button>
+      <button type="button" class="ghost" (click)="close()">{{ 'common.cancel' | t }}</button>
       <span class="spacer"></span>
 
       @if (step() !== 'review') {
@@ -520,11 +519,11 @@
           class="primary"
           (click)="go(step() === 'what' ? 'data' : step() === 'data' ? 'how' : 'review')"
         >
-          Siguiente
+          {{ 'backup.next' | t }}
         </button>
       } @else {
         <button type="button" class="primary" [disabled]="!canRun()" (click)="run()">
-          Respaldar
+          {{ 'backup.run' | t }}
         </button>
       }
     </footer>
