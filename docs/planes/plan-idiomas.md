@@ -1,6 +1,6 @@
 # Plan — Druse en varios idiomas
 
-Creación: 16 de septiembre de 2026. Estado: **fase 1 en curso** (22 de septiembre de 2026): está la base —servicio, catálogos, formatos, arranque, selector y guardas—; falta migrar las *features* (§8).
+Creación: 16 de septiembre de 2026. Estado: **fase 1 terminada** (22 de septiembre de 2026): la interfaz entera está en el catálogo —1 564 claves, inglés al 100 %—, no queda ninguna plantilla con texto a mano y el camino crítico pasa en los dos idiomas. Lo siguiente es la fase 2: los mensajes del backend y de Tauri (§3, §4).
 
 Objetivo: que Druse se pueda usar entero en **español, inglés, portugués de Brasil
 y francés**, y que añadir un quinto idioma sea traducir un archivo, no tocar código.
@@ -17,6 +17,7 @@ y francés**, y que añadir un quinto idioma sea traducir un archivo, no tocar c
 | Mecanismo en Angular | Servicio propio basado en signals y catálogos JSON. Sin dependencias nuevas. |
 | Errores del backend | La API devuelve una clave y sus parámetros; el frontend pone el texto. Hay un solo catálogo. |
 | Textos legales | Se traducen, pero manda el español, y así se indica. Los traduce o revisa el mantenedor, no la comunidad. |
+| Referencia de SQL | Un archivo por idioma (`sql-reference.{es,en}.ts`), no claves del catálogo: es documentación —93 funciones y palabras reservadas— y meterla clave a clave obligaría a la comunidad a traducir documentación de SQL para llegar al umbral de §6. Una prueba compara las dos. |
 | Traducciones | Las hace la comunidad en Weblate (o Crowdin). |
 | Entregas | Cuatro fases que se pueden publicar por separado (§8). |
 
@@ -203,6 +204,13 @@ Se hace lo mismo con `BackupFailure`, `TransferFailure`, `RestoreFailure` y las 
 5. `en.json` completo.
 
 **Terminada cuando**: la lista de excepciones del detector está vacía, el barrido `qps` no encuentra texto sin marcar ni recortes nuevos, las e2e pasan en `es`, el camino crítico pasa en `en`, y se ha revisado en la app levantada, en los dos temas.
+
+**Cómo quedó** (22 de septiembre de 2026):
+
+- 1 564 claves en `es`, las mismas en `en`. `build/i18n-pendientes.json` ya no lista ninguna plantilla pendiente; solo el aviso de privacidad, marcado como lo que no va al catálogo y por qué (fase 4).
+- Lo que componen las funciones puras —los comentarios del SQL del compositor, los avisos del escritor— llega al idioma por `core/i18n/active.ts`, que guarda el servicio de esta ventana. Sin servicio cae al catálogo fuente, así que las pruebas que llaman a la función suelta siguen comprobando el texto.
+- Las e2e abren Druse en el idioma que se les pida (`DRUSE_E2E_LOCALE`) y comparan contra el mismo catálogo: el camino crítico se escribe una vez y pasa en `es` y en `en`.
+- `tests/idiomas.spec.ts` es el paso del pseudoidioma. Con el texto un 40 % más largo no se recorta nada, y lo único que sale sin marcar son datos y los nombres de los idiomas, que van en el suyo a propósito.
 
 ### Fase 2 — Backend, Tauri e IA
 
