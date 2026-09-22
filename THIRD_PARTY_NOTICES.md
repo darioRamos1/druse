@@ -6,6 +6,8 @@ El [inventario de dependencias](docs/licencias-dependencias.csv) recoge versione
 
 El empaquetado conserva la extracción de licencias de Angular y los avisos originales de Monaco, Inter y JetBrains Mono en `api/licenses/frontend/`. Esa carpeta no representa una revisión completa de todos los componentes. La [reconciliación de Comunidad](docs/revisiones/licencias-comunidad-2026-09-21.md) identifica los archivos de su API que coinciden con NuGet y los textos todavía pendientes.
 
+Comunidad incluye además los textos de sus versiones NuGet/runtime en `api/licenses/nuget-comunidad/`, con un índice de versiones, procedencia y hashes. El [expediente de textos originales](docs/terceros/comunidad/README.md) conserva los documentos y los límites de esta recopilación. Incluirlos no supone aprobación de redistribución ni de SignPath.
+
 ## Controladores de bases de datos no libres
 
 Cuatro controladores que usa Druse no son software libre:
