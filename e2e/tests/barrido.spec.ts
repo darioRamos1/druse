@@ -1,6 +1,7 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 
 import { abrir, apuntarPestana, conectar, ejecutar, escribirSql } from '../support/druse';
+import { medir } from '../support/medir';
 
 /**
  * Barrido visual de toda la aplicación: recorre pantallas y diálogos, los
@@ -16,85 +17,6 @@ const hallazgos: string[] = [];
 
 async function foto(page: Page, nombre: string, sitio?: Locator): Promise<void> {
   await (sitio ?? page).screenshot({ path: `${SALIDA}/${nombre}.png` });
-}
-
-/** Lo medible: qué no cabe, qué se corta y qué botón no dice lo que hace. */
-async function medir(page: Page, donde: string): Promise<void> {
-  const encontrado = await page.evaluate((sitio) => {
-    const problemas: string[] = [];
-
-    for (const element of Array.from(document.querySelectorAll<HTMLElement>('*'))) {
-      const style = getComputedStyle(element);
-
-      if (style.display === 'none' || style.visibility === 'hidden') {
-        continue;
-      }
-
-      const caja = element.getBoundingClientRect();
-
-      if (
-        caja.width === 0 ||
-        caja.height === 0 ||
-        element.closest('.monaco-editor') ||
-        (element.matches('.label') && caja.width <= 1 && caja.height <= 1)
-      ) {
-        continue;
-      }
-
-      // Contenido que no cabe en un contenedor que además lo recorta.
-      const recorta = style.overflowX === 'hidden' || style.overflowX === 'clip';
-      const sobra = element.scrollWidth - element.clientWidth;
-
-      /*
-       * Recortar con puntos suspensivos no es un defecto: es una decisión, y
-       * además se ve. Una celda de datos con un texto largo dentro va a
-       * desbordar siempre —el dato lo pone quien consulta, no quien diseña— y,
-       * mientras quede sitio para leer un trozo y los puntos, hace lo que se le
-       * pidió.
-       *
-       * Lo que sí es un defecto es recortar hasta dejarlo en nada: ahí no hay
-       * decisión que valga, porque no se lee ni el principio. De ahí el ancho
-       * mínimo, en lugar de un «tiene ellipsis, se perdona».
-       */
-      const decidido = style.textOverflow === 'ellipsis' && element.clientWidth >= 40;
-
-      if (
-        recorta &&
-        !decidido &&
-        sobra > 2 &&
-        element.children.length === 0 &&
-        element.textContent?.trim()
-      ) {
-        problemas.push(
-          `${sitio}: «${element.textContent.trim().slice(0, 32)}» se corta (${sobra}px)`,
-        );
-      }
-
-      // Alto que se desborda sin poder desplazarse.
-      const sobraAlto = element.scrollHeight - element.clientHeight;
-
-      if (style.overflowY === 'hidden' && sobraAlto > 4 && element.children.length > 0) {
-        problemas.push(
-          `${sitio}: <${element.tagName.toLowerCase()}.${String(element.className).split(' ')[0]}> esconde ${sobraAlto}px de alto`,
-        );
-      }
-    }
-
-    for (const boton of Array.from(document.querySelectorAll('button'))) {
-      const texto = boton.textContent?.trim() ?? '';
-      const nombre = boton.getAttribute('aria-label') ?? boton.getAttribute('title') ?? '';
-
-      if (texto.length === 0 && nombre.length === 0) {
-        problemas.push(
-          `${sitio}: botón sin nombre accesible (.${String(boton.className).split(' ')[0]})`,
-        );
-      }
-    }
-
-    return [...new Set(problemas)];
-  }, donde);
-
-  hallazgos.push(...encontrado);
 }
 
 /**
@@ -200,7 +122,7 @@ test.describe('barrido visual', () => {
     await expect(page.locator('.pager__range')).toBeVisible({
       timeout: 30_000,
     });
-    await medir(page, 'resultados');
+    await medir(page, 'resultados', hallazgos);
     await foto(page, '01-resultados');
 
     await page.getByRole('button', { name: 'Filtros', exact: true }).click();
@@ -221,12 +143,12 @@ test.describe('barrido visual', () => {
       .catch(() => {});
     await page.locator('app-results-panel').getByText('Mensajes').first().click();
     await page.waitForTimeout(200);
-    await medir(page, 'mensajes');
+    await medir(page, 'mensajes', hallazgos);
     await foto(page, '02-mensajes');
 
     await page.locator('app-results-panel').getByText('Historial').first().click();
     await page.waitForTimeout(400);
-    await medir(page, 'historial');
+    await medir(page, 'historial', hallazgos);
     await foto(page, '03-historial');
 
     await page.locator('app-results-panel').getByText('Resultados').first().click();
@@ -235,13 +157,13 @@ test.describe('barrido visual', () => {
     await escribirSql(page, 'SELECT * FROM tabla_que_no_existe');
     await ejecutar(page, 'todo');
     await page.waitForTimeout(500);
-    await medir(page, 'error de consulta');
+    await medir(page, 'error de consulta', hallazgos);
     await foto(page, '04-error');
 
     // --- Menú del árbol ----------------------------------------------------
     await menuDe(page, 'Tables');
     await page.waitForTimeout(200);
-    await medir(page, 'menú del árbol');
+    await medir(page, 'menú del árbol', hallazgos);
     await foto(page, '05-menu-arbol');
     await page.keyboard.press('Escape');
     await page.locator('app-sql-editor').click();
@@ -254,7 +176,7 @@ test.describe('barrido visual', () => {
     await sidebar.getByText('public', { exact: true }).first().click();
     await sidebar.locator('.filter__input').fill('e2e');
     await page.waitForTimeout(400);
-    await medir(page, 'filtro del explorador');
+    await medir(page, 'filtro del explorador', hallazgos);
     await foto(page, '19-filtro', sidebar);
     await sidebar.locator('.filter__clear').click();
 
@@ -267,7 +189,7 @@ test.describe('barrido visual', () => {
     await page.locator('app-sql-editor .monaco-editor textarea').first().focus();
     await page.keyboard.press('Control+k');
     await expect(page.locator('app-command-palette')).toBeVisible();
-    await medir(page, 'paleta');
+    await medir(page, 'paleta', hallazgos);
     await foto(page, '06-paleta');
     await page.getByLabel('Buscar comandos', { exact: true }).fill('Confirmar la transacción');
     await expect(page.getByRole('option', { name: /^Confirmar la transacción/ }))
@@ -294,12 +216,12 @@ test.describe('barrido visual', () => {
     }
 
     await expect(barra.locator('.tab')).toHaveCount(antes + nuevas);
-    await medir(page, 'barra con muchas pestañas');
+    await medir(page, 'barra con muchas pestañas', hallazgos);
     await foto(page, '06c-pestanas', barra);
 
     await barra.locator('.listing__toggle').click();
     await expect(barra.locator('.listing__menu')).toBeVisible();
-    await medir(page, 'lista de pestañas');
+    await medir(page, 'lista de pestañas', hallazgos);
     await foto(page, '06d-lista-pestanas');
 
     await barra.locator('.listing__search input').fill('Consulta 1');
@@ -320,7 +242,7 @@ test.describe('barrido visual', () => {
     const atajos = page.locator('app-shortcuts-sheet');
 
     await expect(atajos).toBeVisible({ timeout: 30_000 });
-    await medir(page, 'hoja de atajos');
+    await medir(page, 'hoja de atajos', hallazgos);
     await foto(page, '06b-atajos', atajos.locator('.dialog'));
     await page.keyboard.press('Escape');
 
@@ -390,7 +312,7 @@ test.describe('barrido visual', () => {
 
       await expect(dialogo).toBeVisible({ timeout: 30_000 });
       await page.waitForTimeout(500);
-      await medir(page, nombre);
+      await medir(page, nombre, hallazgos);
       await foto(page, nombre, dialogo.locator('.dialog').first());
       if (selector === 'app-settings-dialog') {
         for (const [tab, file] of [
@@ -423,7 +345,7 @@ test.describe('barrido visual', () => {
     ).toBeVisible();
 
     await page.waitForTimeout(300);
-    await medir(page, 'destino del respaldo');
+    await medir(page, 'destino del respaldo', hallazgos);
     await foto(page, '10b-respaldo-destino', respaldo.locator('.dialog'));
     await cerrar(page, respaldo, 'destino del respaldo');
 
@@ -437,7 +359,7 @@ test.describe('barrido visual', () => {
     const diagrama = page.locator('app-diagram-panel');
 
     await expect(diagrama.locator('.chooser')).toBeVisible({ timeout: 60_000 });
-    await medir(page, 'elegir tablas del diagrama');
+    await medir(page, 'elegir tablas del diagrama', hallazgos);
     await foto(page, '20-mer-tablas', diagrama.locator('.dialog'));
 
     await diagrama.getByRole('button', { name: 'Dibujar' }).click();
@@ -445,7 +367,7 @@ test.describe('barrido visual', () => {
       timeout: 60_000,
     });
     await page.waitForTimeout(400);
-    await medir(page, 'diagrama');
+    await medir(page, 'diagrama', hallazgos);
     await foto(page, '20-mer', diagrama.locator('.dialog'));
     await cerrar(page, diagrama, 'diagrama');
 
@@ -461,7 +383,7 @@ test.describe('barrido visual', () => {
     await expect(diagramaBase.locator('.chooser')).toBeVisible({
       timeout: 60_000,
     });
-    await medir(page, 'elegir tablas de la base');
+    await medir(page, 'elegir tablas de la base', hallazgos);
     await foto(page, '20-mer-base-tablas', diagramaBase.locator('.dialog'));
     await cerrar(page, diagramaBase, 'diagrama de la base');
 
@@ -473,7 +395,7 @@ test.describe('barrido visual', () => {
     const traslado = page.locator('app-transfer-dialog');
 
     await expect(traslado).toBeVisible();
-    await medir(page, 'migrar una tabla');
+    await medir(page, 'migrar una tabla', hallazgos);
     await foto(page, '13-migrar-una', traslado.locator('.dialog'));
     await page.keyboard.press('Escape');
 
@@ -491,7 +413,7 @@ test.describe('barrido visual', () => {
 
       await expect(dialogo).toBeVisible({ timeout: 30_000 });
       await page.waitForTimeout(600);
-      await medir(page, nombre);
+      await medir(page, nombre, hallazgos);
       await foto(page, nombre, dialogo.locator('.dialog').first());
       await cerrar(page, dialogo, nombre);
     }
@@ -535,7 +457,7 @@ test.describe('barrido visual', () => {
 
       await expect(runner).toBeVisible({ timeout: 30_000 });
       await page.waitForTimeout(600);
-      await medir(page, 'ejecutar procedimiento');
+      await medir(page, 'ejecutar procedimiento', hallazgos);
       await foto(page, '13c-procedimiento', runner.locator('.dialog'));
       await page.keyboard.press('Escape');
     } else {
@@ -566,7 +488,7 @@ test.describe('barrido visual', () => {
       if (motor === 'Informix (DRDA)') {
         await dialogo.getByRole('button', { name: 'DRDA', exact: true }).click();
       }
-      await medir(page, `conexión ${motor}`);
+      await medir(page, `conexión ${motor}`, hallazgos);
       await foto(
         page,
         `13d-conexion-${motor.replace(/[^a-z]/gi, '').toLowerCase()}`,
@@ -582,7 +504,7 @@ test.describe('barrido visual', () => {
 
     await expect(asistente).toBeVisible({ timeout: 30_000 });
     await page.waitForTimeout(500);
-    await medir(page, 'asistente');
+    await medir(page, 'asistente', hallazgos);
     await foto(page, '14-asistente');
 
     const anchoAsistente = page.getByRole('separator', {
@@ -615,7 +537,7 @@ test.describe('barrido visual', () => {
 
     await expect(proveedores).toBeVisible({ timeout: 30_000 });
     await page.waitForTimeout(500);
-    await medir(page, 'proveedor de IA');
+    await medir(page, 'proveedor de IA', hallazgos);
     await foto(page, '15-proveedor-ia', proveedores.locator('.dialog'));
     await cerrar(page, proveedores, 'proveedor de IA');
 
@@ -628,12 +550,12 @@ test.describe('barrido visual', () => {
     await escribirSql(page, 'SELECT 1 AS uno, 2 AS dos, 3 AS tres');
     await ejecutar(page, 'todo');
     await page.waitForTimeout(300);
-    await medir(page, 'claro: resultados');
+    await medir(page, 'claro: resultados', hallazgos);
     await foto(page, '16-claro-resultados');
 
     await page.getByRole('button', { name: 'Nueva conexión' }).click();
     await expect(page.locator('app-connection-dialog')).toBeVisible();
-    await medir(page, 'claro: conexión');
+    await medir(page, 'claro: conexión', hallazgos);
     await foto(page, '17-claro-conexion', page.locator('app-connection-dialog .dialog'));
     await page.keyboard.press('Escape');
     await page.getByRole('button', { name: 'Tema oscuro' }).click();
@@ -642,7 +564,7 @@ test.describe('barrido visual', () => {
     for (const ancho of [1440, 1280, 1024, 900]) {
       await page.setViewportSize({ width: ancho, height: 760 });
       await page.waitForTimeout(400);
-      await medir(page, `ancho ${ancho}`);
+      await medir(page, `ancho ${ancho}`, hallazgos);
       await foto(page, `18-ancho-${ancho}`);
     }
 

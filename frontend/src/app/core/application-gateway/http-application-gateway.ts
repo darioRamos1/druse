@@ -65,7 +65,7 @@ import {
   SaveConnectionRequest,
 } from './application-gateway';
 import { DesktopHost } from './desktop-host';
-import { I18nService } from '../i18n/i18n.service';
+import { translate } from '../i18n/active';
 import {
   AiChatRequest,
   AiProbeResult,
@@ -146,7 +146,6 @@ export class HttpApplicationGateway extends ApplicationGateway {
   // El asistente lee su respuesta con `fetch`, que no pasa por el interceptor:
   // necesita saber por su cuenta a qué host hablar y con qué token.
   private readonly _desktop = inject(DesktopHost);
-  private readonly _i18n = inject(I18nService);
 
   override getHealth(): Observable<HealthStatus> {
     return this._http.get<HealthStatus>('/api/health');
@@ -743,7 +742,7 @@ export class HttpApplicationGateway extends ApplicationGateway {
         let corte = buffer.indexOf('\n\n');
 
         while (corte >= 0) {
-          const evento = parseEvent(buffer.slice(0, corte), this._i18n.t('ai.failed'));
+          const evento = parseEvent(buffer.slice(0, corte), translate('ai.failed'));
 
           buffer = buffer.slice(corte + 2);
           corte = buffer.indexOf('\n\n');
@@ -772,7 +771,7 @@ export class HttpApplicationGateway extends ApplicationGateway {
 
       subscriber.next({
         kind: 'error',
-        message: error instanceof Error ? error.message : this._i18n.t('ai.unreachable'),
+        message: error instanceof Error ? error.message : translate('ai.unreachable'),
       });
       subscriber.complete();
     }

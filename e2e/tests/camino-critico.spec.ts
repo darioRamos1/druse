@@ -9,6 +9,7 @@ import {
   escribirSql,
   primeraColumna,
 } from '../support/druse';
+import { t } from '../support/i18n';
 
 /**
  * Lo que tiene que funcionar para que Druse sirva de algo: abrir, conectarse a
@@ -24,13 +25,15 @@ test.describe('el camino crítico', () => {
     await abrir(page);
 
     await expect(
-      page.getByRole('button', { name: 'Ejecutar', exact: false }).first(),
+      page.getByRole('button', { name: t('toolbar.run'), exact: false }).first(),
     ).toBeVisible();
     await expect(page.locator('app-results-panel')).toBeVisible();
 
     // Sin conexión no se puede ejecutar, y la barra lo dice en lugar de dejar
     // pulsar y fallar después.
-    await expect(page.locator('app-editor-toolbar .chip').first()).toContainText('sin conexión');
+    await expect(page.locator('app-editor-toolbar .chip').first()).toContainText(
+      t('shell.noConnection'),
+    );
   });
 
   /**
@@ -46,7 +49,7 @@ test.describe('el camino crítico', () => {
   }) => {
     await abrir(page);
 
-    await page.getByRole('button', { name: 'Nueva conexión' }).click();
+    await page.getByRole('button', { name: t('topbar.newConnection') }).click();
 
     const dialogo = page.locator('app-connection-dialog');
 
@@ -60,26 +63,27 @@ test.describe('el camino crítico', () => {
     // haría fallar la segunda vuelta por nombre duplicado.
     const nombre = `E2E sin base ${Date.now()}`;
 
-    await campo('Nombre').fill(nombre);
-    await campo('Servidor').fill(CONTENEDOR.host);
-    await campo('Puerto').fill(String(CONTENEDOR.puerto));
-    await campo('Usuario').fill(CONTENEDOR.usuario);
-    await campo('Contraseña').fill(CONTENEDOR.contrasena);
-    await dialogo.getByRole('button', { name: /Opciones avanzadas/ }).click();
-    await dialogo.getByRole('button', { name: 'Sin cifrar' }).click();
+    await campo(t('connection.name')).fill(nombre);
+    await campo(t('connection.server')).fill(CONTENEDOR.host);
+    await campo(t('connection.port')).fill(String(CONTENEDOR.puerto));
+    await campo(t('connection.user')).fill(CONTENEDOR.usuario);
+    await campo(t('connection.password')).fill(CONTENEDOR.contrasena);
+    await dialogo.getByRole('button', { name: new RegExp(t('connection.advanced')) }).click();
+    await dialogo.getByRole('button', { name: t('connection.ssl.disable') }).click();
 
     // Lo primero: que el formulario sepa decir cuáles hay.
-    await dialogo.getByRole('button', { name: 'Buscar bases de datos' }).click();
-    await expect(dialogo.locator('#connection-database-detail')).toContainText('disponibles', {
-      timeout: 30_000,
-    });
+    await dialogo.getByRole('button', { name: t('connection.searchDatabases') }).click();
+
+    // Lo que se comprueba es que las haya traído y que la del contenedor esté
+    // entre ellas. El resumen de al lado es un plural —«hay N disponibles»— y
+    // resolverlo aquí sería reescribir el catálogo en la prueba.
     await expect(
       dialogo.locator(`#connection-databases option[value="${CONTENEDOR.base}"]`),
-    ).toHaveCount(1);
+    ).toHaveCount(1, { timeout: 30_000 });
 
     // Y que dejándola vacía se conecte igual.
-    await campo('Base de datos').fill('');
-    await dialogo.getByRole('button', { name: 'Conectar' }).click();
+    await campo(t('connection.database')).fill('');
+    await dialogo.getByRole('button', { name: t('connection.connect'), exact: true }).click();
     await expect(dialogo).toBeHidden({ timeout: 60_000 });
 
     const sidebar = page.locator('app-connections-sidebar');
@@ -101,9 +105,9 @@ test.describe('el camino crítico', () => {
     const fila = sidebar.locator('.node--connection', { hasText: nombre }).first();
 
     await fila.locator('.connection-menu-trigger').click();
-    await fila.locator('[title="Desconectar"]').click();
+    await fila.locator(`[title="${t('sidebar.disconnect')}"]`).click();
     await fila.locator('.connection-menu-trigger').click();
-    await fila.locator('[title="Eliminar esta conexión guardada"]').click();
+    await fila.locator(`[title="${t('sidebar.forgetTitle')}"]`).click();
     await expect(sidebar.getByText(nombre)).toHaveCount(0, { timeout: 30_000 });
   });
 
@@ -141,7 +145,7 @@ test.describe('el camino crítico', () => {
 
     // Cada instrucción trae el suyo, y se eligen por pestaña.
     await expect(conjuntos(page)).toHaveCount(3);
-    await expect(conjuntos(page).first()).toContainText('Resultado 1');
+    await expect(conjuntos(page).first()).toContainText(t('results.set', { n: 1 }));
   });
 
   test('una consulta a una tabla que no existe se cuenta sin romper nada', async ({ page }) => {

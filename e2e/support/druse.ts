@@ -1,4 +1,5 @@
 import { expect, type Page } from '@playwright/test';
+import { elegirIdioma, t } from './i18n';
 
 /**
  * Lo que hace falta saber de Druse para escribir una prueba.
@@ -46,7 +47,12 @@ export const SQLSERVER = {
  * existía, y a fallar por nombre repetido. El editor, además, se carga aparte
  * con Monaco y es lo último en aparecer.
  */
-export async function abrir(page: Page): Promise<void> {
+export async function abrir(page: Page, idioma?: string): Promise<void> {
+  // El idioma se deja puesto antes del primer pintado: con `DRUSE_E2E_LOCALE`
+  // —o con el que pida quien llama— la misma prueba recorre la aplicación
+  // traducida.
+  await elegirIdioma(page, idioma);
+
   const conexiones = page.waitForResponse(
     (response) =>
       response.url().endsWith('/api/connections') && response.request().method() === 'GET',
@@ -133,7 +139,7 @@ async function crearConexion(
   servidor: typeof CONTENEDOR = CONTENEDOR,
   motor = 'PostgreSQL',
 ): Promise<void> {
-  await page.getByRole('button', { name: 'Nueva conexión' }).click();
+  await page.getByRole('button', { name: t('topbar.newConnection') }).click();
 
   const dialogo = page.locator('app-connection-dialog');
 
@@ -151,12 +157,12 @@ async function crearConexion(
   const campo = (etiqueta: string) =>
     dialogo.locator(`.field:has(.field__label:text-is("${etiqueta}")) input`).first();
 
-  await campo('Nombre').fill(servidor.nombre);
-  await campo('Servidor').fill(servidor.host);
-  await campo('Puerto').fill(String(servidor.puerto));
-  await campo('Base de datos').fill(servidor.base);
-  await campo('Usuario').fill(servidor.usuario);
-  await campo('Contraseña').fill(servidor.contrasena);
+  await campo(t('connection.name')).fill(servidor.nombre);
+  await campo(t('connection.server')).fill(servidor.host);
+  await campo(t('connection.port')).fill(String(servidor.puerto));
+  await campo(t('connection.database')).fill(servidor.base);
+  await campo(t('connection.user')).fill(servidor.usuario);
+  await campo(t('connection.password')).fill(servidor.contrasena);
 
   /**
    * Sin cifrar, que es lo que ofrece el contenedor.
@@ -170,8 +176,8 @@ async function crearConexion(
   // SQL Server se queda con el cifrado por omisión, que acepta su certificado
   // autofirmado: sin cifrar, su driver ni siquiera lo intenta.
   if (motor === 'PostgreSQL') {
-    await dialogo.getByRole('button', { name: /Opciones avanzadas/ }).click();
-    await dialogo.getByRole('button', { name: 'Sin cifrar' }).click();
+    await dialogo.getByRole('button', { name: new RegExp(t('connection.advanced')) }).click();
+    await dialogo.getByRole('button', { name: t('connection.ssl.disable') }).click();
   }
 
   /**
@@ -195,7 +201,7 @@ async function crearConexion(
     }
   });
 
-  await dialogo.getByRole('button', { name: 'Conectar' }).click();
+  await dialogo.getByRole('button', { name: t('connection.connect'), exact: true }).click();
 
   try {
     await expect(dialogo).toBeHidden({ timeout: 60_000 });
@@ -351,9 +357,9 @@ export async function ejecutar(page: Page, que: 'todo' | 'la del cursor'): Promi
 
 /** Tras recibir la respuesta, espera a que Angular refleje el fin de la ejecución. */
 export async function esperarFinDeConsulta(page: Page): Promise<void> {
-  await expect(page.getByLabel('Consulta en curso')).toBeHidden({ timeout: 30_000 });
+  await expect(page.getByLabel(t('results.running'))).toBeHidden({ timeout: 30_000 });
   await expect(
-    page.locator('app-editor-toolbar').getByRole('button', { name: 'Ejecutar', exact: true }),
+    page.locator('app-editor-toolbar').getByRole('button', { name: t('toolbar.run'), exact: true }),
   ).toBeEnabled({ timeout: 30_000 });
 }
 
