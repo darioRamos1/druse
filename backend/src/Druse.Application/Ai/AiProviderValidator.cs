@@ -1,3 +1,5 @@
+using System.Globalization;
+
 using Druse.Application.Connections;
 using Druse.Domain;
 
@@ -18,49 +20,60 @@ public static class AiProviderValidator
     {
         if (profile is null)
         {
-            return ValidationResult.FromTexts(["El proveedor es obligatorio."]);
+            return new ValidationResult(
+                [new UserMessage(MessageKeys.AiProvider.Required, "El proveedor es obligatorio.")]);
         }
 
-        var errors = new List<string>();
+        var errors = new List<UserMessage>();
 
         if (string.IsNullOrWhiteSpace(profile.Name))
         {
-            errors.Add("El nombre del proveedor es obligatorio.");
+            errors.Add(new UserMessage(
+                MessageKeys.AiProvider.Name,
+                "El nombre del proveedor es obligatorio."));
         }
         else if (profile.Name.Length > MaxNameLength)
         {
-            errors.Add($"El nombre no puede superar {MaxNameLength} caracteres.");
+            errors.Add(UserMessage.With(
+                MessageKeys.AiProvider.NameTooLong,
+                $"El nombre no puede superar {MaxNameLength} caracteres.",
+                "max",
+                MaxNameLength.ToString(CultureInfo.InvariantCulture)));
         }
 
         if (profile.Kind == AiProviderKind.LocalCli)
         {
             if (string.IsNullOrWhiteSpace(profile.Command))
             {
-                errors.Add("Falta el programa que atiende a este proveedor.");
+                errors.Add(new UserMessage(
+                    MessageKeys.AiProvider.Command,
+                    "Falta el programa que atiende a este proveedor."));
             }
             else if (profile.Command is not ("claude" or "codex"))
             {
-                errors.Add("El programa debe ser claude o codex.");
+                errors.Add(new UserMessage(
+                    MessageKeys.AiProvider.UnknownCommand,
+                    "El programa debe ser claude o codex."));
             }
 
-            return ValidationResult.FromTexts(errors);
+            return new ValidationResult(errors);
         }
 
         if (string.IsNullOrWhiteSpace(profile.Model))
         {
-            errors.Add("El modelo es obligatorio.");
+            errors.Add(new UserMessage(MessageKeys.AiProvider.Model, "El modelo es obligatorio."));
         }
 
         ValidateBaseUrl(profile, errors);
 
-        return ValidationResult.FromTexts(errors);
+        return new ValidationResult(errors);
     }
 
-    private static void ValidateBaseUrl(AiProviderProfile profile, List<string> errors)
+    private static void ValidateBaseUrl(AiProviderProfile profile, List<UserMessage> errors)
     {
         if (string.IsNullOrWhiteSpace(profile.BaseUrl))
         {
-            errors.Add("La URL base es obligatoria.");
+            errors.Add(new UserMessage(MessageKeys.AiProvider.BaseUrl, "La URL base es obligatoria."));
 
             return;
         }
@@ -68,7 +81,9 @@ public static class AiProviderValidator
         if (!Uri.TryCreate(profile.BaseUrl, UriKind.Absolute, out var url)
             || (url.Scheme != Uri.UriSchemeHttp && url.Scheme != Uri.UriSchemeHttps))
         {
-            errors.Add("La URL base debe empezar por http:// o https://.");
+            errors.Add(new UserMessage(
+                MessageKeys.AiProvider.BaseUrlScheme,
+                "La URL base debe empezar por http:// o https://."));
 
             return;
         }
@@ -90,7 +105,11 @@ public static class AiProviderValidator
 
         if (url.AbsolutePath.Contains(forbiddenPath, StringComparison.OrdinalIgnoreCase))
         {
-            errors.Add($"La URL base termina donde empieza {forbiddenPath}: quita esa parte.");
+            errors.Add(UserMessage.With(
+                MessageKeys.AiProvider.BaseUrlPath,
+                $"La URL base termina donde empieza {forbiddenPath}: quita esa parte.",
+                "path",
+                forbiddenPath));
         }
 
         /*

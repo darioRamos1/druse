@@ -30,6 +30,20 @@ public static class MessageKeys
         public const string Timeout = "server.connection.timeout";
     }
 
+    /// <summary>Lo que se comprueba de un proveedor de IA antes de preguntarle nada.</summary>
+    public static class AiProvider
+    {
+        public const string Required = "server.ai.required";
+        public const string Name = "server.ai.name";
+        public const string NameTooLong = "server.ai.nameTooLong";
+        public const string Command = "server.ai.command";
+        public const string UnknownCommand = "server.ai.unknownCommand";
+        public const string Model = "server.ai.model";
+        public const string BaseUrl = "server.ai.baseUrl";
+        public const string BaseUrlScheme = "server.ai.baseUrlScheme";
+        public const string BaseUrlPath = "server.ai.baseUrlPath";
+    }
+
     /// <summary>El servidor intermedio, que es otra máquina y otros errores.</summary>
     public static class Tunnel
     {
