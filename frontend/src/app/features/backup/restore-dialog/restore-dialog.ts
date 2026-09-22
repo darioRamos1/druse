@@ -13,6 +13,9 @@ import {
 import { RestoreRequest } from '../../../core/application-gateway/application-gateway';
 import { DesktopHost } from '../../../core/application-gateway/desktop-host';
 import { RestoreStore, outcomeLabel } from '../../../core/backup/restore.store';
+import { I18nService } from '../../../core/i18n/i18n.service';
+import { formatDate, formatNumber } from '../../../core/i18n/locale-format';
+import { TranslatePipe } from '../../../core/i18n/translate.pipe';
 import { ExplorerNode } from '../../../shared/models/workspace';
 import { FolderPicker } from '../../../shared/ui/folder-picker/folder-picker';
 import { Icon } from '../../../shared/ui/icon/icon';
@@ -35,12 +38,13 @@ import { DialogBackdrop } from '../../../shared/a11y/dialog-backdrop';
 @Component({
   selector: 'app-restore-dialog',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [DialogBackdrop, DialogFocus, FolderPicker, Icon, OperationProgress],
+  imports: [DialogBackdrop, DialogFocus, FolderPicker, Icon, OperationProgress, TranslatePipe],
   templateUrl: './restore-dialog.html',
   styleUrl: './restore-dialog.scss',
 })
 export class RestoreDialog {
   private readonly _desktop = inject(DesktopHost);
+  private readonly _i18n = inject(I18nService);
 
   protected readonly store = inject(RestoreStore);
 
@@ -79,6 +83,28 @@ export class RestoreDialog {
       0,
     ),
   );
+
+  /** El aviso de «en {base}, la base abierta», con el nombre en negrita. */
+  protected hereParts(target: string) {
+    return this._i18n.tParts('restore.hereOpen', { target });
+  }
+
+  /** Las filas y los segundos, con los separadores del idioma. */
+  protected rows(value: number): string {
+    return formatNumber(value);
+  }
+
+  protected seconds(milliseconds: number): string {
+    return formatNumber(milliseconds / 1000, {
+      minimumFractionDigits: 1,
+      maximumFractionDigits: 1,
+    });
+  }
+
+  /** Cuándo se hizo el respaldo, en el idioma elegido. */
+  protected made(value: string): string {
+    return formatDate(value, { dateStyle: 'medium', timeStyle: 'short' });
+  }
 
   /** Elige el artefacto con el diálogo del sistema. */
   protected async choose(folder: boolean): Promise<void> {
@@ -162,11 +188,11 @@ export class RestoreDialog {
     }
 
     if (this.newDatabase().trim().length === 0) {
-      return 'Escribe el nombre de la base que se va a crear.';
+      return this._i18n.t('restore.newDatabaseMissing');
     }
 
     return this.nameTaken()
-      ? `Ya hay una base llamada «${this.newDatabase().trim()}» en este servidor.`
+      ? this._i18n.t('restore.newDatabaseTaken', { name: this.newDatabase().trim() })
       : null;
   });
 
@@ -189,8 +215,8 @@ export class RestoreDialog {
 
     if (!this.canRestore()) {
       return this.inspection() === null
-        ? 'Mira antes el respaldo: se restaura lo que se ha inspeccionado, no lo que haya en esa ruta.'
-        : 'Este respaldo no se puede aplicar aquí. El motivo está arriba.';
+        ? this._i18n.t('restore.blockedInspect')
+        : this._i18n.t('restore.blockedRejected');
     }
 
     return this.destinationProblem();

@@ -123,7 +123,9 @@ function literalsIn(html) {
   }
 
   for (const match of clean.matchAll(/\s(aria-label|title|placeholder|alt)="([^"]*)"/g)) {
-    if (/\p{L}{2,}/u.test(match[2])) {
+    // Una clave del catálogo no es texto a mano: hay componentes —el selector de
+    // carpetas— que reciben el título como clave y lo traducen dentro.
+    if (/\p{L}{2,}/u.test(match[2]) && !(match[2] in es)) {
       found.push(`${match[1]}="${match[2]}"`);
     }
   }

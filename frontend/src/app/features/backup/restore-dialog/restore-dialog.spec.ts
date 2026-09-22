@@ -193,8 +193,8 @@ describe('RestoreDialog', () => {
 
     const collisions = element.querySelector('.collisions');
 
-    expect(collisions?.textContent).toContain('2 tabla(s) ya existen');
-    expect(collisions?.textContent).toContain('42000 filas');
+    expect(collisions?.textContent).toContain('2 tablas ya existen');
+    expect(collisions?.textContent).toContain('42.000 filas');
     expect(collisions?.textContent).toContain('tienda.clientes');
   });
 

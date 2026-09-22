@@ -9,13 +9,14 @@
 <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="restore-title">
   <header class="head">
     <div>
-      <h2 class="title" id="restore-title">Restaurar en {{ target().label }}</h2>
-      <p class="subtitle">
-        Se aplica sobre esta base. Antes de tocar nada verás qué trae el respaldo y qué se
-        sobrescribiría.
-      </p>
+      <h2 class="title" id="restore-title">
+        {{ 'restore.title' | t: { target: target().label } }}
+      </h2>
+      <p class="subtitle">{{ 'restore.subtitle' | t }}</p>
     </div>
-    <button type="button" class="close" (click)="close()" aria-label="Cerrar">×</button>
+    <button type="button" class="close" (click)="close()" [attr.aria-label]="'common.close' | t">
+      ×
+    </button>
   </header>
 
   @if (store.progress(); as progress) {
@@ -34,23 +35,30 @@
           (cancelRequested)="cancel()"
         />
 
-        <p class="hint">Puedes cerrar esta ventana: la restauración sigue en el proceso local.</p>
+        <p class="hint">{{ 'restore.keepsGoing' | t }}</p>
       } @else {
         <div class="result" [class]="'result--' + progress.outcome.toLowerCase()">
-          <h3 class="result__title">{{ outcomeLabel(progress.outcome) }}</h3>
+          <h3 class="result__title">{{ outcomeLabel(progress.outcome) | t }}</h3>
 
           <dl class="result__facts">
             <div>
-              <dt>Instrucciones</dt>
-              <dd>{{ progress.statementsDone }} de {{ progress.statementsTotal }}</dd>
+              <dt>{{ 'restore.statements' | t }}</dt>
+              <dd>
+                {{
+                  'restore.statementsDone'
+                    | t: { done: progress.statementsDone, total: progress.statementsTotal }
+                }}
+              </dd>
             </div>
             <div>
-              <dt>Filas escritas</dt>
-              <dd>{{ progress.rowsWritten }}</dd>
+              <dt>{{ 'restore.rowsWritten' | t }}</dt>
+              <dd>{{ rows(progress.rowsWritten) }}</dd>
             </div>
             <div>
-              <dt>Duración</dt>
-              <dd>{{ (progress.elapsedMilliseconds / 1000).toFixed(1) }} s</dd>
+              <dt>{{ 'restore.duration' | t }}</dt>
+              <dd>
+                {{ 'restore.seconds' | t: { seconds: seconds(progress.elapsedMilliseconds) } }}
+              </dd>
             </div>
           </dl>
 
@@ -60,7 +68,7 @@
           -->
           @if (progress.failure; as failure) {
             <p class="result__where">
-              Se paró en la instrucción {{ failure.index }}. Lo aplicado hasta ahí sigue en la base.
+              {{ 'restore.stoppedAt' | t: { index: failure.index } }}
             </p>
             <p class="error">{{ failure.message }}</p>
             <pre class="sql">{{ failure.statement }}</pre>
@@ -70,33 +78,37 @@
         <div class="actions">
           <button type="button" class="ghost" (click)="copyReport()">
             <app-icon name="new-query" />
-            Copiar informe
+            {{ 'restore.copyReport' | t }}
           </button>
 
           @if (progress.failure) {
             <button type="button" class="ghost" (click)="resume()">
               <app-icon name="play-outline" />
-              Reanudar desde la {{ progress.failure.index }}
+              {{ 'restore.resumeFrom' | t: { index: progress.failure.index } }}
             </button>
           }
 
           <span class="spacer"></span>
 
-          <button type="button" class="ghost" (click)="another()">Restaurar otro</button>
-          <button type="button" class="primary" (click)="dismiss()">Cerrar</button>
+          <button type="button" class="ghost" (click)="another()">
+            {{ 'restore.another' | t }}
+          </button>
+          <button type="button" class="primary" (click)="dismiss()">
+            {{ 'common.close' | t }}
+          </button>
         </div>
       }
     </div>
   } @else {
     <div class="body">
-      <label class="label" for="restore-path">Respaldo que se aplica</label>
+      <label class="label" for="restore-path">{{ 'restore.path' | t }}</label>
 
       <div class="picker">
         <input
           id="restore-path"
           type="text"
           class="picker__path"
-          placeholder="C:\respaldos\tienda.sql"
+          [placeholder]="'restore.pathExample' | t"
           [value]="path()"
           (input)="path.set($any($event.target).value)"
         />
@@ -109,16 +121,16 @@
         @if (canChoose()) {
           <button type="button" class="ghost" (click)="choose(false)">
             <app-icon name="folder-open" />
-            Archivo
+            {{ 'restore.chooseFile' | t }}
           </button>
           <button type="button" class="ghost" (click)="choose(true)">
             <app-icon name="folder-open" />
-            Carpeta
+            {{ 'restore.chooseFolder' | t }}
           </button>
         } @else {
           <button type="button" class="ghost" (click)="picking.set(true)">
             <app-icon name="folder-open" />
-            Buscar…
+            {{ 'restore.browse' | t }}
           </button>
         }
 
@@ -129,12 +141,12 @@
           (click)="inspect()"
         >
           <app-icon name="eye" />
-          Mirar
+          {{ 'restore.inspect' | t }}
         </button>
       </div>
 
       @if (store.inspecting()) {
-        <p class="hint">Leyendo el respaldo…</p>
+        <p class="hint">{{ 'restore.inspecting' | t }}</p>
       }
 
       @if (store.error(); as error) {
@@ -145,7 +157,7 @@
         <!-- Lo que impide seguir, todo junto y no de uno en uno. -->
         @if (found.rejections.length > 0) {
           <div class="reject">
-            <p class="reject__title">No se puede restaurar este respaldo aquí:</p>
+            <p class="reject__title">{{ 'restore.rejected' | t }}</p>
             <ul class="warnings">
               @for (rejection of found.rejections; track rejection.message) {
                 <li>{{ rejection.message }}</li>
@@ -157,34 +169,36 @@
         @if (found.manifest; as manifest) {
           <dl class="facts">
             <div>
-              <dt>Motor</dt>
+              <dt>{{ 'restore.engine' | t }}</dt>
               <dd>{{ manifest.engine }} {{ manifest.serverVersion }}</dd>
             </div>
             <div>
-              <dt>Origen</dt>
+              <dt>{{ 'restore.source' | t }}</dt>
               <dd>{{ manifest.database ?? '—' }}</dd>
             </div>
             <div>
-              <dt>Hecho el</dt>
-              <dd>{{ manifest.createdAt }}</dd>
+              <dt>{{ 'restore.createdAt' | t }}</dt>
+              <dd>{{ made(manifest.createdAt) }}</dd>
             </div>
             <div>
-              <dt>Contenido</dt>
-              <dd>{{ manifest.tables }} tablas · {{ manifest.rows }} filas</dd>
+              <dt>{{ 'restore.content' | t }}</dt>
+              <dd>
+                {{ 'restore.contentValue' | t: { tables: manifest.tables, rows: manifest.rows } }}
+              </dd>
             </div>
           </dl>
 
           @if (!manifest.consistentSnapshot) {
-            <p class="hint">Las tablas de este respaldo no se leyeron en el mismo instante.</p>
+            <p class="hint">{{ 'restore.notConsistent' | t }}</p>
           }
         } @else {
-          <p class="hint">El respaldo no trae manifiesto: no se puede saber de qué motor viene.</p>
+          <p class="hint">{{ 'restore.noManifest' | t }}</p>
         }
 
         <p class="hint">
-          {{ found.statements }} instrucciones · {{ found.tables.length }} tablas
+          {{ 'restore.summary' | t: { statements: found.statements, tables: found.tables.length } }}
           @if (found.compressed) {
-            · comprimido
+            · {{ 'restore.compressed' | t }}
           }
         </p>
 
@@ -193,7 +207,7 @@
           destino a una base nueva hace que ese aviso deje de aplicar.
         -->
         <fieldset class="where">
-          <legend class="where__title">Dónde se restaura</legend>
+          <legend class="where__title">{{ 'restore.where' | t }}</legend>
 
           <label class="radio">
             <input
@@ -202,10 +216,15 @@
               [checked]="destination() === 'here'"
               (change)="destination.set('here')"
             />
-            <span
-              >En <strong>{{ target().label }}</strong
-              >, la base abierta</span
-            >
+            <span>
+              @for (part of hereParts(target().label); track $index) {
+                @if (part.tag === 'target') {
+                  <strong>{{ part.text }}</strong>
+                } @else {
+                  {{ part.text }}
+                }
+              }
+            </span>
           </label>
 
           <label class="radio">
@@ -215,7 +234,7 @@
               [checked]="destination() === 'new'"
               (change)="destination.set('new')"
             />
-            <span>En una base nueva, que se crea ahora</span>
+            <span>{{ 'restore.newDatabase' | t }}</span>
           </label>
 
           @if (destination() === 'new') {
@@ -223,7 +242,7 @@
               <input
                 type="text"
                 [value]="newDatabase()"
-                [attr.placeholder]="found.sourceDatabase ?? 'nombre de la base'"
+                [attr.placeholder]="found.sourceDatabase ?? ('restore.newDatabaseName' | t)"
                 (input)="newDatabase.set($any($event.target).value)"
               />
             </div>
@@ -232,8 +251,7 @@
               <p class="error">{{ problem }}</p>
             } @else {
               <p class="hint">
-                Se crea vacía y el respaldo entra dentro. Nada de lo que hay en
-                {{ target().label }} se toca.
+                {{ 'restore.newDatabaseSafe' | t: { target: target().label } }}
               </p>
             }
           }
@@ -247,9 +265,11 @@
         @if (found.collisions.length > 0 && destination() === 'here') {
           <div class="collisions">
             <p class="collisions__title">
-              {{ found.collisions.length }} tabla(s) ya existen en {{ target().label }}
+              {{
+                'restore.collisions' | t: { count: found.collisions.length, target: target().label }
+              }}
               @if (rowsAtRisk() > 0) {
-                y tienen {{ rowsAtRisk() }} filas
+                {{ 'restore.collisionsRows' | t: { rows: rows(rowsAtRisk()) } }}
               }
             </p>
             <ul class="warnings">
@@ -257,15 +277,14 @@
                 <li>
                   {{ collision.table }}
                   @if (collision.rows) {
-                    <span class="rows">~{{ collision.rows }} filas</span>
+                    <span class="rows">{{
+                      'restore.collisionRows' | t: { rows: rows(collision.rows) }
+                    }}</span>
                   }
                 </li>
               }
             </ul>
-            <p class="hint">
-              El respaldo intentará crearlas de nuevo. Lo que ya está no se borra solo: si chocan,
-              la restauración se para y te dice dónde.
-            </p>
+            <p class="hint">{{ 'restore.collisionsHint' | t }}</p>
           </div>
         }
 
@@ -280,7 +299,7 @@
     </div>
 
     <footer class="foot">
-      <button type="button" class="ghost" (click)="close()">Cancelar</button>
+      <button type="button" class="ghost" (click)="close()">{{ 'common.cancel' | t }}</button>
 
       <!-- Por qué está apagado el botón. Sin esto se lee como una avería. -->
       @if (launchBlocker(); as motivo) {
@@ -289,7 +308,7 @@
 
       <span class="spacer"></span>
       <button type="button" class="primary" [disabled]="!canLaunch()" (click)="run()">
-        {{ destination() === 'new' ? 'Crear y restaurar' : 'Restaurar' }}
+        {{ (destination() === 'new' ? 'restore.createAndRun' : 'restore.run') | t }}
       </button>
     </footer>
   }

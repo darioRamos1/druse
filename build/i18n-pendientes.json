@@ -2,7 +2,6 @@
   "frontend/src/app/features/ai/ai-panel/ai-panel.html",
   "frontend/src/app/features/ai/ai-provider-dialog/ai-provider-dialog.html",
   "frontend/src/app/features/backup/backup-dialog/backup-dialog.html",
-  "frontend/src/app/features/backup/restore-dialog/restore-dialog.html",
   "frontend/src/app/features/query-builder/query-builder/query-builder.html",
   "frontend/src/app/features/tables/table-designer/table-designer.html",
   "frontend/src/app/features/transfer/transfer-dialog/transfer-dialog.html",

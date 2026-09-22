@@ -1,6 +1,8 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 
+import { I18nService } from '../i18n/i18n.service';
+
 import {
   ApplicationGateway,
   RestoreInspection,
@@ -26,6 +28,7 @@ const POLL_MS = 500;
 @Injectable({ providedIn: 'root' })
 export class RestoreStore {
   private readonly _gateway = inject(ApplicationGateway);
+  private readonly _i18n = inject(I18nService);
 
   private readonly _inspection = signal<RestoreInspection | null>(null);
   private readonly _inspecting = signal(false);
@@ -62,13 +65,13 @@ export class RestoreStore {
 
     switch (progress.step) {
       case 'Reading':
-        return 'Leyendo el respaldo';
+        return this._i18n.t('restore.step.reading');
       case 'Checking':
-        return 'Comprobando el destino';
+        return this._i18n.t('restore.step.checking');
       case 'Applying':
-        return 'Aplicando';
+        return this._i18n.t('restore.step.applying');
       default:
-        return 'Terminado';
+        return this._i18n.t('restore.step.done');
     }
   });
 
@@ -101,7 +104,7 @@ export class RestoreStore {
       this._inspection.set(await firstValueFrom(this._gateway.inspectRestore(sessionId, path)));
     } catch (error) {
       this._inspection.set(null);
-      this._error.set(message(error));
+      this._error.set(message(error, this._i18n.t('restore.noProcess')));
     } finally {
       this._inspecting.set(false);
     }
@@ -144,7 +147,7 @@ export class RestoreStore {
 
       this.poll(id);
     } catch (error) {
-      this._error.set(message(error));
+      this._error.set(message(error, this._i18n.t('restore.noProcess')));
     }
   }
 
@@ -171,7 +174,7 @@ export class RestoreStore {
     try {
       await firstValueFrom(this._gateway.cancelRestore(progress.id));
     } catch (error) {
-      this._error.set(message(error));
+      this._error.set(message(error, this._i18n.t('restore.noProcess')));
     }
   }
 
@@ -206,21 +209,35 @@ export class RestoreStore {
     }
 
     const lines = [
-      `Restauración ${progress.id}`,
-      `Estado: ${outcomeLabel(progress.outcome)}`,
-      `Instrucciones: ${progress.statementsDone} de ${progress.statementsTotal}`,
-      `Filas escritas: ${progress.rowsWritten}`,
-      `Duración: ${Math.round(progress.elapsedMilliseconds / 1000)} s`,
+      this._i18n.t('restore.report.title', { id: progress.id }),
+      this._i18n.t('restore.report.state', {
+        outcome: this._i18n.t(outcomeLabel(progress.outcome)),
+      }),
+      this._i18n.t('restore.report.statements', {
+        done: progress.statementsDone,
+        total: progress.statementsTotal,
+      }),
+      this._i18n.t('restore.report.rows', { rows: progress.rowsWritten }),
+      this._i18n.t('restore.report.duration', {
+        seconds: Math.round(progress.elapsedMilliseconds / 1000),
+      }),
     ];
 
     if (progress.failure) {
       lines.push(
-        `Falló en la instrucción ${progress.failure.index}: ${progress.failure.message}`,
+        this._i18n.t('restore.report.failure', {
+          index: progress.failure.index,
+          message: progress.failure.message,
+        }),
         progress.failure.statement,
       );
     }
 
-    lines.push(...progress.warnings.map((warning) => `Aviso: ${warning.message}`));
+    lines.push(
+      ...progress.warnings.map((warning) =>
+        this._i18n.t('restore.report.warning', { message: warning.message }),
+      ),
+    );
 
     return lines.join('\n');
   });
@@ -253,21 +270,21 @@ export class RestoreStore {
   }
 }
 
-/** Cómo acabó, dicho para leerlo. */
+/** Cómo acabó: la clave del catálogo, que traduce quien lo pinta. */
 export function outcomeLabel(outcome: RestoreOutcome): string {
   switch (outcome) {
     case 'Completed':
-      return 'Correcto';
+      return 'restore.outcome.completed';
     case 'Failed':
-      return 'Fallida';
+      return 'restore.outcome.failed';
     case 'Cancelled':
-      return 'Cancelada';
+      return 'restore.outcome.cancelled';
     default:
-      return 'En marcha';
+      return 'restore.outcome.running';
   }
 }
 
-function message(error: unknown): string {
+function message(error: unknown, fallback: string): string {
   if (typeof error === 'object' && error !== null && 'error' in error) {
     const body = (error as { error?: { message?: string } }).error;
 
@@ -276,5 +293,5 @@ function message(error: unknown): string {
     }
   }
 
-  return error instanceof Error ? error.message : 'No se pudo hablar con el proceso local.';
+  return error instanceof Error ? error.message : fallback;
 }
