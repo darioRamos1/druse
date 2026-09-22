@@ -43,6 +43,42 @@
       [hidden]="section() !== 'appearance'"
     >
       <section class="section">
+        <h3 class="section__title">{{ 'settings.language.title' | t }}</h3>
+        <p class="section__hint">{{ 'settings.language.hint' | t }}</p>
+        <div
+          class="choice choice--wrap"
+          role="group"
+          [attr.aria-label]="'settings.language.label' | t"
+        >
+          @for (option of locales(); track option.id) {
+            <!--
+              Cada idioma con su nombre en su propio idioma, y con `lang`: quien
+              no entiende el idioma actual tiene que poder encontrar el suyo, y
+              el lector de pantalla pronunciarlo bien.
+            -->
+            <button
+              type="button"
+              class="choice__item"
+              [attr.lang]="option.id === 'qps' ? null : option.id"
+              [class.is-active]="locale() === option.id"
+              [attr.aria-pressed]="locale() === option.id"
+              (click)="setLocale(option.id)"
+            >
+              {{ option.name }}
+              @if (!option.complete) {
+                <span class="choice__badge">beta</span>
+              }
+            </button>
+          }
+        </div>
+        @if (incompleteLocale(); as incomplete) {
+          <p class="section__hint">
+            {{ 'settings.language.incomplete' | t: { name: incomplete.name } }}
+          </p>
+        }
+      </section>
+
+      <section class="section">
         <h3 class="section__title">Tema</h3>
         <div class="choice" role="group" aria-label="Tema">
           <button

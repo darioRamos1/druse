@@ -27,6 +27,7 @@ import { OperationProgress } from '../../../shared/ui/operation-progress/operati
 import { QueryHistory } from '../../query-history/query-history/query-history';
 import { CopyFormat } from '../results-grid/copy-formats';
 import { ResultsGrid } from '../results-grid/results-grid';
+import { formatNumber } from '../../../core/i18n/locale-format';
 
 type ResultsTab = 'results' | 'messages' | 'history';
 
@@ -431,6 +432,6 @@ export class ResultsPanel {
 
     return set.truncated
       ? `1–${set.rows.length} (recortado)`
-      : `1–${set.rows.length} de ${set.totalRows.toLocaleString('es')}`;
+      : `1–${set.rows.length} de ${formatNumber(set.totalRows)}`;
   });
 }

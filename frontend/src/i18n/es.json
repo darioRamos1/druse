@@ -1,0 +1,6 @@
+{
+  "settings.language.title": "Idioma",
+  "settings.language.hint": "Se aplica al momento, sin reiniciar. Los nombres de las tablas, el SQL y los mensajes de los servidores no se traducen.",
+  "settings.language.label": "Idioma de la interfaz",
+  "settings.language.incomplete": "{name} está a medias: lo que falte se verá en inglés."
+}

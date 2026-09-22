@@ -21,6 +21,7 @@ import {
 import { Icon } from '../../../shared/ui/icon/icon';
 import { Disclosure } from '../../../shared/a11y/disclosure';
 import { shortcutLabel } from '../../../core/shortcuts/shortcut-label';
+import { formatNumber } from '../../../core/i18n/locale-format';
 
 /**
  * Una conexión a la que la pestaña puede cambiarse.
@@ -432,7 +433,7 @@ export class EditorToolbar {
    * las dos formas.
    */
   protected rowsLabel(rows: number): string {
-    return new Intl.NumberFormat('es', { useGrouping: true }).format(rows);
+    return formatNumber(rows, { useGrouping: true });
   }
 
   /** Etiqueta compacta: 600 s se lee peor que 10 min. */

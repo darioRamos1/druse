@@ -150,6 +150,7 @@ Invoke-Bloque 'Backend: se ejecutaron pruebas de verdad' {
 # --- Frontend ----------------------------------------------------------------
 Invoke-Bloque 'Frontend: formato' { npm run format:check } -Directorio (Join-Path $repoRoot 'frontend')
 Invoke-Bloque 'Frontend: pruebas' { npm test } -Directorio (Join-Path $repoRoot 'frontend')
+Invoke-Bloque 'Frontend: idiomas' { node build/scripts/check-i18n.mjs }
 
 if (-not $Rapido) {
     Invoke-Bloque 'Frontend: compilación' { npm run build } -Directorio (Join-Path $repoRoot 'frontend')

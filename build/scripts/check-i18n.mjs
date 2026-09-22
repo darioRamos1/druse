@@ -1,0 +1,118 @@
+#!/usr/bin/env node
+/**
+ * Guardas de los catálogos de idioma que necesitan mirar el código fuente.
+ *
+ * La estructura de los catálogos —mismas claves en `es` y `en`, parámetros
+ * iguales, ICU válido— la comprueba una prueba del frontend
+ * (`core/i18n/catalogs.spec.ts`), que usa el mismo analizador que la
+ * aplicación. Aquí va lo que una prueba en el navegador no puede hacer:
+ * recorrer el código para ver qué claves usa.
+ *
+ * - **Claves que ya no usa nadie.** Se busca cada clave como texto literal en
+ *   el TypeScript y las plantillas. Una clave que se construye a trozos
+ *   (`'settings.section.' + id`) se declara con un comentario
+ *   `i18n-keys: settings.section.*` en el archivo que la usa.
+ * - **Formatos con el idioma escrito a mano.** Había `'es'` fijo en nueve
+ *   `toLocaleString`, `localeCompare` e `Intl`, y cada uno habría seguido en
+ *   español con la interfaz en otro idioma. Todo pasa por `locale-format.ts`.
+ * - **Cuánto falta en `pt-BR` y `fr`**, solo como información: pueden estar a
+ *   medias hasta que la comunidad los complete.
+ *
+ * Sale con código 1 si hay claves sin usar o formatos con idioma fijo.
+ */
+import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { dirname, join, relative } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
+const frontend = join(root, 'frontend', 'src');
+const catalogs = join(frontend, 'i18n');
+
+const read = (path) => readFileSync(path, 'utf8').replace(/^﻿/, '');
+const catalog = (locale) => JSON.parse(read(join(catalogs, `${locale}.json`)));
+
+function* sourceFiles(dir) {
+  for (const name of readdirSync(dir)) {
+    const path = join(dir, name);
+
+    if (statSync(path).isDirectory()) {
+      if (name !== 'i18n') {
+        yield* sourceFiles(path);
+      }
+    } else if (/\.(ts|html)$/.test(name) && !name.endsWith('.spec.ts')) {
+      yield path;
+    }
+  }
+}
+
+const es = catalog('es');
+const keys = Object.keys(es);
+
+let source = '';
+const prefixes = [];
+const fixedLocale = [];
+const fixedLocalePattern =
+  /(toLocale(?:String|DateString|TimeString)\(\s*['"][a-z]{2}|localeCompare\([^)]*,\s*['"][a-z]{2}|new Intl\.\w+\(\s*['"][a-z]{2})/;
+
+for (const file of sourceFiles(frontend)) {
+  const text = read(file);
+  source += text + '\n';
+
+  if (file.endsWith('.ts') && fixedLocalePattern.test(text)) {
+    fixedLocale.push(relative(root, file));
+  }
+
+  for (const match of text.matchAll(/i18n-keys:\s*([\w.*-]+(?:\s*,\s*[\w.*-]+)*)/g)) {
+    for (const pattern of match[1].split(',')) {
+      prefixes.push({ pattern: pattern.trim(), file: relative(root, file) });
+    }
+  }
+}
+
+const declared = (key) =>
+  prefixes.some(({ pattern }) =>
+    pattern.endsWith('*') ? key.startsWith(pattern.slice(0, -1)) : key === pattern,
+  );
+
+const unused = keys.filter(
+  (key) => !source.includes(`'${key}'`) && !source.includes(`"${key}"`) && !declared(key),
+);
+
+console.log(`Catálogo fuente: ${keys.length} claves.`);
+
+for (const locale of ['en', 'pt-BR', 'fr']) {
+  const translated = Object.keys(catalog(locale)).filter((key) => key in es).length;
+  const percent = keys.length === 0 ? 100 : Math.floor((translated / keys.length) * 100);
+  console.log(`  ${locale.padEnd(5)} ${String(percent).padStart(3)} % (${translated} de ${keys.length})`);
+}
+
+let failed = false;
+
+if (fixedLocale.length > 0) {
+  failed = true;
+  console.error('\nFormatos con el idioma escrito a mano (usa core/i18n/locale-format.ts):');
+
+  for (const file of fixedLocale) {
+    console.error(`  ${file}`);
+  }
+}
+
+if (unused.length > 0) {
+  failed = true;
+  console.error(`\n${unused.length} claves que no usa nadie:`);
+
+  for (const key of unused) {
+    console.error(`  ${key}`);
+  }
+
+  console.error(
+    '\nBórralas de todos los catálogos o, si se construyen a trozos, decláralas con ' +
+      '«i18n-keys: prefijo.*» en el archivo que las usa.',
+  );
+}
+
+if (failed) {
+  process.exit(1);
+}
+
+console.log('\nTodas las claves se usan y ningún formato lleva el idioma fijo.');

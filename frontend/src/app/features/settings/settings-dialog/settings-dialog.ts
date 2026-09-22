@@ -13,6 +13,9 @@ import { firstValueFrom } from 'rxjs';
 
 import { ApplicationGateway } from '../../../core/application-gateway/application-gateway';
 import { FileSaveService } from '../../../core/files/file-save.service';
+import { I18nService, LocaleOption } from '../../../core/i18n/i18n.service';
+import { Locale } from '../../../core/i18n/locale';
+import { TranslatePipe } from '../../../core/i18n/translate.pipe';
 import { ThemeService } from '../../../core/theme/theme.service';
 import {
   BackgroundFit,
@@ -137,7 +140,7 @@ type SettingsSection = 'appearance' | 'editor' | 'privacy' | 'about';
 @Component({
   selector: 'app-settings-dialog',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [DialogBackdrop, DialogFocus, Icon, PrivacyNotice],
+  imports: [DialogBackdrop, DialogFocus, Icon, PrivacyNotice, TranslatePipe],
   templateUrl: './settings-dialog.html',
   styleUrl: './settings-dialog.scss',
 })
@@ -178,6 +181,21 @@ export class SettingsDialog {
   }
 
   private readonly _themes = inject(ThemeService);
+  private readonly _i18n = inject(I18nService);
+
+  protected readonly locale = this._i18n.locale;
+
+  /** Los idiomas que se pueden elegir; llegan en cuanto se leen sus catálogos. */
+  protected readonly locales = signal<readonly LocaleOption[]>([]);
+
+  /** El elegido, si está a medias: se avisa de qué pasa con lo que falta. */
+  protected readonly incompleteLocale = computed(
+    () => this.locales().find((option) => option.id === this.locale() && !option.complete) ?? null,
+  );
+
+  protected setLocale(locale: Locale): void {
+    void this._i18n.setLocale(locale);
+  }
   protected readonly updates = inject(UpdateService);
 
   private readonly _gateway = inject(ApplicationGateway);
@@ -218,6 +236,7 @@ export class SettingsDialog {
 
   constructor() {
     void this.updates.initialize();
+    void this._i18n.options().then((options) => this.locales.set(options));
   }
 
   /**

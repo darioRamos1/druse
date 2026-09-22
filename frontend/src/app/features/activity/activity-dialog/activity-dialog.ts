@@ -18,6 +18,7 @@ import {
 import { RunningJobsService } from '../../../core/jobs/running-jobs.service';
 import { DialogBackdrop } from '../../../shared/a11y/dialog-backdrop';
 import { DialogFocus } from '../../../shared/a11y/dialog-focus';
+import { formatDate } from '../../../core/i18n/locale-format';
 
 /** Consultar el historial nunca descarta avisos ni reinicia trabajos. */
 @Component({
@@ -33,10 +34,6 @@ export class ActivityDialog {
   private readonly gateway = inject(ApplicationGateway);
   private readonly destroyRef = inject(DestroyRef);
   private readonly closeButton = viewChild<ElementRef<HTMLButtonElement>>('closeButton');
-  private readonly dates = new Intl.DateTimeFormat('es', {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-  });
 
   // Si la API no responde, todavía se puede consultar el aviso del arranque.
   protected readonly jobs = signal<readonly JobSummary[]>(this.runningJobs.interrupted());
@@ -96,6 +93,8 @@ export class ActivityDialog {
 
   protected date(value: string): string {
     const date = new Date(value);
-    return Number.isNaN(date.getTime()) ? 'Fecha no disponible' : this.dates.format(date);
+    return Number.isNaN(date.getTime())
+      ? 'Fecha no disponible'
+      : formatDate(date, { dateStyle: 'medium', timeStyle: 'short' });
   }
 }

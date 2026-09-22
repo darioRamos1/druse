@@ -2,6 +2,7 @@ import { ChangeDetectionStrategy, Component, input, output, signal } from '@angu
 
 import { QueryHistoryEntry } from '../../../shared/models/workspace';
 import { Icon } from '../../../shared/ui/icon/icon';
+import { formatDate as formatLocaleDate } from '../../../core/i18n/locale-format';
 
 /**
  * Historial de consultas ejecutadas.
@@ -41,7 +42,7 @@ export class QueryHistory {
 
   /** Fecha corta y legible; la absoluta va en el atributo `title`. */
   protected formatDate(iso: string): string {
-    return new Date(iso).toLocaleString('es', {
+    return formatLocaleDate(iso, {
       day: '2-digit',
       month: '2-digit',
       hour: '2-digit',

@@ -12,6 +12,7 @@ import {
 import { ConnectionStore } from './connection-store';
 import { NoticeStore } from './notice-store';
 import { describeError } from './errors';
+import { formatNumber } from '../i18n/locale-format';
 
 /** Nodo del árbol con su estado de expansión y sus hijos ya cargados. */
 interface TreeEntry {
@@ -726,7 +727,10 @@ function toExplorerNode(entry: TreeEntry): ExplorerNode {
     expandable: object.hasChildren,
     expanded: entry.expanded,
     loading: entry.loading,
-    badge: object.approximateRowCount?.toLocaleString('es'),
+    badge:
+      object.approximateRowCount === undefined
+        ? undefined
+        : formatNumber(object.approximateRowCount),
     hint: object.kind === 'column' ? object.dataType : undefined,
     source: object,
     connectionId: entry.connectionId,

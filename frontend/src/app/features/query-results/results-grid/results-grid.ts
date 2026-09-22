@@ -15,6 +15,7 @@ import { CellEdit, ResultColumn, ResultRow, ResultSet } from '../../../shared/mo
 import { Icon } from '../../../shared/ui/icon/icon';
 import { fitColumnWidth, MIN_COLUMN_WIDTH } from '../../../core/application-gateway/column-widths';
 import { CopyFormat, CopySelection, formatSelection } from './copy-formats';
+import { formatNumber } from '../../../core/i18n/locale-format';
 
 /** Ancho de la columna del número de fila. */
 const ROW_NUMBER_WIDTH = 44;
@@ -730,7 +731,7 @@ export class ResultsGrid {
     }
 
     const columnas = selection.columns === 1 ? '1 columna' : `${selection.columns} columnas`;
-    const filas = selection.rows === 1 ? '1 fila' : `${selection.rows.toLocaleString('es')} filas`;
+    const filas = selection.rows === 1 ? '1 fila' : `${formatNumber(selection.rows)} filas`;
 
     return `${columnas} × ${filas}`;
   });

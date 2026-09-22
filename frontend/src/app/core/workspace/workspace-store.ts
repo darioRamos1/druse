@@ -14,6 +14,7 @@ import {
   TransactionState,
 } from '../application-gateway/application-gateway';
 import { FileSaveService, describeSave } from '../files/file-save.service';
+import { I18nService } from '../i18n/i18n.service';
 import { ThemeService } from '../theme/theme.service';
 import { AUTO_CHECK_PREFERENCE, UpdateService } from '../update/update.service';
 import { describeError, diagnosticQuery, isSessionLost } from './errors';
@@ -96,6 +97,7 @@ export class WorkspaceStore {
   private readonly _gateway = inject(ApplicationGateway);
   private readonly _files = inject(FileSaveService);
   private readonly _theme = inject(ThemeService);
+  private readonly _i18n = inject(I18nService);
   private readonly _updates = inject(UpdateService);
   private readonly _connectionStore = inject(ConnectionStore);
   private readonly _execution = inject(ExecutionStore);
@@ -346,6 +348,7 @@ export class WorkspaceStore {
 
       this._formatSettings.set(parseFormatSettings(preferences));
       this._theme.adopt(preferences);
+      void this._i18n.adopt(preferences);
 
       // Y de aquí sale también si Druse puede buscar actualizaciones al abrirse.
       // Tiene que estar leído antes de que el shell arranque el actualizador: si

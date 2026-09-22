@@ -4,6 +4,7 @@ import {
   SuggestedRelation,
   TableDetail,
 } from '../../shared/models/workspace';
+import { compareText } from '../../core/i18n/locale-format';
 
 /**
  * Cuánto se enseña de cada tabla.
@@ -195,7 +196,7 @@ export function layoutDiagram(
     details.set(tableKey(detail.table), detail);
   }
 
-  const keys = [...details.keys()].sort((a, b) => a.localeCompare(b, 'es'));
+  const keys = [...details.keys()].sort(compareText);
   const parents = new Map<string, Set<string>>();
 
   for (const key of keys) {
@@ -268,9 +269,7 @@ export function layoutDiagram(
 
       const difference = barycenter(a) - barycenter(b);
 
-      return difference !== 0 && Number.isFinite(difference)
-        ? difference
-        : a.localeCompare(b, 'es');
+      return difference !== 0 && Number.isFinite(difference) ? difference : compareText(a, b);
     });
 
     let y: number = BOX.marginY;

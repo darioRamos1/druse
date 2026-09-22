@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
 
 import { Icon } from '../icon/icon';
+import { formatNumber } from '../../../core/i18n/locale-format';
 
 /**
  * Cómo va una operación larga, con lo que hace falta para no mentir.
@@ -98,5 +99,5 @@ function toPercent(value: number | null): number | null {
 
 /** Separa los miles para que un millón se lea de un vistazo. */
 function format(value: number): string {
-  return value.toLocaleString('es-ES');
+  return formatNumber(value);
 }

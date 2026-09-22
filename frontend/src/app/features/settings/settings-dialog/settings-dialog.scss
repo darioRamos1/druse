@@ -230,6 +230,17 @@
   display: flex;
   gap: 6px;
 
+  // Un idioma a medias: lo que falte se verá en inglés.
+  &__badge {
+    padding: 1px 5px;
+    border-radius: var(--dr-radius-xs);
+    background: var(--dr-surface-hover);
+    color: var(--dr-text-tertiary);
+    font-size: 10px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
   &--wrap {
     flex-wrap: wrap;
   }
