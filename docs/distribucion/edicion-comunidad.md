@@ -50,6 +50,8 @@ La landing tiene despliegue satisfactorio en [GitHub Pages](https://github.com/d
 
 ## Pendientes antes de solicitar la firma
 
+Resultado más reciente: [PR #25 con avisos Rust/nativos y canal de actualización](../revisiones/avisos-rust-actualizaciones-2026-09-22.md), integrado y comprobado localmente y en GitHub. La revisión registra los nuevos hashes, las pruebas y sus límites. Todavía no es una release pública ni una firma concedida.
+
 Actualización del 22 de septiembre: el [PR #22 y su instalador](../revisiones/comunidad-2026-09-22.md) incorporan los 41 avisos NuGet y los cinco del frontend. La nueva revisión registra hashes distintos para los instaladores de GitHub y local; reemplaza los anteriores como evidencia más reciente. Las comprobaciones de CI, API/SQLite, inventario y firma local del actualizador pasan. Continúa sin Authenticode y sin prueba de instalación en Windows limpio.
 
 1. Aclarar con SignPath SNI, WebView2 y el lugar del consentimiento de actualizaciones. La respuesta anterior no aprobó esos tres puntos.
