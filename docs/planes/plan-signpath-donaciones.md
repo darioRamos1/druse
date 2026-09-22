@@ -1,5 +1,7 @@
 # Plan de preparación para SignPath Foundation y donaciones
 
+Estado al 22 de septiembre: [PR #22 integrado e instaladores verificados](../revisiones/comunidad-2026-09-22.md), con 41 avisos NuGet originales para 37 entradas. CI de Comunidad, API/SQLite e inventarios pasan; la firma local del actualizador es válida, Authenticode sigue ausente. Se añade reconocimiento de 238 crates Rust y evidencia del SDK/loader WebView2. Siguen abiertos OSS-04, Windows limpio, respuesta de SignPath, beta/canal público de Comunidad e identidad/perfil receptor para donaciones. Las entradas fechadas más abajo conservan antecedentes; no sustituyen este estado.
+
 Textos NuGet reunidos el 21 de septiembre: [expediente de Comunidad](../terceros/comunidad/README.md), con 41 documentos originales para las 37 entradas del grafo de API. Se localizaron textos para las 28 entradas antes pendientes, con commits o etiquetas resueltos y hashes. Comunidad los incorpora al paquete y rechaza versiones sin ficha o avisos alterados. Esto reduce el pendiente de recopilación de OSS-04; no cierra compatibilidad, obligaciones de terceros, procedencia ni elegibilidad. SNI/WebView2 y Windows limpio siguen abiertos.
 
 Continuación del 21 de septiembre: [reconciliación de Comunidad](../revisiones/licencias-comunidad-2026-09-21.md), con 377 de 401 archivos de API vinculados por SHA-256 a NuGet y 28 paquetes del grafo sin aviso local localizado. Se corrige la omisión de los avisos generados por Angular y los avisos originales de Monaco/fuentes en el empaquetado. OSS-04 sigue abierto; recopilar evidencia no equivale a aprobar redistribución. El protocolo de Windows limpio ahora identifica Comunidad como candidata y comprueba sus cuatro motores y los avisos instalados.
@@ -8,13 +10,13 @@ Continuación del 21 de septiembre: [reconciliación de Comunidad](../revisiones
 
 Avance del 21 de septiembre: Darío autorizó abrir el repositorio y continuar. `darioRamos1/druse` es público desde el 16 de septiembre, con GPL y avisos en `main`, comprobado también sin autenticación. Implementada y probada localmente la [edición Comunidad](../distribucion/edicion-comunidad.md) sin Oracle/IBM/IKVM, con canal propio y guardas de contenido. La API publicada arranca y ejecuta una consulta SQLite; no hay todavía una beta aprobada para SignPath. SNI/WebView2, consentimiento durante la instalación, redistribución y pruebas de Windows limpio siguen abiertos.
 
-Cierre técnico del bloque Comunidad, 21 de septiembre: PR #18 integrado en `main`; instalador NSIS e inventario construidos en GitHub y descargados con SHA-256 coincidente. Pasaron las comprobaciones de API/SQLite, exclusiones y canal Rust, y 969 pruebas locales del frontend. Pages desplegó correctamente. Véanse [hashes, ejecución y límites](../distribucion/edicion-comunidad.md). La última respuesta localizada en Gmail sigue siendo la del 16 de septiembre; el seguimiento está redactado, sin enviar. Esto no cierra PKG-04, OSS-03/04, PUB-04 ni SIG-01.
+Cierre técnico del bloque Comunidad, 21 de septiembre: PR #18 integrado en `main`; instalador NSIS e inventario construidos en GitHub y descargados con SHA-256 coincidente. Pasaron las comprobaciones de API/SQLite, exclusiones y canal Rust, y 969 pruebas locales del frontend. Pages desplegó correctamente. Véanse [hashes, ejecución y límites](../distribucion/edicion-comunidad.md). La última respuesta localizada en Gmail sigue siendo la del 16 de septiembre; el seguimiento se envió después, el 21 de septiembre a las 16:33, como registra el enlace de envío anterior. Esto no cierra PKG-04, OSS-03/04, PUB-04 ni SIG-01.
 
 Avance del 16 de septiembre: [respuesta de SignPath recibida](../distribucion/consulta-signpath-borrador.md). Druse aún no está listo para revisión: requieren repositorio público, artefacto publicado con alcance definido, licencia, inventario y flujo de construcción/firma. Podrían evaluar una edición independiente sin Oracle/IBM; no es una admisión. SNI, WebView2 y consentimiento durante la instalación no quedaron resueltos expresamente. OSS-03 y SIG-01 siguen abiertos. El siguiente paso propuesto es concretar DEC-03 y la edición candidata, manteniendo la distribución completa fuera de ese alcance de firma.
 
 Avance del 15 de septiembre: [revisión de controladores](../revisiones/controladores-signpath-2026-09-15.md), ocho documentos de evidencia local con hashes y consulta de elegibilidad actualizada a GPL v3 con el permiso adicional existente. Consulta enviada a `info@signpath.io` desde `druse.contacto@gmail.com` a las 14:21 (America/Bogota), con confirmación de Gmail. OSS-03/04 siguen abiertos: faltan términos completos del JDBC, reconciliación de redistribuibles IBM y respuesta sobre elegibilidad. No se retiraron motores.
 
-Creación: 12 de septiembre de 2026. Actualización: 14 de septiembre de 2026. Estado: fase A abierta; preparación de fases B, C y E adelantada en lo que no depende de decisiones del titular.
+Creación: 12 de septiembre de 2026. Actualización: 22 de septiembre de 2026. Estado: revisión de terceros abierta; preparación de fases B, C y E adelantada en lo que no depende de decisiones del titular.
 
 Última comprobación: [revisión del 14 de septiembre](../revisiones/revision-signpath-2026-09-14.md), con inventario actualizado, guardas de CI y manifiestos verificadas, y pendientes de candidatura. SIG-01 sigue abierto: preparar el expediente no equivale a presentarlo.
 
@@ -28,7 +30,9 @@ Objetivo: preparar una candidatura verificable de Druse y habilitar aportes volu
 
 Complementa la [guía de sostenibilidad](../guias/guia-estrategia-open-source.md) y desarrolla la ruta SignPath de **REL-005** del [plan de mejoras](PLAN_MEJORAS_DRUSE.md). La alternativa Microsoft Store permanece en el [plan de distribución](../distribucion/distribucion-windows-smartscreen.md).
 
-## 1. Punto de partida
+## 1. Punto de partida histórico
+
+Esta tabla describe el comienzo del plan. El repositorio ya es público, Pages desplegó y CI de Comunidad pasó; los resultados actuales están en la revisión del 22 de septiembre enlazada arriba.
 
 | Evidencia local | Consecuencia para el plan |
 | --- | --- |
