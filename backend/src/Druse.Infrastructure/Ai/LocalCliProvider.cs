@@ -402,20 +402,12 @@ public sealed class LocalCliProvider(ICliSession sessions) : IAiProvider
                 $"No se encontro «{request.Profile.Command}» en este equipo.");
         var shell = CliPath.NeedsShell(path);
 
-        var info = new ProcessStartInfo(shell ? "cmd.exe" : path)
-        {
-            RedirectStandardInput = true,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            UseShellExecute = false,
-            CreateNoWindow = true,
-            StandardOutputEncoding = Encoding.UTF8,
+        var info = PipeStartInfo(shell ? "cmd.exe" : path);
 
-            // Fuera del proyecto: sin esto, el programa leería los archivos de
-            // instrucciones del repositorio donde esté Druse y respondería con
-            // ellos en la cabeza.
-            WorkingDirectory = Path.GetTempPath(),
-        };
+        // Fuera del proyecto: sin esto, el programa leería los archivos de
+        // instrucciones del repositorio donde esté Druse y respondería con
+        // ellos en la cabeza.
+        info.WorkingDirectory = Path.GetTempPath();
 
         // Con cuenta propia, el programa busca sus credenciales donde le diga
         // Druse y no en la sesión del equipo: es lo que permite preguntar con
@@ -439,6 +431,33 @@ public sealed class LocalCliProvider(ICliSession sessions) : IAiProvider
 
         return new Process { StartInfo = info };
     }
+
+    /// <summary>
+    /// UTF-8 sin marca de orden de bytes, en los tres sentidos.
+    ///
+    /// **La entrada es la que importa.** Sin decirlo, .NET escribe en la página
+    /// de códigos de la consola —850 o 1252 en un Windows en español—, y el
+    /// prompt lleva tildes desde la primera frase. Claude lo tragaba; Codex
+    /// exige UTF-8 y rechazaba el turno entero con «input is not valid UTF-8».
+    /// Sin marca de orden: un BOM delante del prompt sería un carácter más que
+    /// el programa leería como parte de la pregunta.
+    /// </summary>
+    internal static readonly Encoding PipeEncoding = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false);
+
+    /// <summary>Cómo se lanza el programa: sin ventana y con las tres tuberías en UTF-8.</summary>
+    internal static ProcessStartInfo PipeStartInfo(string fileName) => new(fileName)
+    {
+        RedirectStandardInput = true,
+        RedirectStandardOutput = true,
+        RedirectStandardError = true,
+        UseShellExecute = false,
+        CreateNoWindow = true,
+        StandardInputEncoding = PipeEncoding,
+        StandardOutputEncoding = PipeEncoding,
+        // Los errores también: son lo que se le enseña al usuario cuando algo
+        // falla, y con otra página de códigos sus tildes salían rotas.
+        StandardErrorEncoding = PipeEncoding,
+    };
 
     private static IEnumerable<string> Arguments(AiRequest request, string model)
     {

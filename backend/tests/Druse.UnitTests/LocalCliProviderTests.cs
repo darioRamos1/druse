@@ -192,4 +192,26 @@ public sealed class LocalCliProviderTests
         Assert.True(probe.Reachable);
         Assert.Contains("gpt-fijo", probe.Detail, StringComparison.Ordinal);
     }
+
+    /// <summary>
+    /// El prompt llega al programa en UTF-8, tildes incluidas.
+    ///
+    /// Sin decirlo, .NET escribía la entrada en la página de códigos de la
+    /// consola, y Codex rechazaba el turno con «input is not valid UTF-8» en la
+    /// primera tilde. Se comprueban los bytes y no solo la propiedad: que tampoco
+    /// vaya una marca de orden delante de la pregunta.
+    /// </summary>
+    [Fact]
+    public void ElPromptSaleEnUtf8SinMarcaDeOrden()
+    {
+        var info = LocalCliProvider.PipeStartInfo("codex");
+
+        Assert.NotNull(info.StandardInputEncoding);
+        Assert.Empty(info.StandardInputEncoding!.GetPreamble());
+        Assert.Equal(
+            new byte[] { 0x63, 0xC3, 0xB3, 0x6D, 0x6F },
+            info.StandardInputEncoding.GetBytes("cómo"));
+        Assert.Same(info.StandardInputEncoding, info.StandardErrorEncoding);
+        Assert.Same(info.StandardInputEncoding, info.StandardOutputEncoding);
+    }
 }
