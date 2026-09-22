@@ -14,6 +14,7 @@ import {
   viewChild,
 } from '@angular/core';
 
+import { TranslatePipe } from '../../../core/i18n/translate.pipe';
 import { ConnectionSummary, QueryTab } from '../../../shared/models/workspace';
 import { EngineBadge } from '../../../shared/ui/engine-badge/engine-badge';
 import { Icon } from '../../../shared/ui/icon/icon';
@@ -22,7 +23,7 @@ import { Icon } from '../../../shared/ui/icon/icon';
 @Component({
   selector: 'app-editor-tabs',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [EngineBadge, Icon],
+  imports: [EngineBadge, Icon, TranslatePipe],
   templateUrl: './editor-tabs.html',
   styleUrl: './editor-tabs.scss',
 })

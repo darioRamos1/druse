@@ -12,6 +12,9 @@ import {
   signal,
   viewChild,
 } from '@angular/core';
+
+import { I18nService } from '../../../core/i18n/i18n.service';
+import { TranslatePipe } from '../../../core/i18n/translate.pipe';
 import type * as MonacoApi from 'monaco-editor';
 
 import {
@@ -66,15 +69,18 @@ const MAX_SUGGEST_LINE_HEIGHT = 22;
 @Component({
   selector: 'app-sql-editor',
   changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [TranslatePipe],
   template: `
     <div class="host" #container></div>
     @if (!ready()) {
       <div class="placeholder">
         @if (failed()) {
           <span class="placeholder__error">{{ failure() }}</span>
-          <button type="button" class="placeholder__retry" (click)="retry()">Reintentar</button>
+          <button type="button" class="placeholder__retry" (click)="retry()">
+            {{ 'common.retry' | t }}
+          </button>
         } @else {
-          <span>Cargando editor…</span>
+          <span>{{ 'editor.loading' | t }}</span>
         }
       </div>
     }
@@ -161,6 +167,7 @@ export default class SqlEditor implements OnInit {
   private readonly _zone = inject(NgZone);
   private readonly _destroyRef = inject(DestroyRef);
   private readonly _snippets = inject(SnippetStore);
+  private readonly _i18n = inject(I18nService);
 
   private readonly _container = viewChild.required<ElementRef<HTMLElement>>('container');
 
@@ -243,7 +250,7 @@ export default class SqlEditor implements OnInit {
   protected readonly failed = signal(false);
 
   /** Por qué no cargó, para no dejar al usuario con un «no se pudo» a secas. */
-  protected readonly failure = signal('No se pudo cargar el editor.');
+  protected readonly failure = signal('');
 
   private _editor: MonacoApi.editor.IStandaloneCodeEditor | null = null;
 
@@ -664,7 +671,7 @@ export default class SqlEditor implements OnInit {
     try {
       monaco = await this._loader.load();
     } catch (error) {
-      this.failure.set(error instanceof Error ? error.message : 'No se pudo cargar el editor.');
+      this.failure.set(error instanceof Error ? error.message : this._i18n.t('editor.loadFailed'));
       this.failed.set(true);
       return;
     }
@@ -893,7 +900,7 @@ export default class SqlEditor implements OnInit {
     // atajos libres se reservan para lo que se hace a cada rato.
     editor.addAction({
       id: 'druse.open-in-builder',
-      label: 'Abrir en el compositor',
+      label: this._i18n.t('editor.openInBuilder'),
       contextMenuGroupId: '1_druse',
       contextMenuOrder: 1,
       run: run(() => this.openInBuilder.emit(this.activeFragment().text)),

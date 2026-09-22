@@ -15,8 +15,8 @@
       @if (tab.dirty) {
         <span
           class="tab__dirty"
-          title="Cambios sin guardar"
-          aria-label="Cambios sin guardar"
+          [title]="'tabs.unsaved' | t"
+          [attr.aria-label]="'tabs.unsaved' | t"
         ></span>
       }
       @if (connectionFor(tab); as connection) {
@@ -30,16 +30,19 @@
               La base de la pestaña manda sobre la de la conexión: se puede
               cambiar desde la barra, y entonces esta es la que se ejecuta.
             -->
-            {{ connection.name }} · {{ tab.database ?? connection.database }}
+            {{
+              'tabs.context'
+                | t: { connection: connection.name, database: tab.database ?? connection.database }
+            }}
           } @else {
-            Sin conexión asignada
+            {{ 'tabs.noConnection' | t }}
           }
         </span>
       </span>
       <button
         type="button"
         class="tab__close"
-        [attr.aria-label]="'Cerrar ' + tab.title"
+        [attr.aria-label]="'tabs.close' | t: { title: tab.title }"
         (click)="onClose($event, tab.id)"
         (keydown)="stopCloseKeydown($event)"
       >
@@ -51,8 +54,8 @@
   <button
     type="button"
     class="tabs__add"
-    title="Nueva consulta (Ctrl+T)"
-    aria-label="Nueva consulta"
+    [title]="'tabs.newTitle' | t: { shortcut: 'Ctrl+T' }"
+    [attr.aria-label]="'tabs.new' | t"
     (click)="create.emit()"
   >
     +
@@ -71,8 +74,8 @@
     type="button"
     class="listing__toggle"
     [class.is-open]="listing()"
-    title="Todas las pestañas abiertas"
-    aria-label="Todas las pestañas abiertas"
+    [title]="'tabs.all' | t"
+    [attr.aria-label]="'tabs.all' | t"
     [attr.aria-expanded]="listing()"
     (click)="toggleListing()"
   >
@@ -89,8 +92,8 @@
           <input
             #search
             type="search"
-            placeholder="Buscar entre las abiertas"
-            aria-label="Buscar entre las pestañas abiertas"
+            [placeholder]="'tabs.search.placeholder' | t"
+            [attr.aria-label]="'tabs.search.label' | t"
             [value]="filter()"
             (input)="onFilter($event)"
             (keydown.enter)="chooseFirst(); $event.preventDefault()"
@@ -98,7 +101,7 @@
         </label>
       }
 
-      <ul role="listbox" aria-label="Pestañas abiertas">
+      <ul role="listbox" [attr.aria-label]="'tabs.list' | t">
         @for (tab of listed(); track tab.id) {
           <li>
             <button
@@ -116,23 +119,30 @@
                 <strong>{{ tab.title }}</strong>
                 <small>
                   @if (connectionFor(tab); as connection) {
-                    {{ connection.name }} · {{ tab.database ?? connection.database }}
+                    {{
+                      'tabs.context'
+                        | t
+                          : {
+                              connection: connection.name,
+                              database: tab.database ?? connection.database,
+                            }
+                    }}
                   } @else {
-                    Sin conexión asignada
+                    {{ 'tabs.noConnection' | t }}
                   }
                 </small>
               </span>
               @if (tab.dirty) {
                 <span
                   class="listing__dirty"
-                  title="Cambios sin guardar"
-                  aria-label="Cambios sin guardar"
+                  [title]="'tabs.unsaved' | t"
+                  [attr.aria-label]="'tabs.unsaved' | t"
                 ></span>
               }
             </button>
           </li>
         } @empty {
-          <li class="listing__empty">Ninguna pestaña se llama así.</li>
+          <li class="listing__empty">{{ 'tabs.none' | t }}</li>
         }
       </ul>
     </div>

@@ -4,13 +4,13 @@
   [disabled]="running() || !canExecute()"
   [attr.title]="
     canExecute()
-      ? 'Ejecuta todo el documento (' + shortcut('Ctrl+Enter') + ')'
-      : 'Abre una conexión para poder ejecutar'
+      ? ('toolbar.runTitle' | t: { shortcut: shortcut('Ctrl+Enter') })
+      : ('toolbar.runNeedsConnection' | t)
   "
   (click)="execute.emit()"
 >
   <app-icon name="play" [size]="11" />
-  <span class="run__label">Ejecutar</span>
+  <span class="run__label">{{ 'toolbar.run' | t }}</span>
 </button>
 
 <button
@@ -18,20 +18,18 @@
   class="btn current"
   [disabled]="running() || !canExecute()"
   [attr.title]="
-    (hasSelection()
-      ? 'Ejecuta solo lo seleccionado'
-      : 'Ejecuta la instrucción donde está el cursor') +
-    ' (' +
-    shortcut('Ctrl+Shift+Enter') +
-    ')'
+    (hasSelection() ? 'toolbar.runSelectionTitle' : 'toolbar.runCurrentTitle')
+      | t: { shortcut: shortcut('Ctrl+Shift+Enter') }
   "
-  [attr.aria-label]="hasSelection() ? 'Ejecutar selección' : 'Ejecutar instrucción actual'"
+  [attr.aria-label]="(hasSelection() ? 'toolbar.runSelection' : 'toolbar.runCurrentLabel') | t"
   (click)="executeSelection.emit()"
 >
   <app-icon name="play-outline" [size]="11" />
-  <span class="label">{{ hasSelection() ? 'Ejecutar selección' : 'Ejecutar actual' }}</span>
+  <span class="label">{{
+    (hasSelection() ? 'toolbar.runSelection' : 'toolbar.runCurrent') | t
+  }}</span>
   <span class="compact-label" aria-hidden="true">{{
-    hasSelection() ? 'Selección' : 'Actual'
+    (hasSelection() ? 'toolbar.selectionShort' : 'toolbar.currentShort') | t
   }}</span>
 </button>
 
@@ -39,12 +37,12 @@
   <button
     type="button"
     class="btn"
-    title="Cancela la consulta en curso"
+    [title]="'toolbar.cancelTitle' | t"
     [disabled]="!running() || canceling()"
     (click)="cancel.emit()"
   >
     <app-icon name="stop" [size]="11" />
-    <span>{{ canceling() ? 'Cancelando…' : 'Cancelar' }}</span>
+    <span>{{ (canceling() ? 'toolbar.canceling' : 'common.cancel') | t }}</span>
   </button>
 }
 
@@ -59,18 +57,18 @@
     <button
       type="button"
       class="btn btn--split"
-      [title]="'Formatear (' + shortcut('Ctrl+Shift+F') + ')'"
+      [title]="'toolbar.formatTitle' | t: { shortcut: shortcut('Ctrl+Shift+F') }"
       (click)="format.emit()"
     >
       <app-icon name="format" [size]="11" />
-      <span class="label">Formatear</span>
+      <span class="label">{{ 'toolbar.format' | t }}</span>
     </button>
 
     <button
       type="button"
       class="btn btn--caret"
-      title="Cómo se formatea"
-      aria-label="Opciones de formateo"
+      [title]="'toolbar.formatHow' | t"
+      [attr.aria-label]="'toolbar.formatOptions' | t"
       [attr.aria-expanded]="editingFormat()"
       (click)="toggleFormat()"
     >
@@ -84,32 +82,38 @@
       (toggle)="onSecondaryToggle($event)"
       (keydown)="onSecondaryKeydown($event)"
     >
-      <summary class="btn" aria-label="Más acciones del editor" title="Más acciones del editor">
-        Más <app-icon name="chevron-down" [size]="9" />
+      <summary
+        class="btn"
+        [attr.aria-label]="'toolbar.moreLabel' | t"
+        [title]="'toolbar.moreLabel' | t"
+      >
+        {{ 'toolbar.more' | t }} <app-icon name="chevron-down" [size]="9" />
       </summary>
-      <div class="secondary-actions__menu" role="group" aria-label="Acciones del editor">
+      <div class="secondary-actions__menu" role="group" [attr.aria-label]="'toolbar.actions' | t">
         <button
           type="button"
-          aria-label="Formatear SQL"
+          [attr.aria-label]="'toolbar.formatSql' | t"
           (click)="secondaryMenu.close(true); format.emit()"
         >
           <app-icon name="format" [size]="14" />
-          <span>Formatear SQL</span><kbd>{{ shortcut('Ctrl+Shift+F') }}</kbd>
+          <span>{{ 'toolbar.formatSql' | t }}</span
+          ><kbd>{{ shortcut('Ctrl+Shift+F') }}</kbd>
         </button>
         <button
           type="button"
-          aria-label="Opciones de formateo"
+          [attr.aria-label]="'toolbar.formatOptions' | t"
           (click)="secondaryMenu.close(true); toggleFormat()"
         >
-          <app-icon name="settings" [size]="14" /><span>Opciones de formateo…</span>
+          <app-icon name="settings" [size]="14" /><span>{{ 'toolbar.formatOptionsMenu' | t }}</span>
         </button>
         <button
           type="button"
-          aria-label="Comentar o descomentar líneas"
+          [attr.aria-label]="'toolbar.commentLabel' | t"
           (click)="secondaryMenu.close(true); toggleLineComment.emit()"
         >
           <app-icon name="comment" [size]="14" />
-          <span>Comentar / descomentar</span><kbd>{{ shortcut('Ctrl+/') }}</kbd>
+          <span>{{ 'toolbar.commentMenu' | t }}</span
+          ><kbd>{{ shortcut('Ctrl+/') }}</kbd>
         </button>
         @if (!transactionOpen()) {
           <button
@@ -120,10 +124,8 @@
           >
             <app-icon name="transaction" [size]="14" />
             <span
-              >Iniciar transacción
-              <small>{{
-                beginTransactionReason() ?? 'Agrupa consultas hasta confirmar o deshacer.'
-              }}</small>
+              >{{ 'toolbar.begin' | t }}
+              <small>{{ beginTransactionReason() ?? ('toolbar.beginHint' | t) }}</small>
             </span>
           </button>
         }
@@ -135,22 +137,22 @@
     <div
       class="format__menu"
       role="dialog"
-      aria-label="Opciones de formateo"
+      [attr.aria-label]="'toolbar.formatOptions' | t"
       (keydown.escape)="closeFormat($event)"
     >
       @for (group of formatGroups; track group.key) {
-        <p class="format__label">{{ group.label }}</p>
-        <div class="format__options" role="group" [attr.aria-label]="group.label">
+        <p class="format__label">{{ group.label | t }}</p>
+        <div class="format__options" role="group" [attr.aria-label]="group.label | t">
           @for (option of group.options; track option.value) {
             <button
               type="button"
               class="format__option"
               [attr.aria-pressed]="isChosen(group.key, option.value)"
               [class.is-selected]="isChosen(group.key, option.value)"
-              [attr.title]="option.hint ?? null"
+              [attr.title]="option.hint ? (option.hint | t: { width: option.value }) : null"
               (click)="choose(group.key, option.value)"
             >
-              {{ option.label }}
+              {{ option.label | t: { width: option.value } }}
             </button>
           }
         </div>
@@ -163,12 +165,12 @@
   <button
     type="button"
     class="btn"
-    [title]="'Comentar/descomentar líneas (' + shortcut('Ctrl+/') + ')'"
+    [title]="'toolbar.commentTitle' | t: { shortcut: shortcut('Ctrl+/') }"
     data-secondary
     (click)="toggleLineComment.emit()"
   >
     <app-icon name="comment" [size]="12" />
-    <span class="label">Comentar</span>
+    <span class="label">{{ 'toolbar.comment' | t }}</span>
   </button>
 }
 
@@ -182,7 +184,7 @@
   -->
   <span class="tx" [attr.title]="transactionHint()">
     <span class="tx__dot" aria-hidden="true"></span>
-    <span class="label">Transacción abierta en</span>
+    <span class="label">{{ 'toolbar.transactionOpenIn' | t }}</span>
     <strong>{{ transactionScope() }}</strong>
   </span>
 
@@ -192,7 +194,7 @@
     [disabled]="transactionBusy()"
     (click)="commit.emit()"
   >
-    Commit
+    {{ 'toolbar.commit' | t }}
   </button>
   <button
     type="button"
@@ -200,7 +202,7 @@
     [disabled]="transactionBusy()"
     (click)="rollback.emit()"
   >
-    Rollback
+    {{ 'toolbar.rollback' | t }}
   </button>
 } @else if (!compact()) {
   <!--
@@ -211,12 +213,12 @@
     type="button"
     class="btn"
     [disabled]="beginTransactionReason() !== null"
-    [title]="beginTransactionReason() ?? 'Agrupa consultas hasta confirmar o deshacer.'"
+    [title]="beginTransactionReason() ?? ('toolbar.beginHint' | t)"
     (click)="startTransaction()"
     data-secondary
   >
     <app-icon name="transaction" [size]="11" />
-    <span class="label">Iniciar transacción</span>
+    <span class="label">{{ 'toolbar.begin' | t }}</span>
   </button>
 }
 
@@ -238,10 +240,15 @@
     [attr.aria-expanded]="choosingDatabase()"
     [attr.title]="
       databases().length > 0 || connections().length > 0
-        ? (connection()?.name ? connection()!.name + ' · ' : '') +
-          context() +
-          ' — conexión y base contra las que se ejecuta'
-        : 'Conecta para elegir dónde se ejecuta'
+        ? ('toolbar.context.title'
+          | t
+            : {
+                connection: connection()?.name
+                  ? ('toolbar.context.named' | t: { name: connection()!.name })
+                  : '',
+                context: context(),
+              })
+        : ('toolbar.context.connectFirst' | t)
     "
     (click)="toggleDatabases()"
   >
@@ -253,7 +260,7 @@
     <span class="chip__mono">{{ context() }}</span>
     <span class="chip__short">{{ database() ?? contextDatabase() }}</span>
     @if (connection()?.environment === 'production') {
-      <span class="tag tag--production">Producción</span>
+      <span class="tag tag--production">{{ 'toolbar.production' | t }}</span>
     }
     <app-icon name="chevron-down" [size]="9" />
   </button>
@@ -261,7 +268,7 @@
   @if (choosingDatabase()) {
     <div class="context__menu" (keydown.escape)="choosingDatabase.set(false)">
       @if (connections().length > 0) {
-        <p class="context__title">Conexión</p>
+        <p class="context__title">{{ 'toolbar.connection' | t }}</p>
         <ul role="listbox">
           @for (option of connections(); track option.id) {
             <li>
@@ -277,15 +284,15 @@
                 <span class="context__tags">
                   @if (option.environment !== 'other') {
                     <span class="tag" [class]="'tag--' + option.environment">
-                      {{ option.environment }}
+                      {{ 'connection.environment.' + option.environment | t }}
                     </span>
                   }
                   @if (option.readOnly) {
-                    <span class="tag">solo lectura</span>
+                    <span class="tag">{{ 'toolbar.readOnly' | t }}</span>
                   }
                   <!-- Se dice antes de pulsar: elegirla abre la sesión. -->
                   @if (!option.open) {
-                    <span class="tag">sin abrir</span>
+                    <span class="tag">{{ 'toolbar.notOpen' | t }}</span>
                   }
                 </span>
               </button>
@@ -295,7 +302,7 @@
       }
 
       @if (databases().length > 0) {
-        <p class="context__title">Base</p>
+        <p class="context__title">{{ 'toolbar.database' | t }}</p>
         <ul role="listbox">
           @for (name of databases(); track name) {
             <li>
@@ -323,12 +330,9 @@
     class="chip"
     [attr.aria-expanded]="editingLimits()"
     [attr.aria-label]="
-      'Opciones de ejecución: ' +
-      rowsLabel(maxRows()) +
-      ' filas, tiempo límite ' +
-      label(timeoutSeconds())
+      'toolbar.limits.label' | t: { rows: rowsLabel(maxRows()), timeout: label(timeoutSeconds()) }
     "
-    title="Límite de filas y tiempo de ejecución"
+    [title]="'toolbar.limits.title' | t"
     (click)="toggleLimits()"
   >
     <app-icon name="table" [size]="12" />
@@ -339,27 +343,27 @@
     <div
       class="limits__menu"
       role="dialog"
-      aria-label="Opciones de ejecución"
+      [attr.aria-label]="'toolbar.limits.dialog' | t"
       (keydown.escape)="closeLimits($event)"
     >
       <label>
-        <span>Límite de filas</span>
+        <span>{{ 'toolbar.limits.rows' | t }}</span>
         <select
-          aria-label="Límite de filas"
+          [attr.aria-label]="'toolbar.limits.rows' | t"
           [value]="maxRows()"
           (change)="chooseRows(+$any($event.target).value)"
         >
           @for (option of rowOptions; track option) {
             <option [value]="option" [selected]="option === maxRows()">
-              {{ rowsLabel(option) }} filas
+              {{ 'toolbar.limits.rowsOption' | t: { rows: rowsLabel(option) } }}
             </option>
           }
         </select>
       </label>
       <label>
-        <span>Tiempo límite</span>
+        <span>{{ 'toolbar.limits.timeout' | t }}</span>
         <select
-          aria-label="Tiempo límite"
+          [attr.aria-label]="'toolbar.limits.timeout' | t"
           [value]="timeoutSeconds()"
           (change)="chooseTimeout(+$any($event.target).value)"
         >
@@ -370,7 +374,7 @@
           }
         </select>
       </label>
-      <p>Se aplican a la próxima ejecución.</p>
+      <p>{{ 'toolbar.limits.next' | t }}</p>
     </div>
   }
 </div>
@@ -378,12 +382,12 @@
 <button
   type="button"
   class="btn panel-toggle"
-  [attr.aria-label]="maximized() ? 'Restaurar editor y resultados' : 'Maximizar editor'"
-  [title]="maximized() ? 'Restaurar editor y resultados' : 'Maximizar editor'"
+  [attr.aria-label]="(maximized() ? 'toolbar.restoreLabel' : 'toolbar.maximize') | t"
+  [title]="(maximized() ? 'toolbar.restoreLabel' : 'toolbar.maximize') | t"
   (click)="toggleMaximize.emit()"
 >
   <app-icon [name]="maximized() ? 'panel-split' : 'maximize'" [size]="14" />
   @if (maximized()) {
-    Restaurar
+    {{ 'toolbar.restore' | t }}
   }
 </button>

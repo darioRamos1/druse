@@ -24,19 +24,6 @@ const MONACO_MESSAGES: Readonly<Record<Locale, string | null>> = {
 /** Tope de espera. Pasado esto se da por fallido y se puede reintentar. */
 const LOAD_TIMEOUT_MS = 20000;
 
-/** Lo que se pueda decir de un error del cargador AMD, que no siempre es `Error`. */
-function describe(error: unknown): string {
-  if (error instanceof Error) {
-    return error.message;
-  }
-
-  const detail = error as { errorCode?: string; moduleId?: string } | null;
-
-  return detail?.moduleId
-    ? `no se encontró ${detail.moduleId}`
-    : (detail?.errorCode ?? 'motivo desconocido');
-}
-
 declare global {
   interface Window {
     /** Cargador AMD que expone `loader.js` de Monaco. */
@@ -63,6 +50,19 @@ declare global {
 export class MonacoLoader {
   private _loading: Promise<typeof MonacoApi> | null = null;
   private readonly _i18n = inject(I18nService);
+
+  /** Lo que se pueda decir de un error del cargador AMD, que no siempre es `Error`. */
+  private describe(error: unknown): string {
+    if (error instanceof Error) {
+      return error.message;
+    }
+
+    const detail = error as { errorCode?: string; moduleId?: string } | null;
+
+    return detail?.moduleId
+      ? this._i18n.t('editor.monaco.missingModule', { module: detail.moduleId })
+      : (detail?.errorCode ?? this._i18n.t('editor.monaco.unknown'));
+  }
 
   load(): Promise<typeof MonacoApi> {
     if (window.monaco) {
@@ -125,7 +125,7 @@ export class MonacoLoader {
         const amdRequire = window.require;
 
         if (!amdRequire?.config) {
-          reject(new Error('El cargador de Monaco no quedó disponible.'));
+          reject(new Error(this._i18n.t('editor.monaco.noLoader')));
           return;
         }
 
@@ -138,24 +138,26 @@ export class MonacoLoader {
           ['vs/editor/editor.main'],
           () => {
             if (!window.monaco) {
-              reject(new Error('Monaco no se inicializó correctamente.'));
+              reject(new Error(this._i18n.t('editor.monaco.notInitialized')));
               return;
             }
 
             resolve(window.monaco);
           },
           (error: unknown) => {
-            reject(new Error(`No se pudieron cargar los módulos del editor: ${describe(error)}`));
+            reject(
+              new Error(this._i18n.t('editor.monaco.modules', { reason: this.describe(error) })),
+            );
           },
         );
       };
 
-      script.onerror = () => reject(new Error('No se pudo cargar Monaco.'));
+      script.onerror = () => reject(new Error(this._i18n.t('editor.monaco.script')));
 
       // Un cargador que no responde tampoco puede dejar la promesa en el aire:
       // sin esto, el editor esperaría indefinidamente a un script que nunca
       // llegó.
-      setTimeout(() => reject(new Error('El editor tardó demasiado en cargar.')), LOAD_TIMEOUT_MS);
+      setTimeout(() => reject(new Error(this._i18n.t('editor.monaco.timeout'))), LOAD_TIMEOUT_MS);
 
       document.head.appendChild(script);
     });

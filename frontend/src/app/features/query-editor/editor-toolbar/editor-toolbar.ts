@@ -13,6 +13,8 @@ import {
   signal,
 } from '@angular/core';
 
+import { I18nService } from '../../../core/i18n/i18n.service';
+import { TranslatePipe } from '../../../core/i18n/translate.pipe';
 import {
   DEFAULT_FORMAT_SETTINGS,
   FORMAT_WIDTHS,
@@ -65,7 +67,7 @@ interface FormatGroup {
 @Component({
   selector: 'app-editor-toolbar',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [Icon, Disclosure],
+  imports: [Icon, Disclosure, TranslatePipe],
   templateUrl: './editor-toolbar.html',
   styleUrl: './editor-toolbar.scss',
 })
@@ -74,6 +76,7 @@ export class EditorToolbar {
   private readonly _host = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly injector = inject(Injector);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly _i18n = inject(I18nService);
   protected readonly compact = signal(false);
 
   constructor() {
@@ -168,11 +171,11 @@ export class EditorToolbar {
 
   protected readonly beginTransactionReason = computed(() =>
     !this.canExecute()
-      ? 'Abre una conexión para usar transacciones.'
+      ? this._i18n.t('toolbar.tx.noConnection')
       : this.running()
-        ? 'Espera a que termine la consulta.'
+        ? this._i18n.t('toolbar.tx.running')
         : this.transactionBusy()
-          ? 'Espera a que termine la operación de transacción.'
+          ? this._i18n.t('toolbar.tx.busy')
           : null,
   );
 
@@ -239,9 +242,8 @@ export class EditorToolbar {
    */
   protected readonly transactionHint = computed(() =>
     this.transactionDdlIsReversible()
-      ? 'Todo lo que ejecutes en esta conexión entra en la transacción hasta que la confirmes o la deshagas.'
-      : 'Todo lo que ejecutes en esta conexión entra en la transacción. ' +
-        'Crear o modificar tablas es la excepción: en este motor queda hecho aunque pulses Rollback.',
+      ? this._i18n.t('toolbar.tx.hint')
+      : this._i18n.t('toolbar.tx.hintDdl'),
   );
 
   /** Valores habituales, para no obligar a teclear un número. */
@@ -270,13 +272,17 @@ export class EditorToolbar {
   protected readonly formatGroups: readonly FormatGroup[] = [
     {
       key: 'style',
-      label: 'Reparto de líneas',
+      label: 'toolbar.format.style',
       options: [
-        { value: 'standard', label: 'Estándar', hint: 'Cada elemento en su línea, sangrado' },
+        {
+          value: 'standard',
+          label: 'toolbar.format.standard',
+          hint: 'toolbar.format.standardHint',
+        },
         {
           value: 'tabular',
-          label: 'Tabular',
-          hint: 'Palabra clave a la izquierda y valores en columna',
+          label: 'toolbar.format.tabular',
+          hint: 'toolbar.format.tabularHint',
         },
       ],
     },
@@ -285,29 +291,34 @@ export class EditorToolbar {
       // una lista—, no sobre las cláusulas: `FROM` siempre empieza línea. La
       // etiqueta lo dice para no prometer lo que no hace.
       key: 'expressionWidth',
-      label: 'Ancho de expresión',
+      label: 'toolbar.format.width',
+      // El número va como parámetro: una clave por ancho no tendría sentido.
       options: FORMAT_WIDTHS.map((width) => ({
         value: width,
-        label: String(width),
-        hint: `Parte funciones y listas al pasar de ${width} caracteres`,
+        label: 'toolbar.format.widthValue',
+        hint: 'toolbar.format.widthHint',
       })),
     },
     {
       key: 'keywordCase',
-      label: 'Palabras clave',
+      label: 'toolbar.format.keywords',
       options: [
-        { value: 'upper', label: 'MAYÚSCULAS' },
-        { value: 'lower', label: 'minúsculas' },
-        { value: 'preserve', label: 'Como estén', hint: 'No cambia la caja de nada' },
+        { value: 'upper', label: 'toolbar.format.upper' },
+        { value: 'lower', label: 'toolbar.format.lower' },
+        {
+          value: 'preserve',
+          label: 'toolbar.format.preserve',
+          hint: 'toolbar.format.preserveHint',
+        },
       ],
     },
     {
       key: 'indent',
-      label: 'Sangría',
+      label: 'toolbar.format.indent',
       options: [
-        { value: 'spaces2', label: '2 espacios' },
-        { value: 'spaces4', label: '4 espacios' },
-        { value: 'tabs', label: 'Tabulaciones' },
+        { value: 'spaces2', label: 'toolbar.format.spaces2' },
+        { value: 'spaces4', label: 'toolbar.format.spaces4' },
+        { value: 'tabs', label: 'toolbar.format.tabs' },
       ],
     },
   ];
@@ -438,6 +449,8 @@ export class EditorToolbar {
 
   /** Etiqueta compacta: 600 s se lee peor que 10 min. */
   protected label(seconds: number): string {
-    return seconds >= 60 && seconds % 60 === 0 ? `${seconds / 60} min` : `${seconds}s`;
+    return seconds >= 60 && seconds % 60 === 0
+      ? this._i18n.t('toolbar.limits.minutes', { n: seconds / 60 })
+      : this._i18n.t('toolbar.limits.seconds', { n: seconds });
   }
 }
