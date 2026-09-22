@@ -95,7 +95,7 @@ function explainStatus(status: number, i18n: I18nService): string {
   switch (status) {
     // Angular usa el 0 cuando la petición ni siquiera llegó a salir.
     case 0:
-      return 'Druse no obtuvo respuesta de su propio motor. Comprueba que la aplicación siga abierta y vuelve a intentarlo.';
+      return i18n.t('error.status.0');
 
     case 400:
       return i18n.t('error.status.400');

@@ -1,4 +1,5 @@
 import { Injectable, signal } from '@angular/core';
+import { translate } from '../i18n/active';
 
 /** Cómo alcanzar la API local. */
 export interface ApiConnection {
@@ -275,9 +276,9 @@ export class DesktopHost {
       return Promise.resolve({
         version: 'desarrollo',
         variant: 'web',
-        variantLabel: 'Navegador',
+        variantLabel: translate('desktop.variantBrowser'),
         updatesEnabled: false,
-        updatesDisabledReason: 'Las actualizaciones se administran desde la aplicación instalada.',
+        updatesDisabledReason: translate('desktop.updatesFromInstalled'),
       });
     }
 
@@ -309,7 +310,7 @@ export class DesktopHost {
     const invoke = bridge?.core?.invoke ?? bridge?.invoke;
 
     if (!invoke) {
-      return Promise.reject(new Error('La función requiere el envoltorio de escritorio.'));
+      return Promise.reject(new Error(translate('desktop.needsWrapper')));
     }
 
     return invoke<T>(command, args);

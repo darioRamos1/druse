@@ -1,6 +1,6 @@
 import { MessageParams, formatMessage } from './icu';
 import type { I18nService } from './i18n.service';
-import { SOURCE_CATALOG } from './locale';
+import { Locale, SOURCE_CATALOG } from './locale';
 
 /**
  * El servicio de idioma de esta ventana, para las funciones que no son
@@ -23,6 +23,16 @@ let active: I18nService | null = null;
 /** Lo llama el propio servicio al crearse. */
 export function setActiveI18n(service: I18nService): void {
   active = service;
+}
+
+/**
+ * El idioma elegido, para lo que no se traduce clave a clave.
+ *
+ * Lo usa la referencia de SQL, que tiene un archivo por idioma en vez de
+ * entradas en el catálogo. Sin servicio, español: es el original.
+ */
+export function activeLocale(): Locale {
+  return active ? active.locale() : 'es';
 }
 
 /**
