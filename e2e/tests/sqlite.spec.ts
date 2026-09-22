@@ -687,4 +687,37 @@ test.describe('SQLite de punta a punta', () => {
       expect(await primeraColumna(page)).toEqual(['11']);
     }).toPass({ timeout: 30_000 });
   });
+
+  /**
+   * Una tabla ancha enseña **todas** sus columnas, la última incluida.
+   *
+   * La última columna se estira para ocupar lo que sobra de la ventana. Cuando
+   * las demás ya pasaban del ancho visible no sobraba nada, y se quedaba en
+   * cero píxeles: el `SELECT *` parecía traer una columna menos. Es de la
+   * cuadrícula y no del motor —apareció en SQL Server—, así que basta SQLite.
+   */
+  test('un resultado con muchas columnas no pierde la última', async ({ page }) => {
+    await abrir(page);
+    await hastaLasTablas(page);
+    await menuDeNodo(page, 'clientes');
+    await page.getByRole('menuitem', { name: 'Abrir SELECT' }).click();
+
+    const columnas = Array.from({ length: 60 }, (_, i) => `'valor ${i + 1}' AS campo_${i + 1}`);
+
+    await escribirSql(page, `SELECT ${columnas.join(', ')}`);
+    await ejecutar(page, 'todo');
+
+    const cabeceras = page.locator('app-results-grid .cell--head');
+
+    await expect(cabeceras).toHaveCount(60, { timeout: 30_000 });
+
+    const ultima = cabeceras.last();
+
+    await ultima.scrollIntoViewIfNeeded();
+    await expect(ultima).toContainText('campo_60');
+
+    const caja = await ultima.boundingBox();
+
+    expect(caja?.width ?? 0).toBeGreaterThanOrEqual(84);
+  });
 });

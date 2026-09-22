@@ -682,7 +682,12 @@ export interface ResultColumn {
   readonly dataType: string;
   readonly inputKind?: InputKind;
   readonly kind: ColumnType;
-  /** Ancho en píxeles; `null` reparte el espacio sobrante. */
+  /**
+   * Ancho en píxeles; `null` si no se calculó.
+   *
+   * La última columna de la cuadrícula se estira para ocupar el espacio
+   * sobrante, pero nunca por debajo de este ancho.
+   */
   readonly width: number | null;
   readonly sorted?: 'asc' | 'desc';
   readonly filter?: string;

@@ -51,8 +51,24 @@ describe('ResultsGrid', () => {
   it('reserva la última columna para el espacio sobrante', () => {
     const header = element.querySelector<HTMLElement>('.head');
 
-    // 44px del número de fila, los anchos declarados y 1fr al final.
-    expect(header?.style.gridTemplateColumns).toBe('44px 80px 200px 1fr');
+    // 44px del número de fila, los anchos declarados y la última estirada.
+    expect(header?.style.gridTemplateColumns).toBe('44px 80px 200px minmax(84px, 1fr)');
+  });
+
+  /**
+   * Con un `1fr` a secas, una tabla más ancha que la ventana dejaba la última
+   * columna en cero píxeles, y el `SELECT *` parecía traer una menos.
+   */
+  it('la última columna estirada nunca baja de su ancho calculado', async () => {
+    fixture.componentRef.setInput('resultSet', {
+      ...resultSet,
+      columns: resultSet.columns.map((column) => ({ ...column, width: column.width ?? 150 })),
+    });
+    await fixture.whenStable();
+
+    const header = element.querySelector<HTMLElement>('.head');
+
+    expect(header?.style.gridTemplateColumns).toBe('44px 80px 200px minmax(150px, 1fr)');
   });
 
   /**
@@ -564,19 +580,19 @@ describe('ResultsGrid', () => {
     }
 
     it('arrastrar el borde cambia el ancho de esa columna', async () => {
-      expect(template()).toBe('44px 80px 200px 1fr');
+      expect(template()).toBe('44px 80px 200px minmax(84px, 1fr)');
 
       await arrastrar(0, 60);
 
       // Solo la primera: las demás se quedan como estaban.
-      expect(template()).toBe('44px 140px 200px 1fr');
+      expect(template()).toBe('44px 140px 200px minmax(84px, 1fr)');
     });
 
     it('arrastrar hacia la izquierda estrecha, pero no por debajo del mínimo', async () => {
       await arrastrar(0, -500);
 
       // 84 px es el mismo suelo que usa el reparto inicial.
-      expect(template()).toBe('44px 84px 200px 1fr');
+      expect(template()).toBe('44px 84px 200px minmax(84px, 1fr)');
     });
 
     it('arrastrar el asa no selecciona la columna', async () => {
@@ -598,7 +614,7 @@ describe('ResultsGrid', () => {
 
       // `ana@example.com` son 15 caracteres de fuente monoespaciada más el aire
       // de la celda: más que el título, así que manda el contenido.
-      expect(template()).toBe('44px 80px 134px 1fr');
+      expect(template()).toBe('44px 80px 134px minmax(84px, 1fr)');
     });
 
     it('el doble clic sobre una columna estrecha deja sitio al título', async () => {
@@ -621,7 +637,7 @@ describe('ResultsGrid', () => {
       });
       await fixture.whenStable();
 
-      expect(template()).toBe('44px 140px 200px 1fr');
+      expect(template()).toBe('44px 140px 200px minmax(84px, 1fr)');
     });
 
     it('se olvida cuando el resultado trae otras columnas', async () => {
@@ -634,7 +650,7 @@ describe('ResultsGrid', () => {
       });
       await fixture.whenStable();
 
-      expect(template()).toBe('44px 120px');
+      expect(template()).toBe('44px minmax(120px, 1fr)');
     });
   });
   /**
@@ -702,7 +718,7 @@ describe('ResultsGrid', () => {
       await fixture.whenStable();
 
       expect(element.querySelector<HTMLElement>('.head')?.style.gridTemplateColumns).toBe(
-        '44px 96px 200px 1fr',
+        '44px 96px 200px minmax(84px, 1fr)',
       );
 
       handle(0).dispatchEvent(
@@ -712,7 +728,7 @@ describe('ResultsGrid', () => {
 
       // 96 menos los 64 del paso largo, con el suelo de 84 px por delante.
       expect(element.querySelector<HTMLElement>('.head')?.style.gridTemplateColumns).toBe(
-        '44px 84px 200px 1fr',
+        '44px 84px 200px minmax(84px, 1fr)',
       );
     });
 

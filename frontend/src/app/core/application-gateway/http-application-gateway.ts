@@ -777,6 +777,8 @@ export class HttpApplicationGateway extends ApplicationGateway {
     // a mano, donde se puede mirar la muestra.
     const widths = initialColumnWidths(kinds, dto.rows);
 
+    // La última también lleva el suyo aunque la cuadrícula la estire: es su
+    // suelo cuando no sobra espacio que repartir.
     const columns = dto.columns.map<ResultColumn>((column, index) => ({
       name: column.name,
       dataType: column.dataType,
@@ -784,12 +786,6 @@ export class HttpApplicationGateway extends ApplicationGateway {
       inputKind: column.inputKind,
       width: widths[index],
     }));
-
-    // La última columna se estira para ocupar el espacio sobrante, como en el
-    // mockup.
-    if (columns.length > 0) {
-      columns[columns.length - 1] = { ...columns[columns.length - 1], width: null };
-    }
 
     return {
       columns,

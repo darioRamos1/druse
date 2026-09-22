@@ -213,20 +213,29 @@ export class ResultsGrid {
   });
 
   /**
-   * Plantilla de columnas de la rejilla. La última lleva `1fr` para absorber el
+   * Plantilla de columnas de la rejilla. La última se estira para absorber el
    * espacio sobrante, igual que en el mockup.
+   *
+   * Se estira con `minmax` y no con un `1fr` a secas: cuando las demás ya pasan
+   * del ancho visible no sobra nada, y `1fr` valía cero. El contenido no la
+   * salvaba porque la celda es un contenedor de tamaño (`container-type`), que
+   * no cuenta lo que lleva dentro al medirse. Así un `SELECT *` de una tabla
+   * ancha parecía traer una columna menos.
    */
   protected readonly gridTemplate = computed(() => {
     const custom = this.customWidths();
+    const all = this.resultSet().columns;
 
-    const columns = this.resultSet().columns.map((column) => {
+    const columns = all.map((column, index) => {
       const ajustado = custom[column.name];
 
       if (ajustado !== undefined) {
         return `${ajustado}px`;
       }
 
-      return column.width === null ? '1fr' : `${column.width}px`;
+      const width = column.width ?? MIN_COLUMN_WIDTH;
+
+      return index === all.length - 1 ? `minmax(${width}px, 1fr)` : `${width}px`;
     });
 
     return [`${ROW_NUMBER_WIDTH}px`, ...columns].join(' ');
