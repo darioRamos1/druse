@@ -52,6 +52,68 @@ describe('MonacoLoader', () => {
     vi.restoreAllMocks();
   });
 
+  const esTraduccion = (script: HTMLScriptElement) => script.src.endsWith('/nls/lang/es.js');
+  const esCargador = (script: HTMLScriptElement) => script.src.endsWith('/vs/loader.js');
+
+  /**
+   * Deja pasar la traducción —o su fallo— y devuelve el script del cargador,
+   * que solo se inserta después.
+   */
+  async function cargador(traduccion: 'load' | 'error' = 'load'): Promise<HTMLScriptElement> {
+    const textos = scripts.filter(esTraduccion).at(-1)!;
+
+    if (traduccion === 'load') {
+      textos.onload?.(new Event('load'));
+    } else {
+      textos.onerror?.(new Event('error'));
+    }
+
+    await vi.advanceTimersByTimeAsync(0);
+
+    return scripts.filter(esCargador).at(-1)!;
+  }
+
+  /**
+   * Los textos en español van **antes** que Monaco y como script suelto.
+   *
+   * Se pedían con la opción `vs/nls` del cargador AMD, y como el archivo no es
+   * un módulo AMD, el cargador se quedaba esperando su `define`: el editor no
+   * arrancaba nunca.
+   */
+  it('carga los textos en español antes que el cargador de Monaco', async () => {
+    void loader.load();
+
+    expect(scripts.map((script) => script.src.split('/assets/')[1])).toEqual([
+      'monaco/vs/nls/lang/es.js',
+    ]);
+
+    let options: Record<string, unknown> | null = null;
+    (window as { require?: unknown }).require = Object.assign(() => undefined, {
+      config: (value: Record<string, unknown>) => (options = value),
+    });
+
+    (await cargador()).onload?.(new Event('load'));
+
+    expect(scripts.filter(esCargador)).toHaveLength(1);
+    expect(options).not.toHaveProperty('vs/nls');
+  });
+
+  it('si los textos no llegan, el editor arranca igual, en inglés', async () => {
+    const promesa = loader.load();
+
+    (window as { require?: unknown }).require = Object.assign(
+      (_modules: string[], onLoad: () => void) => {
+        (window as { monaco?: unknown }).monaco = { editor: {} };
+        onLoad();
+      },
+      { config: () => undefined },
+    );
+
+    (await cargador('error')).onload?.(new Event('load'));
+
+    await expect(promesa).resolves.toBeDefined();
+  });
+
   it('un módulo que no carga rechaza en lugar de dejar la espera colgada', async () => {
     const promesa = loader.load();
 
@@ -62,7 +124,7 @@ describe('MonacoLoader', () => {
       { config: () => undefined },
     );
 
-    scripts[0].onload?.(new Event('load'));
+    (await cargador()).onload?.(new Event('load'));
 
     await expect(promesa).rejects.toThrow(/vs\/editor\/editor\.main/);
   });
@@ -78,14 +140,14 @@ describe('MonacoLoader', () => {
       { config: () => undefined },
     );
 
-    scripts[0].onload?.(new Event('load'));
+    (await cargador()).onload?.(new Event('load'));
     await expect(primera).rejects.toThrow(/la red iba mal/);
 
     // El segundo intento vuelve a inyectar el script: si se hubiera guardado la
     // promesa fallida, no habría segundo intento.
     const segunda = loader.load();
 
-    expect(scripts).toHaveLength(2);
+    expect(scripts.filter(esTraduccion)).toHaveLength(2);
 
     (window as { require?: unknown }).require = Object.assign(
       (_modules: string[], onLoad: () => void) => {
@@ -95,7 +157,7 @@ describe('MonacoLoader', () => {
       { config: () => undefined },
     );
 
-    scripts[1].onload?.(new Event('load'));
+    (await cargador()).onload?.(new Event('load'));
 
     await expect(segunda).resolves.toBeDefined();
   });
@@ -103,7 +165,7 @@ describe('MonacoLoader', () => {
   it('si el script del cargador no llega, se rechaza con un motivo', async () => {
     const promesa = loader.load();
 
-    scripts[0].onerror?.(new Event('error'));
+    (await cargador()).onerror?.(new Event('error'));
 
     await expect(promesa).rejects.toThrow(/No se pudo cargar Monaco/);
   });

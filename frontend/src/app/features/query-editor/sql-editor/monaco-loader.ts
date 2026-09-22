@@ -62,7 +62,33 @@ export class MonacoLoader {
     return this._loading;
   }
 
-  private injectLoader(): Promise<typeof MonacoApi> {
+  /**
+   * Los textos de Monaco en español, antes que Monaco.
+   *
+   * Sin esto, el menú contextual mezclaba «Abrir en el compositor» con «Cut»,
+   * «Copy» y «Change All Occurrences». El paquete trae la traducción en
+   * `vs/nls/lang/es.js`, que **no es un módulo AMD**: es un script que deja los
+   * textos en `globalThis._VSCODE_NLS_MESSAGES`, y Monaco los lee de ahí al
+   * evaluarse. Pedirlo por la opción `vs/nls` del cargador lo dejaba esperando
+   * un `define` que nunca llega, y el editor no arrancaba. Por eso va como
+   * script suelto y delante.
+   *
+   * Si falla, se sigue: un editor en inglés es mucho mejor que ninguno.
+   */
+  private loadMessages(): Promise<void> {
+    return new Promise<void>((resolve) => {
+      const script = document.createElement('script');
+      script.src = `${MONACO_BASE}/vs/nls/lang/es.js`;
+      script.async = true;
+      script.onload = () => resolve();
+      script.onerror = () => resolve();
+      document.head.appendChild(script);
+    });
+  }
+
+  private async injectLoader(): Promise<typeof MonacoApi> {
+    await this.loadMessages();
+
     return new Promise<typeof MonacoApi>((resolve, reject) => {
       const script = document.createElement('script');
       script.src = `${MONACO_BASE}/vs/loader.js`;
