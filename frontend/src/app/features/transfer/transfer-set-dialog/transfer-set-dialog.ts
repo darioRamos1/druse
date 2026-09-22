@@ -21,6 +21,9 @@ import {
   TransferTable,
   TransferTableOptions,
 } from '../../../core/application-gateway/application-gateway';
+import { I18nService } from '../../../core/i18n/i18n.service';
+import { formatNumber } from '../../../core/i18n/locale-format';
+import { TranslatePipe } from '../../../core/i18n/translate.pipe';
 import { TransferStore } from '../../../core/transfer/transfer.store';
 import { WorkspaceStore } from '../../../core/workspace/workspace-store';
 import { DatabaseObject } from '../../../shared/models/workspace';
@@ -52,7 +55,7 @@ interface Pair {
 @Component({
   selector: 'app-transfer-set-dialog',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [DialogBackdrop, DialogFocus, FormsModule, OperationProgress],
+  imports: [DialogBackdrop, DialogFocus, FormsModule, OperationProgress, TranslatePipe],
   templateUrl: './transfer-set-dialog.html',
   styleUrl: './transfer-set-dialog.scss',
 })
@@ -60,6 +63,7 @@ export class TransferSetDialog {
   private readonly _workspace = inject(WorkspaceStore);
   private readonly _gateway = inject(ApplicationGateway);
   private readonly _transfers = inject(TransferStore);
+  private readonly _i18n = inject(I18nService);
 
   /** Nodo del que salen las tablas: un esquema o la carpeta que las agrupa. */
   readonly node = input.required<DatabaseObject>();
@@ -160,10 +164,32 @@ export class TransferSetDialog {
    * significa algo.
    */
   protected readonly modes: readonly { readonly id: TransferMode; readonly label: string }[] = [
-    { id: 'Insert', label: 'Añadir las filas' },
-    { id: 'Upsert', label: 'Actualizar la que ya está' },
-    { id: 'SkipExisting', label: 'Omitir las que ya están' },
+    { id: 'Insert', label: 'transferSet.mode.insert' },
+    { id: 'Upsert', label: 'transferSet.mode.upsert' },
+    { id: 'SkipExisting', label: 'transferSet.mode.skip' },
   ];
+
+  /** Las frases con un trozo en negrita, sin partirlas en varias claves. */
+  protected gapParts(table: string, reason: string) {
+    return this._i18n.tParts('transferSet.gap', { table }, { reason });
+  }
+
+  protected cycleParts(tables: string) {
+    return this._i18n.tParts('transferSet.cycles', { tables });
+  }
+
+  protected missingParts(count: number, names: string) {
+    return this._i18n.tParts('transferSet.missing', { count: formatNumber(count) }, { names });
+  }
+
+  protected warningParts(subject: string, message: string) {
+    return this._i18n.tParts('transfer.warning', { subject }, { message });
+  }
+
+  /** Las filas, con los separadores del idioma. */
+  protected count(value: number): string {
+    return formatNumber(value);
+  }
 
   protected readonly sourceName = computed(() => qualify(this.node()));
 

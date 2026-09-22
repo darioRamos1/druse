@@ -9,13 +9,14 @@
 <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="transfer-set-title">
   <header class="head">
     <div>
-      <h2 class="title" id="transfer-set-title">Migrar tablas de {{ sourceName() }}</h2>
-      <p class="subtitle">
-        Marca las que se llevan y elige dónde van. Se copian en el orden que exijan sus claves
-        foráneas, y antes de escribir nada verás cuál va primero.
-      </p>
+      <h2 class="title" id="transfer-set-title">
+        {{ 'transferSet.title' | t: { source: sourceName() } }}
+      </h2>
+      <p class="subtitle">{{ 'transferSet.subtitle' | t }}</p>
     </div>
-    <button type="button" class="close" (click)="close()" aria-label="Cerrar">×</button>
+    <button type="button" class="close" (click)="close()" [attr.aria-label]="'common.close' | t">
+      ×
+    </button>
   </header>
 
   <div class="body">
@@ -31,21 +32,24 @@
            y no a volver a marcar seis tablas. -->
       @if (profiles().length > 0) {
         <section class="saved">
-          <h3 class="saved__title">Migraciones guardadas</h3>
+          <h3 class="saved__title">{{ 'transferSet.profiles' | t }}</h3>
           <ul class="saved__list">
             @for (profile of profiles(); track profile.id) {
               <li class="saved__row">
                 <button type="button" class="saved__open" (click)="openProfile(profile)">
                   <span class="saved__name">{{ profile.name }}</span>
                   <span class="saved__detail">
-                    {{ profile.tables.length }} tablas → {{ profile.targetSchema ?? '—' }}
+                    {{
+                      'transferSet.profileDetail'
+                        | t: { count: profile.tables.length, target: profile.targetSchema ?? '—' }
+                    }}
                   </span>
                 </button>
                 <button
                   type="button"
                   class="saved__forget"
-                  [attr.aria-label]="'Borrar el perfil ' + profile.name"
-                  title="Borrar"
+                  [attr.aria-label]="'transferSet.deleteProfile' | t: { name: profile.name }"
+                  [title]="'transferSet.delete' | t"
                   (click)="deleteProfile(profile)"
                 >
                   ×
@@ -57,16 +61,20 @@
       }
 
       @if (loadingSource()) {
-        <p class="empty">Leyendo las tablas…</p>
+        <p class="empty">{{ 'transferSet.loadingTables' | t }}</p>
       } @else if (sourceTables().length === 0) {
-        <p class="empty">Aquí no hay tablas que migrar.</p>
+        <p class="empty">{{ 'transferSet.noTables' | t }}</p>
       } @else {
         <div class="bulk">
-          <span class="bulk__count"
-            >{{ selected().size }} de {{ sourceTables().length }} marcadas</span
-          >
-          <button type="button" class="link" (click)="all()">Todas</button>
-          <button type="button" class="link" (click)="none()">Ninguna</button>
+          <span class="bulk__count">
+            {{
+              'transferSet.marked' | t: { marked: selected().size, total: sourceTables().length }
+            }}
+          </span>
+          <button type="button" class="link" (click)="all()">{{ 'transferSet.all' | t }}</button>
+          <button type="button" class="link" (click)="none()">
+            {{ 'transferSet.none' | t }}
+          </button>
         </div>
 
         <ul class="tables">
@@ -86,7 +94,9 @@
                   que no dice nada— en vez de callarse.
                 -->
                 @if (table.approximateRowCount != null) {
-                  <span class="tables__rows">~{{ table.approximateRowCount }} filas</span>
+                  <span class="tables__rows">
+                    {{ 'transferSet.tableRows' | t: { rows: count(table.approximateRowCount) } }}
+                  </span>
                 }
               </label>
             </li>
@@ -100,7 +110,7 @@
     <!-- ---------------------------------------------------------------- -->
     @if (step() === 'target') {
       <label class="field">
-        <span class="field__label">Conexión de destino</span>
+        <span class="field__label">{{ 'transfer.targetConnection' | t }}</span>
         <select
           [value]="targetConnectionId()"
           (change)="onTargetConnection($any($event.target).value)"
@@ -109,15 +119,17 @@
             <option [value]="connection.id">
               {{ connection.name }}
               @if (connection.id === connectionId()) {
-                (esta misma)
+                {{ 'transfer.sameConnection' | t }}
               }
             </option>
           }
         </select>
       </label>
 
-      <nav class="trail" aria-label="Dónde estás">
-        <button type="button" class="trail__step" (click)="back()">Bases</button>
+      <nav class="trail" [attr.aria-label]="'transfer.trail' | t">
+        <button type="button" class="trail__step" (click)="back()">
+          {{ 'transfer.databases' | t }}
+        </button>
         @for (node of trail(); track node.id; let i = $index) {
           <span class="trail__sep">›</span>
           <button type="button" class="trail__step" (click)="back(i)">{{ node.name }}</button>
@@ -129,18 +141,18 @@
       <div class="choose">
         <button type="button" class="btn" [disabled]="!here() || browsing()" (click)="chooseHere()">
           @if (here(); as folder) {
-            Migrar a «{{ folder.name }}»
+            {{ 'transferSet.here' | t: { name: folder.name } }}
           } @else {
-            Entra en una base para elegir dónde
+            {{ 'transferSet.noHere' | t }}
           }
         </button>
       </div>
 
       <div class="browser">
         @if (browsing()) {
-          <p class="browser__empty">Leyendo el catálogo…</p>
+          <p class="browser__empty">{{ 'transfer.readingCatalog' | t }}</p>
         } @else if (nodes().length === 0) {
-          <p class="browser__empty">Aquí no hay nada que enseñar.</p>
+          <p class="browser__empty">{{ 'transfer.nothingHere' | t }}</p>
         } @else {
           <ul class="browser__list">
             @for (node of nodes(); track node.id) {
@@ -168,19 +180,21 @@
     @if (step() === 'plan') {
       <p class="route">
         {{ sourceName() }} <span class="route__arrow">→</span> {{ targetName() }}
-        <button type="button" class="link" (click)="step.set('target')">Cambiar destino</button>
+        <button type="button" class="link" (click)="step.set('target')">
+          {{ 'transfer.changeTarget' | t }}
+        </button>
       </p>
 
       <div class="options">
         <label class="field">
-          <span class="field__label">Qué hacer con lo que ya está, por omisión</span>
+          <span class="field__label">{{ 'transferSet.defaultMode' | t }}</span>
           <!-- La opción marcada va en el <option> y no en el <select>: al abrir un
                perfil, el valor se pone antes de que existan las opciones y se
                perdería. -->
           <select (change)="onMode($any($event.target).value)">
             @for (option of modes; track option.id) {
               <option [value]="option.id" [selected]="option.id === mode()">
-                {{ option.label }}
+                {{ option.label | t }}
               </option>
             }
           </select>
@@ -192,32 +206,36 @@
             [checked]="ordered()"
             (change)="onOrdered($any($event.target).checked)"
           />
-          <span>Ordenar por las claves foráneas del destino</span>
+          <span>{{ 'transferSet.ordered' | t }}</span>
         </label>
 
         <label class="field field--inline">
           <input type="checkbox" [(ngModel)]="keepIdentity" />
-          <span>Conservar los identificadores del origen</span>
+          <span>{{ 'transfer.keepIdentity' | t }}</span>
         </label>
 
         <label class="field field--inline">
           <input type="checkbox" [(ngModel)]="atomic" />
-          <span>Cada tabla entera o nada</span>
+          <span>{{ 'transferSet.atomic' | t }}</span>
         </label>
       </div>
 
       <!-- Vaciar y cargar no se ofrece aquí: el proceso local exige escribir el
            nombre de cada tabla que se vacía, y eso se hace de una en una. -->
-      <p class="note">
-        Para vaciar y cargar, hazlo tabla a tabla: borrar exige escribir el nombre de cada una.
-      </p>
+      <p class="note">{{ 'transferSet.noReplace' | t }}</p>
 
       @if (profileGaps().length > 0) {
         <section class="gaps">
-          <h3 class="gaps__title">Lo que el perfil pedía y hoy no se puede migrar</h3>
+          <h3 class="gaps__title">{{ 'transferSet.gaps' | t }}</h3>
           @for (gap of profileGaps(); track gap.table) {
             <p class="warn">
-              <strong>{{ gap.table }}:</strong> {{ gap.reason }}
+              @for (part of gapParts(gap.table, gap.reason); track $index) {
+                @if (part.tag === 'table') {
+                  <strong>{{ part.text }}</strong>
+                } @else {
+                  {{ part.text }}
+                }
+              }
             </p>
           }
         </section>
@@ -226,12 +244,12 @@
       <!-- Guardar es opcional y va aquí, con la pasada ya armada: es justo lo que
            se guarda. -->
       <label class="field field--inline save">
-        <span class="field__label">Guardar esta migración</span>
+        <span class="field__label">{{ 'transferSet.saveProfile' | t }}</span>
         <input
           type="text"
           [value]="profileName()"
           (input)="profileName.set($any($event.target).value)"
-          placeholder="nombre del perfil"
+          [placeholder]="'transferSet.profileName' | t"
         />
         <button
           type="button"
@@ -239,7 +257,7 @@
           [disabled]="!profileName().trim() || savingProfile() || ready().length === 0"
           (click)="saveProfile()"
         >
-          {{ profileId() ? 'Actualizar' : 'Guardar' }}
+          {{ (profileId() ? 'transferSet.update' : 'transferSet.save') | t }}
         </button>
       </label>
 
@@ -247,19 +265,19 @@
            todo, y una se actualiza mientras las demás se añaden. -->
       <details class="each" [open]="tweaked() > 0">
         <summary class="each__summary">
-          Ajustar tabla por tabla
+          {{ 'transferSet.eachTable' | t }}
           @if (tweaked(); as cuantas) {
-            <span class="each__badge">{{ cuantas }} con algo distinto</span>
+            <span class="each__badge">{{ 'transferSet.tweaked' | t: { count: cuantas } }}</span>
           }
         </summary>
 
         <table class="each__table">
           <thead>
             <tr>
-              <th scope="col">Tabla</th>
-              <th scope="col">Qué hacer con lo que ya está</th>
-              <th scope="col">Qué filas se llevan</th>
-              <th scope="col">Con qué se reconoce la fila</th>
+              <th scope="col">{{ 'transferSet.table' | t }}</th>
+              <th scope="col">{{ 'transferSet.tableMode' | t }}</th>
+              <th scope="col">{{ 'transferSet.tableWhere' | t }}</th>
+              <th scope="col">{{ 'transferSet.tableKey' | t }}</th>
             </tr>
           </thead>
           <tbody>
@@ -273,7 +291,7 @@
                         [value]="option.id"
                         [selected]="option.id === modeOf(pair.source.name)"
                       >
-                        {{ option.label }}
+                        {{ option.label | t }}
                       </option>
                     }
                   </select>
@@ -284,7 +302,7 @@
                     class="each__where"
                     [value]="whereOf(pair.source.name)"
                     (change)="setTableWhere(pair.source.name, $any($event.target).value)"
-                    placeholder="todas — o una condición, sin WHERE"
+                    [placeholder]="'transferSet.whereExample' | t"
                   />
                 </td>
                 <td>
@@ -296,7 +314,7 @@
                       class="each__key"
                       [value]="keyOf(pair.source.name)"
                       (change)="setTableKey(pair.source.name, $any($event.target).value)"
-                      placeholder="la clave primaria"
+                      [placeholder]="'transferSet.keyExample' | t"
                     />
                   } @else {
                     <span class="each__na">—</span>
@@ -311,11 +329,11 @@
       <section class="plan">
         <h3 class="plan__title">
           @if (planning()) {
-            Preguntando en qué orden van…
+            {{ 'transferSet.planning' | t }}
           } @else if (order(); as order) {
-            Se copian en este orden
+            {{ 'transferSet.planned' | t }}
           } @else {
-            Se copian en el orden de la lista
+            {{ 'transferSet.unplanned' | t }}
           }
         </h3>
 
@@ -334,18 +352,26 @@
         @if (order(); as order) {
           @if (order.cycles.length > 0) {
             <p class="warn">
-              <strong>{{ order.cycles.join(', ') }}</strong> se apuntan entre sí, y con un ciclo no
-              hay orden que las satisfaga a la vez. Se copian en el orden en que están, así que el
-              destino puede rechazar filas que apunten a otras que todavía no han llegado.
+              @for (part of cycleParts(order.cycles.join(', ')); track $index) {
+                @if (part.tag === 'tables') {
+                  <strong>{{ part.text }}</strong>
+                } @else {
+                  {{ part.text }}
+                }
+              }
             </p>
           }
         }
 
         @if (missing().length > 0) {
           <p class="warn">
-            No están en el destino y se quedan fuera:
-            <strong>{{ missing().length }}</strong> — {{ missingNames() }}. Créalas antes, o migra
-            esas de una en una.
+            @for (part of missingParts(missing().length, missingNames()); track $index) {
+              @if (part.tag === 'count') {
+                <strong>{{ part.text }}</strong>
+              } @else {
+                {{ part.text }}
+              }
+            }
           </p>
         }
       </section>
@@ -357,8 +383,15 @@
     @if (step() === 'running' && progress(); as progress) {
       @if (tables(); as tables) {
         <p class="tables-progress">
-          Tabla {{ tables.done + 1 > tables.total ? tables.total : tables.done + 1 }} de
-          {{ tables.total }} — {{ tables.done }} terminadas
+          {{
+            'transferSet.tablesProgress'
+              | t
+                : {
+                    current: tables.done + 1 > tables.total ? tables.total : tables.done + 1,
+                    total: tables.total,
+                    done: tables.done,
+                  }
+          }}
         </p>
       }
 
@@ -379,17 +412,22 @@
           <h3 class="summary__title">
             @switch (progress.outcome) {
               @case ('Completed') {
-                Copiadas {{ progress.rowsCopied }} filas de {{ progress.tablesDone }} tablas
+                {{
+                  'transferSet.doneRows'
+                    | t: { rows: count(progress.rowsCopied), tables: progress.tablesDone }
+                }}
               }
               @case ('CompletedWithWarnings') {
-                Copiadas {{ progress.rowsCopied }} filas de {{ progress.tablesDone }} tablas, con
-                avisos
+                {{
+                  'transferSet.doneWarnings'
+                    | t: { rows: count(progress.rowsCopied), tables: progress.tablesDone }
+                }}
               }
               @case ('Cancelled') {
-                Cancelado con {{ progress.rowsCopied }} filas ya copiadas
+                {{ 'transfer.doneCancelled' | t: { rows: count(progress.rowsCopied) } }}
               }
               @default {
-                No se pudo terminar
+                {{ 'transfer.doneFailed' | t }}
               }
             }
           </h3>
@@ -397,20 +435,32 @@
           @if (progress.failure) {
             <p class="problem">{{ progress.failure.message }}</p>
             <p class="summary__line">
-              Se pararon en «{{ progress.currentObject }}», con {{ progress.tablesDone }} de
-              {{ progress.tablesTotal }} tablas ya copiadas enteras. Lo que entró se queda: repite
-              desde ahí, no desde el principio.
+              {{
+                'transferSet.stopped'
+                  | t
+                    : {
+                        table: progress.currentObject,
+                        done: progress.tablesDone,
+                        total: progress.tablesTotal,
+                      }
+              }}
             </p>
           }
 
           @for (warning of progress.warnings; track $index) {
             <p class="warn">
-              <strong>{{ warning.subject }}:</strong> {{ warning.message }}
+              @for (part of warningParts(warning.subject, warning.message); track $index) {
+                @if (part.tag === 'subject') {
+                  <strong>{{ part.text }}</strong>
+                } @else {
+                  {{ part.text }}
+                }
+              }
             </p>
           }
 
           <details class="summary__report">
-            <summary>Ver el registro</summary>
+            <summary>{{ 'transfer.seeReport' | t }}</summary>
             <pre>{{ report() }}</pre>
           </details>
         </section>
@@ -420,11 +470,13 @@
 
   <footer class="foot">
     @if (step() === 'running' && finished()) {
-      <button type="button" class="btn" (click)="dismiss()">Cerrar</button>
+      <button type="button" class="btn" (click)="dismiss()">{{ 'common.close' | t }}</button>
     } @else if (step() === 'running') {
-      <button type="button" class="btn" (click)="close()">Dejarlo en segundo plano</button>
+      <button type="button" class="btn" (click)="close()">
+        {{ 'transfer.background' | t }}
+      </button>
     } @else {
-      <button type="button" class="btn" (click)="close()">Cancelar</button>
+      <button type="button" class="btn" (click)="close()">{{ 'common.cancel' | t }}</button>
 
       @if (step() === 'tables') {
         <button
@@ -433,13 +485,13 @@
           [disabled]="selected().size === 0"
           (click)="toTarget()"
         >
-          Elegir destino ({{ selected().size }})
+          {{ 'transferSet.toTarget' | t: { count: selected().size } }}
         </button>
       }
 
       @if (step() === 'plan') {
         <button type="button" class="btn btn--primary" [disabled]="!canRun()" (click)="run()">
-          Copiar {{ ready().length }} tablas
+          {{ 'transferSet.run' | t: { count: ready().length } }}
         </button>
       }
     }

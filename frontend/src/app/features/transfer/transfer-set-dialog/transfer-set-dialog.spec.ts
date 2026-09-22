@@ -464,7 +464,7 @@ describe('TransferSetDialog', () => {
 
     // Y las opciones son las del perfil, no las de por omisión.
     expect(element.querySelector<HTMLSelectElement>('.options select')?.value).toBe('Upsert');
-    expect(boton('Copiar 1 tablas')).toBeTruthy();
+    expect(boton('Copiar 1 tabla')).toBeTruthy();
   });
 
   /** Lanzar un perfil se anota, y no lo modifica. */
@@ -481,7 +481,7 @@ describe('TransferSetDialog', () => {
     boton('Ventas a producción').click();
     await settle(fixture);
 
-    boton('Copiar 1 tablas').click();
+    boton('Copiar 1 tabla').click();
     await settle(fixture);
 
     expect(gateway.ranProfiles).toEqual(['perfil-1']);
