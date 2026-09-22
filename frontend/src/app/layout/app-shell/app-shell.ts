@@ -25,6 +25,8 @@ import { SettingsDialog } from '../../features/settings/settings-dialog/settings
 import { ActivityDialog } from '../../features/activity/activity-dialog/activity-dialog';
 import { FormatSettings } from '../../core/workspace/format-settings';
 import { ComposedQueries } from '../../core/workspace/composed-queries';
+import { I18nService } from '../../core/i18n/i18n.service';
+import { TranslatePipe } from '../../core/i18n/translate.pipe';
 import { WorkspaceStore } from '../../core/workspace/workspace-store';
 import { SqlFileService } from '../../core/sql-files/sql-file.service';
 import { ConnectionDialog } from '../../features/connections/connection-dialog/connection-dialog';
@@ -90,7 +92,7 @@ const SIDEBAR_MAX = 520;
 const DISCONNECTED: SessionStatus = {
   connected: false,
   engine: 'postgresql',
-  engineVersion: 'Sin conexión',
+  engineVersion: '',
   database: '—',
   user: '—',
   lastDurationMs: null,
@@ -131,6 +133,7 @@ const DISCONNECTED: SessionStatus = {
     ResizeHandle,
     AiPanel,
     AiProviderDialog,
+    TranslatePipe,
   ],
   templateUrl: './app-shell.html',
   styleUrl: './app-shell.scss',
@@ -779,6 +782,7 @@ export class AppShell {
   protected readonly builderState = signal<unknown>(null);
 
   private readonly _composed = inject(ComposedQueries);
+  private readonly _i18n = inject(I18nService);
 
   protected openBuilder(node: ExplorerNode, state: unknown = null): void {
     this.prepareOverlay();
@@ -805,10 +809,7 @@ export class AppShell {
     const found = this._composed.find(sql);
 
     if (!found) {
-      this._store.notify(
-        'Esta consulta no se puede abrir en el compositor: solo se reabren las que salieron ' +
-          'de él y no se han retocado a mano.',
-      );
+      this._store.notify(this._i18n.t('shell.composer.notFromBuilder'));
       return;
     }
 
@@ -934,7 +935,12 @@ export class AppShell {
    * diciendo la original estaría señalando a otra base que la que se ejecuta.
    */
   protected readonly session = computed(() => {
-    const status = this._store.session() ?? DISCONNECTED;
+    // «Sin conexión» se traduce al pintarse: el estado de reserva es una
+    // constante y no sabe en qué idioma está la interfaz.
+    const status = this._store.session() ?? {
+      ...DISCONNECTED,
+      engineVersion: this._i18n.t('status.disconnected'),
+    };
     const database = this._store.activeDatabase();
 
     return database && database !== status.database ? { ...status, database } : status;
@@ -1083,7 +1089,7 @@ export class AppShell {
     const sql = this._editor()?.activeFragment().text.trim() ?? '';
 
     if (sql.length === 0) {
-      this._store.notify('No hay nada que guardar: el editor está vacío.');
+      this._store.notify(this._i18n.t('shell.snippet.empty'));
 
       return;
     }
@@ -1092,8 +1098,8 @@ export class AppShell {
 
     this._store.notify(
       saved
-        ? `Fragmento guardado: «${saved.name}».`
-        : (this._snippets.error() ?? 'No se pudo guardar el fragmento.'),
+        ? this._i18n.t('shell.snippet.saved', { name: saved.name })
+        : (this._snippets.error() ?? this._i18n.t('shell.snippet.saveFailed')),
     );
   }
 
@@ -1107,13 +1113,13 @@ export class AppShell {
 
     this._store.notify(
       removed
-        ? `Fragmento borrado: «${snippet.name}».`
-        : (this._snippets.error() ?? 'No se pudo borrar el fragmento.'),
+        ? this._i18n.t('shell.snippet.deleted', { name: snippet.name })
+        : (this._snippets.error() ?? this._i18n.t('shell.snippet.deleteFailed')),
     );
   }
 
   protected onFormatFailed(message: string): void {
-    this._store.notify(`No se pudo formatear: ${message}`);
+    this._store.notify(this._i18n.t('shell.format.failed', { message }));
   }
 
   protected setMaxRows(rows: number): void {
@@ -1136,7 +1142,7 @@ export class AppShell {
         this._store.openSqlFile(document.fileName, document.contents, document.documentId);
       }
     } catch (error) {
-      this._store.notify(this.fileError('No se pudo abrir el archivo SQL', error));
+      this._store.notify(this.fileError('shell.file.openFailed', error));
     }
   }
 
@@ -1160,10 +1166,10 @@ export class AppShell {
 
       if (saved) {
         this._store.markTabSaved(tab.id, tab.sql, saved.fileName, saved.documentId);
-        this._store.notify(`Guardado: ${saved.fileName}`);
+        this._store.notify(this._i18n.t('shell.file.saved', { name: saved.fileName }));
       }
     } catch (error) {
-      this._store.notify(this.fileError('No se pudo guardar el archivo SQL', error));
+      this._store.notify(this.fileError('shell.file.saveFailed', error));
     }
   }
 
@@ -1228,16 +1234,14 @@ export class AppShell {
       // decirlo: un programa que calla sobre las conexiones que abre —o que deja
       // de abrir— no deja elegir, solo decide por su cuenta.
       if (this.updates.state() === 'undecided') {
-        this._store.notify(
-          'Druse no busca actualizaciones por su cuenta. Elige si quieres que lo haga en Preferencias.',
-        );
+        this._store.notify(this._i18n.t('shell.updates.undecided'));
         return;
       }
 
       const release = this.updates.available();
 
       if (release) {
-        this._store.notify(`Druse ${release.version} está disponible en Preferencias.`);
+        this._store.notify(this._i18n.t('shell.updates.available', { version: release.version }));
       }
     });
   }
@@ -1496,7 +1500,7 @@ export class AppShell {
     const table = this._store.activeTab()?.sourceTable;
 
     if (!table) {
-      this._store.notify('Esta pestaña no viene de ninguna tabla.');
+      this._store.notify(this._i18n.t('shell.tab.noSource'));
       return;
     }
 
@@ -1505,7 +1509,7 @@ export class AppShell {
     try {
       await navigator.clipboard.writeText(name);
     } catch {
-      this._store.notify('No se pudo copiar al portapapeles.');
+      this._store.notify(this._i18n.t('shell.clipboard.copyFailed'));
     }
   }
 
@@ -1520,9 +1524,7 @@ export class AppShell {
     const table = tab?.sourceTable;
 
     if (!tab || !table || !tab.connectionId) {
-      this._store.notify(
-        'Esta pestaña no viene de ninguna tabla: abre el diagrama desde el explorador.',
-      );
+      this._store.notify(this._i18n.t('shell.diagram.noSource'));
       return;
     }
 
@@ -1557,8 +1559,9 @@ export class AppShell {
     this._store.updateSql(sql);
   }
 
-  private fileError(prefix: string, error: unknown): string {
-    return `${prefix}: ${error instanceof Error ? error.message : String(error)}`;
+  /** El aviso de un archivo que no se pudo leer o escribir, con el motivo dentro. */
+  private fileError(key: string, error: unknown): string {
+    return this._i18n.t(key, { message: error instanceof Error ? error.message : String(error) });
   }
 
   protected onCursorChange(position: CursorPosition): void {
@@ -1647,11 +1650,11 @@ export class AppShell {
 
   // --- Copiar nombres --------------------------------------------------------
   protected onCopied(name: string): void {
-    this._store.notify(`Copiado: ${name}`);
+    this._store.notify(this._i18n.t('shell.copied', { name }));
   }
 
   protected onCopyFailed(): void {
-    this._store.notify('No se pudo acceder al portapapeles.');
+    this._store.notify(this._i18n.t('shell.clipboard.unavailable'));
   }
 
   // --- Historial -------------------------------------------------------------

@@ -18,12 +18,12 @@
   <button
     type="button"
     class="mobile-explorer-toggle"
-    aria-label="Abrir explorador de bases de datos"
+    [attr.aria-label]="'shell.explorer.open' | t"
     [attr.aria-expanded]="mobileExplorerOpen()"
     aria-controls="connections-explorer"
     (click)="mobileExplorerOpen.update((open) => !open)"
   >
-    Bases
+    {{ 'shell.explorer.mobile' | t }}
   </button>
   @if (mobileExplorerOpen()) {
     <div class="mobile-sidebar-backdrop" (click)="closeMobileExplorer()"></div>
@@ -68,7 +68,7 @@
     [(size)]="sidebarWidth"
     [min]="sidebarMin"
     [max]="sidebarMax"
-    aria-label="Ancho del panel de conexiones"
+    [attr.aria-label]="'shell.resize.sidebar' | t"
   />
 
   <main class="main" [class.is-results-maximized]="maximizedPanel() === 'results'">
@@ -165,17 +165,17 @@
               class="banner__button banner__button--danger"
               (click)="confirmDestructive()"
             >
-              Ejecutar de todos modos
+              {{ 'shell.rejection.runAnyway' | t }}
             </button>
           }
           <button type="button" class="banner__button" (click)="dismissRejection()">
-            Cancelar
+            {{ 'common.cancel' | t }}
           </button>
         </div>
       </div>
     } @else if (notice(); as message) {
       <div class="banner" role="status" aria-live="polite">
-        <span class="banner__label">Aviso</span>
+        <span class="banner__label">{{ 'shell.notice.label' | t }}</span>
         <span class="banner__text">{{ message }}</span>
         <!--
           Cuando lo que falló fue la conexión, la salida va en el propio aviso:
@@ -183,10 +183,12 @@
         -->
         @if (lostConnection(); as lost) {
           <button type="button" class="banner__button" (click)="reconnect(lost.id)">
-            Reconectar
+            {{ 'shell.notice.reconnect' | t }}
           </button>
         }
-        <button type="button" class="banner__button" (click)="dismissNotice()">Cerrar</button>
+        <button type="button" class="banner__button" (click)="dismissNotice()">
+          {{ 'common.close' | t }}
+        </button>
       </div>
     }
 
@@ -197,11 +199,11 @@
       (sizeChange)="requestedResultsHeight.set($event)"
       [min]="resultsMin()"
       [max]="resultsMax()"
-      title="Arrastra o usa las flechas para ajustar. Intro o doble clic recupera el tamaño automático."
+      [title]="'shell.resize.hintAuto' | t"
       (dblclick)="requestedResultsHeight.set(null)"
       (keydown.enter)="requestedResultsHeight.set(null); $event.preventDefault()"
       [inverted]="true"
-      aria-label="Alto del panel de resultados"
+      [attr.aria-label]="'shell.resize.results' | t"
     />
 
     <app-results-panel
@@ -273,9 +275,9 @@
         (sizeChange)="requestedAssistantWidth.set($event)"
         [min]="assistantLayout().min"
         [max]="assistantLayout().max"
-        aria-label="Ancho del asistente"
+        [attr.aria-label]="'shell.resize.assistant' | t"
         aria-controls="sql-assistant"
-        title="Arrastra o usa las flechas para ajustar. Intro o doble clic recupera el ancho inicial."
+        [title]="'shell.resize.hintInitial' | t"
         (dblclick)="requestedAssistantWidth.set(null)"
         (keydown.enter)="requestedAssistantWidth.set(null); $event.preventDefault()"
       />
@@ -284,7 +286,7 @@
       id="sql-assistant"
       class="ai"
       role="complementary"
-      aria-label="Asistente SQL"
+      [attr.aria-label]="'shell.assistant' | t"
       [hidden]="!aiOpen()"
       [class.is-overlay]="assistantLayout().overlay"
       [style.width.px]="assistantLayout().width"
