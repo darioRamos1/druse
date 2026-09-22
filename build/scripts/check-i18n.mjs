@@ -107,7 +107,9 @@ function literalsIn(html) {
     // Lo marcado con `translate="no"` —`NULL`, `CSV`, nombres de producto— es
     // así a propósito: es el atributo de HTML para decirlo, y también lo
     // respetan los traductores del navegador.
-    .replace(/<(\w+)\b[^>]*\btranslate="no"[^>]*>[^<]*<\/\1>/g, ' ')
+    // El cierre admite espacios antes del `>`: Prettier parte `</code\n>` cuando
+    // la etiqueta no puede llevar espacio significativo alrededor.
+    .replace(/<(\w+)\b[^>]*\btranslate="no"[^>]*>[^<]*<\/\1\s*>/g, ' ')
     .replace(/\{\{[\s\S]*?\}\}/g, ' ')
     .replace(/@(?:if|else if|for|switch|case|defer|placeholder|loading|empty|else|default)\b\s*(\((?:[^()]|\((?:[^()]|\([^()]*\))*\))*\))?\s*\{/g, ' ')
     .replace(/@let\s[^;]*;/g, ' ');

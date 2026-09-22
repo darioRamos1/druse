@@ -8,6 +8,8 @@ import {
 } from '@angular/core';
 
 import { AiStore } from '../../../core/ai/ai-store';
+import { I18nService } from '../../../core/i18n/i18n.service';
+import { TranslatePipe } from '../../../core/i18n/translate.pipe';
 import {
   AiDisclosure,
   AiModelList,
@@ -63,8 +65,8 @@ const OPTIONS: readonly ProviderOption[] = [
   {
     id: 'openai',
     kind: 'openaicompatible',
-    name: 'OpenAI API',
-    detail: 'GPT · con clave de plataforma',
+    name: 'ai.provider.option.openai',
+    detail: 'ai.provider.option.openaiDetail',
     icon: 'sparkles',
     baseUrl: 'https://api.openai.com/v1',
     model: '',
@@ -73,8 +75,8 @@ const OPTIONS: readonly ProviderOption[] = [
   {
     id: 'anthropic',
     kind: 'anthropic',
-    name: 'Anthropic API',
-    detail: 'Claude · con clave de consola',
+    name: 'ai.provider.option.anthropic',
+    detail: 'ai.provider.option.anthropicDetail',
     icon: 'sparkles',
     baseUrl: 'https://api.anthropic.com/v1',
     model: '',
@@ -83,8 +85,8 @@ const OPTIONS: readonly ProviderOption[] = [
   {
     id: 'gemini',
     kind: 'gemini',
-    name: 'Google Gemini',
-    detail: 'Gemini · con clave de Google AI',
+    name: 'ai.provider.option.gemini',
+    detail: 'ai.provider.option.geminiDetail',
     icon: 'sparkles',
     baseUrl: 'https://generativelanguage.googleapis.com/v1beta',
     model: '',
@@ -93,8 +95,8 @@ const OPTIONS: readonly ProviderOption[] = [
   {
     id: 'compatible',
     kind: 'openaicompatible',
-    name: 'Compatible con OpenAI',
-    detail: 'MaaS de empresa · Azure · OpenRouter',
+    name: 'ai.provider.option.compatible',
+    detail: 'ai.provider.option.compatibleDetail',
     icon: 'schema',
     baseUrl: '',
     model: '',
@@ -106,8 +108,8 @@ const OPTIONS: readonly ProviderOption[] = [
   {
     id: 'local',
     kind: 'openaicompatible',
-    name: 'IA local',
-    detail: 'Ollama · LM Studio · vLLM',
+    name: 'ai.provider.option.local',
+    detail: 'ai.provider.option.localDetail',
     icon: 'console',
     baseUrl: 'http://localhost:11434/v1',
     model: 'qwen2.5-coder',
@@ -116,8 +118,8 @@ const OPTIONS: readonly ProviderOption[] = [
   {
     id: 'claude',
     kind: 'localcli',
-    name: 'Tu cuenta Claude',
-    detail: 'Pro o Max · por el programa claude',
+    name: 'ai.provider.option.claude',
+    detail: 'ai.provider.option.claudeDetail',
     icon: 'sparkles',
     baseUrl: '',
     model: 'sonnet',
@@ -130,8 +132,8 @@ const OPTIONS: readonly ProviderOption[] = [
   {
     id: 'codex',
     kind: 'localcli',
-    name: 'Tu cuenta ChatGPT',
-    detail: 'Plus o Pro · por el programa codex',
+    name: 'ai.provider.option.codex',
+    detail: 'ai.provider.option.codexDetail',
     icon: 'sparkles',
     baseUrl: '',
     model: '',
@@ -142,8 +144,8 @@ const OPTIONS: readonly ProviderOption[] = [
 
 /** Qué puede acompañar a la pregunta, dicho como lo entendería cualquiera. */
 const DISCLOSURES: readonly { readonly value: AiDisclosure; readonly label: string }[] = [
-  { value: 'schema', label: 'SQL y estructura' },
-  { value: 'nothing', label: 'Nada, solo lo que escriba' },
+  { value: 'schema', label: 'ai.provider.disclosure.schema' },
+  { value: 'nothing', label: 'ai.provider.disclosure.nothing' },
 ];
 
 /**
@@ -156,13 +158,31 @@ const DISCLOSURES: readonly { readonly value: AiDisclosure; readonly label: stri
  */
 @Component({
   selector: 'app-ai-provider-dialog',
-  imports: [DialogBackdrop, DialogFocus, Icon],
+  imports: [DialogBackdrop, DialogFocus, Icon, TranslatePipe],
   templateUrl: './ai-provider-dialog.html',
   styleUrl: './ai-provider-dialog.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class AiProviderDialog {
   private readonly _store = inject(AiStore);
+  private readonly _i18n = inject(I18nService);
+
+  /** «Conectado con Claude como alguien», en una sola frase del catálogo. */
+  protected connected(account?: string): string {
+    return account
+      ? this._i18n.t('ai.provider.connectedAs', { provider: this.accountProvider(), account })
+      : this._i18n.t('ai.provider.connected', { provider: this.accountProvider() });
+  }
+
+  /** El plan, cuando el programa lo dice y no repite el nombre del proveedor. */
+  protected plan(plan?: string): string {
+    return plan && plan !== 'ChatGPT' ? this._i18n.t('ai.provider.plan', { plan }) : '';
+  }
+
+  /** La raíz de la API, con las rutas que no hay que añadir en `<code>`. */
+  protected baseUrlParts() {
+    return this._i18n.tParts('ai.provider.baseUrlHint', { paths: '' });
+  }
   private readonly _gateway = inject(ApplicationGateway);
 
   readonly closed = output<void>();
@@ -352,7 +372,7 @@ export class AiProviderDialog {
       }
     } catch (error) {
       this.session.set(null);
-      this.sessionError.set(describe(error));
+      this.sessionError.set(describe(error, this._i18n));
     } finally {
       this.sessionLoading.set(false);
     }
@@ -388,16 +408,16 @@ export class AiProviderDialog {
       if (!result.started) {
         // Sin ventana que abrir, lo unico util que queda es la orden: se
         // ensena entera, con su variable, para poder pegarla en una consola.
-        this.error.set(result.message ?? 'No se pudo abrir el inicio de sesion.');
+        this.error.set(result.message ?? this._i18n.t('ai.provider.loginFailed'));
         this.manual.set(result.manual);
       } else {
         this.session.set(null);
         this.sessionError.set(
-          `Completa el inicio de sesión con ${this.accountProvider()} en la ventana que se abrió.`,
+          this._i18n.t('ai.provider.finishLogin', { provider: this.accountProvider() }),
         );
       }
     } catch (error) {
-      this.error.set(describe(error));
+      this.error.set(describe(error, this._i18n));
     } finally {
       this.loggingIn.set(false);
     }
@@ -474,7 +494,7 @@ export class AiProviderDialog {
         this.model.set(answer.models[0]);
       }
     } catch (error) {
-      this.error.set(describe(error));
+      this.error.set(describe(error, this._i18n));
     } finally {
       this.listing.set(false);
     }
@@ -494,7 +514,7 @@ export class AiProviderDialog {
 
       this.probe.set({ ok: result.reachable, detail: result.detail, ms: result.elapsedMs });
     } catch (error) {
-      this.probe.set({ ok: false, detail: describe(error), ms: 0 });
+      this.probe.set({ ok: false, detail: describe(error, this._i18n), ms: 0 });
     } finally {
       this.probing.set(false);
     }
@@ -519,7 +539,7 @@ export class AiProviderDialog {
 
       this.closed.emit();
     } catch (error) {
-      this.error.set(describe(error));
+      this.error.set(describe(error, this._i18n));
     } finally {
       this.saving.set(false);
     }
@@ -623,7 +643,7 @@ interface ApiFailure {
   readonly title?: string;
 }
 
-function describe(error: unknown): string {
+function describe(error: unknown, i18n: I18nService): string {
   if (typeof error === 'object' && error !== null && 'status' in error) {
     const response = error as { status: number; error?: unknown; message?: string };
     const body = response.error as ApiFailure | string | null | undefined;
@@ -646,15 +666,15 @@ function describe(error: unknown): string {
     // Estado 0 es que la petición no llegó a salir. Casi siempre significa que
     // la API local no está: dice «se cayó», no «lo escribiste mal».
     if (response.status === 0) {
-      return 'Druse no responde. ¿Sigue abierta la aplicación?';
+      return i18n.t('ai.provider.noApi');
     }
 
     if (response.status === 401) {
-      return 'La sesión con la API local caducó. Vuelve a abrir Druse.';
+      return i18n.t('ai.provider.expired');
     }
 
-    return `La API respondió ${response.status}.`;
+    return i18n.t('ai.provider.apiStatus', { status: response.status });
   }
 
-  return error instanceof Error ? error.message : 'No se pudo guardar el proveedor.';
+  return error instanceof Error ? error.message : i18n.t('ai.provider.saveFailed');
 }

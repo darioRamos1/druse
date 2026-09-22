@@ -1,6 +1,4 @@
 [
-  "frontend/src/app/features/ai/ai-panel/ai-panel.html",
-  "frontend/src/app/features/ai/ai-provider-dialog/ai-provider-dialog.html",
   "frontend/src/app/features/query-builder/query-builder/query-builder.html",
   "frontend/src/app/shared/privacy/privacy-notice.html"
 ]

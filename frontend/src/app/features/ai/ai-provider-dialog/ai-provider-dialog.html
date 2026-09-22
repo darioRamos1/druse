@@ -5,18 +5,22 @@
   <header class="head">
     <div class="head__icon"><app-icon name="sparkles" [size]="16" /></div>
     <div class="head__text">
-      <h2 class="head__title" id="ai-provider-title">Proveedor de IA</h2>
-      <p class="head__subtitle">
-        Elige quién responde al asistente. La clave se guarda cifrada en este equipo, igual que las
-        contraseñas de las conexiones.
-      </p>
+      <h2 class="head__title" id="ai-provider-title">{{ 'ai.provider.title' | t }}</h2>
+      <p class="head__subtitle">{{ 'ai.provider.subtitle' | t }}</p>
     </div>
-    <button type="button" class="head__close" (click)="close()" aria-label="Cerrar">×</button>
+    <button
+      type="button"
+      class="head__close"
+      (click)="close()"
+      [attr.aria-label]="'common.close' | t"
+    >
+      ×
+    </button>
   </header>
 
   <div class="body">
     @if (providers().length > 0) {
-      <h3 class="section">Configurados</h3>
+      <h3 class="section">{{ 'ai.provider.configured' | t }}</h3>
 
       <div class="saved">
         @for (provider of providers(); track provider.id) {
@@ -25,14 +29,14 @@
               <span class="saved__name">{{ provider.name }}</span>
               <span class="saved__model">{{ provider.model }}</span>
               @if (provider.isDefault) {
-                <span class="saved__badge">por omisión</span>
+                <span class="saved__badge">{{ 'ai.provider.default' | t }}</span>
               }
             </button>
             <button
               type="button"
               class="saved__remove"
               (click)="remove(provider)"
-              [attr.aria-label]="'Quitar ' + provider.name"
+              [attr.aria-label]="'ai.provider.remove' | t: { name: provider.name }"
             >
               <app-icon name="trash" [size]="12" />
             </button>
@@ -41,12 +45,12 @@
 
         <button type="button" class="saved__new" (click)="startNew()">
           <app-icon name="plus" [size]="11" />
-          Añadir otro
+          {{ 'ai.provider.addAnother' | t }}
         </button>
       </div>
     }
 
-    <h3 class="section">{{ editing() ? 'Editar' : 'Proveedor' }}</h3>
+    <h3 class="section">{{ (editing() ? 'ai.provider.edit' : 'ai.provider.section') | t }}</h3>
 
     <div class="options">
       @for (option of options; track option.id) {
@@ -60,8 +64,8 @@
         >
           <span class="option__icon"><app-icon [name]="option.icon" [size]="13" /></span>
           <span class="option__text">
-            <span class="option__name">{{ option.name }}</span>
-            <span class="option__detail">{{ option.detail }}</span>
+            <span class="option__name">{{ option.name | t }}</span>
+            <span class="option__detail">{{ option.detail | t }}</span>
           </span>
           @if (chosen().id === option.id) {
             <span class="option__check">✓</span>
@@ -70,17 +74,17 @@
       }
     </div>
 
-    <h3 class="section">Conexión</h3>
+    <h3 class="section">{{ 'ai.provider.connection' | t }}</h3>
 
     <div class="fields">
       <label class="field">
-        <span class="field__label">Nombre</span>
+        <span class="field__label">{{ 'ai.provider.name' | t }}</span>
         <input
           class="field__input"
           type="text"
           [value]="name()"
           (input)="set('name', $event)"
-          placeholder="MaaS corporativo"
+          [placeholder]="'ai.provider.nameExample' | t"
         />
       </label>
 
@@ -91,7 +95,7 @@
           un campo donde quitarlos.
         -->
         <label class="field">
-          <span class="field__label">Programa</span>
+          <span class="field__label">{{ 'ai.provider.command' | t }}</span>
           <input class="field__input" type="text" [value]="command()" readonly disabled />
         </label>
 
@@ -116,7 +120,7 @@
             [class.is-selected]="!ownSession()"
             (click)="ownSession() && toggleOwnSession()"
           >
-            La sesion de este equipo
+            {{ 'ai.provider.machineSession' | t }}
           </button>
           <button
             type="button"
@@ -124,21 +128,20 @@
             [class.is-selected]="ownSession()"
             (click)="!ownSession() && toggleOwnSession()"
           >
-            Otra cuenta, solo para Druse
+            {{ 'ai.provider.ownSession' | t }}
           </button>
         </div>
 
         @if (ownSession() && !editing()) {
-          <span class="field__hint">
-            Al iniciar sesión se creará este perfil y sus credenciales quedarán separadas de las del
-            equipo.
-          </span>
+          <span class="field__hint">{{ 'ai.provider.ownSessionHint' | t }}</span>
         }
 
         @if (sessionLoading()) {
           <div class="session">
             <span class="session__dot"></span>
-            <span class="session__text">Comprobando tu cuenta de {{ accountProvider() }}…</span>
+            <span class="session__text">
+              {{ 'ai.provider.checking' | t: { provider: accountProvider() } }}
+            </span>
           </div>
         } @else if (session(); as state) {
           <div
@@ -149,9 +152,7 @@
             <span class="session__dot"></span>
             <span class="session__text">
               @if (state.loggedIn === true) {
-                Conectado con {{ accountProvider()
-                }}{{ state.account ? ' como ' + state.account : ''
-                }}{{ state.plan && state.plan !== 'ChatGPT' ? ' · plan ' + state.plan : '' }}
+                {{ connected(state.account) }}{{ plan(state.plan) }}
               } @else {
                 {{ state.detail }}
               }
@@ -164,40 +165,43 @@
                 [disabled]="loggingIn()"
                 (click)="login()"
               >
-                {{ loggingIn() ? 'Abriendo…' : 'Iniciar sesión con ' + accountProvider() }}
+                @if (loggingIn()) {
+                  {{ 'ai.provider.loggingIn' | t }}
+                } @else {
+                  {{ 'ai.provider.login' | t: { provider: accountProvider() } }}
+                }
               </button>
               <button type="button" class="btn btn--slim" (click)="recheck()">
-                Ya inicié sesión
+                {{ 'ai.provider.recheck' | t }}
               </button>
             }
           </div>
 
           @if (!state.installed) {
             <span class="field__hint">
-              Se instala aparte, desde una consola:
-              <code
+              {{ 'ai.provider.install' | t }}
+              <code translate="no"
                 >npm i -g
                 {{ command() === 'codex' ? '@openai/codex' : '@anthropic-ai/claude-code' }}</code
               >
             </span>
           } @else {
-            <span class="field__hint">
-              Responde con tu propia cuenta y consume de su cuota. El inicio de sesion ocurre en el
-              propio programa, no en Druse.
-            </span>
+            <span class="field__hint">{{ 'ai.provider.ownQuota' | t }}</span>
           }
         } @else {
           <div class="session is-missing">
             <span class="session__dot"></span>
             <span class="session__text">
-              {{ sessionError() || 'No se pudo comprobar la cuenta.' }}
+              {{ sessionError() || ('ai.provider.noCheck' | t) }}
             </span>
-            <button type="button" class="btn btn--slim" (click)="recheck()">Reintentar</button>
+            <button type="button" class="btn btn--slim" (click)="recheck()">
+              {{ 'common.retry' | t }}
+            </button>
           </div>
         }
       } @else {
         <label class="field">
-          <span class="field__label">URL base</span>
+          <span class="field__label">{{ 'ai.provider.baseUrl' | t }}</span>
           <input
             class="field__input"
             type="text"
@@ -206,8 +210,14 @@
             [placeholder]="chosen().hint ?? 'https://…/v1'"
           />
           <span class="field__hint">
-            La raíz de la API, sin añadir <code>/chat/completions</code>, <code>/messages</code> ni
-            <code>:generateContent</code>.
+            @for (part of baseUrlParts(); track $index) {
+              @if (part.tag === 'paths') {
+                <code translate="no">/chat/completions</code>, <code translate="no">/messages</code>
+                {{ 'ai.provider.nor' | t }} <code translate="no">:generateContent</code>
+              } @else {
+                {{ part.text }}
+              }
+            }
           </span>
           @if (unencrypted()) {
             <!--
@@ -215,10 +225,7 @@
               de un cortafuegos, y prohibirlo empuja a poner https sobre un
               puerto que sirve texto plano.
             -->
-            <span class="field__warn">
-              Sin cifrar: la clave viajara en claro por tu red. Correcto en un servidor interno; no
-              lo uses contra internet.
-            </span>
+            <span class="field__warn">{{ 'ai.provider.unencrypted' | t }}</span>
           }
         </label>
       }
@@ -226,7 +233,7 @@
       <div class="grid">
         @if (!isLocalCli()) {
           <label class="field">
-            <span class="field__label">Clave</span>
+            <span class="field__label">{{ 'ai.provider.key' | t }}</span>
             <span class="secret">
               <input
                 class="field__input"
@@ -234,7 +241,7 @@
                 [value]="apiKey() ?? ''"
                 (input)="set('apiKey', $event)"
                 [placeholder]="
-                  editing()?.hasStoredKey ? 'Guardada — escribe para cambiarla' : 'Sin clave'
+                  (editing()?.hasStoredKey ? 'ai.provider.keyStored' : 'ai.provider.keyMissing') | t
                 "
               />
               <button
@@ -242,7 +249,7 @@
                 class="secret__toggle"
                 [attr.aria-pressed]="revealKey()"
                 (click)="revealKey.set(!revealKey())"
-                aria-label="Mostrar la clave"
+                [attr.aria-label]="'ai.provider.showKey' | t"
               >
                 <app-icon [name]="revealKey() ? 'eye-off' : 'eye'" [size]="13" />
               </button>
@@ -251,14 +258,14 @@
         }
 
         <label class="field">
-          <span class="field__label">Modelo</span>
+          <span class="field__label">{{ 'ai.provider.model' | t }}</span>
           <span class="with-action">
             <input
               class="field__input"
               type="text"
               [value]="model()"
               (input)="set('model', $event)"
-              placeholder="glm-5.2"
+              [placeholder]="'glm-5.2'"
             />
             @if (canListModels()) {
               <button
@@ -267,16 +274,13 @@
                 [disabled]="listing() || (!isLocalCli() && baseUrl().length === 0)"
                 (click)="loadModels()"
               >
-                {{ listing() ? 'Buscando…' : 'Ver los suyos' }}
+                {{ (listing() ? 'ai.provider.listing' : 'ai.provider.listModels') | t }}
               </button>
             }
           </span>
 
           @if (isLocalCli() && models().length === 0) {
-            <span class="field__hint">
-              Puedes dejarlo vacío para usar el modelo predeterminado de tu cuenta, o escribir uno
-              concreto.
-            </span>
+            <span class="field__hint">{{ 'ai.provider.modelOptional' | t }}</span>
           }
 
           @if (models().length > 0) {
@@ -307,7 +311,7 @@
     </div>
 
     @if (!staysHere()) {
-      <h3 class="section">Qué puede salir de este equipo</h3>
+      <h3 class="section">{{ 'ai.provider.whatLeaves' | t }}</h3>
 
       <div class="disclosures">
         @for (item of disclosures; track item.value) {
@@ -317,21 +321,22 @@
             [class.is-selected]="disclosure() === item.value"
             (click)="disclosure.set(item.value)"
           >
-            {{ item.label }}
+            {{ item.label | t }}
           </button>
         }
         <span class="disclosures__note">
           {{
-            disclosure() === 'nothing'
-              ? 'No se añade contexto del editor ni de la base.'
-              : 'Puede viajar el SQL abierto y nombres de tablas y columnas; las filas de resultados no.'
+            (disclosure() === 'nothing'
+              ? 'ai.provider.disclosureNothing'
+              : 'ai.provider.disclosureSchema'
+            ) | t
           }}
         </span>
       </div>
     } @else {
       <p class="local-note">
         <app-icon name="eye-off" [size]="12" />
-        Responde en este equipo, así que nada sale a internet.
+        {{ 'ai.provider.staysHere' | t }}
       </p>
     }
 
@@ -354,28 +359,32 @@
         pegarla en una consola y terminar el inicio de sesión a mano.
       -->
       <p class="field__hint">
-        Ábrelo tú en una consola: <code class="manual">{{ order }}</code>
+        {{ 'ai.provider.manual' | t }} <code class="manual">{{ order }}</code>
       </p>
     }
   </div>
 
   <footer class="foot">
     <button type="button" class="btn" [disabled]="probing()" (click)="test()">
-      {{ probing() ? 'Probando…' : 'Probar' }}
+      {{ (probing() ? 'ai.provider.probing' : 'ai.provider.probe') | t }}
     </button>
 
     @if (probe(); as result) {
       <span class="probe" [class.is-bad]="!result.ok">
         <span class="probe__dot"></span>
-        {{ result.ok ? 'Respondió en ' + result.ms + ' ms' : result.detail }}
+        @if (result.ok) {
+          {{ 'ai.provider.answeredIn' | t: { ms: result.ms } }}
+        } @else {
+          {{ result.detail }}
+        }
       </span>
     }
 
     <span class="foot__spacer"></span>
 
-    <button type="button" class="btn" (click)="close()">Cancelar</button>
+    <button type="button" class="btn" (click)="close()">{{ 'common.cancel' | t }}</button>
     <button type="button" class="btn btn--primary" [disabled]="saving()" (click)="save()">
-      Guardar
+      {{ 'ai.provider.save' | t }}
     </button>
   </footer>
 </div>

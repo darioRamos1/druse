@@ -2,6 +2,7 @@ import { Injectable, computed, inject, signal } from '@angular/core';
 import { Subscription } from 'rxjs';
 
 import { ApplicationGateway } from '../application-gateway/application-gateway';
+import { I18nService } from '../i18n/i18n.service';
 import {
   AiMessage,
   AiProvider,
@@ -29,6 +30,7 @@ export interface ChatTurn {
 @Injectable({ providedIn: 'root' })
 export class AiStore {
   private readonly _gateway = inject(ApplicationGateway);
+  private readonly _i18n = inject(I18nService);
 
   private readonly _providers = signal<readonly AiProvider[]>([]);
   private readonly _activeId = signal<string | null>(null);
@@ -135,7 +137,7 @@ export class AiStore {
           }
         },
         error: (error: unknown) => {
-          this.failLast(error instanceof Error ? error.message : 'El asistente no respondió.');
+          this.failLast(error instanceof Error ? error.message : this._i18n.t('ai.noAnswer'));
           this.settle();
         },
         complete: () => {

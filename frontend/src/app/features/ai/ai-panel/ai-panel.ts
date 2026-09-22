@@ -9,6 +9,8 @@ import {
 } from '@angular/core';
 
 import { AiStore } from '../../../core/ai/ai-store';
+import { I18nService } from '../../../core/i18n/i18n.service';
+import { TranslatePipe } from '../../../core/i18n/translate.pipe';
 import { Icon } from '../../../shared/ui/icon/icon';
 
 /** Un trozo de respuesta ya separado en prosa y SQL. */
@@ -52,13 +54,24 @@ export interface AiContext {
  */
 @Component({
   selector: 'app-ai-panel',
-  imports: [Icon],
+  imports: [Icon, TranslatePipe],
   templateUrl: './ai-panel.html',
   styleUrl: './ai-panel.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class AiPanel {
   private readonly _store = inject(AiStore);
+  private readonly _i18n = inject(I18nService);
+
+  /** «Pregunta sobre {base}», con el nombre de la base en `<code>`. */
+  protected askParts(database: string) {
+    return this._i18n.tParts('ai.askAboutDatabase', { database });
+  }
+
+  /** Deja empezada la frase de una sugerencia, en el idioma elegido. */
+  protected suggest(key: string): void {
+    this.draft.set(this._i18n.t(key));
+  }
 
   /** Lo que se le puede contar al modelo sobre la base abierta. */
   readonly context = input<AiContext>({ sql: '', schema: '', tables: [], database: '' });
@@ -123,16 +136,16 @@ export class AiPanel {
     }
 
     if (provider.kind === 'localcli') {
-      return 'La pregunta y el contexto elegido viajan mediante el programa de tu cuenta de IA.';
+      return this._i18n.t('ai.promise.cli');
     }
 
     if (isLocal(provider.baseUrl)) {
-      return 'La pregunta y el contexto elegido se procesan en este equipo.';
+      return this._i18n.t('ai.promise.local');
     }
 
-    return provider.disclosure === 'nothing'
-      ? 'Solo viaja lo que escribas.'
-      : 'Pueden viajar el SQL abierto y nombres de tablas y columnas. Ninguna fila de resultados.';
+    return this._i18n.t(
+      provider.disclosure === 'nothing' ? 'ai.promise.nothing' : 'ai.promise.schema',
+    );
   });
 
   protected send(): void {
@@ -181,8 +194,9 @@ export class AiPanel {
     this._store.clear();
   }
 
-  protected ask(text: string): void {
-    this.draft.set(text);
+  /** Manda una de las sugerencias. Recibe su clave del catálogo, no la frase. */
+  protected ask(key: string): void {
+    this.draft.set(this._i18n.t(key));
     this.send();
   }
 

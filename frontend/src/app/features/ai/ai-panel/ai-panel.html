@@ -1,8 +1,8 @@
 <div class="head">
-  <span class="head__title">Asistente</span>
+  <span class="head__title">{{ 'ai.title' | t }}</span>
 
   @if (turns().length > 0) {
-    <button type="button" class="head__action" (click)="clear()" title="Empezar de nuevo">
+    <button type="button" class="head__action" (click)="clear()" [title]="'ai.restart' | t">
       <app-icon name="plus" [size]="12" />
     </button>
   }
@@ -17,7 +17,7 @@
         [class.is-open]="pickerOpen()"
         (click)="pickerOpen.set(!pickerOpen())"
         [attr.aria-expanded]="pickerOpen()"
-        aria-label="Cambiar de proveedor"
+        [attr.aria-label]="'ai.changeProvider' | t"
       >
         <span class="dot" [class.dot--local]="isLocal(provider.baseUrl)"></span>
         <span class="picker__name">{{ provider.name }}</span>
@@ -26,7 +26,7 @@
 
       @if (pickerOpen()) {
         <div class="menu" role="menu">
-          <div class="menu__label">Proveedores</div>
+          <div class="menu__label">{{ 'ai.providers' | t }}</div>
 
           @for (candidate of providers(); track candidate.id) {
             <button
@@ -48,7 +48,7 @@
 
           <button type="button" role="menuitem" class="menu__item" (click)="configure.emit()">
             <app-icon name="settings" [size]="12" />
-            <span class="menu__name">Configurar proveedores…</span>
+            <span class="menu__name">{{ 'ai.configureProviders' | t }}</span>
           </button>
         </div>
       }
@@ -59,7 +59,7 @@
     type="button"
     class="head__action"
     (click)="closed.emit()"
-    aria-label="Cerrar el asistente"
+    [attr.aria-label]="'ai.close' | t"
   >
     <app-icon name="disconnect" [size]="12" />
   </button>
@@ -73,13 +73,10 @@
     -->
     <div class="empty">
       <div class="empty__mark"><app-icon name="sparkles" [size]="19" /></div>
-      <div class="empty__title">Elige quién responde</div>
-      <p class="empty__text">
-        El asistente habla con el proveedor que tú configures: el de tu empresa, tu propia cuenta o
-        un modelo instalado en este equipo.
-      </p>
+      <div class="empty__title">{{ 'ai.chooseWho' | t }}</div>
+      <p class="empty__text">{{ 'ai.chooseWhoText' | t }}</p>
       <button type="button" class="btn btn--primary" (click)="configure.emit()">
-        Configurar un proveedor
+        {{ 'ai.configureOne' | t }}
       </button>
     </div>
   } @else if (turns().length === 0) {
@@ -87,12 +84,18 @@
       <div class="empty__mark"><app-icon name="sparkles" [size]="19" /></div>
       <div class="empty__title">
         @if (context().database) {
-          Pregunta sobre <code>{{ context().database }}</code>
+          @for (part of askParts(context().database); track $index) {
+            @if (part.tag === 'database') {
+              <code>{{ part.text }}</code>
+            } @else {
+              {{ part.text }}
+            }
+          }
         } @else {
-          Pregunta sobre tu SQL
+          {{ 'ai.askAboutSql' | t }}
         }
       </div>
-      <p class="empty__text">{{ promise() }} No ejecuta nada: lo que escriba pasa por el editor.</p>
+      <p class="empty__text">{{ 'ai.runsNothing' | t: { promise: promise() } }}</p>
 
       <!--
         Las sugerencias no son genéricas: cada una usa algo que Druse ya tiene
@@ -100,33 +103,25 @@
         navegador no puede hacer.
       -->
       <div class="starters">
-        <button
-          type="button"
-          class="starter"
-          (click)="ask('Explica la consulta que tengo en el editor.')"
-        >
+        <button type="button" class="starter" (click)="ask('ai.starter.explain')">
           <app-icon name="format" [size]="14" />
           <span class="starter__text">
-            <span class="starter__title">Explica la consulta del editor</span>
-            <span class="starter__hint">Qué hace, tabla por tabla</span>
+            <span class="starter__title">{{ 'ai.starter.explainTitle' | t }}</span>
+            <span class="starter__hint">{{ 'ai.starter.explainHint' | t }}</span>
           </span>
         </button>
-        <button type="button" class="starter" (click)="draft.set('Escribe una consulta que ')">
+        <button type="button" class="starter" (click)="suggest('ai.starter.write')">
           <app-icon name="plus" [size]="14" />
           <span class="starter__text">
-            <span class="starter__title">Escribe una consulta que…</span>
-            <span class="starter__hint">Dilo en tus palabras, sale el SQL</span>
+            <span class="starter__title">{{ 'ai.starter.writeTitle' | t }}</span>
+            <span class="starter__hint">{{ 'ai.starter.writeHint' | t }}</span>
           </span>
         </button>
-        <button
-          type="button"
-          class="starter"
-          (click)="ask('¿Por qué puede ir lenta la consulta del editor y qué índice ayudaría?')"
-        >
+        <button type="button" class="starter" (click)="ask('ai.starter.slow')">
           <app-icon name="play-outline" [size]="14" />
           <span class="starter__text">
-            <span class="starter__title">Por qué esta consulta va lenta</span>
-            <span class="starter__hint">Y qué índice la arreglaría</span>
+            <span class="starter__title">{{ 'ai.starter.slowTitle' | t }}</span>
+            <span class="starter__hint">{{ 'ai.starter.slowHint' | t }}</span>
           </span>
         </button>
       </div>
@@ -141,12 +136,13 @@
         <app-icon name="eye" [size]="13" />
         <div class="disclosure__text">
           <span class="disclosure__what">
-            Contexto enviado:
+            {{ 'ai.sentContext' | t }}
             @if (sharedSql()) {
-              <code>SQL del editor</code>{{ sharedTables().length > 0 ? ' y ' : '' }}
+              <code>{{ 'ai.sentSql' | t }}</code
+              >{{ sharedTables().length > 0 ? ('ai.sentAnd' | t) : '' }}
             }
             @if (sharedTables().length > 0) {
-              estructura de
+              {{ 'ai.sentStructure' | t }}
               @for (table of sharedTables(); track table; let last = $last) {
                 <code>{{ table }}</code
                 >{{ last ? '' : ', ' }}
@@ -169,9 +165,11 @@
             } @else {
               <div class="sql">
                 <div class="sql__head">
-                  <span class="sql__label">SQL</span>
+                  <span class="sql__label" translate="no">SQL</span>
                   <span class="head__spacer"></span>
-                  <span class="sql__lines">{{ part.text.split('\n').length }} líneas</span>
+                  <span class="sql__lines">
+                    {{ 'ai.lines' | t: { count: part.text.split('\n').length } }}
+                  </span>
                 </div>
                 <pre class="sql__code">{{ part.text }}</pre>
                 <div class="sql__foot">
@@ -183,15 +181,13 @@
                     "
                   >
                     <app-icon name="plus" [size]="11" />
-                    {{
-                      part.action === 'replace' ? 'Reemplazar consulta' : 'Insertar en el editor'
-                    }}
+                    {{ (part.action === 'replace' ? 'ai.replaceQuery' : 'ai.insertInEditor') | t }}
                   </button>
                   <button type="button" class="btn btn--sm" (click)="copy(part.text)">
-                    Copiar
+                    {{ 'ai.copy' | t }}
                   </button>
                   <span class="head__spacer"></span>
-                  <span class="sql__warning">No se ejecuta solo</span>
+                  <span class="sql__warning">{{ 'ai.notRun' | t }}</span>
                 </div>
               </div>
             }
@@ -219,8 +215,8 @@
         [value]="draft()"
         (input)="onInput($event)"
         (keydown)="onKeydown($event)"
-        placeholder="Pregunta sobre este esquema o pide una consulta…"
-        aria-label="Pregunta al asistente"
+        [placeholder]="'ai.composer' | t"
+        [attr.aria-label]="'ai.composerLabel' | t"
       ></textarea>
 
       <div class="composer__tools">
@@ -230,10 +226,10 @@
             class="chip"
             [class.is-on]="includeSql()"
             (click)="includeSql.set(!includeSql())"
-            [title]="includeSql() ? 'Deja de enviar el SQL abierto' : 'Envía el SQL abierto'"
+            [title]="(includeSql() ? 'ai.sqlOff' : 'ai.sqlOn') | t"
           >
             <app-icon name="format" [size]="10" />
-            SQL del editor
+            {{ 'ai.sentSql' | t }}
           </button>
         }
 
@@ -243,12 +239,10 @@
             class="chip"
             [class.is-on]="includeSchema()"
             (click)="includeSchema.set(!includeSchema())"
-            [title]="
-              includeSchema() ? 'Deja de enviar la estructura' : 'Envía la estructura de las tablas'
-            "
+            [title]="(includeSchema() ? 'ai.schemaOff' : 'ai.schemaOn') | t"
           >
             <app-icon name="table" [size]="10" />
-            {{ context().tables.length }} tablas
+            {{ 'ai.tables' | t: { count: context().tables.length } }}
           </button>
         }
 
@@ -259,7 +253,7 @@
             type="button"
             class="composer__send composer__send--stop"
             (click)="cancel()"
-            aria-label="Parar"
+            [attr.aria-label]="'ai.stop' | t"
           >
             <app-icon name="stop" [size]="12" />
           </button>
@@ -269,7 +263,7 @@
             class="composer__send"
             [disabled]="draft().trim().length === 0"
             (click)="send()"
-            aria-label="Enviar"
+            [attr.aria-label]="'ai.send' | t"
           >
             <app-icon name="sort-desc" [size]="13" />
           </button>
