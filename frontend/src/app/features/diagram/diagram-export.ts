@@ -1,4 +1,5 @@
 import { SchemaGraph, SuggestedRelation, TableDetail } from '../../shared/models/workspace';
+import { translate } from '../../core/i18n/active';
 
 /**
  * El diagrama como texto.
@@ -105,7 +106,7 @@ export function toMermaid(graph: SchemaGraph, options: ExportOptions): string {
     for (const suggestion of graph.suggestions ?? []) {
       // Comentada, siempre: nadie comprueba esta relación.
       lines.push(
-        `    %% supuesta por Druse, sin clave foránea: ${safeName(suggestion.toTable)} ||--o{ ` +
+        `    %% ${translate('diagram.export.assumed')}: ${safeName(suggestion.toTable)} ||--o{ ` +
           `${safeName(suggestion.fromTable)} : "${suggestion.column}"`,
       );
     }
@@ -159,7 +160,7 @@ export function toDbml(graph: SchemaGraph, options: ExportOptions): string {
   if (options.includeSuggested) {
     for (const suggestion of graph.suggestions ?? []) {
       lines.push(
-        `// supuesta por Druse, sin clave foránea: ${safeName(suggestion.fromTable)}.` +
+        `// ${translate('diagram.export.assumed')}: ${safeName(suggestion.fromTable)}.` +
           `${safeName(suggestion.column)} > ${safeName(suggestion.toTable)}.` +
           `${safeName(suggestion.referencedColumn)}`,
       );

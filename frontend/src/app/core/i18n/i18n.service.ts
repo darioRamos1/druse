@@ -2,6 +2,7 @@ import { Injectable, computed, inject, isDevMode, signal } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 
 import { ApplicationGateway } from '../application-gateway/application-gateway';
+import { setActiveI18n } from './active';
 import { MessageParams, formatMessage, pseudolocalize } from './icu';
 import { setFormatLocale } from './locale-format';
 import {
@@ -103,6 +104,10 @@ export class I18nService {
   readonly intlLocale = computed(() => intlOf(this._locale()));
 
   constructor() {
+    // Las funciones puras que traducen sin poder inyectar —el escritor de SQL—
+    // preguntan por aquí.
+    setActiveI18n(this);
+
     // Normalmente ya lo hizo el arranque; repetirlo cubre las pruebas y
     // cualquier otro punto de entrada que no pase por `main.ts`.
     applyDocumentLocale(this._locale());

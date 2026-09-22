@@ -1,3 +1,4 @@
+import { translate } from '../../../core/i18n/active';
 import { DatabaseEngine, KnownColumn } from '../../../shared/models/workspace';
 import { DatePeriod, SQL_DIALECTS } from './sql-dialects';
 
@@ -196,7 +197,9 @@ function comparison(
   other?: string | null,
 ): string {
   const valor = (value: string | null | undefined) =>
-    value === null || value === undefined ? '/* valor obligatorio */' : literal(value);
+    value === null || value === undefined
+      ? `/* ${translate('sql.writer.requiredValue')} */`
+      : literal(value);
 
   if (other && COMPARISON_OPERATORS.includes(filter.operator)) {
     return `${expression} ${filter.operator} ${other}`;
@@ -210,7 +213,9 @@ function comparison(
     case 'IN':
     case 'NOT IN':
       // Se acepta la lista tal y como se escribe: `1, 2, 3` o `'a', 'b'`.
-      return `${expression} ${filter.operator} (${filter.value ?? '/* valores obligatorios */'})`;
+      return `${expression} ${filter.operator} (${
+        filter.value ?? `/* ${translate('sql.writer.requiredValues')} */`
+      })`;
 
     case 'BETWEEN':
       // Los dos extremos entran: es lo que dice SQL, y lo que el panel explica.
@@ -472,7 +477,7 @@ export function buildUpdate(
   const resto = spec.columns.filter((column) => !column.isPrimaryKey && !isGenerated(column));
 
   if (resto.length === 0) {
-    return '-- Esta tabla no tiene columnas modificables.\n';
+    return `-- ${translate('sql.writer.noEditableColumns')}\n`;
   }
 
   const asignaciones = resto
@@ -484,7 +489,7 @@ export function buildUpdate(
       ? clave
           .map((column) => `${quote(engine, column.name)} = /* ${column.dataType} */`)
           .join(' AND ')
-      : '/* condición: esta tabla no tiene clave primaria */';
+      : `/* ${translate('sql.writer.noPrimaryKey')} */`;
 
   return `UPDATE ${qualify(engine, spec.schema, spec.table)}\nSET\n${asignaciones}\nWHERE ${filtro};\n`;
 }
@@ -492,7 +497,7 @@ export function buildUpdate(
 /** UPDATE rellenado; nunca produce una sentencia ejecutable sin cláusula WHERE. */
 export function buildUpdateValues(engine: DatabaseEngine, spec: UpdateValuesSpec): string {
   if (spec.assignments.length === 0) {
-    return '-- Elige al menos una columna para modificar.\n';
+    return `-- ${translate('sql.writer.chooseColumn')}\n`;
   }
 
   const assignments = spec.assignments
@@ -502,7 +507,7 @@ export function buildUpdateValues(engine: DatabaseEngine, spec: UpdateValuesSpec
   const where =
     filters.length > 0
       ? filters.map((filter) => condition(engine, filter)).join('\n  AND ')
-      : '/* condición obligatoria */';
+      : `/* ${translate('sql.writer.requiredCondition')} */`;
 
   return `UPDATE ${qualify(engine, spec.schema, spec.table)}\nSET\n${assignments}\nWHERE ${where};\n`;
 }
@@ -522,7 +527,7 @@ export function buildDeleteValues(
   const where =
     filters.length > 0
       ? filters.map((filter) => condition(engine, filter)).join('\n  AND ')
-      : '/* condición obligatoria */';
+      : `/* ${translate('sql.writer.requiredCondition')} */`;
 
   return `DELETE FROM ${qualify(engine, spec.schema, spec.table)}\nWHERE ${where};\n`;
 }
@@ -641,7 +646,7 @@ export function buildCall(engine: DatabaseEngine, spec: CallSpec): string {
       // No hay procedimientos que llamar, y no es que la base no tenga ninguno:
       // el motor no sabe lo que son. El explorador ni siquiera enseña la carpeta,
       // así que aquí no se llega salvo por un guion escrito a mano.
-      return '-- SQLite no tiene procedimientos almacenados: no hay nada que llamar.\n';
+      return `-- ${translate('sql.writer.sqliteNoProcedures')}\n`;
   }
 }
 
@@ -795,11 +800,7 @@ function buildInformixCall(
 
   const nombres = salidas.map((salida) => salida.name).join(', ');
 
-  return (
-    `-- Informix solo recoge los parámetros de salida (${nombres}) dentro de\n` +
-    `-- otro procedimiento, con INTO. Aquí se ejecuta sin ellos.\n` +
-    llamada
-  );
+  return `-- ${translate('sql.writer.informixOutputs', { names: nombres })}\n` + llamada;
 }
 
 function writeArgument(parameter: RoutineArgument): string {
@@ -847,7 +848,7 @@ function writeValue(entry: ColumnWrite): string {
       return 'DEFAULT';
     case 'value':
       return entry.value.text === null
-        ? `/* ${entry.dataType}: valor obligatorio */`
+        ? `/* ${translate('sql.writer.requiredTyped', { type: entry.dataType })} */`
         : literal(entry.value.text);
   }
 }
