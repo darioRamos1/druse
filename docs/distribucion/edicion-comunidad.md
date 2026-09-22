@@ -46,6 +46,8 @@ La landing tiene despliegue satisfactorio en [GitHub Pages](https://github.com/d
 
 ## Pendientes antes de solicitar la firma
 
+Actualización del 22 de septiembre: el [PR #22 y su instalador](../revisiones/comunidad-2026-09-22.md) incorporan los 41 avisos NuGet y los cinco del frontend. La nueva revisión registra hashes distintos para los instaladores de GitHub y local; reemplaza los anteriores como evidencia más reciente. Las comprobaciones de CI, API/SQLite, inventario y firma local del actualizador pasan. Continúa sin Authenticode y sin prueba de instalación en Windows limpio.
+
 1. Aclarar con SignPath SNI, WebView2 y el lugar del consentimiento de actualizaciones. La respuesta anterior no aprobó esos tres puntos.
 2. Completar avisos y reconciliación de terceros del artefacto final, procedencia y condiciones de distribución.
 3. Probar instalación, actualización, desinstalación y tráfico real según el protocolo de Windows limpio.
