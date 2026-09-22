@@ -101,6 +101,8 @@ const pending = new Set(JSON.parse(read(pendingPath)));
 function literalsIn(html) {
   const clean = html
     .replace(/<!--[\s\S]*?-->/g, ' ')
+    // Los nombres de tecla no se traducen: el plan lo deja así (§2.5).
+    .replace(/<kbd\b[^>]*>[^<]*<\/kbd>/g, ' ')
     .replace(/\{\{[\s\S]*?\}\}/g, ' ')
     .replace(/@(?:if|else if|for|switch|case|defer|placeholder|loading|empty|else|default)\b\s*(\((?:[^()]|\((?:[^()]|\([^()]*\))*\))*\))?\s*\{/g, ' ')
     .replace(/@let\s[^;]*;/g, ' ');

@@ -3,6 +3,7 @@ import {
   ChangeDetectionStrategy,
   Component,
   computed,
+  inject,
   input,
   output,
   signal,
@@ -17,9 +18,18 @@ import { EngineBadge } from '../../shared/ui/engine-badge/engine-badge';
 import { Icon } from '../../shared/ui/icon/icon';
 import { DialogBackdrop } from '../../shared/a11y/dialog-backdrop';
 import { editorShortcutLabel, shortcutLabel } from '../../core/shortcuts/shortcut-label';
+import { I18nService } from '../../core/i18n/i18n.service';
+import { TranslatePipe } from '../../core/i18n/translate.pipe';
 
 type PaletteItem = { readonly disabledReason?: string | null } & (
-  | { readonly id: string; readonly kind: 'command'; readonly label: string; readonly hint: string }
+  | {
+      readonly id: string;
+      readonly kind: 'command';
+      readonly label: string;
+      readonly hint: string;
+      /** La clave del comando: se busca también por ella (ver `searchable`). */
+      readonly alias?: string;
+    }
   | {
       readonly id: string;
       readonly kind: 'tab';
@@ -53,7 +63,7 @@ type PaletteItem = { readonly disabledReason?: string | null } & (
 @Component({
   selector: 'app-command-palette',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [DialogBackdrop, Icon, EngineBadge],
+  imports: [DialogBackdrop, Icon, EngineBadge, TranslatePipe],
   templateUrl: './command-palette.html',
   styleUrl: './command-palette.scss',
 })
@@ -134,84 +144,97 @@ export default class CommandPalette implements AfterViewInit {
   protected readonly confirmingDelete = signal<string | null>(null);
   private readonly _input = viewChild<ElementRef<HTMLInputElement>>('search');
   private _returnFocus: HTMLElement | null = null;
+  private readonly _i18n = inject(I18nService);
 
   protected readonly items = computed<readonly PaletteItem[]>(() => {
     const term = this.query().trim().toLowerCase();
     const commands: PaletteItem[] = [
-      { id: 'new-query', kind: 'command', label: 'Nueva consulta', hint: 'Ctrl+T' },
-      { id: 'new-connection', kind: 'command', label: 'Nueva conexión', hint: 'Crear perfil' },
-      { id: 'execute', kind: 'command', label: 'Ejecutar consulta activa', hint: 'Ctrl+Enter' },
+      { id: 'new-query', kind: 'command', label: 'palette.command.newQuery', hint: 'Ctrl+T' },
+      {
+        id: 'new-connection',
+        kind: 'command',
+        label: 'palette.command.newConnection',
+        hint: 'palette.command.newConnectionHint',
+      },
+      { id: 'execute', kind: 'command', label: 'palette.command.execute', hint: 'Ctrl+Enter' },
       {
         id: 'execute-current',
         kind: 'command',
-        label: this.hasSelection() ? 'Ejecutar selección' : 'Ejecutar instrucción actual',
+        label: this.hasSelection()
+          ? 'palette.command.executeSelection'
+          : 'palette.command.executeCurrent',
         hint: 'Ctrl+Shift+Enter',
       },
-      { id: 'format', kind: 'command', label: 'Formatear SQL', hint: 'Ctrl+Shift+F' },
+      { id: 'format', kind: 'command', label: 'palette.command.format', hint: 'Ctrl+Shift+F' },
       {
         id: 'toggle-line-comment',
         kind: 'command',
-        label: 'Comentar/descomentar líneas',
+        label: 'palette.command.toggleComment',
         hint: 'Ctrl+/',
       },
       // El buscador del editor existía y no lo decía nadie.
-      { id: 'find', kind: 'command', label: 'Buscar en el editor', hint: 'Ctrl+F' },
+      { id: 'find', kind: 'command', label: 'palette.command.find', hint: 'Ctrl+F' },
       {
         id: 'replace',
         kind: 'command',
-        label: 'Buscar y reemplazar',
+        label: 'palette.command.replace',
         hint: editorShortcutLabel('replace'),
       },
-      { id: 'history', kind: 'command', label: 'Abrir historial', hint: 'Consultas anteriores' },
+      {
+        id: 'history',
+        kind: 'command',
+        label: 'palette.command.history',
+        hint: 'palette.command.historyHint',
+      },
       {
         id: 'save-snippet',
         kind: 'command',
-        label: 'Guardar como fragmento',
-        hint: 'Lo seleccionado, o la instrucción del cursor',
+        label: 'palette.command.saveSnippet',
+        hint: 'palette.command.saveSnippetHint',
       },
       {
         id: 'duplicate-tab',
         kind: 'command',
-        label: 'Duplicar la pestaña',
-        hint: 'Con el mismo SQL',
+        label: 'palette.command.duplicateTab',
+        hint: 'palette.command.duplicateTabHint',
       },
       {
         id: 'close-other-tabs',
         kind: 'command',
-        label: 'Cerrar las demás pestañas',
-        hint: 'Se preguntará por las que tengan cambios',
+        label: 'palette.command.closeOtherTabs',
+        hint: 'palette.command.closeOtherTabsHint',
       },
       {
         id: 'copy-qualified-name',
         kind: 'command',
-        label: 'Copiar el nombre calificado',
-        hint: 'De la tabla de esta pestaña',
+        label: 'palette.command.copyQualifiedName',
+        hint: 'palette.command.copyQualifiedNameHint',
       },
       {
         id: 'diagram',
         kind: 'command',
-        label: 'Ver el diagrama',
-        hint: 'De donde se está trabajando',
+        label: 'palette.command.diagram',
+        hint: 'palette.command.diagramHint',
       },
       {
         id: 'transaction-begin',
         kind: 'command',
-        label: 'Iniciar transacción',
-        hint: 'Agrupa las siguientes consultas en una transacción',
+        label: 'palette.command.transactionBegin',
+        hint: 'palette.command.transactionBeginHint',
       },
       {
         id: 'transaction-commit',
         kind: 'command',
-        label: 'Confirmar la transacción',
-        hint: 'Escribe los cambios. No se deshace',
+        label: 'palette.command.transactionCommit',
+        hint: 'palette.command.transactionCommitHint',
       },
       {
         id: 'transaction-rollback',
         kind: 'command',
-        label: 'Deshacer la transacción',
-        hint: 'Tira lo hecho desde que se abrió',
+        label: 'palette.command.transactionRollback',
+        hint: 'palette.command.transactionRollbackHint',
       },
-      { id: 'shortcuts', kind: 'command', label: 'Ver los atajos de teclado', hint: 'F1' },
+      { id: 'shortcuts', kind: 'command', label: 'palette.command.shortcuts', hint: 'F1' },
     ];
     /*
      * Las pestañas abiertas, delante de todo.
@@ -222,12 +245,15 @@ export default class CommandPalette implements AfterViewInit {
      */
     const tabs: PaletteItem[] = this.tabs().map((tab) => {
       const connection = this.connections().find((item) => item.id === tab.connectionId);
-      const estado = [tab.dirty ? 'sin guardar' : '', tab.active ? 'delante' : '']
+      const estado = [
+        tab.dirty ? this._i18n.t('palette.tab.unsaved') : '',
+        tab.active ? this._i18n.t('palette.tab.front') : '',
+      ]
         .filter(Boolean)
         .join(' · ');
       const contexto = connection
         ? `${connection.name} · ${tab.database ?? connection.database}`
-        : 'Sin conexión asignada';
+        : this._i18n.t('palette.tab.noConnection');
 
       return {
         id: `tab:${tab.id}`,
@@ -241,7 +267,10 @@ export default class CommandPalette implements AfterViewInit {
       id: `connection:${connection.id}`,
       kind: 'connection',
       label: connection.name,
-      hint: `${connection.database} · ${connection.state === 'connected' ? 'conectada' : 'sin conexión'}`,
+      hint: this._i18n.t('palette.connection.hint', {
+        database: connection.database,
+        state: connection.state,
+      }),
       connection,
     }));
     const objects: PaletteItem[] = this.nodes()
@@ -250,7 +279,14 @@ export default class CommandPalette implements AfterViewInit {
         id: `object:${node.id}`,
         kind: 'object',
         label: node.label,
-        hint: `${this.connections().find((connection) => connection.id === node.connectionId)?.name ?? 'Conexión'} · ${node.source.database ?? ''} · ${node.source.schema ? `${node.source.schema}.` : ''}${node.source.name} · ${node.kind === 'view' ? 'vista' : 'tabla'}`,
+        hint: this._i18n.t('palette.object.hint', {
+          connection:
+            this.connections().find((connection) => connection.id === node.connectionId)?.name ??
+            this._i18n.t('palette.object.connection'),
+          database: node.source.database ?? '',
+          name: `${node.source.schema ? `${node.source.schema}.` : ''}${node.source.name}`,
+          kind: node.kind,
+        }),
         node,
       }));
 
@@ -268,7 +304,12 @@ export default class CommandPalette implements AfterViewInit {
       ...tabs,
       ...commands.map((command) => ({
         ...command,
-        hint: shortcutLabel(command.hint),
+        // Etiqueta y pista son claves; la pista también puede ser un atajo.
+        label: this._i18n.t(command.label),
+        hint: command.hint.startsWith('palette.')
+          ? this._i18n.t(command.hint)
+          : shortcutLabel(command.hint),
+        alias: command.label,
         disabledReason: this.commandDisabledReason(command.id),
       })),
       ...snippets,
@@ -276,23 +317,27 @@ export default class CommandPalette implements AfterViewInit {
       ...objects,
     ];
 
-    return term
-      ? all.filter((item) => `${item.label} ${item.hint}`.toLowerCase().includes(term))
-      : all;
+    const wanted = searchable(term);
+
+    return wanted ? all.filter((item) => searchable(haystack(item)).includes(wanted)) : all;
   });
 
   private commandDisabledReason(id: string): string | null {
     const tab = this.activeTab();
-    const connectionRequired = 'Abre una conexión para usar esta acción.';
-    const queryRequired = 'Abre una consulta para usar esta acción.';
-    const sqlRequired = 'Escribe SQL en la consulta activa.';
+    const t = (key: string) => this._i18n.t(key);
+    const connectionRequired = t('palette.disabled.connection');
+    const queryRequired = t('palette.disabled.query');
+    const sqlRequired = t('palette.disabled.sql');
+    const running = t('palette.disabled.running');
+    const transactionBusy = t('palette.disabled.transactionBusy');
+    const tableRequired = t('palette.disabled.table');
 
     switch (id) {
       case 'execute':
       case 'execute-current':
         if (!this.hasConnection()) return connectionRequired;
-        if (this.running()) return 'Espera a que termine la consulta en curso.';
-        if (this.transactionBusy()) return 'Espera a que termine la operación de transacción.';
+        if (this.running()) return running;
+        if (this.transactionBusy()) return transactionBusy;
         return !tab?.sql.trim() ? sqlRequired : null;
       case 'format':
       case 'save-snippet':
@@ -303,22 +348,22 @@ export default class CommandPalette implements AfterViewInit {
       case 'duplicate-tab':
         return tab ? null : queryRequired;
       case 'close-other-tabs':
-        return this.tabs().length > 1 ? null : 'Abre otra pestaña para usar esta acción.';
+        return this.tabs().length > 1 ? null : t('palette.disabled.otherTab');
       case 'copy-qualified-name':
-        return tab?.sourceTable ? null : 'Abre una tabla desde el explorador.';
+        return tab?.sourceTable ? null : tableRequired;
       case 'diagram':
-        if (!tab?.sourceTable || !tab.connectionId) return 'Abre una tabla desde el explorador.';
+        if (!tab?.sourceTable || !tab.connectionId) return tableRequired;
         return this.hasConnection() ? null : connectionRequired;
       case 'transaction-begin':
       case 'transaction-commit':
       case 'transaction-rollback':
         if (!this.hasConnection()) return connectionRequired;
-        if (this.transactionBusy()) return 'Espera a que termine la operación de transacción.';
-        if (this.running()) return 'Espera a que termine la consulta en curso.';
+        if (this.transactionBusy()) return transactionBusy;
+        if (this.running()) return running;
         if (id === 'transaction-begin') {
-          return this.transactionOpen() ? 'La conexión ya tiene una transacción abierta.' : null;
+          return this.transactionOpen() ? t('palette.disabled.transactionOpen') : null;
         }
-        return this.transactionOpen() ? null : 'No hay una transacción abierta en esta conexión.';
+        return this.transactionOpen() ? null : t('palette.disabled.noTransaction');
       default:
         return null;
     }
@@ -357,40 +402,9 @@ export default class CommandPalette implements AfterViewInit {
    * interfaz que está en español de arriba abajo.
    */
   protected kindLabel(item: PaletteItem): string {
-    const nombre = item.kind === 'object' ? item.node.kind : item.kind;
-
-    if (nombre === 'snippet') {
-      return 'fragmento';
-    }
-
-    if (nombre === 'tab') {
-      return 'pestaña';
-    }
-
-    switch (nombre) {
-      case 'command':
-        return 'comando';
-      case 'connection':
-        return 'conexión';
-      case 'database':
-        return 'base';
-      case 'schema':
-        return 'esquema';
-      case 'folder':
-        return 'carpeta';
-      case 'table':
-        return 'tabla';
-      case 'view':
-        return 'vista';
-      case 'function':
-        return 'función';
-      case 'procedure':
-        return 'procedimiento';
-      case 'column':
-        return 'columna';
-      default:
-        return nombre;
-    }
+    return this._i18n.t('palette.kind', {
+      kind: item.kind === 'object' ? item.node.kind : item.kind,
+    });
   }
 
   protected close(): void {
@@ -596,6 +610,24 @@ export default class CommandPalette implements AfterViewInit {
  * Los comentarios de cabecera se saltan: «-- pedidos del día» explica, pero no
  * distingue un fragmento de otro tan bien como el `SELECT` que viene detrás.
  */
+/**
+ * El texto para comparar: minúsculas y sin tildes. «conexion» encuentra
+ * «Conexión», y quien escribe sin acentos no se queda sin resultados.
+ */
+function searchable(text: string): string {
+  return text.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase().trim();
+}
+
+/**
+ * Dónde se busca un resultado. Los comandos llevan además su clave, que está
+ * en inglés: quien cambia de idioma sigue encontrando «format» o «history».
+ */
+function haystack(item: PaletteItem): string {
+  const alias = item.kind === 'command' && item.alias ? item.alias.replace(/[.]/g, ' ') : '';
+
+  return `${item.label} ${item.hint} ${alias}`;
+}
+
 function firstLine(sql: string): string {
   const line = sql
     .split('\n')

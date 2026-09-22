@@ -82,6 +82,28 @@ describe('CommandPalette', () => {
     expect(opened[0]?.id).toBe(table.id);
   });
 
+  /** Lo que queda en la lista al escribir `term` en el buscador. */
+  function buscar(term: string): string[] {
+    const input = fixture.nativeElement.querySelector('input') as HTMLInputElement;
+    input.value = term;
+    input.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+
+    return [...(fixture.nativeElement as HTMLElement).querySelectorAll('.result strong')].map(
+      (label) => label.textContent?.trim() ?? '',
+    );
+  }
+
+  it('encuentra sin tildes lo que se escribe con ellas', () => {
+    expect(buscar('conexion')).toContain('Nueva conexión');
+  });
+
+  it('encuentra los comandos por su nombre en inglés, sea cual sea el idioma', () => {
+    // Quien cambia de idioma sigue buscando «format» o «history» por costumbre.
+    expect(buscar('format')).toContain('Formatear SQL');
+    expect(buscar('history')).toContain('Abrir historial');
+  });
+
   it('ofrece comandos de ejecución, formato e historial', () => {
     const text = (fixture.nativeElement as HTMLElement).textContent;
 

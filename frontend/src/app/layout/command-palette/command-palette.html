@@ -4,7 +4,7 @@
   class="palette"
   role="dialog"
   aria-modal="true"
-  aria-label="Paleta de comandos"
+  [attr.aria-label]="'palette.label' | t"
   (keydown)="trapFocus($event)"
 >
   <header class="search">
@@ -17,8 +17,8 @@
       <input
         #search
         type="text"
-        placeholder="Nombre del fragmento — vacío, lo pone la primera línea"
-        aria-label="Nombre del fragmento"
+        [placeholder]="'palette.snippetName.placeholder' | t"
+        [attr.aria-label]="'palette.snippetName.label' | t"
         [value]="query()"
         (input)="onInput($event)"
         (keydown.enter)="confirmName(); $event.preventDefault()"
@@ -29,8 +29,8 @@
       <input
         #search
         type="search"
-        placeholder="Buscar pestañas, conexiones, tablas o comandos"
-        aria-label="Buscar comandos"
+        [placeholder]="'palette.search.placeholder' | t"
+        [attr.aria-label]="'palette.search.label' | t"
         aria-controls="palette-results"
         [attr.aria-activedescendant]="items().length ? 'palette-option-' + selected() : null"
         [value]="query()"
@@ -46,12 +46,14 @@
   </header>
 
   @if (naming()) {
-    <p class="naming">
-      Se guarda lo seleccionado en el editor; si no hay selección, la instrucción donde esté el
-      cursor.
-    </p>
+    <p class="naming">{{ 'palette.snippetName.hint' | t }}</p>
   } @else {
-    <div id="palette-results" class="results dr-scroll-fade" role="listbox" aria-label="Resultados">
+    <div
+      id="palette-results"
+      class="results dr-scroll-fade"
+      role="listbox"
+      [attr.aria-label]="'palette.results' | t"
+    >
       @for (item of items(); track item.id; let index = $index) {
         <button
           type="button"
@@ -86,30 +88,33 @@
             }}</small>
           </span>
           @if (item.kind === 'snippet' && confirmingDelete() === item.snippet.id) {
-            <span class="result__warn">Shift+Supr otra vez para borrarlo</span>
+            <span class="result__warn">{{ 'palette.deleteAgain' | t }}</span>
           }
           <span class="result__kind">{{ kindLabel(item) }}</span>
         </button>
       } @empty {
-        <p class="empty">No hay coincidencias. Prueba con otro nombre.</p>
+        <p class="empty">{{ 'palette.empty' | t }}</p>
       }
     </div>
 
     <footer class="foot">
-      <span><kbd>↑</kbd><kbd>↓</kbd> navegar</span>
+      <span><kbd>↑</kbd><kbd>↓</kbd> {{ 'palette.foot.navigate' | t }}</span>
       @if (items()[selected()]; as item) {
         @if (item.disabledReason) {
-          <span>No disponible</span>
+          <span>{{ 'palette.foot.unavailable' | t }}</span>
         } @else {
-          <span><kbd>Enter</kbd> abrir</span>
+          <span><kbd>Enter</kbd> {{ 'palette.foot.open' | t }}</span>
         }
       }
       <!-- El atajo se anuncia solo cuando hay algo que borrar con él. -->
       @if (selectedSnippet()) {
-        <span><kbd>Shift</kbd><kbd>Supr</kbd> borrar</span>
+        <span>
+          <kbd>Shift</kbd><kbd>{{ 'palette.foot.deleteKey' | t }}</kbd>
+          {{ 'palette.foot.delete' | t }}
+        </span>
       }
       <span class="spacer"></span>
-      <span>{{ items().length }} {{ items().length === 1 ? 'resultado' : 'resultados' }}</span>
+      <span>{{ 'palette.foot.count' | t: { count: items().length } }}</span>
     </footer>
   }
 </section>
