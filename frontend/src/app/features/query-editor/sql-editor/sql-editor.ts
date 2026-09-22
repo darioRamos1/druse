@@ -687,7 +687,7 @@ export default class SqlEditor implements OnInit {
     // El autocompletado se registra una vez por editor y se retira al destruirlo:
     // de lo contrario cada editor añadiría otro proveedor y las sugerencias
     // saldrían repetidas.
-    const disposeCompletion = registerSqlCompletion(monaco, () => ({
+    const disposeCompletion = registerSqlCompletion(monaco, this._i18n, () => ({
       engine: this.engine(),
       schema: this.schema(),
       loadColumns: this.loadColumns(),
@@ -699,7 +699,7 @@ export default class SqlEditor implements OnInit {
 
     // El tooltip lee del mismo catálogo, así que nunca dispara una consulta:
     // aparecería tarde y con el ratón ya en otro sitio.
-    const disposeHover = registerSqlHover(monaco, () => ({
+    const disposeHover = registerSqlHover(monaco, this._i18n, () => ({
       schema: this.schema(),
       engine: this.engine(),
     }));
@@ -711,7 +711,7 @@ export default class SqlEditor implements OnInit {
 
     // Sobre un nombre mal escrito, la bombilla (o Ctrl+.) lo cambia por el que
     // se le parece: lo mismo que dice el aviso, a un clic.
-    const disposeQuickFixes = registerSqlQuickFixes(monaco, () => ({
+    const disposeQuickFixes = registerSqlQuickFixes(monaco, this._i18n, () => ({
       schema: this.schema(),
       model: this._editor?.getModel() ?? null,
     }));
@@ -863,7 +863,7 @@ export default class SqlEditor implements OnInit {
         return;
       }
 
-      const markers = findProblems(model.getValue(), this.schema()).map((problem) => {
+      const markers = findProblems(model.getValue(), this.schema(), this._i18n).map((problem) => {
         const start = model.getPositionAt(problem.start);
         const end = model.getPositionAt(problem.end);
 

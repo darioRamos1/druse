@@ -1,6 +1,16 @@
+import { TestBed } from '@angular/core/testing';
+
 import { SchemaIndex } from '../../../shared/models/workspace';
 
 import { registerSqlCompletion } from './sql-completion';
+import { I18nService } from '../../../core/i18n/i18n.service';
+/**
+ * El servicio de idioma de verdad, con el catálogo en español.
+ *
+ * Los mensajes salen del catálogo, así que la prueba comprueba lo que el
+ * usuario lee y no una cadena escrita dos veces.
+ */
+const i18n = () => TestBed.inject(I18nService);
 
 /** Columna del índice, con lo justo para no repetir cuatro campos en cada línea. */
 function col(
@@ -126,7 +136,7 @@ function complete(
 ) {
   const { monaco, provider } = fakeMonaco();
 
-  registerSqlCompletion(monaco as never, () => ({ engine, schema: index, snippets }));
+  registerSqlCompletion(monaco as never, i18n(), () => ({ engine, schema: index, snippets }));
 
   const lines = sql.split('\n');
   const position = { lineNumber: lines.length, column: lines[lines.length - 1].length + 1 };
@@ -167,7 +177,7 @@ function completeAt(
   const position = { lineNumber: before.length, column: before[before.length - 1].length + 1 };
   const { monaco, provider } = fakeMonaco();
 
-  registerSqlCompletion(monaco as never, () => ({
+  registerSqlCompletion(monaco as never, i18n(), () => ({
     engine: 'postgresql',
     schema: index,
     loadColumns,
@@ -488,7 +498,7 @@ describe('autocompletado SQL', () => {
       const pedidos: string[] = [];
       const { monaco, provider } = fakeMonaco();
 
-      registerSqlCompletion(monaco as never, () => ({
+      registerSqlCompletion(monaco as never, i18n(), () => ({
         engine: 'sqlserver',
         schema: index,
         loadRelations: (schemaName) => {
@@ -520,7 +530,7 @@ describe('autocompletado SQL', () => {
       const columnas: { schema: string | null; name: string }[] = [];
       const { monaco, provider } = fakeMonaco();
 
-      registerSqlCompletion(monaco as never, () => ({
+      registerSqlCompletion(monaco as never, i18n(), () => ({
         engine: 'sqlserver',
         schema: index,
         loadRelations: (schemaName) => {
@@ -578,7 +588,7 @@ describe('autocompletado SQL', () => {
       const pedidas: { schema: string | null; name: string }[] = [];
       const { monaco, provider } = fakeMonaco();
 
-      registerSqlCompletion(monaco as never, () => ({
+      registerSqlCompletion(monaco as never, i18n(), () => ({
         engine: 'sqlserver',
         schema: sinAbrir,
         loadColumns: (schema, name) => {
@@ -606,7 +616,7 @@ describe('autocompletado SQL', () => {
       const pedidas: string[] = [];
       const { monaco, provider } = fakeMonaco();
 
-      registerSqlCompletion(monaco as never, () => ({
+      registerSqlCompletion(monaco as never, i18n(), () => ({
         engine: 'sqlserver',
         schema: multiSchema,
         loadColumns: (_schema, name) => {

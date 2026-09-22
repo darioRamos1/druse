@@ -9,6 +9,7 @@ import {
 import { SqlReference, aliasMap, findRelation, relationMentions } from './sql-context';
 import { SavedSnippet } from '../../../core/application-gateway/application-gateway';
 import { functionsFor, keywordsFor } from './sql-keywords';
+import { I18nService } from '../../../core/i18n/i18n.service';
 import { describeReference, referenceFor, signatureLabel } from './sql-reference';
 import { snippetsFor } from './sql-snippets';
 import { statementAt } from './sql-statements';
@@ -19,15 +20,15 @@ import { statementAt } from './sql-statements';
  * El tipo primero, que es lo que se busca; después lo que cambia cómo se
  * escribe la consulta: si admite nulos y si es clave primaria.
  */
-export function describeColumn(column: KnownColumn): string {
+export function describeColumn(column: KnownColumn, i18n: I18nService): string {
   const partes = [column.dataType];
 
   if (!column.isNullable) {
-    partes.push('no nulo');
+    partes.push(i18n.t('sql.notNull'));
   }
 
   if (column.isPrimaryKey) {
-    partes.push('clave primaria');
+    partes.push(i18n.t('sql.primaryKey'));
   }
 
   return partes.join(' · ');
@@ -180,6 +181,7 @@ function columnSources(sql: string, offset: number, index: SchemaIndex): ColumnS
  */
 export function registerSqlCompletion(
   monaco: typeof MonacoApi,
+  i18n: I18nService,
   getContext: () => CompletionContext,
 ): () => void {
   const provider = monaco.languages.registerCompletionItemProvider('sql', {
@@ -255,7 +257,10 @@ export function registerSqlCompletion(
         const insertName = includeSchema ? relation.qualified : relation.name;
         const detail =
           relation.columns.length > 0
-            ? `${relation.qualified} · ${relation.columns.length} columnas`
+            ? i18n.t('sql.completion.columns', {
+                qualified: relation.qualified,
+                count: relation.columns.length,
+              })
             : relation.qualified;
         const alias = suggestedAlias(relation.name);
 
@@ -273,7 +278,7 @@ export function registerSqlCompletion(
             kind,
             insertText: `${insertName} AS \${1:${alias}}`,
             insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
-            detail: `${detail} · con alias`,
+            detail: i18n.t('sql.completion.withAlias', { detail }),
             sortText: `0_${relation.name}_1`,
             range,
           },
@@ -297,7 +302,7 @@ export function registerSqlCompletion(
             insertText: column.name,
             // El tipo a la derecha evita ir a mirar la tabla para saber si algo
             // es un texto, una fecha o un número.
-            detail: describeColumn(column),
+            detail: describeColumn(column, i18n),
             documentation: `${relation.qualified}.${column.name}`,
             // El orden del catálogo es el de la tabla, que es más útil que el
             // alfabético para quien conoce su esquema.
@@ -381,10 +386,13 @@ export function registerSqlCompletion(
         const prefijo = alias === reference.name ? '' : `${alias}.`;
 
         suggestions.push({
-          label: `columnas de ${alias}`,
+          label: i18n.t('sql.completion.allColumns', { alias }),
           kind: monaco.languages.CompletionItemKind.Snippet,
           insertText: relation.columns.map((column) => `${prefijo}${column.name}`).join(', '),
-          detail: `${relation.qualified} · ${relation.columns.length} columnas`,
+          detail: i18n.t('sql.completion.columns', {
+            qualified: relation.qualified,
+            count: relation.columns.length,
+          }),
           sortText: `00_${alias}`,
           range,
         });
@@ -397,14 +405,14 @@ export function registerSqlCompletion(
           label: saved.name,
           kind: monaco.languages.CompletionItemKind.Snippet,
           insertText: saved.sql,
-          detail: 'fragmento guardado',
+          detail: i18n.t('sql.completion.savedSnippet'),
           documentation: { value: ['```sql', saved.sql, '```'].join('\n') },
           sortText: `1_${saved.name}`,
           range,
         });
       }
 
-      for (const snippet of snippetsFor(engine)) {
+      for (const snippet of snippetsFor(engine, i18n)) {
         suggestions.push({
           label: snippet.trigger,
           kind: monaco.languages.CompletionItemKind.Snippet,
@@ -496,7 +504,7 @@ export function registerSqlCompletion(
               // Se filtra por el nombre de la columna aunque se inserte
               // calificada: quien busca `id` escribe `id`, no `users.id`.
               filterText: column.name,
-              detail: `${source.qualifier} · ${describeColumn(column)}`,
+              detail: `${source.qualifier} · ${describeColumn(column, i18n)}`,
               documentation: `${source.relation.qualified}.${column.name}`,
               // Delante de las tablas —donde se piden columnas es lo que se
               // busca— y en el orden de cada tabla, que es el que conoce quien

@@ -1,5 +1,15 @@
+import { TestBed } from '@angular/core/testing';
+
 import { SchemaIndex } from '../../../shared/models/workspace';
 import { registerSqlHover } from './sql-hover';
+import { I18nService } from '../../../core/i18n/i18n.service';
+/**
+ * El servicio de idioma de verdad, con el catálogo en español.
+ *
+ * Los mensajes salen del catálogo, así que la prueba comprueba lo que el
+ * usuario lee y no una cadena escrita dos veces.
+ */
+const i18n = () => TestBed.inject(I18nService);
 
 function col(
   name: string,
@@ -53,7 +63,7 @@ function fakeMonaco() {
 /** Devuelve el texto del tooltip al posarse sobre `palabra` dentro de `sql`. */
 function hover(sql: string, palabra: string): string | null {
   const { monaco, provider } = fakeMonaco();
-  registerSqlHover(monaco as never, () => ({ schema }));
+  registerSqlHover(monaco as never, i18n(), () => ({ schema }));
 
   const lines = sql.split('\n');
   const lineNumber = lines.findIndex((line) => line.includes(palabra)) + 1;

@@ -7,6 +7,7 @@ import {
   SchemaIndex,
 } from '../../../shared/models/workspace';
 import { aliasMap, findRelation } from './sql-context';
+import { I18nService } from '../../../core/i18n/i18n.service';
 import { describeReference, referenceFor, SqlReferenceEntry } from './sql-reference';
 
 /** Lo que el tooltip necesita saber. Es un subconjunto del contexto del editor. */
@@ -23,53 +24,54 @@ export interface HoverContext {
 const MAX_COLUMNS = 12;
 
 /** Descripción de una tabla: qué es, dónde vive y qué columnas tiene. */
-function describeRelation(relation: KnownRelation): string {
-  const tipo = relation.kind === 'view' ? 'Vista' : 'Tabla';
+function describeRelation(relation: KnownRelation, i18n: I18nService): string {
+  const tipo = i18n.t(relation.kind === 'view' ? 'sql.hover.view' : 'sql.hover.table');
   const lineas = [`**${tipo}** \`${relation.qualified}\``];
 
   if (relation.columns.length === 0) {
     // Puede que simplemente no se hayan pedido todavía; decir «no tiene
     // columnas» sería mentir.
-    lineas.push('', '_Sus columnas aún no se han cargado._');
+    lineas.push('', i18n.t('sql.hover.columnsNotLoaded'));
 
     return lineas.join('\n');
   }
 
-  lineas.push('', `${relation.columns.length} columnas:`, '');
+  lineas.push('', i18n.t('sql.hover.columns', { count: relation.columns.length }), '');
 
   for (const column of relation.columns.slice(0, MAX_COLUMNS)) {
-    lineas.push(`- ${describeColumnLine(column)}`);
+    lineas.push(`- ${describeColumnLine(column, i18n)}`);
   }
 
   if (relation.columns.length > MAX_COLUMNS) {
-    lineas.push(`- _y ${relation.columns.length - MAX_COLUMNS} más_`);
+    lineas.push(i18n.t('sql.hover.andMore', { count: relation.columns.length - MAX_COLUMNS }));
   }
 
   return lineas.join('\n');
 }
 
-function describeColumnLine(column: KnownColumn): string {
+function describeColumnLine(column: KnownColumn, i18n: I18nService): string {
   const marcas = [`\`${column.dataType}\``];
 
   if (column.isPrimaryKey) {
-    marcas.push('clave primaria');
+    marcas.push(i18n.t('sql.primaryKey'));
   }
 
   if (!column.isNullable) {
-    marcas.push('no nulo');
+    marcas.push(i18n.t('sql.notNull'));
   }
 
   return `**${column.name}** — ${marcas.join(' · ')}`;
 }
 
 /** Descripción de una columna concreta. */
-function describeColumn(relation: KnownRelation, column: KnownColumn): string {
+function describeColumn(relation: KnownRelation, column: KnownColumn, i18n: I18nService): string {
+  const nulos = i18n.t(column.isNullable ? 'sql.hover.nullable' : 'sql.hover.notNullable');
+  const clave = column.isPrimaryKey ? ` · ${i18n.t('sql.primaryKey')}` : '';
+
   return [
     `**${column.name}** — \`${column.dataType}\``,
     '',
-    `${column.isNullable ? 'Admite nulos' : 'No admite nulos'}${
-      column.isPrimaryKey ? ' · clave primaria' : ''
-    }`,
+    `${nulos}${clave}`,
     '',
     `_${relation.qualified}_`,
   ].join('\n');
@@ -85,6 +87,7 @@ function describeColumn(relation: KnownRelation, column: KnownColumn): string {
  */
 export function registerSqlHover(
   monaco: typeof MonacoApi,
+  i18n: I18nService,
   getContext: () => HoverContext,
 ): () => void {
   const provider = monaco.languages.registerHoverProvider('sql', {
@@ -114,7 +117,7 @@ export function registerSqlHover(
         : findRelation(schema, { schema: null, name });
 
       if (relation) {
-        return { range, contents: [{ value: describeRelation(relation) }] };
+        return { range, contents: [{ value: describeRelation(relation, i18n) }] };
       }
 
       // ¿Es una columna de alguna de las tablas en juego?
@@ -131,7 +134,7 @@ export function registerSqlHover(
         const column = owner?.columns.find((item) => item.name.toLowerCase() === name);
 
         if (owner && column) {
-          return { range, contents: [{ value: describeColumn(owner, column) }] };
+          return { range, contents: [{ value: describeColumn(owner, column, i18n) }] };
         }
       }
 

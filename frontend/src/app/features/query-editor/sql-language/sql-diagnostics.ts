@@ -1,6 +1,7 @@
 import type * as MonacoApi from 'monaco-editor';
 
 import { SchemaIndex } from '../../../shared/models/workspace';
+import { I18nService } from '../../../core/i18n/i18n.service';
 import {
   aliasMap,
   declaredNames,
@@ -42,7 +43,7 @@ const QUALIFIED_COLUMN = new RegExp(`\\b(${IDENTIFIER})\\.(${IDENTIFIER})\\b`, '
  * No es un analizador de SQL. No entiende subconsultas ni columnas sin calificar,
  * y no pretende hacerlo: quien decide si la consulta es válida es el servidor.
  */
-export function findProblems(sql: string, schema: SchemaIndex): SqlProblem[] {
+export function findProblems(sql: string, schema: SchemaIndex, i18n: I18nService): SqlProblem[] {
   // Sin catálogo no hay nada que contrastar: al conectar, durante el primer
   // segundo, todo estaría subrayado.
   if (schema.relations.length === 0) {
@@ -81,8 +82,10 @@ export function findProblems(sql: string, schema: SchemaIndex): SqlProblem[] {
           start: mention.start,
           end: mention.end,
           message:
-            `No existe ${reference.schema}.${reference.name} en el esquema ${reference.schema}.` +
-            didYouMean(parecida),
+            i18n.t('sql.problem.noQualified', {
+              qualified: `${reference.schema}.${reference.name}`,
+              schema: reference.schema,
+            }) + didYouMean(parecida, i18n),
           ...(parecida && plain ? { fix: `${reference.schema}.${parecida}` } : {}),
         });
       }
@@ -104,7 +107,10 @@ export function findProblems(sql: string, schema: SchemaIndex): SqlProblem[] {
         start: mention.start,
         end: mention.end,
         message:
-          `No existe la tabla ${reference.name} en ${[...cargados][0]}.` + didYouMean(parecida),
+          i18n.t('sql.problem.noTable', {
+            table: reference.name,
+            schema: [...cargados][0],
+          }) + didYouMean(parecida, i18n),
         ...(parecida && plain ? { fix: parecida } : {}),
       });
     }
@@ -148,7 +154,9 @@ export function findProblems(sql: string, schema: SchemaIndex): SqlProblem[] {
     problems.push({
       start,
       end: start + column.length,
-      message: `${relation.qualified} no tiene la columna ${column}.` + didYouMean(parecida),
+      message:
+        i18n.t('sql.problem.noColumn', { table: relation.qualified, column }) +
+        didYouMean(parecida, i18n),
       ...(parecida ? { fix: parecida } : {}),
     });
   }
@@ -156,8 +164,8 @@ export function findProblems(sql: string, schema: SchemaIndex): SqlProblem[] {
   return problems;
 }
 
-function didYouMean(name: string | null): string {
-  return name ? ` ¿Quisiste decir ${name}?` : '';
+function didYouMean(name: string | null, i18n: I18nService): string {
+  return name ? i18n.t('sql.problem.didYouMean', { name }) : '';
 }
 
 /**
@@ -233,6 +241,7 @@ export interface QuickFixContext {
  */
 export function registerSqlQuickFixes(
   monaco: typeof MonacoApi,
+  i18n: I18nService,
   getContext: () => QuickFixContext,
 ): () => void {
   const provider = monaco.languages.registerCodeActionProvider('sql', {
@@ -244,7 +253,7 @@ export function registerSqlQuickFixes(
         return { actions, dispose: () => undefined };
       }
 
-      for (const problem of findProblems(model.getValue(), schema)) {
+      for (const problem of findProblems(model.getValue(), schema, i18n)) {
         if (!problem.fix) {
           continue;
         }
@@ -263,7 +272,7 @@ export function registerSqlQuickFixes(
         }
 
         actions.push({
-          title: `Cambiar por ${problem.fix}`,
+          title: i18n.t('sql.problem.replaceWith', { name: problem.fix }),
           kind: 'quickfix',
           isPreferred: true,
           diagnostics: [

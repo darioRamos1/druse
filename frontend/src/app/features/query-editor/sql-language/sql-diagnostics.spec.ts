@@ -1,5 +1,15 @@
+import { TestBed } from '@angular/core/testing';
+
 import { SchemaIndex } from '../../../shared/models/workspace';
 import { closest, findProblems } from './sql-diagnostics';
+import { I18nService } from '../../../core/i18n/i18n.service';
+/**
+ * El servicio de idioma de verdad, con el catálogo en español.
+ *
+ * Los mensajes salen del catálogo, así que la prueba comprueba lo que el
+ * usuario lee y no una cadena escrita dos veces.
+ */
+const i18n = () => TestBed.inject(I18nService);
 
 function col(name: string, dataType = 'int') {
   return { name, dataType, isPrimaryKey: false, isNullable: false };
@@ -28,7 +38,7 @@ const cargado: SchemaIndex = {
 };
 
 const mensajes = (sql: string, index: SchemaIndex = cargado) =>
-  findProblems(sql, index).map((problem) => problem.message);
+  findProblems(sql, index, i18n()).map((problem) => problem.message);
 
 describe('avisos del editor', () => {
   it('avisa de una tabla que no existe en el esquema cargado', () => {
@@ -39,7 +49,7 @@ describe('avisos del editor', () => {
 
   it('señala exactamente el nombre, no la línea entera', () => {
     const sql = 'SELECT * FROM tpublico.usuarioss';
-    const [problema] = findProblems(sql, cargado);
+    const [problema] = findProblems(sql, cargado, i18n());
 
     expect(sql.slice(problema.start, problema.end)).toBe('tpublico.usuarioss');
   });
@@ -112,7 +122,7 @@ describe('avisos del editor', () => {
   // --- ¿Quisiste decir…? ------------------------------------------------------
 
   it('propone el arreglo con el esquema tal como se escribió', () => {
-    const [problema] = findProblems('SELECT * FROM tpublico.usuarioss', cargado);
+    const [problema] = findProblems('SELECT * FROM tpublico.usuarioss', cargado, i18n());
 
     expect(problema.fix).toBe('tpublico.usuarios');
   });
@@ -121,20 +131,21 @@ describe('avisos del editor', () => {
     const [problema] = findProblems(
       'SELECT * FROM tpublico.usuarios u WHERE u.nombres = 1',
       cargado,
+      i18n(),
     );
 
     expect(problema.fix).toBe('nombre');
   });
 
   it('no propone nada si ningún nombre se parece', () => {
-    const [problema] = findProblems('SELECT * FROM tpublico.inventario', cargado);
+    const [problema] = findProblems('SELECT * FROM tpublico.inventario', cargado, i18n());
 
     expect(problema.message).toBe('No existe tpublico.inventario en el esquema tpublico.');
     expect(problema.fix).toBeUndefined();
   });
 
   it('no ofrece arreglo sobre un nombre entre comillas', () => {
-    const [problema] = findProblems('SELECT * FROM "usuarioss"', cargado);
+    const [problema] = findProblems('SELECT * FROM "usuarioss"', cargado, i18n());
 
     // El aviso sí; reescribirlo sin comillas podría cambiar a qué tabla apunta.
     expect(problema?.fix).toBeUndefined();

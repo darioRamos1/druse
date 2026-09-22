@@ -266,7 +266,7 @@ export class TransferSetDialog {
       this.sourceTables.set(tables);
       this.selected.set(new Set(tables.map((table) => table.id)));
     } catch (error) {
-      this.localError.set(describe(error));
+      this.localError.set(describe(error, this._i18n.t('transfer.noProcess')));
     } finally {
       this.loadingSource.set(false);
     }
@@ -522,9 +522,7 @@ export class TransferSetDialog {
     const targetSession = this._workspace.sessionForConnection(target);
 
     if (!profile.id || !sourceSession || !targetSession) {
-      this.localError.set(
-        'Para abrir un perfil hacen falta abiertas las dos conexiones que nombra.',
-      );
+      this.localError.set(this._i18n.t('transferSet.needsBothConnections'));
 
       return;
     }
@@ -556,7 +554,7 @@ export class TransferSetDialog {
 
       await this.plan();
     } catch (error) {
-      this.localError.set(describe(error));
+      this.localError.set(describe(error, this._i18n.t('transfer.noProcess')));
     }
   }
 
@@ -602,7 +600,7 @@ export class TransferSetDialog {
       this.profileId.set(saved.id ?? null);
       await this.loadProfiles();
     } catch (error) {
-      this.localError.set(describe(error));
+      this.localError.set(describe(error, this._i18n.t('transfer.noProcess')));
     } finally {
       this.savingProfile.set(false);
     }
@@ -622,7 +620,7 @@ export class TransferSetDialog {
 
       await this.loadProfiles();
     } catch (error) {
-      this.localError.set(describe(error));
+      this.localError.set(describe(error, this._i18n.t('transfer.noProcess')));
     }
   }
 
@@ -703,7 +701,7 @@ export class TransferSetDialog {
       this.nodes.set(await fetch());
     } catch (error) {
       this.nodes.set([]);
-      this.localError.set(describe(error));
+      this.localError.set(describe(error, this._i18n.t('transfer.noProcess')));
     } finally {
       this.browsing.set(false);
     }
@@ -753,7 +751,7 @@ function qualify(object: DatabaseObject): string {
   return object.schema ? `${object.schema}.${object.name}` : object.name;
 }
 
-function describe(error: unknown): string {
+function describe(error: unknown, fallback: string): string {
   if (typeof error === 'object' && error !== null && 'error' in error) {
     const body = (error as { error?: { message?: string } }).error;
 
@@ -762,5 +760,5 @@ function describe(error: unknown): string {
     }
   }
 
-  return error instanceof Error ? error.message : 'No se pudo hablar con el proceso local.';
+  return error instanceof Error ? error.message : fallback;
 }
