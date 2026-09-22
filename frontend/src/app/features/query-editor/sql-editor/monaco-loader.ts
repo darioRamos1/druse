@@ -1,8 +1,25 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 import type * as MonacoApi from 'monaco-editor';
+
+import { I18nService } from '../../../core/i18n/i18n.service';
+import { Locale } from '../../../core/i18n/locale';
 
 /** Ruta donde `angular.json` copia el paquete de Monaco. */
 const MONACO_BASE = 'assets/monaco';
+
+/**
+ * El archivo de textos de Monaco para cada idioma de Druse.
+ *
+ * El inglés no tiene: es el idioma en que Monaco viene escrito. El
+ * pseudoidioma usa el español, que es de donde sale.
+ */
+const MONACO_MESSAGES: Readonly<Record<Locale, string | null>> = {
+  es: 'es',
+  en: null,
+  'pt-BR': 'pt-br',
+  fr: 'fr',
+  qps: 'es',
+};
 
 /** Tope de espera. Pasado esto se da por fallido y se puede reintentar. */
 const LOAD_TIMEOUT_MS = 20000;
@@ -45,6 +62,7 @@ declare global {
 @Injectable({ providedIn: 'root' })
 export class MonacoLoader {
   private _loading: Promise<typeof MonacoApi> | null = null;
+  private readonly _i18n = inject(I18nService);
 
   load(): Promise<typeof MonacoApi> {
     if (window.monaco) {
@@ -63,22 +81,31 @@ export class MonacoLoader {
   }
 
   /**
-   * Los textos de Monaco en español, antes que Monaco.
+   * Los textos de Monaco en el idioma de Druse, antes que Monaco.
    *
    * Sin esto, el menú contextual mezclaba «Abrir en el compositor» con «Cut»,
-   * «Copy» y «Change All Occurrences». El paquete trae la traducción en
-   * `vs/nls/lang/es.js`, que **no es un módulo AMD**: es un script que deja los
-   * textos en `globalThis._VSCODE_NLS_MESSAGES`, y Monaco los lee de ahí al
-   * evaluarse. Pedirlo por la opción `vs/nls` del cargador lo dejaba esperando
-   * un `define` que nunca llega, y el editor no arrancaba. Por eso va como
-   * script suelto y delante.
+   * «Copy» y «Change All Occurrences». El paquete trae las traducciones en
+   * `vs/nls/lang/`, y **no son módulos AMD**: son scripts que dejan los textos
+   * en `globalThis._VSCODE_NLS_MESSAGES`, y Monaco los lee de ahí al evaluarse.
+   * Pedirlos por la opción `vs/nls` del cargador lo dejaba esperando un
+   * `define` que nunca llega, y el editor no arrancaba. Por eso van como script
+   * suelto y delante.
+   *
+   * Como Monaco solo los lee al evaluarse, el idioma es el que había al abrir
+   * el editor: cambiarlo después se nota en Monaco al volver a abrir Druse.
    *
    * Si falla, se sigue: un editor en inglés es mucho mejor que ninguno.
    */
   private loadMessages(): Promise<void> {
+    const messages = MONACO_MESSAGES[this._i18n.locale()];
+
+    if (!messages) {
+      return Promise.resolve();
+    }
+
     return new Promise<void>((resolve) => {
       const script = document.createElement('script');
-      script.src = `${MONACO_BASE}/vs/nls/lang/es.js`;
+      script.src = `${MONACO_BASE}/vs/nls/lang/${messages}.js`;
       script.async = true;
       script.onload = () => resolve();
       script.onerror = () => resolve();

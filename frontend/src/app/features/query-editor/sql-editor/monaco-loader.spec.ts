@@ -1,5 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 
+import { ApplicationGateway } from '../../../core/application-gateway/application-gateway';
+import { I18nService } from '../../../core/i18n/i18n.service';
 import { MonacoLoader } from './monaco-loader';
 
 /**
@@ -26,7 +28,9 @@ describe('MonacoLoader', () => {
 
   beforeEach(() => {
     vi.useFakeTimers();
-    TestBed.configureTestingModule({});
+    TestBed.configureTestingModule({
+      providers: [{ provide: ApplicationGateway, useValue: {} }],
+    });
     loader = TestBed.inject(MonacoLoader);
 
     originalMonaco = Object.getOwnPropertyDescriptor(window, 'monaco');
@@ -96,6 +100,17 @@ describe('MonacoLoader', () => {
 
     expect(scripts.filter(esCargador)).toHaveLength(1);
     expect(options).not.toHaveProperty('vs/nls');
+  });
+
+  it('sigue al idioma de Druse: en inglés no carga textos, porque Monaco ya viene así', async () => {
+    await TestBed.inject(I18nService).setLocale('en', { persist: false });
+
+    void loader.load();
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(scripts.map((script) => script.src.split('/assets/')[1])).toEqual([
+      'monaco/vs/loader.js',
+    ]);
   });
 
   it('si los textos no llegan, el editor arranca igual, en inglés', async () => {

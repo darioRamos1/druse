@@ -1,6 +1,6 @@
 {
   "settings.language.title": "Language",
-  "settings.language.hint": "Applies right away, without restarting. Table names, SQL and messages from the servers are not translated.",
+  "settings.language.hint": "Applies right away, without restarting; the editor's own menu changes the next time Druse opens. Table names, SQL and messages from the servers are not translated.",
   "settings.language.label": "Interface language",
   "settings.language.incomplete": "{name} is incomplete: anything missing will show in English."
 }
