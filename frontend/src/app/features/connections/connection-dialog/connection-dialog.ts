@@ -8,6 +8,9 @@ import {
   output,
   signal,
 } from '@angular/core';
+
+import { I18nService } from '../../../core/i18n/i18n.service';
+import { TranslatePipe } from '../../../core/i18n/translate.pipe';
 import { FormsModule } from '@angular/forms';
 
 import { DesktopHost } from '../../../core/application-gateway/desktop-host';
@@ -124,13 +127,13 @@ function posicion(engine: DatabaseEngine): number {
 const AUTHENTICATIONS: readonly AuthenticationOption[] = [
   {
     id: 'password',
-    label: 'Autenticación de SQL Server',
-    hint: 'Usuario y contraseña definidos en el propio motor.',
+    label: 'connection.auth.sql',
+    hint: 'connection.auth.sqlHint',
   },
   {
     id: 'windows',
-    label: 'Autenticación de Windows',
-    hint: 'Usa la sesión de Windows con la que abriste el equipo. No hay contraseña que escribir.',
+    label: 'connection.auth.windows',
+    hint: 'connection.auth.windowsHint',
   },
 ];
 
@@ -141,9 +144,9 @@ const AUTHENTICATIONS: readonly AuthenticationOption[] = [
  * ofrecerlo sería prometer algo que fallaría al conectar.
  */
 const SSH_AUTHENTICATIONS: readonly SshAuthenticationOption[] = [
-  { id: 'password', label: 'Contraseña' },
-  { id: 'privatekey', label: 'Clave privada' },
-  { id: 'keyboardinteractive', label: 'Interactivo (2FA)' },
+  { id: 'password', label: 'connection.ssh.auth.password' },
+  { id: 'privatekey', label: 'connection.ssh.auth.privatekey' },
+  { id: 'keyboardinteractive', label: 'connection.ssh.auth.keyboardinteractive' },
 ];
 
 /**
@@ -156,41 +159,35 @@ const SSH_AUTHENTICATIONS: readonly SshAuthenticationOption[] = [
 const SSL_MODES: readonly SslOption[] = [
   {
     id: 'disable',
-    label: 'Sin cifrar',
-    hint: 'La conversación viaja en claro. Solo para servidores en tu propia máquina.',
+    label: 'connection.ssl.disable',
+    hint: 'connection.ssl.disableHint',
   },
   {
     id: 'prefer',
-    label: 'Cifra si puede',
-    hint: 'Cifra si el servidor lo ofrece, y sigue adelante si no.',
+    label: 'connection.ssl.prefer',
+    hint: 'connection.ssl.preferHint',
   },
   {
     id: 'require',
-    label: 'Cifrado',
-    hint:
-      'Exige cifrado, pero no comprueba el certificado: protege de quien escucha el ' +
-      'cable, no de quien se hace pasar por el servidor.',
+    label: 'connection.ssl.require',
+    hint: 'connection.ssl.requireHint',
   },
   {
     id: 'verifyca',
-    label: 'Certificado de confianza',
-    hint:
-      'Exige que el certificado lo firme una autoridad de confianza. No comprueba que ' +
-      'el nombre sea el de este servidor.',
+    label: 'connection.ssl.verifyca',
+    hint: 'connection.ssl.verifycaHint',
   },
   {
     id: 'verifyfull',
-    label: 'Certificado y nombre',
-    hint:
-      'Comprueba además que el certificado sea el de este servidor. Es el único modo ' +
-      'que protege de un intermediario, y lo que piden los servicios en la nube.',
+    label: 'connection.ssl.verifyfull',
+    hint: 'connection.ssl.verifyfullHint',
   },
 ];
 
 const ENVIRONMENTS: readonly EnvironmentOption[] = [
-  { id: 'development', label: 'Desarrollo' },
-  { id: 'testing', label: 'Pruebas' },
-  { id: 'production', label: 'Producción' },
+  { id: 'development', label: 'connection.environment.development' },
+  { id: 'testing', label: 'connection.environment.testing' },
+  { id: 'production', label: 'connection.environment.production' },
 ];
 
 /**
@@ -202,12 +199,13 @@ const ENVIRONMENTS: readonly EnvironmentOption[] = [
 @Component({
   selector: 'app-connection-dialog',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [DialogBackdrop, DialogFocus, FormsModule, EngineBadge, Icon],
+  imports: [DialogBackdrop, DialogFocus, FormsModule, EngineBadge, Icon, TranslatePipe],
   templateUrl: './connection-dialog.html',
   styleUrl: './connection-dialog.scss',
 })
 export class ConnectionDialog {
   private readonly _store = inject(WorkspaceStore);
+  private readonly _i18n = inject(I18nService);
   private readonly _desktop = inject(DesktopHost);
 
   /**
@@ -301,11 +299,11 @@ export class ConnectionDialog {
     () => this.selected()?.capabilities ?? CAPACIDADES_CORRIENTES,
   );
   protected readonly advancedOpen = signal(false);
-  protected readonly advancedSummary = computed(
-    () =>
-      (SSL_MODES.find((option) => option.id === this.sslMode())?.label ?? '') +
-      ' · ' +
-      (this.sshEnabled() ? 'SSH activado' : 'Sin túnel SSH'),
+  protected readonly advancedSummary = computed(() =>
+    this._i18n.t('connection.advanced.summary', {
+      ssl: this._i18n.t(SSL_MODES.find((option) => option.id === this.sslMode())?.label ?? ''),
+      ssh: this.sshEnabled() ? 'on' : 'off',
+    }),
   );
   protected readonly environments = ENVIRONMENTS;
   protected readonly authentications = AUTHENTICATIONS;
@@ -345,17 +343,14 @@ export class ConnectionDialog {
    */
   protected readonly readOnlyHint = computed(() => {
     if (!this.capabilities().enforcesReadOnlySessions) {
-      return (
-        'Este motor no tiene sesiones de solo lectura: Druse avisa antes de ejecutar, ' +
-        'pero la garantía es un usuario con permisos restringidos en el servidor.'
-      );
+      return this._i18n.t('connection.readOnly.warning');
     }
 
     // En un motor que es un archivo el candado es el más fuerte de todos: se
     // abre sin permiso de escritura y no hay instrucción que pueda saltárselo.
-    return this.esArchivo()
-      ? 'El archivo se abre sin permiso de escritura: no hay forma de tocarlo desde aquí.'
-      : 'Druse pone la sesión en solo lectura: el servidor rechaza cualquier escritura.';
+    return this._i18n.t(
+      this.esArchivo() ? 'connection.readOnly.file' : 'connection.readOnly.session',
+    );
   });
   protected readonly environment = signal<ConnectionEnvironment>('development');
   protected readonly save = signal(true);
@@ -532,7 +527,9 @@ export class ConnectionDialog {
    * llamarlas igual lleva a escribir una donde va la otra.
    */
   protected sshSecretLabel(): string {
-    return this.usesSshKey() ? 'Passphrase de la clave' : 'Contraseña SSH';
+    return this._i18n.t(
+      this.usesSshKey() ? 'connection.ssh.passphrase' : 'connection.ssh.password',
+    );
   }
 
   /**
@@ -556,7 +553,7 @@ export class ConnectionDialog {
 
       this.databases.set(databases);
       this.databasesNotice.set(
-        error ?? (databases.length === 0 ? 'El servidor no devolvió ninguna base.' : null),
+        error ?? (databases.length === 0 ? this._i18n.t('connection.databases.none') : null),
       );
 
       // Con una sola no hay nada que elegir, y dejar el campo vacío obligaría a
@@ -577,7 +574,7 @@ export class ConnectionDialog {
    */
   protected databaseHint(): string {
     if (this.esArchivo()) {
-      return 'La ruta del archivo, por ejemplo C:\\datos\\ventas.db. Druse no lo crea: tiene que existir.';
+      return this._i18n.t('connection.databases.fileHint');
     }
 
     const notice = this.databasesNotice();
@@ -589,12 +586,10 @@ export class ConnectionDialog {
     const found = this.databases();
 
     if (found.length > 0) {
-      return found.length === 1
-        ? 'Solo hay una base disponible y ya está puesta.'
-        : `${found.length} bases disponibles: escribe o elige de la lista.`;
+      return this._i18n.t('connection.databases.found', { count: found.length });
     }
 
-    return 'Si la dejas vacía, se abre la primera a la que tengas acceso.';
+    return this._i18n.t('connection.databases.emptyHint');
   }
 
   protected async test(): Promise<void> {
@@ -659,10 +654,7 @@ export class ConnectionDialog {
         this.closed.emit();
       } else {
         this.feedbackKind.set('error');
-        this.feedback.set(
-          this._store.notice() ??
-            'No se pudo abrir la conexión. Revisa los datos e inténtalo de nuevo.',
-        );
+        this.feedback.set(this._store.notice() ?? this._i18n.t('connection.connectFailed'));
       }
     } finally {
       this.connecting.set(false);
@@ -685,7 +677,7 @@ export class ConnectionDialog {
         this.closed.emit();
       } else {
         this.feedbackKind.set('error');
-        this.feedback.set(this._store.notice() ?? 'No se pudieron guardar los cambios.');
+        this.feedback.set(this._store.notice() ?? this._i18n.t('connection.saveFailed'));
       }
     } finally {
       this.saving.set(false);
@@ -776,7 +768,7 @@ export class ConnectionDialog {
       const error = await this._store.createDatabase(this.toForm());
 
       this.feedbackKind.set(error ? 'error' : 'success');
-      this.feedback.set(error ?? 'Base creada y vacía. Pulsa Conectar para abrirla.');
+      this.feedback.set(error ?? this._i18n.t('connection.created'));
     } finally {
       this.creando.set(false);
     }
@@ -788,12 +780,14 @@ export class ConnectionDialog {
 
   protected portHint(): string | null {
     return this.engine() === 'sqlserver' && this.host().includes('\\')
-      ? 'Opcional para una instancia con nombre, por ejemplo SERVIDOR\\SQLEXPRESS.'
+      ? this._i18n.t('connection.portHint')
       : null;
   }
 
   protected namePlaceholder(): string {
-    return `${ENGINE_NAMES[this.engine()] ?? 'Base de datos'} — Desarrollo`;
+    return this._i18n.t('connection.namePlaceholder', {
+      engine: ENGINE_NAMES[this.engine()] ?? this._i18n.t('connection.database'),
+    });
   }
 
   /**
@@ -804,12 +798,14 @@ export class ConnectionDialog {
    * sería una base concreta de un servidor que aún no se ha visto.
    */
   protected databasePlaceholder(): string {
-    return this.esArchivo() ? 'ruta del archivo .db' : (this.selected()?.defaultDatabase ?? '');
+    return this.esArchivo()
+      ? this._i18n.t('connection.filePlaceholder')
+      : (this.selected()?.defaultDatabase ?? '');
   }
 
   /** Cómo se llama aquí lo que en un servidor es «la base de datos». */
   protected databaseLabel(): string {
-    return this.esArchivo() ? 'Archivo' : 'Base de datos';
+    return this._i18n.t(this.esArchivo() ? 'connection.file' : 'connection.database');
   }
 
   private validForm(): ConnectionForm | null {
@@ -821,7 +817,7 @@ export class ConnectionDialog {
         this.advancedOpen.set(true);
       }
       this.feedbackKind.set('error');
-      this.feedback.set('Revisa los campos marcados antes de continuar.');
+      this.feedback.set(this._i18n.t('connection.check'));
       return null;
     }
 
@@ -842,7 +838,7 @@ export class ConnectionDialog {
 
     if (!this.sshEnabled()) {
       this.feedbackKind.set('error');
-      this.feedback.set('Activa el servidor intermedio para poder probarlo.');
+      this.feedback.set(this._i18n.t('connection.ssh.enableFirst'));
       return null;
     }
 
@@ -859,7 +855,7 @@ export class ConnectionDialog {
     if (relevantes.some((campo) => errors[campo])) {
       this.advancedOpen.set(true);
       this.feedbackKind.set('error');
-      this.feedback.set('Revisa los campos del servidor intermedio y del destino.');
+      this.feedback.set(this._i18n.t('connection.ssh.check'));
       return null;
     }
 
@@ -868,32 +864,31 @@ export class ConnectionDialog {
 
   private validationErrors(): Partial<Record<ConnectionField, string>> {
     const errors: Partial<Record<ConnectionField, string>> = {};
+    const t = (key: string) => this._i18n.t(key);
     const namedSqlServer = this.engine() === 'sqlserver' && this.host().includes('\\');
     const port = this.port();
 
     if (!this.name().trim()) {
-      errors.name = 'Escribe un nombre para identificar esta conexión.';
+      errors.name = t('connection.error.name');
     }
     if (this.capabilities().requiresHost && !this.host().trim()) {
-      errors.host = 'Indica el servidor o la dirección IP.';
+      errors.host = t('connection.error.host');
     }
 
     // En un servidor, la base vacía significa «la primera a la que tenga
     // acceso». En un motor que es un archivo no hay tal cosa: sin la ruta no hay
     // nada que abrir.
     if (this.capabilities().requiresDatabase && !this.database().trim()) {
-      errors.database = this.esArchivo()
-        ? 'Indica el archivo de la base de datos.'
-        : 'Indica la base de datos.';
+      errors.database = t(this.esArchivo() ? 'connection.error.file' : 'connection.error.database');
     }
     if (
       this.capabilities().requiresHost &&
       !namedSqlServer &&
       (!Number.isInteger(port) || port! < 1 || port! > 65_535)
     ) {
-      errors.port = 'Indica un puerto entre 1 y 65535.';
+      errors.port = t('connection.error.port');
     } else if (port !== null && (!Number.isInteger(port) || port < 0 || port > 65_535)) {
-      errors.port = 'Indica un puerto entre 1 y 65535.';
+      errors.port = t('connection.error.port');
     }
     // Con autenticación de Windows el usuario lo pone el sistema y el campo ni
     // siquiera se muestra, así que no hay nada que exigir. Y hay motores que no
@@ -903,30 +898,29 @@ export class ConnectionDialog {
       !this.usesWindowsAuth() &&
       !this.username().trim()
     ) {
-      errors.username = 'Indica el usuario de la base de datos.';
+      errors.username = t('connection.error.username');
     }
 
     // En SQLI el driver no puede deducirlo, y sin él su error habla de red y
     // manda a mirar el cortafuegos cuando lo que falta es este campo.
     if (this.usaSqli() && !this.informixServer().trim()) {
-      errors.informixServer =
-        'Indica el servidor Informix del `sqlhosts` (por ejemplo, `vehi_tcp`).';
+      errors.informixServer = t('connection.error.informixServer');
     }
 
     if (this.sshEnabled()) {
       const sshPort = this.sshPort();
 
       if (!this.sshHost().trim()) {
-        errors.sshHost = 'Indica el servidor SSH intermedio.';
+        errors.sshHost = t('connection.error.sshHost');
       }
       if (!Number.isInteger(sshPort) || sshPort! < 1 || sshPort! > 65_535) {
-        errors.sshPort = 'Indica un puerto entre 1 y 65535.';
+        errors.sshPort = t('connection.error.port');
       }
       if (!this.sshUsername().trim()) {
-        errors.sshUsername = 'Indica el usuario del servidor SSH.';
+        errors.sshUsername = t('connection.error.sshUsername');
       }
       if (this.sshAuthentication() === 'privatekey' && !this.sshPrivateKeyPath().trim()) {
-        errors.sshPrivateKeyPath = 'Indica la ruta del archivo de clave privada.';
+        errors.sshPrivateKeyPath = t('connection.error.sshKey');
       }
     }
 

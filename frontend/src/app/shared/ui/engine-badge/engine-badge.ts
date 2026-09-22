@@ -42,13 +42,14 @@ export const ENGINE_NAMES: Readonly<Record<DatabaseEngine, string>> = {
  * formulario sin nombre, sin color y sin versiones.
  */
 export const ENGINE_VERSIONS: Readonly<Record<DatabaseEngine, string>> = {
-  postgresql: '12 – 18',
-  sqlserver: '2016 – 2022',
-  mysql: '8.0+ · MariaDB',
-  informix: '12.10+ · protocolo DRDA',
-  informixsqli: '12.10+',
-  oracle: '12c – 23ai',
-  sqlite: '3.16+ · archivo local',
+  // Claves del catálogo: algunas llevan palabras («protocolo DRDA»).
+  postgresql: 'engine.versions.postgresql',
+  sqlserver: 'engine.versions.sqlserver',
+  mysql: 'engine.versions.mysql',
+  informix: 'engine.versions.informix',
+  informixsqli: 'engine.versions.informixsqli',
+  oracle: 'engine.versions.oracle',
+  sqlite: 'engine.versions.sqlite',
 };
 
 /**

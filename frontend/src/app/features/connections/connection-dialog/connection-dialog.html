@@ -32,23 +32,24 @@
     </span>
     <div class="head__text">
       <h2 class="head__title" id="connection-dialog-title">
-        {{ editing() ? 'Editar conexión' : 'Nueva conexión' }}
+        {{ (editing() ? 'connection.title.edit' : 'connection.title.new') | t }}
       </h2>
       <p class="head__subtitle">
-        @if (editing()) {
-          Cambia lo que necesites. Las contraseñas guardadas no se muestran: si dejas el campo
-          vacío, se conservan tal y como están.
-        } @else {
-          Elige el motor e indica los datos de acceso. Al conectar se aplican las opciones de
-          guardado que marques abajo.
-        }
+        {{ (editing() ? 'connection.subtitle.edit' : 'connection.subtitle.new') | t }}
       </p>
     </div>
-    <button type="button" class="head__close" aria-label="Cerrar" (click)="close()">×</button>
+    <button
+      type="button"
+      class="head__close"
+      [attr.aria-label]="'common.close' | t"
+      (click)="close()"
+    >
+      ×
+    </button>
   </header>
 
   <div class="body">
-    <h3 class="section">Motor</h3>
+    <h3 class="section">{{ 'connection.engine' | t }}</h3>
     <div class="engines">
       @for (option of engines(); track option.id) {
         <button
@@ -61,7 +62,7 @@
           <app-engine-badge [engine]="option.id" [size]="24" class="engine__badge" />
           <span class="engine__text">
             <span class="engine__name">{{ option.name }}</span>
-            <span class="engine__versions">{{ option.versions }}</span>
+            <span class="engine__versions">{{ option.versions | t }}</span>
           </span>
           @if (isSelected(option)) {
             <span class="engine__check" aria-hidden="true">✓</span>
@@ -71,8 +72,8 @@
     </div>
 
     @if (transports().length) {
-      <div class="protocols" role="group" aria-label="Protocolo de conexión">
-        <span class="field__label">Protocolo</span>
+      <div class="protocols" role="group" [attr.aria-label]="'connection.protocolGroup' | t">
+        <span class="field__label">{{ 'connection.protocol' | t }}</span>
         @for (option of transports(); track option.id) {
           <button
             type="button"
@@ -87,10 +88,10 @@
       </div>
     }
 
-    <h3 class="section">Conexión</h3>
+    <h3 class="section">{{ 'connection.section.connection' | t }}</h3>
     <div class="grid">
       <label class="field field--wide">
-        <span class="field__label">Nombre</span>
+        <span class="field__label">{{ 'connection.name' | t }}</span>
         <input
           class="field__input"
           type="text"
@@ -107,7 +108,9 @@
 
       @if (pideServidor()) {
         <label class="field field--host">
-          <span class="field__label">{{ usaSqli() ? 'Host' : 'Servidor' }}</span>
+          <span class="field__label">{{
+            (usaSqli() ? 'connection.host' : 'connection.server') | t
+          }}</span>
           <input
             class="field__input"
             type="text"
@@ -122,7 +125,7 @@
         </label>
 
         <label class="field field--port">
-          <span class="field__label">Puerto</span>
+          <span class="field__label">{{ 'connection.port' | t }}</span>
           <input
             class="field__input"
             type="number"
@@ -150,12 +153,12 @@
       -->
       @if (usaSqli()) {
         <label class="field field--wide">
-          <span class="field__label">Server (INFORMIXSERVER)</span>
+          <span class="field__label">{{ 'connection.informixServer' | t }}</span>
           <input
             class="field__input"
             type="text"
             [(ngModel)]="informixServer"
-            placeholder="vehi_tcp"
+            [placeholder]="'connection.informixServer.placeholder' | t"
             [class.is-invalid]="fieldError('informixServer')"
             [attr.aria-invalid]="!!fieldError('informixServer')"
             aria-describedby="connection-informix-server-detail"
@@ -164,7 +167,7 @@
             <span class="field__error" id="connection-informix-server-detail">{{ error }}</span>
           } @else {
             <span class="field__hint" id="connection-informix-server-detail">
-              El alias definido en `sqlhosts`, por ejemplo `vehi_tcp`; no es el Host ni la IP.
+              {{ 'connection.informixServerHint' | t }}
             </span>
           }
         </label>
@@ -193,15 +196,17 @@
               [disabled]="loadingDatabases()"
               (click)="loadDatabases()"
             >
-              {{ loadingDatabases() ? 'Buscando…' : 'Buscar bases de datos' }}
+              {{ (loadingDatabases() ? 'connection.searching' : 'connection.searchDatabases') | t }}
             </button>
           } @else if (puedeCrear()) {
             <!-- Dos acciones y no una: abrir un archivo que ya está y nombrar
                  uno que todavía no existe son diálogos distintos del sistema, y
                  el primero no deja hacer lo segundo. -->
-            <button type="button" class="picker__load" (click)="elegirArchivo()">Examinar…</button>
+            <button type="button" class="picker__load" (click)="elegirArchivo()">
+              {{ 'connection.browse' | t }}
+            </button>
             <button type="button" class="picker__load" [disabled]="creando()" (click)="crearBase()">
-              {{ creando() ? 'Creando…' : 'Crear una nueva' }}
+              {{ (creando() ? 'connection.creating' : 'connection.createNew') | t }}
             </button>
           }
         </span>
@@ -221,7 +226,9 @@
 
       @if (supportsWindowsAuth()) {
         <div class="field field--wide">
-          <span class="field__label" id="connection-auth-label">Autenticación</span>
+          <span class="field__label" id="connection-auth-label">{{
+            'connection.authentication' | t
+          }}</span>
           <div class="auths" role="group" aria-labelledby="connection-auth-label">
             @for (option of authentications; track option.id) {
               <button
@@ -231,8 +238,8 @@
                 [attr.aria-pressed]="authentication() === option.id"
                 (click)="selectAuthentication(option.id)"
               >
-                <span>{{ option.label }}</span>
-                <span class="auth__hint">{{ option.hint }}</span>
+                <span>{{ option.label | t }}</span>
+                <span class="auth__hint">{{ option.hint | t }}</span>
               </button>
             }
           </div>
@@ -241,7 +248,7 @@
 
       @if (pideIdentidad() && !usesWindowsAuth()) {
         <label class="field">
-          <span class="field__label">Usuario</span>
+          <span class="field__label">{{ 'connection.user' | t }}</span>
           <input
             class="field__input"
             type="text"
@@ -257,7 +264,7 @@
         </label>
 
         <label class="field">
-          <span class="field__label">Contraseña</span>
+          <span class="field__label">{{ 'connection.password' | t }}</span>
           <!--
             Se puede mirar lo que se escribe. Sin esto, una contraseña larga
             copiada a mano solo se comprueba fallando al conectar, y ahí no se
@@ -273,9 +280,11 @@
             <button
               type="button"
               class="secret__toggle"
-              [attr.aria-label]="passwordVisible() ? 'Ocultar la contraseña' : 'Ver la contraseña'"
+              [attr.aria-label]="
+                (passwordVisible() ? 'connection.password.hide' : 'connection.password.show') | t
+              "
               [attr.aria-pressed]="passwordVisible()"
-              [attr.title]="passwordVisible() ? 'Ocultar' : 'Ver'"
+              [attr.title]="(passwordVisible() ? 'common.hide' : 'common.show') | t"
               (click)="passwordVisible.set(!passwordVisible())"
             >
               <app-icon [name]="passwordVisible() ? 'eye-off' : 'eye'" [size]="13" />
@@ -286,25 +295,21 @@
         <!-- Sin este aviso, el hueco donde estaban usuario y contraseña haría
              dudar de si falta algo por rellenar. -->
         <div class="field field--wide">
-          <span class="field__label">Identidad</span>
-          <span class="field__hint">
-            La sesión se abre con la cuenta de Windows con la que estás usando este equipo.
-          </span>
+          <span class="field__label">{{ 'connection.identity' | t }}</span>
+          <span class="field__hint">{{ 'connection.identity.windows' | t }}</span>
         </div>
       } @else {
         <!-- Y en un motor que es un archivo tampoco hay identidad que dar: quien
              puede leer el archivo puede leer la base. -->
         <div class="field field--wide">
-          <span class="field__label">Identidad</span>
-          <span class="field__hint">
-            Este motor no tiene usuarios: el permiso es el del archivo en el disco.
-          </span>
+          <span class="field__label">{{ 'connection.identity' | t }}</span>
+          <span class="field__hint">{{ 'connection.identity.file' | t }}</span>
         </div>
       }
     </div>
 
-    <h3 class="section">Entorno</h3>
-    <div class="environments" role="group" aria-label="Entorno">
+    <h3 class="section">{{ 'connection.environment' | t }}</h3>
+    <div class="environments" role="group" [attr.aria-label]="'connection.environment' | t">
       @for (option of environments; track option.id) {
         <button
           type="button"
@@ -315,7 +320,7 @@
           (click)="environment.set(option.id)"
         >
           <span class="environment__dot" aria-hidden="true"></span>
-          {{ option.label }}
+          {{ option.label | t }}
         </button>
       }
     </div>
@@ -323,7 +328,7 @@
     <label class="checkbox">
       <input type="checkbox" [(ngModel)]="readOnly" />
       <span>
-        Solo lectura
+        {{ 'connection.readOnly' | t }}
         <span class="checkbox__hint">{{ readOnlyHint() }}</span>
       </span>
     </label>
@@ -338,7 +343,7 @@
       >
         <span class="advanced-toggle__title">
           <app-icon name="settings" [size]="14" />
-          Opciones avanzadas
+          {{ 'connection.advanced' | t }}
         </span>
         <span class="advanced-toggle__summary">{{ advancedSummary() }}</span>
         <app-icon name="chevron-down" [size]="12" />
@@ -347,10 +352,14 @@
         class="advanced"
         id="connection-advanced"
         [hidden]="!advancedOpen()"
-        aria-label="Cifrado y túnel SSH"
+        [attr.aria-label]="'connection.advanced.label' | t"
       >
-        <h3 class="section">Cifrado</h3>
-        <div class="environments" role="group" aria-label="Cifrado de la conexión">
+        <h3 class="section">{{ 'connection.encryption' | t }}</h3>
+        <div
+          class="environments"
+          role="group"
+          [attr.aria-label]="'connection.encryption.group' | t"
+        >
           @for (option of sslModes; track option.id) {
             <button
               type="button"
@@ -359,33 +368,30 @@
               [attr.aria-pressed]="sslMode() === option.id"
               (click)="selectSslMode(option.id)"
             >
-              {{ option.label }}
+              {{ option.label | t }}
             </button>
           }
         </div>
         <p class="field__hint">{{ sslHint() }}</p>
 
-        <h3 class="section">Túnel SSH</h3>
+        <h3 class="section">{{ 'connection.ssh' | t }}</h3>
         <label class="checkbox">
           <input type="checkbox" [(ngModel)]="sshEnabled" />
           <span>
-            Conectar a través de un servidor SSH
-            <span class="checkbox__hint">
-              Para bases que solo son accesibles desde otra máquina. El tráfico viaja dentro de la
-              sesión SSH.
-            </span>
+            {{ 'connection.ssh.enable' | t }}
+            <span class="checkbox__hint">{{ 'connection.ssh.enableHint' | t }}</span>
           </span>
         </label>
 
         @if (sshEnabled()) {
           <div class="grid grid--tunnel">
             <label class="field field--host">
-              <span class="field__label">Servidor SSH</span>
+              <span class="field__label">{{ 'connection.ssh.server' | t }}</span>
               <input
                 class="field__input"
                 type="text"
                 [(ngModel)]="sshHost"
-                placeholder="bastion.empresa.com"
+                [placeholder]="'connection.ssh.serverPlaceholder' | t"
                 [class.is-invalid]="fieldError('sshHost')"
                 [attr.aria-invalid]="!!fieldError('sshHost')"
               />
@@ -395,7 +401,7 @@
             </label>
 
             <label class="field field--port">
-              <span class="field__label">Puerto</span>
+              <span class="field__label">{{ 'connection.port' | t }}</span>
               <input
                 class="field__input"
                 type="number"
@@ -411,7 +417,7 @@
             </label>
 
             <label class="field">
-              <span class="field__label">Usuario SSH</span>
+              <span class="field__label">{{ 'connection.ssh.user' | t }}</span>
               <input
                 class="field__input"
                 type="text"
@@ -426,7 +432,9 @@
             </label>
 
             <div class="field">
-              <span class="field__label" id="ssh-auth-label">Acceso al servidor SSH</span>
+              <span class="field__label" id="ssh-auth-label">{{
+                'connection.ssh.access' | t
+              }}</span>
               <div class="environments" role="group" aria-labelledby="ssh-auth-label">
                 @for (option of sshAuthentications; track option.id) {
                   <button
@@ -436,7 +444,7 @@
                     [attr.aria-pressed]="sshAuthentication() === option.id"
                     (click)="selectSshAuthentication(option.id)"
                   >
-                    {{ option.label }}
+                    {{ option.label | t }}
                   </button>
                 }
               </div>
@@ -444,21 +452,19 @@
 
             @if (usesSshKey()) {
               <label class="field field--wide">
-                <span class="field__label">Archivo de clave privada</span>
+                <span class="field__label">{{ 'connection.ssh.keyFile' | t }}</span>
                 <input
                   class="field__input"
                   type="text"
                   [(ngModel)]="sshPrivateKeyPath"
-                  placeholder="C:\Users\tu-usuario\.ssh\id_ed25519"
+                  [placeholder]="'connection.ssh.keyPlaceholder' | t"
                   [class.is-invalid]="fieldError('sshPrivateKeyPath')"
                   [attr.aria-invalid]="!!fieldError('sshPrivateKeyPath')"
                 />
                 @if (fieldError('sshPrivateKeyPath'); as error) {
                   <span class="field__error">{{ error }}</span>
                 } @else {
-                  <span class="field__hint">
-                    Se guarda la ruta, nunca el contenido de la clave.
-                  </span>
+                  <span class="field__hint">{{ 'connection.ssh.keyFileHint' | t }}</span>
                 }
               </label>
             }
@@ -475,9 +481,14 @@
                 <button
                   type="button"
                   class="secret__toggle"
-                  [attr.aria-label]="sshSecretVisible() ? 'Ocultar el secreto' : 'Ver el secreto'"
+                  [attr.aria-label]="
+                    (sshSecretVisible()
+                      ? 'connection.ssh.secret.hide'
+                      : 'connection.ssh.secret.show'
+                    ) | t
+                  "
                   [attr.aria-pressed]="sshSecretVisible()"
-                  [attr.title]="sshSecretVisible() ? 'Ocultar' : 'Ver'"
+                  [attr.title]="(sshSecretVisible() ? 'common.hide' : 'common.show') | t"
                   (click)="sshSecretVisible.set(!sshSecretVisible())"
                 >
                   <app-icon [name]="sshSecretVisible() ? 'eye-off' : 'eye'" [size]="13" />
@@ -487,7 +498,7 @@
 
             @if (usesSshPrompts()) {
               <label class="field">
-                <span class="field__label">Código de un solo uso</span>
+                <span class="field__label">{{ 'connection.ssh.code' | t }}</span>
                 <input
                   class="field__input"
                   type="text"
@@ -495,7 +506,7 @@
                   autocomplete="off"
                   inputmode="numeric"
                 />
-                <span class="field__hint">Caduca en segundos, así que nunca se guarda.</span>
+                <span class="field__hint">{{ 'connection.ssh.codeHint' | t }}</span>
               </label>
             }
           </div>
@@ -509,8 +520,8 @@
       <label class="checkbox">
         <input type="checkbox" [(ngModel)]="save" />
         <span>
-          Guardar esta conexión
-          <span class="checkbox__hint">Queda disponible al volver a abrir Druse.</span>
+          {{ 'connection.save' | t }}
+          <span class="checkbox__hint">{{ 'connection.saveHint' | t }}</span>
         </span>
       </label>
     }
@@ -523,11 +534,8 @@
           [disabled]="!secretStore()?.available"
         />
         <span>
-          Recordar el secreto del túnel
-          <span class="checkbox__hint">
-            La contraseña o passphrase del servidor SSH, en el almacén del sistema. El código de un
-            solo uso nunca se guarda.
-          </span>
+          {{ 'connection.rememberSsh' | t }}
+          <span class="checkbox__hint">{{ 'connection.rememberSshHint' | t }}</span>
         </span>
       </label>
     }
@@ -536,16 +544,16 @@
       <label class="checkbox" [class.is-disabled]="!secretStore()?.available">
         <input type="checkbox" [(ngModel)]="storePassword" [disabled]="!secretStore()?.available" />
         <span>
-          Recordar la contraseña
+          {{ 'connection.rememberPassword' | t }}
           <span class="checkbox__hint">
             @if (secretStore(); as store) {
               @if (store.available) {
-                Se guarda en {{ store.description }}, nunca en la base local.
+                {{ 'connection.storedIn' | t: { store: store.description } }}
               } @else {
                 {{ store.description }}
               }
             } @else {
-              Se guarda en el almacén seguro del sistema, nunca en la base local.
+              {{ 'connection.storedInSystem' | t }}
             }
           </span>
         </span>
@@ -564,7 +572,7 @@
       [disabled]="testing() || testingTunnel() || connecting() || saving()"
       (click)="test()"
     >
-      {{ testing() ? 'Probando…' : 'Probar conexión' }}
+      {{ (testing() ? 'connection.testing' : 'connection.test') | t }}
     </button>
     <!--
       Solo cuando hay servidor intermedio: sin él no hay nada que probar, y un
@@ -581,20 +589,20 @@
         [disabled]="testing() || testingTunnel() || connecting() || saving()"
         (click)="testTunnel()"
       >
-        {{ testingTunnel() ? 'Probando túnel…' : 'Probar túnel' }}
+        {{ (testingTunnel() ? 'connection.testingTunnel' : 'connection.testTunnel') | t }}
       </button>
     }
     <span class="foot__spacer"></span>
-    <button type="button" class="btn" (click)="close()">Cancelar</button>
+    <button type="button" class="btn" (click)="close()">{{ 'common.cancel' | t }}</button>
     @if (editing()) {
       <!-- Guardar y conectar son cosas distintas: quien corrige el puerto de una
            conexión de producción no está pidiendo entrar en ella. -->
       <button type="button" class="btn btn--primary" [disabled]="saving()" (click)="saveChanges()">
-        {{ saving() ? 'Guardando…' : 'Guardar cambios' }}
+        {{ (saving() ? 'connection.saving' : 'connection.saveChanges') | t }}
       </button>
     } @else {
       <button type="button" class="btn btn--primary" [disabled]="connecting()" (click)="connect()">
-        {{ connecting() ? 'Conectando…' : 'Conectar' }}
+        {{ (connecting() ? 'connection.connecting' : 'connection.connect') | t }}
       </button>
     }
   </footer>

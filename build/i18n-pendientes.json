@@ -4,8 +4,6 @@
   "frontend/src/app/features/ai/ai-provider-dialog/ai-provider-dialog.html",
   "frontend/src/app/features/backup/backup-dialog/backup-dialog.html",
   "frontend/src/app/features/backup/restore-dialog/restore-dialog.html",
-  "frontend/src/app/features/connections/connection-dialog/connection-dialog.html",
-  "frontend/src/app/features/connections/connections-sidebar/connections-sidebar.html",
   "frontend/src/app/features/diagram/diagram-canvas/diagram-canvas.html",
   "frontend/src/app/features/diagram/diagram-panel/diagram-panel.html",
   "frontend/src/app/features/import/import-dialog/import-dialog.html",

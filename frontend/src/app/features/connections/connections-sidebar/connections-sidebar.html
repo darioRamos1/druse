@@ -1,10 +1,10 @@
 <header class="head">
-  <h2 class="head__title">Conexiones</h2>
+  <h2 class="head__title">{{ 'sidebar.title' | t }}</h2>
   <div class="head__actions">
     <button
       type="button"
       class="mini-button mini-button--accent"
-      title="Agregar conexión"
+      [title]="'sidebar.add' | t"
       (click)="addConnection.emit()"
     >
       <app-icon name="plus" [size]="13" />
@@ -24,19 +24,19 @@
       #filterInput
       type="text"
       class="filter__input"
-      placeholder="Filtrar conexiones y objetos"
-      title="Filtrar conexiones y objetos (Ctrl+Shift+E). Prefijos: t: tabla, v: vista, e: esquema, c: columna, f: función, p: procedimiento"
+      [placeholder]="'sidebar.filter.placeholder' | t"
+      [title]="'sidebar.filter.title' | t"
       [value]="typed()"
       (input)="onFilter($event)"
       (keydown.escape)="clearFilter()"
-      aria-label="Filtrar conexiones y objetos"
+      [attr.aria-label]="'sidebar.filter.placeholder' | t"
     />
     @if (typed()) {
       <button
         type="button"
         class="filter__clear"
-        title="Limpiar el filtro"
-        aria-label="Limpiar el filtro"
+        [title]="'sidebar.filter.clear' | t"
+        [attr.aria-label]="'sidebar.filter.clear' | t"
         (click)="clearFilter()"
       >
         ×
@@ -47,17 +47,22 @@
   @if (search()) {
     <p class="filter__count" role="status">
       @if (matchCount()) {
-        {{ matchCount() }} {{ matchCount() === 1 ? 'objeto' : 'objetos' }}
+        {{ 'sidebar.filter.count' | t: { count: matchCount() } }}
       } @else if (visibleConnections().length) {
-        Solo coinciden conexiones
+        {{ 'sidebar.filter.onlyConnections' | t }}
       } @else {
-        Sin coincidencias
+        {{ 'sidebar.filter.none' | t }}
       }
     </p>
   }
 </div>
 
-<div class="tree" role="tree" aria-label="Conexiones y objetos" (keydown)="onTreeKeydown($event)">
+<div
+  class="tree"
+  role="tree"
+  [attr.aria-label]="'sidebar.tree' | t"
+  (keydown)="onTreeKeydown($event)"
+>
   @for (connection of visibleConnections(); track connection.id) {
     <div
       class="node node--connection"
@@ -71,10 +76,13 @@
       [attr.aria-posinset]="treePositions().get(connection.id)?.index"
       [attr.aria-setsize]="treePositions().get(connection.id)?.count"
       [attr.aria-label]="
-        connection.name +
-        ' · ' +
-        statusLabel(connection) +
-        (connection.readOnly ? ' · Solo lectura' : '')
+        'sidebar.connection.label'
+          | t
+            : {
+                name: connection.name,
+                status: statusLabel(connection),
+                readOnly: connection.readOnly ? 'yes' : 'no',
+              }
       "
       [attr.aria-expanded]="connection.expanded"
       (focus)="focusedId.set(connection.id)"
@@ -90,7 +98,9 @@
       <span class="node__label">
         {{ connection.name }}
         @if (connection.readOnly) {
-          <span class="node__tag" title="Solo lectura">RO</span>
+          <span class="node__tag" [title]="'sidebar.readOnly' | t">{{
+            'sidebar.readOnlyTag' | t
+          }}</span>
         }
       </span>
       <span
@@ -108,11 +118,9 @@
             data-menu-trigger
             [class.is-attention]="connection.lost"
             [attr.tabindex]="tabStop() === connection.id ? 0 : -1"
-            [attr.aria-label]="'Acciones de conexión ' + connection.name"
+            [attr.aria-label]="'sidebar.connection.actions' | t: { name: connection.name }"
             [attr.title]="
-              connection.lost
-                ? 'Conexión perdida. Abre las acciones para reconectar.'
-                : 'Acciones de conexión'
+              (connection.lost ? 'sidebar.connection.lost' : 'sidebar.connection.actionsTitle') | t
             "
             [attr.aria-expanded]="openMenuId() === connection.id"
             aria-haspopup="menu"
@@ -125,7 +133,7 @@
             <div
               class="node-menu"
               role="menu"
-              [attr.aria-label]="'Acciones de conexión ' + connection.name"
+              [attr.aria-label]="'sidebar.connection.actions' | t: { name: connection.name }"
               [style.top.px]="menuPosition().top"
               [style.left.px]="menuPosition().left"
               (click)="$event.stopPropagation()"
@@ -135,42 +143,42 @@
                 <button
                   type="button"
                   role="menuitem"
-                  title="Volver a conectar"
+                  [title]="'sidebar.reconnect' | t"
                   [disabled]="connection.state === 'connecting'"
                   (click)="act($event, () => reconnect.emit(connection.id))"
                 >
-                  <app-icon name="refresh" [size]="12" /> Volver a conectar
+                  <app-icon name="refresh" [size]="12" /> {{ 'sidebar.reconnect' | t }}
                 </button>
               }
               @if (connection.state === 'connected') {
                 <button
                   type="button"
                   role="menuitem"
-                  title="Desconectar"
+                  [title]="'sidebar.disconnect' | t"
                   (click)="act($event, () => disconnect.emit(connection.id))"
                 >
-                  <app-icon name="disconnect" [size]="12" /> Desconectar
+                  <app-icon name="disconnect" [size]="12" /> {{ 'sidebar.disconnect' | t }}
                 </button>
               }
               @if (connection.saved) {
                 <button
                   type="button"
                   role="menuitem"
-                  title="Editar esta conexión"
+                  [title]="'sidebar.editTitle' | t"
                   [disabled]="connection.state === 'connecting'"
                   (click)="act($event, () => edit.emit(connection.id))"
                 >
-                  <app-icon name="edit" [size]="12" /> Editar conexión
+                  <app-icon name="edit" [size]="12" /> {{ 'sidebar.edit' | t }}
                 </button>
                 <button
                   type="button"
                   role="menuitem"
                   class="is-danger"
-                  title="Eliminar esta conexión guardada"
+                  [title]="'sidebar.forgetTitle' | t"
                   [disabled]="connection.state === 'connecting'"
                   (click)="act($event, () => forget.emit(connection.id))"
                 >
-                  <app-icon name="trash" [size]="12" /> Eliminar conexión guardada
+                  <app-icon name="trash" [size]="12" /> {{ 'sidebar.forget' | t }}
                 </button>
               }
             </div>
@@ -190,7 +198,9 @@
           [attr.aria-level]="node.depth + 1"
           [attr.aria-posinset]="treePositions().get(node.id)?.index"
           [attr.aria-setsize]="treePositions().get(node.id)?.count"
-          [attr.aria-label]="node.label + (node.hint ? ' · ' + node.hint : '')"
+          [attr.aria-label]="
+            'sidebar.node.label' | t: { label: node.label, hint: node.hint || 'none' }
+          "
           [attr.aria-selected]="!!node.selected"
           [attr.aria-expanded]="node.expandable ? node.expanded : null"
           (focus)="focusedId.set(node.id)"
@@ -252,7 +262,7 @@
                 class="node__menu-trigger"
                 data-menu-trigger
                 [attr.tabindex]="tabStop() === node.id ? 0 : -1"
-                [attr.aria-label]="'Acciones para ' + node.label"
+                [attr.aria-label]="'sidebar.node.actions' | t: { name: node.label }"
                 [attr.aria-expanded]="openMenuId() === node.id"
                 aria-haspopup="menu"
                 (click)="toggleMenu($event, node.id)"
@@ -265,7 +275,7 @@
                 <div
                   class="node-menu"
                   role="menu"
-                  [attr.aria-label]="'Acciones para ' + node.label"
+                  [attr.aria-label]="'sidebar.node.actions' | t: { name: node.label }"
                   [style.top.px]="menuPosition().top"
                   [style.left.px]="menuPosition().left"
                   (click)="$event.stopPropagation()"
@@ -278,7 +288,7 @@
                       (click)="act($event, () => openNode.emit(node))"
                     >
                       <app-icon name="console" [size]="12" />
-                      Abrir SELECT
+                      {{ 'sidebar.openSelect' | t }}
                     </button>
                     <button
                       type="button"
@@ -286,11 +296,11 @@
                       (click)="act($event, () => composeQuery.emit(node))"
                     >
                       <app-icon name="filter" [size]="12" />
-                      Componer consulta
+                      {{ 'sidebar.compose' | t }}
                     </button>
                     <button type="button" role="menuitem" (click)="copyName($event, node)">
                       <app-icon name="new-query" [size]="12" />
-                      Copiar nombre calificado
+                      {{ 'sidebar.copyName' | t }}
                     </button>
                   }
 
@@ -301,7 +311,7 @@
                       (click)="act($event, () => runProcedure.emit(node))"
                     >
                       <app-icon name="play-outline" [size]="12" />
-                      Ejecutar procedimiento
+                      {{ 'sidebar.runProcedure' | t }}
                     </button>
                   }
 
@@ -312,7 +322,7 @@
                       (click)="act($event, () => definition.emit(node))"
                     >
                       <app-icon name="new-query" [size]="12" />
-                      Ver DDL
+                      {{ 'sidebar.ddl' | t }}
                     </button>
                   }
 
@@ -323,7 +333,7 @@
                       (click)="act($event, () => importInto.emit(node))"
                     >
                       <app-icon name="export" [size]="12" />
-                      Importar archivo
+                      {{ 'sidebar.import' | t }}
                     </button>
                     <button
                       type="button"
@@ -331,7 +341,7 @@
                       (click)="act($event, () => transferFrom.emit(node))"
                     >
                       <app-icon name="export" [size]="12" />
-                      Migrar datos a…
+                      {{ 'sidebar.migrate' | t }}
                     </button>
                     <button
                       type="button"
@@ -339,7 +349,7 @@
                       (click)="act($event, () => designTable.emit(node))"
                     >
                       <app-icon name="table" [size]="12" />
-                      Modificar tabla
+                      {{ 'sidebar.design' | t }}
                     </button>
                   }
 
@@ -358,7 +368,7 @@
                       (click)="act($event, () => diagram.emit(node))"
                     >
                       <app-icon name="diagram" [size]="12" />
-                      Ver diagrama…
+                      {{ 'sidebar.diagram' | t }}
                     </button>
                   }
 
@@ -375,7 +385,7 @@
                       (click)="act($event, () => backup.emit(node))"
                     >
                       <app-icon name="save" [size]="12" />
-                      Respaldar…
+                      {{ 'sidebar.backup' | t }}
                     </button>
                   }
 
@@ -389,7 +399,7 @@
                       (click)="act($event, () => restore.emit(node))"
                     >
                       <app-icon name="folder-open" [size]="12" />
-                      Restaurar…
+                      {{ 'sidebar.restore' | t }}
                     </button>
                   }
 
@@ -403,7 +413,7 @@
                       (click)="act($event, () => createTable.emit(node))"
                     >
                       <app-icon name="plus" [size]="12" />
-                      Crear tabla
+                      {{ 'sidebar.createTable' | t }}
                     </button>
                     <!-- La pasada de varias tablas sale de aquí y no del menú de
                          una tabla: lo que se elige son las de este sitio. -->
@@ -413,7 +423,7 @@
                       (click)="act($event, () => transferTablesFrom.emit(node))"
                     >
                       <app-icon name="export" [size]="12" />
-                      Migrar tablas a…
+                      {{ 'sidebar.migrateTables' | t }}
                     </button>
                   }
 
@@ -424,7 +434,7 @@
                       (click)="act($event, () => refreshNode.emit(node.id))"
                     >
                       <app-icon name="refresh" [size]="12" />
-                      Actualizar objetos
+                      {{ 'sidebar.refresh' | t }}
                     </button>
                   }
                 </div>
@@ -437,20 +447,20 @@
   } @empty {
     <p class="empty">
       @if (filter()) {
-        Ninguna conexión coincide con el filtro.
+        {{ 'sidebar.empty.filter' | t }}
       } @else {
-        No hay conexiones todavía.
+        {{ 'sidebar.empty.none' | t }}
       }
       <button type="button" class="empty__action" (click)="addConnection.emit()">
-        Crear una conexión
+        {{ 'sidebar.empty.create' | t }}
       </button>
     </p>
   }
 </div>
 
 <footer class="foot">
-  <span>{{ connections().length }} conexiones · {{ activeCount() }} activas</span>
+  <span>{{ 'sidebar.foot' | t: { total: connections().length, active: activeCount() } }}</span>
   @if (version()) {
-    <span class="foot__version">v{{ version() }}</span>
+    <span class="foot__version">{{ 'sidebar.version' | t: { version: version() } }}</span>
   }
 </footer>

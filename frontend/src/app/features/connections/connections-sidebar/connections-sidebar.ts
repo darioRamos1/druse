@@ -14,6 +14,8 @@ import {
   viewChild,
 } from '@angular/core';
 
+import { I18nService } from '../../../core/i18n/i18n.service';
+import { TranslatePipe } from '../../../core/i18n/translate.pipe';
 import { ConnectionSummary, ExplorerNode } from '../../../shared/models/workspace';
 import { EngineBadge } from '../../../shared/ui/engine-badge/engine-badge';
 import { Icon, IconName } from '../../../shared/ui/icon/icon';
@@ -168,7 +170,7 @@ const KIND_ICONS: Readonly<Record<ExplorerNode['kind'], IconName | null>> = {
 @Component({
   selector: 'app-connections-sidebar',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [Icon, EngineBadge],
+  imports: [Icon, EngineBadge, TranslatePipe],
   templateUrl: './connections-sidebar.html',
   styleUrl: './connections-sidebar.scss',
 })
@@ -267,13 +269,13 @@ export class ConnectionsSidebar {
   protected statusLabel(connection: ConnectionSummary): string {
     switch (connection.state) {
       case 'connected':
-        return 'Conectado';
+        return this._i18n.t('sidebar.status.connected');
       case 'connecting':
-        return 'Conectando…';
+        return this._i18n.t('sidebar.status.connecting');
       case 'error':
-        return 'Error de conexión';
+        return this._i18n.t('sidebar.status.error');
       default:
-        return 'Sin conexión. Haz clic para conectar.';
+        return this._i18n.t('sidebar.status.off');
     }
   }
 
@@ -332,6 +334,7 @@ export class ConnectionsSidebar {
   protected readonly search = computed(() => parseSearch(this.filter()));
 
   private readonly _filterInput = viewChild<ElementRef<HTMLInputElement>>('filterInput');
+  private readonly _i18n = inject(I18nService);
   private _pending: ReturnType<typeof setTimeout> | null = null;
 
   constructor() {
