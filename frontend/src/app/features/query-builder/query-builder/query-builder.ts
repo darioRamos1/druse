@@ -3,6 +3,8 @@ import {
   Component,
   OnInit,
   computed,
+  DestroyRef,
+  effect,
   inject,
   input,
   output,
@@ -39,7 +41,10 @@ import {
   buildInsertValues,
   buildSelect,
   buildUpdateValues,
+  COMPARISON_OPERATORS,
 } from '../../query-editor/sql-language/sql-writer';
+import { SQL_DIALECTS } from '../../query-editor/sql-language/sql-dialects';
+import { MAX_JOIN_HOPS, findJoinPath } from './join-path';
 import { DialogFocus } from '../../../shared/a11y/dialog-focus';
 import { DialogBackdrop } from '../../../shared/a11y/dialog-backdrop';
 
@@ -112,13 +117,65 @@ interface OrderDraft {
   readonly descending: boolean;
 }
 
+/** Un cruce tal como se guarda: lo justo para volver a montarlo. */
+interface SavedJoin {
+  readonly id: number;
+  readonly type: JoinType;
+  readonly tableId: string;
+  readonly schema: string;
+  readonly table: string;
+  readonly leftJoinId: number | null;
+  readonly leftColumn: string;
+  readonly rightColumn: string;
+  readonly chosen: readonly string[];
+}
+
+/**
+ * El formulario de un SELECT, para poder volver a él.
+ *
+ * Antes solo se guardaba el SQL, y cargar una composición la dejaba como texto:
+ * cambiar un filtro obligaba a rehacerla entera desde el formulario vacío.
+ */
+interface CompositionState {
+  readonly chosen: readonly string[];
+  readonly joins: readonly SavedJoin[];
+  readonly filters: readonly QueryFilter[];
+  readonly grouped: boolean;
+  readonly groupByKeys: readonly string[];
+  readonly groupPeriods: Readonly<Record<string, DatePeriod | 'none' | undefined>>;
+  readonly aggregates: readonly AggregateDraft[];
+  readonly having: readonly HavingDraft[];
+  readonly orders: readonly OrderDraft[];
+  readonly limit: number | null;
+  /** Falta en las guardadas antes de que existiera. */
+  readonly distinct?: boolean;
+  /** El SQL retocado a mano, si lo estaba al guardar. */
+  readonly sqlOverride: string | null;
+}
+
 interface SavedComposition {
   readonly id: string;
   readonly name: string;
   readonly sql: string;
+  /** Falta en las guardadas antes de que existiera: esas se abren como texto. */
+  readonly state?: CompositionState;
 }
 
 const MAX_JOIN_SUGGESTIONS = 40;
+
+/**
+ * Cuántas tablas se leen para buscar un camino entre dos.
+ *
+ * El mismo tope que aplica la API al grafo del esquema: pasarlo sería una
+ * petición que el servidor rechaza.
+ */
+const MAX_PATH_TABLES = 300;
+
+/** Cuánto se espera tras el último cambio antes de refrescar la vista previa. */
+const AUTO_PREVIEW_DELAY_MS = 700;
+
+/** Dónde se recuerda si la vista previa se actualiza sola. Es de quien usa Druse, no de la tabla. */
+const AUTO_PREVIEW_KEY = 'druse.query-builder.auto-preview';
 
 /** Operadores que se ofrecen, en el orden en que se usan. */
 const OPERATORS: readonly FilterOperator[] = [
@@ -128,8 +185,11 @@ const OPERATORS: readonly FilterOperator[] = [
   '>=',
   '<',
   '<=',
+  'BETWEEN',
   'LIKE',
+  'NOT LIKE',
   'IN',
+  'NOT IN',
   'IS NULL',
   'IS NOT NULL',
 ];
@@ -152,9 +212,9 @@ const DATE_PERIODS: readonly { readonly value: DatePeriod | 'none'; readonly lab
  * ayudas. Por eso enseña el SQL mientras se compone, en vez de esconderlo
  * detrás de una interfaz que haya que aprender.
  *
- * Los JOIN son explícitos: se eligen las dos tablas y ambas columnas porque
- * Druse todavía no lee claves foráneas del catálogo y no debe inventar una
- * relación.
+ * Los JOIN se proponen desde las claves foráneas que el catálogo declara, pero
+ * las dos columnas quedan a la vista y se pueden cambiar: una relación que el
+ * esquema no declara no se inventa, se elige.
  */
 @Component({
   selector: 'app-query-builder',
@@ -180,14 +240,14 @@ export class QueryBuilder implements OnInit {
   /**
    * Tipos de unión que ofrece el compositor.
    *
-   * Ni MySQL ni Informix tienen `FULL OUTER JOIN`, así que allí no se enseña:
-   * ofrecerlo produciría SQL que el servidor rechaza, y el usuario buscaría el
-   * error en su consulta en vez de en el motor.
+   * `FULL OUTER JOIN` solo donde el motor lo entiende: ofrecerlo en otro
+   * produciría SQL que el servidor rechaza, y el usuario buscaría el error en
+   * su consulta en vez de en el motor. Lo decide el dialecto.
    */
   protected readonly joinTypes = computed<readonly JoinType[]>(() =>
-    this.engine() === 'mysql' || this.engine() === 'informix'
-      ? ['INNER', 'LEFT', 'RIGHT', 'CROSS']
-      : ['INNER', 'LEFT', 'RIGHT', 'FULL OUTER', 'CROSS'],
+    SQL_DIALECTS[this.engine()].fullOuterJoin
+      ? ['INNER', 'LEFT', 'RIGHT', 'FULL OUTER', 'CROSS']
+      : ['INNER', 'LEFT', 'RIGHT', 'CROSS'],
   );
 
   /** Columnas de la tabla, según lo que el catálogo ya sabe. */
@@ -211,6 +271,7 @@ export class QueryBuilder implements OnInit {
     { id: 1, target: '', descending: false },
   ]);
   protected readonly limit = signal<number | null>(100);
+  protected readonly distinct = signal(false);
   protected readonly insertDrafts = signal<readonly ColumnDraft[]>([]);
   protected readonly updateDrafts = signal<readonly ColumnDraft[]>([]);
   protected readonly updateFilters = signal<readonly QueryFilter[]>([]);
@@ -221,6 +282,87 @@ export class QueryBuilder implements OnInit {
   protected readonly savedCompositions = signal<readonly SavedComposition[]>([]);
   protected readonly compositionName = signal('');
   private _previewExecutionId: string | null = null;
+  private _autoPreviewTimer: ReturnType<typeof setTimeout> | undefined;
+
+  /**
+   * La vista previa se refresca sola al cambiar la composición.
+   *
+   * **Apagada por omisión.** Es una consulta real contra el servidor en cada
+   * cambio, y contra una base de producción con tablas grandes eso no puede
+   * pasar sin que alguien lo pida. Se recuerda entre sesiones.
+   */
+  protected readonly autoPreview = signal(readAutoPreview());
+
+  /**
+   * Cuándo se puede refrescar sola: solo un SELECT, y solo el que escribe el
+   * formulario. El SQL retocado a mano puede ser cualquier cosa —un DELETE
+   * pegado encima—, y ejecutarlo sin que se pulse nada sería peligroso.
+   */
+  protected readonly canAutoPreview = computed(
+    () =>
+      this.operation() === 'select' &&
+      this.sqlOverride() === null &&
+      this.validationMessages().length === 0 &&
+      !this.hasPendingValues() &&
+      !this.joins().some((join) => join.loading),
+  );
+
+  /**
+   * Algún filtro sin su valor.
+   *
+   * Refrescar entonces ejecutaría el marcador de «valor obligatorio» y enseñaría
+   * un error de sintaxis por cada campo que se está a medio escribir.
+   */
+  private readonly hasPendingValues = computed(() =>
+    [...this.filters(), ...this.having()].some(
+      (filter) =>
+        this.needsValue(filter.operator) &&
+        !(filter as QueryFilter).compareColumn &&
+        (filter.value === null ||
+          (filter.operator === 'BETWEEN' && (filter as QueryFilter).valueTo == null)),
+    ),
+  );
+
+  private readonly scheduleAutoPreview = effect(() => {
+    const sql = this.sql();
+
+    clearTimeout(this._autoPreviewTimer);
+
+    if (!this.autoPreview() || !this.canAutoPreview() || this.loading() || !sql) {
+      return;
+    }
+
+    this._autoPreviewTimer = setTimeout(() => void this.refreshPreview(), AUTO_PREVIEW_DELAY_MS);
+  });
+
+  constructor() {
+    inject(DestroyRef).onDestroy(() => clearTimeout(this._autoPreviewTimer));
+  }
+
+  protected setAutoPreview(enabled: boolean): void {
+    this.autoPreview.set(enabled);
+
+    try {
+      localStorage.setItem(AUTO_PREVIEW_KEY, enabled ? '1' : '0');
+    } catch {
+      // Sin almacenamiento se recuerda solo mientras el diálogo siga abierto.
+    }
+  }
+
+  /** Cancela la que siga en curso —ya describe una composición vieja— y lanza otra. */
+  private async refreshPreview(): Promise<void> {
+    if (!this.canAutoPreview()) {
+      return;
+    }
+
+    if (this._previewExecutionId) {
+      await this._store.cancelExecution(this._previewExecutionId);
+      this._previewExecutionId = null;
+      this.previewRunning.set(false);
+    }
+
+    await this.runPreview();
+  }
 
   ngOnInit(): void {
     // Las columnas hacen falta para todo lo de aquí; se piden una vez.
@@ -329,6 +471,8 @@ export class QueryBuilder implements OnInit {
           having: grouped ? this.toHaving() : undefined,
           orders: this.toOrders(),
           limit: this.limit(),
+          // Con GROUP BY cada grupo ya sale una sola vez: DISTINCT no añadiría nada.
+          distinct: !grouped && this.distinct(),
         });
     }
   });
@@ -746,6 +890,114 @@ export class QueryBuilder implements OnInit {
     }
   }
 
+  /** Buscando el camino hasta una tabla. */
+  protected readonly pathSearching = signal(false);
+
+  /** Por qué no se añadió el camino pedido, si no se pudo. */
+  protected readonly pathNotice = signal<string | null>(null);
+
+  /**
+   * Añade los cruces que llevan hasta una tabla, siguiendo las claves foráneas.
+   *
+   * Es la parte que más cuesta escribir a mano: de `clientes` a `productos` hay
+   * que pasar por `pedidos` y por `lineas`, y acertar las cuatro columnas de
+   * los dos `ON` intermedios. Aquí se elige el destino y el resto lo dice el
+   * esquema, que se lee entero una vez para ver también quién apunta a quién.
+   */
+  protected async joinPathTo(tableId: string): Promise<void> {
+    this.pathNotice.set(null);
+
+    const target = this.availableRelations().find((node) => node.source.id === tableId)?.source;
+
+    if (!target) {
+      return;
+    }
+
+    const candidates = [this.table(), ...this.availableRelations().map((node) => node.source)];
+
+    if (candidates.length > MAX_PATH_TABLES) {
+      this.pathNotice.set(
+        `Hay ${candidates.length} tablas a la vista y no se pueden leer más de ${MAX_PATH_TABLES} ` +
+          'de una vez. Añade los cruces uno a uno.',
+      );
+      return;
+    }
+
+    this.pathSearching.set(true);
+
+    try {
+      const graph = await this._store.schemaGraph(this.connectionId(), candidates);
+
+      if (!graph) {
+        this.pathNotice.set('No se pudo leer el esquema para buscar el camino.');
+        return;
+      }
+
+      const path = findJoinPath(graph, this.table(), target);
+
+      if (path === null) {
+        this.pathNotice.set(
+          `No hay un camino de claves foráneas de hasta ${MAX_JOIN_HOPS} saltos entre ` +
+            `${this.table().name} y ${target.name}.`,
+        );
+        return;
+      }
+
+      const sameTable = (
+        a: { schema?: string; name: string },
+        b: { schema?: string; name: string },
+      ) =>
+        a.name.toLowerCase() === b.name.toLowerCase() &&
+        (a.schema ?? this.table().schema ?? '').toLowerCase() ===
+          (b.schema ?? this.table().schema ?? '').toLowerCase();
+
+      let leftJoinId: number | null = null;
+      let nextId = Math.max(0, ...this.joins().map((join) => join.id)) + 1;
+      const added: SavedJoin[] = [];
+
+      for (const step of path) {
+        const relation = this.availableRelations().find((node) => sameTable(node.source, step.to));
+
+        if (!relation) {
+          this.pathNotice.set(`El camino pasa por ${step.to.name}, que no está a la vista.`);
+          return;
+        }
+
+        added.push({
+          id: nextId,
+          type: 'INNER',
+          tableId: relation.source.id,
+          schema: relation.source.schema ?? '',
+          table: relation.source.name,
+          leftJoinId,
+          leftColumn: step.fromColumn,
+          rightColumn: step.toColumn,
+          chosen: [],
+        });
+        leftJoinId = nextId;
+        nextId += 1;
+      }
+
+      this.joins.update((current) => [
+        ...current,
+        ...added.map((join) => ({
+          ...join,
+          search: this.relationLabel(
+            this.availableRelations().find((node) => node.source.id === join.tableId)!.source,
+          ),
+          columns: [],
+          loading: true,
+          suggestionsOpen: false,
+          highlighted: 0,
+        })),
+      ]);
+
+      await Promise.all(added.map((join) => this.restoreJoinColumns(join)));
+    } finally {
+      this.pathSearching.set(false);
+    }
+  }
+
   protected readonly simpleForeignKeys = computed(() =>
     this.foreignKeys().filter((key) => key.columns.length === 1),
   );
@@ -1039,7 +1291,9 @@ export class QueryBuilder implements OnInit {
 
     this.filters.update((current) => [
       ...current,
-      { column: primera, operator: '=', value: '', conjunction: 'AND' },
+      // `null` y no `''`: sin rellenar, el SQL lo marca como pendiente. Con
+      // cadena vacía salía `"id" = ''`, una condición que parece completa.
+      { column: primera, operator: '=', value: null, conjunction: 'AND' },
     ]);
   }
 
@@ -1082,7 +1336,7 @@ export class QueryBuilder implements OnInit {
    * separada por comas, y un calendario no sabe escribir eso.
    */
   protected filterKind(filter: QueryFilter): InputKind {
-    if (filter.operator === 'IN') {
+    if (filter.operator === 'IN' || filter.operator === 'NOT IN') {
       return 'text';
     }
 
@@ -1120,6 +1374,61 @@ export class QueryBuilder implements OnInit {
   /** `IS NULL` y `IS NOT NULL` no llevan valor: el campo estorba. */
   protected needsValue(operator: FilterOperator): boolean {
     return operator !== 'IS NULL' && operator !== 'IS NOT NULL';
+  }
+
+  /** Si los filtros mezclan AND y OR, que es cuando el orden importa. */
+  protected readonly mixesConjunctions = computed(
+    () =>
+      new Set(
+        this.filters()
+          .slice(1)
+          .map((filter) => filter.conjunction ?? 'AND'),
+      ).size > 1,
+  );
+
+  /**
+   * Lo que se escribió en el campo de valor, tal como lo guarda el filtro.
+   *
+   * Vaciar el campo de una columna que no es de texto deja el valor pendiente:
+   * en un número o una fecha, `''` no es un valor, y escribirlo producía
+   * `"id" = ''`. En texto sí lo es, y se respeta.
+   */
+  protected filterText(filter: QueryFilter, text: string): string | null {
+    return text === '' && this.filterKind(filter) !== 'text' ? null : text;
+  }
+
+  /** Si el operador compara dos cosas, y por tanto admite otra columna. */
+  protected isComparison(operator: FilterOperator): boolean {
+    return COMPARISON_OPERATORS.includes(operator);
+  }
+
+  /**
+   * Cambia entre comparar con un valor y con otra columna.
+   *
+   * Al pasar a columna se propone una distinta de la del filtro: comparar una
+   * columna consigo misma no filtra nada.
+   */
+  protected setCompareTarget(index: number, target: 'value' | 'column'): void {
+    const filter = this.filters()[index];
+
+    if (!filter) {
+      return;
+    }
+
+    if (target === 'value') {
+      this.patchFilter(index, { compareColumn: null });
+      return;
+    }
+
+    const otra =
+      this.columns().find((column) => column.name !== filter.column)?.name ?? filter.column;
+
+    this.patchFilter(index, { compareColumn: otra });
+  }
+
+  /** Lista separada por comas: se explica en el propio campo. */
+  protected isList(operator: FilterOperator): boolean {
+    return operator === 'IN' || operator === 'NOT IN';
   }
 
   protected setLimit(value: string): void {
@@ -1174,14 +1483,111 @@ export class QueryBuilder implements OnInit {
       return;
     }
 
-    const saved: SavedComposition = { id: crypto.randomUUID(), name, sql: this.sql() };
+    const saved: SavedComposition = {
+      id: crypto.randomUUID(),
+      name,
+      sql: this.sql(),
+      state: this.compositionState(),
+    };
     this.savedCompositions.update((current) => [saved, ...current]);
     this.compositionName.set('');
     this.persistSavedCompositions();
   }
 
-  protected loadComposition(saved: SavedComposition): void {
-    this.sqlOverride.set(saved.sql);
+  protected async loadComposition(saved: SavedComposition): Promise<void> {
+    const state = saved.state;
+
+    if (!state) {
+      this.sqlOverride.set(saved.sql);
+      return;
+    }
+
+    this.invalidateAffected();
+    this.operation.set('select');
+    this.chosen.set(state.chosen);
+    this.filters.set(state.filters);
+    this.grouped.set(state.grouped);
+    this.groupByKeys.set(state.groupByKeys);
+    this.groupPeriods.set(state.groupPeriods);
+    this.aggregates.set(state.aggregates);
+    this.having.set(state.having);
+    this.orders.set(state.orders);
+    this.limit.set(state.limit);
+    this.distinct.set(state.distinct ?? false);
+    this.sqlOverride.set(state.sqlOverride);
+
+    // Los cruces se montan con las columnas que se eligieron, no con las que
+    // propondría la tabla al elegirla de nuevo: `loadJoin` las recalcula, y
+    // aquí eso desharía lo guardado.
+    this.joins.set(
+      state.joins.map((join) => ({
+        ...join,
+        search: `${join.schema ? `${join.schema}.` : ''}${join.table}`,
+        columns: [],
+        loading: true,
+        suggestionsOpen: false,
+        highlighted: 0,
+      })),
+    );
+
+    await Promise.all(state.joins.map((join) => this.restoreJoinColumns(join)));
+  }
+
+  /** Lo que se guarda de la composición actual. */
+  private compositionState(): CompositionState {
+    return {
+      chosen: this.chosen(),
+      joins: this.joins().map((join) => {
+        const relation = this.availableRelations().find((node) => node.source.id === join.tableId);
+
+        return {
+          id: join.id,
+          type: join.type,
+          tableId: join.tableId,
+          schema: relation?.source.schema ?? '',
+          table: relation?.source.name ?? join.search,
+          leftJoinId: join.leftJoinId,
+          leftColumn: join.leftColumn,
+          rightColumn: join.rightColumn,
+          chosen: join.chosen,
+        };
+      }),
+      filters: this.filters(),
+      grouped: this.grouped(),
+      groupByKeys: this.groupByKeys(),
+      groupPeriods: this.groupPeriods(),
+      aggregates: this.aggregates(),
+      having: this.having(),
+      orders: this.orders(),
+      limit: this.limit(),
+      distinct: this.distinct(),
+      sqlOverride: this.sqlOverride(),
+    };
+  }
+
+  /**
+   * Trae las columnas de un cruce restaurado, sin tocar las que se eligieron.
+   *
+   * Si la tabla ya no existe, el cruce se queda sin columnas y el formulario lo
+   * enseña vacío: mejor que quitarlo en silencio y generar otra consulta.
+   */
+  private async restoreJoinColumns(join: SavedJoin): Promise<void> {
+    let columns: readonly KnownColumn[] = [];
+
+    try {
+      columns = await this._store.ensureColumnsAsync(
+        join.schema || null,
+        join.table,
+        this.connectionId(),
+        this.table().database,
+      );
+    } catch {
+      // Sin columnas: el cruce queda a la vista para corregirlo.
+    }
+
+    this.joins.update((current) =>
+      current.map((item) => (item.id === join.id ? { ...item, columns, loading: false } : item)),
+    );
   }
 
   protected removeComposition(id: string): void {
@@ -1478,4 +1884,12 @@ function aggregateLabelForOrder(
       ? '*'
       : (columns.find((option) => option.key === aggregate.columnKey)?.label ?? '?');
   return `${aggregate.function}(${aggregate.distinct ? 'DISTINCT ' : ''}${column})`;
+}
+
+function readAutoPreview(): boolean {
+  try {
+    return localStorage.getItem(AUTO_PREVIEW_KEY) === '1';
+  } catch {
+    return false;
+  }
 }

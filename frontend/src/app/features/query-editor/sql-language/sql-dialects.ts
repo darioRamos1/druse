@@ -64,12 +64,33 @@ export interface SqlDialect {
    * un cero, que es la señal para que asigne el siguiente valor.
    */
   readonly allGeneratedInsert: (table: string, serial: string | null) => string;
+
+  /**
+   * Si el motor entiende `FULL OUTER JOIN`.
+   *
+   * Vive aquí y no en el compositor porque antes se decidía allí con una
+   * comparación de nombres: `informix` quedaba fuera y `informixsqli` —el
+   * mismo servidor por otro protocolo— no, así que la opción aparecía o no
+   * según cómo se hubiera conectado. Aquí el motor que falte no compila.
+   */
+  readonly fullOuterJoin: boolean;
+
+  /**
+   * Si `DISTINCT` va **delante** del límite escrito tras el SELECT.
+   *
+   * Solo importa en los motores con `leadingLimit`, y ahí cada uno lo quiere al
+   * revés: SQL Server escribe `SELECT DISTINCT TOP 10` e Informix
+   * `SELECT FIRST 10 DISTINCT`. En el orden contrario, los dos lo rechazan.
+   */
+  readonly distinctBeforeLeadingLimit: boolean;
 }
 
 /** PostgreSQL, y la base de la que parten los demás: comillas dobles y `LIMIT`. */
 const doubleQuote = (identifier: string) => `"${identifier.replace(/"/g, '""')}"`;
 
 const POSTGRESQL: SqlDialect = {
+  distinctBeforeLeadingLimit: true,
+  fullOuterJoin: true,
   quote: doubleQuote,
   leadingLimit: null,
   dateTrunc: (column, period) => `DATE_TRUNC('${period}', ${column})`,
@@ -77,6 +98,8 @@ const POSTGRESQL: SqlDialect = {
 };
 
 const SQLSERVER: SqlDialect = {
+  distinctBeforeLeadingLimit: true,
+  fullOuterJoin: true,
   quote: (identifier) => `[${identifier.replace(/]/g, ']]')}]`,
   leadingLimit: (limit) => `TOP ${limit} `,
   dateTrunc: (column, period) => {
@@ -95,6 +118,8 @@ const SQLSERVER: SqlDialect = {
 };
 
 const MYSQL: SqlDialect = {
+  distinctBeforeLeadingLimit: true,
+  fullOuterJoin: false,
   quote: (identifier) => `\`${identifier.replace(/`/g, '``')}\``,
   leadingLimit: null,
   dateTrunc: (column, period) => {
@@ -121,6 +146,8 @@ const MYSQL: SqlDialect = {
  * faltaba antes: SQLI no aparecía en ninguna de las cuatro ramas.
  */
 const INFORMIX: SqlDialect = {
+  distinctBeforeLeadingLimit: false,
+  fullOuterJoin: false,
   quote: doubleQuote,
   leadingLimit: (limit) => `FIRST ${limit} `,
   dateTrunc: (column, period) => {
@@ -155,6 +182,8 @@ const INFORMIX: SqlDialect = {
  * `OracleIdentifier`.
  */
 const ORACLE: SqlDialect = {
+  distinctBeforeLeadingLimit: true,
+  fullOuterJoin: true,
   quote: (identifier) =>
     /^[A-Za-z][A-Za-z0-9_$#]*$/.test(identifier)
       ? identifier.toUpperCase()
@@ -188,6 +217,8 @@ const ORACLE: SqlDialect = {
  * recorta ese texto por donde toque.
  */
 const SQLITE: SqlDialect = {
+  distinctBeforeLeadingLimit: true,
+  fullOuterJoin: true,
   quote: doubleQuote,
   leadingLimit: null,
   dateTrunc: (column, period) => {

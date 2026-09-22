@@ -74,6 +74,15 @@
               </p>
             }
           </div>
+
+          <label class="distinct">
+            <input
+              type="checkbox"
+              [checked]="distinct()"
+              (change)="distinct.set($any($event.target).checked)"
+            />
+            Quitar filas repetidas <code>DISTINCT</code>
+          </label>
         </section>
       }
 
@@ -95,6 +104,25 @@
             Añadir JOIN
           </button>
         </div>
+
+        @if (availableRelations().length > 0) {
+          <div class="filter join-path">
+            <span class="hint">Llegar hasta</span>
+            <select
+              [disabled]="pathSearching()"
+              (change)="joinPathTo($any($event.target).value); $any($event.target).value = ''"
+              aria-label="Tabla a la que llegar siguiendo las claves foráneas"
+            >
+              <option value="">{{ pathSearching() ? 'Buscando el camino…' : 'una tabla…' }}</option>
+              @for (relation of availableRelations(); track relation.source.id) {
+                <option [value]="relation.source.id">{{ relationLabel(relation.source) }}</option>
+              }
+            </select>
+          </div>
+          @if (pathNotice(); as notice) {
+            <p class="hint hint--warning">{{ notice }}</p>
+          }
+        }
 
         @if (simpleForeignKeys().length > 0) {
           <div class="filter">
@@ -136,7 +164,7 @@
                   aria-label="Tipo de JOIN"
                 >
                   @for (type of joinTypes(); track type) {
-                    <option [value]="type">{{ type }} JOIN</option>
+                    <option [value]="type" [selected]="type === join.type">{{ type }} JOIN</option>
                   }
                 </select>
               </label>
@@ -226,7 +254,10 @@
                         aria-label="Tabla izquierda del JOIN"
                       >
                         @for (source of joinSources(join); track source.joinId) {
-                          <option [value]="source.joinId ?? ''">
+                          <option
+                            [value]="source.joinId ?? ''"
+                            [selected]="(source.joinId ?? '') === (join.leftJoinId ?? '')"
+                          >
                             {{ source.alias }} · {{ source.label }}
                           </option>
                         }
@@ -240,7 +271,12 @@
                         aria-label="Columna izquierda del JOIN"
                       >
                         @for (column of leftColumns(join); track column.name) {
-                          <option [value]="column.name">{{ column.name }}</option>
+                          <option
+                            [value]="column.name"
+                            [selected]="column.name === join.leftColumn"
+                          >
+                            {{ column.name }}
+                          </option>
                         }
                       </select>
                     </label>
@@ -262,7 +298,12 @@
                         aria-label="Columna de la tabla cruzada"
                       >
                         @for (column of join.columns; track column.name) {
-                          <option [value]="column.name">{{ column.name }}</option>
+                          <option
+                            [value]="column.name"
+                            [selected]="column.name === join.rightColumn"
+                          >
+                            {{ column.name }}
+                          </option>
                         }
                       </select>
                     </label>
@@ -343,7 +384,12 @@
                       [attr.aria-label]="'Período para ' + option.label"
                     >
                       @for (period of datePeriods; track period.value) {
-                        <option [value]="period.value">{{ period.label }}</option>
+                        <option
+                          [value]="period.value"
+                          [selected]="period.value === (groupPeriods()[option.key] ?? 'none')"
+                        >
+                          {{ period.label }}
+                        </option>
                       }
                     </select>
                   }
@@ -371,7 +417,9 @@
                   aria-label="Función agregada"
                 >
                   @for (function of aggregateFunctions; track function) {
-                    <option [value]="function">{{ function }}</option>
+                    <option [value]="function" [selected]="function === aggregate.function">
+                      {{ function }}
+                    </option>
                   }
                 </select>
                 <span>(</span>
@@ -384,7 +432,9 @@
                     <option value="*">* · todas las filas</option>
                   }
                   @for (option of queryColumns(); track option.key) {
-                    <option [value]="option.key">{{ option.label }}</option>
+                    <option [value]="option.key" [selected]="option.key === aggregate.columnKey">
+                      {{ option.label }}
+                    </option>
                   }
                 </select>
                 <span>)</span>
@@ -444,7 +494,9 @@
                 aria-label="Cálculo para HAVING"
               >
                 @for (aggregate of aggregates(); track aggregate.id) {
-                  <option [value]="aggregate.id">{{ aggregateLabel(aggregate) }}</option>
+                  <option [value]="aggregate.id" [selected]="aggregate.id === filter.aggregateId">
+                    {{ aggregateLabel(aggregate) }}
+                  </option>
                 }
               </select>
               <select
@@ -453,7 +505,9 @@
                 aria-label="Operador HAVING"
               >
                 @for (operator of havingOperators; track operator) {
-                  <option [value]="operator">{{ operator }}</option>
+                  <option [value]="operator" [selected]="operator === filter.operator">
+                    {{ operator }}
+                  </option>
                 }
               </select>
               <app-value-input
@@ -489,6 +543,16 @@
         @if (grouped()) {
           <p class="hint">Filtran las filas antes de calcular los grupos.</p>
         }
+        @if (mixesConjunctions()) {
+          <!--
+            Solo cuando se mezclan: con todo AND o todo OR el orden no cambia
+            nada, y la nota sería ruido.
+          -->
+          <p class="hint">
+            Se evalúan en orden, de arriba abajo: cada cambio entre AND y OR agrupa lo anterior
+            entre paréntesis.
+          </p>
+        }
 
         @for (filter of filters(); track $index; let filterIndex = $index) {
           <div class="filter">
@@ -508,7 +572,9 @@
               aria-label="Columna"
             >
               @for (column of columns(); track column.name) {
-                <option [value]="column.name">{{ column.name }}</option>
+                <option [value]="column.name" [selected]="column.name === filter.column">
+                  {{ column.name }}
+                </option>
               }
             </select>
 
@@ -518,18 +584,65 @@
               aria-label="Operador"
             >
               @for (operator of operators; track operator) {
-                <option [value]="operator">{{ operator }}</option>
+                <option [value]="operator" [selected]="operator === filter.operator">
+                  {{ operator }}
+                </option>
               }
             </select>
 
-            @if (needsValue(filter.operator)) {
+            @if (isComparison(filter.operator)) {
+              <!--
+                Con qué se compara: un valor escrito o otra columna de la tabla,
+                como fecha_entrega > fecha_pedido. Sin esto había que ir al
+                editor para algo que el compositor ya casi escribe.
+              -->
+              <select
+                class="filter__target"
+                [value]="filter.compareColumn ? 'column' : 'value'"
+                (change)="setCompareTarget($index, $any($event.target).value)"
+                aria-label="Comparar con"
+              >
+                <option value="value">un valor</option>
+                <option value="column">otra columna</option>
+              </select>
+            }
+
+            @if (filter.compareColumn && isComparison(filter.operator)) {
+              <select
+                [value]="filter.compareColumn"
+                (change)="patchFilter($index, { compareColumn: $any($event.target).value })"
+                aria-label="Columna con la que se compara"
+              >
+                @for (column of columns(); track column.name) {
+                  <option [value]="column.name" [selected]="column.name === filter.compareColumn">
+                    {{ column.name }}
+                  </option>
+                }
+              </select>
+            } @else if (needsValue(filter.operator)) {
               <app-value-input
                 [value]="filter.value ?? ''"
                 [kind]="filterKind(filter)"
-                [dataType]="filter.operator === 'IN' ? '1, 2, 3' : 'valor'"
-                label="Valor"
-                (valueChange)="patchFilter($index, { value: $event })"
+                [dataType]="
+                  isList(filter.operator)
+                    ? '1, 2, 3'
+                    : filter.operator === 'BETWEEN'
+                      ? 'desde'
+                      : 'valor'
+                "
+                [label]="filter.operator === 'BETWEEN' ? 'Desde' : 'Valor'"
+                (valueChange)="patchFilter($index, { value: filterText(filter, $event) })"
               />
+              @if (filter.operator === 'BETWEEN') {
+                <span class="filter__between">y</span>
+                <app-value-input
+                  [value]="filter.valueTo ?? ''"
+                  [kind]="filterKind(filter)"
+                  dataType="hasta"
+                  label="Hasta"
+                  (valueChange)="patchFilter($index, { valueTo: filterText(filter, $event) })"
+                />
+              }
             } @else {
               <span class="filter__novalue">sin valor</span>
             }
@@ -562,7 +675,9 @@
             >
               <option value="">(sin orden)</option>
               @for (option of orderOptions(); track option.value) {
-                <option [value]="option.value">{{ option.label }}</option>
+                <option [value]="option.value" [selected]="option.value === order.target">
+                  {{ option.label }}
+                </option>
               }
             </select>
             <label class="check">
@@ -731,7 +846,9 @@
               aria-label="Columna del filtro"
             >
               @for (column of columns(); track column.name) {
-                <option [value]="column.name">{{ column.name }}</option>
+                <option [value]="column.name" [selected]="column.name === filter.column">
+                  {{ column.name }}
+                </option>
               }
             </select>
             <select
@@ -740,7 +857,9 @@
               aria-label="Operador del filtro"
             >
               @for (operator of operators; track operator) {
-                <option [value]="operator">{{ operator }}</option>
+                <option [value]="operator" [selected]="operator === filter.operator">
+                  {{ operator }}
+                </option>
               }
             </select>
             @if (needsValue(filter.operator)) {
@@ -748,9 +867,25 @@
                 type="text"
                 [value]="filter.value ?? ''"
                 (input)="patchUpdateFilter($index, { value: $any($event.target).value })"
-                placeholder="valor obligatorio"
-                aria-label="Valor del filtro"
+                [placeholder]="
+                  isList(filter.operator)
+                    ? '1, 2, 3'
+                    : filter.operator === 'BETWEEN'
+                      ? 'desde'
+                      : 'valor obligatorio'
+                "
+                [attr.aria-label]="filter.operator === 'BETWEEN' ? 'Desde' : 'Valor del filtro'"
               />
+              @if (filter.operator === 'BETWEEN') {
+                <span class="filter__between">y</span>
+                <input
+                  type="text"
+                  [value]="filter.valueTo ?? ''"
+                  (input)="patchUpdateFilter($index, { valueTo: $any($event.target).value })"
+                  placeholder="hasta"
+                  aria-label="Hasta"
+                />
+              }
             } @else {
               <span class="filter__novalue">sin valor</span>
             }
@@ -888,7 +1023,20 @@
               {{ previewCanceling() ? 'Cancelando…' : 'Cancelar prueba' }}
             </button>
           }
+          <label class="auto-preview">
+            <input
+              type="checkbox"
+              [checked]="autoPreview()"
+              (change)="setAutoPreview($any($event.target).checked)"
+            />
+            Actualizar sola
+          </label>
         </div>
+        @if (autoPreview() && sqlOverride() !== null) {
+          <p class="hint">
+            No se actualiza sola con el SQL retocado a mano: pulsa «Probar con 10 filas».
+          </p>
+        }
 
         @if (previewSet(); as set) {
           <app-results-grid [resultSet]="set" [compact]="true" />

@@ -676,3 +676,30 @@ input[type='number'] {
     }
   }
 }
+
+// La «y» entre los dos extremos de BETWEEN: se lee como la frase que es.
+.filter__between {
+  color: var(--dr-text-tertiary);
+  font-size: 12px;
+}
+
+// Junto a los botones de la vista previa, empujada al final de la fila.
+.auto-preview {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  margin-left: auto;
+  color: var(--dr-text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.distinct {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  margin-top: 8px;
+  color: var(--dr-text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+}

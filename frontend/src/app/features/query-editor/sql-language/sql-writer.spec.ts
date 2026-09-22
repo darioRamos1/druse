@@ -53,6 +53,124 @@ describe('escribir SQL', () => {
   describe('SELECT', () => {
     const base = { schema: 'tpublico', table: 'usuarios', columns: [], filters: [], limit: null };
 
+    /**
+     * Los filtros se evalúan en el orden en que se leen.
+     *
+     * SQL evalúa `AND` antes que `OR`, y la lista escrita tal cual significaba
+     * otra cosa de la que se ve en el panel: con el primero cierto, la fila
+     * salía aunque el último fallara.
+     */
+    it('agrupa entre paréntesis cada vez que se pasa de OR a AND', () => {
+      const sql = buildSelect('postgresql', {
+        ...base,
+        filters: [
+          { column: 'estado', operator: '=', value: 'A' },
+          { column: 'estado', operator: '=', value: 'B', conjunction: 'OR' },
+          { column: 'total', operator: '>', value: '100', conjunction: 'AND' },
+        ],
+      });
+
+      expect(sql).toContain(`WHERE ("estado" = 'A'\n  OR "estado" = 'B')\n  AND "total" > 100`);
+    });
+
+    it('sin mezclar AND y OR no añade paréntesis', () => {
+      const sql = buildSelect('postgresql', {
+        ...base,
+        filters: [
+          { column: 'a', operator: '=', value: '1' },
+          { column: 'b', operator: '=', value: '2', conjunction: 'OR' },
+          { column: 'c', operator: '=', value: '3', conjunction: 'OR' },
+        ],
+      });
+
+      expect(sql).toContain(`WHERE "a" = 1\n  OR "b" = 2\n  OR "c" = 3`);
+    });
+
+    it('cada cambio de enlace envuelve todo lo anterior', () => {
+      const sql = buildSelect('postgresql', {
+        ...base,
+        filters: [
+          { column: 'a', operator: '=', value: '1' },
+          { column: 'b', operator: '=', value: '2', conjunction: 'AND' },
+          { column: 'c', operator: '=', value: '3', conjunction: 'OR' },
+          { column: 'd', operator: '=', value: '4', conjunction: 'AND' },
+        ],
+      });
+
+      expect(sql).toContain(`WHERE (("a" = 1\n  AND "b" = 2)\n  OR "c" = 3)\n  AND "d" = 4`);
+    });
+
+    it('compara una columna con otra', () => {
+      const sql = buildSelect('postgresql', {
+        ...base,
+        filters: [{ column: 'entrega', operator: '>', value: null, compareColumn: 'pedido' }],
+      });
+
+      expect(sql).toContain('WHERE "entrega" > "pedido"');
+    });
+
+    it('con cruces, la columna comparada lleva el alias de la tabla principal', () => {
+      const sql = buildSelect('postgresql', {
+        ...base,
+        alias: 't0',
+        filters: [{ column: 'entrega', operator: '>', value: null, compareColumn: 'pedido' }],
+      });
+
+      expect(sql).toContain('WHERE "t0"."entrega" > "t0"."pedido"');
+    });
+
+    it('fuera de las comparaciones, la otra columna se ignora', () => {
+      const sql = buildSelect('postgresql', {
+        ...base,
+        filters: [{ column: 'nombre', operator: 'LIKE', value: 'a%', compareColumn: 'otra' }],
+      });
+
+      expect(sql).toContain(`"nombre" LIKE 'a%'`);
+    });
+
+    it('escribe DISTINCT en el sitio que pide cada motor', () => {
+      const spec = { ...base, distinct: true, limit: 10 };
+
+      expect(buildSelect('postgresql', spec)).toContain('SELECT DISTINCT *');
+      // SQL Server lo quiere delante del TOP; Informix, detrás del FIRST.
+      expect(buildSelect('sqlserver', spec)).toContain('SELECT DISTINCT TOP 10 *');
+      expect(buildSelect('informix', spec)).toContain('SELECT FIRST 10 DISTINCT *');
+      expect(buildSelect('informixsqli', spec)).toContain('SELECT FIRST 10 DISTINCT *');
+    });
+
+    it('escribe BETWEEN con sus dos extremos', () => {
+      const sql = buildSelect('postgresql', {
+        ...base,
+        filters: [
+          { column: 'fecha', operator: 'BETWEEN', value: '2025-01-01', valueTo: '2025-01-31' },
+        ],
+      });
+
+      expect(sql).toContain(`"fecha" BETWEEN '2025-01-01' AND '2025-01-31'`);
+    });
+
+    it('marca el extremo que falta en un BETWEEN a medias', () => {
+      const sql = buildSelect('postgresql', {
+        ...base,
+        filters: [{ column: 'total', operator: 'BETWEEN', value: '10', valueTo: null }],
+      });
+
+      expect(sql).toContain('"total" BETWEEN 10 AND /* valor obligatorio */');
+    });
+
+    it('escribe las versiones negadas de LIKE e IN', () => {
+      const sql = buildSelect('postgresql', {
+        ...base,
+        filters: [
+          { column: 'nombre', operator: 'NOT LIKE', value: 'test%' },
+          { column: 'id', operator: 'NOT IN', value: '1, 2', conjunction: 'AND' },
+        ],
+      });
+
+      expect(sql).toContain(`"nombre" NOT LIKE 'test%'`);
+      expect(sql).toContain('"id" NOT IN (1, 2)');
+    });
+
     it('sin columnas elegidas usa el asterisco', () => {
       expect(buildSelect('postgresql', base)).toContain('SELECT *');
     });

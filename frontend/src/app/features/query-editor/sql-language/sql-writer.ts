@@ -15,6 +15,14 @@ export interface QueryFilter {
   readonly operator: FilterOperator;
   /** `null` significa que todavía no se rellenó; `''` es texto vacío. */
   readonly value: string | null;
+  /** El otro extremo de `BETWEEN`. Los demás operadores lo ignoran. */
+  readonly valueTo?: string | null;
+  /**
+   * Comparar con otra columna de la misma tabla en vez de con un valor:
+   * `fecha_entrega > fecha_pedido`. Solo con los operadores de comparación;
+   * con el resto no significa nada y se ignora.
+   */
+  readonly compareColumn?: string | null;
   /** Cómo se enlaza con la condición anterior. La primera ignora este valor. */
   readonly conjunction?: LogicalOperator;
 }
@@ -22,7 +30,19 @@ export interface QueryFilter {
 export type LogicalOperator = 'AND' | 'OR';
 
 export type FilterOperator =
-  '=' | '<>' | '>' | '>=' | '<' | '<=' | 'LIKE' | 'IN' | 'IS NULL' | 'IS NOT NULL';
+  | '='
+  | '<>'
+  | '>'
+  | '>='
+  | '<'
+  | '<='
+  | 'BETWEEN'
+  | 'LIKE'
+  | 'NOT LIKE'
+  | 'IN'
+  | 'NOT IN'
+  | 'IS NULL'
+  | 'IS NOT NULL';
 
 /** Lo que hay que saber para escribir un SELECT. */
 export interface SelectSpec {
@@ -30,6 +50,8 @@ export interface SelectSpec {
   readonly table: string;
   /** Columnas elegidas. Vacío significa `*`. */
   readonly columns: readonly (string | SelectColumn)[];
+  /** Quitar las filas repetidas del resultado. */
+  readonly distinct?: boolean;
   readonly filters: readonly QueryFilter[];
   readonly orderBy?: string | SelectColumn;
   readonly descending?: boolean;
@@ -156,24 +178,46 @@ function condition(engine: DatabaseEngine, filter: QueryFilter, alias?: string):
     ? `${quote(engine, alias)}.${quote(engine, filter.column)}`
     : quote(engine, filter.column);
 
-  return comparison(column, filter);
+  const other = filter.compareColumn
+    ? alias
+      ? `${quote(engine, alias)}.${quote(engine, filter.compareColumn)}`
+      : quote(engine, filter.compareColumn)
+    : null;
+
+  return comparison(column, filter, other);
 }
 
-function comparison(expression: string, filter: Pick<QueryFilter, 'operator' | 'value'>): string {
+/** Los operadores que comparan dos cosas del mismo tipo, y por tanto dos columnas. */
+export const COMPARISON_OPERATORS: readonly FilterOperator[] = ['=', '<>', '>', '>=', '<', '<='];
+
+function comparison(
+  expression: string,
+  filter: Pick<QueryFilter, 'operator' | 'value' | 'valueTo'>,
+  other?: string | null,
+): string {
+  const valor = (value: string | null | undefined) =>
+    value === null || value === undefined ? '/* valor obligatorio */' : literal(value);
+
+  if (other && COMPARISON_OPERATORS.includes(filter.operator)) {
+    return `${expression} ${filter.operator} ${other}`;
+  }
+
   switch (filter.operator) {
     case 'IS NULL':
     case 'IS NOT NULL':
       return `${expression} ${filter.operator}`;
 
     case 'IN':
+    case 'NOT IN':
       // Se acepta la lista tal y como se escribe: `1, 2, 3` o `'a', 'b'`.
-      return `${expression} IN (${filter.value ?? '/* valores obligatorios */'})`;
+      return `${expression} ${filter.operator} (${filter.value ?? '/* valores obligatorios */'})`;
 
-    case 'LIKE':
-      return `${expression} LIKE ${filter.value === null ? '/* valor obligatorio */' : literal(filter.value)}`;
+    case 'BETWEEN':
+      // Los dos extremos entran: es lo que dice SQL, y lo que el panel explica.
+      return `${expression} BETWEEN ${valor(filter.value)} AND ${valor(filter.valueTo)}`;
 
     default:
-      return `${expression} ${filter.operator} ${filter.value === null ? '/* valor obligatorio */' : literal(filter.value)}`;
+      return `${expression} ${filter.operator} ${valor(filter.value)}`;
   }
 }
 
@@ -213,16 +257,42 @@ function dateGroupExpression(
   );
 }
 
-function conditions<T extends Pick<QueryFilter, 'operator' | 'value' | 'conjunction'>>(
+/**
+ * Une las condiciones **en el orden en que se leen**, de arriba abajo.
+ *
+ * SQL evalúa `AND` antes que `OR`, así que la lista «A o B y C» escrita tal
+ * cual significaba `A OR (B AND C)`: con A cierto, la fila salía aunque C
+ * fallara, y en el panel nada lo dejaba ver. Aquí cada cambio de `AND` a `OR`
+ * —o al revés— cierra un paréntesis sobre lo anterior: `(A OR B) AND C`, que
+ * es lo que se lee. Mientras no se mezclan, no se añade ninguno.
+ */
+function conditions<T extends Pick<QueryFilter, 'operator' | 'value' | 'valueTo' | 'conjunction'>>(
   filters: readonly T[],
   expression: (filter: T) => string,
+  other?: (filter: T) => string | null,
 ): string {
-  return filters
-    .map((filter, index) => {
-      const prefix = index === 0 ? '' : `${filter.conjunction ?? 'AND'} `;
-      return `${prefix}${comparison(expression(filter), filter)}`;
-    })
-    .join('\n  ');
+  let text = '';
+  let previous: LogicalOperator | null = null;
+
+  filters.forEach((filter, index) => {
+    const current = comparison(expression(filter), filter, other?.(filter));
+
+    if (index === 0) {
+      text = current;
+      return;
+    }
+
+    const conjunction = filter.conjunction ?? 'AND';
+
+    if (previous !== null && previous !== conjunction) {
+      text = `(${text})`;
+    }
+
+    text = `${text}\n  ${conjunction} ${current}`;
+    previous = conjunction;
+  });
+
+  return text;
 }
 
 /**
@@ -271,13 +341,16 @@ export function buildSelect(engine: DatabaseEngine, spec: SelectSpec): string {
   const columnas =
     selected.length > 0 ? selected.join(', ') : alias ? `${quote(engine, alias)}.*` : '*';
 
-  const leading = SQL_DIALECTS[engine].leadingLimit;
+  const dialect = SQL_DIALECTS[engine];
+  const leading = dialect.leadingLimit;
   const top = spec.limit && leading ? leading(spec.limit) : '';
+  const distinct = spec.distinct ? 'DISTINCT ' : '';
+  const prefix = dialect.distinctBeforeLeadingLimit ? `${distinct}${top}` : `${top}${distinct}`;
 
   const from = alias
     ? `${qualify(engine, spec.schema, spec.table)} AS ${quote(engine, alias)}`
     : qualify(engine, spec.schema, spec.table);
-  const lineas = [`SELECT ${top}${columnas}`, `FROM ${from}`];
+  const lineas = [`SELECT ${prefix}${columnas}`, `FROM ${from}`];
 
   for (const join of spec.joins ?? []) {
     lineas.push(
@@ -291,12 +364,16 @@ export function buildSelect(engine: DatabaseEngine, spec: SelectSpec): string {
     }
   }
 
+  /** Una columna de la tabla principal, con su alias si hay cruces. */
+  const reference = (column: string) =>
+    alias ? `${quote(engine, alias)}.${quote(engine, column)}` : quote(engine, column);
+
   if (spec.filters.length > 0) {
     lineas.push(
-      `WHERE ${conditions(spec.filters, (filter) =>
-        alias
-          ? `${quote(engine, alias)}.${quote(engine, filter.column)}`
-          : quote(engine, filter.column),
+      `WHERE ${conditions(
+        spec.filters,
+        (filter) => reference(filter.column),
+        (filter) => (filter.compareColumn ? reference(filter.compareColumn) : null),
       )}`,
     );
   }

@@ -131,6 +131,28 @@ const store = {
           ],
     ),
   tableStructure: () => Promise.resolve({ foreignKeys: tableForeignKeys }),
+  schemaGraph: (_connectionId: string, tables: readonly DatabaseObject[]) =>
+    Promise.resolve({
+      tables: tables.map((item) => ({
+        table: item,
+        columns: [],
+        structure: {
+          foreignKeys:
+            item.name === 'orders'
+              ? [
+                  {
+                    name: 'fk_customer',
+                    columns: ['customer_id'],
+                    referencedSchema: 'public',
+                    referencedTable: 'customers',
+                    referencedColumns: ['id'],
+                  },
+                ]
+              : [],
+        },
+      })),
+      missing: [],
+    }),
   previewQuery: (): Promise<QueryResult | null> => Promise.resolve(null),
   cancelExecution: () => Promise.resolve(),
   countRows: () => Promise.resolve(3),
@@ -492,6 +514,264 @@ describe('QueryBuilder', () => {
     expect(localStorage.length).toBe(1);
   });
 
+  /**
+   * Una composición guardada vuelve como formulario, no como texto.
+   *
+   * Antes solo se guardaba el SQL: al cargarla, cambiar un filtro obligaba a
+   * rehacerla desde el formulario vacío.
+   */
+  it('al cargar una composición recupera el formulario y no solo el SQL', async () => {
+    const fixture = await create(table);
+    const element = fixture.nativeElement as HTMLElement;
+    const builder = fixture.componentInstance as any;
+
+    builder.filters.set([{ column: 'id', operator: 'BETWEEN', value: '1', valueTo: '9' }]);
+    builder.limit.set(25);
+    builder.compositionName.set('Primeros pedidos');
+    builder.saveComposition();
+    fixture.detectChanges();
+
+    const guardado = (element.querySelector('.sql') as HTMLTextAreaElement).value;
+
+    // Se cambia todo lo que la composición debe devolver.
+    builder.filters.set([]);
+    builder.limit.set(100);
+    fixture.detectChanges();
+    expect((element.querySelector('.sql') as HTMLTextAreaElement).value).not.toBe(guardado);
+
+    await builder.loadComposition(builder.savedCompositions()[0]);
+    fixture.detectChanges();
+
+    expect((element.querySelector('.sql') as HTMLTextAreaElement).value).toBe(guardado);
+    expect(builder.filters()).toEqual([
+      { column: 'id', operator: 'BETWEEN', value: '1', valueTo: '9' },
+    ]);
+    // Formulario vivo, no texto fijo: no hay nada que restablecer.
+    expect(element.textContent).not.toContain('Restablecer desde el formulario');
+  });
+
+  it('restaura los cruces con las columnas que se eligieron', async () => {
+    const fixture = await create(table);
+    const builder = fixture.componentInstance as any;
+
+    builder.joins.set([
+      {
+        id: 1,
+        type: 'LEFT',
+        tableId: customer.id,
+        search: 'public.customers',
+        leftJoinId: null,
+        leftColumn: 'customer_id',
+        rightColumn: 'id',
+        columns: [],
+        chosen: ['name'],
+        loading: false,
+        suggestionsOpen: false,
+        highlighted: 0,
+      },
+    ]);
+    builder.compositionName.set('Con clientes');
+    builder.saveComposition();
+    builder.joins.set([]);
+
+    await builder.loadComposition(builder.savedCompositions()[0]);
+
+    const [join] = builder.joins();
+    expect(join).toMatchObject({
+      type: 'LEFT',
+      leftColumn: 'customer_id',
+      rightColumn: 'id',
+      chosen: ['name'],
+      loading: false,
+    });
+    expect(join.columns.map((column: { name: string }) => column.name)).toEqual(['id', 'name']);
+  });
+
+  it('una composición antigua, sin formulario, se sigue abriendo como SQL', async () => {
+    const fixture = await create(table);
+    const builder = fixture.componentInstance as any;
+
+    await builder.loadComposition({ id: 'x', name: 'Antigua', sql: 'SELECT 1;' });
+    fixture.detectChanges();
+
+    expect((fixture.nativeElement.querySelector('.sql') as HTMLTextAreaElement).value).toBe(
+      'SELECT 1;',
+    );
+  });
+
+  it('explica el orden de evaluación solo cuando se mezclan AND y OR', async () => {
+    const fixture = await create(table);
+    const element = fixture.nativeElement as HTMLElement;
+    const builder = fixture.componentInstance as any;
+    const nota = 'Se evalúan en orden';
+
+    builder.filters.set([
+      { column: 'id', operator: '=', value: '1' },
+      { column: 'id', operator: '=', value: '2', conjunction: 'OR' },
+    ]);
+    fixture.detectChanges();
+    expect(element.textContent).not.toContain(nota);
+
+    builder.filters.update((filters: unknown[]) => [
+      ...filters,
+      { column: 'id', operator: '=', value: '3', conjunction: 'AND' },
+    ]);
+    fixture.detectChanges();
+    expect(element.textContent).toContain(nota);
+  });
+
+  it('BETWEEN pide los dos extremos', async () => {
+    const fixture = await create(table);
+    const element = fixture.nativeElement as HTMLElement;
+    const builder = fixture.componentInstance as any;
+
+    builder.filters.set([{ column: 'id', operator: 'BETWEEN', value: null, valueTo: null }]);
+    fixture.detectChanges();
+
+    expect(element.querySelector('.filter__between')?.textContent).toContain('y');
+    expect(element.querySelectorAll('.filter app-value-input').length).toBe(2);
+  });
+
+  it('un filtro nuevo queda pendiente, no comparado con texto vacío', async () => {
+    const fixture = await create(table);
+    const element = fixture.nativeElement as HTMLElement;
+
+    [...element.querySelectorAll<HTMLButtonElement>('button')]
+      .find((button) => button.textContent?.trim() === 'Añadir filtro')!
+      .click();
+    fixture.detectChanges();
+
+    const sql = (element.querySelector('.sql') as HTMLTextAreaElement).value;
+    expect(sql).toContain('/* valor obligatorio */');
+    expect(sql).not.toContain("= ''");
+  });
+
+  it('vaciar el valor de una columna numérica lo deja pendiente', async () => {
+    const fixture = await create(table);
+    const builder = fixture.componentInstance as any;
+
+    builder.columns.set([
+      { name: 'id', dataType: 'int', isNullable: false, isPrimaryKey: true, inputKind: 'integer' },
+      { name: 'name', dataType: 'text', isNullable: true, isPrimaryKey: false, inputKind: 'text' },
+    ]);
+
+    expect(builder.filterText({ column: 'id', operator: '=', value: '1' }, '')).toBeNull();
+    // En texto, la cadena vacía sí es un valor.
+    expect(builder.filterText({ column: 'name', operator: '=', value: 'a' }, '')).toBe('');
+  });
+
+  it('al comparar con otra columna propone una distinta de la del filtro', async () => {
+    const fixture = await create(table);
+    const builder = fixture.componentInstance as any;
+
+    builder.filters.set([{ column: 'id', operator: '>', value: null }]);
+    builder.setCompareTarget(0, 'column');
+
+    expect(builder.filters()[0].compareColumn).toBeTruthy();
+    expect(builder.filters()[0].compareColumn).not.toBe('id');
+
+    builder.setCompareTarget(0, 'value');
+    expect(builder.filters()[0].compareColumn).toBeNull();
+  });
+
+  describe('vista previa automática', () => {
+    it('está apagada por omisión', async () => {
+      const fixture = await create(table);
+
+      expect((fixture.componentInstance as any).autoPreview()).toBe(false);
+    });
+
+    it('se refresca sola con el SQL del formulario', async () => {
+      const previews: string[] = [];
+      const original = store.previewQuery;
+      store.previewQuery = ((_c: string, _d: string, sql: string) => {
+        previews.push(sql);
+        return Promise.resolve(null);
+      }) as never;
+
+      try {
+        vi.useFakeTimers();
+        const fixture = await create(table);
+        const builder = fixture.componentInstance as any;
+
+        builder.setAutoPreview(true);
+        builder.limit.set(5);
+        fixture.detectChanges();
+        await vi.advanceTimersByTimeAsync(1000);
+
+        expect(previews.length).toBe(1);
+        expect(localStorage.getItem('druse.query-builder.auto-preview')).toBe('1');
+      } finally {
+        vi.useRealTimers();
+        store.previewQuery = original;
+      }
+    });
+
+    it('nunca ejecuta sola el SQL retocado a mano ni un UPDATE', async () => {
+      const fixture = await create(table);
+      const builder = fixture.componentInstance as any;
+
+      builder.patchSql('DELETE FROM orders');
+      expect(builder.canAutoPreview()).toBe(false);
+
+      builder.resetSql();
+      builder.setOperation('update');
+      expect(builder.canAutoPreview()).toBe(false);
+    });
+
+    it('espera a que los filtros tengan su valor', async () => {
+      const fixture = await create(table);
+      const builder = fixture.componentInstance as any;
+
+      builder.filters.set([{ column: 'id', operator: '=', value: null }]);
+      expect(builder.canAutoPreview()).toBe(false);
+
+      builder.filters.set([{ column: 'id', operator: '=', value: '1' }]);
+      expect(builder.canAutoPreview()).toBe(true);
+    });
+  });
+
+  it('llegar hasta una tabla añade el cruce que sale de las claves foráneas', async () => {
+    const fixture = await create(table);
+    const builder = fixture.componentInstance as any;
+
+    builder.columns.update((columns: readonly unknown[]) => [
+      ...columns,
+      { name: 'customer_id', dataType: 'int', isNullable: false, isPrimaryKey: false },
+    ]);
+    await builder.joinPathTo(customer.id);
+    fixture.detectChanges();
+
+    expect(builder.joins()).toHaveLength(1);
+    expect(builder.joins()[0]).toMatchObject({
+      tableId: customer.id,
+      leftJoinId: null,
+      leftColumn: 'customer_id',
+      rightColumn: 'id',
+      loading: false,
+    });
+    expect((fixture.nativeElement.querySelector('.sql') as HTMLTextAreaElement).value).toContain(
+      'ON [t0].[customer_id] = [t1].[id]',
+    );
+
+    // Lo que se ve tiene que ser lo que se escribe. Con `[value]` en el select,
+    // el valor llegaba antes que las opciones y se enseñaba la primera, `id`.
+    const izquierda = fixture.nativeElement.querySelector(
+      'select[aria-label="Columna izquierda del JOIN"]',
+    ) as HTMLSelectElement;
+    expect(izquierda.selectedOptions[0]?.value).toBe('customer_id');
+  });
+
+  it('avisa cuando no hay camino hasta la tabla', async () => {
+    const fixture = await create(table);
+    const builder = fixture.componentInstance as any;
+
+    await builder.joinPathTo(auditCustomerNode.source.id);
+
+    expect(builder.joins()).toHaveLength(0);
+    expect(builder.pathNotice()).toContain('No hay un camino');
+  });
+
   it('presenta cada JOIN como una relación legible entre dos tablas', async () => {
     const fixture = await create(table);
     const element = fixture.nativeElement as HTMLElement;
@@ -573,6 +853,21 @@ describe('QueryBuilder', () => {
     ) as HTMLSelectElement;
     expect(remainingSource.value).toBe('');
     expect(preview.value).toContain('ON [t0].[id] = [t1].[name]');
+  });
+
+  /**
+   * Los dos Informix son el mismo servidor: el protocolo no cambia el dialecto.
+   * Antes solo `informix` quitaba la opción, y por SQLI aparecía.
+   */
+  it.each(['informix', 'informixsqli'] as const)('oculta FULL OUTER JOIN en %s', async (engine) => {
+    const fixture = TestBed.createComponent(QueryBuilder);
+    fixture.componentRef.setInput('table', table);
+    fixture.componentRef.setInput('engine', engine);
+    fixture.componentRef.setInput('connectionId', 'connection-1');
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    expect((fixture.componentInstance as any).joinTypes()).not.toContain('FULL OUTER');
   });
 
   it('oculta FULL OUTER JOIN en MySQL y CROSS JOIN no muestra condición', async () => {
