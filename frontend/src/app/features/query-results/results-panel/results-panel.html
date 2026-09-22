@@ -8,7 +8,7 @@
       [attr.aria-selected]="activeTab() === 'results'"
       (click)="select('results')"
     >
-      Resultados
+      {{ 'results.tab.results' | t }}
       @if (rowCount() > 0) {
         <span class="tab__count">{{ rowCount() }}</span>
       }
@@ -21,7 +21,7 @@
       [attr.aria-selected]="activeTab() === 'messages'"
       (click)="select('messages')"
     >
-      Mensajes
+      {{ 'results.tab.messages' | t }}
       @if (messageCount() > 0) {
         <span class="tab__count">{{ messageCount() }}</span>
       }
@@ -34,7 +34,7 @@
       [attr.aria-selected]="activeTab() === 'history'"
       (click)="select('history')"
     >
-      Historial
+      {{ 'results.tab.history' | t }}
     </button>
   </div>
 
@@ -46,11 +46,11 @@
     [class.is-on]="showFilters() || activeFilterCount() > 0"
     [disabled]="running() || !currentSet()"
     [attr.aria-expanded]="showFilters()"
-    title="Filtrar solo las filas cargadas, sin consultar la base de datos"
+    [title]="'results.filtersTitle' | t"
     (click)="toggleFilters()"
   >
     <app-icon name="filter" [size]="12" />
-    Filtros
+    {{ 'results.filters' | t }}
     @if (activeFilterCount()) {
       <span>{{ activeFilterCount() }}</span>
     }
@@ -62,10 +62,10 @@
     [class.is-on]="compact()"
     [disabled]="running() || !currentSet()"
     [attr.aria-pressed]="compact()"
-    title="Alternar densidad de filas"
+    [title]="'results.densityTitle' | t"
     (click)="toggleDensity()"
   >
-    Densidad {{ compact() ? 'compacta' : 'cómoda' }}
+    {{ 'results.density' | t: { mode: compact() ? 'compact' : 'comfortable' } }}
   </button>
 
   <!--
@@ -83,15 +83,11 @@
       [disabled]="running() || !currentSet() || !hasSelection()"
       aria-haspopup="menu"
       [attr.aria-expanded]="copyOpen()"
-      [title]="
-        hasSelection()
-          ? 'Copiar la selección con formato'
-          : 'Selecciona columnas o celdas para copiarlas'
-      "
+      [title]="(hasSelection() ? 'results.copyTitle' : 'results.copyNeedsSelection') | t"
       (click)="toggleCopy($event)"
     >
       <app-icon name="new-query" [size]="12" />
-      Copiar como
+      {{ 'results.copyAs' | t }}
       @if (hasSelection()) {
         <span class="tool-button__hint">{{ selectionLabel() }}</span>
       }
@@ -101,7 +97,7 @@
       <ul
         class="export__menu"
         role="menu"
-        aria-label="Copiar la selección"
+        [attr.aria-label]="'results.copySelection' | t"
         [style.top.px]="copyPosition().top"
         [style.left.px]="copyPosition().left"
       >
@@ -112,8 +108,8 @@
             role="menuitem"
             (click)="chooseCopy('excel')"
           >
-            Para Excel
-            <span class="export__hint">Tabuladores, con los nombres arriba</span>
+            {{ 'results.copy.excel' | t }}
+            <span class="export__hint">{{ 'results.copy.excelHint' | t }}</span>
           </button>
         </li>
         <li>
@@ -123,14 +119,14 @@
             role="menuitem"
             (click)="chooseCopy('where-in')"
           >
-            Como condición IN
-            <span class="export__hint">Para pegar detrás de un WHERE</span>
+            {{ 'results.copy.in' | t }}
+            <span class="export__hint">{{ 'results.copy.inHint' | t }}</span>
           </button>
         </li>
         <li>
           <button type="button" class="export__option" role="menuitem" (click)="chooseCopy('list')">
-            Como lista de valores
-            <span class="export__hint">Separados por comas</span>
+            {{ 'results.copy.list' | t }}
+            <span class="export__hint">{{ 'results.copy.listHint' | t }}</span>
           </button>
         </li>
       </ul>
@@ -147,29 +143,28 @@
       class="tool-button"
       [disabled]="running() || !currentSet() || exporting()"
       aria-haspopup="menu"
-      title="Exportar: vuelve a ejecutar el SQL original sin los filtros locales"
+      [title]="'results.exportTitle' | t"
       [attr.aria-expanded]="exportOpen()"
       (click)="toggleExport($event)"
     >
       <app-icon name="export" [size]="12" />
-      {{ exporting() ? 'Exportando…' : 'Exportar' }}
-      <span class="tool-button__hint">CSV · Excel</span>
+      {{ (exporting() ? 'results.exporting' : 'results.export') | t }}
+      <span class="tool-button__hint" translate="no">CSV · Excel</span>
     </button>
 
     @if (exportOpen()) {
       <ul
         class="export__menu export__menu--query"
         role="menu"
-        aria-label="Exportar la consulta original"
+        [attr.aria-label]="'results.exportMenu' | t"
         [style.top.px]="exportPosition().top"
         [style.left.px]="exportPosition().left"
       >
         <li role="presentation" class="export__scope">
-          <strong>Exportar la consulta original</strong>
-          Se volverá a ejecutar el SQL que generó estos resultados, sin los filtros locales ni el
-          límite de filas del editor.
+          <strong>{{ 'results.exportMenu' | t }}</strong>
+          {{ 'results.exportScope' | t }}
           @if (resultSets().length > 1) {
-            Cambiar de pestaña de resultado no cambia el SQL exportado.
+            {{ 'results.exportScopeSets' | t }}
           }
         </li>
         <li>
@@ -179,8 +174,8 @@
             role="menuitem"
             (click)="chooseExport('csv')"
           >
-            CSV
-            <span class="export__hint">Hasta 1 000 000 de filas</span>
+            <span translate="no">CSV</span>
+            <span class="export__hint">{{ 'results.export.csvHint' | t }}</span>
           </button>
         </li>
         <li>
@@ -190,8 +185,8 @@
             role="menuitem"
             (click)="chooseExport('xlsx')"
           >
-            Excel
-            <span class="export__hint">Hasta 200 000 filas o 2 millones de celdas</span>
+            <span translate="no">Excel</span>
+            <span class="export__hint">{{ 'results.export.xlsxHint' | t }}</span>
           </button>
         </li>
       </ul>
@@ -200,24 +195,24 @@
   <button
     type="button"
     class="tool-button panel-toggle"
-    [attr.aria-label]="maximized() ? 'Restaurar editor y resultados' : 'Maximizar resultados'"
-    [title]="maximized() ? 'Restaurar editor y resultados' : 'Maximizar resultados'"
+    [attr.aria-label]="(maximized() ? 'toolbar.restoreLabel' : 'results.maximize') | t"
+    [title]="(maximized() ? 'toolbar.restoreLabel' : 'results.maximize') | t"
     (click)="toggleMaximize.emit()"
   >
     <app-icon [name]="maximized() ? 'panel-split' : 'maximize'" [size]="14" />
     @if (maximized()) {
-      Restaurar
+      {{ 'toolbar.restore' | t }}
     }
   </button>
 </header>
 
 @switch (running() ? 'running' : activeTab()) {
   @case ('running') {
-    <section class="query-progress" aria-label="Consulta en curso" aria-busy="true">
+    <section class="query-progress" [attr.aria-label]="'results.running' | t" aria-busy="true">
       <div class="query-progress__card">
-        <p class="query-progress__eyebrow">Consulta en curso</p>
+        <p class="query-progress__eyebrow">{{ 'results.running' | t }}</p>
         <app-operation-progress
-          [step]="canceling() ? 'Cancelando consulta…' : 'Ejecutando consulta…'"
+          [step]="(canceling() ? 'results.cancelingStep' : 'results.runningStep') | t"
           [subject]="progressSubject()"
           [overall]="null"
           [elapsedMs]="elapsedMs()"
@@ -226,12 +221,11 @@
         />
         <p class="query-progress__hint">
           @if (canceling()) {
-            La cancelación ya fue enviada. Puede tardar unos segundos mientras el motor libera la
-            operación.
+            {{ 'results.cancelingHint' | t }}
           } @else if (elapsedMs() >= 10_000) {
-            Está tardando más de lo habitual. Puedes cancelarla sin cerrar la aplicación.
+            {{ 'results.slowHint' | t }}
           } @else {
-            Límite configurado: {{ timeoutSeconds() }} s. Puedes cancelar en cualquier momento.
+            {{ 'results.limitHint' | t: { seconds: timeoutSeconds() } }}
           }
         </p>
       </div>
@@ -241,7 +235,7 @@
   @case ('results') {
     @if (currentSet(); as set) {
       @if (resultSets().length > 1) {
-        <div class="sets" role="tablist" aria-label="Conjuntos de resultados">
+        <div class="sets" role="tablist" [attr.aria-label]="'results.sets' | t">
           @for (item of resultSets(); track $index) {
             <button
               type="button"
@@ -251,7 +245,7 @@
               [attr.aria-selected]="$index === selectedSetIndex()"
               (click)="selectSet($index)"
             >
-              Resultado {{ $index + 1 }}
+              {{ 'results.set' | t: { n: $index + 1 } }}
               <span class="sets__count">{{ item.rows.length }}</span>
             </button>
           }
@@ -262,15 +256,19 @@
         <div class="filter-scope">
           <span role="status">
             @if (activeFilterCount()) {
-              <strong>{{ filteredRowCount() }} de {{ set.rows.length }} filas cargadas</strong>
-              coinciden.
+              <strong>{{
+                'results.filter.matching'
+                  | t: { matched: filteredRowCount(), total: set.rows.length }
+              }}</strong>
             } @else {
-              Filtra sobre las {{ set.rows.length }} filas cargadas.
+              {{ 'results.filter.over' | t: { total: set.rows.length } }}
             }
-            Los filtros son locales; no se aplican al exportar.
+            {{ 'results.filter.local' | t }}
           </span>
           @if (activeFilterCount()) {
-            <button type="button" class="btn" (click)="resetFilters()">Limpiar filtros</button>
+            <button type="button" class="btn" (click)="resetFilters()">
+              {{ 'results.filter.clear' | t }}
+            </button>
           }
         </div>
       }
@@ -297,36 +295,36 @@
         <div class="edits edits--danger" role="status">
           @if (deletePreview(); as statements) {
             <div class="edits__sql">
-              <p class="edits__title">Se va a ejecutar:</p>
+              <p class="edits__title">{{ 'results.willRun' | t }}</p>
               @for (statement of statements; track $index) {
                 <code class="edits__statement">{{ statement }}</code>
               }
             </div>
 
             <div class="edits__actions">
-              <button type="button" class="btn" (click)="cancelDelete.emit()">Volver</button>
+              <button type="button" class="btn" (click)="cancelDelete.emit()">
+                {{ 'results.back' | t }}
+              </button>
               <button
                 type="button"
                 class="btn btn--danger"
                 [disabled]="deleting()"
                 (click)="deleteRows.emit()"
               >
-                {{ deleting() ? 'Borrando…' : 'Confirmar y borrar' }}
+                {{ (deleting() ? 'results.deleting' : 'results.confirmDelete') | t }}
               </button>
             </div>
           } @else {
             <p class="edits__count">
-              <span class="mono">{{ selectedRows().length }}</span>
-              {{ selectedRows().length === 1 ? 'fila señalada' : 'filas señaladas' }}
-              · para borrar
+              {{ 'results.markedRows' | t: { count: selectedRows().length } }}
             </p>
 
             <div class="edits__actions">
               <button type="button" class="btn" (click)="clearSelection.emit()">
-                Quitar marca
+                {{ 'results.unmark' | t }}
               </button>
               <button type="button" class="btn btn--primary" (click)="prepareDelete.emit()">
-                Ver SQL y borrar
+                {{ 'results.previewDelete' | t }}
               </button>
             </div>
           }
@@ -341,34 +339,36 @@
         <div class="edits" role="status">
           @if (editPreview(); as statements) {
             <div class="edits__sql">
-              <p class="edits__title">Se va a ejecutar:</p>
+              <p class="edits__title">{{ 'results.willRun' | t }}</p>
               @for (statement of statements; track $index) {
                 <code class="edits__statement">{{ statement }}</code>
               }
             </div>
 
             <div class="edits__actions">
-              <button type="button" class="btn" (click)="cancelSave.emit()">Volver</button>
+              <button type="button" class="btn" (click)="cancelSave.emit()">
+                {{ 'results.back' | t }}
+              </button>
               <button
                 type="button"
                 class="btn btn--danger"
                 [disabled]="saving()"
                 (click)="saveEdits.emit()"
               >
-                {{ saving() ? 'Guardando…' : 'Confirmar y guardar' }}
+                {{ (saving() ? 'results.saving' : 'results.confirmSave') | t }}
               </button>
             </div>
           } @else {
             <p class="edits__count">
-              <span class="mono">{{ edits().length }}</span>
-              {{ edits().length === 1 ? 'celda cambiada' : 'celdas cambiadas' }}
-              · sin guardar
+              {{ 'results.changedCells' | t: { count: edits().length } }}
             </p>
 
             <div class="edits__actions">
-              <button type="button" class="btn" (click)="discardEdits.emit()">Descartar</button>
+              <button type="button" class="btn" (click)="discardEdits.emit()">
+                {{ 'results.discard' | t }}
+              </button>
               <button type="button" class="btn btn--primary" (click)="prepareEdits.emit()">
-                Ver SQL y guardar
+                {{ 'results.previewSave' | t }}
               </button>
             </div>
           }
@@ -378,27 +378,26 @@
       <footer class="foot">
         <div class="foot__item">
           <span class="dot" aria-hidden="true"></span>
-          {{ set.rows.length }} filas obtenidas en
-          <span class="mono">{{ set.durationMs }} ms</span>
+          {{ 'results.fetched' | t: { count: set.rows.length, ms: set.durationMs } }}
         </div>
 
         @if (set.truncated) {
           <span class="sep" aria-hidden="true"></span>
-          <div class="foot__item foot__item--warning" title="Se alcanzó el límite de filas">
-            Resultado recortado: hay más filas sin cargar
+          <div class="foot__item foot__item--warning" [title]="'results.limitReached' | t">
+            {{ 'results.truncated' | t }}
           </div>
         }
 
         @if (result()?.rowsAffected; as affected) {
           <span class="sep" aria-hidden="true"></span>
           <div class="foot__item">
-            <span class="mono">{{ affected }}</span> filas afectadas
+            {{ 'results.affected' | t: { count: affected } }}
           </div>
         }
 
         <span class="spacer"></span>
 
-        <nav class="pager" aria-label="Paginación">
+        <nav class="pager" [attr.aria-label]="'results.pagination' | t">
           <span class="pager__range">{{ rangeLabel() }}</span>
         </nav>
       </footer>
@@ -409,15 +408,15 @@
           @if (executed.error?.code; as code) {
             <code class="empty__code">{{ code }}</code>
           }
-          <button type="button" class="empty__action" (click)="copyError()">Copiar error</button>
+          <button type="button" class="empty__action" (click)="copyError()">
+            {{ 'results.copyError' | t }}
+          </button>
         } @else if (executed.state === 'canceled') {
-          La ejecución se canceló.
+          {{ 'results.canceled' | t }}
         } @else if (executed.rowsAffected !== undefined && executed.rowsAffected !== null) {
-          <span class="mono">{{ executed.rowsAffected }}</span
-          >&nbsp;filas afectadas en
-          <span class="mono">&nbsp;{{ executed.durationMs }} ms</span>
+          {{ 'results.affectedIn' | t: { count: executed.rowsAffected, ms: executed.durationMs } }}
         } @else {
-          La instrucción se ejecutó correctamente y no devolvió filas.
+          {{ 'results.noRows' | t }}
         }
       </div>
     } @else if (firstSession()) {
@@ -425,40 +424,42 @@
         <span class="welcome__icon" aria-hidden="true"
           ><app-icon name="database" [size]="22"
         /></span>
-        <h2 id="welcome-title">Conecta tu primera base de datos</h2>
-        <p>Explora tus tablas y ejecuta consultas desde un mismo espacio de trabajo.</p>
+        <h2 id="welcome-title">{{ 'results.welcome.title' | t }}</h2>
+        <p>{{ 'results.welcome.text' | t }}</p>
         <div class="welcome__actions">
           <button type="button" class="welcome__primary" (click)="createConnection.emit()">
-            <app-icon name="plus" [size]="13" /> Crear conexión
+            <app-icon name="plus" [size]="13" /> {{ 'results.welcome.create' | t }}
           </button>
           <button type="button" (click)="openSql.emit()">
-            <app-icon name="folder-open" [size]="13" /> Abrir SQL
+            <app-icon name="folder-open" [size]="13" /> {{ 'results.welcome.open' | t }}
           </button>
         </div>
-        <span class="welcome__hint">También puedes empezar a escribir SQL en el editor.</span>
+        <span class="welcome__hint">{{ 'results.welcome.hint' | t }}</span>
       </section>
     } @else if (readyToQuery()) {
       <section class="welcome" aria-labelledby="query-start-title">
         <span class="welcome__icon" aria-hidden="true"
           ><app-icon name="database" [size]="22"
         /></span>
-        <h2 id="query-start-title">Conexión lista</h2>
-        <p>Busca una tabla en el explorador o empieza una consulta en el editor.</p>
+        <h2 id="query-start-title">{{ 'results.ready.title' | t }}</h2>
+        <p>{{ 'results.ready.text' | t }}</p>
         <div class="welcome__actions">
           <button type="button" class="welcome__primary" (click)="exploreTables.emit()">
-            <app-icon name="search" [size]="13" /> Explorar tablas
+            <app-icon name="search" [size]="13" /> {{ 'results.ready.explore' | t }}
           </button>
-          <button type="button" (click)="writeSql.emit()">Escribir SQL</button>
+          <button type="button" (click)="writeSql.emit()">{{ 'results.ready.write' | t }}</button>
         </div>
-        <span class="welcome__hint">Ejecuta tu consulta con {{ shortcut('Ctrl+Enter') }}.</span>
+        <span class="welcome__hint">{{
+          'results.ready.hint' | t: { shortcut: shortcut('Ctrl+Enter') }
+        }}</span>
       </section>
     } @else {
       <div class="empty">
-        <strong>Los resultados aparecerán aquí</strong>
-        <span>
-          Ejecuta el documento con {{ shortcut('Ctrl+Enter') }}, o con
-          {{ shortcut('Ctrl+Shift+Enter') }} solo la instrucción donde tengas el cursor.
-        </span>
+        <strong>{{ 'results.empty.title' | t }}</strong>
+        <span>{{
+          'results.empty.text'
+            | t: { all: shortcut('Ctrl+Enter'), current: shortcut('Ctrl+Shift+Enter') }
+        }}</span>
       </div>
     }
   }
@@ -468,19 +469,13 @@
       <ul class="messages">
         @for (message of messages(); track $index) {
           <li class="messages__item" [attr.data-severity]="message.severity">
-            <strong>{{
-              message.severity === 'error'
-                ? 'Error'
-                : message.severity === 'warning'
-                  ? 'Advertencia'
-                  : 'Información'
-            }}</strong>
+            <strong>{{ 'results.severity' | t: { severity: message.severity } }}</strong>
             <span>{{ message.text }}</span>
           </li>
         }
       </ul>
     } @else {
-      <div class="empty">Sin mensajes.</div>
+      <div class="empty">{{ 'results.noMessages' | t }}</div>
     }
   }
 

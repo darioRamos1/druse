@@ -11,11 +11,12 @@ import {
   signal,
 } from '@angular/core';
 
+import { I18nService } from '../../../core/i18n/i18n.service';
+import { TranslatePipe } from '../../../core/i18n/translate.pipe';
 import { CellEdit, ResultColumn, ResultRow, ResultSet } from '../../../shared/models/workspace';
 import { Icon } from '../../../shared/ui/icon/icon';
 import { fitColumnWidth, MIN_COLUMN_WIDTH } from '../../../core/application-gateway/column-widths';
 import { CopyFormat, CopySelection, formatSelection } from './copy-formats';
-import { formatNumber } from '../../../core/i18n/locale-format';
 
 /** Ancho de la columna del número de fila. */
 const ROW_NUMBER_WIDTH = 44;
@@ -56,7 +57,7 @@ interface MenuPosition {
 @Component({
   selector: 'app-results-grid',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [Icon],
+  imports: [Icon, TranslatePipe],
   templateUrl: './results-grid.html',
   styleUrl: './results-grid.scss',
 })
@@ -159,6 +160,7 @@ export class ResultsGrid {
   protected readonly isResizing = signal(false);
 
   private readonly host = inject(ElementRef<HTMLElement>);
+  private readonly _i18n = inject(I18nService);
 
   /**
    * Lleva el teclado a la cuadrícula.
@@ -730,10 +732,7 @@ export class ResultsGrid {
       return '';
     }
 
-    const columnas = selection.columns === 1 ? '1 columna' : `${selection.columns} columnas`;
-    const filas = selection.rows === 1 ? '1 fila' : `${formatNumber(selection.rows)} filas`;
-
-    return `${columnas} × ${filas}`;
+    return this._i18n.t('grid.selection', { columns: selection.columns, rows: selection.rows });
   });
 
   private readonly selectionShape = computed(() => {

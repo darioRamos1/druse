@@ -103,6 +103,10 @@ function literalsIn(html) {
     .replace(/<!--[\s\S]*?-->/g, ' ')
     // Los nombres de tecla no se traducen: el plan lo deja así (§2.5).
     .replace(/<kbd\b[^>]*>[^<]*<\/kbd>/g, ' ')
+    // Lo marcado con `translate="no"` —`NULL`, `CSV`, nombres de producto— es
+    // así a propósito: es el atributo de HTML para decirlo, y también lo
+    // respetan los traductores del navegador.
+    .replace(/<(\w+)\b[^>]*\btranslate="no"[^>]*>[^<]*<\/\1>/g, ' ')
     .replace(/\{\{[\s\S]*?\}\}/g, ' ')
     .replace(/@(?:if|else if|for|switch|case|defer|placeholder|loading|empty|else|default)\b\s*(\((?:[^()]|\((?:[^()]|\([^()]*\))*\))*\))?\s*\{/g, ' ')
     .replace(/@let\s[^;]*;/g, ' ');

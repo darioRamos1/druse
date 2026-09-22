@@ -14,6 +14,8 @@ import {
   viewChild,
 } from '@angular/core';
 
+import { I18nService } from '../../../core/i18n/i18n.service';
+import { TranslatePipe } from '../../../core/i18n/translate.pipe';
 import { ExportFormat } from '../../../core/application-gateway/application-gateway';
 import { shortcutLabel } from '../../../core/shortcuts/shortcut-label';
 import {
@@ -40,7 +42,7 @@ type ResultsTab = 'results' | 'messages' | 'history';
 @Component({
   selector: 'app-results-panel',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [Icon, OperationProgress, ResultsGrid, QueryHistory],
+  imports: [Icon, OperationProgress, ResultsGrid, QueryHistory, TranslatePipe],
   templateUrl: './results-panel.html',
   styleUrl: './results-panel.scss',
 })
@@ -112,6 +114,7 @@ export class ResultsPanel {
   private readonly grid = viewChild(ResultsGrid);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly injector = inject(Injector);
+  private readonly _i18n = inject(I18nService);
   private menuTrigger: HTMLElement | null = null;
 
   protected readonly hasSelection = computed(() => this.grid()?.hasSelection() ?? false);
@@ -135,12 +138,12 @@ export class ResultsPanel {
 
   protected readonly progressSubject = computed(() => {
     if (this.canceling()) {
-      return 'Esperando que el motor detenga la ejecución';
+      return this._i18n.t('results.progress.stopping');
     }
 
-    return this.elapsedMs() >= 10_000
-      ? 'La base de datos sigue procesando la consulta'
-      : 'Esperando la respuesta de la base de datos';
+    return this._i18n.t(
+      this.elapsedMs() >= 10_000 ? 'results.progress.processing' : 'results.progress.waiting',
+    );
   });
 
   constructor() {
@@ -424,14 +427,20 @@ export class ResultsPanel {
     const set = this.currentSet();
 
     if (this.activeFilterCount())
-      return `${this.filteredRowCount()} de ${this.rowCount()} cargadas`;
+      return this._i18n.t('results.range.filtered', {
+        filtered: this.filteredRowCount(),
+        total: this.rowCount(),
+      });
 
     if (!set || set.rows.length === 0) {
-      return 'Sin filas';
+      return this._i18n.t('results.range.none');
     }
 
     return set.truncated
-      ? `1–${set.rows.length} (recortado)`
-      : `1–${set.rows.length} de ${formatNumber(set.totalRows)}`;
+      ? this._i18n.t('results.range.truncated', { count: set.rows.length })
+      : this._i18n.t('results.range.all', {
+          count: set.rows.length,
+          total: formatNumber(set.totalRows),
+        });
   });
 }

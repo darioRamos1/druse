@@ -18,7 +18,7 @@
 <div
   class="body"
   role="grid"
-  aria-label="Resultados de la consulta"
+  [attr.aria-label]="'grid.label' | t"
   [attr.aria-rowcount]="announcedRowCount()"
   [attr.aria-colcount]="resultSet().columns.length + 1"
   [attr.aria-readonly]="!editable()"
@@ -30,7 +30,7 @@
       <button
         type="button"
         class="copy-all"
-        title="Copiar los nombres de las columnas"
+        [title]="'grid.copyHeaders' | t"
         (click)="copyHeaders()"
       >
         <app-icon name="new-query" [size]="11" />
@@ -76,10 +76,10 @@
           role="separator"
           tabindex="0"
           aria-orientation="vertical"
-          [attr.aria-label]="'Ajustar el ancho de ' + column.name"
+          [attr.aria-label]="'grid.resize' | t: { name: column.name }"
           [attr.aria-valuenow]="widthOf(i)"
           [attr.aria-valuemin]="minWidth"
-          title="Arrastra o usa las flechas para ajustar el ancho. Doble clic o Intro lo ajusta al contenido."
+          [title]="'grid.resizeTitle' | t"
           (mousedown)="beginResize(i, $event)"
           (dblclick)="autoFit(i, $event)"
           (keydown.enter)="autoFit(i, $event)"
@@ -106,10 +106,10 @@
           <input
             type="search"
             class="filters__input"
-            placeholder="filtrar…"
+            [placeholder]="'grid.filterPlaceholder' | t"
             [value]="filters()[i] ?? ''"
             (input)="onFilter(i, $event)"
-            [attr.aria-label]="'Filtrar ' + column.name"
+            [attr.aria-label]="'grid.filter' | t: { name: column.name }"
           />
         </div>
       }
@@ -129,7 +129,7 @@
         aria-colindex="1"
         [class.is-marked]="isRowSelected(row.number)"
         [class.is-selected]="isRowChosen(r)"
-        title="Arrastra para coger varias filas; doble clic copia esta"
+        [title]="'grid.rowTitle' | t"
         (mousedown)="beginRowSelection(r, $event)"
         (mouseenter)="extendRowSelection(r, $event)"
         (contextmenu)="openRowMenu($event, r)"
@@ -186,10 +186,10 @@
               (blur)="commitEdit(row, i, $event)"
               (keydown.enter)="commitEdit(row, i, $event)"
               (keydown.escape)="cancelEdit()"
-              [attr.aria-label]="'Editar ' + column.name"
+              [attr.aria-label]="'grid.edit' | t: { name: column.name }"
             />
           } @else if (shownValue(row, i) === null) {
-            <span class="null">NULL</span>
+            <span class="null" translate="no">NULL</span>
           } @else if (column.kind === 'boolean') {
             <span class="pill">{{ shownValue(row, i) }}</span>
           } @else {
@@ -208,9 +208,9 @@
          explica que no hay nada que enseñar. -->
     <div role="row">
       @if (filtered()) {
-        <p class="empty" role="gridcell">Ninguna fila coincide con los filtros.</p>
+        <p class="empty" role="gridcell">{{ 'grid.noMatch' | t }}</p>
       } @else {
-        <p class="empty" role="gridcell">La consulta no devolvió filas.</p>
+        <p class="empty" role="gridcell">{{ 'grid.noRows' | t }}</p>
       }
     </div>
   }
@@ -218,9 +218,11 @@
   @if (remainingRows() > 0) {
     <div role="row">
       <div class="more" role="gridcell">
-        <span>Mostrando {{ renderedRows().length }} de {{ visibleRows().length }} filas.</span>
+        <span>{{
+          'grid.showing' | t: { shown: renderedRows().length, total: visibleRows().length }
+        }}</span>
         <button type="button" (click)="showMore()">
-          Mostrar {{ remainingRows() > 500 ? 500 : remainingRows() }} más
+          {{ 'grid.showMore' | t: { count: remainingRows() > 500 ? 500 : remainingRows() } }}
         </button>
       </div>
     </div>
@@ -236,26 +238,28 @@
   <ul
     class="copy-menu"
     role="menu"
-    aria-label="Copiar la selección"
+    [attr.aria-label]="'results.copySelection' | t"
     [style.top.px]="position.top"
     [style.left.px]="position.left"
   >
-    <li class="copy-menu__title">Copiar {{ selectionLabel() }}</li>
+    <li class="copy-menu__title">
+      {{ 'results.copy.title' | t: { selection: selectionLabel() } }}
+    </li>
     <li>
       <button type="button" class="copy-menu__option" role="menuitem" (click)="copyAs('excel')">
-        Para Excel
-        <span class="copy-menu__hint">Tabuladores, con los nombres arriba</span>
+        {{ 'results.copy.excel' | t }}
+        <span class="copy-menu__hint">{{ 'results.copy.excelHint' | t }}</span>
       </button>
     </li>
     <li>
       <button type="button" class="copy-menu__option" role="menuitem" (click)="copyAs('where-in')">
-        Como condición IN
-        <span class="copy-menu__hint">columna IN ('a', 'b'), sin repetidos</span>
+        {{ 'results.copy.in' | t }}
+        <span class="copy-menu__hint">{{ 'results.copy.inHintGrid' | t }}</span>
       </button>
     </li>
     <li>
       <button type="button" class="copy-menu__option" role="menuitem" (click)="copyAs('list')">
-        Como lista de valores
+        {{ 'results.copy.list' | t }}
         <span class="copy-menu__hint">'a', 'b', 'c'</span>
       </button>
     </li>
