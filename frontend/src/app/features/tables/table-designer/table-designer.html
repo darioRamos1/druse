@@ -9,32 +9,39 @@
 <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="table-designer-title">
   <header class="head">
     <div class="head__text">
-      <h2 class="head__title" id="table-designer-title">{{ title() }}</h2>
+      <h2 class="head__title" id="table-designer-title">{{ title() | t: titleParams() }}</h2>
       <p class="head__subtitle">
-        {{ qualifiedTarget() }} · Nada se ejecuta hasta que veas el SQL y lo confirmes.
+        {{ 'designer.subtitle' | t: { target: qualifiedTarget() } }}
       </p>
     </div>
-    <button type="button" class="head__close" aria-label="Cerrar" (click)="close()">×</button>
+    <button
+      type="button"
+      class="head__close"
+      [attr.aria-label]="'common.close' | t"
+      (click)="close()"
+    >
+      ×
+    </button>
   </header>
 
   <div class="body">
     @if (applied(); as statements) {
       <!-- Ya se aplicó: lo único que queda por hacer es enseñar qué se ejecutó. -->
-      <p class="done" role="status">Cambios aplicados.</p>
+      <p class="done" role="status">{{ 'designer.applied' | t }}</p>
       <pre class="sql">{{ statements.join('\n') }}</pre>
     } @else if (loading()) {
       <!-- Nada editable hasta que esté leída: lo que llega reemplaza lo que
            hubiera, así que un campo escrito antes de tiempo se perdía. -->
-      <p class="loading" role="status">Leyendo la tabla…</p>
+      <p class="loading" role="status">{{ 'designer.loading' | t }}</p>
     } @else {
       <label class="field">
-        <span class="field__label">Nombre de la tabla</span>
+        <span class="field__label">{{ 'designer.name' | t }}</span>
         <input
           class="field__input"
           type="text"
           [(ngModel)]="name"
           (ngModelChange)="touched()"
-          placeholder="pedidos"
+          [placeholder]="'designer.nameExample' | t"
         />
       </label>
 
@@ -50,7 +57,7 @@
           [attr.aria-selected]="section() === 'columns'"
           (click)="select('columns')"
         >
-          Columnas
+          {{ 'designer.tab.columns' | t }}
         </button>
         <button
           type="button"
@@ -60,7 +67,7 @@
           [attr.aria-selected]="section() === 'indexes'"
           (click)="select('indexes')"
         >
-          Índices
+          {{ 'designer.tab.indexes' | t }}
           @if (indexes().length > 0) {
             <span class="tabs__count">{{ indexes().length }}</span>
           }
@@ -73,7 +80,7 @@
           [attr.aria-selected]="section() === 'keys'"
           (click)="select('keys')"
         >
-          Claves foráneas
+          {{ 'designer.tab.keys' | t }}
           @if (foreignKeys().length > 0) {
             <span class="tabs__count">{{ foreignKeys().length }}</span>
           }
@@ -86,7 +93,7 @@
           [attr.aria-selected]="section() === 'constraints'"
           (click)="select('constraints')"
         >
-          Restricciones
+          {{ 'designer.tab.constraints' | t }}
           @if (constraints().length > 0) {
             <span class="tabs__count">{{ constraints().length }}</span>
           }
@@ -95,12 +102,12 @@
 
       <div class="columns" [hidden]="section() !== 'columns'">
         <div class="columns__head">
-          <span>Columna</span>
-          <span>Tipo</span>
-          <span title="Admite nulos">Nulo</span>
-          <span title="Clave primaria">PK</span>
-          <span title="El motor genera el valor">Auto</span>
-          <span>Por defecto</span>
+          <span>{{ 'designer.column' | t }}</span>
+          <span>{{ 'designer.type' | t }}</span>
+          <span [title]="'designer.nullableHint' | t">{{ 'designer.nullable' | t }}</span>
+          <span [title]="'designer.primaryKey' | t" translate="no">PK</span>
+          <span [title]="'designer.identityHint' | t">{{ 'designer.identity' | t }}</span>
+          <span>{{ 'designer.default' | t }}</span>
           <span></span>
         </div>
 
@@ -112,8 +119,8 @@
               [(ngModel)]="row.name"
               (ngModelChange)="touched()"
               [disabled]="row.dropped"
-              placeholder="nombre"
-              aria-label="Nombre de la columna"
+              [placeholder]="'designer.columnNameExample' | t"
+              [attr.aria-label]="'designer.columnName' | t"
             />
 
             <div class="type-picker">
@@ -126,9 +133,9 @@
                 (blur)="closeTypeSuggestions(rowIndex)"
                 (keydown)="onDataTypeKeydown($event, rowIndex, row)"
                 [disabled]="row.dropped"
-                placeholder="tipo"
+                [placeholder]="'designer.dataTypeExample' | t"
                 role="combobox"
-                aria-label="Tipo de dato"
+                [attr.aria-label]="'designer.dataType' | t"
                 aria-autocomplete="list"
                 autocomplete="off"
                 [attr.aria-expanded]="openTypeIndex() === rowIndex"
@@ -146,7 +153,7 @@
                   class="type-picker__menu"
                   [id]="'data-type-options-' + rowIndex"
                   role="listbox"
-                  aria-label="Tipos de dato sugeridos"
+                  [attr.aria-label]="'designer.typeSuggestions' | t"
                 >
                   @for (type of typeSuggestions(row); track type; let optionIndex = $index) {
                     <button
@@ -161,7 +168,7 @@
                       {{ type }}
                     </button>
                   } @empty {
-                    <p class="type-picker__empty">Escribe un tipo personalizado</p>
+                    <p class="type-picker__empty">{{ 'designer.customType' | t }}</p>
                   }
                 </div>
               }
@@ -172,7 +179,7 @@
               [(ngModel)]="row.isNullable"
               (ngModelChange)="touched()"
               [disabled]="row.dropped || row.isPrimaryKey"
-              aria-label="Admite nulos"
+              [attr.aria-label]="'designer.nullableHint' | t"
             />
 
             <input
@@ -180,7 +187,7 @@
               [(ngModel)]="row.isPrimaryKey"
               (ngModelChange)="touched()"
               [disabled]="row.dropped"
-              aria-label="Clave primaria"
+              [attr.aria-label]="'designer.primaryKey' | t"
             />
 
             <input
@@ -188,7 +195,7 @@
               [(ngModel)]="row.isIdentity"
               (ngModelChange)="touched()"
               [disabled]="row.dropped || !!row.origin"
-              aria-label="El motor genera el valor"
+              [attr.aria-label]="'designer.identityHint' | t"
             />
 
             <input
@@ -198,13 +205,13 @@
               (ngModelChange)="touched()"
               [disabled]="row.dropped"
               placeholder="—"
-              aria-label="Valor por defecto"
+              [attr.aria-label]="'designer.defaultValue' | t"
             />
 
             <button
               type="button"
               class="columns__remove"
-              [title]="row.dropped ? 'Conservar esta columna' : 'Quitar esta columna'"
+              [title]="(row.dropped ? 'designer.keepColumn' : 'designer.dropColumn') | t"
               (click)="removeColumn($index)"
             >
               {{ row.dropped ? '↺' : '×' }}
@@ -214,7 +221,9 @@
       </div>
 
       @if (section() === 'columns') {
-        <button type="button" class="btn btn--ghost" (click)="addColumn()">Añadir columna</button>
+        <button type="button" class="btn btn--ghost" (click)="addColumn()">
+          {{ 'designer.addColumn' | t }}
+        </button>
       }
 
       <!-- Índices -->
@@ -228,8 +237,8 @@
                 [(ngModel)]="row.name"
                 (ngModelChange)="touched()"
                 [disabled]="row.dropped || !!row.locked"
-                placeholder="nombre del índice"
-                aria-label="Nombre del índice"
+                [placeholder]="'designer.indexNameExample' | t"
+                [attr.aria-label]="'designer.indexName' | t"
               />
 
               <input
@@ -238,8 +247,8 @@
                 [(ngModel)]="row.columns"
                 (ngModelChange)="touched()"
                 [disabled]="row.dropped || !!row.locked"
-                placeholder="columnas separadas por comas"
-                aria-label="Columnas del índice"
+                [placeholder]="'designer.columnsExample' | t"
+                [attr.aria-label]="'designer.indexColumns' | t"
               />
 
               @if (capabilities().supportsSortDirection) {
@@ -248,10 +257,10 @@
                   [(ngModel)]="row.direction"
                   (ngModelChange)="touched()"
                   [disabled]="row.dropped || !!row.locked"
-                  aria-label="Orden"
+                  [attr.aria-label]="'designer.order' | t"
                 >
-                  <option value="asc">Ascendente</option>
-                  <option value="desc">Descendente</option>
+                  <option value="asc">{{ 'designer.ascending' | t }}</option>
+                  <option value="desc">{{ 'designer.descending' | t }}</option>
                 </select>
               }
 
@@ -262,7 +271,7 @@
                   (ngModelChange)="touched()"
                   [disabled]="row.dropped || !!row.locked"
                 />
-                Único
+                {{ 'designer.unique' | t }}
               </label>
 
               <button
@@ -270,11 +279,12 @@
                 class="columns__remove"
                 [disabled]="!!row.locked"
                 [title]="
-                  row.locked
-                    ? 'Lo sostiene una restricción: quítala desde la pestaña Restricciones'
+                  (row.locked
+                    ? 'designer.lockedIndex'
                     : row.dropped
-                      ? 'Conservar este índice'
-                      : 'Quitar este índice'
+                      ? 'designer.keepIndex'
+                      : 'designer.dropIndex'
+                  ) | t
                 "
                 (click)="removeIndex($index)"
               >
@@ -297,9 +307,9 @@
                     [(ngModel)]="row.method"
                     (ngModelChange)="touched()"
                     [disabled]="row.dropped"
-                    aria-label="Estructura del índice"
+                    [attr.aria-label]="'designer.indexMethod' | t"
                   >
-                    <option value="">Estructura por defecto</option>
+                    <option value="">{{ 'designer.defaultMethod' | t }}</option>
                     @for (method of methods(); track method) {
                       <option [value]="method">{{ method }}</option>
                     }
@@ -313,8 +323,8 @@
                     [(ngModel)]="row.includedColumns"
                     (ngModelChange)="touched()"
                     [disabled]="row.dropped"
-                    placeholder="columnas incluidas (INCLUDE)"
-                    aria-label="Columnas incluidas"
+                    [placeholder]="'designer.includedExample' | t"
+                    [attr.aria-label]="'designer.includedColumns' | t"
                   />
                 }
 
@@ -325,24 +335,24 @@
                     [(ngModel)]="row.filter"
                     (ngModelChange)="touched()"
                     [disabled]="row.dropped"
-                    placeholder="condición (WHERE), por ejemplo estado = 'activo'"
-                    aria-label="Condición del índice"
+                    [placeholder]="'designer.filterExample' | t"
+                    [attr.aria-label]="'designer.filter' | t"
                   />
                 }
               </div>
             }
 
             @if (row.locked) {
-              <p class="rows__note">
-                Lo sostiene una restricción, así que no se puede quitar por su cuenta.
-              </p>
+              <p class="rows__note">{{ 'designer.lockedNote' | t }}</p>
             }
           </div>
         } @empty {
-          <p class="rows__empty">Esta tabla no tiene índices.</p>
+          <p class="rows__empty">{{ 'designer.noIndexes' | t }}</p>
         }
 
-        <button type="button" class="btn btn--ghost" (click)="addIndex()">Añadir índice</button>
+        <button type="button" class="btn btn--ghost" (click)="addIndex()">
+          {{ 'designer.addIndex' | t }}
+        </button>
       </div>
 
       <!-- Claves foráneas -->
@@ -356,8 +366,8 @@
                 [(ngModel)]="row.name"
                 (ngModelChange)="touched()"
                 [disabled]="row.dropped || !!row.origin"
-                placeholder="nombre"
-                aria-label="Nombre de la clave foránea"
+                [placeholder]="'designer.nameExampleShort' | t"
+                [attr.aria-label]="'designer.keyName' | t"
               />
 
               <input
@@ -366,8 +376,8 @@
                 [(ngModel)]="row.columns"
                 (ngModelChange)="touched()"
                 [disabled]="row.dropped || !!row.origin"
-                placeholder="columnas de esta tabla"
-                aria-label="Columnas"
+                [placeholder]="'designer.keyColumnsExample' | t"
+                [attr.aria-label]="'designer.keyColumns' | t"
               />
 
               <span class="rows__arrow" aria-hidden="true">→</span>
@@ -378,8 +388,8 @@
                 [(ngModel)]="row.referencedTable"
                 (ngModelChange)="touched()"
                 [disabled]="row.dropped || !!row.origin"
-                placeholder="tabla referenciada"
-                aria-label="Tabla referenciada"
+                [placeholder]="'designer.referencedTableExample' | t"
+                [attr.aria-label]="'designer.referencedTable' | t"
               />
 
               <input
@@ -388,14 +398,14 @@
                 [(ngModel)]="row.referencedColumns"
                 (ngModelChange)="touched()"
                 [disabled]="row.dropped || !!row.origin"
-                placeholder="columnas referenciadas"
-                aria-label="Columnas referenciadas"
+                [placeholder]="'designer.referencedColumnsExample' | t"
+                [attr.aria-label]="'designer.referencedColumns' | t"
               />
 
               <button
                 type="button"
                 class="columns__remove"
-                [title]="row.dropped ? 'Conservar esta clave' : 'Quitar esta clave'"
+                [title]="(row.dropped ? 'designer.keepKey' : 'designer.dropKey') | t"
                 (click)="removeForeignKey($index)"
               >
                 {{ row.dropped ? '↺' : '×' }}
@@ -404,7 +414,7 @@
 
             <div class="rows__line rows__line--secondary">
               <label class="rows__labelled">
-                Al borrar
+                {{ 'designer.onDelete' | t }}
                 <select
                   class="field__input"
                   [(ngModel)]="row.onDelete"
@@ -412,13 +422,13 @@
                   [disabled]="row.dropped || !!row.origin"
                 >
                   @for (action of capabilities().foreignKeyActions; track action) {
-                    <option [value]="action">{{ actionLabel(action) }}</option>
+                    <option [value]="action">{{ actionLabel(action) | t }}</option>
                   }
                 </select>
               </label>
 
               <label class="rows__labelled">
-                Al cambiar
+                {{ 'designer.onUpdate' | t }}
                 <select
                   class="field__input"
                   [(ngModel)]="row.onUpdate"
@@ -426,24 +436,22 @@
                   [disabled]="row.dropped || !!row.origin"
                 >
                   @for (action of capabilities().foreignKeyActions; track action) {
-                    <option [value]="action">{{ actionLabel(action) }}</option>
+                    <option [value]="action">{{ actionLabel(action) | t }}</option>
                   }
                 </select>
               </label>
 
               @if (row.origin) {
-                <span class="rows__note">
-                  Para cambiarla, quítala y crea otra: ningún motor la modifica en su sitio.
-                </span>
+                <span class="rows__note">{{ 'designer.keyImmutable' | t }}</span>
               }
             </div>
           </div>
         } @empty {
-          <p class="rows__empty">Esta tabla no tiene claves foráneas.</p>
+          <p class="rows__empty">{{ 'designer.noKeys' | t }}</p>
         }
 
         <button type="button" class="btn btn--ghost" (click)="addForeignKey()">
-          Añadir clave foránea
+          {{ 'designer.addKey' | t }}
         </button>
       </div>
 
@@ -452,7 +460,9 @@
         @for (row of constraints(); track $index) {
           <div class="rows__item" [class.is-dropped]="row.dropped">
             <div class="rows__line">
-              <span class="rows__kind">{{ row.kind === 'unique' ? 'Única' : 'Condición' }}</span>
+              <span class="rows__kind">
+                {{ (row.kind === 'unique' ? 'designer.kind.unique' : 'designer.kind.check') | t }}
+              </span>
 
               <input
                 class="field__input"
@@ -460,8 +470,8 @@
                 [(ngModel)]="row.name"
                 (ngModelChange)="touched()"
                 [disabled]="row.dropped || !!row.origin"
-                placeholder="nombre"
-                aria-label="Nombre de la restricción"
+                [placeholder]="'designer.nameExampleShort' | t"
+                [attr.aria-label]="'designer.constraintName' | t"
               />
 
               <input
@@ -471,17 +481,15 @@
                 (ngModelChange)="touched()"
                 [disabled]="row.dropped || !!row.origin"
                 [placeholder]="
-                  row.kind === 'unique'
-                    ? 'columnas separadas por comas'
-                    : 'condición, por ejemplo precio > 0'
+                  (row.kind === 'unique' ? 'designer.columnsExample' : 'designer.checkExample') | t
                 "
-                aria-label="Contenido de la restricción"
+                [attr.aria-label]="'designer.constraintBody' | t"
               />
 
               <button
                 type="button"
                 class="columns__remove"
-                [title]="row.dropped ? 'Conservar esta restricción' : 'Quitar esta restricción'"
+                [title]="(row.dropped ? 'designer.keepConstraint' : 'designer.dropConstraint') | t"
                 (click)="removeConstraint($index)"
               >
                 {{ row.dropped ? '↺' : '×' }}
@@ -489,25 +497,22 @@
             </div>
           </div>
         } @empty {
-          <p class="rows__empty">Esta tabla no tiene restricciones de unicidad ni condiciones.</p>
+          <p class="rows__empty">{{ 'designer.noConstraints' | t }}</p>
         }
 
         <button type="button" class="btn btn--ghost" (click)="addConstraint('unique')">
-          Añadir restricción de unicidad
+          {{ 'designer.addUnique' | t }}
         </button>
 
         @if (capabilities().supportsCheckConstraints) {
           <button type="button" class="btn btn--ghost" (click)="addConstraint('check')">
-            Añadir condición
+            {{ 'designer.addCheck' | t }}
           </button>
         }
       </div>
 
       @if (destructive()) {
-        <p class="warning" role="status">
-          Hay cambios que no se deshacen con otro ALTER: borrar columnas se lleva sus datos, y
-          quitar índices o restricciones puede tardar en rehacerse.
-        </p>
+        <p class="warning" role="status">{{ 'designer.destructive' | t }}</p>
       }
 
       @if (error(); as message) {
@@ -515,14 +520,16 @@
 
         @if (offending()) {
           <p class="culprits">
-            <button type="button" (click)="showOffending()">Ver las filas que lo impiden</button>
-            <span>Se abre en una pestaña nueva y cierra este diálogo.</span>
+            <button type="button" (click)="showOffending()">
+              {{ 'designer.showOffending' | t }}
+            </button>
+            <span>{{ 'designer.showOffendingHint' | t }}</span>
           </p>
         }
       }
 
       @if (statements().length > 0) {
-        <h3 class="section">Esto es lo que se va a ejecutar</h3>
+        <h3 class="section">{{ 'designer.willRun' | t }}</h3>
         <pre class="sql">{{ statements().join('\n') }}</pre>
       }
     }
@@ -531,13 +538,15 @@
   <footer class="foot">
     @if (applied()) {
       <span class="foot__spacer"></span>
-      <button type="button" class="btn btn--primary" (click)="close()">Cerrar</button>
+      <button type="button" class="btn btn--primary" (click)="close()">
+        {{ 'common.close' | t }}
+      </button>
     } @else {
       <button type="button" class="btn" [disabled]="busy() || loading()" (click)="preview()">
-        {{ busy() ? 'Un momento…' : 'Ver SQL' }}
+        {{ (busy() ? 'designer.busy' : 'designer.preview') | t }}
       </button>
       <span class="foot__spacer"></span>
-      <button type="button" class="btn" (click)="close()">Cancelar</button>
+      <button type="button" class="btn" (click)="close()">{{ 'common.cancel' | t }}</button>
       <!-- Aplicar solo se habilita después de ver el SQL: es la regla que impide
            cambiar una estructura sin haber leído qué se cambia. -->
       <button
@@ -546,7 +555,7 @@
         [disabled]="busy() || statements().length === 0"
         (click)="apply()"
       >
-        {{ editing() ? 'Aplicar cambios' : 'Crear tabla' }}
+        {{ (editing() ? 'designer.apply' : 'designer.create') | t }}
       </button>
     }
   </footer>

@@ -10,6 +10,8 @@ import {
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
+import { I18nService } from '../../../core/i18n/i18n.service';
+import { TranslatePipe } from '../../../core/i18n/translate.pipe';
 import { WorkspaceStore } from '../../../core/workspace/workspace-store';
 import {
   CheckConstraintDesign,
@@ -115,12 +117,13 @@ interface DesignRow {
 @Component({
   selector: 'app-table-designer',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [DialogBackdrop, DialogFocus, FormsModule],
+  imports: [DialogBackdrop, DialogFocus, FormsModule, TranslatePipe],
   templateUrl: './table-designer.html',
   styleUrl: './table-designer.scss',
 })
 export class TableDesigner {
   private readonly _store = inject(WorkspaceStore);
+  private readonly _i18n = inject(I18nService);
 
   readonly connectionId = input.required<string>();
 
@@ -349,13 +352,13 @@ export class TableDesigner {
   protected actionLabel(action: ForeignKeyAction): string {
     switch (action) {
       case 'cascade':
-        return 'Aplicar el mismo cambio a las filas hijas';
+        return 'designer.action.cascade';
       case 'setNull':
-        return 'Dejar la columna a nulo';
+        return 'designer.action.setNull';
       case 'setDefault':
-        return 'Dejar su valor por defecto';
+        return 'designer.action.setDefault';
       default:
-        return 'Impedirlo';
+        return 'designer.action.noAction';
     }
   }
 
@@ -518,7 +521,7 @@ export class TableDesigner {
       this.statements.set(statements);
 
       if (statements.length === 0) {
-        this.error.set(this._store.notice() ?? 'No hay ningún cambio que aplicar.');
+        this.error.set(this._store.notice() ?? this._i18n.t('designer.noChanges'));
       }
     } finally {
       this.busy.set(false);
@@ -544,7 +547,7 @@ export class TableDesigner {
       if (statements) {
         this.applied.set(statements);
       } else {
-        this.error.set(this._store.notice() ?? 'No se pudo aplicar el cambio.');
+        this.error.set(this._store.notice() ?? this._i18n.t('designer.applyFailed'));
         this.offending.set(this._store.noticeQuery());
       }
     } finally {
@@ -582,9 +585,18 @@ export class TableDesigner {
     this.closed.emit();
   }
 
-  /** Título y verbo del botón, que cambian entre crear y modificar. */
+  /**
+   * Título y verbo del botón, que cambian entre crear y modificar.
+   *
+   * Devuelve la clave y sus parámetros por separado: el nombre de la tabla entra
+   * en la frase donde cada idioma lo coloque.
+   */
   protected title(): string {
-    return this.editing() ? `Modificar ${this.target().name}` : 'Crear tabla';
+    return this.editing() ? 'designer.edit' : 'designer.create';
+  }
+
+  protected titleParams(): Record<string, string> {
+    return this.editing() ? { name: this.target().name } : {};
   }
 
   protected qualifiedTarget(): string {
@@ -810,19 +822,19 @@ export class TableDesigner {
     const rows = this.rows();
 
     if (!this.name().trim()) {
-      this.error.set('Escribe un nombre para la tabla.');
+      this.error.set(this._i18n.t('designer.needsName'));
       return null;
     }
 
     const live = rows.filter((row) => !row.dropped);
 
     if (live.some((row) => !row.name.trim() || !row.dataType.trim())) {
-      this.error.set('Cada columna necesita un nombre y un tipo.');
+      this.error.set(this._i18n.t('designer.needsColumnName'));
       return null;
     }
 
     if (live.length === 0) {
-      this.error.set('La tabla necesita al menos una columna.');
+      this.error.set(this._i18n.t('designer.needsColumn'));
       return null;
     }
 
@@ -850,11 +862,11 @@ export class TableDesigner {
       }
 
       if (!row.name.trim()) {
-        return 'Cada índice necesita un nombre.';
+        return this._i18n.t('designer.needsIndexName');
       }
 
       if (this.list(row.columns).length === 0) {
-        return `El índice «${row.name.trim()}» necesita al menos una columna.`;
+        return this._i18n.t('designer.needsIndexColumns', { name: row.name.trim() });
       }
     }
 
@@ -864,23 +876,24 @@ export class TableDesigner {
       }
 
       if (!row.name.trim() || !row.referencedTable.trim()) {
-        return 'Cada clave foránea necesita un nombre y una tabla a la que apuntar.';
+        return this._i18n.t('designer.needsKeyName');
       }
 
       const columns = this.list(row.columns);
       const referenced = this.list(row.referencedColumns);
 
       if (columns.length === 0 || referenced.length === 0) {
-        return `La clave foránea «${row.name.trim()}» necesita columnas a los dos lados.`;
+        return this._i18n.t('designer.needsKeyColumns', { name: row.name.trim() });
       }
 
       // Emparejan por posición, así que distinta cantidad no es un descuido: es
       // una clave que el motor rechazaría sin decir cuál de las dos sobra.
       if (columns.length !== referenced.length) {
-        return (
-          `La clave foránea «${row.name.trim()}» empareja ${columns.length} columnas ` +
-          `con ${referenced.length}: tienen que ser las mismas.`
-        );
+        return this._i18n.t('designer.keyColumnsMismatch', {
+          name: row.name.trim(),
+          own: columns.length,
+          other: referenced.length,
+        });
       }
     }
 
@@ -890,9 +903,7 @@ export class TableDesigner {
       }
 
       if (!row.name.trim() || !row.body.trim()) {
-        return row.kind === 'unique'
-          ? 'Cada restricción de unicidad necesita un nombre y sus columnas.'
-          : 'Cada restricción de comprobación necesita un nombre y una condición.';
+        return this._i18n.t(row.kind === 'unique' ? 'designer.needsUnique' : 'designer.needsCheck');
       }
     }
 
