@@ -9,6 +9,7 @@ import {
   signal,
 } from '@angular/core';
 
+import { TranslatePipe } from '../../../core/i18n/translate.pipe';
 import { WorkspaceStore } from '../../../core/workspace/workspace-store';
 import { Icon } from '../../../shared/ui/icon/icon';
 import { ValueInput } from '../../../shared/ui/value-input/value-input';
@@ -50,7 +51,7 @@ interface ParameterDraft {
 @Component({
   selector: 'app-procedure-runner',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [DialogBackdrop, DialogFocus, Icon, ValueInput],
+  imports: [DialogBackdrop, DialogFocus, Icon, ValueInput, TranslatePipe],
   templateUrl: './procedure-runner.html',
   styleUrl: './procedure-runner.scss',
 })

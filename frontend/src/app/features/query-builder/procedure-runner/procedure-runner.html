@@ -9,23 +9,34 @@
 <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="runner-title">
   <header class="head">
     <div>
-      <h2 class="title" id="runner-title">Ejecutar {{ procedure().name }}</h2>
-      <p class="subtitle">{{ procedure().database }} · {{ procedure().schema }} · {{ engine() }}</p>
+      <h2 class="title" id="runner-title">
+        {{ 'runner.title' | t: { name: procedure().name } }}
+      </h2>
+      <p class="subtitle">
+        {{
+          'runner.subtitle'
+            | t: { database: procedure().database, schema: procedure().schema, engine: engine() }
+        }}
+      </p>
     </div>
-    <button type="button" class="close" (click)="closed.emit()" aria-label="Cerrar">×</button>
+    <button
+      type="button"
+      class="close"
+      (click)="closed.emit()"
+      [attr.aria-label]="'common.close' | t"
+    >
+      ×
+    </button>
   </header>
 
   <div class="body">
     @if (loading()) {
-      <p class="state">Leyendo los parámetros…</p>
+      <p class="state">{{ 'runner.loading' | t }}</p>
     } @else if (!signature()) {
-      <p class="state">
-        No se pudieron leer los parámetros de este procedimiento. Puedes abrir su DDL desde el
-        explorador y escribir la llamada a mano.
-      </p>
+      <p class="state">{{ 'runner.failed' | t }}</p>
     } @else {
       @if (inputs().length === 0) {
-        <p class="state">Este procedimiento no recibe parámetros.</p>
+        <p class="state">{{ 'runner.noParameters' | t }}</p>
       } @else {
         <ul class="parameters">
           @for (parameter of inputs(); track parameter.name) {
@@ -34,7 +45,7 @@
                 <span class="name">{{ parameter.name }}</span>
                 <span class="type">{{ parameter.dataType }}</span>
                 @if (parameter.direction === 'inputOutput') {
-                  <span class="badge">entra y sale</span>
+                  <span class="badge">{{ 'runner.inOut' | t }}</span>
                 }
               </div>
 
@@ -45,24 +56,28 @@
                   [kind]="parameter.inputKind ?? 'text'"
                   [dataType]="parameter.dataType"
                   [disabled]="draftFor(parameter).mode !== 'value'"
-                  [label]="'Valor de ' + parameter.name"
+                  [label]="'runner.valueOf' | t: { name: parameter.name }"
                   (valueChange)="setText(parameter, $event)"
                 />
 
-                <div class="modes" role="group" [attr.aria-label]="'Cómo pasar ' + parameter.name">
+                <div
+                  class="modes"
+                  role="group"
+                  [attr.aria-label]="'runner.howToPass' | t: { name: parameter.name }"
+                >
                   <button
                     type="button"
                     [class.is-active]="draftFor(parameter).mode === 'value'"
                     (click)="setMode(parameter, 'value')"
                   >
-                    Valor
+                    {{ 'runner.mode.value' | t }}
                   </button>
                   <button
                     type="button"
                     [class.is-active]="draftFor(parameter).mode === 'null'"
                     (click)="setMode(parameter, 'null')"
                   >
-                    NULL
+                    <span translate="no">NULL</span>
                   </button>
                   @if (parameter.hasDefault) {
                     <button
@@ -70,7 +85,7 @@
                       [class.is-active]="draftFor(parameter).mode === 'omit'"
                       (click)="setMode(parameter, 'omit')"
                     >
-                      Omitir
+                      {{ 'runner.mode.omit' | t }}
                     </button>
                   }
                 </div>
@@ -84,23 +99,20 @@
         <p class="note">
           <app-icon name="export" [size]="12" />
           @if (outputsUnavailable()) {
-            Informix solo entrega los parámetros de salida dentro de otro procedimiento, así que
-            aquí la llamada se ejecuta sin recogerlos.
+            {{ 'runner.outputsInformix' | t }}
           } @else {
-            La llamada declara y lee los parámetros de salida; su valor sale como un resultado más.
+            {{ 'runner.outputs' | t }}
           }
         </p>
       }
 
       @if (missing().length > 0) {
         <p class="warning">
-          Falta el valor de {{ missing().length }}
-          {{ missing().length === 1 ? 'parámetro' : 'parámetros' }}. El SQL lo señala donde
-          corresponde.
+          {{ 'runner.missing' | t: { count: missing().length } }}
         </p>
       }
 
-      <label class="sql-label" for="runner-sql">SQL que se va a ejecutar</label>
+      <label class="sql-label" for="runner-sql">{{ 'runner.sql' | t }}</label>
       <textarea
         id="runner-sql"
         class="sql"
@@ -112,19 +124,21 @@
 
       @if (sqlOverride() !== null) {
         <button type="button" class="reset" (click)="resetSql()">
-          Volver a componerlo desde el formulario
+          {{ 'runner.reset' | t }}
         </button>
       }
     }
   </div>
 
   <footer class="foot">
-    <button type="button" class="secondary" (click)="closed.emit()">Cancelar</button>
+    <button type="button" class="secondary" (click)="closed.emit()">
+      {{ 'common.cancel' | t }}
+    </button>
     <button type="button" class="secondary" [disabled]="!signature()" (click)="emitInsert()">
-      Abrir en el editor
+      {{ 'runner.openInEditor' | t }}
     </button>
     <button type="button" class="primary" [disabled]="!signature()" (click)="emitRun()">
-      Ejecutar
+      {{ 'runner.run' | t }}
     </button>
   </footer>
 </div>
