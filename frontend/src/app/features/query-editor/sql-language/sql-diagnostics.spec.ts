@@ -1,5 +1,5 @@
 import { SchemaIndex } from '../../../shared/models/workspace';
-import { findProblems } from './sql-diagnostics';
+import { closest, findProblems } from './sql-diagnostics';
 
 function col(name: string, dataType = 'int') {
   return { name, dataType, isPrimaryKey: false, isNullable: false };
@@ -33,7 +33,7 @@ const mensajes = (sql: string, index: SchemaIndex = cargado) =>
 describe('avisos del editor', () => {
   it('avisa de una tabla que no existe en el esquema cargado', () => {
     expect(mensajes('SELECT * FROM tpublico.usuarioss')).toEqual([
-      'No existe tpublico.usuarioss en el esquema tpublico.',
+      'No existe tpublico.usuarioss en el esquema tpublico. ¿Quisiste decir usuarios?',
     ]);
   });
 
@@ -50,7 +50,7 @@ describe('avisos del editor', () => {
 
   it('avisa de una columna que la tabla no tiene', () => {
     expect(mensajes('SELECT * FROM tpublico.usuarios u WHERE u.nombres = 1')).toEqual([
-      'tpublico.usuarios no tiene la columna nombres.',
+      'tpublico.usuarios no tiene la columna nombres. ¿Quisiste decir nombre?',
     ]);
   });
 
@@ -107,5 +107,50 @@ describe('avisos del editor', () => {
 
     // Podría estar en un esquema que todavía no se ha traído.
     expect(mensajes('SELECT * FROM pedidos', dos)).toEqual([]);
+  });
+
+  // --- ¿Quisiste decir…? ------------------------------------------------------
+
+  it('propone el arreglo con el esquema tal como se escribió', () => {
+    const [problema] = findProblems('SELECT * FROM tpublico.usuarioss', cargado);
+
+    expect(problema.fix).toBe('tpublico.usuarios');
+  });
+
+  it('propone la columna parecida como arreglo', () => {
+    const [problema] = findProblems(
+      'SELECT * FROM tpublico.usuarios u WHERE u.nombres = 1',
+      cargado,
+    );
+
+    expect(problema.fix).toBe('nombre');
+  });
+
+  it('no propone nada si ningún nombre se parece', () => {
+    const [problema] = findProblems('SELECT * FROM tpublico.inventario', cargado);
+
+    expect(problema.message).toBe('No existe tpublico.inventario en el esquema tpublico.');
+    expect(problema.fix).toBeUndefined();
+  });
+
+  it('no ofrece arreglo sobre un nombre entre comillas', () => {
+    const [problema] = findProblems('SELECT * FROM "usuarioss"', cargado);
+
+    // El aviso sí; reescribirlo sin comillas podría cambiar a qué tabla apunta.
+    expect(problema?.fix).toBeUndefined();
+  });
+
+  describe('closest', () => {
+    it('cuenta dos letras cambiadas de sitio como un solo error', () => {
+      expect(closest('usaurios', ['usuarios', 'facturas'])).toBe('usuarios');
+    });
+
+    it('no confunde nombres cortos distintos', () => {
+      expect(closest('id', ['nombre', 'correo'])).toBeNull();
+    });
+
+    it('no propone el mismo nombre', () => {
+      expect(closest('Usuarios', ['usuarios'])).toBeNull();
+    });
   });
 });

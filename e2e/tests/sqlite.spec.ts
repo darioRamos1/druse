@@ -11,6 +11,7 @@ import {
   escribirSql,
   esperarFinDeConsulta,
   primeraColumna,
+  situarCursor,
 } from '../support/druse';
 
 /**
@@ -537,7 +538,7 @@ test.describe('SQLite de punta a punta', () => {
       editor.trigger('e2e', 'editor.action.triggerSuggest', {});
     });
 
-    const desplegable = page.locator('app-sql-editor .suggest-widget').filter({ visible: true });
+    const desplegable = page.locator('.druse-overflow-widgets .suggest-widget').filter({ visible: true });
 
     await expect(desplegable).toBeVisible({ timeout: 30_000 });
 
@@ -619,7 +620,7 @@ test.describe('SQLite de punta a punta', () => {
       editor.focus();
     });
 
-    const desplegable = page.locator('app-sql-editor .suggest-widget').filter({ visible: true });
+    const desplegable = page.locator('.druse-overflow-widgets .suggest-widget').filter({ visible: true });
 
     const nombres = async () =>
       page.evaluate(() =>
@@ -719,5 +720,67 @@ test.describe('SQLite de punta a punta', () => {
     const caja = await ultima.boundingBox();
 
     expect(caja?.width ?? 0).toBeGreaterThanOrEqual(84);
+  });
+
+  /**
+   * Las ayudas que explican el SQL mientras se escribe.
+   *
+   * Lo que no se ve en las pruebas del frontend es que Monaco las pinte de
+   * verdad: la firma al abrir el paréntesis, la explicación al posarse encima y
+   * el arreglo rápido sobre un nombre mal escrito.
+   */
+  test('el editor explica las funciones y arregla los nombres mal escritos', async ({ page }) => {
+    await abrir(page);
+    await hastaLasTablas(page);
+    await menuDeNodo(page, 'clientes');
+    await page.getByRole('menuitem', { name: 'Abrir SELECT' }).click();
+
+    const editor = page.locator('app-sql-editor');
+
+    // --- Ayuda de parámetros ----------------------------------------------
+    await escribirSql(page, 'SELECT ROUND(id');
+    await situarCursor(page, 1, 16);
+    await page.keyboard.type(', ');
+
+    // Fuera del editor: las ventanas emergentes viven en su propia capa.
+    const firma = page.locator('.druse-overflow-widgets .parameter-hints-widget');
+
+    await expect(firma).toBeVisible({ timeout: 15_000 });
+    await expect(firma).toContainText('ROUND(número, decimales)');
+    await expect(firma.locator('.parameter.active')).toHaveText('decimales');
+
+    if (process.env['DRUSE_BARRIDO']) {
+      await page.screenshot({ path: `${BARRIDO}/25-ayuda-parametros.png` });
+    }
+
+    await page.keyboard.press('Escape');
+
+    // --- Arreglo rápido ------------------------------------------------------
+    await escribirSql(page, 'SELECT * FROM clientess');
+
+    const marca = editor.locator('.squiggly-warning');
+
+    await expect(marca).toBeVisible({ timeout: 15_000 });
+
+    await situarCursor(page, 1, 18);
+    await page.keyboard.press('Control+.');
+
+    const arreglo = page.locator('.action-widget').getByText('Cambiar por clientes');
+
+    await expect(arreglo).toBeVisible({ timeout: 15_000 });
+
+    if (process.env['DRUSE_BARRIDO']) {
+      await page.screenshot({ path: `${BARRIDO}/26-arreglo-rapido.png` });
+    }
+
+    // Con el teclado, como se llega a él: Monaco tapa su menú con una capa que
+    // se come los clics sintéticos de la prueba.
+    await page.keyboard.press('Enter');
+
+    const texto = await page.evaluate(
+      () => (window as any).monaco.editor.getEditors()[0].getValue() as string,
+    );
+
+    expect(texto).toBe('SELECT * FROM clientes');
   });
 });

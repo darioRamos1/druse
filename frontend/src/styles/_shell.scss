@@ -90,22 +90,27 @@
 
 /**
  * La cabecera del diálogo: título, una línea de explicación y la cruz de
- * cerrar. Las tres clases solo aparecen dentro de un diálogo, y allí dicen
- * siempre lo mismo.
+ * cerrar. En Druse las tres clases solo aparecen dentro de un diálogo, y allí
+ * dicen siempre lo mismo.
+ *
+ * **Monaco también usa `.title`** —en el menú del arreglo rápido, entre
+ * otros—, y estas reglas le cambiaban la letra después de que él midiera el
+ * ancho: el texto salía cortado. Por eso se excluye lo suyo, con `:where` para
+ * no subir la especificidad y seguir perdiendo frente a los componentes.
  */
-.title {
+.title:where(:not(.monaco-editor *, .monaco-component *)) {
   margin: 0;
   font-size: 15px;
   font-weight: 600;
 }
 
-.subtitle {
+.subtitle:where(:not(.monaco-editor *, .monaco-component *)) {
   margin: 4px 0 0;
   color: var(--dr-text-tertiary);
   font-size: 12px;
 }
 
-.close {
+.close:where(:not(.monaco-editor *, .monaco-component *)) {
   margin-left: auto;
   border: 0;
   background: transparent;

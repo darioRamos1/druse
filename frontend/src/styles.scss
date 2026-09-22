@@ -188,3 +188,25 @@ app-query-builder .join-suggestions {
 .monaco-editor .sticky-widget .sticky-line-content:hover {
   background: var(--dr-surface-hover);
 }
+
+// Las ventanas emergentes del editor SQL: ayuda de parámetros, tooltip,
+// sugerencias y arreglos rápidos. Viven fuera del editor para que las pestañas
+// y la barra —que están por encima de él— no las tapen. Por encima de la barra
+// superior (30) y por debajo de los paneles laterales y los diálogos.
+.monaco-editor.druse-overflow-widgets {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 0;
+  height: 0;
+  z-index: 40;
+}
+
+// El menú de acciones de Monaco (el del arreglo rápido) mide sus filas dando por
+// hecho el `box-sizing` por omisión del navegador. Con el `border-box` global
+// de arriba las dejaba más estrechas que su texto, y «Cambiar por clientes»
+// salía como «Cambiar por clie…».
+.action-widget,
+.action-widget * {
+  box-sizing: content-box;
+}

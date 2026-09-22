@@ -688,7 +688,10 @@ test.describe('la interfaz por dentro', () => {
     });
 
     const editor = page.locator('app-sql-editor .monaco-editor');
-    const suggestions = editor.locator('.suggest-widget').filter({ visible: true });
+    // Las ventanas emergentes de Monaco viven en su propia capa, fuera del editor.
+    const suggestions = page
+      .locator('.druse-overflow-widgets .suggest-widget')
+      .filter({ visible: true });
 
     await expect(suggestions).toBeVisible({ timeout: 10_000 });
 

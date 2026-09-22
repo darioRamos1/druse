@@ -9,6 +9,7 @@ import {
 import { SqlReference, aliasMap, findRelation, relationMentions } from './sql-context';
 import { SavedSnippet } from '../../../core/application-gateway/application-gateway';
 import { functionsFor, keywordsFor } from './sql-keywords';
+import { describeReference, referenceFor, signatureLabel } from './sql-reference';
 import { snippetsFor } from './sql-snippets';
 import { statementAt } from './sql-statements';
 
@@ -421,21 +422,42 @@ export function registerSqlCompletion(
       }
 
       for (const keyword of keywordsFor(engine)) {
+        const reference = referenceFor(keyword, engine);
+
         suggestions.push({
           label: keyword,
           kind: monaco.languages.CompletionItemKind.Keyword,
           insertText: keyword,
+          // La explicación va en el panel lateral del desplegable: se lee al
+          // dudar entre dos opciones, sin salir del editor a buscarla.
+          ...(reference ? { documentation: { value: describeReference(reference) } } : {}),
           sortText: `3_${keyword}`,
           range,
         });
       }
 
       for (const fn of functionsFor(engine)) {
+        const reference = referenceFor(fn, engine);
+        const sinArgumentos = reference?.params?.length === 0;
+
         suggestions.push({
           label: fn,
           kind: monaco.languages.CompletionItemKind.Function,
-          insertText: `${fn}($0)`,
+          // Sin argumentos se cierra el paréntesis: `NOW()` no tiene nada que
+          // rellenar, y dejar el cursor dentro obligaba a salir con una flecha.
+          insertText: sinArgumentos ? `${fn}()` : `${fn}($0)`,
           insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+          ...(reference
+            ? {
+                detail: signatureLabel(reference),
+                documentation: { value: describeReference(reference, { signature: false }) },
+              }
+            : {}),
+          // Al aceptarla se abre la ayuda de parámetros: es justo el momento en
+          // que hace falta saber qué va dentro.
+          ...(sinArgumentos
+            ? {}
+            : { command: { id: 'editor.action.triggerParameterHints', title: '' } }),
           sortText: `4_${fn}`,
           range,
         });

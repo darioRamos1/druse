@@ -120,4 +120,28 @@ describe('tooltip del editor', () => {
   it('no inventa nada sobre lo que no conoce', () => {
     expect(hover('SELECT * FROM tpublico.usuarios WHERE loquesea = 1', 'loquesea')).toBeNull();
   });
+
+  // --- Funciones y palabras reservadas ---------------------------------------
+
+  it('explica una función que se está llamando', () => {
+    const texto = hover('SELECT COALESCE(correo, nombre) FROM tpublico.usuarios', 'COALESCE');
+
+    expect(texto).toContain('COALESCE(valor, alternativa, …)');
+    expect(texto).toContain('primer valor que no sea nulo');
+  });
+
+  it('una palabra que no se llama no se explica como función', () => {
+    expect(hover('SELECT date FROM tpublico.usuarios', 'date')).toBeNull();
+  });
+
+  it('explica la frase entera desde cualquiera de sus palabras', () => {
+    const sql = 'SELECT nombre, COUNT(*) FROM tpublico.usuarios GROUP BY nombre';
+
+    expect(hover(sql, 'BY')).toContain('**GROUP BY**');
+    expect(hover(sql, 'GROUP')).toContain('**GROUP BY**');
+  });
+
+  it('una tabla o columna manda sobre la palabra reservada', () => {
+    expect(hover('SELECT u.nombre FROM tpublico.usuarios u', 'nombre')).toContain('varchar(200)');
+  });
 });

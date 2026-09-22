@@ -1,11 +1,22 @@
 import type * as MonacoApi from 'monaco-editor';
 
-import { KnownColumn, KnownRelation, SchemaIndex } from '../../../shared/models/workspace';
+import {
+  DatabaseEngine,
+  KnownColumn,
+  KnownRelation,
+  SchemaIndex,
+} from '../../../shared/models/workspace';
 import { aliasMap, findRelation } from './sql-context';
+import { describeReference, referenceFor, SqlReferenceEntry } from './sql-reference';
 
 /** Lo que el tooltip necesita saber. Es un subconjunto del contexto del editor. */
 export interface HoverContext {
   readonly schema: SchemaIndex;
+  /**
+   * Para explicar las funciones y palabras de este motor y no las de otro.
+   * Sin él se explica la primera que haya.
+   */
+  readonly engine?: DatabaseEngine;
 }
 
 /** Columnas que se listan antes de cortar. */
@@ -124,9 +135,86 @@ export function registerSqlHover(
         }
       }
 
+      // ¿Es una función o una palabra reservada? Va lo último: una columna que
+      // se llame `date` es antes columna que función.
+      const found = referenceAt(line, word.startColumn - 1, getContext().engine);
+
+      if (found) {
+        return {
+          range: {
+            ...range,
+            startColumn: found.start + 1,
+            endColumn: found.end + 1,
+          },
+          contents: [{ value: describeReference(found.entry) }],
+        };
+      }
+
       return null;
     },
   });
 
   return () => provider.dispose();
+}
+
+/** Palabras que forman la frase más larga del catálogo: `ON DUPLICATE KEY UPDATE`. */
+const MAX_PHRASE = 4;
+
+/**
+ * La entrada del catálogo bajo el cursor, si la hay.
+ *
+ * Se prueban primero las frases más largas que contienen la palabra: sobre el
+ * `ALL` de `UNION ALL` se explica `UNION ALL`, y sobre el `BY` de `GROUP BY`,
+ * `GROUP BY`. Una función solo se explica cuando se la llama —va seguida de su
+ * paréntesis—: `date` a secas es mucho más a menudo un nombre que la función de
+ * SQLite.
+ */
+function referenceAt(
+  line: string,
+  wordStart: number,
+  engine: DatabaseEngine | undefined,
+): { entry: SqlReferenceEntry; start: number; end: number } | null {
+  const words = [...line.matchAll(/[\p{L}_][\p{L}\p{N}_$]*/gu)].map((match) => ({
+    text: match[0],
+    start: match.index ?? 0,
+    end: (match.index ?? 0) + match[0].length,
+  }));
+  const index = words.findIndex((item) => item.start === wordStart);
+
+  if (index === -1) {
+    return null;
+  }
+
+  for (let size = MAX_PHRASE; size >= 1; size--) {
+    for (let first = Math.max(0, index - size + 1); first <= index; first++) {
+      const phrase = words.slice(first, first + size);
+
+      if (phrase.length < size || phrase.some((item) => item === undefined)) {
+        continue;
+      }
+
+      // Las palabras de una frase van separadas solo por espacios: `GROUP, BY`
+      // no es `GROUP BY`.
+      const contiguous = phrase.every(
+        (item, position) =>
+          position === 0 || /^\s+$/.test(line.slice(phrase[position - 1].end, item.start)),
+      );
+
+      if (!contiguous) {
+        continue;
+      }
+
+      const entry = referenceFor(phrase.map((item) => item.text).join(' '), engine);
+      const start = phrase[0].start;
+      const end = phrase[phrase.length - 1].end;
+
+      if (!entry || (entry.kind === 'function' && !/^\s*\(/.test(line.slice(end)))) {
+        continue;
+      }
+
+      return { entry, start, end };
+    }
+  }
+
+  return null;
 }

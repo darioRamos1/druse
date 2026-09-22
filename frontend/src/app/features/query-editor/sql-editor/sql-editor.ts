@@ -21,8 +21,9 @@ import {
   SchemaIndex,
 } from '../../../shared/models/workspace';
 import { registerSqlCompletion } from '../sql-language/sql-completion';
-import { findProblems } from '../sql-language/sql-diagnostics';
+import { findProblems, registerSqlQuickFixes } from '../sql-language/sql-diagnostics';
 import { registerSqlHover } from '../sql-language/sql-hover';
+import { registerSqlSignatureHelp } from '../sql-language/sql-signature';
 import { formatSql } from '../sql-language/sql-formatting';
 import { statementAt } from '../sql-language/sql-statements';
 import { DEFAULT_FORMAT_SETTINGS, FormatSettings } from '../../../core/workspace/format-settings';
@@ -239,6 +240,21 @@ export default class SqlEditor implements OnInit {
   protected readonly failure = signal('No se pudo cargar el editor.');
 
   private _editor: MonacoApi.editor.IStandaloneCodeEditor | null = null;
+
+  /**
+   * Dónde se pintan las ventanas emergentes de Monaco.
+   *
+   * Cuelga del `body` para no heredar el nivel del editor. Lleva la clase
+   * `monaco-editor` porque los estilos y los colores del tema de Monaco se
+   * aplican bajo ella; sin la clase, las ventanas saldrían sin fondo.
+   */
+  private readonly _overflowHost = (() => {
+    const host = document.createElement('div');
+
+    host.className = 'monaco-editor druse-overflow-widgets';
+
+    return host;
+  })();
   private _monaco: typeof MonacoApi | null = null;
   private _syncingExternalValue = false;
 
@@ -653,6 +669,7 @@ export default class SqlEditor implements OnInit {
 
     this._monaco = monaco;
     this.registerThemes(this.accent());
+    document.body.appendChild(this._overflowHost);
 
     // El autocompletado se registra una vez por editor y se retira al destruirlo:
     // de lo contrario cada editor añadiría otro proveedor y las sugerencias
@@ -669,7 +686,22 @@ export default class SqlEditor implements OnInit {
 
     // El tooltip lee del mismo catálogo, así que nunca dispara una consulta:
     // aparecería tarde y con el ratón ya en otro sitio.
-    const disposeHover = registerSqlHover(monaco, () => ({ schema: this.schema() }));
+    const disposeHover = registerSqlHover(monaco, () => ({
+      schema: this.schema(),
+      engine: this.engine(),
+    }));
+
+    // La firma de la función que se está escribiendo, con el argumento actual
+    // resaltado. Depende del motor: `DATEDIFF` no pide lo mismo en SQL Server
+    // que en MySQL.
+    const disposeSignatures = registerSqlSignatureHelp(monaco, () => ({ engine: this.engine() }));
+
+    // Sobre un nombre mal escrito, la bombilla (o Ctrl+.) lo cambia por el que
+    // se le parece: lo mismo que dice el aviso, a un clic.
+    const disposeQuickFixes = registerSqlQuickFixes(monaco, () => ({
+      schema: this.schema(),
+      model: this._editor?.getModel() ?? null,
+    }));
 
     // Monaco instala muchísimos escuchadores de eventos. Crearlo fuera de la
     // zona evita ciclos de detección de cambios en cada pulsación.
@@ -711,6 +743,17 @@ export default class SqlEditor implements OnInit {
         suggestOnTriggerCharacters: true,
         quickSuggestions: { other: true, comments: false, strings: false },
         scrollbar: { verticalScrollbarSize: 10, horizontalScrollbarSize: 10 },
+        /*
+         * Las ventanas emergentes viven en su propia capa, fuera del editor.
+         *
+         * La ayuda de parámetros y el tooltip se dibujan **encima** de la línea.
+         * En la primera línea —donde empieza casi toda consulta— eso es encima
+         * del editor, y ahí primero las recortaba su caja y después, dejándolas
+         * salir, las tapaban las pestañas y la barra, que están a propósito por
+         * encima del editor para que sus menús lo cubran.
+         */
+        fixedOverflowWidgets: true,
+        overflowWidgetsDomNode: this._overflowHost,
       });
 
       const editor = this._editor;
@@ -760,10 +803,13 @@ export default class SqlEditor implements OnInit {
     this._destroyRef.onDestroy(() => {
       disposeCompletion();
       disposeHover();
+      disposeSignatures();
+      disposeQuickFixes();
       clearTimeout(this._diagnosticsTimer);
       this._editor?.dispose();
       this._editor = null;
       this._monaco = null;
+      this._overflowHost.remove();
     });
   }
 
