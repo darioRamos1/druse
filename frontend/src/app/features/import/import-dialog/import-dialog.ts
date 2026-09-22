@@ -9,6 +9,8 @@ import {
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
+import { I18nService } from '../../../core/i18n/i18n.service';
+import { TranslatePipe } from '../../../core/i18n/translate.pipe';
 import { WorkspaceStore } from '../../../core/workspace/workspace-store';
 import { DatabaseObject } from '../../../shared/models/workspace';
 import { DialogFocus } from '../../../shared/a11y/dialog-focus';
@@ -25,12 +27,18 @@ import { DialogBackdrop } from '../../../shared/a11y/dialog-backdrop';
 @Component({
   selector: 'app-import-dialog',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [DialogBackdrop, DialogFocus, FormsModule],
+  imports: [DialogBackdrop, DialogFocus, FormsModule, TranslatePipe],
   templateUrl: './import-dialog.html',
   styleUrl: './import-dialog.scss',
 })
 export class ImportDialog {
   private readonly _store = inject(WorkspaceStore);
+  private readonly _i18n = inject(I18nService);
+
+  /** El aviso de columnas obligatorias sin valor, con los nombres en negrita. */
+  protected missingParts(columns: readonly string[]) {
+    return this._i18n.tParts('import.missingRequired', { columns: columns.join(', ') });
+  }
 
   /** Tabla de destino, la que el usuario eligió en el explorador. */
   readonly table = input.required<DatabaseObject>();

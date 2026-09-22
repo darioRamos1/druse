@@ -9,28 +9,28 @@
 <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="import-title">
   <header class="head">
     <div>
-      <h2 class="title" id="import-title">Importar a {{ qualified() }}</h2>
-      <p class="subtitle">
-        Las columnas se emparejan por nombre. Antes de escribir nada verás qué se va a insertar.
-      </p>
+      <h2 class="title" id="import-title">{{ 'import.title' | t: { table: qualified() } }}</h2>
+      <p class="subtitle">{{ 'import.subtitle' | t }}</p>
     </div>
-    <button type="button" class="close" (click)="close()" aria-label="Cerrar">×</button>
+    <button type="button" class="close" (click)="close()" [attr.aria-label]="'common.close' | t">
+      ×
+    </button>
   </header>
 
   <div class="body">
     <label class="field">
-      <span class="field__label">Archivo CSV o Excel</span>
+      <span class="field__label">{{ 'import.file' | t }}</span>
       <input type="file" accept=".csv,.xlsx,.txt" (change)="onFile($event)" />
     </label>
 
     <div class="options">
       <label class="check">
         <input type="checkbox" [checked]="hasHeaders()" (change)="hasHeaders.set(!hasHeaders())" />
-        La primera fila son los nombres de las columnas
+        {{ 'import.hasHeaders' | t }}
       </label>
 
       <label class="field field--inline">
-        <span class="field__label">Separador</span>
+        <span class="field__label">{{ 'import.delimiter' | t }}</span>
         <input
           type="text"
           maxlength="1"
@@ -41,19 +41,19 @@
       </label>
 
       <label class="field field--inline">
-        <span class="field__label">Codificación</span>
+        <span class="field__label">{{ 'import.encoding' | t }}</span>
         <select [value]="encoding()" (change)="encoding.set($any($event.target).value)">
-          <option value="utf8bom">UTF-8</option>
-          <option value="latin1">Latin-1</option>
+          <option value="utf8bom" translate="no">UTF-8</option>
+          <option value="latin1" translate="no">Latin-1</option>
         </select>
       </label>
 
       <label class="field field--inline">
-        <span class="field__label">Texto que significa NULL</span>
+        <span class="field__label">{{ 'import.nullText' | t }}</span>
         <input
           type="text"
           class="tiny"
-          placeholder="(ninguno)"
+          [placeholder]="'import.nullTextNone' | t"
           [value]="nullText()"
           (input)="nullText.set($any($event.target).value)"
         />
@@ -63,25 +63,26 @@
     @if (preview(); as resumen) {
       <section class="preview">
         <h3 class="preview__title">
-          {{ resumen.rowCount }} {{ resumen.rowCount === 1 ? 'fila' : 'filas' }} listas para
-          insertar
+          {{ 'import.ready' | t: { count: resumen.rowCount } }}
         </h3>
 
         <table class="mapping">
           <caption class="sr-only">
-            Correspondencia entre las columnas del archivo y las de la tabla
+            {{
+              'import.mapping' | t
+            }}
           </caption>
           <thead>
             <tr>
-              <th scope="col">Columna del archivo</th>
-              <th scope="col">Columna de la tabla</th>
+              <th scope="col">{{ 'import.sourceColumn' | t }}</th>
+              <th scope="col">{{ 'import.targetColumn' | t }}</th>
             </tr>
           </thead>
           <tbody>
             @for (mapping of resumen.mappings; track mapping.source) {
               <tr [class.is-ignored]="!mapping.target">
                 <td>{{ mapping.source }}</td>
-                <td>{{ mapping.target ?? 'no se importa' }}</td>
+                <td>{{ mapping.target ?? ('import.notImported' | t) }}</td>
               </tr>
             }
           </tbody>
@@ -89,31 +90,40 @@
 
         @if (resumen.missingRequired.length > 0) {
           <p class="warn">
-            Sin valor y obligatorias en la tabla:
-            <strong>{{ resumen.missingRequired.join(', ') }}</strong
-            >. El motor rechazará el lote salvo que tengan un valor por defecto.
+            @for (part of missingParts(resumen.missingRequired); track $index) {
+              @if (part.tag === 'columns') {
+                <strong>{{ part.text }}</strong>
+              } @else {
+                {{ part.text }}
+              }
+            }
           </p>
         }
 
         @if (resumen.problems.length > 0) {
           <div class="problems">
             <p class="problems__title">
-              {{ resumen.problems.length }}
-              {{ resumen.problems.length === 1 ? 'valor no cabe' : 'valores no caben' }}
-              en su columna. No se importará nada hasta arreglarlos.
+              {{ 'import.problems' | t: { count: resumen.problems.length } }}
             </p>
             <ul class="problems__list">
               @for (problem of resumen.problems.slice(0, 20); track $index) {
-                <li>Fila {{ problem.row }}, {{ problem.column }}: {{ problem.message }}</li>
+                <li>
+                  {{
+                    'import.problem'
+                      | t: { row: problem.row, column: problem.column, message: problem.message }
+                  }}
+                </li>
               }
             </ul>
             @if (resumen.problems.length > 20) {
-              <p class="problems__more">y {{ resumen.problems.length - 20 }} más.</p>
+              <p class="problems__more">
+                {{ 'import.more' | t: { count: resumen.problems.length - 20 } }}
+              </p>
             }
           </div>
         } @else if (resumen.statements.length > 0) {
           <div class="sql">
-            <p class="sql__title">Se va a ejecutar, para cada fila:</p>
+            <p class="sql__title">{{ 'import.statements' | t }}</p>
             @for (statement of resumen.statements; track $index) {
               <code class="sql__statement">{{ statement }}</code>
             }
@@ -124,12 +134,12 @@
   </div>
 
   <footer class="foot">
-    <button type="button" class="btn" (click)="close()">Cancelar</button>
+    <button type="button" class="btn" (click)="close()">{{ 'common.cancel' | t }}</button>
 
     <span class="spacer"></span>
 
     <button type="button" class="btn" [disabled]="!file() || busy()" (click)="analyze()">
-      {{ busy() ? 'Leyendo…' : 'Ver qué va a pasar' }}
+      {{ (busy() ? 'import.reading' : 'import.analyze') | t }}
     </button>
 
     <!-- Importar solo se ofrece después de mirar, y nunca con problemas dentro. -->
@@ -139,7 +149,7 @@
       [disabled]="!preview() || preview()!.problems.length > 0 || busy()"
       (click)="run()"
     >
-      Importar
+      {{ 'import.run' | t }}
     </button>
   </footer>
 </div>
