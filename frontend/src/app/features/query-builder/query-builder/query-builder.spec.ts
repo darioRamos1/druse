@@ -289,14 +289,18 @@ describe('QueryBuilder', () => {
       .click();
     await fixture.whenStable();
     fixture.detectChanges();
-    expect(element.textContent).toContain('Se borrarían 3 filas');
+    // El número va en su propio `<span>`, así que el texto llega con los
+    // espacios de las etiquetas: se comparan las palabras, no el espaciado.
+    const dicho = () => element.textContent?.replace(/\s+/g, ' ') ?? '';
+
+    expect(dicho()).toContain('Se borrarían 3 filas');
 
     const value = element.querySelector('input[aria-label="Valor del filtro"]') as HTMLInputElement;
     value.value = '42';
     value.dispatchEvent(new Event('input'));
     fixture.detectChanges();
 
-    expect(element.textContent).not.toContain('Se borrarían');
+    expect(dicho()).not.toContain('Se borrarían');
   });
 
   it('una vista solo permite componer SELECT', async () => {

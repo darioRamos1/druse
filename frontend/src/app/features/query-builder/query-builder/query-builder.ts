@@ -17,6 +17,9 @@ import {
   ApplicationGateway,
   SavedCompositionRecord,
 } from '../../../core/application-gateway/application-gateway';
+import { I18nService } from '../../../core/i18n/i18n.service';
+import { formatNumber } from '../../../core/i18n/locale-format';
+import { TranslatePipe } from '../../../core/i18n/translate.pipe';
 import { WorkspaceStore } from '../../../core/workspace/workspace-store';
 import { ValueInput } from '../../../shared/ui/value-input/value-input';
 import {
@@ -203,11 +206,11 @@ const OPERATORS: readonly FilterOperator[] = [
 const HAVING_OPERATORS: readonly FilterOperator[] = ['=', '<>', '>', '>=', '<', '<='];
 const AGGREGATE_FUNCTIONS: readonly AggregateFunction[] = ['COUNT', 'SUM', 'AVG', 'MIN', 'MAX'];
 const DATE_PERIODS: readonly { readonly value: DatePeriod | 'none'; readonly label: string }[] = [
-  { value: 'none', label: 'Valor completo' },
-  { value: 'day', label: 'Por día' },
-  { value: 'month', label: 'Por mes' },
-  { value: 'quarter', label: 'Por trimestre' },
-  { value: 'year', label: 'Por año' },
+  { value: 'none', label: 'builder.period.none' },
+  { value: 'day', label: 'builder.period.day' },
+  { value: 'month', label: 'builder.period.month' },
+  { value: 'quarter', label: 'builder.period.quarter' },
+  { value: 'year', label: 'builder.period.year' },
 ];
 
 /**
@@ -225,12 +228,31 @@ const DATE_PERIODS: readonly { readonly value: DatePeriod | 'none'; readonly lab
 @Component({
   selector: 'app-query-builder',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [DialogBackdrop, DialogFocus, ValueInput, ResultsGrid],
+  imports: [DialogBackdrop, DialogFocus, ValueInput, ResultsGrid, TranslatePipe],
   templateUrl: './query-builder.html',
   styleUrl: './query-builder.scss',
 })
 export class QueryBuilder implements OnInit {
   private readonly _store = inject(WorkspaceStore);
+  private readonly _i18n = inject(I18nService);
+
+  /** Las frases con un trozo con formato propio, sin partir la clave. */
+  protected starParts() {
+    return this._i18n.tParts('builder.starHint', { star: '' });
+  }
+
+  protected distinctParts() {
+    return this._i18n.tParts('builder.distinct', { keyword: '' });
+  }
+
+  protected affectedParts(rows: number) {
+    return this._i18n.tParts('builder.affected', { rows: formatNumber(rows) }, { count: rows });
+  }
+
+  /** El alias que se propone para un cálculo, en el idioma elegido. */
+  private defaultAlias(): string {
+    return this._i18n.t('builder.aliasDefault');
+  }
   private readonly _gateway = inject(ApplicationGateway);
 
   readonly table = input.required<DatabaseObject>();
@@ -628,7 +650,7 @@ export class QueryBuilder implements OnInit {
     const messages: string[] = [];
 
     if (this.grouped() && this.groupByKeys().length === 0 && this.aggregates().length === 0) {
-      messages.push('Elige una columna de agrupación o al menos un cálculo agregado.');
+      messages.push(this._i18n.t('builder.needsGroupOrAggregate'));
     }
 
     for (const aggregate of this.aggregates()) {
@@ -641,11 +663,16 @@ export class QueryBuilder implements OnInit {
         (aggregate.function === 'SUM' || aggregate.function === 'AVG') &&
         !isNumericColumn(column)
       ) {
-        messages.push(`${aggregate.function} requiere una columna numérica: ${column.name}.`);
+        messages.push(
+          this._i18n.t('builder.needsNumeric', {
+            function: aggregate.function,
+            column: column.name,
+          }),
+        );
       }
 
       if (aggregate.distinct && aggregate.columnKey === '*') {
-        messages.push('COUNT DISTINCT necesita una columna concreta, no *.');
+        messages.push(this._i18n.t('builder.needsConcreteColumn'));
       }
     }
 
@@ -653,7 +680,16 @@ export class QueryBuilder implements OnInit {
       const period = this.groupPeriods()[key] ?? 'none';
       const column = this.queryColumns().find((option) => option.key === key)?.column;
       if (period !== 'none' && column && !isDateColumn(column)) {
-        messages.push(`La agrupación por ${period} requiere una fecha: ${column.name}.`);
+        // El período se dice como en el desplegable que lo eligió, no con el
+        // nombre del contrato: «Por mes» y no «month».
+        messages.push(
+          this._i18n.t('builder.needsDate', {
+            period: this._i18n
+              .t(`builder.period.${period}`)
+              .toLocaleLowerCase(this._i18n.intlLocale()),
+            column: column.name,
+          }),
+        );
       }
     }
 
@@ -716,7 +752,7 @@ export class QueryBuilder implements OnInit {
         id,
         function: 'COUNT',
         columnKey: '*',
-        alias: id === 1 ? 'cantidad' : `cantidad_${id}`,
+        alias: id === 1 ? this.defaultAlias() : `${this.defaultAlias()}_${id}`,
         distinct: false,
       },
     ]);
@@ -948,8 +984,10 @@ export class QueryBuilder implements OnInit {
 
     if (candidates.length > MAX_PATH_TABLES) {
       this.pathNotice.set(
-        `Hay ${candidates.length} tablas a la vista y no se pueden leer más de ${MAX_PATH_TABLES} ` +
-          'de una vez. Añade los cruces uno a uno.',
+        this._i18n.t('builder.tooManyTables', {
+          count: candidates.length,
+          max: MAX_PATH_TABLES,
+        }),
       );
       return;
     }
@@ -960,7 +998,7 @@ export class QueryBuilder implements OnInit {
       const graph = await this._store.schemaGraph(this.connectionId(), candidates);
 
       if (!graph) {
-        this.pathNotice.set('No se pudo leer el esquema para buscar el camino.');
+        this.pathNotice.set(this._i18n.t('builder.schemaFailed'));
         return;
       }
 
@@ -968,8 +1006,11 @@ export class QueryBuilder implements OnInit {
 
       if (path === null) {
         this.pathNotice.set(
-          `No hay un camino de claves foráneas de hasta ${MAX_JOIN_HOPS} saltos entre ` +
-            `${this.table().name} y ${target.name}.`,
+          this._i18n.t('builder.noPath', {
+            hops: MAX_JOIN_HOPS,
+            from: this.table().name,
+            to: target.name,
+          }),
         );
         return;
       }
@@ -990,7 +1031,7 @@ export class QueryBuilder implements OnInit {
         const relation = this.availableRelations().find((node) => sameTable(node.source, step.to));
 
         if (!relation) {
-          this.pathNotice.set(`El camino pasa por ${step.to.name}, que no está a la vista.`);
+          this.pathNotice.set(this._i18n.t('builder.pathOutOfView', { table: step.to.name }));
           return;
         }
 
@@ -1635,7 +1676,7 @@ export class QueryBuilder implements OnInit {
       // Se devuelve a la lista: quitarla de la vista sin haberla borrado haría
       // creer que ya no está.
       this.savedCompositions.set(before);
-      this.compositionError.set('No se pudo borrar la composición.');
+      this.compositionError.set(this._i18n.t('builder.compositionDeleteFailed'));
     }
   }
 
@@ -1923,7 +1964,7 @@ export class QueryBuilder implements OnInit {
       // Sin la base, al menos lo que siga en el navegador: mejor que una lista
       // vacía que haga pensar que se perdieron.
       this.savedCompositions.set(this.legacyCompositions());
-      this.compositionError.set('No se pudieron leer las composiciones guardadas.');
+      this.compositionError.set(this._i18n.t('builder.compositionsReadFailed'));
     }
   }
 
@@ -1933,7 +1974,7 @@ export class QueryBuilder implements OnInit {
       this.compositionError.set(null);
     } catch {
       this.savedCompositions.update((current) => current.filter((item) => item.id !== saved.id));
-      this.compositionError.set('No se pudo guardar la composición.');
+      this.compositionError.set(this._i18n.t('builder.compositionSaveFailed'));
     }
   }
 

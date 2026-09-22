@@ -530,7 +530,7 @@ test.describe('migrar datos entre tablas', () => {
     await expect(dialogo.locator('.plan__list li')).toHaveCount(1, { timeout: 30_000 });
     await expect(dialogo.locator('.route')).toContainText(esquema);
 
-    await dialogo.getByRole('button', { name: 'Copiar 1 tablas' }).click();
+    await dialogo.getByRole('button', { name: 'Copiar 1 tabla' }).click();
     await expect(dialogo.locator('.summary__title')).toContainText('Copiadas 2 filas', {
       timeout: 60_000,
     });
@@ -742,7 +742,7 @@ test.describe('migrar datos entre tablas', () => {
     await fila.locator('select').selectOption('Upsert');
     await fila.locator('.each__key').fill('codigo');
 
-    await dialogo.getByRole('button', { name: 'Copiar 1 tablas' }).click();
+    await dialogo.getByRole('button', { name: 'Copiar 1 tabla' }).click();
     await expect(dialogo.locator('.summary__title')).toContainText('Copiadas 2 filas', {
       timeout: 60_000,
     });

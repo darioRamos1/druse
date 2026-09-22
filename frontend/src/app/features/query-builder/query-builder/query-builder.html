@@ -6,19 +6,28 @@
 <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="builder-title">
   <header class="head">
     <div>
-      <h2 class="title" id="builder-title">Componer consulta sobre {{ table().name }}</h2>
-      <p class="subtitle">{{ table().database }} · {{ table().schema }} · {{ engine() }}</p>
+      <h2 class="title" id="builder-title">
+        {{ 'builder.title' | t: { table: table().name } }}
+      </h2>
+      <p class="subtitle">
+        {{
+          'builder.subtitle'
+            | t: { database: table().database, schema: table().schema, engine: engine() }
+        }}
+      </p>
     </div>
-    <button type="button" class="close" (click)="close()" aria-label="Cerrar">×</button>
+    <button type="button" class="close" (click)="close()" [attr.aria-label]="'common.close' | t">
+      ×
+    </button>
   </header>
 
-  <nav class="operations" aria-label="Tipo de consulta">
+  <nav class="operations" [attr.aria-label]="'builder.operations' | t">
     <button
       type="button"
       [class.is-active]="operation() === 'select'"
       (click)="setOperation('select')"
     >
-      SELECT
+      <span translate="no">SELECT</span>
     </button>
     @if (table().kind === 'table') {
       <button
@@ -26,14 +35,14 @@
         [class.is-active]="operation() === 'insert'"
         (click)="setOperation('insert')"
       >
-        INSERT
+        <span translate="no">INSERT</span>
       </button>
       <button
         type="button"
         [class.is-active]="operation() === 'update'"
         (click)="setOperation('update')"
       >
-        UPDATE
+        <span translate="no">UPDATE</span>
       </button>
       <button
         type="button"
@@ -41,7 +50,7 @@
         [class.is-active]="operation() === 'delete'"
         (click)="setOperation('delete')"
       >
-        DELETE
+        <span translate="no">DELETE</span>
       </button>
     }
   </nav>
@@ -50,8 +59,16 @@
     @if (operation() === 'select') {
       @if (!grouped()) {
         <section class="block">
-          <h3 class="block__title">Columnas</h3>
-          <p class="hint">Sin marcar ninguna se escribe <code>*</code>.</p>
+          <h3 class="block__title">{{ 'builder.columns' | t }}</h3>
+          <p class="hint">
+            @for (part of starParts(); track $index) {
+              @if (part.tag === 'star') {
+                <code translate="no">*</code>
+              } @else {
+                {{ part.text }}
+              }
+            }
+          </p>
 
           <div class="columns">
             @for (column of columns(); track column.name) {
@@ -67,9 +84,9 @@
             } @empty {
               <p class="hint">
                 @if (loading()) {
-                  Cargando las columnas…
+                  {{ 'builder.loadingColumns' | t }}
                 } @else {
-                  No se pudieron cargar columnas para este objeto.
+                  {{ 'builder.noColumns' | t }}
                 }
               </p>
             }
@@ -81,7 +98,13 @@
               [checked]="distinct()"
               (change)="distinct.set($any($event.target).checked)"
             />
-            Quitar filas repetidas <code>DISTINCT</code>
+            @for (part of distinctParts(); track $index) {
+              @if (part.tag === 'keyword') {
+                <code translate="no">DISTINCT</code>
+              } @else {
+                {{ part.text }}
+              }
+            }
           </label>
         </section>
       }
@@ -89,10 +112,8 @@
       <section class="block joins-block">
         <div class="joins-heading">
           <div>
-            <h3 class="block__title">Cruces con otras tablas</h3>
-            <p class="hint">
-              Cada cruce incorpora una tabla y la relaciona con cualquiera de las anteriores.
-            </p>
+            <h3 class="block__title">{{ 'builder.joins' | t }}</h3>
+            <p class="hint">{{ 'builder.joinsHint' | t }}</p>
           </div>
           <button
             type="button"
@@ -101,19 +122,21 @@
             (click)="addJoin()"
           >
             <span aria-hidden="true">+</span>
-            Añadir JOIN
+            {{ 'builder.addJoin' | t }}
           </button>
         </div>
 
         @if (availableRelations().length > 0) {
           <div class="filter join-path">
-            <span class="hint">Llegar hasta</span>
+            <span class="hint">{{ 'builder.reach' | t }}</span>
             <select
               [disabled]="pathSearching()"
               (change)="joinPathTo($any($event.target).value); $any($event.target).value = ''"
-              aria-label="Tabla a la que llegar siguiendo las claves foráneas"
+              [attr.aria-label]="'builder.reachLabel' | t"
             >
-              <option value="">{{ pathSearching() ? 'Buscando el camino…' : 'una tabla…' }}</option>
+              <option value="">
+                {{ (pathSearching() ? 'builder.searchingPath' : 'builder.pickTable') | t }}
+              </option>
               @for (relation of availableRelations(); track relation.source.id) {
                 <option [value]="relation.source.id">{{ relationLabel(relation.source) }}</option>
               }
@@ -126,10 +149,13 @@
 
         @if (simpleForeignKeys().length > 0) {
           <div class="filter">
-            <span class="hint">Relaciones detectadas:</span>
+            <span class="hint">{{ 'builder.detected' | t }}</span>
             @for (key of simpleForeignKeys(); track key.name) {
               <button type="button" class="btn btn--small" (click)="addForeignKeyJoin(key)">
-                {{ key.columns[0] }} → {{ key.referencedTable }}
+                {{
+                  'builder.foreignKeyJoin'
+                    | t: { column: key.columns[0], table: key.referencedTable }
+                }}
               </button>
             }
           </div>
@@ -137,13 +163,13 @@
 
         @if (joins().length === 0) {
           <div class="join-empty">
-            <span class="join-empty__mark" aria-hidden="true">ON</span>
+            <span class="join-empty__mark" aria-hidden="true" translate="no">ON</span>
             <span>
-              <strong>Aún no hay cruces</strong>
+              <strong>{{ 'builder.noJoinsYet' | t }}</strong>
               @if (availableRelations().length > 0 || availableSchemas().length > 0) {
-                <small>Añade una tabla para construir la primera relación.</small>
+                <small>{{ 'builder.noJoinsHint' | t }}</small>
               } @else {
-                <small>No hay otros esquemas o tablas visibles en esta base.</small>
+                <small>{{ 'builder.noTablesHint' | t }}</small>
               }
             </span>
           </div>
@@ -153,23 +179,25 @@
           <article class="join-card">
             <header class="join-card__head">
               <span class="join-card__step">
-                <small>JOIN {{ joinIndex + 1 }}</small>
+                <small>{{ 'builder.joinStep' | t: { number: joinIndex + 1 } }}</small>
                 <strong>t{{ joinIndex + 1 }}</strong>
               </span>
               <label class="join-control">
-                <span>Tipo de cruce</span>
+                <span>{{ 'builder.joinType' | t }}</span>
                 <select
                   [value]="join.type"
                   (change)="patchJoin(join.id, { type: $any($event.target).value })"
-                  aria-label="Tipo de JOIN"
+                  [attr.aria-label]="'builder.joinTypeLabel' | t"
                 >
                   @for (type of joinTypes(); track type) {
-                    <option [value]="type" [selected]="type === join.type">{{ type }} JOIN</option>
+                    <option [value]="type" [selected]="type === join.type">
+                      {{ 'builder.joinTypeOption' | t: { type: type } }}
+                    </option>
                   }
                 </select>
               </label>
               <div class="join-search">
-                <label [for]="'join-search-' + join.id">Tabla que se incorpora</label>
+                <label [for]="'join-search-' + join.id">{{ 'builder.joinTable' | t }}</label>
                 <input
                   [id]="'join-search-' + join.id"
                   type="search"
@@ -178,8 +206,8 @@
                   (focus)="openJoinSuggestions(join.id)"
                   (keydown)="onJoinSearchKeydown($event, join)"
                   (blur)="closeJoinSuggestions(join.id)"
-                  placeholder="Buscar esquema.tabla"
-                  aria-label="Buscar tabla para JOIN"
+                  [placeholder]="'builder.joinSearch' | t"
+                  [attr.aria-label]="'builder.joinSearchLabel' | t"
                   role="combobox"
                   aria-autocomplete="list"
                   [attr.aria-expanded]="join.suggestionsOpen"
@@ -212,7 +240,7 @@
                         <span class="join-suggestions__text">
                           @if (suggestion.kind === 'schema') {
                             <strong>{{ suggestion.schema }}</strong>
-                            <small>Cargar tablas de este esquema</small>
+                            <small>{{ 'builder.loadSchemaTables' | t }}</small>
                           } @else {
                             <strong>{{ suggestion.table }}</strong>
                             <small>{{ suggestion.schema }}</small>
@@ -221,7 +249,7 @@
                         <span class="join-suggestions__kind">{{ suggestion.kind }}</span>
                       </button>
                     } @empty {
-                      <span class="join-suggestions__empty">Sin coincidencias</span>
+                      <span class="join-suggestions__empty">{{ 'builder.noMatches' | t }}</span>
                     }
                   </div>
                 }
@@ -230,8 +258,8 @@
                 type="button"
                 class="icon join-card__remove"
                 (click)="removeJoin(join.id)"
-                aria-label="Quitar JOIN"
-                title="Quitar este JOIN"
+                [attr.aria-label]="'builder.removeJoin' | t"
+                [title]="'builder.removeThisJoin' | t"
               >
                 ×
               </button>
@@ -240,35 +268,35 @@
             @if (join.type !== 'CROSS') {
               <div class="join-condition">
                 <div class="join-condition__title">
-                  <span>ON</span>
-                  <small>Condición de relación</small>
+                  <span translate="no">ON</span>
+                  <small>{{ 'builder.onCondition' | t }}</small>
                 </div>
                 <div class="join-expression">
                   <div class="join-operand">
-                    <span class="join-operand__role">Tabla existente</span>
+                    <span class="join-operand__role">{{ 'builder.existingTable' | t }}</span>
                     <label>
-                      <span>Tabla</span>
+                      <span>{{ 'builder.table' | t }}</span>
                       <select
                         [value]="join.leftJoinId ?? ''"
                         (change)="changeJoinSource(join.id, $any($event.target).value)"
-                        aria-label="Tabla izquierda del JOIN"
+                        [attr.aria-label]="'builder.leftTable' | t"
                       >
                         @for (source of joinSources(join); track source.joinId) {
                           <option
                             [value]="source.joinId ?? ''"
                             [selected]="(source.joinId ?? '') === (join.leftJoinId ?? '')"
                           >
-                            {{ source.alias }} · {{ source.label }}
+                            {{ 'builder.source' | t: { alias: source.alias, label: source.label } }}
                           </option>
                         }
                       </select>
                     </label>
                     <label>
-                      <span>Columna</span>
+                      <span>{{ 'builder.column' | t }}</span>
                       <select
                         [value]="join.leftColumn"
                         (change)="patchJoin(join.id, { leftColumn: $any($event.target).value })"
-                        aria-label="Columna izquierda del JOIN"
+                        [attr.aria-label]="'builder.leftColumn' | t"
                       >
                         @for (column of leftColumns(join); track column.name) {
                           <option
@@ -281,21 +309,23 @@
                       </select>
                     </label>
                   </div>
-                  <span class="join-expression__operator" aria-label="igual a">=</span>
+                  <span class="join-expression__operator" [attr.aria-label]="'builder.equals' | t">
+                    =
+                  </span>
                   <div class="join-operand join-operand--new">
-                    <span class="join-operand__role">Tabla incorporada</span>
+                    <span class="join-operand__role">{{ 'builder.newTable' | t }}</span>
                     <span class="join-operand__table">
                       <strong>t{{ joinIndex + 1 }}</strong>
                       <span>{{
-                        relationLabel(joinRelation(join)) || 'Elige una tabla arriba'
+                        relationLabel(joinRelation(join)) || ('builder.pickTableAbove' | t)
                       }}</span>
                     </span>
                     <label>
-                      <span>Columna</span>
+                      <span>{{ 'builder.column' | t }}</span>
                       <select
                         [value]="join.rightColumn"
                         (change)="patchJoin(join.id, { rightColumn: $any($event.target).value })"
-                        aria-label="Columna de la tabla cruzada"
+                        [attr.aria-label]="'builder.rightColumn' | t"
                       >
                         @for (column of join.columns; track column.name) {
                           <option
@@ -312,10 +342,10 @@
               </div>
             } @else {
               <div class="join-card__cross">
-                <span>CROSS</span>
+                <span translate="no">CROSS</span>
                 <p>
-                  <strong>Sin condición ON</strong>
-                  <small>Combina cada fila con todas las filas de la tabla incorporada.</small>
+                  <strong>{{ 'builder.noOn' | t }}</strong>
+                  <small>{{ 'builder.crossHint' | t }}</small>
                 </p>
               </div>
             }
@@ -323,8 +353,8 @@
             @if (!grouped()) {
               <div class="join-columns">
                 <span class="join-columns__head">
-                  <strong>Columnas de t{{ joinIndex + 1 }}</strong>
-                  <small>Márcalas para incluirlas en el SELECT.</small>
+                  <strong>{{ 'builder.joinColumns' | t: { number: joinIndex + 1 } }}</strong>
+                  <small>{{ 'builder.joinColumnsHint' | t }}</small>
                 </span>
                 <div class="join-columns__options">
                   @for (column of join.columns; track column.name) {
@@ -338,7 +368,7 @@
                     </label>
                   } @empty {
                     <span class="hint">{{
-                      join.loading ? 'Cargando columnas…' : 'Sin columnas visibles'
+                      (join.loading ? 'builder.loadingJoinColumns' : 'builder.noJoinColumns') | t
                     }}</span>
                   }
                 </div>
@@ -351,21 +381,19 @@
       <section class="block grouping" [class.is-on]="grouped()">
         <div class="joins-heading">
           <div>
-            <h3 class="block__title">Agrupar resultados</h3>
-            <p class="hint">
-              Resume las filas por una o más columnas y calcula totales por cada grupo.
-            </p>
+            <h3 class="block__title">{{ 'builder.grouping' | t }}</h3>
+            <p class="hint">{{ 'builder.groupingHint' | t }}</p>
           </div>
           <label class="check">
             <input type="checkbox" [checked]="grouped()" (change)="toggleGrouping()" />
-            <span>{{ grouped() ? 'Activado' : 'Activar GROUP BY' }}</span>
+            <span>{{ (grouped() ? 'builder.groupingOn' : 'builder.groupingOff') | t }}</span>
           </label>
         </div>
 
         @if (grouped()) {
           <div class="block">
-            <span class="block__title">Columnas de agrupación</span>
-            <p class="hint">Estas columnas aparecerán tanto en SELECT como en GROUP BY.</p>
+            <span class="block__title">{{ 'builder.groupColumns' | t }}</span>
+            <p class="hint">{{ 'builder.groupColumnsHint' | t }}</p>
             <div class="columns">
               @for (option of queryColumns(); track option.key) {
                 <label class="column" [class.is-on]="isGrouped(option.key)">
@@ -381,14 +409,14 @@
                       [value]="groupPeriods()[option.key] ?? 'none'"
                       (click)="$event.stopPropagation()"
                       (change)="setGroupPeriod(option.key, $any($event.target).value)"
-                      [attr.aria-label]="'Período para ' + option.label"
+                      [attr.aria-label]="'builder.periodFor' | t: { column: option.label }"
                     >
                       @for (period of datePeriods; track period.value) {
                         <option
                           [value]="period.value"
                           [selected]="period.value === (groupPeriods()[option.key] ?? 'none')"
                         >
-                          {{ period.label }}
+                          {{ period.label | t }}
                         </option>
                       }
                     </select>
@@ -401,11 +429,11 @@
           <div class="block">
             <div class="joins-heading">
               <div>
-                <span class="block__title">Cálculos agregados</span>
-                <p class="hint">COUNT, SUM, AVG, MIN y MAX funcionan en todos los motores.</p>
+                <span class="block__title">{{ 'builder.aggregates' | t }}</span>
+                <p class="hint">{{ 'builder.aggregatesHint' | t }}</p>
               </div>
               <button type="button" class="btn btn--small" (click)="addAggregate()">
-                Añadir cálculo
+                {{ 'builder.addAggregate' | t }}
               </button>
             </div>
 
@@ -414,7 +442,7 @@
                 <select
                   [value]="aggregate.function"
                   (change)="changeAggregateFunction(aggregate.id, $any($event.target).value)"
-                  aria-label="Función agregada"
+                  [attr.aria-label]="'builder.aggregateFunction' | t"
                 >
                   @for (function of aggregateFunctions; track function) {
                     <option [value]="function" [selected]="function === aggregate.function">
@@ -426,10 +454,10 @@
                 <select
                   [value]="aggregate.columnKey"
                   (change)="patchAggregate(aggregate.id, { columnKey: $any($event.target).value })"
-                  aria-label="Columna agregada"
+                  [attr.aria-label]="'builder.aggregateColumn' | t"
                 >
                   @if (aggregate.function === 'COUNT') {
-                    <option value="*">* · todas las filas</option>
+                    <option value="*">{{ 'builder.allRows' | t }}</option>
                   }
                   @for (option of queryColumns(); track option.key) {
                     <option [value]="option.key" [selected]="option.key === aggregate.columnKey">
@@ -445,23 +473,23 @@
                     [disabled]="aggregate.columnKey === '*'"
                     (change)="patchAggregate(aggregate.id, { distinct: !aggregate.distinct })"
                   />
-                  DISTINCT
+                  <span translate="no">DISTINCT</span>
                 </label>
                 <label class="field">
-                  <span>Alias</span>
+                  <span>{{ 'builder.alias' | t }}</span>
                   <input
                     type="text"
                     [value]="aggregate.alias"
                     (input)="patchAggregate(aggregate.id, { alias: $any($event.target).value })"
-                    placeholder="cantidad"
-                    aria-label="Alias del cálculo"
+                    [placeholder]="'builder.aliasDefault' | t"
+                    [attr.aria-label]="'builder.aliasLabel' | t"
                   />
                 </label>
                 <button
                   type="button"
                   class="icon"
                   (click)="removeAggregate(aggregate.id)"
-                  aria-label="Quitar cálculo"
+                  [attr.aria-label]="'builder.removeAggregate' | t"
                 >
                   ×
                 </button>
@@ -473,8 +501,8 @@
 
       @if (grouped()) {
         <section class="block">
-          <h3 class="block__title">Condiciones HAVING</h3>
-          <p class="hint">Se aplican después de calcular cada grupo.</p>
+          <h3 class="block__title">{{ 'builder.having' | t }}</h3>
+          <p class="hint">{{ 'builder.havingHint' | t }}</p>
 
           @for (filter of having(); track filter.id; let filterIndex = $index) {
             <div class="filter">
@@ -482,16 +510,16 @@
                 <select
                   [value]="filter.conjunction"
                   (change)="patchHaving(filter.id, { conjunction: $any($event.target).value })"
-                  aria-label="Unión HAVING"
+                  [attr.aria-label]="'builder.havingConjunction' | t"
                 >
-                  <option value="AND">AND</option>
-                  <option value="OR">OR</option>
+                  <option value="AND" translate="no">AND</option>
+                  <option value="OR" translate="no">OR</option>
                 </select>
               }
               <select
                 [value]="filter.aggregateId"
                 (change)="patchHaving(filter.id, { aggregateId: +$any($event.target).value })"
-                aria-label="Cálculo para HAVING"
+                [attr.aria-label]="'builder.havingAggregate' | t"
               >
                 @for (aggregate of aggregates(); track aggregate.id) {
                   <option [value]="aggregate.id" [selected]="aggregate.id === filter.aggregateId">
@@ -502,7 +530,7 @@
               <select
                 [value]="filter.operator"
                 (change)="patchHaving(filter.id, { operator: $any($event.target).value })"
-                aria-label="Operador HAVING"
+                [attr.aria-label]="'builder.havingOperator' | t"
               >
                 @for (operator of havingOperators; track operator) {
                   <option [value]="operator" [selected]="operator === filter.operator">
@@ -513,15 +541,15 @@
               <app-value-input
                 [value]="filter.value ?? ''"
                 [kind]="havingKind(filter)"
-                dataType="valor de HAVING"
-                label="Valor HAVING"
+                [dataType]="'builder.havingValueType' | t"
+                [label]="'builder.havingValue' | t"
                 (valueChange)="patchHaving(filter.id, { value: $event })"
               />
               <button
                 type="button"
                 class="icon"
                 (click)="removeHaving(filter.id)"
-                aria-label="Quitar condición HAVING"
+                [attr.aria-label]="'builder.removeHaving' | t"
               >
                 ×
               </button>
@@ -534,24 +562,23 @@
             [disabled]="aggregates().length === 0"
             (click)="addHaving()"
           >
-            Añadir condición HAVING
+            {{ 'builder.addHaving' | t }}
           </button>
         </section>
       }
       <section class="block">
-        <h3 class="block__title">{{ grouped() ? 'Filtros WHERE' : 'Filtros' }}</h3>
+        <h3 class="block__title">
+          {{ (grouped() ? 'builder.filtersWhere' : 'builder.filters') | t }}
+        </h3>
         @if (grouped()) {
-          <p class="hint">Filtran las filas antes de calcular los grupos.</p>
+          <p class="hint">{{ 'builder.filtersBeforeGroups' | t }}</p>
         }
         @if (mixesConjunctions()) {
           <!--
             Solo cuando se mezclan: con todo AND o todo OR el orden no cambia
             nada, y la nota sería ruido.
           -->
-          <p class="hint">
-            Se evalúan en orden, de arriba abajo: cada cambio entre AND y OR agrupa lo anterior
-            entre paréntesis.
-          </p>
+          <p class="hint">{{ 'builder.mixedConjunctions' | t }}</p>
         }
 
         @for (filter of filters(); track $index; let filterIndex = $index) {
@@ -560,16 +587,16 @@
               <select
                 [value]="filter.conjunction ?? 'AND'"
                 (change)="patchFilter($index, { conjunction: $any($event.target).value })"
-                aria-label="Unión del filtro"
+                [attr.aria-label]="'builder.filterConjunction' | t"
               >
-                <option value="AND">AND</option>
-                <option value="OR">OR</option>
+                <option value="AND" translate="no">AND</option>
+                <option value="OR" translate="no">OR</option>
               </select>
             }
             <select
               [value]="filter.column"
               (change)="patchFilter($index, { column: $any($event.target).value })"
-              aria-label="Columna"
+              [attr.aria-label]="'builder.column' | t"
             >
               @for (column of columns(); track column.name) {
                 <option [value]="column.name" [selected]="column.name === filter.column">
@@ -581,7 +608,7 @@
             <select
               [value]="filter.operator"
               (change)="patchFilter($index, { operator: $any($event.target).value })"
-              aria-label="Operador"
+              [attr.aria-label]="'builder.operator' | t"
             >
               @for (operator of operators; track operator) {
                 <option [value]="operator" [selected]="operator === filter.operator">
@@ -600,10 +627,10 @@
                 class="filter__target"
                 [value]="filter.compareColumn ? 'column' : 'value'"
                 (change)="setCompareTarget($index, $any($event.target).value)"
-                aria-label="Comparar con"
+                [attr.aria-label]="'builder.compareWith' | t"
               >
-                <option value="value">un valor</option>
-                <option value="column">otra columna</option>
+                <option value="value">{{ 'builder.compareValue' | t }}</option>
+                <option value="column">{{ 'builder.compareColumn' | t }}</option>
               </select>
             }
 
@@ -611,7 +638,7 @@
               <select
                 [value]="filter.compareColumn"
                 (change)="patchFilter($index, { compareColumn: $any($event.target).value })"
-                aria-label="Columna con la que se compara"
+                [attr.aria-label]="'builder.compareColumnLabel' | t"
               >
                 @for (column of columns(); track column.name) {
                   <option [value]="column.name" [selected]="column.name === filter.compareColumn">
@@ -624,56 +651,63 @@
                 [value]="filter.value ?? ''"
                 [kind]="filterKind(filter)"
                 [dataType]="
-                  isList(filter.operator)
-                    ? '1, 2, 3'
+                  (isList(filter.operator)
+                    ? 'builder.listExample'
                     : filter.operator === 'BETWEEN'
-                      ? 'desde'
-                      : 'valor'
+                      ? 'builder.from'
+                      : 'builder.value'
+                  ) | t
                 "
-                [label]="filter.operator === 'BETWEEN' ? 'Desde' : 'Valor'"
+                [label]="
+                  (filter.operator === 'BETWEEN' ? 'builder.fromLabel' : 'builder.valueLabel') | t
+                "
                 (valueChange)="patchFilter($index, { value: filterText(filter, $event) })"
               />
               @if (filter.operator === 'BETWEEN') {
-                <span class="filter__between">y</span>
+                <span class="filter__between">{{ 'builder.and' | t }}</span>
                 <app-value-input
                   [value]="filter.valueTo ?? ''"
                   [kind]="filterKind(filter)"
-                  dataType="hasta"
-                  label="Hasta"
+                  [dataType]="'builder.to' | t"
+                  [label]="'builder.toLabel' | t"
                   (valueChange)="patchFilter($index, { valueTo: filterText(filter, $event) })"
                 />
               }
             } @else {
-              <span class="filter__novalue">sin valor</span>
+              <span class="filter__novalue">{{ 'builder.noValue' | t }}</span>
             }
 
             <button
               type="button"
               class="icon"
               (click)="removeFilter($index)"
-              aria-label="Quitar filtro"
+              [attr.aria-label]="'builder.removeFilter' | t"
             >
               ×
             </button>
           </div>
         }
 
-        <button type="button" class="btn btn--small" (click)="addFilter()">Añadir filtro</button>
+        <button type="button" class="btn btn--small" (click)="addFilter()">
+          {{ 'builder.addFilter' | t }}
+        </button>
       </section>
 
       <section class="block">
         <div class="joins-heading">
-          <h3 class="block__title">Ordenamiento</h3>
-          <button type="button" class="btn btn--small" (click)="addOrder()">Añadir orden</button>
+          <h3 class="block__title">{{ 'builder.ordering' | t }}</h3>
+          <button type="button" class="btn btn--small" (click)="addOrder()">
+            {{ 'builder.addOrder' | t }}
+          </button>
         </div>
         @for (order of orders(); track order.id) {
           <div class="filter">
             <select
               [value]="order.target"
               (change)="patchOrder(order.id, { target: $any($event.target).value })"
-              aria-label="Ordenar por"
+              [attr.aria-label]="'builder.orderBy' | t"
             >
-              <option value="">(sin orden)</option>
+              <option value="">{{ 'builder.noOrder' | t }}</option>
               @for (option of orderOptions(); track option.value) {
                 <option [value]="option.value" [selected]="option.value === order.target">
                   {{ option.label }}
@@ -686,14 +720,14 @@
                 [checked]="order.descending"
                 (change)="patchOrder(order.id, { descending: !order.descending })"
               />
-              Descendente
+              {{ 'builder.descending' | t }}
             </label>
             @if (orders().length > 1) {
               <button
                 type="button"
                 class="icon"
                 (click)="removeOrder(order.id)"
-                aria-label="Quitar orden"
+                [attr.aria-label]="'builder.removeOrder' | t"
               >
                 ×
               </button>
@@ -703,25 +737,22 @@
 
         <div class="block--row">
           <label class="field">
-            <span class="field__label">Máximo de filas</span>
+            <span class="field__label">{{ 'builder.limit' | t }}</span>
             <input
               type="number"
               min="1"
               class="tiny"
               [value]="limit() ?? ''"
               (input)="setLimit($any($event.target).value)"
-              placeholder="sin límite"
+              [placeholder]="'builder.noLimit' | t"
             />
           </label>
         </div>
       </section>
     } @else if (operation() === 'insert') {
       <section class="block">
-        <h3 class="block__title">Fila nueva</h3>
-        <p class="hint">
-          Elige qué enviar. Omitir conserva el valor por defecto del servidor; vacío escribe una
-          cadena vacía.
-        </p>
+        <h3 class="block__title">{{ 'builder.newRow' | t }}</h3>
+        <p class="hint">{{ 'builder.newRowHint' | t }}</p>
 
         <div class="value-grid">
           @for (column of columns(); track column.name) {
@@ -732,17 +763,17 @@
               </div>
 
               @if (column.isGenerated) {
-                <span class="value-row__automatic">Automático</span>
+                <span class="value-row__automatic">{{ 'builder.automatic' | t }}</span>
               } @else {
                 <select
                   [value]="draftFor('insert', column.name)?.mode ?? 'omit'"
                   (change)="patchDraft('insert', column.name, { mode: $any($event.target).value })"
-                  [attr.aria-label]="'Modo para ' + column.name"
+                  [attr.aria-label]="'builder.modeFor' | t: { column: column.name }"
                 >
-                  <option value="omit">Omitir / valor por defecto</option>
-                  <option value="value">Escribir valor</option>
+                  <option value="omit">{{ 'builder.mode.omitDefault' | t }}</option>
+                  <option value="value">{{ 'builder.mode.write' | t }}</option>
                   @if (column.isNullable) {
-                    <option value="null">NULL</option>
+                    <option value="null" translate="no">NULL</option>
                   }
                 </select>
 
@@ -751,7 +782,7 @@
                     [value]="draftFor('insert', column.name)?.text ?? ''"
                     [kind]="column.inputKind ?? 'text'"
                     [dataType]="column.dataType"
-                    [label]="'Valor para ' + column.name"
+                    [label]="'builder.valueFor' | t: { column: column.name }"
                     (valueChange)="patchDraft('insert', column.name, { text: $event })"
                   />
                 } @else {
@@ -759,9 +790,9 @@
                     @if (column.defaultValue) {
                       {{ column.defaultValue }}
                     } @else if (column.isNullable) {
-                      columna opcional
+                      {{ 'builder.optionalColumn' | t }}
                     } @else {
-                      valor obligatorio
+                      {{ 'builder.requiredValue' | t }}
                     }
                   </span>
                 }
@@ -777,10 +808,8 @@
       -->
       @if (operation() === 'update') {
         <section class="block">
-          <h3 class="block__title">Cambios</h3>
-          <p class="hint">
-            Solo se incluyen las columnas que marques. La clave primaria no se modifica.
-          </p>
+          <h3 class="block__title">{{ 'builder.changes' | t }}</h3>
+          <p class="hint">{{ 'builder.changesHint' | t }}</p>
 
           <div class="value-grid">
             @for (column of columns(); track column.name) {
@@ -796,15 +825,15 @@
                     (change)="
                       patchDraft('update', column.name, { mode: $any($event.target).value })
                     "
-                    [attr.aria-label]="'Modo para ' + column.name"
+                    [attr.aria-label]="'builder.modeFor' | t: { column: column.name }"
                   >
-                    <option value="omit">No cambiar</option>
-                    <option value="value">Escribir valor</option>
+                    <option value="omit">{{ 'builder.mode.keep' | t }}</option>
+                    <option value="value">{{ 'builder.mode.write' | t }}</option>
                     @if (column.isNullable) {
-                      <option value="null">NULL</option>
+                      <option value="null" translate="no">NULL</option>
                     }
                     @if (column.defaultValue) {
-                      <option value="default">DEFAULT</option>
+                      <option value="default" translate="no">DEFAULT</option>
                     }
                   </select>
 
@@ -813,11 +842,11 @@
                       [value]="draftFor('update', column.name)?.text ?? ''"
                       [kind]="column.inputKind ?? 'text'"
                       [dataType]="column.dataType"
-                      [label]="'Valor para ' + column.name"
+                      [label]="'builder.valueFor' | t: { column: column.name }"
                       (valueChange)="patchDraft('update', column.name, { text: $event })"
                     />
                   } @else {
-                    <span class="value-row__detail">sin cambio</span>
+                    <span class="value-row__detail">{{ 'builder.noChange' | t }}</span>
                   }
                 </div>
               }
@@ -828,13 +857,13 @@
 
       <section class="block block--where">
         <h3 class="block__title">
-          {{ operation() === 'delete' ? 'Qué filas se borran' : 'Dónde aplicar el cambio' }}
+          {{ (operation() === 'delete' ? 'builder.whichRowsDeleted' : 'builder.whereToApply') | t }}
         </h3>
         <p class="hint hint--warning">
           @if (operation() === 'delete') {
-            Sin condición no se genera un DELETE ejecutable: borraría la tabla entera.
+            {{ 'builder.deleteWarning' | t }}
           } @else {
-            El UPDATE siempre conserva una cláusula WHERE visible.
+            {{ 'builder.updateWarning' | t }}
           }
         </p>
 
@@ -843,7 +872,7 @@
             <select
               [value]="filter.column"
               (change)="patchUpdateFilter($index, { column: $any($event.target).value })"
-              aria-label="Columna del filtro"
+              [attr.aria-label]="'builder.filterColumn' | t"
             >
               @for (column of columns(); track column.name) {
                 <option [value]="column.name" [selected]="column.name === filter.column">
@@ -854,7 +883,7 @@
             <select
               [value]="filter.operator"
               (change)="patchUpdateFilter($index, { operator: $any($event.target).value })"
-              aria-label="Operador del filtro"
+              [attr.aria-label]="'builder.filterOperator' | t"
             >
               @for (operator of operators; track operator) {
                 <option [value]="operator" [selected]="operator === filter.operator">
@@ -868,32 +897,35 @@
                 [value]="filter.value ?? ''"
                 (input)="patchUpdateFilter($index, { value: $any($event.target).value })"
                 [placeholder]="
-                  isList(filter.operator)
-                    ? '1, 2, 3'
+                  (isList(filter.operator)
+                    ? 'builder.listExample'
                     : filter.operator === 'BETWEEN'
-                      ? 'desde'
-                      : 'valor obligatorio'
+                      ? 'builder.from'
+                      : 'builder.requiredValue'
+                  ) | t
                 "
-                [attr.aria-label]="filter.operator === 'BETWEEN' ? 'Desde' : 'Valor del filtro'"
+                [attr.aria-label]="
+                  (filter.operator === 'BETWEEN' ? 'builder.fromLabel' : 'builder.filterValue') | t
+                "
               />
               @if (filter.operator === 'BETWEEN') {
-                <span class="filter__between">y</span>
+                <span class="filter__between">{{ 'builder.and' | t }}</span>
                 <input
                   type="text"
                   [value]="filter.valueTo ?? ''"
                   (input)="patchUpdateFilter($index, { valueTo: $any($event.target).value })"
-                  placeholder="hasta"
-                  aria-label="Hasta"
+                  [placeholder]="'builder.to' | t"
+                  [attr.aria-label]="'builder.toLabel' | t"
                 />
               }
             } @else {
-              <span class="filter__novalue">sin valor</span>
+              <span class="filter__novalue">{{ 'builder.noValue' | t }}</span>
             }
             <button
               type="button"
               class="icon"
               (click)="removeUpdateFilter($index)"
-              aria-label="Quitar filtro"
+              [attr.aria-label]="'builder.removeFilter' | t"
             >
               ×
             </button>
@@ -901,7 +933,7 @@
         }
 
         <button type="button" class="btn btn--small" (click)="addUpdateFilter()">
-          Añadir condición
+          {{ 'builder.addCondition' | t }}
         </button>
 
         @if (operation() === 'delete') {
@@ -916,18 +948,21 @@
               [disabled]="counting() || sqlOverride() !== null"
               (click)="countAffected()"
             >
-              {{ counting() ? 'Contando…' : 'Contar filas afectadas' }}
+              {{ (counting() ? 'builder.counting' : 'builder.countAffected') | t }}
             </button>
 
             @if (affected() !== null) {
               <span class="count__result" [class.count__result--many]="(affected() ?? 0) > 1">
-                Se borrarían <span class="mono">{{ affected() }}</span>
-                {{ affected() === 1 ? 'fila' : 'filas' }}
+                @for (part of affectedParts(affected() ?? 0); track $index) {
+                  @if (part.tag === 'rows') {
+                    <span class="mono">{{ part.text }}</span>
+                  } @else {
+                    {{ part.text }}
+                  }
+                }
               </span>
             } @else if (sqlOverride() !== null) {
-              <span class="hint"
-                >Restablece el SQL para contar con los filtros del formulario.</span
-              >
+              <span class="hint">{{ 'builder.resetToCount' | t }}</span>
             }
           </div>
         }
@@ -936,7 +971,7 @@
 
     @if (operation() === 'select' && validationMessages().length > 0) {
       <section class="block" role="alert">
-        <h3 class="block__title">Revisa la composición</h3>
+        <h3 class="block__title">{{ 'builder.review' | t }}</h3>
         @for (message of validationMessages(); track message) {
           <p class="hint hint--warning">{{ message }}</p>
         }
@@ -947,8 +982,8 @@
       <section class="block">
         <div class="joins-heading">
           <div>
-            <h3 class="block__title">Composiciones guardadas</h3>
-            <p class="hint">Se guardan para esta conexión y tabla.</p>
+            <h3 class="block__title">{{ 'builder.compositions' | t }}</h3>
+            <p class="hint">{{ 'builder.compositionsHint' | t }}</p>
             @if (compositionError(); as error) {
               <p class="hint hint--warning">{{ error }}</p>
             }
@@ -958,8 +993,8 @@
               type="text"
               [value]="compositionName()"
               (input)="compositionName.set($any($event.target).value)"
-              placeholder="Nombre de la composición"
-              aria-label="Nombre de la composición"
+              [placeholder]="'builder.compositionName' | t"
+              [attr.aria-label]="'builder.compositionName' | t"
             />
             <button
               type="button"
@@ -967,7 +1002,7 @@
               [disabled]="!compositionName().trim()"
               (click)="saveComposition()"
             >
-              Guardar
+              {{ 'builder.saveComposition' | t }}
             </button>
           </div>
         </div>
@@ -980,7 +1015,7 @@
               type="button"
               class="icon"
               (click)="removeComposition(saved.id)"
-              [attr.aria-label]="'Eliminar ' + saved.name"
+              [attr.aria-label]="'builder.removeComposition' | t: { name: saved.name }"
             >
               ×
             </button>
@@ -991,10 +1026,10 @@
 
     <section class="block preview">
       <div class="preview__head">
-        <h3 class="block__title">Así queda</h3>
+        <h3 class="block__title">{{ 'builder.result' | t }}</h3>
         @if (sqlOverride() !== null) {
           <button type="button" class="reset" (click)="resetSql()">
-            Restablecer desde el formulario
+            {{ 'builder.resetSql' | t }}
           </button>
         }
       </div>
@@ -1002,7 +1037,7 @@
         class="sql"
         [value]="sql()"
         (input)="patchSql($any($event.target).value)"
-        aria-label="SQL generado"
+        [attr.aria-label]="'builder.generatedSql' | t"
         spellcheck="false"
       ></textarea>
 
@@ -1014,7 +1049,7 @@
             [disabled]="previewRunning() || validationMessages().length > 0"
             (click)="runPreview()"
           >
-            {{ previewRunning() ? 'Ejecutando vista previa…' : 'Probar con 10 filas' }}
+            {{ (previewRunning() ? 'builder.previewRunning' : 'builder.preview') | t }}
           </button>
           @if (previewRunning()) {
             <button
@@ -1023,7 +1058,7 @@
               [disabled]="previewCanceling()"
               (click)="cancelQueryPreview()"
             >
-              {{ previewCanceling() ? 'Cancelando…' : 'Cancelar prueba' }}
+              {{ (previewCanceling() ? 'builder.previewCanceling' : 'builder.previewCancel') | t }}
             </button>
           }
           <label class="auto-preview">
@@ -1032,21 +1067,23 @@
               [checked]="autoPreview()"
               (change)="setAutoPreview($any($event.target).checked)"
             />
-            Actualizar sola
+            {{ 'builder.autoPreview' | t }}
           </label>
         </div>
         @if (autoPreview() && sqlOverride() !== null) {
           <p class="hint">
-            No se actualiza sola con el SQL retocado a mano: pulsa «Probar con 10 filas».
+            {{ 'builder.autoPreviewOff' | t: { button: 'builder.preview' | t } }}
           </p>
         }
 
         @if (previewSet(); as set) {
           <app-results-grid [resultSet]="set" [compact]="true" />
         } @else if (previewResult()?.error; as error) {
-          <p class="hint hint--warning">{{ error.message }} {{ error.code ?? '' }}</p>
+          <p class="hint hint--warning">
+            {{ 'builder.previewError' | t: { message: error.message, code: error.code ?? '' } }}
+          </p>
         } @else if (previewResult()?.state === 'canceled') {
-          <p class="hint">La vista previa fue cancelada.</p>
+          <p class="hint">{{ 'builder.previewCanceled' | t }}</p>
         }
       }
     </section>
@@ -1055,31 +1092,31 @@
   <footer class="foot">
     <div class="templates">
       @if (table().kind === 'table') {
-        <span class="templates__label">Plantillas:</span>
+        <span class="templates__label">{{ 'builder.templates' | t }}</span>
         <button
           type="button"
           class="btn btn--small"
           [disabled]="!templatesReady()"
           (click)="insertTemplate('create')"
         >
-          CREATE TABLE
+          <span translate="no">CREATE TABLE</span>
         </button>
         <button type="button" class="btn btn--small" (click)="insertTemplate('drop')">
-          DROP TABLE
+          <span translate="no">DROP TABLE</span>
         </button>
       }
     </div>
 
     <span class="spacer"></span>
 
-    <button type="button" class="btn" (click)="close()">Cancelar</button>
+    <button type="button" class="btn" (click)="close()">{{ 'common.cancel' | t }}</button>
     <button
       type="button"
       class="btn btn--primary"
       [disabled]="operation() === 'select' && validationMessages().length > 0"
       (click)="insertSql()"
     >
-      Insertar {{ operation().toUpperCase() }} en el editor
+      {{ 'builder.insert' | t: { operation: operation().toUpperCase() } }}
     </button>
   </footer>
 </div>
