@@ -1,6 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 
 import { DesktopHost } from '../application-gateway/desktop-host';
+import { I18nService } from '../i18n/i18n.service';
 
 export interface ChosenBackground {
   readonly name: string;
@@ -30,6 +31,7 @@ const BROWSER_KEY = 'druse.editorBackground';
 @Injectable({ providedIn: 'root' })
 export class EditorBackgroundStore {
   private readonly _desktop = inject(DesktopHost);
+  private readonly _i18n = inject(I18nService);
 
   async choose(): Promise<ChosenBackground | null> {
     if (this._desktop.isDesktop) {
@@ -99,7 +101,7 @@ export class EditorBackgroundStore {
           }
 
           if (file.size > MAX_BACKGROUND_BYTES) {
-            reject(new Error('La imagen supera el límite de 8 MB.'));
+            reject(new Error(this._i18n.t('background.tooBig')));
             return;
           }
 
@@ -107,7 +109,9 @@ export class EditorBackgroundStore {
           reader.addEventListener('load', () =>
             resolve({ name: file.name, source: String(reader.result) }),
           );
-          reader.addEventListener('error', () => reject(new Error('No se pudo leer la imagen.')));
+          reader.addEventListener('error', () =>
+            reject(new Error(this._i18n.t('background.readFailed'))),
+          );
           reader.readAsDataURL(file);
         },
         { once: true },

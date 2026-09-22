@@ -17,13 +17,6 @@ export interface CopySelection {
   readonly rows: readonly (readonly (string | null)[])[];
 }
 
-/** Nombre legible de cada formato, para los menús. */
-export const COPY_FORMAT_LABELS: Readonly<Record<CopyFormat, string>> = {
-  excel: 'Excel',
-  'where-in': 'Condición IN',
-  list: 'Lista de valores',
-};
-
 export function formatSelection(selection: CopySelection, format: CopyFormat): string {
   switch (format) {
     case 'excel':

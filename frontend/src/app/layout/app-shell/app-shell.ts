@@ -971,7 +971,7 @@ export class AppShell {
     const session = this._store.session();
 
     if (!session) {
-      return 'sin conexión';
+      return this._i18n.t('shell.noConnection');
     }
 
     const database = this._store.activeTab()?.database ?? session.database;
@@ -1324,10 +1324,7 @@ export class AppShell {
     // cambios sin guardar, por el mismo motivo.
     if (
       this._store.hasOpenTransaction(id) &&
-      !window.confirm(
-        'Esta conexión tiene una transacción abierta. Al cerrarla se perderán los ' +
-          'cambios sin confirmar. ¿Cerrar de todos modos?',
-      )
+      !window.confirm(this._i18n.t('shell.closeWithTransaction'))
     ) {
       return;
     }
@@ -1442,10 +1439,7 @@ export class AppShell {
   protected closeTab(id: string): void {
     const tab = this.tabs().find((item) => item.id === id);
 
-    if (
-      tab?.dirty &&
-      !window.confirm(`“${tab.title}” tiene cambios sin guardar. ¿Cerrar de todos modos?`)
-    ) {
+    if (tab?.dirty && !window.confirm(this._i18n.t('shell.closeDirtyTab', { title: tab.title }))) {
       return;
     }
 

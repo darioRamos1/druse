@@ -4,6 +4,7 @@ import { Observable, firstValueFrom } from 'rxjs';
 import { ApplicationGateway, TransactionState } from '../application-gateway/application-gateway';
 import { PendingWorkService } from '../files/pending-work.service';
 import { NoticeStore } from './notice-store';
+import { I18nService } from '../i18n/i18n.service';
 
 /**
  * Cada cuánto se vuelve a preguntar por una transacción abierta.
@@ -46,6 +47,7 @@ interface WatchedTransaction {
 @Injectable({ providedIn: 'root' })
 export class TransactionStore {
   private readonly _gateway = inject(ApplicationGateway);
+  private readonly _i18n = inject(I18nService);
   private readonly _pendingWork = inject(PendingWorkService);
   private readonly _notices = inject(NoticeStore);
 
@@ -124,8 +126,10 @@ export class TransactionStore {
         const minutos = Math.max(1, Math.round(state.idleTimeoutSeconds / 60));
 
         this._notices.set(
-          `La transacción de «${state.connectionName}» se deshizo sola tras ${minutos} min sin ` +
-            'actividad, para no dejar filas bloqueadas. Los cambios sin confirmar se perdieron.',
+          this._i18n.t('transactions.autoRolledBack', {
+            connection: state.connectionName,
+            minutes: minutos,
+          }),
         );
       }
     } catch {

@@ -1,4 +1,5 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
+import { I18nService } from '../i18n/i18n.service';
 
 import {
   AvailableUpdate,
@@ -25,6 +26,7 @@ export const AUTO_CHECK_PREFERENCE = 'updates.autoCheck';
 @Injectable({ providedIn: 'root' })
 export class UpdateService {
   private readonly _host = inject(DesktopHost);
+  private readonly _i18n = inject(I18nService);
   private initialized = false;
 
   /**
@@ -98,7 +100,7 @@ export class UpdateService {
       await this.check();
     } catch (error) {
       this.initialized = false;
-      this.fail(error, 'No se pudo consultar la información de Druse.');
+      this.fail(error, this._i18n.t('update.infoFailed'));
     }
   }
 
@@ -143,7 +145,7 @@ export class UpdateService {
       this.available.set(update);
       this.state.set(update ? 'available' : 'current');
     } catch (error) {
-      this.fail(error, 'No se pudo buscar actualizaciones.');
+      this.fail(error, this._i18n.t('update.checkFailed'));
     }
   }
 
@@ -166,7 +168,7 @@ export class UpdateService {
       await this._host.downloadAndInstallUpdate();
       this.state.set('installing');
     } catch (error) {
-      this.fail(error, 'No se pudo instalar la actualización.');
+      this.fail(error, this._i18n.t('update.installFailed'));
     } finally {
       unlisten();
     }

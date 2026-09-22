@@ -3,6 +3,7 @@ import { firstValueFrom } from 'rxjs';
 
 import { ApplicationGateway, JobSummary } from '../application-gateway/application-gateway';
 import { BackupStore } from '../backup/backup.store';
+import { I18nService } from '../i18n/i18n.service';
 import { RestoreStore } from '../backup/restore.store';
 import { DesktopHost } from '../application-gateway/desktop-host';
 import { PendingWorkService } from '../files/pending-work.service';
@@ -37,6 +38,7 @@ const CANCEL_TIMEOUT_MS = 30_000;
 @Injectable({ providedIn: 'root' })
 export class RunningJobsService {
   private readonly _backups = inject(BackupStore);
+  private readonly _i18n = inject(I18nService);
   private readonly _restores = inject(RestoreStore);
   private readonly _transfers = inject(TransferStore);
   private readonly _pendingWork = inject(PendingWorkService);
@@ -62,15 +64,15 @@ export class RunningJobsService {
    */
   readonly label = computed(() => {
     if (this._backups.running()) {
-      return 'un respaldo';
+      return this._i18n.t('jobs.backup');
     }
 
     if (this._restores.running()) {
-      return 'una restauración';
+      return this._i18n.t('jobs.restore');
     }
 
     if (this._transfers.running()) {
-      return 'un traslado de datos';
+      return this._i18n.t('jobs.transfer');
     }
 
     return null;

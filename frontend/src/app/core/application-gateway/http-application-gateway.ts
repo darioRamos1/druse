@@ -65,6 +65,7 @@ import {
   SaveConnectionRequest,
 } from './application-gateway';
 import { DesktopHost } from './desktop-host';
+import { I18nService } from '../i18n/i18n.service';
 import {
   AiChatRequest,
   AiProbeResult,
@@ -84,7 +85,7 @@ import {
  * comentario para mantener viva la conexión—: eso no es un error, es ruido del
  * protocolo, y tratarlo como fallo cortaría la respuesta a medias.
  */
-function parseEvent(block: string): AiStreamEvent | null {
+function parseEvent(block: string, failed: string): AiStreamEvent | null {
   let nombre = '';
   let datos = '';
 
@@ -109,7 +110,7 @@ function parseEvent(block: string): AiStreamEvent | null {
 
     return nombre === 'chunk'
       ? { kind: 'chunk', text: payload.text ?? '' }
-      : { kind: 'error', message: payload.message ?? 'El asistente falló.' };
+      : { kind: 'error', message: payload.message ?? failed };
   } catch {
     return null;
   }
@@ -145,6 +146,7 @@ export class HttpApplicationGateway extends ApplicationGateway {
   // El asistente lee su respuesta con `fetch`, que no pasa por el interceptor:
   // necesita saber por su cuenta a qué host hablar y con qué token.
   private readonly _desktop = inject(DesktopHost);
+  private readonly _i18n = inject(I18nService);
 
   override getHealth(): Observable<HealthStatus> {
     return this._http.get<HealthStatus>('/api/health');
@@ -741,7 +743,7 @@ export class HttpApplicationGateway extends ApplicationGateway {
         let corte = buffer.indexOf('\n\n');
 
         while (corte >= 0) {
-          const evento = parseEvent(buffer.slice(0, corte));
+          const evento = parseEvent(buffer.slice(0, corte), this._i18n.t('ai.failed'));
 
           buffer = buffer.slice(corte + 2);
           corte = buffer.indexOf('\n\n');
@@ -770,7 +772,7 @@ export class HttpApplicationGateway extends ApplicationGateway {
 
       subscriber.next({
         kind: 'error',
-        message: error instanceof Error ? error.message : 'No se pudo hablar con el asistente.',
+        message: error instanceof Error ? error.message : this._i18n.t('ai.unreachable'),
       });
       subscriber.complete();
     }

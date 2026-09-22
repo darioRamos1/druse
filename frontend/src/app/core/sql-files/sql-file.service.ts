@@ -1,4 +1,5 @@
 import { Injectable, inject } from '@angular/core';
+import { I18nService } from '../i18n/i18n.service';
 
 import {
   DesktopHost,
@@ -25,6 +26,7 @@ export interface SqlFileSaveRequest {
 @Injectable({ providedIn: 'root' })
 export class SqlFileService {
   private readonly _desktop = inject(DesktopHost);
+  private readonly _i18n = inject(I18nService);
 
   async open(): Promise<OpenedSqlDocument | null> {
     if (this._desktop.isDesktop) {
@@ -144,11 +146,11 @@ export class SqlFileService {
   /** Comprueba el archivo elegido y devuelve su contenido. */
   private async read(file: File): Promise<OpenedSqlDocument> {
     if (!file.name.toLowerCase().endsWith('.sql')) {
-      throw new Error('Solo se pueden abrir archivos con extensión .sql.');
+      throw new Error(this._i18n.t('sqlFile.wrongExtension'));
     }
 
     if (file.size > MAX_SQL_BYTES) {
-      throw new Error('El archivo SQL supera el límite de 10 MB.');
+      throw new Error(this._i18n.t('sqlFile.tooBig'));
     }
 
     let contents: string;
@@ -156,7 +158,7 @@ export class SqlFileService {
     try {
       contents = await file.text();
     } catch {
-      throw new Error('No se pudo leer el archivo SQL.');
+      throw new Error(this._i18n.t('sqlFile.readFailed'));
     }
 
     return {

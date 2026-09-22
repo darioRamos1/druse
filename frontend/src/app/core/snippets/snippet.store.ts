@@ -2,6 +2,7 @@ import { Injectable, computed, inject, signal } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 
 import { ApplicationGateway, SavedSnippet } from '../application-gateway/application-gateway';
+import { I18nService } from '../i18n/i18n.service';
 
 /**
  * Los fragmentos de SQL guardados.
@@ -18,6 +19,7 @@ import { ApplicationGateway, SavedSnippet } from '../application-gateway/applica
 @Injectable({ providedIn: 'root' })
 export class SnippetStore {
   private readonly _gateway = inject(ApplicationGateway);
+  private readonly _i18n = inject(I18nService);
 
   private readonly _snippets = signal<readonly SavedSnippet[]>([]);
   private readonly _error = signal<string | null>(null);
@@ -37,7 +39,7 @@ export class SnippetStore {
     } catch {
       // No poder leerlos no puede impedir escribir SQL: la lista se queda vacía
       // y el editor sigue funcionando sin ellos.
-      this._error.set('No se pudieron leer los fragmentos guardados.');
+      this._error.set(this._i18n.t('snippets.readFailed'));
     }
   }
 
@@ -58,7 +60,7 @@ export class SnippetStore {
       await firstValueFrom(this._gateway.saveSnippet(snippet));
       this._error.set(null);
     } catch {
-      this._error.set(`No se pudo guardar «${snippet.name}».`);
+      this._error.set(this._i18n.t('snippets.saveFailed', { name: snippet.name }));
 
       return null;
     }
@@ -78,7 +80,7 @@ export class SnippetStore {
       await firstValueFrom(this._gateway.deleteSnippet(id));
       this._error.set(null);
     } catch {
-      this._error.set('No se pudo borrar el fragmento.');
+      this._error.set(this._i18n.t('snippets.deleteFailed'));
 
       return false;
     }
