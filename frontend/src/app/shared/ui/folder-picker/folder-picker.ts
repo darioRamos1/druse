@@ -11,7 +11,10 @@ import {
   signal,
   untracked,
 } from '@angular/core';
-import { DatePipe } from '@angular/common';
+
+import { I18nService } from '../../../core/i18n/i18n.service';
+import { formatDate, formatNumber } from '../../../core/i18n/locale-format';
+import { TranslatePipe } from '../../../core/i18n/translate.pipe';
 import { firstValueFrom } from 'rxjs';
 
 import {
@@ -45,12 +48,13 @@ const TYPING_PAUSE = 250;
 @Component({
   selector: 'app-folder-picker',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [DatePipe, Icon],
+  imports: [Icon, TranslatePipe],
   templateUrl: './folder-picker.html',
   styleUrl: './folder-picker.scss',
 })
 export class FolderPicker implements OnDestroy {
   private readonly _gateway = inject(ApplicationGateway);
+  private readonly _i18n = inject(I18nService);
 
   /**
    * Qué se está haciendo.
@@ -78,10 +82,12 @@ export class FolderPicker implements OnDestroy {
   /** Nombre propuesto, que el usuario puede cambiar entero. */
   readonly suggestedName = input('');
 
-  readonly title = input('Elegir dónde guardar');
+  /** Clave del catálogo, no texto: el selector la traduce. */
+  readonly title = input('picker.defaultTitle');
 
   /** Cambia según se guarde un archivo o una carpeta con el respaldo dentro. */
-  readonly nameLabel = input('Nombre del archivo');
+  /** Clave del catálogo, como `title`. */
+  readonly nameLabel = input('picker.defaultName');
 
   /** La ruta completa elegida: carpeta y nombre ya unidos por el proceso local. */
   readonly chosen = output<string>();
@@ -186,7 +192,7 @@ export class FolderPicker implements OnDestroy {
         folders: [],
         files: [],
         canWrite: false,
-        error: 'No se pudo leer esa carpeta.',
+        error: this._i18n.t('picker.readFailed'),
       });
     } finally {
       this.loading.set(false);
@@ -248,7 +254,25 @@ export class FolderPicker implements OnDestroy {
       unit++;
     }
 
-    return `${size.toFixed(size >= 10 ? 0 : 1)} ${units[unit]}`;
+    return this._i18n.t('picker.size', {
+      // Un decimal fijo por debajo de 10, como antes con `toFixed`; pero con
+      // la coma o el punto del idioma, que `toFixed` ponía siempre en inglés.
+      size: formatNumber(size, {
+        minimumFractionDigits: size >= 10 ? 0 : 1,
+        maximumFractionDigits: size >= 10 ? 0 : 1,
+      }),
+      unit: units[unit],
+    });
+  }
+
+  /**
+   * La fecha del archivo en el idioma elegido.
+   *
+   * Con el `date` de Angular salía siempre en `en-US`, que es su idioma por
+   * omisión, fuera cual fuera el de la interfaz.
+   */
+  protected fileDate(value: string): string {
+    return formatDate(value, { dateStyle: 'short', timeStyle: 'short' });
   }
 
   /** Qué saldría de unir la carpeta actual con el nombre escrito. */
@@ -273,7 +297,7 @@ export class FolderPicker implements OnDestroy {
         path: name,
         canWrite: false,
         exists: false,
-        problem: 'No se pudo comprobar ese destino.',
+        problem: this._i18n.t('picker.checkFailed'),
       });
     }
   }
@@ -302,7 +326,7 @@ export class FolderPicker implements OnDestroy {
         path: parent,
         canWrite: false,
         exists: false,
-        problem: `No se pudo crear «${trimmed}» aquí.`,
+        problem: this._i18n.t('picker.createFailed', { name: trimmed }),
       });
     }
   }

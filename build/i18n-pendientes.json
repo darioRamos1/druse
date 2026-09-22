@@ -11,6 +11,5 @@
   "frontend/src/app/features/tables/table-designer/table-designer.html",
   "frontend/src/app/features/transfer/transfer-dialog/transfer-dialog.html",
   "frontend/src/app/features/transfer/transfer-set-dialog/transfer-set-dialog.html",
-  "frontend/src/app/shared/privacy/privacy-notice.html",
-  "frontend/src/app/shared/ui/folder-picker/folder-picker.html"
+  "frontend/src/app/shared/privacy/privacy-notice.html"
 ]

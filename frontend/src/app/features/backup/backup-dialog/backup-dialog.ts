@@ -331,7 +331,7 @@ export class BackupDialog {
    * esperar un `.sql` donde va a aparecer un directorio.
    */
   protected readonly pickerLabel = computed(() =>
-    this.writesFolder() ? 'Nombre de la carpeta' : 'Nombre del archivo',
+    this.writesFolder() ? 'picker.folderName' : 'picker.defaultName',
   );
 
   protected picked(path: string): void {

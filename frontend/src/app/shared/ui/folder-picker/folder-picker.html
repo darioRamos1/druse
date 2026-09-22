@@ -2,8 +2,10 @@
 
 <div class="picker" role="dialog" aria-modal="true" aria-labelledby="picker-title">
   <header class="head">
-    <h2 class="title" id="picker-title">{{ title() }}</h2>
-    <button type="button" class="close" (click)="cancel()" aria-label="Cerrar">×</button>
+    <h2 class="title" id="picker-title">{{ title() | t }}</h2>
+    <button type="button" class="close" (click)="cancel()" [attr.aria-label]="'common.close' | t">
+      ×
+    </button>
   </header>
 
   <!--
@@ -12,24 +14,24 @@
   -->
   <div class="bar">
     <button type="button" class="ghost" [disabled]="!listing() || folder() === ''" (click)="up()">
-      Subir
+      {{ 'picker.up' | t }}
     </button>
 
     <span class="here" [title]="folder()">
-      {{ folder() || 'Este equipo' }}
+      {{ folder() || ('picker.thisComputer' | t) }}
     </span>
 
     @if (mode() === 'save') {
       <button type="button" class="ghost" [disabled]="folder() === ''" (click)="startCreating()">
         <app-icon name="plus" />
-        Nueva carpeta
+        {{ 'picker.newFolder' | t }}
       </button>
     }
   </div>
 
   <div class="list" role="listbox">
     @if (loading()) {
-      <p class="empty">Leyendo…</p>
+      <p class="empty">{{ 'picker.reading' | t }}</p>
     } @else if (listing(); as current) {
       @if (current.error) {
         <p class="problem">{{ current.error }}</p>
@@ -41,14 +43,18 @@
           <input
             type="text"
             class="new-name"
-            placeholder="Nombre de la carpeta"
+            [placeholder]="'picker.folderName' | t"
             autofocus
             #nueva
             (keydown.enter)="create(nueva.value)"
             (keydown.escape)="creating.set(null)"
           />
-          <button type="button" class="ghost" (click)="create(nueva.value)">Crear</button>
-          <button type="button" class="ghost" (click)="creating.set(null)">Cancelar</button>
+          <button type="button" class="ghost" (click)="create(nueva.value)">
+            {{ 'picker.create' | t }}
+          </button>
+          <button type="button" class="ghost" (click)="creating.set(null)">
+            {{ 'common.cancel' | t }}
+          </button>
         </div>
       }
 
@@ -62,9 +68,9 @@
             contiene se marca: si no, habría que entrar en cada una a mirar.
           -->
           @if (folder.marked) {
-            <span class="row__tag row__tag--marked">respaldo</span>
+            <span class="row__tag row__tag--marked">{{ 'picker.tag.backup' | t }}</span>
           } @else if (folder.kind === 'Known') {
-            <span class="row__tag">acceso rápido</span>
+            <span class="row__tag">{{ 'picker.tag.known' | t }}</span>
           }
         </button>
       }
@@ -76,21 +82,24 @@
           [class.is-selected]="selected()?.path === file.path"
           (click)="select(file)"
           (dblclick)="select(file); accept()"
-          [title]="mode() === 'save' ? 'Usar este nombre' : 'Abrir este respaldo'"
+          [title]="(mode() === 'save' ? 'picker.useName' : 'picker.openBackup') | t"
         >
           <app-icon name="save" />
           <span class="row__name">{{ file.name }}</span>
           <span class="row__meta">
-            {{ sizeLabel(file.size) }} · {{ file.modifiedUtc | date: 'short' }}
+            {{
+              'picker.fileMeta'
+                | t: { size: sizeLabel(file.size), date: fileDate(file.modifiedUtc) }
+            }}
           </span>
         </button>
       }
 
       @if (current.folders.length === 0 && current.files.length === 0 && !current.error) {
         @if (mode() === 'open') {
-          <p class="empty">Aquí no hay respaldos ni carpetas.</p>
+          <p class="empty">{{ 'picker.emptyOpen' | t }}</p>
         } @else {
-          <p class="empty">Aquí no hay carpetas. Puedes guardar en esta misma.</p>
+          <p class="empty">{{ 'picker.emptySave' | t }}</p>
         }
       }
     }
@@ -99,7 +108,7 @@
   <div class="foot">
     @if (mode() === 'save') {
       <label class="field">
-        <span class="field__label">{{ nameLabel() }}</span>
+        <span class="field__label">{{ nameLabel() | t }}</span>
         <input
           type="text"
           [value]="name()"
@@ -120,11 +129,11 @@
           @if (destination.problem) {
             <span class="result__note">{{ destination.problem }}</span>
           } @else if (destination.exists) {
-            <span class="result__note">Ya existe: se sobrescribiría.</span>
+            <span class="result__note">{{ 'picker.exists' | t }}</span>
           }
         </p>
       } @else if (folder() === '') {
-        <p class="result">Entra en una carpeta para poder guardar aquí.</p>
+        <p class="result">{{ 'picker.enterFolder' | t }}</p>
       }
     } @else {
       @if (selected(); as file) {
@@ -132,19 +141,21 @@
           <span class="result__path">{{ file.path }}</span>
         </p>
       } @else {
-        <p class="result">Elige un archivo, o entra en la carpeta del respaldo y úsala tal cual.</p>
+        <p class="result">{{ 'picker.chooseFile' | t }}</p>
       }
     }
 
     <div class="actions">
-      <button type="button" class="ghost" (click)="cancel()">Cancelar</button>
+      <button type="button" class="ghost" (click)="cancel()">{{ 'common.cancel' | t }}</button>
 
       @if (canUseFolder()) {
-        <button type="button" class="ghost" (click)="useFolder()">Usar esta carpeta</button>
+        <button type="button" class="ghost" (click)="useFolder()">
+          {{ 'picker.useFolder' | t }}
+        </button>
       }
 
       <button type="button" class="primary" [disabled]="!canAccept()" (click)="accept()">
-        {{ mode() === 'open' ? 'Abrir' : 'Usar esta ruta' }}
+        {{ (mode() === 'open' ? 'picker.open' : 'picker.usePath') | t }}
       </button>
     </div>
   </div>

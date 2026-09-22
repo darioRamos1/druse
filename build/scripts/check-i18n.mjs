@@ -146,6 +146,15 @@ for (const file of sourceFiles(frontend)) {
     ? read(file)
     : [...read(file).matchAll(/\btemplate:\s*`([\s\S]*?)`/g)].map((match) => match[1]).join('\n');
 
+  // Las pipes de formato de Angular usan su propio idioma, `en-US` por
+  // omisión, y no el de la interfaz: una fecha salía «8/17/26» con todo en
+  // español. En las plantillas ya migradas no puede quedar ninguna.
+  const relativePath = relative(root, file).replaceAll('\\', '/');
+
+  if (html && /\|\s*(?:date|number|percent|currency)\b/.test(html) && !pending.has(relativePath)) {
+    fixedLocale.push(`${relativePath} (pipe de formato de Angular)`);
+  }
+
   if (html) {
     const found = literalsIn(html);
 

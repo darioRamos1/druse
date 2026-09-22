@@ -245,7 +245,7 @@ describe('FolderPicker', () => {
       const archivo = element.querySelector('.row--file');
 
       expect(archivo?.textContent).toContain('tienda.sql');
-      expect(archivo?.textContent).toContain('2.0 KB');
+      expect(archivo?.textContent).toContain('2,0 KB');
       expect(element.querySelector('.row__tag--marked')?.textContent).toContain('respaldo');
     });
 
