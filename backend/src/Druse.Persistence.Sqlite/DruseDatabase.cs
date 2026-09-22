@@ -342,6 +342,31 @@ public sealed class DruseDatabase
                 ON diagrams (connection_id, updated_at_utc DESC);
             """, cancellationToken);
 
+        // Consultas guardadas desde el compositor, por tabla.
+        //
+        // Antes vivían en el almacenamiento del WebView, que se pierde al
+        // limpiar los datos del navegador. `model` lleva el SQL y el estado del
+        // formulario en JSON, por lo mismo que el de los diagramas: su forma la
+        // decide la interfaz.
+        await ExecuteAsync(connection, """
+            CREATE TABLE IF NOT EXISTS query_compositions (
+                id              TEXT NOT NULL PRIMARY KEY,
+                connection_id   TEXT NOT NULL,
+                database_name   TEXT NOT NULL,
+                schema_name     TEXT NOT NULL,
+                table_name      TEXT NOT NULL,
+                name            TEXT NOT NULL,
+                model           TEXT NOT NULL,
+                created_at_utc  TEXT NOT NULL,
+                updated_at_utc  TEXT NOT NULL
+            );
+            """, cancellationToken);
+
+        await ExecuteAsync(connection, """
+            CREATE INDEX IF NOT EXISTS ix_query_compositions_table
+                ON query_compositions (connection_id, database_name, schema_name, table_name, updated_at_utc DESC);
+            """, cancellationToken);
+
         // Los trabajos largos que hubo: respaldos, restauraciones y traslados.
         //
         // **Se guarda para poder decir qué quedó a medias.** Un trabajo que

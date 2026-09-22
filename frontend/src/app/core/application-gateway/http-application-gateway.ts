@@ -47,6 +47,7 @@ import {
   RowDeleteRequest,
   RowEditRequest,
   RowEditResult,
+  SavedCompositionRecord,
   SavedDiagram,
   SavedSnippet,
   TableChangeResult,
@@ -425,6 +426,25 @@ export class HttpApplicationGateway extends ApplicationGateway {
 
   override deleteDiagram(id: string): Observable<void> {
     return this._http.delete<void>(`/api/workspace/diagrams/${id}`);
+  }
+
+  override getCompositions(
+    connectionId: string,
+    database: string,
+    schema: string | undefined,
+    table: string,
+  ): Observable<readonly SavedCompositionRecord[]> {
+    return this._http.get<SavedCompositionRecord[]>('/api/workspace/compositions', {
+      params: { connectionId, database, schema: schema ?? '', table },
+    });
+  }
+
+  override saveComposition(composition: SavedCompositionRecord): Observable<void> {
+    return this._http.put<void>(`/api/workspace/compositions/${composition.id}`, composition);
+  }
+
+  override deleteComposition(id: string): Observable<void> {
+    return this._http.delete<void>(`/api/workspace/compositions/${id}`);
   }
 
   override exportQuery(request: ExportRequest): Observable<Blob> {

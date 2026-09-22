@@ -21,6 +21,70 @@ internal static class StorageEndpoints
         MapEditorTabs(app);
         MapSnippets(app);
         MapDiagrams(app);
+        MapCompositions(app);
+    }
+
+    /// <summary>
+    /// Consultas guardadas desde el compositor, por tabla.
+    ///
+    /// `model` lleva el SQL y el estado del formulario; su forma la decide la
+    /// interfaz, y aquí solo se exige que exista.
+    /// </summary>
+    private static void MapCompositions(IEndpointRouteBuilder app)
+    {
+        app.MapGet("/api/workspace/compositions", async (
+            Guid connectionId,
+            string database,
+            string? schema,
+            string table,
+            ICompositionStore compositions,
+            CancellationToken cancellationToken) =>
+            Results.Ok(
+                (await compositions.GetAllAsync(
+                    connectionId,
+                    database,
+                    schema ?? string.Empty,
+                    table,
+                    cancellationToken))
+                    .Select(composition => composition.ToDto())))
+        .WithName("GetCompositions");
+
+        app.MapPut("/api/workspace/compositions/{id:guid}", async (
+            Guid id,
+            SavedCompositionDto request,
+            ICompositionStore compositions,
+            CancellationToken cancellationToken) =>
+        {
+            var name = request.Name?.Trim() ?? string.Empty;
+
+            // Sin nombre no se vuelve a encontrar, y sin tabla no se sabe dónde
+            // enseñarla.
+            if (name.Length == 0
+                || string.IsNullOrWhiteSpace(request.Table)
+                || string.IsNullOrWhiteSpace(request.Model))
+            {
+                return Results.BadRequest(
+                    new { message = "Una composición necesita nombre, tabla y contenido." });
+            }
+
+            await compositions.SaveAsync(
+                (request with { Name = name }).ToDomain(id),
+                cancellationToken);
+
+            return Results.NoContent();
+        })
+        .WithName("SaveComposition");
+
+        app.MapDelete("/api/workspace/compositions/{id:guid}", async (
+            Guid id,
+            ICompositionStore compositions,
+            CancellationToken cancellationToken) =>
+        {
+            await compositions.DeleteAsync(id, cancellationToken);
+
+            return Results.NoContent();
+        })
+        .WithName("DeleteComposition");
     }
 
     /// <summary>

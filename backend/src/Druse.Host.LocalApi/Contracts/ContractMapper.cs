@@ -592,6 +592,46 @@ internal static class ContractMapper
         };
     }
 
+    public static SavedCompositionDto ToDto(this SavedComposition composition)
+    {
+        ArgumentNullException.ThrowIfNull(composition);
+
+        return new SavedCompositionDto
+        {
+            Id = composition.Id.ToString(),
+            ConnectionId = composition.ConnectionId.ToString(),
+            Database = composition.Database,
+            Schema = composition.Schema.Length == 0 ? null : composition.Schema,
+            Table = composition.Table,
+            Name = composition.Name,
+            Model = composition.Model,
+            CreatedAtUtc = composition.CreatedAtUtc,
+            UpdatedAtUtc = composition.UpdatedAtUtc,
+        };
+    }
+
+    public static SavedComposition ToDomain(this SavedCompositionDto composition, Guid id)
+    {
+        ArgumentNullException.ThrowIfNull(composition);
+
+        var now = DateTimeOffset.UtcNow;
+
+        return new SavedComposition
+        {
+            Id = id,
+            ConnectionId = Guid.TryParse(composition.ConnectionId, out var connection)
+                ? connection
+                : Guid.Empty,
+            Database = composition.Database ?? string.Empty,
+            Schema = composition.Schema ?? string.Empty,
+            Table = composition.Table,
+            Name = composition.Name,
+            Model = composition.Model,
+            CreatedAtUtc = composition.CreatedAtUtc ?? now,
+            UpdatedAtUtc = now,
+        };
+    }
+
     public static SqlSnippetDto ToDto(this SqlSnippet snippet)
     {
         ArgumentNullException.ThrowIfNull(snippet);

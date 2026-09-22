@@ -239,6 +239,24 @@ export interface SavedDiagram {
   readonly updatedAtUtc?: string;
 }
 
+/**
+ * Una consulta guardada desde el compositor, de una tabla concreta.
+ *
+ * `model` es JSON con el SQL y el estado del formulario; su forma la decide el
+ * compositor.
+ */
+export interface SavedCompositionRecord {
+  readonly id: string;
+  readonly connectionId: string;
+  readonly database: string;
+  readonly schema?: string | null;
+  readonly table: string;
+  readonly name: string;
+  readonly model: string;
+  readonly createdAtUtc?: string;
+  readonly updatedAtUtc?: string;
+}
+
 export interface SavedSnippet {
   readonly id: string;
   readonly name: string;
@@ -517,6 +535,18 @@ export abstract class ApplicationGateway {
   abstract saveDiagram(diagram: SavedDiagram): Observable<void>;
 
   abstract deleteDiagram(id: string): Observable<void>;
+
+  /** Las consultas guardadas desde el compositor para una tabla. */
+  abstract getCompositions(
+    connectionId: string,
+    database: string,
+    schema: string | undefined,
+    table: string,
+  ): Observable<readonly SavedCompositionRecord[]>;
+
+  abstract saveComposition(composition: SavedCompositionRecord): Observable<void>;
+
+  abstract deleteComposition(id: string): Observable<void>;
 
   /**
    * Exporta el resultado de una consulta.

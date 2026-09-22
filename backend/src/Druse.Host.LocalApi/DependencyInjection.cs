@@ -69,6 +69,7 @@ internal static class DependencyInjection
         services.AddScoped<IEditorTabStore, SqliteEditorTabStore>();
         services.AddScoped<ISqlSnippetStore, SqliteSqlSnippetStore>();
         services.AddScoped<IDiagramStore, SqliteDiagramStore>();
+        services.AddScoped<ICompositionStore, SqliteCompositionStore>();
         services.AddScoped<IBackupProfileStore, SqliteBackupProfileStore>();
         services.AddScoped<ITransferProfileStore, SqliteTransferProfileStore>();
         services.AddScoped<IAiProviderStore, SqliteAiProviderStore>();

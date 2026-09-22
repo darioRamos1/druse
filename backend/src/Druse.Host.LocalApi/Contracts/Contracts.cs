@@ -454,6 +454,23 @@ public sealed record SavedDiagramDto
     public DateTimeOffset? UpdatedAtUtc { get; init; }
 }
 
+/// <summary>
+/// Una consulta guardada desde el compositor. `model` lleva el SQL y el estado
+/// del formulario, en JSON.
+/// </summary>
+public sealed record SavedCompositionDto
+{
+    public required string Id { get; init; }
+    public required string ConnectionId { get; init; }
+    public required string Database { get; init; }
+    public string? Schema { get; init; }
+    public required string Table { get; init; }
+    public required string Name { get; init; }
+    public required string Model { get; init; }
+    public DateTimeOffset? CreatedAtUtc { get; init; }
+    public DateTimeOffset? UpdatedAtUtc { get; init; }
+}
+
 // ---------------------------------------------------------------------------
 // Edición de filas
 // ---------------------------------------------------------------------------

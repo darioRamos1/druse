@@ -949,6 +949,9 @@
           <div>
             <h3 class="block__title">Composiciones guardadas</h3>
             <p class="hint">Se guardan para esta conexión y tabla.</p>
+            @if (compositionError(); as error) {
+              <p class="hint hint--warning">{{ error }}</p>
+            }
           </div>
           <div class="filter">
             <input

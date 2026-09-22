@@ -1,6 +1,12 @@
 import { signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 
+import { of, throwError } from 'rxjs';
+
+import {
+  ApplicationGateway,
+  SavedCompositionRecord,
+} from '../../../core/application-gateway/application-gateway';
 import { WorkspaceStore } from '../../../core/workspace/workspace-store';
 import { DatabaseObject, QueryResult } from '../../../shared/models/workspace';
 import { QueryBuilder } from './query-builder';
@@ -158,6 +164,53 @@ const store = {
   countRows: () => Promise.resolve(3),
 };
 
+/**
+ * La base de Druse, de mentira: una lista en memoria.
+ *
+ * `failing` hace que todo falle, para ver qué hace el compositor sin ella.
+ */
+const compositions = {
+  records: [] as SavedCompositionRecord[],
+  failing: false,
+};
+
+const gateway = {
+  getCompositions: (
+    connectionId: string,
+    database: string,
+    schema: string | undefined,
+    name: string,
+  ) =>
+    compositions.failing
+      ? throwError(() => new Error('sin base'))
+      : of(
+          compositions.records.filter(
+            (record) =>
+              record.connectionId === connectionId &&
+              record.database === database &&
+              (record.schema ?? '') === (schema ?? '') &&
+              record.table === name,
+          ),
+        ),
+  saveComposition: (record: SavedCompositionRecord) => {
+    if (compositions.failing) {
+      return throwError(() => new Error('sin base'));
+    }
+    compositions.records = [
+      record,
+      ...compositions.records.filter((item) => item.id !== record.id),
+    ];
+    return of(undefined);
+  },
+  deleteComposition: (id: string) => {
+    if (compositions.failing) {
+      return throwError(() => new Error('sin base'));
+    }
+    compositions.records = compositions.records.filter((item) => item.id !== id);
+    return of(undefined);
+  },
+};
+
 async function create(target: DatabaseObject): Promise<ComponentFixture<QueryBuilder>> {
   const fixture = TestBed.createComponent(QueryBuilder);
 
@@ -177,9 +230,14 @@ describe('QueryBuilder', () => {
     relationNodes.set([customerNode, auditCustomerNode, foreignCustomerNode]);
     tableForeignKeys = [];
     localStorage.clear();
+    compositions.records = [];
+    compositions.failing = false;
     await TestBed.configureTestingModule({
       imports: [QueryBuilder],
-      providers: [{ provide: WorkspaceStore, useValue: store }],
+      providers: [
+        { provide: WorkspaceStore, useValue: store },
+        { provide: ApplicationGateway, useValue: gateway },
+      ],
     }).compileComponents();
   });
 
@@ -511,7 +569,98 @@ describe('QueryBuilder', () => {
     fixture.detectChanges();
 
     expect(element.textContent).toContain('Ventas por mes');
-    expect(localStorage.length).toBe(1);
+    // En la base de Druse, no en el navegador.
+    expect(compositions.records.map((record) => record.name)).toEqual(['Ventas por mes']);
+    expect(compositions.records[0]).toMatchObject({
+      connectionId: 'connection-1',
+      database: 'druse_test',
+      schema: 'public',
+      table: 'orders',
+    });
+    expect(localStorage.length).toBe(0);
+  });
+
+  it('al abrirse lee las composiciones guardadas de su tabla', async () => {
+    compositions.records = [
+      {
+        id: 'guardada',
+        connectionId: 'connection-1',
+        database: 'druse_test',
+        schema: 'public',
+        table: 'orders',
+        name: 'De la base',
+        model: JSON.stringify({ sql: 'SELECT 1;' }),
+      },
+      {
+        id: 'otra-tabla',
+        connectionId: 'connection-1',
+        database: 'druse_test',
+        schema: 'public',
+        table: 'customers',
+        name: 'De otra tabla',
+        model: JSON.stringify({ sql: 'SELECT 2;' }),
+      },
+    ];
+
+    const fixture = await create(table);
+
+    expect(fixture.nativeElement.textContent).toContain('De la base');
+    expect(fixture.nativeElement.textContent).not.toContain('De otra tabla');
+  });
+
+  /**
+   * Las que quedaron en el navegador de antes se suben a la base una vez, y
+   * solo entonces se borran de allí.
+   */
+  it('sube a la base las composiciones que quedaban en el navegador', async () => {
+    const key = 'druse.query-builder.v1:connection-1:druse_test:public:orders';
+    localStorage.setItem(
+      key,
+      JSON.stringify([{ id: 'vieja', name: 'De antes', sql: 'SELECT 3;' }]),
+    );
+
+    const fixture = await create(table);
+    // La subida y la lectura van una detrás de otra: la lista llega después.
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(compositions.records.map((record) => record.id)).toEqual(['vieja']);
+    expect(localStorage.getItem(key)).toBeNull();
+    expect(fixture.nativeElement.textContent).toContain('De antes');
+  });
+
+  it('sin la base, no borra del navegador lo que no pudo subir', async () => {
+    const key = 'druse.query-builder.v1:connection-1:druse_test:public:orders';
+    localStorage.setItem(
+      key,
+      JSON.stringify([{ id: 'vieja', name: 'De antes', sql: 'SELECT 3;' }]),
+    );
+    compositions.failing = true;
+
+    const fixture = await create(table);
+
+    expect(localStorage.getItem(key)).not.toBeNull();
+    expect(fixture.nativeElement.textContent).toContain('De antes');
+    expect(fixture.nativeElement.textContent).toContain(
+      'No se pudieron leer las composiciones guardadas.',
+    );
+  });
+
+  it('si no se pudo borrar, la composición vuelve a la lista', async () => {
+    const fixture = await create(table);
+    const builder = fixture.componentInstance as any;
+
+    builder.compositionName.set('Se queda');
+    builder.saveComposition();
+    await fixture.whenStable();
+    compositions.failing = true;
+
+    await builder.removeComposition(builder.savedCompositions()[0].id);
+
+    expect(builder.savedCompositions().map((saved: { name: string }) => saved.name)).toEqual([
+      'Se queda',
+    ]);
+    expect(builder.compositionError()).toBe('No se pudo borrar la composición.');
   });
 
   /**

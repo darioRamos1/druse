@@ -11,6 +11,12 @@ import {
   signal,
 } from '@angular/core';
 
+import { firstValueFrom } from 'rxjs';
+
+import {
+  ApplicationGateway,
+  SavedCompositionRecord,
+} from '../../../core/application-gateway/application-gateway';
 import { WorkspaceStore } from '../../../core/workspace/workspace-store';
 import { ValueInput } from '../../../shared/ui/value-input/value-input';
 import {
@@ -225,6 +231,7 @@ const DATE_PERIODS: readonly { readonly value: DatePeriod | 'none'; readonly lab
 })
 export class QueryBuilder implements OnInit {
   private readonly _store = inject(WorkspaceStore);
+  private readonly _gateway = inject(ApplicationGateway);
 
   readonly table = input.required<DatabaseObject>();
   readonly engine = input.required<DatabaseEngine>();
@@ -281,6 +288,9 @@ export class QueryBuilder implements OnInit {
   protected readonly previewCanceling = signal(false);
   protected readonly savedCompositions = signal<readonly SavedComposition[]>([]);
   protected readonly compositionName = signal('');
+
+  /** Por qué no se pudo leer, guardar o borrar una composición, si falló. */
+  protected readonly compositionError = signal<string | null>(null);
   private _previewExecutionId: string | null = null;
   private _autoPreviewTimer: ReturnType<typeof setTimeout> | undefined;
 
@@ -367,7 +377,7 @@ export class QueryBuilder implements OnInit {
   ngOnInit(): void {
     // Las columnas hacen falta para todo lo de aquí; se piden una vez.
     void this.load();
-    this.loadSavedCompositions();
+    void this.loadSavedCompositions();
   }
 
   private async load(): Promise<void> {
@@ -1491,7 +1501,7 @@ export class QueryBuilder implements OnInit {
     };
     this.savedCompositions.update((current) => [saved, ...current]);
     this.compositionName.set('');
-    this.persistSavedCompositions();
+    void this.persistComposition(saved);
   }
 
   protected async loadComposition(saved: SavedComposition): Promise<void> {
@@ -1590,9 +1600,19 @@ export class QueryBuilder implements OnInit {
     );
   }
 
-  protected removeComposition(id: string): void {
+  protected async removeComposition(id: string): Promise<void> {
+    const before = this.savedCompositions();
     this.savedCompositions.update((current) => current.filter((saved) => saved.id !== id));
-    this.persistSavedCompositions();
+
+    try {
+      await firstValueFrom(this._gateway.deleteComposition(id));
+      this.compositionError.set(null);
+    } catch {
+      // Se devuelve a la lista: quitarla de la vista sin haberla borrado haría
+      // creer que ya no está.
+      this.savedCompositions.set(before);
+      this.compositionError.set('No se pudo borrar la composición.');
+    }
   }
 
   protected insertSql(): void {
@@ -1837,26 +1857,107 @@ export class QueryBuilder implements OnInit {
     this.having.update((current) => current.filter((filter) => !removed.has(filter.aggregateId)));
   }
 
-  private compositionStorageKey(): string {
+  /**
+   * Lee las composiciones de esta tabla desde la base de Druse.
+   *
+   * Las que quedaran en el almacenamiento del navegador —donde vivían antes—
+   * se suben la primera vez y solo después se borran de allí: perderlas por el
+   * camino sería peor que tenerlas en dos sitios un rato.
+   */
+  private async loadSavedCompositions(): Promise<void> {
     const table = this.table();
+
+    try {
+      const pending = this.legacyCompositions();
+
+      for (const saved of pending) {
+        await firstValueFrom(this._gateway.saveComposition(this.toRecord(saved)));
+      }
+
+      if (pending.length > 0) {
+        this.forgetLegacyCompositions();
+      }
+
+      const records = await firstValueFrom(
+        this._gateway.getCompositions(
+          this.connectionId(),
+          table.database ?? '',
+          table.schema,
+          table.name,
+        ),
+      );
+
+      this.savedCompositions.set(records.flatMap((record) => fromRecord(record)));
+      this.compositionError.set(null);
+    } catch {
+      // Sin la base, al menos lo que siga en el navegador: mejor que una lista
+      // vacía que haga pensar que se perdieron.
+      this.savedCompositions.set(this.legacyCompositions());
+      this.compositionError.set('No se pudieron leer las composiciones guardadas.');
+    }
+  }
+
+  private async persistComposition(saved: SavedComposition): Promise<void> {
+    try {
+      await firstValueFrom(this._gateway.saveComposition(this.toRecord(saved)));
+      this.compositionError.set(null);
+    } catch {
+      this.savedCompositions.update((current) => current.filter((item) => item.id !== saved.id));
+      this.compositionError.set('No se pudo guardar la composición.');
+    }
+  }
+
+  private toRecord(saved: SavedComposition): SavedCompositionRecord {
+    const table = this.table();
+
+    return {
+      id: saved.id,
+      connectionId: this.connectionId(),
+      database: table.database ?? '',
+      schema: table.schema ?? null,
+      table: table.name,
+      name: saved.name,
+      model: JSON.stringify({ sql: saved.sql, state: saved.state }),
+    };
+  }
+
+  /** Dónde se guardaban antes, en el almacenamiento del navegador. */
+  private legacyStorageKey(): string {
+    const table = this.table();
+
     return `druse.query-builder.v1:${this.connectionId()}:${table.database}:${table.schema ?? ''}:${table.name}`;
   }
 
-  private loadSavedCompositions(): void {
+  private legacyCompositions(): SavedComposition[] {
     try {
-      const raw = localStorage.getItem(this.compositionStorageKey());
-      this.savedCompositions.set(raw ? (JSON.parse(raw) as SavedComposition[]) : []);
+      const raw = localStorage.getItem(this.legacyStorageKey());
+      return raw ? (JSON.parse(raw) as SavedComposition[]) : [];
     } catch {
-      this.savedCompositions.set([]);
+      return [];
     }
   }
 
-  private persistSavedCompositions(): void {
+  private forgetLegacyCompositions(): void {
     try {
-      localStorage.setItem(this.compositionStorageKey(), JSON.stringify(this.savedCompositions()));
+      localStorage.removeItem(this.legacyStorageKey());
     } catch {
-      // Guardar una composición no debe impedir seguir componiendo SQL.
+      // Si no se puede borrar, la próxima vez se vuelven a subir con el mismo
+      // identificador y se reemplazan: no se duplican.
     }
+  }
+}
+
+/** Lo que llega de la base, de vuelta a la forma del compositor. */
+function fromRecord(record: SavedCompositionRecord): SavedComposition[] {
+  try {
+    const model = JSON.parse(record.model) as { sql?: string; state?: CompositionState };
+
+    return typeof model.sql === 'string'
+      ? [{ id: record.id, name: record.name, sql: model.sql, state: model.state }]
+      : [];
+  } catch {
+    // Un modelo ilegible no puede tumbar la lista entera.
+    return [];
   }
 }
 
