@@ -798,8 +798,12 @@ public sealed class SavedConnectionServiceTests : IDisposable
     {
         var invalid = Profile() with { Host = "", Port = 0 };
 
-        await Assert.ThrowsAsync<ArgumentException>(
+        var error = await Assert.ThrowsAsync<InvalidProfileException>(
             () => _service.SaveAsync(invalid, null, false, CancellationToken.None));
+
+        // Y se sabe **qué** no vale: la clave es lo que permite a la ventana
+        // decirlo en su idioma y señalar la casilla.
+        Assert.Contains(error.Messages, message => message.Key == MessageKeys.Connection.Host);
     }
 
     [Fact]

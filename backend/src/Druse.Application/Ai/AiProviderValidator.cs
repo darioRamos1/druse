@@ -18,7 +18,7 @@ public static class AiProviderValidator
     {
         if (profile is null)
         {
-            return new ValidationResult(["El proveedor es obligatorio."]);
+            return ValidationResult.FromTexts(["El proveedor es obligatorio."]);
         }
 
         var errors = new List<string>();
@@ -43,7 +43,7 @@ public static class AiProviderValidator
                 errors.Add("El programa debe ser claude o codex.");
             }
 
-            return new ValidationResult(errors);
+            return ValidationResult.FromTexts(errors);
         }
 
         if (string.IsNullOrWhiteSpace(profile.Model))
@@ -53,7 +53,7 @@ public static class AiProviderValidator
 
         ValidateBaseUrl(profile, errors);
 
-        return new ValidationResult(errors);
+        return ValidationResult.FromTexts(errors);
     }
 
     private static void ValidateBaseUrl(AiProviderProfile profile, List<string> errors)

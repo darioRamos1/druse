@@ -1,14 +1,23 @@
+using System.Globalization;
+
 using Druse.Domain;
 
 namespace Druse.Application.Connections;
 
 /// <summary>Resultado de validar un perfil antes de intentar conectarse.</summary>
-/// <param name="Errors">Vacío cuando el perfil es válido.</param>
-public readonly record struct ValidationResult(IReadOnlyList<string> Errors)
+/// <param name="Messages">Vacío cuando el perfil es válido.</param>
+public readonly record struct ValidationResult(IReadOnlyList<UserMessage> Messages)
 {
-    public bool IsValid => Errors.Count == 0;
+    /// <summary>Solo los textos, para lo que no traduce: registros y pruebas.</summary>
+    public IReadOnlyList<string> Errors => [.. Messages.Select(message => message.Text)];
+
+    public bool IsValid => Messages.Count == 0;
 
     public static ValidationResult Valid => new([]);
+
+    /// <summary>Un resultado a partir de textos sueltos, mientras queden sin clave.</summary>
+    public static ValidationResult FromTexts(IEnumerable<string> texts) =>
+        new([.. texts.Select(text => new UserMessage(string.Empty, text))]);
 }
 
 /// <summary>
@@ -50,25 +59,30 @@ public static class ConnectionProfileValidator
     {
         if (profile is null)
         {
-            return new ValidationResult(["El perfil de conexión es obligatorio."]);
+            return new ValidationResult(
+                [new UserMessage(MessageKeys.Connection.Required, "El perfil de conexión es obligatorio.")]);
         }
 
         var motor = capabilities ?? Corriente;
 
-        var errors = new List<string>();
+        var errors = new List<UserMessage>();
 
         if (string.IsNullOrWhiteSpace(profile.Name))
         {
-            errors.Add("El nombre de la conexión es obligatorio.");
+            errors.Add(new UserMessage(MessageKeys.Connection.Name, "El nombre de la conexión es obligatorio."));
         }
         else if (profile.Name.Length > MaxNameLength)
         {
-            errors.Add($"El nombre no puede superar {MaxNameLength} caracteres.");
+            errors.Add(UserMessage.With(
+                MessageKeys.Connection.NameTooLong,
+                $"El nombre no puede superar {MaxNameLength} caracteres.",
+                "max",
+                MaxNameLength.ToString(CultureInfo.InvariantCulture)));
         }
 
         if (motor.RequiresHost && string.IsNullOrWhiteSpace(profile.Host))
         {
-            errors.Add("El servidor es obligatorio.");
+            errors.Add(new UserMessage(MessageKeys.Connection.Host, "El servidor es obligatorio."));
         }
 
         var namedSqlServerInstance =
@@ -85,8 +99,9 @@ public static class ConnectionProfileValidator
             && profile.Port is < 1 or > 65535
             && !(namedSqlServerInstance && profile.Port == 0))
         {
-            errors.Add(
-                "El puerto debe estar entre 1 y 65535, salvo en una instancia con nombre de SQL Server.");
+            errors.Add(new UserMessage(
+                MessageKeys.Connection.Port,
+                "El puerto debe estar entre 1 y 65535, salvo en una instancia con nombre de SQL Server."));
         }
 
         // La base **no** es obligatoria en un servidor. Vacía significa «la
@@ -99,8 +114,12 @@ public static class ConnectionProfileValidator
         if (motor.RequiresDatabase && string.IsNullOrWhiteSpace(profile.Database))
         {
             errors.Add(motor.UsesFilePath
-                ? "Indica el archivo de la base de datos."
-                : "La base de datos es obligatoria.");
+                ? new UserMessage(
+                    MessageKeys.Connection.DatabaseFile,
+                    "Indica el archivo de la base de datos.")
+                : new UserMessage(
+                    MessageKeys.Connection.Database,
+                    "La base de datos es obligatoria."));
         }
 
         // Con autenticación de Windows la identidad la pone la sesión del sistema,
@@ -109,38 +128,47 @@ public static class ConnectionProfileValidator
             && !profile.UsesIntegratedSecurity
             && string.IsNullOrWhiteSpace(profile.Username))
         {
-            errors.Add("El usuario es obligatorio.");
+            errors.Add(new UserMessage(MessageKeys.Connection.Username, "El usuario es obligatorio."));
         }
 
         if (!Enum.IsDefined(profile.Authentication))
         {
-            errors.Add("El método de autenticación indicado no es válido.");
+            errors.Add(new UserMessage(
+                MessageKeys.Connection.Authentication,
+                "El método de autenticación indicado no es válido."));
         }
         else if (profile.UsesIntegratedSecurity && !motor.SupportsIntegratedSecurity)
         {
-            errors.Add("La autenticación de Windows solo está disponible en SQL Server.");
+            errors.Add(new UserMessage(
+                MessageKeys.Connection.WindowsOnSqlServer,
+                "La autenticación de Windows solo está disponible en SQL Server."));
         }
         else if (profile.UsesIntegratedSecurity && !OperatingSystem.IsWindows())
         {
             // Fuera de Windows no hay sesión de dominio de la que colgarse: el
             // driver fallaría mucho más tarde y con un error del sistema.
-            errors.Add("La autenticación de Windows solo está disponible en Windows.");
+            errors.Add(new UserMessage(
+                MessageKeys.Connection.WindowsOnWindows,
+                "La autenticación de Windows solo está disponible en Windows."));
         }
 
         if (!Enum.IsDefined(profile.Engine))
         {
-            errors.Add("El motor indicado no es válido.");
+            errors.Add(new UserMessage(MessageKeys.Connection.Engine, "El motor indicado no es válido."));
         }
 
         if (motor.RequiresLogicalServer && string.IsNullOrWhiteSpace(profile.InformixServer))
         {
-            errors.Add(
-                "El Server de Informix (INFORMIXSERVER) es obligatorio para una conexión SQLI.");
+            errors.Add(new UserMessage(
+                MessageKeys.Connection.InformixServer,
+                "El Server de Informix (INFORMIXSERVER) es obligatorio para una conexión SQLI."));
         }
 
         if (profile.ConnectTimeoutSeconds is < 1 or > 300)
         {
-            errors.Add("El tiempo de espera de conexión debe estar entre 1 y 300 segundos.");
+            errors.Add(new UserMessage(
+                MessageKeys.Connection.Timeout,
+                "El tiempo de espera de conexión debe estar entre 1 y 300 segundos."));
         }
 
         if (profile.SshTunnel is { } tunnel)
@@ -158,36 +186,45 @@ public static class ConnectionProfileValidator
     /// del motor: son dos máquinas distintas y el usuario tiene que saber en cuál
     /// se equivocó.
     /// </summary>
-    private static void Validate(SshTunnelSettings tunnel, List<string> errors)
+    private static void Validate(SshTunnelSettings tunnel, List<UserMessage> errors)
     {
         if (string.IsNullOrWhiteSpace(tunnel.Host))
         {
-            errors.Add("El servidor del túnel SSH es obligatorio.");
+            errors.Add(new UserMessage(MessageKeys.Tunnel.Host, "El servidor del túnel SSH es obligatorio."));
         }
 
         if (tunnel.Port is < 1 or > 65535)
         {
-            errors.Add("El puerto del túnel SSH debe estar entre 1 y 65535.");
+            errors.Add(new UserMessage(
+                MessageKeys.Tunnel.Port,
+                "El puerto del túnel SSH debe estar entre 1 y 65535."));
         }
 
         if (string.IsNullOrWhiteSpace(tunnel.Username))
         {
-            errors.Add("El usuario del túnel SSH es obligatorio.");
+            errors.Add(new UserMessage(
+                MessageKeys.Tunnel.Username,
+                "El usuario del túnel SSH es obligatorio."));
         }
 
         if (!Enum.IsDefined(tunnel.Authentication))
         {
-            errors.Add("El método de autenticación del túnel SSH no es válido.");
+            errors.Add(new UserMessage(
+                MessageKeys.Tunnel.Authentication,
+                "El método de autenticación del túnel SSH no es válido."));
         }
         else if (tunnel.UsesPrivateKey && string.IsNullOrWhiteSpace(tunnel.PrivateKeyPath))
         {
-            errors.Add("Indica el archivo de clave privada del túnel SSH.");
+            errors.Add(new UserMessage(
+                MessageKeys.Tunnel.PrivateKey,
+                "Indica el archivo de clave privada del túnel SSH."));
         }
 
         if (tunnel.ConnectTimeoutSeconds is < 1 or > 300)
         {
-            errors.Add(
-                "El tiempo de espera del túnel SSH debe estar entre 1 y 300 segundos.");
+            errors.Add(new UserMessage(
+                MessageKeys.Tunnel.Timeout,
+                "El tiempo de espera del túnel SSH debe estar entre 1 y 300 segundos."));
         }
     }
 }

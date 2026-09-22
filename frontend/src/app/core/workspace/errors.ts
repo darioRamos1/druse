@@ -30,6 +30,15 @@ export function describeError(error: unknown, i18n: I18nService): string {
 
   const body = error.error;
 
+  // Lo que el proceso local manda con clave: cada motivo, ya escrito para
+  // leerse, en el idioma de esta ventana. Es lo que sustituye a adivinar el
+  // texto a partir del nombre del campo.
+  const conClave = keyedMessages(body?.messages, i18n);
+
+  if (conClave.length > 0) {
+    return conClave.join(' ');
+  }
+
   // Un fallo de validación sabe exactamente qué campo está mal, así que se
   // cuenta campo por campo en lugar de resumirlo en un código.
   const validation = validationMessages(body?.errors, i18n);
@@ -88,6 +97,32 @@ export function isSessionLost(error: unknown): boolean {
   const message = error.error?.message;
 
   return typeof message === 'string' && message.includes('no está abierta');
+}
+
+/**
+ * Los mensajes que el proceso local manda con su clave del catálogo.
+ *
+ * Llegan como `{ key, text, args }`: la clave se traduce aquí y el texto es el
+ * respaldo mientras un mensaje aún no tenga clave —la migración va grupo a
+ * grupo— o si el catálogo de este idioma todavía no la trae.
+ */
+function keyedMessages(messages: unknown, i18n: I18nService): string[] {
+  if (!Array.isArray(messages)) {
+    return [];
+  }
+
+  return messages
+    .map((message: { key?: unknown; text?: unknown; args?: unknown }) => {
+      const key = typeof message?.key === 'string' ? message.key : '';
+      const text = typeof message?.text === 'string' ? message.text : '';
+
+      if (key.length > 0 && i18n.has(key)) {
+        return i18n.t(key, (message.args as Record<string, string>) ?? {});
+      }
+
+      return text;
+    })
+    .filter((text) => text.length > 0);
 }
 
 /** Lo que significa cada código, dicho como se lo contarías a alguien. */

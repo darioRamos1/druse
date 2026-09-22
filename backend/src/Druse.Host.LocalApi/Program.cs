@@ -147,6 +147,25 @@ app.Use(async (context, next) =>
         context.Response.StatusCode = StatusCodes.Status400BadRequest;
         await context.Response.WriteAsJsonAsync(new { message = exception.Message });
     }
+    catch (InvalidProfileException exception)
+    {
+        // Lo que se mandó no vale, y se dice campo a campo **con su clave**: es
+        // lo que permite que la ventana lo escriba en su idioma y señale la
+        // casilla. `message` sigue yendo, en español, para quien llame a la API
+        // sin catálogo delante.
+        context.Response.StatusCode = StatusCodes.Status400BadRequest;
+
+        await context.Response.WriteAsJsonAsync(new
+        {
+            message = exception.Message,
+            messages = exception.Messages.Select(message => new
+            {
+                key = message.Key,
+                text = message.Text,
+                args = message.Args,
+            }),
+        });
+    }
     catch (ArgumentException exception)
     {
         context.Response.StatusCode = StatusCodes.Status400BadRequest;

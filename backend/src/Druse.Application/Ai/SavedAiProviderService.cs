@@ -67,7 +67,7 @@ public sealed class SavedAiProviderService(
 
         if (!validation.IsValid)
         {
-            throw new ArgumentException(string.Join(" ", validation.Errors), nameof(profile));
+            throw new InvalidProfileException(validation.Messages, nameof(profile));
         }
 
         await _providers.SaveAsync(profile, cancellationToken);

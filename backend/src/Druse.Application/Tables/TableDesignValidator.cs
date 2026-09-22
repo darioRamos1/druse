@@ -23,7 +23,7 @@ public static class TableDesignValidator
     {
         if (table is null)
         {
-            return new ValidationResult(["La definición de la tabla es obligatoria."]);
+            return ValidationResult.FromTexts(["La definición de la tabla es obligatoria."]);
         }
 
         var errors = new List<string>();
@@ -51,7 +51,7 @@ public static class TableDesignValidator
             errors.Add("Solo una columna puede generar su valor automáticamente.");
         }
 
-        return new ValidationResult(errors);
+        return ValidationResult.FromTexts(errors);
     }
 
     public static ValidationResult Validate(TableAlteration? alteration) =>
@@ -63,7 +63,7 @@ public static class TableDesignValidator
     {
         if (alteration is null)
         {
-            return new ValidationResult(["Los cambios sobre la tabla son obligatorios."]);
+            return ValidationResult.FromTexts(["Los cambios sobre la tabla son obligatorios."]);
         }
 
         var errors = new List<string>();
@@ -169,7 +169,7 @@ public static class TableDesignValidator
             ValidateName(alteration.DroppedPrimaryKeyName, "la clave primaria", errors);
         }
 
-        return new ValidationResult(errors);
+        return ValidationResult.FromTexts(errors);
     }
 
     /// <summary>

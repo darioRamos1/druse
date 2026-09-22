@@ -114,7 +114,7 @@ public sealed class SavedConnectionService(
 
         if (!validation.IsValid)
         {
-            throw new ArgumentException(string.Join(" ", validation.Errors), nameof(profile));
+            throw new InvalidProfileException(validation.Messages, nameof(profile));
         }
 
         await _profiles.SaveAsync(profile, cancellationToken);

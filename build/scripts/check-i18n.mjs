@@ -75,9 +75,30 @@ const declared = (key) =>
     pattern.endsWith('*') ? key.startsWith(pattern.slice(0, -1)) : key === pattern,
   );
 
-const unused = keys.filter(
-  (key) => !source.includes(`'${key}'`) && !source.includes(`"${key}"`) && !declared(key),
+/**
+ * Las claves que manda el proceso local, leídas de sus constantes.
+ *
+ * Un `server.*` no aparece en el código del frontend: lo escribe el backend y el
+ * frontend solo lo traduce. Para no darlo por muerto se miran sus constantes, y
+ * de paso se caza lo contrario —una clave `server.*` en el catálogo que el
+ * backend ya no manda—, que si no se quedaría ahí para siempre. La dirección que
+ * falta, una constante sin traducción, la comprueba `MessageKeysTests`.
+ */
+const backendKeys = new Set(
+  [...read(join(root, 'backend', 'src', 'Druse.Domain', 'MessageKeys.cs')).matchAll(
+    /"([\w.]+)"/g,
+  )].map((match) => match[1]),
 );
+
+const unused = keys.filter(
+  (key) =>
+    !source.includes(`'${key}'`) &&
+    !source.includes(`"${key}"`) &&
+    !declared(key) &&
+    !backendKeys.has(key),
+);
+
+const strayServerKeys = keys.filter((key) => key.startsWith('server.') && !backendKeys.has(key));
 
 console.log(`Catálogo fuente: ${keys.length} claves.`);
 
@@ -236,6 +257,17 @@ if (unused.length > 0) {
     '\nBórralas de todos los catálogos o, si se construyen a trozos, decláralas con ' +
       '«i18n-keys: prefijo.*» en el archivo que las usa.',
   );
+}
+
+if (strayServerKeys.length > 0) {
+  failed = true;
+  console.error(`\n${strayServerKeys.length} claves «server.» que el backend ya no manda:`);
+
+  for (const key of strayServerKeys) {
+    console.error(`  ${key}`);
+  }
+
+  console.error('\nBórralas de los catálogos o vuelve a declararlas en MessageKeys.cs.');
 }
 
 if (failed) {

@@ -201,7 +201,7 @@ public sealed class ConnectionService(
 
         if (!validation.IsValid)
         {
-            throw new ArgumentException(string.Join(" ", validation.Errors), nameof(profile));
+            throw new InvalidProfileException(validation.Messages, nameof(profile));
         }
 
         if (Capabilities(profile) is not { CanCreateDatabase: true })
@@ -237,7 +237,7 @@ public sealed class ConnectionService(
 
         if (!validation.IsValid)
         {
-            throw new ArgumentException(string.Join(" ", validation.Errors), nameof(profile));
+            throw new InvalidProfileException(validation.Messages, nameof(profile));
         }
 
         var provider = _providers.GetProvider(profile.Engine);
@@ -342,7 +342,7 @@ public sealed class ConnectionService(
 
         if (!validation.IsValid)
         {
-            throw new ArgumentException(string.Join(" ", validation.Errors), nameof(profile));
+            throw new InvalidProfileException(validation.Messages, nameof(profile));
         }
 
         var provider = _providers.GetProvider(profile.Engine);
