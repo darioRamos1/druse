@@ -28,18 +28,26 @@ describe('ShortcutsSheet', () => {
   it('adapta los grupos a macOS y Linux sin alterar la documentación base', () => {
     const mac = shortcutGroups('MacIntel').flatMap((group) => group.shortcuts);
     const linux = shortcutGroups('Linux x86_64').flatMap((group) => group.shortcuts);
-    expect(mac.find((shortcut) => shortcut.what === 'Buscar y reemplazar')?.keys).toEqual([
+    expect(mac.find((shortcut) => shortcut.what === 'shortcuts.write.replace')?.keys).toEqual([
       '⌘',
       '⌥',
       'F',
     ]);
-    expect(linux.find((shortcut) => shortcut.what === 'Duplicar la línea')?.keys).toEqual([
-      'Ctrl',
-      'Shift',
-      'Alt',
-      '↓',
-    ]);
+    expect(
+      linux.find((shortcut) => shortcut.what === 'shortcuts.write.duplicateLine')?.keys,
+    ).toEqual(['Ctrl', 'Shift', 'Alt', '↓']);
     expect(SHORTCUT_GROUPS[0].shortcuts[0].keys).toEqual(['Ctrl', 'Enter']);
+  });
+
+  it('traduce antes de adaptar a la plataforma: la tecla dentro de la frase también cambia', () => {
+    const traducciones: Record<string, string> = {
+      'shortcuts.tabs.first': 'Go to the first one; up to Alt+8',
+    };
+    const mac = shortcutGroups('MacIntel', (key) => traducciones[key] ?? key).flatMap(
+      (group) => group.shortcuts,
+    );
+
+    expect(mac.some((shortcut) => shortcut.what === 'Go to the first one; up to ⌥+8')).toBe(true);
   });
 
   it('se cierra con la cruz', () => {

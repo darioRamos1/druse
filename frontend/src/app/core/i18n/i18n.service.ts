@@ -67,7 +67,12 @@ export interface LocaleOption {
  */
 @Injectable({ providedIn: 'root' })
 export class I18nService {
-  private readonly _gateway = inject(ApplicationGateway);
+  /**
+   * Opcional: solo sirve para guardar la preferencia. Sin él —en las pruebas de
+   * un componente suelto— el idioma se aplica igual, y cada prueba de cada
+   * componente traducido no tiene que traer un gateway que no usa.
+   */
+  private readonly _gateway = inject(ApplicationGateway, { optional: true });
 
   private readonly _locale = signal<Locale>(prepared?.locale ?? 'es');
   private readonly _catalogs = signal<ReadonlyMap<Locale, Catalog>>(
@@ -182,7 +187,7 @@ export class I18nService {
     setFormatLocale(intlOf(locale));
     rememberLocale(locale);
 
-    if (persist) {
+    if (persist && this._gateway) {
       try {
         await firstValueFrom(this._gateway.setPreference(LOCALE_PREFERENCE, locale));
       } catch {

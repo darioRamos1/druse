@@ -5,14 +5,22 @@
   (document:keydown.escape)="close()"
 ></div>
 
-<section #dialog class="dialog" tabindex="-1" role="dialog" aria-label="Atajos de teclado">
+<section
+  #dialog
+  class="dialog"
+  tabindex="-1"
+  role="dialog"
+  [attr.aria-label]="'shortcuts.title' | t"
+>
   <header class="head">
     <app-icon name="console" [size]="14" />
     <div class="head__text">
-      <h2 class="title">Atajos de teclado</h2>
-      <p class="subtitle">Los mismos que anuncian los botones, todos juntos.</p>
+      <h2 class="title">{{ 'shortcuts.title' | t }}</h2>
+      <p class="subtitle">{{ 'shortcuts.subtitle' | t }}</p>
     </div>
-    <button type="button" class="close" (click)="close()" aria-label="Cerrar">×</button>
+    <button type="button" class="close" (click)="close()" [attr.aria-label]="'common.close' | t">
+      ×
+    </button>
   </header>
 
   <div class="body">

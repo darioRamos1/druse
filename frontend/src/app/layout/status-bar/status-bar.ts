@@ -2,6 +2,8 @@ import { ChangeDetectionStrategy, Component, computed, inject, input, output } f
 
 import { BackupStore } from '../../core/backup/backup.store';
 import { RestoreStore } from '../../core/backup/restore.store';
+import { I18nService } from '../../core/i18n/i18n.service';
+import { TranslatePipe } from '../../core/i18n/translate.pipe';
 import { RunningJobsService } from '../../core/jobs/running-jobs.service';
 import { SessionStatus } from '../../shared/models/workspace';
 import { EngineBadge } from '../../shared/ui/engine-badge/engine-badge';
@@ -10,7 +12,7 @@ import { EngineBadge } from '../../shared/ui/engine-badge/engine-badge';
 @Component({
   selector: 'app-status-bar',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [EngineBadge],
+  imports: [EngineBadge, TranslatePipe],
   templateUrl: './status-bar.html',
   styleUrl: './status-bar.scss',
 })
@@ -51,25 +53,28 @@ export class StatusBar {
    * su cuenta qué hacer con lo que quedó escrito.
    */
   protected readonly jobs = inject(RunningJobsService);
+  private readonly _i18n = inject(I18nService);
 
   protected readonly interrupted = this.jobs.interrupted;
 
   protected readonly interruptedLabel = computed(() => {
-    const count = this.interrupted().length;
-
-    return count === 1 ? '1 trabajo quedó sin terminar' : `${count} trabajos quedaron sin terminar`;
+    return this._i18n.t('status.interrupted', { count: this.interrupted().length });
   });
 
   /** El aviso abre la actividad; descartarlo es una decisión aparte. */
   protected readonly interruptedDetail = computed(() =>
     [
-      'Estaban en marcha cuando Druse se cerró; lo que escribieron puede estar a medias.',
+      this._i18n.t('status.interruptedWhy'),
       '',
-      ...this.interrupted().map(
-        (job) => `· ${nameOf(job.kind)}${job.subject ? `: ${job.subject}` : ''}`,
-      ),
+      ...this.interrupted().map((job) => {
+        const kind = this._i18n.t('status.jobKind', { kind: job.kind });
+
+        return job.subject
+          ? this._i18n.t('status.jobWithSubject', { kind, subject: job.subject })
+          : this._i18n.t('status.job', { kind });
+      }),
       '',
-      'Ver detalle en Actividad.',
+      this._i18n.t('status.interruptedMore'),
     ].join('\n'),
   );
 
@@ -106,16 +111,4 @@ function shorten(name: string | undefined): string {
   const text = name ?? '';
 
   return text.length > 32 ? `${text.slice(0, 31)}…` : text;
-}
-
-/** Cómo se llama cada clase de trabajo cuando hay que nombrarla. */
-function nameOf(kind: string): string {
-  switch (kind) {
-    case 'Backup':
-      return 'Respaldo';
-    case 'Restore':
-      return 'Restauración';
-    default:
-      return 'Traslado de datos';
-  }
 }

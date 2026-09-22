@@ -4,10 +4,13 @@ import {
   ElementRef,
   afterNextRender,
   computed,
+  inject,
   output,
   viewChild,
 } from '@angular/core';
 
+import { I18nService } from '../../core/i18n/i18n.service';
+import { TranslatePipe } from '../../core/i18n/translate.pipe';
 import { Icon } from '../../shared/ui/icon/icon';
 import { DialogFocus } from '../../shared/a11y/dialog-focus';
 import { DialogBackdrop } from '../../shared/a11y/dialog-backdrop';
@@ -40,74 +43,91 @@ interface Grupo {
  */
 export const SHORTCUT_GROUPS: readonly Grupo[] = [
   {
-    title: 'Ejecutar',
+    title: 'shortcuts.run',
     shortcuts: [
-      { keys: ['Ctrl', 'Enter'], what: 'Ejecutar la consulta entera' },
-      { keys: ['Ctrl', 'Shift', 'Enter'], what: 'Ejecutar solo la instrucción del cursor' },
-      { keys: ['F5'], what: 'Volver a ejecutar' },
-      { keys: ['Esc'], what: 'Cancelar lo que se esté ejecutando' },
+      { keys: ['Ctrl', 'Enter'], what: 'shortcuts.run.all' },
+      { keys: ['Ctrl', 'Shift', 'Enter'], what: 'shortcuts.run.current' },
+      { keys: ['F5'], what: 'shortcuts.run.again' },
+      { keys: ['Esc'], what: 'shortcuts.run.cancel' },
     ],
   },
   {
-    title: 'Pestañas',
+    title: 'shortcuts.tabs',
     shortcuts: [
-      { keys: ['Ctrl', 'T'], what: 'Nueva consulta' },
-      { keys: ['Alt', '1'], what: 'Ir a la primera; hasta Alt+8' },
-      { keys: ['Alt', '9'], what: 'Ir a la última' },
-      { keys: ['Alt', '←'], what: 'Pestaña anterior' },
-      { keys: ['Alt', '→'], what: 'Pestaña siguiente' },
-      { keys: ['Ctrl', 'F4'], what: 'Cerrar la pestaña' },
+      { keys: ['Ctrl', 'T'], what: 'shortcuts.tabs.new' },
+      { keys: ['Alt', '1'], what: 'shortcuts.tabs.first' },
+      { keys: ['Alt', '9'], what: 'shortcuts.tabs.last' },
+      { keys: ['Alt', '←'], what: 'shortcuts.tabs.previous' },
+      { keys: ['Alt', '→'], what: 'shortcuts.tabs.next' },
+      { keys: ['Ctrl', 'F4'], what: 'shortcuts.tabs.close' },
     ],
   },
   {
-    title: 'Archivo',
+    title: 'shortcuts.file',
     shortcuts: [
-      { keys: ['Ctrl', 'O'], what: 'Abrir un archivo SQL' },
-      { keys: ['Ctrl', 'S'], what: 'Guardar' },
-      { keys: ['Ctrl', 'Shift', 'S'], what: 'Guardar como' },
-      { keys: ['Ctrl', 'Shift', 'X'], what: 'Exportar los resultados' },
+      { keys: ['Ctrl', 'O'], what: 'shortcuts.file.open' },
+      { keys: ['Ctrl', 'S'], what: 'shortcuts.file.save' },
+      { keys: ['Ctrl', 'Shift', 'S'], what: 'shortcuts.file.saveAs' },
+      { keys: ['Ctrl', 'Shift', 'X'], what: 'shortcuts.file.export' },
     ],
   },
   {
-    title: 'Escribir',
+    title: 'shortcuts.write',
     shortcuts: [
-      { keys: ['Ctrl', 'clic'], what: 'Poner otro cursor donde se pulse' },
+      { keys: ['Ctrl', 'shortcuts.key.click'], what: 'shortcuts.write.cursor' },
       {
         keys: ['Ctrl', 'Alt', '↑'],
         editorAction: 'cursor-above',
-        what: 'Otro cursor arriba o abajo',
+        what: 'shortcuts.write.cursorAbove',
       },
-      { keys: ['Ctrl', 'D'], what: 'Añadir la siguiente ocurrencia a la selección' },
-      { keys: ['Alt', '↑'], what: 'Mover la línea arriba o abajo' },
-      { keys: ['Shift', 'Alt', '↓'], editorAction: 'copy-line-down', what: 'Duplicar la línea' },
-      { keys: ['Ctrl', '/'], what: 'Comentar o descomentar' },
-      { keys: ['Ctrl', 'Shift', 'F'], what: 'Formatear el SQL' },
-      { keys: ['Ctrl', 'F'], what: 'Buscar' },
-      { keys: ['Ctrl', 'H'], editorAction: 'replace', what: 'Buscar y reemplazar' },
+      { keys: ['Ctrl', 'D'], what: 'shortcuts.write.nextMatch' },
+      { keys: ['Alt', '↑'], what: 'shortcuts.write.moveLine' },
+      {
+        keys: ['Shift', 'Alt', '↓'],
+        editorAction: 'copy-line-down',
+        what: 'shortcuts.write.duplicateLine',
+      },
+      { keys: ['Ctrl', '/'], what: 'shortcuts.write.comment' },
+      { keys: ['Ctrl', 'Shift', 'F'], what: 'shortcuts.write.format' },
+      { keys: ['Ctrl', 'F'], what: 'shortcuts.write.find' },
+      { keys: ['Ctrl', 'H'], editorAction: 'replace', what: 'shortcuts.write.replace' },
     ],
   },
   {
-    title: 'Moverse',
+    title: 'shortcuts.move',
     shortcuts: [
-      { keys: ['Ctrl', 'K'], what: 'Buscar cualquier cosa y ejecutar comandos' },
-      { keys: ['Ctrl', 'Shift', 'E'], what: 'Filtrar en el explorador' },
-      { keys: ['Ctrl', 'Shift', 'R'], what: 'Llevar el teclado a los resultados' },
-      { keys: ['Esc'], what: 'Volver al editor' },
-      { keys: ['F1'], what: 'Esta hoja' },
+      { keys: ['Ctrl', 'K'], what: 'shortcuts.move.palette' },
+      { keys: ['Ctrl', 'Shift', 'E'], what: 'shortcuts.move.explorer' },
+      { keys: ['Ctrl', 'Shift', 'R'], what: 'shortcuts.move.results' },
+      { keys: ['Esc'], what: 'shortcuts.move.editor' },
+      { keys: ['F1'], what: 'shortcuts.move.sheet' },
     ],
   },
 ];
 
-export function shortcutGroups(platform?: string): readonly Grupo[] {
+/**
+ * Los atajos listos para enseñar: traducidos y con las teclas de la plataforma.
+ *
+ * `translate` recibe las claves del catálogo. Se traduce **antes** de adaptar a
+ * la plataforma: en Mac, «hasta Alt+8» tiene que acabar diciendo «⌥8» también
+ * en la frase ya traducida.
+ */
+export function shortcutGroups(
+  platform?: string,
+  translate: (key: string) => string = (key) => key,
+): readonly Grupo[] {
+  const key = (text: string) => (text.startsWith('shortcuts.') ? translate(text) : text);
+
   return SHORTCUT_GROUPS.map((group) => ({
     ...group,
+    title: translate(group.title),
     shortcuts: group.shortcuts.map((shortcut) => ({
       ...shortcut,
       keys: (shortcut.editorAction
         ? editorShortcutLabel(shortcut.editorAction, platform)
-        : shortcutLabel(shortcut.keys.join('+'), platform)
+        : shortcutLabel(shortcut.keys.map(key).join('+'), platform)
       ).split('+'),
-      what: shortcutLabel(shortcut.what, platform),
+      what: shortcutLabel(translate(shortcut.what), platform),
     })),
   }));
 }
@@ -121,7 +141,7 @@ export function shortcutGroups(platform?: string): readonly Grupo[] {
 @Component({
   selector: 'app-shortcuts-sheet',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [DialogBackdrop, DialogFocus, Icon],
+  imports: [DialogBackdrop, DialogFocus, Icon, TranslatePipe],
   templateUrl: './shortcuts-sheet.html',
   styleUrl: './shortcuts-sheet.scss',
 })
@@ -142,16 +162,20 @@ export class ShortcutsSheet {
     afterNextRender(() => this._dialog()?.nativeElement.focus());
   }
 
-  protected readonly groups = shortcutGroups();
+  private readonly _i18n = inject(I18nService);
+
+  /** Se rehace al cambiar de idioma: `t` lee la señal del idioma. */
+  protected readonly groups = computed(() => shortcutGroups(undefined, (key) => this._i18n.t(key)));
 
   /** En dos columnas, repartidas por grupos enteros y equilibradas por alto. */
   protected readonly columns = computed<readonly (readonly Grupo[])[]>(() => {
-    const total = this.groups.reduce((suma, grupo) => suma + grupo.shortcuts.length, 0);
+    const groups = this.groups();
+    const total = groups.reduce((suma, grupo) => suma + grupo.shortcuts.length, 0);
     const izquierda: Grupo[] = [];
     const derecha: Grupo[] = [];
     let contadas = 0;
 
-    for (const grupo of this.groups) {
+    for (const grupo of groups) {
       if (contadas < total / 2) {
         izquierda.push(grupo);
       } else {

@@ -1,7 +1,9 @@
 @if (session(); as s) {
   <div class="item item--state">
     <span class="dot" [class.dot--off]="!s.connected" aria-hidden="true"></span>
-    <span class="state-label">{{ s.connected ? 'Conectado' : 'Sin conexión' }}</span>
+    <span class="state-label">{{
+      (s.connected ? 'status.connected' : 'status.disconnected') | t
+    }}</span>
   </div>
 
   <div class="item item--engine">
@@ -18,26 +20,28 @@
     datos», y el nombre en monoespaciada ya dice que es un dato y no una frase.
     Van en un `title` para que sigan estando cuando ya no se vean.
   -->
-  <div class="item item--database" title="Base de datos">
-    <span class="text">Base de datos</span>
+  <div class="item item--database" [title]="'status.database' | t">
+    <span class="text">{{ 'status.database' | t }}</span>
     <span class="mono" [title]="s.database">{{ s.database }}</span>
   </div>
 
-  <div class="item item--user" title="Usuario de la sesión">
-    <span class="text">Usuario</span>
+  <div class="item item--user" [title]="'status.userTitle' | t">
+    <span class="text">{{ 'status.user' | t }}</span>
     <span class="mono" [title]="s.user">{{ s.user }}</span>
   </div>
 
   <span class="spacer"></span>
 
   @if (s.lastDurationMs !== null) {
-    <div class="item item--duration" title="Última ejecución">
-      <span class="text">Última ejecución</span>
-      <span class="mono">{{ s.lastDurationMs }} ms</span>
+    <div class="item item--duration" [title]="'status.lastRun' | t">
+      <span class="text">{{ 'status.lastRun' | t }}</span>
+      <span class="mono">{{ 'status.duration' | t: { ms: s.lastDurationMs } }}</span>
     </div>
   }
 
-  <div class="item item--caret">Ln {{ line() }}, Col {{ column() }}</div>
+  <div class="item item--caret">
+    {{ 'status.caret' | t: { line: line(), column: column() } }}
+  </div>
 
   <div class="item item--encoding mono">{{ encoding() }}</div>
 }
@@ -54,7 +58,7 @@
     type="button"
     class="op op--backup"
     (click)="showBackup.emit()"
-    title="Ver el respaldo en curso"
+    [title]="'status.backupTitle' | t"
   >
     <span class="op-bar" [class.op-bar--waiting]="percent() === null">
       <span class="op-fill" [style.width.%]="percent() ?? 100"></span>
@@ -85,13 +89,13 @@
     type="button"
     class="op op--restore"
     (click)="showRestore.emit()"
-    title="Ver la restauración en curso"
+    [title]="'status.restoreTitle' | t"
   >
     <span class="op-bar" [class.op-bar--waiting]="restorePercent() === null">
       <span class="op-fill" [style.width.%]="restorePercent() ?? 100"></span>
     </span>
 
-    <span class="op-step">Restaurando · {{ restore.stepLabel() }}</span>
+    <span class="op-step">{{ 'status.restoring' | t: { step: restore.stepLabel() } }}</span>
 
     @if (restoreSubject()) {
       <span class="mono op-subject">{{ restoreSubject() }}</span>
@@ -118,11 +122,13 @@
   [class.op--interrupted]="interrupted().length > 0"
   (click)="showActivity.emit()"
   [attr.aria-label]="
-    interrupted().length ? 'Actividad: ' + interruptedLabel() : 'Ver actividad reciente'
+    interrupted().length
+      ? ('status.activityLabel' | t: { detail: interruptedLabel() })
+      : ('status.activityTitle' | t)
   "
-  [title]="interrupted().length ? interruptedDetail() : 'Ver actividad reciente'"
+  [title]="interrupted().length ? interruptedDetail() : ('status.activityTitle' | t)"
 >
-  Actividad
+  {{ 'status.activity' | t }}
   @if (interrupted().length > 0) {
     <span class="op-count" aria-hidden="true">{{ interrupted().length }}</span>
   }

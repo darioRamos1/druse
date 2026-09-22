@@ -4,12 +4,13 @@ import { ThemeName } from '../../core/theme/theme.service';
 import { Icon } from '../../shared/ui/icon/icon';
 import { Disclosure } from '../../shared/a11y/disclosure';
 import { shortcutLabel } from '../../core/shortcuts/shortcut-label';
+import { TranslatePipe } from '../../core/i18n/translate.pipe';
 
 /** Barra superior: marca, acciones principales, búsqueda global y controles de ventana. */
 @Component({
   selector: 'app-top-bar',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [Icon, Disclosure],
+  imports: [Icon, Disclosure, TranslatePipe],
   templateUrl: './top-bar.html',
   styleUrl: './top-bar.scss',
 })

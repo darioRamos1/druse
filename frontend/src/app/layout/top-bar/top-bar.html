@@ -2,20 +2,16 @@
   <button
     type="button"
     class="icon-button explorer-toggle"
-    [attr.aria-label]="
-      explorerOpen()
-        ? 'Ocultar explorador de bases de datos'
-        : 'Mostrar explorador de bases de datos'
-    "
+    [attr.aria-label]="(explorerOpen() ? 'topbar.explorer.hide' : 'topbar.explorer.show') | t"
     [attr.aria-expanded]="explorerOpen()"
     aria-controls="connections-explorer"
-    [title]="'Explorador de bases de datos (' + shortcut('Ctrl+Shift+E') + ')'"
+    [title]="'topbar.explorer.title' | t: { shortcut: shortcut('Ctrl+Shift+E') }"
     (click)="toggleExplorer.emit()"
   >
     <app-icon name="panel-left" [size]="16" />
   </button>
   <span class="brand__mark" aria-hidden="true"><span class="brand__core"></span></span>
-  <span class="brand__name">Druse</span>
+  <span class="brand__name">{{ 'app.name' | t }}</span>
 </div>
 
 <span class="divider" aria-hidden="true"></span>
@@ -23,34 +19,42 @@
 <div class="actions">
   <button type="button" class="btn btn--primary" (click)="newConnection.emit()">
     <app-icon name="plus" [size]="12" class="btn__icon" />
-    Nueva conexión
+    {{ 'topbar.newConnection' | t }}
   </button>
   <button type="button" class="btn" (click)="newQuery.emit()">
     <app-icon name="new-query" [size]="12" />
-    Nueva consulta
+    {{ 'topbar.newQuery' | t }}
   </button>
   <details class="file-menu" appDisclosure #fileMenu="disclosure">
-    <summary class="btn" aria-label="Archivo">
+    <summary class="btn" [attr.aria-label]="'topbar.file' | t">
       <app-icon name="folder-open" [size]="13" />
-      Archivo
+      {{ 'topbar.file' | t }}
       <app-icon name="chevron-down" [size]="10" />
     </summary>
-    <div class="file-menu__panel" role="group" aria-label="Acciones de archivo">
-      <button type="button" aria-label="Abrir SQL" (click)="fileMenu.close(true); openSql.emit()">
+    <div class="file-menu__panel" role="group" [attr.aria-label]="'topbar.fileActions' | t">
+      <button
+        type="button"
+        [attr.aria-label]="'topbar.openSql' | t"
+        (click)="fileMenu.close(true); openSql.emit()"
+      >
         <app-icon name="folder-open" [size]="14" />
-        Abrir SQL <kbd>{{ shortcut('Ctrl+O') }}</kbd>
-      </button>
-      <button type="button" aria-label="Guardar" (click)="fileMenu.close(true); saveSql.emit()">
-        <app-icon name="save" [size]="14" />
-        Guardar <kbd>{{ shortcut('Ctrl+S') }}</kbd>
+        {{ 'topbar.openSql' | t }} <kbd>{{ shortcut('Ctrl+O') }}</kbd>
       </button>
       <button
         type="button"
-        aria-label="Guardar como"
+        [attr.aria-label]="'topbar.save' | t"
+        (click)="fileMenu.close(true); saveSql.emit()"
+      >
+        <app-icon name="save" [size]="14" />
+        {{ 'topbar.save' | t }} <kbd>{{ shortcut('Ctrl+S') }}</kbd>
+      </button>
+      <button
+        type="button"
+        [attr.aria-label]="'topbar.saveAs' | t"
         (click)="fileMenu.close(true); saveSqlAs.emit()"
       >
         <span class="file-menu__indent"></span>
-        Guardar como… <kbd>{{ shortcut('Ctrl+Shift+S') }}</kbd>
+        {{ 'topbar.saveAsMenu' | t }} <kbd>{{ shortcut('Ctrl+Shift+S') }}</kbd>
       </button>
     </div>
   </details>
@@ -66,12 +70,12 @@
   <button
     type="button"
     class="search"
-    aria-label="Abrir búsqueda global"
-    [title]="'Buscar tablas, consultas y conexiones (' + shortcut('Ctrl+K') + ')'"
+    [attr.aria-label]="'topbar.search.label' | t"
+    [title]="'topbar.search.title' | t: { shortcut: shortcut('Ctrl+K') }"
     (click)="openPalette.emit()"
   >
     <app-icon name="search" [size]="13" />
-    <span class="search__placeholder">Buscar en Druse…</span>
+    <span class="search__placeholder">{{ 'topbar.search.placeholder' | t }}</span>
     <kbd class="search__shortcut">{{ shortcut('Ctrl+K') }}</kbd>
   </button>
 </div>
@@ -86,22 +90,22 @@
     class="assistant"
     [class.is-active]="assistantOpen()"
     [attr.aria-pressed]="assistantOpen()"
-    aria-label="Asistente"
+    [attr.aria-label]="'topbar.assistant' | t"
     [attr.aria-expanded]="assistantOpen()"
     aria-controls="sql-assistant"
     (click)="toggleAssistant.emit()"
   >
     <app-icon name="sparkles" [size]="13" />
-    Asistente
+    {{ 'topbar.assistant' | t }}
   </button>
 
-  <div class="segmented" role="group" aria-label="Tema">
+  <div class="segmented" role="group" [attr.aria-label]="'topbar.theme' | t">
     <button
       type="button"
       class="segmented__item"
       [class.is-active]="theme() === 'light'"
       [attr.aria-pressed]="theme() === 'light'"
-      aria-label="Tema claro"
+      [attr.aria-label]="'topbar.theme.light' | t"
       (click)="themeSelected.emit('light')"
     >
       <app-icon name="sun" [size]="13" />
@@ -111,14 +115,19 @@
       class="segmented__item"
       [class.is-active]="theme() === 'dark'"
       [attr.aria-pressed]="theme() === 'dark'"
-      aria-label="Tema oscuro"
+      [attr.aria-label]="'topbar.theme.dark' | t"
       (click)="themeSelected.emit('dark')"
     >
       <app-icon name="moon" [size]="13" />
     </button>
   </div>
 
-  <button type="button" class="icon-button" aria-label="Preferencias" (click)="openSettings.emit()">
+  <button
+    type="button"
+    class="icon-button"
+    [attr.aria-label]="'settings.title' | t"
+    (click)="openSettings.emit()"
+  >
     <app-icon name="settings" [size]="15" />
   </button>
 </div>

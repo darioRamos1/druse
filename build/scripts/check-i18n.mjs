@@ -107,7 +107,8 @@ function literalsIn(html) {
   const found = [];
 
   for (const match of clean.matchAll(/>([^<>]+)</g)) {
-    const text = match[1].replace(/[{}]/g, ' ').trim();
+    // Las entidades (`&nbsp;`, `&amp;`) no son texto aunque lleven letras.
+    const text = match[1].replace(/&(?:[a-z]+|#\d+);/gi, ' ').replace(/[{}]/g, ' ').trim();
 
     if (/\p{L}{2,}/u.test(text)) {
       found.push(text.replace(/\s+/g, ' '));
