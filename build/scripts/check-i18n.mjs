@@ -86,7 +86,96 @@ for (const locale of ['en', 'pt-BR', 'fr']) {
   console.log(`  ${locale.padEnd(5)} ${String(percent).padStart(3)} % (${translated} de ${keys.length})`);
 }
 
+// --- Texto visible sin pasar por el catálogo ---------------------------------
+//
+// Nodos de texto y atributos que se leen (`aria-label`, `title`,
+// `placeholder`, `alt`) escritos a mano en las plantillas. Las que aún no se
+// han migrado están en `build/i18n-pendientes.json`, que se va vaciando
+// feature a feature: la fase 1 se cierra con la lista vacía.
+//
+// Es una heurística, no un analizador de Angular: se quitan comentarios,
+// interpolaciones y bloques de control, y lo que quede con letras es texto.
+const pendingPath = join(root, 'build', 'i18n-pendientes.json');
+const pending = new Set(JSON.parse(read(pendingPath)));
+
+function literalsIn(html) {
+  const clean = html
+    .replace(/<!--[\s\S]*?-->/g, ' ')
+    .replace(/\{\{[\s\S]*?\}\}/g, ' ')
+    .replace(/@(?:if|else if|for|switch|case|defer|placeholder|loading|empty|else|default)\b\s*(\((?:[^()]|\((?:[^()]|\([^()]*\))*\))*\))?\s*\{/g, ' ')
+    .replace(/@let\s[^;]*;/g, ' ');
+  const found = [];
+
+  for (const match of clean.matchAll(/>([^<>]+)</g)) {
+    const text = match[1].replace(/[{}]/g, ' ').trim();
+
+    if (/\p{L}{2,}/u.test(text)) {
+      found.push(text.replace(/\s+/g, ' '));
+    }
+  }
+
+  for (const match of clean.matchAll(/\s(aria-label|title|placeholder|alt)="([^"]*)"/g)) {
+    if (/\p{L}{2,}/u.test(match[2])) {
+      found.push(`${match[1]}="${match[2]}"`);
+    }
+  }
+
+  return found;
+}
+
+const withLiterals = new Map();
+
+for (const file of sourceFiles(frontend)) {
+  // Las plantillas escritas dentro del componente (`template: \`…\``) cuentan
+  // igual que las de su propio archivo.
+  const html = file.endsWith('.html')
+    ? read(file)
+    : [...read(file).matchAll(/\btemplate:\s*`([\s\S]*?)`/g)].map((match) => match[1]).join('\n');
+
+  if (html) {
+    const found = literalsIn(html);
+
+    if (found.length > 0) {
+      withLiterals.set(relative(root, file).replaceAll('\\', '/'), found);
+    }
+  }
+}
+
+const unexpected = [...withLiterals].filter(([file]) => !pending.has(file));
+const alreadyClean = [...pending].filter((file) => !withLiterals.has(file));
+const pendingLiterals = [...withLiterals]
+  .filter(([file]) => pending.has(file))
+  .reduce((total, [, found]) => total + found.length, 0);
+
+console.log(
+  `\nPlantillas pendientes de migrar: ${pending.size}, con ${pendingLiterals} textos a mano.`,
+);
+
 let failed = false;
+
+if (unexpected.length > 0) {
+  failed = true;
+  console.error('\nTexto visible escrito a mano en plantillas ya migradas:');
+
+  for (const [file, found] of unexpected) {
+    console.error(`  ${file}`);
+
+    for (const text of found.slice(0, 5)) {
+      console.error(`    «${text}»`);
+    }
+  }
+}
+
+if (alreadyClean.length > 0) {
+  failed = true;
+  console.error(
+    '\nEstas plantillas ya no tienen texto a mano: quítalas de build/i18n-pendientes.json.',
+  );
+
+  for (const file of alreadyClean) {
+    console.error(`  ${file}`);
+  }
+}
 
 if (fixedLocale.length > 0) {
   failed = true;
