@@ -44,6 +44,60 @@ public static class MessageKeys
         public const string BaseUrlPath = "server.ai.baseUrlPath";
     }
 
+    /// <summary>
+    /// Cómo se llama cada cosa del diseñador dentro de una frase.
+    ///
+    /// Van aparte porque se usan como parámetro: «El nombre de {cosa} es
+    /// obligatorio» es una sola frase para las siete. Llevan el artículo dentro
+    /// porque en español el artículo es parte del nombre.
+    /// </summary>
+    public static class Thing
+    {
+        public const string Table = "server.thing.table";
+        public const string Column = "server.thing.column";
+        public const string Index = "server.thing.index";
+        public const string IndexColumn = "server.thing.indexColumn";
+        public const string Constraint = "server.thing.constraint";
+        public const string UniqueConstraint = "server.thing.uniqueConstraint";
+        public const string CheckConstraint = "server.thing.checkConstraint";
+        public const string ConstraintColumn = "server.thing.constraintColumn";
+        public const string PrimaryKey = "server.thing.primaryKey";
+        public const string ForeignKey = "server.thing.foreignKey";
+        public const string ForeignKeyColumn = "server.thing.foreignKeyColumn";
+        public const string ReferencedTable = "server.thing.referencedTable";
+    }
+
+    /// <summary>Lo que se comprueba de una tabla antes de escribir su DDL.</summary>
+    public static class Table
+    {
+        public const string Required = "server.table.required";
+        public const string AlterationRequired = "server.table.alterationRequired";
+        public const string NoColumns = "server.table.noColumns";
+        public const string NoChanges = "server.table.noChanges";
+        public const string SingleIdentity = "server.table.singleIdentity";
+        public const string DuplicatedColumns = "server.table.duplicatedColumns";
+        public const string ColumnType = "server.table.columnType";
+        public const string PrimaryKeyNullable = "server.table.primaryKeyNullable";
+        public const string AlterAndDrop = "server.table.alterAndDrop";
+        public const string PrimaryKeyColumns = "server.table.primaryKeyColumns";
+        public const string PrimaryKeyDropped = "server.table.primaryKeyDropped";
+        public const string IndexColumns = "server.table.indexColumns";
+        public const string IndexRepeats = "server.table.indexRepeats";
+        public const string IndexIncluded = "server.table.indexIncluded";
+        public const string IndexFilter = "server.table.indexFilter";
+        public const string IndexMethod = "server.table.indexMethod";
+        public const string DuplicatedIndexes = "server.table.duplicatedIndexes";
+        public const string ForeignKeyColumns = "server.table.foreignKeyColumns";
+        public const string ForeignKeyMismatch = "server.table.foreignKeyMismatch";
+        public const string UniqueColumns = "server.table.uniqueColumns";
+        public const string CheckBody = "server.table.checkBody";
+        public const string ChecksUnsupported = "server.table.checksUnsupported";
+        public const string UnknownColumns = "server.table.unknownColumns";
+        public const string NameRequired = "server.table.nameRequired";
+        public const string NameNewline = "server.table.nameNewline";
+        public const string NameTooLong = "server.table.nameTooLong";
+    }
+
     /// <summary>El servidor intermedio, que es otra máquina y otros errores.</summary>
     public static class Tunnel
     {

@@ -112,17 +112,37 @@ function keyedMessages(messages: unknown, i18n: I18nService): string[] {
   }
 
   return messages
-    .map((message: { key?: unknown; text?: unknown; args?: unknown }) => {
+    .map((message: { key?: unknown; text?: unknown; args?: unknown; keyArgs?: unknown }) => {
       const key = typeof message?.key === 'string' ? message.key : '';
       const text = typeof message?.text === 'string' ? message.text : '';
 
       if (key.length > 0 && i18n.has(key)) {
-        return i18n.t(key, (message.args as Record<string, string>) ?? {});
+        return i18n.t(key, { ...asParams(message.args), ...terms(message.keyArgs, i18n) });
       }
 
       return text;
     })
     .filter((text) => text.length > 0);
+}
+
+function asParams(args: unknown): Record<string, string> {
+  return args && typeof args === 'object' ? (args as Record<string, string>) : {};
+}
+
+/**
+ * Los parámetros que son, a su vez, claves del catálogo.
+ *
+ * «El nombre de {cosa} es obligatorio» es la misma frase para una columna y para
+ * un índice, así que el proceso local manda la cosa como clave y se traduce
+ * aquí. Una que no esté en el catálogo se deja tal cual: se verá rara, que es
+ * como se encuentran.
+ */
+function terms(keyArgs: unknown, i18n: I18nService): Record<string, string> {
+  const entries = Object.entries(asParams(keyArgs));
+
+  return Object.fromEntries(
+    entries.map(([name, key]) => [name, i18n.has(key) ? i18n.t(key) : key]),
+  );
 }
 
 /** Lo que significa cada código, dicho como se lo contarías a alguien. */

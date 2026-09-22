@@ -19,12 +19,28 @@ namespace Druse.Domain;
 /// formato invariante y es el frontend quien los escribe como toque en cada
 /// idioma.
 /// </param>
+/// <param name="KeyArgs">
+/// Los parámetros que **también** son claves del catálogo.
+///
+/// Hay frases que se arman con una palabra del propio programa: «El nombre de la
+/// columna es obligatorio» es la misma frase que «El nombre del índice es
+/// obligatorio», y la única diferencia es el nombre de la cosa. Mandarlas como
+/// veintiuna claves parecidas obliga a traducir veintiuna veces lo mismo; pegar
+/// la palabra en español dentro del texto impide traducirla. Así que la palabra
+/// viaja como clave —<c>server.thing.column</c>— y el frontend la traduce antes
+/// de meterla en la frase.
+/// </param>
 public sealed record UserMessage(
     string Key,
     string Text,
-    IReadOnlyDictionary<string, string>? Args = null)
+    IReadOnlyDictionary<string, string>? Args = null,
+    IReadOnlyDictionary<string, string>? KeyArgs = null)
 {
     /// <summary>Un mensaje con un solo parámetro, que es el caso corriente.</summary>
     public static UserMessage With(string key, string text, string name, string value) =>
         new(key, text, new Dictionary<string, string> { [name] = value });
+
+    /// <summary>Un mensaje cuyo único parámetro es otra clave del catálogo.</summary>
+    public static UserMessage WithTerm(string key, string text, string name, string term) =>
+        new(key, text, null, new Dictionary<string, string> { [name] = term });
 }
