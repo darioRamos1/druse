@@ -603,9 +603,9 @@ export class ConnectionDialog {
     this.feedback.set(null);
 
     try {
-      const message = await this._store.testConnection(form);
-      this.feedbackKind.set(message.startsWith('Conexión correcta') ? 'success' : 'error');
-      this.feedback.set(message);
+      const result = await this._store.testConnection(form);
+      this.feedbackKind.set(result.ok ? 'success' : 'error');
+      this.feedback.set(result.message);
     } finally {
       this.testing.set(false);
     }
@@ -629,9 +629,9 @@ export class ConnectionDialog {
     this.feedback.set(null);
 
     try {
-      const message = await this._store.testTunnel(form);
-      this.feedbackKind.set(message.startsWith('Túnel correcto') ? 'success' : 'error');
-      this.feedback.set(message);
+      const result = await this._store.testTunnel(form);
+      this.feedbackKind.set(result.ok ? 'success' : 'error');
+      this.feedback.set(result.message);
     } finally {
       this.testingTunnel.set(false);
     }

@@ -1,5 +1,7 @@
 import { HttpErrorResponse } from '@angular/common/http';
 
+import { I18nService } from '../i18n/i18n.service';
+
 /**
  * Cómo se le cuenta al usuario lo que falló.
  *
@@ -21,19 +23,19 @@ import { HttpErrorResponse } from '@angular/common/http';
  * usuario, pero es lo primero que hace falta el día que tenga que contarle el
  * problema a alguien.
  */
-export function describeError(error: unknown): string {
+export function describeError(error: unknown, i18n: I18nService): string {
   if (!(error instanceof HttpErrorResponse)) {
-    return 'Druse encontró un problema inesperado. Si vuelve a ocurrir, reinicia la aplicación.';
+    return i18n.t('error.unexpected');
   }
 
   const body = error.error;
 
   // Un fallo de validación sabe exactamente qué campo está mal, así que se
   // cuenta campo por campo en lugar de resumirlo en un código.
-  const validation = validationMessages(body?.errors);
+  const validation = validationMessages(body?.errors, i18n);
 
   if (validation.length > 0) {
-    return `Revisa los datos enviados: ${validation.join(' ')}`;
+    return i18n.t('error.validation', { details: validation.join(' ') });
   }
 
   // Cuando el servidor explica el motivo, se enseña tal cual: sus mensajes ya
@@ -45,7 +47,10 @@ export function describeError(error: unknown): string {
     return message;
   }
 
-  return `${explainStatus(error.status)} (${error.status})`;
+  return i18n.t('error.withStatus', {
+    message: explainStatus(error.status, i18n),
+    status: error.status,
+  });
 }
 
 /**
@@ -86,58 +91,56 @@ export function isSessionLost(error: unknown): boolean {
 }
 
 /** Lo que significa cada código, dicho como se lo contarías a alguien. */
-function explainStatus(status: number): string {
+function explainStatus(status: number, i18n: I18nService): string {
   switch (status) {
     // Angular usa el 0 cuando la petición ni siquiera llegó a salir.
     case 0:
       return 'Druse no obtuvo respuesta de su propio motor. Comprueba que la aplicación siga abierta y vuelve a intentarlo.';
 
     case 400:
-      return 'La solicitud contiene datos incompletos o con un formato incorrecto.';
+      return i18n.t('error.status.400');
 
     case 401:
     case 403:
-      return 'Esta ventana perdió el permiso para hablar con el motor de Druse. Cierra la aplicación y vuelve a abrirla.';
+      return i18n.t('error.status.401');
 
     case 404:
-      return 'Eso ya no existe. Es probable que la conexión se haya cerrado; vuelve a abrirla y repite la operación.';
+      return i18n.t('error.status.404');
 
     case 408:
-      return 'La operación tardó demasiado y se cortó. Prueba otra vez, o con menos datos.';
+      return i18n.t('error.status.408');
 
     case 409:
-      return 'La operación no se aplicó porque algo había cambiado mientras tanto. Actualiza y vuelve a intentarlo.';
+      return i18n.t('error.status.409');
 
     case 413:
-      return 'El archivo es demasiado grande para procesarlo de una vez.';
+      return i18n.t('error.status.413');
 
     case 428:
-      return 'Falta una contraseña para abrir esta conexión.';
+      return i18n.t('error.status.428');
 
     case 500:
-      return 'Algo falló dentro de Druse mientras atendía la petición. No se aplicó ningún cambio.';
+      return i18n.t('error.status.500');
 
     // 502, 503 y 504 significan lo mismo desde aquí: el proceso que hace el
     // trabajo no está atendiendo. Es lo que se ve si se cerró o si aún arranca.
     case 502:
     case 503:
     case 504:
-      return 'El motor de Druse no está respondiendo: puede que se haya cerrado o que todavía esté arrancando. Espera unos segundos y, si sigue igual, reinicia la aplicación.';
+      return i18n.t('error.status.502');
 
     default:
-      return status >= 500
-        ? 'El motor de Druse falló al atender la petición.'
-        : 'Druse no pudo completar la operación.';
+      return i18n.t(status >= 500 ? 'error.status.server' : 'error.status.other');
   }
 }
 
-function validationMessages(errors: unknown): string[] {
+function validationMessages(errors: unknown, i18n: I18nService): string[] {
   if (!errors || typeof errors !== 'object') {
     return [];
   }
 
   const messages = Object.entries(errors as Record<string, unknown>).flatMap(([field, value]) => {
-    const known = validationFieldMessage(field);
+    const known = validationFieldMessage(field, i18n);
 
     if (known) {
       return [known];
@@ -151,10 +154,10 @@ function validationMessages(errors: unknown): string[] {
       .filter((message): message is string => typeof message === 'string')
       .map((message) => {
         if (/required/i.test(message)) {
-          return 'Falta un dato obligatorio.';
+          return i18n.t('error.field.required');
         }
         if (/could not be converted|invalid/i.test(message)) {
-          return 'Uno de los valores tiene un formato incorrecto.';
+          return i18n.t('error.field.format');
         }
 
         return message;
@@ -164,23 +167,23 @@ function validationMessages(errors: unknown): string[] {
   return [...new Set(messages)];
 }
 
-function validationFieldMessage(field: string): string | null {
+function validationFieldMessage(field: string, i18n: I18nService): string | null {
   const normalized = field.toLowerCase();
 
   if (normalized.endsWith('.name')) {
-    return 'El nombre de la conexión es obligatorio.';
+    return i18n.t('error.field.name');
   }
   if (normalized.endsWith('.host')) {
-    return 'El servidor es obligatorio.';
+    return i18n.t('error.field.host');
   }
   if (normalized.endsWith('.port')) {
-    return 'El puerto debe ser un número entre 1 y 65535.';
+    return i18n.t('error.field.port');
   }
   if (normalized.endsWith('.database')) {
-    return 'La base de datos es obligatoria.';
+    return i18n.t('error.field.database');
   }
   if (normalized.endsWith('.username')) {
-    return 'El usuario es obligatorio.';
+    return i18n.t('error.field.username');
   }
 
   return null;

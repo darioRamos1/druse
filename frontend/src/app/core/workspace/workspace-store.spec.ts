@@ -1653,11 +1653,12 @@ describe('WorkspaceStore', () => {
     it('cuando el camino entero funciona lo dice nombrando los dos extremos', async () => {
       gateway.tunnelResult = { succeeded: true, reach: 'complete', durationMs: 42 };
 
-      const mensaje = await store.testTunnel(conTunel());
+      const resultado = await store.testTunnel(conTunel());
 
-      expect(mensaje).toContain('Túnel correcto');
-      expect(mensaje).toContain('db.interna:5432');
-      expect(mensaje).toContain('bastion.empresa.com');
+      expect(resultado.ok).toBe(true);
+      expect(resultado.message).toContain('Túnel correcto');
+      expect(resultado.message).toContain('db.interna:5432');
+      expect(resultado.message).toContain('bastion.empresa.com');
     });
 
     /**
@@ -1674,9 +1675,10 @@ describe('WorkspaceStore', () => {
         durationMs: 8,
       };
 
-      const mensaje = await store.testTunnel(conTunel());
+      const resultado = await store.testTunnel(conTunel());
 
-      expect(mensaje).toBe('Usuario o clave incorrectos en bastion.empresa.com.');
+      expect(resultado.ok).toBe(false);
+      expect(resultado.message).toBe('Usuario o clave incorrectos en bastion.empresa.com.');
     });
 
     it('no manda la contraseña de la base al servidor intermedio', async () => {

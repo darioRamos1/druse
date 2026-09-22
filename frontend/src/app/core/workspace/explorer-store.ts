@@ -2,6 +2,7 @@ import { Injectable, computed, inject, signal } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 
 import { ApplicationGateway } from '../application-gateway/application-gateway';
+import { I18nService } from '../i18n/i18n.service';
 import {
   DatabaseObject,
   ExplorerNode,
@@ -51,6 +52,7 @@ export type SessionLossHandler = (connectionId: string, error: unknown) => boole
 @Injectable({ providedIn: 'root' })
 export class ExplorerStore {
   private readonly _gateway = inject(ApplicationGateway);
+  private readonly _i18n = inject(I18nService);
   private readonly _connections = inject(ConnectionStore);
   private readonly _notices = inject(NoticeStore);
 
@@ -449,7 +451,7 @@ export class ExplorerStore {
         })),
       ]);
     } catch (error) {
-      this._notices.set(describeError(error));
+      this._notices.set(describeError(error, this._i18n));
     }
   }
 
@@ -492,7 +494,7 @@ export class ExplorerStore {
       // no se puede leer, el autocompletado tendrá menos, y ya está. Cuando el
       // usuario abra ese nodo a mano sí verá el motivo.
       if (!quiet) {
-        this._notices.set(describeError(error));
+        this._notices.set(describeError(error, this._i18n));
       }
     } finally {
       entry.loading = false;

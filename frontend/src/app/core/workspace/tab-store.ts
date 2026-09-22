@@ -2,6 +2,7 @@ import { Injectable, computed, inject, signal } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 
 import { ApplicationGateway } from '../application-gateway/application-gateway';
+import { I18nService } from '../i18n/i18n.service';
 import { DatabaseObject, QueryTab } from '../../shared/models/workspace';
 
 /**
@@ -47,9 +48,16 @@ export interface NewTab {
 @Injectable({ providedIn: 'root' })
 export class TabStore {
   private readonly _gateway = inject(ApplicationGateway);
+  private readonly _i18n = inject(I18nService);
 
   private readonly _tabs = signal<readonly QueryTab[]>([
-    { id: 'q1', title: 'Consulta 1', active: true, dirty: false, sql: '' },
+    {
+      id: 'q1',
+      title: this._i18n.t('workspace.newTab', { number: 1 }),
+      active: true,
+      dirty: false,
+      sql: '',
+    },
   ]);
 
   readonly tabs = this._tabs.asReadonly();
@@ -219,7 +227,7 @@ export class TabStore {
       ...tabs.map((tab) => ({ ...tab, active: false })),
       {
         id: `q${tabCounter}`,
-        title: title ?? `Consulta ${tabCounter}`,
+        title: title ?? this._i18n.t('workspace.newTab', { number: tabCounter }),
         active: true,
         dirty: false,
         sql,

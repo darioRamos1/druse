@@ -82,6 +82,12 @@ const DEFAULT_ROW_LIMIT = 500;
 /** Tope del proceso local, que aquí se respeta para no prometer lo que rechazará. */
 const MAX_ROW_LIMIT = 100_000;
 
+/** El resultado de una prueba: si fue bien y qué decirle al usuario. */
+export interface ProbeResult {
+  readonly ok: boolean;
+  readonly message: string;
+}
+
 /**
  * Estado del área de trabajo: conexiones, explorador, pestañas y resultados.
  *
@@ -391,12 +397,12 @@ export class WorkspaceStore {
         : this.activeTab()?.id === tabId && this.activeTab()?.sql === tabSql;
 
     if (!connection?.sessionId) {
-      this._notices.set('No hay ninguna conexión abierta.');
+      this._notices.set(this._i18n.t('workspace.noConnection'));
       return;
     }
 
     if (!sql) {
-      this._notices.set('No hay ninguna consulta que exportar.');
+      this._notices.set(this._i18n.t('workspace.nothingToExport'));
       return;
     }
 
@@ -416,7 +422,9 @@ export class WorkspaceStore {
       );
 
       if (stillCurrent()) {
-        const fileName = `${sanitizeFileName(source?.title ?? tab?.title ?? 'druse')}.${format}`;
+        const fileName = `${sanitizeFileName(
+          source?.title ?? tab?.title ?? this._i18n.t('workspace.defaultFileName'),
+        )}.${format}`;
 
         // Se anuncia después de guardar y solo si de verdad se guardó. Antes se
         // daba por hecho, y en la aplicación empaquetada eso significaba decir
@@ -425,7 +433,11 @@ export class WorkspaceStore {
 
         if (stillCurrent()) {
           this._notices.set(
-            describeSave(outcome, `Exportado a ${format.toUpperCase()}`, 'Exportación cancelada.'),
+            describeSave(
+              outcome,
+              this._i18n.t('workspace.exportedTo', { format: format.toUpperCase() }),
+              this._i18n.t('workspace.exportCancelled'),
+            ),
           );
         }
       }
@@ -449,7 +461,7 @@ export class WorkspaceStore {
         const failure = await asHttpErrorFromBlob(error);
 
         if (!connection || !this.noteSessionLoss(connection.id, failure ?? error)) {
-          const message = await describeBlobError(error);
+          const message = await describeBlobError(error, this._i18n);
 
           if (stillCurrent()) {
             this._notices.set(message);
@@ -495,14 +507,10 @@ export class WorkspaceStore {
     return this.runTransaction(
       (sessionId) => this._gateway.beginTransaction(sessionId),
       (state) => {
-        const aviso = state.ddlIsReversible
-          ? ''
-          : ' Crear o modificar tablas no se deshace en este motor, aunque uses «Deshacer».';
+        const aviso = state.ddlIsReversible ? '' : this._i18n.t('workspace.ddlNotReversible');
 
         return (
-          `Transacción abierta en «${state.connectionName}». ` +
-          'Todo lo que ejecutes en esta conexión entra en ella hasta que la confirmes o la deshagas.' +
-          aviso
+          this._i18n.t('workspace.transactionOpen', { connection: state.connectionName }) + aviso
         );
       },
     );
@@ -511,14 +519,14 @@ export class WorkspaceStore {
   async commitTransaction(): Promise<boolean> {
     return this.runTransaction(
       (sessionId) => this._gateway.commitTransaction(sessionId),
-      (state) => `Cambios confirmados en «${state.connectionName}».`,
+      (state) => this._i18n.t('workspace.committed', { connection: state.connectionName }),
     );
   }
 
   async rollbackTransaction(): Promise<boolean> {
     return this.runTransaction(
       (sessionId) => this._gateway.rollbackTransaction(sessionId),
-      (state) => `Cambios deshechos en «${state.connectionName}».`,
+      (state) => this._i18n.t('workspace.rolledBack', { connection: state.connectionName }),
     );
   }
 
@@ -533,7 +541,7 @@ export class WorkspaceStore {
     const connection = this.activeConnection();
 
     if (!connection?.sessionId) {
-      this._notices.set('Abre una conexión para poder usar transacciones.');
+      this._notices.set(this._i18n.t('workspace.needsConnection'));
 
       return false;
     }
@@ -551,7 +559,7 @@ export class WorkspaceStore {
         return false;
       }
 
-      this._notices.set(describeError(error));
+      this._notices.set(describeError(error, this._i18n));
 
       // El estado local pudo quedarse atrás —otra pestaña la cerró, o se
       // deshizo sola—, así que se vuelve a preguntar en lugar de dejar los
@@ -638,7 +646,7 @@ export class WorkspaceStore {
         return [...live, ...restored];
       });
     } catch (error) {
-      this._notices.set(describeError(error));
+      this._notices.set(describeError(error, this._i18n));
     }
   }
 
@@ -697,8 +705,11 @@ export class WorkspaceStore {
         return 'needsPassword';
       }
 
-      this.patchConnection(connectionId, { state: 'error', error: describeError(error) });
-      this._notices.set(describeError(error));
+      this.patchConnection(connectionId, {
+        state: 'error',
+        error: describeError(error, this._i18n),
+      });
+      this._notices.set(describeError(error, this._i18n));
 
       return 'failed';
     }
@@ -713,7 +724,7 @@ export class WorkspaceStore {
     try {
       await firstValueFrom(this._gateway.deleteConnection(connectionId));
     } catch (error) {
-      this._notices.set(describeError(error));
+      this._notices.set(describeError(error, this._i18n));
       return;
     }
 
@@ -727,7 +738,7 @@ export class WorkspaceStore {
     try {
       this._history.set(await firstValueFrom(this._gateway.getHistory(search)));
     } catch (error) {
-      this._notices.set(describeError(error));
+      this._notices.set(describeError(error, this._i18n));
     }
   }
 
@@ -736,7 +747,7 @@ export class WorkspaceStore {
       await firstValueFrom(this._gateway.clearHistory());
       this._history.set([]);
     } catch (error) {
-      this._notices.set(describeError(error));
+      this._notices.set(describeError(error, this._i18n));
     }
   }
 
@@ -802,10 +813,7 @@ export class WorkspaceStore {
     // Druse pueda arreglar, pero callarlo dejaría creer que esos cambios se
     // pueden deshacer con Rollback.
     if (this.hasOpenTransaction(connectionId)) {
-      this._notices.set(
-        `Lo que ejecutes contra «${database}» no entra en la transacción abierta: ` +
-          'va por otra conexión y se confirma solo.',
-      );
+      this._notices.set(this._i18n.t('workspace.otherDatabase', { database }));
     }
 
     // El autocompletado de la base nueva no está cargado todavía; se pide por
@@ -876,12 +884,10 @@ export class WorkspaceStore {
     // dice porque desde aquí ya no se ve, y una transacción olvidada retiene
     // bloqueos hasta que alguien se acuerda.
     if (previous && this.hasOpenTransaction(previous)) {
-      const before = this.findConnection(previous)?.name ?? 'la conexión anterior';
+      const before =
+        this.findConnection(previous)?.name ?? this._i18n.t('workspace.previousConnection');
 
-      this._notices.set(
-        `La transacción abierta en «${before}» sigue ahí: es de esa conexión y no ` +
-          'se cierra al cambiar de pestaña.',
-      );
+      this._notices.set(this._i18n.t('workspace.transactionStays', { connection: before }));
     }
 
     if (database) {
@@ -993,7 +999,7 @@ export class WorkspaceStore {
     try {
       this._editPreview.set(await firstValueFrom(this._gateway.previewRowEdits(request)));
     } catch (error) {
-      this._notices.set(describeError(error));
+      this._notices.set(describeError(error, this._i18n));
     }
   }
 
@@ -1019,16 +1025,14 @@ export class WorkspaceStore {
 
       // El aviso va **después** de releer: `execute` limpia el aviso al empezar,
       // así que ponerlo antes equivalía a no ponerlo.
-      this._notices.set(
-        `${result.rowsAffected} ${result.rowsAffected === 1 ? 'fila guardada' : 'filas guardadas'}.`,
-      );
+      this._notices.set(this._i18n.t('workspace.rowsSaved', { rows: result.rowsAffected }));
 
       return true;
     } catch (error) {
       const connectionId = this.activeConnection()?.id;
 
       if (!connectionId || !this.noteSessionLoss(connectionId, error)) {
-        this._notices.set(describeError(error));
+        this._notices.set(describeError(error, this._i18n));
       }
 
       return false;
@@ -1191,7 +1195,7 @@ export class WorkspaceStore {
     try {
       this._deletePreview.set(await firstValueFrom(this._gateway.previewRowDeletes(request)));
     } catch (error) {
-      this._notices.set(describeError(error));
+      this._notices.set(describeError(error, this._i18n));
     }
   }
 
@@ -1214,16 +1218,14 @@ export class WorkspaceStore {
 
       // Después de releer, por lo mismo que al guardar: `execute` limpia el
       // aviso al empezar.
-      this._notices.set(
-        `${result.rowsAffected} ${result.rowsAffected === 1 ? 'fila borrada' : 'filas borradas'}.`,
-      );
+      this._notices.set(this._i18n.t('workspace.rowsDeleted', { rows: result.rowsAffected }));
 
       return true;
     } catch (error) {
       const connectionId = this.activeConnection()?.id;
 
       if (!connectionId || !this.noteSessionLoss(connectionId, error)) {
-        this._notices.set(describeError(error));
+        this._notices.set(describeError(error, this._i18n));
       }
 
       return false;
@@ -1292,7 +1294,7 @@ export class WorkspaceStore {
       ?.sessionId;
 
     if (!sessionId) {
-      this._notices.set('No hay ninguna conexión abierta.');
+      this._notices.set(this._i18n.t('workspace.noConnection'));
       return;
     }
 
@@ -1304,7 +1306,7 @@ export class WorkspaceStore {
       );
     } catch (error) {
       this._importPreview.set(null);
-      this._notices.set(describeError(error));
+      this._notices.set(describeError(error, this._i18n));
     } finally {
       this._importing.set(false);
     }
@@ -1321,7 +1323,7 @@ export class WorkspaceStore {
       ?.sessionId;
 
     if (!sessionId) {
-      this._notices.set('No hay ninguna conexión abierta.');
+      this._notices.set(this._i18n.t('workspace.noConnection'));
       return false;
     }
 
@@ -1332,7 +1334,10 @@ export class WorkspaceStore {
 
       this._importPreview.set(null);
       this._notices.set(
-        `${result.rowsAffected} ${result.rowsAffected === 1 ? 'fila importada' : 'filas importadas'} en ${table.name}.`,
+        this._i18n.t('workspace.rowsImported', {
+          rows: result.rowsAffected,
+          table: table.name,
+        }),
       );
 
       // El recuento del árbol se queda viejo en cuanto se insertan filas.
@@ -1340,7 +1345,7 @@ export class WorkspaceStore {
 
       return true;
     } catch (error) {
-      this._notices.set(describeError(error));
+      this._notices.set(describeError(error, this._i18n));
       return false;
     } finally {
       this._importing.set(false);
@@ -1415,8 +1420,8 @@ export class WorkspaceStore {
 
       return true;
     } catch (error) {
-      this.patchConnection(id, { state: 'error', error: describeError(error) });
-      this._notices.set(describeError(error));
+      this.patchConnection(id, { state: 'error', error: describeError(error, this._i18n) });
+      this._notices.set(describeError(error, this._i18n));
 
       return false;
     }
@@ -1442,7 +1447,7 @@ export class WorkspaceStore {
       state: 'error',
       lost: true,
       sessionId: undefined,
-      error: 'La conexión se perdió.',
+      error: this._i18n.t('workspace.connectionLost'),
     });
 
     // El árbol y la transacción eran de una sesión que ya no existe. Dejarlos
@@ -1453,7 +1458,9 @@ export class WorkspaceStore {
     this._transactions.forget(connectionId);
 
     this._notices.set(
-      `Se perdió la conexión con «${connection?.name ?? 'la base'}». Vuelve a conectarla para seguir.`,
+      this._i18n.t('workspace.connectionLostDetail', {
+        connection: connection?.name ?? this._i18n.t('workspace.theDatabase'),
+      }),
     );
 
     return true;
@@ -1471,7 +1478,7 @@ export class WorkspaceStore {
       // Con el mensaje va la consulta que enseña lo que lo provocó, cuando el
       // proceso local supo escribirla: sin ella, arreglar un rechazo por los
       // datos que ya había empieza por escribir la búsqueda a mano.
-      this._notices.set(describeError(error), diagnosticQuery(error));
+      this._notices.set(describeError(error, this._i18n), diagnosticQuery(error));
     }
   }
 
@@ -1494,10 +1501,7 @@ export class WorkspaceStore {
     }
 
     if (!connection.saved) {
-      this._notices.set(
-        `«${connection.name}» no está guardada, así que Druse no tiene con qué volver a abrirla. ` +
-          'Créala de nuevo desde «Nueva conexión».',
-      );
+      this._notices.set(this._i18n.t('workspace.notSaved', { connection: connection.name }));
 
       return 'failed';
     }
@@ -1524,7 +1528,7 @@ export class WorkspaceStore {
 
     if (connected) {
       this.patchConnection(connectionId, { lost: false });
-      this._notices.set(`Conexión con «${connection.name}» restablecida.`);
+      this._notices.set(this._i18n.t('workspace.reconnected', { connection: connection.name }));
 
       return 'ok';
     }
@@ -1639,7 +1643,7 @@ export class WorkspaceStore {
 
       return saved;
     } catch (error) {
-      this._notices.set(describeError(error));
+      this._notices.set(describeError(error, this._i18n));
       return null;
     }
   }
@@ -1660,7 +1664,7 @@ export class WorkspaceStore {
 
       return null;
     } catch (error) {
-      return describeError(error);
+      return describeError(error, this._i18n);
     }
   }
 
@@ -1682,19 +1686,28 @@ export class WorkspaceStore {
 
       return { databases, error: null };
     } catch (error) {
-      return { databases: [], error: describeError(error) };
+      return { databases: [], error: describeError(error, this._i18n) };
     }
   }
 
-  async testConnection(form: ConnectionForm): Promise<string> {
+  async testConnection(form: ConnectionForm): Promise<ProbeResult> {
     try {
       const result = await firstValueFrom(this._gateway.testConnection(toRequest(form)));
 
       return result.succeeded
-        ? `Conexión correcta con ${describeVersion(form.engine, result.serverVersion ?? '')} en ${result.durationMs} ms.`
-        : (result.errorMessage ?? 'No se pudo conectar.');
+        ? {
+            ok: true,
+            message: this._i18n.t('workspace.testOk', {
+              version: describeVersion(form.engine, result.serverVersion ?? ''),
+              ms: result.durationMs,
+            }),
+          }
+        : {
+            ok: false,
+            message: result.errorMessage ?? this._i18n.t('workspace.testFailed'),
+          };
     } catch (error) {
-      return describeError(error);
+      return { ok: false, message: describeError(error, this._i18n) };
     }
   }
 
@@ -1706,17 +1719,24 @@ export class WorkspaceStore {
    * conexión de base de datos, así que lo que responda es de la red y de la
    * cuenta SSH, de nadie más.
    */
-  async testTunnel(form: ConnectionForm): Promise<string> {
+  async testTunnel(form: ConnectionForm): Promise<ProbeResult> {
     try {
       const result = await firstValueFrom(this._gateway.testTunnel(toRequest(form)));
 
       if (result.succeeded) {
-        return `Túnel correcto: se llegó a ${form.host}:${form.port} a través de ${form.sshTunnel?.host ?? 'el servidor intermedio'} en ${result.durationMs} ms.`;
+        return {
+          ok: true,
+          message: this._i18n.t('workspace.tunnelOk', {
+            target: `${form.host}:${form.port}`,
+            through: form.sshTunnel?.host ?? this._i18n.t('workspace.tunnelJump'),
+            ms: result.durationMs,
+          }),
+        };
       }
 
-      return result.errorMessage ?? 'No se pudo abrir el túnel.';
+      return { ok: false, message: result.errorMessage ?? this._i18n.t('workspace.tunnelFailed') };
     } catch (error) {
-      return describeError(error);
+      return { ok: false, message: describeError(error, this._i18n) };
     }
   }
 
@@ -1885,7 +1905,7 @@ export class WorkspaceStore {
           : this._gateway.previewCreateTable(sessionId, design),
       );
     } catch (error) {
-      this._notices.set(describeError(error));
+      this._notices.set(describeError(error, this._i18n));
       return [];
     }
   }
@@ -1966,7 +1986,7 @@ export class WorkspaceStore {
     const connection = this.findConnection(node.connectionId);
 
     if (!connection?.sessionId) {
-      this._notices.set('La conexión de este objeto no está abierta.');
+      this._notices.set(this._i18n.t('workspace.objectNotOpen'));
       return;
     }
 
@@ -1983,7 +2003,7 @@ export class WorkspaceStore {
         node.source.database,
       );
     } catch (error) {
-      this._notices.set(describeError(error));
+      this._notices.set(describeError(error, this._i18n));
     }
   }
 
@@ -2088,14 +2108,14 @@ export class WorkspaceStore {
     const tabSql = tab?.sql;
 
     if (!connection?.sessionId) {
-      this._notices.set('No hay ninguna conexión abierta.');
+      this._notices.set(this._i18n.t('workspace.noConnection'));
       return null;
     }
 
     const sql = sqlOverride ?? tab?.sql ?? '';
 
     if (!sql.trim()) {
-      this._notices.set('No hay ninguna instrucción que ejecutar.');
+      this._notices.set(this._i18n.t('workspace.nothingToRun'));
       return null;
     }
 
@@ -2154,7 +2174,7 @@ export class WorkspaceStore {
         }
       } else if (!this.noteSessionLoss(connection.id, error)) {
         if (this.activeTab()?.id === tabId && this.activeTab()?.sql === tabSql) {
-          this._notices.set(describeError(error));
+          this._notices.set(describeError(error, this._i18n));
         }
       }
 
@@ -2324,7 +2344,7 @@ async function asHttpErrorFromBlob(error: unknown): Promise<HttpErrorResponse | 
   }
 }
 
-async function describeBlobError(error: unknown): Promise<string> {
+async function describeBlobError(error: unknown, i18n: I18nService): Promise<string> {
   if (error instanceof HttpErrorResponse && error.error instanceof Blob) {
     try {
       const text = await error.error.text();
@@ -2338,7 +2358,7 @@ async function describeBlobError(error: unknown): Promise<string> {
     }
   }
 
-  return describeError(error);
+  return describeError(error, i18n);
 }
 
 /** Reconoce el 409 con el que la API pide confirmación. */

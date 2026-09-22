@@ -81,8 +81,14 @@ describe('ConnectionDialog', () => {
 
   beforeEach(async () => {
     vi.clearAllMocks();
-    store.testConnection.mockResolvedValue('Conexión correcta con SQL Server 16 en 12 ms.');
-    store.testTunnel.mockResolvedValue('Túnel correcto: se llegó a db.interna:5432 en 30 ms.');
+    store.testConnection.mockResolvedValue({
+      ok: true,
+      message: 'Conexión correcta con SQL Server 16 en 12 ms.',
+    });
+    store.testTunnel.mockResolvedValue({
+      ok: true,
+      message: 'Túnel correcto: se llegó a db.interna:5432 en 30 ms.',
+    });
     store.connectionDatabases.mockResolvedValue({ databases: [], error: null });
     store.connect.mockResolvedValue(true);
     store.saveConnection.mockResolvedValue(true);
