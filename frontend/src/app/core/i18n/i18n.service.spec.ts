@@ -48,6 +48,18 @@ describe('I18nService', () => {
     expect(formatLocale()).toBe('en');
   });
 
+  it('tParts devuelve la frase en trozos, con cada elemento marcado en su sitio', async () => {
+    await service.setLocale('en', { persist: false });
+
+    const parts = service.tParts('settings.license.grant', { copyright: 'COPYRIGHT.txt' });
+    const code = parts.find((part) => part.tag === 'copyright');
+
+    expect(code?.text).toBe('COPYRIGHT.txt');
+    expect(parts.map((part) => part.text).join('')).toContain('described in COPYRIGHT.txt.');
+    // El trozo con formato va entre dos de texto, sin partir la frase.
+    expect(parts.at(-1)).toEqual({ text: '.', tag: null });
+  });
+
   it('una clave desconocida se enseña tal cual, para que se note', () => {
     expect(service.t('no.existe')).toBe('no.existe');
   });

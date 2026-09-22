@@ -116,6 +116,51 @@ export class I18nService {
     return locale === 'qps' ? pseudolocalize(text) : text;
   }
 
+  /** Si el catálogo fuente tiene la clave: para textos que pueden venir de fuera. */
+  has(key: string): boolean {
+    return key in SOURCE_CATALOG;
+  }
+
+  /**
+   * Una frase con trozos que se pintan distinto —un nombre de archivo en
+   * `<code>`, un enlace—, sin partirla.
+   *
+   * Partir «El texto está en », «LICENSE.txt» y «, dentro de…» en tres claves
+   * impide traducirla: cada idioma coloca las piezas en otro orden. Aquí la
+   * frase es una sola clave con `{file}` dentro, y se devuelve en trozos: el
+   * texto normal con `tag: null` y cada parámetro de `rich` con su nombre, para
+   * que la plantilla lo pinte como quiera.
+   */
+  tParts(
+    key: string,
+    rich: Readonly<Record<string, string>>,
+    params: MessageParams = {},
+  ): { readonly text: string; readonly tag: string | null }[] {
+    // Marcas con dígitos y no con el nombre: el pseudoidioma acentúa las
+    // letras, y una marca con letras dejaría de reconocerse.
+    const names = Object.keys(rich);
+    const markers = Object.fromEntries(names.map((name, index) => [name, `\u0001${index}\u0002`]));
+    const text = this.t(key, { ...params, ...markers });
+    const parts: { text: string; tag: string | null }[] = [];
+    let last = 0;
+
+    for (const match of text.matchAll(/\u0001(\d+)\u0002/g)) {
+      if (match.index > last) {
+        parts.push({ text: text.slice(last, match.index), tag: null });
+      }
+
+      const name = names[Number(match[1])];
+      parts.push({ text: rich[name], tag: name });
+      last = match.index + match[0].length;
+    }
+
+    if (last < text.length) {
+      parts.push({ text: text.slice(last), tag: null });
+    }
+
+    return parts;
+  }
+
   /**
    * Cambia el idioma, al momento.
    *

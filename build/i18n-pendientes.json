@@ -17,7 +17,6 @@
   "frontend/src/app/features/query-history/query-history/query-history.html",
   "frontend/src/app/features/query-results/results-grid/results-grid.html",
   "frontend/src/app/features/query-results/results-panel/results-panel.html",
-  "frontend/src/app/features/settings/settings-dialog/settings-dialog.html",
   "frontend/src/app/features/tables/table-designer/table-designer.html",
   "frontend/src/app/features/transfer/transfer-dialog/transfer-dialog.html",
   "frontend/src/app/features/transfer/transfer-set-dialog/transfer-set-dialog.html",

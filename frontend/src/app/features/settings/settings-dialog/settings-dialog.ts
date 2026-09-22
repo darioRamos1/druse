@@ -43,13 +43,13 @@ import { PrivacyNotice } from '../../../shared/privacy/privacy-notice';
  * del mockup, así que la lista siempre incluye el punto de partida.
  */
 const ACCENTS: readonly { readonly name: string; readonly value: string }[] = [
-  { name: 'Índigo', value: '#6c8bff' },
-  { name: 'Violeta', value: '#9a7cff' },
-  { name: 'Turquesa', value: '#2fb8b0' },
-  { name: 'Verde', value: '#3ddc97' },
-  { name: 'Ámbar', value: '#f0b429' },
-  { name: 'Coral', value: '#f2686b' },
-  { name: 'Rosa', value: '#f472b6' },
+  { name: 'settings.color.indigo', value: '#6c8bff' },
+  { name: 'settings.color.violet', value: '#9a7cff' },
+  { name: 'settings.color.turquoise', value: '#2fb8b0' },
+  { name: 'settings.color.green', value: '#3ddc97' },
+  { name: 'settings.color.amber', value: '#f0b429' },
+  { name: 'settings.color.coral', value: '#f2686b' },
+  { name: 'settings.color.pink', value: '#f472b6' },
 ];
 
 /**
@@ -60,12 +60,12 @@ const ACCENTS: readonly { readonly name: string; readonly value: string }[] = [
  * un panel azulado, y al 90 % es una pantalla de discoteca.
  */
 const TINTS: readonly { readonly name: string; readonly value: string }[] = [
-  { name: 'Neutro', value: '#808080' },
-  { name: 'Azul', value: '#5b7bb8' },
-  { name: 'Violeta', value: '#7f6fb0' },
-  { name: 'Verde', value: '#5b9c7f' },
-  { name: 'Arena', value: '#a89272' },
-  { name: 'Ciruela', value: '#a3708f' },
+  { name: 'settings.color.neutral', value: '#808080' },
+  { name: 'settings.color.blue', value: '#5b7bb8' },
+  { name: 'settings.color.violet', value: '#7f6fb0' },
+  { name: 'settings.color.green', value: '#5b9c7f' },
+  { name: 'settings.color.sand', value: '#a89272' },
+  { name: 'settings.color.plum', value: '#a3708f' },
 ];
 
 /**
@@ -103,24 +103,17 @@ const PREVIEW_LINES: readonly (readonly PreviewToken[])[] = [
   [{ kind: 'comment', width: 34 }],
 ];
 
-/** Traduce un encuadre a la esquina —o el centro— donde queda. */
-function corner(x: number, y: number): string {
-  const horizontal = x < 34 ? 'la izquierda' : x > 66 ? 'la derecha' : 'el centro';
-  const vertical = y < 34 ? 'arriba' : y > 66 ? 'abajo' : 'el medio';
-
-  if (horizontal === 'el centro' && vertical === 'el medio') {
-    return 'centrada';
-  }
-
-  if (horizontal === 'el centro') {
-    return `${vertical === 'arriba' ? 'arriba' : 'abajo'} del todo`;
-  }
-
-  if (vertical === 'el medio') {
-    return `pegada a ${horizontal}`;
-  }
-
-  return `${vertical} a ${horizontal}`;
+/**
+ * La zona donde queda un encuadre, para elegir su frase.
+ *
+ * Solo la zona: la frase entera sale del catálogo. Antes se armaba aquí con
+ * trozos —«pegada a» + «la izquierda»—, y eso no se puede traducir.
+ */
+function corner(x: number, y: number): { h: string; v: string } {
+  return {
+    h: x < 34 ? 'left' : x > 66 ? 'right' : 'center',
+    v: y < 34 ? 'top' : y > 66 ? 'bottom' : 'middle',
+  };
 }
 
 const FITS: readonly {
@@ -128,10 +121,26 @@ const FITS: readonly {
   readonly label: string;
   readonly hint: string;
 }[] = [
-  { value: 'cover', label: 'Llenar', hint: 'Cubre el editor; recorta lo que sobra' },
-  { value: 'contain', label: 'Encajar', hint: 'Enseña la imagen entera' },
-  { value: 'tile', label: 'Repetir', hint: 'La usa como patrón' },
-  { value: 'scale', label: 'Tamaño', hint: 'El tamaño lo decides tú' },
+  {
+    value: 'cover',
+    label: 'settings.background.fit.cover',
+    hint: 'settings.background.fit.coverHint',
+  },
+  {
+    value: 'contain',
+    label: 'settings.background.fit.contain',
+    hint: 'settings.background.fit.containHint',
+  },
+  {
+    value: 'tile',
+    label: 'settings.background.fit.tile',
+    hint: 'settings.background.fit.tileHint',
+  },
+  {
+    value: 'scale',
+    label: 'settings.background.fit.scale',
+    hint: 'settings.background.fit.scaleHint',
+  },
 ];
 
 type SettingsSection = 'appearance' | 'editor' | 'privacy' | 'about';
@@ -147,10 +156,10 @@ type SettingsSection = 'appearance' | 'editor' | 'privacy' | 'about';
 export class SettingsDialog {
   protected readonly section = signal<SettingsSection>('appearance');
   protected readonly sections: readonly { id: SettingsSection; label: string }[] = [
-    { id: 'appearance', label: 'Apariencia' },
-    { id: 'editor', label: 'Editor' },
-    { id: 'privacy', label: 'Privacidad' },
-    { id: 'about', label: 'Acerca de' },
+    { id: 'appearance', label: 'settings.section.appearance' },
+    { id: 'editor', label: 'settings.section.editor' },
+    { id: 'privacy', label: 'settings.section.privacy' },
+    { id: 'about', label: 'settings.section.about' },
   ];
   private readonly body = viewChild<ElementRef<HTMLElement>>('body');
 
@@ -223,12 +232,12 @@ export class SettingsDialog {
       this.diagnosticsMessage.set(
         resultado.saved
           ? resultado.path
-            ? `Guardado en ${resultado.path}`
-            : 'Guardado en tus descargas.'
+            ? this._i18n.t('settings.diagnostics.savedAt', { path: resultado.path })
+            : this._i18n.t('settings.diagnostics.savedDownloads')
           : null,
       );
     } catch {
-      this.diagnosticsMessage.set('No se pudo preparar el diagnóstico.');
+      this.diagnosticsMessage.set(this._i18n.t('settings.diagnostics.failed'));
     } finally {
       this.savingDiagnostics.set(false);
     }
@@ -319,7 +328,9 @@ export class SettingsDialog {
     try {
       await this._themes.chooseBackground();
     } catch (error) {
-      this.problem.set(error instanceof Error ? error.message : 'No se pudo usar la imagen.');
+      this.problem.set(
+        error instanceof Error ? error.message : this._i18n.t('settings.background.unusable'),
+      );
     }
   }
 
@@ -426,19 +437,64 @@ export class SettingsDialog {
       return '';
     }
 
-    if (background.fit === 'tile') {
-      return `Repetida al ${background.scale} %, desde ${corner(background.x, background.y)}`;
-    }
+    const position = this._i18n.t(
+      'settings.background.position',
+      corner(background.x, background.y),
+    );
 
-    const size =
-      background.fit === 'scale'
-        ? `Al ${background.scale} %`
-        : background.fit === 'contain'
-          ? 'Entera'
-          : 'Llenando el editor';
-
-    return `${size}, ${corner(background.x, background.y)}`;
+    return this._i18n.t('settings.background.framing', {
+      fit: background.fit,
+      scale: background.scale,
+      position,
+    });
   });
+
+  /**
+   * La variante, por su identificador y no por la etiqueta que manda la
+   * aplicación de escritorio: esa llega en español.
+   *
+   * i18n-keys: settings.about.variant.*
+   */
+  protected readonly variantLabel = computed(() => {
+    const info = this.updates.info();
+    const key = `settings.about.variant.${info?.variant ?? ''}`;
+
+    return this._i18n.has(key) ? this._i18n.t(key) : (info?.variantLabel ?? '');
+  });
+
+  /** En el navegador no hay versión instalada: se dice que es la de desarrollo. */
+  protected readonly appVersion = computed(() => {
+    const info = this.updates.info();
+
+    return info?.variant === 'web'
+      ? this._i18n.t('settings.about.devVersion')
+      : (info?.version ?? '');
+  });
+
+  /**
+   * Por qué no hay actualizaciones. En el navegador lo dice la interfaz; en la
+   * aplicación de escritorio lo manda Rust, todavía en español (fase 2).
+   */
+  protected readonly disabledReason = computed(() => {
+    const info = this.updates.info();
+
+    return info?.variant === 'web'
+      ? this._i18n.t('settings.about.webUpdates')
+      : (info?.updatesDisabledReason ?? '');
+  });
+
+  /** Los dos párrafos de la licencia, con sus nombres de archivo dentro. */
+  protected readonly licenseGrant = computed(() =>
+    this._i18n.tParts('settings.license.grant', { copyright: 'api/COPYRIGHT-Druse.txt' }),
+  );
+
+  protected readonly licenseWarranty = computed(() =>
+    this._i18n.tParts('settings.license.warranty', {
+      license: 'api/LICENSE-Druse.txt',
+      url: 'https://www.gnu.org/licenses/gpl-3.0.html',
+      notices: 'api/THIRD_PARTY_NOTICES-Druse.md',
+    }),
+  );
 
   /** Si hay algo que restablecer; sin esto el botón mentiría estando siempre activo. */
   protected readonly customized = computed(() => {

@@ -10,13 +10,20 @@
 <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="settings-title">
   <header class="head">
     <div>
-      <h2 class="title" id="settings-title">Preferencias</h2>
-      <p class="subtitle">Los cambios se guardan automáticamente.</p>
+      <h2 class="title" id="settings-title">{{ 'settings.title' | t }}</h2>
+      <p class="subtitle">{{ 'settings.subtitle' | t }}</p>
     </div>
-    <button type="button" class="close" (click)="closed.emit()" aria-label="Cerrar">×</button>
+    <button
+      type="button"
+      class="close"
+      (click)="closed.emit()"
+      [attr.aria-label]="'common.close' | t"
+    >
+      ×
+    </button>
   </header>
 
-  <nav class="categories" role="tablist" aria-label="Secciones de preferencias">
+  <nav class="categories" role="tablist" [attr.aria-label]="'settings.sections' | t">
     @for (item of sections; track item.id) {
       <button
         type="button"
@@ -29,7 +36,7 @@
         (click)="selectSection(item.id)"
         (keydown)="onSectionKeydown($event, $index)"
       >
-        {{ item.label }}
+        {{ item.label | t }}
       </button>
     }
   </nav>
@@ -66,7 +73,7 @@
             >
               {{ option.name }}
               @if (!option.complete) {
-                <span class="choice__badge">beta</span>
+                <span class="choice__badge">{{ 'settings.language.beta' | t }}</span>
               }
             </button>
           }
@@ -79,8 +86,8 @@
       </section>
 
       <section class="section">
-        <h3 class="section__title">Tema</h3>
-        <div class="choice" role="group" aria-label="Tema">
+        <h3 class="section__title">{{ 'settings.theme.title' | t }}</h3>
+        <div class="choice" role="group" [attr.aria-label]="'settings.theme.title' | t">
           <button
             type="button"
             class="choice__item"
@@ -89,7 +96,7 @@
             (click)="setTheme('light')"
           >
             <app-icon name="sun" [size]="13" />
-            Claro
+            {{ 'settings.theme.light' | t }}
           </button>
           <button
             type="button"
@@ -99,20 +106,17 @@
             (click)="setTheme('dark')"
           >
             <app-icon name="moon" [size]="13" />
-            Oscuro
+            {{ 'settings.theme.dark' | t }}
           </button>
         </div>
       </section>
 
       <section class="section">
-        <h3 class="section__title">Tamaño</h3>
-        <p class="section__hint">
-          La interfaz se agranda entera —texto, barras e iconos a la vez—, así que nada se sale de
-          su sitio. El editor lleva su propio cuerpo de letra.
-        </p>
+        <h3 class="section__title">{{ 'settings.scale.title' | t }}</h3>
+        <p class="section__hint">{{ 'settings.scale.hint' | t }}</p>
 
         <label class="field">
-          <span class="field__label">Interfaz</span>
+          <span class="field__label">{{ 'settings.scale.label' | t }}</span>
           <input
             type="range"
             [min]="minScale"
@@ -126,11 +130,8 @@
       </section>
 
       <section class="section">
-        <h3 class="section__title">Color de acento</h3>
-        <p class="section__hint">
-          Botones, selección, foco y el cursor del editor. El texto que va encima se elige solo
-          según el contraste.
-        </p>
+        <h3 class="section__title">{{ 'settings.accent.title' | t }}</h3>
+        <p class="section__hint">{{ 'settings.accent.hint' | t }}</p>
 
         <div class="swatches">
           @for (accent of accents; track accent.value) {
@@ -139,34 +140,33 @@
               class="swatch"
               [class.is-active]="appearance().accent === accent.value"
               [style.--swatch]="accent.value"
-              [title]="accent.name"
-              [attr.aria-label]="'Acento ' + accent.name"
+              [title]="accent.name | t"
+              [attr.aria-label]="'settings.accent.swatch' | t: { name: accent.name | t }"
               [attr.aria-pressed]="appearance().accent === accent.value"
               (click)="setAccent(accent.value)"
             ></button>
           }
 
-          <label class="swatch swatch--custom" title="Elegir otro color">
+          <label class="swatch swatch--custom" [title]="'settings.accent.custom' | t">
             <input
               type="color"
               [value]="accentValue()"
-              aria-label="Color de acento personalizado"
+              [attr.aria-label]="'settings.accent.customLabel' | t"
               (change)="setAccent($any($event.target).value)"
             />
           </label>
 
           @if (appearance().accent) {
-            <button type="button" class="link" (click)="clearAccent()">Usar el del tema</button>
+            <button type="button" class="link" (click)="clearAccent()">
+              {{ 'settings.useTheme' | t }}
+            </button>
           }
         </div>
       </section>
 
       <section class="section">
-        <h3 class="section__title">Tono de la interfaz</h3>
-        <p class="section__hint">
-          Tiñe paneles, bordes y texto sin tocar su luminosidad, así que la interfaz sigue leyéndose
-          igual. Los colores de estado no cambian: un error sigue siendo rojo.
-        </p>
+        <h3 class="section__title">{{ 'settings.tint.title' | t }}</h3>
+        <p class="section__hint">{{ 'settings.tint.hint' | t }}</p>
 
         <div class="swatches">
           @for (tint of tints; track tint.value) {
@@ -175,24 +175,26 @@
               class="swatch"
               [class.is-active]="appearance().tint === tint.value"
               [style.--swatch]="tint.value"
-              [title]="tint.name"
-              [attr.aria-label]="'Tono ' + tint.name"
+              [title]="tint.name | t"
+              [attr.aria-label]="'settings.tint.swatch' | t: { name: tint.name | t }"
               [attr.aria-pressed]="appearance().tint === tint.value"
               (click)="setTint(tint.value)"
             ></button>
           }
 
-          <label class="swatch swatch--custom" title="Elegir otro tono">
+          <label class="swatch swatch--custom" [title]="'settings.tint.custom' | t">
             <input
               type="color"
               [value]="tintValue()"
-              aria-label="Tono personalizado"
+              [attr.aria-label]="'settings.tint.customLabel' | t"
               (change)="setTint($any($event.target).value)"
             />
           </label>
 
           @if (appearance().tint) {
-            <button type="button" class="link" (click)="clearTint()">Usar el del tema</button>
+            <button type="button" class="link" (click)="clearTint()">
+              {{ 'settings.useTheme' | t }}
+            </button>
           }
         </div>
       </section>
@@ -205,10 +207,14 @@
       [hidden]="section() !== 'editor'"
     >
       <section class="section">
-        <h3 class="section__title">Letra del editor</h3>
+        <h3 class="section__title">{{ 'settings.font.title' | t }}</h3>
         <div class="field">
-          <span class="field__label">Editor</span>
-          <div class="choice choice--wrap" role="group" aria-label="Cuerpo de letra del editor">
+          <span class="field__label">{{ 'settings.font.label' | t }}</span>
+          <div
+            class="choice choice--wrap"
+            role="group"
+            [attr.aria-label]="'settings.font.group' | t"
+          >
             @for (size of fontSizes; track size) {
               <button
                 type="button"
@@ -225,11 +231,8 @@
       </section>
 
       <section class="section">
-        <h3 class="section__title">Fondo del editor</h3>
-        <p class="section__hint">
-          Una imagen detrás del código, atenuada. La imagen se guarda con la aplicación, no en la
-          base de preferencias.
-        </p>
+        <h3 class="section__title">{{ 'settings.background.title' | t }}</h3>
+        <p class="section__hint">{{ 'settings.background.hint' | t }}</p>
 
         @if (background(); as image) {
           <!--
@@ -260,11 +263,13 @@
           <p class="file">
             <app-icon name="folder-open" [size]="13" />
             <span class="file__name">{{ image.name }}</span>
-            <button type="button" class="link" (click)="clearBackground()">Quitar</button>
+            <button type="button" class="link" (click)="clearBackground()">
+              {{ 'settings.background.remove' | t }}
+            </button>
           </p>
 
           <label class="field">
-            <span class="field__label">Intensidad</span>
+            <span class="field__label">{{ 'settings.background.intensity' | t }}</span>
             <input
               type="range"
               min="0"
@@ -276,17 +281,21 @@
             <span class="field__value">{{ image.opacity }}%</span>
           </label>
 
-          <div class="choice choice--wrap" role="group" aria-label="Encaje de la imagen">
+          <div
+            class="choice choice--wrap"
+            role="group"
+            [attr.aria-label]="'settings.background.fitGroup' | t"
+          >
             @for (fit of fits; track fit.value) {
               <button
                 type="button"
                 class="choice__item"
                 [class.is-active]="image.fit === fit.value"
                 [attr.aria-pressed]="image.fit === fit.value"
-                [title]="fit.hint"
+                [title]="fit.hint | t"
                 (click)="setFit(fit.value)"
               >
-                {{ fit.label }}
+                {{ fit.label | t }}
               </button>
             }
           </div>
@@ -297,7 +306,7 @@
         -->
           @if (image.fit === 'tile' || image.fit === 'scale') {
             <label class="field">
-              <span class="field__label">Tamaño</span>
+              <span class="field__label">{{ 'settings.background.size' | t }}</span>
               <input
                 type="range"
                 [min]="minBackgroundScale"
@@ -311,7 +320,7 @@
           }
 
           <label class="field">
-            <span class="field__label">Horizontal</span>
+            <span class="field__label">{{ 'settings.background.horizontal' | t }}</span>
             <input
               type="range"
               min="0"
@@ -324,7 +333,7 @@
           </label>
 
           <label class="field">
-            <span class="field__label">Vertical</span>
+            <span class="field__label">{{ 'settings.background.vertical' | t }}</span>
             <input
               type="range"
               min="0"
@@ -337,11 +346,11 @@
           </label>
 
           <button type="button" class="link link--inline" (click)="centerBackground()">
-            Centrar y volver al tamaño original
+            {{ 'settings.background.center' | t }}
           </button>
         } @else {
           <button type="button" class="secondary" (click)="chooseBackground()">
-            Elegir imagen…
+            {{ 'settings.background.choose' | t }}
           </button>
         }
 
@@ -367,12 +376,12 @@
       [hidden]="section() !== 'about'"
     >
       <section class="section update">
-        <h3 class="section__title">Acerca de y actualizaciones</h3>
+        <h3 class="section__title">{{ 'settings.about.title' | t }}</h3>
 
         @if (updates.info(); as info) {
           <div class="update__identity">
-            <strong>Druse {{ info.version }}</strong>
-            <span>{{ info.variantLabel }}</span>
+            <strong>{{ 'settings.about.product' | t: { version: appVersion() } }}</strong>
+            <span>{{ variantLabel() }}</span>
           </div>
 
           @if (info.updatesEnabled) {
@@ -383,47 +392,46 @@
                 (change)="toggleAutoCheck($event)"
               />
               <span>
-                Buscar actualizaciones al abrir Druse
-                <span class="checkbox__hint">
-                  Consulta en GitHub cuál es la última versión publicada. Es una petición HTTPS y no
-                  lleva SQL ni credenciales; GitHub recibe la dirección IP y las cabeceras de la
-                  petición. Sin esto, Druse no se conecta solo y puedes buscarlas a mano cuando
-                  quieras.
-                </span>
+                {{ 'settings.about.autoCheck' | t }}
+                <span class="checkbox__hint">{{ 'settings.about.autoCheckHint' | t }}</span>
               </span>
             </label>
           }
 
           @switch (updates.state()) {
             @case ('undecided') {
-              <p class="update__status">Todavía no has elegido. Druse no ha consultado nada.</p>
+              <p class="update__status">{{ 'settings.about.undecided' | t }}</p>
             }
             @case ('disabled') {
-              <p class="section__hint">{{ info.updatesDisabledReason }}</p>
+              <p class="section__hint">{{ disabledReason() }}</p>
             }
             @case ('checking') {
-              <p class="update__status">Buscando actualizaciones…</p>
+              <p class="update__status">{{ 'settings.about.checking' | t }}</p>
             }
             @case ('current') {
-              <p class="update__status update__status--success">Tienes la versión más reciente.</p>
+              <p class="update__status update__status--success">
+                {{ 'settings.about.current' | t }}
+              </p>
             }
             @case ('available') {
               @if (updates.available(); as release) {
                 <div class="update__release">
-                  <strong>Druse {{ release.version }} está disponible</strong>
+                  <strong>{{
+                    'settings.about.available' | t: { version: release.version }
+                  }}</strong>
                   @if (release.notes) {
                     <p class="update__notes">{{ release.notes }}</p>
                   }
                 </div>
                 <button type="button" class="primary update__action" (click)="updates.apply()">
-                  Descargar e instalar
+                  {{ 'settings.about.install' | t }}
                 </button>
               }
             }
             @case ('downloading') {
               <div class="update__progress">
                 <div class="update__progress-head">
-                  <span>Descargando actualización…</span>
+                  <span>{{ 'settings.about.downloading' | t }}</span>
                   @if (updates.percent(); as percent) {
                     <span>{{ percent }}%</span>
                   }
@@ -435,11 +443,13 @@
               </div>
             }
             @case ('installing') {
-              <p class="update__status">Instalando. Druse se reiniciará al terminar.</p>
+              <p class="update__status">{{ 'settings.about.installing' | t }}</p>
             }
             @case ('error') {
               <p class="problem">{{ updates.error() }}</p>
-              <button type="button" class="secondary" (click)="updates.check()">Reintentar</button>
+              <button type="button" class="secondary" (click)="updates.check()">
+                {{ 'common.retry' | t }}
+              </button>
             }
           }
 
@@ -451,17 +461,17 @@
             updates.state() !== 'installing'
           ) {
             <button type="button" class="link" (click)="updates.check()">
-              Buscar actualizaciones
+              {{ 'settings.about.check' | t }}
             </button>
           }
         } @else {
           @if (updates.state() === 'error') {
             <p class="problem">{{ updates.error() }}</p>
             <button type="button" class="secondary" (click)="updates.initialize()">
-              Reintentar
+              {{ 'common.retry' | t }}
             </button>
           } @else {
-            <p class="update__status">Leyendo la versión instalada…</p>
+            <p class="update__status">{{ 'settings.about.reading' | t }}</p>
           }
         }
         <!--
@@ -478,14 +488,13 @@
             [disabled]="savingDiagnostics()"
             (click)="saveDiagnostics()"
           >
-            {{ savingDiagnostics() ? 'Preparando…' : 'Guardar diagnóstico…' }}
+            {{
+              (savingDiagnostics() ? 'settings.diagnostics.preparing' : 'settings.diagnostics.save')
+                | t
+            }}
           </button>
 
-          <p class="section__hint">
-            Los registros de Druse y la versión, en un zip. Se filtran credenciales, pero los
-            errores pueden incluir nombres de servidores, bases o tablas. Revisa el archivo antes de
-            compartirlo.
-          </p>
+          <p class="section__hint">{{ 'settings.diagnostics.hint' | t }}</p>
 
           @if (diagnosticsMessage(); as mensaje) {
             <p class="section__hint">{{ mensaje }}</p>
@@ -499,20 +508,34 @@
         abre el navegador, y la copia que importa es la que viaja instalada.
       -->
       <section class="section license">
-        <h3 class="section__title">Licencia</h3>
+        <h3 class="section__title">{{ 'settings.license.title' | t }}</h3>
+        <!-- Una frase por párrafo, con los nombres de archivo dentro: partirla
+             impediría traducirla, porque cada idioma los coloca en otro sitio. -->
         <p class="license__text">
-          © 2026 Darío Ramos. Druse es software libre: puedes redistribuirlo y modificarlo según la
-          GNU General Public License, exclusivamente versión 3 (GPL-3.0-only), con un permiso
-          adicional para combinarlo con los controladores de Oracle, IBM y Microsoft que no son
-          libres, descrito en <code>api/COPYRIGHT-Druse.txt</code>.
+          @for (part of licenseGrant(); track $index) {
+            @if (part.tag) {
+              <code>{{ part.text }}</code>
+            } @else {
+              <!-- En su propio elemento: suelto, el texto arrastra los saltos de
+                   línea de alrededor y aparece un espacio antes del punto. -->
+              <span>{{ part.text }}</span>
+            }
+          }
         </p>
         <p class="section__hint">
-          Se distribuye sin ninguna garantía, ni siquiera la implícita de comerciabilidad o de
-          idoneidad para un fin concreto. El texto completo está en
-          <code>api/LICENSE-Druse.txt</code>, dentro de la carpeta de Druse, y en
-          <span class="license__url">https://www.gnu.org/licenses/gpl-3.0.html</span>. Los
-          componentes de terceros conservan sus propias licencias; se detallan en
-          <code>api/THIRD_PARTY_NOTICES-Druse.md</code>.
+          @for (part of licenseWarranty(); track $index) {
+            @switch (part.tag) {
+              @case ('url') {
+                <span class="license__url">{{ part.text }}</span>
+              }
+              @case (null) {
+                <span>{{ part.text }}</span>
+              }
+              @default {
+                <code>{{ part.text }}</code>
+              }
+            }
+          }
         </p>
       </section>
     </div>
@@ -520,8 +543,8 @@
 
   <footer class="foot">
     <button type="button" class="link" [disabled]="!customized()" (click)="reset()">
-      Restablecer la apariencia
+      {{ 'settings.resetAppearance' | t }}
     </button>
-    <button type="button" class="primary" (click)="closed.emit()">Listo</button>
+    <button type="button" class="primary" (click)="closed.emit()">{{ 'common.done' | t }}</button>
   </footer>
 </div>
