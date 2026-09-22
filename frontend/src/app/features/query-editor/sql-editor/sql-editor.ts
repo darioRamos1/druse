@@ -223,6 +223,12 @@ export default class SqlEditor implements OnInit {
   readonly openPalette = output<void>();
 
   /**
+   * Volver al compositor con la consulta donde está el cursor, o con la
+   * selección. Solo sabe reabrir lo que salió de allí; eso lo decide el shell.
+   */
+  readonly openInBuilder = output<string>();
+
+  /**
    * La hoja de atajos.
    *
    * Hace falta pedirla desde aquí porque **Monaco se queda F1** para su propia
@@ -882,6 +888,16 @@ export default class SqlEditor implements OnInit {
     editor: MonacoApi.editor.IStandaloneCodeEditor,
   ): void {
     const run = (action: () => void) => () => this._zone.run(action);
+
+    // En el menú contextual y no con atajo: se usa de vez en cuando, y los
+    // atajos libres se reservan para lo que se hace a cada rato.
+    editor.addAction({
+      id: 'druse.open-in-builder',
+      label: 'Abrir en el compositor',
+      contextMenuGroupId: '1_druse',
+      contextMenuOrder: 1,
+      run: run(() => this.openInBuilder.emit(this.activeFragment().text)),
+    });
 
     // Ejecutar: Ctrl/Cmd + Enter.
     editor.addCommand(

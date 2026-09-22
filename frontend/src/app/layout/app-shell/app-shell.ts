@@ -24,6 +24,7 @@ import { UpdateService } from '../../core/update/update.service';
 import { SettingsDialog } from '../../features/settings/settings-dialog/settings-dialog';
 import { ActivityDialog } from '../../features/activity/activity-dialog/activity-dialog';
 import { FormatSettings } from '../../core/workspace/format-settings';
+import { ComposedQueries } from '../../core/workspace/composed-queries';
 import { WorkspaceStore } from '../../core/workspace/workspace-store';
 import { SqlFileService } from '../../core/sql-files/sql-file.service';
 import { ConnectionDialog } from '../../features/connections/connection-dialog/connection-dialog';
@@ -774,13 +775,49 @@ export class AppShell {
   /** Tabla sobre la que se está componiendo una consulta. */
   protected readonly builderTarget = signal<ExplorerNode | null>(null);
 
-  protected openBuilder(node: ExplorerNode): void {
+  /** El formulario con el que se abre, cuando se reabre algo ya compuesto. */
+  protected readonly builderState = signal<unknown>(null);
+
+  private readonly _composed = inject(ComposedQueries);
+
+  protected openBuilder(node: ExplorerNode, state: unknown = null): void {
     this.prepareOverlay();
+    this.builderState.set(state);
     this.builderTarget.set(node);
+  }
+
+  /** Recuerda lo que el compositor mandó al editor, para poder reabrirlo. */
+  protected rememberComposed(event: { readonly sql: string; readonly state: unknown }): void {
+    const target = this.builderTarget();
+
+    if (target) {
+      this._composed.remember({ sql: event.sql, state: event.state, node: target });
+    }
+  }
+
+  /**
+   * Reabre en el compositor la consulta del editor, si salió de allí.
+   *
+   * Si no se reconoce se dice por qué, en vez de abrir un formulario vacío que
+   * haría pensar que se perdió lo compuesto.
+   */
+  protected openComposedAt(sql: string): void {
+    const found = this._composed.find(sql);
+
+    if (!found) {
+      this._store.notify(
+        'Esta consulta no se puede abrir en el compositor: solo se reabren las que salieron ' +
+          'de él y no se han retocado a mano.',
+      );
+      return;
+    }
+
+    this.openBuilder(found.node, found.state);
   }
 
   protected closeBuilder(): void {
     this.builderTarget.set(null);
+    this.builderState.set(null);
   }
 
   /**

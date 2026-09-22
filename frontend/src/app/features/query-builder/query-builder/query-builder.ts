@@ -237,8 +237,23 @@ export class QueryBuilder implements OnInit {
   readonly engine = input.required<DatabaseEngine>();
   readonly connectionId = input.required<string>();
 
+  /**
+   * Un formulario con el que arrancar, en vez del vacío.
+   *
+   * Es lo que permite reabrir desde el editor una consulta que salió de aquí.
+   * Se aplica en cuanto están las columnas, que es cuando el formulario puede
+   * enseñarlo.
+   */
+  readonly initialState = input<unknown>(null);
+
   readonly closed = output<void>();
   readonly insert = output<string>();
+
+  /**
+   * El SELECT que se manda al editor junto con su formulario, para que quien
+   * lo recuerde pueda volver a abrirlo aquí.
+   */
+  readonly composed = output<{ readonly sql: string; readonly state: unknown }>();
 
   protected readonly operators = OPERATORS;
   protected readonly havingOperators = HAVING_OPERATORS;
@@ -418,6 +433,12 @@ export class QueryBuilder implements OnInit {
       }
     } finally {
       this.loading.set(false);
+    }
+
+    const initial = this.initialState();
+
+    if (initial) {
+      await this.applyState(initial as CompositionState);
     }
   }
 
@@ -1505,13 +1526,16 @@ export class QueryBuilder implements OnInit {
   }
 
   protected async loadComposition(saved: SavedComposition): Promise<void> {
-    const state = saved.state;
-
-    if (!state) {
+    if (!saved.state) {
       this.sqlOverride.set(saved.sql);
       return;
     }
 
+    await this.applyState(saved.state);
+  }
+
+  /** Pone el formulario como estaba en `state`. */
+  private async applyState(state: CompositionState): Promise<void> {
     this.invalidateAffected();
     this.operation.set('select');
     this.chosen.set(state.chosen);
@@ -1616,6 +1640,12 @@ export class QueryBuilder implements OnInit {
   }
 
   protected insertSql(): void {
+    // Solo el SELECT se puede reabrir: los de escritura van con sus valores
+    // escritos y se ejecutan una vez.
+    if (this.operation() === 'select') {
+      this.composed.emit({ sql: this.sql(), state: this.compositionState() });
+    }
+
     this.insert.emit(this.sql());
     this.closed.emit();
   }

@@ -921,6 +921,65 @@ describe('QueryBuilder', () => {
     expect(builder.pathNotice()).toContain('No hay un camino');
   });
 
+  describe('reabrir desde el editor', () => {
+    it('al insertar un SELECT manda también su formulario', async () => {
+      const fixture = await create(table);
+      const builder = fixture.componentInstance as any;
+      const emitted: { sql: string; state: any }[] = [];
+      fixture.componentInstance.composed.subscribe((event) => emitted.push(event as never));
+
+      builder.limit.set(7);
+      builder.insertSql();
+
+      expect(emitted).toHaveLength(1);
+      expect(emitted[0].sql).toContain('TOP 7');
+      expect(emitted[0].state.limit).toBe(7);
+    });
+
+    it('un UPDATE no se recuerda: se escribe con sus valores y se ejecuta una vez', async () => {
+      const fixture = await create(table);
+      const builder = fixture.componentInstance as any;
+      let emitted = 0;
+      fixture.componentInstance.composed.subscribe(() => emitted++);
+
+      builder.setOperation('update');
+      builder.insertSql();
+
+      expect(emitted).toBe(0);
+    });
+
+    it('arranca con el formulario recibido en vez del vacío', async () => {
+      const fixture = TestBed.createComponent(QueryBuilder);
+      fixture.componentRef.setInput('table', table);
+      fixture.componentRef.setInput('engine', 'sqlserver');
+      fixture.componentRef.setInput('connectionId', 'connection-1');
+      fixture.componentRef.setInput('initialState', {
+        chosen: ['id'],
+        joins: [],
+        filters: [{ column: 'total', operator: '>', value: '100' }],
+        grouped: false,
+        groupByKeys: [],
+        groupPeriods: {},
+        aggregates: [],
+        having: [],
+        orders: [{ id: 1, target: '', descending: false }],
+        limit: 5,
+        distinct: true,
+        sqlOverride: null,
+      });
+      fixture.detectChanges();
+      await fixture.whenStable();
+      // Las columnas y la estructura llegan una detrás de otra, y el formulario
+      // se aplica después de las dos.
+      await new Promise((resolve) => setTimeout(resolve));
+      fixture.detectChanges();
+
+      const sql = (fixture.nativeElement.querySelector('.sql') as HTMLTextAreaElement).value;
+      expect(sql).toContain('SELECT DISTINCT TOP 5 [id]');
+      expect(sql).toContain('WHERE [total] > 100');
+    });
+  });
+
   it('presenta cada JOIN como una relación legible entre dos tablas', async () => {
     const fixture = await create(table);
     const element = fixture.nativeElement as HTMLElement;

@@ -140,6 +140,7 @@
         (openFile)="openSqlFile()"
         (newTab)="createTab()"
         (openPalette)="paletteOpen.set(true)"
+        (openInBuilder)="openComposedAt($event)"
         (showShortcuts)="shortcutsOpen.set(true)"
         (formatFailed)="onFormatFailed($event)"
       />
@@ -402,7 +403,9 @@
       [table]="destino.source"
       [engine]="engineFor(destino.connectionId)"
       [connectionId]="destino.connectionId"
+      [initialState]="builderState()"
       (insert)="insertComposed($event)"
+      (composed)="rememberComposed($event)"
       (closed)="closeBuilder()"
     />
   }
