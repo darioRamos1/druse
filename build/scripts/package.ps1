@@ -130,6 +130,9 @@ if ($RequireUpdaterSignature -and -not $updaterSigning) {
 if (-not $Runtime) {
     $Runtime = if ($IsWindows) { 'win-x64' } elseif ($IsMacOS) { 'osx-arm64' } else { 'linux-x64' }
 }
+if ($Community -and $Runtime -ne 'win-x64') {
+    throw 'La evidencia de terceros de Comunidad cubre únicamente win-x64.'
+}
 
 Write-Host "Empaquetando Druse para $Runtime" -ForegroundColor Cyan
 
@@ -282,6 +285,8 @@ Copy-DruseFrontendNotices -RepoRoot $repoRoot -ApiOutput $apiOutput
 if ($Community) {
     . (Join-Path $PSScriptRoot 'avisos-nuget-comunidad.ps1')
     Copy-DruseCommunityNugetNotices -RepoRoot $repoRoot -ApiOutput $apiOutput
+    node (Join-Path $PSScriptRoot 'avisos-rust-comunidad.cjs') $apiOutput
+    if ($LASTEXITCODE -ne 0) { throw 'No se pudieron incorporar los avisos Rust/nativos de Comunidad.' }
 }
 # Incluye los avisos recién generados y los bytes de la API después de firmarla.
 $inventory = @(Get-DrusePackageInventory -Path $apiOutput -Prefix 'api')
@@ -377,6 +382,10 @@ try {
     cargo @tauriArgs
 
     if ($LASTEXITCODE -ne 0) { throw 'Falló la construcción del instalador.' }
+    if ($Community) {
+        node (Join-Path $PSScriptRoot 'avisos-rust-comunidad.cjs') --verify-native
+        if ($LASTEXITCODE -ne 0) { throw 'El instalador utiliza herramientas nativas distintas del expediente.' }
+    }
 }
 finally {
     Pop-Location

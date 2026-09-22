@@ -19,31 +19,16 @@ jobs:
       GH_TOKEN: ${{ github.token }}
 
     steps:
-      - name: Exigir una ejecución de CI en verde para este commit
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Exigir CI general y Comunidad para el commit exacto
+        shell: pwsh
         run: |
-          sha='${{ github.sha }}'
-          echo "Commit a publicar: $sha"
-
-          consulta="repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs?head_sha=$sha&status=completed&per_page=100"
-
-          ejecuciones=$(gh api "$consulta" --jq '.workflow_runs | length')
-
-          if [ "$ejecuciones" -eq 0 ]; then
-            echo "::error::La integración continua no ha terminado nunca sobre $sha. Lanza CI sobre este commit y espera a que acabe."
-            exit 1
-          fi
-
-          # Se mira la más reciente y no «alguna en verde»: si el commit se
-          # reintentó y la última quedó en rojo, publicarlo sería publicar algo
-          # que se sabe roto.
-          conclusion=$(gh api "$consulta" --jq '.workflow_runs | sort_by(.run_started_at) | last | .conclusion')
-
-          echo "Última ejecución de CI sobre este commit: $conclusion"
-
-          if [ "$conclusion" != "success" ]; then
-            echo "::error::La última ejecución de CI sobre $sha terminó en '$conclusion'. No se publica."
-            exit 1
-          fi
+          . ./build/scripts/verificacion-release.ps1
+          foreach ($workflow in @('ci.yml', 'comunidad.yml')) {
+            $result = Get-DruseEstadoCI -Repository $env:GITHUB_REPOSITORY -Commit $env:GITHUB_SHA -Workflow $workflow
+            if (-not $result.verde) { throw $result.detalle }
+            Write-Host $result.detalle
+          }
 
   windows:
     name: Instaladores y actualización
@@ -91,7 +76,7 @@ jobs:
         run: npm ci
 
       - name: Instalar CLI de Tauri
-        run: cargo install tauri-cli --version "^2" --locked
+        run: cargo install tauri-cli --version 2.11.4 --locked
 
       - name: Construir y publicar
         shell: pwsh

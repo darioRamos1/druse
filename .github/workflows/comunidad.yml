@@ -13,6 +13,8 @@ on:
       - 'COPYRIGHT'
       - 'THIRD_PARTY_NOTICES.md'
       - 'docs/terceros/comunidad/**'
+      - 'docs/terceros/comunidad-rust/**'
+      - 'docs/terceros/comunidad-nativos/**'
       - '.gitattributes'
 
 permissions:
@@ -51,6 +53,9 @@ jobs:
           ./build/tests/avisos-frontend.ps1
           ./build/tests/evidencia-licencias-comunidad.ps1
           ./build/tests/avisos-nuget-comunidad.ps1
+          node --test ./build/tests/avisos-rust-comunidad.cjs
+          ./build/tests/release-verificacion.ps1
+          ./build/tests/ci-release.ps1
       - name: Preparar API y frontend de Comunidad
         shell: pwsh
         run: ./build/scripts/package.ps1 -Community -SkipInstaller

@@ -8,6 +8,8 @@ El empaquetado conserva la extracción de licencias de Angular y los avisos orig
 
 Comunidad incluye además los textos de sus versiones NuGet/runtime en `api/licenses/nuget-comunidad/`, con un índice de versiones, procedencia y hashes. El [expediente de textos originales](docs/terceros/comunidad/README.md) conserva los documentos y los límites de esta recopilación. Incluirlos no supone aprobación de redistribución ni de SignPath.
 
+Los avisos de [Rust](docs/terceros/comunidad-rust/README.md) y del [SDK WebView2/NSIS](docs/terceros/comunidad-nativos/README.md) viajan en `api/licenses/comunidad-rust/` y `api/licenses/comunidad-nativos/`. Sus índices identifican versiones, fuentes y hashes. La recopilación no cierra obligaciones sobre código generado o fuente correspondiente, ni sustituye los términos del WebView2 Evergreen Runtime.
+
 ## Controladores de bases de datos no libres
 
 Cuatro controladores que usa Druse no son software libre:

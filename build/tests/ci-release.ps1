@@ -3,10 +3,10 @@ $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot '../scripts/verificacion-release.ps1')
 $commit = 'a' * 40
 $repository = 'test/druse'
-$api = @{ response = '[]'; exitCode = 0; calls = 0 }
+$api = @{ response = '[]'; exitCode = 0; calls = 0; workflow = 'ci.yml' }
 $previousGh = Get-Item Function:gh -ErrorAction SilentlyContinue
 ${function:gh} = {
-    if ($args[0] -ne 'api' -or $args[1] -ne "repos/$repository/actions/workflows/ci.yml/runs?head_sha=$commit&per_page=100" -or
+    if ($args[0] -ne 'api' -or $args[1] -ne "repos/$repository/actions/workflows/$($api.workflow)/runs?head_sha=$commit&per_page=100" -or
         $args -notcontains '--paginate' -or $args -notcontains '--slurp' -or $args -contains '--jq') {
         throw 'La consulta no identifica el workflow y commit exactos con todas sus ejecuciones.'
     }
@@ -17,7 +17,7 @@ ${function:gh} = {
 
 function Run([int]$Id, [string]$Status = 'completed', [string]$Conclusion = 'success') {
     return [ordered]@{
-        id = $Id; path = '.github/workflows/ci.yml'; head_sha = $commit
+        id = $Id; path = ".github/workflows/$($api.workflow)"; head_sha = $commit
         status = $Status; conclusion = $Conclusion; run_attempt = 1
         created_at = "2026-09-13T10:00:$($Id.ToString('00'))Z"
         run_started_at = "2026-09-13T10:00:$($Id.ToString('00'))Z"
@@ -26,7 +26,7 @@ function Run([int]$Id, [string]$Status = 'completed', [string]$Conclusion = 'suc
 }
 function Check([string]$Case, [object[]]$Runs, [bool]$Expected) {
     $api.response = ConvertTo-Json -InputObject @(@{ workflow_runs = @($Runs) }) -Depth 5 -Compress
-    $result = Get-DruseEstadoCI -Repository $repository -Commit $commit
+    $result = Get-DruseEstadoCI -Repository $repository -Commit $commit -Workflow $api.workflow
     if ($result.verde -ne $Expected) { throw "Resultado incorrecto para ${Case}: $($result.detalle)" }
     return $result
 }
@@ -60,6 +60,11 @@ try {
     }
     $api.exitCode = 1; $api.response = '[]'
     if ((Get-DruseEstadoCI -Repository $repository -Commit $commit).verde) { throw 'Error de API aceptado.' }
+    $api.exitCode = 0; $api.workflow = 'comunidad.yml'
+    Check 'Comunidad correcto' @((Run 1)) $true | Out-Null
+    Check 'Comunidad en cola invalida verde' @((Run 1), (Run 2 'queued' '')) $false | Out-Null
+    $general = Run 1; $general.path = '.github/workflows/ci.yml'
+    Check 'CI general no sustituye Comunidad' @($general) $false | Out-Null
     "OK: $($api.calls) escenarios de CI; sin llamadas a GitHub."
 }
 finally {
