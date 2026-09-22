@@ -1,3 +1,6 @@
-[
-  "frontend/src/app/shared/privacy/privacy-notice.html"
-]
+{
+  "pendientes": [],
+  "fueraDelCatalogo": {
+    "frontend/src/app/shared/privacy/privacy-notice.html": "Fase 4: se traduce como una página por idioma —privacy-notice.{es,en,…}.html— y no por catálogo, porque manda la versión en español."
+  }
+}

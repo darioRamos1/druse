@@ -90,14 +90,21 @@ for (const locale of ['en', 'pt-BR', 'fr']) {
 // --- Texto visible sin pasar por el catálogo ---------------------------------
 //
 // Nodos de texto y atributos que se leen (`aria-label`, `title`,
-// `placeholder`, `alt`) escritos a mano en las plantillas. Las que aún no se
-// han migrado están en `build/i18n-pendientes.json`, que se va vaciando
-// feature a feature: la fase 1 se cierra con la lista vacía.
+// `placeholder`, `alt`) escritos a mano en las plantillas.
+//
+// `build/i18n-pendientes.json` lleva dos listas. `pendientes` son las que
+// faltan por migrar y se fue vaciando feature a feature: la fase 1 se cierra
+// con esa lista vacía. `fueraDelCatalogo` son las que **no** van al catálogo,
+// con el motivo escrito al lado: el aviso de privacidad se traduce como una
+// página por idioma porque manda la versión en español.
 //
 // Es una heurística, no un analizador de Angular: se quitan comentarios,
 // interpolaciones y bloques de control, y lo que quede con letras es texto.
 const pendingPath = join(root, 'build', 'i18n-pendientes.json');
-const pending = new Set(JSON.parse(read(pendingPath)));
+const pendingFile = JSON.parse(read(pendingPath));
+const pending = new Set(pendingFile.pendientes);
+const excluded = new Map(Object.entries(pendingFile.fueraDelCatalogo));
+const allowed = new Set([...pending, ...excluded.keys()]);
 
 function literalsIn(html) {
   const clean = html
@@ -155,7 +162,7 @@ for (const file of sourceFiles(frontend)) {
   // español. En las plantillas ya migradas no puede quedar ninguna.
   const relativePath = relative(root, file).replaceAll('\\', '/');
 
-  if (html && /\|\s*(?:date|number|percent|currency)\b/.test(html) && !pending.has(relativePath)) {
+  if (html && /\|\s*(?:date|number|percent|currency)\b/.test(html) && !allowed.has(relativePath)) {
     fixedLocale.push(`${relativePath} (pipe de formato de Angular)`);
   }
 
@@ -168,7 +175,7 @@ for (const file of sourceFiles(frontend)) {
   }
 }
 
-const unexpected = [...withLiterals].filter(([file]) => !pending.has(file));
+const unexpected = [...withLiterals].filter(([file]) => !allowed.has(file));
 const alreadyClean = [...pending].filter((file) => !withLiterals.has(file));
 const pendingLiterals = [...withLiterals]
   .filter(([file]) => pending.has(file))
@@ -177,6 +184,10 @@ const pendingLiterals = [...withLiterals]
 console.log(
   `\nPlantillas pendientes de migrar: ${pending.size}, con ${pendingLiterals} textos a mano.`,
 );
+
+for (const [file, why] of excluded) {
+  console.log(`  Fuera del catálogo: ${file} — ${why}`);
+}
 
 let failed = false;
 
