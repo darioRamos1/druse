@@ -27,6 +27,7 @@ function Remove-TestDirectory([string]$Target) {
 
 $completo = Join-Path $releaseDir "Druse-$version-windows-x86_64-completo-setup.exe"
 $ligero = Join-Path $releaseDir "Druse-$version-windows-x86_64-sin-informix-setup.exe"
+$comunidad = Join-Path $releaseDir "Druse-$version-windows-x86_64-comunidad-setup.exe"
 $selector = Join-Path $releaseDir "Druse-$version-installer.exe"
 $latest = Join-Path $releaseDir 'latest.json'
 
@@ -38,7 +39,7 @@ $latest = Join-Path $releaseDir 'latest.json'
     Cada prueba parte de una release que sí se publicaría y rompe una sola cosa.
     Así, cuando una falla, se sabe cuál es esa cosa.
 #>
-function Nueva-Release {
+function Nueva-Release([switch]$Community) {
     Remove-TestDirectory $releaseDir
 
     New-Item -ItemType Directory -Force $releaseDir | Out-Null
@@ -47,9 +48,16 @@ function Nueva-Release {
     Set-Content -LiteralPath $completo -Value 'MZ instalador completo de mentira' -Encoding ASCII
     Set-Content -LiteralPath $ligero -Value 'MZ instalador ligero de mentira' -Encoding ASCII
     Set-Content -LiteralPath $selector -Value 'MZ selector de mentira' -Encoding ASCII
+    $installers = @($completo, $ligero)
+    $pairs = @(@('completo', $completo), @('sin-informix', $ligero))
+    if ($Community) {
+        Set-Content -LiteralPath $comunidad -Value 'MZ Comunidad de mentira' -Encoding ASCII
+        $installers += $comunidad
+        $pairs += ,@('comunidad', $comunidad)
+    }
 
     # Firma con una clave de usar y tirar: la del actualizador no está aquí.
-    $clave = node (Join-Path $PSScriptRoot 'firma-de-prueba.cjs') $releaseDir $completo $ligero
+    $clave = node (Join-Path $PSScriptRoot 'firma-de-prueba.cjs') $releaseDir @installers
 
     if ($LASTEXITCODE -ne 0) { throw 'No se pudieron generar las firmas de prueba.' }
 
@@ -69,9 +77,15 @@ function Nueva-Release {
         }
     }
 
+    if ($Community) {
+        $manifiesto.platforms['windows-x86_64-comunidad'] = @{
+            url = "https://example.invalid/$([IO.Path]::GetFileName($comunidad))"
+            signature = (Get-Content "$comunidad.sig" -Raw).Trim()
+        }
+    }
     $manifiesto | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $latest -Encoding UTF8
 
-    foreach ($par in @(@('completo', $completo), @('sin-informix', $ligero))) {
+    foreach ($par in $pairs) {
         $variante, $artefacto = $par
         $contenido = [ordered]@{
             producto  = 'Druse'
@@ -107,11 +121,11 @@ function Nueva-Release {
     Comprueba que la verificación rechaza, y por el motivo esperado.
 #>
 function Debe-Rechazar {
-    param([string]$Clave, [string]$Patron, [string]$Caso)
+    param([string]$Clave, [string]$Patron, [string]$Caso, [switch]$Community)
 
     try {
         Invoke-DruseReleaseVerificacion -SinAuthenticode `
-            -ReleaseDir $releaseDir -Version $version -PublicKey $Clave -ManifestDir $manifestDir | Out-Null
+            -ReleaseDir $releaseDir -Version $version -PublicKey $Clave -ManifestDir $manifestDir -IncludeCommunity:$Community | Out-Null
     }
     catch {
         if ($_.Exception.Message -notmatch $Patron) {
@@ -253,7 +267,29 @@ try {
     Remove-Item -LiteralPath "$ligero.sig" -Force
     Debe-Rechazar $clave 'Faltan artefactos' 'una release incompleta'
 
-    'OK: release correcta aceptada; ausencia de manifiestos, producto/versión incorrectos, artefacto tocado, firma ajena, latest.json desincronizado, ediciones cruzadas, avisos legales ausentes o viejos y release incompleta, rechazados.'
+    $clave = Nueva-Release -Community
+    $result = Invoke-DruseReleaseVerificacion -SinAuthenticode -ReleaseDir $releaseDir -Version $version -PublicKey $clave -ManifestDir $manifestDir -IncludeCommunity -ExpectedBaseUrl 'https://example.invalid'
+    if ($result.artefactos.Count -ne 4 -or $result.contenido_revisado -notcontains 'comunidad') { throw 'Falta Comunidad en la evidencia.' }
+    try {
+        Invoke-DruseReleaseVerificacion -SinAuthenticode -ReleaseDir $releaseDir -Version $version -PublicKey $clave -ManifestDir $manifestDir -IncludeCommunity -ExpectedBaseUrl 'https://otro.invalid' | Out-Null
+        throw 'Se aceptó un origen distinto.'
+    } catch { if ($_.Exception.Message -notmatch 'La dirección') { throw } }
+
+    foreach ($case in @('ausente', 'firma', 'http', 'otro instalador', 'bytes', 'inventario')) {
+        $clave = Nueva-Release -Community
+        $manifest = Get-Content $latest -Raw | ConvertFrom-Json
+        switch ($case) {
+            'ausente' { $manifest.platforms.PSObject.Properties.Remove('windows-x86_64-comunidad'); $pattern='no anuncia la plataforma' }
+            'firma' { $manifest.platforms.'windows-x86_64-comunidad'.signature = $manifest.platforms.'windows-x86_64-completo'.signature; $pattern='no es la del archivo' }
+            'http' { $manifest.platforms.'windows-x86_64-comunidad'.url = $manifest.platforms.'windows-x86_64-comunidad'.url.Replace('https:','http:'); $pattern='La dirección' }
+            'otro instalador' { $manifest.platforms.'windows-x86_64-comunidad'.url = $manifest.platforms.'windows-x86_64-completo'.url; $pattern='La dirección' }
+            'bytes' { Add-Content $comunidad 'alterado'; $pattern='no corresponde a' }
+            'inventario' { Remove-Item -LiteralPath (Join-Path $manifestDir "manifiesto-comunidad-$version-win-x64.json"); $pattern='Falta el manifiesto' }
+        }
+        $manifest | ConvertTo-Json -Depth 6 | Set-Content $latest -Encoding utf8
+        Debe-Rechazar $clave $pattern "Comunidad: $case" -Community
+    }
+    'OK: releases de dos y tres ediciones verificadas; Comunidad ausente, cruzada, alterada, sin inventario o con URL incorrecta se rechaza.'
 }
 finally {
     Remove-TestDirectory $raiz

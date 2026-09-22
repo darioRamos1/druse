@@ -1,0 +1,210 @@
+{
+  "esquema": 1,
+  "alcance": "Avisos del SDK WebView2 y herramientas NSIS fijados. No incluye ni aprueba los términos del Evergreen Runtime, código generado o admisión SignPath.",
+  "nsisArchivos": [
+    {
+      "ruta": "COPYING",
+      "sha256": "e7dd514003ab96cb3ddccbc028fe5c795fccf57dc41f21cfb9d4dd16ead23bf5"
+    },
+    {
+      "ruta": "makensis.exe",
+      "sha256": "f497e92deb9f179f7b8f7553fcb3bd04f511bb2949e5e4a2aee80a10f7b20431"
+    },
+    {
+      "ruta": "Bin/makensis.exe",
+      "sha256": "42850802704ecb11163f7e0329d35ee54bd288953200d4966e226d572848cfc5"
+    },
+    {
+      "ruta": "Plugins/x86-unicode/AdvSplash.dll",
+      "sha256": "c8605c3d043ed6ab8a0ae5f825a9dda47f0e37974ccc0a667ac28643cece0ca5"
+    },
+    {
+      "ruta": "Plugins/x86-unicode/Banner.dll",
+      "sha256": "42c9387cb1749bf8338d5a6e6e8f598a22997e4cb9472da8dccc75c44b48f59c"
+    },
+    {
+      "ruta": "Plugins/x86-unicode/BgImage.dll",
+      "sha256": "b0912ab403831cb402233089c4851f5f5fdc8740207b327899896c2a639b0e9d"
+    },
+    {
+      "ruta": "Plugins/x86-unicode/Dialer.dll",
+      "sha256": "c98057ce5874835b3b53ebdb213568363fe81261dd6d3f87fb2a8b4e3e9fa08f"
+    },
+    {
+      "ruta": "Plugins/x86-unicode/InstallOptions.dll",
+      "sha256": "44b1d70219f88564d94da9fc8a7ca4d25d103575519c84a44df3057b8af98f71"
+    },
+    {
+      "ruta": "Plugins/x86-unicode/LangDLL.dll",
+      "sha256": "4cf25411f28f639f72156c24b0f66ea42f5aee5973f6c137d901da6ae42d5b7e"
+    },
+    {
+      "ruta": "Plugins/x86-unicode/Math.dll",
+      "sha256": "a3635534e7a6a316b1d1971f6abd3ac610f883317e2691e3b90fbee215ed2a8b"
+    },
+    {
+      "ruta": "Plugins/x86-unicode/nsDialogs.dll",
+      "sha256": "b1350f487692057c8ffde75dcc55287a52a3272240d4d4912f24464b27551fc0"
+    },
+    {
+      "ruta": "Plugins/x86-unicode/nsExec.dll",
+      "sha256": "b121689861b506dbc9c3797b49bc8a90d555cb7db58cb959165cc758391c00bb"
+    },
+    {
+      "ruta": "Plugins/x86-unicode/NSISdl.dll",
+      "sha256": "ddf40229dd9d6b268902d8dea88c8a04aacf1af218dd29f6dcd35babc54ac08d"
+    },
+    {
+      "ruta": "Plugins/x86-unicode/Splash.dll",
+      "sha256": "cafe8c18223aa6de236c5d8bc1d5491a3f2f3c8a3504fa341efad875bb1c84e5"
+    },
+    {
+      "ruta": "Plugins/x86-unicode/StartMenu.dll",
+      "sha256": "fe330320459637d8dd2b5d84d07925c38ec264152ffd3b1760a4d44d76536caa"
+    },
+    {
+      "ruta": "Plugins/x86-unicode/System.dll",
+      "sha256": "8b4c47c4cf5e76ec57dd5a050d5acd832a0d532ee875d7b44f6cdaf68f90d37c"
+    },
+    {
+      "ruta": "Plugins/x86-unicode/TypeLib.dll",
+      "sha256": "560d9bbfe0ead171312e58fbb32d5ac8aabea93fc6811be1c6eefe49b21a8452"
+    },
+    {
+      "ruta": "Plugins/x86-unicode/UserInfo.dll",
+      "sha256": "e0dc3112796dbaa37f25ab54b7fac2fbf791cbc6e36a84fc61c6423b84a3677b"
+    },
+    {
+      "ruta": "Plugins/x86-unicode/VPatch.dll",
+      "sha256": "fcb976e78efe58e8e5190e7bcc0c2c425aec2526f5ae2be5a29fba94f0b7321f"
+    },
+    {
+      "ruta": "Stubs/bzip2-x86-unicode",
+      "sha256": "f858e22d841ac5805a601552aeed24b26c596174d59b593745f4fbdd090420ab"
+    },
+    {
+      "ruta": "Stubs/bzip2_solid-x86-unicode",
+      "sha256": "ec69630d3b5faa18a97dd6679c4d1af88ff00786920e36d654ea142fd410147c"
+    },
+    {
+      "ruta": "Stubs/lzma-x86-unicode",
+      "sha256": "e916a205c5421f4287411d402fe1d2cb37e3df93db00ff4cfbacec3b8ec8877e"
+    },
+    {
+      "ruta": "Stubs/lzma_solid-x86-unicode",
+      "sha256": "a0d065b62d34be5f0aaaf7c162e101a5e25d7cd3eb10a13fdb37f91b02ebfce2"
+    },
+    {
+      "ruta": "Stubs/zlib-x86-unicode",
+      "sha256": "01621a30a5676e79494394514861f645cb2c19536edab35275f8012e4246e3b6"
+    },
+    {
+      "ruta": "Stubs/zlib_solid-x86-unicode",
+      "sha256": "e6c2afdd03c7bc5f1dc24449e5c92f3859f7586f399dff01c175d52e052bc943"
+    },
+    {
+      "ruta": "Plugins/x86-unicode/additional/nsis_tauri_utils.dll",
+      "sha256": "5ba143b5db4a87d32d6e7802e033330aae56cbceabe0d1e3ba41948385ad4709"
+    }
+  ],
+  "paquetes": [
+    {
+      "version": "1.0.3650.58",
+      "documentos": [
+        {
+          "archivo": "fuentes/0af8f1b807512aae39c2ac1aa4d0cae65cabecb6fd554b8439a5162a0d6eca55.txt",
+          "sha256": "0af8f1b807512aae39c2ac1aa4d0cae65cabecb6fd554b8439a5162a0d6eca55",
+          "origen": {
+            "paqueteSha256": "911a472128c82ac8baa0c486c23342cc9dd6e7dc50d754e676726642ca065c60",
+            "ruta": "LICENSE.txt",
+            "url": "https://api.nuget.org/v3-flatcontainer/microsoft.web.webview2/1.0.3650.58/microsoft.web.webview2.1.0.3650.58.nupkg"
+          }
+        },
+        {
+          "archivo": "fuentes/106423785c5b7eba0a8e61d1837f2132e9c828e20ad530f565d981c1df60dd90.txt",
+          "sha256": "106423785c5b7eba0a8e61d1837f2132e9c828e20ad530f565d981c1df60dd90",
+          "origen": {
+            "paqueteSha256": "911a472128c82ac8baa0c486c23342cc9dd6e7dc50d754e676726642ca065c60",
+            "ruta": "NOTICE.txt",
+            "url": "https://api.nuget.org/v3-flatcontainer/microsoft.web.webview2/1.0.3650.58/microsoft.web.webview2.1.0.3650.58.nupkg"
+          }
+        }
+      ],
+      "loaderSha256": "0659b741bde6348d4c4a6ec4ceb9af50e3d0048ed9cd3c8659bccbb61fde55ee",
+      "componente": "Microsoft.Web.WebView2 SDK"
+    },
+    {
+      "version": "3.11",
+      "documentos": [
+        {
+          "archivo": "fuentes/e7dd514003ab96cb3ddccbc028fe5c795fccf57dc41f21cfb9d4dd16ead23bf5.txt",
+          "sha256": "e7dd514003ab96cb3ddccbc028fe5c795fccf57dc41f21cfb9d4dd16ead23bf5",
+          "origen": {
+            "paqueteSha256": "c7d27f780ddb6cffb4730138cd1591e841f4b7edb155856901cdf5f214394fa1",
+            "ruta": "nsis-3.11/COPYING",
+            "url": "https://github.com/tauri-apps/binary-releases/releases/download/nsis-3.11/nsis-3.11.zip"
+          }
+        },
+        {
+          "archivo": "fuentes/5ab8e53598d27d3d06eda02ac0b42d462e9ff6f81ca406273004ebf53cd9ad42.txt",
+          "sha256": "5ab8e53598d27d3d06eda02ac0b42d462e9ff6f81ca406273004ebf53cd9ad42",
+          "origen": {
+            "paqueteSha256": "c7d27f780ddb6cffb4730138cd1591e841f4b7edb155856901cdf5f214394fa1",
+            "ruta": "nsis-3.11/Docs/makensisw/License.txt",
+            "url": "https://github.com/tauri-apps/binary-releases/releases/download/nsis-3.11/nsis-3.11.zip"
+          }
+        },
+        {
+          "archivo": "fuentes/75416e94e65b7584ee76e66f7f2f0b087ad8bc1371d3da4486091923076d36b3.txt",
+          "sha256": "75416e94e65b7584ee76e66f7f2f0b087ad8bc1371d3da4486091923076d36b3",
+          "origen": {
+            "paqueteSha256": "c7d27f780ddb6cffb4730138cd1591e841f4b7edb155856901cdf5f214394fa1",
+            "ruta": "nsis-3.11/Docs/Modern UI/License.txt",
+            "url": "https://github.com/tauri-apps/binary-releases/releases/download/nsis-3.11/nsis-3.11.zip"
+          }
+        },
+        {
+          "archivo": "fuentes/d5957bd99460eb21148bd2695eeb5a3718abae6b118040a4678926da3f4cfbc0.txt",
+          "sha256": "d5957bd99460eb21148bd2695eeb5a3718abae6b118040a4678926da3f4cfbc0",
+          "origen": {
+            "paqueteSha256": "c7d27f780ddb6cffb4730138cd1591e841f4b7edb155856901cdf5f214394fa1",
+            "ruta": "nsis-3.11/Docs/Modern UI 2/License.txt",
+            "url": "https://github.com/tauri-apps/binary-releases/releases/download/nsis-3.11/nsis-3.11.zip"
+          }
+        },
+        {
+          "archivo": "fuentes/326e587f36ca58e14bd09cca153f9e69f1c5ed701189aa47d2d0627af7e16280.txt",
+          "sha256": "326e587f36ca58e14bd09cca153f9e69f1c5ed701189aa47d2d0627af7e16280",
+          "origen": {
+            "paqueteSha256": "c7d27f780ddb6cffb4730138cd1591e841f4b7edb155856901cdf5f214394fa1",
+            "ruta": "nsis-3.11/Docs/NSISdl/License.txt",
+            "url": "https://github.com/tauri-apps/binary-releases/releases/download/nsis-3.11/nsis-3.11.zip"
+          }
+        }
+      ],
+      "componente": "NSIS"
+    },
+    {
+      "version": "0.5.3",
+      "documentos": [
+        {
+          "archivo": "fuentes/0d542e0c8804e39aa7f37eb00da5a762149dc682d7829451287e11b938e94594.txt",
+          "sha256": "0d542e0c8804e39aa7f37eb00da5a762149dc682d7829451287e11b938e94594",
+          "origen": {
+            "url": "https://github.com/tauri-apps/nsis-tauri-utils/blob/13d9edd27b69310e108d6fbd49f90992f8a05390/LICENSE_APACHE-2.0",
+            "commit": "13d9edd27b69310e108d6fbd49f90992f8a05390"
+          }
+        },
+        {
+          "archivo": "fuentes/1c1020fa10a6bf318717e82c911bcc54ebdfb9bb280460ae332bcb2f82f57fbe.txt",
+          "sha256": "1c1020fa10a6bf318717e82c911bcc54ebdfb9bb280460ae332bcb2f82f57fbe",
+          "origen": {
+            "url": "https://github.com/tauri-apps/nsis-tauri-utils/blob/13d9edd27b69310e108d6fbd49f90992f8a05390/LICENSE_MIT",
+            "commit": "13d9edd27b69310e108d6fbd49f90992f8a05390"
+          }
+        }
+      ],
+      "componente": "nsis-tauri-utils"
+    }
+  ]
+}

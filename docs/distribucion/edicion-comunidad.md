@@ -19,7 +19,11 @@ npm ci --prefix frontend
 
 El instalador se identifica como **Druse Comunidad** (`io.druse.comunidad`) y los artefactos llevan `-comunidad`. Su canal de actualización es `windows-x86_64-comunidad`, sin fallback a la completa ni a la edición sin Informix. Las preferencias/conexiones de la API conservan la ubicación de Druse; no se anuncia aislamiento de perfiles entre ediciones.
 
-El workflow [comunidad.yml](../../.github/workflows/comunidad.yml) construye en un runner Windows alojado por GitHub y conserva instalador e inventario bajo un nombre que contiene el SHA del commit. No usa secretos de firma, no publica una release y no envía artefactos a SignPath. El flujo actual `release.ps1` sigue dedicado a las dos ediciones anteriores: antes de una actualización pública de Comunidad hay que incorporar su artefacto y firma de actualización al manifiesto de releases, con las mismas verificaciones.
+El workflow [comunidad.yml](../../.github/workflows/comunidad.yml) construye en un runner Windows alojado por GitHub y conserva instalador e inventario bajo un nombre que contiene el SHA del commit. No usa secretos de firma, no publica una release y no envía artefactos a SignPath.
+
+`release.ps1` prepara las tres ediciones y añade `windows-x86_64-comunidad` al mismo `latest.json` que consulta el actualizador. Exige instalador, firma, URL HTTPS de la release y manifiesto de contenido propios; las firmas y los instaladores no pueden cruzarse entre ediciones. Los tres inventarios y la evidencia se conservan junto a los artefactos. Antes de publicar exige el workflow de Comunidad y CI general satisfactorios para el commit exacto; un intento nuevo pendiente invalida un verde anterior. El selector existente sigue ofreciendo las dos ediciones anteriores; Comunidad tiene su descarga directa. No se ha publicado todavía este canal ni se ha probado una actualización en Windows limpio.
+
+Comunidad está limitada a `win-x64` en este expediente. Incluye 165 textos únicos de Rust y los avisos del SDK/loader WebView2, NSIS y su complemento Tauri. Cambios de Cargo.lock/Cargo.toml, documentos o bibliotecas nativas requieren renovar la evidencia. Los detalles y límites están en [Rust](../terceros/comunidad-rust/README.md) y [componentes nativos](../terceros/comunidad-nativos/README.md).
 
 ## Evidencia local del 21 de septiembre de 2026
 
