@@ -97,7 +97,12 @@ describe('ResultsGrid', () => {
     expect(numbers).toEqual(['1', '2', '3']);
   });
 
-  it('añade resultados grandes al DOM en bloques manejables', async () => {
+  /**
+   * Pinta 501 filas en jsdom, que no es rápido: con la suite entera corriendo
+   * en paralelo, los 5 s por omisión se agotaban en casi cada ejecución y el
+   * fallo tapaba los de verdad. El límite es de esta prueba, no de las demás.
+   */
+  it('añade resultados grandes al DOM en bloques manejables', { timeout: 30_000 }, async () => {
     const rows = Array.from({ length: 501 }, (_, index) => ({
       number: index + 1,
       values: [String(index + 1), `persona${index + 1}@example.com`, 'true'],
