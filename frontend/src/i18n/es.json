@@ -613,6 +613,7 @@
   "designer.typeSuggestions": "Tipos de dato sugeridos",
   "designer.unique": "Único",
   "designer.willRun": "Esto es lo que se va a ejecutar",
+  "desktop.devVersion": "desarrollo",
   "desktop.needsWrapper": "La función requiere el envoltorio de escritorio.",
   "desktop.updatesFromInstalled": "Las actualizaciones se administran desde la aplicación instalada.",
   "desktop.variantBrowser": "Navegador",

@@ -274,7 +274,7 @@ export class DesktopHost {
   appInfo(): Promise<DesktopAppInfo> {
     if (!this.isDesktop) {
       return Promise.resolve({
-        version: 'desarrollo',
+        version: translate('desktop.devVersion'),
         variant: 'web',
         variantLabel: translate('desktop.variantBrowser'),
         updatesEnabled: false,

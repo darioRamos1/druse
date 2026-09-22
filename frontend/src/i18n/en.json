@@ -613,6 +613,7 @@
   "designer.typeSuggestions": "Suggested data types",
   "designer.unique": "Unique",
   "designer.willRun": "This is what is going to run",
+  "desktop.devVersion": "development",
   "desktop.needsWrapper": "The feature needs the desktop wrapper.",
   "desktop.updatesFromInstalled": "Updates are managed from the installed application.",
   "desktop.variantBrowser": "Browser",
