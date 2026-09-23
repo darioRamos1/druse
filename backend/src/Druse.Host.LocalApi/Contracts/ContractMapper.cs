@@ -109,6 +109,18 @@ internal static class ContractMapper
         };
     }
 
+    /// <summary>El mensaje con su clave, o nada si ese aún no la tiene.</summary>
+    public static UserMessageDto? ToDto(this UserMessage? message) =>
+        message is null
+            ? null
+            : new UserMessageDto
+            {
+                Key = message.Key,
+                Text = message.Text,
+                Args = message.Args,
+                KeyArgs = message.KeyArgs,
+            };
+
     public static TestConnectionResponse ToResponse(this TestConnectionResult result)
     {
         ArgumentNullException.ThrowIfNull(result);
@@ -119,6 +131,7 @@ internal static class ContractMapper
             ServerVersion = result.ServerVersion,
             ErrorMessage = result.Error?.Message,
             ErrorCode = result.Error?.Code,
+            Error = result.Error?.Localized.ToDto(),
             DurationMs = (long)result.Duration.TotalMilliseconds,
         };
     }
@@ -132,6 +145,7 @@ internal static class ContractMapper
             Succeeded = result.Succeeded,
             Reach = result.Reach.ToString().ToLowerInvariant(),
             ErrorMessage = result.Error?.Message,
+            Error = result.Error?.Localized.ToDto(),
             DurationMs = (long)result.Duration.TotalMilliseconds,
         };
     }
@@ -246,6 +260,7 @@ internal static class ContractMapper
                 Code = result.Error.Code,
                 Position = result.Error.Position,
                 Line = result.Error.Line,
+                Localized = result.Error.Localized.ToDto(),
             },
         };
     }

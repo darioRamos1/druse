@@ -97,6 +97,15 @@ public sealed record QueryError
 {
     public required string Message { get; init; }
 
+    /// <summary>
+    /// La misma frase con su clave, cuando la escribe Druse y no el motor.
+    ///
+    /// Lo que dice el motor llega en el idioma en que él hable y no hay catálogo
+    /// que valga; lo que explica Druse alrededor sí se puede traducir, y esto es
+    /// lo que lo permite. Nulo mientras un mensaje aún no tenga clave.
+    /// </summary>
+    public UserMessage? Localized { get; init; }
+
     /// <summary>Código del motor, tal cual. Útil para buscar en su documentación.</summary>
     public string? Code { get; init; }
 

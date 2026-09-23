@@ -49,6 +49,7 @@ import {
   SavedConnection,
   SchemaIndex,
   SecretStoreStatus,
+  ServerMessage,
   SessionStatus,
   TableAlteration,
   TableDesign,
@@ -1690,6 +1691,35 @@ export class WorkspaceStore {
     }
   }
 
+  /**
+   * Lo que se le enseña al usuario de un fallo del proceso local.
+   *
+   * Con clave, en el idioma de la ventana; sin ella, el texto que mandó —lo que
+   * dice el motor viene en su idioma y no hay catálogo que valga—; y si no vino
+   * ninguno, lo que Druse sepa decir por su cuenta.
+   */
+  private serverText(
+    message: ServerMessage | undefined,
+    text: string | undefined,
+    fallback: string,
+  ): string {
+    if (message && this._i18n.has(message.key)) {
+      return this._i18n.t(message.key, { ...message.args, ...this.terms(message.keyArgs) });
+    }
+
+    return text ?? this._i18n.t(fallback);
+  }
+
+  /** Los parámetros que son, a su vez, claves del catálogo. */
+  private terms(keyArgs: Readonly<Record<string, string>> | undefined): Record<string, string> {
+    return Object.fromEntries(
+      Object.entries(keyArgs ?? {}).map(([name, key]) => [
+        name,
+        this._i18n.has(key) ? this._i18n.t(key) : key,
+      ]),
+    );
+  }
+
   async testConnection(form: ConnectionForm): Promise<ProbeResult> {
     try {
       const result = await firstValueFrom(this._gateway.testConnection(toRequest(form)));
@@ -1704,7 +1734,7 @@ export class WorkspaceStore {
           }
         : {
             ok: false,
-            message: result.errorMessage ?? this._i18n.t('workspace.testFailed'),
+            message: this.serverText(result.error, result.errorMessage, 'workspace.testFailed'),
           };
     } catch (error) {
       return { ok: false, message: describeError(error, this._i18n) };
@@ -1734,7 +1764,10 @@ export class WorkspaceStore {
         };
       }
 
-      return { ok: false, message: result.errorMessage ?? this._i18n.t('workspace.tunnelFailed') };
+      return {
+        ok: false,
+        message: this.serverText(result.error, result.errorMessage, 'workspace.tunnelFailed'),
+      };
     } catch (error) {
       return { ok: false, message: describeError(error, this._i18n) };
     }

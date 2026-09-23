@@ -35,5 +35,12 @@ public interface IProviderRegistry
 public sealed class UnsupportedEngineException(DatabaseEngine engine)
     : InvalidOperationException($"No hay un proveedor registrado para el motor '{engine}'.")
 {
+    /// <summary>El mismo aviso con su clave, para decirlo en el idioma de la ventana.</summary>
+    public UserMessage Localized { get; } = UserMessage.With(
+        MessageKeys.Session.UnsupportedEngine,
+        $"No hay un proveedor registrado para el motor '{engine}'.",
+        "engine",
+        engine.ToString());
+
     public DatabaseEngine Engine { get; } = engine;
 }

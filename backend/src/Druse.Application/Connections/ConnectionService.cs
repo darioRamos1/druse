@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Globalization;
 using Druse.Application.Abstractions;
 using Druse.Database.Abstractions;
 using Druse.Domain;
@@ -113,7 +114,17 @@ public sealed class ConnectionService(
                         + $"{profile.Host}:{profile.Port} antes de {TunnelProbeTimeoutSeconds} segundos. "
                         + "Suele ser el cortafuegos del servidor de la base, o que ese nombre no se "
                         + "resuelve igual desde el servidor intermedio.",
-                    stopwatch.Elapsed);
+                    stopwatch.Elapsed,
+                    new UserMessage(
+                        MessageKeys.Tunnel.ForwardTimeout,
+                        $"Se entró en {profile.SshTunnel.Host}, pero desde allí no se llegó a "
+                            + $"{profile.Host}:{profile.Port} antes de {TunnelProbeTimeoutSeconds} segundos.",
+                        new Dictionary<string, string>
+                        {
+                            ["bastion"] = profile.SshTunnel.Host,
+                            ["target"] = $"{profile.Host}:{profile.Port}",
+                            ["seconds"] = TunnelProbeTimeoutSeconds.ToString(CultureInfo.InvariantCulture),
+                        }));
             }
             catch (Exception exception) when (exception is not OperationCanceledException)
             {
@@ -126,7 +137,16 @@ public sealed class ConnectionService(
                     TunnelReach.Forward,
                     $"Se entró en {profile.SshTunnel.Host}, pero desde allí se rechazó la conexión a "
                         + $"{profile.Host}:{profile.Port}.",
-                    stopwatch.Elapsed);
+                    stopwatch.Elapsed,
+                    new UserMessage(
+                        MessageKeys.Tunnel.ForwardRefused,
+                        $"Se entró en {profile.SshTunnel.Host}, pero desde allí se rechazó la conexión a "
+                            + $"{profile.Host}:{profile.Port}.",
+                        new Dictionary<string, string>
+                        {
+                            ["bastion"] = profile.SshTunnel.Host,
+                            ["target"] = $"{profile.Host}:{profile.Port}",
+                        }));
             }
 
             stopwatch.Stop();
@@ -147,7 +167,11 @@ public sealed class ConnectionService(
         if (!validation.IsValid)
         {
             return TestConnectionResult.Failure(
-                new QueryError { Message = string.Join(" ", validation.Errors) },
+                new QueryError
+                {
+                    Message = string.Join(" ", validation.Errors),
+                    Localized = validation.Messages[0],
+                },
                 TimeSpan.Zero);
         }
 
@@ -206,9 +230,15 @@ public sealed class ConnectionService(
 
         if (Capabilities(profile) is not { CanCreateDatabase: true })
         {
-            throw new ArgumentException(
-                $"Druse no crea bases de datos de {profile.Engine}: créala en el servidor y " +
-                "vuelve a conectar.",
+            throw new InvalidProfileException(
+                [
+                    UserMessage.With(
+                        MessageKeys.Session.CannotCreateDatabase,
+                        $"Druse no crea bases de datos de {profile.Engine}: créala en el servidor y " +
+                        "vuelve a conectar.",
+                        "engine",
+                        profile.Engine.ToString()),
+                ],
                 nameof(profile));
         }
 

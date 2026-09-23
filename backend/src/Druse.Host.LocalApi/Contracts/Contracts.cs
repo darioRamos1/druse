@@ -90,6 +90,10 @@ public sealed record TestConnectionResponse
     public string? ServerVersion { get; init; }
     public string? ErrorMessage { get; init; }
     public string? ErrorCode { get; init; }
+
+    /// <summary>El motivo con su clave, cuando lo escribe Druse y no el motor.</summary>
+    public UserMessageDto? Error { get; init; }
+
     public required long DurationMs { get; init; }
 }
 
@@ -108,6 +112,10 @@ public sealed record TestTunnelResponse
     public required string Reach { get; init; }
 
     public string? ErrorMessage { get; init; }
+
+    /// <summary>El motivo con su clave, cuando lo escribe Druse y no el servidor SSH.</summary>
+    public UserMessageDto? Error { get; init; }
+
     public required long DurationMs { get; init; }
 }
 
@@ -206,12 +214,31 @@ public sealed record QueryMessageDto
     public required string Severity { get; init; }
 }
 
+/// <summary>
+/// Un mensaje con su clave, tal y como viaja.
+///
+/// `text` va siempre: es lo que ve quien llame a la API sin catálogo, y lo que
+/// se enseña mientras un mensaje aún no tenga clave. `args` son datos —números
+/// sin formatear, nombres— y `keyArgs` son parámetros que a su vez son claves,
+/// para las frases que se arman con una palabra del propio programa.
+/// </summary>
+public sealed record UserMessageDto
+{
+    public required string Key { get; init; }
+    public required string Text { get; init; }
+    public IReadOnlyDictionary<string, string>? Args { get; init; }
+    public IReadOnlyDictionary<string, string>? KeyArgs { get; init; }
+}
+
 public sealed record QueryErrorDto
 {
     public required string Message { get; init; }
     public string? Code { get; init; }
     public int? Position { get; init; }
     public int? Line { get; init; }
+
+    /// <summary>El mismo mensaje con su clave, cuando lo escribe Druse.</summary>
+    public UserMessageDto? Localized { get; init; }
 }
 
 public sealed record QueryResultResponse

@@ -50,16 +50,27 @@ public sealed record TunnelTestResult
         Error = new QueryError
         {
             Message = "Esta conexión no usa servidor intermedio: no hay túnel que probar.",
+            Localized = new UserMessage(
+                MessageKeys.Tunnel.NotConfigured,
+                "Esta conexión no usa servidor intermedio: no hay túnel que probar."),
         },
     };
 
-    public static TunnelTestResult Failure(TunnelReach reach, string message, TimeSpan duration) =>
+    /// <param name="localized">
+    /// El mismo motivo con su clave, cuando lo escribe Druse. Lo que venga del
+    /// servidor SSH llega como él lo diga y va sin clave.
+    /// </param>
+    public static TunnelTestResult Failure(
+        TunnelReach reach,
+        string message,
+        TimeSpan duration,
+        UserMessage? localized = null) =>
         new()
         {
             Succeeded = false,
             Reach = reach,
             Duration = duration,
-            Error = new QueryError { Message = message },
+            Error = new QueryError { Message = message, Localized = localized },
         };
 
     public static TunnelTestResult Success(TimeSpan duration) => new()

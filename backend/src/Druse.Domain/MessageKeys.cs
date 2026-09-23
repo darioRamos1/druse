@@ -98,6 +98,14 @@ public static class MessageKeys
         public const string NameTooLong = "server.table.nameTooLong";
     }
 
+    /// <summary>Lo que se dice de una sesión o de un motor que no atiende.</summary>
+    public static class Session
+    {
+        public const string NotOpen = "server.session.notOpen";
+        public const string UnsupportedEngine = "server.session.unsupportedEngine";
+        public const string CannotCreateDatabase = "server.session.cannotCreateDatabase";
+    }
+
     /// <summary>El servidor intermedio, que es otra máquina y otros errores.</summary>
     public static class Tunnel
     {
@@ -107,5 +115,8 @@ public static class MessageKeys
         public const string Authentication = "server.tunnel.authentication";
         public const string PrivateKey = "server.tunnel.privateKey";
         public const string Timeout = "server.tunnel.timeout";
+        public const string NotConfigured = "server.tunnel.notConfigured";
+        public const string ForwardTimeout = "server.tunnel.forwardTimeout";
+        public const string ForwardRefused = "server.tunnel.forwardRefused";
     }
 }

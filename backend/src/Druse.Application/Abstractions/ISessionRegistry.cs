@@ -1,3 +1,5 @@
+using Druse.Domain;
+
 using Druse.Database.Abstractions;
 
 namespace Druse.Application.Abstractions;
@@ -46,4 +48,11 @@ public sealed class SessionNotFoundException(Guid sessionId)
     : InvalidOperationException($"La sesión '{sessionId}' no está abierta.")
 {
     public Guid SessionId { get; } = sessionId;
+
+    /// <summary>El mismo aviso con su clave, para decirlo en el idioma de la ventana.</summary>
+    public UserMessage Localized { get; } = UserMessage.With(
+        MessageKeys.Session.NotOpen,
+        $"La sesión '{sessionId}' no está abierta.",
+        "session",
+        sessionId.ToString());
 }

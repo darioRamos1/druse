@@ -254,11 +254,28 @@ export interface SessionInfo {
   readonly readOnly: boolean;
 }
 
+/**
+ * Un mensaje del proceso local con su clave del catálogo.
+ *
+ * `text` es el español de origen: se enseña mientras un mensaje no tenga clave,
+ * o si el catálogo de este idioma aún no la trae. `keyArgs` son parámetros que
+ * a su vez son claves —«la columna», «el índice»—, para las frases que se arman
+ * con una palabra del propio programa.
+ */
+export interface ServerMessage {
+  readonly key: string;
+  readonly text: string;
+  readonly args?: Readonly<Record<string, string>>;
+  readonly keyArgs?: Readonly<Record<string, string>>;
+}
+
 export interface TestConnectionResult {
   readonly succeeded: boolean;
   readonly serverVersion?: string;
   readonly errorMessage?: string;
   readonly errorCode?: string;
+  /** El motivo con su clave, cuando lo escribe Druse y no el motor. */
+  readonly error?: ServerMessage;
   readonly durationMs: number;
 }
 
@@ -274,6 +291,8 @@ export interface TestTunnelResult {
   readonly succeeded: boolean;
   readonly reach: TunnelReach;
   readonly errorMessage?: string;
+  /** El motivo con su clave, cuando lo escribe Druse y no el servidor SSH. */
+  readonly error?: ServerMessage;
   readonly durationMs: number;
 }
 

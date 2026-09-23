@@ -2,6 +2,7 @@
 using Druse.Application.Abstractions;
 using Druse.Database.Abstractions;
 using Druse.Host.LocalApi;
+using Druse.Host.LocalApi.Contracts;
 using Druse.Host.LocalApi.Diagnostics;
 using Druse.Host.LocalApi.Endpoints;
 using Druse.Host.LocalApi.Security;
@@ -140,12 +141,22 @@ app.Use(async (context, next) =>
     catch (SessionNotFoundException exception)
     {
         context.Response.StatusCode = StatusCodes.Status404NotFound;
-        await context.Response.WriteAsJsonAsync(new { message = exception.Message });
+
+        await context.Response.WriteAsJsonAsync(new
+        {
+            message = exception.Message,
+            messages = new[] { exception.Localized.ToDto() },
+        });
     }
     catch (UnsupportedEngineException exception)
     {
         context.Response.StatusCode = StatusCodes.Status400BadRequest;
-        await context.Response.WriteAsJsonAsync(new { message = exception.Message });
+
+        await context.Response.WriteAsJsonAsync(new
+        {
+            message = exception.Message,
+            messages = new[] { exception.Localized.ToDto() },
+        });
     }
     catch (InvalidProfileException exception)
     {
@@ -158,12 +169,7 @@ app.Use(async (context, next) =>
         await context.Response.WriteAsJsonAsync(new
         {
             message = exception.Message,
-            messages = exception.Messages.Select(message => new
-            {
-                key = message.Key,
-                text = message.Text,
-                args = message.Args,
-            }),
+            messages = exception.Messages.Select(message => message.ToDto()),
         });
     }
     catch (ArgumentException exception)
