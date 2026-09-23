@@ -1,5 +1,9 @@
 # Expediente para SignPath Foundation — borrador sin presentar
 
+[Consulta de seguimiento enviada](consulta-signpath-seguimiento.md) el 21 de septiembre: repo público y construcción de Comunidad comunicados; SNI, WebView2 y consentimiento pendientes de respuesta. La consulta no sustituye una solicitud formal.
+
+Actualización del 21 de septiembre: [repositorio público](https://github.com/darioRamos1/druse), GPL y avisos disponibles. La [edición Comunidad](edicion-comunidad.md) excluye Oracle/IBM/IKVM; el PR #18 está integrado y su CI produjo el instalador y el inventario, descargados con hash coincidente. Falta completar pruebas de Windows limpio, publicar una beta revisada y aclarar SNI, WebView2 y consentimiento; no se ha presentado una solicitud formal.
+
 Actualización del 16 de septiembre: [respuesta a la consulta](consulta-signpath-borrador.md). SignPath considera que Druse todavía no está listo para revisión y admite evaluar una edición separada sin Oracle/IBM bajo condiciones; no ha aprobado la candidatura. SNI, WebView2, consentimiento durante la instalación y revisión de redistribución siguen abiertos. La [revisión documental de controladores](../revisiones/controladores-signpath-2026-09-15.md) conserva la evidencia local.
 
 Preparación: 13 de septiembre de 2026. Corresponde a **SIG-01** del [plan de SignPath y donaciones](../planes/plan-signpath-donaciones.md).
@@ -14,10 +18,10 @@ Privacidad: el aviso provisional ya está incorporado al código de Preferencias
 
 | Qué falta | De quién depende |
 | --- | --- |
-| El repositorio es privado | **DEC-01** |
+| Repositorio público desde el 16 de septiembre | **DEC-01 cerrado**; verificación de procedencia sigue separada |
 | GPL-3.0-only elegida y `LICENSE` incorporado; faltan procedencia y compatibilidad de terceros | **DEC-02-R**, **OSS-03/04** |
 | No hay release pública ni evidencia de uso | **PUB-04**, y después **PUB-05** |
-| El alcance de Oracle, IBM, SNI y WebView2 sigue sin resolver | **OSS-03 / DEC-03**: respuesta recibida; edición separada sin Oracle/IBM evaluable bajo condiciones, SNI/WebView2 sin resolución expresa |
+| Comunidad excluye Oracle/IBM; SNI y WebView2 siguen sin resolución expresa | **OSS-03 / DEC-03**: edición separada construida y funcional; elegibilidad todavía pendiente |
 | La opción de desactivar la búsqueda de actualizaciones no se ofrece durante la instalación | **P-01**: la respuesta valora la activación explícita, pero no aclara si basta el primer arranque |
 
 La respuesta pide repositorio público, artefacto publicado en la forma que se firmaría, licencia, inventario y flujo de construcción/firma. Debe aclararse el quinto punto; no se considera cerrado por la valoración favorable de la activación explícita.
@@ -30,7 +34,7 @@ La respuesta pide repositorio público, artefacto publicado en la forma que se f
 | Qué es | Cliente de escritorio para administrar y consultar bases de datos: PostgreSQL, SQL Server, MySQL/MariaDB, Oracle, SQLite e Informix |
 | Plataforma de distribución | Windows x64, instalador NSIS construido con Tauri; API local en .NET autocontenida |
 | Versión actual | 1.1.0, sin publicar |
-| Repositorio | `github.com/darioRamos1/druse` (privado hoy) |
+| Repositorio | [github.com/darioRamos1/druse](https://github.com/darioRamos1/druse) (público) |
 | Contacto público | `druse.contacto@gmail.com` |
 | Licencia | GNU GPL v3 exclusivamente (`GPL-3.0-only`), elegida por Darío el 14 de septiembre de 2026; [LICENSE](../../LICENSE). Con un permiso adicional de la sección 7 en [COPYRIGHT](../../COPYRIGHT), limitado a cuatro controladores de bases de datos no libres |
 
@@ -56,7 +60,7 @@ Un mantenedor único es lo que hay. No se inventan revisores ni un tamaño de eq
 4. `release.ps1` trabaja en tres etapas —construir, verificar y publicar— precisamente para que la firma pueda ocurrir fuera de la máquina de construcción y los bytes firmados se publiquen sin reconstruirse.
 5. La verificación comprueba, sobre los bytes finales, que cada firma de actualización corresponde a su archivo, que `latest.json` coincide con lo que hay en disco, que ninguna firma Authenticode es inválida y que los instaladores son los que se revisaron. Publicar exige integración continua verde para ese commit exacto y deja `evidencia.json` con commit, hashes y resultados.
 
-**Estado de la integración continua:** hoy no ejecuta. Los trabajos terminan en tres segundos sin runner y sin ejecutar un solo paso, y GitHub lo explica en la anotación de cada uno: «The job was not started because recent account payments have failed or your spending limit needs to be increased». El mismo mensaje aparece al menos desde el 11 de septiembre de 2026. Está anotado en el [presupuesto](financiacion.md) y es un requisito previo para la ruta de firma: el conector de SignPath necesita un sistema de construcción admitido y verificable.
+**Estado de la integración continua:** las ejecuciones anteriores a la apertura fallaban sin iniciar pasos por facturación/cuota. El 21 de septiembre finalizaron correctamente Pages y el [workflow específico de Comunidad](https://github.com/darioRamos1/druse/actions/runs/35625598733), que construyó instalador e inventario en un runner alojado por GitHub. Los commits, hashes y límites de estas comprobaciones están en la [evidencia de Comunidad](edicion-comunidad.md). Esto no acredita la CI general de todos los proveedores ni una integración de firma, todavía no concedida.
 
 ## 5. Dependencias que hay que resolver
 
@@ -85,7 +89,7 @@ La edición sin Informix está comprobada: 402 archivos y 140 MB, **sin un solo 
 
 ## 7. Evidencia de uso
 
-**No hay ninguna todavía, y no se va a inventar.** El repositorio es privado, no hay release pública, ni descargas, ni incidencias de terceros, ni usuarios que hayan reportado nada. Esa evidencia solo puede existir después de PUB-04 y PUB-05.
+Todavía no se ha reunido evidencia de uso de una beta candidata. El repositorio ya es público; siguen pendientes la release revisada, las pruebas externas y su registro en PUB-04/PUB-05.
 
 Lo que sí se puede enseñar hoy: historial de desarrollo sostenido, suite de pruebas —950 del frontend, más de 1.100 del backend, pruebas de contrato por motor y de punta a punta— y la [matriz de motores](../motores/matriz-de-motores.md) que distingue lo probado de lo anunciado.
 
@@ -93,11 +97,11 @@ Lo que sí se puede enseñar hoy: historial de desarrollo sostenido, suite de pr
 
 > Druse is a Windows desktop database client (Tauri shell, self-contained .NET local API) for PostgreSQL, SQL Server, MySQL/MariaDB, Oracle, SQLite and Informix. It is maintained by a single developer.
 >
-> Druse's original code is licensed under GPL-3.0-only, with an additional permission under GPL v3 section 7 that allows combining it with four non-free database drivers (Oracle, IBM Db2/Informix and Microsoft SqlClient SNI) without extending to any other library. Third-party components retain their own licenses; dependency compatibility and distribution scope remain under review. The repository is still private and no public candidate release is claimed.
+> Druse's original code is licensed under GPL-3.0-only, with an additional permission under GPL v3 section 7 for four database drivers. The repository is now public. A separate Community edition excludes Oracle and IBM components and the JDBC/IKVM bridge; Microsoft SNI, WebView2 and the remaining redistribution checks still need resolution. No reviewed public candidate release is claimed.
 >
 > Releases are produced from a clean Git tree by a staged script: the package contents are checked against an explicit exclusion list and the build is stopped if an excluded component appears; a SHA-256 manifest is produced for every build; before publishing, every updater signature is verified against the final bytes, the update manifest is checked against the artifacts on disk, and any invalid Authenticode signature stops the release. Publishing requires a green CI run for that exact commit and records commit, hashes and check results as release evidence. Only Druse's own installers and binaries would be submitted for signing; third-party components would not.
 >
-> The project's draft code signing policy is available in the currently private repository. The maintainer approves every release manually and uses two-factor authentication. Code review found no telemetry integration; network behavior still needs runtime validation. Druse runs a local API and connects to user-configured databases, SSH servers and optional AI providers. Automatic update checks stay disabled until the user explicitly enables them. The application privacy draft describes these connections and the data involved.
+> The project's draft code signing policy is available in the public repository. The maintainer approves every release manually and uses two-factor authentication. Code review found no telemetry integration; network behavior still needs runtime validation. Druse runs a local API and connects to user-configured databases, SSH servers and optional AI providers. Automatic update checks stay disabled until the user explicitly enables them. The application privacy draft describes these connections and the data involved.
 >
 > Open items we are aware of: the dependency scope of Oracle, IBM and Microsoft SNI components (subject of a separate eligibility question), and offering the update opt-out during installation rather than on first run.
 

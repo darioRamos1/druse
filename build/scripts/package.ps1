@@ -37,6 +37,10 @@
     Falla si no está disponible la clave privada del actualizador. Las
     publicaciones deben usarlo; una compilación local de prueba puede omitirla.
 
+.PARAMETER Community
+    Construye la edición Comunidad sin Oracle, IBM Informix ni IKVM.
+    Usa el canal comunidad; su elegibilidad para SignPath sigue pendiente.
+
 .PARAMETER CertificateThumbprint
     Huella del certificado de firma de código, ya instalado en el almacén de
     Windows. Si no se indica, se toma de `DRUSE_SIGN_THUMBPRINT`.
@@ -64,12 +68,17 @@ param(
     [switch]$SkipInstaller,
     [switch]$Portable,
     [switch]$WithoutInformix,
+    [switch]$Community,
     [switch]$RequireUpdaterSignature,
     [string]$CertificateThumbprint = $env:DRUSE_SIGN_THUMBPRINT,
     [string]$TimestampUrl = 'http://timestamp.digicert.com'
 )
 
 $ErrorActionPreference = 'Stop'
+
+if ($Community -and $WithoutInformix) {
+    throw 'Usa -Community o -WithoutInformix, no ambos.'
+}
 
 # En Windows hay que cargar el entorno de MSVC antes de compilar: sin sus
 # variables, Rust puede encontrar un enlazador sin las librerías del SDK y
@@ -88,13 +97,18 @@ $signing = [bool]$CertificateThumbprint -or [bool]$signCommand
 # Distingue las dos variantes en el nombre de cada artefacto. La completa lleva
 # `-completo` en lugar de nada: si una se quedara sin sufijo, la siguiente
 # ejecución sobrescribiría su instalador antes de renombrarlo.
-$VariantSuffix = if ($WithoutInformix) { '-sin-informix' } else { '-completo' }
-$Variant = if ($WithoutInformix) { 'sin-informix' } else { 'completo' }
+$Variant = if ($Community) { 'comunidad' } elseif ($WithoutInformix) { 'sin-informix' } else { 'completo' }
+$VariantSuffix = "-$Variant"
 
 $repoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $apiProject = Join-Path $repoRoot 'backend/src/Druse.Host.LocalApi'
 $tauriDir = Join-Path $repoRoot 'shells/desktop-tauri'
 $apiOutput = Join-Path $tauriDir 'api'
+$cargoTargetDir = if ($env:CARGO_TARGET_DIR) {
+    [IO.Path]::GetFullPath($env:CARGO_TARGET_DIR, $tauriDir)
+} else {
+    Join-Path $tauriDir 'target'
+}
 
 # La versión sale de `tauri.conf.json`, que es la que acaba en el nombre del
 # instalador: leerla de otro sitio produciría un manifiesto que dice una versión
@@ -115,6 +129,9 @@ if ($RequireUpdaterSignature -and -not $updaterSigning) {
 
 if (-not $Runtime) {
     $Runtime = if ($IsWindows) { 'win-x64' } elseif ($IsMacOS) { 'osx-arm64' } else { 'linux-x64' }
+}
+if ($Community -and $Runtime -ne 'win-x64') {
+    throw 'La evidencia de terceros de Comunidad cubre únicamente win-x64.'
 }
 
 Write-Host "Empaquetando Druse para $Runtime" -ForegroundColor Cyan
@@ -144,7 +161,10 @@ Write-Host '[1/3] Publicando la API local...' -ForegroundColor Cyan
 # El directorio se vacía primero: restos de una publicación anterior con otro
 # runtime acabarían dentro del instalador.
 if (Test-Path $apiOutput) {
-    Remove-Item $apiOutput -Recurse -Force
+    $resolvedOutput = (Resolve-Path -LiteralPath $apiOutput).Path
+    $expectedOutput = [IO.Path]::GetFullPath((Join-Path $repoRoot 'shells/desktop-tauri/api'))
+    if ($resolvedOutput -ne $expectedOutput) { throw 'La salida de la API está fuera de la carpeta esperada.' }
+    Remove-Item -LiteralPath $resolvedOutput -Recurse -Force
 }
 
 dotnet publish $apiProject `
@@ -154,7 +174,8 @@ dotnet publish $apiProject `
     --output $apiOutput `
     -p:PublishSingleFile=false `
     -p:DebugType=none `
-    "-p:IncludeInformix=$(if ($WithoutInformix) { 'false' } else { 'true' })"
+    "-p:IncludeInformix=$(if ($WithoutInformix -or $Community) { 'false' } else { 'true' })" `
+    "-p:IncludeOracle=$(if ($Community) { 'false' } else { 'true' })"
 
 if ($LASTEXITCODE -ne 0) {
     throw 'Falló la publicación de la API.'
@@ -259,6 +280,19 @@ finally {
 
 Write-Host '      Frontend compilado.' -ForegroundColor Green
 
+. (Join-Path $PSScriptRoot 'avisos-frontend.ps1')
+Copy-DruseFrontendNotices -RepoRoot $repoRoot -ApiOutput $apiOutput
+if ($Community) {
+    . (Join-Path $PSScriptRoot 'avisos-nuget-comunidad.ps1')
+    Copy-DruseCommunityNugetNotices -RepoRoot $repoRoot -ApiOutput $apiOutput
+    node (Join-Path $PSScriptRoot 'avisos-rust-comunidad.cjs') $apiOutput
+    if ($LASTEXITCODE -ne 0) { throw 'No se pudieron incorporar los avisos Rust/nativos de Comunidad.' }
+}
+# Incluye los avisos recién generados y los bytes de la API después de firmarla.
+$inventory = @(Get-DrusePackageInventory -Path $apiOutput -Prefix 'api')
+$findings = @(Test-DrusePackageContent -Inventory $inventory -Rules (Get-DrusePackageRules -Variant $Variant))
+if (@($findings | Where-Object aplicar).Count) { throw 'El contenido final incluye archivos excluidos.' }
+
 # --- 3. Instalador ----------------------------------------------------------
 if ($SkipInstaller) {
     Write-Host '[3/3] Instalador omitido (-SkipInstaller).' -ForegroundColor Yellow
@@ -311,7 +345,12 @@ if ($signing) {
     $bundleOverride.windows = $windows
 }
 
-@{ bundle = $bundleOverride } |
+$tauriConfig = @{ bundle = $bundleOverride }
+if ($Community) {
+    $tauriConfig.productName = 'Druse Comunidad'
+    $tauriConfig.identifier = 'io.druse.comunidad'
+}
+$tauriConfig |
     ConvertTo-Json -Depth 5 |
     Set-Content $tauriOverride -Encoding UTF8
 
@@ -338,10 +377,15 @@ try {
 
     $tauriArgs += @('--config', $tauriOverride)
     if ($bundles) { $tauriArgs += @('--bundles', $bundles) }
+    $tauriArgs += @('--', '--locked')
 
     cargo @tauriArgs
 
     if ($LASTEXITCODE -ne 0) { throw 'Falló la construcción del instalador.' }
+    if ($Community) {
+        node (Join-Path $PSScriptRoot 'avisos-rust-comunidad.cjs') --verify-native
+        if ($LASTEXITCODE -ne 0) { throw 'El instalador utiliza herramientas nativas distintas del expediente.' }
+    }
 }
 finally {
     Pop-Location
@@ -354,10 +398,10 @@ finally {
     Remove-Item $tauriOverride -Force -ErrorAction SilentlyContinue
 }
 
-$bundleDir = Join-Path $tauriDir "target/$Runtime/release/bundle"
+$bundleDir = Join-Path $cargoTargetDir "$Runtime/release/bundle"
 
 if (-not (Test-Path $bundleDir)) {
-    $bundleDir = Join-Path $tauriDir 'target/release/bundle'
+    $bundleDir = Join-Path $cargoTargetDir 'release/bundle'
 }
 
 Write-Host ''
@@ -423,7 +467,7 @@ if ($Portable) {
     Write-Host ''
     Write-Host '[4/4] Creando la distribución portable...' -ForegroundColor Cyan
 
-    $releaseDir = Join-Path $tauriDir 'target/release'
+    $releaseDir = Join-Path $cargoTargetDir 'release'
     $appName = if ($IsWindows) { 'druse.exe' } else { 'druse' }
     $appPath = Join-Path $releaseDir $appName
 

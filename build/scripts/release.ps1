@@ -11,7 +11,7 @@
     reconstruir nada. Reconstruir produciría bytes distintos de los que se
     firmaron, que es justo el error que esto persigue.
 
-    - `construir`: empaqueta las dos variantes, reúne los artefactos con sus
+    - `construir`: empaqueta las tres variantes, reúne los artefactos con sus
       firmas del actualizador, genera `latest.json` y el instalador selector.
     - `verificar`: comprueba que lo que hay en el directorio de la release se
       puede publicar. No construye nada.
@@ -80,8 +80,10 @@ $tag = "v$version"
 $baseUrl = "https://github.com/$Repository/releases/download/$tag"
 $completeName = "Druse-$version-windows-x86_64-completo-setup.exe"
 $liteName = "Druse-$version-windows-x86_64-sin-informix-setup.exe"
+$communityName = "Druse-$version-windows-x86_64-comunidad-setup.exe"
 $complete = Join-Path $releaseDir $completeName
 $lite = Join-Path $releaseDir $liteName
+$community = Join-Path $releaseDir $communityName
 $selector = Join-Path $releaseDir "Druse-$version-installer.exe"
 $latest = Join-Path $releaseDir 'latest.json'
 $evidencia = Join-Path $releaseDir 'evidencia.json'
@@ -98,7 +100,10 @@ $notes = if (Test-Path $notesFile) { Get-Content $notesFile -Raw } else { "Druse
 
 function Invoke-DruseConstruccion {
     if (Test-Path $releaseDir) {
-        Remove-Item $releaseDir -Recurse -Force
+        $resolved = [IO.Path]::GetFullPath($releaseDir)
+        $allowed = [IO.Path]::GetFullPath((Join-Path $repoRoot 'artifacts/releases')).TrimEnd([IO.Path]::DirectorySeparatorChar)
+        if ((Split-Path -Parent $resolved) -ne $allowed) { throw 'Directorio de release fuera de artifacts/releases.' }
+        Remove-Item -LiteralPath $resolved -Recurse -Force
     }
 
     New-Item -ItemType Directory -Path $releaseDir -Force | Out-Null
@@ -109,22 +114,37 @@ function Invoke-DruseConstruccion {
     & (Join-Path $PSScriptRoot 'package.ps1') -WithoutInformix -RequireUpdaterSignature
     if ($LASTEXITCODE -ne 0) { throw 'Falló el paquete sin Informix.' }
 
-    $bundleRoot = Join-Path $tauriDir 'target/release/bundle/nsis'
+    & (Join-Path $PSScriptRoot 'package.ps1') -Community -RequireUpdaterSignature
+    if ($LASTEXITCODE -ne 0) { throw 'Falló el paquete de Comunidad.' }
+
+    $targetRoot = if ($env:CARGO_TARGET_DIR) {
+        if ([IO.Path]::IsPathRooted($env:CARGO_TARGET_DIR)) { $env:CARGO_TARGET_DIR }
+        else { Join-Path $tauriDir $env:CARGO_TARGET_DIR }
+    } else { Join-Path $tauriDir 'target' }
+    $bundleRoot = Join-Path $targetRoot 'release/bundle/nsis'
     $completeSource = Get-ChildItem $bundleRoot -Filter '*-completo.exe' |
         Sort-Object LastWriteTime -Descending |
         Select-Object -First 1
     $liteSource = Get-ChildItem $bundleRoot -Filter '*-sin-informix.exe' |
         Sort-Object LastWriteTime -Descending |
         Select-Object -First 1
+    $communitySource = Get-ChildItem $bundleRoot -Filter '*-comunidad.exe' |
+        Sort-Object LastWriteTime -Descending |
+        Select-Object -First 1
 
-    if (-not $completeSource -or -not $liteSource) {
-        throw 'No se encontraron los dos instaladores NSIS.'
+    if (-not $completeSource -or -not $liteSource -or -not $communitySource) {
+        throw 'No se encontraron los tres instaladores NSIS.'
     }
 
     Copy-Item $completeSource.FullName $complete
     Copy-Item $liteSource.FullName $lite
     Copy-Item "$($completeSource.FullName).sig" "$complete.sig"
     Copy-Item "$($liteSource.FullName).sig" "$lite.sig"
+    Copy-Item $communitySource.FullName $community
+    Copy-Item "$($communitySource.FullName).sig" "$community.sig"
+    foreach ($variant in @('completo', 'sin-informix', 'comunidad')) {
+        Copy-Item (Join-Path $repoRoot "artifacts/paquete/manifiesto-$variant-$version-win-x64.json") $releaseDir
+    }
 
     $manifest = [ordered]@{
         version   = $version
@@ -138,6 +158,10 @@ function Invoke-DruseConstruccion {
             'windows-x86_64-sin-informix' = [ordered]@{
                 url       = "$baseUrl/$liteName"
                 signature = (Get-Content "$lite.sig" -Raw).Trim()
+            }
+            'windows-x86_64-comunidad' = [ordered]@{
+                url       = "$baseUrl/$communityName"
+                signature = (Get-Content "$community.sig" -Raw).Trim()
             }
         }
     }
@@ -197,6 +221,10 @@ function Invoke-DrusePublicacion([object]$verificacion) {
     if ($LASTEXITCODE -ne 0) { throw 'No se pudo determinar el commit que se ha construido.' }
 
     $ci = Get-DruseEstadoCI -Commit $commit -Repository $Repository
+    $communityCi = Get-DruseEstadoCI -Commit $commit -Repository $Repository -Workflow 'comunidad.yml'
+    if (-not $communityCi.verde) {
+        throw "Comunidad necesita su workflow satisfactorio para el commit exacto: $($communityCi.detalle)."
+    }
 
     if ($ci.verde) {
         Write-Host "  OK   integración continua verde para $($commit.Substring(0, 8)): $($ci.detalle)" -ForegroundColor Green
@@ -239,11 +267,13 @@ function Invoke-DrusePublicacion([object]$verificacion) {
             url      = $ci.url
         }
         verificacion = $verificacion
+        comunidad_ci = $communityCi
     }
 
     $registro | ConvertTo-Json -Depth 6 | Set-Content $evidencia -Encoding UTF8
 
-    $assets = @($selector, $complete, "$complete.sig", $lite, "$lite.sig", $latest)
+    $assets = @($selector, $complete, "$complete.sig", $lite, "$lite.sig", $community, "$community.sig", $latest, $evidencia) +
+        @(foreach ($variant in @('completo', 'sin-informix', 'comunidad')) { Join-Path $releaseDir "manifiesto-$variant-$version-win-x64.json" })
     $tagArgs = if ($tagCommit) { @('--verify-tag') } else { @('--target', $commit) }
 
     if (Test-Path $notesFile) {
@@ -269,7 +299,9 @@ if ($Etapa -in @('todo', 'verificar', 'publicar')) {
         -ReleaseDir $releaseDir `
         -Version $version `
         -PublicKey ([string]$config.plugins.updater.pubkey) `
-        -ManifestDir (Join-Path $repoRoot 'artifacts/paquete')
+        -ManifestDir $releaseDir `
+        -IncludeCommunity `
+        -ExpectedBaseUrl $baseUrl
 }
 
 if ($publicando) {

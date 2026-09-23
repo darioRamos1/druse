@@ -6,6 +6,8 @@ El código original de Druse está bajo **GNU GPL v3, exclusivamente versión 3*
 
 Una *drusa* es la costra de cristales que tapiza el interior de una geoda: la estructura que aparece al abrir la piedra. Es lo que hace la aplicación con una base de datos.
 
+El repositorio es público. Se está preparando una [edición Comunidad](docs/distribucion/edicion-comunidad.md) sin Oracle ni IBM para evaluación de SignPath; todavía no cuenta con su aprobación o firma.
+
 > **Estado: versión 1.1.0.** Funciona el flujo completo contra **PostgreSQL, SQL Server y MySQL/MariaDB**: conectar, explorar el catálogo, escribir SQL con ayudas de esquema, ejecutar, cancelar, consultar el historial, **exportar e importar CSV o Excel** y **editar filas desde la cuadrícula**, todo dentro de una aplicación de escritorio que no necesita .NET ni Node.js instalados. Las [notas de la primera beta](docs/release-notes/0.1.0-beta.md) siguen describiendo con qué números se comprobó ese flujo.
 
 ## Editar, importar y exportar

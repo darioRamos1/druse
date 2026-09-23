@@ -26,24 +26,25 @@ function Get-DruseEstadoCI {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory)][string]$Repository,
-        [Parameter(Mandatory)][ValidatePattern('^[0-9a-fA-F]{40}$')][string]$Commit
+        [Parameter(Mandatory)][ValidatePattern('^[0-9a-fA-F]{40}$')][string]$Commit,
+        [ValidateSet('ci.yml', 'comunidad.yml')][string]$Workflow = 'ci.yml'
     )
     if (-not (Get-Command gh -ErrorAction SilentlyContinue)) {
         return @{ verde = $false; detalle = 'no se encontró gh para consultar CI' }
     }
-    $endpoint = "repos/$Repository/actions/workflows/ci.yml/runs?head_sha=$Commit&per_page=100"
+    $endpoint = "repos/$Repository/actions/workflows/$Workflow/runs?head_sha=$Commit&per_page=100"
     $respuesta = gh api $endpoint --paginate --slurp 2>&1
     if ($LASTEXITCODE -ne 0) {
-        return @{ verde = $false; detalle = 'no se pudo consultar el workflow ci.yml' }
+        return @{ verde = $false; detalle = "no se pudo consultar el workflow $Workflow" }
     }
     try {
         $paginas = $respuesta | ConvertFrom-Json -ErrorAction Stop
         $ejecuciones = @($paginas | ForEach-Object { $_.workflow_runs } | Where-Object { $null -ne $_ })
         if ($ejecuciones.Count -eq 0) {
-            return @{ verde = $false; detalle = 'el commit no tiene ninguna ejecución de ci.yml' }
+            return @{ verde = $false; detalle = "el commit no tiene ninguna ejecución de $Workflow" }
         }
         foreach ($ejecucion in $ejecuciones) {
-            if ($ejecucion.head_sha -ne $Commit -or $ejecucion.path -ne '.github/workflows/ci.yml' -or -not $ejecucion.id) {
+            if ($ejecucion.head_sha -ne $Commit -or $ejecucion.path -ne ".github/workflows/$Workflow" -or -not $ejecucion.id) {
                 return @{ verde = $false; detalle = 'la respuesta no corresponde al workflow y commit requeridos' }
             }
         }
@@ -52,13 +53,13 @@ function Get-DruseEstadoCI {
         }, id | Select-Object -First 1
         return @{
             verde = $ultima.status -eq 'completed' -and $ultima.conclusion -eq 'success'
-            detalle = "ci.yml: ejecución $($ultima.id), intento $($ultima.run_attempt), $($ultima.status)/$($ultima.conclusion)"
+            detalle = "${Workflow}: ejecución $($ultima.id), intento $($ultima.run_attempt), $($ultima.status)/$($ultima.conclusion)"
             run_id = $ultima.id
             url = $ultima.html_url
         }
     }
     catch {
-        return @{ verde = $false; detalle = 'no se pudo interpretar la respuesta de ci.yml' }
+        return @{ verde = $false; detalle = "no se pudo interpretar la respuesta de $Workflow" }
     }
 }
 
@@ -121,7 +122,9 @@ function Invoke-DruseReleaseVerificacion {
         [Parameter(Mandatory)][string]$Version,
         [Parameter(Mandatory)][string]$PublicKey,
         [string]$ManifestDir,
-        [switch]$SinAuthenticode
+        [switch]$SinAuthenticode,
+        [switch]$IncludeCommunity,
+        [string]$ExpectedBaseUrl
     )
 
     if ([string]::IsNullOrWhiteSpace($ManifestDir)) {
@@ -137,7 +140,14 @@ function Invoke-DruseReleaseVerificacion {
     $selector = Join-Path $ReleaseDir $selectorName
     $latest = Join-Path $ReleaseDir 'latest.json'
 
-    $faltan = @($complete, "$complete.sig", $lite, "$lite.sig", $selector, $latest) |
+    $pairs = @(@('completo', $complete), @('sin-informix', $lite))
+    if ($IncludeCommunity) {
+        $communityName = "Druse-$Version-windows-x86_64-comunidad-setup.exe"
+        $pairs += ,@('comunidad', (Join-Path $ReleaseDir $communityName))
+    }
+    $installers = @($pairs | ForEach-Object { $_[1] })
+
+    $faltan = @(@($selector, $latest) + @($installers | ForEach-Object { $_; "$_.sig" })) |
         Where-Object { -not (Test-Path -LiteralPath $_) } |
         ForEach-Object { [IO.Path]::GetFileName($_) }
 
@@ -152,7 +162,7 @@ function Invoke-DruseReleaseVerificacion {
     #    aparecería en el equipo del usuario, no aquí.
     $publicKeyId = Get-DruseMinisignKeyId $PublicKey
 
-    foreach ($firma in @("$complete.sig", "$lite.sig")) {
+    foreach ($firma in @($installers | ForEach-Object { "$_.sig" })) {
         if ((Get-DruseMinisignKeyId (Get-Content -LiteralPath $firma -Raw)) -ne $publicKeyId) {
             throw "La firma $([IO.Path]::GetFileName($firma)) no pertenece a la clave pública configurada. No se publicará."
         }
@@ -165,7 +175,7 @@ function Invoke-DruseReleaseVerificacion {
     #    modifica el archivo y deja la firma apuntando a algo que ya no existe.
     $verificador = Join-Path $PSScriptRoot 'verificar-actualizacion.cjs'
 
-    foreach ($artefacto in @($complete, $lite)) {
+    foreach ($artefacto in $installers) {
         node $verificador $artefacto "$artefacto.sig" --pubkey $PublicKey
 
         if ($LASTEXITCODE -ne 0) {
@@ -181,10 +191,10 @@ function Invoke-DruseReleaseVerificacion {
         throw "latest.json anuncia la versión $($manifiesto.version) y se está publicando la $Version."
     }
 
-    $declaradas = @(
-        @('windows-x86_64-completo', $manifiesto.platforms.'windows-x86_64-completo', "$complete.sig", $completeName),
-        @('windows-x86_64-sin-informix', $manifiesto.platforms.'windows-x86_64-sin-informix', "$lite.sig", $liteName)
-    )
+    $declaradas = @(foreach ($pair in $pairs) {
+        $key = "windows-x86_64-$($pair[0])"
+        ,@($key, $manifiesto.platforms.$key, "$($pair[1]).sig", [IO.Path]::GetFileName($pair[1]))
+    })
 
     foreach ($entrada in $declaradas) {
         $plataforma, $anunciada, $archivoFirma, $nombre = $entrada
@@ -197,7 +207,11 @@ function Invoke-DruseReleaseVerificacion {
             throw "La firma de $plataforma en latest.json no es la del archivo .sig. No se publicará."
         }
 
-        if (-not $anunciada.url.EndsWith("/$nombre")) {
+        $uri = $null
+        if (-not [Uri]::TryCreate([string]$anunciada.url, [UriKind]::Absolute, [ref]$uri) -or
+            $uri.Scheme -ne 'https' -or $uri.UserInfo -or $uri.Query -or $uri.Fragment -or
+            -not $anunciada.url.EndsWith("/$nombre") -or
+            ($ExpectedBaseUrl -and $anunciada.url -cne "$ExpectedBaseUrl/$nombre")) {
             throw "La dirección de $plataforma en latest.json no apunta a $nombre."
         }
     }
@@ -207,12 +221,10 @@ function Invoke-DruseReleaseVerificacion {
     # basta—, una instalación sin Informix se actualizaría a la completa y se
     # llevaría los 111 MB del controlador de IBM que alguien decidió no
     # instalar. Una actualización no cambia de edición.
-    $completoAnunciado = $manifiesto.platforms.'windows-x86_64-completo'
-    $ligeroAnunciado = $manifiesto.platforms.'windows-x86_64-sin-informix'
-
-    if ($completoAnunciado.url -eq $ligeroAnunciado.url -or
-        $completoAnunciado.signature.Trim() -eq $ligeroAnunciado.signature.Trim()) {
-        throw 'Las dos ediciones anuncian el mismo artefacto en latest.json: una actualización cambiaría de edición.'
+    $urls = @($declaradas | ForEach-Object { $_[1].url } | Sort-Object -Unique)
+    $signatures = @($declaradas | ForEach-Object { $_[1].signature.Trim() } | Sort-Object -Unique)
+    if ($urls.Count -ne $pairs.Count -or $signatures.Count -ne $pairs.Count) {
+        throw 'Las ediciones anuncian el mismo artefacto en latest.json: una actualización cambiaría de edición.'
     }
 
     Write-Host '  OK   cada edición anuncia su propio instalador' -ForegroundColor Green
@@ -222,7 +234,7 @@ function Invoke-DruseReleaseVerificacion {
     #    proyecto sin poder publicar hasta conseguir un certificado.
     $authenticode = [ordered]@{}
 
-    foreach ($artefacto in @($selector, $complete, $lite)) {
+    foreach ($artefacto in @($selector) + $installers) {
         $nombre = [IO.Path]::GetFileName($artefacto)
         $estado = if ($SinAuthenticode -or -not $IsWindows) {
             'NoComprobado'
@@ -246,7 +258,7 @@ function Invoke-DruseReleaseVerificacion {
     #    de que se revisara qué llevaba dentro.
     $revisados = @()
 
-    foreach ($par in @(@('completo', $complete), @('sin-informix', $lite))) {
+    foreach ($par in $pairs) {
         $variante, $artefacto = $par
 
         $manifiestoPaquete = Join-Path $ManifestDir "manifiesto-$variante-$Version-win-x64.json"
@@ -266,7 +278,7 @@ function Invoke-DruseReleaseVerificacion {
             throw "El manifiesto de contenido de $variante no corresponde al producto y versión requeridos."
         }
 
-        if (-not ($contenido.contenido | Where-Object { $_.sha256 -eq $hash })) {
+        if (-not ($contenido.contenido | Where-Object { $_.ruta -like 'bundle/*.exe' -and $_.sha256 -eq $hash })) {
             throw "El instalador $variante no figura en su manifiesto de contenido: sus bytes no son los que se revisaron."
         }
 
@@ -283,14 +295,14 @@ function Invoke-DruseReleaseVerificacion {
         Write-Host "  OK   la variante $variante coincide con su manifiesto de contenido" -ForegroundColor Green
     }
 
+    $artifactHashes = [ordered]@{}
+    foreach ($artifact in @($selector) + $installers) {
+        $artifactHashes[[IO.Path]::GetFileName($artifact)] = (Get-FileHash -LiteralPath $artifact -Algorithm SHA256).Hash.ToLowerInvariant()
+    }
     return [ordered]@{
         firmas_actualizador = 'verificadas contra los bytes publicados'
         authenticode        = $authenticode
         contenido_revisado  = $revisados
-        artefactos          = [ordered]@{
-            $completeName = (Get-FileHash -LiteralPath $complete -Algorithm SHA256).Hash.ToLowerInvariant()
-            $liteName     = (Get-FileHash -LiteralPath $lite -Algorithm SHA256).Hash.ToLowerInvariant()
-            $selectorName = (Get-FileHash -LiteralPath $selector -Algorithm SHA256).Hash.ToLowerInvariant()
-        }
+        artefactos          = $artifactHashes
     }
 }

@@ -1,0 +1,89 @@
+name: Verificar edición Comunidad
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'backend/**'
+      - 'frontend/**'
+      - 'build/**'
+      - 'shells/desktop-tauri/**'
+      - '.github/workflows/comunidad.yml'
+      - 'LICENSE'
+      - 'COPYRIGHT'
+      - 'THIRD_PARTY_NOTICES.md'
+      - 'docs/terceros/comunidad/**'
+      - 'docs/terceros/comunidad-rust/**'
+      - 'docs/terceros/comunidad-nativos/**'
+      - '.gitattributes'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: comunidad-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  comunidad:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    env:
+      DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+      DRUSE_VARIANT: comunidad
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: '10.0.x'
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Instalar frontend
+        working-directory: frontend
+        run: |
+          npm install --global npm@11.12.1
+          npm ci
+      - name: Comprobar exclusiones
+        shell: pwsh
+        run: |
+          ./build/tests/manifiesto-paquete.ps1
+          ./build/tests/avisos-frontend.ps1
+          ./build/tests/evidencia-licencias-comunidad.ps1
+          ./build/tests/avisos-nuget-comunidad.ps1
+          node --test ./build/tests/avisos-rust-comunidad.cjs
+          ./build/tests/release-verificacion.ps1
+          ./build/tests/ci-release.ps1
+      - name: Preparar API y frontend de Comunidad
+        shell: pwsh
+        run: ./build/scripts/package.ps1 -Community -SkipInstaller
+      - name: Probar independencia y consulta SQLite
+        shell: pwsh
+        run: ./build/tests/comunidad-publicada.ps1
+      - name: Recoger evidencia de terceros de la API publicada
+        shell: pwsh
+        run: ./build/scripts/evidencia-licencias-comunidad.ps1 -OutputPath artifacts/licencias-comunidad/ci
+      - name: Verificar canal de actualización de Comunidad
+        working-directory: shells/desktop-tauri
+        run: cargo test --locked updates::tests
+      - name: Instalar CLI de Tauri
+        run: cargo install tauri-cli --version 2.11.4 --locked
+      - name: Construir instalador candidato sin firma de SignPath
+        shell: pwsh
+        run: |
+          ./build/scripts/package.ps1 -Community
+          if (-not (Get-ChildItem 'shells/desktop-tauri/target/release/bundle/nsis/*-comunidad.exe')) {
+            throw 'Falta el instalador de Comunidad.'
+          }
+      - name: Conservar instalador e inventario del commit
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: druse-comunidad-${{ github.sha }}
+          path: |
+            shells/desktop-tauri/target/release/bundle/nsis/*-comunidad.exe
+            artifacts/paquete/manifiesto-comunidad-*.json
+            artifacts/licencias-comunidad/ci/**
+          if-no-files-found: error
+          retention-days: 14
