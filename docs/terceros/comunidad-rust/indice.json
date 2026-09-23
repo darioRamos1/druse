@@ -4,7 +4,7 @@
   "features": [
     "custom-protocol"
   ],
-  "cargoLockSha256": "8d4ddab237534dcf3067c2f372b15ba879ad9f6556bda8179ee16c61243abde8",
+  "cargoLockSha256": "66293c45dfafd710d7abda1fe27076d4e7d309278cef321a7f0d2f4a6e831c34",
   "cargoTomlSha256": "3f870d4eb39cb92afcedb23305bbd17305f2a76930e1f997a331a62c5e0b7554",
   "alcance": "Avisos recopilados del grafo normal Windows. No cierra revisión de fuente correspondiente, código generado, compatibilidad o elegibilidad SignPath.",
   "macrosSeparadas": 24,
@@ -4340,20 +4340,20 @@
     },
     {
       "componente": "tauri",
-      "version": "2.11.5",
+      "version": "2.11.6",
       "licenciaDeclarada": "Apache-2.0 OR MIT",
-      "fuente": "https://static.crates.io/crates/tauri/tauri-2.11.5.crate",
-      "crateSha256": "667b20e2726d572dea2de7370da16e188eb06008faf9a92fab7cdc46791190b5",
-      "commit": "7cd71369c00978a3783b6ae3e9972358abbe4ae6",
+      "fuente": "https://static.crates.io/crates/tauri/tauri-2.11.6.crate",
+      "crateSha256": "6fa5bacdb9bbad5954af3d1bd6cf6ae9192cab1b2e270f4a07f904610b9e85f4",
+      "commit": "9452ddee5ebefd9b678a94ff003521379df6c9ae",
       "documentos": [
         {
           "archivo": "fuentes/0d542e0c8804e39aa7f37eb00da5a762149dc682d7829451287e11b938e94594.txt",
           "sha256": "0d542e0c8804e39aa7f37eb00da5a762149dc682d7829451287e11b938e94594",
           "origen": {
             "tipo": "archivo-crate",
-            "url": "https://static.crates.io/crates/tauri/tauri-2.11.5.crate",
+            "url": "https://static.crates.io/crates/tauri/tauri-2.11.6.crate",
             "ruta": "LICENSE_APACHE-2.0",
-            "crateSha256": "667b20e2726d572dea2de7370da16e188eb06008faf9a92fab7cdc46791190b5"
+            "crateSha256": "6fa5bacdb9bbad5954af3d1bd6cf6ae9192cab1b2e270f4a07f904610b9e85f4"
           }
         },
         {
@@ -4361,9 +4361,9 @@
           "sha256": "9dd42ea92cff2ede5cd477cbfcce051b2d0115c0ac7f368ee88cb545055dff1d",
           "origen": {
             "tipo": "archivo-crate",
-            "url": "https://static.crates.io/crates/tauri/tauri-2.11.5.crate",
+            "url": "https://static.crates.io/crates/tauri/tauri-2.11.6.crate",
             "ruta": "LICENSE_MIT",
-            "crateSha256": "667b20e2726d572dea2de7370da16e188eb06008faf9a92fab7cdc46791190b5"
+            "crateSha256": "6fa5bacdb9bbad5954af3d1bd6cf6ae9192cab1b2e270f4a07f904610b9e85f4"
           }
         }
       ]
@@ -4450,20 +4450,20 @@
     },
     {
       "componente": "tauri-plugin-updater",
-      "version": "2.11.0",
+      "version": "2.12.0",
       "licenciaDeclarada": "Apache-2.0 OR MIT",
-      "fuente": "https://static.crates.io/crates/tauri-plugin-updater/tauri-plugin-updater-2.11.0.crate",
-      "crateSha256": "b28d8cabdeb0564f03ae261963de4bc3d98321cd3d213e76a81b7d344e5df606",
-      "commit": "6aa2854f314481a459be1189b02c65a2450789ab",
+      "fuente": "https://static.crates.io/crates/tauri-plugin-updater/tauri-plugin-updater-2.12.0.crate",
+      "crateSha256": "7a5cad8ed5948d988e1018ecd31e27cacedbf72ce3fb972940c3e4bf51639e4b",
+      "commit": "5baf71a47292d8490f0ba3d53f15224e55c48327",
       "documentos": [
         {
           "archivo": "fuentes/eb8a6c84630461b352badcab1dbe5d0168c56d377358b2b8c86b51003272d5ef.txt",
           "sha256": "eb8a6c84630461b352badcab1dbe5d0168c56d377358b2b8c86b51003272d5ef",
           "origen": {
             "tipo": "archivo-crate",
-            "url": "https://static.crates.io/crates/tauri-plugin-updater/tauri-plugin-updater-2.11.0.crate",
+            "url": "https://static.crates.io/crates/tauri-plugin-updater/tauri-plugin-updater-2.12.0.crate",
             "ruta": "LICENSE.spdx",
-            "crateSha256": "b28d8cabdeb0564f03ae261963de4bc3d98321cd3d213e76a81b7d344e5df606"
+            "crateSha256": "7a5cad8ed5948d988e1018ecd31e27cacedbf72ce3fb972940c3e4bf51639e4b"
           }
         },
         {
@@ -4471,9 +4471,9 @@
           "sha256": "0cec06e0e55fbc3dc5cee4fca9b607f66cb8f4e4dbcf3b3c013594dd156732e9",
           "origen": {
             "tipo": "archivo-crate",
-            "url": "https://static.crates.io/crates/tauri-plugin-updater/tauri-plugin-updater-2.11.0.crate",
+            "url": "https://static.crates.io/crates/tauri-plugin-updater/tauri-plugin-updater-2.12.0.crate",
             "ruta": "LICENSE_APACHE-2.0",
-            "crateSha256": "b28d8cabdeb0564f03ae261963de4bc3d98321cd3d213e76a81b7d344e5df606"
+            "crateSha256": "7a5cad8ed5948d988e1018ecd31e27cacedbf72ce3fb972940c3e4bf51639e4b"
           }
         },
         {
@@ -4481,9 +4481,9 @@
           "sha256": "89ff9689dcf9dd53968785d05a26f7898bb169dbfcada8d032b3e68cf0d55607",
           "origen": {
             "tipo": "archivo-crate",
-            "url": "https://static.crates.io/crates/tauri-plugin-updater/tauri-plugin-updater-2.11.0.crate",
+            "url": "https://static.crates.io/crates/tauri-plugin-updater/tauri-plugin-updater-2.12.0.crate",
             "ruta": "LICENSE_MIT",
-            "crateSha256": "b28d8cabdeb0564f03ae261963de4bc3d98321cd3d213e76a81b7d344e5df606"
+            "crateSha256": "7a5cad8ed5948d988e1018ecd31e27cacedbf72ce3fb972940c3e4bf51639e4b"
           }
         }
       ]
