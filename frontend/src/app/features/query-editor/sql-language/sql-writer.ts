@@ -1,6 +1,7 @@
 import { translate } from '../../../core/i18n/active';
 import { DatabaseEngine, KnownColumn } from '../../../shared/models/workspace';
 import { DatePeriod, SQL_DIALECTS } from './sql-dialects';
+import { statementsOf } from './sql-statements';
 
 /**
  * El periodo al que se agrupa una fecha.
@@ -16,6 +17,8 @@ export interface QueryFilter {
   readonly operator: FilterOperator;
   /** `null` significa que todavía no se rellenó; `''` es texto vacío. */
   readonly value: string | null;
+  /** Origen de IN / NOT IN. Ausente conserva las listas SQL de composiciones anteriores. */
+  readonly inSource?: 'list' | 'query';
   /** El otro extremo de `BETWEEN`. Los demás operadores lo ignoran. */
   readonly valueTo?: string | null;
   /**
@@ -191,9 +194,20 @@ function condition(engine: DatabaseEngine, filter: QueryFilter, alias?: string):
 /** Los operadores que comparan dos cosas del mismo tipo, y por tanto dos columnas. */
 export const COMPARISON_OPERATORS: readonly FilterOperator[] = ['=', '<>', '>', '>=', '<', '<='];
 
+/** Una subconsulta SELECT, sin el terminador que solo corresponde a la consulta exterior. */
+export function inSubquery(value: string | null): string | null {
+  const statements = statementsOf(value ?? '');
+  if (statements.length !== 1) {
+    return null;
+  }
+  const sql = statements[0].text.replace(/;\s*$/, '');
+  const start = sql.replace(/^(?:\s|--[^\r\n]*(?:\r?\n|$)|\/\*[\s\S]*?\*\/)+/, '');
+  return /^SELECT\b/i.test(start) ? sql : null;
+}
+
 function comparison(
   expression: string,
-  filter: Pick<QueryFilter, 'operator' | 'value' | 'valueTo'>,
+  filter: Pick<QueryFilter, 'operator' | 'value' | 'valueTo' | 'inSource'>,
   other?: string | null,
 ): string {
   const valor = (value: string | null | undefined) =>
@@ -212,9 +226,12 @@ function comparison(
 
     case 'IN':
     case 'NOT IN':
+      if (filter.inSource === 'query') {
+        return `${expression} ${filter.operator} (\n${inSubquery(filter.value) ?? `/* ${translate('sql.writer.requiredValues')} */`}\n)`;
+      }
       // Se acepta la lista tal y como se escribe: `1, 2, 3` o `'a', 'b'`.
       return `${expression} ${filter.operator} (${
-        filter.value ?? `/* ${translate('sql.writer.requiredValues')} */`
+        filter.value?.trim() || `/* ${translate('sql.writer.requiredValues')} */`
       })`;
 
     case 'BETWEEN':

@@ -29,13 +29,21 @@ describe('druseTheme', () => {
     expect(conAcento.colors['editorCursor.foreground']?.toUpperCase()).toBe('#FF8800');
   });
 
-  it('mantiene legibles comentarios, operadores y números de línea sobre el fondo oscuro', () => {
+  it.each(['dark', 'light'] as const)(
+    'mantiene contraste alto en los signos y comentarios del tema %s',
+    (name) => {
+      const theme = druseTheme(name, null);
+      const background = parseHex(theme.colors['editorOverviewRuler.background'])!;
+      for (const token of ['comment', 'operator.sql', 'delimiter']) {
+        const rule = theme.rules.find((rule) => rule.token === token)!;
+        expect(contrast(parseHex(rule.foreground!)!, background)).toBeGreaterThanOrEqual(7);
+      }
+    },
+  );
+
+  it('mantiene legibles los números de línea sobre el fondo oscuro', () => {
     const theme = druseTheme('dark', null);
     const background = parseHex(theme.colors['editorOverviewRuler.background'])!;
-    for (const token of ['comment', 'operator.sql', 'delimiter']) {
-      const rule = theme.rules.find((rule) => rule.token === token)!;
-      expect(contrast(parseHex(rule.foreground!)!, background)).toBeGreaterThanOrEqual(4.5);
-    }
     expect(
       contrast(parseHex(theme.colors['editorLineNumber.foreground'])!, background),
     ).toBeGreaterThanOrEqual(4.5);
