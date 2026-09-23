@@ -1,6 +1,6 @@
 # Expediente para SignPath Foundation — borrador sin presentar
 
-Actualización del 15 de septiembre: [revisión documental de los cuatro controladores](../revisiones/controladores-signpath-2026-09-15.md). La consulta declara ahora GPL-3.0-only y el permiso adicional presente en `COPYRIGHT`; todavía no hay respuesta de SignPath ni revisión de redistribución cerrada.
+Actualización del 16 de septiembre: [respuesta a la consulta](consulta-signpath-borrador.md). SignPath considera que Druse todavía no está listo para revisión y admite evaluar una edición separada sin Oracle/IBM bajo condiciones; no ha aprobado la candidatura. SNI, WebView2, consentimiento durante la instalación y revisión de redistribución siguen abiertos. La [revisión documental de controladores](../revisiones/controladores-signpath-2026-09-15.md) conserva la evidencia local.
 
 Preparación: 13 de septiembre de 2026. Corresponde a **SIG-01** del [plan de SignPath y donaciones](../planes/plan-signpath-donaciones.md).
 
@@ -17,10 +17,10 @@ Privacidad: el aviso provisional ya está incorporado al código de Preferencias
 | El repositorio es privado | **DEC-01** |
 | GPL-3.0-only elegida y `LICENSE` incorporado; faltan procedencia y compatibilidad de terceros | **DEC-02-R**, **OSS-03/04** |
 | No hay release pública ni evidencia de uso | **PUB-04**, y después **PUB-05** |
-| El alcance de Oracle, IBM y SNI sigue sin resolver | **OSS-03**, con la [consulta](consulta-signpath-borrador.md) todavía sin enviar |
-| La opción de desactivar la búsqueda de actualizaciones no se ofrece durante la instalación | Respuesta a esa misma consulta |
+| El alcance de Oracle, IBM, SNI y WebView2 sigue sin resolver | **OSS-03 / DEC-03**: respuesta recibida; edición separada sin Oracle/IBM evaluable bajo condiciones, SNI/WebView2 sin resolución expresa |
+| La opción de desactivar la búsqueda de actualizaciones no se ofrece durante la instalación | **P-01**: la respuesta valora la activación explícita, pero no aclara si basta el primer arranque |
 
-Los cuatro primeros son decisiones o trabajo; el quinto puede que no haga falta, y por eso se pregunta antes de construir una página de instalador que quizá nadie exige.
+La respuesta pide repositorio público, artefacto publicado en la forma que se firmaría, licencia, inventario y flujo de construcción/firma. Debe aclararse el quinto punto; no se considera cerrado por la valoración favorable de la activación explícita.
 
 ## 2. El proyecto
 
