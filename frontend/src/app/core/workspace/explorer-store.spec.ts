@@ -132,6 +132,18 @@ describe('ExplorerStore', () => {
     expect(explorer.databasesFor('c2')).toEqual([]);
   });
 
+  it('sin recuento de filas no pinta un cero', async () => {
+    // La API manda `null`, no omite el campo: así llega todo lo que no es una
+    // tabla, y el árbol ponía un «0» junto a cada base y cada carpeta.
+    const sinRecuento = { ...database, approximateRowCount: null } as unknown as DatabaseObject;
+    const conRecuento = { ...database, id: 'db:otra', name: 'otra', approximateRowCount: 0 };
+    gateway.getDatabases = () => of([sinRecuento, conRecuento]);
+
+    await explorer.loadDatabases('c1', 'sesion-c1');
+
+    expect(explorer.nodes().map((node) => node.badge)).toEqual([undefined, '0']);
+  });
+
   it('desplegar carga los hijos una sola vez', async () => {
     await explorer.toggleNode('c1||db:druse_test');
     expect(explorer.nodes().map((node) => node.label)).toEqual(['druse_test', 'public']);

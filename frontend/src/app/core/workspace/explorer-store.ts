@@ -729,10 +729,11 @@ function toExplorerNode(entry: TreeEntry): ExplorerNode {
     expandable: object.hasChildren,
     expanded: entry.expanded,
     loading: entry.loading,
+    // `== null` y no `=== undefined`: la API manda `null` para todo lo que no es
+    // una tabla, y `formatNumber(null)` pintaba un «0» junto a cada base,
+    // esquema y carpeta del árbol.
     badge:
-      object.approximateRowCount === undefined
-        ? undefined
-        : formatNumber(object.approximateRowCount),
+      object.approximateRowCount == null ? undefined : formatNumber(object.approximateRowCount),
     hint: object.kind === 'column' ? object.dataType : undefined,
     source: object,
     connectionId: entry.connectionId,
