@@ -47,6 +47,25 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
+<#
+    La contraseña de estos contenedores, en un solo sitio.
+
+    Es de usar y tirar y solo escucha en loopback, pero estaba escrita a mano en
+    once líneas: repetirla invita a copiarla a otro sitio, y el analizador la
+    señala cada vez que la ve pegada a un `mysql -p`. Aquí se declara una vez y
+    se puede cambiar con DRUSE_TEST_PASSWORD sin tocar el script.
+
+    SQL Server exige mayúsculas, minúsculas, número y longitud mínima, así que
+    la suya se deriva de la misma en lugar de ser otra distinta que recordar.
+#>
+$DevPassword = if ($env:DRUSE_TEST_PASSWORD) { $env:DRUSE_TEST_PASSWORD } else { 'druse_dev_only' }
+$SqlServerPassword = if ($env:DRUSE_TEST_MSSQL_PASSWORD) {
+    $env:DRUSE_TEST_MSSQL_PASSWORD
+}
+else {
+    "$($DevPassword.Substring(0, 1).ToUpperInvariant())$($DevPassword.Substring(1))_1"
+}
+
 $PostgresName = 'druse-pg-test'
 $SqlServerName = 'druse-mssql-test'
 $MySqlName = 'druse-mysql-test'
@@ -84,7 +103,7 @@ if ($Engine -in 'all', 'postgres') {
 
         docker run -d `
             --name $PostgresName `
-            -e POSTGRES_PASSWORD=druse_dev_only `
+            -e POSTGRES_PASSWORD=$DevPassword `
             -e POSTGRES_DB=druse_test `
             -p "127.0.0.1:${PostgresPort}:5432" `
             postgres:18-alpine | Out-Null
@@ -153,7 +172,7 @@ if ($Engine -in 'all', 'sqlserver') {
         docker run -d `
             --name $SqlServerName `
             -e 'ACCEPT_EULA=Y' `
-            -e 'MSSQL_SA_PASSWORD=Druse_dev_only_1' `
+            -e "MSSQL_SA_PASSWORD=$SqlServerPassword" `
             -e 'MSSQL_PID=Developer' `
             -p "127.0.0.1:${SqlServerPort}:1433" `
             mcr.microsoft.com/mssql/server:2022-latest | Out-Null
@@ -166,7 +185,7 @@ if ($Engine -in 'all', 'sqlserver') {
         Start-Sleep -Seconds 1
 
         docker exec $SqlServerName /opt/mssql-tools18/bin/sqlcmd `
-            -S localhost -U sa -P 'Druse_dev_only_1' -C -Q 'SELECT 1' 2>$null | Out-Null
+            -S localhost -U sa -P "$SqlServerPassword" -C -Q 'SELECT 1' 2>$null | Out-Null
 
         if ($LASTEXITCODE -eq 0) { $ready = $true; break }
     }
@@ -177,7 +196,7 @@ if ($Engine -in 'all', 'sqlserver') {
 
     # La base no se crea sola, a diferencia de POSTGRES_DB.
     docker exec $SqlServerName /opt/mssql-tools18/bin/sqlcmd `
-        -S localhost -U sa -P 'Druse_dev_only_1' -C `
+        -S localhost -U sa -P "$SqlServerPassword" -C `
         -Q "IF DB_ID('druse_test') IS NULL CREATE DATABASE druse_test; IF DB_ID('druse_test_secondary') IS NULL CREATE DATABASE druse_test_secondary;" 2>$null | Out-Null
 
     Write-Host "  SQL Server listo en 127.0.0.1:$SqlServerPort" -ForegroundColor Green
@@ -194,7 +213,7 @@ if ($Engine -in 'all', 'mysql') {
 
         docker run -d `
             --name $MySqlName `
-            -e MYSQL_ROOT_PASSWORD=druse_dev_only `
+            -e MYSQL_ROOT_PASSWORD=$DevPassword `
             -e MYSQL_DATABASE=druse_test `
             -p "127.0.0.1:${MySqlPort}:3306" `
             mysql:8.4 | Out-Null
@@ -204,13 +223,13 @@ if ($Engine -in 'all', 'mysql') {
 
     foreach ($attempt in 1..60) {
         Start-Sleep -Seconds 1
-        docker exec $MySqlName mysqladmin ping -uroot -pdruse_dev_only 2>$null | Out-Null
+        docker exec $MySqlName mysqladmin ping -uroot "-p$DevPassword" 2>$null | Out-Null
 
         if ($LASTEXITCODE -eq 0) { $ready = $true; break }
     }
 
     if ($ready) {
-        docker exec $MySqlName mysql -uroot -pdruse_dev_only `
+        docker exec $MySqlName mysql -uroot "-p$DevPassword" `
             -e 'CREATE DATABASE IF NOT EXISTS druse_test_secondary;' 2>$null | Out-Null
 
         Write-Host "  MySQL listo en 127.0.0.1:$MySqlPort" -ForegroundColor Green
@@ -234,9 +253,9 @@ if ($Engine -in 'all', 'oracle') {
         # sola y no exige aceptar una licencia a mano en el registro.
         docker run -d `
             --name $OracleName `
-            -e ORACLE_PASSWORD=druse_dev_only `
+            -e ORACLE_PASSWORD=$DevPassword `
             -e APP_USER=druse `
-            -e APP_USER_PASSWORD=druse_dev_only `
+            -e APP_USER_PASSWORD=$DevPassword `
             -p "127.0.0.1:${OraclePort}:1521" `
             gvenzl/oracle-free:slim | Out-Null
     }
@@ -247,7 +266,7 @@ if ($Engine -in 'all', 'oracle') {
     foreach ($attempt in 1..180) {
         Start-Sleep -Seconds 1
 
-        docker exec $OracleName bash -lc "echo 'SELECT 1 FROM DUAL;' | sqlplus -s system/druse_dev_only@localhost/FREEPDB1" 2>$null | Out-Null
+        docker exec $OracleName bash -lc "echo 'SELECT 1 FROM DUAL;' | sqlplus -s system/$DevPassword@localhost/FREEPDB1" 2>$null | Out-Null
 
         if ($LASTEXITCODE -eq 0) { $ready = $true; break }
     }
@@ -266,13 +285,18 @@ if ($Engine -in 'all', 'oracle') {
     # `SELECT ANY SEQUENCE` no es de más: una columna de identidad crea por
     # detrás una secuencia, y sin poder leerla el `CREATE TABLE` en el otro
     # esquema falla con `ORA-41900`.
+    #
+    # El guion va en comillas simples para que PL/SQL conserve sus `$` y sus
+    # comillas tal cual; la contraseña se mete después, por su marca, en lugar
+    # de convertirlo en un here-string expandido donde cualquier `$` del SQL
+    # pasaría a ser una variable de PowerShell.
     $preparacion = @'
 DECLARE
   ya NUMBER;
 BEGIN
   SELECT COUNT(*) INTO ya FROM all_users WHERE username = 'DRUSE_SECUNDARIO';
   IF ya = 0 THEN
-    EXECUTE IMMEDIATE 'CREATE USER druse_secundario IDENTIFIED BY druse_dev_only';
+    EXECUTE IMMEDIATE 'CREATE USER druse_secundario IDENTIFIED BY __DRUSE_PASSWORD__';
     EXECUTE IMMEDIATE 'ALTER USER druse_secundario QUOTA UNLIMITED ON USERS';
   END IF;
 END;
@@ -287,10 +311,10 @@ GRANT CREATE ANY TABLE, ALTER ANY TABLE, DROP ANY TABLE,
       CREATE ANY INDEX, DROP ANY INDEX,
       CREATE ANY SEQUENCE, DROP ANY SEQUENCE, SELECT ANY SEQUENCE TO druse;
 EXIT;
-'@
+'@ -replace '__DRUSE_PASSWORD__', $DevPassword
 
     $preparacion | docker exec -i $OracleName bash -lc "cat > /tmp/druse-setup.sql" | Out-Null
-    docker exec $OracleName bash -lc "sqlplus -s system/druse_dev_only@localhost/FREEPDB1 @/tmp/druse-setup.sql" | Out-Null
+    docker exec $OracleName bash -lc "sqlplus -s system/$DevPassword@localhost/FREEPDB1 @/tmp/druse-setup.sql" | Out-Null
 
     Write-Host "  Oracle listo en 127.0.0.1:$OraclePort, servicio FREEPDB1, usuario druse" -ForegroundColor Green
 }
