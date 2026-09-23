@@ -30,11 +30,19 @@ internal static class InformixSqliConnectionStringFactory
     /// Como en DRDA, una conexión de Informix pertenece a **una** base y no se
     /// cambia con un `USE`: navegar a otra exige abrir otra conexión, y por eso
     /// la base es un parámetro y no se toma siempre del perfil.
+    ///
+    /// <paramref name="baseLocale"/> es el locale con el que se creó esa base,
+    /// tal como lo guarda el catálogo —`en_US.819`, `en_US.57372`—. Sin él, el
+    /// driver da por hecho `en_US.819` y **contra cualquier otra base se niega
+    /// a conectar**: el servidor responde «Database locale information
+    /// mismatch». Quién lo averigua y cuándo está en
+    /// <see cref="InformixSqliLocale"/>.
     /// </summary>
     public static string Build(
         ConnectionProfile profile,
         DatabaseCredentials credentials,
-        string? database)
+        string? database,
+        string? baseLocale = null)
     {
         ArgumentNullException.ThrowIfNull(profile);
 
@@ -84,6 +92,11 @@ internal static class InformixSqliConnectionStringFactory
         // fuerza por DRDA, escrito como lo espera este driver.
         url.Append(";DELIMIDENT=Y");
 
+        if (!string.IsNullOrWhiteSpace(baseLocale))
+        {
+            url.Append(";DB_LOCALE=").Append(InformixSqliLocale.Validar(baseLocale));
+        }
+
         if (profile.SslMode == SslMode.Require)
         {
             url.Append(";SSLCONNECTION=true");
@@ -110,5 +123,10 @@ internal static class InformixSqliConnectionStringFactory
         "password",
         "DELIMIDENT",
         "SSLCONNECTION",
+
+        // Lo decide el catálogo del servidor: un valor escrito a mano que no
+        // coincida con la base deja la conexión cerrada o, peor, las tildes
+        // convertidas con la tabla equivocada.
+        "DB_LOCALE",
     };
 }

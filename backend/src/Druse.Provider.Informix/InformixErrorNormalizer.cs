@@ -150,6 +150,13 @@ internal static class InformixErrorNormalizer
         -908 => "El servidor no admite más conexiones en este momento.",
         -329 => "No se encontró la base de datos indicada en ese servidor.",
         -387 => "El usuario no tiene permiso para conectarse a esta base de datos.",
+
+        // Por SQLI Druse ya averigua el locale de la base y reconecta con él; si
+        // llega hasta aquí es que no pudo leerlo del catálogo.
+        -23197 => "La base usa un locale distinto de Latin-1 y Druse no pudo leerlo en " +
+                  "sysmaster para conectar con él. Comprueba que este usuario pueda " +
+                  "entrar en sysmaster, o conéctate por DRDA, donde el servidor convierte " +
+                  "el texto por su cuenta.",
         _ => null,
     };
 }

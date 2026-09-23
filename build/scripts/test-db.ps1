@@ -346,11 +346,24 @@ if ($Engine -in 'all', 'informix') {
         $existing = docker exec $InformixName bash -lc `
             'echo "SELECT name FROM sysdatabases;" | dbaccess sysmaster -' 2>$null
 
-        foreach ($database in 'druse_test', 'druse_test2') {
+        # Las dos últimas no están en Latin-1, y es a propósito: el driver JDBC de
+        # SQLI supone `en_US.819` y contra cualquier otra base no conecta si Druse
+        # no le dice su locale. El locale de una base es el `DB_LOCALE` de quien
+        # la crea, así que se fija al crearla.
+        $databases = [ordered]@{
+            'druse_test'      = 'en_US.819'
+            'druse_test2'     = 'en_US.819'
+            'druse_test_utf8' = 'en_US.utf8'
+            'druse_test_1252' = 'en_US.1252'
+        }
+
+        foreach ($database in $databases.Keys) {
             if ($existing -match "\b$database\b") { continue }
 
+            $locale = $databases[$database]
+
             docker exec $InformixName bash -lc `
-                "echo `"CREATE DATABASE $database WITH LOG;`" | dbaccess - -" 2>$null | Out-Null
+                "export DB_LOCALE=$locale CLIENT_LOCALE=$locale; echo `"CREATE DATABASE $database WITH LOG;`" | dbaccess - -" 2>$null | Out-Null
         }
 
         Write-Host "  Informix listo en 127.0.0.1:$InformixPort (DRDA) y 127.0.0.1:$InformixSqliPort (SQLI)" -ForegroundColor Green

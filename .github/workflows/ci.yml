@@ -273,9 +273,15 @@ jobs:
           # Informix no tiene `CREATE DATABASE IF NOT EXISTS`, y las bases deben
           # llevar registro de transacciones porque DRDA lo exige: sin `WITH LOG`
           # el servidor está vivo pero rechaza la conexión.
+          #
+          # Las dos últimas, fuera de Latin-1 a propósito: por SQLI el driver no
+          # conecta a ellas si Druse no le dice su locale. El locale de una base
+          # es el `DB_LOCALE` de quien la crea.
           docker exec druse-informix bash -lc \
             'echo "CREATE DATABASE druse_test WITH LOG;" | dbaccess - -
-             echo "CREATE DATABASE druse_test2 WITH LOG;" | dbaccess - -'
+             echo "CREATE DATABASE druse_test2 WITH LOG;" | dbaccess - -
+             DB_LOCALE=en_US.utf8 CLIENT_LOCALE=en_US.utf8 dbaccess - - <<< "CREATE DATABASE druse_test_utf8 WITH LOG;"
+             DB_LOCALE=en_US.1252 CLIENT_LOCALE=en_US.1252 dbaccess - - <<< "CREATE DATABASE druse_test_1252 WITH LOG;"'
 
       - name: Probar contra los cuatro motores
         run: >

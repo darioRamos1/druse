@@ -177,9 +177,7 @@ public sealed class InformixDatabaseProvider : IDatabaseProvider
 
         try
         {
-            await using var connection = Crear(profile, credentials);
-
-            await connection.OpenAsync(cancellationToken);
+            await using var connection = await AbrirAsync(profile, credentials, cancellationToken);
 
             stopwatch.Stop();
             return TestConnectionResult.Success(connection.ServerVersion, stopwatch.Elapsed);
@@ -200,22 +198,16 @@ public sealed class InformixDatabaseProvider : IDatabaseProvider
     {
         ArgumentNullException.ThrowIfNull(profile);
 
-        var connection = Crear(profile, credentials);
+        DbConnection connection;
 
         try
         {
-            await connection.OpenAsync(cancellationToken);
-        }
-        catch (OperationCanceledException)
-        {
-            await connection.DisposeAsync();
-            throw;
+            // Si abrir falla, `AbrirAsync` ya deja la conexión cerrada: no queda
+            // ninguna viva a medias.
+            connection = await AbrirAsync(profile, credentials, cancellationToken);
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
-            // Si abrir falla, la conexión no debe quedar viva a medias.
-            await connection.DisposeAsync();
-
             // Y el motivo se cuenta: «la contraseña no es correcta» es algo que
             // el usuario puede arreglar; «error inesperado», no.
             throw new DatabaseOperationException(InformixErrorNormalizer.Normalize(exception));
@@ -232,21 +224,39 @@ public sealed class InformixDatabaseProvider : IDatabaseProvider
     /// Es el único punto donde los dos caminos se separan. Lo que devuelve es
     /// `DbConnection` en ambos casos, y por eso el resto del proveedor no tiene
     /// que enterarse de por dónde ha entrado.
+    ///
+    /// Por SQLI abrir no es un solo intento: si la base no está en Latin-1, el
+    /// driver necesita que se le diga su locale, y eso lo resuelve
+    /// <see cref="InformixSqliLocale"/>. Por DRDA el servidor convierte solo.
     /// </summary>
-    private DbConnection Crear(ConnectionProfile profile, DatabaseCredentials credentials)
+    private async Task<DbConnection> AbrirAsync(
+        ConnectionProfile profile,
+        DatabaseCredentials credentials,
+        CancellationToken cancellationToken)
     {
-        if (!EsSqli)
+        if (EsSqli)
         {
-            return new DB2Connection(InformixConnectionStringFactory.Build(profile, credentials));
+            // Idempotente y aquí, no en el constructor estático: el registro solo
+            // hace falta si alguien va a conectar por SQLI, y cargarlo siempre
+            // obligaría a la variante sin Informix a arrastrar el puente.
+            Druse.Jdbc.JdbcConnection.RegisterInformixDriver();
+
+            return await InformixSqliLocale.AbrirAsync(profile, credentials, cancellationToken);
         }
 
-        // Idempotente y aquí, no en el constructor estático: el registro solo hace
-        // falta si alguien va a conectar por SQLI, y cargarlo siempre obligaría a
-        // la variante sin Informix a arrastrar el puente.
-        Druse.Jdbc.JdbcConnection.RegisterInformixDriver();
+        var connection = new DB2Connection(InformixConnectionStringFactory.Build(profile, credentials));
 
-        return new Druse.Jdbc.JdbcConnection(
-            InformixSqliConnectionStringFactory.Build(profile, credentials));
+        try
+        {
+            await connection.OpenAsync(cancellationToken);
+
+            return connection;
+        }
+        catch
+        {
+            await connection.DisposeAsync();
+            throw;
+        }
     }
 
     public Task<IDatabaseSession> OpenDatabaseSessionAsync(

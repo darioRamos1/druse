@@ -280,6 +280,68 @@ public abstract class DatabaseProviderContractTests<TFixture>
         Assert.StartsWith("2026-08-11", row[3], StringComparison.Ordinal);
     }
 
+    /// <summary>
+    /// Las tildes llegan como se guardaron, por la cuadrícula **y** por exportar.
+    ///
+    /// Son dos caminos de lectura distintos —exportar abre su propio lector, en
+    /// streaming— y el texto tiene que salir idéntico por los dos en todos los
+    /// motores. Qué codificación usa cada servidor es cosa suya; lo que Druse
+    /// garantiza es que al usuario le llega el mismo «canción» que escribió.
+    ///
+    /// Solo letras de Latin-1: la base de pruebas de Informix está en
+    /// `en_US.819`, y un carácter que la base no puede guardar no dice nada del
+    /// proveedor. Las bases que no son Latin-1 se prueban aparte, en las pruebas
+    /// de SQLI, que es el transporte donde eso importa.
+    /// </summary>
+    [Fact]
+    public async Task Tildes_LleganIgualPorLaCuadriculaYPorExportar()
+    {
+        if (Skip) { return; }
+
+        const string Texto = "canción, Ñandú, pingüino";
+
+        await using var session = await OpenAsync();
+
+        var table = Fixture.Stored($"druse_tilde_{Guid.NewGuid().ToString("N")[..8]}");
+        var select = $"SELECT nombre FROM {table}";
+
+        try
+        {
+            var created = await ExecuteAsync(
+                session,
+                $"CREATE TABLE {table} (id INTEGER, nombre {Fixture.TypesByFamily[ColumnFamily.Text]})");
+
+            Assert.Equal(QueryExecutionState.Succeeded, created.State);
+
+            var inserted = await ExecuteAsync(session, $"INSERT INTO {table} (id, nombre) VALUES (1, '{Texto}')");
+
+            Assert.Equal(QueryExecutionState.Succeeded, inserted.State);
+
+            var grid = await ExecuteAsync(session, select);
+
+            Assert.Equal(Texto, grid.ResultSets[0].Rows[0][0]);
+
+            var exported = new List<string?>();
+
+            await using (var reader = await Fixture.Executor.OpenReaderAsync(
+                session,
+                Query(select),
+                CancellationToken.None))
+            {
+                await foreach (var row in reader.ReadRowsAsync(CancellationToken.None))
+                {
+                    exported.Add(row[0]);
+                }
+            }
+
+            Assert.Equal([Texto], exported);
+        }
+        finally
+        {
+            await ExecuteAsync(session, Fixture.DropTable(table));
+        }
+    }
+
     [Fact]
     public async Task ErrorDeSintaxis_DevuelveEstadoFallidoConCodigo()
     {
