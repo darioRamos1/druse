@@ -419,6 +419,71 @@ describe('QueryBuilder', () => {
     expect(sql).toContain('[t1].[name]');
   });
 
+  it('añade COUNT, SUM y MIN como totales sin obligar a usar GROUP BY', async () => {
+    const fixture = await create(table);
+    const element = fixture.nativeElement as HTMLElement;
+    await vi.waitFor(() => {
+      fixture.detectChanges();
+      expect(
+        element.querySelector<HTMLButtonElement>('button[aria-label="Añadir COUNT"]')!.disabled,
+      ).toBe(false);
+    });
+    for (const fn of ['COUNT', 'SUM', 'MIN']) {
+      element.querySelector<HTMLButtonElement>(`button[aria-label="Añadir ${fn}"]`)!.click();
+      fixture.detectChanges();
+    }
+    const sql = element.querySelector<HTMLTextAreaElement>('textarea.sql')!.value;
+    expect(sql).toContain('COUNT(*)');
+    expect(sql).toContain('SUM([total])');
+    expect(sql).toContain('MIN([id])');
+    expect(sql).not.toContain('GROUP BY');
+  });
+
+  it('edita una lista IN, cambia a subconsulta y valida consultas separadas', async () => {
+    const fixture = await create(table);
+    const builder = fixture.componentInstance as any;
+    const element = fixture.nativeElement as HTMLElement;
+    builder.addFilter();
+    builder.patchFilter(0, { operator: 'IN' });
+    fixture.detectChanges();
+    const list = element.querySelector<HTMLTextAreaElement>(
+      'textarea[aria-label="Lista de valores"]',
+    )!;
+    list.value = '1,\n2, 3';
+    list.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+    expect(builder.sql()).toContain('[id] IN (1,\n2, 3)');
+    const source = element.querySelector<HTMLSelectElement>('.in-editor select')!;
+    source.value = 'query';
+    source.dispatchEvent(new Event('change'));
+    fixture.detectChanges();
+    expect(builder.canPreview()).toBe(false);
+    const query = element.querySelector<HTMLTextAreaElement>(
+      'textarea[aria-label="Subconsulta SELECT"]',
+    )!;
+    query.value = 'SELECT id FROM a UNION SELECT id FROM b;';
+    query.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+    expect(builder.canPreview()).toBe(true);
+    expect(builder.sql()).toContain('IN (\nSELECT id FROM a UNION SELECT id FROM b\n)');
+    query.value = 'SELECT id FROM a; SELECT id FROM b;';
+    query.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+    expect(builder.canPreview()).toBe(false);
+    expect(element.textContent).toContain('Combina varios SELECT con UNION');
+  });
+
+  it('vuelve al total general sin conservar un ORDER BY de una columna agrupada', async () => {
+    const fixture = await create(table);
+    const builder = fixture.componentInstance as any;
+    builder.toggleGrouping();
+    builder.orders.set([{ id: 1, target: 'group:base:id', descending: false }]);
+    builder.clearGroupColumns();
+    expect(builder.sql()).toContain('COUNT(*)');
+    expect(builder.sql()).not.toContain('GROUP BY');
+    expect(builder.sql()).not.toContain('ORDER BY');
+  });
+
   it('activa GROUP BY y mantiene WHERE separado de HAVING', async () => {
     const fixture = await create(table);
     const element = fixture.nativeElement as HTMLElement;

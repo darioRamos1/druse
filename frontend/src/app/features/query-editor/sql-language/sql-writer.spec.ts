@@ -10,6 +10,7 @@ import {
   buildSelect,
   buildUpdate,
   buildUpdateValues,
+  inSubquery,
   quote,
 } from './sql-writer';
 
@@ -169,6 +170,51 @@ describe('escribir SQL', () => {
 
       expect(sql).toContain(`"nombre" NOT LIKE 'test%'`);
       expect(sql).toContain('"id" NOT IN (1, 2)');
+    });
+
+    it('escribe IN con una subconsulta UNION y retira solo el terminador exterior', () => {
+      const sql = buildSelect('postgresql', {
+        ...base,
+        filters: [
+          {
+            column: 'nombre',
+            operator: 'IN',
+            inSource: 'query',
+            value: "SELECT 'a;b' UNION SELECT 'c'; -- final",
+          },
+        ],
+      });
+      expect(sql).toContain(`"nombre" IN (\nSELECT 'a;b' UNION SELECT 'c'\n)`);
+    });
+
+    it('no incluye varias instrucciones sueltas dentro de una subconsulta', () => {
+      expect(inSubquery('SELECT id FROM a; SELECT id FROM b;')).toBeNull();
+      expect(inSubquery('DELETE FROM a;')).toBeNull();
+      expect(inSubquery('-- sin consulta')).toBeNull();
+    });
+
+    it('cierra NOT IN en otra línea para que un comentario final no lo oculte', () => {
+      const sql = buildSelect('postgresql', {
+        ...base,
+        filters: [
+          {
+            column: 'id',
+            operator: 'NOT IN',
+            inSource: 'query',
+            value: '-- ids\nSELECT id FROM pendientes -- revisar',
+          },
+        ],
+      });
+      expect(sql).toContain('"id" NOT IN (\n-- ids\nSELECT id FROM pendientes -- revisar\n)');
+    });
+
+    it('marca una lista IN vacía como pendiente en vez de generar IN ()', () => {
+      const sql = buildSelect('postgresql', {
+        ...base,
+        filters: [{ column: 'id', operator: 'IN', value: '  ' }],
+      });
+      expect(sql).not.toContain('IN ()');
+      expect(sql).toContain('IN (/*');
     });
 
     it('sin columnas elegidas usa el asterisco', () => {

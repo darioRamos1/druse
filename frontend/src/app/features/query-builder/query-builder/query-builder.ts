@@ -50,6 +50,7 @@ import {
   buildInsertValues,
   buildSelect,
   buildUpdateValues,
+  inSubquery,
   COMPARISON_OPERATORS,
 } from '../../query-editor/sql-language/sql-writer';
 import { SQL_DIALECTS } from '../../query-editor/sql-language/sql-dialects';
@@ -379,6 +380,7 @@ export class QueryBuilder implements OnInit {
         this.needsValue(filter.operator) &&
         !(filter as QueryFilter).compareColumn &&
         (filter.value === null ||
+          (this.isList(filter.operator) && !filter.value?.trim()) ||
           (filter.operator === 'BETWEEN' && (filter as QueryFilter).valueTo == null)),
     ),
   );
@@ -696,6 +698,21 @@ export class QueryBuilder implements OnInit {
   protected readonly validationMessages = computed(() => {
     const messages: string[] = [];
 
+    for (const filter of this.filters()) {
+      if (
+        this.isList(filter.operator) &&
+        filter.inSource === 'query' &&
+        filter.value?.trim() &&
+        !inSubquery(filter.value)
+      ) {
+        messages.push(this._i18n.t('builder.inQueryInvalid'));
+      }
+    }
+
+    if (!this.grouped()) {
+      return [...new Set(messages)];
+    }
+
     if (this.grouped() && this.groupByKeys().length === 0 && this.aggregates().length === 0) {
       messages.push(this._i18n.t('builder.needsGroupOrAggregate'));
     }
@@ -769,6 +786,15 @@ export class QueryBuilder implements OnInit {
     return this.groupByKeys().includes(key);
   }
 
+  protected clearGroupColumns(): void {
+    this.groupByKeys.set([]);
+    this.orders.update((current) =>
+      current.map((order) =>
+        order.target.startsWith('group:') ? { ...order, target: '' } : order,
+      ),
+    );
+  }
+
   protected toggleGroupColumn(key: string): void {
     this.groupByKeys.update((current) =>
       current.includes(key) ? current.filter((item) => item !== key) : [...current, key],
@@ -791,18 +817,35 @@ export class QueryBuilder implements OnInit {
     return isDateColumn(option.column);
   }
 
-  protected addAggregate(): void {
+  protected addAggregate(fn: AggregateFunction = 'COUNT'): void {
+    // Los accesos directos calculan un total global; GROUP BY se elige por separado.
+    if (!this.grouped()) {
+      this.grouped.set(true);
+      this.groupByKeys.set([]);
+      this.orders.set([{ id: 1, target: '', descending: false }]);
+    }
     const id = Math.max(0, ...this.aggregates().map((aggregate) => aggregate.id)) + 1;
     this.aggregates.update((current) => [
       ...current,
       {
         id,
-        function: 'COUNT',
-        columnKey: '*',
+        function: fn,
+        columnKey: fn === 'COUNT' ? '*' : this.preferredAggregateColumn(fn),
         alias: id === 1 ? this.defaultAlias() : `${this.defaultAlias()}_${id}`,
         distinct: false,
       },
     ]);
+  }
+
+  private preferredAggregateColumn(fn: AggregateFunction): string {
+    const columns = this.queryColumns();
+    const preferred =
+      fn === 'SUM' || fn === 'AVG'
+        ? (columns.find(
+            (option) => isNumericColumn(option.column) && !option.column.isPrimaryKey,
+          ) ?? columns.find((option) => isNumericColumn(option.column)))
+        : columns.find((option) => this.chosen().includes(option.column.name));
+    return preferred?.key ?? columns[0]?.key ?? '';
   }
 
   protected patchAggregate(id: number, patch: Partial<AggregateDraft>): void {
@@ -822,7 +865,7 @@ export class QueryBuilder implements OnInit {
       function: value,
       columnKey:
         value !== 'COUNT' && aggregate.columnKey === '*'
-          ? (this.queryColumns()[0]?.key ?? '*')
+          ? this.preferredAggregateColumn(value)
           : aggregate.columnKey,
     });
   }
@@ -1422,8 +1465,18 @@ export class QueryBuilder implements OnInit {
 
   protected patchFilter(index: number, patch: Partial<QueryFilter>): void {
     this.filters.update((current) =>
-      current.map((filter, i) => (i === index ? { ...filter, ...patch } : filter)),
+      current.map((filter, i) => {
+        if (i !== index) return filter;
+        if (patch.operator && this.isList(patch.operator) !== this.isList(filter.operator)) {
+          return { ...filter, ...patch, value: null, compareColumn: null, inSource: 'list' };
+        }
+        return { ...filter, ...patch };
+      }),
     );
+  }
+
+  protected setInSource(index: number, inSource: 'list' | 'query'): void {
+    this.patchFilter(index, { inSource, value: null, compareColumn: null });
   }
 
   protected addUpdateFilter(): void {
@@ -1513,6 +1566,7 @@ export class QueryBuilder implements OnInit {
    * `"id" = ''`. En texto sí lo es, y se respeta.
    */
   protected filterText(filter: QueryFilter, text: string): string | null {
+    if (this.isList(filter.operator) && !text.trim()) return null;
     return text === '' && this.filterKind(filter) !== 'text' ? null : text;
   }
 

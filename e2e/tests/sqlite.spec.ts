@@ -173,6 +173,38 @@ async function hastaLasTablas(page: Page) {
 }
 
 test.describe('SQLite de punta a punta', () => {
+  test('combina COUNT SUM MIN con una lista IN y con subconsultas UNION', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    await abrir(page);
+    await hastaLasTablas(page);
+    await page.getByRole('button', { name: 'Tema oscuro', exact: true }).click();
+    await menuDeNodo(page, 'pedidos');
+    await page.getByRole('menuitem', { name: 'Componer consulta', exact: true }).click();
+    const builder = page.locator('app-query-builder');
+    for (const fn of ['COUNT', 'SUM', 'MIN']) {
+      await builder.getByRole('button', { name: `Añadir ${fn}`, exact: true }).click();
+    }
+    await builder.getByLabel('Columna agregada', { exact: true }).nth(1).selectOption('base:total');
+    await builder.getByLabel('Columna agregada', { exact: true }).nth(2).selectOption('base:total');
+    await builder.getByRole('button', { name: 'Añadir filtro', exact: true }).click();
+    await builder.getByLabel('Columna', { exact: true }).selectOption('cliente_id');
+    await builder.getByLabel('Operador', { exact: true }).selectOption('IN');
+    await builder.getByRole('textbox', { name: 'Lista de valores', exact: true }).fill('1, 2');
+    await expect(builder.locator('textarea.sql')).not.toHaveValue(/GROUP BY/);
+    await builder.getByRole('button', { name: 'Probar con 10 filas', exact: true }).click();
+    await expect(builder.locator('app-results-grid .cell__text')).toHaveText(['2', '12', '5']);
+    await builder.getByLabel('Comparar IN con', { exact: true }).selectOption('query');
+    await builder.getByRole('textbox', { name: 'Subconsulta SELECT', exact: true }).fill(
+      "SELECT id FROM clientes WHERE nombre = 'Ana'\nUNION\nSELECT id FROM clientes WHERE nombre = 'Luis';",
+    );
+    await builder.getByRole('button', { name: 'Probar con 10 filas', exact: true }).click();
+    await expect(builder.locator('app-results-grid .cell__text')).toHaveText(['2', '12', '5']);
+    if (process.env['DRUSE_BARRIDO_DIR']) {
+      mkdirSync(BARRIDO, { recursive: true });
+      await page.screenshot({ path: join(BARRIDO, 'query-builder-aggregates-in.png') });
+    }
+  });
+
   test('el compositor permite buscar columnas y revisar resultados en ambos temas', async ({
     page,
   }) => {

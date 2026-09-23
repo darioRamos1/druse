@@ -439,10 +439,29 @@
             </label>
           </div>
 
+          <div class="aggregate-shortcuts" [attr.aria-label]="'builder.aggregates' | t">
+            @for (fn of aggregateFunctions; track fn) {
+              <button
+                type="button"
+                class="btn btn--small"
+                [disabled]="loading() || queryColumns().length === 0"
+                [attr.aria-label]="'builder.addFunction' | t: { function: fn }"
+                (click)="addAggregate(fn)"
+              >
+                <span translate="no">+ {{ fn }}</span>
+              </button>
+            }
+          </div>
+
           @if (grouped()) {
             <div class="block">
               <span class="block__title">{{ 'builder.groupColumns' | t }}</span>
               <p class="hint">{{ 'builder.groupColumnsHint' | t }}</p>
+              @if (groupByKeys().length > 0) {
+                <button type="button" class="btn btn--small" (click)="clearGroupColumns()">
+                  {{ 'builder.globalTotals' | t }}
+                </button>
+              }
               <div class="columns">
                 @for (option of queryColumns(); track option.key) {
                   <label class="column" [class.is-on]="isGrouped(option.key)">
@@ -487,7 +506,7 @@
               </div>
 
               @for (aggregate of aggregates(); track aggregate.id) {
-                <div class="filter">
+                <div class="filter aggregate-row">
                   <select
                     [value]="aggregate.function"
                     (change)="changeAggregateFunction(aggregate.id, $any($event.target).value)"
@@ -633,7 +652,7 @@
           }
 
           @for (filter of filters(); track $index; let filterIndex = $index) {
-            <div class="filter">
+            <div class="filter" [class.filter--list]="isList(filter.operator)">
               @if (filterIndex > 0) {
                 <select
                   [value]="filter.conjunction ?? 'AND'"
@@ -697,6 +716,44 @@
                     </option>
                   }
                 </select>
+              } @else if (isList(filter.operator)) {
+                <div class="in-editor">
+                  <label class="field">
+                    <span>{{ 'builder.inSource' | t }}</span>
+                    <select
+                      [value]="filter.inSource ?? 'list'"
+                      [attr.aria-label]="'builder.inSource' | t"
+                      (change)="setInSource($index, $any($event.target).value)"
+                    >
+                      <option value="list">{{ 'builder.inList' | t }}</option>
+                      <option value="query">{{ 'builder.inQuery' | t }}</option>
+                    </select>
+                  </label>
+                  <textarea
+                    [rows]="filter.inSource === 'query' ? 5 : 3"
+                    [value]="filter.value ?? ''"
+                    (input)="
+                      patchFilter($index, { value: filterText(filter, $any($event.target).value) })
+                    "
+                    [attr.aria-label]="
+                      (filter.inSource === 'query' ? 'builder.inQuery' : 'builder.inList') | t
+                    "
+                    [attr.aria-describedby]="'in-hint-' + filterIndex"
+                    [placeholder]="
+                      (filter.inSource === 'query'
+                        ? 'builder.inQueryExample'
+                        : 'builder.inListExample'
+                      ) | t
+                    "
+                    spellcheck="false"
+                  ></textarea>
+                  <p class="hint" [id]="'in-hint-' + filterIndex">
+                    {{
+                      (filter.inSource === 'query' ? 'builder.inQueryHint' : 'builder.inListHint')
+                        | t
+                    }}
+                  </p>
+                </div>
               } @else if (needsValue(filter.operator)) {
                 <app-value-input
                   [value]="filter.value ?? ''"
