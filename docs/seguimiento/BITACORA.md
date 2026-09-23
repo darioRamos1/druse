@@ -448,20 +448,43 @@ compilado con un servidor estático que devuelva la CSP exacta del envoltorio.
 ## 2. Cómo retomar (prompt de arranque de sesión)
 
 ```text
-Lee docs/seguimiento/BITACORA.md y docs/planes/PLAN_TRABAJO_DRUSE.md, y revisa el mockup de referencia
-docs/mockups/druse-main.html.
+Lee docs/seguimiento/BITACORA.md —empieza por «Estado actual» y «Qué toca
+retomar»— y el plan de lo que vayas a tocar, que vive en docs/planes/.
 
 Antes de escribir código:
-1. Confirma la fase activa y las tareas pendientes según la bitácora.
-2. Verifica el estado real del repositorio (no confíes solo en la bitácora):
-   `git status` y `git log` antes de nada.
-3. Lee «Qué toca retomar»: las correcciones 028–030 están verificadas y solo
-   falta integrarlas antes de volver a los motores reales.
-4. Propón únicamente los cambios de la siguiente tarea pendiente.
+1. Mira el estado real del repositorio, no solo la bitácora: `git status`,
+   `git log --oneline -10` y `gh pr list`.
+2. Si hay trabajo mío sin commitear, no lo toques sin preguntar: puede estar a
+   medias. Lo tuyo va en commits temáticos sobre la rama, con rutas explícitas
+   en `git add` —nunca `git add <carpeta>`, que se lleva lo que no es tuyo.
+3. Dime qué vas a hacer y hazlo; no hace falta que me pidas permiso para cada
+   paso.
 
-Al terminar: ejecuta compilación y pruebas, resume archivos modificados y
-actualiza el checklist del plan y esta bitácora.
+Cómo se entra en `main`: por pull request. La rama exige una aprobación y nadie
+puede aprobar la suya, así que se fusiona con `gh pr merge --squash --admin`.
+El flujo `comunidad` tarda unos veinte minutos y es el que decide.
+
+Al terminar: compila, ejecuta las pruebas que toquen, comprueba en la aplicación
+levantada lo que se vea en pantalla, y actualiza el plan y esta bitácora.
 ```
+
+### Lo primero de la próxima sesión
+
+Elige uno y dilo antes de empezar:
+
+- **Los ~51 avisos de SonarQube.** Solo se ven desde el editor del usuario:
+  pídele el panel de problemas pegado, por bloques. Se cerraron ya los cinco de
+  `workspace-store.ts` y el de `test-db.ps1`.
+- **El PR #29**, que no puede entrar hasta rehacer los avisos de Rust por
+  versión. Es trabajo de evidencia y el expediente prohíbe reutilizar la
+  licencia de otra versión: se decide con el usuario antes de tocarlo.
+- **La fase 2 de los idiomas**, por donde iba: los normalizadores de error de
+  cada motor, y después respaldos, restauraciones y traslados. El camino ya está
+  hecho —`UserMessage`, `MessageKeys` y la prueba que los ata al catálogo—; se
+  copia el patrón de `ConnectionProfileValidator`.
+- **Lo que falta por comprobar**: las siete e2e de SQL Server y Oracle, que
+  necesitan sus contenedores (`./build/scripts/test-db.ps1 -Engine sqlserver`), y
+  los instaladores, que no se regeneran desde antes de los idiomas.
 
 ---
 
