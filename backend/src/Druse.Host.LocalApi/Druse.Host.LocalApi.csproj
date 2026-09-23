@@ -7,13 +7,13 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.12" />
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.10" />
     <!--
       Referencia directa para elevar la dependencia transitiva de Microsoft.AspNetCore.OpenApi,
       que trae Microsoft.OpenApi 2.0.0 (CVE-2026-49451, GHSA-v5pm-xwqc-g5wc, CVSS 7.5).
       Parcheado a partir de 2.7.5. Revisar si una versión futura del SDK ya la eleva.
     -->
-    <PackageReference Include="Microsoft.OpenApi" Version="2.12.2" />
+    <PackageReference Include="Microsoft.OpenApi" Version="2.7.5" />
   </ItemGroup>
 
   <ItemGroup>
