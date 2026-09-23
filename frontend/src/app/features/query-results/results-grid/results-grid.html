@@ -120,6 +120,7 @@
     <div
       class="row"
       role="row"
+      [class.is-striped]="r % 2 === 1"
       [attr.aria-rowindex]="headerRows() + r + 1"
       [style.grid-template-columns]="gridTemplate()"
     >

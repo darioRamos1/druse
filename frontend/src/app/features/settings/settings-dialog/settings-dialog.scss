@@ -525,3 +525,64 @@
   cursor: pointer;
   box-shadow: var(--dr-shadow-accent-button);
 }
+
+/*
+ * La miniatura se queda arriba al bajar: los colores están debajo, y elegir uno
+ * sin ver dónde cae obligaba a subir y bajar en cada cambio. El fondo tapa lo
+ * que pasa por detrás; los márgenes negativos lo estiran hasta el borde del
+ * hueco con desplazamiento sin mover la miniatura de su sitio.
+ */
+.grid-preview-dock {
+  position: sticky;
+  z-index: 1;
+  top: -18px;
+  margin: -18px -20px 0;
+  padding: 18px 20px 12px;
+  background: var(--dr-surface-dialog);
+}
+
+// Dos columnas: son ocho colores, y en una sola la lista empujaba el botón de
+// restablecer fuera de la vista.
+.grid-colors {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 8px 16px;
+  margin: 0 0 12px;
+  padding: 0;
+  list-style: none;
+
+  &__item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 30px;
+  }
+
+  &__label {
+    flex: 1;
+    color: var(--dr-text-muted);
+  }
+
+  // Los enlaces van arriba en el resto del diálogo; aquí comparten fila con la
+  // muestra y se centran con ella.
+  .link {
+    align-self: center;
+  }
+}
+
+/* Una muestra que es a la vez el selector: se ve el color puesto y se pulsa
+   encima para cambiarlo. */
+.swatch--pick {
+  flex: none;
+  overflow: hidden;
+
+  input {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    border: 0;
+    opacity: 0;
+    cursor: pointer;
+  }
+}

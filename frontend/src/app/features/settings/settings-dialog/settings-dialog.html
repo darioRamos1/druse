@@ -19,7 +19,7 @@
       (click)="closed.emit()"
       [attr.aria-label]="'common.close' | t"
     >
-      ×
+      <app-icon name="close" [size]="12" />
     </button>
   </header>
 
@@ -357,6 +357,118 @@
         @if (problem(); as message) {
           <p class="problem">{{ message }}</p>
         }
+      </section>
+    </div>
+    <div
+      class="settings-panel"
+      role="tabpanel"
+      id="settings-panel-results"
+      aria-labelledby="settings-tab-results"
+      [hidden]="section() !== 'results'"
+    >
+      <!--
+        La miniatura lee las mismas variables que la cuadrícula de verdad, así
+        que cada cambio se ve aquí en el momento y sin tener que ejecutar nada.
+      -->
+      <div class="grid-preview-dock">
+        <app-grid-preview [label]="'settings.grid.preview' | t" />
+      </div>
+
+      <section class="section">
+        <h3 class="section__title">{{ 'settings.grid.title' | t }}</h3>
+        <p class="section__hint">{{ 'settings.grid.hint' | t }}</p>
+
+        <div class="field">
+          <span class="field__label">{{ 'settings.grid.size' | t }}</span>
+          <div
+            class="choice choice--wrap"
+            role="group"
+            [attr.aria-label]="'settings.grid.sizeGroup' | t"
+          >
+            @for (size of gridFontSizes; track size) {
+              <button
+                type="button"
+                class="choice__item choice__item--compact"
+                [class.is-active]="grid().fontSize === size"
+                [attr.aria-pressed]="grid().fontSize === size"
+                (click)="setGrid({ fontSize: size })"
+              >
+                {{ size }}
+              </button>
+            }
+          </div>
+        </div>
+
+        <div class="field">
+          <span class="field__label">{{ 'settings.grid.font' | t }}</span>
+          <div class="choice" role="group" [attr.aria-label]="'settings.grid.fontGroup' | t">
+            <button
+              type="button"
+              class="choice__item"
+              [class.is-active]="grid().font === 'mono'"
+              [attr.aria-pressed]="grid().font === 'mono'"
+              (click)="setGrid({ font: 'mono' })"
+            >
+              {{ 'settings.grid.font.mono' | t }}
+            </button>
+            <button
+              type="button"
+              class="choice__item"
+              [class.is-active]="grid().font === 'ui'"
+              [attr.aria-pressed]="grid().font === 'ui'"
+              (click)="setGrid({ font: 'ui' })"
+            >
+              {{ 'settings.grid.font.ui' | t }}
+            </button>
+          </div>
+        </div>
+
+        <label class="checkbox">
+          <input
+            type="checkbox"
+            [checked]="grid().zebra"
+            (change)="setGrid({ zebra: $any($event.target).checked })"
+          />
+          <span>
+            {{ 'settings.grid.zebra' | t }}
+            <span class="checkbox__hint">{{ 'settings.grid.zebraHint' | t }}</span>
+          </span>
+        </label>
+      </section>
+
+      <section class="section">
+        <h3 class="section__title">{{ 'settings.grid.colors.title' | t }}</h3>
+        <p class="section__hint">{{ 'settings.grid.colors.hint' | t }}</p>
+
+        <ul class="grid-colors">
+          @for (item of gridColors; track item.key) {
+            <li class="grid-colors__item">
+              <label class="swatch swatch--pick" [style.--swatch]="gridColorValues()[item.key]">
+                <input
+                  type="color"
+                  [value]="gridColorValues()[item.key]"
+                  [attr.aria-label]="'settings.grid.colorLabel' | t: { name: item.label | t }"
+                  (change)="setGridColor(item.key, $any($event.target).value)"
+                />
+              </label>
+              <span class="grid-colors__label">{{ item.label | t }}</span>
+              @if (grid().colors[item.key]) {
+                <button type="button" class="link" (click)="setGridColor(item.key, null)">
+                  {{ 'settings.useTheme' | t }}
+                </button>
+              }
+            </li>
+          }
+        </ul>
+
+        <button
+          type="button"
+          class="link link--inline"
+          [disabled]="!gridCustomized()"
+          (click)="resetGrid()"
+        >
+          {{ 'settings.grid.reset' | t }}
+        </button>
       </section>
     </div>
     <div

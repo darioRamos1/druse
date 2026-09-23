@@ -326,6 +326,53 @@ test.describe('barrido visual', () => {
       await cerrar(page, dialogo, nombre);
     }
 
+    // --- Los colores de la cuadrícula ------------------------------------------
+    // Se prueban con la cuadrícula de verdad detrás, no solo con la miniatura: la
+    // miniatura copia las reglas a mano y podría quedarse atrás sin que nadie lo
+    // viera. Se deja como estaba al terminar, que lo que sigue fotografía el tema
+    // de serie.
+    await page.getByRole('button', { name: 'Preferencias' }).click();
+
+    const ajustes = page.locator('app-settings-dialog');
+
+    await expect(ajustes).toBeVisible({ timeout: 30_000 });
+    await ajustes.getByRole('tab', { name: 'Resultados', exact: true }).click();
+    await page.waitForTimeout(300);
+    await medir(page, 'preferencias de resultados', hallazgos);
+    await foto(page, '08e-preferencias-resultados', ajustes.locator('.dialog'));
+
+    await ajustes.getByRole('button', { name: '14', exact: true }).click();
+    await ajustes.getByRole('checkbox', { name: /Filas alternas/ }).check();
+    await ajustes.getByLabel('Color: Fondo de la cabecera').fill('#2b3a55');
+    await ajustes.getByLabel('Color: Números').fill('#f0b429');
+    await ajustes.getByLabel('Color: Texto').fill('#9ad7c3');
+    await ajustes.getByLabel('Color: NULL').fill('#f2686b');
+    await page.waitForTimeout(300);
+    await foto(page, '08f-preferencias-resultados-a-mano', ajustes.locator('.dialog'));
+    await cerrar(page, ajustes, 'preferencias de resultados');
+
+    // Una consulta propia, con un valor de cada tipo que tiene color: la de la
+    // pestaña puede ser cualquiera a estas alturas.
+    await apuntarPestana(page);
+    await escribirSql(
+      page,
+      `SELECT n AS numero, 'fila ' || n AS descripcion, NULLIF(n % 3, 0)::text AS vacio,
+              now() AS cuando, n % 2 = 0 AS par
+       FROM generate_series(1, 12) AS n`,
+    );
+    await ejecutar(page, 'todo');
+    await page.locator('app-results-panel').getByText('Resultados').first().click();
+    await expect(page.locator('app-results-grid .row').first()).toBeVisible({ timeout: 30_000 });
+    await page.waitForTimeout(300);
+    await medir(page, 'resultados a mano', hallazgos);
+    await foto(page, '08g-resultados-a-mano', page.locator('app-results-panel'));
+
+    await page.getByRole('button', { name: 'Preferencias' }).click();
+    await expect(ajustes).toBeVisible({ timeout: 30_000 });
+    await ajustes.getByRole('tab', { name: 'Resultados', exact: true }).click();
+    await ajustes.getByRole('button', { name: 'Restablecer los resultados' }).click();
+    await cerrar(page, ajustes, 'preferencias de resultados');
+
     // --- El paso donde se elige el destino del respaldo --------------------
     // La casilla de sobrescribir solo sale cuando lo que se va a escribir es una
     // carpeta: un archivo o un zip los nombra el usuario en el diálogo del

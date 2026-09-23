@@ -58,7 +58,66 @@ export interface Appearance {
   /** Color del que se toman matiz y saturación para teñir el decorado. */
   readonly tint: string | null;
   readonly background: EditorBackground | null;
+  readonly grid: GridAppearance;
 }
+
+/**
+ * Lo que se puede pintar a mano en la cuadrícula de resultados.
+ *
+ * Una clave por cosa que se distingue al leer un resultado: la cabecera, las
+ * líneas y el color que ya da el tipo de cada columna. No hay un color por
+ * columna concreta porque las columnas cambian con cada consulta; lo que se
+ * repite de una a otra es el tipo.
+ */
+export type GridColorKey =
+  | 'headerBackground'
+  | 'headerText'
+  | 'lines'
+  | 'text'
+  | 'number'
+  | 'timestamp'
+  | 'boolean'
+  | 'null';
+
+export const GRID_COLOR_KEYS: readonly GridColorKey[] = [
+  'headerBackground',
+  'headerText',
+  'lines',
+  'text',
+  'number',
+  'timestamp',
+  'boolean',
+  'null',
+];
+
+/**
+ * Qué letra usan las celdas.
+ *
+ * La monoespaciada alinea las cifras de una columna, que es por lo que es la de
+ * serie; la de la interfaz cabe más texto por columna, y hay quien consulta más
+ * nombres que importes.
+ */
+export type GridFont = 'mono' | 'ui';
+
+export interface GridAppearance {
+  /** Cuerpo de la letra de las celdas, en píxeles. El modo compacto le quita uno. */
+  readonly fontSize: number;
+  readonly font: GridFont;
+  /** Filas alternas sombreadas, para no perder la fila al leer de lado a lado. */
+  readonly zebra: boolean;
+  /** Colores elegidos; lo que falta, o es `null`, es el del tema. */
+  readonly colors: Readonly<Partial<Record<GridColorKey, string | null>>>;
+}
+
+/** Tamaños de letra de la cuadrícula que se ofrecen. */
+export const GRID_FONT_SIZES: readonly number[] = [10, 11, 12, 13, 14, 16];
+
+export const DEFAULT_GRID: GridAppearance = {
+  fontSize: 12,
+  font: 'mono',
+  zebra: false,
+  colors: {},
+};
 
 export const DEFAULT_APPEARANCE: Appearance = {
   theme: DEFAULT_THEME,
@@ -67,7 +126,18 @@ export const DEFAULT_APPEARANCE: Appearance = {
   accent: null,
   tint: null,
   background: null,
+  grid: DEFAULT_GRID,
 };
+
+/** Si la cuadrícula está como la trae el tema. */
+export function isDefaultGrid(grid: GridAppearance): boolean {
+  return (
+    grid.fontSize === DEFAULT_GRID.fontSize &&
+    grid.font === DEFAULT_GRID.font &&
+    grid.zebra === DEFAULT_GRID.zebra &&
+    GRID_COLOR_KEYS.every((key) => !grid.colors[key])
+  );
+}
 
 /** Saturación del decorado en las dos paletas. Es el 1× de la escala. */
 const BASE_TINT_SATURATION = 30;
@@ -108,6 +178,12 @@ export function appearancePreferences(appearance: Appearance): Readonly<Record<s
     'ui.editorBackground.scale': String(appearance.background?.scale ?? ''),
     'ui.editorBackground.x': String(appearance.background?.x ?? ''),
     'ui.editorBackground.y': String(appearance.background?.y ?? ''),
+    'ui.grid.fontSize': String(appearance.grid.fontSize),
+    'ui.grid.font': appearance.grid.font,
+    'ui.grid.zebra': String(appearance.grid.zebra),
+    ...Object.fromEntries(
+      GRID_COLOR_KEYS.map((key) => [`ui.grid.color.${key}`, appearance.grid.colors[key] ?? '']),
+    ),
   };
 }
 
@@ -139,6 +215,26 @@ export function parseAppearance(
     accent: color(raw, 'ui.accent', current.accent),
     tint: color(raw, 'ui.tint', current.tint),
     background: background(raw, current.background),
+    grid: grid(raw, current.grid),
+  };
+}
+
+function grid(raw: Readonly<Record<string, string>>, current: GridAppearance): GridAppearance {
+  const fontSize = Number.parseInt(raw['ui.grid.fontSize'] ?? '', 10);
+  const font = raw['ui.grid.font'];
+  const zebra = raw['ui.grid.zebra'];
+
+  return {
+    fontSize: GRID_FONT_SIZES.includes(fontSize) ? fontSize : current.fontSize,
+    font: font === 'mono' || font === 'ui' ? font : current.font,
+    zebra: zebra === 'true' ? true : zebra === 'false' ? false : current.zebra,
+    // Solo lo elegido: un color que es el del tema no se apunta, ni como `null`.
+    colors: Object.fromEntries(
+      GRID_COLOR_KEYS.flatMap((key) => {
+        const value = color(raw, `ui.grid.color.${key}`, current.colors[key] ?? null);
+        return value ? [[key, value]] : [];
+      }),
+    ),
   };
 }
 
@@ -224,8 +320,85 @@ export function appearanceVariables(appearance: Appearance): Readonly<Record<str
     ...accentVariables(appearance),
     ...tintVariables(appearance),
     ...scaleVariables(appearance),
+    ...gridVariables(appearance.grid),
   };
 }
+
+/**
+ * La cuadrícula de resultados, escrita como variables que la hoja de la
+ * cuadrícula lee con el color del tema de respaldo.
+ *
+ * Dos colores arrastran a otros. Una cabecera con fondo propio y sin color de
+ * letra elegido se queda con el que más contraste dé, por lo mismo que el texto
+ * sobre el acento; y el booleano pinta también su píldora, con el borde y el
+ * relleno sacados de él para que no quede un verde enmarcando otro color.
+ */
+function gridVariables(grid: GridAppearance): Record<string, string> {
+  const variables: Record<string, string> = {};
+  const colors = Object.fromEntries(
+    GRID_COLOR_KEYS.flatMap((key) => {
+      const rgb = grid.colors[key] ? parseHex(grid.colors[key]!) : null;
+      return rgb ? [[key, rgb]] : [];
+    }),
+  ) as Partial<Record<GridColorKey, Rgb>>;
+
+  for (const [key, rgb] of Object.entries(colors) as [GridColorKey, Rgb][]) {
+    variables[`--dr-grid-${GRID_VARIABLE[key]}`] = toHex(rgb);
+  }
+
+  if (colors.headerBackground && !colors.headerText) {
+    variables['--dr-grid-header-text'] = readableOn(colors.headerBackground);
+  }
+
+  // El tipo de la columna va en el mismo color que el nombre pero apagado: con
+  // su gris de serie encima de una cabecera pintada a mano podía no leerse.
+  if (colors.headerBackground || colors.headerText) {
+    variables['--dr-grid-header-type-opacity'] = '0.65';
+  }
+
+  if (colors.boolean) {
+    const rgb = toRgbComponents(colors.boolean);
+    variables['--dr-grid-boolean-tint'] = `rgb(${rgb} / 12%)`;
+    variables['--dr-grid-boolean-line'] = `rgb(${rgb} / 35%)`;
+  }
+
+  if (grid.fontSize !== DEFAULT_GRID.fontSize) {
+    variables['--dr-grid-font-size'] = `${grid.fontSize}px`;
+  }
+
+  if (grid.font === 'ui') {
+    variables['--dr-grid-font'] = 'var(--dr-font-ui)';
+  }
+
+  if (grid.zebra) {
+    variables['--dr-grid-stripe'] = 'var(--dr-surface-stripe)';
+  }
+
+  return variables;
+}
+
+/** El nombre de la variable de cada color, sin el prefijo. */
+const GRID_VARIABLE: Readonly<Record<GridColorKey, string>> = {
+  headerBackground: 'header-bg',
+  headerText: 'header-text',
+  lines: 'lines',
+  text: 'text',
+  number: 'number',
+  timestamp: 'timestamp',
+  boolean: 'boolean',
+  null: 'null',
+};
+
+/** Todas las variables que puede escribir la cuadrícula, para poder retirarlas. */
+export const GRID_VARIABLES: readonly string[] = [
+  ...Object.values(GRID_VARIABLE).map((name) => `--dr-grid-${name}`),
+  '--dr-grid-boolean-tint',
+  '--dr-grid-boolean-line',
+  '--dr-grid-header-type-opacity',
+  '--dr-grid-font-size',
+  '--dr-grid-font',
+  '--dr-grid-stripe',
+];
 
 /**
  * El acento entero a partir de un solo color.

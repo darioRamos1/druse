@@ -21,15 +21,21 @@ import {
   BackgroundFit,
   DEFAULT_APPEARANCE,
   DEFAULT_BACKGROUND,
+  DEFAULT_GRID,
   EDITOR_FONT_SIZES,
+  GRID_FONT_SIZES,
+  GridAppearance,
+  GridColorKey,
   MAX_BACKGROUND_OPACITY,
   MAX_BACKGROUND_SCALE,
   MAX_SCALE,
   MIN_BACKGROUND_SCALE,
   MIN_SCALE,
   ThemeName,
+  isDefaultGrid,
 } from '../../../core/theme/appearance';
 import { Icon } from '../../../shared/ui/icon/icon';
+import { GridPreview } from '../grid-preview/grid-preview';
 import { UpdateService } from '../../../core/update/update.service';
 import { DialogFocus } from '../../../shared/a11y/dialog-focus';
 import { DialogBackdrop } from '../../../shared/a11y/dialog-backdrop';
@@ -143,13 +149,59 @@ const FITS: readonly {
   },
 ];
 
-type SettingsSection = 'appearance' | 'editor' | 'privacy' | 'about';
+/**
+ * Los colores de la cuadrícula, con el token del tema que usan si nadie elige.
+ *
+ * El token hace falta para enseñar en el selector el color de partida: un
+ * selector de color no puede estar vacío, y abrirlo en negro haría creer que
+ * ese es el que hay puesto.
+ */
+const GRID_COLORS: readonly {
+  readonly key: GridColorKey;
+  readonly label: string;
+  readonly token: string;
+}[] = [
+  {
+    key: 'headerBackground',
+    label: 'settings.grid.color.headerBackground',
+    token: '--dr-surface-grid-header',
+  },
+  { key: 'headerText', label: 'settings.grid.color.headerText', token: '--dr-text-tertiary' },
+  { key: 'lines', label: 'settings.grid.color.lines', token: '--dr-border-input' },
+  { key: 'text', label: 'settings.grid.color.text', token: '--dr-text-muted' },
+  { key: 'number', label: 'settings.grid.color.number', token: '--dr-info' },
+  { key: 'timestamp', label: 'settings.grid.color.timestamp', token: '--dr-text-tertiary' },
+  { key: 'boolean', label: 'settings.grid.color.boolean', token: '--dr-success' },
+  { key: 'null', label: 'settings.grid.color.null', token: '--dr-text-disabled' },
+];
+
+/** Lee el color que da un token del tema, en el hexadecimal que pide el selector. */
+function resolveToken(token: string): string {
+  try {
+    const probe = document.createElement('span');
+    probe.style.color = `var(${token})`;
+    probe.style.display = 'none';
+    document.body.append(probe);
+    const value = getComputedStyle(probe).color;
+    probe.remove();
+
+    const [r, g, b] = (value.match(/[\d.]+/g) ?? []).map(Number);
+
+    return [r, g, b].every(Number.isFinite)
+      ? '#' + [r, g, b].map((v) => Math.round(v).toString(16).padStart(2, '0')).join('')
+      : '#808080';
+  } catch {
+    return '#808080';
+  }
+}
+
+type SettingsSection = 'appearance' | 'editor' | 'results' | 'privacy' | 'about';
 
 /** Preferencias agrupadas por lo que se quiere ajustar. */
 @Component({
   selector: 'app-settings-dialog',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [DialogBackdrop, DialogFocus, Icon, PrivacyNotice, TranslatePipe],
+  imports: [DialogBackdrop, DialogFocus, GridPreview, Icon, PrivacyNotice, TranslatePipe],
   templateUrl: './settings-dialog.html',
   styleUrl: './settings-dialog.scss',
 })
@@ -158,6 +210,7 @@ export class SettingsDialog {
   protected readonly sections: readonly { id: SettingsSection; label: string }[] = [
     { id: 'appearance', label: 'settings.section.appearance' },
     { id: 'editor', label: 'settings.section.editor' },
+    { id: 'results', label: 'settings.section.results' },
     { id: 'privacy', label: 'settings.section.privacy' },
     { id: 'about', label: 'settings.section.about' },
   ];
@@ -351,6 +404,40 @@ export class SettingsDialog {
     void this._themes.update({ editorFontSize });
   }
 
+  protected readonly grid = computed(() => this.appearance().grid);
+  protected readonly gridFontSizes = GRID_FONT_SIZES;
+  protected readonly gridColors = GRID_COLORS;
+  protected readonly gridCustomized = computed(() => !isDefaultGrid(this.grid()));
+
+  /**
+   * El color que enseña cada selector: el elegido, o el que pone el tema.
+   *
+   * Depende del tema y del tono porque los dos cambian lo que resuelve el token;
+   * leerlo una sola vez dejaría el selector con el color del tema de antes.
+   */
+  protected readonly gridColorValues = computed(() => {
+    this.theme();
+    this.appearance().tint;
+    const colors = this.grid().colors;
+
+    return Object.fromEntries(
+      GRID_COLORS.map(({ key, token }) => [key, colors[key] ?? resolveToken(token)]),
+    ) as Record<GridColorKey, string>;
+  });
+
+  protected setGrid(changes: Partial<GridAppearance>): void {
+    void this._themes.update({ grid: { ...this.grid(), ...changes } });
+  }
+
+  /** `null` devuelve ese color al del tema. */
+  protected setGridColor(key: GridColorKey, value: string | null): void {
+    this.setGrid({ colors: { ...this.grid().colors, [key]: value } });
+  }
+
+  protected resetGrid(): void {
+    void this._themes.update({ grid: DEFAULT_GRID });
+  }
+
   /**
    * Mueve el encuadre en un solo eje.
    *
@@ -504,6 +591,7 @@ export class SettingsDialog {
       appearance.accent ||
       appearance.tint ||
       appearance.background ||
+      !isDefaultGrid(appearance.grid) ||
       appearance.scale !== DEFAULT_APPEARANCE.scale ||
       appearance.editorFontSize !== DEFAULT_APPEARANCE.editorFontSize
     );

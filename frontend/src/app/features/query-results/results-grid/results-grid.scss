@@ -23,11 +23,11 @@
   z-index: 2;
   top: 0;
   height: var(--dr-grid-header-height);
-  background: var(--dr-surface-grid-header);
-  border-bottom: 1px solid var(--dr-border-input);
-  font-size: 11.5px;
+  background: var(--dr-grid-header-bg, var(--dr-surface-grid-header));
+  border-bottom: 1px solid var(--dr-grid-lines, var(--dr-border-input));
+  font-size: calc(var(--dr-grid-font-size, 12px) - 0.5px);
   font-weight: 600;
-  color: var(--dr-text-tertiary);
+  color: var(--dr-grid-header-text, var(--dr-text-tertiary));
   letter-spacing: 0.02em;
 
   // Cada título selecciona su columna, así que se comporta como algo que se
@@ -75,21 +75,30 @@
   }
 }
 
+// Compacto quita un punto a la letra que haya elegida, no la fija en 11: con una
+// letra grande elegida, el compacto la dejaba más pequeña que la de serie.
 .body.is-compact .row {
   height: 25px;
-  font-size: 11px;
+  font-size: calc(var(--dr-grid-font-size, 12px) - 1px);
 }
 
 .body.is-compact .cell {
   padding-inline: 7px;
 }
 
+// La altura acompaña a la letra: con 16 px en una fila de 32 las mayúsculas
+// tocaban el borde. Con la de serie sale lo mismo que antes.
 .row {
-  height: 32px;
-  border-bottom: 1px solid var(--dr-border-hairline);
-  font-family: var(--dr-font-mono);
-  font-size: 12px;
-  color: var(--dr-text-secondary);
+  height: max(32px, calc(var(--dr-grid-font-size, 12px) * 2.2));
+  border-bottom: 1px solid var(--dr-grid-lines, var(--dr-border-hairline));
+  font-family: var(--dr-grid-font, var(--dr-font-mono));
+  font-size: var(--dr-grid-font-size, 12px);
+  color: var(--dr-grid-text, var(--dr-text-secondary));
+
+  // Las filas alternas. Sin elegirlas, la variable no existe y no pinta nada.
+  &.is-striped {
+    background: var(--dr-grid-stripe, transparent);
+  }
 
   &:hover {
     background: var(--dr-surface-hover);
@@ -101,7 +110,7 @@
   align-items: center;
   gap: 5px;
   padding: 0 10px;
-  border-right: 1px solid var(--dr-border-faint);
+  border-right: 1px solid var(--dr-grid-lines, var(--dr-border-faint));
   overflow: hidden;
   white-space: nowrap;
 
@@ -127,7 +136,7 @@
     text-overflow: ellipsis;
 
     &.is-sorted {
-      color: var(--dr-text-secondary);
+      color: var(--dr-grid-header-text, var(--dr-text-secondary));
     }
   }
 
@@ -157,7 +166,8 @@
     font-family: var(--dr-font-mono);
     font-size: 9.5px;
     font-weight: 400;
-    color: var(--dr-text-disabled);
+    color: var(--dr-grid-header-text, var(--dr-text-disabled));
+    opacity: var(--dr-grid-header-type-opacity, 1);
   }
 
   /*
@@ -199,13 +209,13 @@
   &--number {
     justify-content: center;
     padding: 0;
-    border-right-color: var(--dr-border-hairline);
+    border-right-color: var(--dr-grid-lines, var(--dr-border-hairline));
     color: var(--dr-text-disabled);
-    font-size: 10.5px;
+    font-size: 0.875em;
   }
 
   &--value {
-    border-right-color: var(--dr-border-hairline);
+    border-right-color: var(--dr-grid-lines, var(--dr-border-hairline));
     text-overflow: ellipsis;
     cursor: default;
 
@@ -224,16 +234,17 @@
     }
 
     // El tipo de la columna decide el color, igual que en el mockup.
+    // Cada uno se puede cambiar en los ajustes; sin cambiar, el del tema.
     &[data-kind='number'] {
-      color: var(--dr-info);
+      color: var(--dr-grid-number, var(--dr-info));
     }
 
     &[data-kind='text'] {
-      color: var(--dr-text-muted);
+      color: var(--dr-grid-text, var(--dr-text-muted));
     }
 
     &[data-kind='timestamp'] {
-      color: var(--dr-text-tertiary);
+      color: var(--dr-grid-timestamp, var(--dr-text-tertiary));
     }
   }
 }
@@ -314,8 +325,8 @@
   padding: 1px 5px;
   border-radius: 4px;
   background: var(--dr-surface-stripe);
-  color: var(--dr-text-disabled);
-  font-size: 10.5px;
+  color: var(--dr-grid-null, var(--dr-text-disabled));
+  font-size: 0.875em;
   font-style: italic;
   letter-spacing: 0.04em;
 }
@@ -325,11 +336,11 @@
   align-items: center;
   gap: 5px;
   padding: 2px 7px;
-  border: 1px solid var(--dr-success-line-soft);
+  border: 1px solid var(--dr-grid-boolean-line, var(--dr-success-line-soft));
   border-radius: 5px;
-  background: var(--dr-success-tint);
-  color: var(--dr-success);
-  font-size: 11px;
+  background: var(--dr-grid-boolean-tint, var(--dr-success-tint));
+  color: var(--dr-grid-boolean, var(--dr-success));
+  font-size: 0.92em;
 }
 
 .empty {

@@ -7,6 +7,8 @@ import {
   Appearance,
   DEFAULT_APPEARANCE,
   DEFAULT_BACKGROUND,
+  DEFAULT_GRID,
+  GRID_VARIABLES,
   ThemeName,
   appearancePreferences,
   appearanceVariables,
@@ -39,6 +41,7 @@ const CUSTOMIZABLE = [
   '--dr-text-on-accent',
   '--dr-hue',
   '--dr-sat-scale',
+  ...GRID_VARIABLES,
 ];
 
 /** Las que pinta la imagen de fondo del editor, que se ponen y se quitan aparte. */
@@ -87,9 +90,23 @@ export function cachedAppearance(): Appearance {
   try {
     const raw = localStorage.getItem(APPEARANCE_CACHE_KEY);
 
-    return raw
-      ? { ...DEFAULT_APPEARANCE, ...(JSON.parse(raw) as Partial<Appearance>) }
-      : DEFAULT_APPEARANCE;
+    if (!raw) {
+      return DEFAULT_APPEARANCE;
+    }
+
+    const cached = JSON.parse(raw) as Partial<Appearance>;
+
+    // La cuadrícula se fusiona aparte: una copia de antes de que existiera no la
+    // trae, y una a medias no puede dejar la letra sin tamaño.
+    return {
+      ...DEFAULT_APPEARANCE,
+      ...cached,
+      grid: {
+        ...DEFAULT_GRID,
+        ...cached.grid,
+        colors: { ...DEFAULT_GRID.colors, ...cached.grid?.colors },
+      },
+    };
   } catch {
     return DEFAULT_APPEARANCE;
   }
@@ -202,6 +219,7 @@ export class ThemeService {
       background: null,
       scale: DEFAULT_APPEARANCE.scale,
       editorFontSize: DEFAULT_APPEARANCE.editorFontSize,
+      grid: DEFAULT_GRID,
     });
     this.paintBackground(null);
   }

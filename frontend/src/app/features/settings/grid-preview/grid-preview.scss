@@ -1,0 +1,105 @@
+:host {
+  display: block;
+}
+
+/*
+ * Miniatura de la cuadrícula de resultados.
+ *
+ * Copia las reglas de la cuadrícula de verdad con sus mismas variables, así que
+ * lo que se ve aquí es lo que se verá al ejecutar. La copia es a mano porque los
+ * estilos de un componente no salen de él.
+ */
+.grid-preview {
+  overflow: hidden;
+  border: 1px solid var(--dr-grid-lines, var(--dr-border-input));
+  border-radius: var(--dr-radius-sm);
+  background: var(--dr-surface-panel);
+  font-family: var(--dr-grid-font, var(--dr-font-mono));
+  font-size: var(--dr-grid-font-size, 12px);
+  color: var(--dr-grid-text, var(--dr-text-secondary));
+
+  &__row {
+    display: grid;
+    grid-template-columns: 30px 0.5fr 1.2fr 1.6fr 0.9fr 0.9fr;
+    height: max(28px, calc(var(--dr-grid-font-size, 12px) * 2.2));
+    border-bottom: 1px solid var(--dr-grid-lines, var(--dr-border-hairline));
+
+    &:last-child {
+      border-bottom: 0;
+    }
+
+    &.is-striped {
+      background: var(--dr-grid-stripe, transparent);
+    }
+
+    &--head {
+      background: var(--dr-grid-header-bg, var(--dr-surface-grid-header));
+      border-bottom-color: var(--dr-grid-lines, var(--dr-border-input));
+      font-family: var(--dr-font-ui);
+      font-size: calc(var(--dr-grid-font-size, 12px) - 0.5px);
+      font-weight: 600;
+      color: var(--dr-grid-header-text, var(--dr-text-tertiary));
+
+      small {
+        font-family: var(--dr-font-mono);
+        font-size: 9.5px;
+        font-weight: 400;
+        color: var(--dr-grid-header-text, var(--dr-text-disabled));
+        opacity: var(--dr-grid-header-type-opacity, 1);
+      }
+    }
+  }
+
+  &__cell {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    min-width: 0;
+    padding: 0 8px;
+    overflow: hidden;
+    border-right: 1px solid var(--dr-grid-lines, var(--dr-border-faint));
+    white-space: nowrap;
+
+    &:last-child {
+      border-right: 0;
+    }
+
+    &--number {
+      justify-content: center;
+      padding: 0;
+      color: var(--dr-text-disabled);
+      font-size: 0.875em;
+    }
+
+    &[data-kind='number'] {
+      color: var(--dr-grid-number, var(--dr-info));
+    }
+
+    &[data-kind='text'] {
+      color: var(--dr-grid-text, var(--dr-text-muted));
+    }
+
+    &[data-kind='timestamp'] {
+      color: var(--dr-grid-timestamp, var(--dr-text-tertiary));
+    }
+  }
+
+  &__null {
+    padding: 1px 5px;
+    border-radius: 4px;
+    background: var(--dr-surface-stripe);
+    color: var(--dr-grid-null, var(--dr-text-disabled));
+    font-size: 0.875em;
+    font-style: italic;
+    letter-spacing: 0.04em;
+  }
+
+  &__pill {
+    padding: 1px 6px;
+    border: 1px solid var(--dr-grid-boolean-line, var(--dr-success-line-soft));
+    border-radius: 5px;
+    background: var(--dr-grid-boolean-tint, var(--dr-success-tint));
+    color: var(--dr-grid-boolean, var(--dr-success));
+    font-size: 0.92em;
+  }
+}

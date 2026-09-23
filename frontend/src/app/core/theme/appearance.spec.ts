@@ -1,5 +1,6 @@
 import {
   DEFAULT_APPEARANCE,
+  DEFAULT_GRID,
   appearancePreferences,
   appearanceVariables,
   backgroundStyle,
@@ -49,6 +50,12 @@ describe('apariencia', () => {
           scale: 140,
           x: 20,
           y: 80,
+        },
+        grid: {
+          fontSize: 14,
+          font: 'ui' as const,
+          zebra: true,
+          colors: { headerBackground: '#223344', number: '#f0b429' },
         },
       };
 
@@ -105,6 +112,76 @@ describe('apariencia', () => {
         appearanceVariables({ ...DEFAULT_APPEARANCE, scale: 100 })['--dr-scale'],
       ).toBeUndefined();
       expect(appearanceVariables({ ...DEFAULT_APPEARANCE, scale: 125 })['--dr-scale']).toBe('1.25');
+    });
+  });
+
+  describe('cuadrícula de resultados', () => {
+    it('lo que el servidor no trae no borra lo elegido', () => {
+      const current = {
+        ...DEFAULT_APPEARANCE,
+        grid: { ...DEFAULT_GRID, zebra: true, colors: { number: '#f0b429' } },
+      };
+
+      expect(parseAppearance({}, current).grid).toEqual(current.grid);
+    });
+
+    it('un color vacío vuelve al del tema y uno roto se descarta', () => {
+      const current = {
+        ...DEFAULT_APPEARANCE,
+        grid: { ...DEFAULT_GRID, colors: { text: '#ffffff' } },
+      };
+
+      const parsed = parseAppearance(
+        { 'ui.grid.color.text': '', 'ui.grid.color.number': 'rojizo' },
+        current,
+      );
+
+      expect(parsed.grid.colors).toEqual({});
+    });
+
+    it('ignora un tamaño de letra que no se ofrece', () => {
+      expect(parseAppearance({ 'ui.grid.fontSize': '41' }).grid.fontSize).toBe(12);
+    });
+
+    it('cada tipo escribe su variable', () => {
+      const variables = appearanceVariables({
+        ...DEFAULT_APPEARANCE,
+        grid: { ...DEFAULT_GRID, colors: { number: '#F0B429', null: '#ff0000' } },
+      });
+
+      expect(variables['--dr-grid-number']).toBe('#f0b429');
+      expect(variables['--dr-grid-null']).toBe('#ff0000');
+      expect(variables['--dr-grid-text']).toBeUndefined();
+    });
+
+    it('una cabecera pintada sin color de letra se queda con el legible', () => {
+      const variables = appearanceVariables({
+        ...DEFAULT_APPEARANCE,
+        grid: { ...DEFAULT_GRID, colors: { headerBackground: '#f5f0c8' } },
+      });
+
+      expect(variables['--dr-grid-header-text']).not.toBe('#fff');
+    });
+
+    it('el booleano arrastra el borde y el relleno de su píldora', () => {
+      const variables = appearanceVariables({
+        ...DEFAULT_APPEARANCE,
+        grid: { ...DEFAULT_GRID, colors: { boolean: '#6c8bff' } },
+      });
+
+      expect(variables['--dr-grid-boolean-tint']).toBe('rgb(108 139 255 / 12%)');
+      expect(variables['--dr-grid-boolean-line']).toBe('rgb(108 139 255 / 35%)');
+    });
+
+    it('letra, tipo y franjas solo se escriben si cambian', () => {
+      const variables = appearanceVariables({
+        ...DEFAULT_APPEARANCE,
+        grid: { ...DEFAULT_GRID, fontSize: 14, font: 'ui', zebra: true },
+      });
+
+      expect(variables['--dr-grid-font-size']).toBe('14px');
+      expect(variables['--dr-grid-font']).toBe('var(--dr-font-ui)');
+      expect(variables['--dr-grid-stripe']).toBe('var(--dr-surface-stripe)');
     });
   });
 
