@@ -64,6 +64,14 @@ updates:
     groups:
       backend:
         patterns: ['*']
+    # `Microsoft.OpenApi` va pegado a `Microsoft.AspNetCore.OpenApi`, que pide
+    # `>= 2.12.0 && < 3.0.0`. Con los avisos como errores, proponer la 3.x deja
+    # el grupo entero sin restaurar —pasó en el PR #23— y bloquea de paso las
+    # otras diez actualizaciones. Se mira dentro de la 2.x hasta que ASP.NET
+    # Core admita la 3.
+    ignore:
+      - dependency-name: Microsoft.OpenApi
+        update-types: ['version-update:semver-major']
 
   - package-ecosystem: cargo
     directory: /shells/desktop-tauri
