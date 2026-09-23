@@ -37,27 +37,43 @@ publicar los artefactos en otro sitio.
 
 #### Lo que deja abierta la 057
 
-0. **Los PR no los puede aprobar quien los abre.** `main` exige una aprobación y
+0. **Dependabot no puede subir nada que viaje en el instalador** hasta que se
+   rehaga su ficha de terceros. Pasó dos veces el mismo día: el **#23** con
+   NuGet —cerrado— y el **#29** con dos crates de Rust, que **sigue abierto** y
+   falla con «Cambió el grafo Rust: revisar los avisos antes de empaquetar
+   Comunidad». Es trabajo de evidencia, no de código, y el expediente prohíbe
+   reutilizar la licencia de otra versión. Lo que sí entró va en el **#27**:
+   IKVM y las cuatro de los proyectos de prueba.
+
+1. **Los otros ~51 avisos de SonarQube.** En la 057 se cerraron cinco de
+   `workspace-store.ts` —dos importaciones muertas, `statusText` obsoleto y las
+   dos funciones que pasaban de 15 de complejidad, `export` y `execute`— y el de
+   la contraseña repetida en `test-db.ps1`. El resto no se ha visto: el
+   repositorio no tiene ESLint ni `sonar-project.properties`, así que solo se ven
+   desde el editor del usuario y hay que pedirle la lista.
+
+2. **Los PR no los puede aprobar quien los abre.** `main` exige una aprobación y
    descarta las que haya al empujar, así que hoy la única forma de fusionar es la
    excepción de administrador. Si va a entrar más gente, merece la pena decidir si
    esa regla se queda como está.
 
-1. **La fase 2 de los idiomas, por donde va el plan**: los normalizadores de error
+3. **La fase 2 de los idiomas, por donde va el plan**: los normalizadores de error
    de cada motor —solo la explicación que añade Druse, no lo que dice el motor—,
    y después los respaldos, las restauraciones y los traslados. El camino está
    hecho: `UserMessage`, `MessageKeys` y la prueba que los ata al catálogo.
-2. **Tauri y el asistente**, que cierran esa fase: los títulos de los diálogos
+4. **Tauri y el asistente**, que cierran esa fase: los títulos de los diálogos
    nativos se los pasa el frontend, que ya los tiene traducidos, y el chat gana
    `Locale` para responder en el idioma elegido.
-3. **Las siete e2e de SQL Server y Oracle no se vieron pasar**: sus contenedores
+5. **Las siete e2e de SQL Server y Oracle no se vieron pasar**: sus contenedores
    no estaban levantados. No son de este trabajo, pero hay que repetirlas antes de
    dar la sesión por buena del todo.
-4. **Los instaladores no se regeneraron.** Los últimos son de antes de los
+6. **Los instaladores no se regeneraron.** Los últimos son de antes de los
    idiomas y del menú de Monaco traducido.
-5. **`ci.yml` no ejecuta el comprobador de idiomas.** `comprobar-todo.ps1` sí lo
-   hace desde la 057; en el flujo de GitHub no se tocó porque el usuario tiene
-   trabajo suyo a medias en ese archivo.
-6. **Portugués y francés siguen vacíos**, que es la fase 3 y depende de que el
+7. **`ci.yml` no ejecuta el comprobador de idiomas.** El flujo del frontend pasa
+   `format:check` y `npm test`, pero no `check-i18n.mjs`; en local lo ejecuta
+   `comprobar-todo.ps1` desde la 057. Es una línea, y conviene ponerla antes de
+   que llegue una traducción de la comunidad.
+8. **Portugués y francés siguen vacíos**, que es la fase 3 y depende de que el
    repositorio sea público.
 
 #### Lo que deja abierta la 056
@@ -570,6 +586,21 @@ propio programa —«El nombre de **la columna** es obligatorio», que es la mis
 frase que la del índice— la palabra viaja como clave en `keyArgs` y la traduce el
 frontend: una clave en vez de veintiuna casi iguales.
 
+#### Y lo que entró después, ya con PR
+
+La sesión terminó ordenando lo que había suelto en el árbol, que era trabajo del
+usuario: el **compositor** aprende `IN` con lista o con subconsulta —y avisa
+cuando lo escrito no es una sola consulta— y saca los cálculos de detrás de
+«Agrupar resultados»; el **tema oscuro** gana contraste en sus cuatro tonos
+apagados; y la **contraseña de los contenedores de prueba** pasa a declararse una
+vez, cambiable con `DRUSE_TEST_PASSWORD`, que era lo que señalaba SonarQube.
+
+De paso se cerraron cinco avisos suyos en `workspace-store.ts`. Los dos de
+complejidad tenían razón en el fondo: `export` y `execute` hacían tres trabajos
+seguidos y repetían en cada rama la comprobación de «¿sigue siendo esto lo que
+hay delante?». Ahora se resuelve una vez y viaja con el resto, que es donde se
+podía colar una comprobación distinta de las demás.
+
 #### Estado
 
 **1 090 del frontend**, **671 unitarias** y **182 de integración** del backend
@@ -577,6 +608,12 @@ frontend: una clave en vez de veintiuna casi iguales.
 distintos que tiene—, el **camino crítico en inglés** entero y el **paso del
 pseudoidioma** limpio. De la suite de punta a punta en español, 61 pasadas y siete
 rojas: las siete de SQL Server y Oracle, sin contenedor levantado.
+
+Al cerrar la sesión, con lo del compositor dentro: **1 104 del frontend**, las
+**9 de SQLite de punta a punta** —que recorren el compositor en los dos temas— y
+**402 contractuales** contra PostgreSQL y SQLite. En GitHub quedaron fusionados
+los PR **#21**, **#27**, **#28** y **#30**, cerrado el **#23** y abierto el
+**#29**.
 
 ### Sesión 056 — 2026-09-11 · Los seis rojos de SQLite
 
