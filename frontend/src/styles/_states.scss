@@ -1,0 +1,32 @@
+// =============================================================================
+// Druse — el icono de los estados
+//
+// Un panel vacío, un error o un «hecho» llevan delante un recuadro pequeño con
+// su icono: es lo que deja distinguirlos de reojo, sin leer la frase. Es global
+// porque lo usan varios paneles y porque, repetido en cada uno, empujaba sus
+// hojas de estilos por encima del presupuesto por componente.
+// =============================================================================
+
+.dr-state-icon {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  margin-bottom: 2px;
+  border: 1px solid var(--dr-border-subtle);
+  border-radius: 9px;
+  background: var(--dr-surface-hover);
+  color: var(--dr-text-tertiary);
+
+  &--danger {
+    border-color: var(--dr-danger-line-soft);
+    background: var(--dr-danger-tint);
+    color: var(--dr-danger);
+  }
+
+  &--success {
+    border-color: var(--dr-success-line-soft);
+    background: var(--dr-success-tint);
+    color: var(--dr-success);
+  }
+}

@@ -213,6 +213,7 @@
 }
 
 .tool-button {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 6px;
@@ -478,9 +479,11 @@
   text-align: center;
 
   &__error {
-    color: var(--dr-danger);
+    max-width: 640px;
+    color: var(--dr-danger-text, var(--dr-danger));
     font-family: var(--dr-font-mono);
     font-size: 12px;
+    overflow-wrap: anywhere;
   }
 }
 
@@ -497,13 +500,23 @@
 }
 
 .empty__action {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   min-height: 28px;
+  margin-top: 2px;
   padding: 0 10px;
   border: 1px solid var(--dr-border-subtle);
   border-radius: 5px;
   background: transparent;
   color: var(--dr-text-muted);
   cursor: pointer;
+
+  &:hover {
+    border-color: var(--dr-border-strong);
+    background: var(--dr-surface-hover);
+    color: var(--dr-text);
+  }
 }
 
 .messages__item {

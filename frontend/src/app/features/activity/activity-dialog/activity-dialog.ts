@@ -22,12 +22,13 @@ import { RunningJobsService } from '../../../core/jobs/running-jobs.service';
 import { DialogBackdrop } from '../../../shared/a11y/dialog-backdrop';
 import { DialogFocus } from '../../../shared/a11y/dialog-focus';
 import { formatDate } from '../../../core/i18n/locale-format';
+import { Icon } from '../../../shared/ui/icon/icon';
 
 /** Consultar el historial nunca descarta avisos ni reinicia trabajos. */
 @Component({
   selector: 'app-activity-dialog',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [DialogBackdrop, DialogFocus, TranslatePipe],
+  imports: [Icon, DialogBackdrop, DialogFocus, TranslatePipe],
   templateUrl: './activity-dialog.html',
   styleUrl: './activity-dialog.scss',
 })

@@ -15,6 +15,7 @@ import { WorkspaceStore } from '../../../core/workspace/workspace-store';
 import { DatabaseObject } from '../../../shared/models/workspace';
 import { DialogFocus } from '../../../shared/a11y/dialog-focus';
 import { DialogBackdrop } from '../../../shared/a11y/dialog-backdrop';
+import { Icon } from '../../../shared/ui/icon/icon';
 
 /**
  * Importar un archivo dentro de una tabla.
@@ -27,7 +28,7 @@ import { DialogBackdrop } from '../../../shared/a11y/dialog-backdrop';
 @Component({
   selector: 'app-import-dialog',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [DialogBackdrop, DialogFocus, FormsModule, TranslatePipe],
+  imports: [Icon, DialogBackdrop, DialogFocus, FormsModule, TranslatePipe],
   templateUrl: './import-dialog.html',
   styleUrl: './import-dialog.scss',
 })

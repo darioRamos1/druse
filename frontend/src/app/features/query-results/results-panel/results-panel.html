@@ -50,7 +50,7 @@
     (click)="toggleFilters()"
   >
     <app-icon name="filter" [size]="12" />
-    {{ 'results.filters' | t }}
+    <span class="tool-button__label">{{ 'results.filters' | t }}</span>
     @if (activeFilterCount()) {
       <span>{{ activeFilterCount() }}</span>
     }
@@ -86,8 +86,8 @@
       [title]="(hasSelection() ? 'results.copyTitle' : 'results.copyNeedsSelection') | t"
       (click)="toggleCopy($event)"
     >
-      <app-icon name="new-query" [size]="12" />
-      {{ 'results.copyAs' | t }}
+      <app-icon name="copy" [size]="12" />
+      <span class="tool-button__label">{{ 'results.copyAs' | t }}</span>
       @if (hasSelection()) {
         <span class="tool-button__hint">{{ selectionLabel() }}</span>
       }
@@ -148,7 +148,9 @@
       (click)="toggleExport($event)"
     >
       <app-icon name="export" [size]="12" />
-      {{ (exporting() ? 'results.exporting' : 'results.export') | t }}
+      <span class="tool-button__label">{{
+        (exporting() ? 'results.exporting' : 'results.export') | t
+      }}</span>
       <span class="tool-button__hint" translate="no">CSV · Excel</span>
     </button>
 
@@ -402,20 +404,37 @@
         </nav>
       </footer>
     } @else if (result(); as executed) {
-      <div class="empty">
+      <!--
+        Cada desenlace lleva su icono y su color, para distinguirlos de reojo:
+        un error, una cancelación y un «hecho, sin filas» se parecían demasiado
+        como una línea de texto suelta en medio del panel.
+      -->
+      <div class="empty dr-rise-in" [attr.role]="executed.state === 'failed' ? 'alert' : null">
         @if (executed.state === 'failed') {
+          <span class="dr-state-icon dr-state-icon--danger" aria-hidden="true"
+            ><app-icon name="alert" [size]="18"
+          /></span>
+          <strong>{{ 'results.failedTitle' | t }}</strong>
           <span class="empty__error">{{ executed.error?.message }}</span>
           @if (executed.error?.code; as code) {
             <code class="empty__code">{{ code }}</code>
           }
           <button type="button" class="empty__action" (click)="copyError()">
+            <app-icon name="copy" [size]="12" />
             {{ 'results.copyError' | t }}
           </button>
         } @else if (executed.state === 'canceled') {
+          <span class="dr-state-icon" aria-hidden="true"><app-icon name="stop" [size]="16" /></span>
           {{ 'results.canceled' | t }}
         } @else if (executed.rowsAffected !== undefined && executed.rowsAffected !== null) {
+          <span class="dr-state-icon dr-state-icon--success" aria-hidden="true"
+            ><app-icon name="check" [size]="16"
+          /></span>
           {{ 'results.affectedIn' | t: { count: executed.rowsAffected, ms: executed.durationMs } }}
         } @else {
+          <span class="dr-state-icon" aria-hidden="true"
+            ><app-icon name="inbox" [size]="17"
+          /></span>
           {{ 'results.noRows' | t }}
         }
       </div>
@@ -454,7 +473,10 @@
         }}</span>
       </section>
     } @else {
-      <div class="empty">
+      <div class="empty dr-rise-in">
+        <span class="dr-state-icon" aria-hidden="true"
+          ><app-icon name="play-outline" [size]="15"
+        /></span>
         <strong>{{ 'results.empty.title' | t }}</strong>
         <span>{{
           'results.empty.text'
@@ -475,7 +497,10 @@
         }
       </ul>
     } @else {
-      <div class="empty">{{ 'results.noMessages' | t }}</div>
+      <div class="empty dr-rise-in">
+        <span class="dr-state-icon" aria-hidden="true"><app-icon name="inbox" [size]="17" /></span>
+        {{ 'results.noMessages' | t }}
+      </div>
     }
   }
 

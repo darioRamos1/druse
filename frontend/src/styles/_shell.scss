@@ -58,8 +58,12 @@
   box-shadow: var(--dr-shadow-dialog);
 }
 
+// La entrada va también en la lista: si desapareciera al sacudir, al quitar la
+// sacudida el navegador la vería como nueva y el diálogo volvería a entrar.
 .dialog.is-nudging {
-  animation: dialog-nudge 180ms ease-in-out;
+  animation:
+    dr-dialog-in var(--dr-duration-slow) var(--dr-ease-out),
+    dialog-nudge 180ms ease-in-out;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -110,16 +114,24 @@
   font-size: 12px;
 }
 
+// La cruz es un icono dentro de un cuadrado de 28 px: el carácter «×» que
+// había antes medía la mitad y había que apuntarle con cuidado.
 .close:where(:not(.monaco-editor *, .monaco-component *)) {
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  width: 28px;
+  height: 28px;
   margin-left: auto;
+  padding: 0;
   border: 0;
+  border-radius: 7px;
   background: transparent;
   color: var(--dr-text-tertiary);
-  font-size: 18px;
-  line-height: 1;
   cursor: pointer;
 
   &:hover {
+    background: var(--dr-surface-hover);
     color: var(--dr-text);
   }
 }

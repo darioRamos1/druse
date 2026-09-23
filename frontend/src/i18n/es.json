@@ -1654,5 +1654,6 @@
   "workspace.transactionStays": "La transacción abierta en «{connection}» sigue ahí: es de esa conexión y no se cierra al cambiar de pestaña.",
   "workspace.tunnelFailed": "No se pudo abrir el túnel.",
   "workspace.tunnelJump": "el servidor intermedio",
-  "workspace.tunnelOk": "Túnel correcto: se llegó a {target} a través de {through} en {ms} ms."
+  "workspace.tunnelOk": "Túnel correcto: se llegó a {target} a través de {through} en {ms} ms.",
+  "results.failedTitle": "La consulta no se pudo ejecutar"
 }

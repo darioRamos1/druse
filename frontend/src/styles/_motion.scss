@@ -1,0 +1,164 @@
+// =============================================================================
+// Druse — movimiento
+//
+// Antes casi nada se movía: un botón pasaba de apagado a encendido de golpe, y
+// un diálogo o un menú aparecían ya puestos, sin decir de dónde salían. No es
+// cuestión de adorno: una transición corta es lo que hace que el ojo relacione
+// el antes con el después, y su ausencia se lee como una interfaz tosca.
+//
+// Tres reglas para que no se convierta en lo contrario:
+//
+// - **Cortas.** Nada pasa de 220 ms. Una herramienta que se usa horas no puede
+//   hacer esperar a su propia animación.
+// - **Solo propiedades baratas**: color, opacidad y transformaciones. Nada que
+//   obligue a recalcular la maquetación, que en la cuadrícula de resultados
+//   son cientos de celdas.
+// - **Con `:where`**, que no suma especificidad: cualquier componente que
+//   declare su propia transición o animación manda sobre esto sin pelear.
+//
+// Y todo se apaga con `prefers-reduced-motion`, al final del archivo.
+// =============================================================================
+
+:root {
+  --dr-ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --dr-ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+  --dr-duration-fast: 120ms;
+  --dr-duration: 180ms;
+  --dr-duration-slow: 220ms;
+}
+
+// Lo de Monaco se queda fuera: el editor tiene sus propias animaciones y medir
+// su texto a mitad de una transición le hacía colocar mal el cursor.
+$interactive: ':where(button, a, [role="tab"], [role="menuitem"], [role="option"], input, select, textarea, summary, .btn):where(:not(.monaco-editor *, .monaco-component *))';
+
+/**
+ * Pasar por encima y enfocar, sin saltos.
+ *
+ * La lista de propiedades es cerrada a propósito: `transition: all` también
+ * animaría el ancho cuando cambia una etiqueta, que se ve como un temblor.
+ */
+#{$interactive} {
+  transition-property: color, background-color, border-color, box-shadow, opacity, transform;
+  transition-duration: var(--dr-duration-fast);
+  transition-timing-function: var(--dr-ease-out);
+}
+
+/**
+ * Al pulsar, el botón cede un píxel.
+ *
+ * Es la señal de «te he oído» que falta cuando la acción tarda en verse —
+ * ejecutar, conectar, exportar—. Solo en botones sueltos: una fila del árbol o
+ * una opción de menú hundiéndose se lee como que algo se ha roto.
+ */
+:where(button):where(
+    :not([role='treeitem'], [role='tab'], [role='menuitem'], [role='option'], .monaco-editor *)
+  ):active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+// --- Entradas -----------------------------------------------------------------
+
+@keyframes dr-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+/**
+ * El diálogo crece un poco desde donde va a quedar.
+ *
+ * Poco: con más de un 4 % se nota que «rebota», y un diálogo de confirmación
+ * que rebota parece que quiere llamar la atención.
+ */
+@keyframes dr-dialog-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.97);
+  }
+}
+
+@keyframes dr-pop-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.98);
+  }
+}
+
+@keyframes dr-rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+
+:where(.backdrop) {
+  animation: dr-fade-in var(--dr-duration) var(--dr-ease-out);
+}
+
+// La sacudida de `is-nudging` es otra animación de la misma caja; como va con
+// más especificidad, sustituye a esta mientras dura y no se suman.
+:where(.dialog) {
+  animation: dr-dialog-in var(--dr-duration-slow) var(--dr-ease-out);
+}
+
+/**
+ * Menús y listas desplegables aparecen desde su botón.
+ *
+ * Solo los propios: las sugerencias de Monaco también son un `listbox`, y
+ * animarlas retrasaba la primera sugerencia justo cuando se está escribiendo.
+ */
+:where([role='menu'], [role='listbox']):where(
+  :not(.monaco-editor *, .monaco-component *, .monaco-list)
+) {
+  transform-origin: top center;
+  animation: dr-pop-in var(--dr-duration-fast) var(--dr-ease-out);
+}
+
+// Los desplegables hechos con `<details>` —el menú Archivo— no son `role="menu"`,
+// pero se abren igual y deben entrar igual.
+:where(details[open] > :not(summary)) {
+  transform-origin: top center;
+  animation: dr-pop-in var(--dr-duration-fast) var(--dr-ease-out);
+}
+
+/** Para lo que aparece dentro de un panel: estados vacíos, errores, avisos. */
+.dr-rise-in {
+  animation: dr-rise-in var(--dr-duration) var(--dr-ease-out) both;
+}
+
+// --- Foco -------------------------------------------------------------------------
+
+/**
+ * Un anillo de foco que se ve en los dos temas.
+ *
+ * Solo con teclado (`:focus-visible`): con ratón el anillo aparecía en cada
+ * botón pulsado y se confundía con «seleccionado».
+ */
+#{$interactive}:focus-visible {
+  outline: 2px solid var(--dr-accent-line-strong, var(--dr-accent));
+  outline-offset: 2px;
+}
+
+// --- Menos movimiento -------------------------------------------------------------
+
+/**
+ * Quien pide menos movimiento no lo recibe.
+ *
+ * Se recortan duraciones en vez de quitar las propiedades: así los cambios de
+ * color siguen llegando al estado final y ningún `animationend` se queda sin
+ * dispararse. Lo que se anima con el desplazamiento —el degradado de las
+ * listas— no se toca: no se mueve solo, lo mueve quien desplaza.
+ */
+@media (prefers-reduced-motion: reduce) {
+  *:not(.dr-scroll-fade),
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  :where(button):active:not(:disabled) {
+    transform: none;
+  }
+}

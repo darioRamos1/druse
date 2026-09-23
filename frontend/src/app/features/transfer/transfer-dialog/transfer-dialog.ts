@@ -27,6 +27,7 @@ import { DatabaseColumn, DatabaseObject } from '../../../shared/models/workspace
 import { OperationProgress } from '../../../shared/ui/operation-progress/operation-progress';
 import { DialogFocus } from '../../../shared/a11y/dialog-focus';
 import { DialogBackdrop } from '../../../shared/a11y/dialog-backdrop';
+import { Icon } from '../../../shared/ui/icon/icon';
 
 /** En qué pantalla del asistente estamos. */
 type Step = 'target' | 'types' | 'columns' | 'running';
@@ -46,7 +47,7 @@ type Step = 'target' | 'types' | 'columns' | 'running';
 @Component({
   selector: 'app-transfer-dialog',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [DialogBackdrop, DialogFocus, FormsModule, OperationProgress, TranslatePipe],
+  imports: [Icon, DialogBackdrop, DialogFocus, FormsModule, OperationProgress, TranslatePipe],
   templateUrl: './transfer-dialog.html',
   styleUrl: './transfer-dialog.scss',
 })

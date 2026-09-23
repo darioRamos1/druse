@@ -1654,5 +1654,6 @@
   "workspace.transactionStays": "The transaction open on “{connection}” is still there: it belongs to that connection and does not close when you switch tabs.",
   "workspace.tunnelFailed": "The tunnel could not be opened.",
   "workspace.tunnelJump": "the jump server",
-  "workspace.tunnelOk": "Tunnel fine: {target} was reached through {through} in {ms} ms."
+  "workspace.tunnelOk": "Tunnel fine: {target} was reached through {through} in {ms} ms.",
+  "results.failedTitle": "The query could not run"
 }

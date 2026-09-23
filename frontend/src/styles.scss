@@ -1,5 +1,7 @@
 @use 'styles/tokens';
 @use 'styles/shell';
+@use 'styles/motion';
+@use 'styles/states';
 
 // =============================================================================
 // Druse — estilos globales
@@ -81,6 +83,33 @@ pre {
 
   to {
     mask-image: linear-gradient(to bottom, #000 100%, transparent);
+  }
+}
+
+/*
+ * Con el panel estrecho —el asistente abierto, una ventana a media pantalla—
+ * los controles bajaban a una segunda fila y se comían la altura de los
+ * resultados. Primero se van las pistas, que repiten lo que ya dice el menú; si
+ * aún no cabe, los botones con icono se quedan con el icono. La etiqueta no se
+ * quita del todo: sigue siendo el nombre que leen los lectores de pantalla.
+ *
+ * Vive aquí y no en el panel para que su hoja no rebase el presupuesto por
+ * componente; el contenedor `results` es el propio panel.
+ */
+@container results (max-width: 860px) {
+  app-results-panel .tool-button__hint {
+    display: none;
+  }
+}
+
+@container results (max-width: 760px) {
+  app-results-panel .tool-button__label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
   }
 }
 
