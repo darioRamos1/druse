@@ -25,6 +25,8 @@ Solo hacen falta dos textos nuevos: los avisos de .NET Runtime para 9.0.18 y `NO
 - Publicación `Release`, Windows x64, autocontenida, sin Oracle ni Informix: correcta.
 - Arranque de esa API: ofrece MySQL, PostgreSQL, SQLite y SQL Server y ejecuta `SELECT 42` en SQLite.
 - Pruebas unitarias del backend: 671 aprobadas, 14 omitidas de JDBC/Informix; ninguna fallida. Las omisiones no prueban esos casos.
+- Pruebas contractuales de SQLite: 55 aprobadas, exigiendo que el motor esté disponible.
+- Integración: 104 casos aprobados y 79 omitidos por servidores ausentes; dos casos del contrato HTTP fallaron inicialmente al ejecutar desde una salida fuera del repositorio y pasaron al repetirlos con la ruta dentro del checkout. No se cambió código para esa repetición.
 - El copiador sigue exigiendo versiones exactas y rechazando textos alterados o rutas externas; sus pruebas pasan. Con el índice renovado selecciona 37 entradas y 38 archivos de avisos.
 
 Las pruebas de arranque no acreditan conexiones reales a SQL Server, MySQL ni PostgreSQL. La ejecución de Comunidad del PR comprueba además el empaquetado del instalador. Se mantienen pendientes la aceptación de SNI por SignPath y la revisión completa de redistribución y fuente correspondiente.
