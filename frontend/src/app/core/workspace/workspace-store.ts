@@ -40,14 +40,13 @@ import {
   EngineInfo,
   ExplorerNode,
   QueryHistoryEntry,
+  QueryTab,
   CellEdit,
   EditableTable,
   IndexCapabilities,
   QueryResult,
   KnownColumn,
-  KnownRelation,
   SavedConnection,
-  SchemaIndex,
   SecretStoreStatus,
   ServerMessage,
   SessionStatus,
@@ -82,6 +81,24 @@ const DEFAULT_ROW_LIMIT = 500;
 
 /** Tope del proceso local, que aquí se respeta para no prometer lo que rechazará. */
 const MAX_ROW_LIMIT = 100_000;
+
+/**
+ * Contra qué se exporta, resuelto una sola vez.
+ *
+ * Se arma antes de empezar porque las tres partes de la exportación —pedirla,
+ * guardarla y contar lo que falló— hablan de lo mismo, y recalcularlo en cada
+ * una abría la puerta a que dijeran cosas distintas.
+ */
+interface ExportTarget {
+  readonly connection: ConnectionSummary;
+  readonly sessionId: string;
+  readonly tab: QueryTab | null;
+  readonly sql: string;
+  readonly database?: string;
+  readonly title?: string;
+  /** Si lo que se exportó sigue siendo lo que hay delante. */
+  readonly stillCurrent: () => boolean;
+}
 
 /** El resultado de una prueba: si fue bien y qué decirle al usuario. */
 export interface ProbeResult {
@@ -386,24 +403,9 @@ export class WorkspaceStore {
     confirmDestructive = false,
     sqlOverride?: string,
   ): Promise<void> {
-    const source = this._execution.result() ? this._execution.source() : null;
-    const connection = source ? this.findConnection(source.connectionId) : this.activeConnection();
-    const tab = this.activeTab();
-    const tabId = source?.tabId ?? tab?.id;
-    const sql = (sqlOverride ?? source?.sql ?? tab?.sql ?? '').trim();
-    const tabSql = tab?.sql;
-    const stillCurrent = (): boolean =>
-      source
-        ? this._execution.source() === source
-        : this.activeTab()?.id === tabId && this.activeTab()?.sql === tabSql;
+    const target = this.exportTarget(sqlOverride);
 
-    if (!connection?.sessionId) {
-      this._notices.set(this._i18n.t('workspace.noConnection'));
-      return;
-    }
-
-    if (!sql) {
-      this._notices.set(this._i18n.t('workspace.nothingToExport'));
+    if (!target) {
       return;
     }
 
@@ -413,64 +415,129 @@ export class WorkspaceStore {
     try {
       const blob = await firstValueFrom(
         this._gateway.exportQuery({
-          sessionId: connection.sessionId,
-          sql,
-          database: source?.database ?? tab?.database,
+          sessionId: target.sessionId,
+          sql: target.sql,
+          database: target.database,
           format,
-          fileName: source?.title ?? tab?.title,
+          fileName: target.title,
           confirmDestructive,
         }),
       );
 
-      if (stillCurrent()) {
-        const fileName = `${sanitizeFileName(
-          source?.title ?? tab?.title ?? this._i18n.t('workspace.defaultFileName'),
-        )}.${format}`;
-
-        // Se anuncia después de guardar y solo si de verdad se guardó. Antes se
-        // daba por hecho, y en la aplicación empaquetada eso significaba decir
-        // «Exportado» sin haber escrito nada en ningún sitio.
-        const outcome = await this._files.save(fileName, blob);
-
-        if (stillCurrent()) {
-          this._notices.set(
-            describeSave(
-              outcome,
-              this._i18n.t('workspace.exportedTo', { format: format.toUpperCase() }),
-              this._i18n.t('workspace.exportCancelled'),
-            ),
-          );
-        }
-      }
+      await this.saveExport(blob, format, target);
     } catch (error) {
-      const rejection = await asRejectionFromBlob(error);
-
-      if (rejection) {
-        if (tab && connection && this.activeTab()?.id === tab.id && stillCurrent()) {
-          this._execution.noteRejection({
-            value: rejection,
-            operation: 'export',
-            tabId: tab.id,
-            connectionId: connection.id,
-            sql,
-            format,
-          });
-        }
-      } else {
-        // La exportación viaja como blob, así que el cuerpo del error hay que
-        // leerlo antes de poder reconocer una sesión perdida.
-        const failure = await asHttpErrorFromBlob(error);
-
-        if (!connection || !this.noteSessionLoss(connection.id, failure ?? error)) {
-          const message = await describeBlobError(error, this._i18n);
-
-          if (stillCurrent()) {
-            this._notices.set(message);
-          }
-        }
-      }
+      await this.noteExportFailure(error, format, target);
     } finally {
       this._exporting.set(false);
+    }
+  }
+
+  /**
+   * Qué se exporta y contra qué, o `null` si falta algo y ya se ha dicho.
+   *
+   * Sale del resultado en pantalla cuando lo hay —la cuadrícula solo tiene las
+   * primeras 500 filas, así que se reexporta su consulta entera— y de la pestaña
+   * activa cuando no. `stillCurrent` es lo que permite no anunciar nada si
+   * mientras tanto se cambió de pestaña o se editó el SQL.
+   */
+  private exportTarget(sqlOverride?: string): ExportTarget | null {
+    const source = this._execution.result() ? this._execution.source() : null;
+    const connection = source ? this.findConnection(source.connectionId) : this.activeConnection();
+    const tab = this.activeTab();
+    const tabId = source?.tabId ?? tab?.id;
+    const tabSql = tab?.sql;
+    const sql = (sqlOverride ?? source?.sql ?? tab?.sql ?? '').trim();
+
+    if (!connection?.sessionId) {
+      this._notices.set(this._i18n.t('workspace.noConnection'));
+      return null;
+    }
+
+    if (!sql) {
+      this._notices.set(this._i18n.t('workspace.nothingToExport'));
+      return null;
+    }
+
+    return {
+      connection,
+      sessionId: connection.sessionId,
+      tab,
+      sql,
+      database: source?.database ?? tab?.database,
+      title: source?.title ?? tab?.title,
+      stillCurrent: () =>
+        source
+          ? this._execution.source() === source
+          : this.activeTab()?.id === tabId && this.activeTab()?.sql === tabSql,
+    };
+  }
+
+  /** Guarda lo exportado y **solo entonces** dice dónde quedó. */
+  private async saveExport(blob: Blob, format: ExportFormat, target: ExportTarget): Promise<void> {
+    if (!target.stillCurrent()) {
+      return;
+    }
+
+    const fileName = `${sanitizeFileName(
+      target.title ?? this._i18n.t('workspace.defaultFileName'),
+    )}.${format}`;
+
+    // Se anuncia después de guardar y solo si de verdad se guardó. Antes se
+    // daba por hecho, y en la aplicación empaquetada eso significaba decir
+    // «Exportado» sin haber escrito nada en ningún sitio.
+    const outcome = await this._files.save(fileName, blob);
+
+    if (target.stillCurrent()) {
+      this._notices.set(
+        describeSave(
+          outcome,
+          this._i18n.t('workspace.exportedTo', { format: format.toUpperCase() }),
+          this._i18n.t('workspace.exportCancelled'),
+        ),
+      );
+    }
+  }
+
+  /**
+   * Lo que se hace cuando la exportación no sale.
+   *
+   * Un 409 es la API pidiendo confirmación y se guarda para ofrecerla; lo demás
+   * puede ser una sesión perdida, que se reconoce **leyendo el blob**, porque
+   * una exportación viaja como archivo y su error también.
+   */
+  private async noteExportFailure(
+    error: unknown,
+    format: ExportFormat,
+    target: ExportTarget,
+  ): Promise<void> {
+    const { connection, tab } = target;
+    const rejection = await asRejectionFromBlob(error);
+
+    if (rejection) {
+      if (tab && this.activeTab()?.id === tab.id && target.stillCurrent()) {
+        this._execution.noteRejection({
+          value: rejection,
+          operation: 'export',
+          tabId: tab.id,
+          connectionId: connection.id,
+          sql: target.sql,
+          format,
+        });
+      }
+
+      return;
+    }
+
+    const failure = await asHttpErrorFromBlob(error);
+
+    if (this.noteSessionLoss(connection.id, failure ?? error)) {
+      return;
+    }
+
+    const message = await describeBlobError(error, this._i18n);
+
+    if (target.stillCurrent()) {
+      this._notices.set(message);
     }
   }
 
@@ -2154,6 +2221,12 @@ export class WorkspaceStore {
 
     this._notices.clear();
 
+    // Lo que hay delante ahora. Si cambia mientras se ejecuta —otra pestaña,
+    // otro SQL—, lo que vuelva no se enseña ni se cuenta: sería el resultado de
+    // una consulta que ya nadie está mirando.
+    const sigueDelante = (): boolean =>
+      this.activeTab()?.id === tabId && this.activeTab()?.sql === tabSql;
+
     try {
       const result = await this._execution.run({
         sessionId: connection.sessionId,
@@ -2164,17 +2237,17 @@ export class WorkspaceStore {
         confirmDestructive,
       });
 
-      if (this.activeTab()?.id === tabId && this.activeTab()?.sql === tabSql) {
-        this._execution.show(result, {
-          tabId: tabId ?? null,
-          connectionId: connection.id,
-          database: tab?.database,
-          sql,
-          title: tab?.title ?? 'druse',
-        });
-      } else {
+      if (!sigueDelante()) {
         return null;
       }
+
+      this._execution.show(result, {
+        tabId: tabId ?? null,
+        connectionId: connection.id,
+        database: tab?.database,
+        sql,
+        title: tab?.title ?? 'druse',
+      });
 
       this._connectionStore.patchSession(connection.id, { lastDurationMs: result.durationMs });
 
@@ -2187,31 +2260,48 @@ export class WorkspaceStore {
 
       return result;
     } catch (error) {
-      // Un 409 no es un fallo de transporte: es la API pidiendo confirmación.
-      const rejection = asRejection(error);
-
-      if (rejection) {
-        if (
-          tab &&
-          connection &&
-          this.activeTab()?.id === tab.id &&
-          this.activeTab()?.sql === tabSql
-        ) {
-          this._execution.noteRejection({
-            value: rejection,
-            operation: 'execute',
-            tabId: tab.id,
-            connectionId: connection.id,
-            sql,
-          });
-        }
-      } else if (!this.noteSessionLoss(connection.id, error)) {
-        if (this.activeTab()?.id === tabId && this.activeTab()?.sql === tabSql) {
-          this._notices.set(describeError(error, this._i18n));
-        }
-      }
+      this.noteExecuteFailure(error, { connection, tab, sql, sigueDelante });
 
       return null;
+    }
+  }
+
+  /**
+   * Lo que se hace cuando una consulta no sale.
+   *
+   * Un 409 no es un fallo de transporte: es la API pidiendo confirmación, y se
+   * guarda para poder ofrecerla. Lo demás puede ser una sesión perdida —que
+   * tiene su propio aviso, con su botón de reconectar— y, si no lo es, el
+   * motivo escrito para leerlo.
+   */
+  private noteExecuteFailure(
+    error: unknown,
+    context: {
+      connection: ConnectionSummary;
+      tab: QueryTab | null;
+      sql: string;
+      sigueDelante: () => boolean;
+    },
+  ): void {
+    const { connection, tab, sql, sigueDelante } = context;
+    const rejection = asRejection(error);
+
+    if (rejection) {
+      if (tab && this.activeTab()?.id === tab.id && sigueDelante()) {
+        this._execution.noteRejection({
+          value: rejection,
+          operation: 'execute',
+          tabId: tab.id,
+          connectionId: connection.id,
+          sql,
+        });
+      }
+
+      return;
+    }
+
+    if (!this.noteSessionLoss(connection.id, error) && sigueDelante()) {
+      this._notices.set(describeError(error, this._i18n));
     }
   }
 
@@ -2368,7 +2458,6 @@ async function asHttpErrorFromBlob(error: unknown): Promise<HttpErrorResponse | 
   try {
     return new HttpErrorResponse({
       status: error.status,
-      statusText: error.statusText,
       url: error.url ?? undefined,
       error: JSON.parse(await error.error.text()),
     });
