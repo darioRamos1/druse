@@ -70,9 +70,10 @@ const DARK: MonacoApi.editor.IStandaloneThemeData = {
     // Palabras reservadas: violeta, como SELECT / FROM / WHERE en el mockup.
     { token: 'keyword', foreground: 'A78BFA', fontStyle: 'bold' },
     { token: 'keyword.sql', foreground: 'A78BFA', fontStyle: 'bold' },
-    { token: 'operator.sql', foreground: 'A7B4CA' },
-    { token: 'delimiter', foreground: 'A7B4CA' },
-    { token: 'delimiter.parenthesis', foreground: 'A7B4CA' },
+    // Los signos también son código: deben leerse tan claramente como los nombres.
+    { token: 'operator.sql', foreground: 'D3DEEE' },
+    { token: 'delimiter', foreground: 'D3DEEE' },
+    { token: 'delimiter.parenthesis', foreground: 'D3DEEE' },
     // Identificadores y alias.
     { token: 'identifier', foreground: 'DCE3F0' },
     { token: 'identifier.quote', foreground: '7FE3A8' },
@@ -81,7 +82,7 @@ const DARK: MonacoApi.editor.IStandaloneThemeData = {
     { token: 'string.sql', foreground: '7FE3A8' },
     { token: 'number', foreground: 'F2B36B' },
     { token: 'predefined', foreground: 'F2B36B' },
-    { token: 'comment', foreground: '98A6BC', fontStyle: 'italic' },
+    { token: 'comment', foreground: 'B6C5D8', fontStyle: '' },
   ],
   colors: {
     'editor.background': '#00000000',
@@ -124,16 +125,16 @@ const LIGHT: MonacoApi.editor.IStandaloneThemeData = {
   rules: [
     { token: 'keyword', foreground: '6D47E0', fontStyle: 'bold' },
     { token: 'keyword.sql', foreground: '6D47E0', fontStyle: 'bold' },
-    { token: 'operator.sql', foreground: '7B8496' },
-    { token: 'delimiter', foreground: '7B8496' },
-    { token: 'delimiter.parenthesis', foreground: '7B8496' },
+    { token: 'operator.sql', foreground: '4B586D' },
+    { token: 'delimiter', foreground: '4B586D' },
+    { token: 'delimiter.parenthesis', foreground: '4B586D' },
     { token: 'identifier', foreground: '1C2432' },
     { token: 'identifier.quote', foreground: '0F7A55' },
     { token: 'string', foreground: '0F7A55' },
     { token: 'string.sql', foreground: '0F7A55' },
     { token: 'number', foreground: 'A85D06' },
     { token: 'predefined', foreground: 'A85D06' },
-    { token: 'comment', foreground: '8B93A4', fontStyle: 'italic' },
+    { token: 'comment', foreground: '48566B', fontStyle: '' },
   ],
   colors: {
     'editor.background': '#00000000',

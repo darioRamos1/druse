@@ -239,10 +239,10 @@
   --dr-text-bright: hsl(calc(var(--dr-hue) + 1) calc(40% * var(--dr-sat-scale)) 90.2%);
   --dr-text-secondary: hsl(calc(var(--dr-hue) + 1) calc(36.7% * var(--dr-sat-scale)) 84.5%);
   --dr-text-muted: hsl(calc(var(--dr-hue) + 2) calc(23.9% * var(--dr-sat-scale)) 77.8%);
-  --dr-text-tertiary: hsl(calc(var(--dr-hue) + 1) calc(16% * var(--dr-sat-scale)) 70%);
-  --dr-text-dim: hsl(calc(var(--dr-hue) + 1) calc(13.9% * var(--dr-sat-scale)) 66%);
-  --dr-text-faint: hsl(calc(var(--dr-hue) + 2) calc(15% * var(--dr-sat-scale)) 64%);
-  --dr-text-faintest: hsl(calc(var(--dr-hue) + 1) calc(15.3% * var(--dr-sat-scale)) 62%);
+  --dr-text-tertiary: hsl(calc(var(--dr-hue) + 1) calc(16% * var(--dr-sat-scale)) 74%);
+  --dr-text-dim: hsl(calc(var(--dr-hue) + 1) calc(13.9% * var(--dr-sat-scale)) 72%);
+  --dr-text-faint: hsl(calc(var(--dr-hue) + 2) calc(15% * var(--dr-sat-scale)) 70%);
+  --dr-text-faintest: hsl(calc(var(--dr-hue) + 1) calc(15.3% * var(--dr-sat-scale)) 68%);
   --dr-text-disabled: hsl(calc(var(--dr-hue) + 3) calc(16.9% * var(--dr-sat-scale)) 46%);
 
   // Indicador apagado: el punto que aún no dice nada.

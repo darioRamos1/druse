@@ -213,6 +213,50 @@ app-query-builder .join-suggestions {
 
 // Layout del compositor, junto a sus sugerencias, para mantener pequeño el bloque diferido.
 app-query-builder {
+  .aggregate-shortcuts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 14px;
+  }
+
+  .aggregate-row,
+  .filter--list {
+    flex-wrap: wrap;
+  }
+
+  .aggregate-row select {
+    max-width: 100%;
+  }
+
+  .in-editor {
+    display: grid;
+    flex-basis: 100%;
+    order: 1;
+    gap: 8px;
+    min-width: 0;
+    padding: 10px;
+    margin-bottom: 8px;
+    border: 1px solid var(--dr-border);
+    border-radius: var(--dr-radius);
+    background: var(--dr-surface-panel);
+
+    textarea {
+      width: 100%;
+      resize: vertical;
+      padding: 8px;
+      border: 1px solid var(--dr-border-input);
+      border-radius: var(--dr-radius-sm);
+      background: var(--dr-surface-input);
+      color: var(--dr-text);
+      font: 12px/1.6 var(--dr-font-mono);
+    }
+
+    .hint {
+      margin: 0;
+    }
+  }
+
   .operations {
     display: flex;
     gap: 2px;
