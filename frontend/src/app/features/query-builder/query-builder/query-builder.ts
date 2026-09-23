@@ -302,6 +302,13 @@ export class QueryBuilder implements OnInit {
   protected readonly sqlOverride = signal<string | null>(null);
 
   protected readonly chosen = signal<readonly string[]>([]);
+  protected readonly columnSearch = signal('');
+  protected readonly visibleColumns = computed(() => {
+    const search = this.columnSearch().trim().toLocaleLowerCase();
+    return this.columns().filter((column) =>
+      `${column.name} ${column.dataType}`.toLocaleLowerCase().includes(search),
+    );
+  });
   protected readonly joins = signal<readonly JoinDraft[]>([]);
   protected readonly filters = signal<readonly QueryFilter[]>([]);
   protected readonly grouped = signal(false);
@@ -321,6 +328,10 @@ export class QueryBuilder implements OnInit {
   protected readonly updateFilters = signal<readonly QueryFilter[]>([]);
   protected readonly foreignKeys = signal<readonly DatabaseForeignKey[]>([]);
   protected readonly previewResult = signal<QueryResult | null>(null);
+  private readonly previewSql = signal<string | null>(null);
+  protected readonly previewStale = computed(
+    () => this.previewResult() !== null && this.previewSql() !== this.sql(),
+  );
   protected readonly previewRunning = signal(false);
   protected readonly previewCanceling = signal(false);
   protected readonly savedCompositions = signal<readonly SavedComposition[]>([]);
@@ -329,6 +340,8 @@ export class QueryBuilder implements OnInit {
   /** Por qué no se pudo leer, guardar o borrar una composición, si falló. */
   protected readonly compositionError = signal<string | null>(null);
   private _previewExecutionId: string | null = null;
+  private _previewRefresh = 0;
+  private _destroyed = false;
   private _autoPreviewTimer: ReturnType<typeof setTimeout> | undefined;
 
   /**
@@ -360,14 +373,24 @@ export class QueryBuilder implements OnInit {
    * Refrescar entonces ejecutaría el marcador de «valor obligatorio» y enseñaría
    * un error de sintaxis por cada campo que se está a medio escribir.
    */
-  private readonly hasPendingValues = computed(() =>
-    [...this.filters(), ...this.having()].some(
+  protected readonly hasPendingValues = computed(() =>
+    [...this.filters(), ...(this.grouped() ? this.having() : [])].some(
       (filter) =>
         this.needsValue(filter.operator) &&
         !(filter as QueryFilter).compareColumn &&
         (filter.value === null ||
           (filter.operator === 'BETWEEN' && (filter as QueryFilter).valueTo == null)),
     ),
+  );
+
+  protected readonly canPreview = computed(
+    () =>
+      !this.loading() &&
+      this.operation() === 'select' &&
+      this.sql().trim().length > 0 &&
+      this.validationMessages().length === 0 &&
+      (this.sqlOverride() !== null ||
+        (!this.hasPendingValues() && !this.joins().some((join) => join.loading))),
   );
 
   private readonly scheduleAutoPreview = effect(() => {
@@ -383,7 +406,16 @@ export class QueryBuilder implements OnInit {
   });
 
   constructor() {
-    inject(DestroyRef).onDestroy(() => clearTimeout(this._autoPreviewTimer));
+    inject(DestroyRef).onDestroy(() => {
+      this._destroyed = true;
+      this._previewRefresh += 1;
+      clearTimeout(this._autoPreviewTimer);
+      const executionId = this._previewExecutionId;
+      this._previewExecutionId = null;
+      if (executionId) {
+        void this._store.cancelExecution(executionId);
+      }
+    });
   }
 
   protected setAutoPreview(enabled: boolean): void {
@@ -398,17 +430,26 @@ export class QueryBuilder implements OnInit {
 
   /** Cancela la que siga en curso —ya describe una composición vieja— y lanza otra. */
   private async refreshPreview(): Promise<void> {
-    if (!this.canAutoPreview()) {
+    if (this._destroyed || !this.autoPreview() || !this.canAutoPreview()) {
       return;
     }
 
+    const refresh = ++this._previewRefresh;
     if (this._previewExecutionId) {
-      await this._store.cancelExecution(this._previewExecutionId);
+      const executionId = this._previewExecutionId;
       this._previewExecutionId = null;
       this.previewRunning.set(false);
+      await this._store.cancelExecution(executionId);
     }
 
-    await this.runPreview();
+    if (
+      refresh === this._previewRefresh &&
+      !this._destroyed &&
+      this.autoPreview() &&
+      this.canAutoPreview()
+    ) {
+      await this.runPreview();
+    }
   }
 
   ngOnInit(): void {
@@ -595,6 +636,12 @@ export class QueryBuilder implements OnInit {
     this.chosen.update((current) =>
       current.includes(name) ? current.filter((item) => item !== name) : [...current, name],
     );
+  }
+
+  protected selectVisibleColumns(): void {
+    this.chosen.update((current) => [
+      ...new Set([...current, ...this.visibleColumns().map((column) => column.name)]),
+    ]);
   }
 
   /** Columnas disponibles para agrupar, incluidas las de los JOIN válidos. */
@@ -1510,25 +1557,29 @@ export class QueryBuilder implements OnInit {
   }
 
   protected async runPreview(): Promise<void> {
-    if (this.previewRunning() || this.validationMessages().length > 0) {
+    if (this._destroyed || this.previewRunning() || !this.canPreview()) {
       return;
     }
 
     const executionId = crypto.randomUUID();
+    const sql = this.sql();
     this._previewExecutionId = executionId;
     this.previewRunning.set(true);
     this.previewCanceling.set(false);
     this.previewResult.set(null);
 
     try {
-      this.previewResult.set(
-        await this._store.previewQuery(
-          this.connectionId(),
-          this.table().database,
-          this.sql(),
-          executionId,
-        ),
+      const result = await this._store.previewQuery(
+        this.connectionId(),
+        this.table().database,
+        sql,
+        executionId,
       );
+      // Una consulta cancelada puede responder después de su sustituta.
+      if (this._previewExecutionId === executionId) {
+        this.previewSql.set(sql);
+        this.previewResult.set(result);
+      }
     } finally {
       if (this._previewExecutionId === executionId) {
         this._previewExecutionId = null;
@@ -1709,8 +1760,11 @@ export class QueryBuilder implements OnInit {
   }
 
   protected close(): void {
+    clearTimeout(this._autoPreviewTimer);
+    this._previewRefresh += 1;
     if (this._previewExecutionId) {
       void this.cancelQueryPreview();
+      this._previewExecutionId = null;
     }
     this.closed.emit();
   }

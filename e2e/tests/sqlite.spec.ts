@@ -173,6 +173,77 @@ async function hastaLasTablas(page: Page) {
 }
 
 test.describe('SQLite de punta a punta', () => {
+  test('el compositor permite buscar columnas y revisar resultados en ambos temas', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await abrir(page);
+    await hastaLasTablas(page);
+    await page
+      .getByRole('button', { name: 'Tema oscuro', exact: true })
+      .click();
+    await menuDeNodo(page, 'clientes');
+    await page
+      .getByRole('menuitem', { name: 'Componer consulta', exact: true })
+      .click();
+    const builder = page.locator('app-query-builder');
+    const search = builder.getByRole('searchbox', {
+      name: 'Buscar por nombre o tipo…',
+    });
+    await expect(search).toBeVisible();
+    await search.fill('nombre');
+    await builder.getByRole('button', { name: 'Seleccionar visibles' }).click();
+    await expect(builder.locator('textarea.sql')).toHaveValue(
+      /SELECT "nombre"/,
+    );
+    await search.fill('');
+    await builder.getByRole('button', { name: 'Probar con 10 filas' }).click();
+    await expect(builder.locator('app-results-grid')).toContainText('Ana');
+    await builder.getByRole('button', { name: 'Desmarcar todas' }).click();
+    await expect(
+      builder.getByRole('status').filter({ hasText: 'SQL anterior' }),
+    ).toBeVisible();
+
+    const previewBefore = await builder.locator('.preview').boundingBox();
+    await builder.locator('.builder-workspace > .body').evaluate((element) => {
+      element.scrollTop = element.scrollHeight;
+    });
+    expect((await builder.locator('.preview').boundingBox())?.y).toBe(
+      previewBefore?.y,
+    );
+    await builder.locator('.builder-workspace > .body').evaluate((element) => {
+      element.scrollTop = 0;
+    });
+    if (process.env['DRUSE_BARRIDO_DIR']) {
+      mkdirSync(BARRIDO, { recursive: true });
+      await page.screenshot({ path: join(BARRIDO, 'query-builder-dark.png') });
+    }
+
+    await builder.getByRole('button', { name: 'Cerrar', exact: true }).click();
+    await page.getByRole('button', { name: 'Tema claro', exact: true }).click();
+    await menuDeNodo(page, 'clientes');
+    await page
+      .getByRole('menuitem', { name: 'Componer consulta', exact: true })
+      .click();
+    await expect(search).toBeVisible();
+    if (process.env['DRUSE_BARRIDO_DIR']) {
+      await page.screenshot({ path: join(BARRIDO, 'query-builder-light.png') });
+    }
+
+    await page.setViewportSize({ width: 600, height: 800 });
+    await expect(builder.locator('.dialog')).toBeVisible();
+    expect(
+      await builder
+        .locator('.builder-workspace')
+        .evaluate((element) => element.scrollWidth <= element.clientWidth + 1),
+    ).toBe(true);
+    if (process.env['DRUSE_BARRIDO_DIR']) {
+      await page.screenshot({
+        path: join(BARRIDO, 'query-builder-narrow.png'),
+      });
+    }
+  });
+
   test('el formulario pierde el servidor y el árbol trae lo que hay dentro', async ({ page }) => {
     await abrir(page);
 

@@ -827,6 +827,106 @@ describe('QueryBuilder', () => {
     expect(builder.filters()[0].compareColumn).toBeNull();
   });
 
+  it('busca columnas por nombre o tipo y conserva las selecciones ocultas', async () => {
+    const fixture = await create(table);
+    const element = fixture.nativeElement as HTMLElement;
+    const search = element.querySelector<HTMLInputElement>('.column-tools input')!;
+    const select = element.querySelector<HTMLButtonElement>('.column-tools button')!;
+    const sql = element.querySelector<HTMLTextAreaElement>('.sql')!;
+    search.value = 'NUMERIC';
+    search.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+    expect(element.querySelectorAll('.column')).toHaveLength(1);
+    select.click();
+    search.value = 'note';
+    search.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+    select.click();
+    fixture.detectChanges();
+    expect(sql.value).toContain('[total], [note]');
+    search.value = 'missing-column';
+    search.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+    expect(select.disabled).toBe(true);
+    expect(sql.value).toContain('[total], [note]');
+  });
+
+  it('bloquea una prueba con filtros incompletos y permite probar el SQL editado', async () => {
+    const fixture = await create(table);
+    const builder = fixture.componentInstance as any;
+    const preview = vi.spyOn(store, 'previewQuery');
+    preview.mockClear();
+    builder.filters.set([{ column: 'id', operator: '=', value: null }]);
+    await builder.runPreview();
+    expect(preview).not.toHaveBeenCalled();
+    builder.patchSql('SELECT 1;');
+    await builder.runPreview();
+    expect(preview).toHaveBeenCalledTimes(1);
+  });
+
+  it('no reemplaza los resultados nuevos con una respuesta cancelada tardía', async () => {
+    const fixture = await create(table);
+    const builder = fixture.componentInstance as any;
+    let finishOld!: (result: QueryResult) => void;
+    const result: QueryResult = {
+      executionId: 'new',
+      state: 'succeeded',
+      durationMs: 1,
+      resultSets: [],
+      messages: [],
+    };
+    vi.spyOn(store, 'previewQuery')
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            finishOld = resolve;
+          }),
+      )
+      .mockResolvedValueOnce(result);
+    const oldRequest = builder.runPreview();
+    builder.setAutoPreview(true);
+    builder.limit.set(5);
+    await builder.refreshPreview();
+    finishOld({ ...result, executionId: 'old' });
+    await oldRequest;
+    expect(builder.previewResult()?.executionId).toBe('new');
+    expect(builder.previewStale()).toBe(false);
+    builder.limit.set(8);
+    expect(builder.previewStale()).toBe(true);
+  });
+
+  it('no lanza otra prueba si se destruye el diálogo mientras cancela la anterior', async () => {
+    const fixture = await create(table);
+    const builder = fixture.componentInstance as any;
+    let finishCancel!: () => void;
+    let finishPreview!: (result: null) => void;
+    const preview = vi
+      .spyOn(store, 'previewQuery')
+      .mockClear()
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            finishPreview = resolve;
+          }),
+      );
+    vi.spyOn(store, 'cancelExecution').mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finishCancel = resolve;
+        }),
+    );
+    const pending = builder.runPreview();
+    builder.setAutoPreview(true);
+    const refresh = builder.refreshPreview();
+    fixture.destroy();
+    finishCancel();
+    await refresh;
+    finishPreview(null);
+    await pending;
+    expect(preview).toHaveBeenCalledTimes(1);
+    expect(builder.previewResult()).toBeNull();
+  });
+
   describe('vista previa automática', () => {
     it('está apagada por omisión', async () => {
       const fixture = await create(table);
