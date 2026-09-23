@@ -73,7 +73,7 @@
 }
 
 // =============================================================================
-// Tema oscuro — el del mockup, y el que se aplica mientras no se elija otro
+// Tema oscuro — superficies neutras y texto secundario legible
 //
 // El selector sin atributo va primero para que valga también antes de que el
 // código haya podido escribir `data-theme`: el arranque nunca se ve sin colores.
@@ -97,49 +97,49 @@
   // tiene que seguir siendo rojo aunque el resto sea verde.
   // ---------------------------------------------------------------------------
   --dr-hue: 218;
-  --dr-sat-scale: 1;
+  --dr-sat-scale: 0.65;
 
   // ---------------------------------------------------------------------------
   // Superficies
   // ---------------------------------------------------------------------------
   --dr-surface-outer: hsl(
-    calc(var(--dr-hue) + 7) calc(22.2% * var(--dr-sat-scale)) 3.5%
+    calc(var(--dr-hue) + 7) calc(22.2% * var(--dr-sat-scale)) 5%
   ); // fondo fuera de la ventana
   --dr-surface-base: hsl(
-    calc(var(--dr-hue) + 2) calc(21.4% * var(--dr-sat-scale)) 5.5%
+    calc(var(--dr-hue) + 2) calc(21.4% * var(--dr-sat-scale)) 8%
   ); // fondo principal: editor y área central
   --dr-surface-panel: hsl(
-    var(--dr-hue) calc(28.2% * var(--dr-sat-scale)) 7.6%
+    var(--dr-hue) calc(28.2% * var(--dr-sat-scale)) 11%
   ); // sidebar, pestañas, toolbar, panel de resultados
-  --dr-surface-topbar: hsl(calc(var(--dr-hue) + 7) calc(33.3% * var(--dr-sat-scale)) 9.4%);
-  --dr-surface-statusbar: hsl(calc(var(--dr-hue) + 2) calc(33.3% * var(--dr-sat-scale)) 7.1%);
-  --dr-surface-grid-header: hsl(calc(var(--dr-hue) + 2) calc(33.3% * var(--dr-sat-scale)) 10.6%);
+  --dr-surface-topbar: hsl(calc(var(--dr-hue) + 7) calc(33.3% * var(--dr-sat-scale)) 14%);
+  --dr-surface-statusbar: hsl(calc(var(--dr-hue) + 2) calc(33.3% * var(--dr-sat-scale)) 10%);
+  --dr-surface-grid-header: hsl(calc(var(--dr-hue) + 2) calc(33.3% * var(--dr-sat-scale)) 15%);
   --dr-surface-raised: hsl(
-    calc(var(--dr-hue) + 5) calc(30.8% * var(--dr-sat-scale)) 15.3%
+    calc(var(--dr-hue) + 5) calc(30.8% * var(--dr-sat-scale)) 19%
   ); // botones y elementos elevados
-  --dr-surface-raised-hover: hsl(calc(var(--dr-hue) + 4) calc(30.6% * var(--dr-sat-scale)) 19.2%);
-  --dr-surface-input: hsl(calc(var(--dr-hue) + 2) calc(33.3% * var(--dr-sat-scale)) 7.1%);
+  --dr-surface-raised-hover: hsl(calc(var(--dr-hue) + 4) calc(30.6% * var(--dr-sat-scale)) 23%);
+  --dr-surface-input: hsl(calc(var(--dr-hue) + 2) calc(33.3% * var(--dr-sat-scale)) 9%);
 
   --dr-surface-hover: hsl(
-    calc(var(--dr-hue) + 2) calc(30% * var(--dr-sat-scale)) 11.8%
+    calc(var(--dr-hue) + 2) calc(30% * var(--dr-sat-scale)) 16%
   ); // paso del ratón sobre algo que no está activo
   --dr-surface-active: hsl(
-    calc(var(--dr-hue) + 3) calc(29.4% * var(--dr-sat-scale)) 16.7%
+    calc(var(--dr-hue) + 3) calc(29.4% * var(--dr-sat-scale)) 20%
   ); // seleccionado, abierto, pulsado
   --dr-surface-active-strong: hsl(
-    calc(var(--dr-hue) + 5) calc(30.7% * var(--dr-sat-scale)) 19.8%
+    calc(var(--dr-hue) + 5) calc(30.7% * var(--dr-sat-scale)) 24%
   ); // ratón sobre algo ya activo
   --dr-surface-overlay: hsl(
-    calc(var(--dr-hue) + 2) calc(31% * var(--dr-sat-scale)) 11.4%
+    calc(var(--dr-hue) + 2) calc(31% * var(--dr-sat-scale)) 16%
   ); // menús y desplegables, que flotan sobre todo
   --dr-surface-dialog: hsl(
-    calc(var(--dr-hue) + 3) calc(32% * var(--dr-sat-scale)) 9.8%
+    calc(var(--dr-hue) + 3) calc(32% * var(--dr-sat-scale)) 13%
   ); // cuerpo de los diálogos modales
   --dr-surface-sunken: hsl(
-    calc(var(--dr-hue) + 2) calc(33.3% * var(--dr-sat-scale)) 8.8%
+    calc(var(--dr-hue) + 2) calc(33.3% * var(--dr-sat-scale)) 11%
   ); // zonas hundidas: pies de diálogo, cabeceras
   --dr-surface-inset: hsl(
-    calc(var(--dr-hue) + 1) calc(35% * var(--dr-sat-scale)) 7.8%
+    calc(var(--dr-hue) + 1) calc(35% * var(--dr-sat-scale)) 9%
   ); // lo más hundido: campos de búsqueda
   --dr-surface-stripe: rgb(124 135 156 / 10%); // franjas de la cuadrícula
 
@@ -150,18 +150,18 @@
   // y uno para el contorno de los diálogos.
   // ---------------------------------------------------------------------------
   --dr-border-hairline: hsl(
-    calc(var(--dr-hue) + 3) calc(29.2% * var(--dr-sat-scale)) 12.7%
+    calc(var(--dr-hue) + 3) calc(29.2% * var(--dr-sat-scale)) 18%
   ); // líneas entre filas
   --dr-border-faint: hsl(
-    calc(var(--dr-hue) + 5) calc(28% * var(--dr-sat-scale)) 14.7%
+    calc(var(--dr-hue) + 5) calc(28% * var(--dr-sat-scale)) 21%
   ); // separadores de zona
-  --dr-border: hsl(calc(var(--dr-hue) + 3) calc(26.8% * var(--dr-sat-scale)) 16.1%);
-  --dr-border-subtle: hsl(calc(var(--dr-hue) + 2) calc(23.1% * var(--dr-sat-scale)) 17.8%);
-  --dr-border-strong: hsl(calc(var(--dr-hue) + 4) calc(26.3% * var(--dr-sat-scale)) 22.4%);
+  --dr-border: hsl(calc(var(--dr-hue) + 3) calc(26.8% * var(--dr-sat-scale)) 26%);
+  --dr-border-subtle: hsl(calc(var(--dr-hue) + 2) calc(23.1% * var(--dr-sat-scale)) 28%);
+  --dr-border-strong: hsl(calc(var(--dr-hue) + 4) calc(26.3% * var(--dr-sat-scale)) 35%);
 
-  --dr-border-input: hsl(calc(var(--dr-hue) + 2) calc(26.7% * var(--dr-sat-scale)) 17.6%);
-  --dr-border-input-hover: hsl(calc(var(--dr-hue) + 1) calc(26.8% * var(--dr-sat-scale)) 27.8%);
-  --dr-border-dialog: hsl(calc(var(--dr-hue) + 3) calc(26.9% * var(--dr-sat-scale)) 20.4%);
+  --dr-border-input: hsl(calc(var(--dr-hue) + 2) calc(26.7% * var(--dr-sat-scale)) 45%);
+  --dr-border-input-hover: hsl(calc(var(--dr-hue) + 1) calc(26.8% * var(--dr-sat-scale)) 57%);
+  --dr-border-dialog: hsl(calc(var(--dr-hue) + 3) calc(26.9% * var(--dr-sat-scale)) 33%);
 
   // ---------------------------------------------------------------------------
   // Acentos
@@ -239,11 +239,11 @@
   --dr-text-bright: hsl(calc(var(--dr-hue) + 1) calc(40% * var(--dr-sat-scale)) 90.2%);
   --dr-text-secondary: hsl(calc(var(--dr-hue) + 1) calc(36.7% * var(--dr-sat-scale)) 84.5%);
   --dr-text-muted: hsl(calc(var(--dr-hue) + 2) calc(23.9% * var(--dr-sat-scale)) 77.8%);
-  --dr-text-tertiary: hsl(calc(var(--dr-hue) + 1) calc(16% * var(--dr-sat-scale)) 60.8%);
-  --dr-text-dim: hsl(calc(var(--dr-hue) + 1) calc(13.9% * var(--dr-sat-scale)) 54.9%);
-  --dr-text-faint: hsl(calc(var(--dr-hue) + 2) calc(15% * var(--dr-sat-scale)) 47.1%);
-  --dr-text-faintest: hsl(calc(var(--dr-hue) + 1) calc(15.3% * var(--dr-sat-scale)) 43.5%);
-  --dr-text-disabled: hsl(calc(var(--dr-hue) + 3) calc(16.9% * var(--dr-sat-scale)) 35.9%);
+  --dr-text-tertiary: hsl(calc(var(--dr-hue) + 1) calc(16% * var(--dr-sat-scale)) 70%);
+  --dr-text-dim: hsl(calc(var(--dr-hue) + 1) calc(13.9% * var(--dr-sat-scale)) 66%);
+  --dr-text-faint: hsl(calc(var(--dr-hue) + 2) calc(15% * var(--dr-sat-scale)) 64%);
+  --dr-text-faintest: hsl(calc(var(--dr-hue) + 1) calc(15.3% * var(--dr-sat-scale)) 62%);
+  --dr-text-disabled: hsl(calc(var(--dr-hue) + 3) calc(16.9% * var(--dr-sat-scale)) 46%);
 
   // Indicador apagado: el punto que aún no dice nada.
   --dr-indicator-off: hsl(calc(var(--dr-hue) + 4) calc(17.3% * var(--dr-sat-scale)) 29.4%);

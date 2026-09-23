@@ -1,4 +1,5 @@
 import { druseTheme } from './druse-theme';
+import { contrast, parseHex } from '../../../core/theme/color';
 
 /**
  * Los colores del editor que **solo se ven mirando la aplicación**.
@@ -11,7 +12,7 @@ import { druseTheme } from './druse-theme';
 describe('druseTheme', () => {
   it('la regla de la derecha lleva el fondo del panel en los dos temas', () => {
     // Es un canvas: sin fondo propio sale negro, no transparente.
-    expect(druseTheme('dark', null).colors['editorOverviewRuler.background']).toBe('#0B0D11');
+    expect(druseTheme('dark', null).colors['editorOverviewRuler.background']).toBe('#121417');
     expect(druseTheme('light', null).colors['editorOverviewRuler.background']).toBe('#FFFFFF');
   });
 
@@ -26,5 +27,17 @@ describe('druseTheme', () => {
     const conAcento = druseTheme('dark', '#ff8800');
 
     expect(conAcento.colors['editorCursor.foreground']?.toUpperCase()).toBe('#FF8800');
+  });
+
+  it('mantiene legibles comentarios, operadores y números de línea sobre el fondo oscuro', () => {
+    const theme = druseTheme('dark', null);
+    const background = parseHex(theme.colors['editorOverviewRuler.background'])!;
+    for (const token of ['comment', 'operator.sql', 'delimiter']) {
+      const rule = theme.rules.find((rule) => rule.token === token)!;
+      expect(contrast(parseHex(rule.foreground!)!, background)).toBeGreaterThanOrEqual(4.5);
+    }
+    expect(
+      contrast(parseHex(theme.colors['editorLineNumber.foreground'])!, background),
+    ).toBeGreaterThanOrEqual(4.5);
   });
 });

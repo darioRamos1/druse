@@ -70,9 +70,9 @@ const DARK: MonacoApi.editor.IStandaloneThemeData = {
     // Palabras reservadas: violeta, como SELECT / FROM / WHERE en el mockup.
     { token: 'keyword', foreground: 'A78BFA', fontStyle: 'bold' },
     { token: 'keyword.sql', foreground: 'A78BFA', fontStyle: 'bold' },
-    { token: 'operator.sql', foreground: '66728A' },
-    { token: 'delimiter', foreground: '66728A' },
-    { token: 'delimiter.parenthesis', foreground: '66728A' },
+    { token: 'operator.sql', foreground: 'A7B4CA' },
+    { token: 'delimiter', foreground: 'A7B4CA' },
+    { token: 'delimiter.parenthesis', foreground: 'A7B4CA' },
     // Identificadores y alias.
     { token: 'identifier', foreground: 'DCE3F0' },
     { token: 'identifier.quote', foreground: '7FE3A8' },
@@ -81,31 +81,31 @@ const DARK: MonacoApi.editor.IStandaloneThemeData = {
     { token: 'string.sql', foreground: '7FE3A8' },
     { token: 'number', foreground: 'F2B36B' },
     { token: 'predefined', foreground: 'F2B36B' },
-    { token: 'comment', foreground: '3F485C', fontStyle: 'italic' },
+    { token: 'comment', foreground: '98A6BC', fontStyle: 'italic' },
   ],
   colors: {
     'editor.background': '#00000000',
     'editor.foreground': '#DCE3F0',
-    'editorLineNumber.foreground': '#3F485C',
+    'editorLineNumber.foreground': '#8998AF',
     'editor.lineHighlightBorder': '#00000000',
-    'editorIndentGuide.background1': '#171E2B',
-    'editorIndentGuide.activeBackground1': '#2A3348',
-    'editorWidget.background': '#141A26',
-    'editorWidget.border': '#2A3348',
-    'editorSuggestWidget.background': '#141A26',
-    'editorSuggestWidget.border': '#2A3348',
-    'editorHoverWidget.background': '#141A26',
-    'editorHoverWidget.border': '#2A3348',
+    'editorIndentGuide.background1': '#2B3340',
+    'editorIndentGuide.activeBackground1': '#526079',
+    'editorWidget.background': '#222733',
+    'editorWidget.border': '#465166',
+    'editorSuggestWidget.background': '#222733',
+    'editorSuggestWidget.border': '#465166',
+    'editorHoverWidget.background': '#222733',
+    'editorHoverWidget.border': '#465166',
     // La línea que Monaco pega arriba al desplazar **necesita fondo propio**.
     // El del editor es transparente a propósito —para que se vea el panel—, y
     // esa franja lo heredaba: al bajar por un guion largo, la primera línea se
     // quedaba escrita encima del texto que pasaba por debajo.
-    'editorStickyScroll.background': '#101623',
-    'editorStickyScrollHover.background': '#171E2B',
-    'editorStickyScroll.border': '#2A3348',
-    'scrollbarSlider.background': '#1E253480',
-    'scrollbarSlider.hoverBackground': '#2A3348B3',
-    'scrollbarSlider.activeBackground': '#2A3348',
+    'editorStickyScroll.background': '#121417',
+    'editorStickyScrollHover.background': '#232936',
+    'editorStickyScroll.border': '#465166',
+    'scrollbarSlider.background': '#8998AF55',
+    'scrollbarSlider.hoverBackground': '#8998AF88',
+    'scrollbarSlider.activeBackground': '#8998AFBB',
     'minimap.background': '#00000000',
     'editorGutter.background': '#00000000',
     'editorOverviewRuler.border': '#151B26',
@@ -114,7 +114,7 @@ const DARK: MonacoApi.editor.IStandaloneThemeData = {
     // del contenedor como hace el resto del editor: pintarlo con el
     // `#00000000` del editor lo deja **negro sólido**. Aquí apenas se nota; en
     // el tema claro es una franja negra de diez píxeles pegada al borde.
-    'editorOverviewRuler.background': '#0B0D11',
+    'editorOverviewRuler.background': '#121417',
   },
 };
 
