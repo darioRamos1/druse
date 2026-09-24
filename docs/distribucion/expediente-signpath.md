@@ -33,7 +33,7 @@ La respuesta pide repositorio público, artefacto publicado en la forma que se f
 | Nombre | Druse |
 | Qué es | Cliente de escritorio para administrar y consultar bases de datos: PostgreSQL, SQL Server, MySQL/MariaDB, Oracle, SQLite e Informix |
 | Plataforma de distribución | Windows x64, instalador NSIS construido con Tauri; API local en .NET autocontenida |
-| Versión actual | 1.2.0, sin publicar |
+| Versión actual | 1.2.1, sin publicar |
 | Repositorio | [github.com/darioRamos1/druse](https://github.com/darioRamos1/druse) (público) |
 | Contacto público | `druse.contacto@gmail.com` |
 | Licencia | GNU GPL v3 exclusivamente (`GPL-3.0-only`), elegida por Darío el 14 de septiembre de 2026; [LICENSE](../../LICENSE). Con un permiso adicional de la sección 7 en [COPYRIGHT](../../COPYRIGHT), limitado a cuatro controladores de bases de datos no libres |

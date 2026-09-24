@@ -18,6 +18,11 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: '1.2.1',
+    date: '2026-09-24',
+    items: ['whatsNew.v1_2_1.sqlColors'],
+  },
+  {
     version: '1.2.0',
     date: '2026-09-24',
     items: [

@@ -34,10 +34,23 @@ describe('druseTheme', () => {
     (name) => {
       const theme = druseTheme(name, null);
       const background = parseHex(theme.colors['editorOverviewRuler.background'])!;
-      for (const token of ['comment', 'operator.sql', 'delimiter']) {
+      for (const token of ['keyword.sql', 'comment', 'operator.sql', 'delimiter']) {
         const rule = theme.rules.find((rule) => rule.token === token)!;
         expect(contrast(parseHex(rule.foreground!)!, background)).toBeGreaterThanOrEqual(7);
       }
+    },
+  );
+
+  it.each(['dark', 'light'] as const)(
+    'los operadores SQL se distinguen de los identificadores como las reservadas en %s',
+    (name) => {
+      const theme = druseTheme(name, '#ff8800');
+      const keyword = theme.rules.find((rule) => rule.token === 'keyword.sql')!;
+      const operator = theme.rules.find((rule) => rule.token === 'operator.sql')!;
+      const identifier = theme.rules.find((rule) => rule.token === 'identifier')!;
+      expect(operator.foreground).toBe(keyword.foreground);
+      expect(operator.fontStyle).toBe(keyword.fontStyle);
+      expect(operator.foreground).not.toBe(identifier.foreground);
     },
   );
 

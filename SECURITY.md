@@ -20,7 +20,7 @@ No hay programa de recompensas.
 
 ## Qué versiones se corrigen
 
-Solo la última publicada. Druse está en 1.2.0 y todavía no tiene una rama de mantenimiento con versiones anteriores; si eso cambia, esta sección lo dirá.
+Solo la última publicada. Druse está en 1.2.1 y todavía no tiene una rama de mantenimiento con versiones anteriores; si eso cambia, esta sección lo dirá.
 
 ## Qué se considera un fallo de seguridad
 

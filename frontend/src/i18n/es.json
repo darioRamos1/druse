@@ -1,4 +1,5 @@
 {
+  "whatsNew.v1_2_1.sqlColors": "Las palabras SQL como INNER JOIN, AND e IS NOT NULL se resaltan en violeta, con mejor contraste en los temas claro y oscuro.",
   "activity.close": "Cerrar actividad",
   "activity.empty.text": "Aquí podrás consultar tus respaldos, restauraciones y traslados.",
   "activity.empty.title": "Aún no hay trabajos registrados",
