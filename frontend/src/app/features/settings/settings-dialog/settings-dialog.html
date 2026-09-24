@@ -375,6 +375,109 @@
       </div>
 
       <section class="section">
+        <h3 class="section__title">{{ 'settings.grid.background.title' | t }}</h3>
+        <p class="section__hint">{{ 'settings.grid.background.hint' | t }}</p>
+        <button
+          type="button"
+          class="secondary"
+          [disabled]="choosingBackground()"
+          (click)="chooseBackground('grid')"
+        >
+          {{
+            (grid().background ? 'settings.grid.background.replace' : 'settings.background.choose')
+              | t
+          }}
+        </button>
+        @if (grid().background; as image) {
+          <p class="file">
+            <app-icon name="folder-open" [size]="13" />
+            <span class="file__name">{{ image.name }}</span>
+            <button
+              type="button"
+              class="link"
+              [disabled]="choosingBackground()"
+              (click)="clearBackground('grid')"
+            >
+              {{ 'settings.background.remove' | t }}
+            </button>
+          </p>
+          <label class="field">
+            <span class="field__label">{{ 'settings.background.intensity' | t }}</span>
+            <input
+              type="range"
+              min="0"
+              [max]="maxOpacity"
+              step="1"
+              [value]="image.opacity"
+              (input)="setGridBackground({ opacity: +$any($event.target).value })"
+            />
+            <span class="field__value">{{ image.opacity }}%</span>
+          </label>
+          <div
+            class="choice choice--wrap"
+            role="group"
+            [attr.aria-label]="'settings.background.fitGroup' | t"
+          >
+            @for (fit of fits; track fit.value) {
+              <button
+                type="button"
+                class="choice__item"
+                [class.is-active]="image.fit === fit.value"
+                [attr.aria-pressed]="image.fit === fit.value"
+                (click)="setGridBackground({ fit: fit.value })"
+              >
+                {{ fit.label | t }}
+              </button>
+            }
+          </div>
+          @if (image.fit === 'tile' || image.fit === 'scale') {
+            <label class="field">
+              <span class="field__label">{{ 'settings.background.size' | t }}</span>
+              <input
+                type="range"
+                [min]="minBackgroundScale"
+                [max]="maxBackgroundScale"
+                step="5"
+                [value]="image.scale"
+                (input)="setGridBackground({ scale: +$any($event.target).value })"
+              />
+              <span class="field__value">{{ image.scale }}%</span>
+            </label>
+          }
+          <label class="field">
+            <span class="field__label">{{ 'settings.background.horizontal' | t }}</span>
+            <input
+              type="range"
+              min="0"
+              max="100"
+              step="1"
+              [value]="image.x"
+              (input)="setGridBackground({ x: +$any($event.target).value })"
+            />
+            <span class="field__value">{{ image.x }}%</span>
+          </label>
+          <label class="field">
+            <span class="field__label">{{ 'settings.background.vertical' | t }}</span>
+            <input
+              type="range"
+              min="0"
+              max="100"
+              step="1"
+              [value]="image.y"
+              (input)="setGridBackground({ y: +$any($event.target).value })"
+            />
+            <span class="field__value">{{ image.y }}%</span>
+          </label>
+          <button type="button" class="link link--inline" (click)="centerGridBackground()">
+            {{ 'settings.background.center' | t }}
+          </button>
+        }
+        @if (gridProblem(); as message) {
+          <p class="problem" role="alert">{{ message }}</p>
+        }
+      </section>
+
+      <section class="section">
         <h3 class="section__title">{{ 'settings.grid.title' | t }}</h3>
         <p class="section__hint">{{ 'settings.grid.hint' | t }}</p>
 

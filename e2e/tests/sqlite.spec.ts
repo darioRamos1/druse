@@ -173,6 +173,85 @@ async function hastaLasTablas(page: Page) {
 }
 
 test.describe('SQLite de punta a punta', () => {
+  test('el fondo de resultados se ajusta, persiste y se quita sin cambiar el editor', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 960 });
+    await abrir(page);
+    await hastaLasTablas(page);
+    await menuDeNodo(page, 'clientes');
+    await page.getByRole('menuitem', { name: 'Abrir SELECT', exact: true }).click();
+    await escribirSql(page, "WITH RECURSIVE n(id) AS (SELECT 1 UNION ALL SELECT id + 1 FROM n WHERE id < 40) SELECT id, 'Ana' AS nombre, 'ana@ejemplo.test' AS email FROM n");
+    await ejecutar(page, 'todo');
+    await expect(page.locator('app-results-grid .row')).toHaveCount(40);
+    const image = await page.evaluate(() => {
+      const canvas = document.createElement('canvas');
+      canvas.width = 800;
+      canvas.height = 400;
+      const ctx = canvas.getContext('2d')!;
+      const gradient = ctx.createLinearGradient(0, 0, 800, 400);
+      gradient.addColorStop(0, '#2457c5');
+      gradient.addColorStop(1, '#ffb464');
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, 800, 400);
+      ctx.fillStyle = '#164f69';
+      ctx.beginPath();
+      ctx.moveTo(0, 400);
+      ctx.lineTo(260, 60);
+      ctx.lineTo(440, 280);
+      ctx.lineTo(630, 140);
+      ctx.lineTo(800, 400);
+      ctx.fill();
+      return canvas.toDataURL().split(',')[1];
+    });
+    const preferences = async () => {
+      await page.getByRole('button', { name: 'Preferencias', exact: true }).click();
+      await page.locator('app-settings-dialog').getByRole('tab', { name: 'Resultados', exact: true }).click();
+    };
+    await preferences();
+    const panel = page.locator('#settings-panel-results');
+    const editorBefore = await page.locator('html').evaluate(el => (el as HTMLElement).style.getPropertyValue('--dr-editor-background'));
+    const chooser = page.waitForEvent('filechooser');
+    await panel.getByRole('button', { name: /Elegir imagen|Cambiar imagen/ }).click();
+    await (await chooser).setFiles({ name: 'montanas.png', mimeType: 'image/png', buffer: Buffer.from(image, 'base64') });
+    await expect(panel.locator('.file__name')).toHaveText('montanas.png');
+    await panel.getByRole('slider', { name: /Intensidad/ }).fill('25');
+    await panel.getByRole('button', { name: 'Encajar', exact: true }).click();
+    const preview = panel.locator('.grid-preview');
+    await expect.poll(() => preview.evaluate(el => getComputedStyle(el, '::before').opacity)).toBe('0.25');
+    await expect.poll(() => preview.evaluate(el => getComputedStyle(el, '::before').backgroundImage)).toContain('data:image/png');
+    if (process.env['DRUSE_BARRIDO_DIR']) {
+      mkdirSync(BARRIDO, { recursive: true });
+      await page.screenshot({ path: join(BARRIDO, 'results-background-settings.png') });
+    }
+    await page.getByRole('button', { name: 'Listo', exact: true }).click();
+    const grid = page.locator('app-results-grid');
+    await expect.poll(() => grid.evaluate(el => getComputedStyle(el, '::before').backgroundSize)).toBe('contain');
+    await grid.locator('.cell--value').first().click();
+    await expect(grid.locator('.cell--value').first()).toHaveClass(/is-selected/);
+    await grid.locator('.body').evaluate(el => { el.scrollTop = 350; });
+    await expect(grid.locator('.head')).toBeVisible();
+    if (process.env['DRUSE_BARRIDO_DIR']) {
+      await page.screenshot({ path: join(BARRIDO, 'results-background-grid.png') });
+    }
+    await page.getByRole('button', { name: 'Tema claro', exact: true }).click();
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
+    await expect.poll(() => grid.evaluate(el => getComputedStyle(el, '::before').opacity)).toBe('0.25');
+    if (process.env['DRUSE_BARRIDO_DIR']) {
+      await page.screenshot({ path: join(BARRIDO, 'results-background-light.png') });
+    }
+    await page.getByRole('button', { name: 'Tema oscuro', exact: true }).click();
+    await page.reload();
+    await expect(page.getByRole('button', { name: 'Preferencias', exact: true })).toBeVisible();
+    await expect.poll(() => page.locator('html').evaluate(el => (el as HTMLElement).style.getPropertyValue('--dr-grid-background'))).toContain('data:image/png');
+    await preferences();
+    await expect(panel.locator('.file__name')).toHaveText('montanas.png');
+    await expect(panel.getByRole('slider', { name: /Intensidad/ })).toHaveValue('25');
+    await panel.getByRole('button', { name: 'Quitar', exact: true }).click();
+    await expect(panel.locator('.file__name')).toHaveCount(0);
+    expect(await page.evaluate(() => localStorage.getItem('druse.gridBackground'))).toBeNull();
+    expect(await page.locator('html').evaluate(el => (el as HTMLElement).style.getPropertyValue('--dr-editor-background'))).toBe(editorBefore);
+    expect(await preview.evaluate(el => getComputedStyle(el, '::before').backgroundImage)).toBe('none');
+  });
+
   test('combina COUNT SUM MIN con una lista IN y con subconsultas UNION', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 1000 });
     await abrir(page);

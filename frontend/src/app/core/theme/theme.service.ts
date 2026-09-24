@@ -5,6 +5,7 @@ import { ApplicationGateway } from '../application-gateway/application-gateway';
 import { DesktopHost } from '../application-gateway/desktop-host';
 import {
   Appearance,
+  BackgroundTarget,
   DEFAULT_APPEARANCE,
   DEFAULT_BACKGROUND,
   DEFAULT_GRID,
@@ -45,13 +46,10 @@ const CUSTOMIZABLE = [
 ];
 
 /** Las que pinta la imagen de fondo del editor, que se ponen y se quitan aparte. */
-const BACKGROUND_VARIABLES = [
-  '--dr-editor-background',
-  '--dr-editor-background-size',
-  '--dr-editor-background-repeat',
-  '--dr-editor-background-position',
-  '--dr-editor-background-opacity',
-];
+const backgroundVariables = (target: BackgroundTarget) =>
+  ['', '-size', '-repeat', '-position', '-opacity'].map(
+    (suffix) => `--dr-${target}-background${suffix}`,
+  );
 
 /**
  * Escribe la apariencia en el documento.
@@ -137,6 +135,7 @@ export class ThemeService {
   private readonly _gateway = inject(ApplicationGateway);
   private readonly _desktop = inject(DesktopHost);
   private readonly _backgrounds = inject(EditorBackgroundStore);
+  private readonly backgroundRevision: Record<BackgroundTarget, number> = { editor: 0, grid: 0 };
 
   private readonly _appearance = signal<Appearance>(cachedAppearance());
   readonly appearance = this._appearance.asReadonly();
@@ -152,6 +151,7 @@ export class ThemeService {
     applyAppearance(this._appearance());
     void this._desktop.setWindowTheme(this.theme());
     void this.restoreBackground();
+    void this.restoreBackground('grid');
   }
 
   /**
@@ -166,6 +166,7 @@ export class ThemeService {
     // perderse por eso.
     this.apply(parseAppearance(preferences, this._appearance()));
     void this.restoreBackground();
+    void this.restoreBackground('grid');
   }
 
   /** Cambia el tema. Se conserva lo demás: los colores elegidos valen para los dos. */
@@ -212,7 +213,10 @@ export class ThemeService {
 
   /** Devuelve la apariencia a la del tema, sin tocar el tema elegido. */
   async reset(): Promise<void> {
+    this.backgroundRevision.editor++;
+    this.backgroundRevision.grid++;
     await this._backgrounds.forget();
+    await this._backgrounds.forget('grid');
     await this.update({
       accent: null,
       tint: null,
@@ -222,6 +226,12 @@ export class ThemeService {
       grid: DEFAULT_GRID,
     });
     this.paintBackground(null);
+    this.paintBackground(null, 'grid');
+  }
+
+  async resetGrid(): Promise<void> {
+    await this.clearBackground('grid');
+    await this.update({ grid: DEFAULT_GRID });
   }
 
   /**
@@ -232,47 +242,72 @@ export class ThemeService {
    * hoy es instantáneo. Se queda donde la deje el almacén y aquí solo se guarda
    * cómo se ve.
    */
-  async chooseBackground(): Promise<boolean> {
-    const chosen = await this._backgrounds.choose();
+  async chooseBackground(target: BackgroundTarget = 'editor'): Promise<boolean> {
+    const revision = ++this.backgroundRevision[target];
+    const chosen = await this._backgrounds.choose(target);
 
-    if (!chosen) {
+    if (!chosen || revision !== this.backgroundRevision[target]) {
       return false;
     }
 
-    const previous = this._appearance().background;
+    const previous = this.getBackground(target);
 
-    await this.update({
-      // Si ya había una imagen, la nueva hereda cómo estaba puesta: cambiar la
-      // foto no es motivo para volver a encuadrar.
-      background: { ...DEFAULT_BACKGROUND, ...previous, name: chosen.name },
-    });
+    await this.update(
+      this.backgroundChange(target, {
+        // Si ya había una imagen, la nueva hereda cómo estaba puesta: cambiar la
+        // foto no es motivo para volver a encuadrar.
+        ...DEFAULT_BACKGROUND,
+        ...previous,
+        name: chosen.name,
+      }),
+    );
 
-    this.paintBackground(chosen.source);
+    if (revision === this.backgroundRevision[target]) this.paintBackground(chosen.source, target);
 
     return true;
   }
 
-  async clearBackground(): Promise<void> {
-    await this._backgrounds.forget();
-    await this.update({ background: null });
-    this.paintBackground(null);
+  async clearBackground(target: BackgroundTarget = 'editor'): Promise<void> {
+    this.backgroundRevision[target]++;
+    await this._backgrounds.forget(target);
+    await this.update(this.backgroundChange(target, null));
+    this.paintBackground(null, target);
+  }
+
+  private getBackground(target: BackgroundTarget) {
+    return target === 'editor' ? this._appearance().background : this._appearance().grid.background;
+  }
+
+  private backgroundChange(
+    target: BackgroundTarget,
+    background: Appearance['background'],
+  ): Partial<Appearance> {
+    return target === 'editor'
+      ? { background }
+      : { grid: { ...this._appearance().grid, background } };
   }
 
   /** Vuelve a colgar la imagen guardada, si la hay. */
-  private async restoreBackground(): Promise<void> {
-    if (!this._appearance().background) {
-      this.paintBackground(null);
+  private async restoreBackground(target: BackgroundTarget = 'editor'): Promise<void> {
+    const revision = ++this.backgroundRevision[target];
+    if (!this.getBackground(target)) {
+      this.paintBackground(null, target);
       return;
     }
 
-    this.paintBackground(await this._backgrounds.load());
+    try {
+      const source = await this._backgrounds.load(target);
+      if (revision === this.backgroundRevision[target]) this.paintBackground(source, target);
+    } catch {
+      if (revision === this.backgroundRevision[target]) this.paintBackground(null, target);
+    }
   }
 
-  private paintBackground(source: string | null): void {
+  private paintBackground(source: string | null, target: BackgroundTarget = 'editor'): void {
     const root = document.documentElement;
-    const background = this._appearance().background;
+    const background = this.getBackground(target);
 
-    for (const name of BACKGROUND_VARIABLES) {
+    for (const name of backgroundVariables(target)) {
       root.style.removeProperty(name);
     }
 
@@ -280,7 +315,7 @@ export class ThemeService {
       return;
     }
 
-    for (const [name, value] of Object.entries(backgroundStyle(background, source))) {
+    for (const [name, value] of Object.entries(backgroundStyle(background, source, target))) {
       root.style.setProperty(name, value);
     }
   }
@@ -301,18 +336,26 @@ export class ThemeService {
     if (appearance.background && previous.background) {
       this.repaintBackgroundStyle(appearance.background);
     }
+    if (appearance.grid.background) {
+      this.repaintBackgroundStyle(appearance.grid.background, 'grid');
+    } else {
+      this.paintBackground(null, 'grid');
+    }
   }
 
-  private repaintBackgroundStyle(background: NonNullable<Appearance['background']>): void {
+  private repaintBackgroundStyle(
+    background: NonNullable<Appearance['background']>,
+    target: BackgroundTarget = 'editor',
+  ): void {
     const root = document.documentElement;
 
-    if (!root.style.getPropertyValue('--dr-editor-background')) {
+    if (!root.style.getPropertyValue(`--dr-${target}-background`)) {
       return;
     }
 
-    const style = backgroundStyle(background, '');
+    const style = backgroundStyle(background, '', target);
 
-    for (const name of BACKGROUND_VARIABLES.filter((n) => n !== '--dr-editor-background')) {
+    for (const name of backgroundVariables(target).slice(1)) {
       root.style.setProperty(name, style[name]);
     }
   }

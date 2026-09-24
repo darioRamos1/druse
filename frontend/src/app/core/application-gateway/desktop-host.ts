@@ -258,17 +258,19 @@ export class DesktopHost {
    * protocolo de recursos, que es relajar una protección real para ahorrarse una
    * lectura que ocurre una vez por arranque.
    */
-  chooseEditorBackground(): Promise<{ name: string; source: string } | null> {
-    return this.invoke('choose_editor_background');
+  chooseEditorBackground(
+    target: 'editor' | 'grid' = 'editor',
+  ): Promise<{ name: string; source: string } | null> {
+    return this.invoke('choose_editor_background', { target });
   }
 
   /** La imagen de fondo guardada, o `null` si no hay ninguna. */
-  readEditorBackground(): Promise<string | null> {
-    return this.invoke('read_editor_background');
+  readEditorBackground(target: 'editor' | 'grid' = 'editor'): Promise<string | null> {
+    return this.invoke('read_editor_background', { target });
   }
 
-  clearEditorBackground(): Promise<void> {
-    return this.invoke('clear_editor_background');
+  clearEditorBackground(target: 'editor' | 'grid' = 'editor'): Promise<void> {
+    return this.invoke('clear_editor_background', { target });
   }
 
   appInfo(): Promise<DesktopAppInfo> {

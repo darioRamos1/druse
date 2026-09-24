@@ -19,9 +19,10 @@ import { TranslatePipe } from '../../../core/i18n/translate.pipe';
 import { ThemeService } from '../../../core/theme/theme.service';
 import {
   BackgroundFit,
+  BackgroundTarget,
+  EditorBackground,
   DEFAULT_APPEARANCE,
   DEFAULT_BACKGROUND,
-  DEFAULT_GRID,
   EDITOR_FONT_SIZES,
   GRID_FONT_SIZES,
   GridAppearance,
@@ -331,6 +332,8 @@ export class SettingsDialog {
 
   /** Qué salió mal al elegir una imagen, para decirlo donde se pidió. */
   protected readonly problem = signal<string | null>(null);
+  protected readonly gridProblem = signal<string | null>(null);
+  protected readonly choosingBackground = signal(false);
 
   protected readonly accents = ACCENTS;
   protected readonly tints = TINTS;
@@ -375,21 +378,26 @@ export class SettingsDialog {
     void this._themes.update({ tint: null });
   }
 
-  protected async chooseBackground(): Promise<void> {
-    this.problem.set(null);
+  protected async chooseBackground(target: BackgroundTarget = 'editor'): Promise<void> {
+    if (this.choosingBackground()) return;
+    const problem = target === 'editor' ? this.problem : this.gridProblem;
+    problem.set(null);
+    this.choosingBackground.set(true);
 
     try {
-      await this._themes.chooseBackground();
+      await this._themes.chooseBackground(target);
     } catch (error) {
-      this.problem.set(
+      problem.set(
         error instanceof Error ? error.message : this._i18n.t('settings.background.unusable'),
       );
+    } finally {
+      this.choosingBackground.set(false);
     }
   }
 
-  protected clearBackground(): void {
-    this.problem.set(null);
-    void this._themes.clearBackground();
+  protected clearBackground(target: BackgroundTarget = 'editor'): void {
+    (target === 'editor' ? this.problem : this.gridProblem).set(null);
+    void this._themes.clearBackground(target);
   }
 
   protected setScale(value: string): void {
@@ -435,7 +443,18 @@ export class SettingsDialog {
   }
 
   protected resetGrid(): void {
-    void this._themes.update({ grid: DEFAULT_GRID });
+    this.gridProblem.set(null);
+    void this._themes.resetGrid();
+  }
+
+  protected setGridBackground(changes: Partial<EditorBackground>): void {
+    const background = this.grid().background;
+    if (background) this.setGrid({ background: { ...background, ...changes } });
+  }
+
+  protected centerGridBackground(): void {
+    const { scale, x, y } = DEFAULT_BACKGROUND;
+    this.setGridBackground({ scale, x, y });
   }
 
   /**

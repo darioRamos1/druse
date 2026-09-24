@@ -27,7 +27,22 @@ const FORMATS: &[(&str, &str)] = &[
 /// Siempre el mismo nombre, con la extensión del original. Guardar el nombre que
 /// traía obligaría a recordarlo en algún sitio para poder encontrarlo después, y
 /// aquí solo puede haber una imagen a la vez.
-const STORED_STEM: &str = "editor-background";
+#[derive(Clone, Copy, Default, serde::Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum BackgroundTarget {
+    #[default]
+    Editor,
+    Grid,
+}
+
+impl BackgroundTarget {
+    fn stem(self) -> &'static str {
+        match self {
+            Self::Editor => "editor-background",
+            Self::Grid => "grid-background",
+        }
+    }
+}
 
 #[derive(serde::Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -44,14 +59,21 @@ pub struct ChosenBackground {
 /// borrarse, y un fondo que desaparece al reordenar una carpeta de fotos sería
 /// un fallo imposible de entender desde la aplicación.
 #[tauri::command]
-pub async fn choose_editor_background(app: AppHandle) -> Result<Option<ChosenBackground>, String> {
+pub async fn choose_editor_background(
+    app: AppHandle,
+    target: Option<BackgroundTarget>,
+) -> Result<Option<ChosenBackground>, String> {
+    let target = target.unwrap_or_default();
     let extensions: Vec<&str> = FORMATS.iter().map(|(extension, _)| *extension).collect();
 
     let Some(selected) = app
         .dialog()
         .file()
         .add_filter("Imagen", &extensions)
-        .set_title("Elegir el fondo del editor")
+        .set_title(match target {
+            BackgroundTarget::Editor => "Elegir el fondo del editor",
+            BackgroundTarget::Grid => "Elegir el fondo de los resultados",
+        })
         .blocking_pick_file()
     else {
         return Ok(None);
@@ -78,11 +100,11 @@ pub async fn choose_editor_background(app: AppHandle) -> Result<Option<ChosenBac
     let name = path
         .file_name()
         .map(|value| value.to_string_lossy().to_string())
-        .unwrap_or_else(|| format!("{STORED_STEM}.{extension}"));
+        .unwrap_or_else(|| format!("{}.{extension}", target.stem()));
 
-    clear(&app)?;
+    clear(&app, target)?;
 
-    let stored = storage_path(&app, extension)?;
+    let stored = storage_path(&app, target, extension)?;
     if let Some(parent) = stored.parent() {
         std::fs::create_dir_all(parent)
             .map_err(|error| format!("No se pudo preparar la carpeta de datos: {error}"))?;
@@ -98,9 +120,13 @@ pub async fn choose_editor_background(app: AppHandle) -> Result<Option<ChosenBac
 
 /// La imagen guardada, lista para pintar, o nada si no hay ninguna.
 #[tauri::command]
-pub async fn read_editor_background(app: AppHandle) -> Result<Option<String>, String> {
+pub async fn read_editor_background(
+    app: AppHandle,
+    target: Option<BackgroundTarget>,
+) -> Result<Option<String>, String> {
+    let target = target.unwrap_or_default();
     for (extension, mime) in FORMATS {
-        let path = storage_path(&app, extension)?;
+        let path = storage_path(&app, target, extension)?;
 
         if path.is_file() {
             let bytes = std::fs::read(&path)
@@ -114,8 +140,11 @@ pub async fn read_editor_background(app: AppHandle) -> Result<Option<String>, St
 }
 
 #[tauri::command]
-pub async fn clear_editor_background(app: AppHandle) -> Result<(), String> {
-    clear(&app)
+pub async fn clear_editor_background(
+    app: AppHandle,
+    target: Option<BackgroundTarget>,
+) -> Result<(), String> {
+    clear(&app, target.unwrap_or_default())
 }
 
 /// Borra la imagen guardada, sea cual sea su formato.
@@ -123,9 +152,9 @@ pub async fn clear_editor_background(app: AppHandle) -> Result<(), String> {
 /// Recorre todos los formatos y no solo el actual: cambiar de PNG a JPG dejaría
 /// el anterior ahí para siempre, y la aplicación lo encontraría primero al
 /// arrancar.
-fn clear(app: &AppHandle) -> Result<(), String> {
+fn clear(app: &AppHandle, target: BackgroundTarget) -> Result<(), String> {
     for (extension, _) in FORMATS {
-        let path = storage_path(app, extension)?;
+        let path = storage_path(app, target, extension)?;
 
         if path.is_file() {
             std::fs::remove_file(&path)
@@ -136,13 +165,17 @@ fn clear(app: &AppHandle) -> Result<(), String> {
     Ok(())
 }
 
-fn storage_path(app: &AppHandle, extension: &str) -> Result<PathBuf, String> {
+fn storage_path(
+    app: &AppHandle,
+    target: BackgroundTarget,
+    extension: &str,
+) -> Result<PathBuf, String> {
     let directory = app
         .path()
         .app_data_dir()
         .map_err(|error| format!("No se encontró la carpeta de datos: {error}"))?;
 
-    Ok(directory.join(format!("{STORED_STEM}.{extension}")))
+    Ok(directory.join(format!("{}.{extension}", target.stem())))
 }
 
 fn format_of(path: &Path) -> Result<(&'static str, &'static str), String> {

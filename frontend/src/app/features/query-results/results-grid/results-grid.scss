@@ -1,9 +1,24 @@
 :host {
+  position: relative;
+  isolation: isolate;
   display: flex;
   flex-direction: column;
   flex: 1;
   min-height: 0;
   overflow: hidden;
+
+  &::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background-image: var(--dr-grid-background, none);
+    background-size: var(--dr-grid-background-size, cover);
+    background-repeat: var(--dr-grid-background-repeat, no-repeat);
+    background-position: var(--dr-grid-background-position, center);
+    opacity: var(--dr-grid-background-opacity, 0);
+  }
 }
 
 .head,

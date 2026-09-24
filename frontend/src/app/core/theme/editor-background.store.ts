@@ -2,6 +2,7 @@ import { Injectable, inject } from '@angular/core';
 
 import { DesktopHost } from '../application-gateway/desktop-host';
 import { I18nService } from '../i18n/i18n.service';
+import { BackgroundTarget } from './appearance';
 
 export interface ChosenBackground {
   readonly name: string;
@@ -13,7 +14,7 @@ export interface ChosenBackground {
 export const MAX_BACKGROUND_BYTES = 8 * 1024 * 1024;
 
 /** Dónde la guarda el navegador, que no tiene carpeta de datos donde dejarla. */
-const BROWSER_KEY = 'druse.editorBackground';
+const browserKey = (target: BackgroundTarget) => `druse.${target}Background`;
 
 /**
  * Dónde vive la imagen de fondo del editor.
@@ -33,16 +34,16 @@ export class EditorBackgroundStore {
   private readonly _desktop = inject(DesktopHost);
   private readonly _i18n = inject(I18nService);
 
-  async choose(): Promise<ChosenBackground | null> {
+  async choose(target: BackgroundTarget = 'editor'): Promise<ChosenBackground | null> {
     if (this._desktop.isDesktop) {
-      return this._desktop.chooseEditorBackground();
+      return this._desktop.chooseEditorBackground(target);
     }
 
     const chosen = await this.chooseInBrowser();
 
     if (chosen) {
       try {
-        localStorage.setItem(BROWSER_KEY, JSON.stringify(chosen));
+        localStorage.setItem(browserKey(target), JSON.stringify(chosen));
       } catch {
         // No cabe en el almacenamiento del navegador. La imagen se ve en esta
         // sesión y se pierde al recargar; es preferible a rechazarla, porque
@@ -54,13 +55,13 @@ export class EditorBackgroundStore {
   }
 
   /** La imagen guardada, ya lista para pintar. */
-  async load(): Promise<string | null> {
+  async load(target: BackgroundTarget = 'editor'): Promise<string | null> {
     if (this._desktop.isDesktop) {
-      return this._desktop.readEditorBackground();
+      return this._desktop.readEditorBackground(target);
     }
 
     try {
-      const raw = localStorage.getItem(BROWSER_KEY);
+      const raw = localStorage.getItem(browserKey(target));
 
       return raw ? ((JSON.parse(raw) as ChosenBackground).source ?? null) : null;
     } catch {
@@ -68,14 +69,14 @@ export class EditorBackgroundStore {
     }
   }
 
-  async forget(): Promise<void> {
+  async forget(target: BackgroundTarget = 'editor'): Promise<void> {
     if (this._desktop.isDesktop) {
-      await this._desktop.clearEditorBackground();
+      await this._desktop.clearEditorBackground(target);
       return;
     }
 
     try {
-      localStorage.removeItem(BROWSER_KEY);
+      localStorage.removeItem(browserKey(target));
     } catch {
       // Si no se puede borrar, tampoco se pudo guardar.
     }
@@ -88,6 +89,14 @@ export class EditorBackgroundStore {
       input.accept = 'image/png,image/jpeg,image/webp,image/gif';
       input.hidden = true;
       document.body.append(input);
+      input.addEventListener(
+        'cancel',
+        () => {
+          input.remove();
+          resolve(null);
+        },
+        { once: true },
+      );
 
       input.addEventListener(
         'change',

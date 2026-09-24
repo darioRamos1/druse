@@ -10,6 +10,8 @@
  * estilos de un componente no salen de él.
  */
 .grid-preview {
+  position: relative;
+  isolation: isolate;
   overflow: hidden;
   border: 1px solid var(--dr-grid-lines, var(--dr-border-input));
   border-radius: var(--dr-radius-sm);
@@ -17,6 +19,19 @@
   font-family: var(--dr-grid-font, var(--dr-font-mono));
   font-size: var(--dr-grid-font-size, 12px);
   color: var(--dr-grid-text, var(--dr-text-secondary));
+
+  &::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background-image: var(--dr-grid-background, none);
+    background-size: var(--dr-grid-background-size, cover);
+    background-repeat: var(--dr-grid-background-repeat, no-repeat);
+    background-position: var(--dr-grid-background-position, center);
+    opacity: var(--dr-grid-background-opacity, 0);
+  }
 
   &__row {
     display: grid;

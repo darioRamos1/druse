@@ -1,5 +1,6 @@
 import {
   DEFAULT_APPEARANCE,
+  DEFAULT_BACKGROUND,
   DEFAULT_GRID,
   appearancePreferences,
   appearanceVariables,
@@ -52,6 +53,7 @@ describe('apariencia', () => {
           y: 80,
         },
         grid: {
+          background: { ...DEFAULT_BACKGROUND, name: 'results.png', opacity: 12 },
           fontSize: 14,
           font: 'ui' as const,
           zebra: true,
@@ -116,6 +118,22 @@ describe('apariencia', () => {
   });
 
   describe('cuadrícula de resultados', () => {
+    it('el fondo se conserva con preferencias antiguas y se quita de forma independiente', () => {
+      const current = {
+        ...DEFAULT_APPEARANCE,
+        background: { ...DEFAULT_BACKGROUND, name: 'editor.png' },
+        grid: { ...DEFAULT_GRID, background: { ...DEFAULT_BACKGROUND, name: 'grid.png' } },
+      };
+      expect(parseAppearance({}, current)).toEqual(current);
+      const parsed = parseAppearance({ 'ui.gridBackground.name': '' }, current);
+      expect(parsed.grid.background).toBeNull();
+      expect(parsed.background).toEqual(current.background);
+      const limited = parseAppearance({
+        'ui.gridBackground.name': 'grid.png',
+        'ui.gridBackground.opacity': '1000',
+      });
+      expect(limited.grid.background?.opacity).toBe(60);
+    });
     it('lo que el servidor no trae no borra lo elegido', () => {
       const current = {
         ...DEFAULT_APPEARANCE,

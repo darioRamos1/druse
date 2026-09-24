@@ -25,6 +25,7 @@ export function parseTheme(value: string | null | undefined): ThemeName {
  * tamaño a mano.
  */
 export type BackgroundFit = 'cover' | 'contain' | 'tile' | 'scale';
+export type BackgroundTarget = 'editor' | 'grid';
 
 export interface EditorBackground {
   /** Nombre del archivo, para poder enseñar cuál está puesto. */
@@ -100,6 +101,7 @@ export const GRID_COLOR_KEYS: readonly GridColorKey[] = [
 export type GridFont = 'mono' | 'ui';
 
 export interface GridAppearance {
+  readonly background: EditorBackground | null;
   /** Cuerpo de la letra de las celdas, en píxeles. El modo compacto le quita uno. */
   readonly fontSize: number;
   readonly font: GridFont;
@@ -113,6 +115,7 @@ export interface GridAppearance {
 export const GRID_FONT_SIZES: readonly number[] = [10, 11, 12, 13, 14, 16];
 
 export const DEFAULT_GRID: GridAppearance = {
+  background: null,
   fontSize: 12,
   font: 'mono',
   zebra: false,
@@ -135,6 +138,7 @@ export function isDefaultGrid(grid: GridAppearance): boolean {
     grid.fontSize === DEFAULT_GRID.fontSize &&
     grid.font === DEFAULT_GRID.font &&
     grid.zebra === DEFAULT_GRID.zebra &&
+    !grid.background &&
     GRID_COLOR_KEYS.every((key) => !grid.colors[key])
   );
 }
@@ -182,6 +186,12 @@ export function appearancePreferences(appearance: Appearance): Readonly<Record<s
     'ui.grid.font': appearance.grid.font,
     'ui.grid.zebra': String(appearance.grid.zebra),
     ...Object.fromEntries(
+      ['name', 'opacity', 'fit', 'scale', 'x', 'y'].map((key) => [
+        `ui.gridBackground.${key}`,
+        String(appearance.grid.background?.[key as keyof EditorBackground] ?? ''),
+      ]),
+    ),
+    ...Object.fromEntries(
       GRID_COLOR_KEYS.map((key) => [`ui.grid.color.${key}`, appearance.grid.colors[key] ?? '']),
     ),
   };
@@ -226,6 +236,7 @@ function grid(raw: Readonly<Record<string, string>>, current: GridAppearance): G
 
   return {
     fontSize: GRID_FONT_SIZES.includes(fontSize) ? fontSize : current.fontSize,
+    background: background(raw, current.background, 'ui.gridBackground'),
     font: font === 'mono' || font === 'ui' ? font : current.font,
     zebra: zebra === 'true' ? true : zebra === 'false' ? false : current.zebra,
     // Solo lo elegido: un color que es el del tema no se apunta, ni como `null`.
@@ -253,18 +264,19 @@ function color(
 function background(
   raw: Readonly<Record<string, string>>,
   current: EditorBackground | null,
+  prefix = 'ui.editorBackground',
 ): EditorBackground | null {
-  if (!('ui.editorBackground.name' in raw)) {
+  if (!(`${prefix}.name` in raw)) {
     return current;
   }
 
-  const name = raw['ui.editorBackground.name'].trim();
+  const name = raw[`${prefix}.name`].trim();
 
   if (!name) {
     return null;
   }
 
-  const opacity = Number.parseInt(raw['ui.editorBackground.opacity'] ?? '', 10);
+  const opacity = Number.parseInt(raw[`${prefix}.opacity`] ?? '', 10);
   const previous = current ?? { ...DEFAULT_BACKGROUND, name };
 
   return {
@@ -272,15 +284,15 @@ function background(
     opacity: Number.isFinite(opacity)
       ? clamp(opacity, 0, MAX_BACKGROUND_OPACITY)
       : previous.opacity,
-    fit: parseFit(raw['ui.editorBackground.fit']),
+    fit: parseFit(raw[`${prefix}.fit`]),
     scale: percentage(
-      raw['ui.editorBackground.scale'],
+      raw[`${prefix}.scale`],
       previous.scale,
       MIN_BACKGROUND_SCALE,
       MAX_BACKGROUND_SCALE,
     ),
-    x: percentage(raw['ui.editorBackground.x'], previous.x, 0, 100),
-    y: percentage(raw['ui.editorBackground.y'], previous.y, 0, 100),
+    x: percentage(raw[`${prefix}.x`], previous.x, 0, 100),
+    y: percentage(raw[`${prefix}.y`], previous.y, 0, 100),
   };
 }
 
@@ -498,16 +510,17 @@ export function tintStrength(hex: string): number {
 export function backgroundStyle(
   background: EditorBackground,
   source: string,
+  target: BackgroundTarget = 'editor',
 ): Record<string, string> {
   const sized = background.fit === 'tile' || background.fit === 'scale';
   const scale = clamp(background.scale, MIN_BACKGROUND_SCALE, MAX_BACKGROUND_SCALE);
 
   return {
-    '--dr-editor-background': `url("${source}")`,
-    '--dr-editor-background-size': sized ? `${scale}% auto` : background.fit,
-    '--dr-editor-background-repeat': background.fit === 'tile' ? 'repeat' : 'no-repeat',
-    '--dr-editor-background-position': `${clamp(background.x, 0, 100)}% ${clamp(background.y, 0, 100)}%`,
-    '--dr-editor-background-opacity': String(
+    [`--dr-${target}-background`]: `url("${source}")`,
+    [`--dr-${target}-background-size`]: sized ? `${scale}% auto` : background.fit,
+    [`--dr-${target}-background-repeat`]: background.fit === 'tile' ? 'repeat' : 'no-repeat',
+    [`--dr-${target}-background-position`]: `${clamp(background.x, 0, 100)}% ${clamp(background.y, 0, 100)}%`,
+    [`--dr-${target}-background-opacity`]: String(
       clamp(background.opacity, 0, MAX_BACKGROUND_OPACITY) / 100,
     ),
   };
