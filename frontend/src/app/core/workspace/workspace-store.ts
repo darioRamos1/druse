@@ -17,6 +17,7 @@ import { FileSaveService, describeSave } from '../files/file-save.service';
 import { I18nService } from '../i18n/i18n.service';
 import { ThemeService } from '../theme/theme.service';
 import { AUTO_CHECK_PREFERENCE, UpdateService } from '../update/update.service';
+import { WHATS_NEW_PREFERENCE, WhatsNewService } from '../whats-new/whats-new.service';
 import { describeError, diagnosticQuery, isSessionLost } from './errors';
 import { ConnectionStore } from './connection-store';
 import { ExecutionStore } from './execution-store';
@@ -123,6 +124,7 @@ export class WorkspaceStore {
   private readonly _theme = inject(ThemeService);
   private readonly _i18n = inject(I18nService);
   private readonly _updates = inject(UpdateService);
+  private readonly _whatsNew = inject(WhatsNewService);
   private readonly _connectionStore = inject(ConnectionStore);
   private readonly _execution = inject(ExecutionStore);
   private readonly _explorer = inject(ExplorerStore);
@@ -319,6 +321,22 @@ export class WorkspaceStore {
     }
   }
 
+  /**
+   * Da por vistas las novedades de una versión, para no volver a abrirlas solas.
+   *
+   * Si no se puede guardar, se enseñarán otra vez en el siguiente arranque, que
+   * es un error mucho más llevadero que no enseñarlas nunca.
+   */
+  async markWhatsNewSeen(version: string): Promise<void> {
+    this._whatsNew.lastSeen.set(version);
+
+    try {
+      await firstValueFrom(this._gateway.setPreference(WHATS_NEW_PREFERENCE, version));
+    } catch {
+      // Se vuelve a intentar en el próximo arranque.
+    }
+  }
+
   async setTimeout(seconds: number): Promise<void> {
     const clamped = Math.min(3600, Math.max(1, Math.round(seconds)));
 
@@ -378,6 +396,7 @@ export class WorkspaceStore {
       // Tiene que estar leído antes de que el shell arranque el actualizador: si
       // llegara después, la consulta ya habría salido sin permiso.
       this._updates.adopt(preferences);
+      this._whatsNew.adopt(preferences);
     } catch {
       // Se sigue con los valores por defecto.
     }

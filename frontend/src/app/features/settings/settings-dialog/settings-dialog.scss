@@ -205,6 +205,38 @@
   }
 }
 
+.release {
+  &__head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  &__badge {
+    padding: 1px 7px;
+    border: 1px solid var(--dr-accent-line);
+    border-radius: 999px;
+    background: var(--dr-accent-tint);
+    color: var(--dr-accent);
+    font-size: var(--dr-font-size-xs);
+    font-weight: 500;
+  }
+
+  &__items {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin: 0;
+    padding-left: 18px;
+    color: var(--dr-text-secondary);
+    line-height: 1.5;
+
+    li::marker {
+      color: var(--dr-accent);
+    }
+  }
+}
+
 .license {
   &__text {
     margin: 0;

@@ -114,6 +114,13 @@ $cargoTargetDir = if ($env:CARGO_TARGET_DIR) {
 # instalador: leerla de otro sitio produciría un manifiesto que dice una versión
 # distinta de la que se reparte.
 $appVersion = (Get-Content (Join-Path $tauriDir 'tauri.conf.json') -Raw | ConvertFrom-Json).version
+
+# Cada versión trae sus novedades: Druse las enseña solo al abrirse tras
+# actualizar, y sin entrada no habría nada que enseñar.
+$releaseNotes = Join-Path $repoRoot 'frontend/src/app/core/whats-new/release-notes.ts'
+if (-not (Select-String -Path $releaseNotes -SimpleMatch "version: '$appVersion'" -Quiet)) {
+    throw "Faltan las novedades de la versión $appVersion en $releaseNotes."
+}
 $manifestDir = Join-Path $repoRoot 'artifacts/paquete'
 $updaterKey = if ($env:TAURI_SIGNING_PRIVATE_KEY_PATH) {
     $env:TAURI_SIGNING_PRIVATE_KEY_PATH

@@ -4,7 +4,7 @@ Revisión: 12 de septiembre de 2026.
 
 ## Estado del proyecto
 
-`build/scripts/package.ps1` ya genera un instalador NSIS para Windows x64 con la API autocontenida y el frontend. La versión configurada es 1.1.0. La tarea pendiente del plan es **REL-005: firma Authenticode y sellado de tiempo**.
+`build/scripts/package.ps1` ya genera un instalador NSIS para Windows x64 con la API autocontenida y el frontend. La versión configurada es 1.2.0. La tarea pendiente del plan es **REL-005: firma Authenticode y sellado de tiempo**.
 
 En la revisión local no hay firma Authenticode configurada. Existe un certificado autofirmado de pruebas; no se utiliza para presentar los instaladores como confiables en otros equipos. La clave del actualizador sí está disponible: el archivo `.sig` resultante protege las actualizaciones de Tauri, pero no sustituye una firma Authenticode.
 
@@ -14,7 +14,7 @@ Para generar el instalador completo:
 ./build/scripts/package.ps1 -Runtime win-x64 -RequireUpdaterSignature
 ```
 
-Resultado: `shells/desktop-tauri/target/release/bundle/nsis/Druse_1.1.0_x64-setup-completo.exe`, acompañado de su `.sig`. La variante sin Informix se genera añadiendo `-WithoutInformix`.
+Resultado: `shells/desktop-tauri/target/release/bundle/nsis/Druse_1.2.0_x64-setup-completo.exe`, acompañado de su `.sig`. La variante sin Informix se genera añadiendo `-WithoutInformix`.
 
 La generación no instala Druse en el equipo ni publica una GitHub Release. No debe anunciarse actualización pública mientras sus artefactos sigan alojados únicamente en un repositorio privado.
 

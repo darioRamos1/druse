@@ -8,7 +8,7 @@ Una *drusa* es la costra de cristales que tapiza el interior de una geoda: la es
 
 El repositorio es público. Se está preparando una [edición Comunidad](docs/distribucion/edicion-comunidad.md) sin Oracle ni IBM para evaluación de SignPath; todavía no cuenta con su aprobación o firma.
 
-> **Estado: versión 1.1.0.** Funciona el flujo completo contra **PostgreSQL, SQL Server y MySQL/MariaDB**: conectar, explorar el catálogo, escribir SQL con ayudas de esquema, ejecutar, cancelar, consultar el historial, **exportar e importar CSV o Excel** y **editar filas desde la cuadrícula**, todo dentro de una aplicación de escritorio que no necesita .NET ni Node.js instalados. Las [notas de la primera beta](docs/release-notes/0.1.0-beta.md) siguen describiendo con qué números se comprobó ese flujo.
+> **Estado: versión 1.2.0.** Funciona el flujo completo contra **PostgreSQL, SQL Server y MySQL/MariaDB**: conectar, explorar el catálogo, escribir SQL con ayudas de esquema, ejecutar, cancelar, consultar el historial, **exportar e importar CSV o Excel** y **editar filas desde la cuadrícula**, todo dentro de una aplicación de escritorio que no necesita .NET ni Node.js instalados. Las [notas de la primera beta](docs/release-notes/0.1.0-beta.md) siguen describiendo con qué números se comprobó ese flujo.
 
 ## Editar, importar y exportar
 

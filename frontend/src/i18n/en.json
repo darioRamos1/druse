@@ -1682,5 +1682,17 @@
   "settings.grid.colorLabel": "Color: {name}",
   "settings.grid.preview": "Results grid preview",
   "settings.grid.reset": "Reset results",
-  "results.failedTitle": "The query could not run"
+  "results.failedTitle": "The query could not run",
+  "settings.section.whatsNew": "What's new",
+  "settings.whatsNew.installed": "Installed",
+  "settings.whatsNew.version": "Druse {version}",
+  "whatsNew.v1_2_0.english": "Druse now speaks English from start to finish. Change the language in Preferences; it applies right away.",
+  "whatsNew.v1_2_0.gridLook": "The results grid, your way: colors, font, font size and striped rows, in Preferences → Results.",
+  "whatsNew.v1_2_0.gridBackground": "Results can have their own background image, at the intensity you choose and separate from the editor's.",
+  "whatsNew.v1_2_0.theme": "Editor and interface colors revised so everything reads better, in both light and dark themes.",
+  "whatsNew.v1_2_0.motion": "Smoother transitions, refreshed icons and states you can tell apart at a glance.",
+  "whatsNew.v1_2_0.builder": "Query builder: IN with a list or a subquery, simpler calculations, column search and a notice when the preview is out of date.",
+  "whatsNew.v1_2_0.informix": "Informix over SQLI now connects to databases that don't use Latin-1.",
+  "whatsNew.v1_2_0.explorer": "The explorer no longer shows “0” rows when the engine doesn't report a count.",
+  "whatsNew.v1_2_0.whatsNew": "This section: every time Druse updates, it will open on its own to tell you what's new."
 }

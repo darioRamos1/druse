@@ -47,6 +47,7 @@ Las pruebas de los guiones de construcción no compilan nada y tardan un segundo
 - **Todo en español**: interfaz, mensajes de error, comentarios, nombres de pruebas y mensajes de commit. Los identificadores técnicos —clases, métodos, tipos— se quedan como están.
 - **Los comentarios explican por qué, no qué.** Un comentario que repite lo que dice la línea siguiente sobra; uno que cuenta qué pasó cuando se hizo de la otra forma se queda.
 - **Una función nueva con interfaz añade su captura** al barrido de `e2e/tests/barrido.spec.ts`, y las imágenes se miran antes de darla por terminada.
+- **Un cambio que se nota al usar Druse va a las novedades** de la próxima versión: una línea en `frontend/src/app/core/whats-new/release-notes.ts`, con su texto en `es.json` y `en.json`. La versión se sube con `build/scripts/subir-version.ps1` y su entrada va arriba del todo; `package.ps1` no empaqueta una versión sin ella, y Druse la enseña sola la primera vez que se abre tras actualizar. El proceso completo está en [`AGENTS.md`](AGENTS.md).
 - Las decisiones de arquitectura se registran en [`docs/decisions`](docs/decisions), un archivo por decisión.
 - Los mensajes de commit llevan ámbito y dicen qué cambió en la aplicación, no qué archivos se tocaron: `fix(sqlite): cancelar una consulta ahora la corta de verdad`.
 

@@ -5,6 +5,7 @@ import {
   computed,
   inject,
   input,
+  linkedSignal,
   output,
   signal,
   viewChild,
@@ -41,6 +42,8 @@ import { UpdateService } from '../../../core/update/update.service';
 import { DialogFocus } from '../../../shared/a11y/dialog-focus';
 import { DialogBackdrop } from '../../../shared/a11y/dialog-backdrop';
 import { PrivacyNotice } from '../../../shared/privacy/privacy-notice';
+import { formatDate } from '../../../core/i18n/locale-format';
+import { RELEASE_NOTES } from '../../../core/whats-new/release-notes';
 
 /**
  * Colores de acento propuestos.
@@ -196,7 +199,7 @@ function resolveToken(token: string): string {
   }
 }
 
-type SettingsSection = 'appearance' | 'editor' | 'results' | 'privacy' | 'about';
+export type SettingsSection = 'appearance' | 'editor' | 'results' | 'privacy' | 'whatsNew' | 'about';
 
 /** Preferencias agrupadas por lo que se quiere ajustar. */
 @Component({
@@ -207,12 +210,16 @@ type SettingsSection = 'appearance' | 'editor' | 'results' | 'privacy' | 'about'
   styleUrl: './settings-dialog.scss',
 })
 export class SettingsDialog {
-  protected readonly section = signal<SettingsSection>('appearance');
+  /** La sección con la que se abre; tras una actualización, las novedades. */
+  readonly initialSection = input<SettingsSection>('appearance');
+
+  protected readonly section = linkedSignal<SettingsSection>(() => this.initialSection());
   protected readonly sections: readonly { id: SettingsSection; label: string }[] = [
     { id: 'appearance', label: 'settings.section.appearance' },
     { id: 'editor', label: 'settings.section.editor' },
     { id: 'results', label: 'settings.section.results' },
     { id: 'privacy', label: 'settings.section.privacy' },
+    { id: 'whatsNew', label: 'settings.section.whatsNew' },
     { id: 'about', label: 'settings.section.about' },
   ];
   private readonly body = viewChild<ElementRef<HTMLElement>>('body');
@@ -587,6 +594,21 @@ export class SettingsDialog {
     return info?.variant === 'web'
       ? this._i18n.t('settings.about.webUpdates')
       : (info?.updatesDisabledReason ?? '');
+  });
+
+  /**
+   * Lo que trajo cada versión, con la fecha en el idioma elegido.
+   *
+   * La fecha se lee a mediodía: a medianoche en UTC, al oeste de Greenwich se
+   * pintaría el día anterior.
+   */
+  protected readonly releaseNotes = computed(() => {
+    this.locale();
+
+    return RELEASE_NOTES.map((note) => ({
+      ...note,
+      dateLabel: formatDate(`${note.date}T12:00:00`, { dateStyle: 'long' }),
+    }));
   });
 
   /** Los dos párrafos de la licencia, con sus nombres de archivo dentro. */

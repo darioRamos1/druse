@@ -21,7 +21,11 @@ import { SnippetStore } from '../../core/snippets/snippet.store';
 import { SplashScreen } from '../../core/startup/splash-screen';
 import { ThemeName, ThemeService } from '../../core/theme/theme.service';
 import { UpdateService } from '../../core/update/update.service';
-import { SettingsDialog } from '../../features/settings/settings-dialog/settings-dialog';
+import {
+  SettingsDialog,
+  type SettingsSection,
+} from '../../features/settings/settings-dialog/settings-dialog';
+import { WhatsNewService } from '../../core/whats-new/whats-new.service';
 import { ActivityDialog } from '../../features/activity/activity-dialog/activity-dialog';
 import { FormatSettings } from '../../core/workspace/format-settings';
 import { ComposedQueries } from '../../core/workspace/composed-queries';
@@ -145,6 +149,7 @@ export class AppShell {
   private readonly _themes = inject(ThemeService);
   private readonly _splash = inject(SplashScreen);
   protected readonly updates = inject(UpdateService);
+  private readonly _whatsNew = inject(WhatsNewService);
 
   /**
    * No se usa desde aquí: se inyecta para que exista.
@@ -165,6 +170,7 @@ export class AppShell {
   protected readonly editorFontSize = computed(() => this._themes.appearance().editorFontSize);
 
   protected readonly settingsOpen = signal(false);
+  protected readonly settingsSection = signal<SettingsSection>('appearance');
   protected readonly activityOpen = signal(false);
 
   // --- Asistente -------------------------------------------------------------
@@ -250,7 +256,8 @@ export class AppShell {
    */
   protected readonly editorRatio = signal('16 / 9');
 
-  protected openSettings(): void {
+  protected openSettings(section: SettingsSection = 'appearance'): void {
+    this.settingsSection.set(section);
     this.prepareOverlay();
     const box = this._editorElement()?.nativeElement.getBoundingClientRect();
 
@@ -1230,6 +1237,8 @@ export class AppShell {
     this._splash.dismiss();
 
     void this.updates.initialize().then(() => {
+      this.showWhatsNew();
+
       // Mientras nadie haya elegido, Druse no ha consultado nada y hay que
       // decirlo: un programa que calla sobre las conexiones que abre —o que deja
       // de abrir— no deja elegir, solo decide por su cuenta.
@@ -1244,6 +1253,26 @@ export class AppShell {
         this._store.notify(this._i18n.t('shell.updates.available', { version: release.version }));
       }
     });
+  }
+
+  /**
+   * Tras actualizar, abre Preferencias en las novedades, una vez por versión.
+   *
+   * En el navegador no: ahí no hay versión instalada, y la ventana taparía la
+   * aplicación en cada arranque de desarrollo y de las pruebas.
+   */
+  private showWhatsNew(): void {
+    const info = this.updates.info();
+
+    if (!info || info.variant === 'web' || !this._whatsNew.shouldShow(info.version)) {
+      return;
+    }
+
+    void this._store.markWhatsNewSeen(info.version);
+
+    if (!this.settingsOpen()) {
+      this.openSettings('whatsNew');
+    }
   }
 
   // --- Conexiones ------------------------------------------------------------

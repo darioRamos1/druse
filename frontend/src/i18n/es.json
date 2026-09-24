@@ -1682,5 +1682,17 @@
   "settings.grid.colorLabel": "Color: {name}",
   "settings.grid.preview": "Vista previa de la cuadrícula de resultados",
   "settings.grid.reset": "Restablecer los resultados",
-  "results.failedTitle": "La consulta no se pudo ejecutar"
+  "results.failedTitle": "La consulta no se pudo ejecutar",
+  "settings.section.whatsNew": "Novedades",
+  "settings.whatsNew.installed": "Instalada",
+  "settings.whatsNew.version": "Druse {version}",
+  "whatsNew.v1_2_0.english": "Druse ya habla inglés de principio a fin. El idioma se cambia en Preferencias y se aplica al momento.",
+  "whatsNew.v1_2_0.gridLook": "La cuadrícula de resultados, a tu gusto: colores, tipo y tamaño de letra y filas alternas, en Preferencias → Resultados.",
+  "whatsNew.v1_2_0.gridBackground": "Los resultados pueden tener su propia imagen de fondo, con la intensidad que elijas y aparte de la del editor.",
+  "whatsNew.v1_2_0.theme": "Colores del editor y de la interfaz revisados para que todo se lea mejor, en tema claro y oscuro.",
+  "whatsNew.v1_2_0.motion": "Transiciones más suaves, iconos renovados y estados que se distinguen de un vistazo.",
+  "whatsNew.v1_2_0.builder": "Compositor de consultas: IN con una lista o una subconsulta, cálculos más directos, búsqueda de columnas y aviso cuando la vista previa no está al día.",
+  "whatsNew.v1_2_0.informix": "Informix por SQLI ya se conecta a bases que no usan Latin-1.",
+  "whatsNew.v1_2_0.explorer": "El explorador ya no muestra «0» filas cuando el motor no da el recuento.",
+  "whatsNew.v1_2_0.whatsNew": "Esta sección: cada vez que Druse se actualice, se abrirá sola para contarte lo nuevo."
 }

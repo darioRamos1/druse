@@ -586,6 +586,30 @@
     <div
       class="settings-panel"
       role="tabpanel"
+      id="settings-panel-whatsNew"
+      aria-labelledby="settings-tab-whatsNew"
+      [hidden]="section() !== 'whatsNew'"
+    >
+      @for (note of releaseNotes(); track note.version) {
+        <section class="section release">
+          <h3 class="section__title release__head">
+            <span>{{ 'settings.whatsNew.version' | t: { version: note.version } }}</span>
+            @if (note.version === updates.info()?.version) {
+              <span class="release__badge">{{ 'settings.whatsNew.installed' | t }}</span>
+            }
+          </h3>
+          <p class="section__hint">{{ note.dateLabel }}</p>
+          <ul class="release__items">
+            @for (item of note.items; track item) {
+              <li>{{ item | t }}</li>
+            }
+          </ul>
+        </section>
+      }
+    </div>
+    <div
+      class="settings-panel"
+      role="tabpanel"
       id="settings-panel-about"
       aria-labelledby="settings-tab-about"
       [hidden]="section() !== 'about'"

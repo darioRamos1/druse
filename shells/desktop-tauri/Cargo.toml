@@ -1,6 +1,6 @@
 [package]
 name = "druse"
-version = "1.1.0"
+version = "1.2.0"
 description = "Cliente de bases de datos de escritorio"
 authors = ["Darío Ramos"]
 license = "GPL-3.0-only"

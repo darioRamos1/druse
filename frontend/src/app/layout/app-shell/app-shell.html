@@ -443,6 +443,7 @@
   @if (settingsOpen()) {
     <app-settings-dialog
       [editorRatio]="editorRatio()"
+      [initialSection]="settingsSection()"
       (autoUpdateCheckChange)="setAutoUpdateCheck($event)"
       (closed)="settingsOpen.set(false)"
     />
