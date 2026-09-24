@@ -1,6 +1,6 @@
 # Textos de terceros de la API de Comunidad
 
-Recopilación del 21 de septiembre de 2026 para las 37 entradas NuGet/runtime del grafo examinado. El [índice](indice.json) relaciona cada componente y versión con sus textos originales, SHA-256 y procedencia. Contiene 41 documentos distintos; varios componentes comparten documentos.
+Recopilación inicial del 21 de septiembre de 2026 para las 37 entradas NuGet/runtime del grafo examinado. El [índice](indice.json) relaciona cada componente y versión con sus textos originales, SHA-256 y procedencia. La recopilación inicial conserva 41 archivos; varios componentes comparten textos. El 23 de septiembre se añadieron doce fichas de versiones y dos textos nuevos: véase la [revisión de la actualización](../../revisiones/actualizacion-nuget-2026-09-23.md). El catálogo contiene 49 fichas y el paquete solo selecciona las versiones de su grafo publicado.
 
 Se han recuperado textos para las 28 entradas que no tenían aviso local en la [revisión inicial](../../revisiones/licencias-comunidad-2026-09-21.md). Esto resuelve la localización de esos textos; **no cierra la revisión de compatibilidad, redistribución ni elegibilidad para SignPath**.
 

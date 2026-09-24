@@ -1,8 +1,8 @@
 {
   "esquema": 1,
-  "generado": "2026-09-21T23:36:14.8496955-05:00",
-  "alcance": "Textos para las 37 entradas NuGet/runtime de la API local de Comunidad examinada el 21 de septiembre. No es aprobación de redistribución ni de SignPath.",
-  "depsSha256": "ebb490351aef90bcb3bf3875daf35fef88cf140c298556046330672fc4bf8f25",
+  "generado": "2026-09-23T19:54:00.6794253+00:00",
+  "alcance": "Catálogo de avisos por versión. Incluye las 37 entradas del grafo inicial de Comunidad y doce versiones revisadas el 23 de septiembre de 2026. No es aprobación de redistribución ni de SignPath.",
+  "depsSha256": "dd2465db0407bb70a0ec2f06d413d2a5fd1f03437944884b3f7db372904e1348",
   "limites": [
     "Recopilación de textos originales; no demuestra cubrir cada obligación o archivo de terceros.",
     "Las etiquetas de versión se resolvieron a commits; no equivalen a una reconstrucción verificable del paquete NuGet.",
@@ -1046,6 +1046,396 @@
           "gitBlob": null,
           "archivo": "fuentes/system.security.cryptography.pro-bedf8f21/THIRD-PARTY-NOTICES.TXT",
           "origen": "THIRD-PARTY-NOTICES.TXT"
+        }
+      ],
+      "estado": "TEXTOS RECOPILADOS; REVISION PENDIENTE"
+    },
+    {
+      "componente": "Microsoft.AspNetCore.OpenApi",
+      "version": "10.0.12",
+      "licenciaDeclarada": "MIT",
+      "procedencia": "textos del NuGet contrastados con el archivo nupkg y del commit declarado por nuspec cuando existe",
+      "repositorio": "https://github.com/dotnet/dotnet",
+      "commit": "95017c711e6afc1085133d440e42b4bd78155701",
+      "etiqueta": null,
+      "nuspecSha256": "c0ef82c63679d826ac210cd2d152d7450c119880d49e4f510affa59270e92892",
+      "nupkgSha256": "c20150e4528d04748bd911ff99768e2db2cc74bd88af20f20bd6ca0d72f7c3e5",
+      "evidenciaDll": null,
+      "documentos": [
+        {
+          "archivo": "fuentes/microsoft.aspnetcore.app.runtime-6f3d800f/THIRD-PARTY-NOTICES.TXT",
+          "sha256": "307d014f65d8482314f1400ddeae7a0cbabb96c2207bcc77f6233cc10588e5d9",
+          "origen": "THIRD-PARTY-NOTICES.TXT",
+          "url": "https://www.nuget.org/packages/Microsoft.AspNetCore.OpenApi/10.0.12",
+          "gitBlob": null
+        },
+        {
+          "archivo": "fuentes/aspnetcore-f7d90799/LICENSE.txt",
+          "sha256": "cfc21f5e8bd655ae997eec916138b707b1d290b83272c02a95c9f821b8c87310",
+          "origen": "src/aspnetcore/LICENSE.txt",
+          "url": "https://github.com/dotnet/dotnet/blob/95017c711e6afc1085133d440e42b4bd78155701/src/aspnetcore/LICENSE.txt",
+          "gitBlob": "984713a49622a96da110443c15477613bc12656b"
+        },
+        {
+          "archivo": "fuentes/aspnetcore-f7d90799/THIRD-PARTY-NOTICES.txt",
+          "sha256": "52af3d603b6d069e635f8afd08ec44ec01559255b5f3afd161ae9e6fe7e7aa54",
+          "origen": "src/aspnetcore/THIRD-PARTY-NOTICES.txt",
+          "url": "https://github.com/dotnet/dotnet/blob/95017c711e6afc1085133d440e42b4bd78155701/src/aspnetcore/THIRD-PARTY-NOTICES.txt",
+          "gitBlob": "484f2d5485153f66280acb8646f1e019a58b069c"
+        }
+      ],
+      "estado": "TEXTOS RECOPILADOS; REVISION PENDIENTE"
+    },
+    {
+      "componente": "Microsoft.Bcl.Cryptography",
+      "version": "9.0.18",
+      "licenciaDeclarada": "MIT",
+      "procedencia": "textos del NuGet contrastados con el archivo nupkg y del commit declarado por nuspec cuando existe",
+      "repositorio": "https://github.com/dotnet/runtime",
+      "commit": "d839c41c85988aadc213e8e42269ecd7883a1790",
+      "etiqueta": null,
+      "nuspecSha256": "8f8a01b238f75b0efaa357a956500bf74241c518f98eb78e708b95c6ec735c14",
+      "nupkgSha256": "df4ad21a599fad23b5f589cf66895185865318c799123d7b7e97c80ff115e006",
+      "evidenciaDll": null,
+      "documentos": [
+        {
+          "archivo": "fuentes/system.security.cryptography.pro-bedf8f21/LICENSE.TXT",
+          "sha256": "d7a68596ab69b06f51ca278a6545148e4269a9381c26d597c13df5d88e08cf5b",
+          "origen": "LICENSE.TXT",
+          "url": "https://www.nuget.org/packages/Microsoft.Bcl.Cryptography/9.0.18",
+          "gitBlob": null
+        },
+        {
+          "archivo": "fuentes/system.security.cryptography.pro-bedf8f21/THIRD-PARTY-NOTICES.TXT",
+          "sha256": "40686c6447a7d5b5d3693068e4571b5f483d7ed335aeee773ef662440de4c5d5",
+          "origen": "THIRD-PARTY-NOTICES.TXT",
+          "url": "https://www.nuget.org/packages/Microsoft.Bcl.Cryptography/9.0.18",
+          "gitBlob": null
+        },
+        {
+          "archivo": "fuentes/aspnetcore-f7d90799/LICENSE.txt",
+          "sha256": "cfc21f5e8bd655ae997eec916138b707b1d290b83272c02a95c9f821b8c87310",
+          "origen": "LICENSE.TXT",
+          "url": "https://github.com/dotnet/runtime/blob/d839c41c85988aadc213e8e42269ecd7883a1790/LICENSE.TXT",
+          "gitBlob": "984713a49622a96da110443c15477613bc12656b"
+        },
+        {
+          "archivo": "fuentes/sha256-fa3e9d0a2c52476f04fe798d7dc4f6e7edb7b68a3d2f4d5f59a39bce957eedc8.txt",
+          "sha256": "fa3e9d0a2c52476f04fe798d7dc4f6e7edb7b68a3d2f4d5f59a39bce957eedc8",
+          "origen": "THIRD-PARTY-NOTICES.TXT",
+          "url": "https://github.com/dotnet/runtime/blob/d839c41c85988aadc213e8e42269ecd7883a1790/THIRD-PARTY-NOTICES.TXT",
+          "gitBlob": "3dc0d7aa85979909a3f6400611349a86c7277fa5"
+        }
+      ],
+      "estado": "TEXTOS RECOPILADOS; REVISION PENDIENTE"
+    },
+    {
+      "componente": "Microsoft.Data.SqlClient.Extensions.Abstractions",
+      "version": "7.1.0",
+      "licenciaDeclarada": "MIT",
+      "procedencia": "textos del NuGet contrastados con el archivo nupkg y del commit declarado por nuspec cuando existe",
+      "repositorio": "https://github.com/dotnet/SqlClient",
+      "commit": "744f4f0aa264c751120e5b909e8591ec5754638f",
+      "etiqueta": null,
+      "nuspecSha256": "ab956441aa93395ab6d3e61fd7ff51b319aef1e7b0db94c44e7bd50729a483ef",
+      "nupkgSha256": "09f5fc40ff768c38a38df5d5ed2b3665e4b94730fb8a804f41e620e1755d0534",
+      "evidenciaDll": null,
+      "documentos": [
+        {
+          "archivo": "fuentes/sqlclient-8c70cec9/COPYRIGHT.md",
+          "sha256": "c16067a715383a17949174ef6928434b2ff0b324a98dbbf248bc14afc3432f76",
+          "origen": "COPYRIGHT.md",
+          "url": "https://github.com/dotnet/SqlClient/blob/744f4f0aa264c751120e5b909e8591ec5754638f/COPYRIGHT.md",
+          "gitBlob": "a1df5f1f9f22bfa413964f3ca7e82372c9e89739"
+        },
+        {
+          "archivo": "fuentes/sqlclient-8c70cec9/LICENSE",
+          "sha256": "9fa73cb72fb654d029c9214f0e3eec32c301a0c23be71b50fe3910e61553fa34",
+          "origen": "LICENSE",
+          "url": "https://github.com/dotnet/SqlClient/blob/744f4f0aa264c751120e5b909e8591ec5754638f/LICENSE",
+          "gitBlob": "a33fe1c58fdd2c89165eda0b4257aa759d9c8326"
+        },
+        {
+          "archivo": "fuentes/sqlclient-8c70cec9/NOTICE.txt",
+          "sha256": "db4e07b72af7b58c5a6cd39762fe757e7db7f9af4e67e8d6ecc05731dd7ff66c",
+          "origen": "NOTICE.txt",
+          "url": "https://github.com/dotnet/SqlClient/blob/744f4f0aa264c751120e5b909e8591ec5754638f/NOTICE.txt",
+          "gitBlob": "0b936c6bb60efa99c0c1e4c853cc516eb3f7835b"
+        }
+      ],
+      "estado": "TEXTOS RECOPILADOS; REVISION PENDIENTE"
+    },
+    {
+      "componente": "Microsoft.Data.SqlClient.Internal.Logging",
+      "version": "7.1.0",
+      "licenciaDeclarada": "MIT",
+      "procedencia": "textos del NuGet contrastados con el archivo nupkg y del commit declarado por nuspec cuando existe",
+      "repositorio": "https://github.com/dotnet/SqlClient",
+      "commit": "744f4f0aa264c751120e5b909e8591ec5754638f",
+      "etiqueta": null,
+      "nuspecSha256": "2b30374955f37ce035aec52a0e8923f1c994bd92457e72d74e29ed26945a2575",
+      "nupkgSha256": "6e80ced3a5ad31da44758d1ec4425c65efaf7d90e694648f5d75d174c8b7214e",
+      "evidenciaDll": null,
+      "documentos": [
+        {
+          "archivo": "fuentes/sqlclient-8c70cec9/COPYRIGHT.md",
+          "sha256": "c16067a715383a17949174ef6928434b2ff0b324a98dbbf248bc14afc3432f76",
+          "origen": "COPYRIGHT.md",
+          "url": "https://github.com/dotnet/SqlClient/blob/744f4f0aa264c751120e5b909e8591ec5754638f/COPYRIGHT.md",
+          "gitBlob": "a1df5f1f9f22bfa413964f3ca7e82372c9e89739"
+        },
+        {
+          "archivo": "fuentes/sqlclient-8c70cec9/LICENSE",
+          "sha256": "9fa73cb72fb654d029c9214f0e3eec32c301a0c23be71b50fe3910e61553fa34",
+          "origen": "LICENSE",
+          "url": "https://github.com/dotnet/SqlClient/blob/744f4f0aa264c751120e5b909e8591ec5754638f/LICENSE",
+          "gitBlob": "a33fe1c58fdd2c89165eda0b4257aa759d9c8326"
+        },
+        {
+          "archivo": "fuentes/sqlclient-8c70cec9/NOTICE.txt",
+          "sha256": "db4e07b72af7b58c5a6cd39762fe757e7db7f9af4e67e8d6ecc05731dd7ff66c",
+          "origen": "NOTICE.txt",
+          "url": "https://github.com/dotnet/SqlClient/blob/744f4f0aa264c751120e5b909e8591ec5754638f/NOTICE.txt",
+          "gitBlob": "0b936c6bb60efa99c0c1e4c853cc516eb3f7835b"
+        }
+      ],
+      "estado": "TEXTOS RECOPILADOS; REVISION PENDIENTE"
+    },
+    {
+      "componente": "Microsoft.Data.SqlClient.SNI.runtime",
+      "version": "7.1.0",
+      "licenciaDeclarada": "LICENSE.txt",
+      "procedencia": "textos del NuGet contrastados con el archivo nupkg y del commit declarado por nuspec cuando existe",
+      "repositorio": null,
+      "commit": null,
+      "etiqueta": null,
+      "nuspecSha256": "cddf4fa253cb201f0a25d14e27ff6c61739d9156334ca2a8ba55ee3f266d66de",
+      "nupkgSha256": "38517e107bc915c9cf28cb6f378a858f2b34d45acfa7cf7db45b33ac4a772684",
+      "evidenciaDll": null,
+      "documentos": [
+        {
+          "archivo": "fuentes/microsoft.data.sqlclient.sni.run-66232cc4/LICENSE.txt",
+          "sha256": "9335e8bad875dd7be4eebd55d2335eb6433d1cea61aadb3817af7807bef8932a",
+          "origen": "LICENSE.txt",
+          "url": "https://www.nuget.org/packages/Microsoft.Data.SqlClient.SNI.runtime/7.1.0",
+          "gitBlob": null
+        }
+      ],
+      "estado": "TEXTOS RECOPILADOS; REVISION PENDIENTE"
+    },
+    {
+      "componente": "Microsoft.Data.SqlClient",
+      "version": "7.1.0",
+      "licenciaDeclarada": "MIT",
+      "procedencia": "textos del NuGet contrastados con el archivo nupkg y del commit declarado por nuspec cuando existe",
+      "repositorio": "https://github.com/dotnet/sqlclient",
+      "commit": "744f4f0aa264c751120e5b909e8591ec5754638f",
+      "etiqueta": null,
+      "nuspecSha256": "6c8f11429ae6fff949193bf12f30e8253c4d71e88986a197982d851f273604b0",
+      "nupkgSha256": "22b2e017b756f6ee48e1ad89af8bf12005c229acd8a2c41726eb1ae6b9397035",
+      "evidenciaDll": null,
+      "documentos": [
+        {
+          "archivo": "fuentes/sqlclient-8c70cec9/COPYRIGHT.md",
+          "sha256": "c16067a715383a17949174ef6928434b2ff0b324a98dbbf248bc14afc3432f76",
+          "origen": "COPYRIGHT.md",
+          "url": "https://github.com/dotnet/SqlClient/blob/744f4f0aa264c751120e5b909e8591ec5754638f/COPYRIGHT.md",
+          "gitBlob": "a1df5f1f9f22bfa413964f3ca7e82372c9e89739"
+        },
+        {
+          "archivo": "fuentes/sqlclient-8c70cec9/LICENSE",
+          "sha256": "9fa73cb72fb654d029c9214f0e3eec32c301a0c23be71b50fe3910e61553fa34",
+          "origen": "LICENSE",
+          "url": "https://github.com/dotnet/SqlClient/blob/744f4f0aa264c751120e5b909e8591ec5754638f/LICENSE",
+          "gitBlob": "a33fe1c58fdd2c89165eda0b4257aa759d9c8326"
+        },
+        {
+          "archivo": "fuentes/sqlclient-8c70cec9/NOTICE.txt",
+          "sha256": "db4e07b72af7b58c5a6cd39762fe757e7db7f9af4e67e8d6ecc05731dd7ff66c",
+          "origen": "NOTICE.txt",
+          "url": "https://github.com/dotnet/SqlClient/blob/744f4f0aa264c751120e5b909e8591ec5754638f/NOTICE.txt",
+          "gitBlob": "0b936c6bb60efa99c0c1e4c853cc516eb3f7835b"
+        }
+      ],
+      "estado": "TEXTOS RECOPILADOS; REVISION PENDIENTE"
+    },
+    {
+      "componente": "Microsoft.Data.Sqlite.Core",
+      "version": "10.0.12",
+      "licenciaDeclarada": "MIT",
+      "procedencia": "textos del NuGet contrastados con el archivo nupkg y del commit declarado por nuspec cuando existe",
+      "repositorio": "https://github.com/dotnet/dotnet",
+      "commit": "95017c711e6afc1085133d440e42b4bd78155701",
+      "etiqueta": null,
+      "nuspecSha256": "56030907327ba858664e4c2cbc6547ad56d766d900bc323c14408fcd42fc46a0",
+      "nupkgSha256": "5e8ed353006dadf55d5c7f56d237321c20bb10c786262e6b25526756e1036332",
+      "evidenciaDll": null,
+      "documentos": [
+        {
+          "archivo": "fuentes/dotnet-e2f47b01/LICENSE.txt",
+          "sha256": "ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b",
+          "origen": "src/efcore/LICENSE.txt",
+          "url": "https://github.com/dotnet/dotnet/blob/95017c711e6afc1085133d440e42b4bd78155701/src/efcore/LICENSE.txt",
+          "gitBlob": "a616ed188dfce68ee308f674350ad242d8588c2b"
+        }
+      ],
+      "estado": "TEXTOS RECOPILADOS; REVISION PENDIENTE"
+    },
+    {
+      "componente": "Microsoft.Data.Sqlite",
+      "version": "10.0.12",
+      "licenciaDeclarada": "MIT",
+      "procedencia": "textos del NuGet contrastados con el archivo nupkg y del commit declarado por nuspec cuando existe",
+      "repositorio": "https://github.com/dotnet/dotnet",
+      "commit": "95017c711e6afc1085133d440e42b4bd78155701",
+      "etiqueta": null,
+      "nuspecSha256": "8e1c47c77197daaac1584979b7bb42a9a8f6deaff9f6d18029b3a689a2107c6c",
+      "nupkgSha256": "246679d8c6c83ffcf4c8a480066e3f4fc4e051c96b71bedfd932fe7a5af1f7d4",
+      "evidenciaDll": null,
+      "documentos": [
+        {
+          "archivo": "fuentes/dotnet-e2f47b01/LICENSE.txt",
+          "sha256": "ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b",
+          "origen": "src/efcore/LICENSE.txt",
+          "url": "https://github.com/dotnet/dotnet/blob/95017c711e6afc1085133d440e42b4bd78155701/src/efcore/LICENSE.txt",
+          "gitBlob": "a616ed188dfce68ee308f674350ad242d8588c2b"
+        }
+      ],
+      "estado": "TEXTOS RECOPILADOS; REVISION PENDIENTE"
+    },
+    {
+      "componente": "Microsoft.OpenApi",
+      "version": "2.12.2",
+      "licenciaDeclarada": "MIT",
+      "procedencia": "textos del NuGet contrastados con el archivo nupkg y del commit declarado por nuspec cuando existe",
+      "repositorio": "https://github.com/Microsoft/OpenAPI.NET",
+      "commit": "a24aac560adbf013ff5aa63a873e5a7babce38d2",
+      "etiqueta": null,
+      "nuspecSha256": "51780bbfff64a8638ae398d4aec5c4035a33496bac7f115ccbd04f6d8e2807f3",
+      "nupkgSha256": "3a35b85631e1c7b877b61244ca93e042f6a249ca2e055fd5c3d92b54f1b247a9",
+      "evidenciaDll": null,
+      "documentos": [
+        {
+          "archivo": "fuentes/openapi.net-99fc3f83/LICENSE",
+          "sha256": "5d177f23ecfeb0ea8e050b6a5a16355e1ae9a0b286436ca8f83ed08b3795be6b",
+          "origen": "LICENSE",
+          "url": "https://github.com/Microsoft/OpenAPI.NET/blob/a24aac560adbf013ff5aa63a873e5a7babce38d2/LICENSE",
+          "gitBlob": "017b9885a46ad4c7f4367ad2949fb66fb56f977f"
+        }
+      ],
+      "estado": "TEXTOS RECOPILADOS; REVISION PENDIENTE"
+    },
+    {
+      "componente": "SQLitePCLRaw.core",
+      "version": "3.0.5",
+      "licenciaDeclarada": "Apache-2.0",
+      "procedencia": "textos del NuGet contrastados con el archivo nupkg y del commit declarado por nuspec cuando existe",
+      "repositorio": "https://github.com/ericsink/SQLitePCL.raw",
+      "commit": "ed046114d5a30534e13294d94d78eb73de896ad4",
+      "etiqueta": null,
+      "nuspecSha256": "094854edfffc182626e9787e8005198bc1cb881666ca7fd68d75336e9b53bf2c",
+      "nupkgSha256": "7476b4b8e067d88c4cb598a31893b511037b88e05c28d524f4b4433fe9f69048",
+      "evidenciaDll": null,
+      "documentos": [
+        {
+          "archivo": "fuentes/sqlitepcl.raw-ca835d21/LICENSE.TXT",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "origen": "LICENSE.TXT",
+          "url": "https://github.com/ericsink/SQLitePCL.raw/blob/ed046114d5a30534e13294d94d78eb73de896ad4/LICENSE.TXT",
+          "gitBlob": "d645695673349e3947e8e5ae42332d0ac3164cd7"
+        },
+        {
+          "archivo": "fuentes/sha256-5a1ab2f670f86dd2f8d42e40a8459cc278ca6d5225a7e2a5fa3ea0184396a6d9.txt",
+          "sha256": "5a1ab2f670f86dd2f8d42e40a8459cc278ca6d5225a7e2a5fa3ea0184396a6d9",
+          "origen": "NOTICE.TXT",
+          "url": "https://github.com/ericsink/SQLitePCL.raw/blob/ed046114d5a30534e13294d94d78eb73de896ad4/NOTICE.TXT",
+          "gitBlob": "d728ea62485dc1f4a73fe54bbd73d23aa680d283"
+        }
+      ],
+      "estado": "TEXTOS RECOPILADOS; REVISION PENDIENTE"
+    },
+    {
+      "componente": "System.Configuration.ConfigurationManager",
+      "version": "9.0.18",
+      "licenciaDeclarada": "MIT",
+      "procedencia": "textos del NuGet contrastados con el archivo nupkg y del commit declarado por nuspec cuando existe",
+      "repositorio": "https://github.com/dotnet/runtime",
+      "commit": "d839c41c85988aadc213e8e42269ecd7883a1790",
+      "etiqueta": null,
+      "nuspecSha256": "5a5a0a2e787b2036e93f8404c150c9158ade17897bb1159202d5c870d55729e4",
+      "nupkgSha256": "2b38ba7971e59b56482057d2e02e2f3fb4361da111263de09e1130001ddbb9a9",
+      "evidenciaDll": null,
+      "documentos": [
+        {
+          "archivo": "fuentes/system.security.cryptography.pro-bedf8f21/LICENSE.TXT",
+          "sha256": "d7a68596ab69b06f51ca278a6545148e4269a9381c26d597c13df5d88e08cf5b",
+          "origen": "LICENSE.TXT",
+          "url": "https://www.nuget.org/packages/System.Configuration.ConfigurationManager/9.0.18",
+          "gitBlob": null
+        },
+        {
+          "archivo": "fuentes/system.security.cryptography.pro-bedf8f21/THIRD-PARTY-NOTICES.TXT",
+          "sha256": "40686c6447a7d5b5d3693068e4571b5f483d7ed335aeee773ef662440de4c5d5",
+          "origen": "THIRD-PARTY-NOTICES.TXT",
+          "url": "https://www.nuget.org/packages/System.Configuration.ConfigurationManager/9.0.18",
+          "gitBlob": null
+        },
+        {
+          "archivo": "fuentes/aspnetcore-f7d90799/LICENSE.txt",
+          "sha256": "cfc21f5e8bd655ae997eec916138b707b1d290b83272c02a95c9f821b8c87310",
+          "origen": "LICENSE.TXT",
+          "url": "https://github.com/dotnet/runtime/blob/d839c41c85988aadc213e8e42269ecd7883a1790/LICENSE.TXT",
+          "gitBlob": "984713a49622a96da110443c15477613bc12656b"
+        },
+        {
+          "archivo": "fuentes/sha256-fa3e9d0a2c52476f04fe798d7dc4f6e7edb7b68a3d2f4d5f59a39bce957eedc8.txt",
+          "sha256": "fa3e9d0a2c52476f04fe798d7dc4f6e7edb7b68a3d2f4d5f59a39bce957eedc8",
+          "origen": "THIRD-PARTY-NOTICES.TXT",
+          "url": "https://github.com/dotnet/runtime/blob/d839c41c85988aadc213e8e42269ecd7883a1790/THIRD-PARTY-NOTICES.TXT",
+          "gitBlob": "3dc0d7aa85979909a3f6400611349a86c7277fa5"
+        }
+      ],
+      "estado": "TEXTOS RECOPILADOS; REVISION PENDIENTE"
+    },
+    {
+      "componente": "System.Security.Cryptography.ProtectedData",
+      "version": "9.0.18",
+      "licenciaDeclarada": "MIT",
+      "procedencia": "textos del NuGet contrastados con el archivo nupkg y del commit declarado por nuspec cuando existe",
+      "repositorio": "https://github.com/dotnet/runtime",
+      "commit": "d839c41c85988aadc213e8e42269ecd7883a1790",
+      "etiqueta": null,
+      "nuspecSha256": "be0d6f585ab58747e2e252d83cbc64007b239d6982c3508c6e7f8b3ece640cf5",
+      "nupkgSha256": "25f2dd663cb3a110c75766ba8c6c2aff1c2e1b2dd3d1764d181df32bd2003c11",
+      "evidenciaDll": null,
+      "documentos": [
+        {
+          "archivo": "fuentes/system.security.cryptography.pro-bedf8f21/LICENSE.TXT",
+          "sha256": "d7a68596ab69b06f51ca278a6545148e4269a9381c26d597c13df5d88e08cf5b",
+          "origen": "LICENSE.TXT",
+          "url": "https://www.nuget.org/packages/System.Security.Cryptography.ProtectedData/9.0.18",
+          "gitBlob": null
+        },
+        {
+          "archivo": "fuentes/system.security.cryptography.pro-bedf8f21/THIRD-PARTY-NOTICES.TXT",
+          "sha256": "40686c6447a7d5b5d3693068e4571b5f483d7ed335aeee773ef662440de4c5d5",
+          "origen": "THIRD-PARTY-NOTICES.TXT",
+          "url": "https://www.nuget.org/packages/System.Security.Cryptography.ProtectedData/9.0.18",
+          "gitBlob": null
+        },
+        {
+          "archivo": "fuentes/aspnetcore-f7d90799/LICENSE.txt",
+          "sha256": "cfc21f5e8bd655ae997eec916138b707b1d290b83272c02a95c9f821b8c87310",
+          "origen": "LICENSE.TXT",
+          "url": "https://github.com/dotnet/runtime/blob/d839c41c85988aadc213e8e42269ecd7883a1790/LICENSE.TXT",
+          "gitBlob": "984713a49622a96da110443c15477613bc12656b"
+        },
+        {
+          "archivo": "fuentes/sha256-fa3e9d0a2c52476f04fe798d7dc4f6e7edb7b68a3d2f4d5f59a39bce957eedc8.txt",
+          "sha256": "fa3e9d0a2c52476f04fe798d7dc4f6e7edb7b68a3d2f4d5f59a39bce957eedc8",
+          "origen": "THIRD-PARTY-NOTICES.TXT",
+          "url": "https://github.com/dotnet/runtime/blob/d839c41c85988aadc213e8e42269ecd7883a1790/THIRD-PARTY-NOTICES.TXT",
+          "gitBlob": "3dc0d7aa85979909a3f6400611349a86c7277fa5"
         }
       ],
       "estado": "TEXTOS RECOPILADOS; REVISION PENDIENTE"
