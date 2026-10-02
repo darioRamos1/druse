@@ -120,6 +120,7 @@
         class="editor"
         [hidden]="maximizedPanel() === 'results'"
         [value]="sql()"
+        [guardChanges]="edits().length > 0"
         [engine]="activeEngine()"
         [theme]="theme()"
         [accent]="accent()"

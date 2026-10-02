@@ -1,4 +1,6 @@
 {
+  "whatsNew.v1_2_2.pendingCells": "Keep unsaved cell changes by cancelling a tab, connection, database or query change. Closing another tab preserves your results.",
+  "whatsNew.v1_2_2.importAnalysis": "After changing an import file, its options or its destination, analyze it again before inserting the data.",
   "whatsNew.v1_2_1.sqlColors": "SQL words such as INNER JOIN, AND and IS NOT NULL are highlighted in violet, with improved contrast in both light and dark themes.",
   "activity.close": "Close activity",
   "activity.empty.text": "Here you can check your backups, restores and transfers.",
@@ -1632,6 +1634,9 @@
   "update.installFailed": "The update couldn''t be installed.",
   "workspace.committed": "Changes committed on “{connection}”.",
   "workspace.connectionLost": "The connection was lost.",
+  "workspace.discardCellEdits": "There are {count} cells with unsaved changes. Discard them and continue? Choose Cancel to keep the query and changes; you can save them from the results preview.",
+  "workspace.waitForCellSave": "Wait until the cells finish saving before changing context.",
+  "workspace.importNeedsAnalysis": "Analyze the file again with the current options and destination before importing.",
   "workspace.connectionLostDetail": "The connection with “{connection}” was lost. Connect it again to continue.",
   "workspace.ddlNotReversible": " Creating or altering tables is not undone on this engine, even with “Rollback”.",
   "workspace.defaultFileName": "druse",

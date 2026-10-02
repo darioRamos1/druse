@@ -1,4 +1,6 @@
 {
+  "whatsNew.v1_2_2.pendingCells": "Puedes conservar las celdas sin guardar al cancelar un cambio de pestaña, conexión, base o consulta. Cerrar otra pestaña conserva tus resultados.",
+  "whatsNew.v1_2_2.importAnalysis": "Al cambiar el archivo, las opciones o el destino de una importación, debes analizar de nuevo antes de insertar los datos.",
   "whatsNew.v1_2_1.sqlColors": "Las palabras SQL como INNER JOIN, AND e IS NOT NULL se resaltan en violeta, con mejor contraste en los temas claro y oscuro.",
   "activity.close": "Cerrar actividad",
   "activity.empty.text": "Aquí podrás consultar tus respaldos, restauraciones y traslados.",
@@ -1632,6 +1634,9 @@
   "update.installFailed": "No se pudo instalar la actualización.",
   "workspace.committed": "Cambios confirmados en «{connection}».",
   "workspace.connectionLost": "La conexión se perdió.",
+  "workspace.discardCellEdits": "Hay {count} celdas con cambios sin guardar. ¿Quieres descartarlos y continuar? Pulsa Cancelar para conservar la consulta y los cambios; puedes guardarlos desde la vista previa de resultados.",
+  "workspace.waitForCellSave": "Espera a que termine de guardar las celdas antes de cambiar de contexto.",
+  "workspace.importNeedsAnalysis": "Analiza de nuevo el archivo con las opciones y el destino actuales antes de importar.",
   "workspace.connectionLostDetail": "Se perdió la conexión con «{connection}». Vuelve a conectarla para seguir.",
   "workspace.ddlNotReversible": " Crear o modificar tablas no se deshace en este motor, aunque uses «Deshacer».",
   "workspace.defaultFileName": "druse",

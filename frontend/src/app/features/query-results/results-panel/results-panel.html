@@ -279,7 +279,7 @@
         [resultSet]="set"
         [showFilters]="showFilters()"
         [compact]="compact()"
-        [editable]="editable()"
+        [editable]="editable() && !saving()"
         [pendingEdits]="edits()"
         [selectedRows]="selectedRows()"
         (copied)="copied.emit($event)"
@@ -348,7 +348,7 @@
             </div>
 
             <div class="edits__actions">
-              <button type="button" class="btn" (click)="cancelSave.emit()">
+              <button type="button" class="btn" [disabled]="saving()" (click)="cancelSave.emit()">
                 {{ 'results.back' | t }}
               </button>
               <button
@@ -366,10 +366,15 @@
             </p>
 
             <div class="edits__actions">
-              <button type="button" class="btn" (click)="discardEdits.emit()">
+              <button type="button" class="btn" [disabled]="saving()" (click)="discardEdits.emit()">
                 {{ 'results.discard' | t }}
               </button>
-              <button type="button" class="btn btn--primary" (click)="prepareEdits.emit()">
+              <button
+                type="button"
+                class="btn btn--primary"
+                [disabled]="saving()"
+                (click)="prepareEdits.emit()"
+              >
                 {{ 'results.previewSave' | t }}
               </button>
             </div>

@@ -12,7 +12,13 @@
       <h2 class="title" id="import-title">{{ 'import.title' | t: { table: qualified() } }}</h2>
       <p class="subtitle">{{ 'import.subtitle' | t }}</p>
     </div>
-    <button type="button" class="close" (click)="close()" [attr.aria-label]="'common.close' | t">
+    <button
+      type="button"
+      class="close"
+      [disabled]="running()"
+      (click)="close()"
+      [attr.aria-label]="'common.close' | t"
+    >
       <app-icon name="close" [size]="12" />
     </button>
   </header>
@@ -20,12 +26,17 @@
   <div class="body">
     <label class="field">
       <span class="field__label">{{ 'import.file' | t }}</span>
-      <input type="file" accept=".csv,.xlsx,.txt" (change)="onFile($event)" />
+      <input type="file" accept=".csv,.xlsx,.txt" [disabled]="busy()" (change)="onFile($event)" />
     </label>
 
     <div class="options">
       <label class="check">
-        <input type="checkbox" [checked]="hasHeaders()" (change)="hasHeaders.set(!hasHeaders())" />
+        <input
+          type="checkbox"
+          [disabled]="busy()"
+          [checked]="hasHeaders()"
+          (change)="hasHeaders.set(!hasHeaders())"
+        />
         {{ 'import.hasHeaders' | t }}
       </label>
 
@@ -35,6 +46,7 @@
           type="text"
           maxlength="1"
           class="tiny"
+          [disabled]="busy()"
           [value]="delimiter()"
           (input)="delimiter.set($any($event.target).value || ',')"
         />
@@ -42,7 +54,11 @@
 
       <label class="field field--inline">
         <span class="field__label">{{ 'import.encoding' | t }}</span>
-        <select [value]="encoding()" (change)="encoding.set($any($event.target).value)">
+        <select
+          [disabled]="busy()"
+          [value]="encoding()"
+          (change)="encoding.set($any($event.target).value)"
+        >
           <option value="utf8bom" translate="no">UTF-8</option>
           <option value="latin1" translate="no">Latin-1</option>
         </select>
@@ -54,6 +70,7 @@
           type="text"
           class="tiny"
           [placeholder]="'import.nullTextNone' | t"
+          [disabled]="busy()"
           [value]="nullText()"
           (input)="nullText.set($any($event.target).value)"
         />
@@ -134,7 +151,9 @@
   </div>
 
   <footer class="foot">
-    <button type="button" class="btn" (click)="close()">{{ 'common.cancel' | t }}</button>
+    <button type="button" class="btn" [disabled]="running()" (click)="close()">
+      {{ 'common.cancel' | t }}
+    </button>
 
     <span class="spacer"></span>
 
@@ -143,12 +162,7 @@
     </button>
 
     <!-- Importar solo se ofrece después de mirar, y nunca con problemas dentro. -->
-    <button
-      type="button"
-      class="btn btn--danger"
-      [disabled]="!preview() || preview()!.problems.length > 0 || busy()"
-      (click)="run()"
-    >
+    <button type="button" class="btn btn--danger" [disabled]="!canImport()" (click)="run()">
       {{ 'import.run' | t }}
     </button>
   </footer>

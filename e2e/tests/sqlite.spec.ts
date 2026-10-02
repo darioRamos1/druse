@@ -173,6 +173,89 @@ async function hastaLasTablas(page: Page) {
 }
 
 test.describe('SQLite de punta a punta', () => {
+  test('cancelar el cambio de contexto conserva las celdas y el SQL del editor', async ({ page }) => {
+    await abrir(page);
+    await hastaLasTablas(page);
+    await menuDeNodo(page, 'clientes');
+    await page.getByRole('menuitem', { name: 'Abrir SELECT', exact: true }).click();
+    await situarCursor(page, 1, 1);
+    await ejecutar(page, 'todo');
+
+    const leerSql = () => page.evaluate(() => (window as any).monaco.editor.getEditors()[0].getValue() as string);
+    const sql = await leerSql();
+    const celda = page.locator('app-results-grid .row .cell--value').nth(1);
+    await expect(celda).toHaveClass(/is-editable/);
+    await celda.dblclick();
+    await celda.locator('input').fill('Ana pendiente');
+    await celda.locator('input').press('Tab');
+    await expect(celda).toHaveText('Ana pendiente');
+
+    const avisos: string[] = [];
+    page.on('dialog', async dialog => {
+      avisos.push(dialog.message());
+      await dialog.dismiss();
+    });
+
+    await page.locator('app-sql-editor').click();
+    await page.keyboard.press('Control+End');
+    await page.keyboard.type('x');
+    await expect.poll(leerSql).toBe(sql);
+    await expect(celda).toHaveText('Ana pendiente');
+
+    await page.keyboard.press('Control+Y');
+    await expect.poll(leerSql).toBe(sql);
+    await expect(celda).toHaveText('Ana pendiente');
+
+    await escribirSql(page, 'SELECT 1;');
+    await expect.poll(leerSql).toBe(sql);
+    await expect(celda).toHaveText('Ana pendiente');
+
+    await page.keyboard.press('Control+T');
+    await expect(celda).toHaveText('Ana pendiente');
+    await expect.poll(() => avisos.length).toBe(4);
+    expect(avisos.every(aviso => aviso.includes('sin guardar'))).toBe(true);
+    expect(await leerSql()).toBe(sql);
+
+    await page.getByRole('button', { name: 'Descartar', exact: true }).click();
+    await expect(celda).toHaveText('Ana');
+  });
+
+  test('cambiar las opciones de importación exige analizar de nuevo antes de escribir', async ({ page }) => {
+    await abrir(page);
+    await hastaLasTablas(page);
+    await menuDeNodo(page, 'clientes');
+    await page.getByRole('menuitem', { name: /Importar/ }).click();
+
+    const dialogo = page.locator('app-import-dialog');
+    const importar = dialogo.getByRole('button', { name: 'Importar', exact: true });
+    await dialogo.locator('input[type=file]').setInputFiles({
+      name: 'clientes.csv',
+      mimeType: 'text/csv',
+      buffer: Buffer.from('id,nombre,email,nit\n99,Ana importada,importada@ejemplo.test,999\n'),
+    });
+    await expect(importar).toBeDisabled();
+    await dialogo.getByRole('button', { name: 'Ver qué va a pasar', exact: true }).click();
+    await expect(dialogo.locator('.preview')).toBeVisible();
+    await expect(importar).toBeEnabled();
+
+    await dialogo.locator('input[type=text]').last().fill('NULL');
+    await expect(dialogo.locator('.preview')).toHaveCount(0);
+    await expect(importar).toBeDisabled();
+    if (process.env['DRUSE_BARRIDO']) {
+      mkdirSync(BARRIDO, { recursive: true });
+      await dialogo.locator('.dialog').screenshot({ path: join(BARRIDO, 'importacion-pendiente-de-analizar.png') });
+    }
+    await dialogo.getByRole('button', { name: 'Ver qué va a pasar', exact: true }).click();
+    await expect(importar).toBeEnabled();
+
+    if (process.env['DRUSE_BARRIDO']) {
+      mkdirSync(BARRIDO, { recursive: true });
+      await dialogo.locator('.dialog').screenshot({ path: join(BARRIDO, 'importacion-analisis-vigente.png') });
+    }
+    await dialogo.getByRole('button', { name: 'Cancelar', exact: true }).click();
+    await expect(dialogo).toHaveCount(0);
+  });
+
   test('el fondo de resultados se ajusta, persiste y se quita sin cambiar el editor', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 960 });
     await abrir(page);

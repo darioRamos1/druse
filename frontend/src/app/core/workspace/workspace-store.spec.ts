@@ -1,6 +1,6 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { TestBed } from '@angular/core/testing';
-import { Observable, of, throwError } from 'rxjs';
+import { Observable, Subject, of, throwError } from 'rxjs';
 
 import {
   ApplicationGateway,
@@ -540,6 +540,7 @@ describe('WorkspaceStore', () => {
   let archivos: { save: ReturnType<typeof vi.fn> };
 
   beforeEach(() => {
+    vi.restoreAllMocks();
     gateway = new FakeGateway();
     archivos = { save: vi.fn().mockResolvedValue({ saved: true, path: 'C:\\datos\\ventas.xlsx' }) };
 
@@ -1084,6 +1085,7 @@ describe('WorkspaceStore', () => {
     it('cambiar de pestaña no arrastra los cambios pendientes', async () => {
       await abrirTabla();
 
+      vi.spyOn(window, 'confirm').mockReturnValue(true);
       store.editCell({ row: 1, column: 'email', value: 'da igual' });
       store.createTab('SELECT 1');
 
@@ -1091,6 +1093,122 @@ describe('WorkspaceStore', () => {
       // guardarlos luego contra la tabla equivocada.
       expect(store.edits()).toEqual([]);
       expect(store.result()).toBeNull();
+    });
+
+    it('cancelar el cambio de pestaña conserva el SQL, el resultado y las ediciones', async () => {
+      const anterior = store.activeTab()!.id;
+      await abrirTabla();
+      const activa = store.activeTab();
+      const resultado = store.result();
+      store.toggleRowSelection(1);
+      store.editCell({ row: 1, column: 'email', value: 'pendiente' });
+      const confirmar = vi.spyOn(window, 'confirm').mockReturnValue(false);
+
+      store.selectTab(anterior);
+
+      expect(confirmar).toHaveBeenCalledOnce();
+      expect(store.activeTab()).toEqual(activa);
+      expect(store.result()).toBe(resultado);
+      expect(store.edits()[0].value).toBe('pendiente');
+      expect(store.selectedRows()).toEqual([1]);
+      expect(gateway.rowEditRequests).toEqual([]);
+    });
+
+    it('cerrar otra pestaña no retira el resultado ni pide descartar sus celdas', async () => {
+      const anterior = store.activeTab()!.id;
+      await abrirTabla();
+      const resultado = store.result();
+      store.editCell({ row: 1, column: 'email', value: 'pendiente' });
+      const confirmar = vi.spyOn(window, 'confirm').mockReturnValue(false);
+
+      store.closeTab(anterior);
+      store.selectTab(store.activeTab()!.id);
+
+      expect(confirmar).not.toHaveBeenCalled();
+      expect(store.tabs().some((tab) => tab.id === anterior)).toBe(false);
+      expect(store.result()).toBe(resultado);
+      expect(store.edits()).toHaveLength(1);
+    });
+
+    it('cancelar la modificación del SQL conserva su origen editable', async () => {
+      await abrirTabla();
+      const sql = store.activeTab()?.sql;
+      store.editCell({ row: 1, column: 'email', value: 'pendiente' });
+      vi.spyOn(window, 'confirm').mockReturnValue(false);
+
+      store.updateSql('SELECT * FROM otra_tabla');
+
+      expect(store.activeTab()?.sql).toBe(sql);
+      expect(store.editableTable()?.table.name).toBe('users');
+      expect(store.edits()).toHaveLength(1);
+    });
+
+    it('cancelar el cambio de base o la desconexión no cambia el destino', async () => {
+      await abrirTabla();
+      const activa = store.activeTab();
+      const resultado = store.result();
+      const conexion = store.activeConnection()!.id;
+      store.editCell({ row: 1, column: 'email', value: 'pendiente' });
+      vi.spyOn(window, 'confirm').mockReturnValue(false);
+
+      store.useDatabase('otra_base');
+      await store.disconnect(conexion);
+
+      expect(store.activeTab()).toEqual(activa);
+      expect(store.result()).toBe(resultado);
+      expect(gateway.closedSessions).toEqual([]);
+      expect(store.edits()).toHaveLength(1);
+    });
+
+    it('cancelar el cambio de conexión no abre la sesión ni cambia las celdas', async () => {
+      await abrirTabla();
+      gateway.savedConnections = [savedProfile];
+      await store.loadSavedConnections();
+      const activa = store.activeTab();
+      store.editCell({ row: 1, column: 'email', value: 'pendiente' });
+      vi.spyOn(window, 'confirm').mockReturnValue(false);
+
+      expect(await store.useConnection(savedProfile.id)).toBe('failed');
+      expect(store.activeTab()).toEqual(activa);
+      expect(gateway.openSavedCalls).toEqual([]);
+      expect(store.edits()).toHaveLength(1);
+    });
+
+    it('abrir una conexión en segundo plano no limpia las celdas de otra pestaña', async () => {
+      await abrirTabla();
+      gateway.savedConnections = [savedProfile];
+      await store.loadSavedConnections();
+      const iniciadora = store.activeTab()!.id;
+      const respuesta = new Subject<SessionInfo>();
+      vi.spyOn(gateway, 'openSavedSession').mockReturnValue(respuesta);
+      const cambio = store.useConnection(savedProfile.id);
+
+      store.createTab('SELECT * FROM public.users;', tables[0]);
+      await store.execute();
+      store.editCell({ row: 1, column: 'email', value: 'pendiente en otra pestaña' });
+      const activa = store.activeTab();
+      const resultado = store.result();
+      respuesta.next({ ...session, sessionId: 'sesion-otra' });
+      expect(await cambio).toBe('ok');
+
+      expect(store.activeTab()).toEqual(activa);
+      expect(store.result()).toBe(resultado);
+      expect(store.edits()).toHaveLength(1);
+      expect(store.tabs().find((tab) => tab.id === iniciadora)?.connectionId).toBe(savedProfile.id);
+    });
+
+    it('cancelar una nueva ejecución conserva las celdas y no pide otra consulta', async () => {
+      await abrirTabla();
+      const resultado = store.result();
+      store.editCell({ row: 1, column: 'email', value: 'pendiente' });
+      vi.spyOn(window, 'confirm').mockReturnValue(false);
+      const ejecutar = vi.spyOn(gateway, 'executeQuery');
+
+      await store.execute();
+
+      expect(ejecutar).not.toHaveBeenCalled();
+      expect(store.result()).toBe(resultado);
+      expect(store.edits()).toHaveLength(1);
     });
 
     it('modificar el SQL invalida el origen editable de la pestaña', async () => {
@@ -1102,6 +1220,54 @@ describe('WorkspaceStore', () => {
 
       expect(store.activeTab()?.sourceTable).toBeUndefined();
       expect(store.editableTable()).toBeNull();
+    });
+
+    it('guardar bloquea el cambio de contexto y las nuevas ediciones hasta terminar', async () => {
+      await abrirTabla();
+      const resultado = store.result();
+      store.editCell({ row: 1, column: 'email', value: 'pendiente' });
+      const respuesta = new Subject<RowEditResult>();
+      const guardar = vi.spyOn(gateway, 'applyRowEdits').mockReturnValue(respuesta);
+      const confirmar = vi.spyOn(window, 'confirm').mockReturnValue(true);
+
+      const guardado = store.saveEdits();
+      expect(store.createTab()).toBe(false);
+      store.editCell({ row: 1, column: 'email', value: 'otro cambio' });
+      expect(await store.saveEdits()).toBe(false);
+      expect(guardar).toHaveBeenCalledOnce();
+      expect(confirmar).not.toHaveBeenCalled();
+      expect(store.result()).toBe(resultado);
+      expect(store.edits()[0].value).toBe('pendiente');
+
+      respuesta.next({ rowsAffected: 1, durationMs: 3, statements: [] });
+      expect(await guardado).toBe(true);
+      expect(store.edits()).toEqual([]);
+      expect(store.savingEdits()).toBe(false);
+    });
+
+    it('una vista previa tardía no recupera el SQL de celdas descartadas', async () => {
+      await abrirTabla();
+      store.editCell({ row: 1, column: 'email', value: 'pendiente' });
+      const respuesta = new Subject<readonly string[]>();
+      vi.spyOn(gateway, 'previewRowEdits').mockReturnValue(respuesta);
+
+      const analisis = store.prepareEdits();
+      store.discardEdits();
+      respuesta.next(['UPDATE antiguo']);
+      await analisis;
+
+      expect(store.editPreview()).toBeNull();
+      expect(store.edits()).toEqual([]);
+    });
+
+    it('cambiar una celda después del análisis retira el SQL anterior', async () => {
+      await abrirTabla();
+      store.editCell({ row: 1, column: 'email', value: 'pendiente' });
+      await store.prepareEdits();
+      expect(store.editPreview()).not.toBeNull();
+
+      store.editCell({ row: 1, column: 'email', value: 'otro cambio' });
+      expect(store.editPreview()).toBeNull();
     });
   });
 
@@ -1120,10 +1286,90 @@ describe('WorkspaceStore', () => {
 
     it('importar avisa de cuántas filas entraron', async () => {
       await store.connect(form);
+      await store.previewImport(tabla, archivo, opciones);
       await store.runImport(tabla, archivo, opciones);
 
-      expect(gateway.importCalls).toEqual([true]);
+      expect(gateway.importCalls).toEqual([false, true]);
       expect(store.notice()).toContain('2 filas importadas');
+    });
+
+    it('cambiar las opciones invalida la confirmación aunque el archivo sea el mismo', async () => {
+      await store.connect(form);
+      await store.previewImport(tabla, archivo, opciones);
+
+      const importado = await store.runImport(tabla, archivo, { ...opciones, delimiter: ';' });
+
+      expect(importado).toBe(false);
+      expect(gateway.importCalls).toEqual([false]);
+    });
+
+    it('no recupera una vista previa que llega después de cerrar el diálogo', async () => {
+      await store.connect(form);
+      const respuesta = new Subject<ImportPreview>();
+      vi.spyOn(gateway, 'previewImport').mockReturnValue(respuesta);
+      const analisis = store.previewImport(tabla, archivo, opciones);
+
+      store.clearImportPreview();
+      respuesta.next(gateway.importPreviewResult);
+      await analisis;
+
+      expect(store.importPreview()).toBeNull();
+      expect(store.importing()).toBe(false);
+    });
+
+    it('un análisis anterior no sustituye al último ni libera sus controles', async () => {
+      await store.connect(form);
+      const anterior = new Subject<ImportPreview>();
+      const actual = new Subject<ImportPreview>();
+      vi.spyOn(gateway, 'previewImport').mockReturnValueOnce(anterior).mockReturnValueOnce(actual);
+      const primero = store.previewImport(tabla, archivo, opciones);
+      const segundo = store.previewImport(tabla, archivo, { ...opciones, nullText: 'NULL' });
+
+      anterior.next({ ...gateway.importPreviewResult, rowCount: 100 });
+      await primero;
+      expect(store.importing()).toBe(true);
+      expect(store.importPreview()).toBeNull();
+
+      actual.next(gateway.importPreviewResult);
+      await segundo;
+      expect(store.importPreview()?.rowCount).toBe(2);
+      expect(store.importing()).toBe(false);
+    });
+
+    it('el análisis no autoriza otro archivo ni otra tabla', async () => {
+      await store.connect(form);
+      await store.previewImport(tabla, archivo, opciones);
+
+      expect(await store.runImport(tabla, new File(['id\n2'], 'datos.csv'), opciones)).toBe(false);
+      expect(await store.runImport({ ...tabla, name: 'otra' }, archivo, opciones)).toBe(false);
+      expect(gateway.importCalls).toEqual([false]);
+    });
+
+    it('reconectar invalida el análisis de la sesión anterior', async () => {
+      gateway.savedConnections = [savedProfile];
+      await store.loadSavedConnections();
+      await store.connectSaved(savedProfile.id);
+      await store.previewImport(tabla, archivo, opciones, savedProfile.id);
+      vi.spyOn(gateway, 'openSavedSession').mockReturnValue(
+        of({ ...session, sessionId: 'sesion-otra' }),
+      );
+      await store.reconnect(savedProfile.id);
+
+      expect(store.hasImportPreview(tabla, archivo, opciones, savedProfile.id)).toBe(false);
+      expect(await store.runImport(tabla, archivo, opciones, savedProfile.id)).toBe(false);
+      expect(gateway.importCalls).toEqual([false]);
+    });
+
+    it('los problemas del análisis impiden importar incluso con las mismas opciones', async () => {
+      await store.connect(form);
+      gateway.importPreviewResult = {
+        ...gateway.importPreviewResult,
+        problems: [{ row: 1, column: 'id', message: 'Clave inválida' }],
+      };
+      await store.previewImport(tabla, archivo, opciones);
+
+      expect(await store.runImport(tabla, archivo, opciones)).toBe(false);
+      expect(gateway.importCalls).toEqual([false]);
     });
 
     it('sin conexión no se importa nada', async () => {

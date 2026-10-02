@@ -462,6 +462,12 @@ test.describe('barrido visual', () => {
       await page.waitForTimeout(600);
       await medir(page, nombre, hallazgos);
       await foto(page, nombre, dialogo.locator('.dialog').first());
+      if (selector === 'app-import-dialog') {
+        await dialogo.locator('input[type=file]').setInputFiles({
+          name: 'ejemplo.csv', mimeType: 'text/csv', buffer: Buffer.from('id\n'),
+        });
+        await foto(page, '13aa-importar-pendiente-de-analizar', dialogo.locator('.dialog'));
+      }
       await cerrar(page, dialogo, nombre);
     }
 

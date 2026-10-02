@@ -1461,8 +1461,9 @@ export class AppShell {
 
   // --- Pestañas --------------------------------------------------------------
   protected selectTab(id: string): void {
-    this.executionError.set(null);
-    this._store.selectTab(id);
+    if (this._store.selectTab(id)) {
+      this.executionError.set(null);
+    }
   }
 
   protected closeTab(id: string): void {
@@ -1472,13 +1473,15 @@ export class AppShell {
       return;
     }
 
-    this.executionError.set(null);
-    this._store.closeTab(id);
+    if (this._store.closeTab(id) && tab?.active) {
+      this.executionError.set(null);
+    }
   }
 
   protected createTab(): void {
-    this.executionError.set(null);
-    this._store.createTab();
+    if (this._store.createTab()) {
+      this.executionError.set(null);
+    }
   }
 
   /**
@@ -1577,9 +1580,12 @@ export class AppShell {
 
   // --- Editor ----------------------------------------------------------------
   protected onSqlChange(sql: string): void {
+    if (!this._store.updateSql(sql)) {
+      this._editor()?.rejectLastChange();
+      return;
+    }
     if (sql.trim()) this.startedWriting.set(true);
     this.executionError.set(null);
-    this._store.updateSql(sql);
   }
 
   /** El aviso de un archivo que no se pudo leer o escribir, con el motivo dentro. */

@@ -8,8 +8,9 @@ leer resultados sin depender tanto del ratón. Se propone mejorar la interfaz
 actual de forma incremental, conservando su diseño y sus protecciones.
 
 Revisión del código de la versión **1.2.1**, sobre el commit **e00b493**.
-Este documento contiene propuestas pendientes; crearlo no implementa ninguna
-de ellas. Complementa el [plan de mejoras existente](PLAN_MEJORAS_DRUSE.md), la
+La revisión inicial se registró sin implementar las propuestas. **DRU-01 y
+DRU-02 ya están implementadas en 1.2.2**; las demás siguen pendientes.
+Complementa el [plan de mejoras existente](PLAN_MEJORAS_DRUSE.md), la
 [revisión de interfaz anterior](../revisiones/revision-ui-ux-2026-09-08.md) y el
 [plan de idiomas](plan-idiomas.md). Sus pendientes históricos requieren volver
 a comprobarse antes de incorporarlos a un ciclo nuevo.
@@ -63,8 +64,8 @@ este recorrido limitado.
 
 | ID | Mejora | Prioridad | Evidencia | Tamaño |
 | --- | --- | --- | --- | --- |
-| DRU-01 | Proteger ediciones pendientes de la cuadrícula | P1 | Código | 1–2 días |
-| DRU-02 | Invalidar vistas previas de importación desactualizadas | P1 | Código | 1–2 días |
+| DRU-01 | Proteger ediciones pendientes de la cuadrícula | P1 | Implementado y probado en 1.2.2 | Cerrado |
+| DRU-02 | Invalidar vistas previas de importación desactualizadas | P1 | Implementado y probado en 1.2.2 | Cerrado |
 | DRU-03 | Editar valores sin ambigüedad ni pérdida de formato | P1 | Código | 2–4 días |
 | DRU-04 | Distinguir sesión de IA y respuesta válida del modelo | P1 | Reproducido + código | 2–3 días |
 | DRU-05 | Historial con búsqueda fiable, filtros y paginación | P2 | Código | 2–4 días |
@@ -80,6 +81,31 @@ este recorrido limitado.
 | DRU-15 | Ajustar y reutilizar correspondencias de importación | P3 | Código; propuesta | 3–5 días |
 
 ## Fase 1 — Proteger el trabajo y aclarar lo que se confirma
+
+### Primera entrega — 1.2.2, 2 de octubre de 2026
+
+- **DRU-01:** confirmación antes de cambiar o cerrar la pestaña activa, abrir
+  otra consulta o archivo, cambiar de conexión o base, desconectar, reconectar,
+  modificar el SQL o reejecutarlo. Cancelar conserva los cambios y su contexto;
+  cerrar una pestaña inactiva conserva el resultado visible. Los atajos y las
+  acciones del explorador pasan por la misma protección. El editor restaura el
+  SQL aceptado también al cancelar «Deshacer», «Rehacer» y cambios programáticos.
+- Mientras se guardan celdas se bloquean nuevos cambios y cambios de contexto
+  que descartarían esas celdas. Las vistas previas tardías de celdas descartadas
+  se ignoran; modificar otra celda retira el SQL previamente analizado.
+- **DRU-02:** el análisis se vincula al archivo, las cuatro opciones de lectura,
+  la tabla y la sesión. Cambiar cualquier entrada o reconectar exige analizar
+  otra vez. Cerrar el diálogo invalida respuestas pendientes. Las entradas se
+  bloquean durante las operaciones; el cierre permanece disponible durante el
+  análisis y se bloquea durante la escritura.
+- Verificación: TypeScript, guarda de idiomas y **286 pruebas de frontend** en
+  diez archivos, incluidas novedades y las áreas afectadas; **12 E2E de SQLite**,
+  incluidas dos regresiones nuevas.
+  Se inspeccionaron las capturas del análisis vigente y del análisis invalidado.
+  El barrido incorpora la captura de importación pendiente de analizar.
+- Límites: verificación de navegador con Chromium y SQLite. Queda pendiente
+  comprobar estos recorridos en Tauri/WebView2 y con los demás motores. No se
+  modificó el contrato de importación ni se sustituyó la validación del backend.
 
 ### DRU-01 — Ediciones pendientes de la cuadrícula
 
@@ -126,6 +152,12 @@ botón. El servidor mantiene su validación y su operación transaccional.
 [ImportService](../../backend/src/Druse.Application/Rows/ImportService.cs).
 
 ### DRU-03 — Fidelidad de los valores editados
+
+**Observación adicional durante la primera entrega.** Pulsar Enter dentro del
+editor de una celda confirma el valor y vuelve a abrir el campo: el evento llega
+también al manejador de la celda. Se reprodujo en Chromium durante la regresión
+de DRU-01; la prueba usa Tab para finalizar la edición. Corregir la propagación
+del teclado se incorpora a esta tarea pendiente.
 
 **Hallazgo.** El editor transforma la cadena exacta `NULL` en un nulo. No hay
 una acción explícita para distinguirla del texto literal «NULL». Además,
