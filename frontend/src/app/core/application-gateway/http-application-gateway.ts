@@ -8,6 +8,7 @@ import {
   EngineInfo,
   IndexCapabilities,
   QueryHistoryEntry,
+  QueryHistoryFilter,
   QueryResult,
   ResultColumn,
   ResultSet,
@@ -387,8 +388,25 @@ export class HttpApplicationGateway extends ApplicationGateway {
     return this._http.post<SessionInfo>(`/api/connections/${id}/sessions`, { password });
   }
 
-  override getHistory(search?: string): Observable<readonly QueryHistoryEntry[]> {
-    const query = search ? `?search=${encodeURIComponent(search)}` : '';
+  override getHistory(
+    search?: string,
+    filter?: QueryHistoryFilter,
+  ): Observable<readonly QueryHistoryEntry[]> {
+    const parameters = new URLSearchParams();
+    const dates = { from: filter?.from, until: filter?.until };
+    for (const key of ['from', 'until'] as const) {
+      const value = dates[key];
+      if (value && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+        const date = new Date(`${value}T00:00:00`);
+        // «Hasta» incluye el día local completo, incluso al cambiar de horario.
+        if (key === 'until') date.setDate(date.getDate() + 1);
+        dates[key] = date.toISOString();
+      }
+    }
+    for (const [key, value] of Object.entries({ ...filter, ...dates, search })) {
+      if (value !== undefined && value !== '') parameters.set(key, String(value));
+    }
+    const query = parameters.size ? `?${parameters}` : '';
 
     return this._http.get<QueryHistoryEntry[]>(`/api/history${query}`);
   }

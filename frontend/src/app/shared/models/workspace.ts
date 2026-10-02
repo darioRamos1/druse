@@ -159,6 +159,19 @@ export interface SecretStoreStatus {
   readonly description: string;
 }
 
+/** Filtros del historial: las fechas de la interfaz son días locales completos. */
+export interface QueryHistoryFilter {
+  readonly search?: string;
+  readonly connection?: string;
+  readonly database?: string;
+  readonly from?: string;
+  readonly until?: string;
+  readonly succeeded?: boolean;
+  readonly before?: string;
+  readonly beforeId?: string;
+  readonly limit?: number;
+}
+
 /** Entrada del historial local de ejecuciones. */
 export interface QueryHistoryEntry {
   readonly id: string;

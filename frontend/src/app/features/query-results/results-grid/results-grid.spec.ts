@@ -32,6 +32,148 @@ describe('ResultsGrid', () => {
     await fixture.whenStable();
   });
 
+  describe('recorrer con el teclado', () => {
+    function celda(row: number, column: number): HTMLElement {
+      return element.querySelector<HTMLElement>(
+        `[data-nav-row="${row}"][data-nav-column="${column}"]`,
+      )!;
+    }
+    async function tecla(
+      row: number,
+      column: number,
+      key: string,
+      options: KeyboardEventInit = {},
+    ): Promise<void> {
+      celda(row, column).focus();
+      celda(row, column).dispatchEvent(
+        new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true, ...options }),
+      );
+      await fixture.whenStable();
+    }
+    it('tiene una sola celda en el recorrido de Tab y mueve el foco con flechas', async () => {
+      expect(element.querySelectorAll('[data-nav-row][tabindex="0"]').length).toBe(1);
+      await tecla(0, 0, 'ArrowRight');
+      expect(document.activeElement).toBe(celda(0, 1));
+      expect(celda(0, 1).tabIndex).toBe(0);
+      expect(celda(0, 0).tabIndex).toBe(-1);
+      await tecla(0, 1, 'ArrowDown');
+      expect(document.activeElement).toBe(celda(1, 1));
+      expect(element.querySelectorAll('[data-nav-row][tabindex="0"]').length).toBe(1);
+    });
+    it('Inicio y Fin recorren columnas y Control llega a los extremos del resultado', async () => {
+      await tecla(0, 1, 'End');
+      expect(document.activeElement).toBe(celda(0, 2));
+      await tecla(0, 2, 'End', { ctrlKey: true });
+      expect(document.activeElement).toBe(celda(2, 2));
+      await tecla(2, 2, 'Home', { metaKey: true });
+      expect(document.activeElement).toBe(celda(0, 0));
+      await tecla(0, 0, 'ArrowUp');
+      expect(document.activeElement).toBe(celda(-1, 0));
+    });
+    it('Mayúsculas extiende un rectángulo y anuncia su tamaño', async () => {
+      await tecla(0, 0, 'ArrowRight', { shiftKey: true });
+      await tecla(0, 1, 'ArrowDown', { shiftKey: true });
+      expect(element.querySelectorAll('.cell--value.is-selected').length).toBe(4);
+      expect(element.querySelector('[aria-live="polite"]')?.textContent).toContain('2 columnas');
+      await tecla(1, 1, 'ArrowRight');
+      expect(element.querySelectorAll('.cell--value.is-selected').length).toBe(1);
+    });
+    it('F2 lleva al editor y las flechas dentro de él conservan el foco', async () => {
+      fixture.componentRef.setInput('editable', true);
+      await fixture.whenStable();
+      await tecla(0, 1, 'F2');
+      const editor = element.querySelector<HTMLTextAreaElement>('.cell__editor')!;
+      expect(document.activeElement).toBe(editor);
+      editor.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
+      await fixture.whenStable();
+      expect(document.activeElement).toBe(editor);
+      editor.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+      await fixture.whenStable();
+      expect(document.activeElement).toBe(celda(0, 1));
+    });
+    it('F4 permite ajustar el ancho de una cabecera y volver con Escape', async () => {
+      await tecla(-1, 0, 'F4');
+      const handle = element.querySelector<HTMLElement>('.cell__resize')!;
+      expect(document.activeElement).toBe(handle);
+      handle.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
+      handle.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+      await fixture.whenStable();
+      expect(document.activeElement).toBe(celda(-1, 0));
+      expect(handle.getAttribute('aria-valuenow')).toBe('96');
+    });
+    it('filtrar quita la selección anterior y Escape enfoca la primera coincidencia', async () => {
+      fixture.componentRef.setInput('showFilters', true);
+      await fixture.whenStable();
+      await tecla(0, 1, 'ArrowDown', { shiftKey: true });
+      const filter = element.querySelectorAll<HTMLInputElement>('.filters__input')[1];
+      filter.focus();
+      filter.value = 'luis';
+      filter.dispatchEvent(new Event('input'));
+      await fixture.whenStable();
+      expect(document.activeElement).toBe(filter);
+      expect(element.querySelectorAll('.cell--value.is-selected').length).toBe(0);
+      filter.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+      await fixture.whenStable();
+      expect(document.activeElement).toBe(celda(0, 1));
+      expect(celda(0, 1).textContent).toContain('luis');
+    });
+    it('la navegación carga otro bloque y no pierde el foco en la fila 501', async () => {
+      fixture.componentRef.setInput('resultSet', {
+        ...resultSet,
+        totalRows: 502,
+        rows: Array.from({ length: 502 }, (_, i) => ({
+          number: i + 1,
+          values: [`${i + 1}`, 'correo', 'true'],
+        })),
+      });
+      await fixture.whenStable();
+      await tecla(499, 0, 'ArrowDown');
+      expect(document.activeElement).toBe(celda(500, 0));
+      expect(celda(500, 0).textContent?.trim()).toBe('501');
+      expect(element.querySelectorAll('[data-nav-row][tabindex="0"]').length).toBe(1);
+    });
+    it('sin coincidencias queda una cabecera accesible y Tab conserva su comportamiento nativo', async () => {
+      fixture.componentRef.setInput('resultSet', { ...resultSet, rows: [], totalRows: 0 });
+      await fixture.whenStable();
+      expect(celda(-1, 0).tabIndex).toBe(0);
+      const event = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true });
+      celda(-1, 0).dispatchEvent(event);
+      expect(event.defaultPrevented).toBe(false);
+    });
+    it('Alt Supr solo señala la fila editable, sin ejecutar un borrado', async () => {
+      const toggled = vi.fn();
+      fixture.componentInstance.rowToggled.subscribe(toggled);
+      await tecla(0, 0, 'Delete', { altKey: true });
+      expect(toggled).not.toHaveBeenCalled();
+      fixture.componentRef.setInput('editable', true);
+      await fixture.whenStable();
+      await tecla(1, 0, 'Delete', { altKey: true });
+      expect(toggled).toHaveBeenCalledExactlyOnceWith(2);
+    });
+    it('Espacio con modificadores selecciona la columna o la fila completas', async () => {
+      await tecla(0, 1, ' ', { ctrlKey: true });
+      expect(element.querySelectorAll('.cell--value.is-selected').length).toBe(3);
+      expect(celda(-1, 1).getAttribute('aria-selected')).toBe('true');
+      await tecla(1, 1, ' ', { shiftKey: true });
+      expect(element.querySelectorAll('.cell--value.is-selected').length).toBe(3);
+      expect(celda(1, 0).getAttribute('aria-selected')).toBe('true');
+      expect(celda(0, 1).getAttribute('aria-selected')).toBe('false');
+    });
+    it('renovar el resultado conserva un foco válido aunque cambien las columnas', async () => {
+      await tecla(0, 0, 'End', { ctrlKey: true });
+      fixture.componentRef.setInput('resultSet', {
+        ...resultSet,
+        columns: [resultSet.columns[0]],
+        rows: [{ number: 1, values: ['nueva'] }],
+        totalRows: 1,
+      });
+      await fixture.whenStable();
+      expect(document.activeElement).toBe(celda(0, 0));
+      expect(celda(0, 0).textContent).toContain('nueva');
+      expect(element.querySelectorAll('[data-nav-row][tabindex="0"]').length).toBe(1);
+    });
+  });
+
   describe('editar valores sin cambiar su significado', () => {
     async function abrir(
       value: string | null,
@@ -128,7 +270,11 @@ describe('ResultsGrid', () => {
       input.dispatchEvent(new FocusEvent('blur', { relatedTarget: action }));
       expect(edited).not.toHaveBeenCalled();
       action.dispatchEvent(new FocusEvent('blur'));
-      expect(edited).toHaveBeenCalledExactlyOnceWith({ row: 1, column: 'valor', value: 'borrador' });
+      expect(edited).toHaveBeenCalledExactlyOnceWith({
+        row: 1,
+        column: 'valor',
+        value: 'borrador',
+      });
     });
 
     it('Escape en la acción NULL también descarta el borrador', async () => {

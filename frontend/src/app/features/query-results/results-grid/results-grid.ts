@@ -1,14 +1,17 @@
 import {
   ChangeDetectionStrategy,
+  afterNextRender,
   Component,
   computed,
   effect,
   ElementRef,
   HostListener,
   inject,
+  Injector,
   input,
   output,
   signal,
+  untracked,
 } from '@angular/core';
 
 import { I18nService } from '../../../core/i18n/i18n.service';
@@ -17,12 +20,14 @@ import { CellEdit, ResultColumn, ResultRow, ResultSet } from '../../../shared/mo
 import { Icon } from '../../../shared/ui/icon/icon';
 import { fitColumnWidth, MIN_COLUMN_WIDTH } from '../../../core/application-gateway/column-widths';
 import { CopyFormat, CopySelection, formatSelection } from './copy-formats';
+import { shortcutLabel } from '../../../core/shortcuts/shortcut-label';
 
 /** Ancho de la columna del número de fila. */
 const ROW_NUMBER_WIDTH = 44;
 
 /** Filas añadidas al DOM en cada bloque. */
 const ROW_PAGE_SIZE = 500;
+let nextHelpId = 0;
 
 /** Celda que se está editando, por número de fila y columna. */
 interface CellPosition {
@@ -85,6 +90,10 @@ export class ResultsGrid {
   readonly rowToggled = output<number>();
   readonly copyFailed = output<void>();
   readonly cellEdited = output<CellEdit>();
+  readonly filtersRequested = output<void>();
+  protected readonly shortcut = shortcutLabel;
+  protected readonly helpId = `druse-grid-help-${++nextHelpId}`;
+  protected readonly activeCell = signal<CellAnchor>({ row: 0, column: 0 });
 
   protected isRowSelected(row: number): boolean {
     return this.selectedRows().includes(row);
@@ -160,22 +169,176 @@ export class ResultsGrid {
 
   protected readonly isResizing = signal(false);
 
-  private readonly host = inject(ElementRef<HTMLElement>);
+  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly _i18n = inject(I18nService);
+  private readonly injector = inject(Injector);
 
   /**
    * Lleva el teclado a la cuadrícula.
    *
    * Se enfoca una celda y no el contenedor: las flechas, el copiado y la
    * edición cuelgan de la celda, así que enfocar el marco dejaría el foco en un
-   * sitio donde no funciona nada. Si ya había una celda seleccionada se vuelve a
-   * ella; si no, a la primera.
+   * sitio donde no funciona nada. Se recuerda la última celda recorrida; al
+   * filtrar se vuelve a la primera coincidencia de la misma columna.
    */
   focusGrid(): void {
-    const element = this.host.nativeElement as HTMLElement;
-    const seleccionada = element.querySelector<HTMLElement>('.cell--value.is-selected');
+    this.focusCell(this.activeCell());
+  }
 
-    (seleccionada ?? element.querySelector<HTMLElement>('.cell--value'))?.focus();
+  protected cellTabIndex(row: number, column: number): number {
+    const active = this.activeCell();
+    const activeRow = this.visibleRows().length ? active.row : -1;
+    return activeRow === row && active.column === column ? 0 : -1;
+  }
+
+  protected activateCell(row: number, column: number): void {
+    this.activeCell.set({ row, column });
+  }
+
+  private focusCell(position: CellAnchor): void {
+    const row = this.visibleRows().length ? position.row : -1;
+    this.host.nativeElement
+      .querySelector<HTMLElement>(`[data-nav-row="${row}"][data-nav-column="${position.column}"]`)
+      ?.focus();
+  }
+
+  private afterRender(action: () => void): void {
+    afterNextRender(action, { injector: this.injector });
+  }
+
+  protected onCellKeydown(event: KeyboardEvent, row: number, column: number): void {
+    // Los editores, filtros y asas conservan sus propias teclas. La cabecera
+    // ocupa la fila -1 para poder llegar a ella sin sumar paradas de Tab.
+    if (event.target !== event.currentTarget) return;
+    const modifier = event.ctrlKey || event.metaKey;
+    const lastColumn = this.resultSet().columns.length - 1;
+    const lastRow = this.visibleRows().length - 1;
+    let next = { row, column };
+    if (event.key === 'F3') {
+      event.preventDefault();
+      event.stopPropagation();
+      this.filtersRequested.emit();
+      this.afterRender(() =>
+        this.host.nativeElement
+          .querySelectorAll<HTMLInputElement>('.filters__input')
+          [column]?.focus(),
+      );
+      return;
+    }
+    if (event.key === 'F4' && row === -1) {
+      event.preventDefault();
+      event.stopPropagation();
+      this.host.nativeElement.querySelectorAll<HTMLElement>('.cell__resize')[column]?.focus();
+      return;
+    }
+    if (event.key === 'F2' && row >= 0) {
+      event.preventDefault();
+      event.stopPropagation();
+      this.startEditing(this.visibleRows()[row].number, column);
+      return;
+    }
+    if (event.key === ' ' && modifier && row >= 0) {
+      event.preventDefault();
+      event.stopPropagation();
+      this.selectColumn(column, event);
+      return;
+    }
+    if (event.key === ' ' && event.shiftKey && row >= 0) {
+      event.preventDefault();
+      event.stopPropagation();
+      this.clearSelection();
+      this.chosenRows.set([row]);
+      this.lastRow = row;
+      return;
+    }
+    if (event.key === 'Delete' && event.altKey && row >= 0 && this.editable()) {
+      event.preventDefault();
+      event.stopPropagation();
+      this.rowToggled.emit(this.visibleRows()[row].number);
+      return;
+    }
+    if (event.key === 'Enter' && row >= 0 && this.editable()) {
+      event.preventDefault();
+      event.stopPropagation();
+      this.startEditing(this.visibleRows()[row].number, column);
+      return;
+    }
+    if (event.key.toLowerCase() === 'c' && modifier) {
+      event.preventDefault();
+      event.stopPropagation();
+      if (row >= 0) void this.copyShortcut(this.visibleRows()[row], column);
+      else if (event.shiftKey) void this.copyHeaders();
+      else void this.copyAs('excel');
+      return;
+    }
+    switch (event.key) {
+      case 'ArrowUp':
+        next.row--;
+        break;
+      case 'ArrowDown':
+        next.row++;
+        break;
+      case 'ArrowLeft':
+        next.column--;
+        break;
+      case 'ArrowRight':
+        next.column++;
+        break;
+      case 'Home':
+        next.column = 0;
+        if (modifier) next.row = lastRow < 0 ? -1 : 0;
+        break;
+      case 'End':
+        next.column = lastColumn;
+        if (modifier) next.row = lastRow;
+        break;
+      default:
+        return;
+    }
+    event.preventDefault();
+    event.stopPropagation();
+    next = {
+      row: Math.max(-1, Math.min(lastRow, next.row)),
+      column: Math.max(0, Math.min(lastColumn, next.column)),
+    };
+    const anchor = event.shiftKey && row >= 0 ? (this.anchor() ?? { row, column }) : null;
+    this.clearSelection();
+    if (next.row >= 0) {
+      this.anchor.set(anchor ?? next);
+      this.focus.set(next);
+    }
+    this.activeCell.set(next);
+    if (next.row >= this.visibleLimit()) {
+      this.visibleLimit.set(Math.ceil((next.row + 1) / ROW_PAGE_SIZE) * ROW_PAGE_SIZE);
+      this.afterRender(() => this.focusCell(next));
+    } else {
+      this.focusCell(next);
+    }
+  }
+
+  protected leaveControl(event: Event): void {
+    event.preventDefault();
+    event.stopPropagation();
+    this.focusGrid();
+  }
+
+  private resetNavigation(): void {
+    // Las posiciones filtradas representan otras filas: conservar un rango
+    // antiguo podría copiar datos distintos de los que se seleccionaron.
+    const focused = this.host.nativeElement.ownerDocument.activeElement;
+    const restore =
+      focused instanceof HTMLElement &&
+      focused.matches('.cell--value, .cell--head') &&
+      this.host.nativeElement.contains(focused);
+    this.activeCell.set({
+      row: 0,
+      column: Math.min(
+        untracked(this.activeCell).column,
+        Math.max(0, this.resultSet().columns.length - 1),
+      ),
+    });
+    this.clearSelection();
+    if (restore) this.afterRender(() => this.focusGrid());
   }
 
   /**
@@ -206,6 +369,7 @@ export class ResultsGrid {
     this.editing.set(null);
     this.menu.set(null);
     this.visibleLimit.set(ROW_PAGE_SIZE);
+    this.resetNavigation();
 
     // Los anchos son lo único que sobrevive a una ejecución: volver a lanzar la
     // consulta que acabas de ensanchar y encontrarla otra vez estrecha sería
@@ -284,6 +448,7 @@ export class ResultsGrid {
   clearFilters(): void {
     this.filters.set({});
     this.visibleLimit.set(ROW_PAGE_SIZE);
+    this.resetNavigation();
   }
 
   protected readonly renderedRows = computed(() =>
@@ -299,6 +464,7 @@ export class ResultsGrid {
 
     this.filters.update((current) => ({ ...current, [columnIndex]: term }));
     this.visibleLimit.set(ROW_PAGE_SIZE);
+    this.resetNavigation();
   }
 
   protected showMore(): void {
@@ -317,6 +483,8 @@ export class ResultsGrid {
     if (event.button === 2) {
       return;
     }
+
+    this.activateCell(row, column);
 
     this.selectedColumns.set([]);
     this.chosenRows.set([]);
@@ -351,6 +519,8 @@ export class ResultsGrid {
    * y esta, que es lo que hace cualquier lista con selección múltiple.
    */
   protected selectColumn(column: number, event: Event): void {
+    if ((event.currentTarget as HTMLElement | null)?.matches?.('.cell--head'))
+      this.activateCell(-1, column);
     const { shift, toggle } = modifiersOf(event);
 
     this.anchor.set(null);
@@ -612,6 +782,9 @@ export class ResultsGrid {
     if (this.editable()) {
       this.editingChanged = false;
       this.editing.set({ row, column });
+      this.afterRender(() =>
+        this.host.nativeElement.querySelector<HTMLElement>('.cell__editor')?.focus(),
+      );
     }
   }
 

@@ -9,7 +9,8 @@ actual de forma incremental, conservando su diseño y sus protecciones.
 
 Revisión del código de la versión **1.2.1**, sobre el commit **e00b493**.
 La revisión inicial se registró sin implementar las propuestas. **DRU-01 y
-DRU-02 están implementadas en 1.2.2; DRU-03 y DRU-04, en 1.2.3**. Las demás
+DRU-02 están implementadas en 1.2.2; DRU-03 y DRU-04, en 1.2.3; DRU-05 y
+DRU-07, en 1.3.0**. Las demás
 siguen pendientes; los límites de verificación se registran en cada entrega.
 Complementa el [plan de mejoras existente](PLAN_MEJORAS_DRUSE.md), la
 [revisión de interfaz anterior](../revisiones/revision-ui-ux-2026-09-08.md) y el
@@ -254,6 +255,65 @@ inferencias. Verificar streaming y cancelación en el contrato HTTP/SSE.
 [diálogo de proveedores](../../frontend/src/app/features/ai/ai-provider-dialog/ai-provider-dialog.ts).
 
 ## Fase 2 — Facilitar la consulta y la lectura
+
+### Tercera entrega — 1.3.0, 2 de octubre de 2026
+
+- **DRU-05:** búsqueda con espera de 250 ms y cancelación de la lectura anterior;
+  solo la revisión vigente puede actualizar lista, carga y error. Los filtros
+  se conservan al salir y volver al historial. Conexión y base admiten texto
+  literal; se combinan con días locales completos y resultado correcto/fallido.
+  La búsqueda general también encuentra el nombre de la base.
+  Los filtros adicionales se agrupan en una sección desplegable con recuento
+  de filtros activos para dejar espacio a la lista en ventanas pequeñas.
+- Se cargan páginas de 100 entradas con una fila adicional para saber si queda
+  otra página. El cursor usa fecha e identificador para desempatar ejecuciones
+  simultáneas y evitar los desplazamientos de OFFSET. Las consultas nuevas se
+  recuperan al actualizar. Vaciar cancela lecturas pendientes y borra el
+  historial completo, incluso cuando hay filtros. Hay estado de carga, error y
+  reintento; un intervalo invertido se rechaza antes de pedirlo al servidor.
+- Cada entrada muestra su base y permite desplegar el SQL original completo.
+  Abrir una pestaña conserva conexión y base; ninguna de estas acciones ejecuta
+  SQL. El contrato de lista de `/api/history` sigue disponible para los clientes
+  anteriores. Se actualizó OpenAPI con los filtros y la ruta de prueba de
+  respuesta de IA de la entrega anterior. La prueba del contrato encuentra el
+  repositorio también al compilar en una carpeta temporal aislada.
+- **DRU-07:** una celda o cabecera participa en Tab; las flechas, Inicio/Fin y
+  Control/Comando + Inicio/Fin recorren los datos. Mayús amplía un rectángulo;
+  Control/Comando + Espacio selecciona columna y Mayús + Espacio, fila. El
+  tamaño seleccionado se anuncia y el foco tiene un contorno propio.
+- F2 o Intro abre el editor; sus flechas conservan el cursor de texto. F3 abre
+  el filtro de la columna y Escape regresa a la primera coincidencia o a la
+  cabecera si no quedan filas. Filtrar limpia la selección anterior para no
+  copiar otras filas por posición. El avance carga el siguiente bloque al
+  cruzar la fila 500. F4 desde una cabecera permite ajustar su ancho y volver
+  con Escape. Alt + Supr solo señala la fila editable para el flujo existente
+  de vista previa y confirmación de borrado. Ayudas traducidas y modificadores
+  adaptados a la plataforma; los controles de filtro y «Mostrar más» siguen
+  siendo accesibles en el recorrido de Tab.
+- Verificación: TypeScript de aplicación y E2E, guarda de idiomas y **305
+  pruebas de frontend** en ocho archivos; **10 pruebas del almacén de historial**
+  con SQLite, incluido el recorrido de 537 entradas con el mismo instante y una
+  inserción entre páginas; **18 pruebas de integración correctas y tres
+  omitidas** por requerir PostgreSQL, incluidos HTTP de historial y OpenAPI.
+- Navegador: **14 recorridos de SQLite y dos del historial**. El historial se
+  comprueba en español e inglés con 537 entradas simuladas, filtros combinados,
+  respuesta antigua retrasada, fallo/reintento y borrado. Desplegar SQL y abrir
+  una pestaña no envían consultas. La cuadrícula usa una consulta real de SQLite
+  con 502 filas: selección y copia, Control + Fin, F3, filtro vacío, Escape,
+  salida con Tab y ajuste de ancho por teclado. La edición real con F2 conserva
+  las comprobaciones de texto NULL, vacío y nulo de la entrega anterior.
+- Capturas: historial y cuadrícula a 1440 × 960 en oscuro y 900 × 760 en claro;
+  el barrido incorpora SQL completo y selección con teclado. La primera pasada
+  nueva encontró dos problemas del arnés: un selector de etiqueta que incluía
+  las opciones del desplegable y los saltos CRLF del portapapeles de Windows.
+  Se corrigieron y los casos nuevos se repitieron. La inspección de la ventana
+  pequeña motivó agrupar los filtros; se repitió la comprobación tras ese ajuste.
+- Límites: quedan pendientes lector de pantalla y Tauri/WebView2. La navegación
+  con Control/Comando + Fin sigue acumulando el DOM hasta la última fila del
+  resultado cargado; no sustituye el trabajo de medición y ventana de filas de
+  DRU-10. Los filtros de historial se comprueban sobre el SQLite local, sin
+  depender del motor donde se ejecutó el SQL. No se repitió inferencia externa
+  ni se declara resuelto el rechazo de 6.1.
 
 ### DRU-05 — Historial útil y búsqueda sin carreras
 
@@ -530,7 +590,8 @@ completar todo el plan.
 - Registrar aquí o en la bitácora qué criterio pasó, qué evidencia se obtuvo y
   qué quedó pendiente; una casilla histórica no sustituye una comprobación actual.
 
-Estado inicial: **DRU-01 a DRU-15 pendientes**. Estado tras las dos primeras
-entregas: **DRU-01 a DRU-04 implementadas; DRU-05 a DRU-15 pendientes**.
+Estado inicial: **DRU-01 a DRU-15 pendientes**. Estado tras las tres primeras
+entregas: **DRU-01 a DRU-05 y DRU-07 implementadas; DRU-06 y DRU-08 a
+DRU-15 pendientes**.
 La comprobación nativa y de otros motores de las entregas implementadas sigue
 pendiente y se mantiene explícita arriba.

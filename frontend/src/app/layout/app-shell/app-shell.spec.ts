@@ -1,10 +1,12 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { By } from '@angular/platform-browser';
 import { of } from 'rxjs';
 
 import { ApplicationGateway } from '../../core/application-gateway/application-gateway';
 import { WorkspaceStore } from '../../core/workspace/workspace-store';
 import { ConnectionForm, DatabaseObject } from '../../shared/models/workspace';
 import { AppShell } from './app-shell';
+import { ResultsPanel } from '../../features/query-results/results-panel/results-panel';
 
 /** Gateway que no habla con nadie: el shell debe montarse sin API detrás. */
 function silentGateway(): Partial<ApplicationGateway> {
@@ -127,6 +129,31 @@ describe('AppShell', () => {
     fixture = TestBed.createComponent(AppShell);
     element = fixture.nativeElement as HTMLElement;
     await fixture.whenStable();
+  });
+
+  it('recupera el SQL del historial con su conexión y base sin ejecutarlo', async () => {
+    const panel = fixture.debugElement.query(By.directive(ResultsPanel))
+      .componentInstance as ResultsPanel;
+    const store = TestBed.inject(WorkspaceStore);
+    const execute = vi.spyOn(store, 'execute');
+    panel.reuseQuery.emit({
+      id: 'historial',
+      connectionId: 'conexion-original',
+      connectionName: 'Origen',
+      database: 'otra_base',
+      sql: 'SELECT 1;',
+      executedAtUtc: '2026-10-02T12:00:00Z',
+      durationMs: 1,
+      succeeded: true,
+    });
+    await fixture.whenStable();
+    expect(store.activeTab()).toMatchObject({
+      sql: 'SELECT 1;',
+      connectionId: 'conexion-original',
+      database: 'otra_base',
+      title: 'Historial · Consulta',
+    });
+    expect(execute).not.toHaveBeenCalled();
   });
 
   it('reproduce las cinco zonas del mockup', () => {

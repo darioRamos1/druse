@@ -65,6 +65,7 @@ import {
   ForeignKeyDesign,
   KnownColumn,
   QueryHistoryEntry,
+  QueryHistoryFilter,
   SavedConnection,
   SessionStatus,
 } from '../../shared/models/workspace';
@@ -929,6 +930,10 @@ export class AppShell {
   protected readonly rejection = this._store.rejection;
   protected readonly notice = this._store.notice;
   protected readonly history = this._store.history;
+  protected readonly historyFilter = this._store.historyFilter;
+  protected readonly historyLoading = this._store.historyLoading;
+  protected readonly historyError = this._store.historyError;
+  protected readonly historyHasMore = this._store.historyHasMore;
   protected readonly exporting = this._store.exporting;
   protected readonly transaction = this._store.transaction;
   protected readonly transactionBusy = this._store.transactionBusy;
@@ -1691,8 +1696,12 @@ export class AppShell {
     void this._store.loadHistory();
   }
 
-  protected searchHistory(term: string): void {
-    void this._store.loadHistory(term);
+  protected searchHistory(filter: QueryHistoryFilter): void {
+    this._store.searchHistory(filter);
+  }
+
+  protected moreHistory(): void {
+    void this._store.loadMoreHistory();
   }
 
   protected clearHistory(): void {
@@ -1705,7 +1714,7 @@ export class AppShell {
       entry.sql,
       undefined,
       entry.connectionId,
-      'Historial · Consulta',
+      this._i18n.t('history.tabTitle'),
       entry.database,
     );
   }

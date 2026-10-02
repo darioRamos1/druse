@@ -554,6 +554,117 @@ describe('WorkspaceStore', () => {
     store = TestBed.inject(WorkspaceStore);
   });
 
+  describe('historial vigente y paginado', () => {
+    const entrada = (id: string): QueryHistoryEntry => ({
+      id,
+      connectionName: 'Local',
+      database: 'ventas',
+      sql: `SELECT '${id}'`,
+      executedAtUtc: '2026-10-02T12:00:00Z',
+      durationMs: 1,
+      succeeded: true,
+    });
+    it('cancela la búsqueda anterior y una respuesta tardía no reemplaza la vigente', async () => {
+      const antigua = new Subject<readonly QueryHistoryEntry[]>();
+      const vigente = new Subject<readonly QueryHistoryEntry[]>();
+      vi.spyOn(gateway, 'getHistory').mockReturnValueOnce(antigua).mockReturnValueOnce(vigente);
+      const pending = store.loadHistory({ search: 'antigua' });
+      const current = store.loadHistory({ search: 'vigente' });
+      expect(antigua.observed).toBe(false);
+      vigente.next([entrada('vigente')]);
+      vigente.complete();
+      antigua.next([entrada('antigua')]);
+      await Promise.all([pending, current]);
+      expect(store.history().map((entry) => entry.id)).toEqual(['vigente']);
+      expect(store.historyLoading()).toBe(false);
+    });
+    it('agrupa pulsaciones rápidas y conserva los filtros al actualizar', async () => {
+      vi.useFakeTimers();
+      try {
+        const get = vi.spyOn(gateway, 'getHistory');
+        store.searchHistory({ search: 'primera' });
+        store.searchHistory({ search: 'final', database: 'ventas', succeeded: false });
+        expect(get).not.toHaveBeenCalled();
+        await vi.advanceTimersByTimeAsync(250);
+        expect(get).toHaveBeenCalledTimes(1);
+        expect(get.mock.calls[0]).toEqual([
+          'final',
+          {
+            search: 'final',
+            database: 'ventas',
+            succeeded: false,
+            limit: 101,
+            before: undefined,
+            beforeId: undefined,
+          },
+        ]);
+        await store.loadHistory();
+        expect(store.historyFilter().database).toBe('ventas');
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+    it('elimina resultados al cambiar el término incluso durante la espera', async () => {
+      await store.loadHistory();
+      vi.spyOn(gateway, 'getHistory').mockReturnValue(of([entrada('vieja')]));
+      await store.loadHistory();
+      store.searchHistory({ search: '' });
+      expect(store.history()).toEqual([]);
+      expect(store.historyLoading()).toBe(true);
+    });
+    it('pide más entradas desde la última visible y no añade la fila de sondeo', async () => {
+      const get = vi
+        .spyOn(gateway, 'getHistory')
+        .mockReturnValueOnce(of(Array.from({ length: 101 }, (_, i) => entrada(`${i}`))))
+        .mockReturnValueOnce(of([entrada('100'), entrada('101')]));
+      await store.loadHistory({ database: 'ventas' });
+      expect(store.history().length).toBe(100);
+      expect(store.historyHasMore()).toBe(true);
+      await store.loadMoreHistory();
+      expect(get.mock.calls[1]).toEqual([
+        undefined,
+        { database: 'ventas', limit: 101, before: '2026-10-02T12:00:00Z', beforeId: '99' },
+      ]);
+      expect(store.history().length).toBe(102);
+      expect(store.historyHasMore()).toBe(false);
+    });
+    it('un fallo se muestra en el historial y permite reintentar', async () => {
+      vi.spyOn(gateway, 'getHistory')
+        .mockReturnValueOnce(
+          throwError(
+            () =>
+              new HttpErrorResponse({ status: 500, error: { message: 'historial inaccesible' } }),
+          ),
+        )
+        .mockReturnValueOnce(of([entrada('recuperada')]));
+      await store.loadHistory();
+      expect(store.historyError()).toContain('historial inaccesible');
+      expect(store.historyLoading()).toBe(false);
+      await store.loadHistory();
+      expect(store.historyError()).toBeNull();
+      expect(store.history()[0].id).toBe('recuperada');
+    });
+    it('vaciar cancela las lecturas pendientes y no permite repoblar la lista', async () => {
+      const pending = new Subject<readonly QueryHistoryEntry[]>();
+      vi.spyOn(gateway, 'getHistory').mockReturnValue(pending);
+      const loaded = store.loadHistory();
+      await store.clearHistory();
+      await loaded;
+      pending.next([entrada('antigua')]);
+      expect(pending.observed).toBe(false);
+      expect(store.history()).toEqual([]);
+      expect(store.historyHasMore()).toBe(false);
+      expect(store.historyLoading()).toBe(false);
+    });
+    it('rechaza un intervalo invertido antes de pedirlo al servidor', async () => {
+      const get = vi.spyOn(gateway, 'getHistory');
+      await store.loadHistory({ from: '2026-10-03', until: '2026-10-02' });
+      expect(get).not.toHaveBeenCalled();
+      expect(store.historyError()).toContain('Hasta');
+      expect(store.historyLoading()).toBe(false);
+    });
+  });
+
   describe('conexión', () => {
     it('deja la conexión activa y carga el primer nivel', async () => {
       const connected = await store.connect(form);

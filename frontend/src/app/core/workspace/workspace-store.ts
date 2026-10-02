@@ -1,4 +1,4 @@
-import { Injectable, computed, inject, signal } from '@angular/core';
+import { DestroyRef, Injectable, computed, inject, signal } from '@angular/core';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Observable, firstValueFrom } from 'rxjs';
 
@@ -41,6 +41,7 @@ import {
   EngineInfo,
   ExplorerNode,
   QueryHistoryEntry,
+  QueryHistoryFilter,
   QueryTab,
   CellEdit,
   EditableTable,
@@ -674,6 +675,18 @@ export class WorkspaceStore {
 
   private readonly _history = signal<readonly QueryHistoryEntry[]>([]);
   readonly history = this._history.asReadonly();
+  readonly historyLoading = signal(false);
+  readonly historyError = signal<string | null>(null);
+  readonly historyHasMore = signal(false);
+  readonly historyFilter = signal<QueryHistoryFilter>({});
+  private historyTimer: ReturnType<typeof setTimeout> | undefined;
+  private historyRevision = 0;
+  private cancelHistory: (() => void) | null = null;
+  private clearingHistory = false;
+  private readonly historyCleanup = inject(DestroyRef).onDestroy(() => {
+    this.cancelHistory?.();
+    clearTimeout(this.historyTimer);
+  });
 
   /**
    * Perfiles guardados, completos.
@@ -823,20 +836,93 @@ export class WorkspaceStore {
     this._explorer.forget(connectionId);
   }
 
-  async loadHistory(search?: string): Promise<void> {
-    try {
-      this._history.set(await firstValueFrom(this._gateway.getHistory(search)));
-    } catch (error) {
-      this._notices.set(describeError(error, this._i18n));
+  loadHistory(filter?: QueryHistoryFilter): Promise<void> {
+    clearTimeout(this.historyTimer);
+    this.historyFilter.set(filter ?? this.historyFilter());
+    if (this.clearingHistory) return Promise.resolve();
+    this._history.set([]);
+    this.historyHasMore.set(false);
+    return this.fetchHistory(false);
+  }
+
+  searchHistory(filter: QueryHistoryFilter): void {
+    this.historyFilter.set(filter);
+    clearTimeout(this.historyTimer);
+    this.cancelHistory?.();
+    ++this.historyRevision;
+    this._history.set([]);
+    this.historyHasMore.set(false);
+    this.historyError.set(null);
+    this.historyLoading.set(true);
+    this.historyTimer = setTimeout(() => void this.loadHistory(), 250);
+  }
+
+  loadMoreHistory(): Promise<void> {
+    if (this.historyLoading() || !this.historyHasMore()) return Promise.resolve();
+    return this.fetchHistory(true);
+  }
+
+  private fetchHistory(append: boolean): Promise<void> {
+    this.cancelHistory?.();
+    const revision = ++this.historyRevision;
+    const last = append ? this._history().at(-1) : undefined;
+    const filter = {
+      ...this.historyFilter(),
+      limit: 101,
+      before: last?.executedAtUtc,
+      beforeId: last?.id,
+    };
+    this.historyLoading.set(true);
+    this.historyError.set(null);
+    if (filter.from && filter.until && filter.from > filter.until) {
+      this.historyError.set(this._i18n.t('history.invalidDates'));
+      this.historyLoading.set(false);
+      return Promise.resolve();
     }
+    return new Promise<void>((resolve) => {
+      const subscription = this._gateway.getHistory(filter.search, filter).subscribe({
+        next: (entries) => {
+          if (revision !== this.historyRevision) return;
+          const page = entries.slice(0, 100);
+          this._history.update((current) => (append ? [...current, ...page] : page));
+          this.historyHasMore.set(entries.length > 100);
+        },
+        error: (error) => {
+          if (revision === this.historyRevision) {
+            this.historyError.set(describeError(error, this._i18n));
+            this.historyLoading.set(false);
+          }
+          resolve();
+        },
+        complete: () => {
+          if (revision === this.historyRevision) this.historyLoading.set(false);
+          resolve();
+        },
+      });
+      this.cancelHistory = () => {
+        subscription.unsubscribe();
+        resolve();
+      };
+    });
   }
 
   async clearHistory(): Promise<void> {
+    if (this.clearingHistory) return;
+    this.clearingHistory = true;
+    clearTimeout(this.historyTimer);
+    this.cancelHistory?.();
+    ++this.historyRevision;
+    this.historyLoading.set(true);
+    this.historyError.set(null);
     try {
       await firstValueFrom(this._gateway.clearHistory());
       this._history.set([]);
+      this.historyHasMore.set(false);
     } catch (error) {
-      this._notices.set(describeError(error, this._i18n));
+      this.historyError.set(describeError(error, this._i18n));
+    } finally {
+      this.clearingHistory = false;
+      this.historyLoading.set(false);
     }
   }
 

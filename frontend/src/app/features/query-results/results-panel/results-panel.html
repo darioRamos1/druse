@@ -286,6 +286,7 @@
         (copyFailed)="copyFailed.emit()"
         (cellEdited)="cellEdited.emit($event)"
         (rowToggled)="rowToggled.emit($event)"
+        (filtersRequested)="showFilters.set(true)"
       />
 
       @if (selectedRows().length > 0) {
@@ -512,6 +513,12 @@
   @default {
     <app-query-history
       [entries]="history()"
+      [filter]="historyFilter()"
+      [loading]="historyLoading()"
+      [error]="historyError()"
+      [hasMore]="historyHasMore()"
+      (more)="moreHistory.emit()"
+      (retry)="refreshHistory.emit()"
       (search)="searchHistory.emit($event)"
       (clear)="clearHistory.emit()"
       (reuse)="reuseQuery.emit($event)"

@@ -125,6 +125,9 @@ test.describe('barrido visual', () => {
     });
     await medir(page, 'resultados', hallazgos);
     await foto(page, '01-resultados');
+    await page.locator('app-results-grid .cell--value').first().focus();
+    await page.keyboard.press('Shift+ArrowRight');
+    await foto(page, '01a-cuadricula-teclado');
 
     await page.getByRole('button', { name: 'Filtros', exact: true }).click();
     await page.getByRole('searchbox', { name: 'Filtrar numero', exact: true }).fill('1');
@@ -151,6 +154,11 @@ test.describe('barrido visual', () => {
     await page.waitForTimeout(400);
     await medir(page, 'historial', hallazgos);
     await foto(page, '03-historial');
+    const detalleHistorial = page.locator('app-query-history .item__detail > summary').first();
+    if (await detalleHistorial.count()) {
+      await detalleHistorial.click();
+      await foto(page, '03-historial-sql-completo');
+    }
 
     await page.locator('app-results-panel').getByText('Resultados').first().click();
 

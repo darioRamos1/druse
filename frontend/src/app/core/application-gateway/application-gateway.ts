@@ -8,6 +8,7 @@ import {
   EngineInfo,
   IndexCapabilities,
   QueryHistoryEntry,
+  QueryHistoryFilter,
   QueryResult,
   SavedConnection,
   SecretStoreStatus,
@@ -492,7 +493,10 @@ export abstract class ApplicationGateway {
 
   // --- Historial y preferencias ---------------------------------------------
 
-  abstract getHistory(search?: string): Observable<readonly QueryHistoryEntry[]>;
+  abstract getHistory(
+    search?: string,
+    filter?: QueryHistoryFilter,
+  ): Observable<readonly QueryHistoryEntry[]>;
 
   abstract clearHistory(): Observable<void>;
 

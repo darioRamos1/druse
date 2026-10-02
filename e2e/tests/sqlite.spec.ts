@@ -176,6 +176,70 @@ async function hastaLasTablas(page: Page) {
 }
 
 test.describe('SQLite de punta a punta', () => {
+  test('las flechas recorren el resultado, cargan filas y los filtros devuelven el foco', async ({ page, context }) => {
+    await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+    await abrir(page);
+    await conectado(page);
+    await page.locator('app-editor-toolbar .limits .chip').click();
+    await page.getByLabel('Límite de filas', { exact: true }).selectOption('1000');
+    await page.keyboard.press('Escape');
+    await escribirSql(page, "WITH RECURSIVE numeros(n) AS (SELECT 1 UNION ALL SELECT n + 1 FROM numeros WHERE n < 502) SELECT n AS numero, 'fila ' || n AS etiqueta FROM numeros;");
+    await ejecutar(page, 'todo');
+    const grid = page.locator('app-results-grid');
+    const cell = (row: number, column: number) => grid.locator(`[data-nav-row="${row}"][data-nav-column="${column}"]`);
+    await cell(0, 0).focus();
+    await page.keyboard.press('Shift+ArrowRight');
+    await page.keyboard.press('Shift+ArrowDown');
+    await expect(grid.locator('.cell--value.is-selected')).toHaveCount(4);
+    await page.keyboard.press('Control+c');
+    await expect.poll(() => page.evaluate(async () => (await navigator.clipboard.readText()).replace(/\r\n/g, '\n'))).toBe('numero\tetiqueta\n1\tfila 1\n2\tfila 2');
+    await page.keyboard.press('Control+End');
+    await expect(cell(501, 1)).toBeFocused();
+    await expect(cell(501, 1)).toHaveText('fila 502');
+    await expect(grid.locator('[data-nav-row][tabindex="0"]')).toHaveCount(1);
+    await page.keyboard.press('F3');
+    const filter = grid.getByRole('searchbox', { name: 'Filtrar etiqueta', exact: true });
+    await expect(filter).toBeFocused();
+    await filter.fill('fila 502');
+    await page.keyboard.press('Escape');
+    await expect(cell(0, 1)).toBeFocused();
+    await expect(cell(0, 1)).toHaveText('fila 502');
+    await page.keyboard.press('Tab');
+    await expect(cell(0, 1)).not.toBeFocused();
+    expect(await grid.locator('.cell--value').evaluateAll((cells) => cells.some((cell) => cell === document.activeElement))).toBe(false);
+    const capture = async (name: string) => {
+      if (!process.env['DRUSE_BARRIDO']) return;
+      mkdirSync(BARRIDO, { recursive: true });
+      await page.screenshot({ path: join(BARRIDO, `${name}.png`) });
+    };
+    await page.getByRole('button', { name: 'Tema oscuro', exact: true }).click();
+    await page.setViewportSize({ width: 1440, height: 960 });
+    await cell(0, 1).focus();
+    await page.keyboard.press('ArrowLeft');
+    await page.keyboard.press('ArrowRight');
+    await capture('cuadricula-teclado-oscuro-1440');
+    await filter.fill('no coincide');
+    await filter.press('Escape');
+    await expect(cell(-1, 1)).toBeFocused();
+    await page.getByRole('button', { name: 'Limpiar filtros', exact: true }).click();
+    await page.getByRole('button', { name: 'Filtros', exact: true }).click();
+    await cell(-1, 0).focus();
+    await page.keyboard.press('F4');
+    const handle = grid.getByRole('separator', { name: 'Ajustar el ancho de numero', exact: true });
+    await expect(handle).toBeFocused();
+    await page.keyboard.press('ArrowRight');
+    await page.keyboard.press('Escape');
+    await expect(cell(-1, 0)).toBeFocused();
+    await page.getByRole('button', { name: 'Tema claro', exact: true }).click();
+    await page.setViewportSize({ width: 900, height: 760 });
+    await cell(0, 0).focus();
+    await page.keyboard.press('ArrowRight');
+    await capture('cuadricula-teclado-claro-900');
+    await page.locator('app-editor-toolbar .limits .chip').click();
+    await page.getByLabel('Límite de filas', { exact: true }).selectOption('500');
+    await page.keyboard.press('Escape');
+  });
+
   test('guardar distingue el texto NULL, la cadena vacía y el nulo sin tocar otros valores', async ({
     page,
   }) => {
@@ -219,7 +283,9 @@ test.describe('SQLite de punta a punta', () => {
       await expect(page.locator('app-results-panel .edits')).toHaveCount(0);
       await expect.poll(read).toBe(expected);
     };
-    await value.dblclick();
+    await value.focus();
+    await page.keyboard.press('F2');
+    await expect(value.locator('.cell__editor')).toBeFocused();
     await value.locator('.cell__editor').fill('NULL');
     await value.locator('.cell__editor').press('Enter');
     await expect(value.locator('.cell__editor')).toHaveCount(0);

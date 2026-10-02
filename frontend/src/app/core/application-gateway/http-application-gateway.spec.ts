@@ -1,9 +1,40 @@
 import { HttpClient } from '@angular/common/http';
 import { TestBed } from '@angular/core/testing';
-import { lastValueFrom, toArray } from 'rxjs';
+import { lastValueFrom, of, toArray } from 'rxjs';
 import { AiStreamEvent, SaveAiProviderRequest } from '../../shared/models/ai';
 import { DesktopHost } from './desktop-host';
 import { HttpApplicationGateway } from './http-application-gateway';
+
+describe('filtros HTTP del historial', () => {
+  it('envía días locales completos, comodines literales, resultado y cursor', () => {
+    const get = vi.fn().mockReturnValue(of([]));
+    TestBed.configureTestingModule({
+      providers: [
+        HttpApplicationGateway,
+        { provide: HttpClient, useValue: { get } },
+        { provide: DesktopHost, useValue: {} },
+      ],
+    });
+    const gateway = TestBed.inject(HttpApplicationGateway);
+    gateway.getHistory('SELECT 100%', {
+      from: '2026-10-02',
+      until: '2026-10-02',
+      connection: 'A&B',
+      database: 'ventas_',
+      succeeded: false,
+      limit: 101,
+      before: '2026-10-02T12:00:00+00:00',
+      beforeId: 'cursor',
+    });
+    const parameters = new URL(get.mock.calls[0][0], 'http://localhost').searchParams;
+    expect(parameters.get('from')).toBe(new Date('2026-10-02T00:00:00').toISOString());
+    expect(parameters.get('until')).toBe(new Date('2026-10-03T00:00:00').toISOString());
+    expect(parameters.get('succeeded')).toBe('false');
+    expect(parameters.get('before')).toBe('2026-10-02T12:00:00+00:00');
+    expect(parameters.get('search')).toBe('SELECT 100%');
+    expect(parameters.get('connection')).toBe('A&B');
+  });
+});
 
 describe('contrato SSE de las pruebas de IA', () => {
   let gateway: HttpApplicationGateway;

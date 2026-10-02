@@ -21,6 +21,7 @@ import { shortcutLabel } from '../../../core/shortcuts/shortcut-label';
 import {
   CellEdit,
   QueryHistoryEntry,
+  QueryHistoryFilter,
   QueryResult,
   ResultSet,
 } from '../../../shared/models/workspace';
@@ -50,6 +51,10 @@ export class ResultsPanel {
   readonly resultSet = input<ResultSet | null>(null);
   readonly result = input<QueryResult | null>(null);
   readonly history = input<readonly QueryHistoryEntry[]>([]);
+  readonly historyFilter = input<QueryHistoryFilter>({});
+  readonly historyLoading = input(false);
+  readonly historyError = input<string | null>(null);
+  readonly historyHasMore = input(false);
   readonly pageSize = input(500);
   readonly running = input(false);
   readonly canceling = input(false);
@@ -73,7 +78,8 @@ export class ResultsPanel {
   readonly saving = input(false);
 
   readonly refreshHistory = output<void>();
-  readonly searchHistory = output<string>();
+  readonly searchHistory = output<QueryHistoryFilter>();
+  readonly moreHistory = output<void>();
   readonly clearHistory = output<void>();
   readonly reuseQuery = output<QueryHistoryEntry>();
   readonly exportAs = output<ExportFormat>();
