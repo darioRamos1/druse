@@ -7,6 +7,7 @@ empieza por el [README principal](../README.md).
 
 - [Plan maestro](planes/PLAN_TRABAJO_DRUSE.md): alcance, arquitectura y fases.
 - [Plan de mejoras](planes/PLAN_MEJORAS_DRUSE.md): fiabilidad y trabajo pendiente.
+- [Plan de interfaz y funcionalidad — 2 de octubre de 2026](planes/plan-ui-funcionalidad-2026-10-02.md): revisión actual, prioridades y criterios de aceptación.
 - [Bitácora de sesiones](seguimiento/BITACORA.md): avances y próximos pasos.
 - [Mejoras visuales](planes/plan-mejoras-visuales.md).
 - [Diagramas entidad-relación](planes/plan-mer-y-diagramas.md).
