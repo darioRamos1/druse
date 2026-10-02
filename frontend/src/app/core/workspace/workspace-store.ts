@@ -1073,9 +1073,13 @@ export class WorkspaceStore {
     if (this._savingEdits()) {
       return;
     }
+    const result = this.resultSet();
+    const index = result?.columns.findIndex((column) => column.name === edit.column) ?? -1;
+    const row = result?.rows.find((row) => row.number === edit.row);
+    const original = row && index >= 0 ? row.values[index] : undefined;
     this._edits.update((current) => [
       ...current.filter((item) => !(item.row === edit.row && item.column === edit.column)),
-      edit,
+      ...(edit.value === original ? [] : [edit]),
     ]);
     this._editPreview.set(null);
   }

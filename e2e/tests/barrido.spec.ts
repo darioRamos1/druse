@@ -1,7 +1,8 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 
-import { abrir, apuntarPestana, conectar, ejecutar, escribirSql } from '../support/druse';
+import { abrir, apuntarPestana, conectar, ejecutar, escribirSql, situarCursor } from '../support/druse';
 import { medir } from '../support/medir';
+import { comprobarDiagnosticoIa, prepararDiagnosticoIa } from '../support/ai-diagnostics';
 
 /**
  * Barrido visual de toda la aplicación: recorre pantallas y diálogos, los
@@ -437,6 +438,16 @@ test.describe('barrido visual', () => {
     // --- El asistente de una tabla, con sus pasos --------------------------
     await desplegar(page, 'Tables', 'accionista');
     await menuDe(page, 'accionista');
+    await page.getByRole('menuitem', { name: 'Abrir SELECT', exact: true }).click();
+    await situarCursor(page, 1, 1);
+    await ejecutar(page, 'todo');
+    const celdaEditable = page.locator('app-results-grid .cell--value.is-editable').first();
+    if (await celdaEditable.count()) {
+      await celdaEditable.dblclick();
+      await foto(page, '12c-celda-con-nulo-explicito');
+      await celdaEditable.locator('.cell__editor').press('Escape');
+    }
+    await menuDe(page, 'accionista');
     await page.getByRole('menuitem', { name: 'Migrar datos a…' }).click();
 
     const traslado = page.locator('app-transfer-dialog');
@@ -551,6 +562,8 @@ test.describe('barrido visual', () => {
     }
 
     // --- El asistente ------------------------------------------------------
+    // El diagnóstico visual usa un proveedor simulado para no gastar cuota.
+    await prepararDiagnosticoIa(page);
     await page.getByRole('button', { name: 'Asistente', exact: true }).click();
 
     const asistente = page.locator('app-ai-panel');
@@ -592,6 +605,7 @@ test.describe('barrido visual', () => {
     await page.waitForTimeout(500);
     await medir(page, 'proveedor de IA', hallazgos);
     await foto(page, '15-proveedor-ia', proveedores.locator('.dialog'));
+    await comprobarDiagnosticoIa(page, name => foto(page, `15b-${name}`, proveedores.locator('.dialog')));
     await cerrar(page, proveedores, 'proveedor de IA');
 
     await page.getByRole('button', { name: 'Asistente', exact: true }).click();

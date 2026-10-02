@@ -765,6 +765,7 @@ export abstract class ApplicationGateway {
    * escrito la pregunta es descubrirlo tarde.
    */
   abstract testAiProvider(request: SaveAiProviderRequest): Observable<AiProbeResult>;
+  abstract streamAiProviderTest(request: SaveAiProviderRequest): Observable<AiStreamEvent>;
 
   /**
    * Los modelos que ese proveedor tiene desplegados.

@@ -3,6 +3,7 @@ import { Subscription } from 'rxjs';
 
 import { ApplicationGateway } from '../application-gateway/application-gateway';
 import { I18nService } from '../i18n/i18n.service';
+import { aiFailureMessage } from './ai-failure';
 import {
   AiMessage,
   AiProvider,
@@ -18,6 +19,7 @@ export interface ChatTurn {
   readonly streaming?: boolean;
   /** El proveedor falló a media respuesta. Se enseña debajo de lo que sí llegó. */
   readonly error?: string;
+  readonly errorDetail?: string;
 }
 
 /**
@@ -133,7 +135,7 @@ export class AiStore {
           if (event.kind === 'chunk') {
             this.appendToLast(event.text);
           } else if (event.kind === 'error') {
-            this.failLast(event.message);
+            this.failLast(aiFailureMessage(event, this._i18n), event.detail ?? event.message);
           }
         },
         error: (error: unknown) => {
@@ -173,7 +175,7 @@ export class AiStore {
     });
   }
 
-  private failLast(message: string): void {
+  private failLast(message: string, detail?: string): void {
     this._turns.update((turns) => {
       if (turns.length === 0) {
         return turns;
@@ -181,7 +183,10 @@ export class AiStore {
 
       const last = turns[turns.length - 1];
 
-      return [...turns.slice(0, -1), { ...last, streaming: false, error: message }];
+      return [
+        ...turns.slice(0, -1),
+        { ...last, streaming: false, error: message, errorDetail: detail },
+      ];
     });
   }
 

@@ -92,6 +92,7 @@ export class ResultsGrid {
 
   /** Celda que se está escribiendo ahora mismo. */
   protected readonly editing = signal<CellPosition | null>(null);
+  private editingChanged = false;
 
   /** Filtro escrito por el usuario en cada columna, por índice. */
   protected readonly filters = signal<Readonly<Record<number, string | undefined>>>({});
@@ -609,6 +610,7 @@ export class ResultsGrid {
   /** Empieza a editar una celda, si aquí se puede. */
   protected startEditing(row: number, column: number): void {
     if (this.editable()) {
+      this.editingChanged = false;
       this.editing.set({ row, column });
     }
   }
@@ -642,9 +644,6 @@ export class ResultsGrid {
       date: 'date',
       time: 'time',
       datetime: 'datetime-local',
-      datetimeOffset: 'datetime-local',
-      integer: 'number',
-      decimal: 'number',
     };
 
     const tipo = nativo[column.inputKind ?? 'text'];
@@ -653,14 +652,13 @@ export class ResultsGrid {
       return 'text';
     }
 
-    const encaja: Readonly<Record<string, RegExp>> = {
-      date: /^\d{4}-\d{2}-\d{2}$/,
-      time: /^\d{2}:\d{2}(:\d{2})?$/,
-      'datetime-local': /^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}/,
-      number: /^-?\d*[.]?\d+([eE][-+]?\d+)?$/,
-    };
-
-    return encaja[tipo].test(value.trim()) ? tipo : 'text';
+    // El navegador normaliza segundos, fracciones y separadores. Solo se usa
+    // su control si la ida y la vuelta conservan el valor entero, sin recortar.
+    // Los números quedan como texto para evitar redondeos al usar las flechas.
+    const input = document.createElement('input');
+    input.type = tipo;
+    input.value = value;
+    return value.length > 0 && input.value === value ? tipo : 'text';
   }
 
   /** Lo que hay que mostrar: el cambio pendiente si lo hay, o el valor original. */
@@ -675,24 +673,69 @@ export class ResultsGrid {
    *
    * Un campo vacío se guarda como cadena vacía, no como NULL: son cosas
    * distintas y confundirlas al escribir sería la peor forma de descubrirlo.
-   * Para poner NULL se escribe la palabra, que es lo que la cuadrícula muestra.
+   * Los nulos se ponen con su acción explícita; escribir NULL conserva el texto.
    */
   protected commitEdit(row: ResultRow, columnIndex: number, event: Event): void {
+    event.stopPropagation();
+    const cell = (event.target as HTMLElement).closest<HTMLElement>('.cell--value');
+    if (
+      event instanceof FocusEvent &&
+      event.relatedTarget instanceof Node &&
+      cell?.contains(event.relatedTarget)
+    ) {
+      return;
+    }
+    if (!this.isEditing(row.number, columnIndex)) {
+      return;
+    }
     this.editing.set(null);
 
-    const escrito = (event.target as HTMLInputElement).value;
-    const column = this.resultSet().columns[columnIndex];
-    const value = escrito === 'NULL' ? null : escrito;
-
-    if (value === row.values[columnIndex]) {
+    // Un control puede normalizar el valor al abrirlo. Sin una intervención
+    // del usuario eso nunca autoriza a cambiar fechas, saltos de línea o nulos.
+    if (!this.editingChanged) {
       return;
     }
 
-    this.cellEdited.emit({ row: row.number, column: column.name, value });
+    const control = cell?.querySelector<HTMLTextAreaElement | HTMLInputElement>('.cell__editor');
+    const escrito = control?.value ?? (event.target as HTMLInputElement).value;
+    const column = this.resultSet().columns[columnIndex];
+    if (escrito === this.shownValue(row, columnIndex)) {
+      return;
+    }
+
+    this.cellEdited.emit({ row: row.number, column: column.name, value: escrito });
   }
 
-  protected cancelEdit(): void {
+  protected markEdited(): void {
+    this.editingChanged = true;
+  }
+
+  protected commitOnEnter(row: ResultRow, columnIndex: number, event: Event): void {
+    event.stopPropagation();
+    if (!(event as KeyboardEvent).shiftKey) {
+      event.preventDefault();
+      this.commitEdit(row, columnIndex, event);
+      (event.target as HTMLElement).closest<HTMLElement>('.cell--value')?.focus();
+    }
+  }
+
+  protected setNull(row: ResultRow, columnIndex: number, event: Event): void {
+    event.stopPropagation();
     this.editing.set(null);
+    if (this.shownValue(row, columnIndex) !== null) {
+      this.cellEdited.emit({
+        row: row.number,
+        column: this.resultSet().columns[columnIndex].name,
+        value: null,
+      });
+    }
+    (event.target as HTMLElement).closest<HTMLElement>('.cell--value')?.focus();
+  }
+
+  protected cancelEdit(event: Event): void {
+    event.stopPropagation();
+    this.editing.set(null);
+    (event.target as HTMLElement).closest<HTMLElement>('.cell--value')?.focus();
   }
 
   /** Rectángulo seleccionado, ya con las esquinas ordenadas. */

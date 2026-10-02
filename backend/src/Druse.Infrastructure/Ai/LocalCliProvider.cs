@@ -164,7 +164,7 @@ public sealed class LocalCliProvider(ICliSession sessions) : IAiProvider
 
         if (failure is not null)
         {
-            throw new InvalidOperationException(failure);
+            throw new AiProviderException(failure, reader.FailureDetail ?? failure);
         }
 
         // Un programa que muere sin escribir nada útil deja al usuario mirando
@@ -335,7 +335,7 @@ public sealed class LocalCliProvider(ICliSession sessions) : IAiProvider
          */
         var sesion = state.LoggedIn == true ? state.Detail : $"{state.Detail} Se intentará igual.";
 
-        return new AiProbe(true, $"{sesion} {ModelNote(request, model)}", clock.ElapsedMilliseconds);
+        return new AiProbe(true, $"{sesion} {ModelNote(request, model)} La respuesta del modelo aún no está comprobada.", clock.ElapsedMilliseconds);
     }
 
     /// <summary>

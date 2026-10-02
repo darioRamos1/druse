@@ -199,6 +199,15 @@
 
           @if (turn.error) {
             <div class="failure">{{ turn.error }}</div>
+            @if (turn.errorDetail) {
+              <details class="failure-detail">
+                <summary>{{ 'ai.failure.detail' | t }}</summary>
+                <pre>{{ turn.errorDetail }}</pre>
+                <button type="button" class="btn btn--sm" (click)="copy(turn.errorDetail)">
+                  {{ 'ai.failure.copy' | t }}
+                </button>
+              </details>
+            }
           }
         </div>
       }

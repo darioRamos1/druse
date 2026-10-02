@@ -415,6 +415,10 @@
 
 .cell__editor {
   width: 100%;
+  min-width: 0;
+  resize: none;
+  overflow: auto;
+  height: 22px;
   padding: 0;
   border: 0;
   background: transparent;
@@ -422,6 +426,18 @@
   font-family: inherit;
   font-size: inherit;
   outline: none;
+}
+
+.cell__null {
+  flex-shrink: 0;
+  padding: 1px 3px;
+  border: 1px solid var(--dr-border);
+  border-radius: 3px;
+  background: var(--dr-surface-raised);
+  color: var(--dr-text-secondary);
+  font: inherit;
+  font-size: 9px;
+  cursor: pointer;
 }
 
 // Menú de copia, el que sale con el botón derecho sobre la selección.

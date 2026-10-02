@@ -9,7 +9,8 @@ actual de forma incremental, conservando su diseño y sus protecciones.
 
 Revisión del código de la versión **1.2.1**, sobre el commit **e00b493**.
 La revisión inicial se registró sin implementar las propuestas. **DRU-01 y
-DRU-02 ya están implementadas en 1.2.2**; las demás siguen pendientes.
+DRU-02 están implementadas en 1.2.2; DRU-03 y DRU-04, en 1.2.3**. Las demás
+siguen pendientes; los límites de verificación se registran en cada entrega.
 Complementa el [plan de mejoras existente](PLAN_MEJORAS_DRUSE.md), la
 [revisión de interfaz anterior](../revisiones/revision-ui-ux-2026-09-08.md) y el
 [plan de idiomas](plan-idiomas.md). Sus pendientes históricos requieren volver
@@ -66,8 +67,8 @@ este recorrido limitado.
 | --- | --- | --- | --- | --- |
 | DRU-01 | Proteger ediciones pendientes de la cuadrícula | P1 | Implementado y probado en 1.2.2 | Cerrado |
 | DRU-02 | Invalidar vistas previas de importación desactualizadas | P1 | Implementado y probado en 1.2.2 | Cerrado |
-| DRU-03 | Editar valores sin ambigüedad ni pérdida de formato | P1 | Código | 2–4 días |
-| DRU-04 | Distinguir sesión de IA y respuesta válida del modelo | P1 | Reproducido + código | 2–3 días |
+| DRU-03 | Editar valores sin ambigüedad ni pérdida de formato | P1 | Implementado y probado en 1.2.3 | Validación nativa pendiente |
+| DRU-04 | Distinguir sesión de IA y respuesta válida del modelo | P1 | Implementado y probado en 1.2.3 | Validación nativa pendiente |
 | DRU-05 | Historial con búsqueda fiable, filtros y paginación | P2 | Código | 2–4 días |
 | DRU-06 | Recuperar resultados al volver a una pestaña | P2 | Código | 3–5 días |
 | DRU-07 | Recorrer la cuadrícula con teclado y ayudas traducidas | P2 | Código | 2–3 días |
@@ -106,6 +107,53 @@ este recorrido limitado.
 - Límites: verificación de navegador con Chromium y SQLite. Queda pendiente
   comprobar estos recorridos en Tauri/WebView2 y con los demás motores. No se
   modificó el contrato de importación ni se sustituyó la validación del backend.
+
+### Segunda entrega — 1.2.3, 2 de octubre de 2026
+
+- **DRU-03:** escribir `NULL` conserva texto; la acción «Establecer NULL» pone
+  un nulo y borrar texto pone una cadena vacía. Abrir y salir de la celda no
+  genera una edición. Los controles nativos solo se usan si pueden representar
+  el valor completo; zona, fracciones, números grandes y texto multilínea
+  conservan su entrada de texto. Enter termina sin reabrir; Escape cancela y
+  Tab permite llegar a la acción de nulo sin perder el borrador. Volver al
+  valor original elimina el cambio pendiente.
+- El conversor conserva enteros de 64 bits, precisión decimal representable y
+  marcas de tiempo con offset y siete decimales. Si `decimal.TryParse` o la
+  conversión temporal exigirían redondeo, se rechaza antes de parametrizar.
+  Esto no amplía la precisión de .NET ni cambia las reglas de escala o rango
+  del motor y la columna de destino. Los alias de tipos de motores se prueban
+  en el conversor; la escritura real comprobada en este entorno es SQLite.
+- **DRU-04:** configuración local, sesión, versión del CLI y catálogo se muestran
+  separados de la respuesta. «Probar respuesta» usa el modelo escrito, un
+  prompt mínimo sin SQL, esquema ni filas, y explica que consume uso. Se puede
+  cancelar; éxito exige texto y evento terminal, y desaparece al cambiar la
+  configuración, cuenta o consultar otra vez la sesión. El resultado vive
+  solo en el diálogo y muestra proveedor, modelo, versión y momento.
+- Los errores anidados de Codex se extraen como mensaje legible, con causas
+  distintas para modelo rechazado, autenticación, cuota y red. El detalle sigue
+  disponible para copiar en configuración y chat; se omite la clave del perfil.
+  Un error conserva el modelo elegido. Una cuenta propia aún sin perfil no
+  se muestra como autenticada usando la sesión del equipo. Los nombres
+  sugeridos se muestran traducidos.
+- Verificación: TypeScript, guarda de idiomas, **296 pruebas de frontend** en
+  diez archivos, **696 pruebas unitarias de backend correctas y 14 omitidas**
+  por sus condiciones existentes, y **7 pruebas HTTP/SSE de integración** con
+  proveedor simulado, incluida cancelación que llega al proveedor.
+- Navegador: **13 E2E de SQLite y un E2E de diagnóstico de IA**. Se comprueba la
+  escritura real de texto `NULL`, vacío y nulo mediante vista previa y
+  confirmación, sin alterar offset, fracción ni los números de las demás
+  columnas. IA reproduce catálogo con 6.1 anunciado, rechazo, respuesta válida
+  y cambio de modelo, sin inferencias externas. Se inspeccionaron las capturas
+  de celda y diagnóstico en ambos temas; IA también a 900 × 760 y 1440 × 960.
+  El barrido incorpora estas interfaces con un proveedor simulado.
+  Una recarga del servidor durante una captura interrumpió el caso del
+  diseñador; se repitió con los archivos estables y pasó.
+- Límites: siguen pendientes Tauri/WebView2 y escritura en otros motores.
+  El rechazo real anterior de 6.1 con Codex CLI 0.150.1 y esta cuenta no se
+  declara resuelto: la entrega permite comprobarlo y entenderlo sin sustituir
+  el modelo. No se repitió una inferencia externa ni se cambió el CLI o la cuenta.
+- Referencias de la comprobación de Codex: [estado de autenticación](https://learn.chatgpt.com/docs/auth)
+  y [modo no interactivo y eventos JSONL](https://learn.chatgpt.com/docs/non-interactive-mode).
 
 ### DRU-01 — Ediciones pendientes de la cuadrícula
 
@@ -482,5 +530,7 @@ completar todo el plan.
 - Registrar aquí o en la bitácora qué criterio pasó, qué evidencia se obtuvo y
   qué quedó pendiente; una casilla histórica no sustituye una comprobación actual.
 
-Estado inicial: **DRU-01 a DRU-15 pendientes**. La suite existente pasó, pero no
-cubre por sí sola todos los riesgos y funciones descritos en este plan.
+Estado inicial: **DRU-01 a DRU-15 pendientes**. Estado tras las dos primeras
+entregas: **DRU-01 a DRU-04 implementadas; DRU-05 a DRU-15 pendientes**.
+La comprobación nativa y de otros motores de las entregas implementadas sigue
+pendiente y se mantiene explícita arriba.

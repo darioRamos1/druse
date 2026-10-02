@@ -179,16 +179,50 @@
               El editor sale con el valor actual ya seleccionado: escribir encima
               es lo que se espera al entrar en una celda.
             -->
-            <input
-              class="cell__editor"
-              [type]="editorType(column, shownValue(row, i))"
-              [value]="shownValue(row, i) ?? 'NULL'"
-              autofocus
+            @if (editorType(column, shownValue(row, i)) === 'text') {
+              <textarea
+                rows="1"
+                wrap="off"
+                class="cell__editor"
+                [value]="shownValue(row, i) ?? ''"
+                [placeholder]="shownValue(row, i) === null ? 'NULL' : ''"
+                autofocus
+                (input)="markEdited()"
+                (keydown)="$event.stopPropagation()"
+                (blur)="commitEdit(row, i, $event)"
+                (keydown.enter)="commitOnEnter(row, i, $event)"
+                (keydown.escape)="cancelEdit($event)"
+                [attr.aria-label]="'grid.edit' | t: { name: column.name }"
+              ></textarea>
+            } @else {
+              <input
+                class="cell__editor"
+                [type]="editorType(column, shownValue(row, i))"
+                [value]="shownValue(row, i) ?? ''"
+                autofocus
+                step="any"
+                (input)="markEdited()"
+                (keydown)="$event.stopPropagation()"
+                (blur)="commitEdit(row, i, $event)"
+                (keydown.enter)="commitOnEnter(row, i, $event)"
+                (keydown.escape)="cancelEdit($event)"
+                [attr.aria-label]="'grid.edit' | t: { name: column.name }"
+              />
+            }
+            <button
+              type="button"
+              class="cell__null"
+              translate="no"
+              [title]="'grid.setNull' | t: { name: column.name }"
+              [attr.aria-label]="'grid.setNull' | t: { name: column.name }"
+              (mousedown)="$event.preventDefault(); $event.stopPropagation()"
+              (keydown)="$event.stopPropagation()"
+              (keydown.escape)="cancelEdit($event)"
               (blur)="commitEdit(row, i, $event)"
-              (keydown.enter)="commitEdit(row, i, $event)"
-              (keydown.escape)="cancelEdit()"
-              [attr.aria-label]="'grid.edit' | t: { name: column.name }"
-            />
+              (click)="setNull(row, i, $event)"
+            >
+              NULL
+            </button>
           } @else if (shownValue(row, i) === null) {
             <span class="null" translate="no">NULL</span>
           } @else if (column.kind === 'boolean') {

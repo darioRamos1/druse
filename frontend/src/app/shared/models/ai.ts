@@ -107,6 +107,7 @@ export interface CliSessionState {
   readonly account?: string;
   readonly plan?: string;
   readonly detail: string;
+  readonly version?: string;
 }
 
 /**
@@ -128,6 +129,7 @@ export interface AiProbeResult {
   readonly reachable: boolean;
   readonly detail: string;
   readonly elapsedMs: number;
+  readonly modelVerified?: boolean;
 }
 
 export type AiRole = 'user' | 'assistant' | 'system';
@@ -162,4 +164,9 @@ export interface AiChatRequest {
 export type AiStreamEvent =
   | { readonly kind: 'chunk'; readonly text: string }
   | { readonly kind: 'done' }
-  | { readonly kind: 'error'; readonly message: string };
+  | {
+      readonly kind: 'error';
+      readonly message: string;
+      readonly code?: string;
+      readonly detail?: string;
+    };

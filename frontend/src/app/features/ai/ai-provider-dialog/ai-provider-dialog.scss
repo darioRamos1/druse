@@ -642,3 +642,28 @@
   gap: 8px;
   flex-wrap: wrap;
 }
+
+.diagnostic {
+  margin-top: 16px;
+  padding: 12px;
+  border: 1px solid var(--dr-border-subtle);
+  border-radius: 9px;
+
+  .section {
+    margin-top: 0;
+  }
+  .probe {
+    display: flex;
+    margin-top: 10px;
+  }
+  details {
+    margin-top: 8px;
+    font-size: var(--dr-font-size-xs);
+  }
+  pre {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    max-height: 120px;
+    overflow: auto;
+  }
+}

@@ -171,7 +171,39 @@ internal static class AiEndpoints
                 reachable = probe.Reachable,
                 detail = probe.Detail,
                 elapsedMs = probe.ElapsedMilliseconds,
+                modelVerified = false,
             });
+        });
+
+        app.MapPost("/api/ai/providers/test-response", async (
+            SaveAiProviderDto request,
+            SavedAiProviderService providers,
+            IEnumerable<IAiProvider> known,
+            IAppPaths paths,
+            HttpContext context,
+            CancellationToken cancellationToken) =>
+        {
+            var profile = ToDomain(request);
+            var validation = AiProviderValidator.Validate(profile);
+            if (!validation.IsValid)
+            {
+                context.Response.StatusCode = StatusCodes.Status400BadRequest;
+                await context.Response.WriteAsJsonAsync(new { message = string.Join(" ", validation.Errors) }, cancellationToken);
+                return;
+            }
+            var key = request.ApiKey;
+            if (key is null && request.Id is { } id)
+            {
+                key = await providers.GetKeyAsync(id, cancellationToken);
+            }
+            context.Response.ContentType = "text/event-stream";
+            context.Response.Headers.CacheControl = "no-cache";
+            // Sin SQL, esquema ni historial: esta prueba solo comprueba la
+            // respuesta del modelo elegido y se ejecuta por una acción explícita.
+            await StreamAsync(For(known, profile), new AiRequest(
+                profile, key,
+                [new AiMessage(AiRole.User, "Responde únicamente OK, sin usar herramientas ni leer archivos.")],
+                AiSessionDirectory.For(profile, paths)), context, cancellationToken);
         });
 
         /*
@@ -244,6 +276,7 @@ internal static class AiEndpoints
                 account = state.Account,
                 plan = state.Plan,
                 detail = state.Detail,
+                version = state.Version,
             });
         });
 
@@ -358,17 +391,18 @@ internal static class AiEndpoints
 
             await WriteEventAsync(context, "done", new { }, cancellationToken);
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
             // Lo canceló el usuario. No hay nada que contarle que no sepa ya, y
             // el socket puede estar cerrado.
         }
-        catch (Exception error) when (error is InvalidOperationException or HttpRequestException)
+        catch (Exception error) when (error is InvalidOperationException or HttpRequestException or OperationCanceledException)
         {
+            var failure = AiFailure.From(error, request.ApiKey);
             await WriteEventAsync(
                 context,
                 "error",
-                new { message = error.Message },
+                new { message = failure.Message, code = failure.Code, detail = failure.Detail },
                 CancellationToken.None);
         }
     }

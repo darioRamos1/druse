@@ -106,11 +106,21 @@ function parseEvent(block: string, failed: string): AiStreamEvent | null {
   }
 
   try {
-    const payload = JSON.parse(datos) as { text?: string; message?: string };
+    const payload = JSON.parse(datos) as {
+      text?: string;
+      message?: string;
+      code?: string;
+      detail?: string;
+    };
 
     return nombre === 'chunk'
       ? { kind: 'chunk', text: payload.text ?? '' }
-      : { kind: 'error', message: payload.message ?? failed };
+      : {
+          kind: 'error',
+          message: payload.message ?? failed,
+          code: payload.code,
+          detail: payload.detail,
+        };
   } catch {
     return null;
   }
@@ -683,11 +693,22 @@ export class HttpApplicationGateway extends ApplicationGateway {
    * token—, porque no pasa por él.
    */
   override streamAiChat(request: AiChatRequest): Observable<AiStreamEvent> {
+    return this.stream('/api/ai/chat', request);
+  }
+
+  override streamAiProviderTest(request: SaveAiProviderRequest): Observable<AiStreamEvent> {
+    return this.stream('/api/ai/providers/test-response', request);
+  }
+
+  private stream(
+    path: string,
+    request: AiChatRequest | SaveAiProviderRequest,
+  ): Observable<AiStreamEvent> {
     return new Observable<AiStreamEvent>((subscriber) => {
       const abort = new AbortController();
       const { baseUrl, token } = this._desktop.connection();
 
-      void this.pump(request, baseUrl, token, abort.signal, subscriber);
+      void this.pump(path, request, baseUrl, token, abort.signal, subscriber);
 
       // Cancelar la suscripción corta la petición de verdad: si no, el modelo
       // seguiría escribiendo —y cobrándose— una respuesta que nadie mira.
@@ -696,14 +717,15 @@ export class HttpApplicationGateway extends ApplicationGateway {
   }
 
   private async pump(
-    request: AiChatRequest,
+    path: string,
+    request: AiChatRequest | SaveAiProviderRequest,
     baseUrl: string,
     token: string | null,
     signal: AbortSignal,
     subscriber: Subscriber<AiStreamEvent>,
   ): Promise<void> {
     try {
-      const response = await fetch(`${baseUrl}/api/ai/chat`, {
+      const response = await fetch(`${baseUrl}${path}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -714,9 +736,29 @@ export class HttpApplicationGateway extends ApplicationGateway {
       });
 
       if (!response.ok || !response.body) {
+        const detail = (await response.text()).slice(0, 8000);
+        let message = translate('ai.provider.apiStatus', { status: response.status });
+        try {
+          const failure = JSON.parse(detail) as {
+            message?: unknown;
+            detail?: unknown;
+            title?: unknown;
+          };
+          const readable = failure.message ?? failure.detail ?? failure.title;
+          if (typeof readable === 'string' && readable.trim()) message = readable;
+        } catch {
+          // Una página de error no es JSON; queda disponible en el detalle.
+        }
         subscriber.next({
           kind: 'error',
-          message: `La API respondió ${response.status}.`,
+          message,
+          code:
+            response.status === 401 || response.status === 403
+              ? 'authentication'
+              : response.status === 429
+                ? 'quota'
+                : 'other',
+          detail,
         });
         subscriber.complete();
 
@@ -735,6 +777,7 @@ export class HttpApplicationGateway extends ApplicationGateway {
         }
 
         buffer += decoder.decode(value, { stream: true });
+        buffer = buffer.replace(/\r\n/g, '\n');
 
         // Los sucesos van separados por una línea en blanco. Se procesa solo lo
         // que está completo: un trozo puede partir un suceso por la mitad, y
@@ -759,6 +802,11 @@ export class HttpApplicationGateway extends ApplicationGateway {
         }
       }
 
+      subscriber.next({
+        kind: 'error',
+        message: translate('ai.incompleteResponse'),
+        code: 'other',
+      });
       subscriber.complete();
     } catch (error) {
       // Abortar es lo que hace el propio usuario al cancelar: no es un fallo que
@@ -772,6 +820,7 @@ export class HttpApplicationGateway extends ApplicationGateway {
       subscriber.next({
         kind: 'error',
         message: error instanceof Error ? error.message : translate('ai.unreachable'),
+        code: 'network',
       });
       subscriber.complete();
     }

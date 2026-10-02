@@ -305,6 +305,17 @@
   line-height: 1.45;
 }
 
+.failure-detail {
+  margin-top: 6px;
+  font-size: var(--dr-font-size-xs);
+  pre {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    max-height: 160px;
+    overflow: auto;
+  }
+}
+
 /** Tres puntos mientras no ha llegado nada, donde va a aparecer el texto. */
 .thinking {
   display: flex;

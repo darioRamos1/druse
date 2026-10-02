@@ -1062,6 +1062,15 @@ describe('WorkspaceStore', () => {
       expect(enviado.confirmed).toBe(false);
     });
 
+    it('volver al valor original elimina la edición pendiente', async () => {
+      await abrirTabla();
+      const original = store.result()!.resultSets[0].rows[0].values[1];
+      store.editCell({ row: 1, column: 'email', value: 'temporal' });
+      expect(store.edits()).toHaveLength(1);
+      store.editCell({ row: 1, column: 'email', value: original });
+      expect(store.edits()).toEqual([]);
+    });
+
     it('guardar sí confirma, y limpia los cambios pendientes', async () => {
       await abrirTabla();
 

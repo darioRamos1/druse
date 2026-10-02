@@ -162,6 +162,21 @@ describe('AiStore', () => {
     expect(store.turns()[1].text).toBe('parcial');
   });
 
+  it('explica el rechazo del modelo y conserva el detalle original', async () => {
+    const store = await ready();
+    store.ask('hola');
+    stream.next({
+      kind: 'error',
+      code: 'unsupportedModel',
+      message: 'model is not supported',
+      detail: '{"error":"model is not supported"}',
+    });
+    stream.complete();
+    expect(store.turns()[1].error).toContain('no admite este modelo');
+    expect(store.turns()[1].errorDetail).toBe('{"error":"model is not supported"}');
+    expect(store.busy()).toBe(false);
+  });
+
   it('no lanza dos peticiones a la vez', async () => {
     const store = await ready();
 

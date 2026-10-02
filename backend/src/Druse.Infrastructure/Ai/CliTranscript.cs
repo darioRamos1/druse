@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Druse.Application.Ai;
 
 namespace Druse.Infrastructure.Ai;
 
@@ -22,6 +23,7 @@ internal sealed class CliTranscript(string command)
     private readonly Dictionary<string, int> _delivered = [];
 
     private readonly bool _codex = LocalCliProvider.IsCodex(command);
+    public string? FailureDetail { get; private set; }
 
     public (string Text, string? Error) Read(string line)
     {
@@ -76,7 +78,8 @@ internal sealed class CliTranscript(string command)
                     ? nested.GetString()
                     : null;
 
-            return (string.Empty, detail ?? "Codex terminó con un error.");
+            FailureDetail = detail ?? "Codex terminó con un error.";
+            return (string.Empty, AiFailure.ReadMessage(FailureDetail));
         }
 
         return (string.Empty, null);

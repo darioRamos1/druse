@@ -98,7 +98,8 @@ public sealed class CliTranscriptTests
         var (text, error) = transcript.Read(linea);
 
         Assert.Empty(text);
-        Assert.Equal(rechazo, error);
+        Assert.Equal("The 'gpt-6.1-sol' model is not supported when using Codex with a ChatGPT account.", error);
+        Assert.Equal(rechazo, transcript.FailureDetail);
     }
 
     [Fact]

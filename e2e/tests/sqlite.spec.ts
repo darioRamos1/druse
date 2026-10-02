@@ -91,6 +91,9 @@ test.beforeAll(() => {
     END;
     INSERT INTO clientes (id, nombre, email, nit) VALUES (1, 'Ana', 'ana@ejemplo.test', '900');
     INSERT INTO pedidos (id, cliente_id, total) VALUES (10, 1, 5), (11, 1, 7);
+    DROP TABLE IF EXISTS fidelidad;
+    CREATE TABLE fidelidad (id INTEGER PRIMARY KEY, valor TEXT, instante TIMESTAMP WITH TIME ZONE, decimal_preciso TEXT, entero_grande TEXT);
+    INSERT INTO fidelidad VALUES (1, 'original', '2026-10-02T10:20:30.1234567-05:00', '0.1234567890123456789012345678', '9007199254740993');
   `);
 
   db.close();
@@ -173,6 +176,74 @@ async function hastaLasTablas(page: Page) {
 }
 
 test.describe('SQLite de punta a punta', () => {
+  test('guardar distingue el texto NULL, la cadena vacía y el nulo sin tocar otros valores', async ({
+    page,
+  }) => {
+    await abrir(page);
+    await hastaLasTablas(page);
+    await menuDeNodo(page, 'fidelidad');
+    await page
+      .getByRole('menuitem', { name: 'Abrir SELECT', exact: true })
+      .click();
+    await situarCursor(page, 1, 1);
+    await ejecutar(page, 'todo');
+    const cells = page.locator('app-results-grid .row .cell--value');
+    const value = cells.nth(1);
+    const instant = cells.nth(2);
+    await instant.dblclick();
+    await expect(instant.locator('textarea')).toHaveValue(
+      '2026-10-02T10:20:30.1234567-05:00',
+    );
+    await instant.locator('.cell__editor').press('Escape');
+    await expect(page.locator('app-results-panel .edits')).toHaveCount(0);
+    await expect(cells.nth(3)).toHaveText('0.1234567890123456789012345678');
+    await expect(cells.nth(4)).toHaveText('9007199254740993');
+    const read = () => {
+      const db = new DatabaseSync(ARCHIVO);
+      try {
+        return db.prepare('SELECT valor FROM fidelidad WHERE id = 1').get()![
+          'valor'
+        ];
+      } finally {
+        db.close();
+      }
+    };
+    const save = async (expected: string | null, literal: string) => {
+      await page
+        .getByRole('button', { name: 'Ver SQL y guardar', exact: true })
+        .click();
+      await expect(page.locator('.edits__statement')).toContainText(literal);
+      await page
+        .getByRole('button', { name: 'Confirmar y guardar', exact: true })
+        .click();
+      await expect(page.locator('app-results-panel .edits')).toHaveCount(0);
+      await expect.poll(read).toBe(expected);
+    };
+    await value.dblclick();
+    await value.locator('.cell__editor').fill('NULL');
+    await value.locator('.cell__editor').press('Enter');
+    await expect(value.locator('.cell__editor')).toHaveCount(0);
+    await save('NULL', "'NULL'");
+    await value.dblclick();
+    if (process.env['DRUSE_BARRIDO']) {
+      mkdirSync(BARRIDO, { recursive: true });
+      await page.screenshot({ path: join(BARRIDO, 'celda-texto-null.png') });
+      await value.locator('.cell__editor').press('Escape');
+      await page.getByRole('button', { name: 'Tema oscuro', exact: true }).click();
+      await value.dblclick();
+      await page.screenshot({ path: join(BARRIDO, 'celda-texto-null-oscuro.png') });
+    }
+    await value.locator('.cell__editor').fill('');
+    await value.locator('.cell__editor').press('Enter');
+    await save('', "''");
+    await value.dblclick();
+    await value
+      .getByRole('button', { name: 'Establecer NULL en valor', exact: true })
+      .click();
+    await save(null, 'NULL');
+    await expect(instant).toHaveText('2026-10-02T10:20:30.1234567-05:00');
+  });
+
   test('cancelar el cambio de contexto conserva las celdas y el SQL del editor', async ({ page }) => {
     await abrir(page);
     await hastaLasTablas(page);
@@ -186,8 +257,8 @@ test.describe('SQLite de punta a punta', () => {
     const celda = page.locator('app-results-grid .row .cell--value').nth(1);
     await expect(celda).toHaveClass(/is-editable/);
     await celda.dblclick();
-    await celda.locator('input').fill('Ana pendiente');
-    await celda.locator('input').press('Tab');
+    await celda.locator('.cell__editor').fill('Ana pendiente');
+    await celda.locator('.cell__editor').press('Enter');
     await expect(celda).toHaveText('Ana pendiente');
 
     const avisos: string[] = [];
