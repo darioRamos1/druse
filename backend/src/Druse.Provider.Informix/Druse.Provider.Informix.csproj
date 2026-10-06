@@ -41,7 +41,7 @@
   <ItemGroup>
     <PackageReference Include="Net.IBM.Data.Db2" Version="10.0.0.200"
                       Condition="'$(DruseDb2Platform)' == 'win'" />
-    <PackageReference Include="Net.IBM.Data.Db2-lnx" Version="10.0.0.200"
+    <PackageReference Include="Net.IBM.Data.Db2-lnx" Version="10.0.0.300"
                       Condition="'$(DruseDb2Platform)' == 'lnx'" />
     <PackageReference Include="Net.IBM.Data.Db2-osx" Version="10.0.0.200"
                       Condition="'$(DruseDb2Platform)' == 'osx'" />
