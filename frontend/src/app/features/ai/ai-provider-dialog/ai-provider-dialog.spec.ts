@@ -22,17 +22,15 @@ describe('comprobación de respuesta del proveedor', () => {
   beforeEach(async () => {
     stream = new Subject();
     probe = new Subject();
-    gateway.getCliSession
-      .mockReset()
-      .mockReturnValue(
-        of({
-          installed: true,
-          loggedIn: true,
-          version: 'codex-cli 0.150.1',
-          account: 'ChatGPT',
-          detail: 'Con sesión',
-        }),
-      );
+    gateway.getCliSession.mockReset().mockReturnValue(
+      of({
+        installed: true,
+        loggedIn: true,
+        version: 'codex-cli 0.150.1',
+        account: 'ChatGPT',
+        detail: 'Con sesión',
+      }),
+    );
     gateway.listAiModels.mockReset().mockReturnValue(of({ models: ['gpt-6.1-sol', 'gpt-6-sol'] }));
     gateway.testAiProvider.mockReset().mockReturnValue(probe);
     gateway.streamAiProviderTest.mockReset().mockReturnValue(stream);
@@ -82,7 +80,9 @@ describe('comprobación de respuesta del proveedor', () => {
   }
 
   it('instalación, sesión y catálogo no generan inferencias ni verifican el modelo', async () => {
-    expect(element.querySelector<HTMLInputElement>('.field__input')?.value).toBe('Tu cuenta ChatGPT');
+    expect(element.querySelector<HTMLInputElement>('.field__input')?.value).toBe(
+      'Tu cuenta ChatGPT',
+    );
     expect(element.textContent).toContain('codex-cli 0.150.1');
     button('Comprobar configuración').click();
     probe.next({

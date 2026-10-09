@@ -199,7 +199,8 @@ function resolveToken(token: string): string {
   }
 }
 
-export type SettingsSection = 'appearance' | 'editor' | 'results' | 'privacy' | 'whatsNew' | 'about';
+export type SettingsSection =
+  'appearance' | 'editor' | 'results' | 'privacy' | 'whatsNew' | 'about';
 
 /** Preferencias agrupadas por lo que se quiere ajustar. */
 @Component({
