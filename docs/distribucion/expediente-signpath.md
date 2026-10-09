@@ -1,4 +1,6 @@
-# Expediente para SignPath Foundation — borrador sin presentar
+# Expediente para SignPath Foundation — solicitud presentada, revisión pendiente
+
+[Solicitud formal enviada](solicitud-signpath-2026-10-08.md) el 8 de octubre de 2026 mediante el formulario oficial. SignPath mostró «Form submitted» sin identificador. Se declararon la ausencia de release pública y de reputación de uso; la presentación no significa que el proyecto cumpla todos los requisitos ni que haya sido admitido.
 
 [Consulta de seguimiento enviada](consulta-signpath-seguimiento.md) el 21 de septiembre: repo público y construcción de Comunidad comunicados; SNI, WebView2 y consentimiento pendientes de respuesta. La consulta no sustituye una solicitud formal.
 
@@ -8,13 +10,13 @@ Actualización del 16 de septiembre: [respuesta a la consulta](consulta-signpath
 
 Preparación: 13 de septiembre de 2026. Corresponde a **SIG-01** del [plan de SignPath y donaciones](../planes/plan-signpath-donaciones.md).
 
-Revisión técnica: [14 de septiembre de 2026](../revisiones/revision-signpath-2026-09-14.md). El inventario y las guardas de publicación están actualizados; la solicitud sigue pendiente de presentación. La excepción explícita `-SinComprobarCI` se registra y no puede describirse como CI verificada ante SignPath.
+Revisión técnica: [14 de septiembre de 2026](../revisiones/revision-signpath-2026-09-14.md). El inventario y las guardas de publicación están actualizados; la solicitud se presentó después, con las limitaciones declaradas. La excepción explícita `-SinComprobarCI` se registra y no puede describirse como CI verificada ante SignPath.
 
 Privacidad: el aviso provisional ya está incorporado al código de Preferencias y a la landing. Pendiente de distribuir, completar datos del responsable y ejecutar el [protocolo de Windows limpio](pruebas-instalador-signpath.md); todavía no es una política final validada por tráfico real.
 
-**Esto no es una solicitud presentada.** Es el material reunido para que Darío lo revise y decida si presenta la [solicitud](https://signpath.org/apply.html), y para ver de un vistazo qué falta. Hay requisitos que hoy no se cumplen y están marcados como tales: presentar un expediente que exagere el estado del proyecto es la forma más rápida de que lo rechacen.
+**Este expediente no acredita elegibilidad ni admisión.** Hay requisitos que hoy no se cumplen y están marcados como tales. El [formulario presentado](solicitud-signpath-2026-10-08.md) los declaró sin exagerar el estado del proyecto.
 
-## 1. Bloqueantes antes de poder presentarlo
+## 1. Pendientes para que la candidatura pueda prosperar
 
 | Qué falta | De quién depende |
 | --- | --- |

@@ -6,7 +6,7 @@ Revisión: 14 de septiembre de 2026. Corresponde a **PUB-03** del [plan de SignP
 
 **Los instaladores de Druse no están firmados con Authenticode.** Windows puede mostrar un aviso de SmartScreen; actualmente el instalador no acredita su editor mediante esa firma.
 
-No hay certificado propio ni servicio de firma concedido. **La solicitud a SignPath Foundation está pendiente de presentarse**, y hasta que exista una respuesta no se usa su nombre, su logotipo ni la atribución que su programa exige: hacerlo antes sería anunciar un patrocinio que no se ha concedido.
+No hay certificado propio ni servicio de firma concedido. **La solicitud a SignPath Foundation se presentó el 8 de octubre de 2026 y sigue pendiente de respuesta.** Hasta que se conceda el servicio no se usa su logotipo ni la atribución de firma que el programa exige: hacerlo antes sería anunciar un patrocinio que no se ha concedido.
 
 Lo que sí está firmado hoy son las **actualizaciones**: cada instalador publicado lleva su archivo `.sig` de minisign generado con la clave del actualizador de Tauri, y la aplicación rechaza cualquier actualización cuya firma no valide contra la clave pública incluida en el programa. Eso protege el canal de actualización; **no sustituye a Authenticode** ni quita el aviso de SmartScreen.
 
@@ -53,7 +53,7 @@ Qué pasaría entonces: se retira el artefacto de la release, se publica un avis
 
 Druse installers are **not yet signed with Authenticode**. The application update files are signed with the Tauri updater key (minisign) and verified before an update is applied, which protects the update channel but is not code signing.
 
-An application to the SignPath Foundation is **prepared but not yet submitted**; no signing service has been granted, so no SignPath attribution appears here or in the product. Releases are built from a clean Git tree, their package contents are checked against an explicit exclusion list, and a SHA-256 manifest is produced for every build. Before publishing, every signature is verified against the final bytes and the release is refused if anything does not match; publishing also requires a green CI run for that exact commit, and each release records its commit, hashes and check results. Each release is approved manually by the maintainer, whose GitHub account uses two-factor authentication. Only Druse's own binaries and installers would be submitted for signing; third-party components would not.
+An application to the SignPath Foundation was submitted on October 8, 2026, but no signing service has been granted, so no SignPath signing attribution appears here or in the product. Releases are built from a clean Git tree, their package contents are checked against an explicit exclusion list, and a SHA-256 manifest is produced for every build. Before publishing, every signature is verified against the final bytes and the release is refused if anything does not match; publishing also requires a green CI run for that exact commit, and each release records its commit, hashes and check results. Each release is approved manually by the maintainer, whose GitHub account uses two-factor authentication. Only Druse's own binaries and installers would be submitted for signing; third-party components would not.
 
 Report anything suspicious to `druse.contacto@gmail.com`.
 
