@@ -1,5 +1,7 @@
 # Plan de preparación para SignPath Foundation y donaciones
 
+Estado al 11 de octubre de 2026: SignPath rechazó por ahora la solicitud por falta de reconocimiento y adopción pública; el correo de decisión llegó el 9 de octubre. Ya existe una [beta pública de Comunidad](https://github.com/darioRamos1/druse/releases/tag/v1.3.0-beta.1), publicada tras enviar el formulario. La prioridad actual se desarrolla en el [plan para volver a solicitar SignPath](plan-reaplicacion-signpath-2026-10-11.md): pruebas externas, referencias independientes y actividad sostenida, junto al cierre de los pendientes técnicos. SIG-01 tiene respuesta negativa, no una revisión pendiente; la firma sigue sin concederse. Las entradas anteriores conservan su contexto histórico.
+
 Validación del bloque Rust/actualizaciones: [PR #25 integrado, instaladores y hashes comprobados](../revisiones/avisos-rust-actualizaciones-2026-09-22.md). CI de Comunidad satisfactoria; 165 textos Rust y nueve nativos incluidos; firma local del actualizador válida. Preparado respaldo local de 307 crates. No se publicó una actualización ni se cerraron revisión de fuente correspondiente, Windows limpio o SignPath.
 
 Avance del 16 de septiembre: [respuesta de SignPath recibida](../distribucion/consulta-signpath-borrador.md). Druse aún no está listo para revisión: requieren repositorio público, artefacto publicado con alcance definido, licencia, inventario y flujo de construcción/firma. Podrían evaluar una edición independiente sin Oracle/IBM; no es una admisión. SNI, WebView2 y consentimiento durante la instalación no quedaron resueltos expresamente. OSS-03 y SIG-01 siguen abiertos. El siguiente paso propuesto es concretar DEC-03 y la edición candidata, manteniendo la distribución completa fuera de ese alcance de firma.
@@ -164,7 +166,7 @@ Revisar mensualmente descargas agregadas, reportes voluntarios, usuarios que reg
 
 ## 9. Qué toca ahora
 
-La documentación y las guardas de publicación han avanzado. Siguen pendientes decisiones **DEC-01 a DEC-04**, revisión de procedencia/licencias y verificaciones técnicas de Windows y privacidad:
+Actualización del 11 de octubre: primero seguir el [plan de reaplicación](plan-reaplicacion-signpath-2026-10-11.md), que añade adopción y referencias externas tras el rechazo. La beta pública ya existe. DEC-01, DEC-02-L y DEC-03 están resueltas según los registros anteriores; siguen abiertas DEC-02-R, DEC-04 y las verificaciones técnicas siguientes. Las donaciones continúan como trabajo separado:
 
 1. **DEC-02-R y OSS-04:** GPL-3.0-only ya está elegida y aplicada al código original. Completar derechos, avisos de terceros y compatibilidad de distribución. `CONTRIBUTING.md` ya establece términos GPL para aportes y revisión de procedencia.
 2. **OSS-03 / DEC-03:** concretar la edición independiente sin Oracle/IBM que SignPath permite evaluar bajo condiciones. Comprobar exclusiones e independencia del artefacto; aclarar SNI/WebView2. La [respuesta recibida](../distribucion/consulta-signpath-borrador.md) no aprueba componentes ni obliga a retirar motores de la distribución completa.
@@ -172,6 +174,6 @@ La documentación y las guardas de publicación han avanzado. Siguen pendientes 
 4. **PKG-04:** probar instalación, actualización y desinstalación en un Windows limpio; de ahí sale la respuesta a P-02.
 5. **DON-01:** alta en Sponsors con los datos del titular. Solo después se crea `.github/FUNDING.yml`.
 
-En la fase D, **SIG-04** tiene etapas de release y guardas comprobadas: requiere el workflow `ci.yml` del commit exacto y ambos manifiestos con producto, versión, variante y hashes correctos. La excepción explícita `-SinComprobarCI` sigue registrada; no acredita una construcción verificada para SignPath. **SIG-01 permanece abierto** por respuesta y elegibilidad, aunque el formulario ya se presentó. SIG-02 y SIG-03 se completan con la configuración y el alcance que acuerde SignPath si concede el servicio.
+En la fase D, **SIG-04** tiene etapas de release y guardas comprobadas: requiere el workflow `ci.yml` del commit exacto y ambos manifiestos con producto, versión, variante y hashes correctos. La excepción explícita `-SinComprobarCI` sigue registrada; no acredita una construcción verificada para SignPath. **SIG-01 recibió una respuesta negativa el 9 de octubre**; obtener admisión exige reunir nueva evidencia y volver a solicitarla. SIG-02 y SIG-03 se completan con la configuración y el alcance que acuerde SignPath si concede el servicio.
 
 Las dos cosas que la matriz de motores dejó a la vista ya están corregidas: la exigencia de motores de la integración continua se acotó con `DRUSE_OPTIONAL_ENGINES=oracle` —la cobertura de Oracle sigue siendo local, pero ahora está declarada— y la imagen de Informix va por digest.
