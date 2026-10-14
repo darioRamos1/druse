@@ -1,12 +1,12 @@
 # Política de firma de código — borrador
 
-Revisión: 14 de septiembre de 2026. Corresponde a **PUB-03** del [plan de SignPath y donaciones](docs/planes/plan-signpath-donaciones.md).
+Revisión: 14 de octubre de 2026. Corresponde a **PUB-03** del [plan de SignPath y donaciones](docs/planes/plan-signpath-donaciones.md).
 
 ## Estado actual: sin firma
 
 **Los instaladores de Druse no están firmados con Authenticode.** Windows puede mostrar un aviso de SmartScreen; actualmente el instalador no acredita su editor mediante esa firma.
 
-No hay certificado propio ni servicio de firma concedido. **La solicitud a SignPath Foundation se presentó el 8 de octubre de 2026 y sigue pendiente de respuesta.** Hasta que se conceda el servicio no se usa su logotipo ni la atribución de firma que el programa exige: hacerlo antes sería anunciar un patrocinio que no se ha concedido.
+No hay certificado propio ni servicio de firma concedido. **La solicitud presentada a SignPath Foundation el 8 de octubre fue rechazada por ahora el 9 de octubre por falta de reconocimiento público.** El [plan de reaplicación](docs/planes/plan-reaplicacion-signpath-2026-10-11.md) recoge las evidencias que hay que reunir. SNI, WebView2 y consentimiento durante la instalación siguen sin resolución expresa. Hasta que se conceda el servicio no se usa su logotipo ni la atribución de firma que el programa exige.
 
 El canal de **actualizaciones** usa archivos `.sig` de minisign generados con la clave del actualizador de Tauri: la aplicación rechaza una actualización cuya firma no valide contra la clave pública incluida en el programa. La beta pública de Comunidad 1.3.0 se distribuye fuera de `releases/latest`, sin `.sig` ni actualización automática desde esa beta. La firma de actualización protege ese canal cuando se use; **no sustituye a Authenticode** ni quita el aviso de SmartScreen.
 
@@ -14,7 +14,7 @@ El canal de **actualizaciones** usa archivos `.sig` de minisign generados con la
 
 Cuando exista un servicio de firma:
 
-- El instalador NSIS de cada variante y el instalador selector que publica la release.
+- Para la candidatura a SignPath Foundation, el instalador NSIS de Comunidad. La edición completa y el selector de otras ediciones quedan fuera de ese alcance; cualquier ampliación requiere acuerdo expreso del proveedor de firma.
 - Los binarios propios que viajan dentro: `Druse.Host.LocalApi.exe` y las bibliotecas `Druse.*`. Un instalador firmado que suelta ejecutables sin firmar es justo lo que hace saltar a los antivirus corporativos.
 
 **No** se firmarían los componentes de terceros. El runtime de .NET de una publicación autocontenida ya viene firmado por Microsoft, y volver a firmar un archivo ajeno afirmaría sobre su origen algo que Druse no puede afirmar. Una regla global que firme todo lo que hay en el directorio queda descartada por escrito.

@@ -4,6 +4,8 @@ Fecha: 11 de octubre de 2026. Responsable: Darío Ramos. Horizonte inicial: ocho
 
 Objetivo: demostrar que personas ajenas al mantenimiento conocen y usan Druse, reunir referencias independientes y presentar una edición Comunidad comprobada. La aceptación depende de SignPath. Este plan complementa el [plan técnico y de donaciones](plan-signpath-donaciones.md); las donaciones no son una condición para esta candidatura.
 
+Avance del 14 de octubre: preparados localmente README y landing con descarga, tres casos de uso, [guía SQLite ilustrada](../guias/primera-prueba-sqlite.md), [convocatoria para revisión](../distribucion/convocatoria-pruebas-comunidad.md) y documentos de estado actualizados (REA-01/02/03/05/17). El recorrido de consulta y CSV pasó con un perfil aislado y la API ya construida. El [registro de evidencia](../distribucion/evidencia-adopcion-signpath.md) recoge los resultados y límites: Windows limpio no está disponible y una compilación nueva está bloqueada por avisos de seguridad de una dependencia transitiva. No se han publicado estos cambios, enviado mensajes ni registrado pruebas externas. La difusión amplia queda pendiente de resolver esos puntos.
+
 ## 1. Qué dijo SignPath y qué sabemos hoy
 
 Se recibieron dos correos en `druse.contacto@gmail.com`. Las horas siguientes corresponden a America/Bogota:
@@ -124,4 +126,4 @@ Orden propuesto para la siguiente tarea:
 4. Revisar la descarga y presentar el material de convocatoria listo para publicar (REA-02).
 5. Iniciar las pruebas externas y el registro semanal cuando Darío autorice las publicaciones.
 
-Este cambio solo registra el plan y la respuesta recibida. No ejecuta campañas, no presenta una nueva solicitud, no contrata firma y no marca las tareas futuras como completadas.
+El plan se creó el 11 de octubre. El primer bloque se inició el 14 de octubre con los entregables y límites indicados arriba. La preparación local no equivale a publicación ni a completar Windows limpio o adopción externa; las casillas de las fases siguen pendientes de su cierre completo.

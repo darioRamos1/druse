@@ -1,6 +1,10 @@
-# Expediente para SignPath Foundation — solicitud presentada, revisión pendiente
+# Expediente para SignPath Foundation — preparación tras el rechazo
 
-[Solicitud formal enviada](solicitud-signpath-2026-10-08.md) el 8 de octubre de 2026 mediante el formulario oficial. SignPath mostró «Form submitted» sin identificador. Se declararon la ausencia de release pública y de reputación de uso; la presentación no significa que el proyecto cumpla todos los requisitos ni que haya sido admitido.
+Estado revisado el 14 de octubre de 2026: la solicitud recibió una respuesta negativa el 9 de octubre por falta de reconocimiento y adopción pública. La [beta Comunidad 1.3.0](https://github.com/darioRamos1/druse/releases/tag/v1.3.0-beta.1) está publicada desde el 8 de octubre (America/Bogota), después del envío del formulario. Se sigue el [plan de reaplicación](../planes/plan-reaplicacion-signpath-2026-10-11.md). No hay admisión ni firma concedida; SNI, WebView2 y consentimiento durante instalación siguen sin resolución expresa.
+
+Los párrafos fechados de septiembre y el formulario enviado conservan el estado que existía en ese momento. Para pruebas externas y avances actuales, consultar el [registro de evidencia](evidencia-adopcion-signpath.md).
+
+[Solicitud formal enviada](solicitud-signpath-2026-10-08.md) el 8 de octubre de 2026 mediante el formulario oficial. SignPath mostró «Form submitted» sin identificador. Se declararon entonces la ausencia de release pública y de reputación de uso. La [respuesta del 9 de octubre](https://mail.google.com/mail/u/?authuser=druse.contacto%40gmail.com#all/1a11f4083f4875b9) invita a volver a solicitarlo cuando exista mayor reconocimiento.
 
 [Consulta de seguimiento enviada](consulta-signpath-seguimiento.md) el 21 de septiembre: repo público y construcción de Comunidad comunicados; SNI, WebView2 y consentimiento pendientes de respuesta. La consulta no sustituye una solicitud formal.
 
@@ -22,7 +26,7 @@ Privacidad: el aviso provisional ya está incorporado al código de Preferencias
 | --- | --- |
 | Repositorio público desde el 16 de septiembre | **DEC-01 cerrado**; verificación de procedencia sigue separada |
 | GPL-3.0-only elegida y `LICENSE` incorporado; faltan procedencia y compatibilidad de terceros | **DEC-02-R**, **OSS-03/04** |
-| No hay release pública ni evidencia de uso | **PUB-04**, y después **PUB-05** |
+| Beta pública disponible; falta validar el instalador en Windows limpio y reunir uso externo | **PUB-04** parcialmente cubierto; **PUB-05** abierto |
 | Comunidad excluye Oracle/IBM; SNI y WebView2 siguen sin resolución expresa | **OSS-03 / DEC-03**: edición separada construida y funcional; elegibilidad todavía pendiente |
 | La opción de desactivar la búsqueda de actualizaciones no se ofrece durante la instalación | **P-01**: la respuesta valora la activación explícita, pero no aclara si basta el primer arranque |
 
@@ -35,7 +39,7 @@ La respuesta pide repositorio público, artefacto publicado en la forma que se f
 | Nombre | Druse |
 | Qué es | Cliente de escritorio para administrar y consultar bases de datos: PostgreSQL, SQL Server, MySQL/MariaDB, Oracle, SQLite e Informix |
 | Plataforma de distribución | Windows x64, instalador NSIS construido con Tauri; API local en .NET autocontenida |
-| Versión actual | 1.3.0, sin publicar |
+| Versión actual | 1.3.0, con beta Comunidad pública `v1.3.0-beta.1`; sin release estable |
 | Repositorio | [github.com/darioRamos1/druse](https://github.com/darioRamos1/druse) (público) |
 | Contacto público | `druse.contacto@gmail.com` |
 | Licencia | GNU GPL v3 exclusivamente (`GPL-3.0-only`), elegida por Darío el 14 de septiembre de 2026; [LICENSE](../../LICENSE). Con un permiso adicional de la sección 7 en [COPYRIGHT](../../COPYRIGHT), limitado a cuatro controladores de bases de datos no libres |
@@ -70,14 +74,14 @@ El inventario completo está en [`licencias-dependencias.csv`](../licencias-depe
 
 | Componente | Términos | Situación |
 | --- | --- | --- |
-| `Oracle.ManagedDataAccess.Core` 23.26.301 | Oracle Free Distribution, Hosting, and Use Terms | En ambas ediciones actuales |
+| `Oracle.ManagedDataAccess.Core` 23.26.301 | Oracle Free Distribution, Hosting, and Use Terms | Excluido de Comunidad; presente en completa y sin Informix |
 | `Net.IBM.Data.Db2` 10.0.0.200 | IBM IPLA | Solo en la edición completa |
 | `com.ibm.informix:jdbc` 15.0.0.1.1 | IBM Informix JDBC License Agreement | Solo en la completa, mediante IKVM |
 | IKVM 8.11.2 y sus runtimes | Zlib y GPL con excepción Classpath, según archivo | Solo en la completa; obligaciones de aviso por archivo |
-| `Microsoft.Data.SqlClient.SNI.runtime` 6.0.2 | Microsoft Software License Terms propios del componente nativo | **En las dos ediciones**; retirarlo dejaría sin SQL Server a la candidata |
+| `Microsoft.Data.SqlClient.SNI.runtime` 6.0.2 | Microsoft Software License Terms propios del componente nativo | También en Comunidad; elegibilidad pendiente de respuesta expresa |
 | WebView2 | Runtime externo de Microsoft | No se distribuye; lo instala su propio bootstrapper |
 
-La edición sin Informix está comprobada: 402 archivos y 140 MB, **sin un solo archivo de IBM ni de IKVM**, frente a 612 archivos y 298 MB de la completa. Lo que ninguna de las dos resuelve por sí sola es Oracle y SNI, y por eso la consulta pregunta si pueden acogerse a la excepción de bibliotecas de sistema.
+La edición sin Informix no equivale a Comunidad: esta última también excluye Oracle. Los recuentos antiguos de completa y sin Informix no describen el instalador candidato actual; usar el manifiesto adjunto a la beta. SNI y WebView2 siguen pendientes de aclaración.
 
 ## 6. Requisitos de conducta de la aplicación
 
@@ -91,11 +95,13 @@ La edición sin Informix está comprobada: 402 archivos y 140 MB, **sin un solo 
 
 ## 7. Evidencia de uso
 
-Todavía no se ha reunido evidencia de uso de una beta candidata. El repositorio ya es público; siguen pendientes la release revisada, las pruebas externas y su registro en PUB-04/PUB-05.
+La beta candidata ya tiene descarga pública. Todavía no se ha reunido evidencia de uso externo verificado; el [registro de adopción](evidencia-adopcion-signpath.md) distingue contadores, comprobaciones propias y pruebas de terceros.
 
 Lo que sí se puede enseñar hoy: historial de desarrollo sostenido, suite de pruebas —950 del frontend, más de 1.100 del backend, pruebas de contrato por motor y de punta a punta— y la [matriz de motores](../motores/matriz-de-motores.md) que distingue lo probado de lo anunciado.
 
 ## 8. Texto en inglés para el formulario
+
+Antecedente de la primera candidatura. No reutilizar sin actualizar release, respuesta recibida y evidencias de uso conforme al plan de reaplicación.
 
 > Druse is a Windows desktop database client (Tauri shell, self-contained .NET local API) for PostgreSQL, SQL Server, MySQL/MariaDB, Oracle, SQLite and Informix. It is maintained by a single developer.
 >

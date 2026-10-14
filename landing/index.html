@@ -66,6 +66,7 @@
         <nav id="navigation" aria-label="Navegación principal">
           <a href="#herramientas">Herramientas</a>
           <a href="#motores">Compatibilidad</a>
+          <a href="./primeros-pasos.html">Primera prueba</a>
           <a href="#preguntas">Preguntas</a>
           <a class="button button-small" href="#descargar"
             >Obtener Druse <span aria-hidden="true">↗</span></a
@@ -285,6 +286,8 @@
           <li>Oracle</li>
           <li>Informix</li>
         </ul>
+        <p>La beta descargable de Comunidad incluye PostgreSQL, MySQL/MariaDB,
+          SQL Server y SQLite. Oracle e Informix pertenecen a la edición completa.</p>
       </section>
 
       <section
@@ -390,26 +393,26 @@
         <ol class="steps">
           <li>
             <span class="step-number">01</span>
-            <h3>Conecta tu base</h3>
+            <h3>Empieza con SQLite</h3>
             <p>
-              Elige el motor y guarda tu perfil para tener tus conexiones a
-              mano.
+              Crea una base de ejemplo sin servidor y ejecuta tu primera consulta
+              con la guía de diez minutos.
             </p>
           </li>
           <li>
             <span class="step-number">02</span>
-            <h3>Encuentra la respuesta</h3>
+            <h3>Explora PostgreSQL</h3>
             <p>
-              Explora el esquema, escribe SQL y consulta los resultados en el
-              mismo espacio.
+              Conecta tu servidor de pruebas, recorre tablas y columnas, y abre
+              una consulta desde el explorador.
             </p>
           </li>
           <li>
             <span class="step-number">03</span>
-            <h3>Llévala más lejos</h3>
+            <h3>Exporta el resultado</h3>
             <p>
-              Edita, exporta o vuelve a una consulta desde el historial. Sigue
-              donde lo dejaste.
+              Guarda la consulta como CSV o Excel y comprueba los datos fuera
+              de Druse. El ejemplo usa tres ventas ficticias.
             </p>
           </li>
         </ol>
@@ -429,14 +432,22 @@
             Una aplicación de escritorio con todo lo necesario para empezar. Sin
             instalar .NET ni Node.js.
           </p>
-          <a class="button button-primary" id="download-link" hidden
+          <a class="button button-primary" id="download-link"
+            href="https://github.com/darioRamos1/druse/releases/tag/v1.3.0-beta.1"
             ><svg aria-hidden="true" viewBox="0 0 24 24">
               <path d="M12 3v12m-5-5 5 5 5-5M5 16v5h14v-5" /></svg
-            >Descargar para Windows</a
+            >Descargar beta de Comunidad</a
           >
           <p class="availability" id="download-status">
-            La descarga pública estará disponible próximamente.
+            Versión 1.3.0 beta · Windows x64. Incluye PostgreSQL, SQL Server,
+            MySQL/MariaDB y SQLite. No incluye Oracle ni Informix.
           </p>
+          <p>Sin firma Authenticode; Windows puede mostrar SmartScreen. Esta beta
+            no se actualiza automáticamente. La instalación y el tráfico en
+            Windows limpio siguen pendientes de validación completa.</p>
+          <p><a href="https://github.com/darioRamos1/druse/releases/download/v1.3.0-beta.1/SHA256SUMS.txt">Hashes SHA-256</a>
+            · <a href="./primeros-pasos.html">Prueba SQLite de diez minutos</a>
+            · <a href="https://github.com/darioRamos1/druse/blob/main/CODE_SIGNING_POLICY.md">Code signing policy</a></p>
         </div>
         <div class="download-mark" aria-hidden="true">
           <img src="./assets/druse.png" alt="" width="128" height="128" /><span
@@ -462,9 +473,9 @@
               >
             </summary>
             <p>
-              Druse admite PostgreSQL, SQL Server, MySQL, MariaDB, SQLite,
-              Oracle e Informix. La disponibilidad de Informix depende de la
-              edición instalada.
+              La beta de Comunidad permite conectar PostgreSQL, SQL Server,
+              MySQL/MariaDB y SQLite. Oracle e Informix están disponibles en el
+              código de la edición completa y no forman parte de esta descarga.
             </p>
           </details>
           <details>
@@ -486,8 +497,9 @@
             </summary>
             <p>
               El instalador de Windows incluye los componentes de ejecución de
-              Druse. No necesitas instalar .NET ni Node.js. Solo debes tener
-              acceso a la base de datos con la que quieras trabajar.
+              Druse. No necesitas instalar .NET ni Node.js. El instalador puede
+              necesitar descargar Microsoft Edge WebView2 si falta en el equipo.
+              Para la prueba SQLite no necesitas un servidor de bases de datos.
             </p>
           </details>
           <details>

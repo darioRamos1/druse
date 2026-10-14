@@ -935,6 +935,14 @@ h3 {
 .download-section .eyebrow {
   color: #b6a8e1;
 }
+.download-copy {
+  min-width: 0;
+  flex: 1;
+}
+.download-copy p a {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
 .download-copy > p:not(.eyebrow):not(.availability) {
   font-size: 14px;
   color: #aba5bd;
@@ -943,6 +951,7 @@ h3 {
   margin-bottom: 24px;
 }
 .availability {
+  max-width: 410px;
   font-size: 12px;
   color: #c1b8d5;
   margin-bottom: 0;

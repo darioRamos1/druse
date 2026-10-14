@@ -1,5 +1,7 @@
 # Solicitud formal a SignPath Foundation — enviada
 
+Registro histórico del formulario del 8 de octubre. La beta se publicó después de su envío y la solicitud fue rechazada por ahora el 9 de octubre por falta de reconocimiento público. El estado actual y las evidencias nuevas están en el [expediente](expediente-signpath.md) y el [plan de reaplicación](../planes/plan-reaplicacion-signpath-2026-10-11.md); las respuestas de esta tabla no se han reescrito retroactivamente.
+
 El formulario oficial es <https://signpath.org/apply.html>. Darío autorizó expresamente la aceptación del Código de Conducta, el tratamiento de datos y el envío el 8 de octubre de 2026. Tras pulsar «Submit», el formulario mostró **«Form submitted. Thank you, we'll be in touch soon.»** No proporcionó identificador de solicitud. Esto acredita el envío, no la admisión ni la firma.
 
 | Campo | Respuesta preparada |

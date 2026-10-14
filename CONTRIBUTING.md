@@ -14,7 +14,7 @@ También son útiles:
 - **Informes de compatibilidad** de un motor y versión concretos: qué funcionó y qué no.
 - Preguntas sobre documentación que no se entiende o que ya no describe lo que hace el programa.
 
-La apertura pública del repositorio sigue siendo una decisión separada, registrada en el [plan de SignPath y donaciones](docs/planes/plan-signpath-donaciones.md).
+El repositorio es público desde el 16 de septiembre de 2026. La beta de Comunidad y el trabajo para reunir pruebas externas están registrados en el [plan de reaplicación a SignPath](docs/planes/plan-reaplicacion-signpath-2026-10-11.md).
 
 ## Antes de abrir una incidencia
 
