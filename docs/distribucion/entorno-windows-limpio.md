@@ -13,6 +13,10 @@ Windows 11 Home Single Language, con 16 GiB de RAM total y unos 4,3 GiB disponib
 
 Darío confirmó que no dispone de otro disco o carpeta con **al menos 80 GiB libres**. La VM queda pendiente por falta de espacio. Es un presupuesto propio para disco virtual, ISO, actualizaciones e instantánea; no una cifra exigida por SignPath. La propuesta asigna 4 GiB al invitado y pide 6 GiB de RAM libre al arrancar, para dejar margen al anfitrión. Hace falta recuperar memoria disponible antes de iniciar la VM.
 
+Limpieza solicitada por Darío el 14 de octubre: se eliminaron cachés de descarga de npm, pip y NuGet, cachés de Angular y resultados regenerables de compilación de Druse. El espacio libre pasó de unos 21,4 a **27,5 GiB en C:** y de 10,6 a **18,4 GiB en P:**, aproximadamente 14 GiB recuperados entre ambas unidades. Los instaladores, el kit de Windows limpio, los manifiestos y los registros de pruebas se conservaron; el SHA-256 del instalador y del kit no cambió. Los binarios y objetos de compilación eliminados deben regenerarse antes de repetir las pruebas.
+
+Docker eliminó además unos 17 GB de caché de construcción interna, sin borrar imágenes, contenedores ni volúmenes. Ese tamaño no se suma al espacio físico recuperado: no se compactó su disco virtual ni se detuvieron los tres contenedores que estaban en ejecución. La revisión automática rechazó la eliminación de carpetas temporales de Visual Studio con «blocked by policy», sin más detalle; esas carpetas quedaron intactas. Ninguna unidad alcanza todavía el presupuesto de la VM.
+
 ## Software preparado
 
 La consulta al catálogo `winget`, fuente `winget`, identificó VirtualBox 7.2.20. Se descargó el instalador oficial a:

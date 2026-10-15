@@ -37,6 +37,8 @@ El [expediente del entorno Windows limpio](entorno-windows-limpio.md) registra V
 
 Darío confirmó que no dispone de otra ubicación con espacio suficiente. La preparación no continúa con instalación del hipervisor ni descarga de la ISO. Se avanzó con la [consulta técnica sobre SNI, WebView2 y consentimiento](consulta-signpath-pendientes-2026-10-14.md): borrador local, sin envío ni respuesta nueva. REA-14/15 siguen abiertos.
 
+Después, a petición de Darío, se recuperaron aproximadamente 14 GiB entre C: y P: mediante limpieza de cachés y compilaciones regenerables. El [registro del entorno](entorno-windows-limpio.md) detalla el alcance y el espacio final: 27,5 GiB en C: y 18,4 GiB en P:. Se conservaron los registros, el instalador, el manifiesto y el kit transferible; sus comprobaciones anteriores siguen siendo históricas, y las salidas de compilación eliminadas se deben regenerar para volver a ejecutarlas. Los hashes del instalador y del kit se comprobaron sin cambios. No se ha creado la VM ni ejecutado una prueba adicional de instalación.
+
 ## Pruebas externas
 
 **Ninguna prueba externa verificada registrada todavía.** No se publicaron convocatorias ni se enviaron mensajes durante este bloque.
