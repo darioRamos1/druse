@@ -35,6 +35,8 @@ Las salidas, configuración temporal, perfil y CSV de la verificación se conser
 
 El [expediente del entorno Windows limpio](entorno-windows-limpio.md) registra VirtualBox 7.2.20 descargado, su firma Oracle válida y el hash coincidente con el catálogo. El guion `build/scripts/comprobar-vm-windows.ps1` se ejecutó en modo de lectura tanto sin ruta como con una ruta propuesta en P:, y notificó correctamente los prerrequisitos ausentes. Se comprobó que no creó la carpeta de VM. El equipo tiene unos 23 GiB libres en C:, 11 en P: y 4,3 GiB de RAM libre; hace falta una ubicación con al menos 80 GiB y memoria disponible antes del arranque. El usuario todavía debe obtener la ISO oficial. La descarga del hipervisor y esta comprobación no acreditan una VM creada ni pruebas del instalador.
 
+Darío confirmó que no dispone de otra ubicación con espacio suficiente. La preparación no continúa con instalación del hipervisor ni descarga de la ISO. Se avanzó con la [consulta técnica sobre SNI, WebView2 y consentimiento](consulta-signpath-pendientes-2026-10-14.md): borrador local, sin envío ni respuesta nueva. REA-14/15 siguen abiertos.
+
 ## Pruebas externas
 
 **Ninguna prueba externa verificada registrada todavía.** No se publicaron convocatorias ni se enviaron mensajes durante este bloque.

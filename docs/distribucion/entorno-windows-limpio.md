@@ -11,7 +11,7 @@ Windows 11 Home Single Language, con 16 GiB de RAM total y unos 4,3 GiB disponib
 | C: | Aproximadamente 23 GiB | Insuficiente para el presupuesto de la VM |
 | P: | Aproximadamente 11 GiB | Insuficiente para el presupuesto de la VM |
 
-Se pidió una ruta en otro disco o carpeta con **al menos 80 GiB libres**. Es un presupuesto propio para disco virtual, ISO, actualizaciones e instantánea; no una cifra exigida por SignPath. La propuesta asigna 4 GiB al invitado y pide 6 GiB de RAM libre al arrancar, para dejar margen al anfitrión. Hace falta recuperar memoria disponible antes de iniciar la VM.
+Darío confirmó que no dispone de otro disco o carpeta con **al menos 80 GiB libres**. La VM queda pendiente por falta de espacio. Es un presupuesto propio para disco virtual, ISO, actualizaciones e instantánea; no una cifra exigida por SignPath. La propuesta asigna 4 GiB al invitado y pide 6 GiB de RAM libre al arrancar, para dejar margen al anfitrión. Hace falta recuperar memoria disponible antes de iniciar la VM.
 
 ## Software preparado
 
@@ -72,3 +72,5 @@ Después de instalar Windows en la VM y guardar la instantánea inicial, traslad
 4. Ejecutar el protocolo y devolver resultados y evidencia sin datos sensibles.
 
 El kit y la preparación del anfitrión no cierran PKG-04 ni constituyen pruebas externas de adopción.
+
+Mientras no exista un entorno adecuado, se puede avanzar con la [consulta técnica preparada para SignPath](consulta-signpath-pendientes-2026-10-14.md). No se ha instalado VirtualBox ni descargado la ISO; las pruebas siguen pendientes.

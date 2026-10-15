@@ -8,6 +8,8 @@ Los párrafos fechados de septiembre y el formulario enviado conservan el estado
 
 [Consulta de seguimiento enviada](consulta-signpath-seguimiento.md) el 21 de septiembre: repo público y construcción de Comunidad comunicados; SNI, WebView2 y consentimiento pendientes de respuesta. La consulta no sustituye una solicitud formal.
 
+[Nueva consulta técnica preparada](consulta-signpath-pendientes-2026-10-14.md) el 14 de octubre: borrador local que retoma esas tres preguntas y reconoce el rechazo por falta de reconocimiento público. No se ha enviado ni resuelve los pendientes. La prueba en Windows limpio sigue sin ejecutarse por falta de espacio para la VM.
+
 Actualización del 21 de septiembre: [repositorio público](https://github.com/darioRamos1/druse), GPL y avisos disponibles. La [edición Comunidad](edicion-comunidad.md) excluye Oracle/IBM/IKVM; el PR #18 está integrado y su CI produjo el instalador y el inventario, descargados con hash coincidente. Falta completar pruebas de Windows limpio, publicar una beta revisada y aclarar SNI, WebView2 y consentimiento; no se ha presentado una solicitud formal.
 
 Actualización del 16 de septiembre: [respuesta a la consulta](consulta-signpath-borrador.md). SignPath considera que Druse todavía no está listo para revisión y admite evaluar una edición separada sin Oracle/IBM bajo condiciones; no ha aprobado la candidatura. SNI, WebView2, consentimiento durante la instalación y revisión de redistribución siguen abiertos. La [revisión documental de controladores](../revisiones/controladores-signpath-2026-09-15.md) conserva la evidencia local.
