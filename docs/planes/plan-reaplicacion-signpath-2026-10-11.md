@@ -6,6 +6,8 @@ Objetivo: demostrar que personas ajenas al mantenimiento conocen y usan Druse, r
 
 Avance del 14 de octubre: preparados localmente README y landing con descarga, tres casos de uso, [guía SQLite ilustrada](../guias/primera-prueba-sqlite.md), [convocatoria para revisión](../distribucion/convocatoria-pruebas-comunidad.md) y documentos de estado actualizados (REA-01/02/03/05/17). El recorrido de consulta y CSV pasó con un perfil aislado y la API ya construida. El [registro de evidencia](../distribucion/evidencia-adopcion-signpath.md) recoge los resultados y límites: Windows limpio no está disponible y una compilación nueva está bloqueada por avisos de seguridad de una dependencia transitiva. No se han publicado estos cambios, enviado mensajes ni registrado pruebas externas. La difusión amplia queda pendiente de resolver esos puntos.
 
+Continuación del 14 de octubre: [corregidas las referencias PKCS y el runtime autocontenido](../revisiones/seguridad-comunidad-2026-10-14.md), con avisos de terceros actualizados. La solución compila, la auditoría NuGet de 19 proyectos no informa paquetes vulnerables y pasan las pruebas seleccionadas de SQL Server, Oracle y SQLite. Se construyó y verificó el instalador local y se preparó un kit transferible con protocolo y hoja de resultados. Darío no dispone de entorno de pruebas y el equipo actual usa Windows Home, sin soporte de Sandbox: preparar una VM con Windows es la siguiente dependencia. Windows limpio, una nueva distribución pública y las pruebas externas siguen pendientes; esta corrección local no actualiza la beta ya publicada.
+
 ## 1. Qué dijo SignPath y qué sabemos hoy
 
 Se recibieron dos correos en `druse.contacto@gmail.com`. Las horas siguientes corresponden a America/Bogota:

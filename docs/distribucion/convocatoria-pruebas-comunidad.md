@@ -4,6 +4,8 @@ Preparada el 14 de octubre de 2026. REA-05 del [plan de reaplicación](../planes
 
 Estado: material listo para revisar; no enviado ni publicado. La difusión amplia depende del protocolo de Windows limpio. Darío elige destinatarios y autoriza las publicaciones. La guía nueva aún necesita desplegarse en Pages; usar el enlace al Markdown del repositorio solo después de publicar ese commit.
 
+Actualización de seguridad del 14 de octubre: el código y el runtime local ya se corrigieron, pero la beta pública enlazada en el borrador conserva las dependencias anteriores. Antes de usar esta convocatoria, publicar una candidata distinta con los cambios de la [revisión de seguridad](../revisiones/seguridad-comunidad-2026-10-14.md), validar sus bytes y sustituir versión, enlace y hashes en el material. No basta con que compile el código local.
+
 ## Mensaje breve
 
 Estoy desarrollando Druse, un cliente de escritorio de código abierto para bases de datos, y busco personas que prueben su beta de Comunidad en Windows x64.
@@ -18,6 +20,7 @@ Puedes dejar el resultado, incluso si todo funcionó, en <https://github.com/dar
 
 ## Antes de publicar
 
+- [ ] Publicar la candidata con las dependencias corregidas y actualizar el enlace, versión y hashes del mensaje y las guías.
 - [ ] Completar la prueba del instalador en Windows limpio y actualizar el mensaje con su resultado real.
 - [ ] Publicar la guía y añadir su enlace accesible sin sesión.
 - [ ] Elegir un grupo concreto cuyas reglas permitan presentar proyectos y adaptar el mensaje a ese público.
