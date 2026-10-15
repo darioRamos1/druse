@@ -31,6 +31,10 @@ Se actualizaron README, política de firma, expediente y edición Comunidad para
 
 Las salidas, configuración temporal, perfil y CSV de la verificación se conservan localmente en `artifacts/signpath-inicio-2026-10-14/`, fuera del control de versiones. La captura de la guía muestra únicamente datos ficticios.
 
+### Preparación de una VM
+
+El [expediente del entorno Windows limpio](entorno-windows-limpio.md) registra VirtualBox 7.2.20 descargado, su firma Oracle válida y el hash coincidente con el catálogo. El guion `build/scripts/comprobar-vm-windows.ps1` se ejecutó en modo de lectura tanto sin ruta como con una ruta propuesta en P:, y notificó correctamente los prerrequisitos ausentes. Se comprobó que no creó la carpeta de VM. El equipo tiene unos 23 GiB libres en C:, 11 en P: y 4,3 GiB de RAM libre; hace falta una ubicación con al menos 80 GiB y memoria disponible antes del arranque. El usuario todavía debe obtener la ISO oficial. La descarga del hipervisor y esta comprobación no acreditan una VM creada ni pruebas del instalador.
+
 ## Pruebas externas
 
 **Ninguna prueba externa verificada registrada todavía.** No se publicaron convocatorias ni se enviaron mensajes durante este bloque.

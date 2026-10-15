@@ -8,6 +8,8 @@ Avance del 14 de octubre: preparados localmente README y landing con descarga, t
 
 Continuación del 14 de octubre: [corregidas las referencias PKCS y el runtime autocontenido](../revisiones/seguridad-comunidad-2026-10-14.md), con avisos de terceros actualizados. La solución compila, la auditoría NuGet de 19 proyectos no informa paquetes vulnerables y pasan las pruebas seleccionadas de SQL Server, Oracle y SQLite. Se construyó y verificó el instalador local y se preparó un kit transferible con protocolo y hoja de resultados. Darío no dispone de entorno de pruebas y el equipo actual usa Windows Home, sin soporte de Sandbox: preparar una VM con Windows es la siguiente dependencia. Windows limpio, una nueva distribución pública y las pruebas externas siguen pendientes; esta corrección local no actualiza la beta ya publicada.
 
+Preparación de la VM, 14 de octubre: [VirtualBox descargado y verificado, configuración y comprobación del anfitrión preparadas](../distribucion/entorno-windows-limpio.md). C: tiene unos 23 GiB libres y P: unos 11; faltan una ubicación con el presupuesto de 80 GiB, más RAM libre al arrancar y la ISO oficial. VirtualBox no se ha instalado, la VM no se ha creado y no hay resultados de instalación. Se pidió al titular una ruta con espacio antes de reservar el disco virtual.
+
 ## 1. Qué dijo SignPath y qué sabemos hoy
 
 Se recibieron dos correos en `druse.contacto@gmail.com`. Las horas siguientes corresponden a America/Bogota:
