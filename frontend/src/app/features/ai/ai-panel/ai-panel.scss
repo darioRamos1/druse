@@ -243,22 +243,21 @@
     color: var(--dr-text-dim);
   }
 
-  &__code {
-    margin: 0;
-    padding: 9px 10px;
-    font-family: var(--dr-font-mono);
-    font-size: var(--dr-font-size-xs);
-    line-height: 19px;
-    color: var(--dr-text-muted);
-    white-space: pre;
-    overflow-x: auto;
-  }
-
   /** Que no se ejecute solo es una promesa, y se dice donde está el botón. */
   &__warning {
     font-size: 10.5px;
     color: var(--dr-text-faintest);
   }
+}
+
+.sql__code,
+.code__code {
+  margin: 0;
+  padding: 9px 10px;
+  font: var(--dr-font-size-xs) / 19px var(--dr-font-mono);
+  color: var(--dr-text-muted);
+  white-space: pre;
+  overflow-x: auto;
 }
 
 .failure {
@@ -269,17 +268,6 @@
   color: var(--dr-danger-text);
   font-size: var(--dr-font-size-xs);
   line-height: 1.45;
-}
-
-.failure-detail {
-  margin-top: 6px;
-  font-size: var(--dr-font-size-xs);
-  pre {
-    white-space: pre-wrap;
-    overflow-wrap: anywhere;
-    max-height: 160px;
-    overflow: auto;
-  }
 }
 
 /** Tres puntos mientras no ha llegado nada, donde va a aparecer el texto. */
@@ -610,7 +598,7 @@
   color: var(--dr-text-dim);
 }
 
-.context-detail {
+.detail {
   margin-top: 6px;
   font-size: var(--dr-font-size-xs);
   summary {
@@ -623,6 +611,10 @@
     overflow-wrap: anywhere;
     text-align: left;
   }
+}
+
+.failure-detail pre {
+  max-height: 160px;
 }
 
 .btn {

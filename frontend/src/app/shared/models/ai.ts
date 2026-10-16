@@ -178,6 +178,50 @@ export interface AiChatRequest {
    * este equipo no puede depender de que la pantalla se acuerde.
    */
   readonly context?: AiContextSnapshot;
+  readonly previewHash?: string;
+}
+
+export interface AiChatLimits {
+  readonly maxSqlBytes: number;
+  readonly maxSchemaBytes: number;
+  readonly maxNotesBytes: number;
+  readonly maxContextBytes: number;
+  readonly maxHistoryBytes: number;
+  readonly maxInputBytes: number;
+  readonly maxQuestionBytes: number;
+  readonly maxHistoryTurns: number;
+  readonly windowTokens: number;
+  readonly questionReserveTokens: number;
+  readonly responseReserveTokens: number;
+  readonly capacityKnown: boolean;
+}
+
+export interface AiChatUsage {
+  readonly sqlBytes: number;
+  readonly schemaBytes: number;
+  readonly notesBytes: number;
+  readonly contextBytes: number;
+  readonly historyBytes: number;
+  readonly inputBytes: number;
+  readonly questionBytes: number;
+  readonly historyTurns: number;
+  readonly estimatedTokens: number;
+  readonly questionReserveTokens: number;
+  readonly responseReserveTokens: number;
+}
+
+export interface AiChatPreview {
+  readonly hash: string;
+  readonly context: string;
+  readonly messages: readonly AiMessage[];
+  readonly limits: AiChatLimits;
+  readonly usage: AiChatUsage;
+  readonly issues: readonly {
+    readonly code: string;
+    readonly used: number;
+    readonly max: number;
+  }[];
+  readonly valid: boolean;
 }
 
 /**
@@ -195,6 +239,8 @@ export type AiStreamEvent =
       readonly providerId: string;
       readonly model: string;
       readonly disclosure: AiDisclosure;
+      readonly hash?: string;
+      readonly usage?: AiChatUsage;
     }
   | { readonly kind: 'done' }
   | {

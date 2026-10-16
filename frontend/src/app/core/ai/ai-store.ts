@@ -6,6 +6,9 @@ import { I18nService } from '../i18n/i18n.service';
 import { aiFailureMessage } from './ai-failure';
 import {
   AiContextSnapshot,
+  AiChatRequest,
+  AiChatPreview,
+  AiChatUsage,
   AiSource,
   AiMessage,
   AiProvider,
@@ -33,6 +36,13 @@ export interface AiChatRequestSnapshot {
   readonly context?: AiContextSnapshot;
   /** Confirmación del servidor de lo preparado para el proveedor. */
   readonly sentContext?: string;
+  readonly sentHash?: string;
+  readonly sentUsage?: AiChatUsage;
+  readonly payload: AiChatRequest;
+  readonly conversationKey: string;
+  readonly historyTurnIndices: readonly number[];
+  readonly omittedTurnIndices: readonly number[];
+  readonly preview?: AiChatPreview;
 }
 
 interface Conversation {
@@ -151,6 +161,78 @@ export class AiStore {
     await this.refresh();
   }
 
+  readonly historyQuestions = computed(() =>
+    this.turns().flatMap((question, index, turns) => {
+      const answer = turns[index + 1];
+      return question.role === 'user' &&
+        answer?.role === 'assistant' &&
+        !answer.error &&
+        !answer.streaming &&
+        answer.text.trim()
+        ? [{ index, text: question.text }]
+        : [];
+    }),
+  );
+
+  prepare(
+    text: string,
+    context?: AiContextSnapshot,
+    historyLimit: number | null = null,
+  ): AiChatRequestSnapshot | null {
+    const provider = this.active();
+    if (!provider || this.busy() || !text.trim()) return null;
+    const attached =
+      provider.disclosure === 'nothing' || !context
+        ? undefined
+        : cloneContext({
+            ...context,
+            notes: provider.shareBusinessNotes ? context.notes : undefined,
+          });
+    const questions = this.historyQuestions();
+    const selected =
+      historyLimit === null
+        ? questions
+        : historyLimit <= 0
+          ? []
+          : questions.slice(-Math.floor(historyLimit));
+    const historyTurnIndices = selected.map((question) => question.index);
+    const messages: AiMessage[] = selected.flatMap((question) => [
+      {
+        role: 'user' as const,
+        text: question.text,
+        context: this.turns()[question.index].request?.context,
+      },
+      { role: 'assistant' as const, text: this.turns()[question.index + 1].text },
+    ]);
+    messages.push({ role: 'user', text: text.trim() });
+    return {
+      source: { ...this._source() },
+      provider: { ...provider },
+      createdAt: new Date().toISOString(),
+      context: attached,
+      conversationKey: this._key(),
+      historyTurnIndices,
+      omittedTurnIndices: questions
+        .filter((question) => !historyTurnIndices.includes(question.index))
+        .map((question) => question.index),
+      payload: {
+        providerId: provider.id,
+        model: provider.model,
+        disclosure: provider.disclosure,
+        shareBusinessNotes: provider.shareBusinessNotes ?? false,
+        context: attached,
+        messages: messages.map((message) => ({
+          ...message,
+          context: message.context ? cloneContext(message.context) : undefined,
+        })),
+      },
+    };
+  }
+
+  preview(request: AiChatRequestSnapshot): Promise<AiChatPreview> {
+    return this.once(this._gateway.previewAiChat(request.payload));
+  }
+
   /**
    * Manda la pregunta y va escribiendo la respuesta según llega.
    *
@@ -159,32 +241,30 @@ export class AiStore {
    * aparecer el texto, en lugar de dejar un hueco.
    */
   ask(text: string, context?: AiContextSnapshot): void {
-    const provider = this.active();
-    const key = this._key();
-    if (!provider || this.busy() || !text.trim()) return;
+    const request = this.prepare(text, context);
+    if (request) this.sendPrepared(request);
+  }
 
-    const request: AiChatRequestSnapshot = {
-      source: { ...this._source() },
-      provider: { ...provider },
-      createdAt: new Date().toISOString(),
-      context:
-        provider.disclosure === 'nothing' || !context
-          ? undefined
-          : cloneContext({
-              ...context,
-              notes: provider.shareBusinessNotes ? context.notes : undefined,
-            }),
+  /** Envía la copia revisada, aunque cambie el editor; otro origen o proveedor la invalida. */
+  sendPrepared(request: AiChatRequestSnapshot, preview?: AiChatPreview): boolean {
+    if (this.busy() || request.conversationKey !== this._key() || (preview && !preview.valid))
+      return false;
+    const captured = {
+      ...request,
+      preview,
+      payload: { ...request.payload, previewHash: preview?.hash },
     };
     this.patch(
-      key,
+      request.conversationKey,
       [
         ...this.turns(),
-        { role: 'user', text, request },
+        { role: 'user', text: request.payload.messages.at(-1)!.text, request: captured },
         { role: 'assistant', text: '', streaming: true },
       ],
       true,
     );
-    this.start(key, request);
+    this.start(request.conversationKey, captured);
+    return true;
   }
 
   /** Repite la última pregunta fallida con su contexto original, sin otro turno de usuario. */
@@ -204,62 +284,49 @@ export class AiStore {
   }
 
   private start(key: string, request: AiChatRequestSnapshot): void {
-    const turns = this._conversations().get(key)!.turns;
-    const history: AiMessage[] = [];
-    // Un fallo deja la pregunta visible, pero no entra como una pregunta huérfana en el historial.
-    for (let i = 0; i < turns.length - 2; i += 2) {
-      const question = turns[i];
-      const answer = turns[i + 1];
-      if (!answer || answer.error || !answer.text.trim()) continue;
-      history.push({ role: 'user', text: question.text, context: question.request?.context });
-      history.push({ role: 'assistant', text: answer.text });
-    }
-    history.push({ role: 'user', text: turns.at(-2)!.text });
-
     // Registrar antes de suscribir evita que una respuesta síncrona deje una suscripción fantasma.
     const stream = new Subscription();
     this._streams.set(key, stream);
     stream.add(
-      this._gateway
-        .streamAiChat({
-          providerId: request.provider.id,
-          model: request.provider.model,
-          disclosure: request.provider.disclosure,
-          shareBusinessNotes: request.provider.shareBusinessNotes ?? false,
-          messages: history,
-          context: request.context,
-        })
-        .subscribe({
-          next: (event) => {
-            if (event.kind === 'context') {
-              this.update(key, (current) =>
-                current.map((turn, index) =>
-                  index === current.length - 2
-                    ? { ...turn, request: { ...request, sentContext: event.text } }
-                    : turn,
-                ),
-              );
-            } else if (event.kind === 'chunk') {
-              this.updateLast(key, (last) => ({ ...last, text: last.text + event.text }));
-            } else if (event.kind === 'error') {
-              this.updateLast(key, (last) => ({
-                ...last,
-                streaming: false,
-                error: aiFailureMessage(event, this._i18n),
-                errorDetail: event.detail ?? event.message,
-              }));
-            }
-          },
-          error: (error: unknown) => {
+      this._gateway.streamAiChat(request.payload).subscribe({
+        next: (event) => {
+          if (event.kind === 'context') {
+            this.update(key, (current) =>
+              current.map((turn, index) =>
+                index === current.length - 2
+                  ? {
+                      ...turn,
+                      request: {
+                        ...request,
+                        sentContext: event.text,
+                        sentHash: event.hash,
+                        sentUsage: event.usage,
+                      },
+                    }
+                  : turn,
+              ),
+            );
+          } else if (event.kind === 'chunk') {
+            this.updateLast(key, (last) => ({ ...last, text: last.text + event.text }));
+          } else if (event.kind === 'error') {
             this.updateLast(key, (last) => ({
               ...last,
               streaming: false,
-              error: error instanceof Error ? error.message : this._i18n.t('ai.noAnswer'),
+              error: aiFailureMessage(event, this._i18n),
+              errorDetail: event.detail ?? event.message,
             }));
-            this.settle(key);
-          },
-          complete: () => this.settle(key),
-        }),
+          }
+        },
+        error: (error: unknown) => {
+          this.updateLast(key, (last) => ({
+            ...last,
+            streaming: false,
+            error: error instanceof Error ? error.message : this._i18n.t('ai.noAnswer'),
+          }));
+          this.settle(key);
+        },
+        complete: () => this.settle(key),
+      }),
     );
   }
 

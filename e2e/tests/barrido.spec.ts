@@ -622,6 +622,7 @@ test.describe('barrido visual', () => {
 
     const contextoRequests = await prepararContextoChat(page);
     await comprobarContextoChat(page, contextoRequests,
+      // Incluye la vista previa y el presupuesto antes de la primera pregunta.
       name => foto(page, `15c-${name}`, asistente));
     await comprobarSelectorContexto(page, name => foto(page, `15d-${name}`, asistente));
     await comprobarNotasContexto(page, name => foto(page, `15e-${name}`, asistente));

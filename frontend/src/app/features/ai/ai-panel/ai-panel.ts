@@ -20,13 +20,16 @@ import { formatDate } from '../../../core/i18n/locale-format';
 import { AiCatalog, aiTableKey } from '../../../core/ai/ai-catalog';
 import { qualifiedName } from '../../../core/ai/ai-context';
 import { DatabaseObject } from '../../../shared/models/workspace';
-import { AiSource } from '../../../shared/models/ai';
+import { AiSource, AiChatPreview } from '../../../shared/models/ai';
 import { AiNotesStore, eligibleNotes } from '../../../core/ai/ai-notes-store';
 import { AiNotes } from '../ai-notes/ai-notes';
+import { AiPreview } from '../ai-preview/ai-preview';
+import { describeError } from '../../../core/workspace/errors';
 
 /** Un trozo de respuesta ya separado en prosa y SQL. */
 export interface ChatPart {
-  readonly kind: 'text' | 'sql';
+  readonly kind: 'text' | 'sql' | 'code';
+  readonly language?: string;
   readonly text: string;
   /** Acción que recomienda el modelo para este bloque. */
   readonly action?: 'insert' | 'replace';
@@ -70,7 +73,7 @@ export interface AiContext {
  */
 @Component({
   selector: 'app-ai-panel',
-  imports: [Icon, TranslatePipe, AiNotes],
+  imports: [Icon, TranslatePipe, AiNotes, AiPreview],
   templateUrl: './ai-panel.html',
   styleUrl: './ai-panel.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -98,6 +101,18 @@ export class AiPanel {
   protected readonly tableName = qualifiedName;
   private mention: { start: number; end: number } | null = null;
   private preparation = 0;
+  protected readonly review = signal<{
+    request: AiChatRequestSnapshot;
+    preview: AiChatPreview;
+    rawDraft: string;
+  } | null>(null);
+  protected readonly preparationError = signal('');
+  protected readonly historyLimit = signal<number | null>(null);
+  protected readonly historyQuestions = this._store.historyQuestions;
+  protected readonly omittedQuestions = computed(() => {
+    const omitted = this.review()?.request.omittedTurnIndices ?? [];
+    return this.historyQuestions().filter((question) => omitted.includes(question.index));
+  });
   protected readonly matches = computed(() => {
     const query = this.catalogQuery().toLowerCase();
     return this.catalog
@@ -142,6 +157,7 @@ export class AiPanel {
     formatDate(value, { dateStyle: 'short', timeStyle: 'short' });
   protected readonly retry = () => this._store.retry();
   protected preparedContext(request: AiChatRequestSnapshot): string {
+    if (request.preview) return request.preview.context || this._i18n.t('ai.noAttachedContext');
     const context = request.context;
     if (!context) return this._i18n.t('ai.noAttachedContext');
     return [
@@ -189,6 +205,13 @@ export class AiPanel {
           this.openContextPicker();
         });
     });
+    effect(() => {
+      this.active();
+      untracked(() => {
+        this.review.set(null);
+        this.preparation++;
+      });
+    });
     inject(DestroyRef).onDestroy(() => {
       this.preparation++;
       this.catalog.pause();
@@ -207,6 +230,10 @@ export class AiPanel {
       sessionId: context.sessionId ?? '',
       revision: context.revision,
     });
+    if (changed) {
+      this.review.set(null);
+      this.preparation++;
+    }
     if (changed && this.selectorOpen()) void this.catalog.loadCatalog();
   }
 
@@ -296,6 +323,8 @@ export class AiPanel {
     const includeSql = this.includeSql();
     const preparation = ++this.preparation;
     this.preparing.set(true);
+    this.preparationError.set('');
+    this.review.set(null);
     try {
       if (this.contextAllowed() && includeSchema && this.catalog.selected().length) {
         const current = await this.catalog.refreshSelected();
@@ -323,7 +352,7 @@ export class AiPanel {
         this.context().database !== context.database
       )
         return;
-      this._store.ask(
+      const request = this._store.prepare(
         text,
         this.contextAllowed()
           ? {
@@ -346,11 +375,46 @@ export class AiPanel {
                   : undefined,
             }
           : undefined,
+        this.historyLimit(),
       );
-      if (this.draft() === rawDraft) this.draft.set('');
+      if (!request) return;
+      const preview = await this._store.preview(request);
+      if (
+        preparation !== this.preparation ||
+        this.active() !== provider ||
+        this.context().sessionId !== context.sessionId ||
+        this.context().database !== context.database
+      )
+        return;
+      this.selectorOpen.set(false);
+      this.review.set({ request, preview, rawDraft });
+    } catch (error) {
+      if (preparation === this.preparation)
+        this.preparationError.set(describeError(error, this._i18n));
     } finally {
       this.preparing.set(false);
     }
+  }
+
+  protected confirmReview(): void {
+    const review = this.review();
+    if (!review || this.preparing()) return;
+    if (this._store.sendPrepared(review.request, review.preview)) {
+      if (this.draft() === review.rawDraft) this.draft.set('');
+      this.review.set(null);
+    }
+  }
+
+  protected backToEditing(): void {
+    this.review.set(null);
+    setTimeout(() =>
+      this.host.nativeElement.querySelector<HTMLTextAreaElement>('.composer__input')?.focus(),
+    );
+  }
+
+  protected changeHistory(limit: number | null): void {
+    this.historyLimit.set(limit);
+    void this.send();
   }
 
   /**
@@ -445,7 +509,7 @@ export function composeContext(
  */
 export function split(text: string): readonly ChatPart[] {
   const parts: ChatPart[] = [];
-  const fence = /```(?:sql(?:-(insert|replace))?)?\n?([\s\S]*?)(?:```|$)/gi;
+  const fence = /^```([^`\r\n]*)\r?\n([\s\S]*?)(?:^```[ \t]*(?:\r?\n|(?![\s\S]))|(?![\s\S]))/gm;
   let cursor = 0;
   let match = fence.exec(text);
 
@@ -457,12 +521,16 @@ export function split(text: string): readonly ChatPart[] {
     }
 
     const sql = match[2].trim();
+    const tag = match[1].trim().toLowerCase();
+    const sqlTag = /^sql(?:-(insert|replace))?$/.exec(tag);
 
     if (sql.length > 0) {
       parts.push({
-        kind: 'sql',
+        kind: sqlTag ? 'sql' : 'code',
         text: sql,
-        action: match[1]?.toLowerCase() === 'replace' ? 'replace' : 'insert',
+        ...(sqlTag
+          ? { action: sqlTag[1] === 'replace' ? ('replace' as const) : ('insert' as const) }
+          : { language: tag }),
       });
     }
 

@@ -12,7 +12,7 @@
   <button
     type="button"
     class="notes-toggle"
-    (click)="notesOpen.set(!notesOpen())"
+    (click)="review.set(null); notesOpen.set(!notesOpen())"
     [attr.aria-label]="'ai.notes.title' | t"
     [attr.aria-expanded]="notesOpen()"
     aria-controls="chat-notes"
@@ -92,6 +92,18 @@
     [includeTables]="includeSchema()"
     [connectionIds]="context().knownConnectionIds ?? []"
   />
+} @else if (review(); as pending) {
+  <app-ai-preview
+    [request]="pending.request"
+    [preview]="pending.preview"
+    [historyLimit]="historyLimit()"
+    [omitted]="omittedQuestions()"
+    [disabled]="preparing() || busy()"
+    (confirmed)="confirmReview()"
+    (back)="backToEditing()"
+    (historyChanged)="changeHistory($event)"
+    (restarted)="clear(); review.set(null)"
+  />
 } @else {
   <div class="body">
     @if (!configured()) {
@@ -164,7 +176,7 @@
                 {{ request.provider.name }} · {{ request.provider.model }} ·
                 {{ formatTimestamp(request.createdAt) }}
               </div>
-              <details class="context-detail">
+              <details class="context-detail detail">
                 <summary>
                   {{
                     (request.sentContext === undefined
@@ -178,7 +190,39 @@
                     ? preparedContext(request)
                     : request.sentContext || ('ai.noAttachedContext' | t)
                 }}</pre>
+                @if (request.omittedTurnIndices.length) {
+                  <p>
+                    {{ 'ai.preview.omitted' | t }}
+                    @for (index of request.omittedTurnIndices; track index) {
+                      #{{ index / 2 + 1 }}
+                    }
+                  </p>
+                }
               </details>
+              @if (request.preview; as prepared) {
+                <details class="request-history detail">
+                  <summary>{{ 'ai.preview.historyText' | t }}</summary>
+                  <p>{{ 'ai.preview.historyCount' | t: { count: prepared.usage.historyTurns } }}</p>
+                  @for (message of prepared.messages.slice(1, -1); track $index) {
+                    <strong>{{
+                      (message.role === 'user' ? 'ai.preview.question' : 'ai.preview.answer') | t
+                    }}</strong>
+                    <pre>{{ message.text }}</pre>
+                  } @empty {
+                    <p>{{ 'ai.preview.noHistory' | t }}</p>
+                  }
+                  <p>
+                    {{
+                      'ai.preview.estimate'
+                        | t
+                          : {
+                              used: (request.sentUsage ?? prepared.usage).estimatedTokens,
+                              max: prepared.limits.windowTokens,
+                            }
+                    }}
+                  </p>
+                </details>
+              }
             }
           </div>
         } @else {
@@ -189,31 +233,42 @@
               } @else {
                 <div class="sql">
                   <div class="sql__head">
-                    <span class="sql__label" translate="no">SQL</span>
+                    <span class="sql__label" translate="no">{{
+                      part.kind === 'sql' ? 'SQL' : part.language || ('ai.code' | t)
+                    }}</span>
                     <span class="head__spacer"></span>
                     <span class="sql__lines">
                       {{ 'ai.lines' | t: { count: part.text.split('\n').length } }}
                     </span>
                   </div>
-                  <pre class="sql__code">{{ part.text }}</pre>
+                  <pre
+                    [class.sql__code]="part.kind === 'sql'"
+                    [class.code__code]="part.kind === 'code'"
+                    >{{ part.text }}</pre>
                   <div class="sql__foot">
-                    <button
-                      type="button"
-                      class="btn btn--primary btn--sm"
-                      (click)="
-                        part.action === 'replace' ? replace.emit(part.text) : insert.emit(part.text)
-                      "
-                    >
-                      <app-icon name="plus" [size]="11" />
-                      {{
-                        (part.action === 'replace' ? 'ai.replaceQuery' : 'ai.insertInEditor') | t
-                      }}
-                    </button>
+                    @if (part.kind === 'sql') {
+                      <button
+                        type="button"
+                        class="btn btn--primary btn--sm"
+                        (click)="
+                          part.action === 'replace'
+                            ? replace.emit(part.text)
+                            : insert.emit(part.text)
+                        "
+                      >
+                        <app-icon name="plus" [size]="11" />
+                        {{
+                          (part.action === 'replace' ? 'ai.replaceQuery' : 'ai.insertInEditor') | t
+                        }}
+                      </button>
+                    }
                     <button type="button" class="btn btn--sm" (click)="copy(part.text)">
                       {{ 'ai.copy' | t }}
                     </button>
                     <span class="head__spacer"></span>
-                    <span class="sql__warning">{{ 'ai.notRun' | t }}</span>
+                    @if (part.kind === 'sql') {
+                      <span class="sql__warning">{{ 'ai.notRun' | t }}</span>
+                    }
                   </div>
                 </div>
               }
@@ -231,7 +286,7 @@
                 </button>
               }
               @if (turn.errorDetail) {
-                <details class="failure-detail">
+                <details class="failure-detail detail">
                   <summary>{{ 'ai.failure.detail' | t }}</summary>
                   <pre>{{ turn.errorDetail }}</pre>
                   <button type="button" class="btn btn--sm" (click)="copy(turn.errorDetail)">
@@ -247,8 +302,11 @@
   </div>
 }
 
-@if (configured() && !notesOpen()) {
+@if (configured() && !notesOpen() && !review()) {
   <div class="composer">
+    @if (preparationError()) {
+      <p class="failure" role="alert">{{ preparationError() }}</p>
+    }
     @if (contextAllowed() && context().sessionId) {
       <div class="context-selection">
         <button

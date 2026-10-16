@@ -2,9 +2,12 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
+using System.Text;
 using Druse.Application.Ai;
 using Druse.Domain;
 using Druse.Host.LocalApi.Security;
+using Druse.Host.LocalApi.Endpoints;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
@@ -245,6 +248,147 @@ public sealed class AiDiagnosticsTests
             Assert.Equal(HttpStatusCode.Conflict, retry.StatusCode);
             Assert.Equal(1, provider.StreamCalls);
         }
+    }
+
+    [Fact]
+    public async Task LaVistaPreviaNoLlamaAlProveedorYCuentaYConfirmaElMismoTextoUtf8()
+    {
+        var provider = new TestProvider();
+        using var root = new DruseApiFactory();
+        using var host = WithProvider(root, provider);
+        using var client = Client(host);
+        var id = await SaveProfile(client, "schema");
+        const string sql = "SELECT 'á😀';";
+        var request = new AiChatDto(id, [new AiMessageDto("user", "Explica la consulta")],
+            new AiContextDto(new AiSourceDto("c1", "Pruebas", "ventas", "sqlite"), sql, null, []), "gpt-6.1-sol", "schema");
+        using var previewResponse = await client.PostAsJsonAsync("/api/ai/chat/preview", request);
+        previewResponse.EnsureSuccessStatusCode();
+        var preview = (await previewResponse.Content.ReadFromJsonAsync<AiChatPreview>())!;
+        Assert.True(preview.Valid);
+        Assert.Equal(0, provider.StreamCalls);
+        Assert.Equal(Encoding.UTF8.GetByteCount(sql), preview.Usage.SqlBytes);
+        Assert.Equal(preview.Messages.Sum(message => Encoding.UTF8.GetByteCount(message.Text)), preview.Usage.InputBytes);
+        Assert.True(preview.Usage.QuestionReserveTokens > 0);
+        Assert.True(preview.Usage.ResponseReserveTokens > 0);
+        using var sent = await client.PostAsJsonAsync("/api/ai/chat", request with { PreviewHash = preview.Hash });
+        sent.EnsureSuccessStatusCode();
+        var body = await sent.Content.ReadAsStringAsync();
+        using var receipt = JsonDocument.Parse(body.Split("data: ")[1].Split("\n\n")[0]);
+        Assert.Equal(preview.Context, receipt.RootElement.GetProperty("text").GetString());
+        Assert.Equal(preview.Hash, receipt.RootElement.GetProperty("hash").GetString());
+        Assert.Equal(preview.Usage.SqlBytes, receipt.RootElement.GetProperty("usage").GetProperty("sqlBytes").GetInt32());
+        Assert.Equal(preview.Messages.Select(message => message.Text), provider.LastRequest.Messages.Select(message => message.Text));
+    }
+
+    [Theory]
+    [InlineData("MaxSqlBytes", "sql")]
+    [InlineData("MaxSchemaBytes", "schema")]
+    [InlineData("MaxNotesBytes", "notes")]
+    [InlineData("MaxContextBytes", "context")]
+    [InlineData("MaxHistoryBytes", "history")]
+    [InlineData("MaxInputBytes", "input")]
+    [InlineData("MaxQuestionBytes", "question")]
+    [InlineData("MaxHistoryTurns", "turns")]
+    [InlineData("WindowTokens", "budget")]
+    public async Task LosLimitesDeServidorBloqueanExcesosAunqueSeOmitaLaVistaPrevia(string setting, string code)
+    {
+        var provider = new TestProvider();
+        using var root = new DruseApiFactory();
+        using var host = WithProvider(root, provider);
+        using var client = Client(host);
+        var id = await SaveProfile(client, "schema");
+        using var grant = await client.PutAsJsonAsync($"/api/ai/providers/{id}/notes-sharing", new { enabled = true });
+        grant.EnsureSuccessStatusCode();
+        var owner = Guid.NewGuid();
+        var context = new AiContextDto(new AiSourceDto(owner.ToString(), "Pruebas", "ventas", "sqlite"), "SELECT 1", "TABLE facturas;", [],
+            Notes: [new AiBusinessNote(Guid.NewGuid(), owner, "ventas", "Importe sin IVA", true, null, DateTimeOffset.UtcNow)]);
+        var request = new AiChatDto(id, [new("user", "Anterior", context), new("assistant", "Respuesta anterior"), new("user", "Actual")], context,
+            "gpt-6.1-sol", "schema", true);
+        var configuration = host.Services.GetRequiredService<IConfiguration>();
+        configuration[$"AiChat:Defaults:{setting}"] = setting == "MaxHistoryTurns" ? "0" : setting == "WindowTokens" ? "1024" : "1";
+        if (setting == "WindowTokens")
+        {
+            configuration["AiChat:Defaults:QuestionReserveTokens"] = "400";
+            configuration["AiChat:Defaults:ResponseReserveTokens"] = "400";
+        }
+        using var prepared = await client.PostAsJsonAsync("/api/ai/chat/preview", request);
+        prepared.EnsureSuccessStatusCode();
+        var preview = (await prepared.Content.ReadFromJsonAsync<AiChatPreview>())!;
+        Assert.False(preview.Valid);
+        Assert.Contains(preview.Issues, issue => issue.Code == code);
+        Assert.Contains("TABLE facturas;", preview.Context, StringComparison.Ordinal);
+        using var sent = await client.PostAsJsonAsync("/api/ai/chat", request);
+        Assert.Equal(HttpStatusCode.RequestEntityTooLarge, sent.StatusCode);
+        Assert.Equal(0, provider.StreamCalls);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task CambiarElContenidoOLosLimitesInvalidaUnaVistaPrevia(bool changeLimits)
+    {
+        var provider = new TestProvider();
+        using var root = new DruseApiFactory();
+        using var host = WithProvider(root, provider);
+        using var client = Client(host);
+        var id = await SaveProfile(client, "schema");
+        var request = new AiChatDto(id, [new("user", "Original")], null, "gpt-6.1-sol", "schema");
+        using var response = await client.PostAsJsonAsync("/api/ai/chat/preview", request);
+        var preview = (await response.Content.ReadFromJsonAsync<AiChatPreview>())!;
+        if (changeLimits)
+        {
+            host.Services.GetRequiredService<IConfiguration>()["AiChat:Defaults:MaxSqlBytes"] = "1000";
+        }
+        else
+        {
+            request = request with { Messages = [new("user", "Modificada")] };
+        }
+        using var sent = await client.PostAsJsonAsync("/api/ai/chat", request with { PreviewHash = preview.Hash });
+        Assert.Equal(HttpStatusCode.Conflict, sent.StatusCode);
+        Assert.Equal(0, provider.StreamCalls);
+    }
+
+    [Fact]
+    public async Task LaPoliticaDelPerfilRespetaElLimiteUtf8ExactoYDeclaraSuCapacidad()
+    {
+        var provider = new TestProvider();
+        using var root = new DruseApiFactory();
+        using var host = WithProvider(root, provider);
+        using var client = Client(host);
+        var id = await SaveProfile(client, "schema");
+        var configuration = host.Services.GetRequiredService<IConfiguration>();
+        const string sql = "SELECT 'á😀';";
+        configuration["AiChat:Defaults:MaxSqlBytes"] = "1";
+        configuration[$"AiChat:Providers:{id}:MaxSqlBytes"] = Encoding.UTF8.GetByteCount(sql).ToString(System.Globalization.CultureInfo.InvariantCulture);
+        configuration[$"AiChat:Providers:{id}:CapacityKnown"] = "true";
+        var context = new AiContextDto(new AiSourceDto("c1", "Pruebas", "ventas", "sqlite"), sql, null, []);
+        var request = new AiChatDto(id, [new("user", "Pregunta")], context, "gpt-6.1-sol", "schema");
+        using var response = await client.PostAsJsonAsync("/api/ai/chat/preview", request);
+        var preview = (await response.Content.ReadFromJsonAsync<AiChatPreview>())!;
+        Assert.True(preview.Valid);
+        Assert.True(preview.Limits.CapacityKnown);
+        Assert.Equal(preview.Limits.MaxSqlBytes, preview.Usage.SqlBytes);
+        using var exceeded = await client.PostAsJsonAsync("/api/ai/chat", request with { Context = context with { Sql = sql + "+" } });
+        Assert.Equal(HttpStatusCode.RequestEntityTooLarge, exceeded.StatusCode);
+        Assert.Equal(0, provider.StreamCalls);
+    }
+
+    [Fact]
+    public async Task LosLimitesDeSeccionSeAplicanAlContextoPermitido()
+    {
+        var provider = new TestProvider();
+        using var root = new DruseApiFactory();
+        using var host = WithProvider(root, provider);
+        using var client = Client(host);
+        var id = await SaveProfile(client, "nothing");
+        host.Services.GetRequiredService<IConfiguration>()["AiChat:Defaults:MaxSqlBytes"] = "1";
+        using var response = await client.PostAsJsonAsync("/api/ai/chat/preview", new AiChatDto(id, [new("user", "Pregunta")],
+            new AiContextDto(new AiSourceDto("c1", "Pruebas", "ventas", "sqlite"), "SQL no autorizado", null, []), "gpt-6.1-sol", "nothing"));
+        var preview = (await response.Content.ReadFromJsonAsync<AiChatPreview>())!;
+        Assert.True(preview.Valid);
+        Assert.Equal(0, preview.Usage.SqlBytes);
+        Assert.Empty(preview.Context);
+        Assert.DoesNotContain(preview.Messages, message => message.Text.Contains("SQL no autorizado", StringComparison.Ordinal));
     }
 
     private static async Task<Guid> SaveProfile(HttpClient client, string disclosure)

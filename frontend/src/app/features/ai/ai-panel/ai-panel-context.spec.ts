@@ -5,7 +5,7 @@ import { AiPanel } from './ai-panel';
 import { AiCatalog } from '../../../core/ai/ai-catalog';
 import { AiStore } from '../../../core/ai/ai-store';
 import { ApplicationGateway } from '../../../core/application-gateway/application-gateway';
-import { AiProvider, AiStreamEvent } from '../../../shared/models/ai';
+import { AiProvider, AiStreamEvent, AiChatRequest } from '../../../shared/models/ai';
 import { DatabaseObject } from '../../../shared/models/workspace';
 
 const table: DatabaseObject = {
@@ -62,6 +62,41 @@ describe('selección de contexto del panel de IA', () => {
             getTableStructure: () =>
               of({ indexes: [], foreignKeys: [], checkConstraints: [], uniqueConstraints: [] }),
             streamAiChat: stream,
+            previewAiChat: (request: AiChatRequest) =>
+              of({
+                hash: 'preparado',
+                valid: true,
+                issues: [],
+                context: request.context?.schema ?? '',
+                messages: [{ role: 'system', text: 'Instrucciones' }, ...request.messages],
+                limits: {
+                  maxSqlBytes: 16384,
+                  maxSchemaBytes: 32768,
+                  maxNotesBytes: 16384,
+                  maxContextBytes: 49152,
+                  maxHistoryBytes: 32768,
+                  maxInputBytes: 65536,
+                  maxQuestionBytes: 8192,
+                  maxHistoryTurns: 20,
+                  windowTokens: 16384,
+                  questionReserveTokens: 1024,
+                  responseReserveTokens: 2048,
+                  capacityKnown: false,
+                },
+                usage: {
+                  sqlBytes: 9,
+                  schemaBytes: 0,
+                  notesBytes: 0,
+                  contextBytes: 9,
+                  historyBytes: 0,
+                  inputBytes: 100,
+                  questionBytes: 20,
+                  historyTurns: 0,
+                  estimatedTokens: 100,
+                  questionReserveTokens: 900,
+                  responseReserveTokens: 2048,
+                },
+              }),
           },
         },
       ],
@@ -119,10 +154,47 @@ describe('selección de contexto del panel de IA', () => {
     expect(input.value).toBe('Explica facturas');
     catalog.allowPartial.set(true);
     enter(input);
+    await vi.waitFor(() => {
+      fixture.detectChanges();
+      expect(fixture.nativeElement.querySelector('app-ai-preview')).toBeTruthy();
+    });
+    expect(stream).not.toHaveBeenCalled();
+    fixture.nativeElement.querySelector('app-ai-preview .confirm').click();
     await vi.waitFor(() => expect(stream).toHaveBeenCalledTimes(1));
     const request = stream.mock.calls[0][0];
     expect(request.context.warnings[0]).toContain('facturas');
     expect(request.context.schema).toBeUndefined();
+  });
+
+  it('envía la copia revisada aunque cambie el SQL abierto y conserva el hash', async () => {
+    enter(write('Pregunta preparada'));
+    await vi.waitFor(() => {
+      fixture.detectChanges();
+      expect(fixture.nativeElement.querySelector('app-ai-preview')).toBeTruthy();
+    });
+    expect(stream).not.toHaveBeenCalled();
+    fixture.componentRef.setInput('context', { ...context, sql: 'SELECT cambiado;' });
+    fixture.detectChanges();
+    fixture.nativeElement.querySelector('app-ai-preview .confirm').click();
+    expect(stream).toHaveBeenCalledTimes(1);
+    expect(stream.mock.calls[0][0].context.sql).toBe('SELECT 1;');
+    expect(stream.mock.calls[0][0].previewHash).toBe('preparado');
+  });
+
+  it('cambiar de base descarta una vista previa sin enviar', async () => {
+    enter(write('Pregunta preparada'));
+    await vi.waitFor(() => {
+      fixture.detectChanges();
+      expect(fixture.nativeElement.querySelector('app-ai-preview')).toBeTruthy();
+    });
+    fixture.componentRef.setInput('context', {
+      ...context,
+      database: 'otra',
+      source: { ...context.source, database: 'otra' },
+    });
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('app-ai-preview')).toBeNull();
+    expect(stream).not.toHaveBeenCalled();
   });
 
   it('la petición del explorador se consume una vez y editar SQL no vuelve a añadir una tabla quitada', async () => {

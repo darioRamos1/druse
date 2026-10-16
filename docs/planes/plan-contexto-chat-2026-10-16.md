@@ -1,7 +1,7 @@
 # Plan de mejora del contexto del chat — 16 de octubre de 2026
 
-**Estado:** fase A implementada en 1.4.0, fase B en 1.5.0 y fase C en 1.6.0.
-Fases D–E pendientes.
+**Estado:** fase A implementada en 1.4.0, fase B en 1.5.0, fase C en 1.6.0 y
+fase D en 1.7.0. Primera entrega A–D implementada; fase E pendiente.
 
 ## Objetivo
 
@@ -17,8 +17,8 @@ esa regla, sin necesitar que se pegue todo en cada pregunta.
 
 Este documento desarrolla [DRU-11 del plan de interfaz y funcionalidad](plan-ui-funcionalidad-2026-10-02.md#dru-11--continuidad-y-contexto-del-chat).
 Amplía su alcance con selección de metadatos y conocimiento de negocio. Sus
-estimaciones anteriores no cubren esta ampliación. Las fases A y B no cierran
-DRU-11; su cierre requiere verificar las fases A–D.
+estimaciones anteriores no cubren esta ampliación. La primera entrega funcional
+comprende A–D; la fase E amplía los adjuntos de ejecución.
 
 ## Situación inicial comprobada en el código
 
@@ -229,28 +229,62 @@ Las capturas se revisaron en español e inglés, con temas claro y oscuro.
 La compilación de producción mantiene el aviso conocido de presupuesto inicial.
 No se validaron Tauri/WebView2 ni respuestas de modelos externos.
 
-**Siguiente paso:** fase D, vista previa completa y límites de contexto e historial.
+**Siguiente paso tras la fase C:** fase D, vista previa completa y límites de contexto e historial.
 
 ### Fase D — Vista previa, límites y cierre de la primera entrega
 
-- [ ] Mostrar el contexto que se enviará antes de la primera pregunta y permitir
+- [x] Mostrar el contexto que se enviará antes de la primera pregunta y permitir
   consultarlo por turno después. Corregir el indicador actual para que el pasado
   no se calcule desde la selección presente.
-- [ ] Establecer límites configurables y validados en servidor para tamaño por
+- [x] Establecer límites configurables y validados en servidor para tamaño por
   sección, contexto total e historial. El recuento de caracteres/bytes puede ser
   exacto; cualquier estimación de tokens debe identificarse como aproximada.
-- [ ] Reservar espacio para pregunta y respuesta según las capacidades conocidas
+- [x] Reservar espacio para pregunta y respuesta según las capacidades conocidas
   del proveedor. Si se desconocen, usar un límite conservador documentado.
-- [ ] Ante exceso, proponer quitar objetos, reducir historial o iniciar otra
+- [x] Ante exceso, proponer quitar objetos, reducir historial o iniciar otra
   conversación. No cortar silenciosamente tablas elegidas ni claves compuestas.
-- [ ] Al reducir historial, señalar qué turnos dejan de acompañar la pregunta;
+- [x] Al reducir historial, señalar qué turnos dejan de acompañar la pregunta;
   conservar la conversación visible. No añadir resúmenes automáticos en esta entrega.
-- [ ] Distinguir bloques SQL de otros lenguajes antes de ofrecer insertar o
+- [x] Distinguir bloques SQL de otros lenguajes antes de ofrecer insertar o
   reemplazar código, según el pendiente original de DRU-11.
 
 **Aceptación:** lo visto en la vista previa y lo registrado para el proveedor
 coinciden; el tamaño tiene un límite comprobable; ningún bloque JSON ofrece
 reemplazar SQL. Las fases A–D juntas constituyen la primera entrega funcional.
+
+**Entrega del 16 de octubre de 2026 — 1.7.0.** El servidor compone una vista
+previa sin invocar al proveedor. El chat muestra la pregunta, el contexto real,
+el historial incluido y los tamaños antes de confirmar. Una copia inmutable y
+un hash ligado a perfil, destino, contenido y política impiden enviar una
+revisión que cambió. Cada turno conserva lo revisado y la confirmación del
+servidor, además del historial elegido; reintentar reutiliza esa copia.
+
+Se validan bytes UTF-8 por sección, contexto, historial, pregunta y entrada
+completa, más número de preguntas y presupuesto estimado con reservas. Los
+límites se configuran en servidor, globalmente o por perfil. Los conectores
+actuales no informan capacidades verificadas: se aplica el presupuesto
+conservador documentado en [ADR 0010](../decisions/0010-vista-previa-y-presupuesto-del-chat.md).
+La estimación de tokens y la reserva de salida son orientativas; no se afirma
+un recuento del modelo ni se limita su generación. Los excesos bloquean la
+confirmación y reciben 413 en servidor aunque se omita la vista previa.
+
+El historial solo se reduce por elección explícita, con parejas completas,
+indicando qué preguntas quedan fuera y conservándolas en pantalla. Los bloques
+sin etiqueta, JSON, Python y otros lenguajes ofrecen copiar; las acciones del
+editor solo aparecen para etiquetas SQL explícitas, también durante streaming.
+
+**Comprobaciones:** tipado, guarda de idiomas y 314 pruebas del frontend,
+incluidas novedades, catálogo, notas, cancelación, selección, historial,
+reintento y transporte SSE; 30 pruebas de integración para permisos, notas,
+composición, límites por sección, UTF-8 y cambios posteriores a una revisión.
+Los seis recorridos de navegador usan SQLite real, composición real del servidor
+para notas/vista previa y respuestas simuladas. Se revisaron capturas en ambos
+idiomas, en temas claro/oscuro y con una ventana de 900 px. La compilación de
+producción conserva el aviso conocido de presupuesto del paquete inicial.
+
+**Siguiente paso:** fase E, adjuntos de ejecución revisables. Quedan pendientes
+las comprobaciones nativas en Tauri/WebView2, otros motores de servidor y las
+inferencias con proveedores externos; no se simulan como verificadas.
 
 ### Fase E — Adjuntos de ejecución, segunda entrega
 

@@ -463,8 +463,11 @@ cancelación y claridad sobre truncamiento. Integrar DRU-07 y DRU-09.
 detalla selección de tablas, relaciones, notas de negocio y fases de entrega.
 La fase A se implementa en 1.4.0: conversaciones por base/proveedor, contexto
 por pregunta y reintento. La fase B, en 1.5.0, añade selección de tablas y sus
-relaciones reales; notas, vista previa y límites siguen pendientes. El alcance
-ampliado tiene estimación propia en ese plan.
+relaciones reales; la C, en 1.6.0, notas persistentes y permiso por proveedor.
+La D, en 1.7.0, completa la primera entrega con vista previa del servidor,
+límites y reducción explícita del historial, y acciones del editor solo para
+bloques SQL. El plan detalla las pruebas y las verificaciones nativas y de
+proveedores externos pendientes. Los adjuntos de ejecución pertenecen a la fase E.
 
 **Hallazgo.** La conversación es global, crece sin un presupuesto visible y
 permanece al cambiar de proveedor. Los turnos no registran proveedor, modelo,

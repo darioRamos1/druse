@@ -33,6 +33,50 @@ export async function prepararContextoChat(page: Page): Promise<ChatRequest[]> {
       },
     }),
   );
+  await page.route('**/api/ai/chat/preview', (route) => {
+    const request = route.request().postDataJSON() as ChatRequest;
+    return route.fulfill({
+      json: {
+        hash: 'vista-simulada',
+        valid: true,
+        issues: [],
+        context: [request.context?.sql, request.context?.schema]
+          .filter(Boolean)
+          .join('\n\n'),
+        messages: [
+          { role: 'system', text: 'Asistente de prueba' },
+          ...request.messages,
+        ],
+        limits: {
+          maxSqlBytes: 16384,
+          maxSchemaBytes: 32768,
+          maxNotesBytes: 16384,
+          maxContextBytes: 49152,
+          maxHistoryBytes: 32768,
+          maxInputBytes: 65536,
+          maxQuestionBytes: 8192,
+          maxHistoryTurns: 20,
+          windowTokens: 16384,
+          questionReserveTokens: 1024,
+          responseReserveTokens: 2048,
+          capacityKnown: false,
+        },
+        usage: {
+          sqlBytes: Buffer.byteLength(request.context?.sql ?? ''),
+          schemaBytes: Buffer.byteLength(request.context?.schema ?? ''),
+          notesBytes: 0,
+          contextBytes: 0,
+          historyBytes: 0,
+          inputBytes: 1000,
+          questionBytes: 30,
+          historyTurns: (request.messages.length - 1) / 2,
+          estimatedTokens: 400,
+          questionReserveTokens: 1000,
+          responseReserveTokens: 2048,
+        },
+      },
+    });
+  });
   await page.route('**/api/ai/chat', (route) => {
     const request = route.request().postDataJSON() as ChatRequest;
     requests.push(request);
@@ -69,6 +113,9 @@ export async function comprobarContextoChat(
   );
   await panel.locator('textarea').fill('Explica esta consulta');
   await panel.locator('textarea').press('Enter');
+  await expect(panel.locator('app-ai-preview')).toBeVisible();
+  if (capture) await capture('vista-previa');
+  await confirmarEnvio(page);
   await expect(panel.locator('.failure')).toBeVisible();
   await panel.locator('.context-detail summary').click();
   await expect(panel.locator('.context-detail pre')).toContainText(
@@ -94,6 +141,7 @@ export async function comprobarContextoChat(
   await expect(panel.locator('.turn--user')).toHaveCount(0);
   await panel.locator('textarea').fill('Pregunta del segundo proveedor');
   await panel.locator('textarea').press('Enter');
+  await confirmarEnvio(page);
   await expect(panel.locator('.sql__code')).toBeVisible();
   expect(requests[2].messages).toHaveLength(1);
   await panel.locator('.picker__current').click();
@@ -142,4 +190,11 @@ export async function comprobarNotasContexto(
     .fill('Los importes se expresan sin IVA.');
   await capture('notas-negocio');
   await button.click();
+}
+
+export async function confirmarEnvio(page: Page): Promise<void> {
+  await page
+    .locator('app-ai-panel app-ai-preview')
+    .getByRole('button', { name: t('ai.preview.send'), exact: true })
+    .click();
 }

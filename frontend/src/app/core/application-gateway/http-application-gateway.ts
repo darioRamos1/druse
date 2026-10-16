@@ -69,6 +69,8 @@ import { DesktopHost } from './desktop-host';
 import { translate } from '../i18n/active';
 import {
   AiChatRequest,
+  AiChatPreview,
+  AiChatUsage,
   AiBusinessNote,
   AiDisclosure,
   AiProbeResult,
@@ -117,6 +119,8 @@ function parseEvent(block: string, failed: string): AiStreamEvent | null {
       providerId: string;
       model: string;
       disclosure: AiDisclosure;
+      hash?: string;
+      usage?: AiChatUsage;
     };
 
     if (nombre === 'context') {
@@ -126,6 +130,8 @@ function parseEvent(block: string, failed: string): AiStreamEvent | null {
         providerId: payload.providerId,
         model: payload.model,
         disclosure: payload.disclosure,
+        ...(payload.hash ? { hash: payload.hash } : {}),
+        ...(payload.usage ? { usage: payload.usage } : {}),
       };
     }
 
@@ -743,6 +749,10 @@ export class HttpApplicationGateway extends ApplicationGateway {
    */
   override streamAiChat(request: AiChatRequest): Observable<AiStreamEvent> {
     return this.stream('/api/ai/chat', request);
+  }
+
+  override previewAiChat(request: AiChatRequest): Observable<AiChatPreview> {
+    return this._http.post<AiChatPreview>('/api/ai/chat/preview', request);
   }
 
   override streamAiProviderTest(request: SaveAiProviderRequest): Observable<AiStreamEvent> {

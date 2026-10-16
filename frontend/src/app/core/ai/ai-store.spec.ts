@@ -330,6 +330,7 @@ describe('AiStore', () => {
     stream.next({
       kind: 'context',
       text: 'Contexto filtrado',
+      hash: 'revisado',
       providerId: 'p1',
       model: provider.model,
       disclosure: 'schema',
@@ -337,6 +338,7 @@ describe('AiStore', () => {
     stream.next({ kind: 'chunk', text: 'respuesta' });
     stream.complete();
     expect(store.turns()[0].request?.sentContext).toBe('Contexto filtrado');
+    expect(store.turns()[0].request?.sentHash).toBe('revisado');
     store.ask('segunda');
     expect(lastRequest!.messages[0].context?.sql).toBe('SELECT 1');
     expect(store.turns()[0].request?.sentContext).toBe('Contexto filtrado');
@@ -391,5 +393,47 @@ describe('AiStore', () => {
     stream.complete();
     store.ask('otra pregunta');
     expect(lastRequest!.messages.map((message) => message.text)).toEqual(['otra pregunta']);
+  });
+
+  it('prepara sin enviar y reduce el historial sin quitar mensajes visibles', async () => {
+    const store = await ready();
+    store.ask('primera', context());
+    stream.next({ kind: 'chunk', text: 'respuesta primera' });
+    stream.complete();
+    stream = new Subject<AiStreamEvent>();
+    store.ask('segunda');
+    stream.next({ kind: 'chunk', text: 'respuesta segunda' });
+    stream.complete();
+    stream = new Subject<AiStreamEvent>();
+    const snapshot = store.prepare('tercera', context(), 1)!;
+    expect(subscriptions).toBe(2);
+    expect(store.turns()).toHaveLength(4);
+    expect(snapshot.historyTurnIndices).toEqual([2]);
+    expect(snapshot.omittedTurnIndices).toEqual([0]);
+    expect(snapshot.payload.messages.map((message) => message.text)).toEqual([
+      'segunda',
+      'respuesta segunda',
+      'tercera',
+    ]);
+    expect(store.sendPrepared(snapshot)).toBe(true);
+    expect(store.turns()).toHaveLength(6);
+    stream.next({ kind: 'error', message: 'Falló' });
+    stream.complete();
+    const originalPayload = lastRequest;
+    stream = new Subject<AiStreamEvent>();
+    store.retry();
+    expect(lastRequest).toEqual(originalPayload);
+    expect(store.turns()).toHaveLength(6);
+  });
+
+  it('no envía una copia preparada para otro proveedor o base', async () => {
+    const store = await ready();
+    const request = store.prepare('preparada', context())!;
+    store.use('p2');
+    expect(store.sendPrepared(request)).toBe(false);
+    store.use('p1');
+    store.setSource({ ...context().source, database: 'otra' });
+    expect(store.sendPrepared(request)).toBe(false);
+    expect(subscriptions).toBe(0);
   });
 });

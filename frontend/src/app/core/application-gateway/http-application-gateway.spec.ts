@@ -112,7 +112,7 @@ describe('contrato SSE de las pruebas de IA', () => {
   it('recibe la confirmación de contexto del servidor aunque llegue fragmentada', async () => {
     response([
       'event: con',
-      'text\ndata: {"text":"Motor: sqlite","providerId":"p1","model":"modelo","disclosure":"schema"}\n\n',
+      'text\ndata: {"text":"Motor: sqlite","providerId":"p1","model":"modelo","disclosure":"schema","hash":"revisado","usage":{"sqlBytes":9,"estimatedTokens":100}}\n\n',
       'event: chunk\ndata: {"text":"OK"}\n\nevent: done\ndata: {}\n\n',
     ]);
     const events = await lastValueFrom(
@@ -128,6 +128,8 @@ describe('contrato SSE de las pruebas de IA', () => {
     expect(events[0]).toEqual({
       kind: 'context',
       text: 'Motor: sqlite',
+      hash: 'revisado',
+      usage: { sqlBytes: 9, estimatedTokens: 100 },
       providerId: 'p1',
       model: 'modelo',
       disclosure: 'schema',

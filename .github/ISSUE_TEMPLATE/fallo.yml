@@ -17,7 +17,7 @@ body:
     attributes:
       label: Versión de Druse
       description: Aparece en Preferencias, junto con la variante (completa o sin Informix).
-      placeholder: '1.6.0 completa'
+      placeholder: '1.7.0 completa'
     validations:
       required: true
 

@@ -12,7 +12,7 @@ El repositorio es público. La [beta de Comunidad 1.3.0 para Windows x64](https:
 
 SignPath rechazó por ahora la solicitud el 9 de octubre por falta de reconocimiento público. El [plan de reaplicación](docs/planes/plan-reaplicacion-signpath-2026-10-11.md) reúne las pruebas externas y verificaciones pendientes; no hay firma concedida.
 
-> **Estado: versión 1.6.0.** Funciona el flujo completo contra **PostgreSQL, SQL Server y MySQL/MariaDB**: conectar, explorar el catálogo, escribir SQL con ayudas de esquema, ejecutar, cancelar, consultar el historial, **exportar e importar CSV o Excel** y **editar filas desde la cuadrícula**, todo dentro de una aplicación de escritorio que no necesita .NET ni Node.js instalados. Las [notas de la primera beta](docs/release-notes/0.1.0-beta.md) siguen describiendo con qué números se comprobó ese flujo.
+> **Estado: versión 1.7.0.** Funciona el flujo completo contra **PostgreSQL, SQL Server y MySQL/MariaDB**: conectar, explorar el catálogo, escribir SQL con ayudas de esquema, ejecutar, cancelar, consultar el historial, **exportar e importar CSV o Excel** y **editar filas desde la cuadrícula**, todo dentro de una aplicación de escritorio que no necesita .NET ni Node.js instalados. Las [notas de la primera beta](docs/release-notes/0.1.0-beta.md) siguen describiendo con qué números se comprobó ese flujo.
 
 ## Editar, importar y exportar
 

@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { abrir, apuntarPestanaA } from '../support/druse';
+import { confirmarEnvio } from '../support/ai-context';
 import { t } from '../support/i18n';
 import type { AiChatRequest } from '../../frontend/src/app/shared/models/ai';
 
@@ -110,6 +111,7 @@ for (const locale of ['es', 'en']) {
       await panel
         .getByRole('button', { name: t('ai.send'), exact: true })
         .click();
+      await confirmarEnvio(page);
       await expect.poll(() => requests.length).toBe(before + 1);
       await expect(panel.locator('.thinking')).toHaveCount(0);
     };

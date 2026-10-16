@@ -24,6 +24,7 @@ import {
 } from '../../shared/models/workspace';
 import {
   AiChatRequest,
+  AiChatPreview,
   AiBusinessNote,
   AiProbeResult,
   AiProvider,
@@ -810,6 +811,7 @@ export abstract class ApplicationGateway {
    * palabra no. Cancelar la suscripción corta la petición.
    */
   abstract streamAiChat(request: AiChatRequest): Observable<AiStreamEvent>;
+  abstract previewAiChat(request: AiChatRequest): Observable<AiChatPreview>;
 }
 
 /** Qué clase de sitio es una entrada del selector, para pintarle su icono. */

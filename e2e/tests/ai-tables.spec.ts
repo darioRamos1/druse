@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { abrir, escribirSql, apuntarPestanaA } from '../support/druse';
-import { prepararContextoChat } from '../support/ai-context';
+import { prepararContextoChat, confirmarEnvio } from '../support/ai-context';
 import { t } from '../support/i18n';
 
 const directory = join(tmpdir(), 'druse-chat-tablas');
@@ -98,6 +98,7 @@ for (const locale of ['es', 'en']) {
     await panel
       .getByRole('button', { name: t('ai.send'), exact: true })
       .click();
+    await confirmarEnvio(page);
     await expect(panel.locator('.failure')).toBeVisible();
     expect(requests).toHaveLength(1);
     const schema = requests[0].context?.schema ?? '';
