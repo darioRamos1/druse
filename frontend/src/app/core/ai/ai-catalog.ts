@@ -36,7 +36,7 @@ export class AiCatalog {
   private selectionVersion = 0;
   private readonly remembered = new Map<string, readonly DatabaseObject[]>();
   private readonly listing = new Subject<void>();
-  private listed = false;
+  readonly catalogComplete = signal(false);
   private readonly tasks = new Map<string, { stop: Subject<void>; done: Promise<void> }>();
   private readonly _selected = signal<readonly AiSelectedTable[]>([]);
   private readonly _catalog = signal<readonly DatabaseObject[]>([]);
@@ -79,7 +79,7 @@ export class AiCatalog {
     this.selectionVersion++;
     this.signature = signature;
     this._catalog.set([]);
-    this.listed = false;
+    this.catalogComplete.set(false);
     this.catalogError.set('');
     this.allowPartial.set(false);
     const tables = this.remembered.get(this.scope()) ?? [];
@@ -214,11 +214,13 @@ export class AiCatalog {
   }
 
   async loadCatalog(force = false): Promise<void> {
-    if (!this.target?.sessionId || this.catalogLoading() || (this.listed && !force)) return;
+    if (!this.target?.sessionId || this.catalogLoading() || (this.catalogComplete() && !force))
+      return;
     this.listing.next();
     const generation = this.generation;
     const target = this.target;
     this.catalogLoading.set(true);
+    this.catalogComplete.set(false);
     this.catalogError.set('');
     const found: DatabaseObject[] = [];
     const visited = new Set<string>();
@@ -260,7 +262,7 @@ export class AiCatalog {
       await walk({ ...database, database: target.source.database }, 0);
       if (generation !== this.generation) return;
       this._catalog.set([...new Map(found.map((table) => [aiTableKey(table), table])).values()]);
-      this.listed = errors.length === 0;
+      this.catalogComplete.set(errors.length === 0);
       this.catalogError.set(errors.join('\n'));
     } catch (error) {
       if (generation === this.generation)

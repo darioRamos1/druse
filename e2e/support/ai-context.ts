@@ -124,3 +124,22 @@ export async function comprobarSelectorContexto(
   await expect(panel.locator('.catalog-status')).toBeHidden();
   await capture('selector-tablas');
 }
+
+/** Las notas se editan localmente aunque el proveedor aún no tenga permiso. */
+export async function comprobarNotasContexto(
+  page: Page,
+  capture: (name: string) => Promise<void>,
+): Promise<void> {
+  const panel = page.locator('app-ai-panel');
+  const button = panel.getByRole('button', {
+    name: t('ai.notes.title'),
+    exact: true,
+  });
+  await button.click();
+  await expect(panel.locator('app-ai-notes form')).toBeVisible();
+  await panel
+    .getByLabel(t('ai.notes.text'), { exact: true })
+    .fill('Los importes se expresan sin IVA.');
+  await capture('notas-negocio');
+  await button.click();
+}

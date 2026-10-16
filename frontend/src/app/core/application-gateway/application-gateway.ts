@@ -24,6 +24,7 @@ import {
 } from '../../shared/models/workspace';
 import {
   AiChatRequest,
+  AiBusinessNote,
   AiProbeResult,
   AiProvider,
   AiProviderList,
@@ -756,6 +757,11 @@ export abstract class ApplicationGateway {
 
   /** Proveedores configurados y dónde se guardan sus claves. */
   abstract getAiProviders(): Observable<AiProviderList>;
+
+  abstract getAiNotes(): Observable<readonly AiBusinessNote[]>;
+  abstract saveAiNote(note: AiBusinessNote): Observable<AiBusinessNote>;
+  abstract deleteAiNote(id: string): Observable<void>;
+  abstract setAiNotesSharing(id: string, enabled: boolean): Observable<AiProvider>;
 
   /** Crea o actualiza un proveedor. La clave solo viaja de ida. */
   abstract saveAiProvider(request: SaveAiProviderRequest): Observable<AiProvider>;

@@ -195,6 +195,58 @@ public sealed class AiDiagnosticsTests
         Assert.Equal(0, provider.StreamCalls);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task LasNotasRequierenPermisoYSeFiltranPorBaseTablaEstadoYFormato(bool enabled)
+    {
+        var provider = new TestProvider();
+        using var root = new DruseApiFactory();
+        using var host = WithProvider(root, provider);
+        using var client = Client(host);
+        var id = await SaveProfile(client, "schema");
+        using var grant = await client.PutAsJsonAsync($"/api/ai/providers/{id}/notes-sharing", new { enabled });
+        grant.EnsureSuccessStatusCode();
+        var owner = Guid.NewGuid();
+        var note = new AiBusinessNote(Guid.NewGuid(), owner, "ventas", "BASE_PERMITIDA", true, null, DateTimeOffset.UtcNow);
+        var attached = new
+        {
+            source = new { connectionId = owner.ToString(), connectionName = "Pruebas", database = "ventas", engine = "sqlite" },
+            tables = new[] { "\"main\".\"facturas\"" },
+            notes = new[] { note, note with { Text = "TABLA_PERMITIDA", Reference = new AiNoteReference("t1", "main", "facturas", "table", "importe") },
+                note with { Text = "AJENA_CONEXION", ConnectionId = Guid.NewGuid() }, note with { Text = "AJENA_BASE", Database = "otra" },
+                note with { Text = "AJENA_TABLA", Reference = new AiNoteReference("t2", "main", "clientes", "table") },
+                note with { Text = "AJENA_ESTADO", Enabled = false }, note with { Text = "AJENA_FORMATO", FormatVersion = 2 } },
+        };
+        using var response = await client.PostAsJsonAsync("/api/ai/chat", new
+        {
+            providerId = id, model = "gpt-6.1-sol", disclosure = "schema", shareBusinessNotes = enabled, context = attached,
+            messages = new object[] { new { role = "user", text = "Anterior", context = attached }, new { role = "assistant", text = "Respuesta", context = (object?)null },
+                new { role = "user", text = "Actual", context = (object?)null } },
+        });
+        response.EnsureSuccessStatusCode();
+        var body = await response.Content.ReadAsStringAsync();
+        foreach (var text in provider.LastRequest.Messages.Where(message => message.Role == AiRole.User).Select(message => message.Text))
+        {
+            Assert.Equal(enabled, text.Contains("BASE_PERMITIDA", StringComparison.Ordinal));
+            Assert.Equal(enabled, text.Contains("TABLA_PERMITIDA", StringComparison.Ordinal));
+            Assert.DoesNotContain("AJENA_", text, StringComparison.Ordinal);
+        }
+        Assert.Equal(enabled, body.Contains("BASE_PERMITIDA", StringComparison.Ordinal));
+        if (enabled)
+        {
+            using var revoked = await client.PutAsJsonAsync($"/api/ai/providers/{id}/notes-sharing", new { enabled = false });
+            revoked.EnsureSuccessStatusCode();
+            using var retry = await client.PostAsJsonAsync("/api/ai/chat", new
+            {
+                providerId = id, model = "gpt-6.1-sol", disclosure = "schema", shareBusinessNotes = true, context = attached,
+                messages = new[] { new { role = "user", text = "Actual" } },
+            });
+            Assert.Equal(HttpStatusCode.Conflict, retry.StatusCode);
+            Assert.Equal(1, provider.StreamCalls);
+        }
+    }
+
     private static async Task<Guid> SaveProfile(HttpClient client, string disclosure)
     {
         using var saved = await client.PostAsJsonAsync("/api/ai/providers", new

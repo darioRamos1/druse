@@ -9,6 +9,17 @@
 
   <span class="head__spacer"></span>
 
+  <button
+    type="button"
+    class="notes-toggle"
+    (click)="notesOpen.set(!notesOpen())"
+    [attr.aria-label]="'ai.notes.title' | t"
+    [attr.aria-expanded]="notesOpen()"
+    aria-controls="chat-notes"
+  >
+    {{ 'ai.notes.open' | t }}
+  </button>
+
   @if (active(); as provider) {
     <div class="picker">
       <button
@@ -73,156 +84,170 @@
   </div>
 }
 
-<div class="body">
-  @if (!configured()) {
-    <!--
+@if (notesOpen()) {
+  <app-ai-notes
+    id="chat-notes"
+    [source]="noteSource()"
+    [saved]="!!context().connectionSaved"
+    [includeTables]="includeSchema()"
+    [connectionIds]="context().knownConnectionIds ?? []"
+  />
+} @else {
+  <div class="body">
+    @if (!configured()) {
+      <!--
       Sin proveedores no hay asistente. Se dice y se ofrece el paso siguiente, en
       lugar de enseñar un cuadro de texto que fallaría al pulsar enviar.
     -->
-    <div class="empty">
-      <div class="empty__mark"><app-icon name="sparkles" [size]="19" /></div>
-      <div class="empty__title">{{ 'ai.chooseWho' | t }}</div>
-      <p class="empty__text">{{ 'ai.chooseWhoText' | t }}</p>
-      <button type="button" class="btn btn--primary" (click)="configure.emit()">
-        {{ 'ai.configureOne' | t }}
-      </button>
-    </div>
-  } @else if (turns().length === 0) {
-    <div class="empty">
-      <div class="empty__mark"><app-icon name="sparkles" [size]="19" /></div>
-      <div class="empty__title">
-        @if (context().database) {
-          @for (part of askParts(context().database); track $index) {
-            @if (part.tag === 'database') {
-              <code>{{ part.text }}</code>
-            } @else {
-              {{ part.text }}
-            }
-          }
-        } @else {
-          {{ 'ai.askAboutSql' | t }}
-        }
+      <div class="empty">
+        <div class="empty__mark"><app-icon name="sparkles" [size]="19" /></div>
+        <div class="empty__title">{{ 'ai.chooseWho' | t }}</div>
+        <p class="empty__text">{{ 'ai.chooseWhoText' | t }}</p>
+        <button type="button" class="btn btn--primary" (click)="configure.emit()">
+          {{ 'ai.configureOne' | t }}
+        </button>
       </div>
-      <p class="empty__text">{{ 'ai.runsNothing' | t: { promise: promise() } }}</p>
+    } @else if (turns().length === 0) {
+      <div class="empty">
+        <div class="empty__mark"><app-icon name="sparkles" [size]="19" /></div>
+        <div class="empty__title">
+          @if (context().database) {
+            @for (part of askParts(context().database); track $index) {
+              @if (part.tag === 'database') {
+                <code>{{ part.text }}</code>
+              } @else {
+                {{ part.text }}
+              }
+            }
+          } @else {
+            {{ 'ai.askAboutSql' | t }}
+          }
+        </div>
+        <p class="empty__text">{{ 'ai.runsNothing' | t: { promise: promise() } }}</p>
 
-      <!--
+        <!--
         Las sugerencias no son genéricas: cada una usa algo que Druse ya tiene
         delante —el editor, el esquema, el motor—, que es lo que un chat en el
         navegador no puede hacer.
       -->
-      <div class="starters">
-        <button type="button" class="starter" (click)="ask('ai.starter.explain')">
-          <app-icon name="format" [size]="14" />
-          <span class="starter__text">
-            <span class="starter__title">{{ 'ai.starter.explainTitle' | t }}</span>
-            <span class="starter__hint">{{ 'ai.starter.explainHint' | t }}</span>
-          </span>
-        </button>
-        <button type="button" class="starter" (click)="suggest('ai.starter.write')">
-          <app-icon name="plus" [size]="14" />
-          <span class="starter__text">
-            <span class="starter__title">{{ 'ai.starter.writeTitle' | t }}</span>
-            <span class="starter__hint">{{ 'ai.starter.writeHint' | t }}</span>
-          </span>
-        </button>
-        <button type="button" class="starter" (click)="ask('ai.starter.slow')">
-          <app-icon name="play-outline" [size]="14" />
-          <span class="starter__text">
-            <span class="starter__title">{{ 'ai.starter.slowTitle' | t }}</span>
-            <span class="starter__hint">{{ 'ai.starter.slowHint' | t }}</span>
-          </span>
-        </button>
-      </div>
-    </div>
-  } @else {
-    @for (turn of turns(); track $index) {
-      @if (turn.role === 'user') {
-        <div class="turn turn--user">
-          <div>{{ turn.text }}</div>
-          @if (turn.request; as request) {
-            <div class="turn__origin">
-              {{ request.provider.name }} · {{ request.provider.model }} ·
-              {{ formatTimestamp(request.createdAt) }}
-            </div>
-            <details class="context-detail">
-              <summary>
-                {{
-                  (request.sentContext === undefined ? 'ai.preparedContext' : 'ai.recordedContext')
-                    | t
-                }}
-              </summary>
-              <pre>{{
-                request.sentContext === undefined
-                  ? preparedContext(request)
-                  : request.sentContext || ('ai.noAttachedContext' | t)
-              }}</pre>
-            </details>
-          }
+        <div class="starters">
+          <button type="button" class="starter" (click)="ask('ai.starter.explain')">
+            <app-icon name="format" [size]="14" />
+            <span class="starter__text">
+              <span class="starter__title">{{ 'ai.starter.explainTitle' | t }}</span>
+              <span class="starter__hint">{{ 'ai.starter.explainHint' | t }}</span>
+            </span>
+          </button>
+          <button type="button" class="starter" (click)="suggest('ai.starter.write')">
+            <app-icon name="plus" [size]="14" />
+            <span class="starter__text">
+              <span class="starter__title">{{ 'ai.starter.writeTitle' | t }}</span>
+              <span class="starter__hint">{{ 'ai.starter.writeHint' | t }}</span>
+            </span>
+          </button>
+          <button type="button" class="starter" (click)="ask('ai.starter.slow')">
+            <app-icon name="play-outline" [size]="14" />
+            <span class="starter__text">
+              <span class="starter__title">{{ 'ai.starter.slowTitle' | t }}</span>
+              <span class="starter__hint">{{ 'ai.starter.slowHint' | t }}</span>
+            </span>
+          </button>
         </div>
-      } @else {
-        <div class="turn turn--assistant">
-          @for (part of turn.parts; track $index) {
-            @if (part.kind === 'text') {
-              <p class="prose">{{ part.text }}</p>
-            } @else {
-              <div class="sql">
-                <div class="sql__head">
-                  <span class="sql__label" translate="no">SQL</span>
-                  <span class="head__spacer"></span>
-                  <span class="sql__lines">
-                    {{ 'ai.lines' | t: { count: part.text.split('\n').length } }}
-                  </span>
-                </div>
-                <pre class="sql__code">{{ part.text }}</pre>
-                <div class="sql__foot">
-                  <button
-                    type="button"
-                    class="btn btn--primary btn--sm"
-                    (click)="
-                      part.action === 'replace' ? replace.emit(part.text) : insert.emit(part.text)
-                    "
-                  >
-                    <app-icon name="plus" [size]="11" />
-                    {{ (part.action === 'replace' ? 'ai.replaceQuery' : 'ai.insertInEditor') | t }}
-                  </button>
-                  <button type="button" class="btn btn--sm" (click)="copy(part.text)">
-                    {{ 'ai.copy' | t }}
-                  </button>
-                  <span class="head__spacer"></span>
-                  <span class="sql__warning">{{ 'ai.notRun' | t }}</span>
-                </div>
+      </div>
+    } @else {
+      @for (turn of turns(); track $index) {
+        @if (turn.role === 'user') {
+          <div class="turn turn--user">
+            <div>{{ turn.text }}</div>
+            @if (turn.request; as request) {
+              <div class="turn__origin">
+                {{ request.provider.name }} · {{ request.provider.model }} ·
+                {{ formatTimestamp(request.createdAt) }}
               </div>
-            }
-          }
-
-          @if (turn.streaming && turn.text.length === 0) {
-            <div class="thinking"><span></span><span></span><span></span></div>
-          }
-
-          @if (turn.error) {
-            <div class="failure">{{ turn.error }}</div>
-            @if ($last) {
-              <button type="button" class="btn btn--sm" (click)="retry()" [disabled]="busy()">
-                {{ 'ai.retryQuestion' | t }}
-              </button>
-            }
-            @if (turn.errorDetail) {
-              <details class="failure-detail">
-                <summary>{{ 'ai.failure.detail' | t }}</summary>
-                <pre>{{ turn.errorDetail }}</pre>
-                <button type="button" class="btn btn--sm" (click)="copy(turn.errorDetail)">
-                  {{ 'ai.failure.copy' | t }}
-                </button>
+              <details class="context-detail">
+                <summary>
+                  {{
+                    (request.sentContext === undefined
+                      ? 'ai.preparedContext'
+                      : 'ai.recordedContext'
+                    ) | t
+                  }}
+                </summary>
+                <pre>{{
+                  request.sentContext === undefined
+                    ? preparedContext(request)
+                    : request.sentContext || ('ai.noAttachedContext' | t)
+                }}</pre>
               </details>
             }
-          }
-        </div>
+          </div>
+        } @else {
+          <div class="turn turn--assistant">
+            @for (part of turn.parts; track $index) {
+              @if (part.kind === 'text') {
+                <p class="prose">{{ part.text }}</p>
+              } @else {
+                <div class="sql">
+                  <div class="sql__head">
+                    <span class="sql__label" translate="no">SQL</span>
+                    <span class="head__spacer"></span>
+                    <span class="sql__lines">
+                      {{ 'ai.lines' | t: { count: part.text.split('\n').length } }}
+                    </span>
+                  </div>
+                  <pre class="sql__code">{{ part.text }}</pre>
+                  <div class="sql__foot">
+                    <button
+                      type="button"
+                      class="btn btn--primary btn--sm"
+                      (click)="
+                        part.action === 'replace' ? replace.emit(part.text) : insert.emit(part.text)
+                      "
+                    >
+                      <app-icon name="plus" [size]="11" />
+                      {{
+                        (part.action === 'replace' ? 'ai.replaceQuery' : 'ai.insertInEditor') | t
+                      }}
+                    </button>
+                    <button type="button" class="btn btn--sm" (click)="copy(part.text)">
+                      {{ 'ai.copy' | t }}
+                    </button>
+                    <span class="head__spacer"></span>
+                    <span class="sql__warning">{{ 'ai.notRun' | t }}</span>
+                  </div>
+                </div>
+              }
+            }
+
+            @if (turn.streaming && turn.text.length === 0) {
+              <div class="thinking"><span></span><span></span><span></span></div>
+            }
+
+            @if (turn.error) {
+              <div class="failure">{{ turn.error }}</div>
+              @if ($last) {
+                <button type="button" class="btn btn--sm" (click)="retry()" [disabled]="busy()">
+                  {{ 'ai.retryQuestion' | t }}
+                </button>
+              }
+              @if (turn.errorDetail) {
+                <details class="failure-detail">
+                  <summary>{{ 'ai.failure.detail' | t }}</summary>
+                  <pre>{{ turn.errorDetail }}</pre>
+                  <button type="button" class="btn btn--sm" (click)="copy(turn.errorDetail)">
+                    {{ 'ai.failure.copy' | t }}
+                  </button>
+                </details>
+              }
+            }
+          </div>
+        }
       }
     }
-  }
-</div>
+  </div>
+}
 
-@if (configured()) {
+@if (configured() && !notesOpen()) {
   <div class="composer">
     @if (contextAllowed() && context().sessionId) {
       <div class="context-selection">

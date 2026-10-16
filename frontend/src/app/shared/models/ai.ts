@@ -34,6 +34,7 @@ export interface AiProvider {
   /** Programa que atiende a un proveedor `localcli`. Vacío en los demás. */
   readonly command: string;
   readonly disclosure: AiDisclosure;
+  readonly shareBusinessNotes?: boolean;
   /**
    * Este perfil inicia sesion por su cuenta, aparte de la del equipo.
    *
@@ -76,6 +77,7 @@ export interface SaveAiProviderRequest {
   readonly model: string;
   readonly command: string;
   readonly disclosure: AiDisclosure;
+  readonly shareBusinessNotes?: boolean;
   readonly ownSession: boolean;
   readonly isDefault: boolean;
   readonly apiKey?: string;
@@ -151,6 +153,7 @@ export interface AiContextSnapshot {
   readonly schema?: string;
   readonly tables: readonly string[];
   readonly warnings?: readonly string[];
+  readonly notes?: readonly AiBusinessNote[];
 }
 
 /** Un turno de la conversación. */
@@ -165,6 +168,7 @@ export interface AiChatRequest {
   readonly providerId: string;
   readonly model: string;
   readonly disclosure: AiDisclosure;
+  readonly shareBusinessNotes?: boolean;
   readonly messages: readonly AiMessage[];
   /**
    * SQL y estructura elegidos para la pregunta actual, separados por categoría.
@@ -199,3 +203,22 @@ export type AiStreamEvent =
       readonly code?: string;
       readonly detail?: string;
     };
+
+export interface AiNoteReference {
+  readonly objectId: string;
+  readonly schema: string;
+  readonly table: string;
+  readonly kind: 'table' | 'view';
+  readonly column?: string | null;
+}
+
+export interface AiBusinessNote {
+  readonly id: string;
+  readonly connectionId: string;
+  readonly database: string;
+  readonly text: string;
+  readonly enabled: boolean;
+  readonly reference: AiNoteReference | null;
+  readonly updatedAtUtc: string;
+  readonly formatVersion: number;
+}

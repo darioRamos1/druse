@@ -78,6 +78,7 @@ export class AiStore {
       provider?.id,
       provider?.model,
       provider?.disclosure,
+      provider?.shareBusinessNotes ?? false,
       provider?.baseUrl,
       provider?.kind,
       provider?.command,
@@ -115,6 +116,13 @@ export class AiStore {
     this._providers.set(list.providers);
     this._canStoreKeys.set(list.canStoreKeys);
     this._storeDescription.set(list.storeDescription);
+  }
+
+  async setNotesSharing(id: string, enabled: boolean): Promise<void> {
+    const saved = await this.once(this._gateway.setAiNotesSharing(id, enabled));
+    this._providers.update((providers) =>
+      providers.map((provider) => (provider.id === id ? saved : provider)),
+    );
   }
 
   use(id: string): void {
@@ -159,7 +167,13 @@ export class AiStore {
       source: { ...this._source() },
       provider: { ...provider },
       createdAt: new Date().toISOString(),
-      context: provider.disclosure === 'nothing' || !context ? undefined : cloneContext(context),
+      context:
+        provider.disclosure === 'nothing' || !context
+          ? undefined
+          : cloneContext({
+              ...context,
+              notes: provider.shareBusinessNotes ? context.notes : undefined,
+            }),
     };
     this.patch(
       key,
@@ -211,6 +225,7 @@ export class AiStore {
           providerId: request.provider.id,
           model: request.provider.model,
           disclosure: request.provider.disclosure,
+          shareBusinessNotes: request.provider.shareBusinessNotes ?? false,
           messages: history,
           context: request.context,
         })
@@ -299,5 +314,9 @@ function cloneContext(context: AiContextSnapshot): AiContextSnapshot {
     source: { ...context.source },
     tables: [...context.tables],
     warnings: context.warnings ? [...context.warnings] : undefined,
+    notes: context.notes?.map((note) => ({
+      ...note,
+      reference: note.reference ? { ...note.reference } : null,
+    })),
   };
 }

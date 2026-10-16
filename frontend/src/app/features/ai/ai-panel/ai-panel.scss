@@ -651,3 +651,16 @@
     }
   }
 }
+
+.notes-toggle {
+  flex: none;
+  white-space: nowrap;
+  background: var(--dr-surface-panel);
+  color: var(--dr-text-dim);
+  border: 1px solid var(--dr-border);
+  border-radius: var(--dr-radius-sm);
+  padding: 3px 6px;
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}

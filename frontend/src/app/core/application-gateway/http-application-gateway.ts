@@ -69,6 +69,7 @@ import { DesktopHost } from './desktop-host';
 import { translate } from '../i18n/active';
 import {
   AiChatRequest,
+  AiBusinessNote,
   AiDisclosure,
   AiProbeResult,
   AiProvider,
@@ -669,6 +670,22 @@ export class HttpApplicationGateway extends ApplicationGateway {
   }
 
   // --- Asistente -------------------------------------------------------------
+
+  override getAiNotes(): Observable<readonly AiBusinessNote[]> {
+    return this._http.get<readonly AiBusinessNote[]>('/api/ai/notes');
+  }
+
+  override saveAiNote(note: AiBusinessNote): Observable<AiBusinessNote> {
+    return this._http.put<AiBusinessNote>(`/api/ai/notes/${note.id}`, note);
+  }
+
+  override deleteAiNote(id: string): Observable<void> {
+    return this._http.delete<void>(`/api/ai/notes/${id}`);
+  }
+
+  override setAiNotesSharing(id: string, enabled: boolean): Observable<AiProvider> {
+    return this._http.put<AiProvider>(`/api/ai/providers/${id}/notes-sharing`, { enabled });
+  }
 
   override getAiProviders(): Observable<AiProviderList> {
     return this._http.get<AiProviderList>('/api/ai/providers');

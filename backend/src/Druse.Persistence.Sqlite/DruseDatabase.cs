@@ -67,7 +67,7 @@ public sealed class DruseDatabase
     }
 
     /// <summary>Versión del esquema que escribe esta compilación.</summary>
-    private const int SchemaVersion = 9;
+    private const int SchemaVersion = 10;
 
     /// <summary>
     /// Crea el esquema si falta y aplica lo que le falte al archivo del usuario.
@@ -314,6 +314,25 @@ public sealed class DruseDatabase
             "own_session",
             "INTEGER NOT NULL DEFAULT 0",
             cancellationToken);
+
+        // El permiso de notas es independiente del esquema y nace desactivado al actualizar.
+        await AddColumnIfMissingAsync(connection, "ai_providers", "share_business_notes", "INTEGER NOT NULL DEFAULT 0", cancellationToken);
+
+        // Sin cascada: una conexión eliminada deja notas pendientes de revisar, no texto perdido.
+        await ExecuteAsync(connection, """
+            CREATE TABLE IF NOT EXISTS ai_business_notes (
+                id TEXT NOT NULL PRIMARY KEY,
+                connection_id TEXT NOT NULL,
+                database_name TEXT NOT NULL,
+                text TEXT NOT NULL,
+                enabled INTEGER NOT NULL DEFAULT 1,
+                reference_json TEXT NULL,
+                updated_at_utc TEXT NOT NULL,
+                format_version INTEGER NOT NULL DEFAULT 1
+            );
+            CREATE INDEX IF NOT EXISTS ix_ai_business_notes_scope
+                ON ai_business_notes (connection_id, database_name, updated_at_utc DESC);
+            """, cancellationToken);
 
         // Diagramas entidad-relación guardados.
         //

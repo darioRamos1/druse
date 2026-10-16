@@ -42,6 +42,8 @@ describe('AiStore', () => {
     const gateway = {
       getAiProviders: () => of({ providers, canStoreKeys: true, storeDescription: 'Credenciales' }),
       saveAiProvider: () => of(savedProvider),
+      setAiNotesSharing: (_id: string, enabled: boolean) =>
+        of({ ...provider, shareBusinessNotes: enabled }),
       streamAiChat: (request: AiChatRequest) => {
         lastRequest = request;
 
@@ -338,6 +340,48 @@ describe('AiStore', () => {
     store.ask('segunda');
     expect(lastRequest!.messages[0].context?.sql).toBe('SELECT 1');
     expect(store.turns()[0].request?.sentContext).toBe('Contexto filtrado');
+  });
+
+  it('aísla el historial al cambiar el permiso y conserva las notas originales al reintentar', async () => {
+    const store = await ready();
+    const note = {
+      id: 'n1',
+      connectionId: 'c1',
+      database: 'ventas',
+      text: 'Sin IVA',
+      enabled: true,
+      reference: {
+        objectId: 't1',
+        schema: 'public',
+        table: 'facturas',
+        kind: 'table' as const,
+        column: 'importe',
+      },
+      updatedAtUtc: '2026-10-16T00:00:00Z',
+      formatVersion: 1,
+    };
+    store.ask('sin permiso', { ...context(), notes: [note] });
+    expect(lastRequest!.context?.notes).toBeUndefined();
+    store.cancel();
+    await store.setNotesSharing('p1', true);
+    expect(store.turns()).toEqual([]);
+    stream = new Subject<AiStreamEvent>();
+    store.ask('con permiso', { ...context(), notes: [note] });
+    stream.next({ kind: 'error', message: 'Falló' });
+    stream.complete();
+    note.text = 'Con IVA';
+    note.reference.column = 'otra';
+    stream = new Subject<AiStreamEvent>();
+    store.retry();
+    expect(lastRequest!.shareBusinessNotes).toBe(true);
+    expect(lastRequest!.context?.notes?.[0].text).toBe('Sin IVA');
+    expect(lastRequest!.context?.notes?.[0].reference?.column).toBe('importe');
+    store.cancel();
+    await store.setNotesSharing('p1', false);
+    expect(store.turns()[0].text).toBe('sin permiso');
+    store.ask('otra sin permiso', { ...context(), notes: [note] });
+    expect(lastRequest!.shareBusinessNotes).toBe(false);
+    expect(lastRequest!.messages.map((message) => message.text)).not.toContain('con permiso');
   });
 
   it('omite también la pregunta de una respuesta fallida al continuar', async () => {

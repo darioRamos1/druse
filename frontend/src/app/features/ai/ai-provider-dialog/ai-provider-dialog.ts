@@ -763,6 +763,7 @@ export class AiProviderDialog {
       command: this.command().trim(),
       disclosure: this.staysHere() ? ('schema' as AiDisclosure) : this.disclosure(),
       ownSession: this.ownSession(),
+      shareBusinessNotes: editing?.shareBusinessNotes ?? false,
       // El primero que se configura es el que se usa: nadie configura uno para
       // luego tener que ir a marcarlo.
       isDefault: editing?.isDefault ?? this.providers().length === 0,

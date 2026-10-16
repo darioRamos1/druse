@@ -118,4 +118,7 @@ public sealed record AiProviderProfile
 
     /// <summary>El que se usa mientras el usuario no elija otro.</summary>
     public bool IsDefault { get; init; }
+
+    /// <summary>Compartir conocimiento de negocio requiere una elección aparte del esquema.</summary>
+    public bool ShareBusinessNotes { get; init; }
 }

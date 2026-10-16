@@ -15,7 +15,7 @@ namespace Druse.Persistence.Sqlite;
 public sealed class SqliteAiProviderStore(DruseDatabase database) : IAiProviderStore
 {
     private const string Columns =
-        "id, name, kind, base_url, model, command, own_session, disclosure, is_default, created_at_utc";
+        "id, name, kind, base_url, model, command, own_session, disclosure, is_default, created_at_utc, share_business_notes";
 
     private readonly DruseDatabase _database = database;
 
@@ -69,7 +69,7 @@ public sealed class SqliteAiProviderStore(DruseDatabase database) : IAiProviderS
         // orden de la lista.
         command.CommandText = $"""
             INSERT INTO ai_providers ({Columns})
-            VALUES ($id, $name, $kind, $baseUrl, $model, $command, $ownSession, $disclosure, $isDefault, $created)
+            VALUES ($id, $name, $kind, $baseUrl, $model, $command, $ownSession, $disclosure, $isDefault, $created, $shareNotes)
             ON CONFLICT (id) DO UPDATE SET
                 name = excluded.name,
                 kind = excluded.kind,
@@ -78,7 +78,8 @@ public sealed class SqliteAiProviderStore(DruseDatabase database) : IAiProviderS
                 command = excluded.command,
                 own_session = excluded.own_session,
                 disclosure = excluded.disclosure,
-                is_default = excluded.is_default;
+                is_default = excluded.is_default,
+                share_business_notes = excluded.share_business_notes;
             """;
 
         command.Parameters.AddWithValue("$id", profile.Id.ToString());
@@ -89,6 +90,7 @@ public sealed class SqliteAiProviderStore(DruseDatabase database) : IAiProviderS
         command.Parameters.AddWithValue("$command", profile.Command);
         command.Parameters.AddWithValue("$ownSession", profile.OwnSession ? 1 : 0);
         command.Parameters.AddWithValue("$disclosure", (int)profile.Disclosure);
+        command.Parameters.AddWithValue("$shareNotes", profile.ShareBusinessNotes ? 1 : 0);
         command.Parameters.AddWithValue("$isDefault", profile.IsDefault ? 1 : 0);
         command.Parameters.AddWithValue(
             "$created",
@@ -119,5 +121,6 @@ public sealed class SqliteAiProviderStore(DruseDatabase database) : IAiProviderS
         OwnSession = reader.GetInt32(6) != 0,
         Disclosure = (AiDisclosure)reader.GetInt32(7),
         IsDefault = reader.GetInt32(8) != 0,
+        ShareBusinessNotes = reader.GetInt32(10) != 0,
     };
 }

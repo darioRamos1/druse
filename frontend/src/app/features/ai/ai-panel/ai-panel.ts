@@ -21,6 +21,8 @@ import { AiCatalog, aiTableKey } from '../../../core/ai/ai-catalog';
 import { qualifiedName } from '../../../core/ai/ai-context';
 import { DatabaseObject } from '../../../shared/models/workspace';
 import { AiSource } from '../../../shared/models/ai';
+import { AiNotesStore, eligibleNotes } from '../../../core/ai/ai-notes-store';
+import { AiNotes } from '../ai-notes/ai-notes';
 
 /** Un trozo de respuesta ya separado en prosa y SQL. */
 export interface ChatPart {
@@ -48,6 +50,8 @@ export interface AiContext {
   readonly source?: AiSource;
   readonly sessionId?: string;
   readonly revision?: number;
+  readonly connectionSaved?: boolean;
+  readonly knownConnectionIds?: readonly string[];
 }
 
 /**
@@ -66,7 +70,7 @@ export interface AiContext {
  */
 @Component({
   selector: 'app-ai-panel',
-  imports: [Icon, TranslatePipe],
+  imports: [Icon, TranslatePipe, AiNotes],
   templateUrl: './ai-panel.html',
   styleUrl: './ai-panel.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -76,6 +80,16 @@ export class AiPanel {
   private readonly _i18n = inject(I18nService);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   protected readonly catalog = inject(AiCatalog);
+  protected readonly notes = inject(AiNotesStore);
+  protected readonly notesOpen = signal(false);
+  protected readonly noteSource = computed(
+    () =>
+      this.context().source ?? {
+        connectionId: '',
+        connectionName: '',
+        database: this.context().database,
+      },
+  );
   readonly requestedTable = input<DatabaseObject | null>(null);
   protected readonly selectorOpen = signal(false);
   protected readonly catalogQuery = signal('');
@@ -83,6 +97,7 @@ export class AiPanel {
   protected readonly tableKey = aiTableKey;
   protected readonly tableName = qualifiedName;
   private mention: { start: number; end: number } | null = null;
+  private preparation = 0;
   protected readonly matches = computed(() => {
     const query = this.catalogQuery().toLowerCase();
     return this.catalog
@@ -135,6 +150,16 @@ export class AiPanel {
       context.source.database,
       context.source.schema,
       context.warnings?.join('\n'),
+      ...(context.notes ?? []).map(
+        (note) =>
+          `${note.database} · ${
+            note.reference
+              ? [note.reference.schema, note.reference.table, note.reference.column]
+                  .filter(Boolean)
+                  .join('.')
+              : this._i18n.t('ai.notes.base')
+          } (${this.formatTimestamp(note.updatedAtUtc)}):\n${note.text}`,
+      ),
       composeContext(
         {
           sql: context.sql ?? '',
@@ -164,7 +189,10 @@ export class AiPanel {
           this.openContextPicker();
         });
     });
-    inject(DestroyRef).onDestroy(() => this.catalog.pause());
+    inject(DestroyRef).onDestroy(() => {
+      this.preparation++;
+      this.catalog.pause();
+    });
   }
 
   private activateContext(context: AiContext): void {
@@ -264,9 +292,12 @@ export class AiPanel {
     const context = this.context();
     const provider = this.active();
     if (!provider) return;
+    const includeSchema = this.includeSchema();
+    const includeSql = this.includeSql();
+    const preparation = ++this.preparation;
     this.preparing.set(true);
     try {
-      if (this.contextAllowed() && this.includeSchema() && this.catalog.selected().length) {
+      if (this.contextAllowed() && includeSchema && this.catalog.selected().length) {
         const current = await this.catalog.refreshSelected();
         if (
           !current ||
@@ -280,6 +311,18 @@ export class AiPanel {
           return;
         }
       }
+      if (this.contextAllowed() && provider.shareBusinessNotes && !(await this.notes.load())) {
+        this.notesOpen.set(true);
+        return;
+      }
+      if (
+        preparation !== this.preparation ||
+        this.active() !== provider ||
+        this.context().sessionId !== context.sessionId ||
+        this.context().source?.connectionId !== context.source?.connectionId ||
+        this.context().database !== context.database
+      )
+        return;
       this._store.ask(
         text,
         this.contextAllowed()
@@ -289,12 +332,18 @@ export class AiPanel {
                 connectionName: '',
                 database: context.database,
               },
-              sql: this.includeSql() ? context.sql.trim() || undefined : undefined,
-              schema: this.includeSchema()
-                ? this.catalog.described().schema || undefined
-                : undefined,
-              tables: this.includeSchema() ? [...this.catalog.names()] : [],
-              warnings: this.includeSchema() ? [...this.catalog.warnings()] : [],
+              sql: includeSql ? context.sql.trim() || undefined : undefined,
+              schema: includeSchema ? this.catalog.described().schema || undefined : undefined,
+              tables: includeSchema ? [...this.catalog.names()] : [],
+              warnings: includeSchema ? [...this.catalog.warnings()] : [],
+              notes:
+                provider.shareBusinessNotes && context.connectionSaved
+                  ? eligibleNotes(
+                      this.notes.notes(),
+                      this.noteSource(),
+                      includeSchema ? this.catalog.selected() : [],
+                    )
+                  : undefined,
             }
           : undefined,
       );
@@ -347,6 +396,7 @@ export class AiPanel {
   }
 
   protected cancel(): void {
+    this.preparation++;
     if (this.preparing()) this.catalog.pause();
     this._store.cancel();
   }

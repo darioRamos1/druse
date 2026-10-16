@@ -1,6 +1,7 @@
 # Plan de mejora del contexto del chat — 16 de octubre de 2026
 
-**Estado:** fase A implementada en 1.4.0 y fase B en 1.5.0. Fases C–E pendientes.
+**Estado:** fase A implementada en 1.4.0, fase B en 1.5.0 y fase C en 1.6.0.
+Fases D–E pendientes.
 
 ## Objetivo
 
@@ -178,25 +179,57 @@ memoria durante la sesión; las notas persistentes, la vista previa completa
 antes de enviar y el presupuesto de contexto siguen pendientes. La decisión
 está en [ADR 0008](../decisions/0008-seleccion-de-tablas-para-el-chat.md).
 
-**Siguiente paso:** fase C, conocimiento de negocio por base.
+**Siguiente paso tras la fase B:** fase C, conocimiento de negocio por base.
 
 ### Fase C — Conocimiento de negocio por base
 
-- [ ] Añadir notas generales de la base y notas asociadas a tablas o columnas.
+- [x] Añadir notas generales de la base y notas asociadas a tablas o columnas.
   Cada nota contiene texto, ámbito y fecha de modificación.
-- [ ] Persistirlas en el almacenamiento local existente mediante un contrato
+- [x] Persistirlas en el almacenamiento local existente mediante un contrato
   versionado. Revisar si preferencias ofrece tamaño y operaciones suficientes;
   si no, usar un repositorio específico con migración.
-- [ ] Incluir únicamente notas generales activadas y notas de los objetos
+- [x] Incluir únicamente notas generales activadas y notas de los objetos
   seleccionados; mostrar cuáles se compartirán.
-- [ ] Definir el comportamiento al renombrar/eliminar objetos o conexiones: no
+- [x] Definir el comportamiento al renombrar/eliminar objetos o conexiones: no
   reasignar notas por coincidencia de nombre; mostrar las referencias pendientes.
-- [ ] Mantener las notas como conocimiento aportado por la persona, separado de
+- [x] Mantener las notas como conocimiento aportado por la persona, separado de
   los hechos del catálogo y de las instrucciones internas del asistente.
 
 **Aceptación:** las notas sobreviven a reiniciar Druse y reconectar, quedan
 aisladas por conexión/base y se pueden excluir sin borrarlas. Una nota que
 contradice el catálogo no cambia la estructura declarada como real.
+
+**Entrega del 16 de octubre de 2026 — 1.6.0.** «Notas» abre un editor de reglas
+generales y notas de tablas/vistas o columnas seleccionadas. Cada nota se guarda
+en SQLite por separado, con fecha UTC, activación, propietario y referencia
+versionada. El permiso de compartir se concede por proveedor y comienza
+desactivado, también para perfiles existentes. Editar un proveedor conserva
+ese permiso; cambiarlo aísla el historial y el servidor rechaza peticiones
+preparadas con otro valor.
+
+Solo se adjuntan notas activas de la conexión/base actual y de objetos incluidos
+con detalle comprobado. Excluir el esquema excluye las notas de sus objetos.
+Cada pregunta conserva una copia profunda; editar o desactivar notas cambia
+las preguntas futuras. Las notas se describen como conocimiento de la persona,
+separado del catálogo, pidiendo señalar las contradicciones.
+
+Los objetos ausentes y las conexiones eliminadas dejan notas visibles,
+pendientes de vinculación manual. «Mostrar notas de todas las conexiones» permite
+recuperarlas. El formato desconocido se conserva y no se comparte ni sobrescribe.
+Los límites de identidad y el reparto de comprobaciones entre cliente y servidor
+están documentados en [ADR 0009](../decisions/0009-notas-de-negocio-para-el-chat.md).
+
+**Comprobaciones:** compilación de backend y frontend, tipado y catálogo de
+idiomas, 300 pruebas del frontend, 31 pruebas unitarias de persistencia y
+validación, y 16 de integración de notas/contexto. Cuatro recorridos de navegador
+usan SQLite real y chat simulado: comprueban selección, persistencia, permisos,
+columnas y tablas renombradas y notas de conexiones eliminadas, sin cuentas
+ni inferencias externas.
+Las capturas se revisaron en español e inglés, con temas claro y oscuro.
+La compilación de producción mantiene el aviso conocido de presupuesto inicial.
+No se validaron Tauri/WebView2 ni respuestas de modelos externos.
+
+**Siguiente paso:** fase D, vista previa completa y límites de contexto e historial.
 
 ### Fase D — Vista previa, límites y cierre de la primera entrega
 

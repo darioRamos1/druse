@@ -194,6 +194,11 @@ export class AppShell {
     return {
       database,
       sessionId: connection?.sessionId,
+      connectionSaved: connection?.saved ?? false,
+      knownConnectionIds: this._store
+        .connections()
+        .filter((item) => item.saved)
+        .map((item) => item.id),
       revision: this._store.catalogRevision(),
       source: {
         connectionId: connection?.id ?? '',

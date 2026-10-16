@@ -3,7 +3,7 @@ import { expect, test, type Locator, type Page } from '@playwright/test';
 import { abrir, apuntarPestana, conectar, ejecutar, escribirSql, situarCursor } from '../support/druse';
 import { medir } from '../support/medir';
 import { comprobarDiagnosticoIa, prepararDiagnosticoIa } from '../support/ai-diagnostics';
-import { comprobarContextoChat, prepararContextoChat, comprobarSelectorContexto } from '../support/ai-context';
+import { comprobarContextoChat, prepararContextoChat, comprobarSelectorContexto, comprobarNotasContexto } from '../support/ai-context';
 
 /**
  * Barrido visual de toda la aplicación: recorre pantallas y diálogos, los
@@ -624,6 +624,7 @@ test.describe('barrido visual', () => {
     await comprobarContextoChat(page, contextoRequests,
       name => foto(page, `15c-${name}`, asistente));
     await comprobarSelectorContexto(page, name => foto(page, `15d-${name}`, asistente));
+    await comprobarNotasContexto(page, name => foto(page, `15e-${name}`, asistente));
     await page.getByRole('button', { name: 'Asistente', exact: true }).click();
     await expect(asistente).toBeHidden();
 
