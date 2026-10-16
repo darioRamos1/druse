@@ -1,6 +1,6 @@
 # Plan de mejora del contexto del chat — 16 de octubre de 2026
 
-**Estado:** propuesto, pendiente de implementación.
+**Estado:** fase A implementada en 1.4.0. Fases B–E pendientes.
 
 ## Objetivo
 
@@ -16,10 +16,10 @@ esa regla, sin necesitar que se pegue todo en cada pregunta.
 
 Este documento desarrolla [DRU-11 del plan de interfaz y funcionalidad](plan-ui-funcionalidad-2026-10-02.md#dru-11--continuidad-y-contexto-del-chat).
 Amplía su alcance con selección de metadatos y conocimiento de negocio. Sus
-estimaciones anteriores no cubren esta ampliación. Crear este plan no cierra
-DRU-11 ni cambia el comportamiento de la aplicación.
+estimaciones anteriores no cubren esta ampliación. La fase A no cierra DRU-11;
+su cierre requiere verificar las fases A–D.
 
-## Situación actual comprobada en el código
+## Situación inicial comprobada en el código
 
 | Pieza | Comportamiento actual | Limitación |
 | --- | --- | --- |
@@ -78,21 +78,50 @@ comparte cuando se incorpora a la selección visible.
 
 ### Fase A — Contrato, aislamiento y copia del contexto
 
-- [ ] Definir un contexto tipado con origen, motor, base, esquema, SQL opcional,
-  objetos, relaciones, notas y avisos de omisión.
-- [ ] Asociar cada conversación a conexión/base y perfil/modelo. El identificador
+- [x] Definir un contexto tipado con origen, motor, base, SQL opcional, esquema
+  y nombres de tablas. Las relaciones, notas y avisos se incorporan con B–D.
+- [x] Asociar cada conversación a conexión/base y perfil/modelo. El identificador
   de sesión sirve para validar lecturas, pero no para identificar notas persistidas.
-- [ ] Registrar por turno proveedor, modelo, fecha y contexto realmente enviado.
-- [ ] Componer y validar las categorías en backend antes de llamar al proveedor;
+- [x] Registrar por pregunta proveedor, modelo, fecha y contexto preparado,
+  con confirmación de composición del servidor.
+- [x] Componer y validar las categorías en backend antes de llamar al proveedor;
   devolver un resumen de lo enviado que coincida con la interfaz.
-- [ ] Al cambiar base, proveedor o modelo, conservar los turnos en su conversación
+- [x] Al cambiar base, proveedor o modelo, conservar los turnos en su conversación
   de origen. Una respuesta en curso permanece asociada al origen.
-- [ ] Añadir reintento con la misma copia de contexto, sin duplicar la pregunta;
+- [x] Añadir reintento con la misma copia de contexto, sin duplicar la pregunta;
   volver a comprobar los permisos vigentes antes de reenviar.
 
 **Aceptación:** una respuesta de la base A no aparece como respuesta de la B;
 editar SQL o notas mientras llega una respuesta no altera el contexto registrado;
 un cambio de proveedor no reenvía silenciosamente el historial anterior.
+
+**Entrega del 16 de octubre de 2026 — 1.4.0.** El contexto de cada pregunta
+conserva SQL y esquema por separado, origen, proveedor, modelo y fecha. El
+servidor confirma su composición y rechaza modelos o permisos desactualizados.
+Cada base/proveedor conserva su conversación en memoria, con suscripciones
+independientes y reintento de la última respuesta fallida sin duplicar la pregunta.
+El contexto histórico acompaña a su pregunta dentro del mensaje de usuario para
+mantener la asociación también con Anthropic y Gemini. La decisión está en
+[ADR 0007](../decisions/0007-contexto-del-chat-por-pregunta.md).
+
+**Verificación:** TypeScript de aplicación y E2E, guarda de idiomas, 102 pruebas
+del frontend (IA, gateway, novedades y shell), 12 de integración de IA y dos
+recorridos Chromium en español e inglés. Se revisaron las capturas de los dos
+temas, incluido el panel a 900 px de ventana, con proveedores simulados. El
+barrido general reutiliza el mismo recorrido; no se ejecutó entero porque
+requiere PostgreSQL. No se verificaron inferencias externas, motores de servidor
+ni Tauri/WebView2.
+
+El arranque de trabajadores `forks` de Vitest agotó su tiempo en este equipo.
+Las pruebas se ejecutaron correctamente con una configuración temporal ignorada
+en `frontend/.angular/chat-vitest.config.mjs`, usando `pool: 'threads'`,
+`maxWorkers: 1`, `testTimeout: 20000` y `hookTimeout: 30000`, pasada a
+`ng test --runner-config=.angular/chat-vitest.config.mjs`. No se cambió la
+configuración del proyecto.
+
+**Siguiente paso:** fase B, selector de tablas y lectura detallada de relaciones.
+La vista previa antes de preguntar, las notas y los límites de historial
+permanecen pendientes en sus fases. Las conversaciones se pierden al cerrar Druse.
 
 ### Fase B — Selección de tablas y lectura de relaciones
 

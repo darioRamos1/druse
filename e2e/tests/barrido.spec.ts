@@ -3,6 +3,7 @@ import { expect, test, type Locator, type Page } from '@playwright/test';
 import { abrir, apuntarPestana, conectar, ejecutar, escribirSql, situarCursor } from '../support/druse';
 import { medir } from '../support/medir';
 import { comprobarDiagnosticoIa, prepararDiagnosticoIa } from '../support/ai-diagnostics';
+import { comprobarContextoChat, prepararContextoChat } from '../support/ai-context';
 
 /**
  * Barrido visual de toda la aplicación: recorre pantallas y diálogos, los
@@ -618,6 +619,12 @@ test.describe('barrido visual', () => {
 
     await page.getByRole('button', { name: 'Asistente', exact: true }).click();
     await expect(asistente).toBeHidden({ timeout: 10_000 });
+
+    const contextoRequests = await prepararContextoChat(page);
+    await comprobarContextoChat(page, contextoRequests,
+      name => foto(page, `15c-${name}`, asistente));
+    await page.getByRole('button', { name: 'Asistente', exact: true }).click();
+    await expect(asistente).toBeHidden();
 
     // --- Tema claro en las dos pantallas que más se miran ------------------
     await page.getByRole('button', { name: 'Tema claro' }).click();

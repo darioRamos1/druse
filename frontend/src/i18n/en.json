@@ -157,10 +157,7 @@
   "ai.schemaOff": "Stop sending the structure",
   "ai.schemaOn": "Send the structure of the tables",
   "ai.send": "Send",
-  "ai.sentAnd": " and ",
-  "ai.sentContext": "Context sent:",
   "ai.sentSql": "SQL from the editor",
-  "ai.sentStructure": "structure of",
   "ai.sqlOff": "Stop sending the open SQL",
   "ai.sqlOn": "Send the open SQL",
   "ai.starter.explain": "Explain the query I have in the editor.",
@@ -1739,5 +1736,13 @@
   "whatsNew.v1_2_0.builder": "Query builder: IN with a list or a subquery, simpler calculations, column search and a notice when the preview is out of date.",
   "whatsNew.v1_2_0.informix": "Informix over SQLI now connects to databases that don't use Latin-1.",
   "whatsNew.v1_2_0.explorer": "The explorer no longer shows “0” rows when the engine doesn't report a count.",
-  "whatsNew.v1_2_0.whatsNew": "This section: every time Druse updates, it will open on its own to tell you what's new."
+  "whatsNew.v1_2_0.whatsNew": "This section: every time Druse updates, it will open on its own to tell you what's new.",
+  "ai.noConnection": "No connection",
+  "ai.noDatabase": "No database selected",
+  "ai.conversationScope": "Each database and provider keeps its conversation during this session.",
+  "ai.preparedContext": "View prepared context",
+  "ai.recordedContext": "View question context",
+  "ai.noAttachedContext": "No attached context.",
+  "ai.retryQuestion": "Retry question",
+  "whatsNew.v1_4_0.chatContext": "Chat keeps separate conversations for each database and provider, lets you inspect the context of each question and retry a failed response."
 }

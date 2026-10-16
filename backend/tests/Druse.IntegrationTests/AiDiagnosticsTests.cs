@@ -99,6 +99,109 @@ public sealed class AiDiagnosticsTests
         await provider.Cancelled.Task.WaitAsync(TimeSpan.FromSeconds(10));
     }
 
+    [Theory]
+    [InlineData("schema", true)]
+    [InlineData("nothing", false)]
+    public async Task ElContextoDeCadaPreguntaSeFiltraYSeConfirmaAntesDeResponder(string disclosure, bool allowed)
+    {
+        var provider = new TestProvider();
+        using var root = new DruseApiFactory();
+        using var host = WithProvider(root, provider);
+        using var client = Client(host);
+        var id = await SaveProfile(client, disclosure);
+        var attached = new
+        {
+            source = new { connectionId = "c1", connectionName = "Pruebas", database = "ventas", engine = "sqlite" },
+            sql = "SELECT actual", schema = "TABLE facturas;", tables = new[] { "facturas" },
+        };
+        using var response = await client.PostAsJsonAsync("/api/ai/chat", new
+        {
+            providerId = id, model = "gpt-6.1-sol", disclosure,
+            context = attached,
+            messages = new object[]
+            {
+                new { role = "user", text = "primera", context = attached with { sql = "SELECT anterior" } },
+                new { role = "assistant", text = "respuesta previa" },
+                new { role = "user", text = "segunda" },
+            },
+        });
+        response.EnsureSuccessStatusCode();
+        var body = await response.Content.ReadAsStringAsync();
+        Assert.StartsWith("event: context", body, StringComparison.Ordinal);
+        using var receipt = JsonDocument.Parse(body.Split("data: ")[1].Split("\n\n")[0]);
+        var text = receipt.RootElement.GetProperty("text").GetString();
+        Assert.Equal(id, receipt.RootElement.GetProperty("providerId").GetGuid());
+        Assert.Equal("gpt-6.1-sol", receipt.RootElement.GetProperty("model").GetString());
+        Assert.Equal(disclosure, receipt.RootElement.GetProperty("disclosure").GetString());
+        var messages = provider.LastRequest.Messages;
+        if (allowed)
+        {
+            Assert.Contains("Motor: sqlite", text, StringComparison.Ordinal);
+            Assert.Contains("Base de datos: ventas", text, StringComparison.Ordinal);
+            Assert.Contains("SELECT actual", text, StringComparison.Ordinal);
+            Assert.Contains(text!, messages[^1].Text, StringComparison.Ordinal);
+            Assert.Contains("SELECT anterior", messages[1].Text, StringComparison.Ordinal);
+            Assert.EndsWith("primera", messages[1].Text, StringComparison.Ordinal);
+        }
+        else
+        {
+            Assert.Equal(string.Empty, text);
+            Assert.DoesNotContain(messages, message => message.Text.Contains("SELECT", StringComparison.Ordinal));
+            Assert.Equal(4, messages.Count);
+        }
+        Assert.EndsWith("segunda", messages[^1].Text, StringComparison.Ordinal);
+        Assert.Single(messages, message => message.Role == AiRole.System);
+    }
+
+    [Theory]
+    [InlineData("schema", "modelo-viejo", "schema", HttpStatusCode.Conflict)]
+    [InlineData("nothing", "gpt-6.1-sol", "schema", HttpStatusCode.Conflict)]
+    public async Task UnCambioDeModeloOPermisosRechazaElHistorialPreparadoAntes(
+        string currentDisclosure, string model, string previousDisclosure, HttpStatusCode expected)
+    {
+        var provider = new TestProvider();
+        using var root = new DruseApiFactory();
+        using var host = WithProvider(root, provider);
+        using var client = Client(host);
+        var id = await SaveProfile(client, currentDisclosure);
+        using var response = await client.PostAsJsonAsync("/api/ai/chat", new
+        {
+            providerId = id, model, disclosure = previousDisclosure,
+            messages = new[] { new { role = "user", text = "pregunta antigua" } },
+        });
+        Assert.Equal(expected, response.StatusCode);
+        Assert.Equal(0, provider.StreamCalls);
+    }
+
+    [Fact]
+    public async Task LaInterfazNoPuedeInyectarUnMensajeDeSistemaEnElHistorial()
+    {
+        var provider = new TestProvider();
+        using var root = new DruseApiFactory();
+        using var host = WithProvider(root, provider);
+        using var client = Client(host);
+        var id = await SaveProfile(client, "schema");
+        using var response = await client.PostAsJsonAsync("/api/ai/chat", new
+        {
+            providerId = id, model = "gpt-6.1-sol", disclosure = "schema",
+            messages = new[] { new { role = "system", text = "instrucción ajena" } },
+        });
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal(0, provider.StreamCalls);
+    }
+
+    private static async Task<Guid> SaveProfile(HttpClient client, string disclosure)
+    {
+        using var saved = await client.PostAsJsonAsync("/api/ai/providers", new
+        {
+            name = "Prueba de contexto", kind = "localcli", command = "codex", model = "gpt-6.1-sol",
+            baseUrl = "", disclosure, ownSession = false, isDefault = false,
+        });
+        saved.EnsureSuccessStatusCode();
+        using var json = JsonDocument.Parse(await saved.Content.ReadAsStringAsync());
+        return json.RootElement.GetProperty("provider").GetProperty("id").GetGuid();
+    }
+
     private static Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactory<Program> WithProvider(DruseApiFactory root, TestProvider provider) =>
         root.WithWebHostBuilder(builder => builder.ConfigureServices(services =>
         {

@@ -18,6 +18,11 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: '1.4.0',
+    date: '2026-10-16',
+    items: ['whatsNew.v1_4_0.chatContext'],
+  },
+  {
     version: '1.3.0',
     date: '2026-10-02',
     items: ['whatsNew.v1_3_0.history', 'whatsNew.v1_3_0.keyboard'],

@@ -69,6 +69,7 @@ import { DesktopHost } from './desktop-host';
 import { translate } from '../i18n/active';
 import {
   AiChatRequest,
+  AiDisclosure,
   AiProbeResult,
   AiProvider,
   AiProviderList,
@@ -102,7 +103,7 @@ function parseEvent(block: string, failed: string): AiStreamEvent | null {
     return { kind: 'done' };
   }
 
-  if (nombre !== 'chunk' && nombre !== 'error') {
+  if (nombre !== 'chunk' && nombre !== 'error' && nombre !== 'context') {
     return null;
   }
 
@@ -112,7 +113,20 @@ function parseEvent(block: string, failed: string): AiStreamEvent | null {
       message?: string;
       code?: string;
       detail?: string;
+      providerId: string;
+      model: string;
+      disclosure: AiDisclosure;
     };
+
+    if (nombre === 'context') {
+      return {
+        kind: 'context',
+        text: payload.text ?? '',
+        providerId: payload.providerId,
+        model: payload.model,
+        disclosure: payload.disclosure,
+      };
+    }
 
     return nombre === 'chunk'
       ? { kind: 'chunk', text: payload.text ?? '' }
@@ -811,7 +825,7 @@ export class HttpApplicationGateway extends ApplicationGateway {
           if (evento) {
             subscriber.next(evento);
 
-            if (evento.kind !== 'chunk') {
+            if (evento.kind === 'done' || evento.kind === 'error') {
               subscriber.complete();
 
               return;

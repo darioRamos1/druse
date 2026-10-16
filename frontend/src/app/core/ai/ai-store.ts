@@ -5,6 +5,8 @@ import { ApplicationGateway } from '../application-gateway/application-gateway';
 import { I18nService } from '../i18n/i18n.service';
 import { aiFailureMessage } from './ai-failure';
 import {
+  AiContextSnapshot,
+  AiSource,
   AiMessage,
   AiProvider,
   AiProviderList,
@@ -17,9 +19,25 @@ export interface ChatTurn {
   readonly text: string;
   /** Todavía llegando. Solo puede serlo el último. */
   readonly streaming?: boolean;
+  /** Copia de la petición: cambiar de base o editar el SQL no reescribe el pasado. */
+  readonly request?: AiChatRequestSnapshot;
   /** El proveedor falló a media respuesta. Se enseña debajo de lo que sí llegó. */
   readonly error?: string;
   readonly errorDetail?: string;
+}
+
+export interface AiChatRequestSnapshot {
+  readonly source: AiSource;
+  readonly provider: AiProvider;
+  readonly createdAt: string;
+  readonly context?: AiContextSnapshot;
+  /** Confirmación del servidor de lo preparado para el proveedor. */
+  readonly sentContext?: string;
+}
+
+interface Conversation {
+  readonly turns: readonly ChatTurn[];
+  readonly busy: boolean;
 }
 
 /**
@@ -36,17 +54,42 @@ export class AiStore {
 
   private readonly _providers = signal<readonly AiProvider[]>([]);
   private readonly _activeId = signal<string | null>(null);
-  private readonly _turns = signal<readonly ChatTurn[]>([]);
-  private readonly _busy = signal(false);
+  private readonly _source = signal<AiSource>({
+    connectionId: '',
+    connectionName: '',
+    database: '',
+  });
+  private readonly _conversations = signal<ReadonlyMap<string, Conversation>>(new Map());
   private readonly _canStoreKeys = signal(true);
   private readonly _storeDescription = signal('');
 
   /** Suscripción viva mientras el modelo escribe. Cancelarla corta la petición. */
-  private _stream: Subscription | null = null;
+  private readonly _streams = new Map<string, Subscription>();
 
   readonly providers = this._providers.asReadonly();
-  readonly turns = this._turns.asReadonly();
-  readonly busy = this._busy.asReadonly();
+  private readonly _key = computed(() => {
+    const source = this._source();
+    const provider = this.active();
+    // Cambiar permisos o destino tampoco debe recuperar un historial más permisivo.
+    return JSON.stringify([
+      source.connectionId,
+      source.database,
+      source.engine,
+      provider?.id,
+      provider?.model,
+      provider?.disclosure,
+      provider?.baseUrl,
+      provider?.kind,
+      provider?.command,
+      provider?.ownSession,
+    ]);
+  });
+  readonly turns = computed(() => this._conversations().get(this._key())?.turns ?? []);
+  readonly busy = computed(() => this._conversations().get(this._key())?.busy ?? false);
+
+  setSource(source: AiSource): void {
+    this._source.set({ ...source });
+  }
   readonly canStoreKeys = this._canStoreKeys.asReadonly();
   readonly storeDescription = this._storeDescription.asReadonly();
 
@@ -107,110 +150,149 @@ export class AiStore {
    * así la pantalla puede enseñar que está pensando en el sitio donde va a
    * aparecer el texto, en lugar de dejar un hueco.
    */
-  ask(text: string, context?: string): void {
+  ask(text: string, context?: AiContextSnapshot): void {
     const provider = this.active();
+    const key = this._key();
+    if (!provider || this.busy() || !text.trim()) return;
 
-    if (!provider || this._busy()) {
-      return;
+    const request: AiChatRequestSnapshot = {
+      source: { ...this._source() },
+      provider: { ...provider },
+      createdAt: new Date().toISOString(),
+      context: provider.disclosure === 'nothing' || !context ? undefined : cloneContext(context),
+    };
+    this.patch(
+      key,
+      [
+        ...this.turns(),
+        { role: 'user', text, request },
+        { role: 'assistant', text: '', streaming: true },
+      ],
+      true,
+    );
+    this.start(key, request);
+  }
+
+  /** Repite la última pregunta fallida con su contexto original, sin otro turno de usuario. */
+  retry(): void {
+    const turns = this.turns();
+    const last = turns.at(-1);
+    const question = turns.at(-2);
+    const request = question?.request;
+    if (this.busy() || !last?.error || question?.role !== 'user' || !request) return;
+    const key = this._key();
+    this.patch(
+      key,
+      [...turns.slice(0, -1), { role: 'assistant', text: '', streaming: true }],
+      true,
+    );
+    this.start(key, request);
+  }
+
+  private start(key: string, request: AiChatRequestSnapshot): void {
+    const turns = this._conversations().get(key)!.turns;
+    const history: AiMessage[] = [];
+    // Un fallo deja la pregunta visible, pero no entra como una pregunta huérfana en el historial.
+    for (let i = 0; i < turns.length - 2; i += 2) {
+      const question = turns[i];
+      const answer = turns[i + 1];
+      if (!answer || answer.error || !answer.text.trim()) continue;
+      history.push({ role: 'user', text: question.text, context: question.request?.context });
+      history.push({ role: 'assistant', text: answer.text });
     }
+    history.push({ role: 'user', text: turns.at(-2)!.text });
 
-    const historia: AiMessage[] = [
-      ...this._turns()
-        .filter((turn) => !turn.error)
-        .map((turn) => ({ role: turn.role, text: turn.text }) as AiMessage),
-      { role: 'user', text },
-    ];
-
-    this._turns.update((turns) => [
-      ...turns,
-      { role: 'user', text },
-      { role: 'assistant', text: '', streaming: true },
-    ]);
-    this._busy.set(true);
-
-    this._stream = this._gateway
-      .streamAiChat({ providerId: provider.id, messages: historia, context })
-      .subscribe({
-        next: (event) => {
-          if (event.kind === 'chunk') {
-            this.appendToLast(event.text);
-          } else if (event.kind === 'error') {
-            this.failLast(aiFailureMessage(event, this._i18n), event.detail ?? event.message);
-          }
-        },
-        error: (error: unknown) => {
-          this.failLast(error instanceof Error ? error.message : this._i18n.t('ai.noAnswer'));
-          this.settle();
-        },
-        complete: () => {
-          this.finishLast();
-          this.settle();
-        },
-      });
+    // Registrar antes de suscribir evita que una respuesta síncrona deje una suscripción fantasma.
+    const stream = new Subscription();
+    this._streams.set(key, stream);
+    stream.add(
+      this._gateway
+        .streamAiChat({
+          providerId: request.provider.id,
+          model: request.provider.model,
+          disclosure: request.provider.disclosure,
+          messages: history,
+          context: request.context,
+        })
+        .subscribe({
+          next: (event) => {
+            if (event.kind === 'context') {
+              this.update(key, (current) =>
+                current.map((turn, index) =>
+                  index === current.length - 2
+                    ? { ...turn, request: { ...request, sentContext: event.text } }
+                    : turn,
+                ),
+              );
+            } else if (event.kind === 'chunk') {
+              this.updateLast(key, (last) => ({ ...last, text: last.text + event.text }));
+            } else if (event.kind === 'error') {
+              this.updateLast(key, (last) => ({
+                ...last,
+                streaming: false,
+                error: aiFailureMessage(event, this._i18n),
+                errorDetail: event.detail ?? event.message,
+              }));
+            }
+          },
+          error: (error: unknown) => {
+            this.updateLast(key, (last) => ({
+              ...last,
+              streaming: false,
+              error: error instanceof Error ? error.message : this._i18n.t('ai.noAnswer'),
+            }));
+            this.settle(key);
+          },
+          complete: () => this.settle(key),
+        }),
+    );
   }
 
-  /** Corta la respuesta a medias, dejando lo que ya se escribió. */
+  /** Cancelar y reiniciar solo afectan a la conversación que se está viendo. */
   cancel(): void {
-    this._stream?.unsubscribe();
-    this._stream = null;
-    this.finishLast();
-    this._busy.set(false);
+    const key = this._key();
+    this._streams.get(key)?.unsubscribe();
+    this.settle(key);
   }
 
-  /** Empieza de cero. No toca los proveedores. */
   clear(): void {
     this.cancel();
-    this._turns.set([]);
+    this.patch(this._key(), [], false);
   }
 
-  private appendToLast(text: string): void {
-    this._turns.update((turns) => {
-      if (turns.length === 0) {
-        return turns;
-      }
-
-      const last = turns[turns.length - 1];
-
-      return [...turns.slice(0, -1), { ...last, text: last.text + text }];
-    });
+  private patch(key: string, turns: readonly ChatTurn[], busy: boolean): void {
+    this._conversations.update((all) => new Map(all).set(key, { turns, busy }));
   }
 
-  private failLast(message: string, detail?: string): void {
-    this._turns.update((turns) => {
-      if (turns.length === 0) {
-        return turns;
-      }
-
-      const last = turns[turns.length - 1];
-
-      return [
-        ...turns.slice(0, -1),
-        { ...last, streaming: false, error: message, errorDetail: detail },
-      ];
-    });
+  private update(key: string, change: (turns: readonly ChatTurn[]) => readonly ChatTurn[]): void {
+    const current = this._conversations().get(key);
+    if (current) this.patch(key, change(current.turns), current.busy);
   }
 
-  private finishLast(): void {
-    this._turns.update((turns) => {
-      if (turns.length === 0) {
-        return turns;
-      }
-
-      const last = turns[turns.length - 1];
-
-      return last.streaming ? [...turns.slice(0, -1), { ...last, streaming: false }] : turns;
-    });
+  private updateLast(key: string, change: (turn: ChatTurn) => ChatTurn): void {
+    this.update(key, (turns) =>
+      turns.length ? [...turns.slice(0, -1), change(turns.at(-1)!)] : turns,
+    );
   }
 
-  private settle(): void {
-    this._busy.set(false);
-    this._stream = null;
+  private settle(key: string): void {
+    this._streams.delete(key);
+    const current = this._conversations().get(key);
+    if (current)
+      this.patch(
+        key,
+        current.turns.map((turn) => (turn.streaming ? { ...turn, streaming: false } : turn)),
+        false,
+      );
   }
 
-  /** Convierte un observable de una sola respuesta en promesa, que es como se usa aquí. */
   private once<T>(source: import('rxjs').Observable<T>): Promise<T> {
     return new Promise<T>((resolve, reject) => {
       source.subscribe({ next: resolve, error: reject });
     });
   }
+}
+
+function cloneContext(context: AiContextSnapshot): AiContextSnapshot {
+  return { ...context, source: { ...context.source }, tables: [...context.tables] };
 }

@@ -109,6 +109,32 @@ describe('contrato SSE de las pruebas de IA', () => {
     ]);
   });
 
+  it('recibe la confirmación de contexto del servidor aunque llegue fragmentada', async () => {
+    response([
+      'event: con',
+      'text\ndata: {"text":"Motor: sqlite","providerId":"p1","model":"modelo","disclosure":"schema"}\n\n',
+      'event: chunk\ndata: {"text":"OK"}\n\nevent: done\ndata: {}\n\n',
+    ]);
+    const events = await lastValueFrom(
+      gateway
+        .streamAiChat({
+          providerId: 'p1',
+          model: 'modelo',
+          disclosure: 'schema',
+          messages: [{ role: 'user', text: 'Pregunta' }],
+        })
+        .pipe(toArray()),
+    );
+    expect(events[0]).toEqual({
+      kind: 'context',
+      text: 'Motor: sqlite',
+      providerId: 'p1',
+      model: 'modelo',
+      disclosure: 'schema',
+    });
+    expect(events.at(-1)).toEqual({ kind: 'done' });
+  });
+
   it('la desconexión sin evento terminal es un error', async () => {
     response(['event: chunk\ndata: {"text":"parcial"}\n\n']);
     const events = await lastValueFrom(gateway.streamAiProviderTest(request).pipe(toArray()));

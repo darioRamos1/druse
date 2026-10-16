@@ -190,10 +190,17 @@ export class AppShell {
    */
   protected readonly aiContext = computed(() => {
     const session = this._store.session();
+    const connection = this._store.activeConnection();
     const described = describeSchema(this._store.schemaIndex().relations);
 
     return {
       database: session?.database ?? '',
+      source: {
+        connectionId: connection?.id ?? '',
+        connectionName: connection?.name ?? '',
+        database: session?.database ?? '',
+        engine: session?.engine ?? connection?.engine,
+      },
       tables: described.tables,
       schema: described.schema,
       sql: this._store.activeTab()?.sql ?? '',

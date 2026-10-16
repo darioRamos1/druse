@@ -65,6 +65,14 @@
   </button>
 </div>
 
+@if (configured()) {
+  <div class="conversation-scope">
+    <strong>{{ context().source?.connectionName || ('ai.noConnection' | t) }}</strong>
+    <span>{{ context().database || ('ai.noDatabase' | t) }}</span>
+    <small>{{ 'ai.conversationScope' | t }}</small>
+  </div>
+}
+
 <div class="body">
   @if (!configured()) {
     <!--
@@ -127,36 +135,30 @@
       </div>
     </div>
   } @else {
-    @if (sharedSql() || sharedTables().length > 0) {
-      <!--
-        Lo primero que se lee, antes que la conversación: qué salió de este
-        equipo. Es la línea que convierte una promesa en algo comprobable.
-      -->
-      <div class="disclosure">
-        <app-icon name="eye" [size]="13" />
-        <div class="disclosure__text">
-          <span class="disclosure__what">
-            {{ 'ai.sentContext' | t }}
-            @if (sharedSql()) {
-              <code>{{ 'ai.sentSql' | t }}</code
-              >{{ sharedTables().length > 0 ? ('ai.sentAnd' | t) : '' }}
-            }
-            @if (sharedTables().length > 0) {
-              {{ 'ai.sentStructure' | t }}
-              @for (table of sharedTables(); track table; let last = $last) {
-                <code>{{ table }}</code
-                >{{ last ? '' : ', ' }}
-              }
-            }
-          </span>
-          <span class="disclosure__note">{{ promise() }}</span>
-        </div>
-      </div>
-    }
-
     @for (turn of turns(); track $index) {
       @if (turn.role === 'user') {
-        <div class="turn turn--user">{{ turn.text }}</div>
+        <div class="turn turn--user">
+          <div>{{ turn.text }}</div>
+          @if (turn.request; as request) {
+            <div class="turn__origin">
+              {{ request.provider.name }} · {{ request.provider.model }} ·
+              {{ formatTimestamp(request.createdAt) }}
+            </div>
+            <details class="context-detail">
+              <summary>
+                {{
+                  (request.sentContext === undefined ? 'ai.preparedContext' : 'ai.recordedContext')
+                    | t
+                }}
+              </summary>
+              <pre>{{
+                request.sentContext === undefined
+                  ? preparedContext(request)
+                  : request.sentContext || ('ai.noAttachedContext' | t)
+              }}</pre>
+            </details>
+          }
+        </div>
       } @else {
         <div class="turn turn--assistant">
           @for (part of turn.parts; track $index) {
@@ -199,6 +201,11 @@
 
           @if (turn.error) {
             <div class="failure">{{ turn.error }}</div>
+            @if ($last) {
+              <button type="button" class="btn btn--sm" (click)="retry()" [disabled]="busy()">
+                {{ 'ai.retryQuestion' | t }}
+              </button>
+            }
             @if (turn.errorDetail) {
               <details class="failure-detail">
                 <summary>{{ 'ai.failure.detail' | t }}</summary>

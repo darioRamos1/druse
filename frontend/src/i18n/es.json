@@ -157,10 +157,7 @@
   "ai.schemaOff": "Deja de enviar la estructura",
   "ai.schemaOn": "Envía la estructura de las tablas",
   "ai.send": "Enviar",
-  "ai.sentAnd": " y ",
-  "ai.sentContext": "Contexto enviado:",
   "ai.sentSql": "SQL del editor",
-  "ai.sentStructure": "estructura de",
   "ai.sqlOff": "Deja de enviar el SQL abierto",
   "ai.sqlOn": "Envía el SQL abierto",
   "ai.starter.explain": "Explica la consulta que tengo en el editor.",
@@ -1739,5 +1736,13 @@
   "whatsNew.v1_2_0.builder": "Compositor de consultas: IN con una lista o una subconsulta, cálculos más directos, búsqueda de columnas y aviso cuando la vista previa no está al día.",
   "whatsNew.v1_2_0.informix": "Informix por SQLI ya se conecta a bases que no usan Latin-1.",
   "whatsNew.v1_2_0.explorer": "El explorador ya no muestra «0» filas cuando el motor no da el recuento.",
-  "whatsNew.v1_2_0.whatsNew": "Esta sección: cada vez que Druse se actualice, se abrirá sola para contarte lo nuevo."
+  "whatsNew.v1_2_0.whatsNew": "Esta sección: cada vez que Druse se actualice, se abrirá sola para contarte lo nuevo.",
+  "ai.noConnection": "Sin conexión",
+  "ai.noDatabase": "Sin base seleccionada",
+  "ai.conversationScope": "Cada base y proveedor conserva su conversación durante esta sesión.",
+  "ai.preparedContext": "Ver contexto preparado",
+  "ai.recordedContext": "Ver contexto de la pregunta",
+  "ai.noAttachedContext": "Sin contexto adjunto.",
+  "ai.retryQuestion": "Reintentar pregunta",
+  "whatsNew.v1_4_0.chatContext": "El chat separa las conversaciones por base y proveedor, permite consultar el contexto de cada pregunta y reintentar una respuesta fallida."
 }

@@ -134,24 +134,43 @@ export interface AiProbeResult {
 
 export type AiRole = 'user' | 'assistant' | 'system';
 
+/** Identidad estable de la base; no contiene credenciales ni el identificador de sesión. */
+export interface AiSource {
+  readonly connectionId: string;
+  readonly connectionName: string;
+  readonly database: string;
+  readonly engine?: string;
+}
+
+/** Categorías separadas para que el servidor aplique los permisos antes de componer. */
+export interface AiContextSnapshot {
+  readonly source: AiSource;
+  readonly sql?: string;
+  readonly schema?: string;
+  readonly tables: readonly string[];
+}
+
 /** Un turno de la conversación. */
 export interface AiMessage {
   readonly role: AiRole;
   readonly text: string;
+  readonly context?: AiContextSnapshot;
 }
 
 /** Lo que se le pide al asistente en una vuelta. */
 export interface AiChatRequest {
   readonly providerId: string;
+  readonly model: string;
+  readonly disclosure: AiDisclosure;
   readonly messages: readonly AiMessage[];
   /**
-   * Estructura de las tablas en juego, ya compuesta.
+   * SQL y estructura elegidos para la pregunta actual, separados por categoría.
    *
    * Va aparte de los mensajes para que el backend pueda **negarse a enviarla**
    * cuando el proveedor no tiene permiso para verla: la decisión de qué sale de
    * este equipo no puede depender de que la pantalla se acuerde.
    */
-  readonly context?: string;
+  readonly context?: AiContextSnapshot;
 }
 
 /**
@@ -163,6 +182,13 @@ export interface AiChatRequest {
  */
 export type AiStreamEvent =
   | { readonly kind: 'chunk'; readonly text: string }
+  | {
+      readonly kind: 'context';
+      readonly text: string;
+      readonly providerId: string;
+      readonly model: string;
+      readonly disclosure: AiDisclosure;
+    }
   | { readonly kind: 'done' }
   | {
       readonly kind: 'error';

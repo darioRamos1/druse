@@ -2,16 +2,19 @@ import {
   ChangeDetectionStrategy,
   Component,
   computed,
+  effect,
   inject,
   input,
   output,
   signal,
 } from '@angular/core';
 
-import { AiStore } from '../../../core/ai/ai-store';
+import { AiStore, AiChatRequestSnapshot } from '../../../core/ai/ai-store';
 import { I18nService } from '../../../core/i18n/i18n.service';
 import { TranslatePipe } from '../../../core/i18n/translate.pipe';
 import { Icon } from '../../../shared/ui/icon/icon';
+import { formatDate } from '../../../core/i18n/locale-format';
+import { AiSource } from '../../../shared/models/ai';
 
 /** Un trozo de respuesta ya separado en prosa y SQL. */
 export interface ChatPart {
@@ -36,6 +39,7 @@ export interface AiContext {
   readonly tables: readonly string[];
   /** Base a la que apunta la pestaña, para nombrarla en la pantalla vacía. */
   readonly database: string;
+  readonly source?: AiSource;
 }
 
 /**
@@ -43,8 +47,8 @@ export interface AiContext {
  *
  * Tres decisiones que se ven en pantalla y que no son de adorno:
  *
- * 1. **Se dice qué se envió.** Encima de la conversación, antes de nada. Quien
- *    trabaja con datos de otros tiene derecho a saber qué salió de su equipo.
+ * 1. **Cada pregunta conserva su contexto.** Se puede consultar lo preparado y
+ *    su confirmación del servidor aunque después se edite el SQL o cambie la base.
  * 2. **El SQL no se ejecuta solo.** Se inserta en el editor, donde una persona
  *    lo lee y decide. Un modelo que se equivoca de `WHERE` en un `DELETE` no
  *    tiene por qué poder ejecutarlo.
@@ -96,6 +100,42 @@ export class AiPanel {
   protected readonly active = this._store.active;
   protected readonly busy = this._store.busy;
   protected readonly configured = this._store.configured;
+  protected readonly formatTimestamp = (value: string) =>
+    formatDate(value, { dateStyle: 'short', timeStyle: 'short' });
+  protected readonly retry = () => this._store.retry();
+  protected preparedContext(request: AiChatRequestSnapshot): string {
+    const context = request.context;
+    if (!context) return this._i18n.t('ai.noAttachedContext');
+    return [
+      context.source.engine,
+      context.source.database,
+      composeContext(
+        {
+          sql: context.sql ?? '',
+          schema: context.schema ?? '',
+          tables: context.tables,
+          database: context.source.database,
+        },
+        true,
+        true,
+      ),
+    ]
+      .filter(Boolean)
+      .join('\n\n');
+  }
+
+  constructor() {
+    effect(() => {
+      const context = this.context();
+      this._store.setSource(
+        context.source ?? {
+          connectionId: '',
+          connectionName: '',
+          database: context.database,
+        },
+      );
+    });
+  }
   protected readonly isLocal = isLocal;
   protected readonly contextAllowed = computed(() => {
     const provider = this.active();
@@ -110,16 +150,6 @@ export class AiPanel {
       parts:
         turn.role === 'assistant' ? split(turn.text) : [{ kind: 'text' as const, text: turn.text }],
     })),
-  );
-
-  /** Cuántas tablas viajan con la pregunta. Cero significa que no va ninguna. */
-  protected readonly sharedTables = computed(() =>
-    this.contextAllowed() && this.includeSchema() ? this.context().tables : [],
-  );
-
-  /** Si la consulta abierta forma parte del contexto de la próxima pregunta. */
-  protected readonly sharedSql = computed(
-    () => this.contextAllowed() && this.includeSql() && this.context().sql.trim().length > 0,
   );
 
   /**
@@ -155,10 +185,20 @@ export class AiPanel {
       return;
     }
 
+    const context = this.context();
     this._store.ask(
       text,
       this.contextAllowed()
-        ? composeContext(this.context(), this.includeSql(), this.includeSchema())
+        ? {
+            source: context.source ?? {
+              connectionId: '',
+              connectionName: '',
+              database: context.database,
+            },
+            sql: this.includeSql() ? context.sql.trim() || undefined : undefined,
+            schema: this.includeSchema() ? context.schema.trim() || undefined : undefined,
+            tables: this.includeSchema() ? [...context.tables] : [],
+          }
         : undefined,
     );
     this.draft.set('');

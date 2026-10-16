@@ -3,7 +3,12 @@ import { Observable, Subject, of } from 'rxjs';
 
 import { AiStore } from './ai-store';
 import { ApplicationGateway } from '../application-gateway/application-gateway';
-import { AiChatRequest, AiProvider, AiStreamEvent } from '../../shared/models/ai';
+import {
+  AiChatRequest,
+  AiContextSnapshot,
+  AiProvider,
+  AiStreamEvent,
+} from '../../shared/models/ai';
 
 const provider: AiProvider = {
   id: 'p1',
@@ -24,17 +29,18 @@ describe('AiStore', () => {
   let subscriptions: number;
   let unsubscriptions: number;
   let savedProvider: AiProvider;
+  let providers: AiProvider[];
 
   beforeEach(() => {
     savedProvider = provider;
+    providers = [provider, { ...provider, id: 'p2', name: 'Otro proveedor' }];
     stream = new Subject<AiStreamEvent>();
     lastRequest = null;
     subscriptions = 0;
     unsubscriptions = 0;
 
     const gateway = {
-      getAiProviders: () =>
-        of({ providers: [provider], canStoreKeys: true, storeDescription: 'Credenciales' }),
+      getAiProviders: () => of({ providers, canStoreKeys: true, storeDescription: 'Credenciales' }),
       saveAiProvider: () => of(savedProvider),
       streamAiChat: (request: AiChatRequest) => {
         lastRequest = request;
@@ -190,8 +196,8 @@ describe('AiStore', () => {
   it('manda el contexto solo cuando se le da', async () => {
     const store = await ready();
 
-    store.ask('con esquema', 'Tablas disponibles: accionista.');
-    expect(lastRequest!.context).toBe('Tablas disponibles: accionista.');
+    store.ask('con esquema', context());
+    expect(lastRequest!.context?.schema).toBe('TABLE accionista;');
 
     store.cancel();
     store.ask('sin esquema');
@@ -222,6 +228,124 @@ describe('AiStore', () => {
     store.clear();
 
     expect(store.turns()).toEqual([]);
-    expect(store.providers().length).toBe(1);
+    expect(store.providers().length).toBe(2);
+  });
+
+  function context(): AiContextSnapshot {
+    return {
+      source: { connectionId: 'c1', connectionName: 'Pruebas', database: 'ventas' },
+      schema: 'TABLE accionista;',
+      sql: 'SELECT 1',
+      tables: ['accionista'],
+    };
+  }
+
+  it('recupera el historial por conexión y base sin mezclar bases homónimas', async () => {
+    const store = await ready();
+    const source = context().source;
+    store.setSource(source);
+    store.ask('primera base', context());
+    store.cancel();
+    store.setSource({ ...source, database: 'otra' });
+    expect(store.turns()).toEqual([]);
+    store.setSource({ ...source, connectionId: 'c2' });
+    expect(store.turns()).toEqual([]);
+    store.setSource(source);
+    expect(store.turns()[0].text).toBe('primera base');
+  });
+
+  it('separa proveedores y recupera su conversación al volver', async () => {
+    const store = await ready();
+    store.ask('para p1');
+    store.cancel();
+    store.use('p2');
+    expect(store.turns()).toEqual([]);
+    store.ask('para p2');
+    expect(lastRequest!.messages.map((message) => message.text)).toEqual(['para p2']);
+    store.cancel();
+    store.use('p1');
+    expect(store.turns()[0].text).toBe('para p1');
+  });
+
+  it('no recupera historial al cambiar modelo o reducir permisos', async () => {
+    const store = await ready();
+    store.ask('con estructura', context());
+    store.cancel();
+    providers = [{ ...provider, model: 'otro-modelo' }];
+    await store.refresh();
+    expect(store.turns()).toEqual([]);
+    providers = [{ ...provider, disclosure: 'nothing' }];
+    await store.refresh();
+    store.ask('sin estructura', context());
+    expect(lastRequest!.context).toBeUndefined();
+    expect(lastRequest!.messages).toEqual([{ role: 'user', text: 'sin estructura' }]);
+  });
+
+  it('la respuesta en curso termina en su base aunque haya otra petición abierta', async () => {
+    const store = await ready();
+    const source = context().source;
+    store.setSource(source);
+    store.ask('base A');
+    const first = stream;
+    store.setSource({ ...source, database: 'B' });
+    expect(store.busy()).toBe(false);
+    stream = new Subject<AiStreamEvent>();
+    store.ask('base B');
+    first.next({ kind: 'chunk', text: 'respuesta A' });
+    first.complete();
+    expect(store.turns()[1].text).toBe('');
+    expect(store.busy()).toBe(true);
+    stream.next({ kind: 'chunk', text: 'respuesta B' });
+    stream.complete();
+    store.setSource(source);
+    expect(store.turns()[1].text).toBe('respuesta A');
+    expect(store.busy()).toBe(false);
+  });
+
+  it('conserva una copia del contexto y reintenta sin duplicar la pregunta', async () => {
+    const store = await ready();
+    const original = { ...context(), tables: ['accionista'] };
+    store.ask('consulta', original);
+    stream.next({ kind: 'error', message: 'Falló' });
+    stream.complete();
+    original.tables.push('otra');
+    original.sql = 'SELECT cambiado';
+    stream = new Subject<AiStreamEvent>();
+    store.retry();
+    expect(store.turns().length).toBe(2);
+    expect(lastRequest!.messages.map((message) => message.text)).toEqual(['consulta']);
+    expect(lastRequest!.context?.tables).toEqual(['accionista']);
+    expect(lastRequest!.context?.sql).toBe('SELECT 1');
+    stream.next({ kind: 'chunk', text: 'Ahora sí' });
+    stream.complete();
+    expect(store.turns()[1].error).toBeUndefined();
+    expect(store.turns()[1].text).toBe('Ahora sí');
+  });
+
+  it('registra la confirmación del servidor y conserva el contexto de preguntas anteriores', async () => {
+    const store = await ready();
+    store.ask('primera', context());
+    stream.next({
+      kind: 'context',
+      text: 'Contexto filtrado',
+      providerId: 'p1',
+      model: provider.model,
+      disclosure: 'schema',
+    });
+    stream.next({ kind: 'chunk', text: 'respuesta' });
+    stream.complete();
+    expect(store.turns()[0].request?.sentContext).toBe('Contexto filtrado');
+    store.ask('segunda');
+    expect(lastRequest!.messages[0].context?.sql).toBe('SELECT 1');
+    expect(store.turns()[0].request?.sentContext).toBe('Contexto filtrado');
+  });
+
+  it('omite también la pregunta de una respuesta fallida al continuar', async () => {
+    const store = await ready();
+    store.ask('fallida');
+    stream.next({ kind: 'error', message: 'Falló' });
+    stream.complete();
+    store.ask('otra pregunta');
+    expect(lastRequest!.messages.map((message) => message.text)).toEqual(['otra pregunta']);
   });
 });
