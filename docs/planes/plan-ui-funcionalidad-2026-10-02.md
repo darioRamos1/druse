@@ -459,6 +459,10 @@ cancelación y claridad sobre truncamiento. Integrar DRU-07 y DRU-09.
 
 ### DRU-11 — Continuidad y contexto del chat
 
+**Desarrollo del alcance:** el [plan de contexto del chat del 16 de octubre](plan-contexto-chat-2026-10-16.md)
+detalla selección de tablas, relaciones, notas de negocio y fases de entrega.
+Sigue pendiente de implementación; su alcance ampliado tiene estimación propia.
+
 **Hallazgo.** La conversación es global, crece sin un presupuesto visible y
 permanece al cambiar de proveedor. Los turnos no registran proveedor, modelo,
 base ni contexto enviado. Un fallo aparece como texto sin acción de reintento.
