@@ -111,8 +111,9 @@ public sealed class AiDiagnosticsTests
         var id = await SaveProfile(client, disclosure);
         var attached = new
         {
-            source = new { connectionId = "c1", connectionName = "Pruebas", database = "ventas", engine = "sqlite" },
+            source = new { connectionId = "c1", connectionName = "Pruebas", database = "ventas", engine = "sqlite", serverVersion = "3.50.0", schema = "ventas" },
             sql = "SELECT actual", schema = "TABLE facturas;", tables = new[] { "facturas" },
+            warnings = new[] { "Falta la estructura de tabla_oculta" },
         };
         using var response = await client.PostAsJsonAsync("/api/ai/chat", new
         {
@@ -138,6 +139,9 @@ public sealed class AiDiagnosticsTests
         {
             Assert.Contains("Motor: sqlite", text, StringComparison.Ordinal);
             Assert.Contains("Base de datos: ventas", text, StringComparison.Ordinal);
+            Assert.Contains("Versión del servidor: 3.50.0", text, StringComparison.Ordinal);
+            Assert.Contains("Esquema activo: ventas", text, StringComparison.Ordinal);
+            Assert.Contains("tabla_oculta", text, StringComparison.Ordinal);
             Assert.Contains("SELECT actual", text, StringComparison.Ordinal);
             Assert.Contains(text!, messages[^1].Text, StringComparison.Ordinal);
             Assert.Contains("SELECT anterior", messages[1].Text, StringComparison.Ordinal);
@@ -147,6 +151,7 @@ public sealed class AiDiagnosticsTests
         {
             Assert.Equal(string.Empty, text);
             Assert.DoesNotContain(messages, message => message.Text.Contains("SELECT", StringComparison.Ordinal));
+            Assert.DoesNotContain(messages, message => message.Text.Contains("tabla_oculta", StringComparison.Ordinal));
             Assert.Equal(4, messages.Count);
         }
         Assert.EndsWith("segunda", messages[^1].Text, StringComparison.Ordinal);

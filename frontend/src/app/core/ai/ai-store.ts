@@ -294,5 +294,10 @@ export class AiStore {
 }
 
 function cloneContext(context: AiContextSnapshot): AiContextSnapshot {
-  return { ...context, source: { ...context.source }, tables: [...context.tables] };
+  return {
+    ...context,
+    source: { ...context.source },
+    tables: [...context.tables],
+    warnings: context.warnings ? [...context.warnings] : undefined,
+  };
 }

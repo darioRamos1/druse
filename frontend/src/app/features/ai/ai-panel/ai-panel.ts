@@ -3,6 +3,9 @@ import {
   Component,
   computed,
   effect,
+  DestroyRef,
+  ElementRef,
+  untracked,
   inject,
   input,
   output,
@@ -14,6 +17,9 @@ import { I18nService } from '../../../core/i18n/i18n.service';
 import { TranslatePipe } from '../../../core/i18n/translate.pipe';
 import { Icon } from '../../../shared/ui/icon/icon';
 import { formatDate } from '../../../core/i18n/locale-format';
+import { AiCatalog, aiTableKey } from '../../../core/ai/ai-catalog';
+import { qualifiedName } from '../../../core/ai/ai-context';
+import { DatabaseObject } from '../../../shared/models/workspace';
 import { AiSource } from '../../../shared/models/ai';
 
 /** Un trozo de respuesta ya separado en prosa y SQL. */
@@ -40,6 +46,8 @@ export interface AiContext {
   /** Base a la que apunta la pestaña, para nombrarla en la pantalla vacía. */
   readonly database: string;
   readonly source?: AiSource;
+  readonly sessionId?: string;
+  readonly revision?: number;
 }
 
 /**
@@ -66,6 +74,21 @@ export interface AiContext {
 export class AiPanel {
   private readonly _store = inject(AiStore);
   private readonly _i18n = inject(I18nService);
+  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
+  protected readonly catalog = inject(AiCatalog);
+  readonly requestedTable = input<DatabaseObject | null>(null);
+  protected readonly selectorOpen = signal(false);
+  protected readonly catalogQuery = signal('');
+  protected readonly preparing = signal(false);
+  protected readonly tableKey = aiTableKey;
+  protected readonly tableName = qualifiedName;
+  private mention: { start: number; end: number } | null = null;
+  protected readonly matches = computed(() => {
+    const query = this.catalogQuery().toLowerCase();
+    return this.catalog
+      .catalog()
+      .filter((table) => `${table.schema ?? ''}.${table.name}`.toLowerCase().includes(query));
+  });
 
   /** «Pregunta sobre {base}», con el nombre de la base en `<code>`. */
   protected askParts(database: string) {
@@ -108,7 +131,10 @@ export class AiPanel {
     if (!context) return this._i18n.t('ai.noAttachedContext');
     return [
       context.source.engine,
+      context.source.serverVersion,
       context.source.database,
+      context.source.schema,
+      context.warnings?.join('\n'),
       composeContext(
         {
           sql: context.sql ?? '',
@@ -127,15 +153,68 @@ export class AiPanel {
   constructor() {
     effect(() => {
       const context = this.context();
-      this._store.setSource(
-        context.source ?? {
-          connectionId: '',
-          connectionName: '',
-          database: context.database,
-        },
-      );
+      untracked(() => this.activateContext(context));
     });
+    effect(() => {
+      const table = this.requestedTable();
+      if (table)
+        untracked(() => {
+          this.activateContext(this.context());
+          this.catalog.add(table);
+          this.openContextPicker();
+        });
+    });
+    inject(DestroyRef).onDestroy(() => this.catalog.pause());
   }
+
+  private activateContext(context: AiContext): void {
+    const source = context.source ?? {
+      connectionId: '',
+      connectionName: '',
+      database: context.database,
+    };
+    this._store.setSource(source);
+    const changed = this.catalog.activate({
+      source,
+      sessionId: context.sessionId ?? '',
+      revision: context.revision,
+    });
+    if (changed && this.selectorOpen()) void this.catalog.loadCatalog();
+  }
+
+  protected openContextPicker(focus = false): void {
+    this.selectorOpen.set(true);
+    void this.catalog.loadCatalog();
+    if (focus)
+      setTimeout(() =>
+        this.host.nativeElement.querySelector<HTMLInputElement>('.catalog-search')?.focus(),
+      );
+  }
+
+  protected closeContextPicker(): void {
+    this.selectorOpen.set(false);
+    this.mention = null;
+  }
+
+  protected selectTable(table: DatabaseObject): void {
+    if (!this.mention && this.catalog.isSelected(table)) this.catalog.remove(table);
+    else {
+      this.catalog.add(table);
+      if (this.mention) {
+        const value = this.draft();
+        this.draft.set(
+          value.slice(0, this.mention.start) +
+            qualifiedName(table) +
+            ' ' +
+            value.slice(this.mention.end),
+        );
+        this.mention = null;
+        this.catalogQuery.set('');
+        this.host.nativeElement.querySelector<HTMLTextAreaElement>('textarea')?.focus();
+      }
+    }
+  }
+
   protected readonly isLocal = isLocal;
   protected readonly contextAllowed = computed(() => {
     const provider = this.active();
@@ -178,30 +257,51 @@ export class AiPanel {
     );
   });
 
-  protected send(): void {
-    const text = this.draft().trim();
-
-    if (text.length === 0 || this.busy()) {
-      return;
-    }
-
+  protected async send(): Promise<void> {
+    const rawDraft = this.draft();
+    const text = rawDraft.trim();
+    if (!text || this.busy() || this.preparing()) return;
     const context = this.context();
-    this._store.ask(
-      text,
-      this.contextAllowed()
-        ? {
-            source: context.source ?? {
-              connectionId: '',
-              connectionName: '',
-              database: context.database,
-            },
-            sql: this.includeSql() ? context.sql.trim() || undefined : undefined,
-            schema: this.includeSchema() ? context.schema.trim() || undefined : undefined,
-            tables: this.includeSchema() ? [...context.tables] : [],
-          }
-        : undefined,
-    );
-    this.draft.set('');
+    const provider = this.active();
+    if (!provider) return;
+    this.preparing.set(true);
+    try {
+      if (this.contextAllowed() && this.includeSchema() && this.catalog.selected().length) {
+        const current = await this.catalog.refreshSelected();
+        if (
+          !current ||
+          this.active() !== provider ||
+          this.context().sessionId !== context.sessionId ||
+          this.context().database !== context.database
+        )
+          return;
+        if (this.catalog.failures().length && !this.catalog.allowPartial()) {
+          this.openContextPicker();
+          return;
+        }
+      }
+      this._store.ask(
+        text,
+        this.contextAllowed()
+          ? {
+              source: context.source ?? {
+                connectionId: '',
+                connectionName: '',
+                database: context.database,
+              },
+              sql: this.includeSql() ? context.sql.trim() || undefined : undefined,
+              schema: this.includeSchema()
+                ? this.catalog.described().schema || undefined
+                : undefined,
+              tables: this.includeSchema() ? [...this.catalog.names()] : [],
+              warnings: this.includeSchema() ? [...this.catalog.warnings()] : [],
+            }
+          : undefined,
+      );
+      if (this.draft() === rawDraft) this.draft.set('');
+    } finally {
+      this.preparing.set(false);
+    }
   }
 
   /**
@@ -211,6 +311,18 @@ export class AiPanel {
    * para pulsar un botón en la pregunta más corta.
    */
   protected onKeydown(event: KeyboardEvent): void {
+    if (event.key === 'Escape' && this.selectorOpen()) {
+      event.preventDefault();
+      event.stopPropagation();
+      this.closeContextPicker();
+      return;
+    }
+    if (event.key === 'Enter' && this.mention && this.selectorOpen()) {
+      event.preventDefault();
+      const first = this.matches()[0];
+      if (first) this.selectTable(first);
+      return;
+    }
     if (event.key === 'Enter' && !event.shiftKey) {
       event.preventDefault();
       this.send();
@@ -218,7 +330,15 @@ export class AiPanel {
   }
 
   protected onInput(event: Event): void {
-    this.draft.set((event.target as HTMLTextAreaElement).value);
+    const input = event.target as HTMLTextAreaElement;
+    this.draft.set(input.value);
+    const prefix = input.value.slice(0, input.selectionStart);
+    const mention = /(?:^|\s)@([^@\s]*)$/.exec(prefix);
+    if (mention && this.contextAllowed() && this.context().sessionId) {
+      this.mention = { start: prefix.lastIndexOf('@'), end: input.selectionStart };
+      this.catalogQuery.set(mention[1]);
+      this.openContextPicker();
+    } else this.mention = null;
   }
 
   protected choose(id: string): void {
@@ -227,6 +347,7 @@ export class AiPanel {
   }
 
   protected cancel(): void {
+    if (this.preparing()) this.catalog.pause();
     this._store.cancel();
   }
 

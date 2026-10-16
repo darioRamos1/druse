@@ -157,6 +157,9 @@ export class WorkspaceStore {
 
   readonly searchableSchemas = this._explorer.searchableSchemas;
 
+  /** Permite descartar detalles de metadatos leídos antes de un refresco del catálogo. */
+  readonly catalogRevision = computed(() => this._explorer.revisionFor(this.activeConnection()?.id ?? ''));
+
   /**
    * Lo que el editor sabe del catálogo, ya recortado a dónde se está trabajando.
    *
@@ -785,6 +788,7 @@ export class WorkspaceStore {
         connected: true,
         engine: session.engine,
         engineVersion: describeVersion(session.engine, session.serverVersion),
+        serverVersion: session.serverVersion,
         database: session.database,
         user: connection.name,
         lastDurationMs: null,
@@ -1698,6 +1702,7 @@ export class WorkspaceStore {
         connected: true,
         engine: form.engine,
         engineVersion: describeVersion(form.engine, session.serverVersion),
+        serverVersion: session.serverVersion,
         database: session.database,
         user: describeUser(form),
         lastDurationMs: null,

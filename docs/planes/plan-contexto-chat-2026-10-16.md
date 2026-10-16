@@ -1,6 +1,6 @@
 # Plan de mejora del contexto del chat — 16 de octubre de 2026
 
-**Estado:** fase A implementada en 1.4.0. Fases B–E pendientes.
+**Estado:** fase A implementada en 1.4.0 y fase B en 1.5.0. Fases C–E pendientes.
 
 ## Objetivo
 
@@ -16,8 +16,8 @@ esa regla, sin necesitar que se pegue todo en cada pregunta.
 
 Este documento desarrolla [DRU-11 del plan de interfaz y funcionalidad](plan-ui-funcionalidad-2026-10-02.md#dru-11--continuidad-y-contexto-del-chat).
 Amplía su alcance con selección de metadatos y conocimiento de negocio. Sus
-estimaciones anteriores no cubren esta ampliación. La fase A no cierra DRU-11;
-su cierre requiere verificar las fases A–D.
+estimaciones anteriores no cubren esta ampliación. Las fases A y B no cierran
+DRU-11; su cierre requiere verificar las fases A–D.
 
 ## Situación inicial comprobada en el código
 
@@ -119,30 +119,66 @@ en `frontend/.angular/chat-vitest.config.mjs`, usando `pool: 'threads'`,
 `ng test --runner-config=.angular/chat-vitest.config.mjs`. No se cambió la
 configuración del proyecto.
 
-**Siguiente paso:** fase B, selector de tablas y lectura detallada de relaciones.
+**Siguiente paso tras esa entrega:** fase B, selector de tablas y lectura detallada de relaciones.
 La vista previa antes de preguntar, las notas y los límites de historial
 permanecen pendientes en sus fases. Las conversaciones se pierden al cerrar Druse.
 
 ### Fase B — Selección de tablas y lectura de relaciones
 
-- [ ] Crear el selector por conexión/base, con búsqueda, selección múltiple y
+- [x] Crear el selector por conexión/base, con búsqueda, selección múltiple y
   acceso por botón, `@` y menú del explorador.
-- [ ] Obtener objetos del catálogo sin exigir expandir antes el árbol. Cargar
+- [x] Obtener objetos del catálogo sin exigir expandir antes el árbol. Cargar
   estructura detallada únicamente de los seleccionados, con cancelación.
-- [ ] Reutilizar `getTableStructure` para columnas, claves primarias, foráneas e
+- [x] Reutilizar `getColumns` y `getTableStructure` para columnas, claves primarias, foráneas e
   índices; incluir valores predeterminados cuando estén disponibles.
-- [ ] Incluir motor y versión cuando se conozca, base y esquema activo cuando
+- [x] Incluir motor y versión cuando se conozca, base y esquema activo cuando
   exista. No deducir la versión del servidor a partir del controlador.
-- [ ] Mostrar tablas referenciadas por claves foráneas como sugerencias para
+- [x] Mostrar tablas referenciadas por claves foráneas como sugerencias para
   añadir; no expandir automáticamente toda la red de relaciones.
-- [ ] Invalidar metadatos al cambiar la estructura o reconectar. Evitar que una
+- [x] Invalidar metadatos al cambiar la estructura o reconectar. Evitar que una
   lectura iniciada en una base termine asociada a otra.
-- [ ] Ante permisos insuficientes u objetos eliminados, indicar qué falta y
+- [x] Ante permisos insuficientes u objetos eliminados, indicar qué falta y
   permitir quitar el objeto o continuar explícitamente con contexto parcial.
 
 **Aceptación:** seleccionar una tabla no expandida incorpora sus columnas; dos
 tablas homónimas de esquemas diferentes no se confunden; las claves compuestas
 conservan el orden y las parejas de columnas; no se inventan relaciones ausentes.
+
+**Entrega del 16 de octubre de 2026 — 1.5.0.** El botón «Añadir contexto», las
+menciones `@` y «Añadir al chat» del explorador comparten una selección por base.
+Se eliminó la selección y carga automática de hasta 40 tablas. La descripción
+incluye columnas completas, valores predeterminados, claves compuestas, claves
+foráneas, índices y restricciones declaradas. Las referencias se sugieren para
+añadirlas manualmente; no se infieren relaciones ni se comparten filas.
+
+El catálogo del chat tiene su propio ciclo de lecturas, sin depender de que las
+ramas del explorador estén abiertas. Las revisiones del explorador invalidan
+el detalle y cada envío lo relee para recoger DDL externo. Cambiar de origen o
+selección durante esa preparación impide enviar y conserva el borrador. Los
+fallos requieren quitar el objeto o aceptar expresamente el contexto parcial.
+
+La versión del servidor se toma de la respuesta de apertura, sin deducirla del
+controlador. La base del chat sigue la pestaña activa; para motores basados en
+archivo se resuelve el alias único del catálogo mediante sus capacidades. Así
+la ruta de SQLite al conectar y su alias `main` no se confunden.
+
+**Verificación:** TypeScript de aplicación y E2E, guarda de idiomas, 291 pruebas
+del frontend y 12 de integración de IA. Los recorridos Chromium de la fase A
+siguen pasando en español e inglés. Otros dos recorridos usan SQLite real con
+123 tablas/vistas, una clave foránea compuesta, un índice descendente y valores
+predeterminados: abrir el selector no pide columnas, y seleccionar dos tablas
+solo lee sus detalles. Se revisaron las capturas en ambos idiomas y temas,
+incluida la ventana de 900 px. El barrido general incorpora el selector mediante
+el mismo soporte; no se ejecutó entero porque requiere PostgreSQL.
+
+Los proveedores de IA se simularon; no se verificaron inferencias externas,
+motores de servidor ni Tauri/WebView2. Vitest se ejecutó con la configuración
+temporal de un trabajador descrita en la fase A. La selección permanece en
+memoria durante la sesión; las notas persistentes, la vista previa completa
+antes de enviar y el presupuesto de contexto siguen pendientes. La decisión
+está en [ADR 0008](../decisions/0008-seleccion-de-tablas-para-el-chat.md).
+
+**Siguiente paso:** fase C, conocimiento de negocio por base.
 
 ### Fase C — Conocimiento de negocio por base
 

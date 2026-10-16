@@ -140,6 +140,8 @@ export interface AiSource {
   readonly connectionName: string;
   readonly database: string;
   readonly engine?: string;
+  readonly serverVersion?: string;
+  readonly schema?: string;
 }
 
 /** Categorías separadas para que el servidor aplique los permisos antes de componer. */
@@ -148,6 +150,7 @@ export interface AiContextSnapshot {
   readonly sql?: string;
   readonly schema?: string;
   readonly tables: readonly string[];
+  readonly warnings?: readonly string[];
 }
 
 /** Un turno de la conversación. */

@@ -224,6 +224,123 @@
 
 @if (configured()) {
   <div class="composer">
+    @if (contextAllowed() && context().sessionId) {
+      <div class="context-selection">
+        <button
+          type="button"
+          class="chip"
+          (click)="openContextPicker(true)"
+          [attr.aria-expanded]="selectorOpen()"
+          aria-controls="chat-catalog"
+        >
+          <app-icon name="plus" [size]="11" /> {{ 'ai.catalog.add' | t }}
+        </button>
+        @for (item of catalog.selected(); track tableKey(item.table)) {
+          <button
+            type="button"
+            class="chip is-on"
+            (click)="catalog.remove(item.table)"
+            [class.has-error]="!!item.error"
+            [attr.aria-label]="'ai.catalog.remove' | t: { table: tableName(item.table) }"
+          >
+            {{ tableName(item.table) }} {{ item.loading ? '…' : '×' }}
+          </button>
+        }
+      </div>
+      @if (selectorOpen()) {
+        <section
+          id="chat-catalog"
+          class="catalog-picker"
+          [attr.aria-label]="'ai.catalog.title' | t"
+          (keydown.escape)="closeContextPicker(); $event.stopPropagation()"
+        >
+          <div class="catalog-picker__head">
+            <strong>{{ 'ai.catalog.title' | t }}</strong>
+            <button
+              type="button"
+              class="head__action"
+              (click)="closeContextPicker()"
+              [attr.aria-label]="'ai.catalog.close' | t"
+            >
+              ×
+            </button>
+          </div>
+          <input
+            type="search"
+            class="catalog-search"
+            [value]="catalogQuery()"
+            (input)="catalogQuery.set($any($event.target).value)"
+            [placeholder]="'ai.catalog.search' | t"
+            [attr.aria-label]="'ai.catalog.search' | t"
+          />
+          @if (catalog.catalogLoading()) {
+            <p role="status">{{ 'ai.catalog.loading' | t }}</p>
+          }
+          @if (catalog.catalogError()) {
+            <p class="failure" role="alert">{{ catalog.catalogError() }}</p>
+          }
+          <div class="catalog-picker__list">
+            @for (table of matches(); track tableKey(table)) {
+              <label class="catalog-option">
+                <input
+                  type="checkbox"
+                  [checked]="catalog.isSelected(table)"
+                  (change)="selectTable(table)"
+                />
+                <code>{{ tableName(table) }}</code>
+                <small>{{
+                  (table.kind === 'view' ? 'ai.catalog.view' : 'ai.catalog.table') | t
+                }}</small>
+              </label>
+            } @empty {
+              @if (!catalog.catalogLoading()) {
+                <p>{{ 'ai.catalog.empty' | t }}</p>
+              }
+            }
+          </div>
+          @if (catalog.suggestions().length) {
+            <p>{{ 'ai.catalog.related' | t }}</p>
+            <div class="context-selection">
+              @for (table of catalog.suggestions(); track tableKey(table)) {
+                <button type="button" class="chip" (click)="selectTable(table)">
+                  {{ tableName(table) }} +
+                </button>
+              }
+            </div>
+          }
+          <button
+            type="button"
+            class="btn btn--sm"
+            (click)="catalog.loadCatalog(true); catalog.refreshSelected()"
+            [disabled]="catalog.catalogLoading() || catalog.loading()"
+          >
+            {{ 'ai.catalog.reload' | t }}
+          </button>
+        </section>
+      }
+      @if (catalog.loading() || preparing()) {
+        <p class="catalog-status" role="status">{{ 'ai.catalog.reading' | t }}</p>
+      }
+      @if (catalog.failures().length) {
+        <div class="catalog-problems" role="alert">
+          @for (item of catalog.failures(); track tableKey(item.table)) {
+            <p>
+              <strong>{{ tableName(item.table) }}</strong
+              >: {{ item.error }}
+            </p>
+          }
+          <label
+            ><input
+              type="checkbox"
+              [checked]="catalog.allowPartial()"
+              (change)="catalog.allowPartial.set($any($event.target).checked)"
+            />
+            {{ 'ai.catalog.partial' | t }}</label
+          >
+        </div>
+      }
+    }
+
     <div class="composer__box">
       <textarea
         class="composer__input"
@@ -249,7 +366,7 @@
           </button>
         }
 
-        @if (contextAllowed() && context().tables.length > 0) {
+        @if (contextAllowed() && catalog.selected().length > 0) {
           <button
             type="button"
             class="chip"
@@ -258,13 +375,13 @@
             [title]="(includeSchema() ? 'ai.schemaOff' : 'ai.schemaOn') | t"
           >
             <app-icon name="table" [size]="10" />
-            {{ 'ai.tables' | t: { count: context().tables.length } }}
+            {{ 'ai.tables' | t: { count: catalog.selected().length } }}
           </button>
         }
 
         <span class="head__spacer"></span>
 
-        @if (busy()) {
+        @if (busy() || preparing()) {
           <button
             type="button"
             class="composer__send composer__send--stop"

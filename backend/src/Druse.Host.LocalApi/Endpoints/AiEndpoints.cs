@@ -40,9 +40,11 @@ public sealed record SaveAiProviderDto(
 /// <summary>Un turno de la conversación tal y como llega de la interfaz.</summary>
 public sealed record AiMessageDto(string Role, string Text, AiContextDto? Context = null);
 
-public sealed record AiSourceDto(string ConnectionId, string ConnectionName, string Database, string? Engine);
+public sealed record AiSourceDto(string ConnectionId, string ConnectionName, string Database, string? Engine,
+    string? ServerVersion = null, string? Schema = null);
 
-public sealed record AiContextDto(AiSourceDto Source, string? Sql, string? Schema, IReadOnlyList<string> Tables);
+public sealed record AiContextDto(AiSourceDto Source, string? Sql, string? Schema, IReadOnlyList<string> Tables,
+    IReadOnlyList<string>? Warnings = null);
 
 /// <summary>Lo que se le pide al asistente.</summary>
 /// <param name="Context">
@@ -496,6 +498,14 @@ internal static class AiEndpoints
             {
                 parts.Add($"Base de datos: {source.Database}");
             }
+            if (!string.IsNullOrWhiteSpace(source.ServerVersion))
+            {
+                parts.Add($"Versión del servidor: {source.ServerVersion}");
+            }
+            if (!string.IsNullOrWhiteSpace(source.Schema))
+            {
+                parts.Add($"Esquema activo: {source.Schema}");
+            }
         }
         if (!string.IsNullOrWhiteSpace(context.Sql))
         {
@@ -504,6 +514,10 @@ internal static class AiEndpoints
         if (!string.IsNullOrWhiteSpace(context.Schema))
         {
             parts.Add($"Estructura de las tablas en juego:\n\n{context.Schema}");
+        }
+        if (context.Warnings is { Count: > 0 })
+        {
+            parts.Add($"Contexto parcial; no supongas los metadatos que faltan:\n{string.Join('\n', context.Warnings)}");
         }
         return string.Join("\n\n", parts);
     }

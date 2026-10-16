@@ -6,6 +6,8 @@ import { ApplicationGateway } from '../../core/application-gateway/application-g
 import { WorkspaceStore } from '../../core/workspace/workspace-store';
 import { ConnectionForm, DatabaseObject } from '../../shared/models/workspace';
 import { AppShell } from './app-shell';
+import { AiCatalog } from '../../core/ai/ai-catalog';
+import { ConnectionsSidebar } from '../../features/connections/connections-sidebar/connections-sidebar';
 import { ResultsPanel } from '../../features/query-results/results-panel/results-panel';
 
 /** Gateway que no habla con nadie: el shell debe montarse sin API detrás. */
@@ -573,6 +575,69 @@ describe('AppShell', () => {
     shell.detectChanges();
 
     expect(dom.querySelector('app-backup-dialog')).toBeTruthy();
+  });
+
+  it('añadir una tabla del explorador abre su base en el chat sin ejecutar consultas', async () => {
+    TestBed.resetTestingModule();
+    await TestBed.configureTestingModule({
+      imports: [AppShell],
+      providers: [
+        {
+          provide: ApplicationGateway,
+          useValue: {
+            ...backupGateway(),
+            getAiProviders: silentGateway().getAiProviders,
+            getColumns: () =>
+              of([
+                {
+                  name: 'id',
+                  dataType: 'integer',
+                  ordinal: 0,
+                  isPrimaryKey: true,
+                  isNullable: false,
+                },
+              ]),
+            getTableStructure: () =>
+              of({ indexes: [], foreignKeys: [], uniqueConstraints: [], checkConstraints: [] }),
+          },
+        },
+      ],
+    }).compileComponents();
+    const shell = TestBed.createComponent(AppShell);
+    await shell.whenStable();
+    const store = TestBed.inject(WorkspaceStore);
+    await store.connect({ ...connectionForm, engine: 'postgresql' });
+    store.useDatabase('otra_base');
+    shell.detectChanges();
+    const sidebar = shell.debugElement.query(By.directive(ConnectionsSidebar))
+      .componentInstance as ConnectionsSidebar;
+    const execute = vi.spyOn(store, 'execute');
+    sidebar.addToChat.emit({
+      id: 'objeto',
+      label: 'orders',
+      kind: 'table',
+      depth: 4,
+      expandable: true,
+      expanded: false,
+      loading: false,
+      connectionId: store.activeConnection()!.id,
+      source: {
+        id: 'table:public.orders',
+        name: 'orders',
+        schema: 'public',
+        database: 'druse_test',
+        kind: 'table',
+        hasChildren: true,
+      },
+    });
+    await vi.waitFor(() => {
+      shell.detectChanges();
+      expect(shell.nativeElement.querySelector('app-ai-panel')).toBeTruthy();
+      expect(TestBed.inject(AiCatalog).selected()).toHaveLength(1);
+    });
+    expect(store.activeDatabase()).toBe('druse_test');
+    expect(TestBed.inject(AiCatalog).selected()[0].table.schema).toBe('public');
+    expect(execute).not.toHaveBeenCalled();
   });
 
   it('en móvil conserva un control para abrir el explorador', () => {

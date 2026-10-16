@@ -462,8 +462,9 @@ cancelación y claridad sobre truncamiento. Integrar DRU-07 y DRU-09.
 **Desarrollo del alcance:** el [plan de contexto del chat del 16 de octubre](plan-contexto-chat-2026-10-16.md)
 detalla selección de tablas, relaciones, notas de negocio y fases de entrega.
 La fase A se implementa en 1.4.0: conversaciones por base/proveedor, contexto
-por pregunta y reintento. La selección de tablas y las notas siguen pendientes;
-el alcance ampliado tiene estimación propia en ese plan.
+por pregunta y reintento. La fase B, en 1.5.0, añade selección de tablas y sus
+relaciones reales; notas, vista previa y límites siguen pendientes. El alcance
+ampliado tiene estimación propia en ese plan.
 
 **Hallazgo.** La conversación es global, crece sin un presupuesto visible y
 permanece al cambiar de proveedor. Los turnos no registran proveedor, modelo,

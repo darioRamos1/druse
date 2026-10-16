@@ -774,6 +774,7 @@ export interface SessionStatus {
   readonly connected: boolean;
   readonly engine: DatabaseEngine;
   readonly engineVersion: string;
+  readonly serverVersion?: string;
   readonly database: string;
   readonly user: string;
   readonly lastDurationMs: number | null;

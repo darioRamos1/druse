@@ -410,6 +410,8 @@
 }
 
 .composer {
+  max-height: 65%;
+  overflow-y: auto;
   flex: none;
   padding: 10px 12px 12px;
   border-top: 1px solid var(--dr-border-hairline);
@@ -487,6 +489,79 @@
     font-size: 10.5px;
     color: var(--dr-text-faintest);
   }
+}
+
+.context-selection {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-bottom: 7px;
+  .chip {
+    max-width: 100%;
+    height: auto;
+    min-height: 24px;
+    overflow-wrap: anywhere;
+    text-align: left;
+  }
+}
+
+.catalog-picker {
+  border: 1px solid var(--dr-border-subtle);
+  border-radius: var(--dr-radius);
+  padding: 8px;
+  margin-bottom: 8px;
+  color: var(--dr-text-muted);
+  font-size: var(--dr-font-size-xs);
+  &__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  &__list {
+    max-height: 180px;
+    overflow-y: auto;
+    margin: 6px 0;
+  }
+  p {
+    margin: 6px 0;
+  }
+}
+
+.catalog-search {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid var(--dr-border-input);
+  border-radius: var(--dr-radius-sm);
+  background: var(--dr-surface-input);
+  color: var(--dr-text);
+}
+
+.catalog-option {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 0;
+  cursor: pointer;
+  code {
+    flex: 1;
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+  small {
+    color: var(--dr-text-dim);
+  }
+}
+
+.catalog-status,
+.catalog-problems {
+  font-size: var(--dr-font-size-xs);
+  margin: 6px 0;
+  color: var(--dr-text-muted);
+}
+.catalog-problems,
+.chip.has-error {
+  color: var(--dr-danger-text);
 }
 
 /** Qué acompaña a la pregunta. Se puede apagar, y apagado se nota. */

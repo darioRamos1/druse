@@ -108,3 +108,19 @@ export async function comprobarContextoChat(
     'SELECT 1 AS original;',
   );
 }
+
+/** El barrido general usa el catálogo de su base de prueba, sin datos de filas. */
+export async function comprobarSelectorContexto(
+  page: Page,
+  capture: (name: string) => Promise<void>,
+): Promise<void> {
+  const panel = page.locator('app-ai-panel');
+  await panel
+    .getByRole('button', { name: t('ai.catalog.add'), exact: true })
+    .click();
+  const checkbox = panel.locator('.catalog-option input').first();
+  await expect(checkbox).toBeVisible();
+  await checkbox.check();
+  await expect(panel.locator('.catalog-status')).toBeHidden();
+  await capture('selector-tablas');
+}
