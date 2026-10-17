@@ -12,6 +12,7 @@ public sealed record AiChatLimits
     public int MaxSqlBytes { get; init; } = 16_384;
     public int MaxSchemaBytes { get; init; } = 32_768;
     public int MaxNotesBytes { get; init; } = 16_384;
+    public int MaxErrorBytes { get; init; } = 16_384;
     public int MaxContextBytes { get; init; } = 49_152;
     public int MaxHistoryBytes { get; init; } = 32_768;
     public int MaxInputBytes { get; init; } = 65_536;
@@ -24,7 +25,7 @@ public sealed record AiChatLimits
 }
 
 public sealed record AiChatIssue(string Code, int Used, int Max);
-public sealed record AiChatUsage(int SqlBytes, int SchemaBytes, int NotesBytes, int ContextBytes,
+public sealed record AiChatUsage(int SqlBytes, int SchemaBytes, int NotesBytes, int ErrorBytes, int ContextBytes,
     int HistoryBytes, int InputBytes, int QuestionBytes, int HistoryTurns,
     int EstimatedTokens, int QuestionReserveTokens, int ResponseReserveTokens);
 public sealed record AiPreviewMessage(string Role, string Text);
@@ -57,7 +58,7 @@ internal static partial class AiEndpoints
     {
         var limits = configuration.GetSection($"AiChat:Providers:{profile.Id}").Get<AiChatLimits>()
             ?? configuration.GetSection("AiChat:Defaults").Get<AiChatLimits>() ?? new AiChatLimits();
-        var byteLimits = new[] { limits.MaxSqlBytes, limits.MaxSchemaBytes, limits.MaxNotesBytes,
+        var byteLimits = new[] { limits.MaxSqlBytes, limits.MaxSchemaBytes, limits.MaxNotesBytes, limits.MaxErrorBytes,
             limits.MaxContextBytes, limits.MaxHistoryBytes, limits.MaxInputBytes, limits.MaxQuestionBytes };
         if (byteLimits.Any(value => value is < 1 or > 1_048_576) || limits.MaxHistoryTurns is < 0 or > 100
             || limits.WindowTokens is < 1024 or > 1_000_000 || limits.QuestionReserveTokens < 1
@@ -77,18 +78,20 @@ internal static partial class AiEndpoints
                 issues.Add(new AiChatIssue(code, used, max));
             }
         }
-        (int Sql, int Schema, int Notes, int Context) Measure(AiContextDto? attached)
+        (int Sql, int Schema, int Notes, int Error, int Context) Measure(AiContextDto? attached)
         {
             var allowed = profile.Disclosure != AiDisclosure.NothingButThePrompt;
             var sql = allowed ? Bytes(attached?.Sql) : 0;
             var schema = allowed ? Bytes(attached?.Schema) : 0;
             var notes = allowed ? Bytes(DescribeNotes(profile, attached)) : 0;
+            var error = allowed ? Bytes(DescribeExecutionError(attached)) : 0;
             var total = Bytes(DescribeContext(profile, attached));
             Check("sql", sql, limits.MaxSqlBytes);
             Check("schema", schema, limits.MaxSchemaBytes);
             Check("notes", notes, limits.MaxNotesBytes);
+            Check("error", error, limits.MaxErrorBytes);
             Check("context", total, limits.MaxContextBytes);
-            return (sql, schema, notes, total);
+            return (sql, schema, notes, error, total);
         }
         var current = Measure(request.Context);
         foreach (var message in request.Messages.Take(request.Messages.Count - 1))
@@ -116,7 +119,7 @@ internal static partial class AiEndpoints
         // Se liga al destino y a los límites además del texto: un cambio exige revisar otra vez.
         var hash = Convert.ToHexString(SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(new { profile, limits, request = normalized, messages })));
         return new AiChatPreview(hash, DescribeContext(profile, request.Context), messages, limits,
-            new AiChatUsage(current.Sql, current.Schema, current.Notes, current.Context,
+            new AiChatUsage(current.Sql, current.Schema, current.Notes, current.Error, current.Context,
                 historyBytes, inputBytes, questionBytes, turns, estimated, questionReserve, limits.ResponseReserveTokens), issues);
     }
 }

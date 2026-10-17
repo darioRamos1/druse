@@ -154,6 +154,23 @@ export interface AiContextSnapshot {
   readonly tables: readonly string[];
   readonly warnings?: readonly string[];
   readonly notes?: readonly AiBusinessNote[];
+  readonly executionError?: AiExecutionError;
+}
+
+/** Solo el diagnóstico de una ejecución: nunca sesiones, filas ni perfiles de conexión. */
+export interface AiExecutionError {
+  readonly executionId: string;
+  readonly occurredAtUtc: string;
+  readonly sql: string;
+  readonly message: string;
+  readonly code?: string;
+  readonly line?: number;
+  readonly position?: number;
+}
+
+export interface AiErrorAttachment {
+  readonly source: AiSource;
+  readonly error: AiExecutionError;
 }
 
 /** Un turno de la conversación. */
@@ -185,6 +202,7 @@ export interface AiChatLimits {
   readonly maxSqlBytes: number;
   readonly maxSchemaBytes: number;
   readonly maxNotesBytes: number;
+  readonly maxErrorBytes: number;
   readonly maxContextBytes: number;
   readonly maxHistoryBytes: number;
   readonly maxInputBytes: number;
@@ -200,6 +218,7 @@ export interface AiChatUsage {
   readonly sqlBytes: number;
   readonly schemaBytes: number;
   readonly notesBytes: number;
+  readonly errorBytes: number;
   readonly contextBytes: number;
   readonly historyBytes: number;
   readonly inputBytes: number;

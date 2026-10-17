@@ -21,6 +21,7 @@ import { WHATS_NEW_PREFERENCE, WhatsNewService } from '../whats-new/whats-new.se
 import { describeError, diagnosticQuery, isSessionLost } from './errors';
 import { ConnectionStore } from './connection-store';
 import { ExecutionStore } from './execution-store';
+import { resolveAiDatabase } from '../ai/ai-context';
 import { ExplorerStore } from './explorer-store';
 import { NoticeStore } from './notice-store';
 import { TabStore } from './tab-store';
@@ -158,7 +159,9 @@ export class WorkspaceStore {
   readonly searchableSchemas = this._explorer.searchableSchemas;
 
   /** Permite descartar detalles de metadatos leídos antes de un refresco del catálogo. */
-  readonly catalogRevision = computed(() => this._explorer.revisionFor(this.activeConnection()?.id ?? ''));
+  readonly catalogRevision = computed(() =>
+    this._explorer.revisionFor(this.activeConnection()?.id ?? ''),
+  );
 
   /**
    * Lo que el editor sabe del catálogo, ya recortado a dónde se está trabajando.
@@ -213,6 +216,7 @@ export class WorkspaceStore {
 
   /** Lo que hay en la cuadrícula y su estado; vive en {@link ExecutionStore}. */
   readonly result = this._execution.result;
+  readonly resultSource = this._execution.source;
 
   readonly running = this._execution.running;
 
@@ -2506,6 +2510,20 @@ export class WorkspaceStore {
     const sigueDelante = (): boolean =>
       this.activeTab()?.id === tabId && this.activeTab()?.sql === tabSql;
 
+    // Se captura antes de esperar: editar la consulta no debe reescribir el diagnóstico.
+    const occurredAtUtc = new Date().toISOString();
+    const aiSource = {
+      connectionId: connection.id,
+      connectionName: connection.name,
+      database: resolveAiDatabase(
+        tab?.database ?? this.session()?.database ?? '',
+        this.databasesFor(connection.id),
+        this.engines().find((engine) => engine.id === connection.engine)?.capabilities
+          .usesFilePath ?? false,
+      ),
+      engine: connection.engine,
+      serverVersion: this.session()?.serverVersion,
+    };
     try {
       const result = await this._execution.run({
         sessionId: connection.sessionId,
@@ -2521,6 +2539,8 @@ export class WorkspaceStore {
       }
 
       this._execution.show(result, {
+        aiSource,
+        occurredAtUtc,
         tabId: tabId ?? null,
         connectionId: connection.id,
         database: tab?.database,

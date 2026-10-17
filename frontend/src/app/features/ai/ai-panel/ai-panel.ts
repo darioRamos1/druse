@@ -20,10 +20,16 @@ import { formatDate } from '../../../core/i18n/locale-format';
 import { AiCatalog, aiTableKey } from '../../../core/ai/ai-catalog';
 import { qualifiedName } from '../../../core/ai/ai-context';
 import { DatabaseObject } from '../../../shared/models/workspace';
-import { AiSource, AiChatPreview } from '../../../shared/models/ai';
+import {
+  AiSource,
+  AiChatPreview,
+  AiErrorAttachment,
+  AiExecutionError,
+} from '../../../shared/models/ai';
 import { AiNotesStore, eligibleNotes } from '../../../core/ai/ai-notes-store';
 import { AiNotes } from '../ai-notes/ai-notes';
 import { AiPreview } from '../ai-preview/ai-preview';
+import { AiExecutionErrorEditor } from '../ai-execution-error/ai-execution-error';
 import { describeError } from '../../../core/workspace/errors';
 
 /** Un trozo de respuesta ya separado en prosa y SQL. */
@@ -73,7 +79,7 @@ export interface AiContext {
  */
 @Component({
   selector: 'app-ai-panel',
-  imports: [Icon, TranslatePipe, AiNotes, AiPreview],
+  imports: [Icon, TranslatePipe, AiNotes, AiPreview, AiExecutionErrorEditor],
   templateUrl: './ai-panel.html',
   styleUrl: './ai-panel.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -94,6 +100,8 @@ export class AiPanel {
       },
   );
   readonly requestedTable = input<DatabaseObject | null>(null);
+  readonly requestedError = input<AiErrorAttachment | null>(null);
+  protected readonly errorAttachment = signal<AiErrorAttachment | null>(null);
   protected readonly selectorOpen = signal(false);
   protected readonly catalogQuery = signal('');
   protected readonly preparing = signal(false);
@@ -206,6 +214,28 @@ export class AiPanel {
         });
     });
     effect(() => {
+      const attachment = this.requestedError();
+      if (attachment)
+        untracked(() => {
+          this.activateContext(this.context());
+          const source = this.context().source;
+          if (
+            attachment.source.connectionId !== source?.connectionId ||
+            attachment.source.database !== source.database
+          )
+            return;
+          this.errorAttachment.set({
+            source: { ...attachment.source },
+            error: { ...attachment.error },
+          });
+          this.includeSql.set(false);
+          this.notesOpen.set(false);
+          this.review.set(null);
+          this.preparation++;
+          if (!this.draft().trim()) this.draft.set(this._i18n.t('ai.executionError.question'));
+        });
+    });
+    effect(() => {
       this.active();
       untracked(() => {
         this.review.set(null);
@@ -225,6 +255,15 @@ export class AiPanel {
       database: context.database,
     };
     this._store.setSource(source);
+    const attached = this.errorAttachment();
+    if (
+      attached &&
+      (attached.source.connectionId !== source.connectionId ||
+        attached.source.database !== source.database)
+    ) {
+      this.errorAttachment.set(null);
+      this.preparationError.set(this._i18n.t('ai.executionError.sourceChanged'));
+    }
     const changed = this.catalog.activate({
       source,
       sessionId: context.sessionId ?? '',
@@ -315,12 +354,19 @@ export class AiPanel {
   protected async send(): Promise<void> {
     const rawDraft = this.draft();
     const text = rawDraft.trim();
-    if (!text || this.busy() || this.preparing()) return;
+    if (
+      !text ||
+      this.busy() ||
+      this.preparing() ||
+      (this.errorAttachment() && !this.contextAllowed())
+    )
+      return;
     const context = this.context();
     const provider = this.active();
     if (!provider) return;
     const includeSchema = this.includeSchema();
     const includeSql = this.includeSql();
+    const attachment = this.errorAttachment();
     const preparation = ++this.preparation;
     this.preparing.set(true);
     this.preparationError.set('');
@@ -356,12 +402,14 @@ export class AiPanel {
         text,
         this.contextAllowed()
           ? {
-              source: context.source ?? {
-                connectionId: '',
-                connectionName: '',
-                database: context.database,
-              },
+              source: attachment?.source ??
+                context.source ?? {
+                  connectionId: '',
+                  connectionName: '',
+                  database: context.database,
+                },
               sql: includeSql ? context.sql.trim() || undefined : undefined,
+              executionError: attachment ? { ...attachment.error } : undefined,
               schema: includeSchema ? this.catalog.described().schema || undefined : undefined,
               tables: includeSchema ? [...this.catalog.names()] : [],
               warnings: includeSchema ? [...this.catalog.warnings()] : [],
@@ -401,6 +449,8 @@ export class AiPanel {
     if (!review || this.preparing()) return;
     if (this._store.sendPrepared(review.request, review.preview)) {
       if (this.draft() === review.rawDraft) this.draft.set('');
+      // El adjunto pertenece a esta pregunta; el siguiente turno decide de nuevo qué añadir.
+      this.errorAttachment.set(null);
       this.review.set(null);
     }
   }
@@ -410,6 +460,19 @@ export class AiPanel {
     setTimeout(() =>
       this.host.nativeElement.querySelector<HTMLTextAreaElement>('.composer__input')?.focus(),
     );
+  }
+
+  protected editError(error: AiExecutionError): void {
+    const attachment = this.errorAttachment();
+    if (attachment) this.errorAttachment.set({ ...attachment, error: { ...error } });
+    this.review.set(null);
+    this.preparation++;
+  }
+
+  protected removeError(): void {
+    this.errorAttachment.set(null);
+    this.review.set(null);
+    this.preparation++;
   }
 
   protected changeHistory(limit: number | null): void {

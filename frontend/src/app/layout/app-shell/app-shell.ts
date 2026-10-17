@@ -76,6 +76,7 @@ import { TopBar } from '../top-bar/top-bar';
 import CommandPalette from '../command-palette/command-palette';
 import { ShortcutsSheet } from '../shortcuts-sheet/shortcuts-sheet';
 import { AiPanel } from '../../features/ai/ai-panel/ai-panel';
+import { AiErrorAttachment } from '../../shared/models/ai';
 import { AiProviderDialog } from '../../features/ai/ai-provider-dialog/ai-provider-dialog';
 import { AiStore } from '../../core/ai/ai-store';
 import { resolveAiDatabase } from '../../core/ai/ai-context';
@@ -171,6 +172,43 @@ export class AppShell {
   protected readonly aiOpen = signal(false);
   protected readonly aiProvidersOpen = signal(false);
   protected readonly aiTableRequest = signal<DatabaseObject | null>(null);
+  protected readonly aiErrorRequest = signal<AiErrorAttachment | null>(null);
+  protected readonly explainableError = computed<AiErrorAttachment | null>(() => {
+    const result = this._store.result();
+    const source = this._store.resultSource();
+    const current = this.aiContext().source;
+    if (
+      result?.state !== 'failed' ||
+      !result.error?.message ||
+      !source?.aiSource ||
+      !source.occurredAtUtc ||
+      source.aiSource.connectionId !== current.connectionId ||
+      source.aiSource.database !== current.database ||
+      this._store.running()
+    )
+      return null;
+    return {
+      source: { ...source.aiSource },
+      error: {
+        executionId: result.executionId,
+        occurredAtUtc: source.occurredAtUtc,
+        sql: source.sql,
+        message: result.error.message,
+        code: result.error.code,
+        line: result.error.line,
+        position: result.error.position,
+      },
+    };
+  });
+
+  protected explainQueryError(executionId: string): void {
+    const attachment = this.explainableError();
+    if (!attachment || attachment.error.executionId !== executionId) return;
+    // Cada clic es una elección nueva, incluso al volver a adjuntar el mismo fallo.
+    this.aiErrorRequest.set({ source: { ...attachment.source }, error: { ...attachment.error } });
+    this.aiOpen.set(true);
+    void this._ai.refresh();
+  }
 
   /**
    * Lo que el asistente puede saber de la base sin que nadie se lo escriba.

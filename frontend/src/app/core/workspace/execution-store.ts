@@ -8,6 +8,7 @@ import {
   QueryRejected,
 } from '../application-gateway/application-gateway';
 import { QueryResult, ResultSet } from '../../shared/models/workspace';
+import { AiSource } from '../../shared/models/ai';
 
 /**
  * De dónde salió lo que hay en la cuadrícula.
@@ -23,6 +24,8 @@ export interface DisplayedResultSource {
   readonly database?: string;
   readonly sql: string;
   readonly title: string;
+  readonly aiSource?: AiSource;
+  readonly occurredAtUtc?: string;
 }
 
 /**

@@ -1838,5 +1838,20 @@
   "ai.preview.issue.turns": "Previous questions: {used}; maximum {max}.",
   "ai.preview.issue.budget": "Estimated budget including reserves: {used}; maximum {max}.",
   "ai.preview.issue.request": "Request size: {used}; maximum {max}.",
-  "whatsNew.v1_7_0.chatPreview": "Review context and its size before sending, choose how much history to share, and copy other code languages without inserting them as SQL."
+  "whatsNew.v1_7_0.chatPreview": "Review context and its size before sending, choose how much history to share, and copy other code languages without inserting them as SQL.",
+  "ai.executionError.explain": "Explain this error",
+  "ai.executionError.title": "Attached execution error",
+  "ai.executionError.review": "Review and mask sensitive data in both fields. The preview will remove recognizable credentials and connection strings; check the final text before sending.",
+  "ai.executionError.blocked": "This provider does not allow sharing context. Change its permission or remove the attachment to continue.",
+  "ai.executionError.sql": "SQL that was executed",
+  "ai.executionError.message": "Execution diagnostic",
+  "ai.executionError.code": "Code",
+  "ai.executionError.line": "Line",
+  "ai.executionError.position": "Position",
+  "ai.executionError.remove": "Remove attached error",
+  "ai.executionError.sourceChanged": "The attached error was removed when the database or connection changed.",
+  "ai.executionError.question": "Explain the cause of this error and suggest how to fix the query.",
+  "ai.preview.section.error": "Execution error",
+  "ai.preview.issue.error": "Execution error: {used}; maximum {max}.",
+  "whatsNew.v1_8_0.explainError": "Ask the chat to explain an error with the query that caused it, edit the attachment, and review the diagnostic before sending."
 }

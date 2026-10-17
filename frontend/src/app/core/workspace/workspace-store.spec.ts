@@ -554,6 +554,36 @@ describe('WorkspaceStore', () => {
     store = TestBed.inject(WorkspaceStore);
   });
 
+  it('conserva la selección ejecutada y su origen aunque después se edite el SQL', async () => {
+    await store.connect(form);
+    store.updateSql('SELECT anterior; SELECT fallo;');
+    vi.spyOn(gateway, 'executeQuery').mockImplementation((request) =>
+      of({
+        executionId: request.executionId!,
+        state: 'failed',
+        resultSets: [],
+        messages: [],
+        durationMs: 1,
+        error: { message: 'No existe fallo', code: '42703' },
+      }),
+    );
+    const result = await store.execute('SELECT fallo;');
+    store.updateSql('SELECT posterior;');
+    expect(result?.state).toBe('failed');
+    expect(store.resultSource()).toMatchObject({
+      sql: 'SELECT fallo;',
+      aiSource: {
+        connectionId: store.activeConnection()!.id,
+        connectionName: form.name,
+        database: form.database,
+        engine: form.engine,
+      },
+    });
+    expect(store.resultSource()?.occurredAtUtc).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+    expect(JSON.stringify(store.resultSource()?.aiSource)).not.toContain(form.password);
+    expect(JSON.stringify(store.resultSource()?.aiSource)).not.toContain('sessionId');
+  });
+
   describe('historial vigente y paginado', () => {
     const entrada = (id: string): QueryHistoryEntry => ({
       id,

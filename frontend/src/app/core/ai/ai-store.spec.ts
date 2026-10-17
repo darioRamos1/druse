@@ -72,6 +72,34 @@ describe('AiStore', () => {
     return store;
   }
 
+  it('congela el error y su procedencia para el reintento y el historial', async () => {
+    const store = await ready();
+    const source = { connectionId: 'c1', connectionName: 'Prueba', database: 'ventas' };
+    store.setSource(source);
+    const error = {
+      executionId: 'e1',
+      occurredAtUtc: '2026-10-16T12:00:00Z',
+      sql: 'SELECT fallo;',
+      message: 'Fallo original',
+    };
+    const request = store.prepare('Explica', { source, tables: [], executionError: error })!;
+    error.sql = 'SELECT cambiado;';
+    error.message = 'Otro error';
+    expect(request.context?.executionError?.sql).toBe('SELECT fallo;');
+    store.sendPrepared(request);
+    stream.next({ kind: 'error', message: 'Fallo del proveedor' });
+    stream.complete();
+    stream = new Subject<AiStreamEvent>();
+    store.retry();
+    expect(lastRequest?.context?.executionError?.message).toBe('Fallo original');
+    stream.next({ kind: 'chunk', text: 'Respuesta' });
+    stream.next({ kind: 'done' });
+    stream.complete();
+    const following = store.prepare('Siguiente');
+    expect(following?.payload.messages[0].context?.executionError?.sql).toBe('SELECT fallo;');
+    expect(following?.context?.executionError).toBeUndefined();
+  });
+
   /**
    * El proveedor va a la base local y su clave al llavero del sistema: dos
    * escrituras, y la segunda puede fallar sola. El aviso tiene que llegar entero

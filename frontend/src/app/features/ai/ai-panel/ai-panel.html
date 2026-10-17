@@ -304,6 +304,14 @@
 
 @if (configured() && !notesOpen() && !review()) {
   <div class="composer">
+    @if (errorAttachment(); as attachment) {
+      <app-ai-execution-error
+        [attachment]="attachment"
+        [allowed]="contextAllowed()"
+        (changed)="editError($event)"
+        (removed)="removeError()"
+      />
+    }
     @if (preparationError()) {
       <p class="failure" role="alert">{{ preparationError() }}</p>
     }
@@ -436,7 +444,7 @@
       ></textarea>
 
       <div class="composer__tools">
-        @if (contextAllowed() && context().sql.trim().length > 0) {
+        @if (contextAllowed() && !errorAttachment() && context().sql.trim().length > 0) {
           <button
             type="button"
             class="chip"
@@ -477,7 +485,7 @@
           <button
             type="button"
             class="composer__send"
-            [disabled]="draft().trim().length === 0"
+            [disabled]="draft().trim().length === 0 || (!!errorAttachment() && !contextAllowed())"
             (click)="send()"
             [attr.aria-label]="'ai.send' | t"
           >

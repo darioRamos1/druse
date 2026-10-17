@@ -50,6 +50,8 @@ type ResultsTab = 'results' | 'messages' | 'history';
 export class ResultsPanel {
   readonly resultSet = input<ResultSet | null>(null);
   readonly result = input<QueryResult | null>(null);
+  readonly canExplainError = input(false);
+  readonly explainError = output<string>();
   readonly history = input<readonly QueryHistoryEntry[]>([]);
   readonly historyFilter = input<QueryHistoryFilter>({});
   readonly historyLoading = input(false);

@@ -391,6 +391,94 @@ public sealed class AiDiagnosticsTests
         Assert.DoesNotContain(preview.Messages, message => message.Text.Contains("SQL no autorizado", StringComparison.Ordinal));
     }
 
+    [Theory]
+    [InlineData("schema", true)]
+    [InlineData("schemaAndRows", true)]
+    [InlineData("nothing", false)]
+    public async Task ElErrorSeRevisaConSuProcedenciaYSeFiltraTambienEnElHistorial(string disclosure, bool allowed)
+    {
+        var provider = new TestProvider();
+        using var root = new DruseApiFactory();
+        using var host = WithProvider(root, provider);
+        using var client = Client(host);
+        var id = await SaveProfile(client, disclosure);
+        var error = new AiExecutionErrorDto("ejecucion-original", "2026-10-16T13:20:00Z",
+            "SELECT columna_inexistente FROM facturas;\nALTER USER demo PASSWORD 'claveSql';",
+            "No existe columna_inexistente\nServer=servidorPrivado;Database=ventas;Password=claveDsn;\n" +
+            "postgresql://usuarioUri:claveUri@hostPrivado/ventas\n" +
+            "jdbc:oracle:thin:usuarioJdbc/claveJdbc@hostPrivado:1521/base\n" +
+            "host=hostLibpq dbname=ventas user=usuarioLibpq password=claveLibpq\n" +
+            "Authorization: Bearer tokenPortador\n\"password\": \"claveJson\"\n" +
+            "Pwd='clave con espacios'; api_key=claveApi; uid=usuarioUid;", "42703", 1, 8);
+        var context = new AiContextDto(new("c1", "Pruebas", "ventas", "postgresql"), null, null, [], ExecutionError: error);
+        var request = new AiChatDto(id, [new("user", "Anterior", context), new("assistant", "Respuesta"), new("user", "Explica este fallo")],
+            context, "gpt-6.1-sol", disclosure);
+        using var prepared = await client.PostAsJsonAsync("/api/ai/chat/preview", request);
+        prepared.EnsureSuccessStatusCode();
+        var preview = (await prepared.Content.ReadFromJsonAsync<AiChatPreview>())!;
+        Assert.True(preview.Valid);
+        Assert.Equal(0, provider.StreamCalls);
+        Assert.Equal(allowed, preview.Usage.ErrorBytes > 0);
+        foreach (var message in preview.Messages)
+        {
+            foreach (var secret in new[] { "claveSql", "servidorPrivado", "claveDsn", "usuarioUri", "claveUri", "hostPrivado",
+                "usuarioJdbc", "claveJdbc", "hostLibpq", "usuarioLibpq", "claveLibpq", "tokenPortador", "claveJson", "clave con espacios", "claveApi", "usuarioUid" })
+            {
+                Assert.DoesNotContain(secret, message.Text, StringComparison.Ordinal);
+            }
+        }
+        if (allowed)
+        {
+            Assert.Contains("ejecucion-original", preview.Context, StringComparison.Ordinal);
+            Assert.Contains("2026-10-16T13:20:00Z", preview.Context, StringComparison.Ordinal);
+            Assert.Contains("SELECT columna_inexistente FROM facturas;", preview.Context, StringComparison.Ordinal);
+            Assert.Contains("Código: 42703", preview.Context, StringComparison.Ordinal);
+            Assert.Contains("Línea: 1", preview.Context, StringComparison.Ordinal);
+            Assert.Contains("Posición: 8", preview.Context, StringComparison.Ordinal);
+            Assert.Contains("[oculto]", preview.Context, StringComparison.Ordinal);
+            Assert.Contains("ejecucion-original", preview.Messages[1].Text, StringComparison.Ordinal);
+        }
+        else
+        {
+            Assert.Empty(preview.Context);
+            Assert.DoesNotContain(preview.Messages, message => message.Text.Contains("ejecucion-original", StringComparison.Ordinal));
+        }
+        using var response = await client.PostAsJsonAsync("/api/ai/chat", request with { PreviewHash = preview.Hash });
+        response.EnsureSuccessStatusCode();
+        Assert.Equal(preview.Messages.Select(message => message.Text), provider.LastRequest.Messages.Select(message => message.Text));
+        using var changed = await client.PostAsJsonAsync("/api/ai/chat", request with {
+            PreviewHash = preview.Hash, Context = context with { ExecutionError = error with { Sql = "SELECT otra;" } } });
+        Assert.Equal(HttpStatusCode.Conflict, changed.StatusCode);
+        Assert.Equal(1, provider.StreamCalls);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ElLimiteDeErroresBloqueaTambienUnAdjuntoHistoricoSinInvocarAlProveedor(bool historical)
+    {
+        var provider = new TestProvider();
+        using var root = new DruseApiFactory();
+        using var host = WithProvider(root, provider);
+        using var client = Client(host);
+        var id = await SaveProfile(client, "schema");
+        host.Services.GetRequiredService<IConfiguration>()["AiChat:Defaults:MaxErrorBytes"] = "100";
+        var context = new AiContextDto(new("c1", "Pruebas", "ventas", "sqlite"), null, null, [],
+            ExecutionError: new("e1", "2026-10-16T00:00:00Z", "SELECT " + new string('a', 500), "No existe la columna"));
+        var request = new AiChatDto(id, historical
+            ? [new("user", "Anterior", context), new("assistant", "Respuesta"), new("user", "Actual")]
+            : [new("user", "Actual")], historical ? null : context, "gpt-6.1-sol", "schema");
+        using var prepared = await client.PostAsJsonAsync("/api/ai/chat/preview", request);
+        prepared.EnsureSuccessStatusCode();
+        var preview = (await prepared.Content.ReadFromJsonAsync<AiChatPreview>())!;
+        Assert.False(preview.Valid);
+        Assert.Contains(preview.Issues, issue => issue.Code == "error");
+        Assert.Contains(new string('a', 500), preview.Messages[1].Text, StringComparison.Ordinal);
+        using var response = await client.PostAsJsonAsync("/api/ai/chat", request);
+        Assert.Equal(HttpStatusCode.RequestEntityTooLarge, response.StatusCode);
+        Assert.Equal(0, provider.StreamCalls);
+    }
+
     private static async Task<Guid> SaveProfile(HttpClient client, string disclosure)
     {
         using var saved = await client.PostAsJsonAsync("/api/ai/providers", new

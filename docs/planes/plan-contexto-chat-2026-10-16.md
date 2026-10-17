@@ -288,8 +288,16 @@ inferencias con proveedores externos; no se simulan como verificadas.
 
 ### Fase E — Adjuntos de ejecución, segunda entrega
 
-- [ ] «Explicar este error» adjunta consulta y error revisables, con procedencia
+- [x] «Explicar este error» adjunta consulta y error revisables, con procedencia
   de la ejecución; excluir credenciales y cadenas de conexión de los diagnósticos.
+
+**Primer incremento implementado el 2026-10-16 (1.8.0):** acción desde el resultado
+fallido, copia del SQL ejecutado y su origen, adjunto editable, revisión explícita,
+filtrado de credenciales reconocibles en el servidor y límite propio aplicado
+también al historial. Cambiar de base retira el borrador adjunto y revocar el permiso
+de contexto bloquea su envío. Véase [ADR 0011](../decisions/0011-explicar-errores-en-el-chat.md).
+Comprobado con fallos reales de SQLite y respuesta de IA simulada en Chromium;
+otros motores y Tauri/WebView2 quedan pendientes. La fase E continúa abierta:
 - [ ] «Analizar estas filas» permite elegir filas y columnas y aplicar límites
   antes de componer el contexto. Nunca adjuntar resultados automáticamente.
 - [ ] Permitir ocultar columnas antes de enviar; mostrar nulos, tamaños y recortes

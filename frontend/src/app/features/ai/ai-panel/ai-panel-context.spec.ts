@@ -1,6 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { HttpErrorResponse } from '@angular/common/http';
-import { of, throwError } from 'rxjs';
+import { of, throwError, Subject, firstValueFrom } from 'rxjs';
 import { AiPanel } from './ai-panel';
 import { AiCatalog } from '../../../core/ai/ai-catalog';
 import { AiStore } from '../../../core/ai/ai-store';
@@ -73,6 +73,7 @@ describe('selección de contexto del panel de IA', () => {
                   maxSqlBytes: 16384,
                   maxSchemaBytes: 32768,
                   maxNotesBytes: 16384,
+                  maxErrorBytes: 16384,
                   maxContextBytes: 49152,
                   maxHistoryBytes: 32768,
                   maxInputBytes: 65536,
@@ -87,6 +88,7 @@ describe('selección de contexto del panel de IA', () => {
                   sqlBytes: 9,
                   schemaBytes: 0,
                   notesBytes: 0,
+                  errorBytes: 0,
                   contextBytes: 9,
                   historyBytes: 0,
                   inputBytes: 100,
@@ -110,7 +112,7 @@ describe('selección de contexto del panel de IA', () => {
   });
 
   function write(value: string): HTMLTextAreaElement {
-    const input = fixture.nativeElement.querySelector('textarea') as HTMLTextAreaElement;
+    const input = fixture.nativeElement.querySelector('.composer__input') as HTMLTextAreaElement;
     input.value = value;
     input.dispatchEvent(new Event('input', { bubbles: true }));
     fixture.detectChanges();
@@ -179,6 +181,127 @@ describe('selección de contexto del panel de IA', () => {
     expect(stream).toHaveBeenCalledTimes(1);
     expect(stream.mock.calls[0][0].context.sql).toBe('SELECT 1;');
     expect(stream.mock.calls[0][0].previewHash).toBe('preparado');
+  });
+
+  const attachment = {
+    source: context.source,
+    error: {
+      executionId: 'ejecucion-1',
+      occurredAtUtc: '2026-10-16T12:00:00Z',
+      sql: 'SELECT fallo;',
+      message: 'No existe fallo',
+      code: '42703',
+      line: 1,
+      position: 8,
+    },
+  };
+
+  it('adjunta solo el SQL ejecutado, permite ocultar datos y exige confirmar la revisión', async () => {
+    fixture.componentRef.setInput('requestedError', attachment);
+    fixture.detectChanges();
+    const sql = fixture.nativeElement.querySelector(
+      'app-ai-execution-error textarea',
+    ) as HTMLTextAreaElement;
+    expect(sql.value).toBe('SELECT fallo;');
+    sql.value = 'SELECT ocultado;';
+    sql.dispatchEvent(new Event('input', { bubbles: true }));
+    fixture.detectChanges();
+    expect(stream).not.toHaveBeenCalled();
+    enter(write('Explica el error'));
+    await vi.waitFor(() => {
+      fixture.detectChanges();
+      expect(fixture.nativeElement.querySelector('app-ai-preview')).toBeTruthy();
+    });
+    fixture.componentRef.setInput('context', { ...context, sql: 'SELECT posterior;' });
+    fixture.detectChanges();
+    expect(stream).not.toHaveBeenCalled();
+    fixture.nativeElement.querySelector('app-ai-preview .confirm').click();
+    expect(stream).toHaveBeenCalledTimes(1);
+    const request = stream.mock.calls[0][0];
+    expect(request.context.sql).toBeUndefined();
+    expect(request.context.executionError).toEqual({
+      ...attachment.error,
+      sql: 'SELECT ocultado;',
+    });
+    expect(request.context.source).toEqual(attachment.source);
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('app-ai-execution-error')).toBeNull();
+    expect(attachment.error.sql).toBe('SELECT fallo;');
+  });
+
+  it('retira el error al cambiar de base y no lo recupera al editar SQL', () => {
+    fixture.componentRef.setInput('requestedError', attachment);
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('app-ai-execution-error')).toBeTruthy();
+    fixture.componentRef.setInput('context', {
+      ...context,
+      database: 'otra',
+      source: { ...context.source, database: 'otra' },
+    });
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('app-ai-execution-error')).toBeNull();
+    expect(fixture.nativeElement.textContent).toContain('Se retiró el error adjunto');
+    fixture.componentRef.setInput('context', { ...context, sql: 'SELECT posterior;' });
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('app-ai-execution-error')).toBeNull();
+    expect(stream).not.toHaveBeenCalled();
+  });
+
+  it('quitar el adjunto invalida una revisión que todavía está llegando', async () => {
+    fixture.componentRef.setInput('requestedError', attachment);
+    fixture.detectChanges();
+    const gateway = TestBed.inject(ApplicationGateway);
+    const request = TestBed.inject(AiStore).prepare('Explica', {
+      source: context.source,
+      tables: [],
+    })!;
+    const preview = await firstValueFrom(gateway.previewAiChat(request.payload));
+    const pending = new Subject<typeof preview>();
+    vi.spyOn(gateway, 'previewAiChat').mockReturnValue(pending);
+    enter(write('Explica'));
+    fixture.detectChanges();
+    fixture.nativeElement.querySelector('app-ai-execution-error button').click();
+    pending.next(preview);
+    pending.complete();
+    await fixture.whenStable();
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('app-ai-preview')).toBeNull();
+    expect(fixture.nativeElement.querySelector('app-ai-execution-error')).toBeNull();
+    expect(stream).not.toHaveBeenCalled();
+  });
+
+  it('no muestra posiciones vacías cuando el motor devuelve null', () => {
+    fixture.componentRef.setInput('requestedError', {
+      ...attachment,
+      error: { ...attachment.error, line: null, position: null },
+    });
+    fixture.detectChanges();
+    const text = fixture.nativeElement.querySelector('app-ai-execution-error').textContent;
+    expect(text).not.toContain('Línea:');
+    expect(text).not.toContain('Posición:');
+  });
+
+  it('bloquea el envío del error cuando se revoca el permiso de contexto', async () => {
+    fixture.componentRef.setInput('requestedError', attachment);
+    fixture.detectChanges();
+    const gateway = TestBed.inject(ApplicationGateway);
+    vi.spyOn(gateway, 'getAiProviders').mockReturnValue(
+      of({
+        providers: [{ ...provider, disclosure: 'nothing' }],
+        canStoreKeys: true,
+        storeDescription: '',
+      }),
+    );
+    await TestBed.inject(AiStore).refresh();
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('.composer__send').disabled).toBe(true);
+    enter(write('Explica'));
+    await fixture.whenStable();
+    expect(stream).not.toHaveBeenCalled();
+    expect(fixture.nativeElement.querySelector('app-ai-preview')).toBeNull();
+    fixture.nativeElement.querySelector('app-ai-execution-error button').click();
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('.composer__send').disabled).toBe(false);
   });
 
   it('cambiar de base descarta una vista previa sin enviar', async () => {

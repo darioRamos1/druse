@@ -429,6 +429,16 @@
             <app-icon name="copy" [size]="12" />
             {{ 'results.copyError' | t }}
           </button>
+          @if (canExplainError() && executed.error?.message && !running()) {
+            <button
+              type="button"
+              class="empty__action"
+              (click)="explainError.emit(executed.executionId)"
+            >
+              <app-icon name="sparkles" [size]="12" />
+              {{ 'ai.executionError.explain' | t }}
+            </button>
+          }
         } @else if (executed.state === 'canceled') {
           <span class="dr-state-icon" aria-hidden="true"><app-icon name="stop" [size]="16" /></span>
           {{ 'results.canceled' | t }}

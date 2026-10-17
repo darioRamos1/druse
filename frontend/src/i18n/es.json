@@ -1838,5 +1838,20 @@
   "ai.preview.issue.turns": "Preguntas anteriores: {used}; máximo {max}.",
   "ai.preview.issue.budget": "Presupuesto estimado con reservas: {used}; máximo {max}.",
   "ai.preview.issue.request": "Tamaño de la solicitud: {used}; máximo {max}.",
-  "whatsNew.v1_7_0.chatPreview": "Revisa el contexto y su tamaño antes de enviarlo, elige cuánto historial compartir y copia bloques de otros lenguajes sin insertarlos como SQL."
+  "whatsNew.v1_7_0.chatPreview": "Revisa el contexto y su tamaño antes de enviarlo, elige cuánto historial compartir y copia bloques de otros lenguajes sin insertarlos como SQL.",
+  "ai.executionError.explain": "Explicar este error",
+  "ai.executionError.title": "Error de ejecución adjunto",
+  "ai.executionError.review": "Revisa y oculta datos sensibles en ambos campos. La vista previa quitará credenciales y cadenas de conexión reconocibles; comprueba el texto final antes de enviarlo.",
+  "ai.executionError.blocked": "Este proveedor no permite compartir contexto. Cambia su permiso o quita el adjunto para continuar.",
+  "ai.executionError.sql": "SQL que se ejecutó",
+  "ai.executionError.message": "Diagnóstico de la ejecución",
+  "ai.executionError.code": "Código",
+  "ai.executionError.line": "Línea",
+  "ai.executionError.position": "Posición",
+  "ai.executionError.remove": "Quitar error adjunto",
+  "ai.executionError.sourceChanged": "Se retiró el error adjunto al cambiar de base o conexión.",
+  "ai.executionError.question": "Explica la causa de este error y sugiere cómo corregir la consulta.",
+  "ai.preview.section.error": "Error de ejecución",
+  "ai.preview.issue.error": "Error de ejecución: {used}; máximo {max}.",
+  "whatsNew.v1_8_0.explainError": "Pide al chat que explique un error con la consulta que lo produjo, edita el adjunto y revisa el diagnóstico antes de enviarlo."
 }

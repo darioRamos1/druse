@@ -379,6 +379,7 @@ function cloneContext(context: AiContextSnapshot): AiContextSnapshot {
   return {
     ...context,
     source: { ...context.source },
+    executionError: context.executionError ? { ...context.executionError } : undefined,
     tables: [...context.tables],
     warnings: context.warnings ? [...context.warnings] : undefined,
     notes: context.notes?.map((note) => ({
