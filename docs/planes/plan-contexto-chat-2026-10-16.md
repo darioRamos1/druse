@@ -298,10 +298,21 @@ también al historial. Cambiar de base retira el borrador adjunto y revocar el p
 de contexto bloquea su envío. Véase [ADR 0011](../decisions/0011-explicar-errores-en-el-chat.md).
 Comprobado con fallos reales de SQLite y respuesta de IA simulada en Chromium;
 otros motores y Tauri/WebView2 quedan pendientes. La fase E continúa abierta:
-- [ ] «Analizar estas filas» permite elegir filas y columnas y aplicar límites
+
+- [x] «Analizar estas filas» permite elegir filas y columnas y aplicar límites
   antes de componer el contexto. Nunca adjuntar resultados automáticamente.
-- [ ] Permitir ocultar columnas antes de enviar; mostrar nulos, tamaños y recortes
+- [x] Permitir ocultar columnas antes de enviar; mostrar nulos, tamaños y recortes
   sin cargar innecesariamente binarios o valores grandes.
+
+**Segundo incremento implementado el 2026-10-19 (1.9.0):** selector explícito de
+filas y columnas del conjunto visible, exclusión y ocultación de valores,
+distinción entre nulos/vacíos/binarios y recorte UTF-8 de textos grandes aceptado
+por la persona. La revisión y el historial conservan la muestra elegida; el servidor
+exige permiso de datos y aplica límites de forma y tamaño a los adjuntos actuales
+e históricos. Véase [ADR 0012](../decisions/0012-muestras-de-filas-en-el-chat.md).
+El recorrido de esta entrega utiliza SQLite y Chromium con inferencia simulada.
+La fase E continúa abierta por la integración de planes:
+
 - [ ] Incorporar planes de ejecución cuando exista soporte comprobado; no
   ejecutar consultas ni generar un plan con ejecución desde el asistente.
 

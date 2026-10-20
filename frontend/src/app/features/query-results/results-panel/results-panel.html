@@ -40,6 +40,22 @@
 
   <span class="spacer"></span>
 
+  @if (canAnalyzeRows() && currentSet()?.rows?.length && result(); as executed) {
+    <button
+      type="button"
+      class="tool-button"
+      [disabled]="running()"
+      (click)="
+        analyzeRows.emit({ executionId: executed.executionId, resultSetIndex: selectedSetIndex() })
+      "
+      [attr.aria-label]="'ai.rows.analyze' | t"
+      [title]="'ai.rows.analyze' | t"
+    >
+      <app-icon name="sparkles" [size]="12" />
+      <span class="tool-button__label">{{ 'ai.rows.analyze' | t }}</span>
+    </button>
+  }
+
   <button
     type="button"
     class="tool-button filter-toggle"

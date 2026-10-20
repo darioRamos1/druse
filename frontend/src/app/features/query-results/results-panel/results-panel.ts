@@ -52,6 +52,8 @@ export class ResultsPanel {
   readonly result = input<QueryResult | null>(null);
   readonly canExplainError = input(false);
   readonly explainError = output<string>();
+  readonly canAnalyzeRows = input(false);
+  readonly analyzeRows = output<{ executionId: string; resultSetIndex: number }>();
   readonly history = input<readonly QueryHistoryEntry[]>([]);
   readonly historyFilter = input<QueryHistoryFilter>({});
   readonly historyLoading = input(false);

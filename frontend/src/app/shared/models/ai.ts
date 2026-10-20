@@ -155,6 +155,25 @@ export interface AiContextSnapshot {
   readonly warnings?: readonly string[];
   readonly notes?: readonly AiBusinessNote[];
   readonly executionError?: AiExecutionError;
+  readonly rows?: AiRowsAttachment;
+}
+
+export interface AiRowCell {
+  readonly kind: 'text' | 'null' | 'masked' | 'binary' | 'truncated';
+  readonly value?: string;
+  readonly originalBytes?: number;
+}
+
+/** Una muestra elegida; los valores excluidos nunca forman parte de esta copia. */
+export interface AiRowsAttachment {
+  readonly executionId: string;
+  readonly occurredAtUtc: string;
+  readonly resultSetIndex: number;
+  readonly availableRows: number;
+  readonly resultTruncated: boolean;
+  readonly truncationAccepted: boolean;
+  readonly columns: readonly { ordinal: number; name: string; dataType: string }[];
+  readonly rows: readonly { index: number; cells: readonly AiRowCell[] }[];
 }
 
 /** Solo el diagnóstico de una ejecución: nunca sesiones, filas ni perfiles de conexión. */
@@ -203,6 +222,7 @@ export interface AiChatLimits {
   readonly maxSchemaBytes: number;
   readonly maxNotesBytes: number;
   readonly maxErrorBytes: number;
+  readonly maxRowsBytes: number;
   readonly maxContextBytes: number;
   readonly maxHistoryBytes: number;
   readonly maxInputBytes: number;
@@ -219,6 +239,7 @@ export interface AiChatUsage {
   readonly schemaBytes: number;
   readonly notesBytes: number;
   readonly errorBytes: number;
+  readonly rowsBytes: number;
   readonly contextBytes: number;
   readonly historyBytes: number;
   readonly inputBytes: number;

@@ -37,6 +37,32 @@ describe('ResultsPanel', () => {
     expect(element.querySelector('.welcome')).toBeNull();
   });
 
+  it('analizar filas conserva el conjunto visible y la ejecución, sin elegir datos', () => {
+    const analyze = vi.fn();
+    fixture.componentInstance.analyzeRows.subscribe(analyze);
+    const set = {
+      columns: [{ name: 'id', dataType: 'int', kind: 'number', width: null }],
+      rows: [{ number: 1, values: ['1'] }],
+      totalRows: 1,
+      durationMs: 1,
+      truncated: false,
+    };
+    fixture.componentRef.setInput('result', {
+      executionId: 'e1',
+      state: 'succeeded',
+      resultSets: [set, set],
+      messages: [],
+      durationMs: 1,
+    });
+    fixture.componentRef.setInput('canAnalyzeRows', true);
+    fixture.detectChanges();
+    element.querySelectorAll<HTMLButtonElement>('.sets button')[1].click();
+    fixture.detectChanges();
+    element.querySelector<HTMLButtonElement>('[aria-label="Analizar estas filas"]')!.click();
+    expect(analyze).toHaveBeenCalledWith({ executionId: 'e1', resultSetIndex: 1 });
+    expect(fixture.componentInstance.selectedRows()).toEqual([]);
+  });
+
   it('ofrece explicar solo un fallo con procedencia y emite su ejecución', () => {
     const explain = vi.fn();
     fixture.componentInstance.explainError.subscribe(explain);

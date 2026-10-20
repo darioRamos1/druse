@@ -181,6 +181,7 @@ export class AiStore {
   ): AiChatRequestSnapshot | null {
     const provider = this.active();
     if (!provider || this.busy() || !text.trim()) return null;
+    if (context?.rows && provider.disclosure !== 'schemaAndRows') return null;
     const attached =
       provider.disclosure === 'nothing' || !context
         ? undefined
@@ -380,6 +381,16 @@ function cloneContext(context: AiContextSnapshot): AiContextSnapshot {
     ...context,
     source: { ...context.source },
     executionError: context.executionError ? { ...context.executionError } : undefined,
+    rows: context.rows
+      ? {
+          ...context.rows,
+          columns: context.rows.columns.map((column) => ({ ...column })),
+          rows: context.rows.rows.map((row) => ({
+            ...row,
+            cells: row.cells.map((cell) => ({ ...cell })),
+          })),
+        }
+      : undefined,
     tables: [...context.tables],
     warnings: context.warnings ? [...context.warnings] : undefined,
     notes: context.notes?.map((note) => ({

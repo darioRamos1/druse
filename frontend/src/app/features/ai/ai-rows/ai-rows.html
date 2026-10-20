@@ -1,0 +1,127 @@
+<details open>
+  <summary>{{ 'ai.rows.title' | t }}</summary>
+  <p class="origin">
+    {{ request().source.connectionName }} · {{ request().source.database }} ·
+    {{ 'ai.rows.set' | t: { n: request().resultSetIndex + 1 } }}
+  </p>
+  <p class="origin">{{ request().occurredAtUtc }} · {{ request().executionId }}</p>
+  <p>{{ 'ai.rows.review' | t }}</p>
+  @if (!allowed()) {
+    <p role="alert">{{ 'ai.rows.blocked' | t }}</p>
+  }
+  @if (request().resultSet.truncated) {
+    <p role="status">{{ 'ai.rows.resultTruncated' | t }}</p>
+  }
+  <details class="columns" open>
+    <summary>
+      {{ 'ai.rows.columns' | t: { selected: selectedColumns(), max: columnLimit } }}
+    </summary>
+    <div class="column-list">
+      @for (column of request().resultSet.columns; track $index; let index = $index) {
+        <div class="column">
+          <label
+            ><input
+              type="checkbox"
+              [checked]="modes()[index] !== 'exclude'"
+              [disabled]="modes()[index] === 'exclude' && selectedColumns() >= columnLimit"
+              (change)="columnMode(index, $any($event.target).checked ? 'include' : 'exclude')"
+            />
+            {{ column.name }} <small>{{ column.dataType }}</small></label
+          >
+          @if (modes()[index] !== 'exclude') {
+            <label class="mask"
+              ><input
+                type="checkbox"
+                [checked]="modes()[index] === 'mask'"
+                (change)="columnMode(index, $any($event.target).checked ? 'mask' : 'include')"
+              />
+              {{ 'ai.rows.mask' | t }}</label
+            >
+          }
+        </div>
+      }
+    </div>
+  </details>
+  <p>
+    {{
+      'ai.rows.count'
+        | t: { selected: indices().length, total: request().resultSet.rows.length, max: rowLimit }
+    }}
+  </p>
+  <p class="origin">{{ 'ai.rows.originalOrder' | t }}</p>
+  <div class="table-scroll" tabindex="0" [attr.aria-label]="'ai.rows.localPreview' | t">
+    <table>
+      <thead>
+        <tr>
+          <th>{{ 'ai.rows.pick' | t }}</th>
+          @for (column of previewColumns(); track column.index) {
+            <th>{{ column.name }}</th>
+          }
+        </tr>
+      </thead>
+      <tbody>
+        @for (row of visibleRows(); track $index; let offset = $index) {
+          @let index = page() * 10 + offset;
+          <tr>
+            <th>
+              <label
+                ><input
+                  type="checkbox"
+                  [attr.aria-label]="'ai.rows.pickRow' | t: { n: index + 1 }"
+                  [checked]="indices().includes(index)"
+                  [disabled]="!indices().includes(index) && indices().length >= rowLimit"
+                  (change)="toggleRow(index)"
+                />
+                {{ index + 1 }}</label
+              >
+            </th>
+            @for (column of previewColumns(); track column.index) {
+              @let cell = previewValue(index, column.index);
+              <td>{{ cell.key ? (cell.key | t) : cell.text }}</td>
+            }
+          </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+  <nav [attr.aria-label]="'ai.rows.pages' | t">
+    <button type="button" [disabled]="page() === 0" (click)="page.set(page() - 1)">
+      {{ 'ai.rows.previous' | t }}
+    </button>
+    <span>{{ page() + 1 }} / {{ pages() }}</span>
+    <button type="button" [disabled]="page() + 1 >= pages()" (click)="page.set(page() + 1)">
+      {{ 'ai.rows.next' | t }}
+    </button>
+  </nav>
+  @if (hasTruncation()) {
+    <label class="accept"
+      ><input
+        type="checkbox"
+        [checked]="accepted()"
+        (change)="accepted.set($any($event.target).checked)"
+      />
+      {{ 'ai.rows.acceptTruncation' | t }}</label
+    >
+  }
+  @if (sample(); as chosen) {
+    <p class="origin">{{ 'ai.rows.bytes' | t: { bytes: sampleBytes() } }}</p>
+    @for (row of chosen.rows; track row.index) {
+      @for (cell of row.cells; track $index) {
+        @if (cell.kind === 'truncated') {
+          <p>
+            {{
+              'ai.rows.cellTruncated'
+                | t
+                  : {
+                      row: row.index + 1,
+                      column: chosen.columns[$index].name,
+                      bytes: cell.originalBytes ?? 0,
+                    }
+            }}
+          </p>
+        }
+      }
+    }
+  }
+  <button type="button" (click)="removed.emit()">{{ 'ai.rows.remove' | t }}</button>
+</details>

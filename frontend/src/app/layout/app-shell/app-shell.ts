@@ -77,6 +77,7 @@ import CommandPalette from '../command-palette/command-palette';
 import { ShortcutsSheet } from '../shortcuts-sheet/shortcuts-sheet';
 import { AiPanel } from '../../features/ai/ai-panel/ai-panel';
 import { AiErrorAttachment } from '../../shared/models/ai';
+import { AiRowsRequest } from '../../core/ai/ai-rows';
 import { AiProviderDialog } from '../../features/ai/ai-provider-dialog/ai-provider-dialog';
 import { AiStore } from '../../core/ai/ai-store';
 import { resolveAiDatabase } from '../../core/ai/ai-context';
@@ -173,6 +174,44 @@ export class AppShell {
   protected readonly aiProvidersOpen = signal(false);
   protected readonly aiTableRequest = signal<DatabaseObject | null>(null);
   protected readonly aiErrorRequest = signal<AiErrorAttachment | null>(null);
+  protected readonly aiRowsRequest = signal<AiRowsRequest | null>(null);
+  protected readonly canAnalyzeRows = computed(() => {
+    const result = this._store.result();
+    const source = this._store.resultSource();
+    const current = this.aiContext().source;
+    return (
+      result?.state === 'succeeded' &&
+      !!source?.occurredAtUtc &&
+      !!source.aiSource &&
+      source.aiSource.connectionId === current.connectionId &&
+      source.aiSource.database === current.database &&
+      !this._store.running() &&
+      result.resultSets.some((set) => set.rows.length > 0)
+    );
+  });
+
+  protected analyzeQueryRows(event: { executionId: string; resultSetIndex: number }): void {
+    if (!this.canAnalyzeRows()) return;
+    const result = this._store.result();
+    const source = this._store.resultSource();
+    const set = result?.resultSets[event.resultSetIndex];
+    if (
+      result?.executionId !== event.executionId ||
+      !source?.aiSource ||
+      !source.occurredAtUtc ||
+      !set?.rows.length
+    )
+      return;
+    this.aiRowsRequest.set({
+      source: { ...source.aiSource },
+      executionId: result.executionId,
+      occurredAtUtc: source.occurredAtUtc,
+      resultSetIndex: event.resultSetIndex,
+      resultSet: set,
+    });
+    this.aiOpen.set(true);
+    void this._ai.refresh();
+  }
   protected readonly explainableError = computed<AiErrorAttachment | null>(() => {
     const result = this._store.result();
     const source = this._store.resultSource();

@@ -479,6 +479,143 @@ public sealed class AiDiagnosticsTests
         Assert.Equal(0, provider.StreamCalls);
     }
 
+    private static AiRowsAttachmentDto RowSample() => new("ejecucion-filas", "2026-10-19T13:00:00Z", 1, 20, true, true,
+        [new(0, "id", "bigint"), new(2, "valor", "text"), new(4, "oculto", "text"), new(5, "archivo", "blob"), new(6, "detalle", "text")],
+        [new(3, [new("text", "9007199254740993"), new("null"), new("masked"), new("binary"), new("truncated", "Prefijo elegido", 4000)]),
+         new(7, [new("text", "2"), new("text", ""), new("masked"), new("binary"), new("text", "Completo")])]);
+
+    [Theory]
+    [InlineData("schema", false)]
+    [InlineData("nothing", false)]
+    [InlineData("schemaAndRows", false)]
+    [InlineData("schema", true)]
+    [InlineData("nothing", true)]
+    [InlineData("schemaAndRows", true)]
+    public async Task LasFilasActualesEHistoricasExigenElPermisoDeDatos(string disclosure, bool historical)
+    {
+        var provider = new TestProvider();
+        using var root = new DruseApiFactory();
+        using var host = WithProvider(root, provider);
+        using var client = Client(host);
+        var id = await SaveProfile(client, disclosure);
+        var context = new AiContextDto(new("c1", "Pruebas", "ventas", "sqlite"), null, null, [], Rows: RowSample());
+        var request = new AiChatDto(id, historical
+            ? [new("user", "Anterior", context), new("assistant", "Respuesta"), new("user", "Analiza")]
+            : [new("user", "Analiza")], historical ? null : context, "gpt-6.1-sol", disclosure);
+        using var prepared = await client.PostAsJsonAsync("/api/ai/chat/preview", request);
+        if (disclosure != "schemaAndRows")
+        {
+            Assert.Equal(HttpStatusCode.Forbidden, prepared.StatusCode);
+            using var blocked = await client.PostAsJsonAsync("/api/ai/chat", request);
+            Assert.Equal(HttpStatusCode.Forbidden, blocked.StatusCode);
+            Assert.Equal(0, provider.StreamCalls);
+            return;
+        }
+        prepared.EnsureSuccessStatusCode();
+        var preview = (await prepared.Content.ReadFromJsonAsync<AiChatPreview>())!;
+        Assert.True(preview.Valid);
+        Assert.Equal(0, provider.StreamCalls);
+        Assert.Equal(!historical, preview.Usage.RowsBytes > 0);
+        var text = preview.Messages[1].Text;
+        Assert.Contains("9007199254740993", text, StringComparison.Ordinal);
+        Assert.Contains("ejecucion-filas", text, StringComparison.Ordinal);
+        Assert.Contains("\"resultSetIndex\":1", text, StringComparison.Ordinal);
+        Assert.Contains("\"resultTruncated\":true", text, StringComparison.Ordinal);
+        foreach (var kind in new[] { "null", "masked", "binary", "truncated" })
+        {
+            Assert.Contains($"\"kind\":\"{kind}\"", text, StringComparison.Ordinal);
+        }
+        Assert.Contains("\"value\":\"\"", text, StringComparison.Ordinal);
+        using var sent = await client.PostAsJsonAsync("/api/ai/chat", request with { PreviewHash = preview.Hash });
+        sent.EnsureSuccessStatusCode();
+        Assert.Equal(preview.Messages.Select(message => message.Text), provider.LastRequest.Messages.Select(message => message.Text));
+        using var changed = await client.PostAsJsonAsync("/api/ai/chat", request with { Context = context with { Rows = RowSample() with { ResultSetIndex = 2 } }, PreviewHash = preview.Hash });
+        Assert.Equal(HttpStatusCode.Conflict, changed.StatusCode);
+        Assert.Equal(1, provider.StreamCalls);
+    }
+
+    [Theory]
+    [InlineData("masked", "valor que no debe salir", null)]
+    [InlineData("binary", "binario que no debe salir", null)]
+    [InlineData("null", "nulo falsificado", null)]
+    [InlineData("truncated", "prefijo", 500)]
+    [InlineData("otro", "no permitido", null)]
+    [InlineData("text", null, null)]
+    public async Task UnaCeldaOcultaOBinariaNoPuedeTransportarContenido(string kind, string? value, int? originalBytes)
+    {
+        var provider = new TestProvider();
+        using var root = new DruseApiFactory();
+        using var host = WithProvider(root, provider);
+        using var client = Client(host);
+        var id = await SaveProfile(client, "schemaAndRows");
+        var sample = RowSample() with { Columns = [new(0, "dato", "text")], Rows = [new(0, [new(kind, value, originalBytes)])] };
+        var context = new AiContextDto(new("c1", "Pruebas", "ventas", "sqlite"), null, null, [], Rows: sample);
+        using var response = await client.PostAsJsonAsync("/api/ai/chat", new AiChatDto(id, [new("user", "Analiza")], context, "gpt-6.1-sol", "schemaAndRows"));
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal(0, provider.StreamCalls);
+    }
+
+    [Theory]
+    [InlineData("rows")]
+    [InlineData("columns")]
+    [InlineData("cell")]
+    [InlineData("index")]
+    [InlineData("duplicate")]
+    [InlineData("acceptance")]
+    public async Task ElServidorRechazaUnaMuestraInvalidaAunqueSeEludaElSelector(string problem)
+    {
+        var provider = new TestProvider();
+        using var root = new DruseApiFactory();
+        using var host = WithProvider(root, provider);
+        using var client = Client(host);
+        var id = await SaveProfile(client, "schemaAndRows");
+        var sample = RowSample();
+        sample = problem switch
+        {
+            "rows" => sample with { Rows = Enumerable.Range(0, 51).Select(index => new AiSampleRowDto(index, sample.Rows[0].Cells)).ToArray(), AvailableRows = 100 },
+            "columns" => sample with { Columns = Enumerable.Range(0, 33).Select(index => new AiRowColumnDto(index, "c", "text")).ToArray() },
+            "cell" => sample with { Rows = [new(0, [new("text", new string('á', 513)), new("null"), new("masked"), new("binary"), new("text", "x")])] },
+            "index" => sample with { Rows = [sample.Rows[0] with { Index = 20 }] },
+            "duplicate" => sample with { Rows = [sample.Rows[0], sample.Rows[0]] },
+            _ => sample with { TruncationAccepted = false },
+        };
+        var context = new AiContextDto(new("c1", "Pruebas", "ventas", "sqlite"), null, null, [], Rows: sample);
+        using var response = await client.PostAsJsonAsync("/api/ai/chat/preview", new AiChatDto(id, [new("user", "Analiza")], context, "gpt-6.1-sol", "schemaAndRows"));
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal(0, provider.StreamCalls);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ElPresupuestoDeFilasSeCompruebaTambienEnElHistorialYLaRevocacionBloqueaReenvios(bool historical)
+    {
+        var provider = new TestProvider();
+        using var root = new DruseApiFactory();
+        using var host = WithProvider(root, provider);
+        using var client = Client(host);
+        var id = await SaveProfile(client, "schemaAndRows");
+        var context = new AiContextDto(new("c1", "Pruebas", "ventas", "sqlite"), null, null, [], Rows: RowSample());
+        var request = new AiChatDto(id, historical ? [new("user", "Anterior", context), new("assistant", "Respuesta"), new("user", "Analiza")]
+            : [new("user", "Analiza")], historical ? null : context, "gpt-6.1-sol", "schemaAndRows");
+        host.Services.GetRequiredService<IConfiguration>()["AiChat:Defaults:MaxRowsBytes"] = "100";
+        using var prepared = await client.PostAsJsonAsync("/api/ai/chat/preview", request);
+        var preview = (await prepared.Content.ReadFromJsonAsync<AiChatPreview>())!;
+        Assert.False(preview.Valid);
+        Assert.Contains(preview.Issues, issue => issue.Code == "rows");
+        using var blocked = await client.PostAsJsonAsync("/api/ai/chat", request);
+        Assert.Equal(HttpStatusCode.RequestEntityTooLarge, blocked.StatusCode);
+        Assert.Equal(0, provider.StreamCalls);
+        using var revoked = await client.PostAsJsonAsync("/api/ai/providers", new { id, name = "Permiso revocado", kind = "localcli", command = "codex",
+            model = "gpt-6.1-sol", baseUrl = "", disclosure = "schema", ownSession = false, isDefault = false });
+        revoked.EnsureSuccessStatusCode();
+        using var stale = await client.PostAsJsonAsync("/api/ai/chat", request);
+        Assert.Equal(HttpStatusCode.Conflict, stale.StatusCode);
+        using var forbidden = await client.PostAsJsonAsync("/api/ai/chat", request with { Disclosure = "schema" });
+        Assert.Equal(HttpStatusCode.Forbidden, forbidden.StatusCode);
+        Assert.Equal(0, provider.StreamCalls);
+    }
+
     private static async Task<Guid> SaveProfile(HttpClient client, string disclosure)
     {
         using var saved = await client.PostAsJsonAsync("/api/ai/providers", new

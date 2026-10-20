@@ -72,6 +72,46 @@ describe('AiStore', () => {
     return store;
   }
 
+  it('rechaza filas sin permiso y congela la muestra para el reintento y el historial', async () => {
+    const store = await ready();
+    const source = { connectionId: 'c1', connectionName: 'Prueba', database: 'ventas' };
+    store.setSource(source);
+    const rows = {
+      executionId: 'e1',
+      occurredAtUtc: '2026-10-19T13:00:00Z',
+      resultSetIndex: 0,
+      availableRows: 1,
+      resultTruncated: false,
+      truncationAccepted: false,
+      columns: [{ ordinal: 0, name: 'id', dataType: 'text' }],
+      rows: [{ index: 0, cells: [{ kind: 'text' as const, value: 'original' }] }],
+    };
+    expect(store.prepare('Analiza', { source, tables: [], rows })).toBeNull();
+    providers = [{ ...provider, disclosure: 'schemaAndRows' }];
+    await store.refresh();
+    const request = store.prepare('Analiza', { source, tables: [], rows })!;
+    rows.rows[0].cells[0].value = 'modificado';
+    rows.columns[0].name = 'otra';
+    store.sendPrepared(request);
+    stream.next({ kind: 'error', message: 'Falló' });
+    stream.complete();
+    stream = new Subject<AiStreamEvent>();
+    store.retry();
+    expect(lastRequest?.context?.rows?.rows[0].cells[0].value).toBe('original');
+    expect(lastRequest?.context?.rows?.columns[0].name).toBe('id');
+    stream.next({ kind: 'chunk', text: 'Respuesta' });
+    stream.complete();
+    expect(
+      store.prepare('Siguiente')?.payload.messages[0].context?.rows?.rows[0].cells[0].value,
+    ).toBe('original');
+    providers = [{ ...provider, disclosure: 'schema' }];
+    await store.refresh();
+    expect(store.turns()).toEqual([]);
+    expect(store.prepare('Sin filas')?.payload.messages).toEqual([
+      { role: 'user', text: 'Sin filas' },
+    ]);
+  });
+
   it('congela el error y su procedencia para el reintento y el historial', async () => {
     const store = await ready();
     const source = { connectionId: 'c1', connectionName: 'Prueba', database: 'ventas' };

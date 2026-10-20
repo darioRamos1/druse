@@ -5,6 +5,7 @@ import { medir } from '../support/medir';
 import { comprobarDiagnosticoIa, prepararDiagnosticoIa } from '../support/ai-diagnostics';
 import { comprobarContextoChat, prepararContextoChat, comprobarSelectorContexto, comprobarNotasContexto } from '../support/ai-context';
 import { comprobarErrorContexto } from '../support/ai-execution-error';
+import { comprobarMuestraContexto } from '../support/ai-rows';
 
 /**
  * Barrido visual de toda la aplicación: recorre pantallas y diálogos, los
@@ -628,6 +629,7 @@ test.describe('barrido visual', () => {
     await comprobarSelectorContexto(page, name => foto(page, `15d-${name}`, asistente));
     await comprobarNotasContexto(page, name => foto(page, `15e-${name}`, asistente));
     await comprobarErrorContexto(page, name => foto(page, `15f-${name}`, asistente));
+    await comprobarMuestraContexto(page, name => foto(page, `15g-${name}`, asistente));
     await page.getByRole('button', { name: 'Asistente', exact: true }).click();
     await expect(asistente).toBeHidden();
 

@@ -74,6 +74,7 @@ describe('selección de contexto del panel de IA', () => {
                   maxSchemaBytes: 32768,
                   maxNotesBytes: 16384,
                   maxErrorBytes: 16384,
+                  maxRowsBytes: 32768,
                   maxContextBytes: 49152,
                   maxHistoryBytes: 32768,
                   maxInputBytes: 65536,
@@ -89,6 +90,7 @@ describe('selección de contexto del panel de IA', () => {
                   schemaBytes: 0,
                   notesBytes: 0,
                   errorBytes: 0,
+                  rowsBytes: 0,
                   contextBytes: 9,
                   historyBytes: 0,
                   inputBytes: 100,
@@ -181,6 +183,112 @@ describe('selección de contexto del panel de IA', () => {
     expect(stream).toHaveBeenCalledTimes(1);
     expect(stream.mock.calls[0][0].context.sql).toBe('SELECT 1;');
     expect(stream.mock.calls[0][0].previewHash).toBe('preparado');
+  });
+
+  const rowsRequest = {
+    source: context.source,
+    executionId: 'filas-1',
+    occurredAtUtc: '2026-10-19T13:00:00Z',
+    resultSetIndex: 0,
+    resultSet: {
+      columns: [
+        { name: 'id', dataType: 'integer', kind: 'number' as const, width: null },
+        { name: 'secreto', dataType: 'text', kind: 'text' as const, width: null },
+        { name: 'detalle', dataType: 'text', kind: 'text' as const, width: null },
+      ],
+      rows: [{ number: 1, values: ['1', 'DATO_PRIVADO', 'á'.repeat(600)] }],
+      totalRows: 1,
+      durationMs: 1,
+      truncated: false,
+    },
+  };
+
+  async function grantRows(): Promise<void> {
+    vi.spyOn(TestBed.inject(ApplicationGateway), 'getAiProviders').mockReturnValue(
+      of({
+        providers: [{ ...provider, disclosure: 'schemaAndRows' }],
+        canStoreKeys: true,
+        storeDescription: '',
+      }),
+    );
+    await TestBed.inject(AiStore).refresh();
+    fixture.detectChanges();
+  }
+
+  it('consume la entrega del shell una vez y retiene solo el selector pendiente al limpiar la entrada', () => {
+    const received = vi.fn(() => fixture.componentRef.setInput('requestedRows', null));
+    fixture.componentInstance.rowsReceived.subscribe(received);
+    fixture.componentRef.setInput('requestedRows', rowsRequest);
+    fixture.detectChanges();
+    expect(received).toHaveBeenCalledTimes(1);
+    expect(fixture.componentInstance.requestedRows()).toBeNull();
+    expect(fixture.nativeElement.querySelector('app-ai-rows')).toBeTruthy();
+    fixture.componentRef.setInput('context', { ...context, sql: 'SELECT posterior;' });
+    fixture.detectChanges();
+    expect(received).toHaveBeenCalledTimes(1);
+    expect(fixture.nativeElement.querySelector('app-ai-rows input:checked')).toBeNull();
+  });
+
+  function checkRows(selector: string): void {
+    const checkbox = fixture.nativeElement.querySelector(selector) as HTMLInputElement;
+    checkbox.checked = true;
+    checkbox.dispatchEvent(new Event('change', { bubbles: true }));
+    fixture.detectChanges();
+  }
+
+  it('elegir filas requiere permiso, no envía nada al abrir y conserva la selección al volver de la revisión', async () => {
+    fixture.componentRef.setInput('requestedRows', rowsRequest);
+    fixture.detectChanges();
+    expect(stream).not.toHaveBeenCalled();
+    expect(fixture.nativeElement.querySelector('app-ai-rows input:checked')).toBeNull();
+    expect(fixture.nativeElement.querySelector('.composer__send').disabled).toBe(true);
+    await grantRows();
+    checkRows('app-ai-rows .column input');
+    checkRows('app-ai-rows tbody input');
+    enter(write('Analiza'));
+    await vi.waitFor(() => {
+      fixture.detectChanges();
+      expect(fixture.nativeElement.querySelector('app-ai-preview')).toBeTruthy();
+    });
+    const buttons = fixture.nativeElement.querySelectorAll('app-ai-preview .actions button');
+    buttons[1].click();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    expect(fixture.nativeElement.querySelector('app-ai-rows tbody input').checked).toBe(true);
+    expect(fixture.nativeElement.querySelector('app-ai-rows .column input').checked).toBe(true);
+    enter(write('Analiza'));
+    await vi.waitFor(() => {
+      fixture.detectChanges();
+      expect(fixture.nativeElement.querySelector('app-ai-preview')).toBeTruthy();
+    });
+    fixture.nativeElement.querySelector('app-ai-preview .confirm').click();
+    expect(stream).toHaveBeenCalledTimes(1);
+    const payload = stream.mock.calls[0][0] as AiChatRequest;
+    expect(payload.context?.sql).toBeUndefined();
+    expect(payload.context?.rows?.columns.map((column) => column.name)).toEqual(['id']);
+    expect(JSON.stringify(payload)).not.toContain('DATO_PRIVADO');
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('app-ai-rows')).toBeNull();
+  });
+
+  it('los textos grandes exigen aceptar el recorte y cambiar de base retira la muestra', async () => {
+    await grantRows();
+    fixture.componentRef.setInput('requestedRows', rowsRequest);
+    fixture.detectChanges();
+    checkRows('app-ai-rows .column:nth-child(3) input');
+    checkRows('app-ai-rows tbody input');
+    expect(fixture.nativeElement.querySelector('.composer__send').disabled).toBe(true);
+    expect(fixture.nativeElement.querySelector('app-ai-rows').textContent).toContain('1200 bytes');
+    checkRows('app-ai-rows .accept input');
+    expect(fixture.nativeElement.querySelector('.composer__send').disabled).toBe(false);
+    fixture.componentRef.setInput('context', {
+      ...context,
+      database: 'otra',
+      source: { ...context.source, database: 'otra' },
+    });
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('app-ai-rows')).toBeNull();
+    expect(stream).not.toHaveBeenCalled();
   });
 
   const attachment = {

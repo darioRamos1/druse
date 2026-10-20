@@ -30,6 +30,9 @@ import { AiNotesStore, eligibleNotes } from '../../../core/ai/ai-notes-store';
 import { AiNotes } from '../ai-notes/ai-notes';
 import { AiPreview } from '../ai-preview/ai-preview';
 import { AiExecutionErrorEditor } from '../ai-execution-error/ai-execution-error';
+import { AiRows } from '../ai-rows/ai-rows';
+import { AiRowsRequest, AiRowsSelection } from '../../../core/ai/ai-rows';
+import { AiRowsAttachment } from '../../../shared/models/ai';
 import { describeError } from '../../../core/workspace/errors';
 
 /** Un trozo de respuesta ya separado en prosa y SQL. */
@@ -79,7 +82,7 @@ export interface AiContext {
  */
 @Component({
   selector: 'app-ai-panel',
-  imports: [Icon, TranslatePipe, AiNotes, AiPreview, AiExecutionErrorEditor],
+  imports: [Icon, TranslatePipe, AiNotes, AiPreview, AiExecutionErrorEditor, AiRows],
   templateUrl: './ai-panel.html',
   styleUrl: './ai-panel.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -102,6 +105,15 @@ export class AiPanel {
   readonly requestedTable = input<DatabaseObject | null>(null);
   readonly requestedError = input<AiErrorAttachment | null>(null);
   protected readonly errorAttachment = signal<AiErrorAttachment | null>(null);
+  readonly requestedRows = input<AiRowsRequest | null>(null);
+  readonly rowsReceived = output<void>();
+  protected readonly rowsRequest = signal<AiRowsRequest | null>(null);
+  protected readonly rowsAttachment = signal<AiRowsAttachment | null>(null);
+  protected readonly rowsSelection = signal<AiRowsSelection | null>(null);
+  protected readonly rowsAllowed = computed(() => this.active()?.disclosure === 'schemaAndRows');
+  protected readonly rowsBlocked = computed(
+    () => !!this.rowsRequest() && (!this.rowsAllowed() || !this.rowsAttachment()),
+  );
   protected readonly selectorOpen = signal(false);
   protected readonly catalogQuery = signal('');
   protected readonly preparing = signal(false);
@@ -228,11 +240,40 @@ export class AiPanel {
             source: { ...attachment.source },
             error: { ...attachment.error },
           });
+          this.rowsRequest.set(null);
+          this.rowsAttachment.set(null);
+          this.rowsSelection.set(null);
           this.includeSql.set(false);
           this.notesOpen.set(false);
           this.review.set(null);
           this.preparation++;
-          if (!this.draft().trim()) this.draft.set(this._i18n.t('ai.executionError.question'));
+          if (!this.draft().trim() || this.draft() === this._i18n.t('ai.rows.question'))
+            this.draft.set(this._i18n.t('ai.executionError.question'));
+        });
+    });
+    effect(() => {
+      const request = this.requestedRows();
+      if (request)
+        untracked(() => {
+          // El shell deja de retener el resultado original tras entregarlo al selector local.
+          this.rowsReceived.emit();
+          this.activateContext(this.context());
+          const source = this.context().source;
+          if (
+            request.source.connectionId !== source?.connectionId ||
+            request.source.database !== source.database
+          )
+            return;
+          this.rowsRequest.set({ ...request, source: { ...request.source } });
+          this.rowsSelection.set(null);
+          this.rowsAttachment.set(null);
+          this.errorAttachment.set(null);
+          this.includeSql.set(false);
+          this.notesOpen.set(false);
+          this.review.set(null);
+          this.preparation++;
+          if (!this.draft().trim() || this.draft() === this._i18n.t('ai.executionError.question'))
+            this.draft.set(this._i18n.t('ai.rows.question'));
         });
     });
     effect(() => {
@@ -255,6 +296,16 @@ export class AiPanel {
       database: context.database,
     };
     this._store.setSource(source);
+    const rows = this.rowsRequest();
+    if (
+      rows &&
+      (rows.source.connectionId !== source.connectionId || rows.source.database !== source.database)
+    ) {
+      this.rowsRequest.set(null);
+      this.rowsAttachment.set(null);
+      this.rowsSelection.set(null);
+      this.preparationError.set(this._i18n.t('ai.rows.sourceChanged'));
+    }
     const attached = this.errorAttachment();
     if (
       attached &&
@@ -358,6 +409,7 @@ export class AiPanel {
       !text ||
       this.busy() ||
       this.preparing() ||
+      this.rowsBlocked() ||
       (this.errorAttachment() && !this.contextAllowed())
     )
       return;
@@ -367,6 +419,7 @@ export class AiPanel {
     const includeSchema = this.includeSchema();
     const includeSql = this.includeSql();
     const attachment = this.errorAttachment();
+    const rows = this.rowsAttachment();
     const preparation = ++this.preparation;
     this.preparing.set(true);
     this.preparationError.set('');
@@ -402,7 +455,8 @@ export class AiPanel {
         text,
         this.contextAllowed()
           ? {
-              source: attachment?.source ??
+              source: this.rowsRequest()?.source ??
+                attachment?.source ??
                 context.source ?? {
                   connectionId: '',
                   connectionName: '',
@@ -410,6 +464,7 @@ export class AiPanel {
                 },
               sql: includeSql ? context.sql.trim() || undefined : undefined,
               executionError: attachment ? { ...attachment.error } : undefined,
+              rows: rows ?? undefined,
               schema: includeSchema ? this.catalog.described().schema || undefined : undefined,
               tables: includeSchema ? [...this.catalog.names()] : [],
               warnings: includeSchema ? [...this.catalog.warnings()] : [],
@@ -451,6 +506,9 @@ export class AiPanel {
       if (this.draft() === review.rawDraft) this.draft.set('');
       // El adjunto pertenece a esta pregunta; el siguiente turno decide de nuevo qué añadir.
       this.errorAttachment.set(null);
+      this.rowsRequest.set(null);
+      this.rowsAttachment.set(null);
+      this.rowsSelection.set(null);
       this.review.set(null);
     }
   }
@@ -473,6 +531,19 @@ export class AiPanel {
     this.errorAttachment.set(null);
     this.review.set(null);
     this.preparation++;
+  }
+
+  protected changeRows(rows: AiRowsAttachment | null): void {
+    if (JSON.stringify(this.rowsAttachment()) === JSON.stringify(rows)) return;
+    this.rowsAttachment.set(rows);
+    this.review.set(null);
+    this.preparation++;
+  }
+
+  protected removeRows(): void {
+    this.rowsRequest.set(null);
+    this.rowsSelection.set(null);
+    this.changeRows(null);
   }
 
   protected changeHistory(limit: number | null): void {

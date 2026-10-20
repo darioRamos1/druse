@@ -104,6 +104,15 @@
     (historyChanged)="changeHistory($event)"
     (restarted)="clear(); review.set(null)"
   />
+} @else if (configured() && rowsRequest(); as request) {
+  <app-ai-rows
+    [request]="request"
+    [allowed]="rowsAllowed()"
+    [initialSelection]="rowsSelection()"
+    (selectionChanged)="rowsSelection.set($event)"
+    (changed)="changeRows($event)"
+    (removed)="removeRows()"
+  />
 } @else {
   <div class="body">
     @if (!configured()) {
@@ -444,7 +453,12 @@
       ></textarea>
 
       <div class="composer__tools">
-        @if (contextAllowed() && !errorAttachment() && context().sql.trim().length > 0) {
+        @if (
+          contextAllowed() &&
+          !errorAttachment() &&
+          !rowsRequest() &&
+          context().sql.trim().length > 0
+        ) {
           <button
             type="button"
             class="chip"
@@ -485,7 +499,11 @@
           <button
             type="button"
             class="composer__send"
-            [disabled]="draft().trim().length === 0 || (!!errorAttachment() && !contextAllowed())"
+            [disabled]="
+              draft().trim().length === 0 ||
+              (!!errorAttachment() && !contextAllowed()) ||
+              rowsBlocked()
+            "
             (click)="send()"
             [attr.aria-label]="'ai.send' | t"
           >

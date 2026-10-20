@@ -49,7 +49,7 @@ public sealed record AiSourceDto(string ConnectionId, string ConnectionName, str
 
 public sealed record AiContextDto(AiSourceDto Source, string? Sql, string? Schema, IReadOnlyList<string> Tables,
     IReadOnlyList<string>? Warnings = null, IReadOnlyList<AiBusinessNote>? Notes = null,
-    AiExecutionErrorDto? ExecutionError = null);
+    AiExecutionErrorDto? ExecutionError = null, AiRowsAttachmentDto? Rows = null);
 
 public sealed record AiExecutionErrorDto(string ExecutionId, string OccurredAtUtc, string Sql,
     string Message, string? Code = null, int? Line = null, int? Position = null);
@@ -567,6 +567,11 @@ internal static partial class AiEndpoints
         if (executionError.Length > 0)
         {
             parts.Add(executionError);
+        }
+        var rows = DescribeRows(profile, context);
+        if (rows.Length > 0)
+        {
+            parts.Add(rows);
         }
         return string.Join("\n\n", parts);
     }
