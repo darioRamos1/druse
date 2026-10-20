@@ -75,6 +75,7 @@ describe('selección de contexto del panel de IA', () => {
                   maxNotesBytes: 16384,
                   maxErrorBytes: 16384,
                   maxRowsBytes: 32768,
+                  maxPlanBytes: 16384,
                   maxContextBytes: 49152,
                   maxHistoryBytes: 32768,
                   maxInputBytes: 65536,
@@ -91,6 +92,7 @@ describe('selección de contexto del panel de IA', () => {
                   notesBytes: 0,
                   errorBytes: 0,
                   rowsBytes: 0,
+                  planBytes: 0,
                   contextBytes: 9,
                   historyBytes: 0,
                   inputBytes: 100,
@@ -126,6 +128,88 @@ describe('selección de contexto del panel de IA', () => {
       new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }),
     );
   }
+
+  const planAttachment = {
+    source: context.source,
+    plan: {
+      format: 'sqlite-query-plan' as const,
+      executionId: 'e1',
+      occurredAtUtc: '2026-10-19T12:00:00Z',
+      sql: 'EXPLAIN QUERY PLAN SELECT * FROM clientes;',
+      text: 'SCAN clientes',
+    },
+  };
+
+  it('actualiza la pregunta sugerida al sustituir un plan y conserva una pregunta propia', () => {
+    fixture.componentRef.setInput('requestedPlan', planAttachment);
+    fixture.detectChanges();
+    const planQuestion = fixture.nativeElement.querySelector('.composer__input').value;
+    fixture.componentRef.setInput('requestedError', attachment);
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('.composer__input').value).not.toBe(planQuestion);
+    fixture.componentRef.setInput('requestedPlan', { ...planAttachment });
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('.composer__input').value).toBe(planQuestion);
+    write('Mi pregunta concreta');
+    fixture.componentRef.setInput('requestedError', { ...attachment });
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('.composer__input').value).toBe(
+      'Mi pregunta concreta',
+    );
+    expect(fixture.nativeElement.querySelector('app-ai-execution-plan')).toBeNull();
+  });
+
+  it('permite editar y quitar el plan sin restaurarlo al cambiar el editor', async () => {
+    fixture.componentRef.setInput('requestedPlan', planAttachment);
+    fixture.detectChanges();
+    const editor = fixture.nativeElement.querySelector('app-ai-execution-plan');
+    expect(editor.textContent).toContain('e1');
+    const sql = editor.querySelector('textarea') as HTMLTextAreaElement;
+    expect(sql.value).toBe(planAttachment.plan.sql);
+    sql.value = 'SQL revisado';
+    sql.dispatchEvent(new Event('input', { bubbles: true }));
+    fixture.detectChanges();
+    enter(write('Analiza'));
+    await vi.waitFor(() => {
+      fixture.detectChanges();
+      expect(fixture.nativeElement.querySelector('app-ai-preview')).toBeTruthy();
+    });
+    expect(stream).not.toHaveBeenCalled();
+    const preview = fixture.nativeElement.querySelector('app-ai-preview');
+    preview.querySelectorAll('button')[1].click();
+    fixture.detectChanges();
+    fixture.nativeElement.querySelector('app-ai-execution-plan button').click();
+    fixture.componentRef.setInput('context', { ...context, sql: 'SELECT posterior;' });
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('app-ai-execution-plan')).toBeNull();
+  });
+
+  it('el plan se descarta al cambiar de base y el permiso solo pregunta bloquea su envío', async () => {
+    fixture.componentRef.setInput('requestedPlan', planAttachment);
+    fixture.detectChanges();
+    const gateway = TestBed.inject(ApplicationGateway);
+    vi.spyOn(gateway, 'getAiProviders').mockReturnValue(
+      of({
+        providers: [{ ...provider, disclosure: 'nothing' }],
+        canStoreKeys: true,
+        storeDescription: '',
+      }),
+    );
+    await TestBed.inject(AiStore).refresh();
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('.composer__send').disabled).toBe(true);
+    enter(write('Analiza'));
+    await fixture.whenStable();
+    expect(stream).not.toHaveBeenCalled();
+    expect(fixture.nativeElement.querySelector('app-ai-preview')).toBeNull();
+    fixture.componentRef.setInput('context', {
+      ...context,
+      database: 'otra',
+      source: { ...context.source, database: 'otra' },
+    });
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('app-ai-execution-plan')).toBeNull();
+  });
 
   it('una mención resuelta con Enter selecciona la tabla y no envía todavía la pregunta', async () => {
     const input = write('Usa @fact');

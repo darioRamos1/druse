@@ -1882,5 +1882,17 @@
   "ai.rows.sourceChanged": "The sample was removed when the database or connection changed.",
   "ai.preview.section.rows": "Row sample",
   "ai.preview.issue.rows": "Row sample: {used}; maximum {max}.",
-  "whatsNew.v1_9_0.chatRows": "Choose rows and columns to analyze in chat, mask sensitive values, and review truncation before sharing the sample with an authorized provider."
+  "whatsNew.v1_9_0.chatRows": "Choose rows and columns to analyze in chat, mask sensitive values, and review truncation before sharing the sample with an authorized provider.",
+  "ai.plan.analyze": "Analyze this plan",
+  "ai.plan.title": "Attached estimated plan",
+  "ai.plan.review": "Review the SQL and plan; they may contain sensitive names or values. You can edit them before sending. This attachment does not query the database again or contain actual execution times or rows.",
+  "ai.plan.sql": "Plan SQL (editable copy)",
+  "ai.plan.text": "Plan text (editable copy)",
+  "ai.plan.remove": "Remove plan",
+  "ai.plan.question": "Analyze this estimated plan: explain its access paths and indexes, and what information is missing to evaluate improvements.",
+  "ai.plan.blocked": "The provider must allow sharing schema to send the plan.",
+  "ai.plan.sourceChanged": "The plan was removed because the connection or database changed.",
+  "ai.preview.section.plan": "Estimated plan",
+  "ai.preview.issue.plan": "The plan exceeds its limit. Edit or remove it before sending.",
+  "whatsNew.v1_10_0.chatPlans": "You can attach a SQLite estimated plan obtained with EXPLAIN QUERY PLAN to the chat and review its SQL, contents and limits before sending."
 }

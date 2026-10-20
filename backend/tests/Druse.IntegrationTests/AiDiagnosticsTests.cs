@@ -616,6 +616,92 @@ public sealed class AiDiagnosticsTests
         Assert.Equal(0, provider.StreamCalls);
     }
 
+    [Fact]
+    public async Task ElPlanRevisadoSePrevisualizaYSeEnviaExactamenteSinInvocarAlProveedorAntesDeConfirmar()
+    {
+        var provider = new TestProvider();
+        using var root = new DruseApiFactory();
+        using var host = WithProvider(root, provider);
+        using var client = Client(host);
+        var id = await SaveProfile(client, "schema");
+        var plan = new AiExecutionPlanDto("sqlite-query-plan", "e1", "2026-10-19T12:00:00Z",
+            "EXPLAIN QUERY PLAN SELECT * FROM clientes;", "3\t0\t0\tSCAN clientes");
+        var context = new AiContextDto(new("c1", "Pruebas", "ventas", "sqlite", "3.49"), null, null, [], ExecutionPlan: plan);
+        var request = new AiChatDto(id, [new("user", "Analiza")], context, "gpt-6.1-sol", "schema");
+        using var prepared = await client.PostAsJsonAsync("/api/ai/chat/preview", request);
+        prepared.EnsureSuccessStatusCode();
+        var preview = (await prepared.Content.ReadFromJsonAsync<AiChatPreview>())!;
+        Assert.True(preview.Valid);
+        Assert.Contains("SCAN clientes", preview.Context, StringComparison.Ordinal);
+        Assert.Contains("No contiene tiempos ni filas reales", preview.Context, StringComparison.Ordinal);
+        Assert.True(preview.Usage.PlanBytes > 0);
+        Assert.Equal(0, preview.Usage.RowsBytes);
+        Assert.Equal(0, provider.StreamCalls);
+        using var changed = await client.PostAsJsonAsync("/api/ai/chat", request with
+        {
+            Context = context with { ExecutionPlan = plan with { Text = "Texto editado" } }, PreviewHash = preview.Hash,
+        });
+        Assert.Equal(HttpStatusCode.Conflict, changed.StatusCode);
+        Assert.Equal(0, provider.StreamCalls);
+        using var sent = await client.PostAsJsonAsync("/api/ai/chat", request with { PreviewHash = preview.Hash });
+        sent.EnsureSuccessStatusCode();
+        Assert.Equal(1, provider.StreamCalls);
+        Assert.Equal(preview.Messages.Select(message => message.Text), provider.LastRequest.Messages.Select(message => message.Text));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task LosPlanesActualesEHistoricosRespetanPresupuestoYPermisos(bool historical)
+    {
+        var provider = new TestProvider();
+        using var root = new DruseApiFactory();
+        using var host = WithProvider(root, provider);
+        using var client = Client(host);
+        var id = await SaveProfile(client, "schema");
+        var context = new AiContextDto(new("c1", "Pruebas", "ventas", "sqlite"), null, null, [],
+            ExecutionPlan: new("sqlite-query-plan", "e1", "2026-10-19T12:00:00Z", "EXPLAIN QUERY PLAN SELECT 1;", new string('á', 200)));
+        var request = new AiChatDto(id, historical ? [new("user", "Anterior", context), new("assistant", "Respuesta"), new("user", "Analiza")]
+            : [new("user", "Analiza")], historical ? null : context, "gpt-6.1-sol", "schema");
+        host.Services.GetRequiredService<IConfiguration>()["AiChat:Defaults:MaxPlanBytes"] = "100";
+        using var prepared = await client.PostAsJsonAsync("/api/ai/chat/preview", request);
+        var preview = (await prepared.Content.ReadFromJsonAsync<AiChatPreview>())!;
+        Assert.False(preview.Valid);
+        Assert.Contains(preview.Issues, issue => issue.Code == "plan");
+        using var blocked = await client.PostAsJsonAsync("/api/ai/chat", request);
+        Assert.Equal(HttpStatusCode.RequestEntityTooLarge, blocked.StatusCode);
+        using var revoked = await client.PostAsJsonAsync("/api/ai/providers", new { id, name = "Revocado", kind = "localcli", command = "codex",
+            model = "gpt-6.1-sol", baseUrl = "", disclosure = "nothing", ownSession = false, isDefault = false });
+        revoked.EnsureSuccessStatusCode();
+        using var stale = await client.PostAsJsonAsync("/api/ai/chat", request);
+        Assert.Equal(HttpStatusCode.Conflict, stale.StatusCode);
+        using var forbidden = await client.PostAsJsonAsync("/api/ai/chat/preview", request with { Disclosure = "nothing" });
+        Assert.Equal(HttpStatusCode.Forbidden, forbidden.StatusCode);
+        using var forbiddenSend = await client.PostAsJsonAsync("/api/ai/chat", request with { Disclosure = "nothing" });
+        Assert.Equal(HttpStatusCode.Forbidden, forbiddenSend.StatusCode);
+        Assert.Equal(0, provider.StreamCalls);
+    }
+
+    [Theory]
+    [InlineData("postgresql", "sqlite-query-plan", "plan", "e1", "2026-10-19T12:00:00Z")]
+    [InlineData("sqlite", "actual", "plan", "e1", "2026-10-19T12:00:00Z")]
+    [InlineData("sqlite", "sqlite-query-plan", "", "e1", "2026-10-19T12:00:00Z")]
+    [InlineData("sqlite", "sqlite-query-plan", "plan", "", "2026-10-19T12:00:00Z")]
+    [InlineData("sqlite", "sqlite-query-plan", "plan", "e1", "ayer")]
+    public async Task ElServidorRechazaPlanesSinFormatoCompatibleTextoOProcedencia(string engine, string format, string text, string executionId, string date)
+    {
+        var provider = new TestProvider();
+        using var root = new DruseApiFactory();
+        using var host = WithProvider(root, provider);
+        using var client = Client(host);
+        var id = await SaveProfile(client, "schema");
+        var context = new AiContextDto(new("c1", "Pruebas", "ventas", engine), null, null, [],
+            ExecutionPlan: new(format, executionId, date, "EXPLAIN QUERY PLAN SELECT 1;", text));
+        using var response = await client.PostAsJsonAsync("/api/ai/chat/preview", new AiChatDto(id, [new("user", "Analiza")], context, "gpt-6.1-sol", "schema"));
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal(0, provider.StreamCalls);
+    }
+
     private static async Task<Guid> SaveProfile(HttpClient client, string disclosure)
     {
         using var saved = await client.PostAsJsonAsync("/api/ai/providers", new

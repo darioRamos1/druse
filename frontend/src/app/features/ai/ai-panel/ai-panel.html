@@ -104,6 +104,13 @@
     (historyChanged)="changeHistory($event)"
     (restarted)="clear(); review.set(null)"
   />
+} @else if (configured() && planAttachment(); as attachment) {
+  <app-ai-execution-plan
+    [attachment]="attachment"
+    [allowed]="contextAllowed()"
+    (changed)="editPlan($event)"
+    (removed)="removePlan()"
+  />
 } @else if (configured() && rowsRequest(); as request) {
   <app-ai-rows
     [request]="request"
@@ -457,6 +464,7 @@
           contextAllowed() &&
           !errorAttachment() &&
           !rowsRequest() &&
+          !planAttachment() &&
           context().sql.trim().length > 0
         ) {
           <button
@@ -502,7 +510,8 @@
             [disabled]="
               draft().trim().length === 0 ||
               (!!errorAttachment() && !contextAllowed()) ||
-              rowsBlocked()
+              rowsBlocked() ||
+              planBlocked()
             "
             (click)="send()"
             [attr.aria-label]="'ai.send' | t"

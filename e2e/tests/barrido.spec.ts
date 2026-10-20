@@ -6,6 +6,7 @@ import { comprobarDiagnosticoIa, prepararDiagnosticoIa } from '../support/ai-dia
 import { comprobarContextoChat, prepararContextoChat, comprobarSelectorContexto, comprobarNotasContexto } from '../support/ai-context';
 import { comprobarErrorContexto } from '../support/ai-execution-error';
 import { comprobarMuestraContexto } from '../support/ai-rows';
+import { comprobarPlanContexto } from '../support/ai-plans';
 
 /**
  * Barrido visual de toda la aplicación: recorre pantallas y diálogos, los
@@ -663,3 +664,10 @@ test.describe('barrido visual', () => {
     console.log([...new Set(consola)].join('\n') || '(limpia)');
   });
 });
+
+for (const locale of ['es', 'en']) {
+  test(`barrido del plan estimado de SQLite (${locale})`, async ({ page }) => {
+    test.skip(!process.env['DRUSE_BARRIDO'], 'El barrido se pide a mano.');
+    await comprobarPlanContexto(page, locale, name => foto(page, `19-${locale}-${name}`, page.locator('app-ai-panel')));
+  });
+}

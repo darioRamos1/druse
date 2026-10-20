@@ -156,6 +156,21 @@ export interface AiContextSnapshot {
   readonly notes?: readonly AiBusinessNote[];
   readonly executionError?: AiExecutionError;
   readonly rows?: AiRowsAttachment;
+  readonly executionPlan?: AiExecutionPlan;
+}
+
+/** Plan estimado obtenido manualmente; SQL y texto son la copia revisada por la persona. */
+export interface AiExecutionPlan {
+  readonly format: 'sqlite-query-plan';
+  readonly executionId: string;
+  readonly occurredAtUtc: string;
+  readonly sql: string;
+  readonly text: string;
+}
+
+export interface AiPlanAttachment {
+  readonly source: AiSource;
+  readonly plan: AiExecutionPlan;
 }
 
 export interface AiRowCell {
@@ -223,6 +238,7 @@ export interface AiChatLimits {
   readonly maxNotesBytes: number;
   readonly maxErrorBytes: number;
   readonly maxRowsBytes: number;
+  readonly maxPlanBytes: number;
   readonly maxContextBytes: number;
   readonly maxHistoryBytes: number;
   readonly maxInputBytes: number;
@@ -240,6 +256,7 @@ export interface AiChatUsage {
   readonly notesBytes: number;
   readonly errorBytes: number;
   readonly rowsBytes: number;
+  readonly planBytes: number;
   readonly contextBytes: number;
   readonly historyBytes: number;
   readonly inputBytes: number;

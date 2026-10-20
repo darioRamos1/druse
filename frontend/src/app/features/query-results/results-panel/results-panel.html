@@ -40,6 +40,19 @@
 
   <span class="spacer"></span>
 
+  @if (canAnalyzePlan() && result(); as executed) {
+    <button
+      type="button"
+      class="tool-button"
+      [disabled]="running()"
+      (click)="analyzePlan.emit(executed.executionId)"
+      [attr.aria-label]="'ai.plan.analyze' | t"
+      [title]="'ai.plan.analyze' | t"
+    >
+      <app-icon name="sparkles" [size]="12" />
+      <span class="tool-button__label">{{ 'ai.plan.analyze' | t }}</span>
+    </button>
+  }
   @if (canAnalyzeRows() && currentSet()?.rows?.length && result(); as executed) {
     <button
       type="button"

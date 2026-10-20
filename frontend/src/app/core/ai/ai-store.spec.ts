@@ -112,6 +112,41 @@ describe('AiStore', () => {
     ]);
   });
 
+  it('congela el plan para reintento e historial y bloquea su envío al revocar estructura', async () => {
+    const store = await ready();
+    const source = {
+      connectionId: 'c1',
+      connectionName: 'Prueba',
+      database: 'ventas',
+      engine: 'sqlite',
+    };
+    store.setSource(source);
+    const plan = {
+      format: 'sqlite-query-plan' as const,
+      executionId: 'e1',
+      occurredAtUtc: '2026-10-19T12:00:00Z',
+      sql: 'EXPLAIN QUERY PLAN SELECT * FROM clientes;',
+      text: 'SCAN clientes',
+    };
+    const request = store.prepare('Analiza', { source, tables: [], executionPlan: plan })!;
+    plan.text = 'modificado';
+    store.sendPrepared(request);
+    stream.next({ kind: 'error', message: 'Fallo' });
+    stream.complete();
+    stream = new Subject<AiStreamEvent>();
+    store.retry();
+    expect(lastRequest?.context?.executionPlan?.text).toBe('SCAN clientes');
+    stream.next({ kind: 'chunk', text: 'Respuesta' });
+    stream.complete();
+    expect(store.prepare('Siguiente')?.payload.messages[0].context?.executionPlan?.text).toBe(
+      'SCAN clientes',
+    );
+    providers = [{ ...provider, disclosure: 'nothing' }];
+    await store.refresh();
+    expect(store.turns()).toEqual([]);
+    expect(store.prepare('Analiza', { source, tables: [], executionPlan: plan })).toBeNull();
+  });
+
   it('congela el error y su procedencia para el reintento y el historial', async () => {
     const store = await ready();
     const source = { connectionId: 'c1', connectionName: 'Prueba', database: 'ventas' };

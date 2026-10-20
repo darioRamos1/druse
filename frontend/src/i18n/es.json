@@ -1882,5 +1882,17 @@
   "ai.rows.sourceChanged": "Se retiró la muestra al cambiar de base o conexión.",
   "ai.preview.section.rows": "Muestra de filas",
   "ai.preview.issue.rows": "Muestra de filas: {used}; máximo {max}.",
-  "whatsNew.v1_9_0.chatRows": "Elige filas y columnas para analizarlas en el chat, oculta valores sensibles y revisa los recortes antes de compartir la muestra con un proveedor autorizado."
+  "whatsNew.v1_9_0.chatRows": "Elige filas y columnas para analizarlas en el chat, oculta valores sensibles y revisa los recortes antes de compartir la muestra con un proveedor autorizado.",
+  "ai.plan.analyze": "Analizar este plan",
+  "ai.plan.title": "Plan estimado adjunto",
+  "ai.plan.review": "Revisa el SQL y el plan; pueden contener nombres o valores sensibles. Puedes editarlos antes de enviarlos. Este adjunto no vuelve a consultar la base ni contiene tiempos o filas reales de ejecución.",
+  "ai.plan.sql": "SQL del plan (copia editable)",
+  "ai.plan.text": "Texto del plan (copia editable)",
+  "ai.plan.remove": "Quitar plan",
+  "ai.plan.question": "Analiza este plan estimado: explica sus accesos e índices y qué información faltaría para evaluar mejoras.",
+  "ai.plan.blocked": "El proveedor debe permitir compartir estructura para enviar el plan.",
+  "ai.plan.sourceChanged": "Se quitó el plan porque cambió la conexión o la base.",
+  "ai.preview.section.plan": "Plan estimado",
+  "ai.preview.issue.plan": "El plan supera su límite. Vuelve a editarlo o quítalo antes de enviar.",
+  "whatsNew.v1_10_0.chatPlans": "Puedes adjuntar al chat un plan estimado de SQLite obtenido con EXPLAIN QUERY PLAN y revisar su SQL, contenido y límites antes de enviarlo."
 }

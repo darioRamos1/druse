@@ -181,6 +181,7 @@ export class AiStore {
   ): AiChatRequestSnapshot | null {
     const provider = this.active();
     if (!provider || this.busy() || !text.trim()) return null;
+    if (context?.executionPlan && provider.disclosure === 'nothing') return null;
     if (context?.rows && provider.disclosure !== 'schemaAndRows') return null;
     const attached =
       provider.disclosure === 'nothing' || !context
@@ -380,6 +381,7 @@ function cloneContext(context: AiContextSnapshot): AiContextSnapshot {
   return {
     ...context,
     source: { ...context.source },
+    executionPlan: context.executionPlan ? { ...context.executionPlan } : undefined,
     executionError: context.executionError ? { ...context.executionError } : undefined,
     rows: context.rows
       ? {

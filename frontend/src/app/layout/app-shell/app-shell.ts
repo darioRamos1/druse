@@ -76,6 +76,8 @@ import { TopBar } from '../top-bar/top-bar';
 import CommandPalette from '../command-palette/command-palette';
 import { ShortcutsSheet } from '../shortcuts-sheet/shortcuts-sheet';
 import { AiPanel } from '../../features/ai/ai-panel/ai-panel';
+import { sqlitePlan } from '../../core/ai/ai-plans';
+import { AiPlanAttachment } from '../../shared/models/ai';
 import { AiErrorAttachment } from '../../shared/models/ai';
 import { AiRowsRequest } from '../../core/ai/ai-rows';
 import { AiProviderDialog } from '../../features/ai/ai-provider-dialog/ai-provider-dialog';
@@ -175,6 +177,28 @@ export class AppShell {
   protected readonly aiTableRequest = signal<DatabaseObject | null>(null);
   protected readonly aiErrorRequest = signal<AiErrorAttachment | null>(null);
   protected readonly aiRowsRequest = signal<AiRowsRequest | null>(null);
+  protected readonly aiPlanRequest = signal<AiPlanAttachment | null>(null);
+  protected readonly analyzablePlan = computed(() => {
+    if (!this.canAnalyzeRows()) return null;
+    const result = this._store.result()!;
+    const source = this._store.resultSource()!;
+    const engine = this._store.engines().find((item) => item.id === source.aiSource?.engine);
+    return sqlitePlan(
+      engine?.capabilities,
+      source.aiSource!,
+      source.sql,
+      result.executionId,
+      source.occurredAtUtc!,
+      result.resultSets,
+    );
+  });
+  protected analyzeQueryPlan(executionId: string): void {
+    const attachment = this.analyzablePlan();
+    if (!attachment || attachment.plan.executionId !== executionId) return;
+    this.aiPlanRequest.set({ source: { ...attachment.source }, plan: { ...attachment.plan } });
+    this.aiOpen.set(true);
+    void this._ai.refresh();
+  }
   protected readonly canAnalyzeRows = computed(() => {
     const result = this._store.result();
     const source = this._store.resultSource();

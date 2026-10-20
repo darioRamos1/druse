@@ -24,7 +24,7 @@ body:
     id: version
     attributes:
       label: Versión y variante de Druse
-      placeholder: '1.9.0 sin Informix'
+      placeholder: '1.10.0 sin Informix'
     validations:
       required: true
 

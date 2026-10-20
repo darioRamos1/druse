@@ -1,7 +1,9 @@
 # Plan de mejora del contexto del chat — 16 de octubre de 2026
 
 **Estado:** fase A implementada en 1.4.0, fase B en 1.5.0, fase C en 1.6.0 y
-fase D en 1.7.0. Primera entrega A–D implementada; fase E pendiente.
+fase D en 1.7.0. Primera entrega A–D implementada. Fase E implementada en
+1.8.0–1.10.0 con errores, muestras y planes estimados de SQLite; validaciones
+nativas y de otros motores/proveedores pendientes.
 
 ## Objetivo
 
@@ -48,7 +50,8 @@ de motores. Las rutas de referencia están al final.
 | Compatibilidad | Reutilizar capacidades y proveedores; sin condicionales por motor en los componentes |
 | Dependencias | Reutilizar infraestructura actual; justificar cualquier dependencia nueva antes de incorporarla |
 
-Quedan para una segunda entrega: adjuntar filas, errores y planes de ejecución.
+La segunda entrega añade filas, errores y planes de ejecución; su cierre
+y los límites comprobados están registrados en la fase E.
 Quedan fuera del alcance: agentes que ejecutan consultas, indexación vectorial,
 recorrer toda la base al abrir el chat, relaciones inferidas automáticamente y
 sincronización de notas entre equipos.
@@ -313,8 +316,23 @@ e históricos. Véase [ADR 0012](../decisions/0012-muestras-de-filas-en-el-chat.
 El recorrido de esta entrega utiliza SQLite y Chromium con inferencia simulada.
 La fase E continúa abierta por la integración de planes:
 
-- [ ] Incorporar planes de ejecución cuando exista soporte comprobado; no
+- [x] Incorporar planes de ejecución cuando exista soporte comprobado; no
   ejecutar consultas ni generar un plan con ejecución desde el asistente.
+
+**Tercer incremento implementado el 2026-10-19 (1.10.0):** «Analizar este plan»
+reconoce un resultado completo de `EXPLAIN QUERY PLAN` obtenido manualmente en
+SQLite. Conserva origen y SQL de la ejecución y permite editar las copias antes
+de revisar el envío. No genera planes ni ejecuta consultas desde el chat. El
+servidor aplica permiso de estructura, límite propio, hash y control del historial.
+Véase [ADR 0013](../decisions/0013-planes-estimados-en-el-chat.md). La integración
+de adjuntos de esta fase queda implementada para el soporte comprobado de SQLite;
+planes de otros motores, proveedores externos y validación nativa Tauri/WebView2
+siguen pendientes y no se consideran verificados.
+
+Comprobación de 1.10.0: SQLite 3.53.3 con inferencia simulada en Chromium,
+359 pruebas frontend, 63 de integración y 14 recorridos E2E correctos. Capturas
+revisadas en español/inglés, claro/oscuro y ancho reducido. TypeScript, idiomas y
+compilación de producción correctos; persiste el aviso conocido de tamaño inicial.
 
 **Aceptación:** adjuntar filas exige el permiso de datos del proveedor y selección
 explícita. Las filas compartidas quedan registradas en el turno, en memoria, y
