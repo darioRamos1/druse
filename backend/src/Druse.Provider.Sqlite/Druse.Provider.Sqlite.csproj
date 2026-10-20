@@ -11,7 +11,7 @@
 
       Es la única dependencia de los cinco proveedores que no había que traer.
     -->
-    <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.12" />
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.13" />
 
     <!--
       Ya viajaba debajo del anterior, y se declara porque ahora **se usa**:
