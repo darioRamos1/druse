@@ -14,7 +14,7 @@
       JDBC que ya existe por Informix— habría funcionado, pero cargaría con el
       driver de Oracle y con IKVM para resolver un problema que aquí no hay.
     -->
-    <PackageReference Include="Oracle.ManagedDataAccess.Core" Version="23.26.301" />
+    <PackageReference Include="Oracle.ManagedDataAccess.Core" Version="23.26.400" />
   </ItemGroup>
 
   <ItemGroup>
