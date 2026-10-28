@@ -6,6 +6,12 @@ terminan satisfactoriamente para el mismo commit, **Publicar versión** construy
 y publica una versión nueva. La versión se sube con `subir-version.ps1` y debe
 tener su entrada de novedades, como indica `AGENTS.md`.
 
+Esta es la regla permanente del proyecto: cuando el mantenedor autoriza subir
+o publicar un ajuste, se actualizan también los instaladores, los portables y
+la landing, sin pedir esas tres cosas otra vez. Publicar incluye comprobar el
+resultado de la release y de Pages, además de subir el código. Las revisiones
+obligatorias del repositorio siguen siendo necesarias.
+
 No se sobrescriben versiones existentes. Un cambio posterior necesita otra
 versión; las descargas de las versiones anteriores siguen disponibles. Los
 cambios solo de documentación o de la landing no necesitan otra versión de la

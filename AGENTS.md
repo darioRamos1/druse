@@ -66,6 +66,30 @@ commit; no se hace commit en rojo.
   déjalos fuera y avisa.
 - No hagas `push` ni abras PR si no te lo piden.
 
+## Al subir o publicar un ajuste
+
+Por petición del mantenedor, **cada publicación de un ajuste incluye siempre
+actualizar los instaladores, los portables y las descargas de la landing**.
+No hay que esperar a que vuelva a pedir esas actualizaciones por separado.
+
+- Publica las tres ediciones —Completa, Sin Informix y Comunidad— con su
+  instalador y su ZIP sin instalación: seis paquetes de la misma versión,
+  acompañados de sus hashes e inventarios. No reemplaces los archivos de una
+  versión ya publicada.
+- Sigue el [flujo de publicación automática](docs/distribucion/publicacion-automatica.md):
+  integrar en `main`, esperar CI general y Comunidad satisfactorios para el
+  commit exacto y comprobar la publicación completa de la nueva versión.
+- Comprueba después el despliegue de Pages, las seis descargas de la landing
+  y que la guía enlaza esa misma versión. Los enlaces se generan desde Releases;
+  no hay que editar versiones ni nombres de archivo a mano.
+- Si fallan las pruebas, la construcción, la subida o Pages, conserva las
+  descargas anteriores y explica qué falta. No des por publicada ni actualizada
+  la web hasta comprobar el resultado.
+- La autorización para subir o publicar un ajuste incluye estos pasos; no
+  vuelvas a pedir permiso para actualizar sus descargas. Los commits locales
+  por sí solos no autorizan un `push`. Respeta las revisiones y protecciones
+  del repositorio; si falta aprobación de otro revisor, informa del bloqueo.
+
 ## Qué no cuenta como novedad
 
 Refactorizaciones sin efecto visible, pruebas, documentación interna, la
