@@ -41,14 +41,20 @@
   }
 
   &__close {
+    display: inline-grid;
+    flex: none;
+    place-items: center;
+    width: 28px;
+    height: 28px;
+    padding: 0;
     border: none;
+    border-radius: 7px;
     background: none;
     color: var(--dr-text-tertiary);
-    font-size: 18px;
-    line-height: 1;
     cursor: pointer;
 
     &:hover {
+      background: var(--dr-surface-hover);
       color: var(--dr-text);
     }
   }

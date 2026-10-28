@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="referrer" content="no-referrer" />
+    <meta name="description" content="Prueba Druse en diez minutos con SQLite y datos ficticios, sin configurar un servidor." />
+    <title>Tu primera consulta con SQLite — Druse</title>
+    <link rel="icon" href="./assets/druse.png" />
+    <link rel="stylesheet" href="./styles.css" />
+    <link rel="stylesheet" href="./privacy.css" />
+    <link rel="stylesheet" href="./primeros-pasos.css" />
+  </head>
+  <body class="legal-page">
+    <a class="skip-link" href="#contenido">Saltar al contenido</a>
+    <header class="container legal-footer"><a href="./">← Volver a Druse</a></header>
+    <main class="container legal-layout" id="contenido">
+      <nav class="legal-sidebar" aria-label="Pasos de la prueba">
+        <a href="#instalar">1. Instalar</a>
+        <a href="#crear">2. Crear una base</a>
+        <a href="#consultar">3. Consultar</a>
+        <a href="#exportar">4. Exportar</a>
+        <a href="#contar">5. Contar el resultado</a>
+      </nav>
+      <div class="legal-content">
+        <p class="eyebrow">DIEZ MINUTOS · DATOS FICTICIOS</p>
+        <h1>Tu primera consulta con SQLite.</h1>
+        <p class="legal-intro">Crea una base de ejemplo, consulta tres ventas y exporta el resultado.
+          No necesitas un servidor de bases de datos, .NET ni Node.js.</p>
+        <aside class="legal-draft">
+          <p><strong>Druse Comunidad para Windows x64.</strong> Consulta la versión y las comprobaciones
+            en los enlaces de descarga. Los paquetes no tienen firma Authenticode
+            ni aprobación de SignPath; Windows puede mostrar SmartScreen.
+            Usa solo los datos ficticios de esta guía.</p>
+        </aside>
+        <section id="instalar">
+          <h2>1. Descarga e instala</h2>
+          <!-- descarga-guia:inicio -->
+          <p>Descarga el <a href="https://github.com/darioRamos1/druse/releases/download/v1.3.0-beta.1/Druse-Comunidad-1.3.0-beta.1-win-x64-setup.exe">instalador de Comunidad 1.3.0-beta.1</a>
+            y <a href="https://github.com/darioRamos1/druse/releases/download/v1.3.0-beta.1/SHA256SUMS.txt">SHA256SUMS.txt</a> de la
+            <a href="https://github.com/darioRamos1/druse/releases/tag/v1.3.0-beta.1">publicación oficial</a>. Desde la carpeta de descarga, comprueba el archivo en PowerShell:</p>
+          <pre><code>Get-FileHash -LiteralPath '.\Druse-Comunidad-1.3.0-beta.1-win-x64-setup.exe' -Algorithm SHA256</code></pre>
+          <p>El resultado debe coincidir con la entrada del instalador en <code>SHA256SUMS.txt</code>.
+            Esto comprueba la integridad; no sustituye a la firma del editor.
+            El instalador puede necesitar conexión para obtener Microsoft Edge WebView2.
+            Si Windows o tu organización bloquean la instalación, puedes reportarlo y detener la prueba.</p>
+          <p>El portable de esta beta todavía no está disponible. Las conexiones se guardan en tu perfil de Windows.</p>
+        <!-- descarga-guia:fin -->
+        </section>
+        <section id="crear">
+          <h2>2. Crea una base vacía</h2>
+          <ol>
+            <li>Abre Druse y pulsa <strong>Nueva conexión</strong>. Elige <strong>SQLite</strong>.</li>
+            <li>Escribe <strong>Mi primera prueba</strong> en Nombre.</li>
+            <li>Junto a Archivo, pulsa <strong>Crear una nueva</strong> y guarda
+              <code>druse-prueba.db</code> en una carpeta de pruebas. Usa un nombre nuevo si ya existe.</li>
+            <li>Tras el aviso de base creada, pulsa <strong>Conectar</strong>.
+              SQLite no pide servidor, usuario ni contraseña.</li>
+          </ol>
+          <p>Comprueba que la pestaña SQL apunta a <strong>Mi primera prueba</strong> y a
+            <strong>main</strong>. Si no es así, elige esa conexión y esa base en el selector del editor.</p>
+        </section>
+        <section id="consultar">
+          <h2>3. Carga el ejemplo y consulta</h2>
+          <p>Abre el <a href="./assets/primeros-pasos.sql">SQL de ejemplo</a>, copia todo su contenido
+            en el editor y pulsa <strong>Ctrl + Enter</strong>. Crea una tabla con tres ventas ficticias.
+            Ejecútalo una sola vez en la base vacía. Si dice que la tabla ya existe, continúa con la consulta.</p>
+          <p>Reemplaza el texto del editor por esta consulta y vuelve a pulsar <strong>Ctrl + Enter</strong>:</p>
+          <pre><code id="consulta-ejemplo">SELECT producto, unidades, precio_cop,
+       unidades * precio_cop AS total_cop
+FROM druse_prueba_ventas
+ORDER BY id;</code></pre>
+          <p>Debes ver tres filas: Café → 24000, Té → 21000 y Cacao → 15000 en
+            <code>total_cop</code>. Para sumar las ventas, ejecuta por separado:</p>
+          <pre><code id="consulta-total">SELECT SUM(unidades * precio_cop) AS total_cop
+FROM druse_prueba_ventas;</code></pre>
+          <p>El total esperado es <strong>60000</strong>. Los importes son pesos enteros de ejemplo.</p>
+          <figure>
+            <img src="./assets/primera-consulta.png" alt="Consulta de las tres ventas ficticias en Druse y sus resultados: Café, Té y Cacao." width="1280" height="720" loading="lazy" />
+            <figcaption>Captura del recorrido local de desarrollo, 14 de octubre de 2026.
+              No acredita una instalación de la beta publicada en Windows limpio.</figcaption>
+          </figure>
+        </section>
+        <section id="exportar">
+          <h2>4. Exporta las tres ventas</h2>
+          <p>Vuelve a ejecutar la primera consulta, la que muestra los tres productos. En los resultados,
+            abre <strong>Exportar</strong> y elige <strong>CSV</strong>. Guarda el archivo y comprueba que
+            contiene los tres productos y sus importes. Exportar vuelve a ejecutar la consulta original.</p>
+        </section>
+        <section id="contar">
+          <h2>5. Cuéntanos cómo te fue</h2>
+          <p>Sirven tanto las pruebas correctas como los fallos. Abre un
+            <a href="https://github.com/darioRamos1/druse/issues/new?template=compatibilidad.yml">informe de compatibilidad</a>
+            o escribe a <a href="mailto:druse.contacto@gmail.com?subject=Prueba%20SQLite%20de%20Druse%20Comunidad">druse.contacto@gmail.com</a>.</p>
+          <ul>
+            <li>Edición y versión de Druse que descargaste; versión de Windows.</li>
+            <li>Pasos completados: instalar, conectar, consultar, sumar y exportar.</li>
+            <li>Qué esperabas, qué ocurrió y mensaje exacto si apareció un error.</li>
+            <li>Si es tu primera prueba o ya habías usado Druse antes.</li>
+          </ul>
+          <p>No incluyas contraseñas, rutas con datos personales ni información de clientes.
+            Los informes de GitHub son públicos. Un correo se mantiene privado salvo que autorices su publicación.</p>
+          <p>Al terminar, desconecta la conexión de prueba. El archivo SQLite y el CSV quedan en las
+            carpetas que elegiste. Puedes conservarlos para una segunda prueba.</p>
+        </section>
+        <p><a href="./privacidad-aplicacion.html">Privacidad de la aplicación</a> ·
+          <a href="https://github.com/darioRamos1/druse/blob/main/CODE_SIGNING_POLICY.md">Code signing policy</a></p>
+      </div>
+    </main>
+  </body>
+</html>

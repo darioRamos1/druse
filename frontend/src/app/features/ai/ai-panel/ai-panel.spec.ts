@@ -49,10 +49,8 @@ describe('split', () => {
     ]);
   });
 
-  it('reconoce el bloque sin la etiqueta del lenguaje', () => {
-    expect(split('```\nSELECT 1\n```')).toEqual([
-      { kind: 'sql', text: 'SELECT 1', action: 'insert' },
-    ]);
+  it('deja un bloque sin lenguaje como código sin acciones SQL', () => {
+    expect(split('```\nSELECT 1\n```')).toEqual([{ kind: 'code', text: 'SELECT 1', language: '' }]);
   });
 
   it('reconoce cuándo el modelo recomienda sustituir la consulta', () => {
@@ -88,6 +86,25 @@ describe('split', () => {
   it('no crea partes vacías', () => {
     expect(split('```sql\n\n```')).toEqual([]);
     expect(split('')).toEqual([]);
+  });
+
+  it('separa JSON, Python y SQL sin ofrecer insertar otros lenguajes', () => {
+    expect(
+      split(
+        '```json\n{"ok":true}\n```\n```python\nprint(1)\n```\n```SQL-REPLACE\r\nSELECT 2;\r\n```',
+      ),
+    ).toEqual([
+      { kind: 'code', text: '{"ok":true}', language: 'json' },
+      { kind: 'code', text: 'print(1)', language: 'python' },
+      { kind: 'sql', text: 'SELECT 2;', action: 'replace' },
+    ]);
+  });
+
+  it('no confunde una etiqueta parcial durante el streaming con SQL', () => {
+    expect(split('```json\n{"parcial":')).toEqual([
+      { kind: 'code', text: '{"parcial":', language: 'json' },
+    ]);
+    expect(split('```sq')).toEqual([{ kind: 'text', text: '```sq' }]);
   });
 
   it('conserva los saltos dentro del SQL', () => {

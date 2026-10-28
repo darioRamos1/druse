@@ -14,7 +14,7 @@ También son útiles:
 - **Informes de compatibilidad** de un motor y versión concretos: qué funcionó y qué no.
 - Preguntas sobre documentación que no se entiende o que ya no describe lo que hace el programa.
 
-La apertura pública del repositorio sigue siendo una decisión separada, registrada en el [plan de SignPath y donaciones](docs/planes/plan-signpath-donaciones.md).
+El repositorio es público desde el 16 de septiembre de 2026. La beta de Comunidad y el trabajo para reunir pruebas externas están registrados en el [plan de reaplicación a SignPath](docs/planes/plan-reaplicacion-signpath-2026-10-11.md).
 
 ## Antes de abrir una incidencia
 
@@ -47,6 +47,7 @@ Las pruebas de los guiones de construcción no compilan nada y tardan un segundo
 - **Todo en español**: interfaz, mensajes de error, comentarios, nombres de pruebas y mensajes de commit. Los identificadores técnicos —clases, métodos, tipos— se quedan como están.
 - **Los comentarios explican por qué, no qué.** Un comentario que repite lo que dice la línea siguiente sobra; uno que cuenta qué pasó cuando se hizo de la otra forma se queda.
 - **Una función nueva con interfaz añade su captura** al barrido de `e2e/tests/barrido.spec.ts`, y las imágenes se miran antes de darla por terminada.
+- **Un cambio que se nota al usar Druse va a las novedades** de la próxima versión: una línea en `frontend/src/app/core/whats-new/release-notes.ts`, con su texto en `es.json` y `en.json`. La versión se sube con `build/scripts/subir-version.ps1` y su entrada va arriba del todo; `package.ps1` no empaqueta una versión sin ella, y Druse la enseña sola la primera vez que se abre tras actualizar. El proceso completo está en [`AGENTS.md`](AGENTS.md).
 - Las decisiones de arquitectura se registran en [`docs/decisions`](docs/decisions), un archivo por decisión.
 - Los mensajes de commit llevan ámbito y dicen qué cambió en la aplicación, no qué archivos se tocaron: `fix(sqlite): cancelar una consulta ahora la corta de verdad`.
 

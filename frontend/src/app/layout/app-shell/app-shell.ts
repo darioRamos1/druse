@@ -21,7 +21,11 @@ import { SnippetStore } from '../../core/snippets/snippet.store';
 import { SplashScreen } from '../../core/startup/splash-screen';
 import { ThemeName, ThemeService } from '../../core/theme/theme.service';
 import { UpdateService } from '../../core/update/update.service';
-import { SettingsDialog } from '../../features/settings/settings-dialog/settings-dialog';
+import {
+  SettingsDialog,
+  type SettingsSection,
+} from '../../features/settings/settings-dialog/settings-dialog';
+import { WhatsNewService } from '../../core/whats-new/whats-new.service';
 import { ActivityDialog } from '../../features/activity/activity-dialog/activity-dialog';
 import { FormatSettings } from '../../core/workspace/format-settings';
 import { ComposedQueries } from '../../core/workspace/composed-queries';
@@ -61,6 +65,7 @@ import {
   ForeignKeyDesign,
   KnownColumn,
   QueryHistoryEntry,
+  QueryHistoryFilter,
   SavedConnection,
   SessionStatus,
 } from '../../shared/models/workspace';
@@ -71,18 +76,13 @@ import { TopBar } from '../top-bar/top-bar';
 import CommandPalette from '../command-palette/command-palette';
 import { ShortcutsSheet } from '../shortcuts-sheet/shortcuts-sheet';
 import { AiPanel } from '../../features/ai/ai-panel/ai-panel';
+import { sqlitePlan } from '../../core/ai/ai-plans';
+import { AiPlanAttachment } from '../../shared/models/ai';
+import { AiErrorAttachment } from '../../shared/models/ai';
+import { AiRowsRequest } from '../../core/ai/ai-rows';
 import { AiProviderDialog } from '../../features/ai/ai-provider-dialog/ai-provider-dialog';
 import { AiStore } from '../../core/ai/ai-store';
-import { describeSchema } from '../../core/ai/ai-context';
-
-/**
- * Cuantas tablas se precargan al abrir el asistente.
- *
- * Cada una es una consulta al catalogo del motor. El tope evita que abrir el
- * panel sobre una base de cientos de tablas se convierta en una espera, y
- * coincide con el que aplica el propio compositor del contexto.
- */
-const MAX_WARMED_TABLES = 40;
+import { resolveAiDatabase } from '../../core/ai/ai-context';
 
 /** Límites de arrastre de los paneles, en píxeles. */
 const SIDEBAR_MIN = 200;
@@ -145,6 +145,7 @@ export class AppShell {
   private readonly _themes = inject(ThemeService);
   private readonly _splash = inject(SplashScreen);
   protected readonly updates = inject(UpdateService);
+  private readonly _whatsNew = inject(WhatsNewService);
 
   /**
    * No se usa desde aquí: se inyecta para que exista.
@@ -165,6 +166,7 @@ export class AppShell {
   protected readonly editorFontSize = computed(() => this._themes.appearance().editorFontSize);
 
   protected readonly settingsOpen = signal(false);
+  protected readonly settingsSection = signal<SettingsSection>('appearance');
   protected readonly activityOpen = signal(false);
 
   // --- Asistente -------------------------------------------------------------
@@ -172,23 +174,143 @@ export class AppShell {
 
   protected readonly aiOpen = signal(false);
   protected readonly aiProvidersOpen = signal(false);
+  protected readonly aiTableRequest = signal<DatabaseObject | null>(null);
+  protected readonly aiErrorRequest = signal<AiErrorAttachment | null>(null);
+  protected readonly aiRowsRequest = signal<AiRowsRequest | null>(null);
+  protected readonly aiPlanRequest = signal<AiPlanAttachment | null>(null);
+  protected readonly analyzablePlan = computed(() => {
+    if (!this.canAnalyzeRows()) return null;
+    const result = this._store.result()!;
+    const source = this._store.resultSource()!;
+    const engine = this._store.engines().find((item) => item.id === source.aiSource?.engine);
+    return sqlitePlan(
+      engine?.capabilities,
+      source.aiSource!,
+      source.sql,
+      result.executionId,
+      source.occurredAtUtc!,
+      result.resultSets,
+    );
+  });
+  protected analyzeQueryPlan(executionId: string): void {
+    const attachment = this.analyzablePlan();
+    if (!attachment || attachment.plan.executionId !== executionId) return;
+    this.aiPlanRequest.set({ source: { ...attachment.source }, plan: { ...attachment.plan } });
+    this.aiOpen.set(true);
+    void this._ai.refresh();
+  }
+  protected readonly canAnalyzeRows = computed(() => {
+    const result = this._store.result();
+    const source = this._store.resultSource();
+    const current = this.aiContext().source;
+    return (
+      result?.state === 'succeeded' &&
+      !!source?.occurredAtUtc &&
+      !!source.aiSource &&
+      source.aiSource.connectionId === current.connectionId &&
+      source.aiSource.database === current.database &&
+      !this._store.running() &&
+      result.resultSets.some((set) => set.rows.length > 0)
+    );
+  });
+
+  protected analyzeQueryRows(event: { executionId: string; resultSetIndex: number }): void {
+    if (!this.canAnalyzeRows()) return;
+    const result = this._store.result();
+    const source = this._store.resultSource();
+    const set = result?.resultSets[event.resultSetIndex];
+    if (
+      result?.executionId !== event.executionId ||
+      !source?.aiSource ||
+      !source.occurredAtUtc ||
+      !set?.rows.length
+    )
+      return;
+    this.aiRowsRequest.set({
+      source: { ...source.aiSource },
+      executionId: result.executionId,
+      occurredAtUtc: source.occurredAtUtc,
+      resultSetIndex: event.resultSetIndex,
+      resultSet: set,
+    });
+    this.aiOpen.set(true);
+    void this._ai.refresh();
+  }
+  protected readonly explainableError = computed<AiErrorAttachment | null>(() => {
+    const result = this._store.result();
+    const source = this._store.resultSource();
+    const current = this.aiContext().source;
+    if (
+      result?.state !== 'failed' ||
+      !result.error?.message ||
+      !source?.aiSource ||
+      !source.occurredAtUtc ||
+      source.aiSource.connectionId !== current.connectionId ||
+      source.aiSource.database !== current.database ||
+      this._store.running()
+    )
+      return null;
+    return {
+      source: { ...source.aiSource },
+      error: {
+        executionId: result.executionId,
+        occurredAtUtc: source.occurredAtUtc,
+        sql: source.sql,
+        message: result.error.message,
+        code: result.error.code,
+        line: result.error.line,
+        position: result.error.position,
+      },
+    };
+  });
+
+  protected explainQueryError(executionId: string): void {
+    const attachment = this.explainableError();
+    if (!attachment || attachment.error.executionId !== executionId) return;
+    // Cada clic es una elección nueva, incluso al volver a adjuntar el mismo fallo.
+    this.aiErrorRequest.set({ source: { ...attachment.source }, error: { ...attachment.error } });
+    this.aiOpen.set(true);
+    void this._ai.refresh();
+  }
 
   /**
    * Lo que el asistente puede saber de la base sin que nadie se lo escriba.
    *
    * Lo compone el shell porque es quien conoce el espacio de trabajo; el panel
-   * solo lo recibe hecho y decide si mandarlo. De momento son los nombres de
-   * las tablas cargadas en el arbol de la conexion activa y el SQL abierto:
+   * recibe el origen y el SQL; el catálogo del chat carga únicamente la
+   * selección explícita de tablas de esa base:
    * **nombres y consulta, nunca filas de resultados**.
    */
   protected readonly aiContext = computed(() => {
     const session = this._store.session();
-    const described = describeSchema(this._store.schemaIndex().relations);
+    const connection = this._store.activeConnection();
+    const engine = this._store.engines().find((item) => item.id === connection?.engine);
+    const database = resolveAiDatabase(
+      this._store.activeDatabase() ?? '',
+      this._store.databasesFor(connection?.id ?? ''),
+      engine?.capabilities.usesFilePath ?? false,
+    );
+    const table = this._store.activeTab()?.sourceTable;
 
     return {
-      database: session?.database ?? '',
-      tables: described.tables,
-      schema: described.schema,
+      database,
+      sessionId: connection?.sessionId,
+      connectionSaved: connection?.saved ?? false,
+      knownConnectionIds: this._store
+        .connections()
+        .filter((item) => item.saved)
+        .map((item) => item.id),
+      revision: this._store.catalogRevision(),
+      source: {
+        connectionId: connection?.id ?? '',
+        connectionName: connection?.name ?? '',
+        database,
+        serverVersion: session?.serverVersion,
+        schema: table?.database === database ? table.schema : undefined,
+        engine: session?.engine ?? connection?.engine,
+      },
+      tables: [],
+      schema: '',
       sql: this._store.activeTab()?.sql ?? '',
     };
   });
@@ -197,40 +319,33 @@ export class AppShell {
     const abriendo = !this.aiOpen();
 
     this.aiOpen.set(abriendo);
+    if (!abriendo) this.aiTableRequest.set(null);
 
     // La lista se pide al abrir y no al arrancar: quien no use el asistente no
     // tiene por que pagar una peticion mas en cada arranque.
     if (abriendo) {
       void this._ai.refresh();
-      void this.warmSchema();
     }
   }
 
   protected closeAssistant(): void {
     this.aiOpen.set(false);
+    this.aiTableRequest.set(null);
     this.host.nativeElement.querySelector<HTMLButtonElement>('app-top-bar .assistant')?.focus();
   }
 
-  /**
-   * Carga las columnas de las tablas que el usuario no ha desplegado.
-   *
-   * Sin esto, el asistente solo conoce las tablas que estuvieran abiertas en el
-   * arbol —normalmente ninguna— y responde pidiendo los nombres de las columnas
-   * en lugar de escribir la consulta. Se hace al abrir el panel y no al
-   * arrancar, y una sola vez por tabla: el store cachea lo que trae.
-   */
-  private async warmSchema(): Promise<void> {
-    const pending = this._store
-      .schemaIndex()
-      .relations.filter((relation) => relation.columns.length === 0)
-      .slice(0, MAX_WARMED_TABLES);
-
-    // De una en una y no en paralelo: son peticiones al catalogo del motor, y
-    // cuarenta a la vez sobre una conexion compartida compiten con lo que el
-    // usuario este haciendo en ese momento.
-    for (const relation of pending) {
-      await this._store.ensureColumnsAsync(relation.schema || null, relation.name);
+  protected async addTableToChat(node: ExplorerNode): Promise<void> {
+    const outcome = await this._store.useConnection(node.connectionId);
+    if (outcome === 'needsPassword') {
+      this.editConnection(node.connectionId);
+      return;
     }
+    if (outcome !== 'ok') return;
+    if (node.source.database) this._store.useDatabase(node.source.database);
+    if (node.source.database && this._store.activeDatabase() !== node.source.database) return;
+    this.aiTableRequest.set({ ...node.source });
+    this.aiOpen.set(true);
+    void this._ai.refresh();
   }
 
   /** Inserta donde esté el cursor, o sustituye únicamente la selección activa. */
@@ -250,7 +365,8 @@ export class AppShell {
    */
   protected readonly editorRatio = signal('16 / 9');
 
-  protected openSettings(): void {
+  protected openSettings(section: SettingsSection = 'appearance'): void {
+    this.settingsSection.set(section);
     this.prepareOverlay();
     const box = this._editorElement()?.nativeElement.getBoundingClientRect();
 
@@ -922,6 +1038,10 @@ export class AppShell {
   protected readonly rejection = this._store.rejection;
   protected readonly notice = this._store.notice;
   protected readonly history = this._store.history;
+  protected readonly historyFilter = this._store.historyFilter;
+  protected readonly historyLoading = this._store.historyLoading;
+  protected readonly historyError = this._store.historyError;
+  protected readonly historyHasMore = this._store.historyHasMore;
   protected readonly exporting = this._store.exporting;
   protected readonly transaction = this._store.transaction;
   protected readonly transactionBusy = this._store.transactionBusy;
@@ -1230,6 +1350,8 @@ export class AppShell {
     this._splash.dismiss();
 
     void this.updates.initialize().then(() => {
+      this.showWhatsNew();
+
       // Mientras nadie haya elegido, Druse no ha consultado nada y hay que
       // decirlo: un programa que calla sobre las conexiones que abre —o que deja
       // de abrir— no deja elegir, solo decide por su cuenta.
@@ -1244,6 +1366,26 @@ export class AppShell {
         this._store.notify(this._i18n.t('shell.updates.available', { version: release.version }));
       }
     });
+  }
+
+  /**
+   * Tras actualizar, abre Preferencias en las novedades, una vez por versión.
+   *
+   * En el navegador no: ahí no hay versión instalada, y la ventana taparía la
+   * aplicación en cada arranque de desarrollo y de las pruebas.
+   */
+  private showWhatsNew(): void {
+    const info = this.updates.info();
+
+    if (!info || info.variant === 'web' || !this._whatsNew.shouldShow(info.version)) {
+      return;
+    }
+
+    void this._store.markWhatsNewSeen(info.version);
+
+    if (!this.settingsOpen()) {
+      this.openSettings('whatsNew');
+    }
   }
 
   // --- Conexiones ------------------------------------------------------------
@@ -1432,8 +1574,9 @@ export class AppShell {
 
   // --- Pestañas --------------------------------------------------------------
   protected selectTab(id: string): void {
-    this.executionError.set(null);
-    this._store.selectTab(id);
+    if (this._store.selectTab(id)) {
+      this.executionError.set(null);
+    }
   }
 
   protected closeTab(id: string): void {
@@ -1443,13 +1586,15 @@ export class AppShell {
       return;
     }
 
-    this.executionError.set(null);
-    this._store.closeTab(id);
+    if (this._store.closeTab(id) && tab?.active) {
+      this.executionError.set(null);
+    }
   }
 
   protected createTab(): void {
-    this.executionError.set(null);
-    this._store.createTab();
+    if (this._store.createTab()) {
+      this.executionError.set(null);
+    }
   }
 
   /**
@@ -1548,9 +1693,12 @@ export class AppShell {
 
   // --- Editor ----------------------------------------------------------------
   protected onSqlChange(sql: string): void {
+    if (!this._store.updateSql(sql)) {
+      this._editor()?.rejectLastChange();
+      return;
+    }
     if (sql.trim()) this.startedWriting.set(true);
     this.executionError.set(null);
-    this._store.updateSql(sql);
   }
 
   /** El aviso de un archivo que no se pudo leer o escribir, con el motivo dentro. */
@@ -1656,8 +1804,12 @@ export class AppShell {
     void this._store.loadHistory();
   }
 
-  protected searchHistory(term: string): void {
-    void this._store.loadHistory(term);
+  protected searchHistory(filter: QueryHistoryFilter): void {
+    this._store.searchHistory(filter);
+  }
+
+  protected moreHistory(): void {
+    void this._store.loadMoreHistory();
   }
 
   protected clearHistory(): void {
@@ -1670,7 +1822,7 @@ export class AppShell {
       entry.sql,
       undefined,
       entry.connectionId,
-      'Historial · Consulta',
+      this._i18n.t('history.tabTitle'),
       entry.database,
     );
   }

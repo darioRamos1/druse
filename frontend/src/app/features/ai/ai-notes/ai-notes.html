@@ -1,0 +1,137 @@
+<section [attr.aria-label]="'ai.notes.title' | t">
+  <h3>{{ 'ai.notes.title' | t }}</h3>
+  <p>{{ 'ai.notes.help' | t }}</p>
+  @if (ai.active(); as provider) {
+    <label class="permission"
+      ><input
+        type="checkbox"
+        [checked]="!!provider.shareBusinessNotes"
+        [disabled]="permissionBusy() || ai.busy()"
+        (change)="sharing($any($event.target).checked)"
+      />
+      {{ 'ai.notes.share' | t: { provider: provider.name } }}</label
+    >
+    @if (provider.disclosure === 'nothing') {
+      <p>{{ 'ai.notes.noContext' | t }}</p>
+    }
+  }
+  <p class="hint">{{ 'ai.notes.futureQuestions' | t }}</p>
+  @if (permissionError()) {
+    <p role="alert">{{ permissionError() }}</p>
+  }
+  <label
+    ><input type="checkbox" [checked]="all()" (change)="all.set($any($event.target).checked)" />{{
+      'ai.notes.all' | t
+    }}</label
+  >
+  @if (store.loading()) {
+    <p role="status">{{ 'ai.notes.loading' | t }}</p>
+  }
+  @if (store.error()) {
+    <p role="alert">{{ store.error() }}</p>
+  }
+  @if (catalog.catalogError()) {
+    <p role="alert">{{ catalog.catalogError() }}</p>
+  }
+  <button
+    type="button"
+    (click)="store.load(true); catalog.loadCatalog(true); catalog.refreshSelected()"
+    [disabled]="store.loading() || store.saving()"
+  >
+    {{ 'ai.notes.reload' | t }}
+  </button>
+  <div class="notes-list">
+    @for (note of visible(); track note.id) {
+      <article class="note">
+        <strong>{{ label(note) }}</strong>
+        <small>{{ formatTimestamp(note.updatedAtUtc) }} · {{ status(note) | t }}</small>
+        <p class="note-text">{{ note.text }}</p>
+        <small>{{ (note.enabled ? 'ai.notes.enabled' : 'ai.notes.disabled') | t }}</small>
+        <small>{{ (included(note) ? 'ai.notes.willShare' : 'ai.notes.excluded') | t }}</small>
+        @if (note.enabled && note.reference && !included(note)) {
+          <small>{{ 'ai.notes.notSelected' | t }}</small>
+        }
+        <div class="actions">
+          <button
+            type="button"
+            (click)="edit(note)"
+            [disabled]="store.saving() || note.formatVersion !== 1"
+          >
+            {{ 'ai.notes.edit' | t }}
+          </button>
+          <button type="button" (click)="store.remove(note.id)" [disabled]="store.saving()">
+            {{ 'ai.notes.delete' | t }}
+          </button>
+        </div>
+      </article>
+    } @empty {
+      @if (!store.loading()) {
+        <p>{{ 'ai.notes.empty' | t }}</p>
+      }
+    }
+  </div>
+  <form (submit)="save(); $event.preventDefault()">
+    <h4>{{ (editing() ? 'ai.notes.edit' : 'ai.notes.new') | t }}</h4>
+    @if (!saved()) {
+      <p>{{ 'ai.notes.saveConnection' | t }}</p>
+    }
+    <label
+      >{{ 'ai.notes.scope' | t }}
+      <select
+        [value]="target()"
+        (change)="target.set($any($event.target).value)"
+        [disabled]="store.saving()"
+      >
+        @if (editing(); as note) {
+          <option value="original">{{ label(note) }}</option>
+        }
+        @if (saved()) {
+          <option value="base">{{ source().database }} · {{ 'ai.notes.base' | t }}</option>
+          @for (option of targets(); track option.value) {
+            <option [value]="option.value">{{ option.label }}</option>
+          }
+        }
+      </select>
+    </label>
+    @if (editing()) {
+      <p class="hint">{{ 'ai.notes.rebind' | t }}</p>
+    }
+    <label
+      >{{ 'ai.notes.text' | t
+      }}<textarea
+        rows="3"
+        maxlength="8000"
+        required
+        [value]="text()"
+        (input)="text.set($any($event.target).value)"
+        [disabled]="store.saving()"
+      ></textarea>
+    </label>
+    <label
+      ><input
+        type="checkbox"
+        [checked]="enabled()"
+        (change)="enabled.set($any($event.target).checked)"
+        [disabled]="store.saving()"
+      />{{ 'ai.notes.enabled' | t }}</label
+    >
+    <div class="actions">
+      <button
+        type="submit"
+        [disabled]="
+          store.saving() ||
+          store.loading() ||
+          !text().trim() ||
+          (!saved() && target() !== 'original')
+        "
+      >
+        {{ 'ai.notes.save' | t }}
+      </button>
+      @if (editing()) {
+        <button type="button" (click)="reset()" [disabled]="store.saving()">
+          {{ 'ai.notes.cancel' | t }}
+        </button>
+      }
+    </div>
+  </form>
+</section>

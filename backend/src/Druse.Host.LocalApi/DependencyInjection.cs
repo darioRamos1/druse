@@ -75,6 +75,7 @@ internal static class DependencyInjection
         services.AddScoped<IBackupProfileStore, SqliteBackupProfileStore>();
         services.AddScoped<ITransferProfileStore, SqliteTransferProfileStore>();
         services.AddScoped<IAiProviderStore, SqliteAiProviderStore>();
+        services.AddScoped<IAiBusinessNoteStore, SqliteAiBusinessNoteStore>();
 
         // Los trabajos largos que hubo. Va en SQLite y no en memoria porque la
         // pregunta que responde —«¿quedó algo a medias?»— solo se hace después de

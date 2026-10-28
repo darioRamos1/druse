@@ -232,6 +232,7 @@ export class ConnectionsSidebar {
    * tablas hay debajo.
    */
   readonly backup = output<ExplorerNode>();
+  readonly addToChat = output<ExplorerNode>();
 
   /**
    * Dibujar el diagrama de lo que cuelga de este nodo.

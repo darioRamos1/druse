@@ -5,6 +5,7 @@ import {
   computed,
   inject,
   input,
+  linkedSignal,
   output,
   signal,
   viewChild,
@@ -19,21 +20,30 @@ import { TranslatePipe } from '../../../core/i18n/translate.pipe';
 import { ThemeService } from '../../../core/theme/theme.service';
 import {
   BackgroundFit,
+  BackgroundTarget,
+  EditorBackground,
   DEFAULT_APPEARANCE,
   DEFAULT_BACKGROUND,
   EDITOR_FONT_SIZES,
+  GRID_FONT_SIZES,
+  GridAppearance,
+  GridColorKey,
   MAX_BACKGROUND_OPACITY,
   MAX_BACKGROUND_SCALE,
   MAX_SCALE,
   MIN_BACKGROUND_SCALE,
   MIN_SCALE,
   ThemeName,
+  isDefaultGrid,
 } from '../../../core/theme/appearance';
 import { Icon } from '../../../shared/ui/icon/icon';
+import { GridPreview } from '../grid-preview/grid-preview';
 import { UpdateService } from '../../../core/update/update.service';
 import { DialogFocus } from '../../../shared/a11y/dialog-focus';
 import { DialogBackdrop } from '../../../shared/a11y/dialog-backdrop';
 import { PrivacyNotice } from '../../../shared/privacy/privacy-notice';
+import { formatDate } from '../../../core/i18n/locale-format';
+import { RELEASE_NOTES } from '../../../core/whats-new/release-notes';
 
 /**
  * Colores de acento propuestos.
@@ -143,22 +153,74 @@ const FITS: readonly {
   },
 ];
 
-type SettingsSection = 'appearance' | 'editor' | 'privacy' | 'about';
+/**
+ * Los colores de la cuadrícula, con el token del tema que usan si nadie elige.
+ *
+ * El token hace falta para enseñar en el selector el color de partida: un
+ * selector de color no puede estar vacío, y abrirlo en negro haría creer que
+ * ese es el que hay puesto.
+ */
+const GRID_COLORS: readonly {
+  readonly key: GridColorKey;
+  readonly label: string;
+  readonly token: string;
+}[] = [
+  {
+    key: 'headerBackground',
+    label: 'settings.grid.color.headerBackground',
+    token: '--dr-surface-grid-header',
+  },
+  { key: 'headerText', label: 'settings.grid.color.headerText', token: '--dr-text-tertiary' },
+  { key: 'lines', label: 'settings.grid.color.lines', token: '--dr-border-input' },
+  { key: 'text', label: 'settings.grid.color.text', token: '--dr-text-muted' },
+  { key: 'number', label: 'settings.grid.color.number', token: '--dr-info' },
+  { key: 'timestamp', label: 'settings.grid.color.timestamp', token: '--dr-text-tertiary' },
+  { key: 'boolean', label: 'settings.grid.color.boolean', token: '--dr-success' },
+  { key: 'null', label: 'settings.grid.color.null', token: '--dr-text-disabled' },
+];
+
+/** Lee el color que da un token del tema, en el hexadecimal que pide el selector. */
+function resolveToken(token: string): string {
+  try {
+    const probe = document.createElement('span');
+    probe.style.color = `var(${token})`;
+    probe.style.display = 'none';
+    document.body.append(probe);
+    const value = getComputedStyle(probe).color;
+    probe.remove();
+
+    const [r, g, b] = (value.match(/[\d.]+/g) ?? []).map(Number);
+
+    return [r, g, b].every(Number.isFinite)
+      ? '#' + [r, g, b].map((v) => Math.round(v).toString(16).padStart(2, '0')).join('')
+      : '#808080';
+  } catch {
+    return '#808080';
+  }
+}
+
+export type SettingsSection =
+  'appearance' | 'editor' | 'results' | 'privacy' | 'whatsNew' | 'about';
 
 /** Preferencias agrupadas por lo que se quiere ajustar. */
 @Component({
   selector: 'app-settings-dialog',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [DialogBackdrop, DialogFocus, Icon, PrivacyNotice, TranslatePipe],
+  imports: [DialogBackdrop, DialogFocus, GridPreview, Icon, PrivacyNotice, TranslatePipe],
   templateUrl: './settings-dialog.html',
   styleUrl: './settings-dialog.scss',
 })
 export class SettingsDialog {
-  protected readonly section = signal<SettingsSection>('appearance');
+  /** La sección con la que se abre; tras una actualización, las novedades. */
+  readonly initialSection = input<SettingsSection>('appearance');
+
+  protected readonly section = linkedSignal<SettingsSection>(() => this.initialSection());
   protected readonly sections: readonly { id: SettingsSection; label: string }[] = [
     { id: 'appearance', label: 'settings.section.appearance' },
     { id: 'editor', label: 'settings.section.editor' },
+    { id: 'results', label: 'settings.section.results' },
     { id: 'privacy', label: 'settings.section.privacy' },
+    { id: 'whatsNew', label: 'settings.section.whatsNew' },
     { id: 'about', label: 'settings.section.about' },
   ];
   private readonly body = viewChild<ElementRef<HTMLElement>>('body');
@@ -278,6 +340,8 @@ export class SettingsDialog {
 
   /** Qué salió mal al elegir una imagen, para decirlo donde se pidió. */
   protected readonly problem = signal<string | null>(null);
+  protected readonly gridProblem = signal<string | null>(null);
+  protected readonly choosingBackground = signal(false);
 
   protected readonly accents = ACCENTS;
   protected readonly tints = TINTS;
@@ -322,21 +386,26 @@ export class SettingsDialog {
     void this._themes.update({ tint: null });
   }
 
-  protected async chooseBackground(): Promise<void> {
-    this.problem.set(null);
+  protected async chooseBackground(target: BackgroundTarget = 'editor'): Promise<void> {
+    if (this.choosingBackground()) return;
+    const problem = target === 'editor' ? this.problem : this.gridProblem;
+    problem.set(null);
+    this.choosingBackground.set(true);
 
     try {
-      await this._themes.chooseBackground();
+      await this._themes.chooseBackground(target);
     } catch (error) {
-      this.problem.set(
+      problem.set(
         error instanceof Error ? error.message : this._i18n.t('settings.background.unusable'),
       );
+    } finally {
+      this.choosingBackground.set(false);
     }
   }
 
-  protected clearBackground(): void {
-    this.problem.set(null);
-    void this._themes.clearBackground();
+  protected clearBackground(target: BackgroundTarget = 'editor'): void {
+    (target === 'editor' ? this.problem : this.gridProblem).set(null);
+    void this._themes.clearBackground(target);
   }
 
   protected setScale(value: string): void {
@@ -349,6 +418,51 @@ export class SettingsDialog {
 
   protected setEditorFontSize(editorFontSize: number): void {
     void this._themes.update({ editorFontSize });
+  }
+
+  protected readonly grid = computed(() => this.appearance().grid);
+  protected readonly gridFontSizes = GRID_FONT_SIZES;
+  protected readonly gridColors = GRID_COLORS;
+  protected readonly gridCustomized = computed(() => !isDefaultGrid(this.grid()));
+
+  /**
+   * El color que enseña cada selector: el elegido, o el que pone el tema.
+   *
+   * Depende del tema y del tono porque los dos cambian lo que resuelve el token;
+   * leerlo una sola vez dejaría el selector con el color del tema de antes.
+   */
+  protected readonly gridColorValues = computed(() => {
+    this.theme();
+    this.appearance().tint;
+    const colors = this.grid().colors;
+
+    return Object.fromEntries(
+      GRID_COLORS.map(({ key, token }) => [key, colors[key] ?? resolveToken(token)]),
+    ) as Record<GridColorKey, string>;
+  });
+
+  protected setGrid(changes: Partial<GridAppearance>): void {
+    void this._themes.update({ grid: { ...this.grid(), ...changes } });
+  }
+
+  /** `null` devuelve ese color al del tema. */
+  protected setGridColor(key: GridColorKey, value: string | null): void {
+    this.setGrid({ colors: { ...this.grid().colors, [key]: value } });
+  }
+
+  protected resetGrid(): void {
+    this.gridProblem.set(null);
+    void this._themes.resetGrid();
+  }
+
+  protected setGridBackground(changes: Partial<EditorBackground>): void {
+    const background = this.grid().background;
+    if (background) this.setGrid({ background: { ...background, ...changes } });
+  }
+
+  protected centerGridBackground(): void {
+    const { scale, x, y } = DEFAULT_BACKGROUND;
+    this.setGridBackground({ scale, x, y });
   }
 
   /**
@@ -483,6 +597,21 @@ export class SettingsDialog {
       : (info?.updatesDisabledReason ?? '');
   });
 
+  /**
+   * Lo que trajo cada versión, con la fecha en el idioma elegido.
+   *
+   * La fecha se lee a mediodía: a medianoche en UTC, al oeste de Greenwich se
+   * pintaría el día anterior.
+   */
+  protected readonly releaseNotes = computed(() => {
+    this.locale();
+
+    return RELEASE_NOTES.map((note) => ({
+      ...note,
+      dateLabel: formatDate(`${note.date}T12:00:00`, { dateStyle: 'long' }),
+    }));
+  });
+
   /** Los dos párrafos de la licencia, con sus nombres de archivo dentro. */
   protected readonly licenseGrant = computed(() =>
     this._i18n.tParts('settings.license.grant', { copyright: 'api/COPYRIGHT-Druse.txt' }),
@@ -504,6 +633,7 @@ export class SettingsDialog {
       appearance.accent ||
       appearance.tint ||
       appearance.background ||
+      !isDefaultGrid(appearance.grid) ||
       appearance.scale !== DEFAULT_APPEARANCE.scale ||
       appearance.editorFontSize !== DEFAULT_APPEARANCE.editorFontSize
     );

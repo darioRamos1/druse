@@ -1,118 +1,118 @@
-import { describeSchema } from './ai-context';
-import { KnownColumn, KnownRelation } from '../../shared/models/workspace';
+import { describeSelectedTables, resolveAiDatabase } from './ai-context';
+import { TableDetail } from '../../shared/models/workspace';
 
-function column(name: string, dataType: string, extra: Partial<KnownColumn> = {}): KnownColumn {
-  return { name, dataType, isNullable: true, isPrimaryKey: false, ...extra };
-}
+describe('describeSelectedTables', () => {
+  const detail: TableDetail = {
+    table: {
+      id: 't',
+      name: 'facturas',
+      schema: 'ventas',
+      database: 'bd',
+      kind: 'table',
+      hasChildren: true,
+    },
+    columns: [
+      {
+        name: 'empresa_id',
+        dataType: 'integer',
+        ordinal: 0,
+        isNullable: false,
+        isPrimaryKey: true,
+      },
+      {
+        name: 'cliente_id',
+        dataType: 'integer',
+        ordinal: 1,
+        isNullable: false,
+        isPrimaryKey: true,
+      },
+      {
+        name: 'importe',
+        dataType: 'numeric',
+        ordinal: 2,
+        isNullable: true,
+        isPrimaryKey: false,
+        defaultValue: '0',
+      },
+    ],
+    structure: {
+      primaryKey: { name: 'pk', columns: ['cliente_id', 'empresa_id'] },
+      foreignKeys: [
+        {
+          name: 'fk_cliente',
+          columns: ['empresa_id', 'cliente_id'],
+          referencedSchema: 'personas',
+          referencedTable: 'clientes',
+          referencedColumns: ['empresa', 'id'],
+          onDelete: 'cascade',
+          onUpdate: 'noAction',
+        },
+      ],
+      indexes: [
+        {
+          name: 'ix_importe',
+          columns: [{ name: 'importe', direction: 'desc' }],
+          isUnique: false,
+          isConstraintIndex: false,
+          isPrimaryKey: false,
+          includedColumns: ['cliente_id'],
+          filter: 'importe > 0',
+        },
+      ],
+      uniqueConstraints: [],
+      checkConstraints: [],
+    },
+  };
 
-function relation(
-  name: string,
-  columns: readonly KnownColumn[],
-  kind: 'table' | 'view' = 'table',
-): KnownRelation {
-  return { schema: 'public', name, kind, qualified: `public.${name}`, columns };
-}
-
-describe('describeSchema', () => {
-  it('no dice nada cuando no hay tablas', () => {
-    expect(describeSchema([])).toEqual({ schema: '', tables: [] });
-  });
-
-  it('describe cada tabla con sus columnas y tipos', () => {
-    const { schema } = describeSchema([
-      relation('accionista', [
-        column('id', 'integer', { isPrimaryKey: true, isNullable: false }),
-        column('nombre', 'text', { isNullable: false }),
-        column('ciudad_id', 'integer'),
-      ]),
-    ]);
-
-    expect(schema).toBe(
-      'TABLE public.accionista (\n' +
-        '  id integer PRIMARY KEY NOT NULL,\n' +
-        '  nombre text NOT NULL,\n' +
-        '  ciudad_id integer\n' +
-        ');',
+  it('conserva el orden de las claves compuestas, las parejas de FK, índices y valores predeterminados', () => {
+    const { schema } = describeSelectedTables([detail]);
+    expect(schema).toContain('PRIMARY KEY ("cliente_id", "empresa_id")');
+    expect(schema).toContain(
+      'FOREIGN KEY ("empresa_id", "cliente_id") REFERENCES "personas"."clientes" ("empresa", "id")',
     );
+    expect(schema).toContain('ON DELETE CASCADE ON UPDATE NO ACTION');
+    expect(schema).toContain('"importe" numeric DEFAULT 0');
+    expect(schema).toContain('("importe" DESC) INCLUDE ("cliente_id") WHERE importe > 0;');
   });
 
-  /**
-   * Es la razón de ser de esta función: sin tipos, el modelo no sabe si puede
-   * sumar una columna o si tiene que convertirla.
-   */
-  it('incluye el tipo de cada columna', () => {
-    const { schema } = describeSchema([
-      relation('operacion', [column('importe', 'numeric(12,2)'), column('cuando', 'timestamptz')]),
+  it('no recorta columnas elegidas explícitamente ni las claves que las usan', () => {
+    const columns = Array.from({ length: 85 }, (_, ordinal) => ({
+      ...detail.columns[0],
+      name: `c${ordinal}`,
+      ordinal,
+    }));
+    const { schema } = describeSelectedTables([
+      {
+        ...detail,
+        columns,
+        structure: { ...detail.structure, primaryKey: { name: 'pk', columns: ['c84', 'c1'] } },
+      },
     ]);
-
-    expect(schema).toContain('importe numeric(12,2)');
-    expect(schema).toContain('cuando timestamptz');
+    expect(schema).toContain('"c84" integer NOT NULL');
+    expect(schema).toContain('PRIMARY KEY ("c84", "c1")');
   });
 
-  it('distingue una vista de una tabla', () => {
-    const { schema } = describeSchema([
-      relation('v_resumen', [column('total', 'numeric')], 'view'),
+  it('escapa comillas en nombres sin confundir esquema y tabla', () => {
+    expect(
+      describeSelectedTables([
+        { ...detail, table: { ...detail.table, name: 'a"b', schema: 's.x' } },
+      ]).schema,
+    ).toContain('TABLE "s.x"."a""b"');
+  });
+
+  it('no inventa relaciones por los nombres de las columnas', () => {
+    const { schema } = describeSelectedTables([
+      { ...detail, structure: { ...detail.structure, foreignKeys: [] } },
     ]);
-
-    expect(schema).toContain('VIEW public.v_resumen');
+    expect(schema).not.toContain('FOREIGN KEY');
   });
+});
 
-  /**
-   * Una tabla sin columnas cargadas se nombra igual: el modelo sabe que existe y
-   * puede preguntar por ella, que es mejor que fingir que no está.
-   */
-  it('nombra las tablas de las que aún no se conocen columnas', () => {
-    const { schema } = describeSchema([relation('sin_cargar', [])]);
-
-    expect(schema).toBe('TABLE public.sin_cargar;');
-  });
-
-  it('pone delante las tablas de las que sí se sabe algo', () => {
-    const { tables } = describeSchema([
-      relation('vacia', []),
-      relation('conocida', [column('id', 'integer')]),
-    ]);
-
-    expect(tables[0]).toBe('public.conocida');
-  });
-
-  /**
-   * Una base de cientos de tablas no cabe en la pregunta, y meterla entera
-   * cuesta dinero por tokens y entierra lo que importa.
-   */
-  it('corta a 40 tablas y dice cuántas quedaron fuera', () => {
-    const many = Array.from({ length: 45 }, (_, index) =>
-      relation(`t${index}`, [column('id', 'integer')]),
-    );
-
-    const { schema, tables } = describeSchema(many);
-
-    expect(tables.length).toBe(40);
-    expect(schema).toContain('y 5 tablas más');
-  });
-
-  /** Una tabla de ciento veinte columnas se comería el presupuesto entero. */
-  it('corta a 60 columnas y dice cuántas quedaron fuera', () => {
-    const wide = Array.from({ length: 75 }, (_, index) => column(`c${index}`, 'text'));
-
-    const { schema } = describeSchema([relation('ancha', wide)]);
-
-    expect(schema).toContain('y 15 columnas más');
-  });
-
-  /**
-   * Lo que no puede pasar nunca: que salga un dato de una fila. Aquí solo hay
-   * nombres y tipos, y esta prueba está para que siga siendo así.
-   */
-  it('no incluye valores, solo estructura', () => {
-    const { schema } = describeSchema([
-      relation('accionista', [
-        column('nombre', 'text', { defaultValue: "'Marta Ibáñez'" }),
-        column('saldo', 'numeric', { defaultValue: '1248930.00' }),
-      ]),
-    ]);
-
-    expect(schema).not.toContain('Marta');
-    expect(schema).not.toContain('1248930');
+describe('resolveAiDatabase', () => {
+  it('resuelve el alias único de un motor basado en archivo sin sustituir bases elegidas explícitamente', () => {
+    expect(resolveAiDatabase('C:/ventas.db', ['main'], true)).toBe('main');
+    expect(resolveAiDatabase('aux', ['main', 'aux'], true)).toBe('aux');
+    expect(resolveAiDatabase('C:/ventas.db', ['main', 'aux'], true)).toBe('C:/ventas.db');
+    expect(resolveAiDatabase('ventas', ['otra'], false)).toBe('ventas');
   });
 });

@@ -1,10 +1,14 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { By } from '@angular/platform-browser';
 import { of } from 'rxjs';
 
 import { ApplicationGateway } from '../../core/application-gateway/application-gateway';
 import { WorkspaceStore } from '../../core/workspace/workspace-store';
 import { ConnectionForm, DatabaseObject } from '../../shared/models/workspace';
 import { AppShell } from './app-shell';
+import { AiCatalog } from '../../core/ai/ai-catalog';
+import { ConnectionsSidebar } from '../../features/connections/connections-sidebar/connections-sidebar';
+import { ResultsPanel } from '../../features/query-results/results-panel/results-panel';
 
 /** Gateway que no habla con nadie: el shell debe montarse sin API detrás. */
 function silentGateway(): Partial<ApplicationGateway> {
@@ -127,6 +131,31 @@ describe('AppShell', () => {
     fixture = TestBed.createComponent(AppShell);
     element = fixture.nativeElement as HTMLElement;
     await fixture.whenStable();
+  });
+
+  it('recupera el SQL del historial con su conexión y base sin ejecutarlo', async () => {
+    const panel = fixture.debugElement.query(By.directive(ResultsPanel))
+      .componentInstance as ResultsPanel;
+    const store = TestBed.inject(WorkspaceStore);
+    const execute = vi.spyOn(store, 'execute');
+    panel.reuseQuery.emit({
+      id: 'historial',
+      connectionId: 'conexion-original',
+      connectionName: 'Origen',
+      database: 'otra_base',
+      sql: 'SELECT 1;',
+      executedAtUtc: '2026-10-02T12:00:00Z',
+      durationMs: 1,
+      succeeded: true,
+    });
+    await fixture.whenStable();
+    expect(store.activeTab()).toMatchObject({
+      sql: 'SELECT 1;',
+      connectionId: 'conexion-original',
+      database: 'otra_base',
+      title: 'Historial · Consulta',
+    });
+    expect(execute).not.toHaveBeenCalled();
   });
 
   it('reproduce las cinco zonas del mockup', () => {
@@ -546,6 +575,69 @@ describe('AppShell', () => {
     shell.detectChanges();
 
     expect(dom.querySelector('app-backup-dialog')).toBeTruthy();
+  });
+
+  it('añadir una tabla del explorador abre su base en el chat sin ejecutar consultas', async () => {
+    TestBed.resetTestingModule();
+    await TestBed.configureTestingModule({
+      imports: [AppShell],
+      providers: [
+        {
+          provide: ApplicationGateway,
+          useValue: {
+            ...backupGateway(),
+            getAiProviders: silentGateway().getAiProviders,
+            getColumns: () =>
+              of([
+                {
+                  name: 'id',
+                  dataType: 'integer',
+                  ordinal: 0,
+                  isPrimaryKey: true,
+                  isNullable: false,
+                },
+              ]),
+            getTableStructure: () =>
+              of({ indexes: [], foreignKeys: [], uniqueConstraints: [], checkConstraints: [] }),
+          },
+        },
+      ],
+    }).compileComponents();
+    const shell = TestBed.createComponent(AppShell);
+    await shell.whenStable();
+    const store = TestBed.inject(WorkspaceStore);
+    await store.connect({ ...connectionForm, engine: 'postgresql' });
+    store.useDatabase('otra_base');
+    shell.detectChanges();
+    const sidebar = shell.debugElement.query(By.directive(ConnectionsSidebar))
+      .componentInstance as ConnectionsSidebar;
+    const execute = vi.spyOn(store, 'execute');
+    sidebar.addToChat.emit({
+      id: 'objeto',
+      label: 'orders',
+      kind: 'table',
+      depth: 4,
+      expandable: true,
+      expanded: false,
+      loading: false,
+      connectionId: store.activeConnection()!.id,
+      source: {
+        id: 'table:public.orders',
+        name: 'orders',
+        schema: 'public',
+        database: 'druse_test',
+        kind: 'table',
+        hasChildren: true,
+      },
+    });
+    await vi.waitFor(() => {
+      shell.detectChanges();
+      expect(shell.nativeElement.querySelector('app-ai-panel')).toBeTruthy();
+      expect(TestBed.inject(AiCatalog).selected()).toHaveLength(1);
+    });
+    expect(store.activeDatabase()).toBe('druse_test');
+    expect(TestBed.inject(AiCatalog).selected()[0].table.schema).toBe('public');
+    expect(execute).not.toHaveBeenCalled();
   });
 
   it('en móvil conserva un control para abrir el explorador', () => {

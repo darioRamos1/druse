@@ -82,6 +82,26 @@ public sealed class CliTranscriptTests
         Assert.Contains("not supported", error);
     }
 
+    // Codex 0.150.1 devuelve el rechazo de 6.1 como JSON dentro de una cadena;
+    // el chat debe conservar el motivo tanto en el error como al cerrar el turno.
+    [Theory]
+    [InlineData("error")]
+    [InlineData("turn.failed")]
+    public void CodexConservaElRechazoRealDeGpt61ConCuentaChatGpt(string evento)
+    {
+        const string rechazo = """{"type":"error","status":400,"error":{"type":"invalid_request_error","message":"The 'gpt-6.1-sol' model is not supported when using Codex with a ChatGPT account."}}""";
+        var linea = evento == "error"
+            ? System.Text.Json.JsonSerializer.Serialize(new { type = evento, message = rechazo })
+            : System.Text.Json.JsonSerializer.Serialize(new { type = evento, error = new { message = rechazo } });
+        var transcript = new CliTranscript("codex");
+
+        var (text, error) = transcript.Read(linea);
+
+        Assert.Empty(text);
+        Assert.Equal("The 'gpt-6.1-sol' model is not supported when using Codex with a ChatGPT account.", error);
+        Assert.Equal(rechazo, transcript.FailureDetail);
+    }
+
     [Fact]
     public void ClaudeEntregaLosTrozosSegunLlegan()
     {

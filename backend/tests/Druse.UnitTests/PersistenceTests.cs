@@ -444,6 +444,60 @@ public sealed class QueryHistoryStoreTests : IDisposable
         Assert.Equal(2, await _store.ClearAsync(CancellationToken.None));
         Assert.Empty(await _store.GetRecentAsync(10, null, CancellationToken.None));
     }
+
+    [Fact]
+    public async Task RecorreMasDeQuinientasEntradasSinRepetirAunqueLlegueOtra()
+    {
+        var instant = DateTimeOffset.Parse("2026-10-02T12:00:00Z", System.Globalization.CultureInfo.InvariantCulture);
+        var originals = new HashSet<Guid>();
+        for (var i = 0; i < 537; i++)
+        {
+            var entry = Entry($"SELECT {i}") with { ExecutedAtUtc = instant };
+            originals.Add(entry.Id);
+            await _store.AddAsync(entry, CancellationToken.None);
+        }
+        var page = await _store.GetRecentAsync(100, null, CancellationToken.None);
+        var seen = page.Select(entry => entry.Id).ToList();
+        await _store.AddAsync(Entry("SELECT 'nueva'") with { ExecutedAtUtc = instant.AddMinutes(1) }, CancellationToken.None);
+        while (page.Count > 0)
+        {
+            var last = page[^1];
+            page = await _store.GetRecentAsync(100, null, CancellationToken.None,
+                new QueryHistoryFilter { Before = last.ExecutedAtUtc, BeforeId = last.Id });
+            seen.AddRange(page.Select(entry => entry.Id));
+        }
+        Assert.Equal(537, seen.Count);
+        Assert.Equal(537, seen.Distinct().Count());
+        Assert.True(originals.SetEquals(seen));
+        Assert.Equal(500, (await _store.GetRecentAsync(1000, null, CancellationToken.None)).Count);
+    }
+
+    [Fact]
+    public async Task CombinaOrigenFechaYResultadoSinInterpretarComodines()
+    {
+        var from = DateTimeOffset.Parse("2026-10-02T05:00:00Z", System.Globalization.CultureInfo.InvariantCulture);
+        var entry = Entry("SELECT * FROM", succeeded: false) with
+        { ConnectionName = "Local 100%", Database = "ventas_2026", ExecutedAtUtc = from };
+        await _store.AddAsync(entry, CancellationToken.None);
+        await _store.AddAsync(entry with { Id = Guid.NewGuid(), Succeeded = true }, CancellationToken.None);
+        await _store.AddAsync(entry with { Id = Guid.NewGuid(), Database = "ventasX2026" }, CancellationToken.None);
+        await _store.AddAsync(entry with { Id = Guid.NewGuid(), ExecutedAtUtc = from.AddDays(1) }, CancellationToken.None);
+        var filter = new QueryHistoryFilter
+        { Connection = "100%", Database = "ventas_", Succeeded = false, From = from, Until = from.AddDays(1) };
+        Assert.Equal(entry.Id, Assert.Single(await _store.GetRecentAsync(100, null, CancellationToken.None, filter)).Id);
+        Assert.Empty(await _store.GetRecentAsync(100, "no existe", CancellationToken.None, filter));
+    }
+
+    [Fact]
+    public async Task BuscaLaBaseYConservaElInstanteDeUnaFechaConOffset()
+    {
+        var date = DateTimeOffset.Parse("2026-10-02T00:00:00-05:00", System.Globalization.CultureInfo.InvariantCulture);
+        await _store.AddAsync(Entry("SELECT 1") with { Database = "archivo_%", ExecutedAtUtc = date }, CancellationToken.None);
+        var filter = new QueryHistoryFilter { From = date, Until = date.AddDays(1) };
+        var found = Assert.Single(await _store.GetRecentAsync(100, "archivo_%", CancellationToken.None, filter));
+        Assert.Equal(date, found.ExecutedAtUtc);
+        Assert.Equal(TimeSpan.Zero, found.ExecutedAtUtc.Offset);
+    }
 }
 
 /// <summary>

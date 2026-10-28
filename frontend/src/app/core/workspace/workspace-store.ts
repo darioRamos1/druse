@@ -1,4 +1,4 @@
-import { Injectable, computed, inject, signal } from '@angular/core';
+import { DestroyRef, Injectable, computed, inject, signal } from '@angular/core';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Observable, firstValueFrom } from 'rxjs';
 
@@ -17,9 +17,11 @@ import { FileSaveService, describeSave } from '../files/file-save.service';
 import { I18nService } from '../i18n/i18n.service';
 import { ThemeService } from '../theme/theme.service';
 import { AUTO_CHECK_PREFERENCE, UpdateService } from '../update/update.service';
+import { WHATS_NEW_PREFERENCE, WhatsNewService } from '../whats-new/whats-new.service';
 import { describeError, diagnosticQuery, isSessionLost } from './errors';
 import { ConnectionStore } from './connection-store';
 import { ExecutionStore } from './execution-store';
+import { resolveAiDatabase } from '../ai/ai-context';
 import { ExplorerStore } from './explorer-store';
 import { NoticeStore } from './notice-store';
 import { TabStore } from './tab-store';
@@ -40,6 +42,7 @@ import {
   EngineInfo,
   ExplorerNode,
   QueryHistoryEntry,
+  QueryHistoryFilter,
   QueryTab,
   CellEdit,
   EditableTable,
@@ -123,6 +126,7 @@ export class WorkspaceStore {
   private readonly _theme = inject(ThemeService);
   private readonly _i18n = inject(I18nService);
   private readonly _updates = inject(UpdateService);
+  private readonly _whatsNew = inject(WhatsNewService);
   private readonly _connectionStore = inject(ConnectionStore);
   private readonly _execution = inject(ExecutionStore);
   private readonly _explorer = inject(ExplorerStore);
@@ -153,6 +157,11 @@ export class WorkspaceStore {
   readonly searchableRelations = this._explorer.searchableRelations;
 
   readonly searchableSchemas = this._explorer.searchableSchemas;
+
+  /** Permite descartar detalles de metadatos leídos antes de un refresco del catálogo. */
+  readonly catalogRevision = computed(() =>
+    this._explorer.revisionFor(this.activeConnection()?.id ?? ''),
+  );
 
   /**
    * Lo que el editor sabe del catálogo, ya recortado a dónde se está trabajando.
@@ -207,6 +216,7 @@ export class WorkspaceStore {
 
   /** Lo que hay en la cuadrícula y su estado; vive en {@link ExecutionStore}. */
   readonly result = this._execution.result;
+  readonly resultSource = this._execution.source;
 
   readonly running = this._execution.running;
 
@@ -319,6 +329,22 @@ export class WorkspaceStore {
     }
   }
 
+  /**
+   * Da por vistas las novedades de una versión, para no volver a abrirlas solas.
+   *
+   * Si no se puede guardar, se enseñarán otra vez en el siguiente arranque, que
+   * es un error mucho más llevadero que no enseñarlas nunca.
+   */
+  async markWhatsNewSeen(version: string): Promise<void> {
+    this._whatsNew.lastSeen.set(version);
+
+    try {
+      await firstValueFrom(this._gateway.setPreference(WHATS_NEW_PREFERENCE, version));
+    } catch {
+      // Se vuelve a intentar en el próximo arranque.
+    }
+  }
+
   async setTimeout(seconds: number): Promise<void> {
     const clamped = Math.min(3600, Math.max(1, Math.round(seconds)));
 
@@ -378,6 +404,7 @@ export class WorkspaceStore {
       // Tiene que estar leído antes de que el shell arranque el actualizador: si
       // llegara después, la consulta ya habría salido sin permiso.
       this._updates.adopt(preferences);
+      this._whatsNew.adopt(preferences);
     } catch {
       // Se sigue con los valores por defecto.
     }
@@ -655,6 +682,18 @@ export class WorkspaceStore {
 
   private readonly _history = signal<readonly QueryHistoryEntry[]>([]);
   readonly history = this._history.asReadonly();
+  readonly historyLoading = signal(false);
+  readonly historyError = signal<string | null>(null);
+  readonly historyHasMore = signal(false);
+  readonly historyFilter = signal<QueryHistoryFilter>({});
+  private historyTimer: ReturnType<typeof setTimeout> | undefined;
+  private historyRevision = 0;
+  private cancelHistory: (() => void) | null = null;
+  private clearingHistory = false;
+  private readonly historyCleanup = inject(DestroyRef).onDestroy(() => {
+    this.cancelHistory?.();
+    clearTimeout(this.historyTimer);
+  });
 
   /**
    * Perfiles guardados, completos.
@@ -753,6 +792,7 @@ export class WorkspaceStore {
         connected: true,
         engine: session.engine,
         engineVersion: describeVersion(session.engine, session.serverVersion),
+        serverVersion: session.serverVersion,
         database: session.database,
         user: connection.name,
         lastDurationMs: null,
@@ -787,7 +827,9 @@ export class WorkspaceStore {
   async forget(connectionId: string): Promise<void> {
     // Cierra la sesión si estaba abierta. Para un perfil guardado, `disconnect`
     // lo deja en la lista como desconectado, así que hay que retirarlo después.
-    await this.disconnect(connectionId);
+    if (!(await this.disconnect(connectionId))) {
+      return;
+    }
 
     try {
       await firstValueFrom(this._gateway.deleteConnection(connectionId));
@@ -802,20 +844,93 @@ export class WorkspaceStore {
     this._explorer.forget(connectionId);
   }
 
-  async loadHistory(search?: string): Promise<void> {
-    try {
-      this._history.set(await firstValueFrom(this._gateway.getHistory(search)));
-    } catch (error) {
-      this._notices.set(describeError(error, this._i18n));
+  loadHistory(filter?: QueryHistoryFilter): Promise<void> {
+    clearTimeout(this.historyTimer);
+    this.historyFilter.set(filter ?? this.historyFilter());
+    if (this.clearingHistory) return Promise.resolve();
+    this._history.set([]);
+    this.historyHasMore.set(false);
+    return this.fetchHistory(false);
+  }
+
+  searchHistory(filter: QueryHistoryFilter): void {
+    this.historyFilter.set(filter);
+    clearTimeout(this.historyTimer);
+    this.cancelHistory?.();
+    ++this.historyRevision;
+    this._history.set([]);
+    this.historyHasMore.set(false);
+    this.historyError.set(null);
+    this.historyLoading.set(true);
+    this.historyTimer = setTimeout(() => void this.loadHistory(), 250);
+  }
+
+  loadMoreHistory(): Promise<void> {
+    if (this.historyLoading() || !this.historyHasMore()) return Promise.resolve();
+    return this.fetchHistory(true);
+  }
+
+  private fetchHistory(append: boolean): Promise<void> {
+    this.cancelHistory?.();
+    const revision = ++this.historyRevision;
+    const last = append ? this._history().at(-1) : undefined;
+    const filter = {
+      ...this.historyFilter(),
+      limit: 101,
+      before: last?.executedAtUtc,
+      beforeId: last?.id,
+    };
+    this.historyLoading.set(true);
+    this.historyError.set(null);
+    if (filter.from && filter.until && filter.from > filter.until) {
+      this.historyError.set(this._i18n.t('history.invalidDates'));
+      this.historyLoading.set(false);
+      return Promise.resolve();
     }
+    return new Promise<void>((resolve) => {
+      const subscription = this._gateway.getHistory(filter.search, filter).subscribe({
+        next: (entries) => {
+          if (revision !== this.historyRevision) return;
+          const page = entries.slice(0, 100);
+          this._history.update((current) => (append ? [...current, ...page] : page));
+          this.historyHasMore.set(entries.length > 100);
+        },
+        error: (error) => {
+          if (revision === this.historyRevision) {
+            this.historyError.set(describeError(error, this._i18n));
+            this.historyLoading.set(false);
+          }
+          resolve();
+        },
+        complete: () => {
+          if (revision === this.historyRevision) this.historyLoading.set(false);
+          resolve();
+        },
+      });
+      this.cancelHistory = () => {
+        subscription.unsubscribe();
+        resolve();
+      };
+    });
   }
 
   async clearHistory(): Promise<void> {
+    if (this.clearingHistory) return;
+    this.clearingHistory = true;
+    clearTimeout(this.historyTimer);
+    this.cancelHistory?.();
+    ++this.historyRevision;
+    this.historyLoading.set(true);
+    this.historyError.set(null);
     try {
       await firstValueFrom(this._gateway.clearHistory());
       this._history.set([]);
+      this.historyHasMore.set(false);
     } catch (error) {
-      this._notices.set(describeError(error, this._i18n));
+      this.historyError.set(describeError(error, this._i18n));
+    } finally {
+      this.clearingHistory = false;
+      this.historyLoading.set(false);
     }
   }
 
@@ -852,7 +967,7 @@ export class WorkspaceStore {
   useDatabase(database: string): void {
     const tab = this.activeTab();
 
-    if (!tab || tab.database === database) {
+    if (!tab || tab.database === database || !this.confirmDiscardEdits()) {
       return;
     }
 
@@ -916,6 +1031,12 @@ export class WorkspaceStore {
       return 'ok';
     }
 
+    if (!this.confirmDiscardEdits()) {
+      return 'failed';
+    }
+
+    const edits = this._edits();
+
     if (!connection.sessionId) {
       const outcome = await this.openSaved(connectionId);
 
@@ -924,9 +1045,18 @@ export class WorkspaceStore {
       }
     }
 
+    // Abrir una sesión puede tardar: la decisión anterior no autoriza a tirar
+    // celdas que se hayan editado después de confirmar.
+    const stillActive = this.activeTab()?.id === tab?.id;
+    if (stillActive && this._edits() !== edits && !this.confirmDiscardEdits()) {
+      return 'failed';
+    }
+
     const database = this._connectionStore.sessionFor(connectionId)?.database;
 
-    this._connectionStore.activate(connectionId);
+    if (stillActive) {
+      this._connectionStore.activate(connectionId);
+    }
 
     if (tab) {
       // La base y la procedencia editable eran de la conexión anterior: aquí no
@@ -944,7 +1074,7 @@ export class WorkspaceStore {
     // son la clase de detalle que lleva a tomar una decisión al revés.
     const source = this._execution.source();
 
-    if (source && (source.connectionId === previous || source.tabId === tab?.id)) {
+    if (source && source.tabId === tab?.id) {
       this.clearDisplayedResult();
     }
 
@@ -1034,10 +1164,18 @@ export class WorkspaceStore {
 
   /** Anota un cambio sobre una celda. */
   editCell(edit: CellEdit): void {
+    if (this._savingEdits()) {
+      return;
+    }
+    const result = this.resultSet();
+    const index = result?.columns.findIndex((column) => column.name === edit.column) ?? -1;
+    const row = result?.rows.find((row) => row.number === edit.row);
+    const original = row && index >= 0 ? row.values[index] : undefined;
     this._edits.update((current) => [
       ...current.filter((item) => !(item.row === edit.row && item.column === edit.column)),
-      edit,
+      ...(edit.value === original ? [] : [edit]),
     ]);
+    this._editPreview.set(null);
   }
 
   /** Vuelve del SQL a la lista de cambios, conservándolos. */
@@ -1049,6 +1187,23 @@ export class WorkspaceStore {
   discardEdits(): void {
     this._edits.set([]);
     this._editPreview.set(null);
+  }
+
+  private confirmDiscardEdits(): boolean {
+    if (this._edits().length === 0) {
+      return true;
+    }
+
+    if (this._savingEdits()) {
+      this._notices.set(this._i18n.t('workspace.waitForCellSave'));
+      return false;
+    }
+
+    // Se decide antes de cambiar el origen: preguntar desde la limpieza sería
+    // demasiado tarde, cuando la pestaña o la conexión ya no son las mismas.
+    return window.confirm(
+      this._i18n.t('workspace.discardCellEdits', { count: this._edits().length }),
+    );
   }
 
   /**
@@ -1064,15 +1219,27 @@ export class WorkspaceStore {
       return;
     }
 
+    const edits = this._edits();
+    const tabId = this.activeTab()?.id;
+    const stillCurrent = () => this._edits() === edits && this.activeTab()?.id === tabId;
+
     try {
-      this._editPreview.set(await firstValueFrom(this._gateway.previewRowEdits(request)));
+      const preview = await firstValueFrom(this._gateway.previewRowEdits(request));
+      if (stillCurrent()) {
+        this._editPreview.set(preview);
+      }
     } catch (error) {
-      this._notices.set(describeError(error, this._i18n));
+      if (stillCurrent()) {
+        this._notices.set(describeError(error, this._i18n));
+      }
     }
   }
 
   /** Guarda los cambios y vuelve a ejecutar la consulta para ver el resultado. */
   async saveEdits(): Promise<boolean> {
+    if (this._savingEdits()) {
+      return false;
+    }
     const request = this.buildEditRequest(true);
 
     if (!request) {
@@ -1344,11 +1511,48 @@ export class WorkspaceStore {
   private readonly _importPreview = signal<ImportPreview | null>(null);
   readonly importPreview = this._importPreview.asReadonly();
 
-  private readonly _importing = signal(false);
-  readonly importing = this._importing.asReadonly();
+  private readonly _importAnalyzing = signal(false);
+  private readonly _importRunning = signal(false);
+  readonly importing = computed(() => this._importAnalyzing() || this._importRunning());
+  readonly importRunning = this._importRunning.asReadonly();
+  private _importRevision = 0;
+  private _importAnalysis: {
+    sessionId: string;
+    table: DatabaseObject;
+    file: File;
+    options: ImportOptions;
+  } | null = null;
 
   clearImportPreview(): void {
+    this._importRevision++;
+    this._importAnalysis = null;
     this._importPreview.set(null);
+    this._importAnalyzing.set(false);
+  }
+
+  hasImportPreview(
+    table: DatabaseObject,
+    file: File,
+    options: ImportOptions,
+    connectionId?: string,
+  ): boolean {
+    const analysis = this._importAnalysis;
+    const sessionId = (connectionId ? this.findConnection(connectionId) : this.activeConnection())
+      ?.sessionId;
+
+    return (
+      !!analysis &&
+      !!this._importPreview() &&
+      analysis.sessionId === sessionId &&
+      analysis.file === file &&
+      analysis.table.database === table.database &&
+      analysis.table.schema === table.schema &&
+      analysis.table.name === table.name &&
+      analysis.options.hasHeaders === options.hasHeaders &&
+      analysis.options.delimiter === options.delimiter &&
+      analysis.options.encoding === options.encoding &&
+      analysis.options.nullText === options.nullText
+    );
   }
 
   /** Pide qué se insertaría, sin escribir nada. */
@@ -1358,6 +1562,12 @@ export class WorkspaceStore {
     options: ImportOptions,
     connectionId?: string,
   ): Promise<void> {
+    if (this._importRunning()) {
+      return;
+    }
+
+    this.clearImportPreview();
+    const revision = this._importRevision;
     const sessionId = (connectionId ? this.findConnection(connectionId) : this.activeConnection())
       ?.sessionId;
 
@@ -1366,17 +1576,27 @@ export class WorkspaceStore {
       return;
     }
 
-    this._importing.set(true);
+    this._importAnalyzing.set(true);
+    const analysis = { sessionId, table: { ...table }, file, options: { ...options } };
 
     try {
-      this._importPreview.set(
-        await firstValueFrom(this._gateway.previewImport(sessionId, table, file, options)),
+      const preview = await firstValueFrom(
+        this._gateway.previewImport(sessionId, table, file, options),
       );
+
+      if (revision === this._importRevision) {
+        this._importAnalysis = analysis;
+        this._importPreview.set(preview);
+      }
     } catch (error) {
-      this._importPreview.set(null);
-      this._notices.set(describeError(error, this._i18n));
+      if (revision === this._importRevision) {
+        this._importPreview.set(null);
+        this._notices.set(describeError(error, this._i18n));
+      }
     } finally {
-      this._importing.set(false);
+      if (revision === this._importRevision) {
+        this._importAnalyzing.set(false);
+      }
     }
   }
 
@@ -1395,12 +1615,24 @@ export class WorkspaceStore {
       return false;
     }
 
-    this._importing.set(true);
+    if (this.importing()) {
+      return false;
+    }
+
+    if (
+      !this.hasImportPreview(table, file, options, connectionId) ||
+      this._importPreview()!.problems.length > 0
+    ) {
+      this._notices.set(this._i18n.t('workspace.importNeedsAnalysis'));
+      return false;
+    }
+
+    this._importRunning.set(true);
 
     try {
       const result = await firstValueFrom(this._gateway.runImport(sessionId, table, file, options));
 
-      this._importPreview.set(null);
+      this.clearImportPreview();
       this._notices.set(
         this._i18n.t('workspace.rowsImported', {
           rows: result.rowsAffected,
@@ -1416,7 +1648,7 @@ export class WorkspaceStore {
       this._notices.set(describeError(error, this._i18n));
       return false;
     } finally {
-      this._importing.set(false);
+      this._importRunning.set(false);
     }
   }
 
@@ -1474,6 +1706,7 @@ export class WorkspaceStore {
         connected: true,
         engine: form.engine,
         engineVersion: describeVersion(form.engine, session.serverVersion),
+        serverVersion: session.serverVersion,
         database: session.database,
         user: describeUser(form),
         lastDurationMs: null,
@@ -1574,6 +1807,13 @@ export class WorkspaceStore {
       return 'failed';
     }
 
+    if (this._execution.source()?.connectionId === connectionId) {
+      if (!this.confirmDiscardEdits()) {
+        return 'failed';
+      }
+      this.clearDisplayedResult();
+    }
+
     if (connection.sessionId) {
       try {
         await firstValueFrom(this._gateway.closeSession(connection.sessionId));
@@ -1612,8 +1852,15 @@ export class WorkspaceStore {
    * Un perfil guardado no desaparece de la lista: se queda desconectado, listo
    * para volver a abrirse. Para eliminarlo está {@link forget}.
    */
-  async disconnect(connectionId: string): Promise<void> {
+  async disconnect(connectionId: string): Promise<boolean> {
     const connection = this.findConnection(connectionId);
+
+    if (this._execution.source()?.connectionId === connectionId) {
+      if (!this.confirmDiscardEdits()) {
+        return false;
+      }
+      this.clearDisplayedResult();
+    }
 
     if (connection?.sessionId) {
       try {
@@ -1648,6 +1895,8 @@ export class WorkspaceStore {
         this._connectionStore.connections().find((item) => item.sessionId)?.id ?? null,
       );
     }
+
+    return true;
   }
 
   /**
@@ -2127,14 +2376,28 @@ export class WorkspaceStore {
 
   // --- Pestañas --------------------------------------------------------------
 
-  selectTab(id: string): void {
+  selectTab(id: string): boolean {
+    if (this.activeTab()?.id === id) {
+      return true;
+    }
+    if (!this.tabs().some((tab) => tab.id === id) || !this.confirmDiscardEdits()) {
+      return false;
+    }
     this._tabStore.select(id);
     this.clearDisplayedResult();
+    return true;
   }
 
-  closeTab(id: string): void {
+  closeTab(id: string): boolean {
+    const tab = this.tabs().find((item) => item.id === id);
+    if (!tab || (tab.active && !this.confirmDiscardEdits())) {
+      return false;
+    }
     this._tabStore.close(id);
-    this.clearDisplayedResult();
+    if (tab.active) {
+      this.clearDisplayedResult();
+    }
+    return true;
   }
 
   createTab(
@@ -2145,26 +2408,41 @@ export class WorkspaceStore {
       undefined,
     title?: string,
     database: string | undefined = this.activeTab()?.database,
-  ): void {
+  ): boolean {
+    if (!this.confirmDiscardEdits()) {
+      return false;
+    }
     this._tabStore.create({ sql, sourceTable, connectionId, title, database });
 
     // Cambiar de pestaña cambia lo que hay en la cuadrícula: los cambios
     // pendientes de la anterior no pueden seguir vivos.
     this.clearDisplayedResult();
+    return true;
   }
 
-  openSqlFile(fileName: string, sql: string, documentId?: string): void {
+  openSqlFile(fileName: string, sql: string, documentId?: string): boolean {
+    if (!this.confirmDiscardEdits()) {
+      return false;
+    }
     this._tabStore.openFile(fileName, sql, documentId, {
       connectionId: this.activeTab()?.connectionId ?? this._connectionStore.activeId() ?? undefined,
       database: this.activeTab()?.database,
     });
     this.clearDisplayedResult();
+    return true;
   }
 
-  updateSql(sql: string): void {
+  updateSql(sql: string): boolean {
+    if (sql === (this.activeTab()?.sql ?? '')) {
+      return true;
+    }
+    if (!this.confirmDiscardEdits()) {
+      return false;
+    }
     this._tabStore.updateSql(sql);
     this._execution.dismissRejection();
     this.discardEdits();
+    return true;
   }
 
   /** Abre una pestaña con un SELECT sobre la tabla indicada. */
@@ -2219,6 +2497,11 @@ export class WorkspaceStore {
       return null;
     }
 
+    if (!this.confirmDiscardEdits()) {
+      return null;
+    }
+    this.discardEdits();
+
     this._notices.clear();
 
     // Lo que hay delante ahora. Si cambia mientras se ejecuta —otra pestaña,
@@ -2227,6 +2510,20 @@ export class WorkspaceStore {
     const sigueDelante = (): boolean =>
       this.activeTab()?.id === tabId && this.activeTab()?.sql === tabSql;
 
+    // Se captura antes de esperar: editar la consulta no debe reescribir el diagnóstico.
+    const occurredAtUtc = new Date().toISOString();
+    const aiSource = {
+      connectionId: connection.id,
+      connectionName: connection.name,
+      database: resolveAiDatabase(
+        tab?.database ?? this.session()?.database ?? '',
+        this.databasesFor(connection.id),
+        this.engines().find((engine) => engine.id === connection.engine)?.capabilities
+          .usesFilePath ?? false,
+      ),
+      engine: connection.engine,
+      serverVersion: this.session()?.serverVersion,
+    };
     try {
       const result = await this._execution.run({
         sessionId: connection.sessionId,
@@ -2242,6 +2539,8 @@ export class WorkspaceStore {
       }
 
       this._execution.show(result, {
+        aiSource,
+        occurredAtUtc,
         tabId: tabId ?? null,
         connectionId: connection.id,
         database: tab?.database,

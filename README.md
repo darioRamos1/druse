@@ -6,9 +6,13 @@ El código original de Druse está bajo **GNU GPL v3, exclusivamente versión 3*
 
 Una *drusa* es la costra de cristales que tapiza el interior de una geoda: la estructura que aparece al abrir la piedra. Es lo que hace la aplicación con una base de datos.
 
-El repositorio es público. Se está preparando una [edición Comunidad](docs/distribucion/edicion-comunidad.md) sin Oracle ni IBM para evaluación de SignPath; todavía no cuenta con su aprobación o firma.
+El repositorio es público. Las [descargas para Windows x64](https://darioramos1.github.io/druse/#descargar) muestran la última publicación disponible, con las opciones de instalador y portable de cada edición. Comunidad incluye PostgreSQL, SQL Server, MySQL/MariaDB y SQLite; Completa añade Oracle e IBM Informix y Sin Informix conserva Oracle. Solo se enlazan archivos ya publicados: una opción pendiente aparece como no disponible. Los paquetes actuales no tienen firma Authenticode. Consulta los hashes y las limitaciones en las notas antes de ejecutarlos.
 
-> **Estado: versión 1.1.0.** Funciona el flujo completo contra **PostgreSQL, SQL Server y MySQL/MariaDB**: conectar, explorar el catálogo, escribir SQL con ayudas de esquema, ejecutar, cancelar, consultar el historial, **exportar e importar CSV o Excel** y **editar filas desde la cuadrícula**, todo dentro de una aplicación de escritorio que no necesita .NET ni Node.js instalados. Las [notas de la primera beta](docs/release-notes/0.1.0-beta.md) siguen describiendo con qué números se comprobó ese flujo.
+**Prueba de diez minutos:** sigue la [guía SQLite](docs/guias/primera-prueba-sqlite.md) para crear una base de ejemplo, consultar y exportar datos ficticios sin configurar un servidor.
+
+SignPath rechazó por ahora la solicitud el 9 de octubre por falta de reconocimiento público. El [plan de reaplicación](docs/planes/plan-reaplicacion-signpath-2026-10-11.md) reúne las pruebas externas y verificaciones pendientes; no hay firma concedida.
+
+> **Estado: versión 1.11.0.** Funciona el flujo completo contra **PostgreSQL, SQL Server y MySQL/MariaDB**: conectar, explorar el catálogo, escribir SQL con ayudas de esquema, ejecutar, cancelar, consultar el historial, **exportar e importar CSV o Excel** y **editar filas desde la cuadrícula**, todo dentro de una aplicación de escritorio que no necesita .NET ni Node.js instalados. Las [notas de la primera beta](docs/release-notes/0.1.0-beta.md) siguen describiendo con qué números se comprobó ese flujo.
 
 ## Editar, importar y exportar
 

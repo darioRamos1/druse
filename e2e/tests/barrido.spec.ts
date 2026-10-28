@@ -1,7 +1,12 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 
-import { abrir, apuntarPestana, conectar, ejecutar, escribirSql } from '../support/druse';
+import { abrir, apuntarPestana, conectar, ejecutar, escribirSql, situarCursor } from '../support/druse';
 import { medir } from '../support/medir';
+import { comprobarDiagnosticoIa, prepararDiagnosticoIa } from '../support/ai-diagnostics';
+import { comprobarContextoChat, prepararContextoChat, comprobarSelectorContexto, comprobarNotasContexto } from '../support/ai-context';
+import { comprobarErrorContexto } from '../support/ai-execution-error';
+import { comprobarMuestraContexto } from '../support/ai-rows';
+import { comprobarPlanContexto } from '../support/ai-plans';
 
 /**
  * Barrido visual de toda la aplicación: recorre pantallas y diálogos, los
@@ -124,6 +129,9 @@ test.describe('barrido visual', () => {
     });
     await medir(page, 'resultados', hallazgos);
     await foto(page, '01-resultados');
+    await page.locator('app-results-grid .cell--value').first().focus();
+    await page.keyboard.press('Shift+ArrowRight');
+    await foto(page, '01a-cuadricula-teclado');
 
     await page.getByRole('button', { name: 'Filtros', exact: true }).click();
     await page.getByRole('searchbox', { name: 'Filtrar numero', exact: true }).fill('1');
@@ -150,6 +158,11 @@ test.describe('barrido visual', () => {
     await page.waitForTimeout(400);
     await medir(page, 'historial', hallazgos);
     await foto(page, '03-historial');
+    const detalleHistorial = page.locator('app-query-history .item__detail > summary').first();
+    if (await detalleHistorial.count()) {
+      await detalleHistorial.click();
+      await foto(page, '03-historial-sql-completo');
+    }
 
     await page.locator('app-results-panel').getByText('Resultados').first().click();
 
@@ -326,6 +339,53 @@ test.describe('barrido visual', () => {
       await cerrar(page, dialogo, nombre);
     }
 
+    // --- Los colores de la cuadrícula ------------------------------------------
+    // Se prueban con la cuadrícula de verdad detrás, no solo con la miniatura: la
+    // miniatura copia las reglas a mano y podría quedarse atrás sin que nadie lo
+    // viera. Se deja como estaba al terminar, que lo que sigue fotografía el tema
+    // de serie.
+    await page.getByRole('button', { name: 'Preferencias' }).click();
+
+    const ajustes = page.locator('app-settings-dialog');
+
+    await expect(ajustes).toBeVisible({ timeout: 30_000 });
+    await ajustes.getByRole('tab', { name: 'Resultados', exact: true }).click();
+    await page.waitForTimeout(300);
+    await medir(page, 'preferencias de resultados', hallazgos);
+    await foto(page, '08e-preferencias-resultados', ajustes.locator('.dialog'));
+
+    await ajustes.getByRole('button', { name: '14', exact: true }).click();
+    await ajustes.getByRole('checkbox', { name: /Filas alternas/ }).check();
+    await ajustes.getByLabel('Color: Fondo de la cabecera').fill('#2b3a55');
+    await ajustes.getByLabel('Color: Números').fill('#f0b429');
+    await ajustes.getByLabel('Color: Texto').fill('#9ad7c3');
+    await ajustes.getByLabel('Color: NULL').fill('#f2686b');
+    await page.waitForTimeout(300);
+    await foto(page, '08f-preferencias-resultados-a-mano', ajustes.locator('.dialog'));
+    await cerrar(page, ajustes, 'preferencias de resultados');
+
+    // Una consulta propia, con un valor de cada tipo que tiene color: la de la
+    // pestaña puede ser cualquiera a estas alturas.
+    await apuntarPestana(page);
+    await escribirSql(
+      page,
+      `SELECT n AS numero, 'fila ' || n AS descripcion, NULLIF(n % 3, 0)::text AS vacio,
+              now() AS cuando, n % 2 = 0 AS par
+       FROM generate_series(1, 12) AS n`,
+    );
+    await ejecutar(page, 'todo');
+    await page.locator('app-results-panel').getByText('Resultados').first().click();
+    await expect(page.locator('app-results-grid .row').first()).toBeVisible({ timeout: 30_000 });
+    await page.waitForTimeout(300);
+    await medir(page, 'resultados a mano', hallazgos);
+    await foto(page, '08g-resultados-a-mano', page.locator('app-results-panel'));
+
+    await page.getByRole('button', { name: 'Preferencias' }).click();
+    await expect(ajustes).toBeVisible({ timeout: 30_000 });
+    await ajustes.getByRole('tab', { name: 'Resultados', exact: true }).click();
+    await ajustes.getByRole('button', { name: 'Restablecer los resultados' }).click();
+    await cerrar(page, ajustes, 'preferencias de resultados');
+
     // --- El paso donde se elige el destino del respaldo --------------------
     // La casilla de sobrescribir solo sale cuando lo que se va a escribir es una
     // carpeta: un archivo o un zip los nombra el usuario en el diálogo del
@@ -390,6 +450,16 @@ test.describe('barrido visual', () => {
     // --- El asistente de una tabla, con sus pasos --------------------------
     await desplegar(page, 'Tables', 'accionista');
     await menuDe(page, 'accionista');
+    await page.getByRole('menuitem', { name: 'Abrir SELECT', exact: true }).click();
+    await situarCursor(page, 1, 1);
+    await ejecutar(page, 'todo');
+    const celdaEditable = page.locator('app-results-grid .cell--value.is-editable').first();
+    if (await celdaEditable.count()) {
+      await celdaEditable.dblclick();
+      await foto(page, '12c-celda-con-nulo-explicito');
+      await celdaEditable.locator('.cell__editor').press('Escape');
+    }
+    await menuDe(page, 'accionista');
     await page.getByRole('menuitem', { name: 'Migrar datos a…' }).click();
 
     const traslado = page.locator('app-transfer-dialog');
@@ -415,6 +485,12 @@ test.describe('barrido visual', () => {
       await page.waitForTimeout(600);
       await medir(page, nombre, hallazgos);
       await foto(page, nombre, dialogo.locator('.dialog').first());
+      if (selector === 'app-import-dialog') {
+        await dialogo.locator('input[type=file]').setInputFiles({
+          name: 'ejemplo.csv', mimeType: 'text/csv', buffer: Buffer.from('id\n'),
+        });
+        await foto(page, '13aa-importar-pendiente-de-analizar', dialogo.locator('.dialog'));
+      }
       await cerrar(page, dialogo, nombre);
     }
 
@@ -498,6 +574,8 @@ test.describe('barrido visual', () => {
     }
 
     // --- El asistente ------------------------------------------------------
+    // El diagnóstico visual usa un proveedor simulado para no gastar cuota.
+    await prepararDiagnosticoIa(page);
     await page.getByRole('button', { name: 'Asistente', exact: true }).click();
 
     const asistente = page.locator('app-ai-panel');
@@ -539,10 +617,22 @@ test.describe('barrido visual', () => {
     await page.waitForTimeout(500);
     await medir(page, 'proveedor de IA', hallazgos);
     await foto(page, '15-proveedor-ia', proveedores.locator('.dialog'));
+    await comprobarDiagnosticoIa(page, name => foto(page, `15b-${name}`, proveedores.locator('.dialog')));
     await cerrar(page, proveedores, 'proveedor de IA');
 
     await page.getByRole('button', { name: 'Asistente', exact: true }).click();
     await expect(asistente).toBeHidden({ timeout: 10_000 });
+
+    const contextoRequests = await prepararContextoChat(page);
+    await comprobarContextoChat(page, contextoRequests,
+      // Incluye la vista previa y el presupuesto antes de la primera pregunta.
+      name => foto(page, `15c-${name}`, asistente));
+    await comprobarSelectorContexto(page, name => foto(page, `15d-${name}`, asistente));
+    await comprobarNotasContexto(page, name => foto(page, `15e-${name}`, asistente));
+    await comprobarErrorContexto(page, name => foto(page, `15f-${name}`, asistente));
+    await comprobarMuestraContexto(page, name => foto(page, `15g-${name}`, asistente));
+    await page.getByRole('button', { name: 'Asistente', exact: true }).click();
+    await expect(asistente).toBeHidden();
 
     // --- Tema claro en las dos pantallas que más se miran ------------------
     await page.getByRole('button', { name: 'Tema claro' }).click();
@@ -574,3 +664,10 @@ test.describe('barrido visual', () => {
     console.log([...new Set(consola)].join('\n') || '(limpia)');
   });
 });
+
+for (const locale of ['es', 'en']) {
+  test(`barrido del plan estimado de SQLite (${locale})`, async ({ page }) => {
+    test.skip(!process.env['DRUSE_BARRIDO'], 'El barrido se pide a mano.');
+    await comprobarPlanContexto(page, locale, name => foto(page, `19-${locale}-${name}`, page.locator('app-ai-panel')));
+  });
+}

@@ -4,11 +4,69 @@
     type="search"
     class="search__input"
     [placeholder]="'history.filter.placeholder' | t"
-    [value]="term()"
+    [value]="filter().search ?? ''"
     (input)="onSearch($event)"
     [attr.aria-label]="'history.filter.label' | t"
   />
 </div>
+
+<details class="filter-options" [open]="filterCount() > 0">
+  <summary>
+    {{ 'history.filters' | t }}
+    @if (filterCount()) {
+      ({{ filterCount() }})
+    }
+  </summary>
+  <div class="filters">
+    <label
+      >{{ 'history.connection' | t
+      }}<input
+        type="search"
+        [value]="filter().connection ?? ''"
+        (input)="onSearch($event, 'connection')"
+    /></label>
+    <label
+      >{{ 'history.database' | t
+      }}<input
+        type="search"
+        [value]="filter().database ?? ''"
+        (input)="onSearch($event, 'database')"
+    /></label>
+    <label
+      >{{ 'history.from' | t
+      }}<input type="date" [value]="filter().from ?? ''" (input)="onSearch($event, 'from')"
+    /></label>
+    <label
+      >{{ 'history.until' | t
+      }}<input type="date" [value]="filter().until ?? ''" (input)="onSearch($event, 'until')"
+    /></label>
+    <label
+      >{{ 'history.outcome' | t
+      }}<select
+        [value]="filter().succeeded === undefined ? '' : '' + filter().succeeded"
+        (change)="onSearch($event, 'succeeded')"
+      >
+        <option value="">{{ 'history.all' | t }}</option>
+        <option value="true">{{ 'history.success' | t }}</option>
+        <option value="false">{{ 'history.failed' | t }}</option>
+      </select></label
+    >
+    <button type="button" class="foot__action" (click)="search.emit({})">
+      {{ 'history.reset' | t }}
+    </button>
+  </div>
+</details>
+@if (error()) {
+  <div class="notice" role="alert">
+    {{ error() }}
+    <button type="button" class="foot__action" (click)="retry.emit()">
+      {{ 'history.retry' | t }}
+    </button>
+  </div>
+}
+@if (loading()) {
+  <p class="notice" role="status">{{ 'history.loading' | t }}</p>
+}
 
 @if (entries().length > 0) {
   <ul class="list dr-scroll-fade">
@@ -27,6 +85,8 @@
           <span class="item__dot" aria-hidden="true">·</span>
           <span>{{ entry.connectionName }}</span>
           <span class="item__dot" aria-hidden="true">·</span>
+          <span>{{ entry.database }}</span>
+          <span class="item__dot" aria-hidden="true">·</span>
           <span>{{ 'history.duration' | t: { ms: entry.durationMs } }}</span>
           @if (entry.succeeded && entry.rowCount !== undefined && entry.rowCount !== null) {
             <span class="item__dot" aria-hidden="true">·</span>
@@ -37,19 +97,37 @@
             <span class="item__error">{{ entry.errorMessage }}</span>
           }
         </span>
+        <details class="item__detail">
+          <summary>{{ 'history.detail' | t }}</summary>
+          <pre>{{ entry.sql }}</pre>
+        </details>
       </li>
     }
   </ul>
-
-  <footer class="foot">
-    <span class="foot__count">{{ 'history.count' | t: { count: entries().length } }}</span>
-    <span class="foot__spacer"></span>
-    <button type="button" class="foot__action" (click)="clear.emit()">
-      {{ 'history.clear' | t }}
-    </button>
-  </footer>
-} @else if (term()) {
-  <p class="empty">{{ 'history.noMatch' | t: { term: term() } }}</p>
-} @else {
-  <p class="empty">{{ 'history.empty' | t }}</p>
+} @else if (!loading() && !error()) {
+  <p class="empty">
+    {{
+      (filter().search ||
+      filter().connection ||
+      filter().database ||
+      filter().from ||
+      filter().until ||
+      filter().succeeded !== undefined
+        ? 'history.noMatchFilters'
+        : 'history.empty'
+      ) | t
+    }}
+  </p>
 }
+<footer class="foot">
+  <span class="foot__count">{{ 'history.count' | t: { count: entries().length } }}</span>
+  <span class="foot__spacer"></span>
+  @if (hasMore()) {
+    <button type="button" class="foot__action" [disabled]="loading()" (click)="more.emit()">
+      {{ 'history.more' | t }}
+    </button>
+  }
+  <button type="button" class="foot__action" [disabled]="loading()" (click)="clear.emit()">
+    {{ 'history.clear' | t }}
+  </button>
+</footer>

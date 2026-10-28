@@ -2,6 +2,8 @@ import {
   ChangeDetectionStrategy,
   Component,
   computed,
+  effect,
+  DestroyRef,
   inject,
   input,
   output,
@@ -15,6 +17,7 @@ import { WorkspaceStore } from '../../../core/workspace/workspace-store';
 import { DatabaseObject } from '../../../shared/models/workspace';
 import { DialogFocus } from '../../../shared/a11y/dialog-focus';
 import { DialogBackdrop } from '../../../shared/a11y/dialog-backdrop';
+import { Icon } from '../../../shared/ui/icon/icon';
 
 /**
  * Importar un archivo dentro de una tabla.
@@ -27,7 +30,7 @@ import { DialogBackdrop } from '../../../shared/a11y/dialog-backdrop';
 @Component({
   selector: 'app-import-dialog',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [DialogBackdrop, DialogFocus, FormsModule, TranslatePipe],
+  imports: [Icon, DialogBackdrop, DialogFocus, FormsModule, TranslatePipe],
   templateUrl: './import-dialog.html',
   styleUrl: './import-dialog.scss',
 })
@@ -43,6 +46,9 @@ export class ImportDialog {
   /** Tabla de destino, la que el usuario eligió en el explorador. */
   readonly table = input.required<DatabaseObject>();
   readonly connectionId = input.required<string>();
+  private readonly destinationSession = computed(() =>
+    this._store.sessionForConnection(this.connectionId()),
+  );
 
   readonly closed = output<void>();
 
@@ -57,6 +63,34 @@ export class ImportDialog {
 
   protected readonly preview = this._store.importPreview;
   protected readonly busy = this._store.importing;
+  protected readonly running = this._store.importRunning;
+  private readonly options = computed(() => ({
+    hasHeaders: this.hasHeaders(),
+    delimiter: this.delimiter(),
+    encoding: this.encoding(),
+    nullText: this.nullText(),
+  }));
+  protected readonly canImport = computed(() => {
+    const file = this.file();
+    return (
+      !!file &&
+      !this.busy() &&
+      this.preview()?.problems.length === 0 &&
+      this._store.hasImportPreview(this.table(), file, this.options(), this.connectionId())
+    );
+  });
+
+  constructor() {
+    effect(() => {
+      this.file();
+      this.options();
+      this.table();
+      this.connectionId();
+      this.destinationSession();
+      this._store.clearImportPreview();
+    });
+    inject(DestroyRef).onDestroy(() => this._store.clearImportPreview());
+  }
 
   protected readonly qualified = computed(() => {
     const table = this.table();
@@ -79,41 +113,21 @@ export class ImportDialog {
   protected async analyze(): Promise<void> {
     const file = this.file();
 
-    if (!file) {
+    if (!file || this.busy()) {
       return;
     }
 
-    await this._store.previewImport(
-      this.table(),
-      file,
-      {
-        hasHeaders: this.hasHeaders(),
-        delimiter: this.delimiter(),
-        encoding: this.encoding(),
-        nullText: this.nullText(),
-      },
-      this.connectionId(),
-    );
+    await this._store.previewImport(this.table(), file, this.options(), this.connectionId());
   }
 
   protected async run(): Promise<void> {
     const file = this.file();
 
-    if (!file) {
+    if (!file || !this.canImport()) {
       return;
     }
 
-    const ok = await this._store.runImport(
-      this.table(),
-      file,
-      {
-        hasHeaders: this.hasHeaders(),
-        delimiter: this.delimiter(),
-        encoding: this.encoding(),
-        nullText: this.nullText(),
-      },
-      this.connectionId(),
-    );
+    const ok = await this._store.runImport(this.table(), file, this.options(), this.connectionId());
 
     if (ok) {
       this.close();
@@ -121,6 +135,9 @@ export class ImportDialog {
   }
 
   protected close(): void {
+    if (this.running()) {
+      return;
+    }
     this._store.clearImportPreview();
     this.closed.emit();
   }

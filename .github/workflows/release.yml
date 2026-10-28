@@ -2,10 +2,18 @@ name: Publicar versión
 
 on:
   workflow_dispatch:
+  workflow_run:
+    workflows: [CI, Verificar edición Comunidad]
+    types: [completed]
+    branches: [main]
 
 permissions:
-  contents: write
+  contents: read
   actions: read
+
+concurrency:
+  group: release
+  cancel-in-progress: false
 
 jobs:
   # Publicar es lo único que sale de aquí hacia los equipos de otras personas, y
@@ -14,26 +22,46 @@ jobs:
   # rojo. Este job pregunta por el commit concreto que se va a empaquetar.
   checks:
     name: El commit está validado
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.head_repository.full_name == github.repository &&
+      github.event.workflow_run.event != 'pull_request')
     runs-on: ubuntu-latest
+    outputs:
+      publicar: ${{ steps.checks.outputs.publicar }}
+      commit: ${{ steps.checks.outputs.commit }}
     env:
       GH_TOKEN: ${{ github.token }}
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          persist-credentials: false
       - name: Exigir CI general y Comunidad para el commit exacto
+        id: checks
         shell: pwsh
+        env:
+          DRUSE_AUTOMATICA: ${{ github.event_name == 'workflow_run' }}
         run: |
-          . ./build/scripts/verificacion-release.ps1
-          foreach ($workflow in @('ci.yml', 'comunidad.yml')) {
-            $result = Get-DruseEstadoCI -Repository $env:GITHUB_REPOSITORY -Commit $env:GITHUB_SHA -Workflow $workflow
-            if (-not $result.verde) { throw $result.detalle }
-            Write-Host $result.detalle
-          }
+          . ./build/scripts/publicacion-automatica.ps1
+          $commit = (git rev-parse HEAD).Trim()
+          $version = (Get-Content shells/desktop-tauri/tauri.conf.json -Raw | ConvertFrom-Json).version
+          $result = Get-DruseDecisionPublicacion -Repository $env:GITHUB_REPOSITORY -Commit $commit -Version $version -Automatica:($env:DRUSE_AUTOMATICA -eq 'true')
+          Write-Host $result.detalle
+          "publicar=$($result.publicar.ToString().ToLowerInvariant())" >> $env:GITHUB_OUTPUT
+          "commit=$commit" >> $env:GITHUB_OUTPUT
 
   windows:
-    name: Instaladores y actualización
+    name: Instaladores, portables y actualización
     runs-on: windows-latest
     needs: checks
+    if: needs.checks.outputs.publicar == 'true'
+    timeout-minutes: 90
+    permissions:
+      contents: write
+      actions: read
     env:
       GH_TOKEN: ${{ github.token }}
       TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
@@ -46,6 +74,8 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
+          ref: ${{ needs.checks.outputs.commit }}
+          persist-credentials: false
 
       - name: Comprobar la clave del actualizador
         shell: pwsh

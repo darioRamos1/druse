@@ -1,7 +1,7 @@
 {
   "esquema": 1,
-  "generado": "2026-09-23T19:54:00.6794253+00:00",
-  "alcance": "Catálogo de avisos por versión. Incluye las 37 entradas del grafo inicial de Comunidad y doce versiones revisadas el 23 de septiembre de 2026. No es aprobación de redistribución ni de SignPath.",
+  "generado": "2026-10-28",
+  "alcance": "Unión de los catálogos NuGet/runtime ya recopilados en ambas ramas: 51 fichas por componente y versión. Conserva las doce versiones del 23 de septiembre y los runtime 10.0.13 del 14 de octubre. Los hashes de los grafos identifican las recopilaciones de origen; no describen una nueva construcción ni constituyen aprobación de redistribución o de SignPath.",
   "depsSha256": "dd2465db0407bb70a0ec2f06d413d2a5fd1f03437944884b3f7db372904e1348",
   "limites": [
     "Recopilación de textos originales; no demuestra cubrir cada obligación o archivo de terceros.",
@@ -1439,6 +1439,85 @@
         }
       ],
       "estado": "TEXTOS RECOPILADOS; REVISION PENDIENTE"
+    },
+    {
+      "componente": "Microsoft.AspNetCore.App.Runtime.win-x64",
+      "version": "10.0.13",
+      "licenciaDeclarada": "MIT",
+      "procedencia": "texto incluido en el paquete NuGet de la caché examinada",
+      "repositorio": null,
+      "commit": null,
+      "etiqueta": null,
+      "nuspecSha256": "944ffbb56415134ae47257feeeeaf086b8a1c1a34b39ed8f2a6fc044b91ee5c7",
+      "evidenciaDll": null,
+      "documentos": [
+        {
+          "archivo": "fuentes/microsoft.aspnetcore.app.runtime-6f3d800f/LICENSE.txt",
+          "sha256": "d7a68596ab69b06f51ca278a6545148e4269a9381c26d597c13df5d88e08cf5b",
+          "origen": "LICENSE.txt",
+          "url": "https://www.nuget.org/packages/Microsoft.AspNetCore.App.Runtime.win-x64/10.0.13",
+          "gitBlob": null
+        },
+        {
+          "archivo": "fuentes/microsoft.aspnetcore.app.runtime-6f3d800f/THIRD-PARTY-NOTICES.TXT",
+          "sha256": "307d014f65d8482314f1400ddeae7a0cbabb96c2207bcc77f6233cc10588e5d9",
+          "origen": "THIRD-PARTY-NOTICES.TXT",
+          "url": "https://www.nuget.org/packages/Microsoft.AspNetCore.App.Runtime.win-x64/10.0.13",
+          "gitBlob": null
+        }
+      ],
+      "estado": "TEXTOS RECOPILADOS; REVISION PENDIENTE"
+    },
+    {
+      "componente": "Microsoft.NETCore.App.Runtime.win-x64",
+      "version": "10.0.13",
+      "licenciaDeclarada": "MIT",
+      "procedencia": "texto incluido en el paquete NuGet de la caché examinada",
+      "repositorio": null,
+      "commit": null,
+      "etiqueta": null,
+      "nuspecSha256": "84e8cb90bd380fe379ba5eec956ff386803901d78c6a1a3d79cea372091508a3",
+      "evidenciaDll": null,
+      "documentos": [
+        {
+          "archivo": "fuentes/microsoft.netcore.app.runtime.wi-2649fc5f/LICENSE.TXT",
+          "sha256": "d7a68596ab69b06f51ca278a6545148e4269a9381c26d597c13df5d88e08cf5b",
+          "origen": "LICENSE.TXT",
+          "url": "https://www.nuget.org/packages/Microsoft.NETCore.App.Runtime.win-x64/10.0.13",
+          "gitBlob": null
+        },
+        {
+          "archivo": "fuentes/microsoft.netcore.app.runtime.wi-2649fc5f/THIRD-PARTY-NOTICES.TXT",
+          "sha256": "6d15e10a101c6bfff2ab4429ed061bf76c456fc4b23ad6b03e0d0f8377148a21",
+          "origen": "THIRD-PARTY-NOTICES.TXT",
+          "url": "https://www.nuget.org/packages/Microsoft.NETCore.App.Runtime.win-x64/10.0.13",
+          "gitBlob": null
+        }
+      ],
+      "estado": "TEXTOS RECOPILADOS; REVISION PENDIENTE"
+    }
+  ],
+  "catalogosOrigen": [
+    {
+      "generado": "2026-09-21T23:36:14.8496955-05:00",
+      "depsSha256": "ebb490351aef90bcb3bf3875daf35fef88cf140c298556046330672fc4bf8f25",
+      "alcance": "Textos para las 37 entradas NuGet/runtime de la API local de Comunidad examinada el 21 de septiembre. No es aprobación de redistribución ni de SignPath."
+    },
+    {
+      "generado": "2026-09-23T19:54:00.6794253+00:00",
+      "depsSha256": "dd2465db0407bb70a0ec2f06d413d2a5fd1f03437944884b3f7db372904e1348",
+      "alcance": "Catálogo de avisos por versión. Incluye las 37 entradas del grafo inicial de Comunidad y doce versiones revisadas el 23 de septiembre de 2026. No es aprobación de redistribución ni de SignPath."
+    }
+  ],
+  "actualizaciones": [
+    {
+      "fecha": "2026-10-14",
+      "paquetes": [
+        "Microsoft.AspNetCore.App.Runtime.win-x64/10.0.13",
+        "Microsoft.NETCore.App.Runtime.win-x64/10.0.13"
+      ],
+      "depsSha256": "41e3f3aa38e00f07c5d312d23d9d442c9d029714a859327828da7ded9a6ff669",
+      "alcance": "Runtime corregido de la nueva API Comunidad local; no modifica la beta publicada."
     }
   ]
 }

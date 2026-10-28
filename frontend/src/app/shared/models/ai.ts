@@ -34,6 +34,7 @@ export interface AiProvider {
   /** Programa que atiende a un proveedor `localcli`. Vacío en los demás. */
   readonly command: string;
   readonly disclosure: AiDisclosure;
+  readonly shareBusinessNotes?: boolean;
   /**
    * Este perfil inicia sesion por su cuenta, aparte de la del equipo.
    *
@@ -76,6 +77,7 @@ export interface SaveAiProviderRequest {
   readonly model: string;
   readonly command: string;
   readonly disclosure: AiDisclosure;
+  readonly shareBusinessNotes?: boolean;
   readonly ownSession: boolean;
   readonly isDefault: boolean;
   readonly apiKey?: string;
@@ -107,6 +109,7 @@ export interface CliSessionState {
   readonly account?: string;
   readonly plan?: string;
   readonly detail: string;
+  readonly version?: string;
 }
 
 /**
@@ -128,28 +131,154 @@ export interface AiProbeResult {
   readonly reachable: boolean;
   readonly detail: string;
   readonly elapsedMs: number;
+  readonly modelVerified?: boolean;
 }
 
 export type AiRole = 'user' | 'assistant' | 'system';
+
+/** Identidad estable de la base; no contiene credenciales ni el identificador de sesión. */
+export interface AiSource {
+  readonly connectionId: string;
+  readonly connectionName: string;
+  readonly database: string;
+  readonly engine?: string;
+  readonly serverVersion?: string;
+  readonly schema?: string;
+}
+
+/** Categorías separadas para que el servidor aplique los permisos antes de componer. */
+export interface AiContextSnapshot {
+  readonly source: AiSource;
+  readonly sql?: string;
+  readonly schema?: string;
+  readonly tables: readonly string[];
+  readonly warnings?: readonly string[];
+  readonly notes?: readonly AiBusinessNote[];
+  readonly executionError?: AiExecutionError;
+  readonly rows?: AiRowsAttachment;
+  readonly executionPlan?: AiExecutionPlan;
+}
+
+/** Plan estimado obtenido manualmente; SQL y texto son la copia revisada por la persona. */
+export interface AiExecutionPlan {
+  readonly format: 'sqlite-query-plan';
+  readonly executionId: string;
+  readonly occurredAtUtc: string;
+  readonly sql: string;
+  readonly text: string;
+}
+
+export interface AiPlanAttachment {
+  readonly source: AiSource;
+  readonly plan: AiExecutionPlan;
+}
+
+export interface AiRowCell {
+  readonly kind: 'text' | 'null' | 'masked' | 'binary' | 'truncated';
+  readonly value?: string;
+  readonly originalBytes?: number;
+}
+
+/** Una muestra elegida; los valores excluidos nunca forman parte de esta copia. */
+export interface AiRowsAttachment {
+  readonly executionId: string;
+  readonly occurredAtUtc: string;
+  readonly resultSetIndex: number;
+  readonly availableRows: number;
+  readonly resultTruncated: boolean;
+  readonly truncationAccepted: boolean;
+  readonly columns: readonly { ordinal: number; name: string; dataType: string }[];
+  readonly rows: readonly { index: number; cells: readonly AiRowCell[] }[];
+}
+
+/** Solo el diagnóstico de una ejecución: nunca sesiones, filas ni perfiles de conexión. */
+export interface AiExecutionError {
+  readonly executionId: string;
+  readonly occurredAtUtc: string;
+  readonly sql: string;
+  readonly message: string;
+  readonly code?: string;
+  readonly line?: number;
+  readonly position?: number;
+}
+
+export interface AiErrorAttachment {
+  readonly source: AiSource;
+  readonly error: AiExecutionError;
+}
 
 /** Un turno de la conversación. */
 export interface AiMessage {
   readonly role: AiRole;
   readonly text: string;
+  readonly context?: AiContextSnapshot;
 }
 
 /** Lo que se le pide al asistente en una vuelta. */
 export interface AiChatRequest {
   readonly providerId: string;
+  readonly model: string;
+  readonly disclosure: AiDisclosure;
+  readonly shareBusinessNotes?: boolean;
   readonly messages: readonly AiMessage[];
   /**
-   * Estructura de las tablas en juego, ya compuesta.
+   * SQL y estructura elegidos para la pregunta actual, separados por categoría.
    *
    * Va aparte de los mensajes para que el backend pueda **negarse a enviarla**
    * cuando el proveedor no tiene permiso para verla: la decisión de qué sale de
    * este equipo no puede depender de que la pantalla se acuerde.
    */
-  readonly context?: string;
+  readonly context?: AiContextSnapshot;
+  readonly previewHash?: string;
+}
+
+export interface AiChatLimits {
+  readonly maxSqlBytes: number;
+  readonly maxSchemaBytes: number;
+  readonly maxNotesBytes: number;
+  readonly maxErrorBytes: number;
+  readonly maxRowsBytes: number;
+  readonly maxPlanBytes: number;
+  readonly maxContextBytes: number;
+  readonly maxHistoryBytes: number;
+  readonly maxInputBytes: number;
+  readonly maxQuestionBytes: number;
+  readonly maxHistoryTurns: number;
+  readonly windowTokens: number;
+  readonly questionReserveTokens: number;
+  readonly responseReserveTokens: number;
+  readonly capacityKnown: boolean;
+}
+
+export interface AiChatUsage {
+  readonly sqlBytes: number;
+  readonly schemaBytes: number;
+  readonly notesBytes: number;
+  readonly errorBytes: number;
+  readonly rowsBytes: number;
+  readonly planBytes: number;
+  readonly contextBytes: number;
+  readonly historyBytes: number;
+  readonly inputBytes: number;
+  readonly questionBytes: number;
+  readonly historyTurns: number;
+  readonly estimatedTokens: number;
+  readonly questionReserveTokens: number;
+  readonly responseReserveTokens: number;
+}
+
+export interface AiChatPreview {
+  readonly hash: string;
+  readonly context: string;
+  readonly messages: readonly AiMessage[];
+  readonly limits: AiChatLimits;
+  readonly usage: AiChatUsage;
+  readonly issues: readonly {
+    readonly code: string;
+    readonly used: number;
+    readonly max: number;
+  }[];
+  readonly valid: boolean;
 }
 
 /**
@@ -161,5 +290,38 @@ export interface AiChatRequest {
  */
 export type AiStreamEvent =
   | { readonly kind: 'chunk'; readonly text: string }
+  | {
+      readonly kind: 'context';
+      readonly text: string;
+      readonly providerId: string;
+      readonly model: string;
+      readonly disclosure: AiDisclosure;
+      readonly hash?: string;
+      readonly usage?: AiChatUsage;
+    }
   | { readonly kind: 'done' }
-  | { readonly kind: 'error'; readonly message: string };
+  | {
+      readonly kind: 'error';
+      readonly message: string;
+      readonly code?: string;
+      readonly detail?: string;
+    };
+
+export interface AiNoteReference {
+  readonly objectId: string;
+  readonly schema: string;
+  readonly table: string;
+  readonly kind: 'table' | 'view';
+  readonly column?: string | null;
+}
+
+export interface AiBusinessNote {
+  readonly id: string;
+  readonly connectionId: string;
+  readonly database: string;
+  readonly text: string;
+  readonly enabled: boolean;
+  readonly reference: AiNoteReference | null;
+  readonly updatedAtUtc: string;
+  readonly formatVersion: number;
+}

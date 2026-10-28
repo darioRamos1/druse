@@ -18,7 +18,8 @@ public readonly record struct CliSessionState(
     bool? LoggedIn,
     string? Account,
     string? Plan,
-    string Detail);
+    string Detail,
+    string? Version = null);
 
 /// <summary>
 /// Qué pasó al intentar abrir la consola del inicio de sesión.

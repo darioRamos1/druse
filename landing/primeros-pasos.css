@@ -1,0 +1,7 @@
+.legal-content a { color: var(--accent); text-decoration: underline; text-underline-offset: 3px; }
+.legal-content pre { padding: 18px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); overflow-x: auto; }
+.legal-content pre code { font-family: var(--mono); color: var(--text); white-space: pre; overflow-wrap: normal; }
+.legal-content ol { padding-left: 24px; }
+.legal-content figure { margin: 28px 0; }
+.legal-content figure img { width: 100%; height: auto; border: 1px solid var(--line); border-radius: 12px; }
+.legal-content figcaption { margin-top: 10px; color: var(--muted); font-size: 0.8rem; }

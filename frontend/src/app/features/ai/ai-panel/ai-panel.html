@@ -9,6 +9,17 @@
 
   <span class="head__spacer"></span>
 
+  <button
+    type="button"
+    class="notes-toggle"
+    (click)="review.set(null); notesOpen.set(!notesOpen())"
+    [attr.aria-label]="'ai.notes.title' | t"
+    [attr.aria-expanded]="notesOpen()"
+    aria-controls="chat-notes"
+  >
+    {{ 'ai.notes.open' | t }}
+  </button>
+
   @if (active(); as provider) {
     <div class="picker">
       <button
@@ -65,149 +76,378 @@
   </button>
 </div>
 
-<div class="body">
-  @if (!configured()) {
-    <!--
+@if (configured()) {
+  <div class="conversation-scope">
+    <strong>{{ context().source?.connectionName || ('ai.noConnection' | t) }}</strong>
+    <span>{{ context().database || ('ai.noDatabase' | t) }}</span>
+    <small>{{ 'ai.conversationScope' | t }}</small>
+  </div>
+}
+
+@if (notesOpen()) {
+  <app-ai-notes
+    id="chat-notes"
+    [source]="noteSource()"
+    [saved]="!!context().connectionSaved"
+    [includeTables]="includeSchema()"
+    [connectionIds]="context().knownConnectionIds ?? []"
+  />
+} @else if (review(); as pending) {
+  <app-ai-preview
+    [request]="pending.request"
+    [preview]="pending.preview"
+    [historyLimit]="historyLimit()"
+    [omitted]="omittedQuestions()"
+    [disabled]="preparing() || busy()"
+    (confirmed)="confirmReview()"
+    (back)="backToEditing()"
+    (historyChanged)="changeHistory($event)"
+    (restarted)="clear(); review.set(null)"
+  />
+} @else if (configured() && planAttachment(); as attachment) {
+  <app-ai-execution-plan
+    [attachment]="attachment"
+    [allowed]="contextAllowed()"
+    (changed)="editPlan($event)"
+    (removed)="removePlan()"
+  />
+} @else if (configured() && rowsRequest(); as request) {
+  <app-ai-rows
+    [request]="request"
+    [allowed]="rowsAllowed()"
+    [initialSelection]="rowsSelection()"
+    (selectionChanged)="rowsSelection.set($event)"
+    (changed)="changeRows($event)"
+    (removed)="removeRows()"
+  />
+} @else {
+  <div class="body">
+    @if (!configured()) {
+      <!--
       Sin proveedores no hay asistente. Se dice y se ofrece el paso siguiente, en
       lugar de enseñar un cuadro de texto que fallaría al pulsar enviar.
     -->
-    <div class="empty">
-      <div class="empty__mark"><app-icon name="sparkles" [size]="19" /></div>
-      <div class="empty__title">{{ 'ai.chooseWho' | t }}</div>
-      <p class="empty__text">{{ 'ai.chooseWhoText' | t }}</p>
-      <button type="button" class="btn btn--primary" (click)="configure.emit()">
-        {{ 'ai.configureOne' | t }}
-      </button>
-    </div>
-  } @else if (turns().length === 0) {
-    <div class="empty">
-      <div class="empty__mark"><app-icon name="sparkles" [size]="19" /></div>
-      <div class="empty__title">
-        @if (context().database) {
-          @for (part of askParts(context().database); track $index) {
-            @if (part.tag === 'database') {
-              <code>{{ part.text }}</code>
-            } @else {
-              {{ part.text }}
-            }
-          }
-        } @else {
-          {{ 'ai.askAboutSql' | t }}
-        }
+      <div class="empty">
+        <div class="empty__mark"><app-icon name="sparkles" [size]="19" /></div>
+        <div class="empty__title">{{ 'ai.chooseWho' | t }}</div>
+        <p class="empty__text">{{ 'ai.chooseWhoText' | t }}</p>
+        <button type="button" class="btn btn--primary" (click)="configure.emit()">
+          {{ 'ai.configureOne' | t }}
+        </button>
       </div>
-      <p class="empty__text">{{ 'ai.runsNothing' | t: { promise: promise() } }}</p>
+    } @else if (turns().length === 0) {
+      <div class="empty">
+        <div class="empty__mark"><app-icon name="sparkles" [size]="19" /></div>
+        <div class="empty__title">
+          @if (context().database) {
+            @for (part of askParts(context().database); track $index) {
+              @if (part.tag === 'database') {
+                <code>{{ part.text }}</code>
+              } @else {
+                {{ part.text }}
+              }
+            }
+          } @else {
+            {{ 'ai.askAboutSql' | t }}
+          }
+        </div>
+        <p class="empty__text">{{ 'ai.runsNothing' | t: { promise: promise() } }}</p>
 
-      <!--
+        <!--
         Las sugerencias no son genéricas: cada una usa algo que Druse ya tiene
         delante —el editor, el esquema, el motor—, que es lo que un chat en el
         navegador no puede hacer.
       -->
-      <div class="starters">
-        <button type="button" class="starter" (click)="ask('ai.starter.explain')">
-          <app-icon name="format" [size]="14" />
-          <span class="starter__text">
-            <span class="starter__title">{{ 'ai.starter.explainTitle' | t }}</span>
-            <span class="starter__hint">{{ 'ai.starter.explainHint' | t }}</span>
-          </span>
-        </button>
-        <button type="button" class="starter" (click)="suggest('ai.starter.write')">
-          <app-icon name="plus" [size]="14" />
-          <span class="starter__text">
-            <span class="starter__title">{{ 'ai.starter.writeTitle' | t }}</span>
-            <span class="starter__hint">{{ 'ai.starter.writeHint' | t }}</span>
-          </span>
-        </button>
-        <button type="button" class="starter" (click)="ask('ai.starter.slow')">
-          <app-icon name="play-outline" [size]="14" />
-          <span class="starter__text">
-            <span class="starter__title">{{ 'ai.starter.slowTitle' | t }}</span>
-            <span class="starter__hint">{{ 'ai.starter.slowHint' | t }}</span>
-          </span>
-        </button>
-      </div>
-    </div>
-  } @else {
-    @if (sharedSql() || sharedTables().length > 0) {
-      <!--
-        Lo primero que se lee, antes que la conversación: qué salió de este
-        equipo. Es la línea que convierte una promesa en algo comprobable.
-      -->
-      <div class="disclosure">
-        <app-icon name="eye" [size]="13" />
-        <div class="disclosure__text">
-          <span class="disclosure__what">
-            {{ 'ai.sentContext' | t }}
-            @if (sharedSql()) {
-              <code>{{ 'ai.sentSql' | t }}</code
-              >{{ sharedTables().length > 0 ? ('ai.sentAnd' | t) : '' }}
-            }
-            @if (sharedTables().length > 0) {
-              {{ 'ai.sentStructure' | t }}
-              @for (table of sharedTables(); track table; let last = $last) {
-                <code>{{ table }}</code
-                >{{ last ? '' : ', ' }}
-              }
-            }
-          </span>
-          <span class="disclosure__note">{{ promise() }}</span>
+        <div class="starters">
+          <button type="button" class="starter" (click)="ask('ai.starter.explain')">
+            <app-icon name="format" [size]="14" />
+            <span class="starter__text">
+              <span class="starter__title">{{ 'ai.starter.explainTitle' | t }}</span>
+              <span class="starter__hint">{{ 'ai.starter.explainHint' | t }}</span>
+            </span>
+          </button>
+          <button type="button" class="starter" (click)="suggest('ai.starter.write')">
+            <app-icon name="plus" [size]="14" />
+            <span class="starter__text">
+              <span class="starter__title">{{ 'ai.starter.writeTitle' | t }}</span>
+              <span class="starter__hint">{{ 'ai.starter.writeHint' | t }}</span>
+            </span>
+          </button>
+          <button type="button" class="starter" (click)="ask('ai.starter.slow')">
+            <app-icon name="play-outline" [size]="14" />
+            <span class="starter__text">
+              <span class="starter__title">{{ 'ai.starter.slowTitle' | t }}</span>
+              <span class="starter__hint">{{ 'ai.starter.slowHint' | t }}</span>
+            </span>
+          </button>
         </div>
       </div>
-    }
-
-    @for (turn of turns(); track $index) {
-      @if (turn.role === 'user') {
-        <div class="turn turn--user">{{ turn.text }}</div>
-      } @else {
-        <div class="turn turn--assistant">
-          @for (part of turn.parts; track $index) {
-            @if (part.kind === 'text') {
-              <p class="prose">{{ part.text }}</p>
-            } @else {
-              <div class="sql">
-                <div class="sql__head">
-                  <span class="sql__label" translate="no">SQL</span>
-                  <span class="head__spacer"></span>
-                  <span class="sql__lines">
-                    {{ 'ai.lines' | t: { count: part.text.split('\n').length } }}
-                  </span>
-                </div>
-                <pre class="sql__code">{{ part.text }}</pre>
-                <div class="sql__foot">
-                  <button
-                    type="button"
-                    class="btn btn--primary btn--sm"
-                    (click)="
-                      part.action === 'replace' ? replace.emit(part.text) : insert.emit(part.text)
-                    "
-                  >
-                    <app-icon name="plus" [size]="11" />
-                    {{ (part.action === 'replace' ? 'ai.replaceQuery' : 'ai.insertInEditor') | t }}
-                  </button>
-                  <button type="button" class="btn btn--sm" (click)="copy(part.text)">
-                    {{ 'ai.copy' | t }}
-                  </button>
-                  <span class="head__spacer"></span>
-                  <span class="sql__warning">{{ 'ai.notRun' | t }}</span>
-                </div>
+    } @else {
+      @for (turn of turns(); track $index) {
+        @if (turn.role === 'user') {
+          <div class="turn turn--user">
+            <div>{{ turn.text }}</div>
+            @if (turn.request; as request) {
+              <div class="turn__origin">
+                {{ request.provider.name }} · {{ request.provider.model }} ·
+                {{ formatTimestamp(request.createdAt) }}
               </div>
+              <details class="context-detail detail">
+                <summary>
+                  {{
+                    (request.sentContext === undefined
+                      ? 'ai.preparedContext'
+                      : 'ai.recordedContext'
+                    ) | t
+                  }}
+                </summary>
+                <pre>{{
+                  request.sentContext === undefined
+                    ? preparedContext(request)
+                    : request.sentContext || ('ai.noAttachedContext' | t)
+                }}</pre>
+                @if (request.omittedTurnIndices.length) {
+                  <p>
+                    {{ 'ai.preview.omitted' | t }}
+                    @for (index of request.omittedTurnIndices; track index) {
+                      #{{ index / 2 + 1 }}
+                    }
+                  </p>
+                }
+              </details>
+              @if (request.preview; as prepared) {
+                <details class="request-history detail">
+                  <summary>{{ 'ai.preview.historyText' | t }}</summary>
+                  <p>{{ 'ai.preview.historyCount' | t: { count: prepared.usage.historyTurns } }}</p>
+                  @for (message of prepared.messages.slice(1, -1); track $index) {
+                    <strong>{{
+                      (message.role === 'user' ? 'ai.preview.question' : 'ai.preview.answer') | t
+                    }}</strong>
+                    <pre>{{ message.text }}</pre>
+                  } @empty {
+                    <p>{{ 'ai.preview.noHistory' | t }}</p>
+                  }
+                  <p>
+                    {{
+                      'ai.preview.estimate'
+                        | t
+                          : {
+                              used: (request.sentUsage ?? prepared.usage).estimatedTokens,
+                              max: prepared.limits.windowTokens,
+                            }
+                    }}
+                  </p>
+                </details>
+              }
             }
-          }
+          </div>
+        } @else {
+          <div class="turn turn--assistant">
+            @for (part of turn.parts; track $index) {
+              @if (part.kind === 'text') {
+                <p class="prose">{{ part.text }}</p>
+              } @else {
+                <div class="sql">
+                  <div class="sql__head">
+                    <span class="sql__label" translate="no">{{
+                      part.kind === 'sql' ? 'SQL' : part.language || ('ai.code' | t)
+                    }}</span>
+                    <span class="head__spacer"></span>
+                    <span class="sql__lines">
+                      {{ 'ai.lines' | t: { count: part.text.split('\n').length } }}
+                    </span>
+                  </div>
+                  <pre
+                    [class.sql__code]="part.kind === 'sql'"
+                    [class.code__code]="part.kind === 'code'"
+                    >{{ part.text }}</pre>
+                  <div class="sql__foot">
+                    @if (part.kind === 'sql') {
+                      <button
+                        type="button"
+                        class="btn btn--primary btn--sm"
+                        (click)="
+                          part.action === 'replace'
+                            ? replace.emit(part.text)
+                            : insert.emit(part.text)
+                        "
+                      >
+                        <app-icon name="plus" [size]="11" />
+                        {{
+                          (part.action === 'replace' ? 'ai.replaceQuery' : 'ai.insertInEditor') | t
+                        }}
+                      </button>
+                    }
+                    <button type="button" class="btn btn--sm" (click)="copy(part.text)">
+                      {{ 'ai.copy' | t }}
+                    </button>
+                    <span class="head__spacer"></span>
+                    @if (part.kind === 'sql') {
+                      <span class="sql__warning">{{ 'ai.notRun' | t }}</span>
+                    }
+                  </div>
+                </div>
+              }
+            }
 
-          @if (turn.streaming && turn.text.length === 0) {
-            <div class="thinking"><span></span><span></span><span></span></div>
-          }
+            @if (turn.streaming && turn.text.length === 0) {
+              <div class="thinking"><span></span><span></span><span></span></div>
+            }
 
-          @if (turn.error) {
-            <div class="failure">{{ turn.error }}</div>
+            @if (turn.error) {
+              <div class="failure">{{ turn.error }}</div>
+              @if ($last) {
+                <button type="button" class="btn btn--sm" (click)="retry()" [disabled]="busy()">
+                  {{ 'ai.retryQuestion' | t }}
+                </button>
+              }
+              @if (turn.errorDetail) {
+                <details class="failure-detail detail">
+                  <summary>{{ 'ai.failure.detail' | t }}</summary>
+                  <pre>{{ turn.errorDetail }}</pre>
+                  <button type="button" class="btn btn--sm" (click)="copy(turn.errorDetail)">
+                    {{ 'ai.failure.copy' | t }}
+                  </button>
+                </details>
+              }
+            }
+          </div>
+        }
+      }
+    }
+  </div>
+}
+
+@if (configured() && !notesOpen() && !review()) {
+  <div class="composer">
+    @if (errorAttachment(); as attachment) {
+      <app-ai-execution-error
+        [attachment]="attachment"
+        [allowed]="contextAllowed()"
+        (changed)="editError($event)"
+        (removed)="removeError()"
+      />
+    }
+    @if (preparationError()) {
+      <p class="failure" role="alert">{{ preparationError() }}</p>
+    }
+    @if (contextAllowed() && context().sessionId) {
+      <div class="context-selection">
+        <button
+          type="button"
+          class="chip"
+          (click)="openContextPicker(true)"
+          [attr.aria-expanded]="selectorOpen()"
+          aria-controls="chat-catalog"
+        >
+          <app-icon name="plus" [size]="11" /> {{ 'ai.catalog.add' | t }}
+        </button>
+        @for (item of catalog.selected(); track tableKey(item.table)) {
+          <button
+            type="button"
+            class="chip is-on"
+            (click)="catalog.remove(item.table)"
+            [class.has-error]="!!item.error"
+            [attr.aria-label]="'ai.catalog.remove' | t: { table: tableName(item.table) }"
+          >
+            {{ tableName(item.table) }} {{ item.loading ? '…' : '×' }}
+          </button>
+        }
+      </div>
+      @if (selectorOpen()) {
+        <section
+          id="chat-catalog"
+          class="catalog-picker"
+          [attr.aria-label]="'ai.catalog.title' | t"
+          (keydown.escape)="closeContextPicker(); $event.stopPropagation()"
+        >
+          <div class="catalog-picker__head">
+            <strong>{{ 'ai.catalog.title' | t }}</strong>
+            <button
+              type="button"
+              class="head__action"
+              (click)="closeContextPicker()"
+              [attr.aria-label]="'ai.catalog.close' | t"
+            >
+              ×
+            </button>
+          </div>
+          <input
+            type="search"
+            class="catalog-search"
+            [value]="catalogQuery()"
+            (input)="catalogQuery.set($any($event.target).value)"
+            [placeholder]="'ai.catalog.search' | t"
+            [attr.aria-label]="'ai.catalog.search' | t"
+          />
+          @if (catalog.catalogLoading()) {
+            <p role="status">{{ 'ai.catalog.loading' | t }}</p>
           }
+          @if (catalog.catalogError()) {
+            <p class="failure" role="alert">{{ catalog.catalogError() }}</p>
+          }
+          <div class="catalog-picker__list">
+            @for (table of matches(); track tableKey(table)) {
+              <label class="catalog-option">
+                <input
+                  type="checkbox"
+                  [checked]="catalog.isSelected(table)"
+                  (change)="selectTable(table)"
+                />
+                <code>{{ tableName(table) }}</code>
+                <small>{{
+                  (table.kind === 'view' ? 'ai.catalog.view' : 'ai.catalog.table') | t
+                }}</small>
+              </label>
+            } @empty {
+              @if (!catalog.catalogLoading()) {
+                <p>{{ 'ai.catalog.empty' | t }}</p>
+              }
+            }
+          </div>
+          @if (catalog.suggestions().length) {
+            <p>{{ 'ai.catalog.related' | t }}</p>
+            <div class="context-selection">
+              @for (table of catalog.suggestions(); track tableKey(table)) {
+                <button type="button" class="chip" (click)="selectTable(table)">
+                  {{ tableName(table) }} +
+                </button>
+              }
+            </div>
+          }
+          <button
+            type="button"
+            class="btn btn--sm"
+            (click)="catalog.loadCatalog(true); catalog.refreshSelected()"
+            [disabled]="catalog.catalogLoading() || catalog.loading()"
+          >
+            {{ 'ai.catalog.reload' | t }}
+          </button>
+        </section>
+      }
+      @if (catalog.loading() || preparing()) {
+        <p class="catalog-status" role="status">{{ 'ai.catalog.reading' | t }}</p>
+      }
+      @if (catalog.failures().length) {
+        <div class="catalog-problems" role="alert">
+          @for (item of catalog.failures(); track tableKey(item.table)) {
+            <p>
+              <strong>{{ tableName(item.table) }}</strong
+              >: {{ item.error }}
+            </p>
+          }
+          <label
+            ><input
+              type="checkbox"
+              [checked]="catalog.allowPartial()"
+              (change)="catalog.allowPartial.set($any($event.target).checked)"
+            />
+            {{ 'ai.catalog.partial' | t }}</label
+          >
         </div>
       }
     }
-  }
-</div>
 
-@if (configured()) {
-  <div class="composer">
     <div class="composer__box">
       <textarea
         class="composer__input"
@@ -220,7 +460,13 @@
       ></textarea>
 
       <div class="composer__tools">
-        @if (contextAllowed() && context().sql.trim().length > 0) {
+        @if (
+          contextAllowed() &&
+          !errorAttachment() &&
+          !rowsRequest() &&
+          !planAttachment() &&
+          context().sql.trim().length > 0
+        ) {
           <button
             type="button"
             class="chip"
@@ -233,7 +479,7 @@
           </button>
         }
 
-        @if (contextAllowed() && context().tables.length > 0) {
+        @if (contextAllowed() && catalog.selected().length > 0) {
           <button
             type="button"
             class="chip"
@@ -242,13 +488,13 @@
             [title]="(includeSchema() ? 'ai.schemaOff' : 'ai.schemaOn') | t"
           >
             <app-icon name="table" [size]="10" />
-            {{ 'ai.tables' | t: { count: context().tables.length } }}
+            {{ 'ai.tables' | t: { count: catalog.selected().length } }}
           </button>
         }
 
         <span class="head__spacer"></span>
 
-        @if (busy()) {
+        @if (busy() || preparing()) {
           <button
             type="button"
             class="composer__send composer__send--stop"
@@ -261,7 +507,12 @@
           <button
             type="button"
             class="composer__send"
-            [disabled]="draft().trim().length === 0"
+            [disabled]="
+              draft().trim().length === 0 ||
+              (!!errorAttachment() && !contextAllowed()) ||
+              rowsBlocked() ||
+              planBlocked()
+            "
             (click)="send()"
             [attr.aria-label]="'ai.send' | t"
           >

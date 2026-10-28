@@ -310,9 +310,22 @@ internal static class StorageEndpoints
             IQueryHistoryStore history,
             CancellationToken cancellationToken,
             int? limit,
-            string? search) =>
+            string? search,
+            string? connection,
+            string? database,
+            DateTimeOffset? from,
+            DateTimeOffset? until,
+            bool? succeeded,
+            DateTimeOffset? before,
+            Guid? beforeId) =>
         {
-            var entries = await history.GetRecentAsync(limit ?? 100, search, cancellationToken);
+            if (before.HasValue != beforeId.HasValue || (from.HasValue && until.HasValue && from >= until))
+            {
+                return Results.BadRequest(new { message = "El cursor o el intervalo del historial no es válido." });
+            }
+            var entries = await history.GetRecentAsync(limit ?? 100, search, cancellationToken,
+                new QueryHistoryFilter { Connection = connection, Database = database, From = from,
+                    Until = until, Succeeded = succeeded, Before = before, BeforeId = beforeId });
 
             return Results.Ok(entries.Select(entry => entry.ToDto()));
         })

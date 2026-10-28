@@ -22,6 +22,7 @@
   [attr.aria-rowcount]="announcedRowCount()"
   [attr.aria-colcount]="resultSet().columns.length + 1"
   [attr.aria-readonly]="!editable()"
+  [attr.aria-describedby]="helpId"
   [class.is-compact]="compact()"
   [class.is-resizing]="isResizing()"
 >
@@ -30,6 +31,7 @@
       <button
         type="button"
         class="copy-all"
+        tabindex="-1"
         [title]="'grid.copyHeaders' | t"
         (click)="copyHeaders()"
       >
@@ -44,7 +46,11 @@
       <div
         class="cell cell--head"
         role="columnheader"
-        tabindex="0"
+        [attr.tabindex]="cellTabIndex(-1, i)"
+        data-nav-row="-1"
+        [attr.data-nav-column]="i"
+        (focus)="activateCell(-1, i)"
+        (keydown)="onCellKeydown($event, -1, i)"
         [attr.aria-colindex]="i + 2"
         [attr.aria-sort]="column.sorted ? 'descending' : 'none'"
         [class.is-selected]="isColumnSelected(i)"
@@ -53,7 +59,8 @@
           column.name +
           ' · ' +
           column.dataType +
-          ' — Seleccionar la columna (Control para añadir, Mayúsculas para un tramo)'
+          ' — ' +
+          ('grid.columnHelp' | t: { modifier: shortcut('Ctrl') })
         "
         (click)="selectColumn(i, $event)"
         (keydown.enter)="selectColumn(i, $event)"
@@ -74,7 +81,8 @@
         <span
           class="cell__resize"
           role="separator"
-          tabindex="0"
+          tabindex="-1"
+          (keydown.escape)="leaveControl($event)"
           aria-orientation="vertical"
           [attr.aria-label]="'grid.resize' | t: { name: column.name }"
           [attr.aria-valuenow]="widthOf(i)"
@@ -109,6 +117,7 @@
             [placeholder]="'grid.filterPlaceholder' | t"
             [value]="filters()[i] ?? ''"
             (input)="onFilter(i, $event)"
+            (keydown.escape)="leaveControl($event)"
             [attr.aria-label]="'grid.filter' | t: { name: column.name }"
           />
         </div>
@@ -120,6 +129,7 @@
     <div
       class="row"
       role="row"
+      [class.is-striped]="r % 2 === 1"
       [attr.aria-rowindex]="headerRows() + r + 1"
       [style.grid-template-columns]="gridTemplate()"
     >
@@ -143,9 +153,10 @@
         @if (editable()) {
           <input
             type="checkbox"
+            tabindex="-1"
             class="cell--number__check"
             [checked]="isRowSelected(row.number)"
-            [attr.aria-label]="'Señalar la fila ' + row.number + ' para borrar'"
+            [attr.aria-label]="'grid.markRow' | t: { row: row.number }"
             (click)="$event.stopPropagation()"
             (mousedown)="$event.stopPropagation()"
             (change)="rowToggled.emit(row.number)"
@@ -157,7 +168,11 @@
         <div
           class="cell cell--value"
           role="gridcell"
-          tabindex="0"
+          [attr.tabindex]="cellTabIndex(r, i)"
+          [attr.data-nav-row]="r"
+          [attr.data-nav-column]="i"
+          (focus)="activateCell(r, i)"
+          (keydown)="onCellKeydown($event, r, i)"
           [attr.aria-colindex]="i + 2"
           [attr.aria-selected]="isSelected(r, i)"
           [attr.data-kind]="column.kind"
@@ -169,25 +184,56 @@
           (mouseenter)="extendCellSelection(r, i, $event)"
           (contextmenu)="openMenu($event, r, i)"
           (dblclick)="editable() ? startEditing(row.number, i) : copyCell(row, i)"
-          (keydown.control.c)="copyShortcut(row, i)"
-          (keydown.meta.c)="copyShortcut(row, i)"
-          (keydown.enter)="startEditing(row.number, i)"
         >
           @if (isEditing(row.number, i)) {
             <!--
               El editor sale con el valor actual ya seleccionado: escribir encima
               es lo que se espera al entrar en una celda.
             -->
-            <input
-              class="cell__editor"
-              [type]="editorType(column, shownValue(row, i))"
-              [value]="shownValue(row, i) ?? 'NULL'"
-              autofocus
+            @if (editorType(column, shownValue(row, i)) === 'text') {
+              <textarea
+                rows="1"
+                wrap="off"
+                class="cell__editor"
+                [value]="shownValue(row, i) ?? ''"
+                [placeholder]="shownValue(row, i) === null ? 'NULL' : ''"
+                autofocus
+                (input)="markEdited()"
+                (keydown)="$event.stopPropagation()"
+                (blur)="commitEdit(row, i, $event)"
+                (keydown.enter)="commitOnEnter(row, i, $event)"
+                (keydown.escape)="cancelEdit($event)"
+                [attr.aria-label]="'grid.edit' | t: { name: column.name }"
+              ></textarea>
+            } @else {
+              <input
+                class="cell__editor"
+                [type]="editorType(column, shownValue(row, i))"
+                [value]="shownValue(row, i) ?? ''"
+                autofocus
+                step="any"
+                (input)="markEdited()"
+                (keydown)="$event.stopPropagation()"
+                (blur)="commitEdit(row, i, $event)"
+                (keydown.enter)="commitOnEnter(row, i, $event)"
+                (keydown.escape)="cancelEdit($event)"
+                [attr.aria-label]="'grid.edit' | t: { name: column.name }"
+              />
+            }
+            <button
+              type="button"
+              class="cell__null"
+              translate="no"
+              [title]="'grid.setNull' | t: { name: column.name }"
+              [attr.aria-label]="'grid.setNull' | t: { name: column.name }"
+              (mousedown)="$event.preventDefault(); $event.stopPropagation()"
+              (keydown)="$event.stopPropagation()"
+              (keydown.escape)="cancelEdit($event)"
               (blur)="commitEdit(row, i, $event)"
-              (keydown.enter)="commitEdit(row, i, $event)"
-              (keydown.escape)="cancelEdit()"
-              [attr.aria-label]="'grid.edit' | t: { name: column.name }"
-            />
+              (click)="setNull(row, i, $event)"
+            >
+              NULL
+            </button>
           } @else if (shownValue(row, i) === null) {
             <span class="null" translate="no">NULL</span>
           } @else if (column.kind === 'boolean') {
@@ -228,6 +274,35 @@
     </div>
   }
 </div>
+
+<div
+  class="keyboard-help"
+  [attr.title]="
+    'grid.keyboardDetail'
+      | t
+        : {
+            copy: shortcut('Ctrl+C'),
+            column: shortcut('Ctrl+Space'),
+            end: shortcut('Ctrl+End'),
+            headers: shortcut('Ctrl+Shift+C'),
+          }
+  "
+>
+  {{ 'grid.keyboardHelp' | t }}
+</div>
+<span class="sr-only" [id]="helpId">{{
+  'grid.keyboardDetail'
+    | t
+      : {
+          copy: shortcut('Ctrl+C'),
+          column: shortcut('Ctrl+Space'),
+          end: shortcut('Ctrl+End'),
+          headers: shortcut('Ctrl+Shift+C'),
+        }
+}}</span>
+<span class="sr-only" role="status" aria-live="polite" aria-atomic="true">{{
+  selectionLabel()
+}}</span>
 
 <!--
   El menú de copia vive fuera del contenedor con desplazamiento y en coordenadas

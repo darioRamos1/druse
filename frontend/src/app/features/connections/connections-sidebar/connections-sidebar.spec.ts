@@ -303,6 +303,20 @@ describe('ConnectionsSidebar', () => {
     expect(pedidos[0].source.name).toBe('orders');
   });
 
+  it('añadir al chat entrega la tabla con su conexión y esquema sin abrirla', () => {
+    fixture.componentRef.setInput('explorerNodes', [table]);
+    fixture.detectChanges();
+    const requests: ExplorerNode[] = [];
+    fixture.componentInstance.addToChat.subscribe((node) => requests.push(node));
+    (fixture.nativeElement.querySelector('.node__menu-trigger') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    const action = [...fixture.nativeElement.querySelectorAll('.node-menu button')].find(
+      (button: Element) => button.textContent?.includes('Añadir al chat'),
+    ) as HTMLButtonElement;
+    action.click();
+    expect(requests).toEqual([table]);
+  });
+
   /**
    * El diagrama de la base entera. Antes solo se ofrecía sobre un esquema, y en
    * SQL Server o Informix —donde una base tiene varios— no había forma de pedir

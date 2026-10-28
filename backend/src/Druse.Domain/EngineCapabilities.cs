@@ -103,6 +103,9 @@ public sealed record EngineCapabilities
     /// </summary>
     public bool SupportsTransportEncryption { get; init; } = true;
 
+    /// <summary>Formato de plan que el chat reconoce en resultados obtenidos expresamente por la persona.</summary>
+    public string? AiPlanFormat { get; init; }
+
     // --- Lo que promete una sesión ------------------------------------------
 
     /// <summary>

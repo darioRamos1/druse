@@ -66,6 +66,7 @@
         <nav id="navigation" aria-label="Navegación principal">
           <a href="#herramientas">Herramientas</a>
           <a href="#motores">Compatibilidad</a>
+          <a href="./primeros-pasos.html">Primera prueba</a>
           <a href="#preguntas">Preguntas</a>
           <a class="button button-small" href="#descargar"
             >Obtener Druse <span aria-hidden="true">↗</span></a
@@ -285,6 +286,8 @@
           <li>Oracle</li>
           <li>Informix</li>
         </ul>
+        <p>La edición Comunidad incluye PostgreSQL, MySQL/MariaDB,
+          SQL Server y SQLite. Oracle e Informix pertenecen a la edición completa.</p>
       </section>
 
       <section
@@ -390,26 +393,26 @@
         <ol class="steps">
           <li>
             <span class="step-number">01</span>
-            <h3>Conecta tu base</h3>
+            <h3>Empieza con SQLite</h3>
             <p>
-              Elige el motor y guarda tu perfil para tener tus conexiones a
-              mano.
+              Crea una base de ejemplo sin servidor y ejecuta tu primera consulta
+              con la guía de diez minutos.
             </p>
           </li>
           <li>
             <span class="step-number">02</span>
-            <h3>Encuentra la respuesta</h3>
+            <h3>Explora PostgreSQL</h3>
             <p>
-              Explora el esquema, escribe SQL y consulta los resultados en el
-              mismo espacio.
+              Conecta tu servidor de pruebas, recorre tablas y columnas, y abre
+              una consulta desde el explorador.
             </p>
           </li>
           <li>
             <span class="step-number">03</span>
-            <h3>Llévala más lejos</h3>
+            <h3>Exporta el resultado</h3>
             <p>
-              Edita, exporta o vuelve a una consulta desde el historial. Sigue
-              donde lo dejaste.
+              Guarda la consulta como CSV o Excel y comprueba los datos fuera
+              de Druse. El ejemplo usa tres ventas ficticias.
             </p>
           </li>
         </ol>
@@ -420,29 +423,51 @@
         id="descargar"
         aria-labelledby="download-title"
       >
-        <div class="download-copy">
-          <p class="eyebrow">UN ESPACIO PARA TUS DATOS</p>
-          <h2 id="download-title">
-            Tu próxima consulta<br />empieza con Druse.
-          </h2>
-          <p>
-            Una aplicación de escritorio con todo lo necesario para empezar. Sin
-            instalar .NET ni Node.js.
-          </p>
-          <a class="button button-primary" id="download-link" hidden
-            ><svg aria-hidden="true" viewBox="0 0 24 24">
-              <path d="M12 3v12m-5-5 5 5 5-5M5 16v5h14v-5" /></svg
-            >Descargar para Windows</a
-          >
-          <p class="availability" id="download-status">
-            La descarga pública estará disponible próximamente.
-          </p>
+        <!-- descargas:inicio -->
+        <div class="download-intro">
+          <div class="download-copy">
+            <p class="eyebrow">ELIGE CÓMO EMPEZAR</p>
+            <h2 id="download-title">Tu próxima consulta<br />empieza con Druse.</h2>
+            <p>Instala Druse o descarga el ZIP para ejecutarlo sin instalación. Sin instalar .NET ni Node.js.</p>
+            <p class="availability" id="download-status">Versión 1.3.0-beta.1 · Windows x64 · Beta de Comunidad.</p>
+          </div>
+          <img class="download-logo" src="./assets/druse.png" alt="" width="100" height="100" />
         </div>
-        <div class="download-mark" aria-hidden="true">
-          <img src="./assets/druse.png" alt="" width="128" height="128" /><span
-            >Tu escritorio. Tus conexiones.<br />Tu forma de trabajar.</span
-          >
+        <div class="download-editions">
+          <article class="download-edition" aria-labelledby="edition-comunidad">
+            <p class="download-edition-label">PARA EMPEZAR</p>
+            <h3 id="edition-comunidad">Comunidad</h3>
+            <p class="download-edition-description">PostgreSQL, SQL Server, MySQL/MariaDB y SQLite. Sin controladores de Oracle ni IBM.</p>
+            <div class="download-edition-actions">
+              <a class="button button-primary" href="https://github.com/darioRamos1/druse/releases/download/v1.3.0-beta.1/Druse-Comunidad-1.3.0-beta.1-win-x64-setup.exe" aria-label="Instalador para Windows de Comunidad">Instalador para Windows</a>
+              <span class="download-unavailable">Portable · ZIP: aún no disponible</span>
+            </div>
+          </article>
+          <article class="download-edition" aria-labelledby="edition-completo">
+            <p class="download-edition-label">OTRAS OPCIONES</p>
+            <h3 id="edition-completo">Completa</h3>
+            <p class="download-edition-description">Todos los motores de Druse, incluidos Oracle e IBM Informix.</p>
+            <div class="download-edition-actions">
+              <span class="download-unavailable">Instalador para Windows: aún no disponible</span>
+              <span class="download-unavailable">Portable · ZIP: aún no disponible</span>
+            </div>
+          </article>
+          <article class="download-edition" aria-labelledby="edition-sin-informix">
+            <p class="download-edition-label">OTRAS OPCIONES</p>
+            <h3 id="edition-sin-informix">Sin Informix</h3>
+            <p class="download-edition-description">Los motores de la edición completa, incluido Oracle, sin el controlador de IBM Informix.</p>
+            <div class="download-edition-actions">
+              <span class="download-unavailable">Instalador para Windows: aún no disponible</span>
+              <span class="download-unavailable">Portable · ZIP: aún no disponible</span>
+            </div>
+          </article>
         </div>
+        <div class="download-details">
+          <p><strong>¿Instalador o portable?</strong> El instalador es la opción recomendada para uso habitual. Para usar el portable, extrae todo el ZIP y abre <code>druse.exe</code>. Las conexiones y preferencias se guardan en tu perfil de Windows; no se trasladan al copiar la carpeta.</p>
+          <p>El portable requiere Microsoft Edge WebView2 instalado. El instalador puede descargarlo si falta. Los paquetes no tienen firma Authenticode; Windows puede mostrar SmartScreen. Esta beta no se actualiza automáticamente. Consulta las limitaciones y comprobaciones de cada versión antes de descargar.</p>
+          <p><a href="https://github.com/darioRamos1/druse/releases/tag/v1.3.0-beta.1">Notas de la versión y comprobaciones</a> · <a href="https://github.com/darioRamos1/druse/releases/download/v1.3.0-beta.1/SHA256SUMS.txt">Hashes SHA-256</a> · <a href="./primeros-pasos.html">Prueba SQLite de diez minutos</a> · <a href="https://github.com/darioRamos1/druse/blob/main/CODE_SIGNING_POLICY.md">Política de firma</a></p>
+        </div>
+        <!-- descargas:fin -->
       </section>
 
       <section
@@ -462,9 +487,9 @@
               >
             </summary>
             <p>
-              Druse admite PostgreSQL, SQL Server, MySQL, MariaDB, SQLite,
-              Oracle e Informix. La disponibilidad de Informix depende de la
-              edición instalada.
+              La edición Comunidad permite conectar PostgreSQL, SQL Server,
+              MySQL/MariaDB y SQLite. Oracle e Informix están disponibles en la
+              edición completa. Elige tu edición en el apartado de descargas.
             </p>
           </details>
           <details>
@@ -473,8 +498,8 @@
             </summary>
             <p>
               Druse es una aplicación de escritorio. Esta página presenta la
-              aplicación; para conectar tus bases de datos necesitas instalarla
-              en tu equipo.
+              aplicación; para conectar tus bases de datos necesitas ejecutarla
+              en tu equipo, con el instalador o el portable.
             </p>
           </details>
           <details>
@@ -486,8 +511,9 @@
             </summary>
             <p>
               El instalador de Windows incluye los componentes de ejecución de
-              Druse. No necesitas instalar .NET ni Node.js. Solo debes tener
-              acceso a la base de datos con la que quieras trabajar.
+              Druse. No necesitas instalar .NET ni Node.js. El instalador puede
+              necesitar descargar Microsoft Edge WebView2 si falta en el equipo.
+              Para la prueba SQLite no necesitas un servidor de bases de datos.
             </p>
           </details>
           <details>
