@@ -616,11 +616,11 @@ jobs:
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/.cargo/bin/cargo-tauri
-          key: cargo-tauri-2-${{ runner.os }}
+          key: cargo-tauri-2.11.4-${{ runner.os }}
 
       - name: Instalar el CLI de Tauri
         if: steps.cli-de-tauri.outputs.cache-hit != 'true'
-        run: cargo install tauri-cli --version "^2" --locked
+        run: cargo install tauri-cli --version 2.11.4 --locked
 
       # La API viaja dentro del paquete, así que se publica en el directorio que
       # `tauri.conf.json` declara como recurso. Es lo mismo que hace el paso 1 de
@@ -652,7 +652,11 @@ jobs:
         working-directory: shells/desktop-tauri
         env:
           APPIMAGE_EXTRACT_AND_RUN: 1
-        run: cargo tauri build --bundles ${{ matrix.bundles }}
+          # El strip incluido en linuxdeploy no admite todas las secciones de
+          # las bibliotecas actuales de Ubuntu; conservar símbolos evita esa
+          # transformación sin excluir archivos ni verificaciones del paquete.
+          NO_STRIP: ${{ matrix.os == 'ubuntu-latest' && '1' || '' }}
+        run: cargo tauri build --verbose --bundles ${{ matrix.bundles }} -- --locked
 
       - name: Recoger los artefactos
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
