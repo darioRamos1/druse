@@ -298,7 +298,11 @@
                       <app-icon name="filter" [size]="12" />
                       {{ 'sidebar.compose' | t }}
                     </button>
-                    <button type="button" role="menuitem" (click)="act($event, () => addToChat.emit(node))">
+                    <button
+                      type="button"
+                      role="menuitem"
+                      (click)="act($event, () => addToChat.emit(node))"
+                    >
                       <app-icon name="sparkles" [size]="12" />
                       {{ 'ai.catalog.addToChat' | t }}
                     </button>

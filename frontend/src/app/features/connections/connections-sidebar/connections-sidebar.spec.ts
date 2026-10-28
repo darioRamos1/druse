@@ -307,7 +307,7 @@ describe('ConnectionsSidebar', () => {
     fixture.componentRef.setInput('explorerNodes', [table]);
     fixture.detectChanges();
     const requests: ExplorerNode[] = [];
-    fixture.componentInstance.addToChat.subscribe(node => requests.push(node));
+    fixture.componentInstance.addToChat.subscribe((node) => requests.push(node));
     (fixture.nativeElement.querySelector('.node__menu-trigger') as HTMLButtonElement).click();
     fixture.detectChanges();
     const action = [...fixture.nativeElement.querySelectorAll('.node-menu button')].find(
