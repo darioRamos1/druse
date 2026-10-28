@@ -411,6 +411,10 @@ jobs:
         shell: pwsh
         run: ./build/tests/publicacion-borrador.ps1
 
+      - name: Versión y avisos de terceros permanecen coherentes
+        shell: pwsh
+        run: ./build/tests/subir-version.ps1
+
       - name: Descargas de la landing sin enlaces a paquetes incompletos
         run: node --test build/tests/descargas-web.cjs
 

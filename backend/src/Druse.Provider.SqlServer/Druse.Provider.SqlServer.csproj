@@ -5,8 +5,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.Data.SqlClient" Version="7.0.2" />
-    <!-- SqlClient todavía resuelve PKCS 9.0.13; 9.0.21 corrige CVE-2026-70162 y CVE-2026-84008. -->
+    <PackageReference Include="Microsoft.Data.SqlClient" Version="7.1.0" />
+    <!-- Se mantiene el parche de PKCS al actualizar SqlClient para evitar resolver una versión vulnerable. -->
     <PackageReference Include="System.Security.Cryptography.Pkcs" Version="9.0.21" />
   </ItemGroup>
 

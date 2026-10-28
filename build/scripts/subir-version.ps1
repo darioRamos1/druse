@@ -50,6 +50,18 @@ if ($Version -notmatch '^\d+\.\d+\.\d+$') {
 
 $a = [regex]::Escape($actual)
 
+# El expediente fija también los archivos de Cargo. Cambiar solo la versión de
+# Druse no cambia sus dependencias; sí cambia esos hashes y debe acompañarlos.
+# Si ya no coincidían antes, no damos por revisado un grafo nuevo por accidente.
+$rustIndexPath = Join-Path $repoRoot 'docs/terceros/comunidad-rust/indice.json'
+$rustIndex = Get-Content -LiteralPath $rustIndexPath -Raw | ConvertFrom-Json
+$cargoLockPath = Join-Path $repoRoot 'shells/desktop-tauri/Cargo.lock'
+$cargoTomlPath = Join-Path $repoRoot 'shells/desktop-tauri/Cargo.toml'
+if ($rustIndex.cargoLockSha256 -cne (Get-FileHash -LiteralPath $cargoLockPath).Hash.ToLowerInvariant() -or
+    $rustIndex.cargoTomlSha256 -cne (Get-FileHash -LiteralPath $cargoTomlPath).Hash.ToLowerInvariant()) {
+    throw 'El expediente Rust no corresponde al grafo actual. Revisa sus dependencias y avisos antes de subir la versión.'
+}
+
 # Cada sustitución tiene que encontrar su texto: si uno cambió de forma, se
 # avisa en lugar de dejar esa copia atrás en silencio.
 $cambios = @(
@@ -78,6 +90,14 @@ foreach ($cambio in $cambios) {
 
     [IO.File]::WriteAllText($ruta, ($texto -replace $cambio.Buscar, $cambio.Poner))
 }
+
+$rustIndexText = [IO.File]::ReadAllText($rustIndexPath)
+foreach ($entry in @(@('cargoLockSha256', $cargoLockPath), @('cargoTomlSha256', $cargoTomlPath))) {
+    $key, $file = $entry
+    $newHash = (Get-FileHash -LiteralPath $file).Hash.ToLowerInvariant()
+    $rustIndexText = $rustIndexText.Replace([string]$rustIndex.$key, $newHash)
+}
+[IO.File]::WriteAllText($rustIndexPath, $rustIndexText)
 
 Write-Host "Versión: $actual -> $Version" -ForegroundColor Cyan
 
