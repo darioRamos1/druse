@@ -12,7 +12,8 @@
     firmaron, que es justo el error que esto persigue.
 
     - `construir`: empaqueta las tres variantes, reúne los artefactos con sus
-      firmas del actualizador, genera `latest.json` y el instalador selector.
+      firmas del actualizador y sus ZIP portables, genera `latest.json`, hashes
+      y el instalador selector.
     - `verificar`: comprueba que lo que hay en el directorio de la release se
       puede publicar. No construye nada.
     - `publicar`: exige integración continua verde para ese commit exacto, vuelve
@@ -30,10 +31,9 @@
 .PARAMETER SinComprobarCI
     Publica aunque la integración continua no esté verde para ese commit.
 
-    **Queda anotado en la evidencia de la release**, y por eso existe: hoy las
-    ejecuciones de Actions terminan en fallo por facturación sin ejecutar un
-    paso, así que bloquear sin salida convertiría el guion en inservible. Lo que
-    no puede pasar es que una publicación sin comprobar parezca comprobada.
+    **Queda anotado en la evidencia de la release**. Es una salida explícita
+    ante indisponibilidad de CI; no acredita una publicación comprobada.
+    Comunidad sigue necesitando su propio workflow satisfactorio.
 
 .EXAMPLE
     ./build/scripts/release.ps1
@@ -87,6 +87,10 @@ $community = Join-Path $releaseDir $communityName
 $selector = Join-Path $releaseDir "Druse-$version-installer.exe"
 $latest = Join-Path $releaseDir 'latest.json'
 $evidencia = Join-Path $releaseDir 'evidencia.json'
+$checksums = Join-Path $releaseDir 'SHA256SUMS.txt'
+$portables = @(foreach ($variant in @('completo', 'sin-informix', 'comunidad')) {
+    Join-Path $releaseDir "Druse-$version-windows-x86_64-$variant-portable.zip"
+})
 
 $notesFile = Join-Path $repoRoot "docs/release-notes/$version.md"
 
@@ -108,13 +112,13 @@ function Invoke-DruseConstruccion {
 
     New-Item -ItemType Directory -Path $releaseDir -Force | Out-Null
 
-    & (Join-Path $PSScriptRoot 'package.ps1') -RequireUpdaterSignature
+    & (Join-Path $PSScriptRoot 'package.ps1') -Portable -RequireUpdaterSignature
     if ($LASTEXITCODE -ne 0) { throw 'Falló el paquete completo.' }
 
-    & (Join-Path $PSScriptRoot 'package.ps1') -WithoutInformix -RequireUpdaterSignature
+    & (Join-Path $PSScriptRoot 'package.ps1') -WithoutInformix -Portable -RequireUpdaterSignature
     if ($LASTEXITCODE -ne 0) { throw 'Falló el paquete sin Informix.' }
 
-    & (Join-Path $PSScriptRoot 'package.ps1') -Community -RequireUpdaterSignature
+    & (Join-Path $PSScriptRoot 'package.ps1') -Community -Portable -RequireUpdaterSignature
     if ($LASTEXITCODE -ne 0) { throw 'Falló el paquete de Comunidad.' }
 
     $targetRoot = if ($env:CARGO_TARGET_DIR) {
@@ -144,6 +148,8 @@ function Invoke-DruseConstruccion {
     Copy-Item "$($communitySource.FullName).sig" "$community.sig"
     foreach ($variant in @('completo', 'sin-informix', 'comunidad')) {
         Copy-Item (Join-Path $repoRoot "artifacts/paquete/manifiesto-$variant-$version-win-x64.json") $releaseDir
+        $portableSource = Join-Path $targetRoot "portable/Druse-$version-win-x64-portable-$variant.zip"
+        Copy-Item -LiteralPath $portableSource -Destination (Join-Path $releaseDir "Druse-$version-windows-x86_64-$variant-portable.zip")
     }
 
     $manifest = [ordered]@{
@@ -202,6 +208,8 @@ function Invoke-DruseConstruccion {
             -TimestampUrl $(if ($env:DRUSE_SIGN_TIMESTAMP_URL) { $env:DRUSE_SIGN_TIMESTAMP_URL } else { 'http://timestamp.digicert.com' }) `
             -Command $env:DRUSE_SIGN_COMMAND
     }
+
+    Write-DruseReleaseChecksums -ReleaseDir $releaseDir
 }
 
 # --- Etapa 3: publicar -------------------------------------------------------
@@ -272,18 +280,44 @@ function Invoke-DrusePublicacion([object]$verificacion) {
 
     $registro | ConvertTo-Json -Depth 6 | Set-Content $evidencia -Encoding UTF8
 
-    $assets = @($selector, $complete, "$complete.sig", $lite, "$lite.sig", $community, "$community.sig", $latest, $evidencia) +
+    # La evidencia se crea después de verificar; también debe poder contrastarse
+    # con los hashes descargados, sin incluir el propio archivo de hashes.
+    Write-DruseReleaseChecksums -ReleaseDir $releaseDir
+    Test-DruseReleaseChecksums -ReleaseDir $releaseDir
+
+    $assets = @($selector, $complete, "$complete.sig", $lite, "$lite.sig", $community, "$community.sig", $latest, $evidencia, $checksums) + $portables +
         @(foreach ($variant in @('completo', 'sin-informix', 'comunidad')) { Join-Path $releaseDir "manifiesto-$variant-$version-win-x64.json" })
     $tagArgs = if ($tagCommit) { @('--verify-tag') } else { @('--target', $commit) }
 
+    # Crear la release como borrador evita que /latest anuncie una versión con
+    # solo parte de sus paquetes si se interrumpe alguna de las subidas.
     if (Test-Path $notesFile) {
-        gh release create $tag @assets @tagArgs --repo $Repository --title "Druse $version" --notes-file $notesFile
+        gh release create $tag @assets @tagArgs --draft --repo $Repository --title "Druse $version" --notes-file $notesFile
     }
     else {
-        gh release create $tag @assets @tagArgs --repo $Repository --title "Druse $version" --notes $notes
+        gh release create $tag @assets @tagArgs --draft --repo $Repository --title "Druse $version" --notes $notes
     }
 
-    if ($LASTEXITCODE -ne 0) { throw 'GitHub no pudo crear la publicación.' }
+    if ($LASTEXITCODE -ne 0) { throw 'GitHub no pudo crear el borrador de la publicación. No se reemplazará una versión existente.' }
+
+    $uploadedResponse = gh api "repos/$Repository/releases/tags/$tag"
+    if ($LASTEXITCODE -ne 0) { throw 'No se pudo comprobar el borrador subido. Se conserva sin publicar.' }
+    $uploaded = $uploadedResponse | ConvertFrom-Json -ErrorAction Stop
+    if ($uploaded.draft -ne $true -or $uploaded.tag_name -cne $tag -or @($uploaded.assets).Count -ne $assets.Count) {
+        throw 'El borrador de GitHub no contiene exactamente los artefactos esperados. Se conserva sin publicar.'
+    }
+    foreach ($asset in $assets) {
+        $local = Get-Item -LiteralPath $asset
+        $remote = @($uploaded.assets | Where-Object { $_.name -ceq $local.Name })
+        $expectedDigest = 'sha256:' + (Get-FileHash -LiteralPath $asset -Algorithm SHA256).Hash.ToLowerInvariant()
+        if ($remote.Count -ne 1 -or $remote[0].state -ne 'uploaded' -or $remote[0].size -ne $local.Length -or
+            ($remote[0].digest -and $remote[0].digest -cne $expectedDigest)) {
+            throw "GitHub no confirmó el archivo completo $($local.Name). El borrador se conserva sin publicar."
+        }
+    }
+
+    gh release edit $tag --repo $Repository --draft=false
+    if ($LASTEXITCODE -ne 0) { throw 'GitHub no pudo publicar el borrador verificado. No se reemplazará una versión existente.' }
 }
 
 # --- Orquestación ------------------------------------------------------------
@@ -301,6 +335,7 @@ if ($Etapa -in @('todo', 'verificar', 'publicar')) {
         -PublicKey ([string]$config.plugins.updater.pubkey) `
         -ManifestDir $releaseDir `
         -IncludeCommunity `
+        -IncludePortable `
         -ExpectedBaseUrl $baseUrl
 }
 

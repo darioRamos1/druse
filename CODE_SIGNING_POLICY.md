@@ -25,7 +25,7 @@ Cuando exista un servicio de firma:
 2. `package.ps1` publica la API .NET autocontenida, comprueba el contenido del paquete contra `build/paquete-excluidos.json` y **detiene la construcción si aparece un componente excluido** de esa variante.
 3. Se genera un **manifiesto** con el SHA-256 de cada archivo del paquete y de los artefactos finales, en `artifacts/paquete/`.
 4. Tauri construye el instalador y, si hay clave del actualizador, su `.sig`.
-5. `release.ps1` calcula el SHA-256 de ambos instaladores, los incrusta en el instalador selector y publica la release con sus artefactos y `latest.json`.
+5. `release.ps1` reúne los instaladores y ZIP sin instalación de las tres ediciones, verifica su contenido y publica la release con `SHA256SUMS.txt`, evidencia y `latest.json`. El selector conserva los hashes de los instaladores que ofrece.
 
 Antes de publicar, una etapa de verificación comprueba sobre los bytes finales que cada firma de actualización pertenece a la clave que lleva dentro la aplicación **y corresponde a ese archivo**, que `latest.json` coincide con los archivos y que ninguna firma Authenticode es inválida. Los manifiestos de ambas variantes son obligatorios y deben coincidir en producto, versión, variante y hashes. Por defecto, publicar exige la ejecución más reciente de `ci.yml` satisfactoria para ese commit exacto. Existe una excepción explícita `-SinComprobarCI`, registrada en `evidencia.json` junto al commit, hashes y comprobaciones; usarla no acredita una construcción verificada por SignPath.
 
@@ -33,9 +33,9 @@ El orden importa y está anotado: **la firma Authenticode modifica el archivo**,
 
 ## Quién aprueba una release
 
-Darío Ramos, mantenedor de Druse, es quien decide qué versión se publica y quien aprueba manualmente cada firma. La cuenta de GitHub del proyecto tiene autenticación en dos pasos.
+Darío Ramos, mantenedor de Druse, decide qué cambios incorpora a `main`. Por su autorización del 28 de octubre de 2026, una versión nueva incorporada a esa rama se publica automáticamente cuando CI general y Comunidad terminan satisfactoriamente para ese commit exacto. La cuenta de GitHub del proyecto tiene autenticación en dos pasos.
 
-No hay firma automática desencadenada por una rama: una release sale porque alguien la aprobó, no porque un commit llegó a `main`.
+Este flujo genera la firma del actualizador con la clave de Tauri configurada en GitHub; no incorpora firma Authenticode ni afirma aprobación de SignPath. Si se concede un servicio de firma, su aprobación manual seguirá siendo necesaria antes de integrarlo en este flujo.
 
 ## Cómo comprobar lo que descargaste
 
@@ -53,7 +53,7 @@ Qué pasaría entonces: se retira el artefacto de la release, se publica un avis
 
 Druse installers are **not yet signed with Authenticode**. The Tauri updater verifies minisign signatures before applying updates; the Community 1.3.0 beta is distributed outside `releases/latest` without an updater signature or automatic updates. Updater signatures protect that channel when used, but are not Authenticode code signing.
 
-An application to the SignPath Foundation was submitted on October 8, 2026, but no signing service has been granted, so no SignPath signing attribution appears here or in the product. Releases are built from a clean Git tree, their package contents are checked against an explicit exclusion list, and a SHA-256 manifest is produced for every build. Before publishing, every signature is verified against the final bytes and the release is refused if anything does not match; publishing also requires a green CI run for that exact commit, and each release records its commit, hashes and check results. Each release is approved manually by the maintainer, whose GitHub account uses two-factor authentication. Only Druse's own binaries and installers would be submitted for signing; third-party components would not.
+An application to the SignPath Foundation was submitted on October 8, 2026, but no signing service has been granted, so no SignPath signing attribution appears here or in the product. Releases are built from a clean Git tree, package contents are checked against an exclusion list, and SHA-256 manifests are produced. Signatures are verified against the final bytes before publication. As authorized by the maintainer on October 28, new versions merged into main are published automatically after both CI and Community checks succeed for the exact commit; each release records its commit, hashes and results. This produces Tauri updater signatures, not Authenticode or SignPath approval. Any future signing service still requires its manual approval process. Only Druse's own binaries and installers would be submitted for signing; third-party components would not.
 
 Report anything suspicious to `druse.contacto@gmail.com`.
 

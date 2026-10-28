@@ -286,7 +286,7 @@
           <li>Oracle</li>
           <li>Informix</li>
         </ul>
-        <p>La beta descargable de Comunidad incluye PostgreSQL, MySQL/MariaDB,
+        <p>La edición Comunidad incluye PostgreSQL, MySQL/MariaDB,
           SQL Server y SQLite. Oracle e Informix pertenecen a la edición completa.</p>
       </section>
 
@@ -423,37 +423,51 @@
         id="descargar"
         aria-labelledby="download-title"
       >
-        <div class="download-copy">
-          <p class="eyebrow">UN ESPACIO PARA TUS DATOS</p>
-          <h2 id="download-title">
-            Tu próxima consulta<br />empieza con Druse.
-          </h2>
-          <p>
-            Una aplicación de escritorio con todo lo necesario para empezar. Sin
-            instalar .NET ni Node.js.
-          </p>
-          <a class="button button-primary" id="download-link"
-            href="https://github.com/darioRamos1/druse/releases/tag/v1.3.0-beta.1"
-            ><svg aria-hidden="true" viewBox="0 0 24 24">
-              <path d="M12 3v12m-5-5 5 5 5-5M5 16v5h14v-5" /></svg
-            >Descargar beta de Comunidad</a
-          >
-          <p class="availability" id="download-status">
-            Versión 1.3.0 beta · Windows x64. Incluye PostgreSQL, SQL Server,
-            MySQL/MariaDB y SQLite. No incluye Oracle ni Informix.
-          </p>
-          <p>Sin firma Authenticode; Windows puede mostrar SmartScreen. Esta beta
-            no se actualiza automáticamente. La instalación y el tráfico en
-            Windows limpio siguen pendientes de validación completa.</p>
-          <p><a href="https://github.com/darioRamos1/druse/releases/download/v1.3.0-beta.1/SHA256SUMS.txt">Hashes SHA-256</a>
-            · <a href="./primeros-pasos.html">Prueba SQLite de diez minutos</a>
-            · <a href="https://github.com/darioRamos1/druse/blob/main/CODE_SIGNING_POLICY.md">Code signing policy</a></p>
+        <!-- descargas:inicio -->
+        <div class="download-intro">
+          <div class="download-copy">
+            <p class="eyebrow">ELIGE CÓMO EMPEZAR</p>
+            <h2 id="download-title">Tu próxima consulta<br />empieza con Druse.</h2>
+            <p>Instala Druse o descarga el ZIP para ejecutarlo sin instalación. Sin instalar .NET ni Node.js.</p>
+            <p class="availability" id="download-status">Versión 1.3.0-beta.1 · Windows x64 · Beta de Comunidad.</p>
+          </div>
+          <img class="download-logo" src="./assets/druse.png" alt="" width="100" height="100" />
         </div>
-        <div class="download-mark" aria-hidden="true">
-          <img src="./assets/druse.png" alt="" width="128" height="128" /><span
-            >Tu escritorio. Tus conexiones.<br />Tu forma de trabajar.</span
-          >
+        <div class="download-editions">
+          <article class="download-edition" aria-labelledby="edition-comunidad">
+            <p class="download-edition-label">PARA EMPEZAR</p>
+            <h3 id="edition-comunidad">Comunidad</h3>
+            <p class="download-edition-description">PostgreSQL, SQL Server, MySQL/MariaDB y SQLite. Sin controladores de Oracle ni IBM.</p>
+            <div class="download-edition-actions">
+              <a class="button button-primary" href="https://github.com/darioRamos1/druse/releases/download/v1.3.0-beta.1/Druse-Comunidad-1.3.0-beta.1-win-x64-setup.exe" aria-label="Instalador para Windows de Comunidad">Instalador para Windows</a>
+              <span class="download-unavailable">Portable · ZIP: aún no disponible</span>
+            </div>
+          </article>
+          <article class="download-edition" aria-labelledby="edition-completo">
+            <p class="download-edition-label">OTRAS OPCIONES</p>
+            <h3 id="edition-completo">Completa</h3>
+            <p class="download-edition-description">Todos los motores de Druse, incluidos Oracle e IBM Informix.</p>
+            <div class="download-edition-actions">
+              <span class="download-unavailable">Instalador para Windows: aún no disponible</span>
+              <span class="download-unavailable">Portable · ZIP: aún no disponible</span>
+            </div>
+          </article>
+          <article class="download-edition" aria-labelledby="edition-sin-informix">
+            <p class="download-edition-label">OTRAS OPCIONES</p>
+            <h3 id="edition-sin-informix">Sin Informix</h3>
+            <p class="download-edition-description">Los motores de la edición completa, incluido Oracle, sin el controlador de IBM Informix.</p>
+            <div class="download-edition-actions">
+              <span class="download-unavailable">Instalador para Windows: aún no disponible</span>
+              <span class="download-unavailable">Portable · ZIP: aún no disponible</span>
+            </div>
+          </article>
         </div>
+        <div class="download-details">
+          <p><strong>¿Instalador o portable?</strong> El instalador es la opción recomendada para uso habitual. Para usar el portable, extrae todo el ZIP y abre <code>druse.exe</code>. Las conexiones y preferencias se guardan en tu perfil de Windows; no se trasladan al copiar la carpeta.</p>
+          <p>El portable requiere Microsoft Edge WebView2 instalado. El instalador puede descargarlo si falta. Los paquetes no tienen firma Authenticode; Windows puede mostrar SmartScreen. Esta beta no se actualiza automáticamente. Consulta las limitaciones y comprobaciones de cada versión antes de descargar.</p>
+          <p><a href="https://github.com/darioRamos1/druse/releases/tag/v1.3.0-beta.1">Notas de la versión y comprobaciones</a> · <a href="https://github.com/darioRamos1/druse/releases/download/v1.3.0-beta.1/SHA256SUMS.txt">Hashes SHA-256</a> · <a href="./primeros-pasos.html">Prueba SQLite de diez minutos</a> · <a href="https://github.com/darioRamos1/druse/blob/main/CODE_SIGNING_POLICY.md">Política de firma</a></p>
+        </div>
+        <!-- descargas:fin -->
       </section>
 
       <section
@@ -473,9 +487,9 @@
               >
             </summary>
             <p>
-              La beta de Comunidad permite conectar PostgreSQL, SQL Server,
-              MySQL/MariaDB y SQLite. Oracle e Informix están disponibles en el
-              código de la edición completa y no forman parte de esta descarga.
+              La edición Comunidad permite conectar PostgreSQL, SQL Server,
+              MySQL/MariaDB y SQLite. Oracle e Informix están disponibles en la
+              edición completa. Elige tu edición en el apartado de descargas.
             </p>
           </details>
           <details>
@@ -484,8 +498,8 @@
             </summary>
             <p>
               Druse es una aplicación de escritorio. Esta página presenta la
-              aplicación; para conectar tus bases de datos necesitas instalarla
-              en tu equipo.
+              aplicación; para conectar tus bases de datos necesitas ejecutarla
+              en tu equipo, con el instalador o el portable.
             </p>
           </details>
           <details>

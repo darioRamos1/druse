@@ -1894,5 +1894,6 @@
   "ai.plan.sourceChanged": "Se quitó el plan porque cambió la conexión o la base.",
   "ai.preview.section.plan": "Plan estimado",
   "ai.preview.issue.plan": "El plan supera su límite. Vuelve a editarlo o quítalo antes de enviar.",
-  "whatsNew.v1_10_0.chatPlans": "Puedes adjuntar al chat un plan estimado de SQLite obtenido con EXPLAIN QUERY PLAN y revisar su SQL, contenido y límites antes de enviarlo."
+  "whatsNew.v1_10_0.chatPlans": "Puedes adjuntar al chat un plan estimado de SQLite obtenido con EXPLAIN QUERY PLAN y revisar su SQL, contenido y límites antes de enviarlo.",
+  "whatsNew.v1_11_0.downloads": "La web ofrece las ediciones Completa, Sin Informix y Comunidad con instalador y ZIP sin instalación de la última versión publicada."
 }

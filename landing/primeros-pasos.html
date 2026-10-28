@@ -28,21 +28,24 @@
         <p class="legal-intro">Crea una base de ejemplo, consulta tres ventas y exporta el resultado.
           No necesitas un servidor de bases de datos, .NET ni Node.js.</p>
         <aside class="legal-draft">
-          <p><strong>Beta Comunidad 1.3.0 para Windows x64.</strong> No tiene firma Authenticode
-            ni aprobación de SignPath; Windows puede mostrar SmartScreen. No se actualiza
-            automáticamente. Las pruebas completas de instalación y tráfico en Windows limpio
-            siguen pendientes. Usa solo los datos ficticios de esta guía.</p>
+          <p><strong>Druse Comunidad para Windows x64.</strong> Consulta la versión y las comprobaciones
+            en los enlaces de descarga. Los paquetes no tienen firma Authenticode
+            ni aprobación de SignPath; Windows puede mostrar SmartScreen.
+            Usa solo los datos ficticios de esta guía.</p>
         </aside>
         <section id="instalar">
           <h2>1. Descarga e instala</h2>
-          <p>Abre la <a href="https://github.com/darioRamos1/druse/releases/tag/v1.3.0-beta.1">release oficial</a>
-            y descarga <code>Druse-Comunidad-1.3.0-beta.1-win-x64-setup.exe</code> y
-            <code>SHA256SUMS.txt</code>. Puedes comprobar el archivo en PowerShell desde la carpeta de descarga:</p>
+          <!-- descarga-guia:inicio -->
+          <p>Descarga el <a href="https://github.com/darioRamos1/druse/releases/download/v1.3.0-beta.1/Druse-Comunidad-1.3.0-beta.1-win-x64-setup.exe">instalador de Comunidad 1.3.0-beta.1</a>
+            y <a href="https://github.com/darioRamos1/druse/releases/download/v1.3.0-beta.1/SHA256SUMS.txt">SHA256SUMS.txt</a> de la
+            <a href="https://github.com/darioRamos1/druse/releases/tag/v1.3.0-beta.1">publicación oficial</a>. Desde la carpeta de descarga, comprueba el archivo en PowerShell:</p>
           <pre><code>Get-FileHash -LiteralPath '.\Druse-Comunidad-1.3.0-beta.1-win-x64-setup.exe' -Algorithm SHA256</code></pre>
           <p>El resultado debe coincidir con la entrada del instalador en <code>SHA256SUMS.txt</code>.
             Esto comprueba la integridad; no sustituye a la firma del editor.
             El instalador puede necesitar conexión para obtener Microsoft Edge WebView2.
             Si Windows o tu organización bloquean la instalación, puedes reportarlo y detener la prueba.</p>
+          <p>El portable de esta beta todavía no está disponible. Las conexiones se guardan en tu perfil de Windows.</p>
+        <!-- descarga-guia:fin -->
         </section>
         <section id="crear">
           <h2>2. Crea una base vacía</h2>
@@ -90,7 +93,7 @@ FROM druse_prueba_ventas;</code></pre>
             <a href="https://github.com/darioRamos1/druse/issues/new?template=compatibilidad.yml">informe de compatibilidad</a>
             o escribe a <a href="mailto:druse.contacto@gmail.com?subject=Prueba%20SQLite%20de%20Druse%20Comunidad">druse.contacto@gmail.com</a>.</p>
           <ul>
-            <li>Versión: Druse Comunidad 1.3.0 beta.1; versión de Windows.</li>
+            <li>Edición y versión de Druse que descargaste; versión de Windows.</li>
             <li>Pasos completados: instalar, conectar, consultar, sumar y exportar.</li>
             <li>Qué esperabas, qué ocurrió y mensaje exacto si apareció un error.</li>
             <li>Si es tu primera prueba o ya habías usado Druse antes.</li>
