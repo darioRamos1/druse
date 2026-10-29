@@ -1,7 +1,7 @@
 {
   "esquema": 1,
   "generado": "2026-10-28",
-  "alcance": "Unión de los catálogos NuGet/runtime ya recopilados en ambas ramas: 51 fichas por componente y versión. Conserva las doce versiones del 23 de septiembre y los runtime 10.0.13 del 14 de octubre. Los hashes de los grafos identifican las recopilaciones de origen; no describen una nueva construcción ni constituyen aprobación de redistribución o de SignPath.",
+  "alcance": "Catálogo de avisos por versión: 61 fichas. Conserva las recopilaciones históricas e incorpora las versiones exactas de Comunidad actualizadas el 28 de octubre de 2026. No es aprobación de redistribución ni de SignPath.",
   "depsSha256": "dd2465db0407bb70a0ec2f06d413d2a5fd1f03437944884b3f7db372904e1348",
   "limites": [
     "Recopilación de textos originales; no demuestra cubrir cada obligación o archivo de terceros.",
@@ -1495,6 +1495,334 @@
         }
       ],
       "estado": "TEXTOS RECOPILADOS; REVISION PENDIENTE"
+    },
+    {
+      "componente": "Microsoft.AspNetCore.OpenApi",
+      "version": "10.0.14",
+      "licenciaDeclarada": "MIT",
+      "procedencia": "Nuspec y archivo nupkg de la versión exacta; textos del commit declarado por nuspec.",
+      "repositorio": "https://github.com/dotnet/dotnet",
+      "commit": "0427b9abbead3fa64c6655eb4290c537397131fa",
+      "etiqueta": null,
+      "nuspecSha256": "9b263dfee161475b086f907ea56aae97a2a98740887c3ada9b619ad0f360720e",
+      "nupkgSha256": "6a97f22455aae43bc866472cf1d4cfdcbc4d652091c187f02a02296de33af60f",
+      "nupkgUrl": "https://api.nuget.org/v3-flatcontainer/microsoft.aspnetcore.openapi/10.0.14/microsoft.aspnetcore.openapi.10.0.14.nupkg",
+      "evidenciaDll": null,
+      "documentos": [
+        {
+          "archivo": "fuentes/microsoft.aspnetcore.app.runtime-6f3d800f/THIRD-PARTY-NOTICES.TXT",
+          "sha256": "307d014f65d8482314f1400ddeae7a0cbabb96c2207bcc77f6233cc10588e5d9",
+          "origen": "THIRD-PARTY-NOTICES.TXT",
+          "url": "https://www.nuget.org/packages/Microsoft.AspNetCore.OpenApi/10.0.14",
+          "gitBlob": null
+        },
+        {
+          "archivo": "fuentes/aspnetcore-f7d90799/LICENSE.txt",
+          "sha256": "cfc21f5e8bd655ae997eec916138b707b1d290b83272c02a95c9f821b8c87310",
+          "origen": "src/aspnetcore/LICENSE.txt",
+          "url": "https://github.com/dotnet/dotnet/blob/0427b9abbead3fa64c6655eb4290c537397131fa/src/aspnetcore/LICENSE.txt",
+          "gitBlob": "984713a49622a96da110443c15477613bc12656b"
+        },
+        {
+          "archivo": "fuentes/aspnetcore-f7d90799/THIRD-PARTY-NOTICES.txt",
+          "sha256": "52af3d603b6d069e635f8afd08ec44ec01559255b5f3afd161ae9e6fe7e7aa54",
+          "origen": "src/aspnetcore/THIRD-PARTY-NOTICES.txt",
+          "url": "https://github.com/dotnet/dotnet/blob/0427b9abbead3fa64c6655eb4290c537397131fa/src/aspnetcore/THIRD-PARTY-NOTICES.txt",
+          "gitBlob": "484f2d5485153f66280acb8646f1e019a58b069c"
+        }
+      ],
+      "estado": "TEXTOS RECOPILADOS; REVISION PENDIENTE"
+    },
+    {
+      "componente": "Microsoft.Data.SqlClient",
+      "version": "7.1.1",
+      "licenciaDeclarada": "MIT",
+      "procedencia": "Nuspec y archivo nupkg de la versión exacta; textos del commit declarado por nuspec.",
+      "repositorio": "https://github.com/dotnet/sqlclient",
+      "commit": "29ce2d856cb5a9450f79ea62c0afc744fd337fde",
+      "etiqueta": null,
+      "nuspecSha256": "49e3d9e3b3c1724caf53e890494a551639c29a2d2736d63ae60d6d286cf42429",
+      "nupkgSha256": "1da22a633fb44406d9a9400b00471039e8895ac3e717afe2e3beedba2f049e37",
+      "nupkgUrl": "https://api.nuget.org/v3-flatcontainer/microsoft.data.sqlclient/7.1.1/microsoft.data.sqlclient.7.1.1.nupkg",
+      "evidenciaDll": null,
+      "documentos": [
+        {
+          "archivo": "fuentes/sqlclient-8c70cec9/COPYRIGHT.md",
+          "sha256": "c16067a715383a17949174ef6928434b2ff0b324a98dbbf248bc14afc3432f76",
+          "origen": "COPYRIGHT.md",
+          "url": "https://github.com/dotnet/SqlClient/blob/29ce2d856cb5a9450f79ea62c0afc744fd337fde/COPYRIGHT.md",
+          "gitBlob": "a1df5f1f9f22bfa413964f3ca7e82372c9e89739"
+        },
+        {
+          "archivo": "fuentes/sqlclient-54ab5aef/LICENSE",
+          "sha256": "9fa73cb72fb654d029c9214f0e3eec32c301a0c23be71b50fe3910e61553fa34",
+          "origen": "LICENSE",
+          "url": "https://github.com/dotnet/SqlClient/blob/29ce2d856cb5a9450f79ea62c0afc744fd337fde/LICENSE",
+          "gitBlob": "a33fe1c58fdd2c89165eda0b4257aa759d9c8326"
+        },
+        {
+          "archivo": "fuentes/sqlclient-8c70cec9/NOTICE.txt",
+          "sha256": "db4e07b72af7b58c5a6cd39762fe757e7db7f9af4e67e8d6ecc05731dd7ff66c",
+          "origen": "NOTICE.txt",
+          "url": "https://github.com/dotnet/SqlClient/blob/29ce2d856cb5a9450f79ea62c0afc744fd337fde/NOTICE.txt",
+          "gitBlob": "0b936c6bb60efa99c0c1e4c853cc516eb3f7835b"
+        }
+      ],
+      "estado": "TEXTOS RECOPILADOS; REVISION PENDIENTE"
+    },
+    {
+      "componente": "Microsoft.Data.SqlClient.Extensions.Abstractions",
+      "version": "7.1.1",
+      "licenciaDeclarada": "MIT",
+      "procedencia": "Nuspec y archivo nupkg de la versión exacta; textos del commit declarado por nuspec.",
+      "repositorio": "https://github.com/dotnet/SqlClient",
+      "commit": "29ce2d856cb5a9450f79ea62c0afc744fd337fde",
+      "etiqueta": null,
+      "nuspecSha256": "d8f57baba5b79c3736b93ce3ee1732de4ac3bee23dbdaa1ecb4cf52186efbd90",
+      "nupkgSha256": "a55ae5174a088388b8b744e995e4687c00cd9e7c2d355a1fa16fcb7b0b3d49b1",
+      "nupkgUrl": "https://api.nuget.org/v3-flatcontainer/microsoft.data.sqlclient.extensions.abstractions/7.1.1/microsoft.data.sqlclient.extensions.abstractions.7.1.1.nupkg",
+      "evidenciaDll": null,
+      "documentos": [
+        {
+          "archivo": "fuentes/sqlclient-8c70cec9/COPYRIGHT.md",
+          "sha256": "c16067a715383a17949174ef6928434b2ff0b324a98dbbf248bc14afc3432f76",
+          "origen": "COPYRIGHT.md",
+          "url": "https://github.com/dotnet/SqlClient/blob/29ce2d856cb5a9450f79ea62c0afc744fd337fde/COPYRIGHT.md",
+          "gitBlob": "a1df5f1f9f22bfa413964f3ca7e82372c9e89739"
+        },
+        {
+          "archivo": "fuentes/sqlclient-54ab5aef/LICENSE",
+          "sha256": "9fa73cb72fb654d029c9214f0e3eec32c301a0c23be71b50fe3910e61553fa34",
+          "origen": "LICENSE",
+          "url": "https://github.com/dotnet/SqlClient/blob/29ce2d856cb5a9450f79ea62c0afc744fd337fde/LICENSE",
+          "gitBlob": "a33fe1c58fdd2c89165eda0b4257aa759d9c8326"
+        },
+        {
+          "archivo": "fuentes/sqlclient-8c70cec9/NOTICE.txt",
+          "sha256": "db4e07b72af7b58c5a6cd39762fe757e7db7f9af4e67e8d6ecc05731dd7ff66c",
+          "origen": "NOTICE.txt",
+          "url": "https://github.com/dotnet/SqlClient/blob/29ce2d856cb5a9450f79ea62c0afc744fd337fde/NOTICE.txt",
+          "gitBlob": "0b936c6bb60efa99c0c1e4c853cc516eb3f7835b"
+        }
+      ],
+      "estado": "TEXTOS RECOPILADOS; REVISION PENDIENTE"
+    },
+    {
+      "componente": "Microsoft.Data.SqlClient.Internal.Logging",
+      "version": "7.1.1",
+      "licenciaDeclarada": "MIT",
+      "procedencia": "Nuspec y archivo nupkg de la versión exacta; textos del commit declarado por nuspec.",
+      "repositorio": "https://github.com/dotnet/SqlClient",
+      "commit": "29ce2d856cb5a9450f79ea62c0afc744fd337fde",
+      "etiqueta": null,
+      "nuspecSha256": "249b07e072f59026cedc62cd6275483e652bbb7b5bf1d1e260896fdf90609193",
+      "nupkgSha256": "719ea3febaf817e991ebc90432c5534303d29e51d566ab6df62e32b1ada1de6a",
+      "nupkgUrl": "https://api.nuget.org/v3-flatcontainer/microsoft.data.sqlclient.internal.logging/7.1.1/microsoft.data.sqlclient.internal.logging.7.1.1.nupkg",
+      "evidenciaDll": null,
+      "documentos": [
+        {
+          "archivo": "fuentes/sqlclient-8c70cec9/COPYRIGHT.md",
+          "sha256": "c16067a715383a17949174ef6928434b2ff0b324a98dbbf248bc14afc3432f76",
+          "origen": "COPYRIGHT.md",
+          "url": "https://github.com/dotnet/SqlClient/blob/29ce2d856cb5a9450f79ea62c0afc744fd337fde/COPYRIGHT.md",
+          "gitBlob": "a1df5f1f9f22bfa413964f3ca7e82372c9e89739"
+        },
+        {
+          "archivo": "fuentes/sqlclient-54ab5aef/LICENSE",
+          "sha256": "9fa73cb72fb654d029c9214f0e3eec32c301a0c23be71b50fe3910e61553fa34",
+          "origen": "LICENSE",
+          "url": "https://github.com/dotnet/SqlClient/blob/29ce2d856cb5a9450f79ea62c0afc744fd337fde/LICENSE",
+          "gitBlob": "a33fe1c58fdd2c89165eda0b4257aa759d9c8326"
+        },
+        {
+          "archivo": "fuentes/sqlclient-8c70cec9/NOTICE.txt",
+          "sha256": "db4e07b72af7b58c5a6cd39762fe757e7db7f9af4e67e8d6ecc05731dd7ff66c",
+          "origen": "NOTICE.txt",
+          "url": "https://github.com/dotnet/SqlClient/blob/29ce2d856cb5a9450f79ea62c0afc744fd337fde/NOTICE.txt",
+          "gitBlob": "0b936c6bb60efa99c0c1e4c853cc516eb3f7835b"
+        }
+      ],
+      "estado": "TEXTOS RECOPILADOS; REVISION PENDIENTE"
+    },
+    {
+      "componente": "Microsoft.Data.Sqlite",
+      "version": "10.0.14",
+      "licenciaDeclarada": "MIT",
+      "procedencia": "Nuspec y archivo nupkg de la versión exacta; textos del commit declarado por nuspec.",
+      "repositorio": "https://github.com/dotnet/dotnet",
+      "commit": "0427b9abbead3fa64c6655eb4290c537397131fa",
+      "etiqueta": null,
+      "nuspecSha256": "b8b507b3b9c0b0a7bb8776af6b4e155dfb663e5971f899e585e3a9ccd642bcbf",
+      "nupkgSha256": "34ee7848923872dcbf341e89b6c192170f222815cb9cb2604ac707b25b7fb0b4",
+      "nupkgUrl": "https://api.nuget.org/v3-flatcontainer/microsoft.data.sqlite/10.0.14/microsoft.data.sqlite.10.0.14.nupkg",
+      "evidenciaDll": null,
+      "documentos": [
+        {
+          "archivo": "fuentes/dotnet-e2f47b01/LICENSE.txt",
+          "sha256": "ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b",
+          "origen": "src/efcore/LICENSE.txt",
+          "url": "https://github.com/dotnet/dotnet/blob/0427b9abbead3fa64c6655eb4290c537397131fa/src/efcore/LICENSE.txt",
+          "gitBlob": "a616ed188dfce68ee308f674350ad242d8588c2b"
+        }
+      ],
+      "estado": "TEXTOS RECOPILADOS; REVISION PENDIENTE"
+    },
+    {
+      "componente": "Microsoft.Data.Sqlite.Core",
+      "version": "10.0.14",
+      "licenciaDeclarada": "MIT",
+      "procedencia": "Nuspec y archivo nupkg de la versión exacta; textos del commit declarado por nuspec.",
+      "repositorio": "https://github.com/dotnet/dotnet",
+      "commit": "0427b9abbead3fa64c6655eb4290c537397131fa",
+      "etiqueta": null,
+      "nuspecSha256": "4615a0038e9bf693ed2b2152967587137ba18abe2b5a1c7579b8d9f4a8c5e1b8",
+      "nupkgSha256": "df0828e3861a1e0240c9a3ec1891cdc1942cdc47b61c8d2fb36ce2542f02b092",
+      "nupkgUrl": "https://api.nuget.org/v3-flatcontainer/microsoft.data.sqlite.core/10.0.14/microsoft.data.sqlite.core.10.0.14.nupkg",
+      "evidenciaDll": null,
+      "documentos": [
+        {
+          "archivo": "fuentes/dotnet-e2f47b01/LICENSE.txt",
+          "sha256": "ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b",
+          "origen": "src/efcore/LICENSE.txt",
+          "url": "https://github.com/dotnet/dotnet/blob/0427b9abbead3fa64c6655eb4290c537397131fa/src/efcore/LICENSE.txt",
+          "gitBlob": "a616ed188dfce68ee308f674350ad242d8588c2b"
+        }
+      ],
+      "estado": "TEXTOS RECOPILADOS; REVISION PENDIENTE"
+    },
+    {
+      "componente": "Microsoft.OpenApi",
+      "version": "2.13.0",
+      "licenciaDeclarada": "MIT",
+      "procedencia": "Nuspec y archivo nupkg de la versión exacta; textos del commit declarado por nuspec.",
+      "repositorio": "https://github.com/Microsoft/OpenAPI.NET",
+      "commit": "0b8c9d697dcf0fca2d107cb79517c56d3f9ae940",
+      "etiqueta": null,
+      "nuspecSha256": "4a978cd286473b92630dfa71645f2d77e1c9898a10180bc66ea9b8aabf1703a0",
+      "nupkgSha256": "f377b54c159b7e7f47e8587390666cb9dff8bb4e55af82c4edbc90d1c0d2f943",
+      "nupkgUrl": "https://api.nuget.org/v3-flatcontainer/microsoft.openapi/2.13.0/microsoft.openapi.2.13.0.nupkg",
+      "evidenciaDll": null,
+      "documentos": [
+        {
+          "archivo": "fuentes/openapi.net-99fc3f83/LICENSE",
+          "sha256": "5d177f23ecfeb0ea8e050b6a5a16355e1ae9a0b286436ca8f83ed08b3795be6b",
+          "origen": "LICENSE",
+          "url": "https://github.com/Microsoft/OpenAPI.NET/blob/0b8c9d697dcf0fca2d107cb79517c56d3f9ae940/LICENSE",
+          "gitBlob": "017b9885a46ad4c7f4367ad2949fb66fb56f977f"
+        }
+      ],
+      "estado": "TEXTOS RECOPILADOS; REVISION PENDIENTE"
+    },
+    {
+      "componente": "SQLitePCLRaw.bundle_e_sqlite3",
+      "version": "2.1.13",
+      "licenciaDeclarada": "Apache-2.0",
+      "procedencia": "Correspondencia por versión: nuspec declara el repositorio sin commit; version_stamp del commit de mantenimiento declara 2.1.13. No demuestra equivalencia entre fuente y binario ni una reconstrucción del NuGet.",
+      "repositorio": "https://github.com/ericsink/SQLitePCL.raw",
+      "commit": "0873d14f6dcb3a8537444679468499ab9f5a782a",
+      "etiqueta": null,
+      "nuspecSha256": "f04f469c99056d21b928d6677ae2cd6db582fa0228ce934741ecefa2fae3c09d",
+      "nupkgSha256": "89a216f8059d09cabcb45ab75ac2f180b733323c27d41cf9a981dc5f5b5c6c0f",
+      "nupkgUrl": "https://api.nuget.org/v3-flatcontainer/sqlitepclraw.bundle_e_sqlite3/2.1.13/sqlitepclraw.bundle_e_sqlite3.2.1.13.nupkg",
+      "evidenciaDll": null,
+      "documentos": [
+        {
+          "archivo": "fuentes/sqlitepcl.raw-ca835d21/LICENSE.TXT",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "origen": "LICENSE.TXT",
+          "url": "https://github.com/ericsink/SQLitePCL.raw/blob/0873d14f6dcb3a8537444679468499ab9f5a782a/LICENSE.TXT",
+          "gitBlob": "d645695673349e3947e8e5ae42332d0ac3164cd7"
+        },
+        {
+          "archivo": "fuentes/sqlitepcl.raw-ca835d21/NOTICE.TXT",
+          "sha256": "485b276b3d2bfaa26df348e1e5c84df3648981e09b88531a6a53006f0705c24b",
+          "origen": "NOTICE.TXT",
+          "url": "https://github.com/ericsink/SQLitePCL.raw/blob/0873d14f6dcb3a8537444679468499ab9f5a782a/NOTICE.TXT",
+          "gitBlob": "9b4d10b6022750c492749e0b4bb22b0f0e70ef5b"
+        }
+      ],
+      "estado": "TEXTOS RECOPILADOS; REVISION PENDIENTE",
+      "evidenciaVersionFuente": {
+        "archivo": "fuentes/sha256-bebfedb0128f5c36f4fc0c2e37f6d3db072e7ada1b902b9c4373a3915bcd64bb.txt",
+        "sha256": "bebfedb0128f5c36f4fc0c2e37f6d3db072e7ada1b902b9c4373a3915bcd64bb",
+        "origen": "version_stamp/version_stamp.cs",
+        "url": "https://github.com/ericsink/SQLitePCL.raw/blob/0873d14f6dcb3a8537444679468499ab9f5a782a/version_stamp/version_stamp.cs",
+        "gitBlob": "2965df80a04eb0aaf0f606159f29739ff5e03665"
+      }
+    },
+    {
+      "componente": "SQLitePCLRaw.lib.e_sqlite3",
+      "version": "2.1.13",
+      "licenciaDeclarada": "Apache-2.0",
+      "procedencia": "Correspondencia por versión: nuspec declara el repositorio sin commit; version_stamp del commit de mantenimiento declara 2.1.13. No demuestra equivalencia entre fuente y binario ni una reconstrucción del NuGet.",
+      "repositorio": "https://github.com/ericsink/SQLitePCL.raw",
+      "commit": "0873d14f6dcb3a8537444679468499ab9f5a782a",
+      "etiqueta": null,
+      "nuspecSha256": "5e0800665aeb09107c3b45e1162109efb9b83dbaad987a4eca5d686d34769e86",
+      "nupkgSha256": "d07d13b4779123cfa56b3348b504d57a2ab6fc10c764fb6e2c9d787987e39201",
+      "nupkgUrl": "https://api.nuget.org/v3-flatcontainer/sqlitepclraw.lib.e_sqlite3/2.1.13/sqlitepclraw.lib.e_sqlite3.2.1.13.nupkg",
+      "evidenciaDll": null,
+      "documentos": [
+        {
+          "archivo": "fuentes/sqlitepcl.raw-ca835d21/LICENSE.TXT",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "origen": "LICENSE.TXT",
+          "url": "https://github.com/ericsink/SQLitePCL.raw/blob/0873d14f6dcb3a8537444679468499ab9f5a782a/LICENSE.TXT",
+          "gitBlob": "d645695673349e3947e8e5ae42332d0ac3164cd7"
+        },
+        {
+          "archivo": "fuentes/sqlitepcl.raw-ca835d21/NOTICE.TXT",
+          "sha256": "485b276b3d2bfaa26df348e1e5c84df3648981e09b88531a6a53006f0705c24b",
+          "origen": "NOTICE.TXT",
+          "url": "https://github.com/ericsink/SQLitePCL.raw/blob/0873d14f6dcb3a8537444679468499ab9f5a782a/NOTICE.TXT",
+          "gitBlob": "9b4d10b6022750c492749e0b4bb22b0f0e70ef5b"
+        }
+      ],
+      "estado": "TEXTOS RECOPILADOS; REVISION PENDIENTE",
+      "evidenciaVersionFuente": {
+        "archivo": "fuentes/sha256-bebfedb0128f5c36f4fc0c2e37f6d3db072e7ada1b902b9c4373a3915bcd64bb.txt",
+        "sha256": "bebfedb0128f5c36f4fc0c2e37f6d3db072e7ada1b902b9c4373a3915bcd64bb",
+        "origen": "version_stamp/version_stamp.cs",
+        "url": "https://github.com/ericsink/SQLitePCL.raw/blob/0873d14f6dcb3a8537444679468499ab9f5a782a/version_stamp/version_stamp.cs",
+        "gitBlob": "2965df80a04eb0aaf0f606159f29739ff5e03665"
+      }
+    },
+    {
+      "componente": "SQLitePCLRaw.provider.e_sqlite3",
+      "version": "2.1.13",
+      "licenciaDeclarada": "Apache-2.0",
+      "procedencia": "Correspondencia por versión: nuspec declara el repositorio sin commit; version_stamp del commit de mantenimiento declara 2.1.13. No demuestra equivalencia entre fuente y binario ni una reconstrucción del NuGet.",
+      "repositorio": "https://github.com/ericsink/SQLitePCL.raw",
+      "commit": "0873d14f6dcb3a8537444679468499ab9f5a782a",
+      "etiqueta": null,
+      "nuspecSha256": "d31fbb24bed1097f15170bc81b1de4832213f9d50deab423ec8c7aa16995b1c7",
+      "nupkgSha256": "513ef2ba5d01c14d1e8032d9d2ca2c8985df7ec7d351f0e40917476114ac1f9c",
+      "nupkgUrl": "https://api.nuget.org/v3-flatcontainer/sqlitepclraw.provider.e_sqlite3/2.1.13/sqlitepclraw.provider.e_sqlite3.2.1.13.nupkg",
+      "evidenciaDll": null,
+      "documentos": [
+        {
+          "archivo": "fuentes/sqlitepcl.raw-ca835d21/LICENSE.TXT",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "origen": "LICENSE.TXT",
+          "url": "https://github.com/ericsink/SQLitePCL.raw/blob/0873d14f6dcb3a8537444679468499ab9f5a782a/LICENSE.TXT",
+          "gitBlob": "d645695673349e3947e8e5ae42332d0ac3164cd7"
+        },
+        {
+          "archivo": "fuentes/sqlitepcl.raw-ca835d21/NOTICE.TXT",
+          "sha256": "485b276b3d2bfaa26df348e1e5c84df3648981e09b88531a6a53006f0705c24b",
+          "origen": "NOTICE.TXT",
+          "url": "https://github.com/ericsink/SQLitePCL.raw/blob/0873d14f6dcb3a8537444679468499ab9f5a782a/NOTICE.TXT",
+          "gitBlob": "9b4d10b6022750c492749e0b4bb22b0f0e70ef5b"
+        }
+      ],
+      "estado": "TEXTOS RECOPILADOS; REVISION PENDIENTE",
+      "evidenciaVersionFuente": {
+        "archivo": "fuentes/sha256-bebfedb0128f5c36f4fc0c2e37f6d3db072e7ada1b902b9c4373a3915bcd64bb.txt",
+        "sha256": "bebfedb0128f5c36f4fc0c2e37f6d3db072e7ada1b902b9c4373a3915bcd64bb",
+        "origen": "version_stamp/version_stamp.cs",
+        "url": "https://github.com/ericsink/SQLitePCL.raw/blob/0873d14f6dcb3a8537444679468499ab9f5a782a/version_stamp/version_stamp.cs",
+        "gitBlob": "2965df80a04eb0aaf0f606159f29739ff5e03665"
+      }
     }
   ],
   "catalogosOrigen": [
@@ -1518,6 +1846,23 @@
       ],
       "depsSha256": "41e3f3aa38e00f07c5d312d23d9d442c9d029714a859327828da7ded9a6ff669",
       "alcance": "Runtime corregido de la nueva API Comunidad local; no modifica la beta publicada."
+    },
+    {
+      "fecha": "2026-10-28",
+      "paquetes": [
+        "Microsoft.AspNetCore.OpenApi/10.0.14",
+        "Microsoft.Data.SqlClient/7.1.1",
+        "Microsoft.Data.SqlClient.Extensions.Abstractions/7.1.1",
+        "Microsoft.Data.SqlClient.Internal.Logging/7.1.1",
+        "Microsoft.Data.Sqlite/10.0.14",
+        "Microsoft.Data.Sqlite.Core/10.0.14",
+        "Microsoft.OpenApi/2.13.0",
+        "SQLitePCLRaw.bundle_e_sqlite3/2.1.13",
+        "SQLitePCLRaw.lib.e_sqlite3/2.1.13",
+        "SQLitePCLRaw.provider.e_sqlite3/2.1.13"
+      ],
+      "depsSha256": "f8b400131b163619fc04e8be1403332a2840e8ad95e1449f9bde223277443987",
+      "alcance": "Grafo Comunidad autocontenido de Windows x64. Textos de paquetes exactos y commits de origen; SQLitePCLRaw 2.1.13 se vincula por versión de su generador, no por commit declarado en nuspec."
     }
   ]
 }
