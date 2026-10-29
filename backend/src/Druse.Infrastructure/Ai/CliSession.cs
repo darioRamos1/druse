@@ -52,17 +52,17 @@ public sealed class CliSession : ICliSession
         {
             var line = await RunAsync(command, ["login", "status"], home, cancellationToken);
 
-            return ReadCodexStatus(line);
+            return ReadCodexStatus(line) with { Version = version.Trim() };
         }
 
         var status = await RunAsync(command, ["auth", "status", "--json"], home, cancellationToken);
 
         if (status is null)
         {
-            return new CliSessionState(true, null, null, null, "Está instalado, pero no dijo su estado.");
+            return new CliSessionState(true, null, null, null, "Está instalado, pero no dijo su estado.", version.Trim());
         }
 
-        return ReadClaudeStatus(status);
+        return ReadClaudeStatus(status) with { Version = version.Trim() };
     }
 
     public async Task<CliLaunch> StartLoginAsync(

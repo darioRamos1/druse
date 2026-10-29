@@ -878,6 +878,7 @@ internal static class ContractMapper
 
         return new EngineCapabilitiesDto
         {
+            AiPlanFormat = capabilities.AiPlanFormat,
             RequiresHost = capabilities.RequiresHost,
             RequiresUsername = capabilities.RequiresUsername,
             RequiresDatabase = capabilities.RequiresDatabase,

@@ -1,4 +1,4 @@
-import { KnownRelation } from '../../shared/models/workspace';
+import { DatabaseObject, TableDetail } from '../../shared/models/workspace';
 
 /** Lo que el asistente sabe de la base, ya compuesto y listo para enviar. */
 export interface AiSchemaContext {
@@ -8,94 +8,73 @@ export interface AiSchemaContext {
   readonly tables: readonly string[];
 }
 
-/**
- * Cuántas tablas se describen como mucho.
- *
- * Una base de trescientas tablas no cabe en la pregunta —ni conviene: cuesta
- * dinero por tokens y entierra lo que importa entre ruido—. El tope se aplica a
- * las tablas cargadas, que son las que el usuario ha estado mirando, así que lo
- * que sobrevive al corte suele ser lo que está usando.
- */
-const MAX_TABLES = 40;
-
-/**
- * Cuántas columnas se describen por tabla.
- *
- * Una tabla ancha —de esas de ciento veinte columnas que aparecen en sistemas
- * viejos— se comería el presupuesto entero. Se cuentan las que faltan para que
- * el modelo sepa que hay más y pueda pedirlas.
- */
-const MAX_COLUMNS = 60;
-
-/**
- * Describe el esquema para el asistente.
- *
- * **Estructura, nunca datos.** De aquí sale cómo se llaman las tablas y las
- * columnas y de qué tipo son; ninguna fila. Es lo que hace útil al asistente sin
- * mandar fuera información de nadie, y por eso la composición vive en una
- * función suelta y probada en lugar de estar embebida en un componente: es la
- * frontera por la que sale trabajo del equipo.
- *
- * El formato imita un `CREATE TABLE` recortado porque es lo que mejor entienden
- * los modelos: han leído millones. Una lista en prosa se interpreta peor.
- */
-export function describeSchema(relations: readonly KnownRelation[]): AiSchemaContext {
-  // Primero lo que tiene columnas conocidas: una tabla de la que solo se sabe
-  // el nombre ocupa sitio y apenas ayuda, así que cede el turno.
-  const ordered = [...relations].sort(
-    (left, right) => Number(right.columns.length > 0) - Number(left.columns.length > 0),
-  );
-
-  const chosen = ordered.slice(0, MAX_TABLES);
-
-  if (chosen.length === 0) {
-    return { schema: '', tables: [] };
-  }
-
-  const lines: string[] = [];
-  const tables: string[] = [];
-
-  for (const relation of chosen) {
-    tables.push(relation.qualified);
-    lines.push(describeRelation(relation));
-  }
-
-  const omitted = relations.length - chosen.length;
-
-  if (omitted > 0) {
-    lines.push(`-- y ${omitted} tablas más que no se han cargado.`);
-  }
-
-  return { schema: lines.join('\n'), tables };
+function quote(name: string): string {
+  return `"${name.replaceAll('"', '""')}"`;
 }
 
-function describeRelation(relation: KnownRelation): string {
-  const what = relation.kind === 'view' ? 'VIEW' : 'TABLE';
+export function qualifiedName(table: Pick<DatabaseObject, 'schema' | 'name'>): string {
+  return table.schema ? `${quote(table.schema)}.${quote(table.name)}` : quote(table.name);
+}
 
-  // Sin columnas cargadas se dice el nombre y ya: es más útil que callarlo
-  // —el modelo sabe que la tabla existe y puede preguntar por ella— y es
-  // honesto sobre lo que no se sabe.
-  if (relation.columns.length === 0) {
-    return `${what} ${relation.qualified};`;
-  }
+/** Los motores basados en archivo pueden usar una ruta al conectar y un alias en el catálogo. */
+export function resolveAiDatabase(
+  database: string,
+  catalog: readonly string[],
+  usesFilePath: boolean,
+): string {
+  return !catalog.includes(database) && usesFilePath && catalog.length === 1
+    ? catalog[0]
+    : database;
+}
 
-  const columns = relation.columns.slice(0, MAX_COLUMNS).map((column) => {
-    const marks = [
-      column.dataType,
-      column.isPrimaryKey ? 'PRIMARY KEY' : '',
-      column.isNullable ? '' : 'NOT NULL',
-    ]
-      .filter((mark) => mark.length > 0)
-      .join(' ');
-
-    return `  ${column.name} ${marks}`;
-  });
-
-  const rest = relation.columns.length - columns.length;
-
-  if (rest > 0) {
-    columns.push(`  -- y ${rest} columnas más`);
-  }
-
-  return `${what} ${relation.qualified} (\n${columns.join(',\n')}\n);`;
+/** La selección explícita no se recorta: una FK compuesta necesita todas sus columnas. */
+export function describeSelectedTables(details: readonly TableDetail[]): AiSchemaContext {
+  const schema = details
+    .map(({ table, columns, structure }) => {
+      const name = qualifiedName(table);
+      const lines = [...columns]
+        .sort((a, b) => a.ordinal - b.ordinal)
+        .map(
+          (column) =>
+            `  ${quote(column.name)} ${column.dataType}${column.isNullable ? '' : ' NOT NULL'}${
+              column.defaultValue == null ? '' : ` DEFAULT ${column.defaultValue}`
+            }${column.isGenerated ? ' GENERATED' : ''}`,
+        );
+      const names = (values: readonly string[]) => values.map(quote).join(', ');
+      const actions = {
+        noAction: 'NO ACTION',
+        cascade: 'CASCADE',
+        setNull: 'SET NULL',
+        setDefault: 'SET DEFAULT',
+      };
+      if (structure.primaryKey)
+        lines.push(`  PRIMARY KEY (${names(structure.primaryKey.columns)})`);
+      for (const key of structure.foreignKeys) {
+        lines.push(
+          `  CONSTRAINT ${quote(key.name)} FOREIGN KEY (${names(key.columns)}) REFERENCES ${qualifiedName(
+            { schema: key.referencedSchema ?? table.schema, name: key.referencedTable },
+          )} (${names(key.referencedColumns)}) ON DELETE ${actions[key.onDelete]} ON UPDATE ${actions[key.onUpdate]}`,
+        );
+      }
+      for (const constraint of structure.uniqueConstraints)
+        lines.push(`  CONSTRAINT ${quote(constraint.name)} UNIQUE (${names(constraint.columns)})`);
+      for (const constraint of structure.checkConstraints) {
+        if (constraint.expression)
+          lines.push(`  CONSTRAINT ${quote(constraint.name)} CHECK (${constraint.expression})`);
+      }
+      const indexes = structure.indexes
+        .filter((index) => !index.isPrimaryKey)
+        .map(
+          (index) =>
+            `${index.isUnique ? 'UNIQUE ' : ''}INDEX ${quote(index.name)} ON ${name}${index.method ? ` USING ${index.method}` : ''} (${index.columns.map((column) => `${quote(column.name)}${column.direction === 'desc' ? ' DESC' : ''}`).join(', ')})${
+              index.includedColumns.length ? ` INCLUDE (${names(index.includedColumns)})` : ''
+            }${index.filter ? ` WHERE ${index.filter}` : ''};`,
+        );
+      return [
+        `${table.kind === 'view' ? 'VIEW' : 'TABLE'} ${name} (\n${lines.join(',\n')}\n);`,
+        ...indexes,
+      ].join('\n');
+    })
+    .join('\n\n');
+  return { schema, tables: details.map((detail) => qualifiedName(detail.table)) };
 }

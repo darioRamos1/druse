@@ -114,6 +114,13 @@ $cargoTargetDir = if ($env:CARGO_TARGET_DIR) {
 # instalador: leerla de otro sitio produciría un manifiesto que dice una versión
 # distinta de la que se reparte.
 $appVersion = (Get-Content (Join-Path $tauriDir 'tauri.conf.json') -Raw | ConvertFrom-Json).version
+
+# Cada versión trae sus novedades: Druse las enseña solo al abrirse tras
+# actualizar, y sin entrada no habría nada que enseñar.
+$releaseNotes = Join-Path $repoRoot 'frontend/src/app/core/whats-new/release-notes.ts'
+if (-not (Select-String -Path $releaseNotes -SimpleMatch "version: '$appVersion'" -Quiet)) {
+    throw "Faltan las novedades de la versión $appVersion en $releaseNotes."
+}
 $manifestDir = Join-Path $repoRoot 'artifacts/paquete'
 $updaterKey = if ($env:TAURI_SIGNING_PRIVATE_KEY_PATH) {
     $env:TAURI_SIGNING_PRIVATE_KEY_PATH
@@ -475,10 +482,12 @@ if ($Portable) {
         throw "No se encontró el ejecutable en $appPath"
     }
 
-    $staging = Join-Path $tauriDir "target/portable/Druse-$Runtime"
+    $portableRoot = [IO.Path]::GetFullPath((Join-Path $cargoTargetDir 'portable'))
+    $staging = [IO.Path]::GetFullPath((Join-Path $portableRoot "Druse-$Runtime-$Variant"))
+    if ((Split-Path -Parent $staging) -ne $portableRoot) { throw 'Directorio portable fuera del destino de Cargo.' }
 
     if (Test-Path $staging) {
-        Remove-Item $staging -Recurse -Force
+        Remove-Item -LiteralPath $staging -Recurse -Force
     }
 
     New-Item -ItemType Directory -Force $staging | Out-Null
@@ -492,7 +501,8 @@ if ($Portable) {
 Druse — distribución portable
 
 Ejecuta druse.exe. No hace falta instalar nada: la API viaja dentro y no
-necesitas .NET ni Node.js.
+necesitas .NET ni Node.js. Extrae el ZIP completo antes de ejecutar Druse.
+Requiere Microsoft Edge WebView2 Runtime; si falta, instálalo desde Microsoft.
 
 Dónde se guardan tus datos
 --------------------------
@@ -516,8 +526,8 @@ y Microsoft que no son libres. Los componentes de terceros conservan sus
 propias licencias: consulta api\THIRD_PARTY_NOTICES-Druse.md.
 '@ | Set-Content (Join-Path $staging 'LEEME.txt') -Encoding UTF8
 
-    $zip = Join-Path $tauriDir "target/portable/Druse-$appVersion-$Runtime-portable$VariantSuffix.zip"
-    Remove-Item $zip -Force -ErrorAction SilentlyContinue
+    $zip = Join-Path $portableRoot "Druse-$appVersion-$Runtime-portable$VariantSuffix.zip"
+    Remove-Item -LiteralPath $zip -Force -ErrorAction SilentlyContinue
     Compress-Archive -Path "$staging\*" -DestinationPath $zip -CompressionLevel Optimal
 
     "  {0}  ({1:N1} MB)" -f $zip, ((Get-Item $zip).Length / 1MB)
@@ -533,7 +543,7 @@ $artifactPaths = @(foreach ($bundle in $bundles) { $bundle.FullName; "$($bundle.
 # El ZIP portable solo existe con -Portable, y `Get-DruseArtifactEntries` ignora
 # lo que no está: así el manifiesto lista lo que se generó de verdad en esta
 # ejecución, sin una entrada vacía para lo que no se pidió.
-if ($Portable) { $artifactPaths += $zip }
+if ($Portable) { $artifactPaths += @($zip, $appPath, (Join-Path $staging 'LEEME.txt')) }
 
 $manifest = Write-DrusePackageManifest `
     -Inventory ($inventory + @(Get-DruseArtifactEntries -Path $artifactPaths)) `

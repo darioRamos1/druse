@@ -1,0 +1,27 @@
+<h3>{{ 'ai.plan.title' | t }}</h3>
+<p class="origin">
+  {{ attachment().source.connectionName }} · {{ attachment().source.database }} ·
+  {{ attachment().source.engine }} {{ attachment().source.serverVersion }}
+</p>
+<p class="origin">{{ attachment().plan.occurredAtUtc }} · {{ attachment().plan.executionId }}</p>
+<p>{{ 'ai.plan.review' | t }}</p>
+@if (!allowed()) {
+  <p role="alert">{{ 'ai.plan.blocked' | t }}</p>
+}
+<label
+  >{{ 'ai.plan.sql' | t }}
+  <textarea
+    rows="4"
+    [value]="attachment().plan.sql"
+    (input)="edit('sql', $any($event.target).value)"
+  ></textarea>
+</label>
+<label
+  >{{ 'ai.plan.text' | t }}
+  <textarea
+    rows="10"
+    [value]="attachment().plan.text"
+    (input)="edit('text', $any($event.target).value)"
+  ></textarea>
+</label>
+<button type="button" (click)="removed.emit()">{{ 'ai.plan.remove' | t }}</button>

@@ -70,6 +70,18 @@ export class ExplorerStore {
     this._onSessionLost = handler;
   }
 
+  private readonly _revisions = signal<ReadonlyMap<string, number>>(new Map());
+
+  revisionFor(connectionId: string): number {
+    return this._revisions().get(connectionId) ?? 0;
+  }
+
+  private invalidate(connectionId: string): void {
+    this._revisions.update((all) =>
+      new Map(all).set(connectionId, (all.get(connectionId) ?? 0) + 1),
+    );
+  }
+
   /** Árbol por conexión, en forma de raíces con hijos perezosos. */
   private readonly _roots = signal<readonly TreeEntry[]>([]);
 
@@ -81,6 +93,7 @@ export class ExplorerStore {
    * responde, y enseñarlo sería ofrecer un catálogo que nadie puede consultar.
    */
   forget(connectionId: string): void {
+    this.invalidate(connectionId);
     this.forgetPrimed(connectionId);
     this._roots.update((roots) => roots.filter((root) => root.connectionId !== connectionId));
   }
@@ -419,6 +432,7 @@ export class ExplorerStore {
       return;
     }
 
+    this.invalidate(entry.connectionId);
     entry.children = null;
     entry.expanded = true;
 
@@ -433,6 +447,7 @@ export class ExplorerStore {
    * de estructura: es ella quien sabe cuándo hay sesión nueva de la que colgar.
    */
   async loadDatabases(connectionId: string, sessionId: string): Promise<void> {
+    this.invalidate(connectionId);
     try {
       const databases = await firstValueFrom(this._gateway.getDatabases(sessionId));
 
@@ -729,10 +744,11 @@ function toExplorerNode(entry: TreeEntry): ExplorerNode {
     expandable: object.hasChildren,
     expanded: entry.expanded,
     loading: entry.loading,
+    // `== null` y no `=== undefined`: la API manda `null` para todo lo que no es
+    // una tabla, y `formatNumber(null)` pintaba un «0» junto a cada base,
+    // esquema y carpeta del árbol.
     badge:
-      object.approximateRowCount === undefined
-        ? undefined
-        : formatNumber(object.approximateRowCount),
+      object.approximateRowCount == null ? undefined : formatNumber(object.approximateRowCount),
     hint: object.kind === 'column' ? object.dataType : undefined,
     source: object,
     connectionId: entry.connectionId,

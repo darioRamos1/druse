@@ -173,6 +173,7 @@ export default class SqlEditor implements OnInit {
 
   readonly value = input('');
   readonly readOnly = input(false);
+  readonly guardChanges = input(false);
   readonly engine = input<DatabaseEngine>('postgresql');
 
   /**
@@ -270,8 +271,16 @@ export default class SqlEditor implements OnInit {
   })();
   private _monaco: typeof MonacoApi | null = null;
   private _syncingExternalValue = false;
+  private _rejectedChangeAction: 'undo' | 'redo' = 'undo';
 
   constructor() {
+    effect(() => {
+      if (this.guardChanges() && this.ready()) {
+        // Una edición rechazada no debe deshacer el SQL que ya se había
+        // aceptado antes de empezar a cambiar celdas en los resultados.
+        this._editor?.pushUndoStop();
+      }
+    });
     // El valor puede cambiar desde fuera al cambiar de pestaña. Se compara antes
     // de escribir para no reponer el mismo texto en cada pulsación, lo que
     // devolvería el cursor al principio.
@@ -547,6 +556,35 @@ export default class SqlEditor implements OnInit {
     this._editor?.focus();
   }
 
+  rejectLastChange(): void {
+    const editor = this._editor;
+    if (!editor) {
+      return;
+    }
+    const model = editor.getModel();
+    const value = this.value();
+    const action = this._rejectedChangeAction;
+    this._syncingExternalValue = true;
+
+    // Monaco rechaza un undo/redo anidado dentro del que notificó el cambio.
+    // Se espera a que acabe para conservar también su historial y su selección.
+    queueMicrotask(() => {
+      try {
+        if (this._destroyRef.destroyed || editor.getModel() !== model) {
+          return;
+        }
+        editor.trigger('druse', action, null);
+        // setValue no crea un paso que deshacer; aun así, cancelar debe reponer
+        // el SQL aceptado en los cambios que llegan desde acciones externas.
+        if (editor.getValue() !== value) {
+          editor.setValue(value);
+        }
+      } finally {
+        this._syncingExternalValue = false;
+      }
+    });
+  }
+
   /** Quita el error de la ejecución anterior sin tocar los avisos del catálogo. */
   clearExecutionError(): void {
     const model = this._editor?.getModel();
@@ -771,10 +809,12 @@ export default class SqlEditor implements OnInit {
 
       const editor = this._editor;
 
-      editor.onDidChangeModelContent(() => {
+      editor.onDidChangeModelContent((event) => {
         this.clearExecutionError();
 
         if (!this._syncingExternalValue) {
+          // Cancelar un «Deshacer» exige rehacerlo, no deshacer otro paso.
+          this._rejectedChangeAction = event.isUndoing ? 'redo' : 'undo';
           this._zone.run(() => this.valueChange.emit(editor.getValue()));
         }
 

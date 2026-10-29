@@ -30,6 +30,7 @@ import { DatabaseObject } from '../../../shared/models/workspace';
 import { OperationProgress } from '../../../shared/ui/operation-progress/operation-progress';
 import { DialogFocus } from '../../../shared/a11y/dialog-focus';
 import { DialogBackdrop } from '../../../shared/a11y/dialog-backdrop';
+import { Icon } from '../../../shared/ui/icon/icon';
 
 type Step = 'tables' | 'target' | 'plan' | 'running';
 
@@ -55,7 +56,7 @@ interface Pair {
 @Component({
   selector: 'app-transfer-set-dialog',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [DialogBackdrop, DialogFocus, FormsModule, OperationProgress, TranslatePipe],
+  imports: [Icon, DialogBackdrop, DialogFocus, FormsModule, OperationProgress, TranslatePipe],
   templateUrl: './transfer-set-dialog.html',
   styleUrl: './transfer-set-dialog.scss',
 })

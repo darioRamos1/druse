@@ -1,5 +1,7 @@
 # Edición Comunidad — candidata a revisión
 
+Estado al 14 de octubre de 2026: ya existe una [beta pública 1.3.0](https://github.com/darioRamos1/druse/releases/tag/v1.3.0-beta.1), construida por [GitHub Actions](https://github.com/darioRamos1/druse/actions/runs/37871707187) desde `e5b36685fa15b54ce3b259d48a446a0c56fcbff5`. Incluye instalador, inventario y hashes; no tiene Authenticode, `.sig` ni actualización automática. SignPath rechazó por ahora la solicitud por falta de reconocimiento público. El [plan de reaplicación](../planes/plan-reaplicacion-signpath-2026-10-11.md) y el [registro de evidencia](evidencia-adopcion-signpath.md) describen el trabajo actual. Los apartados de septiembre conservan sus resultados históricos; Windows limpio, SNI, WebView2 y revisión de terceros siguen pendientes.
+
 La edición Comunidad conserva PostgreSQL, SQL Server, MySQL/MariaDB y SQLite. Excluye los proveedores de Oracle e Informix, los controladores de Oracle/IBM y el puente JDBC/IKVM. La edición completa sigue disponible en el código.
 
 Esta separación aplica la vía que SignPath indicó en su respuesta del 16 de septiembre. **No acredita elegibilidad ni firma concedida:** Microsoft SNI y WebView2 siguen sin aclaración expresa, y quedan obligaciones de redistribución y pruebas de Windows pendientes.

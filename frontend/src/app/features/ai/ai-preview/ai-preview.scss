@@ -1,0 +1,107 @@
+:host {
+  display: block;
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 12px;
+  color: var(--dr-text);
+  font-size: 12px;
+}
+h3,
+h4 {
+  font-size: 12px;
+  margin: 12px 0 8px;
+}
+h3 {
+  margin-top: 0;
+}
+p,
+li {
+  line-height: 1.5;
+}
+pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 240px;
+  overflow: auto;
+  font: 11px/1.6 var(--dr-font-mono);
+  padding: 8px;
+  background: var(--dr-surface-input);
+  border: 1px solid var(--dr-border);
+  border-radius: 4px;
+}
+.destination {
+  overflow-wrap: anywhere;
+  color: var(--dr-text-dim);
+}
+summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+details {
+  margin: 12px 0;
+}
+label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+select,
+button {
+  font: inherit;
+  color: inherit;
+  background: var(--dr-surface-panel);
+  padding: 6px;
+  border: 1px solid var(--dr-border);
+  border-radius: 4px;
+}
+select:focus-visible,
+button:focus-visible {
+  outline: 2px solid var(--dr-accent);
+  outline-offset: 2px;
+}
+button {
+  cursor: pointer;
+}
+button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  position: sticky;
+  bottom: -12px;
+  background: var(--dr-surface-panel);
+  border-top: 1px solid var(--dr-border);
+  padding: 12px 0;
+}
+.confirm {
+  border-color: var(--dr-accent);
+}
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+th,
+td {
+  text-align: left;
+  padding: 4px;
+  border-bottom: 1px solid var(--dr-border-faint);
+}
+td:last-child,
+th:last-child {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.omitted {
+  border-left: 2px solid var(--dr-accent);
+  padding-left: 8px;
+}
+.omitted li {
+  overflow-wrap: anywhere;
+}
+.problems {
+  color: var(--dr-danger);
+}

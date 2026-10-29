@@ -15,6 +15,8 @@
       driver de Oracle y con IKVM para resolver un problema que aquí no hay.
     -->
     <PackageReference Include="Oracle.ManagedDataAccess.Core" Version="23.26.301" />
+    <!-- ODP.NET trae PKCS 8.0.1; se conserva la rama 8 con el parche de ambos avisos de octubre. -->
+    <PackageReference Include="System.Security.Cryptography.Pkcs" Version="8.0.2" />
   </ItemGroup>
 
   <ItemGroup>

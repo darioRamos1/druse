@@ -68,10 +68,11 @@ const DARK: MonacoApi.editor.IStandaloneThemeData = {
   inherit: true,
   rules: [
     // Palabras reservadas: violeta, como SELECT / FROM / WHERE en el mockup.
-    { token: 'keyword', foreground: 'A78BFA', fontStyle: 'bold' },
-    { token: 'keyword.sql', foreground: 'A78BFA', fontStyle: 'bold' },
-    // Los signos también son código: deben leerse tan claramente como los nombres.
-    { token: 'operator.sql', foreground: 'D3DEEE' },
+    { token: 'keyword', foreground: 'BBA3FF', fontStyle: 'bold' },
+    { token: 'keyword.sql', foreground: 'BBA3FF', fontStyle: 'bold' },
+    // Monaco también clasifica JOIN, AND, IS y NULL como operadores. Dejarlos
+    // en gris hacía que media cláusula pareciera un nombre sin reconocer.
+    { token: 'operator.sql', foreground: 'BBA3FF', fontStyle: 'bold' },
     { token: 'delimiter', foreground: 'D3DEEE' },
     { token: 'delimiter.parenthesis', foreground: 'D3DEEE' },
     // Identificadores y alias.
@@ -123,9 +124,9 @@ const LIGHT: MonacoApi.editor.IStandaloneThemeData = {
   base: 'vs',
   inherit: true,
   rules: [
-    { token: 'keyword', foreground: '6D47E0', fontStyle: 'bold' },
-    { token: 'keyword.sql', foreground: '6D47E0', fontStyle: 'bold' },
-    { token: 'operator.sql', foreground: '4B586D' },
+    { token: 'keyword', foreground: '5933CC', fontStyle: 'bold' },
+    { token: 'keyword.sql', foreground: '5933CC', fontStyle: 'bold' },
+    { token: 'operator.sql', foreground: '5933CC', fontStyle: 'bold' },
     { token: 'delimiter', foreground: '4B586D' },
     { token: 'delimiter.parenthesis', foreground: '4B586D' },
     { token: 'identifier', foreground: '1C2432' },

@@ -39,7 +39,7 @@ $latest = Join-Path $releaseDir 'latest.json'
     Cada prueba parte de una release que sí se publicaría y rompe una sola cosa.
     Así, cuando una falla, se sabe cuál es esa cosa.
 #>
-function Nueva-Release([switch]$Community) {
+function Nueva-Release([switch]$Community, [switch]$Portable) {
     Remove-TestDirectory $releaseDir
 
     New-Item -ItemType Directory -Force $releaseDir | Out-Null
@@ -109,9 +109,28 @@ function Nueva-Release([switch]$Community) {
                 })
         }
 
+        if ($Portable) {
+            $staging = Join-Path $raiz "portable-$variante"
+            Remove-TestDirectory $staging
+            New-Item -ItemType Directory -Path (Join-Path $staging 'api') -Force | Out-Null
+            Set-Content -LiteralPath (Join-Path $staging 'druse.exe') -Value "MZ Druse $variante" -Encoding ascii
+            Set-Content -LiteralPath (Join-Path $staging 'LEEME.txt') -Value 'Extrae el ZIP antes de ejecutar.' -Encoding utf8
+            Set-Content -LiteralPath (Join-Path $staging 'api/Druse.Host.LocalApi.exe') -Value "MZ API $variante" -Encoding ascii
+            foreach ($aviso in Get-DruseRequiredNotices) {
+                Copy-Item -LiteralPath $aviso.origen -Destination (Join-Path $staging $aviso.ruta)
+            }
+            $portablePath = Join-Path $releaseDir "Druse-$version-windows-x86_64-$variante-portable.zip"
+            [IO.Compression.ZipFile]::CreateFromDirectory($staging, $portablePath)
+            $contenido.contenido = @($contenido.contenido | Where-Object { $_.ruta -notlike 'api/*' }) +
+                @(Get-DrusePackageInventory -Path (Join-Path $staging 'api') -Prefix 'api') +
+                @(Get-DruseArtifactEntries -Path @((Join-Path $staging 'druse.exe'), (Join-Path $staging 'LEEME.txt'), $portablePath))
+        }
+
         $contenido | ConvertTo-Json -Depth 6 |
             Set-Content -LiteralPath (Join-Path $manifestDir "manifiesto-$variante-$version-win-x64.json") -Encoding UTF8
     }
+
+    if ($Portable) { Write-DruseReleaseChecksums -ReleaseDir $releaseDir }
 
     return [string]$clave
 }
@@ -121,11 +140,11 @@ function Nueva-Release([switch]$Community) {
     Comprueba que la verificación rechaza, y por el motivo esperado.
 #>
 function Debe-Rechazar {
-    param([string]$Clave, [string]$Patron, [string]$Caso, [switch]$Community)
+    param([string]$Clave, [string]$Patron, [string]$Caso, [switch]$Community, [switch]$Portable)
 
     try {
         Invoke-DruseReleaseVerificacion -SinAuthenticode `
-            -ReleaseDir $releaseDir -Version $version -PublicKey $Clave -ManifestDir $manifestDir -IncludeCommunity:$Community | Out-Null
+            -ReleaseDir $releaseDir -Version $version -PublicKey $Clave -ManifestDir $manifestDir -IncludeCommunity:$Community -IncludePortable:$Portable | Out-Null
     }
     catch {
         if ($_.Exception.Message -notmatch $Patron) {
@@ -289,7 +308,57 @@ try {
         $manifest | ConvertTo-Json -Depth 6 | Set-Content $latest -Encoding utf8
         Debe-Rechazar $clave $pattern "Comunidad: $case" -Community
     }
-    'OK: releases de dos y tres ediciones verificadas; Comunidad ausente, cruzada, alterada, sin inventario o con URL incorrecta se rechaza.'
+    $clave = Nueva-Release -Community -Portable
+    $result = Invoke-DruseReleaseVerificacion -SinAuthenticode -ReleaseDir $releaseDir -Version $version -PublicKey $clave -ManifestDir $manifestDir -IncludeCommunity -IncludePortable
+    if ($result.artefactos.Count -ne 7) { throw 'Faltan los tres portables en la evidencia.' }
+    Set-Content -LiteralPath (Join-Path $releaseDir 'evidencia.json') -Value '{"prueba":true}'
+    Write-DruseReleaseChecksums -ReleaseDir $releaseDir
+    Test-DruseReleaseChecksums -ReleaseDir $releaseDir
+    if (-not (Select-String -LiteralPath (Join-Path $releaseDir 'SHA256SUMS.txt') -SimpleMatch 'evidencia.json' -Quiet)) {
+        throw 'La evidencia publicada necesita su propio hash.'
+    }
+
+    foreach ($case in @('ausente', 'otra edición', 'API alterada', 'falta API', 'archivo extra', 'ruta no segura', 'ejecutable alterado', 'sin hashes', 'hash incorrecto', 'hash omitido', 'hash repetido')) {
+        $clave = Nueva-Release -Community -Portable
+        $portablePath = Join-Path $releaseDir "Druse-$version-windows-x86_64-comunidad-portable.zip"
+        $manifestPath = Join-Path $manifestDir "manifiesto-comunidad-$version-win-x64.json"
+        $checksumsPath = Join-Path $releaseDir 'SHA256SUMS.txt'
+        $pattern = 'portable'
+        switch ($case) {
+            'ausente' { Remove-Item -LiteralPath $portablePath; $pattern = 'Faltan artefactos' }
+            'otra edición' {
+                Copy-Item -LiteralPath (Join-Path $releaseDir "Druse-$version-windows-x86_64-completo-portable.zip") -Destination $portablePath -Force
+                $pattern = 'no figura en su manifiesto'
+            }
+            { $_ -in @('API alterada', 'falta API', 'archivo extra', 'ruta no segura', 'ejecutable alterado') } {
+                $archive = [IO.Compression.ZipFile]::Open($portablePath, [IO.Compression.ZipArchiveMode]::Update)
+                try {
+                    switch ($case) {
+                        'API alterada' { $archive.GetEntry('api/Druse.Host.LocalApi.exe').Delete(); $name = 'api/Druse.Host.LocalApi.exe'; $pattern = 'no coincide con el inventario' }
+                        'ejecutable alterado' { $archive.GetEntry('druse.exe').Delete(); $name = 'druse.exe'; $pattern = 'no coincide con el inventario' }
+                        'falta API' { $archive.GetEntry('api/Druse.Host.LocalApi.exe').Delete(); $name = $null; $pattern = 'no contiene todos' }
+                        'archivo extra' { $name = 'api/controlador-no-revisado.dll'; $pattern = 'inesperado' }
+                        'ruta no segura' { $name = '../fuera.exe'; $pattern = 'ruta no segura' }
+                    }
+                    if ($name) {
+                        $writer = [IO.StreamWriter]::new($archive.CreateEntry($name).Open())
+                        try { $writer.Write('bytes no revisados') } finally { $writer.Dispose() }
+                    }
+                } finally { $archive.Dispose() }
+                # Incluso si alguien recalcula el hash del ZIP, sus archivos deben
+                # coincidir con la API y el ejecutable revisados al empaquetar.
+                $manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
+                ($manifest.contenido | Where-Object { $_.ruta -like 'bundle/*-portable*.zip' }).sha256 = (Get-FileHash -LiteralPath $portablePath).Hash.ToLowerInvariant()
+                $manifest | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $manifestPath
+            }
+            'sin hashes' { Remove-Item -LiteralPath $checksumsPath; $pattern = 'Falta SHA256SUMS' }
+            'hash incorrecto' { (Get-Content -LiteralPath $checksumsPath) -replace '^[a-f0-9]{64}', ('0' * 64) | Set-Content -LiteralPath $checksumsPath; $pattern = 'SHA256SUMS.txt no coincide' }
+            'hash omitido' { Get-Content -LiteralPath $checksumsPath | Select-Object -Skip 1 | Set-Content -LiteralPath (Join-Path $raiz 'sums.txt'); Copy-Item -LiteralPath (Join-Path $raiz 'sums.txt') -Destination $checksumsPath -Force; $pattern = 'no enumera todos' }
+            'hash repetido' { $firstHash = Get-Content -LiteralPath $checksumsPath -TotalCount 1; Add-Content -LiteralPath $checksumsPath -Value $firstHash; $pattern = 'repite un artefacto' }
+        }
+        Debe-Rechazar $clave $pattern "Portable: $case" -Community -Portable
+    }
+    'OK: instaladores y portables de las tres ediciones verificados; rechazos de firmas, inventarios, ZIP mezclados o alterados y hashes incompletos comprobados.'
 }
 finally {
     Remove-TestDirectory $raiz
