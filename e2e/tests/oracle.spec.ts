@@ -2,6 +2,7 @@ import { type Page, expect, test } from '@playwright/test';
 
 import {
   abrir,
+  abrirPerfilGuardado,
   apuntarPestanaA,
   conjuntos,
   ejecutar,
@@ -97,19 +98,20 @@ async function conectarOracle(page: Page): Promise<void> {
     return;
   }
 
-  await fila.click();
+  if ((await fila.getAttribute('class'))?.includes('is-offline')) {
+    await abrirPerfilGuardado(page, fila, ORACLE.contrasena);
+  }
+
+  await expect(fila).not.toHaveClass(/is-offline/, { timeout: 60_000 });
 }
 
 test.describe('Oracle de punta a punta', () => {
   test('se conecta, se explora y se consulta', async ({ page }) => {
     await abrir(page);
+    await conectarOracle(page);
 
     const sidebar = page.locator('app-connections-sidebar');
     const fila = sidebar.locator('.node--connection', { hasText: ORACLE.nombre }).first();
-
-    if ((await fila.count()) === 0) {
-      await crearConexion(page);
-    }
 
     // --- El árbol -----------------------------------------------------------
     // El primer nivel de Oracle son esquemas, no bases: es lo que hay dentro de

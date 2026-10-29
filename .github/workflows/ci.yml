@@ -45,6 +45,10 @@ env:
 permissions:
   contents: read
 
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   backend:
     name: Backend (${{ matrix.os }})
@@ -298,16 +302,16 @@ jobs:
           -ExpectedSuites 3
           -MinimumTests 800
 
-  # La aplicación entera por donde la usa una persona: Angular, la API local y un
-  # PostgreSQL de verdad. Es el único job que prueba las tres capas juntas, y por
-  # eso vale la pena aunque tarde: lo que se le escapa a las otras es justamente
-  # que encajen entre sí.
+  # La aplicación entera por donde la usa una persona: Angular, la API local y
+  # los motores que usan sus recorridos. SQL Server comprueba la migración entre
+  # motores y Oracle el guion de varias instrucciones; ejecutar esas pruebas sin
+  # sus servidores solo comprobaba errores de conexión.
   #
   # Solo en Linux. Un E2E por sistema operativo triplicaría el tiempo para
   # comprobar tres veces lo mismo: lo que aquí se ejercita es la aplicación, no
   # el sistema debajo.
   e2e:
-    name: Punta a punta
+    name: Punta a punta (PostgreSQL, SQL Server, Oracle y SQLite)
     runs-on: ubuntu-latest
 
     services:
@@ -324,8 +328,63 @@ jobs:
           --health-timeout 5s
           --health-retries 10
 
+      sqlserver:
+        image: mcr.microsoft.com/mssql/server:2022-latest@sha256:ba4c8329f48fb8f02e1416be6a930ebfd71268caee78aa985f3af4315e457c89
+        env:
+          ACCEPT_EULA: 'Y'
+          MSSQL_SA_PASSWORD: Druse_dev_only_1
+          MSSQL_PID: Developer
+          MSSQL_MEMORY_LIMIT_MB: 2048
+        ports:
+          - 14433:1433
+        options: >-
+          --health-cmd "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P Druse_dev_only_1 -C -b -Q 'SELECT 1'"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 20
+          --health-start-period 30s
+
+      oracle:
+        image: gvenzl/oracle-free:23.26.3-slim-faststart@sha256:f5ff19033860d662c821cb04eb10483fa94f14f78eae252d054291ea07028093
+        env:
+          ORACLE_PASSWORD: druse_dev_only
+          APP_USER: druse
+          APP_USER_PASSWORD: druse_dev_only
+        ports:
+          - 15210:1521
+        options: >-
+          --health-cmd healthcheck.sh
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 30
+          --health-start-period 30s
+
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # Se prepara un perfil desechable completo. La sugerencia tras un alias
+      # necesita columnas reales; una base vacía no reproduce lo que usa ese E2E.
+      - name: Preparar y comprobar las bases de punta a punta
+        run: |
+          docker exec -i "${{ job.services.postgres.id }}" \
+            psql -U postgres -d druse_test -v ON_ERROR_STOP=1 <<'SQL'
+          CREATE TABLE accionista (id integer PRIMARY KEY, nombre text NOT NULL, participacion numeric(5,2));
+          CREATE TABLE ciudad (id integer PRIMARY KEY, nombre text NOT NULL, poblacion integer, id_ciudad integer REFERENCES accionista (id));
+          INSERT INTO accionista VALUES (1, 'Ana', 51.00), (2, 'Bea', 49.00);
+          INSERT INTO ciudad VALUES (1, 'Guadalajara', 1495189, 1), (2, 'Monterrey', 1142994, 2);
+          SQL
+
+          docker exec "${{ job.services.sqlserver.id }}" \
+            /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P 'Druse_dev_only_1' -C -b \
+            -Q "CREATE DATABASE druse_test;"
+
+          docker exec -i "${{ job.services.oracle.id }}" \
+            sqlplus -L -s druse/druse_dev_only@localhost/FREEPDB1 <<'SQL'
+          WHENEVER OSERROR EXIT FAILURE
+          WHENEVER SQLERROR EXIT FAILURE
+          SELECT 1 FROM DUAL;
+          EXIT;
+          SQL
 
       - name: Instalar .NET
         uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
@@ -656,7 +715,22 @@ jobs:
           # las bibliotecas actuales de Ubuntu; conservar símbolos evita esa
           # transformación sin excluir archivos ni verificaciones del paquete.
           NO_STRIP: ${{ matrix.os == 'ubuntu-latest' && '1' || '' }}
-        run: cargo tauri build --verbose --bundles ${{ matrix.bundles }} -- --locked
+        run: |
+          if [[ "${{ runner.os }}" == 'Linux' ]]; then
+            # El paquete de IBM incluye libDB2xml4c.so.58, pero el RPATH de
+            # libdb2clixml4c.so apunta a /opt/ibm/db2, que no existe aquí.
+            # linuxdeploy debe resolverla desde la API que se está empaquetando.
+            export LD_LIBRARY_PATH="$PWD/api/clidriver/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+            for library in api/clidriver/lib/libdb2.so.1 api/clidriver/lib/libdb2clixml4c.so; do
+              dependencies="$(LC_ALL=C ldd "$library")"
+              printf '%s\n' "$dependencies"
+              if [[ "$dependencies" == *'not found'* ]]; then
+                echo "::error::Faltan dependencias nativas de IBM en $library."
+                exit 1
+              fi
+            done
+          fi
+          cargo tauri build --verbose --bundles ${{ matrix.bundles }} -- --locked
 
       - name: Recoger los artefactos
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

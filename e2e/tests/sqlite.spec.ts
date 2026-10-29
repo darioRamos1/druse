@@ -7,6 +7,7 @@ import { expect, test, type Page } from '@playwright/test';
 
 import {
   abrir,
+  apuntarPestanaA,
   ejecutar,
   escribirSql,
   esperarFinDeConsulta,
@@ -180,6 +181,9 @@ test.describe('SQLite de punta a punta', () => {
     await context.grantPermissions(['clipboard-read', 'clipboard-write']);
     await abrir(page);
     await conectado(page);
+    // La suite conserva pestañas de otros motores; el teclado debe ejecutar en
+    // el archivo de esta prueba aunque haya quedado otra pestaña seleccionada.
+    await apuntarPestanaA(page, 'E2E SQLite', 'main');
     await page.locator('app-editor-toolbar .limits .chip').click();
     await page.getByLabel('Límite de filas', { exact: true }).selectOption('1000');
     await page.keyboard.press('Escape');

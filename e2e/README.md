@@ -1,8 +1,8 @@
 # Pruebas de punta a punta
 
 Druse entero, por donde lo usa una persona: Angular en el navegador, la API
-local detrás y un PostgreSQL de verdad al fondo. Es el único sitio del
-repositorio donde las tres capas se prueban juntas.
+local detrás y motores de verdad al fondo. Aquí se prueban las tres capas
+juntas con PostgreSQL, SQL Server, Oracle y SQLite.
 
 ## Qué se prueba aquí, y qué no
 
@@ -35,6 +35,13 @@ porque crea la base al arrancar.
 
 **SQLite no necesita nada.** Su prueba se crea su propio archivo, así que corre
 en cualquier máquina sin levantar un solo contenedor.
+
+CI levanta los tres servidores, espera sus comprobaciones de salud y prepara
+las bases antes de iniciar Playwright. PostgreSQL recibe `accionista` y `ciudad`,
+las tablas que usa el autocompletado; SQL Server recibe `druse_test`, y Oracle
+el usuario `druse` del servicio `FREEPDB1`. Las imágenes se fijan por digest.
+Un fallo de preparación detiene el trabajo; las pruebas de esos motores no se
+omiten por falta de servidor.
 
 ## Ejecutarlas
 

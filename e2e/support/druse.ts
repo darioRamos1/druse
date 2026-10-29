@@ -1,4 +1,4 @@
-import { expect, type Page } from '@playwright/test';
+import { expect, type Locator, type Page } from '@playwright/test';
 import { elegirIdioma, t } from './i18n';
 
 /**
@@ -79,7 +79,7 @@ export async function abrir(page: Page, idioma?: string): Promise<void> {
  */
 export async function conectar(page: Page): Promise<void> {
   const sidebar = page.locator('app-connections-sidebar');
-  const fila = sidebar.getByText(CONTENEDOR.nombre).first();
+  const fila = sidebar.locator('.node--connection', { hasText: CONTENEDOR.nombre }).first();
 
   if ((await fila.count()) === 0) {
     await crearConexion(page);
@@ -94,7 +94,9 @@ export async function conectar(page: Page): Promise<void> {
    * costumbre plegaría el árbol que acaba de desplegar el diálogo, y la prueba
    * se quedaría esperando algo que ella misma acaba de esconder.
    */
-  if (!(await base.isVisible().catch(() => false))) {
+  if ((await fila.getAttribute('class'))?.includes('is-offline')) {
+    await abrirPerfilGuardado(page, fila, CONTENEDOR.contrasena);
+  } else if (!(await base.isVisible().catch(() => false))) {
     await fila.click();
   }
 
@@ -127,10 +129,34 @@ export async function conectarSqlServer(page: Page): Promise<void> {
   await expect(fila).toBeVisible({ timeout: 60_000 });
 
   if ((await fila.getAttribute('class'))?.includes('is-offline')) {
-    await fila.click();
+    await abrirPerfilGuardado(page, fila, SQLSERVER.contrasena);
   }
 
   await expect(fila).not.toHaveClass(/is-offline/, { timeout: 60_000 });
+}
+
+/**
+ * Los perfiles se conservan entre pruebas, pero Linux en CI no tiene llavero.
+ * La contraseña se entrega al diálogo cuando la aplicación la pide; así se
+ * ejercita también el recorrido real de un perfil sin contraseña guardada.
+ */
+export async function abrirPerfilGuardado(page: Page, fila: Locator, contrasena: string): Promise<void> {
+  await fila.click();
+  const dialogo = page.locator('app-connection-dialog');
+
+  await expect(async () => {
+    const conectado = !(await fila.getAttribute('class'))?.includes('is-offline');
+    expect(conectado || (await dialogo.isVisible())).toBe(true);
+  }).toPass({ timeout: 60_000 });
+
+  if (await dialogo.isVisible()) {
+    await dialogo
+      .locator(`.field:has(.field__label:text-is("${t('connection.password')}")) input`)
+      .first()
+      .fill(contrasena);
+    await dialogo.getByRole('button', { name: t('connection.connect'), exact: true }).click();
+    await expect(dialogo).toBeHidden({ timeout: 60_000 });
+  }
 }
 
 /** Rellena el diálogo de conexión nueva y conecta. */

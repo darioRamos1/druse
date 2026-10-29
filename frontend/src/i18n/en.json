@@ -1895,5 +1895,6 @@
   "ai.preview.section.plan": "Estimated plan",
   "ai.preview.issue.plan": "The plan exceeds its limit. Edit or remove it before sending.",
   "whatsNew.v1_10_0.chatPlans": "You can attach a SQLite estimated plan obtained with EXPLAIN QUERY PLAN to the chat and review its SQL, contents and limits before sending.",
-  "whatsNew.v1_11_0.downloads": "The website offers Full, Without Informix and Community editions with an installer and a ZIP that runs without installation for the latest published version."
+  "whatsNew.v1_11_0.downloads": "The website offers Full, Without Informix and Community editions with an installer and a ZIP that runs without installation for the latest published version.",
+  "whatsNew.v1_11_1.savedPassword": "When opening a connection without a saved password, you can enter it and connect from the profile dialog."
 }
