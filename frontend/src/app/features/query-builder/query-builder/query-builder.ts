@@ -57,6 +57,7 @@ import { SQL_DIALECTS } from '../../query-editor/sql-language/sql-dialects';
 import { MAX_JOIN_HOPS, findJoinPath } from './join-path';
 import { DialogFocus } from '../../../shared/a11y/dialog-focus';
 import { DialogBackdrop } from '../../../shared/a11y/dialog-backdrop';
+import { Icon } from '../../../shared/ui/icon/icon';
 
 type Operation = 'select' | 'insert' | 'update' | 'delete';
 type InputMode = 'omit' | 'value' | 'null' | 'default';
@@ -229,7 +230,7 @@ const DATE_PERIODS: readonly { readonly value: DatePeriod | 'none'; readonly lab
 @Component({
   selector: 'app-query-builder',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [DialogBackdrop, DialogFocus, ValueInput, ResultsGrid, TranslatePipe],
+  imports: [Icon, DialogBackdrop, DialogFocus, ValueInput, ResultsGrid, TranslatePipe],
   templateUrl: './query-builder.html',
   styleUrl: './query-builder.scss',
 })

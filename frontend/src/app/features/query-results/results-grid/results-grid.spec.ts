@@ -32,6 +32,265 @@ describe('ResultsGrid', () => {
     await fixture.whenStable();
   });
 
+  describe('recorrer con el teclado', () => {
+    function celda(row: number, column: number): HTMLElement {
+      return element.querySelector<HTMLElement>(
+        `[data-nav-row="${row}"][data-nav-column="${column}"]`,
+      )!;
+    }
+    async function tecla(
+      row: number,
+      column: number,
+      key: string,
+      options: KeyboardEventInit = {},
+    ): Promise<void> {
+      celda(row, column).focus();
+      celda(row, column).dispatchEvent(
+        new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true, ...options }),
+      );
+      await fixture.whenStable();
+    }
+    it('tiene una sola celda en el recorrido de Tab y mueve el foco con flechas', async () => {
+      expect(element.querySelectorAll('[data-nav-row][tabindex="0"]').length).toBe(1);
+      await tecla(0, 0, 'ArrowRight');
+      expect(document.activeElement).toBe(celda(0, 1));
+      expect(celda(0, 1).tabIndex).toBe(0);
+      expect(celda(0, 0).tabIndex).toBe(-1);
+      await tecla(0, 1, 'ArrowDown');
+      expect(document.activeElement).toBe(celda(1, 1));
+      expect(element.querySelectorAll('[data-nav-row][tabindex="0"]').length).toBe(1);
+    });
+    it('Inicio y Fin recorren columnas y Control llega a los extremos del resultado', async () => {
+      await tecla(0, 1, 'End');
+      expect(document.activeElement).toBe(celda(0, 2));
+      await tecla(0, 2, 'End', { ctrlKey: true });
+      expect(document.activeElement).toBe(celda(2, 2));
+      await tecla(2, 2, 'Home', { metaKey: true });
+      expect(document.activeElement).toBe(celda(0, 0));
+      await tecla(0, 0, 'ArrowUp');
+      expect(document.activeElement).toBe(celda(-1, 0));
+    });
+    it('Mayúsculas extiende un rectángulo y anuncia su tamaño', async () => {
+      await tecla(0, 0, 'ArrowRight', { shiftKey: true });
+      await tecla(0, 1, 'ArrowDown', { shiftKey: true });
+      expect(element.querySelectorAll('.cell--value.is-selected').length).toBe(4);
+      expect(element.querySelector('[aria-live="polite"]')?.textContent).toContain('2 columnas');
+      await tecla(1, 1, 'ArrowRight');
+      expect(element.querySelectorAll('.cell--value.is-selected').length).toBe(1);
+    });
+    it('F2 lleva al editor y las flechas dentro de él conservan el foco', async () => {
+      fixture.componentRef.setInput('editable', true);
+      await fixture.whenStable();
+      await tecla(0, 1, 'F2');
+      const editor = element.querySelector<HTMLTextAreaElement>('.cell__editor')!;
+      expect(document.activeElement).toBe(editor);
+      editor.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
+      await fixture.whenStable();
+      expect(document.activeElement).toBe(editor);
+      editor.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+      await fixture.whenStable();
+      expect(document.activeElement).toBe(celda(0, 1));
+    });
+    it('F4 permite ajustar el ancho de una cabecera y volver con Escape', async () => {
+      await tecla(-1, 0, 'F4');
+      const handle = element.querySelector<HTMLElement>('.cell__resize')!;
+      expect(document.activeElement).toBe(handle);
+      handle.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
+      handle.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+      await fixture.whenStable();
+      expect(document.activeElement).toBe(celda(-1, 0));
+      expect(handle.getAttribute('aria-valuenow')).toBe('96');
+    });
+    it('filtrar quita la selección anterior y Escape enfoca la primera coincidencia', async () => {
+      fixture.componentRef.setInput('showFilters', true);
+      await fixture.whenStable();
+      await tecla(0, 1, 'ArrowDown', { shiftKey: true });
+      const filter = element.querySelectorAll<HTMLInputElement>('.filters__input')[1];
+      filter.focus();
+      filter.value = 'luis';
+      filter.dispatchEvent(new Event('input'));
+      await fixture.whenStable();
+      expect(document.activeElement).toBe(filter);
+      expect(element.querySelectorAll('.cell--value.is-selected').length).toBe(0);
+      filter.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+      await fixture.whenStable();
+      expect(document.activeElement).toBe(celda(0, 1));
+      expect(celda(0, 1).textContent).toContain('luis');
+    });
+    it('la navegación carga otro bloque y no pierde el foco en la fila 501', async () => {
+      fixture.componentRef.setInput('resultSet', {
+        ...resultSet,
+        totalRows: 502,
+        rows: Array.from({ length: 502 }, (_, i) => ({
+          number: i + 1,
+          values: [`${i + 1}`, 'correo', 'true'],
+        })),
+      });
+      await fixture.whenStable();
+      await tecla(499, 0, 'ArrowDown');
+      expect(document.activeElement).toBe(celda(500, 0));
+      expect(celda(500, 0).textContent?.trim()).toBe('501');
+      expect(element.querySelectorAll('[data-nav-row][tabindex="0"]').length).toBe(1);
+    });
+    it('sin coincidencias queda una cabecera accesible y Tab conserva su comportamiento nativo', async () => {
+      fixture.componentRef.setInput('resultSet', { ...resultSet, rows: [], totalRows: 0 });
+      await fixture.whenStable();
+      expect(celda(-1, 0).tabIndex).toBe(0);
+      const event = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true });
+      celda(-1, 0).dispatchEvent(event);
+      expect(event.defaultPrevented).toBe(false);
+    });
+    it('Alt Supr solo señala la fila editable, sin ejecutar un borrado', async () => {
+      const toggled = vi.fn();
+      fixture.componentInstance.rowToggled.subscribe(toggled);
+      await tecla(0, 0, 'Delete', { altKey: true });
+      expect(toggled).not.toHaveBeenCalled();
+      fixture.componentRef.setInput('editable', true);
+      await fixture.whenStable();
+      await tecla(1, 0, 'Delete', { altKey: true });
+      expect(toggled).toHaveBeenCalledExactlyOnceWith(2);
+    });
+    it('Espacio con modificadores selecciona la columna o la fila completas', async () => {
+      await tecla(0, 1, ' ', { ctrlKey: true });
+      expect(element.querySelectorAll('.cell--value.is-selected').length).toBe(3);
+      expect(celda(-1, 1).getAttribute('aria-selected')).toBe('true');
+      await tecla(1, 1, ' ', { shiftKey: true });
+      expect(element.querySelectorAll('.cell--value.is-selected').length).toBe(3);
+      expect(celda(1, 0).getAttribute('aria-selected')).toBe('true');
+      expect(celda(0, 1).getAttribute('aria-selected')).toBe('false');
+    });
+    it('renovar el resultado conserva un foco válido aunque cambien las columnas', async () => {
+      await tecla(0, 0, 'End', { ctrlKey: true });
+      fixture.componentRef.setInput('resultSet', {
+        ...resultSet,
+        columns: [resultSet.columns[0]],
+        rows: [{ number: 1, values: ['nueva'] }],
+        totalRows: 1,
+      });
+      await fixture.whenStable();
+      expect(document.activeElement).toBe(celda(0, 0));
+      expect(celda(0, 0).textContent).toContain('nueva');
+      expect(element.querySelectorAll('[data-nav-row][tabindex="0"]').length).toBe(1);
+    });
+  });
+
+  describe('editar valores sin cambiar su significado', () => {
+    async function abrir(
+      value: string | null,
+      inputKind = 'text',
+    ): Promise<HTMLTextAreaElement | HTMLInputElement> {
+      fixture.componentRef.setInput('editable', true);
+      fixture.componentRef.setInput('resultSet', {
+        ...resultSet,
+        columns: [{ name: 'valor', dataType: 'text', kind: 'text', width: 250, inputKind }],
+        rows: [{ number: 1, values: [value] }],
+      });
+      await fixture.whenStable();
+      element
+        .querySelector<HTMLElement>('.cell--value')!
+        .dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+      await fixture.whenStable();
+      return element.querySelector<HTMLTextAreaElement | HTMLInputElement>('.cell__editor')!;
+    }
+
+    it('escribir NULL conserva el texto literal y Enter termina la edición una vez', async () => {
+      const edited = vi.fn();
+      fixture.componentInstance.cellEdited.subscribe(edited);
+      const input = await abrir('anterior');
+      input.value = 'NULL';
+      input.dispatchEvent(new Event('input'));
+      input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+      await fixture.whenStable();
+
+      expect(edited).toHaveBeenCalledExactlyOnceWith({ row: 1, column: 'valor', value: 'NULL' });
+      expect(element.querySelector('.cell__editor')).toBeNull();
+    });
+
+    it('poner un nulo exige la acción explícita', async () => {
+      const edited = vi.fn();
+      fixture.componentInstance.cellEdited.subscribe(edited);
+      await abrir('NULL');
+      element.querySelector<HTMLButtonElement>('.cell__null')!.click();
+      await fixture.whenStable();
+      expect(edited).toHaveBeenCalledExactlyOnceWith({ row: 1, column: 'valor', value: null });
+    });
+
+    it('borrar el texto conserva la cadena vacía', async () => {
+      const edited = vi.fn();
+      fixture.componentInstance.cellEdited.subscribe(edited);
+      const input = await abrir('anterior');
+      input.value = '';
+      input.dispatchEvent(new Event('input'));
+      input.dispatchEvent(new FocusEvent('blur'));
+      expect(edited).toHaveBeenCalledExactlyOnceWith({ row: 1, column: 'valor', value: '' });
+    });
+
+    it.each([
+      [null, 'text'],
+      ['NULL', 'text'],
+      ['', 'text'],
+      ['línea uno\r\nlínea dos', 'text'],
+      ['2026-10-02T11:12:13.1234567-05:00', 'datetimeOffset'],
+      ['2026-10-02 11:12:13.1200', 'datetime'],
+      ['11:12:13.1234567', 'time'],
+      ['9007199254740993', 'integer'],
+      ['12345678901234567890.123456789', 'decimal'],
+    ])('abrir y cerrar %s de tipo %s no produce una edición', async (value, kind) => {
+      const edited = vi.fn();
+      fixture.componentInstance.cellEdited.subscribe(edited);
+      const input = await abrir(value, kind!);
+      input.dispatchEvent(new FocusEvent('blur'));
+      expect(edited).not.toHaveBeenCalled();
+    });
+
+    it('una fecha con zona y precisión completa usa texto', async () => {
+      const input = await abrir('2026-10-02T11:12:13.1234567-05:00', 'datetimeOffset');
+      expect(input.value).toBe('2026-10-02T11:12:13.1234567-05:00');
+      expect(input.tagName).toBe('TEXTAREA');
+    });
+
+    it('Escape cancela aunque después llegue el blur del control', async () => {
+      const edited = vi.fn();
+      fixture.componentInstance.cellEdited.subscribe(edited);
+      const input = await abrir('anterior');
+      input.value = 'cambio cancelado';
+      input.dispatchEvent(new Event('input'));
+      input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+      input.dispatchEvent(new FocusEvent('blur'));
+      expect(edited).not.toHaveBeenCalled();
+    });
+
+    it('Tab hacia la acción NULL conserva el borrador y salir de ella lo confirma', async () => {
+      const edited = vi.fn();
+      fixture.componentInstance.cellEdited.subscribe(edited);
+      const input = await abrir('anterior');
+      const action = element.querySelector<HTMLButtonElement>('.cell__null')!;
+      input.value = 'borrador';
+      input.dispatchEvent(new Event('input'));
+      input.dispatchEvent(new FocusEvent('blur', { relatedTarget: action }));
+      expect(edited).not.toHaveBeenCalled();
+      action.dispatchEvent(new FocusEvent('blur'));
+      expect(edited).toHaveBeenCalledExactlyOnceWith({
+        row: 1,
+        column: 'valor',
+        value: 'borrador',
+      });
+    });
+
+    it('Escape en la acción NULL también descarta el borrador', async () => {
+      const edited = vi.fn();
+      fixture.componentInstance.cellEdited.subscribe(edited);
+      const input = await abrir('anterior');
+      const action = element.querySelector<HTMLButtonElement>('.cell__null')!;
+      input.value = 'cancelado';
+      input.dispatchEvent(new Event('input'));
+      input.dispatchEvent(new FocusEvent('blur', { relatedTarget: action }));
+      action.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+      action.dispatchEvent(new FocusEvent('blur'));
+      expect(edited).not.toHaveBeenCalled();
+    });
+  });
+
   it('muestra el nombre y el tipo de cada columna', () => {
     const headers = element.querySelectorAll('.cell--head');
 

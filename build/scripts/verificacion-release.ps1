@@ -20,6 +20,83 @@
 
 . (Join-Path $PSScriptRoot 'manifiesto.ps1')
 
+function Write-DruseReleaseChecksums {
+    [CmdletBinding()]
+    param([Parameter(Mandatory)][string]$ReleaseDir)
+
+    $lines = @(Get-ChildItem -LiteralPath $ReleaseDir -File | Where-Object Name -ne 'SHA256SUMS.txt' |
+        Sort-Object Name | ForEach-Object {
+            if ($_.Name -notmatch '^[A-Za-z0-9._-]+$') { throw 'Nombre de artefacto no admitido en SHA256SUMS.txt.' }
+            '{0}  {1}' -f (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant(), $_.Name
+        })
+    if (-not $lines.Count) { throw 'No hay artefactos para generar SHA256SUMS.txt.' }
+    $lines | Set-Content -LiteralPath (Join-Path $ReleaseDir 'SHA256SUMS.txt') -Encoding utf8
+}
+
+function Test-DruseReleaseChecksums {
+    [CmdletBinding()]
+    param([Parameter(Mandatory)][string]$ReleaseDir)
+
+    $path = Join-Path $ReleaseDir 'SHA256SUMS.txt'
+    if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { throw 'Falta SHA256SUMS.txt.' }
+    $declared = [Collections.Generic.Dictionary[string, string]]::new([StringComparer]::Ordinal)
+    foreach ($line in Get-Content -LiteralPath $path) {
+        if ($line -notmatch '^([a-f0-9]{64})  ([A-Za-z0-9._-]+)$' -or $Matches[2] -eq 'SHA256SUMS.txt') {
+            throw 'SHA256SUMS.txt contiene una línea no válida.'
+        }
+        if (-not $declared.TryAdd($Matches[2], $Matches[1])) { throw 'SHA256SUMS.txt repite un artefacto.' }
+    }
+    $files = @(Get-ChildItem -LiteralPath $ReleaseDir -File | Where-Object Name -ne 'SHA256SUMS.txt')
+    if ($declared.Count -ne $files.Count) { throw 'SHA256SUMS.txt no enumera todos los artefactos de la release.' }
+    foreach ($file in $files) {
+        if (-not $declared.ContainsKey($file.Name) -or
+            $declared[$file.Name] -cne (Get-FileHash -LiteralPath $file.FullName -Algorithm SHA256).Hash.ToLowerInvariant()) {
+            throw "SHA256SUMS.txt no coincide con $($file.Name)."
+        }
+    }
+}
+
+# El hash del ZIP acredita sus bytes, pero no detecta haber comprimido la API
+# de otra edición. Se contrasta cada entrada sin extraer archivos al disco.
+function Test-DrusePortableContent {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)][string]$Path,
+        [Parameter(Mandatory)][object]$Manifest
+    )
+
+    $zipHash = (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash.ToLowerInvariant()
+    if (-not @($Manifest.contenido | Where-Object { $_.ruta -like 'bundle/*-portable*.zip' -and $_.sha256 -eq $zipHash }).Count) {
+        throw "El portable $($Manifest.variante) no figura en su manifiesto de contenido."
+    }
+    $expected = [Collections.Generic.Dictionary[string, object]]::new([StringComparer]::Ordinal)
+    foreach ($entry in $Manifest.contenido | Where-Object { $_.ruta -like 'api/*' -or $_.ruta -in @('bundle/druse.exe', 'bundle/LEEME.txt') }) {
+        $name = ([string]$entry.ruta) -replace '^bundle/', ''
+        if (-not $expected.TryAdd($name, $entry)) { throw 'El inventario portable contiene rutas repetidas.' }
+    }
+    foreach ($required in @('druse.exe', 'LEEME.txt', 'api/Druse.Host.LocalApi.exe')) {
+        if (-not $expected.ContainsKey($required)) { throw "Falta $required en el inventario portable." }
+    }
+    $seen = [Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+    $archive = [IO.Compression.ZipFile]::OpenRead($Path)
+    try {
+        foreach ($entry in $archive.Entries) {
+            $name = $entry.FullName.Replace('\', '/')
+            if ($name -match '(^/|:|(^|/)\.\.(/|$))') { throw 'El portable contiene una ruta no segura.' }
+            if (-not $entry.Name) { continue }
+            if (-not $seen.Add($name) -or -not $expected.ContainsKey($name)) { throw "Contenido portable inesperado: $name." }
+            $stream = $entry.Open()
+            try { $hash = [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData($stream)).ToLowerInvariant() }
+            finally { $stream.Dispose() }
+            if ($entry.Length -ne $expected[$name].bytes -or $hash -cne $expected[$name].sha256) {
+                throw "El contenido portable no coincide con el inventario: $name."
+            }
+        }
+        if ($seen.Count -ne $expected.Count) { throw 'El portable no contiene todos los archivos del inventario.' }
+    }
+    finally { $archive.Dispose() }
+}
+
 # Consulta el workflow del proyecto, nunca checks ajenos como Dependabot.
 # No filtrar por completed: una ejecución nueva pendiente invalida el verde anterior.
 function Get-DruseEstadoCI {
@@ -124,6 +201,7 @@ function Invoke-DruseReleaseVerificacion {
         [string]$ManifestDir,
         [switch]$SinAuthenticode,
         [switch]$IncludeCommunity,
+        [switch]$IncludePortable,
         [string]$ExpectedBaseUrl
     )
 
@@ -146,8 +224,12 @@ function Invoke-DruseReleaseVerificacion {
         $pairs += ,@('comunidad', (Join-Path $ReleaseDir $communityName))
     }
     $installers = @($pairs | ForEach-Object { $_[1] })
+    $portables = @()
+    if ($IncludePortable) {
+        $portables = @(foreach ($pair in $pairs) { Join-Path $ReleaseDir "Druse-$Version-windows-x86_64-$($pair[0])-portable.zip" })
+    }
 
-    $faltan = @(@($selector, $latest) + @($installers | ForEach-Object { $_; "$_.sig" })) |
+    $faltan = @(@($selector, $latest) + $portables + @($installers | ForEach-Object { $_; "$_.sig" })) |
         Where-Object { -not (Test-Path -LiteralPath $_) } |
         ForEach-Object { [IO.Path]::GetFileName($_) }
 
@@ -291,14 +373,20 @@ function Invoke-DruseReleaseVerificacion {
             throw "La variante $variante no lleva los avisos legales vigentes: $($avisos -join '; '). No se publicará."
         }
 
+        if ($IncludePortable) {
+            $portable = Join-Path $ReleaseDir "Druse-$Version-windows-x86_64-$variante-portable.zip"
+            Test-DrusePortableContent -Path $portable -Manifest $contenido
+        }
+
         $revisados += $variante
         Write-Host "  OK   la variante $variante coincide con su manifiesto de contenido" -ForegroundColor Green
     }
 
     $artifactHashes = [ordered]@{}
-    foreach ($artifact in @($selector) + $installers) {
+    foreach ($artifact in @($selector) + $installers + $portables) {
         $artifactHashes[[IO.Path]::GetFileName($artifact)] = (Get-FileHash -LiteralPath $artifact -Algorithm SHA256).Hash.ToLowerInvariant()
     }
+    if ($IncludePortable) { Test-DruseReleaseChecksums -ReleaseDir $ReleaseDir }
     return [ordered]@{
         firmas_actualizador = 'verificadas contra los bytes publicados'
         authenticode        = $authenticode

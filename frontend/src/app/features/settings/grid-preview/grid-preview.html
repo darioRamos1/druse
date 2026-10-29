@@ -1,0 +1,36 @@
+<div class="grid-preview" role="img" [attr.aria-label]="label()">
+  <div class="grid-preview__row grid-preview__row--head">
+    <span class="grid-preview__cell">#</span>
+    <span class="grid-preview__cell"
+      ><span translate="no">id</span> <small translate="no">int</small></span
+    >
+    <span class="grid-preview__cell"
+      ><span translate="no">name</span> <small translate="no">text</small></span
+    >
+    <span class="grid-preview__cell"
+      ><span translate="no">created_at</span> <small translate="no">timestamp</small></span
+    >
+    <span class="grid-preview__cell"
+      ><span translate="no">active</span> <small translate="no">bool</small></span
+    >
+    <span class="grid-preview__cell"
+      ><span translate="no">note</span> <small translate="no">text</small></span
+    >
+  </div>
+  @for (row of rows; track $index; let odd = $odd) {
+    <div class="grid-preview__row" [class.is-striped]="odd">
+      <span class="grid-preview__cell grid-preview__cell--number">{{ $index + 1 }}</span>
+      @for (value of row; track $index; let c = $index) {
+        <span class="grid-preview__cell" [attr.data-kind]="kinds[c]">
+          @if (value === null) {
+            <span class="grid-preview__null" translate="no">NULL</span>
+          } @else if (c === 3) {
+            <span class="grid-preview__pill">{{ value }}</span>
+          } @else {
+            {{ value }}
+          }
+        </span>
+      }
+    </div>
+  }
+</div>

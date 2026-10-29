@@ -1,0 +1,49 @@
+:host {
+  display: block;
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 14px;
+  font-size: 12px;
+}
+h3 {
+  margin: 0 0 10px;
+  font-size: 14px;
+}
+p {
+  overflow-wrap: anywhere;
+}
+.origin {
+  color: var(--dr-text-dim);
+  font-size: 11px;
+}
+label {
+  display: block;
+  margin: 12px 0;
+}
+textarea {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  resize: vertical;
+  margin-top: 6px;
+  padding: 8px;
+  border: 1px solid var(--dr-border);
+  border-radius: 4px;
+  background: var(--dr-surface-input);
+  color: var(--dr-text);
+  font: 11px/1.5 var(--dr-font-mono);
+}
+button {
+  cursor: pointer;
+  padding: 6px 10px;
+  background: var(--dr-surface-hover);
+  border: 1px solid var(--dr-border);
+  border-radius: 4px;
+  color: var(--dr-text);
+}
+textarea:focus-visible,
+button:focus-visible {
+  outline: 2px solid var(--dr-accent);
+  outline-offset: 2px;
+}

@@ -1,0 +1,128 @@
+<section [attr.aria-label]="'ai.preview.title' | t">
+  <h3 tabindex="-1">{{ 'ai.preview.title' | t }}</h3>
+  <p>{{ request().provider.name }} · {{ request().provider.model }}</p>
+  <p class="destination">{{ request().provider.baseUrl || request().provider.command }}</p>
+  <p>
+    {{ request().source.connectionName || ('ai.noConnection' | t) }} ·
+    {{ request().source.database || ('ai.noDatabase' | t) }}
+  </p>
+  <p>{{ 'ai.preview.frozen' | t }}</p>
+  <h4>{{ 'ai.preview.question' | t }}</h4>
+  <pre class="question">{{ request().payload.messages.at(-1)?.text }}</pre>
+  <h4>{{ 'ai.preview.context' | t }}</h4>
+  <pre class="attached-context">{{ preview().context || ('ai.noAttachedContext' | t) }}</pre>
+  <label
+    >{{ 'ai.preview.history' | t }}
+    <select
+      [attr.aria-label]="'ai.preview.history' | t"
+      [value]="historyLimit() ?? -1"
+      [disabled]="disabled()"
+      (change)="
+        historyChanged.emit($any($event.target).value === '-1' ? null : +$any($event.target).value)
+      "
+    >
+      <option value="-1">{{ 'ai.preview.historyAll' | t }}</option>
+      @for (count of historyChoices; track count) {
+        <option [value]="count">{{ 'ai.preview.historyLast' | t: { count } }}</option>
+      }
+    </select>
+  </label>
+  <p>{{ 'ai.preview.historyCount' | t: { count: preview().usage.historyTurns } }}</p>
+  @if (omitted().length) {
+    <div class="omitted" role="status">
+      <strong>{{ 'ai.preview.omitted' | t }}</strong>
+      <ul>
+        @for (question of omitted(); track question.index) {
+          <li>#{{ question.index / 2 + 1 }} · {{ question.text }}</li>
+        }
+      </ul>
+    </div>
+  }
+  <details class="history-detail">
+    <summary>{{ 'ai.preview.historyText' | t }}</summary>
+    @for (message of preview().messages.slice(1, -1); track $index) {
+      <strong>{{
+        (message.role === 'user' ? 'ai.preview.question' : 'ai.preview.answer') | t
+      }}</strong>
+      <pre>{{ message.text }}</pre>
+    } @empty {
+      <p>{{ 'ai.preview.noHistory' | t }}</p>
+    }
+  </details>
+  <details class="instructions">
+    <summary>{{ 'ai.preview.instructions' | t }}</summary>
+    <pre>{{ preview().messages[0]?.text }}</pre>
+  </details>
+  <details class="budget" open>
+    <summary>{{ 'ai.preview.budget' | t }}</summary>
+    <p>
+      {{
+        (preview().limits.capacityKnown ? 'ai.preview.knownCapacity' : 'ai.preview.unknownCapacity')
+          | t
+      }}
+    </p>
+    <p>
+      {{
+        'ai.preview.estimate'
+          | t: { used: preview().usage.estimatedTokens, max: preview().limits.windowTokens }
+      }}
+    </p>
+    <p>
+      {{
+        'ai.preview.reserves'
+          | t
+            : {
+                question: preview().usage.questionReserveTokens,
+                response: preview().usage.responseReserveTokens,
+              }
+      }}
+    </p>
+    <table>
+      <thead>
+        <tr>
+          <th>{{ 'ai.preview.section' | t }}</th>
+          <th>{{ 'ai.preview.bytes' | t }}</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (section of sections; track section) {
+          <tr>
+            <td>{{ sectionKeys[section] | t }}</td>
+            <td>{{ size(section) }} / {{ maximum(section) }}</td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </details>
+  @if (preview().issues.length) {
+    <div class="problems" role="alert">
+      <p>{{ 'ai.preview.tooLarge' | t }}</p>
+      <ul>
+        @for (issue of preview().issues; track issue.code) {
+          <li>
+            {{
+              issueKeys[issue.code] || issueKeys['request']
+                | t: { used: issue.used, max: issue.max }
+            }}
+          </li>
+        }
+      </ul>
+    </div>
+  }
+  <div class="actions">
+    <button
+      type="button"
+      class="confirm"
+      [disabled]="disabled() || !preview().valid"
+      (click)="confirmed.emit()"
+    >
+      {{ 'ai.preview.send' | t }}
+    </button>
+    <button type="button" [disabled]="disabled()" (click)="back.emit()">
+      {{ 'ai.preview.back' | t }}
+    </button>
+    <button type="button" [disabled]="disabled()" (click)="restarted.emit()">
+      {{ 'ai.restart' | t }}
+    </button>
+  </div>
+</section>

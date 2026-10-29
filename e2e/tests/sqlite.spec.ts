@@ -91,6 +91,9 @@ test.beforeAll(() => {
     END;
     INSERT INTO clientes (id, nombre, email, nit) VALUES (1, 'Ana', 'ana@ejemplo.test', '900');
     INSERT INTO pedidos (id, cliente_id, total) VALUES (10, 1, 5), (11, 1, 7);
+    DROP TABLE IF EXISTS fidelidad;
+    CREATE TABLE fidelidad (id INTEGER PRIMARY KEY, valor TEXT, instante TIMESTAMP WITH TIME ZONE, decimal_preciso TEXT, entero_grande TEXT);
+    INSERT INTO fidelidad VALUES (1, 'original', '2026-10-02T10:20:30.1234567-05:00', '0.1234567890123456789012345678', '9007199254740993');
   `);
 
   db.close();
@@ -173,6 +176,302 @@ async function hastaLasTablas(page: Page) {
 }
 
 test.describe('SQLite de punta a punta', () => {
+  test('las flechas recorren el resultado, cargan filas y los filtros devuelven el foco', async ({ page, context }) => {
+    await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+    await abrir(page);
+    await conectado(page);
+    await page.locator('app-editor-toolbar .limits .chip').click();
+    await page.getByLabel('Límite de filas', { exact: true }).selectOption('1000');
+    await page.keyboard.press('Escape');
+    await escribirSql(page, "WITH RECURSIVE numeros(n) AS (SELECT 1 UNION ALL SELECT n + 1 FROM numeros WHERE n < 502) SELECT n AS numero, 'fila ' || n AS etiqueta FROM numeros;");
+    await ejecutar(page, 'todo');
+    const grid = page.locator('app-results-grid');
+    const cell = (row: number, column: number) => grid.locator(`[data-nav-row="${row}"][data-nav-column="${column}"]`);
+    await cell(0, 0).focus();
+    await page.keyboard.press('Shift+ArrowRight');
+    await page.keyboard.press('Shift+ArrowDown');
+    await expect(grid.locator('.cell--value.is-selected')).toHaveCount(4);
+    await page.keyboard.press('Control+c');
+    await expect.poll(() => page.evaluate(async () => (await navigator.clipboard.readText()).replace(/\r\n/g, '\n'))).toBe('numero\tetiqueta\n1\tfila 1\n2\tfila 2');
+    await page.keyboard.press('Control+End');
+    await expect(cell(501, 1)).toBeFocused();
+    await expect(cell(501, 1)).toHaveText('fila 502');
+    await expect(grid.locator('[data-nav-row][tabindex="0"]')).toHaveCount(1);
+    await page.keyboard.press('F3');
+    const filter = grid.getByRole('searchbox', { name: 'Filtrar etiqueta', exact: true });
+    await expect(filter).toBeFocused();
+    await filter.fill('fila 502');
+    await page.keyboard.press('Escape');
+    await expect(cell(0, 1)).toBeFocused();
+    await expect(cell(0, 1)).toHaveText('fila 502');
+    await page.keyboard.press('Tab');
+    await expect(cell(0, 1)).not.toBeFocused();
+    expect(await grid.locator('.cell--value').evaluateAll((cells) => cells.some((cell) => cell === document.activeElement))).toBe(false);
+    const capture = async (name: string) => {
+      if (!process.env['DRUSE_BARRIDO']) return;
+      mkdirSync(BARRIDO, { recursive: true });
+      await page.screenshot({ path: join(BARRIDO, `${name}.png`) });
+    };
+    await page.getByRole('button', { name: 'Tema oscuro', exact: true }).click();
+    await page.setViewportSize({ width: 1440, height: 960 });
+    await cell(0, 1).focus();
+    await page.keyboard.press('ArrowLeft');
+    await page.keyboard.press('ArrowRight');
+    await capture('cuadricula-teclado-oscuro-1440');
+    await filter.fill('no coincide');
+    await filter.press('Escape');
+    await expect(cell(-1, 1)).toBeFocused();
+    await page.getByRole('button', { name: 'Limpiar filtros', exact: true }).click();
+    await page.getByRole('button', { name: 'Filtros', exact: true }).click();
+    await cell(-1, 0).focus();
+    await page.keyboard.press('F4');
+    const handle = grid.getByRole('separator', { name: 'Ajustar el ancho de numero', exact: true });
+    await expect(handle).toBeFocused();
+    await page.keyboard.press('ArrowRight');
+    await page.keyboard.press('Escape');
+    await expect(cell(-1, 0)).toBeFocused();
+    await page.getByRole('button', { name: 'Tema claro', exact: true }).click();
+    await page.setViewportSize({ width: 900, height: 760 });
+    await cell(0, 0).focus();
+    await page.keyboard.press('ArrowRight');
+    await capture('cuadricula-teclado-claro-900');
+    await page.locator('app-editor-toolbar .limits .chip').click();
+    await page.getByLabel('Límite de filas', { exact: true }).selectOption('500');
+    await page.keyboard.press('Escape');
+  });
+
+  test('guardar distingue el texto NULL, la cadena vacía y el nulo sin tocar otros valores', async ({
+    page,
+  }) => {
+    await abrir(page);
+    await hastaLasTablas(page);
+    await menuDeNodo(page, 'fidelidad');
+    await page
+      .getByRole('menuitem', { name: 'Abrir SELECT', exact: true })
+      .click();
+    await situarCursor(page, 1, 1);
+    await ejecutar(page, 'todo');
+    const cells = page.locator('app-results-grid .row .cell--value');
+    const value = cells.nth(1);
+    const instant = cells.nth(2);
+    await instant.dblclick();
+    await expect(instant.locator('textarea')).toHaveValue(
+      '2026-10-02T10:20:30.1234567-05:00',
+    );
+    await instant.locator('.cell__editor').press('Escape');
+    await expect(page.locator('app-results-panel .edits')).toHaveCount(0);
+    await expect(cells.nth(3)).toHaveText('0.1234567890123456789012345678');
+    await expect(cells.nth(4)).toHaveText('9007199254740993');
+    const read = () => {
+      const db = new DatabaseSync(ARCHIVO);
+      try {
+        return db.prepare('SELECT valor FROM fidelidad WHERE id = 1').get()![
+          'valor'
+        ];
+      } finally {
+        db.close();
+      }
+    };
+    const save = async (expected: string | null, literal: string) => {
+      await page
+        .getByRole('button', { name: 'Ver SQL y guardar', exact: true })
+        .click();
+      await expect(page.locator('.edits__statement')).toContainText(literal);
+      await page
+        .getByRole('button', { name: 'Confirmar y guardar', exact: true })
+        .click();
+      await expect(page.locator('app-results-panel .edits')).toHaveCount(0);
+      await expect.poll(read).toBe(expected);
+    };
+    await value.focus();
+    await page.keyboard.press('F2');
+    await expect(value.locator('.cell__editor')).toBeFocused();
+    await value.locator('.cell__editor').fill('NULL');
+    await value.locator('.cell__editor').press('Enter');
+    await expect(value.locator('.cell__editor')).toHaveCount(0);
+    await save('NULL', "'NULL'");
+    await value.dblclick();
+    if (process.env['DRUSE_BARRIDO']) {
+      mkdirSync(BARRIDO, { recursive: true });
+      await page.screenshot({ path: join(BARRIDO, 'celda-texto-null.png') });
+      await value.locator('.cell__editor').press('Escape');
+      await page.getByRole('button', { name: 'Tema oscuro', exact: true }).click();
+      await value.dblclick();
+      await page.screenshot({ path: join(BARRIDO, 'celda-texto-null-oscuro.png') });
+    }
+    await value.locator('.cell__editor').fill('');
+    await value.locator('.cell__editor').press('Enter');
+    await save('', "''");
+    await value.dblclick();
+    await value
+      .getByRole('button', { name: 'Establecer NULL en valor', exact: true })
+      .click();
+    await save(null, 'NULL');
+    await expect(instant).toHaveText('2026-10-02T10:20:30.1234567-05:00');
+  });
+
+  test('cancelar el cambio de contexto conserva las celdas y el SQL del editor', async ({ page }) => {
+    await abrir(page);
+    await hastaLasTablas(page);
+    await menuDeNodo(page, 'clientes');
+    await page.getByRole('menuitem', { name: 'Abrir SELECT', exact: true }).click();
+    await situarCursor(page, 1, 1);
+    await ejecutar(page, 'todo');
+
+    const leerSql = () => page.evaluate(() => (window as any).monaco.editor.getEditors()[0].getValue() as string);
+    const sql = await leerSql();
+    const celda = page.locator('app-results-grid .row .cell--value').nth(1);
+    await expect(celda).toHaveClass(/is-editable/);
+    await celda.dblclick();
+    await celda.locator('.cell__editor').fill('Ana pendiente');
+    await celda.locator('.cell__editor').press('Enter');
+    await expect(celda).toHaveText('Ana pendiente');
+
+    const avisos: string[] = [];
+    page.on('dialog', async dialog => {
+      avisos.push(dialog.message());
+      await dialog.dismiss();
+    });
+
+    await page.locator('app-sql-editor').click();
+    await page.keyboard.press('Control+End');
+    await page.keyboard.type('x');
+    await expect.poll(leerSql).toBe(sql);
+    await expect(celda).toHaveText('Ana pendiente');
+
+    await page.keyboard.press('Control+Y');
+    await expect.poll(leerSql).toBe(sql);
+    await expect(celda).toHaveText('Ana pendiente');
+
+    await escribirSql(page, 'SELECT 1;');
+    await expect.poll(leerSql).toBe(sql);
+    await expect(celda).toHaveText('Ana pendiente');
+
+    await page.keyboard.press('Control+T');
+    await expect(celda).toHaveText('Ana pendiente');
+    await expect.poll(() => avisos.length).toBe(4);
+    expect(avisos.every(aviso => aviso.includes('sin guardar'))).toBe(true);
+    expect(await leerSql()).toBe(sql);
+
+    await page.getByRole('button', { name: 'Descartar', exact: true }).click();
+    await expect(celda).toHaveText('Ana');
+  });
+
+  test('cambiar las opciones de importación exige analizar de nuevo antes de escribir', async ({ page }) => {
+    await abrir(page);
+    await hastaLasTablas(page);
+    await menuDeNodo(page, 'clientes');
+    await page.getByRole('menuitem', { name: /Importar/ }).click();
+
+    const dialogo = page.locator('app-import-dialog');
+    const importar = dialogo.getByRole('button', { name: 'Importar', exact: true });
+    await dialogo.locator('input[type=file]').setInputFiles({
+      name: 'clientes.csv',
+      mimeType: 'text/csv',
+      buffer: Buffer.from('id,nombre,email,nit\n99,Ana importada,importada@ejemplo.test,999\n'),
+    });
+    await expect(importar).toBeDisabled();
+    await dialogo.getByRole('button', { name: 'Ver qué va a pasar', exact: true }).click();
+    await expect(dialogo.locator('.preview')).toBeVisible();
+    await expect(importar).toBeEnabled();
+
+    await dialogo.locator('input[type=text]').last().fill('NULL');
+    await expect(dialogo.locator('.preview')).toHaveCount(0);
+    await expect(importar).toBeDisabled();
+    if (process.env['DRUSE_BARRIDO']) {
+      mkdirSync(BARRIDO, { recursive: true });
+      await dialogo.locator('.dialog').screenshot({ path: join(BARRIDO, 'importacion-pendiente-de-analizar.png') });
+    }
+    await dialogo.getByRole('button', { name: 'Ver qué va a pasar', exact: true }).click();
+    await expect(importar).toBeEnabled();
+
+    if (process.env['DRUSE_BARRIDO']) {
+      mkdirSync(BARRIDO, { recursive: true });
+      await dialogo.locator('.dialog').screenshot({ path: join(BARRIDO, 'importacion-analisis-vigente.png') });
+    }
+    await dialogo.getByRole('button', { name: 'Cancelar', exact: true }).click();
+    await expect(dialogo).toHaveCount(0);
+  });
+
+  test('el fondo de resultados se ajusta, persiste y se quita sin cambiar el editor', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 960 });
+    await abrir(page);
+    await hastaLasTablas(page);
+    await menuDeNodo(page, 'clientes');
+    await page.getByRole('menuitem', { name: 'Abrir SELECT', exact: true }).click();
+    await escribirSql(page, "WITH RECURSIVE n(id) AS (SELECT 1 UNION ALL SELECT id + 1 FROM n WHERE id < 40) SELECT id, 'Ana' AS nombre, 'ana@ejemplo.test' AS email FROM n");
+    await ejecutar(page, 'todo');
+    await expect(page.locator('app-results-grid .row')).toHaveCount(40);
+    const image = await page.evaluate(() => {
+      const canvas = document.createElement('canvas');
+      canvas.width = 800;
+      canvas.height = 400;
+      const ctx = canvas.getContext('2d')!;
+      const gradient = ctx.createLinearGradient(0, 0, 800, 400);
+      gradient.addColorStop(0, '#2457c5');
+      gradient.addColorStop(1, '#ffb464');
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, 800, 400);
+      ctx.fillStyle = '#164f69';
+      ctx.beginPath();
+      ctx.moveTo(0, 400);
+      ctx.lineTo(260, 60);
+      ctx.lineTo(440, 280);
+      ctx.lineTo(630, 140);
+      ctx.lineTo(800, 400);
+      ctx.fill();
+      return canvas.toDataURL().split(',')[1];
+    });
+    const preferences = async () => {
+      await page.getByRole('button', { name: 'Preferencias', exact: true }).click();
+      await page.locator('app-settings-dialog').getByRole('tab', { name: 'Resultados', exact: true }).click();
+    };
+    await preferences();
+    const panel = page.locator('#settings-panel-results');
+    const editorBefore = await page.locator('html').evaluate(el => (el as HTMLElement).style.getPropertyValue('--dr-editor-background'));
+    const chooser = page.waitForEvent('filechooser');
+    await panel.getByRole('button', { name: /Elegir imagen|Cambiar imagen/ }).click();
+    await (await chooser).setFiles({ name: 'montanas.png', mimeType: 'image/png', buffer: Buffer.from(image, 'base64') });
+    await expect(panel.locator('.file__name')).toHaveText('montanas.png');
+    await panel.getByRole('slider', { name: /Intensidad/ }).fill('25');
+    await panel.getByRole('button', { name: 'Encajar', exact: true }).click();
+    const preview = panel.locator('.grid-preview');
+    await expect.poll(() => preview.evaluate(el => getComputedStyle(el, '::before').opacity)).toBe('0.25');
+    await expect.poll(() => preview.evaluate(el => getComputedStyle(el, '::before').backgroundImage)).toContain('data:image/png');
+    if (process.env['DRUSE_BARRIDO_DIR']) {
+      mkdirSync(BARRIDO, { recursive: true });
+      await page.screenshot({ path: join(BARRIDO, 'results-background-settings.png') });
+    }
+    await page.getByRole('button', { name: 'Listo', exact: true }).click();
+    const grid = page.locator('app-results-grid');
+    await expect.poll(() => grid.evaluate(el => getComputedStyle(el, '::before').backgroundSize)).toBe('contain');
+    await grid.locator('.cell--value').first().click();
+    await expect(grid.locator('.cell--value').first()).toHaveClass(/is-selected/);
+    await grid.locator('.body').evaluate(el => { el.scrollTop = 350; });
+    await expect(grid.locator('.head')).toBeVisible();
+    if (process.env['DRUSE_BARRIDO_DIR']) {
+      await page.screenshot({ path: join(BARRIDO, 'results-background-grid.png') });
+    }
+    await page.getByRole('button', { name: 'Tema claro', exact: true }).click();
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
+    await expect.poll(() => grid.evaluate(el => getComputedStyle(el, '::before').opacity)).toBe('0.25');
+    if (process.env['DRUSE_BARRIDO_DIR']) {
+      await page.screenshot({ path: join(BARRIDO, 'results-background-light.png') });
+    }
+    await page.getByRole('button', { name: 'Tema oscuro', exact: true }).click();
+    await page.reload();
+    await expect(page.getByRole('button', { name: 'Preferencias', exact: true })).toBeVisible();
+    await expect.poll(() => page.locator('html').evaluate(el => (el as HTMLElement).style.getPropertyValue('--dr-grid-background'))).toContain('data:image/png');
+    await preferences();
+    await expect(panel.locator('.file__name')).toHaveText('montanas.png');
+    await expect(panel.getByRole('slider', { name: /Intensidad/ })).toHaveValue('25');
+    await panel.getByRole('button', { name: 'Quitar', exact: true }).click();
+    await expect(panel.locator('.file__name')).toHaveCount(0);
+    expect(await page.evaluate(() => localStorage.getItem('druse.gridBackground'))).toBeNull();
+    expect(await page.locator('html').evaluate(el => (el as HTMLElement).style.getPropertyValue('--dr-editor-background'))).toBe(editorBefore);
+    expect(await preview.evaluate(el => getComputedStyle(el, '::before').backgroundImage)).toBe('none');
+  });
+
   test('combina COUNT SUM MIN con una lista IN y con subconsultas UNION', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 1000 });
     await abrir(page);

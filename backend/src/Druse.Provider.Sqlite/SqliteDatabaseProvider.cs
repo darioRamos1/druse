@@ -102,6 +102,7 @@ public sealed class SqliteDatabaseProvider : IDatabaseProvider
     /// </summary>
     public EngineCapabilities Capabilities { get; } = new()
     {
+        AiPlanFormat = "sqlite-query-plan",
         RequiresHost = false,
         RequiresUsername = false,
         RequiresDatabase = true,

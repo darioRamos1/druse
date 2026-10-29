@@ -40,7 +40,12 @@ export type IconName =
   | 'sort-desc'
   | 'eye'
   | 'eye-off'
-  | 'transaction';
+  | 'transaction'
+  | 'alert'
+  | 'check'
+  | 'copy'
+  | 'close'
+  | 'inbox';
 
 interface IconDefinition {
   readonly viewBox: string;
@@ -53,6 +58,34 @@ interface IconDefinition {
  * Todos usan `currentColor` para heredar el color del contexto.
  */
 const ICONS: Readonly<Record<IconName, IconDefinition>> = {
+  alert: {
+    viewBox: '0 0 16 16',
+    body:
+      '<circle cx="8" cy="8" r="6.2" stroke="currentColor" stroke-width="1.3"/>' +
+      '<path d="M8 4.8v3.8" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>' +
+      '<circle cx="8" cy="11.1" r=".85" fill="currentColor"/>',
+  },
+  check: {
+    viewBox: '0 0 14 14',
+    body: '<path d="M2.8 7.3l2.7 2.7 5.7-6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>',
+  },
+  copy: {
+    viewBox: '0 0 14 14',
+    body:
+      '<rect x="4.6" y="4.6" width="7.2" height="7.2" rx="1.6" stroke="currentColor" stroke-width="1.2"/>' +
+      '<path d="M9.4 2.9A1.5 1.5 0 0 0 8 2.2H3.8a1.6 1.6 0 0 0-1.6 1.6V8a1.5 1.5 0 0 0 .7 1.3" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>',
+  },
+  close: {
+    viewBox: '0 0 12 12',
+    body: '<path d="M2.6 2.6l6.8 6.8M9.4 2.6l-6.8 6.8" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>',
+  },
+  /** La bandeja vacía: «aquí llegará algo», para los huecos que aún no tienen nada. */
+  inbox: {
+    viewBox: '0 0 16 16',
+    body:
+      '<path d="M2 9.2l1.7-5.1A1.4 1.4 0 0 1 5 3.2h6a1.4 1.4 0 0 1 1.3.9L14 9.2v2.6a1.4 1.4 0 0 1-1.4 1.4H3.4A1.4 1.4 0 0 1 2 11.8V9.2z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/>' +
+      '<path d="M2 9.2h3.2l.9 1.5h3.8l.9-1.5H14" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/>',
+  },
   maximize: {
     viewBox: '0 0 16 16',
     body: '<path d="M6 2H2v4m8-4h4v4M2 10v4h4m8-4v4h-4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>',

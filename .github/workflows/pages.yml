@@ -7,7 +7,16 @@ on:
       - "landing/**"
       - "frontend/src/app/shared/privacy/privacy-notice.html"
       - "build/scripts/generar-privacidad-web.cjs"
+      - "build/scripts/generar-descargas-web.cjs"
       - ".github/workflows/pages.yml"
+  release:
+    types: [published]
+  # Las releases creadas con GITHUB_TOKEN no disparan el evento release.
+  # workflow_run permite refrescar las descargas también en ese caso.
+  workflow_run:
+    workflows: [Publicar versión]
+    types: [completed]
+    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -19,7 +28,9 @@ concurrency:
 
 jobs:
   deploy:
-    if: github.ref == 'refs/heads/main'
+    if: >-
+      (github.event_name == 'release' || github.ref == 'refs/heads/main') &&
+      (github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success')
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -31,6 +42,13 @@ jobs:
     steps:
       - name: Obtener el repositorio
         uses: actions/checkout@v7.0.1
+        with:
+          ref: main
+          persist-credentials: false
+      - name: Preparar las descargas de la última versión publicada
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node build/scripts/generar-descargas-web.cjs
       - name: Comprobar el aviso compartido de privacidad
         run: node build/scripts/generar-privacidad-web.cjs --check
       - name: Configurar Pages

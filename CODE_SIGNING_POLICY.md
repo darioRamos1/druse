@@ -1,20 +1,20 @@
 # Política de firma de código — borrador
 
-Revisión: 14 de septiembre de 2026. Corresponde a **PUB-03** del [plan de SignPath y donaciones](docs/planes/plan-signpath-donaciones.md).
+Revisión: 14 de octubre de 2026. Corresponde a **PUB-03** del [plan de SignPath y donaciones](docs/planes/plan-signpath-donaciones.md).
 
 ## Estado actual: sin firma
 
 **Los instaladores de Druse no están firmados con Authenticode.** Windows puede mostrar un aviso de SmartScreen; actualmente el instalador no acredita su editor mediante esa firma.
 
-No hay certificado propio ni servicio de firma concedido. **La solicitud a SignPath Foundation está pendiente de presentarse**, y hasta que exista una respuesta no se usa su nombre, su logotipo ni la atribución que su programa exige: hacerlo antes sería anunciar un patrocinio que no se ha concedido.
+No hay certificado propio ni servicio de firma concedido. **La solicitud presentada a SignPath Foundation el 8 de octubre fue rechazada por ahora el 9 de octubre por falta de reconocimiento público.** El [plan de reaplicación](docs/planes/plan-reaplicacion-signpath-2026-10-11.md) recoge las evidencias que hay que reunir. SNI, WebView2 y consentimiento durante la instalación siguen sin resolución expresa. Hasta que se conceda el servicio no se usa su logotipo ni la atribución de firma que el programa exige.
 
-Lo que sí está firmado hoy son las **actualizaciones**: cada instalador publicado lleva su archivo `.sig` de minisign generado con la clave del actualizador de Tauri, y la aplicación rechaza cualquier actualización cuya firma no valide contra la clave pública incluida en el programa. Eso protege el canal de actualización; **no sustituye a Authenticode** ni quita el aviso de SmartScreen.
+El canal de **actualizaciones** usa archivos `.sig` de minisign generados con la clave del actualizador de Tauri: la aplicación rechaza una actualización cuya firma no valide contra la clave pública incluida en el programa. La beta pública de Comunidad 1.3.0 se distribuye fuera de `releases/latest`, sin `.sig` ni actualización automática desde esa beta. La firma de actualización protege ese canal cuando se use; **no sustituye a Authenticode** ni quita el aviso de SmartScreen.
 
 ## Qué se firmaría
 
 Cuando exista un servicio de firma:
 
-- El instalador NSIS de cada variante y el instalador selector que publica la release.
+- Para la candidatura a SignPath Foundation, el instalador NSIS de Comunidad. La edición completa y el selector de otras ediciones quedan fuera de ese alcance; cualquier ampliación requiere acuerdo expreso del proveedor de firma.
 - Los binarios propios que viajan dentro: `Druse.Host.LocalApi.exe` y las bibliotecas `Druse.*`. Un instalador firmado que suelta ejecutables sin firmar es justo lo que hace saltar a los antivirus corporativos.
 
 **No** se firmarían los componentes de terceros. El runtime de .NET de una publicación autocontenida ya viene firmado por Microsoft, y volver a firmar un archivo ajeno afirmaría sobre su origen algo que Druse no puede afirmar. Una regla global que firme todo lo que hay en el directorio queda descartada por escrito.
@@ -25,7 +25,7 @@ Cuando exista un servicio de firma:
 2. `package.ps1` publica la API .NET autocontenida, comprueba el contenido del paquete contra `build/paquete-excluidos.json` y **detiene la construcción si aparece un componente excluido** de esa variante.
 3. Se genera un **manifiesto** con el SHA-256 de cada archivo del paquete y de los artefactos finales, en `artifacts/paquete/`.
 4. Tauri construye el instalador y, si hay clave del actualizador, su `.sig`.
-5. `release.ps1` calcula el SHA-256 de ambos instaladores, los incrusta en el instalador selector y publica la release con sus artefactos y `latest.json`.
+5. `release.ps1` reúne los instaladores y ZIP sin instalación de las tres ediciones, verifica su contenido y publica la release con `SHA256SUMS.txt`, evidencia y `latest.json`. El selector conserva los hashes de los instaladores que ofrece.
 
 Antes de publicar, una etapa de verificación comprueba sobre los bytes finales que cada firma de actualización pertenece a la clave que lleva dentro la aplicación **y corresponde a ese archivo**, que `latest.json` coincide con los archivos y que ninguna firma Authenticode es inválida. Los manifiestos de ambas variantes son obligatorios y deben coincidir en producto, versión, variante y hashes. Por defecto, publicar exige la ejecución más reciente de `ci.yml` satisfactoria para ese commit exacto. Existe una excepción explícita `-SinComprobarCI`, registrada en `evidencia.json` junto al commit, hashes y comprobaciones; usarla no acredita una construcción verificada por SignPath.
 
@@ -33,9 +33,9 @@ El orden importa y está anotado: **la firma Authenticode modifica el archivo**,
 
 ## Quién aprueba una release
 
-Darío Ramos, mantenedor de Druse, es quien decide qué versión se publica y quien aprueba manualmente cada firma. La cuenta de GitHub del proyecto tiene autenticación en dos pasos.
+Darío Ramos, mantenedor de Druse, decide qué cambios incorpora a `main`. Por su autorización del 28 de octubre de 2026, una versión nueva incorporada a esa rama se publica automáticamente cuando CI general y Comunidad terminan satisfactoriamente para ese commit exacto. La cuenta de GitHub del proyecto tiene autenticación en dos pasos.
 
-No hay firma automática desencadenada por una rama: una release sale porque alguien la aprobó, no porque un commit llegó a `main`.
+Este flujo genera la firma del actualizador con la clave de Tauri configurada en GitHub; no incorpora firma Authenticode ni afirma aprobación de SignPath. Si se concede un servicio de firma, su aprobación manual seguirá siendo necesaria antes de integrarlo en este flujo.
 
 ## Cómo comprobar lo que descargaste
 
@@ -51,9 +51,9 @@ Qué pasaría entonces: se retira el artefacto de la release, se publica un avis
 
 ## Summary in English
 
-Druse installers are **not yet signed with Authenticode**. The application update files are signed with the Tauri updater key (minisign) and verified before an update is applied, which protects the update channel but is not code signing.
+Druse installers are **not yet signed with Authenticode**. The Tauri updater verifies minisign signatures before applying updates; the Community 1.3.0 beta is distributed outside `releases/latest` without an updater signature or automatic updates. Updater signatures protect that channel when used, but are not Authenticode code signing.
 
-An application to the SignPath Foundation is **prepared but not yet submitted**; no signing service has been granted, so no SignPath attribution appears here or in the product. Releases are built from a clean Git tree, their package contents are checked against an explicit exclusion list, and a SHA-256 manifest is produced for every build. Before publishing, every signature is verified against the final bytes and the release is refused if anything does not match; publishing also requires a green CI run for that exact commit, and each release records its commit, hashes and check results. Each release is approved manually by the maintainer, whose GitHub account uses two-factor authentication. Only Druse's own binaries and installers would be submitted for signing; third-party components would not.
+An application to the SignPath Foundation was submitted on October 8, 2026, but no signing service has been granted, so no SignPath signing attribution appears here or in the product. Releases are built from a clean Git tree, package contents are checked against an exclusion list, and SHA-256 manifests are produced. Signatures are verified against the final bytes before publication. As authorized by the maintainer on October 28, new versions merged into main are published automatically after both CI and Community checks succeed for the exact commit; each release records its commit, hashes and results. This produces Tauri updater signatures, not Authenticode or SignPath approval. Any future signing service still requires its manual approval process. Only Druse's own binaries and installers would be submitted for signing; third-party components would not.
 
 Report anything suspicious to `druse.contacto@gmail.com`.
 

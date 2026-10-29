@@ -49,11 +49,20 @@ public sealed record QueryHistoryEntry
 }
 
 /// <summary>
-/// Historial local de consultas.
-///
-/// Guarda el SQL que escribió el usuario, que puede contener datos sensibles en
-/// literales. Vive solo en su máquina y debe poder borrarse por completo.
+/// Filtros y cursor de lectura del historial; hasta es un límite exclusivo.
 /// </summary>
+public sealed record QueryHistoryFilter
+{
+    public string? Connection { get; init; }
+    public string? Database { get; init; }
+    public DateTimeOffset? From { get; init; }
+    public DateTimeOffset? Until { get; init; }
+    public bool? Succeeded { get; init; }
+    public DateTimeOffset? Before { get; init; }
+    public Guid? BeforeId { get; init; }
+}
+
+/// <summary>Historial local de SQL, que puede contener datos sensibles y se puede vaciar entero.</summary>
 public interface IQueryHistoryStore
 {
     Task AddAsync(QueryHistoryEntry entry, CancellationToken cancellationToken);
@@ -62,7 +71,8 @@ public interface IQueryHistoryStore
     Task<IReadOnlyList<QueryHistoryEntry>> GetRecentAsync(
         int limit,
         string? search,
-        CancellationToken cancellationToken);
+        CancellationToken cancellationToken,
+        QueryHistoryFilter? filter = null);
 
     /// <summary>Vacía el historial. Devuelve cuántas entradas se borraron.</summary>
     Task<int> ClearAsync(CancellationToken cancellationToken);

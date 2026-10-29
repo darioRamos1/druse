@@ -71,10 +71,9 @@ pub async fn save_export(
 /// puede traer separadores. Sin esto, un título como `../../algo` acabaría
 /// proponiendo una ruta fuera de donde el usuario cree que está guardando.
 fn safe_file_name(value: &str) -> String {
-    let trimmed = Path::new(value.trim())
-        .file_name()
-        .and_then(|name| name.to_str())
-        .unwrap_or("");
+    // Un nombre puede venir de otro sistema: Path solo reconoce los separadores
+    // de la plataforma donde se ejecuta Druse.
+    let trimmed = value.trim().rsplit(['/', '\\']).next().unwrap_or("");
 
     if trimmed.is_empty() {
         "druse".to_string()

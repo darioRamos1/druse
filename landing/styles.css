@@ -925,15 +925,108 @@ h3 {
     radial-gradient(ellipse at 100% 80%, #8270d521, transparent 70%), #15131e;
   border: 1px solid #3a314f;
   border-radius: 14px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 40px;
+  display: block;
   position: relative;
   overflow: hidden;
 }
 .download-section .eyebrow {
   color: #b6a8e1;
+}
+.download-copy {
+  min-width: 0;
+  flex: 1;
+}
+.download-intro {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 30px;
+  margin-bottom: 32px;
+}
+.download-logo {
+  width: 100px;
+  height: 100px;
+  border-radius: 26px;
+  transform: rotate(-8deg);
+  box-shadow: 0 20px 70px #8672f532;
+}
+.download-editions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+.download-edition {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 24px 20px;
+  border: 1px solid #4a405e;
+  border-radius: 10px;
+  background: #1c1827;
+}
+.download-edition-label {
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  color: #c7b6ef;
+  margin: 0 0 14px;
+}
+.download-edition h3 {
+  font-size: 23px;
+  margin: 0 0 12px;
+}
+.download-edition-description {
+  color: #c1b8d5;
+  font-size: 13px;
+  line-height: 1.7;
+  margin: 0 0 24px;
+}
+.download-edition-actions {
+  display: grid;
+  gap: 10px;
+  margin-top: auto;
+}
+.download-edition .button {
+  min-width: 0;
+  padding: 12px 10px;
+  font-size: 12px;
+  text-align: center;
+}
+.download-edition .button-secondary {
+  background: transparent;
+  color: #e1d7f5;
+  border-color: #77668e;
+}
+.download-edition .button-secondary:hover {
+  background: #342a47;
+}
+.download-unavailable {
+  display: block;
+  font-size: 12px;
+  color: #aaa2b9;
+  line-height: 1.6;
+  padding: 10px 0;
+}
+.download-details {
+  display: grid;
+  gap: 14px;
+  margin-top: 28px;
+  font-size: 12px;
+  color: #bab1cc;
+  line-height: 1.8;
+}
+.download-details p {
+  margin: 0;
+}
+.download-details a {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.download-details code {
+  color: #e1d7f5;
+}
+.download-copy p a {
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 .download-copy > p:not(.eyebrow):not(.availability) {
   font-size: 14px;
@@ -943,32 +1036,12 @@ h3 {
   margin-bottom: 24px;
 }
 .availability {
+  max-width: 410px;
   font-size: 12px;
   color: #c1b8d5;
   margin-bottom: 0;
   border-left: 2px solid #9680d8;
   padding-left: 12px;
-}
-.download-copy > .button {
-  margin-bottom: 14px;
-}
-.download-mark {
-  text-align: center;
-  min-width: 220px;
-}
-.download-mark > img {
-  width: 100px;
-  height: 100px;
-  margin: 0 auto 24px;
-  border-radius: 26px;
-  box-shadow: 0 20px 70px #8672f532;
-  transform: rotate(-8deg);
-}
-.download-mark > span {
-  display: block;
-  color: #b2a6c9;
-  font-size: 12px;
-  line-height: 1.8;
 }
 .faq {
   display: grid;
@@ -1070,6 +1143,12 @@ details > p {
   }
   .download-section {
     padding: 45px;
+  }
+  .download-editions {
+    gap: 12px;
+  }
+  .download-edition {
+    padding: 20px 14px;
   }
   .steps {
     gap: 30px;
@@ -1258,16 +1337,16 @@ details > p {
     padding: 32px 27px;
     gap: 30px;
   }
-  .download-mark {
-    min-width: 100px;
+  .download-editions {
+    grid-template-columns: 1fr;
   }
-  .download-mark > img {
+  .download-edition {
+    padding: 24px;
+  }
+  .download-logo {
     width: 76px;
     height: 76px;
     border-radius: 19px;
-  }
-  .download-mark > span {
-    display: none;
   }
   .download-copy h2 {
     font-size: 32px;
@@ -1349,10 +1428,7 @@ details > p {
     display: block;
     margin-top: 6px;
   }
-  .download-section {
-    display: block;
-  }
-  .download-mark {
+  .download-logo {
     display: none;
   }
   .engine-list {

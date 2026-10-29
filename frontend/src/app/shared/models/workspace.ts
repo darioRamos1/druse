@@ -29,6 +29,8 @@ export type ConnectionState = 'connected' | 'disconnected' | 'connecting' | 'err
  * de un condicional que antes estaba escrito en el componente.
  */
 export interface EngineCapabilities {
+  /** Formato reconocido de un plan obtenido manualmente. Ausente si no está comprobado. */
+  readonly aiPlanFormat?: 'sqlite-query-plan' | null;
   /** Hay un servidor al que apuntar. Falso en los motores que son un archivo. */
   readonly requiresHost: boolean;
   readonly requiresUsername: boolean;
@@ -157,6 +159,19 @@ export interface SavedConnection {
 export interface SecretStoreStatus {
   readonly available: boolean;
   readonly description: string;
+}
+
+/** Filtros del historial: las fechas de la interfaz son días locales completos. */
+export interface QueryHistoryFilter {
+  readonly search?: string;
+  readonly connection?: string;
+  readonly database?: string;
+  readonly from?: string;
+  readonly until?: string;
+  readonly succeeded?: boolean;
+  readonly before?: string;
+  readonly beforeId?: string;
+  readonly limit?: number;
 }
 
 /** Entrada del historial local de ejecuciones. */
@@ -761,6 +776,7 @@ export interface SessionStatus {
   readonly connected: boolean;
   readonly engine: DatabaseEngine;
   readonly engineVersion: string;
+  readonly serverVersion?: string;
   readonly database: string;
   readonly user: string;
   readonly lastDurationMs: number | null;

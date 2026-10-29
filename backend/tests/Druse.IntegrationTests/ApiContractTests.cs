@@ -1,6 +1,7 @@
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using System.Runtime.CompilerServices;
 
 namespace Druse.IntegrationTests;
 
@@ -187,18 +188,21 @@ public sealed class ApiContractTests(DruseApiFactory factory) : IClassFixture<Dr
     /// de contar directorios: el número de niveles cambia entre `Debug` y
     /// `Release` y entre plataformas.
     /// </summary>
-    private static string RepositoryRoot()
+    private static string RepositoryRoot([CallerFilePath] string sourcePath = "")
     {
-        var directory = new DirectoryInfo(AppContext.BaseDirectory);
-
-        while (directory is not null)
+        // Los artefactos aislados pueden vivir fuera del repositorio para no
+        // bloquear las DLL de una sesión de Druse que siga abierta.
+        foreach (var start in new[] { AppContext.BaseDirectory, Path.GetDirectoryName(sourcePath) })
         {
-            if (File.Exists(Path.Combine(directory.FullName, "docs", "planes", "PLAN_TRABAJO_DRUSE.md")))
+            var directory = start is null ? null : new DirectoryInfo(start);
+            while (directory is not null)
             {
-                return directory.FullName;
+                if (File.Exists(Path.Combine(directory.FullName, "docs", "planes", "PLAN_TRABAJO_DRUSE.md")))
+                {
+                    return directory.FullName;
+                }
+                directory = directory.Parent;
             }
-
-            directory = directory.Parent;
         }
 
         throw new InvalidOperationException("No se encontró la raíz del repositorio.");

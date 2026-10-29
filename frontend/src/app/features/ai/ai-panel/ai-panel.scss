@@ -176,40 +176,6 @@
 }
 
 /** Lo primero que se lee: qué salió de este equipo. */
-.disclosure {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  flex: none;
-  padding: 8px 10px;
-  border: 1px solid var(--dr-border-input);
-  border-radius: var(--dr-radius);
-  background: var(--dr-surface-inset);
-  color: var(--dr-info);
-
-  &__text {
-    display: flex;
-    flex-direction: column;
-    gap: 3px;
-    min-width: 0;
-  }
-
-  &__what {
-    font-size: var(--dr-font-size-xs);
-    color: var(--dr-text-muted);
-
-    code {
-      font-family: var(--dr-font-mono);
-      color: var(--dr-info);
-    }
-  }
-
-  &__note {
-    font-size: 10.5px;
-    color: var(--dr-text-faint);
-  }
-}
-
 .turn {
   flex: none;
 
@@ -277,22 +243,21 @@
     color: var(--dr-text-dim);
   }
 
-  &__code {
-    margin: 0;
-    padding: 9px 10px;
-    font-family: var(--dr-font-mono);
-    font-size: var(--dr-font-size-xs);
-    line-height: 19px;
-    color: var(--dr-text-muted);
-    white-space: pre;
-    overflow-x: auto;
-  }
-
   /** Que no se ejecute solo es una promesa, y se dice donde está el botón. */
   &__warning {
     font-size: 10.5px;
     color: var(--dr-text-faintest);
   }
+}
+
+.sql__code,
+.code__code {
+  margin: 0;
+  padding: 9px 10px;
+  font: var(--dr-font-size-xs) / 19px var(--dr-font-mono);
+  color: var(--dr-text-muted);
+  white-space: pre;
+  overflow-x: auto;
 }
 
 .failure {
@@ -433,6 +398,8 @@
 }
 
 .composer {
+  max-height: 65%;
+  overflow-y: auto;
   flex: none;
   padding: 10px 12px 12px;
   border-top: 1px solid var(--dr-border-hairline);
@@ -512,6 +479,79 @@
   }
 }
 
+.context-selection {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-bottom: 7px;
+  .chip {
+    max-width: 100%;
+    height: auto;
+    min-height: 24px;
+    overflow-wrap: anywhere;
+    text-align: left;
+  }
+}
+
+.catalog-picker {
+  border: 1px solid var(--dr-border-subtle);
+  border-radius: var(--dr-radius);
+  padding: 8px;
+  margin-bottom: 8px;
+  color: var(--dr-text-muted);
+  font-size: var(--dr-font-size-xs);
+  &__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  &__list {
+    max-height: 180px;
+    overflow-y: auto;
+    margin: 6px 0;
+  }
+  p {
+    margin: 6px 0;
+  }
+}
+
+.catalog-search {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid var(--dr-border-input);
+  border-radius: var(--dr-radius-sm);
+  background: var(--dr-surface-input);
+  color: var(--dr-text);
+}
+
+.catalog-option {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 0;
+  cursor: pointer;
+  code {
+    flex: 1;
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+  small {
+    color: var(--dr-text-dim);
+  }
+}
+
+.catalog-status,
+.catalog-problems {
+  font-size: var(--dr-font-size-xs);
+  margin: 6px 0;
+  color: var(--dr-text-muted);
+}
+.catalog-problems,
+.chip.has-error {
+  color: var(--dr-danger-text);
+}
+
 /** Qué acompaña a la pregunta. Se puede apagar, y apagado se nota. */
 .chip {
   display: flex;
@@ -533,6 +573,48 @@
     background: var(--dr-surface-hover);
     color: var(--dr-text-muted);
   }
+}
+
+.conversation-scope {
+  flex: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--dr-border-subtle);
+  color: var(--dr-text-muted);
+  font-size: var(--dr-font-size-xs);
+  overflow-wrap: anywhere;
+
+  small {
+    flex-basis: 100%;
+    color: var(--dr-text-dim);
+  }
+}
+
+.turn__origin {
+  margin-top: 8px;
+  font-size: 10px;
+  color: var(--dr-text-dim);
+}
+
+.detail {
+  margin-top: 6px;
+  font-size: var(--dr-font-size-xs);
+  summary {
+    cursor: pointer;
+  }
+  pre {
+    max-height: 220px;
+    overflow: auto;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    text-align: left;
+  }
+}
+
+.failure-detail pre {
+  max-height: 160px;
 }
 
 .btn {
@@ -560,4 +642,17 @@
       color: var(--dr-text-on-accent);
     }
   }
+}
+
+.notes-toggle {
+  flex: none;
+  white-space: nowrap;
+  background: var(--dr-surface-panel);
+  color: var(--dr-text-dim);
+  border: 1px solid var(--dr-border);
+  border-radius: var(--dr-radius-sm);
+  padding: 3px 6px;
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
 }

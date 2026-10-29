@@ -1,0 +1,40 @@
+<details open>
+  <summary>{{ 'ai.executionError.title' | t }}</summary>
+  <p class="origin">
+    {{ attachment().source.connectionName }} · {{ attachment().source.database }} ·
+    {{ attachment().source.engine }}
+  </p>
+  <p class="origin">
+    {{ attachment().error.occurredAtUtc }} · {{ attachment().error.executionId }}
+  </p>
+  <p>{{ 'ai.executionError.review' | t }}</p>
+  @if (!allowed()) {
+    <p role="alert">{{ 'ai.executionError.blocked' | t }}</p>
+  }
+  <label
+    >{{ 'ai.executionError.sql' | t }}
+    <textarea
+      rows="3"
+      [value]="attachment().error.sql"
+      (input)="edit('sql', $any($event.target).value)"
+    ></textarea>
+  </label>
+  <label
+    >{{ 'ai.executionError.message' | t }}
+    <textarea
+      rows="3"
+      [value]="attachment().error.message"
+      (input)="edit('message', $any($event.target).value)"
+    ></textarea>
+  </label>
+  @if (attachment().error.code) {
+    <p>{{ 'ai.executionError.code' | t }}: {{ attachment().error.code }}</p>
+  }
+  @if (attachment().error.line != null) {
+    <p>{{ 'ai.executionError.line' | t }}: {{ attachment().error.line }}</p>
+  }
+  @if (attachment().error.position != null) {
+    <p>{{ 'ai.executionError.position' | t }}: {{ attachment().error.position }}</p>
+  }
+  <button type="button" (click)="removed.emit()">{{ 'ai.executionError.remove' | t }}</button>
+</details>

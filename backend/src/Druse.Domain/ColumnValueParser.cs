@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Text.RegularExpressions;
 
 namespace Druse.Domain;
 
@@ -185,6 +186,13 @@ public static class ColumnValueParser
                 return true;
 
             case ColumnFamily.Fractional when decimal.TryParse(text, NumberStyles.Float, invariant, out var numero):
+                // Decimal.TryParse puede redondear sin fallar. El valor que se
+                // parametriza debe coincidir con lo escrito, también con exponentes.
+                if (NormalizeNumber(text) != NormalizeNumber(numero.ToString(invariant)))
+                {
+                    error = "El número supera la precisión admitida por Druse; no se guardó para evitar redondearlo.";
+                    return false;
+                }
                 value = numero;
                 return true;
 
@@ -208,14 +216,26 @@ public static class ColumnValueParser
                 return true;
 
             case ColumnFamily.Time when TimeSpan.TryParse(text, invariant, out var hora):
+                if (LosesFraction(text, out error))
+                {
+                    return false;
+                }
                 value = hora;
                 return true;
 
             case ColumnFamily.Timestamp when DateTime.TryParse(text, invariant, DateTimeStyles.None, out var momento):
+                if (LosesFraction(text, out error))
+                {
+                    return false;
+                }
                 value = momento;
                 return true;
 
             case ColumnFamily.TimestampWithZone when DateTimeOffset.TryParse(text, invariant, DateTimeStyles.None, out var conZona):
+                if (LosesFraction(text, out error))
+                {
+                    return false;
+                }
                 value = conZona;
                 return true;
 
@@ -229,6 +249,37 @@ public static class ColumnValueParser
 
         error = $"«{text}» no es un valor válido para una columna {dataType}.";
         return false;
+    }
+
+    private static (bool Negative, string Digits, long Power) NormalizeNumber(string text)
+    {
+        var source = text.Trim();
+        var negative = source.StartsWith('-');
+        source = source.TrimStart('+', '-');
+        var exponentAt = source.IndexOfAny(['e', 'E']);
+        long exponent = 0;
+        if (exponentAt >= 0)
+        {
+            long.TryParse(source[(exponentAt + 1)..], NumberStyles.Integer, CultureInfo.InvariantCulture, out exponent);
+            source = source[..exponentAt];
+        }
+        var dot = source.IndexOf('.');
+        var fraction = dot < 0 ? 0 : source.Length - dot - 1;
+        var digits = source.Replace(".", string.Empty, StringComparison.Ordinal).TrimStart('0');
+        if (digits.Length == 0)
+        {
+            return (false, "0", 0);
+        }
+        var significant = digits.TrimEnd('0');
+        return (negative, significant, exponent - fraction + digits.Length - significant.Length);
+    }
+
+    private static bool LosesFraction(string text, out string? error)
+    {
+        var fraction = Regex.Match(text, @"(?:^|[T ])\d{1,2}:\d{2}:\d{2}\.(\d+)", RegexOptions.CultureInvariant).Groups[1].Value;
+        var loses = fraction.Length > 7 && fraction[7..].Any(digit => digit != '0');
+        error = loses ? "La hora supera la precisión admitida por Druse; no se guardó para evitar redondearla." : null;
+        return loses;
     }
 
     private static bool TryParseBoolean(string text, out object value, out string? error)

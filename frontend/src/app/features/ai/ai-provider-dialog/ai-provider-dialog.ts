@@ -2,12 +2,16 @@ import {
   ChangeDetectionStrategy,
   Component,
   computed,
+  DestroyRef,
   inject,
   output,
   signal,
 } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { firstValueFrom, Subscription } from 'rxjs';
 
 import { AiStore } from '../../../core/ai/ai-store';
+import { aiFailureMessage } from '../../../core/ai/ai-failure';
 import { I18nService } from '../../../core/i18n/i18n.service';
 import { TranslatePipe } from '../../../core/i18n/translate.pipe';
 import {
@@ -15,6 +19,7 @@ import {
   AiModelList,
   AiProvider,
   AiProviderKind,
+  AiStreamEvent,
   CliLaunch,
   CliSessionState,
 } from '../../../shared/models/ai';
@@ -166,6 +171,11 @@ const DISCLOSURES: readonly { readonly value: AiDisclosure; readonly label: stri
 export class AiProviderDialog {
   private readonly _store = inject(AiStore);
   private readonly _i18n = inject(I18nService);
+  private readonly _destroy = inject(DestroyRef);
+  private responseSubscription?: Subscription;
+  private revision = 0;
+  private sessionRevision = 0;
+  private modelsRevision = 0;
 
   /** «Conectado con Claude como alguien», en una sola frase del catálogo. */
   protected connected(account?: string): string {
@@ -205,6 +215,18 @@ export class AiProviderDialog {
   protected readonly revealKey = signal(false);
   protected readonly probing = signal(false);
   protected readonly probe = signal<{ ok: boolean; detail: string; ms: number } | null>(null);
+  protected readonly testingResponse = signal(false);
+  protected readonly diagnosis = signal<{
+    ok: boolean;
+    message: string;
+    detail?: string;
+    model: string;
+    version?: string;
+    provider: string;
+    account?: string;
+    testedAt: string;
+    ms: number;
+  } | null>(null);
   protected readonly error = signal('');
 
   /**
@@ -292,6 +314,11 @@ export class AiProviderDialog {
     }
 
     const changed = this.chosen().id !== option.id;
+    this.invalidateChecks();
+    this.sessionRevision++;
+    this.modelsRevision++;
+    this.sessionLoading.set(false);
+    this.listing.set(false);
 
     this.chosen.set(option);
     this.probe.set(null);
@@ -318,8 +345,14 @@ export class AiProviderDialog {
     // seria un campo donde quitarlo.
     this.command.set(option.command ?? '');
 
-    if (this.name().length === 0 || OPTIONS.some((candidate) => candidate.name === this.name())) {
-      this.name.set(option.id === 'compatible' ? '' : option.name);
+    if (
+      this.name().length === 0 ||
+      OPTIONS.some(
+        (candidate) =>
+          candidate.name === this.name() || this._i18n.t(candidate.name) === this.name(),
+      )
+    ) {
+      this.name.set(option.id === 'compatible' ? '' : this._i18n.t(option.name));
     }
 
     this.session.set(null);
@@ -337,6 +370,10 @@ export class AiProviderDialog {
    * hay cuenta donde no la hay.
    */
   protected toggleOwnSession(): void {
+    this.invalidateChecks();
+    this.modelsRevision++;
+    this.listing.set(false);
+    this._models.set([]);
     this.ownSession.set(!this.ownSession());
     this.session.set(null);
 
@@ -355,15 +392,25 @@ export class AiProviderDialog {
    * sesion.
    */
   private async refreshSession(command: string): Promise<void> {
+    this.invalidateChecks();
+    const revision = ++this.sessionRevision;
+    if (this.ownSession() && !this.editing()) {
+      // Todavía no existe la carpeta de esta cuenta. Consultar la del equipo
+      // daría una sesión válida para un perfil que aún no se ha autenticado.
+      this.sessionLoading.set(false);
+      this.sessionError.set(this._i18n.t('ai.provider.ownSessionHint'));
+      return;
+    }
     this.sessionLoading.set(true);
     this.sessionError.set('');
 
     try {
-      const state = await new Promise<CliSessionState>((resolve, reject) => {
+      const state = await firstValueFrom(
         this._gateway
           .getCliSession(command, this.sessionOwner())
-          .subscribe({ next: resolve, error: reject });
-      });
+          .pipe(takeUntilDestroyed(this._destroy)),
+      );
+      if (revision !== this.sessionRevision || this._destroy.destroyed) return;
 
       this.session.set(state);
 
@@ -371,10 +418,11 @@ export class AiProviderDialog {
         await this.loadModels();
       }
     } catch (error) {
+      if (revision !== this.sessionRevision || this._destroy.destroyed) return;
       this.session.set(null);
       this.sessionError.set(describe(error, this._i18n));
     } finally {
-      this.sessionLoading.set(false);
+      if (revision === this.sessionRevision) this.sessionLoading.set(false);
     }
   }
 
@@ -385,6 +433,7 @@ export class AiProviderDialog {
     if (!command) {
       return;
     }
+    this.invalidateChecks();
 
     this.loggingIn.set(true);
     this.error.set('');
@@ -433,12 +482,18 @@ export class AiProviderDialog {
   }
 
   protected edit(provider: AiProvider): void {
+    this.invalidateChecks();
+    this.sessionRevision++;
+    this.sessionLoading.set(false);
+    this.modelsRevision++;
+    this.listing.set(false);
+    this._models.set([]);
     this.editing.set(provider);
     this.chosen.set(
       OPTIONS.find((option) => option.kind === provider.kind && matches(option, provider)) ??
         OPTIONS[0],
     );
-    this.name.set(provider.name);
+    this.name.set(this._i18n.t(provider.name));
     this.baseUrl.set(provider.baseUrl);
     this.model.set(provider.model);
     this.command.set(provider.command);
@@ -450,9 +505,17 @@ export class AiProviderDialog {
     this.apiKey.set(null);
     this.probe.set(null);
     this.error.set('');
+    this.session.set(null);
+    if (provider.command) void this.refreshSession(provider.command);
   }
 
   protected startNew(): void {
+    this.invalidateChecks();
+    this.sessionRevision++;
+    this.sessionLoading.set(false);
+    this.modelsRevision++;
+    this.listing.set(false);
+    this._models.set([]);
     this.editing.set(null);
     this.name.set('');
     this.baseUrl.set(this.chosen().baseUrl);
@@ -463,6 +526,8 @@ export class AiProviderDialog {
     this.apiKey.set(null);
     this.probe.set(null);
     this.error.set('');
+    this.session.set(null);
+    if (this.command()) void this.refreshSession(this.command());
   }
 
   /**
@@ -473,13 +538,21 @@ export class AiProviderDialog {
    * cuál era el bueno.
    */
   protected async loadModels(): Promise<void> {
+    const revision = ++this.modelsRevision;
+    const identity = this.identity();
     this.listing.set(true);
     this.error.set('');
 
     try {
-      const answer = await new Promise<AiModelList>((resolve, reject) => {
-        this._gateway.listAiModels(this.request()).subscribe({ next: resolve, error: reject });
-      });
+      const answer: AiModelList = await firstValueFrom(
+        this._gateway.listAiModels(this.request()).pipe(takeUntilDestroyed(this._destroy)),
+      );
+      if (
+        revision !== this.modelsRevision ||
+        identity !== this.identity() ||
+        this._destroy.destroyed
+      )
+        return;
 
       this._models.set(answer.models);
 
@@ -491,33 +564,123 @@ export class AiProviderDialog {
           answer.detail ?? 'Ese proveedor no enumera sus modelos. Escribe el nombre a mano.',
         );
       } else if (this.model().length === 0) {
-        this.model.set(answer.models[0]);
+        this.selectModel(answer.models[0]);
       }
     } catch (error) {
+      if (
+        revision !== this.modelsRevision ||
+        identity !== this.identity() ||
+        this._destroy.destroyed
+      )
+        return;
       this.error.set(describe(error, this._i18n));
     } finally {
-      this.listing.set(false);
+      if (revision === this.modelsRevision) this.listing.set(false);
     }
   }
 
   protected async test(): Promise<void> {
+    this.invalidateChecks();
+    const revision = this.revision;
+    const identity = this.identity();
     this.probing.set(true);
     this.probe.set(null);
     this.error.set('');
 
     try {
-      const result = await new Promise<{ reachable: boolean; detail: string; elapsedMs: number }>(
-        (resolve, reject) => {
-          this._gateway.testAiProvider(this.request()).subscribe({ next: resolve, error: reject });
-        },
+      const result = await firstValueFrom(
+        this._gateway.testAiProvider(this.request()).pipe(takeUntilDestroyed(this._destroy)),
       );
+      if (revision !== this.revision || identity !== this.identity() || this._destroy.destroyed)
+        return;
 
       this.probe.set({ ok: result.reachable, detail: result.detail, ms: result.elapsedMs });
     } catch (error) {
+      if (revision !== this.revision || identity !== this.identity() || this._destroy.destroyed)
+        return;
       this.probe.set({ ok: false, detail: describe(error, this._i18n), ms: 0 });
     } finally {
-      this.probing.set(false);
+      if (revision === this.revision) this.probing.set(false);
     }
+  }
+
+  protected testResponse(): void {
+    this.invalidateChecks();
+    const revision = this.revision;
+    const identity = this.identity();
+    const request = this.request();
+    const version = this.session()?.version;
+    const started = performance.now();
+    let text = '';
+    this.testingResponse.set(true);
+    const finish = (error?: Extract<AiStreamEvent, { kind: 'error' }>) => {
+      if (revision !== this.revision || identity !== this.identity() || this._destroy.destroyed)
+        return;
+      this.testingResponse.set(false);
+      this.diagnosis.set({
+        ok: !error,
+        message: error
+          ? aiFailureMessage(error, this._i18n)
+          : this._i18n.t('ai.provider.responseVerified'),
+        detail: error ? (error.detail ?? error.message) : undefined,
+        model: request.model,
+        version,
+        provider: this._i18n.t(this.chosen().name),
+        account: this.session()?.account,
+        testedAt: new Date().toLocaleTimeString(),
+        ms: Math.round(performance.now() - started),
+      });
+    };
+    const incomplete = () =>
+      finish({ kind: 'error', message: this._i18n.t('ai.incompleteResponse') });
+    // Solo un evento terminal con texto confirma el modelo. Un catálogo, un
+    // fragmento o el cierre de la conexión no acreditan una respuesta completa.
+    this.responseSubscription = this._gateway
+      .streamAiProviderTest(request)
+      .pipe(takeUntilDestroyed(this._destroy))
+      .subscribe({
+        next: (event) => {
+          if (event.kind === 'chunk') text += event.text;
+          else if (event.kind === 'error') finish(event);
+          else if (text.trim()) finish();
+          else incomplete();
+        },
+        error: (error) => finish({ kind: 'error', message: describe(error, this._i18n) }),
+        complete: () => {
+          if (this.testingResponse()) incomplete();
+        },
+      });
+  }
+
+  protected cancelTest(): void {
+    this.invalidateChecks();
+  }
+
+  protected async copyDetail(detail: string): Promise<void> {
+    try {
+      await navigator.clipboard.writeText(detail);
+    } catch {
+      this.error.set(this._i18n.t('shell.clipboard.copyFailed'));
+    }
+  }
+
+  protected selectModel(model: string): void {
+    this.invalidateChecks();
+    this.model.set(model);
+  }
+
+  private identity(): string {
+    return JSON.stringify([this.request(), this.session()?.account, this.session()?.version]);
+  }
+
+  private invalidateChecks(): void {
+    // La marca anterior deja de ser válida si cambia cualquier dato del perfil.
+    this.revision++;
+    this.responseSubscription?.unsubscribe();
+    this.testingResponse.set(false);
+    this.probing.set(false);
+    this.probe.set(null);
+    this.diagnosis.set(null);
   }
 
   protected async save(): Promise<void> {
@@ -554,10 +717,17 @@ export class AiProviderDialog {
   }
 
   protected close(): void {
+    this.invalidateChecks();
     this.closed.emit();
   }
 
   protected set(target: 'name' | 'baseUrl' | 'model' | 'command' | 'apiKey', event: Event): void {
+    this.invalidateChecks();
+    if (target === 'baseUrl' || target === 'apiKey') {
+      this.modelsRevision++;
+      this.listing.set(false);
+      this._models.set([]);
+    }
     const value = (event.target as HTMLInputElement).value;
 
     ({
@@ -593,6 +763,7 @@ export class AiProviderDialog {
       command: this.command().trim(),
       disclosure: this.staysHere() ? ('schema' as AiDisclosure) : this.disclosure(),
       ownSession: this.ownSession(),
+      shareBusinessNotes: editing?.shareBusinessNotes ?? false,
       // El primero que se configura es el que se usa: nadie configura uno para
       // luego tener que ir a marcarlo.
       isDefault: editing?.isDefault ?? this.providers().length === 0,

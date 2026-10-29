@@ -232,9 +232,14 @@ pub async fn download_and_install_update(
     update.install(bytes).map_err(|error| error.to_string())?;
 
     #[cfg(not(target_os = "windows"))]
-    app.restart();
+    {
+        app.restart()
+    }
 
-    Ok(())
+    #[cfg(target_os = "windows")]
+    {
+        Ok(())
+    }
 }
 
 #[cfg(test)]

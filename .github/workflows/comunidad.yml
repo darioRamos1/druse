@@ -1,6 +1,19 @@
 name: Verificar edición Comunidad
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - 'backend/**'
+      - 'frontend/**'
+      - 'shells/desktop-tauri/**'
+      - 'build/**'
+      - '.github/workflows/**'
+      - 'LICENSE'
+      - 'COPYRIGHT'
+      - 'THIRD_PARTY_NOTICES.md'
+      - 'docs/terceros/**'
+      - '.gitattributes'
   workflow_dispatch:
   pull_request:
     paths:

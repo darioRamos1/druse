@@ -13,6 +13,59 @@ namespace Druse.UnitTests;
 public sealed class ColumnValueParserTests
 {
     [Theory]
+    [InlineData("bigint", "9007199254740993")]
+    [InlineData("int8", "9223372036854775807")]
+    [InlineData("number(19,0)", "-9007199254740993")]
+    public void ConservaEnterosQueJavaScriptNoPuedeRepresentar(string type, string text)
+    {
+        Assert.True(ColumnValueParser.TryParse(type, text, out var value, out _));
+        Assert.Equal(text, ((long)value).ToString(System.Globalization.CultureInfo.InvariantCulture));
+    }
+
+    [Theory]
+    [InlineData("numeric(38,28)")]
+    [InlineData("decimal(38,28)")]
+    [InlineData("number(38,28)")]
+    public void ConservaLaPrecisionDecimalYRechazaElRedondeoSilencioso(string type)
+    {
+        Assert.True(ColumnValueParser.TryParse(type, "0.1234567890123456789012345678", out var value, out _));
+        Assert.Equal(0.1234567890123456789012345678m, value);
+        Assert.True(ColumnValueParser.TryParse(type, "1.2300000000000000000000000000000e2", out value, out _));
+        Assert.Equal(123m, value);
+        Assert.False(ColumnValueParser.TryParse(type, "0.12345678901234567890123456789", out _, out var error));
+        Assert.Contains("redondearlo", error, StringComparison.Ordinal);
+        Assert.False(ColumnValueParser.TryParse(type, "1e-29", out _, out _));
+    }
+
+    [Theory]
+    [InlineData("timestamptz")]
+    [InlineData("datetimeoffset(7)")]
+    [InlineData("timestamp with time zone")]
+    public void ConservaElOffsetYLosSieteDecimalesDeLaHora(string type)
+    {
+        const string text = "2026-10-02T10:20:30.1234567-05:00";
+        Assert.True(ColumnValueParser.TryParse(type, text, out var value, out _));
+        Assert.Equal(text, ((DateTimeOffset)value).ToString("yyyy-MM-dd'T'HH:mm:ss.fffffffzzz", System.Globalization.CultureInfo.InvariantCulture));
+        Assert.False(ColumnValueParser.TryParse(type, "2026-10-02T10:20:30.12345678-05:00", out _, out var error));
+        Assert.Contains("redondearla", error, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("text")]
+    [InlineData("varchar(200)")]
+    [InlineData("nvarchar(max)")]
+    public void DistingueTextoNullVacioYNulo(string type)
+    {
+        Assert.True(ColumnValueParser.TryParse(type, "NULL", out var literal, out _));
+        Assert.Equal("NULL", literal);
+        Assert.True(ColumnValueParser.TryParse(type, "", out var empty, out _));
+        Assert.Equal("", empty);
+        Assert.True(ColumnValueParser.TryParse(type, null, out var nil, out _));
+        Assert.Equal(DBNull.Value, nil);
+        Assert.Equal("'NULL'", ColumnValueParser.ToLiteral(type, "NULL"));
+    }
+
+    [Theory]
     // Los tres motores llaman parecido a lo mismo.
     [InlineData("int4", ColumnFamily.Integral)]
     [InlineData("bigint", ColumnFamily.Integral)]

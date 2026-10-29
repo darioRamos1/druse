@@ -8,6 +8,7 @@ import {
   EngineInfo,
   IndexCapabilities,
   QueryHistoryEntry,
+  QueryHistoryFilter,
   QueryResult,
   SavedConnection,
   SecretStoreStatus,
@@ -23,6 +24,8 @@ import {
 } from '../../shared/models/workspace';
 import {
   AiChatRequest,
+  AiChatPreview,
+  AiBusinessNote,
   AiProbeResult,
   AiProvider,
   AiProviderList,
@@ -492,7 +495,10 @@ export abstract class ApplicationGateway {
 
   // --- Historial y preferencias ---------------------------------------------
 
-  abstract getHistory(search?: string): Observable<readonly QueryHistoryEntry[]>;
+  abstract getHistory(
+    search?: string,
+    filter?: QueryHistoryFilter,
+  ): Observable<readonly QueryHistoryEntry[]>;
 
   abstract clearHistory(): Observable<void>;
 
@@ -753,6 +759,11 @@ export abstract class ApplicationGateway {
   /** Proveedores configurados y dónde se guardan sus claves. */
   abstract getAiProviders(): Observable<AiProviderList>;
 
+  abstract getAiNotes(): Observable<readonly AiBusinessNote[]>;
+  abstract saveAiNote(note: AiBusinessNote): Observable<AiBusinessNote>;
+  abstract deleteAiNote(id: string): Observable<void>;
+  abstract setAiNotesSharing(id: string, enabled: boolean): Observable<AiProvider>;
+
   /** Crea o actualiza un proveedor. La clave solo viaja de ida. */
   abstract saveAiProvider(request: SaveAiProviderRequest): Observable<AiProvider>;
 
@@ -765,6 +776,7 @@ export abstract class ApplicationGateway {
    * escrito la pregunta es descubrirlo tarde.
    */
   abstract testAiProvider(request: SaveAiProviderRequest): Observable<AiProbeResult>;
+  abstract streamAiProviderTest(request: SaveAiProviderRequest): Observable<AiStreamEvent>;
 
   /**
    * Los modelos que ese proveedor tiene desplegados.
@@ -799,6 +811,7 @@ export abstract class ApplicationGateway {
    * palabra no. Cancelar la suscripción corta la petición.
    */
   abstract streamAiChat(request: AiChatRequest): Observable<AiStreamEvent>;
+  abstract previewAiChat(request: AiChatRequest): Observable<AiChatPreview>;
 }
 
 /** Qué clase de sitio es una entrada del selector, para pintarle su icono. */

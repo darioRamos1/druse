@@ -14,7 +14,7 @@
       (click)="close()"
       [attr.aria-label]="'common.close' | t"
     >
-      ×
+      <app-icon name="close" [size]="12" />
     </button>
   </header>
 
@@ -26,7 +26,7 @@
         @for (provider of providers(); track provider.id) {
           <div class="saved__row" [class.is-editing]="editing()?.id === provider.id">
             <button type="button" class="saved__pick" (click)="edit(provider)">
-              <span class="saved__name">{{ provider.name }}</span>
+              <span class="saved__name">{{ provider.name | t }}</span>
               <span class="saved__model">{{ provider.model }}</span>
               @if (provider.isDefault) {
                 <span class="saved__badge">{{ 'ai.provider.default' | t }}</span>
@@ -187,6 +187,9 @@
             </span>
           } @else {
             <span class="field__hint">{{ 'ai.provider.ownQuota' | t }}</span>
+            @if (state.version) {
+              <span class="field__hint" translate="no">{{ state.version }}</span>
+            }
           }
         } @else {
           <div class="session is-missing">
@@ -197,6 +200,16 @@
             <button type="button" class="btn btn--slim" (click)="recheck()">
               {{ 'common.retry' | t }}
             </button>
+            @if (ownSession() && !editing()) {
+              <button
+                type="button"
+                class="btn btn--slim"
+                [disabled]="loggingIn()"
+                (click)="login()"
+              >
+                {{ 'ai.provider.login' | t: { provider: accountProvider() } }}
+              </button>
+            }
           </div>
         }
       } @else {
@@ -299,12 +312,13 @@
                   type="button"
                   class="choice"
                   [class.is-selected]="model() === candidate"
-                  (click)="model.set(candidate)"
+                  (click)="selectModel(candidate)"
                 >
                   {{ candidate }}
                 </button>
               }
             </span>
+            <span class="field__hint">{{ 'ai.provider.catalogOnly' | t }}</span>
           }
         </label>
       </div>
@@ -344,6 +358,64 @@
       <p class="warning">{{ storeDescription() }}</p>
     }
 
+    <section class="diagnostic" aria-live="polite">
+      <h3 class="section">{{ 'ai.provider.checkResponse' | t }}</h3>
+      <p class="field__hint">{{ 'ai.provider.responseHint' | t }}</p>
+      @if (testingResponse()) {
+        <button type="button" class="btn" (click)="cancelTest()">
+          {{ 'ai.provider.cancelTest' | t }}
+        </button>
+        <span class="field__hint">{{ 'ai.provider.probing' | t }}</span>
+      } @else {
+        <button
+          type="button"
+          class="btn"
+          [disabled]="
+            model().trim().length === 0 ||
+            sessionLoading() ||
+            probing() ||
+            saving() ||
+            (ownSession() && !editing())
+          "
+          (click)="testResponse()"
+        >
+          {{ 'ai.provider.testResponse' | t }}
+        </button>
+      }
+      @if (diagnosis(); as result) {
+        <p class="probe" [class.is-bad]="!result.ok">
+          <span class="probe__dot"></span>{{ result.message }}
+        </p>
+        <p class="field__hint">
+          {{
+            'ai.provider.responseMeta'
+              | t
+                : {
+                    provider: result.provider,
+                    model: result.model,
+                    when: result.testedAt,
+                    ms: result.ms,
+                  }
+          }}
+        </p>
+        @if (result.version) {
+          <p class="field__hint">{{ result.version }}</p>
+        }
+        @if (result.account) {
+          <p class="field__hint">{{ connected(result.account) }}</p>
+        }
+        @if (result.detail) {
+          <details>
+            <summary>{{ 'ai.failure.detail' | t }}</summary>
+            <pre>{{ result.detail }}</pre>
+          </details>
+          <button type="button" class="btn btn--slim" (click)="copyDetail(result.detail)">
+            {{ 'ai.failure.copy' | t }}
+          </button>
+        }
+      }
+    </section>
+
     @if (error()) {
       <p class="warning warning--error">{{ error() }}</p>
     }
@@ -365,18 +437,21 @@
   </div>
 
   <footer class="foot">
-    <button type="button" class="btn" [disabled]="probing()" (click)="test()">
-      {{ (probing() ? 'ai.provider.probing' : 'ai.provider.probe') | t }}
-    </button>
+    @if (isLocalCli()) {
+      <button
+        type="button"
+        class="btn"
+        [disabled]="probing() || testingResponse()"
+        (click)="test()"
+      >
+        {{ (probing() ? 'ai.provider.checkingConfig' : 'ai.provider.checkConfig') | t }}
+      </button>
+    }
 
     @if (probe(); as result) {
       <span class="probe" [class.is-bad]="!result.ok">
         <span class="probe__dot"></span>
-        @if (result.ok) {
-          {{ 'ai.provider.answeredIn' | t: { ms: result.ms } }}
-        } @else {
-          {{ result.detail }}
-        }
+        {{ result.detail }}
       </span>
     }
 

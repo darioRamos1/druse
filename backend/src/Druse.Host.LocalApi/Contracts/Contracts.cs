@@ -298,6 +298,8 @@ public sealed record EngineDto
 /// </summary>
 public sealed record EngineCapabilitiesDto
 {
+    public string? AiPlanFormat { get; init; }
+
     /// <summary>Hay un servidor al que apuntar. Falso en los motores que son un archivo.</summary>
     public required bool RequiresHost { get; init; }
 

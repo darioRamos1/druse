@@ -40,7 +40,7 @@ public sealed class SqliteQueryHistoryStore(DruseDatabase database) : IQueryHist
         command.Parameters.AddWithValue("$connectionName", entry.ConnectionName);
         command.Parameters.AddWithValue("$database", entry.Database);
         command.Parameters.AddWithValue("$sql", entry.Sql);
-        command.Parameters.AddWithValue("$executedAt", entry.ExecutedAtUtc.ToString("O", CultureInfo.InvariantCulture));
+        command.Parameters.AddWithValue("$executedAt", entry.ExecutedAtUtc.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture));
         command.Parameters.AddWithValue("$duration", entry.DurationMs);
         command.Parameters.AddWithValue("$succeeded", entry.Succeeded ? 1 : 0);
         command.Parameters.AddWithValue("$rowCount", (object?)entry.RowCount ?? DBNull.Value);
@@ -52,33 +52,63 @@ public sealed class SqliteQueryHistoryStore(DruseDatabase database) : IQueryHist
     public async Task<IReadOnlyList<QueryHistoryEntry>> GetRecentAsync(
         int limit,
         string? search,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        QueryHistoryFilter? filter = null)
     {
         await using var connection = await _database.OpenAsync(cancellationToken);
         await using var command = connection.CreateCommand();
 
-        var filter = string.IsNullOrWhiteSpace(search)
-            ? string.Empty
-            : """
-              WHERE sql_text LIKE $search ESCAPE '\'
-                 OR connection_name LIKE $search ESCAPE '\'
-              """;
+        var conditions = new List<string>();
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            conditions.Add(@"(sql_text LIKE $search ESCAPE '\' OR connection_name LIKE $search ESCAPE '\' OR database_name LIKE $search ESCAPE '\')");
+            command.Parameters.AddWithValue("$search", $"%{EscapeLikePattern(search)}%");
+        }
+        if (!string.IsNullOrWhiteSpace(filter?.Connection))
+        {
+            conditions.Add(@"connection_name LIKE $connection ESCAPE '\'");
+            command.Parameters.AddWithValue("$connection", $"%{EscapeLikePattern(filter.Connection)}%");
+        }
+        if (!string.IsNullOrWhiteSpace(filter?.Database))
+        {
+            conditions.Add(@"database_name LIKE $database ESCAPE '\'");
+            command.Parameters.AddWithValue("$database", $"%{EscapeLikePattern(filter.Database)}%");
+        }
+        if (filter?.From is { } from)
+        {
+            conditions.Add("executed_at_utc >= $from");
+            command.Parameters.AddWithValue("$from", from.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture));
+        }
+        if (filter?.Until is { } until)
+        {
+            conditions.Add("executed_at_utc < $until");
+            command.Parameters.AddWithValue("$until", until.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture));
+        }
+        if (filter?.Succeeded is { } succeeded)
+        {
+            conditions.Add("succeeded = $succeeded");
+            command.Parameters.AddWithValue("$succeeded", succeeded ? 1 : 0);
+        }
+        if (filter?.Before is { } before && filter.BeforeId is { } beforeId)
+        {
+            // El identificador desempata ejecuciones simultáneas. Un OFFSET
+            // repetiría filas si llega otra ejecución entre dos páginas.
+            conditions.Add("(executed_at_utc < $before OR (executed_at_utc = $before AND id < $beforeId))");
+            command.Parameters.AddWithValue("$before", before.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture));
+            command.Parameters.AddWithValue("$beforeId", beforeId.ToString());
+        }
+        var where = conditions.Count == 0 ? string.Empty : "WHERE " + string.Join(" AND ", conditions);
 
         command.CommandText = $"""
             SELECT id, connection_id, connection_name, database_name, sql_text,
                    executed_at_utc, duration_ms, succeeded, row_count, error_message
             FROM query_history
-            {filter}
-            ORDER BY executed_at_utc DESC
+            {where}
+            ORDER BY executed_at_utc DESC, id DESC
             LIMIT $limit;
             """;
 
         command.Parameters.AddWithValue("$limit", Math.Clamp(limit, 1, MaxLimit));
-
-        if (filter.Length > 0)
-        {
-            command.Parameters.AddWithValue("$search", $"%{EscapeLikePattern(search!)}%");
-        }
 
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
 

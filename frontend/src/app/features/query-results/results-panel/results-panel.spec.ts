@@ -37,6 +37,58 @@ describe('ResultsPanel', () => {
     expect(element.querySelector('.welcome')).toBeNull();
   });
 
+  it('analizar filas conserva el conjunto visible y la ejecución, sin elegir datos', () => {
+    const analyze = vi.fn();
+    fixture.componentInstance.analyzeRows.subscribe(analyze);
+    const set = {
+      columns: [{ name: 'id', dataType: 'int', kind: 'number', width: null }],
+      rows: [{ number: 1, values: ['1'] }],
+      totalRows: 1,
+      durationMs: 1,
+      truncated: false,
+    };
+    fixture.componentRef.setInput('result', {
+      executionId: 'e1',
+      state: 'succeeded',
+      resultSets: [set, set],
+      messages: [],
+      durationMs: 1,
+    });
+    fixture.componentRef.setInput('canAnalyzeRows', true);
+    fixture.detectChanges();
+    element.querySelectorAll<HTMLButtonElement>('.sets button')[1].click();
+    fixture.detectChanges();
+    element.querySelector<HTMLButtonElement>('[aria-label="Analizar estas filas"]')!.click();
+    expect(analyze).toHaveBeenCalledWith({ executionId: 'e1', resultSetIndex: 1 });
+    expect(fixture.componentInstance.selectedRows()).toEqual([]);
+  });
+
+  it('ofrece explicar solo un fallo con procedencia y emite su ejecución', () => {
+    const explain = vi.fn();
+    fixture.componentInstance.explainError.subscribe(explain);
+    const failed = {
+      executionId: 'e1',
+      state: 'failed',
+      resultSets: [],
+      messages: [],
+      durationMs: 2,
+      error: { message: 'No existe la columna' },
+    };
+    fixture.componentRef.setInput('result', failed);
+    fixture.detectChanges();
+    expect(element.textContent).not.toContain('Explicar este error');
+    fixture.componentRef.setInput('canExplainError', true);
+    fixture.detectChanges();
+    const action = Array.from(element.querySelectorAll<HTMLButtonElement>('.empty__action')).find(
+      (button) => button.textContent?.includes('Explicar este error'),
+    )!;
+    action.click();
+    expect(explain).toHaveBeenCalledWith('e1');
+    fixture.componentRef.setInput('result', { ...failed, state: 'canceled' });
+    fixture.detectChanges();
+    expect(element.textContent).not.toContain('Explicar este error');
+  });
+
   it('muestra actividad, tiempo y cancelación mientras se ejecuta', () => {
     fixture.componentRef.setInput('running', true);
     fixture.componentRef.setInput('timeoutSeconds', 30);

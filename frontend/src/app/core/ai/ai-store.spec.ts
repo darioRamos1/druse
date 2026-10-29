@@ -3,7 +3,12 @@ import { Observable, Subject, of } from 'rxjs';
 
 import { AiStore } from './ai-store';
 import { ApplicationGateway } from '../application-gateway/application-gateway';
-import { AiChatRequest, AiProvider, AiStreamEvent } from '../../shared/models/ai';
+import {
+  AiChatRequest,
+  AiContextSnapshot,
+  AiProvider,
+  AiStreamEvent,
+} from '../../shared/models/ai';
 
 const provider: AiProvider = {
   id: 'p1',
@@ -24,18 +29,21 @@ describe('AiStore', () => {
   let subscriptions: number;
   let unsubscriptions: number;
   let savedProvider: AiProvider;
+  let providers: AiProvider[];
 
   beforeEach(() => {
     savedProvider = provider;
+    providers = [provider, { ...provider, id: 'p2', name: 'Otro proveedor' }];
     stream = new Subject<AiStreamEvent>();
     lastRequest = null;
     subscriptions = 0;
     unsubscriptions = 0;
 
     const gateway = {
-      getAiProviders: () =>
-        of({ providers: [provider], canStoreKeys: true, storeDescription: 'Credenciales' }),
+      getAiProviders: () => of({ providers, canStoreKeys: true, storeDescription: 'Credenciales' }),
       saveAiProvider: () => of(savedProvider),
+      setAiNotesSharing: (_id: string, enabled: boolean) =>
+        of({ ...provider, shareBusinessNotes: enabled }),
       streamAiChat: (request: AiChatRequest) => {
         lastRequest = request;
 
@@ -63,6 +71,109 @@ describe('AiStore', () => {
 
     return store;
   }
+
+  it('rechaza filas sin permiso y congela la muestra para el reintento y el historial', async () => {
+    const store = await ready();
+    const source = { connectionId: 'c1', connectionName: 'Prueba', database: 'ventas' };
+    store.setSource(source);
+    const rows = {
+      executionId: 'e1',
+      occurredAtUtc: '2026-10-19T13:00:00Z',
+      resultSetIndex: 0,
+      availableRows: 1,
+      resultTruncated: false,
+      truncationAccepted: false,
+      columns: [{ ordinal: 0, name: 'id', dataType: 'text' }],
+      rows: [{ index: 0, cells: [{ kind: 'text' as const, value: 'original' }] }],
+    };
+    expect(store.prepare('Analiza', { source, tables: [], rows })).toBeNull();
+    providers = [{ ...provider, disclosure: 'schemaAndRows' }];
+    await store.refresh();
+    const request = store.prepare('Analiza', { source, tables: [], rows })!;
+    rows.rows[0].cells[0].value = 'modificado';
+    rows.columns[0].name = 'otra';
+    store.sendPrepared(request);
+    stream.next({ kind: 'error', message: 'Falló' });
+    stream.complete();
+    stream = new Subject<AiStreamEvent>();
+    store.retry();
+    expect(lastRequest?.context?.rows?.rows[0].cells[0].value).toBe('original');
+    expect(lastRequest?.context?.rows?.columns[0].name).toBe('id');
+    stream.next({ kind: 'chunk', text: 'Respuesta' });
+    stream.complete();
+    expect(
+      store.prepare('Siguiente')?.payload.messages[0].context?.rows?.rows[0].cells[0].value,
+    ).toBe('original');
+    providers = [{ ...provider, disclosure: 'schema' }];
+    await store.refresh();
+    expect(store.turns()).toEqual([]);
+    expect(store.prepare('Sin filas')?.payload.messages).toEqual([
+      { role: 'user', text: 'Sin filas' },
+    ]);
+  });
+
+  it('congela el plan para reintento e historial y bloquea su envío al revocar estructura', async () => {
+    const store = await ready();
+    const source = {
+      connectionId: 'c1',
+      connectionName: 'Prueba',
+      database: 'ventas',
+      engine: 'sqlite',
+    };
+    store.setSource(source);
+    const plan = {
+      format: 'sqlite-query-plan' as const,
+      executionId: 'e1',
+      occurredAtUtc: '2026-10-19T12:00:00Z',
+      sql: 'EXPLAIN QUERY PLAN SELECT * FROM clientes;',
+      text: 'SCAN clientes',
+    };
+    const request = store.prepare('Analiza', { source, tables: [], executionPlan: plan })!;
+    plan.text = 'modificado';
+    store.sendPrepared(request);
+    stream.next({ kind: 'error', message: 'Fallo' });
+    stream.complete();
+    stream = new Subject<AiStreamEvent>();
+    store.retry();
+    expect(lastRequest?.context?.executionPlan?.text).toBe('SCAN clientes');
+    stream.next({ kind: 'chunk', text: 'Respuesta' });
+    stream.complete();
+    expect(store.prepare('Siguiente')?.payload.messages[0].context?.executionPlan?.text).toBe(
+      'SCAN clientes',
+    );
+    providers = [{ ...provider, disclosure: 'nothing' }];
+    await store.refresh();
+    expect(store.turns()).toEqual([]);
+    expect(store.prepare('Analiza', { source, tables: [], executionPlan: plan })).toBeNull();
+  });
+
+  it('congela el error y su procedencia para el reintento y el historial', async () => {
+    const store = await ready();
+    const source = { connectionId: 'c1', connectionName: 'Prueba', database: 'ventas' };
+    store.setSource(source);
+    const error = {
+      executionId: 'e1',
+      occurredAtUtc: '2026-10-16T12:00:00Z',
+      sql: 'SELECT fallo;',
+      message: 'Fallo original',
+    };
+    const request = store.prepare('Explica', { source, tables: [], executionError: error })!;
+    error.sql = 'SELECT cambiado;';
+    error.message = 'Otro error';
+    expect(request.context?.executionError?.sql).toBe('SELECT fallo;');
+    store.sendPrepared(request);
+    stream.next({ kind: 'error', message: 'Fallo del proveedor' });
+    stream.complete();
+    stream = new Subject<AiStreamEvent>();
+    store.retry();
+    expect(lastRequest?.context?.executionError?.message).toBe('Fallo original');
+    stream.next({ kind: 'chunk', text: 'Respuesta' });
+    stream.next({ kind: 'done' });
+    stream.complete();
+    const following = store.prepare('Siguiente');
+    expect(following?.payload.messages[0].context?.executionError?.sql).toBe('SELECT fallo;');
+    expect(following?.context?.executionError).toBeUndefined();
+  });
 
   /**
    * El proveedor va a la base local y su clave al llavero del sistema: dos
@@ -162,6 +273,21 @@ describe('AiStore', () => {
     expect(store.turns()[1].text).toBe('parcial');
   });
 
+  it('explica el rechazo del modelo y conserva el detalle original', async () => {
+    const store = await ready();
+    store.ask('hola');
+    stream.next({
+      kind: 'error',
+      code: 'unsupportedModel',
+      message: 'model is not supported',
+      detail: '{"error":"model is not supported"}',
+    });
+    stream.complete();
+    expect(store.turns()[1].error).toContain('no admite este modelo');
+    expect(store.turns()[1].errorDetail).toBe('{"error":"model is not supported"}');
+    expect(store.busy()).toBe(false);
+  });
+
   it('no lanza dos peticiones a la vez', async () => {
     const store = await ready();
 
@@ -175,8 +301,8 @@ describe('AiStore', () => {
   it('manda el contexto solo cuando se le da', async () => {
     const store = await ready();
 
-    store.ask('con esquema', 'Tablas disponibles: accionista.');
-    expect(lastRequest!.context).toBe('Tablas disponibles: accionista.');
+    store.ask('con esquema', context());
+    expect(lastRequest!.context?.schema).toBe('TABLE accionista;');
 
     store.cancel();
     store.ask('sin esquema');
@@ -207,6 +333,210 @@ describe('AiStore', () => {
     store.clear();
 
     expect(store.turns()).toEqual([]);
-    expect(store.providers().length).toBe(1);
+    expect(store.providers().length).toBe(2);
+  });
+
+  function context(): AiContextSnapshot {
+    return {
+      source: { connectionId: 'c1', connectionName: 'Pruebas', database: 'ventas' },
+      schema: 'TABLE accionista;',
+      sql: 'SELECT 1',
+      tables: ['accionista'],
+    };
+  }
+
+  it('recupera el historial por conexión y base sin mezclar bases homónimas', async () => {
+    const store = await ready();
+    const source = context().source;
+    store.setSource(source);
+    store.ask('primera base', context());
+    store.cancel();
+    store.setSource({ ...source, database: 'otra' });
+    expect(store.turns()).toEqual([]);
+    store.setSource({ ...source, connectionId: 'c2' });
+    expect(store.turns()).toEqual([]);
+    store.setSource(source);
+    expect(store.turns()[0].text).toBe('primera base');
+  });
+
+  it('separa proveedores y recupera su conversación al volver', async () => {
+    const store = await ready();
+    store.ask('para p1');
+    store.cancel();
+    store.use('p2');
+    expect(store.turns()).toEqual([]);
+    store.ask('para p2');
+    expect(lastRequest!.messages.map((message) => message.text)).toEqual(['para p2']);
+    store.cancel();
+    store.use('p1');
+    expect(store.turns()[0].text).toBe('para p1');
+  });
+
+  it('no recupera historial al cambiar modelo o reducir permisos', async () => {
+    const store = await ready();
+    store.ask('con estructura', context());
+    store.cancel();
+    providers = [{ ...provider, model: 'otro-modelo' }];
+    await store.refresh();
+    expect(store.turns()).toEqual([]);
+    providers = [{ ...provider, disclosure: 'nothing' }];
+    await store.refresh();
+    store.ask('sin estructura', context());
+    expect(lastRequest!.context).toBeUndefined();
+    expect(lastRequest!.messages).toEqual([{ role: 'user', text: 'sin estructura' }]);
+  });
+
+  it('la respuesta en curso termina en su base aunque haya otra petición abierta', async () => {
+    const store = await ready();
+    const source = context().source;
+    store.setSource(source);
+    store.ask('base A');
+    const first = stream;
+    store.setSource({ ...source, database: 'B' });
+    expect(store.busy()).toBe(false);
+    stream = new Subject<AiStreamEvent>();
+    store.ask('base B');
+    first.next({ kind: 'chunk', text: 'respuesta A' });
+    first.complete();
+    expect(store.turns()[1].text).toBe('');
+    expect(store.busy()).toBe(true);
+    stream.next({ kind: 'chunk', text: 'respuesta B' });
+    stream.complete();
+    store.setSource(source);
+    expect(store.turns()[1].text).toBe('respuesta A');
+    expect(store.busy()).toBe(false);
+  });
+
+  it('conserva una copia del contexto y reintenta sin duplicar la pregunta', async () => {
+    const store = await ready();
+    const original = { ...context(), tables: ['accionista'] };
+    store.ask('consulta', original);
+    stream.next({ kind: 'error', message: 'Falló' });
+    stream.complete();
+    original.tables.push('otra');
+    original.sql = 'SELECT cambiado';
+    stream = new Subject<AiStreamEvent>();
+    store.retry();
+    expect(store.turns().length).toBe(2);
+    expect(lastRequest!.messages.map((message) => message.text)).toEqual(['consulta']);
+    expect(lastRequest!.context?.tables).toEqual(['accionista']);
+    expect(lastRequest!.context?.sql).toBe('SELECT 1');
+    stream.next({ kind: 'chunk', text: 'Ahora sí' });
+    stream.complete();
+    expect(store.turns()[1].error).toBeUndefined();
+    expect(store.turns()[1].text).toBe('Ahora sí');
+  });
+
+  it('registra la confirmación del servidor y conserva el contexto de preguntas anteriores', async () => {
+    const store = await ready();
+    store.ask('primera', context());
+    stream.next({
+      kind: 'context',
+      text: 'Contexto filtrado',
+      hash: 'revisado',
+      providerId: 'p1',
+      model: provider.model,
+      disclosure: 'schema',
+    });
+    stream.next({ kind: 'chunk', text: 'respuesta' });
+    stream.complete();
+    expect(store.turns()[0].request?.sentContext).toBe('Contexto filtrado');
+    expect(store.turns()[0].request?.sentHash).toBe('revisado');
+    store.ask('segunda');
+    expect(lastRequest!.messages[0].context?.sql).toBe('SELECT 1');
+    expect(store.turns()[0].request?.sentContext).toBe('Contexto filtrado');
+  });
+
+  it('aísla el historial al cambiar el permiso y conserva las notas originales al reintentar', async () => {
+    const store = await ready();
+    const note = {
+      id: 'n1',
+      connectionId: 'c1',
+      database: 'ventas',
+      text: 'Sin IVA',
+      enabled: true,
+      reference: {
+        objectId: 't1',
+        schema: 'public',
+        table: 'facturas',
+        kind: 'table' as const,
+        column: 'importe',
+      },
+      updatedAtUtc: '2026-10-16T00:00:00Z',
+      formatVersion: 1,
+    };
+    store.ask('sin permiso', { ...context(), notes: [note] });
+    expect(lastRequest!.context?.notes).toBeUndefined();
+    store.cancel();
+    await store.setNotesSharing('p1', true);
+    expect(store.turns()).toEqual([]);
+    stream = new Subject<AiStreamEvent>();
+    store.ask('con permiso', { ...context(), notes: [note] });
+    stream.next({ kind: 'error', message: 'Falló' });
+    stream.complete();
+    note.text = 'Con IVA';
+    note.reference.column = 'otra';
+    stream = new Subject<AiStreamEvent>();
+    store.retry();
+    expect(lastRequest!.shareBusinessNotes).toBe(true);
+    expect(lastRequest!.context?.notes?.[0].text).toBe('Sin IVA');
+    expect(lastRequest!.context?.notes?.[0].reference?.column).toBe('importe');
+    store.cancel();
+    await store.setNotesSharing('p1', false);
+    expect(store.turns()[0].text).toBe('sin permiso');
+    store.ask('otra sin permiso', { ...context(), notes: [note] });
+    expect(lastRequest!.shareBusinessNotes).toBe(false);
+    expect(lastRequest!.messages.map((message) => message.text)).not.toContain('con permiso');
+  });
+
+  it('omite también la pregunta de una respuesta fallida al continuar', async () => {
+    const store = await ready();
+    store.ask('fallida');
+    stream.next({ kind: 'error', message: 'Falló' });
+    stream.complete();
+    store.ask('otra pregunta');
+    expect(lastRequest!.messages.map((message) => message.text)).toEqual(['otra pregunta']);
+  });
+
+  it('prepara sin enviar y reduce el historial sin quitar mensajes visibles', async () => {
+    const store = await ready();
+    store.ask('primera', context());
+    stream.next({ kind: 'chunk', text: 'respuesta primera' });
+    stream.complete();
+    stream = new Subject<AiStreamEvent>();
+    store.ask('segunda');
+    stream.next({ kind: 'chunk', text: 'respuesta segunda' });
+    stream.complete();
+    stream = new Subject<AiStreamEvent>();
+    const snapshot = store.prepare('tercera', context(), 1)!;
+    expect(subscriptions).toBe(2);
+    expect(store.turns()).toHaveLength(4);
+    expect(snapshot.historyTurnIndices).toEqual([2]);
+    expect(snapshot.omittedTurnIndices).toEqual([0]);
+    expect(snapshot.payload.messages.map((message) => message.text)).toEqual([
+      'segunda',
+      'respuesta segunda',
+      'tercera',
+    ]);
+    expect(store.sendPrepared(snapshot)).toBe(true);
+    expect(store.turns()).toHaveLength(6);
+    stream.next({ kind: 'error', message: 'Falló' });
+    stream.complete();
+    const originalPayload = lastRequest;
+    stream = new Subject<AiStreamEvent>();
+    store.retry();
+    expect(lastRequest).toEqual(originalPayload);
+    expect(store.turns()).toHaveLength(6);
+  });
+
+  it('no envía una copia preparada para otro proveedor o base', async () => {
+    const store = await ready();
+    const request = store.prepare('preparada', context())!;
+    store.use('p2');
+    expect(store.sendPrepared(request)).toBe(false);
+    store.use('p1');
+    store.setSource({ ...context().source, database: 'otra' });
+    expect(store.sendPrepared(request)).toBe(false);
+    expect(subscriptions).toBe(0);
   });
 });

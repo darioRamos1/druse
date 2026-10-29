@@ -32,6 +32,7 @@ import {
 } from '../../../shared/models/workspace';
 import { DialogFocus } from '../../../shared/a11y/dialog-focus';
 import { DialogBackdrop } from '../../../shared/a11y/dialog-backdrop';
+import { Icon } from '../../../shared/ui/icon/icon';
 
 /** Pestañas del diseñador. */
 export type DesignerSection = 'columns' | 'indexes' | 'keys' | 'constraints';
@@ -117,7 +118,7 @@ interface DesignRow {
 @Component({
   selector: 'app-table-designer',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [DialogBackdrop, DialogFocus, FormsModule, TranslatePipe],
+  imports: [Icon, DialogBackdrop, DialogFocus, FormsModule, TranslatePipe],
   templateUrl: './table-designer.html',
   styleUrl: './table-designer.scss',
 })
