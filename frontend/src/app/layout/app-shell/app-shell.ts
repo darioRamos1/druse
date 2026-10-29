@@ -1413,8 +1413,13 @@ export class AppShell {
     this.dialogOpen.set(true);
   }
 
-  protected connectSaved(id: string): void {
-    void this._store.connectSaved(id);
+  protected async connectSaved(id: string): Promise<void> {
+    // Sin almacén seguro, el perfil existe pero necesita que se escriba su
+    // contraseña. La barra lateral y la paleta deben ofrecer el mismo diálogo
+    // que el selector del editor, en vez de dejar el clic sin respuesta.
+    if ((await this._store.openSaved(id)) === 'needsPassword') {
+      this.editConnection(id);
+    }
   }
 
   protected activateFromPalette(id: string): void {

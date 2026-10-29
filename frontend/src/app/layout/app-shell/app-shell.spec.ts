@@ -1,19 +1,24 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
-import { of } from 'rxjs';
+import { HttpErrorResponse } from '@angular/common/http';
+import { of, throwError } from 'rxjs';
 
 import { ApplicationGateway } from '../../core/application-gateway/application-gateway';
 import { WorkspaceStore } from '../../core/workspace/workspace-store';
-import { ConnectionForm, DatabaseObject } from '../../shared/models/workspace';
+import { ConnectionForm, DatabaseObject, SavedConnection } from '../../shared/models/workspace';
 import { AppShell } from './app-shell';
 import { AiCatalog } from '../../core/ai/ai-catalog';
 import { ConnectionsSidebar } from '../../features/connections/connections-sidebar/connections-sidebar';
+import { ConnectionDialog } from '../../features/connections/connection-dialog/connection-dialog';
 import { ResultsPanel } from '../../features/query-results/results-panel/results-panel';
 
 /** Gateway que no habla con nadie: el shell debe montarse sin API detrás. */
 function silentGateway(): Partial<ApplicationGateway> {
   return {
     getEngines: () => of([]),
+    getSavedConnections: () => of([]),
+    getSecretStoreStatus: () => of({ available: false, description: 'Sin almacén seguro' }),
+    getHistory: () => of([]),
     getJobs: () => of([]),
     getAiProviders: () => of({ providers: [], canStoreKeys: true, storeDescription: '' }),
     getDatabases: () => of([]),
@@ -247,6 +252,81 @@ describe('AppShell', () => {
 
   it('sin conexiones, invita a crear una', () => {
     expect(element.querySelector('.empty__action')?.textContent).toContain('Crear una conexión');
+  });
+
+  describe('abrir un perfil guardado desde el explorador', () => {
+    const profile: SavedConnection = {
+      id: 'perfil-sin-clave',
+      name: 'Servidor guardado',
+      engine: 'postgresql',
+      host: '127.0.0.1',
+      port: 5432,
+      database: 'druse_test',
+      username: 'postgres',
+      authentication: 'password',
+      sslMode: 'disable',
+      environment: 'development',
+      readOnly: false,
+      hasStoredPassword: false,
+    };
+
+    async function openSaved(response: ReturnType<ApplicationGateway['openSavedSession']>) {
+      const gateway = TestBed.inject(ApplicationGateway);
+      const store = TestBed.inject(WorkspaceStore);
+      Object.assign(gateway, {
+        getSavedConnections: () => of([profile]),
+        getSecretStoreStatus: () => of({ available: false, description: 'Sin almacén seguro' }),
+        openSavedSession: () => response,
+      });
+      await store.loadSavedConnections();
+      await fixture.whenStable();
+      const sidebar = fixture.debugElement.query(By.directive(ConnectionsSidebar))
+        .componentInstance as ConnectionsSidebar;
+      sidebar.connectSaved.emit(profile.id);
+      await fixture.whenStable();
+      return store;
+    }
+
+    it('pide la contraseña con el perfil completo cuando el servidor responde 428', async () => {
+      const store = await openSaved(throwError(() => new HttpErrorResponse({ status: 428 })));
+      const dialog = fixture.debugElement.query(By.directive(ConnectionDialog))
+        .componentInstance as ConnectionDialog;
+
+      expect(dialog.connection()).toEqual(profile);
+      expect(
+        element.querySelector<HTMLInputElement>('app-connection-dialog input[type="password"]')
+          ?.value,
+      ).toBe('');
+      expect(store.connections()[0].state).toBe('disconnected');
+      expect(store.notice()).toBeNull();
+    });
+
+    it('abre el árbol sin pedir contraseña si el servidor puede recuperar la guardada', async () => {
+      const store = await openSaved(
+        of({
+          sessionId: 'sesion-guardada',
+          engine: 'postgresql',
+          serverVersion: '18.0',
+          database: 'druse_test',
+          readOnly: false,
+        }),
+      );
+
+      expect(element.querySelector('app-connection-dialog')).toBeNull();
+      expect(store.connections()[0]).toMatchObject({ state: 'connected', expanded: true });
+    });
+
+    it('conserva el error de conexión sin confundirlo con una contraseña pendiente', async () => {
+      const store = await openSaved(
+        throwError(
+          () => new HttpErrorResponse({ status: 503, statusText: 'Servicio no disponible' }),
+        ),
+      );
+
+      expect(element.querySelector('app-connection-dialog')).toBeNull();
+      expect(store.connections()[0].state).toBe('error');
+      expect(store.notice()).toBeTruthy();
+    });
   });
 
   it('la ayuda inicial abre el formulario de conexión', async () => {
