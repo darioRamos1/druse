@@ -20,6 +20,103 @@
 
 . (Join-Path $PSScriptRoot 'manifiesto.ps1')
 
+function Test-DruseRutaSoloDocumental {
+    param([string]$Path)
+
+    if ([string]::IsNullOrWhiteSpace($Path) -or $Path -match '[\\\x00-\x1f\x7f]|(^/)|//|(^|/)\.\.?(/|$)') { return $false }
+    if ($Path -clike 'landing/*') { return $true }
+    # Los expedientes de terceros sí aportan avisos y pruebas a los paquetes.
+    if ($Path -clike 'docs/*' -and $Path -notmatch '^docs/terceros(?:[/.-]|$)') { return $true }
+    return $Path -cin @('README.md', 'AGENTS.md', 'CONTRIBUTING.md', 'SECURITY.md', 'CODE_OF_CONDUCT.md', 'SUPPORT.md', 'CODE_SIGNING_POLICY.md')
+}
+
+# Una versión puede esperar a CI mientras main recibe documentación. Sólo esa
+# clase de avance conserva los mismos bytes del programa que se comprobaron.
+function Get-DruseCompatibilidadMain {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)][string]$Repository,
+        [Parameter(Mandatory)][ValidatePattern('^[0-9a-fA-F]{40}$')][string]$Commit,
+        [Parameter(Mandatory)][ValidatePattern('^\d+\.\d+\.\d+$')][string]$Version
+    )
+
+    $mainResponse = gh api "repos/$Repository/commits/main" --jq '.sha'
+    if ($LASTEXITCODE -ne 0) { throw 'No se pudo comprobar el commit actual de main.' }
+    $main = ($mainResponse -join '').Trim()
+    if ($main -notmatch '^[0-9a-fA-F]{40}$') { throw 'La respuesta del commit de main no es válida.' }
+    if ($main -eq $Commit) { return @{ compatible = $true; detalle = 'El commit comprobado sigue siendo main.' } }
+
+    $config = gh api "repos/$Repository/contents/shells/desktop-tauri/tauri.conf.json?ref=$main" --jq '.content'
+    if ($LASTEXITCODE -ne 0) { throw 'No se pudo comprobar la versión actual de main.' }
+    try {
+        $mainVersion = ([Text.Encoding]::UTF8.GetString([Convert]::FromBase64String(($config -join '').Trim())) | ConvertFrom-Json -ErrorAction Stop).version
+        if ($mainVersion -isnot [string] -or $mainVersion -notmatch '^\d+\.\d+\.\d+$') { throw 'Versión inválida.' }
+    }
+    catch { throw 'La configuración de versión de main no es válida.' }
+    if ($mainVersion -ne $Version) {
+        return @{ compatible = $false; detalle = 'main ya tiene otra versión; se espera su comprobación.' }
+    }
+
+    $response = gh api "repos/$Repository/compare/$Commit...$main"
+    if ($LASTEXITCODE -ne 0) { throw 'No se pudo comprobar qué cambió en main.' }
+    try { $comparison = $response | ConvertFrom-Json -ErrorAction Stop }
+    catch { throw 'La comparación de main no es JSON válido.' }
+    if ($null -eq $comparison -or $comparison -is [array] -or
+        $comparison.status -isnot [string] -or $comparison.status -notin @('ahead', 'behind', 'diverged', 'identical') -or
+        $comparison.base_commit.sha -isnot [string] -or $comparison.merge_base_commit.sha -isnot [string] -or
+        $comparison.base_commit.sha -ne $Commit -or
+        $comparison.files -isnot [array]) {
+        throw 'La comparación de main no contiene la evidencia esperada.'
+    }
+    if ($comparison.status -ne 'ahead' -or $comparison.merge_base_commit.sha -ne $Commit) {
+        return @{ compatible = $false; detalle = 'El commit comprobado ya no es antecesor de main.' }
+    }
+    if ($comparison.ahead_by -isnot [long] -or $comparison.ahead_by -lt 1 -or
+        $comparison.behind_by -isnot [long] -or $comparison.behind_by -ne 0 -or
+        $comparison.total_commits -isnot [long] -or $comparison.total_commits -ne $comparison.ahead_by) {
+        throw 'La comparación de main no describe un avance completo y válido.'
+    }
+    if ($comparison.PSObject.Properties['truncated'] -and $comparison.truncated -isnot [bool]) {
+        throw 'La comparación de main contiene un indicador de truncamiento inválido.'
+    }
+    # GitHub limita a 300 los archivos de compare. En el límite no se puede
+    # acreditar que todos los demás sean documentos: se espera el nuevo SHA.
+    if ($comparison.files.Count -ge 300 -or $comparison.truncated -eq $true) {
+        return @{ compatible = $false; detalle = 'La lista de cambios de main puede estar truncada; se espera su comprobación.' }
+    }
+    foreach ($file in $comparison.files) {
+        if ($file.filename -isnot [string] -or [string]::IsNullOrWhiteSpace($file.filename) -or
+            $file.status -isnot [string] -or $file.status -notin @('added', 'removed', 'modified', 'renamed', 'copied', 'changed', 'unchanged') -or
+            ($null -ne $file.previous_filename -and $file.previous_filename -isnot [string]) -or
+            ($file.status -in @('renamed', 'copied') -and [string]::IsNullOrWhiteSpace($file.previous_filename))) {
+            throw 'La comparación de main contiene un archivo sin evidencia completa.'
+        }
+        if (-not (Test-DruseRutaSoloDocumental $file.filename) -or
+            ($file.previous_filename -and -not (Test-DruseRutaSoloDocumental $file.previous_filename))) {
+            return @{ compatible = $false; detalle = 'main tiene cambios de aplicación o de contenido del paquete; se espera su comprobación.' }
+        }
+    }
+    $latestResponse = gh api "repos/$Repository/commits/main" --jq '.sha'
+    if ($LASTEXITCODE -ne 0) { throw 'No se pudo confirmar que main se mantuvo durante la comprobación.' }
+    if (($latestResponse -join '').Trim() -ne $main) {
+        return @{ compatible = $false; detalle = 'main volvió a avanzar durante la comprobación; se espera la nueva validación.' }
+    }
+    return @{ compatible = $true; detalle = 'main sólo añadió documentación o cambios de la landing.' }
+}
+
+function Assert-DruseMainCompatible {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)][string]$Repository,
+        [Parameter(Mandatory)][string]$Commit,
+        [Parameter(Mandatory)][string]$Version
+    )
+    $result = Get-DruseCompatibilidadMain -Repository $Repository -Commit $Commit -Version $Version
+    if (-not $result.compatible) {
+        throw "La publicación ya no corresponde al código actual de main. $($result.detalle) Se conservan las descargas anteriores y cualquier borrador pendiente."
+    }
+}
+
 function Write-DruseReleaseChecksums {
     [CmdletBinding()]
     param([Parameter(Mandatory)][string]$ReleaseDir)
