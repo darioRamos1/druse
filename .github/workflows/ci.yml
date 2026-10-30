@@ -22,6 +22,7 @@ on:
     paths:
       - 'backend/**'
       - 'frontend/**'
+      - 'e2e/**'
       - 'shells/desktop-tauri/**'
       - 'build/**'
       - '.github/workflows/**'
@@ -117,6 +118,7 @@ jobs:
   backend-con-motores-reales:
     name: Backend con los cuatro motores
     runs-on: ubuntu-latest
+    timeout-minutes: 30
 
     services:
       postgres:
@@ -292,6 +294,8 @@ jobs:
           --verbosity normal
           --results-directory artifacts/test-results
           --logger trx
+          --blame-hang-timeout 5m
+          --blame-hang-dump-type mini
 
       - name: Comprobar que se ejecutaron pruebas
         if: always()
@@ -301,6 +305,15 @@ jobs:
           -ResultsDirectory artifacts/test-results
           -ExpectedSuites 3
           -MinimumTests 800
+
+      - name: Conservar el diagnóstico si las pruebas fallan o se bloquean
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: backend-motores-diagnostico-${{ github.sha }}
+          path: artifacts/test-results/**
+          if-no-files-found: warn
+          retention-days: 7
 
   # La aplicación entera por donde la usa una persona: Angular, la API local y
   # los motores que usan sus recorridos. SQL Server comprueba la migración entre
@@ -313,6 +326,7 @@ jobs:
   e2e:
     name: Punta a punta (PostgreSQL, SQL Server, Oracle y SQLite)
     runs-on: ubuntu-latest
+    timeout-minutes: 30
 
     services:
       postgres:
@@ -423,16 +437,19 @@ jobs:
 
       - name: Probar
         working-directory: e2e
+        timeout-minutes: 20
         run: npm test
 
       # El informe solo sirve cuando algo falló, y entonces es lo primero que se
       # mira: trae la traza, la captura y el vídeo del momento exacto.
       - name: Recoger el informe
-        if: failure()
+        if: failure() || cancelled()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: e2e-informe
-          path: e2e/playwright-report/**
+          path: |
+            e2e/playwright-report/**
+            e2e/test-results/**
           retention-days: 14
 
   # Las pruebas de los guiones de construcción. No compilan, no publican y no
@@ -693,6 +710,11 @@ jobs:
           --output shells/desktop-tauri/api
           -p:PublishSingleFile=false
           -p:DebugType=none
+
+      - name: Preparar y arrancar la API autocontenida de Linux
+        if: matrix.os == 'ubuntu-latest'
+        shell: pwsh
+        run: ./build/scripts/preparar-api-linux.ps1
 
       - name: Compilar el frontend
         working-directory: frontend

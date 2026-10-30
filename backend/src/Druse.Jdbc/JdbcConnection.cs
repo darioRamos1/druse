@@ -20,6 +20,9 @@ public sealed class JdbcConnection : DbConnection
     private string _connectionString = string.Empty;
     private string _database = string.Empty;
     private string _serverVersion = string.Empty;
+    private readonly object _estado = new();
+    private bool _abandonada;
+    private readonly Func<string, java.sql.Connection> _abrir = java.sql.DriverManager.getConnection;
 
     private static bool _informixRegistrado;
 
@@ -58,6 +61,11 @@ public sealed class JdbcConnection : DbConnection
 
     public JdbcConnection(string connectionString) => ConnectionString = connectionString;
 
+    // Permite verificar el ciclo de vida sin un servidor ni un socket real.
+    internal JdbcConnection(java.sql.Connection conexion) => _java = conexion;
+
+    internal JdbcConnection(Func<string, java.sql.Connection> abrir) => _abrir = abrir;
+
     /// <summary>La conexión de `java.sql`, para quien necesite bajar un piso.</summary>
     internal java.sql.Connection Java =>
         _java ?? throw new InvalidOperationException("La conexión no está abierta.");
@@ -75,24 +83,53 @@ public sealed class JdbcConnection : DbConnection
 
     public override string ServerVersion => _serverVersion;
 
-    public override ConnectionState State =>
-        _java is not null && !_java.isClosed() ? ConnectionState.Open : ConnectionState.Closed;
+    public override ConnectionState State
+    {
+        get
+        {
+            var conexion = Volatile.Read(ref _java);
+            return conexion is not null && !conexion.isClosed()
+                ? ConnectionState.Open
+                : ConnectionState.Closed;
+        }
+    }
 
     public override void Open()
     {
+        lock (_estado)
+        {
+            if (_abandonada)
+            {
+                throw new InvalidOperationException("La conexión se canceló; abre una sesión nueva.");
+            }
+        }
+
         if (State == ConnectionState.Open)
         {
             return;
         }
 
+        java.sql.Connection? creada = null;
+
         try
         {
-            _java = java.sql.DriverManager.getConnection(_connectionString);
+            creada = _abrir(_connectionString);
 
-            var meta = _java.getMetaData();
+            var meta = creada.getMetaData();
 
             _serverVersion = meta.getDatabaseProductVersion() ?? string.Empty;
-            _database = _java.getCatalog() ?? DatabaseOf(_connectionString);
+            _database = creada.getCatalog() ?? DatabaseOf(_connectionString);
+
+            lock (_estado)
+            {
+                // Open puede devolver su conexión después de haber cancelado la
+                // espera. No debe reaparecer abierta ni perder su cierre.
+                if (!_abandonada)
+                {
+                    _java = creada;
+                    creada = null;
+                }
+            }
         }
         catch (java.sql.SQLException exception)
         {
@@ -100,6 +137,22 @@ public sealed class JdbcConnection : DbConnection
             // estado SQL delante, que es lo que distingue «no existe la base» de
             // «la clave no vale».
             throw new JdbcException(exception);
+        }
+        finally
+        {
+            // También somos dueños de la conexión si falló la lectura de sus
+            // metadatos o si Open terminó después de cancelar su espera.
+            if (creada is not null)
+            {
+                try
+                {
+                    creada.close();
+                }
+                catch (java.sql.SQLException)
+                {
+                    // El cierre no debe tapar el error original de apertura.
+                }
+            }
         }
     }
 
@@ -124,26 +177,50 @@ public sealed class JdbcConnection : DbConnection
             },
             // Nada que cancelar todavía: sin statement, JDBC no ofrece por dónde.
             () => { },
-            cancellationToken);
+            cancellationToken,
+            Abandonar);
+
+    internal void Abandonar(Task pendiente)
+    {
+        java.sql.Connection? conexion;
+
+        lock (_estado)
+        {
+            _abandonada = true;
+            conexion = _java;
+            _java = null;
+        }
+
+        if (conexion is not null)
+        {
+            // Dispose ya no espera a la consulta cancelada. La conexión física
+            // sigue teniendo dueño y se cierra cuando el driver la libera.
+            _ = JdbcCancellation.AlTerminar(pendiente, conexion.close);
+        }
+    }
 
     public override void Close()
     {
-        if (_java is null)
+        java.sql.Connection? conexion;
+
+        lock (_estado)
+        {
+            conexion = _java;
+            _java = null;
+        }
+
+        if (conexion is null)
         {
             return;
         }
 
         try
         {
-            _java.close();
+            conexion.close();
         }
         catch (java.sql.SQLException)
         {
             // Cerrar algo que ya se cayó no es un error que nadie pueda arreglar.
-        }
-        finally
-        {
-            _java = null;
         }
     }
 

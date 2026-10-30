@@ -37,6 +37,15 @@ public sealed class JdbcTransaction : DbTransaction
         // salga de un `using` sin haber llamado a Commit.
         if (disposing && !_terminada)
         {
+            // Una consulta cancelada puede seguir dentro de JDBC. Su conexión
+            // ya se retiró de uso y el cierre diferido deshará la transacción.
+            if (_connection.State == ConnectionState.Closed)
+            {
+                _terminada = true;
+                base.Dispose(disposing);
+                return;
+            }
+
             try
             {
                 Rollback();

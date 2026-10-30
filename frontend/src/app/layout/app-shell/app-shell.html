@@ -326,7 +326,11 @@
 -->
 @defer (when dialogOpen()) {
   @if (dialogOpen()) {
-    <app-connection-dialog [connection]="editingConnection()" (closed)="closeDialog()" />
+    <app-connection-dialog
+      [connection]="editingConnection()"
+      [purpose]="connectionDialogPurpose()"
+      (closed)="closeDialog()"
+    />
   }
 }
 

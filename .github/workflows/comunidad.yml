@@ -81,8 +81,19 @@ jobs:
       - name: Verificar canal de actualización de Comunidad
         working-directory: shells/desktop-tauri
         run: cargo test --locked updates::tests
+      # Compilar el mismo CLI en cada ajuste retrasa también la publicación.
+      # La release puede reutilizar este binario exacto del mismo Windows.
+      - name: Recuperar CLI de Tauri
+        id: cli-de-tauri
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cargo/bin/cargo-tauri.exe
+          key: cargo-tauri-2.11.4-${{ runner.os }}
       - name: Instalar CLI de Tauri
+        if: steps.cli-de-tauri.outputs.cache-hit != 'true'
         run: cargo install tauri-cli --version 2.11.4 --locked
+      - name: Comprobar versión del CLI
+        run: cargo tauri --version
       - name: Construir instalador candidato sin firma de SignPath
         shell: pwsh
         run: |

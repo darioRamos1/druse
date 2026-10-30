@@ -17,16 +17,16 @@ namespace Druse.Jdbc;
 ///
 /// Así que lo que se hace es **dejar de esperar**: quien canceló recupera el
 /// control al instante y la consulta se suelta. Sigue corriendo en el servidor
-/// hasta que acabe sola, y esa conexión queda ocupada mientras tanto. Es un
-/// compromiso, no una victoria, y se elige porque la alternativa —una interfaz
-/// congelada sin forma de salir— es peor.
+/// hasta que acabe sola. La conexión se retira de uso y se cierra físicamente
+/// cuando el driver la libera; una sesión nueva permite seguir trabajando.
 /// </summary>
 internal static class JdbcCancellation
 {
     public static async Task<T> RunAsync<T>(
         Func<T> trabajo,
         Action cancelar,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        Action<Task>? abandonar = null)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
@@ -50,8 +50,13 @@ internal static class JdbcCancellation
         // Se pide igualmente: hoy este driver lo ignora, pero es lo correcto y
         // el día que lo atienda —u otro driver use esto— la consulta morirá de
         // verdad en vez de quedarse corriendo.
-        Intentar(cancelar);
-        Soltar(tarea);
+        // El propio cancel() también puede esperar el mismo socket que execute.
+        // Pedirlo en este hilo convertiría «dejar de esperar» en otra espera sin
+        // límite. El cierre físico se pospone hasta que ambos hayan salido del
+        // driver; mientras tanto, la conexión no se vuelve a ofrecer para uso.
+        var intento = Task.Run(() => Intentar(cancelar));
+        var pendiente = Task.WhenAll(Soltar(tarea), intento);
+        abandonar?.Invoke(pendiente);
 
         throw new OperationCanceledException("La operación se canceló.", cancellationToken);
     }
@@ -78,8 +83,8 @@ internal static class JdbcCancellation
     /// porque si es un lector nadie más va a hacerlo y se quedaría abierto sobre
     /// una conexión que sigue viva.
     /// </summary>
-    private static void Soltar<T>(Task<T> tarea) =>
-        _ = tarea.ContinueWith(
+    internal static Task Soltar<T>(Task<T> tarea) =>
+        tarea.ContinueWith(
             terminada =>
             {
                 if (terminada.IsFaulted)
@@ -102,6 +107,21 @@ internal static class JdbcCancellation
                 }
             },
             CancellationToken.None,
-            TaskContinuationOptions.ExecuteSynchronously,
+            // Puede que el resultado haya llegado justo después de ganar el
+            // token. Su Dispose también puede bloquear: nunca corre en el hilo
+            // que debe devolver la cancelación.
+            TaskContinuationOptions.None,
+            TaskScheduler.Default);
+
+    /// <summary>No vuelve a entrar en el driver mientras tenga trabajo pendiente.</summary>
+    internal static Task AlTerminar(Task pendiente, Action cerrar) =>
+        pendiente.ContinueWith(
+            terminada =>
+            {
+                _ = terminada.Exception;
+                Intentar(cerrar);
+            },
+            CancellationToken.None,
+            TaskContinuationOptions.None,
             TaskScheduler.Default);
 }

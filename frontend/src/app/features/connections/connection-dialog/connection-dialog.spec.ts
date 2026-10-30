@@ -408,6 +408,7 @@ describe('ConnectionDialog', () => {
     });
 
     it('guarda sin escribir contraseñas y las conserva', async () => {
+      expect(button('Conectar')).toBeUndefined();
       button('Guardar cambios').click();
       await fixture.whenStable();
 
@@ -424,6 +425,52 @@ describe('ConnectionDialog', () => {
         }),
       );
       expect(store.connect).not.toHaveBeenCalled();
+    });
+
+    it('en modo conectar envía la clave con el mismo perfil y no ofrece guardar en su lugar', async () => {
+      fixture.componentRef.setInput('purpose', 'connect');
+      await fixture.whenStable();
+      const password = fixture.nativeElement.querySelector('.secret input') as HTMLInputElement;
+      password.value = 'clave-escrita';
+      password.dispatchEvent(new Event('input'));
+      fixture.detectChanges();
+      expect(fixture.nativeElement.querySelector('.head__title').textContent.trim()).toBe(
+        'Conectar',
+      );
+      expect(button('Guardar cambios')).toBeUndefined();
+
+      const closed = vi.fn();
+      fixture.componentInstance.closed.subscribe(closed);
+      button('Conectar').click();
+      await fixture.whenStable();
+
+      expect(store.connect).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: saved.id,
+          name: saved.name,
+          host: saved.host,
+          database: saved.database,
+          password: 'clave-escrita',
+          save: true,
+          environment: 'production',
+          readOnly: true,
+        }),
+      );
+      expect(store.saveConnection).not.toHaveBeenCalled();
+      expect(closed).toHaveBeenCalledOnce();
+    });
+
+    it('cancelar el modo conectar no guarda ni abre la conexión', async () => {
+      fixture.componentRef.setInput('purpose', 'connect');
+      await fixture.whenStable();
+      const closed = vi.fn();
+      fixture.componentInstance.closed.subscribe(closed);
+      button('Cancelar').click();
+      await fixture.whenStable();
+
+      expect(closed).toHaveBeenCalledOnce();
+      expect(store.connect).not.toHaveBeenCalled();
+      expect(store.saveConnection).not.toHaveBeenCalled();
     });
 
     it('envía la contraseña nueva cuando se escribe una', async () => {
