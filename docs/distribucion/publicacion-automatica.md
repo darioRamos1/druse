@@ -33,6 +33,22 @@ La clave `TAURI_SIGNING_PRIVATE_KEY` debe estar configurada en GitHub. Su firma
 protege el canal de actualización de Tauri; los paquetes todavía no tienen
 firma Authenticode.
 
+## Comprobación del paquete Linux
+
+CI construye también DEB y AppImage. La API autocontenida de ambos formatos
+omite únicamente `libcoreclrtraceptprovider.so`: es el proveedor opcional de
+PerfCollect/LTTng, enlazado con una ABI antigua que Ubuntu 24.04 no proporciona.
+La [carga de .NET 10.0.13](https://github.com/dotnet/runtime/blob/v10.0.13/src/coreclr/pal/src/misc/tracepointprovider.cpp#L109-L113)
+tolera expresamente su ausencia. El CLR, los proveedores de bases de datos y
+EventPipe, usado por `dotnet-trace`, se conservan.
+
+El [linuxdeploy usado por Tauri](https://github.com/linuxdeploy/linuxdeploy/blob/659c9db/src/core/appdir.cpp#L744-L760)
+inspecciona todos los ELF existentes antes de aplicar exclusiones de copia;
+dejar ese proveedor dentro impediría empaquetar. La preparación arranca después
+la API publicada en un directorio temporal y comprueba su proceso, puerto,
+versión y respuesta de salud antes de construir los dos formatos. Cualquier
+fallo detiene el trabajo. Esta preparación no afecta los paquetes de Windows.
+
 ## Publicación y recuperación
 
 La subida crea primero un borrador. Solo se publica cuando GitHub confirma

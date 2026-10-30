@@ -150,11 +150,18 @@ export async function abrirPerfilGuardado(page: Page, fila: Locator, contrasena:
   }).toPass({ timeout: 60_000 });
 
   if (await dialogo.isVisible()) {
+    const conectar = dialogo.getByRole('button', {
+      name: t('connection.connect'),
+      exact: true,
+    });
+    await expect(conectar, 'El diálogo que pide la contraseña debe permitir conectar').toBeVisible({
+      timeout: 15_000,
+    });
     await dialogo
       .locator(`.field:has(.field__label:text-is("${t('connection.password')}")) input`)
       .first()
       .fill(contrasena);
-    await dialogo.getByRole('button', { name: t('connection.connect'), exact: true }).click();
+    await conectar.click({ timeout: 15_000 });
     await expect(dialogo).toBeHidden({ timeout: 60_000 });
   }
 }

@@ -10,6 +10,7 @@ import { AppShell } from './app-shell';
 import { AiCatalog } from '../../core/ai/ai-catalog';
 import { ConnectionsSidebar } from '../../features/connections/connections-sidebar/connections-sidebar';
 import { ConnectionDialog } from '../../features/connections/connection-dialog/connection-dialog';
+import { EditorToolbar } from '../../features/query-editor/editor-toolbar/editor-toolbar';
 import { ResultsPanel } from '../../features/query-results/results-panel/results-panel';
 
 /** Gateway que no habla con nadie: el shell debe montarse sin API detrás. */
@@ -270,7 +271,10 @@ describe('AppShell', () => {
       hasStoredPassword: false,
     };
 
-    async function openSaved(response: ReturnType<ApplicationGateway['openSavedSession']>) {
+    async function openSaved(
+      response: ReturnType<ApplicationGateway['openSavedSession']>,
+      origin: 'explorador' | 'editor' | 'reconectar' = 'explorador',
+    ) {
       const gateway = TestBed.inject(ApplicationGateway);
       const store = TestBed.inject(WorkspaceStore);
       Object.assign(gateway, {
@@ -282,23 +286,69 @@ describe('AppShell', () => {
       await fixture.whenStable();
       const sidebar = fixture.debugElement.query(By.directive(ConnectionsSidebar))
         .componentInstance as ConnectionsSidebar;
-      sidebar.connectSaved.emit(profile.id);
+      if (origin === 'editor') {
+        const toolbar = fixture.debugElement.query(By.directive(EditorToolbar))
+          .componentInstance as EditorToolbar;
+        toolbar.connectionChange.emit(profile.id);
+      } else if (origin === 'reconectar') {
+        sidebar.reconnect.emit(profile.id);
+      } else {
+        sidebar.connectSaved.emit(profile.id);
+      }
       await fixture.whenStable();
       return store;
     }
 
-    it('pide la contraseña con el perfil completo cuando el servidor responde 428', async () => {
+    it.each(['explorador', 'editor', 'reconectar'] as const)(
+      'ofrece Conectar con el perfil completo al pedir contraseña desde %s',
+      async (origin) => {
+        const store = await openSaved(
+          throwError(() => new HttpErrorResponse({ status: 428 })),
+          origin,
+        );
+        const dialog = fixture.debugElement.query(By.directive(ConnectionDialog))
+          .componentInstance as ConnectionDialog;
+
+        expect(dialog.connection()).toEqual(profile);
+        expect(dialog.purpose()).toBe('connect');
+        expect(
+          element.querySelector<HTMLInputElement>('app-connection-dialog input[type="password"]')
+            ?.value,
+        ).toBe('');
+        const actions = [...element.querySelectorAll('app-connection-dialog .foot button')].map(
+          (button) => button.textContent?.trim(),
+        );
+        expect(actions).toContain('Conectar');
+        expect(actions).not.toContain('Guardar cambios');
+        expect(store.connections()[0].state).toBe('disconnected');
+        expect(store.notice()).toBeNull();
+      },
+    );
+
+    it('cancelar la contraseña no conecta ni modifica el perfil y editar sigue ofreciendo solo guardar', async () => {
       const store = await openSaved(throwError(() => new HttpErrorResponse({ status: 428 })));
+      const cancel = [
+        ...element.querySelectorAll<HTMLButtonElement>('app-connection-dialog button'),
+      ].find((button) => button.textContent?.trim() === 'Cancelar')!;
+      cancel.click();
+      await fixture.whenStable();
+
+      expect(element.querySelector('app-connection-dialog')).toBeNull();
+      expect(store.connections()[0].state).toBe('disconnected');
+      expect(store.savedProfile(profile.id)).toEqual(profile);
+
+      const sidebar = fixture.debugElement.query(By.directive(ConnectionsSidebar))
+        .componentInstance as ConnectionsSidebar;
+      sidebar.edit.emit(profile.id);
+      await fixture.whenStable();
       const dialog = fixture.debugElement.query(By.directive(ConnectionDialog))
         .componentInstance as ConnectionDialog;
-
-      expect(dialog.connection()).toEqual(profile);
-      expect(
-        element.querySelector<HTMLInputElement>('app-connection-dialog input[type="password"]')
-          ?.value,
-      ).toBe('');
-      expect(store.connections()[0].state).toBe('disconnected');
-      expect(store.notice()).toBeNull();
+      expect(dialog.purpose()).toBe('edit');
+      const actions = [...element.querySelectorAll('app-connection-dialog .foot button')].map(
+        (button) => button.textContent?.trim(),
+      );
+      expect(actions).toContain('Guardar cambios');
+      expect(actions).not.toContain('Conectar');
     });
 
     it('abre el árbol sin pedir contraseña si el servidor puede recuperar la guardada', async () => {

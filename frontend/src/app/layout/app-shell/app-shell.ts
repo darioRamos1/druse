@@ -337,7 +337,7 @@ export class AppShell {
   protected async addTableToChat(node: ExplorerNode): Promise<void> {
     const outcome = await this._store.useConnection(node.connectionId);
     if (outcome === 'needsPassword') {
-      this.editConnection(node.connectionId);
+      this.requestConnectionPassword(node.connectionId);
       return;
     }
     if (outcome !== 'ok') return;
@@ -500,6 +500,7 @@ export class AppShell {
 
   /** Perfil que se está editando; `null` cuando el diálogo crea uno nuevo. */
   protected readonly editingConnection = signal<SavedConnection | null>(null);
+  protected readonly connectionDialogPurpose = signal<'edit' | 'connect'>('connect');
   protected readonly paletteOpen = signal(false);
 
   /**
@@ -1392,6 +1393,7 @@ export class AppShell {
   protected openDialog(): void {
     this.prepareOverlay();
     this.editingConnection.set(null);
+    this.connectionDialogPurpose.set('connect');
     this.dialogOpen.set(true);
   }
 
@@ -1402,6 +1404,14 @@ export class AppShell {
    * «Editar» acabaría creando una conexión nueva sin que el usuario lo pidiera.
    */
   protected editConnection(id: string): void {
+    this.openSavedConnectionDialog(id, 'edit');
+  }
+
+  private requestConnectionPassword(id: string): void {
+    this.openSavedConnectionDialog(id, 'connect');
+  }
+
+  private openSavedConnectionDialog(id: string, purpose: 'edit' | 'connect'): void {
     const profile = this._store.savedProfile(id);
 
     if (!profile) {
@@ -1410,6 +1420,7 @@ export class AppShell {
 
     this.prepareOverlay();
     this.editingConnection.set(profile);
+    this.connectionDialogPurpose.set(purpose);
     this.dialogOpen.set(true);
   }
 
@@ -1418,7 +1429,7 @@ export class AppShell {
     // contraseña. La barra lateral y la paleta deben ofrecer el mismo diálogo
     // que el selector del editor, en vez de dejar el clic sin respuesta.
     if ((await this._store.openSaved(id)) === 'needsPassword') {
-      this.editConnection(id);
+      this.requestConnectionPassword(id);
     }
   }
 
@@ -1439,6 +1450,7 @@ export class AppShell {
   protected closeDialog(): void {
     this.dialogOpen.set(false);
     this.editingConnection.set(null);
+    this.connectionDialogPurpose.set('connect');
   }
 
   protected toggleConnection(id: string): void {
@@ -1527,7 +1539,7 @@ export class AppShell {
    */
   protected async useConnection(connectionId: string): Promise<void> {
     if ((await this._store.useConnection(connectionId)) === 'needsPassword') {
-      this.editConnection(connectionId);
+      this.requestConnectionPassword(connectionId);
     }
   }
 
@@ -1541,7 +1553,7 @@ export class AppShell {
     const outcome = await this._store.reconnect(id);
 
     if (outcome === 'needsPassword') {
-      this.editConnection(id);
+      this.requestConnectionPassword(id);
     }
   }
 

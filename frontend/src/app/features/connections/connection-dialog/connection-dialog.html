@@ -32,10 +32,21 @@
     </span>
     <div class="head__text">
       <h2 class="head__title" id="connection-dialog-title">
-        {{ (editing() ? 'connection.title.edit' : 'connection.title.new') | t }}
+        {{
+          (connectingSaved()
+            ? 'connection.connect'
+            : editing()
+              ? 'connection.title.edit'
+              : 'connection.title.new'
+          ) | t
+        }}
       </h2>
       <p class="head__subtitle">
-        {{ (editing() ? 'connection.subtitle.edit' : 'connection.subtitle.new') | t }}
+        @if (connectingSaved()) {
+          {{ connection()?.name }}
+        } @else {
+          {{ (editing() ? 'connection.subtitle.edit' : 'connection.subtitle.new') | t }}
+        }
       </p>
     </div>
     <button
@@ -594,7 +605,7 @@
     }
     <span class="foot__spacer"></span>
     <button type="button" class="btn" (click)="close()">{{ 'common.cancel' | t }}</button>
-    @if (editing()) {
+    @if (editing() && purpose() === 'edit') {
       <!-- Guardar y conectar son cosas distintas: quien corrige el puerto de una
            conexión de producción no está pidiendo entrar en ella. -->
       <button type="button" class="btn btn--primary" [disabled]="saving()" (click)="saveChanges()">

@@ -216,10 +216,16 @@ export class ConnectionDialog {
    */
   readonly connection = input<SavedConnection | null>(null);
 
+  /** Editar solo guarda; pedir una contraseña pendiente permite abrir la sesión. */
+  readonly purpose = input<'edit' | 'connect'>('edit');
+
   readonly closed = output<void>();
 
   /** Está editando un perfil que ya existía. */
   protected readonly editing = computed(() => this.connection() !== null);
+  protected readonly connectingSaved = computed(
+    () => this.editing() && this.purpose() === 'connect',
+  );
 
   /**
    * Los motores que la API dice tener, en el orden en que se ofrecen y sin los

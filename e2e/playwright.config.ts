@@ -71,6 +71,9 @@ export default defineConfig({
   // que hay que arreglar.
   retries: 0,
   forbidOnly: !!process.env.CI,
+  // Una regresión común puede bloquear decenas de recorridos durante minutos.
+  // Tres fallos ya impiden publicar; conservamos su diagnóstico sin agotar CI.
+  maxFailures: process.env.CI ? 3 : 0,
 
   reporter: process.env.CI ? [['list'], ['html', { open: 'never' }]] : [['list']],
 

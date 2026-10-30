@@ -131,13 +131,16 @@ public sealed class JdbcCommand : DbCommand
         JdbcCancellation.RunAsync(
             () => ExecuteDbDataReader(behavior),
             Cancel,
-            cancellationToken);
+            cancellationToken,
+            Abandonar);
 
     public override Task<int> ExecuteNonQueryAsync(CancellationToken cancellationToken) =>
-        JdbcCancellation.RunAsync(ExecuteNonQuery, Cancel, cancellationToken);
+        JdbcCancellation.RunAsync(ExecuteNonQuery, Cancel, cancellationToken, Abandonar);
 
     public override Task<object?> ExecuteScalarAsync(CancellationToken cancellationToken) =>
-        JdbcCancellation.RunAsync(ExecuteScalar, Cancel, cancellationToken);
+        JdbcCancellation.RunAsync(ExecuteScalar, Cancel, cancellationToken, Abandonar);
+
+    private void Abandonar(Task pendiente) => _connection?.Abandonar(pendiente);
 
     protected override DbDataReader ExecuteDbDataReader(CommandBehavior behavior)
     {
@@ -155,7 +158,8 @@ public sealed class JdbcCommand : DbCommand
             sentencias,
             Preparar,
             behavior.HasFlag(CommandBehavior.CloseConnection) ? _connection : null,
-            Cancel);
+            Cancel,
+            Abandonar);
     }
 
     /// <summary>Prepara una sentencia suelta con los parámetros del comando.</summary>

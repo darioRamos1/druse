@@ -105,8 +105,18 @@ jobs:
         working-directory: frontend
         run: npm ci
 
+      # Comunidad ya construyó este CLI en Windows para el commit validado.
+      - name: Recuperar CLI de Tauri
+        id: cli-de-tauri
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cargo/bin/cargo-tauri.exe
+          key: cargo-tauri-2.11.4-${{ runner.os }}
       - name: Instalar CLI de Tauri
+        if: steps.cli-de-tauri.outputs.cache-hit != 'true'
         run: cargo install tauri-cli --version 2.11.4 --locked
+      - name: Comprobar versión del CLI
+        run: cargo tauri --version
 
       - name: Construir y publicar
         shell: pwsh

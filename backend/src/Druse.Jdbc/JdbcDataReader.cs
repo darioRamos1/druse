@@ -18,6 +18,8 @@ public sealed class JdbcDataReader : DbDataReader, IEnumerable<DbDataRecord>
     private readonly Func<string, java.sql.PreparedStatement> _preparar;
     private readonly JdbcConnection? _cerrarTambien;
     private readonly Action _cancelar;
+    private readonly Action<Task> _abandonarConexion;
+    private Task? _pendiente;
 
     private java.sql.ResultSet? _rs;
     private java.sql.Statement? _statement;
@@ -39,12 +41,14 @@ public sealed class JdbcDataReader : DbDataReader, IEnumerable<DbDataRecord>
         IReadOnlyList<string> sentencias,
         Func<string, java.sql.PreparedStatement> preparar,
         JdbcConnection? cerrarTambien,
-        Action cancelar)
+        Action cancelar,
+        Action<Task> abandonarConexion)
     {
         _sentencias = sentencias;
         _preparar = preparar;
         _cerrarTambien = cerrarTambien;
         _cancelar = cancelar;
+        _abandonarConexion = abandonarConexion;
 
         Avanzar();
     }
@@ -139,6 +143,8 @@ public sealed class JdbcDataReader : DbDataReader, IEnumerable<DbDataRecord>
 
     public override bool Read()
     {
+        ComprobarAbierto();
+
         try
         {
             return Rs.next();
@@ -158,12 +164,31 @@ public sealed class JdbcDataReader : DbDataReader, IEnumerable<DbDataRecord>
     /// nada hasta que llegara la última fila.
     /// </summary>
     public override Task<bool> ReadAsync(CancellationToken cancellationToken) =>
-        JdbcCancellation.RunAsync(Read, _cancelar, cancellationToken);
+        JdbcCancellation.RunAsync(Read, _cancelar, cancellationToken, Abandonar);
 
     public override Task<bool> NextResultAsync(CancellationToken cancellationToken) =>
-        JdbcCancellation.RunAsync(NextResult, _cancelar, cancellationToken);
+        JdbcCancellation.RunAsync(NextResult, _cancelar, cancellationToken, Abandonar);
 
-    public override bool NextResult() => Avanzar();
+    private void Abandonar(Task pendiente)
+    {
+        _pendiente = pendiente;
+        _abandonarConexion(pendiente);
+        Close();
+    }
+
+    public override bool NextResult()
+    {
+        ComprobarAbierto();
+        return Avanzar();
+    }
+
+    private void ComprobarAbierto()
+    {
+        if (_cerrado)
+        {
+            throw new InvalidOperationException("El lector está cerrado.");
+        }
+    }
 
     public override string GetName(int ordinal) => Meta.getColumnLabel(Ordinal(ordinal)) ?? string.Empty;
 
@@ -328,6 +353,19 @@ public sealed class JdbcDataReader : DbDataReader, IEnumerable<DbDataRecord>
 
         _cerrado = true;
 
+        if (_pendiente is { IsCompleted: false } pendiente)
+        {
+            // ResultSet.close también puede bloquear mientras next está dentro
+            // del driver. El using debe terminar sin volver a esperar por él.
+            _ = JdbcCancellation.AlTerminar(pendiente, CerrarRecursos);
+            return;
+        }
+
+        CerrarRecursos();
+    }
+
+    private void CerrarRecursos()
+    {
         CerrarActual();
 
         _cerrarTambien?.Close();
