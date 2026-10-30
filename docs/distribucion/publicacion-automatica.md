@@ -61,6 +61,8 @@ el borrador se conserva sin publicar y las descargas anteriores siguen activas.
 
 La subida crea primero un borrador. Solo se publica cuando GitHub confirma
 todos los archivos, sus tamaños y sus hashes cuando los proporciona la API.
+Se localiza en el listado autenticado y se comprueba y publica por su ID: la
+consulta de una release por etiqueta puede devolver 404 mientras es borrador.
 Un fallo conserva el borrador y las descargas públicas anteriores.
 
 Si queda un borrador pendiente, el siguiente intento se detiene con una
@@ -76,8 +78,10 @@ No usa la excepción local `-SinComprobarCI`.
 
 Al terminar **Publicar versión**, Pages vuelve a generar los enlaces estáticos
 desde GitHub Releases. También escucha las publicaciones manuales y permite
-ejecución manual. Así funciona aunque GitHub no emita otro evento `release`
-cuando la publicación la creó su propio `GITHUB_TOKEN`.
+ejecución manual. El evento de una publicación solicita una ejecución desde
+`main`, porque el entorno de Pages no admite despliegues desde etiquetas. Se
+conserva esa protección. Así funciona también cuando GitHub no emite otro evento
+`release` porque la publicación la creó su propio `GITHUB_TOKEN`.
 
 El generador elige la versión más reciente con los seis paquetes y sus hashes.
 Si hay un fallo o una publicación incompleta, conserva la web anterior. La
