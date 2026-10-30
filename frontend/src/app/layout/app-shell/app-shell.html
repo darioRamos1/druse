@@ -329,6 +329,8 @@
     <app-connection-dialog
       [connection]="editingConnection()"
       [purpose]="connectionDialogPurpose()"
+      [activateSession]="pendingConnectionSelection() === null"
+      (connected)="completeConnectionSelection()"
       (closed)="closeDialog()"
     />
   }

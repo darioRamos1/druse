@@ -1,6 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 
 import {
+  CONTENEDOR,
   SQLSERVER,
   abrir,
   apuntarPestana,
@@ -33,7 +34,10 @@ test.describe('migrar datos entre tablas', () => {
    * análisis de riesgo, y saltárselo aquí sería probar una aplicación que no es
    * la que se reparte—. La prueba confirma igual que lo haría una persona.
    */
-  async function prepararTablas(page: Page, options: { conClave?: boolean } = {}): Promise<void> {
+  async function prepararTablas(
+    page: Page,
+    options: { conClave?: boolean } = {},
+  ): Promise<void> {
     // La clave primaria solo hace falta para los modos que reconocen filas; en
     // los demás se deja fuera para no dar por hecho que la tabla la tiene.
     const clave = options.conClave ? ' PRIMARY KEY' : '';
@@ -68,15 +72,52 @@ test.describe('migrar datos entre tablas', () => {
     // cuanto se pulsa, mucho antes de que el servidor conteste, y sin esperar a
     // que termine la consulta siguiente llegaría pisando a esta.
     const respuesta = page.waitForResponse(
-      (r) => r.url().includes('/api/queries') && r.request().method() === 'POST',
+      (r) =>
+        r.url().includes('/api/queries') && r.request().method() === 'POST',
       { timeout: 60_000 },
     );
 
-    await aviso.getByRole('button', { name: 'Ejecutar de todos modos' }).click();
+    await aviso
+      .getByRole('button', { name: 'Ejecutar de todos modos' })
+      .click();
 
     await expect(aviso).toBeHidden({ timeout: 60_000 });
     await respuesta;
     await esperarFinDeConsulta(page);
+
+    // La reconexión restaura carpetas que se leyeron antes de este DDL. Volver
+    // a desplegarlas conserva esa caché: se actualiza desde el menú real para
+    // que las tablas y los esquemas recién creados puedan elegirse después.
+    const sidebar = page.locator('app-connections-sidebar');
+    const conexion = sidebar
+      .locator('.node--connection', { hasText: CONTENEDOR.nombre })
+      .first();
+    const id = await conexion.getAttribute('data-tree-id');
+    expect(id).toBeTruthy();
+    const base = sidebar.locator(
+      `[data-tree-id^="${id}|"][data-tree-id$="|db:${CONTENEDOR.base}"]`,
+    );
+
+    if ((await base.getAttribute('aria-expanded')) !== 'true') {
+      await base.click();
+    }
+
+    await expect(base).toHaveAttribute('aria-expanded', 'true');
+    await base
+      .getByRole('button', { name: `Acciones para ${CONTENEDOR.base}` })
+      .click();
+    const catalogo = page.waitForResponse(
+      (response) =>
+        response.url().endsWith('/metadata/children') &&
+        response.request().method() === 'POST' &&
+        response.request().postDataJSON()?.id === `db:${CONTENEDOR.base}`,
+      { timeout: 30_000 },
+    );
+    await page.getByRole('menuitem', { name: 'Actualizar objetos' }).click();
+    expect((await catalogo).ok()).toBe(true);
+    await expect(
+      sidebar.getByText('public', { exact: true }).first(),
+    ).toBeVisible();
   }
 
   /**
@@ -114,7 +155,11 @@ test.describe('migrar datos entre tablas', () => {
    * pliega, así que hacerlo por costumbre escondería justo lo que se busca. Es la
    * misma cautela que toma `conectar`.
    */
-  async function desplegar(page: Page, nodo: string, hijo: string): Promise<void> {
+  async function desplegar(
+    page: Page,
+    nodo: string,
+    hijo: string,
+  ): Promise<void> {
     const sidebar = page.locator('app-connections-sidebar');
     const dentro = sidebar.getByText(hijo, { exact: true }).first();
 
@@ -147,7 +192,9 @@ test.describe('migrar datos entre tablas', () => {
     await fila.getByRole('button', { name: `Acciones para ${tabla}` }).click();
   }
 
-  test('copia las filas de una tabla a otra y lo demuestra contándolas', async ({ page }) => {
+  test('copia las filas de una tabla a otra y lo demuestra contándolas', async ({
+    page,
+  }) => {
     await abrir(page);
     await conectar(page);
     await prepararTablas(page);
@@ -177,17 +224,27 @@ test.describe('migrar datos entre tablas', () => {
     await dialogo.getByRole('button', { name: 'Ver qué va a pasar' }).click();
 
     await expect(dialogo.locator('.preview')).toBeVisible({ timeout: 30_000 });
-    await expect(dialogo.locator('.sql__statement').first()).toContainText('SELECT');
-    await expect(dialogo.locator('.sql__statement').last()).toContainText('INSERT INTO');
+    await expect(dialogo.locator('.sql__statement').first()).toContainText(
+      'SELECT',
+    );
+    await expect(dialogo.locator('.sql__statement').last()).toContainText(
+      'INSERT INTO',
+    );
 
     await dialogo.getByRole('button', { name: 'Copiar las filas' }).click();
 
-    await expect(dialogo.locator('.summary__title')).toContainText('Copiadas 3 filas', {
-      timeout: 60_000,
-    });
+    await expect(dialogo.locator('.summary__title')).toContainText(
+      'Copiadas 3 filas',
+      {
+        timeout: 60_000,
+      },
+    );
 
     // El del pie, no la aspa de la cabecera: las dos se llaman «Cerrar».
-    await dialogo.locator('.foot').getByRole('button', { name: 'Cerrar' }).click();
+    await dialogo
+      .locator('.foot')
+      .getByRole('button', { name: 'Cerrar' })
+      .click();
     await expect(dialogo).toBeHidden();
 
     // Y lo que importa: las filas están allí de verdad.
@@ -201,7 +258,9 @@ test.describe('migrar datos entre tablas', () => {
    * aplicación delante: lo que importa no es el mensaje del asistente, sino que
    * al final haya tres filas y no seis.
    */
-  test('repetir la copia actualizando no duplica las filas', async ({ page }) => {
+  test('repetir la copia actualizando no duplica las filas', async ({
+    page,
+  }) => {
     await abrir(page);
     await conectar(page);
     await prepararTablas(page, { conClave: true });
@@ -222,11 +281,17 @@ test.describe('migrar datos entre tablas', () => {
 
       await dialogo.getByRole('button', { name: 'Copiar las filas' }).click();
 
-      await expect(dialogo.locator('.summary__title')).toContainText('Copiadas 3 filas', {
-        timeout: 60_000,
-      });
+      await expect(dialogo.locator('.summary__title')).toContainText(
+        'Copiadas 3 filas',
+        {
+          timeout: 60_000,
+        },
+      );
 
-      await dialogo.locator('.foot').getByRole('button', { name: 'Cerrar' }).click();
+      await dialogo
+        .locator('.foot')
+        .getByRole('button', { name: 'Cerrar' })
+        .click();
       await expect(dialogo).toBeHidden();
 
       expect(await contar(page, DESTINO)).toBe('3');
@@ -269,7 +334,9 @@ test.describe('migrar datos entre tablas', () => {
 
     // Mismo motor: no hay nada que traducir, y el asistente lo dice en lugar de
     // enseñar una tabla de tipos vacía.
-    await expect(dialogo.locator('.route')).toContainText(nueva, { timeout: 30_000 });
+    await expect(dialogo.locator('.route')).toContainText(nueva, {
+      timeout: 30_000,
+    });
     await expect(dialogo.locator('.body')).toContainText('mismo motor');
 
     await dialogo.getByRole('button', { name: 'Crear la tabla' }).click();
@@ -279,11 +346,17 @@ test.describe('migrar datos entre tablas', () => {
 
     await dialogo.getByRole('button', { name: 'Copiar las filas' }).click();
 
-    await expect(dialogo.locator('.summary__title')).toContainText('Copiadas 3 filas', {
-      timeout: 60_000,
-    });
+    await expect(dialogo.locator('.summary__title')).toContainText(
+      'Copiadas 3 filas',
+      {
+        timeout: 60_000,
+      },
+    );
 
-    await dialogo.locator('.foot').getByRole('button', { name: 'Cerrar' }).click();
+    await dialogo
+      .locator('.foot')
+      .getByRole('button', { name: 'Cerrar' })
+      .click();
     await expect(dialogo).toBeHidden();
 
     // La tabla existe y tiene dentro lo que se copió.
@@ -303,7 +376,9 @@ test.describe('migrar datos entre tablas', () => {
    * Es la única acción del asistente que borra, y una casilla marcada sin querer
    * no se distingue de una marcada a propósito.
    */
-  test('vaciar el destino exige escribir el nombre de la tabla', async ({ page }) => {
+  test('vaciar el destino exige escribir el nombre de la tabla', async ({
+    page,
+  }) => {
     await abrir(page);
     await conectar(page);
     await prepararTablas(page);
@@ -319,7 +394,9 @@ test.describe('migrar datos entre tablas', () => {
 
     const copiar = dialogo.getByRole('button', { name: 'Copiar las filas' });
 
-    await expect(dialogo.locator('.danger__text')).toContainText('no se deshace');
+    await expect(dialogo.locator('.danger__text')).toContainText(
+      'no se deshace',
+    );
     await expect(copiar).toBeDisabled();
 
     await dialogo.locator('.danger input').fill(DESTINO);
@@ -327,7 +404,10 @@ test.describe('migrar datos entre tablas', () => {
     await expect(copiar).toBeEnabled();
 
     // Y se cierra sin copiar: lo que se comprobaba era la puerta, no el paso.
-    await dialogo.locator('.foot').getByRole('button', { name: 'Cancelar' }).click();
+    await dialogo
+      .locator('.foot')
+      .getByRole('button', { name: 'Cancelar' })
+      .click();
     await expect(dialogo).toBeHidden();
   });
   /**
@@ -338,7 +418,9 @@ test.describe('migrar datos entre tablas', () => {
    * irán antes de escribir nada. Lo que se comprueba al final son las filas de
    * las dos tablas del destino.
    */
-  test('migra varias tablas a la vez, las padres antes que las hijas', async ({ page }) => {
+  test('migra varias tablas a la vez, las padres antes que las hijas', async ({
+    page,
+  }) => {
     await abrir(page);
     await conectar(page);
 
@@ -405,9 +487,12 @@ test.describe('migrar datos entre tablas', () => {
 
     // El orden es el producto de la fase: la padre primero, aunque se marcaran
     // por orden alfabético.
-    await expect(dialogo.locator('.plan__title')).toContainText('Se copian en este orden', {
-      timeout: 30_000,
-    });
+    await expect(dialogo.locator('.plan__title')).toContainText(
+      'Se copian en este orden',
+      {
+        timeout: 30_000,
+      },
+    );
 
     const orden = await dialogo.locator('.plan__list li').allTextContents();
 
@@ -420,7 +505,9 @@ test.describe('migrar datos entre tablas', () => {
     // plegado porque lo normal es que todas vayan igual, así que se abre.
     await dialogo.locator('.each__summary').click();
 
-    const filaHija = dialogo.locator('.each__table tbody tr', { hasText: 'e2e_pedidos' }).first();
+    const filaHija = dialogo
+      .locator('.each__table tbody tr', { hasText: 'e2e_pedidos' })
+      .first();
 
     await filaHija.locator('.each__where').fill('cliente_id = 1');
     await filaHija.locator('.each__where').blur();
@@ -429,11 +516,17 @@ test.describe('migrar datos entre tablas', () => {
 
     await dialogo.getByRole('button', { name: 'Copiar 2 tablas' }).click();
 
-    await expect(dialogo.locator('.summary__title')).toContainText('Copiadas 4 filas de 2 tablas', {
-      timeout: 60_000,
-    });
+    await expect(dialogo.locator('.summary__title')).toContainText(
+      'Copiadas 4 filas de 2 tablas',
+      {
+        timeout: 60_000,
+      },
+    );
 
-    await dialogo.locator('.foot').getByRole('button', { name: 'Cerrar' }).click();
+    await dialogo
+      .locator('.foot')
+      .getByRole('button', { name: 'Cerrar' })
+      .click();
     await expect(dialogo).toBeHidden();
 
     // Lo que demuestra que la pasada sirvió: las filas están al otro lado, y la
@@ -498,7 +591,10 @@ test.describe('migrar datos entre tablas', () => {
     await dialogo.getByRole('button', { name: 'Ninguna' }).click();
     // Se pulsa la fila, que es lo que hace una persona: la etiqueta envuelve a la
     // casilla.
-    await dialogo.locator('.tables__row', { hasText: 'e2e_perfil_clientes' }).first().click();
+    await dialogo
+      .locator('.tables__row', { hasText: 'e2e_perfil_clientes' })
+      .first()
+      .click();
     await expect(dialogo.locator('.bulk__count')).toContainText('1 de');
 
     await dialogo.getByRole('button', { name: 'Elegir destino' }).click();
@@ -511,13 +607,18 @@ test.describe('migrar datos entre tablas', () => {
     }
 
     await dialogo.getByRole('button', { name: 'Migrar a' }).click();
-    await expect(dialogo.locator('.plan__list li')).toHaveCount(1, { timeout: 30_000 });
+    await expect(dialogo.locator('.plan__list li')).toHaveCount(1, {
+      timeout: 30_000,
+    });
 
     await dialogo.locator('.save input').fill(perfil);
     await dialogo.getByRole('button', { name: 'Guardar' }).click();
 
     // Se cierra sin copiar: lo que se comprobaba era que quedara guardado.
-    await dialogo.locator('.foot').getByRole('button', { name: 'Cancelar' }).click();
+    await dialogo
+      .locator('.foot')
+      .getByRole('button', { name: 'Cancelar' })
+      .click();
     await expect(dialogo).toBeHidden();
 
     // --- Segunda vez: se abre el perfil y se lanza -------------------------
@@ -527,15 +628,23 @@ test.describe('migrar datos entre tablas', () => {
     await dialogo.locator('.saved__open', { hasText: perfil }).first().click();
 
     // Salta directo al plan, con su tabla y su destino ya resueltos.
-    await expect(dialogo.locator('.plan__list li')).toHaveCount(1, { timeout: 30_000 });
+    await expect(dialogo.locator('.plan__list li')).toHaveCount(1, {
+      timeout: 30_000,
+    });
     await expect(dialogo.locator('.route')).toContainText(esquema);
 
     await dialogo.getByRole('button', { name: 'Copiar 1 tabla' }).click();
-    await expect(dialogo.locator('.summary__title')).toContainText('Copiadas 2 filas', {
-      timeout: 60_000,
-    });
+    await expect(dialogo.locator('.summary__title')).toContainText(
+      'Copiadas 2 filas',
+      {
+        timeout: 60_000,
+      },
+    );
 
-    await dialogo.locator('.foot').getByRole('button', { name: 'Cerrar' }).click();
+    await dialogo
+      .locator('.foot')
+      .getByRole('button', { name: 'Cerrar' })
+      .click();
     await expect(dialogo).toBeHidden();
 
     expect(await contar(page, `${esquema}.e2e_perfil_clientes`)).toBe('2');
@@ -547,8 +656,13 @@ test.describe('migrar datos entre tablas', () => {
       .first()
       .getByRole('button', { name: `Borrar el perfil ${perfil}` })
       .click();
-    await expect(dialogo.locator('.saved__row', { hasText: perfil })).toHaveCount(0);
-    await dialogo.locator('.foot').getByRole('button', { name: 'Cancelar' }).click();
+    await expect(
+      dialogo.locator('.saved__row', { hasText: perfil }),
+    ).toHaveCount(0);
+    await dialogo
+      .locator('.foot')
+      .getByRole('button', { name: 'Cancelar' })
+      .click();
 
     await ejecutarConAviso(
       page,
@@ -563,7 +677,9 @@ test.describe('migrar datos entre tablas', () => {
    * es lo que ve quien migra: que la pantalla de tipos dice **qué se pierde** al
    * otro lado antes de crear nada, y que después las filas están allí de verdad.
    */
-  test('migra de PostgreSQL a SQL Server y avisa de lo que se pierde', async ({ page }) => {
+  test('migra de PostgreSQL a SQL Server y avisa de lo que se pierde', async ({
+    page,
+  }) => {
     await abrir(page);
     await conectar(page);
     await conectarSqlServer(page);
@@ -629,18 +745,28 @@ test.describe('migrar datos entre tablas', () => {
     ).toHaveValue('uniqueidentifier');
 
     // Y lo que hay que leer: qué deja de ser cierto al otro lado.
-    await expect(dialogo.locator('.body')).toContainText('deja de comprobar que lo sea');
+    await expect(dialogo.locator('.body')).toContainText(
+      'deja de comprobar que lo sea',
+    );
 
     await dialogo.getByRole('button', { name: 'Crear la tabla' }).click();
 
-    await expect(dialogo.locator('.hint')).toContainText('5 de 5 columnas', { timeout: 60_000 });
-
-    await dialogo.getByRole('button', { name: 'Copiar las filas' }).click();
-    await expect(dialogo.locator('.summary__title')).toContainText('Copiadas 2 filas', {
+    await expect(dialogo.locator('.hint')).toContainText('5 de 5 columnas', {
       timeout: 60_000,
     });
 
-    await dialogo.locator('.foot').getByRole('button', { name: 'Cerrar' }).click();
+    await dialogo.getByRole('button', { name: 'Copiar las filas' }).click();
+    await expect(dialogo.locator('.summary__title')).toContainText(
+      'Copiadas 2 filas',
+      {
+        timeout: 60_000,
+      },
+    );
+
+    await dialogo
+      .locator('.foot')
+      .getByRole('button', { name: 'Cerrar' })
+      .click();
     await expect(dialogo).toBeHidden();
 
     // Y las filas están en SQL Server, contadas desde una pestaña que mira allí.
@@ -670,7 +796,9 @@ test.describe('migrar datos entre tablas', () => {
      * haría que alguna acabara pulsando en el árbol que no era.
      */
     const sqlserver = page
-      .locator('app-connections-sidebar .node--connection', { hasText: SQLSERVER.nombre })
+      .locator('app-connections-sidebar .node--connection', {
+        hasText: SQLSERVER.nombre,
+      })
       .first();
 
     await sqlserver.locator('.connection-menu-trigger').click();
@@ -684,7 +812,9 @@ test.describe('migrar datos entre tablas', () => {
    * base por su cuenta, así que la fila que ya está se reconoce por el código, no
    * por el id. Lo que se cuenta al final son las filas: dos y no tres.
    */
-  test('actualiza por una clave de negocio dentro de la pasada', async ({ page }) => {
+  test('actualiza por una clave de negocio dentro de la pasada', async ({
+    page,
+  }) => {
     await abrir(page);
     await conectar(page);
 
@@ -719,7 +849,10 @@ test.describe('migrar datos entre tablas', () => {
     await expect(dialogo).toBeVisible();
 
     await dialogo.getByRole('button', { name: 'Ninguna' }).click();
-    await dialogo.locator('.tables__row', { hasText: 'e2e_clave_clientes' }).first().click();
+    await dialogo
+      .locator('.tables__row', { hasText: 'e2e_clave_clientes' })
+      .first()
+      .click();
     await expect(dialogo.locator('.bulk__count')).toContainText('1 de');
 
     await dialogo.getByRole('button', { name: 'Elegir destino' }).click();
@@ -732,7 +865,9 @@ test.describe('migrar datos entre tablas', () => {
     }
 
     await dialogo.getByRole('button', { name: 'Migrar a' }).click();
-    await expect(dialogo.locator('.plan__list li')).toHaveCount(1, { timeout: 30_000 });
+    await expect(dialogo.locator('.plan__list li')).toHaveCount(1, {
+      timeout: 30_000,
+    });
 
     // Esta tabla se actualiza, y se reconoce por el código y no por el id.
     await dialogo.locator('.each__summary').click();
@@ -743,18 +878,27 @@ test.describe('migrar datos entre tablas', () => {
     await fila.locator('.each__key').fill('codigo');
 
     await dialogo.getByRole('button', { name: 'Copiar 1 tabla' }).click();
-    await expect(dialogo.locator('.summary__title')).toContainText('Copiadas 2 filas', {
-      timeout: 60_000,
-    });
+    await expect(dialogo.locator('.summary__title')).toContainText(
+      'Copiadas 2 filas',
+      {
+        timeout: 60_000,
+      },
+    );
 
-    await dialogo.locator('.foot').getByRole('button', { name: 'Cerrar' }).click();
+    await dialogo
+      .locator('.foot')
+      .getByRole('button', { name: 'Cerrar' })
+      .click();
     await expect(dialogo).toBeHidden();
 
     // Dos y no tres: la de código «A» era la misma fila, aunque su id fuera otro.
     expect(await contar(page, `${esquema}.e2e_clave_clientes`)).toBe('2');
 
     // Y se actualizó de verdad: el nombre viejo ya no está.
-    await escribirSql(page, `SELECT nombre FROM ${esquema}.e2e_clave_clientes WHERE codigo = 'A'`);
+    await escribirSql(
+      page,
+      `SELECT nombre FROM ${esquema}.e2e_clave_clientes WHERE codigo = 'A'`,
+    );
     await ejecutar(page, 'todo');
 
     expect((await primeraColumna(page))[0]).toBe('Ana');

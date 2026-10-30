@@ -218,8 +218,10 @@ export class ConnectionDialog {
 
   /** Editar solo guarda; pedir una contraseña pendiente permite abrir la sesión. */
   readonly purpose = input<'edit' | 'connect'>('edit');
+  readonly activateSession = input(true);
 
   readonly closed = output<void>();
+  readonly connected = output<void>();
 
   /** Está editando un perfil que ya existía. */
   protected readonly editing = computed(() => this.connection() !== null);
@@ -654,9 +656,12 @@ export class ConnectionDialog {
     this.feedback.set(null);
 
     try {
-      const connected = await this._store.connect(form);
+      const connected = this.activateSession()
+        ? await this._store.connect(form)
+        : await this._store.connect(form, false);
 
       if (connected) {
+        this.connected.emit();
         this.closed.emit();
       } else {
         this.feedbackKind.set('error');

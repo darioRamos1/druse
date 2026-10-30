@@ -1027,7 +1027,7 @@ export class WorkspaceStore {
     const tab = this.activeTab();
     const previous = this.activeConnection()?.id;
 
-    if (previous === connectionId) {
+    if (previous === connectionId && (!tab || tab.connectionId === connectionId)) {
       return 'ok';
     }
 
@@ -1661,7 +1661,7 @@ export class WorkspaceStore {
    * usuario cierra y reabre, vuelve a pedirse. El almacén seguro llega en la
    * Fase 3.
    */
-  async connect(form: ConnectionForm): Promise<boolean> {
+  async connect(form: ConnectionForm, activate = true): Promise<boolean> {
     let id = form.id ?? crypto.randomUUID();
 
     // Guardar el perfil antes de conectar hace que sobreviva aunque la conexión
@@ -1711,7 +1711,10 @@ export class WorkspaceStore {
         user: describeUser(form),
         lastDurationMs: null,
       });
-      this.activateConnection(id);
+      // El selector del editor termina su cambio sólo si la pestaña que lo
+      // pidió sigue delante. Abrir la sesión no autoriza a repuntar otra que el
+      // usuario haya elegido mientras se esperaba la contraseña.
+      if (activate) this.activateConnection(id);
 
       await this._explorer.loadDatabases(id, session.sessionId);
 

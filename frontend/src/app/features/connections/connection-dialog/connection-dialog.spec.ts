@@ -473,6 +473,19 @@ describe('ConnectionDialog', () => {
       expect(store.saveConnection).not.toHaveBeenCalled();
     });
 
+    it('avisa del éxito sin elegir otra pestaña cuando el selector debe terminar su cambio', async () => {
+      fixture.componentRef.setInput('purpose', 'connect');
+      fixture.componentRef.setInput('activateSession', false);
+      await fixture.whenStable();
+      const connected = vi.fn();
+      fixture.componentInstance.connected.subscribe(connected);
+      button('Conectar').click();
+      await fixture.whenStable();
+
+      expect(store.connect).toHaveBeenCalledWith(expect.objectContaining({ id: saved.id }), false);
+      expect(connected).toHaveBeenCalledOnce();
+    });
+
     it('envía la contraseña nueva cuando se escribe una', async () => {
       const password = [...fixture.nativeElement.querySelectorAll('.field__input')].find(
         (input: HTMLInputElement) => input.type === 'password',

@@ -1898,5 +1898,6 @@
   "whatsNew.v1_11_0.downloads": "La web ofrece las ediciones Completa, Sin Informix y Comunidad con instalador y ZIP sin instalación de la última versión publicada.",
   "whatsNew.v1_11_1.savedPassword": "Al abrir una conexión cuya contraseña no está guardada, puedes introducirla y conectar desde el diálogo del perfil.",
   "whatsNew.v1_11_1.jdbcCancellation": "En conexiones JDBC, la cancelación y el tiempo límite vuelven a liberar la interfaz aunque el controlador tarde en detener la consulta.",
-  "whatsNew.v1_11_1.informixBackup": "Los respaldos SQL de Informix por SQLI conservan las fechas al restaurarse y sus errores de sintaxis se explican en español."
+  "whatsNew.v1_11_1.informixBackup": "Los respaldos SQL de Informix por SQLI conservan las fechas al restaurarse y sus errores de sintaxis se explican en español.",
+  "whatsNew.v1_11_1.copyMenu": "El menú de copia de la cuadrícula se mantiene dentro de la ventana para que puedas usar todas sus opciones."
 }
