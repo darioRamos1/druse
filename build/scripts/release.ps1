@@ -287,7 +287,8 @@ function Invoke-DrusePublicacion([object]$verificacion) {
 
     $assets = @($selector, $complete, "$complete.sig", $lite, "$lite.sig", $community, "$community.sig", $latest, $evidencia, $checksums) + $portables +
         @(foreach ($variant in @('completo', 'sin-informix', 'comunidad')) { Join-Path $releaseDir "manifiesto-$variant-$version-win-x64.json" })
-    $tagArgs = if ($tagCommit) { @('--verify-tag') } else { @('--target', $commit) }
+    $tagArgs = @('--target', $commit)
+    if ($tagCommit) { $tagArgs += '--verify-tag' }
 
     # Construir tarda: un verde inicial no autoriza a publicar un código viejo
     # si main incorporó otro ajuste mientras se preparaban los seis paquetes.
@@ -304,10 +305,26 @@ function Invoke-DrusePublicacion([object]$verificacion) {
 
     if ($LASTEXITCODE -ne 0) { throw 'GitHub no pudo crear el borrador de la publicación. No se reemplazará una versión existente.' }
 
-    $uploadedResponse = gh api "repos/$Repository/releases/tags/$tag"
+    # La búsqueda REST por etiqueta no garantiza encontrar un borrador recién
+    # creado. El listado autenticado sí lo incluye; desde aquí se conserva su
+    # ID para verificar y publicar exactamente la misma release.
+    $releasePagesResponse = gh api "repos/$Repository/releases?per_page=100" --paginate --slurp
+    if ($LASTEXITCODE -ne 0) { throw 'No se pudo localizar el borrador subido. Se conserva sin publicar.' }
+    $releasePages = $releasePagesResponse | ConvertFrom-Json -NoEnumerate -ErrorAction Stop
+    if ($releasePages -isnot [array] -or @($releasePages | Where-Object { $_ -isnot [array] }).Count) {
+        throw 'El listado de releases no contiene páginas válidas. Se conserva el borrador sin publicar.'
+    }
+    $drafts = @($releasePages | ForEach-Object { $_ } | Where-Object { $_.tag_name -ceq $tag })
+    if ($drafts.Count -ne 1 -or $drafts[0].draft -ne $true -or $drafts[0].target_commitish -cne $commit -or
+        [string]$drafts[0].id -notmatch '^[1-9][0-9]*$') {
+        throw 'No se encontró un único borrador de la etiqueta y el commit esperados. Se conserva sin publicar.'
+    }
+    $releaseId = [string]$drafts[0].id
+    $uploadedResponse = gh api "repos/$Repository/releases/$releaseId"
     if ($LASTEXITCODE -ne 0) { throw 'No se pudo comprobar el borrador subido. Se conserva sin publicar.' }
     $uploaded = $uploadedResponse | ConvertFrom-Json -ErrorAction Stop
-    if ($uploaded.draft -ne $true -or $uploaded.tag_name -cne $tag -or @($uploaded.assets).Count -ne $assets.Count) {
+    if ([string]$uploaded.id -cne $releaseId -or $uploaded.draft -ne $true -or $uploaded.tag_name -cne $tag -or
+        $uploaded.target_commitish -cne $commit -or @($uploaded.assets).Count -ne $assets.Count) {
         throw 'El borrador de GitHub no contiene exactamente los artefactos esperados. Se conserva sin publicar.'
     }
     foreach ($asset in $assets) {
@@ -323,7 +340,7 @@ function Invoke-DrusePublicacion([object]$verificacion) {
     # También puede avanzar durante la subida. El borrador verificado permanece
     # privado si sus bytes ya no corresponden a la aplicación actual.
     Assert-DruseMainCompatible -Repository $Repository -Commit $commit -Version $version
-    gh release edit $tag --repo $Repository --draft=false
+    $null = gh api "repos/$Repository/releases/$releaseId" --method PATCH --field draft=false
     if ($LASTEXITCODE -ne 0) { throw 'GitHub no pudo publicar el borrador verificado. No se reemplazará una versión existente.' }
 }
 

@@ -27,9 +27,23 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  solicitar-publicacion:
+    if: github.event_name == 'release'
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+    steps:
+      # El entorno de Pages solo admite main. Un evento release usa la etiqueta
+      # como referencia aunque el checkout pida main; el despliegue se rechaza.
+      - name: Solicitar el despliegue desde main
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: gh workflow run pages.yml --ref main
+
   deploy:
     if: >-
-      (github.event_name == 'release' || github.ref == 'refs/heads/main') &&
+      github.event_name != 'release' && github.ref == 'refs/heads/main' &&
       (github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success')
     runs-on: ubuntu-latest
     permissions:
