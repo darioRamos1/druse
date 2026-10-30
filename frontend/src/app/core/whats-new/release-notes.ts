@@ -19,8 +19,13 @@ export interface ReleaseNote {
 export const RELEASE_NOTES: readonly ReleaseNote[] = [
   {
     version: '1.11.1',
-    date: '2026-10-29',
-    items: ['whatsNew.v1_11_1.savedPassword', 'whatsNew.v1_11_1.jdbcCancellation'],
+    date: '2026-10-30',
+    items: [
+      'whatsNew.v1_11_1.savedPassword',
+      'whatsNew.v1_11_1.jdbcCancellation',
+      'whatsNew.v1_11_1.informixBackup',
+      'whatsNew.v1_11_1.copyMenu',
+    ],
   },
   { version: '1.11.0', date: '2026-10-28', items: ['whatsNew.v1_11_0.downloads'] },
   { version: '1.10.0', date: '2026-10-19', items: ['whatsNew.v1_10_0.chatPlans'] },

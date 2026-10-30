@@ -98,6 +98,13 @@ const DISCONNECTED: SessionStatus = {
   lastDurationMs: null,
 };
 
+interface PendingConnectionSelection {
+  readonly tabId: string;
+  readonly connectionId: string;
+  readonly previousConnectionId?: string;
+  readonly previousDatabase?: string;
+}
+
 /**
  * Ventana principal: compone la barra superior, el panel lateral, el editor,
  * los resultados y la barra de estado.
@@ -501,6 +508,7 @@ export class AppShell {
   /** Perfil que se está editando; `null` cuando el diálogo crea uno nuevo. */
   protected readonly editingConnection = signal<SavedConnection | null>(null);
   protected readonly connectionDialogPurpose = signal<'edit' | 'connect'>('connect');
+  protected readonly pendingConnectionSelection = signal<PendingConnectionSelection | null>(null);
   protected readonly paletteOpen = signal(false);
 
   /**
@@ -1393,6 +1401,7 @@ export class AppShell {
   protected openDialog(): void {
     this.prepareOverlay();
     this.editingConnection.set(null);
+    this.pendingConnectionSelection.set(null);
     this.connectionDialogPurpose.set('connect');
     this.dialogOpen.set(true);
   }
@@ -1407,11 +1416,15 @@ export class AppShell {
     this.openSavedConnectionDialog(id, 'edit');
   }
 
-  private requestConnectionPassword(id: string): void {
-    this.openSavedConnectionDialog(id, 'connect');
+  private requestConnectionPassword(id: string, selection?: PendingConnectionSelection): void {
+    this.openSavedConnectionDialog(id, 'connect', selection);
   }
 
-  private openSavedConnectionDialog(id: string, purpose: 'edit' | 'connect'): void {
+  private openSavedConnectionDialog(
+    id: string,
+    purpose: 'edit' | 'connect',
+    selection?: PendingConnectionSelection,
+  ): void {
     const profile = this._store.savedProfile(id);
 
     if (!profile) {
@@ -1420,6 +1433,7 @@ export class AppShell {
 
     this.prepareOverlay();
     this.editingConnection.set(profile);
+    this.pendingConnectionSelection.set(selection ?? null);
     this.connectionDialogPurpose.set(purpose);
     this.dialogOpen.set(true);
   }
@@ -1450,6 +1464,7 @@ export class AppShell {
   protected closeDialog(): void {
     this.dialogOpen.set(false);
     this.editingConnection.set(null);
+    this.pendingConnectionSelection.set(null);
     this.connectionDialogPurpose.set('connect');
   }
 
@@ -1538,8 +1553,36 @@ export class AppShell {
    * mismo diálogo que al editarla: es donde el usuario ya sabe escribirla.
    */
   protected async useConnection(connectionId: string): Promise<void> {
+    const tab = this._store.activeTab();
     if ((await this._store.useConnection(connectionId)) === 'needsPassword') {
-      this.requestConnectionPassword(connectionId);
+      this.requestConnectionPassword(
+        connectionId,
+        tab
+          ? {
+              tabId: tab.id,
+              connectionId,
+              previousConnectionId: tab.connectionId,
+              previousDatabase: tab.database,
+            }
+          : undefined,
+      );
+    }
+  }
+
+  protected async completeConnectionSelection(): Promise<void> {
+    const selection = this.pendingConnectionSelection();
+    this.pendingConnectionSelection.set(null);
+    if (!selection) return;
+
+    const tab = this._store.activeTab();
+    // La clave sólo completa el cambio que se pidió: cancelar, cambiar de
+    // pestaña o elegir otro contexto no debe repuntar trabajo distinto.
+    if (
+      tab?.id === selection.tabId &&
+      tab.connectionId === selection.previousConnectionId &&
+      tab.database === selection.previousDatabase
+    ) {
+      await this._store.useConnection(selection.connectionId);
     }
   }
 

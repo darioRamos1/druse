@@ -1016,7 +1016,7 @@ export class ResultsGrid {
       this.focus.set({ row, column });
     }
 
-    this.menu.set({ top: event.clientY, left: event.clientX });
+    this.positionMenu(event);
   }
 
   /**
@@ -1037,7 +1037,31 @@ export class ResultsGrid {
       this.lastRow = row;
     }
 
-    this.menu.set({ top: event.clientY, left: event.clientX });
+    this.positionMenu(event);
+  }
+
+  private positionMenu(event: MouseEvent): void {
+    const position = { top: event.clientY, left: event.clientX };
+    this.menu.set(position);
+    this.afterRender(() => {
+      if (this.menu() !== position) return;
+      const menu = this.host.nativeElement.querySelector<HTMLElement>('.copy-menu');
+      if (!menu) return;
+
+      // El tamaño depende del idioma y de la escala de interfaz. Medir el menú
+      // real evita dejar sus últimas opciones fuera de la ventana al copiar.
+      const bounds = menu.getBoundingClientRect();
+      const scale = (menu.offsetWidth > 0 ? bounds.width / menu.offsetWidth : 1) || 1;
+      const margin = 8 * scale;
+      this.menu.set({
+        top:
+          Math.max(margin, Math.min(position.top, window.innerHeight - bounds.height - margin)) /
+          scale,
+        left:
+          Math.max(margin, Math.min(position.left, window.innerWidth - bounds.width - margin)) /
+          scale,
+      });
+    });
   }
 
   /**

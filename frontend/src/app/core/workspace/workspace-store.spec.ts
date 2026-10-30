@@ -2584,6 +2584,16 @@ describe('WorkspaceStore', () => {
       expect(store.result()).not.toBeNull();
     });
 
+    it('puede abrir una sesión sin elegir pestaña y vincularla después de forma explícita', async () => {
+      await store.connect(form, false);
+      const connectionId = store.connections()[0].id;
+      expect(store.activeTab()?.connectionId).toBeUndefined();
+
+      expect(await store.useConnection(connectionId)).toBe('ok');
+
+      expect(store.activeTab()?.connectionId).toBe(connectionId);
+    });
+
     /** Si le falta la contraseña se dice, para que la pida quien tiene el diálogo. */
     it('una conexión sin contraseña guardada pide que se escriba', async () => {
       await store.connect(form);

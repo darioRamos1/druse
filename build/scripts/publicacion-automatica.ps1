@@ -12,22 +12,9 @@ function Get-DruseDecisionPublicacion {
     )
 
     if ($Automatica) {
-        $main = gh api "repos/$Repository/commits/main" --jq '.sha'
-        if ($LASTEXITCODE -ne 0) { throw 'No se pudo comprobar el commit actual de main.' }
-        if ($main.Trim() -ne $Commit) {
-            $config = gh api "repos/$Repository/contents/shells/desktop-tauri/tauri.conf.json?ref=$($main.Trim())" --jq '.content'
-            if ($LASTEXITCODE -ne 0) { throw 'No se pudo comprobar la versión actual de main.' }
-            $mainVersion = ([Text.Encoding]::UTF8.GetString([Convert]::FromBase64String(($config -join '').Trim())) | ConvertFrom-Json).version
-            if ($mainVersion -ne $Version) {
-                return @{ publicar = $false; detalle = 'main ya tiene otra versión; se espera su comprobación.' }
-            }
-            # Un ajuste solo de la web o de documentación no inicia CI otra vez.
-            # No debe cancelar una versión cuyo código ya terminó de validarse.
-            $comparison = gh api "repos/$Repository/compare/$Commit...$($main.Trim())" --jq '.status'
-            if ($LASTEXITCODE -ne 0) { throw 'No se pudo comprobar que el commit pertenece al historial de main.' }
-            if ($comparison.Trim() -notin @('ahead', 'identical')) {
-                return @{ publicar = $false; detalle = 'El commit comprobado ya no pertenece al historial actual de main.' }
-            }
+        $main = Get-DruseCompatibilidadMain -Repository $Repository -Commit $Commit -Version $Version
+        if (-not $main.compatible) {
+            return @{ publicar = $false; detalle = $main.detalle }
         }
     }
 

@@ -1897,5 +1897,7 @@
   "whatsNew.v1_10_0.chatPlans": "You can attach a SQLite estimated plan obtained with EXPLAIN QUERY PLAN to the chat and review its SQL, contents and limits before sending.",
   "whatsNew.v1_11_0.downloads": "The website offers Full, Without Informix and Community editions with an installer and a ZIP that runs without installation for the latest published version.",
   "whatsNew.v1_11_1.savedPassword": "When opening a connection without a saved password, you can enter it and connect from the profile dialog.",
-  "whatsNew.v1_11_1.jdbcCancellation": "For JDBC connections, cancellation and time limits free the interface even when the driver takes time to stop the query."
+  "whatsNew.v1_11_1.jdbcCancellation": "For JDBC connections, cancellation and time limits free the interface even when the driver takes time to stop the query.",
+  "whatsNew.v1_11_1.informixBackup": "Informix SQLI backups preserve dates when restored, and syntax errors have a clear Spanish explanation.",
+  "whatsNew.v1_11_1.copyMenu": "The grid copy menu stays inside the window so you can use all its options."
 }

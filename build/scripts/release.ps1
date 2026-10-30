@@ -289,6 +289,10 @@ function Invoke-DrusePublicacion([object]$verificacion) {
         @(foreach ($variant in @('completo', 'sin-informix', 'comunidad')) { Join-Path $releaseDir "manifiesto-$variant-$version-win-x64.json" })
     $tagArgs = if ($tagCommit) { @('--verify-tag') } else { @('--target', $commit) }
 
+    # Construir tarda: un verde inicial no autoriza a publicar un código viejo
+    # si main incorporó otro ajuste mientras se preparaban los seis paquetes.
+    Assert-DruseMainCompatible -Repository $Repository -Commit $commit -Version $version
+
     # Crear la release como borrador evita que /latest anuncie una versión con
     # solo parte de sus paquetes si se interrumpe alguna de las subidas.
     if (Test-Path $notesFile) {
@@ -316,6 +320,9 @@ function Invoke-DrusePublicacion([object]$verificacion) {
         }
     }
 
+    # También puede avanzar durante la subida. El borrador verificado permanece
+    # privado si sus bytes ya no corresponden a la aplicación actual.
+    Assert-DruseMainCompatible -Repository $Repository -Commit $commit -Version $version
     gh release edit $tag --repo $Repository --draft=false
     if ($LASTEXITCODE -ne 0) { throw 'GitHub no pudo publicar el borrador verificado. No se reemplazará una versión existente.' }
 }

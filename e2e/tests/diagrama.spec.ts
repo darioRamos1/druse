@@ -16,68 +16,78 @@ test.describe('el diagrama entidad-relación', () => {
     await conectar(page);
 
     const sidebar = page.locator('app-connections-sidebar');
-
-    // Conectar deja a la vista las **bases**, no sus esquemas: el árbol carga
-    // por niveles y `public` cuelga de `druse_test`.
-    const esquema = sidebar.getByText('public', { exact: true }).first();
-
-    if (!(await esquema.isVisible().catch(() => false))) {
-      await sidebar.getByText('druse_test', { exact: true }).first().click();
-    }
-
-    await expect(esquema).toBeVisible({ timeout: 60_000 });
-
-    await sidebar
-      .locator('.node', { hasText: 'public' })
-      .first()
-      .getByRole('button', { name: 'Acciones para public' })
-      .click();
-
-    await page.getByRole('menuitem', { name: 'Ver diagrama' }).click();
-
     const panel = page.locator('app-diagram-panel');
-    await expect(panel).toBeVisible();
+    const prefijo = `e2e_foco_${Date.now()}`;
+    const padre = `${prefijo}_padre`;
+    const hija = `${prefijo}_hija`;
+    const aislada = `${prefijo}_aislada`;
+    const limpieza = `DROP TABLE IF EXISTS ${hija}; DROP TABLE IF EXISTS ${padre}; DROP TABLE IF EXISTS ${aislada}`;
 
-    // Sobre un esquema se pregunta primero qué tablas entran: dibujar las
-    // trescientas de una base es una tela de araña y una espera.
-    const elegir = panel.locator('.chooser');
-    await expect(elegir).toBeVisible({ timeout: 60_000 });
-    await expect(panel.locator('.pick').first()).toBeVisible();
+    // Dos tablas pueden ser vecinas entre sí: su cantidad no garantiza que
+    // haya algo que apagar. El caso necesita una tercera tabla sin relación.
+    await ejecutarConAviso(
+      page,
+      `${limpieza};
+       CREATE TABLE ${padre} (id integer PRIMARY KEY, nombre text);
+       CREATE TABLE ${hija} (id integer PRIMARY KEY, padre_id integer REFERENCES ${padre} (id));
+       CREATE TABLE ${aislada} (id integer PRIMARY KEY, nota text)`,
+    );
 
-    // Entran todas marcadas, así que basta con confirmar.
-    await panel.getByRole('button', { name: 'Dibujar' }).click();
+    try {
+      // Conectar deja a la vista las bases, y el esquema cuelga de druse_test.
+      const esquema = sidebar.getByText('public', { exact: true }).first();
+      if (!(await esquema.isVisible().catch(() => false))) {
+        await sidebar.getByText('druse_test', { exact: true }).first().click();
+      }
+      await expect(esquema).toBeVisible({ timeout: 60_000 });
+      await sidebar
+        .locator('.node', { hasText: 'public' })
+        .first()
+        .getByRole('button', { name: 'Acciones para public' })
+        .click();
+      await page.getByRole('menuitem', { name: 'Ver diagrama' }).click();
+      await expect(panel).toBeVisible();
 
-    // La lectura del catálogo tarda: son varias tablas en una sola petición.
-    const cajas = panel.locator('.node');
-    await expect(cajas.first()).toBeVisible({ timeout: 60_000 });
+      // El esquema puede contener las tablas de otros recorridos: se eligen
+      // únicamente las de esta prueba para saber cuál es ajena al vecindario.
+      await expect(panel.locator('.chooser')).toBeVisible({ timeout: 60_000 });
+      await panel.getByRole('button', { name: 'Ninguna' }).click();
+      for (const nombre of [padre, hija, aislada]) {
+        await panel.locator('.pick', { hasText: nombre }).click();
+      }
+      await panel.getByRole('button', { name: 'Dibujar' }).click();
+      const cajas = panel.locator('.node');
+      await expect(cajas).toHaveCount(3, { timeout: 60_000 });
+      await expect(panel.locator('.wire:not(.is-suggested)')).toHaveCount(1);
+      await expect(panel.locator('.legend__item')).toHaveCount(3);
 
-    const dibujadas = await cajas.count();
-    expect(dibujadas).toBeGreaterThan(0);
+      // Plegar y volver a desplegar conserva todas las columnas leídas.
+      const filasCompleto = await panel.locator('.row').count();
+      expect(filasCompleto).toBeGreaterThan(0);
+      await panel.getByRole('button', { name: 'Plegado' }).click();
+      await expect(panel.locator('.row')).toHaveCount(0);
+      await panel.getByRole('button', { name: 'Completo' }).click();
+      await expect(panel.locator('.row')).toHaveCount(filasCompleto);
 
-    // La leyenda está siempre, porque el círculo de «admite nulos» no se
-    // entiende sin ella.
-    await expect(panel.locator('.legend__item')).toHaveCount(3);
+      const cajaHija = cajas.filter({ has: page.locator('.node__name', { hasText: hija }) });
+      const cajaPadre = cajas.filter({ has: page.locator('.node__name', { hasText: padre }) });
+      const cajaAislada = cajas.filter({ has: page.locator('.node__name', { hasText: aislada }) });
+      await cajaHija.locator('.node__head').click();
+      await expect(cajaHija).toHaveClass(/is-selected/);
+      await expect(cajaHija).not.toHaveClass(/is-dim/);
+      await expect(cajaPadre).not.toHaveClass(/is-dim/);
+      await expect(cajaAislada).toHaveClass(/is-dim/);
+      await expect(panel.locator('.node.is-dim')).toHaveCount(1);
+      await expect(cajaAislada).toBeVisible();
 
-    // --- El nivel de detalle cambia lo que se ve --------------------------
-    const filasCompleto = await panel.locator('.row').count();
-
-    await panel.getByRole('button', { name: 'Plegado' }).click();
-    await expect(panel.locator('.row')).toHaveCount(0);
-
-    await panel.getByRole('button', { name: 'Completo' }).click();
-    await expect(panel.locator('.row')).toHaveCount(filasCompleto);
-
-    // --- Marcar una tabla resalta sus vecinas -----------------------------
-    await cajas.first().locator('.node__head').click();
-
-    // Con más de una tabla, marcar una apaga algo; con una sola, no hay nada
-    // que apagar y el diagrama se queda igual. Las dos son correctas.
-    if (dibujadas > 1) {
-      await expect(panel.locator('.node.is-dim').first()).toBeVisible();
+      await panel.getByRole('button', { name: 'Cerrar' }).click();
+      await expect(panel).toBeHidden();
+    } finally {
+      if (await panel.isVisible()) {
+        await panel.getByRole('button', { name: 'Cerrar' }).click();
+      }
+      await ejecutarConAviso(page, limpieza);
     }
-
-    await panel.getByRole('button', { name: 'Cerrar' }).click();
-    await expect(panel).toBeHidden();
   });
 
   /**

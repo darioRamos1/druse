@@ -470,6 +470,8 @@
   position: fixed;
   z-index: 20;
   min-width: 232px;
+  max-height: calc(100dvh - 16px);
+  overflow-y: auto;
   margin: 0;
   padding: 4px;
   list-style: none;

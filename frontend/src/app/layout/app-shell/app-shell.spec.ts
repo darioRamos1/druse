@@ -1,11 +1,20 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
 import { HttpErrorResponse } from '@angular/common/http';
-import { of, throwError } from 'rxjs';
+import { of, Subject, throwError } from 'rxjs';
 
-import { ApplicationGateway } from '../../core/application-gateway/application-gateway';
+import {
+  ApplicationGateway,
+  ConnectRequest,
+} from '../../core/application-gateway/application-gateway';
 import { WorkspaceStore } from '../../core/workspace/workspace-store';
-import { ConnectionForm, DatabaseObject, SavedConnection } from '../../shared/models/workspace';
+import { TabStore } from '../../core/workspace/tab-store';
+import {
+  ConnectionForm,
+  DatabaseObject,
+  SavedConnection,
+  SessionInfo,
+} from '../../shared/models/workspace';
 import { AppShell } from './app-shell';
 import { AiCatalog } from '../../core/ai/ai-catalog';
 import { ConnectionsSidebar } from '../../features/connections/connections-sidebar/connections-sidebar';
@@ -349,6 +358,116 @@ describe('AppShell', () => {
       );
       expect(actions).toContain('Guardar cambios');
       expect(actions).not.toContain('Conectar');
+    });
+
+    async function pendingSwitch(destination?: Subject<SessionInfo>) {
+      const gateway = TestBed.inject(ApplicationGateway);
+      const store = TestBed.inject(WorkspaceStore);
+      const session = (request: ConnectRequest): SessionInfo => ({
+        sessionId: `sesion-${request.profile.name}`,
+        engine: request.profile.engine,
+        serverVersion: '18.0',
+        database: request.profile.database,
+        readOnly: false,
+      });
+      const openSession = vi.fn((request: ConnectRequest) =>
+        destination && request.profile.name === profile.name ? destination : of(session(request)),
+      );
+      Object.assign(gateway, {
+        openSession,
+        updateConnection: () => of(profile),
+      });
+      await store.connect({ ...connectionForm, id: 'origen' });
+      store.updateSql('SELECT 42;');
+      const tabId = store.activeTab()!.id;
+      expect(store.activeTab()!.connectionId).toBe('origen');
+
+      await openSaved(
+        throwError(() => new HttpErrorResponse({ status: 428 })),
+        'editor',
+      );
+      return { store, openSession, tabId };
+    }
+
+    function submitConnectionPassword() {
+      const password = element.querySelector<HTMLInputElement>(
+        'app-connection-dialog input[type="password"]',
+      )!;
+      password.value = 'clave-ahora';
+      password.dispatchEvent(new Event('input'));
+      fixture.detectChanges();
+      const connect = [
+        ...element.querySelectorAll<HTMLButtonElement>('app-connection-dialog .foot button'),
+      ].find((button) => button.textContent?.trim() === 'Conectar')!;
+      connect.click();
+    }
+
+    it('completa el cambio de conexión de una pestaña ya vinculada después de escribir la contraseña', async () => {
+      const { store, openSession, tabId } = await pendingSwitch();
+      submitConnectionPassword();
+      await fixture.whenStable();
+
+      expect(openSession).toHaveBeenLastCalledWith(
+        expect.objectContaining({ password: 'clave-ahora' }),
+      );
+      expect(element.querySelector('app-connection-dialog')).toBeNull();
+      expect(store.activeTab()).toMatchObject({
+        id: tabId,
+        connectionId: profile.id,
+        sql: 'SELECT 42;',
+      });
+      expect(store.activeConnection()?.id).toBe(profile.id);
+    });
+
+    it('una respuesta tardía no vincula otra pestaña vacía que se abrió mientras conectaba', async () => {
+      const destination = new Subject<SessionInfo>();
+      const { store, openSession, tabId } = await pendingSwitch(destination);
+      submitConnectionPassword();
+      await vi.waitFor(() => expect(openSession).toHaveBeenCalledTimes(2));
+      TestBed.inject(TabStore).create({ sql: 'SELECT otra;' });
+      const otra = store.activeTab()!.id;
+
+      destination.next({
+        sessionId: 'sesion-destino',
+        engine: 'postgresql',
+        serverVersion: '18.0',
+        database: profile.database,
+        readOnly: false,
+      });
+      destination.complete();
+      await fixture.whenStable();
+
+      expect(store.connections().find((connection) => connection.id === profile.id)?.state).toBe(
+        'connected',
+      );
+      expect(store.tabs().find((tab) => tab.id === tabId)?.connectionId).toBe('origen');
+      expect(store.activeTab()).toMatchObject({ id: otra, sql: 'SELECT otra;' });
+      expect(store.activeTab()?.connectionId).toBeUndefined();
+      expect(store.activeConnection()?.id).toBe('origen');
+    });
+
+    it('no repunta el contexto que cambió mientras se esperaba la contraseña', async () => {
+      const destination = new Subject<SessionInfo>();
+      const { store, openSession } = await pendingSwitch(destination);
+      submitConnectionPassword();
+      await vi.waitFor(() => expect(openSession).toHaveBeenCalledTimes(2));
+      store.useDatabase('otra_base');
+
+      destination.next({
+        sessionId: 'sesion-destino',
+        engine: 'postgresql',
+        serverVersion: '18.0',
+        database: profile.database,
+        readOnly: false,
+      });
+      destination.complete();
+      await fixture.whenStable();
+
+      expect(store.activeTab()).toMatchObject({
+        connectionId: 'origen',
+        database: 'otra_base',
+        sql: 'SELECT 42;',
+      });
     });
 
     it('abre el árbol sin pedir contraseña si el servidor puede recuperar la guardada', async () => {

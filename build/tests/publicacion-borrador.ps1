@@ -40,7 +40,9 @@ $expectedAssets = @($selector, $complete, "$complete.sig", $lite, "$lite.sig", $
 foreach ($asset in $expectedAssets | Where-Object { $_ -ne $evidencia -and $_ -ne $checksums }) {
     Set-Content -LiteralPath $asset -Value "Contenido revisado: $([IO.Path]::GetFileName($asset))"
 }
-$state = @{ mode = 'correcto'; edits = 0; creates = 0; api = 0; useNotesFile = $false }
+$state = @{ mode = 'correcto'; edits = 0; creates = 0; api = 0; mainChecks = 0; useNotesFile = $false }
+$expectedCommit = 'a' * 40
+$advancedMain = 'b' * 40
 
 function git {
     $global:LASTEXITCODE = 0
@@ -59,8 +61,34 @@ function Get-DruseEstadoCI {
 
 function gh {
     $global:LASTEXITCODE = 0
+    if ($args[0] -eq 'api' -and $args[1] -eq "repos/$Repository/commits/main") {
+        $state.mainChecks++
+        if ($state.mode -eq 'fallo main antes del borrador' -or
+            ($state.mode -eq 'fallo main durante subida' -and $state.creates -gt 0)) {
+            $global:LASTEXITCODE = 1; return
+        }
+        if ($state.mode -eq 'main avanzó antes del borrador' -or
+            ($state.creates -gt 0 -and $state.mode -in @('main avanzó durante subida', 'documentación durante subida', 'otra versión durante subida', 'comparación inválida durante subida'))) {
+            return $advancedMain
+        }
+        return $expectedCommit
+    }
+    if ($args[0] -eq 'api' -and $args[1] -eq "repos/$Repository/contents/shells/desktop-tauri/tauri.conf.json?ref=$advancedMain") {
+        $mainVersion = if ($state.mode -eq 'otra versión durante subida') { '1.12.0' } else { $version }
+        return [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes((@{version=$mainVersion} | ConvertTo-Json)))
+    }
+    if ($args[0] -eq 'api' -and $args[1] -eq "repos/$Repository/compare/$expectedCommit...$advancedMain") {
+        if ($state.mode -eq 'comparación inválida durante subida') { return 'no JSON' }
+        $changed = if ($state.mode -eq 'documentación durante subida') { 'docs/guia.md' } else { 'backend/Program.cs' }
+        return ConvertTo-Json -InputObject @{
+            status = 'ahead'; ahead_by = 1; behind_by = 0; total_commits = 1
+            base_commit = @{sha=$expectedCommit}; merge_base_commit = @{sha=$expectedCommit}
+            files = @(@{filename=$changed; status='modified'})
+        } -Depth 5 -Compress
+    }
     if ($args[0] -eq 'release' -and $args[1] -eq 'create') {
         $state.creates++
+        if ($state.mainChecks -lt 1) { throw 'Se intentó crear un borrador sin volver a comprobar main tras construir.' }
         if ($args[2] -ne $tag -or $args -notcontains '--draft' -or $args -contains '--clobber') { throw 'Debe crear un borrador nuevo sin sobrescribir.' }
         foreach ($asset in $expectedAssets) {
             if ($args -notcontains $asset) { throw "Falta el artefacto esperado $asset en la creación del borrador." }
@@ -93,7 +121,7 @@ function gh {
     }
     if ($args[0] -eq 'release' -and $args[1] -eq 'edit' -and $args[2] -eq $tag) {
         $state.edits++
-        if ($state.creates -ne 1 -or $state.api -ne 1 -or $args -notcontains '--draft=false') { throw 'Se intentó publicar antes de verificar el borrador.' }
+        if ($state.creates -ne 1 -or $state.api -ne 1 -or $state.mainChecks -lt 2 -or $args -notcontains '--draft=false') { throw 'Se intentó publicar antes de verificar el borrador y revalidar main.' }
         if ($state.mode -eq 'fallo publicación') { $global:LASTEXITCODE = 1 }
         return
     }
@@ -101,15 +129,15 @@ function gh {
 }
 
 try {
-    $cases = @('correcto', 'sin digest', 'notas desde archivo', 'falta archivo', 'tamaño distinto', 'hash distinto', 'subida abierta', 'nombre duplicado', 'otra etiqueta', 'ya pública', 'fallo subida', 'fallo API', 'JSON inválido', 'fallo publicación')
+    $cases = @('correcto', 'sin digest', 'notas desde archivo', 'falta archivo', 'tamaño distinto', 'hash distinto', 'subida abierta', 'nombre duplicado', 'otra etiqueta', 'ya pública', 'fallo subida', 'fallo API', 'JSON inválido', 'fallo publicación', 'main avanzó antes del borrador', 'main avanzó durante subida', 'documentación durante subida', 'otra versión durante subida', 'fallo main antes del borrador', 'fallo main durante subida', 'comparación inválida durante subida')
     foreach ($case in $cases) {
-        $state.mode = $case; $state.edits = 0; $state.creates = 0; $state.api = 0
+        $state.mode = $case; $state.edits = 0; $state.creates = 0; $state.api = 0; $state.mainChecks = 0
         $state.useNotesFile = $case -eq 'notas desde archivo'
         if ($state.useNotesFile) { Set-Content -LiteralPath $notesFile -Value $notes }
         elseif (Test-Path -LiteralPath $notesFile) { Remove-Item -LiteralPath $notesFile }
         $caught = $null
         try { Invoke-PublicacionDePrueba @{ prueba = $true } | Out-Null } catch { $caught = $_ }
-        if ($case -in @('correcto', 'sin digest', 'notas desde archivo')) {
+        if ($case -in @('correcto', 'sin digest', 'notas desde archivo', 'documentación durante subida')) {
             if ($caught -or $state.edits -ne 1) { throw "No se publicó el borrador válido ($case): $caught" }
         }
         elseif ($case -eq 'fallo publicación') {
@@ -118,6 +146,13 @@ try {
             }
         }
         elseif (-not $caught -or $state.edits -ne 0) { throw "Se intentó publicar un borrador incorrecto: $case" }
+        if ($case -in @('main avanzó antes del borrador', 'fallo main antes del borrador') -and $state.creates -ne 0) {
+            throw 'Un cambio anterior a la subida no debe crear un borrador.'
+        }
+        if ($case -in @('main avanzó durante subida', 'otra versión durante subida', 'fallo main durante subida', 'comparación inválida durante subida') -and
+            ($state.creates -ne 1 -or $state.api -ne 1 -or $state.edits -ne 0 -or -not $caught)) {
+            throw 'Un cambio durante la subida debe conservar el borrador sin hacerlo público.'
+        }
     }
     "OK: $($cases.Count) escenarios de borrador; solo se publica con todos los archivos comprobados, sin red."
 }

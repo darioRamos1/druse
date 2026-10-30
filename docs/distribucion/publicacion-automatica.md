@@ -51,6 +51,14 @@ fallo detiene el trabajo. Esta preparación no afecta los paquetes de Windows.
 
 ## Publicación y recuperación
 
+Antes de subir los archivos y antes de hacer público el borrador se comprueba
+que `main` conserva el código construido. Sólo se permiten avances comprobados
+de la landing o de documentación que no forme parte de los paquetes. Un cambio
+de aplicación, licencia o avisos de terceros espera la validación del nuevo
+commit, aunque conserve el número de versión. Una comparación inválida o con
+300 archivos tampoco se da por completa. Si `main` avanza durante la subida,
+el borrador se conserva sin publicar y las descargas anteriores siguen activas.
+
 La subida crea primero un borrador. Solo se publica cuando GitHub confirma
 todos los archivos, sus tamaños y sus hashes cuando los proporciona la API.
 Un fallo conserva el borrador y las descargas públicas anteriores.

@@ -32,6 +32,45 @@ describe('ResultsGrid', () => {
     await fixture.whenStable();
   });
 
+  it.each([1, 1.25])(
+    'mantiene el menú completo dentro de la ventana con escala %s',
+    async (scale) => {
+      const originalBounds = HTMLElement.prototype.getBoundingClientRect;
+      const bounds = vi
+        .spyOn(HTMLElement.prototype, 'getBoundingClientRect')
+        .mockImplementation(function (this: HTMLElement) {
+          return this.matches('.copy-menu')
+            ? new DOMRect(0, 0, 240 * scale, 200 * scale)
+            : originalBounds.call(this);
+        });
+      const widths = vi
+        .spyOn(HTMLElement.prototype, 'offsetWidth', 'get')
+        .mockImplementation(function (this: HTMLElement) {
+          return this.matches('.copy-menu') ? 240 : 0;
+        });
+      try {
+        element.querySelector<HTMLElement>('.cell--value')!.dispatchEvent(
+          new MouseEvent('contextmenu', {
+            clientX: window.innerWidth - 2,
+            clientY: window.innerHeight - 2,
+          }),
+        );
+        await fixture.whenStable();
+        const menu = element.querySelector<HTMLElement>('.copy-menu')!;
+        const top = Number.parseFloat(menu.style.top) * scale;
+        const left = Number.parseFloat(menu.style.left) * scale;
+        expect(top).toBeGreaterThanOrEqual(8 * scale);
+        expect(left).toBeGreaterThanOrEqual(8 * scale);
+        expect(top + 200 * scale).toBeLessThanOrEqual(window.innerHeight - 8 * scale);
+        expect(left + 240 * scale).toBeLessThanOrEqual(window.innerWidth - 8 * scale);
+        expect(menu.querySelectorAll('[role="menuitem"]')).toHaveLength(3);
+      } finally {
+        bounds.mockRestore();
+        widths.mockRestore();
+      }
+    },
+  );
+
   describe('recorrer con el teclado', () => {
     function celda(row: number, column: number): HTMLElement {
       return element.querySelector<HTMLElement>(
