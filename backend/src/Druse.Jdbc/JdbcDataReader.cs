@@ -406,7 +406,10 @@ public sealed class JdbcDataReader : DbDataReader, IEnumerable<DbDataRecord>
         java.lang.Float f => f.floatValue(),
         java.math.BigDecimal m => decimal.Parse(m.toString(), System.Globalization.CultureInfo.InvariantCulture),
         java.sql.Timestamp t => DateTime.Parse(t.toString(), System.Globalization.CultureInfo.InvariantCulture),
-        java.sql.Date fecha => DateTime.Parse(fecha.toString(), System.Globalization.CultureInfo.InvariantCulture),
+        // DATE no lleva hora: convertirlo a DateTime añadía medianoche al
+        // respaldo y el propio Informix rechazaba ese literal al restaurarlo.
+        java.sql.Date fecha => DateOnly.ParseExact(
+            fecha.toString(), "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture),
         byte[] bytes => bytes,
         _ => valor.ToString() ?? string.Empty,
     };
@@ -420,7 +423,8 @@ public sealed class JdbcDataReader : DbDataReader, IEnumerable<DbDataRecord>
         java.sql.Types.FLOAT or java.sql.Types.REAL => typeof(float),
         java.sql.Types.DOUBLE => typeof(double),
         java.sql.Types.NUMERIC or java.sql.Types.DECIMAL => typeof(decimal),
-        java.sql.Types.DATE or java.sql.Types.TIME or java.sql.Types.TIMESTAMP => typeof(DateTime),
+        java.sql.Types.DATE => typeof(DateOnly),
+        java.sql.Types.TIME or java.sql.Types.TIMESTAMP => typeof(DateTime),
         java.sql.Types.BINARY or java.sql.Types.VARBINARY or java.sql.Types.LONGVARBINARY or java.sql.Types.BLOB => typeof(byte[]),
         _ => typeof(string),
     };

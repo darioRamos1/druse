@@ -62,7 +62,7 @@ internal static class InformixErrorNormalizer
     }
 
     /// <summary>
-    /// Código con el que el driver JDBC tapa los errores de sintaxis.
+    /// Código con el que algunas versiones del driver JDBC tapan la sintaxis.
     ///
     /// No es del motor: es suyo. Comprobado contra el servidor, **el driver
     /// parsea la sentencia antes de mandarla** y, si no la entiende, ni siquiera
@@ -72,7 +72,7 @@ internal static class InformixErrorNormalizer
     /// </summary>
     private const int JdbcParserError = -79716;
 
-    /// <summary>Lo único que dice el driver cuando su parser se atraganta.</summary>
+    /// <summary>Texto genérico con el que ese parser oculta el error de sintaxis.</summary>
     private const string JdbcParserMessage = "System or internal error";
 
     /// <summary>El número que Informix usa para un error de sintaxis.</summary>
@@ -84,13 +84,10 @@ internal static class InformixErrorNormalizer
     /// Son los mismos números que por DRDA, así que la explicación se busca en la
     /// misma tabla. Lo que cambia es de dónde se saca el código.
     ///
-    /// **Salvo con la sintaxis**, que el driver no deja llegar al servidor: la
-    /// caza su parser y responde con un código propio y un «System or internal
-    /// error» que no le dice nada a nadie. Ese caso —y solo ese, reconocido por
-    /// su código **y** su mensaje— se cuenta como lo que es: el mismo error de
-    /// sintaxis que habría devuelto el motor, con el número que Informix usa
-    /// para él. Así la misma falta se lee igual por los dos transportes, que es
-    /// justo lo que el contrato exige.
+    /// La sintaxis puede llegar con el número del motor (-201), o quedarse en
+    /// el parser del driver bajo «System or internal error». Ese segundo caso
+    /// se reconoce por su código **y** su mensaje para no confundir un fallo
+    /// interno real con una instrucción mal escrita.
     ///
     /// Con cualquier otro mensaje bajo ese código se respeta lo que dijo el
     /// driver: sería un fallo interno de verdad, y llamarlo sintaxis mandaría a
@@ -113,6 +110,21 @@ internal static class InformixErrorNormalizer
             {
                 Message = "La instrucción tiene un error de sintaxis. El driver de Informix la "
                     + "rechaza antes de enviarla, así que el servidor no señala dónde está.",
+                Code = InformixSyntaxError.ToString(CultureInfo.InvariantCulture),
+            };
+        }
+
+        if (exception.ErrorCode == InformixSyntaxError)
+        {
+            // Las versiones que ya devuelven -201 pueden señalar una posición
+            // en su texto. Se explica el fallo sin borrar ese detalle del driver.
+            const string explicacion = "La instrucción tiene un error de sintaxis.";
+
+            return new QueryError
+            {
+                Message = string.IsNullOrWhiteSpace(exception.Message)
+                    ? explicacion
+                    : $"{explicacion} {exception.Message}",
                 Code = InformixSyntaxError.ToString(CultureInfo.InvariantCulture),
             };
         }

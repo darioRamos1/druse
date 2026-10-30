@@ -111,11 +111,9 @@ public sealed class InformixSqliProviderTests
     /// <summary>
     /// Un error de sintaxis se cuenta como tal, no como «error interno».
     ///
-    /// Este driver **no deja llegar la sintaxis al servidor**: la caza su propio
-    /// parser y responde con un código suyo y un «System or internal error» que
-    /// no le dice nada a nadie. Comprobado contra el servidor que todo lo demás
-    /// sí viaja y vuelve con su número de Informix —-206, -217, -674—, así que
-    /// este es el único caso que hay que traducir.
+    /// La sintaxis puede llegar con -201 y el detalle del servidor, o quedar
+    /// oculta por el parser del driver bajo «System or internal error». Ambos
+    /// caminos deben explicar qué puede corregir quien escribió la consulta.
     ///
     /// Se mira el mensaje y no solo el código porque es lo que el usuario lee.
     /// </summary>
