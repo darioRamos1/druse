@@ -62,9 +62,32 @@ if (-not (Test-Path $vcvars)) {
     throw "No se encontró vcvars64.bat en $installPath"
 }
 
+# Cada edición se empaqueta desde la misma sesión de PowerShell. Volver a
+# ejecutar vcvars64 añade otra copia de sus rutas y la tercera edición puede
+# superar el límite de PATH de cmd, que npm usa para encontrar Angular.
+$loadedTools = $env:VCToolsInstallDir
+$loadedCompiler = Get-Command 'cl.exe' -CommandType Application -ErrorAction SilentlyContinue
+$loadedLinker = Get-Command 'link.exe' -CommandType Application -ErrorAction SilentlyContinue
+if ($env:DRUSE_MSVC_ENV_READY -eq $vcvars -and
+    $env:VSCMD_ARG_TGT_ARCH -eq 'x64' -and
+    -not [string]::IsNullOrWhiteSpace($loadedTools) -and
+    -not [string]::IsNullOrWhiteSpace($env:LIB) -and
+    -not [string]::IsNullOrWhiteSpace($env:INCLUDE) -and
+    $loadedCompiler -and $loadedLinker -and
+    (Test-Path -LiteralPath (Join-Path $loadedTools 'include/excpt.h')) -and
+    (Test-Path -LiteralPath (Join-Path $loadedTools 'lib/x64/msvcrt.lib')) -and
+    $loadedCompiler.Source -eq (Join-Path $loadedTools 'bin/Hostx64/x64/cl.exe') -and
+    $loadedLinker.Source -eq (Join-Path $loadedTools 'bin/Hostx64/x64/link.exe')) {
+    Write-Host "Entorno de MSVC ya cargado desde: $installPath" -ForegroundColor DarkGray
+    return
+}
+
 # `vcvars64.bat` solo sabe exportar variables a un `cmd`. Se ejecuta ahí, se
 # vuelca el entorno resultante y se copia a esta sesión.
 $output = & cmd /c "`"$vcvars`" >nul 2>&1 && set"
+if ($LASTEXITCODE -ne 0) {
+    throw "No se pudo cargar el entorno de MSVC desde $vcvars."
+}
 
 foreach ($line in $output) {
     if ($line -match '^([^=]+)=(.*)$') {
@@ -79,4 +102,5 @@ if ((Test-Path $cargoBin) -and ($env:Path -notlike "*$cargoBin*")) {
     $env:Path = "$env:Path;$cargoBin"
 }
 
+$env:DRUSE_MSVC_ENV_READY = $vcvars
 Write-Host "Entorno de MSVC cargado desde: $installPath" -ForegroundColor DarkGray
