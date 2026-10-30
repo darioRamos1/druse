@@ -585,6 +585,11 @@ jobs:
           npm ci
           npm run build
 
+      - name: Preparar las tres ediciones sin perder Angular
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: ./build/tests/entorno-msvc.ps1
+
       - name: Comprobar que el envoltorio compila
         working-directory: shells/desktop-tauri
         run: cargo check --locked
