@@ -275,4 +275,7 @@ public class InformixFixture : IProviderFixture
 }
 
 /// <summary>Ejecuta el contrato común contra Informix.</summary>
+// DRDA y SQLI modifican el mismo catálogo: incluso con tablas distintas, un DDL
+// puede bloquear al otro transporte si sus clases se ejecutan a la vez.
+[Collection("Catálogo de Informix")]
 public sealed class InformixContractTests : DatabaseProviderContractTests<InformixFixture>;
