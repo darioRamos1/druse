@@ -16,7 +16,7 @@
     -->
     <PackageReference Include="Oracle.ManagedDataAccess.Core" Version="23.26.400" />
     <!-- ODP.NET trae PKCS 8.0.1; se conserva la rama 8 con el parche de ambos avisos de octubre. -->
-    <PackageReference Include="System.Security.Cryptography.Pkcs" Version="8.0.2" />
+    <PackageReference Include="System.Security.Cryptography.Pkcs" Version="10.0.14" />
   </ItemGroup>
 
   <ItemGroup>
