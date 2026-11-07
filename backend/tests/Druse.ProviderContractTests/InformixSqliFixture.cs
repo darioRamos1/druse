@@ -91,4 +91,5 @@ public sealed class InformixSqliFixture : InformixFixture
 }
 
 /// <summary>Ejecuta el contrato común contra Informix por su protocolo nativo.</summary>
+[Collection("Catálogo de Informix")]
 public sealed class InformixSqliContractTests : DatabaseProviderContractTests<InformixSqliFixture>;
