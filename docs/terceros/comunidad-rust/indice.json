@@ -4,8 +4,8 @@
   "features": [
     "custom-protocol"
   ],
-  "cargoLockSha256": "f0cdc9dada6f78ec29deb3386c2da5efb07bdb30957a9c4c5f8726c84b7a7c6d",
-  "cargoTomlSha256": "277098f15b59d0519d07e836b089b594198f6d230043658c82f83cea4150a6a5",
+  "cargoLockSha256": "7b826de8aa1cd75209119f0aae71958a078924373245e312f408ee50b812414c",
+  "cargoTomlSha256": "d675e360d2991ded9af65dfcc2e73b69140dec5e55724afdcb6fdb7279dbdbc8",
   "alcance": "Avisos recopilados del grafo normal Windows. No cierra revisión de fuente correspondiente, código generado, compatibilidad o elegibilidad SignPath.",
   "macrosSeparadas": 21,
   "paquetes": [
