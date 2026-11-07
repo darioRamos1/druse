@@ -253,9 +253,26 @@ h1 > span {
   gap: 12px;
 }
 .hero-note {
-  font-size: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 4px 16px;
+  font-size: 13px;
   color: #8e8e9e;
   margin: 16px 0 0;
+}
+.hero-note a {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+.hero-note a:hover {
+  color: var(--text);
 }
 .preview-stage {
   position: relative;
@@ -1086,6 +1103,11 @@ details > p {
   color: var(--muted);
   margin: 0 25px 22px 0;
 }
+.faq-list a {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
 .site-footer {
   border-top: 1px solid var(--line);
   padding: 29px 0 35px;
@@ -1230,7 +1252,7 @@ details > p {
     padding: 12px 16px;
   }
   .hero-note {
-    font-size: 11px;
+    font-size: 12px;
   }
   .preview-stage {
     margin-top: 40px;

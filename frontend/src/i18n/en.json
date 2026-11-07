@@ -1899,5 +1899,6 @@
   "whatsNew.v1_11_1.savedPassword": "When opening a connection without a saved password, you can enter it and connect from the profile dialog.",
   "whatsNew.v1_11_1.jdbcCancellation": "For JDBC connections, cancellation and time limits free the interface even when the driver takes time to stop the query.",
   "whatsNew.v1_11_1.informixBackup": "Informix SQLI backups preserve dates when restored, and syntax errors have a clear Spanish explanation.",
-  "whatsNew.v1_11_1.copyMenu": "The grid copy menu stays inside the window so you can use all its options."
+  "whatsNew.v1_11_1.copyMenu": "The grid copy menu stays inside the window so you can use all its options.",
+  "whatsNew.v1_11_2.openSource": "The website highlights that Druse is open source and links to GitHub so you can explore the code and contribute."
 }
