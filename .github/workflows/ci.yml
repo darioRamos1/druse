@@ -13,6 +13,8 @@
 # Cada versión publicada necesita pruebas del commit exacto: main las ejecuta
 # al recibir cambios de la aplicación. El recorrido adicional de macOS sigue
 # siendo manual porque todavía no distribuimos instaladores para ese sistema.
+# Linux queda en Ubuntu 24.04: el cambio automático a 26.04 elimina libxml2,
+# necesaria para el controlador de Informix y su ABI ya comprobada.
 
 name: CI
 
@@ -63,8 +65,8 @@ jobs:
         # ninguna release sale de ahí todavía.
         os: >-
           ${{ fromJSON((github.event.inputs.completo == 'true')
-          && '["windows-latest","ubuntu-latest","macos-latest"]'
-          || '["windows-latest","ubuntu-latest"]') }}
+          && '["windows-latest","ubuntu-24.04","macos-latest"]'
+          || '["windows-latest","ubuntu-24.04"]') }}
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -78,7 +80,7 @@ jobs:
       # sistema y no viaja en el paquete. Sin ella la carga falla y la excepción
       # se lleva por delante el proceso de pruebas entero, no solo las suyas.
       - name: Dependencia nativa de Informix
-        if: matrix.os == 'ubuntu-latest'
+        if: matrix.os == 'ubuntu-24.04'
         run: sudo apt-get update && sudo apt-get install -y libxml2
 
       # `-m:1` en los tres pasos: IKVM traduce el jar de Informix y dos proyectos
@@ -117,7 +119,7 @@ jobs:
   # aportar nada. Lo que se valida aquí son los proveedores, no el sistema.
   backend-con-motores-reales:
     name: Backend con los cuatro motores
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
 
     services:
@@ -325,7 +327,7 @@ jobs:
   # el sistema debajo.
   e2e:
     name: Punta a punta (PostgreSQL, SQL Server, Oracle y SQLite)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
 
     services:
@@ -459,7 +461,7 @@ jobs:
   # que nadie recuerda ejecutar a mano antes de una release.
   guiones-de-construccion:
     name: Guiones de construcción
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -512,8 +514,8 @@ jobs:
         # costaba trece minutos de cuota por cada minuto real.
         os: >-
           ${{ fromJSON((github.event.inputs.completo == 'true')
-          && '["windows-latest","ubuntu-latest","macos-latest"]'
-          || '["ubuntu-latest"]') }}
+          && '["windows-latest","ubuntu-24.04","macos-latest"]'
+          || '["ubuntu-24.04"]') }}
 
     defaults:
       run:
@@ -553,7 +555,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [windows-latest, ubuntu-latest]
+        os: [windows-latest, ubuntu-24.04]
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -567,7 +569,7 @@ jobs:
           components: rustfmt, clippy
 
       - name: Dependencias de Tauri en Linux
-        if: matrix.os == 'ubuntu-latest'
+        if: matrix.os == 'ubuntu-24.04'
         run: |
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
@@ -612,7 +614,7 @@ jobs:
   # objetivo, sin que el usuario final necesite el SDK de .NET (ADR 0003).
   publicacion-autocontenida:
     name: Publicación autocontenida (${{ matrix.rid }})
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
@@ -657,8 +659,8 @@ jobs:
         # el de Linux sigue en cada push.
         include: >-
           ${{ fromJSON((github.event.inputs.completo == 'true')
-          && '[{"os":"ubuntu-latest","rid":"linux-x64","bundles":"deb,appimage"},{"os":"macos-latest","rid":"osx-arm64","bundles":"dmg,app"}]'
-          || '[{"os":"ubuntu-latest","rid":"linux-x64","bundles":"deb,appimage"}]') }}
+          && '[{"os":"ubuntu-24.04","rid":"linux-x64","bundles":"deb,appimage"},{"os":"macos-latest","rid":"osx-arm64","bundles":"dmg,app"}]'
+          || '[{"os":"ubuntu-24.04","rid":"linux-x64","bundles":"deb,appimage"}]') }}
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -678,7 +680,7 @@ jobs:
       # construcción llega hasta el final y muere con «failed to run linuxdeploy»,
       # que no menciona la causa.
       - name: Dependencias de Tauri en Linux
-        if: matrix.os == 'ubuntu-latest'
+        if: matrix.os == 'ubuntu-24.04'
         run: |
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libfuse2
@@ -717,7 +719,7 @@ jobs:
           -p:DebugType=none
 
       - name: Preparar y arrancar la API autocontenida de Linux
-        if: matrix.os == 'ubuntu-latest'
+        if: matrix.os == 'ubuntu-24.04'
         shell: pwsh
         run: ./build/scripts/preparar-api-linux.ps1
 
@@ -741,7 +743,7 @@ jobs:
           # El strip incluido en linuxdeploy no admite todas las secciones de
           # las bibliotecas actuales de Ubuntu; conservar símbolos evita esa
           # transformación sin excluir archivos ni verificaciones del paquete.
-          NO_STRIP: ${{ matrix.os == 'ubuntu-latest' && '1' || '' }}
+          NO_STRIP: ${{ matrix.os == 'ubuntu-24.04' && '1' || '' }}
         run: |
           if [[ "${{ runner.os }}" == 'Linux' ]]; then
             # El paquete de IBM incluye libDB2xml4c.so.58, pero el RPATH de
