@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
 
 import {
   abrir,
@@ -258,7 +258,15 @@ test.describe('SQLite de punta a punta', () => {
     const cells = page.locator('app-results-grid .row .cell--value');
     const value = cells.nth(1);
     const instant = cells.nth(2);
-    await instant.dblclick();
+    // La selección puede redistribuir la barra y mover la celda entre los dos
+    // clics; aquí se comprueba la fidelidad del dato, por eso se edita con F2.
+    const edit = async (cell: Locator) => {
+      await expect(cell).toHaveClass(/is-editable/);
+      await cell.focus();
+      await page.keyboard.press('F2');
+      await expect(cell.locator('.cell__editor')).toBeFocused();
+    };
+    await edit(instant);
     await expect(instant.locator('textarea')).toHaveValue(
       '2026-10-02T10:20:30.1234567-05:00',
     );
@@ -281,32 +289,39 @@ test.describe('SQLite de punta a punta', () => {
         .getByRole('button', { name: 'Ver SQL y guardar', exact: true })
         .click();
       await expect(page.locator('.edits__statement')).toContainText(literal);
+      // La barra desaparece antes de releer la tabla: la siguiente edición
+      // necesita el resultado nuevo y que haya terminado el guardado.
+      const recarga = page.waitForResponse(
+        (response) => response.url().includes('/api/queries') && response.request().method() === 'POST',
+        { timeout: 60_000 },
+      );
       await page
         .getByRole('button', { name: 'Confirmar y guardar', exact: true })
         .click();
+      await recarga;
+      await esperarFinDeConsulta(page);
       await expect(page.locator('app-results-panel .edits')).toHaveCount(0);
+      await expect(value).toHaveClass(/is-editable/);
       await expect.poll(read).toBe(expected);
     };
-    await value.focus();
-    await page.keyboard.press('F2');
-    await expect(value.locator('.cell__editor')).toBeFocused();
+    await edit(value);
     await value.locator('.cell__editor').fill('NULL');
     await value.locator('.cell__editor').press('Enter');
     await expect(value.locator('.cell__editor')).toHaveCount(0);
     await save('NULL', "'NULL'");
-    await value.dblclick();
+    await edit(value);
     if (process.env['DRUSE_BARRIDO']) {
       mkdirSync(BARRIDO, { recursive: true });
       await page.screenshot({ path: join(BARRIDO, 'celda-texto-null.png') });
       await value.locator('.cell__editor').press('Escape');
       await page.getByRole('button', { name: 'Tema oscuro', exact: true }).click();
-      await value.dblclick();
+      await edit(value);
       await page.screenshot({ path: join(BARRIDO, 'celda-texto-null-oscuro.png') });
     }
     await value.locator('.cell__editor').fill('');
     await value.locator('.cell__editor').press('Enter');
     await save('', "''");
-    await value.dblclick();
+    await edit(value);
     await value
       .getByRole('button', { name: 'Establecer NULL en valor', exact: true })
       .click();
