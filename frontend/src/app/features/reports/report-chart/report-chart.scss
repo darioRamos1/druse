@@ -1,8 +1,47 @@
+@use '../report-palette';
+
 :host {
+  position: relative;
   display: flex;
   flex-direction: column;
   min-height: 0;
   color: var(--dr-text);
+}
+
+.plot {
+  position: relative;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+
+// El tooltip: texto en tinta del tema, nunca en el color de la serie.
+.tip {
+  position: absolute;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 6px 9px;
+  border: 1px solid var(--dr-border-dialog);
+  border-radius: var(--dr-radius-sm);
+  background: var(--dr-surface-dialog);
+  box-shadow: var(--dr-shadow-popover);
+  pointer-events: none;
+  transform: translate(-50%, calc(-100% - 8px));
+  white-space: nowrap;
+
+  &__label {
+    font-size: 11px;
+    color: var(--dr-text-secondary);
+  }
+
+  &__value {
+    font-size: 13px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
 }
 
 .empty {
@@ -55,25 +94,51 @@
 
   &__bar {
     fill: var(--dr-accent);
-    opacity: 0.88;
+    transition: opacity var(--dr-duration-fast, 120ms) ease-out;
 
-    &:hover {
-      opacity: 1;
+    &.is-selectable {
+      cursor: pointer;
+      outline: none;
     }
+
+    // Al elegir una categoría las demás se apagan: no cambian de color.
+    &.is-dimmed {
+      opacity: 0.32;
+    }
+
+    // Foco y elección con un anillo en la tinta del tema, no solo con color.
+    &.is-picked,
+    &:focus-visible {
+      stroke: var(--dr-text);
+      stroke-width: 2;
+    }
+  }
+
+  &__hit {
+    fill: transparent;
   }
 
   &__line {
     fill: none;
     stroke: var(--dr-accent);
-    stroke-width: 2.5;
+    stroke-width: 2;
     stroke-linejoin: round;
     stroke-linecap: round;
+    pointer-events: none;
   }
 
+  // Anillo del color de la superficie: el punto se separa de la línea.
   &__point {
-    fill: var(--dr-surface-base);
+    fill: var(--dr-surface-raised);
     stroke: var(--dr-accent);
     stroke-width: 2;
+    pointer-events: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chart__bar {
+    transition: none;
   }
 }
 
@@ -117,6 +182,45 @@
     border-radius: inherit;
     background: var(--dr-accent);
     transition: width var(--dr-duration-slow, 200ms) var(--dr-ease-out, ease-out);
+
+    [data-status='good'] & {
+      background: var(--rc-good);
+    }
+
+    [data-status='warning'] & {
+      background: var(--rc-warning);
+    }
+
+    [data-status='critical'] & {
+      background: var(--rc-critical);
+    }
+  }
+
+  // El estado: icono y texto en tinta del tema, con el color solo en el icono.
+  &__status {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    align-self: flex-start;
+    margin: 0;
+    padding: 2px 9px 2px 7px;
+    border: 1px solid var(--dr-border-subtle);
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--dr-text);
+
+    [data-status='good'] & app-icon {
+      color: var(--rc-good);
+    }
+
+    [data-status='warning'] & app-icon {
+      color: var(--rc-warning);
+    }
+
+    [data-status='critical'] & app-icon {
+      color: var(--rc-critical);
+    }
   }
 
   &__detail,

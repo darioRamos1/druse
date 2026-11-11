@@ -21,6 +21,123 @@ export interface ReportSettings {
   /** Solo tabla: columnas a mostrar; vacío es todas. */
   readonly columns: readonly string[];
   readonly sort: ReportSort;
+  readonly appearance: ReportAppearance;
+}
+
+/**
+ * Los ocho tonos categóricos, en su orden fijo.
+ *
+ * El orden es lo que los hace distinguibles con daltonismo (se validó contra
+ * las superficies de los paneles de Druse en claro y en oscuro): no se baraja
+ * ni se repite en ciclo. Los valores viven en `report-chart.scss`, por tema.
+ */
+export const PALETTE = ['blue', 'orange', 'aqua', 'yellow', 'magenta', 'green', 'violet', 'red'] as const;
+export type PaletteColor = (typeof PALETTE)[number];
+
+export interface ReportAppearance {
+  /** `null` hereda: del panel, del tablero o del color de acento del tema. */
+  readonly color: PaletteColor | null;
+  /** Barras: un color por categoría, siempre el mismo para cada una. */
+  readonly byCategory: boolean;
+  /** Escribir los valores sobre barras y puntos. */
+  readonly showValues: boolean;
+  /** Decimales fijos; `null` es automático (hasta dos). */
+  readonly decimals: number | null;
+  readonly prefix: string;
+  readonly suffix: string;
+  /** 1,2 mil en vez de 1.200. */
+  readonly compact: boolean;
+  /**
+   * Indicador: desde qué cifra está «en meta» y desde cuál «cerca». Con meta,
+   * en porcentaje de cumplimiento (90 = 90 %); sin meta, sobre la cifra.
+   */
+  readonly goodAt: number | null;
+  readonly warnAt: number | null;
+}
+
+export const DEFAULT_APPEARANCE: ReportAppearance = {
+  color: null,
+  byCategory: false,
+  showValues: true,
+  decimals: null,
+  prefix: '',
+  suffix: '',
+  compact: false,
+  goodAt: null,
+  warnAt: null,
+};
+
+/** Más categorías que tonos: se usa un solo color en vez de inventar o repetir. */
+export const MAX_CATEGORY_COLORS = PALETTE.length;
+
+function readAppearance(raw: unknown): ReportAppearance {
+  const stored = (typeof raw === 'object' && raw !== null ? raw : {}) as Record<string, unknown>;
+  const number = (value: unknown) => (typeof value === 'number' && Number.isFinite(value) ? value : null);
+  const decimals = number(stored['decimals']);
+
+  return {
+    color: PALETTE.includes(stored['color'] as PaletteColor) ? (stored['color'] as PaletteColor) : null,
+    byCategory: stored['byCategory'] === true,
+    showValues: stored['showValues'] !== false,
+    decimals: decimals === null ? null : Math.min(4, Math.max(0, Math.round(decimals))),
+    prefix: typeof stored['prefix'] === 'string' ? stored['prefix'].slice(0, 8) : '',
+    suffix: typeof stored['suffix'] === 'string' ? stored['suffix'].slice(0, 8) : '',
+    compact: stored['compact'] === true,
+    goodAt: number(stored['goodAt']),
+    warnAt: number(stored['warnAt']),
+  };
+}
+
+export type IndicatorStatus = 'good' | 'warning' | 'critical';
+
+/**
+ * El estado del indicador según sus umbrales, o `null` si no hay ninguno.
+ *
+ * Con meta se mide el cumplimiento en porcentaje; sin meta, la cifra misma.
+ * Por debajo del umbral más bajo es crítico.
+ */
+export function indicatorStatus(indicator: Indicator, appearance: ReportAppearance): IndicatorStatus | null {
+  const { goodAt, warnAt } = appearance;
+
+  if (goodAt === null && warnAt === null) {
+    return null;
+  }
+
+  const measured = indicator.target !== null ? (indicator.ratio === null ? null : indicator.ratio * 100) : indicator.value;
+
+  if (measured === null) {
+    return null;
+  }
+
+  if (goodAt !== null && measured >= goodAt) return 'good';
+  if (warnAt !== null && measured >= warnAt) return 'warning';
+  return 'critical';
+}
+
+/**
+ * Un color estable para cada categoría.
+ *
+ * El color sigue a la categoría, no a su puesto: se reparte por el orden de
+ * los valores en el resultado **sin filtrar**, así que filtrar el tablero no
+ * repinta las barras que quedan. Con más categorías que tonos no hay mapa.
+ */
+export function categoryColors(
+  snapshot: ReportSnapshot,
+  settings: ReportSettings,
+): ReadonlyMap<string | null, PaletteColor> | null {
+  const ordinal = settings.category === null ? -1 : snapshot.columns.findIndex((c) => c.name === settings.category);
+
+  if (ordinal < 0) {
+    return null;
+  }
+
+  const labels = [...new Set(snapshot.rows.map((row) => (row[ordinal] === null ? null : String(row[ordinal]))))].sort(
+    (a, b) => (a === null ? 1 : b === null ? -1 : a < b ? -1 : a > b ? 1 : 0),
+  );
+
+  return labels.length > MAX_CATEGORY_COLORS
+    ? null
+    : new Map(labels.map((label, index) => [label, PALETTE[index]]));
 }
 
 export const AGGREGATES: readonly ReportAggregate[] = ['Sum', 'Count', 'Average', 'Min', 'Max'];
@@ -43,6 +160,7 @@ export function defaultSettings(visual: ReportVisualKind, columns: readonly Repo
     target: visual === 'Indicator' ? (numbers[1]?.name ?? null) : null,
     columns: [],
     sort: 'category',
+    appearance: DEFAULT_APPEARANCE,
   };
 }
 
@@ -62,6 +180,7 @@ export function parseSettings(json: string, visual: ReportVisualKind, columns: r
       target: typeof stored.target === 'string' ? stored.target : null,
       columns: Array.isArray(stored.columns) ? stored.columns.filter((c) => typeof c === 'string') : [],
       sort: stored.sort === 'valueDesc' ? 'valueDesc' : 'category',
+      appearance: readAppearance(stored.appearance),
     };
   } catch {
     return base;
@@ -271,4 +390,24 @@ export function tableView(
     columns: columns.map((column, i) => ({ ...column, ordinal: i })),
     rows: snapshot.rows.map((row) => positions.map((position) => row[position])),
   };
+}
+
+/** Una cifra con el formato del reporte: decimales, compacta, prefijo y sufijo. */
+export function formatFigure(
+  value: number | null,
+  appearance: ReportAppearance,
+  format: (value: number, options: Intl.NumberFormatOptions) => string,
+): string {
+  if (value === null) {
+    return '—';
+  }
+
+  const digits = appearance.decimals;
+  const text = format(value, {
+    notation: appearance.compact ? 'compact' : 'standard',
+    minimumFractionDigits: digits ?? 0,
+    maximumFractionDigits: digits ?? (appearance.compact ? 1 : 2),
+  });
+
+  return `${appearance.prefix}${text}${appearance.suffix}`;
 }

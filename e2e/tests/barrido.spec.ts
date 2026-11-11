@@ -508,10 +508,27 @@ test.describe('barrido visual', () => {
     // Se guardan un indicador y unas barras: el tema claro y los anchos
     // estrechos se miran más abajo sobre este mismo conjunto, y al final se borra.
     await reportes.locator('.inspector').getByLabel('Nombre del reporte').fill(INDICADOR_BARRIDO);
+    // Umbrales: 60 % queda «cerca de la meta», con icono y texto.
+    await reportes.locator('.inspector').getByLabel('En meta desde').fill('90');
+    await reportes.locator('.inspector').getByLabel('En meta desde').press('Tab');
+    await reportes.locator('.inspector').getByLabel('Cerca desde').fill('50');
+    await reportes.locator('.inspector').getByLabel('Cerca desde').press('Tab');
+    await expect(reportes.locator('.indicator__status')).toContainText('Cerca de la meta');
+    await medir(page, 'reportes indicador con umbrales', hallazgos);
+    await foto(page, '21l-reportes-umbrales', reportes.locator('.dialog'));
     await reportes.getByRole('button', { name: 'Guardar reporte' }).click();
     await reportes.getByRole('button', { name: 'Nuevo reporte' }).click();
+    // El nombre propuesto llega un instante después del clic: rellenar antes lo
+    // dejaría detrás de «Reporte 2» en vez de sustituirlo.
+    await expect(reportes.locator('.inspector').getByLabel('Nombre del reporte')).toHaveValue(/^Reporte \d+$/);
     await reportes.locator('.inspector').getByLabel('Nombre del reporte').fill(BARRAS_BARRIDO);
     await reportes.locator('.inspector').getByLabel('Agrupar por').selectOption({ label: 'Ventas.municipio' });
+    // Un color por categoría y prefijo de moneda.
+    await reportes.locator('.inspector').getByLabel('Un color por categoría').check();
+    await reportes.locator('.inspector').getByLabel('Prefijo').fill('$ ');
+    await expect(reportes.locator('.chart__value').first()).toHaveText('$ 80');
+    await medir(page, 'reportes apariencia', hallazgos);
+    await foto(page, '21m-reportes-apariencia', reportes.locator('.dialog'));
     await reportes.getByRole('button', { name: 'Guardar reporte' }).click();
     await expect(reportes.locator('.reports__tab')).toHaveCount(2);
 
@@ -527,11 +544,33 @@ test.describe('barrido visual', () => {
     await medir(page, 'tablero filtrado', hallazgos);
     await foto(page, '22a-tablero-filtrado', reportes.locator('.dialog'));
     await tablero.getByRole('button', { name: 'Quitar filtros' }).click();
+
+    // Pulsar una barra filtra todo el tablero; las demás se apagan sin cambiar de color.
+    await tablero.locator('.panel .chart__bar').nth(1).click();
+    await expect(tablero.locator('.filter select')).toHaveValue('v08001');
+    await medir(page, 'tablero pulsado', hallazgos);
+    await foto(page, '22e-tablero-pulsado', reportes.locator('.dialog'));
+    await tablero.getByRole('button', { name: 'Quitar filtros' }).click();
+
     await tablero.getByRole('button', { name: 'Editar diseño' }).click();
     await tablero.locator('.panel').first().click();
     await medir(page, 'tablero en edición', hallazgos);
     await foto(page, '22b-tablero-edicion', reportes.locator('.dialog'));
-    await tablero.getByRole('button', { name: 'Terminar' }).click();
+
+    // Estilo: color del tablero heredado por el indicador, descripción y otra página.
+    await tablero.locator('.inspector').getByLabel('Color de los paneles').selectOption({ label: 'Turquesa' });
+    await tablero.locator('.panel').nth(1).click();
+    await tablero.locator('.inspector').getByLabel('Descripción', { exact: true }).fill('Ventas sobre metas de enero');
+    await expect(tablero.locator('.inspector')).toContainText('Heredado del tablero: Turquesa.');
+    await medir(page, 'tablero estilo', hallazgos);
+    await foto(page, '22f-tablero-estilo', reportes.locator('.dialog'));
+    await tablero.getByRole('button', { name: 'Página', exact: true }).click();
+    await expect(tablero.locator('.pages__tab')).toHaveCount(2);
+    await medir(page, 'tablero segunda página', hallazgos);
+    await foto(page, '22g-tablero-pagina', reportes.locator('.dialog'));
+    await tablero.locator('.pages__tab').first().click();
+    await tablero.getByRole('button', { name: 'Guardar tablero' }).click();
+    await expect(tablero.getByRole('button', { name: 'Editar diseño' })).toBeVisible();
     await page.keyboard.press('Escape');
     await expect(reportes.locator('.dialog')).toBeHidden();
 

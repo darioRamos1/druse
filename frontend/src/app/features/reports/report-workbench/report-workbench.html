@@ -121,6 +121,9 @@
           [categoryLabel]="categoryLabel()"
           [asTable]="asTable()"
           [columnLabel]="columnLabel()"
+          [appearance]="current.settings.appearance"
+          [color]="current.settings.appearance.color"
+          [categoryColors]="categoryColorMap()"
         />
       </section>
     } @else {
@@ -234,6 +237,113 @@
           </select>
         </label>
       }
+    }
+
+    @if (current.visual !== 'Table') {
+      <fieldset class="section">
+        <legend class="section__title">{{ 'reports.look.title' | t }}</legend>
+
+        <div class="field">
+          <label class="field__label" for="report-color">{{ 'reports.look.color' | t }}</label>
+          <div class="swatch-row">
+            <span
+              class="swatch"
+              aria-hidden="true"
+              [style.background]="current.settings.appearance.color ? 'var(--rc-' + current.settings.appearance.color + ')' : 'var(--dr-accent)'"
+            ></span>
+            <select id="report-color" (change)="patchLook({ color: $any($event.target).value || null })">
+              <option value="" [selected]="current.settings.appearance.color === null">
+                {{ 'reports.look.inherit' | t }}
+              </option>
+              @for (color of palette; track color) {
+                <option [value]="color" [selected]="current.settings.appearance.color === color">
+                  <!-- i18n-keys: reports.color.* -->
+                  {{ 'reports.color.' + color | t }}
+                </option>
+              }
+            </select>
+          </div>
+          <span class="field__hint">{{ 'reports.look.inheritHint' | t }}</span>
+        </div>
+
+        @if (current.visual === 'Bar') {
+          <label class="check">
+            <input
+              type="checkbox"
+              [checked]="current.settings.appearance.byCategory"
+              [disabled]="!categoryColorsAvailable()"
+              (change)="patchLook({ byCategory: $any($event.target).checked })"
+            />
+            {{ 'reports.look.byCategory' | t }}
+          </label>
+          @if (!categoryColorsAvailable()) {
+            <span class="field__hint">{{ 'reports.look.tooManyCategories' | t: { max: maxCategoryColors } }}</span>
+          }
+        }
+
+        @if (current.visual !== 'Indicator') {
+          <label class="check">
+            <input
+              type="checkbox"
+              [checked]="current.settings.appearance.showValues"
+              (change)="patchLook({ showValues: $any($event.target).checked })"
+            />
+            {{ 'reports.look.showValues' | t }}
+          </label>
+        }
+
+        <div class="field-row">
+          <label class="field">
+            <span class="field__label">{{ 'reports.look.decimals' | t }}</span>
+            <select (change)="patchLook({ decimals: $any($event.target).value === '' ? null : +$any($event.target).value })">
+              <option value="" [selected]="current.settings.appearance.decimals === null">{{ 'reports.look.auto' | t }}</option>
+              @for (digits of [0, 1, 2, 3]; track digits) {
+                <option [value]="digits" [selected]="current.settings.appearance.decimals === digits">{{ digits }}</option>
+              }
+            </select>
+          </label>
+          <label class="field">
+            <span class="field__label">{{ 'reports.look.prefix' | t }}</span>
+            <input type="text" maxlength="8" [value]="current.settings.appearance.prefix" (input)="patchLook({ prefix: $any($event.target).value })" />
+          </label>
+          <label class="field">
+            <span class="field__label">{{ 'reports.look.suffix' | t }}</span>
+            <input type="text" maxlength="8" [value]="current.settings.appearance.suffix" (input)="patchLook({ suffix: $any($event.target).value })" />
+          </label>
+        </div>
+        <label class="check">
+          <input
+            type="checkbox"
+            [checked]="current.settings.appearance.compact"
+            (change)="patchLook({ compact: $any($event.target).checked })"
+          />
+          {{ 'reports.look.compact' | t }}
+        </label>
+
+        @if (current.visual === 'Indicator') {
+          <div class="field-row">
+            <label class="field">
+              <span class="field__label">{{ 'reports.look.goodAt' | t }}</span>
+              <input
+                type="number"
+                [value]="current.settings.appearance.goodAt ?? ''"
+                (change)="patchLook({ goodAt: number($any($event.target).value) })"
+              />
+            </label>
+            <label class="field">
+              <span class="field__label">{{ 'reports.look.warnAt' | t }}</span>
+              <input
+                type="number"
+                [value]="current.settings.appearance.warnAt ?? ''"
+                (change)="patchLook({ warnAt: number($any($event.target).value) })"
+              />
+            </label>
+          </div>
+          <span class="field__hint">
+            {{ (current.settings.target ? 'reports.look.thresholdPercent' : 'reports.look.thresholdValue') | t }}
+          </span>
+        }
+      </fieldset>
     }
 
     <div class="inspector__actions">

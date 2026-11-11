@@ -26,6 +26,10 @@ import { Icon } from '../../../shared/ui/icon/icon';
 import { ReportChart } from '../report-chart/report-chart';
 import {
   AGGREGATES,
+  MAX_CATEGORY_COLORS,
+  PALETTE,
+  ReportAppearance,
+  categoryColors,
   ReportAggregate,
   ReportSettings,
   buildIndicator,
@@ -75,6 +79,8 @@ export class ReportWorkbench {
 
   protected readonly visuals = VISUALS;
   protected readonly aggregates = AGGREGATES;
+  protected readonly palette = PALETTE;
+  protected readonly maxCategoryColors = MAX_CATEGORY_COLORS;
 
   protected readonly loading = signal(true);
   protected readonly refreshing = signal(false);
@@ -138,6 +144,17 @@ export class ReportWorkbench {
 
     return snapshot && draft?.visual === 'Table' ? tableView(snapshot, draft.settings) : null;
   });
+
+  /** Colores por categoría, del resultado entero: el color sigue a la categoría. */
+  protected readonly categoryColorMap = computed(() => {
+    const snapshot = this.snapshot();
+    const draft = this.draft();
+
+    return snapshot && draft ? categoryColors(snapshot, draft.settings) : null;
+  });
+
+  /** Un color por categoría solo si caben en la paleta, sin repetir tonos. */
+  protected readonly categoryColorsAvailable = computed(() => this.categoryColorMap() !== null);
 
   protected readonly repeated = computed(() => {
     const snapshot = this.snapshot();
@@ -307,6 +324,19 @@ export class ReportWorkbench {
 
   protected patch(patch: Partial<ReportSettings>): void {
     this.draft.update((draft) => (draft ? { ...draft, settings: { ...draft.settings, ...patch } } : draft));
+  }
+
+  protected patchLook(patch: Partial<ReportAppearance>): void {
+    this.draft.update((draft) =>
+      draft
+        ? { ...draft, settings: { ...draft.settings, appearance: { ...draft.settings.appearance, ...patch } } }
+        : draft,
+    );
+  }
+
+  /** Un campo numérico vacío es «sin umbral». */
+  protected number(text: string): number | null {
+    return text.trim() === '' || !Number.isFinite(Number(text)) ? null : Number(text);
   }
 
   protected chooseAggregate(aggregate: string): void {

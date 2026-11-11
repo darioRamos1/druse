@@ -29,7 +29,7 @@
 
 - [x] 4.1 Tableros: cuadrícula de paneles con reportes de distintos conjuntos, ordenar y redimensionar con botones y teclado.
 - [x] 4.1 Filtros compartidos de fecha y categoría, vinculados por conjunto, aplicados sobre los datos guardados.
-- [ ] 4.2 Personalización: títulos, colores, formato de números, estilo de panel y varias páginas.
+- [x] 4.2 Personalización: colores, formato de números, umbrales, estilo de panel, varias páginas y filtrar al pulsar.
 - [ ] 4.3 Plantillas: guardar, aplicar a otro conjunto con asignación de campos, exportar e importar.
 - [ ] 4.4 Exportación a Excel, PDF y CSV con los filtros activos.
 
@@ -169,8 +169,30 @@ El hito 4 se divide en cuatro entregas (tableros, personalización, plantillas y
   - **En edición, los botones del panel tapaban el título.** Pasan a su propia línea si no caben.
 - El barrido borra al empezar los restos de ejecuciones cortadas, para que no salgan en las capturas.
 
+## 2026-11-11 · Hito 4.2: personalización (versión 1.15.0)
+
+### Qué se hizo
+
+- **Paleta validada, no elegida a ojo.** Ocho tonos categóricos en orden fijo, validados con el script de la guía de visualización contra las superficies reales de los paneles (#e6eaf3 claro, #272c3a oscuro). Pasan banda de luminosidad, croma, separación con daltonismo (peor par 9,1 en claro y 8,4 en oscuro) y visión normal. Algunos tonos quedan por debajo de 3:1 de contraste, así que siempre hay alivio: categoría en el eje, valores escritos o tabla. Viven en `_report-palette.scss`, por tema.
+- **Apariencia del reporte** (en sus ajustes): color o heredado, un color por categoría, valores escritos, decimales, prefijo y sufijo, cifras compactas, y umbrales del indicador («En meta», «Cerca», «Por debajo»). Los umbrales se miden en porcentaje de cumplimiento si hay meta y sobre la cifra si no. El estado lleva icono y texto con la paleta de estados.
+  - El color sigue a la categoría: se reparte sobre el resultado sin filtrar, y filtrar no repinta.
+  - Con más de 8 categorías no se inventan ni se repiten tonos.
+- **Gráficos**: barras con el extremo de datos redondeado y la base recta, líneas de 2 px, puntos con anillo, tooltip propio (ratón y foco) con texto en tinta del tema, y valores y ticks con el formato del reporte.
+- **Tablero**:
+  - Color base del tablero, y por panel descripción, encabezado oculto (sigue nombrado para lectores de pantalla) y color propio.
+  - El color se hereda panel → reporte → tablero → tema, y el inspector dice de dónde viene y permite volver a lo heredado.
+  - Varias páginas: añadir, renombrar, quitar (los paneles pasan a la primera) y mover paneles entre páginas. Los filtros son de todo el tablero.
+  - «Ver como tabla» en cada panel de barras o línea.
+- **Filtrar al pulsar una barra**: si hay un filtro de categoría vinculado a la categoría del reporte, pulsar una barra (o Intro y Espacio con el foco) la elige y todo el tablero se filtra. Pulsarla otra vez lo quita, y las demás barras se apagan sin cambiar de color.
+
+### Comprobaciones y lo que encontró Playwright
+
+- Pruebas: 54 de Reportes en el frontend (colores estables con filtro, más de 8 categorías, estados del indicador, formato, páginas, herencia de color, pulsar barras), 554 de core y layout, `check-i18n` y la e2e de Reportes.
+- El barrido añade capturas de umbrales (`21l`), apariencia (`21m`), barra pulsada (`22e`), estilo y herencia (`22f`) y segunda página (`22g`). Encontró un fallo real, ya corregido: **la descripción escrita justo después de cambiar de panel iba al panel anterior**. El inspector editaba el panel de su bloque de plantilla, que solo se pone al día al repintar. Ahora edita el panel seleccionado en ese momento. La prueba que lo reproduce (escribir sin repintar tras el clic) falla sin el arreglo y pasa con él.
+- También se corrigió una carrera de la propia prueba: el nombre propuesto «Reporte 2» llegaba después de que Playwright empezara a escribir.
+
 ### Dónde retomar
 
-1. Hito 4.2, personalización: título y descripción del panel, colores por serie o categoría, formato de números y fechas, etiquetas y leyenda, estilo del panel y varias páginas por tablero. Filtrar al pulsar una barra.
-2. Hito 4.3, plantillas; hito 4.4, exportación a Excel, PDF y CSV (y decidir la librería de gráficos).
-3. Preparar la sección `#reportes-bi` de la landing con `22-tablero` (estado En desarrollo).
+1. Hito 4.3, plantillas: guardar un gráfico, panel o tablero como plantilla, aplicarla a otro conjunto con asignación de campos por nombre y tipo, y exportar e importar la definición sin SQL, credenciales ni filas.
+2. Hito 4.4, exportación a Excel, PDF y CSV con los filtros activos (y decidir si basta el SVG propio o hace falta una librería).
+3. Preparar la sección `#reportes-bi` de la landing con `22-tablero` y `22e-tablero-pulsado` (estado En desarrollo).

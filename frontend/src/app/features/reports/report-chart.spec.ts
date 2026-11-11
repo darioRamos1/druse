@@ -1,6 +1,10 @@
 import { ReportColumn, ReportSnapshot, ReportValue } from '../../shared/models/reports';
 import {
+  DEFAULT_APPEARANCE,
   ReportSettings,
+  categoryColors,
+  formatFigure,
+  indicatorStatus,
   buildIndicator,
   buildSeries,
   defaultSettings,
@@ -139,5 +143,79 @@ describe('report-chart', () => {
 
     expect(tabla.columns.map((column) => column.name)).toEqual(['izquierda.venta', 'izquierda.municipio']);
     expect(tabla.rows[0]).toEqual([80, '05001']);
+  });
+});
+
+describe('report-chart · apariencia', () => {
+  const ventas = {
+    datasetId: 'ds',
+    definitionVersion: 1,
+    fromOlderDefinition: false,
+    startedAtUtc: '',
+    completedAtUtc: '',
+    columns: [
+      { name: 'municipio', clrType: 'String', dataType: 'text', ordinal: 0 },
+      { name: 'venta', clrType: 'Decimal', dataType: 'numeric', ordinal: 1 },
+    ],
+    rows: [
+      ['08001', 100],
+      ['05001', 80],
+      ['11001', 40],
+    ],
+    unmatchedLeftRows: 0,
+    unmatchedRightRows: 0,
+    repeatedColumns: [],
+  } as const;
+  const base = { ...defaultSettings('Bar', ventas.columns), category: 'municipio', value: 'venta' };
+
+  it('el color sigue a la categoría aunque el resultado venga filtrado', () => {
+    const completo = categoryColors(ventas, base);
+    const filtrado = categoryColors({ ...ventas, rows: [ventas.rows[2]] }, base);
+
+    expect([...completo!.entries()]).toEqual([
+      ['05001', 'blue'],
+      ['08001', 'orange'],
+      ['11001', 'aqua'],
+    ]);
+    // Calculado sobre el filtrado, 11001 cambiaría de color: por eso se calcula sobre el completo.
+    expect(filtrado!.get('11001')).toBe('blue');
+  });
+
+  it('con más categorías que tonos no inventa ni repite colores', () => {
+    const muchas = { ...ventas, rows: Array.from({ length: 9 }, (_, i) => [`0${i}`, i]) };
+
+    expect(categoryColors(muchas, base)).toBeNull();
+  });
+
+  it('el estado del indicador sale de los umbrales, en porcentaje si hay meta', () => {
+    const conMeta = { value: 180, target: 300, ratio: 0.6, zeroTarget: false, withoutTarget: 1, missing: [] };
+    const umbrales = { ...DEFAULT_APPEARANCE, goodAt: 90, warnAt: 50 };
+
+    expect(indicatorStatus(conMeta, umbrales)).toBe('warning');
+    expect(indicatorStatus({ ...conMeta, ratio: 0.95 }, umbrales)).toBe('good');
+    expect(indicatorStatus({ ...conMeta, ratio: 0.4 }, umbrales)).toBe('critical');
+    expect(indicatorStatus(conMeta, DEFAULT_APPEARANCE)).toBeNull();
+    // Sin meta, sobre la cifra.
+    expect(indicatorStatus({ ...conMeta, target: null, ratio: null, value: 220 }, { ...DEFAULT_APPEARANCE, goodAt: 200 })).toBe('good');
+  });
+
+  it('formatea la cifra con decimales, compacta, prefijo y sufijo', () => {
+    const formato = (value: number, options: Intl.NumberFormatOptions) =>
+      new Intl.NumberFormat('es-CO', options).format(value);
+
+    expect(formatFigure(1234.5, { ...DEFAULT_APPEARANCE, decimals: 0, prefix: '$ ' }, formato)).toBe('$ 1.235');
+    expect(formatFigure(0.5, { ...DEFAULT_APPEARANCE, decimals: 2, suffix: ' t' }, formato)).toBe('0,50 t');
+    expect(formatFigure(null, DEFAULT_APPEARANCE, formato)).toBe('—');
+  });
+
+  it('lee la apariencia guardada y ignora lo que no conoce', () => {
+    const leidos = parseSettings(
+      JSON.stringify({ appearance: { color: 'violet', decimals: 9, prefix: '$', showValues: false, color2: 'x' } }),
+      'Bar',
+      ventas.columns,
+    ).appearance;
+
+    expect(leidos).toMatchObject({ color: 'violet', decimals: 4, prefix: '$', showValues: false, byCategory: false });
+    expect(parseSettings(JSON.stringify({ appearance: { color: 'fucsia' } }), 'Bar', ventas.columns).appearance.color).toBeNull();
   });
 });

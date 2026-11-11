@@ -2,14 +2,18 @@ import { ReportColumn, ReportSnapshot, ReportValue } from '../../shared/models/r
 import {
   DashboardFilter,
   FilterValue,
+  addPage,
   addPanel,
   applyFilters,
   categoryOptions,
   emptyDashboard,
   movePanel,
+  movePanelToPage,
   parseDashboard,
   proposeBinding,
+  removePage,
   resizePanel,
+  resolveColor,
 } from './report-dashboard-model';
 
 function columna(name: string, clrType: string, ordinal: number): ReportColumn {
@@ -147,5 +151,56 @@ describe('report-dashboard-model', () => {
 
     expect(leido.pages[0].panels).toEqual([expect.objectContaining({ reportId: 'r1', width: 12, height: 4, title: null })]);
     expect(leido.filters).toEqual([{ id: 'g', kind: 'date', label: 'Mes', bindings: { a: 'mes' } }]);
+  });
+});
+
+describe('report-dashboard-model · páginas y estilo', () => {
+  it('quitar una página lleva sus paneles a la primera, y nunca deja el tablero sin páginas', () => {
+    let modelo = emptyDashboard('Página 1');
+    const primera = modelo.pages[0].id;
+
+    modelo = addPage(modelo, 'Detalle');
+    const segunda = modelo.pages[1].id;
+
+    modelo = addPanel(modelo, segunda, 'r1');
+    modelo = removePage(modelo, segunda);
+
+    expect(modelo.pages.map((page) => page.name)).toEqual(['Página 1']);
+    expect(modelo.pages[0].panels.map((panel) => panel.reportId)).toEqual(['r1']);
+    expect(removePage(modelo, primera)).toBe(modelo);
+  });
+
+  it('mueve un panel a otra página, al final', () => {
+    let modelo = addPage(emptyDashboard('Página 1'), 'Detalle');
+    const [uno, dos] = modelo.pages.map((page) => page.id);
+
+    modelo = addPanel(addPanel(modelo, uno, 'r1'), dos, 'r2');
+    modelo = movePanelToPage(modelo, modelo.pages[0].panels[0].id, dos);
+
+    expect(modelo.pages[0].panels).toEqual([]);
+    expect(modelo.pages[1].panels.map((panel) => panel.reportId)).toEqual(['r2', 'r1']);
+  });
+
+  it('el color gana de lo más concreto a lo más general y dice de dónde viene', () => {
+    const vacio = emptyDashboard('P');
+    const panel = addPanel(vacio, vacio.pages[0].id, 'r').pages[0].panels[0];
+
+    expect(resolveColor({ ...panel, color: 'red' }, 'violet', { color: 'aqua' })).toEqual({ color: 'red', source: 'panel' });
+    expect(resolveColor(panel, 'violet', { color: 'aqua' })).toEqual({ color: 'violet', source: 'report' });
+    expect(resolveColor(panel, null, { color: 'aqua' })).toEqual({ color: 'aqua', source: 'dashboard' });
+    expect(resolveColor(panel, null, { color: null })).toEqual({ color: null, source: 'theme' });
+  });
+
+  it('lee el estilo guardado y descarta colores que no son de la paleta', () => {
+    const leido = parseDashboard(
+      JSON.stringify({
+        style: { color: 'green' },
+        pages: [{ id: 'p', name: 'P', panels: [{ reportId: 'r', color: 'fucsia', description: 'Ventas', hideHeader: true }] }],
+      }),
+      'P',
+    );
+
+    expect(leido.style).toEqual({ color: 'green' });
+    expect(leido.pages[0].panels[0]).toMatchObject({ color: null, description: 'Ventas', hideHeader: true });
   });
 });

@@ -152,6 +152,13 @@ describe('ReportDashboard', () => {
     return todos('button').find((button) => (button.textContent ?? '').trim().startsWith(texto)) as HTMLButtonElement;
   }
 
+  /** El selector «Añadir reporte», por su etiqueta y no por su posición en el inspector. */
+  function selectorDeReportes(): HTMLSelectElement {
+    return todos('.inspector label.field')
+      .find((label) => label.textContent?.includes('Añadir reporte'))!
+      .querySelector('select')!;
+  }
+
   function cifra(panel: number): string {
     return (todos('.panel')[panel].querySelector('.indicator__value')?.textContent ?? '').replace(/\s/g, '');
   }
@@ -275,7 +282,7 @@ describe('ReportDashboard', () => {
     botón('Filtro de fecha').click();
     fixture.detectChanges();
 
-    const añadir = el<HTMLSelectElement>('.inspector select');
+    const añadir = selectorDeReportes();
 
     añadir.value = 'r-visitas';
     añadir.dispatchEvent(new Event('change'));
@@ -295,9 +302,85 @@ describe('ReportDashboard', () => {
     expect(modelo.filters[0]).toMatchObject({ kind: 'date', label: 'Fecha', bindings: { 'ds-visitas': 'fecha' } });
   });
 
+  it('pulsar una barra filtra todo el tablero por su categoría, y pulsarla otra vez lo quita', async () => {
+    await crear(tablero(conTresPaneles));
+
+    const barras = todos('.panel')[0].querySelectorAll<SVGPathElement>('.chart__bar');
+
+    expect(barras[0].getAttribute('role')).toBe('button');
+    // 05001 es la primera barra: el indicador pasa a medir solo ese municipio.
+    barras[0].dispatchEvent(new MouseEvent('click'));
+    fixture.detectChanges();
+
+    expect(el<HTMLSelectElement>('.filter select').value).toBe('v05001');
+    expect(cifra(1)).toBe('85%');
+    const despues = todos('.panel')[0].querySelectorAll('.chart__bar');
+
+    expect(despues).toHaveLength(1);
+    expect(despues[0].getAttribute('aria-pressed')).toBe('true');
+
+    despues[0].dispatchEvent(new MouseEvent('click'));
+    fixture.detectChanges();
+    expect(el<HTMLSelectElement>('.filter select').value).toBe('');
+    expect(todos('.panel')[0].querySelectorAll('.chart__bar')).toHaveLength(3);
+  });
+
+  it('la descripción se escribe en el panel seleccionado, también al cambiar de selección', async () => {
+    await crear(tablero(conTresPaneles));
+    botón('Editar diseño').click();
+    fixture.detectChanges();
+
+    // Primero uno, después el color del tablero y después otro panel: lo que
+    // hizo el barrido cuando la descripción acabó en el panel equivocado.
+    todos('.panel')[0].click();
+    fixture.detectChanges();
+    const color = el<HTMLSelectElement>('#board-color');
+
+    color.value = 'aqua';
+    color.dispatchEvent(new Event('change'));
+    fixture.detectChanges();
+
+    // Sin repintar entre el clic y la escritura: el inspector todavía enseña el
+    // panel anterior, y aun así lo escrito va al que se acaba de seleccionar.
+    const descripcion = todos('.inspector label.field')
+      .find((label) => label.textContent?.trim().startsWith('Descripción'))!
+      .querySelector('input')!;
+
+    todos('.panel')[1].click();
+    descripcion.value = 'Ventas sobre metas';
+    descripcion.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+
+    expect(todos('.panel')[1].querySelector('.panel__description')?.textContent).toContain('Ventas sobre metas');
+    expect(todos('.panel')[0].querySelector('.panel__description')).toBeNull();
+  });
+
+  it('el panel dice de dónde hereda su color y deja volver a lo heredado', async () => {
+    await crear(
+      tablero({
+        ...conTresPaneles,
+        style: { color: 'aqua' },
+        pages: [{ ...conTresPaneles.pages[0], panels: [{ ...conTresPaneles.pages[0].panels[0], color: 'red' }] }],
+      }),
+    );
+    botón('Editar diseño').click();
+    fixture.detectChanges();
+    todos('.panel')[0].click();
+    fixture.detectChanges();
+
+    expect(el('.inspector').textContent).toContain('Elegido para este panel: Rojo.');
+    expect(todos('.panel')[0].querySelector('.chart__bar')?.getAttribute('style')).toContain('--rc-red');
+
+    botón('Volver al color heredado').click();
+    fixture.detectChanges();
+
+    expect(el('.inspector').textContent).toContain('Heredado del tablero: Turquesa.');
+    expect(todos('.panel')[0].querySelector('.chart__bar')?.getAttribute('style')).toContain('--rc-aqua');
+  });
+
   it('un tablero recién guardado se borra también en el servidor', async () => {
     await crear(tablero({ version: 1, pages: [{ id: 'p1', name: 'Página 1', panels: [] }], filters: [] }, false));
-    const añadir = el<HTMLSelectElement>('.inspector select');
+    const añadir = selectorDeReportes();
 
     añadir.value = 'r-visitas';
     añadir.dispatchEvent(new Event('change'));

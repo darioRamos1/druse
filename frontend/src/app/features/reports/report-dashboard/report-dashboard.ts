@@ -24,7 +24,18 @@ import {
 } from '../../../shared/models/reports';
 import { Icon } from '../../../shared/ui/icon/icon';
 import { ReportChart } from '../report-chart/report-chart';
-import { buildIndicator, buildSeries, parseSettings, repeatedInUse, tableView } from '../report-chart';
+import {
+  DEFAULT_APPEARANCE,
+  PALETTE,
+  PaletteColor,
+  ReportAppearance,
+  buildIndicator,
+  buildSeries,
+  categoryColors,
+  parseSettings,
+  repeatedInUse,
+  tableView,
+} from '../report-chart';
 import {
   DashboardFilter,
   DashboardFilterKind,
@@ -35,15 +46,22 @@ import {
   MAX_HEIGHT,
   MIN_HEIGHT,
   MIN_WIDTH,
+  ColorSource,
+  addPage,
   addPanel,
   applyFilters,
   categoryOptions,
   fitsFilter,
   isActive,
   movePanel,
+  movePanelToPage,
   parseDashboard,
   proposeBinding,
+  patchPanel,
+  removePage,
   removePanel,
+  renamePage,
+  resolveColor,
   resizePanel,
   retitlePanel,
 } from '../report-dashboard-model';
@@ -64,6 +82,15 @@ interface PanelView {
   readonly table: ReturnType<typeof tableView> | null;
   readonly valueLabel: string;
   readonly categoryLabel: string;
+  readonly appearance: ReportAppearance;
+  /** El color resuelto y de dónde viene: panel, reporte, tablero o tema. */
+  readonly color: PaletteColor | null;
+  readonly colorSource: ColorSource;
+  readonly categoryColors: ReadonlyMap<string | null, PaletteColor> | null;
+  /** Pulsar una barra filtra el tablero: hay un filtro vinculado a su categoría. */
+  readonly pickFilter: DashboardFilter | null;
+  /** La categoría elegida en ese filtro; `undefined` si no hay ninguna. */
+  readonly picked: string | null | undefined;
 }
 
 /**
@@ -125,7 +152,14 @@ export class ReportDashboard {
   protected readonly selectedPanel = signal<string | null>(null);
   protected readonly confirmDelete = signal(false);
 
-  protected readonly page = computed(() => this.model().pages[0]);
+  protected readonly palette = PALETTE;
+  protected readonly currentPage = signal<string | null>(null);
+  protected readonly pages = computed(() => this.model().pages);
+  protected readonly page = computed(
+    () => this.pages().find((page) => page.id === this.currentPage()) ?? this.pages()[0],
+  );
+  /** Paneles que se ven como tabla en vez de gráfico: la alternativa accesible. */
+  protected readonly asTable = signal<ReadonlySet<string>>(new Set());
   protected readonly filters = computed(() => this.model().filters);
 
   protected readonly dirty = computed(
@@ -135,7 +169,8 @@ export class ReportDashboard {
   /** Los conjuntos que alimentan algún panel: son los que se actualizan y se filtran. */
   protected readonly usedDatasets = computed(() => {
     const ids = new Set(
-      this.page().panels
+      this.pages()
+        .flatMap((page) => page.panels)
         .map((panel) => this.reports().find((report) => report.id === panel.reportId)?.datasetId)
         .filter((id): id is string => id !== undefined),
     );
@@ -185,6 +220,8 @@ export class ReportDashboard {
     this.setEditing(!dashboard.createdAtUtc);
     this.values.set(new Map());
     this.selectedPanel.set(null);
+    this.currentPage.set(model.pages[0]?.id ?? null);
+    this.asTable.set(new Set());
     this.confirmDelete.set(false);
     this.notice.set(null);
     void this.load();
@@ -238,6 +275,12 @@ export class ReportDashboard {
       table: null,
       valueLabel: '',
       categoryLabel: '',
+      appearance: DEFAULT_APPEARANCE,
+      color: null,
+      colorSource: 'theme' as ColorSource,
+      categoryColors: null,
+      pickFilter: null,
+      picked: undefined,
     };
 
     if (!report || !dataset || !stored) {
@@ -246,6 +289,10 @@ export class ReportDashboard {
 
     const { snapshot, unbound } = applyFilters(stored, dataset.id, this.filters(), this.values());
     const settings = parseSettings(report.settings, report.visual, snapshot.columns);
+    const pickFilter =
+      report.visual === 'Bar' && settings.category
+        ? this.filters().find((filter) => filter.kind === 'category' && filter.bindings[dataset.id] === settings.category)
+        : undefined;
     // i18n-keys: reports.aggregate.*
     const how = this._i18n.t(`reports.aggregate.${settings.aggregate}`);
 
@@ -259,7 +306,51 @@ export class ReportDashboard {
       table: report.visual === 'Table' ? tableView(snapshot, settings) : null,
       valueLabel: settings.aggregate === 'Count' || !settings.value ? how : `${how} · ${label(settings.value)}`,
       categoryLabel: settings.category ? label(settings.category) : '',
+      appearance: settings.appearance,
+      ...this.colorOf(panel, settings.appearance.color),
+      // Del resultado sin filtrar: filtrar no repinta las barras que quedan.
+      categoryColors: categoryColors(stored, settings),
+      pickFilter: pickFilter ?? null,
+      picked: pickFilter ? this.pickedValue(pickFilter) : undefined,
     };
+  }
+
+  private colorOf(panel: DashboardPanel, reportColor: PaletteColor | null) {
+    const { color, source } = resolveColor(panel, reportColor, this.model().style);
+
+    return { color, colorSource: source };
+  }
+
+  private pickedValue(filter: DashboardFilter): string | null | undefined {
+    const value = this.values().get(filter.id);
+
+    return value?.kind === 'category' && value.values.length > 0 ? value.values[0] : undefined;
+  }
+
+  /**
+   * Pulsar una barra elige su categoría en el filtro vinculado; pulsarla otra
+   * vez lo quita. Todos los paneles vinculados se filtran a la vez.
+   */
+  protected pick(view: PanelView, label: string | null): void {
+    const filter = view.pickFilter;
+
+    if (!filter) {
+      return;
+    }
+
+    this.setValue(filter.id, {
+      kind: 'category',
+      values: view.picked === label ? [] : [label],
+    });
+  }
+
+  protected toggleTable(panel: DashboardPanel): void {
+    this.asTable.update((set) => {
+      const next = new Set(set);
+
+      if (!next.delete(panel.id)) next.add(panel.id);
+      return next;
+    });
   }
 
   protected when(iso: string): string {
@@ -369,7 +460,7 @@ export class ReportDashboard {
     }
 
     this.model.update((model) => addPanel(model, this.page().id, reportId));
-    const panels = this.model().pages[0].panels;
+    const panels = this.page().panels;
 
     this.selectedPanel.set(panels[panels.length - 1].id);
     // El conjunto nuevo se vincula a los filtros que ya hay, por nombre de columna.
@@ -396,6 +487,75 @@ export class ReportDashboard {
 
   protected remove(panel: DashboardPanel): void {
     this.model.update((model) => removePanel(model, this.page().id, panel.id));
+    this.selectedPanel.set(null);
+  }
+
+  // --- Estilo y páginas ------------------------------------------------------------
+
+  protected styleColor(color: string): void {
+    this.model.update((model) => ({ ...model, style: { ...model.style, color: (color || null) as PaletteColor | null } }));
+  }
+
+  protected patchStyle(panel: DashboardPanel, patch: Parameters<typeof patchPanel>[3]): void {
+    this.model.update((model) => patchPanel(model, this.page().id, panel.id, patch));
+  }
+
+  /**
+   * El panel que está seleccionado ahora mismo.
+   *
+   * El inspector edita siempre este, leído al momento, y no el panel de su
+   * bloque de plantilla: ese alias solo se pone al día al repintar, y quien
+   * escribe justo después de cambiar de panel (una prueba, o un lector de
+   * pantalla rápido) editaba el anterior.
+   */
+  private selectedNow(): DashboardPanel | null {
+    const id = this.selectedPanel();
+
+    return this.page().panels.find((panel) => panel.id === id) ?? null;
+  }
+
+  protected retitleSelected(title: string): void {
+    const panel = this.selectedNow();
+
+    if (panel) this.retitle(panel, title);
+  }
+
+  protected patchSelected(patch: Parameters<typeof patchPanel>[3]): void {
+    const panel = this.selectedNow();
+
+    if (panel) this.patchStyle(panel, patch);
+  }
+
+  protected moveSelectedTo(pageId: string): void {
+    const panel = this.selectedNow();
+
+    if (panel) this.movePanelTo(panel, pageId);
+  }
+
+  protected showPage(id: string): void {
+    this.currentPage.set(id);
+    this.selectedPanel.set(null);
+  }
+
+  protected addPage(): void {
+    // i18n-keys: reports.dashboard.page
+    const name = this._i18n.t('reports.dashboard.page', { number: this.pages().length + 1 });
+
+    this.model.update((model) => addPage(model, name));
+    this.showPage(this.pages()[this.pages().length - 1].id);
+  }
+
+  protected renamePage(name: string): void {
+    this.model.update((model) => renamePage(model, this.page().id, name));
+  }
+
+  protected removePage(): void {
+    this.model.update((model) => removePage(model, this.page().id));
+    this.showPage(this.pages()[0].id);
+  }
+
+  protected movePanelTo(panel: DashboardPanel, pageId: string): void {
+    this.model.update((model) => movePanelToPage(model, panel.id, pageId));
     this.selectedPanel.set(null);
   }
 

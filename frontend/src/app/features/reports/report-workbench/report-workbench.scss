@@ -200,20 +200,6 @@
   }
 }
 
-.check {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-height: 24px;
-  color: var(--dr-text-secondary);
-
-  input {
-    width: auto;
-    min-height: 0;
-    accent-color: var(--dr-accent);
-  }
-}
-
 @media (max-width: 1100px) {
   :host {
     grid-template-columns: minmax(0, 1fr);

@@ -1,4 +1,5 @@
 import { ReportColumn, ReportSnapshot, ReportValue } from '../../shared/models/reports';
+import { PALETTE, PaletteColor } from './report-chart';
 
 /** Columnas de la cuadrícula: un panel ocupa de 3 a 12. */
 export const GRID_COLUMNS = 12;
@@ -14,6 +15,12 @@ export interface DashboardPanel {
   readonly height: number;
   /** Título propio; `null` usa el nombre del reporte. */
   readonly title: string | null;
+  /** Una línea que explica qué se mira; opcional. */
+  readonly description: string | null;
+  /** Sin título ni descripción a la vista; el panel sigue nombrándose para lectores de pantalla. */
+  readonly hideHeader: boolean;
+  /** Color propio en este tablero; `null` hereda del reporte, del tablero o del tema. */
+  readonly color: PaletteColor | null;
 }
 
 export interface DashboardPage {
@@ -40,10 +47,22 @@ export interface DashboardFilter {
   readonly bindings: Readonly<Record<string, string>>;
 }
 
+export interface DashboardStyle {
+  /** El color de los paneles que no eligen otro; `null` es el acento del tema. */
+  readonly color: PaletteColor | null;
+}
+
 export interface DashboardModel {
   readonly version: 1;
   readonly pages: readonly DashboardPage[];
   readonly filters: readonly DashboardFilter[];
+  readonly style: DashboardStyle;
+}
+
+export const DEFAULT_STYLE: DashboardStyle = { color: null };
+
+function paletteColor(value: unknown): PaletteColor | null {
+  return PALETTE.includes(value as PaletteColor) ? (value as PaletteColor) : null;
 }
 
 /** Lo elegido en un filtro. Sin desde/hasta, o sin valores, no filtra. */
@@ -52,7 +71,12 @@ export type FilterValue =
   | { readonly kind: 'category'; readonly values: readonly (string | null)[] };
 
 export function emptyDashboard(pageName: string): DashboardModel {
-  return { version: 1, pages: [{ id: crypto.randomUUID(), name: pageName, panels: [] }], filters: [] };
+  return {
+    version: 1,
+    pages: [{ id: crypto.randomUUID(), name: pageName, panels: [] }],
+    filters: [],
+    style: DEFAULT_STYLE,
+  };
 }
 
 function clamp(value: unknown, min: number, max: number, fallback: number): number {
@@ -75,6 +99,7 @@ function text(value: unknown): string | null {
 function readPanel(panel: Raw): DashboardPanel | null {
   const reportId = text(panel?.['reportId']);
   const title = text(panel?.['title']);
+  const description = text(panel?.['description']);
 
   return reportId === null
     ? null
@@ -84,6 +109,9 @@ function readPanel(panel: Raw): DashboardPanel | null {
         width: clamp(panel?.['width'], MIN_WIDTH, GRID_COLUMNS, 6),
         height: clamp(panel?.['height'], MIN_HEIGHT, MAX_HEIGHT, 4),
         title: title?.trim() ? title : null,
+        description: description?.trim() ? description : null,
+        hideHeader: panel?.['hideHeader'] === true,
+        color: paletteColor(panel?.['color']),
       };
 }
 
@@ -123,7 +151,12 @@ export function parseDashboard(json: string, pageName: string): DashboardModel {
       .map(readFilter)
       .filter((filter): filter is DashboardFilter => filter !== null);
 
-    return pages.length > 0 ? { version: 1, pages, filters } : { ...emptyDashboard(pageName), filters };
+    const rawStyle = raw?.['style'] as Raw;
+    const style: DashboardStyle = { color: paletteColor(rawStyle?.['color']) };
+
+    return pages.length > 0
+      ? { version: 1, pages, filters, style }
+      : { ...emptyDashboard(pageName), filters, style };
   } catch {
     return emptyDashboard(pageName);
   }
@@ -143,7 +176,16 @@ function updatePage(
 export function addPanel(model: DashboardModel, pageId: string, reportId: string): DashboardModel {
   return updatePage(model, pageId, (panels) => [
     ...panels,
-    { id: crypto.randomUUID(), reportId, width: 6, height: 4, title: null },
+    {
+      id: crypto.randomUUID(),
+      reportId,
+      width: 6,
+      height: 4,
+      title: null,
+      description: null,
+      hideHeader: false,
+      color: null,
+    },
   ]);
 }
 
@@ -312,4 +354,84 @@ export function categoryOptions(
   }
 
   return [...values].sort((a, b) => (a === null ? 1 : b === null ? -1 : a < b ? -1 : a > b ? 1 : 0));
+}
+
+/** Cambia campos de estilo de un panel: descripción, encabezado o color. */
+export function patchPanel(
+  model: DashboardModel,
+  pageId: string,
+  panelId: string,
+  patch: Partial<Pick<DashboardPanel, 'description' | 'hideHeader' | 'color'>>,
+): DashboardModel {
+  return updatePage(model, pageId, (panels) =>
+    panels.map((panel) => (panel.id === panelId ? { ...panel, ...patch } : panel)),
+  );
+}
+
+export function addPage(model: DashboardModel, name: string): DashboardModel {
+  return { ...model, pages: [...model.pages, { id: crypto.randomUUID(), name, panels: [] }] };
+}
+
+export function renamePage(model: DashboardModel, pageId: string, name: string): DashboardModel {
+  return { ...model, pages: model.pages.map((page) => (page.id === pageId ? { ...page, name } : page)) };
+}
+
+/**
+ * Quita una página. Sus paneles pasan a la primera de las que quedan: borrar
+ * una página no borra reportes de nadie, y deshacerlo es moverlos de vuelta.
+ */
+export function removePage(model: DashboardModel, pageId: string): DashboardModel {
+  if (model.pages.length <= 1) {
+    return model;
+  }
+
+  const removed = model.pages.find((page) => page.id === pageId);
+  const rest = model.pages.filter((page) => page.id !== pageId);
+
+  return {
+    ...model,
+    pages: rest.map((page, index) =>
+      index === 0 && removed ? { ...page, panels: [...page.panels, ...removed.panels] } : page,
+    ),
+  };
+}
+
+/** Lleva un panel al final de otra página. */
+export function movePanelToPage(model: DashboardModel, panelId: string, pageId: string): DashboardModel {
+  const panel = model.pages.flatMap((page) => page.panels).find((item) => item.id === panelId);
+
+  if (!panel || !model.pages.some((page) => page.id === pageId)) {
+    return model;
+  }
+
+  return {
+    ...model,
+    pages: model.pages.map((page) => ({
+      ...page,
+      panels:
+        page.id === pageId
+          ? [...page.panels.filter((item) => item.id !== panelId), panel]
+          : page.panels.filter((item) => item.id !== panelId),
+    })),
+  };
+}
+
+export type ColorSource = 'panel' | 'report' | 'dashboard' | 'theme';
+
+/**
+ * El color con que se pinta un panel y de dónde viene.
+ *
+ * Gana lo más concreto: el panel en este tablero, después el reporte, después
+ * el tablero y, si nadie eligió, el acento del tema. La interfaz enseña el
+ * origen para que se sepa qué se está heredando y qué se puede restablecer.
+ */
+export function resolveColor(
+  panel: DashboardPanel,
+  reportColor: PaletteColor | null,
+  style: DashboardStyle,
+): { readonly color: PaletteColor | null; readonly source: ColorSource } {
+  if (panel.color) return { color: panel.color, source: 'panel' };
+  if (reportColor) return { color: reportColor, source: 'report' };
+  if (style.color) return { color: style.color, source: 'dashboard' };
+  return { color: null, source: 'theme' };
 }
