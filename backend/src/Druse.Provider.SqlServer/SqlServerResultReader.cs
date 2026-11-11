@@ -12,7 +12,7 @@ namespace Druse.Provider.SqlServer;
 /// liberarlo siempre: de lo contrario la conexión quedaría ocupada por una
 /// consulta que ya nadie está leyendo.
 /// </summary>
-internal sealed class SqlServerResultReader : IQueryResultReader
+internal sealed class SqlServerResultReader : ITypedQueryResultReader
 {
     private readonly DbCommand _command;
     private readonly DbDataReader _reader;
@@ -110,6 +110,9 @@ internal sealed class SqlServerResultReader : IQueryResultReader
             yield return _buffer;
         }
     }
+
+    public Task<TypedQueryResult> ReadTypedAsync(int maxRows, CancellationToken cancellationToken) =>
+        TypedQueryResult.ReadAsync(_reader, Columns, maxRows, cancellationToken);
 
     public async ValueTask DisposeAsync()
     {

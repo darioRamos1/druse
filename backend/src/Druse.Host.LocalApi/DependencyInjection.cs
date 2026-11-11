@@ -4,6 +4,7 @@ using Druse.Application.Backups;
 using Druse.Application.Connections;
 using Druse.Application.Metadata;
 using Druse.Application.Queries;
+using Druse.Application.Reports;
 using Druse.Application.Rows;
 using Druse.Application.Tables;
 using Druse.Application.Transactions;
@@ -64,6 +65,7 @@ internal static class DependencyInjection
 
         // --- Persistencia local ----------------------------------------------
         services.AddSingleton<DruseDatabase>();
+        services.AddSingleton<IReportSnapshotStore, SqliteReportSnapshotStore>();
         services.AddSingleton<IBackupArchiveFactory, BackupArchiveFactory>();
         services.AddScoped<IConnectionProfileStore, SqliteConnectionProfileStore>();
         services.AddScoped<IQueryHistoryStore, SqliteQueryHistoryStore>();
@@ -245,6 +247,8 @@ internal static class DependencyInjection
         services.AddScoped<SavedConnectionService>();
         services.AddScoped<MetadataService>();
         services.AddScoped<QueryService>();
+        services.AddScoped<ReportQueryService>();
+        services.AddScoped<ReportSnapshotService>();
         services.AddScoped<RowEditService>();
         services.AddScoped<TableDesignService>();
         services.AddScoped<ImportService>();

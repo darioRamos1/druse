@@ -34,36 +34,50 @@ public sealed class DruseDatabase
         ArgumentNullException.ThrowIfNull(paths);
 
         _paths = paths;
-        _connectionString = new SqliteConnectionStringBuilder
+        _connectionString = ConnectionString(paths.DatabaseFile);
+    }
+
+    internal static string ConnectionString(string databaseFile) =>
+        new SqliteConnectionStringBuilder
         {
-            DataSource = paths.DatabaseFile,
+            DataSource = databaseFile,
             Mode = SqliteOpenMode.ReadWriteCreate,
             // Varias peticiones HTTP pueden escribir a la vez; sin este modo,
             // SQLite devolvería «database is locked» en cuanto coincidieran.
             Cache = SqliteCacheMode.Shared,
         }.ConnectionString;
-    }
 
     /// <summary>Abre una conexión ya configurada.</summary>
-    public async Task<SqliteConnection> OpenAsync(CancellationToken cancellationToken)
+    public Task<SqliteConnection> OpenAsync(CancellationToken cancellationToken) =>
+        OpenConfiguredAsync(_connectionString, _paths.DatabaseFile, cancellationToken);
+
+    internal static async Task<SqliteConnection> OpenConfiguredAsync(
+        string connectionString,
+        string databaseFile,
+        CancellationToken cancellationToken)
     {
-        var connection = new SqliteConnection(_connectionString);
+        var connection = new SqliteConnection(connectionString);
 
-        await connection.OpenAsync(cancellationToken);
+        try
+        {
+            await connection.OpenAsync(cancellationToken);
 
-        // El archivo lo crea SQLite en la primera apertura, y lo crea con los
-        // permisos por omisión: en Unix, legible por cualquier cuenta de la
-        // máquina. Aquí dentro están las conexiones del usuario y su historial de
-        // consultas, así que se cierra en cuanto existe.
-        Restrict(_paths.DatabaseFile);
+            // Los archivos locales pueden contener datos del usuario. En Unix
+            // se restringen al propietario tan pronto como existen.
+            Restrict(databaseFile);
 
-        // WAL permite leer mientras otro escribe, que es justo lo que hace el
-        // historial mientras el usuario consulta sus conexiones.
-        await ExecuteAsync(connection, "PRAGMA journal_mode = WAL;", cancellationToken);
-        await ExecuteAsync(connection, "PRAGMA foreign_keys = ON;", cancellationToken);
-        await ExecuteAsync(connection, "PRAGMA busy_timeout = 5000;", cancellationToken);
+            // WAL permite seguir leyendo un resultado mientras llega el siguiente.
+            await ExecuteAsync(connection, "PRAGMA journal_mode = WAL;", cancellationToken);
+            await ExecuteAsync(connection, "PRAGMA foreign_keys = ON;", cancellationToken);
+            await ExecuteAsync(connection, "PRAGMA busy_timeout = 5000;", cancellationToken);
 
-        return connection;
+            return connection;
+        }
+        catch
+        {
+            await connection.DisposeAsync();
+            throw;
+        }
     }
 
     /// <summary>Versión del esquema que escribe esta compilación.</summary>
