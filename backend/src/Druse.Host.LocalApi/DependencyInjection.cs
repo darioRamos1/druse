@@ -69,6 +69,9 @@ internal static class DependencyInjection
         services.AddSingleton<DruseDatabase>();
         services.AddSingleton<IReportSnapshotStore, SqliteReportSnapshotStore>();
         services.AddSingleton<IReportDatasetStore, SqliteReportDatasetStore>();
+        services.AddSingleton<IReportRunStore, SqliteReportRunStore>();
+        services.AddSingleton<ISavedReportStore, SqliteSavedReportStore>();
+        services.AddSingleton<ReportRunGate>();
         services.AddSingleton<IBackupArchiveFactory, BackupArchiveFactory>();
         services.AddScoped<IConnectionProfileStore, SqliteConnectionProfileStore>();
         services.AddScoped<IQueryHistoryStore, SqliteQueryHistoryStore>();
@@ -253,6 +256,7 @@ internal static class DependencyInjection
         services.AddScoped<ReportQueryService>();
         services.AddScoped<ReportSnapshotService>();
         services.AddScoped<ReportDatasetPreviewService>();
+        services.AddScoped<ReportRefreshService>();
         services.AddScoped<RowEditService>();
         services.AddScoped<TableDesignService>();
         services.AddScoped<ImportService>();

@@ -47,6 +47,19 @@ export async function anadirFuente(reportes: Locator, alias: string, sql: string
   await inspector.getByLabel('Consulta').fill(sql);
 }
 
+/** El paso 3; necesita el conjunto guardado. */
+export async function abrirVisualizacion(reportes: Locator): Promise<void> {
+  await reportes.locator('.steps__item').nth(2).click();
+  await expect(reportes.locator('app-report-workbench .freshness')).toBeVisible();
+  await expect(reportes.getByRole('button', { name: 'Actualizar ahora' })).toBeEnabled({ timeout: 30_000 });
+}
+
+/** «Actualizar ahora» y esperar a que termine. */
+export async function actualizar(reportes: Locator): Promise<void> {
+  await reportes.getByRole('button', { name: 'Actualizar ahora' }).click();
+  await expect(reportes.getByRole('button', { name: 'Actualizar ahora' })).toBeEnabled({ timeout: 60_000 });
+}
+
 export async function previsualizar(reportes: Locator): Promise<void> {
   await reportes.getByRole('button', { name: 'Vista previa' }).click();
   await expect(reportes.getByRole('button', { name: 'Vista previa' })).toBeEnabled({ timeout: 60_000 });

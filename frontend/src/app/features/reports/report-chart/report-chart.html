@@ -1,0 +1,144 @@
+@switch (kind()) {
+  @case ('Indicator') {
+    @if (indicator(); as data) {
+      <figure class="indicator">
+        <figcaption class="indicator__label">{{ valueLabel() }}</figcaption>
+        @if (data.target !== null) {
+          <p class="indicator__value">{{ data.zeroTarget ? '—' : percent(data.ratio) }}</p>
+          <div
+            class="indicator__track"
+            role="meter"
+            aria-valuemin="0"
+            aria-valuemax="100"
+            [attr.aria-valuenow]="progress(data.ratio)"
+            [attr.aria-label]="'reports.chart.achievement' | t"
+          >
+            <span class="indicator__fill" [style.width.%]="progress(data.ratio)"></span>
+          </div>
+          <p class="indicator__detail">
+            {{ 'reports.chart.ofTarget' | t: { value: number(data.value), target: number(data.target) } }}
+          </p>
+          @if (data.zeroTarget) {
+            <p class="indicator__note">{{ 'reports.chart.zeroTarget' | t }}</p>
+          }
+          @if (data.withoutTarget > 0) {
+            <p class="indicator__note">{{ 'reports.chart.withoutTarget' | t: { count: data.withoutTarget } }}</p>
+          }
+        } @else {
+          <p class="indicator__value">{{ number(data.value) }}</p>
+        }
+      </figure>
+    }
+  }
+  @case ('Table') {
+    @if (table(); as data) {
+      <ng-container *ngTemplateOutlet="grid; context: { $implicit: data }" />
+    }
+  }
+  @default {
+    @if (points().length === 0) {
+      <p class="empty">{{ 'reports.chart.noData' | t }}</p>
+    } @else if (asTable()) {
+      <div class="grid" tabindex="0" [attr.aria-label]="'reports.chart.dataTable' | t">
+        <table>
+          <thead>
+            <tr>
+              <th scope="col">{{ categoryLabel() }}</th>
+              <th scope="col" class="is-number">{{ valueLabel() }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (point of points(); track $index) {
+              <tr>
+                <td [class.is-null]="point.label === null">{{ point.label ?? ('reports.chart.empty' | t) }}</td>
+                <td class="is-number">{{ number(point.value) }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    } @else {
+      <svg
+        class="chart"
+        [attr.viewBox]="'0 0 ' + width + ' ' + height"
+        role="img"
+        [attr.aria-label]="'reports.chart.alt' | t: { value: valueLabel(), category: categoryLabel(), count: points().length }"
+      >
+        @for (tick of ticks(); track tick.y) {
+          <line class="chart__grid" [attr.x1]="left" [attr.x2]="width - 16" [attr.y1]="tick.y" [attr.y2]="tick.y" />
+          <text class="chart__tick" [attr.x]="left - 8" [attr.y]="tick.y" dy="0.32em" text-anchor="end">
+            {{ tick.label }}
+          </text>
+        }
+        <line class="chart__axis" [attr.x1]="left" [attr.x2]="width - 16" [attr.y1]="zeroY()" [attr.y2]="zeroY()" />
+
+        @if (kind() === 'Bar') {
+          @for (bar of bars(); track $index) {
+            <rect class="chart__bar" [attr.x]="bar.x" [attr.y]="bar.y" [attr.width]="bar.width" [attr.height]="bar.height" rx="3">
+              <title>{{ (bar.label ?? ('reports.chart.empty' | t)) + ': ' + number(bar.value) }}</title>
+            </rect>
+            @if (!crowded()) {
+              <text class="chart__value" [attr.x]="bar.center" [attr.y]="bar.y - 6" text-anchor="middle">
+                {{ number(bar.value) }}
+              </text>
+            }
+          }
+        } @else {
+          <path class="chart__line" [attr.d]="linePath()" />
+          @for (bar of bars(); track $index) {
+            <circle class="chart__point" [attr.cx]="bar.center" [attr.cy]="y(bar.value)" r="4">
+              <title>{{ (bar.label ?? ('reports.chart.empty' | t)) + ': ' + number(bar.value) }}</title>
+            </circle>
+            @if (!crowded()) {
+              <text class="chart__value" [attr.x]="bar.center" [attr.y]="y(bar.value) - 10" text-anchor="middle">
+                {{ number(bar.value) }}
+              </text>
+            }
+          }
+        }
+
+        @for (bar of bars(); track $index) {
+          <text
+            class="chart__category"
+            [class.is-empty]="bar.label === null"
+            [attr.x]="bar.center"
+            [attr.y]="bottom + 18"
+            [attr.text-anchor]="crowded() ? 'end' : 'middle'"
+            [attr.transform]="crowded() ? 'rotate(-35 ' + bar.center + ' ' + (bottom + 18) + ')' : null"
+          >
+            {{ short(bar.label, ('reports.chart.empty' | t)) }}
+          </text>
+        }
+      </svg>
+    }
+  }
+}
+
+<ng-template #grid let-data>
+  @if (data.rows.length === 0) {
+    <p class="empty">{{ 'reports.noRows' | t }}</p>
+  } @else {
+    <div class="grid" tabindex="0" [attr.aria-label]="'reports.chart.dataTable' | t">
+      <table>
+        <thead>
+          <tr>
+            @for (column of data.columns; track column.ordinal) {
+              <th scope="col" [class.is-number]="isNumeric(column)">{{ columnLabel()(column.name) }}</th>
+            }
+          </tr>
+        </thead>
+        <tbody>
+          @for (row of data.rows; track $index) {
+            <tr>
+              @for (column of data.columns; track column.ordinal) {
+                <td [class.is-number]="isNumeric(column)" [class.is-null]="row[$index] === null">
+                  {{ cell(row[$index]) }}
+                </td>
+              }
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+</ng-template>

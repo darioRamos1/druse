@@ -1,7 +1,15 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Locator } from '@playwright/test';
 
 import { abrir, conectar } from '../support/druse';
-import { METAS_SQL, VENTAS_SQL, abrirReportes, anadirFuente, previsualizar } from '../support/reportes';
+import {
+  METAS_SQL,
+  VENTAS_SQL,
+  abrirReportes,
+  abrirVisualizacion,
+  actualizar,
+  anadirFuente,
+  previsualizar,
+} from '../support/reportes';
 
 /**
  * Reportes BI de punta a punta: el constructor manda la definición, la API
@@ -56,12 +64,42 @@ test.describe('Reportes BI', () => {
     await expect(reportes.locator('.banner--success')).toContainText('versión 1');
     await expect(reportes.locator('.datasets__item.is-active')).toBeVisible();
 
-    // Se deja el espacio de trabajo como estaba.
-    await reportes.getByRole('button', { name: 'Borrar este conjunto de datos' }).click();
-    await reportes.locator('.confirm').getByRole('button', { name: 'Borrar' }).click();
-    await expect(reportes.locator('.datasets__item.is-active')).toHaveCount(0);
+    // --- Hito 3: actualizar, ver barras e indicador, y reabrirlo ---------------
+    await abrirVisualizacion(reportes);
+    await expect(reportes.locator('.freshness')).toContainText('Todavía no hay datos guardados');
+    await actualizar(reportes);
+    await expect(reportes.locator('.freshness')).toContainText('Datos del');
+    await expect(reportes.locator('.chart__bar')).toHaveCount(1);
 
+    // Por municipio, las tres barras del escenario.
+    await reportes.locator('.inspector').getByLabel('Agrupar por').selectOption({ label: 'Ventas.municipio' });
+    await expect(reportes.locator('.chart__bar')).toHaveCount(3);
+
+    await reportes.getByRole('radio', { name: 'Indicador' }).click();
+    await expect(reportes.locator('.indicator__value')).toHaveText(/60\s?%/);
+    await expect(reportes.locator('.indicator')).toContainText('1 fila sin meta');
+    await reportes.getByRole('button', { name: 'Guardar reporte' }).click();
+    await expect(reportes.locator('.reports__tab[aria-selected="true"]')).toHaveText('Reporte 1');
+
+    // Cerrar y volver: el reporte y sus datos salen de reports.db.
     await page.keyboard.press('Escape');
     await expect(reportes.locator('.dialog')).toBeHidden();
+    const otraVez = await abrirReportes(page);
+
+    await otraVez.locator('.datasets__item', { hasText: 'Conjunto sin nombre' }).first().click();
+    await abrirVisualizacion(otraVez);
+    await expect(otraVez.locator('.indicator__value')).toHaveText(/60\s?%/);
+
+    // Se deja el espacio de trabajo como estaba.
+    await otraVez.locator('.steps__item').first().click();
+    await borrarConjunto(otraVez);
+    await page.keyboard.press('Escape');
+    await expect(otraVez.locator('.dialog')).toBeHidden();
   });
 });
+
+async function borrarConjunto(reportes: Locator): Promise<void> {
+  await reportes.getByRole('button', { name: 'Borrar este conjunto de datos' }).click();
+  await reportes.locator('.confirm').getByRole('button', { name: 'Borrar' }).click();
+  await expect(reportes.locator('.datasets__item.is-active')).toHaveCount(0);
+}

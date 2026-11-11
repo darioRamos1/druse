@@ -108,7 +108,7 @@ public sealed class ReportDatasetPreviewService(
         var results = new List<(ReportSourcePreview Preview, TypedQueryResult? Data)>();
         foreach (var source in dataset.Sources)
         {
-            results.Add(await ReadAsync(source, cancellationToken));
+            results.Add(await ReadSourceAsync(source, cancellationToken));
         }
 
         var previews = results.Select(result => result.Preview).ToArray();
@@ -164,7 +164,11 @@ public sealed class ReportDatasetPreviewService(
         }
     }
 
-    private async Task<(ReportSourcePreview Preview, TypedQueryResult? Data)> ReadAsync(
+    /// <summary>
+    /// Lee una fuente con las credenciales guardadas. Sin datos si falló, con el
+    /// motivo en el diagnóstico: la vista previa y la actualización leen igual.
+    /// </summary>
+    public async Task<(ReportSourcePreview Preview, TypedQueryResult? Data)> ReadSourceAsync(
         ReportSourceDefinition source, CancellationToken cancellationToken)
     {
         var started = clock.GetUtcNow();

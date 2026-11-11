@@ -17,6 +17,14 @@
 - [x] Constructor en Angular: Fuentes, Combinar y vista previa, con el compositor para el modo visual.
 - [ ] Captura del constructor para la landing.
 
+## Tareas del hito 3
+
+- [x] «Actualizar ahora»: lee, cruza y guarda el resultado; un intento fallido conserva el anterior.
+- [x] Historial acotado de intentos (20 por conjunto) con diagnóstico por fuente.
+- [x] Resultado legible sin conexión y aviso de definición anterior.
+- [x] Reportes guardados: tabla, barras, línea e indicador con meta.
+- [ ] Captura del tablero para la landing (hito 4, con los tableros).
+
 Los hitos siguientes cubren el constructor SQL y visual, los reportes guardados, los tableros y plantillas, y la actualización programada. La evidencia para la landing se prepara conforme se valida cada hito.
 
 ## 2026-11-11 · Inicio del hito 1
@@ -100,8 +108,30 @@ Dos fuentes ya materializadas en memoria, con 20.000 filas cada una y un cruce 1
 - e2e `reportes.spec.ts` con Druse levantado y PostgreSQL de pruebas: dos fuentes, claves propuestas, cruce de 3 filas con 2 coincidencias, guardado como versión 1 y borrado. En Linux sin llavero comprueba el diagnóstico de contraseña.
 - Barrido: capturas `21-reportes-*` (vacío, una fuente, combinar y descartar). Sin hallazgos nuevos y con la consola limpia.
 
+## 2026-11-11 · Hito 3: reportes guardados (versión 1.13.0)
+
+### Qué se hizo
+
+- `ReportRefreshService` lee las fuentes con las mismas reglas que la vista previa, las cruza y publica el resultado en `reports.db`. Una fuente caída o truncada, unas claves duplicadas, un resultado de más de 32 MiB o uno más viejo que el guardado dejan el resultado anterior intacto. `ReportRunGate` impide dos actualizaciones a la vez del mismo conjunto (409).
+- Cada intento queda en `report_runs` con su estado, su mensaje, las claves repetidas y el diagnóstico de cada fuente. Se conservan los 20 más recientes por conjunto. La ventana de captura va de la primera lectura a la última.
+- `GET /snapshot` solo lee `reports.db`: se abre con las bases apagadas y avisa si el resultado es de una versión anterior de la definición. Los reportes viven en `saved_reports`, con sus ajustes en JSON. Borrar un conjunto borra su resultado, sus intentos y sus reportes.
+- En Druse, el paso **Visualización** se habilita al guardar el conjunto. Arriba aparecen «Datos del…», la ventana de lectura y **Actualizar ahora**. Debajo, el último intento fallido con sus motivos y los avisos de definición sin guardar o anterior. Los reportes van en pestañas y se configuran en el inspector: tipo, agrupar por, cálculo (suma, contar filas, promedio, mínimo, máximo), cifra, meta y orden.
+- Los gráficos son SVG propio con los tokens del tema. Las barras y la línea llevan los valores escritos y una tabla equivalente a un clic. El indicador con meta calcula el cumplimiento solo con las filas que la tienen: 60 % en el escenario. Cuenta aparte las filas sin meta y no inventa un porcentaje si la meta es cero. También avisa si se suma una cifra repetida del lado «uno». La librería de gráficos se elige en el hito 4, cuando haya que exportar.
+- Los controles comunes del constructor y de Visualización pasaron a `features/reports/_report-controls.scss`.
+
+### Comprobaciones
+
+- Integración con los motores exigidos, 17 casos. El escenario de aceptación:
+  - actualizar y leer el resultado tras borrar las dos conexiones;
+  - fallar sin ellas y conservar el resultado;
+  - reconectar, cambiar la meta en PostgreSQL y ver el cambio;
+  - borrar la tabla y conservar 150;
+  - comprobar los cuatro intentos en orden.
+- Unitarias: 18 de reportes, incluida la poda del historial. La batería completa (733) pasó antes de añadir esa prueba.
+- Frontend: 98 casos en reportes, novedades, i18n y gateway, además de tsc y `check-i18n`. El cálculo de los gráficos tiene pruebas propias: 60 %, meta cero, orden cronológico y columnas que faltan.
+
 ### Dónde retomar
 
-1. Hito 3: «Actualizar ahora», que lee, cruza y guarda el resultado con `ReportSnapshotService`. Después, la visualización (tabla, barras, línea e indicador) sobre el resultado guardado, con las bases desconectadas.
-2. Para el modo visual, falta poder abrir el compositor desde la fuente. Hoy se elige una composición ya guardada.
-3. Preparar la sección `#reportes-bi` de la landing con la captura `21b-reportes-combinar` (estado En desarrollo).
+1. Hito 4: tableros con varios reportes en cuadrícula, filtros compartidos de fecha y categoría, personalización, plantillas y exportación a Excel y PDF. Elegir la librería de gráficos probando tema, accesibilidad y exportación.
+2. Abrir el compositor desde una fuente visual (hoy se elige una composición ya guardada).
+3. Preparar la sección `#reportes-bi` de la landing con las capturas `21b-reportes-combinar` y `21e-reportes-indicador` (estado En desarrollo).

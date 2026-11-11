@@ -70,6 +70,10 @@ import {
   ReportDatabaseList,
   ReportDataset,
   ReportDatasetPreview,
+  ReportRefresh,
+  ReportRun,
+  ReportSnapshot,
+  SavedReport,
 } from '../../shared/models/reports';
 import { translate } from '../i18n/active';
 import {
@@ -515,6 +519,33 @@ export class HttpApplicationGateway extends ApplicationGateway {
 
   override getReportSourceDatabases(connectionId: string): Observable<ReportDatabaseList> {
     return this._http.get<ReportDatabaseList>(`/api/reports/connections/${connectionId}/databases`);
+  }
+
+  override refreshReportDataset(datasetId: string): Observable<ReportRefresh> {
+    return this._http.post<ReportRefresh>(`/api/reports/datasets/${datasetId}/refresh`, null);
+  }
+
+  override getReportSnapshot(datasetId: string): Observable<ReportSnapshot | null> {
+    // Sin resultado todavía llega como 204, sin cuerpo: `null`.
+    return this._http
+      .get<ReportSnapshot>(`/api/reports/datasets/${datasetId}/snapshot`, { observe: 'response' })
+      .pipe(map((response) => response.body));
+  }
+
+  override getReportRuns(datasetId: string): Observable<readonly ReportRun[]> {
+    return this._http.get<ReportRun[]>(`/api/reports/datasets/${datasetId}/runs`);
+  }
+
+  override getSavedReports(datasetId: string): Observable<readonly SavedReport[]> {
+    return this._http.get<SavedReport[]>(`/api/reports/datasets/${datasetId}/reports`);
+  }
+
+  override saveReport(report: SavedReport): Observable<SavedReport> {
+    return this._http.put<SavedReport>(`/api/reports/reports/${report.id}`, report);
+  }
+
+  override deleteReport(id: string): Observable<void> {
+    return this._http.delete<void>(`/api/reports/reports/${id}`);
   }
 
   override saveComposition(composition: SavedCompositionRecord): Observable<void> {

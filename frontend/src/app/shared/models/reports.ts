@@ -112,3 +112,62 @@ export interface ReportDatabaseList {
   readonly failureCode: ReportSourceFailureCode | null;
   readonly message: string | null;
 }
+
+// --- Hito 3: resultado guardado, intentos y reportes ------------------------
+
+export type ReportRunStatus = 'Succeeded' | 'Failed' | 'Canceled';
+
+export interface ReportRunSource {
+  readonly alias: string;
+  readonly failureCode: ReportSourceFailureCode | null;
+  readonly message: string | null;
+  readonly rowCount: number;
+  readonly truncated: boolean;
+  readonly startedAtUtc: string;
+  readonly completedAtUtc: string;
+}
+
+export interface ReportRun {
+  readonly id: string;
+  readonly definitionVersion: number;
+  readonly origin: 'Manual' | 'Scheduled';
+  readonly status: ReportRunStatus;
+  readonly startedAtUtc: string;
+  readonly completedAtUtc: string;
+  readonly message: string | null;
+  readonly duplicateKeys: readonly string[];
+  readonly rowCount: number;
+  readonly sources: readonly ReportRunSource[];
+}
+
+export interface ReportRefresh {
+  readonly outcome: 'Refreshed' | 'Failed';
+  readonly run: ReportRun | null;
+}
+
+/** El último resultado bueno; se lee sin conexión a los orígenes. */
+export interface ReportSnapshot {
+  readonly datasetId: string;
+  readonly definitionVersion: number;
+  readonly fromOlderDefinition: boolean;
+  readonly startedAtUtc: string;
+  readonly completedAtUtc: string;
+  readonly columns: readonly ReportColumn[];
+  readonly rows: readonly (readonly ReportValue[])[];
+  readonly unmatchedLeftRows: number;
+  readonly unmatchedRightRows: number;
+  readonly repeatedColumns: readonly string[];
+}
+
+export type ReportVisualKind = 'Table' | 'Bar' | 'Line' | 'Indicator';
+
+export interface SavedReport {
+  readonly id: string;
+  readonly datasetId: string;
+  readonly name: string;
+  readonly visual: ReportVisualKind;
+  /** JSON de `ReportSettings`. */
+  readonly settings: string;
+  readonly createdAtUtc?: string;
+  readonly updatedAtUtc?: string;
+}

@@ -3,6 +3,10 @@ import {
   ReportDatabaseList,
   ReportDataset,
   ReportDatasetPreview,
+  ReportRefresh,
+  ReportRun,
+  ReportSnapshot,
+  SavedReport,
 } from '../../shared/models/reports';
 
 import {
@@ -572,6 +576,20 @@ export abstract class ApplicationGateway {
 
   /** Bases de una conexión guardada, con su contraseña del llavero. */
   abstract getReportSourceDatabases(connectionId: string): Observable<ReportDatabaseList>;
+
+  /** «Actualizar ahora». Un intento fallido llega como respuesta, no como error. */
+  abstract refreshReportDataset(datasetId: string): Observable<ReportRefresh>;
+
+  /** El último resultado bueno, o `null` si todavía no hay. */
+  abstract getReportSnapshot(datasetId: string): Observable<ReportSnapshot | null>;
+
+  abstract getReportRuns(datasetId: string): Observable<readonly ReportRun[]>;
+
+  abstract getSavedReports(datasetId: string): Observable<readonly SavedReport[]>;
+
+  abstract saveReport(report: SavedReport): Observable<SavedReport>;
+
+  abstract deleteReport(id: string): Observable<void>;
 
   abstract saveComposition(composition: SavedCompositionRecord): Observable<void>;
 

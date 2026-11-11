@@ -115,9 +115,12 @@ public sealed class SqliteReportDatasetStore(IAppPaths paths, TimeProvider clock
         await using var connection = await ReportsDatabase.OpenAsync(_databaseFile, cancellationToken);
         await using var command = connection.CreateCommand();
 
-        // Juntos: un resultado sin definición ocuparía espacio que nadie puede ver ni borrar.
+        // Juntos: un resultado, un intento o un reporte sin definición ocuparían
+        // espacio que nadie puede ver ni borrar.
         command.CommandText = """
             DELETE FROM report_snapshots WHERE dataset_id = $id;
+            DELETE FROM report_runs WHERE dataset_id = $id;
+            DELETE FROM saved_reports WHERE dataset_id = $id;
             DELETE FROM report_datasets WHERE id = $id;
             """;
         command.Parameters.AddWithValue("$id", id.ToString());

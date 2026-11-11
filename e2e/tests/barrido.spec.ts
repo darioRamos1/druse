@@ -2,7 +2,15 @@ import { expect, test, type Locator, type Page } from '@playwright/test';
 
 import { abrir, apuntarPestana, conectar, ejecutar, escribirSql, situarCursor } from '../support/druse';
 import { medir } from '../support/medir';
-import { METAS_SQL, VENTAS_SQL, abrirReportes, anadirFuente, previsualizar } from '../support/reportes';
+import {
+  METAS_SQL,
+  VENTAS_SQL,
+  abrirReportes,
+  abrirVisualizacion,
+  actualizar,
+  anadirFuente,
+  previsualizar,
+} from '../support/reportes';
 import { comprobarDiagnosticoIa, prepararDiagnosticoIa } from '../support/ai-diagnostics';
 import { comprobarContextoChat, prepararContextoChat, comprobarSelectorContexto, comprobarNotasContexto } from '../support/ai-context';
 import { comprobarErrorContexto } from '../support/ai-execution-error';
@@ -470,7 +478,24 @@ test.describe('barrido visual', () => {
     await page.keyboard.press('Escape');
     await expect(reportes.locator('.confirm')).toBeVisible();
     await foto(page, '21c-reportes-descartar', reportes.locator('.dialog'));
-    await reportes.getByRole('button', { name: 'Descartar cambios' }).click();
+    await reportes.getByRole('button', { name: 'Cancelar' }).click();
+
+    // Visualización: el resultado guardado, en barras y como indicador.
+    await reportes.getByRole('button', { name: 'Guardar', exact: true }).click();
+    await abrirVisualizacion(reportes);
+    await actualizar(reportes);
+    await reportes.locator('.inspector').getByLabel('Agrupar por').selectOption({ label: 'Ventas.municipio' });
+    await medir(page, 'reportes barras', hallazgos);
+    await foto(page, '21d-reportes-barras', reportes.locator('.dialog'));
+    await reportes.getByRole('radio', { name: 'Indicador' }).click();
+    await medir(page, 'reportes indicador', hallazgos);
+    await foto(page, '21e-reportes-indicador', reportes.locator('.dialog'));
+
+    // Y se deja como estaba: sin conjuntos de prueba.
+    await reportes.locator('.steps__item').first().click();
+    await reportes.getByRole('button', { name: 'Borrar este conjunto de datos' }).click();
+    await reportes.locator('.confirm').getByRole('button', { name: 'Borrar' }).click();
+    await page.keyboard.press('Escape');
     await expect(reportes.locator('.dialog')).toBeHidden();
 
     // --- El asistente de una tabla, con sus pasos --------------------------

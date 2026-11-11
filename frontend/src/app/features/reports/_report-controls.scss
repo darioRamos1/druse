@@ -1,0 +1,195 @@
+// Controles que comparten el constructor de Reportes y su paso de
+// Visualización. Se emite dentro de cada componente con `@use`, así que sigue
+// encapsulado: cambiar un botón aquí cambia los dos y nada más.
+
+.button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  height: 28px;
+  padding: 0 12px;
+  border: 1px solid var(--dr-border-input);
+  border-radius: var(--dr-radius-sm);
+  background: var(--dr-surface-raised);
+  color: var(--dr-text);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+
+  &:hover:not(:disabled) {
+    background: var(--dr-surface-raised-hover);
+  }
+
+  &:disabled {
+    color: var(--dr-text-disabled);
+    cursor: default;
+  }
+
+  &--primary {
+    border-color: transparent;
+    background: var(--dr-accent-button);
+    color: var(--dr-text-on-accent);
+
+    &:hover:not(:disabled) {
+      background: var(--dr-accent-button);
+      filter: brightness(1.08);
+    }
+
+    &:disabled {
+      opacity: 0.55;
+      color: var(--dr-text-on-accent);
+    }
+  }
+
+  &--danger {
+    border-color: var(--dr-danger-line);
+    background: var(--dr-danger-tint);
+    color: var(--dr-danger-text);
+  }
+}
+
+.icon-button {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: var(--dr-radius-sm);
+  background: transparent;
+  color: var(--dr-text-tertiary);
+  cursor: pointer;
+
+  &:hover {
+    background: var(--dr-surface-hover);
+    color: var(--dr-text);
+  }
+
+  &[aria-pressed='true'] {
+    background: var(--dr-surface-active);
+    color: var(--dr-text);
+  }
+}
+
+.link {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  align-self: flex-start;
+  padding: 2px 0;
+  border: 0;
+  background: none;
+  color: var(--dr-accent);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+
+  &:hover:not(:disabled) {
+    text-decoration: underline;
+  }
+
+  &:disabled {
+    color: var(--dr-text-disabled);
+    cursor: default;
+  }
+
+  &--danger {
+    color: var(--dr-danger-text);
+  }
+}
+
+button:focus-visible,
+select:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+.grid:focus-visible {
+  outline: 2px solid var(--dr-accent-line-strong);
+  outline-offset: 1px;
+}
+
+
+.banner {
+  margin: 0;
+  padding: 7px 10px;
+  border: 1px solid;
+  border-radius: var(--dr-radius-sm);
+  line-height: 1.45;
+
+  &--danger {
+    border-color: var(--dr-danger-line-soft);
+    background: var(--dr-danger-tint-weak);
+    color: var(--dr-danger-text);
+  }
+
+  &--warning {
+    border-color: var(--dr-warning-line);
+    background: var(--dr-warning-tint);
+    color: var(--dr-warning-text);
+  }
+
+  &--success {
+    border-color: var(--dr-success-line-soft);
+    background: var(--dr-success-tint);
+    color: var(--dr-text);
+  }
+}
+
+.placeholder {
+  margin: 24px auto;
+  max-width: 420px;
+  color: var(--dr-text-tertiary);
+  text-align: center;
+  line-height: 1.5;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+
+  &__label {
+    padding: 0;
+    font-size: 11.5px;
+    font-weight: 600;
+    color: var(--dr-text-secondary);
+  }
+
+  &__hint {
+    margin: 0;
+    font-size: 11.5px;
+    line-height: 1.45;
+    color: var(--dr-text-tertiary);
+  }
+
+  &__error {
+    font-size: 11.5px;
+    color: var(--dr-danger-text);
+  }
+
+  input,
+  select,
+  textarea {
+    width: 100%;
+    min-height: 30px;
+    padding: 5px 8px;
+    border: 1px solid var(--dr-border-input);
+    border-radius: var(--dr-radius-sm);
+    background: var(--dr-surface-input);
+    color: var(--dr-text);
+    font: inherit;
+    font-size: 12.5px;
+
+    &:hover:not(:disabled) {
+      border-color: var(--dr-border-input-hover);
+    }
+
+    &:disabled {
+      color: var(--dr-text-disabled);
+    }
+  }
+}

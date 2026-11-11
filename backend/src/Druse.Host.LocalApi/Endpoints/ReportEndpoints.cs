@@ -59,6 +59,106 @@ internal static class ReportEndpoints
         })
         .WithName("DeleteReportDataset");
 
+        // «Actualizar ahora». Un intento fallido responde 200 con el motivo: no
+        // es un error de la API, es lo que hay que contar junto al dato anterior.
+        app.MapPost("/api/reports/datasets/{id:guid}/refresh", async (
+            Guid id,
+            ReportRefreshService refresher,
+            CancellationToken cancellationToken) =>
+        {
+            var result = await refresher.RefreshAsync(id, ReportRunOrigin.Manual, cancellationToken);
+            return result.Outcome switch
+            {
+                ReportRefreshOutcome.NotFound => Results.NotFound(),
+                ReportRefreshOutcome.Busy => Results.Conflict(new
+                {
+                    message = "Este conjunto de datos ya se está actualizando.",
+                    reason = "busy",
+                }),
+                _ => Results.Ok(new ReportRefreshDto(result.Outcome.ToString(), result.Run?.ToDto())),
+            };
+        })
+        .WithName("RefreshReportDataset");
+
+        // Solo lee reports.db: se abre con los orígenes apagados. Sin resultado
+        // todavía es un estado normal (204), no un error: un 404 queda para un
+        // conjunto que no existe, y no ensucia la consola del navegador.
+        app.MapGet("/api/reports/datasets/{id:guid}/snapshot", async (
+            Guid id,
+            IReportDatasetStore datasets,
+            IReportSnapshotStore snapshots,
+            CancellationToken cancellationToken) =>
+        {
+            var dataset = await datasets.FindAsync(id, cancellationToken);
+            if (dataset is null)
+            {
+                return Results.NotFound();
+            }
+
+            var snapshot = await snapshots.FindAsync(id, cancellationToken);
+            return snapshot is null ? Results.NoContent() : Results.Ok(snapshot.ToDto(dataset.Version));
+        })
+        .WithName("GetReportSnapshot");
+
+        app.MapGet("/api/reports/datasets/{id:guid}/runs", async (
+            Guid id,
+            IReportRunStore runs,
+            CancellationToken cancellationToken) =>
+            Results.Ok((await runs.GetRecentAsync(id, ReportRefreshService.RunHistoryLimit, cancellationToken))
+                .Select(run => run.ToDto())))
+        .WithName("GetReportRuns");
+
+        app.MapGet("/api/reports/datasets/{id:guid}/reports", async (
+            Guid id,
+            ISavedReportStore reports,
+            CancellationToken cancellationToken) =>
+            Results.Ok((await reports.GetByDatasetAsync(id, cancellationToken)).Select(report => report.ToDto())))
+        .WithName("GetSavedReports");
+
+        app.MapPut("/api/reports/reports/{id:guid}", async (
+            Guid id,
+            SavedReportDto request,
+            IReportDatasetStore datasets,
+            ISavedReportStore reports,
+            CancellationToken cancellationToken) =>
+        {
+            var name = request.Name?.Trim() ?? string.Empty;
+            if (name.Length == 0
+                || int.TryParse(request.Visual, out _)
+                || !Enum.TryParse<ReportVisualKind>(request.Visual, ignoreCase: true, out var visual)
+                || !Enum.IsDefined(visual)
+                || !IsJson(request.Settings))
+            {
+                return Results.BadRequest(new { message = "Un reporte necesita nombre, tipo de visualización y ajustes." });
+            }
+
+            if (await datasets.FindAsync(request.DatasetId, cancellationToken) is null)
+            {
+                return Results.NotFound(new { message = "El conjunto de datos de este reporte ya no existe." });
+            }
+
+            var saved = await reports.SaveAsync(new SavedReport
+            {
+                Id = id,
+                DatasetId = request.DatasetId,
+                Name = name,
+                Visual = visual,
+                Settings = request.Settings,
+            }, cancellationToken);
+            return Results.Ok(saved.ToDto());
+        })
+        .WithName("SaveReport");
+
+        app.MapDelete("/api/reports/reports/{id:guid}", async (
+            Guid id,
+            ISavedReportStore reports,
+            CancellationToken cancellationToken) =>
+        {
+            await reports.DeleteAsync(id, cancellationToken);
+            return Results.NoContent();
+        })
+        .WithName("DeleteReport");
+
         // Con las credenciales guardadas: el constructor no pide contraseñas.
         app.MapGet("/api/reports/connections/{id:guid}/databases", async (
             Guid id,
@@ -83,5 +183,23 @@ internal static class ReportEndpoints
             return Results.Ok((await previews.PreviewAsync(dataset, cancellationToken)).ToDto());
         })
         .WithName("PreviewReportDataset");
+    }
+
+    private static bool IsJson(string? text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return false;
+        }
+
+        try
+        {
+            using var _ = System.Text.Json.JsonDocument.Parse(text);
+            return true;
+        }
+        catch (System.Text.Json.JsonException)
+        {
+            return false;
+        }
     }
 }

@@ -1,0 +1,255 @@
+<main class="stage">
+  <!-- De cuándo son los datos y cómo fue el último intento: siempre a la vista. -->
+  <div class="freshness" role="status" aria-live="polite">
+    <div class="freshness__text">
+      @if (loading()) {
+        <span>{{ 'reports.loading' | t }}</span>
+      } @else if (snapshot(); as data) {
+        <strong>{{ 'reports.data.from' | t: { date: when(data.completedAtUtc) } }}</strong>
+        <span class="freshness__meta">
+          {{ 'reports.stats.rows' | t: { count: data.rows.length } }}
+          @if (dataset().sources.length > 1) {
+            · {{ 'reports.data.window' | t: { start: when(data.startedAtUtc), end: when(data.completedAtUtc) } }}
+          }
+        </span>
+      } @else {
+        <strong>{{ 'reports.data.none' | t }}</strong>
+        <span class="freshness__meta">{{ 'reports.data.noneHint' | t }}</span>
+      }
+    </div>
+    <button
+      type="button"
+      class="button button--primary"
+      (click)="refresh()"
+      [disabled]="refreshing() || loading()"
+    >
+      <app-icon name="refresh" [size]="11" />
+      {{ (refreshing() ? 'reports.data.refreshing' : 'reports.data.refresh') | t }}
+    </button>
+  </div>
+
+  <div class="notes">
+    @if (error(); as message) {
+      <p class="banner banner--danger" role="alert">{{ message }}</p>
+    }
+    @if (definitionDirty()) {
+      <p class="banner banner--warning">{{ 'reports.data.unsavedDefinition' | t }}</p>
+    }
+    @if (snapshot()?.fromOlderDefinition) {
+      <p class="banner banner--warning">
+        {{ 'reports.data.olderDefinition' | t: { version: snapshot()!.definitionVersion } }}
+      </p>
+    }
+    @if (failedAfterData() && lastRun(); as run) {
+      <div class="banner banner--danger" role="alert">
+        <p>
+          {{ (snapshot() ? 'reports.data.failedKeeps' : 'reports.data.failed') | t: { date: when(run.startedAtUtc) } }}
+          {{ run.message }}
+        </p>
+        @if (run.sources.length > 0) {
+          <ul>
+            @for (source of run.sources; track source.alias) {
+              @if (source.failureCode) {
+                <li>{{ source.alias }}: {{ failureText(source.failureCode, source.message) }}</li>
+              }
+            }
+          </ul>
+        }
+        @if (run.duplicateKeys.length > 0) {
+          <p>{{ 'reports.join.duplicates' | t }} {{ run.duplicateKeys.join(', ') }}</p>
+        }
+      </div>
+    }
+  </div>
+
+  @if (!loading() && snapshot()) {
+    <div class="reports" role="tablist" [attr.aria-label]="'reports.report.list' | t">
+      @for (report of reports(); track report.id) {
+        <button
+          type="button"
+          role="tab"
+          class="reports__tab"
+          [attr.aria-selected]="isSelected(report)"
+          (click)="select(report)"
+        >
+          {{ report.name }}
+        </button>
+      }
+      @if (draft() && !saved()) {
+        <button type="button" role="tab" class="reports__tab" aria-selected="true">
+          {{ draft()!.name }}
+          <span class="reports__new">{{ 'reports.unsaved' | t }}</span>
+        </button>
+      }
+      <button type="button" class="reports__add" (click)="newReport()">
+        <app-icon name="plus" [size]="10" />
+        {{ 'reports.report.new' | t }}
+      </button>
+    </div>
+
+    @if (draft(); as current) {
+      <section class="canvas" role="tabpanel" [attr.aria-label]="current.name">
+        <header class="canvas__head">
+          <h3>{{ current.name }}</h3>
+          @if (current.visual === 'Bar' || current.visual === 'Line') {
+            <button
+              type="button"
+              class="link"
+              [attr.aria-pressed]="asTable()"
+              (click)="asTable.set(!asTable())"
+            >
+              {{ (asTable() ? 'reports.chart.showChart' : 'reports.chart.showTable') | t }}
+            </button>
+          }
+        </header>
+        @if (missing().length > 0) {
+          <p class="banner banner--warning">
+            {{ 'reports.report.missing' | t: { columns: missing().join(', ') } }}
+          </p>
+        }
+        @if (repeated().length > 0) {
+          <p class="banner banner--warning">
+            {{ 'reports.join.repeated' | t: { columns: repeated().join(', ') } }}
+          </p>
+        }
+        <app-report-chart
+          [kind]="current.visual"
+          [series]="series()"
+          [indicator]="indicator()"
+          [table]="table()"
+          [valueLabel]="valueLabel()"
+          [categoryLabel]="categoryLabel()"
+          [asTable]="asTable()"
+          [columnLabel]="columnLabel()"
+        />
+      </section>
+    } @else {
+      <p class="placeholder">{{ 'reports.report.empty' | t }}</p>
+    }
+  }
+</main>
+
+@if (inspectorOpen() && draft(); as current) {
+  <aside class="inspector" [attr.aria-label]="'reports.inspector.label' | t">
+    <label class="field">
+      <span class="field__label">{{ 'reports.report.name' | t }}</span>
+      <input type="text" maxlength="80" [value]="current.name" (input)="rename($any($event.target).value)" />
+    </label>
+
+    <div class="field">
+      <span class="field__label" id="reports-visual">{{ 'reports.report.visual' | t }}</span>
+      <div class="choices" role="radiogroup" aria-labelledby="reports-visual">
+        @for (visual of visuals; track visual) {
+          <button
+            type="button"
+            role="radio"
+            [attr.aria-checked]="current.visual === visual"
+            (click)="chooseVisual(visual)"
+          >
+            <!-- i18n-keys: reports.visual.* -->
+            {{ 'reports.visual.' + visual | t }}
+          </button>
+        }
+      </div>
+    </div>
+
+    @if (current.visual === 'Table') {
+      <fieldset class="field">
+        <legend class="field__label">{{ 'reports.report.columns' | t }}</legend>
+        @for (column of columns(); track column.name) {
+          <label class="check">
+            <input
+              type="checkbox"
+              [checked]="isShown(column.name)"
+              (change)="toggleColumn(column.name, $any($event.target).checked)"
+            />
+            {{ columnLabel()(column.name) }}
+          </label>
+        }
+      </fieldset>
+    } @else {
+      @if (current.visual !== 'Indicator') {
+        <label class="field">
+          <span class="field__label">{{ 'reports.report.category' | t }}</span>
+          <select (change)="patch({ category: $any($event.target).value })">
+            @for (column of columns(); track column.name) {
+              <option [value]="column.name" [selected]="column.name === current.settings.category">
+                {{ columnLabel()(column.name) }}
+              </option>
+            }
+          </select>
+        </label>
+      }
+
+      <label class="field">
+        <span class="field__label">{{ 'reports.report.aggregate' | t }}</span>
+        <select (change)="chooseAggregate($any($event.target).value)">
+          @for (aggregate of aggregates; track aggregate) {
+            <option [value]="aggregate" [selected]="aggregate === current.settings.aggregate">
+              {{ 'reports.aggregate.' + aggregate | t }}
+            </option>
+          }
+        </select>
+      </label>
+
+      @if (current.settings.aggregate !== 'Count') {
+        <label class="field">
+          <span class="field__label">{{ 'reports.report.value' | t }}</span>
+          <select (change)="patch({ value: $any($event.target).value })">
+            @for (column of numericColumns(); track column.name) {
+              <option [value]="column.name" [selected]="column.name === current.settings.value">
+                {{ columnLabel()(column.name) }}
+              </option>
+            }
+          </select>
+          @if (numericColumns().length === 0) {
+            <span class="field__hint">{{ 'reports.report.noNumbers' | t }}</span>
+          }
+        </label>
+      }
+
+      @if (current.visual === 'Indicator') {
+        <label class="field">
+          <span class="field__label">{{ 'reports.report.target' | t }}</span>
+          <select (change)="patch({ target: $any($event.target).value || null })">
+            <option value="" [selected]="current.settings.target === null">{{ 'reports.report.noTarget' | t }}</option>
+            @for (column of numericColumns(); track column.name) {
+              <option [value]="column.name" [selected]="column.name === current.settings.target">
+                {{ columnLabel()(column.name) }}
+              </option>
+            }
+          </select>
+          <span class="field__hint">{{ 'reports.report.targetHint' | t }}</span>
+        </label>
+      } @else {
+        <label class="field">
+          <span class="field__label">{{ 'reports.report.sort' | t }}</span>
+          <select (change)="patch({ sort: $any($event.target).value })">
+            <option value="category" [selected]="current.settings.sort === 'category'">
+              {{ 'reports.report.sortCategory' | t }}
+            </option>
+            <option value="valueDesc" [selected]="current.settings.sort === 'valueDesc'">
+              {{ 'reports.report.sortValue' | t }}
+            </option>
+          </select>
+        </label>
+      }
+    }
+
+    <div class="inspector__actions">
+      <button
+        type="button"
+        class="button button--primary"
+        (click)="saveReport()"
+        [disabled]="!reportDirty() || !current.name.trim() || savingReport()"
+      >
+        <app-icon name="save" [size]="11" />
+        {{ 'reports.report.save' | t }}
+      </button>
+      <button type="button" class="link link--danger" (click)="deleteReport()">
+        <app-icon name="trash" [size]="11" />
+        {{ (saved() ? 'reports.report.delete' : 'reports.report.discard') | t }}
+      </button>
+    </div>
+  </aside>
+}

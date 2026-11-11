@@ -38,6 +38,29 @@ internal static class ReportsDatabase
                     created_utc_ticks INTEGER NOT NULL,
                     updated_utc_ticks INTEGER NOT NULL
                 ) STRICT;
+
+                CREATE TABLE IF NOT EXISTS report_runs (
+                    id TEXT PRIMARY KEY,
+                    dataset_id TEXT NOT NULL,
+                    started_utc_ticks INTEGER NOT NULL,
+                    status TEXT NOT NULL,
+                    detail TEXT NOT NULL
+                ) STRICT;
+
+                CREATE INDEX IF NOT EXISTS ix_report_runs_dataset
+                    ON report_runs (dataset_id, started_utc_ticks DESC);
+
+                CREATE TABLE IF NOT EXISTS saved_reports (
+                    id TEXT PRIMARY KEY,
+                    dataset_id TEXT NOT NULL,
+                    name TEXT NOT NULL,
+                    visual TEXT NOT NULL,
+                    settings TEXT NOT NULL,
+                    created_utc_ticks INTEGER NOT NULL,
+                    updated_utc_ticks INTEGER NOT NULL
+                ) STRICT;
+
+                CREATE INDEX IF NOT EXISTS ix_saved_reports_dataset ON saved_reports (dataset_id);
                 """;
             await command.ExecuteNonQueryAsync(cancellationToken);
             return connection;

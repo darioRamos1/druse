@@ -31,6 +31,7 @@ import {
   ReportValue,
 } from '../../../shared/models/reports';
 import { Icon } from '../../../shared/ui/icon/icon';
+import { ReportWorkbench } from '../report-workbench/report-workbench';
 import {
   MAX_SOURCES,
   adoptExpectedColumns,
@@ -79,7 +80,7 @@ const EMPTY_OPTIONS: SourceOptions = { databases: [], loading: false, error: nul
 @Component({
   selector: 'app-report-builder',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [DialogBackdrop, DialogFocus, Icon, NgTemplateOutlet, TranslatePipe],
+  imports: [DialogBackdrop, DialogFocus, Icon, NgTemplateOutlet, ReportWorkbench, TranslatePipe],
   templateUrl: './report-builder.html',
   styleUrl: './report-builder.scss',
 })
@@ -99,6 +100,12 @@ export class ReportBuilder {
 
   /** La última versión guardada de lo que se está editando, para saber si hay cambios. */
   private readonly _saved = signal<ReportDataset | null>(null);
+
+  /** Lo que usa Visualización: la definición guardada, no la que se está editando. */
+  protected readonly savedDataset = this._saved.asReadonly();
+
+  /** Para pasar a los hijos sin perder `this`. */
+  protected readonly labelOf = (name: string): string => this.columnLabel(name);
 
   protected readonly step = signal<ReportStep>('sources');
   protected readonly activeSource = signal(0);
@@ -303,12 +310,14 @@ export class ReportBuilder {
   // --- Pasos y vista ---------------------------------------------------------
 
   protected goTo(step: ReportStep): void {
-    if (step === 'visual' || (step === 'join' && !this.hasJoin())) {
+    if ((step === 'visual' && this._saved() === null) || (step === 'join' && !this.hasJoin())) {
       return;
     }
 
     this.step.set(step);
-    this.view.set(step === 'join' ? { kind: 'join' } : { kind: 'source', index: this.activeSource() });
+    if (step !== 'visual') {
+      this.view.set(step === 'join' ? { kind: 'join' } : { kind: 'source', index: this.activeSource() });
+    }
     this.inspectorOpen.set(true);
 
     if (step === 'join') {

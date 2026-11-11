@@ -69,7 +69,11 @@
     </div>
   }
 
-  <div class="body" [class.is-inspecting]="inspectorOpen() && sources().length > 0">
+  <div
+    class="body"
+    [class.is-inspecting]="inspectorOpen() && sources().length > 0 && step() !== 'visual'"
+    [class.is-working]="step() === 'visual'"
+  >
     <!-- Navegación: pasos del constructor y conjuntos guardados. -->
     <nav class="rail" [attr.aria-label]="'reports.nav' | t">
       <p class="rail__label">{{ 'reports.steps' | t }}</p>
@@ -102,10 +106,17 @@
           </button>
         </li>
         <li>
-          <button type="button" class="steps__item" disabled>
+          <button
+            type="button"
+            class="steps__item"
+            [class.is-active]="step() === 'visual'"
+            [attr.aria-current]="step() === 'visual' ? 'step' : null"
+            [disabled]="savedDataset() === null"
+            [attr.title]="savedDataset() === null ? ('reports.step.visualNeedsSave' | t) : null"
+            (click)="goTo('visual')"
+          >
             <span class="steps__number" aria-hidden="true">3</span>
             {{ 'reports.step.visual' | t }}
-            <span class="steps__soon">{{ 'reports.soon' | t }}</span>
           </button>
         </li>
       </ol>
@@ -148,6 +159,15 @@
       }
     </nav>
 
+    @if (step() === 'visual' && savedDataset(); as dataset) {
+      <app-report-workbench
+        class="workbench"
+        [dataset]="dataset"
+        [definitionDirty]="dirty()"
+        [inspectorOpen]="inspectorOpen()"
+        [columnLabel]="labelOf"
+      />
+    } @else {
     <!-- Centro: lo que devuelve cada fuente y lo que sale de cruzarlas. -->
     <main class="stage">
       @if (sources().length === 0) {
@@ -202,7 +222,7 @@
           }
           @if (problems().length > 0) {
             <ul class="problems" [attr.aria-label]="'reports.problems' | t">
-              @for (problem of problems(); track problem) {
+              @for (problem of problems(); track $index) {
                 <li>{{ problem | t }}</li>
               }
             </ul>
@@ -256,7 +276,7 @@
                     @if (joined.duplicateKeys.length > 0) {
                       <p>{{ 'reports.join.duplicates' | t }}</p>
                       <ul class="keys">
-                        @for (key of joined.duplicateKeys; track key) {
+                        @for (key of joined.duplicateKeys; track $index) {
                           <li><code>{{ key }}</code></li>
                         }
                       </ul>
@@ -535,6 +555,7 @@
           </button>
         }
       </aside>
+    }
     }
   </div>
 </section>

@@ -1,0 +1,184 @@
+:host {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  color: var(--dr-text);
+}
+
+.empty {
+  margin: 32px auto;
+  color: var(--dr-text-tertiary);
+  text-align: center;
+}
+
+// --- Barras y línea ------------------------------------------------------------
+
+.chart {
+  width: 100%;
+  height: auto;
+  max-height: 420px;
+  font-family: var(--dr-font-ui);
+
+  &__grid {
+    stroke: var(--dr-border-faint);
+    stroke-width: 1;
+  }
+
+  &__axis {
+    stroke: var(--dr-border-strong);
+    stroke-width: 1;
+  }
+
+  &__tick,
+  &__category {
+    fill: var(--dr-text-tertiary);
+    font-size: 11px;
+  }
+
+  &__category.is-empty {
+    font-style: italic;
+  }
+
+  &__value {
+    fill: var(--dr-text-secondary);
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  &__bar {
+    fill: var(--dr-accent);
+    opacity: 0.88;
+
+    &:hover {
+      opacity: 1;
+    }
+  }
+
+  &__line {
+    fill: none;
+    stroke: var(--dr-accent);
+    stroke-width: 2.5;
+    stroke-linejoin: round;
+    stroke-linecap: round;
+  }
+
+  &__point {
+    fill: var(--dr-surface-base);
+    stroke: var(--dr-accent);
+    stroke-width: 2;
+  }
+}
+
+// --- Indicador -------------------------------------------------------------------
+
+.indicator {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-self: flex-start;
+  width: min(420px, 100%);
+  margin: 8px 0;
+  padding: 18px 20px;
+  border: 1px solid var(--dr-border-subtle);
+  border-radius: var(--dr-radius);
+  background: var(--dr-surface-raised);
+
+  &__label {
+    font-size: 12px;
+    color: var(--dr-text-tertiary);
+  }
+
+  &__value {
+    margin: 0;
+    font-size: 40px;
+    font-weight: 650;
+    line-height: 1.05;
+    font-variant-numeric: tabular-nums;
+  }
+
+  &__track {
+    height: 8px;
+    overflow: hidden;
+    border-radius: 999px;
+    background: var(--dr-surface-sunken);
+  }
+
+  &__fill {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: var(--dr-accent);
+    transition: width var(--dr-duration-slow, 200ms) var(--dr-ease-out, ease-out);
+  }
+
+  &__detail,
+  &__note {
+    margin: 0;
+    font-size: 12px;
+    line-height: 1.45;
+    color: var(--dr-text-secondary);
+  }
+
+  &__note {
+    color: var(--dr-text-tertiary);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .indicator__fill {
+    transition: none;
+  }
+}
+
+// --- Tabla -------------------------------------------------------------------------
+
+.grid {
+  flex: 1;
+  min-height: 120px;
+  overflow: auto;
+  border: 1px solid var(--dr-border-subtle);
+  border-radius: var(--dr-radius-sm);
+  background: var(--dr-surface-panel);
+
+  &:focus-visible {
+    outline: 2px solid var(--dr-accent-line-strong);
+    outline-offset: 1px;
+  }
+
+  table {
+    width: max-content;
+    min-width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    font-size: 12px;
+  }
+
+  th,
+  td {
+    padding: 5px 10px;
+    border-bottom: 1px solid var(--dr-border-faint);
+    text-align: left;
+    white-space: nowrap;
+
+    &.is-number {
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+    }
+  }
+
+  th {
+    position: sticky;
+    top: 0;
+    background: var(--dr-surface-grid-header);
+    font-weight: 600;
+  }
+
+  tbody tr:nth-child(even) {
+    background: var(--dr-surface-stripe);
+  }
+
+  td.is-null {
+    color: var(--dr-text-faint);
+    font-style: italic;
+  }
+}

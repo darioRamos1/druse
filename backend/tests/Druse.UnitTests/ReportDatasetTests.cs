@@ -145,6 +145,46 @@ public sealed class ReportDatasetTests
     }
 
     [Fact]
+    public async Task ElHistorialDeIntentosSeQuedaConLosMasRecientes()
+    {
+        using var paths = new TemporaryPaths();
+        paths.EnsureCreated();
+        var runs = new SqliteReportRunStore(paths);
+        var datasetId = Guid.NewGuid();
+        var otro = Guid.NewGuid();
+        var inicio = new DateTimeOffset(2026, 11, 11, 8, 0, 0, TimeSpan.Zero);
+
+        for (var i = 0; i < ReportRefreshService.RunHistoryLimit + 5; i++)
+        {
+            await runs.AddAsync(Intento(datasetId, inicio.AddMinutes(i), i % 2 == 0), CancellationToken.None);
+        }
+
+        await runs.AddAsync(Intento(otro, inicio, ok: true), CancellationToken.None);
+
+        var recientes = await runs.GetRecentAsync(datasetId, 100, CancellationToken.None);
+        Assert.Equal(ReportRefreshService.RunHistoryLimit, recientes.Count);
+        Assert.Equal(inicio.AddMinutes(ReportRefreshService.RunHistoryLimit + 4), recientes[0].StartedAtUtc);
+        Assert.Equal(ReportRunStatus.Succeeded, recientes[0].Status);
+        Assert.Equal("Metas", recientes[1].Sources.Single().Alias);
+
+        // Podar un conjunto no toca los intentos de otro.
+        Assert.Single(await runs.GetRecentAsync(otro, 5, CancellationToken.None));
+
+        static ReportRun Intento(Guid datasetId, DateTimeOffset started, bool ok) => new()
+        {
+            Id = Guid.NewGuid(),
+            DatasetId = datasetId,
+            DefinitionVersion = 1,
+            Origin = ReportRunOrigin.Manual,
+            Status = ok ? ReportRunStatus.Succeeded : ReportRunStatus.Failed,
+            StartedAtUtc = started,
+            CompletedAtUtc = started.AddSeconds(2),
+            Message = ok ? null : "No se pudo leer alguna fuente.",
+            Sources = [new ReportRunSource("Metas", ok ? null : "database-error", null, 2, false, started, started)],
+        };
+    }
+
+    [Fact]
     public void ElEsquemaComparadoCuentaLoQueFaltaCambiaYSobra()
     {
         ReportExpectedColumn[] esperado = [new("mes", "DateOnly"), new("municipio", "String"), new("meta", "Decimal")];
