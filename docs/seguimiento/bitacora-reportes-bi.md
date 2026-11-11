@@ -130,6 +130,14 @@ Dos fuentes ya materializadas en memoria, con 20.000 filas cada una y un cruce 1
 - Unitarias: 18 de reportes, incluida la poda del historial. La batería completa (733) pasó antes de añadir esa prueba.
 - Frontend: 98 casos en reportes, novedades, i18n y gateway, además de tsc y `check-i18n`. El cálculo de los gráficos tiene pruebas propias: 60 %, meta cero, orden cronológico y columnas que faltan.
 
+### Revisión visual con Playwright
+
+- El barrido fotografía ahora Reportes también en tema claro (`21f`–`21h`: indicador, barras y combinar) y a 1.024 y 900 px (`21i`–`21k`), con el conjunto reabierto desde `reports.db`. En claro, el contraste y los estados se leen bien.
+- A 1.024 y 900 px salieron dos fallos y quedaron corregidos:
+  - El inspector superpuesto se abría solo y tapaba «Actualizar ahora». Ahora, por debajo de 1.100 px, empieza cerrado y se abre con su botón.
+  - A 900 px la barra compacta ocultaba el botón **Reportes**, y solo quedaba la paleta para llegar. Ahora se queda como icono, con su nombre accesible.
+- El barrido y la e2e usan un nombre propio para su conjunto y el barrido borra los suyos al final, también los que dejara una ejecución cortada. La consola sale limpia; `medir` solo marca la ventana de detrás, como ya hacía en esos anchos.
+
 ### Dónde retomar
 
 1. Hito 4: tableros con varios reportes en cuadrícula, filtros compartidos de fecha y categoría, personalización, plantillas y exportación a Excel y PDF. Elegir la librería de gráficos probando tema, accesibilidad y exportación.

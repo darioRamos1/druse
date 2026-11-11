@@ -29,6 +29,9 @@ const SALIDA = process.env['DRUSE_BARRIDO_DIR'] ?? 'barrido';
 
 const hallazgos: string[] = [];
 
+/** Nombre propio para el conjunto del barrido: así se encuentra y se borra sin confundirlo. */
+const CONJUNTO_BARRIDO = 'Barrido · Ventas y metas';
+
 async function foto(page: Page, nombre: string, sitio?: Locator): Promise<void> {
   await (sitio ?? page).screenshot({ path: `${SALIDA}/${nombre}.png` });
 }
@@ -462,6 +465,7 @@ test.describe('barrido visual', () => {
     await medir(page, 'reportes vacío', hallazgos);
     await foto(page, '21-reportes-vacio', reportes.locator('.dialog'));
 
+    await reportes.getByLabel('Nombre del conjunto de datos').fill(CONJUNTO_BARRIDO);
     await anadirFuente(reportes, 'Ventas', VENTAS_SQL);
     await previsualizar(reportes);
     await medir(page, 'reportes con una fuente', hallazgos);
@@ -491,10 +495,13 @@ test.describe('barrido visual', () => {
     await medir(page, 'reportes indicador', hallazgos);
     await foto(page, '21e-reportes-indicador', reportes.locator('.dialog'));
 
-    // Y se deja como estaba: sin conjuntos de prueba.
-    await reportes.locator('.steps__item').first().click();
-    await reportes.getByRole('button', { name: 'Borrar este conjunto de datos' }).click();
-    await reportes.locator('.confirm').getByRole('button', { name: 'Borrar' }).click();
+    // Se guardan un indicador y unas barras: el tema claro y los anchos
+    // estrechos se miran más abajo sobre este mismo conjunto, y al final se borra.
+    await reportes.getByRole('button', { name: 'Guardar reporte' }).click();
+    await reportes.getByRole('button', { name: 'Nuevo reporte' }).click();
+    await reportes.locator('.inspector').getByLabel('Agrupar por').selectOption({ label: 'Ventas.municipio' });
+    await reportes.getByRole('button', { name: 'Guardar reporte' }).click();
+    await expect(reportes.locator('.reports__tab')).toHaveCount(2);
     await page.keyboard.press('Escape');
     await expect(reportes.locator('.dialog')).toBeHidden();
 
@@ -699,7 +706,75 @@ test.describe('barrido visual', () => {
     await medir(page, 'claro: conexión', hallazgos);
     await foto(page, '17-claro-conexion', page.locator('app-connection-dialog .dialog'));
     await page.keyboard.press('Escape');
+
+    // Reportes en claro: el conjunto guardado arriba, reabierto desde reports.db.
+    const reportesClaro = await abrirReportes(page);
+
+    await reportesClaro.locator('.datasets__item', { hasText: CONJUNTO_BARRIDO }).first().click();
+    await abrirVisualizacion(reportesClaro);
+    await expect(reportesClaro.locator('.indicator__value')).toBeVisible();
+    await medir(page, 'claro: reportes indicador', hallazgos);
+    await foto(page, '21f-claro-reportes-indicador', reportesClaro.locator('.dialog'));
+    await reportesClaro.locator('.reports__tab').nth(1).click();
+    await expect(reportesClaro.locator('.chart__bar')).toHaveCount(3);
+    await medir(page, 'claro: reportes barras', hallazgos);
+    await foto(page, '21g-claro-reportes-barras', reportesClaro.locator('.dialog'));
+    await reportesClaro.locator('.steps__item').nth(1).click();
+    await previsualizar(reportesClaro);
+    await medir(page, 'claro: reportes combinar', hallazgos);
+    await foto(page, '21h-claro-reportes-combinar', reportesClaro.locator('.dialog'));
+    await page.keyboard.press('Escape');
+    await expect(reportesClaro.locator('.dialog')).toBeHidden();
     await page.getByRole('button', { name: 'Tema oscuro' }).click();
+
+    // Reportes en anchos estrechos: por debajo de 1.100 px el inspector se
+    // superpone a la vista previa, y eso es lo que hay que mirar.
+    // Se abre ya estrecho, como lo encontraría alguien con la ventana así.
+    const tamano = page.viewportSize();
+    let reportesEstrecho = page.locator('app-report-builder');
+
+    for (const ancho of [1024, 900]) {
+      await page.setViewportSize({ width: ancho, height: 760 });
+      reportesEstrecho = await abrirReportes(page);
+      await reportesEstrecho.locator('.datasets__item', { hasText: CONJUNTO_BARRIDO }).first().click();
+      await abrirVisualizacion(reportesEstrecho);
+      await expect(reportesEstrecho.locator('app-report-workbench .inspector')).toHaveCount(0);
+      await page.waitForTimeout(300);
+      await medir(page, `reportes visualización a ${ancho}`, hallazgos);
+      await foto(page, `21i-reportes-visual-${ancho}`, reportesEstrecho.locator('.dialog'));
+      await reportesEstrecho.getByRole('button', { name: 'Mostrar u ocultar la configuración' }).click();
+      await page.waitForTimeout(300);
+      await foto(page, `21j-reportes-visual-inspector-${ancho}`, reportesEstrecho.locator('.dialog'));
+      await reportesEstrecho.locator('.steps__item').first().click();
+      await page.waitForTimeout(300);
+      await medir(page, `reportes fuentes a ${ancho}`, hallazgos);
+      await foto(page, `21k-reportes-fuentes-${ancho}`, reportesEstrecho.locator('.dialog'));
+
+      if (ancho !== 900) {
+        await page.keyboard.press('Escape');
+        await expect(reportesEstrecho.locator('.dialog')).toBeHidden();
+      }
+    }
+
+    // Se deja como estaba: sin conjuntos del barrido, tampoco los que dejara
+    // a medias una ejecución anterior que se cortó antes de llegar aquí.
+    const delBarrido = reportesEstrecho.locator('.datasets__item', { hasText: CONJUNTO_BARRIDO });
+
+    while ((await delBarrido.count()) > 0) {
+      const antes = await delBarrido.count();
+
+      await delBarrido.first().click();
+      await reportesEstrecho.locator('.steps__item').first().click();
+      await reportesEstrecho.getByRole('button', { name: 'Borrar este conjunto de datos' }).click();
+      await reportesEstrecho.locator('.confirm').getByRole('button', { name: 'Borrar' }).click();
+      await expect(delBarrido).toHaveCount(antes - 1);
+    }
+
+    await page.keyboard.press('Escape');
+    await expect(reportesEstrecho.locator('.dialog')).toBeHidden();
+    if (tamano) {
+      await page.setViewportSize(tamano);
+    }
 
     // --- Anchos ------------------------------------------------------------
     for (const ancho of [1440, 1280, 1024, 900]) {

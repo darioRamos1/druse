@@ -25,6 +25,10 @@ test.describe('Reportes BI', () => {
     await conectar(page);
 
     const reportes = await abrirReportes(page);
+    // Un nombre propio: reabrirlo no puede confundirse con restos de otra ejecución.
+    const nombre = `E2E Reportes ${Date.now()}`;
+
+    await reportes.getByLabel('Nombre del conjunto de datos').fill(nombre);
 
     await anadirFuente(reportes, 'Ventas', VENTAS_SQL);
     await previsualizar(reportes);
@@ -86,7 +90,7 @@ test.describe('Reportes BI', () => {
     await expect(reportes.locator('.dialog')).toBeHidden();
     const otraVez = await abrirReportes(page);
 
-    await otraVez.locator('.datasets__item', { hasText: 'Conjunto sin nombre' }).first().click();
+    await otraVez.locator('.datasets__item', { hasText: nombre }).first().click();
     await abrirVisualizacion(otraVez);
     await expect(otraVez.locator('.indicator__value')).toHaveText(/60\s?%/);
 

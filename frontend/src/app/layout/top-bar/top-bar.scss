@@ -291,9 +291,21 @@
     gap: 8px;
   }
 
-  .actions > .btn:not(.btn--primary),
+  .actions > .btn:not(.btn--primary, .btn--reports),
   .segmented {
     display: none;
+  }
+
+  /*
+   * Reportes se queda como icono: es su única puerta visible, y sin ella solo
+   * se llegaría por la paleta. El rótulo sigue dentro y da el nombre accesible.
+   */
+  .btn--reports {
+    width: 30px;
+    gap: 0;
+    padding: 0;
+    justify-content: center;
+    font-size: 0;
   }
 }
 

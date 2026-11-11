@@ -599,7 +599,8 @@
 
 @media (max-width: 1100px) {
   .body,
-  .body.is-inspecting {
+  .body.is-inspecting,
+  .body.is-working {
     grid-template-columns: 184px minmax(0, 1fr);
   }
 

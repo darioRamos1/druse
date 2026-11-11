@@ -71,6 +71,16 @@ interface SourceOptions {
 const EMPTY_OPTIONS: SourceOptions = { databases: [], loading: false, error: null };
 
 /**
+ * Hay sitio para el inspector al lado de la vista previa.
+ *
+ * El mismo corte que la hoja de estilos: por debajo de 1.100 px el inspector
+ * pasa a panel superpuesto. Sin `matchMedia` (pruebas) se supone que sí cabe.
+ */
+function wideLayout(): boolean {
+  return !(globalThis.matchMedia?.('(max-width: 1100px)').matches ?? false);
+}
+
+/**
  * Constructor de conjuntos de datos de Reportes BI.
  *
  * Navegación a la izquierda (pasos y conjuntos guardados), vista previa en el
@@ -110,7 +120,7 @@ export class ReportBuilder {
   protected readonly step = signal<ReportStep>('sources');
   protected readonly activeSource = signal(0);
   protected readonly view = signal<PreviewView>({ kind: 'source', index: 0 });
-  protected readonly inspectorOpen = signal(true);
+  protected readonly inspectorOpen = signal(wideLayout());
 
   protected readonly preview = signal<ReportDatasetPreview | null>(null);
   protected readonly previewing = signal(false);
@@ -318,7 +328,11 @@ export class ReportBuilder {
     if (step !== 'visual') {
       this.view.set(step === 'join' ? { kind: 'join' } : { kind: 'source', index: this.activeSource() });
     }
-    this.inspectorOpen.set(true);
+    // En ancho estrecho el inspector se superpone: abrirlo solo al cambiar de
+    // paso taparía «Actualizar ahora» y la vista previa. Ahí se abre con su botón.
+    if (wideLayout()) {
+      this.inspectorOpen.set(true);
+    }
 
     if (step === 'join') {
       this.proposeKeys();
