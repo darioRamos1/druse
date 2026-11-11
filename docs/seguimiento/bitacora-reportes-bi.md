@@ -8,6 +8,15 @@
 - [x] Acotar el tamaño en bytes y reducir las asignaciones al reabrir resultados anchos.
 - [x] Ejecutar el escenario con los dos motores reales.
 
+## Tareas del hito 2
+
+- [x] Guardar y reabrir definiciones de conjuntos (una o dos fuentes por perfil, modo SQL o visual, unión) con versión.
+- [x] Unión 1:N con aviso de métricas repetidas y ejemplos de claves duplicadas.
+- [x] Vista previa con diagnósticos por fuente, cambios de esquema y muestra marcada.
+- [x] API local y contrato OpenAPI.
+- [ ] Constructor en Angular: Fuentes, Combinar y vista previa, con el compositor para el modo visual.
+- [ ] Captura del constructor para la landing.
+
 Los hitos siguientes cubren el constructor SQL y visual, los reportes guardados, los tableros y plantillas, y la actualización programada. La evidencia para la landing se prepara conforme se valida cada hito.
 
 ## 2026-11-11 · Inicio del hito 1
@@ -59,7 +68,23 @@ Dos fuentes ya materializadas en memoria, con 20.000 filas cada una y un cruce 1
 - Con `test-db.ps1` se levantaron PostgreSQL 18 y SQL Server 2022 desechables. `CrossEngineReportTests` se ejecutó (no se omitió) y pasó en 4 s: tres filas, 220 en ventas, el municipio 11001 sin meta, `05001` como texto, `mes` como `DateOnly` y 60 % de cumplimiento.
 - Con esto se cumple el criterio del hito 1: totales esperados, ceros iniciales, duplicado detectado y fuente truncada rechazada.
 
+## 2026-11-11 · Hito 2: definiciones y vista previa en el backend
+
+### Qué se hizo
+
+- `ReportDataset` describe un conjunto: una o dos fuentes con alias, perfil guardado, base, modo SQL o visual, SQL a ejecutar, copia del estado del compositor y columnas esperadas, más la unión. `ReportDatasetValidator` exige unión con dos fuentes, alias distintos y estado del compositor en las fuentes visuales.
+- `SqliteReportDatasetStore` guarda las definiciones en `reports.db`, junto a los resultados. La versión la pone el almacén y solo sube si cambian las fuentes o la unión, no al renombrar. Borrar un conjunto borra también su resultado guardado. `ReportsDatabase` crea las dos tablas en un solo sitio.
+- `ReportJoin` admite la cardinalidad `ManyToOne`: la izquierda puede repetir la clave y la derecha es el lado «uno». Las columnas numéricas de la derecha que se repiten salen en `RepeatedColumns` para pedir una agregación antes de sumarlas. Las claves duplicadas lanzan `ReportJoinDuplicateKeysException` con hasta tres ejemplos, con las fechas en ISO.
+- `ReportDatasetPreviewService` resuelve las credenciales con el llavero, como al abrir una conexión guardada. Lee cada fuente por separado y devuelve diagnósticos con clave (`connection-missing`, `password-missing`, `ssh-secret-missing`, `engine-unsupported`, `invalid-query`, `database-error`), cambios de esquema frente a la última lectura y hasta 100 filas de muestra. Un fallo de una fuente no oculta el diagnóstico de la otra. Si una fuente se trunca, el cruce se calcula igual pero queda marcado como muestra.
+- La API expone `GET/PUT/DELETE /api/reports/datasets/{id}`, `GET /api/reports/datasets` y `POST /api/reports/datasets/preview`. El contrato está en `docs/api/openapi.json`.
+
+### Comprobaciones
+
+- 17 casos unitarios de reportes y la batería unitaria completa (733 superadas, 0 con error).
+- Con `DRUSE_REQUIRE_ENGINES=1`, ocho pruebas de integración contra SQL Server 2022 y PostgreSQL 18, sin omitidas. Una fuente visual y otra SQL preparan el mismo cruce que dos SQL (3 filas, 2 con meta, 220 en ventas). Una meta duplicada detiene la unión y muestra `2026-01-01 · 05001`. La prueba encontró que la fecha salía como `01/01/2026` y se corrigió.
+
 ### Dónde retomar
 
-1. Hito 2: constructor de conjuntos de datos. Definición persistente (conjunto, fuentes por perfil, unión) con versión, vista previa con diagnósticos por fuente y unión 1:N con detección de métricas del lado «uno» que se repetirían.
-2. Preparar la evidencia de ventas y metas para la sección `#reportes-bi` de la landing (estado En desarrollo).
+1. Constructor en Angular con navegación Fuentes, Combinar y vista previa, y el inspector plegable. Revisar antes qué agrupaciones y agregados admite el compositor (`frontend/src/app/features/query-builder`) para el modo visual.
+2. Llevar la unión a un trabajo de actualización manual que guarde el resultado (hito 3) usando `ReportDatasetPreviewService` y `ReportSnapshotService`.
+3. Preparar la evidencia del cruce y la captura del constructor para la sección `#reportes-bi` de la landing.

@@ -95,7 +95,7 @@ public sealed class ReportJoinTests
         var unique = Data([[enero, "05001", 80m]]);
         var duplicated = Data([[enero, "05001", 100m], [enero, "05001", 101m]]);
 
-        var error = Assert.Throws<InvalidOperationException>(() => ReportJoin.Combine(
+        var error = Assert.Throws<ReportJoinDuplicateKeysException>(() => ReportJoin.Combine(
             duplicateLeft ? duplicated : unique, duplicateLeft ? unique : duplicated,
             Keys, ReportJoinKind.Left, CancellationToken.None));
 

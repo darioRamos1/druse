@@ -80,7 +80,7 @@ public sealed class ReportSnapshotStoreTests
             dataset, later, source, source with { Truncated = true }, CancellationToken.None));
 
         var duplicate = Data([[Mes, "05001", 100m], [Mes, "05001", 101m]]);
-        await Assert.ThrowsAsync<InvalidOperationException>(() => service.CombineAndSaveAsync(
+        await Assert.ThrowsAsync<ReportJoinDuplicateKeysException>(() => service.CombineAndSaveAsync(
             dataset, later, source, duplicate, CancellationToken.None));
 
         var invalid = Data([[Mes, "05001", "valor incompatible"]]);

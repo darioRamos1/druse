@@ -2531,6 +2531,120 @@
           }
         }
       }
+    },
+    "/api/reports/datasets": {
+      "get": {
+        "tags": [
+          "Druse.Host.LocalApi"
+        ],
+        "operationId": "GetReportDatasets",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/reports/datasets/{id}": {
+      "get": {
+        "tags": [
+          "Druse.Host.LocalApi"
+        ],
+        "operationId": "GetReportDataset",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Druse.Host.LocalApi"
+        ],
+        "operationId": "SaveReportDataset",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReportDatasetDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Druse.Host.LocalApi"
+        ],
+        "operationId": "DeleteReportDataset",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/reports/datasets/preview": {
+      "post": {
+        "tags": [
+          "Druse.Host.LocalApi"
+        ],
+        "operationId": "PreviewReportDataset",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReportDatasetDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -4010,6 +4124,146 @@
             "type": "array",
             "items": {
               "type": "string"
+            }
+          }
+        }
+      },
+      "ReportDatasetDto": {
+        "required": [
+          "name",
+          "sources"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "version": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "sources": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReportSourceDto"
+            }
+          },
+          "join": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ReportJoinDto"
+              }
+            ]
+          },
+          "createdAtUtc": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAtUtc": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ReportExpectedColumnDto": {
+        "required": [
+          "name",
+          "clrType"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "clrType": {
+            "type": "string"
+          }
+        }
+      },
+      "ReportJoinDto": {
+        "required": [
+          "keys",
+          "kind",
+          "cardinality"
+        ],
+        "type": "object",
+        "properties": {
+          "keys": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReportJoinKeyDto"
+            }
+          },
+          "kind": {
+            "type": "string"
+          },
+          "cardinality": {
+            "type": "string"
+          }
+        }
+      },
+      "ReportJoinKeyDto": {
+        "required": [
+          "left",
+          "right"
+        ],
+        "type": "object",
+        "properties": {
+          "left": {
+            "type": "string"
+          },
+          "right": {
+            "type": "string"
+          }
+        }
+      },
+      "ReportSourceDto": {
+        "required": [
+          "alias",
+          "connectionId",
+          "database",
+          "mode",
+          "sql"
+        ],
+        "type": "object",
+        "properties": {
+          "alias": {
+            "type": "string"
+          },
+          "connectionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "database": {
+            "type": "string"
+          },
+          "mode": {
+            "type": "string"
+          },
+          "sql": {
+            "type": "string"
+          },
+          "visualModel": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "expectedColumns": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReportExpectedColumnDto"
             }
           }
         }

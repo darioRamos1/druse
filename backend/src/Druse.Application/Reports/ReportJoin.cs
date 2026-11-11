@@ -1,3 +1,4 @@
+using System.Globalization;
 using Druse.Database.Abstractions;
 using Druse.Domain;
 
@@ -15,11 +16,33 @@ public sealed record ReportJoinResult(
     IReadOnlyList<ResultColumn> Columns,
     IReadOnlyList<IReadOnlyList<object?>> Rows,
     int UnmatchedLeftRows,
-    int UnmatchedRightRows);
+    int UnmatchedRightRows)
+{
+    /// <summary>
+    /// Columnas numéricas del lado «uno» que aparecen en varias filas. Sumarlas
+    /// tal cual contaría la misma meta varias veces: hay que agregarlas a su nivel.
+    /// </summary>
+    public IReadOnlyList<string> RepeatedColumns { get; init; } = [];
+}
 
-/// <summary>Une dos resultados con cardinalidad uno a uno.</summary>
+/// <summary>La unión se detuvo por claves repetidas donde no se esperaban.</summary>
+public sealed class ReportJoinDuplicateKeysException(string message, IReadOnlyList<string> sampleKeys)
+    : InvalidOperationException(message)
+{
+    /// <summary>Hasta tres claves repetidas, para que se puedan buscar en el origen.</summary>
+    public IReadOnlyList<string> SampleKeys { get; } = sampleKeys;
+}
+
+/// <summary>Une dos resultados uno a uno o muchos a uno.</summary>
 public static class ReportJoin
 {
+    private const int DuplicateSamples = 3;
+
+    private static readonly HashSet<string> NumericTypes =
+    [
+        nameof(Byte), nameof(Int16), nameof(Int32), nameof(Int64), nameof(Single), nameof(Double), nameof(Decimal),
+    ];
+
     private static readonly EqualityComparer<object[]> KeyComparer = EqualityComparer<object[]>.Create(
         (left, right) => left!.SequenceEqual(right!),
         key =>
@@ -38,6 +61,15 @@ public static class ReportJoin
         TypedQueryResult right,
         IReadOnlyList<ReportJoinKey> keys,
         ReportJoinKind kind,
+        CancellationToken cancellationToken) =>
+        Combine(left, right, keys, kind, ReportJoinCardinality.OneToOne, cancellationToken);
+
+    public static ReportJoinResult Combine(
+        TypedQueryResult left,
+        TypedQueryResult right,
+        IReadOnlyList<ReportJoinKey> keys,
+        ReportJoinKind kind,
+        ReportJoinCardinality cardinality,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(left);
@@ -57,6 +89,11 @@ public static class ReportJoin
         if (!Enum.IsDefined(kind))
         {
             throw new ArgumentOutOfRangeException(nameof(kind));
+        }
+
+        if (!Enum.IsDefined(cardinality))
+        {
+            throw new ArgumentOutOfRangeException(nameof(cardinality));
         }
 
         var leftColumns = new int[keys.Count];
@@ -81,35 +118,52 @@ public static class ReportJoin
             rightColumns[i] = rightColumn.Ordinal;
         }
 
-        var rightIndex = new Dictionary<object[], IReadOnlyList<object?>>(KeyComparer);
+        var rightIndex = new Dictionary<object[], RightEntry>(KeyComparer);
+        var duplicates = new List<string>();
+        var rightWithoutKey = 0;
         foreach (var row in right.Rows)
         {
             cancellationToken.ThrowIfCancellationRequested();
             var key = ReadKey(row, rightColumns);
-            if (key is not null && !rightIndex.TryAdd(key, row))
+            if (key is null)
             {
-                throw new InvalidOperationException("La fuente derecha tiene claves de unión duplicadas.");
+                rightWithoutKey++;
+            }
+            else if (!rightIndex.TryAdd(key, new RightEntry(row)) && duplicates.Count < DuplicateSamples)
+            {
+                duplicates.Add(FormatKey(key));
             }
         }
 
-        var leftKeys = new HashSet<object[]>(KeyComparer);
+        // En las dos cardinalidades la derecha es el lado «uno»: repetirla
+        // multiplicaría filas sin que nadie lo hubiera pedido (N:N).
+        if (duplicates.Count > 0)
+        {
+            throw new ReportJoinDuplicateKeysException(
+                "La fuente derecha tiene claves de unión duplicadas.", duplicates);
+        }
+
+        var leftKeys = cardinality == ReportJoinCardinality.OneToOne
+            ? new HashSet<object[]>(KeyComparer)
+            : null;
         var rows = new List<IReadOnlyList<object?>>(left.Rows.Count);
         var emptyRight = new object?[right.Columns.Count];
         var unmatchedLeft = 0;
-        var matchedRight = 0;
+        var repeated = false;
         foreach (var row in left.Rows)
         {
             cancellationToken.ThrowIfCancellationRequested();
             var key = ReadKey(row, leftColumns);
-            if (key is not null && !leftKeys.Add(key))
+            if (key is not null && leftKeys is not null && !leftKeys.Add(key) && duplicates.Count < DuplicateSamples)
             {
-                throw new InvalidOperationException("La fuente izquierda tiene claves de unión duplicadas.");
+                duplicates.Add(FormatKey(key));
             }
 
             if (key is not null && rightIndex.TryGetValue(key, out var match))
             {
-                rows.Add([.. row, .. match]);
-                matchedRight++;
+                rows.Add([.. row, .. match.Row]);
+                match.Matches++;
+                repeated |= match.Matches > 1;
             }
             else
             {
@@ -121,6 +175,13 @@ public static class ReportJoin
             }
         }
 
+        if (duplicates.Count > 0)
+        {
+            throw new ReportJoinDuplicateKeysException(
+                "La fuente izquierda tiene claves de unión duplicadas. Si se esperan, elige la cardinalidad 1:N.",
+                duplicates);
+        }
+
         // Calificar los nombres conserva la identidad de las columnas cuando
         // los dos motores devuelven un alias igual, como fecha o municipio.
         var columns = left.Columns.Select(column => column with { Name = $"izquierda.{column.Name}" })
@@ -130,7 +191,36 @@ public static class ReportJoin
                 Ordinal = column.Ordinal + left.Columns.Count,
             })).ToArray();
 
-        return new ReportJoinResult(columns, rows, unmatchedLeft, right.Rows.Count - matchedRight);
+        var unmatchedRight = rightWithoutKey + rightIndex.Values.Count(entry => entry.Matches == 0);
+        var keyOrdinals = rightColumns.ToHashSet();
+        return new ReportJoinResult(columns, rows, unmatchedLeft, unmatchedRight)
+        {
+            // Las claves se repiten por definición; lo que no se puede sumar
+            // son las cifras que acompañan a cada fila del lado «uno».
+            RepeatedColumns = repeated
+                ? right.Columns
+                    .Where(column => !keyOrdinals.Contains(column.Ordinal) && NumericTypes.Contains(column.ClrType))
+                    .Select(column => $"derecha.{column.Name}")
+                    .ToArray()
+                : [],
+        };
+    }
+
+    // Fechas en ISO: la clave se copia para buscarla en el origen, y «01/02/2026»
+    // no dice si es enero o febrero.
+    private static string FormatKey(object[] key) => string.Join(" · ", key.Select(value => value switch
+    {
+        DateOnly date => date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+        DateTime date => date.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture),
+        DateTimeOffset date => date.ToString("yyyy-MM-dd HH:mm:ss zzz", CultureInfo.InvariantCulture),
+        _ => Convert.ToString(value, CultureInfo.InvariantCulture),
+    }));
+
+    private sealed class RightEntry(IReadOnlyList<object?> row)
+    {
+        public IReadOnlyList<object?> Row { get; } = row;
+
+        public int Matches { get; set; }
     }
 
     private static ResultColumn ResolveColumn(IReadOnlyList<ResultColumn> columns, string name)

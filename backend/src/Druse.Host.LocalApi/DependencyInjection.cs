@@ -35,6 +35,7 @@ using Druse.Provider.PostgreSql;
 using Druse.Provider.Sqlite;
 using Druse.Provider.SqlServer;
 using Druse.Ssh;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace Druse.Host.LocalApi;
 
@@ -64,8 +65,10 @@ internal static class DependencyInjection
         services.AddSingleton<LocalApiEndpoint>();
 
         // --- Persistencia local ----------------------------------------------
+        services.TryAddSingleton(TimeProvider.System);
         services.AddSingleton<DruseDatabase>();
         services.AddSingleton<IReportSnapshotStore, SqliteReportSnapshotStore>();
+        services.AddSingleton<IReportDatasetStore, SqliteReportDatasetStore>();
         services.AddSingleton<IBackupArchiveFactory, BackupArchiveFactory>();
         services.AddScoped<IConnectionProfileStore, SqliteConnectionProfileStore>();
         services.AddScoped<IQueryHistoryStore, SqliteQueryHistoryStore>();
@@ -249,6 +252,7 @@ internal static class DependencyInjection
         services.AddScoped<QueryService>();
         services.AddScoped<ReportQueryService>();
         services.AddScoped<ReportSnapshotService>();
+        services.AddScoped<ReportDatasetPreviewService>();
         services.AddScoped<RowEditService>();
         services.AddScoped<TableDesignService>();
         services.AddScoped<ImportService>();

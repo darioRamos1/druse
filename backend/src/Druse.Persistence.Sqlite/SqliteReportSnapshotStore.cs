@@ -19,7 +19,7 @@ public sealed class SqliteReportSnapshotStore(IAppPaths paths) : IReportSnapshot
         typeof(DateTime), typeof(DateTimeOffset), typeof(TimeSpan), typeof(byte[]),
     }.ToDictionary(type => type.Name, StringComparer.Ordinal);
 
-    private readonly string _databaseFile = Path.Combine(paths.DataDirectory, "reports.db");
+    private readonly string _databaseFile = ReportsDatabase.File(paths);
 
     public async Task<ReportSnapshot?> FindAsync(Guid datasetId, CancellationToken cancellationToken)
     {
@@ -97,32 +97,8 @@ public sealed class SqliteReportSnapshotStore(IAppPaths paths) : IReportSnapshot
         return await command.ExecuteNonQueryAsync(cancellationToken) == 1;
     }
 
-    private async Task<SqliteConnection> OpenAsync(CancellationToken cancellationToken)
-    {
-        var connection = await DruseDatabase.OpenConfiguredAsync(
-            DruseDatabase.ConnectionString(_databaseFile), _databaseFile, cancellationToken);
-        try
-        {
-            await using var command = connection.CreateCommand();
-            command.CommandText = """
-                CREATE TABLE IF NOT EXISTS report_snapshots (
-                    dataset_id TEXT PRIMARY KEY,
-                    definition_version INTEGER NOT NULL,
-                    started_utc_ticks INTEGER NOT NULL,
-                    completed_utc_ticks INTEGER NOT NULL,
-                    payload_version INTEGER NOT NULL,
-                    payload BLOB NOT NULL
-                ) STRICT;
-                """;
-            await command.ExecuteNonQueryAsync(cancellationToken);
-            return connection;
-        }
-        catch
-        {
-            await connection.DisposeAsync();
-            throw;
-        }
-    }
+    private Task<SqliteConnection> OpenAsync(CancellationToken cancellationToken) =>
+        ReportsDatabase.OpenAsync(_databaseFile, cancellationToken);
 
     private static ReportJoinResult Deserialize(byte[] payload, CancellationToken cancellationToken)
     {
@@ -155,7 +131,13 @@ public sealed class SqliteReportSnapshotStore(IAppPaths paths) : IReportSnapshot
 
         return new ReportJoinResult(columns, rows,
             root.GetProperty(nameof(ReportJoinResult.UnmatchedLeftRows)).GetInt32(),
-            root.GetProperty(nameof(ReportJoinResult.UnmatchedRightRows)).GetInt32());
+            root.GetProperty(nameof(ReportJoinResult.UnmatchedRightRows)).GetInt32())
+        {
+            // Las capturas del hito 1 no lo tenían: eran todas 1:1.
+            RepeatedColumns = root.TryGetProperty(nameof(ReportJoinResult.RepeatedColumns), out var repeated)
+                ? repeated.Deserialize<string[]>() ?? []
+                : [],
+        };
     }
 
     private static object? ReadValue(JsonElement cell, Type type)
