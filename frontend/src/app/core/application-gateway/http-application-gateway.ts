@@ -66,6 +66,11 @@ import {
   SaveConnectionRequest,
 } from './application-gateway';
 import { DesktopHost } from './desktop-host';
+import {
+  ReportDatabaseList,
+  ReportDataset,
+  ReportDatasetPreview,
+} from '../../shared/models/reports';
 import { translate } from '../i18n/active';
 import {
   AiChatRequest,
@@ -482,11 +487,34 @@ export class HttpApplicationGateway extends ApplicationGateway {
     connectionId: string,
     database: string,
     schema: string | undefined,
-    table: string,
+    table?: string,
   ): Observable<readonly SavedCompositionRecord[]> {
     return this._http.get<SavedCompositionRecord[]>('/api/workspace/compositions', {
-      params: { connectionId, database, schema: schema ?? '', table },
+      params:
+        table === undefined
+          ? { connectionId, database }
+          : { connectionId, database, schema: schema ?? '', table },
     });
+  }
+
+  override getReportDatasets(): Observable<readonly ReportDataset[]> {
+    return this._http.get<ReportDataset[]>('/api/reports/datasets');
+  }
+
+  override saveReportDataset(dataset: ReportDataset): Observable<ReportDataset> {
+    return this._http.put<ReportDataset>(`/api/reports/datasets/${dataset.id}`, dataset);
+  }
+
+  override deleteReportDataset(id: string): Observable<void> {
+    return this._http.delete<void>(`/api/reports/datasets/${id}`);
+  }
+
+  override previewReportDataset(dataset: ReportDataset): Observable<ReportDatasetPreview> {
+    return this._http.post<ReportDatasetPreview>('/api/reports/datasets/preview', dataset);
+  }
+
+  override getReportSourceDatabases(connectionId: string): Observable<ReportDatabaseList> {
+    return this._http.get<ReportDatabaseList>(`/api/reports/connections/${connectionId}/databases`);
   }
 
   override saveComposition(composition: SavedCompositionRecord): Observable<void> {

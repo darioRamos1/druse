@@ -117,6 +117,7 @@ export default class CommandPalette implements AfterViewInit {
 
   /** El diagrama de donde se está trabajando. */
   readonly openDiagram = output<void>();
+  readonly openReports = output<void>();
 
   /** Abrir, confirmar o deshacer la transacción.
    *
@@ -215,6 +216,12 @@ export default class CommandPalette implements AfterViewInit {
         kind: 'command',
         label: 'palette.command.diagram',
         hint: 'palette.command.diagramHint',
+      },
+      {
+        id: 'reports',
+        kind: 'command',
+        label: 'palette.command.reports',
+        hint: 'palette.command.reportsHint',
       },
       {
         id: 'transaction-begin',
@@ -495,6 +502,10 @@ export default class CommandPalette implements AfterViewInit {
         case 'diagram':
           this.closeWithoutRestoringFocus();
           this.openDiagram.emit();
+          return;
+        case 'reports':
+          this.closeWithoutRestoringFocus();
+          this.openReports.emit();
           return;
         case 'transaction-begin':
           this.transaction.emit('begin');

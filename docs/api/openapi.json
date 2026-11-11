@@ -1329,7 +1329,6 @@
           {
             "name": "table",
             "in": "query",
-            "required": true,
             "schema": {
               "type": "string"
             }
@@ -2605,6 +2604,30 @@
           "Druse.Host.LocalApi"
         ],
         "operationId": "DeleteReportDataset",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/reports/connections/{id}/databases": {
+      "get": {
+        "tags": [
+          "Druse.Host.LocalApi"
+        ],
+        "operationId": "ListReportSourceDatabases",
         "parameters": [
           {
             "name": "id",

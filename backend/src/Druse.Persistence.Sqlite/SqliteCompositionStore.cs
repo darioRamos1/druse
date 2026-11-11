@@ -19,7 +19,7 @@ public sealed class SqliteCompositionStore(DruseDatabase database) : ICompositio
         Guid connectionId,
         string database,
         string schema,
-        string table,
+        string? table,
         CancellationToken cancellationToken)
     {
         await using var connection = await _database.OpenAsync(cancellationToken);
@@ -31,15 +31,14 @@ public sealed class SqliteCompositionStore(DruseDatabase database) : ICompositio
             FROM query_compositions
             WHERE connection_id = $connection
               AND database_name = $database
-              AND schema_name = $schema
-              AND table_name = $table
+              AND ($table IS NULL OR (schema_name = $schema AND table_name = $table))
             ORDER BY updated_at_utc DESC
             """;
 
         command.Parameters.AddWithValue("$connection", connectionId.ToString());
         command.Parameters.AddWithValue("$database", database);
         command.Parameters.AddWithValue("$schema", schema);
-        command.Parameters.AddWithValue("$table", table);
+        command.Parameters.AddWithValue("$table", (object?)table ?? DBNull.Value);
 
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
 

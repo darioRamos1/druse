@@ -14,7 +14,7 @@
 - [x] Unión 1:N con aviso de métricas repetidas y ejemplos de claves duplicadas.
 - [x] Vista previa con diagnósticos por fuente, cambios de esquema y muestra marcada.
 - [x] API local y contrato OpenAPI.
-- [ ] Constructor en Angular: Fuentes, Combinar y vista previa, con el compositor para el modo visual.
+- [x] Constructor en Angular: Fuentes, Combinar y vista previa, con el compositor para el modo visual.
 - [ ] Captura del constructor para la landing.
 
 Los hitos siguientes cubren el constructor SQL y visual, los reportes guardados, los tableros y plantillas, y la actualización programada. La evidencia para la landing se prepara conforme se valida cada hito.
@@ -83,8 +83,25 @@ Dos fuentes ya materializadas en memoria, con 20.000 filas cada una y un cruce 1
 - 17 casos unitarios de reportes y la batería unitaria completa (733 superadas, 0 con error).
 - Con `DRUSE_REQUIRE_ENGINES=1`, ocho pruebas de integración contra SQL Server 2022 y PostgreSQL 18, sin omitidas. Una fuente visual y otra SQL preparan el mismo cruce que dos SQL (3 filas, 2 con meta, 220 en ventas). Una meta duplicada detiene la unión y muestra `2026-01-01 · 05001`. La prueba encontró que la fecha salía como `01/01/2026` y se corrigió.
 
+## 2026-11-11 · Hito 2: constructor en Druse (versión 1.12.0)
+
+### Qué se hizo
+
+- **Reportes** en la barra superior y «Abrir Reportes BI» en la paleta abren el constructor. A la izquierda están los pasos (Fuentes, Combinar y Visualización, esta última «Próximamente») y los conjuntos guardados. En el centro va la vista previa, con pestañas por fuente y para el resultado combinado. A la derecha, un inspector plegable que pasa a panel superpuesto por debajo de 1.100 px.
+- Cada fuente elige una conexión **guardada** y una base. Las bases se listan con `GET /api/reports/connections/{id}/databases`, que usa la contraseña del llavero. El modo SQL es una consulta escrita a mano. El modo visual copia una composición guardada de esa base: su SQL y su estado. Para eso, `GET /api/workspace/compositions` acepta ahora la consulta sin tabla. «Copiar a SQL editable» conserva la composición, y volver al modo visual pide confirmación si el SQL se editó a mano.
+- Combinar propone como claves las columnas que se llaman igual y tienen el mismo tipo. Permite elegir el tipo de unión y la cardinalidad (1:1 o 1:N). La vista previa resume filas, coincidencias y filas sin pareja. También marca las cifras que se repetirían, enseña las claves duplicadas y usa el alias de cada fuente en las columnas.
+- Al guardar, las columnas de la última vista previa vigente pasan a ser las columnas esperadas. Hay avisos de vista previa desactualizada, de muestra truncada y de cambio de esquema. Antes de descartar cambios o borrar, se pide confirmación en línea.
+- La e2e encontró un círculo sin salida: con dos fuentes, la vista previa exigía la unión, pero las columnas de la unión salen de la vista previa. Ahora la vista previa lee las fuentes por separado mientras no hay unión, y guardar la sigue exigiendo.
+
+### Comprobaciones
+
+- Frontend: 13 casos en `features/reports`, tsc, `check-i18n` y las pruebas de shell, paleta, gateway, novedades e i18n (240 casos).
+- Backend: 12 de integración con los motores exigidos y 17 unitarias de reportes.
+- e2e `reportes.spec.ts` con Druse levantado y PostgreSQL de pruebas: dos fuentes, claves propuestas, cruce de 3 filas con 2 coincidencias, guardado como versión 1 y borrado. En Linux sin llavero comprueba el diagnóstico de contraseña.
+- Barrido: capturas `21-reportes-*` (vacío, una fuente, combinar y descartar). Sin hallazgos nuevos y con la consola limpia.
+
 ### Dónde retomar
 
-1. Constructor en Angular con navegación Fuentes, Combinar y vista previa, y el inspector plegable. Revisar antes qué agrupaciones y agregados admite el compositor (`frontend/src/app/features/query-builder`) para el modo visual.
-2. Llevar la unión a un trabajo de actualización manual que guarde el resultado (hito 3) usando `ReportDatasetPreviewService` y `ReportSnapshotService`.
-3. Preparar la evidencia del cruce y la captura del constructor para la sección `#reportes-bi` de la landing.
+1. Hito 3: «Actualizar ahora», que lee, cruza y guarda el resultado con `ReportSnapshotService`. Después, la visualización (tabla, barras, línea e indicador) sobre el resultado guardado, con las bases desconectadas.
+2. Para el modo visual, falta poder abrir el compositor desde la fuente. Hoy se elige una composición ya guardada.
+3. Preparar la sección `#reportes-bi` de la landing con la captura `21b-reportes-combinar` (estado En desarrollo).

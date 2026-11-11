@@ -77,6 +77,8 @@ public sealed record ReportJoinPreview
     public bool IsSample { get; init; }
 }
 
+public sealed record ReportDatabaseList(IReadOnlyList<string> Databases, string? FailureCode, string? Message);
+
 public sealed record ReportDatasetPreview(IReadOnlyList<ReportSourcePreview> Sources, ReportJoinPreview? Join);
 
 /// <summary>
@@ -95,7 +97,7 @@ public sealed class ReportDatasetPreviewService(
     public async Task<ReportDatasetPreview> PreviewAsync(ReportDataset dataset, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(dataset);
-        var errors = ReportDatasetValidator.Validate(dataset with { Name = "vista previa" });
+        var errors = ReportDatasetValidator.Validate(dataset with { Name = "vista previa" }, requireJoin: false);
         if (errors.Count > 0)
         {
             throw new ArgumentException(string.Join(" ", errors), nameof(dataset));
@@ -110,7 +112,9 @@ public sealed class ReportDatasetPreviewService(
         }
 
         var previews = results.Select(result => result.Preview).ToArray();
-        if (dataset.Sources.Count == 1)
+
+        // Sin unión todavía, cada fuente por su lado: es lo que permite elegir columnas.
+        if (dataset.Sources.Count == 1 || dataset.Join is null)
         {
             return new ReportDatasetPreview(previews, null);
         }
@@ -173,35 +177,13 @@ public sealed class ReportDatasetPreviewService(
             CompletedAtUtc = clock.GetUtcNow(),
         };
 
-        var profile = await saved.FindAsync(source.ConnectionId, cancellationToken);
-        if (profile is null)
+        var resolved = await ResolveAsync(source.ConnectionId, cancellationToken);
+        if (resolved.FailureCode is not null)
         {
-            return (Failed(ReportSourceFailure.ConnectionMissing,
-                "La conexión de esta fuente ya no existe. Vuelve a vincularla."), null);
+            return (Failed(resolved.FailureCode, resolved.Message!), null);
         }
 
-        // Las mismas reglas que al abrir una conexión guardada: la autenticación
-        // de Windows y los motores sin usuarios no piden contraseña.
-        var needsPassword = !profile.UsesIntegratedSecurity
-            && (connections.Capabilities(profile)?.RequiresUsername ?? true);
-        var credentials = needsPassword
-            ? await saved.GetCredentialsAsync(profile.Id, cancellationToken)
-            : new DatabaseCredentials(null);
-        if (needsPassword && string.IsNullOrEmpty(credentials.Password))
-        {
-            return (Failed(ReportSourceFailure.PasswordMissing,
-                "La conexión de esta fuente no tiene contraseña guardada."), null);
-        }
-
-        var ssh = await saved.GetSshCredentialsAsync(profile.Id, cancellationToken);
-        if (profile.UsesSshTunnel
-            && profile.SshTunnel!.Authentication == SshAuthenticationMode.Password
-            && string.IsNullOrEmpty(ssh.Secret))
-        {
-            return (Failed(ReportSourceFailure.SshSecretMissing,
-                "La conexión de esta fuente no tiene guardada la contraseña de su túnel SSH."), null);
-        }
-
+        var (profile, credentials, ssh) = resolved.Connection!.Value;
         TypedQueryResult data;
         try
         {
@@ -235,6 +217,66 @@ public sealed class ReportDatasetPreviewService(
             CompletedAtUtc = clock.GetUtcNow(),
         }, data);
     }
+
+    /// <summary>Bases que se pueden elegir para una fuente, con las credenciales guardadas.</summary>
+    public async Task<ReportDatabaseList> ListDatabasesAsync(Guid connectionId, CancellationToken cancellationToken)
+    {
+        var resolved = await ResolveAsync(connectionId, cancellationToken);
+        if (resolved.FailureCode is not null)
+        {
+            return new ReportDatabaseList([], resolved.FailureCode, resolved.Message);
+        }
+
+        var (profile, credentials, ssh) = resolved.Connection!.Value;
+        try
+        {
+            return new ReportDatabaseList(
+                await connections.ListDatabasesAsync(profile, credentials, ssh, cancellationToken), null, null);
+        }
+        catch (DatabaseOperationException exception)
+        {
+            return new ReportDatabaseList([], ReportSourceFailure.DatabaseError, exception.Error.Message);
+        }
+    }
+
+    private async Task<ResolvedConnection> ResolveAsync(Guid connectionId, CancellationToken cancellationToken)
+    {
+        var profile = await saved.FindAsync(connectionId, cancellationToken);
+        if (profile is null)
+        {
+            return new(null, ReportSourceFailure.ConnectionMissing,
+                "La conexión de esta fuente ya no existe. Vuelve a vincularla.");
+        }
+
+        // Las mismas reglas que al abrir una conexión guardada: la autenticación
+        // de Windows y los motores sin usuarios no piden contraseña.
+        var needsPassword = !profile.UsesIntegratedSecurity
+            && (connections.Capabilities(profile)?.RequiresUsername ?? true);
+        var credentials = needsPassword
+            ? await saved.GetCredentialsAsync(profile.Id, cancellationToken)
+            : new DatabaseCredentials(null);
+        if (needsPassword && string.IsNullOrEmpty(credentials.Password))
+        {
+            return new(null, ReportSourceFailure.PasswordMissing,
+                "La conexión de esta fuente no tiene contraseña guardada.");
+        }
+
+        var ssh = await saved.GetSshCredentialsAsync(profile.Id, cancellationToken);
+        if (profile.UsesSshTunnel
+            && profile.SshTunnel!.Authentication == SshAuthenticationMode.Password
+            && string.IsNullOrEmpty(ssh.Secret))
+        {
+            return new(null, ReportSourceFailure.SshSecretMissing,
+                "La conexión de esta fuente no tiene guardada la contraseña de su túnel SSH.");
+        }
+
+        return new((profile, credentials, ssh), null, null);
+    }
+
+    private sealed record ResolvedConnection(
+        (ConnectionProfile Profile, DatabaseCredentials Credentials, SshCredentials Ssh)? Connection,
+        string? FailureCode,
+        string? Message);
 
     /// <summary>Lo que cambió respecto a la última lectura válida. Vacío la primera vez.</summary>
     public static IReadOnlyList<ReportSchemaChange> CompareSchema(

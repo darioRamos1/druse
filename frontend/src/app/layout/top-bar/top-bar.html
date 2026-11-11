@@ -58,6 +58,15 @@
       </button>
     </div>
   </details>
+  <button
+    type="button"
+    class="btn"
+    (click)="openReports.emit()"
+    [attr.title]="'topbar.reports' | t"
+  >
+    <app-icon name="chart" [size]="13" />
+    {{ 'topbar.reports' | t }}
+  </button>
 </div>
 
 <div class="search-slot">

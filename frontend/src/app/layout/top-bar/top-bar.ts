@@ -28,6 +28,9 @@ export class TopBar {
   readonly themeSelected = output<ThemeName>();
   readonly openSettings = output<void>();
 
+  /** Reportes BI: conjuntos de datos que cruzan bases. */
+  readonly openReports = output<void>();
+
   /** El panel del asistente esta abierto. El boton se queda encendido mientras. */
   readonly assistantOpen = input(false);
 

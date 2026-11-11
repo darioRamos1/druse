@@ -8,6 +8,7 @@
   (openPalette)="paletteOpen.set(true)"
   (themeSelected)="selectTheme($event)"
   (openSettings)="openSettings()"
+  (openReports)="openReports()"
   [assistantOpen]="aiOpen()"
   (toggleAssistant)="toggleAssistant()"
   [explorerOpen]="explorerOpen()"
@@ -395,6 +396,13 @@
   }
 }
 
+<!-- Reportes BI: se carga al pedirlo, como el diagrama. -->
+@defer (when reportsOpen()) {
+  @if (reportsOpen()) {
+    <app-report-builder (closed)="reportsOpen.set(false)" />
+  }
+}
+
 <!--
   El asistente se carga tarde y se descarta al cerrarlo, pero el respaldo no vive
   aquí: está en `BackupStore`, así que cerrar esto no para nada.
@@ -512,6 +520,7 @@
       (closeOtherTabs)="closeOtherTabs()"
       (copyQualifiedName)="copyQualifiedName()"
       (openDiagram)="openDiagramHere()"
+      (openReports)="openReports()"
       (transaction)="runTransactionCommand($event)"
       (showShortcuts)="shortcutsOpen.set(true)"
     />

@@ -78,6 +78,77 @@ public sealed class ReportDatasetEndpointTests(DruseApiFactory factory) : IClass
         Assert.False(preview.GetProperty("join").GetProperty("succeeded").GetBoolean());
     }
 
+    [Fact]
+    public async Task LaVistaPreviaLeeDosFuentesAunqueTodaviaNoHayaUnion()
+    {
+        using var client = factory.CreateAuthenticatedClient();
+        var sinUnion = Dataset(Guid.NewGuid(), Guid.NewGuid(), ventasVisual: false) with { Join = null };
+
+        var response = await client.PostAsJsonAsync("/api/reports/datasets/preview", sinUnion);
+
+        // Guardar la exige; previsualizar no, porque las columnas salen de aquí.
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var preview = await response.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal(2, preview.GetProperty("sources").GetArrayLength());
+        Assert.Equal(JsonValueKind.Null, preview.GetProperty("join").ValueKind);
+    }
+
+    [Fact]
+    public async Task ListaLasComposicionesDeUnaBaseSinFijarLaTabla()
+    {
+        using var client = factory.CreateAuthenticatedClient();
+
+        // Las composiciones cuelgan de una conexión guardada; guardarla no la abre.
+        var (connectionId, _) = await SaveProfilesAsync();
+        foreach (var (table, name) in new[] { ("ventas", "Ventas por mes"), ("metas", "Metas por mes") })
+        {
+            var id = Guid.NewGuid();
+            var saved = await client.PutAsJsonAsync($"/api/workspace/compositions/{id}", new
+            {
+                id,
+                connectionId,
+                database = "comercial",
+                schema = "dbo",
+                table,
+                name,
+                model = """{"sql":"SELECT 1","state":{}}""",
+            });
+            Assert.Equal(HttpStatusCode.NoContent, saved.StatusCode);
+        }
+
+        var todas = await client.GetFromJsonAsync<JsonElement>(
+            $"/api/workspace/compositions?connectionId={connectionId}&database=comercial");
+        var deUnaTabla = await client.GetFromJsonAsync<JsonElement>(
+            $"/api/workspace/compositions?connectionId={connectionId}&database=comercial&schema=dbo&table=metas");
+
+        Assert.Equal(2, todas.GetArrayLength());
+        Assert.Equal("Metas por mes", Assert.Single(deUnaTabla.EnumerateArray()).GetProperty("name").GetString());
+    }
+
+    [Fact]
+    public async Task LasBasesDeUnaConexionQueYaNoExisteDicenPorQue()
+    {
+        using var client = factory.CreateAuthenticatedClient();
+
+        var list = await client.GetFromJsonAsync<JsonElement>($"/api/reports/connections/{Guid.NewGuid()}/databases");
+
+        Assert.Equal(0, list.GetProperty("databases").GetArrayLength());
+        Assert.Equal("connection-missing", list.GetProperty("failureCode").GetString());
+    }
+
+    [RequiresTwoEnginesFact]
+    public async Task LasBasesDeUnaConexionGuardadaSeLeenConSuContrasenaGuardada()
+    {
+        var (_, metas) = await SaveProfilesAsync();
+        using var client = factory.CreateAuthenticatedClient();
+
+        var list = await client.GetFromJsonAsync<JsonElement>($"/api/reports/connections/{metas}/databases");
+
+        Assert.Equal(JsonValueKind.Null, list.GetProperty("failureCode").ValueKind);
+        Assert.Contains(list.GetProperty("databases").EnumerateArray(),
+            database => database.GetString() == TestDatabase.Database);
+    }
+
     [RequiresTwoEnginesFact]
     public async Task UnaFuenteVisualYOtraSqlPreparanElMismoCruceQueDosSql()
     {

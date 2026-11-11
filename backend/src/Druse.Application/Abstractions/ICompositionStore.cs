@@ -14,12 +14,15 @@ namespace Druse.Application.Abstractions;
 /// </summary>
 public interface ICompositionStore
 {
-    /// <summary>Las de una tabla, por lo último que se tocó.</summary>
+    /// <summary>
+    /// Las de una tabla, por lo último que se tocó. Sin tabla, todas las de esa
+    /// base: es lo que necesita una fuente visual de Reportes BI.
+    /// </summary>
     Task<IReadOnlyList<SavedComposition>> GetAllAsync(
         Guid connectionId,
         string database,
         string schema,
-        string table,
+        string? table,
         CancellationToken cancellationToken);
 
     Task SaveAsync(SavedComposition composition, CancellationToken cancellationToken);

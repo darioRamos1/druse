@@ -59,6 +59,14 @@ internal static class ReportEndpoints
         })
         .WithName("DeleteReportDataset");
 
+        // Con las credenciales guardadas: el constructor no pide contraseñas.
+        app.MapGet("/api/reports/connections/{id:guid}/databases", async (
+            Guid id,
+            ReportDatasetPreviewService previews,
+            CancellationToken cancellationToken) =>
+            Results.Ok(await previews.ListDatabasesAsync(id, cancellationToken)))
+        .WithName("ListReportSourceDatabases");
+
         // Sin guardar: el constructor previsualiza lo que se está editando.
         app.MapPost("/api/reports/datasets/preview", async (
             ReportDatasetDto request,
@@ -66,7 +74,7 @@ internal static class ReportEndpoints
             CancellationToken cancellationToken) =>
         {
             var dataset = request.ToDomain(request.Id == Guid.Empty ? Guid.NewGuid() : request.Id);
-            var errors = ReportDatasetValidator.Validate(dataset with { Name = "vista previa" });
+            var errors = ReportDatasetValidator.Validate(dataset with { Name = "vista previa" }, requireJoin: false);
             if (errors.Count > 0)
             {
                 return Results.BadRequest(new { message = string.Join(" ", errors), errors });

@@ -1,4 +1,9 @@
 import { Observable } from 'rxjs';
+import {
+  ReportDatabaseList,
+  ReportDataset,
+  ReportDatasetPreview,
+} from '../../shared/models/reports';
 
 import {
   AuthenticationMode,
@@ -542,13 +547,31 @@ export abstract class ApplicationGateway {
 
   abstract deleteDiagram(id: string): Observable<void>;
 
-  /** Las consultas guardadas desde el compositor para una tabla. */
+  /**
+   * Las consultas guardadas desde el compositor para una tabla. Sin tabla,
+   * todas las de esa base: las fuentes visuales de Reportes BI eligen entre ellas.
+   */
   abstract getCompositions(
     connectionId: string,
     database: string,
     schema: string | undefined,
-    table: string,
+    table?: string,
   ): Observable<readonly SavedCompositionRecord[]>;
+
+  /** Conjuntos de datos de Reportes BI, por lo último que se tocó. */
+  abstract getReportDatasets(): Observable<readonly ReportDataset[]>;
+
+  /** Crea o reemplaza; la respuesta trae la versión que puso el servidor. */
+  abstract saveReportDataset(dataset: ReportDataset): Observable<ReportDataset>;
+
+  /** Borra el conjunto y su resultado guardado. */
+  abstract deleteReportDataset(id: string): Observable<void>;
+
+  /** Lee las fuentes sin guardar y cuenta qué pasó con cada una y con la unión. */
+  abstract previewReportDataset(dataset: ReportDataset): Observable<ReportDatasetPreview>;
+
+  /** Bases de una conexión guardada, con su contraseña del llavero. */
+  abstract getReportSourceDatabases(connectionId: string): Observable<ReportDatabaseList>;
 
   abstract saveComposition(composition: SavedCompositionRecord): Observable<void>;
 

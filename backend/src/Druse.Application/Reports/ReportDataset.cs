@@ -85,8 +85,14 @@ public sealed record ReportDataset
 
 public static class ReportDatasetValidator
 {
-    /// <summary>Lo que falta o sobra para poder guardar o previsualizar. Vacío si vale.</summary>
-    public static IReadOnlyList<string> Validate(ReportDataset dataset)
+    /// <summary>
+    /// Lo que falta o sobra para poder guardar o previsualizar. Vacío si vale.
+    ///
+    /// La vista previa no exige unión (<paramref name="requireJoin"/> en falso):
+    /// las columnas de unión se eligen entre las que devuelve cada fuente, y
+    /// para verlas hay que haberlas leído antes.
+    /// </summary>
+    public static IReadOnlyList<string> Validate(ReportDataset dataset, bool requireJoin = true)
     {
         ArgumentNullException.ThrowIfNull(dataset);
         var errors = new List<string>();
@@ -133,6 +139,11 @@ public static class ReportDatasetValidator
             != dataset.Sources.Count)
         {
             errors.Add("Las fuentes deben tener alias distintos.");
+        }
+
+        if (dataset.Sources.Count == 2 && !requireJoin && dataset.Join is null)
+        {
+            return errors;
         }
 
         if (dataset.Sources.Count == 2)

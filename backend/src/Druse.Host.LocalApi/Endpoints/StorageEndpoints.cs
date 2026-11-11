@@ -36,7 +36,7 @@ internal static class StorageEndpoints
             Guid connectionId,
             string database,
             string? schema,
-            string table,
+            string? table,
             ICompositionStore compositions,
             CancellationToken cancellationToken) =>
             Results.Ok(

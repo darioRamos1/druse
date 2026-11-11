@@ -2,6 +2,7 @@ import { expect, test, type Locator, type Page } from '@playwright/test';
 
 import { abrir, apuntarPestana, conectar, ejecutar, escribirSql, situarCursor } from '../support/druse';
 import { medir } from '../support/medir';
+import { METAS_SQL, VENTAS_SQL, abrirReportes, anadirFuente, previsualizar } from '../support/reportes';
 import { comprobarDiagnosticoIa, prepararDiagnosticoIa } from '../support/ai-diagnostics';
 import { comprobarContextoChat, prepararContextoChat, comprobarSelectorContexto, comprobarNotasContexto } from '../support/ai-context';
 import { comprobarErrorContexto } from '../support/ai-execution-error';
@@ -446,6 +447,31 @@ test.describe('barrido visual', () => {
     await medir(page, 'elegir tablas de la base', hallazgos);
     await foto(page, '20-mer-base-tablas', diagramaBase.locator('.dialog'));
     await cerrar(page, diagramaBase, 'diagrama de la base');
+
+    // --- Reportes BI: vacío, una fuente y el cruce de dos -------------------
+    const reportes = await abrirReportes(page);
+
+    await medir(page, 'reportes vacío', hallazgos);
+    await foto(page, '21-reportes-vacio', reportes.locator('.dialog'));
+
+    await anadirFuente(reportes, 'Ventas', VENTAS_SQL);
+    await previsualizar(reportes);
+    await medir(page, 'reportes con una fuente', hallazgos);
+    await foto(page, '21a-reportes-fuente', reportes.locator('.dialog'));
+
+    await anadirFuente(reportes, 'Metas', METAS_SQL);
+    await previsualizar(reportes);
+    await reportes.locator('.steps__item').nth(1).click();
+    await previsualizar(reportes);
+    await medir(page, 'reportes combinar', hallazgos);
+    await foto(page, '21b-reportes-combinar', reportes.locator('.dialog'));
+
+    // Sin guardar: Escape pregunta antes de descartar, y eso también se mira.
+    await page.keyboard.press('Escape');
+    await expect(reportes.locator('.confirm')).toBeVisible();
+    await foto(page, '21c-reportes-descartar', reportes.locator('.dialog'));
+    await reportes.getByRole('button', { name: 'Descartar cambios' }).click();
+    await expect(reportes.locator('.dialog')).toBeHidden();
 
     // --- El asistente de una tabla, con sus pasos --------------------------
     await desplegar(page, 'Tables', 'accionista');
