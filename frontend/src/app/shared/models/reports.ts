@@ -171,3 +171,12 @@ export interface SavedReport {
   readonly createdAtUtc?: string;
   readonly updatedAtUtc?: string;
 }
+
+/** Un tablero guardado. `model` es JSON de `DashboardModel`. */
+export interface SavedDashboard {
+  readonly id: string;
+  readonly name: string;
+  readonly model: string;
+  readonly createdAtUtc?: string;
+  readonly updatedAtUtc?: string;
+}

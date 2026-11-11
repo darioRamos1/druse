@@ -1,0 +1,326 @@
+import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { Observable, of } from 'rxjs';
+
+import { ApplicationGateway } from '../../../core/application-gateway/application-gateway';
+import {
+  ReportDataset,
+  ReportRefresh,
+  ReportSnapshot,
+  SavedDashboard,
+  SavedReport,
+} from '../../../shared/models/reports';
+import { ReportDashboard } from './report-dashboard';
+
+const ventas: ReportDataset = {
+  id: 'ds-ventas',
+  name: 'Ventas y metas',
+  version: 1,
+  sources: [
+    { alias: 'Ventas', connectionId: 'c1', database: 'v', mode: 'Sql', sql: 'x', expectedColumns: [] },
+    { alias: 'Metas', connectionId: 'c2', database: 'm', mode: 'Sql', sql: 'y', expectedColumns: [] },
+  ],
+  join: { keys: [{ left: 'mes', right: 'mes' }], kind: 'Left', cardinality: 'OneToOne' },
+};
+
+const visitas: ReportDataset = {
+  id: 'ds-visitas',
+  name: 'Visitas',
+  version: 1,
+  sources: [{ alias: 'Visitas', connectionId: 'c3', database: 'w', mode: 'Sql', sql: 'z', expectedColumns: [] }],
+  join: null,
+};
+
+function resultado(datasetId: string, columns: ReportSnapshot['columns'], rows: ReportSnapshot['rows']): ReportSnapshot {
+  return {
+    datasetId,
+    definitionVersion: 1,
+    fromOlderDefinition: false,
+    startedAtUtc: '2026-11-11T15:00:00Z',
+    completedAtUtc: '2026-11-11T15:00:02Z',
+    columns,
+    rows,
+    unmatchedLeftRows: 0,
+    unmatchedRightRows: 0,
+    repeatedColumns: [],
+  };
+}
+
+/** Enero y febrero: el segundo mes que pide el plan para probar los filtros. */
+const datosVentas = resultado(
+  'ds-ventas',
+  [
+    { name: 'izquierda.mes', dataType: 'date', clrType: 'DateOnly', ordinal: 0 },
+    { name: 'izquierda.municipio', dataType: 'text', clrType: 'String', ordinal: 1 },
+    { name: 'izquierda.venta', dataType: 'numeric', clrType: 'Decimal', ordinal: 2 },
+    { name: 'derecha.meta', dataType: 'numeric', clrType: 'Decimal', ordinal: 3 },
+  ],
+  [
+    ['2026-01-01', '05001', 80, 100],
+    ['2026-01-01', '08001', 100, 200],
+    ['2026-01-01', '11001', 40, null],
+    ['2026-02-01', '05001', 90, 100],
+  ],
+);
+
+const datosVisitas = resultado(
+  'ds-visitas',
+  [
+    { name: 'fecha', dataType: 'date', clrType: 'DateOnly', ordinal: 0 },
+    { name: 'visitas', dataType: 'int', clrType: 'Int32', ordinal: 1 },
+  ],
+  [
+    ['2026-01-10', 3],
+    ['2026-02-10', 4],
+  ],
+);
+
+const reportes: SavedReport[] = [
+  {
+    id: 'r-barras',
+    datasetId: 'ds-ventas',
+    name: 'Ventas por municipio',
+    visual: 'Bar',
+    settings: JSON.stringify({ category: 'izquierda.municipio', value: 'izquierda.venta', aggregate: 'Sum' }),
+  },
+  {
+    id: 'r-indicador',
+    datasetId: 'ds-ventas',
+    name: 'Cumplimiento',
+    visual: 'Indicator',
+    settings: JSON.stringify({ value: 'izquierda.venta', target: 'derecha.meta', aggregate: 'Sum' }),
+  },
+  {
+    id: 'r-visitas',
+    datasetId: 'ds-visitas',
+    name: 'Visitas',
+    visual: 'Indicator',
+    settings: JSON.stringify({ value: 'visitas', aggregate: 'Sum' }),
+  },
+];
+
+function tablero(model: object, guardado = true): SavedDashboard {
+  return {
+    id: 'tab-1',
+    name: 'Comercial',
+    model: JSON.stringify(model),
+    ...(guardado ? { createdAtUtc: '2026-11-11T15:00:00Z' } : {}),
+  };
+}
+
+const conTresPaneles = {
+  version: 1,
+  pages: [
+    {
+      id: 'p1',
+      name: 'Página 1',
+      panels: [
+        { id: 'a', reportId: 'r-barras', width: 6, height: 4 },
+        { id: 'b', reportId: 'r-indicador', width: 3, height: 3 },
+        { id: 'c', reportId: 'r-visitas', width: 3, height: 3 },
+      ],
+    },
+  ],
+  filters: [
+    { id: 'f-mes', kind: 'date', label: 'Mes', bindings: { 'ds-ventas': 'izquierda.mes', 'ds-visitas': 'fecha' } },
+    { id: 'f-mun', kind: 'category', label: 'Municipio', bindings: { 'ds-ventas': 'izquierda.municipio' } },
+  ],
+};
+
+describe('ReportDashboard', () => {
+  let fixture: ComponentFixture<ReportDashboard>;
+  let guardados: SavedDashboard[];
+  let actualizados: string[];
+  let borrados: string[];
+
+  async function asentar(): Promise<void> {
+    for (let intento = 0; intento < 30; intento++) {
+      await Promise.resolve();
+    }
+
+    fixture.detectChanges();
+  }
+
+  function el<T extends Element = HTMLElement>(selector: string): T {
+    return fixture.nativeElement.querySelector(selector) as T;
+  }
+
+  function todos(selector: string): HTMLElement[] {
+    return [...fixture.nativeElement.querySelectorAll(selector)] as HTMLElement[];
+  }
+
+  function botón(texto: string): HTMLButtonElement {
+    return todos('button').find((button) => (button.textContent ?? '').trim().startsWith(texto)) as HTMLButtonElement;
+  }
+
+  function cifra(panel: number): string {
+    return (todos('.panel')[panel].querySelector('.indicator__value')?.textContent ?? '').replace(/\s/g, '');
+  }
+
+  async function crear(dashboard: SavedDashboard): Promise<void> {
+    fixture = TestBed.createComponent(ReportDashboard);
+    fixture.componentRef.setInput('dashboard', dashboard);
+    fixture.componentRef.setInput('datasets', [ventas, visitas]);
+    fixture.componentInstance.saved.subscribe((saved) => guardados.push(saved));
+    fixture.detectChanges();
+    await asentar();
+  }
+
+  beforeEach(async () => {
+    guardados = [];
+    actualizados = [];
+    borrados = [];
+
+    const resultados = new Map([
+      ['ds-ventas', datosVentas],
+      ['ds-visitas', datosVisitas],
+    ]);
+    const gateway = {
+      getAllReports: () => of(reportes),
+      getReportSnapshot: (id: string) => of(resultados.get(id) ?? null),
+      refreshReportDataset: (id: string): Observable<ReportRefresh> => {
+        actualizados.push(id);
+        return of({ outcome: id === 'ds-visitas' ? 'Failed' : 'Refreshed', run: null });
+      },
+      saveDashboard: (dashboard: SavedDashboard): Observable<SavedDashboard> =>
+        of({ ...dashboard, createdAtUtc: '2026-11-11T16:00:00Z' }),
+      deleteDashboard: (id: string) => {
+        borrados.push(id);
+        return of(undefined);
+      },
+    };
+
+    await TestBed.configureTestingModule({
+      imports: [ReportDashboard],
+      providers: [{ provide: ApplicationGateway, useValue: gateway }],
+    }).compileComponents();
+  });
+
+  it('pinta cada panel con el resultado guardado de su conjunto', async () => {
+    await crear(tablero(conTresPaneles));
+
+    const paneles = todos('.panel');
+
+    expect(paneles).toHaveLength(3);
+    expect(paneles[0].style.gridColumn).toBe('span 6');
+    expect(paneles[0].querySelectorAll('.chart__bar')).toHaveLength(3);
+    // Sin filtros: (80 + 100 + 90) / (100 + 200 + 100).
+    expect(cifra(1)).toBe('67,5%');
+    expect(cifra(2)).toBe('7');
+    expect(paneles[0].querySelector('.panel__meta')?.textContent).toContain('Ventas y metas');
+  });
+
+  it('el filtro de mes se aplica a los dos conjuntos por su propia columna', async () => {
+    await crear(tablero(conTresPaneles));
+
+    const [desde, hasta] = todos('.filter input[type="date"]') as HTMLInputElement[];
+
+    desde.value = '2026-01-01';
+    desde.dispatchEvent(new Event('change'));
+    hasta.value = '2026-01-31';
+    hasta.dispatchEvent(new Event('change'));
+    fixture.detectChanges();
+
+    // Enero: el 60 % del plan, y 3 visitas.
+    expect(cifra(1)).toBe('60%');
+    expect(cifra(2)).toBe('3');
+    expect(botón('Quitar filtros')).toBeTruthy();
+  });
+
+  it('el filtro de categoría dice qué panel no puede aplicarlo', async () => {
+    await crear(tablero(conTresPaneles));
+
+    const municipio = el<HTMLSelectElement>('.filter select');
+    const opciones = [...municipio.options].map((option) => option.textContent?.trim());
+
+    expect(opciones).toEqual(['Todos', '05001', '08001', '11001']);
+
+    municipio.value = 'v05001';
+    municipio.dispatchEvent(new Event('change'));
+    fixture.detectChanges();
+
+    expect(todos('.panel')[0].querySelectorAll('.chart__bar')).toHaveLength(1);
+    expect(todos('.panel')[2].querySelector('.panel__badge')?.textContent).toContain('Sin filtrar por: Municipio');
+    expect(todos('.panel')[0].querySelector('.panel__badge')).toBeNull();
+  });
+
+  it('en edición se ordena y redimensiona con botones y con el teclado', async () => {
+    await crear(tablero(conTresPaneles));
+    botón('Editar diseño').click();
+    fixture.detectChanges();
+
+    const primero = todos('.panel')[0];
+
+    primero.querySelector<HTMLButtonElement>('button[aria-label="Más ancho"]')!.click();
+    fixture.detectChanges();
+    expect(todos('.panel')[0].style.gridColumn).toBe('span 7');
+
+    todos('.panel')[0].dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', altKey: true }));
+    fixture.detectChanges();
+    expect(todos('.panel').map((panel) => panel.getAttribute('aria-label'))).toEqual([
+      'Cumplimiento',
+      'Ventas por municipio',
+      'Visitas',
+    ]);
+
+    todos('.panel')[1].dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', shiftKey: true }));
+    fixture.detectChanges();
+    expect(todos('.panel')[1].style.gridRow).toBe('span 5');
+  });
+
+  it('un tablero nuevo se abre en edición, añade un reporte y propone la columna del filtro', async () => {
+    await crear(tablero({ version: 1, pages: [{ id: 'p1', name: 'Página 1', panels: [] }], filters: [] }, false));
+
+    expect(el('.board__name')).toBeTruthy();
+
+    botón('Filtro de fecha').click();
+    fixture.detectChanges();
+
+    const añadir = el<HTMLSelectElement>('.inspector select');
+
+    añadir.value = 'r-visitas';
+    añadir.dispatchEvent(new Event('change'));
+    await asentar();
+
+    const vinculo = el<HTMLSelectElement>('.filter-edit select');
+
+    expect(vinculo.value).toBe('fecha');
+
+    botón('Guardar tablero').click();
+    await asentar();
+
+    expect(guardados).toHaveLength(1);
+    const modelo = JSON.parse(guardados[0].model);
+
+    expect(modelo.pages[0].panels[0]).toMatchObject({ reportId: 'r-visitas', width: 6, height: 4 });
+    expect(modelo.filters[0]).toMatchObject({ kind: 'date', label: 'Fecha', bindings: { 'ds-visitas': 'fecha' } });
+  });
+
+  it('un tablero recién guardado se borra también en el servidor', async () => {
+    await crear(tablero({ version: 1, pages: [{ id: 'p1', name: 'Página 1', panels: [] }], filters: [] }, false));
+    const añadir = el<HTMLSelectElement>('.inspector select');
+
+    añadir.value = 'r-visitas';
+    añadir.dispatchEvent(new Event('change'));
+    await asentar();
+    botón('Guardar tablero').click();
+    await asentar();
+
+    botón('Editar diseño').click();
+    fixture.detectChanges();
+    botón('Borrar este tablero').click();
+    fixture.detectChanges();
+    todos('.inspector button').find((button) => button.textContent?.trim() === 'Borrar')!.click();
+    await asentar();
+
+    expect(borrados).toEqual(['tab-1']);
+  });
+
+  it('actualizar todo actualiza cada conjunto y dice cuáles fallaron', async () => {
+    await crear(tablero(conTresPaneles));
+    botón('Actualizar todo').click();
+    await asentar();
+
+    expect(actualizados).toEqual(['ds-ventas', 'ds-visitas']);
+    expect(el('.banner--success').textContent).toContain('No se pudieron actualizar: Visitas');
+  });
+});

@@ -60,6 +60,7 @@
     } @else {
       <svg
         class="chart"
+        [class.chart--fit]="fit()"
         [attr.viewBox]="'0 0 ' + width + ' ' + height"
         role="img"
         [attr.aria-label]="'reports.chart.alt' | t: { value: valueLabel(), category: categoryLabel(), count: points().length }"

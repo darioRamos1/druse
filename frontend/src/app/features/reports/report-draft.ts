@@ -210,3 +210,23 @@ export function sameDefinition(a: ReportDataset, b: ReportDataset): boolean {
 
   return strip(a) === strip(b);
 }
+
+/**
+ * El nombre de una columna como la conoce quien armó el conjunto.
+ *
+ * El cruce califica las columnas con `izquierda.` y `derecha.` para que no
+ * choquen; aquí se enseñan con el alias de cada fuente.
+ */
+export function columnLabelFor(sources: readonly ReportSource[], name: string): string {
+  const [left, right] = sources;
+
+  if (left && name.startsWith('izquierda.')) {
+    return `${left.alias}.${name.slice('izquierda.'.length)}`;
+  }
+
+  if (right && name.startsWith('derecha.')) {
+    return `${right.alias}.${name.slice('derecha.'.length)}`;
+  }
+
+  return name;
+}

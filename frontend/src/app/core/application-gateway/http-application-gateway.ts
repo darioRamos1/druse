@@ -73,6 +73,7 @@ import {
   ReportRefresh,
   ReportRun,
   ReportSnapshot,
+  SavedDashboard,
   SavedReport,
 } from '../../shared/models/reports';
 import { translate } from '../i18n/active';
@@ -538,6 +539,22 @@ export class HttpApplicationGateway extends ApplicationGateway {
 
   override getSavedReports(datasetId: string): Observable<readonly SavedReport[]> {
     return this._http.get<SavedReport[]>(`/api/reports/datasets/${datasetId}/reports`);
+  }
+
+  override getAllReports(): Observable<readonly SavedReport[]> {
+    return this._http.get<SavedReport[]>('/api/reports/reports');
+  }
+
+  override getDashboards(): Observable<readonly SavedDashboard[]> {
+    return this._http.get<SavedDashboard[]>('/api/reports/dashboards');
+  }
+
+  override saveDashboard(dashboard: SavedDashboard): Observable<SavedDashboard> {
+    return this._http.put<SavedDashboard>(`/api/reports/dashboards/${dashboard.id}`, dashboard);
+  }
+
+  override deleteDashboard(id: string): Observable<void> {
+    return this._http.delete<void>(`/api/reports/dashboards/${id}`);
   }
 
   override saveReport(report: SavedReport): Observable<SavedReport> {

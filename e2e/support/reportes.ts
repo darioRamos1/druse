@@ -60,6 +60,63 @@ export async function actualizar(reportes: Locator): Promise<void> {
   await expect(reportes.getByRole('button', { name: 'Actualizar ahora' })).toBeEnabled({ timeout: 60_000 });
 }
 
+/**
+ * Crea un tablero con los reportes indicados y un filtro de fecha y otro de
+ * categoría, y lo guarda. Los filtros se vinculan solos a las columnas que
+ * propone el tablero.
+ */
+export async function crearTablero(reportes: Locator, nombre: string, informes: readonly string[]): Promise<void> {
+  await reportes.getByRole('button', { name: 'Nuevo tablero' }).click();
+  const tablero = reportes.locator('app-report-dashboard');
+
+  await tablero.getByLabel('Nombre del tablero').fill(nombre);
+  for (const informe of informes) {
+    await tablero.locator('.inspector').getByLabel('Añadir reporte').selectOption({ label: informe });
+  }
+
+  await expect(tablero.locator('.panel')).toHaveCount(informes.length);
+  await tablero.getByRole('button', { name: 'Filtro de fecha' }).click();
+  await tablero.getByRole('button', { name: 'Filtro de categoría' }).click();
+  await tablero.getByRole('button', { name: 'Guardar tablero' }).click();
+  await expect(tablero.locator('.board__heading')).toHaveText(nombre);
+}
+
+/**
+ * Borra los tableros y conjuntos cuyo nombre encaje, empezando por los tableros.
+ *
+ * Una ejecución que se corta antes de limpiar deja los suyos en los datos de
+ * prueba, y salen en las capturas siguientes. Esto los quita.
+ */
+export async function borrarRestos(reportes: Locator, tableros: RegExp, conjuntos: RegExp): Promise<void> {
+  const tablero = reportes.locator('app-report-dashboard');
+
+  // Las listas llegan después de abrir: contar antes daría cero y no borraría nada.
+  await expect(reportes.locator('.rail__hint', { hasText: 'Cargando' })).toHaveCount(0, { timeout: 30_000 });
+  const deTableros = reportes.locator('.datasets__item').filter({ has: reportes.page().locator('app-icon') });
+
+  for (let item = deTableros.filter({ hasText: tableros }); (await item.count()) > 0; ) {
+    const antes = await item.count();
+
+    await item.first().click();
+    await tablero.getByRole('button', { name: 'Editar diseño' }).click();
+    await tablero.getByRole('button', { name: 'Borrar este tablero' }).click();
+    await tablero.locator('.inspector').getByRole('button', { name: 'Borrar', exact: true }).click();
+    await expect(item).toHaveCount(antes - 1);
+  }
+
+  const deConjuntos = reportes.locator('.datasets__item').filter({ hasNot: reportes.page().locator('app-icon') });
+
+  for (let item = deConjuntos.filter({ hasText: conjuntos }); (await item.count()) > 0; ) {
+    const antes = await item.count();
+
+    await item.first().click();
+    await reportes.locator('.steps__item').first().click();
+    await reportes.getByRole('button', { name: 'Borrar este conjunto de datos' }).click();
+    await reportes.locator('.confirm').getByRole('button', { name: 'Borrar' }).click();
+    await expect(item).toHaveCount(antes - 1);
+  }
+}
+
 export async function previsualizar(reportes: Locator): Promise<void> {
   await reportes.getByRole('button', { name: 'Vista previa' }).click();
   await expect(reportes.getByRole('button', { name: 'Vista previa' })).toBeEnabled({ timeout: 60_000 });

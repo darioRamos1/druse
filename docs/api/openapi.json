@@ -2718,6 +2718,88 @@
         }
       }
     },
+    "/api/reports/reports": {
+      "get": {
+        "tags": [
+          "Druse.Host.LocalApi"
+        ],
+        "operationId": "GetAllSavedReports",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/reports/dashboards": {
+      "get": {
+        "tags": [
+          "Druse.Host.LocalApi"
+        ],
+        "operationId": "GetReportDashboards",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/reports/dashboards/{id}": {
+      "put": {
+        "tags": [
+          "Druse.Host.LocalApi"
+        ],
+        "operationId": "SaveReportDashboard",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReportDashboardDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Druse.Host.LocalApi"
+        ],
+        "operationId": "DeleteReportDashboard",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
     "/api/reports/reports/{id}": {
       "put": {
         "tags": [
@@ -4300,6 +4382,33 @@
             "items": {
               "type": "string"
             }
+          }
+        }
+      },
+      "ReportDashboardDto": {
+        "required": [
+          "name",
+          "model"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "model": {
+            "type": "string"
+          },
+          "createdAtUtc": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAtUtc": {
+            "type": "string",
+            "format": "date-time"
           }
         }
       },

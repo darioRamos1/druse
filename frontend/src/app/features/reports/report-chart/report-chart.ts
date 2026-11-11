@@ -59,6 +59,8 @@ export class ReportChart {
   readonly asTable = input(false);
   /** Cómo enseñar el nombre de una columna (el alias de su fuente en vez de izquierda/derecha). */
   readonly columnLabel = input<(name: string) => string>((name) => name);
+  /** Llenar el alto del contenedor (paneles del tablero) en vez de crecer con el ancho. */
+  readonly fit = input(false);
 
   protected readonly width = WIDTH;
   protected readonly height = HEIGHT;

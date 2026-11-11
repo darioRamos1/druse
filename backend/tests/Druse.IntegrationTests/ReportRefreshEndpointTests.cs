@@ -141,6 +141,42 @@ public sealed class ReportRefreshEndpointTests(DruseApiFactory factory) : IClass
         Assert.Empty((await client.GetFromJsonAsync<JsonElement>($"/api/reports/datasets/{datasetId}/reports")).EnumerateArray());
     }
 
+    [Fact]
+    public async Task GuardaReabreYBorraUnTableroYListaTodosLosReportes()
+    {
+        using var client = factory.CreateAuthenticatedClient();
+        var datasetId = Guid.NewGuid();
+        await client.PutAsJsonAsync($"/api/reports/datasets/{datasetId}", Dataset(Guid.NewGuid(), Guid.NewGuid(), table: null));
+        var reportId = Guid.NewGuid();
+        await client.PutAsJsonAsync($"/api/reports/reports/{reportId}", new
+        {
+            datasetId,
+            name = "Cumplimiento",
+            visual = "Indicator",
+            settings = "{}",
+        });
+
+        var todos = await client.GetFromJsonAsync<JsonElement>("/api/reports/reports");
+        Assert.Contains(todos.EnumerateArray(), report => report.GetProperty("id").GetGuid() == reportId);
+
+        var id = Guid.NewGuid();
+        var model = $$"""{"version":1,"pages":[{"id":"p1","panels":[{"id":"a","reportId":"{{reportId}}","width":6,"height":4}]}],"filters":[]}""";
+        var saved = await client.PutAsJsonAsync($"/api/reports/dashboards/{id}", new { name = " Ventas 2026 ", model });
+        Assert.Equal(HttpStatusCode.OK, saved.StatusCode);
+        Assert.Equal("Ventas 2026", (await saved.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("name").GetString());
+
+        Assert.Equal(HttpStatusCode.BadRequest,
+            (await client.PutAsJsonAsync($"/api/reports/dashboards/{Guid.NewGuid()}", new { name = "Roto", model = "{roto" })).StatusCode);
+
+        var tableros = await client.GetFromJsonAsync<JsonElement>("/api/reports/dashboards");
+        var tablero = tableros.EnumerateArray().Single(item => item.GetProperty("id").GetGuid() == id);
+        Assert.Equal(model, tablero.GetProperty("model").GetString());
+
+        Assert.Equal(HttpStatusCode.NoContent, (await client.DeleteAsync($"/api/reports/dashboards/{id}")).StatusCode);
+        Assert.DoesNotContain((await client.GetFromJsonAsync<JsonElement>("/api/reports/dashboards")).EnumerateArray(),
+            item => item.GetProperty("id").GetGuid() == id);
+    }
+
     private static async Task<JsonElement> RefreshAsync(HttpClient client, Guid id)
     {
         var response = await client.PostAsync($"/api/reports/datasets/{id}/refresh", null);

@@ -8,6 +8,7 @@ import {
   abrirVisualizacion,
   actualizar,
   anadirFuente,
+  crearTablero,
   previsualizar,
 } from '../support/reportes';
 
@@ -82,8 +83,11 @@ test.describe('Reportes BI', () => {
     await reportes.getByRole('radio', { name: 'Indicador' }).click();
     await expect(reportes.locator('.indicator__value')).toHaveText(/60\s?%/);
     await expect(reportes.locator('.indicator')).toContainText('1 fila sin meta');
+    const informe = `Cumplimiento ${nombre}`;
+
+    await reportes.locator('.inspector').getByLabel('Nombre del reporte').fill(informe);
     await reportes.getByRole('button', { name: 'Guardar reporte' }).click();
-    await expect(reportes.locator('.reports__tab[aria-selected="true"]')).toHaveText('Reporte 1');
+    await expect(reportes.locator('.reports__tab[aria-selected="true"]')).toHaveText(informe);
 
     // Cerrar y volver: el reporte y sus datos salen de reports.db.
     await page.keyboard.press('Escape');
@@ -94,11 +98,40 @@ test.describe('Reportes BI', () => {
     await abrirVisualizacion(otraVez);
     await expect(otraVez.locator('.indicator__value')).toHaveText(/60\s?%/);
 
+    // --- Hito 4: un tablero con el indicador y un filtro de mes compartido -------
+    const tablero = otraVez.locator('app-report-dashboard');
+    const nombreTablero = `Tablero ${Date.now()}`;
+
+    await crearTablero(otraVez, nombreTablero, [informe]);
+    await expect(tablero.locator('.panel .indicator__value')).toHaveText(/60\s?%/);
+
+    // Febrero no tiene datos en el escenario: el indicador se queda sin cifra.
+    const [desde] = await tablero.locator('.filter input[type="date"]').all();
+
+    await desde.fill('2026-02-01');
+    await desde.dispatchEvent('change');
+    await expect(tablero.locator('.panel .indicator__value')).toHaveText('—');
+    await tablero.getByRole('button', { name: 'Quitar filtros' }).click();
+    await expect(tablero.locator('.panel .indicator__value')).toHaveText(/60\s?%/);
+
     // Se deja el espacio de trabajo como estaba.
-    await otraVez.locator('.steps__item').first().click();
-    await borrarConjunto(otraVez);
+    await tablero.getByRole('button', { name: 'Editar diseño' }).click();
+    await tablero.getByRole('button', { name: 'Borrar este tablero' }).click();
+    await tablero.locator('.inspector').getByRole('button', { name: 'Borrar', exact: true }).click();
+    await expect(otraVez.locator('.datasets__item', { hasText: nombreTablero })).toHaveCount(0);
+
+    // Y no vuelve al reabrir: el borrado llegó al servidor, no solo a la lista.
     await page.keyboard.press('Escape');
     await expect(otraVez.locator('.dialog')).toBeHidden();
+    const terceraVez = await abrirReportes(page);
+
+    await expect(terceraVez.locator('.datasets__item', { hasText: nombre }).first()).toBeVisible();
+    await expect(terceraVez.locator('.datasets__item', { hasText: nombreTablero })).toHaveCount(0);
+    await terceraVez.locator('.datasets__item', { hasText: nombre }).first().click();
+    await terceraVez.locator('.steps__item').first().click();
+    await borrarConjunto(terceraVez);
+    await page.keyboard.press('Escape');
+    await expect(terceraVez.locator('.dialog')).toBeHidden();
   });
 });
 

@@ -9,6 +9,7 @@
     <app-icon name="chart" [size]="14" />
     <div class="head__text">
       <h2 class="head__title" id="reports-title">{{ 'reports.title' | t }}</h2>
+      @if (mode() === 'dataset') {
       <input
         class="head__name"
         type="text"
@@ -17,7 +18,9 @@
         (input)="rename($any($event.target).value)"
         [attr.aria-label]="'reports.name' | t"
       />
+      }
     </div>
+    @if (mode() === 'dataset') {
     <p class="head__status" aria-live="polite">
       @if (draft().version > 0) {
         {{ 'reports.versionStatus' | t: { version: draft().version } }}
@@ -44,6 +47,7 @@
       <app-icon name="save" [size]="11" />
       {{ 'reports.save' | t }}
     </button>
+    }
     <button
       type="button"
       class="icon-button"
@@ -71,8 +75,8 @@
 
   <div
     class="body"
-    [class.is-inspecting]="inspectorOpen() && sources().length > 0 && step() !== 'visual'"
-    [class.is-working]="step() === 'visual'"
+    [class.is-inspecting]="mode() === 'dataset' && inspectorOpen() && sources().length > 0 && step() !== 'visual'"
+    [class.is-working]="mode() === 'dashboard' || step() === 'visual'"
   >
     <!-- Navegación: pasos del constructor y conjuntos guardados. -->
     <nav class="rail" [attr.aria-label]="'reports.nav' | t">
@@ -82,8 +86,8 @@
           <button
             type="button"
             class="steps__item"
-            [class.is-active]="step() === 'sources'"
-            [attr.aria-current]="step() === 'sources' ? 'step' : null"
+            [class.is-active]="mode() === 'dataset' && step() === 'sources'"
+            [attr.aria-current]="mode() === 'dataset' && step() === 'sources' ? 'step' : null"
             (click)="goTo('sources')"
           >
             <span class="steps__number" aria-hidden="true">1</span>
@@ -95,8 +99,8 @@
           <button
             type="button"
             class="steps__item"
-            [class.is-active]="step() === 'join'"
-            [attr.aria-current]="step() === 'join' ? 'step' : null"
+            [class.is-active]="mode() === 'dataset' && step() === 'join'"
+            [attr.aria-current]="mode() === 'dataset' && step() === 'join' ? 'step' : null"
             [disabled]="!hasJoin()"
             [attr.title]="hasJoin() ? null : ('reports.step.joinNeedsTwo' | t)"
             (click)="goTo('join')"
@@ -109,8 +113,8 @@
           <button
             type="button"
             class="steps__item"
-            [class.is-active]="step() === 'visual'"
-            [attr.aria-current]="step() === 'visual' ? 'step' : null"
+            [class.is-active]="mode() === 'dataset' && step() === 'visual'"
+            [attr.aria-current]="mode() === 'dataset' && step() === 'visual' ? 'step' : null"
             [disabled]="savedDataset() === null"
             [attr.title]="savedDataset() === null ? ('reports.step.visualNeedsSave' | t) : null"
             (click)="goTo('visual')"
@@ -157,9 +161,55 @@
           }
         </ul>
       }
+
+      <div class="rail__row">
+        <p class="rail__label">{{ 'reports.dashboard.list' | t }}</p>
+        <button
+          type="button"
+          class="icon-button"
+          (click)="newDashboard()"
+          [attr.aria-label]="'reports.dashboard.new' | t"
+          [attr.title]="'reports.dashboard.new' | t"
+        >
+          <app-icon name="plus" [size]="11" />
+        </button>
+      </div>
+      @if (!loadingList() && dashboards().length === 0) {
+        <p class="rail__hint">{{ 'reports.dashboard.none' | t }}</p>
+      } @else {
+        <ul class="datasets">
+          @for (dashboard of dashboards(); track dashboard.id) {
+            <li>
+              <button
+                type="button"
+                class="datasets__item"
+                [class.is-active]="isDashboardOpen(dashboard)"
+                [attr.aria-current]="isDashboardOpen(dashboard) ? 'true' : null"
+                (click)="showDashboard(dashboard)"
+              >
+                <span class="datasets__name">
+                  <app-icon name="chart" [size]="11" />
+                  {{ dashboard.name }}
+                </span>
+              </button>
+            </li>
+          }
+        </ul>
+      }
     </nav>
 
-    @if (step() === 'visual' && savedDataset(); as dataset) {
+    @if (mode() === 'dashboard' && openDashboard(); as board) {
+      <app-report-dashboard
+        class="workbench"
+        [dashboard]="board"
+        [datasets]="datasets()"
+        [inspectorOpen]="inspectorOpen()"
+        (saved)="dashboardSaved($event)"
+        (deleted)="dashboardDeleted($event)"
+        (dirtyChange)="dashboardDirty($event)"
+        (editingChange)="dashboardEditing($event)"
+      />
+    } @else if (step() === 'visual' && savedDataset(); as dataset) {
       <app-report-workbench
         class="workbench"
         [dataset]="dataset"

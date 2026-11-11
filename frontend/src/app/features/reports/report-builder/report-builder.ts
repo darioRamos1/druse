@@ -29,13 +29,17 @@ import {
   ReportSource,
   ReportSourcePreview,
   ReportValue,
+  SavedDashboard,
 } from '../../../shared/models/reports';
 import { Icon } from '../../../shared/ui/icon/icon';
 import { ReportWorkbench } from '../report-workbench/report-workbench';
+import { ReportDashboard } from '../report-dashboard/report-dashboard';
+import { emptyDashboard } from '../report-dashboard-model';
 import {
   MAX_SOURCES,
   adoptExpectedColumns,
   applyComposition,
+  columnLabelFor,
   draftProblems,
   newDataset,
   newSource,
@@ -90,7 +94,7 @@ function wideLayout(): boolean {
 @Component({
   selector: 'app-report-builder',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [DialogBackdrop, DialogFocus, Icon, NgTemplateOutlet, ReportWorkbench, TranslatePipe],
+  imports: [DialogBackdrop, DialogFocus, Icon, NgTemplateOutlet, ReportDashboard, ReportWorkbench, TranslatePipe],
   templateUrl: './report-builder.html',
   styleUrl: './report-builder.scss',
 })
@@ -103,6 +107,17 @@ export class ReportBuilder {
 
   protected readonly datasets = signal<readonly ReportDataset[]>([]);
   protected readonly loadingList = signal(true);
+  protected readonly dashboards = signal<readonly SavedDashboard[]>([]);
+
+  /**
+   * Qué ocupa el centro: el constructor de un conjunto o un tablero.
+   *
+   * El borrador del conjunto se conserva al abrir un tablero: volver a los
+   * pasos lo encuentra donde estaba.
+   */
+  protected readonly mode = signal<'dataset' | 'dashboard'>('dataset');
+  protected readonly openDashboard = signal<SavedDashboard | null>(null);
+  private readonly _dashboardDirty = signal(false);
 
   protected readonly draft = signal<ReportDataset>(
     newDataset(crypto.randomUUID(), this._i18n.t('reports.untitled')),
@@ -220,7 +235,13 @@ export class ReportBuilder {
     this.loadingList.set(true);
 
     try {
-      this.datasets.set(await firstValueFrom(this._gateway.getReportDatasets()));
+      const [datasets, dashboards] = await Promise.all([
+        firstValueFrom(this._gateway.getReportDatasets()),
+        firstValueFrom(this._gateway.getDashboards()),
+      ]);
+
+      this.datasets.set(datasets);
+      this.dashboards.set(dashboards);
     } catch (error) {
       this.error.set(describeError(error, this._i18n));
     } finally {
@@ -229,7 +250,7 @@ export class ReportBuilder {
   }
 
   protected isOpen(dataset: ReportDataset): boolean {
-    return dataset.id === this.draft().id;
+    return this.mode() === 'dataset' && dataset.id === this.draft().id;
   }
 
   protected open(dataset: ReportDataset): void {
@@ -254,6 +275,7 @@ export class ReportBuilder {
   }
 
   private reset(dataset: ReportDataset): void {
+    this.leaveDashboard();
     this.draft.set(dataset);
     this.preview.set(null);
     this._previewedSql.set(new Map());
@@ -320,6 +342,15 @@ export class ReportBuilder {
   // --- Pasos y vista ---------------------------------------------------------
 
   protected goTo(step: ReportStep): void {
+    // Desde un tablero, los pasos devuelven al conjunto que se estaba editando.
+    if (this.mode() === 'dashboard') {
+      this.guard(() => {
+        this.leaveDashboard();
+        this.goTo(step);
+      }, 'dashboard');
+      return;
+    }
+
     if ((step === 'visual' && this._saved() === null) || (step === 'join' && !this.hasJoin())) {
       return;
     }
@@ -677,17 +708,7 @@ export class ReportBuilder {
    * conoce quien armó el conjunto.
    */
   protected columnLabel(name: string): string {
-    const [left, right] = this.sources();
-
-    if (left && name.startsWith('izquierda.')) {
-      return `${left.alias}.${name.slice('izquierda.'.length)}`;
-    }
-
-    if (right && name.startsWith('derecha.')) {
-      return `${right.alias}.${name.slice('derecha.'.length)}`;
-    }
-
-    return name;
+    return columnLabelFor(this.sources(), name);
   }
 
   protected repeatedLabels(names: readonly string[]): string {
@@ -706,11 +727,74 @@ export class ReportBuilder {
     return formatDate(preview.completedAtUtc, { timeStyle: 'medium' });
   }
 
+  // --- Tableros --------------------------------------------------------------
+
+  protected isDashboardOpen(dashboard: SavedDashboard): boolean {
+    return this.mode() === 'dashboard' && this.openDashboard()?.id === dashboard.id;
+  }
+
+  protected showDashboard(dashboard: SavedDashboard): void {
+    this.guard(() => this.enterDashboard(dashboard), 'dashboard');
+  }
+
+  protected newDashboard(): void {
+    this.guard(
+      () =>
+        this.enterDashboard({
+          id: crypto.randomUUID(),
+          name: this._i18n.t('reports.dashboard.untitled'),
+          model: JSON.stringify(emptyDashboard(this._i18n.t('reports.dashboard.page', { number: 1 }))),
+        }),
+      'dashboard',
+    );
+  }
+
+  private enterDashboard(dashboard: SavedDashboard): void {
+    this._dashboardDirty.set(false);
+    this.openDashboard.set(dashboard);
+    this.mode.set('dashboard');
+    this.inspectorOpen.set(wideLayout());
+  }
+
+  private leaveDashboard(): void {
+    this.mode.set('dataset');
+    this.openDashboard.set(null);
+    this._dashboardDirty.set(false);
+  }
+
+  protected dashboardSaved(saved: SavedDashboard): void {
+    this.dashboards.update((list) => [saved, ...list.filter((item) => item.id !== saved.id)]);
+  }
+
+  protected dashboardDeleted(id: string): void {
+    this.dashboards.update((list) => list.filter((item) => item.id !== id));
+    this.leaveDashboard();
+  }
+
+  /** Editar un tablero es pedir el inspector: se abre aunque la ventana sea estrecha. */
+  protected dashboardEditing(editing: boolean): void {
+    if (editing) {
+      this.inspectorOpen.set(true);
+    }
+  }
+
+  protected dashboardDirty(dirty: boolean): void {
+    this._dashboardDirty.set(dirty);
+  }
+
   // --- Confirmaciones --------------------------------------------------------
 
-  /** Antes de descartar cambios sin guardar, se pregunta. */
-  private guard(action: () => void): void {
-    if (!this.dirty()) {
+  /**
+   * Antes de descartar cambios sin guardar, se pregunta.
+   *
+   * `what` dice qué se pierde: abrir otro tablero solo descarta el tablero
+   * abierto (el borrador del conjunto se conserva); abrir otro conjunto o
+   * cerrar descarta los dos.
+   */
+  private guard(action: () => void, what: 'all' | 'dashboard' = 'all'): void {
+    const dashboardDirty = this.mode() === 'dashboard' && this._dashboardDirty();
+
+    if (!dashboardDirty && (what === 'dashboard' || !this.dirty())) {
       action();
       return;
     }

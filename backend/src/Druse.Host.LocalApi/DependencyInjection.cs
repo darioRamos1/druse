@@ -71,6 +71,7 @@ internal static class DependencyInjection
         services.AddSingleton<IReportDatasetStore, SqliteReportDatasetStore>();
         services.AddSingleton<IReportRunStore, SqliteReportRunStore>();
         services.AddSingleton<ISavedReportStore, SqliteSavedReportStore>();
+        services.AddSingleton<IReportDashboardStore, SqliteReportDashboardStore>();
         services.AddSingleton<ReportRunGate>();
         services.AddSingleton<IBackupArchiveFactory, BackupArchiveFactory>();
         services.AddScoped<IConnectionProfileStore, SqliteConnectionProfileStore>();

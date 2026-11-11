@@ -61,6 +61,16 @@ internal static class ReportsDatabase
                 ) STRICT;
 
                 CREATE INDEX IF NOT EXISTS ix_saved_reports_dataset ON saved_reports (dataset_id);
+
+                -- Un tablero apunta a reportes por su id dentro del modelo: si se
+                -- borra un reporte, su panel lo dice al pintarse en vez de romper.
+                CREATE TABLE IF NOT EXISTS report_dashboards (
+                    id TEXT PRIMARY KEY,
+                    name TEXT NOT NULL,
+                    model TEXT NOT NULL,
+                    created_utc_ticks INTEGER NOT NULL,
+                    updated_utc_ticks INTEGER NOT NULL
+                ) STRICT;
                 """;
             await command.ExecuteNonQueryAsync(cancellationToken);
             return connection;

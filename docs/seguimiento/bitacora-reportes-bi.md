@@ -25,6 +25,14 @@
 - [x] Reportes guardados: tabla, barras, línea e indicador con meta.
 - [ ] Captura del tablero para la landing (hito 4, con los tableros).
 
+## Tareas del hito 4
+
+- [x] 4.1 Tableros: cuadrícula de paneles con reportes de distintos conjuntos, ordenar y redimensionar con botones y teclado.
+- [x] 4.1 Filtros compartidos de fecha y categoría, vinculados por conjunto, aplicados sobre los datos guardados.
+- [ ] 4.2 Personalización: títulos, colores, formato de números, estilo de panel y varias páginas.
+- [ ] 4.3 Plantillas: guardar, aplicar a otro conjunto con asignación de campos, exportar e importar.
+- [ ] 4.4 Exportación a Excel, PDF y CSV con los filtros activos.
+
 Los hitos siguientes cubren el constructor SQL y visual, los reportes guardados, los tableros y plantillas, y la actualización programada. La evidencia para la landing se prepara conforme se valida cada hito.
 
 ## 2026-11-11 · Inicio del hito 1
@@ -138,8 +146,31 @@ Dos fuentes ya materializadas en memoria, con 20.000 filas cada una y un cruce 1
   - A 900 px la barra compacta ocultaba el botón **Reportes**, y solo quedaba la paleta para llegar. Ahora se queda como icono, con su nombre accesible.
 - El barrido y la e2e usan un nombre propio para su conjunto y el barrido borra los suyos al final, también los que dejara una ejecución cortada. La consola sale limpia; `medir` solo marca la ventana de detrás, como ya hacía en esos anchos.
 
+## 2026-11-11 · Hito 4.1: tableros y filtros compartidos (versión 1.14.0)
+
+El hito 4 se divide en cuatro entregas (tableros, personalización, plantillas y exportación) para probar y revisar cada una con Playwright antes de seguir.
+
+### Qué se hizo
+
+- Backend: tabla `report_dashboards` en `reports.db` y `GET/PUT/DELETE /api/reports/dashboards`. El modelo es JSON propiedad de la interfaz: páginas, paneles y filtros. También se añadió `GET /api/reports/reports` para elegir reportes de cualquier conjunto.
+- `report-dashboard-model.ts`: cuadrícula de 12 columnas (paneles de 3 a 12 de ancho y de 2 a 8 filas de alto), mover, redimensionar y retitular, y lectura defensiva del JSON guardado. Los filtros de fecha y categoría se vinculan a una columna **por conjunto**. Se aplican sobre las filas guardadas, sin volver a consultar. Un conjunto sin columna vinculada no se filtra y su panel lo dice. Se propone la columna que se llama como las ya vinculadas.
+- En Druse, Reportes tiene una lista de **Tableros**:
+  - En modo vista: filtros arriba, «Actualizar todo» (actualiza cada conjunto usado y dice cuáles fallaron) y los paneles con «Datos del…» de su conjunto.
+  - En **Editar diseño**: el inspector añade reportes, retitula el panel seleccionado y crea y vincula filtros. Cada panel lleva botones para mover y cambiar el tamaño. Alt + flechas mueve y Mayús + flechas redimensiona.
+  - Por debajo de 900 px los paneles se apilan a lo ancho.
+- Los gráficos se siguen dibujando con SVG propio; `ReportChart` tiene un modo `fit` para llenar el panel. La librería se decidirá en la entrega de exportación.
+
+### Comprobaciones y lo que encontró Playwright
+
+- Pruebas: 7 del modelo del tablero (incluido el segundo mes del plan) y 7 del componente, 595 del frontend afectado, 18 de integración y la e2e de Reportes ampliada con un tablero, el filtro de mes y su borrado.
+- La revisión con el barrido (oscuro, edición, claro y 900 px) encontró tres fallos, ya corregidos:
+  - **Borrar un tablero recién creado no llegaba al servidor.** El componente seguía viendo la entrada sin guardar y volvía a aparecer al reabrir. Ahora recuerda que está guardado, y la e2e comprueba que no vuelve.
+  - **En estrecho, «Editar diseño» no enseñaba el inspector**, que empieza cerrado ahí. Editar un tablero lo abre.
+  - **En edición, los botones del panel tapaban el título.** Pasan a su propia línea si no caben.
+- El barrido borra al empezar los restos de ejecuciones cortadas, para que no salgan en las capturas.
+
 ### Dónde retomar
 
-1. Hito 4: tableros con varios reportes en cuadrícula, filtros compartidos de fecha y categoría, personalización, plantillas y exportación a Excel y PDF. Elegir la librería de gráficos probando tema, accesibilidad y exportación.
-2. Abrir el compositor desde una fuente visual (hoy se elige una composición ya guardada).
-3. Preparar la sección `#reportes-bi` de la landing con las capturas `21b-reportes-combinar` y `21e-reportes-indicador` (estado En desarrollo).
+1. Hito 4.2, personalización: título y descripción del panel, colores por serie o categoría, formato de números y fechas, etiquetas y leyenda, estilo del panel y varias páginas por tablero. Filtrar al pulsar una barra.
+2. Hito 4.3, plantillas; hito 4.4, exportación a Excel, PDF y CSV (y decidir la librería de gráficos).
+3. Preparar la sección `#reportes-bi` de la landing con `22-tablero` (estado En desarrollo).

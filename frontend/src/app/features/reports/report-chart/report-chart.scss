@@ -19,6 +19,14 @@
   max-height: 420px;
   font-family: var(--dr-font-ui);
 
+  // En un panel el alto lo pone la cuadrícula: el dibujo se encaja sin deformarse.
+  &--fit {
+    flex: 1;
+    height: 100%;
+    min-height: 0;
+    max-height: none;
+  }
+
   &__grid {
     stroke: var(--dr-border-faint);
     stroke-width: 1;

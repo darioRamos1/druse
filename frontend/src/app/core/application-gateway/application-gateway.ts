@@ -6,6 +6,7 @@ import {
   ReportRefresh,
   ReportRun,
   ReportSnapshot,
+  SavedDashboard,
   SavedReport,
 } from '../../shared/models/reports';
 
@@ -586,6 +587,15 @@ export abstract class ApplicationGateway {
   abstract getReportRuns(datasetId: string): Observable<readonly ReportRun[]>;
 
   abstract getSavedReports(datasetId: string): Observable<readonly SavedReport[]>;
+
+  /** Todos los reportes, para elegir qué va en un tablero. */
+  abstract getAllReports(): Observable<readonly SavedReport[]>;
+
+  abstract getDashboards(): Observable<readonly SavedDashboard[]>;
+
+  abstract saveDashboard(dashboard: SavedDashboard): Observable<SavedDashboard>;
+
+  abstract deleteDashboard(id: string): Observable<void>;
 
   abstract saveReport(report: SavedReport): Observable<SavedReport>;
 

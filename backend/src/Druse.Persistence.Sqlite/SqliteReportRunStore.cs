@@ -82,6 +82,19 @@ public sealed class SqliteSavedReportStore(IAppPaths paths, TimeProvider clock) 
 {
     private readonly string _databaseFile = ReportsDatabase.File(paths);
 
+    public async Task<IReadOnlyList<SavedReport>> GetAllAsync(CancellationToken cancellationToken)
+    {
+        if (!File.Exists(_databaseFile))
+        {
+            return [];
+        }
+
+        await using var connection = await ReportsDatabase.OpenAsync(_databaseFile, cancellationToken);
+        await using var command = connection.CreateCommand();
+        command.CommandText = $"{Select} ORDER BY name, created_utc_ticks;";
+        return await ReadAllAsync(command, cancellationToken);
+    }
+
     public async Task<IReadOnlyList<SavedReport>> GetByDatasetAsync(Guid datasetId, CancellationToken cancellationToken)
     {
         if (!File.Exists(_databaseFile))

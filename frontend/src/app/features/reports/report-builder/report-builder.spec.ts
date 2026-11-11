@@ -90,6 +90,7 @@ describe('ReportBuilder', () => {
 
     const gateway = {
       getReportDatasets: () => of([]),
+      getDashboards: () => of([]),
       getReportSourceDatabases: () => of({ databases: ['ventas', 'metas'], failureCode: null, message: null }),
       getCompositions: () => of([]),
       previewReportDataset: (dataset: ReportDataset): Observable<ReportDatasetPreview> => {

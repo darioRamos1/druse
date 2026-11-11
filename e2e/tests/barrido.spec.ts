@@ -9,6 +9,8 @@ import {
   abrirVisualizacion,
   actualizar,
   anadirFuente,
+  borrarRestos,
+  crearTablero,
   previsualizar,
 } from '../support/reportes';
 import { comprobarDiagnosticoIa, prepararDiagnosticoIa } from '../support/ai-diagnostics';
@@ -31,6 +33,13 @@ const hallazgos: string[] = [];
 
 /** Nombre propio para el conjunto del barrido: así se encuentra y se borra sin confundirlo. */
 const CONJUNTO_BARRIDO = 'Barrido · Ventas y metas';
+const TABLERO_BARRIDO = 'Barrido · Tablero comercial';
+/** Los reportes del barrido, con nombre propio para elegirlos sin confundirlos. */
+const INDICADOR_BARRIDO = 'Barrido · Cumplimiento';
+const BARRAS_BARRIDO = 'Barrido · Ventas por municipio';
+/** Lo que dejan el barrido y la e2e de Reportes si se cortan antes de limpiar. */
+const RESTOS_TABLEROS = /Barrido · |Tablero \d{10,}/;
+const RESTOS_CONJUNTOS = /Barrido · |E2E Reportes \d+|Conjunto sin nombre/;
 
 async function foto(page: Page, nombre: string, sitio?: Locator): Promise<void> {
   await (sitio ?? page).screenshot({ path: `${SALIDA}/${nombre}.png` });
@@ -462,6 +471,7 @@ test.describe('barrido visual', () => {
     // --- Reportes BI: vacío, una fuente y el cruce de dos -------------------
     const reportes = await abrirReportes(page);
 
+    await borrarRestos(reportes, RESTOS_TABLEROS, RESTOS_CONJUNTOS);
     await medir(page, 'reportes vacío', hallazgos);
     await foto(page, '21-reportes-vacio', reportes.locator('.dialog'));
 
@@ -497,11 +507,31 @@ test.describe('barrido visual', () => {
 
     // Se guardan un indicador y unas barras: el tema claro y los anchos
     // estrechos se miran más abajo sobre este mismo conjunto, y al final se borra.
+    await reportes.locator('.inspector').getByLabel('Nombre del reporte').fill(INDICADOR_BARRIDO);
     await reportes.getByRole('button', { name: 'Guardar reporte' }).click();
     await reportes.getByRole('button', { name: 'Nuevo reporte' }).click();
+    await reportes.locator('.inspector').getByLabel('Nombre del reporte').fill(BARRAS_BARRIDO);
     await reportes.locator('.inspector').getByLabel('Agrupar por').selectOption({ label: 'Ventas.municipio' });
     await reportes.getByRole('button', { name: 'Guardar reporte' }).click();
     await expect(reportes.locator('.reports__tab')).toHaveCount(2);
+
+    // Un tablero con los dos reportes y filtros de fecha y categoría.
+    await crearTablero(reportes, TABLERO_BARRIDO, [BARRAS_BARRIDO, INDICADOR_BARRIDO]);
+    const tablero = reportes.locator('app-report-dashboard');
+
+    await expect(tablero.locator('.panel .chart__bar')).toHaveCount(3);
+    await medir(page, 'tablero', hallazgos);
+    await foto(page, '22-tablero', reportes.locator('.dialog'));
+    await tablero.locator('.filter select').selectOption({ label: '05001' });
+    await expect(tablero.locator('.panel .chart__bar')).toHaveCount(1);
+    await medir(page, 'tablero filtrado', hallazgos);
+    await foto(page, '22a-tablero-filtrado', reportes.locator('.dialog'));
+    await tablero.getByRole('button', { name: 'Quitar filtros' }).click();
+    await tablero.getByRole('button', { name: 'Editar diseño' }).click();
+    await tablero.locator('.panel').first().click();
+    await medir(page, 'tablero en edición', hallazgos);
+    await foto(page, '22b-tablero-edicion', reportes.locator('.dialog'));
+    await tablero.getByRole('button', { name: 'Terminar' }).click();
     await page.keyboard.press('Escape');
     await expect(reportes.locator('.dialog')).toBeHidden();
 
@@ -723,6 +753,10 @@ test.describe('barrido visual', () => {
     await previsualizar(reportesClaro);
     await medir(page, 'claro: reportes combinar', hallazgos);
     await foto(page, '21h-claro-reportes-combinar', reportesClaro.locator('.dialog'));
+    await reportesClaro.locator('.datasets__item', { hasText: TABLERO_BARRIDO }).first().click();
+    await expect(reportesClaro.locator('app-report-dashboard .panel .chart__bar')).toHaveCount(3);
+    await medir(page, 'claro: tablero', hallazgos);
+    await foto(page, '22c-claro-tablero', reportesClaro.locator('.dialog'));
     await page.keyboard.press('Escape');
     await expect(reportesClaro.locator('.dialog')).toBeHidden();
     await page.getByRole('button', { name: 'Tema oscuro' }).click();
@@ -749,6 +783,11 @@ test.describe('barrido visual', () => {
       await page.waitForTimeout(300);
       await medir(page, `reportes fuentes a ${ancho}`, hallazgos);
       await foto(page, `21k-reportes-fuentes-${ancho}`, reportesEstrecho.locator('.dialog'));
+      await reportesEstrecho.locator('.datasets__item', { hasText: TABLERO_BARRIDO }).first().click();
+      await expect(reportesEstrecho.locator('app-report-dashboard .panel').first()).toBeVisible();
+      await page.waitForTimeout(300);
+      await medir(page, `tablero a ${ancho}`, hallazgos);
+      await foto(page, `22d-tablero-${ancho}`, reportesEstrecho.locator('.dialog'));
 
       if (ancho !== 900) {
         await page.keyboard.press('Escape');
@@ -758,17 +797,7 @@ test.describe('barrido visual', () => {
 
     // Se deja como estaba: sin conjuntos del barrido, tampoco los que dejara
     // a medias una ejecución anterior que se cortó antes de llegar aquí.
-    const delBarrido = reportesEstrecho.locator('.datasets__item', { hasText: CONJUNTO_BARRIDO });
-
-    while ((await delBarrido.count()) > 0) {
-      const antes = await delBarrido.count();
-
-      await delBarrido.first().click();
-      await reportesEstrecho.locator('.steps__item').first().click();
-      await reportesEstrecho.getByRole('button', { name: 'Borrar este conjunto de datos' }).click();
-      await reportesEstrecho.locator('.confirm').getByRole('button', { name: 'Borrar' }).click();
-      await expect(delBarrido).toHaveCount(antes - 1);
-    }
+    await borrarRestos(reportesEstrecho, RESTOS_TABLEROS, RESTOS_CONJUNTOS);
 
     await page.keyboard.press('Escape');
     await expect(reportesEstrecho.locator('.dialog')).toBeHidden();

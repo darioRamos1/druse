@@ -68,8 +68,29 @@ public sealed record SavedReportDto
     public DateTimeOffset UpdatedAtUtc { get; init; }
 }
 
+public sealed record ReportDashboardDto
+{
+    /// <summary>En las peticiones manda el de la ruta.</summary>
+    public Guid Id { get; init; }
+    public required string Name { get; init; }
+
+    /// <summary>JSON con páginas, paneles y filtros; su forma la decide la interfaz.</summary>
+    public required string Model { get; init; }
+    public DateTimeOffset CreatedAtUtc { get; init; }
+    public DateTimeOffset UpdatedAtUtc { get; init; }
+}
+
 internal static class ReportRunContractMapper
 {
+    public static ReportDashboardDto ToDto(this ReportDashboard dashboard) => new()
+    {
+        Id = dashboard.Id,
+        Name = dashboard.Name,
+        Model = dashboard.Model,
+        CreatedAtUtc = dashboard.CreatedAtUtc,
+        UpdatedAtUtc = dashboard.UpdatedAtUtc,
+    };
+
     public static ReportRunDto ToDto(this ReportRun run) => new()
     {
         Id = run.Id,

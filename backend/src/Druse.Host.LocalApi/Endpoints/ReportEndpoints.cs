@@ -115,6 +115,46 @@ internal static class ReportEndpoints
             Results.Ok((await reports.GetByDatasetAsync(id, cancellationToken)).Select(report => report.ToDto())))
         .WithName("GetSavedReports");
 
+        app.MapGet("/api/reports/reports", async (
+            ISavedReportStore reports,
+            CancellationToken cancellationToken) =>
+            Results.Ok((await reports.GetAllAsync(cancellationToken)).Select(report => report.ToDto())))
+        .WithName("GetAllSavedReports");
+
+        app.MapGet("/api/reports/dashboards", async (
+            IReportDashboardStore dashboards,
+            CancellationToken cancellationToken) =>
+            Results.Ok((await dashboards.GetAllAsync(cancellationToken)).Select(dashboard => dashboard.ToDto())))
+        .WithName("GetReportDashboards");
+
+        app.MapPut("/api/reports/dashboards/{id:guid}", async (
+            Guid id,
+            ReportDashboardDto request,
+            IReportDashboardStore dashboards,
+            CancellationToken cancellationToken) =>
+        {
+            var name = request.Name?.Trim() ?? string.Empty;
+            if (name.Length == 0 || !IsJson(request.Model))
+            {
+                return Results.BadRequest(new { message = "Un tablero necesita nombre y diseño." });
+            }
+
+            var saved = await dashboards.SaveAsync(
+                new ReportDashboard { Id = id, Name = name, Model = request.Model }, cancellationToken);
+            return Results.Ok(saved.ToDto());
+        })
+        .WithName("SaveReportDashboard");
+
+        app.MapDelete("/api/reports/dashboards/{id:guid}", async (
+            Guid id,
+            IReportDashboardStore dashboards,
+            CancellationToken cancellationToken) =>
+        {
+            await dashboards.DeleteAsync(id, cancellationToken);
+            return Results.NoContent();
+        })
+        .WithName("DeleteReportDashboard");
+
         app.MapPut("/api/reports/reports/{id:guid}", async (
             Guid id,
             SavedReportDto request,
