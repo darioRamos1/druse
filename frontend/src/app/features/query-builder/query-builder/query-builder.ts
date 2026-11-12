@@ -8,7 +8,9 @@ import {
   inject,
   input,
   output,
+  Signal,
   signal,
+  WritableSignal,
 } from '@angular/core';
 
 import { firstValueFrom } from 'rxjs';
@@ -32,17 +34,12 @@ import {
 } from '../../../shared/models/workspace';
 import { ResultsGrid } from '../../query-results/results-grid/results-grid';
 import {
-  AggregateFilter,
   AggregateFunction,
   ColumnWrite,
   FilterOperator,
   DatePeriod,
   JoinType,
   QueryFilter,
-  QueryJoin,
-  SelectAggregate,
-  SelectColumn,
-  SelectOrder,
   buildCreateTable,
   buildDropTable,
   buildDeleteCount,
@@ -50,11 +47,25 @@ import {
   buildInsertValues,
   buildSelect,
   buildUpdateValues,
-  inSubquery,
   COMPARISON_OPERATORS,
 } from '../../query-editor/sql-language/sql-writer';
 import { SQL_DIALECTS } from '../../query-editor/sql-language/sql-dialects';
 import { MAX_JOIN_HOPS, findJoinPath } from './join-path';
+import * as Model from '../query-model';
+import {
+  AggregateDraft,
+  CanvasLayout,
+  CompositionState,
+  HavingDraft,
+  ModelCatalog,
+  ModelJoin,
+  OrderDraft,
+  QueryColumnOption,
+  SavedJoin,
+  SelectForm,
+  SelectModel,
+  isDateColumn,
+} from '../query-model';
 import { DialogFocus } from '../../../shared/a11y/dialog-focus';
 import { DialogBackdrop } from '../../../shared/a11y/dialog-backdrop';
 import { Icon } from '../../../shared/ui/icon/icon';
@@ -97,71 +108,6 @@ interface JoinSuggestion {
   readonly schema: string;
   readonly tableId?: string;
   readonly table?: string;
-}
-
-interface QueryColumnOption {
-  readonly key: string;
-  readonly label: string;
-  readonly reference: string | SelectColumn;
-  readonly column: KnownColumn;
-}
-
-interface AggregateDraft {
-  readonly id: number;
-  readonly function: AggregateFunction;
-  readonly columnKey: '*' | string;
-  readonly alias: string;
-  readonly distinct: boolean;
-}
-
-interface HavingDraft {
-  readonly id: number;
-  readonly aggregateId: number;
-  readonly operator: FilterOperator;
-  readonly value: string | null;
-  readonly conjunction: 'AND' | 'OR';
-}
-
-interface OrderDraft {
-  readonly id: number;
-  readonly target: string;
-  readonly descending: boolean;
-}
-
-/** Un cruce tal como se guarda: lo justo para volver a montarlo. */
-interface SavedJoin {
-  readonly id: number;
-  readonly type: JoinType;
-  readonly tableId: string;
-  readonly schema: string;
-  readonly table: string;
-  readonly leftJoinId: number | null;
-  readonly leftColumn: string;
-  readonly rightColumn: string;
-  readonly chosen: readonly string[];
-}
-
-/**
- * El formulario de un SELECT, para poder volver a él.
- *
- * Antes solo se guardaba el SQL, y cargar una composición la dejaba como texto:
- * cambiar un filtro obligaba a rehacerla entera desde el formulario vacío.
- */
-interface CompositionState {
-  readonly chosen: readonly string[];
-  readonly joins: readonly SavedJoin[];
-  readonly filters: readonly QueryFilter[];
-  readonly grouped: boolean;
-  readonly groupByKeys: readonly string[];
-  readonly groupPeriods: Readonly<Record<string, DatePeriod | 'none' | undefined>>;
-  readonly aggregates: readonly AggregateDraft[];
-  readonly having: readonly HavingDraft[];
-  readonly orders: readonly OrderDraft[];
-  readonly limit: number | null;
-  /** Falta en las guardadas antes de que existiera. */
-  readonly distinct?: boolean;
-  /** El SQL retocado a mano, si lo estaba al guardar. */
-  readonly sqlOverride: string | null;
 }
 
 interface SavedComposition {
@@ -303,7 +249,19 @@ export class QueryBuilder implements OnInit {
   protected readonly operation = signal<Operation>('select');
   protected readonly sqlOverride = signal<string | null>(null);
 
-  protected readonly chosen = signal<readonly string[]>([]);
+  /**
+   * El SELECT que se compone, salvo los cruces.
+   *
+   * Las reglas viven en `query-model.ts`; aquí solo se guarda el resultado de
+   * cada operación. Los cruces van aparte porque arrastran estado de pantalla
+   * —el buscador, la carga de columnas— que no es de la consulta.
+   */
+  private readonly _form = signal<SelectForm>(Model.emptySelectForm());
+
+  /** Posiciones del lienzo que traía la composición: se conservan al guardarla de nuevo. */
+  private readonly _layout = signal<CanvasLayout | undefined>(undefined);
+
+  protected readonly chosen = formField(this._form, 'chosen');
   protected readonly columnSearch = signal('');
   protected readonly visibleColumns = computed(() => {
     const search = this.columnSearch().trim().toLocaleLowerCase();
@@ -312,19 +270,33 @@ export class QueryBuilder implements OnInit {
     );
   });
   protected readonly joins = signal<readonly JoinDraft[]>([]);
-  protected readonly filters = signal<readonly QueryFilter[]>([]);
-  protected readonly grouped = signal(false);
-  protected readonly groupByKeys = signal<readonly string[]>([]);
-  protected readonly groupPeriods = signal<
-    Readonly<Record<string, DatePeriod | 'none' | undefined>>
-  >({});
-  protected readonly aggregates = signal<readonly AggregateDraft[]>([]);
-  protected readonly having = signal<readonly HavingDraft[]>([]);
-  protected readonly orders = signal<readonly OrderDraft[]>([
-    { id: 1, target: '', descending: false },
-  ]);
-  protected readonly limit = signal<number | null>(100);
-  protected readonly distinct = signal(false);
+  protected readonly filters = formField(this._form, 'filters');
+  protected readonly grouped = formField(this._form, 'grouped');
+  protected readonly groupByKeys = formField(this._form, 'groupByKeys');
+  protected readonly groupPeriods = formField(this._form, 'groupPeriods');
+  protected readonly aggregates = formField(this._form, 'aggregates');
+  protected readonly having = formField(this._form, 'having');
+  protected readonly orders = formField(this._form, 'orders');
+  protected readonly limit = formField(this._form, 'limit');
+  protected readonly distinct = formField(this._form, 'distinct');
+
+  /** El SELECT entero, cruces incluidos, como lo entiende el modelo. */
+  protected readonly model = computed<SelectModel>(() => ({
+    ...this._form(),
+    joins: this.joins().map((join) => this.toModelJoin(join)),
+  }));
+
+  /** Lo que el modelo necesita saber del catálogo. */
+  private readonly _catalog = computed<ModelCatalog>(() => ({
+    table: { schema: this.table().schema, name: this.table().name },
+    columns: this.columns(),
+    joinColumns: new Map(this.joins().map((join) => [join.id, join.columns])),
+  }));
+
+  /** Aplica una operación del modelo; los cruces no cambian por esta vía. */
+  private apply(operation: (model: SelectModel, catalog: ModelCatalog) => SelectModel): void {
+    this._form.set(Model.formOf(operation(this.model(), this._catalog())));
+  }
   protected readonly insertDrafts = signal<readonly ColumnDraft[]>([]);
   protected readonly updateDrafts = signal<readonly ColumnDraft[]>([]);
   protected readonly updateFilters = signal<readonly QueryFilter[]>([]);
@@ -375,16 +347,7 @@ export class QueryBuilder implements OnInit {
    * Refrescar entonces ejecutaría el marcador de «valor obligatorio» y enseñaría
    * un error de sintaxis por cada campo que se está a medio escribir.
    */
-  protected readonly hasPendingValues = computed(() =>
-    [...this.filters(), ...(this.grouped() ? this.having() : [])].some(
-      (filter) =>
-        this.needsValue(filter.operator) &&
-        !(filter as QueryFilter).compareColumn &&
-        (filter.value === null ||
-          (this.isList(filter.operator) && !filter.value?.trim()) ||
-          (filter.operator === 'BETWEEN' && (filter as QueryFilter).valueTo == null)),
-    ),
-  );
+  protected readonly hasPendingValues = computed(() => Model.hasPendingValues(this.model()));
 
   protected readonly canPreview = computed(
     () =>
@@ -501,10 +464,10 @@ export class QueryBuilder implements OnInit {
       this.loading.set(false);
     }
 
-    const initial = this.initialState();
+    const initial = Model.readCompositionState(this.initialState());
 
     if (initial) {
-      await this.applyState(initial as CompositionState);
+      await this.applyState(initial);
     }
   }
 
@@ -528,49 +491,7 @@ export class QueryBuilder implements OnInit {
         // y tener dos listas invitaría a componer el DELETE mirando la del otro.
         return buildDeleteValues(this.engine(), { ...base, filters: this.updateFilters() });
       default:
-        const joins = this.joins();
-        const queryJoins = this.toQueryJoins(joins);
-        const grouped = this.grouped();
-        const aggregates = grouped ? this.toAggregates() : [];
-        return buildSelect(this.engine(), {
-          ...base,
-          alias: queryJoins.length > 0 ? 't0' : undefined,
-          columns: grouped
-            ? this.groupByKeys().flatMap((key) => {
-                const option = this.queryColumns().find((column) => column.key === key);
-                return option && (this.groupPeriods()[key] ?? 'none') === 'none'
-                  ? [option.reference]
-                  : [];
-              })
-            : queryJoins.length > 0
-              ? this.selectedColumns(joins)
-              : this.chosen(),
-          joins: queryJoins,
-          filters: this.filters().filter((filter) => filter.column.length > 0),
-          groupBy: grouped
-            ? this.groupByKeys().flatMap((key) => {
-                const option = this.queryColumns().find((column) => column.key === key);
-                return option && (this.groupPeriods()[key] ?? 'none') === 'none'
-                  ? [option.reference]
-                  : [];
-              })
-            : undefined,
-          dateGroups: grouped
-            ? this.groupByKeys().flatMap((key) => {
-                const option = this.queryColumns().find((column) => column.key === key);
-                const period = this.groupPeriods()[key] ?? 'none';
-                return option && period !== 'none'
-                  ? [{ column: option.reference, period, alias: `${option.column.name}_${period}` }]
-                  : [];
-              })
-            : undefined,
-          aggregates,
-          having: grouped ? this.toHaving() : undefined,
-          orders: this.toOrders(),
-          limit: this.limit(),
-          // Con GROUP BY cada grupo ya sale una sola vez: DISTINCT no añadiría nada.
-          distinct: !grouped && this.distinct(),
-        });
+        return buildSelect(this.engine(), Model.toSelectSpec(this.model(), this._catalog()));
     }
   });
 
@@ -634,153 +555,56 @@ export class QueryBuilder implements OnInit {
     return this.chosen().includes(name);
   }
 
-  /** Sin ninguna marcada se escribe `*`, que es lo que se quiere al empezar. */
   protected toggleColumn(name: string): void {
-    this.chosen.update((current) =>
-      current.includes(name) ? current.filter((item) => item !== name) : [...current, name],
-    );
+    this.apply((model) => Model.toggleColumn(model, name));
   }
 
   protected selectVisibleColumns(): void {
-    this.chosen.update((current) => [
-      ...new Set([...current, ...this.visibleColumns().map((column) => column.name)]),
-    ]);
+    const names = this.visibleColumns().map((column) => column.name);
+    this.apply((model) => Model.chooseColumns(model, names));
+  }
+
+  protected clearColumns(): void {
+    this.apply(Model.clearColumns);
+  }
+
+  protected setDistinct(distinct: boolean): void {
+    this.apply((model) => Model.setDistinct(model, distinct));
   }
 
   /** Columnas disponibles para agrupar, incluidas las de los JOIN válidos. */
-  protected readonly queryColumns = computed<readonly QueryColumnOption[]>(() => {
-    const joins = this.joins();
-    const aliases = this.toQueryJoins(joins).length > 0;
-    const base = this.columns().map((column) => ({
-      key: `base:${column.name}`,
-      label: aliases ? `t0 · ${column.name}` : column.name,
-      reference: aliases ? ({ alias: 't0', column: column.name } as SelectColumn) : column.name,
-      column,
-    }));
-    const joined = joins.flatMap((join, index) =>
-      this.joinRelation(join)
-        ? join.columns.map((column) => ({
-            key: `join:${join.id}:${column.name}`,
-            label: `t${index + 1} · ${column.name}`,
-            reference: { alias: `t${index + 1}`, column: column.name },
-            column,
-          }))
-        : [],
-    );
+  protected readonly queryColumns = computed(() =>
+    Model.queryColumns(this.model(), this._catalog()),
+  );
 
-    return [...base, ...joined];
-  });
-
-  protected readonly groupedOrderColumns = computed(() => {
-    const chosen = new Set(this.groupByKeys());
-    return this.queryColumns().filter((column) => chosen.has(column.key));
-  });
-
-  protected readonly orderOptions = computed(() => {
-    if (!this.grouped()) {
-      return this.columns().map((column) => ({
-        value: `column:${column.name}`,
-        label: column.name,
-      }));
-    }
-
-    return [
-      ...this.groupedOrderColumns().map((column) => ({
-        value: `group:${column.key}`,
-        label: column.label,
-      })),
-      ...this.aggregates().map((aggregate) => ({
-        value: `aggregate:${aggregate.id}`,
-        label: aggregateLabelForOrder(aggregate, this.queryColumns()),
-      })),
-    ];
-  });
+  protected readonly orderOptions = computed(() =>
+    Model.orderOptions(this.model(), this._catalog()),
+  );
 
   protected readonly validationMessages = computed(() => {
-    const messages: string[] = [];
-
-    for (const filter of this.filters()) {
-      if (
-        this.isList(filter.operator) &&
-        filter.inSource === 'query' &&
-        filter.value?.trim() &&
-        !inSubquery(filter.value)
-      ) {
-        messages.push(this._i18n.t('builder.inQueryInvalid'));
-      }
-    }
-
-    if (!this.grouped()) {
-      return [...new Set(messages)];
-    }
-
-    if (this.grouped() && this.groupByKeys().length === 0 && this.aggregates().length === 0) {
-      messages.push(this._i18n.t('builder.needsGroupOrAggregate'));
-    }
-
-    for (const aggregate of this.aggregates()) {
-      const column = this.queryColumns().find(
-        (option) => option.key === aggregate.columnKey,
-      )?.column;
-
-      if (
-        column &&
-        (aggregate.function === 'SUM' || aggregate.function === 'AVG') &&
-        !isNumericColumn(column)
-      ) {
-        messages.push(
-          this._i18n.t('builder.needsNumeric', {
-            function: aggregate.function,
-            column: column.name,
-          }),
-        );
-      }
-
-      if (aggregate.distinct && aggregate.columnKey === '*') {
-        messages.push(this._i18n.t('builder.needsConcreteColumn'));
-      }
-    }
-
-    for (const key of this.groupByKeys()) {
-      const period = this.groupPeriods()[key] ?? 'none';
-      const column = this.queryColumns().find((option) => option.key === key)?.column;
-      if (period !== 'none' && column && !isDateColumn(column)) {
-        // El período se dice como en el desplegable que lo eligió, no con el
-        // nombre del contrato: «Por mes» y no «month».
-        messages.push(
-          this._i18n.t('builder.needsDate', {
+    const messages = Model.validate(this.model(), this._catalog()).map((problem) => {
+      switch (problem.key) {
+        case 'builder.needsNumeric':
+          return this._i18n.t(problem.key, { function: problem.function, column: problem.column });
+        case 'builder.needsDate':
+          // El período se dice como en el desplegable que lo eligió, no con el
+          // nombre del contrato: «Por mes» y no «month».
+          return this._i18n.t(problem.key, {
             period: this._i18n
-              .t(`builder.period.${period}`)
+              .t(`builder.period.${problem.period}`)
               .toLocaleLowerCase(this._i18n.intlLocale()),
-            column: column.name,
-          }),
-        );
+            column: problem.column,
+          });
+        default:
+          return this._i18n.t(problem.key);
       }
-    }
+    });
 
     return [...new Set(messages)];
   });
 
   protected toggleGrouping(): void {
-    const grouped = !this.grouped();
-    this.grouped.set(grouped);
-    this.orders.set([{ id: 1, target: '', descending: false }]);
-
-    if (!grouped) {
-      return;
-    }
-
-    if (this.groupByKeys().length === 0) {
-      const selected = this.chosen()
-        .map((name) => `base:${name}`)
-        .filter((key) => this.queryColumns().some((column) => column.key === key));
-      const first = this.queryColumns()[0]?.key;
-      this.groupByKeys.set(selected.length > 0 ? selected : first ? [first] : []);
-    }
-
-    if (this.aggregates().length === 0) {
-      this.addAggregate();
-    }
+    this.apply((model, catalog) => Model.toggleGrouping(model, catalog, this.defaultAlias()));
   }
 
   protected isGrouped(key: string): boolean {
@@ -788,162 +612,68 @@ export class QueryBuilder implements OnInit {
   }
 
   protected clearGroupColumns(): void {
-    this.groupByKeys.set([]);
-    this.orders.update((current) =>
-      current.map((order) =>
-        order.target.startsWith('group:') ? { ...order, target: '' } : order,
-      ),
-    );
+    this.apply(Model.clearGroupColumns);
   }
 
   protected toggleGroupColumn(key: string): void {
-    this.groupByKeys.update((current) =>
-      current.includes(key) ? current.filter((item) => item !== key) : [...current, key],
-    );
-
-    this.orders.update((current) =>
-      current.map((order) =>
-        order.target === `group:${key}` && !this.groupByKeys().includes(key)
-          ? { ...order, target: '' }
-          : order,
-      ),
-    );
+    this.apply((model) => Model.toggleGroupColumn(model, key));
   }
 
   protected setGroupPeriod(key: string, period: DatePeriod | 'none'): void {
-    this.groupPeriods.update((current) => ({ ...current, [key]: period }));
+    this.apply((model) => Model.setGroupPeriod(model, key, period));
   }
 
   protected canGroupByDate(option: QueryColumnOption): boolean {
     return isDateColumn(option.column);
   }
 
+  /** Los accesos directos calculan un total global; GROUP BY se elige por separado. */
   protected addAggregate(fn: AggregateFunction = 'COUNT'): void {
-    // Los accesos directos calculan un total global; GROUP BY se elige por separado.
-    if (!this.grouped()) {
-      this.grouped.set(true);
-      this.groupByKeys.set([]);
-      this.orders.set([{ id: 1, target: '', descending: false }]);
-    }
-    const id = Math.max(0, ...this.aggregates().map((aggregate) => aggregate.id)) + 1;
-    this.aggregates.update((current) => [
-      ...current,
-      {
-        id,
-        function: fn,
-        columnKey: fn === 'COUNT' ? '*' : this.preferredAggregateColumn(fn),
-        alias: id === 1 ? this.defaultAlias() : `${this.defaultAlias()}_${id}`,
-        distinct: false,
-      },
-    ]);
-  }
-
-  private preferredAggregateColumn(fn: AggregateFunction): string {
-    const columns = this.queryColumns();
-    const preferred =
-      fn === 'SUM' || fn === 'AVG'
-        ? (columns.find(
-            (option) => isNumericColumn(option.column) && !option.column.isPrimaryKey,
-          ) ?? columns.find((option) => isNumericColumn(option.column)))
-        : columns.find((option) => this.chosen().includes(option.column.name));
-    return preferred?.key ?? columns[0]?.key ?? '';
+    this.apply((model, catalog) => Model.addAggregate(model, catalog, fn, this.defaultAlias()));
   }
 
   protected patchAggregate(id: number, patch: Partial<AggregateDraft>): void {
-    this.aggregates.update((current) =>
-      current.map((aggregate) => (aggregate.id === id ? { ...aggregate, ...patch } : aggregate)),
-    );
+    this.apply((model) => Model.patchAggregate(model, id, patch));
   }
 
   protected changeAggregateFunction(id: number, value: AggregateFunction): void {
-    const aggregate = this.aggregates().find((item) => item.id === id);
-
-    if (!aggregate) {
-      return;
-    }
-
-    this.patchAggregate(id, {
-      function: value,
-      columnKey:
-        value !== 'COUNT' && aggregate.columnKey === '*'
-          ? this.preferredAggregateColumn(value)
-          : aggregate.columnKey,
-    });
+    this.apply((model, catalog) => Model.changeAggregateFunction(model, catalog, id, value));
   }
 
   protected removeAggregate(id: number): void {
-    this.aggregates.update((current) => current.filter((aggregate) => aggregate.id !== id));
-    this.having.update((current) => current.filter((filter) => filter.aggregateId !== id));
-    this.orders.update((current) =>
-      current.map((order) =>
-        order.target === `aggregate:${id}` ? { ...order, target: '' } : order,
-      ),
-    );
+    this.apply((model) => Model.removeAggregate(model, id));
   }
 
   protected aggregateLabel(aggregate: AggregateDraft): string {
-    const column =
-      aggregate.columnKey === '*'
-        ? '*'
-        : (this.queryColumns().find((option) => option.key === aggregate.columnKey)?.label ?? '?');
-
-    return `${aggregate.function}(${column})${aggregate.alias ? ` · ${aggregate.alias}` : ''}`;
+    return Model.aggregateLabel(aggregate, this.queryColumns());
   }
 
   protected addHaving(): void {
-    const aggregate = this.aggregates()[0];
-
-    if (!aggregate) {
-      return;
-    }
-
-    const id = Math.max(0, ...this.having().map((filter) => filter.id)) + 1;
-    this.having.update((current) => [
-      ...current,
-      { id, aggregateId: aggregate.id, operator: '>', value: null, conjunction: 'AND' },
-    ]);
+    this.apply(Model.addHaving);
   }
 
   protected patchHaving(id: number, patch: Partial<HavingDraft>): void {
-    this.having.update((current) =>
-      current.map((filter) => (filter.id === id ? { ...filter, ...patch } : filter)),
-    );
+    this.apply((model) => Model.patchHaving(model, id, patch));
   }
 
   protected removeHaving(id: number): void {
-    this.having.update((current) => current.filter((filter) => filter.id !== id));
+    this.apply((model) => Model.removeHaving(model, id));
   }
 
   protected addOrder(): void {
-    const id = Math.max(0, ...this.orders().map((order) => order.id)) + 1;
-    this.orders.update((current) => [...current, { id, target: '', descending: false }]);
+    this.apply(Model.addOrder);
   }
 
   protected patchOrder(id: number, patch: Partial<OrderDraft>): void {
-    this.orders.update((current) =>
-      current.map((order) => (order.id === id ? { ...order, ...patch } : order)),
-    );
+    this.apply((model) => Model.patchOrder(model, id, patch));
   }
 
   protected removeOrder(id: number): void {
-    this.orders.update((current) => current.filter((order) => order.id !== id));
+    this.apply((model) => Model.removeOrder(model, id));
   }
 
   protected havingKind(filter: HavingDraft): InputKind {
-    const aggregate = this.aggregates().find((item) => item.id === filter.aggregateId);
-
-    if (!aggregate || aggregate.function === 'COUNT') {
-      return 'integer';
-    }
-
-    if (aggregate.function === 'SUM' || aggregate.function === 'AVG') {
-      return 'decimal';
-    }
-
-    return (
-      this.queryColumns().find((column) => column.key === aggregate.columnKey)?.column.inputKind ??
-      'text'
-    );
+    return Model.havingKind(this.model(), this._catalog(), filter);
   }
 
   protected readonly availableRelations = computed(() => {
@@ -1450,30 +1180,15 @@ export class QueryBuilder implements OnInit {
   }
 
   protected addFilter(): void {
-    const primera = this.columns()[0]?.name ?? '';
-
-    this.filters.update((current) => [
-      ...current,
-      // `null` y no `''`: sin rellenar, el SQL lo marca como pendiente. Con
-      // cadena vacía salía `"id" = ''`, una condición que parece completa.
-      { column: primera, operator: '=', value: null, conjunction: 'AND' },
-    ]);
+    this.apply(Model.addFilter);
   }
 
   protected removeFilter(index: number): void {
-    this.filters.update((current) => current.filter((_, i) => i !== index));
+    this.apply((model) => Model.removeFilter(model, index));
   }
 
   protected patchFilter(index: number, patch: Partial<QueryFilter>): void {
-    this.filters.update((current) =>
-      current.map((filter, i) => {
-        if (i !== index) return filter;
-        if (patch.operator && this.isList(patch.operator) !== this.isList(filter.operator)) {
-          return { ...filter, ...patch, value: null, compareColumn: null, inSource: 'list' };
-        }
-        return { ...filter, ...patch };
-      }),
-    );
+    this.apply((model) => Model.patchFilter(model, index, patch));
   }
 
   protected setInSource(index: number, inSource: 'list' | 'query'): void {
@@ -1509,11 +1224,7 @@ export class QueryBuilder implements OnInit {
    * separada por comas, y un calendario no sabe escribir eso.
    */
   protected filterKind(filter: QueryFilter): InputKind {
-    if (filter.operator === 'IN' || filter.operator === 'NOT IN') {
-      return 'text';
-    }
-
-    return this.columns().find((column) => column.name === filter.column)?.inputKind ?? 'text';
+    return Model.filterKind(filter, this.columns());
   }
 
   protected draftFor(operation: 'insert' | 'update', name: string): ColumnDraft | undefined {
@@ -1546,7 +1257,7 @@ export class QueryBuilder implements OnInit {
 
   /** `IS NULL` y `IS NOT NULL` no llevan valor: el campo estorba. */
   protected needsValue(operator: FilterOperator): boolean {
-    return operator !== 'IS NULL' && operator !== 'IS NOT NULL';
+    return Model.needsValue(operator);
   }
 
   /** Si los filtros mezclan AND y OR, que es cuando el orden importa. */
@@ -1602,13 +1313,11 @@ export class QueryBuilder implements OnInit {
 
   /** Lista separada por comas: se explica en el propio campo. */
   protected isList(operator: FilterOperator): boolean {
-    return operator === 'IN' || operator === 'NOT IN';
+    return Model.isList(operator);
   }
 
   protected setLimit(value: string): void {
-    const numero = Number.parseInt(value, 10);
-
-    this.limit.set(Number.isFinite(numero) && numero > 0 ? numero : null);
+    this.apply((model) => Model.setLimit(model, value));
   }
 
   protected async runPreview(): Promise<void> {
@@ -1673,29 +1382,24 @@ export class QueryBuilder implements OnInit {
   }
 
   protected async loadComposition(saved: SavedComposition): Promise<void> {
-    if (!saved.state) {
+    const state = Model.readCompositionState(saved.state);
+
+    if (!state) {
       this.sqlOverride.set(saved.sql);
       return;
     }
 
-    await this.applyState(saved.state);
+    await this.applyState(state);
   }
 
   /** Pone el formulario como estaba en `state`. */
   private async applyState(state: CompositionState): Promise<void> {
     this.invalidateAffected();
     this.operation.set('select');
-    this.chosen.set(state.chosen);
-    this.filters.set(state.filters);
-    this.grouped.set(state.grouped);
-    this.groupByKeys.set(state.groupByKeys);
-    this.groupPeriods.set(state.groupPeriods);
-    this.aggregates.set(state.aggregates);
-    this.having.set(state.having);
-    this.orders.set(state.orders);
-    this.limit.set(state.limit);
-    this.distinct.set(state.distinct ?? false);
-    this.sqlOverride.set(state.sqlOverride);
+    const { joins: _joins, sqlOverride, layout, version: _version, ...form } = state;
+    this._form.set({ ...form, distinct: form.distinct ?? false });
+    this._layout.set(layout);
+    this.sqlOverride.set(sqlOverride);
 
     // Los cruces se montan con las columnas que se eligieron, no con las que
     // propondría la tabla al elegirla de nuevo: `loadJoin` las recalcula, y
@@ -1716,33 +1420,35 @@ export class QueryBuilder implements OnInit {
 
   /** Lo que se guarda de la composición actual. */
   private compositionState(): CompositionState {
-    return {
-      chosen: this.chosen(),
-      joins: this.joins().map((join) => {
-        const relation = this.availableRelations().find((node) => node.source.id === join.tableId);
+    const joins = this.joins().map<SavedJoin>((join) => {
+      const relation = this.joinRelation(join);
 
-        return {
-          id: join.id,
-          type: join.type,
-          tableId: join.tableId,
-          schema: relation?.source.schema ?? '',
-          table: relation?.source.name ?? join.search,
-          leftJoinId: join.leftJoinId,
-          leftColumn: join.leftColumn,
-          rightColumn: join.rightColumn,
-          chosen: join.chosen,
-        };
-      }),
-      filters: this.filters(),
-      grouped: this.grouped(),
-      groupByKeys: this.groupByKeys(),
-      groupPeriods: this.groupPeriods(),
-      aggregates: this.aggregates(),
-      having: this.having(),
-      orders: this.orders(),
-      limit: this.limit(),
-      distinct: this.distinct(),
-      sqlOverride: this.sqlOverride(),
+      return {
+        ...this.toModelJoin(join),
+        tableId: join.tableId,
+        schema: relation?.schema ?? '',
+        // Una tabla que ya no se encuentra se guarda con lo que se escribió:
+        // así se reconoce al reabrirla, en vez de quedar un cruce sin nombre.
+        table: relation?.name ?? join.search,
+      };
+    });
+
+    return Model.compositionState(this._form(), joins, this.sqlOverride(), this._layout());
+  }
+
+  /** El cruce como lo entiende el modelo: sin tabla conocida, no llega al SQL. */
+  private toModelJoin(join: JoinDraft): ModelJoin {
+    const relation = this.joinRelation(join);
+
+    return {
+      id: join.id,
+      type: join.type,
+      schema: relation?.schema ?? '',
+      table: relation?.name ?? '',
+      leftJoinId: join.leftJoinId,
+      leftColumn: join.leftColumn,
+      rightColumn: join.rightColumn,
+      chosen: join.chosen,
     };
   }
 
@@ -1900,141 +1606,8 @@ export class QueryBuilder implements OnInit {
     );
   }
 
-  private selectedColumns(joins: readonly JoinDraft[]): readonly (string | SelectColumn)[] {
-    if (joins.length === 0) {
-      return this.chosen();
-    }
-
-    return [
-      ...this.chosen().map((column) => ({ alias: 't0', column })),
-      ...joins.flatMap((join, index) =>
-        join.chosen.map((column) => ({ alias: `t${index + 1}`, column })),
-      ),
-    ];
-  }
-
-  private toQueryJoins(joins: readonly JoinDraft[]): QueryJoin[] {
-    return joins.flatMap((join, index) => {
-      const relation = this.joinRelation(join);
-
-      if (!relation) {
-        return [];
-      }
-
-      return [
-        {
-          type: join.type,
-          schema: relation.schema,
-          table: relation.name,
-          alias: `t${index + 1}`,
-          leftAlias:
-            join.leftJoinId === null
-              ? 't0'
-              : `t${joins.findIndex((candidate) => candidate.id === join.leftJoinId) + 1}`,
-          leftColumn: join.leftColumn,
-          rightColumn: join.rightColumn,
-        },
-      ];
-    });
-  }
-
-  private toAggregates(): SelectAggregate[] {
-    return this.aggregates().flatMap((aggregate) => {
-      const converted = this.toAggregate(aggregate);
-      return converted ? [converted] : [];
-    });
-  }
-
-  private toHaving(): AggregateFilter[] {
-    return this.having().flatMap((filter) => {
-      const draft = this.aggregates().find((aggregate) => aggregate.id === filter.aggregateId);
-      const aggregate = draft ? this.toAggregate(draft) : undefined;
-
-      return aggregate
-        ? [
-            {
-              aggregate,
-              operator: filter.operator,
-              value: filter.value,
-              conjunction: filter.conjunction,
-            },
-          ]
-        : [];
-    });
-  }
-
-  private toAggregate(aggregate: AggregateDraft): SelectAggregate | undefined {
-    const column =
-      aggregate.columnKey === '*'
-        ? '*'
-        : this.queryColumns().find((option) => option.key === aggregate.columnKey)?.reference;
-
-    return column
-      ? {
-          function: aggregate.function,
-          column,
-          alias: aggregate.alias.trim() || undefined,
-          distinct: aggregate.distinct,
-        }
-      : undefined;
-  }
-
-  private toOrders(): SelectOrder[] {
-    const result: SelectOrder[] = [];
-
-    for (const order of this.orders()) {
-      if (!order.target) {
-        continue;
-      }
-
-      if (order.target.startsWith('column:')) {
-        result.push({
-          expression: order.target.slice('column:'.length),
-          descending: order.descending,
-        });
-        continue;
-      }
-
-      if (order.target.startsWith('aggregate:')) {
-        const id = Number(order.target.slice('aggregate:'.length));
-        const draft = this.aggregates().find((aggregate) => aggregate.id === id);
-        const aggregate = draft ? this.toAggregate(draft) : undefined;
-        if (aggregate) {
-          result.push({ expression: aggregate, descending: order.descending });
-        }
-        continue;
-      }
-
-      const key = order.target.slice('group:'.length);
-      const option = this.queryColumns().find((column) => column.key === key);
-      const period = this.groupPeriods()[key] ?? 'none';
-
-      if (!option) {
-        continue;
-      }
-
-      result.push({
-        expression:
-          period === 'none'
-            ? option.reference
-            : { column: option.reference, period, alias: `${option.column.name}_${period}` },
-        descending: order.descending,
-      });
-    }
-
-    return result;
-  }
-
   private pruneGrouping(): void {
-    const validKeys = new Set(this.queryColumns().map((column) => column.key));
-    this.groupByKeys.update((current) => current.filter((key) => validKeys.has(key)));
-    const removed = new Set(
-      this.aggregates()
-        .filter((aggregate) => aggregate.columnKey !== '*' && !validKeys.has(aggregate.columnKey))
-        .map((aggregate) => aggregate.id),
-    );
-    this.aggregates.update((current) => current.filter((aggregate) => !removed.has(aggregate.id)));
-    this.having.update((current) => current.filter((filter) => !removed.has(filter.aggregateId)));
+    this.apply(Model.pruneGrouping);
   }
 
   /**
@@ -2141,30 +1714,26 @@ function fromRecord(record: SavedCompositionRecord): SavedComposition[] {
   }
 }
 
-function isNumericColumn(column: KnownColumn): boolean {
-  return /\b(tinyint|smallint|integer|int|int2|int4|int8|bigint|serial|decimal|numeric|number|real|float|float4|float8|double|money)\b/i.test(
-    column.dataType,
-  );
-}
+/**
+ * Un campo del formulario que se lee y se escribe como una señal propia.
+ *
+ * El formulario vive entero en una sola señal para que el modelo lo trate de
+ * una pieza, pero la plantilla y las pruebas siguen usando cada campo suelto:
+ * escribir en uno reemplaza ese campo en el formulario común.
+ */
+function formField<K extends keyof SelectForm>(
+  form: WritableSignal<SelectForm>,
+  key: K,
+): WritableSignal<SelectForm[K]> {
+  const field = computed(() => form()[key]) as Signal<SelectForm[K]> &
+    Partial<WritableSignal<SelectForm[K]>>;
+  const set = (value: SelectForm[K]) => form.update((current) => ({ ...current, [key]: value }));
 
-function isDateColumn(column: KnownColumn): boolean {
-  return (
-    column.inputKind === 'date' ||
-    column.inputKind === 'datetime' ||
-    column.inputKind === 'datetimeOffset' ||
-    /(date|datetime2?|smalldatetime|timestamp)/i.test(column.dataType)
-  );
-}
-
-function aggregateLabelForOrder(
-  aggregate: AggregateDraft,
-  columns: readonly QueryColumnOption[],
-): string {
-  const column =
-    aggregate.columnKey === '*'
-      ? '*'
-      : (columns.find((option) => option.key === aggregate.columnKey)?.label ?? '?');
-  return `${aggregate.function}(${aggregate.distinct ? 'DISTINCT ' : ''}${column})`;
+  return Object.assign(field, {
+    set,
+    update: (fn: (value: SelectForm[K]) => SelectForm[K]) => set(fn(form()[key])),
+    asReadonly: () => field as Signal<SelectForm[K]>,
+  }) as WritableSignal<SelectForm[K]>;
 }
 
 function readAutoPreview(): boolean {

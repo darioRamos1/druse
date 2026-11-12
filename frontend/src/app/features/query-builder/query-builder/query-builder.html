@@ -95,7 +95,7 @@
                 type="button"
                 class="btn btn--small"
                 [disabled]="chosen().length === 0"
-                (click)="chosen.set([])"
+                (click)="clearColumns()"
               >
                 {{ 'builder.clearColumns' | t }}
               </button>
@@ -134,7 +134,7 @@
               <input
                 type="checkbox"
                 [checked]="distinct()"
-                (change)="distinct.set($any($event.target).checked)"
+                (change)="setDistinct($any($event.target).checked)"
               />
               @for (part of distinctParts(); track $index) {
                 @if (part.tag === 'keyword') {

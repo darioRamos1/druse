@@ -128,8 +128,13 @@ las animaciones de arrastre. Revisión con el barrido de capturas E2E.
 
 ## 4. Fases y criterios de aceptación
 
-Cada fase es una entrega visible y sigue el flujo de `AGENTS.md`: versión
-*minor*, novedades en español e inglés, comprobaciones y commit.
+Las fases 1 a 4 son entregas visibles y siguen el flujo de `AGENTS.md`:
+versión *minor*, novedades en español e inglés, comprobaciones y commit. La
+fase 0 no cambia nada a la vista: lleva su commit, sin versión ni novedades.
+
+**Estado:** fase 0 hecha el 12 de noviembre de 2026. El modelo vive en
+`frontend/src/app/features/query-builder/query-model.ts` con sus pruebas al
+lado; las del compositor y las E2E que lo abren pasan sin cambios.
 
 | Fase | Trabajo | Cómo se valida |
 |---|---|---|
