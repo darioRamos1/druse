@@ -160,3 +160,18 @@ export async function borrarPlantillas(reportes: Locator, nombres: RegExp): Prom
   await reportes.page().keyboard.press('Escape');
   await expect(galeria).toHaveCount(0);
 }
+
+/**
+ * Espera a que la vista previa de la fuente responda y dice si pidió la
+ * contraseña: en Linux la CI no tiene llavero y el perfil se guarda sin ella.
+ * Mirarlo con `isVisible()` justo tras el clic se adelanta a la respuesta
+ * cuando la máquina va lenta, y la prueba sigue como si hubiera datos.
+ */
+export async function faltaContrasena(reportes: Locator): Promise<boolean> {
+  const aviso = reportes.locator('.diagnostic--danger', { hasText: 'contraseña guardada' });
+
+  // `.first()`: si el aviso sale en el panel y en el inspector, el modo estricto no protesta.
+  await expect(reportes.locator('.stats').or(aviso).first()).toBeVisible({ timeout: 60_000 });
+
+  return aviso.first().isVisible();
+}

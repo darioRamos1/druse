@@ -16,6 +16,7 @@ import {
   borrarPlantillas,
   borrarRestos,
   crearTablero,
+  faltaContrasena,
   previsualizar,
 } from '../support/reportes';
 
@@ -45,9 +46,7 @@ test.describe('Reportes BI', () => {
      * En Linux, CI no tiene llavero: el perfil se guarda sin contraseña y la
      * fuente lo dice. Es el diagnóstico real de ese caso, y es lo que se comprueba.
      */
-    const sinLlavero = reportes.locator('.diagnostic--danger', { hasText: 'contraseña guardada' });
-
-    if (await sinLlavero.isVisible()) {
+    if (await faltaContrasena(reportes)) {
       test.info().annotations.push({ type: 'sin llavero', description: 'La fuente pidió la contraseña.' });
       return;
     }
@@ -166,7 +165,7 @@ test.describe('Plantillas de Reportes BI', () => {
     await anadirFuente(reportes, 'Ventas', VENTAS_SQL);
     await previsualizar(reportes);
 
-    if (await reportes.locator('.diagnostic--danger', { hasText: 'contraseña guardada' }).isVisible()) {
+    if (await faltaContrasena(reportes)) {
       test.info().annotations.push({ type: 'sin llavero', description: 'La fuente pidió la contraseña.' });
       return;
     }
@@ -265,7 +264,7 @@ test.describe('Exportar tableros de Reportes BI', () => {
     await anadirFuente(reportes, 'Ventas', VENTAS_SQL);
     await previsualizar(reportes);
 
-    if (await reportes.locator('.diagnostic--danger', { hasText: 'contraseña guardada' }).isVisible()) {
+    if (await faltaContrasena(reportes)) {
       test.info().annotations.push({ type: 'sin llavero', description: 'La fuente pidió la contraseña.' });
       return;
     }
@@ -381,7 +380,7 @@ test.describe('Exportar tableros de Reportes BI', () => {
     await anadirFuente(reportes, 'Ventas', VENTAS_SQL);
     await previsualizar(reportes);
 
-    if (await reportes.locator('.diagnostic--danger', { hasText: 'contraseña guardada' }).isVisible()) {
+    if (await faltaContrasena(reportes)) {
       test.info().annotations.push({ type: 'sin llavero', description: 'La fuente pidió la contraseña.' });
       return;
     }
@@ -466,7 +465,7 @@ test.describe('Reportes BI entre motores', () => {
     await anadirFuente(reportes, 'Ventas', VENTAS_SQLSERVER_SQL, SQLSERVER);
     await previsualizar(reportes);
 
-    if (await reportes.locator('.diagnostic--danger', { hasText: 'contraseña guardada' }).isVisible()) {
+    if (await faltaContrasena(reportes)) {
       test.info().annotations.push({ type: 'sin llavero', description: 'La fuente pidió la contraseña.' });
       return;
     }
