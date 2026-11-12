@@ -115,7 +115,7 @@ export interface ReportDatabaseList {
 
 // --- Hito 3: resultado guardado, intentos y reportes ------------------------
 
-export type ReportRunStatus = 'Succeeded' | 'Failed' | 'Canceled';
+export type ReportRunStatus = 'Succeeded' | 'Failed' | 'Canceled' | 'Interrupted';
 
 export interface ReportRunSource {
   readonly alias: string;
@@ -138,6 +138,29 @@ export interface ReportRun {
   readonly duplicateKeys: readonly string[];
   readonly rowCount: number;
   readonly sources: readonly ReportRunSource[];
+}
+
+// --- Hito 5: actualización programada ----------------------------------------
+
+export type ReportScheduleFrequency = 'Daily' | 'Weekly';
+
+export type ReportWeekDay = 'Monday' | 'Tuesday' | 'Wednesday' | 'Thursday' | 'Friday' | 'Saturday' | 'Sunday';
+
+/**
+ * Cuándo se actualiza solo un conjunto. Al guardar solo cuentan la regla y la
+ * pausa; el próximo horario, el reintento y `running` los pone el servidor.
+ */
+export interface ReportSchedule {
+  readonly frequency: ReportScheduleFrequency;
+  /** Hora local de la zona, `HH:mm`. */
+  readonly time: string;
+  readonly days: readonly ReportWeekDay[];
+  /** Zona IANA, como la da el navegador. */
+  readonly timeZone: string;
+  readonly paused: boolean;
+  readonly nextRunUtc?: string | null;
+  readonly retryAtUtc?: string | null;
+  readonly running?: boolean;
 }
 
 export interface ReportRefresh {

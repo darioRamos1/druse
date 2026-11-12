@@ -49,6 +49,14 @@
     font-size: 11.5px;
     color: var(--dr-text-tertiary);
   }
+
+  &__schedule {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 11.5px;
+    color: var(--dr-text-secondary);
+  }
 }
 
 .notes {

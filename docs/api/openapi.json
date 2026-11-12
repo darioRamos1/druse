@@ -2646,6 +2646,84 @@
         }
       }
     },
+    "/api/reports/datasets/{id}/schedule": {
+      "get": {
+        "tags": [
+          "Druse.Host.LocalApi"
+        ],
+        "operationId": "GetReportSchedule",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Druse.Host.LocalApi"
+        ],
+        "operationId": "SaveReportSchedule",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReportScheduleDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Druse.Host.LocalApi"
+        ],
+        "operationId": "DeleteReportSchedule",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
     "/api/reports/datasets/{id}/snapshot": {
       "get": {
         "tags": [
@@ -4868,6 +4946,51 @@
           },
           "right": {
             "type": "string"
+          }
+        }
+      },
+      "ReportScheduleDto": {
+        "required": [
+          "frequency",
+          "time",
+          "timeZone"
+        ],
+        "type": "object",
+        "properties": {
+          "frequency": {
+            "type": "string"
+          },
+          "time": {
+            "type": "string"
+          },
+          "days": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "timeZone": {
+            "type": "string"
+          },
+          "paused": {
+            "type": "boolean"
+          },
+          "nextRunUtc": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "retryAtUtc": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "running": {
+            "type": "boolean"
           }
         }
       },

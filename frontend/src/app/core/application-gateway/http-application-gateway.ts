@@ -72,6 +72,7 @@ import {
   ReportDatasetPreview,
   ReportRefresh,
   ReportRun,
+  ReportSchedule,
   ReportSnapshot,
   SavedDashboard,
   SavedReportTemplate,
@@ -537,6 +538,21 @@ export class HttpApplicationGateway extends ApplicationGateway {
 
   override getReportRuns(datasetId: string): Observable<readonly ReportRun[]> {
     return this._http.get<ReportRun[]>(`/api/reports/datasets/${datasetId}/runs`);
+  }
+
+  override getReportSchedule(datasetId: string): Observable<ReportSchedule | null> {
+    // Sin programación llega como 204, sin cuerpo: `null`.
+    return this._http
+      .get<ReportSchedule>(`/api/reports/datasets/${datasetId}/schedule`, { observe: 'response' })
+      .pipe(map((response) => response.body));
+  }
+
+  override saveReportSchedule(datasetId: string, schedule: ReportSchedule): Observable<ReportSchedule> {
+    return this._http.put<ReportSchedule>(`/api/reports/datasets/${datasetId}/schedule`, schedule);
+  }
+
+  override deleteReportSchedule(datasetId: string): Observable<void> {
+    return this._http.delete<void>(`/api/reports/datasets/${datasetId}/schedule`);
   }
 
   override getSavedReports(datasetId: string): Observable<readonly SavedReport[]> {

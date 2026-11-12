@@ -53,3 +53,37 @@ public interface IReportWorkbookWriter
     /// <summary>El libro entero, en memoria: el tope de celdas ya lo acota.</summary>
     byte[] Write(ReportExportDocument document);
 }
+
+/// <summary>
+/// Programaciones de actualización, una por conjunto de datos.
+///
+/// Reclamar y completar son escrituras condicionadas: es lo que garantiza que un
+/// horario se despache una sola vez aunque dos despachos lo vean vencido.
+/// </summary>
+public interface IReportScheduleStore
+{
+    Task<IReadOnlyList<ReportSchedule>> GetAllAsync(CancellationToken cancellationToken);
+
+    Task<ReportSchedule?> FindAsync(Guid datasetId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Crea o cambia la regla. Olvida el reintento pendiente; si hay una
+    /// actualización en marcha, la deja terminar.
+    /// </summary>
+    Task<ReportSchedule> SaveAsync(ReportSchedule schedule, CancellationToken cancellationToken);
+
+    Task DeleteAsync(Guid datasetId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Reclama un horario si sigue tal como se leyó: mismo próximo horario, mismo
+    /// reintento, sin pausa y sin nada en marcha. Lo deja en marcha en <paramref name="slotUtc"/>
+    /// y con <paramref name="nextRunUtc"/> como siguiente.
+    /// </summary>
+    Task<bool> TryClaimAsync(
+        ReportSchedule seen, DateTimeOffset nextRunUtc, DateTimeOffset slotUtc, CancellationToken cancellationToken);
+
+    /// <summary>Cierra el horario en marcha <paramref name="slotUtc"/> y anota el reintento, si lo hay.</summary>
+    Task<bool> CompleteAsync(
+        Guid datasetId, DateTimeOffset slotUtc, DateTimeOffset? retryAtUtc, int attempt,
+        CancellationToken cancellationToken);
+}

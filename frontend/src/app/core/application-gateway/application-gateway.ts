@@ -5,6 +5,7 @@ import {
   ReportDatasetPreview,
   ReportRefresh,
   ReportRun,
+  ReportSchedule,
   ReportSnapshot,
   SavedDashboard,
   SavedReportTemplate,
@@ -587,6 +588,13 @@ export abstract class ApplicationGateway {
   abstract getReportSnapshot(datasetId: string): Observable<ReportSnapshot | null>;
 
   abstract getReportRuns(datasetId: string): Observable<readonly ReportRun[]>;
+
+  /** La programación del conjunto, o `null` si no tiene. */
+  abstract getReportSchedule(datasetId: string): Observable<ReportSchedule | null>;
+
+  abstract saveReportSchedule(datasetId: string, schedule: ReportSchedule): Observable<ReportSchedule>;
+
+  abstract deleteReportSchedule(datasetId: string): Observable<void>;
 
   abstract getSavedReports(datasetId: string): Observable<readonly SavedReport[]>;
 

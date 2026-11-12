@@ -1,3 +1,4 @@
+using System.Globalization;
 using Druse.Application.Reports;
 using Druse.Domain;
 
@@ -20,7 +21,7 @@ public sealed record ReportRunDto
     /// <summary>`Manual` o `Scheduled`.</summary>
     public required string Origin { get; init; }
 
-    /// <summary>`Succeeded`, `Failed` o `Canceled`.</summary>
+    /// <summary>`Succeeded`, `Failed`, `Canceled` o `Interrupted`.</summary>
     public required string Status { get; init; }
     public required DateTimeOffset StartedAtUtc { get; init; }
     public required DateTimeOffset CompletedAtUtc { get; init; }
@@ -28,6 +29,33 @@ public sealed record ReportRunDto
     public required IReadOnlyList<string> DuplicateKeys { get; init; }
     public int RowCount { get; init; }
     public required IReadOnlyList<ReportRunSourceDto> Sources { get; init; }
+}
+
+/// <summary>
+/// La programación de un conjunto. Al guardar solo cuentan la regla y la pausa;
+/// el próximo horario, el reintento y si está en marcha los pone el servidor.
+/// </summary>
+public sealed record ReportScheduleDto
+{
+    /// <summary>`Daily` o `Weekly`.</summary>
+    public required string Frequency { get; init; }
+
+    /// <summary>Hora local de la zona, `HH:mm`.</summary>
+    public required string Time { get; init; }
+
+    /// <summary>Días en inglés (`Monday`…); solo cuentan en la semanal.</summary>
+    public IReadOnlyList<string> Days { get; init; } = [];
+
+    /// <summary>Zona IANA (`America/Bogota`) o de Windows.</summary>
+    public required string TimeZone { get; init; }
+
+    public bool Paused { get; init; }
+
+    public DateTimeOffset? NextRunUtc { get; init; }
+
+    public DateTimeOffset? RetryAtUtc { get; init; }
+
+    public bool Running { get; init; }
 }
 
 /// <summary>`Outcome`: `Refreshed` o `Failed`; el intento va en `Run`.</summary>
@@ -236,6 +264,54 @@ internal static class ReportRunContractMapper
         CreatedAtUtc = dashboard.CreatedAtUtc,
         UpdatedAtUtc = dashboard.UpdatedAtUtc,
     };
+
+    public static ReportScheduleDto ToDto(this ReportSchedule schedule) => new()
+    {
+        Frequency = schedule.Rule.Frequency.ToString(),
+        Time = schedule.Rule.Time.ToString("HH:mm", CultureInfo.InvariantCulture),
+        Days = schedule.Rule.Frequency == ReportScheduleFrequency.Weekly
+            ? schedule.Rule.Days.Select(day => day.ToString()).ToArray()
+            : [],
+        TimeZone = schedule.Rule.TimeZoneId,
+        Paused = schedule.Paused,
+        NextRunUtc = schedule.Paused ? null : schedule.NextRunUtc,
+        RetryAtUtc = schedule.Paused ? null : schedule.RetryAtUtc,
+        Running = schedule.RunningSlotUtc is not null,
+    };
+
+    /// <summary>La regla pedida, o el motivo por el que no se puede programar.</summary>
+    public static (ReportScheduleRule? Rule, string? Problem) ToRule(this ReportScheduleDto dto)
+    {
+        if (int.TryParse(dto.Frequency, out _)
+            || !Enum.TryParse<ReportScheduleFrequency>(dto.Frequency, ignoreCase: true, out var frequency)
+            || !Enum.IsDefined(frequency))
+        {
+            return (null, "La frecuencia es diaria o semanal.");
+        }
+
+        if (!TimeOnly.TryParseExact(dto.Time, "HH:mm", CultureInfo.InvariantCulture, DateTimeStyles.None, out var time))
+        {
+            return (null, "La hora va en formato HH:mm.");
+        }
+
+        var days = new List<DayOfWeek>();
+        foreach (var name in dto.Days ?? [])
+        {
+            if (int.TryParse(name, out _) || !Enum.TryParse<DayOfWeek>(name, ignoreCase: true, out var day))
+            {
+                return (null, $"«{name}» no es un día de la semana.");
+            }
+
+            if (!days.Contains(day))
+            {
+                days.Add(day);
+            }
+        }
+
+        var rule = new ReportScheduleRule(
+            frequency, time, frequency == ReportScheduleFrequency.Weekly ? days : [], dto.TimeZone?.Trim() ?? string.Empty);
+        return ReportScheduleCalendar.Validate(rule) is { } problem ? (null, problem) : (rule, null);
+    }
 
     public static ReportRunDto ToDto(this ReportRun run) => new()
     {

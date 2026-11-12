@@ -73,7 +73,9 @@ internal static class DependencyInjection
         services.AddSingleton<ISavedReportStore, SqliteSavedReportStore>();
         services.AddSingleton<IReportDashboardStore, SqliteReportDashboardStore>();
         services.AddSingleton<IReportTemplateStore, SqliteReportTemplateStore>();
+        services.AddSingleton<IReportScheduleStore, SqliteReportScheduleStore>();
         services.AddSingleton<ReportRunGate>();
+        services.AddSingleton<ReportScheduleDispatcher>();
         services.AddSingleton<IBackupArchiveFactory, BackupArchiveFactory>();
         services.AddScoped<IConnectionProfileStore, SqliteConnectionProfileStore>();
         services.AddScoped<IQueryHistoryStore, SqliteQueryHistoryStore>();
@@ -249,6 +251,9 @@ internal static class DependencyInjection
                 configured is { } minutes ? TimeSpan.FromMinutes(minutes) : null);
         });
         services.AddHostedService<IdleTransactionSweeper>();
+
+        // Las actualizaciones programadas de Reportes, mientras Druse está abierto.
+        services.AddHostedService<ReportScheduler>();
 
         // --- Casos de uso -------------------------------------------------------
         services.AddScoped<ConnectionService>();

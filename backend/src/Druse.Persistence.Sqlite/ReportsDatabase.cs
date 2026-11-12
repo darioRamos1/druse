@@ -83,6 +83,19 @@ internal static class ReportsDatabase
                     created_utc_ticks INTEGER NOT NULL,
                     updated_utc_ticks INTEGER NOT NULL
                 ) STRICT;
+
+                -- Una por conjunto. running_utc_ticks marca el horario reclamado
+                -- y en marcha: si sigue puesto al arrancar, Druse se cerró a mitad.
+                CREATE TABLE IF NOT EXISTS report_schedules (
+                    dataset_id TEXT PRIMARY KEY,
+                    rule TEXT NOT NULL,
+                    paused INTEGER NOT NULL,
+                    next_utc_ticks INTEGER NOT NULL,
+                    attempt INTEGER NOT NULL,
+                    retry_utc_ticks INTEGER,
+                    running_utc_ticks INTEGER,
+                    updated_utc_ticks INTEGER NOT NULL
+                ) STRICT;
                 """;
             await command.ExecuteNonQueryAsync(cancellationToken);
             return connection;

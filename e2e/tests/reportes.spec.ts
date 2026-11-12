@@ -361,7 +361,80 @@ test.describe('Exportar tableros de Reportes BI', () => {
     await page.keyboard.press('Escape');
     await expect(reportes.locator('.dialog')).toBeHidden();
   });
+
+  /**
+   * El criterio del hito 5 con un horario de verdad: se programa para el
+   * minuto siguiente y, sin pulsar «Actualizar ahora», los datos llegan solos.
+   * La API de las pruebas mira los horarios cada 2 s (`Reports__ScheduleTickSeconds`).
+   */
+  test('programa una actualización diaria y llega sola a su hora', async ({ page }) => {
+    test.setTimeout(5 * 60_000);
+    await abrir(page);
+    await conectar(page);
+
+    const restos = /E2E Programar/;
+    const reportes = await abrirReportes(page);
+
+    await borrarRestos(reportes, restos, restos);
+    await reportes.getByLabel('Nombre del conjunto de datos').fill(`E2E Programar ${Date.now()}`);
+    await anadirFuente(reportes, 'Ventas', VENTAS_SQL);
+    await previsualizar(reportes);
+
+    if (await reportes.locator('.diagnostic--danger', { hasText: 'contraseña guardada' }).isVisible()) {
+      test.info().annotations.push({ type: 'sin llavero', description: 'La fuente pidió la contraseña.' });
+      return;
+    }
+
+    await reportes.getByRole('button', { name: 'Guardar', exact: true }).click();
+    await abrirVisualizacionSinDatos(reportes);
+
+    // La hora del minuto siguiente en la zona del navegador, que es la que
+    // propone el formulario; con menos de 15 s de margen, la del otro.
+    const ahora = new Date(await page.evaluate(() => Date.now()));
+    const objetivo = new Date(ahora.getTime() + (ahora.getSeconds() > 45 ? 120_000 : 60_000));
+    const hora = await page.evaluate(
+      (instante) =>
+        new Date(instante).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false }),
+      objetivo.getTime(),
+    );
+
+    await reportes.getByRole('button', { name: 'Programar', exact: true }).click();
+    const formulario = reportes.locator('form.schedule');
+
+    await expect(formulario.getByRole('radio', { name: 'Diaria' })).toHaveAttribute('aria-checked', 'true');
+    await formulario.getByLabel('Hora', { exact: true }).fill(hora);
+    await formulario.getByRole('button', { name: 'Guardar programación' }).click();
+    await expect(formulario).toHaveCount(0);
+    await expect(reportes.locator('.freshness__schedule')).toContainText('Próxima actualización');
+
+    // Nadie pulsa nada: el servidor la despacha y la pantalla la recoge sola.
+    await expect(reportes.locator('.freshness')).toContainText('Datos del', { timeout: 150_000 });
+    await expect(reportes.locator('.freshness')).toContainText('3 filas');
+    await expect(reportes.locator('.freshness__schedule')).toContainText('Próxima actualización');
+    await expect(reportes.locator('.banner--danger')).toHaveCount(0);
+
+    // En pausa lo dice; quitarla deja la barra sin programación.
+    await reportes.getByRole('button', { name: 'Programación', exact: true }).click();
+    await formulario.getByLabel(/En pausa/).check();
+    await formulario.getByRole('button', { name: 'Guardar programación' }).click();
+    await expect(reportes.locator('.freshness__schedule')).toContainText('en pausa');
+    await reportes.getByRole('button', { name: 'Programación', exact: true }).click();
+    await formulario.getByRole('button', { name: 'Quitar programación' }).click();
+    await expect(reportes.locator('.freshness__schedule')).toHaveCount(0);
+    await expect(reportes.getByRole('button', { name: 'Programar', exact: true })).toBeVisible();
+
+    await reportes.locator('.steps__item').first().click();
+    await borrarConjunto(reportes);
+    await page.keyboard.press('Escape');
+    await expect(reportes.locator('.dialog')).toBeHidden();
+  });
 });
+
+/** El paso Visualización de un conjunto recién guardado, todavía sin resultado. */
+async function abrirVisualizacionSinDatos(reportes: Locator): Promise<void> {
+  await abrirVisualizacion(reportes);
+  await expect(reportes.locator('.freshness')).toContainText('Todavía no hay datos guardados');
+}
 
 /** Elige la opción cuyo texto acaba en el nombre de la columna, con o sin alias delante. */
 async function elegirColumna(selector: Locator, columna: string): Promise<void> {

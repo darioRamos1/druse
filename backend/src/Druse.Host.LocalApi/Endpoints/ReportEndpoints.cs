@@ -80,6 +80,58 @@ internal static class ReportEndpoints
         })
         .WithName("RefreshReportDataset");
 
+        // Sin programación es un estado normal (204), como un conjunto sin resultado.
+        app.MapGet("/api/reports/datasets/{id:guid}/schedule", async (
+            Guid id,
+            IReportScheduleStore schedules,
+            CancellationToken cancellationToken) =>
+            await schedules.FindAsync(id, cancellationToken) is { } schedule
+                ? Results.Ok(schedule.ToDto())
+                : Results.NoContent())
+        .WithName("GetReportSchedule");
+
+        // Guardar recalcula siempre el próximo horario desde ahora: al quitar la
+        // pausa no se dispara de golpe un horario que venció mientras estaba parada.
+        app.MapPut("/api/reports/datasets/{id:guid}/schedule", async (
+            Guid id,
+            ReportScheduleDto request,
+            IReportDatasetStore datasets,
+            IReportScheduleStore schedules,
+            TimeProvider clock,
+            CancellationToken cancellationToken) =>
+        {
+            var (rule, problem) = request.ToRule();
+            if (rule is null)
+            {
+                return Results.BadRequest(new { message = problem });
+            }
+
+            if (await datasets.FindAsync(id, cancellationToken) is null)
+            {
+                return Results.NotFound();
+            }
+
+            var saved = await schedules.SaveAsync(new ReportSchedule
+            {
+                DatasetId = id,
+                Rule = rule,
+                Paused = request.Paused,
+                NextRunUtc = ReportScheduleCalendar.NextAfter(rule, clock.GetUtcNow()),
+            }, cancellationToken);
+            return Results.Ok(saved.ToDto());
+        })
+        .WithName("SaveReportSchedule");
+
+        app.MapDelete("/api/reports/datasets/{id:guid}/schedule", async (
+            Guid id,
+            IReportScheduleStore schedules,
+            CancellationToken cancellationToken) =>
+        {
+            await schedules.DeleteAsync(id, cancellationToken);
+            return Results.NoContent();
+        })
+        .WithName("DeleteReportSchedule");
+
         // Solo lee reports.db: se abre con los orígenes apagados. Sin resultado
         // todavía es un estado normal (204), no un error: un 404 queda para un
         // conjunto que no existe, y no ensucia la consola del navegador.

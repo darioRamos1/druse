@@ -121,6 +121,7 @@ public sealed class SqliteReportDatasetStore(IAppPaths paths, TimeProvider clock
             DELETE FROM report_snapshots WHERE dataset_id = $id;
             DELETE FROM report_runs WHERE dataset_id = $id;
             DELETE FROM saved_reports WHERE dataset_id = $id;
+            DELETE FROM report_schedules WHERE dataset_id = $id;
             DELETE FROM report_datasets WHERE id = $id;
             """;
         command.Parameters.AddWithValue("$id", id.ToString());

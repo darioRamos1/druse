@@ -33,6 +33,11 @@
 - [x] 4.3 Plantillas: guardar, aplicar a otro conjunto con asignación de campos, exportar e importar.
 - [x] 4.4 Exportación a Excel, PDF y CSV con los filtros activos.
 
+## Tareas del hito 5
+
+- [x] 5.1 Programación diaria o semanal por conjunto, con hora y zona; recuperación tras cerrar, suspender o arrancar tarde; un reintento ante fallos pasajeros; pausa.
+- [ ] 5.2 Historial de intentos a la vista, retención y cuota de almacenamiento con controles para ver el espacio y borrar los datos guardados.
+
 Los hitos siguientes cubren el constructor SQL y visual, los reportes guardados, los tableros y plantillas, y la actualización programada. La evidencia para la landing se prepara conforme se valida cada hito.
 
 ## 2026-11-11 · Inicio del hito 1
@@ -259,8 +264,36 @@ El hito 4 se divide en cuatro entregas (tableros, personalización, plantillas y
   - **«1 fila sin meta» salía dos veces** en el PDF. El indicador ya lo dice; la nota queda solo en el Excel.
   - **La vista de impresión no llegaba a `<body>`.** Angular inserta el componente después de construirlo, así que el traslado se hace al terminar de pintarlo. Lo encontró la prueba unitaria.
 
+## 2026-11-12 · Hito 5.1: actualización programada (versión 1.18.0)
+
+### Qué se hizo
+
+- **La regla.** Cada conjunto tiene como mucho una programación: diaria o semanal (con sus días), a una hora **local de una zona** (`America/Bogota`, la del equipo por defecto). Se guarda la hora local y no la UTC: «a las 7:00» sigue siendo a las 7:00 cuando cambia el horario de verano. `ReportScheduleCalendar` calcula el siguiente horario. Una hora que no existe (el salto de primavera) se corre a la primera que sí, y una que existe dos veces (el retroceso de otoño) toma la primera, así que ese día no se repite.
+- **Dónde vive.** Tabla `report_schedules` en `reports.db`: regla, pausa, próximo horario, reintento pendiente y `running_utc_ticks`, que es el horario reclamado y en marcha. Borrar el conjunto borra su programación.
+- **Quién despacha.** `ReportScheduler`, un servicio de la API local, mira cada 20 s qué ha vencido (`Reports:ScheduleTickSeconds` lo cambia; las e2e usan 2 s). `ReportScheduleDispatcher` hace el trabajo y ejecuta **la misma actualización que «Actualizar ahora»** (`ReportRefreshService`, origen `Scheduled`) en su propio scope.
+  - No pasa por la cola de `JobRunner`: esa cola está pensada para respaldos, restauraciones y traslados con su registro de trabajos para el usuario. Aquí la persistencia la dan la programación y el historial de intentos, que ya existían.
+- **Reglas del despacho**, probadas moviendo el reloj (`ReportScheduleTests`, 13 pruebas):
+  - **Cada horario a lo sumo una vez.** Se reclama con un `UPDATE` condicionado a todo lo leído (próximo horario, reintento, sin pausa, nada en marcha). Dos despachos a la vez: uno gana y el otro no ejecuta nada.
+  - **Arranque tardío y suspensión.** Con Druse cerrado tres días, al volver hay una sola actualización y el siguiente horario se cuenta desde ahora.
+  - **Fallo pasajero.** Una base que no responde (`database-error`) se reintenta una vez a los cinco minutos. Una contraseña que falta, una consulta inválida o claves duplicadas no se reintentan, porque no se arreglan solas. El resultado anterior se conserva siempre: es la regla de «Actualizar ahora».
+  - **Actualización manual en marcha.** El horario espera un minuto y vuelve a probar; nunca hay dos lecturas del mismo origen a la vez (`ReportRunGate`).
+  - **Druse se cerró a mitad.** Al arrancar, un horario que sigue reclamado se anota como intento `Interrupted` y se repite enseguida, si le queda reintento.
+  - **Pausa.** No se despacha nada, y «Actualizar ahora» sigue funcionando. Guardar la regla (también al quitar la pausa) recalcula el próximo horario desde ahora: no se dispara de golpe uno que venció mientras estaba parada.
+- **API.** `GET/PUT/DELETE /api/reports/datasets/{id}/schedule`, con validación de frecuencia, hora `HH:mm`, días y zona. Sin programación devuelve 204, como un conjunto sin resultado. El contrato OpenAPI está regenerado.
+- **Interfaz.** En Visualización, «Programar» (o «Programación» si ya hay una) junto a «Actualizar ahora» abre un formulario en línea: frecuencia, hora, zona (la del equipo y UTC primero), días, pausa y «Quitar programación». La barra de datos dice «Próxima actualización: …», «en pausa», «se reintenta el …» o «Actualizándose según la programación…». Un fallo programado se cuenta como tal: «La actualización programada del … falló y se conservan los datos anteriores».
+  - Con el conjunto abierto, la pantalla mira poco después de la hora y recoge sola el dato nuevo, sin reabrir nada.
+- **Límite conocido**, como dice el plan: los horarios corren mientras Druse está abierto. Con Druse cerrado se hace una sola actualización al volver. Ejecutar con Druse cerrado necesitaría una tarea del sistema y se estima por separado.
+
+### Comprobaciones
+
+- Backend: 13 unitarias de programación (las de arriba, más los cambios de hora de Nueva York) y 11 de integración del endpoint y el contrato. La batería unitaria completa pasa (762).
+- Frontend: 3 nuevas del banco de trabajo, entre ellas una con reloj simulado en la que un fallo programado y su reintento llegan solos, y 2 de las zonas horarias. En total, 532 de core y Reportes.
+- **e2e nueva con un horario de verdad.** Programa el conjunto para el minuto siguiente y, sin pulsar nada, «Datos del…» aparece solo con sus 3 filas y la próxima actualización de mañana. Después pausa y quita la programación.
+- **Barrido.** Capturas `25-programar`, `25a-programada`, `25b-claro-programar` y `25c-programar-1024`/`-900`, revisadas. No hay hallazgos nuevos.
+- **Encontrado por Playwright:** «Hora» no era un nombre único. La zona horaria («Zona horaria…») y la pausa («…Actualizar ahora…») también lo contienen. La prueba usa el nombre exacto.
+
 ### Dónde retomar
 
-1. Preparar la sección `#reportes-bi` de la landing con `22-tablero`, `22e-tablero-pulsado`, `23b-plantilla-vincular` y `24b-vista-impresion` (estado En desarrollo).
-2. Hito 5, programación: diaria o semanal, recuperación tras reiniciar, historial y retención.
+1. Hito 5.2: historial de intentos visible en Visualización (los 20 que ya se guardan, con origen manual o programado), retención y cuota de `reports.db` con «espacio usado» y «borrar datos guardados».
+2. Preparar la sección `#reportes-bi` de la landing con `22-tablero`, `22e-tablero-pulsado`, `23b-plantilla-vincular`, `24b-vista-impresion` y `25-programar` (estado En desarrollo).
 3. Opcional: filtro «Plantilla de Druse» en el diálogo de guardar del escritorio (`exports.rs`); hoy guarda el `.json` de plantilla sin filtro de tipo (el `.xlsx` y el `.csv` sí lo tienen).

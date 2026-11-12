@@ -11,6 +11,9 @@ public enum ReportRunStatus
     Succeeded,
     Failed,
     Canceled,
+
+    /// <summary>Druse se cerró con la actualización programada en marcha.</summary>
+    Interrupted,
 }
 
 /// <summary>Qué pasó con una fuente en una ejecución.</summary>

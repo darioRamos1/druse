@@ -640,6 +640,20 @@ test.describe('barrido visual', () => {
     await medir(page, 'guardar reporte como plantilla', hallazgos);
     await foto(page, '23d-plantilla-reporte', reportes.locator('.dialog'));
     await reportes.locator('app-report-template-save').getByRole('button', { name: 'Cancelar' }).click();
+
+    // Programar: semanal, lunes y jueves. Queda guardada para verla en claro
+    // y estrecha más abajo; el horario cae en el futuro y no llega a dispararse.
+    await reportes.getByRole('button', { name: 'Programar', exact: true }).click();
+    const programar = reportes.locator('form.schedule');
+
+    await programar.getByRole('radio', { name: 'Semanal' }).click();
+    await programar.getByLabel('Jueves').check();
+    await medir(page, 'programar actualización', hallazgos);
+    await foto(page, '25-programar', reportes.locator('.dialog'));
+    await programar.getByRole('button', { name: 'Guardar programación' }).click();
+    await expect(reportes.locator('.freshness__schedule')).toContainText('Próxima actualización');
+    await medir(page, 'actualización programada', hallazgos);
+    await foto(page, '25a-programada', reportes.locator('.dialog'));
     await page.keyboard.press('Escape');
     await expect(reportes.locator('.dialog')).toBeHidden();
 
@@ -857,6 +871,11 @@ test.describe('barrido visual', () => {
     await expect(reportesClaro.locator('.chart__bar')).toHaveCount(3);
     await medir(page, 'claro: reportes barras', hallazgos);
     await foto(page, '21g-claro-reportes-barras', reportesClaro.locator('.dialog'));
+    await reportesClaro.getByRole('button', { name: 'Programación', exact: true }).click();
+    await expect(reportesClaro.locator('form.schedule')).toBeVisible();
+    await medir(page, 'claro: programar', hallazgos);
+    await foto(page, '25b-claro-programar', reportesClaro.locator('.dialog'));
+    await reportesClaro.locator('form.schedule').getByRole('button', { name: 'Cancelar' }).click();
     await reportesClaro.locator('.steps__item').nth(1).click();
     await previsualizar(reportesClaro);
     await medir(page, 'claro: reportes combinar', hallazgos);
@@ -896,6 +915,11 @@ test.describe('barrido visual', () => {
       await page.waitForTimeout(300);
       await medir(page, `reportes visualización a ${ancho}`, hallazgos);
       await foto(page, `21i-reportes-visual-${ancho}`, reportesEstrecho.locator('.dialog'));
+      await reportesEstrecho.getByRole('button', { name: 'Programación', exact: true }).click();
+      await expect(reportesEstrecho.locator('form.schedule')).toBeVisible();
+      await medir(page, `programar a ${ancho}`, hallazgos);
+      await foto(page, `25c-programar-${ancho}`, reportesEstrecho.locator('.dialog'));
+      await reportesEstrecho.locator('form.schedule').getByRole('button', { name: 'Cancelar' }).click();
       await reportesEstrecho.getByRole('button', { name: 'Mostrar u ocultar la configuración' }).click();
       await page.waitForTimeout(300);
       await foto(page, `21j-reportes-visual-inspector-${ancho}`, reportesEstrecho.locator('.dialog'));

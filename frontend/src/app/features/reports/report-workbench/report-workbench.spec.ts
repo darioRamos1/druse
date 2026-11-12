@@ -6,6 +6,7 @@ import {
   ReportDataset,
   ReportRefresh,
   ReportRun,
+  ReportSchedule,
   ReportSnapshot,
   SavedReport,
 } from '../../../shared/models/reports';
@@ -64,6 +65,9 @@ describe('ReportWorkbench', () => {
   let reportes: SavedReport[];
   let escritos: SavedReport[];
   let lecturas: number;
+  let intentos: ReportRun[];
+  let programada: ReportSchedule | null;
+  let programaciones: ReportSchedule[];
 
   async function asentar(): Promise<void> {
     for (let intento = 0; intento < 20; intento++) {
@@ -99,14 +103,32 @@ describe('ReportWorkbench', () => {
     reportes = [];
     escritos = [];
     lecturas = 0;
+    intentos = [];
+    programada = null;
+    programaciones = [];
 
     const gateway = {
       getReportSnapshot: () => {
         lecturas++;
         return of(guardado);
       },
-      getReportRuns: () => of([]),
+      getReportRuns: () => of(intentos),
       getSavedReports: () => of(reportes),
+      getReportSchedule: () => of(programada),
+      saveReportSchedule: (_id: string, schedule: ReportSchedule): Observable<ReportSchedule> => {
+        programaciones.push(schedule);
+        programada = {
+          ...schedule,
+          nextRunUtc: schedule.paused ? null : '2026-11-13T12:00:00Z',
+          retryAtUtc: null,
+          running: false,
+        };
+        return of(programada);
+      },
+      deleteReportSchedule: () => {
+        programada = null;
+        return of(undefined);
+      },
       refreshReportDataset: (): Observable<ReportRefresh> => of(respuesta),
       saveReport: (report: SavedReport): Observable<SavedReport> => {
         escritos.push(report);
@@ -164,6 +186,99 @@ describe('ReportWorkbench', () => {
     expect(el('.banner--danger').textContent).toContain('se conservan los datos anteriores');
     expect(el('.banner--danger').textContent).toContain('Metas: La conexión de esta fuente ya no existe');
     expect(el('.freshness').textContent).toContain('Datos del');
+  });
+
+  it('programa la actualización semanal y enseña la próxima', async () => {
+    await crear();
+
+    botón('Programar').click();
+    fixture.detectChanges();
+    const form = el('form.schedule');
+    expect(form).toBeTruthy();
+
+    botón('Semanal').click();
+    fixture.detectChanges();
+    const viernes = [...form.querySelectorAll<HTMLLabelElement>('.day')].find((label) =>
+      label.textContent?.includes('Viernes'),
+    )!;
+    viernes.querySelector('input')!.click();
+    const hora = form.querySelector<HTMLInputElement>('input[type="time"]')!;
+    hora.value = '06:30';
+    hora.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+    botón('Guardar programación').click();
+    await asentar();
+
+    expect(programaciones).toHaveLength(1);
+    expect(programaciones[0]).toMatchObject({ frequency: 'Weekly', time: '06:30', days: ['Monday', 'Friday'], paused: false });
+    expect(programaciones[0].timeZone).toBeTruthy();
+    expect(el('form.schedule')).toBeNull();
+    expect(el('.freshness__schedule').textContent).toContain('Próxima actualización');
+    expect(botón('Programación')).toBeTruthy();
+  });
+
+  it('no deja guardar una semanal sin días, y la pausa se dice en la barra', async () => {
+    programada = { frequency: 'Daily', time: '07:00', days: [], timeZone: 'UTC', paused: false, nextRunUtc: '2026-11-13T07:00:00Z' };
+    await crear();
+    expect(el('.freshness__schedule').textContent).toContain('Próxima actualización');
+
+    botón('Programación').click();
+    fixture.detectChanges();
+    botón('Semanal').click();
+    fixture.detectChanges();
+    el<HTMLInputElement>('.day input').click();
+    fixture.detectChanges();
+    expect(el('.schedule .field__error').textContent).toContain('al menos un día');
+    expect(botón('Guardar programación').disabled).toBe(true);
+
+    botón('Diaria').click();
+    el<HTMLInputElement>('form.schedule .check input').click();
+    fixture.detectChanges();
+    botón('Guardar programación').click();
+    await asentar();
+
+    expect(programaciones[0]).toMatchObject({ frequency: 'Daily', days: [], paused: true });
+    expect(el('.freshness__schedule').textContent).toContain('en pausa');
+  });
+
+  it('una actualización programada que llega con el conjunto abierto aparece sola', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] });
+    vi.setSystemTime(new Date('2026-11-13T06:59:00Z'));
+
+    try {
+      programada = { frequency: 'Daily', time: '07:00', days: [], timeZone: 'UTC', paused: false, nextRunUtc: '2026-11-13T07:00:00Z' };
+      await crear();
+      const antes = lecturas;
+
+      // Pasa la hora: el servidor la despachó y el origen falló.
+      intentos = [
+        intento('Failed', {
+          origin: 'Scheduled',
+          startedAtUtc: '2026-11-13T07:00:05Z',
+          message: 'No se pudo leer alguna fuente. Se conserva el resultado anterior.',
+        }),
+      ];
+      programada = { ...programada, nextRunUtc: '2026-11-14T07:00:00Z', retryAtUtc: '2026-11-13T07:05:06Z' };
+      await vi.advanceTimersByTimeAsync(63_000);
+      await asentar();
+
+      expect(el('.banner--danger').textContent).toContain('La actualización programada del');
+      expect(el('.freshness__schedule').textContent).toContain('se reintenta');
+      expect(lecturas).toBe(antes);
+
+      // El reintento salió bien: el dato nuevo se lee sin reabrir nada.
+      intentos = [intento('Succeeded', { origin: 'Scheduled', startedAtUtc: '2026-11-13T07:05:06Z' }), ...intentos];
+      programada = { ...programada, retryAtUtc: null };
+      await vi.advanceTimersByTimeAsync(6 * 60_000);
+      await asentar();
+
+      expect(lecturas).toBe(antes + 1);
+      expect(el('.banner--danger')).toBeNull();
+      expect(el('.freshness__schedule').textContent).toContain('Próxima actualización');
+    } finally {
+      fixture.destroy();
+      vi.useRealTimers();
+    }
   });
 
   it('el indicador con meta da 60 % y cuenta aparte el municipio sin meta', async () => {

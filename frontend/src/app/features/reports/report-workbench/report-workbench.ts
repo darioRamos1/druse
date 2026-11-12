@@ -1,6 +1,7 @@
 import {
   ChangeDetectionStrategy,
   Component,
+  DestroyRef,
   computed,
   effect,
   inject,
@@ -8,7 +9,7 @@ import {
   signal,
   untracked,
 } from '@angular/core';
-import { firstValueFrom } from 'rxjs';
+import { catchError, firstValueFrom, of } from 'rxjs';
 
 import { ApplicationGateway } from '../../../core/application-gateway/application-gateway';
 import { I18nService } from '../../../core/i18n/i18n.service';
@@ -18,12 +19,14 @@ import { describeError } from '../../../core/workspace/errors';
 import {
   ReportDataset,
   ReportRun,
+  ReportSchedule,
   ReportSnapshot,
   ReportVisualKind,
   SavedReport,
 } from '../../../shared/models/reports';
 import { Icon } from '../../../shared/ui/icon/icon';
 import { ReportChart } from '../report-chart/report-chart';
+import { ReportScheduleForm } from '../report-schedule/report-schedule';
 import { ReportTemplateGallery, TemplateApplication } from '../report-template-gallery/report-template-gallery';
 import { ReportTemplateSave, TemplateSaveRequest } from '../report-template-save/report-template-save';
 import { captureTemplate, instantiateTemplate } from '../report-template-model';
@@ -65,7 +68,7 @@ export const VISUALS: readonly ReportVisualKind[] = ['Table', 'Bar', 'Line', 'In
 @Component({
   selector: 'app-report-workbench',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [Icon, ReportChart, ReportTemplateGallery, ReportTemplateSave, TranslatePipe],
+  imports: [Icon, ReportChart, ReportScheduleForm, ReportTemplateGallery, ReportTemplateSave, TranslatePipe],
   templateUrl: './report-workbench.html',
   styleUrl: './report-workbench.scss',
 })
@@ -100,6 +103,36 @@ export class ReportWorkbench {
   protected readonly savingTemplate = signal(false);
   protected readonly templateBusy = signal(false);
   protected readonly currentDatasets = computed(() => [this.dataset()]);
+  /** Programación: la guardada, si el formulario está abierto y si se está guardando. */
+  protected readonly schedule = signal<ReportSchedule | null>(null);
+  protected readonly scheduling = signal(false);
+  protected readonly scheduleBusy = signal(false);
+
+  /** Qué dice la barra de datos sobre la programación: clave del catálogo y fecha. */
+  protected readonly scheduleStatus = computed(() => {
+    const schedule = this.schedule();
+
+    if (!schedule) {
+      return null;
+    }
+
+    if (schedule.paused) {
+      return { key: 'reports.schedule.status.paused', date: null };
+    }
+
+    if (schedule.running) {
+      return { key: 'reports.schedule.status.running', date: null };
+    }
+
+    if (schedule.retryAtUtc) {
+      return { key: 'reports.schedule.status.retry', date: schedule.retryAtUtc };
+    }
+
+    return schedule.nextRunUtc ? { key: 'reports.schedule.status.next', date: schedule.nextRunUtc } : null;
+  });
+
+  /** La próxima mirada por si llegó una actualización programada con esto abierto. */
+  private _watch: ReturnType<typeof setTimeout> | null = null;
 
   /** El último intento falló después del último resultado bueno. */
   protected readonly failedAfterData = computed(() => {
@@ -205,6 +238,8 @@ export class ReportWorkbench {
 
       untracked(() => void this.load(id));
     });
+
+    inject(DestroyRef).onDestroy(() => this.stopWatch());
   }
 
   private async load(datasetId: string): Promise<void> {
@@ -213,17 +248,24 @@ export class ReportWorkbench {
     this.notice.set(null);
     this.draft.set(null);
     this.savingTemplate.set(false);
+    this.scheduling.set(false);
+    this.schedule.set(null);
+    this.stopWatch();
 
     try {
-      const [snapshot, runs, reports] = await Promise.all([
+      const [snapshot, runs, reports, schedule] = await Promise.all([
         firstValueFrom(this._gateway.getReportSnapshot(datasetId)),
         firstValueFrom(this._gateway.getReportRuns(datasetId)),
         firstValueFrom(this._gateway.getSavedReports(datasetId)),
+        // Sin saber la programación los datos se ven igual: no tumba la carga.
+        firstValueFrom(this._gateway.getReportSchedule(datasetId).pipe(catchError(() => of(null)))),
       ]);
 
       this.snapshot.set(snapshot);
       this.lastRun.set(runs[0] ?? null);
       this.reports.set(reports);
+      this.schedule.set(schedule);
+      this.armWatch();
 
       if (reports.length > 0) {
         this.select(reports[0]);
@@ -264,6 +306,118 @@ export class ReportWorkbench {
       this.error.set(describeError(error, this._i18n));
     } finally {
       this.refreshing.set(false);
+    }
+  }
+
+  /** Cómo se cuenta un intento fallido: programado o a mano, con o sin datos anteriores. */
+  protected failureKey(run: ReportRun): string {
+    const prefix = run.origin === 'Scheduled' ? 'reports.data.scheduledFailed' : 'reports.data.failed';
+
+    return this.snapshot() ? `${prefix}Keeps` : prefix;
+  }
+
+  // --- Programar -----------------------------------------------------------------
+
+  protected async saveSchedule(schedule: ReportSchedule): Promise<void> {
+    const datasetId = this.dataset().id;
+
+    this.scheduleBusy.set(true);
+    this.error.set(null);
+
+    try {
+      this.schedule.set(await firstValueFrom(this._gateway.saveReportSchedule(datasetId, schedule)));
+      this.scheduling.set(false);
+      this.armWatch();
+    } catch (error) {
+      this.error.set(describeError(error, this._i18n));
+    } finally {
+      this.scheduleBusy.set(false);
+    }
+  }
+
+  protected async removeSchedule(): Promise<void> {
+    const datasetId = this.dataset().id;
+
+    this.scheduleBusy.set(true);
+    this.error.set(null);
+
+    try {
+      await firstValueFrom(this._gateway.deleteReportSchedule(datasetId));
+      this.schedule.set(null);
+      this.scheduling.set(false);
+      this.stopWatch();
+    } catch (error) {
+      this.error.set(describeError(error, this._i18n));
+    } finally {
+      this.scheduleBusy.set(false);
+    }
+  }
+
+  /**
+   * Programa la próxima mirada: un poco después del horario o del reintento, y
+   * cada pocos segundos mientras el servidor no lo haya despachado. Así el dato
+   * nuevo aparece solo, sin tener que reabrir el conjunto.
+   */
+  private armWatch(): void {
+    this.stopWatch();
+
+    const schedule = this.schedule();
+
+    if (!schedule || schedule.paused) {
+      return;
+    }
+
+    const due = [schedule.nextRunUtc, schedule.retryAtUtc]
+      .filter((value): value is string => !!value)
+      .map((value) => Date.parse(value));
+    const target = schedule.running || due.length === 0 ? Date.now() : Math.min(...due);
+    const delay = Math.min(Math.max(target - Date.now() + 2_000, 5_000), 60 * 60 * 1_000);
+    const datasetId = this.dataset().id;
+
+    this._watch = setTimeout(() => void this.checkScheduled(datasetId), delay);
+  }
+
+  private stopWatch(): void {
+    if (this._watch !== null) {
+      clearTimeout(this._watch);
+      this._watch = null;
+    }
+  }
+
+  private async checkScheduled(datasetId: string): Promise<void> {
+    this._watch = null;
+
+    try {
+      const [schedule, runs] = await Promise.all([
+        firstValueFrom(this._gateway.getReportSchedule(datasetId)),
+        firstValueFrom(this._gateway.getReportRuns(datasetId)),
+      ]);
+
+      if (this.dataset().id !== datasetId) {
+        return;
+      }
+
+      this.schedule.set(schedule);
+
+      const latest = runs[0] ?? null;
+
+      if (latest && latest.id !== this.lastRun()?.id && !this.refreshing()) {
+        this.lastRun.set(latest);
+
+        if (latest.status === 'Succeeded') {
+          this.snapshot.set(await firstValueFrom(this._gateway.getReportSnapshot(datasetId)));
+
+          if (!this.draft()) {
+            this.newReport();
+          }
+        }
+      }
+    } catch {
+      // La API local no respondió esta vez; se vuelve a mirar en la siguiente.
+    }
+
+    if (this.dataset().id === datasetId) {
+      this.armWatch();
     }
   }
 

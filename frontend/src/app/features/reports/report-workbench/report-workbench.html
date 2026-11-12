@@ -16,7 +16,24 @@
         <strong>{{ 'reports.data.none' | t }}</strong>
         <span class="freshness__meta">{{ 'reports.data.noneHint' | t }}</span>
       }
+      @if (!loading() && scheduleStatus(); as status) {
+        <span class="freshness__schedule">
+          <app-icon name="clock" [size]="11" />
+          <!-- i18n-keys: reports.schedule.status.* -->
+          {{ status.key | t: { date: status.date ? when(status.date) : '' } }}
+        </span>
+      }
     </div>
+    <button
+      type="button"
+      class="button"
+      [attr.aria-expanded]="scheduling()"
+      [disabled]="loading()"
+      (click)="scheduling.set(!scheduling())"
+    >
+      <app-icon name="clock" [size]="11" />
+      {{ (schedule() ? 'reports.schedule.edit' : 'reports.schedule.open') | t }}
+    </button>
     <button
       type="button"
       class="button button--primary"
@@ -27,6 +44,16 @@
       {{ (refreshing() ? 'reports.data.refreshing' : 'reports.data.refresh') | t }}
     </button>
   </div>
+
+  @if (scheduling()) {
+    <app-report-schedule
+      [schedule]="schedule()"
+      [busy]="scheduleBusy()"
+      (saved)="saveSchedule($event)"
+      (removed)="removeSchedule()"
+      (cancelled)="scheduling.set(false)"
+    />
+  }
 
   <div class="notes">
     @if (error(); as message) {
@@ -46,7 +73,8 @@
     @if (failedAfterData() && lastRun(); as run) {
       <div class="banner banner--danger" role="alert">
         <p>
-          {{ (snapshot() ? 'reports.data.failedKeeps' : 'reports.data.failed') | t: { date: when(run.startedAtUtc) } }}
+          <!-- i18n-keys: reports.data.failed*, reports.data.scheduledFailed* -->
+          {{ failureKey(run) | t: { date: when(run.startedAtUtc) } }}
           {{ run.message }}
         </p>
         @if (run.sources.length > 0) {
