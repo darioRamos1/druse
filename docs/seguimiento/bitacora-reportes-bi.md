@@ -38,6 +38,16 @@
 - [x] 5.1 Programación diaria o semanal por conjunto, con hora y zona; recuperación tras cerrar, suspender o arrancar tarde; un reintento ante fallos pasajeros; pausa.
 - [x] 5.2 Historial de intentos a la vista, retención y cuota de almacenamiento con controles para ver el espacio y borrar los datos guardados.
 
+## Tareas del hito 6
+
+- [x] Lectura tipada en MySQL, Oracle, SQLite e Informix, con los tipos de cada motor normalizados.
+- [x] Pruebas de contrato de la lectura tipada por motor (tipos, nulos, tope de filas, cancelación) y medición de 20.000 filas.
+- [x] Mensajes de Reportes con clave: en el idioma de la ventana, también los intentos guardados.
+- [x] E2E multifuente: SQL Server + PostgreSQL de punta a punta.
+- [x] Matriz por motor y edición en `docs/motores/matriz-de-motores.md`.
+- [ ] Informix: comprobarlo en la integración continua (aquí no se levantó su contenedor).
+- [ ] Captura del constructor y del tablero para la landing.
+
 Los hitos siguientes cubren el constructor SQL y visual, los reportes guardados, los tableros y plantillas, y la actualización programada. La evidencia para la landing se prepara conforme se valida cada hito.
 
 ## 2026-11-11 · Inicio del hito 1
@@ -311,9 +321,38 @@ El hito 4 se divide en cuatro entregas (tableros, personalización, plantillas y
 - **Barrido.** Capturas `26-historial` (con la confirmación de borrar), `26a-claro-historial` y `26b-historial-1024`/`-900`, revisadas. No hay hallazgos propios de estas pantallas.
   - Los avisos que da el barrido ya existían en todas las pantallas, también en las de hitos anteriores. A 1024 y 900 px se cortan textos de la barra principal detrás del diálogo («Buscar en Druse…», «Filtros», «Exportar»…). Además, `medir()` cuenta como cortado el texto solo para lectores de pantalla de la cuadrícula (`grid.keyboardDetail`). No son de Reportes y quedan para revisarlos aparte.
 
+## 2026-11-12 · Hito 6: compatibilidad y cierre (versión 1.20.0)
+
+### Qué se hizo
+
+- **Más motores.** Hasta ahora Reportes solo leía de SQL Server y PostgreSQL: la lista estaba fija en `ReportQueryService`. Ahora la deciden los proveedores. MySQL, Oracle, SQLite e Informix implementan la lectura tipada (`ITypedQueryResultReader`), y la edición decide cuáles hay. Una fuente cuyo motor no trae la edición lo dice con su código (`engine-unsupported`), que antes se confundía con «consulta inválida», y el resultado guardado sigue a la vista.
+- **Tipos iguales para todos.** `TypedQueryResult.ReadAsync` deja cada columna con un solo tipo que el resultado guardado sabe conservar; antes un tipo raro se descubría al guardar y la actualización fallaba. Cada motor tiene sus particularidades:
+  - El `DATE` de Oracle lleva hora: solo pasa a fecha si todas las filas caen a medianoche.
+  - Los enteros sin signo de MySQL suben al tipo con signo que los contiene.
+  - SQLite tipa valores, no columnas. Si una columna mezcla enteros y reales se lee como real, y si mezcla números y texto, como texto. Si se declara `DATE` con fechas ISO, se lee como fecha.
+  - Un `NUMBER` de Oracle de más de 28 cifras se lee como texto.
+  - Además, la lectura mira la cancelación en cada fila. La prueba nueva encontró que Npgsql sirve las filas de su búfer sin mirar el token.
+- **Mensajes en el idioma de la ventana.** Los 50 motivos que escribe Reportes viajan con su clave `server.reports.*`, la misma vía que ya usaban las conexiones y el diseñador de tablas (`ReportMessages` y `ReportProblemException` en `Druse.Domain`), y tienen texto en español e inglés. Entre ellos:
+  - por qué falló o se interrumpió un intento;
+  - los problemas de la unión;
+  - los rechazos de la API: definición, programación, plantillas, exportación y «ya se está actualizando».
+
+  Un intento guardado conserva su clave en SQLite. Los de antes de esta versión no la tienen y se enseñan con su texto. Lo que escribe el motor sigue llegando con sus palabras, como en el editor.
+- **Matriz por motor y edición** en `docs/motores/matriz-de-motores.md`, sección «Reportes BI por motor y edición».
+
+### Comprobaciones
+
+- **Contrato, contra servidores reales**: PostgreSQL, SQL Server, MySQL 8.4, Oracle Database Free y SQLite. Hay 3 pruebas nuevas por motor: tipos y nulos, tope de filas y cancelación. La batería de contrato completa pasa: 430 pruebas, Informix declarado opcional.
+- **Medición de 20.000 filas** por motor (una columna, una ejecución): PostgreSQL 26 ms, SQLite 35 ms, MySQL 47 ms, Oracle 86 ms y SQL Server 176 ms, todas por debajo de 3 MiB asignados. Junto con lo medido en el hito 1 para cruzar y guardar, los límites de partida (20.000 por fuente y 50.000 en el cruce) se quedan como están.
+- Backend: 4 unitarias de normalización de tipos y la clave del intento interrumpido releída de SQLite; 769 unitarias en total. Integración de Reportes y contrato de la API: 38.
+- Frontend: 2 pruebas de los mensajes en español e inglés; 537 de core y Reportes.
+- **E2E multifuente.** Ventas en SQL Server y metas en PostgreSQL, desde la interfaz: tres filas, «fuentes leídas entre…», 180 de 300 y 60 % con el municipio sin meta aparte.
+- **Informix no se comprobó aquí.** Su contenedor no se levantó en esta máquina, así que sus pruebas de contrato se saltaron. Las mismas pruebas corren en la integración continua, que sí lo levanta. Hasta verlas allí en verde, la matriz lo declara «implementado, pendiente de la integración continua».
+- **Encontrado de paso:** `test-db.ps1` crea la base secundaria de MySQL y el usuario secundario de Oracle antes de que el motor acepte conexiones, la primera vez que crea el contenedor. Volver a lanzarlo lo arregla. Las pruebas de «segunda base» de esos motores fallan hasta entonces; no es de Reportes.
+
 ### Dónde retomar
 
-1. Hito 6, compatibilidad y cierre: matriz por motor y edición, errores en español e inglés, rendimiento, E2E multifuente y declarar los motores compatibles.
-2. Preparar la sección `#reportes-bi` de la landing con `22-tablero`, `22e-tablero-pulsado`, `23b-plantilla-vincular`, `24b-vista-impresion` y `25-programar` (estado En desarrollo).
-3. Revisar los avisos del barrido que no son de Reportes: textos de la barra principal cortados a 1024 y 900 px, y `medir()` contando el texto oculto `.sr-only` de la cuadrícula.
-4. Opcional: filtro «Plantilla de Druse» en el diálogo de guardar del escritorio (`exports.rs`).
+1. Ver en verde las pruebas de contrato de Informix en la integración continua y marcarlo «comprobado» en la matriz.
+2. Preparar la sección `#reportes-bi` de la landing con `22-tablero`, `22e-tablero-pulsado`, `23b-plantilla-vincular`, `24b-vista-impresion` y `25-programar` (estado En desarrollo; Disponible cuando se publique una versión con BI).
+3. `test-db.ps1`: esperar a que MySQL y Oracle acepten conexiones antes de crear la base y el usuario secundarios.
+4. Revisar los avisos del barrido que no son de Reportes: textos de la barra principal cortados a 1024 y 900 px, y `medir()` contando el texto oculto `.sr-only` de la cuadrícula.

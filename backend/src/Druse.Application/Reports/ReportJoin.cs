@@ -26,9 +26,12 @@ public sealed record ReportJoinResult(
 }
 
 /// <summary>La unión se detuvo por claves repetidas donde no se esperaban.</summary>
-public sealed class ReportJoinDuplicateKeysException(string message, IReadOnlyList<string> sampleKeys)
-    : InvalidOperationException(message)
+public sealed class ReportJoinDuplicateKeysException(UserMessage localized, IReadOnlyList<string> sampleKeys)
+    : InvalidOperationException(localized.Text)
 {
+    /// <summary>El motivo con su clave, para decirlo en el idioma de la ventana.</summary>
+    public UserMessage Localized { get; } = localized;
+
     /// <summary>Hasta tres claves repetidas, para que se puedan buscar en el origen.</summary>
     public IReadOnlyList<string> SampleKeys { get; } = sampleKeys;
 }
@@ -78,7 +81,7 @@ public static class ReportJoin
         cancellationToken.ThrowIfCancellationRequested();
         if (left.Truncated || right.Truncated)
         {
-            throw new InvalidOperationException("Una fuente de BI quedó truncada. Reduce las filas o columnas de la consulta.");
+            throw new ReportProblemException(ReportMessages.JoinTruncated());
         }
 
         if (keys.Count == 0)
@@ -104,14 +107,13 @@ public static class ReportJoin
             var rightColumn = ResolveColumn(right.Columns, keys[i].Right);
             if (leftColumn.ClrType != rightColumn.ClrType)
             {
-                throw new InvalidOperationException(
-                    $"Las columnas {leftColumn.Name} y {rightColumn.Name} tienen tipos distintos.");
+                throw new ReportProblemException(ReportMessages.JoinTypesDiffer(leftColumn.Name, rightColumn.Name));
             }
 
             if (leftColumn.ClrType is not (nameof(String) or nameof(DateOnly) or nameof(Boolean) or
                 nameof(Byte) or nameof(Int16) or nameof(Int32) or nameof(Int64) or nameof(Decimal) or nameof(Guid)))
             {
-                throw new InvalidOperationException($"El tipo de la columna {leftColumn.Name} requiere una conversión.");
+                throw new ReportProblemException(ReportMessages.JoinNeedsConversion(leftColumn.Name));
             }
 
             leftColumns[i] = leftColumn.Ordinal;
@@ -139,8 +141,7 @@ public static class ReportJoin
         // multiplicaría filas sin que nadie lo hubiera pedido (N:N).
         if (duplicates.Count > 0)
         {
-            throw new ReportJoinDuplicateKeysException(
-                "La fuente derecha tiene claves de unión duplicadas.", duplicates);
+            throw new ReportJoinDuplicateKeysException(ReportMessages.JoinRightDuplicates(), duplicates);
         }
 
         var leftKeys = cardinality == ReportJoinCardinality.OneToOne
@@ -177,9 +178,7 @@ public static class ReportJoin
 
         if (duplicates.Count > 0)
         {
-            throw new ReportJoinDuplicateKeysException(
-                "La fuente izquierda tiene claves de unión duplicadas. Si se esperan, elige la cardinalidad 1:N.",
-                duplicates);
+            throw new ReportJoinDuplicateKeysException(ReportMessages.JoinLeftDuplicates(), duplicates);
         }
 
         // Calificar los nombres conserva la identidad de las columnas cuando
@@ -228,7 +227,7 @@ public static class ReportJoin
         var matches = columns.Where(column => column.Name == name).Take(2).ToArray();
         if (matches.Length != 1)
         {
-            throw new InvalidOperationException($"La columna de unión {name} falta o es ambigua.");
+            throw new ReportProblemException(ReportMessages.JoinColumnMissing(name));
         }
 
         return matches[0];

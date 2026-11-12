@@ -435,6 +435,130 @@ public abstract class DatabaseProviderContractTests<TFixture>
         Assert.Equal(Fixture.Stored("c"), result.ResultSets[2].Columns[0].Name);
     }
 
+    // -----------------------------------------------------------------------
+    // Lectura tipada de Reportes BI (hito 6): lo que hace falta para declarar
+    // compatible un motor.
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public async Task LecturaTipada_ConservaNumerosFechasYNulos()
+    {
+        if (Skip) { return; }
+
+        await using var session = await OpenAsync();
+
+        var basic = await ReadTypedAsync(session, Fixture.SelectBasicTypes, maxRows: 10);
+        var row = basic.Rows[0];
+
+        Assert.False(basic.Truncated);
+        Assert.Equal(42m, Convert.ToDecimal(row[0], System.Globalization.CultureInfo.InvariantCulture));
+        Assert.Equal(3.5m, Convert.ToDecimal(row[1], System.Globalization.CultureInfo.InvariantCulture));
+        Assert.True(
+            row[3] switch
+            {
+                DateOnly date => date == new DateOnly(2026, 8, 11),
+                DateTime date => date.Date == new DateTime(2026, 8, 11),
+                string text => text.StartsWith("2026-08-11", StringComparison.Ordinal),
+                _ => false,
+            },
+            $"La fecha llegó como {row[3]?.GetType().Name}: {row[3]}");
+        AssertGuardable(basic);
+
+        var nulls = await ReadTypedAsync(session, Fixture.SelectNullAndEmpty, maxRows: 10);
+
+        Assert.Null(nulls.Rows[0][0]);
+        AssertGuardable(nulls);
+    }
+
+    [Fact]
+    public async Task LecturaTipada_DiceSiElLimiteDejoFilasFuera()
+    {
+        if (Skip) { return; }
+
+        await using var session = await OpenAsync();
+
+        var cut = await ReadTypedAsync(session, Fixture.GenerateRows(1000), maxRows: 10);
+
+        Assert.True(cut.Truncated);
+        Assert.Equal(10, cut.Rows.Count);
+        AssertGuardable(cut);
+
+        var whole = await ReadTypedAsync(session, Fixture.GenerateRows(5), maxRows: 10);
+
+        Assert.False(whole.Truncated);
+        Assert.Equal(5, whole.Rows.Count);
+    }
+
+    [Fact]
+    public async Task LecturaTipada_SeCancela()
+    {
+        if (Skip) { return; }
+
+        await using var session = await OpenAsync();
+        await using var reader = await Fixture.Executor.OpenReaderAsync(
+            session, Query(Fixture.GenerateRows(1000), maxRows: 1000), CancellationToken.None);
+        var typed = Assert.IsAssignableFrom<ITypedQueryResultReader>(reader);
+
+        using var cancellation = new CancellationTokenSource();
+        await cancellation.CancelAsync();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => typed.ReadTypedAsync(1000, cancellation.Token));
+    }
+
+    /// <summary>
+    /// Cuánto tarda leer el tope de filas de una fuente de Reportes, por motor.
+    ///
+    /// Es una medición, no una comprobación: solo corre con `DRUSE_MEDIR`
+    /// apuntando a un archivo, donde deja una línea por motor. El tope del
+    /// ejemplo es el de una fuente de BI (20.000 filas).
+    /// </summary>
+    [Fact]
+    public async Task LecturaTipada_MideElTopeDeUnaFuente()
+    {
+        var file = Environment.GetEnvironmentVariable("DRUSE_MEDIR");
+
+        if (Skip || string.IsNullOrWhiteSpace(file)) { return; }
+
+        await using var session = await OpenAsync();
+        await ReadTypedAsync(session, Fixture.GenerateRows(100), maxRows: 100);
+
+        var allocated = GC.GetAllocatedBytesForCurrentThread();
+        var clock = System.Diagnostics.Stopwatch.StartNew();
+        var result = await ReadTypedAsync(session, Fixture.GenerateRows(20_000), maxRows: 20_000);
+        clock.Stop();
+        var bytes = GC.GetAllocatedBytesForCurrentThread() - allocated;
+
+        Assert.Equal(20_000, result.Rows.Count);
+        await File.AppendAllTextAsync(file, string.Create(
+            System.Globalization.CultureInfo.InvariantCulture,
+            $"{Fixture.EngineName}\t{clock.Elapsed.TotalMilliseconds:F1} ms\t{bytes / 1024d / 1024d:F2} MiB{Environment.NewLine}"));
+    }
+
+    private async Task<TypedQueryResult> ReadTypedAsync(IDatabaseSession session, string sql, int maxRows)
+    {
+        await using var reader = await Fixture.Executor.OpenReaderAsync(
+            session, Query(sql, maxRows), CancellationToken.None);
+        var typed = Assert.IsAssignableFrom<ITypedQueryResultReader>(reader);
+
+        return await typed.ReadTypedAsync(maxRows, CancellationToken.None);
+    }
+
+    /// <summary>Cada valor tiene el tipo de su columna, y es uno que el resultado guardado conserva.</summary>
+    private static void AssertGuardable(TypedQueryResult result)
+    {
+        for (var ordinal = 0; ordinal < result.Columns.Count; ordinal++)
+        {
+            var column = result.Columns[ordinal];
+
+            Assert.Contains(column.ClrType, TypedQueryResult.SupportedTypes);
+            foreach (var value in result.Rows.Select(row => row[ordinal]).OfType<object>())
+            {
+                Assert.Equal(column.ClrType, value.GetType().Name);
+            }
+        }
+    }
+
     [Fact]
     public async Task LimiteDeFilas_RecortaYAvisa()
     {

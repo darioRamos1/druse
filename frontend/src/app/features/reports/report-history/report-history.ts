@@ -1,9 +1,11 @@
-import { ChangeDetectionStrategy, Component, computed, input, output, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, input, output, signal } from '@angular/core';
 
+import { I18nService } from '../../../core/i18n/i18n.service';
 import { formatDate, formatNumber } from '../../../core/i18n/locale-format';
 import { TranslatePipe } from '../../../core/i18n/translate.pipe';
 import { ReportRun, ReportStorage } from '../../../shared/models/reports';
 import { Icon } from '../../../shared/ui/icon/icon';
+import { serverText } from '../report-messages';
 
 /** Bytes en la unidad que se lee de un vistazo, con el formato del idioma. */
 export function formatBytes(bytes: number): string {
@@ -78,8 +80,8 @@ export function formatDuration(startedAtUtc: string, completedAtUtc: string): st
                       <app-icon [name]="run.status === 'Succeeded' ? 'check' : 'alert'" [size]="10" />
                       {{ 'reports.history.status.' + run.status | t }}
                     </span>
-                    @if (run.status !== 'Succeeded' && run.message) {
-                      <span class="runs__message">{{ run.message }}</span>
+                    @if (run.status !== 'Succeeded' && reason(run); as text) {
+                      <span class="runs__message">{{ text }}</span>
                     }
                   </td>
                   <td class="is-number">{{ run.status === 'Succeeded' ? count(run.rowCount) : '—' }}</td>
@@ -278,6 +280,8 @@ export class ReportHistory {
   readonly cleared = output<void>();
   readonly closed = output<void>();
 
+  private readonly _i18n = inject(I18nService);
+
   protected readonly confirming = signal(false);
 
   protected readonly datasetBytes = computed(
@@ -292,6 +296,10 @@ export class ReportHistory {
 
   protected when(iso: string): string {
     return formatDate(iso, { dateStyle: 'medium', timeStyle: 'short' });
+  }
+
+  protected reason(run: ReportRun): string | null {
+    return serverText(this._i18n, run.localized, run.message);
   }
 
   protected count(value: number): string {

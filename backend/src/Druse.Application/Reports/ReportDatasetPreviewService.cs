@@ -35,6 +35,9 @@ public sealed record ReportSourcePreview
 
     public string? Message { get; init; }
 
+    /// <summary>El mismo motivo con su clave, cuando lo escribe Druse y no el motor.</summary>
+    public UserMessage? Localized { get; init; }
+
     public IReadOnlyList<ResultColumn> Columns { get; init; } = [];
 
     public IReadOnlyList<IReadOnlyList<object?>> SampleRows { get; init; } = [];
@@ -56,6 +59,8 @@ public sealed record ReportJoinPreview
     public bool Succeeded => Message is null;
 
     public string? Message { get; init; }
+
+    public UserMessage? Localized { get; init; }
 
     public IReadOnlyList<string> DuplicateKeys { get; init; } = [];
 
@@ -123,7 +128,8 @@ public sealed class ReportDatasetPreviewService(
         {
             return new ReportDatasetPreview(previews, new ReportJoinPreview
             {
-                Message = "La unión necesita que las dos fuentes se lean bien.",
+                Message = ReportMessages.JoinNeedsSources().Text,
+                Localized = ReportMessages.JoinNeedsSources(),
             });
         }
 
@@ -155,12 +161,12 @@ public sealed class ReportDatasetPreviewService(
         }
         catch (ReportJoinDuplicateKeysException exception)
         {
-            return new ReportJoinPreview { Message = exception.Message, DuplicateKeys = exception.SampleKeys, IsSample = isSample };
+            return new ReportJoinPreview { Message = exception.Message, Localized = exception.Localized, DuplicateKeys = exception.SampleKeys, IsSample = isSample };
         }
         catch (InvalidOperationException exception)
         {
             // Columnas que faltan, tipos distintos o que requieren conversión.
-            return new ReportJoinPreview { Message = exception.Message, IsSample = isSample };
+            return new ReportJoinPreview { Message = exception.Message, Localized = ReportMessages.From(exception), IsSample = isSample };
         }
     }
 
@@ -194,8 +200,10 @@ public sealed class ReportDatasetPreviewService(
             data = await queries.ReadAsync(
                 profile with { Database = source.Database }, credentials, ssh, source.Sql, cancellationToken);
         }
-        catch (NotSupportedException exception)
+        catch (Exception exception) when (exception is NotSupportedException or UnsupportedEngineException)
         {
+            // Una definición abierta en una edición sin el proveedor de su motor
+            // (por ejemplo, Informix en la edición sin Informix).
             return (Failed(ReportSourceFailure.EngineUnsupported, exception.Message), null);
         }
         catch (DatabaseOperationException exception)
@@ -206,7 +214,10 @@ public sealed class ReportDatasetPreviewService(
         catch (Exception exception) when (exception is InvalidOperationException or ArgumentException
             && !cancellationToken.IsCancellationRequested)
         {
-            return (Failed(ReportSourceFailure.InvalidQuery, exception.Message), null);
+            return (Failed(ReportSourceFailure.InvalidQuery, exception.Message) with
+            {
+                Localized = ReportMessages.From(exception),
+            }, null);
         }
 
         return (new ReportSourcePreview

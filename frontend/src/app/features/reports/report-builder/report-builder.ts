@@ -38,6 +38,8 @@ import { ReportDashboard } from '../report-dashboard/report-dashboard';
 import { ReportTemplateGallery, TemplateApplication } from '../report-template-gallery/report-template-gallery';
 import { instantiateTemplate } from '../report-template-model';
 import { emptyDashboard } from '../report-dashboard-model';
+import { ServerMessage } from '../../../shared/models/workspace';
+import { failureText, serverText } from '../report-messages';
 import {
   MAX_SOURCES,
   adoptExpectedColumns,
@@ -692,15 +694,12 @@ export class ReportBuilder {
     }
   }
 
-  protected failureText(code: string | null, message: string | null): string {
-    // i18n-keys: reports.failure.*
-    const key = `reports.failure.${code ?? 'unknown'}`;
-    const known = this._i18n.t(key);
+  protected failureText(code: string | null, message: string | null, localized?: ServerMessage | null): string {
+    return failureText(this._i18n, code, message, localized);
+  }
 
-    // El motor ya explica su error en su idioma; los demás códigos se traducen.
-    return code === 'database-error' || code === 'invalid-query' || known === key
-      ? (message ?? known)
-      : known;
+  protected serverText(localized: ServerMessage | null | undefined, message: string | null): string | null {
+    return serverText(this._i18n, localized, message);
   }
 
   protected schemaChangeText(change: ReportSourcePreview['schemaChanges'][number]): string {

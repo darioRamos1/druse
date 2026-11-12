@@ -198,6 +198,8 @@ public sealed class ReportScheduleTests
         Assert.Equal(1, await escenario.Despachador.RecoverAsync(CancellationToken.None));
         var intento = Assert.Single(await escenario.Intentos.GetRecentAsync(escenario.DatasetId, 5, CancellationToken.None));
         Assert.Equal(ReportRunStatus.Interrupted, intento.Status);
+        // El motivo vuelve de SQLite con su clave: la ventana lo escribe en su idioma.
+        Assert.Equal(Druse.Domain.MessageKeys.Reports.Interrupted, intento.Localized?.Key);
         Assert.Equal(ReportRunOrigin.Scheduled, intento.Origin);
 
         Assert.Equal(1, await escenario.TickAsync());

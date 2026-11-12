@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Druse.Domain;
 
 namespace Druse.Application.Reports;
 
@@ -92,18 +93,22 @@ public static class ReportDatasetValidator
     /// las columnas de unión se eligen entre las que devuelve cada fuente, y
     /// para verlas hay que haberlas leído antes.
     /// </summary>
-    public static IReadOnlyList<string> Validate(ReportDataset dataset, bool requireJoin = true)
+    public static IReadOnlyList<string> Validate(ReportDataset dataset, bool requireJoin = true) =>
+        ValidateMessages(dataset, requireJoin).Select(message => message.Text).ToArray();
+
+    /// <summary>Lo mismo con su clave, para decirlo en el idioma de la ventana.</summary>
+    public static IReadOnlyList<UserMessage> ValidateMessages(ReportDataset dataset, bool requireJoin = true)
     {
         ArgumentNullException.ThrowIfNull(dataset);
-        var errors = new List<string>();
+        var errors = new List<UserMessage>();
         if (string.IsNullOrWhiteSpace(dataset.Name))
         {
-            errors.Add("El conjunto de datos necesita un nombre.");
+            errors.Add(ReportMessages.DatasetName());
         }
 
         if (dataset.Sources is not { Count: >= 1 and <= ReportDataset.MaxSources })
         {
-            errors.Add("Un conjunto de datos usa una o dos fuentes.");
+            errors.Add(ReportMessages.SourceCount());
             return errors;
         }
 
@@ -111,34 +116,34 @@ public static class ReportDatasetValidator
         {
             if (string.IsNullOrWhiteSpace(source.Alias))
             {
-                errors.Add("Cada fuente necesita un alias.");
+                errors.Add(ReportMessages.SourceAlias());
             }
 
             if (source.ConnectionId == Guid.Empty || string.IsNullOrWhiteSpace(source.Database))
             {
-                errors.Add($"La fuente {source.Alias} necesita una conexión y una base.");
+                errors.Add(ReportMessages.SourceConnection(source.Alias));
             }
 
             if (!Enum.IsDefined(source.Mode))
             {
-                errors.Add($"La fuente {source.Alias} tiene un modo desconocido.");
+                errors.Add(ReportMessages.SourceMode(source.Alias));
             }
 
             if (string.IsNullOrWhiteSpace(source.Sql))
             {
-                errors.Add($"La fuente {source.Alias} no tiene consulta.");
+                errors.Add(ReportMessages.SourceSql(source.Alias));
             }
 
             if (source.Mode == ReportSourceMode.Visual && !IsJson(source.VisualModel))
             {
-                errors.Add($"La fuente visual {source.Alias} no conserva el estado del compositor.");
+                errors.Add(ReportMessages.SourceVisual(source.Alias));
             }
         }
 
         if (dataset.Sources.Select(source => source.Alias.Trim()).Distinct(StringComparer.OrdinalIgnoreCase).Count()
             != dataset.Sources.Count)
         {
-            errors.Add("Las fuentes deben tener alias distintos.");
+            errors.Add(ReportMessages.DistinctAliases());
         }
 
         if (dataset.Sources.Count == 2 && !requireJoin && dataset.Join is null)
@@ -150,20 +155,20 @@ public static class ReportDatasetValidator
         {
             if (dataset.Join is not { Keys.Count: > 0 } join)
             {
-                errors.Add("Con dos fuentes hay que elegir al menos una columna de unión.");
+                errors.Add(ReportMessages.JoinKeys());
             }
             else if (!Enum.IsDefined(join.Kind) || !Enum.IsDefined(join.Cardinality))
             {
-                errors.Add("El tipo de unión o la cardinalidad no son válidos.");
+                errors.Add(ReportMessages.JoinKind());
             }
             else if (join.Keys.Any(key => string.IsNullOrWhiteSpace(key.Left) || string.IsNullOrWhiteSpace(key.Right)))
             {
-                errors.Add("Cada par de la unión necesita una columna a cada lado.");
+                errors.Add(ReportMessages.JoinPair());
             }
         }
         else if (dataset.Join is not null)
         {
-            errors.Add("Una unión necesita dos fuentes.");
+            errors.Add(ReportMessages.JoinTwoSources());
         }
 
         return errors;

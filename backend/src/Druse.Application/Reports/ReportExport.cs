@@ -1,3 +1,5 @@
+using Druse.Domain;
+
 namespace Druse.Application.Reports;
 
 /// <summary>
@@ -113,34 +115,32 @@ public static class ReportExportRules
     public const int MaxPanels = 120;
 
     /// <summary>`null` si se puede escribir; si no, el motivo.</summary>
-    public static string? Validate(ReportExportDocument document)
+    public static UserMessage? Validate(ReportExportDocument document)
     {
         ArgumentNullException.ThrowIfNull(document);
 
         if (document.Panels.Count == 0)
         {
-            return "No hay paneles que exportar.";
+            return ReportMessages.ExportEmpty();
         }
 
         if (document.Panels.Count > MaxPanels)
         {
-            return $"Un libro admite hasta {MaxPanels} paneles.";
+            return ReportMessages.ExportPanels(MaxPanels);
         }
 
         if (document.Panels.Any(panel => panel.Dataset < 0 || panel.Dataset >= document.Datasets.Count))
         {
-            return "Un panel apunta a un conjunto de datos que no viene en la exportación.";
+            return ReportMessages.ExportDataset();
         }
 
         var tables = document.Panels.Select(panel => panel.Figures).Concat(document.Datasets.Select(dataset => dataset.Table));
         if (tables.Any(table => table.Rows.Any(row => row.Count != table.Columns.Count)))
         {
-            return "Una tabla de la exportación tiene filas que no cuadran con sus columnas.";
+            return ReportMessages.ExportTable();
         }
 
         var cells = tables.Sum(table => table.CellCount);
-        return cells > MaxCells
-            ? $"La exportación tiene {cells:N0} celdas y el límite de Excel en Druse es {MaxCells:N0}. Filtra el tablero o exporta un panel."
-            : null;
+        return cells > MaxCells ? ReportMessages.ExportCells(MaxCells) : null;
     }
 }

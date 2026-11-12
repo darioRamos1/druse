@@ -1,3 +1,5 @@
+using Druse.Domain;
+
 namespace Druse.Application.Reports;
 
 public enum ReportScheduleFrequency
@@ -55,22 +57,22 @@ public static class ReportScheduleCalendar
     /// <summary>
     /// Valida la regla. Devuelve el problema, o null si se puede programar.
     /// </summary>
-    public static string? Validate(ReportScheduleRule rule)
+    public static UserMessage? Validate(ReportScheduleRule rule)
     {
         ArgumentNullException.ThrowIfNull(rule);
 
         if (!Enum.IsDefined(rule.Frequency))
         {
-            return "La frecuencia es diaria o semanal.";
+            return ReportMessages.ScheduleFrequency();
         }
 
         if (rule.Frequency == ReportScheduleFrequency.Weekly
             && (rule.Days.Count == 0 || rule.Days.Any(day => !Enum.IsDefined(day))))
         {
-            return "Una programación semanal necesita al menos un día.";
+            return ReportMessages.ScheduleDays();
         }
 
-        return FindZone(rule.TimeZoneId) is null ? "No se reconoce esa zona horaria." : null;
+        return FindZone(rule.TimeZoneId) is null ? ReportMessages.ScheduleZone() : null;
     }
 
     /// <summary>

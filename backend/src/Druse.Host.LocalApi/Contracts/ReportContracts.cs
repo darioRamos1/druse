@@ -56,6 +56,9 @@ public sealed record ReportSourcePreviewDto
     public required bool Succeeded { get; init; }
     public string? FailureCode { get; init; }
     public string? Message { get; init; }
+
+    /// <summary>El motivo con su clave, cuando lo escribe Druse y no el motor.</summary>
+    public UserMessageDto? Localized { get; init; }
     public required IReadOnlyList<ResultColumn> Columns { get; init; }
     public required IReadOnlyList<IReadOnlyList<object?>> SampleRows { get; init; }
     public int RowCount { get; init; }
@@ -69,6 +72,7 @@ public sealed record ReportJoinPreviewDto
 {
     public required bool Succeeded { get; init; }
     public string? Message { get; init; }
+    public UserMessageDto? Localized { get; init; }
     public required IReadOnlyList<string> DuplicateKeys { get; init; }
     public required IReadOnlyList<ResultColumn> Columns { get; init; }
     public required IReadOnlyList<IReadOnlyList<object?>> SampleRows { get; init; }
@@ -146,6 +150,7 @@ internal static class ReportContractMapper
             Succeeded = source.Succeeded,
             FailureCode = source.FailureCode,
             Message = source.Message,
+            Localized = source.Localized.ToDto(),
             Columns = source.Columns,
             SampleRows = source.SampleRows,
             RowCount = source.RowCount,
@@ -161,6 +166,7 @@ internal static class ReportContractMapper
         {
             Succeeded = join.Succeeded,
             Message = join.Message,
+            Localized = join.Localized.ToDto(),
             DuplicateKeys = join.DuplicateKeys,
             Columns = join.Columns,
             SampleRows = join.SampleRows,

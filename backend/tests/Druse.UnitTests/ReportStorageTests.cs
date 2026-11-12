@@ -27,9 +27,9 @@ public sealed class ReportStorageTests
 
         // Con la cuota justa para lo que hay, otro conjunto ya no cabe…
         var justo = new SqliteReportSnapshotStore(paths, usado + 10);
-        var error = await Assert.ThrowsAsync<InvalidOperationException>(
+        var error = await Assert.ThrowsAsync<ReportProblemException>(
             () => justo.SaveAsync(Snapshot(otro, 1, filas: 50), CancellationToken.None));
-        Assert.Contains("MiB", error.Message, StringComparison.Ordinal);
+        Assert.Equal(MessageKeys.Reports.Quota, error.Localized.Key);
         Assert.Null(await justo.FindAsync(otro, CancellationToken.None));
 
         // …pero el mismo conjunto puede sustituir el suyo: no se cuenta dos veces.

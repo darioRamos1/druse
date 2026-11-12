@@ -2,11 +2,12 @@ import { readFileSync } from 'node:fs';
 
 import { expect, test, type Locator } from '@playwright/test';
 
-import { CONTENEDOR, abrir, conectar } from '../support/druse';
+import { CONTENEDOR, SQLSERVER, abrir, conectar, conectarSqlServer } from '../support/druse';
 import {
   METAS_SQL,
   PEDIDOS_SQL,
   VENTAS_SQL,
+  VENTAS_SQLSERVER_SQL,
   abrirGaleria,
   abrirReportes,
   abrirVisualizacion,
@@ -436,6 +437,67 @@ test.describe('Exportar tableros de Reportes BI', () => {
     await expect(reportes.locator('.freshness')).toContainText('Todavía no hay datos guardados');
     await expect(historial.locator('.runs tbody tr')).toHaveCount(1);
     await expect(historial.getByRole('button', { name: 'Borrar datos guardados' })).toHaveCount(0);
+
+    await reportes.locator('.steps__item').first().click();
+    await borrarConjunto(reportes);
+    await page.keyboard.press('Escape');
+    await expect(reportes.locator('.dialog')).toBeHidden();
+  });
+});
+
+test.describe('Reportes BI entre motores', () => {
+  /**
+   * El caso de validación del plan, de punta a punta y con dos motores: las
+   * ventas en SQL Server y las metas en PostgreSQL. La unión izquierda da tres
+   * filas, 220 en ventas y 60 % de cumplimiento con el municipio sin meta aparte.
+   * El cruce lo hace .NET: ninguno de los dos motores ve al otro.
+   */
+  test('cruza ventas de SQL Server con metas de PostgreSQL y da el 60 %', async ({ page }) => {
+    test.setTimeout(4 * 60_000);
+    await abrir(page);
+    await conectar(page);
+    await conectarSqlServer(page);
+
+    const restos = /E2E Multimotor/;
+    const reportes = await abrirReportes(page);
+
+    await borrarRestos(reportes, restos, restos);
+    await reportes.getByLabel('Nombre del conjunto de datos').fill(`E2E Multimotor ${Date.now()}`);
+    await anadirFuente(reportes, 'Ventas', VENTAS_SQLSERVER_SQL, SQLSERVER);
+    await previsualizar(reportes);
+
+    if (await reportes.locator('.diagnostic--danger', { hasText: 'contraseña guardada' }).isVisible()) {
+      test.info().annotations.push({ type: 'sin llavero', description: 'La fuente pidió la contraseña.' });
+      return;
+    }
+
+    await expect(reportes.locator('.stats')).toContainText('3 filas');
+    await anadirFuente(reportes, 'Metas', METAS_SQL);
+    await previsualizar(reportes);
+    await reportes.locator('.steps__item').nth(1).click();
+
+    // Mes y municipio se llaman igual a los dos lados y tienen el mismo tipo,
+    // aunque uno sea `date` de SQL Server y el otro `date` de PostgreSQL.
+    await expect(reportes.locator('.pair')).toHaveCount(2);
+    await previsualizar(reportes);
+    await expect(reportes.locator('.summary')).toContainText('3');
+    await expect(reportes.locator('tbody tr')).toHaveCount(3);
+    await expect(reportes.locator('.diagnostic--danger')).toHaveCount(0);
+
+    await reportes.getByRole('button', { name: 'Guardar', exact: true }).click();
+    await abrirVisualizacion(reportes);
+    await actualizar(reportes);
+    await expect(reportes.locator('.freshness')).toContainText('3 filas');
+    // Dos motores, dos lecturas: la barra dice entre qué momentos se leyeron.
+    await expect(reportes.locator('.freshness')).toContainText('fuentes leídas entre');
+
+    await reportes.getByRole('radio', { name: 'Indicador' }).click();
+    await expect(reportes.locator('.indicator__value')).toHaveText(/60\s?%/);
+    await expect(reportes.locator('.indicator')).toContainText('180 de 300');
+    await expect(reportes.locator('.indicator')).toContainText('1 fila sin meta');
+
+    await reportes.getByRole('radio', { name: 'Tabla' }).click();
+    await expect(reportes.locator('app-report-chart tbody tr')).toHaveCount(3);
 
     await reportes.locator('.steps__item').first().click();
     await borrarConjunto(reportes);

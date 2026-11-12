@@ -20,16 +20,13 @@ public sealed class ReportQueryService(ConnectionService connections, IProviderR
         ArgumentNullException.ThrowIfNull(profile);
         ArgumentException.ThrowIfNullOrWhiteSpace(sql);
 
-        if (profile.Engine is not (DatabaseEngine.SqlServer or DatabaseEngine.PostgreSql))
-        {
-            throw new NotSupportedException("La lectura tipada de BI aún no está habilitada para este motor.");
-        }
-
+        // Los motores los decide la edición: si su proveedor no está registrado,
+        // el registro lanza NotSupportedException y la fuente lo dice.
         // En SQL Server los permisos de la cuenta deben impedir las escrituras
         // que el analizador de SQL no pueda detectar.
         if (SqlSafetyAnalyzer.IsMutating(sql))
         {
-            throw new InvalidOperationException("Las fuentes de BI deben usar consultas de lectura.");
+            throw new ReportProblemException(ReportMessages.ReadOnlyQuery());
         }
 
         var executor = providers.GetQueryExecutor(profile.Engine);
@@ -45,7 +42,12 @@ public sealed class ReportQueryService(ConnectionService connections, IProviderR
                 TimeoutSeconds = 60,
             };
             await using var reader = await executor.OpenReaderAsync(session, request, cancellationToken);
-            return await ((ITypedQueryResultReader)reader).ReadTypedAsync(request.MaxRows, cancellationToken);
+            if (reader is not ITypedQueryResultReader typed)
+            {
+                throw new NotSupportedException("La lectura tipada de BI no está disponible para este motor.");
+            }
+
+            return await typed.ReadTypedAsync(request.MaxRows, cancellationToken);
         }
         finally
         {

@@ -1,3 +1,5 @@
+import { ServerMessage } from './workspace';
+
 /**
  * Conjuntos de datos de Reportes BI, tal como los publica la API local.
  *
@@ -79,6 +81,8 @@ export interface ReportSourcePreview {
   readonly succeeded: boolean;
   readonly failureCode: ReportSourceFailureCode | null;
   readonly message: string | null;
+  /** El motivo con su clave, cuando lo escribe Druse y no el motor. */
+  readonly localized?: ServerMessage | null;
   readonly columns: readonly ReportColumn[];
   readonly sampleRows: readonly (readonly ReportValue[])[];
   readonly rowCount: number;
@@ -91,6 +95,7 @@ export interface ReportSourcePreview {
 export interface ReportJoinPreview {
   readonly succeeded: boolean;
   readonly message: string | null;
+  readonly localized?: ServerMessage | null;
   readonly duplicateKeys: readonly string[];
   readonly columns: readonly ReportColumn[];
   readonly sampleRows: readonly (readonly ReportValue[])[];
@@ -121,6 +126,7 @@ export interface ReportRunSource {
   readonly alias: string;
   readonly failureCode: ReportSourceFailureCode | null;
   readonly message: string | null;
+  readonly localized?: ServerMessage | null;
   readonly rowCount: number;
   readonly truncated: boolean;
   readonly startedAtUtc: string;
@@ -135,6 +141,8 @@ export interface ReportRun {
   readonly startedAtUtc: string;
   readonly completedAtUtc: string;
   readonly message: string | null;
+  /** El motivo con su clave; los intentos de antes del hito 6 no la traen. */
+  readonly localized?: ServerMessage | null;
   readonly duplicateKeys: readonly string[];
   readonly rowCount: number;
   readonly sources: readonly ReportRunSource[];

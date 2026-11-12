@@ -112,9 +112,9 @@ public sealed class ReportJoinTests
             Columns = [Column<DateOnly>("mes", 0), Column<int>("municipio", 1), Column<decimal>("valor", 2)],
         };
 
-        Assert.Contains("truncada", Assert.Throws<InvalidOperationException>(() => ReportJoin.Combine(
+        Assert.Contains("truncada", Assert.Throws<ReportProblemException>(() => ReportJoin.Combine(
             source, truncated, Keys, ReportJoinKind.Left, CancellationToken.None)).Message, StringComparison.Ordinal);
-        Assert.Contains("tipos distintos", Assert.Throws<InvalidOperationException>(() => ReportJoin.Combine(
+        Assert.Contains("tipos distintos", Assert.Throws<ReportProblemException>(() => ReportJoin.Combine(
             source, incompatible, Keys, ReportJoinKind.Left, CancellationToken.None)).Message, StringComparison.Ordinal);
     }
 

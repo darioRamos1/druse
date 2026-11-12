@@ -22,7 +22,7 @@ public sealed class ReportTemplateTests
         var problem = ReportTemplateRules.Validate("Plantilla", null, model);
 
         Assert.NotNull(problem);
-        Assert.Contains($"«{property}»", problem, StringComparison.Ordinal);
+        Assert.Contains($"«{property}»", problem.Text, StringComparison.Ordinal);
     }
 
     [Theory]
@@ -40,7 +40,7 @@ public sealed class ReportTemplateTests
     {
         var model = $$"""{"description":"{{new string('a', ReportTemplateRules.MaxModelBytes)}}"}""";
 
-        Assert.Contains("512 KiB", ReportTemplateRules.Validate("Plantilla", null, model), StringComparison.Ordinal);
+        Assert.Contains("512 KiB", ReportTemplateRules.Validate("Plantilla", null, model)?.Text, StringComparison.Ordinal);
     }
 
     [Fact]

@@ -97,13 +97,13 @@
         <p>
           <!-- i18n-keys: reports.data.failed*, reports.data.scheduledFailed* -->
           {{ failureKey(run) | t: { date: when(run.startedAtUtc) } }}
-          {{ run.message }}
+          {{ serverText(run.localized, run.message) }}
         </p>
         @if (run.sources.length > 0) {
           <ul>
             @for (source of run.sources; track source.alias) {
               @if (source.failureCode) {
-                <li>{{ source.alias }}: {{ failureText(source.failureCode, source.message) }}</li>
+                <li>{{ source.alias }}: {{ failureText(source.failureCode, source.message, source.localized) }}</li>
               }
             }
           </ul>

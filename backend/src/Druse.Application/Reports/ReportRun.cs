@@ -1,3 +1,5 @@
+using Druse.Domain;
+
 namespace Druse.Application.Reports;
 
 public enum ReportRunOrigin
@@ -24,7 +26,11 @@ public sealed record ReportRunSource(
     int RowCount,
     bool Truncated,
     DateTimeOffset StartedAtUtc,
-    DateTimeOffset CompletedAtUtc);
+    DateTimeOffset CompletedAtUtc)
+{
+    /// <summary>El motivo con su clave, cuando lo escribe Druse y no el motor.</summary>
+    public UserMessage? Localized { get; init; }
+}
 
 /// <summary>
 /// Un intento de actualizar un conjunto de datos.
@@ -51,6 +57,12 @@ public sealed record ReportRun
 
     /// <summary>Por qué falló, si falló.</summary>
     public string? Message { get; init; }
+
+    /// <summary>
+    /// El mismo motivo con su clave. Los intentos anteriores al hito 6 no la
+    /// tienen y se enseñan con su texto.
+    /// </summary>
+    public UserMessage? Localized { get; init; }
 
     /// <summary>Claves repetidas que detuvieron la unión, para buscarlas en el origen.</summary>
     public IReadOnlyList<string> DuplicateKeys { get; init; } = [];

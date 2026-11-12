@@ -11,7 +11,11 @@ public sealed record ReportRunSourceDto(
     int RowCount,
     bool Truncated,
     DateTimeOffset StartedAtUtc,
-    DateTimeOffset CompletedAtUtc);
+    DateTimeOffset CompletedAtUtc)
+{
+    /// <summary>El motivo con su clave, cuando lo escribe Druse y no el motor.</summary>
+    public UserMessageDto? Localized { get; init; }
+}
 
 public sealed record ReportRunDto
 {
@@ -26,6 +30,9 @@ public sealed record ReportRunDto
     public required DateTimeOffset StartedAtUtc { get; init; }
     public required DateTimeOffset CompletedAtUtc { get; init; }
     public string? Message { get; init; }
+
+    /// <summary>El motivo con su clave; los intentos viejos no la traen.</summary>
+    public UserMessageDto? Localized { get; init; }
     public required IReadOnlyList<string> DuplicateKeys { get; init; }
     public int RowCount { get; init; }
     public required IReadOnlyList<ReportRunSourceDto> Sources { get; init; }
@@ -303,18 +310,18 @@ internal static class ReportRunContractMapper
     };
 
     /// <summary>La regla pedida, o el motivo por el que no se puede programar.</summary>
-    public static (ReportScheduleRule? Rule, string? Problem) ToRule(this ReportScheduleDto dto)
+    public static (ReportScheduleRule? Rule, UserMessage? Problem) ToRule(this ReportScheduleDto dto)
     {
         if (int.TryParse(dto.Frequency, out _)
             || !Enum.TryParse<ReportScheduleFrequency>(dto.Frequency, ignoreCase: true, out var frequency)
             || !Enum.IsDefined(frequency))
         {
-            return (null, "La frecuencia es diaria o semanal.");
+            return (null, ReportMessages.ScheduleFrequency());
         }
 
         if (!TimeOnly.TryParseExact(dto.Time, "HH:mm", CultureInfo.InvariantCulture, DateTimeStyles.None, out var time))
         {
-            return (null, "La hora va en formato HH:mm.");
+            return (null, ReportMessages.ScheduleTime());
         }
 
         var days = new List<DayOfWeek>();
@@ -322,7 +329,7 @@ internal static class ReportRunContractMapper
         {
             if (int.TryParse(name, out _) || !Enum.TryParse<DayOfWeek>(name, ignoreCase: true, out var day))
             {
-                return (null, $"«{name}» no es un día de la semana.");
+                return (null, ReportMessages.ScheduleDay(name));
             }
 
             if (!days.Contains(day))
@@ -345,11 +352,15 @@ internal static class ReportRunContractMapper
         StartedAtUtc = run.StartedAtUtc,
         CompletedAtUtc = run.CompletedAtUtc,
         Message = run.Message,
+        Localized = run.Localized.ToDto(),
         DuplicateKeys = run.DuplicateKeys,
         RowCount = run.RowCount,
         Sources = run.Sources
             .Select(source => new ReportRunSourceDto(source.Alias, source.FailureCode, source.Message,
-                source.RowCount, source.Truncated, source.StartedAtUtc, source.CompletedAtUtc))
+                source.RowCount, source.Truncated, source.StartedAtUtc, source.CompletedAtUtc)
+            {
+                Localized = source.Localized.ToDto(),
+            })
             .ToArray(),
     };
 

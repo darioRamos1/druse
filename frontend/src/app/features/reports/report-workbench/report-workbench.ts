@@ -32,6 +32,8 @@ import { ReportScheduleForm } from '../report-schedule/report-schedule';
 import { ReportTemplateGallery, TemplateApplication } from '../report-template-gallery/report-template-gallery';
 import { ReportTemplateSave, TemplateSaveRequest } from '../report-template-save/report-template-save';
 import { captureTemplate, instantiateTemplate } from '../report-template-model';
+import { ServerMessage } from '../../../shared/models/workspace';
+import { failureText, serverText } from '../report-messages';
 import {
   AGGREGATES,
   MAX_CATEGORY_COLORS,
@@ -483,12 +485,12 @@ export class ReportWorkbench {
     return formatDate(iso, { dateStyle: 'medium', timeStyle: 'short' });
   }
 
-  protected failureText(code: string | null, message: string | null): string {
-    // i18n-keys: reports.failure.*
-    const key = `reports.failure.${code ?? 'unknown'}`;
-    const known = this._i18n.t(key);
+  protected failureText(code: string | null, message: string | null, localized?: ServerMessage | null): string {
+    return failureText(this._i18n, code, message, localized);
+  }
 
-    return code === 'database-error' || code === 'invalid-query' || known === key ? (message ?? known) : known;
+  protected serverText(localized: ServerMessage | null | undefined, message: string | null): string | null {
+    return serverText(this._i18n, localized, message);
   }
 
   // --- Reportes ------------------------------------------------------------------

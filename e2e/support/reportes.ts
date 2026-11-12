@@ -9,6 +9,10 @@ import { CONTENEDOR } from './druse';
 export const VENTAS_SQL = `SELECT DATE '2026-01-01' AS mes, municipio, importe::numeric(10,2) AS venta
 FROM (VALUES ('05001', 80), ('08001', 100), ('11001', 40)) AS ventas(municipio, importe)`;
 
+/** Las mismas ventas, escritas para SQL Server: la otra mitad del cruce entre motores. */
+export const VENTAS_SQLSERVER_SQL = `SELECT CAST('2026-01-01' AS date) AS mes, municipio, CAST(importe AS decimal(10,2)) AS venta
+FROM (VALUES ('05001', 80), ('08001', 100), ('11001', 40)) AS ventas(municipio, importe)`;
+
 export const METAS_SQL = `SELECT DATE '2026-01-01' AS mes, municipio, importe::numeric(10,2) AS meta
 FROM (VALUES ('05001', 100), ('08001', 200)) AS metas(municipio, importe)`;
 
@@ -27,13 +31,18 @@ export async function abrirReportes(page: Page): Promise<Locator> {
  * La base se escribe y se sale del campo con Tab: el constructor la toma en
  * `change`, que es lo que hace también quien elige de la lista.
  */
-export async function anadirFuente(reportes: Locator, alias: string, sql: string): Promise<void> {
+export async function anadirFuente(
+  reportes: Locator,
+  alias: string,
+  sql: string,
+  servidor: { nombre: string; base: string } = CONTENEDOR,
+): Promise<void> {
   await reportes.getByRole('button', { name: 'Añadir fuente' }).first().click();
 
   const inspector = reportes.locator('.inspector');
   const conexion = inspector.locator('select').first();
   const valor = await conexion
-    .locator('option', { hasText: CONTENEDOR.nombre })
+    .locator('option', { hasText: servidor.nombre })
     .first()
     .getAttribute('value');
 
@@ -42,7 +51,7 @@ export async function anadirFuente(reportes: Locator, alias: string, sql: string
 
   const base = inspector.getByLabel('Base de datos');
 
-  await base.fill(CONTENEDOR.base);
+  await base.fill(servidor.base);
   await base.press('Tab');
   await inspector.getByLabel('Consulta').fill(sql);
 }

@@ -1,5 +1,6 @@
 using Druse.Application.Abstractions;
 using Druse.Application.Reports;
+using Druse.Domain;
 using Druse.Host.LocalApi.Contracts;
 
 namespace Druse.Host.LocalApi.Endpoints;
@@ -39,10 +40,10 @@ internal static class ReportEndpoints
             CancellationToken cancellationToken) =>
         {
             var dataset = request.ToDomain(id);
-            var errors = ReportDatasetValidator.Validate(dataset);
+            var errors = ReportDatasetValidator.ValidateMessages(dataset);
             if (errors.Count > 0)
             {
-                return Results.BadRequest(new { message = string.Join(" ", errors), errors });
+                return Problem(errors);
             }
 
             return Results.Ok((await datasets.SaveAsync(dataset, cancellationToken)).ToDto());
@@ -72,7 +73,8 @@ internal static class ReportEndpoints
                 ReportRefreshOutcome.NotFound => Results.NotFound(),
                 ReportRefreshOutcome.Busy => Results.Conflict(new
                 {
-                    message = "Este conjunto de datos ya se está actualizando.",
+                    message = ReportMessages.Busy().Text,
+                    messages = new[] { ReportMessages.Busy().ToDto() },
                     reason = "busy",
                 }),
                 _ => Results.Ok(new ReportRefreshDto(result.Outcome.ToString(), result.Run?.ToDto())),
@@ -103,7 +105,7 @@ internal static class ReportEndpoints
             var (rule, problem) = request.ToRule();
             if (rule is null)
             {
-                return Results.BadRequest(new { message = problem });
+                return Problem([problem!]);
             }
 
             if (await datasets.FindAsync(id, cancellationToken) is null)
@@ -206,7 +208,7 @@ internal static class ReportEndpoints
             var name = request.Name?.Trim() ?? string.Empty;
             if (name.Length == 0 || !IsJson(request.Model))
             {
-                return Results.BadRequest(new { message = "Un tablero necesita nombre y diseño." });
+                return Problem([ReportMessages.DashboardInvalid()]);
             }
 
             var saved = await dashboards.SaveAsync(
@@ -232,7 +234,7 @@ internal static class ReportEndpoints
             var document = request.ToDomain();
             if (ReportExportRules.Validate(document) is { } problem)
             {
-                return Results.BadRequest(new { message = problem });
+                return Problem([problem]);
             }
 
             return Results.File(
@@ -257,12 +259,12 @@ internal static class ReportEndpoints
                 || !Enum.TryParse<ReportTemplateScope>(request.Scope, ignoreCase: true, out var scope)
                 || !Enum.IsDefined(scope))
             {
-                return Results.BadRequest(new { message = "Una plantilla es de un reporte, un panel o un tablero." });
+                return Problem([ReportMessages.TemplateScope()]);
             }
 
             if (ReportTemplateRules.Validate(request.Name, request.Description, request.Model) is { } problem)
             {
-                return Results.BadRequest(new { message = problem });
+                return Problem([problem]);
             }
 
             var saved = await templates.SaveAsync(new ReportTemplate
@@ -301,12 +303,16 @@ internal static class ReportEndpoints
                 || !Enum.IsDefined(visual)
                 || !IsJson(request.Settings))
             {
-                return Results.BadRequest(new { message = "Un reporte necesita nombre, tipo de visualización y ajustes." });
+                return Problem([ReportMessages.ReportInvalid()]);
             }
 
             if (await datasets.FindAsync(request.DatasetId, cancellationToken) is null)
             {
-                return Results.NotFound(new { message = "El conjunto de datos de este reporte ya no existe." });
+                return Results.NotFound(new
+                {
+                    message = ReportMessages.ReportDatasetMissing().Text,
+                    messages = new[] { ReportMessages.ReportDatasetMissing().ToDto() },
+                });
             }
 
             var saved = await reports.SaveAsync(new SavedReport
@@ -346,16 +352,27 @@ internal static class ReportEndpoints
             CancellationToken cancellationToken) =>
         {
             var dataset = request.ToDomain(request.Id == Guid.Empty ? Guid.NewGuid() : request.Id);
-            var errors = ReportDatasetValidator.Validate(dataset with { Name = "vista previa" }, requireJoin: false);
+            var errors = ReportDatasetValidator.ValidateMessages(dataset with { Name = "vista previa" }, requireJoin: false);
             if (errors.Count > 0)
             {
-                return Results.BadRequest(new { message = string.Join(" ", errors), errors });
+                return Problem(errors);
             }
 
             return Results.Ok((await previews.PreviewAsync(dataset, cancellationToken)).ToDto());
         })
         .WithName("PreviewReportDataset");
     }
+
+    /// <summary>
+    /// Un rechazo con sus motivos: `messages` con clave para la ventana,
+    /// `message` y `errors` en español para quien llame a la API sin catálogo.
+    /// </summary>
+    private static IResult Problem(IReadOnlyList<UserMessage> problems) => Results.BadRequest(new
+    {
+        message = string.Join(" ", problems.Select(problem => problem.Text)),
+        errors = problems.Select(problem => problem.Text).ToArray(),
+        messages = problems.Select(problem => problem.ToDto()).ToArray(),
+    });
 
     private static bool IsJson(string? text)
     {

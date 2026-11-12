@@ -1,5 +1,6 @@
 using System.Text;
 using System.Text.Json;
+using Druse.Domain;
 
 namespace Druse.Application.Reports;
 
@@ -70,22 +71,22 @@ public static class ReportTemplateRules
     };
 
     /// <summary>`null` si se puede guardar; si no, el motivo para quien la envía.</summary>
-    public static string? Validate(string? name, string? description, string? model)
+    public static UserMessage? Validate(string? name, string? description, string? model)
     {
         var trimmed = name?.Trim() ?? string.Empty;
         if (trimmed.Length == 0 || trimmed.Length > MaxNameLength)
         {
-            return "Una plantilla necesita un nombre de hasta 120 caracteres.";
+            return ReportMessages.TemplateName();
         }
 
         if (description is { Length: > MaxDescriptionLength })
         {
-            return "La descripción de una plantilla admite hasta 400 caracteres.";
+            return ReportMessages.TemplateDescription();
         }
 
         if (string.IsNullOrWhiteSpace(model) || Encoding.UTF8.GetByteCount(model) > MaxModelBytes)
         {
-            return "El diseño de la plantilla falta o supera 512 KiB.";
+            return ReportMessages.TemplateSize();
         }
 
         try
@@ -93,16 +94,16 @@ public static class ReportTemplateRules
             using var document = JsonDocument.Parse(model);
             if (document.RootElement.ValueKind != JsonValueKind.Object)
             {
-                return "El diseño de la plantilla no es válido.";
+                return ReportMessages.TemplateInvalid();
             }
 
             return FindForbidden(document.RootElement) is { } property
-                ? $"Una plantilla no puede llevar «{property}»: solo guarda el diseño, sin SQL, conexiones ni filas."
+                ? ReportMessages.TemplateForbidden(property)
                 : null;
         }
         catch (JsonException)
         {
-            return "El diseño de la plantilla no es válido.";
+            return ReportMessages.TemplateInvalid();
         }
     }
 

@@ -87,9 +87,7 @@ public sealed class SqliteReportSnapshotStore(IAppPaths paths, long quotaBytes) 
             var others = (long)(await usage.ExecuteScalarAsync(cancellationToken) ?? 0L);
             if (others + payload.Length > quotaBytes)
             {
-                throw new InvalidOperationException(
-                    $"Los resultados guardados de Reportes superarían los {quotaBytes / (1024 * 1024)} MiB. " +
-                    "Borra los datos guardados de algún conjunto que ya no uses.");
+                throw new ReportProblemException(ReportMessages.Quota(quotaBytes / (1024 * 1024)));
             }
         }
 
@@ -305,7 +303,7 @@ public sealed class SqliteReportSnapshotStore(IAppPaths paths, long quotaBytes) 
         {
             if (count > MaxPayloadBytes - Position)
             {
-                throw new InvalidOperationException("El resultado BI supera los 32 MiB. Reduce las filas o columnas de la consulta.");
+                throw new ReportProblemException(ReportMessages.TooLarge());
             }
 
             base.Write(buffer, offset, count);

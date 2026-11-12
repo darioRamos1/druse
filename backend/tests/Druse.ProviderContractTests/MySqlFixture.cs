@@ -85,7 +85,10 @@ public sealed class MySqlFixture : IProviderFixture
     /// MySQL 8 admite CTE recursivas, pero `cte_max_recursion_depth` vale 1000 por
     /// omisión: pedir muchas más filas que eso aquí abortaría la consulta.
     /// </summary>
+    // La recursión de MySQL se corta en 1.000 vueltas de serie: medir la
+    // lectura de una fuente de BI necesita llegar a 20.000.
     public string GenerateRows(int count) => $"""
+        SET SESSION cte_max_recursion_depth = {Math.Max(count + 1, 1000)};
         WITH RECURSIVE numeros AS (
             SELECT 1 AS n
             UNION ALL

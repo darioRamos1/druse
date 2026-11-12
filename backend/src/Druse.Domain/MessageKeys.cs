@@ -119,4 +119,59 @@ public static class MessageKeys
         public const string ForwardTimeout = "server.tunnel.forwardTimeout";
         public const string ForwardRefused = "server.tunnel.forwardRefused";
     }
+
+    /// <summary>Reportes BI: actualizar, unir, programar, plantillas y exportar.</summary>
+    public static class Reports
+    {
+        public const string Canceled = "server.reports.canceled";
+        public const string SourceUnreadable = "server.reports.sourceUnreadable";
+        public const string SourceTruncated = "server.reports.sourceTruncated";
+        public const string NewerResult = "server.reports.newerResult";
+        public const string Interrupted = "server.reports.interrupted";
+        public const string Busy = "server.reports.busy";
+        public const string Quota = "server.reports.quota";
+        public const string TooLarge = "server.reports.tooLarge";
+        public const string ReadOnlyQuery = "server.reports.readOnlyQuery";
+        public const string NoResultSet = "server.reports.noResultSet";
+        public const string SingleResultSet = "server.reports.singleResultSet";
+        public const string JoinNeedsSources = "server.reports.joinNeedsSources";
+        public const string JoinTruncated = "server.reports.joinTruncated";
+        public const string JoinNoKeys = "server.reports.joinNoKeys";
+        public const string JoinTypesDiffer = "server.reports.joinTypesDiffer";
+        public const string JoinNeedsConversion = "server.reports.joinNeedsConversion";
+        public const string JoinColumnMissing = "server.reports.joinColumnMissing";
+        public const string JoinRightDuplicates = "server.reports.joinRightDuplicates";
+        public const string JoinLeftDuplicates = "server.reports.joinLeftDuplicates";
+        public const string DatasetName = "server.reports.datasetName";
+        public const string SourceCount = "server.reports.sourceCount";
+        public const string SourceAlias = "server.reports.sourceAlias";
+        public const string SourceConnection = "server.reports.sourceConnection";
+        public const string SourceMode = "server.reports.sourceMode";
+        public const string SourceSql = "server.reports.sourceSql";
+        public const string SourceVisual = "server.reports.sourceVisual";
+        public const string DistinctAliases = "server.reports.distinctAliases";
+        public const string JoinKeys = "server.reports.joinKeys";
+        public const string JoinKind = "server.reports.joinKind";
+        public const string JoinPair = "server.reports.joinPair";
+        public const string JoinTwoSources = "server.reports.joinTwoSources";
+        public const string ScheduleFrequency = "server.reports.scheduleFrequency";
+        public const string ScheduleTime = "server.reports.scheduleTime";
+        public const string ScheduleDay = "server.reports.scheduleDay";
+        public const string ScheduleDays = "server.reports.scheduleDays";
+        public const string ScheduleZone = "server.reports.scheduleZone";
+        public const string ReportInvalid = "server.reports.reportInvalid";
+        public const string ReportDatasetMissing = "server.reports.reportDatasetMissing";
+        public const string DashboardInvalid = "server.reports.dashboardInvalid";
+        public const string TemplateScope = "server.reports.templateScope";
+        public const string TemplateName = "server.reports.templateName";
+        public const string TemplateDescription = "server.reports.templateDescription";
+        public const string TemplateSize = "server.reports.templateSize";
+        public const string TemplateInvalid = "server.reports.templateInvalid";
+        public const string TemplateForbidden = "server.reports.templateForbidden";
+        public const string ExportEmpty = "server.reports.exportEmpty";
+        public const string ExportPanels = "server.reports.exportPanels";
+        public const string ExportDataset = "server.reports.exportDataset";
+        public const string ExportTable = "server.reports.exportTable";
+        public const string ExportCells = "server.reports.exportCells";
+    }
 }

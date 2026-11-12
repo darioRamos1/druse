@@ -27,6 +27,40 @@ Las pruebas de contrato se saltan solas cuando falta el servidor, y con `DRUSE_R
 - **MariaDB se anuncia y no se prueba.** El proveedor no distingue MariaDB de MySQL, y por eso el contrato debería valer igual; «debería» no es una ejecución.
 - **Las versiones antiguas de cada rango no tienen evidencia.** PostgreSQL 12, SQL Server 2016, MySQL 8.0, Oracle 12c e Informix 12.10 no se han probado en este repositorio.
 
+## Reportes BI por motor y edición
+
+Reportes BI lee cada fuente con su propio proveedor, en una sesión de solo lectura, y cruza los datos en Druse. Un motor se declara compatible cuando pasa, contra un servidor real, las pruebas de contrato de la lectura tipada (`LecturaTipada_*` en `DatabaseProviderContractTests`):
+
+- números, decimales y fechas que llegan con su tipo, y nulos que llegan como nulos;
+- el tope de filas de una fuente (20.000) que se detecta y se dice;
+- la cancelación, que corta la lectura;
+- cada valor con un tipo que el resultado guardado sabe conservar.
+
+Comprobado el 12 de noviembre de 2026, versión 1.20.0:
+
+| Motor | Lectura tipada | Lectura de 20.000 filas | Completa | Sin Informix | Comunidad |
+| --- | --- | ---: | :---: | :---: | :---: |
+| PostgreSQL | Comprobada | 26 ms | Sí | Sí | Sí |
+| SQL Server | Comprobada | 176 ms | Sí | Sí | Sí |
+| MySQL | Comprobada (`mysql:8.4`) | 47 ms | Sí | Sí | Sí |
+| Oracle | Comprobada (Oracle Database Free) | 86 ms | Sí | Sí | No |
+| SQLite | Comprobada | 35 ms | Sí | Sí | Sí |
+| Informix | Implementada; **la comprueba la integración continua**, que es donde se levanta su contenedor | — | Sí | No | No |
+| MariaDB | Sin prueba propia, como en el resto de Druse | — | Sí | Sí | Sí |
+
+Los tiempos son de una sola ejecución en Windows, con el servidor en un contenedor local y una columna entera; sirven para comparar motores, no como garantía. Se reproducen con `DRUSE_MEDIR=<archivo>` y `dotnet test backend/tests/Druse.ProviderContractTests --filter LecturaTipada`.
+
+El cruce de SQL Server con PostgreSQL se prueba además de punta a punta (`e2e/tests/reportes.spec.ts`, «cruza ventas de SQL Server con metas de PostgreSQL»): tres filas, 220 en ventas y 60 % de cumplimiento con el municipio sin meta aparte.
+
+Lo que cada motor entrega se normaliza al leer:
+
+- Una fecha `DATE` de SQL Server o MySQL se guarda como fecha sin hora. El `DATE` de Oracle lleva hora y solo pasa a fecha si todas las filas caen a medianoche.
+- Los enteros sin signo de MySQL suben al tipo con signo que los contiene; `BIGINT UNSIGNED` pasa a decimal.
+- En SQLite cada valor tiene su tipo, no la columna. Una columna que mezcla enteros y reales se lee como real, y una que mezcla números y texto, como texto. Una columna declarada `DATE` con fechas ISO se lee como fecha.
+- Un `NUMBER` de Oracle de más de 28 cifras se lee como texto antes que perder precisión.
+
+Si un conjunto se abre en una edición que no tiene el proveedor de alguna de sus fuentes, esa fuente lo dice y el resultado guardado sigue a la vista.
+
 ## Cómo reproducirlo
 
 ```powershell

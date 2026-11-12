@@ -55,7 +55,7 @@ public sealed class ReportSnapshotStoreTests
             0,
             0);
         var later = new ReportSnapshot(dataset.DatasetId, 1, Window(Inicio.AddMinutes(1)), oversized);
-        var error = await Assert.ThrowsAsync<InvalidOperationException>(() => store.SaveAsync(later, CancellationToken.None));
+        var error = await Assert.ThrowsAsync<ReportProblemException>(() => store.SaveAsync(later, CancellationToken.None));
         Assert.Contains("32 MiB", error.Message, StringComparison.Ordinal);
 
         var remaining = await store.FindAsync(dataset.DatasetId, CancellationToken.None);
@@ -76,7 +76,7 @@ public sealed class ReportSnapshotStoreTests
         Assert.True(await service.CombineAndSaveAsync(dataset, Window(Inicio), source, source, CancellationToken.None));
 
         var later = Window(Inicio.AddMinutes(1));
-        await Assert.ThrowsAsync<InvalidOperationException>(() => service.CombineAndSaveAsync(
+        await Assert.ThrowsAsync<ReportProblemException>(() => service.CombineAndSaveAsync(
             dataset, later, source, source with { Truncated = true }, CancellationToken.None));
 
         var duplicate = Data([[Mes, "05001", 100m], [Mes, "05001", 101m]]);

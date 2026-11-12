@@ -1,3 +1,4 @@
+using Druse.Domain;
 using ClosedXML.Excel;
 using DocumentFormat.OpenXml;
 using DocumentFormat.OpenXml.Packaging;
@@ -47,7 +48,7 @@ public sealed class ReportWorkbookWriter : IReportWorkbookWriter
 
         if (ReportExportRules.Validate(document) is { } problem)
         {
-            throw new InvalidOperationException(problem);
+            throw new ReportProblemException(problem);
         }
 
         var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);

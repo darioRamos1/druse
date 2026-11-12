@@ -295,7 +295,7 @@
               @if (!read.succeeded) {
                 <div class="diagnostic diagnostic--danger" role="alert">
                   <app-icon name="alert" [size]="13" />
-                  <p>{{ failureText(read.failureCode, read.message) }}</p>
+                  <p>{{ failureText(read.failureCode, read.message, read.localized) }}</p>
                 </div>
               } @else {
                 <p class="stats">
@@ -334,7 +334,7 @@
                 <div class="diagnostic diagnostic--danger" role="alert">
                   <app-icon name="alert" [size]="13" />
                   <div>
-                    <p>{{ joined.message }}</p>
+                    <p>{{ serverText(joined.localized, joined.message) }}</p>
                     @if (joined.duplicateKeys.length > 0) {
                       <p>{{ 'reports.join.duplicates' | t }}</p>
                       <ul class="keys">

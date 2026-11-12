@@ -1,4 +1,5 @@
 using Druse.Application.Abstractions;
+using Druse.Domain;
 
 namespace Druse.Application.Reports;
 
@@ -69,7 +70,8 @@ public sealed class ReportScheduleDispatcher(
                 Status = ReportRunStatus.Interrupted,
                 StartedAtUtc = slot,
                 CompletedAtUtc = now,
-                Message = "Druse se cerró mientras se actualizaba. Se conservan los datos anteriores.",
+                Message = ReportMessages.Interrupted().Text,
+                Localized = ReportMessages.Interrupted(),
             }, cancellationToken);
             recovered++;
         }

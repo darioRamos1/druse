@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using Druse.Application.Abstractions;
 using Druse.Database.Abstractions;
+using Druse.Domain;
 
 namespace Druse.Application.Reports;
 
@@ -76,7 +77,8 @@ public sealed class ReportRefreshService(
             await runs.AddAsync(Run(dataset, origin, started) with
             {
                 Status = ReportRunStatus.Canceled,
-                Message = "Se canceló la actualización.",
+                Message = ReportMessages.Canceled().Text,
+                Localized = ReportMessages.Canceled(),
             }, CancellationToken.None);
             throw;
         }
@@ -90,10 +92,15 @@ public sealed class ReportRefreshService(
         ReportDataset dataset, ReportRunOrigin origin, DateTimeOffset started, CancellationToken cancellationToken)
     {
         var failed = Run(dataset, origin, started) with { Status = ReportRunStatus.Failed };
-        var errors = ReportDatasetValidator.Validate(dataset);
+        var errors = ReportDatasetValidator.ValidateMessages(dataset);
         if (errors.Count > 0)
         {
-            return failed with { Message = string.Join(" ", errors), CompletedAtUtc = clock.GetUtcNow() };
+            return failed with
+            {
+                Message = string.Join(" ", errors.Select(error => error.Text)),
+                Localized = errors[0],
+                CompletedAtUtc = clock.GetUtcNow(),
+            };
         }
 
         var reads = new List<(ReportSourcePreview Preview, TypedQueryResult? Data)>();
@@ -104,14 +111,18 @@ public sealed class ReportRefreshService(
 
         var sources = reads.Select(read => new ReportRunSource(
             read.Preview.Alias, read.Preview.FailureCode, read.Preview.Message, read.Preview.RowCount,
-            read.Preview.Truncated, read.Preview.StartedAtUtc, read.Preview.CompletedAtUtc)).ToArray();
+            read.Preview.Truncated, read.Preview.StartedAtUtc, read.Preview.CompletedAtUtc)
+        {
+            Localized = read.Preview.Localized,
+        }).ToArray();
         failed = failed with { Sources = sources };
 
         if (reads.Any(read => read.Data is null))
         {
             return failed with
             {
-                Message = "No se pudo leer alguna fuente. Se conserva el resultado anterior.",
+                Message = ReportMessages.SourceUnreadable().Text,
+                Localized = ReportMessages.SourceUnreadable(),
                 CompletedAtUtc = clock.GetUtcNow(),
             };
         }
@@ -120,7 +131,8 @@ public sealed class ReportRefreshService(
         {
             return failed with
             {
-                Message = "Alguna fuente supera el límite de filas o de tamaño. Agrupa o filtra su consulta.",
+                Message = ReportMessages.SourceTruncated().Text,
+                Localized = ReportMessages.SourceTruncated(),
                 CompletedAtUtc = clock.GetUtcNow(),
             };
         }
@@ -138,13 +150,19 @@ public sealed class ReportRefreshService(
             return failed with
             {
                 Message = exception.Message,
+                Localized = exception.Localized,
                 DuplicateKeys = exception.SampleKeys,
                 CompletedAtUtc = clock.GetUtcNow(),
             };
         }
         catch (InvalidOperationException exception) when (!cancellationToken.IsCancellationRequested)
         {
-            return failed with { Message = exception.Message, CompletedAtUtc = clock.GetUtcNow() };
+            return failed with
+            {
+                Message = exception.Message,
+                Localized = ReportMessages.From(exception),
+                CompletedAtUtc = clock.GetUtcNow(),
+            };
         }
 
         // La ventana va de la primera lectura a la última: dos motores
@@ -159,7 +177,8 @@ public sealed class ReportRefreshService(
             {
                 return failed with
                 {
-                    Message = "Ya hay un resultado más reciente; este intento no lo sustituye.",
+                    Message = ReportMessages.NewerResult().Text,
+                    Localized = ReportMessages.NewerResult(),
                     CompletedAtUtc = clock.GetUtcNow(),
                 };
             }
@@ -167,7 +186,12 @@ public sealed class ReportRefreshService(
         catch (InvalidOperationException exception) when (!cancellationToken.IsCancellationRequested)
         {
             // Más de 32 MiB o un tipo que todavía no se sabe guardar.
-            return failed with { Message = exception.Message, CompletedAtUtc = clock.GetUtcNow() };
+            return failed with
+            {
+                Message = exception.Message,
+                Localized = ReportMessages.From(exception),
+                CompletedAtUtc = clock.GetUtcNow(),
+            };
         }
 
         return failed with

@@ -169,12 +169,12 @@ public sealed class ReportWorkbookWriterTests
         Assert.Contains("conjunto", ReportExportRules.Validate(documento with
         {
             Panels = [documento.Panels[0] with { Dataset = 3 }],
-        }), StringComparison.Ordinal);
+        })?.Text, StringComparison.Ordinal);
         Assert.Contains("no cuadran", ReportExportRules.Validate(documento with
         {
             Panels = [documento.Panels[0] with { Figures = Table([new("a", ReportExportCellType.Text)], ["x", "y"]) }],
-        }), StringComparison.Ordinal);
-        Assert.Contains("No hay paneles", ReportExportRules.Validate(documento with { Panels = [] }), StringComparison.Ordinal);
+        })?.Text, StringComparison.Ordinal);
+        Assert.Contains("No hay paneles", ReportExportRules.Validate(documento with { Panels = [] })?.Text, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -192,7 +192,7 @@ public sealed class ReportWorkbookWriterTests
         });
 
         Assert.NotNull(problema);
-        Assert.Contains("límite", problema, StringComparison.Ordinal);
+        Assert.Contains("celdas", problema.Text, StringComparison.Ordinal);
     }
 
     [Fact]
