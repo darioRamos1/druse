@@ -1,0 +1,296 @@
+@use '../report-palette';
+
+:host {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  color: var(--dr-text);
+}
+
+.plot {
+  position: relative;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+
+// El tooltip: texto en tinta del tema, nunca en el color de la serie.
+.tip {
+  position: absolute;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 6px 9px;
+  border: 1px solid var(--dr-border-dialog);
+  border-radius: var(--dr-radius-sm);
+  background: var(--dr-surface-dialog);
+  box-shadow: var(--dr-shadow-popover);
+  pointer-events: none;
+  transform: translate(-50%, calc(-100% - 8px));
+  white-space: nowrap;
+
+  &__label {
+    font-size: 11px;
+    color: var(--dr-text-secondary);
+  }
+
+  &__value {
+    font-size: 13px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+.empty {
+  margin: 32px auto;
+  color: var(--dr-text-tertiary);
+  text-align: center;
+}
+
+// --- Barras y línea ------------------------------------------------------------
+
+.chart {
+  width: 100%;
+  height: auto;
+  max-height: 420px;
+  font-family: var(--dr-font-ui);
+
+  // En un panel el alto lo pone la cuadrícula: el dibujo se encaja sin deformarse.
+  &--fit {
+    flex: 1;
+    height: 100%;
+    min-height: 0;
+    max-height: none;
+  }
+
+  &__grid {
+    stroke: var(--dr-border-faint);
+    stroke-width: 1;
+  }
+
+  &__axis {
+    stroke: var(--dr-border-strong);
+    stroke-width: 1;
+  }
+
+  &__tick,
+  &__category {
+    fill: var(--dr-text-tertiary);
+    font-size: 11px;
+  }
+
+  &__category.is-empty {
+    font-style: italic;
+  }
+
+  &__value {
+    fill: var(--dr-text-secondary);
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  &__bar {
+    fill: var(--dr-accent);
+    transition: opacity var(--dr-duration-fast, 120ms) ease-out;
+
+    &.is-selectable {
+      cursor: pointer;
+      outline: none;
+    }
+
+    // Al elegir una categoría las demás se apagan: no cambian de color.
+    &.is-dimmed {
+      opacity: 0.32;
+    }
+
+    // Foco y elección con un anillo en la tinta del tema, no solo con color.
+    &.is-picked,
+    &:focus-visible {
+      stroke: var(--dr-text);
+      stroke-width: 2;
+    }
+  }
+
+  &__hit {
+    fill: transparent;
+  }
+
+  &__line {
+    fill: none;
+    stroke: var(--dr-accent);
+    stroke-width: 2;
+    stroke-linejoin: round;
+    stroke-linecap: round;
+    pointer-events: none;
+  }
+
+  // Anillo del color de la superficie: el punto se separa de la línea.
+  &__point {
+    fill: var(--dr-surface-raised);
+    stroke: var(--dr-accent);
+    stroke-width: 2;
+    pointer-events: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chart__bar {
+    transition: none;
+  }
+}
+
+// --- Indicador -------------------------------------------------------------------
+
+.indicator {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-self: flex-start;
+  width: min(420px, 100%);
+  margin: 8px 0;
+  padding: 18px 20px;
+  border: 1px solid var(--dr-border-subtle);
+  border-radius: var(--dr-radius);
+  background: var(--dr-surface-raised);
+
+  &__label {
+    font-size: 12px;
+    color: var(--dr-text-tertiary);
+  }
+
+  &__value {
+    margin: 0;
+    font-size: 40px;
+    font-weight: 650;
+    line-height: 1.05;
+    font-variant-numeric: tabular-nums;
+  }
+
+  &__track {
+    height: 8px;
+    overflow: hidden;
+    border-radius: 999px;
+    background: var(--dr-surface-sunken);
+  }
+
+  &__fill {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: var(--dr-accent);
+    transition: width var(--dr-duration-slow, 200ms) var(--dr-ease-out, ease-out);
+
+    [data-status='good'] & {
+      background: var(--rc-good);
+    }
+
+    [data-status='warning'] & {
+      background: var(--rc-warning);
+    }
+
+    [data-status='critical'] & {
+      background: var(--rc-critical);
+    }
+  }
+
+  // El estado: icono y texto en tinta del tema, con el color solo en el icono.
+  &__status {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    align-self: flex-start;
+    margin: 0;
+    padding: 2px 9px 2px 7px;
+    border: 1px solid var(--dr-border-subtle);
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--dr-text);
+
+    [data-status='good'] & app-icon {
+      color: var(--rc-good);
+    }
+
+    [data-status='warning'] & app-icon {
+      color: var(--rc-warning);
+    }
+
+    [data-status='critical'] & app-icon {
+      color: var(--rc-critical);
+    }
+  }
+
+  &__detail,
+  &__note {
+    margin: 0;
+    font-size: 12px;
+    line-height: 1.45;
+    color: var(--dr-text-secondary);
+  }
+
+  &__note {
+    color: var(--dr-text-tertiary);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .indicator__fill {
+    transition: none;
+  }
+}
+
+// --- Tabla -------------------------------------------------------------------------
+
+.grid {
+  flex: 1;
+  min-height: 120px;
+  overflow: auto;
+  border: 1px solid var(--dr-border-subtle);
+  border-radius: var(--dr-radius-sm);
+  background: var(--dr-surface-panel);
+
+  &:focus-visible {
+    outline: 2px solid var(--dr-accent-line-strong);
+    outline-offset: 1px;
+  }
+
+  table {
+    width: max-content;
+    min-width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    font-size: 12px;
+  }
+
+  th,
+  td {
+    padding: 5px 10px;
+    border-bottom: 1px solid var(--dr-border-faint);
+    text-align: left;
+    white-space: nowrap;
+
+    &.is-number {
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+    }
+  }
+
+  th {
+    position: sticky;
+    top: 0;
+    background: var(--dr-surface-grid-header);
+    font-weight: 600;
+  }
+
+  tbody tr:nth-child(even) {
+    background: var(--dr-surface-stripe);
+  }
+
+  td.is-null {
+    color: var(--dr-text-faint);
+    font-style: italic;
+  }
+}

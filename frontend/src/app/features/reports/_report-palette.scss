@@ -1,0 +1,37 @@
+/*
+ * Paleta categórica y de estados de Reportes, elegida por tema y no derivada.
+ *
+ * Los ocho tonos van en un orden fijo que se validó (separación para
+ * daltonismo y visión normal) contra las superficies de los paneles de Druse:
+ * #272c3a en oscuro y #e6eaf3 en claro. Algunos quedan por debajo de 3:1 de
+ * contraste, así que los reportes llevan siempre su alivio: valores escritos,
+ * categoría en el eje o la tabla equivalente. El orden es el de `PALETTE` en
+ * `report-chart.ts`.
+ *
+ * Se emite en cada componente que lo usa: el gráfico y los inspectores, que
+ * enseñan la muestra del color elegido.
+ */
+:host {
+  --rc-blue: #3987e5;
+  --rc-orange: #d95926;
+  --rc-aqua: #199e70;
+  --rc-yellow: #c98500;
+  --rc-magenta: #d55181;
+  --rc-green: #008300;
+  --rc-violet: #9085e9;
+  --rc-red: #e66767;
+  --rc-good: #0ca30c;
+  --rc-warning: #fab219;
+  --rc-critical: #d03b3b;
+}
+
+:host-context([data-theme='light']) {
+  --rc-blue: #2a78d6;
+  --rc-orange: #eb6834;
+  --rc-aqua: #1baf7a;
+  --rc-yellow: #eda100;
+  --rc-magenta: #e87ba4;
+  --rc-green: #008300;
+  --rc-violet: #6250d6;
+  --rc-red: #e34948;
+}

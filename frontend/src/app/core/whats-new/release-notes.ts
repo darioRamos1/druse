@@ -18,6 +18,51 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: '1.20.0',
+    date: '2026-11-12',
+    items: ['whatsNew.v1_20_0.engines', 'whatsNew.v1_20_0.messages'],
+  },
+  {
+    version: '1.19.0',
+    date: '2026-11-12',
+    items: ['whatsNew.v1_19_0.history', 'whatsNew.v1_19_0.storage'],
+  },
+  {
+    version: '1.18.0',
+    date: '2026-11-12',
+    items: ['whatsNew.v1_18_0.schedule', 'whatsNew.v1_18_0.recovery'],
+  },
+  {
+    version: '1.17.0',
+    date: '2026-11-12',
+    items: ['whatsNew.v1_17_0.exportExcel', 'whatsNew.v1_17_0.exportPdfCsv'],
+  },
+  {
+    version: '1.16.0',
+    date: '2026-11-11',
+    items: ['whatsNew.v1_16_0.templates', 'whatsNew.v1_16_0.templateFiles'],
+  },
+  {
+    version: '1.15.0',
+    date: '2026-11-11',
+    items: ['whatsNew.v1_15_0.appearance', 'whatsNew.v1_15_0.dashboardStyle'],
+  },
+  {
+    version: '1.14.0',
+    date: '2026-11-11',
+    items: ['whatsNew.v1_14_0.dashboards', 'whatsNew.v1_14_0.sharedFilters'],
+  },
+  {
+    version: '1.13.0',
+    date: '2026-11-11',
+    items: ['whatsNew.v1_13_0.reportRefresh', 'whatsNew.v1_13_0.reportVisuals'],
+  },
+  {
+    version: '1.12.0',
+    date: '2026-11-11',
+    items: ['whatsNew.v1_12_0.reportDatasets', 'whatsNew.v1_12_0.reportJoin'],
+  },
+  {
     version: '1.11.2',
     date: '2026-11-06',
     items: ['whatsNew.v1_11_2.openSource'],

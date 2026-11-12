@@ -1,0 +1,529 @@
+@use '../report-inspector';
+
+:host {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  min-width: 0;
+  min-height: 0;
+
+  &:has(> .inspector) {
+    grid-template-columns: minmax(0, 1fr) 340px;
+  }
+}
+
+.board {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  background: var(--dr-surface-base);
+
+  &__bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 10px 16px;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--dr-border);
+  }
+
+  &__title {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    min-width: 0;
+  }
+
+  &__heading {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 650;
+  }
+
+  &__name {
+    min-width: 220px;
+    height: 30px;
+    padding: 0 8px;
+    border: 1px solid var(--dr-border-input);
+    border-radius: var(--dr-radius-sm);
+    background: var(--dr-surface-input);
+    color: var(--dr-text);
+    font: inherit;
+    font-size: 15px;
+    font-weight: 600;
+  }
+
+  &__dirty {
+    font-size: 11.5px;
+    color: var(--dr-warning-text);
+  }
+
+  &__actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+}
+
+// --- Filtros compartidos -------------------------------------------------------
+
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 10px 18px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--dr-border);
+  background: var(--dr-surface-panel);
+}
+
+.filter {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+
+  &__label {
+    padding: 0;
+    margin-right: 2px;
+    font-size: 11.5px;
+    font-weight: 600;
+    color: var(--dr-text-secondary);
+  }
+
+  input,
+  select {
+    height: 28px;
+    padding: 0 8px;
+    border: 1px solid var(--dr-border-input);
+    border-radius: var(--dr-radius-sm);
+    background: var(--dr-surface-input);
+    color: var(--dr-text);
+    font: inherit;
+    font-size: 12px;
+    color-scheme: light dark;
+  }
+
+  select {
+    min-width: 140px;
+  }
+}
+
+.notes {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 0 16px;
+
+  &:not(:empty) {
+    padding-top: 10px;
+  }
+}
+
+.hint {
+  margin: 0;
+  font-size: 11.5px;
+  color: var(--dr-text-tertiary);
+}
+
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  margin: auto;
+  padding: 32px;
+  color: var(--dr-text-tertiary);
+  text-align: center;
+
+  &__title {
+    margin: 6px 0 0;
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--dr-text);
+  }
+
+  &__text {
+    max-width: 440px;
+    margin: 0;
+    line-height: 1.5;
+  }
+}
+
+// --- Páginas ----------------------------------------------------------------------
+
+.pages {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px;
+  padding: 8px 16px 0;
+  border-bottom: 1px solid var(--dr-border);
+
+  &__tab {
+    height: 30px;
+    padding: 0 12px;
+    border: 0;
+    border-bottom: 2px solid transparent;
+    background: none;
+    color: var(--dr-text-tertiary);
+    font: inherit;
+    cursor: pointer;
+
+    &:hover {
+      color: var(--dr-text);
+    }
+
+    &[aria-selected='true'] {
+      border-bottom-color: var(--dr-accent);
+      color: var(--dr-text);
+      font-weight: 600;
+    }
+  }
+
+  &__add {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    height: 26px;
+    margin-left: 6px;
+    padding: 0 10px;
+    border: 1px dashed var(--dr-border-input);
+    border-radius: var(--dr-radius-sm);
+    background: transparent;
+    color: var(--dr-text-secondary);
+    font: inherit;
+    font-size: 12px;
+    cursor: pointer;
+  }
+}
+
+// --- Cuadrícula ------------------------------------------------------------------
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  grid-auto-rows: 72px;
+  grid-auto-flow: row dense;
+  gap: 12px;
+  margin: 0;
+  padding: 14px 16px 18px;
+  list-style: none;
+}
+
+.panel {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  min-height: 0;
+  padding: 12px 14px;
+  overflow: hidden;
+  border: 1px solid var(--dr-border-subtle);
+  border-radius: 10px;
+  background: var(--dr-surface-raised);
+
+  :host(.is-editing) & {
+    cursor: pointer;
+    border-style: dashed;
+  }
+
+  &.is-selected {
+    border-style: solid !important;
+    border-color: var(--dr-accent-line-strong);
+    box-shadow: 0 0 0 1px var(--dr-accent-line-strong);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--dr-accent-line-strong);
+    outline-offset: 2px;
+  }
+
+  // En edición los botones de diseño bajan a su propia línea si no caben: el
+  // título tiene prioridad, que es lo que dice qué panel se está moviendo.
+  &__head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 6px 8px;
+  }
+
+  &__titles {
+    flex: 1 1 180px;
+    min-width: 0;
+  }
+
+  &__title {
+    margin: 0;
+    overflow: hidden;
+    font-size: 13px;
+    font-weight: 600;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &__description {
+    margin: 2px 0 0;
+    font-size: 12px;
+    line-height: 1.4;
+    color: var(--dr-text-secondary);
+  }
+
+  &__table {
+    flex: none;
+    font-size: 11.5px;
+  }
+
+  // Encabezado oculto a la vista, pero no a los lectores de pantalla.
+  &__head.is-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  &__meta {
+    margin: 2px 0 0;
+    overflow: hidden;
+    font-size: 11px;
+    color: var(--dr-text-tertiary);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &__tools {
+    display: flex;
+    flex: none;
+    gap: 2px;
+
+    button {
+      display: inline-grid;
+      place-items: center;
+      width: 24px;
+      height: 24px;
+      border: 1px solid var(--dr-border-input);
+      border-radius: var(--dr-radius-sm);
+      background: var(--dr-surface-base);
+      color: var(--dr-text-secondary);
+      font: inherit;
+      font-size: 13px;
+      line-height: 1;
+      cursor: pointer;
+
+      &:hover:not(:disabled) {
+        color: var(--dr-text);
+        border-color: var(--dr-accent-line);
+      }
+
+      &:disabled {
+        opacity: 0.4;
+        cursor: default;
+      }
+
+      &.is-danger {
+        color: var(--dr-danger-text);
+      }
+    }
+  }
+
+  &__badge {
+    align-self: flex-start;
+    margin: 0;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: var(--dr-warning-tint);
+    color: var(--dr-warning-text);
+    font-size: 11px;
+    line-height: 1.4;
+  }
+
+  &__body {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-height: 0;
+
+    app-report-chart {
+      flex: 1;
+      min-height: 0;
+    }
+  }
+
+  &__state {
+    margin: auto;
+    color: var(--dr-text-tertiary);
+    text-align: center;
+  }
+}
+
+// --- Inspector ---------------------------------------------------------------------
+
+.section--first {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.inspector {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-height: 0;
+  padding: 14px;
+  overflow-y: auto;
+  border-left: 1px solid var(--dr-border);
+  background: var(--dr-surface-panel);
+
+  &__footer {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: auto;
+    padding-top: 12px;
+  }
+
+  &__row {
+    display: flex;
+    gap: 6px;
+  }
+}
+
+.filter-edit {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--dr-border-subtle);
+  border-radius: var(--dr-radius-sm);
+  background: var(--dr-surface-base);
+
+  &__head {
+    display: flex;
+    gap: 6px;
+
+    input {
+      flex: 1;
+      min-width: 0;
+      height: 28px;
+      padding: 0 8px;
+      border: 1px solid var(--dr-border-input);
+      border-radius: var(--dr-radius-sm);
+      background: var(--dr-surface-input);
+      color: var(--dr-text);
+      font: inherit;
+      font-weight: 600;
+    }
+  }
+}
+
+.field--compact {
+  gap: 3px;
+
+  .field__label {
+    font-weight: 500;
+    color: var(--dr-text-tertiary);
+  }
+}
+
+.filter-add {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+}
+
+// --- Espacios estrechos --------------------------------------------------------------
+
+@media (max-width: 1100px) {
+  :host,
+  :host(:has(> .inspector)) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .inspector {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 2;
+    width: min(340px, 100%);
+    box-shadow: var(--dr-shadow-popover);
+  }
+}
+
+// Por debajo de 900 px cada panel ocupa la fila entera: el orden se conserva.
+@media (max-width: 900px) {
+  .panel {
+    grid-column: 1 / -1 !important;
+  }
+}
+
+// Guardar como plantilla: bajo la barra, para ver el tablero mientras se nombra.
+.template-form {
+  padding: 0 16px 10px;
+
+  app-report-template-save {
+    display: block;
+    max-width: 520px;
+  }
+}
+
+// Menús de exportar: el del tablero, en la barra, y el de cada panel.
+.export {
+  position: relative;
+
+  &--panel {
+    flex: none;
+  }
+}
+
+.menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  min-width: 220px;
+  padding: 4px;
+  border: 1px solid var(--dr-border);
+  border-radius: var(--dr-radius-sm);
+  background: var(--dr-surface-raised);
+  box-shadow: var(--dr-shadow-menu);
+
+  &--end {
+    right: 0;
+    left: auto;
+  }
+
+  &__item {
+    padding: 7px 10px;
+    border: 0;
+    border-radius: var(--dr-radius-xs);
+    background: transparent;
+    color: var(--dr-text);
+    font: inherit;
+    font-size: 12px;
+    text-align: left;
+    cursor: pointer;
+
+    &:hover,
+    &:focus-visible {
+      background: var(--dr-surface-hover);
+    }
+  }
+
+  &__hint {
+    margin: 4px 10px 6px;
+    color: var(--dr-text-tertiary);
+    font-size: 11px;
+    line-height: 1.4;
+  }
+}

@@ -12,7 +12,7 @@ namespace Druse.Provider.MySql;
 /// liberarlo siempre: de lo contrario la conexión quedaría ocupada por una
 /// consulta que ya nadie está leyendo.
 /// </summary>
-internal sealed class MySqlResultReader : IQueryResultReader
+internal sealed class MySqlResultReader : ITypedQueryResultReader
 {
     private readonly DbCommand _command;
     private readonly DbDataReader _reader;
@@ -110,6 +110,10 @@ internal sealed class MySqlResultReader : IQueryResultReader
             yield return _buffer;
         }
     }
+
+    // Reportes BI: los valores originales, no el texto de la cuadrícula.
+    public Task<TypedQueryResult> ReadTypedAsync(int maxRows, CancellationToken cancellationToken) =>
+        TypedQueryResult.ReadAsync(_reader, Columns, maxRows, cancellationToken);
 
     public async ValueTask DisposeAsync()
     {

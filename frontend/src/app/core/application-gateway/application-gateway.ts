@@ -1,4 +1,18 @@
 import { Observable } from 'rxjs';
+import {
+  ReportDatabaseList,
+  ReportDataset,
+  ReportDatasetPreview,
+  ReportRefresh,
+  ReportRun,
+  ReportSchedule,
+  ReportStorage,
+  ReportSnapshot,
+  SavedDashboard,
+  SavedReportTemplate,
+  SavedReport,
+  ExportDocument,
+} from '../../shared/models/reports';
 
 import {
   AuthenticationMode,
@@ -542,13 +556,79 @@ export abstract class ApplicationGateway {
 
   abstract deleteDiagram(id: string): Observable<void>;
 
-  /** Las consultas guardadas desde el compositor para una tabla. */
+  /**
+   * Las consultas guardadas desde el compositor para una tabla. Sin tabla,
+   * todas las de esa base: las fuentes visuales de Reportes BI eligen entre ellas.
+   */
   abstract getCompositions(
     connectionId: string,
     database: string,
     schema: string | undefined,
-    table: string,
+    table?: string,
   ): Observable<readonly SavedCompositionRecord[]>;
+
+  /** Conjuntos de datos de Reportes BI, por lo último que se tocó. */
+  abstract getReportDatasets(): Observable<readonly ReportDataset[]>;
+
+  /** Crea o reemplaza; la respuesta trae la versión que puso el servidor. */
+  abstract saveReportDataset(dataset: ReportDataset): Observable<ReportDataset>;
+
+  /** Borra el conjunto y su resultado guardado. */
+  abstract deleteReportDataset(id: string): Observable<void>;
+
+  /** Lee las fuentes sin guardar y cuenta qué pasó con cada una y con la unión. */
+  abstract previewReportDataset(dataset: ReportDataset): Observable<ReportDatasetPreview>;
+
+  /** Bases de una conexión guardada, con su contraseña del llavero. */
+  abstract getReportSourceDatabases(connectionId: string): Observable<ReportDatabaseList>;
+
+  /** «Actualizar ahora». Un intento fallido llega como respuesta, no como error. */
+  abstract refreshReportDataset(datasetId: string): Observable<ReportRefresh>;
+
+  /** El último resultado bueno, o `null` si todavía no hay. */
+  abstract getReportSnapshot(datasetId: string): Observable<ReportSnapshot | null>;
+
+  abstract getReportRuns(datasetId: string): Observable<readonly ReportRun[]>;
+
+  /** La programación del conjunto, o `null` si no tiene. */
+  abstract getReportSchedule(datasetId: string): Observable<ReportSchedule | null>;
+
+  abstract saveReportSchedule(
+    datasetId: string,
+    schedule: ReportSchedule,
+  ): Observable<ReportSchedule>;
+
+  abstract deleteReportSchedule(datasetId: string): Observable<void>;
+
+  /** Borra el resultado guardado; el conjunto, sus reportes y su historial se quedan. */
+  abstract deleteReportSnapshot(datasetId: string): Observable<void>;
+
+  abstract getReportStorage(): Observable<ReportStorage>;
+
+  abstract getSavedReports(datasetId: string): Observable<readonly SavedReport[]>;
+
+  /** Todos los reportes, para elegir qué va en un tablero. */
+  abstract getAllReports(): Observable<readonly SavedReport[]>;
+
+  abstract getDashboards(): Observable<readonly SavedDashboard[]>;
+
+  abstract saveDashboard(dashboard: SavedDashboard): Observable<SavedDashboard>;
+
+  abstract deleteDashboard(id: string): Observable<void>;
+
+  /** Plantillas de diseño: un reporte, un panel o un tablero, sin SQL ni filas. */
+  abstract getReportTemplates(): Observable<readonly SavedReportTemplate[]>;
+
+  abstract saveReportTemplate(template: SavedReportTemplate): Observable<SavedReportTemplate>;
+
+  abstract deleteReportTemplate(id: string): Observable<void>;
+
+  /** El libro de Excel de un tablero o un panel, con las cifras ya filtradas. */
+  abstract exportReportWorkbook(document: ExportDocument): Observable<Blob>;
+
+  abstract saveReport(report: SavedReport): Observable<SavedReport>;
+
+  abstract deleteReport(id: string): Observable<void>;
 
   abstract saveComposition(composition: SavedCompositionRecord): Observable<void>;
 

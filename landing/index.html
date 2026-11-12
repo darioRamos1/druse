@@ -66,6 +66,7 @@
         <nav id="navigation" aria-label="Navegación principal">
           <a href="#herramientas">Herramientas</a>
           <a href="#motores">Compatibilidad</a>
+          <a href="#reportes-bi">Reportes BI</a>
           <a href="./primeros-pasos.html">Primera prueba</a>
           <a href="#preguntas">Preguntas</a>
           <a class="button button-small" href="#descargar"
@@ -419,6 +420,163 @@
             </p>
           </li>
         </ol>
+      </section>
+
+      <section
+        class="bi container section-space"
+        id="reportes-bi"
+        aria-labelledby="bi-title"
+      >
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">
+              PRÓXIMAMENTE <span class="bi-status">En desarrollo</span>
+            </p>
+            <h2 id="bi-title">
+              Reportes BI en Druse.<br /><span>Varias bases, un tablero.</span>
+            </h2>
+          </div>
+          <p>
+            Estamos desarrollando reportes que combinan datos de distintas
+            bases. Consulta el avance del constructor SQL y visual, los
+            tableros con filtros y las actualizaciones programadas.
+          </p>
+        </div>
+        <figure class="bi-shot bi-shot-main">
+          <img
+            src="./assets/reportes-tablero.webp"
+            alt="Tablero comercial en Druse con dos paneles: ventas por municipio en barras (80, 100 y 40) y un indicador de cumplimiento del 60 %, con filtros de fecha y categoría."
+            width="1232"
+            height="552"
+            loading="lazy"
+            decoding="async"
+          />
+          <figcaption>
+            <span class="bi-tag">Captura de Druse</span> Un tablero con
+            filtros compartidos. Las cifras salen del último dato guardado y
+            se consultan aunque las bases estén desconectadas.
+          </figcaption>
+        </figure>
+        <div class="bi-grid">
+          <figure class="bi-shot">
+            <img
+              src="./assets/reportes-combinar.webp"
+              alt="Paso Combinar del constructor de Reportes: ventas y metas unidas por mes y municipio, con tres filas, dos coincidencias y un municipio sin meta."
+              width="1232"
+              height="552"
+              loading="lazy"
+              decoding="async"
+            />
+            <figcaption>
+              <span class="bi-tag">Captura de Druse</span> Dos fuentes unidas
+              por mes y municipio, con la vista previa del cruce.
+            </figcaption>
+          </figure>
+          <figure class="bi-shot">
+            <img
+              src="./assets/reportes-programar.webp"
+              alt="Formulario de actualización programada: frecuencia semanal, lunes y jueves a las 7:00, zona horaria America/Bogota."
+              width="1232"
+              height="552"
+              loading="lazy"
+              decoding="async"
+            />
+            <figcaption>
+              <span class="bi-tag">Captura de Druse</span> Actualización diaria
+              o semanal, con su hora y su zona horaria.
+            </figcaption>
+          </figure>
+        </div>
+        <ul class="bi-progress" aria-label="Lo que ya funciona en desarrollo">
+          <li>
+            <h3>Cruza bases distintas</h3>
+            <p>
+              SQL Server, PostgreSQL, MySQL, Oracle y SQLite, con una fuente
+              SQL o visual por base.
+            </p>
+          </li>
+          <li>
+            <h3>Tableros a tu medida</h3>
+            <p>
+              Barras, líneas, tablas e indicadores, filtros compartidos y
+              plantillas reutilizables.
+            </p>
+          </li>
+          <li>
+            <h3>Datos al día</h3>
+            <p>
+              Actualizaciones programadas, historial de intentos y exportación
+              a Excel, PDF y CSV.
+            </p>
+          </li>
+        </ul>
+        <p class="bi-note">
+          Aún no está en una versión publicada. Las capturas usan datos
+          ficticios de ventas y metas.
+          <a href="./reportes-bi.html">Ver avance <span aria-hidden="true">→</span></a>
+        </p>
+      </section>
+
+      <section
+        class="news container section-space"
+        id="novedades"
+        aria-labelledby="news-title"
+      >
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">NOVEDADES</p>
+            <h2 id="news-title">
+              Lo último de Druse.<br /><span>Versión a versión.</span>
+            </h2>
+          </div>
+          <p>
+            Lo mismo que cuenta Druse en Preferencias → Novedades, de las
+            versiones que ya puedes descargar.
+          </p>
+        </div>
+        <!-- novedades:inicio -->
+        <div class="news-list">
+          <article class="news-entry" aria-labelledby="news-0">
+            <p class="news-meta"><span class="news-version" id="news-0">Druse 1.11.1</span>
+              <time datetime="2026-10-30">30 de octubre de 2026</time>
+              <span class="news-current">Versión actual</span></p>
+            <ul>
+              <li>Al abrir una conexión cuya contraseña no está guardada, puedes introducirla y conectar desde el diálogo del perfil.</li>
+              <li>En conexiones JDBC, la cancelación y el tiempo límite vuelven a liberar la interfaz aunque el controlador tarde en detener la consulta.</li>
+              <li>Los respaldos SQL de Informix por SQLI conservan las fechas al restaurarse y sus errores de sintaxis se explican en español.</li>
+              <li>El menú de copia de la cuadrícula se mantiene dentro de la ventana para que puedas usar todas sus opciones.</li>
+            </ul>
+          </article>
+          <article class="news-entry" aria-labelledby="news-1">
+            <p class="news-meta"><span class="news-version" id="news-1">Druse 1.11.0</span>
+              <time datetime="2026-10-28">28 de octubre de 2026</time></p>
+            <ul>
+              <li>La web ofrece las ediciones Completa, Sin Informix y Comunidad con instalador y ZIP sin instalación de la última versión publicada.</li>
+            </ul>
+          </article>
+          <article class="news-entry" aria-labelledby="news-2">
+            <p class="news-meta"><span class="news-version" id="news-2">Druse 1.10.0</span>
+              <time datetime="2026-10-19">19 de octubre de 2026</time></p>
+            <ul>
+              <li>Puedes adjuntar al chat un plan estimado de SQLite obtenido con EXPLAIN QUERY PLAN y revisar su SQL, contenido y límites antes de enviarlo.</li>
+            </ul>
+          </article>
+          <article class="news-entry" aria-labelledby="news-3">
+            <p class="news-meta"><span class="news-version" id="news-3">Druse 1.9.0</span>
+              <time datetime="2026-10-19">19 de octubre de 2026</time></p>
+            <ul>
+              <li>Elige filas y columnas para analizarlas en el chat, oculta valores sensibles y revisa los recortes antes de compartir la muestra con un proveedor autorizado.</li>
+            </ul>
+          </article>
+          <article class="news-entry" aria-labelledby="news-4">
+            <p class="news-meta"><span class="news-version" id="news-4">Druse 1.8.0</span>
+              <time datetime="2026-10-16">16 de octubre de 2026</time></p>
+            <ul>
+              <li>Pide al chat que explique un error con la consulta que lo produjo, edita el adjunto y revisa el diagnóstico antes de enviarlo.</li>
+            </ul>
+          </article>
+        </div>
+        <!-- novedades:fin -->
       </section>
 
       <section

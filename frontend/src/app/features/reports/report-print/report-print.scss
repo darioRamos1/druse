@@ -1,0 +1,155 @@
+@use '../report-controls';
+
+/*
+ * En pantalla, una vista previa a pantalla completa sobre todo Druse; al
+ * imprimir, solo el papel. El tema claro lo pone el componente mientras está
+ * abierto, así que los tokens ya son los de papel.
+ */
+:host {
+  position: fixed;
+  inset: 0;
+  z-index: calc(var(--dr-z-modal) + 2);
+  display: block;
+  overflow: auto;
+  background: var(--dr-surface-base);
+  color: var(--dr-text);
+}
+
+.toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--dr-border);
+  background: var(--dr-surface-raised);
+
+  &__hint {
+    flex: 1 1 260px;
+    margin: 0;
+    color: var(--dr-text-secondary);
+    font-size: 12px;
+  }
+}
+
+// Una hoja A4 apaisada a escala de pantalla: lo que se ve es lo que se imprime.
+.paper {
+  width: min(1060px, calc(100% - 32px));
+  margin: 20px auto 40px;
+  padding: 28px 32px;
+  background: #fff;
+  box-shadow: var(--dr-shadow-dialog);
+  color: #1d2230;
+
+  &__head {
+    margin-bottom: 14px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #cfd5e2;
+  }
+
+  &__title {
+    margin: 0 0 4px;
+    font-size: 20px;
+  }
+
+  &__meta,
+  &__filters {
+    margin: 2px 0 0;
+    color: #4a5266;
+    font-size: 12px;
+    line-height: 1.5;
+  }
+}
+
+.sheet {
+  // Cada página del tablero empieza en una hoja nueva.
+  & + & {
+    break-before: page;
+    margin-top: 24px;
+  }
+
+  &__name {
+    margin: 0 0 8px;
+    font-size: 15px;
+  }
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  // La misma altura de fila que el tablero: un panel ocupa en papel lo mismo que en pantalla.
+  grid-auto-rows: 72px;
+  grid-auto-flow: row dense;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  padding: 10px 12px;
+  border: 1px solid #cfd5e2;
+  border-radius: 6px;
+  break-inside: avoid;
+
+  &__title {
+    margin: 0;
+    font-size: 13px;
+  }
+
+  &__description,
+  &__meta,
+  &__note {
+    margin: 2px 0 0;
+    color: #4a5266;
+    font-size: 11px;
+  }
+
+  &__note {
+    font-style: italic;
+  }
+
+  // Lo que no cabe se recorta dentro del panel, en vez de pisar al de al lado en el papel.
+  &__body {
+    flex: 1;
+    min-height: 0;
+    margin-top: 6px;
+    overflow: hidden;
+  }
+}
+
+@media (max-width: 720px) {
+  .grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .panel {
+    grid-column: auto !important;
+  }
+}
+
+@media print {
+  :host {
+    position: static;
+    overflow: visible;
+    background: #fff;
+  }
+
+  .toolbar {
+    display: none;
+  }
+
+  .paper {
+    width: auto;
+    margin: 0;
+    padding: 0;
+    box-shadow: none;
+  }
+}

@@ -4,6 +4,7 @@ using Druse.Application.Backups;
 using Druse.Application.Connections;
 using Druse.Application.Metadata;
 using Druse.Application.Queries;
+using Druse.Application.Reports;
 using Druse.Application.Rows;
 using Druse.Application.Tables;
 using Druse.Application.Transactions;
@@ -34,6 +35,7 @@ using Druse.Provider.PostgreSql;
 using Druse.Provider.Sqlite;
 using Druse.Provider.SqlServer;
 using Druse.Ssh;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace Druse.Host.LocalApi;
 
@@ -63,7 +65,17 @@ internal static class DependencyInjection
         services.AddSingleton<LocalApiEndpoint>();
 
         // --- Persistencia local ----------------------------------------------
+        services.TryAddSingleton(TimeProvider.System);
         services.AddSingleton<DruseDatabase>();
+        services.AddSingleton<IReportSnapshotStore, SqliteReportSnapshotStore>();
+        services.AddSingleton<IReportDatasetStore, SqliteReportDatasetStore>();
+        services.AddSingleton<IReportRunStore, SqliteReportRunStore>();
+        services.AddSingleton<ISavedReportStore, SqliteSavedReportStore>();
+        services.AddSingleton<IReportDashboardStore, SqliteReportDashboardStore>();
+        services.AddSingleton<IReportTemplateStore, SqliteReportTemplateStore>();
+        services.AddSingleton<IReportScheduleStore, SqliteReportScheduleStore>();
+        services.AddSingleton<ReportRunGate>();
+        services.AddSingleton<ReportScheduleDispatcher>();
         services.AddSingleton<IBackupArchiveFactory, BackupArchiveFactory>();
         services.AddScoped<IConnectionProfileStore, SqliteConnectionProfileStore>();
         services.AddScoped<IQueryHistoryStore, SqliteQueryHistoryStore>();
@@ -240,11 +252,18 @@ internal static class DependencyInjection
         });
         services.AddHostedService<IdleTransactionSweeper>();
 
+        // Las actualizaciones programadas de Reportes, mientras Druse está abierto.
+        services.AddHostedService<ReportScheduler>();
+
         // --- Casos de uso -------------------------------------------------------
         services.AddScoped<ConnectionService>();
         services.AddScoped<SavedConnectionService>();
         services.AddScoped<MetadataService>();
         services.AddScoped<QueryService>();
+        services.AddScoped<ReportQueryService>();
+        services.AddScoped<ReportSnapshotService>();
+        services.AddScoped<ReportDatasetPreviewService>();
+        services.AddScoped<ReportRefreshService>();
         services.AddScoped<RowEditService>();
         services.AddScoped<TableDesignService>();
         services.AddScoped<ImportService>();
@@ -259,6 +278,7 @@ internal static class DependencyInjection
         // --- Exportadores -------------------------------------------------------
         services.AddSingleton<IResultExporter, CsvResultExporter>();
         services.AddSingleton<IResultExporter, XlsxResultExporter>();
+        services.AddSingleton<IReportWorkbookWriter, ReportWorkbookWriter>();
 
         // --- Lectores de archivo ------------------------------------------------
         services.AddSingleton<ITableFileReader, CsvTableFileReader>();

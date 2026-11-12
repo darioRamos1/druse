@@ -2,6 +2,19 @@ import { expect, test, type Locator, type Page } from '@playwright/test';
 
 import { abrir, apuntarPestana, conectar, ejecutar, escribirSql, situarCursor } from '../support/druse';
 import { medir } from '../support/medir';
+import {
+  METAS_SQL,
+  VENTAS_SQL,
+  abrirGaleria,
+  abrirReportes,
+  abrirVisualizacion,
+  actualizar,
+  anadirFuente,
+  borrarPlantillas,
+  borrarRestos,
+  crearTablero,
+  previsualizar,
+} from '../support/reportes';
 import { comprobarDiagnosticoIa, prepararDiagnosticoIa } from '../support/ai-diagnostics';
 import { comprobarContextoChat, prepararContextoChat, comprobarSelectorContexto, comprobarNotasContexto } from '../support/ai-context';
 import { comprobarErrorContexto } from '../support/ai-execution-error';
@@ -19,6 +32,18 @@ import { comprobarPlanContexto } from '../support/ai-plans';
 const SALIDA = process.env['DRUSE_BARRIDO_DIR'] ?? 'barrido';
 
 const hallazgos: string[] = [];
+
+/** Nombre propio para el conjunto del barrido: así se encuentra y se borra sin confundirlo. */
+const CONJUNTO_BARRIDO = 'Barrido · Ventas y metas';
+const TABLERO_BARRIDO = 'Barrido · Tablero comercial';
+/** Los reportes del barrido, con nombre propio para elegirlos sin confundirlos. */
+const INDICADOR_BARRIDO = 'Barrido · Cumplimiento';
+const BARRAS_BARRIDO = 'Barrido · Ventas por municipio';
+/** Lo que dejan el barrido y la e2e de Reportes si se cortan antes de limpiar. */
+const PLANTILLA_BARRIDO = 'Barrido · Plantilla comercial';
+const RESTOS_TABLEROS = /Barrido · |Tablero \d{10,}|E2E Plantilla/;
+const RESTOS_CONJUNTOS = /Barrido · |E2E Reportes \d+|E2E Plantilla|Conjunto sin nombre/;
+const RESTOS_PLANTILLAS = /Barrido · |E2E Plantilla \d+/;
 
 async function foto(page: Page, nombre: string, sitio?: Locator): Promise<void> {
   await (sitio ?? page).screenshot({ path: `${SALIDA}/${nombre}.png` });
@@ -447,6 +472,198 @@ test.describe('barrido visual', () => {
     await foto(page, '20-mer-base-tablas', diagramaBase.locator('.dialog'));
     await cerrar(page, diagramaBase, 'diagrama de la base');
 
+    // --- Reportes BI: vacío, una fuente y el cruce de dos -------------------
+    const reportes = await abrirReportes(page);
+
+    await borrarPlantillas(reportes, RESTOS_PLANTILLAS);
+    await borrarRestos(reportes, RESTOS_TABLEROS, RESTOS_CONJUNTOS);
+    await medir(page, 'reportes vacío', hallazgos);
+    await foto(page, '21-reportes-vacio', reportes.locator('.dialog'));
+
+    await reportes.getByLabel('Nombre del conjunto de datos').fill(CONJUNTO_BARRIDO);
+    await anadirFuente(reportes, 'Ventas', VENTAS_SQL);
+    await previsualizar(reportes);
+    await medir(page, 'reportes con una fuente', hallazgos);
+    await foto(page, '21a-reportes-fuente', reportes.locator('.dialog'));
+
+    await anadirFuente(reportes, 'Metas', METAS_SQL);
+    await previsualizar(reportes);
+    await reportes.locator('.steps__item').nth(1).click();
+    await previsualizar(reportes);
+    await medir(page, 'reportes combinar', hallazgos);
+    await foto(page, '21b-reportes-combinar', reportes.locator('.dialog'));
+
+    // Sin guardar: Escape pregunta antes de descartar, y eso también se mira.
+    await page.keyboard.press('Escape');
+    await expect(reportes.locator('.confirm')).toBeVisible();
+    await foto(page, '21c-reportes-descartar', reportes.locator('.dialog'));
+    await reportes.getByRole('button', { name: 'Cancelar' }).click();
+
+    // Visualización: el resultado guardado, en barras y como indicador.
+    await reportes.getByRole('button', { name: 'Guardar', exact: true }).click();
+    await abrirVisualizacion(reportes);
+    await actualizar(reportes);
+    await reportes.locator('.inspector').getByLabel('Agrupar por').selectOption({ label: 'Ventas.municipio' });
+    await medir(page, 'reportes barras', hallazgos);
+    await foto(page, '21d-reportes-barras', reportes.locator('.dialog'));
+    await reportes.getByRole('radio', { name: 'Indicador' }).click();
+    await medir(page, 'reportes indicador', hallazgos);
+    await foto(page, '21e-reportes-indicador', reportes.locator('.dialog'));
+
+    // Se guardan un indicador y unas barras: el tema claro y los anchos
+    // estrechos se miran más abajo sobre este mismo conjunto, y al final se borra.
+    await reportes.locator('.inspector').getByLabel('Nombre del reporte').fill(INDICADOR_BARRIDO);
+    // Umbrales: 60 % queda «cerca de la meta», con icono y texto.
+    await reportes.locator('.inspector').getByLabel('En meta desde').fill('90');
+    await reportes.locator('.inspector').getByLabel('En meta desde').press('Tab');
+    await reportes.locator('.inspector').getByLabel('Cerca desde').fill('50');
+    await reportes.locator('.inspector').getByLabel('Cerca desde').press('Tab');
+    await expect(reportes.locator('.indicator__status')).toContainText('Cerca de la meta');
+    await medir(page, 'reportes indicador con umbrales', hallazgos);
+    await foto(page, '21l-reportes-umbrales', reportes.locator('.dialog'));
+    await reportes.getByRole('button', { name: 'Guardar reporte' }).click();
+    await reportes.getByRole('button', { name: 'Nuevo reporte' }).click();
+    // El nombre propuesto llega un instante después del clic: rellenar antes lo
+    // dejaría detrás de «Reporte 2» en vez de sustituirlo.
+    await expect(reportes.locator('.inspector').getByLabel('Nombre del reporte')).toHaveValue(/^Reporte \d+$/);
+    await reportes.locator('.inspector').getByLabel('Nombre del reporte').fill(BARRAS_BARRIDO);
+    await reportes.locator('.inspector').getByLabel('Agrupar por').selectOption({ label: 'Ventas.municipio' });
+    // Un color por categoría y prefijo de moneda.
+    await reportes.locator('.inspector').getByLabel('Un color por categoría').check();
+    await reportes.locator('.inspector').getByLabel('Prefijo').fill('$ ');
+    await expect(reportes.locator('.chart__value').first()).toHaveText('$ 80');
+    await medir(page, 'reportes apariencia', hallazgos);
+    await foto(page, '21m-reportes-apariencia', reportes.locator('.dialog'));
+    await reportes.getByRole('button', { name: 'Guardar reporte' }).click();
+    await expect(reportes.locator('.reports__tab')).toHaveCount(2);
+
+    // Un tablero con los dos reportes y filtros de fecha y categoría.
+    await crearTablero(reportes, TABLERO_BARRIDO, [BARRAS_BARRIDO, INDICADOR_BARRIDO]);
+    const tablero = reportes.locator('app-report-dashboard');
+
+    await expect(tablero.locator('.panel .chart__bar')).toHaveCount(3);
+    await medir(page, 'tablero', hallazgos);
+    await foto(page, '22-tablero', reportes.locator('.dialog'));
+    await tablero.locator('.filter select').selectOption({ label: '05001' });
+    await expect(tablero.locator('.panel .chart__bar')).toHaveCount(1);
+    await medir(page, 'tablero filtrado', hallazgos);
+    await foto(page, '22a-tablero-filtrado', reportes.locator('.dialog'));
+    await tablero.getByRole('button', { name: 'Quitar filtros' }).click();
+
+    // Pulsar una barra filtra todo el tablero; las demás se apagan sin cambiar de color.
+    await tablero.locator('.panel .chart__bar').nth(1).click();
+    await expect(tablero.locator('.filter select')).toHaveValue('v08001');
+    await medir(page, 'tablero pulsado', hallazgos);
+    await foto(page, '22e-tablero-pulsado', reportes.locator('.dialog'));
+    await tablero.getByRole('button', { name: 'Quitar filtros' }).click();
+
+    await tablero.getByRole('button', { name: 'Editar diseño' }).click();
+    await tablero.locator('.panel').first().click();
+    await medir(page, 'tablero en edición', hallazgos);
+    await foto(page, '22b-tablero-edicion', reportes.locator('.dialog'));
+
+    // Estilo: color del tablero heredado por el indicador, descripción y otra página.
+    await tablero.locator('.inspector').getByLabel('Color de los paneles').selectOption({ label: 'Turquesa' });
+    await tablero.locator('.panel').nth(1).click();
+    await tablero.locator('.inspector').getByLabel('Descripción', { exact: true }).fill('Ventas sobre metas de enero');
+    await expect(tablero.locator('.inspector')).toContainText('Heredado del tablero: Turquesa.');
+    await medir(page, 'tablero estilo', hallazgos);
+    await foto(page, '22f-tablero-estilo', reportes.locator('.dialog'));
+    await tablero.getByRole('button', { name: 'Página', exact: true }).click();
+    await expect(tablero.locator('.pages__tab')).toHaveCount(2);
+    await medir(page, 'tablero segunda página', hallazgos);
+    await foto(page, '22g-tablero-pagina', reportes.locator('.dialog'));
+    await tablero.locator('.pages__tab').first().click();
+    await tablero.getByRole('button', { name: 'Guardar tablero' }).click();
+    await expect(tablero.getByRole('button', { name: 'Editar diseño' })).toBeVisible();
+
+    // --- Plantillas: guardar el tablero, la galería y vincular sus campos --------
+    await tablero.getByRole('button', { name: 'Guardar como plantilla' }).click();
+    await tablero.locator('.template-form').getByLabel('Nombre de la plantilla').fill(PLANTILLA_BARRIDO);
+    await tablero.locator('.template-form').getByLabel('Descripción (opcional)').fill('Ventas por municipio contra la meta, con filtros de mes y municipio.');
+    await medir(page, 'guardar como plantilla', hallazgos);
+    await foto(page, '23-plantilla-guardar', reportes.locator('.dialog'));
+    await tablero.getByRole('button', { name: 'Guardar plantilla' }).click();
+    await expect(tablero.locator('.banner--success')).toContainText('guardada');
+
+    const galeria = await abrirGaleria(reportes);
+
+    await expect(galeria.locator('.card', { hasText: PLANTILLA_BARRIDO })).toBeVisible();
+    await medir(page, 'galería de plantillas', hallazgos);
+    await foto(page, '23a-plantillas-galeria');
+    await galeria.locator('.card', { hasText: PLANTILLA_BARRIDO }).getByRole('button', { name: 'Usar' }).click();
+    await expect(galeria.locator('.fields__row').first()).toBeVisible();
+    await expect(galeria.getByRole('button', { name: 'Crear copia' })).toBeEnabled();
+    await medir(page, 'vincular campos de plantilla', hallazgos);
+    await foto(page, '23b-plantilla-vincular');
+    await galeria.getByRole('button', { name: 'Crear copia' }).click();
+    await expect(tablero.locator('.board__heading')).toHaveText(PLANTILLA_BARRIDO);
+    await expect(tablero.locator('.panel .chart__bar')).toHaveCount(3);
+    await medir(page, 'tablero desde plantilla', hallazgos);
+    await foto(page, '23c-tablero-desde-plantilla', reportes.locator('.dialog'));
+
+    // --- Exportar: el menú del tablero, el de un panel y la vista de impresión --
+    await reportes.locator('.datasets__item', { hasText: TABLERO_BARRIDO }).first().click();
+    await expect(tablero.locator('.panel .chart__bar')).toHaveCount(3);
+    await tablero.locator('.filter select').selectOption({ label: '05001' });
+    await tablero.getByRole('button', { name: 'Exportar', exact: true }).click();
+    await expect(tablero.locator('.menu')).toBeVisible();
+    await medir(page, 'menú exportar tablero', hallazgos);
+    await foto(page, '24-exportar-tablero', reportes.locator('.dialog'));
+    await page.keyboard.press('Escape');
+    await expect(tablero.locator('.menu')).toHaveCount(0);
+    await tablero.locator('.panel').first().getByRole('button', { name: /^Exportar / }).click();
+    await expect(tablero.locator('.panel .menu')).toBeVisible();
+    await medir(page, 'menú exportar panel', hallazgos);
+    await foto(page, '24a-exportar-panel', reportes.locator('.dialog'));
+    await page.keyboard.press('Escape');
+    await tablero.getByRole('button', { name: 'Exportar', exact: true }).click();
+    await tablero.getByRole('menuitem', { name: 'PDF · todas las páginas' }).click();
+    const impresion = page.locator('body > app-report-print');
+
+    await expect(impresion.locator('.paper .chart__bar').first()).toBeVisible();
+    await page.waitForTimeout(300);
+    await medir(page, 'vista de impresión', hallazgos);
+    await foto(page, '24b-vista-impresion');
+    // Lo que sale en papel: sin barra, solo la hoja.
+    await page.emulateMedia({ media: 'print' });
+    await impresion.screenshot({ path: `${SALIDA}/24c-impresion-papel.png` });
+    await page.emulateMedia({ media: 'screen' });
+    await impresion.getByRole('button', { name: 'Cerrar' }).click();
+    await expect(impresion).toHaveCount(0);
+    await tablero.getByRole('button', { name: 'Quitar filtros' }).click();
+
+    // Y en Visualización, «Desde plantilla» junto a «Nuevo reporte».
+    await reportes.locator('.datasets__item', { hasText: CONJUNTO_BARRIDO }).first().click();
+    await abrirVisualizacion(reportes);
+    await reportes.getByRole('button', { name: 'Guardar como plantilla' }).click();
+    await medir(page, 'guardar reporte como plantilla', hallazgos);
+    await foto(page, '23d-plantilla-reporte', reportes.locator('.dialog'));
+    await reportes.locator('app-report-template-save').getByRole('button', { name: 'Cancelar' }).click();
+
+    // Programar: semanal, lunes y jueves. Queda guardada para verla en claro
+    // y estrecha más abajo; el horario cae en el futuro y no llega a dispararse.
+    await reportes.getByRole('button', { name: 'Programar', exact: true }).click();
+    const programar = reportes.locator('form.schedule');
+
+    await programar.getByRole('radio', { name: 'Semanal' }).click();
+    await programar.getByLabel('Jueves').check();
+    await medir(page, 'programar actualización', hallazgos);
+    await foto(page, '25-programar', reportes.locator('.dialog'));
+    await programar.getByRole('button', { name: 'Guardar programación' }).click();
+    await expect(reportes.locator('.freshness__schedule')).toContainText('Próxima actualización');
+    await medir(page, 'actualización programada', hallazgos);
+    await foto(page, '25a-programada', reportes.locator('.dialog'));
+    await reportes.getByRole('button', { name: 'Historial', exact: true }).click();
+    await expect(reportes.locator('app-report-history .runs tbody tr').first()).toBeVisible();
+    await expect(reportes.locator('app-report-history .space')).toContainText('de 512 MB');
+    await reportes.locator('app-report-history').getByRole('button', { name: 'Borrar datos guardados' }).click();
+    await medir(page, 'historial y espacio', hallazgos);
+    await foto(page, '26-historial', reportes.locator('.dialog'));
+    await reportes.locator('app-report-history').getByRole('button', { name: 'Cancelar' }).click();
+    await page.keyboard.press('Escape');
+    await expect(reportes.locator('.dialog')).toBeHidden();
+
     // --- El asistente de una tabla, con sus pasos --------------------------
     await desplegar(page, 'Tables', 'accionista');
     await menuDe(page, 'accionista');
@@ -648,7 +865,133 @@ test.describe('barrido visual', () => {
     await medir(page, 'claro: conexión', hallazgos);
     await foto(page, '17-claro-conexion', page.locator('app-connection-dialog .dialog'));
     await page.keyboard.press('Escape');
+
+    // Reportes en claro: el conjunto guardado arriba, reabierto desde reports.db.
+    const reportesClaro = await abrirReportes(page);
+
+    await reportesClaro.locator('.datasets__item', { hasText: CONJUNTO_BARRIDO }).first().click();
+    await abrirVisualizacion(reportesClaro);
+    await expect(reportesClaro.locator('.indicator__value')).toBeVisible();
+    await medir(page, 'claro: reportes indicador', hallazgos);
+    await foto(page, '21f-claro-reportes-indicador', reportesClaro.locator('.dialog'));
+    await reportesClaro.locator('.reports__tab').nth(1).click();
+    await expect(reportesClaro.locator('.chart__bar')).toHaveCount(3);
+    await medir(page, 'claro: reportes barras', hallazgos);
+    await foto(page, '21g-claro-reportes-barras', reportesClaro.locator('.dialog'));
+    await reportesClaro.getByRole('button', { name: 'Programación', exact: true }).click();
+    await expect(reportesClaro.locator('form.schedule')).toBeVisible();
+    await medir(page, 'claro: programar', hallazgos);
+    await foto(page, '25b-claro-programar', reportesClaro.locator('.dialog'));
+    await reportesClaro.locator('form.schedule').getByRole('button', { name: 'Cancelar' }).click();
+    await reportesClaro.getByRole('button', { name: 'Historial', exact: true }).click();
+    await expect(reportesClaro.locator('app-report-history .space')).toContainText('de 512 MB');
+    await medir(page, 'claro: historial', hallazgos);
+    await foto(page, '26a-claro-historial', reportesClaro.locator('.dialog'));
+    await reportesClaro.getByRole('button', { name: 'Historial', exact: true }).click();
+    await reportesClaro.locator('.steps__item').nth(1).click();
+    await previsualizar(reportesClaro);
+    await medir(page, 'claro: reportes combinar', hallazgos);
+    await foto(page, '21h-claro-reportes-combinar', reportesClaro.locator('.dialog'));
+    await reportesClaro.locator('.datasets__item', { hasText: TABLERO_BARRIDO }).first().click();
+    await expect(reportesClaro.locator('app-report-dashboard .panel .chart__bar')).toHaveCount(3);
+    await medir(page, 'claro: tablero', hallazgos);
+    await foto(page, '22c-claro-tablero', reportesClaro.locator('.dialog'));
+    const galeriaClara = await abrirGaleria(reportesClaro);
+
+    await medir(page, 'claro: galería de plantillas', hallazgos);
+    await foto(page, '23e-claro-plantillas');
+    await galeriaClara.locator('.card', { hasText: PLANTILLA_BARRIDO }).getByRole('button', { name: 'Usar' }).click();
+    await expect(galeriaClara.locator('.fields__row').first()).toBeVisible();
+    await expect(galeriaClara.getByRole('button', { name: 'Crear copia' })).toBeEnabled();
+    await medir(page, 'claro: vincular campos', hallazgos);
+    await foto(page, '23f-claro-plantilla-vincular');
+    await page.keyboard.press('Escape');
+    await page.keyboard.press('Escape');
+    await expect(galeriaClara).toHaveCount(0);
+    await page.keyboard.press('Escape');
+    await expect(reportesClaro.locator('.dialog')).toBeHidden();
     await page.getByRole('button', { name: 'Tema oscuro' }).click();
+
+    // Reportes en anchos estrechos: por debajo de 1.100 px el inspector se
+    // superpone a la vista previa, y eso es lo que hay que mirar.
+    // Se abre ya estrecho, como lo encontraría alguien con la ventana así.
+    const tamano = page.viewportSize();
+    let reportesEstrecho = page.locator('app-report-builder');
+
+    for (const ancho of [1024, 900]) {
+      await page.setViewportSize({ width: ancho, height: 760 });
+      reportesEstrecho = await abrirReportes(page);
+      await reportesEstrecho.locator('.datasets__item', { hasText: CONJUNTO_BARRIDO }).first().click();
+      await abrirVisualizacion(reportesEstrecho);
+      await expect(reportesEstrecho.locator('app-report-workbench .inspector')).toHaveCount(0);
+      await page.waitForTimeout(300);
+      await medir(page, `reportes visualización a ${ancho}`, hallazgos);
+      await foto(page, `21i-reportes-visual-${ancho}`, reportesEstrecho.locator('.dialog'));
+      await reportesEstrecho.getByRole('button', { name: 'Programación', exact: true }).click();
+      await expect(reportesEstrecho.locator('form.schedule')).toBeVisible();
+      await medir(page, `programar a ${ancho}`, hallazgos);
+      await foto(page, `25c-programar-${ancho}`, reportesEstrecho.locator('.dialog'));
+      await reportesEstrecho.locator('form.schedule').getByRole('button', { name: 'Cancelar' }).click();
+      await reportesEstrecho.getByRole('button', { name: 'Historial', exact: true }).click();
+      await expect(reportesEstrecho.locator('app-report-history .space')).toContainText('de 512 MB');
+      await medir(page, `historial a ${ancho}`, hallazgos);
+      await foto(page, `26b-historial-${ancho}`, reportesEstrecho.locator('.dialog'));
+      await reportesEstrecho.getByRole('button', { name: 'Historial', exact: true }).click();
+      await reportesEstrecho.getByRole('button', { name: 'Mostrar u ocultar la configuración' }).click();
+      await page.waitForTimeout(300);
+      await foto(page, `21j-reportes-visual-inspector-${ancho}`, reportesEstrecho.locator('.dialog'));
+      await reportesEstrecho.locator('.steps__item').first().click();
+      await page.waitForTimeout(300);
+      await medir(page, `reportes fuentes a ${ancho}`, hallazgos);
+      await foto(page, `21k-reportes-fuentes-${ancho}`, reportesEstrecho.locator('.dialog'));
+      await reportesEstrecho.locator('.datasets__item', { hasText: TABLERO_BARRIDO }).first().click();
+      await expect(reportesEstrecho.locator('app-report-dashboard .panel').first()).toBeVisible();
+      await page.waitForTimeout(300);
+      await medir(page, `tablero a ${ancho}`, hallazgos);
+      await foto(page, `22d-tablero-${ancho}`, reportesEstrecho.locator('.dialog'));
+
+      if (ancho === 900) {
+        const galeriaEstrecha = await abrirGaleria(reportesEstrecho);
+
+        await medir(page, 'galería de plantillas a 900', hallazgos);
+        await foto(page, '23g-plantillas-900');
+        await galeriaEstrecha.locator('.card', { hasText: PLANTILLA_BARRIDO }).getByRole('button', { name: 'Usar' }).click();
+        await expect(galeriaEstrecha.locator('.fields__row').first()).toBeVisible();
+        await expect(galeriaEstrecha.getByRole('button', { name: 'Crear copia' })).toBeEnabled();
+        await medir(page, 'vincular campos a 900', hallazgos);
+        await foto(page, '23h-plantilla-vincular-900');
+        await page.keyboard.press('Escape');
+        await page.keyboard.press('Escape');
+        await expect(galeriaEstrecha).toHaveCount(0);
+
+        const tableroEstrecho = reportesEstrecho.locator('app-report-dashboard');
+
+        await tableroEstrecho.getByRole('button', { name: 'Exportar', exact: true }).click();
+        await tableroEstrecho.getByRole('menuitem', { name: /^PDF/ }).first().click();
+        await expect(page.locator('body > app-report-print .paper')).toBeVisible();
+        await page.waitForTimeout(300);
+        await medir(page, 'vista de impresión a 900', hallazgos);
+        await foto(page, '24d-vista-impresion-900');
+        await page.locator('body > app-report-print').getByRole('button', { name: 'Cerrar' }).click();
+        await expect(page.locator('body > app-report-print')).toHaveCount(0);
+      }
+
+      if (ancho !== 900) {
+        await page.keyboard.press('Escape');
+        await expect(reportesEstrecho.locator('.dialog')).toBeHidden();
+      }
+    }
+
+    // Se deja como estaba: sin conjuntos del barrido, tampoco los que dejara
+    // a medias una ejecución anterior que se cortó antes de llegar aquí.
+    await borrarPlantillas(reportesEstrecho, RESTOS_PLANTILLAS);
+    await borrarRestos(reportesEstrecho, RESTOS_TABLEROS, RESTOS_CONJUNTOS);
+
+    await page.keyboard.press('Escape');
+    await expect(reportesEstrecho.locator('.dialog')).toBeHidden();
+    if (tamano) {
+      await page.setViewportSize(tamano);
+    }
 
     // --- Anchos ------------------------------------------------------------
     for (const ancho of [1440, 1280, 1024, 900]) {

@@ -1,0 +1,730 @@
+<!--
+  Pulsar fuera no cierra (lo trae `DialogBackdrop`): aquí se escribe SQL, y un
+  roce del ratón se llevaría la definición. Escape sí, y pregunta si hay cambios.
+-->
+<div class="backdrop" (document:keydown.escape)="close()"></div>
+
+<section class="dialog" role="dialog" aria-labelledby="reports-title">
+  <header class="head">
+    <app-icon name="chart" [size]="14" />
+    <div class="head__text">
+      <h2 class="head__title" id="reports-title">{{ 'reports.title' | t }}</h2>
+      @if (mode() === 'dataset') {
+        <input
+          class="head__name"
+          type="text"
+          maxlength="120"
+          [value]="draft().name"
+          (input)="rename($any($event.target).value)"
+          [attr.aria-label]="'reports.name' | t"
+        />
+      }
+    </div>
+    @if (mode() === 'dataset') {
+      <p class="head__status" aria-live="polite">
+        @if (draft().version > 0) {
+          {{ 'reports.versionStatus' | t: { version: draft().version } }}
+        }
+        @if (dirty()) {
+          <span class="head__dirty">{{ 'reports.unsaved' | t }}</span>
+        }
+      </p>
+      <button
+        type="button"
+        class="button"
+        (click)="runPreview()"
+        [disabled]="previewProblems().length > 0 || previewing()"
+      >
+        <app-icon name="play-outline" [size]="11" />
+        {{ (previewing() ? 'reports.previewing' : 'reports.preview') | t }}
+      </button>
+      <button
+        type="button"
+        class="button button--primary"
+        (click)="save()"
+        [disabled]="problems().length > 0 || saving() || !dirty()"
+      >
+        <app-icon name="save" [size]="11" />
+        {{ 'reports.save' | t }}
+      </button>
+    }
+    <button
+      type="button"
+      class="icon-button"
+      (click)="toggleInspector()"
+      [attr.aria-pressed]="inspectorOpen()"
+      [attr.aria-label]="'reports.inspector.toggle' | t"
+      [attr.title]="'reports.inspector.toggle' | t"
+    >
+      <app-icon name="panel-left" [size]="13" />
+    </button>
+    <button
+      type="button"
+      class="icon-button"
+      (click)="close()"
+      [attr.aria-label]="'common.close' | t"
+    >
+      <app-icon name="close" [size]="12" />
+    </button>
+  </header>
+
+  @if (confirm(); as pending) {
+    <div class="confirm" role="alertdialog" aria-live="assertive">
+      <p>{{ pending.message }}</p>
+      <button type="button" class="button" (click)="cancelConfirm()">
+        {{ 'common.cancel' | t }}
+      </button>
+      <button type="button" class="button button--danger" (click)="acceptConfirm()">
+        {{ pending.confirmLabel }}
+      </button>
+    </div>
+  }
+
+  <div
+    class="body"
+    [class.is-inspecting]="
+      mode() === 'dataset' && inspectorOpen() && sources().length > 0 && step() !== 'visual'
+    "
+    [class.is-working]="mode() === 'dashboard' || step() === 'visual'"
+  >
+    <!-- Navegación: pasos del constructor y conjuntos guardados. -->
+    <nav class="rail" [attr.aria-label]="'reports.nav' | t">
+      <p class="rail__label">{{ 'reports.steps' | t }}</p>
+      <ol class="steps">
+        <li>
+          <button
+            type="button"
+            class="steps__item"
+            [class.is-active]="mode() === 'dataset' && step() === 'sources'"
+            [attr.aria-current]="mode() === 'dataset' && step() === 'sources' ? 'step' : null"
+            (click)="goTo('sources')"
+          >
+            <span class="steps__number" aria-hidden="true">1</span>
+            {{ 'reports.step.sources' | t }}
+            <span class="steps__count">{{ sources().length }}/2</span>
+          </button>
+        </li>
+        <li>
+          <button
+            type="button"
+            class="steps__item"
+            [class.is-active]="mode() === 'dataset' && step() === 'join'"
+            [attr.aria-current]="mode() === 'dataset' && step() === 'join' ? 'step' : null"
+            [disabled]="!hasJoin()"
+            [attr.title]="hasJoin() ? null : ('reports.step.joinNeedsTwo' | t)"
+            (click)="goTo('join')"
+          >
+            <span class="steps__number" aria-hidden="true">2</span>
+            {{ 'reports.step.join' | t }}
+          </button>
+        </li>
+        <li>
+          <button
+            type="button"
+            class="steps__item"
+            [class.is-active]="mode() === 'dataset' && step() === 'visual'"
+            [attr.aria-current]="mode() === 'dataset' && step() === 'visual' ? 'step' : null"
+            [disabled]="savedDataset() === null"
+            [attr.title]="savedDataset() === null ? ('reports.step.visualNeedsSave' | t) : null"
+            (click)="goTo('visual')"
+          >
+            <span class="steps__number" aria-hidden="true">3</span>
+            {{ 'reports.step.visual' | t }}
+          </button>
+        </li>
+      </ol>
+
+      <div class="rail__row">
+        <p class="rail__label">{{ 'reports.datasets' | t }}</p>
+        <button
+          type="button"
+          class="icon-button"
+          (click)="startNew()"
+          [attr.aria-label]="'reports.new' | t"
+          [attr.title]="'reports.new' | t"
+        >
+          <app-icon name="plus" [size]="11" />
+        </button>
+      </div>
+      @if (loadingList()) {
+        <p class="rail__hint">{{ 'reports.loading' | t }}</p>
+      } @else if (datasets().length === 0) {
+        <p class="rail__hint">{{ 'reports.noDatasets' | t }}</p>
+      } @else {
+        <ul class="datasets">
+          @for (dataset of datasets(); track dataset.id) {
+            <li>
+              <button
+                type="button"
+                class="datasets__item"
+                [class.is-active]="isOpen(dataset)"
+                [attr.aria-current]="isOpen(dataset) ? 'true' : null"
+                (click)="open(dataset)"
+              >
+                <span class="datasets__name">{{ dataset.name }}</span>
+                <span class="datasets__meta">
+                  {{
+                    'reports.datasetMeta'
+                      | t: { sources: dataset.sources.length, version: dataset.version }
+                  }}
+                </span>
+              </button>
+            </li>
+          }
+        </ul>
+      }
+
+      <div class="rail__row">
+        <p class="rail__label">{{ 'reports.dashboard.list' | t }}</p>
+        <button
+          type="button"
+          class="icon-button"
+          (click)="newDashboard()"
+          [attr.aria-label]="'reports.dashboard.new' | t"
+          [attr.title]="'reports.dashboard.new' | t"
+        >
+          <app-icon name="plus" [size]="11" />
+        </button>
+        <button
+          type="button"
+          class="icon-button"
+          (click)="galleryOpen.set(true)"
+          [attr.aria-label]="'reports.template.newFromTemplate' | t"
+          [attr.title]="'reports.template.newFromTemplate' | t"
+        >
+          <app-icon name="copy" [size]="11" />
+        </button>
+      </div>
+      @if (templateError(); as message) {
+        <p class="rail__hint rail__hint--danger" role="alert">{{ message }}</p>
+      }
+      @if (!loadingList() && dashboards().length === 0) {
+        <p class="rail__hint">{{ 'reports.dashboard.none' | t }}</p>
+      } @else {
+        <ul class="datasets">
+          @for (dashboard of dashboards(); track dashboard.id) {
+            <li>
+              <button
+                type="button"
+                class="datasets__item"
+                [class.is-active]="isDashboardOpen(dashboard)"
+                [attr.aria-current]="isDashboardOpen(dashboard) ? 'true' : null"
+                (click)="showDashboard(dashboard)"
+              >
+                <span class="datasets__name">
+                  <app-icon name="chart" [size]="11" />
+                  {{ dashboard.name }}
+                </span>
+              </button>
+            </li>
+          }
+        </ul>
+      }
+    </nav>
+
+    @if (mode() === 'dashboard' && openDashboard(); as board) {
+      <app-report-dashboard
+        class="workbench"
+        [dashboard]="board"
+        [datasets]="datasets()"
+        [inspectorOpen]="inspectorOpen()"
+        (saved)="dashboardSaved($event)"
+        (deleted)="dashboardDeleted($event)"
+        (dirtyChange)="dashboardDirty($event)"
+        (editingChange)="dashboardEditing($event)"
+      />
+    } @else if (step() === 'visual' && savedDataset(); as dataset) {
+      <app-report-workbench
+        class="workbench"
+        [dataset]="dataset"
+        [definitionDirty]="dirty()"
+        [inspectorOpen]="inspectorOpen()"
+        [columnLabel]="labelOf"
+      />
+    } @else {
+      <!-- Centro: lo que devuelve cada fuente y lo que sale de cruzarlas. -->
+      <main class="stage">
+        @if (sources().length === 0) {
+          <div class="empty">
+            <app-icon name="database" [size]="22" />
+            <p class="empty__title">{{ 'reports.empty.title' | t }}</p>
+            <p class="empty__text">{{ 'reports.empty.text' | t }}</p>
+            @if (connections().length === 0) {
+              <p class="empty__text">{{ 'reports.empty.noConnections' | t }}</p>
+            } @else {
+              <button type="button" class="button button--primary" (click)="addSource()">
+                <app-icon name="plus" [size]="11" />
+                {{ 'reports.source.add' | t }}
+              </button>
+            }
+          </div>
+        } @else {
+          <div class="views" role="tablist" [attr.aria-label]="'reports.views' | t">
+            @for (source of sources(); track $index) {
+              <button
+                type="button"
+                role="tab"
+                class="views__tab"
+                [attr.aria-selected]="isView({ kind: 'source', index: $index })"
+                (click)="show({ kind: 'source', index: $index })"
+              >
+                {{ source.alias || ('reports.source.noAlias' | t) }}
+              </button>
+            }
+            @if (hasJoin()) {
+              <button
+                type="button"
+                role="tab"
+                class="views__tab"
+                [attr.aria-selected]="isView({ kind: 'join' })"
+                (click)="show({ kind: 'join' })"
+              >
+                {{ 'reports.view.combined' | t }}
+              </button>
+            }
+          </div>
+
+          <div class="result" role="tabpanel" [attr.aria-busy]="previewing()">
+            @if (error(); as message) {
+              <p class="banner banner--danger" role="alert">{{ message }}</p>
+            }
+            @if (notice(); as message) {
+              <p class="banner banner--success" role="status">{{ message }}</p>
+            }
+            @if (stale()) {
+              <p class="banner banner--warning" role="status">{{ 'reports.stale' | t }}</p>
+            }
+            @if (problems().length > 0) {
+              <ul class="problems" [attr.aria-label]="'reports.problems' | t">
+                @for (problem of problems(); track $index) {
+                  <li>{{ problem | t }}</li>
+                }
+              </ul>
+            }
+
+            @if (view().kind === 'source') {
+              @if (sourcePreview(); as read) {
+                @if (!read.succeeded) {
+                  <div class="diagnostic diagnostic--danger" role="alert">
+                    <app-icon name="alert" [size]="13" />
+                    <p>{{ failureText(read.failureCode, read.message, read.localized) }}</p>
+                  </div>
+                } @else {
+                  <p class="stats">
+                    {{ 'reports.stats.rows' | t: { count: read.rowCount } }}
+                    · {{ 'reports.stats.readAt' | t: { time: readAt(read) } }}
+                    @if (read.truncated) {
+                      <span class="badge badge--warning">{{ 'reports.sample' | t }}</span>
+                    }
+                  </p>
+                  @if (read.truncated) {
+                    <p class="banner banner--warning">{{ 'reports.truncated' | t }}</p>
+                  }
+                  @if (read.schemaChanges.length > 0) {
+                    <div class="diagnostic diagnostic--warning">
+                      <app-icon name="alert" [size]="13" />
+                      <div>
+                        <p>{{ 'reports.schema.title' | t }}</p>
+                        <ul>
+                          @for (change of read.schemaChanges; track change.column) {
+                            <li>{{ schemaChangeText(change) }}</li>
+                          }
+                        </ul>
+                      </div>
+                    </div>
+                  }
+                  <ng-container
+                    *ngTemplateOutlet="
+                      table;
+                      context: { columns: read.columns, rows: read.sampleRows, repeated: [] }
+                    "
+                  />
+                }
+              } @else {
+                <p class="placeholder">{{ 'reports.noPreview' | t }}</p>
+              }
+            } @else {
+              @if (joinPreview(); as joined) {
+                @if (!joined.succeeded) {
+                  <div class="diagnostic diagnostic--danger" role="alert">
+                    <app-icon name="alert" [size]="13" />
+                    <div>
+                      <p>{{ serverText(joined.localized, joined.message) }}</p>
+                      @if (joined.duplicateKeys.length > 0) {
+                        <p>{{ 'reports.join.duplicates' | t }}</p>
+                        <ul class="keys">
+                          @for (key of joined.duplicateKeys; track $index) {
+                            <li>
+                              <code>{{ key }}</code>
+                            </li>
+                          }
+                        </ul>
+                      }
+                    </div>
+                  </div>
+                } @else {
+                  <dl class="summary">
+                    <div>
+                      <dt>{{ 'reports.join.rows' | t }}</dt>
+                      <dd>{{ count(joined.rowCount) }}</dd>
+                    </div>
+                    <div>
+                      <dt>{{ 'reports.join.matched' | t }}</dt>
+                      <dd>{{ count(joined.matchedRows) }}</dd>
+                    </div>
+                    <div>
+                      <dt>{{ 'reports.join.unmatchedLeft' | t: { alias: sources()[0].alias } }}</dt>
+                      <dd>{{ count(joined.unmatchedLeftRows) }}</dd>
+                    </div>
+                    <div>
+                      <dt>
+                        {{ 'reports.join.unmatchedRight' | t: { alias: sources()[1].alias } }}
+                      </dt>
+                      <dd>{{ count(joined.unmatchedRightRows) }}</dd>
+                    </div>
+                  </dl>
+                  @if (joined.isSample) {
+                    <p class="banner banner--warning">{{ 'reports.join.sample' | t }}</p>
+                  }
+                  @if (joined.repeatedColumns.length > 0) {
+                    <div class="diagnostic diagnostic--warning">
+                      <app-icon name="alert" [size]="13" />
+                      <p>
+                        {{
+                          'reports.join.repeated'
+                            | t: { columns: repeatedLabels(joined.repeatedColumns) }
+                        }}
+                      </p>
+                    </div>
+                  }
+                  <ng-container
+                    *ngTemplateOutlet="
+                      table;
+                      context: {
+                        columns: joined.columns,
+                        rows: joined.sampleRows,
+                        repeated: joined.repeatedColumns,
+                      }
+                    "
+                  />
+                }
+              } @else {
+                <p class="placeholder">{{ 'reports.noPreview' | t }}</p>
+              }
+            }
+          </div>
+        }
+      </main>
+
+      <!-- Inspector: la configuración del paso, plegable para dejar sitio a la vista previa. -->
+      @if (inspectorOpen() && sources().length > 0) {
+        <aside class="inspector" [attr.aria-label]="'reports.inspector.label' | t">
+          @if (step() === 'sources') {
+            <div class="segmented" role="tablist" [attr.aria-label]="'reports.step.sources' | t">
+              @for (source of sources(); track $index) {
+                <button
+                  type="button"
+                  role="tab"
+                  class="segmented__item"
+                  [attr.aria-selected]="activeSource() === $index"
+                  (click)="selectSource($index)"
+                >
+                  {{ source.alias || ('reports.source.noAlias' | t) }}
+                </button>
+              }
+              @if (canAddSource()) {
+                <button type="button" class="segmented__add" (click)="addSource()">
+                  <app-icon name="plus" [size]="10" />
+                  {{ 'reports.source.add' | t }}
+                </button>
+              }
+            </div>
+
+            @if (current(); as source) {
+              <label class="field">
+                <span class="field__label">{{ 'reports.source.alias' | t }}</span>
+                <input
+                  type="text"
+                  maxlength="40"
+                  [value]="source.alias"
+                  (input)="renameSource($any($event.target).value)"
+                />
+              </label>
+
+              <label class="field">
+                <span class="field__label">{{ 'reports.source.connection' | t }}</span>
+                <select
+                  [value]="source.connectionId"
+                  (change)="chooseConnection($any($event.target).value)"
+                >
+                  <option value="" disabled>{{ 'reports.source.chooseConnection' | t }}</option>
+                  @for (connection of connections(); track connection.id) {
+                    <option
+                      [value]="connection.id"
+                      [selected]="connection.id === source.connectionId"
+                    >
+                      {{ connection.name }} · {{ connection.engine }}
+                    </option>
+                  }
+                </select>
+              </label>
+
+              <label class="field">
+                <span class="field__label">{{ 'reports.source.database' | t }}</span>
+                <input
+                  type="text"
+                  [value]="source.database"
+                  [attr.list]="'reports-databases-' + activeSource()"
+                  (change)="chooseDatabase($any($event.target).value)"
+                  [placeholder]="
+                    (currentOptions().loading ? 'reports.loading' : 'reports.source.databaseHint')
+                      | t
+                  "
+                />
+                <datalist [id]="'reports-databases-' + activeSource()">
+                  @for (database of currentOptions().databases; track database) {
+                    <option [value]="database"></option>
+                  }
+                </datalist>
+                @if (currentOptions().error; as problem) {
+                  <span class="field__error">{{ problem }}</span>
+                }
+              </label>
+
+              <div class="field">
+                <span class="field__label" id="reports-mode">{{ 'reports.source.mode' | t }}</span>
+                <div class="toggle" role="radiogroup" aria-labelledby="reports-mode">
+                  <button
+                    type="button"
+                    role="radio"
+                    [attr.aria-checked]="source.mode === 'Sql'"
+                    (click)="useSqlMode()"
+                  >
+                    {{ 'reports.source.sqlMode' | t }}
+                  </button>
+                  <button
+                    type="button"
+                    role="radio"
+                    [attr.aria-checked]="source.mode === 'Visual'"
+                    (click)="useVisualMode()"
+                  >
+                    {{ 'reports.source.visual' | t }}
+                  </button>
+                </div>
+              </div>
+
+              @if (source.mode === 'Visual') {
+                <label class="field">
+                  <span class="field__label">{{ 'reports.source.composition' | t }}</span>
+                  <select
+                    [value]="currentVisual()?.compositionId ?? ''"
+                    (change)="chooseComposition($any($event.target).value)"
+                    [disabled]="!source.database"
+                  >
+                    <option value="" disabled>{{ 'reports.source.chooseComposition' | t }}</option>
+                    @for (record of currentCompositions(); track record.id) {
+                      <option
+                        [value]="record.id"
+                        [selected]="record.id === currentVisual()?.compositionId"
+                      >
+                        {{ record.name }} · {{ record.table }}
+                      </option>
+                    }
+                  </select>
+                  @if (source.database && currentCompositions().length === 0) {
+                    <span class="field__hint">{{ 'reports.source.noCompositions' | t }}</span>
+                  }
+                </label>
+                @if (currentVisual(); as visual) {
+                  <p class="field__hint">
+                    {{ 'reports.source.copied' | t: { name: visual.name, table: visual.table } }}
+                  </p>
+                }
+                <div class="field">
+                  <span class="field__label">{{ 'reports.source.generatedSql' | t }}</span>
+                  <pre class="sql sql--readonly">{{ source.sql || '—' }}</pre>
+                  <button
+                    type="button"
+                    class="link"
+                    (click)="useSqlMode()"
+                    [disabled]="!source.sql"
+                  >
+                    {{ 'reports.source.editAsSql' | t }}
+                  </button>
+                </div>
+              } @else {
+                <label class="field field--grow">
+                  <span class="field__label">{{ 'reports.source.sql' | t }}</span>
+                  <textarea
+                    class="sql"
+                    spellcheck="false"
+                    rows="10"
+                    [value]="source.sql"
+                    (input)="editSql($any($event.target).value)"
+                    [placeholder]="'reports.source.sqlHint' | t"
+                  ></textarea>
+                </label>
+                @if (currentVisual()) {
+                  <p class="field__hint">{{ 'reports.source.keepsVisual' | t }}</p>
+                }
+              }
+
+              <p class="field__hint">{{ 'reports.source.readOnly' | t }}</p>
+              <button
+                type="button"
+                class="link link--danger"
+                (click)="removeSource(activeSource())"
+              >
+                <app-icon name="trash" [size]="11" />
+                {{ 'reports.source.remove' | t }}
+              </button>
+            }
+          } @else if (step() === 'join') {
+            <p class="inspector__intro">
+              {{
+                'reports.join.intro' | t: { left: sources()[0].alias, right: sources()[1].alias }
+              }}
+            </p>
+
+            <fieldset class="field">
+              <legend class="field__label">{{ 'reports.join.keys' | t }}</legend>
+              <datalist id="reports-left-columns">
+                @for (column of leftColumns(); track column.name) {
+                  <option [value]="column.name"></option>
+                }
+              </datalist>
+              <datalist id="reports-right-columns">
+                @for (column of rightColumns(); track column.name) {
+                  <option [value]="column.name"></option>
+                }
+              </datalist>
+              @for (key of join().keys; track $index) {
+                <div class="pair">
+                  <input
+                    type="text"
+                    list="reports-left-columns"
+                    [value]="key.left"
+                    (change)="editKey($index, 'left', $any($event.target).value)"
+                    [attr.aria-label]="'reports.join.leftColumn' | t: { alias: sources()[0].alias }"
+                  />
+                  <span aria-hidden="true">=</span>
+                  <input
+                    type="text"
+                    list="reports-right-columns"
+                    [value]="key.right"
+                    (change)="editKey($index, 'right', $any($event.target).value)"
+                    [attr.aria-label]="
+                      'reports.join.rightColumn' | t: { alias: sources()[1].alias }
+                    "
+                  />
+                  <button
+                    type="button"
+                    class="icon-button"
+                    (click)="removeKey($index)"
+                    [attr.aria-label]="'reports.join.removeKey' | t"
+                  >
+                    <app-icon name="close" [size]="10" />
+                  </button>
+                </div>
+              }
+              @if (leftColumns().length === 0 || rightColumns().length === 0) {
+                <span class="field__hint">{{ 'reports.join.previewForColumns' | t }}</span>
+              }
+              <button type="button" class="link" (click)="addKey()">
+                <app-icon name="plus" [size]="10" />
+                {{ 'reports.join.addKey' | t }}
+              </button>
+            </fieldset>
+
+            <label class="field">
+              <span class="field__label">{{ 'reports.join.kind' | t }}</span>
+              <select
+                [value]="join().kind"
+                (change)="patchJoin({ kind: $any($event.target).value })"
+              >
+                <option value="Left" [selected]="join().kind === 'Left'">
+                  {{ 'reports.join.kindLeft' | t }}
+                </option>
+                <option value="Inner" [selected]="join().kind === 'Inner'">
+                  {{ 'reports.join.kindInner' | t }}
+                </option>
+              </select>
+            </label>
+
+            <label class="field">
+              <span class="field__label">{{ 'reports.join.cardinality' | t }}</span>
+              <select
+                [value]="join().cardinality"
+                (change)="patchJoin({ cardinality: $any($event.target).value })"
+              >
+                <option value="OneToOne" [selected]="join().cardinality === 'OneToOne'">
+                  {{ 'reports.join.oneToOne' | t }}
+                </option>
+                <option value="ManyToOne" [selected]="join().cardinality === 'ManyToOne'">
+                  {{
+                    'reports.join.manyToOne'
+                      | t: { left: sources()[0].alias, right: sources()[1].alias }
+                  }}
+                </option>
+              </select>
+              <span class="field__hint">{{ 'reports.join.cardinalityHint' | t }}</span>
+            </label>
+          }
+
+          @if (draft().version > 0) {
+            <button type="button" class="link link--danger inspector__delete" (click)="remove()">
+              <app-icon name="trash" [size]="11" />
+              {{ 'reports.deleteDataset' | t }}
+            </button>
+          }
+        </aside>
+      }
+    }
+  </div>
+</section>
+
+<!-- Una sola tabla para fuentes y cruce: cabecera fija, números alineados a la derecha. -->
+<ng-template #table let-columns="columns" let-rows="rows" let-repeated="repeated">
+  @if (rows.length === 0) {
+    <p class="placeholder">{{ 'reports.noRows' | t }}</p>
+  } @else {
+    <div class="grid" tabindex="0" [attr.aria-label]="'reports.sampleTable' | t">
+      <table>
+        <thead>
+          <tr>
+            @for (column of columns; track column.ordinal) {
+              <th
+                scope="col"
+                [class.is-number]="isNumeric(column)"
+                [class.is-repeated]="repeated.includes(column.name)"
+              >
+                <span class="grid__name">{{ columnLabel(column.name) }}</span>
+                <span class="grid__type">{{ column.dataType }}</span>
+              </th>
+            }
+          </tr>
+        </thead>
+        <tbody>
+          @for (row of rows; track $index) {
+            <tr>
+              @for (column of columns; track column.ordinal) {
+                <td [class.is-number]="isNumeric(column)" [class.is-null]="row[$index] === null">
+                  {{ cell(row[$index]) }}
+                </td>
+              }
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+</ng-template>
+
+@if (galleryOpen()) {
+  <app-report-template-gallery
+    [scopes]="dashboardScopes"
+    [datasets]="datasets()"
+    (applied)="createFromTemplate($event)"
+    (closed)="galleryOpen.set(false)"
+  />
+}

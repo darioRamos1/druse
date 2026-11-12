@@ -379,3 +379,32 @@ app-query-builder {
     max-height: 340px;
   }
 }
+
+/*
+ * Impresión de Reportes: el PDF de un tablero o un panel.
+ *
+ * Mientras la vista de impresión está abierta (`app-report-print` cuelga de
+ * <body>), se imprime solo ella: el resto de Druse —la ventana con su altura
+ * fija y sus desplazamientos— no tiene nada que hacer en papel.
+ */
+@media print {
+  @page {
+    size: A4 landscape;
+    margin: 12mm;
+  }
+
+  body.is-printing-report {
+    height: auto !important;
+    overflow: visible !important;
+    background: #fff !important;
+
+    > :not(app-report-print) {
+      display: none !important;
+    }
+  }
+
+  html:has(body.is-printing-report) {
+    height: auto !important;
+    overflow: visible !important;
+  }
+}

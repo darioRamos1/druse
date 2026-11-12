@@ -66,6 +66,20 @@ import {
   SaveConnectionRequest,
 } from './application-gateway';
 import { DesktopHost } from './desktop-host';
+import {
+  ReportDatabaseList,
+  ReportDataset,
+  ReportDatasetPreview,
+  ReportRefresh,
+  ReportRun,
+  ReportSchedule,
+  ReportStorage,
+  ReportSnapshot,
+  SavedDashboard,
+  SavedReportTemplate,
+  SavedReport,
+  ExportDocument,
+} from '../../shared/models/reports';
 import { translate } from '../i18n/active';
 import {
   AiChatRequest,
@@ -482,11 +496,119 @@ export class HttpApplicationGateway extends ApplicationGateway {
     connectionId: string,
     database: string,
     schema: string | undefined,
-    table: string,
+    table?: string,
   ): Observable<readonly SavedCompositionRecord[]> {
     return this._http.get<SavedCompositionRecord[]>('/api/workspace/compositions', {
-      params: { connectionId, database, schema: schema ?? '', table },
+      params:
+        table === undefined
+          ? { connectionId, database }
+          : { connectionId, database, schema: schema ?? '', table },
     });
+  }
+
+  override getReportDatasets(): Observable<readonly ReportDataset[]> {
+    return this._http.get<ReportDataset[]>('/api/reports/datasets');
+  }
+
+  override saveReportDataset(dataset: ReportDataset): Observable<ReportDataset> {
+    return this._http.put<ReportDataset>(`/api/reports/datasets/${dataset.id}`, dataset);
+  }
+
+  override deleteReportDataset(id: string): Observable<void> {
+    return this._http.delete<void>(`/api/reports/datasets/${id}`);
+  }
+
+  override previewReportDataset(dataset: ReportDataset): Observable<ReportDatasetPreview> {
+    return this._http.post<ReportDatasetPreview>('/api/reports/datasets/preview', dataset);
+  }
+
+  override getReportSourceDatabases(connectionId: string): Observable<ReportDatabaseList> {
+    return this._http.get<ReportDatabaseList>(`/api/reports/connections/${connectionId}/databases`);
+  }
+
+  override refreshReportDataset(datasetId: string): Observable<ReportRefresh> {
+    return this._http.post<ReportRefresh>(`/api/reports/datasets/${datasetId}/refresh`, null);
+  }
+
+  override getReportSnapshot(datasetId: string): Observable<ReportSnapshot | null> {
+    // Sin resultado todavía llega como 204, sin cuerpo: `null`.
+    return this._http
+      .get<ReportSnapshot>(`/api/reports/datasets/${datasetId}/snapshot`, { observe: 'response' })
+      .pipe(map((response) => response.body));
+  }
+
+  override getReportRuns(datasetId: string): Observable<readonly ReportRun[]> {
+    return this._http.get<ReportRun[]>(`/api/reports/datasets/${datasetId}/runs`);
+  }
+
+  override getReportSchedule(datasetId: string): Observable<ReportSchedule | null> {
+    // Sin programación llega como 204, sin cuerpo: `null`.
+    return this._http
+      .get<ReportSchedule>(`/api/reports/datasets/${datasetId}/schedule`, { observe: 'response' })
+      .pipe(map((response) => response.body));
+  }
+
+  override saveReportSchedule(
+    datasetId: string,
+    schedule: ReportSchedule,
+  ): Observable<ReportSchedule> {
+    return this._http.put<ReportSchedule>(`/api/reports/datasets/${datasetId}/schedule`, schedule);
+  }
+
+  override deleteReportSchedule(datasetId: string): Observable<void> {
+    return this._http.delete<void>(`/api/reports/datasets/${datasetId}/schedule`);
+  }
+
+  override deleteReportSnapshot(datasetId: string): Observable<void> {
+    return this._http.delete<void>(`/api/reports/datasets/${datasetId}/snapshot`);
+  }
+
+  override getReportStorage(): Observable<ReportStorage> {
+    return this._http.get<ReportStorage>('/api/reports/storage');
+  }
+
+  override getSavedReports(datasetId: string): Observable<readonly SavedReport[]> {
+    return this._http.get<SavedReport[]>(`/api/reports/datasets/${datasetId}/reports`);
+  }
+
+  override getAllReports(): Observable<readonly SavedReport[]> {
+    return this._http.get<SavedReport[]>('/api/reports/reports');
+  }
+
+  override getDashboards(): Observable<readonly SavedDashboard[]> {
+    return this._http.get<SavedDashboard[]>('/api/reports/dashboards');
+  }
+
+  override saveDashboard(dashboard: SavedDashboard): Observable<SavedDashboard> {
+    return this._http.put<SavedDashboard>(`/api/reports/dashboards/${dashboard.id}`, dashboard);
+  }
+
+  override deleteDashboard(id: string): Observable<void> {
+    return this._http.delete<void>(`/api/reports/dashboards/${id}`);
+  }
+
+  override getReportTemplates(): Observable<readonly SavedReportTemplate[]> {
+    return this._http.get<SavedReportTemplate[]>('/api/reports/templates');
+  }
+
+  override saveReportTemplate(template: SavedReportTemplate): Observable<SavedReportTemplate> {
+    return this._http.put<SavedReportTemplate>(`/api/reports/templates/${template.id}`, template);
+  }
+
+  override deleteReportTemplate(id: string): Observable<void> {
+    return this._http.delete<void>(`/api/reports/templates/${id}`);
+  }
+
+  override exportReportWorkbook(document: ExportDocument): Observable<Blob> {
+    return this._http.post('/api/reports/exports/xlsx', document, { responseType: 'blob' });
+  }
+
+  override saveReport(report: SavedReport): Observable<SavedReport> {
+    return this._http.put<SavedReport>(`/api/reports/reports/${report.id}`, report);
+  }
+
+  override deleteReport(id: string): Observable<void> {
+    return this._http.delete<void>(`/api/reports/reports/${id}`);
   }
 
   override saveComposition(composition: SavedCompositionRecord): Observable<void> {

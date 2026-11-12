@@ -12,7 +12,7 @@ namespace Druse.Provider.PostgreSql;
 /// liberarlo siempre: de lo contrario la conexión quedaría ocupada por una
 /// consulta que ya nadie está leyendo.
 /// </summary>
-internal sealed class PostgreSqlResultReader : IQueryResultReader
+internal sealed class PostgreSqlResultReader : ITypedQueryResultReader
 {
     private readonly DbCommand _command;
     private readonly DbDataReader _reader;
@@ -112,6 +112,9 @@ internal sealed class PostgreSqlResultReader : IQueryResultReader
             yield return _buffer;
         }
     }
+
+    public Task<TypedQueryResult> ReadTypedAsync(int maxRows, CancellationToken cancellationToken) =>
+        TypedQueryResult.ReadAsync(_reader, Columns, maxRows, cancellationToken);
 
     public async ValueTask DisposeAsync()
     {

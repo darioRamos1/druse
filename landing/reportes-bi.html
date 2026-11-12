@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="referrer" content="no-referrer" />
+    <meta name="description" content="Avance de Reportes BI en Druse: reportes que combinan datos de distintas bases, tableros con filtros y actualizaciones programadas. En desarrollo." />
+    <title>Avance de Reportes BI — Druse</title>
+    <link rel="icon" href="./assets/druse.png" />
+    <link rel="stylesheet" href="./styles.css" />
+    <link rel="stylesheet" href="./privacy.css" />
+    <link rel="stylesheet" href="./primeros-pasos.css" />
+  </head>
+  <body class="legal-page">
+    <a class="skip-link" href="#contenido">Saltar al contenido</a>
+    <header class="container legal-footer"><a href="./#reportes-bi">← Volver a Druse</a></header>
+    <main class="container legal-layout" id="contenido">
+      <nav class="legal-sidebar" aria-label="Avance por etapa">
+        <a href="#cierre">Motores y cierre</a>
+        <a href="#programacion">Programación</a>
+        <a href="#diseno">Diseño y plantillas</a>
+        <a href="#reportes">Reportes guardados</a>
+        <a href="#constructor">Constructor</a>
+        <a href="#cruce">Cruce entre motores</a>
+      </nav>
+      <div class="legal-content">
+        <p class="eyebrow">REPORTES BI <span class="bi-status">En desarrollo</span></p>
+        <h1>El avance de Reportes BI.</h1>
+        <p class="legal-intro">Reportes que combinan datos de distintas bases, tableros con filtros
+          y actualizaciones programadas. Aquí queda lo que ya funciona en desarrollo, de lo más
+          reciente a lo más antiguo.</p>
+        <aside class="legal-draft">
+          <p><strong>Todavía no está en una versión publicada.</strong> Cuando llegue a una
+            versión que se pueda descargar, esta página lo dirá y enlazará sus notas. Las capturas
+            son de Druse en desarrollo y usan datos ficticios: ventas y metas de tres municipios.</p>
+        </aside>
+
+        <ol class="bi-log">
+          <li id="cierre">
+            <time datetime="2026-11-12">12 de noviembre de 2026</time>
+            <h2>Más motores y mensajes en tu idioma</h2>
+            <p>Las fuentes pueden venir de SQL Server, PostgreSQL, MySQL, Oracle y SQLite, y cruzarse
+              entre sí. Cada motor está comprobado contra un servidor real: tipos, nulos, límite de
+              filas y cancelación. Informix está implementado y pendiente de comprobar. Los avisos
+              salen en español o en inglés.</p>
+          </li>
+          <li id="programacion">
+            <time datetime="2026-11-12">12 de noviembre de 2026</time>
+            <h2>Actualizaciones programadas</h2>
+            <p>Cada conjunto de datos se puede actualizar a diario o los días elegidos, a una hora y
+              en una zona horaria. Si Druse estaba cerrado o el equipo dormía, se actualiza una vez al
+              volver; si una base no responde, lo reintenta. El historial cuenta cada intento y se
+              puede ver y liberar el espacio de los datos guardados.</p>
+            <figure>
+              <img src="./assets/reportes-programar.webp" alt="Formulario de actualización programada: frecuencia semanal, lunes y jueves a las 7:00, zona horaria America/Bogota." width="1232" height="552" loading="lazy" decoding="async" />
+              <figcaption><span class="bi-tag">Captura de Druse</span> Programación semanal sobre el indicador de cumplimiento.</figcaption>
+            </figure>
+          </li>
+          <li id="diseno">
+            <time datetime="2026-11-12">11 y 12 de noviembre de 2026</time>
+            <h2>Tableros, diseño, plantillas y exportación</h2>
+            <p>Tableros con varias páginas, filtros compartidos de fecha y categoría, y filtrar al
+              pulsar una barra. Colores, formato de números y umbrales por reporte. Un diseño se
+              guarda como plantilla y se aplica a otro conjunto con columnas distintas. Un tablero o
+              un panel se exporta a Excel, PDF o CSV con los filtros activos.</p>
+            <figure>
+              <img src="./assets/reportes-tablero.webp" alt="Tablero comercial en Druse con ventas por municipio en barras (80, 100 y 40) y un indicador de cumplimiento del 60 %, con filtros de fecha y categoría." width="1232" height="552" loading="lazy" decoding="async" />
+              <figcaption><span class="bi-tag">Captura de Druse</span> Tablero con dos paneles y sus filtros.</figcaption>
+            </figure>
+          </li>
+          <li id="reportes">
+            <time datetime="2026-11-11">11 de noviembre de 2026</time>
+            <h2>Reportes guardados</h2>
+            <p>Tabla, barras, línea e indicador con meta sobre el último resultado guardado, que se
+              consulta con las bases desconectadas. Si una actualización falla, se conservan los
+              datos anteriores y se dice por qué.</p>
+          </li>
+          <li id="constructor">
+            <time datetime="2026-11-11">11 de noviembre de 2026</time>
+            <h2>Constructor SQL y visual</h2>
+            <p>Una o dos fuentes por conjunto, cada una en SQL o con el compositor visual, su unión
+              por una o varias columnas y una vista previa con diagnósticos por fuente.</p>
+            <figure>
+              <img src="./assets/reportes-combinar.webp" alt="Paso Combinar del constructor: ventas y metas unidas por mes y municipio, con tres filas, dos coincidencias y un municipio sin meta." width="1232" height="552" loading="lazy" decoding="async" />
+              <figcaption><span class="bi-tag">Captura de Druse</span> Ventas y metas unidas por mes y municipio.</figcaption>
+            </figure>
+          </li>
+          <li id="cruce">
+            <time datetime="2026-11-11">11 de noviembre de 2026</time>
+            <h2>Cruce entre SQL Server y PostgreSQL</h2>
+            <p>La primera prueba: ventas en SQL Server y metas en PostgreSQL, cruzadas en Druse. Tres
+              municipios, 220 en ventas y un 60 % de cumplimiento, con el municipio sin meta aparte.
+              Los códigos conservan sus ceros iniciales y una clave duplicada detiene la unión.</p>
+          </li>
+        </ol>
+
+        <p><a href="./#reportes-bi">Volver a Reportes BI</a> ·
+          <a href="./#descargar">Descargar Druse</a></p>
+      </div>
+    </main>
+  </body>
+</html>

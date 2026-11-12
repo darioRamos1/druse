@@ -53,6 +53,7 @@ import { TransferDialog } from '../../features/transfer/transfer-dialog/transfer
 import { TransferSetDialog } from '../../features/transfer/transfer-set-dialog/transfer-set-dialog';
 import { TableDesigner } from '../../features/tables/table-designer/table-designer';
 import { DiagramPanel } from '../../features/diagram/diagram-panel/diagram-panel';
+import { ReportBuilder } from '../../features/reports/report-builder/report-builder';
 import { ProcedureRunner } from '../../features/query-builder/procedure-runner/procedure-runner';
 import { QueryBuilder } from '../../features/query-builder/query-builder/query-builder';
 import { buildSelect } from '../../features/query-editor/sql-language/sql-writer';
@@ -131,6 +132,7 @@ interface PendingConnectionSelection {
     RestoreDialog,
     TableDesigner,
     DiagramPanel,
+    ReportBuilder,
     QueryBuilder,
     ProcedureRunner,
     CommandPalette,
@@ -634,6 +636,7 @@ export class AppShell {
       this.transferTarget() !== null ||
       this.transferSetTarget() !== null ||
       this.builderTarget() !== null ||
+      this.reportsOpen() ||
       this.designTarget() !== null ||
       this.procedureTarget() !== null ||
       this.diagramTarget() !== null ||
@@ -846,6 +849,14 @@ export class AppShell {
   protected openDiagram(node: ExplorerNode): void {
     this.prepareOverlay();
     this.diagramTarget.set(node);
+  }
+
+  /** El constructor de Reportes BI. No depende de la pestaña ni de la conexión activa. */
+  protected readonly reportsOpen = signal(false);
+
+  protected openReports(): void {
+    this.prepareOverlay();
+    this.reportsOpen.set(true);
   }
 
   protected closeDiagram(): void {

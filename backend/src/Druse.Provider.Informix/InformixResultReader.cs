@@ -12,7 +12,7 @@ namespace Druse.Provider.Informix;
 /// liberarlo siempre: de lo contrario la conexión quedaría ocupada por una
 /// consulta que ya nadie está leyendo.
 /// </summary>
-internal sealed class InformixResultReader : IQueryResultReader
+internal sealed class InformixResultReader : ITypedQueryResultReader
 {
     private readonly DbCommand _command;
     private readonly DbDataReader _reader;
@@ -110,6 +110,10 @@ internal sealed class InformixResultReader : IQueryResultReader
             yield return _buffer;
         }
     }
+
+    // Reportes BI: los valores originales, no el texto de la cuadrícula.
+    public Task<TypedQueryResult> ReadTypedAsync(int maxRows, CancellationToken cancellationToken) =>
+        TypedQueryResult.ReadAsync(_reader, Columns, maxRows, cancellationToken);
 
     public async ValueTask DisposeAsync()
     {

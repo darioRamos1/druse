@@ -24,6 +24,7 @@ export type IconName =
   | 'schema'
   | 'table'
   | 'diagram'
+  | 'chart'
   | 'play'
   | 'play-outline'
   | 'stop'
@@ -166,6 +167,15 @@ const ICONS: Readonly<Record<IconName, IconDefinition>> = {
       '<rect x="1.4" y="9.4" width="3.6" height="3" rx=".8" stroke="currentColor" stroke-width="1.2"/>' +
       '<rect x="9" y="9.4" width="3.6" height="3" rx=".8" stroke="currentColor" stroke-width="1.2"/>' +
       '<path d="M7 4.4v2.3M3.2 9.4V7.2h7.6v2.2" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>',
+  },
+  /** Barras de distinta altura sobre una base: Reportes BI. */
+  chart: {
+    viewBox: '0 0 14 14',
+    body:
+      '<path d="M1.6 12.4h10.8" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>' +
+      '<rect x="2.6" y="7" width="2.2" height="4" rx="0.6" stroke="currentColor" stroke-width="1.1"/>' +
+      '<rect x="5.9" y="3.6" width="2.2" height="7.4" rx="0.6" stroke="currentColor" stroke-width="1.1"/>' +
+      '<rect x="9.2" y="5.6" width="2.2" height="5.4" rx="0.6" stroke="currentColor" stroke-width="1.1"/>',
   },
   /** Dos tablas unidas por una relación: es lo que dibuja el diagrama. */
   diagram: {

@@ -1,0 +1,722 @@
+<main class="board">
+  <header class="board__bar">
+    <div class="board__title">
+      @if (editing()) {
+        <input
+          class="board__name"
+          type="text"
+          maxlength="120"
+          [value]="name()"
+          (input)="rename($any($event.target).value)"
+          [attr.aria-label]="'reports.dashboard.name' | t"
+        />
+      } @else {
+        <h3 class="board__heading">{{ name() }}</h3>
+      }
+      @if (dirty()) {
+        <span class="board__dirty">{{ 'reports.unsaved' | t }}</span>
+      }
+    </div>
+
+    <div class="board__actions">
+      <button
+        type="button"
+        class="button"
+        (click)="refreshAll()"
+        [disabled]="refreshing() || usedDatasets().length === 0"
+      >
+        <app-icon name="refresh" [size]="11" />
+        {{ (refreshing() ? 'reports.data.refreshing' : 'reports.dashboard.refreshAll') | t }}
+      </button>
+      @if (editing()) {
+        <button
+          type="button"
+          class="button button--primary"
+          (click)="save()"
+          [disabled]="!name().trim() || saving() || !dirty()"
+        >
+          <app-icon name="save" [size]="11" />
+          {{ 'reports.dashboard.save' | t }}
+        </button>
+      }
+      <div
+        class="export"
+        (focusout)="exportMenuFocusOut($event)"
+        (keydown)="exportMenuKeydown($event)"
+      >
+        <button
+          type="button"
+          class="button"
+          aria-haspopup="menu"
+          [attr.aria-expanded]="exportMenu() === 'board'"
+          (click)="toggleExportMenu('board')"
+          [disabled]="exporting() || panels().length === 0"
+        >
+          <app-icon name="export" [size]="11" />
+          {{ (exporting() ? 'reports.export.working' : 'reports.export.board') | t }}
+        </button>
+        @if (exportMenu() === 'board') {
+          <div class="menu" role="menu" [attr.aria-label]="'reports.export.board' | t">
+            @if (pages().length > 1) {
+              <button
+                type="button"
+                role="menuitem"
+                class="menu__item"
+                (click)="exportExcel('page')"
+              >
+                {{ 'reports.export.excelPage' | t }}
+              </button>
+              <button type="button" role="menuitem" class="menu__item" (click)="exportExcel('all')">
+                {{ 'reports.export.excelAll' | t }}
+              </button>
+              <button type="button" role="menuitem" class="menu__item" (click)="openPrint('page')">
+                {{ 'reports.export.pdfPage' | t }}
+              </button>
+              <button type="button" role="menuitem" class="menu__item" (click)="openPrint('all')">
+                {{ 'reports.export.pdfAll' | t }}
+              </button>
+            } @else {
+              <button
+                type="button"
+                role="menuitem"
+                class="menu__item"
+                (click)="exportExcel('page')"
+              >
+                {{ 'reports.export.excel' | t }}
+              </button>
+              <button type="button" role="menuitem" class="menu__item" (click)="openPrint('page')">
+                {{ 'reports.export.pdf' | t }}
+              </button>
+            }
+            <p class="menu__hint">
+              {{
+                (anyActive() ? 'reports.export.withFilters' : 'reports.export.noFiltersHint') | t
+              }}
+            </p>
+          </div>
+        }
+      </div>
+      <button
+        type="button"
+        class="button"
+        [attr.aria-pressed]="savingTemplate() === 'Dashboard'"
+        (click)="savingTemplate.set(savingTemplate() === 'Dashboard' ? null : 'Dashboard')"
+        [disabled]="panels().length === 0 && pages().length === 1"
+      >
+        <app-icon name="copy" [size]="11" />
+        {{ 'reports.template.saveAs.Dashboard' | t }}
+      </button>
+      <button
+        type="button"
+        class="button"
+        [attr.aria-pressed]="editing()"
+        (click)="toggleEditing()"
+      >
+        <app-icon name="edit" [size]="11" />
+        {{ (editing() ? 'reports.dashboard.view' : 'reports.dashboard.edit') | t }}
+      </button>
+    </div>
+  </header>
+
+  @if (filters().length > 0) {
+    <div class="filters" role="group" [attr.aria-label]="'reports.dashboard.filters' | t">
+      @for (filter of filters(); track filter.id) {
+        @if (filter.kind === 'date') {
+          <fieldset class="filter">
+            <legend class="filter__label">{{ filter.label }}</legend>
+            <input
+              type="date"
+              [value]="dateValue(filter, 'from')"
+              (change)="setDate(filter, 'from', $any($event.target).value)"
+              [attr.aria-label]="'reports.dashboard.from' | t: { label: filter.label }"
+            />
+            <span aria-hidden="true">–</span>
+            <input
+              type="date"
+              [value]="dateValue(filter, 'to')"
+              (change)="setDate(filter, 'to', $any($event.target).value)"
+              [attr.aria-label]="'reports.dashboard.to' | t: { label: filter.label }"
+            />
+          </fieldset>
+        } @else {
+          <label class="filter">
+            <span class="filter__label">{{ filter.label }}</span>
+            <select (change)="setCategory(filter, $any($event.target).value)">
+              <option value="" [selected]="categoryValue(filter) === ''">
+                {{ 'reports.dashboard.all' | t }}
+              </option>
+              @for (option of options(filter); track $index) {
+                <option
+                  [value]="optionKey(option)"
+                  [selected]="categoryValue(filter) === optionKey(option)"
+                >
+                  {{ option ?? ('reports.chart.empty' | t) }}
+                </option>
+              }
+            </select>
+          </label>
+        }
+      }
+      @if (anyActive()) {
+        <button type="button" class="link" (click)="clearFilters()">
+          <app-icon name="close" [size]="10" />
+          {{ 'reports.dashboard.clearFilters' | t }}
+        </button>
+      }
+    </div>
+  }
+
+  @if (savingTemplate() === 'Dashboard') {
+    <div class="template-form">
+      <app-report-template-save
+        scope="Dashboard"
+        [defaultName]="name()"
+        [busy]="templateBusy()"
+        (saved)="saveAsTemplate($event)"
+        (cancelled)="savingTemplate.set(null)"
+      />
+    </div>
+  }
+
+  <div class="notes">
+    @if (error(); as message) {
+      <p class="banner banner--danger" role="alert">{{ message }}</p>
+    }
+    @if (notice(); as message) {
+      <p class="banner banner--success" role="status">{{ message }}</p>
+    }
+    @if (editing()) {
+      <p class="hint">{{ 'reports.dashboard.keyboardHint' | t }}</p>
+    }
+  </div>
+
+  @if (pages().length > 1 || editing()) {
+    <div class="pages" role="tablist" [attr.aria-label]="'reports.dashboard.pages' | t">
+      @for (item of pages(); track item.id) {
+        <button
+          type="button"
+          role="tab"
+          class="pages__tab"
+          [attr.aria-selected]="item.id === page().id"
+          (click)="showPage(item.id)"
+        >
+          {{ item.name }}
+        </button>
+      }
+      @if (editing()) {
+        <button type="button" class="pages__add" (click)="addPage()">
+          <app-icon name="plus" [size]="10" />
+          {{ 'reports.dashboard.addPage' | t }}
+        </button>
+      }
+    </div>
+  }
+
+  @if (loading()) {
+    <p class="placeholder">{{ 'reports.loading' | t }}</p>
+  } @else if (panels().length === 0) {
+    <div class="empty">
+      <app-icon name="chart" [size]="22" />
+      <p class="empty__title">{{ 'reports.dashboard.emptyTitle' | t }}</p>
+      <p class="empty__text">
+        {{
+          (catalog().length === 0 ? 'reports.dashboard.noReports' : 'reports.dashboard.emptyText')
+            | t
+        }}
+      </p>
+    </div>
+  } @else {
+    <ol class="grid" [attr.aria-label]="'reports.dashboard.panels' | t">
+      @for (view of panels(); track view.panel.id) {
+        <li
+          class="panel"
+          [class.is-selected]="editing() && selectedPanel() === view.panel.id"
+          [style.grid-column]="'span ' + view.panel.width"
+          [style.grid-row]="'span ' + view.panel.height"
+          [attr.tabindex]="editing() ? 0 : null"
+          [attr.aria-label]="view.title"
+          (click)="select(view.panel)"
+          (focus)="select(view.panel)"
+          (keydown)="keydown($event, view.panel)"
+        >
+          <header class="panel__head" [class.is-hidden]="view.panel.hideHeader && !editing()">
+            <div class="panel__titles">
+              <h4 class="panel__title">
+                {{ view.title || ('reports.dashboard.missingReport' | t) }}
+              </h4>
+              @if (view.panel.description) {
+                <p class="panel__description">{{ view.panel.description }}</p>
+              }
+              @if (view.dataset) {
+                <p class="panel__meta">
+                  {{ view.dataset.name }}
+                  @if (view.snapshot) {
+                    · {{ 'reports.data.from' | t: { date: when(view.snapshot.completedAtUtc) } }}
+                  }
+                </p>
+              }
+            </div>
+            @if (
+              !editing() &&
+              view.report &&
+              (view.report.visual === 'Bar' || view.report.visual === 'Line')
+            ) {
+              <button
+                type="button"
+                class="link panel__table"
+                [attr.aria-pressed]="asTable().has(view.panel.id)"
+                (click)="toggleTable(view.panel)"
+              >
+                {{
+                  (asTable().has(view.panel.id)
+                    ? 'reports.chart.showChart'
+                    : 'reports.chart.showTable'
+                  ) | t
+                }}
+              </button>
+            }
+            @if (!editing() && view.report && view.snapshot) {
+              <div
+                class="export export--panel"
+                (focusout)="exportMenuFocusOut($event)"
+                (keydown)="exportMenuKeydown($event)"
+              >
+                <button
+                  type="button"
+                  class="icon-button"
+                  aria-haspopup="menu"
+                  [attr.aria-expanded]="exportMenu() === view.panel.id"
+                  [attr.aria-label]="'reports.export.panel' | t: { name: view.title }"
+                  [attr.title]="'reports.export.panel' | t: { name: view.title }"
+                  (click)="toggleExportMenu(view.panel.id)"
+                  [disabled]="exporting()"
+                >
+                  <app-icon name="export" [size]="11" />
+                </button>
+                @if (exportMenu() === view.panel.id) {
+                  <div
+                    class="menu menu--end"
+                    role="menu"
+                    [attr.aria-label]="'reports.export.panel' | t: { name: view.title }"
+                  >
+                    <button
+                      type="button"
+                      role="menuitem"
+                      class="menu__item"
+                      (click)="exportExcel(view)"
+                    >
+                      {{ 'reports.export.excel' | t }}
+                    </button>
+                    <button
+                      type="button"
+                      role="menuitem"
+                      class="menu__item"
+                      (click)="openPrint(view)"
+                    >
+                      {{ 'reports.export.pdf' | t }}
+                    </button>
+                    <button
+                      type="button"
+                      role="menuitem"
+                      class="menu__item"
+                      (click)="exportCsv(view, 'figures')"
+                    >
+                      {{ 'reports.export.csvFigures' | t }}
+                    </button>
+                    <button
+                      type="button"
+                      role="menuitem"
+                      class="menu__item"
+                      (click)="exportCsv(view, 'data')"
+                    >
+                      {{ 'reports.export.csvData' | t }}
+                    </button>
+                  </div>
+                }
+              </div>
+            }
+            @if (editing()) {
+              <div
+                class="panel__tools"
+                role="toolbar"
+                [attr.aria-label]="'reports.dashboard.panelTools' | t: { name: view.title }"
+              >
+                <button
+                  type="button"
+                  (click)="move(view.panel, -1); $event.stopPropagation()"
+                  [disabled]="index(view.panel) === 0"
+                  [attr.aria-label]="'reports.dashboard.moveBefore' | t"
+                  [attr.title]="'reports.dashboard.moveBefore' | t"
+                >
+                  ‹
+                </button>
+                <button
+                  type="button"
+                  (click)="move(view.panel, 1); $event.stopPropagation()"
+                  [disabled]="index(view.panel) === panels().length - 1"
+                  [attr.aria-label]="'reports.dashboard.moveAfter' | t"
+                  [attr.title]="'reports.dashboard.moveAfter' | t"
+                >
+                  ›
+                </button>
+                <button
+                  type="button"
+                  (click)="resize(view.panel, -1, 0); $event.stopPropagation()"
+                  [disabled]="!canShrink(view.panel)"
+                  [attr.aria-label]="'reports.dashboard.narrower' | t"
+                  [attr.title]="'reports.dashboard.narrower' | t"
+                >
+                  ⇤
+                </button>
+                <button
+                  type="button"
+                  (click)="resize(view.panel, 1, 0); $event.stopPropagation()"
+                  [disabled]="!canGrow(view.panel)"
+                  [attr.aria-label]="'reports.dashboard.wider' | t"
+                  [attr.title]="'reports.dashboard.wider' | t"
+                >
+                  ⇥
+                </button>
+                <button
+                  type="button"
+                  (click)="resize(view.panel, 0, -1); $event.stopPropagation()"
+                  [disabled]="!canShorter(view.panel)"
+                  [attr.aria-label]="'reports.dashboard.shorter' | t"
+                  [attr.title]="'reports.dashboard.shorter' | t"
+                >
+                  ⤒
+                </button>
+                <button
+                  type="button"
+                  (click)="resize(view.panel, 0, 1); $event.stopPropagation()"
+                  [disabled]="!canTaller(view.panel)"
+                  [attr.aria-label]="'reports.dashboard.taller' | t"
+                  [attr.title]="'reports.dashboard.taller' | t"
+                >
+                  ⤓
+                </button>
+                <button
+                  type="button"
+                  class="is-danger"
+                  (click)="remove(view.panel); $event.stopPropagation()"
+                  [attr.aria-label]="'reports.dashboard.removePanel' | t"
+                  [attr.title]="'reports.dashboard.removePanel' | t"
+                >
+                  <app-icon name="close" [size]="10" />
+                </button>
+              </div>
+            }
+          </header>
+
+          @if (view.unbound.length > 0) {
+            <p class="panel__badge">
+              {{ 'reports.dashboard.notFiltered' | t: { filters: view.unbound.join(', ') } }}
+            </p>
+          }
+          @if (view.repeated.length > 0) {
+            <p class="panel__badge">
+              {{ 'reports.join.repeated' | t: { columns: view.repeated.join(', ') } }}
+            </p>
+          }
+
+          <div class="panel__body">
+            @if (!view.report) {
+              <p class="panel__state">{{ 'reports.dashboard.missingReportHint' | t }}</p>
+            } @else if (!view.snapshot) {
+              <p class="panel__state">{{ 'reports.dashboard.noData' | t }}</p>
+            } @else {
+              <app-report-chart
+                [kind]="view.report.visual"
+                [series]="view.series"
+                [indicator]="view.indicator"
+                [table]="view.table"
+                [valueLabel]="view.valueLabel"
+                [categoryLabel]="view.categoryLabel"
+                [columnLabel]="view.label"
+                [fit]="true"
+                [asTable]="asTable().has(view.panel.id)"
+                [appearance]="view.appearance"
+                [color]="view.color"
+                [categoryColors]="view.categoryColors"
+                [selectable]="!editing() && view.pickFilter !== null"
+                [selected]="view.picked"
+                (pick)="pick(view, $event)"
+              />
+            }
+          </div>
+        </li>
+      }
+    </ol>
+  }
+</main>
+
+@if (editing() && inspectorOpen()) {
+  <aside class="inspector" [attr.aria-label]="'reports.inspector.label' | t">
+    <fieldset class="section section--first">
+      <legend class="section__title">{{ 'reports.dashboard.board' | t }}</legend>
+      <div class="field">
+        <label class="field__label" for="board-color">{{
+          'reports.dashboard.boardColor' | t
+        }}</label>
+        <div class="swatch-row">
+          <span
+            class="swatch"
+            aria-hidden="true"
+            [style.background]="
+              model().style.color ? 'var(--rc-' + model().style.color + ')' : 'var(--dr-accent)'
+            "
+          ></span>
+          <select id="board-color" (change)="styleColor($any($event.target).value)">
+            <option value="" [selected]="model().style.color === null">
+              {{ 'reports.look.theme' | t }}
+            </option>
+            @for (color of palette; track color) {
+              <option [value]="color" [selected]="model().style.color === color">
+                {{ 'reports.color.' + color | t }}
+              </option>
+            }
+          </select>
+        </div>
+        <span class="field__hint">{{ 'reports.dashboard.boardColorHint' | t }}</span>
+      </div>
+      <label class="field">
+        <span class="field__label">{{ 'reports.dashboard.pageName' | t }}</span>
+        <input
+          type="text"
+          maxlength="40"
+          [value]="page().name"
+          (input)="renamePage($any($event.target).value)"
+        />
+      </label>
+      @if (pages().length > 1) {
+        <button type="button" class="link link--danger" (click)="removePage()">
+          <app-icon name="trash" [size]="11" />
+          {{ 'reports.dashboard.removePage' | t }}
+        </button>
+      }
+    </fieldset>
+
+    <label class="field">
+      <span class="field__label">{{ 'reports.dashboard.addReport' | t }}</span>
+      <select (change)="add($any($event.target).value); $any($event.target).value = ''">
+        <option value="" selected>{{ 'reports.dashboard.chooseReport' | t }}</option>
+        @for (group of catalog(); track group.dataset.id) {
+          <optgroup [label]="group.dataset.name">
+            @for (report of group.reports; track report.id) {
+              <option [value]="report.id">{{ report.name }}</option>
+            }
+          </optgroup>
+        }
+      </select>
+      @if (catalog().length === 0) {
+        <span class="field__hint">{{ 'reports.dashboard.noReports' | t }}</span>
+      }
+    </label>
+    <button
+      type="button"
+      class="link"
+      (click)="galleryOpen.set(true)"
+      [disabled]="datasets().length === 0"
+    >
+      <app-icon name="copy" [size]="11" />
+      {{ 'reports.template.addFromTemplate' | t }}
+    </button>
+
+    @if (selected(); as view) {
+      <fieldset class="section">
+        <legend class="section__title">{{ 'reports.dashboard.selectedPanel' | t }}</legend>
+        <label class="field">
+          <span class="field__label">{{ 'reports.dashboard.panelTitle' | t }}</span>
+          <input
+            type="text"
+            maxlength="80"
+            [value]="view.panel.title ?? ''"
+            [placeholder]="view.report?.name ?? ''"
+            (input)="retitleSelected($any($event.target).value)"
+          />
+        </label>
+        <p class="field__hint">
+          {{ 'reports.dashboard.size' | t: { width: view.panel.width, height: view.panel.height } }}
+        </p>
+        <label class="field">
+          <span class="field__label">{{ 'reports.dashboard.panelDescription' | t }}</span>
+          <input
+            type="text"
+            maxlength="140"
+            [value]="view.panel.description ?? ''"
+            (input)="
+              patchSelected({
+                description: $any($event.target).value.trim() ? $any($event.target).value : null,
+              })
+            "
+          />
+        </label>
+        <label class="check">
+          <input
+            type="checkbox"
+            [checked]="view.panel.hideHeader"
+            (change)="patchSelected({ hideHeader: $any($event.target).checked })"
+          />
+          {{ 'reports.dashboard.hideHeader' | t }}
+        </label>
+        <div class="field">
+          <label class="field__label" for="panel-color">{{
+            'reports.dashboard.panelColor' | t
+          }}</label>
+          <div class="swatch-row">
+            <span
+              class="swatch"
+              aria-hidden="true"
+              [style.background]="view.color ? 'var(--rc-' + view.color + ')' : 'var(--dr-accent)'"
+            ></span>
+            <select
+              id="panel-color"
+              (change)="patchSelected({ color: $any($event.target).value || null })"
+            >
+              <option value="" [selected]="view.panel.color === null">
+                {{ 'reports.look.inherit' | t }}
+              </option>
+              @for (color of palette; track color) {
+                <option [value]="color" [selected]="view.panel.color === color">
+                  {{ 'reports.color.' + color | t }}
+                </option>
+              }
+            </select>
+          </div>
+          <!-- De dónde sale el color, y cómo volver a lo heredado. -->
+          <span class="field__hint">
+            <!-- i18n-keys: reports.dashboard.colorFrom.* -->
+            {{
+              'reports.dashboard.colorFrom.' + view.colorSource
+                | t: { color: view.color ? ('reports.color.' + view.color | t) : '' }
+            }}
+          </span>
+          @if (view.panel.color !== null) {
+            <button type="button" class="link" (click)="patchSelected({ color: null })">
+              {{ 'reports.dashboard.resetColor' | t }}
+            </button>
+          }
+        </div>
+        @if (pages().length > 1) {
+          <label class="field">
+            <span class="field__label">{{ 'reports.dashboard.movePage' | t }}</span>
+            <select (change)="moveSelectedTo($any($event.target).value)">
+              @for (item of pages(); track item.id) {
+                <option [value]="item.id" [selected]="item.id === page().id">
+                  {{ item.name }}
+                </option>
+              }
+            </select>
+          </label>
+        }
+        @if (savingTemplate() === 'Panel') {
+          <app-report-template-save
+            scope="Panel"
+            [defaultName]="panelTemplateName()"
+            [busy]="templateBusy()"
+            (saved)="saveAsTemplate($event)"
+            (cancelled)="savingTemplate.set(null)"
+          />
+        } @else if (view.report) {
+          <button type="button" class="link" (click)="savingTemplate.set('Panel')">
+            <app-icon name="copy" [size]="11" />
+            {{ 'reports.template.saveAs.Panel' | t }}
+          </button>
+        }
+      </fieldset>
+    }
+
+    <fieldset class="section">
+      <legend class="section__title">{{ 'reports.dashboard.filters' | t }}</legend>
+      @for (filter of filters(); track filter.id) {
+        <div class="filter-edit">
+          <div class="filter-edit__head">
+            <input
+              type="text"
+              maxlength="40"
+              [value]="filter.label"
+              (input)="relabel(filter, $any($event.target).value)"
+              [attr.aria-label]="'reports.dashboard.filterName' | t"
+            />
+            <button
+              type="button"
+              class="icon-button"
+              (click)="removeFilter(filter)"
+              [attr.aria-label]="'reports.dashboard.removeFilter' | t: { label: filter.label }"
+            >
+              <app-icon name="close" [size]="10" />
+            </button>
+          </div>
+          @for (dataset of usedDatasets(); track dataset.id) {
+            <label class="field field--compact">
+              <span class="field__label">{{ dataset.name }}</span>
+              <select (change)="bind(filter, dataset.id, $any($event.target).value)">
+                <option value="" [selected]="!filter.bindings[dataset.id]">
+                  {{ 'reports.dashboard.unbound' | t }}
+                </option>
+                @for (column of columnsFor(filter, dataset); track column.name) {
+                  <option
+                    [value]="column.name"
+                    [selected]="filter.bindings[dataset.id] === column.name"
+                  >
+                    {{ labelIn(dataset, column.name) }}
+                  </option>
+                }
+              </select>
+            </label>
+          }
+        </div>
+      }
+      <div class="filter-add">
+        <button type="button" class="link" (click)="addFilter('date')">
+          <app-icon name="plus" [size]="10" />
+          {{ 'reports.dashboard.addDateFilter' | t }}
+        </button>
+        <button type="button" class="link" (click)="addFilter('category')">
+          <app-icon name="plus" [size]="10" />
+          {{ 'reports.dashboard.addCategoryFilter' | t }}
+        </button>
+      </div>
+    </fieldset>
+
+    <div class="inspector__footer">
+      @if (confirmDelete()) {
+        <p class="field__hint">{{ 'reports.dashboard.confirmDelete' | t: { name: name() } }}</p>
+        <div class="inspector__row">
+          <button type="button" class="button" (click)="confirmDelete.set(false)">
+            {{ 'common.cancel' | t }}
+          </button>
+          <button type="button" class="button button--danger" (click)="deleteDashboard()">
+            {{ 'reports.delete' | t }}
+          </button>
+        </div>
+      } @else {
+        <button type="button" class="link link--danger" (click)="confirmDelete.set(true)">
+          <app-icon name="trash" [size]="11" />
+          {{ 'reports.dashboard.delete' | t }}
+        </button>
+      }
+    </div>
+  </aside>
+}
+
+@if (galleryOpen()) {
+  <app-report-template-gallery
+    [scopes]="galleryScopes"
+    [datasets]="datasets()"
+    (applied)="applyTemplate($event)"
+    (closed)="galleryOpen.set(false)"
+  />
+}
+
+@if (printing(); as request) {
+  <app-report-print
+    [title]="request.title"
+    [filters]="request.filters"
+    [generatedAt]="request.generatedAt"
+    [pages]="request.pages"
+    [capturedAt]="printCapturedAt"
+    [notes]="printNotes"
+    (closed)="printing.set(null)"
+  />
+}

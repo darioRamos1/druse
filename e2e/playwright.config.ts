@@ -111,6 +111,9 @@ export default defineConfig({
         ...isolated,
         LocalApi__Port: String(API_PORT),
         ASPNETCORE_ENVIRONMENT: 'Development',
+        // Los horarios de Reportes se miran cada 2 s y no cada 20: la prueba
+        // de programación espera a un horario de verdad, no a uno simulado.
+        Reports__ScheduleTickSeconds: '2',
       },
     },
     {

@@ -1,0 +1,274 @@
+<div class="veil" aria-hidden="true"></div>
+
+<section
+  #sheet
+  class="sheet"
+  role="dialog"
+  aria-modal="true"
+  aria-labelledby="template-gallery-title"
+  tabindex="-1"
+>
+  <header class="sheet__head">
+    @if (applying() || importing()) {
+      <button
+        type="button"
+        class="icon-button"
+        (click)="back()"
+        [attr.aria-label]="'reports.template.back' | t"
+      >
+        <span aria-hidden="true">‹</span>
+      </button>
+    } @else {
+      <app-icon name="copy" [size]="13" />
+    }
+    <h2 class="sheet__title" id="template-gallery-title">
+      @if (applying(); as item) {
+        {{ 'reports.template.applyTitle' | t: { name: item.document.name } }}
+      } @else if (importing()) {
+        {{ 'reports.template.importTitle' | t }}
+      } @else {
+        {{ 'reports.template.title' | t }}
+      }
+    </h2>
+    <button
+      type="button"
+      class="icon-button"
+      (click)="close()"
+      [attr.aria-label]="'common.close' | t"
+    >
+      <app-icon name="close" [size]="12" />
+    </button>
+  </header>
+
+  <div class="sheet__notes">
+    @if (error(); as message) {
+      <p class="banner banner--danger" role="alert">{{ message }}</p>
+    }
+    @if (notice(); as message) {
+      <p class="banner banner--success" role="status">{{ message }}</p>
+    }
+  </div>
+
+  @if (applying(); as item) {
+    <!-- Vincular: un conjunto por hueco y una columna por campo. -->
+    <div class="sheet__body">
+      <p class="field__hint">{{ 'reports.template.applyHint' | t }}</p>
+
+      @for (slot of item.document.slots; track $index; let index = $index) {
+        <fieldset class="slot">
+          <legend class="slot__title">
+            @if (item.document.slots.length > 1) {
+              {{ 'reports.template.slot' | t: { number: index + 1 } }}
+              @if (slot.label) {
+                <span class="slot__hint">{{
+                  'reports.template.slotWas' | t: { name: slot.label }
+                }}</span>
+              }
+            } @else {
+              {{ 'reports.template.dataset' | t }}
+            }
+          </legend>
+
+          @if (fixedDataset()) {
+            <p class="slot__fixed">{{ datasetName(fixedDataset()) }}</p>
+          } @else {
+            <div class="field">
+              <select
+                [attr.aria-label]="'reports.template.dataset' | t"
+                (change)="chooseDataset(index, $any($event.target).value)"
+              >
+                <option value="" [selected]="slotDatasets()[index] === null">
+                  {{ 'reports.template.chooseDataset' | t }}
+                </option>
+                @for (dataset of datasets(); track dataset.id) {
+                  <option [value]="dataset.id" [selected]="slotDatasets()[index] === dataset.id">
+                    {{ dataset.name }}
+                  </option>
+                }
+              </select>
+            </div>
+          }
+
+          @switch (columnsState(index)) {
+            @case ('loading') {
+              <p class="field__hint">{{ 'reports.loading' | t }}</p>
+            }
+            @case (null) {
+              <p class="banner banner--warning">{{ 'reports.template.noData' | t }}</p>
+            }
+            @case (undefined) {}
+            @default {
+              <ul class="fields" [attr.aria-label]="'reports.template.fields' | t">
+                @for (field of fieldsOf(index); track field.id) {
+                  <li
+                    class="fields__row"
+                    [class.is-missing]="field.required && !assignment()[field.id]"
+                  >
+                    <label class="fields__name" [for]="'tf-' + field.id">
+                      <span>{{ field.name }}</span>
+                      <span class="chip">{{ kindLabel(field) }}</span>
+                      @if (field.required) {
+                        <span class="fields__required">{{ 'reports.template.required' | t }}</span>
+                      }
+                    </label>
+                    <select
+                      [id]="'tf-' + field.id"
+                      (change)="assign(field, $any($event.target).value)"
+                    >
+                      <option value="" [selected]="!assignment()[field.id]">
+                        {{ 'reports.dashboard.unbound' | t }}
+                      </option>
+                      @for (column of options(field); track column.name) {
+                        <option
+                          [value]="column.name"
+                          [selected]="assignment()[field.id] === column.name"
+                        >
+                          {{ columnLabel(index, column.name) }}
+                        </option>
+                      }
+                    </select>
+                  </li>
+                }
+              </ul>
+            }
+          }
+        </fieldset>
+      }
+    </div>
+
+    <footer class="sheet__foot">
+      @if (missing().length > 0) {
+        <p class="field__hint" role="status">
+          {{ 'reports.template.missing' | t: { fields: missingNames() } }}
+        </p>
+      }
+      <button type="button" class="button" (click)="back()">{{ 'common.cancel' | t }}</button>
+      <button
+        type="button"
+        class="button button--primary"
+        (click)="apply()"
+        [disabled]="!canApply()"
+      >
+        <app-icon name="check" [size]="11" />
+        {{ 'reports.template.create' | t }}
+      </button>
+    </footer>
+  } @else if (importing(); as document) {
+    <!-- Vista previa de lo importado antes de guardarlo. -->
+    <div class="sheet__body">
+      <article class="card card--preview">
+        <div class="card__head">
+          <h3 class="card__name">{{ document.name }}</h3>
+          <span class="chip">{{ scopeLabel(document.scope) }}</span>
+        </div>
+        @if (document.description) {
+          <p class="card__description">{{ document.description }}</p>
+        }
+        <p class="card__meta">{{ summary(document) }}</p>
+        <p class="field__label">{{ 'reports.template.fields' | t }}</p>
+        <ul class="chips">
+          @for (field of document.fields; track field.id) {
+            <li class="chip">{{ field.name }} · {{ kindLabel(field) }}</li>
+          }
+        </ul>
+        <p class="field__hint">{{ 'reports.template.importSafe' | t }}</p>
+      </article>
+    </div>
+    <footer class="sheet__foot">
+      <button type="button" class="button" (click)="back()">{{ 'common.cancel' | t }}</button>
+      <button type="button" class="button button--primary" (click)="confirmImport()">
+        <app-icon name="save" [size]="11" />
+        {{ 'reports.template.saveImported' | t }}
+      </button>
+    </footer>
+  } @else {
+    <div class="sheet__body">
+      <div class="toolbar">
+        <p class="field__hint">{{ 'reports.template.intro' | t }}</p>
+        <label class="button">
+          <app-icon name="folder-open" [size]="11" />
+          {{ 'reports.template.import' | t }}
+          <input
+            class="visually-hidden"
+            type="file"
+            accept=".json,application/json"
+            (change)="readFile($event)"
+          />
+        </label>
+      </div>
+
+      @if (loading()) {
+        <p class="placeholder">{{ 'reports.loading' | t }}</p>
+      } @else if (items().length === 0) {
+        <div class="empty">
+          <app-icon name="copy" [size]="20" />
+          <p>{{ 'reports.template.none' | t }}</p>
+        </div>
+      } @else {
+        <ul class="cards" [attr.aria-label]="'reports.template.title' | t">
+          @for (item of items(); track item.id) {
+            <li class="card">
+              <div class="card__head">
+                <h3 class="card__name">{{ item.document.name }}</h3>
+                <span class="chip" [class.chip--accent]="item.starter">
+                  {{
+                    item.starter
+                      ? ('reports.template.starterLabel' | t)
+                      : scopeLabel(item.document.scope)
+                  }}
+                </span>
+              </div>
+              @if (item.document.description) {
+                <p class="card__description">{{ item.document.description }}</p>
+              }
+              <p class="card__meta">{{ summary(item.document) }}</p>
+
+              @if (confirmDelete() === item.id) {
+                <div class="card__actions" role="alert">
+                  <span class="field__hint">{{ 'reports.template.confirmDelete' | t }}</span>
+                  <button type="button" class="button" (click)="confirmDelete.set(null)">
+                    {{ 'common.cancel' | t }}
+                  </button>
+                  <button type="button" class="button button--danger" (click)="delete(item)">
+                    {{ 'reports.delete' | t }}
+                  </button>
+                </div>
+              } @else {
+                <div class="card__actions">
+                  <button
+                    type="button"
+                    class="button button--primary"
+                    (click)="start(item)"
+                    [disabled]="datasets().length === 0"
+                  >
+                    {{ 'reports.template.use' | t }}
+                  </button>
+                  <button type="button" class="link" (click)="export(item)">
+                    <app-icon name="export" [size]="11" />
+                    {{ 'reports.template.export' | t }}
+                  </button>
+                  @if (!item.starter) {
+                    <button
+                      type="button"
+                      class="link link--danger"
+                      (click)="confirmDelete.set(item.id)"
+                      [attr.aria-label]="
+                        'reports.template.deleteNamed' | t: { name: item.document.name }
+                      "
+                    >
+                      <app-icon name="trash" [size]="11" />
+                      {{ 'reports.delete' | t }}
+                    </button>
+                  }
+                </div>
+              }
+            </li>
+          }
+        </ul>
+        @if (datasets().length === 0) {
+          <p class="field__hint">{{ 'reports.template.needDataset' | t }}</p>
+        }
+      }
+    </div>
+  }
+</section>

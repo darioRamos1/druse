@@ -1179,10 +1179,9 @@ details > p {
     gap: 35px;
   }
 }
-@media (max-width: 760px) {
-  .container {
-    width: calc(100% - 40px);
-  }
+/* Con Reportes BI la barra lleva cinco enlaces: por debajo de 960 px no caben
+   en una línea y pasan al menú desplegable. */
+@media (max-width: 960px) {
   .nav-wrap {
     height: 72px;
   }
@@ -1231,6 +1230,14 @@ details > p {
   }
   .nav-wrap nav > .button {
     margin-top: 8px;
+  }
+}
+@media (max-width: 760px) {
+  .container {
+    width: calc(100% - 40px);
+  }
+  .nav-wrap {
+    height: 72px;
   }
   .hero {
     padding-top: 48px;
@@ -1496,5 +1503,199 @@ details > p {
   }
   .section-space {
     padding-top: 30px;
+  }
+}
+
+/* --- Reportes BI: avance de una función en desarrollo ---------------------- */
+.bi-status {
+  display: inline-block;
+  margin-left: 10px;
+  padding: 2px 8px;
+  border: 1px solid #e3b65a4d;
+  border-radius: 999px;
+  background: #e3b65a14;
+  color: #ecc77a;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  text-transform: none;
+  vertical-align: 1px;
+}
+.bi-shot {
+  margin: 0;
+}
+.bi-shot img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+}
+.bi-shot-main img {
+  box-shadow: 0 30px 80px -40px #7a64e680;
+}
+.bi-shot figcaption {
+  margin-top: 12px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.6;
+}
+.bi-tag {
+  display: inline-block;
+  margin-right: 6px;
+  padding: 1px 7px;
+  border: 1px solid #91cbb43d;
+  border-radius: 4px;
+  background: #91cbb40f;
+  color: var(--green);
+  font-family: var(--mono);
+  font-size: 10px;
+}
+.bi-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-top: 28px;
+}
+.bi-progress {
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin: 34px 0 0;
+  padding: 0;
+}
+.bi-progress li {
+  padding: 22px 24px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+.bi-progress h3 {
+  font-size: 17px;
+  margin-bottom: 8px;
+}
+.bi-progress p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.7;
+}
+.bi-note {
+  margin: 26px 0 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+.bi-note a {
+  margin-left: 6px;
+  color: var(--accent);
+  font-weight: 600;
+}
+@media (max-width: 1000px) {
+  .bi-progress {
+    grid-template-columns: 1fr;
+  }
+}
+@media (max-width: 760px) {
+  .bi-grid {
+    grid-template-columns: 1fr;
+  }
+  .bi-status {
+    margin: 8px 0 0;
+    display: table;
+  }
+}
+
+/* --- Página de avance de Reportes BI --------------------------------------- */
+.bi-log {
+  list-style: none;
+  margin: 32px 0 0;
+  padding: 0;
+  border-left: 1px solid var(--line);
+}
+.bi-log > li {
+  position: relative;
+  padding: 0 0 34px 26px;
+}
+.bi-log > li::before {
+  content: '';
+  position: absolute;
+  left: -5px;
+  top: 8px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--purple);
+}
+.bi-log time {
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 12px;
+}
+.bi-log h2 {
+  margin: 4px 0 8px;
+  font-size: 22px;
+  letter-spacing: -0.4px;
+}
+
+/* --- Novedades: generadas desde las notas de versión de la aplicación ------ */
+.news-list {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+}
+.news-entry {
+  padding: 24px 26px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+.news-entry:first-child {
+  grid-column: 1 / -1;
+  border-color: #3a314f;
+  background:
+    radial-gradient(ellipse at 100% 0%, #8270d51c, transparent 65%), var(--surface);
+}
+.news-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+  margin: 0 0 12px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.news-version {
+  color: var(--text);
+  font-size: 16px;
+  font-weight: 600;
+}
+.news-meta time {
+  font-family: var(--mono);
+  font-size: 12px;
+}
+.news-current {
+  padding: 1px 8px;
+  border: 1px solid #91cbb43d;
+  border-radius: 999px;
+  background: #91cbb40f;
+  color: var(--green);
+  font-family: var(--mono);
+  font-size: 10px;
+}
+.news-entry ul {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.7;
+}
+.news-entry li + li {
+  margin-top: 6px;
+}
+@media (max-width: 760px) {
+  .news-list {
+    grid-template-columns: 1fr;
   }
 }

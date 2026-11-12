@@ -1,0 +1,79 @@
+<!-- La barra solo se ve en pantalla: al imprimir queda el papel. -->
+<div class="toolbar" role="toolbar" [attr.aria-label]="'reports.export.printTools' | t">
+  <p class="toolbar__hint">{{ 'reports.export.printHint' | t }}</p>
+  <button type="button" class="button" (click)="closed.emit()">{{ 'common.close' | t }}</button>
+  <button #printButton type="button" class="button button--primary" (click)="print()">
+    <app-icon name="export" [size]="11" />
+    {{ 'reports.export.print' | t }}
+  </button>
+</div>
+
+<article class="paper" [attr.aria-label]="title()">
+  <header class="paper__head">
+    <h1 class="paper__title">{{ title() }}</h1>
+    <p class="paper__meta">{{ 'reports.export.generated' | t: { date: generatedAt() } }}</p>
+    <p class="paper__filters">
+      <strong>{{ 'reports.dashboard.filters' | t }}:</strong>
+      @for (filter of filters(); track filter.label; let last = $last) {
+        {{ filter.label }}: {{ filter.value }}
+        @if (!last) {
+          ;
+        }
+      } @empty {
+        {{ 'reports.export.noFilters' | t }}
+      }
+    </p>
+  </header>
+
+  @for (page of pages(); track $index) {
+    <section class="sheet" [attr.aria-label]="page.name">
+      @if (pages().length > 1) {
+        <h2 class="sheet__name">{{ page.name }}</h2>
+      }
+      <ol class="grid">
+        @for (view of page.views; track view.panel.id) {
+          <li
+            class="panel"
+            [style.grid-column]="'span ' + view.panel.width"
+            [style.grid-row]="'span ' + view.panel.height"
+          >
+            <h3 class="panel__title">{{ view.title }}</h3>
+            @if (view.panel.description) {
+              <p class="panel__description">{{ view.panel.description }}</p>
+            }
+            @if (view.dataset) {
+              <p class="panel__meta">
+                {{ view.dataset.name }}
+                @if (view.snapshot) {
+                  · {{ capturedAt()(view.snapshot.completedAtUtc) }}
+                }
+              </p>
+            }
+            @for (note of notes()(view); track $index) {
+              <p class="panel__note">{{ note }}</p>
+            }
+            <div class="panel__body">
+              @if (view.report && view.snapshot) {
+                <app-report-chart
+                  [kind]="view.report.visual"
+                  [series]="view.series"
+                  [indicator]="view.indicator"
+                  [table]="view.table"
+                  [valueLabel]="view.valueLabel"
+                  [categoryLabel]="view.categoryLabel"
+                  [columnLabel]="view.label"
+                  [fit]="true"
+                  [appearance]="view.appearance"
+                  [color]="view.color"
+                  [categoryColors]="view.categoryColors"
+                />
+              } @else {
+                <p class="panel__note">{{ 'reports.dashboard.noData' | t }}</p>
+              }
+            </div>
+          </li>
+        }
+      </ol>
+    </section>
+  }
+</article>
