@@ -167,8 +167,12 @@ function main(args) {
   if (args.length === 2 && args[0] === '--releases') releases = JSON.parse(fs.readFileSync(args[1], 'utf8'));
   else if (args.length === 0) releases = JSON.parse(execFileSync('gh', ['api', `repos/${repository}/releases?per_page=100`, '--paginate', '--slurp'], { encoding: 'utf8', maxBuffer: 20 * 1024 * 1024 }));
   else throw new Error('Uso: node build/scripts/generar-descargas-web.cjs [--releases archivo.json]');
-  const release = generatePages(releases, path.resolve(__dirname, '../..'), repository);
+  const root = path.resolve(__dirname, '../..');
+  const release = generatePages(releases, root, repository);
   console.log(`Descargas web: ${release.version}; ${release.legacy ? 'beta anterior, con disponibilidad explícita' : 'tres ediciones con instalador y portable'}.`);
+  // Las novedades llegan hasta la misma versión que se ofrece para descargar.
+  const news = require('./generar-novedades-web.cjs').generateNews(root, release.version);
+  console.log(`Novedades web: ${news.map(entry => entry.version).join(', ')}.`);
 }
 
 module.exports = { EDITIONS, parseVersion, compareVersions, selectRelease, renderDownloads, renderGuide, replaceRegion, generatePages, escapeHtml };

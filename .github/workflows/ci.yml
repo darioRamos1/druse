@@ -494,7 +494,7 @@ jobs:
         run: ./build/tests/subir-version.ps1
 
       - name: Descargas de la landing sin enlaces a paquetes incompletos
-        run: node --test build/tests/descargas-web.cjs
+        run: node --test build/tests/descargas-web.cjs build/tests/novedades-web.cjs
 
       - name: Puertos de las bases de prueba (PowerShell)
         shell: pwsh

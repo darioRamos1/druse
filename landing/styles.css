@@ -1638,3 +1638,64 @@ details > p {
   font-size: 22px;
   letter-spacing: -0.4px;
 }
+
+/* --- Novedades: generadas desde las notas de versión de la aplicación ------ */
+.news-list {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+}
+.news-entry {
+  padding: 24px 26px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+.news-entry:first-child {
+  grid-column: 1 / -1;
+  border-color: #3a314f;
+  background:
+    radial-gradient(ellipse at 100% 0%, #8270d51c, transparent 65%), var(--surface);
+}
+.news-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+  margin: 0 0 12px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.news-version {
+  color: var(--text);
+  font-size: 16px;
+  font-weight: 600;
+}
+.news-meta time {
+  font-family: var(--mono);
+  font-size: 12px;
+}
+.news-current {
+  padding: 1px 8px;
+  border: 1px solid #91cbb43d;
+  border-radius: 999px;
+  background: #91cbb40f;
+  color: var(--green);
+  font-family: var(--mono);
+  font-size: 10px;
+}
+.news-entry ul {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.7;
+}
+.news-entry li + li {
+  margin-top: 6px;
+}
+@media (max-width: 760px) {
+  .news-list {
+    grid-template-columns: 1fr;
+  }
+}
