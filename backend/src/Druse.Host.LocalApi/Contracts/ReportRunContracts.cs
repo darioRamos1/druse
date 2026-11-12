@@ -58,6 +58,20 @@ public sealed record ReportScheduleDto
     public bool Running { get; init; }
 }
 
+public sealed record ReportStorageEntryDto(
+    Guid DatasetId,
+    string Name,
+    long SnapshotBytes,
+    int RunCount,
+    DateTimeOffset? CapturedAtUtc);
+
+/// <summary>El espacio de Reportes BI: el archivo, los resultados y la cuota, en bytes.</summary>
+public sealed record ReportStorageDto(
+    long FileBytes,
+    long SnapshotBytes,
+    long QuotaBytes,
+    IReadOnlyList<ReportStorageEntryDto> Datasets);
+
 /// <summary>`Outcome`: `Refreshed` o `Failed`; el intento va en `Run`.</summary>
 public sealed record ReportRefreshDto(string Outcome, ReportRunDto? Run);
 
@@ -264,6 +278,15 @@ internal static class ReportRunContractMapper
         CreatedAtUtc = dashboard.CreatedAtUtc,
         UpdatedAtUtc = dashboard.UpdatedAtUtc,
     };
+
+    public static ReportStorageDto ToDto(this ReportStorageUsage usage) => new(
+        usage.FileBytes,
+        usage.SnapshotBytes,
+        usage.QuotaBytes,
+        usage.Datasets
+            .Select(entry => new ReportStorageEntryDto(
+                entry.DatasetId, entry.Name, entry.SnapshotBytes, entry.RunCount, entry.CapturedAtUtc))
+            .ToArray());
 
     public static ReportScheduleDto ToDto(this ReportSchedule schedule) => new()
     {

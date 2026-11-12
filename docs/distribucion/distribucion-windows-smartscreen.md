@@ -14,7 +14,7 @@ Para generar el instalador completo:
 ./build/scripts/package.ps1 -Runtime win-x64 -RequireUpdaterSignature
 ```
 
-Resultado: `shells/desktop-tauri/target/release/bundle/nsis/Druse_1.18.0_x64-setup-completo.exe`, acompañado de su `.sig`. La variante sin Informix se genera añadiendo `-WithoutInformix`.
+Resultado: `shells/desktop-tauri/target/release/bundle/nsis/Druse_1.19.0_x64-setup-completo.exe`, acompañado de su `.sig`. La variante sin Informix se genera añadiendo `-WithoutInformix`.
 
 La generación no instala Druse en el equipo ni publica una GitHub Release. No debe anunciarse actualización pública mientras sus artefactos sigan alojados únicamente en un repositorio privado.
 

@@ -423,6 +423,20 @@ test.describe('Exportar tableros de Reportes BI', () => {
     await expect(reportes.locator('.freshness__schedule')).toHaveCount(0);
     await expect(reportes.getByRole('button', { name: 'Programar', exact: true })).toBeVisible();
 
+    // El historial cuenta la actualización programada; borrar los datos deja
+    // el conjunto sin resultado, pero con su historial.
+    await reportes.getByRole('button', { name: 'Historial', exact: true }).click();
+    const historial = reportes.locator('app-report-history');
+
+    await expect(historial.locator('.runs tbody tr').first()).toContainText('Programada');
+    await expect(historial.locator('.runs tbody tr').first()).toContainText('Correcta');
+    await expect(historial.locator('.space')).toContainText('de 512 MB');
+    await historial.getByRole('button', { name: 'Borrar datos guardados' }).click();
+    await historial.getByRole('button', { name: 'Borrar datos', exact: true }).click();
+    await expect(reportes.locator('.freshness')).toContainText('Todavía no hay datos guardados');
+    await expect(historial.locator('.runs tbody tr')).toHaveCount(1);
+    await expect(historial.getByRole('button', { name: 'Borrar datos guardados' })).toHaveCount(0);
+
     await reportes.locator('.steps__item').first().click();
     await borrarConjunto(reportes);
     await page.keyboard.press('Escape');

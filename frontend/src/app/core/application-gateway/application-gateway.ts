@@ -6,6 +6,7 @@ import {
   ReportRefresh,
   ReportRun,
   ReportSchedule,
+  ReportStorage,
   ReportSnapshot,
   SavedDashboard,
   SavedReportTemplate,
@@ -595,6 +596,11 @@ export abstract class ApplicationGateway {
   abstract saveReportSchedule(datasetId: string, schedule: ReportSchedule): Observable<ReportSchedule>;
 
   abstract deleteReportSchedule(datasetId: string): Observable<void>;
+
+  /** Borra el resultado guardado; el conjunto, sus reportes y su historial se quedan. */
+  abstract deleteReportSnapshot(datasetId: string): Observable<void>;
+
+  abstract getReportStorage(): Observable<ReportStorage>;
 
   abstract getSavedReports(datasetId: string): Observable<readonly SavedReport[]>;
 

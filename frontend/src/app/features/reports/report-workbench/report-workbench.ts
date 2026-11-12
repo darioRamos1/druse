@@ -21,11 +21,13 @@ import {
   ReportRun,
   ReportSchedule,
   ReportSnapshot,
+  ReportStorage,
   ReportVisualKind,
   SavedReport,
 } from '../../../shared/models/reports';
 import { Icon } from '../../../shared/ui/icon/icon';
 import { ReportChart } from '../report-chart/report-chart';
+import { ReportHistory } from '../report-history/report-history';
 import { ReportScheduleForm } from '../report-schedule/report-schedule';
 import { ReportTemplateGallery, TemplateApplication } from '../report-template-gallery/report-template-gallery';
 import { ReportTemplateSave, TemplateSaveRequest } from '../report-template-save/report-template-save';
@@ -68,7 +70,7 @@ export const VISUALS: readonly ReportVisualKind[] = ['Table', 'Bar', 'Line', 'In
 @Component({
   selector: 'app-report-workbench',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [Icon, ReportChart, ReportScheduleForm, ReportTemplateGallery, ReportTemplateSave, TranslatePipe],
+  imports: [Icon, ReportChart, ReportHistory, ReportScheduleForm, ReportTemplateGallery, ReportTemplateSave, TranslatePipe],
   templateUrl: './report-workbench.html',
   styleUrl: './report-workbench.scss',
 })
@@ -103,6 +105,11 @@ export class ReportWorkbench {
   protected readonly savingTemplate = signal(false);
   protected readonly templateBusy = signal(false);
   protected readonly currentDatasets = computed(() => [this.dataset()]);
+  /** Historial y espacio: los intentos guardados, el panel abierto y lo que ocupa. */
+  protected readonly runs = signal<readonly ReportRun[]>([]);
+  protected readonly historyOpen = signal(false);
+  protected readonly storage = signal<ReportStorage | null>(null);
+  protected readonly clearing = signal(false);
   /** Programación: la guardada, si el formulario está abierto y si se está guardando. */
   protected readonly schedule = signal<ReportSchedule | null>(null);
   protected readonly scheduling = signal(false);
@@ -250,6 +257,8 @@ export class ReportWorkbench {
     this.savingTemplate.set(false);
     this.scheduling.set(false);
     this.schedule.set(null);
+    this.historyOpen.set(false);
+    this.runs.set([]);
     this.stopWatch();
 
     try {
@@ -263,6 +272,7 @@ export class ReportWorkbench {
 
       this.snapshot.set(snapshot);
       this.lastRun.set(runs[0] ?? null);
+      this.runs.set(runs);
       this.reports.set(reports);
       this.schedule.set(schedule);
       this.armWatch();
@@ -294,6 +304,14 @@ export class ReportWorkbench {
 
       this.lastRun.set(result.run);
 
+      if (result.run) {
+        this.runs.update((runs) => [result.run!, ...runs].slice(0, 20));
+      }
+
+      if (this.historyOpen()) {
+        void this.loadStorage();
+      }
+
       // Un intento fallido no cambia el resultado: solo se relee si hubo uno nuevo.
       if (result.outcome === 'Refreshed') {
         this.snapshot.set(await firstValueFrom(this._gateway.getReportSnapshot(datasetId)));
@@ -314,6 +332,45 @@ export class ReportWorkbench {
     const prefix = run.origin === 'Scheduled' ? 'reports.data.scheduledFailed' : 'reports.data.failed';
 
     return this.snapshot() ? `${prefix}Keeps` : prefix;
+  }
+
+  // --- Historial y espacio ----------------------------------------------------------
+
+  protected toggleHistory(): void {
+    const open = !this.historyOpen();
+
+    this.historyOpen.set(open);
+
+    if (open) {
+      void this.loadStorage();
+    }
+  }
+
+  private async loadStorage(): Promise<void> {
+    try {
+      this.storage.set(await firstValueFrom(this._gateway.getReportStorage()));
+    } catch (error) {
+      this.error.set(describeError(error, this._i18n));
+    }
+  }
+
+  /** Borra el resultado guardado: el conjunto vuelve a «Todavía no hay datos». */
+  protected async clearData(): Promise<void> {
+    const datasetId = this.dataset().id;
+
+    this.clearing.set(true);
+    this.error.set(null);
+
+    try {
+      await firstValueFrom(this._gateway.deleteReportSnapshot(datasetId));
+      this.snapshot.set(null);
+      this.notice.set(this._i18n.t('reports.history.cleared'));
+      await this.loadStorage();
+    } catch (error) {
+      this.error.set(describeError(error, this._i18n));
+    } finally {
+      this.clearing.set(false);
+    }
   }
 
   // --- Programar -----------------------------------------------------------------
@@ -398,6 +455,7 @@ export class ReportWorkbench {
       }
 
       this.schedule.set(schedule);
+      this.runs.set(runs);
 
       const latest = runs[0] ?? null;
 

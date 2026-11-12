@@ -654,6 +654,13 @@ test.describe('barrido visual', () => {
     await expect(reportes.locator('.freshness__schedule')).toContainText('Próxima actualización');
     await medir(page, 'actualización programada', hallazgos);
     await foto(page, '25a-programada', reportes.locator('.dialog'));
+    await reportes.getByRole('button', { name: 'Historial', exact: true }).click();
+    await expect(reportes.locator('app-report-history .runs tbody tr').first()).toBeVisible();
+    await expect(reportes.locator('app-report-history .space')).toContainText('de 512 MB');
+    await reportes.locator('app-report-history').getByRole('button', { name: 'Borrar datos guardados' }).click();
+    await medir(page, 'historial y espacio', hallazgos);
+    await foto(page, '26-historial', reportes.locator('.dialog'));
+    await reportes.locator('app-report-history').getByRole('button', { name: 'Cancelar' }).click();
     await page.keyboard.press('Escape');
     await expect(reportes.locator('.dialog')).toBeHidden();
 
@@ -876,6 +883,11 @@ test.describe('barrido visual', () => {
     await medir(page, 'claro: programar', hallazgos);
     await foto(page, '25b-claro-programar', reportesClaro.locator('.dialog'));
     await reportesClaro.locator('form.schedule').getByRole('button', { name: 'Cancelar' }).click();
+    await reportesClaro.getByRole('button', { name: 'Historial', exact: true }).click();
+    await expect(reportesClaro.locator('app-report-history .space')).toContainText('de 512 MB');
+    await medir(page, 'claro: historial', hallazgos);
+    await foto(page, '26a-claro-historial', reportesClaro.locator('.dialog'));
+    await reportesClaro.getByRole('button', { name: 'Historial', exact: true }).click();
     await reportesClaro.locator('.steps__item').nth(1).click();
     await previsualizar(reportesClaro);
     await medir(page, 'claro: reportes combinar', hallazgos);
@@ -920,6 +932,11 @@ test.describe('barrido visual', () => {
       await medir(page, `programar a ${ancho}`, hallazgos);
       await foto(page, `25c-programar-${ancho}`, reportesEstrecho.locator('.dialog'));
       await reportesEstrecho.locator('form.schedule').getByRole('button', { name: 'Cancelar' }).click();
+      await reportesEstrecho.getByRole('button', { name: 'Historial', exact: true }).click();
+      await expect(reportesEstrecho.locator('app-report-history .space')).toContainText('de 512 MB');
+      await medir(page, `historial a ${ancho}`, hallazgos);
+      await foto(page, `26b-historial-${ancho}`, reportesEstrecho.locator('.dialog'));
+      await reportesEstrecho.getByRole('button', { name: 'Historial', exact: true }).click();
       await reportesEstrecho.getByRole('button', { name: 'Mostrar u ocultar la configuración' }).click();
       await page.waitForTimeout(300);
       await foto(page, `21j-reportes-visual-inspector-${ancho}`, reportesEstrecho.locator('.dialog'));

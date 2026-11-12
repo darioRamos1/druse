@@ -68,6 +68,7 @@ describe('ReportWorkbench', () => {
   let intentos: ReportRun[];
   let programada: ReportSchedule | null;
   let programaciones: ReportSchedule[];
+  let borrados: number;
 
   async function asentar(): Promise<void> {
     for (let intento = 0; intento < 20; intento++) {
@@ -106,6 +107,7 @@ describe('ReportWorkbench', () => {
     intentos = [];
     programada = null;
     programaciones = [];
+    borrados = 0;
 
     const gateway = {
       getReportSnapshot: () => {
@@ -124,6 +126,20 @@ describe('ReportWorkbench', () => {
           running: false,
         };
         return of(programada);
+      },
+      getReportStorage: () =>
+        of({
+          fileBytes: 3 * 1024 * 1024,
+          snapshotBytes: guardado ? 2048 : 0,
+          quotaBytes: 512 * 1024 * 1024,
+          datasets: [
+            { datasetId: 'ds-1', name: 'Ventas y metas', snapshotBytes: guardado ? 2048 : 0, runCount: intentos.length, capturedAtUtc: null },
+          ],
+        }),
+      deleteReportSnapshot: () => {
+        borrados++;
+        guardado = null;
+        return of(undefined);
       },
       deleteReportSchedule: () => {
         programada = null;
@@ -279,6 +295,45 @@ describe('ReportWorkbench', () => {
       fixture.destroy();
       vi.useRealTimers();
     }
+  });
+
+  it('el historial cuenta cada intento con su origen y deja borrar los datos guardados', async () => {
+    intentos = [
+      intento('Failed', {
+        origin: 'Scheduled',
+        startedAtUtc: '2026-11-13T07:00:00Z',
+        completedAtUtc: '2026-11-13T07:00:03Z',
+        message: 'No se pudo leer alguna fuente.',
+      }),
+      intento('Succeeded', { startedAtUtc: '2026-11-12T09:00:00Z', completedAtUtc: '2026-11-12T09:01:30Z' }),
+    ];
+    await crear();
+
+    botón('Historial').click();
+    await asentar();
+
+    const filas = [...fixture.nativeElement.querySelectorAll('.runs tbody tr')] as HTMLElement[];
+
+    expect(filas).toHaveLength(2);
+    expect(filas[0].textContent).toContain('Programada');
+    expect(filas[0].textContent).toContain('Falló');
+    expect(filas[0].textContent).toContain('No se pudo leer alguna fuente.');
+    expect(filas[1].textContent).toContain('A mano');
+    expect(filas[1].textContent).toContain('Correcta');
+    expect(filas[1].textContent).toMatch(/1[,.]5\s*min/);
+    expect(el('.space').textContent).toMatch(/2\s*kB/i);
+    expect(el('.space').textContent).toMatch(/512\s*MB/);
+
+    botón('Borrar datos guardados').click();
+    fixture.detectChanges();
+    expect(el('.space__confirm').textContent).toContain('sus reportes y su programación se quedan');
+    botón('Borrar datos').click();
+    await asentar();
+
+    expect(borrados).toBe(1);
+    expect(el('.freshness').textContent).toContain('Todavía no hay datos guardados');
+    expect(el('.banner--success').textContent).toContain('Se borraron los datos guardados');
+    expect(botón('Borrar datos guardados')).toBeUndefined();
   });
 
   it('el indicador con meta da 60 % y cuenta aparte el municipio sin meta', async () => {

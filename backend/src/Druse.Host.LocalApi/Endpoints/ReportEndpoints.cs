@@ -152,6 +152,24 @@ internal static class ReportEndpoints
         })
         .WithName("GetReportSnapshot");
 
+        // «Borrar datos guardados»: el conjunto, sus reportes y su historial se
+        // quedan; vuelve a tener datos con la próxima actualización.
+        app.MapDelete("/api/reports/datasets/{id:guid}/snapshot", async (
+            Guid id,
+            IReportSnapshotStore snapshots,
+            CancellationToken cancellationToken) =>
+        {
+            await snapshots.DeleteAsync(id, cancellationToken);
+            return Results.NoContent();
+        })
+        .WithName("DeleteReportSnapshot");
+
+        app.MapGet("/api/reports/storage", async (
+            IReportSnapshotStore snapshots,
+            CancellationToken cancellationToken) =>
+            Results.Ok((await snapshots.GetUsageAsync(cancellationToken)).ToDto()))
+        .WithName("GetReportStorage");
+
         app.MapGet("/api/reports/datasets/{id:guid}/runs", async (
             Guid id,
             IReportRunStore runs,

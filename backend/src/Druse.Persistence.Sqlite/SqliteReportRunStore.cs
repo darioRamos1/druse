@@ -25,7 +25,7 @@ public sealed class SqliteReportRunStore(IAppPaths paths) : IReportRunStore
         command.Transaction = transaction;
 
         // El intento y la poda van juntos: el historial queda acotado aunque
-        // alguien actualice cien veces seguidas.
+        // alguien actualice cien veces seguidas, y lo de hace meses se olvida.
         command.CommandText = """
             INSERT INTO report_runs (id, dataset_id, started_utc_ticks, status, detail)
             VALUES ($id, $dataset, $started, $status, $detail);
@@ -37,6 +37,9 @@ public sealed class SqliteReportRunStore(IAppPaths paths) : IReportRunStore
                   WHERE dataset_id = $dataset
                   ORDER BY started_utc_ticks DESC
                   LIMIT $keep);
+
+            DELETE FROM report_runs
+            WHERE dataset_id = $dataset AND started_utc_ticks < $oldest;
             """;
         command.Parameters.AddWithValue("$id", run.Id.ToString());
         command.Parameters.AddWithValue("$dataset", run.DatasetId.ToString());
@@ -44,6 +47,7 @@ public sealed class SqliteReportRunStore(IAppPaths paths) : IReportRunStore
         command.Parameters.AddWithValue("$status", run.Status.ToString());
         command.Parameters.AddWithValue("$detail", JsonSerializer.Serialize(run, JsonOptions));
         command.Parameters.AddWithValue("$keep", ReportRefreshService.RunHistoryLimit);
+        command.Parameters.AddWithValue("$oldest", (run.StartedAtUtc - ReportStorage.RunRetention).UtcTicks);
         await command.ExecuteNonQueryAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
     }

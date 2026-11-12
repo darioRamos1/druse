@@ -73,6 +73,7 @@ import {
   ReportRefresh,
   ReportRun,
   ReportSchedule,
+  ReportStorage,
   ReportSnapshot,
   SavedDashboard,
   SavedReportTemplate,
@@ -553,6 +554,14 @@ export class HttpApplicationGateway extends ApplicationGateway {
 
   override deleteReportSchedule(datasetId: string): Observable<void> {
     return this._http.delete<void>(`/api/reports/datasets/${datasetId}/schedule`);
+  }
+
+  override deleteReportSnapshot(datasetId: string): Observable<void> {
+    return this._http.delete<void>(`/api/reports/datasets/${datasetId}/snapshot`);
+  }
+
+  override getReportStorage(): Observable<ReportStorage> {
+    return this._http.get<ReportStorage>('/api/reports/storage');
   }
 
   override getSavedReports(datasetId: string): Observable<readonly SavedReport[]> {

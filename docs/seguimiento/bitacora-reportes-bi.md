@@ -36,7 +36,7 @@
 ## Tareas del hito 5
 
 - [x] 5.1 Programación diaria o semanal por conjunto, con hora y zona; recuperación tras cerrar, suspender o arrancar tarde; un reintento ante fallos pasajeros; pausa.
-- [ ] 5.2 Historial de intentos a la vista, retención y cuota de almacenamiento con controles para ver el espacio y borrar los datos guardados.
+- [x] 5.2 Historial de intentos a la vista, retención y cuota de almacenamiento con controles para ver el espacio y borrar los datos guardados.
 
 Los hitos siguientes cubren el constructor SQL y visual, los reportes guardados, los tableros y plantillas, y la actualización programada. La evidencia para la landing se prepara conforme se valida cada hito.
 
@@ -292,8 +292,28 @@ El hito 4 se divide en cuatro entregas (tableros, personalización, plantillas y
 - **Barrido.** Capturas `25-programar`, `25a-programada`, `25b-claro-programar` y `25c-programar-1024`/`-900`, revisadas. No hay hallazgos nuevos.
 - **Encontrado por Playwright:** «Hora» no era un nombre único. La zona horaria («Zona horaria…») y la pausa («…Actualizar ahora…») también lo contienen. La prueba usa el nombre exacto.
 
+## 2026-11-12 · Hito 5.2: historial, retención y espacio (versión 1.19.0)
+
+### Qué se hizo
+
+- **Historial a la vista.** En Visualización, «Historial» abre bajo la barra de datos los intentos guardados del conjunto (ya se guardaban 20 desde el hito 3), del más reciente al más viejo: cuándo, origen (a mano o programada), resultado (correcta, falló, cancelada, interrumpida) con su motivo, filas y duración. La tabla tiene altura fija y cabecera fija; con 20 filas se desplaza dentro del panel.
+- **Retención.** Además del tope de 20 por conjunto, al anotar un intento se borran los de más de 90 días (`ReportStorage.RunRetention`), en la misma sentencia que la poda.
+- **Cuota.** Los resultados guardados de todos los conjuntos juntos no pasan de 512 MiB (`ReportStorage.QuotaBytes`); cada uno ya estaba acotado a 32 MiB. Se comprueba al guardar, dentro de la misma transacción, contando lo de los demás más el resultado nuevo, que sustituye al suyo. Superarla es un intento fallido con su motivo («Borra los datos guardados de algún conjunto que ya no uses») y el resultado anterior se queda, como cualquier otro fallo.
+- **Espacio usado.** `GET /api/reports/storage` devuelve el tamaño del archivo `reports.db` (con su `-wal`), lo que suman los resultados, la cuota y, por conjunto, sus bytes, sus intentos y la fecha de su dato. El panel enseña «Datos guardados de este conjunto», «Reportes BI usa X de 512 MB» con una barra, y el tamaño del archivo.
+- **Borrar datos guardados.** `DELETE /api/reports/datasets/{id}/snapshot` borra solo el resultado: el conjunto, sus reportes, su programación y su historial se quedan, y vuelve a tener datos con la próxima actualización. Después hace `VACUUM` para que el archivo encoja de verdad; si otra lectura lo impide, el hueco se reutiliza más tarde. En la interfaz se confirma en el mismo sitio («¿Borrar los datos guardados? El conjunto, sus reportes y su programación se quedan.»).
+- El contrato OpenAPI está regenerado.
+
+### Comprobaciones
+
+- Backend: 3 unitarias nuevas. La cuota rechaza otro conjunto que no cabe, pero deja que el mismo sustituya el suyo. Borrar conserva el conjunto y su historial y deja el uso a cero. Los intentos de hace 120 días se olvidan y los de 30 no. Hay también 1 de integración del endpoint y el contrato.
+- Frontend: 1 nueva del banco de trabajo (historial con origen, motivo y duración; borrar con confirmación) y 2 de formato de bytes y duraciones. Reportes: 91 pruebas.
+- **e2e:** la de programación sigue con el historial, que muestra la actualización «Programada · Correcta», y borra los datos: el conjunto vuelve a «Todavía no hay datos guardados» y el intento sigue en el historial.
+- **Barrido.** Capturas `26-historial` (con la confirmación de borrar), `26a-claro-historial` y `26b-historial-1024`/`-900`, revisadas. No hay hallazgos propios de estas pantallas.
+  - Los avisos que da el barrido ya existían en todas las pantallas, también en las de hitos anteriores. A 1024 y 900 px se cortan textos de la barra principal detrás del diálogo («Buscar en Druse…», «Filtros», «Exportar»…). Además, `medir()` cuenta como cortado el texto solo para lectores de pantalla de la cuadrícula (`grid.keyboardDetail`). No son de Reportes y quedan para revisarlos aparte.
+
 ### Dónde retomar
 
-1. Hito 5.2: historial de intentos visible en Visualización (los 20 que ya se guardan, con origen manual o programado), retención y cuota de `reports.db` con «espacio usado» y «borrar datos guardados».
+1. Hito 6, compatibilidad y cierre: matriz por motor y edición, errores en español e inglés, rendimiento, E2E multifuente y declarar los motores compatibles.
 2. Preparar la sección `#reportes-bi` de la landing con `22-tablero`, `22e-tablero-pulsado`, `23b-plantilla-vincular`, `24b-vista-impresion` y `25-programar` (estado En desarrollo).
-3. Opcional: filtro «Plantilla de Druse» en el diálogo de guardar del escritorio (`exports.rs`); hoy guarda el `.json` de plantilla sin filtro de tipo (el `.xlsx` y el `.csv` sí lo tienen).
+3. Revisar los avisos del barrido que no son de Reportes: textos de la barra principal cortados a 1024 y 900 px, y `medir()` contando el texto oculto `.sr-only` de la cuadrícula.
+4. Opcional: filtro «Plantilla de Druse» en el diálogo de guardar del escritorio (`exports.rs`).

@@ -163,6 +163,23 @@ export interface ReportSchedule {
   readonly running?: boolean;
 }
 
+/** Lo que ocupa un conjunto en reports.db. */
+export interface ReportStorageEntry {
+  readonly datasetId: string;
+  readonly name: string;
+  readonly snapshotBytes: number;
+  readonly runCount: number;
+  readonly capturedAtUtc: string | null;
+}
+
+/** El espacio de Reportes BI, en bytes; la cuota cuenta solo los resultados. */
+export interface ReportStorage {
+  readonly fileBytes: number;
+  readonly snapshotBytes: number;
+  readonly quotaBytes: number;
+  readonly datasets: readonly ReportStorageEntry[];
+}
+
 export interface ReportRefresh {
   readonly outcome: 'Refreshed' | 'Failed';
   readonly run: ReportRun | null;
