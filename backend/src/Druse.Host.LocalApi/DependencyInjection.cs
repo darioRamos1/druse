@@ -273,6 +273,7 @@ internal static class DependencyInjection
         // --- Exportadores -------------------------------------------------------
         services.AddSingleton<IResultExporter, CsvResultExporter>();
         services.AddSingleton<IResultExporter, XlsxResultExporter>();
+        services.AddSingleton<IReportWorkbookWriter, ReportWorkbookWriter>();
 
         // --- Lectores de archivo ------------------------------------------------
         services.AddSingleton<ITableFileReader, CsvTableFileReader>();

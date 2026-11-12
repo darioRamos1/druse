@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 
 import { expect, test, type Locator } from '@playwright/test';
 
-import { abrir, conectar } from '../support/druse';
+import { CONTENEDOR, abrir, conectar } from '../support/druse';
 import {
   METAS_SQL,
   PEDIDOS_SQL,
@@ -239,6 +239,124 @@ test.describe('Plantillas de Reportes BI', () => {
 
     // Se deja como estaba: plantillas, tableros y conjuntos de esta ejecución.
     await borrarPlantillas(reportes, restos);
+    await borrarRestos(reportes, restos, restos);
+    await page.keyboard.press('Escape');
+    await expect(reportes.locator('.dialog')).toBeHidden();
+  });
+});
+
+test.describe('Exportar tableros de Reportes BI', () => {
+  /**
+   * El criterio del hito 4.4: con un filtro de mes activo y la conexión
+   * cerrada, exportar un panel y el tablero. Las cifras tienen que ser las de
+   * la vista: el libro y el CSV salen del resultado guardado, ya filtrado.
+   */
+  test('exporta el tablero y un panel con el filtro de mes activo y la conexión cerrada', async ({ page }) => {
+    await abrir(page);
+    await conectar(page);
+
+    const marca = Date.now();
+    const restos = /E2E Exportar/;
+    let reportes = await abrirReportes(page);
+
+    await borrarRestos(reportes, restos, restos);
+    await reportes.getByLabel('Nombre del conjunto de datos').fill(`E2E Exportar ${marca}`);
+    await anadirFuente(reportes, 'Ventas', VENTAS_SQL);
+    await previsualizar(reportes);
+
+    if (await reportes.locator('.diagnostic--danger', { hasText: 'contraseña guardada' }).isVisible()) {
+      test.info().annotations.push({ type: 'sin llavero', description: 'La fuente pidió la contraseña.' });
+      return;
+    }
+
+    await anadirFuente(reportes, 'Metas', METAS_SQL);
+    await previsualizar(reportes);
+    await reportes.locator('.steps__item').nth(1).click();
+    await previsualizar(reportes);
+    await reportes.getByRole('button', { name: 'Guardar', exact: true }).click();
+    await abrirVisualizacion(reportes);
+    await actualizar(reportes);
+
+    await reportes.locator('.inspector').getByLabel('Agrupar por').selectOption({ label: 'Ventas.municipio' });
+    await reportes.locator('.inspector').getByLabel('Nombre del reporte').fill(`Barras ${marca}`);
+    await reportes.getByRole('button', { name: 'Guardar reporte' }).click();
+    await reportes.getByRole('button', { name: 'Nuevo reporte' }).click();
+    await reportes.getByRole('radio', { name: 'Indicador' }).click();
+    await reportes.locator('.inspector').getByLabel('Nombre del reporte').fill(`Cumplimiento ${marca}`);
+    await reportes.getByRole('button', { name: 'Guardar reporte' }).click();
+    await crearTablero(reportes, `E2E Exportar tablero ${marca}`, [`Barras ${marca}`, `Cumplimiento ${marca}`]);
+
+    // Se cierra la conexión: lo que se exporta sale de reports.db, no de la base.
+    await page.keyboard.press('Escape');
+    await expect(reportes.locator('.dialog')).toBeHidden();
+    const conexion = page.locator('app-connections-sidebar .node--connection', { hasText: CONTENEDOR.nombre }).first();
+
+    await conexion.locator('.connection-menu-trigger').click();
+    await conexion.locator('[title="Desconectar"]').click();
+    await expect(conexion).toHaveClass(/is-offline/, { timeout: 30_000 });
+
+    reportes = await abrirReportes(page);
+    await reportes.locator('.datasets__item', { hasText: `E2E Exportar tablero ${marca}` }).first().click();
+    const tablero = reportes.locator('app-report-dashboard');
+
+    await expect(tablero.locator('.filter input[type="date"]')).toHaveCount(2);
+    const [desde, hasta] = await tablero.locator('.filter input[type="date"]').all();
+
+    await desde.fill('2026-01-01');
+    await desde.dispatchEvent('change');
+    await hasta.fill('2026-01-31');
+    await hasta.dispatchEvent('change');
+    await expect(tablero.locator('.panel .indicator__value')).toHaveText(/60\s?%/);
+
+    // --- Excel del tablero: un libro con su gráfico nativo ----------------------
+    await tablero.getByRole('button', { name: 'Exportar', exact: true }).click();
+    await expect(tablero.locator('.menu')).toContainText('Se exporta con los filtros activos.');
+    const [libro] = await Promise.all([
+      page.waitForEvent('download'),
+      tablero.getByRole('menuitem', { name: 'Excel (.xlsx)' }).click(),
+    ]);
+    const bytes = readFileSync(await libro.path());
+
+    expect(libro.suggestedFilename()).toBe(`E2E Exportar tablero ${marca}.xlsx`);
+    expect(bytes.subarray(0, 2).toString()).toBe('PK');
+    // Los nombres de las partes del ZIP van sin comprimir: se ve que hay gráfico y cuatro hojas.
+    const partes = bytes.toString('latin1');
+
+    expect(partes).toMatch(/charts\/chart\d*\.xml/);
+    expect(partes.match(/xl\/worksheets\/sheet\d+\.xml/g)?.length).toBeGreaterThanOrEqual(4);
+
+    // --- CSV de un panel: exactamente las barras que se ven ---------------------
+    const barras = tablero.locator('.panel', { hasText: `Barras ${marca}` });
+
+    await barras.getByRole('button', { name: `Exportar Barras ${marca}` }).click();
+    const [csv] = await Promise.all([
+      page.waitForEvent('download'),
+      barras.getByRole('menuitem', { name: 'CSV · lo que se ve' }).click(),
+    ]);
+
+    expect(readFileSync(await csv.path(), 'utf-8')).toBe(
+      '﻿Ventas.municipio,Suma · Ventas.venta\r\n05001,80\r\n08001,100\r\n11001,40\r\n',
+    );
+
+    // --- PDF: la vista de impresión con filtros y fecha de los datos ------------
+    await tablero.getByRole('button', { name: 'Exportar', exact: true }).click();
+    await tablero.getByRole('menuitem', { name: 'PDF…' }).click();
+    const vista = page.locator('body > app-report-print');
+
+    await expect(vista.locator('.paper__title')).toHaveText(`E2E Exportar tablero ${marca}`);
+    await expect(vista.locator('.paper__filters')).toContainText('Fecha: 1 ene 2026 – 31 ene 2026');
+    await expect(vista.locator('.paper .indicator__value')).toHaveText(/60\s?%/);
+    await expect(vista.locator('.panel__meta').first()).toContainText('Datos del');
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
+
+    // Lo que saldría por la impresora: solo el papel, en A4 apaisado.
+    const pdf = await page.pdf({ printBackground: true });
+
+    expect(pdf.subarray(0, 4).toString()).toBe('%PDF');
+    await vista.getByRole('button', { name: 'Cerrar' }).click();
+    await expect(vista).toHaveCount(0);
+
+    // Se deja como estaba.
     await borrarRestos(reportes, restos, restos);
     await page.keyboard.press('Escape');
     await expect(reportes.locator('.dialog')).toBeHidden();

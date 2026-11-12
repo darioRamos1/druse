@@ -9,6 +9,7 @@ import {
   SavedDashboard,
   SavedReportTemplate,
   SavedReport,
+  ExportDocument,
 } from '../../shared/models/reports';
 
 import {
@@ -604,6 +605,9 @@ export abstract class ApplicationGateway {
   abstract saveReportTemplate(template: SavedReportTemplate): Observable<SavedReportTemplate>;
 
   abstract deleteReportTemplate(id: string): Observable<void>;
+
+  /** El libro de Excel de un tablero o un panel, con las cifras ya filtradas. */
+  abstract exportReportWorkbook(document: ExportDocument): Observable<Blob>;
 
   abstract saveReport(report: SavedReport): Observable<SavedReport>;
 

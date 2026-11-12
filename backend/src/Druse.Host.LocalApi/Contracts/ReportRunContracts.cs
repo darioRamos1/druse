@@ -96,8 +96,127 @@ public sealed record ReportTemplateDto
     public DateTimeOffset UpdatedAtUtc { get; init; }
 }
 
+/// <summary>Un tablero o un panel para escribir en Excel, calculado por la interfaz con los filtros activos.</summary>
+public sealed record ReportExportRequestDto
+{
+    public required string Title { get; init; }
+    public DateTimeOffset GeneratedAtUtc { get; init; }
+    public required IReadOnlyList<ReportExportFilterDto> Filters { get; init; }
+    public required IReadOnlyList<ReportExportPanelDto> Panels { get; init; }
+    public required IReadOnlyList<ReportExportDatasetDto> Datasets { get; init; }
+    public required ReportExportLabels Labels { get; init; }
+}
+
+public sealed record ReportExportFilterDto(string Label, string Value);
+
+public sealed record ReportExportColumnDto(string Name, string Type);
+
+/// <summary>Filas con los valores tal como los serializa el resultado guardado: números, texto ISO, booleanos o null.</summary>
+public sealed record ReportExportTableDto(
+    IReadOnlyList<ReportExportColumnDto> Columns,
+    IReadOnlyList<IReadOnlyList<System.Text.Json.JsonElement>> Rows);
+
+public sealed record ReportExportPanelDto
+{
+    public required string Title { get; init; }
+    public string? Description { get; init; }
+    public required string Page { get; init; }
+    public int Dataset { get; init; }
+    public required ReportExportTableDto Figures { get; init; }
+
+    /// <summary>`Bar`, `Line` o vacío.</summary>
+    public string? Chart { get; init; }
+    public string? Color { get; init; }
+    public IReadOnlyList<string>? Notes { get; init; }
+    public ReportExportIndicator? Indicator { get; init; }
+}
+
+public sealed record ReportExportDatasetDto(string Name, DateTimeOffset CapturedAtUtc, ReportExportTableDto Table);
+
 internal static class ReportRunContractMapper
 {
+    /// <summary>
+    /// Pasa la petición al modelo tipado. Un valor que no encaja con su
+    /// columna (texto en una de números) se escribe como texto: el archivo no
+    /// pierde el dato aunque la interfaz se haya equivocado de tipo.
+    /// </summary>
+    public static ReportExportDocument ToDomain(this ReportExportRequestDto request) => new()
+    {
+        Title = request.Title,
+        GeneratedAtUtc = request.GeneratedAtUtc,
+        Filters = request.Filters.Select(filter => new ReportExportFilter(filter.Label, filter.Value)).ToArray(),
+        Panels = request.Panels.Select(panel => new ReportExportPanel
+        {
+            Title = panel.Title,
+            Description = panel.Description,
+            Page = panel.Page,
+            Dataset = panel.Dataset,
+            Figures = panel.Figures.ToDomain(),
+            Chart = Enum.TryParse<ReportExportChart>(panel.Chart, ignoreCase: true, out var chart)
+                && !int.TryParse(panel.Chart, out _) ? chart : ReportExportChart.None,
+            Color = panel.Color,
+            Notes = panel.Notes ?? [],
+            Indicator = panel.Indicator,
+        }).ToArray(),
+        Datasets = request.Datasets.Select(dataset => new ReportExportDataset(dataset.Name, dataset.CapturedAtUtc, dataset.Table.ToDomain())).ToArray(),
+        Labels = request.Labels,
+    };
+
+    private static ReportExportTable ToDomain(this ReportExportTableDto table)
+    {
+        var columns = table.Columns
+            .Select(column => new ReportExportColumn(
+                column.Name,
+                Enum.TryParse<ReportExportCellType>(column.Type, ignoreCase: true, out var type) && !int.TryParse(column.Type, out _)
+                    ? type
+                    : ReportExportCellType.Text))
+            .ToArray();
+
+        return new ReportExportTable(
+            columns,
+            table.Rows.Select(row => (IReadOnlyList<object?>)row
+                .Select((value, index) => index < columns.Length ? Typed(value, columns[index].Type) : null)
+                .ToArray()).ToArray());
+    }
+
+    private static object? Typed(System.Text.Json.JsonElement value, ReportExportCellType type)
+    {
+        switch (value.ValueKind)
+        {
+            case System.Text.Json.JsonValueKind.Null or System.Text.Json.JsonValueKind.Undefined:
+                return null;
+            case System.Text.Json.JsonValueKind.True or System.Text.Json.JsonValueKind.False:
+                return value.GetBoolean();
+            case System.Text.Json.JsonValueKind.Number:
+                return value.TryGetDecimal(out var number) ? number : value.GetDouble();
+            case System.Text.Json.JsonValueKind.String:
+                var text = value.GetString()!;
+                // Fechas en ISO: el día solo es una fecha; con hora, un instante en hora local de quien exporta.
+                if (type == ReportExportCellType.Date && DateOnly.TryParseExact(text.Length >= 10 ? text[..10] : text, "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out var day))
+                {
+                    return day.ToDateTime(TimeOnly.MinValue);
+                }
+
+                if (type == ReportExportCellType.DateTime && DateTimeOffset.TryParse(text, System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.AssumeUniversal, out var instant))
+                {
+                    // Con zona (`Z`, `+02:00`, `-05:00`) es un instante: se lleva a la hora local.
+                    // Sin ella es una fecha y hora de pared, y se escribe tal cual.
+                    var zoned = text.EndsWith('Z') || System.Text.RegularExpressions.Regex.IsMatch(text, @"[+-]\d{2}:?\d{2}$");
+                    return zoned ? instant.ToLocalTime().DateTime : instant.DateTime;
+                }
+
+                if (type is ReportExportCellType.Number or ReportExportCellType.Percent
+                    && decimal.TryParse(text, System.Globalization.NumberStyles.Number, System.Globalization.CultureInfo.InvariantCulture, out var parsed))
+                {
+                    return parsed;
+                }
+
+                return text;
+            default:
+                return value.GetRawText();
+        }
+    }
+
     public static ReportTemplateDto ToDto(this ReportTemplate template) => new()
     {
         Id = template.Id,

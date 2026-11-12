@@ -602,6 +602,37 @@ test.describe('barrido visual', () => {
     await medir(page, 'tablero desde plantilla', hallazgos);
     await foto(page, '23c-tablero-desde-plantilla', reportes.locator('.dialog'));
 
+    // --- Exportar: el menú del tablero, el de un panel y la vista de impresión --
+    await reportes.locator('.datasets__item', { hasText: TABLERO_BARRIDO }).first().click();
+    await expect(tablero.locator('.panel .chart__bar')).toHaveCount(3);
+    await tablero.locator('.filter select').selectOption({ label: '05001' });
+    await tablero.getByRole('button', { name: 'Exportar', exact: true }).click();
+    await expect(tablero.locator('.menu')).toBeVisible();
+    await medir(page, 'menú exportar tablero', hallazgos);
+    await foto(page, '24-exportar-tablero', reportes.locator('.dialog'));
+    await page.keyboard.press('Escape');
+    await expect(tablero.locator('.menu')).toHaveCount(0);
+    await tablero.locator('.panel').first().getByRole('button', { name: /^Exportar / }).click();
+    await expect(tablero.locator('.panel .menu')).toBeVisible();
+    await medir(page, 'menú exportar panel', hallazgos);
+    await foto(page, '24a-exportar-panel', reportes.locator('.dialog'));
+    await page.keyboard.press('Escape');
+    await tablero.getByRole('button', { name: 'Exportar', exact: true }).click();
+    await tablero.getByRole('menuitem', { name: 'PDF · todas las páginas' }).click();
+    const impresion = page.locator('body > app-report-print');
+
+    await expect(impresion.locator('.paper .chart__bar').first()).toBeVisible();
+    await page.waitForTimeout(300);
+    await medir(page, 'vista de impresión', hallazgos);
+    await foto(page, '24b-vista-impresion');
+    // Lo que sale en papel: sin barra, solo la hoja.
+    await page.emulateMedia({ media: 'print' });
+    await impresion.screenshot({ path: `${SALIDA}/24c-impresion-papel.png` });
+    await page.emulateMedia({ media: 'screen' });
+    await impresion.getByRole('button', { name: 'Cerrar' }).click();
+    await expect(impresion).toHaveCount(0);
+    await tablero.getByRole('button', { name: 'Quitar filtros' }).click();
+
     // Y en Visualización, «Desde plantilla» junto a «Nuevo reporte».
     await reportes.locator('.datasets__item', { hasText: CONJUNTO_BARRIDO }).first().click();
     await abrirVisualizacion(reportes);
@@ -891,6 +922,17 @@ test.describe('barrido visual', () => {
         await page.keyboard.press('Escape');
         await page.keyboard.press('Escape');
         await expect(galeriaEstrecha).toHaveCount(0);
+
+        const tableroEstrecho = reportesEstrecho.locator('app-report-dashboard');
+
+        await tableroEstrecho.getByRole('button', { name: 'Exportar', exact: true }).click();
+        await tableroEstrecho.getByRole('menuitem', { name: /^PDF/ }).first().click();
+        await expect(page.locator('body > app-report-print .paper')).toBeVisible();
+        await page.waitForTimeout(300);
+        await medir(page, 'vista de impresión a 900', hallazgos);
+        await foto(page, '24d-vista-impresion-900');
+        await page.locator('body > app-report-print').getByRole('button', { name: 'Cerrar' }).click();
+        await expect(page.locator('body > app-report-print')).toHaveCount(0);
       }
 
       if (ancho !== 900) {

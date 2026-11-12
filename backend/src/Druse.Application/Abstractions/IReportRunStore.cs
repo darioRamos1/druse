@@ -46,3 +46,10 @@ public interface IReportTemplateStore
 
     Task DeleteAsync(Guid id, CancellationToken cancellationToken);
 }
+
+/// <summary>Escribe un tablero o un panel de Reportes en un libro de Excel.</summary>
+public interface IReportWorkbookWriter
+{
+    /// <summary>El libro entero, en memoria: el tope de celdas ya lo acota.</summary>
+    byte[] Write(ReportExportDocument document);
+}

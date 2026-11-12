@@ -2,7 +2,9 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { Observable, of } from 'rxjs';
 
 import { ApplicationGateway } from '../../../core/application-gateway/application-gateway';
+import { FileSaveService } from '../../../core/files/file-save.service';
 import {
+  ExportDocument,
   ReportDataset,
   ReportRefresh,
   ReportSnapshot,
@@ -134,6 +136,8 @@ describe('ReportDashboard', () => {
   let actualizados: string[];
   let borrados: string[];
   let plantillas: SavedReportTemplate[];
+  let libros: ExportDocument[];
+  let archivos: { name: string; blob: Blob }[];
   let reportesNuevos: SavedReport[];
 
   async function asentar(): Promise<void> {
@@ -182,6 +186,8 @@ describe('ReportDashboard', () => {
     borrados = [];
     plantillas = [];
     reportesNuevos = [];
+    libros = [];
+    archivos = [];
 
     const resultados = new Map([
       ['ds-ventas', datosVentas],
@@ -204,6 +210,10 @@ describe('ReportDashboard', () => {
         plantillas.push(template);
         return of(template);
       },
+      exportReportWorkbook: (document: ExportDocument): Observable<Blob> => {
+        libros.push(document);
+        return of(new Blob(['xlsx']));
+      },
       saveReport: (report: SavedReport): Observable<SavedReport> => {
         reportesNuevos.push(report);
         return of(report);
@@ -212,7 +222,18 @@ describe('ReportDashboard', () => {
 
     await TestBed.configureTestingModule({
       imports: [ReportDashboard],
-      providers: [{ provide: ApplicationGateway, useValue: gateway }],
+      providers: [
+        { provide: ApplicationGateway, useValue: gateway },
+        {
+          provide: FileSaveService,
+          useValue: {
+            save: async (name: string, blob: Blob) => {
+              archivos.push({ name, blob });
+              return { saved: true, path: null };
+            },
+          },
+        },
+      ],
     }).compileComponents();
   });
 
@@ -489,5 +510,106 @@ describe('ReportDashboard', () => {
     expect(paneles[3].querySelector('.panel__title')?.textContent).toContain('Desde plantilla');
     expect(paneles[3].querySelectorAll('.chart__bar')).toHaveLength(3);
     expect(el('.board__dirty')).toBeTruthy();
+  });
+
+  async function filtrarEnero(): Promise<void> {
+    const [desde, hasta] = todos('.filter input[type="date"]') as HTMLInputElement[];
+
+    desde.value = '2026-01-01';
+    desde.dispatchEvent(new Event('change'));
+    hasta.value = '2026-01-31';
+    hasta.dispatchEvent(new Event('change'));
+    fixture.detectChanges();
+  }
+
+  function menú(etiqueta: string): HTMLButtonElement {
+    return todos('[role="menuitem"]').find((item) => item.textContent?.trim() === etiqueta) as HTMLButtonElement;
+  }
+
+  it('exporta a Excel las cifras de la vista con el filtro de enero', async () => {
+    await crear(tablero(conTresPaneles));
+    await filtrarEnero();
+
+    botón('Exportar').click();
+    fixture.detectChanges();
+    expect(el('.menu').textContent).toContain('Se exporta con los filtros activos.');
+    menú('Excel (.xlsx)').click();
+    await asentar();
+
+    expect(libros).toHaveLength(1);
+    const libro = libros[0];
+
+    expect(libro.title).toBe('Comercial');
+    expect(libro.filters).toEqual([{ label: 'Mes', value: expect.stringMatching(/2026.*–.*2026/) }]);
+    expect(libro.panels.map((panel) => [panel.title, panel.chart])).toEqual([
+      ['Ventas por municipio', 'Bar'],
+      ['Cumplimiento', null],
+      ['Visitas', null],
+    ]);
+    // Enero: el 60 % del plan; febrero no entra.
+    expect(libro.panels[1].indicator).toEqual(expect.objectContaining({ target: 300, ratio: 0.6 }));
+    expect(libro.panels[0].figures.rows).toEqual([
+      ['05001', 80],
+      ['08001', 100],
+      ['11001', 40],
+    ]);
+    // Cada conjunto una sola vez, con sus filas filtradas y sus columnas con nombre visible.
+    expect(libro.datasets.map((dataset) => [dataset.name, dataset.table.rows.length])).toEqual([
+      ['Ventas y metas', 3],
+      ['Visitas', 1],
+    ]);
+    expect(libro.datasets[0].table.columns[0]).toEqual({ name: 'Ventas.mes', type: 'Date' });
+    expect(archivos.map((archivo) => archivo.name)).toEqual(['Comercial.xlsx']);
+    expect(el('.banner--success').textContent).toContain('Comercial.xlsx');
+  });
+
+  it('descarga en CSV lo que dibuja un panel', async () => {
+    await crear(tablero(conTresPaneles));
+    await filtrarEnero();
+
+    (todos('.export--panel button')[0] as HTMLButtonElement).click();
+    fixture.detectChanges();
+    menú('CSV · lo que se ve').click();
+    await asentar();
+
+    expect(archivos).toHaveLength(1);
+    expect(archivos[0].name).toBe('Ventas por municipio.csv');
+    const texto = await archivos[0].blob.text();
+
+    // Blob.text() quita el BOM al decodificar: se comprueba en los bytes.
+    const bytes = new Uint8Array(await archivos[0].blob.arrayBuffer());
+
+    expect([...bytes.slice(0, 3)]).toEqual([0xef, 0xbb, 0xbf]);
+    expect(texto.replace(/^\uFEFF/, '')).toBe(
+      ['Ventas.municipio,Suma · Ventas.venta', '05001,80', '08001,100', '11001,40', ''].join('\r\n'),
+    );
+  });
+
+  it('abre la vista de impresión en claro y la cierra con Escape sin tocar el tema', async () => {
+    document.documentElement.dataset['theme'] = 'dark';
+    await crear(tablero(conTresPaneles));
+    await filtrarEnero();
+
+    botón('Exportar').click();
+    fixture.detectChanges();
+    menú('PDF…').click();
+    fixture.detectChanges();
+    await asentar();
+
+    const vista = document.body.querySelector('app-report-print') as HTMLElement;
+
+    expect(vista.parentElement).toBe(document.body);
+    expect(document.body.classList).toContain('is-printing-report');
+    expect(document.documentElement.dataset['theme']).toBe('light');
+    expect(vista.querySelector('.paper__title')?.textContent).toBe('Comercial');
+    expect(vista.querySelector('.paper__filters')?.textContent).toContain('Mes:');
+    expect(vista.querySelectorAll('.panel')).toHaveLength(3);
+
+    document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    fixture.detectChanges();
+
+    expect(document.body.querySelector('app-report-print')).toBeNull();
+    expect(document.body.classList).not.toContain('is-printing-report');
+    expect(document.documentElement.dataset['theme']).toBe('dark');
   });
 });

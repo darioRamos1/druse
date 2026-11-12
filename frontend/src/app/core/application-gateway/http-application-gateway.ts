@@ -76,6 +76,7 @@ import {
   SavedDashboard,
   SavedReportTemplate,
   SavedReport,
+  ExportDocument,
 } from '../../shared/models/reports';
 import { translate } from '../i18n/active';
 import {
@@ -568,6 +569,10 @@ export class HttpApplicationGateway extends ApplicationGateway {
 
   override deleteReportTemplate(id: string): Observable<void> {
     return this._http.delete<void>(`/api/reports/templates/${id}`);
+  }
+
+  override exportReportWorkbook(document: ExportDocument): Observable<Blob> {
+    return this._http.post('/api/reports/exports/xlsx', document, { responseType: 'blob' });
   }
 
   override saveReport(report: SavedReport): Observable<SavedReport> {

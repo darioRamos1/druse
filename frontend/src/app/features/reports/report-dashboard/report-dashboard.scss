@@ -474,3 +474,56 @@
     max-width: 520px;
   }
 }
+
+// Menús de exportar: el del tablero, en la barra, y el de cada panel.
+.export {
+  position: relative;
+
+  &--panel {
+    flex: none;
+  }
+}
+
+.menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  min-width: 220px;
+  padding: 4px;
+  border: 1px solid var(--dr-border);
+  border-radius: var(--dr-radius-sm);
+  background: var(--dr-surface-raised);
+  box-shadow: var(--dr-shadow-menu);
+
+  &--end {
+    right: 0;
+    left: auto;
+  }
+
+  &__item {
+    padding: 7px 10px;
+    border: 0;
+    border-radius: var(--dr-radius-xs);
+    background: transparent;
+    color: var(--dr-text);
+    font: inherit;
+    font-size: 12px;
+    text-align: left;
+    cursor: pointer;
+
+    &:hover,
+    &:focus-visible {
+      background: var(--dr-surface-hover);
+    }
+  }
+
+  &__hint {
+    margin: 4px 10px 6px;
+    color: var(--dr-text-tertiary);
+    font-size: 11px;
+    line-height: 1.4;
+  }
+}

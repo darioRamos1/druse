@@ -193,3 +193,67 @@ export interface SavedReportTemplate {
   readonly createdAtUtc?: string;
   readonly updatedAtUtc?: string;
 }
+
+// --- Hito 4.4: exportar un tablero o un panel ------------------------------
+
+/** Tipo de celda, con los mismos nombres que `ReportExportCellType` en el servidor. */
+export type ExportCellType = 'Text' | 'Number' | 'Date' | 'DateTime' | 'Boolean' | 'Percent';
+
+export interface ExportColumn {
+  readonly name: string;
+  readonly type: ExportCellType;
+}
+
+export interface ExportTable {
+  readonly columns: readonly ExportColumn[];
+  readonly rows: readonly (readonly ReportValue[])[];
+}
+
+export interface ExportFilter {
+  readonly label: string;
+  readonly value: string;
+}
+
+export interface ExportPanel {
+  readonly title: string;
+  readonly description: string | null;
+  readonly page: string;
+  /** Posición en `datasets`. */
+  readonly dataset: number;
+  readonly figures: ExportTable;
+  readonly chart: 'Bar' | 'Line' | null;
+  readonly color: string | null;
+  readonly notes: readonly string[];
+  readonly indicator: { readonly value: number | null; readonly target: number | null; readonly ratio: number | null } | null;
+}
+
+export interface ExportDataset {
+  readonly name: string;
+  readonly capturedAtUtc: string;
+  readonly table: ExportTable;
+}
+
+/** Los textos fijos del libro, en el idioma de la interfaz. */
+export interface ExportLabels {
+  readonly summary: string;
+  readonly generated: string;
+  readonly filters: string;
+  readonly noFilters: string;
+  readonly panel: string;
+  readonly page: string;
+  readonly dataset: string;
+  readonly capturedAt: string;
+  readonly value: string;
+  readonly target: string;
+  readonly ratio: string;
+  readonly data: string;
+}
+
+export interface ExportDocument {
+  readonly title: string;
+  readonly generatedAtUtc: string;
+  readonly filters: readonly ExportFilter[];
+  readonly panels: readonly ExportPanel[];
+  readonly datasets: readonly ExportDataset[];
+  readonly labels: ExportLabels;
+}

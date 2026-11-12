@@ -31,7 +31,7 @@
 - [x] 4.1 Filtros compartidos de fecha y categoría, vinculados por conjunto, aplicados sobre los datos guardados.
 - [x] 4.2 Personalización: colores, formato de números, umbrales, estilo de panel, varias páginas y filtrar al pulsar.
 - [x] 4.3 Plantillas: guardar, aplicar a otro conjunto con asignación de campos, exportar e importar.
-- [ ] 4.4 Exportación a Excel, PDF y CSV con los filtros activos.
+- [x] 4.4 Exportación a Excel, PDF y CSV con los filtros activos.
 
 Los hitos siguientes cubren el constructor SQL y visual, los reportes guardados, los tableros y plantillas, y la actualización programada. La evidencia para la landing se prepara conforme se valida cada hito.
 
@@ -227,8 +227,40 @@ El hito 4 se divide en cuatro entregas (tableros, personalización, plantillas y
   - **Nombres accesibles ambiguos.** «Guardar reporte como plantilla» y «Nuevo tablero desde plantilla» empezaban como «Guardar reporte» y «Nuevo tablero». Pasaron a «Guardar como plantilla» y «Tablero desde plantilla».
   - **Pestañas repetidas.** Aplicar una plantilla al mismo conjunto dejaba dos reportes con el mismo nombre. Ahora se numeran: «Cumplimiento (2)».
 
+## 2026-11-12 · Hito 4.4: exportar a Excel, PDF y CSV (versión 1.17.0)
+
+### Qué se hizo
+
+- **Dónde se calcula.** Lo calcula el tablero con los filtros activos, sobre los resultados guardados (`report-export-model.ts`): lo que dibuja cada panel —la serie agregada, el indicador o la tabla— y las filas filtradas de cada conjunto, una vez por conjunto. Así las cifras del archivo son las de la vista y no hace falta conexión con las bases.
+- **Excel.** `POST /api/reports/exports/xlsx` recibe ese documento y `ReportWorkbookWriter` escribe el libro con ClosedXML:
+  - Una hoja **Resumen** con el título, la fecha de generación, los filtros activos y una fila por panel con su conjunto, la fecha de sus datos y, en los indicadores, cifra, meta y cumplimiento.
+  - Una hoja por panel con lo que dibuja, sus avisos (filtros que no aplica, filas sin meta) y, en barras y líneas, un **gráfico nativo de Excel** sobre esas celdas, con el color del panel. ClosedXML no dibuja gráficos, así que se añaden después con OpenXML sobre el mismo paquete.
+  - Una hoja **Datos · conjunto** por conjunto con sus filas filtradas.
+  - Las celdas van tipadas: números, fechas con formato `yyyy-mm-dd`, porcentajes, y los códigos como texto, con sus ceros iniciales.
+  - Hay un tope de 2.000.000 de celdas, el mismo que la exportación de resultados. La interfaz avisa antes de pedir el libro y el servidor lo vuelve a comprobar.
+  - Los textos fijos (nombres de hoja, «Filtros», «Datos del») llegan en el idioma de la interfaz.
+- **PDF.** Una vista de impresión (`report-print`) con la cabecera del tablero, los filtros, la fecha de generación y los paneles con su distribución y sus gráficos. Se imprime con el diálogo del sistema («Guardar como PDF»), en A4 apaisado, y cada página del tablero empieza en una hoja nueva.
+  - Mientras está abierta cuelga de `<body>` (dentro del constructor, que es `fixed`, el navegador no reparte en páginas) y pone el tema claro, que se restaura al cerrar.
+  - El CSS de impresión oculta el resto de Druse.
+  - **Decisión de la librería:** se mantiene el SVG propio. El PDF reutiliza los mismos gráficos de la pantalla y el Excel lleva gráficos nativos, así que no hace falta añadir ninguna dependencia ni su inventario de terceros.
+- **CSV.** Se genera en la interfaz, con las reglas de la exportación de resultados: BOM, coma, CRLF, números con punto y fórmulas neutralizadas con un apóstrofo. Hay dos opciones por panel: «lo que se ve» y «datos filtrados del conjunto».
+- **Menús.** «Exportar» en la barra del tablero (con varias páginas: esta página o todas) y un menú por panel en modo vista (Excel, PDF y los dos CSV). El menú dice si se exporta con filtros activos o con todos los datos.
+
+### Comprobaciones y lo que encontró Playwright
+
+- **Pruebas:**
+  - Backend: 5 unitarias del libro. Comprueban celdas tipadas, nombres de hoja válidos y únicos, y que los gráficos nativos apunten a sus celdas; además, el validador de OpenXML no encuentra errores en hojas, dibujos ni gráficos. También hay 2 de integración del endpoint y el contrato OpenAPI regenerado. La batería unitaria completa pasa (749).
+  - Frontend: 7 del modelo (tipos, cifras, CSV con comillas y fórmulas, tope de celdas) y 3 del tablero: Excel con el filtro de enero (60 %, febrero fuera), CSV de un panel con su BOM, y la vista de impresión, que va a `<body>`, pasa a claro y se cierra con Escape devolviendo el tema. En total, 527 de core y Reportes.
+- **e2e nueva**, el criterio del hito. Con el filtro de fecha de enero y la **conexión cerrada**, el Excel del tablero trae su gráfico y sus cuatro hojas, y el CSV del panel trae exactamente las tres barras de la vista. El PDF lleva título, filtros, «Datos del…» y el 60 %, y Chromium genera un PDF real.
+- **Barrido.** Capturas `24`–`24d`: menús de exportar del tablero y del panel, vista de impresión, papel (con medios de impresión emulados) y vista a 900 px. La consola sale limpia.
+- **Fallos encontrados y corregidos:**
+  - **El indicador se salía de su panel en papel.** La vista usaba filas de 56 px frente a las 72 px del tablero. Ahora usa las mismas, y lo que no cabe se recorta dentro del panel.
+  - **Se imprimía una página vacía** con solo su título. Las páginas sin paneles ya no se imprimen.
+  - **«1 fila sin meta» salía dos veces** en el PDF. El indicador ya lo dice; la nota queda solo en el Excel.
+  - **La vista de impresión no llegaba a `<body>`.** Angular inserta el componente después de construirlo, así que el traslado se hace al terminar de pintarlo. Lo encontró la prueba unitaria.
+
 ### Dónde retomar
 
-1. Hito 4.4, exportación a Excel, PDF y CSV con los filtros activos (y decidir si basta el SVG propio o hace falta una librería).
-2. Preparar la sección `#reportes-bi` de la landing con `22-tablero`, `22e-tablero-pulsado` y `23b-plantilla-vincular` (estado En desarrollo).
-3. Opcional: filtro «Plantilla de Druse» en el diálogo de guardar del escritorio (`exports.rs`); hoy guarda el `.json` sin filtro de tipo.
+1. Preparar la sección `#reportes-bi` de la landing con `22-tablero`, `22e-tablero-pulsado`, `23b-plantilla-vincular` y `24b-vista-impresion` (estado En desarrollo).
+2. Hito 5, programación: diaria o semanal, recuperación tras reiniciar, historial y retención.
+3. Opcional: filtro «Plantilla de Druse» en el diálogo de guardar del escritorio (`exports.rs`); hoy guarda el `.json` de plantilla sin filtro de tipo (el `.xlsx` y el `.csv` sí lo tienen).

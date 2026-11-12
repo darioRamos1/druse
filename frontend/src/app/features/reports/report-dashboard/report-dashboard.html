@@ -39,6 +39,33 @@
           {{ 'reports.dashboard.save' | t }}
         </button>
       }
+      <div class="export" (focusout)="exportMenuFocusOut($event)" (keydown)="exportMenuKeydown($event)">
+        <button
+          type="button"
+          class="button"
+          aria-haspopup="menu"
+          [attr.aria-expanded]="exportMenu() === 'board'"
+          (click)="toggleExportMenu('board')"
+          [disabled]="exporting() || panels().length === 0"
+        >
+          <app-icon name="export" [size]="11" />
+          {{ (exporting() ? 'reports.export.working' : 'reports.export.board') | t }}
+        </button>
+        @if (exportMenu() === 'board') {
+          <div class="menu" role="menu" [attr.aria-label]="'reports.export.board' | t">
+            @if (pages().length > 1) {
+              <button type="button" role="menuitem" class="menu__item" (click)="exportExcel('page')">{{ 'reports.export.excelPage' | t }}</button>
+              <button type="button" role="menuitem" class="menu__item" (click)="exportExcel('all')">{{ 'reports.export.excelAll' | t }}</button>
+              <button type="button" role="menuitem" class="menu__item" (click)="openPrint('page')">{{ 'reports.export.pdfPage' | t }}</button>
+              <button type="button" role="menuitem" class="menu__item" (click)="openPrint('all')">{{ 'reports.export.pdfAll' | t }}</button>
+            } @else {
+              <button type="button" role="menuitem" class="menu__item" (click)="exportExcel('page')">{{ 'reports.export.excel' | t }}</button>
+              <button type="button" role="menuitem" class="menu__item" (click)="openPrint('page')">{{ 'reports.export.pdf' | t }}</button>
+            }
+            <p class="menu__hint">{{ (anyActive() ? 'reports.export.withFilters' : 'reports.export.noFiltersHint') | t }}</p>
+          </div>
+        }
+      </div>
       <button
         type="button"
         class="button"
@@ -193,6 +220,30 @@
               >
                 {{ (asTable().has(view.panel.id) ? 'reports.chart.showChart' : 'reports.chart.showTable') | t }}
               </button>
+            }
+            @if (!editing() && view.report && view.snapshot) {
+              <div class="export export--panel" (focusout)="exportMenuFocusOut($event)" (keydown)="exportMenuKeydown($event)">
+                <button
+                  type="button"
+                  class="icon-button"
+                  aria-haspopup="menu"
+                  [attr.aria-expanded]="exportMenu() === view.panel.id"
+                  [attr.aria-label]="'reports.export.panel' | t: { name: view.title }"
+                  [attr.title]="'reports.export.panel' | t: { name: view.title }"
+                  (click)="toggleExportMenu(view.panel.id)"
+                  [disabled]="exporting()"
+                >
+                  <app-icon name="export" [size]="11" />
+                </button>
+                @if (exportMenu() === view.panel.id) {
+                  <div class="menu menu--end" role="menu" [attr.aria-label]="'reports.export.panel' | t: { name: view.title }">
+                    <button type="button" role="menuitem" class="menu__item" (click)="exportExcel(view)">{{ 'reports.export.excel' | t }}</button>
+                    <button type="button" role="menuitem" class="menu__item" (click)="openPrint(view)">{{ 'reports.export.pdf' | t }}</button>
+                    <button type="button" role="menuitem" class="menu__item" (click)="exportCsv(view, 'figures')">{{ 'reports.export.csvFigures' | t }}</button>
+                    <button type="button" role="menuitem" class="menu__item" (click)="exportCsv(view, 'data')">{{ 'reports.export.csvData' | t }}</button>
+                  </div>
+                }
+              </div>
             }
             @if (editing()) {
               <div class="panel__tools" role="toolbar" [attr.aria-label]="'reports.dashboard.panelTools' | t: { name: view.title }">
@@ -458,5 +509,17 @@
     [datasets]="datasets()"
     (applied)="applyTemplate($event)"
     (closed)="galleryOpen.set(false)"
+  />
+}
+
+@if (printing(); as request) {
+  <app-report-print
+    [title]="request.title"
+    [filters]="request.filters"
+    [generatedAt]="request.generatedAt"
+    [pages]="request.pages"
+    [capturedAt]="printCapturedAt"
+    [notes]="printNotes"
+    (closed)="printing.set(null)"
   />
 }

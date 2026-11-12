@@ -2800,6 +2800,29 @@
         }
       }
     },
+    "/api/reports/exports/xlsx": {
+      "post": {
+        "tags": [
+          "Druse.Host.LocalApi"
+        ],
+        "operationId": "ExportReportWorkbook",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReportExportRequestDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
     "/api/reports/templates": {
       "get": {
         "tags": [
@@ -4541,6 +4564,273 @@
           },
           "clrType": {
             "type": "string"
+          }
+        }
+      },
+      "ReportExportColumnDto": {
+        "required": [
+          "name",
+          "type"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          }
+        }
+      },
+      "ReportExportDatasetDto": {
+        "required": [
+          "name",
+          "capturedAtUtc",
+          "table"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "capturedAtUtc": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "table": {
+            "$ref": "#/components/schemas/ReportExportTableDto"
+          }
+        }
+      },
+      "ReportExportFilterDto": {
+        "required": [
+          "label",
+          "value"
+        ],
+        "type": "object",
+        "properties": {
+          "label": {
+            "type": "string"
+          },
+          "value": {
+            "type": "string"
+          }
+        }
+      },
+      "ReportExportIndicator": {
+        "required": [
+          "value",
+          "target",
+          "ratio"
+        ],
+        "type": "object",
+        "properties": {
+          "value": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d\u002B)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "target": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d\u002B)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "ratio": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d\u002B)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
+          }
+        }
+      },
+      "ReportExportLabels": {
+        "required": [
+          "summary",
+          "generated",
+          "filters",
+          "noFilters",
+          "panel",
+          "page",
+          "dataset",
+          "capturedAt",
+          "value",
+          "target",
+          "ratio",
+          "data"
+        ],
+        "type": "object",
+        "properties": {
+          "summary": {
+            "type": "string"
+          },
+          "generated": {
+            "type": "string"
+          },
+          "filters": {
+            "type": "string"
+          },
+          "noFilters": {
+            "type": "string"
+          },
+          "panel": {
+            "type": "string"
+          },
+          "page": {
+            "type": "string"
+          },
+          "dataset": {
+            "type": "string"
+          },
+          "capturedAt": {
+            "type": "string"
+          },
+          "value": {
+            "type": "string"
+          },
+          "target": {
+            "type": "string"
+          },
+          "ratio": {
+            "type": "string"
+          },
+          "data": {
+            "type": "string"
+          }
+        }
+      },
+      "ReportExportPanelDto": {
+        "required": [
+          "title",
+          "page",
+          "figures"
+        ],
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string"
+          },
+          "description": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "page": {
+            "type": "string"
+          },
+          "dataset": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "figures": {
+            "$ref": "#/components/schemas/ReportExportTableDto"
+          },
+          "chart": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "color": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "notes": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string"
+            }
+          },
+          "indicator": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ReportExportIndicator"
+              }
+            ]
+          }
+        }
+      },
+      "ReportExportRequestDto": {
+        "required": [
+          "title",
+          "filters",
+          "panels",
+          "datasets",
+          "labels"
+        ],
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string"
+          },
+          "generatedAtUtc": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "filters": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReportExportFilterDto"
+            }
+          },
+          "panels": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReportExportPanelDto"
+            }
+          },
+          "datasets": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReportExportDatasetDto"
+            }
+          },
+          "labels": {
+            "$ref": "#/components/schemas/ReportExportLabels"
+          }
+        }
+      },
+      "ReportExportTableDto": {
+        "required": [
+          "columns",
+          "rows"
+        ],
+        "type": "object",
+        "properties": {
+          "columns": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReportExportColumnDto"
+            }
+          },
+          "rows": {
+            "type": "array",
+            "items": {
+              "type": "array"
+            }
           }
         }
       },

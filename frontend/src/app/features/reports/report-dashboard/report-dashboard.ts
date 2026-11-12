@@ -12,11 +12,15 @@ import {
 import { firstValueFrom } from 'rxjs';
 
 import { ApplicationGateway } from '../../../core/application-gateway/application-gateway';
+import { FileSaveService } from '../../../core/files/file-save.service';
 import { I18nService } from '../../../core/i18n/i18n.service';
 import { formatDate } from '../../../core/i18n/locale-format';
 import { TranslatePipe } from '../../../core/i18n/translate.pipe';
 import { describeError } from '../../../core/workspace/errors';
 import {
+  ExportDocument,
+  ExportFilter,
+  ExportPanel,
   ReportDataset,
   ReportSnapshot,
   SavedDashboard,
@@ -41,6 +45,7 @@ import {
   DashboardFilter,
   DashboardFilterKind,
   DashboardModel,
+  DashboardPage,
   DashboardPanel,
   FilterValue,
   GRID_COLUMNS,
@@ -68,35 +73,20 @@ import {
   retitlePanel,
 } from '../report-dashboard-model';
 import { columnLabelFor } from '../report-draft';
+import { PanelView } from '../report-panel-view';
+import {
+  MAX_EXPORT_CELLS,
+  PRINT_PALETTE,
+  cellCount,
+  csvBlob,
+  datasetTable,
+  exportFileName,
+  panelFigures,
+} from '../report-export-model';
+import { PrintPage, ReportPrint } from '../report-print/report-print';
 import { ReportTemplateGallery, TemplateApplication } from '../report-template-gallery/report-template-gallery';
 import { ReportTemplateSave, TemplateSaveRequest } from '../report-template-save/report-template-save';
 import { captureTemplate, instantiateTemplate, panelLayout } from '../report-template-model';
-
-/** Lo que pinta un panel, ya calculado con los filtros activos. */
-interface PanelView {
-  readonly panel: DashboardPanel;
-  readonly report: SavedReport | null;
-  readonly dataset: ReportDataset | null;
-  readonly snapshot: ReportSnapshot | null;
-  readonly title: string;
-  readonly unbound: readonly string[];
-  readonly repeated: readonly string[];
-  readonly label: (name: string) => string;
-  readonly series: ReturnType<typeof buildSeries> | null;
-  readonly indicator: ReturnType<typeof buildIndicator> | null;
-  readonly table: ReturnType<typeof tableView> | null;
-  readonly valueLabel: string;
-  readonly categoryLabel: string;
-  readonly appearance: ReportAppearance;
-  /** El color resuelto y de dónde viene: panel, reporte, tablero o tema. */
-  readonly color: PaletteColor | null;
-  readonly colorSource: ColorSource;
-  readonly categoryColors: ReadonlyMap<string | null, PaletteColor> | null;
-  /** Pulsar una barra filtra el tablero: hay un filtro vinculado a su categoría. */
-  readonly pickFilter: DashboardFilter | null;
-  /** La categoría elegida en ese filtro; `undefined` si no hay ninguna. */
-  readonly picked: string | null | undefined;
-}
 
 /**
  * Un tablero: reportes de uno o varios conjuntos en una cuadrícula, con
@@ -110,7 +100,7 @@ interface PanelView {
 @Component({
   selector: 'app-report-dashboard',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [Icon, ReportChart, ReportTemplateGallery, ReportTemplateSave, TranslatePipe],
+  imports: [Icon, ReportChart, ReportPrint, ReportTemplateGallery, ReportTemplateSave, TranslatePipe],
   templateUrl: './report-dashboard.html',
   styleUrl: './report-dashboard.scss',
   host: {
@@ -120,6 +110,7 @@ interface PanelView {
 export class ReportDashboard {
   private readonly _gateway = inject(ApplicationGateway);
   private readonly _i18n = inject(I18nService);
+  private readonly _files = inject(FileSaveService);
 
   readonly dashboard = input.required<SavedDashboard>();
   readonly datasets = input.required<readonly ReportDataset[]>();
@@ -163,6 +154,13 @@ export class ReportDashboard {
   protected readonly galleryOpen = signal(false);
   protected readonly galleryScopes: readonly ReportTemplateScope[] = ['Panel', 'Report'];
 
+  /** Exportar: qué menú está abierto (`board` o el id de un panel) y la vista de impresión. */
+  protected readonly exportMenu = signal<string | null>(null);
+  protected readonly exporting = signal(false);
+  protected readonly printing = signal<PrintRequest | null>(null);
+  protected readonly printCapturedAt = (iso: string): string => this._i18n.t('reports.data.from', { date: this.when(iso) });
+  protected readonly printNotes = (view: PanelView): readonly string[] => this.panelNotes(view, false);
+
   protected readonly palette = PALETTE;
   protected readonly currentPage = signal<string | null>(null);
   protected readonly pages = computed(() => this.model().pages);
@@ -191,9 +189,7 @@ export class ReportDashboard {
 
   protected readonly anyActive = computed(() => [...this.values().values()].some(isActive));
 
-  protected readonly panels = computed<readonly PanelView[]>(() =>
-    this.page().panels.map((panel) => this.view(panel)),
-  );
+  protected readonly panels = computed<readonly PanelView[]>(() => this.viewsOf(this.page()));
 
   /** Los reportes que se pueden añadir, agrupados por su conjunto. */
   protected readonly catalog = computed(() =>
@@ -237,6 +233,8 @@ export class ReportDashboard {
     this.notice.set(null);
     this.savingTemplate.set(null);
     this.galleryOpen.set(false);
+    this.exportMenu.set(null);
+    this.printing.set(null);
     void this.load();
   }
 
@@ -269,6 +267,10 @@ export class ReportDashboard {
     });
   }
 
+  private viewsOf(page: DashboardPage): readonly PanelView[] {
+    return page.panels.map((panel) => this.view(panel));
+  }
+
   private view(panel: DashboardPanel): PanelView {
     const report = this.reports().find((item) => item.id === panel.reportId) ?? null;
     const dataset = report ? (this.datasets().find((item) => item.id === report.datasetId) ?? null) : null;
@@ -294,6 +296,8 @@ export class ReportDashboard {
       categoryColors: null,
       pickFilter: null,
       picked: undefined,
+      settings: null,
+      categoryColumn: null,
     };
 
     if (!report || !dataset || !stored) {
@@ -325,6 +329,8 @@ export class ReportDashboard {
       categoryColors: categoryColors(stored, settings),
       pickFilter: pickFilter ?? null,
       picked: pickFilter ? this.pickedValue(pickFilter) : undefined,
+      settings,
+      categoryColumn: snapshot.columns.find((column) => column.name === settings.category) ?? null,
     };
   }
 
@@ -841,6 +847,250 @@ export class ReportDashboard {
       this.error.set(describeError(error, this._i18n));
     }
   }
+
+  // --- Exportar ------------------------------------------------------------------------
+
+  /**
+   * Los filtros activos, escritos como se leen: van al resumen del Excel y a la
+   * cabecera del PDF, para que el archivo diga qué recorte de los datos es.
+   */
+  private activeFilters(): readonly ExportFilter[] {
+    // Los días llegan como `2026-01-31`: en UTC, para que no salga el 30 al oeste de Greenwich.
+    const day = (iso: string) => formatDate(iso, { dateStyle: 'medium', timeZone: 'UTC' });
+
+    return this.filters().flatMap((filter): ExportFilter[] => {
+      const value = this.values().get(filter.id);
+
+      if (!value || !isActive(value)) {
+        return [];
+      }
+
+      if (value.kind === 'date') {
+        const text =
+          value.from && value.to
+            ? `${day(value.from)} – ${day(value.to)}`
+            : value.from
+              ? this._i18n.t('reports.export.since', { date: day(value.from) })
+              : this._i18n.t('reports.export.until', { date: day(value.to!) });
+
+        return [{ label: filter.label, value: text }];
+      }
+
+      return [
+        {
+          label: filter.label,
+          value: value.values.map((item) => item ?? this._i18n.t('reports.chart.empty')).join(', '),
+        },
+      ];
+    });
+  }
+
+  /**
+   * Lo que acompaña a la cifra de un panel: filtros que no aplica, cifras
+   * repetidas y, en el Excel, las filas sin meta. En el PDF esa última ya la
+   * escribe el propio indicador, y repetirla solo ocupa papel.
+   */
+  private panelNotes(view: PanelView, withoutTarget = true): readonly string[] {
+    return [
+      ...(view.unbound.length > 0
+        ? [this._i18n.t('reports.dashboard.notFiltered', { filters: view.unbound.join(', ') })]
+        : []),
+      ...(view.repeated.length > 0 ? [this._i18n.t('reports.join.repeated', { columns: view.repeated.join(', ') })] : []),
+      ...(withoutTarget && view.indicator && view.indicator.withoutTarget > 0
+        ? [this._i18n.t('reports.chart.withoutTarget', { count: view.indicator.withoutTarget })]
+        : []),
+    ];
+  }
+
+  private entriesFor(target: ExportTarget): readonly { readonly page: DashboardPage; readonly views: readonly PanelView[] }[] {
+    if (typeof target !== 'string') {
+      return [{ page: this.page(), views: [target] }];
+    }
+
+    return (target === 'all' ? this.pages() : [this.page()]).map((page) => ({ page, views: this.viewsOf(page) }));
+  }
+
+  /**
+   * El tablero (o un panel) con las cifras de la vista.
+   *
+   * Cada panel lleva lo que dibuja y cada conjunto sus filas filtradas, una sola
+   * vez aunque lo usen varios paneles. Los paneles sin reporte o sin datos no
+   * entran: no hay nada que escribir de ellos.
+   */
+  private exportDocument(target: ExportTarget): ExportDocument {
+    const t = (key: string) => this._i18n.t(key);
+    const datasetIndex = new Map<string, number>();
+    const datasets: ExportDocument['datasets'][number][] = [];
+    const panels: ExportPanel[] = [];
+
+    for (const { page, views } of this.entriesFor(target)) {
+      for (const view of views) {
+        if (!view.report || !view.dataset || !view.snapshot) {
+          continue;
+        }
+
+        if (!datasetIndex.has(view.dataset.id)) {
+          datasetIndex.set(view.dataset.id, datasets.length);
+          datasets.push({
+            name: view.dataset.name,
+            capturedAtUtc: view.snapshot.completedAtUtc,
+            table: datasetTable(view.snapshot.columns, view.snapshot.rows, view.label),
+          });
+        }
+
+        panels.push({
+          title: view.title,
+          description: view.panel.description,
+          page: page.name,
+          dataset: datasetIndex.get(view.dataset.id)!,
+          figures: panelFigures(
+            { ...view, visual: view.report.visual },
+            { target: t('reports.report.target'), ratio: t('reports.export.ratio') },
+          ),
+          chart: view.report.visual === 'Bar' ? 'Bar' : view.report.visual === 'Line' ? 'Line' : null,
+          color: view.color ? PRINT_PALETTE[view.color] : null,
+          notes: this.panelNotes(view),
+          indicator: view.indicator
+            ? { value: view.indicator.value, target: view.indicator.target, ratio: view.indicator.ratio }
+            : null,
+        });
+      }
+    }
+
+    return {
+      title: typeof target === 'string' ? this.name().trim() : target.title,
+      generatedAtUtc: new Date().toISOString(),
+      filters: this.activeFilters(),
+      panels,
+      datasets,
+      labels: {
+        summary: t('reports.export.summary'),
+        generated: t('reports.export.generatedLabel'),
+        filters: t('reports.dashboard.filters'),
+        noFilters: t('reports.export.noFilters'),
+        panel: t('reports.export.panelLabel'),
+        page: t('reports.export.pageLabel'),
+        dataset: t('reports.export.datasetLabel'),
+        capturedAt: t('reports.export.capturedAt'),
+        value: t('reports.export.value'),
+        target: t('reports.report.target'),
+        ratio: t('reports.export.ratio'),
+        data: t('reports.export.data'),
+      },
+    };
+  }
+
+  protected toggleExportMenu(id: string): void {
+    this.exportMenu.update((open) => (open === id ? null : id));
+  }
+
+  /** El menú se cierra al salir de él, con el teclado o con el ratón. */
+  protected exportMenuFocusOut(event: FocusEvent): void {
+    const next = event.relatedTarget as Node | null;
+
+    if (!next || !(event.currentTarget as HTMLElement).contains(next)) {
+      this.exportMenu.set(null);
+    }
+  }
+
+  protected exportMenuKeydown(event: KeyboardEvent): void {
+    if (event.key === 'Escape' && this.exportMenu()) {
+      event.stopPropagation();
+      this.exportMenu.set(null);
+    }
+  }
+
+  protected async exportExcel(target: ExportTarget): Promise<void> {
+    this.exportMenu.set(null);
+
+    const document = this.exportDocument(target);
+
+    if (document.panels.length === 0) {
+      this.error.set(this._i18n.t('reports.export.nothing'));
+      return;
+    }
+
+    // Se avisa antes de pedir nada: el servidor lo rechazaría igual, pero después de esperar.
+    const cells = cellCount(document);
+
+    if (cells > MAX_EXPORT_CELLS) {
+      this.error.set(this._i18n.t('reports.export.tooBig', { cells, limit: MAX_EXPORT_CELLS }));
+      return;
+    }
+
+    await this.saveFile(exportFileName(document.title, 'xlsx'), () =>
+      firstValueFrom(this._gateway.exportReportWorkbook(document)),
+    );
+  }
+
+  /** CSV de un panel: lo que dibuja (`figures`) o las filas filtradas de su conjunto (`data`). */
+  protected async exportCsv(view: PanelView, what: 'figures' | 'data'): Promise<void> {
+    this.exportMenu.set(null);
+
+    const document = this.exportDocument(view);
+    const panel = document.panels[0];
+
+    if (!panel) {
+      this.error.set(this._i18n.t('reports.export.nothing'));
+      return;
+    }
+
+    const dataset = document.datasets[panel.dataset];
+    const table = what === 'figures' ? panel.figures : dataset.table;
+    const name = what === 'figures' ? view.title : `${view.title} · ${dataset.name}`;
+
+    await this.saveFile(exportFileName(name, 'csv'), async () => csvBlob(table));
+  }
+
+  private async saveFile(fileName: string, build: () => Promise<Blob>): Promise<void> {
+    if (this.exporting()) {
+      return;
+    }
+
+    this.exporting.set(true);
+    this.error.set(null);
+    this.notice.set(null);
+
+    try {
+      const outcome = await this._files.save(fileName, await build());
+
+      if (outcome.saved) {
+        this.notice.set(
+          outcome.path
+            ? this._i18n.t('reports.export.savedTo', { path: outcome.path })
+            : this._i18n.t('reports.export.saved', { name: fileName }),
+        );
+      }
+    } catch (error) {
+      this.error.set(describeError(error, this._i18n));
+    } finally {
+      this.exporting.set(false);
+    }
+  }
+
+  /** Abre la vista de impresión, de donde sale el PDF, con lo que se ve en este momento. */
+  protected openPrint(target: ExportTarget): void {
+    this.exportMenu.set(null);
+    this.printing.set({
+      title: typeof target === 'string' ? this.name().trim() : target.title,
+      // Una página sin paneles no se imprime: sería una hoja con solo un título.
+      pages: this.entriesFor(target)
+        .filter((entry) => entry.views.length > 0)
+        .map((entry) => ({ name: entry.page.name, views: entry.views })),
+      filters: this.activeFilters(),
+      generatedAt: formatDate(new Date(), { dateStyle: 'medium', timeStyle: 'short' }),
+    });
+  }
 }
 
 const EMPTY_KEY = 'empty';
+
+/** Lo que se imprime: se congela al abrir la vista, como una foto del tablero. */
+interface PrintRequest {
+  readonly title: string;
+  readonly pages: readonly PrintPage[];
+  readonly filters: readonly ExportFilter[];
+  readonly generatedAt: string;
+}
+
+type ExportTarget = 'page' | 'all' | PanelView;

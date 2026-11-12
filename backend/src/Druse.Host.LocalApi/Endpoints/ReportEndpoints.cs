@@ -155,6 +155,22 @@ internal static class ReportEndpoints
         })
         .WithName("DeleteReportDashboard");
 
+        app.MapPost("/api/reports/exports/xlsx", (
+            ReportExportRequestDto request,
+            IReportWorkbookWriter writer) =>
+        {
+            var document = request.ToDomain();
+            if (ReportExportRules.Validate(document) is { } problem)
+            {
+                return Results.BadRequest(new { message = problem });
+            }
+
+            return Results.File(
+                writer.Write(document),
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+        })
+        .WithName("ExportReportWorkbook");
+
         app.MapGet("/api/reports/templates", async (
             IReportTemplateStore templates,
             CancellationToken cancellationToken) =>
