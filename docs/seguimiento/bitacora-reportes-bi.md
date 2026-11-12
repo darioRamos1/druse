@@ -15,7 +15,7 @@
 - [x] Vista previa con diagnósticos por fuente, cambios de esquema y muestra marcada.
 - [x] API local y contrato OpenAPI.
 - [x] Constructor en Angular: Fuentes, Combinar y vista previa, con el compositor para el modo visual.
-- [ ] Captura del constructor para la landing.
+- [x] Captura del constructor para la landing.
 
 ## Tareas del hito 3
 
@@ -23,7 +23,7 @@
 - [x] Historial acotado de intentos (20 por conjunto) con diagnóstico por fuente.
 - [x] Resultado legible sin conexión y aviso de definición anterior.
 - [x] Reportes guardados: tabla, barras, línea e indicador con meta.
-- [ ] Captura del tablero para la landing (hito 4, con los tableros).
+- [x] Captura del tablero para la landing (hito 4, con los tableros).
 
 ## Tareas del hito 4
 
@@ -46,7 +46,7 @@
 - [x] E2E multifuente: SQL Server + PostgreSQL de punta a punta.
 - [x] Matriz por motor y edición en `docs/motores/matriz-de-motores.md`.
 - [ ] Informix: comprobarlo en la integración continua (aquí no se levantó su contenedor).
-- [ ] Captura del constructor y del tablero para la landing.
+- [x] Captura del constructor y del tablero para la landing.
 
 Los hitos siguientes cubren el constructor SQL y visual, los reportes guardados, los tableros y plantillas, y la actualización programada. La evidencia para la landing se prepara conforme se valida cada hito.
 
@@ -350,9 +350,26 @@ El hito 4 se divide en cuatro entregas (tableros, personalización, plantillas y
 - **Informix no se comprobó aquí.** Su contenedor no se levantó en esta máquina, así que sus pruebas de contrato se saltaron. Las mismas pruebas corren en la integración continua, que sí lo levanta. Hasta verlas allí en verde, la matriz lo declara «implementado, pendiente de la integración continua».
 - **Encontrado de paso:** `test-db.ps1` crea la base secundaria de MySQL y el usuario secundario de Oracle antes de que el motor acepte conexiones, la primera vez que crea el contenedor. Volver a lanzarlo lo arregla. Las pruebas de «segunda base» de esos motores fallan hasta entonces; no es de Reportes.
 
+## 2026-11-12 · Landing: sección Reportes BI y página de avance
+
+### Qué se hizo
+
+- **Sección `#reportes-bi`** entre «De conectar a crear» y Descargar, con su enlace en el menú. Lleva el estado **En desarrollo** y el texto del plan. Debajo van tres capturas marcadas «Captura de Druse»: el tablero con su 60 %, el cruce de ventas y metas, y la programación. Siguen tres tarjetas con lo que ya funciona y una nota: aún no está en una versión publicada y los datos son ficticios. El enlace **Ver avance** lleva a la página nueva.
+- **`landing/reportes-bi.html`**, la página de avance: un historial por etapa, de lo más reciente a lo más antiguo, con fecha, resultado y su captura. Usa el mismo esquema que la guía de primeros pasos y no tiene porcentajes ni fechas de entrega.
+- **Capturas reproducibles.** `e2e/tests/landing.spec.ts` solo corre si se pide con `DRUSE_LANDING=1`. Arma el escenario del plan con nombres limpios («Ventas y metas», «Tablero comercial»), a diferencia del barrido, que lo llama todo «Barrido · …». Después, `build/scripts/landing-capturas.py` pasa las PNG a WebP en `landing/assets/` (25–62 KB cada una).
+- **Cabecera.** Con cinco enlaces, la barra se apretaba hasta partir los textos a 800 px. El menú desplegable pasa a aparecer por debajo de 960 px, no de 760, y así cambian la regla de `styles.css`, el orden de los botones en `effects.css` y el `matchMedia` de `script.js`.
+
+### Comprobaciones
+
+- A 1280 y 390 px, ni la portada ni la página de avance desbordan en horizontal, y la consola sale limpia sin recursos fallidos.
+- A 1280, 1024 y 961 px la barra cabe en una línea. A 900, 800 y 390 px se usa el menú desplegable, con «Reportes BI» en él, y el enlace lleva a `#reportes-bi`.
+- «Ver avance» se alcanza con Tab y enseña el contorno de foco.
+- `node --test build/tests/descargas-web.cjs` (lo que comprueba la integración continua de la landing) sigue en verde.
+- **Encontrado al generarlas.** La limpieza buscaba el nombre exacto del conjunto, pero su fila lleva también «2 fuentes · v1». No borraba nada, y cada ejecución dejaba otro «Ventas y metas» en la lista. Ahora el patrón no va anclado.
+
 ### Dónde retomar
 
-1. Ver en verde las pruebas de contrato de Informix en la integración continua y marcarlo «comprobado» en la matriz.
-2. Preparar la sección `#reportes-bi` de la landing con `22-tablero`, `22e-tablero-pulsado`, `23b-plantilla-vincular`, `24b-vista-impresion` y `25-programar` (estado En desarrollo; Disponible cuando se publique una versión con BI).
+1. Al publicar una versión con Reportes BI: cambiar el estado a **Disponible**, enlazar sus notas y la guía, y decir qué ediciones y motores están comprobados (la matriz de `docs/motores`). Si se publica una versión de prueba, usar **En pruebas**.
+2. Ver en verde las pruebas de contrato de Informix en la integración continua y marcarlo «comprobado» en la matriz.
 3. `test-db.ps1`: esperar a que MySQL y Oracle acepten conexiones antes de crear la base y el usuario secundarios.
 4. Revisar los avisos del barrido que no son de Reportes: textos de la barra principal cortados a 1024 y 900 px, y `medir()` contando el texto oculto `.sr-only` de la cuadrícula.

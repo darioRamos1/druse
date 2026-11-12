@@ -3,3 +3,6 @@
 # aplicación con calma, y son varios megabytes de PNG que cambian en cada
 # ejecución. Interesa poder compararlas en local, no tenerlas en la historia.
 barrido/
+
+# Las PNG de las capturas de la landing; lo que se publica son sus WebP en landing/assets.
+landing-capturas/

@@ -526,19 +526,6 @@ h1 > span {
   .stars i:nth-child(5) {
     display: none;
   }
-  .nav-wrap {
-    gap: 12px;
-  }
-  .nav-wrap .brand {
-    margin-right: auto;
-  }
-  .menu-toggle {
-    order: 3;
-  }
-  .effects-toggle {
-    order: 2;
-    flex-basis: 36px;
-  }
   .preview-stage {
     margin-top: 44px;
   }
@@ -577,5 +564,23 @@ h1 > span {
   }
   h1 > span {
     -webkit-text-fill-color: currentColor;
+  }
+}
+
+/* El orden de la cabecera con menú desplegable: marca, efectos y menú. Va
+   aparte porque el menú aparece por debajo de 960 px, no solo en móvil. */
+@media (max-width: 960px) {
+  .nav-wrap {
+    gap: 12px;
+  }
+  .nav-wrap .brand {
+    margin-right: auto;
+  }
+  .menu-toggle {
+    order: 3;
+  }
+  .effects-toggle {
+    order: 2;
+    flex-basis: 36px;
   }
 }
