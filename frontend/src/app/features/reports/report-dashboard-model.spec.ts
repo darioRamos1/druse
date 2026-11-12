@@ -37,7 +37,11 @@ function resultado(columns: ReportColumn[], rows: (readonly ReportValue[])[]): R
 
 /** Ventas de enero y febrero, cruzadas con metas: el segundo mes del plan. */
 const ventas = resultado(
-  [columna('izquierda.mes', 'DateOnly', 0), columna('izquierda.municipio', 'String', 1), columna('izquierda.venta', 'Decimal', 2)],
+  [
+    columna('izquierda.mes', 'DateOnly', 0),
+    columna('izquierda.municipio', 'String', 1),
+    columna('izquierda.venta', 'Decimal', 2),
+  ],
   [
     ['2026-01-01', '05001', 80],
     ['2026-01-01', '08001', 100],
@@ -48,7 +52,11 @@ const ventas = resultado(
 
 /** Otro conjunto, con la fecha y el municipio con otros nombres. */
 const visitas = resultado(
-  [columna('fecha', 'DateTime', 0), columna('codigo_municipio', 'String', 1), columna('visitas', 'Int32', 2)],
+  [
+    columna('fecha', 'DateTime', 0),
+    columna('codigo_municipio', 'String', 1),
+    columna('visitas', 'Int32', 2),
+  ],
   [
     ['2026-01-15T10:00:00', '05001', 3],
     ['2026-02-03T09:30:00', '08001', 4],
@@ -82,7 +90,9 @@ describe('report-dashboard-model', () => {
       ['2026-02-01', null, 5],
     ]);
     // Una fecha con hora cuenta por su día.
-    expect(applyFilters(visitas, 'visitas', [mes], febrero).snapshot.rows).toEqual([['2026-02-03T09:30:00', '08001', 4]]);
+    expect(applyFilters(visitas, 'visitas', [mes], febrero).snapshot.rows).toEqual([
+      ['2026-02-03T09:30:00', '08001', 4],
+    ]);
   });
 
   it('un conjunto sin columna vinculada no se filtra y lo dice', () => {
@@ -99,7 +109,9 @@ describe('report-dashboard-model', () => {
       ['f-mun', { kind: 'category', values: [null] }],
     ]);
 
-    expect(applyFilters(ventas, 'ventas', [mes, municipio], ambos).snapshot.rows).toEqual([['2026-02-01', null, 5]]);
+    expect(applyFilters(ventas, 'ventas', [mes, municipio], ambos).snapshot.rows).toEqual([
+      ['2026-02-01', null, 5],
+    ]);
     expect(applyFilters(ventas, 'ventas', [mes, municipio], valores([])).snapshot).toBe(ventas);
   });
 
@@ -116,7 +128,10 @@ describe('report-dashboard-model', () => {
   });
 
   it('propone la columna que se llama como las ya vinculadas, y si no la primera del tipo', () => {
-    const metas = [columna('derecha.region', 'String', 0), columna('derecha.municipio', 'String', 1)];
+    const metas = [
+      columna('derecha.region', 'String', 0),
+      columna('derecha.municipio', 'String', 1),
+    ];
 
     expect(proposeBinding(municipio, metas)).toBe('derecha.municipio');
     expect(proposeBinding({ ...municipio, bindings: {} }, metas)).toBe('derecha.region');
@@ -143,14 +158,27 @@ describe('report-dashboard-model', () => {
 
     const leido = parseDashboard(
       JSON.stringify({
-        pages: [{ id: 'p', name: 'Ventas', panels: [{ reportId: 'r1', width: 40, height: 'alto' }, { width: 3 }] }],
-        filters: [{ id: 'f', kind: 'region', label: 'X' }, { id: 'g', kind: 'date', label: 'Mes', bindings: { a: 'mes', b: 3 } }],
+        pages: [
+          {
+            id: 'p',
+            name: 'Ventas',
+            panels: [{ reportId: 'r1', width: 40, height: 'alto' }, { width: 3 }],
+          },
+        ],
+        filters: [
+          { id: 'f', kind: 'region', label: 'X' },
+          { id: 'g', kind: 'date', label: 'Mes', bindings: { a: 'mes', b: 3 } },
+        ],
       }),
       'Página 1',
     );
 
-    expect(leido.pages[0].panels).toEqual([expect.objectContaining({ reportId: 'r1', width: 12, height: 4, title: null })]);
-    expect(leido.filters).toEqual([{ id: 'g', kind: 'date', label: 'Mes', bindings: { a: 'mes' } }]);
+    expect(leido.pages[0].panels).toEqual([
+      expect.objectContaining({ reportId: 'r1', width: 12, height: 4, title: null }),
+    ]);
+    expect(leido.filters).toEqual([
+      { id: 'g', kind: 'date', label: 'Mes', bindings: { a: 'mes' } },
+    ]);
   });
 });
 
@@ -185,9 +213,18 @@ describe('report-dashboard-model · páginas y estilo', () => {
     const vacio = emptyDashboard('P');
     const panel = addPanel(vacio, vacio.pages[0].id, 'r').pages[0].panels[0];
 
-    expect(resolveColor({ ...panel, color: 'red' }, 'violet', { color: 'aqua' })).toEqual({ color: 'red', source: 'panel' });
-    expect(resolveColor(panel, 'violet', { color: 'aqua' })).toEqual({ color: 'violet', source: 'report' });
-    expect(resolveColor(panel, null, { color: 'aqua' })).toEqual({ color: 'aqua', source: 'dashboard' });
+    expect(resolveColor({ ...panel, color: 'red' }, 'violet', { color: 'aqua' })).toEqual({
+      color: 'red',
+      source: 'panel',
+    });
+    expect(resolveColor(panel, 'violet', { color: 'aqua' })).toEqual({
+      color: 'violet',
+      source: 'report',
+    });
+    expect(resolveColor(panel, null, { color: 'aqua' })).toEqual({
+      color: 'aqua',
+      source: 'dashboard',
+    });
     expect(resolveColor(panel, null, { color: null })).toEqual({ color: null, source: 'theme' });
   });
 
@@ -195,12 +232,22 @@ describe('report-dashboard-model · páginas y estilo', () => {
     const leido = parseDashboard(
       JSON.stringify({
         style: { color: 'green' },
-        pages: [{ id: 'p', name: 'P', panels: [{ reportId: 'r', color: 'fucsia', description: 'Ventas', hideHeader: true }] }],
+        pages: [
+          {
+            id: 'p',
+            name: 'P',
+            panels: [{ reportId: 'r', color: 'fucsia', description: 'Ventas', hideHeader: true }],
+          },
+        ],
       }),
       'P',
     );
 
     expect(leido.style).toEqual({ color: 'green' });
-    expect(leido.pages[0].panels[0]).toMatchObject({ color: null, description: 'Ventas', hideHeader: true });
+    expect(leido.pages[0].panels[0]).toMatchObject({
+      color: null,
+      description: 'Ventas',
+      hideHeader: true,
+    });
   });
 });

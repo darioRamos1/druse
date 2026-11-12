@@ -24,7 +24,10 @@ const columnas = [
   columna('derecha.meta', 'Decimal', 3),
 ];
 
-function resultado(rows: readonly (readonly ReportValue[])[], repeated: readonly string[] = []): ReportSnapshot {
+function resultado(
+  rows: readonly (readonly ReportValue[])[],
+  repeated: readonly string[] = [],
+): ReportSnapshot {
   return {
     datasetId: 'ds-1',
     definitionVersion: 1,
@@ -52,7 +55,10 @@ function ajustes(patch: Partial<ReportSettings>): ReportSettings {
 
 describe('report-chart', () => {
   it('el indicador de cumplimiento da 60 % y cuenta aparte el municipio sin meta', () => {
-    const indicador = buildIndicator(enero, ajustes({ value: 'izquierda.venta', target: 'derecha.meta' }));
+    const indicador = buildIndicator(
+      enero,
+      ajustes({ value: 'izquierda.venta', target: 'derecha.meta' }),
+    );
 
     expect(indicador.value).toBe(180);
     expect(indicador.target).toBe(300);
@@ -61,9 +67,14 @@ describe('report-chart', () => {
   });
 
   it('sin meta, el indicador agrega la cifra de todas las filas', () => {
-    expect(buildIndicator(enero, ajustes({ value: 'izquierda.venta', target: null })).value).toBe(220);
+    expect(buildIndicator(enero, ajustes({ value: 'izquierda.venta', target: null })).value).toBe(
+      220,
+    );
     expect(
-      buildIndicator(enero, ajustes({ value: 'izquierda.venta', target: null, aggregate: 'Average' })).value,
+      buildIndicator(
+        enero,
+        ajustes({ value: 'izquierda.venta', target: null, aggregate: 'Average' }),
+      ).value,
     ).toBeCloseTo(73.333, 2);
   });
 
@@ -85,13 +96,18 @@ describe('report-chart', () => {
       [null, '11001', 5, null],
     ]);
 
-    expect(buildSeries(dos, ajustes({ category: 'izquierda.mes', value: 'izquierda.venta' })).points).toEqual([
+    expect(
+      buildSeries(dos, ajustes({ category: 'izquierda.mes', value: 'izquierda.venta' })).points,
+    ).toEqual([
       { label: '2026-01-01', value: 180 },
       { label: '2026-02-01', value: 10 },
       { label: null, value: 5 },
     ]);
     expect(
-      buildSeries(dos, ajustes({ category: 'izquierda.mes', value: 'izquierda.venta', aggregate: 'Count' })).points,
+      buildSeries(
+        dos,
+        ajustes({ category: 'izquierda.mes', value: 'izquierda.venta', aggregate: 'Count' }),
+      ).points,
     ).toEqual([
       { label: '2026-01-01', value: 2 },
       { label: '2026-02-01', value: 1 },
@@ -100,13 +116,19 @@ describe('report-chart', () => {
   });
 
   it('ordena por cifra si se pide y conserva los ceros iniciales de los códigos', () => {
-    const series = buildSeries(enero, ajustes({ category: 'izquierda.municipio', value: 'izquierda.venta', sort: 'valueDesc' }));
+    const series = buildSeries(
+      enero,
+      ajustes({ category: 'izquierda.municipio', value: 'izquierda.venta', sort: 'valueDesc' }),
+    );
 
     expect(series.points.map((point) => point.label)).toEqual(['08001', '05001', '11001']);
   });
 
   it('dice qué columnas elegidas ya no están en el resultado', () => {
-    const series = buildSeries(enero, ajustes({ category: 'izquierda.region', value: 'izquierda.venta' }));
+    const series = buildSeries(
+      enero,
+      ajustes({ category: 'izquierda.region', value: 'izquierda.venta' }),
+    );
 
     expect(series.points).toEqual([]);
     expect(series.missing).toEqual(['izquierda.region']);
@@ -115,11 +137,15 @@ describe('report-chart', () => {
   it('avisa si se suma una cifra repetida del lado «uno», no si se cuenta', () => {
     const repetido = resultado(enero.rows, ['derecha.meta']);
 
-    expect(repeatedInUse(repetido, ajustes({ value: 'derecha.meta', aggregate: 'Sum' }))).toEqual(['derecha.meta']);
-    expect(repeatedInUse(repetido, ajustes({ value: 'derecha.meta', aggregate: 'Count' }))).toEqual([]);
-    expect(repeatedInUse(repetido, ajustes({ value: 'izquierda.venta', target: 'derecha.meta' }))).toEqual([
+    expect(repeatedInUse(repetido, ajustes({ value: 'derecha.meta', aggregate: 'Sum' }))).toEqual([
       'derecha.meta',
     ]);
+    expect(repeatedInUse(repetido, ajustes({ value: 'derecha.meta', aggregate: 'Count' }))).toEqual(
+      [],
+    );
+    expect(
+      repeatedInUse(repetido, ajustes({ value: 'izquierda.venta', target: 'derecha.meta' })),
+    ).toEqual(['derecha.meta']);
   });
 
   it('propone categoría y cifra, y lee ajustes rotos sin fallar', () => {
@@ -132,16 +158,24 @@ describe('report-chart', () => {
       target: 'derecha.meta',
     });
     expect(parseSettings('{roto', 'Bar', columnas)).toEqual(defaultSettings('Bar', columnas));
-    expect(parseSettings('{"aggregate":"Mediana","sort":"valueDesc"}', 'Bar', columnas)).toMatchObject({
+    expect(
+      parseSettings('{"aggregate":"Mediana","sort":"valueDesc"}', 'Bar', columnas),
+    ).toMatchObject({
       aggregate: 'Sum',
       sort: 'valueDesc',
     });
   });
 
   it('la tabla enseña solo las columnas elegidas, en su orden', () => {
-    const tabla = tableView(enero, ajustes({ columns: ['izquierda.venta', 'izquierda.municipio'] }));
+    const tabla = tableView(
+      enero,
+      ajustes({ columns: ['izquierda.venta', 'izquierda.municipio'] }),
+    );
 
-    expect(tabla.columns.map((column) => column.name)).toEqual(['izquierda.venta', 'izquierda.municipio']);
+    expect(tabla.columns.map((column) => column.name)).toEqual([
+      'izquierda.venta',
+      'izquierda.municipio',
+    ]);
     expect(tabla.rows[0]).toEqual([80, '05001']);
   });
 });
@@ -188,7 +222,14 @@ describe('report-chart · apariencia', () => {
   });
 
   it('el estado del indicador sale de los umbrales, en porcentaje si hay meta', () => {
-    const conMeta = { value: 180, target: 300, ratio: 0.6, zeroTarget: false, withoutTarget: 1, missing: [] };
+    const conMeta = {
+      value: 180,
+      target: 300,
+      ratio: 0.6,
+      zeroTarget: false,
+      withoutTarget: 1,
+      missing: [],
+    };
     const umbrales = { ...DEFAULT_APPEARANCE, goodAt: 90, warnAt: 50 };
 
     expect(indicatorStatus(conMeta, umbrales)).toBe('warning');
@@ -196,26 +237,46 @@ describe('report-chart · apariencia', () => {
     expect(indicatorStatus({ ...conMeta, ratio: 0.4 }, umbrales)).toBe('critical');
     expect(indicatorStatus(conMeta, DEFAULT_APPEARANCE)).toBeNull();
     // Sin meta, sobre la cifra.
-    expect(indicatorStatus({ ...conMeta, target: null, ratio: null, value: 220 }, { ...DEFAULT_APPEARANCE, goodAt: 200 })).toBe('good');
+    expect(
+      indicatorStatus(
+        { ...conMeta, target: null, ratio: null, value: 220 },
+        { ...DEFAULT_APPEARANCE, goodAt: 200 },
+      ),
+    ).toBe('good');
   });
 
   it('formatea la cifra con decimales, compacta, prefijo y sufijo', () => {
     const formato = (value: number, options: Intl.NumberFormatOptions) =>
       new Intl.NumberFormat('es-CO', options).format(value);
 
-    expect(formatFigure(1234.5, { ...DEFAULT_APPEARANCE, decimals: 0, prefix: '$ ' }, formato)).toBe('$ 1.235');
-    expect(formatFigure(0.5, { ...DEFAULT_APPEARANCE, decimals: 2, suffix: ' t' }, formato)).toBe('0,50 t');
+    expect(
+      formatFigure(1234.5, { ...DEFAULT_APPEARANCE, decimals: 0, prefix: '$ ' }, formato),
+    ).toBe('$ 1.235');
+    expect(formatFigure(0.5, { ...DEFAULT_APPEARANCE, decimals: 2, suffix: ' t' }, formato)).toBe(
+      '0,50 t',
+    );
     expect(formatFigure(null, DEFAULT_APPEARANCE, formato)).toBe('—');
   });
 
   it('lee la apariencia guardada y ignora lo que no conoce', () => {
     const leidos = parseSettings(
-      JSON.stringify({ appearance: { color: 'violet', decimals: 9, prefix: '$', showValues: false, color2: 'x' } }),
+      JSON.stringify({
+        appearance: { color: 'violet', decimals: 9, prefix: '$', showValues: false, color2: 'x' },
+      }),
       'Bar',
       ventas.columns,
     ).appearance;
 
-    expect(leidos).toMatchObject({ color: 'violet', decimals: 4, prefix: '$', showValues: false, byCategory: false });
-    expect(parseSettings(JSON.stringify({ appearance: { color: 'fucsia' } }), 'Bar', ventas.columns).appearance.color).toBeNull();
+    expect(leidos).toMatchObject({
+      color: 'violet',
+      decimals: 4,
+      prefix: '$',
+      showValues: false,
+      byCategory: false,
+    });
+    expect(
+      parseSettings(JSON.stringify({ appearance: { color: 'fucsia' } }), 'Bar', ventas.columns)
+        .appearance.color,
+    ).toBeNull();
   });
 });

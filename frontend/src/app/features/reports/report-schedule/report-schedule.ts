@@ -12,7 +12,11 @@ import {
 } from '@angular/core';
 
 import { TranslatePipe } from '../../../core/i18n/translate.pipe';
-import { ReportSchedule, ReportScheduleFrequency, ReportWeekDay } from '../../../shared/models/reports';
+import {
+  ReportSchedule,
+  ReportScheduleFrequency,
+  ReportWeekDay,
+} from '../../../shared/models/reports';
 import { Icon } from '../../../shared/ui/icon/icon';
 
 /** De lunes a domingo, como se lee un calendario en español. */
@@ -44,7 +48,10 @@ export function timeZoneChoices(current: string | null): readonly string[] {
   let all: readonly string[] = [];
 
   try {
-    all = (Intl as unknown as { supportedValuesOf?: (key: string) => string[] }).supportedValuesOf?.('timeZone') ?? [];
+    all =
+      (Intl as unknown as { supportedValuesOf?: (key: string) => string[] }).supportedValuesOf?.(
+        'timeZone',
+      ) ?? [];
   } catch {
     all = [];
   }
@@ -67,12 +74,18 @@ export function timeZoneChoices(current: string | null): readonly string[] {
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [Icon, TranslatePipe],
   template: `
-    <form class="schedule" (submit)="submit($event)" [attr.aria-label]="'reports.schedule.title' | t">
+    <form
+      class="schedule"
+      (submit)="submit($event)"
+      [attr.aria-label]="'reports.schedule.title' | t"
+    >
       <p class="schedule__title">{{ 'reports.schedule.title' | t }}</p>
 
       <div class="schedule__row">
         <div class="field">
-          <span class="field__label" id="schedule-frequency">{{ 'reports.schedule.frequencyLabel' | t }}</span>
+          <span class="field__label" id="schedule-frequency">{{
+            'reports.schedule.frequencyLabel' | t
+          }}</span>
           <div class="choices" role="radiogroup" aria-labelledby="schedule-frequency">
             @for (option of frequencies; track option) {
               <button
@@ -90,7 +103,13 @@ export function timeZoneChoices(current: string | null): readonly string[] {
 
         <label class="field field--time">
           <span class="field__label">{{ 'reports.schedule.time' | t }}</span>
-          <input #timeInput type="time" required [value]="time()" (input)="time.set($any($event.target).value)" />
+          <input
+            #timeInput
+            type="time"
+            required
+            [value]="time()"
+            (input)="time.set($any($event.target).value)"
+          />
         </label>
 
         <label class="field field--zone">
@@ -109,7 +128,11 @@ export function timeZoneChoices(current: string | null): readonly string[] {
           <div class="days">
             @for (day of weekDays; track day) {
               <label class="day">
-                <input type="checkbox" [checked]="days().includes(day)" (change)="toggleDay(day, $any($event.target).checked)" />
+                <input
+                  type="checkbox"
+                  [checked]="days().includes(day)"
+                  (change)="toggleDay(day, $any($event.target).checked)"
+                />
                 <!-- i18n-keys: reports.schedule.day.* -->
                 <span>{{ 'reports.schedule.day.' + day | t }}</span>
               </label>
@@ -119,7 +142,11 @@ export function timeZoneChoices(current: string | null): readonly string[] {
       }
 
       <label class="check">
-        <input type="checkbox" [checked]="paused()" (change)="paused.set($any($event.target).checked)" />
+        <input
+          type="checkbox"
+          [checked]="paused()"
+          (change)="paused.set($any($event.target).checked)"
+        />
         {{ 'reports.schedule.paused' | t }}
       </label>
 
@@ -131,14 +158,25 @@ export function timeZoneChoices(current: string | null): readonly string[] {
 
       <div class="schedule__actions">
         @if (schedule()) {
-          <button type="button" class="link link--danger" [disabled]="busy()" (click)="removed.emit()">
+          <button
+            type="button"
+            class="link link--danger"
+            [disabled]="busy()"
+            (click)="removed.emit()"
+          >
             <app-icon name="trash" [size]="11" />
             {{ 'reports.schedule.remove' | t }}
           </button>
         }
         <span class="schedule__spacer"></span>
-        <button type="button" class="button" (click)="cancelled.emit()">{{ 'common.cancel' | t }}</button>
-        <button type="submit" class="button button--primary" [disabled]="busy() || problem() !== null">
+        <button type="button" class="button" (click)="cancelled.emit()">
+          {{ 'common.cancel' | t }}
+        </button>
+        <button
+          type="submit"
+          class="button button--primary"
+          [disabled]="busy() || problem() !== null"
+        >
           <app-icon name="clock" [size]="11" />
           {{ 'reports.schedule.save' | t }}
         </button>
@@ -146,7 +184,7 @@ export function timeZoneChoices(current: string | null): readonly string[] {
     </form>
   `,
   styles: `
-    @use '../report-controls';
+    @use '../report-inspector';
 
     .schedule {
       display: flex;
@@ -283,7 +321,9 @@ export class ReportScheduleForm implements OnInit, AfterViewInit {
       return 'reports.schedule.problem.time';
     }
 
-    return this.frequency() === 'Weekly' && this.days().length === 0 ? 'reports.schedule.problem.days' : null;
+    return this.frequency() === 'Weekly' && this.days().length === 0
+      ? 'reports.schedule.problem.days'
+      : null;
   });
 
   ngOnInit(): void {
@@ -304,7 +344,9 @@ export class ReportScheduleForm implements OnInit, AfterViewInit {
 
   protected toggleDay(day: ReportWeekDay, checked: boolean): void {
     // Se guarda en orden de semana, no en el orden en que se marcaron.
-    this.days.update((days) => WEEK_DAYS.filter((item) => (item === day ? checked : days.includes(item))));
+    this.days.update((days) =>
+      WEEK_DAYS.filter((item) => (item === day ? checked : days.includes(item))),
+    );
   }
 
   protected submit(event: Event): void {

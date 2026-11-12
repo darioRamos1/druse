@@ -9,7 +9,11 @@
         <span class="freshness__meta">
           {{ 'reports.stats.rows' | t: { count: data.rows.length } }}
           @if (dataset().sources.length > 1) {
-            · {{ 'reports.data.window' | t: { start: when(data.startedAtUtc), end: when(data.completedAtUtc) } }}
+            ·
+            {{
+              'reports.data.window'
+                | t: { start: when(data.startedAtUtc), end: when(data.completedAtUtc) }
+            }}
           }
         </span>
       } @else {
@@ -103,7 +107,10 @@
           <ul>
             @for (source of run.sources; track source.alias) {
               @if (source.failureCode) {
-                <li>{{ source.alias }}: {{ failureText(source.failureCode, source.message, source.localized) }}</li>
+                <li>
+                  {{ source.alias }}:
+                  {{ failureText(source.failureCode, source.message, source.localized) }}
+                </li>
               }
             }
           </ul>
@@ -193,7 +200,12 @@
   <aside class="inspector" [attr.aria-label]="'reports.inspector.label' | t">
     <label class="field">
       <span class="field__label">{{ 'reports.report.name' | t }}</span>
-      <input type="text" maxlength="80" [value]="current.name" (input)="rename($any($event.target).value)" />
+      <input
+        type="text"
+        maxlength="80"
+        [value]="current.name"
+        (input)="rename($any($event.target).value)"
+      />
     </label>
 
     <div class="field">
@@ -272,7 +284,9 @@
         <label class="field">
           <span class="field__label">{{ 'reports.report.target' | t }}</span>
           <select (change)="patch({ target: $any($event.target).value || null })">
-            <option value="" [selected]="current.settings.target === null">{{ 'reports.report.noTarget' | t }}</option>
+            <option value="" [selected]="current.settings.target === null">
+              {{ 'reports.report.noTarget' | t }}
+            </option>
             @for (column of numericColumns(); track column.name) {
               <option [value]="column.name" [selected]="column.name === current.settings.target">
                 {{ columnLabel()(column.name) }}
@@ -306,9 +320,16 @@
             <span
               class="swatch"
               aria-hidden="true"
-              [style.background]="current.settings.appearance.color ? 'var(--rc-' + current.settings.appearance.color + ')' : 'var(--dr-accent)'"
+              [style.background]="
+                current.settings.appearance.color
+                  ? 'var(--rc-' + current.settings.appearance.color + ')'
+                  : 'var(--dr-accent)'
+              "
             ></span>
-            <select id="report-color" (change)="patchLook({ color: $any($event.target).value || null })">
+            <select
+              id="report-color"
+              (change)="patchLook({ color: $any($event.target).value || null })"
+            >
               <option value="" [selected]="current.settings.appearance.color === null">
                 {{ 'reports.look.inherit' | t }}
               </option>
@@ -334,7 +355,9 @@
             {{ 'reports.look.byCategory' | t }}
           </label>
           @if (!categoryColorsAvailable()) {
-            <span class="field__hint">{{ 'reports.look.tooManyCategories' | t: { max: maxCategoryColors } }}</span>
+            <span class="field__hint">{{
+              'reports.look.tooManyCategories' | t: { max: maxCategoryColors }
+            }}</span>
           }
         }
 
@@ -352,20 +375,43 @@
         <div class="field-row">
           <label class="field">
             <span class="field__label">{{ 'reports.look.decimals' | t }}</span>
-            <select (change)="patchLook({ decimals: $any($event.target).value === '' ? null : +$any($event.target).value })">
-              <option value="" [selected]="current.settings.appearance.decimals === null">{{ 'reports.look.auto' | t }}</option>
+            <select
+              (change)="
+                patchLook({
+                  decimals: $any($event.target).value === '' ? null : +$any($event.target).value,
+                })
+              "
+            >
+              <option value="" [selected]="current.settings.appearance.decimals === null">
+                {{ 'reports.look.auto' | t }}
+              </option>
               @for (digits of [0, 1, 2, 3]; track digits) {
-                <option [value]="digits" [selected]="current.settings.appearance.decimals === digits">{{ digits }}</option>
+                <option
+                  [value]="digits"
+                  [selected]="current.settings.appearance.decimals === digits"
+                >
+                  {{ digits }}
+                </option>
               }
             </select>
           </label>
           <label class="field">
             <span class="field__label">{{ 'reports.look.prefix' | t }}</span>
-            <input type="text" maxlength="8" [value]="current.settings.appearance.prefix" (input)="patchLook({ prefix: $any($event.target).value })" />
+            <input
+              type="text"
+              maxlength="8"
+              [value]="current.settings.appearance.prefix"
+              (input)="patchLook({ prefix: $any($event.target).value })"
+            />
           </label>
           <label class="field">
             <span class="field__label">{{ 'reports.look.suffix' | t }}</span>
-            <input type="text" maxlength="8" [value]="current.settings.appearance.suffix" (input)="patchLook({ suffix: $any($event.target).value })" />
+            <input
+              type="text"
+              maxlength="8"
+              [value]="current.settings.appearance.suffix"
+              (input)="patchLook({ suffix: $any($event.target).value })"
+            />
           </label>
         </div>
         <label class="check">
@@ -397,7 +443,12 @@
             </label>
           </div>
           <span class="field__hint">
-            {{ (current.settings.target ? 'reports.look.thresholdPercent' : 'reports.look.thresholdValue') | t }}
+            {{
+              (current.settings.target
+                ? 'reports.look.thresholdPercent'
+                : 'reports.look.thresholdValue'
+              ) | t
+            }}
           </span>
         }
       </fieldset>

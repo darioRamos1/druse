@@ -64,12 +64,8 @@ public sealed record TypedQueryResult(
         var rows = new List<object?[]>();
         var availableBytes = MaxBufferedBytes;
         var truncated = false;
-        while (await reader.ReadAsync(cancellationToken))
+        while (await ReadRowAsync(reader, cancellationToken))
         {
-            // Algunos proveedores sirven las filas de su búfer sin mirar el
-            // token: cancelar tiene que cortar aquí también.
-            cancellationToken.ThrowIfCancellationRequested();
-
             // Se limita lo que conserva Druse. El proveedor puede materializar
             // una celda por su cuenta antes de entregarla.
             availableBytes -= 32L + 8L * columns.Count;
@@ -118,6 +114,27 @@ public sealed record TypedQueryResult(
 
         var typedColumns = columns.Select((column, ordinal) => Reconcile(column, ordinal, rows)).ToArray();
         return new TypedQueryResult(typedColumns, rows, truncated);
+    }
+
+    /// <summary>
+    /// Avanza una fila y cancela igual en todos los motores.
+    ///
+    /// Npgsql sirve las filas de su búfer sin mirar el token, y el proveedor
+    /// de IBM (Informix) envuelve la cancelación en una AggregateException:
+    /// sin esto, cancelar no cortaría en uno y saldría como error en el otro.
+    /// </summary>
+    private static async Task<bool> ReadRowAsync(DbDataReader reader, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        try
+        {
+            return await reader.ReadAsync(cancellationToken);
+        }
+        catch (AggregateException exception)
+            when (exception.Flatten().InnerExceptions.Any(inner => inner is OperationCanceledException))
+        {
+            throw new OperationCanceledException(exception.Message, exception, cancellationToken);
+        }
     }
 
     private static object ReadValue(DbDataReader reader, int ordinal)

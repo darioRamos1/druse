@@ -20,8 +20,22 @@ const ventas: ReportDataset = {
   name: 'Ventas y metas',
   version: 1,
   sources: [
-    { alias: 'Ventas', connectionId: 'c1', database: 'v', mode: 'Sql', sql: 'x', expectedColumns: [] },
-    { alias: 'Metas', connectionId: 'c2', database: 'm', mode: 'Sql', sql: 'y', expectedColumns: [] },
+    {
+      alias: 'Ventas',
+      connectionId: 'c1',
+      database: 'v',
+      mode: 'Sql',
+      sql: 'x',
+      expectedColumns: [],
+    },
+    {
+      alias: 'Metas',
+      connectionId: 'c2',
+      database: 'm',
+      mode: 'Sql',
+      sql: 'y',
+      expectedColumns: [],
+    },
   ],
   join: { keys: [{ left: 'mes', right: 'mes' }], kind: 'Left', cardinality: 'OneToOne' },
 };
@@ -30,11 +44,24 @@ const visitas: ReportDataset = {
   id: 'ds-visitas',
   name: 'Visitas',
   version: 1,
-  sources: [{ alias: 'Visitas', connectionId: 'c3', database: 'w', mode: 'Sql', sql: 'z', expectedColumns: [] }],
+  sources: [
+    {
+      alias: 'Visitas',
+      connectionId: 'c3',
+      database: 'w',
+      mode: 'Sql',
+      sql: 'z',
+      expectedColumns: [],
+    },
+  ],
   join: null,
 };
 
-function resultado(datasetId: string, columns: ReportSnapshot['columns'], rows: ReportSnapshot['rows']): ReportSnapshot {
+function resultado(
+  datasetId: string,
+  columns: ReportSnapshot['columns'],
+  rows: ReportSnapshot['rows'],
+): ReportSnapshot {
   return {
     datasetId,
     definitionVersion: 1,
@@ -84,14 +111,22 @@ const reportes: SavedReport[] = [
     datasetId: 'ds-ventas',
     name: 'Ventas por municipio',
     visual: 'Bar',
-    settings: JSON.stringify({ category: 'izquierda.municipio', value: 'izquierda.venta', aggregate: 'Sum' }),
+    settings: JSON.stringify({
+      category: 'izquierda.municipio',
+      value: 'izquierda.venta',
+      aggregate: 'Sum',
+    }),
   },
   {
     id: 'r-indicador',
     datasetId: 'ds-ventas',
     name: 'Cumplimiento',
     visual: 'Indicator',
-    settings: JSON.stringify({ value: 'izquierda.venta', target: 'derecha.meta', aggregate: 'Sum' }),
+    settings: JSON.stringify({
+      value: 'izquierda.venta',
+      target: 'derecha.meta',
+      aggregate: 'Sum',
+    }),
   },
   {
     id: 'r-visitas',
@@ -125,8 +160,18 @@ const conTresPaneles = {
     },
   ],
   filters: [
-    { id: 'f-mes', kind: 'date', label: 'Mes', bindings: { 'ds-ventas': 'izquierda.mes', 'ds-visitas': 'fecha' } },
-    { id: 'f-mun', kind: 'category', label: 'Municipio', bindings: { 'ds-ventas': 'izquierda.municipio' } },
+    {
+      id: 'f-mes',
+      kind: 'date',
+      label: 'Mes',
+      bindings: { 'ds-ventas': 'izquierda.mes', 'ds-visitas': 'fecha' },
+    },
+    {
+      id: 'f-mun',
+      kind: 'category',
+      label: 'Municipio',
+      bindings: { 'ds-ventas': 'izquierda.municipio' },
+    },
   ],
 };
 
@@ -157,7 +202,9 @@ describe('ReportDashboard', () => {
   }
 
   function botón(texto: string): HTMLButtonElement {
-    return todos('button').find((button) => (button.textContent ?? '').trim().startsWith(texto)) as HTMLButtonElement;
+    return todos('button').find((button) =>
+      (button.textContent ?? '').trim().startsWith(texto),
+    ) as HTMLButtonElement;
   }
 
   /** El selector «Añadir reporte», por su etiqueta y no por su posición en el inspector. */
@@ -168,7 +215,10 @@ describe('ReportDashboard', () => {
   }
 
   function cifra(panel: number): string {
-    return (todos('.panel')[panel].querySelector('.indicator__value')?.textContent ?? '').replace(/\s/g, '');
+    return (todos('.panel')[panel].querySelector('.indicator__value')?.textContent ?? '').replace(
+      /\s/g,
+      '',
+    );
   }
 
   async function crear(dashboard: SavedDashboard): Promise<void> {
@@ -281,7 +331,9 @@ describe('ReportDashboard', () => {
     fixture.detectChanges();
 
     expect(todos('.panel')[0].querySelectorAll('.chart__bar')).toHaveLength(1);
-    expect(todos('.panel')[2].querySelector('.panel__badge')?.textContent).toContain('Sin filtrar por: Municipio');
+    expect(todos('.panel')[2].querySelector('.panel__badge')?.textContent).toContain(
+      'Sin filtrar por: Municipio',
+    );
     expect(todos('.panel')[0].querySelector('.panel__badge')).toBeNull();
   });
 
@@ -296,7 +348,9 @@ describe('ReportDashboard', () => {
     fixture.detectChanges();
     expect(todos('.panel')[0].style.gridColumn).toBe('span 7');
 
-    todos('.panel')[0].dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', altKey: true }));
+    todos('.panel')[0].dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'ArrowRight', altKey: true }),
+    );
     fixture.detectChanges();
     expect(todos('.panel').map((panel) => panel.getAttribute('aria-label'))).toEqual([
       'Cumplimiento',
@@ -304,13 +358,20 @@ describe('ReportDashboard', () => {
       'Visitas',
     ]);
 
-    todos('.panel')[1].dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', shiftKey: true }));
+    todos('.panel')[1].dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'ArrowDown', shiftKey: true }),
+    );
     fixture.detectChanges();
     expect(todos('.panel')[1].style.gridRow).toBe('span 5');
   });
 
   it('un tablero nuevo se abre en edición, añade un reporte y propone la columna del filtro', async () => {
-    await crear(tablero({ version: 1, pages: [{ id: 'p1', name: 'Página 1', panels: [] }], filters: [] }, false));
+    await crear(
+      tablero(
+        { version: 1, pages: [{ id: 'p1', name: 'Página 1', panels: [] }], filters: [] },
+        false,
+      ),
+    );
 
     expect(el('.board__name')).toBeTruthy();
 
@@ -334,7 +395,11 @@ describe('ReportDashboard', () => {
     const modelo = JSON.parse(guardados[0].model);
 
     expect(modelo.pages[0].panels[0]).toMatchObject({ reportId: 'r-visitas', width: 6, height: 4 });
-    expect(modelo.filters[0]).toMatchObject({ kind: 'date', label: 'Fecha', bindings: { 'ds-visitas': 'fecha' } });
+    expect(modelo.filters[0]).toMatchObject({
+      kind: 'date',
+      label: 'Fecha',
+      bindings: { 'ds-visitas': 'fecha' },
+    });
   });
 
   it('pulsar una barra filtra todo el tablero por su categoría, y pulsarla otra vez lo quita', async () => {
@@ -386,7 +451,9 @@ describe('ReportDashboard', () => {
     descripcion.dispatchEvent(new Event('input'));
     fixture.detectChanges();
 
-    expect(todos('.panel')[1].querySelector('.panel__description')?.textContent).toContain('Ventas sobre metas');
+    expect(todos('.panel')[1].querySelector('.panel__description')?.textContent).toContain(
+      'Ventas sobre metas',
+    );
     expect(todos('.panel')[0].querySelector('.panel__description')).toBeNull();
   });
 
@@ -395,7 +462,12 @@ describe('ReportDashboard', () => {
       tablero({
         ...conTresPaneles,
         style: { color: 'aqua' },
-        pages: [{ ...conTresPaneles.pages[0], panels: [{ ...conTresPaneles.pages[0].panels[0], color: 'red' }] }],
+        pages: [
+          {
+            ...conTresPaneles.pages[0],
+            panels: [{ ...conTresPaneles.pages[0].panels[0], color: 'red' }],
+          },
+        ],
       }),
     );
     botón('Editar diseño').click();
@@ -404,17 +476,26 @@ describe('ReportDashboard', () => {
     fixture.detectChanges();
 
     expect(el('.inspector').textContent).toContain('Elegido para este panel: Rojo.');
-    expect(todos('.panel')[0].querySelector('.chart__bar')?.getAttribute('style')).toContain('--rc-red');
+    expect(todos('.panel')[0].querySelector('.chart__bar')?.getAttribute('style')).toContain(
+      '--rc-red',
+    );
 
     botón('Volver al color heredado').click();
     fixture.detectChanges();
 
     expect(el('.inspector').textContent).toContain('Heredado del tablero: Turquesa.');
-    expect(todos('.panel')[0].querySelector('.chart__bar')?.getAttribute('style')).toContain('--rc-aqua');
+    expect(todos('.panel')[0].querySelector('.chart__bar')?.getAttribute('style')).toContain(
+      '--rc-aqua',
+    );
   });
 
   it('un tablero recién guardado se borra también en el servidor', async () => {
-    await crear(tablero({ version: 1, pages: [{ id: 'p1', name: 'Página 1', panels: [] }], filters: [] }, false));
+    await crear(
+      tablero(
+        { version: 1, pages: [{ id: 'p1', name: 'Página 1', panels: [] }], filters: [] },
+        false,
+      ),
+    );
     const añadir = selectorDeReportes();
 
     añadir.value = 'r-visitas';
@@ -427,7 +508,9 @@ describe('ReportDashboard', () => {
     fixture.detectChanges();
     botón('Borrar este tablero').click();
     fixture.detectChanges();
-    todos('.inspector button').find((button) => button.textContent?.trim() === 'Borrar')!.click();
+    todos('.inspector button')
+      .find((button) => button.textContent?.trim() === 'Borrar')!
+      .click();
     await asentar();
 
     expect(borrados).toEqual(['tab-1']);
@@ -457,12 +540,17 @@ describe('ReportDashboard', () => {
     await asentar();
 
     expect(plantillas).toHaveLength(1);
-    expect(plantillas[0]).toEqual(expect.objectContaining({ name: 'Comercial base', scope: 'Dashboard' }));
+    expect(plantillas[0]).toEqual(
+      expect.objectContaining({ name: 'Comercial base', scope: 'Dashboard' }),
+    );
 
     const modelo = JSON.parse(plantillas[0].model);
 
     // Dos conjuntos, dos huecos; los campos sin el prefijo del cruce.
-    expect(modelo.slots.map((slot: { label: string }) => slot.label)).toEqual(['Ventas y metas', 'Visitas']);
+    expect(modelo.slots.map((slot: { label: string }) => slot.label)).toEqual([
+      'Ventas y metas',
+      'Visitas',
+    ]);
     expect(modelo.fields.map((field: { name: string }) => field.name)).toEqual(
       expect.arrayContaining(['municipio', 'venta', 'meta', 'visitas', 'mes', 'fecha']),
     );
@@ -482,23 +570,65 @@ describe('ReportDashboard', () => {
       name: 'Barras',
       description: null,
       slots: [{ label: '' }],
-      fields: [{ id: 'cat', slot: 0, name: 'cat', kind: 'text', required: true }, { id: 'num', slot: 0, name: 'num', kind: 'number', required: true }],
-      reports: [{ key: 'r1', slot: 0, name: 'Visitas por municipio', visual: 'Bar', settings: { category: 'cat', value: 'num', aggregate: 'Sum', target: null, columns: [], sort: 'category', appearance: {} } }],
+      fields: [
+        { id: 'cat', slot: 0, name: 'cat', kind: 'text', required: true },
+        { id: 'num', slot: 0, name: 'num', kind: 'number', required: true },
+      ],
+      reports: [
+        {
+          key: 'r1',
+          slot: 0,
+          name: 'Visitas por municipio',
+          visual: 'Bar',
+          settings: {
+            category: 'cat',
+            value: 'num',
+            aggregate: 'Sum',
+            target: null,
+            columns: [],
+            sort: 'category',
+            appearance: {},
+          },
+        },
+      ],
       layout: {
-        pages: [{ name: '', panels: [{ report: 'r1', width: 12, height: 3, title: 'Desde plantilla', description: null, hideHeader: false, color: 'aqua' }] }],
+        pages: [
+          {
+            name: '',
+            panels: [
+              {
+                report: 'r1',
+                width: 12,
+                height: 3,
+                title: 'Desde plantilla',
+                description: null,
+                hideHeader: false,
+                color: 'aqua',
+              },
+            ],
+          },
+        ],
         filters: [],
         style: { color: null },
       },
     };
-    const aplicar = (fixture.componentInstance as unknown as { applyTemplate(a: TemplateApplication): Promise<void> }).applyTemplate.bind(
-      fixture.componentInstance,
-    );
+    const aplicar = (
+      fixture.componentInstance as unknown as {
+        applyTemplate(a: TemplateApplication): Promise<void>;
+      }
+    ).applyTemplate.bind(fixture.componentInstance);
 
-    await aplicar({ document: panel as never, datasets: ['ds-ventas'], assignment: { cat: 'izquierda.municipio', num: 'izquierda.venta' } });
+    await aplicar({
+      document: panel as never,
+      datasets: ['ds-ventas'],
+      assignment: { cat: 'izquierda.municipio', num: 'izquierda.venta' },
+    });
     await asentar();
 
     expect(reportesNuevos).toHaveLength(1);
-    expect(reportesNuevos[0]).toEqual(expect.objectContaining({ datasetId: 'ds-ventas', name: 'Visitas por municipio' }));
+    expect(reportesNuevos[0]).toEqual(
+      expect.objectContaining({ datasetId: 'ds-ventas', name: 'Visitas por municipio' }),
+    );
     expect(JSON.parse(reportesNuevos[0].settings)).toEqual(
       expect.objectContaining({ category: 'izquierda.municipio', value: 'izquierda.venta' }),
     );
@@ -523,7 +653,9 @@ describe('ReportDashboard', () => {
   }
 
   function menú(etiqueta: string): HTMLButtonElement {
-    return todos('[role="menuitem"]').find((item) => item.textContent?.trim() === etiqueta) as HTMLButtonElement;
+    return todos('[role="menuitem"]').find(
+      (item) => item.textContent?.trim() === etiqueta,
+    ) as HTMLButtonElement;
   }
 
   it('exporta a Excel las cifras de la vista con el filtro de enero', async () => {
@@ -540,7 +672,9 @@ describe('ReportDashboard', () => {
     const libro = libros[0];
 
     expect(libro.title).toBe('Comercial');
-    expect(libro.filters).toEqual([{ label: 'Mes', value: expect.stringMatching(/2026.*–.*2026/) }]);
+    expect(libro.filters).toEqual([
+      { label: 'Mes', value: expect.stringMatching(/2026.*–.*2026/) },
+    ]);
     expect(libro.panels.map((panel) => [panel.title, panel.chart])).toEqual([
       ['Ventas por municipio', 'Bar'],
       ['Cumplimiento', null],
@@ -581,7 +715,9 @@ describe('ReportDashboard', () => {
 
     expect([...bytes.slice(0, 3)]).toEqual([0xef, 0xbb, 0xbf]);
     expect(texto.replace(/^\uFEFF/, '')).toBe(
-      ['Ventas.municipio,Suma · Ventas.venta', '05001,80', '08001,100', '11001,40', ''].join('\r\n'),
+      ['Ventas.municipio,Suma · Ventas.venta', '05001,80', '08001,100', '11001,40', ''].join(
+        '\r\n',
+      ),
     );
   });
 

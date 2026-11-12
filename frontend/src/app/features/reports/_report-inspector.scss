@@ -1,0 +1,73 @@
+@use 'report-palette';
+@use 'report-controls';
+
+// Lo que solo usan los inspectores —secciones, casillas, filas de campos y la
+// muestra de color con su paleta—. Va aparte de `report-controls` porque cada
+// componente emite lo que importa: el constructor no lo usa, y llevarlo le
+// hacía pasar del límite de estilos por componente de la compilación.
+
+// --- Secciones y campos compuestos del inspector -------------------------------
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+  padding: 12px 0 0;
+  border: 0;
+  border-top: 1px solid var(--dr-border-subtle);
+
+  &__title {
+    padding: 0;
+    font-size: 10.5px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--dr-text-faint);
+  }
+}
+
+// Varios campos cortos en una fila: decimales, prefijo, sufijo, umbrales.
+.field-row {
+  display: grid;
+  grid-auto-columns: minmax(0, 1fr);
+  grid-auto-flow: column;
+  gap: 8px;
+}
+
+.check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 24px;
+  color: var(--dr-text-secondary);
+
+  input {
+    width: auto;
+    min-height: 0;
+    accent-color: var(--dr-accent);
+  }
+
+  &:has(input:disabled) {
+    color: var(--dr-text-disabled);
+  }
+}
+
+// Muestra del color elegido junto al selector: el nombre va en la opción.
+.swatch-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  select {
+    flex: 1;
+  }
+}
+
+.swatch {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  border: 1px solid var(--dr-border-strong);
+  border-radius: 4px;
+}

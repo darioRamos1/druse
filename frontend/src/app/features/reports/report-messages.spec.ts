@@ -17,7 +17,9 @@ describe('Mensajes de Reportes en el idioma de la ventana', () => {
   beforeEach(() => {
     localStorage.clear();
     TestBed.configureTestingModule({
-      providers: [{ provide: ApplicationGateway, useValue: { setPreference: () => of(undefined) } }],
+      providers: [
+        { provide: ApplicationGateway, useValue: { setPreference: () => of(undefined) } },
+      ],
     });
     i18n = TestBed.inject(I18nService);
   });
@@ -28,11 +30,15 @@ describe('Mensajes de Reportes en el idioma de la ventana', () => {
   });
 
   it('escribe con su clave el motivo de Druse, también en inglés', async () => {
-    expect(serverText(i18n, tiposDistintos, null)).toBe('Las columnas mes y fecha tienen tipos distintos.');
+    expect(serverText(i18n, tiposDistintos, null)).toBe(
+      'Las columnas mes y fecha tienen tipos distintos.',
+    );
 
     await i18n.setLocale('en', { persist: false });
 
-    expect(serverText(i18n, tiposDistintos, null)).toBe('The columns mes and fecha have different types.');
+    expect(serverText(i18n, tiposDistintos, null)).toBe(
+      'The columns mes and fecha have different types.',
+    );
     expect(serverText(i18n, { key: 'server.reports.interrupted', text: 'x' }, 'x')).toBe(
       'Druse closed while refreshing. The previous data is kept.',
     );
@@ -41,12 +47,17 @@ describe('Mensajes de Reportes en el idioma de la ventana', () => {
   it('sin clave enseña el texto: un intento viejo o un error del motor', async () => {
     await i18n.setLocale('en', { persist: false });
 
-    expect(serverText(i18n, null, 'No se pudo leer alguna fuente.')).toBe('No se pudo leer alguna fuente.');
+    expect(serverText(i18n, null, 'No se pudo leer alguna fuente.')).toBe(
+      'No se pudo leer alguna fuente.',
+    );
     expect(failureText(i18n, 'database-error', 'relation "ventas" does not exist', null)).toBe(
       'relation "ventas" does not exist',
     );
-    expect(failureText(i18n, 'invalid-query', 'texto', { key: 'server.reports.readOnlyQuery', text: 'texto' })).toBe(
-      'Report sources must use read-only queries.',
-    );
+    expect(
+      failureText(i18n, 'invalid-query', 'texto', {
+        key: 'server.reports.readOnlyQuery',
+        text: 'texto',
+      }),
+    ).toBe('Report sources must use read-only queries.');
   });
 });

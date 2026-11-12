@@ -1,4 +1,9 @@
-import { ReportColumn, ReportSnapshot, ReportValue, ReportVisualKind } from '../../shared/models/reports';
+import {
+  ReportColumn,
+  ReportSnapshot,
+  ReportValue,
+  ReportVisualKind,
+} from '../../shared/models/reports';
 
 export type ReportAggregate = 'Sum' | 'Count' | 'Average' | 'Min' | 'Max';
 export type ReportSort = 'category' | 'valueDesc';
@@ -31,7 +36,16 @@ export interface ReportSettings {
  * las superficies de los paneles de Druse en claro y en oscuro): no se baraja
  * ni se repite en ciclo. Los valores viven en `report-chart.scss`, por tema.
  */
-export const PALETTE = ['blue', 'orange', 'aqua', 'yellow', 'magenta', 'green', 'violet', 'red'] as const;
+export const PALETTE = [
+  'blue',
+  'orange',
+  'aqua',
+  'yellow',
+  'magenta',
+  'green',
+  'violet',
+  'red',
+] as const;
 export type PaletteColor = (typeof PALETTE)[number];
 
 export interface ReportAppearance {
@@ -72,11 +86,14 @@ export const MAX_CATEGORY_COLORS = PALETTE.length;
 
 function readAppearance(raw: unknown): ReportAppearance {
   const stored = (typeof raw === 'object' && raw !== null ? raw : {}) as Record<string, unknown>;
-  const number = (value: unknown) => (typeof value === 'number' && Number.isFinite(value) ? value : null);
+  const number = (value: unknown) =>
+    typeof value === 'number' && Number.isFinite(value) ? value : null;
   const decimals = number(stored['decimals']);
 
   return {
-    color: PALETTE.includes(stored['color'] as PaletteColor) ? (stored['color'] as PaletteColor) : null,
+    color: PALETTE.includes(stored['color'] as PaletteColor)
+      ? (stored['color'] as PaletteColor)
+      : null,
     byCategory: stored['byCategory'] === true,
     showValues: stored['showValues'] !== false,
     decimals: decimals === null ? null : Math.min(4, Math.max(0, Math.round(decimals))),
@@ -96,14 +113,22 @@ export type IndicatorStatus = 'good' | 'warning' | 'critical';
  * Con meta se mide el cumplimiento en porcentaje; sin meta, la cifra misma.
  * Por debajo del umbral más bajo es crítico.
  */
-export function indicatorStatus(indicator: Indicator, appearance: ReportAppearance): IndicatorStatus | null {
+export function indicatorStatus(
+  indicator: Indicator,
+  appearance: ReportAppearance,
+): IndicatorStatus | null {
   const { goodAt, warnAt } = appearance;
 
   if (goodAt === null && warnAt === null) {
     return null;
   }
 
-  const measured = indicator.target !== null ? (indicator.ratio === null ? null : indicator.ratio * 100) : indicator.value;
+  const measured =
+    indicator.target !== null
+      ? indicator.ratio === null
+        ? null
+        : indicator.ratio * 100
+      : indicator.value;
 
   if (measured === null) {
     return null;
@@ -125,15 +150,18 @@ export function categoryColors(
   snapshot: ReportSnapshot,
   settings: ReportSettings,
 ): ReadonlyMap<string | null, PaletteColor> | null {
-  const ordinal = settings.category === null ? -1 : snapshot.columns.findIndex((c) => c.name === settings.category);
+  const ordinal =
+    settings.category === null
+      ? -1
+      : snapshot.columns.findIndex((c) => c.name === settings.category);
 
   if (ordinal < 0) {
     return null;
   }
 
-  const labels = [...new Set(snapshot.rows.map((row) => (row[ordinal] === null ? null : String(row[ordinal]))))].sort(
-    (a, b) => (a === null ? 1 : b === null ? -1 : a < b ? -1 : a > b ? 1 : 0),
-  );
+  const labels = [
+    ...new Set(snapshot.rows.map((row) => (row[ordinal] === null ? null : String(row[ordinal])))),
+  ].sort((a, b) => (a === null ? 1 : b === null ? -1 : a < b ? -1 : a > b ? 1 : 0));
 
   return labels.length > MAX_CATEGORY_COLORS
     ? null
@@ -149,7 +177,10 @@ export function isNumericColumn(column: ReportColumn): boolean {
 }
 
 /** Lo razonable para empezar: la primera columna que no es número y la primera que sí. */
-export function defaultSettings(visual: ReportVisualKind, columns: readonly ReportColumn[]): ReportSettings {
+export function defaultSettings(
+  visual: ReportVisualKind,
+  columns: readonly ReportColumn[],
+): ReportSettings {
   const numbers = columns.filter(isNumericColumn);
   const category = columns.find((column) => !isNumericColumn(column))?.name ?? null;
 
@@ -165,7 +196,11 @@ export function defaultSettings(visual: ReportVisualKind, columns: readonly Repo
 }
 
 /** Lee los ajustes guardados sin fiarse: un JSON a medias no rompe el reporte. */
-export function parseSettings(json: string, visual: ReportVisualKind, columns: readonly ReportColumn[]): ReportSettings {
+export function parseSettings(
+  json: string,
+  visual: ReportVisualKind,
+  columns: readonly ReportColumn[],
+): ReportSettings {
   const base = defaultSettings(visual, columns);
 
   try {
@@ -178,7 +213,9 @@ export function parseSettings(json: string, visual: ReportVisualKind, columns: r
         ? (stored.aggregate as ReportAggregate)
         : base.aggregate,
       target: typeof stored.target === 'string' ? stored.target : null,
-      columns: Array.isArray(stored.columns) ? stored.columns.filter((c) => typeof c === 'string') : [],
+      columns: Array.isArray(stored.columns)
+        ? stored.columns.filter((c) => typeof c === 'string')
+        : [],
       sort: stored.sort === 'valueDesc' ? 'valueDesc' : 'category',
       appearance: readAppearance(stored.appearance),
     };
@@ -368,8 +405,12 @@ export function buildIndicator(snapshot: ReportSnapshot, settings: ReportSetting
  * En un cruce 1:N la meta mensual aparece en cada venta diaria; sumarla la
  * multiplica. Contar o tomar el máximo no engaña, sumar y promediar sí.
  */
-export function repeatedInUse(snapshot: ReportSnapshot, settings: ReportSettings): readonly string[] {
-  const summed = settings.aggregate === 'Sum' || settings.aggregate === 'Average' ? [settings.value] : [];
+export function repeatedInUse(
+  snapshot: ReportSnapshot,
+  settings: ReportSettings,
+): readonly string[] {
+  const summed =
+    settings.aggregate === 'Sum' || settings.aggregate === 'Average' ? [settings.value] : [];
   const used = [...summed, settings.target].filter((name): name is string => name !== null);
 
   return used.filter((name) => snapshot.repeatedColumns.includes(name));
@@ -379,7 +420,10 @@ export function repeatedInUse(snapshot: ReportSnapshot, settings: ReportSettings
 export function tableView(
   snapshot: ReportSnapshot,
   settings: ReportSettings,
-): { readonly columns: readonly ReportColumn[]; readonly rows: readonly (readonly ReportValue[])[] } {
+): {
+  readonly columns: readonly ReportColumn[];
+  readonly rows: readonly (readonly ReportValue[])[];
+} {
   const chosen = settings.columns
     .map((name) => snapshot.columns.find((column) => column.name === name))
     .filter((column): column is ReportColumn => column !== undefined);

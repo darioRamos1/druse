@@ -548,7 +548,10 @@ export class HttpApplicationGateway extends ApplicationGateway {
       .pipe(map((response) => response.body));
   }
 
-  override saveReportSchedule(datasetId: string, schedule: ReportSchedule): Observable<ReportSchedule> {
+  override saveReportSchedule(
+    datasetId: string,
+    schedule: ReportSchedule,
+  ): Observable<ReportSchedule> {
     return this._http.put<ReportSchedule>(`/api/reports/datasets/${datasetId}/schedule`, schedule);
   }
 

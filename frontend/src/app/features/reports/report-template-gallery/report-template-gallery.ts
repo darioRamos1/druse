@@ -111,7 +111,17 @@ export class ReportTemplateGallery implements AfterViewInit, OnDestroy {
 
       // Una plantilla que esta versión no sabe leer no se ofrece: aplicarla a medias sería peor.
       return read.ok && scopes.includes(read.document.scope)
-        ? [{ id: template.id, document: { ...read.document, name: template.name, description: template.description }, starter: false }]
+        ? [
+            {
+              id: template.id,
+              document: {
+                ...read.document,
+                name: template.name,
+                description: template.description,
+              },
+              starter: false,
+            },
+          ]
         : [];
     });
 
@@ -124,7 +134,11 @@ export class ReportTemplateGallery implements AfterViewInit, OnDestroy {
     return item ? missingFields(item.document, this.assignment()) : [];
   });
 
-  protected readonly missingNames = computed(() => this.missing().map((field) => field.name).join(', '));
+  protected readonly missingNames = computed(() =>
+    this.missing()
+      .map((field) => field.name)
+      .join(', '),
+  );
 
   /** Se puede crear la copia: cada hueco tiene conjunto con columnas y no falta ningún campo obligatorio. */
   protected readonly canApply = computed(() => {
@@ -206,7 +220,9 @@ export class ReportTemplateGallery implements AfterViewInit, OnDestroy {
     }
 
     const focusables = [
-      ...sheet.querySelectorAll<HTMLElement>('button:not([disabled]), select:not([disabled]), input:not([disabled]), textarea:not([disabled]), [href]'),
+      ...sheet.querySelectorAll<HTMLElement>(
+        'button:not([disabled]), select:not([disabled]), input:not([disabled]), textarea:not([disabled]), [href]',
+      ),
     ].filter((element) => element.getClientRects().length > 0);
 
     event.stopPropagation();
@@ -288,7 +304,8 @@ export class ReportTemplateGallery implements AfterViewInit, OnDestroy {
   }
 
   protected summary(document: TemplateDocument): string {
-    const panels = document.layout?.pages.reduce((total, page) => total + page.panels.length, 0) ?? 0;
+    const panels =
+      document.layout?.pages.reduce((total, page) => total + page.panels.length, 0) ?? 0;
 
     return document.scope === 'Dashboard'
       ? this._i18n.t('reports.template.summaryBoard', {
@@ -374,7 +391,10 @@ export class ReportTemplateGallery implements AfterViewInit, OnDestroy {
       this.notice.set(
         this.scopes().includes(saved.scope)
           ? this._i18n.t('reports.template.imported', { name: saved.name })
-          : this._i18n.t('reports.template.importedElsewhere', { name: saved.name, scope: this.scopeLabel(saved.scope) }),
+          : this._i18n.t('reports.template.importedElsewhere', {
+              name: saved.name,
+              scope: this.scopeLabel(saved.scope),
+            }),
       );
     } catch (error) {
       this.error.set(describeError(error, this._i18n));
@@ -417,7 +437,9 @@ export class ReportTemplateGallery implements AfterViewInit, OnDestroy {
   }
 
   protected chooseDataset(slot: number, id: string): void {
-    this.slotDatasets.update((list) => list.map((item, index) => (index === slot ? id || null : item)));
+    this.slotDatasets.update((list) =>
+      list.map((item, index) => (index === slot ? id || null : item)),
+    );
     void this.useDataset(slot, id || null);
   }
 
@@ -433,7 +455,9 @@ export class ReportTemplateGallery implements AfterViewInit, OnDestroy {
 
     const proposed = Array.isArray(columns)
       ? proposeAssignment(document, slot, columns)
-      : Object.fromEntries(document.fields.filter((field) => field.slot === slot).map((field) => [field.id, null]));
+      : Object.fromEntries(
+          document.fields.filter((field) => field.slot === slot).map((field) => [field.id, null]),
+        );
 
     this.assignment.update((current) => ({ ...current, ...proposed }));
   }

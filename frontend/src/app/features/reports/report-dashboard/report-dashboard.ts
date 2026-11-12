@@ -84,8 +84,14 @@ import {
   panelFigures,
 } from '../report-export-model';
 import { PrintPage, ReportPrint } from '../report-print/report-print';
-import { ReportTemplateGallery, TemplateApplication } from '../report-template-gallery/report-template-gallery';
-import { ReportTemplateSave, TemplateSaveRequest } from '../report-template-save/report-template-save';
+import {
+  ReportTemplateGallery,
+  TemplateApplication,
+} from '../report-template-gallery/report-template-gallery';
+import {
+  ReportTemplateSave,
+  TemplateSaveRequest,
+} from '../report-template-save/report-template-save';
 import { captureTemplate, instantiateTemplate, panelLayout } from '../report-template-model';
 
 /**
@@ -100,7 +106,14 @@ import { captureTemplate, instantiateTemplate, panelLayout } from '../report-tem
 @Component({
   selector: 'app-report-dashboard',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [Icon, ReportChart, ReportPrint, ReportTemplateGallery, ReportTemplateSave, TranslatePipe],
+  imports: [
+    Icon,
+    ReportChart,
+    ReportPrint,
+    ReportTemplateGallery,
+    ReportTemplateSave,
+    TranslatePipe,
+  ],
   templateUrl: './report-dashboard.html',
   styleUrl: './report-dashboard.scss',
   host: {
@@ -158,8 +171,10 @@ export class ReportDashboard {
   protected readonly exportMenu = signal<string | null>(null);
   protected readonly exporting = signal(false);
   protected readonly printing = signal<PrintRequest | null>(null);
-  protected readonly printCapturedAt = (iso: string): string => this._i18n.t('reports.data.from', { date: this.when(iso) });
-  protected readonly printNotes = (view: PanelView): readonly string[] => this.panelNotes(view, false);
+  protected readonly printCapturedAt = (iso: string): string =>
+    this._i18n.t('reports.data.from', { date: this.when(iso) });
+  protected readonly printNotes = (view: PanelView): readonly string[] =>
+    this.panelNotes(view, false);
 
   protected readonly palette = PALETTE;
   protected readonly currentPage = signal<string | null>(null);
@@ -172,7 +187,9 @@ export class ReportDashboard {
   protected readonly filters = computed(() => this.model().filters);
 
   protected readonly dirty = computed(
-    () => this.name().trim() !== this._savedName() || JSON.stringify(this.model()) !== this._savedModel(),
+    () =>
+      this.name().trim() !== this._savedName() ||
+      JSON.stringify(this.model()) !== this._savedModel(),
   );
 
   /** Los conjuntos que alimentan algún panel: son los que se actualizan y se filtran. */
@@ -216,7 +233,10 @@ export class ReportDashboard {
   }
 
   private open(dashboard: SavedDashboard): void {
-    const model = parseDashboard(dashboard.model, this._i18n.t('reports.dashboard.page', { number: 1 }));
+    const model = parseDashboard(
+      dashboard.model,
+      this._i18n.t('reports.dashboard.page', { number: 1 }),
+    );
 
     this.name.set(dashboard.name);
     this.model.set(model);
@@ -254,9 +274,14 @@ export class ReportDashboard {
 
   /** Lee de reports.db los resultados que faltan; no toca los orígenes. */
   private async loadSnapshots(force = false): Promise<void> {
-    const pending = this.usedDatasets().filter((dataset) => force || !this.snapshots().has(dataset.id));
+    const pending = this.usedDatasets().filter(
+      (dataset) => force || !this.snapshots().has(dataset.id),
+    );
     const loaded = await Promise.all(
-      pending.map(async (dataset) => [dataset.id, await firstValueFrom(this._gateway.getReportSnapshot(dataset.id))] as const),
+      pending.map(
+        async (dataset) =>
+          [dataset.id, await firstValueFrom(this._gateway.getReportSnapshot(dataset.id))] as const,
+      ),
     );
 
     this.snapshots.update((map) => {
@@ -273,7 +298,9 @@ export class ReportDashboard {
 
   private view(panel: DashboardPanel): PanelView {
     const report = this.reports().find((item) => item.id === panel.reportId) ?? null;
-    const dataset = report ? (this.datasets().find((item) => item.id === report.datasetId) ?? null) : null;
+    const dataset = report
+      ? (this.datasets().find((item) => item.id === report.datasetId) ?? null)
+      : null;
     const stored = dataset ? (this.snapshots().get(dataset.id) ?? null) : null;
     const label = (name: string) => (dataset ? columnLabelFor(dataset.sources, name) : name);
     const empty = {
@@ -308,7 +335,10 @@ export class ReportDashboard {
     const settings = parseSettings(report.settings, report.visual, snapshot.columns);
     const pickFilter =
       report.visual === 'Bar' && settings.category
-        ? this.filters().find((filter) => filter.kind === 'category' && filter.bindings[dataset.id] === settings.category)
+        ? this.filters().find(
+            (filter) =>
+              filter.kind === 'category' && filter.bindings[dataset.id] === settings.category,
+          )
         : undefined;
     // i18n-keys: reports.aggregate.*
     const how = this._i18n.t(`reports.aggregate.${settings.aggregate}`);
@@ -318,10 +348,16 @@ export class ReportDashboard {
       snapshot,
       unbound,
       repeated: repeatedInUse(snapshot, settings).map(label),
-      series: report.visual === 'Bar' || report.visual === 'Line' ? buildSeries(snapshot, settings) : null,
+      series:
+        report.visual === 'Bar' || report.visual === 'Line'
+          ? buildSeries(snapshot, settings)
+          : null,
       indicator: report.visual === 'Indicator' ? buildIndicator(snapshot, settings) : null,
       table: report.visual === 'Table' ? tableView(snapshot, settings) : null,
-      valueLabel: settings.aggregate === 'Count' || !settings.value ? how : `${how} · ${label(settings.value)}`,
+      valueLabel:
+        settings.aggregate === 'Count' || !settings.value
+          ? how
+          : `${how} · ${label(settings.value)}`,
       categoryLabel: settings.category ? label(settings.category) : '',
       appearance: settings.appearance,
       ...this.colorOf(panel, settings.appearance.color),
@@ -386,7 +422,8 @@ export class ReportDashboard {
 
   protected setDate(filter: DashboardFilter, side: 'from' | 'to', day: string): void {
     const current = this.values().get(filter.id);
-    const base = current?.kind === 'date' ? current : { kind: 'date' as const, from: null, to: null };
+    const base =
+      current?.kind === 'date' ? current : { kind: 'date' as const, from: null, to: null };
 
     this.setValue(filter.id, { ...base, [side]: day || null });
   }
@@ -394,7 +431,9 @@ export class ReportDashboard {
   protected categoryValue(filter: DashboardFilter): string {
     const value = this.values().get(filter.id);
 
-    return value?.kind === 'category' && value.values.length > 0 ? this.optionKey(value.values[0]) : '';
+    return value?.kind === 'category' && value.values.length > 0
+      ? this.optionKey(value.values[0])
+      : '';
   }
 
   protected setCategory(filter: DashboardFilter, key: string): void {
@@ -410,7 +449,14 @@ export class ReportDashboard {
   }
 
   protected options(filter: DashboardFilter): readonly (string | null)[] {
-    return categoryOptions(filter, new Map([...this.snapshots()].filter((entry): entry is [string, ReportSnapshot] => entry[1] !== null)));
+    return categoryOptions(
+      filter,
+      new Map(
+        [...this.snapshots()].filter(
+          (entry): entry is [string, ReportSnapshot] => entry[1] !== null,
+        ),
+      ),
+    );
   }
 
   private setValue(id: string, value: FilterValue): void {
@@ -521,7 +567,10 @@ export class ReportDashboard {
   // --- Estilo y páginas ------------------------------------------------------------
 
   protected styleColor(color: string): void {
-    this.model.update((model) => ({ ...model, style: { ...model.style, color: (color || null) as PaletteColor | null } }));
+    this.model.update((model) => ({
+      ...model,
+      style: { ...model.style, color: (color || null) as PaletteColor | null },
+    }));
   }
 
   protected patchStyle(panel: DashboardPanel, patch: Parameters<typeof patchPanel>[3]): void {
@@ -643,7 +692,10 @@ export class ReportDashboard {
   }
 
   protected removeFilter(filter: DashboardFilter): void {
-    this.model.update((model) => ({ ...model, filters: model.filters.filter((item) => item.id !== filter.id) }));
+    this.model.update((model) => ({
+      ...model,
+      filters: model.filters.filter((item) => item.id !== filter.id),
+    }));
     this.values.update((map) => {
       const next = new Map(map);
 
@@ -668,7 +720,9 @@ export class ReportDashboard {
   }
 
   protected columnsFor(filter: DashboardFilter, dataset: ReportDataset) {
-    return (this.snapshots().get(dataset.id)?.columns ?? []).filter((column) => fitsFilter(filter.kind, column));
+    return (this.snapshots().get(dataset.id)?.columns ?? []).filter((column) =>
+      fitsFilter(filter.kind, column),
+    );
   }
 
   protected labelIn(dataset: ReportDataset, name: string): string {
@@ -712,7 +766,11 @@ export class ReportDashboard {
 
     try {
       const saved = await firstValueFrom(
-        this._gateway.saveDashboard({ id: this.dashboard().id, name, model: JSON.stringify(this.model()) }),
+        this._gateway.saveDashboard({
+          id: this.dashboard().id,
+          name,
+          model: JSON.stringify(this.model()),
+        }),
       );
 
       this._savedName.set(saved.name);
@@ -754,7 +812,8 @@ export class ReportDashboard {
   protected async saveAsTemplate(request: TemplateSaveRequest): Promise<void> {
     const scope = this.savingTemplate();
     const panel = this.selectedNow();
-    const layout = scope === 'Panel' ? (panel ? panelLayout(this.model(), panel.id) : null) : this.model();
+    const layout =
+      scope === 'Panel' ? (panel ? panelLayout(this.model(), panel.id) : null) : this.model();
 
     if (!scope || !layout || this.templateBusy()) {
       return;
@@ -895,19 +954,26 @@ export class ReportDashboard {
       ...(view.unbound.length > 0
         ? [this._i18n.t('reports.dashboard.notFiltered', { filters: view.unbound.join(', ') })]
         : []),
-      ...(view.repeated.length > 0 ? [this._i18n.t('reports.join.repeated', { columns: view.repeated.join(', ') })] : []),
+      ...(view.repeated.length > 0
+        ? [this._i18n.t('reports.join.repeated', { columns: view.repeated.join(', ') })]
+        : []),
       ...(withoutTarget && view.indicator && view.indicator.withoutTarget > 0
         ? [this._i18n.t('reports.chart.withoutTarget', { count: view.indicator.withoutTarget })]
         : []),
     ];
   }
 
-  private entriesFor(target: ExportTarget): readonly { readonly page: DashboardPage; readonly views: readonly PanelView[] }[] {
+  private entriesFor(
+    target: ExportTarget,
+  ): readonly { readonly page: DashboardPage; readonly views: readonly PanelView[] }[] {
     if (typeof target !== 'string') {
       return [{ page: this.page(), views: [target] }];
     }
 
-    return (target === 'all' ? this.pages() : [this.page()]).map((page) => ({ page, views: this.viewsOf(page) }));
+    return (target === 'all' ? this.pages() : [this.page()]).map((page) => ({
+      page,
+      views: this.viewsOf(page),
+    }));
   }
 
   /**
@@ -947,11 +1013,16 @@ export class ReportDashboard {
             { ...view, visual: view.report.visual },
             { target: t('reports.report.target'), ratio: t('reports.export.ratio') },
           ),
-          chart: view.report.visual === 'Bar' ? 'Bar' : view.report.visual === 'Line' ? 'Line' : null,
+          chart:
+            view.report.visual === 'Bar' ? 'Bar' : view.report.visual === 'Line' ? 'Line' : null,
           color: view.color ? PRINT_PALETTE[view.color] : null,
           notes: this.panelNotes(view),
           indicator: view.indicator
-            ? { value: view.indicator.value, target: view.indicator.target, ratio: view.indicator.ratio }
+            ? {
+                value: view.indicator.value,
+                target: view.indicator.target,
+                ratio: view.indicator.ratio,
+              }
             : null,
         });
       }

@@ -169,7 +169,9 @@ function updatePage(
 ): DashboardModel {
   return {
     ...model,
-    pages: model.pages.map((page) => (page.id === pageId ? { ...page, panels: change(page.panels) } : page)),
+    pages: model.pages.map((page) =>
+      page.id === pageId ? { ...page, panels: change(page.panels) } : page,
+    ),
   };
 }
 
@@ -190,16 +192,29 @@ export function addPanel(model: DashboardModel, pageId: string, reportId: string
 }
 
 /** Añade al final de una página paneles ya hechos, como los de una plantilla. */
-export function insertPanels(model: DashboardModel, pageId: string, added: readonly DashboardPanel[]): DashboardModel {
+export function insertPanels(
+  model: DashboardModel,
+  pageId: string,
+  added: readonly DashboardPanel[],
+): DashboardModel {
   return updatePage(model, pageId, (panels) => [...panels, ...added]);
 }
 
-export function removePanel(model: DashboardModel, pageId: string, panelId: string): DashboardModel {
+export function removePanel(
+  model: DashboardModel,
+  pageId: string,
+  panelId: string,
+): DashboardModel {
   return updatePage(model, pageId, (panels) => panels.filter((panel) => panel.id !== panelId));
 }
 
 /** Cambia el orden: la cuadrícula coloca los paneles en ese orden, de izquierda a derecha. */
-export function movePanel(model: DashboardModel, pageId: string, panelId: string, delta: number): DashboardModel {
+export function movePanel(
+  model: DashboardModel,
+  pageId: string,
+  panelId: string,
+  delta: number,
+): DashboardModel {
   return updatePage(model, pageId, (panels) => {
     const from = panels.findIndex((panel) => panel.id === panelId);
     const to = Math.min(panels.length - 1, Math.max(0, from + delta));
@@ -236,9 +251,16 @@ export function resizePanel(
   );
 }
 
-export function retitlePanel(model: DashboardModel, pageId: string, panelId: string, title: string): DashboardModel {
+export function retitlePanel(
+  model: DashboardModel,
+  pageId: string,
+  panelId: string,
+  title: string,
+): DashboardModel {
   return updatePage(model, pageId, (panels) =>
-    panels.map((panel) => (panel.id === panelId ? { ...panel, title: title.trim() ? title : null } : panel)),
+    panels.map((panel) =>
+      panel.id === panelId ? { ...panel, title: title.trim() ? title : null } : panel,
+    ),
   );
 }
 
@@ -266,7 +288,9 @@ export function proposeBinding(
   const candidates = columns.filter((column) => fitsFilter(filter.kind, column));
   const hints = new Set(Object.values(filter.bindings).map(baseName));
 
-  return (candidates.find((column) => hints.has(baseName(column.name))) ?? candidates[0])?.name ?? null;
+  return (
+    (candidates.find((column) => hints.has(baseName(column.name))) ?? candidates[0])?.name ?? null
+  );
 }
 
 export function isActive(value: FilterValue | undefined): boolean {
@@ -335,7 +359,10 @@ export function applyFilters(
   }
 
   return {
-    snapshot: tests.length === 0 ? snapshot : { ...snapshot, rows: snapshot.rows.filter((row) => tests.every((test) => test(row))) },
+    snapshot:
+      tests.length === 0
+        ? snapshot
+        : { ...snapshot, rows: snapshot.rows.filter((row) => tests.every((test) => test(row))) },
     unbound,
   };
 }
@@ -358,7 +385,9 @@ export function categoryOptions(
     }
   }
 
-  return [...values].sort((a, b) => (a === null ? 1 : b === null ? -1 : a < b ? -1 : a > b ? 1 : 0));
+  return [...values].sort((a, b) =>
+    a === null ? 1 : b === null ? -1 : a < b ? -1 : a > b ? 1 : 0,
+  );
 }
 
 /** Cambia campos de estilo de un panel: descripción, encabezado o color. */
@@ -378,7 +407,10 @@ export function addPage(model: DashboardModel, name: string): DashboardModel {
 }
 
 export function renamePage(model: DashboardModel, pageId: string, name: string): DashboardModel {
-  return { ...model, pages: model.pages.map((page) => (page.id === pageId ? { ...page, name } : page)) };
+  return {
+    ...model,
+    pages: model.pages.map((page) => (page.id === pageId ? { ...page, name } : page)),
+  };
 }
 
 /**
@@ -402,7 +434,11 @@ export function removePage(model: DashboardModel, pageId: string): DashboardMode
 }
 
 /** Lleva un panel al final de otra página. */
-export function movePanelToPage(model: DashboardModel, panelId: string, pageId: string): DashboardModel {
+export function movePanelToPage(
+  model: DashboardModel,
+  panelId: string,
+  pageId: string,
+): DashboardModel {
   const panel = model.pages.flatMap((page) => page.panels).find((item) => item.id === panelId);
 
   if (!panel || !model.pages.some((page) => page.id === pageId)) {

@@ -5,7 +5,13 @@ import {
   ReportVisualKind,
   SavedReport,
 } from '../../shared/models/reports';
-import { PALETTE, PaletteColor, ReportSettings, isNumericColumn, parseSettings } from './report-chart';
+import {
+  PALETTE,
+  PaletteColor,
+  ReportSettings,
+  isNumericColumn,
+  parseSettings,
+} from './report-chart';
 import {
   DashboardFilter,
   DashboardModel,
@@ -189,7 +195,9 @@ export function captureTemplate(
   for (const report of reports) {
     if (!slotOf.has(report.datasetId)) {
       slotOf.set(report.datasetId, slots.length);
-      slots.push({ label: source.datasets.find((item) => item.id === report.datasetId)?.name ?? '' });
+      slots.push({
+        label: source.datasets.find((item) => item.id === report.datasetId)?.name ?? '',
+      });
     }
   }
 
@@ -221,14 +229,24 @@ export function captureTemplate(
     fieldIds.add(id);
     byColumn.set(`${slot}|${column}`, fields.length);
     // Solo el nombre base: el prefijo del cruce (`izquierda.`) no dice nada fuera de este conjunto.
-    fields.push({ id, slot, name: baseName(column), kind: original ? kindOf(original) : 'other', required });
+    fields.push({
+      id,
+      slot,
+      name: baseName(column),
+      kind: original ? kindOf(original) : 'other',
+      required,
+    });
     return id;
   };
 
   const keyOf = new Map(reports.map((report, index) => [report.id, `r${index + 1}`]));
 
   const templateReports: TemplateReport[] = reports.map((report) => {
-    const settings = parseSettings(report.settings, report.visual, source.columnsOf(report.datasetId));
+    const settings = parseSettings(
+      report.settings,
+      report.visual,
+      source.columnsOf(report.datasetId),
+    );
     const ref = (column: string | null, required: boolean) =>
       column === null ? null : field(report.datasetId, column, required);
 
@@ -288,7 +306,10 @@ function captureLayout(
       bindings: Object.fromEntries(
         Object.entries(filter.bindings)
           .filter(([datasetId]) => slotOf.has(datasetId))
-          .map(([datasetId, column]) => [String(slotOf.get(datasetId)), field(datasetId, column, false)]),
+          .map(([datasetId, column]) => [
+            String(slotOf.get(datasetId)),
+            field(datasetId, column, false),
+          ]),
       ),
     })),
     style: model.style,
@@ -299,9 +320,7 @@ function captureLayout(
 export function panelLayout(model: DashboardModel, panelId: string): DashboardModel | null {
   const panel = model.pages.flatMap((page) => page.panels).find((item) => item.id === panelId);
 
-  return panel
-    ? { ...model, pages: [{ id: 'p', name: '', panels: [panel] }], filters: [] }
-    : null;
+  return panel ? { ...model, pages: [{ id: 'p', name: '', panels: [panel] }], filters: [] } : null;
 }
 
 // --- Vincular campos --------------------------------------------------------------
@@ -329,7 +348,10 @@ export function proposeAssignment(
   for (const field of fields) {
     const name = baseName(field.name).toLowerCase();
     const match = columns.find(
-      (column) => !used.has(column.name) && fits(field, column) && baseName(column.name).toLowerCase() === name,
+      (column) =>
+        !used.has(column.name) &&
+        fits(field, column) &&
+        baseName(column.name).toLowerCase() === name,
     );
 
     chosen[field.id] = match?.name ?? null;
@@ -349,7 +371,10 @@ export function proposeAssignment(
 }
 
 /** Los campos obligatorios que aún no tienen columna: impiden crear la copia. */
-export function missingFields(document: TemplateDocument, assignment: FieldAssignment): readonly TemplateField[] {
+export function missingFields(
+  document: TemplateDocument,
+  assignment: FieldAssignment,
+): readonly TemplateField[] {
   return document.fields.filter((field) => field.required && !assignment[field.id]);
 }
 
@@ -376,14 +401,18 @@ export function instantiateTemplate(
   newId: () => string = () => crypto.randomUUID(),
   existing: readonly Pick<SavedReport, 'datasetId' | 'name'>[] = [],
 ): TemplateCopy {
-  const column = (fieldId: string | null) => (fieldId === null ? null : (assignment[fieldId] ?? null));
+  const column = (fieldId: string | null) =>
+    fieldId === null ? null : (assignment[fieldId] ?? null);
   const idOf = new Map<string, string>();
   // Aplicar dos veces al mismo conjunto no deja dos pestañas con el mismo nombre.
-  const taken = new Set(existing.map((report) => `${report.datasetId}|${report.name.trim().toLowerCase()}`));
+  const taken = new Set(
+    existing.map((report) => `${report.datasetId}|${report.name.trim().toLowerCase()}`),
+  );
   const unique = (datasetId: string, name: string) => {
     let candidate = name;
 
-    for (let n = 2; taken.has(`${datasetId}|${candidate.trim().toLowerCase()}`); n++) candidate = `${name} (${n})`;
+    for (let n = 2; taken.has(`${datasetId}|${candidate.trim().toLowerCase()}`); n++)
+      candidate = `${name} (${n})`;
     taken.add(`${datasetId}|${candidate.trim().toLowerCase()}`);
     return candidate;
   };
@@ -449,9 +478,19 @@ export function instantiateTemplate(
 
 /** Lo que tendría una plantilla con consultas, credenciales o filas: igual que en el servidor. */
 const FORBIDDEN = new Set(
-  ['sql', 'query', 'connectionId', 'connection', 'connectionString', 'password', 'secret', 'database', 'visualModel', 'rows', 'sampleRows'].map(
-    (key) => key.toLowerCase(),
-  ),
+  [
+    'sql',
+    'query',
+    'connectionId',
+    'connection',
+    'connectionString',
+    'password',
+    'secret',
+    'database',
+    'visualModel',
+    'rows',
+    'sampleRows',
+  ].map((key) => key.toLowerCase()),
 );
 
 /** Por qué no se pudo leer una plantilla, como clave de idioma `reports.template.invalid.*`. */
@@ -479,7 +518,9 @@ function isObject(value: unknown): value is Raw {
 function hasForbidden(value: unknown): boolean {
   if (Array.isArray(value)) return value.some(hasForbidden);
   if (!isObject(value)) return false;
-  return Object.entries(value).some(([key, item]) => FORBIDDEN.has(key.toLowerCase()) || hasForbidden(item));
+  return Object.entries(value).some(
+    ([key, item]) => FORBIDDEN.has(key.toLowerCase()) || hasForbidden(item),
+  );
 }
 
 function str(value: unknown, max: number): string | null {
@@ -487,7 +528,9 @@ function str(value: unknown, max: number): string | null {
 }
 
 function int(value: unknown, min: number, max: number, fallback: number): number {
-  return typeof value === 'number' && Number.isFinite(value) ? Math.min(max, Math.max(min, Math.round(value))) : fallback;
+  return typeof value === 'number' && Number.isFinite(value)
+    ? Math.min(max, Math.max(min, Math.round(value)))
+    : fallback;
 }
 
 function color(value: unknown): PaletteColor | null {
@@ -560,7 +603,13 @@ function readDocument(raw: Raw, scope: ReportTemplateScope, name: string): Templ
     const id = str(item['id'], 80);
     const slot = item['slot'];
 
-    if (!id || typeof slot !== 'number' || !Number.isInteger(slot) || slot < 0 || slot >= slots.length) {
+    if (
+      !id ||
+      typeof slot !== 'number' ||
+      !Number.isInteger(slot) ||
+      slot < 0 ||
+      slot >= slots.length
+    ) {
       throw new Invalid('references');
     }
 
@@ -578,12 +627,19 @@ function readDocument(raw: Raw, scope: ReportTemplateScope, name: string): Templ
   if (fieldSlot.size !== fields.length) throw new Invalid('references');
 
   const reports: TemplateReport[] = list(raw['reports'], MAX_REPORTS).map((item) => {
-    if (!isObject(item) || !VISUALS.includes(item['visual'] as ReportVisualKind)) throw new Invalid('content');
+    if (!isObject(item) || !VISUALS.includes(item['visual'] as ReportVisualKind))
+      throw new Invalid('content');
 
     const key = str(item['key'], 40);
     const slot = item['slot'];
 
-    if (!key || typeof slot !== 'number' || !Number.isInteger(slot) || slot < 0 || slot >= slots.length) {
+    if (
+      !key ||
+      typeof slot !== 'number' ||
+      !Number.isInteger(slot) ||
+      slot < 0 ||
+      slot >= slots.length
+    ) {
       throw new Invalid('references');
     }
 
@@ -600,11 +656,15 @@ function readDocument(raw: Raw, scope: ReportTemplateScope, name: string): Templ
     return { key, slot, name: str(item['name'], 120)?.trim() || key, visual, settings };
   });
 
-  if (reports.length === 0 || new Set(reports.map((report) => report.key)).size !== reports.length) {
+  if (
+    reports.length === 0 ||
+    new Set(reports.map((report) => report.key)).size !== reports.length
+  ) {
     throw new Invalid(reports.length === 0 ? 'content' : 'references');
   }
 
-  const layout = scope === 'Report' ? null : readLayout(raw['layout'], reports, slots.length, fieldSlot);
+  const layout =
+    scope === 'Report' ? null : readLayout(raw['layout'], reports, slots.length, fieldSlot);
 
   if (scope === 'Report' ? reports.length !== 1 : layout === null) throw new Invalid('content');
   if (scope === 'Panel' && (layout!.pages.length !== 1 || layout!.pages[0].panels.length !== 1)) {
@@ -671,7 +731,12 @@ function readLayout(
     for (const [slot, fieldId] of Object.entries(bindings)) {
       const index = Number(slot);
 
-      if (!Number.isInteger(index) || index < 0 || index >= slotCount || fieldSlot.get(fieldId as string) !== index) {
+      if (
+        !Number.isInteger(index) ||
+        index < 0 ||
+        index >= slotCount ||
+        fieldSlot.get(fieldId as string) !== index
+      ) {
         throw new Invalid('references');
       }
     }
@@ -683,7 +748,9 @@ function readLayout(
     };
   });
 
-  const style = isObject(value['style']) ? { color: color(value['style']['color']) } : { color: null };
+  const style = isObject(value['style'])
+    ? { color: color(value['style']['color']) }
+    : { color: null };
 
   return { pages, filters, style };
 }
@@ -695,7 +762,11 @@ export function exportTemplate(document: TemplateDocument): string {
 
 /** Un nombre de archivo sin caracteres que algún sistema rechace. */
 export function templateFileName(name: string): string {
-  const safe = name.replace(/[\\/:*?"<>|\u0000-\u001f]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 80);
+  const safe = name
+    .replace(/[\\/:*?"<>|\u0000-\u001f]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 80);
 
   return `${safe || 'plantilla'}.druse-plantilla.json`;
 }
@@ -743,9 +814,27 @@ export function goalStarter(texts: StarterTexts): TemplateDocument {
       { id: 'fecha', slot: 0, name: 'fecha', kind: 'date', required: true },
     ],
     reports: [
-      { key: 'r1', slot: 0, name: texts.indicator, visual: 'Indicator', settings: settings({ value: 'cifra', target: 'meta' }) },
-      { key: 'r2', slot: 0, name: texts.byCategory, visual: 'Bar', settings: settings({ category: 'categoria', value: 'cifra', sort: 'valueDesc' }) },
-      { key: 'r3', slot: 0, name: texts.overTime, visual: 'Line', settings: settings({ category: 'fecha', value: 'cifra' }) },
+      {
+        key: 'r1',
+        slot: 0,
+        name: texts.indicator,
+        visual: 'Indicator',
+        settings: settings({ value: 'cifra', target: 'meta' }),
+      },
+      {
+        key: 'r2',
+        slot: 0,
+        name: texts.byCategory,
+        visual: 'Bar',
+        settings: settings({ category: 'categoria', value: 'cifra', sort: 'valueDesc' }),
+      },
+      {
+        key: 'r3',
+        slot: 0,
+        name: texts.overTime,
+        visual: 'Line',
+        settings: settings({ category: 'fecha', value: 'cifra' }),
+      },
       { key: 'r4', slot: 0, name: texts.detail, visual: 'Table', settings: settings({}) },
     ],
     layout: {
@@ -753,10 +842,42 @@ export function goalStarter(texts: StarterTexts): TemplateDocument {
         {
           name: texts.page,
           panels: [
-            { report: 'r1', width: 4, height: 4, title: null, description: null, hideHeader: false, color: null },
-            { report: 'r2', width: 8, height: 4, title: null, description: null, hideHeader: false, color: null },
-            { report: 'r3', width: 12, height: 4, title: null, description: null, hideHeader: false, color: null },
-            { report: 'r4', width: 12, height: 5, title: null, description: null, hideHeader: false, color: null },
+            {
+              report: 'r1',
+              width: 4,
+              height: 4,
+              title: null,
+              description: null,
+              hideHeader: false,
+              color: null,
+            },
+            {
+              report: 'r2',
+              width: 8,
+              height: 4,
+              title: null,
+              description: null,
+              hideHeader: false,
+              color: null,
+            },
+            {
+              report: 'r3',
+              width: 12,
+              height: 4,
+              title: null,
+              description: null,
+              hideHeader: false,
+              color: null,
+            },
+            {
+              report: 'r4',
+              width: 12,
+              height: 5,
+              title: null,
+              description: null,
+              hideHeader: false,
+              color: null,
+            },
           ],
         },
       ],

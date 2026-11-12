@@ -39,7 +39,11 @@
           {{ 'reports.dashboard.save' | t }}
         </button>
       }
-      <div class="export" (focusout)="exportMenuFocusOut($event)" (keydown)="exportMenuKeydown($event)">
+      <div
+        class="export"
+        (focusout)="exportMenuFocusOut($event)"
+        (keydown)="exportMenuKeydown($event)"
+      >
         <button
           type="button"
           class="button"
@@ -54,15 +58,41 @@
         @if (exportMenu() === 'board') {
           <div class="menu" role="menu" [attr.aria-label]="'reports.export.board' | t">
             @if (pages().length > 1) {
-              <button type="button" role="menuitem" class="menu__item" (click)="exportExcel('page')">{{ 'reports.export.excelPage' | t }}</button>
-              <button type="button" role="menuitem" class="menu__item" (click)="exportExcel('all')">{{ 'reports.export.excelAll' | t }}</button>
-              <button type="button" role="menuitem" class="menu__item" (click)="openPrint('page')">{{ 'reports.export.pdfPage' | t }}</button>
-              <button type="button" role="menuitem" class="menu__item" (click)="openPrint('all')">{{ 'reports.export.pdfAll' | t }}</button>
+              <button
+                type="button"
+                role="menuitem"
+                class="menu__item"
+                (click)="exportExcel('page')"
+              >
+                {{ 'reports.export.excelPage' | t }}
+              </button>
+              <button type="button" role="menuitem" class="menu__item" (click)="exportExcel('all')">
+                {{ 'reports.export.excelAll' | t }}
+              </button>
+              <button type="button" role="menuitem" class="menu__item" (click)="openPrint('page')">
+                {{ 'reports.export.pdfPage' | t }}
+              </button>
+              <button type="button" role="menuitem" class="menu__item" (click)="openPrint('all')">
+                {{ 'reports.export.pdfAll' | t }}
+              </button>
             } @else {
-              <button type="button" role="menuitem" class="menu__item" (click)="exportExcel('page')">{{ 'reports.export.excel' | t }}</button>
-              <button type="button" role="menuitem" class="menu__item" (click)="openPrint('page')">{{ 'reports.export.pdf' | t }}</button>
+              <button
+                type="button"
+                role="menuitem"
+                class="menu__item"
+                (click)="exportExcel('page')"
+              >
+                {{ 'reports.export.excel' | t }}
+              </button>
+              <button type="button" role="menuitem" class="menu__item" (click)="openPrint('page')">
+                {{ 'reports.export.pdf' | t }}
+              </button>
             }
-            <p class="menu__hint">{{ (anyActive() ? 'reports.export.withFilters' : 'reports.export.noFiltersHint') | t }}</p>
+            <p class="menu__hint">
+              {{
+                (anyActive() ? 'reports.export.withFilters' : 'reports.export.noFiltersHint') | t
+              }}
+            </p>
           </div>
         }
       </div>
@@ -76,7 +106,12 @@
         <app-icon name="copy" [size]="11" />
         {{ 'reports.template.saveAs.Dashboard' | t }}
       </button>
-      <button type="button" class="button" [attr.aria-pressed]="editing()" (click)="toggleEditing()">
+      <button
+        type="button"
+        class="button"
+        [attr.aria-pressed]="editing()"
+        (click)="toggleEditing()"
+      >
         <app-icon name="edit" [size]="11" />
         {{ (editing() ? 'reports.dashboard.view' : 'reports.dashboard.edit') | t }}
       </button>
@@ -107,9 +142,14 @@
           <label class="filter">
             <span class="filter__label">{{ filter.label }}</span>
             <select (change)="setCategory(filter, $any($event.target).value)">
-              <option value="" [selected]="categoryValue(filter) === ''">{{ 'reports.dashboard.all' | t }}</option>
+              <option value="" [selected]="categoryValue(filter) === ''">
+                {{ 'reports.dashboard.all' | t }}
+              </option>
               @for (option of options(filter); track $index) {
-                <option [value]="optionKey(option)" [selected]="categoryValue(filter) === optionKey(option)">
+                <option
+                  [value]="optionKey(option)"
+                  [selected]="categoryValue(filter) === optionKey(option)"
+                >
                   {{ option ?? ('reports.chart.empty' | t) }}
                 </option>
               }
@@ -179,7 +219,10 @@
       <app-icon name="chart" [size]="22" />
       <p class="empty__title">{{ 'reports.dashboard.emptyTitle' | t }}</p>
       <p class="empty__text">
-        {{ (catalog().length === 0 ? 'reports.dashboard.noReports' : 'reports.dashboard.emptyText') | t }}
+        {{
+          (catalog().length === 0 ? 'reports.dashboard.noReports' : 'reports.dashboard.emptyText')
+            | t
+        }}
       </p>
     </div>
   } @else {
@@ -198,7 +241,9 @@
         >
           <header class="panel__head" [class.is-hidden]="view.panel.hideHeader && !editing()">
             <div class="panel__titles">
-              <h4 class="panel__title">{{ view.title || ('reports.dashboard.missingReport' | t) }}</h4>
+              <h4 class="panel__title">
+                {{ view.title || ('reports.dashboard.missingReport' | t) }}
+              </h4>
               @if (view.panel.description) {
                 <p class="panel__description">{{ view.panel.description }}</p>
               }
@@ -211,18 +256,31 @@
                 </p>
               }
             </div>
-            @if (!editing() && view.report && (view.report.visual === 'Bar' || view.report.visual === 'Line')) {
+            @if (
+              !editing() &&
+              view.report &&
+              (view.report.visual === 'Bar' || view.report.visual === 'Line')
+            ) {
               <button
                 type="button"
                 class="link panel__table"
                 [attr.aria-pressed]="asTable().has(view.panel.id)"
                 (click)="toggleTable(view.panel)"
               >
-                {{ (asTable().has(view.panel.id) ? 'reports.chart.showChart' : 'reports.chart.showTable') | t }}
+                {{
+                  (asTable().has(view.panel.id)
+                    ? 'reports.chart.showChart'
+                    : 'reports.chart.showTable'
+                  ) | t
+                }}
               </button>
             }
             @if (!editing() && view.report && view.snapshot) {
-              <div class="export export--panel" (focusout)="exportMenuFocusOut($event)" (keydown)="exportMenuKeydown($event)">
+              <div
+                class="export export--panel"
+                (focusout)="exportMenuFocusOut($event)"
+                (keydown)="exportMenuKeydown($event)"
+              >
                 <button
                   type="button"
                   class="icon-button"
@@ -236,24 +294,114 @@
                   <app-icon name="export" [size]="11" />
                 </button>
                 @if (exportMenu() === view.panel.id) {
-                  <div class="menu menu--end" role="menu" [attr.aria-label]="'reports.export.panel' | t: { name: view.title }">
-                    <button type="button" role="menuitem" class="menu__item" (click)="exportExcel(view)">{{ 'reports.export.excel' | t }}</button>
-                    <button type="button" role="menuitem" class="menu__item" (click)="openPrint(view)">{{ 'reports.export.pdf' | t }}</button>
-                    <button type="button" role="menuitem" class="menu__item" (click)="exportCsv(view, 'figures')">{{ 'reports.export.csvFigures' | t }}</button>
-                    <button type="button" role="menuitem" class="menu__item" (click)="exportCsv(view, 'data')">{{ 'reports.export.csvData' | t }}</button>
+                  <div
+                    class="menu menu--end"
+                    role="menu"
+                    [attr.aria-label]="'reports.export.panel' | t: { name: view.title }"
+                  >
+                    <button
+                      type="button"
+                      role="menuitem"
+                      class="menu__item"
+                      (click)="exportExcel(view)"
+                    >
+                      {{ 'reports.export.excel' | t }}
+                    </button>
+                    <button
+                      type="button"
+                      role="menuitem"
+                      class="menu__item"
+                      (click)="openPrint(view)"
+                    >
+                      {{ 'reports.export.pdf' | t }}
+                    </button>
+                    <button
+                      type="button"
+                      role="menuitem"
+                      class="menu__item"
+                      (click)="exportCsv(view, 'figures')"
+                    >
+                      {{ 'reports.export.csvFigures' | t }}
+                    </button>
+                    <button
+                      type="button"
+                      role="menuitem"
+                      class="menu__item"
+                      (click)="exportCsv(view, 'data')"
+                    >
+                      {{ 'reports.export.csvData' | t }}
+                    </button>
                   </div>
                 }
               </div>
             }
             @if (editing()) {
-              <div class="panel__tools" role="toolbar" [attr.aria-label]="'reports.dashboard.panelTools' | t: { name: view.title }">
-                <button type="button" (click)="move(view.panel, -1); $event.stopPropagation()" [disabled]="index(view.panel) === 0" [attr.aria-label]="'reports.dashboard.moveBefore' | t" [attr.title]="'reports.dashboard.moveBefore' | t">‹</button>
-                <button type="button" (click)="move(view.panel, 1); $event.stopPropagation()" [disabled]="index(view.panel) === panels().length - 1" [attr.aria-label]="'reports.dashboard.moveAfter' | t" [attr.title]="'reports.dashboard.moveAfter' | t">›</button>
-                <button type="button" (click)="resize(view.panel, -1, 0); $event.stopPropagation()" [disabled]="!canShrink(view.panel)" [attr.aria-label]="'reports.dashboard.narrower' | t" [attr.title]="'reports.dashboard.narrower' | t">⇤</button>
-                <button type="button" (click)="resize(view.panel, 1, 0); $event.stopPropagation()" [disabled]="!canGrow(view.panel)" [attr.aria-label]="'reports.dashboard.wider' | t" [attr.title]="'reports.dashboard.wider' | t">⇥</button>
-                <button type="button" (click)="resize(view.panel, 0, -1); $event.stopPropagation()" [disabled]="!canShorter(view.panel)" [attr.aria-label]="'reports.dashboard.shorter' | t" [attr.title]="'reports.dashboard.shorter' | t">⤒</button>
-                <button type="button" (click)="resize(view.panel, 0, 1); $event.stopPropagation()" [disabled]="!canTaller(view.panel)" [attr.aria-label]="'reports.dashboard.taller' | t" [attr.title]="'reports.dashboard.taller' | t">⤓</button>
-                <button type="button" class="is-danger" (click)="remove(view.panel); $event.stopPropagation()" [attr.aria-label]="'reports.dashboard.removePanel' | t" [attr.title]="'reports.dashboard.removePanel' | t">
+              <div
+                class="panel__tools"
+                role="toolbar"
+                [attr.aria-label]="'reports.dashboard.panelTools' | t: { name: view.title }"
+              >
+                <button
+                  type="button"
+                  (click)="move(view.panel, -1); $event.stopPropagation()"
+                  [disabled]="index(view.panel) === 0"
+                  [attr.aria-label]="'reports.dashboard.moveBefore' | t"
+                  [attr.title]="'reports.dashboard.moveBefore' | t"
+                >
+                  ‹
+                </button>
+                <button
+                  type="button"
+                  (click)="move(view.panel, 1); $event.stopPropagation()"
+                  [disabled]="index(view.panel) === panels().length - 1"
+                  [attr.aria-label]="'reports.dashboard.moveAfter' | t"
+                  [attr.title]="'reports.dashboard.moveAfter' | t"
+                >
+                  ›
+                </button>
+                <button
+                  type="button"
+                  (click)="resize(view.panel, -1, 0); $event.stopPropagation()"
+                  [disabled]="!canShrink(view.panel)"
+                  [attr.aria-label]="'reports.dashboard.narrower' | t"
+                  [attr.title]="'reports.dashboard.narrower' | t"
+                >
+                  ⇤
+                </button>
+                <button
+                  type="button"
+                  (click)="resize(view.panel, 1, 0); $event.stopPropagation()"
+                  [disabled]="!canGrow(view.panel)"
+                  [attr.aria-label]="'reports.dashboard.wider' | t"
+                  [attr.title]="'reports.dashboard.wider' | t"
+                >
+                  ⇥
+                </button>
+                <button
+                  type="button"
+                  (click)="resize(view.panel, 0, -1); $event.stopPropagation()"
+                  [disabled]="!canShorter(view.panel)"
+                  [attr.aria-label]="'reports.dashboard.shorter' | t"
+                  [attr.title]="'reports.dashboard.shorter' | t"
+                >
+                  ⤒
+                </button>
+                <button
+                  type="button"
+                  (click)="resize(view.panel, 0, 1); $event.stopPropagation()"
+                  [disabled]="!canTaller(view.panel)"
+                  [attr.aria-label]="'reports.dashboard.taller' | t"
+                  [attr.title]="'reports.dashboard.taller' | t"
+                >
+                  ⤓
+                </button>
+                <button
+                  type="button"
+                  class="is-danger"
+                  (click)="remove(view.panel); $event.stopPropagation()"
+                  [attr.aria-label]="'reports.dashboard.removePanel' | t"
+                  [attr.title]="'reports.dashboard.removePanel' | t"
+                >
                   <app-icon name="close" [size]="10" />
                 </button>
               </div>
@@ -261,10 +409,14 @@
           </header>
 
           @if (view.unbound.length > 0) {
-            <p class="panel__badge">{{ 'reports.dashboard.notFiltered' | t: { filters: view.unbound.join(', ') } }}</p>
+            <p class="panel__badge">
+              {{ 'reports.dashboard.notFiltered' | t: { filters: view.unbound.join(', ') } }}
+            </p>
           }
           @if (view.repeated.length > 0) {
-            <p class="panel__badge">{{ 'reports.join.repeated' | t: { columns: view.repeated.join(', ') } }}</p>
+            <p class="panel__badge">
+              {{ 'reports.join.repeated' | t: { columns: view.repeated.join(', ') } }}
+            </p>
           }
 
           <div class="panel__body">
@@ -303,17 +455,25 @@
     <fieldset class="section section--first">
       <legend class="section__title">{{ 'reports.dashboard.board' | t }}</legend>
       <div class="field">
-        <label class="field__label" for="board-color">{{ 'reports.dashboard.boardColor' | t }}</label>
+        <label class="field__label" for="board-color">{{
+          'reports.dashboard.boardColor' | t
+        }}</label>
         <div class="swatch-row">
           <span
             class="swatch"
             aria-hidden="true"
-            [style.background]="model().style.color ? 'var(--rc-' + model().style.color + ')' : 'var(--dr-accent)'"
+            [style.background]="
+              model().style.color ? 'var(--rc-' + model().style.color + ')' : 'var(--dr-accent)'
+            "
           ></span>
           <select id="board-color" (change)="styleColor($any($event.target).value)">
-            <option value="" [selected]="model().style.color === null">{{ 'reports.look.theme' | t }}</option>
+            <option value="" [selected]="model().style.color === null">
+              {{ 'reports.look.theme' | t }}
+            </option>
             @for (color of palette; track color) {
-              <option [value]="color" [selected]="model().style.color === color">{{ 'reports.color.' + color | t }}</option>
+              <option [value]="color" [selected]="model().style.color === color">
+                {{ 'reports.color.' + color | t }}
+              </option>
             }
           </select>
         </div>
@@ -321,7 +481,12 @@
       </div>
       <label class="field">
         <span class="field__label">{{ 'reports.dashboard.pageName' | t }}</span>
-        <input type="text" maxlength="40" [value]="page().name" (input)="renamePage($any($event.target).value)" />
+        <input
+          type="text"
+          maxlength="40"
+          [value]="page().name"
+          (input)="renamePage($any($event.target).value)"
+        />
       </label>
       @if (pages().length > 1) {
         <button type="button" class="link link--danger" (click)="removePage()">
@@ -347,7 +512,12 @@
         <span class="field__hint">{{ 'reports.dashboard.noReports' | t }}</span>
       }
     </label>
-    <button type="button" class="link" (click)="galleryOpen.set(true)" [disabled]="datasets().length === 0">
+    <button
+      type="button"
+      class="link"
+      (click)="galleryOpen.set(true)"
+      [disabled]="datasets().length === 0"
+    >
       <app-icon name="copy" [size]="11" />
       {{ 'reports.template.addFromTemplate' | t }}
     </button>
@@ -374,7 +544,11 @@
             type="text"
             maxlength="140"
             [value]="view.panel.description ?? ''"
-            (input)="patchSelected({ description: $any($event.target).value.trim() ? $any($event.target).value : null })"
+            (input)="
+              patchSelected({
+                description: $any($event.target).value.trim() ? $any($event.target).value : null,
+              })
+            "
           />
         </label>
         <label class="check">
@@ -386,24 +560,36 @@
           {{ 'reports.dashboard.hideHeader' | t }}
         </label>
         <div class="field">
-          <label class="field__label" for="panel-color">{{ 'reports.dashboard.panelColor' | t }}</label>
+          <label class="field__label" for="panel-color">{{
+            'reports.dashboard.panelColor' | t
+          }}</label>
           <div class="swatch-row">
             <span
               class="swatch"
               aria-hidden="true"
               [style.background]="view.color ? 'var(--rc-' + view.color + ')' : 'var(--dr-accent)'"
             ></span>
-            <select id="panel-color" (change)="patchSelected({ color: $any($event.target).value || null })">
-              <option value="" [selected]="view.panel.color === null">{{ 'reports.look.inherit' | t }}</option>
+            <select
+              id="panel-color"
+              (change)="patchSelected({ color: $any($event.target).value || null })"
+            >
+              <option value="" [selected]="view.panel.color === null">
+                {{ 'reports.look.inherit' | t }}
+              </option>
               @for (color of palette; track color) {
-                <option [value]="color" [selected]="view.panel.color === color">{{ 'reports.color.' + color | t }}</option>
+                <option [value]="color" [selected]="view.panel.color === color">
+                  {{ 'reports.color.' + color | t }}
+                </option>
               }
             </select>
           </div>
           <!-- De dónde sale el color, y cómo volver a lo heredado. -->
           <span class="field__hint">
             <!-- i18n-keys: reports.dashboard.colorFrom.* -->
-            {{ 'reports.dashboard.colorFrom.' + view.colorSource | t: { color: view.color ? ('reports.color.' + view.color | t) : '' } }}
+            {{
+              'reports.dashboard.colorFrom.' + view.colorSource
+                | t: { color: view.color ? ('reports.color.' + view.color | t) : '' }
+            }}
           </span>
           @if (view.panel.color !== null) {
             <button type="button" class="link" (click)="patchSelected({ color: null })">
@@ -416,7 +602,9 @@
             <span class="field__label">{{ 'reports.dashboard.movePage' | t }}</span>
             <select (change)="moveSelectedTo($any($event.target).value)">
               @for (item of pages(); track item.id) {
-                <option [value]="item.id" [selected]="item.id === page().id">{{ item.name }}</option>
+                <option [value]="item.id" [selected]="item.id === page().id">
+                  {{ item.name }}
+                </option>
               }
             </select>
           </label>
@@ -463,9 +651,14 @@
             <label class="field field--compact">
               <span class="field__label">{{ dataset.name }}</span>
               <select (change)="bind(filter, dataset.id, $any($event.target).value)">
-                <option value="" [selected]="!filter.bindings[dataset.id]">{{ 'reports.dashboard.unbound' | t }}</option>
+                <option value="" [selected]="!filter.bindings[dataset.id]">
+                  {{ 'reports.dashboard.unbound' | t }}
+                </option>
                 @for (column of columnsFor(filter, dataset); track column.name) {
-                  <option [value]="column.name" [selected]="filter.bindings[dataset.id] === column.name">
+                  <option
+                    [value]="column.name"
+                    [selected]="filter.bindings[dataset.id] === column.name"
+                  >
                     {{ labelIn(dataset, column.name) }}
                   </option>
                 }
@@ -490,8 +683,12 @@
       @if (confirmDelete()) {
         <p class="field__hint">{{ 'reports.dashboard.confirmDelete' | t: { name: name() } }}</p>
         <div class="inspector__row">
-          <button type="button" class="button" (click)="confirmDelete.set(false)">{{ 'common.cancel' | t }}</button>
-          <button type="button" class="button button--danger" (click)="deleteDashboard()">{{ 'reports.delete' | t }}</button>
+          <button type="button" class="button" (click)="confirmDelete.set(false)">
+            {{ 'common.cancel' | t }}
+          </button>
+          <button type="button" class="button button--danger" (click)="deleteDashboard()">
+            {{ 'reports.delete' | t }}
+          </button>
         </div>
       } @else {
         <button type="button" class="link link--danger" (click)="confirmDelete.set(true)">

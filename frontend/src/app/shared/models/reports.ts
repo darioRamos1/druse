@@ -152,7 +152,8 @@ export interface ReportRun {
 
 export type ReportScheduleFrequency = 'Daily' | 'Weekly';
 
-export type ReportWeekDay = 'Monday' | 'Tuesday' | 'Wednesday' | 'Thursday' | 'Friday' | 'Saturday' | 'Sunday';
+export type ReportWeekDay =
+  'Monday' | 'Tuesday' | 'Wednesday' | 'Thursday' | 'Friday' | 'Saturday' | 'Sunday';
 
 /**
  * Cuándo se actualiza solo un conjunto. Al guardar solo cuentan la regla y la
@@ -272,7 +273,11 @@ export interface ExportPanel {
   readonly chart: 'Bar' | 'Line' | null;
   readonly color: string | null;
   readonly notes: readonly string[];
-  readonly indicator: { readonly value: number | null; readonly target: number | null; readonly ratio: number | null } | null;
+  readonly indicator: {
+    readonly value: number | null;
+    readonly target: number | null;
+    readonly ratio: number | null;
+  } | null;
 }
 
 export interface ExportDataset {

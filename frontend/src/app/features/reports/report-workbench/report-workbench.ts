@@ -29,8 +29,14 @@ import { Icon } from '../../../shared/ui/icon/icon';
 import { ReportChart } from '../report-chart/report-chart';
 import { ReportHistory } from '../report-history/report-history';
 import { ReportScheduleForm } from '../report-schedule/report-schedule';
-import { ReportTemplateGallery, TemplateApplication } from '../report-template-gallery/report-template-gallery';
-import { ReportTemplateSave, TemplateSaveRequest } from '../report-template-save/report-template-save';
+import {
+  ReportTemplateGallery,
+  TemplateApplication,
+} from '../report-template-gallery/report-template-gallery';
+import {
+  ReportTemplateSave,
+  TemplateSaveRequest,
+} from '../report-template-save/report-template-save';
 import { captureTemplate, instantiateTemplate } from '../report-template-model';
 import { ServerMessage } from '../../../shared/models/workspace';
 import { failureText, serverText } from '../report-messages';
@@ -72,7 +78,15 @@ export const VISUALS: readonly ReportVisualKind[] = ['Table', 'Bar', 'Line', 'In
 @Component({
   selector: 'app-report-workbench',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [Icon, ReportChart, ReportHistory, ReportScheduleForm, ReportTemplateGallery, ReportTemplateSave, TranslatePipe],
+  imports: [
+    Icon,
+    ReportChart,
+    ReportHistory,
+    ReportScheduleForm,
+    ReportTemplateGallery,
+    ReportTemplateSave,
+    TranslatePipe,
+  ],
   templateUrl: './report-workbench.html',
   styleUrl: './report-workbench.scss',
 })
@@ -137,7 +151,9 @@ export class ReportWorkbench {
       return { key: 'reports.schedule.status.retry', date: schedule.retryAtUtc };
     }
 
-    return schedule.nextRunUtc ? { key: 'reports.schedule.status.next', date: schedule.nextRunUtc } : null;
+    return schedule.nextRunUtc
+      ? { key: 'reports.schedule.status.next', date: schedule.nextRunUtc }
+      : null;
   });
 
   /** La próxima mirada por si llegó una actualización programada con esto abierto. */
@@ -158,7 +174,9 @@ export class ReportWorkbench {
   protected readonly columns = computed(() => this.snapshot()?.columns ?? []);
   protected readonly numericColumns = computed(() => this.columns().filter(isNumericColumn));
 
-  protected readonly saved = computed(() => this.reports().find((report) => report.id === this.draft()?.id) ?? null);
+  protected readonly saved = computed(
+    () => this.reports().find((report) => report.id === this.draft()?.id) ?? null,
+  );
 
   protected readonly reportDirty = computed(() => {
     const draft = this.draft();
@@ -186,7 +204,9 @@ export class ReportWorkbench {
     const snapshot = this.snapshot();
     const draft = this.draft();
 
-    return snapshot && draft?.visual === 'Indicator' ? buildIndicator(snapshot, draft.settings) : null;
+    return snapshot && draft?.visual === 'Indicator'
+      ? buildIndicator(snapshot, draft.settings)
+      : null;
   });
 
   protected readonly table = computed(() => {
@@ -331,7 +351,8 @@ export class ReportWorkbench {
 
   /** Cómo se cuenta un intento fallido: programado o a mano, con o sin datos anteriores. */
   protected failureKey(run: ReportRun): string {
-    const prefix = run.origin === 'Scheduled' ? 'reports.data.scheduledFailed' : 'reports.data.failed';
+    const prefix =
+      run.origin === 'Scheduled' ? 'reports.data.scheduledFailed' : 'reports.data.failed';
 
     return this.snapshot() ? `${prefix}Keeps` : prefix;
   }
@@ -384,7 +405,9 @@ export class ReportWorkbench {
     this.error.set(null);
 
     try {
-      this.schedule.set(await firstValueFrom(this._gateway.saveReportSchedule(datasetId, schedule)));
+      this.schedule.set(
+        await firstValueFrom(this._gateway.saveReportSchedule(datasetId, schedule)),
+      );
       this.scheduling.set(false);
       this.armWatch();
     } catch (error) {
@@ -485,11 +508,18 @@ export class ReportWorkbench {
     return formatDate(iso, { dateStyle: 'medium', timeStyle: 'short' });
   }
 
-  protected failureText(code: string | null, message: string | null, localized?: ServerMessage | null): string {
+  protected failureText(
+    code: string | null,
+    message: string | null,
+    localized?: ServerMessage | null,
+  ): string {
     return failureText(this._i18n, code, message, localized);
   }
 
-  protected serverText(localized: ServerMessage | null | undefined, message: string | null): string | null {
+  protected serverText(
+    localized: ServerMessage | null | undefined,
+    message: string | null,
+  ): string | null {
     return serverText(this._i18n, localized, message);
   }
 
@@ -540,7 +570,8 @@ export class ReportWorkbench {
         settings: {
           ...base,
           category: base.category === null ? null : (draft.settings.category ?? base.category),
-          value: base.value === null && visual === 'Table' ? null : (draft.settings.value ?? base.value),
+          value:
+            base.value === null && visual === 'Table' ? null : (draft.settings.value ?? base.value),
           aggregate: draft.settings.aggregate,
         },
       };
@@ -548,13 +579,18 @@ export class ReportWorkbench {
   }
 
   protected patch(patch: Partial<ReportSettings>): void {
-    this.draft.update((draft) => (draft ? { ...draft, settings: { ...draft.settings, ...patch } } : draft));
+    this.draft.update((draft) =>
+      draft ? { ...draft, settings: { ...draft.settings, ...patch } } : draft,
+    );
   }
 
   protected patchLook(patch: Partial<ReportAppearance>): void {
     this.draft.update((draft) =>
       draft
-        ? { ...draft, settings: { ...draft.settings, appearance: { ...draft.settings.appearance, ...patch } } }
+        ? {
+            ...draft,
+            settings: { ...draft.settings, appearance: { ...draft.settings.appearance, ...patch } },
+          }
         : draft,
     );
   }
@@ -575,13 +611,21 @@ export class ReportWorkbench {
       return;
     }
 
-    const current = draft.settings.columns.length > 0
-      ? draft.settings.columns
-      : this.columns().map((column) => column.name);
+    const current =
+      draft.settings.columns.length > 0
+        ? draft.settings.columns
+        : this.columns().map((column) => column.name);
     const next = shown ? [...current, name] : current.filter((item) => item !== name);
 
     // Vuelve a «todas» cuando están todas: así una columna nueva del conjunto aparece sola.
-    this.patch({ columns: next.length === this.columns().length ? [] : this.columns().map((c) => c.name).filter((c) => next.includes(c)) });
+    this.patch({
+      columns:
+        next.length === this.columns().length
+          ? []
+          : this.columns()
+              .map((c) => c.name)
+              .filter((c) => next.includes(c)),
+    });
   }
 
   protected isShown(name: string): boolean {
@@ -660,7 +704,15 @@ export class ReportWorkbench {
 
     const datasetId = this.dataset().id;
     const document = captureTemplate('Report', request.name, request.description, {
-      reports: [{ id: draft.id, datasetId, name: draft.name.trim(), visual: draft.visual, settings: JSON.stringify(draft.settings) }],
+      reports: [
+        {
+          id: draft.id,
+          datasetId,
+          name: draft.name.trim(),
+          visual: draft.visual,
+          settings: JSON.stringify(draft.settings),
+        },
+      ],
       datasets: [this.dataset()],
       columnsOf: () => this.columns(),
     });
@@ -668,13 +720,23 @@ export class ReportWorkbench {
     await this.storeTemplate(document.name, document.description, JSON.stringify(document));
   }
 
-  private async storeTemplate(name: string, description: string | null, model: string): Promise<void> {
+  private async storeTemplate(
+    name: string,
+    description: string | null,
+    model: string,
+  ): Promise<void> {
     this.templateBusy.set(true);
     this.error.set(null);
 
     try {
       await firstValueFrom(
-        this._gateway.saveReportTemplate({ id: crypto.randomUUID(), name, description, scope: 'Report', model }),
+        this._gateway.saveReportTemplate({
+          id: crypto.randomUUID(),
+          name,
+          description,
+          scope: 'Report',
+          model,
+        }),
       );
       this.savingTemplate.set(false);
       this.notice.set(this._i18n.t('reports.template.savedNotice', { name }));

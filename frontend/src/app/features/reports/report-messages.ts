@@ -40,5 +40,7 @@ export function failureText(
   const known = i18n.t(key);
 
   // El motor ya explica su error en su idioma; los demás códigos se traducen.
-  return code === 'database-error' || code === 'invalid-query' || known === key ? (message ?? known) : known;
+  return code === 'database-error' || code === 'invalid-query' || known === key
+    ? (message ?? known)
+    : known;
 }

@@ -39,14 +39,26 @@ function dosFuentes(): ReportDataset {
       { ...newSource('Ventas', 'conn-1', 'ventas'), sql: 'SELECT 1 AS municipio' },
       { ...newSource('Metas', 'conn-2', 'metas'), sql: 'SELECT 1 AS municipio' },
     ],
-    join: { keys: [{ left: 'municipio', right: 'municipio' }], kind: 'Left', cardinality: 'OneToOne' },
+    join: {
+      keys: [{ left: 'municipio', right: 'municipio' }],
+      kind: 'Left',
+      cardinality: 'OneToOne',
+    },
   };
 }
 
 describe('report-draft', () => {
   it('propone como claves las columnas con el mismo nombre y el mismo tipo', () => {
-    const izquierda = [columna('mes', 'DateOnly'), columna('Municipio', 'String'), columna('venta', 'Decimal')];
-    const derecha = [columna('mes', 'DateOnly'), columna('municipio', 'String'), columna('venta', 'Int32')];
+    const izquierda = [
+      columna('mes', 'DateOnly'),
+      columna('Municipio', 'String'),
+      columna('venta', 'Decimal'),
+    ];
+    const derecha = [
+      columna('mes', 'DateOnly'),
+      columna('municipio', 'String'),
+      columna('venta', 'Int32'),
+    ];
 
     expect(suggestKeys(izquierda, derecha)).toEqual([
       { left: 'mes', right: 'mes' },
@@ -94,7 +106,10 @@ describe('report-draft', () => {
     expect(draftProblems(sinUnion)).toEqual(['reports.problem.joinKeys']);
 
     const visualSinComposicion = dosFuentes();
-    const fuentes = [{ ...visualSinComposicion.sources[0], mode: 'Visual' as const }, visualSinComposicion.sources[1]];
+    const fuentes = [
+      { ...visualSinComposicion.sources[0], mode: 'Visual' as const },
+      visualSinComposicion.sources[1],
+    ];
 
     expect(draftProblems({ ...visualSinComposicion, sources: fuentes })).toEqual([
       'reports.problem.composition',
@@ -137,7 +152,9 @@ describe('report-draft', () => {
         completedAtUtc: '2026-11-11T15:00:01Z',
       })),
     };
-    const previa = new Map(dataset.sources.map((source) => [source.alias, sourceFingerprint(source)]));
+    const previa = new Map(
+      dataset.sources.map((source) => [source.alias, sourceFingerprint(source)]),
+    );
     const cambiada = {
       ...dataset,
       sources: [dataset.sources[0], { ...dataset.sources[1], sql: 'SELECT 2 AS otra' }],

@@ -29,7 +29,15 @@ export function newDataset(id: string, name: string): ReportDataset {
 }
 
 export function newSource(alias: string, connectionId: string, database: string): ReportSource {
-  return { alias, connectionId, database, mode: 'Sql', sql: '', visualModel: null, expectedColumns: [] };
+  return {
+    alias,
+    connectionId,
+    database,
+    mode: 'Sql',
+    sql: '',
+    visualModel: null,
+    expectedColumns: [],
+  };
 }
 
 /** El alias libre siguiente: `Fuente 1`, `Fuente 2`… sin repetir uno que ya esté. */
@@ -62,7 +70,10 @@ export function readVisualModel(source: ReportSource): VisualSourceModel | null 
 }
 
 /** Copia una composición guardada en la fuente, con el SQL que generó el compositor. */
-export function applyComposition(source: ReportSource, record: SavedCompositionRecord): ReportSource {
+export function applyComposition(
+  source: ReportSource,
+  record: SavedCompositionRecord,
+): ReportSource {
   let parsed: { sql?: unknown; state?: unknown } = {};
 
   try {
@@ -159,7 +170,9 @@ export function suggestKeys(
   return left.flatMap((column) => {
     const match = byName.get(column.name.toLowerCase());
 
-    return match && match.clrType === column.clrType ? [{ left: column.name, right: match.name }] : [];
+    return match && match.clrType === column.clrType
+      ? [{ left: column.name, right: match.name }]
+      : [];
   });
 }
 

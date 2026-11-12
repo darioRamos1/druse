@@ -35,7 +35,10 @@ import {
 import { Icon } from '../../../shared/ui/icon/icon';
 import { ReportWorkbench } from '../report-workbench/report-workbench';
 import { ReportDashboard } from '../report-dashboard/report-dashboard';
-import { ReportTemplateGallery, TemplateApplication } from '../report-template-gallery/report-template-gallery';
+import {
+  ReportTemplateGallery,
+  TemplateApplication,
+} from '../report-template-gallery/report-template-gallery';
 import { instantiateTemplate } from '../report-template-model';
 import { emptyDashboard } from '../report-dashboard-model';
 import { ServerMessage } from '../../../shared/models/workspace';
@@ -61,7 +64,8 @@ import {
 export type ReportStep = 'sources' | 'join' | 'visual';
 
 /** Qué se ve en el centro: una fuente o el cruce. */
-export type PreviewView = { readonly kind: 'source'; readonly index: number } | { readonly kind: 'join' };
+export type PreviewView =
+  { readonly kind: 'source'; readonly index: number } | { readonly kind: 'join' };
 
 /** Una pregunta que espera respuesta antes de hacer algo que descarta trabajo. */
 interface PendingConfirm {
@@ -170,7 +174,9 @@ export class ReportBuilder {
   private readonly _options = signal<ReadonlyMap<string, SourceOptions>>(new Map());
 
   /** Composiciones guardadas por `conexión|base`, pedidas solo al elegir esa base. */
-  private readonly _compositions = signal<ReadonlyMap<string, readonly SavedCompositionRecord[]>>(new Map());
+  private readonly _compositions = signal<ReadonlyMap<string, readonly SavedCompositionRecord[]>>(
+    new Map(),
+  );
 
   /** Solo las conexiones guardadas: una fuente tiene que poder reabrirse mañana. */
   protected readonly connections = computed(() =>
@@ -208,7 +214,9 @@ export class ReportBuilder {
   protected readonly currentCompositions = computed(() => {
     const source = this.current();
 
-    return source ? (this._compositions().get(`${source.connectionId}|${source.database}`) ?? []) : [];
+    return source
+      ? (this._compositions().get(`${source.connectionId}|${source.database}`) ?? [])
+      : [];
   });
 
   protected readonly currentVisual = computed(() => {
@@ -221,10 +229,14 @@ export class ReportBuilder {
     const view = this.view();
     const source = view.kind === 'source' ? this.sources()[view.index] : undefined;
 
-    return source ? (this.preview()?.sources.find((item) => item.alias === source.alias) ?? null) : null;
+    return source
+      ? (this.preview()?.sources.find((item) => item.alias === source.alias) ?? null)
+      : null;
   });
 
-  protected readonly joinPreview = computed<ReportJoinPreview | null>(() => this.preview()?.join ?? null);
+  protected readonly joinPreview = computed<ReportJoinPreview | null>(
+    () => this.preview()?.join ?? null,
+  );
 
   /** Una vista previa que ya no describe la fuente porque se cambió después. */
   protected readonly stale = computed(() => {
@@ -235,7 +247,8 @@ export class ReportBuilder {
       return false;
     }
 
-    const changed = (source: ReportSource) => previewed.get(source.alias) !== sourceFingerprint(source);
+    const changed = (source: ReportSource) =>
+      previewed.get(source.alias) !== sourceFingerprint(source);
 
     return view.kind === 'join'
       ? this.sources().some(changed)
@@ -377,7 +390,9 @@ export class ReportBuilder {
 
     this.step.set(step);
     if (step !== 'visual') {
-      this.view.set(step === 'join' ? { kind: 'join' } : { kind: 'source', index: this.activeSource() });
+      this.view.set(
+        step === 'join' ? { kind: 'join' } : { kind: 'source', index: this.activeSource() },
+      );
     }
     // En ancho estrecho el inspector se superpone: abrirlo solo al cambiar de
     // paso taparía «Actualizar ahora» y la vista previa. Ahí se abre con su botón.
@@ -421,7 +436,11 @@ export class ReportBuilder {
     // probable cuando se cruzan dos bases del mismo servidor.
     const first = this.sources()[0];
     const connection = first?.connectionId ?? this.connections()[0]?.id ?? '';
-    const source = newSource(nextAlias(this.sources(), this._i18n.t('reports.source.defaultAlias')), connection, '');
+    const source = newSource(
+      nextAlias(this.sources(), this._i18n.t('reports.source.defaultAlias')),
+      connection,
+      '',
+    );
 
     this.draft.update((draft) => ({ ...draft, sources: [...draft.sources, source] }));
     const index = this.sources().length - 1;
@@ -474,7 +493,9 @@ export class ReportBuilder {
         preview
           ? {
               ...preview,
-              sources: preview.sources.map((item) => (item.alias === previous ? { ...item, alias } : item)),
+              sources: preview.sources.map((item) =>
+                item.alias === previous ? { ...item, alias } : item,
+              ),
             }
           : preview,
       );
@@ -594,7 +615,9 @@ export class ReportBuilder {
     }
 
     try {
-      const records = await firstValueFrom(this._gateway.getCompositions(connectionId, database, undefined));
+      const records = await firstValueFrom(
+        this._gateway.getCompositions(connectionId, database, undefined),
+      );
 
       this._compositions.update((map) => new Map(map).set(key, records));
     } catch {
@@ -673,7 +696,9 @@ export class ReportBuilder {
 
     // Una unión a medias no se manda: las fuentes se leen igual, cada una por su lado.
     const current = this.draft();
-    const draft = this.problems().includes('reports.problem.joinKeys') ? { ...current, join: null } : current;
+    const draft = this.problems().includes('reports.problem.joinKeys')
+      ? { ...current, join: null }
+      : current;
 
     this.previewing.set(true);
     this.error.set(null);
@@ -682,7 +707,9 @@ export class ReportBuilder {
       const preview = await firstValueFrom(this._gateway.previewReportDataset(draft));
 
       this.preview.set(preview);
-      this._previewedSql.set(new Map(draft.sources.map((source) => [source.alias, sourceFingerprint(source)])));
+      this._previewedSql.set(
+        new Map(draft.sources.map((source) => [source.alias, sourceFingerprint(source)])),
+      );
 
       if (this.step() === 'join') {
         this.proposeKeys();
@@ -694,11 +721,18 @@ export class ReportBuilder {
     }
   }
 
-  protected failureText(code: string | null, message: string | null, localized?: ServerMessage | null): string {
+  protected failureText(
+    code: string | null,
+    message: string | null,
+    localized?: ServerMessage | null,
+  ): string {
     return failureText(this._i18n, code, message, localized);
   }
 
-  protected serverText(localized: ServerMessage | null | undefined, message: string | null): string | null {
+  protected serverText(
+    localized: ServerMessage | null | undefined,
+    message: string | null,
+  ): string | null {
     return serverText(this._i18n, localized, message);
   }
 
@@ -716,7 +750,9 @@ export class ReportBuilder {
       return 'NULL';
     }
 
-    return typeof value === 'number' ? formatNumber(value, { maximumFractionDigits: 10 }) : String(value);
+    return typeof value === 'number'
+      ? formatNumber(value, { maximumFractionDigits: 10 })
+      : String(value);
   }
 
   /**
@@ -733,7 +769,9 @@ export class ReportBuilder {
   }
 
   protected isNumeric(column: ReportColumn): boolean {
-    return ['Byte', 'Int16', 'Int32', 'Int64', 'Single', 'Double', 'Decimal'].includes(column.clrType);
+    return ['Byte', 'Int16', 'Int32', 'Int64', 'Single', 'Double', 'Decimal'].includes(
+      column.clrType,
+    );
   }
 
   protected count(value: number): string {
@@ -760,7 +798,9 @@ export class ReportBuilder {
         this.enterDashboard({
           id: crypto.randomUUID(),
           name: this._i18n.t('reports.dashboard.untitled'),
-          model: JSON.stringify(emptyDashboard(this._i18n.t('reports.dashboard.page', { number: 1 }))),
+          model: JSON.stringify(
+            emptyDashboard(this._i18n.t('reports.dashboard.page', { number: 1 })),
+          ),
         }),
       'dashboard',
     );
@@ -780,7 +820,9 @@ export class ReportBuilder {
 
   /** El nombre de la plantilla, numerado si ya hay un tablero que se llama así. */
   private freeDashboardName(name: string): string {
-    const taken = new Set(this.dashboards().map((dashboard) => dashboard.name.trim().toLowerCase()));
+    const taken = new Set(
+      this.dashboards().map((dashboard) => dashboard.name.trim().toLowerCase()),
+    );
     let candidate = name;
 
     for (let n = 2; taken.has(candidate.trim().toLowerCase()); n++) candidate = `${name} (${n})`;
@@ -869,7 +911,11 @@ export class ReportBuilder {
       return;
     }
 
-    this.ask(this._i18n.t('reports.confirm.discard'), this._i18n.t('reports.confirm.discardAction'), action);
+    this.ask(
+      this._i18n.t('reports.confirm.discard'),
+      this._i18n.t('reports.confirm.discardAction'),
+      action,
+    );
   }
 
   private ask(message: string, confirmLabel: string, run: () => void): void {

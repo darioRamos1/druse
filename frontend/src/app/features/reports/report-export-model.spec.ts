@@ -30,7 +30,13 @@ describe('report-export-model', () => {
     const tabla = panelFigures(
       {
         visual: 'Line',
-        series: { points: [{ label: '2026-01-01', value: 220 }, { label: null, value: 5 }], missing: [] },
+        series: {
+          points: [
+            { label: '2026-01-01', value: 220 },
+            { label: null, value: 5 },
+          ],
+          missing: [],
+        },
         indicator: null,
         table: null,
         valueLabel: 'Suma · Ventas.venta',
@@ -54,13 +60,41 @@ describe('report-export-model', () => {
   });
 
   it('escribe el indicador con meta y cumplimiento, o solo la cifra sin meta', () => {
-    const base = { visual: 'Indicator' as const, series: null, table: null, valueLabel: 'Suma', categoryLabel: '', categoryColumn: null, label: etiqueta };
+    const base = {
+      visual: 'Indicator' as const,
+      series: null,
+      table: null,
+      valueLabel: 'Suma',
+      categoryLabel: '',
+      categoryColumn: null,
+      label: etiqueta,
+    };
     const conMeta = panelFigures(
-      { ...base, indicator: { value: 180, target: 300, ratio: 0.6, zeroTarget: false, withoutTarget: 1, missing: [] } },
+      {
+        ...base,
+        indicator: {
+          value: 180,
+          target: 300,
+          ratio: 0.6,
+          zeroTarget: false,
+          withoutTarget: 1,
+          missing: [],
+        },
+      },
       textos,
     );
     const sinMeta = panelFigures(
-      { ...base, indicator: { value: 7, target: null, ratio: null, zeroTarget: false, withoutTarget: 0, missing: [] } },
+      {
+        ...base,
+        indicator: {
+          value: 7,
+          target: null,
+          ratio: null,
+          zeroTarget: false,
+          withoutTarget: 0,
+          missing: [],
+        },
+      },
       textos,
     );
 
@@ -79,7 +113,13 @@ describe('report-export-model', () => {
         visual: 'Table',
         series: null,
         indicator: null,
-        table: { columns: [columna('izquierda.municipio', 'String'), columna('izquierda.venta', 'Decimal', 1)], rows: [['05001', 80]] },
+        table: {
+          columns: [
+            columna('izquierda.municipio', 'String'),
+            columna('izquierda.venta', 'Decimal', 1),
+          ],
+          rows: [['05001', 80]],
+        },
         valueLabel: '',
         categoryLabel: '',
         categoryColumn: null,
@@ -88,13 +128,21 @@ describe('report-export-model', () => {
       textos,
     );
 
-    expect(tabla.columns.map((column) => column.name)).toEqual(['Ventas.municipio', 'Ventas.venta']);
+    expect(tabla.columns.map((column) => column.name)).toEqual([
+      'Ventas.municipio',
+      'Ventas.venta',
+    ]);
     expect(tabla.rows).toEqual([['05001', 80]]);
   });
 
   it('el CSV conserva ceros iniciales, escapa comillas y neutraliza fórmulas', () => {
     const tabla = datasetTable(
-      [columna('municipio', 'String'), columna('venta', 'Decimal', 1), columna('nota', 'String', 2), columna('activo', 'Boolean', 3)],
+      [
+        columna('municipio', 'String'),
+        columna('venta', 'Decimal', 1),
+        columna('nota', 'String', 2),
+        columna('activo', 'Boolean', 3),
+      ],
       [
         ['05001', 80.5, 'dijo "hola", y se fue', true],
         ['08001', -3, '=HYPERLINK("http://x")', false],
@@ -115,11 +163,32 @@ describe('report-export-model', () => {
   });
 
   it('cuenta las celdas de paneles y conjuntos para avisar antes del límite', () => {
-    const tabla = { columns: [{ name: 'a', type: 'Text' as const }, { name: 'b', type: 'Number' as const }], rows: [['x', 1], ['y', 2]] };
+    const tabla = {
+      columns: [
+        { name: 'a', type: 'Text' as const },
+        { name: 'b', type: 'Number' as const },
+      ],
+      rows: [
+        ['x', 1],
+        ['y', 2],
+      ],
+    };
 
     expect(
       cellCount({
-        panels: [{ title: '', description: null, page: '', dataset: 0, figures: tabla, chart: null, color: null, notes: [], indicator: null }],
+        panels: [
+          {
+            title: '',
+            description: null,
+            page: '',
+            dataset: 0,
+            figures: tabla,
+            chart: null,
+            color: null,
+            notes: [],
+            indicator: null,
+          },
+        ],
         datasets: [{ name: '', capturedAtUtc: '', table: tabla }],
       }),
     ).toBe(8);

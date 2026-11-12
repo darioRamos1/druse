@@ -1,5 +1,17 @@
-import { ReportColumn, ReportDataset, ReportSnapshot, SavedReport } from '../../shared/models/reports';
-import { PaletteColor, ReportAppearance, ReportSettings, buildIndicator, buildSeries, tableView } from './report-chart';
+import {
+  ReportColumn,
+  ReportDataset,
+  ReportSnapshot,
+  SavedReport,
+} from '../../shared/models/reports';
+import {
+  PaletteColor,
+  ReportAppearance,
+  ReportSettings,
+  buildIndicator,
+  buildSeries,
+  tableView,
+} from './report-chart';
 import { ColorSource, DashboardFilter, DashboardPanel } from './report-dashboard-model';
 
 /** Lo que pinta un panel, ya calculado con los filtros activos. */

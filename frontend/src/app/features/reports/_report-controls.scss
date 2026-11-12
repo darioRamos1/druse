@@ -1,5 +1,3 @@
-@use 'report-palette';
-
 // Controles que comparten el constructor de Reportes y su paso de
 // Visualización. Se emite dentro de cada componente con `@use`, así que sigue
 // encapsulado: cambiar un botón aquí cambia los dos y nada más.
@@ -110,7 +108,6 @@ textarea:focus-visible,
   outline-offset: 1px;
 }
 
-
 .banner {
   margin: 0;
   padding: 7px 10px;
@@ -194,70 +191,4 @@ textarea:focus-visible,
       color: var(--dr-text-disabled);
     }
   }
-}
-
-// --- Secciones y campos compuestos del inspector -------------------------------
-
-.section {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  margin: 0;
-  padding: 12px 0 0;
-  border: 0;
-  border-top: 1px solid var(--dr-border-subtle);
-
-  &__title {
-    padding: 0;
-    font-size: 10.5px;
-    font-weight: 600;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    color: var(--dr-text-faint);
-  }
-}
-
-// Varios campos cortos en una fila: decimales, prefijo, sufijo, umbrales.
-.field-row {
-  display: grid;
-  grid-auto-columns: minmax(0, 1fr);
-  grid-auto-flow: column;
-  gap: 8px;
-}
-
-.check {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-height: 24px;
-  color: var(--dr-text-secondary);
-
-  input {
-    width: auto;
-    min-height: 0;
-    accent-color: var(--dr-accent);
-  }
-
-  &:has(input:disabled) {
-    color: var(--dr-text-disabled);
-  }
-}
-
-// Muestra del color elegido junto al selector: el nombre va en la opción.
-.swatch-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-
-  select {
-    flex: 1;
-  }
-}
-
-.swatch {
-  flex: none;
-  width: 18px;
-  height: 18px;
-  border: 1px solid var(--dr-border-strong);
-  border-radius: 4px;
 }

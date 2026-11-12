@@ -10,7 +10,12 @@
 >
   <header class="sheet__head">
     @if (applying() || importing()) {
-      <button type="button" class="icon-button" (click)="back()" [attr.aria-label]="'reports.template.back' | t">
+      <button
+        type="button"
+        class="icon-button"
+        (click)="back()"
+        [attr.aria-label]="'reports.template.back' | t"
+      >
         <span aria-hidden="true">‹</span>
       </button>
     } @else {
@@ -25,7 +30,12 @@
         {{ 'reports.template.title' | t }}
       }
     </h2>
-    <button type="button" class="icon-button" (click)="close()" [attr.aria-label]="'common.close' | t">
+    <button
+      type="button"
+      class="icon-button"
+      (click)="close()"
+      [attr.aria-label]="'common.close' | t"
+    >
       <app-icon name="close" [size]="12" />
     </button>
   </header>
@@ -50,7 +60,9 @@
             @if (item.document.slots.length > 1) {
               {{ 'reports.template.slot' | t: { number: index + 1 } }}
               @if (slot.label) {
-                <span class="slot__hint">{{ 'reports.template.slotWas' | t: { name: slot.label } }}</span>
+                <span class="slot__hint">{{
+                  'reports.template.slotWas' | t: { name: slot.label }
+                }}</span>
               }
             } @else {
               {{ 'reports.template.dataset' | t }}
@@ -65,9 +77,13 @@
                 [attr.aria-label]="'reports.template.dataset' | t"
                 (change)="chooseDataset(index, $any($event.target).value)"
               >
-                <option value="" [selected]="slotDatasets()[index] === null">{{ 'reports.template.chooseDataset' | t }}</option>
+                <option value="" [selected]="slotDatasets()[index] === null">
+                  {{ 'reports.template.chooseDataset' | t }}
+                </option>
                 @for (dataset of datasets(); track dataset.id) {
-                  <option [value]="dataset.id" [selected]="slotDatasets()[index] === dataset.id">{{ dataset.name }}</option>
+                  <option [value]="dataset.id" [selected]="slotDatasets()[index] === dataset.id">
+                    {{ dataset.name }}
+                  </option>
                 }
               </select>
             </div>
@@ -84,7 +100,10 @@
             @default {
               <ul class="fields" [attr.aria-label]="'reports.template.fields' | t">
                 @for (field of fieldsOf(index); track field.id) {
-                  <li class="fields__row" [class.is-missing]="field.required && !assignment()[field.id]">
+                  <li
+                    class="fields__row"
+                    [class.is-missing]="field.required && !assignment()[field.id]"
+                  >
                     <label class="fields__name" [for]="'tf-' + field.id">
                       <span>{{ field.name }}</span>
                       <span class="chip">{{ kindLabel(field) }}</span>
@@ -92,10 +111,18 @@
                         <span class="fields__required">{{ 'reports.template.required' | t }}</span>
                       }
                     </label>
-                    <select [id]="'tf-' + field.id" (change)="assign(field, $any($event.target).value)">
-                      <option value="" [selected]="!assignment()[field.id]">{{ 'reports.dashboard.unbound' | t }}</option>
+                    <select
+                      [id]="'tf-' + field.id"
+                      (change)="assign(field, $any($event.target).value)"
+                    >
+                      <option value="" [selected]="!assignment()[field.id]">
+                        {{ 'reports.dashboard.unbound' | t }}
+                      </option>
                       @for (column of options(field); track column.name) {
-                        <option [value]="column.name" [selected]="assignment()[field.id] === column.name">
+                        <option
+                          [value]="column.name"
+                          [selected]="assignment()[field.id] === column.name"
+                        >
                           {{ columnLabel(index, column.name) }}
                         </option>
                       }
@@ -116,7 +143,12 @@
         </p>
       }
       <button type="button" class="button" (click)="back()">{{ 'common.cancel' | t }}</button>
-      <button type="button" class="button button--primary" (click)="apply()" [disabled]="!canApply()">
+      <button
+        type="button"
+        class="button button--primary"
+        (click)="apply()"
+        [disabled]="!canApply()"
+      >
         <app-icon name="check" [size]="11" />
         {{ 'reports.template.create' | t }}
       </button>
@@ -156,7 +188,12 @@
         <label class="button">
           <app-icon name="folder-open" [size]="11" />
           {{ 'reports.template.import' | t }}
-          <input class="visually-hidden" type="file" accept=".json,application/json" (change)="readFile($event)" />
+          <input
+            class="visually-hidden"
+            type="file"
+            accept=".json,application/json"
+            (change)="readFile($event)"
+          />
         </label>
       </div>
 
@@ -174,7 +211,11 @@
               <div class="card__head">
                 <h3 class="card__name">{{ item.document.name }}</h3>
                 <span class="chip" [class.chip--accent]="item.starter">
-                  {{ item.starter ? ('reports.template.starterLabel' | t) : scopeLabel(item.document.scope) }}
+                  {{
+                    item.starter
+                      ? ('reports.template.starterLabel' | t)
+                      : scopeLabel(item.document.scope)
+                  }}
                 </span>
               </div>
               @if (item.document.description) {
@@ -185,8 +226,12 @@
               @if (confirmDelete() === item.id) {
                 <div class="card__actions" role="alert">
                   <span class="field__hint">{{ 'reports.template.confirmDelete' | t }}</span>
-                  <button type="button" class="button" (click)="confirmDelete.set(null)">{{ 'common.cancel' | t }}</button>
-                  <button type="button" class="button button--danger" (click)="delete(item)">{{ 'reports.delete' | t }}</button>
+                  <button type="button" class="button" (click)="confirmDelete.set(null)">
+                    {{ 'common.cancel' | t }}
+                  </button>
+                  <button type="button" class="button button--danger" (click)="delete(item)">
+                    {{ 'reports.delete' | t }}
+                  </button>
                 </div>
               } @else {
                 <div class="card__actions">
@@ -207,7 +252,9 @@
                       type="button"
                       class="link link--danger"
                       (click)="confirmDelete.set(item.id)"
-                      [attr.aria-label]="'reports.template.deleteNamed' | t: { name: item.document.name }"
+                      [attr.aria-label]="
+                        'reports.template.deleteNamed' | t: { name: item.document.name }
+                      "
                     >
                       <app-icon name="trash" [size]="11" />
                       {{ 'reports.delete' | t }}

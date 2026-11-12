@@ -80,7 +80,10 @@ describe('ReportBuilder', () => {
     botón('Añadir fuente').click();
     await asentar();
     escribir('input[list^="reports-databases"]', 'ventas', 'change');
-    escribir('textarea.sql', 'SELECT municipio, SUM(importe) AS venta FROM ventas GROUP BY municipio');
+    escribir(
+      'textarea.sql',
+      'SELECT municipio, SUM(importe) AS venta FROM ventas GROUP BY municipio',
+    );
   }
 
   beforeEach(async () => {
@@ -91,7 +94,8 @@ describe('ReportBuilder', () => {
     const gateway = {
       getReportDatasets: () => of([]),
       getDashboards: () => of([]),
-      getReportSourceDatabases: () => of({ databases: ['ventas', 'metas'], failureCode: null, message: null }),
+      getReportSourceDatabases: () =>
+        of({ databases: ['ventas', 'metas'], failureCode: null, message: null }),
       getCompositions: () => of([]),
       previewReportDataset: (dataset: ReportDataset): Observable<ReportDatasetPreview> => {
         pedidos.push(dataset);
@@ -128,7 +132,11 @@ describe('ReportBuilder', () => {
     await asentar();
 
     expect(pedidos).toHaveLength(1);
-    expect(pedidos[0].sources[0]).toMatchObject({ connectionId: 'conn-1', database: 'ventas', mode: 'Sql' });
+    expect(pedidos[0].sources[0]).toMatchObject({
+      connectionId: 'conn-1',
+      database: 'ventas',
+      mode: 'Sql',
+    });
     expect(el('.stats').textContent).toContain('2 filas');
     expect(el('td.is-number').textContent?.trim()).toBe('80');
     expect(el('td.is-null').textContent?.trim()).toBe('NULL');
@@ -162,7 +170,9 @@ describe('ReportBuilder', () => {
 
   it('traduce el motivo de una fuente que no se pudo leer', async () => {
     respuesta = vista({
-      sources: [{ ...vista().sources[0], succeeded: false, failureCode: 'password-missing', columns: [] }],
+      sources: [
+        { ...vista().sources[0], succeeded: false, failureCode: 'password-missing', columns: [] },
+      ],
     });
     await prepararFuente();
     botón('Vista previa').click();

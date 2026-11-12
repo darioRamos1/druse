@@ -593,7 +593,10 @@ export abstract class ApplicationGateway {
   /** La programación del conjunto, o `null` si no tiene. */
   abstract getReportSchedule(datasetId: string): Observable<ReportSchedule | null>;
 
-  abstract saveReportSchedule(datasetId: string, schedule: ReportSchedule): Observable<ReportSchedule>;
+  abstract saveReportSchedule(
+    datasetId: string,
+    schedule: ReportSchedule,
+  ): Observable<ReportSchedule>;
 
   abstract deleteReportSchedule(datasetId: string): Observable<void>;
 

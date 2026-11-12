@@ -60,7 +60,11 @@ const reportes: SavedReport[] = [
     datasetId: 'ventas',
     name: 'Por municipio',
     visual: 'Bar',
-    settings: ajustes({ category: 'izquierda.municipio', value: 'izquierda.venta', appearance: { ...DEFAULT_APPEARANCE, color: 'green' } }),
+    settings: ajustes({
+      category: 'izquierda.municipio',
+      value: 'izquierda.venta',
+      appearance: { ...DEFAULT_APPEARANCE, color: 'green' },
+    }),
   },
   {
     id: 'detalle',
@@ -79,15 +83,53 @@ const tablero: DashboardModel = {
       id: 'p1',
       name: 'Resumen',
       panels: [
-        { id: 'a', reportId: 'cumplimiento', width: 4, height: 3, title: 'Meta', description: 'Enero', hideHeader: false, color: 'orange' },
-        { id: 'b', reportId: 'por-municipio', width: 8, height: 4, title: null, description: null, hideHeader: true, color: null },
+        {
+          id: 'a',
+          reportId: 'cumplimiento',
+          width: 4,
+          height: 3,
+          title: 'Meta',
+          description: 'Enero',
+          hideHeader: false,
+          color: 'orange',
+        },
+        {
+          id: 'b',
+          reportId: 'por-municipio',
+          width: 8,
+          height: 4,
+          title: null,
+          description: null,
+          hideHeader: true,
+          color: null,
+        },
       ],
     },
-    { id: 'p2', name: 'Detalle', panels: [{ id: 'c', reportId: 'detalle', width: 12, height: 5, title: null, description: null, hideHeader: false, color: null }] },
+    {
+      id: 'p2',
+      name: 'Detalle',
+      panels: [
+        {
+          id: 'c',
+          reportId: 'detalle',
+          width: 12,
+          height: 5,
+          title: null,
+          description: null,
+          hideHeader: false,
+          color: null,
+        },
+      ],
+    },
   ],
   filters: [
     { id: 'f1', kind: 'date', label: 'Mes', bindings: { ventas: 'izquierda.mes' } },
-    { id: 'f2', kind: 'category', label: 'Municipio', bindings: { ventas: 'izquierda.municipio', borrado: 'x' } },
+    {
+      id: 'f2',
+      kind: 'category',
+      label: 'Municipio',
+      bindings: { ventas: 'izquierda.municipio', borrado: 'x' },
+    },
   ],
   style: { color: 'violet' },
 };
@@ -121,7 +163,11 @@ describe('report-template-model', () => {
     expect(plantilla.name).toBe('Ventas contra meta');
     expect(plantilla.slots).toEqual([{ label: 'Ventas 2026' }]);
     // El reporte que no está en ningún panel no entra.
-    expect(plantilla.reports.map((report) => report.name)).toEqual(['Cumplimiento', 'Por municipio', 'Detalle']);
+    expect(plantilla.reports.map((report) => report.name)).toEqual([
+      'Cumplimiento',
+      'Por municipio',
+      'Detalle',
+    ]);
     expect(plantilla.fields.map((field) => [field.id, field.kind, field.required])).toEqual([
       ['venta', 'number', true],
       ['meta', 'number', false],
@@ -165,7 +211,12 @@ describe('report-template-model', () => {
 
   it('aplica la plantilla a otra fuente como copia independiente con sus filtros', () => {
     const plantilla = capturar();
-    const copia = instantiateTemplate(plantilla, ['pedidos'], proposeAssignment(plantilla, 0, pedidosColumnas), ids);
+    const copia = instantiateTemplate(
+      plantilla,
+      ['pedidos'],
+      proposeAssignment(plantilla, 0, pedidosColumnas),
+      ids,
+    );
 
     expect(copia.reports.map((report) => [report.datasetId, report.name])).toEqual([
       ['pedidos', 'Cumplimiento'],
@@ -180,9 +231,18 @@ describe('report-template-model', () => {
 
     const layout = copia.layout!;
 
-    expect(layout.pages.map((page) => [page.name, page.panels.length])).toEqual([['Resumen', 2], ['Detalle', 1]]);
+    expect(layout.pages.map((page) => [page.name, page.panels.length])).toEqual([
+      ['Resumen', 2],
+      ['Detalle', 1],
+    ]);
     expect(layout.pages[0].panels[0]).toEqual(
-      expect.objectContaining({ reportId: copia.reports[0].id, title: 'Meta', description: 'Enero', color: 'orange', width: 4 }),
+      expect.objectContaining({
+        reportId: copia.reports[0].id,
+        title: 'Meta',
+        description: 'Enero',
+        color: 'orange',
+        width: 4,
+      }),
     );
     expect(layout.pages[0].panels[1].hideHeader).toBe(true);
     expect(layout.filters.map((filter) => filter.bindings)).toEqual([
@@ -191,18 +251,30 @@ describe('report-template-model', () => {
     ]);
     expect(layout.style.color).toBe('violet');
     // Ids nuevos: la copia no comparte nada con el original.
-    expect(copia.reports.some((report) => reportes.some((original) => original.id === report.id))).toBe(false);
+    expect(
+      copia.reports.some((report) => reportes.some((original) => original.id === report.id)),
+    ).toBe(false);
   });
 
   it('numera la copia si el conjunto ya tiene un reporte con ese nombre', () => {
     const plantilla = capturar();
-    const copia = instantiateTemplate(plantilla, ['ventas'], proposeAssignment(plantilla, 0, ventasColumnas), ids, [
-      ...reportes,
-      { datasetId: 'ventas', name: 'Cumplimiento (2)' },
-      { datasetId: 'otro', name: 'Detalle' },
-    ]);
+    const copia = instantiateTemplate(
+      plantilla,
+      ['ventas'],
+      proposeAssignment(plantilla, 0, ventasColumnas),
+      ids,
+      [
+        ...reportes,
+        { datasetId: 'ventas', name: 'Cumplimiento (2)' },
+        { datasetId: 'otro', name: 'Detalle' },
+      ],
+    );
 
-    expect(copia.reports.map((report) => report.name)).toEqual(['Cumplimiento (3)', 'Por municipio (2)', 'Detalle (2)']);
+    expect(copia.reports.map((report) => report.name)).toEqual([
+      'Cumplimiento (3)',
+      'Por municipio (2)',
+      'Detalle (2)',
+    ]);
   });
 
   it('quita de la copia los campos opcionales sin vincular', () => {
@@ -228,7 +300,9 @@ describe('report-template-model', () => {
     });
 
     expect(panel.reports.map((report) => report.name)).toEqual(['Por municipio']);
-    expect(panel.layout?.pages[0].panels).toEqual([expect.objectContaining({ report: 'r1', hideHeader: true })]);
+    expect(panel.layout?.pages[0].panels).toEqual([
+      expect.objectContaining({ report: 'r1', hideHeader: true }),
+    ]);
     expect(panel.layout?.filters).toEqual([]);
     expect(parseTemplate(exportTemplate(panel)).ok).toBe(true);
 
@@ -253,11 +327,30 @@ describe('report-template-model', () => {
     const plantilla = captureTemplate('Dashboard', 'Mixto', null, {
       reports: [reportes[1], gastos],
       datasets: [conjunto('ventas', 'Ventas'), conjunto('gastos', 'Gastos')],
-      columnsOf: (id) => (id === 'gastos' ? [columna('mes', 'DateOnly', 0), columna('importe', 'Decimal', 1)] : ventasColumnas),
+      columnsOf: (id) =>
+        id === 'gastos'
+          ? [columna('mes', 'DateOnly', 0), columna('importe', 'Decimal', 1)]
+          : ventasColumnas,
       layout: {
         ...tablero,
-        pages: [{ id: 'p', name: 'Uno', panels: [tablero.pages[0].panels[1], { ...tablero.pages[0].panels[1], id: 'g', reportId: 'gastos' }] }],
-        filters: [{ id: 'f', kind: 'date', label: 'Mes', bindings: { ventas: 'izquierda.mes', gastos: 'mes' } }],
+        pages: [
+          {
+            id: 'p',
+            name: 'Uno',
+            panels: [
+              tablero.pages[0].panels[1],
+              { ...tablero.pages[0].panels[1], id: 'g', reportId: 'gastos' },
+            ],
+          },
+        ],
+        filters: [
+          {
+            id: 'f',
+            kind: 'date',
+            label: 'Mes',
+            bindings: { ventas: 'izquierda.mes', gastos: 'mes' },
+          },
+        ],
       },
     });
 
@@ -265,7 +358,12 @@ describe('report-template-model', () => {
     // «mes» lo toma primero el reporte de gastos; el del filtro de ventas pasa a «mes_2».
     expect(plantilla.layout?.filters[0].bindings).toEqual({ '0': 'mes_2', '1': 'mes' });
 
-    const copia = instantiateTemplate(plantilla, ['a', 'b'], { venta: 'v', municipio: 'm', mes_2: 'f', mes: 'g', importe: 'i' }, ids);
+    const copia = instantiateTemplate(
+      plantilla,
+      ['a', 'b'],
+      { venta: 'v', municipio: 'm', mes_2: 'f', mes: 'g', importe: 'i' },
+      ids,
+    );
 
     expect(copia.layout!.filters[0].bindings).toEqual({ a: 'f', b: 'g' });
     expect(copia.reports.map((report) => report.datasetId)).toEqual(['a', 'b']);
@@ -273,20 +371,31 @@ describe('report-template-model', () => {
 
   it('rechaza archivos que no son plantillas, con SQL o con referencias rotas', () => {
     const buena = JSON.parse(exportTemplate(capturar())) as Record<string, unknown>;
-    const leer = (cambio: Record<string, unknown>) => parseTemplate(JSON.stringify({ ...buena, ...cambio }));
+    const leer = (cambio: Record<string, unknown>) =>
+      parseTemplate(JSON.stringify({ ...buena, ...cambio }));
 
     expect(parseTemplate('{roto')).toEqual({ ok: false, problem: 'notJson' });
     expect(parseTemplate(JSON.stringify({ name: 'x' }))).toEqual({ ok: false, problem: 'format' });
     expect(leer({ version: 2 })).toEqual({ ok: false, problem: 'version' });
     expect(leer({ scope: 'Informe' })).toEqual({ ok: false, problem: 'scope' });
     expect(leer({ name: '  ' })).toEqual({ ok: false, problem: 'name' });
-    expect(leer({ slots: [{ label: 'x', connectionId: 'abc' }] })).toEqual({ ok: false, problem: 'forbidden' });
-    expect(leer({ extra: { SQL: 'DROP TABLE ventas' } })).toEqual({ ok: false, problem: 'forbidden' });
+    expect(leer({ slots: [{ label: 'x', connectionId: 'abc' }] })).toEqual({
+      ok: false,
+      problem: 'forbidden',
+    });
+    expect(leer({ extra: { SQL: 'DROP TABLE ventas' } })).toEqual({
+      ok: false,
+      problem: 'forbidden',
+    });
 
     const reports = buena['reports'] as Record<string, unknown>[];
-    const malVisual = reports.map((report, index) => (index === 0 ? { ...report, visual: 'Pie' } : report));
+    const malVisual = reports.map((report, index) =>
+      index === 0 ? { ...report, visual: 'Pie' } : report,
+    );
     const malCampo = reports.map((report, index) =>
-      index === 0 ? { ...report, settings: { ...(report['settings'] as object), value: 'inventado' } } : report,
+      index === 0
+        ? { ...report, settings: { ...(report['settings'] as object), value: 'inventado' } }
+        : report,
     );
 
     expect(leer({ reports: malVisual })).toEqual({ ok: false, problem: 'content' });
@@ -294,20 +403,31 @@ describe('report-template-model', () => {
 
     const layout = buena['layout'] as Record<string, unknown>;
 
-    expect(leer({ layout: { ...layout, pages: [{ name: 'x', panels: [{ report: 'r99' }] }] } })).toEqual({
+    expect(
+      leer({ layout: { ...layout, pages: [{ name: 'x', panels: [{ report: 'r99' }] }] } }),
+    ).toEqual({
       ok: false,
       problem: 'references',
     });
-    expect(parseTemplate(`{"format":"druse.report-template","pad":"${'a'.repeat(600 * 1024)}"}`)).toEqual({
+    expect(
+      parseTemplate(`{"format":"druse.report-template","pad":"${'a'.repeat(600 * 1024)}"}`),
+    ).toEqual({
       ok: false,
       problem: 'tooBig',
     });
   });
 
   it('normaliza tamaños y colores de un archivo editado a mano', () => {
-    const buena = JSON.parse(exportTemplate(capturar())) as { layout: { pages: { panels: Record<string, unknown>[] }[] } };
+    const buena = JSON.parse(exportTemplate(capturar())) as {
+      layout: { pages: { panels: Record<string, unknown>[] }[] };
+    };
 
-    buena.layout.pages[0].panels[0] = { ...buena.layout.pages[0].panels[0], width: 99, height: -3, color: 'fucsia' };
+    buena.layout.pages[0].panels[0] = {
+      ...buena.layout.pages[0].panels[0],
+      width: 99,
+      height: -3,
+      color: 'fucsia',
+    };
 
     const leida = parseTemplate(JSON.stringify(buena));
 
@@ -334,7 +454,12 @@ describe('report-template-model', () => {
     const asignacion = proposeAssignment(inicial, 0, pedidosColumnas);
 
     expect(missingFields(inicial, asignacion)).toEqual([]);
-    expect(asignacion).toEqual({ cifra: 'monto_total', meta: 'objetivo', categoria: 'region', fecha: 'fecha_pedido' });
+    expect(asignacion).toEqual({
+      cifra: 'monto_total',
+      meta: 'objetivo',
+      categoria: 'region',
+      fecha: 'fecha_pedido',
+    });
   });
 
   it('propone un nombre de archivo sin caracteres prohibidos', () => {

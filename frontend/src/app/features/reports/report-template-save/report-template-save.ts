@@ -30,20 +30,37 @@ export interface TemplateSaveRequest {
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [Icon, TranslatePipe],
   template: `
-    <form class="save" (submit)="submit($event)" [attr.aria-label]="'reports.template.saveAs.' + scope() | t">
+    <form
+      class="save"
+      (submit)="submit($event)"
+      [attr.aria-label]="'reports.template.saveAs.' + scope() | t"
+    >
       <!-- i18n-keys: reports.template.saveAs.* -->
       <p class="save__title">{{ 'reports.template.saveAs.' + scope() | t }}</p>
       <label class="field">
         <span class="field__label">{{ 'reports.template.name' | t }}</span>
-        <input #nameInput type="text" maxlength="120" [value]="name()" (input)="name.set($any($event.target).value)" />
+        <input
+          #nameInput
+          type="text"
+          maxlength="120"
+          [value]="name()"
+          (input)="name.set($any($event.target).value)"
+        />
       </label>
       <label class="field">
         <span class="field__label">{{ 'reports.template.description' | t }}</span>
-        <textarea rows="2" maxlength="400" [value]="description()" (input)="description.set($any($event.target).value)"></textarea>
+        <textarea
+          rows="2"
+          maxlength="400"
+          [value]="description()"
+          (input)="description.set($any($event.target).value)"
+        ></textarea>
       </label>
       <p class="field__hint">{{ 'reports.template.saveHint' | t }}</p>
       <div class="save__actions">
-        <button type="button" class="button" (click)="cancelled.emit()">{{ 'common.cancel' | t }}</button>
+        <button type="button" class="button" (click)="cancelled.emit()">
+          {{ 'common.cancel' | t }}
+        </button>
         <button type="submit" class="button button--primary" [disabled]="!name().trim() || busy()">
           <app-icon name="save" [size]="11" />
           {{ 'reports.template.save' | t }}

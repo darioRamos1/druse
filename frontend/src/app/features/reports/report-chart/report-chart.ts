@@ -1,5 +1,13 @@
 import { NgTemplateOutlet } from '@angular/common';
-import { ChangeDetectionStrategy, Component, computed, inject, input, output, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  inject,
+  input,
+  output,
+  signal,
+} from '@angular/core';
 
 import { I18nService } from '../../../core/i18n/i18n.service';
 import { formatNumber } from '../../../core/i18n/locale-format';
@@ -56,7 +64,8 @@ function niceStep(max: number, ticks: number): number {
   const raw = max / ticks;
   const power = 10 ** Math.floor(Math.log10(raw));
   const fraction = raw / power;
-  const nice = fraction <= 1 ? 1 : fraction <= 2 ? 2 : fraction <= 2.5 ? 2.5 : fraction <= 5 ? 5 : 10;
+  const nice =
+    fraction <= 1 ? 1 : fraction <= 2 ? 2 : fraction <= 2.5 ? 2.5 : fraction <= 5 ? 5 : 10;
 
   return nice * power;
 }
@@ -146,14 +155,19 @@ export class ReportChart {
     const ticks: Tick[] = [];
 
     for (let value = floor; value <= top + step / 2; value += step) {
-      ticks.push({ y: this.y(value), label: formatNumber(value, { notation: 'compact', maximumFractionDigits: 1 }) });
+      ticks.push({
+        y: this.y(value),
+        label: formatNumber(value, { notation: 'compact', maximumFractionDigits: 1 }),
+      });
     }
 
     return ticks;
   });
 
   /** Ancho de cada hueco del eje de categorías. */
-  protected readonly slot = computed(() => (WIDTH - LEFT - RIGHT) / Math.max(this.points().length, 1));
+  protected readonly slot = computed(
+    () => (WIDTH - LEFT - RIGHT) / Math.max(this.points().length, 1),
+  );
 
   /** El relleno de la serie: el color elegido o, si no hay, el acento del tema. */
   protected readonly seriesFill = computed(() => {
@@ -167,7 +181,8 @@ export class ReportChart {
     // Hueco de al menos 2 px entre barras vecinas, más en proporción si hay sitio.
     const width = Math.max(Math.min(slot * 0.62, 56, slot - 2), 2);
     const zero = this.y(0);
-    const colors = this.kind() === 'Bar' && this.appearance().byCategory ? this.categoryColors() : null;
+    const colors =
+      this.kind() === 'Bar' && this.appearance().byCategory ? this.categoryColors() : null;
 
     return this.points().map((point, index) => {
       const y = this.y(point.value);
@@ -192,7 +207,10 @@ export class ReportChart {
 
   protected readonly linePath = computed(() =>
     this.bars()
-      .map((bar, index) => `${index === 0 ? 'M' : 'L'}${bar.center.toFixed(1)} ${this.y(bar.value).toFixed(1)}`)
+      .map(
+        (bar, index) =>
+          `${index === 0 ? 'M' : 'L'}${bar.center.toFixed(1)} ${this.y(bar.value).toFixed(1)}`,
+      )
       .join(' '),
   );
 
@@ -219,7 +237,9 @@ export class ReportChart {
   }
 
   protected percent(value: number | null): string {
-    return value === null ? '—' : formatNumber(value, { style: 'percent', maximumFractionDigits: 1 });
+    return value === null
+      ? '—'
+      : formatNumber(value, { style: 'percent', maximumFractionDigits: 1 });
   }
 
   /** La barra de progreso del indicador se queda en el 100 % aunque se pase. */
@@ -238,7 +258,9 @@ export class ReportChart {
       return 'NULL';
     }
 
-    return typeof value === 'number' ? formatNumber(value, { maximumFractionDigits: 10 }) : String(value);
+    return typeof value === 'number'
+      ? formatNumber(value, { maximumFractionDigits: 10 })
+      : String(value);
   }
 
   protected isNumeric(column: ReportColumn): boolean {

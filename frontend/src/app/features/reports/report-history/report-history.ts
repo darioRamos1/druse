@@ -1,4 +1,12 @@
-import { ChangeDetectionStrategy, Component, computed, inject, input, output, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  inject,
+  input,
+  output,
+  signal,
+} from '@angular/core';
 
 import { I18nService } from '../../../core/i18n/i18n.service';
 import { formatDate, formatNumber } from '../../../core/i18n/locale-format';
@@ -30,8 +38,18 @@ export function formatDuration(startedAtUtc: string, completedAtUtc: string): st
   const seconds = Math.max(0, (Date.parse(completedAtUtc) - Date.parse(startedAtUtc)) / 1000);
 
   return seconds < 60
-    ? formatNumber(seconds, { style: 'unit', unit: 'second', unitDisplay: 'short', maximumFractionDigits: 1 })
-    : formatNumber(seconds / 60, { style: 'unit', unit: 'minute', unitDisplay: 'short', maximumFractionDigits: 1 });
+    ? formatNumber(seconds, {
+        style: 'unit',
+        unit: 'second',
+        unitDisplay: 'short',
+        maximumFractionDigits: 1,
+      })
+    : formatNumber(seconds / 60, {
+        style: 'unit',
+        unit: 'minute',
+        unitDisplay: 'short',
+        maximumFractionDigits: 1,
+      });
 }
 
 /**
@@ -50,7 +68,12 @@ export function formatDuration(startedAtUtc: string, completedAtUtc: string): st
     <section class="history" [attr.aria-label]="'reports.history.title' | t">
       <header class="history__head">
         <p class="history__title">{{ 'reports.history.title' | t }}</p>
-        <button type="button" class="icon-button" [attr.aria-label]="'common.close' | t" (click)="closed.emit()">
+        <button
+          type="button"
+          class="icon-button"
+          [attr.aria-label]="'common.close' | t"
+          (click)="closed.emit()"
+        >
           <app-icon name="close" [size]="11" />
         </button>
       </header>
@@ -77,14 +100,19 @@ export function formatDuration(startedAtUtc: string, completedAtUtc: string): st
                   <td>{{ 'reports.history.origin.' + run.origin | t }}</td>
                   <td>
                     <span class="status" [class.status--ok]="run.status === 'Succeeded'">
-                      <app-icon [name]="run.status === 'Succeeded' ? 'check' : 'alert'" [size]="10" />
+                      <app-icon
+                        [name]="run.status === 'Succeeded' ? 'check' : 'alert'"
+                        [size]="10"
+                      />
                       {{ 'reports.history.status.' + run.status | t }}
                     </span>
                     @if (run.status !== 'Succeeded' && reason(run); as text) {
                       <span class="runs__message">{{ text }}</span>
                     }
                   </td>
-                  <td class="is-number">{{ run.status === 'Succeeded' ? count(run.rowCount) : '—' }}</td>
+                  <td class="is-number">
+                    {{ run.status === 'Succeeded' ? count(run.rowCount) : '—' }}
+                  </td>
                   <td class="is-number">{{ duration(run.startedAtUtc, run.completedAtUtc) }}</td>
                 </tr>
               }
@@ -101,7 +129,15 @@ export function formatDuration(startedAtUtc: string, completedAtUtc: string): st
               {{ 'reports.history.datasetSpace' | t: { size: bytes(datasetBytes()) } }}
             </span>
             <span class="space__total">
-              {{ 'reports.history.totalSpace' | t: { used: bytes(usage.snapshotBytes), quota: bytes(usage.quotaBytes), file: bytes(usage.fileBytes) } }}
+              {{
+                'reports.history.totalSpace'
+                  | t
+                    : {
+                        used: bytes(usage.snapshotBytes),
+                        quota: bytes(usage.quotaBytes),
+                        file: bytes(usage.fileBytes),
+                      }
+              }}
             </span>
             <span class="meter" aria-hidden="true">
               <span class="meter__fill" [style.width.%]="share()"></span>
@@ -112,16 +148,32 @@ export function formatDuration(startedAtUtc: string, completedAtUtc: string): st
         </div>
         @if (hasData()) {
           @if (confirming()) {
-            <div class="space__confirm" role="group" [attr.aria-label]="'reports.history.clearConfirm' | t">
+            <div
+              class="space__confirm"
+              role="group"
+              [attr.aria-label]="'reports.history.clearConfirm' | t"
+            >
               <span>{{ 'reports.history.clearConfirm' | t }}</span>
-              <button type="button" class="button" (click)="confirming.set(false)">{{ 'common.cancel' | t }}</button>
-              <button type="button" class="button button--danger" [disabled]="busy()" (click)="clear()">
+              <button type="button" class="button" (click)="confirming.set(false)">
+                {{ 'common.cancel' | t }}
+              </button>
+              <button
+                type="button"
+                class="button button--danger"
+                [disabled]="busy()"
+                (click)="clear()"
+              >
                 <app-icon name="trash" [size]="11" />
                 {{ 'reports.history.clearYes' | t }}
               </button>
             </div>
           } @else {
-            <button type="button" class="link link--danger" [disabled]="busy()" (click)="confirming.set(true)">
+            <button
+              type="button"
+              class="link link--danger"
+              [disabled]="busy()"
+              (click)="confirming.set(true)"
+            >
               <app-icon name="trash" [size]="11" />
               {{ 'reports.history.clear' | t }}
             </button>
@@ -285,13 +337,17 @@ export class ReportHistory {
   protected readonly confirming = signal(false);
 
   protected readonly datasetBytes = computed(
-    () => this.storage()?.datasets.find((entry) => entry.datasetId === this.datasetId())?.snapshotBytes ?? 0,
+    () =>
+      this.storage()?.datasets.find((entry) => entry.datasetId === this.datasetId())
+        ?.snapshotBytes ?? 0,
   );
 
   protected readonly share = computed(() => {
     const usage = this.storage();
 
-    return usage && usage.quotaBytes > 0 ? Math.min(100, (usage.snapshotBytes / usage.quotaBytes) * 100) : 0;
+    return usage && usage.quotaBytes > 0
+      ? Math.min(100, (usage.snapshotBytes / usage.quotaBytes) * 100)
+      : 0;
   });
 
   protected when(iso: string): string {

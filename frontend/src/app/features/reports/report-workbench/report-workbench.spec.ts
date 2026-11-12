@@ -133,7 +133,13 @@ describe('ReportWorkbench', () => {
           snapshotBytes: guardado ? 2048 : 0,
           quotaBytes: 512 * 1024 * 1024,
           datasets: [
-            { datasetId: 'ds-1', name: 'Ventas y metas', snapshotBytes: guardado ? 2048 : 0, runCount: intentos.length, capturedAtUtc: null },
+            {
+              datasetId: 'ds-1',
+              name: 'Ventas y metas',
+              snapshotBytes: guardado ? 2048 : 0,
+              runCount: intentos.length,
+              capturedAtUtc: null,
+            },
           ],
         }),
       deleteReportSnapshot: () => {
@@ -200,7 +206,9 @@ describe('ReportWorkbench', () => {
 
     expect(lecturas).toBe(antes);
     expect(el('.banner--danger').textContent).toContain('se conservan los datos anteriores');
-    expect(el('.banner--danger').textContent).toContain('Metas: La conexión de esta fuente ya no existe');
+    expect(el('.banner--danger').textContent).toContain(
+      'Metas: La conexión de esta fuente ya no existe',
+    );
     expect(el('.freshness').textContent).toContain('Datos del');
   });
 
@@ -226,7 +234,12 @@ describe('ReportWorkbench', () => {
     await asentar();
 
     expect(programaciones).toHaveLength(1);
-    expect(programaciones[0]).toMatchObject({ frequency: 'Weekly', time: '06:30', days: ['Monday', 'Friday'], paused: false });
+    expect(programaciones[0]).toMatchObject({
+      frequency: 'Weekly',
+      time: '06:30',
+      days: ['Monday', 'Friday'],
+      paused: false,
+    });
     expect(programaciones[0].timeZone).toBeTruthy();
     expect(el('form.schedule')).toBeNull();
     expect(el('.freshness__schedule').textContent).toContain('Próxima actualización');
@@ -234,7 +247,14 @@ describe('ReportWorkbench', () => {
   });
 
   it('no deja guardar una semanal sin días, y la pausa se dice en la barra', async () => {
-    programada = { frequency: 'Daily', time: '07:00', days: [], timeZone: 'UTC', paused: false, nextRunUtc: '2026-11-13T07:00:00Z' };
+    programada = {
+      frequency: 'Daily',
+      time: '07:00',
+      days: [],
+      timeZone: 'UTC',
+      paused: false,
+      nextRunUtc: '2026-11-13T07:00:00Z',
+    };
     await crear();
     expect(el('.freshness__schedule').textContent).toContain('Próxima actualización');
 
@@ -262,7 +282,14 @@ describe('ReportWorkbench', () => {
     vi.setSystemTime(new Date('2026-11-13T06:59:00Z'));
 
     try {
-      programada = { frequency: 'Daily', time: '07:00', days: [], timeZone: 'UTC', paused: false, nextRunUtc: '2026-11-13T07:00:00Z' };
+      programada = {
+        frequency: 'Daily',
+        time: '07:00',
+        days: [],
+        timeZone: 'UTC',
+        paused: false,
+        nextRunUtc: '2026-11-13T07:00:00Z',
+      };
       await crear();
       const antes = lecturas;
 
@@ -274,7 +301,11 @@ describe('ReportWorkbench', () => {
           message: 'No se pudo leer alguna fuente. Se conserva el resultado anterior.',
         }),
       ];
-      programada = { ...programada, nextRunUtc: '2026-11-14T07:00:00Z', retryAtUtc: '2026-11-13T07:05:06Z' };
+      programada = {
+        ...programada,
+        nextRunUtc: '2026-11-14T07:00:00Z',
+        retryAtUtc: '2026-11-13T07:05:06Z',
+      };
       await vi.advanceTimersByTimeAsync(63_000);
       await asentar();
 
@@ -283,7 +314,10 @@ describe('ReportWorkbench', () => {
       expect(lecturas).toBe(antes);
 
       // El reintento salió bien: el dato nuevo se lee sin reabrir nada.
-      intentos = [intento('Succeeded', { origin: 'Scheduled', startedAtUtc: '2026-11-13T07:05:06Z' }), ...intentos];
+      intentos = [
+        intento('Succeeded', { origin: 'Scheduled', startedAtUtc: '2026-11-13T07:05:06Z' }),
+        ...intentos,
+      ];
       programada = { ...programada, retryAtUtc: null };
       await vi.advanceTimersByTimeAsync(6 * 60_000);
       await asentar();
@@ -305,7 +339,10 @@ describe('ReportWorkbench', () => {
         completedAtUtc: '2026-11-13T07:00:03Z',
         message: 'No se pudo leer alguna fuente.',
       }),
-      intento('Succeeded', { startedAtUtc: '2026-11-12T09:00:00Z', completedAtUtc: '2026-11-12T09:01:30Z' }),
+      intento('Succeeded', {
+        startedAtUtc: '2026-11-12T09:00:00Z',
+        completedAtUtc: '2026-11-12T09:01:30Z',
+      }),
     ];
     await crear();
 
@@ -354,8 +391,9 @@ describe('ReportWorkbench', () => {
     botón('Ver como tabla').click();
     fixture.detectChanges();
 
-    const filas = [...fixture.nativeElement.querySelectorAll('app-report-chart tbody tr')].map((row: Element) =>
-      [...row.querySelectorAll('td')].map((cell) => (cell.textContent ?? '').trim()).join(' '),
+    const filas = [...fixture.nativeElement.querySelectorAll('app-report-chart tbody tr')].map(
+      (row: Element) =>
+        [...row.querySelectorAll('td')].map((cell) => (cell.textContent ?? '').trim()).join(' '),
     );
 
     expect(filas).toEqual(['05001 80', '08001 100', '11001 40']);

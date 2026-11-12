@@ -15,7 +15,10 @@
     <p class="paper__filters">
       <strong>{{ 'reports.dashboard.filters' | t }}:</strong>
       @for (filter of filters(); track filter.label; let last = $last) {
-        {{ filter.label }}: {{ filter.value }}@if (!last) {; }
+        {{ filter.label }}: {{ filter.value }}
+        @if (!last) {
+          ;
+        }
       } @empty {
         {{ 'reports.export.noFilters' | t }}
       }

@@ -60,7 +60,10 @@ export interface FigureSource {
   readonly visual: ReportVisualKind;
   readonly series: Series | null;
   readonly indicator: Indicator | null;
-  readonly table: { readonly columns: readonly ReportColumn[]; readonly rows: readonly (readonly ReportValue[])[] } | null;
+  readonly table: {
+    readonly columns: readonly ReportColumn[];
+    readonly rows: readonly (readonly ReportValue[])[];
+  } | null;
   readonly valueLabel: string;
   readonly categoryLabel: string;
   /** La columna de la categoría, para tipar la primera columna de barras y líneas. */
@@ -76,7 +79,10 @@ export interface FigureSource {
  * cifra, la meta y el cumplimiento. Tabla: sus columnas y filas. Es lo mismo
  * que «Ver como tabla», y sobre esta tabla se reconstruye el gráfico en Excel.
  */
-export function panelFigures(source: FigureSource, texts: { readonly target: string; readonly ratio: string }): ExportTable {
+export function panelFigures(
+  source: FigureSource,
+  texts: { readonly target: string; readonly ratio: string },
+): ExportTable {
   if ((source.visual === 'Bar' || source.visual === 'Line') && source.series) {
     const category = source.categoryColumn ? cellType(source.categoryColumn) : 'Text';
 
@@ -106,7 +112,10 @@ export function panelFigures(source: FigureSource, texts: { readonly target: str
 
   if (source.table) {
     return {
-      columns: source.table.columns.map((column) => ({ name: source.label(column.name), type: cellType(column) })),
+      columns: source.table.columns.map((column) => ({
+        name: source.label(column.name),
+        type: cellType(column),
+      })),
       rows: source.table.rows,
     };
   }
@@ -120,7 +129,10 @@ export function datasetTable(
   rows: readonly (readonly ReportValue[])[],
   label: (name: string) => string,
 ): ExportTable {
-  return { columns: columns.map((column) => ({ name: label(column.name), type: cellType(column) })), rows };
+  return {
+    columns: columns.map((column) => ({ name: label(column.name), type: cellType(column) })),
+    rows,
+  };
 }
 
 export function cellCount(document: Pick<ExportDocument, 'panels' | 'datasets'>): number {
@@ -174,7 +186,11 @@ export function csvBlob(table: ExportTable): Blob {
 
 /** Un nombre de archivo sin caracteres que algún sistema rechace. */
 export function exportFileName(name: string, extension: string): string {
-  const safe = name.replace(/[\\/:*?"<>|\u0000-\u001f]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 80);
+  const safe = name
+    .replace(/[\\/:*?"<>|\u0000-\u001f]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 80);
 
   return `${safe || 'reporte'}.${extension}`;
 }

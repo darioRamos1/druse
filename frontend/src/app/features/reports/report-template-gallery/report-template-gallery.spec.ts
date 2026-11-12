@@ -11,7 +11,16 @@ const pedidos: ReportDataset = {
   id: 'ds-pedidos',
   name: 'Pedidos',
   version: 1,
-  sources: [{ alias: 'Pedidos', connectionId: 'c1', database: 'p', mode: 'Sql', sql: 'x', expectedColumns: [] }],
+  sources: [
+    {
+      alias: 'Pedidos',
+      connectionId: 'c1',
+      database: 'p',
+      mode: 'Sql',
+      sql: 'x',
+      expectedColumns: [],
+    },
+  ],
   join: null,
 };
 
@@ -83,10 +92,15 @@ describe('ReportTemplateGallery', () => {
   }
 
   function botón(etiqueta: string): HTMLButtonElement {
-    return todos('button').find((button) => (button.textContent ?? '').trim().startsWith(etiqueta)) as HTMLButtonElement;
+    return todos('button').find((button) =>
+      (button.textContent ?? '').trim().startsWith(etiqueta),
+    ) as HTMLButtonElement;
   }
 
-  async function crear(scopes: SavedReportTemplate['scope'][], fixed: string | null = null): Promise<void> {
+  async function crear(
+    scopes: SavedReportTemplate['scope'][],
+    fixed: string | null = null,
+  ): Promise<void> {
     fixture = TestBed.createComponent(ReportTemplateGallery);
     fixture.componentRef.setInput('scopes', scopes);
     fixture.componentRef.setInput('datasets', [pedidos, sinDatos]);
@@ -175,7 +189,11 @@ describe('ReportTemplateGallery', () => {
     botón('Crear copia').click();
 
     expect(aplicadas).toEqual([
-      { document: expect.objectContaining({ name: 'Ventas por municipio' }), datasets: ['ds-pedidos'], assignment: { municipio: 'region', venta: 'monto_total' } },
+      {
+        document: expect.objectContaining({ name: 'Ventas por municipio' }),
+        datasets: ['ds-pedidos'],
+        assignment: { municipio: 'region', venta: 'monto_total' },
+      },
     ]);
   });
 
@@ -207,7 +225,9 @@ describe('ReportTemplateGallery', () => {
     await asentar();
 
     expect(guardadas).toHaveLength(1);
-    expect(guardadas[0]).toEqual(expect.objectContaining({ name: 'Copia importada', scope: 'Report' }));
+    expect(guardadas[0]).toEqual(
+      expect.objectContaining({ name: 'Copia importada', scope: 'Report' }),
+    );
     expect(JSON.parse(guardadas[0].model).fields).toHaveLength(2);
     expect(texto()).toContain('Plantilla «Copia importada» importada.');
   });
