@@ -159,6 +159,10 @@
     margin: 4px 8px;
     font-size: 11.5px;
     color: var(--dr-text-tertiary);
+
+    &--danger {
+      color: var(--dr-danger-text);
+    }
   }
 }
 

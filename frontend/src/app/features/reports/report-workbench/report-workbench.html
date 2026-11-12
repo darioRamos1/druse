@@ -32,6 +32,9 @@
     @if (error(); as message) {
       <p class="banner banner--danger" role="alert">{{ message }}</p>
     }
+    @if (notice(); as message) {
+      <p class="banner banner--success" role="status">{{ message }}</p>
+    }
     @if (definitionDirty()) {
       <p class="banner banner--warning">{{ 'reports.data.unsavedDefinition' | t }}</p>
     }
@@ -84,6 +87,10 @@
       <button type="button" class="reports__add" (click)="newReport()">
         <app-icon name="plus" [size]="10" />
         {{ 'reports.report.new' | t }}
+      </button>
+      <button type="button" class="reports__add" (click)="galleryOpen.set(true)">
+        <app-icon name="copy" [size]="10" />
+        {{ 'reports.template.fromTemplate' | t }}
       </button>
     </div>
 
@@ -361,5 +368,30 @@
         {{ (saved() ? 'reports.report.delete' : 'reports.report.discard') | t }}
       </button>
     </div>
+
+    @if (savingTemplate()) {
+      <app-report-template-save
+        scope="Report"
+        [defaultName]="current.name"
+        [busy]="templateBusy()"
+        (saved)="saveAsTemplate($event)"
+        (cancelled)="savingTemplate.set(false)"
+      />
+    } @else {
+      <button type="button" class="link" (click)="savingTemplate.set(true)">
+        <app-icon name="copy" [size]="11" />
+        {{ 'reports.template.saveAs.Report' | t }}
+      </button>
+    }
   </aside>
+}
+
+@if (galleryOpen()) {
+  <app-report-template-gallery
+    [scopes]="['Report', 'Panel']"
+    [datasets]="currentDatasets()"
+    [fixedDataset]="dataset().id"
+    (applied)="applyTemplate($event)"
+    (closed)="galleryOpen.set(false)"
+  />
 }

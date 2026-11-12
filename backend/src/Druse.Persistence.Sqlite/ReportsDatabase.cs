@@ -71,6 +71,18 @@ internal static class ReportsDatabase
                     created_utc_ticks INTEGER NOT NULL,
                     updated_utc_ticks INTEGER NOT NULL
                 ) STRICT;
+
+                -- Diseño sin datos: una plantilla no apunta a conjuntos ni a
+                -- reportes, solo a campos lógicos que se vinculan al aplicarla.
+                CREATE TABLE IF NOT EXISTS report_templates (
+                    id TEXT PRIMARY KEY,
+                    name TEXT NOT NULL,
+                    description TEXT,
+                    scope TEXT NOT NULL,
+                    model TEXT NOT NULL,
+                    created_utc_ticks INTEGER NOT NULL,
+                    updated_utc_ticks INTEGER NOT NULL
+                ) STRICT;
                 """;
             await command.ExecuteNonQueryAsync(cancellationToken);
             return connection;

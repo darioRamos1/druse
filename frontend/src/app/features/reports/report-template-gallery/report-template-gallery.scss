@@ -1,0 +1,307 @@
+@use '../report-controls';
+
+/*
+ * Hoja superpuesta encima del constructor de Reportes. No es un `.dialog`
+ * aparte —su atrapado de foco pelearía con el del constructor—: el foco entra
+ * al abrir, Escape retrocede un paso y el velo tapa lo de detrás.
+ */
+:host {
+  position: fixed;
+  inset: 0;
+  z-index: calc(var(--dr-z-modal) + 1);
+  display: grid;
+  place-items: center;
+  padding: 16px;
+}
+
+.veil {
+  position: absolute;
+  inset: 0;
+  background: var(--dr-scrim);
+}
+
+.sheet {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: min(640px, 100%);
+  max-height: min(720px, 100%);
+  border: 1px solid var(--dr-border);
+  border-radius: var(--dr-radius-window);
+  background: var(--dr-surface-raised);
+  color: var(--dr-text);
+  box-shadow: var(--dr-shadow-dialog);
+  font-size: 12.5px;
+
+  &:focus-visible {
+    outline: 2px solid var(--dr-accent-line-strong);
+    outline-offset: 2px;
+  }
+
+  &__head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 10px 10px 14px;
+    border-bottom: 1px solid var(--dr-border);
+    color: var(--dr-text-secondary);
+  }
+
+  &__title {
+    flex: 1;
+    margin: 0;
+    overflow: hidden;
+    color: var(--dr-text);
+    font-size: 13px;
+    font-weight: 600;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &__notes {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 0 14px;
+
+    &:not(:empty) {
+      padding-top: 10px;
+    }
+  }
+
+  &__body {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    min-height: 0;
+    padding: 12px 14px 14px;
+    overflow: auto;
+  }
+
+  &__foot {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+    padding: 10px 14px;
+    border-top: 1px solid var(--dr-border);
+
+    .field__hint {
+      flex: 1 1 240px;
+    }
+  }
+}
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+
+  .field__hint {
+    flex: 1 1 260px;
+  }
+
+  // El input de archivo vive dentro del botón: el foco se ve en el botón.
+  label.button:focus-within {
+    outline: 2px solid var(--dr-accent-line-strong);
+    outline-offset: 1px;
+  }
+}
+
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px;
+  border: 1px solid var(--dr-border);
+  border-radius: var(--dr-radius-sm);
+  background: var(--dr-surface-base);
+
+  &__head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  &__name {
+    margin: 0;
+    font-size: 13px;
+    font-weight: 600;
+    overflow-wrap: anywhere;
+  }
+
+  &__description {
+    margin: 0;
+    color: var(--dr-text-secondary);
+    line-height: 1.45;
+  }
+
+  &__meta {
+    margin: 0;
+    color: var(--dr-text-tertiary);
+    font-size: 11.5px;
+  }
+
+  &__actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+    margin-top: auto;
+    padding-top: 6px;
+
+    .link {
+      align-self: center;
+    }
+  }
+
+  &--preview {
+    gap: 8px;
+  }
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+  height: 20px;
+  padding: 0 7px;
+  border: 1px solid var(--dr-border);
+  border-radius: 999px;
+  background: var(--dr-surface-raised);
+  color: var(--dr-text-secondary);
+  font-size: 11px;
+  white-space: nowrap;
+
+  &--accent {
+    border-color: var(--dr-accent-line-strong);
+    color: var(--dr-accent);
+  }
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 28px 12px;
+  color: var(--dr-text-tertiary);
+  text-align: center;
+
+  p {
+    margin: 0;
+    max-width: 380px;
+    line-height: 1.5;
+  }
+}
+
+.slot {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+  padding: 12px;
+  border: 1px solid var(--dr-border);
+  border-radius: var(--dr-radius-sm);
+
+  &__title {
+    padding: 0 4px;
+    font-size: 11.5px;
+    font-weight: 600;
+    color: var(--dr-text-secondary);
+  }
+
+  &__hint {
+    margin-left: 6px;
+    font-weight: 400;
+    color: var(--dr-text-tertiary);
+  }
+
+  &__fixed {
+    margin: 0;
+    font-weight: 600;
+  }
+
+  select {
+    width: 100%;
+    min-height: 30px;
+    padding: 5px 8px;
+    border: 1px solid var(--dr-border-input);
+    border-radius: var(--dr-radius-sm);
+    background: var(--dr-surface-input);
+    color: var(--dr-text);
+    font: inherit;
+  }
+}
+
+.fields {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+
+  &__row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
+    align-items: center;
+    gap: 10px;
+
+    // El campo obligatorio sin columna se marca con texto, no solo con color.
+    &.is-missing select {
+      border-color: var(--dr-warning-line);
+    }
+
+    @media (max-width: 520px) {
+      grid-template-columns: minmax(0, 1fr);
+      gap: 4px;
+    }
+  }
+
+  &__name {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    font-weight: 600;
+    overflow-wrap: anywhere;
+  }
+
+  &__required {
+    color: var(--dr-warning-text);
+    font-size: 11px;
+    font-weight: 400;
+  }
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}

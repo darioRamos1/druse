@@ -36,3 +36,13 @@ public interface IReportDashboardStore
 
     Task DeleteAsync(Guid id, CancellationToken cancellationToken);
 }
+
+/// <summary>Plantillas de diseño: reportes, paneles y tableros reutilizables.</summary>
+public interface IReportTemplateStore
+{
+    Task<IReadOnlyList<ReportTemplate>> GetAllAsync(CancellationToken cancellationToken);
+
+    Task<ReportTemplate> SaveAsync(ReportTemplate reportTemplate, CancellationToken cancellationToken);
+
+    Task DeleteAsync(Guid id, CancellationToken cancellationToken);
+}

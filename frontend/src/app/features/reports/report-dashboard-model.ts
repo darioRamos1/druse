@@ -189,6 +189,11 @@ export function addPanel(model: DashboardModel, pageId: string, reportId: string
   ]);
 }
 
+/** Añade al final de una página paneles ya hechos, como los de una plantilla. */
+export function insertPanels(model: DashboardModel, pageId: string, added: readonly DashboardPanel[]): DashboardModel {
+  return updatePage(model, pageId, (panels) => [...panels, ...added]);
+}
+
 export function removePanel(model: DashboardModel, pageId: string, panelId: string): DashboardModel {
   return updatePage(model, pageId, (panels) => panels.filter((panel) => panel.id !== panelId));
 }

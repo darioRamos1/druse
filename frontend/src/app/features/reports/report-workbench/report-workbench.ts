@@ -24,6 +24,9 @@ import {
 } from '../../../shared/models/reports';
 import { Icon } from '../../../shared/ui/icon/icon';
 import { ReportChart } from '../report-chart/report-chart';
+import { ReportTemplateGallery, TemplateApplication } from '../report-template-gallery/report-template-gallery';
+import { ReportTemplateSave, TemplateSaveRequest } from '../report-template-save/report-template-save';
+import { captureTemplate, instantiateTemplate } from '../report-template-model';
 import {
   AGGREGATES,
   MAX_CATEGORY_COLORS,
@@ -62,7 +65,7 @@ export const VISUALS: readonly ReportVisualKind[] = ['Table', 'Bar', 'Line', 'In
 @Component({
   selector: 'app-report-workbench',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [Icon, ReportChart, TranslatePipe],
+  imports: [Icon, ReportChart, ReportTemplateGallery, ReportTemplateSave, TranslatePipe],
   templateUrl: './report-workbench.html',
   styleUrl: './report-workbench.scss',
 })
@@ -91,6 +94,12 @@ export class ReportWorkbench {
   protected readonly draft = signal<ReportDraft | null>(null);
   protected readonly asTable = signal(false);
   protected readonly savingReport = signal(false);
+  protected readonly notice = signal<string | null>(null);
+  /** Plantillas: la galería abierta, el formulario de guardar y si se está guardando. */
+  protected readonly galleryOpen = signal(false);
+  protected readonly savingTemplate = signal(false);
+  protected readonly templateBusy = signal(false);
+  protected readonly currentDatasets = computed(() => [this.dataset()]);
 
   /** El último intento falló después del último resultado bueno. */
   protected readonly failedAfterData = computed(() => {
@@ -201,7 +210,9 @@ export class ReportWorkbench {
   private async load(datasetId: string): Promise<void> {
     this.loading.set(true);
     this.error.set(null);
+    this.notice.set(null);
     this.draft.set(null);
+    this.savingTemplate.set(false);
 
     try {
       const [snapshot, runs, reports] = await Promise.all([
@@ -419,6 +430,74 @@ export class ReportWorkbench {
       if (rest.length > 0) {
         this.select(rest[0]);
       }
+    } catch (error) {
+      this.error.set(describeError(error, this._i18n));
+    }
+  }
+  // --- Plantillas ------------------------------------------------------------------
+
+  /** Guarda el reporte que se está viendo —con sus cambios sin guardar— como plantilla. */
+  protected async saveAsTemplate(request: TemplateSaveRequest): Promise<void> {
+    const draft = this.draft();
+
+    if (!draft || this.templateBusy()) {
+      return;
+    }
+
+    const datasetId = this.dataset().id;
+    const document = captureTemplate('Report', request.name, request.description, {
+      reports: [{ id: draft.id, datasetId, name: draft.name.trim(), visual: draft.visual, settings: JSON.stringify(draft.settings) }],
+      datasets: [this.dataset()],
+      columnsOf: () => this.columns(),
+    });
+
+    await this.storeTemplate(document.name, document.description, JSON.stringify(document));
+  }
+
+  private async storeTemplate(name: string, description: string | null, model: string): Promise<void> {
+    this.templateBusy.set(true);
+    this.error.set(null);
+
+    try {
+      await firstValueFrom(
+        this._gateway.saveReportTemplate({ id: crypto.randomUUID(), name, description, scope: 'Report', model }),
+      );
+      this.savingTemplate.set(false);
+      this.notice.set(this._i18n.t('reports.template.savedNotice', { name }));
+    } catch (error) {
+      this.error.set(describeError(error, this._i18n));
+    } finally {
+      this.templateBusy.set(false);
+    }
+  }
+
+  /** Crea en este conjunto los reportes de la plantilla y abre el primero. */
+  protected async applyTemplate(application: TemplateApplication): Promise<void> {
+    this.galleryOpen.set(false);
+    this.error.set(null);
+
+    const copy = instantiateTemplate(
+      application.document,
+      application.datasets,
+      application.assignment,
+      undefined,
+      this.reports(),
+    );
+
+    try {
+      const saved: SavedReport[] = [];
+
+      for (const report of copy.reports) {
+        saved.push(await firstValueFrom(this._gateway.saveReport(report)));
+      }
+
+      this.reports.update((list) => [...list, ...saved]);
+
+      if (saved.length > 0) {
+        this.select(saved[0]);
+      }
+
+      this.notice.set(this._i18n.t('reports.template.appliedReports', { count: saved.length }));
     } catch (error) {
       this.error.set(describeError(error, this._i18n));
     }

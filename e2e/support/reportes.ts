@@ -121,3 +121,33 @@ export async function previsualizar(reportes: Locator): Promise<void> {
   await reportes.getByRole('button', { name: 'Vista previa' }).click();
   await expect(reportes.getByRole('button', { name: 'Vista previa' })).toBeEnabled({ timeout: 60_000 });
 }
+
+/** Un conjunto con otros nombres de columna: el segundo usuario de una plantilla. */
+export const PEDIDOS_SQL = `SELECT DATE '2026-01-01' AS fecha_pedido, region, monto::numeric(10,2) AS monto_total
+FROM (VALUES ('Norte', 30), ('Sur', 50)) AS pedidos(region, monto)`;
+
+/** Abre la galería de plantillas de tablero desde la lista de Tableros. */
+export async function abrirGaleria(reportes: Locator): Promise<Locator> {
+  await reportes.getByRole('button', { name: 'Tablero desde plantilla' }).click();
+  const galeria = reportes.page().locator('app-report-template-gallery');
+
+  await expect(galeria.locator('.sheet')).toBeVisible();
+  await expect(galeria.locator('.placeholder', { hasText: 'Cargando' })).toHaveCount(0, { timeout: 30_000 });
+  return galeria;
+}
+
+/** Borra las plantillas de tablero cuyo nombre encaje y cierra la galería. */
+export async function borrarPlantillas(reportes: Locator, nombres: RegExp): Promise<void> {
+  const galeria = await abrirGaleria(reportes);
+
+  for (let tarjeta = galeria.locator('.card').filter({ hasText: nombres }); (await tarjeta.count()) > 0; ) {
+    const antes = await tarjeta.count();
+
+    await tarjeta.first().getByRole('button', { name: /^Borrar la plantilla/ }).click();
+    await tarjeta.first().getByRole('button', { name: 'Borrar', exact: true }).click();
+    await expect(tarjeta).toHaveCount(antes - 1);
+  }
+
+  await reportes.page().keyboard.press('Escape');
+  await expect(galeria).toHaveCount(0);
+}

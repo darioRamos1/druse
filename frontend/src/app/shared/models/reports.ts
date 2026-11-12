@@ -180,3 +180,16 @@ export interface SavedDashboard {
   readonly createdAtUtc?: string;
   readonly updatedAtUtc?: string;
 }
+
+export type ReportTemplateScope = 'Report' | 'Panel' | 'Dashboard';
+
+/** Una plantilla guardada. `model` es JSON de `TemplateDocument`. */
+export interface SavedReportTemplate {
+  readonly id: string;
+  readonly name: string;
+  readonly description: string | null;
+  readonly scope: ReportTemplateScope;
+  readonly model: string;
+  readonly createdAtUtc?: string;
+  readonly updatedAtUtc?: string;
+}

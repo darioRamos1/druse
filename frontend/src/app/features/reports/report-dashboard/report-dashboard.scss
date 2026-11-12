@@ -464,3 +464,13 @@
     grid-column: 1 / -1 !important;
   }
 }
+
+// Guardar como plantilla: bajo la barra, para ver el tablero mientras se nombra.
+.template-form {
+  padding: 0 16px 10px;
+
+  app-report-template-save {
+    display: block;
+    max-width: 520px;
+  }
+}

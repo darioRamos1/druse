@@ -30,7 +30,7 @@
 - [x] 4.1 Tableros: cuadrícula de paneles con reportes de distintos conjuntos, ordenar y redimensionar con botones y teclado.
 - [x] 4.1 Filtros compartidos de fecha y categoría, vinculados por conjunto, aplicados sobre los datos guardados.
 - [x] 4.2 Personalización: colores, formato de números, umbrales, estilo de panel, varias páginas y filtrar al pulsar.
-- [ ] 4.3 Plantillas: guardar, aplicar a otro conjunto con asignación de campos, exportar e importar.
+- [x] 4.3 Plantillas: guardar, aplicar a otro conjunto con asignación de campos, exportar e importar.
 - [ ] 4.4 Exportación a Excel, PDF y CSV con los filtros activos.
 
 Los hitos siguientes cubren el constructor SQL y visual, los reportes guardados, los tableros y plantillas, y la actualización programada. La evidencia para la landing se prepara conforme se valida cada hito.
@@ -191,8 +191,44 @@ El hito 4 se divide en cuatro entregas (tableros, personalización, plantillas y
 - El barrido añade capturas de umbrales (`21l`), apariencia (`21m`), barra pulsada (`22e`), estilo y herencia (`22f`) y segunda página (`22g`). Encontró un fallo real, ya corregido: **la descripción escrita justo después de cambiar de panel iba al panel anterior**. El inspector editaba el panel de su bloque de plantilla, que solo se pone al día al repintar. Ahora edita el panel seleccionado en ese momento. La prueba que lo reproduce (escribir sin repintar tras el clic) falla sin el arreglo y pasa con él.
 - También se corrigió una carrera de la propia prueba: el nombre propuesto «Reporte 2» llegaba después de que Playwright empezara a escribir.
 
+## 2026-11-11 · Hito 4.3: plantillas (versión 1.16.0)
+
+### Qué se hizo
+
+- **Formato.** Una plantilla es diseño sin datos (`report-template-model.ts`, formato `druse.report-template`, versión 1):
+  - Lleva los reportes con su apariencia, y en paneles y tableros también páginas, paneles, filtros y estilo.
+  - Las columnas pasan a ser **campos lógicos** con nombre base, tipo (número, fecha, texto, sí/no) y si son obligatorios. Son obligatorios la categoría y la cifra; la meta, las columnas de tabla y los filtros son opcionales.
+  - Un tablero que mezcla conjuntos tiene un **hueco por conjunto**, y cada hueco se rellena con un conjunto propio al aplicarla.
+  - No lleva SQL, conexiones, bases ni filas.
+- **Backend.** Tabla `report_templates` en `reports.db` y `GET/PUT/DELETE /api/reports/templates`. `ReportTemplateRules` exige nombre, ámbito (`Report`, `Panel` o `Dashboard`), JSON de objeto y como mucho 512 KiB. También rechaza, a cualquier profundidad, propiedades como `sql`, `connectionId`, `password`, `database` o `rows`, aunque la plantilla llegue de un archivo editado a mano.
+- **Guardar como plantilla:**
+  - el tablero entero, desde su barra;
+  - el panel elegido, desde el inspector en edición;
+  - un reporte, desde el inspector de Visualización.
+  
+  Se captura lo que se ve, con los cambios sin guardar.
+- **Usar una plantilla** abre una galería superpuesta:
+  - Lista los diseños guardados y un diseño inicial, «Seguimiento de una cifra»: indicador con meta, barras, línea y detalle, con filtros de fecha y categoría.
+  - Al aplicarla, se elige el conjunto de cada hueco y se revisa la columna de cada campo. Se propone primero por nombre y tipo, y después la primera columna libre del tipo: `monto_total` para «venta» y `region` para «municipio».
+  - Un campo obligatorio sin columna, o un conjunto sin datos guardados, impide crear la copia y lo dice.
+  - La copia es independiente: reportes nuevos con ids nuevos, numerados si el nombre ya existe en ese conjunto.
+  - Desde Tableros crea un tablero nuevo. En un tablero en edición añade paneles. En Visualización añade reportes al conjunto abierto.
+- **Exportar e importar.** Exportar guarda `<nombre>.druse-plantilla.json` (diálogo del sistema en el escritorio y descarga en el navegador). Importar valida formato, versión, tamaño, ámbito, tipos de panel y que cada referencia exista, y enseña una vista previa antes de guardarla con id nuevo.
+
+### Comprobaciones y lo que encontró Playwright
+
+- **Pruebas:**
+  - Backend: 10 unitarias de reglas y almacén, 6 de integración de la API y el contrato OpenAPI regenerado. La batería unitaria completa pasa (744).
+  - Frontend: 11 del modelo (incluido el criterio del plan: un tablero de ventas con sus colores, dos páginas y filtros, aplicado a otra fuente con otros nombres de columna), 6 de la galería y 2 del tablero. Además, 143 de Reportes, novedades, gateway e i18n.
+- **e2e nueva en `reportes.spec.ts`.** Guarda un tablero como plantilla y la exporta. Comprueba que el archivo no lleva SQL ni conexiones. Después la borra, la importa y la aplica a un conjunto de pedidos con otros nombres. La copia se dibuja con sus datos y su filtro de categoría funciona.
+- **Barrido.** Capturas `23`–`23h`: guardar, galería, vincular, tablero desde plantilla y guardar un reporte, en oscuro, claro y a 900 px. La consola sale limpia.
+- **Fallos encontrados y corregidos:**
+  - **Escape cerraba todo Reportes.** Al borrar una plantilla o cambiar de paso desaparecía el botón con el foco, y el siguiente Escape lo recibía el constructor. Ahora la galería escucha el teclado en fase de captura mientras está abierta, devuelve el foco a la hoja y tiene su propio atrapado de Tab. Hay una prueba que lo reproduce.
+  - **Nombres accesibles ambiguos.** «Guardar reporte como plantilla» y «Nuevo tablero desde plantilla» empezaban como «Guardar reporte» y «Nuevo tablero». Pasaron a «Guardar como plantilla» y «Tablero desde plantilla».
+  - **Pestañas repetidas.** Aplicar una plantilla al mismo conjunto dejaba dos reportes con el mismo nombre. Ahora se numeran: «Cumplimiento (2)».
+
 ### Dónde retomar
 
-1. Hito 4.3, plantillas: guardar un gráfico, panel o tablero como plantilla, aplicarla a otro conjunto con asignación de campos por nombre y tipo, y exportar e importar la definición sin SQL, credenciales ni filas.
-2. Hito 4.4, exportación a Excel, PDF y CSV con los filtros activos (y decidir si basta el SVG propio o hace falta una librería).
-3. Preparar la sección `#reportes-bi` de la landing con `22-tablero` y `22e-tablero-pulsado` (estado En desarrollo).
+1. Hito 4.4, exportación a Excel, PDF y CSV con los filtros activos (y decidir si basta el SVG propio o hace falta una librería).
+2. Preparar la sección `#reportes-bi` de la landing con `22-tablero`, `22e-tablero-pulsado` y `23b-plantilla-vincular` (estado En desarrollo).
+3. Opcional: filtro «Plantilla de Druse» en el diálogo de guardar del escritorio (`exports.rs`); hoy guarda el `.json` sin filtro de tipo.

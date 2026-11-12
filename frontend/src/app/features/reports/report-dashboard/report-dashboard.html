@@ -39,6 +39,16 @@
           {{ 'reports.dashboard.save' | t }}
         </button>
       }
+      <button
+        type="button"
+        class="button"
+        [attr.aria-pressed]="savingTemplate() === 'Dashboard'"
+        (click)="savingTemplate.set(savingTemplate() === 'Dashboard' ? null : 'Dashboard')"
+        [disabled]="panels().length === 0 && pages().length === 1"
+      >
+        <app-icon name="copy" [size]="11" />
+        {{ 'reports.template.saveAs.Dashboard' | t }}
+      </button>
       <button type="button" class="button" [attr.aria-pressed]="editing()" (click)="toggleEditing()">
         <app-icon name="edit" [size]="11" />
         {{ (editing() ? 'reports.dashboard.view' : 'reports.dashboard.edit') | t }}
@@ -86,6 +96,18 @@
           {{ 'reports.dashboard.clearFilters' | t }}
         </button>
       }
+    </div>
+  }
+
+  @if (savingTemplate() === 'Dashboard') {
+    <div class="template-form">
+      <app-report-template-save
+        scope="Dashboard"
+        [defaultName]="name()"
+        [busy]="templateBusy()"
+        (saved)="saveAsTemplate($event)"
+        (cancelled)="savingTemplate.set(null)"
+      />
     </div>
   }
 
@@ -274,6 +296,10 @@
         <span class="field__hint">{{ 'reports.dashboard.noReports' | t }}</span>
       }
     </label>
+    <button type="button" class="link" (click)="galleryOpen.set(true)" [disabled]="datasets().length === 0">
+      <app-icon name="copy" [size]="11" />
+      {{ 'reports.template.addFromTemplate' | t }}
+    </button>
 
     @if (selected(); as view) {
       <fieldset class="section">
@@ -344,6 +370,20 @@
             </select>
           </label>
         }
+        @if (savingTemplate() === 'Panel') {
+          <app-report-template-save
+            scope="Panel"
+            [defaultName]="panelTemplateName()"
+            [busy]="templateBusy()"
+            (saved)="saveAsTemplate($event)"
+            (cancelled)="savingTemplate.set(null)"
+          />
+        } @else if (view.report) {
+          <button type="button" class="link" (click)="savingTemplate.set('Panel')">
+            <app-icon name="copy" [size]="11" />
+            {{ 'reports.template.saveAs.Panel' | t }}
+          </button>
+        }
       </fieldset>
     }
 
@@ -410,4 +450,13 @@
       }
     </div>
   </aside>
+}
+
+@if (galleryOpen()) {
+  <app-report-template-gallery
+    [scopes]="galleryScopes"
+    [datasets]="datasets()"
+    (applied)="applyTemplate($event)"
+    (closed)="galleryOpen.set(false)"
+  />
 }

@@ -28,12 +28,15 @@ import {
   ReportJoinPreview,
   ReportSource,
   ReportSourcePreview,
+  ReportTemplateScope,
   ReportValue,
   SavedDashboard,
 } from '../../../shared/models/reports';
 import { Icon } from '../../../shared/ui/icon/icon';
 import { ReportWorkbench } from '../report-workbench/report-workbench';
 import { ReportDashboard } from '../report-dashboard/report-dashboard';
+import { ReportTemplateGallery, TemplateApplication } from '../report-template-gallery/report-template-gallery';
+import { instantiateTemplate } from '../report-template-model';
 import { emptyDashboard } from '../report-dashboard-model';
 import {
   MAX_SOURCES,
@@ -94,7 +97,16 @@ function wideLayout(): boolean {
 @Component({
   selector: 'app-report-builder',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [DialogBackdrop, DialogFocus, Icon, NgTemplateOutlet, ReportDashboard, ReportWorkbench, TranslatePipe],
+  imports: [
+    DialogBackdrop,
+    DialogFocus,
+    Icon,
+    NgTemplateOutlet,
+    ReportDashboard,
+    ReportTemplateGallery,
+    ReportWorkbench,
+    TranslatePipe,
+  ],
   templateUrl: './report-builder.html',
   styleUrl: './report-builder.scss',
 })
@@ -118,6 +130,12 @@ export class ReportBuilder {
   protected readonly mode = signal<'dataset' | 'dashboard'>('dataset');
   protected readonly openDashboard = signal<SavedDashboard | null>(null);
   private readonly _dashboardDirty = signal(false);
+
+  /** La galería de plantillas de tablero, abierta desde la lista de Tableros. */
+  protected readonly galleryOpen = signal(false);
+  protected readonly dashboardScopes: readonly ReportTemplateScope[] = ['Dashboard'];
+  /** Si crear desde plantilla falla, se dice junto a la lista, que es lo que está a la vista. */
+  protected readonly templateError = signal<string | null>(null);
 
   protected readonly draft = signal<ReportDataset>(
     newDataset(crypto.randomUUID(), this._i18n.t('reports.untitled')),
@@ -747,6 +765,59 @@ export class ReportBuilder {
         }),
       'dashboard',
     );
+  }
+
+  /**
+   * Un tablero nuevo a partir de una plantilla.
+   *
+   * Es una copia independiente: se crean sus reportes en los conjuntos
+   * elegidos y un tablero con su diseño, ya guardados. Cambiar la plantilla
+   * después no lo toca.
+   */
+  protected createFromTemplate(application: TemplateApplication): void {
+    this.galleryOpen.set(false);
+    this.guard(() => void this.materialize(application), 'dashboard');
+  }
+
+  /** El nombre de la plantilla, numerado si ya hay un tablero que se llama así. */
+  private freeDashboardName(name: string): string {
+    const taken = new Set(this.dashboards().map((dashboard) => dashboard.name.trim().toLowerCase()));
+    let candidate = name;
+
+    for (let n = 2; taken.has(candidate.trim().toLowerCase()); n++) candidate = `${name} (${n})`;
+    return candidate;
+  }
+
+  private async materialize(application: TemplateApplication): Promise<void> {
+    this.templateError.set(null);
+
+    try {
+      const existing = await firstValueFrom(this._gateway.getAllReports());
+      const copy = instantiateTemplate(
+        application.document,
+        application.datasets,
+        application.assignment,
+        undefined,
+        existing,
+      );
+
+      for (const report of copy.reports) {
+        await firstValueFrom(this._gateway.saveReport(report));
+      }
+
+      const saved = await firstValueFrom(
+        this._gateway.saveDashboard({
+          id: crypto.randomUUID(),
+          name: this.freeDashboardName(application.document.name),
+          model: JSON.stringify(copy.layout),
+        }),
+      );
+
+      this.dashboardSaved(saved);
+      this.enterDashboard(saved);
+    } catch (error) {
+      this.templateError.set(describeError(error, this._i18n));
+    }
   }
 
   private enterDashboard(dashboard: SavedDashboard): void {

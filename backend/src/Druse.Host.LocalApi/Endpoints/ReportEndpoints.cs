@@ -155,6 +155,52 @@ internal static class ReportEndpoints
         })
         .WithName("DeleteReportDashboard");
 
+        app.MapGet("/api/reports/templates", async (
+            IReportTemplateStore templates,
+            CancellationToken cancellationToken) =>
+            Results.Ok((await templates.GetAllAsync(cancellationToken)).Select(template => template.ToDto())))
+        .WithName("GetReportTemplates");
+
+        app.MapPut("/api/reports/templates/{id:guid}", async (
+            Guid id,
+            ReportTemplateDto request,
+            IReportTemplateStore templates,
+            CancellationToken cancellationToken) =>
+        {
+            if (int.TryParse(request.Scope, out _)
+                || !Enum.TryParse<ReportTemplateScope>(request.Scope, ignoreCase: true, out var scope)
+                || !Enum.IsDefined(scope))
+            {
+                return Results.BadRequest(new { message = "Una plantilla es de un reporte, un panel o un tablero." });
+            }
+
+            if (ReportTemplateRules.Validate(request.Name, request.Description, request.Model) is { } problem)
+            {
+                return Results.BadRequest(new { message = problem });
+            }
+
+            var saved = await templates.SaveAsync(new ReportTemplate
+            {
+                Id = id,
+                Name = request.Name.Trim(),
+                Description = request.Description,
+                Scope = scope,
+                Model = request.Model,
+            }, cancellationToken);
+            return Results.Ok(saved.ToDto());
+        })
+        .WithName("SaveReportTemplate");
+
+        app.MapDelete("/api/reports/templates/{id:guid}", async (
+            Guid id,
+            IReportTemplateStore templates,
+            CancellationToken cancellationToken) =>
+        {
+            await templates.DeleteAsync(id, cancellationToken);
+            return Results.NoContent();
+        })
+        .WithName("DeleteReportTemplate");
+
         app.MapPut("/api/reports/reports/{id:guid}", async (
             Guid id,
             SavedReportDto request,

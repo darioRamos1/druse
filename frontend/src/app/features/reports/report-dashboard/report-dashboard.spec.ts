@@ -8,7 +8,9 @@ import {
   ReportSnapshot,
   SavedDashboard,
   SavedReport,
+  SavedReportTemplate,
 } from '../../../shared/models/reports';
+import { TemplateApplication } from '../report-template-gallery/report-template-gallery';
 import { ReportDashboard } from './report-dashboard';
 
 const ventas: ReportDataset = {
@@ -131,6 +133,8 @@ describe('ReportDashboard', () => {
   let guardados: SavedDashboard[];
   let actualizados: string[];
   let borrados: string[];
+  let plantillas: SavedReportTemplate[];
+  let reportesNuevos: SavedReport[];
 
   async function asentar(): Promise<void> {
     for (let intento = 0; intento < 30; intento++) {
@@ -176,6 +180,8 @@ describe('ReportDashboard', () => {
     guardados = [];
     actualizados = [];
     borrados = [];
+    plantillas = [];
+    reportesNuevos = [];
 
     const resultados = new Map([
       ['ds-ventas', datosVentas],
@@ -193,6 +199,14 @@ describe('ReportDashboard', () => {
       deleteDashboard: (id: string) => {
         borrados.push(id);
         return of(undefined);
+      },
+      saveReportTemplate: (template: SavedReportTemplate): Observable<SavedReportTemplate> => {
+        plantillas.push(template);
+        return of(template);
+      },
+      saveReport: (report: SavedReport): Observable<SavedReport> => {
+        reportesNuevos.push(report);
+        return of(report);
       },
     };
 
@@ -405,5 +419,75 @@ describe('ReportDashboard', () => {
 
     expect(actualizados).toEqual(['ds-ventas', 'ds-visitas']);
     expect(el('.banner--success').textContent).toContain('No se pudieron actualizar: Visitas');
+  });
+
+  it('guarda el tablero como plantilla con sus campos y sin SQL', async () => {
+    await crear(tablero(conTresPaneles));
+    botón('Guardar como plantilla').click();
+    fixture.detectChanges();
+
+    const nombre = el<HTMLInputElement>('.template-form input');
+
+    expect(nombre.value).toBe('Comercial');
+    nombre.value = 'Comercial base';
+    nombre.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+    botón('Guardar plantilla').click();
+    await asentar();
+
+    expect(plantillas).toHaveLength(1);
+    expect(plantillas[0]).toEqual(expect.objectContaining({ name: 'Comercial base', scope: 'Dashboard' }));
+
+    const modelo = JSON.parse(plantillas[0].model);
+
+    // Dos conjuntos, dos huecos; los campos sin el prefijo del cruce.
+    expect(modelo.slots.map((slot: { label: string }) => slot.label)).toEqual(['Ventas y metas', 'Visitas']);
+    expect(modelo.fields.map((field: { name: string }) => field.name)).toEqual(
+      expect.arrayContaining(['municipio', 'venta', 'meta', 'visitas', 'mes', 'fecha']),
+    );
+    expect(plantillas[0].model).not.toMatch(/"sql"|connectionId|ds-ventas|izquierda\./);
+    expect(el('.banner--success').textContent).toContain('Plantilla «Comercial base» guardada.');
+  });
+
+  it('añade los paneles de una plantilla a la página y crea sus reportes', async () => {
+    await crear(tablero(conTresPaneles));
+    botón('Editar diseño').click();
+    fixture.detectChanges();
+
+    const panel = {
+      format: 'druse.report-template',
+      version: 1,
+      scope: 'Panel',
+      name: 'Barras',
+      description: null,
+      slots: [{ label: '' }],
+      fields: [{ id: 'cat', slot: 0, name: 'cat', kind: 'text', required: true }, { id: 'num', slot: 0, name: 'num', kind: 'number', required: true }],
+      reports: [{ key: 'r1', slot: 0, name: 'Visitas por municipio', visual: 'Bar', settings: { category: 'cat', value: 'num', aggregate: 'Sum', target: null, columns: [], sort: 'category', appearance: {} } }],
+      layout: {
+        pages: [{ name: '', panels: [{ report: 'r1', width: 12, height: 3, title: 'Desde plantilla', description: null, hideHeader: false, color: 'aqua' }] }],
+        filters: [],
+        style: { color: null },
+      },
+    };
+    const aplicar = (fixture.componentInstance as unknown as { applyTemplate(a: TemplateApplication): Promise<void> }).applyTemplate.bind(
+      fixture.componentInstance,
+    );
+
+    await aplicar({ document: panel as never, datasets: ['ds-ventas'], assignment: { cat: 'izquierda.municipio', num: 'izquierda.venta' } });
+    await asentar();
+
+    expect(reportesNuevos).toHaveLength(1);
+    expect(reportesNuevos[0]).toEqual(expect.objectContaining({ datasetId: 'ds-ventas', name: 'Visitas por municipio' }));
+    expect(JSON.parse(reportesNuevos[0].settings)).toEqual(
+      expect.objectContaining({ category: 'izquierda.municipio', value: 'izquierda.venta' }),
+    );
+
+    const paneles = todos('.panel');
+
+    expect(paneles).toHaveLength(4);
+    expect(paneles[3].style.gridColumn).toBe('span 12');
+    expect(paneles[3].querySelector('.panel__title')?.textContent).toContain('Desde plantilla');
+    expect(paneles[3].querySelectorAll('.chart__bar')).toHaveLength(3);
+    expect(el('.board__dirty')).toBeTruthy();
   });
 });

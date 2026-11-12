@@ -74,6 +74,7 @@ import {
   ReportRun,
   ReportSnapshot,
   SavedDashboard,
+  SavedReportTemplate,
   SavedReport,
 } from '../../shared/models/reports';
 import { translate } from '../i18n/active';
@@ -555,6 +556,18 @@ export class HttpApplicationGateway extends ApplicationGateway {
 
   override deleteDashboard(id: string): Observable<void> {
     return this._http.delete<void>(`/api/reports/dashboards/${id}`);
+  }
+
+  override getReportTemplates(): Observable<readonly SavedReportTemplate[]> {
+    return this._http.get<SavedReportTemplate[]>('/api/reports/templates');
+  }
+
+  override saveReportTemplate(template: SavedReportTemplate): Observable<SavedReportTemplate> {
+    return this._http.put<SavedReportTemplate>(`/api/reports/templates/${template.id}`, template);
+  }
+
+  override deleteReportTemplate(id: string): Observable<void> {
+    return this._http.delete<void>(`/api/reports/templates/${id}`);
   }
 
   override saveReport(report: SavedReport): Observable<SavedReport> {

@@ -20,6 +20,7 @@ import {
   ReportDataset,
   ReportSnapshot,
   SavedDashboard,
+  ReportTemplateScope,
   SavedReport,
 } from '../../../shared/models/reports';
 import { Icon } from '../../../shared/ui/icon/icon';
@@ -49,6 +50,7 @@ import {
   ColorSource,
   addPage,
   addPanel,
+  insertPanels,
   applyFilters,
   categoryOptions,
   fitsFilter,
@@ -66,6 +68,9 @@ import {
   retitlePanel,
 } from '../report-dashboard-model';
 import { columnLabelFor } from '../report-draft';
+import { ReportTemplateGallery, TemplateApplication } from '../report-template-gallery/report-template-gallery';
+import { ReportTemplateSave, TemplateSaveRequest } from '../report-template-save/report-template-save';
+import { captureTemplate, instantiateTemplate, panelLayout } from '../report-template-model';
 
 /** Lo que pinta un panel, ya calculado con los filtros activos. */
 interface PanelView {
@@ -105,7 +110,7 @@ interface PanelView {
 @Component({
   selector: 'app-report-dashboard',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [Icon, ReportChart, TranslatePipe],
+  imports: [Icon, ReportChart, ReportTemplateGallery, ReportTemplateSave, TranslatePipe],
   templateUrl: './report-dashboard.html',
   styleUrl: './report-dashboard.scss',
   host: {
@@ -151,6 +156,12 @@ export class ReportDashboard {
   protected readonly values = signal<ReadonlyMap<string, FilterValue>>(new Map());
   protected readonly selectedPanel = signal<string | null>(null);
   protected readonly confirmDelete = signal(false);
+
+  /** Plantillas: qué se está guardando como plantilla, si algo, y la galería. */
+  protected readonly savingTemplate = signal<'Dashboard' | 'Panel' | null>(null);
+  protected readonly templateBusy = signal(false);
+  protected readonly galleryOpen = signal(false);
+  protected readonly galleryScopes: readonly ReportTemplateScope[] = ['Panel', 'Report'];
 
   protected readonly palette = PALETTE;
   protected readonly currentPage = signal<string | null>(null);
@@ -224,6 +235,8 @@ export class ReportDashboard {
     this.asTable.set(new Set());
     this.confirmDelete.set(false);
     this.notice.set(null);
+    this.savingTemplate.set(null);
+    this.galleryOpen.set(false);
     void this.load();
   }
 
@@ -448,6 +461,10 @@ export class ReportDashboard {
     this.editing.set(editing);
     this.editingChange.emit(editing);
     this.selectedPanel.set(null);
+
+    if (this.savingTemplate() === 'Panel') {
+      this.savingTemplate.set(null);
+    }
   }
 
   protected rename(name: string): void {
@@ -468,8 +485,13 @@ export class ReportDashboard {
   }
 
   protected select(panel: DashboardPanel): void {
-    if (this.editing()) {
+    if (this.editing() && this.selectedPanel() !== panel.id) {
       this.selectedPanel.set(panel.id);
+
+      // El formulario de plantilla de panel es del panel que estaba elegido.
+      if (this.savingTemplate() === 'Panel') {
+        this.savingTemplate.set(null);
+      }
     }
   }
 
@@ -709,6 +731,112 @@ export class ReportDashboard {
       }
 
       this.deleted.emit(id);
+    } catch (error) {
+      this.error.set(describeError(error, this._i18n));
+    }
+  }
+
+  // --- Plantillas ----------------------------------------------------------------------
+
+  /**
+   * Guarda el tablero entero —o el panel elegido— como plantilla.
+   *
+   * Se captura lo que se ve, con los cambios sin guardar: es el diseño que se
+   * quiere reutilizar. Los tipos de los campos salen de los resultados
+   * guardados que ya están cargados.
+   */
+  protected async saveAsTemplate(request: TemplateSaveRequest): Promise<void> {
+    const scope = this.savingTemplate();
+    const panel = this.selectedNow();
+    const layout = scope === 'Panel' ? (panel ? panelLayout(this.model(), panel.id) : null) : this.model();
+
+    if (!scope || !layout || this.templateBusy()) {
+      return;
+    }
+
+    const document = captureTemplate(scope, request.name, request.description, {
+      reports: this.reports(),
+      datasets: this.datasets(),
+      columnsOf: (id) => this.snapshots().get(id)?.columns ?? [],
+      layout,
+    });
+
+    if (document.reports.length === 0) {
+      this.error.set(this._i18n.t('reports.template.nothingToSave'));
+      return;
+    }
+
+    this.templateBusy.set(true);
+    this.error.set(null);
+
+    try {
+      await firstValueFrom(
+        this._gateway.saveReportTemplate({
+          id: crypto.randomUUID(),
+          name: document.name,
+          description: document.description,
+          scope,
+          model: JSON.stringify(document),
+        }),
+      );
+      this.savingTemplate.set(null);
+      this.notice.set(this._i18n.t('reports.template.savedNotice', { name: document.name }));
+    } catch (error) {
+      this.error.set(describeError(error, this._i18n));
+    } finally {
+      this.templateBusy.set(false);
+    }
+  }
+
+  protected panelTemplateName(): string {
+    return this.selected()?.title ?? '';
+  }
+
+  /**
+   * Crea los reportes de la plantilla y pone sus paneles en esta página.
+   *
+   * Los reportes quedan guardados en sus conjuntos; los paneles son un cambio
+   * del tablero, que se guarda con «Guardar» como cualquier otro.
+   */
+  protected async applyTemplate(application: TemplateApplication): Promise<void> {
+    this.galleryOpen.set(false);
+    this.error.set(null);
+
+    const copy = instantiateTemplate(
+      application.document,
+      application.datasets,
+      application.assignment,
+      undefined,
+      this.reports(),
+    );
+
+    try {
+      const saved: SavedReport[] = [];
+
+      for (const report of copy.reports) {
+        saved.push(await firstValueFrom(this._gateway.saveReport(report)));
+      }
+
+      this.reports.update((list) => [...list, ...saved]);
+
+      const panels =
+        copy.layout?.pages.flatMap((page) => page.panels) ??
+        saved.map((report) => ({
+          id: crypto.randomUUID(),
+          reportId: report.id,
+          width: 6,
+          height: 4,
+          title: null,
+          description: null,
+          hideHeader: false,
+          color: null,
+        }));
+
+      this.model.update((model) => insertPanels(model, this.page().id, panels));
+      this.selectedPanel.set(panels[panels.length - 1]?.id ?? null);
+      this.notice.set(this._i18n.t('reports.template.appliedPanels', { count: panels.length }));
+      await this.loadSnapshots();
+      this.bindNewDatasets();
     } catch (error) {
       this.error.set(describeError(error, this._i18n));
     }

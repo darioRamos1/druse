@@ -7,6 +7,7 @@ import {
   ReportRun,
   ReportSnapshot,
   SavedDashboard,
+  SavedReportTemplate,
   SavedReport,
 } from '../../shared/models/reports';
 
@@ -596,6 +597,13 @@ export abstract class ApplicationGateway {
   abstract saveDashboard(dashboard: SavedDashboard): Observable<SavedDashboard>;
 
   abstract deleteDashboard(id: string): Observable<void>;
+
+  /** Plantillas de diseño: un reporte, un panel o un tablero, sin SQL ni filas. */
+  abstract getReportTemplates(): Observable<readonly SavedReportTemplate[]>;
+
+  abstract saveReportTemplate(template: SavedReportTemplate): Observable<SavedReportTemplate>;
+
+  abstract deleteReportTemplate(id: string): Observable<void>;
 
   abstract saveReport(report: SavedReport): Observable<SavedReport>;
 

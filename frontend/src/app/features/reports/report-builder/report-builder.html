@@ -173,7 +173,19 @@
         >
           <app-icon name="plus" [size]="11" />
         </button>
+        <button
+          type="button"
+          class="icon-button"
+          (click)="galleryOpen.set(true)"
+          [attr.aria-label]="'reports.template.newFromTemplate' | t"
+          [attr.title]="'reports.template.newFromTemplate' | t"
+        >
+          <app-icon name="copy" [size]="11" />
+        </button>
       </div>
+      @if (templateError(); as message) {
+        <p class="rail__hint rail__hint--danger" role="alert">{{ message }}</p>
+      }
       @if (!loadingList() && dashboards().length === 0) {
         <p class="rail__hint">{{ 'reports.dashboard.none' | t }}</p>
       } @else {
@@ -642,3 +654,12 @@
     </div>
   }
 </ng-template>
+
+@if (galleryOpen()) {
+  <app-report-template-gallery
+    [scopes]="dashboardScopes"
+    [datasets]="datasets()"
+    (applied)="createFromTemplate($event)"
+    (closed)="galleryOpen.set(false)"
+  />
+}

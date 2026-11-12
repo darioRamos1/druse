@@ -80,8 +80,35 @@ public sealed record ReportDashboardDto
     public DateTimeOffset UpdatedAtUtc { get; init; }
 }
 
+public sealed record ReportTemplateDto
+{
+    /// <summary>En las peticiones manda el de la ruta.</summary>
+    public Guid Id { get; init; }
+    public required string Name { get; init; }
+    public string? Description { get; init; }
+
+    /// <summary>`Report`, `Panel` o `Dashboard`.</summary>
+    public required string Scope { get; init; }
+
+    /// <summary>JSON con el diseño y los campos lógicos; nunca SQL, conexiones ni filas.</summary>
+    public required string Model { get; init; }
+    public DateTimeOffset CreatedAtUtc { get; init; }
+    public DateTimeOffset UpdatedAtUtc { get; init; }
+}
+
 internal static class ReportRunContractMapper
 {
+    public static ReportTemplateDto ToDto(this ReportTemplate template) => new()
+    {
+        Id = template.Id,
+        Name = template.Name,
+        Description = template.Description,
+        Scope = template.Scope.ToString(),
+        Model = template.Model,
+        CreatedAtUtc = template.CreatedAtUtc,
+        UpdatedAtUtc = template.UpdatedAtUtc,
+    };
+
     public static ReportDashboardDto ToDto(this ReportDashboard dashboard) => new()
     {
         Id = dashboard.Id,
