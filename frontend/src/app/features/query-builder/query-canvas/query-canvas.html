@@ -1,0 +1,172 @@
+<!--
+  El lienzo se desplaza con las barras del contenedor y no con un arrastre del
+  fondo: así la rueda y el teclado funcionan como en el resto del compositor.
+-->
+<div class="canvas" [attr.aria-label]="'canvas.label' | t" role="group">
+  <div
+    class="surface"
+    #surface
+    [style.width.px]="size().width"
+    [style.height.px]="size().height"
+    (pointermove)="move($event)"
+    (pointerup)="end($event)"
+    (pointercancel)="end($event)"
+  >
+    <svg class="wires" [attr.width]="size().width" [attr.height]="size().height" aria-hidden="true">
+      @for (link of drawn(); track link.joinId) {
+        <path class="wire" [class.is-broken]="link.broken" [attr.d]="link.path" />
+      }
+      @if (ghost(); as path) {
+        <path class="wire wire--ghost" [attr.d]="path" />
+      }
+    </svg>
+
+    @for (link of drawn(); track link.joinId) {
+      <span
+        class="wire-label"
+        [class.is-broken]="link.broken"
+        [style.left.px]="link.mid.x"
+        [style.top.px]="link.mid.y"
+        translate="no"
+        >{{ link.type }}</span
+      >
+    }
+
+    @for (box of placed(); track box.key) {
+      <section
+        class="box"
+        [class.box--base]="box.joinId === null"
+        [style.left.px]="box.x"
+        [style.top.px]="box.y"
+        [style.width.px]="boxWidth"
+        [attr.aria-label]="box.label"
+      >
+        <header class="box__head" (pointerdown)="startBox($event, box)">
+          @if (box.alias) {
+            <span class="box__alias" translate="no">{{ box.alias }}</span>
+          }
+          <span class="box__name" [title]="box.label">{{ box.name }}</span>
+          @if (box.joinId === null) {
+            <span class="box__tag">{{ 'canvas.main' | t }}</span>
+          } @else {
+            <select
+              class="box__type"
+              [value]="box.type"
+              (change)="joinType.emit({ joinId: box.joinId, type: $any($event.target).value })"
+              [attr.aria-label]="'canvas.joinTypeOf' | t: { table: box.label }"
+            >
+              @for (type of joinTypes(); track type) {
+                <option [value]="type" [selected]="type === box.type" translate="no">
+                  {{ type }}
+                </option>
+              }
+            </select>
+            <button
+              type="button"
+              class="box__remove"
+              (click)="removeJoin.emit(box.joinId)"
+              [attr.aria-label]="'canvas.removeTable' | t: { table: box.label }"
+              [title]="'canvas.removeTable' | t: { table: box.label }"
+            >
+              ×
+            </button>
+          }
+        </header>
+
+        @if (box.columns.length > maxRows) {
+          <input
+            class="box__search"
+            type="search"
+            [value]="searches()[box.key] ?? ''"
+            (input)="setSearch(box.key, $any($event.target).value)"
+            [placeholder]="'canvas.searchColumns' | t"
+            [attr.aria-label]="'canvas.searchColumnsOf' | t: { table: box.label }"
+          />
+        }
+
+        @for (column of box.rows; track column.name) {
+          <div
+            class="row"
+            [class.row--pk]="column.isPrimaryKey"
+            [class.row--linked]="box.linked.has(column.name)"
+            [attr.data-box]="box.key"
+            [attr.data-column]="column.name"
+          >
+            @if (!grouped()) {
+              <input
+                type="checkbox"
+                [checked]="isChosen(box, column.name)"
+                (change)="toggleColumn.emit({ key: box.key, column: column.name })"
+                [attr.aria-label]="
+                  'canvas.chooseColumn' | t: { column: column.name, table: box.label }
+                "
+              />
+            }
+            <span class="row__name" [title]="column.name + ' · ' + column.dataType">{{
+              column.name
+            }}</span>
+            <span class="row__type">{{ column.dataType }}</span>
+            <button
+              type="button"
+              class="row__port"
+              (pointerdown)="startWire($event, box, column.name)"
+              (keydown.enter)="openMenu(box, column.name, $event)"
+              (keydown.space)="openMenu(box, column.name, $event)"
+              [attr.aria-label]="'canvas.joinWith' | t: { column: column.name }"
+              [title]="'canvas.joinWithHint' | t"
+            ></button>
+          </div>
+        } @empty {
+          <p class="box__empty">
+            {{ (box.loading ? 'builder.loadingColumns' : 'builder.noColumns') | t }}
+          </p>
+        }
+
+        @if (box.hidden > 0) {
+          <p class="box__more">{{ 'canvas.moreColumns' | t: { count: box.hidden } }}</p>
+        }
+      </section>
+    }
+
+    @if (menu(); as open) {
+      @if (menuBox(); as box) {
+        <div
+          class="menu"
+          #menu
+          role="menu"
+          [style.left.px]="box.x + boxWidth + 10"
+          [style.top.px]="menuTop()"
+          (keydown.escape)="closeMenu($event)"
+        >
+          <p class="menu__title">{{ 'canvas.joinWithTitle' | t: { column: open.column } }}</p>
+          @for (target of targets(); track target.box.key) {
+            <p class="menu__group">{{ target.box.label }}</p>
+            @for (column of target.columns; track column.name) {
+              <button
+                type="button"
+                role="menuitem"
+                class="menu__item"
+                data-target
+                (click)="join(open, { key: target.box.key, column: column.name })"
+              >
+                <span>{{ column.name }}</span>
+                <small>{{ column.dataType }}</small>
+              </button>
+            }
+          } @empty {
+            <p class="menu__empty">{{ 'canvas.nothingToJoin' | t }}</p>
+          }
+          <button type="button" class="menu__close" (click)="closeMenu()">
+            {{ 'common.cancel' | t }}
+          </button>
+        </div>
+      }
+    }
+  </div>
+</div>
+
+@if (boxes().length === 1) {
+  <p class="hint">{{ 'canvas.emptyHint' | t }}</p>
+} @else {
+  <p class="hint">{{ 'canvas.connectHint' | t }}</p>
+}

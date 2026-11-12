@@ -66,6 +66,15 @@ import {
   SelectModel,
   isDateColumn,
 } from '../query-model';
+import { QueryCanvas } from '../query-canvas/query-canvas';
+import {
+  BASE_KEY,
+  CanvasBox,
+  CanvasLink,
+  ColumnEnd,
+  Connection,
+  joinKey,
+} from '../query-canvas/query-canvas-layout';
 import { DialogFocus } from '../../../shared/a11y/dialog-focus';
 import { DialogBackdrop } from '../../../shared/a11y/dialog-backdrop';
 import { Icon } from '../../../shared/ui/icon/icon';
@@ -134,6 +143,9 @@ const AUTO_PREVIEW_DELAY_MS = 700;
 /** Dónde se recuerda si la vista previa se actualiza sola. Es de quien usa Druse, no de la tabla. */
 const AUTO_PREVIEW_KEY = 'druse.query-builder.auto-preview';
 
+/** Dónde se recuerda si se compone con el formulario o con el lienzo. */
+const VIEW_KEY = 'druse.query-builder.view';
+
 /** Operadores que se ofrecen, en el orden en que se usan. */
 const OPERATORS: readonly FilterOperator[] = [
   '=',
@@ -176,7 +188,7 @@ const DATE_PERIODS: readonly { readonly value: DatePeriod | 'none'; readonly lab
 @Component({
   selector: 'app-query-builder',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [Icon, DialogBackdrop, DialogFocus, ValueInput, ResultsGrid, TranslatePipe],
+  imports: [Icon, DialogBackdrop, DialogFocus, ValueInput, ResultsGrid, TranslatePipe, QueryCanvas],
   templateUrl: './query-builder.html',
   styleUrl: './query-builder.scss',
 })
@@ -292,6 +304,122 @@ export class QueryBuilder implements OnInit {
     columns: this.columns(),
     joinColumns: new Map(this.joins().map((join) => [join.id, join.columns])),
   }));
+
+  /**
+   * Formulario o lienzo: dos maneras de editar las columnas y los cruces del
+   * mismo SELECT. Se recuerda, como la vista previa automática.
+   */
+  protected readonly view = signal<'form' | 'canvas'>(readView());
+
+  protected setView(view: 'form' | 'canvas'): void {
+    this.view.set(view);
+
+    try {
+      localStorage.setItem(VIEW_KEY, view);
+    } catch {
+      // Sin almacenamiento se recuerda solo mientras el diálogo siga abierto.
+    }
+  }
+
+  protected readonly layout = this._layout.asReadonly();
+
+  /** Las cajas del lienzo: la tabla principal y un cruce por caja, en el orden del SQL. */
+  protected readonly canvasBoxes = computed<readonly CanvasBox[]>(() => {
+    const joins = this.joins();
+    const aliased = Model.toQueryJoins(this.model().joins).length > 0;
+
+    return [
+      {
+        key: BASE_KEY,
+        alias: aliased ? 't0' : '',
+        label: this.relationLabel(this.table()),
+        name: this.table().name,
+        columns: this.columns(),
+        chosen: this.chosen(),
+        joinId: null,
+        type: null,
+        leftKey: null,
+        loading: this.loading(),
+      },
+      ...joins.map((join, index) => ({
+        key: joinKey(join.id),
+        alias: `t${index + 1}`,
+        label: this.relationLabel(this.joinRelation(join)) || join.search,
+        name: this.joinRelation(join)?.name ?? join.search,
+        columns: join.columns,
+        chosen: join.chosen,
+        joinId: join.id,
+        type: join.type,
+        leftKey: join.leftJoinId === null ? BASE_KEY : joinKey(join.leftJoinId),
+        loading: join.loading,
+      })),
+    ];
+  });
+
+  /** Una línea por cruce con condición; un CROSS no une columnas y no la lleva. */
+  protected readonly canvasLinks = computed<readonly CanvasLink[]>(() =>
+    this.joins()
+      .filter((join) => join.type !== 'CROSS' && this.joinRelation(join))
+      .map((join) => ({
+        joinId: join.id,
+        key: joinKey(join.id),
+        leftKey: join.leftJoinId === null ? BASE_KEY : joinKey(join.leftJoinId),
+        leftColumn: join.leftColumn,
+        rightColumn: join.rightColumn,
+        type: join.type,
+      })),
+  );
+
+  /** Tablas que se pueden añadir al lienzo: todas las de la base salvo la principal. */
+  protected addTable(tableId: string): void {
+    if (tableId) {
+      this.addJoin(tableId);
+    }
+  }
+
+  protected canvasToggle(end: ColumnEnd): void {
+    if (end.key === BASE_KEY) {
+      this.toggleColumn(end.column);
+      return;
+    }
+
+    const join = this.joins().find((item) => joinKey(item.id) === end.key);
+    if (join) {
+      this.toggleJoinColumn(join.id, end.column);
+    }
+  }
+
+  /**
+   * Une dos columnas en el lienzo.
+   *
+   * Un CROSS que recibe una condición pasa a INNER: quien une dos columnas
+   * quiere un cruce por ellas, y un CROSS la ignoraría.
+   */
+  protected canvasConnect(connection: Connection): void {
+    const join = this.joins().find((item) => item.id === connection.joinId);
+
+    if (!join) {
+      return;
+    }
+
+    this.patchJoin(join.id, {
+      leftJoinId: connection.leftJoinId,
+      leftColumn: connection.leftColumn,
+      rightColumn: connection.rightColumn,
+      type: join.type === 'CROSS' ? 'INNER' : join.type,
+    });
+  }
+
+  /** Trae las tablas de un esquema para poder añadirlas al lienzo. */
+  protected loadSchema(schema: string): void {
+    if (schema) {
+      void this._store.ensureRelationsAsync(schema, this.connectionId(), this.table().database);
+    }
+  }
+
+  protected setLayout(layout: CanvasLayout): void {
+    this._layout.set(layout);
+  }
 
   /** Aplica una operación del modelo; los cruces no cambian por esta vía. */
   private apply(operation: (model: SelectModel, catalog: ModelCatalog) => SelectModel): void {
@@ -701,8 +829,16 @@ export class QueryBuilder implements OnInit {
       );
   });
 
-  protected addJoin(): void {
-    const relation = this.availableRelations()[0];
+  /** Añade un cruce; sin tabla dicha, con la primera que se ofrece. */
+  protected addJoin(tableId?: string): void {
+    const relation =
+      tableId === undefined
+        ? this.availableRelations()[0]
+        : this.availableRelations().find((node) => node.source.id === tableId);
+
+    if (tableId !== undefined && !relation) {
+      return;
+    }
 
     if (!relation && this.availableSchemas().length === 0) {
       return;
@@ -1734,6 +1870,14 @@ function formField<K extends keyof SelectForm>(
     update: (fn: (value: SelectForm[K]) => SelectForm[K]) => set(fn(form()[key])),
     asReadonly: () => field as Signal<SelectForm[K]>,
   }) as WritableSignal<SelectForm[K]>;
+}
+
+function readView(): 'form' | 'canvas' {
+  try {
+    return localStorage.getItem(VIEW_KEY) === 'canvas' ? 'canvas' : 'form';
+  } catch {
+    return 'form';
+  }
 }
 
 function readAutoPreview(): boolean {

@@ -136,6 +136,22 @@ fase 0 no cambia nada a la vista: lleva su commit, sin versión ni novedades.
 `frontend/src/app/features/query-builder/query-model.ts` con sus pruebas al
 lado; las del compositor y las E2E que lo abren pasan sin cambios.
 
+Fase 1 hecha el mismo día, en la versión 1.21.0, con el lienzo en
+`frontend/src/app/features/query-builder/query-canvas/`. Cambios respecto a lo
+previsto:
+
+- La colocación es propia y no usa `layoutDiagram`: el diagrama identifica cada
+  caja por su tabla, y aquí la misma tabla puede salir dos veces con alias
+  distintos. Las cajas van por niveles, cada cruce a la derecha de su origen.
+- El arrastre usa eventos de puntero y no el arrastre nativo del navegador,
+  que Tauri intercepta en Windows para soltar archivos.
+- Las tablas se añaden desde el propio lienzo (añadir tabla, llegar hasta,
+  claves foráneas detectadas). Arrastrarlas desde el explorador queda pendiente.
+- Las sugerencias por clave foránea son botones sobre el lienzo, no líneas
+  punteadas: la tabla sugerida todavía no tiene caja a la que llegar.
+- Las pestañas son Formulario y Lienzo; el SQL sigue a la vista en el panel de
+  la derecha, como antes, en las dos.
+
 | Fase | Trabajo | Cómo se valida |
 |---|---|---|
 | 0. Modelo único | Sacar `query-model.ts` del compositor sin cambiar su comportamiento. Añadir `layout` y versión de formato. | Las pruebas actuales del compositor pasan sin tocarlas. Composiciones antiguas se abren igual. Pruebas del modelo: mismo SQL que antes en los seis motores. |

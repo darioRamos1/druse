@@ -29,6 +29,49 @@
   min-width: 0;
 }
 
+/* Formulario o lienzo: un segmentado pequeño, que no compita con SELECT/INSERT. */
+.view-switch {
+  display: inline-flex;
+  gap: 2px;
+  margin-bottom: 14px;
+  padding: 2px;
+  border: 1px solid var(--dr-border);
+  border-radius: var(--dr-radius);
+  background: var(--dr-surface-sunken);
+
+  button {
+    padding: 4px 14px;
+    border: 0;
+    border-radius: var(--dr-radius-xs);
+    background: transparent;
+    color: var(--dr-text-tertiary);
+    font-size: 11.5px;
+    cursor: pointer;
+
+    &:hover {
+      color: var(--dr-text);
+    }
+
+    &.is-active {
+      background: var(--dr-surface-panel);
+      color: var(--dr-text);
+      box-shadow: 0 0 0 1px var(--dr-border);
+    }
+  }
+}
+
+.canvas-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+
+  select {
+    max-width: 260px;
+  }
+}
+
 .block {
   margin-bottom: 18px;
 

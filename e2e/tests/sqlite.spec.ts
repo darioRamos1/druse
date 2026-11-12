@@ -594,6 +594,69 @@ test.describe('SQLite de punta a punta', () => {
     }
   });
 
+  test('el lienzo cruza dos tablas arrastrando una columna sobre otra', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    await abrir(page);
+    await hastaLasTablas(page);
+    // En oscuro: el claro ya sale en la captura del formulario.
+    await page.getByRole('button', { name: 'Tema oscuro', exact: true }).click();
+    await menuDeNodo(page, 'pedidos');
+    await page.getByRole('menuitem', { name: 'Componer consulta', exact: true }).click();
+    const builder = page.locator('app-query-builder');
+    const sql = builder.locator('textarea.sql');
+
+    await builder.getByRole('button', { name: 'Lienzo', exact: true }).click();
+    const canvas = builder.locator('app-query-canvas');
+    await expect(canvas.locator('.box')).toHaveCount(1);
+
+    const add = builder.getByRole('combobox', { name: 'Añadir una tabla al lienzo' });
+    const clientes = await add.locator('option', { hasText: 'clientes' }).getAttribute('value');
+    await add.selectOption(clientes!);
+    await expect(canvas.locator('.box')).toHaveCount(2);
+    // Al añadirla se cruza por la columna que comparten de nombre: aquí `id`,
+    // que no es la relación buena. Se corrige arrastrando.
+    await expect(sql).toHaveValue(/JOIN .*"clientes" AS "t1"/);
+
+    const port = canvas.locator('[data-box="base"][data-column="cliente_id"] .row__port');
+    const target = canvas.locator('[data-box="join:1"][data-column="id"]');
+    const from = (await port.boundingBox())!;
+    const to = (await target.boundingBox())!;
+    await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(to.x + to.width / 2, to.y + to.height / 2, { steps: 12 });
+    await expect(canvas.locator('.wire--ghost')).toHaveCount(1);
+    await page.mouse.up();
+    await expect(sql).toHaveValue(/ON "t0"\."cliente_id" = "t1"\."id"/);
+    await expect(canvas.locator('.wire:not(.wire--ghost)')).toHaveCount(1);
+
+    await canvas.getByRole('checkbox', { name: /Incluir nombre de .*clientes/ }).check();
+    await expect(sql).toHaveValue(/"t1"\."nombre"/);
+    await builder.getByRole('button', { name: 'Probar con 10 filas' }).click();
+    await expect(builder.locator('app-results-grid')).toContainText('Ana');
+
+    // Una caja se mueve desde su cabecera y se queda donde se suelta.
+    const head = canvas.locator('.box').nth(1).locator('.box__head .box__name');
+    const before = (await canvas.locator('.box').nth(1).boundingBox())!;
+    const grip = (await head.boundingBox())!;
+    await page.mouse.move(grip.x + 10, grip.y + grip.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(grip.x + 10, grip.y + 140, { steps: 8 });
+    await page.mouse.up();
+    await expect
+      .poll(async () => (await canvas.locator('.box').nth(1).boundingBox())!.y)
+      .toBeGreaterThan(before.y + 100);
+    await expect(sql).toHaveValue(/ON "t0"\."cliente_id" = "t1"\."id"/);
+
+    if (process.env['DRUSE_BARRIDO_DIR']) {
+      mkdirSync(BARRIDO, { recursive: true });
+      await page.screenshot({ path: join(BARRIDO, 'query-builder-canvas-dark.png') });
+    }
+
+    // El formulario ve el mismo cruce que el lienzo.
+    await builder.getByRole('button', { name: 'Formulario', exact: true }).click();
+    await expect(builder.locator('.join-card')).toHaveCount(1);
+  });
+
   test('el formulario pierde el servidor y el árbol trae lo que hay dentro', async ({ page }) => {
     await abrir(page);
 

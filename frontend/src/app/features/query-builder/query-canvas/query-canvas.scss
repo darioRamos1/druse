@@ -1,0 +1,325 @@
+/*
+  Mismo lenguaje que el diagrama: fondo de puntos, cajas de panel y líneas del
+  color de acento. Las medidas que importan para las líneas —cabecera, filas,
+  buscador— salen de `query-canvas-layout.ts`; si cambian aquí, cambian allí.
+*/
+:host {
+  display: block;
+}
+
+.canvas {
+  position: relative;
+  height: 420px;
+  overflow: auto;
+  border: 1px solid var(--dr-border);
+  border-radius: 8px;
+  background: var(--dr-surface-base);
+  background-image: radial-gradient(var(--dr-border) 1px, transparent 0);
+  background-size: 22px 22px;
+}
+
+.surface {
+  position: relative;
+  min-width: 100%;
+  min-height: 100%;
+  touch-action: none;
+}
+
+.wires {
+  position: absolute;
+  inset: 0 auto auto 0;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.wire {
+  fill: none;
+  stroke: var(--dr-accent);
+  stroke-width: 1.75;
+  stroke-linecap: round;
+
+  &.is-broken {
+    stroke: var(--dr-danger);
+    stroke-dasharray: 5 4;
+  }
+
+  &--ghost {
+    stroke-dasharray: 4 4;
+    opacity: 0.8;
+  }
+}
+
+.wire-label {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  padding: 1px 6px;
+  border: 1px solid var(--dr-accent-line);
+  border-radius: 999px;
+  background: var(--dr-surface-panel);
+  color: var(--dr-accent);
+  font-family: var(--dr-font-mono);
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  pointer-events: none;
+
+  &.is-broken {
+    border-color: var(--dr-danger-line);
+    color: var(--dr-danger-text);
+  }
+}
+
+.box {
+  position: absolute;
+  border: 1px solid var(--dr-border);
+  border-radius: var(--dr-radius);
+  background: var(--dr-surface-panel);
+  box-shadow: var(--dr-shadow-popover);
+
+  &--base {
+    border-color: var(--dr-accent-line);
+  }
+
+  &__head {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    height: 36px;
+    padding: 0 8px;
+    border-bottom: 1px solid var(--dr-border);
+    cursor: grab;
+    user-select: none;
+
+    &:active {
+      cursor: grabbing;
+    }
+  }
+
+  &__alias {
+    flex: none;
+    padding: 1px 5px;
+    border-radius: var(--dr-radius-xs);
+    background: var(--dr-accent-tint);
+    color: var(--dr-accent);
+    font-family: var(--dr-font-mono);
+    font-size: 10px;
+    font-weight: 600;
+  }
+
+  &__name {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    color: var(--dr-text);
+    font-weight: 600;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &__tag {
+    flex: none;
+    color: var(--dr-text-tertiary);
+    font-size: 10.5px;
+  }
+
+  &__type {
+    flex: none;
+    max-width: 78px;
+    height: 22px;
+    padding: 0 4px;
+    font-family: var(--dr-font-mono);
+    font-size: 10px;
+  }
+
+  &__remove {
+    flex: none;
+    width: 22px;
+    height: 22px;
+    border: 0;
+    border-radius: var(--dr-radius-xs);
+    background: transparent;
+    color: var(--dr-text-tertiary);
+    font-size: 15px;
+    line-height: 1;
+    cursor: pointer;
+
+    &:hover,
+    &:focus-visible {
+      background: var(--dr-danger-tint);
+      color: var(--dr-danger-text);
+    }
+  }
+
+  &__search {
+    display: block;
+    width: calc(100% - 12px);
+    height: 26px;
+    margin: 4px 6px;
+    font-size: 11px;
+  }
+
+  &__empty,
+  &__more {
+    margin: 0;
+    padding: 0 10px;
+    color: var(--dr-text-tertiary);
+    font-size: 11px;
+    line-height: 26px;
+  }
+}
+
+.row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 26px;
+  padding: 0 22px 0 8px;
+
+  &:hover {
+    background: var(--dr-surface-hover);
+  }
+
+  &--pk .row__name {
+    color: var(--dr-text-bright);
+    text-decoration: underline dotted var(--dr-text-tertiary);
+  }
+
+  &--linked .row__port {
+    border-color: var(--dr-accent);
+    background: var(--dr-accent);
+  }
+
+  input[type='checkbox'] {
+    flex: none;
+    margin: 0;
+  }
+
+  &__name {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    color: var(--dr-text-secondary);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &__type {
+    flex: none;
+    max-width: 78px;
+    overflow: hidden;
+    color: var(--dr-text-faint);
+    font-family: var(--dr-font-mono);
+    font-size: 9.5px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* El enganche: se arrastra a otra columna, o se pulsa para elegirla de una lista. */
+  &__port {
+    position: absolute;
+    right: 5px;
+    width: 11px;
+    height: 11px;
+    padding: 0;
+    border: 1.5px solid var(--dr-accent-line);
+    border-radius: 50%;
+    background: var(--dr-surface-panel);
+    cursor: crosshair;
+
+    &:hover,
+    &:focus-visible {
+      border-color: var(--dr-accent);
+      box-shadow: 0 0 0 3px var(--dr-accent-line-soft);
+    }
+  }
+}
+
+.menu {
+  position: absolute;
+  z-index: 2;
+  width: 240px;
+  max-height: 280px;
+  overflow-y: auto;
+  padding: 6px;
+  border: 1px solid var(--dr-border-strong);
+  border-radius: var(--dr-radius);
+  background: var(--dr-surface-raised);
+  box-shadow: var(--dr-shadow-menu);
+
+  &__title {
+    margin: 2px 6px 6px;
+    color: var(--dr-text);
+    font-weight: 600;
+  }
+
+  &__group {
+    margin: 6px 6px 2px;
+    color: var(--dr-text-tertiary);
+    font-size: 10.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  &__item {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    width: 100%;
+    padding: 4px 8px;
+    border: 0;
+    border-radius: var(--dr-radius-xs);
+    background: transparent;
+    color: var(--dr-text-secondary);
+    text-align: left;
+    cursor: pointer;
+
+    small {
+      color: var(--dr-text-faint);
+      font-family: var(--dr-font-mono);
+      font-size: 9.5px;
+    }
+
+    &:hover,
+    &:focus-visible {
+      background: var(--dr-accent-tint);
+      color: var(--dr-text);
+      outline: none;
+    }
+  }
+
+  &__empty {
+    margin: 4px 8px;
+    color: var(--dr-text-tertiary);
+  }
+
+  &__close {
+    width: 100%;
+    margin-top: 6px;
+    padding: 4px;
+    border: 1px solid var(--dr-border);
+    border-radius: var(--dr-radius-xs);
+    background: transparent;
+    color: var(--dr-text-secondary);
+    cursor: pointer;
+  }
+}
+
+.hint {
+  margin: 6px 0 0;
+  color: var(--dr-text-tertiary);
+  font-size: 11.5px;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .menu {
+    animation: menu-in 120ms ease-out;
+  }
+}
+
+@keyframes menu-in {
+  from {
+    opacity: 0;
+    transform: translateY(-3px);
+  }
+}

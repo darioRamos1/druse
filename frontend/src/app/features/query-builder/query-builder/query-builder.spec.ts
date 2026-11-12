@@ -1439,4 +1439,159 @@ describe('QueryBuilder', () => {
     expect(fixture.nativeElement.querySelector('.join-suggestions')).toBeNull();
     expect(cerrado).toBe(false);
   });
+
+  describe('lienzo', () => {
+    async function onCanvas(): Promise<ComponentFixture<QueryBuilder>> {
+      const fixture = await create(table);
+      const element = fixture.nativeElement as HTMLElement;
+
+      [...element.querySelectorAll<HTMLButtonElement>('.view-switch button')]
+        .find((button) => button.textContent?.trim() === 'Lienzo')!
+        .click();
+      fixture.detectChanges();
+
+      return fixture;
+    }
+
+    async function addCustomers(fixture: ComponentFixture<QueryBuilder>): Promise<void> {
+      const add = fixture.nativeElement.querySelector(
+        'select[aria-label="Añadir una tabla al lienzo"]',
+      ) as HTMLSelectElement;
+
+      add.value = customer.id;
+      add.dispatchEvent(new Event('change'));
+      await fixture.whenStable();
+      fixture.detectChanges();
+    }
+
+    const sqlOf = (fixture: ComponentFixture<QueryBuilder>) =>
+      (fixture.nativeElement.querySelector('textarea.sql') as HTMLTextAreaElement).value;
+
+    it('enseña la tabla principal como caja y recuerda que se eligió el lienzo', async () => {
+      const fixture = await onCanvas();
+      const boxes = fixture.nativeElement.querySelectorAll('app-query-canvas .box');
+
+      expect(boxes).toHaveLength(1);
+      expect(boxes[0].getAttribute('aria-label')).toBe('public.orders');
+      expect(boxes[0].querySelector('.box__name')?.textContent).toBe('orders');
+      expect(localStorage.getItem('druse.query-builder.view')).toBe('canvas');
+      // El formulario de columnas y cruces deja paso al lienzo; el resto sigue.
+      expect(fixture.nativeElement.querySelector('.joins-block')).toBeNull();
+      expect(fixture.nativeElement.textContent).toContain('Cálculos y agrupación');
+    });
+
+    it('añadir una tabla la cruza por la columna que comparten, como el formulario', async () => {
+      const fixture = await onCanvas();
+      await addCustomers(fixture);
+
+      expect(fixture.nativeElement.querySelectorAll('app-query-canvas .box')).toHaveLength(2);
+      expect(sqlOf(fixture)).toContain('INNER JOIN [public].[customers] AS [t1]');
+      expect(sqlOf(fixture)).toContain('ON [t0].[id] = [t1].[id]');
+    });
+
+    it('marca columnas de cualquier caja y cambia el tipo de cruce en la propia caja', async () => {
+      const fixture = await onCanvas();
+      await addCustomers(fixture);
+
+      (
+        fixture.nativeElement.querySelector(
+          'input[aria-label="Incluir name de public.customers"]',
+        ) as HTMLInputElement
+      ).click();
+      const type = fixture.nativeElement.querySelector(
+        'select[aria-label="Tipo de cruce de public.customers"]',
+      ) as HTMLSelectElement;
+      type.value = 'LEFT';
+      type.dispatchEvent(new Event('change'));
+      fixture.detectChanges();
+
+      expect(sqlOf(fixture)).toContain('[t1].[name]');
+      expect(sqlOf(fixture)).toContain('LEFT JOIN [public].[customers] AS [t1]');
+    });
+
+    it('con el teclado, el enganche de una columna abre la lista para cruzarla', async () => {
+      const fixture = await onCanvas();
+      await addCustomers(fixture);
+      const element = fixture.nativeElement as HTMLElement;
+
+      element
+        .querySelector<HTMLButtonElement>('[data-box="join:1"][data-column="name"] .row__port')!
+        .dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+      fixture.detectChanges();
+
+      const menu = element.querySelector('app-query-canvas .menu') as HTMLElement;
+      expect(menu.textContent).toContain('Cruzar name con…');
+      expect(document.activeElement?.closest('.menu')).toBe(menu);
+
+      [...menu.querySelectorAll<HTMLButtonElement>('.menu__item')]
+        .find((item) => item.textContent?.includes('note'))!
+        .click();
+      fixture.detectChanges();
+
+      // Se cruce desde donde se cruce, el cruce que cambia es el de la caja que
+      // va después, y parte de la principal.
+      expect(sqlOf(fixture)).toContain('ON [t0].[note] = [t1].[name]');
+      expect(element.querySelector('app-query-canvas .menu')).toBeNull();
+    });
+
+    it('Escape cierra la lista sin cerrar el diálogo', async () => {
+      const fixture = await onCanvas();
+      await addCustomers(fixture);
+      const element = fixture.nativeElement as HTMLElement;
+      let cerrado = false;
+      fixture.componentInstance.closed.subscribe(() => (cerrado = true));
+
+      element
+        .querySelector<HTMLButtonElement>('[data-box="base"][data-column="id"] .row__port')!
+        .dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+      fixture.detectChanges();
+      element
+        .querySelector('app-query-canvas .menu')!
+        .dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+      fixture.detectChanges();
+
+      expect(element.querySelector('app-query-canvas .menu')).toBeNull();
+      expect(cerrado).toBe(false);
+    });
+
+    it('quitar una caja quita su cruce, y el formulario ve lo mismo que el lienzo', async () => {
+      const fixture = await onCanvas();
+      await addCustomers(fixture);
+      const element = fixture.nativeElement as HTMLElement;
+      const view = (name: string) =>
+        [...element.querySelectorAll<HTMLButtonElement>('.view-switch button')]
+          .find((button) => button.textContent?.trim() === name)!
+          .click();
+
+      view('Formulario');
+      fixture.detectChanges();
+      expect(element.querySelectorAll('.join-card')).toHaveLength(1);
+
+      view('Lienzo');
+      fixture.detectChanges();
+      element
+        .querySelector<HTMLButtonElement>(
+          'button[aria-label="Quitar public.customers del lienzo"]',
+        )!
+        .click();
+      fixture.detectChanges();
+
+      expect(sqlOf(fixture)).not.toContain('JOIN');
+      expect(element.querySelectorAll('app-query-canvas .box')).toHaveLength(1);
+    });
+
+    it('guarda las posiciones de las cajas con la composición', async () => {
+      const fixture = await onCanvas();
+      const builder = fixture.componentInstance as any;
+
+      builder.setLayout({ base: { x: 300, y: 40 } });
+      builder.compositionName.set('Con lienzo');
+      builder.saveComposition();
+      await fixture.whenStable();
+
+      const saved = JSON.parse(compositions.records[0].model);
+      expect(saved.state.layout).toEqual({ base: { x: 300, y: 40 } });
+      expect(saved.state.version).toBe(2);
+    });
+  });
 });
