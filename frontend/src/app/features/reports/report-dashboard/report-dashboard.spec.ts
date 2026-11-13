@@ -184,6 +184,12 @@ describe('ReportDashboard', () => {
   let libros: ExportDocument[];
   let archivos: { name: string; blob: Blob }[];
   let reportesNuevos: SavedReport[];
+  /** El logo que devuelve la API de la identidad del tablero. */
+  let logo: string;
+
+  function textoVisible(): string {
+    return (fixture.nativeElement as HTMLElement).textContent?.replace(/\s+/g, ' ') ?? '';
+  }
 
   async function asentar(): Promise<void> {
     for (let intento = 0; intento < 30; intento++) {
@@ -236,6 +242,7 @@ describe('ReportDashboard', () => {
     borrados = [];
     plantillas = [];
     reportesNuevos = [];
+    logo = 'iVBORw0KGgo=';
     libros = [];
     archivos = [];
 
@@ -260,6 +267,7 @@ describe('ReportDashboard', () => {
         plantillas.push(template);
         return of(template);
       },
+      getReportIdentityLogo: () => of({ contentType: 'image/png', data: logo }),
       exportReportWorkbook: (document: ExportDocument): Observable<Blob> => {
         libros.push(document);
         return of(new Blob(['xlsx']));
@@ -461,7 +469,7 @@ describe('ReportDashboard', () => {
     await crear(
       tablero({
         ...conTresPaneles,
-        style: { color: 'aqua' },
+        style: { color: 'aqua', identityId: null },
         pages: [
           {
             ...conTresPaneles.pages[0],
@@ -487,6 +495,46 @@ describe('ReportDashboard', () => {
     expect(todos('.panel')[0].querySelector('.chart__bar')?.getAttribute('style')).toContain(
       '--rc-aqua',
     );
+  });
+
+  it('con identidad, el panel sin color propio toma la marca en los dos temas', async () => {
+    fixture = TestBed.createComponent(ReportDashboard);
+    fixture.componentRef.setInput(
+      'dashboard',
+      tablero({ ...conTresPaneles, style: { color: null, identityId: 'andina' } }),
+    );
+    fixture.componentRef.setInput('datasets', [ventas, visitas]);
+    fixture.componentRef.setInput('identities', [
+      {
+        id: 'andina',
+        name: 'Comercial Andina',
+        subtitle: 'Informe mensual',
+        details: ['NIT 900'],
+        footer: null,
+        brandColor: '#0A2A6C',
+        logoOnWhite: false,
+        logoUpdatedAtUtc: null,
+      },
+    ]);
+    fixture.detectChanges();
+    await asentar();
+
+    const host = fixture.nativeElement as HTMLElement;
+    expect(host.querySelector('app-report-identity-header')?.textContent).toContain(
+      'Comercial Andina',
+    );
+    expect(host.style.getPropertyValue('--rc-brand-light')).toBe('#0A2A6C');
+    // Un azul marino no se ve sobre el oscuro: va su versión más clara.
+    expect(host.style.getPropertyValue('--rc-brand-dark')).not.toBe('#0A2A6C');
+    expect(todos('.panel')[0].querySelector('.chart__bar')?.getAttribute('style')).toContain(
+      '--rc-brand',
+    );
+
+    botón('Editar diseño').click();
+    fixture.detectChanges();
+    todos('.panel')[0].click();
+    fixture.detectChanges();
+    expect(el('.inspector').textContent).toContain('Heredado del color de marca de la empresa.');
   });
 
   it('un tablero recién guardado se borra también en el servidor', async () => {
@@ -556,6 +604,65 @@ describe('ReportDashboard', () => {
     );
     expect(plantillas[0].model).not.toMatch(/"sql"|connectionId|ds-ventas|izquierda\./);
     expect(el('.banner--success').textContent).toContain('Plantilla «Comercial base» guardada.');
+    // Sin identidad en el tablero no se ofrece incluirla.
+    expect(textoVisible()).not.toContain('Incluir la identidad');
+  });
+
+  it('incluye la identidad en la plantilla solo si se marca, y no si no cabe', async () => {
+    fixture = TestBed.createComponent(ReportDashboard);
+    fixture.componentRef.setInput(
+      'dashboard',
+      tablero({ ...conTresPaneles, style: { color: null, identityId: 'andina' } }),
+    );
+    fixture.componentRef.setInput('datasets', [ventas, visitas]);
+    fixture.componentRef.setInput('identities', [
+      {
+        id: 'andina',
+        name: 'Comercial Andina',
+        subtitle: null,
+        details: [],
+        footer: 'Confidencial',
+        brandColor: '#0A6CBF',
+        logoOnWhite: false,
+        logoUpdatedAtUtc: '2026-11-12T10:00:00Z',
+      },
+    ]);
+    fixture.detectChanges();
+    await asentar();
+
+    const guardarComoPlantilla = async (incluir: boolean) => {
+      botón('Guardar como plantilla').click();
+      fixture.detectChanges();
+      const casilla = el<HTMLInputElement>('.template-form input[type="checkbox"]');
+
+      // Desmarcada de entrada: llevarse el logo de una empresa tiene que ser a propósito.
+      expect(casilla.checked).toBe(false);
+      casilla.checked = incluir;
+      casilla.dispatchEvent(new Event('change'));
+      fixture.detectChanges();
+      botón('Guardar plantilla').click();
+      await asentar();
+    };
+
+    expect(textoVisible()).not.toContain('Incluir la identidad');
+    await guardarComoPlantilla(false);
+    expect('identity' in JSON.parse(plantillas[0].model)).toBe(false);
+
+    await guardarComoPlantilla(true);
+    expect(JSON.parse(plantillas[1].model).identity).toEqual(
+      expect.objectContaining({
+        id: 'andina',
+        name: 'Comercial Andina',
+        footer: 'Confidencial',
+        logo: { contentType: 'image/png', data: logo },
+      }),
+    );
+
+    // Un logo que no cabe en los 512 KB de la plantilla: se dice y no se guarda nada.
+    logo = 'A'.repeat(600 * 1024);
+    await guardarComoPlantilla(true);
+    expect(plantillas).toHaveLength(2);
+    expect(el('.banner--danger').textContent).toContain('pasaría de 512 KB');
   });
 
   it('añade los paneles de una plantilla a la página y crea sus reportes', async () => {
@@ -609,7 +716,7 @@ describe('ReportDashboard', () => {
           },
         ],
         filters: [],
-        style: { color: null },
+        style: { color: null, identityId: null },
       },
     };
     const aplicar = (
@@ -622,6 +729,7 @@ describe('ReportDashboard', () => {
       document: panel as never,
       datasets: ['ds-ventas'],
       assignment: { cat: 'izquierda.municipio', num: 'izquierda.venta' },
+      identity: null,
     });
     await asentar();
 
@@ -695,6 +803,78 @@ describe('ReportDashboard', () => {
     expect(libro.datasets[0].table.columns[0]).toEqual({ name: 'Ventas.mes', type: 'Date' });
     expect(archivos.map((archivo) => archivo.name)).toEqual(['Comercial.xlsx']);
     expect(el('.banner--success').textContent).toContain('Comercial.xlsx');
+    // Sin identidad no se nombra ninguna; el pie numerado va siempre.
+    expect(libro.identityId).toBeNull();
+    expect(libro.labels.pageOf).toBe('Página {page} de {pages}');
+  });
+
+  it('con identidad, el Excel la nombra y el PDF lleva su encabezado, su franja y su pie', async () => {
+    const dosPáginas = {
+      ...conTresPaneles,
+      style: { color: null, identityId: 'andina' },
+      pages: [
+        { ...conTresPaneles.pages[0], panels: conTresPaneles.pages[0].panels.slice(0, 2) },
+        { id: 'p2', name: 'Página 2', panels: [conTresPaneles.pages[0].panels[2]] },
+      ],
+    };
+    fixture = TestBed.createComponent(ReportDashboard);
+    fixture.componentRef.setInput('dashboard', tablero(dosPáginas));
+    fixture.componentRef.setInput('datasets', [ventas, visitas]);
+    fixture.componentRef.setInput('identities', [
+      {
+        id: 'andina',
+        name: 'Comercial Andina',
+        subtitle: 'Informe mensual',
+        details: ['NIT 900'],
+        footer: 'Uso "interno"',
+        brandColor: '#0A2A6C',
+        logoOnWhite: false,
+        logoUpdatedAtUtc: null,
+      },
+    ]);
+    fixture.detectChanges();
+    await asentar();
+
+    botón('Exportar').click();
+    fixture.detectChanges();
+    menú('Excel · todas las páginas').click();
+    await asentar();
+
+    expect(libros[0].identityId).toBe('andina');
+
+    botón('Exportar').click();
+    fixture.detectChanges();
+    menú('PDF · todas las páginas').click();
+    fixture.detectChanges();
+    await asentar();
+
+    const vista = document.body.querySelector('app-report-print') as HTMLElement;
+    const primera = vista.querySelector('.paper__identity') as HTMLElement;
+
+    expect(primera.textContent).toContain('Comercial Andina');
+    expect(primera.textContent).toContain('NIT 900');
+    // La marca llega a la vista, que no está dentro del tablero.
+    expect(vista.style.getPropertyValue('--rc-brand-light')).toBe('#0A2A6C');
+
+    // La segunda página del tablero empieza con la franja: logo y nombre, sin datos.
+    const franjas = vista.querySelectorAll('.sheet__identity');
+
+    expect(franjas).toHaveLength(1);
+    expect(franjas[0].closest('.sheet')).toBe(vista.querySelectorAll('.sheet')[1]);
+    expect(franjas[0].textContent).toContain('Comercial Andina');
+    expect(franjas[0].textContent).not.toContain('NIT 900');
+
+    const pie = document.getElementById('druse-report-print-page')!;
+
+    expect(pie.textContent).toContain('@bottom-left { content: "Uso \\"interno\\""');
+    expect(pie.textContent).toContain(
+      '"Página " counter(page) " de " counter(pages)',
+    );
+
+    document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    fixture.detectChanges();
+
+    expect(document.getElementById('druse-report-print-page')).toBeNull();
   });
 
   it('descarga en CSV lo que dibuja un panel', async () => {

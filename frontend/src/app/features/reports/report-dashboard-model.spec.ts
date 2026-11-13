@@ -213,25 +213,62 @@ describe('report-dashboard-model · páginas y estilo', () => {
     const vacio = emptyDashboard('P');
     const panel = addPanel(vacio, vacio.pages[0].id, 'r').pages[0].panels[0];
 
-    expect(resolveColor({ ...panel, color: 'red' }, 'violet', { color: 'aqua' })).toEqual({
+    expect(
+      resolveColor({ ...panel, color: 'red' }, 'violet', { color: 'aqua', identityId: null }),
+    ).toEqual({
       color: 'red',
       source: 'panel',
     });
-    expect(resolveColor(panel, 'violet', { color: 'aqua' })).toEqual({
+    expect(resolveColor(panel, 'violet', { color: 'aqua', identityId: null })).toEqual({
       color: 'violet',
       source: 'report',
     });
-    expect(resolveColor(panel, null, { color: 'aqua' })).toEqual({
+    expect(resolveColor(panel, null, { color: 'aqua', identityId: null })).toEqual({
       color: 'aqua',
       source: 'dashboard',
     });
-    expect(resolveColor(panel, null, { color: null })).toEqual({ color: null, source: 'theme' });
+    expect(resolveColor(panel, null, { color: null, identityId: null })).toEqual({
+      color: null,
+      source: 'theme',
+    });
+  });
+
+  it('la marca de la identidad va después del tablero y antes del tema', () => {
+    const vacio = emptyDashboard('P');
+    const panel = addPanel(vacio, vacio.pages[0].id, 'r').pages[0].panels[0];
+    const conIdentidad = { color: null, identityId: 'andina' };
+
+    expect(resolveColor(panel, null, conIdentidad, true)).toEqual({
+      color: 'brand',
+      source: 'brand',
+    });
+    // Un color elegido para el tablero, el reporte o el panel sigue ganando.
+    expect(resolveColor(panel, null, { ...conIdentidad, color: 'aqua' }, true)).toEqual({
+      color: 'aqua',
+      source: 'dashboard',
+    });
+    expect(resolveColor(panel, 'violet', conIdentidad, true).source).toBe('report');
+    // Sin color de marca, el tema.
+    expect(resolveColor(panel, null, conIdentidad, false)).toEqual({
+      color: null,
+      source: 'theme',
+    });
+  });
+
+  it('lee la identidad del tablero, y los de antes salen sin ella', () => {
+    expect(
+      parseDashboard(JSON.stringify({ style: { color: null, identityId: 'andina' } }), 'P').style,
+    ).toEqual({ color: null, identityId: 'andina' });
+    expect(parseDashboard(JSON.stringify({ style: { color: 'aqua' } }), 'P').style).toEqual({
+      color: 'aqua',
+      identityId: null,
+    });
   });
 
   it('lee el estilo guardado y descarta colores que no son de la paleta', () => {
     const leido = parseDashboard(
       JSON.stringify({
-        style: { color: 'green' },
+        style: { color: 'green', identityId: null },
         pages: [
           {
             id: 'p',
@@ -243,7 +280,7 @@ describe('report-dashboard-model · páginas y estilo', () => {
       'P',
     );
 
-    expect(leido.style).toEqual({ color: 'green' });
+    expect(leido.style).toEqual({ color: 'green', identityId: null });
     expect(leido.pages[0].panels[0]).toMatchObject({
       color: null,
       description: 'Ventas',

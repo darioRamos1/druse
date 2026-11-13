@@ -10,6 +10,20 @@ namespace Druse.IntegrationTests;
 /// </summary>
 public sealed class ReportExportEndpointTests(DruseApiFactory factory) : IClassFixture<DruseApiFactory>
 {
+    private static readonly string[] Datos = ["NIT 900.123.456-7"];
+
+    /// <summary>La cabecera de un PNG: firma e IHDR con ancho y alto. Basta para validarlo.</summary>
+    private static byte[] Png(int width, int height)
+    {
+        var data = new byte[33];
+        new byte[] { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A }.CopyTo(data, 0);
+        System.Buffers.Binary.BinaryPrimitives.WriteUInt32BigEndian(data.AsSpan(8), 13);
+        "IHDR"u8.CopyTo(data.AsSpan(12));
+        System.Buffers.Binary.BinaryPrimitives.WriteUInt32BigEndian(data.AsSpan(16), (uint)width);
+        System.Buffers.Binary.BinaryPrimitives.WriteUInt32BigEndian(data.AsSpan(20), (uint)height);
+        return data;
+    }
+
     private static object Labels() => new
     {
         summary = "Resumen",
@@ -26,8 +40,9 @@ public sealed class ReportExportEndpointTests(DruseApiFactory factory) : IClassF
         data = "Datos",
     };
 
-    private static object Document(int dataset = 0) => new
+    private static object Document(int dataset = 0, Guid? identityId = null) => new
     {
+        identityId,
         title = "Comercial",
         generatedAtUtc = "2026-11-11T18:00:00Z",
         filters = new[] { new { label = "Mes", value = "2026-01-01 – 2026-01-31" } },
@@ -89,5 +104,46 @@ public sealed class ReportExportEndpointTests(DruseApiFactory factory) : IClassF
         var response = await client.PostAsJsonAsync("/api/reports/exports/xlsx", Document(dataset: 4));
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task ConLaIdentidadDelTableroElResumenLlevaSuLogoYSusDatos()
+    {
+        using var client = factory.CreateAuthenticatedClient();
+        var id = Guid.NewGuid();
+
+        (await client.PutAsJsonAsync($"/api/reports/identities/{id}", new
+        {
+            name = "Comercial Andina",
+            subtitle = "Informe mensual",
+            details = Datos,
+            footer = "Confidencial",
+        })).EnsureSuccessStatusCode();
+        (await client.PutAsJsonAsync(
+            $"/api/reports/identities/{id}/logo",
+            new { data = Convert.ToBase64String(Png(600, 200)) })).EnsureSuccessStatusCode();
+
+        try
+        {
+            var response = await client.PostAsJsonAsync("/api/reports/exports/xlsx", Document(identityId: id));
+
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            using var workbook = new XLWorkbook(await response.Content.ReadAsStreamAsync());
+            var resumen = workbook.Worksheet("Resumen");
+            Assert.Single(resumen.Pictures);
+            Assert.Equal("Comercial Andina", resumen.Cell(2, 1).GetString());
+            Assert.Equal("Informe mensual", resumen.Cell(3, 1).GetString());
+            Assert.Equal("NIT 900.123.456-7", resumen.Cell(4, 1).GetString());
+            Assert.Equal("Comercial", resumen.Cell(6, 1).GetString());
+        }
+        finally
+        {
+            await client.DeleteAsync($"/api/reports/identities/{id}");
+        }
+
+        // Borrada la identidad, el tablero se exporta como se ve: sin ella.
+        var sinIdentidad = await client.PostAsJsonAsync("/api/reports/exports/xlsx", Document(identityId: id));
+        using var libro = new XLWorkbook(await sinIdentidad.Content.ReadAsStreamAsync());
+        Assert.Equal("Comercial", libro.Worksheet("Resumen").Cell(1, 1).GetString());
     }
 }

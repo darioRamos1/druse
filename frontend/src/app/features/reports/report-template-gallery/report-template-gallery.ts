@@ -21,6 +21,7 @@ import { describeError } from '../../../core/workspace/errors';
 import {
   ReportColumn,
   ReportDataset,
+  ReportIdentity,
   ReportTemplateScope,
   SavedReportTemplate,
 } from '../../../shared/models/reports';
@@ -31,6 +32,7 @@ import {
   MAX_TEMPLATE_BYTES,
   TemplateDocument,
   TemplateField,
+  TemplateIdentity,
   exportTemplate,
   fits,
   goalStarter,
@@ -52,6 +54,8 @@ export interface TemplateApplication {
   readonly document: TemplateDocument;
   readonly datasets: readonly string[];
   readonly assignment: FieldAssignment;
+  /** La identidad de la plantilla, si viene y se quiere usar: quien aplica la crea si falta. */
+  readonly identity: TemplateIdentity | null;
 }
 
 /** Columnas del resultado guardado de un conjunto; `null` si aún no tiene. */
@@ -81,6 +85,8 @@ export class ReportTemplateGallery implements AfterViewInit, OnDestroy {
   readonly datasets = input.required<readonly ReportDataset[]>();
   /** En Visualización la copia va al conjunto abierto: no se pregunta. */
   readonly fixedDataset = input<string | null>(null);
+  /** Las identidades que ya hay: para decir si la de la plantilla se usa o se crea. */
+  readonly identities = input<readonly ReportIdentity[]>([]);
 
   readonly applied = output<TemplateApplication>();
   readonly closed = output<void>();
@@ -99,6 +105,8 @@ export class ReportTemplateGallery implements AfterViewInit, OnDestroy {
   protected readonly applying = signal<GalleryItem | null>(null);
   protected readonly slotDatasets = signal<readonly (string | null)[]>([]);
   protected readonly assignment = signal<FieldAssignment>({});
+  /** Usar la identidad que trae la plantilla. Marcado: quien la incluyó quería que viajara. */
+  protected readonly useIdentity = signal(true);
   private readonly _columns = signal<ReadonlyMap<string, ColumnsState>>(new Map());
 
   protected readonly items = computed<readonly GalleryItem[]>(() => {
@@ -432,6 +440,7 @@ export class ReportTemplateGallery implements AfterViewInit, OnDestroy {
     this.applying.set(item);
     this.slotDatasets.set(slots);
     this.assignment.set({});
+    this.useIdentity.set(true);
     slots.forEach((id, slot) => void this.useDataset(slot, id));
     this.refocus();
   }
@@ -505,6 +514,10 @@ export class ReportTemplateGallery implements AfterViewInit, OnDestroy {
     return dataset ? columnLabelFor(dataset.sources, name) : name;
   }
 
+  protected hasIdentity(id: string): boolean {
+    return this.identities().some((identity) => identity.id.toLowerCase() === id.toLowerCase());
+  }
+
   protected datasetName(id: string | null): string {
     return this.datasets().find((dataset) => dataset.id === id)?.name ?? '';
   }
@@ -529,6 +542,7 @@ export class ReportTemplateGallery implements AfterViewInit, OnDestroy {
       document: item.document,
       datasets: this.slotDatasets() as string[],
       assignment: this.assignment(),
+      identity: this.useIdentity() ? (item.document.identity ?? null) : null,
     });
   }
 }

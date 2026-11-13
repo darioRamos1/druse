@@ -48,9 +48,23 @@ export interface DashboardFilter {
 }
 
 export interface DashboardStyle {
-  /** El color de los paneles que no eligen otro; `null` es el acento del tema. */
+  /**
+   * El color de los paneles que no eligen otro; `null` es el de marca, si el
+   * tablero tiene identidad con color, o el acento del tema.
+   */
   readonly color: PaletteColor | null;
+  /** La identidad de empresa del tablero: logo, datos y color de marca. */
+  readonly identityId: string | null;
 }
+
+/**
+ * Un color de gráfico: un tono de la paleta o el de la marca del tablero.
+ *
+ * `brand` no lleva el color dentro: el tablero pone sus dos tonos —el claro y
+ * el del tema oscuro— en `--rc-brand-light` y `--rc-brand-dark`, y cada
+ * gráfico usa el de su tema, como con la paleta.
+ */
+export type ChartColor = PaletteColor | 'brand';
 
 export interface DashboardModel {
   readonly version: 1;
@@ -59,7 +73,7 @@ export interface DashboardModel {
   readonly style: DashboardStyle;
 }
 
-export const DEFAULT_STYLE: DashboardStyle = { color: null };
+export const DEFAULT_STYLE: DashboardStyle = { color: null, identityId: null };
 
 function paletteColor(value: unknown): PaletteColor | null {
   return PALETTE.includes(value as PaletteColor) ? (value as PaletteColor) : null;
@@ -152,7 +166,11 @@ export function parseDashboard(json: string, pageName: string): DashboardModel {
       .filter((filter): filter is DashboardFilter => filter !== null);
 
     const rawStyle = raw?.['style'] as Raw;
-    const style: DashboardStyle = { color: paletteColor(rawStyle?.['color']) };
+    const style: DashboardStyle = {
+      color: paletteColor(rawStyle?.['color']),
+      // Los tableros de antes de la 1.26 no tienen identidad.
+      identityId: text(rawStyle?.['identityId']) ?? null,
+    };
 
     return pages.length > 0
       ? { version: 1, pages, filters, style }
@@ -457,22 +475,25 @@ export function movePanelToPage(
   };
 }
 
-export type ColorSource = 'panel' | 'report' | 'dashboard' | 'theme';
+export type ColorSource = 'panel' | 'report' | 'dashboard' | 'brand' | 'theme';
 
 /**
  * El color con que se pinta un panel y de dónde viene.
  *
  * Gana lo más concreto: el panel en este tablero, después el reporte, después
- * el tablero y, si nadie eligió, el acento del tema. La interfaz enseña el
- * origen para que se sepa qué se está heredando y qué se puede restablecer.
+ * el tablero, después la marca de su identidad y, si nada de eso hay, el acento
+ * del tema. La interfaz enseña el origen para que se sepa qué se está heredando
+ * y qué se puede restablecer.
  */
 export function resolveColor(
   panel: DashboardPanel,
   reportColor: PaletteColor | null,
   style: DashboardStyle,
-): { readonly color: PaletteColor | null; readonly source: ColorSource } {
+  hasBrand = false,
+): { readonly color: ChartColor | null; readonly source: ColorSource } {
   if (panel.color) return { color: panel.color, source: 'panel' };
   if (reportColor) return { color: reportColor, source: 'report' };
   if (style.color) return { color: style.color, source: 'dashboard' };
+  if (hasBrand) return { color: 'brand', source: 'brand' };
   return { color: null, source: 'theme' };
 }

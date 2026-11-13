@@ -17,6 +17,8 @@ import { Icon } from '../../../shared/ui/icon/icon';
 export interface TemplateSaveRequest {
   readonly name: string;
   readonly description: string | null;
+  /** Llevarse la identidad del tablero: logo y datos de la empresa. */
+  readonly includeIdentity: boolean;
 }
 
 /**
@@ -24,6 +26,10 @@ export interface TemplateSaveRequest {
  *
  * Va en línea, junto a lo que se guarda, y no en otro diálogo: así se ve qué
  * se está convirtiendo en plantilla mientras se le pone nombre.
+ *
+ * Si el tablero tiene identidad, una casilla permite incluirla. Va desmarcada:
+ * las plantillas se comparten, y llevarse el logo de una empresa a otra sería
+ * un error fácil.
  */
 @Component({
   selector: 'app-report-template-save',
@@ -57,6 +63,17 @@ export interface TemplateSaveRequest {
         ></textarea>
       </label>
       <p class="field__hint">{{ 'reports.template.saveHint' | t }}</p>
+      @if (identityName(); as company) {
+        <label class="check">
+          <input
+            type="checkbox"
+            [checked]="includeIdentity()"
+            (change)="includeIdentity.set($any($event.target).checked)"
+          />
+          <span>{{ 'reports.template.includeIdentity' | t: { name: company } }}</span>
+        </label>
+        <p class="field__hint">{{ 'reports.template.includeIdentityHint' | t }}</p>
+      }
       <div class="save__actions">
         <button type="button" class="button" (click)="cancelled.emit()">
           {{ 'common.cancel' | t }}
@@ -96,12 +113,25 @@ export interface TemplateSaveRequest {
     textarea {
       resize: vertical;
     }
+
+    .check {
+      display: flex;
+      align-items: flex-start;
+      gap: 6px;
+      font-size: 12px;
+
+      input {
+        margin: 2px 0 0;
+      }
+    }
   `,
 })
 export class ReportTemplateSave implements OnInit, AfterViewInit {
   readonly scope = input.required<ReportTemplateScope>();
   readonly defaultName = input('');
   readonly busy = input(false);
+  /** El nombre de la identidad del tablero, si tiene: sin él no se ofrece incluirla. */
+  readonly identityName = input<string | null>(null);
 
   readonly saved = output<TemplateSaveRequest>();
   readonly cancelled = output<void>();
@@ -110,6 +140,7 @@ export class ReportTemplateSave implements OnInit, AfterViewInit {
 
   protected readonly name = signal('');
   protected readonly description = signal('');
+  protected readonly includeIdentity = signal(false);
 
   ngOnInit(): void {
     this.name.set(this.defaultName());
@@ -127,7 +158,11 @@ export class ReportTemplateSave implements OnInit, AfterViewInit {
     event.preventDefault();
 
     if (this.name().trim() && !this.busy()) {
-      this.saved.emit({ name: this.name().trim(), description: this.description().trim() || null });
+      this.saved.emit({
+        name: this.name().trim(),
+        description: this.description().trim() || null,
+        includeIdentity: this.includeIdentity() && this.identityName() !== null,
+      });
     }
   }
 }

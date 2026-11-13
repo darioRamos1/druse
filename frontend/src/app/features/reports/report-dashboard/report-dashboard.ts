@@ -22,11 +22,14 @@ import {
   ExportFilter,
   ExportPanel,
   ReportDataset,
+  ReportIdentity,
   ReportSnapshot,
   SavedDashboard,
   ReportTemplateScope,
   SavedReport,
 } from '../../../shared/models/reports';
+import { ReportIdentityHeader } from '../report-identity-header/report-identity-header';
+import { checkBrand, normalizeHex } from '../report-identity-model';
 import { Icon } from '../../../shared/ui/icon/icon';
 import { ReportChart } from '../report-chart/report-chart';
 import {
@@ -92,7 +95,15 @@ import {
   ReportTemplateSave,
   TemplateSaveRequest,
 } from '../report-template-save/report-template-save';
-import { captureTemplate, instantiateTemplate, panelLayout } from '../report-template-model';
+import {
+  MAX_TEMPLATE_BYTES,
+  TemplateDocument,
+  captureTemplate,
+  instantiateTemplate,
+  panelLayout,
+  templateBytes,
+  templateIdentity,
+} from '../report-template-model';
 
 /**
  * Un tablero: reportes de uno o varios conjuntos en una cuadrícula, con
@@ -109,6 +120,7 @@ import { captureTemplate, instantiateTemplate, panelLayout } from '../report-tem
   imports: [
     Icon,
     ReportChart,
+    ReportIdentityHeader,
     ReportPrint,
     ReportTemplateGallery,
     ReportTemplateSave,
@@ -118,6 +130,9 @@ import { captureTemplate, instantiateTemplate, panelLayout } from '../report-tem
   styleUrl: './report-dashboard.scss',
   host: {
     '[class.is-editing]': 'editing()',
+    // Los dos tonos de la marca: cada gráfico usa el de su tema (`--rc-brand`).
+    '[style.--rc-brand-light]': 'brand()?.light ?? null',
+    '[style.--rc-brand-dark]': 'brand()?.dark ?? null',
   },
 })
 export class ReportDashboard {
@@ -128,8 +143,31 @@ export class ReportDashboard {
   readonly dashboard = input.required<SavedDashboard>();
   readonly datasets = input.required<readonly ReportDataset[]>();
   readonly inspectorOpen = input(true);
+  /** Las identidades de empresa que se pueden poner al tablero. */
+  readonly identities = input<readonly ReportIdentity[]>([]);
 
   readonly saved = output<SavedDashboard>();
+
+  /**
+   * La identidad del tablero, si la tiene y sigue existiendo.
+   *
+   * Una identidad borrada deja el id en el modelo, pero el tablero se pinta sin
+   * ella: sin encabezado y con los colores de siempre.
+   */
+  protected readonly identity = computed(() => {
+    const id = this.model().style.identityId;
+    return id ? (this.identities().find((identity) => identity.id === id) ?? null) : null;
+  });
+
+  /** El color de marca en los dos temas, si la identidad tiene uno. */
+  protected readonly brand = computed(() => {
+    const color = normalizeHex(this.identity()?.brandColor);
+    return color ? { light: color, dark: checkBrand(color).dark } : null;
+  });
+
+  protected chooseIdentity(id: string): void {
+    this.model.update((model) => ({ ...model, style: { ...model.style, identityId: id || null } }));
+  }
   readonly deleted = output<string>();
   readonly dirtyChange = output<boolean>();
   /** Al empezar a editar: el constructor abre el inspector, que es donde se edita. */
@@ -371,7 +409,12 @@ export class ReportDashboard {
   }
 
   private colorOf(panel: DashboardPanel, reportColor: PaletteColor | null) {
-    const { color, source } = resolveColor(panel, reportColor, this.model().style);
+    const { color, source } = resolveColor(
+      panel,
+      reportColor,
+      this.model().style,
+      this.brand() !== null,
+    );
 
     return { color, colorSource: source };
   }
@@ -819,7 +862,7 @@ export class ReportDashboard {
       return;
     }
 
-    const document = captureTemplate(scope, request.name, request.description, {
+    let document: TemplateDocument = captureTemplate(scope, request.name, request.description, {
       reports: this.reports(),
       datasets: this.datasets(),
       columnsOf: (id) => this.snapshots().get(id)?.columns ?? [],
@@ -835,6 +878,23 @@ export class ReportDashboard {
     this.error.set(null);
 
     try {
+      const identity = this.identity();
+
+      // Solo si se pidió, y solo en una plantilla de tablero: el logo va dentro.
+      if (request.includeIdentity && identity && scope === 'Dashboard') {
+        const logo = identity.logoUpdatedAtUtc
+          ? await firstValueFrom(this._gateway.getReportIdentityLogo(identity.id))
+          : null;
+
+        document = { ...document, identity: templateIdentity(identity, logo) };
+
+        // Se dice aquí, con palabras, en vez de dejar que el servidor la rechace por tamaño.
+        if (templateBytes(document) > MAX_TEMPLATE_BYTES) {
+          this.error.set(this._i18n.t('reports.template.identityTooBig'));
+          return;
+        }
+      }
+
       await firstValueFrom(
         this._gateway.saveReportTemplate({
           id: crypto.randomUUID(),
@@ -1015,7 +1075,13 @@ export class ReportDashboard {
           ),
           chart:
             view.report.visual === 'Bar' ? 'Bar' : view.report.visual === 'Line' ? 'Line' : null,
-          color: view.color ? PRINT_PALETTE[view.color] : null,
+          // El libro va en claro: la marca, con su tono para el tema claro.
+          color:
+            view.color === 'brand'
+              ? (this.brand()?.light ?? null)
+              : view.color
+                ? PRINT_PALETTE[view.color]
+                : null,
           notes: this.panelNotes(view),
           indicator: view.indicator
             ? {
@@ -1047,7 +1113,9 @@ export class ReportDashboard {
         target: t('reports.report.target'),
         ratio: t('reports.export.ratio'),
         data: t('reports.export.data'),
+        pageOf: this._i18n.t('reports.export.pageOf', { page: '{page}', pages: '{pages}' }),
       },
+      identityId: this.identity()?.id ?? null,
     };
   }
 

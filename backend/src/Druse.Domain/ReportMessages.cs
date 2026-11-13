@@ -181,6 +181,41 @@ public static class ReportMessages
             $"Una plantilla no puede llevar «{property}»: solo guarda el diseño, sin SQL, conexiones ni filas.",
             "property", property);
 
+    // --- Identidades de empresa --------------------------------------------------
+
+    public static UserMessage IdentityName(int max) =>
+        One(MessageKeys.Reports.IdentityName, $"Una identidad necesita el nombre de la empresa, de hasta {max} caracteres.",
+            "max", max.ToString(CultureInfo.InvariantCulture));
+
+    public static UserMessage IdentityDetails(int max) =>
+        One(MessageKeys.Reports.IdentityDetails, $"Los datos de la empresa admiten hasta {max} líneas.",
+            "max", max.ToString(CultureInfo.InvariantCulture));
+
+    public static UserMessage IdentityLine(int max) =>
+        One(MessageKeys.Reports.IdentityLine, $"El subtítulo, cada línea de datos y el pie admiten hasta {max} caracteres.",
+            "max", max.ToString(CultureInfo.InvariantCulture));
+
+    public static UserMessage IdentityColor() =>
+        Plain(MessageKeys.Reports.IdentityColor, "El color de marca va en hexadecimal, como #0A6CBF.");
+
+    public static UserMessage IdentityLogoType() =>
+        Plain(MessageKeys.Reports.IdentityLogoType, "El logo tiene que ser una imagen PNG, JPEG o WebP.");
+
+    public static UserMessage IdentityLogoSize(int maxKib) =>
+        One(MessageKeys.Reports.IdentityLogoSize, $"El logo supera {maxKib} KiB.",
+            "max", maxKib.ToString(CultureInfo.InvariantCulture));
+
+    public static UserMessage IdentityLogoDimensions(int width, int height) =>
+        new(MessageKeys.Reports.IdentityLogoDimensions, $"El logo admite hasta {width} × {height} píxeles.",
+            new Dictionary<string, string>
+            {
+                ["width"] = width.ToString(CultureInfo.InvariantCulture),
+                ["height"] = height.ToString(CultureInfo.InvariantCulture),
+            });
+
+    public static UserMessage IdentityMissing() =>
+        Plain(MessageKeys.Reports.IdentityMissing, "Esa identidad ya no existe.");
+
     public static UserMessage ExportEmpty() =>
         Plain(MessageKeys.Reports.ExportEmpty, "No hay paneles que exportar.");
 

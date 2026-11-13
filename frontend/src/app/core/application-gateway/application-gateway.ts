@@ -9,6 +9,8 @@ import {
   ReportStorage,
   ReportSnapshot,
   SavedDashboard,
+  ReportIdentity,
+  ReportIdentityLogo,
   SavedReportTemplate,
   SavedReport,
   ExportDocument,
@@ -615,6 +617,20 @@ export abstract class ApplicationGateway {
   abstract saveDashboard(dashboard: SavedDashboard): Observable<SavedDashboard>;
 
   abstract deleteDashboard(id: string): Observable<void>;
+
+  /** Identidades de empresa para los tableros: nombre, datos, color y logo. */
+  abstract getReportIdentities(): Observable<readonly ReportIdentity[]>;
+
+  abstract saveReportIdentity(identity: ReportIdentity): Observable<ReportIdentity>;
+
+  abstract deleteReportIdentity(id: string): Observable<void>;
+
+  /** El logo en base64, o error 404 si la identidad no tiene. */
+  abstract getReportIdentityLogo(id: string): Observable<ReportIdentityLogo>;
+
+  abstract saveReportIdentityLogo(id: string, logo: ReportIdentityLogo): Observable<void>;
+
+  abstract deleteReportIdentityLogo(id: string): Observable<void>;
 
   /** Plantillas de diseño: un reporte, un panel o un tablero, sin SQL ni filas. */
   abstract getReportTemplates(): Observable<readonly SavedReportTemplate[]>;

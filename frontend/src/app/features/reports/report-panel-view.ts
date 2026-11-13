@@ -12,7 +12,7 @@ import {
   buildSeries,
   tableView,
 } from './report-chart';
-import { ColorSource, DashboardFilter, DashboardPanel } from './report-dashboard-model';
+import { ChartColor, ColorSource, DashboardFilter, DashboardPanel } from './report-dashboard-model';
 
 /** Lo que pinta un panel, ya calculado con los filtros activos. */
 export interface PanelView {
@@ -30,8 +30,8 @@ export interface PanelView {
   readonly valueLabel: string;
   readonly categoryLabel: string;
   readonly appearance: ReportAppearance;
-  /** El color resuelto y de dónde viene: panel, reporte, tablero o tema. */
-  readonly color: PaletteColor | null;
+  /** El color resuelto y de dónde viene: panel, reporte, tablero, marca o tema. */
+  readonly color: ChartColor | null;
   readonly colorSource: ColorSource;
   readonly categoryColors: ReadonlyMap<string | null, PaletteColor> | null;
   /** Pulsar una barra filtra el tablero: hay un filtro vinculado a su categoría. */

@@ -243,6 +243,33 @@ export interface SavedReportTemplate {
   readonly updatedAtUtc?: string;
 }
 
+// --- Identidad de empresa en los tableros ---------------------------------
+
+/** La identidad de una empresa: nombre, datos y color. El logo se pide aparte. */
+export interface ReportIdentity {
+  readonly id: string;
+  readonly name: string;
+  readonly subtitle: string | null;
+  /** Hasta tres líneas: NIT, dirección, contacto. */
+  readonly details: readonly string[];
+  /** Pie de página del PDF. */
+  readonly footer: string | null;
+  /** `#RRGGBB` o `null`. */
+  readonly brandColor: string | null;
+  /** Fondo blanco detrás del logo en el tema oscuro. */
+  readonly logoOnWhite: boolean;
+  /** Cuándo cambió el logo, o `null` si no tiene. Solo llega del servidor. */
+  readonly logoUpdatedAtUtc?: string | null;
+  readonly createdAtUtc?: string;
+  readonly updatedAtUtc?: string;
+}
+
+/** El logo en base64; el tipo lo pone el servidor al leerlo. */
+export interface ReportIdentityLogo {
+  readonly contentType?: string;
+  readonly data: string;
+}
+
 // --- Hito 4.4: exportar un tablero o un panel ------------------------------
 
 /** Tipo de celda, con los mismos nombres que `ReportExportCellType` en el servidor. */
@@ -300,6 +327,8 @@ export interface ExportLabels {
   readonly target: string;
   readonly ratio: string;
   readonly data: string;
+  /** «Página {page} de {pages}», para el pie de las hojas impresas. */
+  readonly pageOf: string;
 }
 
 export interface ExportDocument {
@@ -309,4 +338,6 @@ export interface ExportDocument {
   readonly panels: readonly ExportPanel[];
   readonly datasets: readonly ExportDataset[];
   readonly labels: ExportLabels;
+  /** La identidad del tablero: el servidor pone su logo y sus datos en el resumen. */
+  readonly identityId: string | null;
 }

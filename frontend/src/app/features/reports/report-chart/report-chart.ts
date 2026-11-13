@@ -24,6 +24,7 @@ import {
   indicatorStatus,
   isNumericColumn,
 } from '../report-chart';
+import { ChartColor } from '../report-dashboard-model';
 
 /** Medidas del lienzo en unidades del viewBox; el SVG escala al ancho disponible. */
 const WIDTH = 720;
@@ -121,7 +122,7 @@ export class ReportChart {
   readonly fit = input(false);
   readonly appearance = input<ReportAppearance>(DEFAULT_APPEARANCE);
   /** El color ya resuelto (panel, reporte o tablero); `null` es el acento del tema. */
-  readonly color = input<PaletteColor | null>(null);
+  readonly color = input<ChartColor | null>(null);
   /** Un color por categoría, estable aunque se filtre. */
   readonly categoryColors = input<ReadonlyMap<string | null, PaletteColor> | null>(null);
   /** Las barras se pueden pulsar para filtrar el tablero por su categoría. */

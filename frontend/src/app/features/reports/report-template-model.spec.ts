@@ -11,7 +11,9 @@ import {
   panelLayout,
   parseTemplate,
   proposeAssignment,
+  templateBytes,
   templateFileName,
+  templateIdentity,
 } from './report-template-model';
 
 function columna(name: string, clrType: string, ordinal: number): ReportColumn {
@@ -131,7 +133,7 @@ const tablero: DashboardModel = {
       bindings: { ventas: 'izquierda.municipio', borrado: 'x' },
     },
   ],
-  style: { color: 'violet' },
+  style: { color: 'violet', identityId: null },
 };
 
 function capturar(): TemplateDocument {
@@ -180,6 +182,15 @@ describe('report-template-model', () => {
     expect(plantilla.layout?.style.color).toBe('violet');
 
     const archivo = exportTemplate(plantilla);
+
+    // La identidad de la empresa no viaja: las plantillas se comparten.
+    const conIdentidad = captureTemplate('Dashboard', 'Con identidad', null, {
+      reports: reportes,
+      datasets: [conjunto('ventas', 'Ventas 2026')],
+      columnsOf: () => ventasColumnas,
+      layout: { ...tablero, style: { color: 'violet', identityId: 'andina' } },
+    });
+    expect(conIdentidad.layout?.style).toEqual({ color: 'violet', identityId: null });
 
     expect(archivo).not.toMatch(/izquierda\.|"sql"|connectionId|"rows"/);
     expect(parseTemplate(archivo)).toEqual({ ok: true, document: plantilla });
@@ -414,6 +425,62 @@ describe('report-template-model', () => {
     ).toEqual({
       ok: false,
       problem: 'tooBig',
+    });
+  });
+
+  it('lleva la identidad solo si se incluyó, y solo en plantillas de tablero', () => {
+    const identidad = templateIdentity(
+      {
+        id: '0B6C1F2E-5A4D-4C3B-9A8F-1E2D3C4B5A69',
+        name: 'Comercial Andina',
+        subtitle: 'Informe mensual',
+        details: ['NIT 900'],
+        footer: 'Confidencial',
+        brandColor: '#0a6cbf',
+        logoOnWhite: true,
+        logoUpdatedAtUtc: '2026-11-12T10:00:00Z',
+      },
+      { contentType: 'image/png', data: 'iVBORw0KGgo=' },
+    );
+    const plantilla = { ...capturar(), identity: identidad };
+    const leida = parseTemplate(exportTemplate(plantilla));
+
+    expect(leida.ok && leida.document.identity).toEqual({
+      ...identidad,
+      // El id y el color se normalizan al leer.
+      id: '0b6c1f2e-5a4d-4c3b-9a8f-1e2d3c4b5a69',
+      brandColor: '#0A6CBF',
+    });
+    // El logo cuenta para el tamaño de la plantilla.
+    expect(templateBytes(plantilla)).toBeGreaterThan(templateBytes(capturar()));
+
+    // Sin incluirla, no hay clave: la plantilla es la de siempre.
+    expect('identity' in capturar()).toBe(false);
+
+    // En una plantilla de panel se ignora; con un logo que no es imagen, se rechaza.
+    const panel = JSON.parse(exportTemplate(plantilla)) as Record<string, unknown>;
+    const deTablero = (cambio: Record<string, unknown>) =>
+      parseTemplate(JSON.stringify({ ...panel, ...cambio }));
+    const unPanel = (panel['layout'] as { pages: { panels: unknown[] }[] }).pages[0].panels[0];
+    const comoPanel = parseTemplate(
+      JSON.stringify({
+        ...panel,
+        scope: 'Panel',
+        layout: { ...(panel['layout'] as object), pages: [{ name: '', panels: [unPanel] }] },
+      }),
+    );
+
+    expect(comoPanel.ok && comoPanel.document.identity).toBeUndefined();
+    expect(
+      deTablero({ identity: { ...identidad, logo: { contentType: 'image/svg+xml', data: 'PHN2Zz4=' } } }),
+    ).toEqual({ ok: false, problem: 'content' });
+    expect(deTablero({ identity: { ...identidad, id: 'andina' } })).toEqual({
+      ok: false,
+      problem: 'content',
+    });
+    expect(deTablero({ identity: { ...identidad, details: ['a', 'b', 'c', 'd'] } })).toEqual({
+      ok: false,
+      problem: 'content',
     });
   });
 

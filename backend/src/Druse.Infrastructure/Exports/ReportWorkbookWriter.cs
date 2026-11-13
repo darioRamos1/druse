@@ -1,5 +1,6 @@
 using Druse.Domain;
 using ClosedXML.Excel;
+using ClosedXML.Excel.Drawings;
 using DocumentFormat.OpenXml;
 using DocumentFormat.OpenXml.Packaging;
 using Druse.Application.Abstractions;
@@ -15,7 +16,8 @@ namespace Druse.Infrastructure.Exports;
 /// Escribe un tablero de Reportes en un libro de Excel.
 ///
 /// Una hoja de resumen con los filtros, la fecha y las cifras de los
-/// indicadores; una hoja por panel con lo que dibuja; y una hoja por conjunto
+/// indicadores —debajo del logo y los datos de la empresa, si el tablero tiene
+/// identidad—; una hoja por panel con lo que dibuja; y una hoja por conjunto
 /// con sus filas filtradas. Al contrario que la exportación de resultados, aquí
 /// las celdas van **tipadas**: el resultado guardado ya trae el tipo de cada
 /// columna, y los códigos con ceros iniciales son texto desde la base, así que
@@ -31,6 +33,12 @@ public sealed class ReportWorkbookWriter : IReportWorkbookWriter
     private const int ExcelCellCharacterLimit = 32_767;
     private const string DateFormat = "yyyy-mm-dd";
     private const string DateTimeFormat = "yyyy-mm-dd hh:mm";
+
+    /// <summary>Alto del logo en la hoja de resumen, en píxeles: unas tres filas.</summary>
+    private const int LogoHeight = 60;
+
+    /// <summary>Ancho máximo del logo, para que uno muy apaisado no tape las cifras.</summary>
+    private const int LogoMaxWidth = 300;
 
     /// <summary>Un gráfico pendiente de añadir cuando ClosedXML termine el libro.</summary>
     private sealed record PendingChart(
@@ -71,6 +79,11 @@ public sealed class ReportWorkbookWriter : IReportWorkbookWriter
             WriteDataset(workbook.AddWorksheet(SheetName($"{document.Labels.Data} · {dataset.Name}", names)), dataset, document.Labels);
         }
 
+        foreach (var sheet in workbook.Worksheets)
+        {
+            Footer(sheet, document);
+        }
+
         using var buffer = new MemoryStream();
         workbook.SaveAs(buffer);
 
@@ -87,12 +100,13 @@ public sealed class ReportWorkbookWriter : IReportWorkbookWriter
     private static void WriteSummary(IXLWorksheet sheet, ReportExportDocument document)
     {
         var labels = document.Labels;
+        var top = document.Identity is { } identity ? WriteIdentity(sheet, identity) : 1;
 
-        Title(sheet.Cell(1, 1), document.Title, 16);
-        sheet.Cell(2, 1).Value = labels.Generated;
-        DateTimeCell(sheet.Cell(2, 2), document.GeneratedAtUtc);
+        Title(sheet.Cell(top, 1), document.Title, 16);
+        sheet.Cell(top + 1, 1).Value = labels.Generated;
+        DateTimeCell(sheet.Cell(top + 1, 2), document.GeneratedAtUtc);
 
-        var row = 4;
+        var row = top + 3;
         sheet.Cell(row, 1).Value = labels.Filters;
         sheet.Cell(row, 1).Style.Font.Bold = true;
         row++;
@@ -137,8 +151,122 @@ public sealed class ReportWorkbookWriter : IReportWorkbookWriter
         }
 
         sheet.Range(header, 1, row, headers.Length).SetAutoFilter();
-        sheet.Columns(1, headers.Length).AdjustToContents(1, 200);
+        // Desde el título: los datos de la empresa son largos y se dejan
+        // desbordar a la derecha en vez de ensanchar la columna de los paneles.
+        sheet.Columns(1, headers.Length).AdjustToContents(top, top + 199);
     }
+
+    /// <summary>
+    /// El encabezado de la empresa: logo arriba a la izquierda y debajo nombre,
+    /// subtítulo y datos, como en el tablero. Devuelve la fila donde sigue la hoja.
+    /// </summary>
+    private static int WriteIdentity(IXLWorksheet sheet, ReportExportIdentity identity)
+    {
+        var row = 1;
+
+        if (LogoPicture(identity.Logo) is { } logo)
+        {
+            var picture = sheet.AddPicture(new MemoryStream(logo.Data), logo.Format, "Logo");
+            picture.MoveTo(sheet.Cell(1, 1), 2, 2);
+            picture.WithSize(logo.Width, logo.Height);
+
+            // Una fila alta para el logo: así lo de debajo no queda tapado,
+            // aunque se cambie el ancho de las columnas.
+            sheet.Row(1).Height = (logo.Height + 6) * 0.75;
+            row = 2;
+        }
+
+        Title(sheet.Cell(row++, 1), identity.Name, 14);
+
+        if (!string.IsNullOrWhiteSpace(identity.Subtitle))
+        {
+            sheet.Cell(row++, 1).Value = Text(identity.Subtitle);
+        }
+
+        var details = identity.Details.Where(line => !string.IsNullOrWhiteSpace(line)).Select(line => line.Trim()).ToArray();
+        if (details.Length > 0)
+        {
+            sheet.Cell(row, 1).Value = Text(string.Join(" · ", details));
+            sheet.Cell(row++, 1).Style.Font.FontColor = XLColor.FromHtml("#4A5266");
+        }
+
+        return row + 1;
+    }
+
+    private sealed record ScaledLogo(byte[] Data, XLPictureFormat Format, int Width, int Height);
+
+    /// <summary>
+    /// El logo reducido al alto del encabezado. Solo PNG y JPEG: WebP —que
+    /// Druse usa solo si el PNG no cabía— no lo abren todas las versiones de
+    /// Excel, y es mejor un resumen sin logo que un libro que pide repararse.
+    /// </summary>
+    private static ScaledLogo? LogoPicture(ReportIdentityLogo? logo)
+    {
+        if (logo is null || LogoImage.Read(logo.Data) is not { Width: > 0, Height: > 0 } info)
+        {
+            return null;
+        }
+
+        var format = info.ContentType switch
+        {
+            "image/png" => XLPictureFormat.Png,
+            "image/jpeg" => XLPictureFormat.Jpeg,
+            _ => (XLPictureFormat?)null,
+        };
+
+        if (format is null)
+        {
+            return null;
+        }
+
+        var scale = Math.Min((double)LogoHeight / info.Height, (double)LogoMaxWidth / info.Width);
+        scale = Math.Min(scale, 1);
+        return new ScaledLogo(
+            logo.Data,
+            format.Value,
+            Math.Max(1, (int)Math.Round(info.Width * scale)),
+            Math.Max(1, (int)Math.Round(info.Height * scale)));
+    }
+
+    /// <summary>
+    /// El pie de cada hoja al imprimirla: el texto de la identidad a la
+    /// izquierda y «Página n de m» a la derecha, como en el PDF.
+    /// </summary>
+    private static void Footer(IXLWorksheet sheet, ReportExportDocument document)
+    {
+        var footer = document.Identity is { } identity
+            ? (string.IsNullOrWhiteSpace(identity.Footer) ? identity.Name : identity.Footer).Trim()
+            : null;
+
+        if (!string.IsNullOrEmpty(footer))
+        {
+            sheet.PageSetup.Footer.Left.AddText(FooterText(footer));
+        }
+
+        if (document.Labels.PageOf is { Length: > 0 } pageOf
+            && pageOf.IndexOf("{page}", StringComparison.Ordinal) is var page and >= 0
+            && pageOf.IndexOf("{pages}", StringComparison.Ordinal) is var pages and >= 0
+            && page < pages)
+        {
+            var right = sheet.PageSetup.Footer.Right;
+            AddFooterText(right, pageOf[..page]);
+            right.AddText(XLHFPredefinedText.PageNumber);
+            AddFooterText(right, pageOf[(page + "{page}".Length)..pages]);
+            right.AddText(XLHFPredefinedText.NumberOfPages);
+            AddFooterText(right, pageOf[(pages + "{pages}".Length)..]);
+        }
+    }
+
+    private static void AddFooterText(IXLHFItem item, string text)
+    {
+        if (text.Length > 0)
+        {
+            item.AddText(FooterText(text));
+        }
+    }
+
+    /// <summary>En un pie de Excel `&amp;` abre un código: el texto del usuario lo lleva doblado.</summary>
+    private static string FooterText(string text) => text.Replace("&", "&&", StringComparison.Ordinal);
 
     private static PendingChart? WritePanel(IXLWorksheet sheet, ReportExportPanel panel, ReportExportDocument document)
     {

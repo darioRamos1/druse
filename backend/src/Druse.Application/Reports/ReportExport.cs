@@ -27,6 +27,27 @@ public sealed record ReportExportDocument
     public required IReadOnlyList<ReportExportDataset> Datasets { get; init; }
 
     public required ReportExportLabels Labels { get; init; }
+
+    /// <summary>
+    /// La empresa del tablero, si tiene identidad: su logo y sus datos van
+    /// arriba de la hoja de resumen, y su pie en el de cada hoja impresa. No la
+    /// manda la interfaz: el servidor la lee de `reports.db` por su id.
+    /// </summary>
+    public ReportExportIdentity? Identity { get; init; }
+}
+
+/// <summary>Lo que el libro enseña de una identidad: el texto y, si lo tiene, el logo.</summary>
+public sealed record ReportExportIdentity
+{
+    public required string Name { get; init; }
+
+    public string? Subtitle { get; init; }
+
+    public IReadOnlyList<string> Details { get; init; } = [];
+
+    public string? Footer { get; init; }
+
+    public ReportIdentityLogo? Logo { get; init; }
 }
 
 public sealed record ReportExportFilter(string Label, string Value);
@@ -104,6 +125,12 @@ public sealed record ReportExportLabels
     public required string Target { get; init; }
     public required string Ratio { get; init; }
     public required string Data { get; init; }
+
+    /// <summary>
+    /// «Página {page} de {pages}», para el pie de las hojas impresas. Opcional
+    /// para no romper a quien no lo mande: sin él, el pie no lleva número.
+    /// </summary>
+    public string? PageOf { get; init; }
 }
 
 /// <summary>Límites de una exportación de Reportes, comprobados antes de construir el libro.</summary>

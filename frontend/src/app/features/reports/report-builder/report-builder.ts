@@ -30,6 +30,7 @@ import {
   ReportSourcePreview,
   ReportTemplateScope,
   ReportValue,
+  ReportIdentity,
   SavedDashboard,
 } from '../../../shared/models/reports';
 import { Icon } from '../../../shared/ui/icon/icon';
@@ -39,10 +40,12 @@ import {
   ReportTemplateGallery,
   TemplateApplication,
 } from '../report-template-gallery/report-template-gallery';
-import { instantiateTemplate } from '../report-template-model';
+import { TemplateIdentity, instantiateTemplate } from '../report-template-model';
 import { emptyDashboard } from '../report-dashboard-model';
 import { DatabaseEngine, DatabaseObject, ServerMessage } from '../../../shared/models/workspace';
 import { QueryBuilder } from '../../query-builder/query-builder/query-builder';
+import { ReportIdentityEditor } from '../report-identity-editor/report-identity-editor';
+import { emptyIdentity } from '../report-identity-model';
 import { failureText, serverText } from '../report-messages';
 import {
   MAX_SOURCES,
@@ -113,6 +116,7 @@ function wideLayout(): boolean {
     NgTemplateOutlet,
     QueryBuilder,
     ReportDashboard,
+    ReportIdentityEditor,
     ReportTemplateGallery,
     ReportWorkbench,
     TranslatePipe,
@@ -137,8 +141,13 @@ export class ReportBuilder {
    * El borrador del conjunto se conserva al abrir un tablero: volver a los
    * pasos lo encuentra donde estaba.
    */
-  protected readonly mode = signal<'dataset' | 'dashboard'>('dataset');
+  protected readonly mode = signal<'dataset' | 'dashboard' | 'identity'>('dataset');
   protected readonly openDashboard = signal<SavedDashboard | null>(null);
+
+  /** Identidades de empresa para los tableros: logo, datos y color de marca. */
+  protected readonly identities = signal<readonly ReportIdentity[]>([]);
+  protected readonly openIdentity = signal<ReportIdentity | null>(null);
+  private readonly _identityDirty = signal(false);
   private readonly _dashboardDirty = signal(false);
 
   /** La galería de plantillas de tablero, abierta desde la lista de Tableros. */
@@ -272,6 +281,7 @@ export class ReportBuilder {
     this.loadingList.set(true);
 
     try {
+      const identities = this.loadIdentities();
       const [datasets, dashboards] = await Promise.all([
         firstValueFrom(this._gateway.getReportDatasets()),
         firstValueFrom(this._gateway.getDashboards()),
@@ -279,6 +289,7 @@ export class ReportBuilder {
 
       this.datasets.set(datasets);
       this.dashboards.set(dashboards);
+      await identities;
     } catch (error) {
       this.error.set(describeError(error, this._i18n));
     } finally {
@@ -385,8 +396,9 @@ export class ReportBuilder {
   // --- Pasos y vista ---------------------------------------------------------
 
   protected goTo(step: ReportStep): void {
-    // Desde un tablero, los pasos devuelven al conjunto que se estaba editando.
-    if (this.mode() === 'dashboard') {
+    // Desde un tablero o una identidad, los pasos devuelven al conjunto que se
+    // estaba editando.
+    if (this.mode() !== 'dataset') {
       this.guard(() => {
         this.leaveDashboard();
         this.goTo(step);
@@ -985,11 +997,19 @@ export class ReportBuilder {
         await firstValueFrom(this._gateway.saveReport(report));
       }
 
+      const identityId = application.identity
+        ? await this.ensureIdentity(application.identity)
+        : null;
+      const layout = copy.layout && {
+        ...copy.layout,
+        style: { ...copy.layout.style, identityId },
+      };
+
       const saved = await firstValueFrom(
         this._gateway.saveDashboard({
           id: crypto.randomUUID(),
           name: this.freeDashboardName(application.document.name),
-          model: JSON.stringify(copy.layout),
+          model: JSON.stringify(layout),
         }),
       );
 
@@ -998,6 +1018,42 @@ export class ReportBuilder {
     } catch (error) {
       this.templateError.set(describeError(error, this._i18n));
     }
+  }
+
+  /**
+   * La identidad de una plantilla, en este perfil.
+   *
+   * Si ya existe —la plantilla se guardó aquí, o ya se aplicó antes— se usa
+   * tal cual, sin pisar los cambios que se le hayan hecho. Si no, se crea con
+   * el mismo id y su logo, y aparece en la lista de identidades.
+   */
+  private async ensureIdentity(identity: TemplateIdentity): Promise<string> {
+    const known = this.identities().find(
+      (item) => item.id.toLowerCase() === identity.id.toLowerCase(),
+    );
+
+    if (known) {
+      return known.id;
+    }
+
+    const saved = await firstValueFrom(
+      this._gateway.saveReportIdentity({
+        id: identity.id,
+        name: identity.name,
+        subtitle: identity.subtitle,
+        details: identity.details,
+        footer: identity.footer,
+        brandColor: identity.brandColor,
+        logoOnWhite: identity.logoOnWhite,
+      }),
+    );
+
+    if (identity.logo) {
+      await firstValueFrom(this._gateway.saveReportIdentityLogo(saved.id, identity.logo));
+    }
+
+    await this.loadIdentities();
+    return saved.id;
   }
 
   private enterDashboard(dashboard: SavedDashboard): void {
@@ -1011,6 +1067,83 @@ export class ReportBuilder {
     this.mode.set('dataset');
     this.openDashboard.set(null);
     this._dashboardDirty.set(false);
+    this.openIdentity.set(null);
+    this._identityDirty.set(false);
+  }
+
+  // --- Identidades de empresa ------------------------------------------------
+
+  /** Sin identidades se puede trabajar igual: si fallan, no tumban las otras listas. */
+  private async loadIdentities(): Promise<void> {
+    try {
+      this.identities.set(await firstValueFrom(this._gateway.getReportIdentities()));
+    } catch {
+      this.identities.set([]);
+    }
+  }
+
+  /**
+   * Los tableros guardados que llevan cada identidad, por id.
+   *
+   * Se lee del modelo de cada tablero, que es donde vive la referencia: así, al
+   * borrar una identidad, se puede decir qué tableros se quedan sin ella.
+   */
+  private readonly _identityUse = computed(() => {
+    const use = new Map<string, string[]>();
+
+    for (const dashboard of this.dashboards()) {
+      try {
+        const id = (JSON.parse(dashboard.model) as { style?: { identityId?: unknown } })?.style
+          ?.identityId;
+        if (typeof id === 'string') {
+          use.set(id, [...(use.get(id) ?? []), dashboard.name]);
+        }
+      } catch {
+        // Un modelo ilegible no lleva identidad que contar.
+      }
+    }
+
+    return use;
+  });
+
+  protected dashboardsUsing(id: string): readonly string[] {
+    return this._identityUse().get(id) ?? [];
+  }
+
+  protected isIdentityOpen(identity: ReportIdentity): boolean {
+    return this.mode() === 'identity' && this.openIdentity()?.id === identity.id;
+  }
+
+  protected showIdentity(identity: ReportIdentity): void {
+    this.guard(() => this.enterIdentity(identity), 'dashboard');
+  }
+
+  protected newIdentity(): void {
+    this.guard(() => this.enterIdentity(emptyIdentity(crypto.randomUUID())), 'dashboard');
+  }
+
+  private enterIdentity(identity: ReportIdentity): void {
+    this.leaveDashboard();
+    this.openIdentity.set(identity);
+    this.mode.set('identity');
+  }
+
+  protected identitySaved(saved: ReportIdentity): void {
+    this.identities.update((list) =>
+      [saved, ...list.filter((item) => item.id !== saved.id)].sort((a, b) =>
+        a.name.localeCompare(b.name, this._i18n.intlLocale()),
+      ),
+    );
+    this.openIdentity.set(saved);
+  }
+
+  protected identityDeleted(id: string): void {
+    this.identities.update((list) => list.filter((item) => item.id !== id));
+    this.leaveDashboard();
+  }
+
+  protected identityDirty(dirty: boolean): void {
+    this._identityDirty.set(dirty);
   }
 
   protected dashboardSaved(saved: SavedDashboard): void {
@@ -1043,7 +1176,9 @@ export class ReportBuilder {
    * cerrar descarta los dos.
    */
   private guard(action: () => void, what: 'all' | 'dashboard' = 'all'): void {
-    const dashboardDirty = this.mode() === 'dashboard' && this._dashboardDirty();
+    const dashboardDirty =
+      (this.mode() === 'dashboard' && this._dashboardDirty()) ||
+      (this.mode() === 'identity' && this._identityDirty());
 
     if (!dashboardDirty && (what === 'dashboard' || !this.dirty())) {
       action();

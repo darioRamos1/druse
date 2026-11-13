@@ -84,6 +84,23 @@ internal static class ReportsDatabase
                     updated_utc_ticks INTEGER NOT NULL
                 ) STRICT;
 
+                -- La identidad de una empresa para sus tableros. Un tablero la
+                -- nombra por su id en el modelo; el logo va aquí, ya comprobado.
+                CREATE TABLE IF NOT EXISTS report_identities (
+                    id TEXT PRIMARY KEY,
+                    name TEXT NOT NULL,
+                    subtitle TEXT,
+                    details TEXT NOT NULL,
+                    footer TEXT,
+                    brand_color TEXT,
+                    logo_on_white INTEGER NOT NULL,
+                    logo BLOB,
+                    logo_type TEXT,
+                    logo_utc_ticks INTEGER,
+                    created_utc_ticks INTEGER NOT NULL,
+                    updated_utc_ticks INTEGER NOT NULL
+                ) STRICT;
+
                 -- Una por conjunto. running_utc_ticks marca el horario reclamado
                 -- y en marcha: si sigue puesto al arrancar, Druse se cerró a mitad.
                 CREATE TABLE IF NOT EXISTS report_schedules (

@@ -85,7 +85,7 @@
     [class.is-inspecting]="
       mode() === 'dataset' && inspectorOpen() && sources().length > 0 && step() !== 'visual'
     "
-    [class.is-working]="mode() === 'dashboard' || step() === 'visual'"
+    [class.is-working]="mode() !== 'dataset' || step() === 'visual'"
   >
     <!-- Navegación: pasos del constructor y conjuntos guardados. -->
     <nav class="rail" [attr.aria-label]="'reports.nav' | t">
@@ -220,6 +220,55 @@
           }
         </ul>
       }
+
+      <!-- Logo, datos y color de una empresa, para ponérselos a sus tableros. -->
+      <div class="rail__row">
+        <p class="rail__label">{{ 'reports.identity.list' | t }}</p>
+        <button
+          type="button"
+          class="icon-button"
+          (click)="newIdentity()"
+          [attr.aria-label]="'reports.identity.new' | t"
+          [attr.title]="'reports.identity.new' | t"
+        >
+          <app-icon name="plus" [size]="11" />
+        </button>
+      </div>
+      @if (!loadingList() && identities().length === 0) {
+        <p class="rail__hint">{{ 'reports.identity.none' | t }}</p>
+      } @else {
+        <ul class="datasets">
+          @for (identity of identities(); track identity.id) {
+            <li>
+              <button
+                type="button"
+                class="datasets__item datasets__item--identity"
+                [class.is-active]="isIdentityOpen(identity)"
+                [attr.aria-current]="isIdentityOpen(identity) ? 'true' : null"
+                (click)="showIdentity(identity)"
+              >
+                <span class="datasets__name">
+                  <!-- Sin color de marca, el punto va hueco. El estilo va aquí y no en
+                       la hoja del constructor, que está en su límite de tamaño. -->
+                  <span
+                    style="
+                      display: inline-block;
+                      flex: none;
+                      width: 9px;
+                      height: 9px;
+                      border: 1px solid var(--dr-text-tertiary);
+                      border-radius: 50%;
+                    "
+                    [style.background]="identity.brandColor ?? 'transparent'"
+                    aria-hidden="true"
+                  ></span>
+                  {{ identity.name }}
+                </span>
+              </button>
+            </li>
+          }
+        </ul>
+      }
     </nav>
 
     @if (mode() === 'dashboard' && openDashboard(); as board) {
@@ -227,11 +276,21 @@
         class="workbench"
         [dashboard]="board"
         [datasets]="datasets()"
+        [identities]="identities()"
         [inspectorOpen]="inspectorOpen()"
         (saved)="dashboardSaved($event)"
         (deleted)="dashboardDeleted($event)"
         (dirtyChange)="dashboardDirty($event)"
         (editingChange)="dashboardEditing($event)"
+      />
+    } @else if (mode() === 'identity' && openIdentity(); as identity) {
+      <app-report-identity-editor
+        class="workbench"
+        [identity]="identity"
+        [usedBy]="dashboardsUsing(identity.id)"
+        (saved)="identitySaved($event)"
+        (deleted)="identityDeleted($event)"
+        (dirtyChange)="identityDirty($event)"
       />
     } @else if (step() === 'visual' && savedDataset(); as dataset) {
       <app-report-workbench
@@ -525,7 +584,7 @@
                     </span>
                     <button
                       type="button"
-                      class="btn btn--small"
+                      class="button"
                       [disabled]="catalogState() === 'loading'"
                       (click)="openCanvas()"
                     >
@@ -547,7 +606,7 @@
                     </select>
                     <button
                       type="button"
-                      class="btn btn--small"
+                      class="button"
                       [disabled]="!canvasTable()"
                       (click)="openCanvas()"
                     >
@@ -569,7 +628,7 @@
                   } @else {
                     <button
                       type="button"
-                      class="btn btn--small"
+                      class="button"
                       [disabled]="!source.database || catalogState() === 'loading'"
                       (click)="loadCatalog()"
                     >
@@ -804,6 +863,7 @@
   <app-report-template-gallery
     [scopes]="dashboardScopes"
     [datasets]="datasets()"
+    [identities]="identities()"
     (applied)="createFromTemplate($event)"
     (closed)="galleryOpen.set(false)"
   />
