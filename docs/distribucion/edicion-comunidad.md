@@ -8,7 +8,7 @@ Esta separación aplica la vía que SignPath indicó en su respuesta del 16 de s
 
 ## Construcción y comprobaciones
 
-Desde la raíz, con .NET 10, Node, Rust, las herramientas de Windows y Tauri CLI 2.11.4:
+Desde la raíz, con .NET 10, Node, Rust, las herramientas de Windows y Tauri CLI 2.12.4:
 
 ```powershell
 npm ci --prefix frontend
