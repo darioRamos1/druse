@@ -444,6 +444,48 @@ describe('ReportWorkbench', () => {
     expect(botón('Guardar reporte').disabled).toBe(true);
   });
 
+  it('conserva un borrador al cancelar el cambio de reporte', async () => {
+    await crear();
+    botón('Nuevo reporte').click();
+    fixture.detectChanges();
+    const nombre = el<HTMLInputElement>('.inspector input[type="text"]');
+    nombre.value = 'Ventas por ciudad';
+    nombre.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+
+    botón('Nuevo reporte').click();
+    fixture.detectChanges();
+    expect(el('.switch-confirm').textContent).toContain('cambios sin guardar');
+
+    botón('Cancelar').click();
+    fixture.detectChanges();
+    expect(nombre.value).toBe('Ventas por ciudad');
+
+    botón('Nuevo reporte').click();
+    fixture.detectChanges();
+    botón('Descartar y continuar').click();
+    fixture.detectChanges();
+    expect(nombre.value).toBe('Reporte 1');
+  });
+
+  it('un indicador recién guardado no cuenta como cambio sin guardar', async () => {
+    await crear();
+    botón('Nuevo reporte').click();
+    fixture.detectChanges();
+    ([...fixture.nativeElement.querySelectorAll('[role="radio"]')] as HTMLButtonElement[])
+      .find((radio) => radio.textContent?.includes('Indicador'))!
+      .click();
+    fixture.detectChanges();
+    botón('Guardar reporte').click();
+    await asentar();
+
+    // Se guarda tal como está el borrador y al leerlo se normaliza: los dos
+    // lados se comparan normalizados, o el reporte parecería cambiado siempre.
+    botón('Nuevo reporte').click();
+    fixture.detectChanges();
+    expect(el('.switch-confirm')).toBeNull();
+  });
+
   it('avisa de que los datos son de una versión anterior de la definición', async () => {
     guardado = { ...enero, definitionVersion: 1, fromOlderDefinition: true };
     await crear();

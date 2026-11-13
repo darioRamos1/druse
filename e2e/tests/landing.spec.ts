@@ -11,6 +11,7 @@ import {
   borrarRestos,
   crearTablero,
   previsualizar,
+  guardarReporte,
 } from '../support/reportes';
 
 /**
@@ -73,9 +74,10 @@ test.describe('capturas de la landing', () => {
 
     await inspector.getByLabel('Agrupar por').selectOption({ label: 'Ventas.municipio' });
     await inspector.getByLabel('Nombre del reporte').fill('Ventas por municipio');
+    await inspector.locator('summary', { hasText: 'Apariencia' }).click();
     await inspector.getByLabel('Un color por categoría').check();
     await inspector.getByLabel('Prefijo').fill('$ ');
-    await reportes.getByRole('button', { name: 'Guardar reporte' }).click();
+    await guardarReporte(reportes);
     await reportes.getByRole('button', { name: 'Nuevo reporte' }).click();
     await expect(inspector.getByLabel('Nombre del reporte')).toHaveValue(/^Reporte \d+$/);
     await reportes.getByRole('radio', { name: 'Indicador' }).click();
@@ -84,7 +86,7 @@ test.describe('capturas de la landing', () => {
     await inspector.getByLabel('En meta desde').press('Tab');
     await inspector.getByLabel('Cerca desde').fill('50');
     await inspector.getByLabel('Cerca desde').press('Tab');
-    await reportes.getByRole('button', { name: 'Guardar reporte' }).click();
+    await guardarReporte(reportes);
 
     // La programación, abierta sobre el indicador.
     await reportes.getByRole('button', { name: 'Programar', exact: true }).click();

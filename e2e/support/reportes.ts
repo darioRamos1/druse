@@ -131,6 +131,7 @@ export async function borrarRestos(reportes: Locator, tableros: RegExp, conjunto
 
     await item.first().click();
     await reportes.locator('.steps__item').first().click();
+    await abrirConfiguracionSiHaceFalta(reportes);
     await reportes.getByRole('button', { name: 'Borrar este conjunto de datos' }).click();
     await reportes.locator('.confirm').getByRole('button', { name: 'Borrar' }).click();
     await expect(item).toHaveCount(antes - 1);
@@ -185,4 +186,36 @@ export async function faltaContrasena(reportes: Locator): Promise<boolean> {
   await expect(reportes.locator('.stats').or(aviso).first()).toBeVisible({ timeout: 60_000 });
 
   return aviso.first().isVisible();
+}
+
+/**
+ * Guarda el reporte abierto y espera a que quede guardado.
+ *
+ * No basta con mirar su pestaña: el borrador sin guardar ya sale como pestaña
+ * seleccionada con su nombre, así que esa comprobación se cumplía antes de que
+ * terminara de guardarse, y lo siguiente (cerrar con Escape) se encontraba con
+ * «cambios sin guardar». El botón se desactiva cuando no queda nada por guardar.
+ */
+export async function guardarReporte(reportes: Locator): Promise<void> {
+  const guardar = reportes.getByRole('button', { name: 'Guardar reporte' });
+
+  await guardar.click();
+  await expect(guardar).toBeDisabled({ timeout: 30_000 });
+}
+
+/**
+ * Deja a la vista el panel de configuración del conjunto, donde está «Borrar».
+ *
+ * En una ventana estrecha el panel empieza cerrado y se abre con su botón; en
+ * una ancha ya está abierto, y pulsar el botón lo cerraría.
+ */
+export async function abrirConfiguracionSiHaceFalta(reportes: Locator): Promise<void> {
+  const borrar = reportes.getByRole('button', { name: 'Borrar este conjunto de datos' });
+  const configurar = reportes.getByRole('button', { name: 'Mostrar u ocultar la configuración', exact: true });
+
+  await expect(borrar.or(configurar).first()).toBeVisible();
+  if (!(await borrar.isVisible())) {
+    await configurar.click();
+    await expect(borrar).toBeVisible();
+  }
 }

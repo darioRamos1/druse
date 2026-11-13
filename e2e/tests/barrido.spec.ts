@@ -14,6 +14,7 @@ import {
   borrarRestos,
   crearTablero,
   previsualizar,
+  guardarReporte,
 } from '../support/reportes';
 import { comprobarDiagnosticoIa, prepararDiagnosticoIa } from '../support/ai-diagnostics';
 import { comprobarContextoChat, prepararContextoChat, comprobarSelectorContexto, comprobarNotasContexto } from '../support/ai-context';
@@ -513,6 +514,7 @@ test.describe('barrido visual', () => {
     // Se guardan un indicador y unas barras: el tema claro y los anchos
     // estrechos se miran más abajo sobre este mismo conjunto, y al final se borra.
     await reportes.locator('.inspector').getByLabel('Nombre del reporte').fill(INDICADOR_BARRIDO);
+    await reportes.locator('.inspector summary', { hasText: 'Apariencia' }).click();
     // Umbrales: 60 % queda «cerca de la meta», con icono y texto.
     await reportes.locator('.inspector').getByLabel('En meta desde').fill('90');
     await reportes.locator('.inspector').getByLabel('En meta desde').press('Tab');
@@ -521,7 +523,7 @@ test.describe('barrido visual', () => {
     await expect(reportes.locator('.indicator__status')).toContainText('Cerca de la meta');
     await medir(page, 'reportes indicador con umbrales', hallazgos);
     await foto(page, '21l-reportes-umbrales', reportes.locator('.dialog'));
-    await reportes.getByRole('button', { name: 'Guardar reporte' }).click();
+    await guardarReporte(reportes);
     await reportes.getByRole('button', { name: 'Nuevo reporte' }).click();
     // El nombre propuesto llega un instante después del clic: rellenar antes lo
     // dejaría detrás de «Reporte 2» en vez de sustituirlo.
@@ -529,12 +531,19 @@ test.describe('barrido visual', () => {
     await reportes.locator('.inspector').getByLabel('Nombre del reporte').fill(BARRAS_BARRIDO);
     await reportes.locator('.inspector').getByLabel('Agrupar por').selectOption({ label: 'Ventas.municipio' });
     // Un color por categoría y prefijo de moneda.
+    // Dentro de `has` el localizador es relativo al elemento: no puede partir de `reportes`.
+    const apariencia = reportes.locator('.inspector details', {
+      has: page.locator('summary', { hasText: 'Apariencia' }),
+    });
+    if ((await apariencia.getAttribute('open')) === null) {
+      await apariencia.locator('summary').click();
+    }
     await reportes.locator('.inspector').getByLabel('Un color por categoría').check();
     await reportes.locator('.inspector').getByLabel('Prefijo').fill('$ ');
     await expect(reportes.locator('.chart__value').first()).toHaveText('$ 80');
     await medir(page, 'reportes apariencia', hallazgos);
     await foto(page, '21m-reportes-apariencia', reportes.locator('.dialog'));
-    await reportes.getByRole('button', { name: 'Guardar reporte' }).click();
+    await guardarReporte(reportes);
     await expect(reportes.locator('.reports__tab')).toHaveCount(2);
 
     // Un tablero con los dos reportes y filtros de fecha y categoría.

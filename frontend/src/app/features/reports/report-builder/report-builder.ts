@@ -6,6 +6,7 @@ import {
   inject,
   output,
   signal,
+  viewChild,
 } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 
@@ -128,6 +129,7 @@ export class ReportBuilder {
   private readonly _gateway = inject(ApplicationGateway);
   private readonly _store = inject(WorkspaceStore);
   private readonly _i18n = inject(I18nService);
+  private readonly _workbench = viewChild(ReportWorkbench);
 
   readonly closed = output<void>();
 
@@ -143,6 +145,7 @@ export class ReportBuilder {
    */
   protected readonly mode = signal<'dataset' | 'dashboard' | 'identity'>('dataset');
   protected readonly openDashboard = signal<SavedDashboard | null>(null);
+  protected readonly editingDashboard = signal(false);
 
   /** Identidades de empresa para los tableros: logo, datos y color de marca. */
   protected readonly identities = signal<readonly ReportIdentity[]>([]);
@@ -173,6 +176,13 @@ export class ReportBuilder {
   protected readonly activeSource = signal(0);
   protected readonly view = signal<PreviewView>({ kind: 'source', index: 0 });
   protected readonly inspectorOpen = signal(wideLayout());
+  protected readonly navigationOpen = signal(false);
+  protected readonly canConfigure = computed(() =>
+    this.mode() === 'dashboard'
+      ? this.editingDashboard()
+      : this.mode() === 'dataset' &&
+        (this.step() === 'visual' ? this._workbench()?.canConfigure() : this.sources().length > 0),
+  );
 
   protected readonly preview = signal<ReportDatasetPreview | null>(null);
   protected readonly previewing = signal(false);
@@ -330,6 +340,7 @@ export class ReportBuilder {
     this.activeSource.set(0);
     this.view.set({ kind: 'source', index: 0 });
     this.step.set('sources');
+    this.inspectorOpen.set(wideLayout());
     this.error.set(null);
     this.notice.set(null);
   }
@@ -390,6 +401,11 @@ export class ReportBuilder {
       return;
     }
 
+    if (this.navigationOpen()) {
+      this.navigationOpen.set(false);
+      return;
+    }
+
     this.guard(() => this.closed.emit());
   }
 
@@ -410,6 +426,15 @@ export class ReportBuilder {
       return;
     }
 
+    if (this.step() === 'visual' && step !== 'visual' && this._workbench()?.hasChanges()) {
+      this.askToDiscard(() => this.changeStep(step), true);
+      return;
+    }
+
+    this.changeStep(step);
+  }
+
+  private changeStep(step: ReportStep): void {
     this.step.set(step);
     if (step !== 'visual') {
       this.view.set(
@@ -420,6 +445,8 @@ export class ReportBuilder {
     // paso taparía «Actualizar ahora» y la vista previa. Ahí se abre con su botón.
     if (wideLayout()) {
       this.inspectorOpen.set(true);
+    } else if (step === 'visual') {
+      this.inspectorOpen.set(false);
     }
 
     if (step === 'join') {
@@ -445,6 +472,12 @@ export class ReportBuilder {
 
   protected toggleInspector(): void {
     this.inspectorOpen.update((open) => !open);
+  }
+
+  protected closeNavigationOnAction(event: MouseEvent): void {
+    if (this.navigationOpen() && (event.target as Element).closest('button:not(:disabled)')) {
+      this.navigationOpen.set(false);
+    }
   }
 
   // --- Fuentes ---------------------------------------------------------------
@@ -1058,6 +1091,7 @@ export class ReportBuilder {
 
   private enterDashboard(dashboard: SavedDashboard): void {
     this._dashboardDirty.set(false);
+    this.editingDashboard.set(false);
     this.openDashboard.set(dashboard);
     this.mode.set('dashboard');
     this.inspectorOpen.set(wideLayout());
@@ -1067,6 +1101,7 @@ export class ReportBuilder {
     this.mode.set('dataset');
     this.openDashboard.set(null);
     this._dashboardDirty.set(false);
+    this.editingDashboard.set(false);
     this.openIdentity.set(null);
     this._identityDirty.set(false);
   }
@@ -1157,6 +1192,7 @@ export class ReportBuilder {
 
   /** Editar un tablero es pedir el inspector: se abre aunque la ventana sea estrecha. */
   protected dashboardEditing(editing: boolean): void {
+    this.editingDashboard.set(editing);
     if (editing) {
       this.inspectorOpen.set(true);
     }
@@ -1180,13 +1216,18 @@ export class ReportBuilder {
       (this.mode() === 'dashboard' && this._dashboardDirty()) ||
       (this.mode() === 'identity' && this._identityDirty());
 
-    if (!dashboardDirty && (what === 'dashboard' || !this.dirty())) {
+    const reportDirty = this._workbench()?.hasChanges() ?? false;
+    if (!dashboardDirty && !reportDirty && (what === 'dashboard' || !this.dirty())) {
       action();
       return;
     }
 
+    this.askToDiscard(action, reportDirty);
+  }
+
+  private askToDiscard(action: () => void, reportDirty: boolean): void {
     this.ask(
-      this._i18n.t('reports.confirm.discard'),
+      this._i18n.t(reportDirty ? 'reports.ui.switchReport' : 'reports.confirm.discard'),
       this._i18n.t('reports.confirm.discardAction'),
       action,
     );
