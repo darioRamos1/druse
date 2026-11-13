@@ -131,10 +131,10 @@ inglés, comprobaciones y commit, como indica `AGENTS.md`.
 
 ## 5. Riesgos y decisiones abiertas
 
-- **Una identidad por tablero o por instalación.** Se propone por tablero, con
-  identidades reutilizables: cubre a la empresa que usa Druse para sí misma y a
-  quien prepara informes para varios clientes. Si solo hiciera falta el primer
-  caso, bastaría una identidad global y la fase 1 sería más corta.
+- **Una identidad por tablero o por instalación.** *Decidido el 12 de noviembre
+  de 2026: por tablero*, con identidades reutilizables. Cubre a la empresa que
+  usa Druse para sí misma y a quien prepara informes para varios clientes, con
+  una identidad por cliente.
 - **Logos con transparencia en el tema oscuro.** Se resuelve con la vista previa
   en los dos temas y la opción de fondo blanco; no se intenta adivinar.
 - **Colores de marca poco legibles.** No se bloquean: se avisa y se propone uno
