@@ -2537,5 +2537,6 @@
   "reports.identity.darkTheme": "Tema oscuro",
   "whatsNew.v1_25_0.identities": "En Reportes BI puedes crear la identidad de una empresa —logo, nombre, datos y color de marca— y ver cómo queda en tema claro y oscuro antes de usarla en sus tableros.",
   "whatsNew.v1_25_0.brandColor": "El color de marca se comprueba en los dos temas: Druse calcula su versión para el tema oscuro y, si no se lee bien, propone el tono más cercano que sí.",
-  "reports.identity.colorExample": "#0A6CBF"
+  "reports.identity.colorExample": "#0A6CBF",
+  "whatsNew.v1_25_1.buttons": "Los botones del lienzo de una fuente visual y de las identidades de empresa tienen ya el mismo aspecto que el resto de Reportes BI, y «Guardar» destaca como acción principal."
 }

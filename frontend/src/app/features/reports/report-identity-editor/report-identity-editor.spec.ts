@@ -173,7 +173,7 @@ describe('ReportIdentityEditor', () => {
     expect(el('.confirm').textContent).toContain('¿Borrar esta identidad?');
     expect(deleted).toEqual([]);
 
-    el('.confirm').querySelector<HTMLButtonElement>('.btn--danger')!.click();
+    el('.confirm').querySelector<HTMLButtonElement>('.button--danger')!.click();
     await fixture.whenStable();
 
     expect(deleted).toEqual(['id-6']);

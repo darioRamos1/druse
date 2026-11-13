@@ -8,20 +8,20 @@
       @if (confirmingDelete()) {
         <span class="confirm" role="alert">
           {{ 'reports.identity.confirmDelete' | t }}
-          <button type="button" class="btn btn--danger" (click)="remove()">
+          <button type="button" class="button button--danger" (click)="remove()">
             {{ 'reports.identity.delete' | t }}
           </button>
-          <button type="button" class="btn" (click)="confirmingDelete.set(false)">
+          <button type="button" class="button" (click)="confirmingDelete.set(false)">
             {{ 'common.cancel' | t }}
           </button>
         </span>
       } @else {
-        <button type="button" class="btn" (click)="confirmingDelete.set(true)">
+        <button type="button" class="button" (click)="confirmingDelete.set(true)">
           {{ 'reports.identity.delete' | t }}
         </button>
         <button
           type="button"
-          class="btn btn--primary"
+          class="button button--primary"
           [disabled]="!!problem() || saving() || !dirty()"
           (click)="save()"
         >
@@ -156,7 +156,7 @@
       <div class="field">
         <span class="field__label">{{ 'reports.identity.logo' | t }}</span>
         <span class="logo-row">
-          <label class="btn btn--file">
+          <label class="button button--file">
             <app-icon name="folder-open" [size]="12" />
             {{ (logo() ? 'reports.identity.replaceLogo' : 'reports.identity.chooseLogo') | t }}
             <input

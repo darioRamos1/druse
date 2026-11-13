@@ -582,7 +582,7 @@
                     </span>
                     <button
                       type="button"
-                      class="btn btn--small"
+                      class="button"
                       [disabled]="catalogState() === 'loading'"
                       (click)="openCanvas()"
                     >
@@ -604,7 +604,7 @@
                     </select>
                     <button
                       type="button"
-                      class="btn btn--small"
+                      class="button"
                       [disabled]="!canvasTable()"
                       (click)="openCanvas()"
                     >
@@ -626,7 +626,7 @@
                   } @else {
                     <button
                       type="button"
-                      class="btn btn--small"
+                      class="button"
                       [disabled]="!source.database || catalogState() === 'loading'"
                       (click)="loadCatalog()"
                     >

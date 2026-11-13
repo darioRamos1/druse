@@ -2537,5 +2537,6 @@
   "reports.identity.darkTheme": "Dark theme",
   "whatsNew.v1_25_0.identities": "In BI Reports you can create a company identity —logo, name, details and brand color— and see how it looks in the light and dark themes before using it on its dashboards.",
   "whatsNew.v1_25_0.brandColor": "The brand color is checked in both themes: Druse works out its dark-theme version and, if it is hard to read, suggests the closest shade that works.",
-  "reports.identity.colorExample": "#0A6CBF"
+  "reports.identity.colorExample": "#0A6CBF",
+  "whatsNew.v1_25_1.buttons": "The buttons for a visual source’s canvas and for company identities now look like the rest of BI Reports, and “Save” stands out as the main action."
 }
