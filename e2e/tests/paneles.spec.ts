@@ -25,7 +25,13 @@ test('ampliar conserva SQL, filtros y tamaño; ejecutar recupera los resultados'
   });
   const editorToggle = page.locator('app-editor-toolbar .panel-toggle');
   const resultsToggle = results.locator('.panel-toggle');
+  // Se espera a que el paso del separador (16 px) se pinte antes de medir: en
+  // una CI lenta, medir justo después del teclado tomaba el alto de antes.
+  const heightBefore = (await results.boundingBox())!.height;
   await handle.press('ArrowUp');
+  await expect
+    .poll(async () => (await results.boundingBox())!.height)
+    .not.toBe(heightBefore);
   const previousHeight = (await results.boundingBox())!.height;
   const previousEditorHeight = (await editor.boundingBox())!.height;
   await results.getByRole('button', { name: 'Filtros', exact: true }).click();

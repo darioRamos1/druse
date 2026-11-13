@@ -7,12 +7,16 @@ test('la conexión lista lleva al explorador y recupera el editor para empezar a
   await page.setViewportSize({ width: 1280, height: 760 });
   await abrir(page);
   await conectar(page);
+  const tabs = page.locator('app-editor-tabs .tab');
+  const before = await tabs.count();
   await page.locator('app-editor-tabs .tabs__add').click();
+  // Se cuenta cuando la pestaña nueva ya está: contar justo después del clic,
+  // en una CI lenta, daba una menos y luego parecía que «sobraba» una.
+  const originalCount = before + 1;
+  await expect(tabs).toHaveCount(originalCount);
 
   const guide = page.getByRole('region', { name: 'Conexión lista' });
   const editor = page.locator('app-sql-editor');
-  const tabs = page.locator('app-editor-tabs .tab');
-  const originalCount = await tabs.count();
   await expect(guide).toBeVisible();
   await page
     .getByRole('button', {
