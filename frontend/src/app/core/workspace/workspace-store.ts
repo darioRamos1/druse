@@ -757,6 +757,41 @@ export class WorkspaceStore {
     }
   }
 
+  /**
+   * Deja leído el catálogo de una base para componer sobre ella.
+   *
+   * Reportes BI lee sus fuentes con sesiones propias y no necesita la conexión
+   * abierta; el compositor sí, porque elige tablas y prueba la consulta con la
+   * sesión del explorador. Si no está abierta se abre —igual que al pulsarla en
+   * el explorador— y después se espera a que lleguen las tablas de esa base.
+   */
+  async prepareCatalogAsync(
+    connectionId: string,
+    database: string,
+    reload = false,
+  ): Promise<ReconnectOutcome> {
+    const connection = this.findConnection(connectionId);
+
+    if (!connection) {
+      return 'failed';
+    }
+
+    if (!connection.sessionId) {
+      const outcome = await this.openSaved(connectionId);
+
+      if (outcome !== 'ok') {
+        return outcome;
+      }
+    } else if (reload) {
+      // Una tabla creada después de conectar no está en lo leído: se rehace el
+      // árbol de la conexión, que es lo mismo que «Actualizar» en el explorador.
+      await this._explorer.loadDatabases(connectionId, connection.sessionId);
+    }
+
+    await this._explorer.primeSchemaIndexAsync(connectionId, database);
+    return 'ok';
+  }
+
   /** Abre una sesión con un perfil ya guardado. */
   async connectSaved(connectionId: string, password?: string): Promise<boolean> {
     return (await this.openSaved(connectionId, password)) === 'ok';

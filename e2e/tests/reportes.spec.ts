@@ -1,8 +1,16 @@
 import { readFileSync } from 'node:fs';
 
-import { expect, test, type Locator } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
 
-import { CONTENEDOR, SQLSERVER, abrir, conectar, conectarSqlServer } from '../support/druse';
+import {
+  CONTENEDOR,
+  SQLSERVER,
+  abrir,
+  conectar,
+  conectarSqlServer,
+  escribirSql,
+  esperarFinDeConsulta,
+} from '../support/druse';
 import {
   METAS_SQL,
   PEDIDOS_SQL,
@@ -506,6 +514,135 @@ test.describe('Reportes BI entre motores', () => {
 });
 
 /** El paso Visualización de un conjunto recién guardado, todavía sin resultado. */
+test.describe('Reportes BI con el lienzo', () => {
+  /**
+   * Una fuente compuesta en el lienzo del compositor, cruzada con otra en SQL.
+   *
+   * El lienzo necesita la sesión del explorador —`conectar` la abre—, así que
+   * componer funciona también en CI. Leer la fuente usa la contraseña guardada,
+   * y sin llavero se acaba ahí, como en las demás pruebas.
+   */
+  test('una fuente se compone en el lienzo, se guarda y se reabre igual', async ({ page }) => {
+    await abrir(page);
+    await conectar(page);
+
+    const tabla = `e2e_lienzo_${Date.now()}`;
+    await ejecutarConAviso(
+      page,
+      `DO $$ DECLARE t text; BEGIN
+         FOR t IN SELECT tablename FROM pg_tables WHERE tablename LIKE 'e2e_lienzo_%' LOOP
+           EXECUTE format('DROP TABLE %I', t);
+         END LOOP;
+       END $$;
+       CREATE TABLE ${tabla} (municipio text, importe numeric(10,2));
+       INSERT INTO ${tabla} VALUES ('05001', 50), ('05001', 30), ('08001', 100), ('11001', 40)`,
+    );
+
+    const reportes = await abrirReportes(page);
+    const nombre = `E2E Lienzo ${Date.now()}`;
+    await reportes.getByLabel('Nombre del conjunto de datos').fill(nombre);
+
+    // La fuente: conexión y base como cualquier otra, y luego el modo visual.
+    await reportes.getByRole('button', { name: 'Añadir fuente' }).first().click();
+    const inspector = reportes.locator('.inspector');
+    const conexion = inspector.locator('select').first();
+    const valor = await conexion
+      .locator('option', { hasText: CONTENEDOR.nombre })
+      .first()
+      .getAttribute('value');
+    await conexion.selectOption(valor ?? '');
+    await inspector.getByLabel('Alias').fill('Lienzo');
+    const base = inspector.getByLabel('Base de datos');
+    await base.fill(CONTENEDOR.base);
+    await base.press('Tab');
+    await inspector.getByRole('radio', { name: 'Visual' }).click();
+
+    const leer = inspector.getByRole('button', { name: 'Leer las tablas de esta base' });
+    if (await leer.isVisible()) {
+      await leer.click();
+    }
+    // La tabla se creó después de conectar: lo leído al conectar no la tiene.
+    await inspector.getByRole('button', { name: 'Volver a leer las tablas' }).click();
+    const elegir = inspector.getByRole('combobox', { name: 'Elige la tabla principal' });
+    await expect(elegir.locator('option', { hasText: tabla })).toHaveCount(1, { timeout: 60_000 });
+    await elegir.selectOption(
+      (await elegir.locator('option', { hasText: tabla }).getAttribute('value'))!,
+    );
+    await inspector.getByRole('button', { name: 'Componer en el lienzo' }).click();
+
+    // El compositor se abre encima, solo para SELECT y ya en el lienzo.
+    const builder = page.locator('app-query-builder');
+    await expect(builder.locator('app-query-canvas .box')).toHaveCount(1);
+    await expect(builder.getByRole('button', { name: 'INSERT' })).toHaveCount(0);
+    await builder.getByLabel('Añadir a Agrupar por').selectOption('base:municipio');
+    await builder.getByLabel('Añadir a Valores').selectOption('base:importe');
+    await builder.getByLabel('Nombre del cálculo sobre importe').last().fill('venta');
+    await builder.getByRole('button', { name: 'Quitar COUNT(*)' }).click();
+    await expect(builder.locator('textarea.sql')).toHaveValue(/SUM\("importe"\) AS "venta"/);
+    await builder.getByRole('button', { name: 'Usar en la fuente' }).click();
+    await expect(builder).toHaveCount(0);
+
+    await expect(inspector).toContainText(`Tabla principal: public.${tabla}`);
+    await expect(inspector.locator('.sql--readonly')).toContainText('GROUP BY "municipio"');
+
+    await previsualizar(reportes);
+    if (await faltaContrasena(reportes)) {
+      test.info().annotations.push({ type: 'sin llavero', description: 'La fuente pidió la contraseña.' });
+      return;
+    }
+    await expect(reportes.locator('.stats')).toContainText('3 filas');
+
+    await anadirFuente(reportes, 'Metas', METAS_SQL);
+    await previsualizar(reportes);
+    await reportes.locator('.steps__item').nth(1).click();
+    await previsualizar(reportes);
+    await reportes.getByRole('button', { name: 'Guardar' }).click();
+    await expect(reportes.locator('.banner--success')).toContainText('versión 1');
+
+    // Reabierta, la fuente vuelve al lienzo con lo que se compuso.
+    await page.keyboard.press('Escape');
+    await expect(reportes.locator('.dialog')).toBeHidden();
+    const otraVez = await abrirReportes(page);
+    await otraVez.locator('.datasets__item', { hasText: nombre }).first().click();
+    await otraVez.locator('.steps__item').nth(0).click();
+    // La primera fuente, la del lienzo, es la que queda activa al reabrir.
+    await otraVez.locator('.inspector').getByRole('button', { name: 'Editar en el lienzo' }).click();
+    await expect(builder.locator('.pill--group')).toContainText('municipio');
+    const barrido = process.env['DRUSE_BARRIDO_DIR'];
+    if (barrido) {
+      await page.screenshot({ path: `${barrido}/reportes-fuente-lienzo.png` });
+    }
+    await expect(builder.locator('textarea.sql')).toHaveValue(/SUM\("importe"\) AS "venta"/);
+
+    // Escape cierra el compositor y deja el constructor abierto.
+    await page.keyboard.press('Escape');
+    await expect(builder).toHaveCount(0);
+    await expect(otraVez.locator('.dialog')).toBeVisible();
+    if (barrido) {
+      await page.screenshot({ path: `${barrido}/reportes-fuente-inspector.png` });
+    }
+    await borrarConjunto(otraVez);
+  });
+
+  async function ejecutarConAviso(page: Page, sql: string): Promise<void> {
+    await escribirSql(page, sql);
+    await page.keyboard.press('Control+Enter');
+
+    // El aviso de sentencias que cambian datos sale según lo que lea el
+    // analizador: un DROP dentro de un bloque DO, por ejemplo, no lo levanta.
+    const aviso = page.getByRole('alertdialog');
+    const avisa = await aviso
+      .waitFor({ timeout: 5_000 })
+      .then(() => true)
+      .catch(() => false);
+    if (avisa) {
+      await aviso.getByRole('button', { name: 'Ejecutar de todos modos' }).click();
+      await expect(aviso).toBeHidden({ timeout: 30_000 });
+    }
+    await esperarFinDeConsulta(page);
+  }
+});
+
 async function abrirVisualizacionSinDatos(reportes: Locator): Promise<void> {
   await abrirVisualizacion(reportes);
   await expect(reportes.locator('.freshness')).toContainText('Todavía no hay datos guardados');

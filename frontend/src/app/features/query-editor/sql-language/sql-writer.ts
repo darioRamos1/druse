@@ -69,6 +69,22 @@ export interface SelectSpec {
   readonly having?: readonly AggregateFilter[];
   readonly dateGroups?: readonly DateGroup[];
   readonly orders?: readonly SelectOrder[];
+  /** Columnas calculadas escritas a mano: van tal cual, entre paréntesis y con su alias. */
+  readonly expressions?: readonly SelectExpression[];
+  /** Expresiones escritas a mano por las que también se agrupa. */
+  readonly groupExpressions?: readonly string[];
+  /** Condiciones escritas a mano, detrás de los filtros del formulario. */
+  readonly rawFilters?: readonly RawFilter[];
+}
+
+export interface SelectExpression {
+  readonly sql: string;
+  readonly alias: string;
+}
+
+export interface RawFilter {
+  readonly sql: string;
+  readonly conjunction?: LogicalOperator;
 }
 
 export interface SelectColumn {
@@ -292,25 +308,38 @@ function conditions<T extends Pick<QueryFilter, 'operator' | 'value' | 'valueTo'
   filters: readonly T[],
   expression: (filter: T) => string,
   other?: (filter: T) => string | null,
+  raw: readonly RawFilter[] = [],
+): string {
+  return joinConditions([
+    ...filters.map((filter) => ({
+      text: comparison(expression(filter), filter, other?.(filter)),
+      conjunction: filter.conjunction,
+    })),
+    // Lo escrito a mano va entre paréntesis: un `OR` suelto dentro cambiaría
+    // el sentido de todo lo demás.
+    ...raw.map((filter) => ({ text: `(${filter.sql})`, conjunction: filter.conjunction })),
+  ]);
+}
+
+function joinConditions(
+  items: readonly { readonly text: string; readonly conjunction?: LogicalOperator }[],
 ): string {
   let text = '';
   let previous: LogicalOperator | null = null;
 
-  filters.forEach((filter, index) => {
-    const current = comparison(expression(filter), filter, other?.(filter));
-
+  items.forEach((item, index) => {
     if (index === 0) {
-      text = current;
+      text = item.text;
       return;
     }
 
-    const conjunction = filter.conjunction ?? 'AND';
+    const conjunction = item.conjunction ?? 'AND';
 
     if (previous !== null && previous !== conjunction) {
       text = `(${text})`;
     }
 
-    text = `${text}\n  ${conjunction} ${current}`;
+    text = `${text}\n  ${conjunction} ${item.text}`;
     previous = conjunction;
   });
 
@@ -348,6 +377,11 @@ function allGeneratedInsert(
 export function buildSelect(engine: DatabaseEngine, spec: SelectSpec): string {
   const alias = spec.alias ?? ((spec.joins?.length ?? 0) > 0 ? 't0' : undefined);
   const selected = spec.columns.map((column) => columnReference(engine, column, alias));
+  selected.push(
+    ...(spec.expressions ?? []).map(
+      (expression) => `(${expression.sql}) AS ${quote(engine, expression.alias)}`,
+    ),
+  );
   selected.push(
     ...(spec.dateGroups ?? []).map((group) => {
       const expression = dateGroupExpression(engine, group, alias);
@@ -390,12 +424,13 @@ export function buildSelect(engine: DatabaseEngine, spec: SelectSpec): string {
   const reference = (column: string) =>
     alias ? `${quote(engine, alias)}.${quote(engine, column)}` : quote(engine, column);
 
-  if (spec.filters.length > 0) {
+  if (spec.filters.length > 0 || (spec.rawFilters?.length ?? 0) > 0) {
     lineas.push(
       `WHERE ${conditions(
         spec.filters,
         (filter) => reference(filter.column),
         (filter) => (filter.compareColumn ? reference(filter.compareColumn) : null),
+        spec.rawFilters,
       )}`,
     );
   }
@@ -403,6 +438,7 @@ export function buildSelect(engine: DatabaseEngine, spec: SelectSpec): string {
   const groups = [
     ...(spec.groupBy ?? []).map((column) => columnReference(engine, column, alias)),
     ...(spec.dateGroups ?? []).map((group) => dateGroupExpression(engine, group, alias)),
+    ...(spec.groupExpressions ?? []).map((sql) => `(${sql})`),
   ];
   if (groups.length > 0) {
     lineas.push(`GROUP BY ${groups.join(', ')}`);

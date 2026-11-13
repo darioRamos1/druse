@@ -18,6 +18,26 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: '1.24.0',
+    date: '2026-11-12',
+    items: ['whatsNew.v1_24_0.toCanvas', 'whatsNew.v1_24_0.safe'],
+  },
+  {
+    version: '1.23.0',
+    date: '2026-11-12',
+    items: ['whatsNew.v1_23_0.canvas', 'whatsNew.v1_23_0.fields'],
+  },
+  {
+    version: '1.22.0',
+    date: '2026-11-12',
+    items: ['whatsNew.v1_22_0.shelves', 'whatsNew.v1_22_0.chart', 'whatsNew.v1_22_0.handSql'],
+  },
+  {
+    version: '1.21.0',
+    date: '2026-11-12',
+    items: ['whatsNew.v1_21_0.canvas', 'whatsNew.v1_21_0.joinByDrag'],
+  },
+  {
     version: '1.20.0',
     date: '2026-11-12',
     items: ['whatsNew.v1_20_0.engines', 'whatsNew.v1_20_0.messages'],

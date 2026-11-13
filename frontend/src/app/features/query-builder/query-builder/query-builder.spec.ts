@@ -1439,4 +1439,343 @@ describe('QueryBuilder', () => {
     expect(fixture.nativeElement.querySelector('.join-suggestions')).toBeNull();
     expect(cerrado).toBe(false);
   });
+
+  describe('lienzo', () => {
+    async function onCanvas(): Promise<ComponentFixture<QueryBuilder>> {
+      const fixture = await create(table);
+      const element = fixture.nativeElement as HTMLElement;
+
+      [...element.querySelectorAll<HTMLButtonElement>('.view-switch button')]
+        .find((button) => button.textContent?.trim() === 'Lienzo')!
+        .click();
+      fixture.detectChanges();
+
+      return fixture;
+    }
+
+    async function addCustomers(fixture: ComponentFixture<QueryBuilder>): Promise<void> {
+      const add = fixture.nativeElement.querySelector(
+        'select[aria-label="Añadir una tabla al lienzo"]',
+      ) as HTMLSelectElement;
+
+      add.value = customer.id;
+      add.dispatchEvent(new Event('change'));
+      await fixture.whenStable();
+      fixture.detectChanges();
+    }
+
+    const sqlOf = (fixture: ComponentFixture<QueryBuilder>) =>
+      (fixture.nativeElement.querySelector('textarea.sql') as HTMLTextAreaElement).value;
+
+    it('enseña la tabla principal como caja y recuerda que se eligió el lienzo', async () => {
+      const fixture = await onCanvas();
+      const boxes = fixture.nativeElement.querySelectorAll('app-query-canvas .box');
+
+      expect(boxes).toHaveLength(1);
+      expect(boxes[0].getAttribute('aria-label')).toBe('public.orders');
+      expect(boxes[0].querySelector('.box__name')?.textContent).toBe('orders');
+      expect(localStorage.getItem('druse.query-builder.view')).toBe('canvas');
+      // El formulario deja paso al lienzo y sus estantes; el máximo de filas sigue.
+      expect(fixture.nativeElement.querySelector('.joins-block')).toBeNull();
+      expect(fixture.nativeElement.textContent).not.toContain('Cálculos y agrupación');
+      expect(
+        [...fixture.nativeElement.querySelectorAll('.shelf__title')].map((title: Element) =>
+          title.textContent?.trim(),
+        ),
+      ).toEqual(['Agrupar por', 'Valores', 'Filtros', 'Orden', 'SQL a mano']);
+      expect(fixture.nativeElement.textContent).toContain('Máximo de filas');
+    });
+
+    it('los estantes montan ventas por grupo con el teclado, y el formulario ve lo mismo', async () => {
+      const fixture = await onCanvas();
+      const element = fixture.nativeElement as HTMLElement;
+      const add = (label: string, value: string) => {
+        const select = element.querySelector(`select[aria-label="${label}"]`) as HTMLSelectElement;
+        select.value = value;
+        select.dispatchEvent(new Event('change'));
+        fixture.detectChanges();
+      };
+
+      add('Añadir a Agrupar por', 'base:note');
+      add('Añadir a Valores', 'base:total');
+      add('Añadir a Filtros', 'created_at');
+      add('Añadir a Orden', 'aggregate:2');
+
+      const sql = sqlOf(fixture);
+      expect(sql).toContain('GROUP BY [note]');
+      // Agrupar sin cálculo cuenta filas; la columna numérica se suma.
+      expect(sql).toContain('COUNT(*) AS [cantidad]');
+      expect(sql).toContain('SUM([total]) AS [cantidad_2]');
+      expect(sql).toContain('WHERE [created_at] =');
+      expect(sql).toContain('ORDER BY SUM([total])');
+      // El desplegable vuelve a «Añadir…»: es un botón, no un valor elegido.
+      expect(
+        (element.querySelector('select[aria-label="Añadir a Valores"]') as HTMLSelectElement).value,
+      ).toBe('');
+
+      element.querySelector<HTMLButtonElement>('button[aria-label="Quitar COUNT(*)"]')!.click();
+      fixture.detectChanges();
+      expect(sqlOf(fixture)).not.toContain('COUNT(*)');
+
+      [...element.querySelectorAll<HTMLButtonElement>('.view-switch button')]
+        .find((button) => button.textContent?.trim() === 'Formulario')!
+        .click();
+      fixture.detectChanges();
+      expect(sqlOf(fixture)).toBe(sql.replace('COUNT(*) AS [cantidad], ', ''));
+    });
+
+    it('lo escrito a mano entra en el SQL y un punto y coma lo bloquea', async () => {
+      const fixture = await onCanvas();
+      const element = fixture.nativeElement as HTMLElement;
+      const button = (text: string) =>
+        [...element.querySelectorAll<HTMLButtonElement>('.hand button')]
+          .find((item) => item.textContent?.includes(text))!
+          .click();
+
+      button('Columna calculada');
+      button('Condición');
+      fixture.detectChanges();
+      const type = (label: string, text: string) => {
+        const input = element.querySelector(`input[aria-label="${label}"]`) as HTMLInputElement;
+        input.value = text;
+        input.dispatchEvent(new Event('input'));
+        fixture.detectChanges();
+      };
+
+      type('Nombre de la columna calculada', 'doble');
+      type('Expresión SQL de doble', 'total * 2');
+      type('Condición SQL 1', 'total > 10;');
+
+      expect(sqlOf(fixture)).toContain('(total * 2) AS [doble]');
+      expect(sqlOf(fixture)).toContain('WHERE (total > 10)');
+
+      type('Condición SQL 1', 'total > 10; DROP TABLE orders');
+      expect(element.textContent).toContain('una sola expresión');
+      expect(
+        [...element.querySelectorAll<HTMLButtonElement>('button')].find((item) =>
+          item.textContent?.includes('Probar con'),
+        )!.disabled,
+      ).toBe(true);
+    });
+
+    it('añadir una tabla la cruza por la columna que comparten, como el formulario', async () => {
+      const fixture = await onCanvas();
+      await addCustomers(fixture);
+
+      expect(fixture.nativeElement.querySelectorAll('app-query-canvas .box')).toHaveLength(2);
+      expect(sqlOf(fixture)).toContain('INNER JOIN [public].[customers] AS [t1]');
+      expect(sqlOf(fixture)).toContain('ON [t0].[id] = [t1].[id]');
+    });
+
+    it('marca columnas de cualquier caja y cambia el tipo de cruce en la propia caja', async () => {
+      const fixture = await onCanvas();
+      await addCustomers(fixture);
+
+      (
+        fixture.nativeElement.querySelector(
+          'input[aria-label="Incluir name de public.customers"]',
+        ) as HTMLInputElement
+      ).click();
+      const type = fixture.nativeElement.querySelector(
+        'select[aria-label="Tipo de cruce de public.customers"]',
+      ) as HTMLSelectElement;
+      type.value = 'LEFT';
+      type.dispatchEvent(new Event('change'));
+      fixture.detectChanges();
+
+      expect(sqlOf(fixture)).toContain('[t1].[name]');
+      expect(sqlOf(fixture)).toContain('LEFT JOIN [public].[customers] AS [t1]');
+    });
+
+    it('con el teclado, el enganche de una columna abre la lista para cruzarla', async () => {
+      const fixture = await onCanvas();
+      await addCustomers(fixture);
+      const element = fixture.nativeElement as HTMLElement;
+
+      element
+        .querySelector<HTMLButtonElement>('[data-box="join:1"][data-column="name"] .row__port')!
+        .dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+      fixture.detectChanges();
+
+      const menu = element.querySelector('app-query-canvas .menu') as HTMLElement;
+      expect(menu.textContent).toContain('Cruzar name con…');
+      expect(document.activeElement?.closest('.menu')).toBe(menu);
+
+      [...menu.querySelectorAll<HTMLButtonElement>('.menu__item')]
+        .find((item) => item.textContent?.includes('note'))!
+        .click();
+      fixture.detectChanges();
+
+      // Se cruce desde donde se cruce, el cruce que cambia es el de la caja que
+      // va después, y parte de la principal.
+      expect(sqlOf(fixture)).toContain('ON [t0].[note] = [t1].[name]');
+      expect(element.querySelector('app-query-canvas .menu')).toBeNull();
+    });
+
+    it('Escape cierra la lista sin cerrar el diálogo', async () => {
+      const fixture = await onCanvas();
+      await addCustomers(fixture);
+      const element = fixture.nativeElement as HTMLElement;
+      let cerrado = false;
+      fixture.componentInstance.closed.subscribe(() => (cerrado = true));
+
+      element
+        .querySelector<HTMLButtonElement>('[data-box="base"][data-column="id"] .row__port')!
+        .dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+      fixture.detectChanges();
+      element
+        .querySelector('app-query-canvas .menu')!
+        .dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+      fixture.detectChanges();
+
+      expect(element.querySelector('app-query-canvas .menu')).toBeNull();
+      expect(cerrado).toBe(false);
+    });
+
+    it('quitar una caja quita su cruce, y el formulario ve lo mismo que el lienzo', async () => {
+      const fixture = await onCanvas();
+      await addCustomers(fixture);
+      const element = fixture.nativeElement as HTMLElement;
+      const view = (name: string) =>
+        [...element.querySelectorAll<HTMLButtonElement>('.view-switch button')]
+          .find((button) => button.textContent?.trim() === name)!
+          .click();
+
+      view('Formulario');
+      fixture.detectChanges();
+      expect(element.querySelectorAll('.join-card')).toHaveLength(1);
+
+      view('Lienzo');
+      fixture.detectChanges();
+      element
+        .querySelector<HTMLButtonElement>(
+          'button[aria-label="Quitar public.customers del lienzo"]',
+        )!
+        .click();
+      fixture.detectChanges();
+
+      expect(sqlOf(fixture)).not.toContain('JOIN');
+      expect(element.querySelectorAll('app-query-canvas .box')).toHaveLength(1);
+    });
+
+    it('guarda las posiciones de las cajas con la composición', async () => {
+      const fixture = await onCanvas();
+      const builder = fixture.componentInstance as any;
+
+      builder.setLayout({ base: { x: 300, y: 40 } });
+      builder.compositionName.set('Con lienzo');
+      builder.saveComposition();
+      await fixture.whenStable();
+
+      const saved = JSON.parse(compositions.records[0].model);
+      expect(saved.state.layout).toEqual({ base: { x: 300, y: 40 } });
+      expect(saved.state.version).toBe(3);
+    });
+  });
+
+  describe('para una fuente de Reportes', () => {
+    it('solo compone SELECT, empieza en el lienzo y devuelve la consulta sin tocar el editor', async () => {
+      const fixture = TestBed.createComponent(QueryBuilder);
+      fixture.componentRef.setInput('table', table);
+      fixture.componentRef.setInput('engine', 'sqlserver');
+      fixture.componentRef.setInput('connectionId', 'connection-1');
+      fixture.componentRef.setInput('purpose', 'source');
+      fixture.detectChanges();
+      await fixture.whenStable();
+      fixture.detectChanges();
+      const element = fixture.nativeElement as HTMLElement;
+      const composed: { sql: string; state: unknown }[] = [];
+      const inserted: string[] = [];
+      fixture.componentInstance.composed.subscribe((value) => composed.push(value));
+      fixture.componentInstance.insert.subscribe((value) => inserted.push(value));
+
+      expect(
+        [...element.querySelectorAll('.operations button')].map((b) => b.textContent?.trim()),
+      ).toEqual(['SELECT']);
+      expect(element.querySelector('.templates button')).toBeNull();
+      expect(element.querySelector('app-query-canvas')).not.toBeNull();
+      // Abrirlo como fuente no cambia cómo se abre en el editor.
+      expect(localStorage.getItem('druse.query-builder.view')).toBeNull();
+
+      const use = [...element.querySelectorAll<HTMLButtonElement>('.foot button')].find(
+        (button) => button.textContent?.trim() === 'Usar en la fuente',
+      )!;
+      use.click();
+
+      expect(composed).toHaveLength(1);
+      expect(composed[0].sql).toContain('FROM [public].[orders]');
+      expect((composed[0].state as { version: number }).version).toBe(3);
+      expect(inserted).toEqual([]);
+    });
+  });
+
+  describe('del SQL a mano al compositor', () => {
+    async function typed(sql: string, view: 'Formulario' | 'Lienzo' = 'Formulario') {
+      const fixture = await create(table);
+      const element = fixture.nativeElement as HTMLElement;
+
+      [...element.querySelectorAll<HTMLButtonElement>('.view-switch button')]
+        .find((button) => button.textContent?.trim() === view)!
+        .click();
+      fixture.detectChanges();
+
+      const textarea = element.querySelector('textarea.sql') as HTMLTextAreaElement;
+      textarea.value = sql;
+      textarea.dispatchEvent(new Event('input'));
+      fixture.detectChanges();
+
+      return { fixture, element, textarea };
+    }
+
+    const press = async (fixture: ComponentFixture<QueryBuilder>, text: string) => {
+      [...(fixture.nativeElement as HTMLElement).querySelectorAll<HTMLButtonElement>('button')]
+        .find((button) => button.textContent?.trim() === text)!
+        .click();
+      await fixture.whenStable();
+      fixture.detectChanges();
+    };
+
+    it('un filtro retocado a mano vuelve al formulario y el SQL deja de estar a mano', async () => {
+      const { fixture, element, textarea } = await typed(
+        'SELECT [id], [total] FROM [public].[orders] WHERE [total] > 50 ORDER BY [id] DESC;',
+      );
+
+      expect(element.textContent).toContain('SQL editado a mano');
+      await press(fixture, 'Llevar al formulario');
+
+      expect(element.textContent).not.toContain('SQL editado a mano');
+      expect(element.textContent).toContain('El SQL se ha llevado al compositor');
+      // Sin TOP: la consulta escrita a mano no tenía límite, y no se le añade.
+      expect(textarea.value).toBe(
+        'SELECT [id], [total]\nFROM [public].[orders]\nWHERE [total] > 50\nORDER BY [id] DESC;\n',
+      );
+      expect((fixture.componentInstance as any).filters()).toEqual([
+        { column: 'total', operator: '>', value: '50' },
+      ]);
+    });
+
+    it('una consulta con WITH se queda como SQL y dice por qué', async () => {
+      const sql = 'WITH x AS (SELECT 1 AS id) SELECT * FROM x;';
+      const { fixture, element, textarea } = await typed(sql);
+
+      await press(fixture, 'Llevar al formulario');
+
+      expect(textarea.value).toBe(sql);
+      expect(element.textContent).toContain('SQL editado a mano');
+      expect(element.querySelector('[role="alert"]')?.textContent).toContain('WITH');
+    });
+
+    it('un cruce escrito a mano aparece en el lienzo', async () => {
+      const { fixture, element, textarea } = await typed(
+        'SELECT [t1].[name] FROM [public].[orders] AS [t0] LEFT JOIN [public].[customers] AS [t1] ON [t0].[id] = [t1].[id];',
+        'Lienzo',
+      );
+
+      await press(fixture, 'Llevar al lienzo');
+
+      expect(element.querySelectorAll('app-query-canvas .box')).toHaveLength(2);
+      expect(textarea.value).toContain('LEFT JOIN [public].[customers] AS [t1]');
+      expect(textarea.value).toContain('SELECT [t1].[name]');
+    });
+  });
 });

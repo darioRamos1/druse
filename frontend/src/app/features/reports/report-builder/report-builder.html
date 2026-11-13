@@ -514,6 +514,84 @@
               </div>
 
               @if (source.mode === 'Visual') {
+                <!-- El lienzo del compositor sobre la base de esta fuente. Lo que se
+                     compone queda copiado en la fuente: se reabre igual y no depende
+                     de ninguna composición guardada. -->
+                <div class="field canvas-source">
+                  <span class="field__label">{{ 'reports.source.canvas' | t }}</span>
+                  @if (currentVisual(); as visual) {
+                    <span class="field__hint">
+                      {{ 'reports.source.canvasTable' | t: { table: visual.table } }}
+                    </span>
+                    <button
+                      type="button"
+                      class="btn btn--small"
+                      [disabled]="catalogState() === 'loading'"
+                      (click)="openCanvas()"
+                    >
+                      {{ 'reports.source.editCanvas' | t }}
+                    </button>
+                  } @else if (canvasTables().length > 0) {
+                    <select
+                      [value]="canvasTable()"
+                      (change)="canvasTable.set($any($event.target).value)"
+                      [attr.aria-label]="'reports.source.chooseTable' | t"
+                      [disabled]="!source.database"
+                    >
+                      <option value="" disabled>{{ 'reports.source.chooseTable' | t }}</option>
+                      @for (table of canvasTables(); track table.id) {
+                        <option [value]="table.id" [selected]="table.id === canvasTable()">
+                          {{ table.schema ? table.schema + '.' + table.name : table.name }}
+                        </option>
+                      }
+                    </select>
+                    <button
+                      type="button"
+                      class="btn btn--small"
+                      [disabled]="!canvasTable()"
+                      (click)="openCanvas()"
+                    >
+                      {{ 'reports.source.openCanvas' | t }}
+                    </button>
+                    <button
+                      type="button"
+                      class="link"
+                      [disabled]="catalogState() === 'loading'"
+                      (click)="loadCatalog(true)"
+                    >
+                      {{
+                        (catalogState() === 'loading'
+                          ? 'reports.source.readingTables'
+                          : 'reports.source.rereadTables'
+                        ) | t
+                      }}
+                    </button>
+                  } @else {
+                    <button
+                      type="button"
+                      class="btn btn--small"
+                      [disabled]="!source.database || catalogState() === 'loading'"
+                      (click)="loadCatalog()"
+                    >
+                      {{
+                        (catalogState() === 'loading'
+                          ? 'reports.source.readingTables'
+                          : 'reports.source.readTables'
+                        ) | t
+                      }}
+                    </button>
+                    <span class="field__hint">{{ 'reports.source.readTablesHint' | t }}</span>
+                  }
+                  @if (catalogState() === 'needsPassword') {
+                    <span class="field__error" role="alert">{{
+                      'reports.source.catalogPassword' | t
+                    }}</span>
+                  } @else if (catalogState() === 'failed') {
+                    <span class="field__error" role="alert">{{
+                      'reports.source.catalogFailed' | t
+                    }}</span>
+                  }
+                </div>
                 <label class="field">
                   <span class="field__label">{{ 'reports.source.composition' | t }}</span>
                   <select
@@ -535,7 +613,9 @@
                     <span class="field__hint">{{ 'reports.source.noCompositions' | t }}</span>
                   }
                 </label>
-                @if (currentVisual(); as visual) {
+                <!-- Solo si salió de una composición guardada: lo compuesto en el
+                     lienzo de la fuente no tiene otra a la que volver. -->
+                @if (currentVisual()?.compositionId && currentVisual(); as visual) {
                   <p class="field__hint">
                     {{ 'reports.source.copied' | t: { name: visual.name, table: visual.table } }}
                   </p>
@@ -726,5 +806,18 @@
     [datasets]="datasets()"
     (applied)="createFromTemplate($event)"
     (closed)="galleryOpen.set(false)"
+  />
+}
+
+<!-- Encima de todo: el compositor de la fuente que se está editando. -->
+@if (composing(); as open) {
+  <app-query-builder
+    purpose="source"
+    [table]="open.table"
+    [engine]="open.engine"
+    [connectionId]="open.connectionId"
+    [initialState]="open.state"
+    (composed)="useComposed($event)"
+    (closed)="closeCanvas()"
   />
 }
