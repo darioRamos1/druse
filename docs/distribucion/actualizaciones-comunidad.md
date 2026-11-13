@@ -19,6 +19,6 @@ En `artifacts/releases/<version>/` quedan los tres instaladores, sus firmas, `la
 
 La integración está preparada; no se ejecutó una publicación ni se modificó el `latest.json` público durante este trabajo. Antes de hacerlo siguen pendientes revisión de redistribución/fuente correspondiente, instalación/actualización en Windows limpio, privacidad y beta aprobada.
 
-Para publicar, CI general y `comunidad.yml` deben terminar correctamente sobre el commit exacto. Hay que ejecutarlos también sobre el commit final integrado: la ejecución de un PR no acredita automáticamente otro SHA. El workflow de releases usa Tauri CLI 2.12.4 y el mismo verificador de CI que el guion local, con paginación y teniendo en cuenta intentos pendientes. `-SinComprobarCI` no permite omitir el control de Comunidad.
+Para publicar, CI general y `comunidad.yml` deben terminar correctamente sobre el commit exacto. Hay que ejecutarlos también sobre el commit final integrado: la ejecución de un PR no acredita automáticamente otro SHA. El workflow de releases usa Tauri CLI 2.11.4 y el mismo verificador de CI que el guion local, con paginación y teniendo en cuenta intentos pendientes. `-SinComprobarCI` no permite omitir el control de Comunidad.
 
 La publicación sube además los tres manifiestos y `evidencia.json`. Authenticode y la firma del actualizador son controles distintos: una firma Tauri válida no constituye firma de SignPath ni reputación de SmartScreen. La candidatura de SignPath sigue limitada a Comunidad; construir las otras ediciones no solicita firma para ellas.

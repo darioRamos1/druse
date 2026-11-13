@@ -5,10 +5,7 @@
   "identifier": "io.druse.desktop",
   "build": {
     "frontendDist": "../../frontend/dist/frontend/browser",
-    "devUrl": "http://localhost:4200",
-    "windows": {
-      "staticVCRuntime": true
-    }
+    "devUrl": "http://localhost:4200"
   },
   "app": {
     "withGlobalTauri": true,

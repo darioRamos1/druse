@@ -88,10 +88,13 @@ jobs:
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/.cargo/bin/cargo-tauri.exe
-          key: cargo-tauri-2.12.4-${{ runner.os }}
+          key: cargo-tauri-2.11.4-${{ runner.os }}
+      # La CLI decide qué NSIS se descarga, y el expediente de avisos de
+      # Comunidad fija NSIS 3.11 por sus hashes: la 2.12 trae NSIS 3.13 y el
+      # instalador deja de coincidir. Subirla exige actualizar antes ese expediente.
       - name: Instalar CLI de Tauri
         if: steps.cli-de-tauri.outputs.cache-hit != 'true'
-        run: cargo install tauri-cli --version 2.12.4 --locked
+        run: cargo install tauri-cli --version 2.11.4 --locked
       - name: Comprobar versión del CLI
         run: cargo tauri --version
       - name: Construir instalador candidato sin firma de SignPath
