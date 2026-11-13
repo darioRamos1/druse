@@ -248,9 +248,17 @@
                 (click)="showIdentity(identity)"
               >
                 <span class="datasets__name">
-                  <!-- Sin color de marca, el punto va hueco. -->
+                  <!-- Sin color de marca, el punto va hueco. El estilo va aquí y no en
+                       la hoja del constructor, que está en su límite de tamaño. -->
                   <span
-                    class="identity-dot"
+                    style="
+                      display: inline-block;
+                      flex: none;
+                      width: 9px;
+                      height: 9px;
+                      border: 1px solid var(--dr-text-tertiary);
+                      border-radius: 50%;
+                    "
                     [style.background]="identity.brandColor ?? 'transparent'"
                     aria-hidden="true"
                   ></span>

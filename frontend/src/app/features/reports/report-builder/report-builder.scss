@@ -646,13 +646,3 @@
     align-self: flex-start;
   }
 }
-
-/* El color de marca de una identidad, en su fila de la lista. */
-.identity-dot {
-  display: inline-block;
-  flex: none;
-  width: 9px;
-  height: 9px;
-  border: 1px solid var(--dr-text-tertiary);
-  border-radius: 50%;
-}
