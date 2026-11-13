@@ -7,7 +7,14 @@
     <span class="identity__actions">
       @if (confirmingDelete()) {
         <span class="confirm" role="alert">
-          {{ 'reports.identity.confirmDelete' | t }}
+          @if (usedBy().length > 0) {
+            {{
+              'reports.identity.confirmDeleteUsed'
+                | t: { count: usedBy().length, dashboards: usedBy().join(', ') }
+            }}
+          } @else {
+            {{ 'reports.identity.confirmDelete' | t }}
+          }
           <button type="button" class="button button--danger" (click)="remove()">
             {{ 'reports.identity.delete' | t }}
           </button>

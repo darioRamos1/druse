@@ -2538,5 +2538,15 @@
   "whatsNew.v1_25_0.identities": "En Reportes BI puedes crear la identidad de una empresa —logo, nombre, datos y color de marca— y ver cómo queda en tema claro y oscuro antes de usarla en sus tableros.",
   "whatsNew.v1_25_0.brandColor": "El color de marca se comprueba en los dos temas: Druse calcula su versión para el tema oscuro y, si no se lee bien, propone el tono más cercano que sí.",
   "reports.identity.colorExample": "#0A6CBF",
-  "whatsNew.v1_25_1.buttons": "Los botones del lienzo de una fuente visual y de las identidades de empresa tienen ya el mismo aspecto que el resto de Reportes BI, y «Guardar» destaca como acción principal."
+  "whatsNew.v1_25_1.buttons": "Los botones del lienzo de una fuente visual y de las identidades de empresa tienen ya el mismo aspecto que el resto de Reportes BI, y «Guardar» destaca como acción principal.",
+  "reports.dashboard.identity": "Identidad de empresa",
+  "reports.dashboard.noIdentity": "Sin identidad",
+  "reports.dashboard.identityHint": "Pone el logo y los datos de la empresa encima del tablero. Su color de marca se usa en los paneles que no eligen otro.",
+  "reports.dashboard.identityNone": "Crea una en Identidades, en la barra lateral, para poner el logo y los datos de una empresa.",
+  "reports.dashboard.colorFrom.brand": "Heredado del color de marca de la empresa.",
+  "reports.look.brand": "Color de marca",
+  "reports.color.brand": "Color de marca",
+  "reports.identity.confirmDeleteUsed": "¿Borrar esta identidad? {count, plural, one {Se quedará sin logo ni color de marca el tablero} other {Se quedarán sin logo ni color de marca # tableros:}} {dashboards}.",
+  "whatsNew.v1_26_0.dashboard": "Pon a un tablero la identidad de una empresa: su logo, su nombre y sus datos salen en el encabezado, en tema claro y oscuro.",
+  "whatsNew.v1_26_0.brand": "El color de marca pasa a los paneles que no eligen otro, con su tono para el tema oscuro, y también al exportar a Excel."
 }

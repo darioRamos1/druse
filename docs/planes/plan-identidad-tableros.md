@@ -142,6 +142,22 @@ Cambios respecto a lo previsto:
 - La lista de identidades va en la barra lateral de Reportes, debajo de
   Tableros, y cada una enseña el punto de su color.
 
+Fase 2 hecha el mismo día, en la versión 1.26.0. Cambios respecto a lo
+previsto:
+
+- La marca llega a los gráficos como un color más de la paleta, `brand`: el
+  tablero pone sus dos tonos en `--rc-brand-light` y `--rc-brand-dark`, y cada
+  gráfico usa el de su tema. La herencia queda panel → reporte → tablero →
+  marca → tema; un color elegido para el tablero sigue ganando a la marca.
+- El encabezado es un componente propio (`report-identity-header`) para que
+  la vista de impresión de la fase 3 diga exactamente lo mismo. Los logos se
+  piden una vez y se guardan por versión (`ReportIdentityLogos`).
+- Una identidad borrada deja su id en el modelo del tablero; el tablero se
+  pinta sin ella. La confirmación de borrado nombra los tableros que la usan.
+- Las plantillas ya no copian la identidad (adelanto de la fase 4: falta la
+  casilla para incluirla a propósito).
+- Al exportar a Excel, los gráficos con la marca ya usan su color.
+
 ## 5. Riesgos y decisiones abiertas
 
 - **Una identidad por tablero o por instalación.** *Decidido el 12 de noviembre

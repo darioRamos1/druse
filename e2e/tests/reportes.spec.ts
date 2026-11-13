@@ -590,6 +590,75 @@ test.describe('Identidades de empresa', () => {
   });
 });
 
+test.describe('Tablero con identidad de empresa', () => {
+  /** Un PNG de 1 × 1, suficiente para que el encabezado tenga logo. */
+  const PNG =
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
+
+  test('el tablero lleva su encabezado y su marca, y pierde las dos al borrar la identidad', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    await abrir(page);
+
+    const id = crypto.randomUUID();
+    const empresa = `Andina ${Date.now()}`;
+    const creada = await page.request.put(`/api/reports/identities/${id}`, {
+      data: {
+        name: empresa,
+        subtitle: 'Informe mensual',
+        details: ['NIT 900.123.456-7'],
+        brandColor: '#C2185B',
+      },
+    });
+    expect(creada.ok()).toBe(true);
+    expect(
+      (await page.request.put(`/api/reports/identities/${id}/logo`, { data: { data: PNG } })).ok(),
+    ).toBe(true);
+
+    const reportes = await abrirReportes(page);
+    const nombre = `Tablero de ${empresa}`;
+    await reportes.getByRole('button', { name: 'Nuevo tablero' }).click();
+    const tablero = reportes.locator('app-report-dashboard');
+    await tablero.getByLabel('Nombre del tablero').fill(nombre);
+    await tablero.locator('.inspector').getByLabel('Identidad de empresa').selectOption({ label: empresa });
+
+    const encabezado = tablero.locator('app-report-identity-header');
+    await expect(encabezado).toContainText(empresa);
+    await expect(encabezado).toContainText('NIT 900.123.456-7');
+    await expect(encabezado.locator('img')).toHaveAttribute('alt', empresa);
+    // La marca llega a los gráficos con sus dos tonos, y el tablero la hereda.
+    expect(
+      await tablero.evaluate((element) =>
+        getComputedStyle(element).getPropertyValue('--rc-brand-light').trim(),
+      ),
+    ).toBe('#C2185B');
+    await expect(tablero.locator('#board-color option').first()).toHaveText('Color de marca');
+
+    await tablero.getByRole('button', { name: 'Guardar tablero' }).click();
+    await expect(tablero.locator('.board__heading')).toHaveText(nombre);
+
+    const barrido = process.env['DRUSE_BARRIDO_DIR'];
+    if (barrido) {
+      await page.screenshot({ path: `${barrido}/reportes-tablero-identidad.png` });
+    }
+
+    // Al borrarla, el aviso dice qué tablero se queda sin ella.
+    await reportes.locator('.datasets__item--identity', { hasText: empresa }).click();
+    const editor = reportes.locator('app-report-identity-editor');
+    await editor.getByRole('button', { name: 'Borrar' }).click();
+    await expect(editor.locator('.confirm')).toContainText(nombre);
+    await editor.locator('.confirm').getByRole('button', { name: 'Borrar' }).click();
+    await expect(reportes.locator('.datasets__item--identity', { hasText: empresa })).toHaveCount(0);
+
+    await reportes.locator('.datasets__item', { hasText: nombre }).click();
+    await expect(tablero.locator('.board__heading')).toHaveText(nombre);
+    await expect(tablero.locator('app-report-identity-header')).toHaveCount(0);
+
+    await borrarRestos(reportes, new RegExp(`^\\s*${nombre}\\s*$`), /^$/);
+  });
+});
+
 test.describe('Reportes BI con el lienzo', () => {
   /**
    * Una fuente compuesta en el lienzo del compositor, cruzada con otra en SQL.

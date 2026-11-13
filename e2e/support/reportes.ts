@@ -113,7 +113,10 @@ export async function borrarRestos(reportes: Locator, tableros: RegExp, conjunto
     await expect(item).toHaveCount(antes - 1);
   }
 
-  const deConjuntos = reportes.locator('.datasets__item').filter({ hasNot: reportes.page().locator('app-icon') });
+  // Las identidades tampoco llevan icono: se quitan por su clase.
+  const deConjuntos = reportes
+    .locator('.datasets__item:not(.datasets__item--identity)')
+    .filter({ hasNot: reportes.page().locator('app-icon') });
 
   for (let item = deConjuntos.filter({ hasText: conjuntos }); (await item.count()) > 0; ) {
     const antes = await item.count();

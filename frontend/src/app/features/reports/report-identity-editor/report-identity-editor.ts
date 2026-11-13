@@ -53,6 +53,8 @@ export class ReportIdentityEditor {
   private readonly _i18n = inject(I18nService);
 
   readonly identity = input.required<ReportIdentity>();
+  /** Los tableros que la llevan: al borrarla se quedan sin ella, y se dice. */
+  readonly usedBy = input<readonly string[]>([]);
 
   readonly saved = output<ReportIdentity>();
   readonly deleted = output<string>();

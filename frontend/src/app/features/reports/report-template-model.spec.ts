@@ -131,7 +131,7 @@ const tablero: DashboardModel = {
       bindings: { ventas: 'izquierda.municipio', borrado: 'x' },
     },
   ],
-  style: { color: 'violet' },
+  style: { color: 'violet', identityId: null },
 };
 
 function capturar(): TemplateDocument {
@@ -180,6 +180,15 @@ describe('report-template-model', () => {
     expect(plantilla.layout?.style.color).toBe('violet');
 
     const archivo = exportTemplate(plantilla);
+
+    // La identidad de la empresa no viaja: las plantillas se comparten.
+    const conIdentidad = captureTemplate('Dashboard', 'Con identidad', null, {
+      reports: reportes,
+      datasets: [conjunto('ventas', 'Ventas 2026')],
+      columnsOf: () => ventasColumnas,
+      layout: { ...tablero, style: { color: 'violet', identityId: 'andina' } },
+    });
+    expect(conIdentidad.layout?.style).toEqual({ color: 'violet', identityId: null });
 
     expect(archivo).not.toMatch(/izquierda\.|"sql"|connectionId|"rows"/);
     expect(parseTemplate(archivo)).toEqual({ ok: true, document: plantilla });

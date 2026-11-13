@@ -1038,6 +1038,34 @@ export class ReportBuilder {
     }
   }
 
+  /**
+   * Los tableros guardados que llevan cada identidad, por id.
+   *
+   * Se lee del modelo de cada tablero, que es donde vive la referencia: así, al
+   * borrar una identidad, se puede decir qué tableros se quedan sin ella.
+   */
+  private readonly _identityUse = computed(() => {
+    const use = new Map<string, string[]>();
+
+    for (const dashboard of this.dashboards()) {
+      try {
+        const id = (JSON.parse(dashboard.model) as { style?: { identityId?: unknown } })?.style
+          ?.identityId;
+        if (typeof id === 'string') {
+          use.set(id, [...(use.get(id) ?? []), dashboard.name]);
+        }
+      } catch {
+        // Un modelo ilegible no lleva identidad que contar.
+      }
+    }
+
+    return use;
+  });
+
+  protected dashboardsUsing(id: string): readonly string[] {
+    return this._identityUse().get(id) ?? [];
+  }
+
   protected isIdentityOpen(identity: ReportIdentity): boolean {
     return this.mode() === 'identity' && this.openIdentity()?.id === identity.id;
   }

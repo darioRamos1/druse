@@ -312,7 +312,9 @@ function captureLayout(
           ]),
       ),
     })),
-    style: model.style,
+    // La identidad de la empresa no viaja en la plantilla: las plantillas se
+    // comparten, y llevarse el logo de una empresa a otra sería un error fácil.
+    style: { color: model.style.color, identityId: null },
   };
 }
 
@@ -749,8 +751,8 @@ function readLayout(
   });
 
   const style = isObject(value['style'])
-    ? { color: color(value['style']['color']) }
-    : { color: null };
+    ? { color: color(value['style']['color']), identityId: null }
+    : { color: null, identityId: null };
 
   return { pages, filters, style };
 }
@@ -885,7 +887,7 @@ export function goalStarter(texts: StarterTexts): TemplateDocument {
         { kind: 'date', label: texts.dateFilter, bindings: { '0': 'fecha' } },
         { kind: 'category', label: texts.categoryFilter, bindings: { '0': 'categoria' } },
       ],
-      style: { color: null },
+      style: { color: null, identityId: null },
     },
   };
 }

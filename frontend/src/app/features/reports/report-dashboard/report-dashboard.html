@@ -118,6 +118,11 @@
     </div>
   </header>
 
+  <!-- La empresa del tablero: su logo, sus datos y la franja de su color. -->
+  @if (identity(); as company) {
+    <app-report-identity-header [identity]="company" />
+  }
+
   @if (filters().length > 0) {
     <div class="filters" role="group" [attr.aria-label]="'reports.dashboard.filters' | t">
       @for (filter of filters(); track filter.id) {
@@ -454,6 +459,27 @@
   <aside class="inspector" [attr.aria-label]="'reports.inspector.label' | t">
     <fieldset class="section section--first">
       <legend class="section__title">{{ 'reports.dashboard.board' | t }}</legend>
+      <label class="field">
+        <span class="field__label">{{ 'reports.dashboard.identity' | t }}</span>
+        <select (change)="chooseIdentity($any($event.target).value)">
+          <option value="" [selected]="identity() === null">
+            {{ 'reports.dashboard.noIdentity' | t }}
+          </option>
+          @for (company of identities(); track company.id) {
+            <option [value]="company.id" [selected]="identity()?.id === company.id">
+              {{ company.name }}
+            </option>
+          }
+        </select>
+        <span class="field__hint">
+          {{
+            (identities().length === 0
+              ? 'reports.dashboard.identityNone'
+              : 'reports.dashboard.identityHint'
+            ) | t
+          }}
+        </span>
+      </label>
       <div class="field">
         <label class="field__label" for="board-color">{{
           'reports.dashboard.boardColor' | t
@@ -463,12 +489,17 @@
             class="swatch"
             aria-hidden="true"
             [style.background]="
-              model().style.color ? 'var(--rc-' + model().style.color + ')' : 'var(--dr-accent)'
+              model().style.color
+                ? 'var(--rc-' + model().style.color + ')'
+                : brand()
+                  ? brand()!.light
+                  : 'var(--dr-accent)'
             "
           ></span>
           <select id="board-color" (change)="styleColor($any($event.target).value)">
+            <!-- Sin color propio, el tablero toma el de la marca si su identidad lo tiene. -->
             <option value="" [selected]="model().style.color === null">
-              {{ 'reports.look.theme' | t }}
+              {{ (brand() ? 'reports.look.brand' : 'reports.look.theme') | t }}
             </option>
             @for (color of palette; track color) {
               <option [value]="color" [selected]="model().style.color === color">

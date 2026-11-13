@@ -23,6 +23,11 @@
   --rc-good: #0ca30c;
   --rc-warning: #fab219;
   --rc-critical: #d03b3b;
+  /*
+   * El color de marca de la identidad del tablero. El tablero pone sus dos
+   * tonos; sin identidad no hay ninguno y queda el acento del tema.
+   */
+  --rc-brand: var(--rc-brand-dark, var(--dr-accent));
 }
 
 :host-context([data-theme='light']) {
@@ -34,4 +39,5 @@
   --rc-green: #008300;
   --rc-violet: #6250d6;
   --rc-red: #e34948;
+  --rc-brand: var(--rc-brand-light, var(--dr-accent));
 }

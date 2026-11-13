@@ -1,0 +1,14 @@
+@if (logo(); as src) {
+  <span class="logo" [class.logo--on-white]="identity().logoOnWhite">
+    <img [src]="src" [alt]="identity().name" />
+  </span>
+}
+<span class="text">
+  <strong class="name">{{ identity().name }}</strong>
+  @if (identity().subtitle) {
+    <span class="subtitle">{{ identity().subtitle }}</span>
+  }
+  @if (details(identity()); as line) {
+    <small class="details">{{ line }}</small>
+  }
+</span>

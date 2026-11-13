@@ -2538,5 +2538,15 @@
   "whatsNew.v1_25_0.identities": "In BI Reports you can create a company identity —logo, name, details and brand color— and see how it looks in the light and dark themes before using it on its dashboards.",
   "whatsNew.v1_25_0.brandColor": "The brand color is checked in both themes: Druse works out its dark-theme version and, if it is hard to read, suggests the closest shade that works.",
   "reports.identity.colorExample": "#0A6CBF",
-  "whatsNew.v1_25_1.buttons": "The buttons for a visual source’s canvas and for company identities now look like the rest of BI Reports, and “Save” stands out as the main action."
+  "whatsNew.v1_25_1.buttons": "The buttons for a visual source’s canvas and for company identities now look like the rest of BI Reports, and “Save” stands out as the main action.",
+  "reports.dashboard.identity": "Company identity",
+  "reports.dashboard.noIdentity": "No identity",
+  "reports.dashboard.identityHint": "Shows the company logo and details above the dashboard. Its brand color is used by panels that do not choose another.",
+  "reports.dashboard.identityNone": "Create one under Identities, in the sidebar, to add a company logo and details.",
+  "reports.dashboard.colorFrom.brand": "Inherited from the company brand color.",
+  "reports.look.brand": "Brand color",
+  "reports.color.brand": "Brand color",
+  "reports.identity.confirmDeleteUsed": "Delete this identity? {count, plural, one {This dashboard will lose its logo and brand color:} other {# dashboards will lose their logo and brand color:}} {dashboards}.",
+  "whatsNew.v1_26_0.dashboard": "Give a dashboard a company identity: its logo, name and details appear in the header, in the light and dark themes.",
+  "whatsNew.v1_26_0.brand": "The brand color goes to panels that do not choose another, with its dark-theme shade, and also when exporting to Excel."
 }

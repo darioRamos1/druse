@@ -461,7 +461,7 @@ describe('ReportDashboard', () => {
     await crear(
       tablero({
         ...conTresPaneles,
-        style: { color: 'aqua' },
+        style: { color: 'aqua', identityId: null },
         pages: [
           {
             ...conTresPaneles.pages[0],
@@ -487,6 +487,46 @@ describe('ReportDashboard', () => {
     expect(todos('.panel')[0].querySelector('.chart__bar')?.getAttribute('style')).toContain(
       '--rc-aqua',
     );
+  });
+
+  it('con identidad, el panel sin color propio toma la marca en los dos temas', async () => {
+    fixture = TestBed.createComponent(ReportDashboard);
+    fixture.componentRef.setInput(
+      'dashboard',
+      tablero({ ...conTresPaneles, style: { color: null, identityId: 'andina' } }),
+    );
+    fixture.componentRef.setInput('datasets', [ventas, visitas]);
+    fixture.componentRef.setInput('identities', [
+      {
+        id: 'andina',
+        name: 'Comercial Andina',
+        subtitle: 'Informe mensual',
+        details: ['NIT 900'],
+        footer: null,
+        brandColor: '#0A2A6C',
+        logoOnWhite: false,
+        logoUpdatedAtUtc: null,
+      },
+    ]);
+    fixture.detectChanges();
+    await asentar();
+
+    const host = fixture.nativeElement as HTMLElement;
+    expect(host.querySelector('app-report-identity-header')?.textContent).toContain(
+      'Comercial Andina',
+    );
+    expect(host.style.getPropertyValue('--rc-brand-light')).toBe('#0A2A6C');
+    // Un azul marino no se ve sobre el oscuro: va su versión más clara.
+    expect(host.style.getPropertyValue('--rc-brand-dark')).not.toBe('#0A2A6C');
+    expect(todos('.panel')[0].querySelector('.chart__bar')?.getAttribute('style')).toContain(
+      '--rc-brand',
+    );
+
+    botón('Editar diseño').click();
+    fixture.detectChanges();
+    todos('.panel')[0].click();
+    fixture.detectChanges();
+    expect(el('.inspector').textContent).toContain('Heredado del color de marca de la empresa.');
   });
 
   it('un tablero recién guardado se borra también en el servidor', async () => {
@@ -609,7 +649,7 @@ describe('ReportDashboard', () => {
           },
         ],
         filters: [],
-        style: { color: null },
+        style: { color: null, identityId: null },
       },
     };
     const aplicar = (
