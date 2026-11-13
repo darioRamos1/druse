@@ -578,6 +578,91 @@ export class ReportWorkbench {
     });
   }
 
+  // --- Arrastrar columnas a los campos ---------------------------------------
+
+  /**
+   * La columna que se lleva a un campo del inspector, si se está llevando.
+   *
+   * Es lo mismo que elegirla en el desplegable del campo, que sigue ahí para
+   * el teclado: arrastrar solo acorta el camino.
+   */
+  protected readonly carried = signal<{
+    readonly name: string;
+    readonly pointer: number;
+    readonly origin: { readonly x: number; readonly y: number };
+    readonly at: { readonly x: number; readonly y: number };
+    readonly moved: boolean;
+  } | null>(null);
+
+  /** Por qué no se aceptó la última columna soltada. */
+  protected readonly dropNotice = signal<string | null>(null);
+
+  protected startCarry(event: PointerEvent, name: string): void {
+    if (event.button !== 0) {
+      return;
+    }
+
+    event.preventDefault();
+    (event.currentTarget as Element).setPointerCapture?.(event.pointerId);
+    const at = { x: event.clientX, y: event.clientY };
+    this.carried.set({ name, pointer: event.pointerId, origin: at, at, moved: false });
+  }
+
+  protected moveCarry(event: PointerEvent): void {
+    const carried = this.carried();
+
+    if (!carried || carried.pointer !== event.pointerId) {
+      return;
+    }
+
+    const at = { x: event.clientX, y: event.clientY };
+    const moved =
+      carried.moved || Math.hypot(at.x - carried.origin.x, at.y - carried.origin.y) >= 4;
+    this.carried.set({ ...carried, at, moved });
+  }
+
+  protected endCarry(event: PointerEvent): void {
+    const carried = this.carried();
+    this.carried.set(null);
+
+    if (!carried || carried.pointer !== event.pointerId || !carried.moved) {
+      return;
+    }
+
+    const field = document
+      .elementFromPoint(event.clientX, event.clientY)
+      ?.closest<HTMLElement>('[data-field]')?.dataset['field'];
+
+    if (field === 'category' || field === 'value' || field === 'target') {
+      this.dropOn(field, carried.name);
+    }
+  }
+
+  protected cancelCarry(): void {
+    this.carried.set(null);
+  }
+
+  /**
+   * Pone una columna en un campo. La cifra y la meta tienen que ser números,
+   * como en sus desplegables: se dice en vez de aceptarla y dibujar un vacío.
+   */
+  protected dropOn(field: 'category' | 'value' | 'target', name: string): void {
+    this.dropNotice.set(null);
+
+    if (field !== 'category' && !this.numericColumns().some((column) => column.name === name)) {
+      this.dropNotice.set(
+        this._i18n.t('reports.report.dropNeedsNumber', { column: this.columnLabel()(name) }),
+      );
+      return;
+    }
+
+    this.patch({ [field]: name });
+  }
+
+  protected isNumber(name: string): boolean {
+    return this.numericColumns().some((column) => column.name === name);
+  }
+
   protected patch(patch: Partial<ReportSettings>): void {
     this.draft.update((draft) =>
       draft ? { ...draft, settings: { ...draft.settings, ...patch } } : draft,

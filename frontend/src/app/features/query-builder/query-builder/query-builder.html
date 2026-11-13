@@ -30,7 +30,7 @@
     >
       <span translate="no">SELECT</span>
     </button>
-    @if (table().kind === 'table') {
+    @if (table().kind === 'table' && purpose() === 'editor') {
       <button
         type="button"
         [class.is-active]="operation() === 'insert'"
@@ -1398,7 +1398,8 @@
 
   <footer class="foot">
     <div class="templates">
-      @if (table().kind === 'table') {
+      <!-- Para una fuente de Reportes solo vale un SELECT: las plantillas sobran. -->
+      @if (table().kind === 'table' && purpose() === 'editor') {
         <span class="templates__label">{{ 'builder.templates' | t }}</span>
         <button
           type="button"
@@ -1423,7 +1424,11 @@
       [disabled]="operation() === 'select' && validationMessages().length > 0"
       (click)="insertSql()"
     >
-      {{ 'builder.insert' | t: { operation: operation().toUpperCase() } }}
+      @if (purpose() === 'source') {
+        {{ 'builder.useInSource' | t }}
+      } @else {
+        {{ 'builder.insert' | t: { operation: operation().toUpperCase() } }}
+      }
     </button>
   </footer>
 </div>

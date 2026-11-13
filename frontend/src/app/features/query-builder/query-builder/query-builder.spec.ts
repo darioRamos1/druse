@@ -1672,4 +1672,40 @@ describe('QueryBuilder', () => {
       expect(saved.state.version).toBe(3);
     });
   });
+
+  describe('para una fuente de Reportes', () => {
+    it('solo compone SELECT, empieza en el lienzo y devuelve la consulta sin tocar el editor', async () => {
+      const fixture = TestBed.createComponent(QueryBuilder);
+      fixture.componentRef.setInput('table', table);
+      fixture.componentRef.setInput('engine', 'sqlserver');
+      fixture.componentRef.setInput('connectionId', 'connection-1');
+      fixture.componentRef.setInput('purpose', 'source');
+      fixture.detectChanges();
+      await fixture.whenStable();
+      fixture.detectChanges();
+      const element = fixture.nativeElement as HTMLElement;
+      const composed: { sql: string; state: unknown }[] = [];
+      const inserted: string[] = [];
+      fixture.componentInstance.composed.subscribe((value) => composed.push(value));
+      fixture.componentInstance.insert.subscribe((value) => inserted.push(value));
+
+      expect(
+        [...element.querySelectorAll('.operations button')].map((b) => b.textContent?.trim()),
+      ).toEqual(['SELECT']);
+      expect(element.querySelector('.templates button')).toBeNull();
+      expect(element.querySelector('app-query-canvas')).not.toBeNull();
+      // Abrirlo como fuente no cambia cómo se abre en el editor.
+      expect(localStorage.getItem('druse.query-builder.view')).toBeNull();
+
+      const use = [...element.querySelectorAll<HTMLButtonElement>('.foot button')].find(
+        (button) => button.textContent?.trim() === 'Usar en la fuente',
+      )!;
+      use.click();
+
+      expect(composed).toHaveLength(1);
+      expect(composed[0].sql).toContain('FROM [public].[orders]');
+      expect((composed[0].state as { version: number }).version).toBe(3);
+      expect(inserted).toEqual([]);
+    });
+  });
 });

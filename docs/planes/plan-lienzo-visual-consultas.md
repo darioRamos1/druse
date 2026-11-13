@@ -168,6 +168,23 @@ gráfico en `preview-chart.ts`. Cambios respecto a lo previsto:
   «sobre el grupo» (`SUM(a) / SUM(b)`); las demás se agrupan también.
 - El formato guardado pasa a la versión 3.
 
+Fase 3 hecha el mismo día, en la versión 1.23.0. Cambios respecto a lo
+previsto:
+
+- El lienzo de una fuente es el propio compositor, abierto encima del
+  constructor de Reportes en modo «fuente»: solo SELECT, empieza en el lienzo
+  y su botón es «Usar en la fuente». Así la fuente tiene cruces, estantes, SQL
+  a mano y vista previa sin repetir nada.
+- Componer necesita el catálogo y la sesión del explorador; las
+  actualizaciones del reporte siguen con sus sesiones propias. Si la conexión
+  no está abierta, «Leer las tablas de esta base» la abre, y «Volver a leer las
+  tablas» recoge las que se crearon después de conectar.
+- La fuente guarda su tabla principal por partes para reabrirse. Las fuentes
+  anteriores la deducen de su nombre.
+- En Visualización, las columnas del conjunto son pastillas que se arrastran a
+  Categoría, Valor o Meta. La cifra y la meta solo aceptan números, y se dice
+  al soltar otra cosa.
+
 | Fase | Trabajo | Cómo se valida |
 |---|---|---|
 | 0. Modelo único | Sacar `query-model.ts` del compositor sin cambiar su comportamiento. Añadir `layout` y versión de formato. | Las pruebas actuales del compositor pasan sin tocarlas. Composiciones antiguas se abren igual. Pruebas del modelo: mismo SQL que antes en los seis motores. |

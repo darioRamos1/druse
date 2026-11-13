@@ -2443,5 +2443,22 @@
   "builder.previewNoNumbers": "A chart needs a numeric column: add a value on the shelves.",
   "whatsNew.v1_22_0.shelves": "On the query builder canvas, drag columns onto the Group by, Values, Filters and Sort shelves; you can also fill them with the keyboard from “Add…”.",
   "whatsNew.v1_22_0.chart": "The query builder preview can also be shown as bars, a line or an indicator, with the BI Reports charts.",
-  "whatsNew.v1_22_0.handSql": "Write a calculated column, a group calculation or a condition by hand without leaving the canvas."
+  "whatsNew.v1_22_0.handSql": "Write a calculated column, a group calculation or a condition by hand without leaving the canvas.",
+  "builder.useInSource": "Use in the source",
+  "reports.source.canvas": "Canvas",
+  "reports.source.canvasTable": "Main table: {table}",
+  "reports.source.editCanvas": "Edit on the canvas",
+  "reports.source.chooseTable": "Choose the main table",
+  "reports.source.openCanvas": "Compose on the canvas",
+  "reports.source.readTables": "Read this database’s tables",
+  "reports.source.readingTables": "Reading the tables…",
+  "reports.source.readTablesHint": "Composing on the canvas needs the catalog, so the connection opens in the explorer. Report refreshes do not need it.",
+  "reports.source.catalogPassword": "The connection has no saved password: connect it from the explorer and try again.",
+  "reports.source.catalogFailed": "This database’s tables could not be read.",
+  "reports.report.fields": "Columns",
+  "reports.report.fieldsHint": "Drag a column onto Category, Value or Target.",
+  "reports.report.dropNeedsNumber": "{column} is not a number: the figure and the target must be.",
+  "whatsNew.v1_23_0.canvas": "A visual BI Reports source is composed on the query builder canvas, with its joins, shelves and hand-written SQL, and reopens just as you left it.",
+  "whatsNew.v1_23_0.fields": "When designing a report, drag the dataset’s columns onto Category, Value or Target.",
+  "reports.source.rereadTables": "Read the tables again"
 }

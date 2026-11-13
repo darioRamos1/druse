@@ -638,3 +638,11 @@
     display: none;
   }
 }
+
+/* Los botones del lienzo de la fuente, a su tamaño y no a lo ancho del campo. */
+.canvas-source {
+  .btn,
+  .link {
+    align-self: flex-start;
+  }
+}

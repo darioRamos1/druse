@@ -240,8 +240,31 @@
         }
       </fieldset>
     } @else {
+      <!-- Las columnas del conjunto, para llevarlas a un campo arrastrando. Los
+           desplegables de cada campo siguen siendo el camino del teclado. -->
+      <div class="field">
+        <span class="field__label">{{ 'reports.report.fields' | t }}</span>
+        <div class="field-chips">
+          @for (column of columns(); track column.name) {
+            <span
+              class="field-chip"
+              [class.field-chip--number]="isNumber(column.name)"
+              (pointerdown)="startCarry($event, column.name)"
+              (pointermove)="moveCarry($event)"
+              (pointerup)="endCarry($event)"
+              (pointercancel)="cancelCarry()"
+              >{{ columnLabel()(column.name) }}</span
+            >
+          }
+        </div>
+        <span class="field__hint">{{ 'reports.report.fieldsHint' | t }}</span>
+        @if (dropNotice(); as notice) {
+          <span class="field__error" role="status">{{ notice }}</span>
+        }
+      </div>
+
       @if (current.visual !== 'Indicator') {
-        <label class="field">
+        <label class="field" data-field="category" [class.is-drop]="carried()?.moved">
           <span class="field__label">{{ 'reports.report.category' | t }}</span>
           <select (change)="patch({ category: $any($event.target).value })">
             @for (column of columns(); track column.name) {
@@ -265,7 +288,7 @@
       </label>
 
       @if (current.settings.aggregate !== 'Count') {
-        <label class="field">
+        <label class="field" data-field="value" [class.is-drop]="carried()?.moved">
           <span class="field__label">{{ 'reports.report.value' | t }}</span>
           <select (change)="patch({ value: $any($event.target).value })">
             @for (column of numericColumns(); track column.name) {
@@ -281,7 +304,7 @@
       }
 
       @if (current.visual === 'Indicator') {
-        <label class="field">
+        <label class="field" data-field="target" [class.is-drop]="carried()?.moved">
           <span class="field__label">{{ 'reports.report.target' | t }}</span>
           <select (change)="patch({ target: $any($event.target).value || null })">
             <option value="" [selected]="current.settings.target === null">
@@ -495,4 +518,16 @@
     (applied)="applyTemplate($event)"
     (closed)="galleryOpen.set(false)"
   />
+}
+
+@if (carried(); as chip) {
+  @if (chip.moved) {
+    <span
+      class="carried-chip"
+      [style.left.px]="chip.at.x"
+      [style.top.px]="chip.at.y"
+      aria-hidden="true"
+      >{{ columnLabel()(chip.name) }}</span
+    >
+  }
 }

@@ -242,6 +242,14 @@ export class QueryBuilder implements OnInit {
    */
   readonly initialState = input<unknown>(null);
 
+  /**
+   * Para qué se compone: una consulta para el editor o una fuente de Reportes.
+   *
+   * Una fuente solo admite SELECT, empieza en el lienzo y su botón no inserta
+   * nada en el editor: devuelve la consulta y su modelo a quien la pidió.
+   */
+  readonly purpose = input<'editor' | 'source'>('editor');
+
   readonly closed = output<void>();
   readonly insert = output<string>();
 
@@ -632,6 +640,12 @@ export class QueryBuilder implements OnInit {
   }
 
   ngOnInit(): void {
+    // Una fuente de Reportes se compone en el lienzo: es a lo que se viene.
+    // No se recuerda como preferencia, para no cambiar cómo se abre en el editor.
+    if (this.purpose() === 'source') {
+      this.view.set('canvas');
+    }
+
     // Las columnas hacen falta para todo lo de aquí; se piden una vez.
     void this.load();
     void this.loadSavedCompositions();
@@ -1719,7 +1733,10 @@ export class QueryBuilder implements OnInit {
       this.composed.emit({ sql: this.sql(), state: this.compositionState() });
     }
 
-    this.insert.emit(this.sql());
+    if (this.purpose() === 'editor') {
+      this.insert.emit(this.sql());
+    }
+
     this.closed.emit();
   }
 

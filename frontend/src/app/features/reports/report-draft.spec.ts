@@ -2,6 +2,7 @@ import { SavedCompositionRecord } from '../../core/application-gateway/applicati
 import { ReportColumn, ReportDataset, ReportDatasetPreview } from '../../shared/models/reports';
 import {
   adoptExpectedColumns,
+  applyCanvas,
   applyComposition,
   draftProblems,
   newDataset,
@@ -12,6 +13,7 @@ import {
   suggestKeys,
   toSqlMode,
   toVisualMode,
+  visualTable,
   visualWouldDiscardSql,
 } from './report-draft';
 
@@ -164,5 +166,46 @@ describe('report-draft', () => {
 
     expect(guardada.sources[0].expectedColumns).toEqual([{ name: 'municipio', clrType: 'String' }]);
     expect(guardada.sources[1].expectedColumns).toEqual([]);
+  });
+});
+
+describe('lienzo de la fuente', () => {
+  it('guarda lo compuesto como copia propia, con su tabla para reabrirlo', () => {
+    const fuente = applyCanvas(
+      newSource('Ventas', 'conn-1', 'ventas'),
+      { schema: 'dbo', name: 'ventas' },
+      { sql: 'SELECT 1', state: { version: 3 } },
+      'ventas',
+    );
+    const modelo = readVisualModel(fuente)!;
+
+    expect(fuente).toMatchObject({ mode: 'Visual', sql: 'SELECT 1' });
+    expect(modelo).toMatchObject({ compositionId: '', table: 'dbo.ventas', state: { version: 3 } });
+    expect(visualTable(modelo)).toEqual({ schema: 'dbo', name: 'ventas' });
+  });
+
+  it('seguir editando una composición copiada recuerda de cuál salió', () => {
+    const copiada = applyComposition(newSource('Ventas', 'conn-1', 'ventas'), composicion);
+    const editada = applyCanvas(
+      copiada,
+      { schema: 'dbo', name: 'ventas' },
+      { sql: 'SELECT 2', state: {} },
+      'x',
+    );
+
+    expect(readVisualModel(editada)).toMatchObject({
+      compositionId: 'comp-1',
+      name: 'Ventas por mes',
+      sql: 'SELECT 2',
+    });
+  });
+
+  it('una fuente de antes, sin la tabla por partes, la deduce del nombre', () => {
+    expect(
+      visualTable({ compositionId: 'c', name: 'n', table: 'dbo.ventas', sql: '', state: null }),
+    ).toEqual({ schema: 'dbo', name: 'ventas' });
+    expect(
+      visualTable({ compositionId: 'c', name: 'n', table: 'ventas', sql: '', state: null }),
+    ).toEqual({ schema: null, name: 'ventas' });
   });
 });

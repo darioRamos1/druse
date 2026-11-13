@@ -399,6 +399,33 @@ describe('ReportWorkbench', () => {
     expect(filas).toEqual(['05001 80', '08001 100', '11001 40']);
   });
 
+  it('las columnas se llevan a los campos, y la cifra solo acepta números', async () => {
+    await crear();
+    botón('Nuevo reporte').click();
+    fixture.detectChanges();
+
+    const chips = [...fixture.nativeElement.querySelectorAll('.field-chip')].map((chip: Element) =>
+      chip.textContent?.trim(),
+    );
+    expect(chips).toEqual(['Ventas.municipio', 'Ventas.venta', 'Metas.meta']);
+    expect(el('[data-field="category"]')).not.toBeNull();
+    expect(el('[data-field="value"]')).not.toBeNull();
+
+    const workbench = fixture.componentInstance as any;
+    workbench.dropOn('value', 'derecha.meta');
+    fixture.detectChanges();
+    expect(
+      el<HTMLSelectElement>('[data-field="value"] select').selectedOptions[0].textContent?.trim(),
+    ).toBe('Metas.meta');
+
+    workbench.dropOn('value', 'izquierda.municipio');
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('Ventas.municipio no es un número');
+    expect(
+      el<HTMLSelectElement>('[data-field="value"] select').selectedOptions[0].textContent?.trim(),
+    ).toBe('Metas.meta');
+  });
+
   it('guarda el reporte con sus ajustes y lo enseña en las pestañas', async () => {
     await crear();
     botón('Nuevo reporte').click();

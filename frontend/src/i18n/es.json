@@ -2443,5 +2443,22 @@
   "builder.previewNoNumbers": "Para verlo en gráfico hace falta una columna numérica: añade un valor en los estantes.",
   "whatsNew.v1_22_0.shelves": "En el lienzo del compositor, arrastra columnas a los estantes Agrupar por, Valores, Filtros y Orden; también se llenan con el teclado desde «Añadir…».",
   "whatsNew.v1_22_0.chart": "La vista previa del compositor se ve también en barras, línea o indicador, con las gráficas de Reportes BI.",
-  "whatsNew.v1_22_0.handSql": "Escribe a mano una columna calculada, un cálculo sobre el grupo o una condición sin dejar el lienzo."
+  "whatsNew.v1_22_0.handSql": "Escribe a mano una columna calculada, un cálculo sobre el grupo o una condición sin dejar el lienzo.",
+  "builder.useInSource": "Usar en la fuente",
+  "reports.source.canvas": "Lienzo",
+  "reports.source.canvasTable": "Tabla principal: {table}",
+  "reports.source.editCanvas": "Editar en el lienzo",
+  "reports.source.chooseTable": "Elige la tabla principal",
+  "reports.source.openCanvas": "Componer en el lienzo",
+  "reports.source.readTables": "Leer las tablas de esta base",
+  "reports.source.readingTables": "Leyendo las tablas…",
+  "reports.source.readTablesHint": "Para componer en el lienzo hace falta su catálogo: se abre la conexión en el explorador. Las actualizaciones del reporte no la necesitan.",
+  "reports.source.catalogPassword": "La conexión no tiene la contraseña guardada: conéctala desde el explorador y vuelve a intentarlo.",
+  "reports.source.catalogFailed": "No se pudieron leer las tablas de esta base.",
+  "reports.report.fields": "Columnas",
+  "reports.report.fieldsHint": "Arrastra una columna a Categoría, Valor o Meta.",
+  "reports.report.dropNeedsNumber": "{column} no es un número: la cifra y la meta tienen que serlo.",
+  "whatsNew.v1_23_0.canvas": "Una fuente visual de Reportes BI se compone en el lienzo del compositor, con sus cruces, estantes y SQL a mano, y se vuelve a abrir tal como se dejó.",
+  "whatsNew.v1_23_0.fields": "Al diseñar un reporte, arrastra las columnas del conjunto a Categoría, Valor o Meta.",
+  "reports.source.rereadTables": "Volver a leer las tablas"
 }

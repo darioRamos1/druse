@@ -15,11 +15,60 @@ import {
  * compositor, el reporte sigue leyendo lo mismo hasta que se vuelva a elegir.
  */
 export interface VisualSourceModel {
+  /** La composición de la que se copió; vacío si se compuso en el lienzo de la fuente. */
   readonly compositionId: string;
   readonly name: string;
+  /** `esquema.tabla`, para enseñarla. */
   readonly table: string;
   readonly sql: string;
   readonly state: unknown;
+  /**
+   * La tabla principal por partes, para volver a abrirla en el lienzo. Falta
+   * en las fuentes de antes de la 1.23; entonces se deduce de `table`.
+   */
+  readonly schema?: string | null;
+  readonly tableName?: string;
+}
+
+/** Esquema y nombre de la tabla principal de una fuente visual. */
+export function visualTable(model: VisualSourceModel): {
+  readonly schema: string | null;
+  readonly name: string;
+} {
+  if (model.tableName) {
+    return { schema: model.schema ?? null, name: model.tableName };
+  }
+
+  const dot = model.table.lastIndexOf('.');
+  return dot < 0
+    ? { schema: null, name: model.table }
+    : { schema: model.table.slice(0, dot), name: model.table.slice(dot + 1) };
+}
+
+/**
+ * Guarda en la fuente lo compuesto en su lienzo.
+ *
+ * Si venía de una composición guardada, se conserva de cuál: es de dónde
+ * salió, aunque ya sea una copia propia que se ha seguido editando.
+ */
+export function applyCanvas(
+  source: ReportSource,
+  table: { readonly schema: string | null; readonly name: string },
+  composed: { readonly sql: string; readonly state: unknown },
+  name: string,
+): ReportSource {
+  const previous = readVisualModel(source);
+  const model: VisualSourceModel = {
+    compositionId: previous?.compositionId ?? '',
+    name: previous?.name ?? name,
+    table: table.schema ? `${table.schema}.${table.name}` : table.name,
+    sql: composed.sql,
+    state: composed.state,
+    schema: table.schema,
+    tableName: table.name,
+  };
+
+  return { ...source, mode: 'Visual', sql: composed.sql, visualModel: JSON.stringify(model) };
 }
 
 export const MAX_SOURCES = 2;
@@ -89,6 +138,8 @@ export function applyComposition(
     table: record.schema ? `${record.schema}.${record.table}` : record.table,
     sql,
     state: parsed.state ?? null,
+    schema: record.schema ?? null,
+    tableName: record.table,
   };
 
   return { ...source, mode: 'Visual', sql, visualModel: JSON.stringify(model) };

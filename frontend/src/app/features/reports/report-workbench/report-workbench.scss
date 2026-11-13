@@ -223,3 +223,47 @@
     box-shadow: var(--dr-shadow-popover);
   }
 }
+
+/* Las columnas del conjunto como pastillas que se llevan a un campo. */
+.field-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.field-chip {
+  padding: 2px 8px;
+  border: 1px solid var(--dr-border);
+  border-radius: 999px;
+  background: var(--dr-surface-panel);
+  color: var(--dr-text-secondary);
+  font-size: 11.5px;
+  cursor: grab;
+  user-select: none;
+  touch-action: none;
+
+  &--number {
+    border-color: var(--dr-accent-line);
+  }
+}
+
+/* Mientras se lleva una, los campos que la aceptan se ofrecen. */
+.field.is-drop {
+  outline: 1px dashed var(--dr-accent-line);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+.carried-chip {
+  position: fixed;
+  z-index: 10;
+  padding: 2px 9px;
+  border: 1px solid var(--dr-accent);
+  border-radius: 999px;
+  background: var(--dr-surface-raised);
+  box-shadow: var(--dr-shadow-menu);
+  color: var(--dr-text);
+  font-size: 11.5px;
+  pointer-events: none;
+  transform: translate(10px, -50%);
+}

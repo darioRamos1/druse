@@ -41,11 +41,13 @@ import {
 } from '../report-template-gallery/report-template-gallery';
 import { instantiateTemplate } from '../report-template-model';
 import { emptyDashboard } from '../report-dashboard-model';
-import { ServerMessage } from '../../../shared/models/workspace';
+import { DatabaseEngine, DatabaseObject, ServerMessage } from '../../../shared/models/workspace';
+import { QueryBuilder } from '../../query-builder/query-builder/query-builder';
 import { failureText, serverText } from '../report-messages';
 import {
   MAX_SOURCES,
   adoptExpectedColumns,
+  applyCanvas,
   applyComposition,
   columnLabelFor,
   draftProblems,
@@ -58,6 +60,7 @@ import {
   suggestKeys,
   toSqlMode,
   toVisualMode,
+  visualTable,
   visualWouldDiscardSql,
 } from '../report-draft';
 
@@ -108,6 +111,7 @@ function wideLayout(): boolean {
     DialogFocus,
     Icon,
     NgTemplateOutlet,
+    QueryBuilder,
     ReportDashboard,
     ReportTemplateGallery,
     ReportWorkbench,
@@ -369,6 +373,12 @@ export class ReportBuilder {
   }
 
   protected close(): void {
+    // Con el compositor abierto, Escape es suyo. Este diálogo registra su escucha
+    // antes que el compositor, así que la ve primero y aquí la deja pasar.
+    if (this.composing()) {
+      return;
+    }
+
     this.guard(() => this.closed.emit());
   }
 
@@ -536,6 +546,135 @@ export class ReportBuilder {
     if (source && record) {
       this.replaceCurrent(applyComposition(source, record));
     }
+  }
+
+  // --- Lienzo de la fuente ----------------------------------------------------
+
+  /**
+   * Tablas y vistas de la base de la fuente que el explorador ya conoce.
+   *
+   * Componer necesita el catálogo; mientras no se ha leído, la lista está
+   * vacía y se ofrece leerlo.
+   */
+  protected readonly canvasTables = computed<readonly DatabaseObject[]>(() => {
+    const source = this.current();
+
+    if (!source?.connectionId || !source.database) {
+      return [];
+    }
+
+    return this._store
+      .searchableRelations()
+      .filter(
+        (node) =>
+          node.connectionId === source.connectionId &&
+          node.source.database === source.database &&
+          (node.source.kind === 'table' || node.source.kind === 'view'),
+      )
+      .map((node) => node.source);
+  });
+
+  /** La tabla elegida para empezar a componer, por id. */
+  protected readonly canvasTable = signal('');
+
+  /** Cómo fue leer el catálogo de la base, si se pidió. */
+  protected readonly catalogState = signal<'idle' | 'loading' | 'needsPassword' | 'failed'>('idle');
+
+  /** El compositor abierto sobre la fuente activa, o `null`. */
+  protected readonly composing = signal<{
+    readonly index: number;
+    readonly table: DatabaseObject;
+    readonly engine: DatabaseEngine;
+    readonly connectionId: string;
+    readonly state: unknown;
+  } | null>(null);
+
+  /**
+   * Lee las tablas de la base de la fuente.
+   *
+   * Abre la conexión en el explorador si no lo estaba: es la misma sesión con
+   * la que el compositor prueba la consulta. Las actualizaciones del reporte
+   * siguen usando sus sesiones propias.
+   */
+  protected async loadCatalog(reload = false): Promise<void> {
+    const source = this.current();
+
+    if (!source?.connectionId || !source.database || this.catalogState() === 'loading') {
+      return;
+    }
+
+    this.catalogState.set('loading');
+    const outcome = await this._store.prepareCatalogAsync(
+      source.connectionId,
+      source.database,
+      reload,
+    );
+    this.catalogState.set(outcome === 'ok' ? 'idle' : outcome);
+  }
+
+  /** Abre el compositor: sobre lo que ya tenía la fuente, o sobre la tabla elegida. */
+  protected async openCanvas(): Promise<void> {
+    const source = this.current();
+
+    if (!source?.connectionId || !source.database) {
+      return;
+    }
+
+    const visual = readVisualModel(source);
+    const find = () => {
+      if (visual) {
+        const wanted = visualTable(visual);
+        return this.canvasTables().find(
+          (table) =>
+            table.name.toLowerCase() === wanted.name.toLowerCase() &&
+            (wanted.schema === null ||
+              (table.schema ?? '').toLowerCase() === wanted.schema.toLowerCase()),
+        );
+      }
+
+      return this.canvasTables().find((table) => table.id === this.canvasTable());
+    };
+
+    let table = find();
+
+    if (!table) {
+      await this.loadCatalog();
+      table = find();
+    }
+
+    if (!table) {
+      return;
+    }
+
+    this.composing.set({
+      index: this.activeSource(),
+      table,
+      engine: this._store.engineForConnection(source.connectionId) ?? 'postgresql',
+      connectionId: source.connectionId,
+      state: visual?.state ?? null,
+    });
+  }
+
+  /** Lo compuesto pasa a la fuente como copia propia, con su SQL y su modelo. */
+  protected useComposed(composed: { readonly sql: string; readonly state: unknown }): void {
+    const open = this.composing();
+    const source = open ? this.sources()[open.index] : undefined;
+
+    if (!open || !source) {
+      return;
+    }
+
+    const table = { schema: open.table.schema ?? null, name: open.table.name };
+    const next = applyCanvas(source, table, composed, open.table.name);
+
+    this.draft.update((draft) => ({
+      ...draft,
+      sources: draft.sources.map((item, i) => (i === open.index ? next : item)),
+    }));
+  }
+
+  protected closeCanvas(): void {
+    this.composing.set(null);
   }
 
   /** Pasar a SQL no pierde nada: el estado visual se queda para poder volver. */
