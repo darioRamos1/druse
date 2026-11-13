@@ -38,6 +38,22 @@ public interface IReportDashboardStore
 }
 
 /// <summary>Plantillas de diseño: reportes, paneles y tableros reutilizables.</summary>
+/// <summary>Identidades de empresa para los tableros; el logo se lee y se guarda aparte.</summary>
+public interface IReportIdentityStore
+{
+    Task<IReadOnlyList<ReportIdentity>> GetAllAsync(CancellationToken cancellationToken);
+
+    /// <summary>Crea o reemplaza los datos; el logo que tuviera se conserva.</summary>
+    Task<ReportIdentity> SaveAsync(ReportIdentity identity, CancellationToken cancellationToken);
+
+    /// <summary>`false` si la identidad no existe. Con `null`, quita el logo.</summary>
+    Task<bool> SetLogoAsync(Guid id, ReportIdentityLogo? logo, CancellationToken cancellationToken);
+
+    Task<ReportIdentityLogo?> GetLogoAsync(Guid id, CancellationToken cancellationToken);
+
+    Task DeleteAsync(Guid id, CancellationToken cancellationToken);
+}
+
 public interface IReportTemplateStore
 {
     Task<IReadOnlyList<ReportTemplate>> GetAllAsync(CancellationToken cancellationToken);

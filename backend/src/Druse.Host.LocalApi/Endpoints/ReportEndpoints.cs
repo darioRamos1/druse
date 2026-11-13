@@ -243,6 +243,105 @@ internal static class ReportEndpoints
         })
         .WithName("ExportReportWorkbook");
 
+        app.MapGet("/api/reports/identities", async (
+            IReportIdentityStore identities,
+            CancellationToken cancellationToken) =>
+            Results.Ok((await identities.GetAllAsync(cancellationToken)).Select(identity => identity.ToDto())))
+        .WithName("GetReportIdentities");
+
+        app.MapPut("/api/reports/identities/{id:guid}", async (
+            Guid id,
+            ReportIdentityDto request,
+            IReportIdentityStore identities,
+            CancellationToken cancellationToken) =>
+        {
+            var details = request.Details ?? [];
+
+            if (ReportIdentityRules.Validate(request.Name, request.Subtitle, details, request.Footer, request.BrandColor)
+                is { } problem)
+            {
+                return Problem([problem]);
+            }
+
+            var saved = await identities.SaveAsync(new ReportIdentity
+            {
+                Id = id,
+                Name = request.Name,
+                Subtitle = request.Subtitle,
+                Details = details,
+                Footer = request.Footer,
+                BrandColor = request.BrandColor,
+                LogoOnWhite = request.LogoOnWhite,
+            }, cancellationToken);
+            return Results.Ok(saved.ToDto());
+        })
+        .WithName("SaveReportIdentity");
+
+        app.MapDelete("/api/reports/identities/{id:guid}", async (
+            Guid id,
+            IReportIdentityStore identities,
+            CancellationToken cancellationToken) =>
+        {
+            await identities.DeleteAsync(id, cancellationToken);
+            return Results.NoContent();
+        })
+        .WithName("DeleteReportIdentity");
+
+        app.MapGet("/api/reports/identities/{id:guid}/logo", async (
+            Guid id,
+            IReportIdentityStore identities,
+            CancellationToken cancellationToken) =>
+            await identities.GetLogoAsync(id, cancellationToken) is { } logo
+                ? Results.Ok(new ReportIdentityLogoDto
+                {
+                    ContentType = logo.ContentType,
+                    Data = Convert.ToBase64String(logo.Data),
+                })
+                : Results.NotFound())
+        .WithName("GetReportIdentityLogo");
+
+        app.MapPut("/api/reports/identities/{id:guid}/logo", async (
+            Guid id,
+            ReportIdentityLogoDto request,
+            IReportIdentityStore identities,
+            CancellationToken cancellationToken) =>
+        {
+            byte[] data;
+            try
+            {
+                data = Convert.FromBase64String(request.Data ?? string.Empty);
+            }
+            catch (FormatException)
+            {
+                return Problem([ReportMessages.IdentityLogoType()]);
+            }
+
+            if (ReportIdentityRules.ValidateLogo(data, out var info) is { } problem)
+            {
+                return Problem([problem]);
+            }
+
+            // El tipo es el que dicen los bytes, no el que diga la petición.
+            if (await identities.SetLogoAsync(id, new ReportIdentityLogo(info!.ContentType, data), cancellationToken))
+            {
+                return Results.NoContent();
+            }
+
+            var missing = ReportMessages.IdentityMissing();
+            return Results.NotFound(new { message = missing.Text, messages = new[] { missing.ToDto() } });
+        })
+        .WithName("SaveReportIdentityLogo");
+
+        app.MapDelete("/api/reports/identities/{id:guid}/logo", async (
+            Guid id,
+            IReportIdentityStore identities,
+            CancellationToken cancellationToken) =>
+        {
+            await identities.SetLogoAsync(id, null, cancellationToken);
+            return Results.NoContent();
+        })
+        .WithName("DeleteReportIdentityLogo");
+
         app.MapGet("/api/reports/templates", async (
             IReportTemplateStore templates,
             CancellationToken cancellationToken) =>

@@ -76,6 +76,8 @@ import {
   ReportStorage,
   ReportSnapshot,
   SavedDashboard,
+  ReportIdentity,
+  ReportIdentityLogo,
   SavedReportTemplate,
   SavedReport,
   ExportDocument,
@@ -585,6 +587,30 @@ export class HttpApplicationGateway extends ApplicationGateway {
 
   override deleteDashboard(id: string): Observable<void> {
     return this._http.delete<void>(`/api/reports/dashboards/${id}`);
+  }
+
+  override getReportIdentities(): Observable<readonly ReportIdentity[]> {
+    return this._http.get<ReportIdentity[]>('/api/reports/identities');
+  }
+
+  override saveReportIdentity(identity: ReportIdentity): Observable<ReportIdentity> {
+    return this._http.put<ReportIdentity>(`/api/reports/identities/${identity.id}`, identity);
+  }
+
+  override deleteReportIdentity(id: string): Observable<void> {
+    return this._http.delete<void>(`/api/reports/identities/${id}`);
+  }
+
+  override getReportIdentityLogo(id: string): Observable<ReportIdentityLogo> {
+    return this._http.get<ReportIdentityLogo>(`/api/reports/identities/${id}/logo`);
+  }
+
+  override saveReportIdentityLogo(id: string, logo: ReportIdentityLogo): Observable<void> {
+    return this._http.put<void>(`/api/reports/identities/${id}/logo`, logo);
+  }
+
+  override deleteReportIdentityLogo(id: string): Observable<void> {
+    return this._http.delete<void>(`/api/reports/identities/${id}/logo`);
   }
 
   override getReportTemplates(): Observable<readonly SavedReportTemplate[]> {

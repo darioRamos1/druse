@@ -145,6 +145,39 @@ public sealed record ReportTemplateDto
     public DateTimeOffset UpdatedAtUtc { get; init; }
 }
 
+/// <summary>Una identidad de empresa, sin su logo: ese se pide aparte.</summary>
+public sealed record ReportIdentityDto
+{
+    /// <summary>En las peticiones manda el de la ruta.</summary>
+    public Guid Id { get; init; }
+    public required string Name { get; init; }
+    public string? Subtitle { get; init; }
+    public IReadOnlyList<string>? Details { get; init; }
+    public string? Footer { get; init; }
+
+    /// <summary>`#RRGGBB` o `null`.</summary>
+    public string? BrandColor { get; init; }
+    public bool LogoOnWhite { get; init; }
+
+    /// <summary>Cuándo cambió el logo, o `null` si no tiene. Solo en respuestas.</summary>
+    public DateTimeOffset? LogoUpdatedAtUtc { get; init; }
+    public DateTimeOffset CreatedAtUtc { get; init; }
+    public DateTimeOffset UpdatedAtUtc { get; init; }
+}
+
+/// <summary>
+/// El logo de una identidad, en base64.
+///
+/// Viaja como JSON y no como imagen porque la API pide su cabecera de acceso, y
+/// un `&lt;img src&gt;` no puede mandarla. Al subirlo, el tipo lo decide el
+/// servidor mirando los bytes, no el que diga la petición.
+/// </summary>
+public sealed record ReportIdentityLogoDto
+{
+    public string? ContentType { get; init; }
+    public required string Data { get; init; }
+}
+
 /// <summary>Un tablero o un panel para escribir en Excel, calculado por la interfaz con los filtros activos.</summary>
 public sealed record ReportExportRequestDto
 {
@@ -275,6 +308,20 @@ internal static class ReportRunContractMapper
         Model = template.Model,
         CreatedAtUtc = template.CreatedAtUtc,
         UpdatedAtUtc = template.UpdatedAtUtc,
+    };
+
+    public static ReportIdentityDto ToDto(this ReportIdentity identity) => new()
+    {
+        Id = identity.Id,
+        Name = identity.Name,
+        Subtitle = identity.Subtitle,
+        Details = identity.Details,
+        Footer = identity.Footer,
+        BrandColor = identity.BrandColor,
+        LogoOnWhite = identity.LogoOnWhite,
+        LogoUpdatedAtUtc = identity.LogoUpdatedAtUtc,
+        CreatedAtUtc = identity.CreatedAtUtc,
+        UpdatedAtUtc = identity.UpdatedAtUtc,
     };
 
     public static ReportDashboardDto ToDto(this ReportDashboard dashboard) => new()

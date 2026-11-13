@@ -1,0 +1,252 @@
+<main class="identity" [attr.aria-label]="'reports.identity.title' | t">
+  <header class="identity__head">
+    <div>
+      <h3 class="identity__title">{{ 'reports.identity.title' | t }}</h3>
+      <p class="identity__hint">{{ 'reports.identity.hint' | t }}</p>
+    </div>
+    <span class="identity__actions">
+      @if (confirmingDelete()) {
+        <span class="confirm" role="alert">
+          {{ 'reports.identity.confirmDelete' | t }}
+          <button type="button" class="btn btn--danger" (click)="remove()">
+            {{ 'reports.identity.delete' | t }}
+          </button>
+          <button type="button" class="btn" (click)="confirmingDelete.set(false)">
+            {{ 'common.cancel' | t }}
+          </button>
+        </span>
+      } @else {
+        <button type="button" class="btn" (click)="confirmingDelete.set(true)">
+          {{ 'reports.identity.delete' | t }}
+        </button>
+        <button
+          type="button"
+          class="btn btn--primary"
+          [disabled]="!!problem() || saving() || !dirty()"
+          (click)="save()"
+        >
+          {{ (saving() ? 'reports.identity.saving' : 'reports.identity.save') | t }}
+        </button>
+      }
+    </span>
+  </header>
+
+  @if (error(); as message) {
+    <p class="banner banner--danger" role="alert">{{ message }}</p>
+  }
+  @if (notice(); as message) {
+    <p class="banner banner--success" role="status">{{ message }}</p>
+  }
+
+  <div class="identity__body">
+    <form class="identity__form" (submit)="$event.preventDefault(); save()">
+      <label class="field">
+        <span class="field__label">{{ 'reports.identity.name' | t }}</span>
+        <input
+          type="text"
+          [maxLength]="limits.name"
+          [value]="draft().name"
+          (input)="patch({ name: $any($event.target).value })"
+          [placeholder]="'reports.identity.namePlaceholder' | t"
+          required
+        />
+      </label>
+
+      <label class="field">
+        <span class="field__label">{{ 'reports.identity.subtitle' | t }}</span>
+        <input
+          type="text"
+          [maxLength]="limits.line"
+          [value]="draft().subtitle ?? ''"
+          (input)="patch({ subtitle: $any($event.target).value })"
+          [placeholder]="'reports.identity.subtitlePlaceholder' | t"
+        />
+      </label>
+
+      <fieldset class="field">
+        <legend class="field__label">{{ 'reports.identity.details' | t }}</legend>
+        @for (line of lines(); track $index) {
+          <input
+            type="text"
+            [maxLength]="limits.line"
+            [value]="line"
+            (input)="setLine($index, $any($event.target).value)"
+            [attr.aria-label]="'reports.identity.detailLine' | t: { number: $index + 1 }"
+            [placeholder]="detailPlaceholders[$index] | t"
+          />
+        }
+      </fieldset>
+
+      <label class="field">
+        <span class="field__label">{{ 'reports.identity.footer' | t }}</span>
+        <input
+          type="text"
+          [maxLength]="limits.line"
+          [value]="draft().footer ?? ''"
+          (input)="patch({ footer: $any($event.target).value })"
+          [placeholder]="'reports.identity.footerPlaceholder' | t"
+        />
+        <span class="field__hint">{{ 'reports.identity.footerHint' | t }}</span>
+      </label>
+
+      <!-- El color de marca: se ve cómo queda en los dos temas antes de guardarlo. -->
+      <div class="field">
+        <span class="field__label" id="identity-color">{{ 'reports.identity.color' | t }}</span>
+        <span class="color-row" role="group" aria-labelledby="identity-color">
+          <input
+            type="color"
+            [value]="brand()?.color ?? '#3987E5'"
+            (input)="pickColor($any($event.target).value)"
+            [attr.aria-label]="'reports.identity.colorPicker' | t"
+          />
+          <input
+            type="text"
+            class="color-row__hex"
+            maxlength="7"
+            [value]="colorText()"
+            (input)="typeColor($any($event.target).value)"
+            [attr.aria-invalid]="colorInvalid()"
+            [attr.aria-label]="'reports.identity.colorHex' | t"
+            [placeholder]="'reports.identity.colorExample' | t"
+          />
+          @if (draft().brandColor) {
+            <button type="button" class="link" (click)="clearColor()">
+              {{ 'reports.identity.noColor' | t }}
+            </button>
+          }
+        </span>
+        @if (colorInvalid()) {
+          <span class="field__error">{{ 'reports.identity.problem.color' | t }}</span>
+        }
+        @if (brand(); as check) {
+          <ul class="contrast">
+            <li [class.is-low]="check.lightContrast < graphicContrast">
+              <span class="contrast__swatch contrast__swatch--light">
+                <span [style.background]="check.color"></span>
+              </span>
+              {{ 'reports.identity.contrastLight' | t: { ratio: ratio(check.lightContrast) } }}
+            </li>
+            <li>
+              <span class="contrast__swatch contrast__swatch--dark">
+                <span [style.background]="check.dark"></span>
+              </span>
+              @if (check.dark === check.color) {
+                {{ 'reports.identity.contrastDark' | t: { ratio: ratio(check.darkContrast) } }}
+              } @else {
+                {{
+                  'reports.identity.contrastDarkAdjusted'
+                    | t: { ratio: ratio(check.darkContrast), color: check.dark }
+                }}
+              }
+            </li>
+          </ul>
+          @if (check.lightSuggestion; as suggestion) {
+            <p class="field__hint field__hint--warning" role="status">
+              {{ 'reports.identity.lowContrast' | t: { min: graphicContrast } }}
+              <button type="button" class="link" (click)="pickColor(suggestion)">
+                {{ 'reports.identity.useSuggestion' | t: { color: suggestion } }}
+              </button>
+            </p>
+          }
+        } @else {
+          <span class="field__hint">{{ 'reports.identity.colorHint' | t }}</span>
+        }
+      </div>
+
+      <div class="field">
+        <span class="field__label">{{ 'reports.identity.logo' | t }}</span>
+        <span class="logo-row">
+          <label class="btn btn--file">
+            <app-icon name="folder-open" [size]="12" />
+            {{ (logo() ? 'reports.identity.replaceLogo' : 'reports.identity.chooseLogo') | t }}
+            <input
+              type="file"
+              accept="image/png,image/jpeg,image/webp,image/svg+xml,.png,.jpg,.jpeg,.webp,.svg"
+              [disabled]="logoBusy()"
+              (change)="chooseLogo($any($event.target))"
+            />
+          </label>
+          @if (logo()) {
+            <button type="button" class="link" (click)="removeLogo()">
+              {{ 'reports.identity.removeLogo' | t }}
+            </button>
+          }
+        </span>
+        <span class="field__hint">
+          {{
+            'reports.identity.logoHint'
+              | t
+                : {
+                    width: limits.logoWidth,
+                    height: limits.logoHeight,
+                    size: limits.logoBytes / 1024,
+                  }
+          }}
+        </span>
+        @if (logoProblem(); as key) {
+          <span class="field__error" role="alert">{{ key | t }}</span>
+        }
+        <label class="check">
+          <input
+            type="checkbox"
+            [checked]="draft().logoOnWhite"
+            (change)="patch({ logoOnWhite: $any($event.target).checked })"
+          />
+          {{ 'reports.identity.logoOnWhite' | t }}
+        </label>
+      </div>
+
+      @if (problem(); as key) {
+        <p class="field__hint field__hint--warning">{{ key | t }}</p>
+      }
+    </form>
+
+    <!-- Cómo queda el encabezado: en los dos temas, para ver lo que el otro esconde. -->
+    <section class="preview" [attr.aria-label]="'reports.identity.preview' | t">
+      <p class="field__label">{{ 'reports.identity.preview' | t }}</p>
+      @for (theme of ['light', 'dark']; track theme) {
+        <div class="sample" [class.sample--dark]="theme === 'dark'">
+          <span class="sample__theme">
+            {{
+              (theme === 'dark' ? 'reports.identity.darkTheme' : 'reports.identity.lightTheme') | t
+            }}
+          </span>
+          <div
+            class="sample__head"
+            [style.border-color]="
+              brand() ? (theme === 'dark' ? brand()!.dark : brand()!.color) : null
+            "
+          >
+            @if (logo(); as src) {
+              <span
+                class="sample__logo"
+                [class.sample__logo--white]="theme === 'dark' && draft().logoOnWhite"
+              >
+                <img [src]="src" [alt]="preview().name" />
+              </span>
+            }
+            <span class="sample__text">
+              <strong>{{ preview().name }}</strong>
+              @if (preview().subtitle) {
+                <span>{{ preview().subtitle }}</span>
+              }
+              @if (preview().details.length > 0) {
+                <small>{{ preview().details.join(' · ') }}</small>
+              }
+            </span>
+          </div>
+          <div class="sample__bars" aria-hidden="true">
+            @for (height of [60, 85, 40, 70]; track $index) {
+              <span
+                [style.height.%]="height"
+                [style.background]="
+                  brand() ? (theme === 'dark' ? brand()!.dark : brand()!.color) : null
+                "
+              ></span>
+            }
+          </div>
+        </div>
+      }
+    </section>
+  </div>
+</main>

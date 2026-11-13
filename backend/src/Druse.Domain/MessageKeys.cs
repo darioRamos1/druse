@@ -168,6 +168,14 @@ public static class MessageKeys
         public const string TemplateSize = "server.reports.templateSize";
         public const string TemplateInvalid = "server.reports.templateInvalid";
         public const string TemplateForbidden = "server.reports.templateForbidden";
+        public const string IdentityName = "server.reports.identityName";
+        public const string IdentityDetails = "server.reports.identityDetails";
+        public const string IdentityLine = "server.reports.identityLine";
+        public const string IdentityColor = "server.reports.identityColor";
+        public const string IdentityLogoType = "server.reports.identityLogoType";
+        public const string IdentityLogoSize = "server.reports.identityLogoSize";
+        public const string IdentityLogoDimensions = "server.reports.identityLogoDimensions";
+        public const string IdentityMissing = "server.reports.identityMissing";
         public const string ExportEmpty = "server.reports.exportEmpty";
         public const string ExportPanels = "server.reports.exportPanels";
         public const string ExportDataset = "server.reports.exportDataset";

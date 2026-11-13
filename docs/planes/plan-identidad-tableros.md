@@ -129,6 +129,19 @@ inglés, comprobaciones y commit, como indica `AGENTS.md`.
 | 3. Exportaciones | Encabezado y pie del PDF; logo y datos en la hoja de resumen de Excel; color de marca en los gráficos editables. | Con un filtro activo y las bases desconectadas, exportar el tablero: el PDF lleva logo, datos y páginas numeradas, y el Excel abre con el logo en el resumen y los gráficos del color de la marca. |
 | 4. Plantillas | Incluir o no la identidad al guardar; importarla con aviso. | Una plantilla sin identidad no lleva el logo; con identidad, al importarla en un perfil limpio se crea la identidad y el tablero sale igual. |
 
+**Estado:** fase 1 hecha el 12 de noviembre de 2026, en la versión 1.25.0.
+Cambios respecto a lo previsto:
+
+- El logo se sirve como JSON (tipo y base64) y no como imagen: la API pide su
+  cabecera de acceso, y un `<img>` no puede mandarla. La interfaz monta la
+  imagen con un `data:`; el PDF de la fase 3 podrá usar lo mismo.
+- Se lee el tipo y el tamaño de PNG, JPEG y WebP por su cabecera, sin
+  decodificar la imagen. El servidor no acepta SVG: la interfaz lo convierte.
+- «Borrar una identidad en uso» pasa a la fase 2: hasta que los tableros la
+  nombren, ninguna está en uso.
+- La lista de identidades va en la barra lateral de Reportes, debajo de
+  Tableros, y cada una enseña el punto de su color.
+
 ## 5. Riesgos y decisiones abiertas
 
 - **Una identidad por tablero o por instalación.** *Decidido el 12 de noviembre

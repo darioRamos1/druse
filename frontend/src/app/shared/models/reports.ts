@@ -243,6 +243,33 @@ export interface SavedReportTemplate {
   readonly updatedAtUtc?: string;
 }
 
+// --- Identidad de empresa en los tableros ---------------------------------
+
+/** La identidad de una empresa: nombre, datos y color. El logo se pide aparte. */
+export interface ReportIdentity {
+  readonly id: string;
+  readonly name: string;
+  readonly subtitle: string | null;
+  /** Hasta tres líneas: NIT, dirección, contacto. */
+  readonly details: readonly string[];
+  /** Pie de página del PDF. */
+  readonly footer: string | null;
+  /** `#RRGGBB` o `null`. */
+  readonly brandColor: string | null;
+  /** Fondo blanco detrás del logo en el tema oscuro. */
+  readonly logoOnWhite: boolean;
+  /** Cuándo cambió el logo, o `null` si no tiene. Solo llega del servidor. */
+  readonly logoUpdatedAtUtc?: string | null;
+  readonly createdAtUtc?: string;
+  readonly updatedAtUtc?: string;
+}
+
+/** El logo en base64; el tipo lo pone el servidor al leerlo. */
+export interface ReportIdentityLogo {
+  readonly contentType?: string;
+  readonly data: string;
+}
+
 // --- Hito 4.4: exportar un tablero o un panel ------------------------------
 
 /** Tipo de celda, con los mismos nombres que `ReportExportCellType` en el servidor. */

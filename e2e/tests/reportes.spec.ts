@@ -514,6 +514,82 @@ test.describe('Reportes BI entre motores', () => {
 });
 
 /** El paso Visualización de un conjunto recién guardado, todavía sin resultado. */
+test.describe('Identidades de empresa', () => {
+  /**
+   * Un logo SVG con un script dentro: el script no se ejecuta y lo que se guarda
+   * es un PNG. Un texto renombrado a .png se rechaza antes de llegar a ningún sitio.
+   */
+  test('crea una identidad con logo y color, y se reabre igual', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    await abrir(page);
+
+    const reportes = await abrirReportes(page);
+    const nombre = `Comercial Andina ${Date.now()}`;
+
+    await reportes.getByRole('button', { name: 'Nueva identidad de empresa' }).click();
+    const editor = reportes.locator('app-report-identity-editor');
+    await expect(editor.getByRole('button', { name: 'Guardar' })).toBeDisabled();
+
+    await editor.getByLabel('Nombre de la empresa').fill(nombre);
+    await editor.getByLabel('Subtítulo').fill('Informe mensual de ventas');
+    await editor.getByLabel('Línea de datos 1').fill('NIT 900.123.456-7');
+    await editor.getByLabel('Línea de datos 2').fill('Cra. 7 # 12-34, Bogotá');
+    await editor.getByLabel('Color de marca en hexadecimal').fill('#0A6CBF');
+    await expect(editor.locator('.contrast')).toContainText('Tema claro: contraste');
+
+    const archivo = editor.locator('input[type="file"]');
+    await archivo.setInputFiles({
+      name: 'logo.png',
+      mimeType: 'image/png',
+      buffer: Buffer.from('esto no es una imagen'),
+    });
+    await expect(editor.getByRole('alert')).toContainText('No se pudo leer esa imagen');
+
+    await archivo.setInputFiles({
+      name: 'andina.svg',
+      mimeType: 'image/svg+xml',
+      buffer: Buffer.from(
+        `<svg xmlns="http://www.w3.org/2000/svg" width="240" height="80">
+           <rect width="240" height="80" rx="14" fill="#0A6CBF"/>
+           <text x="22" y="54" font-size="38" font-family="Arial" fill="#fff">ANDINA</text>
+           <script>window.__scriptDelLogo = true</script>
+         </svg>`,
+      ),
+    });
+    await expect(editor.locator('.sample__logo img')).toHaveCount(2);
+    expect(await page.evaluate(() => (window as { __scriptDelLogo?: boolean }).__scriptDelLogo)).toBeUndefined();
+
+    await editor.getByLabel('Poner fondo blanco al logo en el tema oscuro').check();
+    await editor.getByRole('button', { name: 'Guardar' }).click();
+    await expect(editor.getByRole('status').filter({ hasText: 'Identidad guardada' })).toBeVisible();
+
+    const barrido = process.env['DRUSE_BARRIDO_DIR'];
+    if (barrido) {
+      await page.screenshot({ path: `${barrido}/reportes-identidad.png` });
+    }
+
+    // Cerrar y volver: todo sale de reports.db, y el logo es ya un PNG.
+    await page.keyboard.press('Escape');
+    await expect(reportes.locator('.dialog')).toBeHidden();
+    const otraVez = await abrirReportes(page);
+    await otraVez.locator('.datasets__item', { hasText: nombre }).first().click();
+    const reabierto = otraVez.locator('app-report-identity-editor');
+    await expect(reabierto.getByLabel('Nombre de la empresa')).toHaveValue(nombre);
+    await expect(reabierto.getByLabel('Línea de datos 2')).toHaveValue('Cra. 7 # 12-34, Bogotá');
+    await expect(reabierto.getByLabel('Color de marca en hexadecimal')).toHaveValue('#0A6CBF');
+    await expect(reabierto.locator('.sample__logo img').first()).toHaveAttribute(
+      'src',
+      /^data:image\/png;base64,/,
+    );
+    await expect(reabierto.locator('.sample--dark .sample__logo--white')).toHaveCount(1);
+
+    // Y se borra, con confirmación.
+    await reabierto.getByRole('button', { name: 'Borrar' }).click();
+    await reabierto.locator('.confirm').getByRole('button', { name: 'Borrar' }).click();
+    await expect(otraVez.locator('.datasets__item', { hasText: nombre })).toHaveCount(0);
+  });
+});
+
 test.describe('Reportes BI con el lienzo', () => {
   /**
    * Una fuente compuesta en el lienzo del compositor, cruzada con otra en SQL.

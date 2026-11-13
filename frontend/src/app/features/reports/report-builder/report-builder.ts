@@ -30,6 +30,7 @@ import {
   ReportSourcePreview,
   ReportTemplateScope,
   ReportValue,
+  ReportIdentity,
   SavedDashboard,
 } from '../../../shared/models/reports';
 import { Icon } from '../../../shared/ui/icon/icon';
@@ -43,6 +44,8 @@ import { instantiateTemplate } from '../report-template-model';
 import { emptyDashboard } from '../report-dashboard-model';
 import { DatabaseEngine, DatabaseObject, ServerMessage } from '../../../shared/models/workspace';
 import { QueryBuilder } from '../../query-builder/query-builder/query-builder';
+import { ReportIdentityEditor } from '../report-identity-editor/report-identity-editor';
+import { emptyIdentity } from '../report-identity-model';
 import { failureText, serverText } from '../report-messages';
 import {
   MAX_SOURCES,
@@ -113,6 +116,7 @@ function wideLayout(): boolean {
     NgTemplateOutlet,
     QueryBuilder,
     ReportDashboard,
+    ReportIdentityEditor,
     ReportTemplateGallery,
     ReportWorkbench,
     TranslatePipe,
@@ -137,8 +141,13 @@ export class ReportBuilder {
    * El borrador del conjunto se conserva al abrir un tablero: volver a los
    * pasos lo encuentra donde estaba.
    */
-  protected readonly mode = signal<'dataset' | 'dashboard'>('dataset');
+  protected readonly mode = signal<'dataset' | 'dashboard' | 'identity'>('dataset');
   protected readonly openDashboard = signal<SavedDashboard | null>(null);
+
+  /** Identidades de empresa para los tableros: logo, datos y color de marca. */
+  protected readonly identities = signal<readonly ReportIdentity[]>([]);
+  protected readonly openIdentity = signal<ReportIdentity | null>(null);
+  private readonly _identityDirty = signal(false);
   private readonly _dashboardDirty = signal(false);
 
   /** La galería de plantillas de tablero, abierta desde la lista de Tableros. */
@@ -272,6 +281,7 @@ export class ReportBuilder {
     this.loadingList.set(true);
 
     try {
+      const identities = this.loadIdentities();
       const [datasets, dashboards] = await Promise.all([
         firstValueFrom(this._gateway.getReportDatasets()),
         firstValueFrom(this._gateway.getDashboards()),
@@ -279,6 +289,7 @@ export class ReportBuilder {
 
       this.datasets.set(datasets);
       this.dashboards.set(dashboards);
+      await identities;
     } catch (error) {
       this.error.set(describeError(error, this._i18n));
     } finally {
@@ -385,8 +396,9 @@ export class ReportBuilder {
   // --- Pasos y vista ---------------------------------------------------------
 
   protected goTo(step: ReportStep): void {
-    // Desde un tablero, los pasos devuelven al conjunto que se estaba editando.
-    if (this.mode() === 'dashboard') {
+    // Desde un tablero o una identidad, los pasos devuelven al conjunto que se
+    // estaba editando.
+    if (this.mode() !== 'dataset') {
       this.guard(() => {
         this.leaveDashboard();
         this.goTo(step);
@@ -1011,6 +1023,55 @@ export class ReportBuilder {
     this.mode.set('dataset');
     this.openDashboard.set(null);
     this._dashboardDirty.set(false);
+    this.openIdentity.set(null);
+    this._identityDirty.set(false);
+  }
+
+  // --- Identidades de empresa ------------------------------------------------
+
+  /** Sin identidades se puede trabajar igual: si fallan, no tumban las otras listas. */
+  private async loadIdentities(): Promise<void> {
+    try {
+      this.identities.set(await firstValueFrom(this._gateway.getReportIdentities()));
+    } catch {
+      this.identities.set([]);
+    }
+  }
+
+  protected isIdentityOpen(identity: ReportIdentity): boolean {
+    return this.mode() === 'identity' && this.openIdentity()?.id === identity.id;
+  }
+
+  protected showIdentity(identity: ReportIdentity): void {
+    this.guard(() => this.enterIdentity(identity), 'dashboard');
+  }
+
+  protected newIdentity(): void {
+    this.guard(() => this.enterIdentity(emptyIdentity(crypto.randomUUID())), 'dashboard');
+  }
+
+  private enterIdentity(identity: ReportIdentity): void {
+    this.leaveDashboard();
+    this.openIdentity.set(identity);
+    this.mode.set('identity');
+  }
+
+  protected identitySaved(saved: ReportIdentity): void {
+    this.identities.update((list) =>
+      [saved, ...list.filter((item) => item.id !== saved.id)].sort((a, b) =>
+        a.name.localeCompare(b.name, this._i18n.intlLocale()),
+      ),
+    );
+    this.openIdentity.set(saved);
+  }
+
+  protected identityDeleted(id: string): void {
+    this.identities.update((list) => list.filter((item) => item.id !== id));
+    this.leaveDashboard();
+  }
+
+  protected identityDirty(dirty: boolean): void {
+    this._identityDirty.set(dirty);
   }
 
   protected dashboardSaved(saved: SavedDashboard): void {
@@ -1043,7 +1104,9 @@ export class ReportBuilder {
    * cerrar descarta los dos.
    */
   private guard(action: () => void, what: 'all' | 'dashboard' = 'all'): void {
-    const dashboardDirty = this.mode() === 'dashboard' && this._dashboardDirty();
+    const dashboardDirty =
+      (this.mode() === 'dashboard' && this._dashboardDirty()) ||
+      (this.mode() === 'identity' && this._identityDirty());
 
     if (!dashboardDirty && (what === 'dashboard' || !this.dirty())) {
       action();

@@ -85,7 +85,7 @@
     [class.is-inspecting]="
       mode() === 'dataset' && inspectorOpen() && sources().length > 0 && step() !== 'visual'
     "
-    [class.is-working]="mode() === 'dashboard' || step() === 'visual'"
+    [class.is-working]="mode() !== 'dataset' || step() === 'visual'"
   >
     <!-- Navegación: pasos del constructor y conjuntos guardados. -->
     <nav class="rail" [attr.aria-label]="'reports.nav' | t">
@@ -220,6 +220,47 @@
           }
         </ul>
       }
+
+      <!-- Logo, datos y color de una empresa, para ponérselos a sus tableros. -->
+      <div class="rail__row">
+        <p class="rail__label">{{ 'reports.identity.list' | t }}</p>
+        <button
+          type="button"
+          class="icon-button"
+          (click)="newIdentity()"
+          [attr.aria-label]="'reports.identity.new' | t"
+          [attr.title]="'reports.identity.new' | t"
+        >
+          <app-icon name="plus" [size]="11" />
+        </button>
+      </div>
+      @if (!loadingList() && identities().length === 0) {
+        <p class="rail__hint">{{ 'reports.identity.none' | t }}</p>
+      } @else {
+        <ul class="datasets">
+          @for (identity of identities(); track identity.id) {
+            <li>
+              <button
+                type="button"
+                class="datasets__item"
+                [class.is-active]="isIdentityOpen(identity)"
+                [attr.aria-current]="isIdentityOpen(identity) ? 'true' : null"
+                (click)="showIdentity(identity)"
+              >
+                <span class="datasets__name">
+                  <!-- Sin color de marca, el punto va hueco. -->
+                  <span
+                    class="identity-dot"
+                    [style.background]="identity.brandColor ?? 'transparent'"
+                    aria-hidden="true"
+                  ></span>
+                  {{ identity.name }}
+                </span>
+              </button>
+            </li>
+          }
+        </ul>
+      }
     </nav>
 
     @if (mode() === 'dashboard' && openDashboard(); as board) {
@@ -232,6 +273,14 @@
         (deleted)="dashboardDeleted($event)"
         (dirtyChange)="dashboardDirty($event)"
         (editingChange)="dashboardEditing($event)"
+      />
+    } @else if (mode() === 'identity' && openIdentity(); as identity) {
+      <app-report-identity-editor
+        class="workbench"
+        [identity]="identity"
+        (saved)="identitySaved($event)"
+        (deleted)="identityDeleted($event)"
+        (dirtyChange)="identityDirty($event)"
       />
     } @else if (step() === 'visual' && savedDataset(); as dataset) {
       <app-report-workbench
