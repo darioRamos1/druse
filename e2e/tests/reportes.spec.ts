@@ -149,11 +149,19 @@ test.describe('Reportes BI', () => {
   });
 });
 
+/** Un PNG de 1 × 1, suficiente para que el encabezado tenga logo. */
+const PNG =
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
+
 test.describe('Plantillas de Reportes BI', () => {
   /**
    * El criterio del hito 4.3: diseñar un tablero, guardarlo como plantilla,
    * compartirla como archivo y aplicarla a otra fuente con nombres de columna
    * distintos. La copia es independiente y se dibuja con sus propios datos.
+   *
+   * Y el de la fase 4 de la identidad de empresa: el tablero tiene una y se
+   * incluye a propósito. Antes de importar se borra, como en un perfil limpio:
+   * al aplicar la plantilla se crea de nuevo y el tablero sale igual.
    */
   test('guarda un tablero como plantilla, la exporta, la importa y la aplica a otra fuente', async ({ page }) => {
     await abrir(page);
@@ -167,6 +175,23 @@ test.describe('Plantillas de Reportes BI', () => {
     // Lo que dejara una ejecución cortada antes de limpiar no debe confundir a esta.
     await borrarPlantillas(reportes, /E2E Plantilla \d+/);
     await borrarRestos(reportes, /E2E Plantilla/, /E2E Plantilla/);
+
+    const identidad = crypto.randomUUID();
+    const empresa = `E2E Plantilla Andina ${marca}`;
+    expect(
+      (
+        await page.request.put(`/api/reports/identities/${identidad}`, {
+          data: { name: empresa, details: ['NIT 900.123.456-7'], brandColor: '#C2185B' },
+        })
+      ).ok(),
+    ).toBe(true);
+    expect(
+      (await page.request.put(`/api/reports/identities/${identidad}/logo`, { data: { data: PNG } })).ok(),
+    ).toBe(true);
+    // Se vuelve a abrir para que el constructor la tenga en su lista.
+    await page.keyboard.press('Escape');
+    await expect(reportes.locator('.dialog')).toBeHidden();
+    await abrirReportes(page);
 
     // --- Origen: ventas por municipio en un tablero con filtros ----------------
     await reportes.getByLabel('Nombre del conjunto de datos').fill(`E2E Plantilla ventas ${marca}`);
@@ -185,12 +210,20 @@ test.describe('Plantillas de Reportes BI', () => {
     await expect(reportes.locator('.chart__bar')).toHaveCount(3);
     await reportes.locator('.inspector').getByLabel('Nombre del reporte').fill(`Ventas ${marca}`);
     await reportes.getByRole('button', { name: 'Guardar reporte' }).click();
-    await crearTablero(reportes, `E2E Plantilla tablero ${marca}`, [`Ventas ${marca}`]);
+    await crearTablero(reportes, `E2E Plantilla tablero ${marca}`, [`Ventas ${marca}`], empresa);
 
     const tablero = reportes.locator('app-report-dashboard');
 
     await tablero.getByRole('button', { name: 'Guardar como plantilla' }).click();
     await tablero.locator('.template-form').getByLabel('Nombre de la plantilla').fill(plantilla);
+    // Desmarcada de entrada: el logo de una empresa solo viaja si se pide.
+    const incluir = tablero.locator('.template-form').getByLabel(`Incluir la identidad de «${empresa}»`);
+    await expect(incluir).not.toBeChecked();
+    await incluir.check();
+    const barrido = process.env['DRUSE_BARRIDO_DIR'];
+    if (barrido) {
+      await tablero.locator('.template-form').screenshot({ path: `${barrido}/reportes-plantilla-con-identidad.png` });
+    }
     await tablero.getByRole('button', { name: 'Guardar plantilla' }).click();
     await expect(tablero.locator('.banner--success')).toContainText(`Plantilla «${plantilla}» guardada.`);
 
@@ -216,14 +249,30 @@ test.describe('Plantillas de Reportes BI', () => {
     expect(descarga.suggestedFilename()).toBe(`${plantilla}.druse-plantilla.json`);
     expect(contenido).toContain('"format": "druse.report-template"');
     expect(contenido).not.toMatch(/SELECT|connectionId|"sql"|"rows"/i);
+    // La identidad va dentro, con su logo.
+    const llevada = JSON.parse(contenido).identity;
+    expect(llevada).toEqual(expect.objectContaining({ id: identidad, name: empresa }));
+    expect(llevada.logo).toEqual({ contentType: 'image/png', data: PNG });
 
     await tarjeta.getByRole('button', { name: /^Borrar la plantilla/ }).click();
     await tarjeta.getByRole('button', { name: 'Borrar', exact: true }).click();
     await expect(tarjeta).toHaveCount(0);
 
+    // Un perfil sin esa identidad: se borra y se vuelve a abrir Reportes.
+    expect((await page.request.delete(`/api/reports/identities/${identidad}`)).ok()).toBe(true);
+    await galeria.getByRole('button', { name: 'Cerrar' }).click();
+    await page.keyboard.press('Escape');
+    await expect(reportes.locator('.dialog')).toBeHidden();
+    await abrirReportes(page);
+    await expect(reportes.locator('.datasets__item--identity', { hasText: empresa })).toHaveCount(0);
+    await abrirGaleria(reportes);
+
     await galeria.locator('input[type="file"]').setInputFiles(archivo);
     await expect(galeria.locator('.sheet__title')).toHaveText('Importar plantilla');
     await expect(galeria.locator('.card--preview')).toContainText('municipio · texto');
+    await expect(galeria.locator('.card--preview')).toContainText(
+      `Incluye la identidad de empresa «${empresa}» con su logo y sus datos.`,
+    );
     await galeria.getByRole('button', { name: 'Guardar en mis plantillas' }).click();
     await expect(galeria.locator('.banner--success')).toContainText('importada');
 
@@ -236,7 +285,20 @@ test.describe('Plantillas de Reportes BI', () => {
     await expect(campo('municipio')).toHaveValue('region');
     await expect(campo('venta')).toHaveValue('monto_total');
     await expect(campo('mes')).toHaveValue('fecha_pedido');
+    await expect(galeria.locator('.identity')).toContainText('No la tienes: se añadirá a tus identidades');
+    await expect(galeria.locator('.identity').getByRole('checkbox')).toBeChecked();
+    if (barrido) {
+      await galeria.locator('.sheet').screenshot({ path: `${barrido}/reportes-plantilla-aplicar-identidad.png` });
+    }
     await galeria.getByRole('button', { name: 'Crear copia' }).click();
+
+    // La identidad vuelve a existir, con el mismo id, y el tablero la lleva.
+    await expect(reportes.locator('.datasets__item--identity', { hasText: empresa })).toHaveCount(1);
+    const encabezado = tablero.locator('app-report-identity-header');
+    await expect(encabezado).toContainText(empresa);
+    await expect(encabezado).toContainText('NIT 900.123.456-7');
+    await expect(encabezado.locator('img')).toHaveAttribute('alt', empresa);
+    expect((await page.request.get(`/api/reports/identities/${identidad}/logo`)).ok()).toBe(true);
 
     await expect(tablero.locator('.board__heading')).toHaveText(plantilla);
     await expect(tablero.locator('.panel .chart__bar')).toHaveCount(2);
@@ -245,9 +307,10 @@ test.describe('Plantillas de Reportes BI', () => {
     await tablero.locator('.filter select').selectOption({ label: 'Sur' });
     await expect(tablero.locator('.panel .chart__bar')).toHaveCount(1);
 
-    // Se deja como estaba: plantillas, tableros y conjuntos de esta ejecución.
+    // Se deja como estaba: plantillas, tableros, conjuntos e identidad de esta ejecución.
     await borrarPlantillas(reportes, restos);
     await borrarRestos(reportes, restos, restos);
+    await page.request.delete(`/api/reports/identities/${identidad}`);
     await page.keyboard.press('Escape');
     await expect(reportes.locator('.dialog')).toBeHidden();
   });
@@ -651,10 +714,6 @@ test.describe('Identidades de empresa', () => {
 });
 
 test.describe('Tablero con identidad de empresa', () => {
-  /** Un PNG de 1 × 1, suficiente para que el encabezado tenga logo. */
-  const PNG =
-    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
-
   test('el tablero lleva su encabezado y su marca, y pierde las dos al borrar la identidad', async ({
     page,
   }) => {

@@ -184,6 +184,12 @@ describe('ReportDashboard', () => {
   let libros: ExportDocument[];
   let archivos: { name: string; blob: Blob }[];
   let reportesNuevos: SavedReport[];
+  /** El logo que devuelve la API de la identidad del tablero. */
+  let logo: string;
+
+  function textoVisible(): string {
+    return (fixture.nativeElement as HTMLElement).textContent?.replace(/\s+/g, ' ') ?? '';
+  }
 
   async function asentar(): Promise<void> {
     for (let intento = 0; intento < 30; intento++) {
@@ -236,6 +242,7 @@ describe('ReportDashboard', () => {
     borrados = [];
     plantillas = [];
     reportesNuevos = [];
+    logo = 'iVBORw0KGgo=';
     libros = [];
     archivos = [];
 
@@ -260,6 +267,7 @@ describe('ReportDashboard', () => {
         plantillas.push(template);
         return of(template);
       },
+      getReportIdentityLogo: () => of({ contentType: 'image/png', data: logo }),
       exportReportWorkbook: (document: ExportDocument): Observable<Blob> => {
         libros.push(document);
         return of(new Blob(['xlsx']));
@@ -596,6 +604,65 @@ describe('ReportDashboard', () => {
     );
     expect(plantillas[0].model).not.toMatch(/"sql"|connectionId|ds-ventas|izquierda\./);
     expect(el('.banner--success').textContent).toContain('Plantilla «Comercial base» guardada.');
+    // Sin identidad en el tablero no se ofrece incluirla.
+    expect(textoVisible()).not.toContain('Incluir la identidad');
+  });
+
+  it('incluye la identidad en la plantilla solo si se marca, y no si no cabe', async () => {
+    fixture = TestBed.createComponent(ReportDashboard);
+    fixture.componentRef.setInput(
+      'dashboard',
+      tablero({ ...conTresPaneles, style: { color: null, identityId: 'andina' } }),
+    );
+    fixture.componentRef.setInput('datasets', [ventas, visitas]);
+    fixture.componentRef.setInput('identities', [
+      {
+        id: 'andina',
+        name: 'Comercial Andina',
+        subtitle: null,
+        details: [],
+        footer: 'Confidencial',
+        brandColor: '#0A6CBF',
+        logoOnWhite: false,
+        logoUpdatedAtUtc: '2026-11-12T10:00:00Z',
+      },
+    ]);
+    fixture.detectChanges();
+    await asentar();
+
+    const guardarComoPlantilla = async (incluir: boolean) => {
+      botón('Guardar como plantilla').click();
+      fixture.detectChanges();
+      const casilla = el<HTMLInputElement>('.template-form input[type="checkbox"]');
+
+      // Desmarcada de entrada: llevarse el logo de una empresa tiene que ser a propósito.
+      expect(casilla.checked).toBe(false);
+      casilla.checked = incluir;
+      casilla.dispatchEvent(new Event('change'));
+      fixture.detectChanges();
+      botón('Guardar plantilla').click();
+      await asentar();
+    };
+
+    expect(textoVisible()).not.toContain('Incluir la identidad');
+    await guardarComoPlantilla(false);
+    expect('identity' in JSON.parse(plantillas[0].model)).toBe(false);
+
+    await guardarComoPlantilla(true);
+    expect(JSON.parse(plantillas[1].model).identity).toEqual(
+      expect.objectContaining({
+        id: 'andina',
+        name: 'Comercial Andina',
+        footer: 'Confidencial',
+        logo: { contentType: 'image/png', data: logo },
+      }),
+    );
+
+    // Un logo que no cabe en los 512 KB de la plantilla: se dice y no se guarda nada.
+    logo = 'A'.repeat(600 * 1024);
+    await guardarComoPlantilla(true);
+    expect(plantillas).toHaveLength(2);
+    expect(el('.banner--danger').textContent).toContain('pasaría de 512 KB');
   });
 
   it('añade los paneles de una plantilla a la página y crea sus reportes', async () => {
@@ -662,6 +729,7 @@ describe('ReportDashboard', () => {
       document: panel as never,
       datasets: ['ds-ventas'],
       assignment: { cat: 'izquierda.municipio', num: 'izquierda.venta' },
+      identity: null,
     });
     await asentar();
 

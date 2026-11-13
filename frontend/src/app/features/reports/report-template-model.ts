@@ -1,6 +1,8 @@
 import {
   ReportColumn,
   ReportDataset,
+  ReportIdentity,
+  ReportIdentityLogo,
   ReportTemplateScope,
   ReportVisualKind,
   SavedReport,
@@ -34,6 +36,9 @@ import {
  *
  * Nunca lleva SQL, conexiones, bases ni filas. Por eso se puede exportar a un
  * archivo y dársela a otra persona: cada cual la aplica a sus propios datos.
+ *
+ * La identidad de la empresa (logo y datos) solo viaja si quien guarda la
+ * plantilla lo pide, y solo en las de tablero: ver `TemplateIdentity`.
  */
 
 export const TEMPLATE_FORMAT = 'druse.report-template';
@@ -113,6 +118,25 @@ export interface TemplateLayout {
   readonly style: DashboardStyle;
 }
 
+/**
+ * La identidad de empresa incluida a propósito en una plantilla de tablero.
+ *
+ * Lleva su id para reconocerla: aplicada en el mismo perfil se usa la que ya
+ * hay; en otro, se crea con ese mismo id, así que aplicar la plantilla dos
+ * veces no la duplica. El logo va dentro, en base64, y cuenta para el límite
+ * de tamaño de la plantilla.
+ */
+export interface TemplateIdentity {
+  readonly id: string;
+  readonly name: string;
+  readonly subtitle: string | null;
+  readonly details: readonly string[];
+  readonly footer: string | null;
+  readonly brandColor: string | null;
+  readonly logoOnWhite: boolean;
+  readonly logo: { readonly contentType: string; readonly data: string } | null;
+}
+
 export interface TemplateDocument {
   readonly format: typeof TEMPLATE_FORMAT;
   readonly version: typeof TEMPLATE_VERSION;
@@ -124,6 +148,30 @@ export interface TemplateDocument {
   readonly reports: readonly TemplateReport[];
   /** Solo en paneles y tableros. */
   readonly layout: TemplateLayout | null;
+  /** Solo en tableros, y solo si se pidió al guardarla. */
+  readonly identity?: TemplateIdentity | null;
+}
+
+/** La identidad lista para ir en una plantilla, con su logo si lo tiene. */
+export function templateIdentity(
+  identity: ReportIdentity,
+  logo: ReportIdentityLogo | null,
+): TemplateIdentity {
+  return {
+    id: identity.id,
+    name: identity.name,
+    subtitle: identity.subtitle,
+    details: identity.details,
+    footer: identity.footer,
+    brandColor: identity.brandColor,
+    logoOnWhite: identity.logoOnWhite,
+    logo: logo ? { contentType: logo.contentType ?? 'image/png', data: logo.data } : null,
+  };
+}
+
+/** Lo que ocupa la plantilla guardada: con logo, puede pasar del límite. */
+export function templateBytes(document: TemplateDocument): number {
+  return new Blob([JSON.stringify(document)]).size;
 }
 
 // --- Tipos de campo ---------------------------------------------------------------
@@ -592,6 +640,56 @@ export function parseTemplate(json: string): TemplateRead {
   }
 }
 
+const LOGO_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp']);
+const HEX = /^#[0-9a-f]{6}$/i;
+const BASE64 = /^[A-Za-z0-9+/]+={0,2}$/;
+const ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * La identidad de una plantilla de tablero, con los mismos límites que pone
+ * el servidor a una identidad. El logo solo se acepta como PNG, JPEG o WebP
+ * en base64: el servidor vuelve a mirar sus bytes al guardarlo.
+ */
+function readIdentity(value: unknown): TemplateIdentity | null {
+  if (value === undefined || value === null) return null;
+  if (!isObject(value)) throw new Invalid('content');
+
+  const name = str(value['name'], 120)?.trim();
+  const id = value['id'];
+
+  if (!name || typeof id !== 'string' || !ID.test(id)) throw new Invalid('content');
+
+  const line = (item: unknown) => str(item, 160)?.trim() || null;
+  const details = list(value['details'] ?? [], 3).map(line).filter((item) => item !== null);
+  const brand = value['brandColor'];
+  const logo = value['logo'];
+  let readLogo: TemplateIdentity['logo'] = null;
+
+  if (logo !== undefined && logo !== null) {
+    if (
+      !isObject(logo) ||
+      !LOGO_TYPES.has(logo['contentType'] as string) ||
+      typeof logo['data'] !== 'string' ||
+      !BASE64.test(logo['data'])
+    ) {
+      throw new Invalid('content');
+    }
+
+    readLogo = { contentType: logo['contentType'] as string, data: logo['data'] };
+  }
+
+  return {
+    id: id.toLowerCase(),
+    name,
+    subtitle: line(value['subtitle']),
+    details,
+    footer: line(value['footer']),
+    brandColor: typeof brand === 'string' && HEX.test(brand) ? brand.toUpperCase() : null,
+    logoOnWhite: value['logoOnWhite'] === true,
+    logo: readLogo,
+  };
+}
+
 function readDocument(raw: Raw, scope: ReportTemplateScope, name: string): TemplateDocument {
   const slots: TemplateSlot[] = list(raw['slots'], MAX_SLOTS).map((slot) => ({
     label: (isObject(slot) ? str(slot['label'], 120) : null) ?? '',
@@ -673,6 +771,9 @@ function readDocument(raw: Raw, scope: ReportTemplateScope, name: string): Templ
     throw new Invalid('content');
   }
 
+  // Una identidad en una plantilla de panel o de reporte no tendría dónde ir.
+  const identity = scope === 'Dashboard' ? readIdentity(raw['identity']) : null;
+
   return {
     format: TEMPLATE_FORMAT,
     version: TEMPLATE_VERSION,
@@ -683,6 +784,8 @@ function readDocument(raw: Raw, scope: ReportTemplateScope, name: string): Templ
     fields,
     reports,
     layout,
+    // Sin identidad no se escribe la clave: la plantilla queda igual que antes.
+    ...(identity ? { identity } : {}),
   };
 }
 

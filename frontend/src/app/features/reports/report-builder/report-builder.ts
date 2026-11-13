@@ -40,7 +40,7 @@ import {
   ReportTemplateGallery,
   TemplateApplication,
 } from '../report-template-gallery/report-template-gallery';
-import { instantiateTemplate } from '../report-template-model';
+import { TemplateIdentity, instantiateTemplate } from '../report-template-model';
 import { emptyDashboard } from '../report-dashboard-model';
 import { DatabaseEngine, DatabaseObject, ServerMessage } from '../../../shared/models/workspace';
 import { QueryBuilder } from '../../query-builder/query-builder/query-builder';
@@ -997,11 +997,19 @@ export class ReportBuilder {
         await firstValueFrom(this._gateway.saveReport(report));
       }
 
+      const identityId = application.identity
+        ? await this.ensureIdentity(application.identity)
+        : null;
+      const layout = copy.layout && {
+        ...copy.layout,
+        style: { ...copy.layout.style, identityId },
+      };
+
       const saved = await firstValueFrom(
         this._gateway.saveDashboard({
           id: crypto.randomUUID(),
           name: this.freeDashboardName(application.document.name),
-          model: JSON.stringify(copy.layout),
+          model: JSON.stringify(layout),
         }),
       );
 
@@ -1010,6 +1018,42 @@ export class ReportBuilder {
     } catch (error) {
       this.templateError.set(describeError(error, this._i18n));
     }
+  }
+
+  /**
+   * La identidad de una plantilla, en este perfil.
+   *
+   * Si ya existe —la plantilla se guardó aquí, o ya se aplicó antes— se usa
+   * tal cual, sin pisar los cambios que se le hayan hecho. Si no, se crea con
+   * el mismo id y su logo, y aparece en la lista de identidades.
+   */
+  private async ensureIdentity(identity: TemplateIdentity): Promise<string> {
+    const known = this.identities().find(
+      (item) => item.id.toLowerCase() === identity.id.toLowerCase(),
+    );
+
+    if (known) {
+      return known.id;
+    }
+
+    const saved = await firstValueFrom(
+      this._gateway.saveReportIdentity({
+        id: identity.id,
+        name: identity.name,
+        subtitle: identity.subtitle,
+        details: identity.details,
+        footer: identity.footer,
+        brandColor: identity.brandColor,
+        logoOnWhite: identity.logoOnWhite,
+      }),
+    );
+
+    if (identity.logo) {
+      await firstValueFrom(this._gateway.saveReportIdentityLogo(saved.id, identity.logo));
+    }
+
+    await this.loadIdentities();
+    return saved.id;
   }
 
   private enterDashboard(dashboard: SavedDashboard): void {

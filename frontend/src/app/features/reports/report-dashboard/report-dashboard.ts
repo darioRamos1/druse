@@ -95,7 +95,15 @@ import {
   ReportTemplateSave,
   TemplateSaveRequest,
 } from '../report-template-save/report-template-save';
-import { captureTemplate, instantiateTemplate, panelLayout } from '../report-template-model';
+import {
+  MAX_TEMPLATE_BYTES,
+  TemplateDocument,
+  captureTemplate,
+  instantiateTemplate,
+  panelLayout,
+  templateBytes,
+  templateIdentity,
+} from '../report-template-model';
 
 /**
  * Un tablero: reportes de uno o varios conjuntos en una cuadrícula, con
@@ -854,7 +862,7 @@ export class ReportDashboard {
       return;
     }
 
-    const document = captureTemplate(scope, request.name, request.description, {
+    let document: TemplateDocument = captureTemplate(scope, request.name, request.description, {
       reports: this.reports(),
       datasets: this.datasets(),
       columnsOf: (id) => this.snapshots().get(id)?.columns ?? [],
@@ -870,6 +878,23 @@ export class ReportDashboard {
     this.error.set(null);
 
     try {
+      const identity = this.identity();
+
+      // Solo si se pidió, y solo en una plantilla de tablero: el logo va dentro.
+      if (request.includeIdentity && identity && scope === 'Dashboard') {
+        const logo = identity.logoUpdatedAtUtc
+          ? await firstValueFrom(this._gateway.getReportIdentityLogo(identity.id))
+          : null;
+
+        document = { ...document, identity: templateIdentity(identity, logo) };
+
+        // Se dice aquí, con palabras, en vez de dejar que el servidor la rechace por tamaño.
+        if (templateBytes(document) > MAX_TEMPLATE_BYTES) {
+          this.error.set(this._i18n.t('reports.template.identityTooBig'));
+          return;
+        }
+      }
+
       await firstValueFrom(
         this._gateway.saveReportTemplate({
           id: crypto.randomUUID(),

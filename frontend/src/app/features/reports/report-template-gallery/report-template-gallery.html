@@ -136,6 +136,27 @@
       }
     </div>
 
+    @if (item.document.identity; as company) {
+      <div class="identity" role="note">
+        <label class="identity__check">
+          <input
+            type="checkbox"
+            [checked]="useIdentity()"
+            (change)="useIdentity.set($any($event.target).checked)"
+          />
+          <span>{{ 'reports.template.useIdentity' | t: { name: company.name } }}</span>
+        </label>
+        <p class="field__hint">
+          {{
+            (hasIdentity(company.id)
+              ? 'reports.template.identityKnown'
+              : 'reports.template.identityNew'
+            ) | t
+          }}
+        </p>
+      </div>
+    }
+
     <footer class="sheet__foot">
       @if (missing().length > 0) {
         <p class="field__hint" role="status">
@@ -172,6 +193,16 @@
           }
         </ul>
         <p class="field__hint">{{ 'reports.template.importSafe' | t }}</p>
+        @if (document.identity; as company) {
+          <p class="banner banner--warning" role="note">
+            {{
+              (company.logo
+                ? 'reports.template.importIdentityLogo'
+                : 'reports.template.importIdentity'
+              ) | t: { name: company.name }
+            }}
+          </p>
+        }
       </article>
     </div>
     <footer class="sheet__foot">
@@ -217,6 +248,11 @@
                       : scopeLabel(item.document.scope)
                   }}
                 </span>
+                @if (item.document.identity; as company) {
+                  <span class="chip" [title]="company.name">
+                    {{ 'reports.template.withIdentity' | t }}
+                  </span>
+                }
               </div>
               @if (item.document.description) {
                 <p class="card__description">{{ item.document.description }}</p>

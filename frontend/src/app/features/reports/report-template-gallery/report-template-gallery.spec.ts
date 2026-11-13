@@ -4,7 +4,7 @@ import { Observable, of } from 'rxjs';
 import { ApplicationGateway } from '../../../core/application-gateway/application-gateway';
 import { ReportDataset, ReportSnapshot, SavedReportTemplate } from '../../../shared/models/reports';
 import { DEFAULT_APPEARANCE } from '../report-chart';
-import { captureTemplate, exportTemplate } from '../report-template-model';
+import { captureTemplate, exportTemplate, goalStarter } from '../report-template-model';
 import { ReportTemplateGallery, TemplateApplication } from './report-template-gallery';
 
 const pedidos: ReportDataset = {
@@ -193,6 +193,7 @@ describe('ReportTemplateGallery', () => {
         document: expect.objectContaining({ name: 'Ventas por municipio' }),
         datasets: ['ds-pedidos'],
         assignment: { municipio: 'region', venta: 'monto_total' },
+        identity: null,
       },
     ]);
   });
@@ -257,6 +258,74 @@ describe('ReportTemplateGallery', () => {
     // El constructor de detrás no se entera: no se cierra con la galería encima.
     expect(delConstructor).not.toHaveBeenCalled();
     document.removeEventListener('keydown', delConstructor);
+  });
+
+  it('avisa de la identidad que trae una plantilla de tablero y deja no usarla', async () => {
+    const andina = {
+      id: '0b6c1f2e-5a4d-4c3b-9a8f-1e2d3c4b5a69',
+      name: 'Comercial Andina',
+      subtitle: null,
+      details: ['NIT 900'],
+      footer: null,
+      brandColor: '#0A6CBF',
+      logoOnWhite: false,
+      logo: { contentType: 'image/png', data: 'iVBORw0KGgo=' },
+    };
+    const conIdentidad = {
+      ...goalStarter({
+        name: 'Tablero Andina',
+        description: '',
+        page: 'Resumen',
+        indicator: 'Cifra',
+        byCategory: 'Por categoría',
+        overTime: 'En el tiempo',
+        detail: 'Detalle',
+        dateFilter: 'Fecha',
+        categoryFilter: 'Categoría',
+      }),
+      identity: andina,
+    };
+
+    await crear(['Dashboard']);
+    await importar(exportTemplate(conIdentidad));
+
+    // Antes de guardar nada ya se dice que trae logo y datos de otra empresa.
+    expect(texto()).toContain(
+      'Incluye la identidad de empresa «Comercial Andina» con su logo y sus datos.',
+    );
+    botón('Guardar en mis plantillas').click();
+    await asentar();
+    expect(todos('.card').find((card) => card.textContent?.includes('Tablero Andina'))?.textContent).toContain(
+      'Con identidad',
+    );
+
+    // Al aplicarla: no se tiene, así que se añadirá; marcada por defecto.
+    todos('.card')
+      .find((card) => card.textContent?.includes('Tablero Andina'))!
+      .querySelector<HTMLButtonElement>('.button--primary')!
+      .click();
+    await asentar();
+
+    expect(texto()).toContain('Poner al tablero la identidad de «Comercial Andina»');
+    expect(texto()).toContain('No la tienes: se añadirá a tus identidades');
+    botón('Crear copia').click();
+    expect(aplicadas[0].identity).toEqual(andina);
+
+    // Desmarcada, el tablero sale sin ella.
+    const casilla = fixture.nativeElement.querySelector('.identity input') as HTMLInputElement;
+
+    casilla.checked = false;
+    casilla.dispatchEvent(new Event('change'));
+    fixture.detectChanges();
+    botón('Crear copia').click();
+    expect(aplicadas[1].identity).toBeNull();
+
+    // Si ya se tiene, se dice que se usa la de aquí.
+    const { logo: _logo, ...guardada } = andina;
+
+    fixture.componentRef.setInput('identities', [{ ...guardada, logoUpdatedAtUtc: null }]);
+    fixture.detectChanges();
+    expect(texto()).toContain('Ya la tienes: se usa tal como está en tus identidades.');
   });
 
   it('no importa un archivo con SQL y explica por qué', async () => {

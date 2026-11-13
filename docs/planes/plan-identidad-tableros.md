@@ -1,6 +1,6 @@
 # Plan de implementación · Identidad de empresa en los tableros
 
-12 de noviembre de 2026 · Propuesta.
+12 de noviembre de 2026 · Hecho: las cuatro fases, versiones 1.25.0 a 1.28.0.
 
 ## 1. Qué se busca
 
@@ -179,6 +179,24 @@ previsto:
 - La E2E de exportar con el filtro de mes y la conexión cerrada pasa ahora con
   un tablero con identidad: comprueba el logo en el libro, y en la vista de
   impresión el encabezado, la marca y el pie. Su PDF se revisó a mano.
+
+Fase 4 hecha el mismo día, en la versión 1.28.0. Con ella el plan queda
+completo. Cambios respecto a lo previsto:
+
+- La identidad va en la plantilla con su id, sus datos y el logo en base64,
+  solo en las de tablero y solo si se marca «Incluir la identidad» al
+  guardarla (desmarcada de entrada). Si con el logo pasa de 512 KB, se dice y
+  no se guarda.
+- El aviso llega en dos momentos: al importar el archivo («Incluye la
+  identidad de empresa… con su logo y sus datos») y al aplicarla, con una
+  casilla marcada para ponerla al tablero que dice si ya se tiene o se va a
+  añadir. La galería marca con «Con identidad» las plantillas que la llevan.
+- Se reconoce por id: si ya existe en el perfil, se usa tal como está, sin
+  pisar los cambios; si no, se crea con ese mismo id y su logo, así que
+  aplicar la plantilla dos veces no la duplica.
+- La E2E de plantillas guarda un tablero con identidad, exporta el archivo,
+  borra la identidad como en un perfil limpio, importa, aplica y comprueba que
+  la identidad vuelve con su logo y que el tablero lleva su encabezado.
 
 ## 5. Riesgos y decisiones abiertas
 

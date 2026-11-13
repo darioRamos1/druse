@@ -177,6 +177,7 @@
         scope="Dashboard"
         [defaultName]="name()"
         [busy]="templateBusy()"
+        [identityName]="identity()?.name ?? null"
         (saved)="saveAsTemplate($event)"
         (cancelled)="savingTemplate.set(null)"
       />

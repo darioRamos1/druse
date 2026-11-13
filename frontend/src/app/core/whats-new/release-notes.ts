@@ -18,6 +18,11 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: '1.28.0',
+    date: '2026-11-12',
+    items: ['whatsNew.v1_28_0.templates'],
+  },
+  {
     version: '1.27.0',
     date: '2026-11-12',
     items: ['whatsNew.v1_27_0.pdf', 'whatsNew.v1_27_0.excel'],

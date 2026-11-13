@@ -863,6 +863,7 @@
   <app-report-template-gallery
     [scopes]="dashboardScopes"
     [datasets]="datasets()"
+    [identities]="identities()"
     (applied)="createFromTemplate($event)"
     (closed)="galleryOpen.set(false)"
   />

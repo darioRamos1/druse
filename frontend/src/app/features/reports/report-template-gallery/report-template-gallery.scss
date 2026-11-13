@@ -303,3 +303,30 @@
   clip-path: inset(50%);
   white-space: nowrap;
 }
+
+/* Una plantilla con identidad: se dice antes de crear nada, y se puede no usarla. */
+.identity {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0 16px 12px;
+  padding: 8px 10px;
+  border: 1px solid var(--dr-border);
+  border-radius: var(--dr-radius-sm);
+  background: var(--dr-surface-base);
+
+  &__check {
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+    font-size: 12px;
+
+    input {
+      margin: 2px 0 0;
+    }
+  }
+
+  .field__hint {
+    margin: 0 0 0 20px;
+  }
+}
