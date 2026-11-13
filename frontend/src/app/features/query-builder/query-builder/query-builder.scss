@@ -558,12 +558,22 @@ input[type='number'] {
   flex-wrap: wrap;
 }
 
+.preview__actions {
+  display: inline-flex;
+  gap: 10px;
+}
+
 .reset {
   border: 0;
   background: transparent;
   color: var(--dr-accent-bright);
   font-size: 11px;
   cursor: pointer;
+
+  &:disabled {
+    color: var(--dr-text-disabled);
+    cursor: default;
+  }
 }
 
 .sql {

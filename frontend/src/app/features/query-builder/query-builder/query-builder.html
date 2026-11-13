@@ -1295,11 +1295,27 @@
       <div class="preview__head">
         <h3 class="block__title">{{ 'builder.result' | t }}</h3>
         @if (sqlOverride() !== null) {
-          <button type="button" class="reset" (click)="resetSql()">
-            {{ 'builder.resetSql' | t }}
-          </button>
+          <span class="preview__actions">
+            @if (operation() === 'select') {
+              <button type="button" class="reset" [disabled]="drawing()" (click)="drawSql()">
+                {{ (view() === 'canvas' ? 'builder.toCanvas' : 'builder.toForm') | t }}
+              </button>
+            }
+            <button type="button" class="reset" (click)="resetSql()">
+              {{ 'builder.resetSql' | t }}
+            </button>
+          </span>
         }
       </div>
+      @if (drawNotice(); as notice) {
+        <p
+          class="hint"
+          [class.hint--warning]="notice.tone === 'kept'"
+          [attr.role]="notice.tone === 'kept' ? 'alert' : 'status'"
+        >
+          {{ notice.text }}
+        </p>
+      }
       @if (sqlOverride() !== null) {
         <p class="hint hint--warning" role="status">{{ 'builder.manualSqlHint' | t }}</p>
       }

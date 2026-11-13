@@ -736,6 +736,53 @@ test.describe('SQLite de punta a punta', () => {
     }
   });
 
+  test('el SQL retocado a mano vuelve al lienzo, y un WITH se queda como SQL', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    await abrir(page);
+    await hastaLasTablas(page);
+    await menuDeNodo(page, 'pedidos');
+    await page.getByRole('menuitem', { name: 'Componer consulta', exact: true }).click();
+    const builder = page.locator('app-query-builder');
+    const sql = builder.locator('textarea.sql');
+    await builder.getByRole('button', { name: 'Lienzo', exact: true }).click();
+
+    await sql.fill(
+      `SELECT c.nombre, SUM(p.total) AS gastado
+       FROM main.pedidos p
+       JOIN main.clientes c ON p.cliente_id = c.id
+       WHERE p.total > 1 AND c.nombre <> 'Nadie'
+       GROUP BY c.nombre
+       ORDER BY SUM(p.total) DESC`,
+    );
+    await expect(builder.getByText('SQL editado a mano')).toBeVisible();
+    await builder.getByRole('button', { name: 'Llevar al lienzo' }).click();
+
+    const canvas = builder.locator('app-query-canvas');
+    await expect(canvas.locator('.box')).toHaveCount(2);
+    await expect(builder.locator('.pill--group')).toContainText('nombre');
+    await expect(builder.locator('.pill--value')).toContainText('total');
+    // El filtro de la tabla principal va a su estante; el de la otra, a mano.
+    await expect(builder.locator('[data-shelf="filter"] .pill')).toHaveCount(1);
+    // Con el alias del compositor: «c» ya no existe en la consulta convertida.
+    await expect(builder.getByLabel('Condición SQL 1')).toHaveValue(`"t1".nombre <> 'Nadie'`);
+    await expect(builder.getByText('SQL editado a mano')).toHaveCount(0);
+    await expect(sql).toHaveValue(/INNER JOIN "main"\."clientes" AS "t1"/);
+
+    await builder.getByRole('button', { name: 'Probar con 10 filas' }).click();
+    await expect(builder.locator('app-results-grid')).toContainText('Ana');
+
+    if (process.env['DRUSE_BARRIDO_DIR']) {
+      mkdirSync(BARRIDO, { recursive: true });
+      await page.screenshot({ path: join(BARRIDO, 'query-builder-to-canvas.png') });
+    }
+
+    const conWith = 'WITH caros AS (SELECT * FROM pedidos WHERE total > 5) SELECT * FROM caros';
+    await sql.fill(conWith);
+    await builder.getByRole('button', { name: 'Llevar al lienzo' }).click();
+    await expect(builder.getByRole('alert').filter({ hasText: 'WITH' })).toBeVisible();
+    await expect(sql).toHaveValue(conWith);
+  });
+
   test('el formulario pierde el servidor y el árbol trae lo que hay dentro', async ({ page }) => {
     await abrir(page);
 

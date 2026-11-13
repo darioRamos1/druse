@@ -1708,4 +1708,74 @@ describe('QueryBuilder', () => {
       expect(inserted).toEqual([]);
     });
   });
+
+  describe('del SQL a mano al compositor', () => {
+    async function typed(sql: string, view: 'Formulario' | 'Lienzo' = 'Formulario') {
+      const fixture = await create(table);
+      const element = fixture.nativeElement as HTMLElement;
+
+      [...element.querySelectorAll<HTMLButtonElement>('.view-switch button')]
+        .find((button) => button.textContent?.trim() === view)!
+        .click();
+      fixture.detectChanges();
+
+      const textarea = element.querySelector('textarea.sql') as HTMLTextAreaElement;
+      textarea.value = sql;
+      textarea.dispatchEvent(new Event('input'));
+      fixture.detectChanges();
+
+      return { fixture, element, textarea };
+    }
+
+    const press = async (fixture: ComponentFixture<QueryBuilder>, text: string) => {
+      [...(fixture.nativeElement as HTMLElement).querySelectorAll<HTMLButtonElement>('button')]
+        .find((button) => button.textContent?.trim() === text)!
+        .click();
+      await fixture.whenStable();
+      fixture.detectChanges();
+    };
+
+    it('un filtro retocado a mano vuelve al formulario y el SQL deja de estar a mano', async () => {
+      const { fixture, element, textarea } = await typed(
+        'SELECT [id], [total] FROM [public].[orders] WHERE [total] > 50 ORDER BY [id] DESC;',
+      );
+
+      expect(element.textContent).toContain('SQL editado a mano');
+      await press(fixture, 'Llevar al formulario');
+
+      expect(element.textContent).not.toContain('SQL editado a mano');
+      expect(element.textContent).toContain('El SQL se ha llevado al compositor');
+      // Sin TOP: la consulta escrita a mano no tenía límite, y no se le añade.
+      expect(textarea.value).toBe(
+        'SELECT [id], [total]\nFROM [public].[orders]\nWHERE [total] > 50\nORDER BY [id] DESC;\n',
+      );
+      expect((fixture.componentInstance as any).filters()).toEqual([
+        { column: 'total', operator: '>', value: '50' },
+      ]);
+    });
+
+    it('una consulta con WITH se queda como SQL y dice por qué', async () => {
+      const sql = 'WITH x AS (SELECT 1 AS id) SELECT * FROM x;';
+      const { fixture, element, textarea } = await typed(sql);
+
+      await press(fixture, 'Llevar al formulario');
+
+      expect(textarea.value).toBe(sql);
+      expect(element.textContent).toContain('SQL editado a mano');
+      expect(element.querySelector('[role="alert"]')?.textContent).toContain('WITH');
+    });
+
+    it('un cruce escrito a mano aparece en el lienzo', async () => {
+      const { fixture, element, textarea } = await typed(
+        'SELECT [t1].[name] FROM [public].[orders] AS [t0] LEFT JOIN [public].[customers] AS [t1] ON [t0].[id] = [t1].[id];',
+        'Lienzo',
+      );
+
+      await press(fixture, 'Llevar al lienzo');
+
+      expect(element.querySelectorAll('app-query-canvas .box')).toHaveLength(2);
+      expect(textarea.value).toContain('LEFT JOIN [public].[customers] AS [t1]');
+      expect(textarea.value).toContain('SELECT [t1].[name]');
+    });
+  });
 });

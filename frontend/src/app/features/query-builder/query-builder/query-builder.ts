@@ -69,6 +69,7 @@ import {
 import { FieldDrop, QueryCanvas } from '../query-canvas/query-canvas';
 import { ModelEdit, QueryShelves, ShelfId } from '../query-shelves/query-shelves';
 import { previewChart } from '../preview-chart';
+import { CatalogTable, referencedTables, sqlToModel } from '../sql-to-model';
 import { ReportChart } from '../../reports/report-chart/report-chart';
 import { ReportVisualKind } from '../../../shared/models/reports';
 import {
@@ -771,11 +772,112 @@ export class QueryBuilder implements OnInit {
 
   protected patchSql(value: string): void {
     this.invalidateAffected();
+    this.drawNotice.set(null);
     this.sqlOverride.set(value);
   }
 
   protected resetSql(): void {
+    this.drawNotice.set(null);
     this.sqlOverride.set(null);
+  }
+
+  /** Qué pasó al llevar el SQL a mano al lienzo, si se intentó. */
+  protected readonly drawNotice = signal<{
+    readonly tone: 'done' | 'kept';
+    readonly text: string;
+  } | null>(null);
+
+  protected readonly drawing = signal(false);
+
+  /**
+   * Lleva el SQL retocado a mano al modelo: al lienzo y al formulario.
+   *
+   * Es un paso que se pide, no algo que pase al escribir: convertir mientras se
+   * escribe reescribiría el texto bajo el cursor con el formato del compositor.
+   * Lo que no se entiende queda como columna o condición a mano; si cambia la
+   * forma de la consulta, no se convierte nada y se dice por qué.
+   */
+  protected async drawSql(): Promise<void> {
+    const sql = this.sqlOverride();
+
+    if (sql === null || this.drawing()) {
+      return;
+    }
+
+    this.drawing.set(true);
+
+    try {
+      const tables: CatalogTable[] = this.availableRelations().map((node) => ({
+        id: node.source.id,
+        schema: node.source.schema ?? null,
+        name: node.source.name,
+      }));
+      const loaded = new Map<string, readonly KnownColumn[]>();
+
+      // Las columnas de lo que se cruza, antes de traducir: así los nombres
+      // vuelven a escribirse como los tiene el catálogo.
+      for (const table of referencedTables(sql, tables)) {
+        try {
+          loaded.set(
+            table.id,
+            await this._store.ensureColumnsAsync(
+              table.schema,
+              table.name,
+              this.connectionId(),
+              this.table().database,
+            ),
+          );
+        } catch {
+          // Sin columnas se traduce igual, con los nombres tal como se escribieron.
+        }
+      }
+
+      const result = sqlToModel(sql, {
+        engine: this.engine(),
+        table: { schema: this.table().schema ?? null, name: this.table().name },
+        columns: this.columns(),
+        tables,
+        columnsOf: (id) => loaded.get(id) ?? [],
+      });
+
+      if (!result.ok) {
+        // i18n-keys: builder.toModel.*
+        this.drawNotice.set({
+          tone: 'kept',
+          text: this._i18n.t(`builder.toModel.${result.reason}`),
+        });
+        return;
+      }
+
+      this.invalidateAffected();
+      this._form.set(result.form);
+      this.joins.set(
+        result.joins.map((join) => ({
+          id: join.id,
+          type: join.type,
+          tableId: join.tableId,
+          search: join.schema ? `${join.schema}.${join.table}` : join.table,
+          leftJoinId: join.leftJoinId,
+          leftColumn: join.leftColumn,
+          rightColumn: join.rightColumn,
+          columns: loaded.get(join.tableId) ?? [],
+          chosen: join.chosen,
+          loading: false,
+          suggestionsOpen: false,
+          highlighted: 0,
+        })),
+      );
+      this.sqlOverride.set(null);
+      this.drawNotice.set({
+        tone: 'done',
+        text:
+          result.handPieces > 0
+            ? this._i18n.t('builder.toModel.doneHand', { count: result.handPieces })
+            : this._i18n.t('builder.toModel.done'),
+      });
+    } finally {
+      this.drawing.set(false);
+    }
   }
 
   protected isChosen(name: string): boolean {

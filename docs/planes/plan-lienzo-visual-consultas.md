@@ -185,6 +185,25 @@ previsto:
   Categoría, Valor o Meta. La cifra y la meta solo aceptan números, y se dice
   al soltar otra cosa.
 
+Fase 4 hecha el mismo día, en la versión 1.24.0, con el analizador en
+`frontend/src/app/features/query-builder/sql-to-model.ts`. Con ella el plan
+queda completo. Cambios respecto a lo previsto:
+
+- Llevar el SQL al lienzo es un botón («Llevar al lienzo» o «al formulario»)
+  que aparece cuando el SQL está retocado a mano, no algo que pase al escribir:
+  convertir mientras se escribe reescribiría el texto bajo el cursor.
+- El analizador no se apoya en `sql-statements.ts`: tiene su propio troceado,
+  que entiende las comillas de los seis dialectos. Reconoce los periodos de
+  fecha comparando con lo que escribe cada dialecto.
+- Lo que queda a mano se reescribe con los alias del compositor (`t0`, `t1`…,
+  o ninguno sin cruces): si no, un `c.nombre` dejaría de existir.
+- Un número escrito entre comillas (`'05001'`) queda como condición a mano:
+  pasarlo a filtro lo escribiría sin comillas y cambiaría la comparación.
+- No se convierte, y se dice por qué: WITH, UNION/INTERSECT/EXCEPT, subconsultas
+  en FROM o JOIN, otra tabla principal, cruces sin una igualdad entre dos
+  columnas, OFFSET, órdenes que el modelo no representa, HAVING que no compara
+  un cálculo del SELECT con un número y GROUP BY que no casa con el SELECT.
+
 | Fase | Trabajo | Cómo se valida |
 |---|---|---|
 | 0. Modelo único | Sacar `query-model.ts` del compositor sin cambiar su comportamiento. Añadir `layout` y versión de formato. | Las pruebas actuales del compositor pasan sin tocarlas. Composiciones antiguas se abren igual. Pruebas del modelo: mismo SQL que antes en los seis motores. |
