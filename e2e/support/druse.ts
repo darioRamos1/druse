@@ -190,12 +190,34 @@ async function crearConexion(
   const campo = (etiqueta: string) =>
     dialogo.locator(`.field:has(.field__label:text-is("${etiqueta}")) input`).first();
 
-  await campo(t('connection.name')).fill(servidor.nombre);
-  await campo(t('connection.server')).fill(servidor.host);
-  await campo(t('connection.port')).fill(String(servidor.puerto));
-  await campo(t('connection.database')).fill(servidor.base);
-  await campo(t('connection.user')).fill(servidor.usuario);
-  await campo(t('connection.password')).fill(servidor.contrasena);
+  /**
+   * Se rellena y se comprueba que cada campo conserva lo escrito.
+   *
+   * Elegir el motor pone su puerto por omisión, y en una CI lenta ese cambio
+   * llegaba después de rellenar: el puerto se quedaba vacío y el diálogo
+   * respondía «Indica un puerto entre 1 y 65535». Si algo se pisa, se vuelve a
+   * escribir hasta que el formulario dice lo que se quería.
+   */
+  const valores: [string, string][] = [
+    [t('connection.name'), servidor.nombre],
+    [t('connection.server'), servidor.host],
+    [t('connection.port'), String(servidor.puerto)],
+    [t('connection.database'), servidor.base],
+    [t('connection.user'), servidor.usuario],
+    [t('connection.password'), servidor.contrasena],
+  ];
+
+  await expect(async () => {
+    for (const [etiqueta, valor] of valores) {
+      if ((await campo(etiqueta).inputValue()) !== valor) {
+        await campo(etiqueta).fill(valor);
+      }
+    }
+
+    for (const [etiqueta, valor] of valores) {
+      expect(await campo(etiqueta).inputValue(), etiqueta).toBe(valor);
+    }
+  }).toPass({ timeout: 15_000 });
 
   /**
    * Sin cifrar, que es lo que ofrece el contenedor.
