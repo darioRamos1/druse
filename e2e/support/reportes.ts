@@ -74,11 +74,19 @@ export async function actualizar(reportes: Locator): Promise<void> {
  * categoría, y lo guarda. Los filtros se vinculan solos a las columnas que
  * propone el tablero.
  */
-export async function crearTablero(reportes: Locator, nombre: string, informes: readonly string[]): Promise<void> {
+export async function crearTablero(
+  reportes: Locator,
+  nombre: string,
+  informes: readonly string[],
+  identidad?: string,
+): Promise<void> {
   await reportes.getByRole('button', { name: 'Nuevo tablero' }).click();
   const tablero = reportes.locator('app-report-dashboard');
 
   await tablero.getByLabel('Nombre del tablero').fill(nombre);
+  if (identidad) {
+    await tablero.locator('.inspector').getByLabel('Identidad de empresa').selectOption({ label: identidad });
+  }
   for (const informe of informes) {
     await tablero.locator('.inspector').getByLabel('Añadir reporte').selectOption({ label: informe });
   }

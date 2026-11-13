@@ -2356,6 +2356,7 @@
   "reports.export.value": "Figure",
   "reports.export.ratio": "Attainment",
   "reports.export.data": "Data",
+  "reports.export.pageOf": "Page {page} of {pages}",
   "reports.export.nothing": "There are no panels with data to export.",
   "reports.export.tooBig": "The export would have {cells} cells and the limit is {limit}. Filter the dashboard or export a single panel.",
   "reports.export.saved": "Saved: {name}.",
@@ -2547,6 +2548,8 @@
   "reports.look.brand": "Brand color",
   "reports.color.brand": "Brand color",
   "reports.identity.confirmDeleteUsed": "Delete this identity? {count, plural, one {This dashboard will lose its logo and brand color:} other {# dashboards will lose their logo and brand color:}} {dashboards}.",
+  "whatsNew.v1_27_0.pdf": "The PDF of a dashboard with an identity starts with the company logo and details, and every sheet carries its footer text and “Page n of m”.",
+  "whatsNew.v1_27_0.excel": "When exporting to Excel, the summary sheet starts with the company logo and details, and every printed sheet has a footer with the page number.",
   "whatsNew.v1_26_0.dashboard": "Give a dashboard a company identity: its logo, name and details appear in the header, in the light and dark themes.",
   "whatsNew.v1_26_0.brand": "The brand color goes to panels that do not choose another, with its dark-theme shade, and also when exporting to Excel."
 }

@@ -42,6 +42,13 @@
   box-shadow: var(--dr-shadow-dialog);
   color: #1d2230;
 
+  // En papel, el encabezado de la empresa va sobre blanco, sin el fondo del panel.
+  &__identity {
+    margin-bottom: 12px;
+    padding-inline: 0;
+    background: transparent;
+  }
+
   &__head {
     margin-bottom: 14px;
     padding-bottom: 10px;
@@ -67,6 +74,12 @@
   & + & {
     break-before: page;
     margin-top: 24px;
+  }
+
+  &__identity {
+    margin-bottom: 10px;
+    padding-inline: 0;
+    background: transparent;
   }
 
   &__name {

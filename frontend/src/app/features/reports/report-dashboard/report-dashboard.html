@@ -748,6 +748,8 @@
     [pages]="request.pages"
     [capturedAt]="printCapturedAt"
     [notes]="printNotes"
+    [identity]="identity()"
+    [brandColor]="brand()?.light ?? null"
     (closed)="printing.set(null)"
   />
 }

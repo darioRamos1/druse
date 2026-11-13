@@ -327,6 +327,8 @@ export interface ExportLabels {
   readonly target: string;
   readonly ratio: string;
   readonly data: string;
+  /** «Página {page} de {pages}», para el pie de las hojas impresas. */
+  readonly pageOf: string;
 }
 
 export interface ExportDocument {
@@ -336,4 +338,6 @@ export interface ExportDocument {
   readonly panels: readonly ExportPanel[];
   readonly datasets: readonly ExportDataset[];
   readonly labels: ExportLabels;
+  /** La identidad del tablero: el servidor pone su logo y sus datos en el resumen. */
+  readonly identityId: string | null;
 }

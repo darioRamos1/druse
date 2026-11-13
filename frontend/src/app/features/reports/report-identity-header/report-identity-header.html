@@ -5,10 +5,10 @@
 }
 <span class="text">
   <strong class="name">{{ identity().name }}</strong>
-  @if (identity().subtitle) {
+  @if (identity().subtitle && !compact()) {
     <span class="subtitle">{{ identity().subtitle }}</span>
   }
-  @if (details(identity()); as line) {
+  @if (!compact() && details(identity()); as line) {
     <small class="details">{{ line }}</small>
   }
 </span>

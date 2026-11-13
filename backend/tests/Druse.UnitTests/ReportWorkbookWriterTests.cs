@@ -1,4 +1,5 @@
 using ClosedXML.Excel;
+using ClosedXML.Excel.Drawings;
 using DocumentFormat.OpenXml.Packaging;
 using DocumentFormat.OpenXml.Validation;
 using Druse.Application.Reports;
@@ -29,6 +30,7 @@ public sealed class ReportWorkbookWriterTests
         Target = "Meta",
         Ratio = "Cumplimiento",
         Data = "Datos",
+        PageOf = "Página {page} de {pages}",
     };
 
     private static ReportExportTable Table(ReportExportColumn[] columns, params object?[][] rows) =>
@@ -159,6 +161,94 @@ public sealed class ReportWorkbookWriterTests
             .Select(error => $"{error.Part?.Uri}: {error.Description}")
             .ToArray();
         Assert.Empty(errores);
+    }
+
+    [Fact]
+    public void ConIdentidadElResumenEmpiezaConElLogoYLosDatosDeLaEmpresa()
+    {
+        var documento = Enero() with
+        {
+            Identity = new ReportExportIdentity
+            {
+                Name = "Comercial Andina",
+                Subtitle = "Informe mensual",
+                Details = ["NIT 900.123.456-7", " ", "Bogotá"],
+                Footer = "Confidencial & reservado",
+                Logo = new ReportIdentityLogo("image/png", ReportIdentityTests.Png(600, 200)),
+            },
+        };
+
+        var libro = new ReportWorkbookWriter().Write(documento);
+        using var workbook = new XLWorkbook(new MemoryStream(libro));
+        var resumen = workbook.Worksheet("Resumen");
+
+        // El logo, reducido al alto del encabezado y sin deformarlo, en la primera fila.
+        var logo = Assert.Single(resumen.Pictures);
+        Assert.Equal(1, logo.TopLeftCell.Address.RowNumber);
+        Assert.Equal(60, logo.Height);
+        Assert.Equal(180, logo.Width);
+
+        Assert.Equal("Comercial Andina", resumen.Cell(2, 1).GetString());
+        Assert.Equal("Informe mensual", resumen.Cell(3, 1).GetString());
+        Assert.Equal("NIT 900.123.456-7 · Bogotá", resumen.Cell(4, 1).GetString());
+        // Las cifras empiezan después, con el título del tablero.
+        Assert.Equal("Comercial", resumen.Cell(6, 1).GetString());
+        Assert.Equal("Mes", resumen.Cell(10, 1).GetString());
+
+        // Cada hoja lleva el pie de la empresa —con el «&» doblado, que en un
+        // pie abre un código— y el número de página.
+        var pies = Pies(libro);
+        Assert.Equal(workbook.Worksheets.Count, pies.Length);
+        Assert.All(pies, pie => Assert.Equal("&LConfidencial && reservado&RPágina &P de &N", pie));
+
+        // Las otras hojas no cambian de sitio: el encabezado es solo del resumen.
+        Assert.Empty(workbook.Worksheet("Ventas por municipio").Pictures);
+        Assert.Equal("Ventas por municipio", workbook.Worksheet("Ventas por municipio").Cell(1, 1).GetString());
+    }
+
+    [Fact]
+    public void UnLogoWebpNoEntraEnElLibroPeroLosDatosSi()
+    {
+        var webp = new byte[40];
+        "RIFF"u8.CopyTo(webp);
+        "WEBP"u8.CopyTo(webp.AsSpan(8));
+        "VP8X"u8.CopyTo(webp.AsSpan(12));
+        webp[24] = 99;
+        webp[27] = 49;
+
+        var documento = Enero() with
+        {
+            Identity = new ReportExportIdentity { Name = "Comercial Andina", Logo = new ReportIdentityLogo("image/webp", webp) },
+        };
+
+        var libro = new ReportWorkbookWriter().Write(documento);
+        using var workbook = new XLWorkbook(new MemoryStream(libro));
+        var resumen = workbook.Worksheet("Resumen");
+
+        Assert.Empty(resumen.Pictures);
+        Assert.Equal("Comercial Andina", resumen.Cell(1, 1).GetString());
+        Assert.Equal("Comercial", resumen.Cell(3, 1).GetString());
+        // Sin texto de pie, el pie dice el nombre de la empresa.
+        Assert.StartsWith("&LComercial Andina&R", Pies(libro)[0], StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void SinIdentidadElPieSoloLlevaElNumeroDePagina()
+    {
+        var libro = new ReportWorkbookWriter().Write(Enero());
+        using var workbook = new XLWorkbook(new MemoryStream(libro));
+
+        Assert.Empty(workbook.Worksheet("Resumen").Pictures);
+        Assert.Equal("&RPágina &P de &N", Pies(libro)[0]);
+    }
+
+    /// <summary>El pie de cada hoja tal como lo lee Excel: el texto de `oddFooter`.</summary>
+    private static string[] Pies(byte[] libro)
+    {
+        using var package = SpreadsheetDocument.Open(new MemoryStream(libro), false);
+        return package.WorkbookPart!.WorksheetParts
+            .Select(part => part.Worksheet.Descendants<DocumentFormat.OpenXml.Spreadsheet.OddFooter>().SingleOrDefault()?.Text ?? string.Empty)
+            .ToArray();
     }
 
     [Fact]

@@ -158,6 +158,28 @@ previsto:
   casilla para incluirla a propósito).
 - Al exportar a Excel, los gráficos con la marca ya usan su color.
 
+Fase 3 hecha el mismo día, en la versión 1.27.0. Cambios respecto a lo
+previsto:
+
+- El pie del PDF va en los márgenes de `@page` (`@bottom-left` con el texto
+  de la identidad y `@bottom-right` con «Página n de m»): solo ahí sabe el
+  navegador en qué hoja está. Lo escribe un `<style>` que la vista de impresión
+  pone mientras está abierta. Sin texto de pie, el pie dice el nombre de la
+  empresa; sin identidad, solo el número de página.
+- La franja reducida (logo y nombre) va al principio de cada página del
+  tablero a partir de la segunda, que siempre empieza en hoja nueva. Una
+  página del tablero que ocupe dos hojas no la repite en la segunda: no hay
+  forma fiable de saber dónde corta el navegador.
+- El Excel no recibe la identidad de la interfaz: lleva su id y el servidor
+  lee nombre, datos y logo de `reports.db`. Una identidad borrada se ignora.
+  El logo va en el resumen reducido a 60 px de alto (300 de ancho como mucho)
+  y cada hoja lleva al imprimir el mismo pie que el PDF. Un logo WebP —Druse
+  solo lo usa si el PNG no cabía— no entra en el libro: no todas las versiones
+  de Excel lo abren.
+- La E2E de exportar con el filtro de mes y la conexión cerrada pasa ahora con
+  un tablero con identidad: comprueba el logo en el libro, y en la vista de
+  impresión el encabezado, la marca y el pie. Su PDF se revisó a mano.
+
 ## 5. Riesgos y decisiones abiertas
 
 - **Una identidad por tablero o por instalación.** *Decidido el 12 de noviembre

@@ -187,6 +187,9 @@ public sealed record ReportExportRequestDto
     public required IReadOnlyList<ReportExportPanelDto> Panels { get; init; }
     public required IReadOnlyList<ReportExportDatasetDto> Datasets { get; init; }
     public required ReportExportLabels Labels { get; init; }
+
+    /// <summary>La identidad del tablero; el servidor lee sus datos y su logo.</summary>
+    public Guid? IdentityId { get; init; }
 }
 
 public sealed record ReportExportFilterDto(string Label, string Value);

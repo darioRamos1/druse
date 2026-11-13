@@ -1088,7 +1088,9 @@ export class ReportDashboard {
         target: t('reports.report.target'),
         ratio: t('reports.export.ratio'),
         data: t('reports.export.data'),
+        pageOf: this._i18n.t('reports.export.pageOf', { page: '{page}', pages: '{pages}' }),
       },
+      identityId: this.identity()?.id ?? null,
     };
   }
 

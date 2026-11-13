@@ -735,6 +735,78 @@ describe('ReportDashboard', () => {
     expect(libro.datasets[0].table.columns[0]).toEqual({ name: 'Ventas.mes', type: 'Date' });
     expect(archivos.map((archivo) => archivo.name)).toEqual(['Comercial.xlsx']);
     expect(el('.banner--success').textContent).toContain('Comercial.xlsx');
+    // Sin identidad no se nombra ninguna; el pie numerado va siempre.
+    expect(libro.identityId).toBeNull();
+    expect(libro.labels.pageOf).toBe('Página {page} de {pages}');
+  });
+
+  it('con identidad, el Excel la nombra y el PDF lleva su encabezado, su franja y su pie', async () => {
+    const dosPáginas = {
+      ...conTresPaneles,
+      style: { color: null, identityId: 'andina' },
+      pages: [
+        { ...conTresPaneles.pages[0], panels: conTresPaneles.pages[0].panels.slice(0, 2) },
+        { id: 'p2', name: 'Página 2', panels: [conTresPaneles.pages[0].panels[2]] },
+      ],
+    };
+    fixture = TestBed.createComponent(ReportDashboard);
+    fixture.componentRef.setInput('dashboard', tablero(dosPáginas));
+    fixture.componentRef.setInput('datasets', [ventas, visitas]);
+    fixture.componentRef.setInput('identities', [
+      {
+        id: 'andina',
+        name: 'Comercial Andina',
+        subtitle: 'Informe mensual',
+        details: ['NIT 900'],
+        footer: 'Uso "interno"',
+        brandColor: '#0A2A6C',
+        logoOnWhite: false,
+        logoUpdatedAtUtc: null,
+      },
+    ]);
+    fixture.detectChanges();
+    await asentar();
+
+    botón('Exportar').click();
+    fixture.detectChanges();
+    menú('Excel · todas las páginas').click();
+    await asentar();
+
+    expect(libros[0].identityId).toBe('andina');
+
+    botón('Exportar').click();
+    fixture.detectChanges();
+    menú('PDF · todas las páginas').click();
+    fixture.detectChanges();
+    await asentar();
+
+    const vista = document.body.querySelector('app-report-print') as HTMLElement;
+    const primera = vista.querySelector('.paper__identity') as HTMLElement;
+
+    expect(primera.textContent).toContain('Comercial Andina');
+    expect(primera.textContent).toContain('NIT 900');
+    // La marca llega a la vista, que no está dentro del tablero.
+    expect(vista.style.getPropertyValue('--rc-brand-light')).toBe('#0A2A6C');
+
+    // La segunda página del tablero empieza con la franja: logo y nombre, sin datos.
+    const franjas = vista.querySelectorAll('.sheet__identity');
+
+    expect(franjas).toHaveLength(1);
+    expect(franjas[0].closest('.sheet')).toBe(vista.querySelectorAll('.sheet')[1]);
+    expect(franjas[0].textContent).toContain('Comercial Andina');
+    expect(franjas[0].textContent).not.toContain('NIT 900');
+
+    const pie = document.getElementById('druse-report-print-page')!;
+
+    expect(pie.textContent).toContain('@bottom-left { content: "Uso \\"interno\\""');
+    expect(pie.textContent).toContain(
+      '"Página " counter(page) " de " counter(pages)',
+    );
+
+    document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    fixture.detectChanges();
+
+    expect(document.getElementById('druse-report-print-page')).toBeNull();
   });
 
   it('descarga en CSV lo que dibuja un panel', async () => {

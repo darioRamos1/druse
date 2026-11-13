@@ -2356,6 +2356,7 @@
   "reports.export.value": "Cifra",
   "reports.export.ratio": "Cumplimiento",
   "reports.export.data": "Datos",
+  "reports.export.pageOf": "Página {page} de {pages}",
   "reports.export.nothing": "No hay paneles con datos que exportar.",
   "reports.export.tooBig": "La exportación tendría {cells} celdas y el límite es {limit}. Filtra el tablero o exporta un solo panel.",
   "reports.export.saved": "Guardado: {name}.",
@@ -2547,6 +2548,8 @@
   "reports.look.brand": "Color de marca",
   "reports.color.brand": "Color de marca",
   "reports.identity.confirmDeleteUsed": "¿Borrar esta identidad? {count, plural, one {Se quedará sin logo ni color de marca el tablero} other {Se quedarán sin logo ni color de marca # tableros:}} {dashboards}.",
+  "whatsNew.v1_27_0.pdf": "El PDF de un tablero con identidad empieza con el logo y los datos de la empresa, y cada hoja lleva al pie su texto y «Página n de m».",
+  "whatsNew.v1_27_0.excel": "Al exportar a Excel, la hoja de resumen empieza con el logo y los datos de la empresa, y al imprimir cada hoja lleva su pie con el número de página.",
   "whatsNew.v1_26_0.dashboard": "Pon a un tablero la identidad de una empresa: su logo, su nombre y sus datos salen en el encabezado, en tema claro y oscuro.",
   "whatsNew.v1_26_0.brand": "El color de marca pasa a los paneles que no eligen otro, con su tono para el tema oscuro, y también al exportar a Excel."
 }

@@ -9,6 +9,9 @@
 </div>
 
 <article class="paper" [attr.aria-label]="title()">
+  @if (identity(); as company) {
+    <app-report-identity-header class="paper__identity" [identity]="company" />
+  }
   <header class="paper__head">
     <h1 class="paper__title">{{ title() }}</h1>
     <p class="paper__meta">{{ 'reports.export.generated' | t: { date: generatedAt() } }}</p>
@@ -25,8 +28,12 @@
     </p>
   </header>
 
-  @for (page of pages(); track $index) {
+  @for (page of pages(); track $index; let first = $first) {
     <section class="sheet" [attr.aria-label]="page.name">
+      <!-- Cada página del tablero empieza en hoja nueva: con identidad, lleva su franja. -->
+      @if (!first && identity(); as company) {
+        <app-report-identity-header class="sheet__identity" [identity]="company" [compact]="true" />
+      }
       @if (pages().length > 1) {
         <h2 class="sheet__name">{{ page.name }}</h2>
       }

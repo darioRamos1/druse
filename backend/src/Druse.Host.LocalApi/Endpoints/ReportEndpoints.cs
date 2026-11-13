@@ -227,11 +227,31 @@ internal static class ReportEndpoints
         })
         .WithName("DeleteReportDashboard");
 
-        app.MapPost("/api/reports/exports/xlsx", (
+        app.MapPost("/api/reports/exports/xlsx", async (
             ReportExportRequestDto request,
-            IReportWorkbookWriter writer) =>
+            IReportWorkbookWriter writer,
+            IReportIdentityStore identities,
+            CancellationToken cancellationToken) =>
         {
             var document = request.ToDomain();
+
+            // Una identidad borrada no se nombra: el tablero se exporta sin ella, como se ve.
+            if (request.IdentityId is { } identityId
+                && (await identities.GetAllAsync(cancellationToken)).FirstOrDefault(item => item.Id == identityId) is { } identity)
+            {
+                document = document with
+                {
+                    Identity = new ReportExportIdentity
+                    {
+                        Name = identity.Name,
+                        Subtitle = identity.Subtitle,
+                        Details = identity.Details,
+                        Footer = identity.Footer,
+                        Logo = identity.LogoUpdatedAtUtc is null ? null : await identities.GetLogoAsync(identityId, cancellationToken),
+                    },
+                };
+            }
+
             if (ReportExportRules.Validate(document) is { } problem)
             {
                 return Problem([problem]);

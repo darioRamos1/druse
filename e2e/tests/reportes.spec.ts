@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 
 import { expect, test, type Locator, type Page } from '@playwright/test';
 
@@ -258,6 +258,10 @@ test.describe('Exportar tableros de Reportes BI', () => {
    * El criterio del hito 4.4: con un filtro de mes activo y la conexión
    * cerrada, exportar un panel y el tablero. Las cifras tienen que ser las de
    * la vista: el libro y el CSV salen del resultado guardado, ya filtrado.
+   *
+   * Y el de la fase 3 de la identidad de empresa: el tablero tiene una, así
+   * que el libro lleva su logo en el resumen y el PDF su encabezado, su franja
+   * de marca y un pie con su texto y el número de página.
    */
   test('exporta el tablero y un panel con el filtro de mes activo y la conexión cerrada', async ({ page }) => {
     await abrir(page);
@@ -268,6 +272,41 @@ test.describe('Exportar tableros de Reportes BI', () => {
     let reportes = await abrirReportes(page);
 
     await borrarRestos(reportes, restos, restos);
+
+    // Un logo de verdad, dibujado en el navegador: el de 1 × 1 no se vería en las capturas.
+    const identidad = crypto.randomUUID();
+    const empresa = `E2E Exportar Andina ${marca}`;
+    const logo = await page.evaluate(() => {
+      const lienzo = document.createElement('canvas');
+      lienzo.width = 240;
+      lienzo.height = 80;
+      const dibujo = lienzo.getContext('2d')!;
+      dibujo.fillStyle = '#C2185B';
+      dibujo.fillRect(0, 0, 80, 80);
+      dibujo.fillStyle = '#1d2230';
+      dibujo.font = 'bold 34px sans-serif';
+      dibujo.fillText('ANDINA', 92, 54);
+      return lienzo.toDataURL('image/png').split(',')[1];
+    });
+    expect(
+      (
+        await page.request.put(`/api/reports/identities/${identidad}`, {
+          data: {
+            name: empresa,
+            subtitle: 'Informe mensual de ventas',
+            details: ['NIT 900.123.456-7', 'Calle 10 # 20-30, Bogotá'],
+            footer: 'Confidencial',
+            brandColor: '#C2185B',
+          },
+        })
+      ).ok(),
+    ).toBe(true);
+    expect(
+      (await page.request.put(`/api/reports/identities/${identidad}/logo`, { data: { data: logo } })).ok(),
+    ).toBe(true);
+    await page.keyboard.press('Escape');
+    reportes = await abrirReportes(page);
+
     await reportes.getByLabel('Nombre del conjunto de datos').fill(`E2E Exportar ${marca}`);
     await anadirFuente(reportes, 'Ventas', VENTAS_SQL);
     await previsualizar(reportes);
@@ -292,7 +331,7 @@ test.describe('Exportar tableros de Reportes BI', () => {
     await reportes.getByRole('radio', { name: 'Indicador' }).click();
     await reportes.locator('.inspector').getByLabel('Nombre del reporte').fill(`Cumplimiento ${marca}`);
     await reportes.getByRole('button', { name: 'Guardar reporte' }).click();
-    await crearTablero(reportes, `E2E Exportar tablero ${marca}`, [`Barras ${marca}`, `Cumplimiento ${marca}`]);
+    await crearTablero(reportes, `E2E Exportar tablero ${marca}`, [`Barras ${marca}`, `Cumplimiento ${marca}`], empresa);
 
     // Se cierra la conexión: lo que se exporta sale de reports.db, no de la base.
     await page.keyboard.press('Escape');
@@ -332,6 +371,8 @@ test.describe('Exportar tableros de Reportes BI', () => {
 
     expect(partes).toMatch(/charts\/chart\d*\.xml/);
     expect(partes.match(/xl\/worksheets\/sheet\d+\.xml/g)?.length).toBeGreaterThanOrEqual(4);
+    // Y el logo de la empresa, como imagen del resumen.
+    expect(partes).toMatch(/xl\/media\/image\d*\.png/);
 
     // --- CSV de un panel: exactamente las barras que se ven ---------------------
     const barras = tablero.locator('.panel', { hasText: `Barras ${marca}` });
@@ -352,20 +393,39 @@ test.describe('Exportar tableros de Reportes BI', () => {
     const vista = page.locator('body > app-report-print');
 
     await expect(vista.locator('.paper__title')).toHaveText(`E2E Exportar tablero ${marca}`);
+    const papel = vista.locator('.paper__identity');
+
+    await expect(papel).toContainText(empresa);
+    await expect(papel).toContainText('NIT 900.123.456-7 · Calle 10 # 20-30, Bogotá');
+    await expect(papel.locator('img')).toHaveAttribute('alt', empresa);
+    // Es papel: la marca va en su tono claro, aunque Druse esté en oscuro.
+    expect(
+      await vista.evaluate((element) => getComputedStyle(element).getPropertyValue('--rc-brand-light').trim()),
+    ).toBe('#C2185B');
+    // Un <style> no se pinta: su texto se lee con textContent.
+    expect(await page.locator('#druse-report-print-page').evaluate((style) => style.textContent)).toMatch(
+      /@bottom-left \{ content: "Confidencial".*"Página " counter\(page\) " de " counter\(pages\)/,
+    );
     await expect(vista.locator('.paper__filters')).toContainText('Fecha: 1 ene 2026 – 31 ene 2026');
     await expect(vista.locator('.paper .indicator__value')).toHaveText(/60\s?%/);
     await expect(vista.locator('.panel__meta').first()).toContainText('Datos del');
     await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
 
     // Lo que saldría por la impresora: solo el papel, en A4 apaisado.
-    const pdf = await page.pdf({ printBackground: true });
+    const pdf = await page.pdf({ printBackground: true, preferCSSPageSize: true });
 
     expect(pdf.subarray(0, 4).toString()).toBe('%PDF');
+    const barrido = process.env['DRUSE_BARRIDO_DIR'];
+    if (barrido) {
+      writeFileSync(`${barrido}/reportes-exportar-identidad.pdf`, pdf);
+      await page.screenshot({ path: `${barrido}/reportes-exportar-identidad.png`, fullPage: true });
+    }
     await vista.getByRole('button', { name: 'Cerrar' }).click();
     await expect(vista).toHaveCount(0);
 
     // Se deja como estaba.
     await borrarRestos(reportes, restos, restos);
+    await page.request.delete(`/api/reports/identities/${identidad}`);
     await page.keyboard.press('Escape');
     await expect(reportes.locator('.dialog')).toBeHidden();
   });
