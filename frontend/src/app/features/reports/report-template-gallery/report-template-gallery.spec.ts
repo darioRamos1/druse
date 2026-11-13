@@ -295,9 +295,9 @@ describe('ReportTemplateGallery', () => {
     );
     botón('Guardar en mis plantillas').click();
     await asentar();
-    expect(todos('.card').find((card) => card.textContent?.includes('Tablero Andina'))?.textContent).toContain(
-      'Con identidad',
-    );
+    expect(
+      todos('.card').find((card) => card.textContent?.includes('Tablero Andina'))?.textContent,
+    ).toContain('Con identidad');
 
     // Al aplicarla: no se tiene, así que se añadirá; marcada por defecto.
     todos('.card')

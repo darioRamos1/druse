@@ -472,7 +472,9 @@ describe('report-template-model', () => {
 
     expect(comoPanel.ok && comoPanel.document.identity).toBeUndefined();
     expect(
-      deTablero({ identity: { ...identidad, logo: { contentType: 'image/svg+xml', data: 'PHN2Zz4=' } } }),
+      deTablero({
+        identity: { ...identidad, logo: { contentType: 'image/svg+xml', data: 'PHN2Zz4=' } },
+      }),
     ).toEqual({ ok: false, problem: 'content' });
     expect(deTablero({ identity: { ...identidad, id: 'andina' } })).toEqual({
       ok: false,
