@@ -867,9 +867,7 @@ describe('ReportDashboard', () => {
     const pie = document.getElementById('druse-report-print-page')!;
 
     expect(pie.textContent).toContain('@bottom-left { content: "Uso \\"interno\\""');
-    expect(pie.textContent).toContain(
-      '"Página " counter(page) " de " counter(pages)',
-    );
+    expect(pie.textContent).toContain('"Página " counter(page) " de " counter(pages)');
 
     document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
     fixture.detectChanges();

@@ -660,7 +660,9 @@ function readIdentity(value: unknown): TemplateIdentity | null {
   if (!name || typeof id !== 'string' || !ID.test(id)) throw new Invalid('content');
 
   const line = (item: unknown) => str(item, 160)?.trim() || null;
-  const details = list(value['details'] ?? [], 3).map(line).filter((item) => item !== null);
+  const details = list(value['details'] ?? [], 3)
+    .map(line)
+    .filter((item) => item !== null);
   const brand = value['brandColor'];
   const logo = value['logo'];
   let readLogo: TemplateIdentity['logo'] = null;
