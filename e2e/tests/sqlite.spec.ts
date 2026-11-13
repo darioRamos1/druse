@@ -657,6 +657,85 @@ test.describe('SQLite de punta a punta', () => {
     await expect(builder.locator('.join-card')).toHaveCount(1);
   });
 
+  test('los estantes agrupan y suman arrastrando columnas, y la vista previa sale en barras', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    await abrir(page);
+    await hastaLasTablas(page);
+    await menuDeNodo(page, 'pedidos');
+    await page.getByRole('menuitem', { name: 'Componer consulta', exact: true }).click();
+    const builder = page.locator('app-query-builder');
+    const sql = builder.locator('textarea.sql');
+    await builder.getByRole('button', { name: 'Lienzo', exact: true }).click();
+    const canvas = builder.locator('app-query-canvas');
+
+    // El cruce bueno sale de la clave foránea detectada.
+    await builder.getByRole('button', { name: /cliente_id → clientes/ }).click();
+    await expect(sql).toHaveValue(/ON "t0"\."cliente_id" = "t1"\."id"/);
+
+    const body = builder.locator('.builder-workspace > .body');
+
+    /**
+     * Lleva el nombre de una columna del lienzo a un estante, con el ratón.
+     *
+     * Empieza siempre con el lienzo arriba. Si el estante queda fuera de la
+     * vista, el puntero se queda en el borde de abajo hasta que el panel se
+     * desplaza solo, que es lo que haría quien arrastra.
+     */
+    const drag = async (box: string, column: string, shelf: string) => {
+      await body.evaluate((element) => (element.scrollTop = 0));
+      const name = canvas.locator(`[data-box="${box}"][data-column="${column}"] .row__name`);
+      const target = builder.locator(`[data-shelf="${shelf}"]`);
+      const from = (await name.boundingBox())!;
+      await page.mouse.move(from.x + 8, from.y + from.height / 2);
+      await page.mouse.down();
+      await page.mouse.move(from.x + 30, from.y + 20, { steps: 4 });
+      await expect(builder.locator('.shelves.is-dragging')).toHaveCount(1);
+
+      const edge = (await body.boundingBox())!;
+      for (let step = 0; step < 60; step++) {
+        const to = (await target.boundingBox())!;
+        if (to.y + 30 < edge.y + edge.height - 60) break;
+        await page.mouse.move(from.x + 30, edge.y + edge.height - 6 - (step % 2) * 3);
+      }
+
+      const to = (await target.boundingBox())!;
+      await page.mouse.move(to.x + to.width / 2, to.y + 30, { steps: 6 });
+      await page.mouse.up();
+    };
+
+    await drag('join:1', 'nombre', 'group');
+    await expect(sql).toHaveValue(/GROUP BY "t1"\."nombre"/);
+    await drag('base', 'total', 'value');
+    await expect(sql).toHaveValue(/SUM\("t0"\."total"\)/);
+    // Filtrar por una columna de otra tabla no se puede: se dice por qué.
+    await drag('join:1', 'nombre', 'filter');
+    await expect(builder.getByRole('status').filter({ hasText: 'tabla principal' })).toBeVisible();
+
+    await builder.getByRole('button', { name: 'Probar con 10 filas' }).click();
+    await expect(builder.locator('app-results-grid')).toContainText('Ana');
+    const kinds = builder.getByRole('group', { name: 'Ver el resultado como' });
+    await kinds.getByRole('button', { name: 'Barras' }).click();
+    await expect(builder.locator('app-report-chart svg').first()).toBeVisible();
+    await expect(kinds.getByRole('button', { name: 'Barras' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    await expect(kinds.getByRole('button', { name: 'Tabla' })).toHaveAttribute(
+      'aria-pressed',
+      'false',
+    );
+
+    if (process.env['DRUSE_BARRIDO_DIR']) {
+      mkdirSync(BARRIDO, { recursive: true });
+      await builder.locator('.builder-workspace > .body').evaluate((element) => {
+        element.scrollTop = 380;
+      });
+      await page.screenshot({ path: join(BARRIDO, 'query-builder-shelves.png') });
+    }
+  });
+
   test('el formulario pierde el servidor y el árbol trae lo que hay dentro', async ({ page }) => {
     await abrir(page);
 

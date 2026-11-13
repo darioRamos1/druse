@@ -1,0 +1,346 @@
+<!--
+  Cuatro estantes y lo escrito a mano. Cada estante es a la vez el sitio donde
+  soltar una columna del lienzo (`data-shelf`) y, para el teclado, un
+  desplegable «Añadir» con lo mismo que se podría soltar.
+-->
+<div
+  class="shelves"
+  [class.is-dragging]="dragging()"
+  [attr.aria-label]="'shelves.label' | t"
+  role="group"
+>
+  <section class="shelf" data-shelf="group">
+    <header class="shelf__head">
+      <h4 class="shelf__title">{{ 'shelves.group' | t }}</h4>
+      <select
+        (change)="addGroup($any($event.target).value); reset($event)"
+        [attr.aria-label]="'shelves.addGroup' | t"
+      >
+        <option value="">{{ 'shelves.add' | t }}</option>
+        @for (option of groupable(); track option.key) {
+          <option [value]="option.key">{{ option.label }}</option>
+        }
+      </select>
+    </header>
+    <div class="shelf__pills">
+      @for (option of groups(); track option.key) {
+        <span class="pill pill--group">
+          <span class="pill__label">{{ option.label }}</span>
+          @if (isDate(option)) {
+            <select
+              class="pill__control"
+              [value]="period(option.key)"
+              (change)="setPeriod(option.key, $any($event.target).value)"
+              [attr.aria-label]="'shelves.period' | t: { column: option.label }"
+            >
+              @for (value of periods; track value) {
+                <option [value]="value" [selected]="value === period(option.key)">
+                  {{ 'builder.period.' + value | t }}
+                </option>
+              }
+            </select>
+          }
+          <button
+            type="button"
+            class="pill__remove"
+            (click)="removeGroup(option.key)"
+            [attr.aria-label]="'shelves.remove' | t: { name: option.label }"
+          >
+            ×
+          </button>
+        </span>
+      } @empty {
+        <p class="shelf__empty">{{ 'shelves.dropGroup' | t }}</p>
+      }
+    </div>
+  </section>
+
+  <section class="shelf" data-shelf="value">
+    <header class="shelf__head">
+      <h4 class="shelf__title">{{ 'shelves.value' | t }}</h4>
+      <select
+        (change)="addValue($any($event.target).value); reset($event)"
+        [attr.aria-label]="'shelves.addValue' | t"
+      >
+        <option value="">{{ 'shelves.add' | t }}</option>
+        <option value="*">{{ 'shelves.countRows' | t }}</option>
+        @for (option of options(); track option.key) {
+          <option [value]="option.key">{{ option.label }}</option>
+        }
+      </select>
+    </header>
+    <div class="shelf__pills">
+      @for (aggregate of model().aggregates; track aggregate.id) {
+        <span class="pill pill--value">
+          <select
+            class="pill__control pill__control--mono"
+            [value]="aggregate.function"
+            (change)="setFunction(aggregate.id, $any($event.target).value)"
+            [attr.aria-label]="'shelves.function' | t: { column: columnLabel(aggregate.columnKey) }"
+          >
+            @for (fn of functions; track fn) {
+              <option [value]="fn" [selected]="fn === aggregate.function" translate="no">
+                {{ fn }}
+              </option>
+            }
+          </select>
+          <span class="pill__label">{{ columnLabel(aggregate.columnKey) }}</span>
+          <input
+            type="text"
+            class="pill__alias"
+            [value]="aggregate.alias"
+            (input)="setAlias(aggregate.id, $any($event.target).value)"
+            [attr.aria-label]="'shelves.alias' | t: { column: columnLabel(aggregate.columnKey) }"
+          />
+          <button
+            type="button"
+            class="pill__remove"
+            (click)="removeValue(aggregate.id)"
+            [attr.aria-label]="
+              'shelves.remove'
+                | t: { name: aggregate.function + '(' + columnLabel(aggregate.columnKey) + ')' }
+            "
+          >
+            ×
+          </button>
+        </span>
+      } @empty {
+        <p class="shelf__empty">{{ 'shelves.dropValue' | t }}</p>
+      }
+    </div>
+  </section>
+
+  <section class="shelf" data-shelf="filter">
+    <header class="shelf__head">
+      <h4 class="shelf__title">{{ 'shelves.filter' | t }}</h4>
+      <select
+        (change)="addFilter($any($event.target).value); reset($event)"
+        [attr.aria-label]="'shelves.addFilter' | t"
+      >
+        <option value="">{{ 'shelves.add' | t }}</option>
+        @for (column of catalog().columns; track column.name) {
+          <option [value]="column.name">{{ column.name }}</option>
+        }
+      </select>
+    </header>
+    <div class="shelf__pills">
+      @for (filter of model().filters; track $index; let index = $index) {
+        <span class="pill pill--filter">
+          @if (index > 0) {
+            <select
+              class="pill__control pill__control--mono"
+              [value]="filter.conjunction ?? 'AND'"
+              (change)="patchFilter(index, { conjunction: $any($event.target).value })"
+              [attr.aria-label]="'shelves.conjunction' | t"
+            >
+              <option
+                value="AND"
+                [selected]="(filter.conjunction ?? 'AND') === 'AND'"
+                translate="no"
+              >
+                AND
+              </option>
+              <option value="OR" [selected]="filter.conjunction === 'OR'" translate="no">OR</option>
+            </select>
+          }
+          <span class="pill__label">{{ filter.column }}</span>
+          <select
+            class="pill__control pill__control--mono"
+            [value]="filter.operator"
+            (change)="patchFilter(index, { operator: $any($event.target).value })"
+            [attr.aria-label]="'shelves.operator' | t: { column: filter.column }"
+          >
+            @for (operator of operators; track operator) {
+              <option [value]="operator" [selected]="operator === filter.operator" translate="no">
+                {{ operator }}
+              </option>
+            }
+          </select>
+          @if (filter.compareColumn) {
+            <span class="pill__note">{{
+              'shelves.comparesColumn' | t: { column: filter.compareColumn }
+            }}</span>
+          } @else if (needsValue(filter.operator)) {
+            @if (isList(filter.operator)) {
+              <input
+                type="text"
+                class="pill__value"
+                [value]="filter.value ?? ''"
+                (input)="setValue(index, filter, $any($event.target).value, 'value')"
+                [attr.aria-label]="'shelves.list' | t: { column: filter.column }"
+              />
+            } @else {
+              <app-value-input
+                class="pill__value"
+                [value]="filter.value ?? ''"
+                [kind]="kind(filter)"
+                [dataType]="dataType(filter)"
+                [label]="'shelves.valueOf' | t: { column: filter.column }"
+                (valueChange)="setValue(index, filter, $event, 'value')"
+              />
+              @if (filter.operator === 'BETWEEN') {
+                <app-value-input
+                  class="pill__value"
+                  [value]="filter.valueTo ?? ''"
+                  [kind]="kind(filter)"
+                  [dataType]="dataType(filter)"
+                  [label]="'shelves.valueTo' | t: { column: filter.column }"
+                  (valueChange)="setValue(index, filter, $event, 'valueTo')"
+                />
+              }
+            }
+          }
+          <button
+            type="button"
+            class="pill__remove"
+            (click)="removeFilter(index)"
+            [attr.aria-label]="'shelves.remove' | t: { name: filter.column }"
+          >
+            ×
+          </button>
+        </span>
+      } @empty {
+        <p class="shelf__empty">{{ 'shelves.dropFilter' | t }}</p>
+      }
+    </div>
+  </section>
+
+  <section class="shelf" data-shelf="order">
+    <header class="shelf__head">
+      <h4 class="shelf__title">{{ 'shelves.order' | t }}</h4>
+      <select
+        (change)="addOrder($any($event.target).value); reset($event)"
+        [attr.aria-label]="'shelves.addOrder' | t"
+      >
+        <option value="">{{ 'shelves.add' | t }}</option>
+        @for (option of orderable(); track option.value) {
+          <option [value]="option.value">{{ option.label }}</option>
+        }
+      </select>
+    </header>
+    <div class="shelf__pills">
+      @for (order of orders(); track order.id) {
+        <span class="pill pill--order">
+          <span class="pill__label">{{ order.label }}</span>
+          <button
+            type="button"
+            class="pill__control pill__flip"
+            (click)="flipOrder(order.id, order.descending)"
+            [attr.aria-label]="'shelves.flip' | t: { name: order.label }"
+          >
+            {{ (order.descending ? 'shelves.descending' : 'shelves.ascending') | t }}
+          </button>
+          <button
+            type="button"
+            class="pill__remove"
+            (click)="removeOrder(order.id)"
+            [attr.aria-label]="'shelves.remove' | t: { name: order.label }"
+          >
+            ×
+          </button>
+        </span>
+      } @empty {
+        <p class="shelf__empty">{{ 'shelves.dropOrder' | t }}</p>
+      }
+    </div>
+  </section>
+</div>
+
+@if (notice(); as text) {
+  <p class="notice" role="status">{{ text }}</p>
+}
+@if (model().grouped && model().having.length > 0) {
+  <p class="hint">{{ 'shelves.havingInForm' | t }}</p>
+}
+
+<!-- Lo que el lienzo no sabe dibujar, sin tener que dejarlo por una expresión. -->
+<section class="hand">
+  <header class="hand__head">
+    <h4 class="shelf__title">{{ 'shelves.hand' | t }}</h4>
+    <span class="hand__actions">
+      <button type="button" class="btn btn--small" (click)="addExpression(false)">
+        + {{ 'shelves.addExpression' | t }}
+      </button>
+      <button type="button" class="btn btn--small" (click)="addExpression(true)">
+        + {{ 'shelves.addAggregateExpression' | t }}
+      </button>
+      <button type="button" class="btn btn--small" (click)="addCondition()">
+        + {{ 'shelves.addCondition' | t }}
+      </button>
+    </span>
+  </header>
+  @if (model().expressions.length === 0 && model().conditions.length === 0) {
+    <p class="hint">{{ 'shelves.handHint' | t }}</p>
+  }
+
+  @for (expression of model().expressions; track expression.id) {
+    <div class="hand__row">
+      <input
+        type="text"
+        class="hand__alias"
+        [value]="expression.alias"
+        [placeholder]="expressionAlias(expression)"
+        (input)="patchExpression(expression.id, { alias: $any($event.target).value })"
+        [attr.aria-label]="'shelves.expressionAlias' | t"
+      />
+      <input
+        type="text"
+        class="hand__sql"
+        spellcheck="false"
+        [value]="expression.sql"
+        [placeholder]="
+          (expression.aggregate ? 'shelves.aggregateExample' : 'shelves.expressionExample') | t
+        "
+        (input)="patchExpression(expression.id, { sql: $any($event.target).value })"
+        [attr.aria-label]="'shelves.expressionSql' | t: { alias: expressionAlias(expression) }"
+      />
+      <label class="hand__check">
+        <input
+          type="checkbox"
+          [checked]="expression.aggregate"
+          (change)="patchExpression(expression.id, { aggregate: $any($event.target).checked })"
+        />
+        {{ 'shelves.expressionAggregate' | t }}
+      </label>
+      <button
+        type="button"
+        class="pill__remove"
+        (click)="removeExpression(expression.id)"
+        [attr.aria-label]="'shelves.remove' | t: { name: expressionAlias(expression) }"
+      >
+        ×
+      </button>
+    </div>
+  }
+
+  @for (condition of model().conditions; track condition.id; let index = $index) {
+    <div class="hand__row">
+      <select
+        class="pill__control pill__control--mono"
+        [value]="condition.conjunction"
+        (change)="patchCondition(condition.id, { conjunction: $any($event.target).value })"
+        [attr.aria-label]="'shelves.conjunction' | t"
+      >
+        <option value="AND" [selected]="condition.conjunction === 'AND'" translate="no">AND</option>
+        <option value="OR" [selected]="condition.conjunction === 'OR'" translate="no">OR</option>
+      </select>
+      <input
+        type="text"
+        class="hand__sql"
+        spellcheck="false"
+        [value]="condition.sql"
+        [placeholder]="'shelves.conditionExample' | t"
+        (input)="patchCondition(condition.id, { sql: $any($event.target).value })"
+        [attr.aria-label]="'shelves.conditionSql' | t: { number: index + 1 }"
+      />
+      <button
+        type="button"
+        class="pill__remove"
+        (click)="removeCondition(condition.id)"
+        [attr.aria-label]="'shelves.removeCondition' | t: { number: index + 1 }"
+      >
+        ×
+      </button>
+    </div>
+  }
+</section>

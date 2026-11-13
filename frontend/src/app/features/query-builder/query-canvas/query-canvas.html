@@ -102,9 +102,12 @@
                 "
               />
             }
-            <span class="row__name" [title]="column.name + ' · ' + column.dataType">{{
-              column.name
-            }}</span>
+            <span
+              class="row__name"
+              [title]="column.name + ' · ' + column.dataType"
+              (pointerdown)="startField($event, box, column.name)"
+              >{{ column.name }}</span
+            >
             <span class="row__type">{{ column.dataType }}</span>
             <button
               type="button"
@@ -164,6 +167,12 @@
     }
   </div>
 </div>
+
+@if (carried(); as chip) {
+  <span class="carried" [style.left.px]="chip.x" [style.top.px]="chip.y" aria-hidden="true">{{
+    chip.column
+  }}</span>
+}
 
 @if (boxes().length === 1) {
   <p class="hint">{{ 'canvas.emptyHint' | t }}</p>

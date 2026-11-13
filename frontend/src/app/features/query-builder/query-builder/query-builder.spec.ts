@@ -1475,9 +1475,87 @@ describe('QueryBuilder', () => {
       expect(boxes[0].getAttribute('aria-label')).toBe('public.orders');
       expect(boxes[0].querySelector('.box__name')?.textContent).toBe('orders');
       expect(localStorage.getItem('druse.query-builder.view')).toBe('canvas');
-      // El formulario de columnas y cruces deja paso al lienzo; el resto sigue.
+      // El formulario deja paso al lienzo y sus estantes; el máximo de filas sigue.
       expect(fixture.nativeElement.querySelector('.joins-block')).toBeNull();
-      expect(fixture.nativeElement.textContent).toContain('Cálculos y agrupación');
+      expect(fixture.nativeElement.textContent).not.toContain('Cálculos y agrupación');
+      expect(
+        [...fixture.nativeElement.querySelectorAll('.shelf__title')].map((title: Element) =>
+          title.textContent?.trim(),
+        ),
+      ).toEqual(['Agrupar por', 'Valores', 'Filtros', 'Orden', 'SQL a mano']);
+      expect(fixture.nativeElement.textContent).toContain('Máximo de filas');
+    });
+
+    it('los estantes montan ventas por grupo con el teclado, y el formulario ve lo mismo', async () => {
+      const fixture = await onCanvas();
+      const element = fixture.nativeElement as HTMLElement;
+      const add = (label: string, value: string) => {
+        const select = element.querySelector(`select[aria-label="${label}"]`) as HTMLSelectElement;
+        select.value = value;
+        select.dispatchEvent(new Event('change'));
+        fixture.detectChanges();
+      };
+
+      add('Añadir a Agrupar por', 'base:note');
+      add('Añadir a Valores', 'base:total');
+      add('Añadir a Filtros', 'created_at');
+      add('Añadir a Orden', 'aggregate:2');
+
+      const sql = sqlOf(fixture);
+      expect(sql).toContain('GROUP BY [note]');
+      // Agrupar sin cálculo cuenta filas; la columna numérica se suma.
+      expect(sql).toContain('COUNT(*) AS [cantidad]');
+      expect(sql).toContain('SUM([total]) AS [cantidad_2]');
+      expect(sql).toContain('WHERE [created_at] =');
+      expect(sql).toContain('ORDER BY SUM([total])');
+      // El desplegable vuelve a «Añadir…»: es un botón, no un valor elegido.
+      expect(
+        (element.querySelector('select[aria-label="Añadir a Valores"]') as HTMLSelectElement).value,
+      ).toBe('');
+
+      element.querySelector<HTMLButtonElement>('button[aria-label="Quitar COUNT(*)"]')!.click();
+      fixture.detectChanges();
+      expect(sqlOf(fixture)).not.toContain('COUNT(*)');
+
+      [...element.querySelectorAll<HTMLButtonElement>('.view-switch button')]
+        .find((button) => button.textContent?.trim() === 'Formulario')!
+        .click();
+      fixture.detectChanges();
+      expect(sqlOf(fixture)).toBe(sql.replace('COUNT(*) AS [cantidad], ', ''));
+    });
+
+    it('lo escrito a mano entra en el SQL y un punto y coma lo bloquea', async () => {
+      const fixture = await onCanvas();
+      const element = fixture.nativeElement as HTMLElement;
+      const button = (text: string) =>
+        [...element.querySelectorAll<HTMLButtonElement>('.hand button')]
+          .find((item) => item.textContent?.includes(text))!
+          .click();
+
+      button('Columna calculada');
+      button('Condición');
+      fixture.detectChanges();
+      const type = (label: string, text: string) => {
+        const input = element.querySelector(`input[aria-label="${label}"]`) as HTMLInputElement;
+        input.value = text;
+        input.dispatchEvent(new Event('input'));
+        fixture.detectChanges();
+      };
+
+      type('Nombre de la columna calculada', 'doble');
+      type('Expresión SQL de doble', 'total * 2');
+      type('Condición SQL 1', 'total > 10;');
+
+      expect(sqlOf(fixture)).toContain('(total * 2) AS [doble]');
+      expect(sqlOf(fixture)).toContain('WHERE (total > 10)');
+
+      type('Condición SQL 1', 'total > 10; DROP TABLE orders');
+      expect(element.textContent).toContain('una sola expresión');
+      expect(
+        [...element.querySelectorAll<HTMLButtonElement>('button')].find((item) =>
+          item.textContent?.includes('Probar con'),
+        )!.disabled,
+      ).toBe(true);
     });
 
     it('añadir una tabla la cruza por la columna que comparten, como el formulario', async () => {
@@ -1591,7 +1669,7 @@ describe('QueryBuilder', () => {
 
       const saved = JSON.parse(compositions.records[0].model);
       expect(saved.state.layout).toEqual({ base: { x: 300, y: 40 } });
-      expect(saved.state.version).toBe(2);
+      expect(saved.state.version).toBe(3);
     });
   });
 });

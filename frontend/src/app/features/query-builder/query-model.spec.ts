@@ -26,6 +26,7 @@ import {
   toggleGrouping,
   validate,
 } from './query-model';
+import * as Model from './query-model';
 
 function col(name: string, dataType: string, extra: Partial<KnownColumn> = {}): KnownColumn {
   return { name, dataType, isNullable: true, isPrimaryKey: false, ...extra };
@@ -368,6 +369,120 @@ describe('query-model', () => {
       expect(readCompositionState('SELECT 1')).toBeNull();
       expect(readCompositionState([])).toBeNull();
       expect(readCompositionState({ chosen: 'mes' })?.chosen).toEqual([]);
+    });
+  });
+
+  describe('estantes', () => {
+    it('soltar en Agrupar por empieza a agrupar y cuenta filas', () => {
+      const next = Model.groupBy(model(), catalog(), 'base:municipio_id', 'cantidad');
+
+      expect(next.grouped).toBe(true);
+      expect(next.groupByKeys).toEqual(['base:municipio_id']);
+      expect(next.aggregates.map((aggregate) => aggregate.function)).toEqual(['COUNT']);
+      // Otra columna se suma a los grupos sin añadir otro recuento.
+      expect(Model.groupBy(next, catalog(), 'base:mes', 'cantidad').aggregates).toHaveLength(1);
+      // Una clave que el modelo no conoce no hace nada.
+      expect(Model.groupBy(next, catalog(), 'base:no_existe', 'cantidad')).toBe(next);
+    });
+
+    it('soltar en Valores suma un número y cuenta lo demás', () => {
+      const sum = Model.addValue(model(), catalog(), 'base:importe', 'cantidad');
+      const count = Model.addValue(sum, catalog(), 'base:municipio_id', 'cantidad');
+
+      expect(sum.aggregates[0]).toMatchObject({ function: 'SUM', columnKey: 'base:importe' });
+      expect(count.aggregates[1]).toMatchObject({
+        function: 'COUNT',
+        columnKey: 'base:municipio_id',
+      });
+    });
+
+    it('un orden ocupa el hueco vacío, no se repite y al quitar el último deja el hueco', () => {
+      const ordered = Model.addOrderFor(model(), 'column:mes');
+
+      expect(ordered.orders).toEqual([{ id: 1, target: 'column:mes', descending: false }]);
+      expect(Model.addOrderFor(ordered, 'column:mes')).toBe(ordered);
+      expect(Model.addOrderFor(ordered, 'column:id').orders).toHaveLength(2);
+      expect(Model.clearOrder(ordered, 1).orders).toEqual([
+        { id: 1, target: '', descending: false },
+      ]);
+    });
+
+    it('el caso de validación: ventas por municipio de enero, montado en los estantes', () => {
+      let next = Model.groupBy(model(), catalog(), 'base:municipio_id', 'cantidad');
+      next = Model.addValue(next, catalog(), 'base:importe', 'venta');
+      next = Model.removeAggregate(next, 1);
+      next = Model.patchAggregate(next, 2, { alias: 'venta' });
+      next = Model.addFilterOn(next, 'mes');
+      next = Model.patchFilter(next, 0, { value: '2026-01-01' });
+      const spec = toSelectSpec(next, catalog());
+
+      expect(buildSelect('postgresql', spec)).toBe(
+        [
+          'SELECT "municipio_id", SUM("importe") AS "venta"',
+          'FROM "ventas"."ventas"',
+          `WHERE "mes" = '2026-01-01'`,
+          'GROUP BY "municipio_id"',
+          'LIMIT 100;',
+          '',
+        ].join('\n'),
+      );
+    });
+  });
+
+  describe('SQL a mano', () => {
+    it('una columna calculada va en el SELECT y, si no es sobre el grupo, también en GROUP BY', () => {
+      let next = Model.addExpression(model({ grouped: true, groupByKeys: ['base:mes'] }), false);
+      next = Model.patchExpression(next, 1, { alias: 'anio', sql: 'EXTRACT(YEAR FROM mes);' });
+      next = Model.addExpression(next, true);
+      next = Model.patchExpression(next, 2, { sql: 'SUM(importe) / 2' });
+      const sql = buildSelect('postgresql', toSelectSpec(next, catalog()));
+
+      expect(sql).toContain('(EXTRACT(YEAR FROM mes)) AS "anio"');
+      expect(sql).toContain('(SUM(importe) / 2) AS "expr_2"');
+      expect(sql).toContain('GROUP BY "mes", (EXTRACT(YEAR FROM mes))');
+      expect(sql).not.toContain('(SUM(importe) / 2)\nORDER');
+    });
+
+    it('un cálculo sobre el grupo activa la agrupación y basta para que valga', () => {
+      let next = Model.addExpression(model(), true);
+      next = Model.patchExpression(next, 1, { sql: 'COUNT(*)' });
+
+      expect(next.grouped).toBe(true);
+      expect(validate(next, catalog())).toEqual([]);
+    });
+
+    it('las condiciones van detrás de los filtros, entre paréntesis', () => {
+      let next = Model.addFilterOn(model(), 'id');
+      next = Model.patchFilter(next, 0, { value: '1' });
+      next = Model.addCondition(next);
+      next = Model.patchCondition(next, 1, { sql: "a = 1 OR b = 'x'", conjunction: 'OR' });
+      next = Model.addCondition(next);
+
+      expect(buildSelect('postgresql', toSelectSpec(next, catalog()))).toContain(
+        `WHERE "id" = 1\n  OR (a = 1 OR b = 'x')`,
+      );
+    });
+
+    it('un punto y coma en medio no se deja pasar', () => {
+      let next = Model.addCondition(model());
+      next = Model.patchCondition(next, 1, { sql: '1 = 1; DROP TABLE ventas' });
+
+      expect(validate(next, catalog())).toEqual([{ key: 'builder.handSqlInvalid' }]);
+    });
+
+    it('se guarda y se lee, y lo guardado antes de existir se lee vacío', () => {
+      const next = Model.patchExpression(Model.addExpression(model(), false), 1, {
+        sql: 'id * 2',
+      });
+      const saved = compositionState(Model.formOf(next), [], null);
+
+      expect(readCompositionState(JSON.parse(JSON.stringify(saved)))?.expressions).toEqual(
+        next.expressions,
+      );
+      expect(readCompositionState({ chosen: [] })).toMatchObject({
+        expressions: [],
+        conditions: [],
+      });
     });
   });
 });

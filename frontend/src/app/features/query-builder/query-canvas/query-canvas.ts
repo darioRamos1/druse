@@ -64,7 +64,20 @@ type Drag =
       readonly start: Point;
       readonly origin: Point;
       readonly moved: boolean;
+    }
+  | {
+      /** Una columna que se lleva a un estante, fuera del lienzo. */
+      readonly kind: 'field';
+      readonly from: ColumnEnd;
+      readonly pointer: number;
+      readonly origin: Point;
+      readonly moved: boolean;
     };
+
+/** Una columna soltada sobre un estante (`data-shelf`). */
+export interface FieldDrop extends ColumnEnd {
+  readonly shelf: string;
+}
 
 /** Cuánto hay que mover el puntero para que un clic pase a ser un arrastre. */
 const DRAG_THRESHOLD = 4;
@@ -100,6 +113,21 @@ export class QueryCanvas {
   readonly joinType = output<{ readonly joinId: number; readonly type: JoinType }>();
   readonly removeJoin = output<number>();
   readonly layoutChange = output<CanvasLayout>();
+  /** Se empezó o se terminó de llevar una columna a los estantes. */
+  readonly fieldDrag = output<boolean>();
+  readonly fieldDrop = output<FieldDrop>();
+
+  /** La pastilla que sigue al puntero mientras se lleva una columna a un estante. */
+  protected readonly carried = computed(() => {
+    const drag = this._drag();
+    const client = this._client();
+    return drag?.kind === 'field' && drag.moved && client
+      ? { column: drag.from.column, x: client.x, y: client.y }
+      : null;
+  });
+
+  /** Posición del puntero en la ventana: la pastilla sale del lienzo hacia los estantes. */
+  private readonly _client = signal<Point | null>(null);
 
   protected readonly boxWidth = BOX_WIDTH;
   protected readonly maxRows = MAX_ROWS;
@@ -283,9 +311,80 @@ export class QueryCanvas {
     }
 
     this._pointer.set(at);
+    this._client.set({ x: event.clientX, y: event.clientY });
+
+    if (drag.kind === 'field' && drag.moved) {
+      this.scrollNearEdge(event.clientY);
+    }
     if (!drag.moved && Math.hypot(at.x - drag.origin.x, at.y - drag.origin.y) >= DRAG_THRESHOLD) {
       this._drag.set({ ...drag, moved: true });
+      if (drag.kind === 'field') this.fieldDrag.emit(true);
     }
+  }
+
+  /**
+   * Desplaza el panel que contiene el lienzo cuando el puntero se acerca a su
+   * borde.
+   *
+   * Los estantes quedan debajo del lienzo y, en una ventana normal, fuera de la
+   * vista: sin esto, llevar una columna a «Filtros» o a «Orden» obligaría a
+   * soltarla, desplazarse y no tener ya nada que soltar.
+   */
+  private scrollNearEdge(clientY: number): void {
+    const scroller = this.scroller();
+
+    if (!scroller) {
+      return;
+    }
+
+    const rect = scroller.getBoundingClientRect();
+    const edge = 48;
+
+    if (clientY > rect.bottom - edge) {
+      scroller.scrollTop += Math.ceil((clientY - (rect.bottom - edge)) / 3);
+    } else if (clientY < rect.top + edge) {
+      scroller.scrollTop -= Math.ceil((rect.top + edge - clientY) / 3);
+    }
+  }
+
+  /** El primer antepasado que se desplaza en vertical: el cuerpo del diálogo. */
+  private scroller(): HTMLElement | null {
+    let element = this._surface().nativeElement.parentElement?.parentElement ?? null;
+
+    while (element) {
+      const overflow = getComputedStyle(element).overflowY;
+      if (
+        (overflow === 'auto' || overflow === 'scroll') &&
+        element.scrollHeight > element.clientHeight
+      ) {
+        return element;
+      }
+      element = element.parentElement;
+    }
+
+    return null;
+  }
+
+  /**
+   * Coge una columna por su nombre para llevarla a un estante.
+   *
+   * El nombre y no la casilla: la casilla marca, y un arrastre que empieza en
+   * ella marcaría la columna sin querer.
+   */
+  protected startField(event: PointerEvent, box: PlacedBox, column: string): void {
+    if (event.button !== 0) {
+      return;
+    }
+
+    event.preventDefault();
+    (event.currentTarget as Element).setPointerCapture?.(event.pointerId);
+    this._drag.set({
+      kind: 'field',
+      from: { key: box.key, column },
+      pointer: event.pointerId,
+      origin: this.point(event),
+      moved: false,
+    });
   }
 
   protected end(event: PointerEvent): void {
@@ -297,6 +396,23 @@ export class QueryCanvas {
 
     this._drag.set(null);
     this._pointer.set(null);
+    this._client.set(null);
+
+    if (drag.kind === 'field') {
+      if (!drag.moved) {
+        return;
+      }
+
+      this.fieldDrag.emit(false);
+      const shelf = document
+        .elementFromPoint(event.clientX, event.clientY)
+        ?.closest<HTMLElement>('[data-shelf]');
+
+      if (shelf) {
+        this.fieldDrop.emit({ ...drag.from, shelf: shelf.dataset['shelf']! });
+      }
+      return;
+    }
 
     if (drag.kind === 'box') {
       const moving = this._moving();

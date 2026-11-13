@@ -66,7 +66,11 @@ import {
   SelectModel,
   isDateColumn,
 } from '../query-model';
-import { QueryCanvas } from '../query-canvas/query-canvas';
+import { FieldDrop, QueryCanvas } from '../query-canvas/query-canvas';
+import { ModelEdit, QueryShelves, ShelfId } from '../query-shelves/query-shelves';
+import { previewChart } from '../preview-chart';
+import { ReportChart } from '../../reports/report-chart/report-chart';
+import { ReportVisualKind } from '../../../shared/models/reports';
 import {
   BASE_KEY,
   CanvasBox,
@@ -188,7 +192,17 @@ const DATE_PERIODS: readonly { readonly value: DatePeriod | 'none'; readonly lab
 @Component({
   selector: 'app-query-builder',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [Icon, DialogBackdrop, DialogFocus, ValueInput, ResultsGrid, TranslatePipe, QueryCanvas],
+  imports: [
+    Icon,
+    DialogBackdrop,
+    DialogFocus,
+    ValueInput,
+    ResultsGrid,
+    TranslatePipe,
+    QueryCanvas,
+    QueryShelves,
+    ReportChart,
+  ],
   templateUrl: './query-builder.html',
   styleUrl: './query-builder.scss',
 })
@@ -299,7 +313,7 @@ export class QueryBuilder implements OnInit {
   }));
 
   /** Lo que el modelo necesita saber del catálogo. */
-  private readonly _catalog = computed<ModelCatalog>(() => ({
+  protected readonly catalog = computed<ModelCatalog>(() => ({
     table: { schema: this.table().schema, name: this.table().name },
     columns: this.columns(),
     joinColumns: new Map(this.joins().map((join) => [join.id, join.columns])),
@@ -417,13 +431,84 @@ export class QueryBuilder implements OnInit {
     }
   }
 
+  /** Se está llevando una columna del lienzo a los estantes. */
+  protected readonly fieldDragging = signal(false);
+
+  /** Por qué no se aceptó la última columna soltada en un estante. */
+  protected readonly shelfNotice = signal<string | null>(null);
+
+  /** Lo que piden los estantes: una operación del mismo modelo que edita el formulario. */
+  protected applyEdit(edit: ModelEdit): void {
+    this.shelfNotice.set(null);
+    this.apply(edit);
+  }
+
+  /**
+   * Una columna del lienzo soltada en un estante.
+   *
+   * Lo que el modelo no admite se dice en vez de ignorarlo: los filtros son de
+   * la tabla principal, y sin agrupar solo se ordena por sus columnas.
+   */
+  protected dropField(drop: FieldDrop): void {
+    this.shelfNotice.set(null);
+
+    const join =
+      drop.key === BASE_KEY ? null : this.joins().find((item) => joinKey(item.id) === drop.key);
+    const key = join ? `join:${join.id}:${drop.column}` : `base:${drop.column}`;
+    const alias = this.defaultAlias();
+    const refuse = (message: string) =>
+      this.shelfNotice.set(this._i18n.t(message, { column: drop.column }));
+
+    switch (drop.shelf as ShelfId) {
+      case 'group':
+        this.apply((model, catalog) => Model.groupBy(model, catalog, key, alias));
+        return;
+      case 'value':
+        this.apply((model, catalog) => Model.addValue(model, catalog, key, alias));
+        return;
+      case 'filter':
+        if (join) {
+          refuse('shelves.filterOnlyMain');
+        } else {
+          this.apply((model) => Model.addFilterOn(model, drop.column));
+        }
+        return;
+      case 'order':
+        if (this.grouped()) {
+          if (this.groupByKeys().includes(key)) {
+            this.apply((model) => Model.addOrderFor(model, `group:${key}`));
+          } else {
+            refuse('shelves.orderNeedsGroup');
+          }
+        } else if (join) {
+          refuse('shelves.orderOnlyMain');
+        } else {
+          this.apply((model) => Model.addOrderFor(model, `column:${drop.column}`));
+        }
+        return;
+    }
+  }
+
+  /** Cómo se enseña la vista previa: la cuadrícula o una de las gráficas de Reportes. */
+  protected readonly previewKind = signal<ReportVisualKind>('Table');
+  protected readonly previewKinds: readonly ReportVisualKind[] = [
+    'Table',
+    'Bar',
+    'Line',
+    'Indicator',
+  ];
+  protected readonly chart = computed(() => {
+    const set = this.previewSet();
+    return set ? previewChart(set) : null;
+  });
+
   protected setLayout(layout: CanvasLayout): void {
     this._layout.set(layout);
   }
 
   /** Aplica una operación del modelo; los cruces no cambian por esta vía. */
   private apply(operation: (model: SelectModel, catalog: ModelCatalog) => SelectModel): void {
-    this._form.set(Model.formOf(operation(this.model(), this._catalog())));
+    this._form.set(Model.formOf(operation(this.model(), this.catalog())));
   }
   protected readonly insertDrafts = signal<readonly ColumnDraft[]>([]);
   protected readonly updateDrafts = signal<readonly ColumnDraft[]>([]);
@@ -619,7 +704,7 @@ export class QueryBuilder implements OnInit {
         // y tener dos listas invitaría a componer el DELETE mirando la del otro.
         return buildDeleteValues(this.engine(), { ...base, filters: this.updateFilters() });
       default:
-        return buildSelect(this.engine(), Model.toSelectSpec(this.model(), this._catalog()));
+        return buildSelect(this.engine(), Model.toSelectSpec(this.model(), this.catalog()));
     }
   });
 
@@ -702,15 +787,15 @@ export class QueryBuilder implements OnInit {
 
   /** Columnas disponibles para agrupar, incluidas las de los JOIN válidos. */
   protected readonly queryColumns = computed(() =>
-    Model.queryColumns(this.model(), this._catalog()),
+    Model.queryColumns(this.model(), this.catalog()),
   );
 
   protected readonly orderOptions = computed(() =>
-    Model.orderOptions(this.model(), this._catalog()),
+    Model.orderOptions(this.model(), this.catalog()),
   );
 
   protected readonly validationMessages = computed(() => {
-    const messages = Model.validate(this.model(), this._catalog()).map((problem) => {
+    const messages = Model.validate(this.model(), this.catalog()).map((problem) => {
       switch (problem.key) {
         case 'builder.needsNumeric':
           return this._i18n.t(problem.key, { function: problem.function, column: problem.column });
@@ -801,7 +886,7 @@ export class QueryBuilder implements OnInit {
   }
 
   protected havingKind(filter: HavingDraft): InputKind {
-    return Model.havingKind(this.model(), this._catalog(), filter);
+    return Model.havingKind(this.model(), this.catalog(), filter);
   }
 
   protected readonly availableRelations = computed(() => {
@@ -1414,8 +1499,7 @@ export class QueryBuilder implements OnInit {
    * `"id" = ''`. En texto sí lo es, y se respeta.
    */
   protected filterText(filter: QueryFilter, text: string): string | null {
-    if (this.isList(filter.operator) && !text.trim()) return null;
-    return text === '' && this.filterKind(filter) !== 'text' ? null : text;
+    return Model.filterText(filter, text, this.columns());
   }
 
   /** Si el operador compara dos cosas, y por tanto admite otra columna. */

@@ -60,6 +60,17 @@
   }
 }
 
+.preview-kinds {
+  margin: 4px 0 8px;
+}
+
+.preview-chart {
+  padding: 8px;
+  border: 1px solid var(--dr-border);
+  border-radius: 8px;
+  background: var(--dr-surface-base);
+}
+
 .canvas-tools {
   display: flex;
   flex-wrap: wrap;

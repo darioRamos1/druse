@@ -61,6 +61,28 @@ export interface ModelJoin {
   readonly chosen: readonly string[];
 }
 
+/**
+ * Una columna calculada escrita a mano: lo que el lienzo no sabe dibujar, sin
+ * tener que dejar el lienzo por una sola expresión.
+ */
+export interface ExpressionDraft {
+  readonly id: number;
+  readonly alias: string;
+  readonly sql: string;
+  /**
+   * Si es un cálculo sobre el grupo (`SUM(a) / SUM(b)`). Con GROUP BY, las que
+   * no lo son se agrupan también: si no, el motor rechaza la consulta.
+   */
+  readonly aggregate: boolean;
+}
+
+/** Una condición WHERE escrita a mano. Va detrás de los filtros y entre paréntesis. */
+export interface ConditionDraft {
+  readonly id: number;
+  readonly sql: string;
+  readonly conjunction: 'AND' | 'OR';
+}
+
 /** Todo lo del SELECT que no son los cruces. */
 export interface SelectForm {
   readonly chosen: readonly string[];
@@ -73,6 +95,8 @@ export interface SelectForm {
   readonly orders: readonly OrderDraft[];
   readonly limit: number | null;
   readonly distinct: boolean;
+  readonly expressions: readonly ExpressionDraft[];
+  readonly conditions: readonly ConditionDraft[];
 }
 
 export interface SelectModel extends SelectForm {
@@ -105,7 +129,8 @@ export type ModelProblem =
       readonly function: AggregateFunction;
       readonly column: string;
     }
-  | { readonly key: 'builder.needsDate'; readonly period: DatePeriod; readonly column: string };
+  | { readonly key: 'builder.needsDate'; readonly period: DatePeriod; readonly column: string }
+  | { readonly key: 'builder.handSqlInvalid' };
 
 export const DEFAULT_ORDERS: readonly OrderDraft[] = [{ id: 1, target: '', descending: false }];
 
@@ -121,6 +146,8 @@ export function emptySelectForm(): SelectForm {
     orders: DEFAULT_ORDERS,
     limit: 100,
     distinct: false,
+    expressions: [],
+    conditions: [],
   };
 }
 
@@ -354,7 +381,44 @@ export function toSelectSpec(model: SelectModel, catalog: ModelCatalog): SelectS
     limit: model.limit,
     // Con GROUP BY cada grupo ya sale una sola vez: DISTINCT no añadiría nada.
     distinct: !grouped && model.distinct,
+    expressions: written(model.expressions).map((expression) => ({
+      sql: handSql(expression.sql),
+      alias: expressionAlias(expression),
+    })),
+    groupExpressions: grouped
+      ? written(model.expressions)
+          .filter((expression) => !expression.aggregate)
+          .map((expression) => handSql(expression.sql))
+      : [],
+    rawFilters: written(model.conditions).map((condition) => ({
+      sql: handSql(condition.sql),
+      conjunction: condition.conjunction,
+    })),
   };
+}
+
+/** Lo escrito a mano que tiene algo escrito: un campo vacío todavía no cuenta. */
+function written<T extends { readonly sql: string }>(items: readonly T[]): readonly T[] {
+  return items.filter((item) => handSql(item.sql).length > 0);
+}
+
+/** Sin el punto y coma final que se escapa al copiar de otra consulta. */
+function handSql(sql: string): string {
+  return sql.trim().replace(/;+$/, '').trim();
+}
+
+export function expressionAlias(expression: ExpressionDraft): string {
+  return expression.alias.trim() || `expr_${expression.id}`;
+}
+
+/**
+ * Si lo escrito a mano parece una sola expresión.
+ *
+ * No se analiza el SQL —eso es del motor—, pero un punto y coma en medio
+ * metería otra sentencia dentro de la consulta, y eso no se deja pasar.
+ */
+function isSingleExpression(sql: string): boolean {
+  return !handSql(sql).includes(';');
 }
 
 // ── Validación ──────────────────────────────────────────────────────────────
@@ -390,11 +454,19 @@ export function validate(model: SelectModel, catalog: ModelCatalog): readonly Mo
     }
   }
 
+  if ([...model.expressions, ...model.conditions].some((item) => !isSingleExpression(item.sql))) {
+    problems.push({ key: 'builder.handSqlInvalid' });
+  }
+
   if (!model.grouped) {
     return problems;
   }
 
-  if (model.groupByKeys.length === 0 && model.aggregates.length === 0) {
+  if (
+    model.groupByKeys.length === 0 &&
+    model.aggregates.length === 0 &&
+    written(model.expressions).length === 0
+  ) {
     problems.push({ key: 'builder.needsGroupOrAggregate' });
   }
 
@@ -503,6 +575,22 @@ export function filterKind(filter: QueryFilter, columns: readonly KnownColumn[])
   }
 
   return columns.find((column) => column.name === filter.column)?.inputKind ?? 'text';
+}
+
+/**
+ * Lo que se escribió en el campo de valor, tal como lo guarda el filtro.
+ *
+ * Vaciar el campo de una columna que no es de texto deja el valor pendiente:
+ * en un número o una fecha, `''` no es un valor, y escribirlo producía
+ * `"id" = ''`. En texto sí lo es, y se respeta.
+ */
+export function filterText(
+  filter: QueryFilter,
+  text: string,
+  columns: readonly KnownColumn[],
+): string | null {
+  if (isList(filter.operator) && !text.trim()) return null;
+  return text === '' && filterKind(filter, columns) !== 'text' ? null : text;
 }
 
 // ── Operaciones ─────────────────────────────────────────────────────────────
@@ -802,15 +890,177 @@ export function patchFilter(
   };
 }
 
+// ── Estantes ────────────────────────────────────────────────────────────────
+
+/**
+ * Agrupa por una columna, como al soltarla en «Agrupar por».
+ *
+ * Si todavía no se agrupaba, empieza a hacerlo solo por esa columna y, sin
+ * ningún cálculo, cuenta las filas: un grupo sin cifra no enseña nada.
+ */
+export function groupBy(
+  model: SelectModel,
+  catalog: ModelCatalog,
+  key: string,
+  defaultAlias: string,
+): SelectModel {
+  if (!queryColumns(model, catalog).some((option) => option.key === key)) {
+    return model;
+  }
+
+  if (!model.grouped) {
+    const next: SelectModel = {
+      ...model,
+      grouped: true,
+      groupByKeys: [key],
+      orders: DEFAULT_ORDERS,
+    };
+    return next.aggregates.length > 0 || written(next.expressions).some((e) => e.aggregate)
+      ? next
+      : addAggregate(next, catalog, 'COUNT', defaultAlias);
+  }
+
+  return model.groupByKeys.includes(key)
+    ? model
+    : { ...model, groupByKeys: [...model.groupByKeys, key] };
+}
+
+/**
+ * Añade una cifra sobre una columna, como al soltarla en «Valores».
+ *
+ * Un número se suma; cualquier otra cosa se cuenta. Se cambia luego con un
+ * clic en la función.
+ */
+export function addValue(
+  model: SelectModel,
+  catalog: ModelCatalog,
+  key: string,
+  defaultAlias: string,
+): SelectModel {
+  const option = queryColumns(model, catalog).find((item) => item.key === key);
+
+  if (!option) {
+    return model;
+  }
+
+  const fn: AggregateFunction = isNumericColumn(option.column) ? 'SUM' : 'COUNT';
+  const next = addAggregate(model, catalog, fn, defaultAlias);
+  const added = next.aggregates[next.aggregates.length - 1];
+
+  return patchAggregate(next, added.id, { columnKey: key });
+}
+
+/** Filtra por una columna de la tabla principal, como al soltarla en «Filtros». */
+export function addFilterOn(model: SelectModel, column: string): SelectModel {
+  return {
+    ...model,
+    filters: [...model.filters, { column, operator: '=', value: null, conjunction: 'AND' }],
+  };
+}
+
+/**
+ * Ordena por algo, como al soltarlo en «Orden».
+ *
+ * Ocupa el primer orden vacío —el formulario arranca con uno— y no repite un
+ * orden que ya está.
+ */
+export function addOrderFor(model: SelectModel, target: string): SelectModel {
+  if (model.orders.some((order) => order.target === target)) {
+    return model;
+  }
+
+  const empty = model.orders.find((order) => !order.target);
+
+  return empty
+    ? patchOrder(model, empty.id, { target })
+    : {
+        ...model,
+        orders: [...model.orders, { id: nextId(model.orders), target, descending: false }],
+      };
+}
+
+/** Lo que se ordena de verdad: los órdenes sin destino no cuentan. */
+export function activeOrders(model: SelectModel): readonly OrderDraft[] {
+  return model.orders.filter((order) => order.target);
+}
+
+/** Quita un orden y, si era el último, deja el hueco vacío con el que arranca el formulario. */
+export function clearOrder(model: SelectModel, id: number): SelectModel {
+  const rest = model.orders.filter((order) => order.id !== id);
+  return { ...model, orders: rest.length > 0 ? rest : DEFAULT_ORDERS };
+}
+
+/**
+ * Añade una columna calculada a mano.
+ *
+ * Una que es un cálculo sobre el grupo activa la agrupación, como cualquier
+ * otro cálculo: sin ella, `SUM(...)` junto a columnas sueltas no se ejecuta.
+ */
+export function addExpression(model: SelectModel, aggregate: boolean): SelectModel {
+  const base: SelectModel =
+    aggregate && !model.grouped
+      ? { ...model, grouped: true, groupByKeys: [], orders: DEFAULT_ORDERS }
+      : model;
+
+  return {
+    ...base,
+    expressions: [
+      ...base.expressions,
+      { id: nextId(base.expressions), alias: '', sql: '', aggregate },
+    ],
+  };
+}
+
+export function patchExpression(
+  model: SelectModel,
+  id: number,
+  patch: Partial<ExpressionDraft>,
+): SelectModel {
+  return {
+    ...model,
+    expressions: model.expressions.map((item) => (item.id === id ? { ...item, ...patch } : item)),
+  };
+}
+
+export function removeExpression(model: SelectModel, id: number): SelectModel {
+  return { ...model, expressions: model.expressions.filter((item) => item.id !== id) };
+}
+
+export function addCondition(model: SelectModel): SelectModel {
+  return {
+    ...model,
+    conditions: [
+      ...model.conditions,
+      { id: nextId(model.conditions), sql: '', conjunction: 'AND' },
+    ],
+  };
+}
+
+export function patchCondition(
+  model: SelectModel,
+  id: number,
+  patch: Partial<ConditionDraft>,
+): SelectModel {
+  return {
+    ...model,
+    conditions: model.conditions.map((item) => (item.id === id ? { ...item, ...patch } : item)),
+  };
+}
+
+export function removeCondition(model: SelectModel, id: number): SelectModel {
+  return { ...model, conditions: model.conditions.filter((item) => item.id !== id) };
+}
+
 // ── Lo que se guarda ────────────────────────────────────────────────────────
 
 /**
  * Versión del formato guardado.
  *
  * 1 son las composiciones anteriores, sin número. La 2 añade la versión y las
- * posiciones del lienzo; se leen las dos sin migrar nada.
+ * posiciones del lienzo; la 3, las columnas calculadas y las condiciones
+ * escritas a mano. Se leen todas sin migrar nada.
  */
-export const COMPOSITION_FORMAT = 2;
+export const COMPOSITION_FORMAT = 3;
 
 /** Dónde quedó cada caja en el lienzo, por clave de tabla. */
 export type CanvasLayout = Readonly<Record<string, { readonly x: number; readonly y: number }>>;
@@ -856,6 +1106,8 @@ export function compositionState(
     orders: form.orders,
     limit: form.limit,
     distinct: form.distinct,
+    expressions: form.expressions,
+    conditions: form.conditions,
     sqlOverride,
     ...(layout ? { layout } : {}),
   };
@@ -897,6 +1149,9 @@ export function readCompositionState(value: unknown): CompositionState | null {
         ? (value['limit'] as number | null)
         : empty.limit,
     distinct: value['distinct'] === true,
+    // Las anteriores a la 1.22 no tenían nada escrito a mano.
+    expressions: list<ExpressionDraft>(value['expressions']),
+    conditions: list<ConditionDraft>(value['conditions']),
   };
   const layout = isRecord(value['layout']) ? (value['layout'] as CanvasLayout) : undefined;
 

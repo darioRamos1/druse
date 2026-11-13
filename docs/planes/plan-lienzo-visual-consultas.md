@@ -152,6 +152,22 @@ previsto:
 - Las pestañas son Formulario y Lienzo; el SQL sigue a la vista en el panel de
   la derecha, como antes, en las dos.
 
+Fase 2 hecha el mismo día, en la versión 1.22.0, con los estantes en
+`frontend/src/app/features/query-builder/query-shelves/` y la vista previa en
+gráfico en `preview-chart.ts`. Cambios respecto a lo previsto:
+
+- Las columnas se llevan a los estantes cogiéndolas por el nombre; el círculo
+  sigue siendo para cruzar. Al acercarse al borde, el panel se desplaza solo:
+  los estantes quedan debajo del lienzo.
+- Los filtros de los estantes son de la tabla principal, como los del
+  formulario. Filtrar por una columna de otra tabla se hace con una condición
+  en «SQL a mano», y el estante lo dice al soltarla.
+- Las condiciones HAVING siguen en el formulario; los estantes avisan cuando
+  la consulta las tiene.
+- Las condiciones a mano son de WHERE. Las columnas calculadas pueden ser
+  «sobre el grupo» (`SUM(a) / SUM(b)`); las demás se agrupan también.
+- El formato guardado pasa a la versión 3.
+
 | Fase | Trabajo | Cómo se valida |
 |---|---|---|
 | 0. Modelo único | Sacar `query-model.ts` del compositor sin cambiar su comportamiento. Añadir `layout` y versión de formato. | Las pruebas actuales del compositor pasan sin tocarlas. Composiciones antiguas se abren igual. Pruebas del modelo: mismo SQL que antes en los seis motores. |

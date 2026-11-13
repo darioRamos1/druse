@@ -7,9 +7,26 @@
   display: block;
 }
 
+/* Los mismos campos que el formulario: su hoja no llega a los componentes hijos. */
+select,
+input[type='text'],
+input[type='search'] {
+  padding: 3px 6px;
+  border: 1px solid var(--dr-border-input);
+  border-radius: 6px;
+  background: var(--dr-surface-input);
+  color: var(--dr-text);
+  font-family: var(--dr-font-mono);
+  font-size: 11.5px;
+
+  &:hover:not(:disabled) {
+    border-color: var(--dr-border-input-hover);
+  }
+}
+
 .canvas {
   position: relative;
-  height: 420px;
+  height: 340px;
   overflow: auto;
   border: 1px solid var(--dr-border);
   border-radius: 8px;
@@ -303,6 +320,25 @@
     color: var(--dr-text-secondary);
     cursor: pointer;
   }
+}
+
+/* El nombre de la columna es el asa para llevarla a un estante. */
+.row__name {
+  cursor: grab;
+}
+
+.carried {
+  position: fixed;
+  z-index: 10;
+  padding: 2px 9px;
+  border: 1px solid var(--dr-accent);
+  border-radius: 999px;
+  background: var(--dr-surface-raised);
+  box-shadow: var(--dr-shadow-menu);
+  color: var(--dr-text);
+  font-size: 11.5px;
+  pointer-events: none;
+  transform: translate(10px, -50%);
 }
 
 .hint {
