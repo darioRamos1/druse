@@ -1,5 +1,3 @@
-@use '../report-controls';
-
 /* Una capa sobre el shell, como el diagrama: el constructor necesita casi toda la ventana. */
 :host {
   position: fixed;
@@ -641,7 +639,7 @@
 
 /* Los botones del lienzo de la fuente, a su tamaño y no a lo ancho del campo. */
 .canvas-source {
-  .btn,
+  .button,
   .link {
     align-self: flex-start;
   }
