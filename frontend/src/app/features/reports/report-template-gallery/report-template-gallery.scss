@@ -22,7 +22,7 @@
   position: relative;
   display: flex;
   flex-direction: column;
-  width: min(640px, 100%);
+  width: min(720px, 100%);
   max-height: min(720px, 100%);
   border: 1px solid var(--dr-border);
   border-radius: var(--dr-radius-window);
@@ -40,7 +40,7 @@
     display: flex;
     align-items: center;
     gap: 8px;
-    padding: 10px 10px 10px 14px;
+    padding: 12px 12px 12px 16px;
     border-bottom: 1px solid var(--dr-border);
     color: var(--dr-text-secondary);
   }
@@ -50,7 +50,7 @@
     margin: 0;
     overflow: hidden;
     color: var(--dr-text);
-    font-size: 13px;
+    font-size: 16px;
     font-weight: 600;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -72,7 +72,7 @@
     flex-direction: column;
     gap: 12px;
     min-height: 0;
-    padding: 12px 14px 14px;
+    padding: 14px 16px 16px;
     overflow: auto;
   }
 
@@ -111,7 +111,7 @@
 
 .cards {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(260px, 100%), 1fr));
   gap: 10px;
   margin: 0;
   padding: 0;
@@ -121,10 +121,11 @@
 .card {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  padding: 12px;
+  gap: 8px;
+  min-width: 0;
+  padding: 14px;
   border: 1px solid var(--dr-border);
-  border-radius: var(--dr-radius-sm);
+  border-radius: var(--dr-radius);
   background: var(--dr-surface-base);
 
   &__head {

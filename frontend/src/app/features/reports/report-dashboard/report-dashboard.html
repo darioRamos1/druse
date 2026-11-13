@@ -108,7 +108,8 @@
       </button>
       <button
         type="button"
-        class="button"
+        class="button board__mode"
+        [class.button--primary]="!editing()"
         [attr.aria-pressed]="editing()"
         (click)="toggleEditing()"
       >
@@ -125,6 +126,9 @@
 
   @if (filters().length > 0) {
     <div class="filters" role="group" [attr.aria-label]="'reports.dashboard.filters' | t">
+      <span class="filters__title">
+        <app-icon name="filter" [size]="14" /> {{ 'reports.dashboard.filters' | t }}
+      </span>
       @for (filter of filters(); track filter.id) {
         @if (filter.kind === 'date') {
           <fieldset class="filter">
@@ -221,15 +225,17 @@
   @if (loading()) {
     <p class="placeholder">{{ 'reports.loading' | t }}</p>
   } @else if (panels().length === 0) {
-    <div class="empty">
-      <app-icon name="chart" [size]="22" />
-      <p class="empty__title">{{ 'reports.dashboard.emptyTitle' | t }}</p>
+    <div class="empty report-empty-state">
+      <span class="report-empty-mark"><app-icon name="chart" [size]="24" /></span>
+      <h3 class="empty__title">{{ 'reports.dashboard.emptyTitle' | t }}</h3>
       <p class="empty__text">
-        {{
-          (catalog().length === 0 ? 'reports.dashboard.noReports' : 'reports.dashboard.emptyText')
-            | t
-        }}
+        {{ (catalog().length === 0 ? 'reports.dashboard.noReports' : 'reports.ui.emptyBoard') | t }}
       </p>
+      @if (catalog().length > 0) {
+        <button type="button" class="button button--primary" (click)="choosePanel()">
+          <app-icon name="plus" [size]="13" /> {{ 'reports.dashboard.addReport' | t }}
+        </button>
+      }
     </div>
   } @else {
     <ol class="grid" [attr.aria-label]="'reports.dashboard.panels' | t">
@@ -530,7 +536,10 @@
 
     <label class="field">
       <span class="field__label">{{ 'reports.dashboard.addReport' | t }}</span>
-      <select (change)="add($any($event.target).value); $any($event.target).value = ''">
+      <select
+        #reportPicker
+        (change)="add($any($event.target).value); $any($event.target).value = ''"
+      >
         <option value="" selected>{{ 'reports.dashboard.chooseReport' | t }}</option>
         @for (group of catalog(); track group.dataset.id) {
           <optgroup [label]="group.dataset.name">

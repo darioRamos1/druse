@@ -1,3 +1,4 @@
+import { NgTemplateOutlet } from '@angular/common';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -6,6 +7,7 @@ import {
   effect,
   inject,
   input,
+  output,
   signal,
   untracked,
 } from '@angular/core';
@@ -80,6 +82,7 @@ export const VISUALS: readonly ReportVisualKind[] = ['Table', 'Bar', 'Line', 'In
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     Icon,
+    NgTemplateOutlet,
     ReportChart,
     ReportHistory,
     ReportScheduleForm,
@@ -100,6 +103,7 @@ export class ReportWorkbench {
   readonly definitionDirty = input(false);
   readonly inspectorOpen = input(true);
   readonly columnLabel = input<(name: string) => string>((name) => name);
+  readonly configure = output<void>();
 
   protected readonly visuals = VISUALS;
   protected readonly aggregates = AGGREGATES;
@@ -113,9 +117,12 @@ export class ReportWorkbench {
   protected readonly lastRun = signal<ReportRun | null>(null);
   protected readonly reports = signal<readonly SavedReport[]>([]);
   protected readonly draft = signal<ReportDraft | null>(null);
+  readonly canConfigure = computed(() => this.draft() !== null);
   protected readonly asTable = signal(false);
   protected readonly savingReport = signal(false);
   protected readonly notice = signal<string | null>(null);
+  protected readonly pendingReport = signal<(() => void) | null>(null);
+  private _startingDraft: ReportDraft | null = null;
   /** Plantillas: la galería abierta, el formulario de guardar y si se está guardando. */
   protected readonly galleryOpen = signal(false);
   protected readonly savingTemplate = signal(false);
@@ -178,16 +185,28 @@ export class ReportWorkbench {
     () => this.reports().find((report) => report.id === this.draft()?.id) ?? null,
   );
 
+  /**
+   * Si el borrador dice algo distinto de lo guardado.
+   *
+   * Los ajustes se comparan normalizados **los dos**: se guardan tal como están
+   * en el borrador, y `parseSettings` los ajusta al leer (un indicador que
+   * conserva el «Agrupar por» de cuando era de barras, columnas que ya no
+   * existen). Normalizar solo uno de los lados hacía que un reporte recién
+   * guardado pareciera cambiado, y cerrar Reportes pedía descartarlo.
+   */
   protected readonly reportDirty = computed(() => {
     const draft = this.draft();
     const saved = this.saved();
+    const normalized = (settings: string, visual: ReportVisualKind) =>
+      JSON.stringify(parseSettings(settings, visual, this.columns()));
 
     return (
       draft !== null &&
       (saved === null ||
         saved.name !== draft.name.trim() ||
         saved.visual !== draft.visual ||
-        saved.settings !== JSON.stringify(draft.settings))
+        normalized(saved.settings, saved.visual) !==
+          normalized(JSON.stringify(draft.settings), draft.visual))
     );
   });
 
@@ -535,6 +554,47 @@ export class ReportWorkbench {
     this.asTable.set(false);
   }
 
+  protected switchReport(report?: SavedReport): void {
+    if (report && this.isSelected(report)) {
+      return;
+    }
+
+    this.guardReportChange(() => {
+      if (report) {
+        this.select(report);
+      } else {
+        this.newReport();
+        this.configure.emit();
+      }
+    });
+  }
+
+  hasChanges(): boolean {
+    const draft = this.draft();
+    const saved = this.saved();
+    return (
+      draft !== null &&
+      (saved ? this.reportDirty() : JSON.stringify(draft) !== JSON.stringify(this._startingDraft))
+    );
+  }
+
+  private guardReportChange(change: () => void): void {
+    if (this.savingReport()) {
+      return;
+    }
+    if (this.hasChanges()) {
+      this.pendingReport.set(change);
+    } else {
+      change();
+    }
+  }
+
+  protected discardAndSwitch(): void {
+    const change = this.pendingReport();
+    this.pendingReport.set(null);
+    change?.();
+  }
+
   protected isSelected(report: SavedReport): boolean {
     return this.draft()?.id === report.id;
   }
@@ -542,12 +602,14 @@ export class ReportWorkbench {
   protected newReport(): void {
     const visual: ReportVisualKind = this.numericColumns().length > 0 ? 'Bar' : 'Table';
 
-    this.draft.set({
+    const draft: ReportDraft = {
       id: crypto.randomUUID(),
       name: this._i18n.t('reports.report.defaultName', { number: this.reports().length + 1 }),
       visual,
       settings: defaultSettings(visual, this.columns()),
-    });
+    };
+    this._startingDraft = draft;
+    this.draft.set(draft);
     this.asTable.set(false);
   }
 
@@ -746,6 +808,7 @@ export class ReportWorkbench {
           : [...list, saved],
       );
       this.draft.update((current) => (current ? { ...current, name: saved.name } : current));
+      this.pendingReport.set(null);
     } catch (error) {
       this.error.set(describeError(error, this._i18n));
     } finally {
@@ -833,8 +896,12 @@ export class ReportWorkbench {
   }
 
   /** Crea en este conjunto los reportes de la plantilla y abre el primero. */
-  protected async applyTemplate(application: TemplateApplication): Promise<void> {
+  protected applyTemplate(application: TemplateApplication): void {
     this.galleryOpen.set(false);
+    this.guardReportChange(() => void this.createFromTemplate(application));
+  }
+
+  private async createFromTemplate(application: TemplateApplication): Promise<void> {
     this.error.set(null);
 
     const copy = instantiateTemplate(

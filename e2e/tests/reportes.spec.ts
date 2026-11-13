@@ -26,6 +26,7 @@ import {
   crearTablero,
   faltaContrasena,
   previsualizar,
+  guardarReporte,
 } from '../support/reportes';
 
 /**
@@ -100,7 +101,7 @@ test.describe('Reportes BI', () => {
     const informe = `Cumplimiento ${nombre}`;
 
     await reportes.locator('.inspector').getByLabel('Nombre del reporte').fill(informe);
-    await reportes.getByRole('button', { name: 'Guardar reporte' }).click();
+    await guardarReporte(reportes);
     await expect(reportes.locator('.reports__tab[aria-selected="true"]')).toHaveText(informe);
 
     // Cerrar y volver: el reporte y sus datos salen de reports.db.
@@ -209,7 +210,7 @@ test.describe('Plantillas de Reportes BI', () => {
     await elegirColumna(reportes.locator('.inspector').getByLabel('Agrupar por'), 'municipio');
     await expect(reportes.locator('.chart__bar')).toHaveCount(3);
     await reportes.locator('.inspector').getByLabel('Nombre del reporte').fill(`Ventas ${marca}`);
-    await reportes.getByRole('button', { name: 'Guardar reporte' }).click();
+    await guardarReporte(reportes);
     await crearTablero(reportes, `E2E Plantilla tablero ${marca}`, [`Ventas ${marca}`], empresa);
 
     const tablero = reportes.locator('app-report-dashboard');
@@ -389,11 +390,11 @@ test.describe('Exportar tableros de Reportes BI', () => {
 
     await reportes.locator('.inspector').getByLabel('Agrupar por').selectOption({ label: 'Ventas.municipio' });
     await reportes.locator('.inspector').getByLabel('Nombre del reporte').fill(`Barras ${marca}`);
-    await reportes.getByRole('button', { name: 'Guardar reporte' }).click();
+    await guardarReporte(reportes);
     await reportes.getByRole('button', { name: 'Nuevo reporte' }).click();
     await reportes.getByRole('radio', { name: 'Indicador' }).click();
     await reportes.locator('.inspector').getByLabel('Nombre del reporte').fill(`Cumplimiento ${marca}`);
-    await reportes.getByRole('button', { name: 'Guardar reporte' }).click();
+    await guardarReporte(reportes);
     await crearTablero(reportes, `E2E Exportar tablero ${marca}`, [`Barras ${marca}`, `Cumplimiento ${marca}`], empresa);
 
     // Se cierra la conexión: lo que se exporta sale de reports.db, no de la base.
@@ -629,7 +630,11 @@ test.describe('Reportes BI entre motores', () => {
     await reportes.getByRole('radio', { name: 'Tabla' }).click();
     await expect(reportes.locator('app-report-chart tbody tr')).toHaveCount(3);
 
+    // El reporte cambió y no se guardó: salir de Visualización pregunta antes.
     await reportes.locator('.steps__item').first().click();
+    const aviso = reportes.getByRole('alertdialog');
+    await expect(aviso).toContainText('Tienes cambios sin guardar en este reporte');
+    await aviso.getByRole('button', { name: 'Descartar cambios' }).click();
     await borrarConjunto(reportes);
     await page.keyboard.press('Escape');
     await expect(reportes.locator('.dialog')).toBeHidden();

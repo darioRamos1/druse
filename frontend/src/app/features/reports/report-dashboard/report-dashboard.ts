@@ -8,6 +8,8 @@ import {
   output,
   signal,
   untracked,
+  viewChild,
+  ElementRef,
 } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 
@@ -136,6 +138,7 @@ import {
   },
 })
 export class ReportDashboard {
+  private readonly _reportPicker = viewChild<ElementRef<HTMLSelectElement>>('reportPicker');
   private readonly _gateway = inject(ApplicationGateway);
   private readonly _i18n = inject(I18nService);
   private readonly _files = inject(FileSaveService);
@@ -172,6 +175,7 @@ export class ReportDashboard {
   readonly dirtyChange = output<boolean>();
   /** Al empezar a editar: el constructor abre el inspector, que es donde se edita. */
   readonly editingChange = output<boolean>();
+  readonly configure = output<void>();
 
   /**
    * Si el tablero existe en el servidor.
@@ -550,6 +554,14 @@ export class ReportDashboard {
 
   protected toggleEditing(): void {
     this.setEditing(!this.editing());
+  }
+
+  protected choosePanel(): void {
+    if (!this.editing()) {
+      this.setEditing(true);
+    }
+    this.configure.emit();
+    requestAnimationFrame(() => this._reportPicker()?.nativeElement.focus());
   }
 
   private setEditing(editing: boolean): void {

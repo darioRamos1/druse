@@ -6,7 +6,17 @@
 
 <section class="dialog" role="dialog" aria-labelledby="reports-title">
   <header class="head">
-    <app-icon name="chart" [size]="14" />
+    <button
+      type="button"
+      class="icon-button head__navigation"
+      aria-controls="reports-navigation"
+      [attr.aria-expanded]="navigationOpen()"
+      [attr.aria-label]="'reports.ui.navigation' | t"
+      (click)="navigationOpen.set(!navigationOpen())"
+    >
+      <app-icon name="panel-left" [size]="17" />
+    </button>
+    <span class="head__mark"><app-icon name="chart" [size]="18" /></span>
     <div class="head__text">
       <h2 class="head__title" id="reports-title">{{ 'reports.title' | t }}</h2>
       @if (mode() === 'dataset') {
@@ -20,52 +30,57 @@
         />
       }
     </div>
-    @if (mode() === 'dataset') {
-      <p class="head__status" aria-live="polite">
-        @if (draft().version > 0) {
-          {{ 'reports.versionStatus' | t: { version: draft().version } }}
-        }
-        @if (dirty()) {
-          <span class="head__dirty">{{ 'reports.unsaved' | t }}</span>
-        }
-      </p>
+    <div class="head__actions">
+      @if (mode() === 'dataset' && (step() !== 'visual' || dirty())) {
+        <p class="head__status" aria-live="polite">
+          @if (draft().version > 0) {
+            {{ 'reports.versionStatus' | t: { version: draft().version } }}
+          }
+          @if (dirty()) {
+            <span class="head__dirty">{{ 'reports.unsaved' | t }}</span>
+          }
+        </p>
+        <button
+          type="button"
+          class="button"
+          (click)="runPreview()"
+          [disabled]="previewProblems().length > 0 || previewing()"
+        >
+          <app-icon name="play-outline" [size]="11" />
+          {{ (previewing() ? 'reports.previewing' : 'reports.preview') | t }}
+        </button>
+        <button
+          type="button"
+          class="button button--primary"
+          (click)="save()"
+          [disabled]="problems().length > 0 || saving() || !dirty()"
+        >
+          <app-icon name="save" [size]="11" />
+          {{ 'reports.save' | t }}
+        </button>
+      }
+      @if (canConfigure()) {
+        <button
+          type="button"
+          class="button head__settings"
+          (click)="toggleInspector()"
+          [attr.aria-pressed]="inspectorOpen()"
+          [attr.aria-label]="'reports.inspector.toggle' | t"
+          [attr.title]="'reports.inspector.toggle' | t"
+        >
+          <app-icon name="settings" [size]="15" />
+          {{ 'reports.inspector.label' | t }}
+        </button>
+      }
       <button
         type="button"
-        class="button"
-        (click)="runPreview()"
-        [disabled]="previewProblems().length > 0 || previewing()"
+        class="icon-button"
+        (click)="close()"
+        [attr.aria-label]="'common.close' | t"
       >
-        <app-icon name="play-outline" [size]="11" />
-        {{ (previewing() ? 'reports.previewing' : 'reports.preview') | t }}
+        <app-icon name="close" [size]="12" />
       </button>
-      <button
-        type="button"
-        class="button button--primary"
-        (click)="save()"
-        [disabled]="problems().length > 0 || saving() || !dirty()"
-      >
-        <app-icon name="save" [size]="11" />
-        {{ 'reports.save' | t }}
-      </button>
-    }
-    <button
-      type="button"
-      class="icon-button"
-      (click)="toggleInspector()"
-      [attr.aria-pressed]="inspectorOpen()"
-      [attr.aria-label]="'reports.inspector.toggle' | t"
-      [attr.title]="'reports.inspector.toggle' | t"
-    >
-      <app-icon name="panel-left" [size]="13" />
-    </button>
-    <button
-      type="button"
-      class="icon-button"
-      (click)="close()"
-      [attr.aria-label]="'common.close' | t"
-    >
-      <app-icon name="close" [size]="12" />
-    </button>
+    </div>
   </header>
 
   @if (confirm(); as pending) {
@@ -88,7 +103,13 @@
     [class.is-working]="mode() !== 'dataset' || step() === 'visual'"
   >
     <!-- Navegación: pasos del constructor y conjuntos guardados. -->
-    <nav class="rail" [attr.aria-label]="'reports.nav' | t">
+    <nav
+      class="rail"
+      id="reports-navigation"
+      [class.is-open]="navigationOpen()"
+      [attr.aria-label]="'reports.nav' | t"
+      (click)="closeNavigationOnAction($event)"
+    >
       <p class="rail__label">{{ 'reports.steps' | t }}</p>
       <ol class="steps">
         <li>
@@ -185,15 +206,6 @@
         >
           <app-icon name="plus" [size]="11" />
         </button>
-        <button
-          type="button"
-          class="icon-button"
-          (click)="galleryOpen.set(true)"
-          [attr.aria-label]="'reports.template.newFromTemplate' | t"
-          [attr.title]="'reports.template.newFromTemplate' | t"
-        >
-          <app-icon name="copy" [size]="11" />
-        </button>
       </div>
       @if (templateError(); as message) {
         <p class="rail__hint rail__hint--danger" role="alert">{{ message }}</p>
@@ -220,6 +232,10 @@
           }
         </ul>
       }
+      <button type="button" class="button rail__templates" (click)="galleryOpen.set(true)">
+        <app-icon name="copy" [size]="13" />
+        {{ 'reports.template.newFromTemplate' | t }}
+      </button>
 
       <!-- Logo, datos y color de una empresa, para ponérselos a sus tableros. -->
       <div class="rail__row">
@@ -248,17 +264,8 @@
                 (click)="showIdentity(identity)"
               >
                 <span class="datasets__name">
-                  <!-- Sin color de marca, el punto va hueco. El estilo va aquí y no en
-                       la hoja del constructor, que está en su límite de tamaño. -->
                   <span
-                    style="
-                      display: inline-block;
-                      flex: none;
-                      width: 9px;
-                      height: 9px;
-                      border: 1px solid var(--dr-text-tertiary);
-                      border-radius: 50%;
-                    "
+                    class="report-brand-dot"
                     [style.background]="identity.brandColor ?? 'transparent'"
                     aria-hidden="true"
                   ></span>
@@ -282,6 +289,7 @@
         (deleted)="dashboardDeleted($event)"
         (dirtyChange)="dashboardDirty($event)"
         (editingChange)="dashboardEditing($event)"
+        (configure)="inspectorOpen.set(true)"
       />
     } @else if (mode() === 'identity' && openIdentity(); as identity) {
       <app-report-identity-editor
@@ -299,18 +307,19 @@
         [definitionDirty]="dirty()"
         [inspectorOpen]="inspectorOpen()"
         [columnLabel]="labelOf"
+        (configure)="inspectorOpen.set(true)"
       />
     } @else {
       <!-- Centro: lo que devuelve cada fuente y lo que sale de cruzarlas. -->
       <main class="stage">
         @if (sources().length === 0) {
-          <div class="empty">
-            <app-icon name="database" [size]="22" />
-            <p class="empty__title">{{ 'reports.empty.title' | t }}</p>
-            <p class="empty__text">{{ 'reports.empty.text' | t }}</p>
+          <div class="empty report-empty-state">
+            <span class="report-empty-mark"><app-icon name="database" [size]="25" /></span>
+            <h3 class="empty__title">{{ 'reports.empty.title' | t }}</h3>
             @if (connections().length === 0) {
               <p class="empty__text">{{ 'reports.empty.noConnections' | t }}</p>
             } @else {
+              <p class="empty__text">{{ 'reports.empty.text' | t }}</p>
               <button type="button" class="button button--primary" (click)="addSource()">
                 <app-icon name="plus" [size]="11" />
                 {{ 'reports.source.add' | t }}
@@ -348,7 +357,14 @@
               <p class="banner banner--danger" role="alert">{{ message }}</p>
             }
             @if (notice(); as message) {
-              <p class="banner banner--success" role="status">{{ message }}</p>
+              <div class="banner banner--success report-saved-result">
+                <span role="status">{{ message }}</span>
+                @if (savedDataset() && !dirty()) {
+                  <button type="button" class="button" (click)="goTo('visual')">
+                    <app-icon name="chart" [size]="13" /> {{ 'reports.ui.startVisual' | t }}
+                  </button>
+                }
+              </div>
             }
             @if (stale()) {
               <p class="banner banner--warning" role="status">{{ 'reports.stale' | t }}</p>
@@ -478,6 +494,9 @@
       <!-- Inspector: la configuración del paso, plegable para dejar sitio a la vista previa. -->
       @if (inspectorOpen() && sources().length > 0) {
         <aside class="inspector" [attr.aria-label]="'reports.inspector.label' | t">
+          <h3 class="report-settings-title">
+            {{ (step() === 'join' ? 'reports.ui.joinSettings' : 'reports.ui.sourceSettings') | t }}
+          </h3>
           @if (step() === 'sources') {
             <div class="segmented" role="tablist" [attr.aria-label]="'reports.step.sources' | t">
               @for (source of sources(); track $index) {

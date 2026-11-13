@@ -12,6 +12,52 @@
 // `&--`: Sass no deja añadirlos detrás de un `:not()`.
 
 @mixin controls($outside: '') {
+  .report-empty-state#{$outside} {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    margin: auto;
+    width: min(480px, calc(100% - 32px));
+    padding: 28px 22px;
+    border: 1px solid var(--dr-border);
+    border-radius: var(--dr-radius-window);
+    background: var(--dr-surface-panel);
+    color: var(--dr-text-secondary);
+    text-align: center;
+  }
+
+  .report-empty-mark#{$outside} {
+    display: inline-grid;
+    place-items: center;
+    width: 48px;
+    height: 48px;
+    border-radius: var(--dr-radius);
+    background: var(--dr-accent-tint);
+    color: var(--dr-accent);
+  }
+
+  .report-saved-result#{$outside} {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  .report-settings-title#{$outside} {
+    margin: 0;
+    font-size: 14px;
+  }
+
+  .report-brand-dot#{$outside} {
+    display: inline-block;
+    width: 9px;
+    height: 9px;
+    border: 1px solid var(--dr-text-tertiary);
+    border-radius: 50%;
+  }
+
   .button#{$outside} {
     display: inline-flex;
     align-items: center;
