@@ -175,7 +175,9 @@ test.describe('Oracle de punta a punta', () => {
 
     // Y la segunda es la segunda: el orden del guion es el orden de los
     // resultados, que es lo que permite leerlos sin adivinar cuál es cuál.
+    // La cuadrícula se redibuja después del clic: leerla en el acto puede dar
+    // todavía la del primer conjunto, así que se espera a que cambie.
     await conjuntos(page).nth(1).click();
-    expect(await primeraColumna(page)).toEqual(['2']);
+    await expect.poll(() => primeraColumna(page)).toEqual(['2']);
   });
 });

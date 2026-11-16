@@ -432,8 +432,7 @@
         <div class="catalog-problems" role="alert">
           @for (item of catalog.failures(); track tableKey(item.table)) {
             <p>
-              <strong>{{ tableName(item.table) }}</strong
-              >: {{ item.error }}
+              <strong>{{ tableName(item.table) }}</strong>: {{ item.error }}
             </p>
           }
           <label

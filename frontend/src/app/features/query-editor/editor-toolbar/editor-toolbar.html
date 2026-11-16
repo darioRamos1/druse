@@ -96,8 +96,7 @@
           (click)="secondaryMenu.close(true); format.emit()"
         >
           <app-icon name="format" [size]="14" />
-          <span>{{ 'toolbar.formatSql' | t }}</span
-          ><kbd>{{ shortcut('Ctrl+Shift+F') }}</kbd>
+          <span>{{ 'toolbar.formatSql' | t }}</span><kbd>{{ shortcut('Ctrl+Shift+F') }}</kbd>
         </button>
         <button
           type="button"
@@ -112,8 +111,7 @@
           (click)="secondaryMenu.close(true); toggleLineComment.emit()"
         >
           <app-icon name="comment" [size]="14" />
-          <span>{{ 'toolbar.commentMenu' | t }}</span
-          ><kbd>{{ shortcut('Ctrl+/') }}</kbd>
+          <span>{{ 'toolbar.commentMenu' | t }}</span><kbd>{{ shortcut('Ctrl+/') }}</kbd>
         </button>
         @if (!transactionOpen()) {
           <button
