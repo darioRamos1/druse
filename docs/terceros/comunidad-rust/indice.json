@@ -4,10 +4,10 @@
   "features": [
     "custom-protocol"
   ],
-  "cargoLockSha256": "5256844c9f1e66512996ae1e753e7a0331731a3d5e47a70b1433e2e6af723228",
+  "cargoLockSha256": "f9864c1754bc527fe87c150c20fba9a1bec1b09e8021ce4f321c83c805c02fef",
   "cargoTomlSha256": "314aa238a602928e298348c07d2e72c49e1b64a0f9fb0323beebde8d1a642d9d",
   "alcance": "Avisos recopilados del grafo normal Windows. No cierra revisión de fuente correspondiente, código generado, compatibilidad o elegibilidad SignPath.",
-  "macrosSeparadas": 21,
+  "macrosSeparadas": 22,
   "paquetes": [
     {
       "componente": "aho-corasick",
@@ -3340,20 +3340,30 @@
     },
     {
       "componente": "rfd",
-      "version": "0.16.0",
+      "version": "0.17.2",
       "licenciaDeclarada": "MIT",
-      "fuente": "https://static.crates.io/crates/rfd/rfd-0.16.0.crate",
-      "crateSha256": "a15ad77d9e70a92437d8f74c35d99b4e4691128df018833e99f90bcd36152672",
-      "commit": "5d32eec3a7930eb43b7e864eb773831bbd3d91b4",
+      "fuente": "https://static.crates.io/crates/rfd/rfd-0.17.2.crate",
+      "crateSha256": "20dafead71c16a34e1ff357ddefc8afc11e7d51d6d2b9fbd07eaa48e3e540220",
+      "commit": "cca0cfa5fc38c2752c9c98f9f5168904a515fd55",
       "documentos": [
         {
           "archivo": "fuentes/65fc947f4bac882a2cd104ef73c246b1b037059df9f2b3a58b7f77f0b9e56071.txt",
           "sha256": "65fc947f4bac882a2cd104ef73c246b1b037059df9f2b3a58b7f77f0b9e56071",
           "origen": {
             "tipo": "archivo-crate",
-            "url": "https://static.crates.io/crates/rfd/rfd-0.16.0.crate",
+            "url": "https://static.crates.io/crates/rfd/rfd-0.17.2.crate",
             "ruta": "LICENSE",
-            "crateSha256": "a15ad77d9e70a92437d8f74c35d99b4e4691128df018833e99f90bcd36152672"
+            "crateSha256": "20dafead71c16a34e1ff357ddefc8afc11e7d51d6d2b9fbd07eaa48e3e540220"
+          }
+        },
+        {
+          "archivo": "fuentes/ae26bc7b1bc91fb8648f6a298decbb1a77090a56c9d04e2c23b8365e5f54acb5.txt",
+          "sha256": "ae26bc7b1bc91fb8648f6a298decbb1a77090a56c9d04e2c23b8365e5f54acb5",
+          "origen": {
+            "tipo": "archivo-crate",
+            "url": "https://static.crates.io/crates/rfd/rfd-0.17.2.crate",
+            "ruta": "src/backend/xdg_desktop_portal/window_identifier/LICENSE",
+            "crateSha256": "20dafead71c16a34e1ff357ddefc8afc11e7d51d6d2b9fbd07eaa48e3e540220"
           }
         }
       ]
@@ -3460,20 +3470,20 @@
     },
     {
       "componente": "rustls",
-      "version": "0.23.43",
+      "version": "0.23.46",
       "licenciaDeclarada": "Apache-2.0 OR ISC OR MIT",
-      "fuente": "https://static.crates.io/crates/rustls/rustls-0.23.43.crate",
-      "crateSha256": "0283386ce02abc0151e1761d08802dfe86c173b0b494af5cbc086574e453da06",
-      "commit": "fcf61cdbba30913cfd5b40aefa83989c6233812d",
+      "fuente": "https://static.crates.io/crates/rustls/rustls-0.23.46.crate",
+      "crateSha256": "48e13bd8c0e9365c43cfa5c9e8f9ad49d3c8444926c9aac819e0e4dc503c8fdf",
+      "commit": "f04804fa13341a9b1dc02b5d1dd8a746f2c4b7fb",
       "documentos": [
         {
           "archivo": "fuentes/a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2.txt",
           "sha256": "a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2",
           "origen": {
             "tipo": "archivo-crate",
-            "url": "https://static.crates.io/crates/rustls/rustls-0.23.43.crate",
+            "url": "https://static.crates.io/crates/rustls/rustls-0.23.46.crate",
             "ruta": "LICENSE-APACHE",
-            "crateSha256": "0283386ce02abc0151e1761d08802dfe86c173b0b494af5cbc086574e453da06"
+            "crateSha256": "48e13bd8c0e9365c43cfa5c9e8f9ad49d3c8444926c9aac819e0e4dc503c8fdf"
           }
         },
         {
@@ -3481,9 +3491,9 @@
           "sha256": "7cfafc877eccc46c0e346ccbaa5c51bb6b894d2b818e617d970211e232785ad4",
           "origen": {
             "tipo": "archivo-crate",
-            "url": "https://static.crates.io/crates/rustls/rustls-0.23.43.crate",
+            "url": "https://static.crates.io/crates/rustls/rustls-0.23.46.crate",
             "ruta": "LICENSE-ISC",
-            "crateSha256": "0283386ce02abc0151e1761d08802dfe86c173b0b494af5cbc086574e453da06"
+            "crateSha256": "48e13bd8c0e9365c43cfa5c9e8f9ad49d3c8444926c9aac819e0e4dc503c8fdf"
           }
         },
         {
@@ -3491,9 +3501,9 @@
           "sha256": "709e3175b4212f7b13aa93971c9f62ff8c69ec45ad8c6532a7e0c41d7a7d6f8c",
           "origen": {
             "tipo": "archivo-crate",
-            "url": "https://static.crates.io/crates/rustls/rustls-0.23.43.crate",
+            "url": "https://static.crates.io/crates/rustls/rustls-0.23.46.crate",
             "ruta": "LICENSE-MIT",
-            "crateSha256": "0283386ce02abc0151e1761d08802dfe86c173b0b494af5cbc086574e453da06"
+            "crateSha256": "48e13bd8c0e9365c43cfa5c9e8f9ad49d3c8444926c9aac819e0e4dc503c8fdf"
           }
         }
       ]
@@ -3560,20 +3570,20 @@
     },
     {
       "componente": "rustls-webpki",
-      "version": "0.103.15",
+      "version": "0.103.17",
       "licenciaDeclarada": "ISC",
-      "fuente": "https://static.crates.io/crates/rustls-webpki/rustls-webpki-0.103.15.crate",
-      "crateSha256": "f3c3cf1d8b1e7d4927e2d154c3fcb02979afb9939629c62cd9048d4f07b60ac2",
-      "commit": "c14836d8de33c0ad0ac7dcb28fe9aade20831a4d",
+      "fuente": "https://static.crates.io/crates/rustls-webpki/rustls-webpki-0.103.17.crate",
+      "crateSha256": "e3a0760a887c14823fca5a1c970b01d47c328c696c0c64829d1df50e8f853fd5",
+      "commit": "7d4f8d83cc13d3f4169ef774aebb6319a376e000",
       "documentos": [
         {
           "archivo": "fuentes/5b698ca13897be3afdb7174256fa1574f8c6892b8bea1a66dd6469d3fe27885a.txt",
           "sha256": "5b698ca13897be3afdb7174256fa1574f8c6892b8bea1a66dd6469d3fe27885a",
           "origen": {
             "tipo": "archivo-crate",
-            "url": "https://static.crates.io/crates/rustls-webpki/rustls-webpki-0.103.15.crate",
+            "url": "https://static.crates.io/crates/rustls-webpki/rustls-webpki-0.103.17.crate",
             "ruta": "LICENSE",
-            "crateSha256": "f3c3cf1d8b1e7d4927e2d154c3fcb02979afb9939629c62cd9048d4f07b60ac2"
+            "crateSha256": "e3a0760a887c14823fca5a1c970b01d47c328c696c0c64829d1df50e8f853fd5"
           }
         }
       ]
@@ -4280,20 +4290,20 @@
     },
     {
       "componente": "tauri-plugin-dialog",
-      "version": "2.8.2",
+      "version": "2.8.4",
       "licenciaDeclarada": "Apache-2.0 OR MIT",
-      "fuente": "https://static.crates.io/crates/tauri-plugin-dialog/tauri-plugin-dialog-2.8.2.crate",
-      "crateSha256": "3dca325d6e66e9170f2e1b9631722e4e544bcbc51781575d266abdaba697bd51",
-      "commit": "6bbd44d4ef254d835a12c6d7bdf2a8a61778031a",
+      "fuente": "https://static.crates.io/crates/tauri-plugin-dialog/tauri-plugin-dialog-2.8.4.crate",
+      "crateSha256": "ce0fb9c2b6d34a9720627ed930ebc8af26f61e648695aecaeb03d5c33c5896f5",
+      "commit": "128190689dbe59b59d344e01bf07b00862aa3791",
       "documentos": [
         {
           "archivo": "fuentes/eb8a6c84630461b352badcab1dbe5d0168c56d377358b2b8c86b51003272d5ef.txt",
           "sha256": "eb8a6c84630461b352badcab1dbe5d0168c56d377358b2b8c86b51003272d5ef",
           "origen": {
             "tipo": "archivo-crate",
-            "url": "https://static.crates.io/crates/tauri-plugin-dialog/tauri-plugin-dialog-2.8.2.crate",
+            "url": "https://static.crates.io/crates/tauri-plugin-dialog/tauri-plugin-dialog-2.8.4.crate",
             "ruta": "LICENSE.spdx",
-            "crateSha256": "3dca325d6e66e9170f2e1b9631722e4e544bcbc51781575d266abdaba697bd51"
+            "crateSha256": "ce0fb9c2b6d34a9720627ed930ebc8af26f61e648695aecaeb03d5c33c5896f5"
           }
         },
         {
@@ -4301,9 +4311,9 @@
           "sha256": "0cec06e0e55fbc3dc5cee4fca9b607f66cb8f4e4dbcf3b3c013594dd156732e9",
           "origen": {
             "tipo": "archivo-crate",
-            "url": "https://static.crates.io/crates/tauri-plugin-dialog/tauri-plugin-dialog-2.8.2.crate",
+            "url": "https://static.crates.io/crates/tauri-plugin-dialog/tauri-plugin-dialog-2.8.4.crate",
             "ruta": "LICENSE_APACHE-2.0",
-            "crateSha256": "3dca325d6e66e9170f2e1b9631722e4e544bcbc51781575d266abdaba697bd51"
+            "crateSha256": "ce0fb9c2b6d34a9720627ed930ebc8af26f61e648695aecaeb03d5c33c5896f5"
           }
         },
         {
@@ -4311,29 +4321,29 @@
           "sha256": "89ff9689dcf9dd53968785d05a26f7898bb169dbfcada8d032b3e68cf0d55607",
           "origen": {
             "tipo": "archivo-crate",
-            "url": "https://static.crates.io/crates/tauri-plugin-dialog/tauri-plugin-dialog-2.8.2.crate",
+            "url": "https://static.crates.io/crates/tauri-plugin-dialog/tauri-plugin-dialog-2.8.4.crate",
             "ruta": "LICENSE_MIT",
-            "crateSha256": "3dca325d6e66e9170f2e1b9631722e4e544bcbc51781575d266abdaba697bd51"
+            "crateSha256": "ce0fb9c2b6d34a9720627ed930ebc8af26f61e648695aecaeb03d5c33c5896f5"
           }
         }
       ]
     },
     {
       "componente": "tauri-plugin-fs",
-      "version": "2.7.0",
+      "version": "2.7.1",
       "licenciaDeclarada": "Apache-2.0 OR MIT",
-      "fuente": "https://static.crates.io/crates/tauri-plugin-fs/tauri-plugin-fs-2.7.0.crate",
-      "crateSha256": "213fae2d85d4b76b06de5915d1862db9fa74541171f9d2c15da6ac9bd6e788c6",
-      "commit": "6bbd44d4ef254d835a12c6d7bdf2a8a61778031a",
+      "fuente": "https://static.crates.io/crates/tauri-plugin-fs/tauri-plugin-fs-2.7.1.crate",
+      "crateSha256": "5d58eb1d4984e535f47a642ffec09a2da6f5c18a12b5902d12126cb7626d628b",
+      "commit": "44293a5722efcaf27060504e63b17aeba721b40f",
       "documentos": [
         {
           "archivo": "fuentes/eb8a6c84630461b352badcab1dbe5d0168c56d377358b2b8c86b51003272d5ef.txt",
           "sha256": "eb8a6c84630461b352badcab1dbe5d0168c56d377358b2b8c86b51003272d5ef",
           "origen": {
             "tipo": "archivo-crate",
-            "url": "https://static.crates.io/crates/tauri-plugin-fs/tauri-plugin-fs-2.7.0.crate",
+            "url": "https://static.crates.io/crates/tauri-plugin-fs/tauri-plugin-fs-2.7.1.crate",
             "ruta": "LICENSE.spdx",
-            "crateSha256": "213fae2d85d4b76b06de5915d1862db9fa74541171f9d2c15da6ac9bd6e788c6"
+            "crateSha256": "5d58eb1d4984e535f47a642ffec09a2da6f5c18a12b5902d12126cb7626d628b"
           }
         },
         {
@@ -4341,9 +4351,9 @@
           "sha256": "0cec06e0e55fbc3dc5cee4fca9b607f66cb8f4e4dbcf3b3c013594dd156732e9",
           "origen": {
             "tipo": "archivo-crate",
-            "url": "https://static.crates.io/crates/tauri-plugin-fs/tauri-plugin-fs-2.7.0.crate",
+            "url": "https://static.crates.io/crates/tauri-plugin-fs/tauri-plugin-fs-2.7.1.crate",
             "ruta": "LICENSE_APACHE-2.0",
-            "crateSha256": "213fae2d85d4b76b06de5915d1862db9fa74541171f9d2c15da6ac9bd6e788c6"
+            "crateSha256": "5d58eb1d4984e535f47a642ffec09a2da6f5c18a12b5902d12126cb7626d628b"
           }
         },
         {
@@ -4351,29 +4361,29 @@
           "sha256": "89ff9689dcf9dd53968785d05a26f7898bb169dbfcada8d032b3e68cf0d55607",
           "origen": {
             "tipo": "archivo-crate",
-            "url": "https://static.crates.io/crates/tauri-plugin-fs/tauri-plugin-fs-2.7.0.crate",
+            "url": "https://static.crates.io/crates/tauri-plugin-fs/tauri-plugin-fs-2.7.1.crate",
             "ruta": "LICENSE_MIT",
-            "crateSha256": "213fae2d85d4b76b06de5915d1862db9fa74541171f9d2c15da6ac9bd6e788c6"
+            "crateSha256": "5d58eb1d4984e535f47a642ffec09a2da6f5c18a12b5902d12126cb7626d628b"
           }
         }
       ]
     },
     {
       "componente": "tauri-plugin-updater",
-      "version": "2.13.3",
+      "version": "2.14.1",
       "licenciaDeclarada": "Apache-2.0 OR MIT",
-      "fuente": "https://static.crates.io/crates/tauri-plugin-updater/tauri-plugin-updater-2.13.3.crate",
-      "crateSha256": "855a336eb389d2c1502244fd48fa2d8cb487a430f691bbaed025195f99a04489",
-      "commit": "6bbd44d4ef254d835a12c6d7bdf2a8a61778031a",
+      "fuente": "https://static.crates.io/crates/tauri-plugin-updater/tauri-plugin-updater-2.14.1.crate",
+      "crateSha256": "d957abbcb3f9f6c76d22a3a0f012f30880640d0bccb5634d2b12a9937e4c872b",
+      "commit": "128190689dbe59b59d344e01bf07b00862aa3791",
       "documentos": [
         {
           "archivo": "fuentes/eb8a6c84630461b352badcab1dbe5d0168c56d377358b2b8c86b51003272d5ef.txt",
           "sha256": "eb8a6c84630461b352badcab1dbe5d0168c56d377358b2b8c86b51003272d5ef",
           "origen": {
             "tipo": "archivo-crate",
-            "url": "https://static.crates.io/crates/tauri-plugin-updater/tauri-plugin-updater-2.13.3.crate",
+            "url": "https://static.crates.io/crates/tauri-plugin-updater/tauri-plugin-updater-2.14.1.crate",
             "ruta": "LICENSE.spdx",
-            "crateSha256": "855a336eb389d2c1502244fd48fa2d8cb487a430f691bbaed025195f99a04489"
+            "crateSha256": "d957abbcb3f9f6c76d22a3a0f012f30880640d0bccb5634d2b12a9937e4c872b"
           }
         },
         {
@@ -4381,9 +4391,9 @@
           "sha256": "0cec06e0e55fbc3dc5cee4fca9b607f66cb8f4e4dbcf3b3c013594dd156732e9",
           "origen": {
             "tipo": "archivo-crate",
-            "url": "https://static.crates.io/crates/tauri-plugin-updater/tauri-plugin-updater-2.13.3.crate",
+            "url": "https://static.crates.io/crates/tauri-plugin-updater/tauri-plugin-updater-2.14.1.crate",
             "ruta": "LICENSE_APACHE-2.0",
-            "crateSha256": "855a336eb389d2c1502244fd48fa2d8cb487a430f691bbaed025195f99a04489"
+            "crateSha256": "d957abbcb3f9f6c76d22a3a0f012f30880640d0bccb5634d2b12a9937e4c872b"
           }
         },
         {
@@ -4391,9 +4401,9 @@
           "sha256": "89ff9689dcf9dd53968785d05a26f7898bb169dbfcada8d032b3e68cf0d55607",
           "origen": {
             "tipo": "archivo-crate",
-            "url": "https://static.crates.io/crates/tauri-plugin-updater/tauri-plugin-updater-2.13.3.crate",
+            "url": "https://static.crates.io/crates/tauri-plugin-updater/tauri-plugin-updater-2.14.1.crate",
             "ruta": "LICENSE_MIT",
-            "crateSha256": "855a336eb389d2c1502244fd48fa2d8cb487a430f691bbaed025195f99a04489"
+            "crateSha256": "d957abbcb3f9f6c76d22a3a0f012f30880640d0bccb5634d2b12a9937e4c872b"
           }
         }
       ]
@@ -4740,20 +4750,20 @@
     },
     {
       "componente": "tokio",
-      "version": "1.53.1",
+      "version": "1.54.1",
       "licenciaDeclarada": "MIT",
-      "fuente": "https://static.crates.io/crates/tokio/tokio-1.53.1.crate",
-      "crateSha256": "202caea871b69668250d242070849eb495be178ed697a3e98aebce5bc81a0bed",
-      "commit": "75fef53d0a8590c2d1dbb63672aa7b7d1ef51155",
+      "fuente": "https://static.crates.io/crates/tokio/tokio-1.54.1.crate",
+      "crateSha256": "b52fd3255258d26fac7264ab5a76b53c13367136dc011d3d6ad4f8ed070396a3",
+      "commit": "b53b2001ed2ccfd9b87e32a0c6da1a1eebdc80b8",
       "documentos": [
         {
           "archivo": "fuentes/253cd04c6714889df2d32f3f64d669179a1c95c76ac43c40882c52eb06bc3552.txt",
           "sha256": "253cd04c6714889df2d32f3f64d669179a1c95c76ac43c40882c52eb06bc3552",
           "origen": {
             "tipo": "archivo-crate",
-            "url": "https://static.crates.io/crates/tokio/tokio-1.53.1.crate",
+            "url": "https://static.crates.io/crates/tokio/tokio-1.54.1.crate",
             "ruta": "LICENSE",
-            "crateSha256": "202caea871b69668250d242070849eb495be178ed697a3e98aebce5bc81a0bed"
+            "crateSha256": "b52fd3255258d26fac7264ab5a76b53c13367136dc011d3d6ad4f8ed070396a3"
           }
         }
       ]
@@ -5858,36 +5868,6 @@
     },
     {
       "componente": "windows-sys",
-      "version": "0.60.2",
-      "licenciaDeclarada": "MIT OR Apache-2.0",
-      "fuente": "https://static.crates.io/crates/windows-sys/windows-sys-0.60.2.crate",
-      "crateSha256": "f2f500e4d28234f72040990ec9d39e3a6b950f9f22d3dba18416c35882612bcb",
-      "commit": "4b8893b307719ec23cce698269ca572ef301dc5c",
-      "documentos": [
-        {
-          "archivo": "fuentes/c16f8dcf1a368b83be78d826ea23de4079fe1b4469a0ab9ee20563f37ff3d44b.txt",
-          "sha256": "c16f8dcf1a368b83be78d826ea23de4079fe1b4469a0ab9ee20563f37ff3d44b",
-          "origen": {
-            "tipo": "archivo-crate",
-            "url": "https://static.crates.io/crates/windows-sys/windows-sys-0.60.2.crate",
-            "ruta": "license-apache-2.0",
-            "crateSha256": "f2f500e4d28234f72040990ec9d39e3a6b950f9f22d3dba18416c35882612bcb"
-          }
-        },
-        {
-          "archivo": "fuentes/c2cfccb812fe482101a8f04597dfc5a9991a6b2748266c47ac91b6a5aae15383.txt",
-          "sha256": "c2cfccb812fe482101a8f04597dfc5a9991a6b2748266c47ac91b6a5aae15383",
-          "origen": {
-            "tipo": "archivo-crate",
-            "url": "https://static.crates.io/crates/windows-sys/windows-sys-0.60.2.crate",
-            "ruta": "license-mit",
-            "crateSha256": "f2f500e4d28234f72040990ec9d39e3a6b950f9f22d3dba18416c35882612bcb"
-          }
-        }
-      ]
-    },
-    {
-      "componente": "windows-sys",
       "version": "0.61.2",
       "licenciaDeclarada": "MIT OR Apache-2.0",
       "fuente": "https://static.crates.io/crates/windows-sys/windows-sys-0.61.2.crate",
@@ -5912,36 +5892,6 @@
             "url": "https://static.crates.io/crates/windows-sys/windows-sys-0.61.2.crate",
             "ruta": "license-mit",
             "crateSha256": "ae137229bcbd6cdf0f7b80a31df61766145077ddf49416a728b02cb3921ff3fc"
-          }
-        }
-      ]
-    },
-    {
-      "componente": "windows-targets",
-      "version": "0.53.5",
-      "licenciaDeclarada": "MIT OR Apache-2.0",
-      "fuente": "https://static.crates.io/crates/windows-targets/windows-targets-0.53.5.crate",
-      "crateSha256": "4945f9f551b88e0d65f3db0bc25c33b8acea4d9e41163edf90dcd0b19f9069f3",
-      "commit": "32c3144490c016fe496a0aed769bce60987a2e9d",
-      "documentos": [
-        {
-          "archivo": "fuentes/c16f8dcf1a368b83be78d826ea23de4079fe1b4469a0ab9ee20563f37ff3d44b.txt",
-          "sha256": "c16f8dcf1a368b83be78d826ea23de4079fe1b4469a0ab9ee20563f37ff3d44b",
-          "origen": {
-            "tipo": "archivo-crate",
-            "url": "https://static.crates.io/crates/windows-targets/windows-targets-0.53.5.crate",
-            "ruta": "license-apache-2.0",
-            "crateSha256": "4945f9f551b88e0d65f3db0bc25c33b8acea4d9e41163edf90dcd0b19f9069f3"
-          }
-        },
-        {
-          "archivo": "fuentes/c2cfccb812fe482101a8f04597dfc5a9991a6b2748266c47ac91b6a5aae15383.txt",
-          "sha256": "c2cfccb812fe482101a8f04597dfc5a9991a6b2748266c47ac91b6a5aae15383",
-          "origen": {
-            "tipo": "archivo-crate",
-            "url": "https://static.crates.io/crates/windows-targets/windows-targets-0.53.5.crate",
-            "ruta": "license-mit",
-            "crateSha256": "4945f9f551b88e0d65f3db0bc25c33b8acea4d9e41163edf90dcd0b19f9069f3"
           }
         }
       ]
@@ -6002,36 +5952,6 @@
             "url": "https://static.crates.io/crates/windows-version/windows-version-0.1.7.crate",
             "ruta": "license-mit",
             "crateSha256": "e4060a1da109b9d0326b7262c8e12c84df67cc0dbc9e33cf49e01ccc2eb63631"
-          }
-        }
-      ]
-    },
-    {
-      "componente": "windows_x86_64_msvc",
-      "version": "0.53.1",
-      "licenciaDeclarada": "MIT OR Apache-2.0",
-      "fuente": "https://static.crates.io/crates/windows_x86_64_msvc/windows_x86_64_msvc-0.53.1.crate",
-      "crateSha256": "d6bbff5f0aada427a1e5a6da5f1f98158182f26556f345ac9e04d36d0ebed650",
-      "commit": "d468916ac27a36fb8a12bafc1bf5c0ec2fe92238",
-      "documentos": [
-        {
-          "archivo": "fuentes/c16f8dcf1a368b83be78d826ea23de4079fe1b4469a0ab9ee20563f37ff3d44b.txt",
-          "sha256": "c16f8dcf1a368b83be78d826ea23de4079fe1b4469a0ab9ee20563f37ff3d44b",
-          "origen": {
-            "tipo": "archivo-crate",
-            "url": "https://static.crates.io/crates/windows_x86_64_msvc/windows_x86_64_msvc-0.53.1.crate",
-            "ruta": "license-apache-2.0",
-            "crateSha256": "d6bbff5f0aada427a1e5a6da5f1f98158182f26556f345ac9e04d36d0ebed650"
-          }
-        },
-        {
-          "archivo": "fuentes/c2cfccb812fe482101a8f04597dfc5a9991a6b2748266c47ac91b6a5aae15383.txt",
-          "sha256": "c2cfccb812fe482101a8f04597dfc5a9991a6b2748266c47ac91b6a5aae15383",
-          "origen": {
-            "tipo": "archivo-crate",
-            "url": "https://static.crates.io/crates/windows_x86_64_msvc/windows_x86_64_msvc-0.53.1.crate",
-            "ruta": "license-mit",
-            "crateSha256": "d6bbff5f0aada427a1e5a6da5f1f98158182f26556f345ac9e04d36d0ebed650"
           }
         }
       ]
@@ -6228,20 +6148,20 @@
     },
     {
       "componente": "zip",
-      "version": "4.6.1",
+      "version": "9.6.0",
       "licenciaDeclarada": "MIT",
-      "fuente": "https://static.crates.io/crates/zip/zip-4.6.1.crate",
-      "crateSha256": "caa8cd6af31c3b31c6631b8f483848b91589021b28fffe50adada48d4f4d2ed1",
-      "commit": "56fa5f6e1f3e29d747e5875867e7a647aa612b8c",
+      "fuente": "https://static.crates.io/crates/zip/zip-9.6.0.crate",
+      "crateSha256": "80cc68510ea7553c30a69c732de5278e94183f68765af6c642dbccefd6ec777e",
+      "commit": "ab986cfd822b77d693d98307a3c2505575e4c2eb",
       "documentos": [
         {
-          "archivo": "fuentes/04dc52136d82400b11df5f474949863a70a5d05d2278dec45b99c479494450a6.txt",
-          "sha256": "04dc52136d82400b11df5f474949863a70a5d05d2278dec45b99c479494450a6",
+          "archivo": "fuentes/58545fed1565e42d687aecec6897d35c6d37ccb71479a137c0deb2203e125c79.txt",
+          "sha256": "58545fed1565e42d687aecec6897d35c6d37ccb71479a137c0deb2203e125c79",
           "origen": {
             "tipo": "archivo-crate",
-            "url": "https://static.crates.io/crates/zip/zip-4.6.1.crate",
+            "url": "https://static.crates.io/crates/zip/zip-9.6.0.crate",
             "ruta": "LICENSE",
-            "crateSha256": "caa8cd6af31c3b31c6631b8f483848b91589021b28fffe50adada48d4f4d2ed1"
+            "crateSha256": "80cc68510ea7553c30a69c732de5278e94183f68765af6c642dbccefd6ec777e"
           }
         }
       ]
@@ -6262,6 +6182,76 @@
             "url": "https://static.crates.io/crates/zmij/zmij-1.0.23.crate",
             "ruta": "LICENSE-MIT",
             "crateSha256": "29666d0abbfad1e3dc4dcf6144730dd3a3ab225bbbdac83319345b1b44ccfc1b"
+          }
+        }
+      ]
+    },
+    {
+      "componente": "constant_time_eq",
+      "version": "0.6.1",
+      "licenciaDeclarada": "CC0-1.0 OR MIT-0 OR Apache-2.0",
+      "fuente": "https://static.crates.io/crates/constant_time_eq/constant_time_eq-0.6.1.crate",
+      "crateSha256": "9eb6feb175df65d0a3ccd3e73484e940d0ac664e8034f0519fd49a93db3071d9",
+      "commit": "f5f9476a7f84206ecda2b33f3eb2a3fc1badbbe6",
+      "documentos": [
+        {
+          "archivo": "fuentes/62c7a1e35f56406896d7aa7ca52d0cc0d272ac022b5d2796e7d6905db8a3636a.txt",
+          "sha256": "62c7a1e35f56406896d7aa7ca52d0cc0d272ac022b5d2796e7d6905db8a3636a",
+          "origen": {
+            "tipo": "archivo-crate",
+            "url": "https://static.crates.io/crates/constant_time_eq/constant_time_eq-0.6.1.crate",
+            "ruta": "LICENSE-APACHE",
+            "crateSha256": "9eb6feb175df65d0a3ccd3e73484e940d0ac664e8034f0519fd49a93db3071d9"
+          }
+        },
+        {
+          "archivo": "fuentes/a2010f343487d3f7618affe54f789f5487602331c0a8d03f49e9a7c547cf0499.txt",
+          "sha256": "a2010f343487d3f7618affe54f789f5487602331c0a8d03f49e9a7c547cf0499",
+          "origen": {
+            "tipo": "archivo-crate",
+            "url": "https://static.crates.io/crates/constant_time_eq/constant_time_eq-0.6.1.crate",
+            "ruta": "LICENSE-CC0",
+            "crateSha256": "9eb6feb175df65d0a3ccd3e73484e940d0ac664e8034f0519fd49a93db3071d9"
+          }
+        },
+        {
+          "archivo": "fuentes/9a3aeb3f63659c4c6302d315e1d98784d1e8559858a47ff9562e091bb922d28d.txt",
+          "sha256": "9a3aeb3f63659c4c6302d315e1d98784d1e8559858a47ff9562e091bb922d28d",
+          "origen": {
+            "tipo": "archivo-crate",
+            "url": "https://static.crates.io/crates/constant_time_eq/constant_time_eq-0.6.1.crate",
+            "ruta": "LICENSE-MIT0",
+            "crateSha256": "9eb6feb175df65d0a3ccd3e73484e940d0ac664e8034f0519fd49a93db3071d9"
+          }
+        }
+      ]
+    },
+    {
+      "componente": "typed-path",
+      "version": "0.13.0",
+      "licenciaDeclarada": "MIT OR Apache-2.0",
+      "fuente": "https://static.crates.io/crates/typed-path/typed-path-0.13.0.crate",
+      "crateSha256": "9ce898823d8cd0f028662d2f349694b1af0a5cc9be83f1d213a00d3147445e1e",
+      "commit": "93554f5a6a79a5d98c446fff724967f83cd72b91",
+      "documentos": [
+        {
+          "archivo": "fuentes/62c7a1e35f56406896d7aa7ca52d0cc0d272ac022b5d2796e7d6905db8a3636a.txt",
+          "sha256": "62c7a1e35f56406896d7aa7ca52d0cc0d272ac022b5d2796e7d6905db8a3636a",
+          "origen": {
+            "tipo": "archivo-crate",
+            "url": "https://static.crates.io/crates/typed-path/typed-path-0.13.0.crate",
+            "ruta": "LICENSE-APACHE",
+            "crateSha256": "9ce898823d8cd0f028662d2f349694b1af0a5cc9be83f1d213a00d3147445e1e"
+          }
+        },
+        {
+          "archivo": "fuentes/23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3.txt",
+          "sha256": "23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3",
+          "origen": {
+            "tipo": "archivo-crate",
+            "url": "https://static.crates.io/crates/typed-path/typed-path-0.13.0.crate",
+            "ruta": "LICENSE-MIT",
+            "crateSha256": "9ce898823d8cd0f028662d2f349694b1af0a5cc9be83f1d213a00d3147445e1e"
           }
         }
       ]
