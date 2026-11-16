@@ -1,6 +1,6 @@
 # Avisos de Rust en Druse Comunidad
 
-Este directorio conserva 166 textos originales vinculados a 224 crates del grafo normal Windows x64, con la feature `custom-protocol`. `indice.json` identifica versiones, licencias declaradas, avisos y fuentes; los nombres de `fuentes/` son hashes SHA-256, no nombres de licencia.
+Este directorio conserva 167 textos originales vinculados a 223 crates del grafo normal Windows x64, con la feature `custom-protocol`. `indice.json` identifica versiones, licencias declaradas, avisos y fuentes; los nombres de `fuentes/` son hashes SHA-256, no nombres de licencia.
 
 ## Obtener el código de terceros
 
@@ -10,6 +10,6 @@ Cada entrada contiene una URL `fuente` al archivo `.crate` de esa versión en el
 
 Se contrastaron 402 referencias a documentos: 398 coinciden byte a byte con entradas de archivos `.crate` cuyo SHA-256 corresponde a `Cargo.lock`; cuatro proceden de repositorios upstream en el commit registrado en `.cargo_vcs_info.json`, o del texto oficial MPL enlazado por selectors. Los documentos idénticos se almacenan una sola vez. Se buscaron avisos por nombre también en subdirectorios y en `license_file`; no se tradujeron ni normalizaron finales de línea.
 
-El empaquetado comprueba los hashes de Cargo.lock/Cargo.toml y de cada documento. Un cambio exige revisar y renovar el expediente, no copiar automáticamente avisos de otra versión. La [revisión del 28 de octubre de 2026](../../revisiones/dependencias-rust-2026-10-28.md) contrasta el grafo bloqueado tras actualizar Tauri y sus dependencias, conserva los textos idénticos y añade los dos avisos originales de web-time. Las URL externas se registraron al recopilar; el empaquetado no necesita descargarlas.
+El empaquetado comprueba los hashes de Cargo.lock/Cargo.toml y de cada documento. Un cambio exige revisar y renovar el expediente, no copiar automáticamente avisos de otra versión. La [revisión del 28 de octubre de 2026](../../revisiones/dependencias-rust-2026-10-28.md) contrasta el grafo bloqueado tras actualizar Tauri y sus dependencias, conserva los textos idénticos y añade los dos avisos originales de web-time. La [revisión del 16 de noviembre de 2026](../../revisiones/dependencias-rust-2026-11-16.md) renueva las versiones del actualizador y su pila TLS por avisos de seguridad. Las URL externas se registraron al recopilar; el empaquetado no necesita descargarlas.
 
-El recorrido separa 21 proc-macros y dependencias build/dev. No demuestra qué bytes sobreviven a la optimización, ni cierra obligaciones de código generado, avisos dentro de código fuente, compatibilidad o entrega de fuente correspondiente del conjunto GPL. Debe prepararse el archivo de fuentes de la release antes de cerrar OSS-04. Las bibliotecas nativas y NSIS tienen un expediente separado. La admisión de SignPath sigue pendiente.
+El recorrido separa 22 proc-macros y dependencias build/dev. No demuestra qué bytes sobreviven a la optimización, ni cierra obligaciones de código generado, avisos dentro de código fuente, compatibilidad o entrega de fuente correspondiente del conjunto GPL. Debe prepararse el archivo de fuentes de la release antes de cerrar OSS-04. Las bibliotecas nativas y NSIS tienen un expediente separado. La admisión de SignPath sigue pendiente.
