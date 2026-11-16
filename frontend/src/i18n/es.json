@@ -2565,6 +2565,7 @@
   "reports.look.brand": "Color de marca",
   "reports.color.brand": "Color de marca",
   "reports.identity.confirmDeleteUsed": "¿Borrar esta identidad? {count, plural, one {Se quedará sin logo ni color de marca el tablero} other {Se quedarán sin logo ni color de marca # tableros:}} {dashboards}.",
+  "whatsNew.v1_28_2.secureUpdates": "Las actualizaciones automáticas de Druse se descargan con una conexión segura al día y se descomprimen sin poder escribir fuera de su carpeta.",
   "whatsNew.v1_28_1.reportWorkspace": "Arma reportes con el guardado siempre visible en el editor, abre los ajustes de apariencia cuando los necesites y navega entre conjuntos y tableros en ventanas estrechas.",
   "whatsNew.v1_28_0.templates": "Al guardar un tablero como plantilla puedes incluir su identidad de empresa; quien la aplique en otro equipo recibe el logo y los datos, y Druse avisa antes de añadirlos.",
   "whatsNew.v1_27_0.pdf": "El PDF de un tablero con identidad empieza con el logo y los datos de la empresa, y cada hoja lleva al pie su texto y «Página n de m».",

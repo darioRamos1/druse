@@ -2565,6 +2565,7 @@
   "reports.look.brand": "Brand color",
   "reports.color.brand": "Brand color",
   "reports.identity.confirmDeleteUsed": "Delete this identity? {count, plural, one {This dashboard will lose its logo and brand color:} other {# dashboards will lose their logo and brand color:}} {dashboards}.",
+  "whatsNew.v1_28_2.secureUpdates": "Druse automatic updates now download over an up-to-date secure connection and unpack without being able to write outside their folder.",
   "whatsNew.v1_28_1.reportWorkspace": "Build reports with Save always visible in the editor, open appearance settings when you need them, and navigate datasets and dashboards in narrow windows.",
   "whatsNew.v1_28_0.templates": "When saving a dashboard as a template you can include its company identity; whoever applies it on another computer gets the logo and details, and Druse warns before adding them.",
   "whatsNew.v1_27_0.pdf": "The PDF of a dashboard with an identity starts with the company logo and details, and every sheet carries its footer text and “Page n of m”.",
