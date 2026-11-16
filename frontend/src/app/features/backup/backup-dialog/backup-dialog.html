@@ -90,8 +90,7 @@
             <ul class="warnings">
               @for (warning of progress.warnings; track warning.subject + warning.message) {
                 <li>
-                  <strong>{{ warning.subject }}</strong
-                  >: {{ warning.message }}
+                  <strong>{{ warning.subject }}</strong>: {{ warning.message }}
                 </li>
               }
             </ul>
@@ -421,8 +420,7 @@
               <ul class="warnings">
                 @for (exception of exceptions(); track exception.key) {
                   <li>
-                    <strong>{{ exception.key }}</strong
-                    >: {{ modeLabel(exception.mode) | t }}
+                    <strong>{{ exception.key }}</strong>: {{ modeLabel(exception.mode) | t }}
                   </li>
                 }
               </ul>
